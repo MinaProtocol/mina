@@ -743,7 +743,7 @@ end = struct
             scan_state'
         |> to_staged_ledger_or_error )
     in
-    Logger.info logger
+    Logger.info logger ~module_:__MODULE__ ~location:__LOC__
       "Block info: No of transactions included:%d Coinbase parts:%d Work \
        count:%d Spots available:%d Proofs waiting to be solved:%d"
       user_commands_count cb_parts_count (List.length works) spots_available
@@ -1045,7 +1045,8 @@ end = struct
         match res' with
         | Ok res'' -> if within_capacity res'' then res'' else res
         | Error e ->
-            Logger.error t.logger "%s" (Error.to_string_hum e) ;
+            Logger.error t.logger ~module_:__MODULE__ ~location:__LOC__ "%s"
+              (Error.to_string_hum e) ;
             res
       in
       match count with `One -> by_one t | `Two -> by_one (by_one t)
@@ -1204,7 +1205,7 @@ end = struct
                 Staged_ledger_diff.At_most_one.Zero
             | One x -> One x
             | _ ->
-                Logger.error logger
+                Logger.error logger ~module_:__MODULE__ ~location:__LOC__
                   "Error creating diff: Should have at most one coinbase in \
                    the second pre_diff" ;
                 Zero
@@ -1340,10 +1341,13 @@ end = struct
                   (User_command t) )
           with
           | Error e ->
-              Logger.error logger
-                !"Invalid user command! Error was: %{sexp: Error.t}, command \
-                  was: %{sexp: User_command.With_valid_signature.t}"
-                e t ;
+              Logger.error logger ~module_:__MODULE__ ~location:__LOC__
+                ~metadata:
+                  [ ( "user_command"
+                    , User_command.With_valid_signature.to_yojson t ) ]
+                !"Invalid user command! Error was: %s, command was: \
+                  $user_command"
+                (Error.to_string_hum e) ;
               seq
           | Ok _ -> Sequence.append (Sequence.singleton t) seq )
     in
@@ -1352,7 +1356,8 @@ end = struct
           generate logger completed_works_seq valid_on_this_ledger self
             partitions max_jobs_count unbundled_job_count )
     in
-    Logger.info logger "Block stats: Proofs ready for purchase: %d"
+    Logger.info logger ~module_:__MODULE__ ~location:__LOC__
+      "Block stats: Proofs ready for purchase: %d"
       (Sequence.length completed_works_seq) ;
     trace_event "prediffs done" ;
     { Staged_ledger_diff.With_valid_signatures_and_proofs.diff
@@ -1364,6 +1369,17 @@ let%test_module "test" =
   ( module struct
     module Test_input1 = struct
       open Coda_pow
+
+      module String = struct
+        include String
+
+        let to_yojson s = `String s
+
+        let of_yojson = function
+          | `String s -> Ok s
+          | _ -> Error "expected string"
+      end
+
       module Compressed_public_key = String
 
       module Sok_message = struct
@@ -1387,20 +1403,21 @@ let%test_module "test" =
       end
 
       module User_command = struct
-        type fee = Fee.Unsigned.t [@@deriving sexp, bin_io, compare]
+        type fee = Fee.Unsigned.t [@@deriving sexp, bin_io, compare, yojson]
 
-        type txn_amt = int [@@deriving sexp, bin_io, compare, eq]
+        type txn_amt = int [@@deriving sexp, bin_io, compare, eq, yojson]
 
-        type txn_fee = int [@@deriving sexp, bin_io, compare, eq]
+        type txn_fee = int [@@deriving sexp, bin_io, compare, eq, yojson]
 
         module T = struct
-          type t = txn_amt * txn_fee [@@deriving sexp, bin_io, compare, eq]
+          type t = txn_amt * txn_fee
+          [@@deriving sexp, bin_io, compare, eq, yojson]
         end
 
         include T
 
         module With_valid_signature = struct
-          type t = T.t [@@deriving sexp, bin_io, compare, eq]
+          type t = T.t [@@deriving sexp, bin_io, compare, eq, yojson]
         end
 
         let check : t -> With_valid_signature.t option = fun i -> Some i
@@ -1415,14 +1432,16 @@ let%test_module "test" =
 
       module Fee_transfer = struct
         type public_key = Compressed_public_key.t
-        [@@deriving sexp, bin_io, compare, eq]
+        [@@deriving sexp, bin_io, compare, eq, yojson]
 
-        type fee = Fee.Unsigned.t [@@deriving sexp, bin_io, compare, eq]
+        type fee = Fee.Unsigned.t
+        [@@deriving sexp, bin_io, compare, eq, yojson]
 
-        type single = public_key * fee [@@deriving bin_io, sexp, compare, eq]
+        type single = public_key * fee
+        [@@deriving bin_io, sexp, compare, eq, yojson]
 
         type t = One of single | Two of single * single
-        [@@deriving bin_io, sexp, compare, eq]
+        [@@deriving bin_io, sexp, compare, eq, yojson]
 
         let to_list = function One x -> [x] | Two (x, y) -> [x; y]
 
@@ -1522,7 +1541,7 @@ let%test_module "test" =
       module Ledger_hash = struct
         module Stable = struct
           module V1 = struct
-            type t = int [@@deriving sexp, bin_io, compare, hash, eq]
+            type t = int [@@deriving sexp, bin_io, compare, hash, eq, yojson]
           end
 
           module Latest = V1
@@ -1554,7 +1573,7 @@ let%test_module "test" =
             ; supply_increase: Currency.Amount.t
             ; fee_excess: Fee.Signed.t
             ; proof_type: [`Base | `Merge] }
-          [@@deriving sexp, bin_io, compare, hash]
+          [@@deriving sexp, bin_io, compare, hash, yojson]
 
           let merge s1 s2 =
             let open Or_error.Let_syntax in
@@ -1765,19 +1784,19 @@ let%test_module "test" =
         let proofs_length = 2
 
         type proof = Ledger_proof.Stable.V1.t
-        [@@deriving sexp, bin_io, compare]
+        [@@deriving sexp, bin_io, compare, yojson]
 
         type statement = Ledger_proof_statement.t
-        [@@deriving sexp, bin_io, compare, hash, eq]
+        [@@deriving sexp, bin_io, compare, hash, eq, yojson]
 
-        type fee = Fee.Unsigned.t [@@deriving sexp, bin_io, compare]
+        type fee = Fee.Unsigned.t [@@deriving sexp, bin_io, compare, yojson]
 
         type public_key = Compressed_public_key.t
-        [@@deriving sexp, bin_io, compare]
+        [@@deriving sexp, bin_io, compare, yojson]
 
         module T = struct
           type t = {fee: fee; proofs: proof list; prover: public_key}
-          [@@deriving sexp, bin_io, compare]
+          [@@deriving sexp, bin_io, compare, yojson]
         end
 
         include T
@@ -1811,32 +1830,33 @@ let%test_module "test" =
 
       module Staged_ledger_diff = struct
         type completed_work = Transaction_snark_work.t
-        [@@deriving sexp, bin_io, compare]
+        [@@deriving sexp, bin_io, compare, yojson]
 
         type completed_work_checked = Transaction_snark_work.Checked.t
-        [@@deriving sexp, bin_io, compare]
+        [@@deriving sexp, bin_io, compare, yojson]
 
-        type user_command = User_command.t [@@deriving sexp, bin_io, compare]
+        type user_command = User_command.t
+        [@@deriving sexp, bin_io, compare, yojson]
 
         type fee_transfer_single = Fee_transfer.single
-        [@@deriving sexp, bin_io]
+        [@@deriving sexp, bin_io, yojson]
 
         type user_command_with_valid_signature =
           User_command.With_valid_signature.t
-        [@@deriving sexp, bin_io, compare]
+        [@@deriving sexp, bin_io, compare, yojson]
 
         type public_key = Compressed_public_key.t
-        [@@deriving sexp, bin_io, compare]
+        [@@deriving sexp, bin_io, compare, yojson]
 
         type staged_ledger_hash = Staged_ledger_hash.t
-        [@@deriving sexp, bin_io, compare]
+        [@@deriving sexp, bin_io, compare, yojson]
 
         module At_most_two = struct
           type 'a t =
             | Zero
             | One of 'a option
             | Two of ('a * 'a option) option
-          [@@deriving sexp, bin_io]
+          [@@deriving sexp, bin_io, yojson]
 
           let increase t ws =
             match (t, ws) with
@@ -1849,7 +1869,8 @@ let%test_module "test" =
         end
 
         module At_most_one = struct
-          type 'a t = Zero | One of 'a option [@@deriving sexp, bin_io]
+          type 'a t = Zero | One of 'a option
+          [@@deriving sexp, bin_io, yojson]
 
           let increase t ws =
             match (t, ws) with
@@ -1862,18 +1883,18 @@ let%test_module "test" =
           { completed_works: completed_work list
           ; user_commands: user_command list
           ; coinbase: fee_transfer_single At_most_two.t }
-        [@@deriving sexp, bin_io]
+        [@@deriving sexp, bin_io, yojson]
 
         type pre_diff_with_at_most_one_coinbase =
           { completed_works: completed_work list
           ; user_commands: user_command list
           ; coinbase: fee_transfer_single At_most_one.t }
-        [@@deriving sexp, bin_io]
+        [@@deriving sexp, bin_io, yojson]
 
         type diff =
           pre_diff_with_at_most_two_coinbase
           * pre_diff_with_at_most_one_coinbase option
-        [@@deriving sexp, bin_io]
+        [@@deriving sexp, bin_io, yojson]
 
         module Stable = struct
           module V1 = struct
@@ -1887,29 +1908,29 @@ let%test_module "test" =
 
         type t = Stable.Latest.t =
           {diff: diff; prev_hash: staged_ledger_hash; creator: public_key}
-        [@@deriving sexp]
+        [@@deriving sexp, yojson]
 
         module With_valid_signatures_and_proofs = struct
           type pre_diff_with_at_most_two_coinbase =
             { completed_works: completed_work_checked list
             ; user_commands: user_command_with_valid_signature list
             ; coinbase: fee_transfer_single At_most_two.t }
-          [@@deriving sexp]
+          [@@deriving sexp, yojson]
 
           type pre_diff_with_at_most_one_coinbase =
             { completed_works: completed_work_checked list
             ; user_commands: user_command_with_valid_signature list
             ; coinbase: fee_transfer_single At_most_one.t }
-          [@@deriving sexp]
+          [@@deriving sexp, yojson]
 
           type diff =
             pre_diff_with_at_most_two_coinbase
             * pre_diff_with_at_most_one_coinbase option
-          [@@deriving sexp]
+          [@@deriving sexp, yojson]
 
           type t =
             {diff: diff; prev_hash: staged_ledger_hash; creator: public_key}
-          [@@deriving sexp]
+          [@@deriving sexp, yojson]
 
           let user_commands t =
             (fst t.diff).user_commands

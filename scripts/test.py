@@ -56,6 +56,11 @@ def fail(msg):
     print('ERROR: %s' % msg)
     exit(1)
 
+def fail_with_log(msg, log):
+    with open(log, 'r') as file:
+        print(file.read())
+    fail(msg)
+
 def test_pattern(pattern, string):
     return (pattern and (pattern == '*' or pattern == string))
 
@@ -107,13 +112,21 @@ def run(args):
                 on_failure()
         wet('$ ' + cmd, do)
 
-    coda_exe_path = 'app/cli/src/coda.exe'
-    if not(os.path.exists('dune-project')):
-        coda_exe_path = os.path.join('src', coda_exe_path)
+
+    logproc_filter = '.level in ["Warn", "Error", "Fatal", "Faulty_peer"]'
     coda_build_path = './_build/default'
+
+    coda_app_path = 'app' if os.path.exists('dune-project') else 'src/app'
+    coda_exe_path = os.path.join(coda_app_path, 'cli/src/coda.exe')
     coda_exe = os.path.join(coda_build_path, coda_exe_path)
 
-    jq_filter = '.level=="Warn" or .level=="Error" or .level=="Faulty_peer" or .level=="Fatal"'
+    if os.system('which logproc') == 0:
+        logproc_exe = 'logproc'
+        build_targets = coda_exe
+    else:
+        logproc_exe_path = os.path.join(coda_app_path, 'logproc/logproc.exe')
+        logproc_exe = os.path.join(coda_build_path, logproc_exe_path)
+        build_targets = '%s %s' % (coda_exe_path, logproc_exe_path)
 
     test_permutations = filter_test_permutations(args.whitelist_patterns, args.blacklist_patterns)
     if len(test_permutations) == 0:
@@ -149,7 +162,7 @@ def run(args):
         build_log = os.path.join(profile_dir, 'build.log')
         run_cmd(
             'dune build --display=progress --profile=%s %s 2> %s'
-                % (profile, coda_exe_path, build_log),
+                % (profile, build_targets, build_log),
             lambda: fail_with_log('building %s failed' % profile, build_log)
         )
 
@@ -158,7 +171,7 @@ def run(args):
             log = os.path.join(profile_dir, '%s.log' % test)
             cmd = 'set -o pipefail && %s integration-test %s 2>&1 ' % (coda_exe, test)
             cmd += '| grep -v "* Elements of w " | grep -v "elements in proof:" '
-            cmd += '| tee \'%s\' | ./scripts/jqproc.sh -f \'%s\' ' % (log, jq_filter)
+            cmd += '| tee \'%s\' | %s -f \'%s\' ' % (log, logproc_exe, logproc_filter)
             print('Running: %s' % (cmd))
             run_cmd(cmd, lambda: fail('Test "%s:%s" failed' % (profile, test)))
 

@@ -68,7 +68,6 @@ module Make (Inputs : Inputs_intf) :
 
   let run ~logger ~network ~time_controller ~collected_transitions ~frontier
       ~network_transition_reader ~proposer_transition_reader ~clear_reader =
-    let logger = Logger.child logger __MODULE__ in
     let valid_transition_pipe_capacity = 10 in
     let valid_transition_reader, valid_transition_writer =
       Strict_pipe.create

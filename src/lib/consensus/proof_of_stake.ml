@@ -272,10 +272,10 @@ end
 
 module Epoch_ledger = struct
   type ('ledger_hash, 'amount) t = {hash: 'ledger_hash; total_currency: 'amount}
-  [@@deriving sexp, bin_io, eq, compare, hash]
+  [@@deriving sexp, bin_io, eq, compare, hash, to_yojson]
 
   type value = (Coda_base.Frozen_ledger_hash.t, Amount.t) t
-  [@@deriving sexp, bin_io, eq, compare, hash]
+  [@@deriving sexp, bin_io, eq, compare, hash, to_yojson]
 
   type var = (Coda_base.Frozen_ledger_hash.var, Amount.var) t
 
@@ -422,7 +422,7 @@ module Vrf = struct
 
   module Output = struct
     type t = Random_oracle.Digest.t
-    [@@deriving sexp, bin_io, eq, compare, hash]
+    [@@deriving sexp, bin_io, eq, compare, hash, yojson]
 
     type var = Random_oracle.Digest.Checked.t
 
@@ -618,7 +618,8 @@ module Vrf = struct
     let open Local_state in
     let open Snapshot in
     let open Option.Let_syntax in
-    Logger.info logger "Checking vrf evaluations at %d:%d" (Epoch.to_int epoch)
+    Logger.info logger ~module_:__MODULE__ ~location:__LOC__
+      "Checking vrf evaluations at %d:%d" (Epoch.to_int epoch)
       (Epoch.Slot.to_int slot) ;
     let%bind epoch_snapshot = epoch_snapshot in
     with_return (fun {return} ->
@@ -627,7 +628,7 @@ module Vrf = struct
             let vrf_result =
               T.eval ~private_key {epoch; slot; seed; delegator}
             in
-            Logger.info logger
+            Logger.info logger ~module_:__MODULE__ ~location:__LOC__
               !"vrf result for %d: %d/%d -> %{sexp: Bignum_bigint.t}"
               (Coda_base.Account.Index.to_int delegator)
               (Balance.to_int balance)
@@ -651,11 +652,11 @@ module Epoch_data = struct
     ; start_checkpoint: 'protocol_state_hash
     ; lock_checkpoint: 'protocol_state_hash
     ; length: 'length }
-  [@@deriving sexp, bin_io, eq, compare, hash]
+  [@@deriving sexp, bin_io, eq, compare, hash, to_yojson]
 
   type value =
     (Epoch_ledger.value, Epoch_seed.t, Coda_base.State_hash.t, Length.t) t
-  [@@deriving sexp, bin_io, eq, compare, hash]
+  [@@deriving sexp, bin_io, eq, compare, hash, to_yojson]
 
   type var =
     ( Epoch_ledger.var
@@ -817,7 +818,7 @@ module Consensus_state = struct
     ; curr_slot: 'slot
     ; last_epoch_data: 'epoch_data
     ; curr_epoch_data: 'epoch_data }
-  [@@deriving sexp, bin_io, eq, compare, hash]
+  [@@deriving sexp, bin_io, eq, compare, hash, to_yojson]
 
   module Value = struct
     module Stable = struct
@@ -1244,10 +1245,10 @@ end
 let select ~existing ~candidate ~logger =
   let open Consensus_state in
   let open Epoch_data in
-  let logger = Logger.child logger "proof_of_stake" in
   let string_of_choice = function `Take -> "Take" | `Keep -> "Keep" in
   let log_result choice msg =
-    Logger.debug logger "RESULT: %s -- %s" (string_of_choice choice) msg
+    Logger.debug logger ~module_:__MODULE__ ~location:__LOC__
+      "RESULT: %s -- %s" (string_of_choice choice) msg
   in
   let log_choice ~precondition_msg ~choice_msg choice =
     let choice_msg =
@@ -1258,11 +1259,12 @@ let select ~existing ~candidate ~logger =
     let msg = Printf.sprintf "(%s) && (%s)" precondition_msg choice_msg in
     log_result choice msg
   in
-  Logger.info logger "Selecting best consensus state" ;
-  Logger.trace logger
+  Logger.info logger ~module_:__MODULE__ ~location:__LOC__
+    "Selecting best consensus state" ;
+  Logger.trace logger ~module_:__MODULE__ ~location:__LOC__
     !"existing consensus state: %{sexp:Consensus_state.Value.t}"
     existing ;
-  Logger.trace logger
+  Logger.trace logger ~module_:__MODULE__ ~location:__LOC__
     !"candidate consensus state: %{sexp:Consensus_state.Value.t}"
     candidate ;
   (* TODO: add fork_before_checkpoint check *)
@@ -1352,13 +1354,13 @@ let next_proposal now (state : Consensus_state.Value.t) ~local_state ~keypair
   let open Consensus_state in
   let open Epoch_data in
   let open Keypair in
-  let logger = Logger.child logger "proof_of_stake" in
-  Logger.info logger "Checking for next proposal..." ;
+  Logger.info logger ~module_:__MODULE__ ~location:__LOC__
+    "Checking for next proposal..." ;
   let epoch, slot =
     Epoch.epoch_and_slot_of_time_exn
       (Time.of_span_since_epoch (Time.Span.of_ms now))
   in
-  Logger.info logger
+  Logger.info logger ~module_:__MODULE__ ~location:__LOC__
     "systime: %d, epoch-slot@systime: %08d-%04d, starttime@epoch@systime: %d"
     (Int64.to_int now) (Epoch.to_int epoch) (Epoch.Slot.to_int slot)
     ( Int64.to_int @@ Time.Span.to_ms @@ Time.to_span_since_epoch
@@ -1371,7 +1373,7 @@ let next_proposal now (state : Consensus_state.Value.t) ~local_state ~keypair
      * up to date with the epoch, those would be the last vrf inputs.
     *)
     let epoch_data =
-      Logger.info logger
+      Logger.info logger ~module_:__MODULE__ ~location:__LOC__
         !"Selecting correct epoch data from state -- epoch by time: %d, state \
           epoch: %d, state epoch length: %d"
         (Epoch.to_int epoch)
@@ -1388,7 +1390,7 @@ let next_proposal now (state : Consensus_state.Value.t) ~local_state ~keypair
       else if epoch_transitioning then state.curr_epoch_data
         (* If the epoch we are in is none of the above, something is wrong. *)
       else (
-        Logger.error logger
+        Logger.error logger ~module_:__MODULE__ ~location:__LOC__
           "system time is out of sync with protocol state time" ;
         failwith "System time is out of sync. (hint: setup NTP if you haven't)" )
     in
@@ -1407,12 +1409,12 @@ let next_proposal now (state : Consensus_state.Value.t) ~local_state ~keypair
       in
       ( match snapshot with
       | None ->
-          Logger.info logger
+          Logger.info logger ~module_:__MODULE__ ~location:__LOC__
             "Unable to check vrf evaluation: %s_epoch_ledger does not exist \
              in local state"
             source
       | Some snapshot ->
-          Logger.info logger
+          Logger.info logger ~module_:__MODULE__ ~location:__LOC__
             !"using %s_epoch_snapshot root hash %{sexp:Coda_base.Ledger_hash.t}"
             source
             (Coda_base.Sparse_ledger.merkle_root snapshot.ledger) ) ;
@@ -1438,7 +1440,8 @@ let next_proposal now (state : Consensus_state.Value.t) ~local_state ~keypair
   let ms_since_epoch = Fn.compose Time.Span.to_ms Time.to_span_since_epoch in
   match next_slot with
   | Some (next_slot, data) ->
-      Logger.info logger "Proposing in %d slots"
+      Logger.info logger ~module_:__MODULE__ ~location:__LOC__
+        "Proposing in %d slots"
         (Epoch.Slot.to_int next_slot - Epoch.Slot.to_int slot) ;
       if Epoch.Slot.equal slot next_slot then `Propose_now data
       else
@@ -1448,7 +1451,7 @@ let next_proposal now (state : Consensus_state.Value.t) ~local_state ~keypair
           , data )
   | None ->
       let epoch_end_time = Epoch.end_time epoch |> ms_since_epoch in
-      Logger.info logger
+      Logger.info logger ~module_:__MODULE__ ~location:__LOC__
         "No slots won in this epoch. Waiting for next epoch, @%d"
         (Int64.to_int epoch_end_time) ;
       `Check_again epoch_end_time

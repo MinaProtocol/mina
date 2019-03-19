@@ -103,7 +103,7 @@ module type Network_intf = sig
 end
 
 module type Transition_frontier_Breadcrumb_intf = sig
-  type t [@@deriving sexp, eq, compare]
+  type t [@@deriving sexp, eq, compare, to_yojson]
 
   type display [@@deriving yojson]
 
@@ -549,7 +549,7 @@ module type Bootstrap_controller_intf = sig
   type ledger_db
 
   val run :
-       parent_log:Logger.t
+       logger:Logger.t
     -> network:network
     -> frontier:transition_frontier
     -> ledger_db:ledger_db

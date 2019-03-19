@@ -92,7 +92,7 @@ end
 module Consensus_state = struct
   type ('length, 'public_key) t_ =
     {length: 'length; signer_public_key: 'public_key}
-  [@@deriving eq, bin_io, sexp, hash, compare]
+  [@@deriving eq, bin_io, sexp, hash, compare, to_yojson]
 
   type display = {length: string} [@@deriving yojson]
 

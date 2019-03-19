@@ -258,12 +258,11 @@ module Make (Inputs : Inputs_intf) :
             in
             Some (protocol_state, internal_transition) ) )
 
-  let run ~parent_log ~get_completed_work ~transaction_pool ~time_controller
+  let run ~logger ~get_completed_work ~transaction_pool ~time_controller
       ~keypair ~consensus_local_state ~frontier_reader ~transition_writer =
     trace_task "proposer" (fun () ->
-        let logger = Logger.child parent_log __MODULE__ in
         let log_bootstrap_mode () =
-          Logger.info logger
+          Logger.info logger ~module_:__MODULE__ ~location:__LOC__
             "Bootstrapping right now. Cannot generate new blockchains or \
              schedule event"
         in
@@ -274,10 +273,9 @@ module Make (Inputs : Inputs_intf) :
           | None -> Interruptible.return (log_bootstrap_mode ())
           | Some frontier -> (
               let crumb = Transition_frontier.best_tip frontier in
-              Logger.trace logger
-                !"Begining to propose off of crumb %{sexp: Breadcrumb.t}%!"
-                crumb ;
-              Core.printf !"%!" ;
+              Logger.trace logger ~module_:__MODULE__ ~location:__LOC__
+                ~metadata:[("breadcrumb", Breadcrumb.to_yojson crumb)]
+                !"Begining to propose off of crumb $breadcrumb%!" ;
               let previous_protocol_state, previous_protocol_state_proof =
                 let transition : External_transition.Verified.t =
                   (Breadcrumb.transition_with_hash crumb).data
@@ -303,7 +301,6 @@ module Make (Inputs : Inputs_intf) :
               | None -> Interruptible.return ()
               | Some (protocol_state, internal_transition) ->
                   Debug_assert.debug_assert (fun () ->
-                      let logger = Logger.child logger "Assert_selection" in
                       [%test_result: [`Take | `Keep]]
                         (Consensus_mechanism.select
                            ~existing:
@@ -342,17 +339,21 @@ module Make (Inputs : Inputs_intf) :
                             ~next_state:protocol_state internal_transition )
                     with
                     | Error err ->
-                        Logger.error logger
+                        Logger.error logger ~module_:__MODULE__
+                          ~location:__LOC__
                           "failed to prove generated protocol state: %s"
                           (Error.to_string_hum err) ;
                         return ()
                     | Ok protocol_state_proof ->
                         let span = Time.diff (Time.now time_controller) t0 in
-                        Logger.info logger
-                          !"Protocol_state_proof proving time took: %{sexp: \
-                            int64}ms\n\
-                            %!"
-                          (Time.Span.to_ms span) ;
+                        Logger.info logger ~module_:__MODULE__
+                          ~location:__LOC__
+                          ~metadata:
+                            [ ( "proving_time"
+                              , `Int (Time.Span.to_ms span |> Int64.to_int_exn)
+                              ) ]
+                          !"Protocol_state_proof proving time took: \
+                            $proving_time%!" ;
                         (* since we generated this transition, we do not need to verify it *)
                         let (`I_swear_this_is_safe_see_my_comment
                               external_transition) =

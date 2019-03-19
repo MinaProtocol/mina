@@ -11,7 +11,7 @@ module Query = struct
         | What_hash of 'addr
         | What_contents of 'addr
         | Num_accounts
-      [@@deriving bin_io, sexp]
+      [@@deriving bin_io, sexp, yojson]
     end
 
     module Latest = V1
@@ -22,7 +22,7 @@ module Query = struct
     | What_hash of 'addr
     | What_contents of 'addr
     | Num_accounts
-  [@@deriving sexp]
+  [@@deriving sexp, yojson]
 end
 
 module Answer = struct
@@ -32,7 +32,7 @@ module Answer = struct
         | Has_hash of 'addr * 'hash
         | Contents_are of 'addr * 'account list
         | Num_accounts of int * 'hash
-      [@@deriving bin_io, sexp]
+      [@@deriving bin_io, sexp, yojson]
     end
 
     module Latest = V1
@@ -43,20 +43,20 @@ module Answer = struct
     | Has_hash of 'addr * 'hash
     | Contents_are of 'addr * 'account list
     | Num_accounts of int * 'hash
-  [@@deriving sexp]
+  [@@deriving sexp, yojson]
 end
 
 module type Inputs_intf = sig
   module Addr : Merkle_address.S
 
   module Account : sig
-    type t [@@deriving bin_io, sexp]
+    type t [@@deriving bin_io, sexp, yojson]
   end
 
   module Hash : Merkle_ledger.Intf.Hash with type account := Account.t
 
   module Root_hash : sig
-    type t [@@deriving eq, sexp]
+    type t [@@deriving eq, sexp, yojson]
 
     val to_hash : t -> Hash.t
   end
@@ -97,12 +97,12 @@ module type S = sig
   module Responder : sig
     type t
 
-    val create : merkle_tree -> (query -> unit) -> parent_log:Logger.t -> t
+    val create : merkle_tree -> (query -> unit) -> logger:Logger.t -> t
 
     val answer_query : t -> query -> answer
   end
 
-  val create : merkle_tree -> parent_log:Logger.t -> t
+  val create : merkle_tree -> logger:Logger.t -> t
 
   val answer_writer :
     t -> (root_hash * answer) Envelope.Incoming.t Linear_pipe.Writer.t
@@ -307,13 +307,13 @@ end = struct
        filling in empty hashes for the rest amounts to the correct hash. *)
 
   module Responder = struct
-    type t = {mt: MT.t; f: query -> unit; log: Logger.t}
+    type t = {mt: MT.t; f: query -> unit; logger: Logger.t}
 
-    let create : MT.t -> (query -> unit) -> parent_log:Logger.t -> t =
-     fun mt f ~parent_log -> {mt; f; log= parent_log}
+    let create : MT.t -> (query -> unit) -> logger:Logger.t -> t =
+     fun mt f ~logger -> {mt; f; logger}
 
     let answer_query : t -> query -> answer =
-     fun {mt; f; log} q ->
+     fun {mt; f; logger} q ->
       f q ;
       match q with
       | What_hash a -> Has_hash (a, MT.get_inner_hash_at_addr_exn mt a)
@@ -337,11 +337,19 @@ end = struct
                   else (expected_address, false) )
             in
             if not is_compact then
-              Logger.error log
-                !"Missing an account at address: %{sexp:Addr.t} inside the \
-                  list: %{sexp:(Addr.t * Account.t) list}"
-                (Option.value_exn missing_address)
-                addresses_and_accounts
+              Logger.error logger ~module_:__MODULE__ ~location:__LOC__
+                ~metadata:
+                  [ ( "missing_address"
+                    , Addr.to_yojson (Option.value_exn missing_address) )
+                  ; ( "addresses_and_accounts"
+                    , `List
+                        (List.map addresses_and_accounts
+                           ~f:(fun (addr, account) ->
+                             `Tuple
+                               [Addr.to_yojson addr; Account.to_yojson account]
+                         )) ) ]
+                "Missing an account at address: $missing_address inside the \
+                 list: $addresses_and_accounts"
             else ()
           else () ;
           Contents_are (a, accounts)
@@ -363,7 +371,7 @@ end = struct
     { mutable desired_root: Root_hash.t option
     ; tree: MT.t
     ; mutable validity: Valid.t
-    ; log: Logger.t
+    ; logger: Logger.t
     ; answers: (Root_hash.t * answer) Envelope.Incoming.t Linear_pipe.Reader.t
     ; answer_writer:
         (Root_hash.t * answer) Envelope.Incoming.t Linear_pipe.Writer.t
@@ -390,17 +398,20 @@ end = struct
 
   let expect_children : t -> Addr.t -> Hash.t -> unit =
    fun t parent_addr expected ->
-    Logger.trace t.log
-      !"Expecting children parent %{sexp: Addr.t}, expected: %{sexp: Hash.t}"
-      parent_addr expected ;
+    Logger.trace t.logger ~module_:__MODULE__ ~location:__LOC__
+      ~metadata:
+        [ ("parent_address", Addr.to_yojson parent_addr)
+        ; ("hash", Hash.to_yojson expected) ]
+      "Expecting children parent $parent_address, expected: $hash" ;
     Addr.Table.add_exn t.waiting_parents ~key:parent_addr
       ~data:{expected; children= []}
 
   let expect_content : t -> Addr.t -> Hash.t -> unit =
    fun t addr expected ->
-    Logger.trace t.log
-      !"Expecting content addr %{sexp: Addr.t}, expected: %{sexp: Hash.t}"
-      addr expected ;
+    Logger.trace t.logger ~module_:__MODULE__ ~location:__LOC__
+      ~metadata:
+        [("address", Addr.to_yojson addr); ("hash", Hash.to_yojson expected)]
+      "Expecting content addr $address, expected: $hash" ;
     Addr.Table.add_exn t.waiting_content ~key:addr ~data:expected
 
   (* TODO #435: verify content hash matches expected and blame the peer who gave it to us *)
@@ -518,12 +529,15 @@ end = struct
   let main_loop t =
     let handle_answer env =
       let root_hash, a = Envelope.Incoming.data env in
-      Logger.trace t.log !"Handle answer for %{sexp: Root_hash.t}" root_hash ;
+      Logger.trace t.logger ~module_:__MODULE__ ~location:__LOC__
+        ~metadata:[("root_hash", Root_hash.to_yojson root_hash)]
+        "Handle answer for $root_hash" ;
       if not (Root_hash.equal root_hash (desired_root_exn t)) then (
-        Logger.trace t.log
-          !"My desired root was %{sexp: Root_hash.t}, so I'm ignoring %{sexp: \
-            Root_hash.t}"
-          (desired_root_exn t) root_hash ;
+        Logger.trace t.logger ~module_:__MODULE__ ~location:__LOC__
+          ~metadata:
+            [ ("desired_hash", Root_hash.to_yojson (desired_root_exn t))
+            ; ("ignored_hash", Root_hash.to_yojson root_hash) ]
+          "My desired root was $desired_hash, so I'm ignoring $ignored_hash" ;
         () )
       else
         let res =
@@ -532,12 +546,16 @@ end = struct
             match add_child_hash_to t addr h' with
             (* TODO #435: Stick this in a log, punish the sender *)
             | Error e ->
-                Logger.faulty_peer t.log
-                  !"Got error from when trying to add child_hash %{sexp: \
-                    Hash.t} %s %{sexp: Envelope.Sender.t}"
-                  h' (Error.to_string_hum e)
-                  (Envelope.Incoming.sender env) ;
-                ()
+                Logger.faulty_peer t.logger ~module_:__MODULE__
+                  ~location:__LOC__
+                  ~metadata:
+                    [ ("child_hash", Hash.to_yojson h')
+                    ; ( "sender"
+                      , Envelope.Sender.to_yojson
+                          (Envelope.Incoming.sender env) ) ]
+                  "Got error from when trying to add child_hash $child_hash \
+                   %s $sender"
+                  (Error.to_string_hum e)
             | Ok (`Good children_to_verify) ->
                 (* TODO #312: Make sure we don't write too much *)
                 List.iter children_to_verify ~f:(fun (addr, hash) ->
@@ -554,8 +572,8 @@ end = struct
           | Num_accounts (n, h) -> num_accounts t n h
         in
         if Valid.completely_fresh t.validity then (
-          Logger.trace t.log
-            !"Snarked database sync'd. Completely fresh, all done" ;
+          Logger.trace t.logger ~module_:__MODULE__ ~location:__LOC__
+            "Snarked database sync'd. Completely fresh, all done" ;
           all_done t res )
         else res
     in
@@ -569,10 +587,12 @@ end = struct
     in
     if not should_skip then (
       Option.iter t.desired_root ~f:(fun root_hash ->
-          Logger.info t.log
-            !"new_goal: changing target from %{sexp:Root_hash.t} to \
-              %{sexp:Root_hash.t}"
-            root_hash h ) ;
+          Logger.info t.logger ~module_:__MODULE__ ~location:__LOC__
+            ~metadata:
+              [ ("old_root_hash", Root_hash.to_yojson root_hash)
+              ; ("new_root_hash", Root_hash.to_yojson h) ]
+            "new_goal: changing target from $old_root_hash to $new_root_hash"
+      ) ;
       Ivar.fill_if_empty t.validity_listener
         (`Target_changed (t.desired_root, h)) ;
       t.validity_listener <- Ivar.create () ;
@@ -582,7 +602,8 @@ end = struct
       Linear_pipe.write_without_pushback_if_open t.queries (h, Num_accounts) ;
       `New )
     else (
-      Logger.info t.log "new_goal to same hash, not doing anything" ;
+      Logger.info t.logger ~module_:__MODULE__ ~location:__LOC__
+        "new_goal to same hash, not doing anything" ;
       `Repeat )
 
   let rec valid_tree t =
@@ -607,13 +628,13 @@ end = struct
     new_goal t rh |> ignore ;
     wait_until_valid t rh
 
-  let create mt ~parent_log =
+  let create mt ~logger =
     let qr, qw = Linear_pipe.create () in
     let ar, aw = Linear_pipe.create () in
     let t =
       { desired_root= None
       ; tree= mt
-      ; log= Logger.child parent_log __MODULE__
+      ; logger
       ; validity= Valid.create ()
       ; answers= ar
       ; answer_writer= aw

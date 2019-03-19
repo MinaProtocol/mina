@@ -10,7 +10,7 @@ module type S = sig
     { staged_ledger_hash: 'staged_ledger_hash
     ; snarked_ledger_hash: 'snarked_ledger_hash
     ; timestamp: 'time }
-  [@@deriving sexp, eq, compare, fields]
+  [@@deriving sexp, eq, compare, fields, yojson]
 
   module Value : sig
     module Stable : sig
@@ -20,13 +20,13 @@ module type S = sig
           , Frozen_ledger_hash.Stable.V1.t
           , Block_time.Stable.V1.t )
           t_
-        [@@deriving bin_io, sexp, eq, compare, hash]
+        [@@deriving bin_io, sexp, eq, compare, hash, yojson]
       end
 
       module Latest : module type of V1
     end
 
-    type t = Stable.Latest.t [@@deriving sexp, eq, compare, hash]
+    type t = Stable.Latest.t [@@deriving sexp, eq, compare, hash, yojson]
   end
 
   include
@@ -100,7 +100,7 @@ end) : S = struct
             , Frozen_ledger_hash.Stable.V1.t
             , Block_time.Stable.V1.t )
             t_
-          [@@deriving bin_io, sexp, eq, compare, hash]
+          [@@deriving bin_io, sexp, eq, compare, hash, yojson]
         end
 
         include T
@@ -120,7 +120,7 @@ end) : S = struct
     end
 
     (* bin_io omitted *)
-    type t = Stable.Latest.t [@@deriving sexp, eq, compare, hash]
+    type t = Stable.Latest.t [@@deriving sexp, eq, compare, hash, yojson]
   end
 
   type var =
