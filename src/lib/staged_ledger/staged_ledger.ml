@@ -1817,21 +1817,37 @@ let%test_module "test" =
         type public_key = Compressed_public_key.t
         [@@deriving sexp, bin_io, compare, yojson]
 
-        module T = struct
-          type t = {fee: fee; proofs: proof list; prover: public_key}
-          [@@deriving sexp, bin_io, compare, yojson]
-        end
-
-        include T
-
-        module Statement = struct
-          module T = struct
-            type t = statement list
-            [@@deriving sexp, bin_io, compare, hash, eq]
+        module Stable = struct
+          module V1 = struct
+            type t = {fee: fee; proofs: proof list; prover: public_key}
+            [@@deriving sexp, bin_io, compare, yojson]
           end
 
-          include T
-          include Hashable.Make_binable (T)
+          module Latest = V1
+        end
+
+        type t = Stable.Latest.t =
+          {fee: fee; proofs: proof list; prover: public_key}
+        [@@deriving sexp, compare]
+
+        module Statement = struct
+          module Stable = struct
+            module V1 = struct
+              module T = struct
+                type t = statement list
+                [@@deriving sexp, bin_io, compare, hash, eq]
+              end
+
+              include T
+              include Hashable.Make_binable (T)
+            end
+
+            module Latest = V1
+          end
+
+          type t = Stable.Latest.t [@@deriving sexp, compare, hash, eq]
+
+          include Hashable.Make (Stable.Latest)
 
           let gen =
             Quickcheck.Generator.list_with_length proofs_length
@@ -1841,7 +1857,11 @@ let%test_module "test" =
         type unchecked = t
 
         module Checked = struct
-          include T
+          module Stable = Stable
+
+          type t = Stable.Latest.t =
+            {fee: fee; proofs: proof list; prover: public_key}
+          [@@deriving sexp, compare]
 
           let create_unsafe = Fn.id
         end
@@ -1852,10 +1872,13 @@ let%test_module "test" =
       end
 
       module Staged_ledger_diff = struct
-        type completed_work = Transaction_snark_work.t
+        (* TODO : version *)
+        type completed_work = Transaction_snark_work.Stable.V1.t
         [@@deriving sexp, bin_io, compare, yojson]
 
-        type completed_work_checked = Transaction_snark_work.Checked.t
+        (* TODO : version *)
+        type completed_work_checked =
+          Transaction_snark_work.Checked.Stable.V1.t
         [@@deriving sexp, bin_io, compare, yojson]
 
         type user_command = User_command.t
