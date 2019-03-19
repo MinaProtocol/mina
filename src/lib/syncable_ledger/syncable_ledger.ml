@@ -514,7 +514,7 @@ end = struct
   let handle_node t addr exp_hash =
     if Addr.depth addr >= MT.depth - account_subtree_height then (
       expect_content t addr exp_hash ;
-      Linear_pipe.write_without_pushback t.queries
+      Linear_pipe.write_without_pushback_if_open t.queries
         (desired_root_exn t, What_contents addr) )
     else (
       expect_children t addr exp_hash ;
