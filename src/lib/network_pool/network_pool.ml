@@ -150,7 +150,9 @@ let%test_module "network pool test" =
           ~frontier_broadcast_pipe:frontier_broadcast_pipe_r
       in
       let work = 1 in
-      let priced_proof = {Mock_snark_pool_diff.proof= 0; fee= 0} in
+      let priced_proof =
+        {Mock_snark_pool_diff.Priced_proof.proof= 0; fee= 0}
+      in
       let command = Snark_pool_diff.Add_solved_work (work, priced_proof) in
       (fun () ->
         don't_wait_for
@@ -173,7 +175,8 @@ let%test_module "network pool test" =
           List.map works ~f:(fun work ->
               Envelope.Incoming.local
                 (Snark_pool_diff.Add_solved_work
-                   (work, {Mock_snark_pool_diff.proof= 0; fee= 0})) )
+                   (work, Mock_snark_pool_diff.Priced_proof.{proof= 0; fee= 0}))
+          )
           |> Linear_pipe.of_list
         in
         let frontier_broadcast_pipe_r, _ =
