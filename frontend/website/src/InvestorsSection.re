@@ -1,5 +1,5 @@
 module Investor = {
-  let component = ReasonReact.statelessComponent("BuiltBy.Investor");
+  let component = ReasonReact.statelessComponent("Investors.Investor");
   let make = (~name, ~suffix, _) => {
     let firstName = Js.String.split(" ", name)[0];
     let suffixStr =
@@ -30,7 +30,7 @@ module Investor = {
                 width(`rem(2.5)),
                 height(`rem(2.5)),
                 borderRadius(`percent(100.)),
-                marginRight(`em(1.)),
+                marginRight(`rem(1.)),
                 boxShadow(
                   ~x=`zero,
                   ~y=`zero,
@@ -52,7 +52,7 @@ module Investor = {
   };
 };
 
-let component = ReasonReact.statelessComponent("BuiltBy");
+let component = ReasonReact.statelessComponent("Investors");
 let make = _children => {
   ...component,
   render: _self =>
@@ -73,10 +73,10 @@ let make = _children => {
               Style.MediaQuery.notMobile,
               [
                 // bs-css doesn't allow fr in minmax: https://github.com/SentiaAnalytics/bs-css/pull/124
-                `declaration((
+                unsafe(
                   "grid-template-columns",
                   "repeat(auto-fit, minmax(15rem, 1fr))",
-                )),
+                ),
               ],
             ),
           ])
