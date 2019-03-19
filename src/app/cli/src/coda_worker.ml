@@ -356,7 +356,7 @@ module T = struct
           in
           let coda_process_payment cmd =
             let%map receipt =
-              Run.send_payment log coda (cmd :> User_command.t)
+              Run.send_payment logger coda (cmd :> User_command.t)
             in
             receipt |> Participating_state.active_exn
           in

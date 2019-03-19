@@ -200,7 +200,7 @@ let start_prefix_check logger workers events testnet ~acceptable_delay =
     (Linear_pipe.iter events ~f:(function `Transition (i, (prev, curr)) ->
          Linear_pipe.write all_transitions_w (prev, curr, i) ))
 
-let start_payment_check log root_pipe payment_pipe workers testnet
+let start_payment_check logger root_pipe payment_pipe workers testnet
     ~acceptable_delay =
   let root_lengths = Array.init (List.length workers) ~f:(Fn.const 0) in
   let user_commands_under_inspection = Hashtbl.create (module User_command) in
@@ -239,7 +239,7 @@ let start_payment_check log root_pipe payment_pipe workers testnet
                   if List.mem user_commands user_cmd ~equal:User_command.equal
                   then (
                     in_root.(i) <- true ;
-                    Logger.info log
+                    Logger.info logger ~module_:__MODULE__ ~location:__LOC__
                       !"transaction %{sexp:User_command.t} finally gets into \
                         the root of node %d, when root length is %d"
                       user_cmd i root_lengths.(i) ;
@@ -248,7 +248,7 @@ let start_payment_check log root_pipe payment_pipe workers testnet
                     else user_commands_pass_inspection )
                   else user_commands_pass_inspection
                 else (
-                  Logger.fatal log
+                  Logger.fatal logger ~module_:__MODULE__ ~location:__LOC__
                     !"transaction took too long to get into the root of node %d"
                     i ;
                   Core.exit 1 ) )
@@ -293,8 +293,8 @@ let events workers start_reader =
 let start_checks logger workers payment_reader start_reader testnet
     ~acceptable_delay =
   let event_reader, root_reader = events workers start_reader in
-  start_prefix_check log workers event_reader testnet ~acceptable_delay ;
-  start_payment_check log root_reader payment_reader workers testnet
+  start_prefix_check logger workers event_reader testnet ~acceptable_delay ;
+  start_payment_check logger root_reader payment_reader workers testnet
     ~acceptable_delay:7
 
 (* note: this is very declarative, maybe this should be more imperative? *)
