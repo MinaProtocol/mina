@@ -17,6 +17,34 @@ module Stable = struct
         ; communication_port: int
         (* TCP *) }
       [@@deriving bin_io, compare, hash, sexp]
+
+      let to_yojson {host; discovery_port; communication_port} =
+        `Assoc
+          [ ("host", `String (Unix.Inet_addr.to_string host))
+          ; ("discovery_port", `Int discovery_port)
+          ; ("communication_port", `Int communication_port) ]
+
+      let of_yojson =
+        let lift_string = function `String s -> Some s | _ -> None in
+        let lift_int = function `Int n -> Some n | _ -> None in
+        function
+        | `Assoc ls ->
+            let open Option.Let_syntax in
+            Result.of_option ~error:"missing keys"
+              (let%bind host_str =
+                 List.Assoc.find ls "host" ~equal:String.equal >>= lift_string
+               in
+               let%bind discovery_port =
+                 List.Assoc.find ls "discovery_port" ~equal:String.equal
+                 >>= lift_int
+               in
+               let%map communication_port =
+                 List.Assoc.find ls "communication_port" ~equal:String.equal
+                 >>= lift_int
+               in
+               let host = Unix.Inet_addr.of_string host_str in
+               {host; discovery_port; communication_port})
+        | _ -> Error "expected object"
     end
 
     include T
@@ -57,5 +85,8 @@ let to_communications_host_and_port t =
     ~port:t.communication_port
 
 module Event = struct
-  type nonrec t = Connect of t list | Disconnect of t list [@@deriving sexp]
+  type t =
+    | Connect of Stable.Latest.t list
+    | Disconnect of Stable.Latest.t list
+  [@@deriving sexp]
 end

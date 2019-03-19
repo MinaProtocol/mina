@@ -201,7 +201,7 @@ struct
       module T = struct
         (* "master" types, do not change *)
         type query =
-          Consensus.Consensus_state.value Envelope.Incoming.Stable.V1.t
+          Consensus.Consensus_state.Value.t Envelope.Incoming.Stable.V1.t
         [@@deriving sexp]
 
         type response =
@@ -229,7 +229,8 @@ struct
     module V1 = struct
       module T = struct
         type query =
-          Consensus.Consensus_state.value Envelope.Incoming.Stable.V1.t
+          Consensus.Consensus_state.Value.Stable.V1.t
+          Envelope.Incoming.Stable.V1.t
         [@@deriving bin_io, sexp]
 
         type response =
@@ -260,7 +261,15 @@ end
 
 module Message (Inputs : sig
   module Snark_pool_diff : sig
-    type t [@@deriving bin_io, sexp]
+    type t [@@deriving sexp]
+
+    module Stable :
+      sig
+        module V1 : sig
+          type t [@@deriving bin_io, sexp]
+        end
+      end
+      with type V1.t = t
   end
 
   module Transaction_pool_diff : sig
@@ -277,7 +286,7 @@ struct
       (* "master" types, do not change *)
       type content =
         | New_state of External_transition.Stable.V1.t
-        | Snark_pool_diff of Snark_pool_diff.t
+        | Snark_pool_diff of Snark_pool_diff.Stable.V1.t
         | Transaction_pool_diff of Transaction_pool_diff.t
       [@@deriving bin_io, sexp]
 
@@ -344,7 +353,15 @@ module type Inputs_intf = sig
   end
 
   module Snark_pool_diff : sig
-    type t [@@deriving sexp, bin_io]
+    type t [@@deriving sexp]
+
+    module Stable :
+      sig
+        module V1 : sig
+          type t [@@deriving sexp, bin_io]
+        end
+      end
+      with type V1.t = t
   end
 
   module Transaction_pool_diff : sig
@@ -360,7 +377,7 @@ module type Config_intf = sig
   type time_controller
 
   type t =
-    { parent_log: Logger.t
+    { logger: Logger.t
     ; gossip_net_params: gossip_config
     ; time_controller: time_controller }
 end
@@ -376,7 +393,7 @@ module Make (Inputs : Inputs_intf) = struct
     with type gossip_config := Gossip_net.Config.t
      and type time_controller := Time.Controller.t = struct
     type t =
-      { parent_log: Logger.t
+      { logger: Logger.t
       ; gossip_net_params: Gossip_net.Config.t
       ; time_controller: Time.Controller.t }
   end
@@ -386,7 +403,7 @@ module Make (Inputs : Inputs_intf) = struct
 
   type t =
     { gossip_net: Gossip_net.t
-    ; log: Logger.t
+    ; logger: Logger.t
     ; states:
         (External_transition.t Envelope.Incoming.t * Time.t)
         Strict_pipe.Reader.t
@@ -408,14 +425,13 @@ module Make (Inputs : Inputs_intf) = struct
             State_hash.t Envelope.Incoming.t
          -> External_transition.t Non_empty_list.t option Deferred.t)
       ~(get_ancestry :
-            Consensus.Consensus_state.value Envelope.Incoming.t
+            Consensus.Consensus_state.Value.t Envelope.Incoming.t
          -> ( ( External_transition.t
               , State_body_hash.t list * External_transition.t )
               Proof_carrying_data.t
             * Staged_ledger_aux.t
             * Ledger_hash.t )
             Deferred.Option.t) =
-    let log = Logger.child config.parent_log "coda networking" in
     (* TODO: for following functions, could check that IP in _conn matches
        the sender IP in envelope, punish if mismatch due to IP forgery
     *)
@@ -426,13 +442,13 @@ module Make (Inputs : Inputs_intf) = struct
       answer_sync_ledger_query query_in_envelope
     in
     let transition_catchup_rpc _conn ~version:_ hash_in_envelope =
-      Logger.info log
+      Logger.info config.logger ~module_:__MODULE__ ~location:__LOC__
         !"Peer %{sexp:Envelope.Sender.t} sent transition_catchup"
         (Envelope.Incoming.sender hash_in_envelope) ;
       transition_catchup hash_in_envelope
     in
     let get_ancestry_rpc _conn ~version:_ query_in_envelope =
-      Logger.info log
+      Logger.info config.logger ~module_:__MODULE__ ~location:__LOC__
         !"Sending root proof to peer %{sexp:Envelope.Sender.t}"
         (Envelope.Incoming.sender query_in_envelope) ;
       get_ancestry query_in_envelope
@@ -470,7 +486,7 @@ module Make (Inputs : Inputs_intf) = struct
               `Trd (Envelope.Incoming.map x ~f:(fun _ -> d)) )
     in
     { gossip_net
-    ; log
+    ; logger= config.logger
     ; states
     ; snark_pool_diffs= Strict_pipe.Reader.to_linear_pipe snark_pool_diffs
     ; transaction_pool_diffs=
@@ -484,7 +500,9 @@ module Make (Inputs : Inputs_intf) = struct
 
   (* TODO: Have better pushback behavior *)
   let broadcast t x =
-    Logger.trace t.log !"Broadcasting %{sexp: Message.msg} over gossip net" x ;
+    Logger.trace t.logger ~module_:__MODULE__ ~location:__LOC__
+      !"Broadcasting %{sexp: Message.msg} over gossip net"
+      x ;
     Linear_pipe.write_without_pushback (Gossip_net.broadcast t.gossip_net) x
 
   let broadcast_from_me t content = broadcast t (envelope_from_me t content)
@@ -558,14 +576,14 @@ module Make (Inputs : Inputs_intf) = struct
             match ancestors_or_error with
             | Ok (Some ancestors) -> return (Ok ancestors)
             | Ok None ->
-                Logger.info t.log
+                Logger.info t.logger ~module_:__MODULE__ ~location:__LOC__
                   !"get_ancestry returned no root for non-preferred peer \
                     %{sexp: Peer.t} on consensus_state %{sexp: \
                     Rpcs.Get_ancestry.query}"
                   peer input ;
                 loop remaining_peers (2 * num_peers)
             | Error e ->
-                Logger.warn t.log
+                Logger.warn t.logger ~module_:__MODULE__ ~location:__LOC__
                   !"get_ancestry generated error for non-preferred peer \
                     %{sexp: Peer.t}: %{sexp: Error.t}"
                   peer e ;
@@ -591,14 +609,14 @@ module Make (Inputs : Inputs_intf) = struct
         | Ok (Some ancestors) -> return (Ok ancestors)
         | Ok None ->
             (* #TODO: punish *)
-            Logger.faulty_peer t.log
+            Logger.faulty_peer t.logger ~module_:__MODULE__ ~location:__LOC__
               !"get_ancestry returned no ancestors for the transition sender \
                 %{sexp: Peer.t}, trying non-preferred peers"
               preferred_peer ;
             let peers = get_random_peers () in
             get_ancestry_non_preferred_peers t input_in_envelope peers
         | Error e ->
-            Logger.warn t.log
+            Logger.warn t.logger ~module_:__MODULE__ ~location:__LOC__
               !"get_ancestry generated error for the transition sender \
                 %{sexp: Peer.t}: %{sexp: Error.t}; trying non-preferred peers"
               preferred_peer e ;
@@ -617,12 +635,12 @@ module Make (Inputs : Inputs_intf) = struct
       let peers =
         Gossip_net.random_peers_except t.gossip_net 3 ~except:peers_tried
       in
-      Logger.trace t.log
+      Logger.trace t.logger ~module_:__MODULE__ ~location:__LOC__
         !"SL: Querying the following peers %{sexp: Peer.t list}"
         peers ;
       match%bind
         find_map peers ~f:(fun peer ->
-            Logger.trace t.log
+            Logger.trace t.logger ~module_:__MODULE__ ~location:__LOC__
               !"Asking %{sexp: Peer.t} query regarding ledger_hash %{sexp: \
                 Ledger_hash.t}"
               peer (fst query) ;
@@ -632,7 +650,7 @@ module Make (Inputs : Inputs_intf) = struct
                 (envelope_from_me t query)
             with
             | Ok (Ok answer) ->
-                Logger.trace t.log
+                Logger.trace t.logger ~module_:__MODULE__ ~location:__LOC__
                   !"Received answer from peer %{sexp: Peer.t} on ledger_hash \
                     %{sexp: Ledger_hash.t}"
                   peer (fst answer) ;
@@ -640,22 +658,24 @@ module Make (Inputs : Inputs_intf) = struct
                   (Envelope.Incoming.wrap ~data:answer
                      ~sender:(Envelope.Sender.Remote peer))
             | Ok (Error e) ->
-                Logger.info t.log "Rpc error: %s" (Error.to_string_mach e) ;
+                Logger.info t.logger ~module_:__MODULE__ ~location:__LOC__
+                  "Rpc error: %s" (Error.to_string_mach e) ;
                 Hash_set.add peers_tried peer ;
                 None
             | Error err ->
-                Logger.warn t.log "Network error: %s"
-                  (Error.to_string_mach err) ;
+                Logger.warn t.logger ~module_:__MODULE__ ~location:__LOC__
+                  "Network error: %s" (Error.to_string_mach err) ;
                 None )
       with
       | Some answer ->
-          Logger.trace t.log
+          Logger.trace t.logger ~module_:__MODULE__ ~location:__LOC__
             !"Succeeding with answer on ledger_hash %{sexp: Ledger_hash.t}"
             (fst answer.data) ;
           (* TODO *)
           Linear_pipe.write_if_open response_writer answer
       | None ->
-          Logger.info t.log !"None of the peers I asked knew; trying more" ;
+          Logger.info t.logger ~module_:__MODULE__ ~location:__LOC__
+            !"None of the peers I asked knew; trying more" ;
           if ctr > retry_max then Deferred.unit
           else
             let%bind () = Clock.after retry_interval in
