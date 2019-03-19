@@ -13,6 +13,8 @@ module Colors = {
   let purpleBrown = `rgb((100, 46, 48));
   let offWhite = `rgb((243, 243, 243));
   let grey = `rgb((129, 146, 168));
+
+  let navy = `rgb((0, 49, 90));
 };
 
 module Typeface = {
@@ -20,6 +22,8 @@ module Typeface = {
 
   let ibmplexsans =
     fontFamily("IBM Plex Sans, Helvetica Neue, Arial, sans-serif");
+
+  let ibmplexmono = fontFamily("IBM Plex Mono, Menlo, monospace");
 
   let aktivgrotesk = fontFamily("aktiv-grotesk-extended, sans-serif");
 };
@@ -41,6 +45,7 @@ module Link = {
     style([
       Typeface.ibmplexsans,
       color(Colors.hyperlink),
+      textDecoration(`none),
       fontWeight(`medium),
       fontSize(`rem(1.0)),
       letterSpacing(`rem(-0.0125)),
