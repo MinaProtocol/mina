@@ -9,7 +9,7 @@ module type With_checksum_intf = sig
   module Controller : sig
     type 'a t
 
-    val create : parent_log:Logger.t -> 'a Binable.m -> 'a t
+    val create : logger:Logger.t -> 'a Binable.m -> 'a t
   end
 
   val load :

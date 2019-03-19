@@ -17,7 +17,7 @@ let%test_module "Sync_handler" =
     let%test "sync with ledgers from another peer via glue_sync_ledger" =
       Backtrace.elide := false ;
       Printexc.record_backtrace true ;
-      let logger = Logger.create () in
+      let logger = Logger.null () in
       Ledger.with_ephemeral_ledger ~f:(fun dest_ledger ->
           Thread_safe.block_on_async_exn (fun () ->
               let%bind frontier =
@@ -28,9 +28,7 @@ let%test_module "Sync_handler" =
                 |> Ledger.of_database
               in
               let desired_root = Ledger.merkle_root source_ledger in
-              let sync_ledger =
-                Sync_ledger.Mask.create dest_ledger ~parent_log:logger
-              in
+              let sync_ledger = Sync_ledger.Mask.create dest_ledger ~logger in
               let query_reader = Sync_ledger.Mask.query_reader sync_ledger in
               let answer_writer = Sync_ledger.Mask.answer_writer sync_ledger in
               let peer =

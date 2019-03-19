@@ -37,6 +37,8 @@ module type S = sig
        and type key := key
        and type key_set := key_set
 
+    exception Dangling_parent_reference of Core.Uuid.t
+
     val get_hash : t -> Addr.t -> hash option
     (** get hash from mask, if present, else from its parent *)
 

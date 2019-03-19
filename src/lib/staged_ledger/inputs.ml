@@ -50,8 +50,6 @@ module type S = sig
        and type proof := Proof.t
        and type sok_digest := Sok_message.Digest.t
 
-    include Binable.S with type t := t
-
     include Sexpable.S with type t := t
   end
 

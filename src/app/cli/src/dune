@@ -10,10 +10,13 @@
    transition_frontier_controller sync_handler ledger_catchup
    transition_handler bootstrap_controller transition_router async
    async_extra rpc_parallel async_ssl cohttp o1trace cohttp-async parallel
-   file_system yojson web_client_pipe work_selector graphql-async graphql-cohttp root_prover)
+   file_system yojson web_client_pipe work_selector graphql-async graphql-cohttp root_prover
+   module_version)
  (preprocessor_deps ../../../config.mlh)
  (preprocess
-  (pps ppx_jane ppx_deriving.eq ppx_deriving.make ppx_inline_test ppx_coda))
+  (pps ppx_deriving.eq ppx_deriving.make ppx_inline_test ppx_coda
+    ppx_base ppx_let ppx_optcomp ppx_sexp_conv ppx_bin_prot ppx_fields_conv ppx_custom_printf ppx_assert ppx_deriving_yojson
+  ))
  (flags -short-paths -w -40 -g -warn-error
    +3+4+6+8+9+10+11+12+14+16+20+21+23+24+26+27+29+32..39+56-58+59+60+61)
  (modes native))

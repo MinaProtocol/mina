@@ -25,7 +25,7 @@ end
 
 module Worker_state = struct
   module type S = sig
-    val verify_wrap : Consensus.Protocol_state.value -> Tock.Proof.t -> bool
+    val verify_wrap : Consensus.Protocol_state.Value.t -> Tock.Proof.t -> bool
 
     val verify_transaction_snark :
       Transaction_snark.t -> message:Sok_message.t -> bool
@@ -109,7 +109,7 @@ module Worker = struct
         { verify_blockchain= f (Blockchain.bin_t, Bool.bin_t, verify_blockchain)
         ; verify_transaction_snark=
             f
-              ( [%bin_type_class: Transaction_snark.t * Sok_message.t]
+              ( [%bin_type_class: Transaction_snark.t * Sok_message.Stable.V1.t]
               , Bool.bin_t
               , verify_transaction_snark ) }
 

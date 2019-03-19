@@ -1,3 +1,5 @@
+[%%import "../../config.mlh"]
+
 open Core_kernel
 open Snark_params
 open Snark_bits
@@ -5,19 +7,33 @@ open Tuple_lib
 open Fold_lib
 
 module Time : sig
-  type t [@@deriving sexp, eq]
+  type t [@@deriving sexp, eq, yojson]
 
   type t0 = t
 
   module Controller : sig
+    [%%if time_offsets]
+
+    type t
+
+    val create : t -> t
+
+    val basic : t
+
+    [%%else]
+
     type t = unit
 
     val create : unit -> t
+
+    val basic : unit
+
+    [%%endif]
   end
 
   module Stable : sig
     module V1 : sig
-      type nonrec t = t [@@deriving sexp, bin_io, compare, eq, hash]
+      type nonrec t = t [@@deriving sexp, bin_io, compare, eq, hash, yojson]
     end
   end
 

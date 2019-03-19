@@ -27,7 +27,8 @@ module Body = struct
     let%map amount =
       let min, max =
         let max_amount_without_overflow =
-          Amount.(sub max_int (of_fee fee)) |> Option.value_exn
+          Amount.(sub max_int (of_fee fee))
+          |> Option.value_exn ?here:None ?message:None ?error:None
         in
         match tag with
         | Payment -> (Amount.zero, max_amount_without_overflow)
@@ -35,9 +36,9 @@ module Body = struct
         | Fee_transfer -> (Amount.zero, max_amount_without_overflow)
         | Coinbase ->
             (* In this case, 
-             fee - amount should be defined. In other words,
-             fee >= amount. *)
-            (Amount.zero, Amount.of_fee fee)
+             amount - fee should be defined. In other words,
+             amount >= fee *)
+            (Amount.of_fee fee, Amount.max_int)
       in
       Amount.gen_incl min max
     and public_key = Public_key.Compressed.gen in
@@ -160,7 +161,7 @@ module Changes = struct
     match tag with
     | Payment ->
         { sender_delta=
-            Amount.add_fee amount fee |> Option.value_exn
+            Option.value_exn (Amount.add_fee amount fee)
             |> Amount.Signed.of_unsigned |> Amount.Signed.negate
         ; receiver_increase= amount
         ; excess= Amount.Signed.of_unsigned (Amount.of_fee fee)
@@ -176,15 +177,15 @@ module Changes = struct
         { sender_delta= Amount.Signed.of_unsigned (Amount.of_fee fee)
         ; receiver_increase= amount
         ; excess=
-            Amount.add_fee amount fee |> Option.value_exn
+            Option.value_exn (Amount.add_fee amount fee)
             |> Amount.Signed.of_unsigned |> Amount.Signed.negate
         ; supply_increase= Amount.zero }
     | Coinbase ->
-        let coinbase_amount = Amount.of_fee fee in
-        { sender_delta=
-            Amount.sub coinbase_amount amount
-            |> Option.value_exn |> Amount.Signed.of_unsigned
-        ; receiver_increase= amount
+        let coinbase_amount = amount in
+        { sender_delta= Amount.Signed.of_unsigned (Amount.of_fee fee)
+        ; receiver_increase=
+            Amount.sub coinbase_amount (Amount.of_fee fee)
+            |> Option.value_exn ?here:None ?message:None ?error:None
         ; excess= Amount.Signed.zero
         ; supply_increase= coinbase_amount }
 
@@ -198,6 +199,10 @@ module Changes = struct
       let%bind e = else_ in
       Amount.Signed.Checked.if_ cond ~then_ ~else_:e
 
+    let if_amount cond ~then_ ~else_ =
+      let%bind e = else_ in
+      Amount.Checked.if_ cond ~then_ ~else_:e
+
     let of_payload (payload : payload_var) =
       let tag = payload.body.tag in
       let fee = payload.common.fee in
@@ -207,15 +212,29 @@ module Changes = struct
       let%bind is_payment = Tag.Checked.is_payment tag in
       let%bind is_fee_transfer = Tag.Checked.is_fee_transfer tag in
       let%bind is_user_command = Tag.Checked.is_user_command tag in
-      let coinbase_amount = Amount.Checked.of_fee fee in
+      let coinbase_amount = amount in
       let%bind supply_increase =
         Amount.Checked.if_ is_coinbase ~then_:coinbase_amount
           ~else_:Amount.(var_of_t zero)
       in
       let%bind receiver_increase =
-        Amount.Checked.if_ is_stake_delegation
+        let%bind coinbase_receiver_increase =
+          with_label __LOC__
+            (let%bind proposer_reward, `Underflow underflowed =
+               Amount.Checked.sub_flagged coinbase_amount
+                 (Amount.Checked.of_fee fee)
+             in
+             let%map () =
+               Boolean.Assert.any
+                 [Boolean.not underflowed; Boolean.not is_coinbase]
+             in
+             proposer_reward)
+        in
+        if_amount is_stake_delegation
           ~then_:(Amount.var_of_t Amount.zero)
-          ~else_:amount
+          ~else_:
+            (if_amount is_coinbase ~then_:coinbase_receiver_increase
+               ~else_:(return amount))
       in
       let%bind neg_amount_plus_fee =
         let%bind res, `Overflow overflowed =
@@ -248,23 +267,13 @@ module Changes = struct
                ~else_:(return fee_transfer_excess))
       in
       let%bind sender_delta =
-        let%bind coinbase_sender_delta =
-          with_label __LOC__
-            (let%bind proposer_reward, `Underflow underflowed =
-               Amount.Checked.sub_flagged coinbase_amount amount
-             in
-             let%map () =
-               Boolean.Assert.any
-                 [Boolean.not underflowed; Boolean.not is_coinbase]
-             in
-             Amount.Signed.Checked.of_unsigned proposer_reward)
+        let%bind fee_transfer_or_coinbase =
+          Boolean.any [is_fee_transfer; is_coinbase]
         in
         if_' is_stake_delegation ~then_:neg_fee
           ~else_:
-            (if_' is_coinbase ~then_:coinbase_sender_delta
-               ~else_:
-                 (if_' is_fee_transfer ~then_:pos_fee
-                    ~else_:(return neg_amount_plus_fee)))
+            (if_' fee_transfer_or_coinbase ~then_:pos_fee
+               ~else_:(return neg_amount_plus_fee))
       in
       return {sender_delta; receiver_increase; excess; supply_increase}
   end
@@ -293,15 +302,14 @@ let excess (payload : t) : Amount.Signed.t =
   | Payment -> Amount.Signed.of_unsigned (Amount.of_fee fee)
   | Stake_delegation -> Amount.Signed.of_unsigned (Amount.of_fee fee)
   | Fee_transfer ->
-      Amount.add_fee amount fee |> Option.value_exn
+      Option.value_exn (Amount.add_fee amount fee)
       |> Amount.Signed.of_unsigned |> Amount.Signed.negate
   | Coinbase -> Amount.Signed.zero
 
 let supply_increase (payload : payload) =
   let tag = payload.body.tag in
-  let fee = payload.common.fee in
   match tag with
-  | Coinbase -> Amount.of_fee fee
+  | Coinbase -> payload.body.amount
   | Payment | Stake_delegation | Fee_transfer -> Amount.zero
 
 let%test_unit "fold_compatibility" =

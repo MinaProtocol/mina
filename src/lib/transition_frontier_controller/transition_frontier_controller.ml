@@ -13,8 +13,8 @@ module type Inputs_intf = sig
      and type state_hash := State_hash.t
      and type external_transition := External_transition.t
      and type transition_frontier := Transition_frontier.t
-     and type syncable_ledger_query := Sync_ledger.query
-     and type syncable_ledger_answer := Sync_ledger.answer
+     and type syncable_ledger_query := Sync_ledger.Query.t
+     and type syncable_ledger_answer := Sync_ledger.Answer.t
 
   module Transition_handler :
     Transition_handler_intf
@@ -32,11 +32,11 @@ module type Inputs_intf = sig
     with type peer := Network_peer.Peer.t
      and type state_hash := State_hash.t
      and type external_transition := External_transition.t
-     and type consensus_state := Consensus.Consensus_state.value
+     and type consensus_state := Consensus.Consensus_state.Value.t
      and type state_body_hash := State_body_hash.t
      and type ledger_hash := Ledger_hash.t
-     and type sync_ledger_query := Sync_ledger.query
-     and type sync_ledger_answer := Sync_ledger.answer
+     and type sync_ledger_query := Sync_ledger.Query.t
+     and type sync_ledger_answer := Sync_ledger.Answer.t
      and type parallel_scan_state := Staged_ledger.Scan_state.t
 
   module Catchup :
@@ -68,7 +68,6 @@ module Make (Inputs : Inputs_intf) :
 
   let run ~logger ~network ~time_controller ~collected_transitions ~frontier
       ~network_transition_reader ~proposer_transition_reader ~clear_reader =
-    let logger = Logger.child logger __MODULE__ in
     let valid_transition_pipe_capacity = 10 in
     let valid_transition_reader, valid_transition_writer =
       Strict_pipe.create
@@ -92,6 +91,12 @@ module Make (Inputs : Inputs_intf) :
     let catchup_breadcrumbs_reader, catchup_breadcrumbs_writer =
       Strict_pipe.create Synchronous
     in
+    let proposer_transition_reader_copy, proposer_transition_writer_copy =
+      Strict_pipe.create Synchronous
+    in
+    Strict_pipe.transfer proposer_transition_reader
+      proposer_transition_writer_copy ~f:Fn.id
+    |> don't_wait_for ;
     let unprocessed_transition_cache =
       Transition_handler.Unprocessed_transition_cache.create ~logger
     in
@@ -110,7 +115,8 @@ module Make (Inputs : Inputs_intf) :
       ~f:(Strict_pipe.Writer.write primary_transition_writer)
     |> don't_wait_for ;
     Transition_handler.Processor.run ~logger ~time_controller ~frontier
-      ~primary_transition_reader ~proposer_transition_reader
+      ~primary_transition_reader
+      ~proposer_transition_reader:proposer_transition_reader_copy
       ~catchup_job_writer ~catchup_breadcrumbs_reader
       ~catchup_breadcrumbs_writer ~processed_transition_writer
       ~unprocessed_transition_cache ;
@@ -121,7 +127,8 @@ module Make (Inputs : Inputs_intf) :
         kill primary_transition_reader primary_transition_writer ;
         kill processed_transition_reader processed_transition_writer ;
         kill catchup_job_reader catchup_job_writer ;
-        kill catchup_breadcrumbs_reader catchup_breadcrumbs_writer )
+        kill catchup_breadcrumbs_reader catchup_breadcrumbs_writer ;
+        kill proposer_transition_reader_copy proposer_transition_writer_copy )
     |> don't_wait_for ;
     processed_transition_reader
 end

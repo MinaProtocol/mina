@@ -78,7 +78,7 @@ module Make (Inputs : Inputs.S) = struct
             match Cached.sequence_result cached_breadcrumb_result with
             | Error (`Validation_error e) ->
                 (* TODO: Punish *)
-                Logger.faulty_peer logger
+                Logger.faulty_peer logger ~module_:__MODULE__ ~location:__LOC__
                   "invalid transition in catchup scheduler breadcrumb \
                    builder: %s"
                   (Error.to_string_hum e) ;
@@ -88,7 +88,6 @@ module Make (Inputs : Inputs.S) = struct
 
   let create ~logger ~frontier ~time_controller ~catchup_job_writer
       ~catchup_breadcrumbs_writer =
-    let logger = Logger.child logger "catchup_scheduler" in
     let collected_transitions = State_hash.Table.create () in
     let parent_root_timeouts = State_hash.Table.create () in
     let breadcrumb_builder_supervisor =
@@ -156,6 +155,18 @@ module Make (Inputs : Inputs.S) = struct
       Time.Timeout.create t.time_controller duration ~f:(fun _ ->
           let subtree = extract_subtree t cached_transition in
           remove_tree t parent_hash ;
+          Logger.info t.logger ~module_:__MODULE__ ~location:__LOC__
+            ~metadata:
+              [ ("parent_hash", Coda_base.State_hash.to_yojson parent_hash)
+              ; ( "duration"
+                , `Int (Inputs.Time.Span.to_ms duration |> Int64.to_int_trunc)
+                )
+              ; ( "cached_transition"
+                , Cached.peek cached_transition
+                  |> With_hash.data
+                  |> Inputs.External_transition.Verified.to_yojson ) ]
+            "timed out waiting for the parent of $cached_transition after \
+             $duration ms, signalling a catchup job" ;
           (* it's ok to create a new thread here because the thread essentially does no work *)
           don't_wait_for (Writer.write t.catchup_job_writer subtree) )
     in
@@ -166,10 +177,11 @@ module Make (Inputs : Inputs.S) = struct
           ~data:[cached_transition] ;
         Hashtbl.update t.collected_transitions hash
           ~f:(Option.value ~default:[]) ;
-        Hashtbl.add_exn t.parent_root_timeouts ~key:parent_hash
+        Hashtbl.add t.parent_root_timeouts ~key:parent_hash
           ~data:
             (make_timeout
                (Option.value remaining_time ~default:timeout_duration))
+        |> ignore
     | Some cached_sibling_transitions ->
         if
           List.exists cached_sibling_transitions
@@ -177,10 +189,10 @@ module Make (Inputs : Inputs.S) = struct
               State_hash.equal hash
                 (With_hash.hash (Cached.peek cached_sibling_transition)) )
         then
-          Logger.info t.logger
-            !"Received request to watch transition for catchup that already \
-              was being watched: %{sexp: State_hash.t}"
-            hash
+          Logger.info t.logger ~module_:__MODULE__ ~location:__LOC__
+            ~metadata:[("state_hash", State_hash.to_yojson hash)]
+            "Received request to watch transition for catchup that already \
+             was being watched: $state_hash"
         else
           let _ : Time.Span.t option = cancel_timeout t hash in
           Hashtbl.set t.collected_transitions ~key:parent_hash

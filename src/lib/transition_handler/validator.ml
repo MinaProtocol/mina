@@ -68,7 +68,6 @@ module Make (Inputs : Inputs.With_unprocessed_transition_cache.S) :
          , drop_head buffered
          , unit )
          Writer.t) ~unprocessed_transition_cache =
-    let logger = Logger.child logger __MODULE__ in
     don't_wait_for
       (Reader.iter transition_reader
          ~f:(fun (`Transition transition_env, `Time_received _) ->
@@ -86,19 +85,34 @@ module Make (Inputs : Inputs.With_unprocessed_transition_cache.S) :
                    ~unprocessed_transition_cache transition_with_hash
                with
              | Ok cached_transition ->
-                 Logger.info logger
+                 Logger.info logger ~module_:__MODULE__ ~location:__LOC__
                    !"accepting transition %{sexp:State_hash.t}"
                    hash ;
+                 let transition_time =
+                   External_transition.Verified.protocol_state transition
+                   |> Protocol_state.blockchain_state
+                   |> Blockchain_state.timestamp |> Block_time.to_time
+                 in
+                 let hist_name =
+                   match Envelope.Incoming.sender transition_env with
+                   | Envelope.Sender.Local ->
+                       "accepted_transition_local_latency"
+                   | Envelope.Sender.Remote _ ->
+                       "accepted_transition_remote_latency"
+                 in
+                 Perf_histograms.add_span ~name:hist_name
+                   (Core_kernel.Time.diff (Core_kernel.Time.now ())
+                      transition_time) ;
                  Writer.write valid_transition_writer cached_transition
              | Error `Duplicate ->
-                 Logger.info logger
+                 Logger.info logger ~module_:__MODULE__ ~location:__LOC__
                    !"ignoring transition we've already seen \
                      %{sexp:State_hash.t}"
                    hash
              | Error (`Invalid reason) ->
-                 Logger.warn logger
+                 Logger.warn logger ~module_:__MODULE__ ~location:__LOC__
                    !"rejecting transitions because \"%s\" -- sent by %{sexp: \
-                     Network_peer.Peer.t}"
+                     Envelope.Sender.t}"
                    reason
                    (Envelope.Incoming.sender transition_env) ) ))
 end

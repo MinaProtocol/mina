@@ -51,6 +51,8 @@ end = struct
       | Insufficient_fee of Currency.Fee.t * Currency.Fee.t
       | Non_zero_fee_excess of
           Scan_state.Space_partition.t * Transaction.t list
+      | Invalid_proof of
+          Ledger_proof.t * Ledger_proof_statement.t * Compressed_public_key.t
       | Unexpected of Error.t
     [@@deriving sexp]
 
@@ -76,6 +78,12 @@ end = struct
               Transaction.t list} and the current queue with slots \
               partitioned as %{sexp: Scan_state.Space_partition.t} \n"
             txns partition
+      | Invalid_proof (p, s, prover) ->
+          Format.asprintf
+            !"Verification failed for proof: %{sexp: Ledger_proof.t} \
+              Statement: %{sexp: Ledger_proof_statement.t} Prover: \
+              %{sexp:Compressed_public_key.t}\n"
+            p s prover
       | Unexpected e -> Error.to_string_hum e
 
     let to_error = Fn.compose Error.of_string to_string
@@ -85,15 +93,26 @@ end = struct
     | Ok a -> Ok a
     | Error e -> Error (Staged_ledger_error.Unexpected e)
 
-  type job = Scan_state.Available_job.t
+  type job = Scan_state.Available_job.t [@@deriving sexp]
 
   let verify_proof proof statement ~message =
     Inputs.Ledger_proof_verifier.verify proof statement ~message
 
-  let verify ~message job proof =
+  let verify ~message job proof prover =
+    let open Deferred.Let_syntax in
     match Scan_state.statement_of_job job with
-    | None -> return false
-    | Some statement -> verify_proof proof statement ~message
+    | None ->
+        Deferred.return
+          ( Or_error.errorf !"Error creating statement from job %{sexp:job}" job
+          |> to_staged_ledger_or_error )
+    | Some statement -> (
+        match%map verify_proof proof statement ~message with
+        | true -> Ok ()
+        | _ ->
+            Error
+              (Staged_ledger_error.Invalid_proof (proof, statement, prover)) )
+
+  (*TODO: Punish*)
 
   module M = struct
     include Monad.Ident
@@ -117,17 +136,16 @@ end = struct
         let verify proof stmt ~message = verify_proof proof stmt ~message
       end)
 
-  type scan_state = Scan_state.t [@@deriving sexp, bin_io]
-
   type t =
     { scan_state:
-        scan_state
+        Scan_state.t
         (* Invariant: this is the ledger after having applied all the transactions in
      * the above state. *)
     ; ledger: Ledger.attached_mask sexp_opaque }
   [@@deriving sexp]
 
-  type serializable = scan_state * Ledger.serializable [@@deriving bin_io]
+  type serializable = Scan_state.Stable.V1.t * Ledger.serializable
+  [@@deriving bin_io]
 
   let serializable_of_t t = (t.scan_state, Ledger.serializable_of_t t.ledger)
 
@@ -188,7 +206,7 @@ end = struct
     let {Ledger_proof_statement.target; _} = Ledger_proof.statement proof in
     target
 
-  let verify_scan_state_after_apply ledger (scan_state : scan_state) =
+  let verify_scan_state_after_apply ledger (scan_state : Scan_state.t) =
     let error_prefix =
       "Error verifying the parallel scan state after applying the diff."
     in
@@ -410,11 +428,6 @@ end = struct
   let check_completed_works scan_state
       (completed_works : Transaction_snark_work.t list) =
     let open Deferred.Result.Let_syntax in
-    let check_or_error label b =
-      if not b then
-        Error (Staged_ledger_error.Unexpected (Error.of_string label))
-      else Ok ()
-    in
     let%bind jobses =
       Deferred.return
         (let open Result.Let_syntax in
@@ -425,12 +438,21 @@ end = struct
         in
         chunks_of jobs ~n:Transaction_snark_work.proofs_length)
     in
-    Deferred.List.for_all (List.zip_exn jobses completed_works)
-      ~f:(fun (jobs, work) ->
-        let message = Sok_message.create ~fee:work.fee ~prover:work.prover in
-        Deferred.List.for_all (List.zip_exn jobs work.proofs)
-          ~f:(fun (job, proof) -> verify ~message job proof ) )
-    |> Deferred.map ~f:(check_or_error "proofs did not verify")
+    let check job_proofs prover message =
+      let open Deferred.Let_syntax in
+      Deferred.List.find_map job_proofs ~f:(fun (job, proof) ->
+          match%map verify ~message job proof prover with
+          | Ok () -> None
+          | Error e -> Some e )
+    in
+    let open Deferred.Let_syntax in
+    let%map result =
+      Deferred.List.find_map (List.zip_exn jobses completed_works)
+        ~f:(fun (jobs, work) ->
+          let message = Sok_message.create ~fee:work.fee ~prover:work.prover in
+          check (List.zip_exn jobs work.proofs) work.prover message )
+    in
+    Option.value_map result ~default:(Ok ()) ~f:(fun e -> Error e)
 
   let create_fee_transfers completed_works delta public_key coinbase_fts =
     let open Result.Let_syntax in
@@ -744,7 +766,7 @@ end = struct
             scan_state'
         |> to_staged_ledger_or_error )
     in
-    Logger.info logger
+    Logger.info logger ~module_:__MODULE__ ~location:__LOC__
       "Block info: No of transactions included:%d Coinbase parts:%d Work \
        count:%d Spots available:%d Proofs waiting to be solved:%d"
       user_commands_count cb_parts_count (List.length works) spots_available
@@ -1046,7 +1068,8 @@ end = struct
         match res' with
         | Ok res'' -> if within_capacity res'' then res'' else res
         | Error e ->
-            Logger.error t.logger "%s" (Error.to_string_hum e) ;
+            Logger.error t.logger ~module_:__MODULE__ ~location:__LOC__ "%s"
+              (Error.to_string_hum e) ;
             res
       in
       match count with `One -> by_one t | `Two -> by_one (by_one t)
@@ -1205,7 +1228,7 @@ end = struct
                 Staged_ledger_diff.At_most_one.Zero
             | One x -> One x
             | _ ->
-                Logger.error logger
+                Logger.error logger ~module_:__MODULE__ ~location:__LOC__
                   "Error creating diff: Should have at most one coinbase in \
                    the second pre_diff" ;
                 Zero
@@ -1340,12 +1363,14 @@ end = struct
                 Transaction_validator.apply_transaction validating_ledger
                   (User_command t) )
           with
-          | Error _ ->
-              Logger.error logger
-                !"Invalid user command: %{sexp: \
-                  User_command.With_valid_signature.t} \n\
-                  %!"
-                t ;
+          | Error e ->
+              Logger.error logger ~module_:__MODULE__ ~location:__LOC__
+                ~metadata:
+                  [ ( "user_command"
+                    , User_command.With_valid_signature.to_yojson t ) ]
+                !"Invalid user command! Error was: %s, command was: \
+                  $user_command"
+                (Error.to_string_hum e) ;
               seq
           | Ok _ -> Sequence.append (Sequence.singleton t) seq )
     in
@@ -1354,7 +1379,8 @@ end = struct
           generate logger completed_works_seq valid_on_this_ledger self
             partitions max_jobs_count unbundled_job_count )
     in
-    Logger.info logger "Block stats: Proofs ready for purchase: %d"
+    Logger.info logger ~module_:__MODULE__ ~location:__LOC__
+      "Block stats: Proofs ready for purchase: %d"
       (Sequence.length completed_works_seq) ;
     trace_event "prediffs done" ;
     { Staged_ledger_diff.With_valid_signatures_and_proofs.diff
@@ -1366,11 +1392,31 @@ let%test_module "test" =
   ( module struct
     module Test_input1 = struct
       open Coda_pow
+
+      module String = struct
+        include String
+
+        let to_yojson s = `String s
+
+        let of_yojson = function
+          | `String s -> Ok s
+          | _ -> Error "expected string"
+      end
+
       module Compressed_public_key = String
 
       module Sok_message = struct
+        module Stable = struct
+          module V1 = struct
+            type t = unit [@@deriving bin_io, sexp]
+          end
+
+          module Latest = V1
+        end
+
         module Digest = Unit
-        include Unit
+
+        type t = Stable.Latest.t [@@deriving sexp]
 
         let create ~fee:_ ~prover:_ = ()
       end
@@ -1380,20 +1426,21 @@ let%test_module "test" =
       end
 
       module User_command = struct
-        type fee = Fee.Unsigned.t [@@deriving sexp, bin_io, compare]
+        type fee = Fee.Unsigned.t [@@deriving sexp, bin_io, compare, yojson]
 
-        type txn_amt = int [@@deriving sexp, bin_io, compare, eq]
+        type txn_amt = int [@@deriving sexp, bin_io, compare, eq, yojson]
 
-        type txn_fee = int [@@deriving sexp, bin_io, compare, eq]
+        type txn_fee = int [@@deriving sexp, bin_io, compare, eq, yojson]
 
         module T = struct
-          type t = txn_amt * txn_fee [@@deriving sexp, bin_io, compare, eq]
+          type t = txn_amt * txn_fee
+          [@@deriving sexp, bin_io, compare, eq, yojson]
         end
 
         include T
 
         module With_valid_signature = struct
-          type t = T.t [@@deriving sexp, bin_io, compare, eq]
+          type t = T.t [@@deriving sexp, bin_io, compare, eq, yojson]
         end
 
         let check : t -> With_valid_signature.t option = fun i -> Some i
@@ -1408,14 +1455,16 @@ let%test_module "test" =
 
       module Fee_transfer = struct
         type public_key = Compressed_public_key.t
-        [@@deriving sexp, bin_io, compare, eq]
+        [@@deriving sexp, bin_io, compare, eq, yojson]
 
-        type fee = Fee.Unsigned.t [@@deriving sexp, bin_io, compare, eq]
+        type fee = Fee.Unsigned.t
+        [@@deriving sexp, bin_io, compare, eq, yojson]
 
-        type single = public_key * fee [@@deriving bin_io, sexp, compare, eq]
+        type single = public_key * fee
+        [@@deriving bin_io, sexp, compare, eq, yojson]
 
         type t = One of single | Two of single * single
-        [@@deriving bin_io, sexp, compare, eq]
+        [@@deriving bin_io, sexp, compare, eq, yojson]
 
         let to_list = function One x -> [x] | Two (x, y) -> [x; y]
 
@@ -1513,12 +1562,17 @@ let%test_module "test" =
       end
 
       module Ledger_hash = struct
-        module T = struct
-          type t = int [@@deriving sexp, bin_io, compare, hash, eq]
+        module Stable = struct
+          module V1 = struct
+            type t = int [@@deriving sexp, bin_io, compare, hash, eq, yojson]
+          end
+
+          module Latest = V1
         end
 
-        include T
-        include Hashable.Make_binable (T)
+        type t = int [@@deriving sexp, compare, hash, eq]
+
+        include Hashable.Make_binable (Stable.Latest)
 
         let to_bytes : t -> string =
          fun _ -> failwith "to_bytes in ledger hash"
@@ -1537,12 +1591,12 @@ let%test_module "test" =
       module Ledger_proof_statement = struct
         module T = struct
           type t =
-            { source: Ledger_hash.t
-            ; target: Ledger_hash.t
+            { source: Ledger_hash.Stable.V1.t
+            ; target: Ledger_hash.Stable.V1.t
             ; supply_increase: Currency.Amount.t
             ; fee_excess: Fee.Signed.t
             ; proof_type: [`Base | `Merge] }
-          [@@deriving sexp, bin_io, compare, hash]
+          [@@deriving sexp, bin_io, compare, hash, yojson]
 
           let merge s1 s2 =
             let open Or_error.Let_syntax in
@@ -1587,7 +1641,12 @@ let%test_module "test" =
 
       module Ledger_proof = struct
         (*A proof here is a statement *)
-        include Ledger_proof_statement
+        module Stable = struct
+          module V1 = Ledger_proof_statement
+          module Latest = V1
+        end
+
+        type t = Stable.Latest.t [@@deriving sexp]
 
         type ledger_hash = Ledger_hash.t
 
@@ -1747,31 +1806,48 @@ let%test_module "test" =
       module Transaction_snark_work = struct
         let proofs_length = 2
 
-        type proof = Ledger_proof.t [@@deriving sexp, bin_io, compare]
+        type proof = Ledger_proof.Stable.V1.t
+        [@@deriving sexp, bin_io, compare, yojson]
 
         type statement = Ledger_proof_statement.t
-        [@@deriving sexp, bin_io, compare, hash, eq]
+        [@@deriving sexp, bin_io, compare, hash, eq, yojson]
 
-        type fee = Fee.Unsigned.t [@@deriving sexp, bin_io, compare]
+        type fee = Fee.Unsigned.t [@@deriving sexp, bin_io, compare, yojson]
 
         type public_key = Compressed_public_key.t
-        [@@deriving sexp, bin_io, compare]
+        [@@deriving sexp, bin_io, compare, yojson]
 
-        module T = struct
-          type t = {fee: fee; proofs: proof list; prover: public_key}
-          [@@deriving sexp, bin_io, compare]
-        end
-
-        include T
-
-        module Statement = struct
-          module T = struct
-            type t = statement list
-            [@@deriving sexp, bin_io, compare, hash, eq]
+        module Stable = struct
+          module V1 = struct
+            type t = {fee: fee; proofs: proof list; prover: public_key}
+            [@@deriving sexp, bin_io, compare, yojson]
           end
 
-          include T
-          include Hashable.Make_binable (T)
+          module Latest = V1
+        end
+
+        type t = Stable.Latest.t =
+          {fee: fee; proofs: proof list; prover: public_key}
+        [@@deriving sexp, compare]
+
+        module Statement = struct
+          module Stable = struct
+            module V1 = struct
+              module T = struct
+                type t = statement list
+                [@@deriving sexp, bin_io, compare, hash, eq]
+              end
+
+              include T
+              include Hashable.Make_binable (T)
+            end
+
+            module Latest = V1
+          end
+
+          type t = Stable.Latest.t [@@deriving sexp, compare, hash, eq]
+
+          include Hashable.Make (Stable.Latest)
 
           let gen =
             Quickcheck.Generator.list_with_length proofs_length
@@ -1781,7 +1857,11 @@ let%test_module "test" =
         type unchecked = t
 
         module Checked = struct
-          include T
+          module Stable = Stable
+
+          type t = Stable.Latest.t =
+            {fee: fee; proofs: proof list; prover: public_key}
+          [@@deriving sexp, compare]
 
           let create_unsafe = Fn.id
         end
@@ -1792,33 +1872,37 @@ let%test_module "test" =
       end
 
       module Staged_ledger_diff = struct
-        type completed_work = Transaction_snark_work.t
-        [@@deriving sexp, bin_io, compare]
+        (* TODO : version *)
+        type completed_work = Transaction_snark_work.Stable.V1.t
+        [@@deriving sexp, bin_io, compare, yojson]
 
-        type completed_work_checked = Transaction_snark_work.Checked.t
-        [@@deriving sexp, bin_io, compare]
+        (* TODO : version *)
+        type completed_work_checked =
+          Transaction_snark_work.Checked.Stable.V1.t
+        [@@deriving sexp, bin_io, compare, yojson]
 
-        type user_command = User_command.t [@@deriving sexp, bin_io, compare]
+        type user_command = User_command.t
+        [@@deriving sexp, bin_io, compare, yojson]
 
         type fee_transfer_single = Fee_transfer.single
-        [@@deriving sexp, bin_io]
+        [@@deriving sexp, bin_io, yojson]
 
         type user_command_with_valid_signature =
           User_command.With_valid_signature.t
-        [@@deriving sexp, bin_io, compare]
+        [@@deriving sexp, bin_io, compare, yojson]
 
         type public_key = Compressed_public_key.t
-        [@@deriving sexp, bin_io, compare]
+        [@@deriving sexp, bin_io, compare, yojson]
 
         type staged_ledger_hash = Staged_ledger_hash.t
-        [@@deriving sexp, bin_io, compare]
+        [@@deriving sexp, bin_io, compare, yojson]
 
         module At_most_two = struct
           type 'a t =
             | Zero
             | One of 'a option
             | Two of ('a * 'a option) option
-          [@@deriving sexp, bin_io]
+          [@@deriving sexp, bin_io, yojson]
 
           let increase t ws =
             match (t, ws) with
@@ -1831,7 +1915,8 @@ let%test_module "test" =
         end
 
         module At_most_one = struct
-          type 'a t = Zero | One of 'a option [@@deriving sexp, bin_io]
+          type 'a t = Zero | One of 'a option
+          [@@deriving sexp, bin_io, yojson]
 
           let increase t ws =
             match (t, ws) with
@@ -1844,44 +1929,54 @@ let%test_module "test" =
           { completed_works: completed_work list
           ; user_commands: user_command list
           ; coinbase: fee_transfer_single At_most_two.t }
-        [@@deriving sexp, bin_io]
+        [@@deriving sexp, bin_io, yojson]
 
         type pre_diff_with_at_most_one_coinbase =
           { completed_works: completed_work list
           ; user_commands: user_command list
           ; coinbase: fee_transfer_single At_most_one.t }
-        [@@deriving sexp, bin_io]
+        [@@deriving sexp, bin_io, yojson]
 
         type diff =
           pre_diff_with_at_most_two_coinbase
           * pre_diff_with_at_most_one_coinbase option
-        [@@deriving sexp, bin_io]
+        [@@deriving sexp, bin_io, yojson]
 
-        type t =
+        module Stable = struct
+          module V1 = struct
+            type t =
+              {diff: diff; prev_hash: staged_ledger_hash; creator: public_key}
+            [@@deriving sexp, bin_io]
+          end
+
+          module Latest = V1
+        end
+
+        type t = Stable.Latest.t =
           {diff: diff; prev_hash: staged_ledger_hash; creator: public_key}
-        [@@deriving sexp, bin_io]
+        [@@deriving sexp, yojson]
 
         module With_valid_signatures_and_proofs = struct
           type pre_diff_with_at_most_two_coinbase =
             { completed_works: completed_work_checked list
             ; user_commands: user_command_with_valid_signature list
             ; coinbase: fee_transfer_single At_most_two.t }
-          [@@deriving sexp]
+          [@@deriving sexp, yojson]
 
           type pre_diff_with_at_most_one_coinbase =
             { completed_works: completed_work_checked list
             ; user_commands: user_command_with_valid_signature list
             ; coinbase: fee_transfer_single At_most_one.t }
-          [@@deriving sexp]
+          [@@deriving sexp, yojson]
 
           type diff =
             pre_diff_with_at_most_two_coinbase
             * pre_diff_with_at_most_one_coinbase option
-          [@@deriving sexp]
+          [@@deriving sexp, yojson]
 
           type t =
             {diff: diff; prev_hash: staged_ledger_hash; creator: public_key}
-          [@@deriving sexp]
+          [@@deriving sexp, yojson]
 
           let user_commands t =
             (fst t.diff).user_commands
@@ -2001,7 +2096,7 @@ let%test_module "test" =
 
     let%test_unit "Max throughput" =
       (*Always at worst case number of provers. This is enforced by creating proof bundles *)
-      let logger = Logger.create () in
+      let logger = Logger.null () in
       let p =
         Int.pow 2
           Transaction_snark_scan_state.Constants.transaction_capacity_log_2
@@ -2040,7 +2135,7 @@ let%test_module "test" =
     let%test_unit "Be able to include random number of user_commands" =
       (*Always at worst case number of provers*)
       Backtrace.elide := false ;
-      let logger = Logger.create () in
+      let logger = Logger.null () in
       let p =
         Int.pow 2
           Transaction_snark_scan_state.Constants.transaction_capacity_log_2
@@ -2086,7 +2181,7 @@ let%test_module "test" =
           ; prover= "P" }
       in
       Backtrace.elide := false ;
-      let logger = Logger.create () in
+      let logger = Logger.null () in
       let p =
         Int.pow 2
           Transaction_snark_scan_state.Constants.transaction_capacity_log_2
@@ -2133,7 +2228,7 @@ let%test_module "test" =
               ; proofs= stmts
               ; prover= "P" }
           in
-          let logger = Logger.create () in
+          let logger = Logger.null () in
           let txns =
             List.init 6 ~f:(fun _ -> [])
             @ [[(1, 0); (1, 0); (1, 0)]] @ [[(1, 0); (1, 0)]]
@@ -2182,7 +2277,7 @@ let%test_module "test" =
       Quickcheck.test g ~trials:50 ~f:(fun i ->
           Async.Thread_safe.block_on_async_exn (fun () ->
               let open Deferred.Let_syntax in
-              let logger = Logger.create () in
+              let logger = Logger.null () in
               let txns = txns i (fun x -> (x + 1) * 100) (fun _ -> 4) in
               let scan_state = Sl.scan_state !sl in
               let work =
@@ -2218,7 +2313,7 @@ let%test_module "test" =
 
     let%test_unit "Snarked ledger" =
       Backtrace.elide := false ;
-      let logger = Logger.create () in
+      let logger = Logger.null () in
       let p =
         Int.pow 2
           Transaction_snark_scan_state.Constants.transaction_capacity_log_2
@@ -2250,7 +2345,7 @@ let%test_module "test" =
     let%test_unit "max throughput-random number of proofs-worst case provers" =
       (*Always at worst case number of provers*)
       Backtrace.elide := false ;
-      let logger = Logger.create () in
+      let logger = Logger.null () in
       let p =
         Int.pow 2
           Transaction_snark_scan_state.Constants.transaction_capacity_log_2
@@ -2300,7 +2395,7 @@ let%test_module "test" =
                    case provers" =
       (*Always at worst case number of provers*)
       Backtrace.elide := false ;
-      let logger = Logger.create () in
+      let logger = Logger.null () in
       let p =
         Int.pow 2
           Transaction_snark_scan_state.Constants.transaction_capacity_log_2
@@ -2367,7 +2462,7 @@ let%test_module "test" =
         else None
       in
       Backtrace.elide := false ;
-      let logger = Logger.create () in
+      let logger = Logger.null () in
       let p =
         Int.pow 2
           Transaction_snark_scan_state.Constants.transaction_capacity_log_2

@@ -1,10 +1,12 @@
 [%%import "config/ledger_depth/tiny.mlh"]
+[%%import "config/curve_size/small.mlh"]
 [%%import "config/coinbase/standard.mlh"]
 [%%import "config/consensus/postake_tiny.mlh"]
 [%%import "config/scan_state/small.mlh"]
 [%%import "config/debug_level/some.mlh"]
 [%%import "config/proof_level/none.mlh"]
 
+[%%define time_offsets false]
 [%%define fake_hash true]
 
 [%%define genesis_ledger "test"]

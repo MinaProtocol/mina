@@ -1,3 +1,6 @@
+[%%import
+"../../config.mlh"]
+
 open Util
 open Core_kernel
 open Snark_params
@@ -14,7 +17,7 @@ module Time = struct
       module T = struct
         let version = 1
 
-        type t = UInt64.t [@@deriving bin_io, sexp, compare, eq, hash]
+        type t = UInt64.t [@@deriving bin_io, sexp, compare, eq, hash, yojson]
       end
 
       include T
@@ -34,13 +37,31 @@ module Time = struct
   end
 
   module Controller = struct
+    [%%if
+    time_offsets]
+
+    type t = Time.Span.t Lazy.t
+
+    let create offset = offset
+
+    let basic =
+      lazy
+        ( Core_kernel.Time.Span.of_int_sec @@ Int.of_string
+        @@ Unix.getenv "CODA_TIME_OFFSET" )
+
+    [%%else]
+
     type t = unit
 
     let create () = ()
+
+    let basic = ()
+
+    [%%endif]
   end
 
   (* DO NOT add bin_io the deriving list *)
-  type t = Stable.Latest.t [@@deriving sexp, compare, eq, hash]
+  type t = Stable.Latest.t [@@deriving sexp, compare, eq, hash, yojson]
 
   type t0 = t
 
@@ -128,7 +149,16 @@ module Time = struct
     Time.of_span_since_epoch
       (Time.Span.of_ms (Int64.to_float (UInt64.to_int64 t)))
 
+  [%%if
+  time_offsets]
+
+  let now offset = of_time (Time.sub (Time.now ()) (Lazy.force offset))
+
+  [%%else]
+
   let now _ = of_time (Time.now ())
+
+  [%%endif]
 
   let field_var_to_unpacked (x : Tick.Field.Var.t) =
     Tick.Field.Checked.unpack ~length:64 x

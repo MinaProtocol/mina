@@ -35,8 +35,8 @@ module Make (Inputs : Inputs_intf) :
    and type state_hash := State_hash.t
    and type external_transition := Inputs.External_transition.t
    and type transition_frontier := Inputs.Transition_frontier.t
-   and type syncable_ledger_query := Sync_ledger.query
-   and type syncable_ledger_answer := Sync_ledger.answer = struct
+   and type syncable_ledger_query := Sync_ledger.Query.t
+   and type syncable_ledger_answer := Sync_ledger.Answer.t = struct
   open Inputs
 
   let get_breadcrumb_ledgers frontier =
@@ -61,11 +61,8 @@ module Make (Inputs : Inputs_intf) :
   let answer_query ~frontier hash query ~logger =
     let open Option.Let_syntax in
     let%map ledger = get_ledger_by_hash ~frontier hash in
-    let responder =
-      Sync_ledger.Mask.Responder.create ledger ignore ~parent_log:logger
-    in
-    let answer = Sync_ledger.Mask.Responder.answer_query responder query in
-    (hash, answer)
+    let responder = Sync_ledger.Mask.Responder.create ledger ignore ~logger in
+    Sync_ledger.Mask.Responder.answer_query responder query
 
   let transition_catchup ~frontier state_hash =
     let open Option.Let_syntax in

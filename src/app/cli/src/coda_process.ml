@@ -20,7 +20,7 @@ let spawn_exn (config : Coda_worker.Input.t) =
 
 let local_config ?proposal_interval ~peers ~discovery_port ~external_port
     ~acceptable_delay ~program_dir ~proposer ~snark_worker_config
-    ~work_selection () =
+    ~work_selection ~offset ~trace_dir () =
   let host = "127.0.0.1" in
   let conf_dir =
     Filename.temp_dir_name
@@ -29,18 +29,24 @@ let local_config ?proposal_interval ~peers ~discovery_port ~external_port
   let config =
     { Coda_worker.Input.host
     ; env=
-        Core.Unix.environment () |> Array.to_list
-        |> List.filter_map
-             ~f:
-               (Fn.compose
-                  (function [a; b] -> Some (a, b) | _ -> None)
-                  (String.split ~on:'='))
+        ( "CODA_TIME_OFFSET"
+        , Time.Span.to_int63_seconds_round_down_exn offset
+          |> Int63.to_int
+          |> Option.value_exn ?here:None ?message:None ?error:None
+          |> Int.to_string )
+        :: ( Core.Unix.environment () |> Array.to_list
+           |> List.filter_map
+                ~f:
+                  (Fn.compose
+                     (function [a; b] -> Some (a, b) | _ -> None)
+                     (String.split ~on:'=')) )
     ; proposer
     ; external_port
     ; snark_worker_config
     ; work_selection
     ; peers
     ; conf_dir
+    ; trace_dir
     ; program_dir
     ; acceptable_delay
     ; discovery_port }
@@ -49,8 +55,8 @@ let local_config ?proposal_interval ~peers ~discovery_port ~external_port
 
 let disconnect (conn, proc, _) =
   let%bind () = Coda_worker.Connection.close conn in
-  let%bind _ : Unix.Exit_or_signal.t = Process.wait proc in
-  return ()
+  let%map _ : Unix.Exit_or_signal.t = Process.wait proc in
+  ()
 
 let peers_exn (conn, proc, _) =
   Coda_worker.Connection.run_exn conn ~f:Coda_worker.functions.peers ~arg:()

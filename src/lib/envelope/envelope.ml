@@ -1,21 +1,59 @@
 open Core
 open Network_peer
+open Module_version
+
+module Sender = struct
+  module Stable = struct
+    module V1 = struct
+      module T = struct
+        let version = 1
+
+        type t = Local | Remote of Peer.t [@@deriving sexp, bin_io, yojson]
+      end
+
+      include T
+      include Registration.Make_latest_version (T)
+    end
+
+    module Latest = V1
+
+    module Module_decl = struct
+      let name = "envelope_sender"
+
+      type latest = Latest.t
+    end
+
+    module Registrar = Registration.Make (Module_decl)
+    module Registered_V1 = Registrar.Register (V1)
+  end
+
+  (* bin_io intentionally omitted in deriving list *)
+  type t = Stable.Latest.t = Local | Remote of Peer.t
+  [@@deriving sexp, yojson]
+end
 
 module Incoming = struct
-  type 'a t = {data: 'a; sender: Peer.t} [@@deriving sexp, bin_io]
+  module Stable = struct
+    module V1 = struct
+      type 'a t = {data: 'a; sender: Sender.Stable.V1.t}
+      [@@deriving sexp, bin_io]
+    end
 
-  let sender {sender; _} = sender
+    module Latest = V1
+  end
 
-  let data {data; _} = data
+  (* bin_io intentionally omitted *)
+  type 'a t = 'a Stable.Latest.t [@@deriving sexp]
 
-  let wrap ~data ~sender = {data; sender}
+  let sender t = t.Stable.Latest.sender
 
-  let map ~f t = {t with data= f t.data}
+  let data t = t.Stable.Latest.data
+
+  let wrap ~data ~sender = Stable.Latest.{data; sender}
+
+  let map ~f t = Stable.Latest.{t with data= f t.data}
 
   let local data =
-    let sender =
-      Peer.create Unix.Inet_addr.localhost ~discovery_port:0
-        ~communication_port:0
-    in
-    {data; sender}
+    let sender = Sender.Local in
+    Stable.Latest.{data; sender}
 end

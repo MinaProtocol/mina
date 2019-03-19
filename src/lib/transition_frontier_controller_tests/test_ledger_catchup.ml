@@ -78,7 +78,7 @@ let%test_module "Ledger catchup" =
     let%test "catchup to a peer" =
       Core.Backtrace.elide := false ;
       Async.Scheduler.set_record_backtraces true ;
-      let logger = Logger.create () in
+      let logger = Logger.null () in
       Thread_safe.block_on_async_exn (fun () ->
           let%bind me, peer, network =
             Network_builder.setup_me_and_a_peer
@@ -97,7 +97,7 @@ let%test_module "Ledger catchup" =
 
     let%test_unit "peers can provide transitions with length between \
                    max_length to 2 * max_length" =
-      let logger = Logger.create () in
+      let logger = Logger.null () in
       Thread_safe.block_on_async_exn (fun () ->
           let num_breadcrumbs =
             Int.gen_incl max_length (2 * max_length) |> Quickcheck.random_value
@@ -111,8 +111,11 @@ let%test_module "Ledger catchup" =
           let best_transition =
             Transition_frontier.Breadcrumb.transition_with_hash best_breadcrumb
           in
-          Logger.info logger !"Best transition of peer: %{sexp:State_hash.t}"
-          @@ With_hash.hash best_transition ;
+          Logger.info logger ~module_:__MODULE__ ~location:__LOC__
+            ~metadata:
+              [ ( "state_hash"
+                , State_hash.to_yojson (With_hash.hash best_transition) ) ]
+            "Best transition of peer: $state_hash" ;
           let history =
             Transition_frontier.root_history_path_map peer.frontier
               (With_hash.hash best_transition)
