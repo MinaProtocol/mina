@@ -100,8 +100,7 @@ struct
           (Ledger_hash.Stable.V1.t * Sync_ledger.Query.Stable.V1.t)
           Envelope.Incoming.Stable.V1.t
 
-        type response =
-          (Ledger_hash.Stable.V1.t * Sync_ledger.Answer.Stable.V1.t) Or_error.t
+        type response = Sync_ledger.Answer.Stable.V1.t Or_error.t
       end
 
       module Caller = T
@@ -124,8 +123,7 @@ struct
           Envelope.Incoming.Stable.V1.t
         [@@deriving bin_io, sexp]
 
-        type response =
-          (Ledger_hash.Stable.V1.t * Sync_ledger.Answer.Stable.V1.t) Or_error.t
+        type response = Sync_ledger.Answer.Stable.V1.t Or_error.t
         [@@deriving bin_io, sexp]
 
         let version = 1
@@ -419,7 +417,7 @@ module Make (Inputs : Inputs_intf) = struct
       ~(answer_sync_ledger_query :
             (Ledger_hash.t * Ledger.Location.Addr.t Syncable_ledger.Query.t)
             Envelope.Incoming.t
-         -> (Ledger_hash.t * Sync_ledger.Answer.t) Deferred.Or_error.t)
+         -> Sync_ledger.Answer.t Deferred.Or_error.t)
       ~(transition_catchup :
             State_hash.t Envelope.Incoming.t
          -> External_transition.t Non_empty_list.t option Deferred.t)
@@ -621,10 +619,9 @@ module Make (Inputs : Inputs_intf) = struct
             let peers = get_random_peers () in
             get_ancestry_non_preferred_peers t input_in_envelope peers )
 
-  (* TODO: Check whether responses are good or not. *)
   let glue_sync_ledger t query_reader response_writer =
-    (* We attempt to query 3 random peers, retry_max times. We keep track
-       of the peers that couldn't answer a particular query and won't try them
+    (* We attempt to query 3 random peers, retry_max times. We keep track of the
+       peers that couldn't answer a particular query and won't try them
        again. *)
     let retry_max = 6 in
     let retry_interval = Core.Time.Span.of_ms 200. in
@@ -651,7 +648,7 @@ module Make (Inputs : Inputs_intf) = struct
                 Logger.trace t.log
                   !"Received answer from peer %{sexp: Peer.t} on ledger_hash \
                     %{sexp: Ledger_hash.t}"
-                  peer (fst answer) ;
+                  peer (fst query) ;
                 Some
                   (Envelope.Incoming.wrap ~data:answer
                      ~sender:(Envelope.Sender.Remote peer))
@@ -667,9 +664,10 @@ module Make (Inputs : Inputs_intf) = struct
       | Some answer ->
           Logger.trace t.log
             !"Succeeding with answer on ledger_hash %{sexp: Ledger_hash.t}"
-            (fst answer.data) ;
+            (fst query) ;
           (* TODO *)
-          Linear_pipe.write_if_open response_writer answer
+          Linear_pipe.write_if_open response_writer
+            (fst query, snd query, answer)
       | None ->
           Logger.info t.log !"None of the peers I asked knew; trying more" ;
           if ctr > retry_max then Deferred.unit

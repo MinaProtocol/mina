@@ -64,8 +64,7 @@ module Make (Inputs : Inputs_intf) :
     let responder =
       Sync_ledger.Mask.Responder.create ledger ignore ~parent_log:logger
     in
-    let answer = Sync_ledger.Mask.Responder.answer_query responder query in
-    (hash, answer)
+    Sync_ledger.Mask.Responder.answer_query responder query
 
   let transition_catchup ~frontier state_hash =
     let open Option.Let_syntax in

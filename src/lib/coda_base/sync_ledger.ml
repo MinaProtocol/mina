@@ -23,7 +23,7 @@ module Mask = Syncable_ledger.Make (struct
   module Hash = Hash
   module Root_hash = Root_hash
 
-  let subtree_height = 3
+  let account_subtree_height = 3
 end)
 
 module Db = Syncable_ledger.Make (struct
@@ -33,7 +33,7 @@ module Db = Syncable_ledger.Make (struct
   module Hash = Hash
   module Root_hash = Root_hash
 
-  let subtree_height = 3
+  let account_subtree_height = 3
 end)
 
 module Answer = struct

@@ -501,7 +501,8 @@ struct
                 !"Found an answer for : %{sexp:(Ledger.Addr.t \
                   Syncable_ledger.Query.t)}"
                 sync_ledger_query ;
-              Pipe_lib.Linear_pipe.write response_writer answer )
+              Pipe_lib.Linear_pipe.write response_writer
+                (ledger_hash, sync_ledger_query, answer) )
       |> don't_wait_for
   end
 
