@@ -201,7 +201,7 @@ struct
       module T = struct
         (* "master" types, do not change *)
         type query =
-          Consensus.Consensus_state.value Envelope.Incoming.Stable.V1.t
+          Consensus.Consensus_state.Value.t Envelope.Incoming.Stable.V1.t
         [@@deriving sexp]
 
         type response =
@@ -229,7 +229,8 @@ struct
     module V1 = struct
       module T = struct
         type query =
-          Consensus.Consensus_state.value Envelope.Incoming.Stable.V1.t
+          Consensus.Consensus_state.Value.Stable.V1.t
+          Envelope.Incoming.Stable.V1.t
         [@@deriving bin_io, sexp]
 
         type response =
@@ -424,7 +425,7 @@ module Make (Inputs : Inputs_intf) = struct
             State_hash.t Envelope.Incoming.t
          -> External_transition.t Non_empty_list.t option Deferred.t)
       ~(get_ancestry :
-            Consensus.Consensus_state.value Envelope.Incoming.t
+            Consensus.Consensus_state.Value.t Envelope.Incoming.t
          -> ( ( External_transition.t
               , State_body_hash.t list * External_transition.t )
               Proof_carrying_data.t
