@@ -83,14 +83,18 @@ module Reader0 = struct
   let map reader ~f =
     assert_not_read reader ;
     reader.has_reader <- true ;
-    let strict_reader = wrap_reader (Pipe.map reader.reader ~f) in
+    let strict_reader =
+      wrap_reader ?name:reader.name (Pipe.map reader.reader ~f)
+    in
     reader.downstreams <- [strict_reader] ;
     strict_reader
 
   let filter_map reader ~f =
     assert_not_read reader ;
     reader.has_reader <- true ;
-    let strict_reader = wrap_reader (Pipe.filter_map reader.reader ~f) in
+    let strict_reader =
+      wrap_reader ?name:reader.name (Pipe.filter_map reader.reader ~f)
+    in
     reader.downstreams <- [strict_reader] ;
     strict_reader
 
@@ -149,7 +153,9 @@ module Reader0 = struct
       don't_wait_for
         (let%map () = Deferred.List.iter readers ~f:Pipe.closed in
          Pipe.close_read reader.reader) ;
-      let strict_readers = List.map readers ~f:wrap_reader in
+      let strict_readers =
+        List.map readers ~f:(wrap_reader ?name:reader.name)
+      in
       reader.downstreams <- downstreams_from_list strict_readers ;
       strict_readers
 
