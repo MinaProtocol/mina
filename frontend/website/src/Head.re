@@ -43,6 +43,11 @@ let make = (~extra, ~filename, _children) => {
       />
       extra
       <title> {ReasonReact.string("Coda Cryptocurrency Protocol")} </title>
+      <link
+        rel="stylesheet"
+        type_="text/css"
+        href="/static/css/normalize.css"
+      />
       <link rel="stylesheet" type_="text/css" href={filename ++ ".css"} />
       <link
         rel="icon"
