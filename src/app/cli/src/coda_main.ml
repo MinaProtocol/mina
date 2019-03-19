@@ -728,8 +728,9 @@ struct
            ~data:
              (Add_solved_work
                 ( List.map res.spec.instances ~f:Single.Spec.statement
-                , { Diff.proof= res.proofs
-                  ; fee= {fee= res.spec.fee; prover= res.prover} } ))
+                , Diff.Priced_proof.
+                    { proof= res.proofs
+                    ; fee= {fee= res.spec.fee; prover= res.prover} } ))
            ~sender:Envelope.Sender.Local)
   end
 
