@@ -85,7 +85,7 @@ module Make (Inputs : Inputs_intf) :
     |> Unix_timestamp.of_int64
 
   let create_bufferred_pipe ?name () =
-    Strict_pipe.create ?name (Buffered (`Capacity 10, `Overflow Drop_head))
+    Strict_pipe.create ?name (Buffered (`Capacity 10, `Overflow Crash))
 
   let kill reader writer =
     Strict_pipe.Reader.clear reader ;
@@ -145,7 +145,7 @@ module Make (Inputs : Inputs_intf) :
       Strict_pipe.Writer.write clear_writer `Clear |> don't_wait_for ;
       let bootstrap_controller_reader, bootstrap_controller_writer =
         Strict_pipe.create ~name:"bootstrap controller"
-          (Buffered (`Capacity 10, `Overflow Drop_head))
+          (Buffered (`Capacity 10, `Overflow Crash))
       in
       Logger.info logger ~module_:__MODULE__ ~location:__LOC__
         "Bootstrap state: starting." ;

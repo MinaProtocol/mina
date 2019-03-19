@@ -71,20 +71,18 @@ module Make (Inputs : Inputs_intf) :
     let valid_transition_pipe_capacity = 10 in
     let valid_transition_reader, valid_transition_writer =
       Strict_pipe.create ~name:"valid transitions"
-        (Buffered
-           (`Capacity valid_transition_pipe_capacity, `Overflow Drop_head))
+        (Buffered (`Capacity valid_transition_pipe_capacity, `Overflow Crash))
     in
     let primary_transition_pipe_capacity =
       valid_transition_pipe_capacity + List.length collected_transitions
     in
     let primary_transition_reader, primary_transition_writer =
       Strict_pipe.create ~name:"primary transitions"
-        (Buffered
-           (`Capacity primary_transition_pipe_capacity, `Overflow Drop_head))
+        (Buffered (`Capacity primary_transition_pipe_capacity, `Overflow Crash))
     in
     let processed_transition_reader, processed_transition_writer =
       Strict_pipe.create ~name:"processed transitions"
-        (Buffered (`Capacity 10, `Overflow Drop_head))
+        (Buffered (`Capacity 10, `Overflow Crash))
     in
     let catchup_job_reader, catchup_job_writer =
       Strict_pipe.create ~name:"catchup jobs" Synchronous

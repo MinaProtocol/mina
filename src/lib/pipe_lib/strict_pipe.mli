@@ -1,8 +1,8 @@
 open Async_kernel
 
-exception Overflow
+exception Overflow of string option
 
-exception Multiple_reads_attempted
+exception Multiple_reads_attempted of string option
 
 type crash = Overflow_behavior_crash
 
@@ -103,7 +103,7 @@ module Writer : sig
 end
 
 val create :
-  ?name:string
+     ?name:string
   -> ('type_, 'write_return) type_
   -> 't Reader.t * ('t, 'type_, 'write_return) Writer.t
 

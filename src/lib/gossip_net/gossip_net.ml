@@ -160,7 +160,7 @@ module Make (Message : Message_intf) :
         let broadcast_reader, broadcast_writer = Linear_pipe.create () in
         let received_reader, received_writer =
           Strict_pipe.create ~name:"received gossip messages"
-            (Buffered (`Capacity 64, `Overflow Drop_head))
+            (Buffered (`Capacity 64, `Overflow Crash))
         in
         let t =
           { timeout= config.timeout

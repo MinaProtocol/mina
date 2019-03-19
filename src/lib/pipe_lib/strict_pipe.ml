@@ -1,9 +1,9 @@
 open Async_kernel
 open Core_kernel
 
-exception Overflow
+exception Overflow of string option
 
-exception Multiple_reads_attempted
+exception Multiple_reads_attempted of string option
 
 type crash = Overflow_behavior_crash
 
@@ -46,7 +46,7 @@ module Reader0 = struct
     {reader; has_reader; downstreams= []; name}
 
   let assert_not_read reader =
-    if reader.has_reader then raise Multiple_reads_attempted
+    if reader.has_reader then raise (Multiple_reads_attempted reader.name)
 
   let wrap_reader ?name reader =
     {reader; has_reader= false; downstreams= []; name}
@@ -181,7 +181,7 @@ module Writer = struct
       ('t, b buffered, unit) t -> 't -> b overflow_behavior -> unit =
    fun writer data overflow_behavior ->
     match overflow_behavior with
-    | Crash -> raise Overflow
+    | Crash -> raise (Overflow writer.name)
     | Drop_head ->
         let logger = Logger.create () in
         let my_name = Option.value writer.name ~default:"<unnamed>" in
