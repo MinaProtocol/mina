@@ -77,7 +77,7 @@ struct
           let%bind ( `Hash_after_applying staged_ledger_hash
                    , `Ledger_proof proof_opt
                    , `Staged_ledger transitioned_staged_ledger
-                   , `Pending_coinbase_update _ ) =
+                   , `Pending_coinbase_data _ ) =
             let open Deferred.Let_syntax in
             match%map
               Inputs.Staged_ledger.apply ~logger staged_ledger

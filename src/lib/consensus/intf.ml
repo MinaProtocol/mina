@@ -6,13 +6,13 @@ open Coda_numbers
 module type Prover_state_intf = sig
   type t [@@deriving bin_io, sexp]
 
-  type pending_coinbase_collection
+  type pending_coinbase_witness
 
   val precomputed_handler : Snark_params.Tick.Handler.t
 
   val handler :
        t
-    -> pending_coinbase:pending_coinbase_collection
+    -> pending_coinbase:pending_coinbase_witness
     -> Snark_params.Tick.Handler.t
 end
 
@@ -79,7 +79,7 @@ module type S = sig
 
   module Prover_state :
     Prover_state_intf
-    with type pending_coinbase_collection := Coda_base.Pending_coinbase.t
+    with type pending_coinbase_witness := Coda_base.Pending_coinbase_witness.t
 
   module Protocol_state :
     Coda_base.Protocol_state.S

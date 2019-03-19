@@ -27,7 +27,7 @@ module type S = sig
     -> Consensus.Protocol_state.value
     -> Consensus.Snark_transition.value
     -> Consensus.Prover_state.t
-    -> Pending_coinbase.t
+    -> Pending_coinbase_witness.t
     -> Blockchain.t Deferred.Or_error.t
 end
 
@@ -43,7 +43,7 @@ module Worker_state = struct
       -> Consensus_mechanism.Protocol_state.value
       -> Consensus_mechanism.Snark_transition.value
       -> Consensus_mechanism.Prover_state.t
-      -> Pending_coinbase.t
+      -> Pending_coinbase_witness.t
       -> Blockchain.t
 
     val verify : Consensus_mechanism.Protocol_state.value -> Proof.t -> bool
@@ -190,7 +190,7 @@ module Functions = struct
         * Consensus_mechanism.Protocol_state.value
         * Consensus_mechanism.Snark_transition.value
         * Consensus_mechanism.Prover_state.t
-        * Pending_coinbase.t] Blockchain.bin_t
+        * Pending_coinbase_witness.t] Blockchain.bin_t
       (fun w
       ( ({Blockchain.state= prev_state; proof= prev_proof} as chain)
       , next_state
@@ -220,7 +220,7 @@ module Worker = struct
             * Consensus_mechanism.Protocol_state.value
             * Consensus_mechanism.Snark_transition.value
             * Consensus_mechanism.Prover_state.t
-            * Pending_coinbase.t
+            * Pending_coinbase_witness.t
           , Blockchain.t )
           F.t
       ; verify_blockchain: ('w, Blockchain.t, bool) F.t }

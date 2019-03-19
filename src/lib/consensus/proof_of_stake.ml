@@ -600,7 +600,9 @@ module Vrf = struct
         unstage (Coda_base.Sparse_ledger.handler dummy_sparse_ledger)
       in
       let pending_coinbase_handler =
-        unstage (Coda_base.Pending_coinbase.handler empty_pending_coinbase)
+        unstage
+          (Coda_base.Pending_coinbase.handler empty_pending_coinbase
+             ~is_new_stack:false)
       in
       let handlers =
         Snarky.Request.Handler.(
@@ -1158,11 +1160,13 @@ module Prover_state = struct
 
   let precomputed_handler = Vrf.Precomputed.handler
 
-  let handler {delegator; ledger; private_key} ~pending_coinbase :
-      Snark_params.Tick.Handler.t =
+  let handler {delegator; ledger; private_key}
+      ~pending_coinbase:{ Coda_base.Pending_coinbase_witness.pending_coinbases
+                        ; is_new_stack } : Snark_params.Tick.Handler.t =
     let ledger_handler = unstage (Coda_base.Sparse_ledger.handler ledger) in
     let pending_coinbase_handler =
-      unstage (Coda_base.Pending_coinbase.handler pending_coinbase)
+      unstage
+        (Coda_base.Pending_coinbase.handler pending_coinbases ~is_new_stack)
     in
     let handlers =
       Snarky.Request.Handler.(
@@ -1694,7 +1698,8 @@ let%test_module "Proof of stake tests" =
         let handler =
           Prover_state.handler
             {delegator; ledger= sparse_ledger; private_key}
-            ~pending_coinbase:pending_coinbases
+            ~pending_coinbase:
+              {Pending_coinbase_witness.pending_coinbases; is_new_stack= true}
         in
         let%map `Success _, var = Snark_params.Tick.handle result handler in
         As_prover.read typ var

@@ -32,9 +32,7 @@ module type S = sig
 
     val empty : t
 
-    val of_coinbase : Coinbase.t -> t Or_error.t
-
-    val add_coinbase : t -> Coinbase.t -> t Or_error.t
+    val of_coinbase : Coinbase.t -> t
 
     val genesis : t
   end
@@ -52,7 +50,7 @@ module type S = sig
   and Stack : sig
     include Data_hash.Full_size
 
-    val push : t -> Coinbase.t -> t Or_error.t
+    val push : t -> Coinbase.t -> t
 
     val empty : t
 
@@ -75,7 +73,7 @@ module type S = sig
 
   val merkle_root : t -> Hash.t
 
-  val handler : t -> (request -> response) Staged.t
+  val handler : t -> is_new_stack:bool -> (request -> response) Staged.t
 
   val update_coinbase_stack : t -> Stack.t -> is_new_stack:bool -> t Or_error.t
 
@@ -102,38 +100,27 @@ module type S = sig
       | Coinbase_stack_path : Address.value -> path Request.t
       | Get_coinbase_stack : Address.value -> (Stack.t * path) Request.t
       | Set_coinbase_stack : Address.value * Stack.t -> unit Request.t
-      | Find_index_of_newest_stack : bool -> Address.value Request.t
+      | Find_index_of_newest_stack : Address.value Request.t
       | Find_index_of_oldest_stack : Address.value Request.t
 
     val get : var -> Address.var -> (Stack.var, _) Tick.Checked.t
 
-    val add_coinbase :
-         var
-      -> is_new_stack:Boolean.var
-      -> Coinbase_data.var
-      -> (var, 's) Tick.Checked.t
+    val add_coinbase : var -> Coinbase_data.var -> (var, 's) Tick.Checked.t
     (**
    [update_stack t ~is_new_stack updtaed_stack] implements the following spec:
-   - gets the address[addr] of the latest stack or a new stack if [is_new_stack] is true
-   - finds a coinbase stack in [t] at path [addr] and replaces it with [updated_stack]
-   - returns a root [t'] of a tree
-   - resets any mutation to the store
-   which is [t].
+   - gets the address[addr] of the latest stack or a new stack
+   - finds a coinbase stack in [t] at path [addr] and pushes the coinbase_data on to the stack
+   - returns a root [t'] of the tree
   *)
 
     val pop_coinbases :
-         var
-      -> ledger_proof_stack:Stack.var
-      -> proof_emitted:Boolean.var
-      -> (var, 's) Tick.Checked.t
+      var -> proof_emitted:Boolean.var -> (var * Stack.var, 's) Tick.Checked.t
     (**
    [pop_coinbases t pk updated_stack] implements the following spec:
 
    - gets the address[addr] of the oldest stack.
-   - finds a coinbase stack in [t] at path [addr] and replaces it with empty stack
-   - returns a root [t'] of a tree
-   which is [t].
-   - resets any mutation to the store
+   - finds a coinbase stack in [t] at path [addr] and replaces it with empty stack if a [proof_emitted] is true
+   - returns a root [t'] of the tree
   *)
   end
 end

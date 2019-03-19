@@ -6,6 +6,10 @@ open O1trace
 module type Inputs_intf = sig
   include Protocols.Coda_pow.Inputs_intf
 
+  module Pending_coinbase_witness :
+    Protocols.Coda_pow.Pending_coinbase_witness_intf
+    with type pending_coinbases := Pending_coinbase.t
+
   module Ledger_db : sig
     type t
   end
@@ -37,7 +41,7 @@ module type Inputs_intf = sig
       -> prev_state_proof:Protocol_state_proof.t
       -> next_state:Consensus_mechanism.Protocol_state.value
       -> Internal_transition.t
-      -> Pending_coinbase.t
+      -> Pending_coinbase_witness.t
       -> Protocol_state_proof.t Deferred.Or_error.t
   end
 end
@@ -174,23 +178,23 @@ module Make (Inputs : Inputs_intf) :
       ~staged_ledger ~transactions ~get_completed_work ~logger
       ~(keypair : Keypair.t) ~proposal_data =
     let open Interruptible.Let_syntax in
+    let self = Public_key.compress keypair.public_key in
     let%bind ( diff
              , next_staged_ledger_hash
              , ledger_proof_opt
-             , pending_coinbase_update ) =
+             , is_new_stack
+             , coinbase_amount ) =
       Interruptible.uninterruptible
         (let open Deferred.Let_syntax in
         let diff =
           measure "create_diff" (fun () ->
-              Staged_ledger.create_diff staged_ledger
-                ~self:(Public_key.compress keypair.public_key)
-                ~logger ~transactions_by_fee:transactions ~get_completed_work
-          )
+              Staged_ledger.create_diff staged_ledger ~self ~logger
+                ~transactions_by_fee:transactions ~get_completed_work )
         in
         let%map ( `Hash_after_applying next_staged_ledger_hash
                 , `Ledger_proof ledger_proof_opt
                 , `Staged_ledger _transitioned_staged_ledger
-                , `Pending_coinbase_update pending_coinbase_update ) =
+                , `Pending_coinbase_data (is_new_stack, coinbase_amount) ) =
           let%map or_error =
             Staged_ledger.apply_diff_unchecked staged_ledger diff
           in
@@ -200,7 +204,8 @@ module Make (Inputs : Inputs_intf) :
         ( diff
         , next_staged_ledger_hash
         , ledger_proof_opt
-        , pending_coinbase_update ))
+        , is_new_stack
+        , coinbase_amount ))
     in
     let%bind protocol_state, consensus_transition_data =
       lift_sync (fun () ->
@@ -257,18 +262,20 @@ module Make (Inputs : Inputs_intf) :
                      ledger_proof_opt)
                 ~blockchain_state:
                   (Protocol_state.blockchain_state protocol_state)
-                ~consensus_data:consensus_transition_data ()
-                ~pending_coinbase_update
+                ~consensus_data:consensus_transition_data ~proposer:self
+                ~coinbase:coinbase_amount ()
             in
             let internal_transition =
               Internal_transition.create ~snark_transition
                 ~prover_state:(Proposal_data.prover_state proposal_data)
                 ~staged_ledger_diff:(Staged_ledger_diff.forget diff)
             in
-            Some
-              ( protocol_state
-              , internal_transition
-              , Staged_ledger.pending_coinbase_collection staged_ledger ) ) )
+            let witness =
+              { Pending_coinbase_witness.pending_coinbases=
+                  Staged_ledger.pending_coinbase_collection staged_ledger
+              ; is_new_stack }
+            in
+            Some (protocol_state, internal_transition, witness) ) )
 
   let run ~parent_log ~get_completed_work ~transaction_pool ~time_controller
       ~keypair ~consensus_local_state ~frontier_reader ~transition_writer =

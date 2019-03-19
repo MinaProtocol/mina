@@ -48,11 +48,15 @@ module Prover_state = struct
 
   let precomputed_handler =
     unstage
-      ( Coda_base.Pending_coinbase.handler
-      @@ (Pending_coinbase.create () |> Or_error.ok_exn) )
+      (Coda_base.Pending_coinbase.handler
+         (Pending_coinbase.create () |> Or_error.ok_exn)
+         ~is_new_stack:false)
 
-  let handler () ~pending_coinbase =
-    unstage (Coda_base.Pending_coinbase.handler pending_coinbase)
+  let handler ()
+      ~pending_coinbase:{ Coda_base.Pending_coinbase_witness.pending_coinbases
+                        ; is_new_stack } =
+    unstage
+      (Coda_base.Pending_coinbase.handler pending_coinbases ~is_new_stack)
 end
 
 module Proposal_data = struct

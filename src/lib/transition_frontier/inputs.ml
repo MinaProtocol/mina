@@ -74,7 +74,6 @@ module type Inputs_intf = sig
      and type user_command := User_command.t
      and type transaction_witness := Transaction_witness.t
      and type pending_coinbase_collection := Pending_coinbase.t
-     and type pending_coinbase_update := Pending_coinbase_update.t
 
   val max_length : int
 end

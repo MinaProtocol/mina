@@ -42,11 +42,6 @@ module type S = sig
     Coda_pow.Pending_coinbase_stack_state_intf
     with type pending_coinbase_stack := Pending_coinbase.Stack.t
 
-  module Pending_coinbase_update :
-    Pending_coinbase_update_intf
-    with type coinbase_data := Pending_coinbase.Coinbase_data.t
-     and type pending_coinbase_stack := Pending_coinbase.Stack.t
-
   module Ledger_proof_statement :
     Coda_pow.Ledger_proof_statement_intf
     with type ledger_hash := Frozen_ledger_hash.t

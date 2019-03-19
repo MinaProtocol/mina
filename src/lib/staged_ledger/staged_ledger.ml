@@ -41,7 +41,6 @@ module Make (Inputs : Inputs.S) : sig
      and type user_command := Inputs.User_command.t
      and type transaction_witness := Inputs.Transaction_witness.t
      and type pending_coinbase_collection := Inputs.Pending_coinbase.t
-     and type pending_coinbase_update := Inputs.Pending_coinbase_update.t
 end = struct
   open Inputs
   module Scan_state = Transaction_snark_scan_state.Make (Inputs)
@@ -385,16 +384,9 @@ end = struct
       (Pending_coinbase.latest_stack pending_coinbase_collection ~is_new_stack)
 
   let push_coinbase_and_get_new_collection current_stack (t : Transaction.t) =
-    let open Result.Let_syntax in
-    let pending_coinbase_before = current_stack in
     match t with
-    | Coinbase c ->
-        let%map pending_coinbase_after =
-          Pending_coinbase.Stack.push pending_coinbase_before c
-          |> to_staged_ledger_or_error
-        in
-        (pending_coinbase_before, pending_coinbase_after)
-    | _ -> Ok (pending_coinbase_before, pending_coinbase_before)
+    | Coinbase c -> Pending_coinbase.Stack.push current_stack c
+    | _ -> current_stack
 
   let apply_transaction_and_get_statement ledger current_stack s =
     let open Result.Let_syntax in
@@ -405,7 +397,7 @@ end = struct
     let source =
       Ledger.merkle_root ledger |> Frozen_ledger_hash.of_ledger_hash
     in
-    let%bind pending_coinbase_before, pending_coinbase_after =
+    let pending_coinbase_after =
       push_coinbase_and_get_new_collection current_stack s
     in
     let%map undo =
@@ -417,7 +409,7 @@ end = struct
       ; fee_excess
       ; supply_increase
       ; pending_coinbase_stack_state=
-          {source= pending_coinbase_before; target= pending_coinbase_after}
+          {source= current_stack; target= pending_coinbase_after}
       ; proof_type= `Base }
     , pending_coinbase_after )
 
@@ -797,9 +789,9 @@ end = struct
 
   (*update the pending_coinbase tree with the updated/new stack and delete the oldest stack if a proof was emitted*)
   let update_pending_coinbase_collection pending_coinbase_collection
-      updated_coinbase_stack coinbases ~is_new_stack ~ledger_proof =
+      updated_coinbase_stack ~is_new_stack ~ledger_proof =
     let open Result.Let_syntax in
-    let%bind oldest_stack, pending_coinbase_collection_updated1 =
+    let%bind pending_coinbase_collection_updated1 =
       if Option.is_some ledger_proof then
         let%bind oldest_stack, pending_coinbase_collection_updated1 =
           Pending_coinbase.remove_coinbase_stack pending_coinbase_collection
@@ -819,32 +811,25 @@ end = struct
                     "Pending coinbase stack of the ledger proof did not match \
                      the oldest stack in the pending coinbase tree"))
         in
-        (oldest_stack, pending_coinbase_collection_updated1)
-      else
-        let%map oldest_stack =
-          Pending_coinbase.oldest_stack pending_coinbase_collection
-          |> to_staged_ledger_or_error
-        in
-        (oldest_stack, pending_coinbase_collection)
+        pending_coinbase_collection_updated1
+      else Ok pending_coinbase_collection
     in
-    let%bind pending_coinbase_collection_updated2 =
+    let%map pending_coinbase_collection_updated2 =
       Pending_coinbase.update_coinbase_stack
         pending_coinbase_collection_updated1 updated_coinbase_stack
         ~is_new_stack
       |> to_staged_ledger_or_error
     in
-    let%map coinbase_data =
-      List.fold ~init:(Ok Pending_coinbase.Coinbase_data.empty) coinbases
-        ~f:(fun acc cb ->
-          let%bind acc = acc in
-          Pending_coinbase.Coinbase_data.add_coinbase acc cb
-          |> to_staged_ledger_or_error )
-    in
-    let update =
-      Pending_coinbase_update.create_value ~oldest_stack ~is_new_stack
-        ~coinbase_data
-    in
-    (update, pending_coinbase_collection_updated2)
+    pending_coinbase_collection_updated2
+
+  let coinbase_for_blockchain_snark (coinbases : Coinbase.t list) =
+    match coinbases with
+    | [] -> Ok Currency.Amount.zero
+    | [x] -> Ok x.amount
+    | [x; _] -> Ok x.amount
+    | _ ->
+        Error
+          (Staged_ledger_error.Coinbase_error "More than two coinbase parts")
 
   (* N.B.: we don't expose apply_diff_unverified
      in For_tests only, we expose apply apply_unverified, which calls apply_diff_unverified *)
@@ -927,10 +912,13 @@ end = struct
           eprintf !"Unexpected error: %s %{sexp:Error.t}\n%!" __LOC__ e ) ;
       Deferred.return (to_staged_ledger_or_error r)
     in
-    let%bind pending_coinbase_update, updated_pending_coinbase_collection' =
+    let%bind updated_pending_coinbase_collection' =
       update_pending_coinbase_collection t.pending_coinbase_collection
-        updated_coinbase_stack coinbases ~is_new_stack ~ledger_proof:res_opt
+        updated_coinbase_stack ~is_new_stack ~ledger_proof:res_opt
       |> Deferred.return
+    in
+    let%bind coinbase_amount =
+      coinbase_for_blockchain_snark coinbases |> Deferred.return
     in
     let%map () =
       Deferred.return
@@ -953,7 +941,7 @@ end = struct
     ( `Hash_after_applying (hash new_staged_ledger)
     , `Ledger_proof res_opt
     , `Staged_ledger new_staged_ledger
-    , `Pending_coinbase_update pending_coinbase_update )
+    , `Pending_coinbase_data (is_new_stack, coinbase_amount) )
 
   let apply t witness ~logger = apply_diff t witness ~logger
 
@@ -1044,9 +1032,13 @@ end = struct
       Or_error.ok_exn
         (Scan_state.fill_work_and_enqueue_transactions scan_state' data works)
     in
-    let%map pending_coinbase_update, update_pending_coinbase_collection' =
+    let%bind coinbase_amount =
+      coinbase_for_blockchain_snark coinbases
+      |> Staged_ledger_error.to_or_error |> Deferred.return
+    in
+    let%map update_pending_coinbase_collection' =
       update_pending_coinbase_collection t.pending_coinbase_collection
-        updated_coinbase_stack coinbases ~is_new_stack ~ledger_proof:res_opt
+        updated_coinbase_stack ~is_new_stack ~ledger_proof:res_opt
       |> Staged_ledger_error.to_or_error |> Deferred.return
     in
     Or_error.ok_exn
@@ -1061,7 +1053,7 @@ end = struct
     ( `Hash_after_applying (hash new_staged_ledger)
     , `Ledger_proof res_opt
     , `Staged_ledger new_staged_ledger
-    , `Pending_coinbase_update pending_coinbase_update )
+    , `Pending_coinbase_data (is_new_stack, coinbase_amount) )
 
   module Resources = struct
     module Discarded = struct
@@ -1787,29 +1779,7 @@ let%test_module "test" =
 
           let to_string (pk, amt) = pk ^ Currency.Amount.to_string amt
 
-          let of_coinbase (cb : Coinbase.t) : t Or_error.t =
-            Option.value_map cb.fee_transfer
-              ~default:(Ok (cb.proposer, cb.amount))
-              ~f:(fun (_, fee) ->
-                match
-                  Currency.Amount.sub cb.amount (Currency.Amount.of_fee fee)
-                with
-                | None -> Or_error.error_string "Coinbase underflow"
-                | Some amount -> Ok (cb.proposer, amount) )
-
-          let add_coinbase (pk1, amt1) cb : t Or_error.t =
-            let open Or_error.Let_syntax in
-            let%bind pk2, amt2 = of_coinbase cb in
-            if
-              Compressed_public_key.equal pk1 pk2
-              || Compressed_public_key.equal pk1 Compressed_public_key.empty
-            then
-              match Currency.Amount.add amt1 amt2 with
-              | None -> Or_error.error_string "Coinbase underflow"
-              | Some amount -> Ok (pk2, amount)
-            else
-              Or_error.error_string
-                "Tried to add multiple coinbase with different proposers"
+          let of_coinbase (cb : Coinbase.t) : t = (cb.proposer, cb.amount)
 
           let empty = (Compressed_public_key.empty, Currency.Amount.zero)
 
@@ -1823,8 +1793,7 @@ let%test_module "test" =
           [@@deriving sexp, bin_io, compare, hash, eq]
 
           let push (t : t) c =
-            let open Or_error.Let_syntax in
-            let%map cb = Coinbase_data.of_coinbase c in
+            let cb = Coinbase_data.of_coinbase c in
             cb :: t
 
           let empty = []
@@ -1876,30 +1845,6 @@ let%test_module "test" =
         type t =
           {source: Pending_coinbase.Stack.t; target: Pending_coinbase.Stack.t}
         [@@deriving sexp, bin_io, compare, hash]
-      end
-
-      module Pending_coinbase_update = struct
-        type ('pending_coinbase_stack, 'coinbase, 'bool) t_ =
-          { oldest_stack: 'pending_coinbase_stack
-          ; coinbase: 'coinbase
-          ; is_new_stack: 'bool }
-        [@@deriving bin_io, sexp]
-
-        type t =
-          (Pending_coinbase.Stack.t, Pending_coinbase.Coinbase_data.t, bool) t_
-        [@@deriving bin_io, sexp]
-
-        type value =
-          (Pending_coinbase.Stack.t, Pending_coinbase.Coinbase_data.t, bool) t_
-        [@@deriving sexp, bin_io]
-
-        let create_value ~oldest_stack ~is_new_stack ~coinbase_data =
-          {oldest_stack; is_new_stack; coinbase= coinbase_data}
-
-        let genesis =
-          { oldest_stack= Pending_coinbase.Stack.empty
-          ; is_new_stack= false
-          ; coinbase= Pending_coinbase.Coinbase_data.empty }
       end
 
       module Ledger_proof_statement = struct
@@ -2371,7 +2316,7 @@ let%test_module "test" =
       let%map ( `Hash_after_applying hash
               , `Ledger_proof ledger_proof
               , `Staged_ledger sl'
-              , `Pending_coinbase_update _ ) =
+              , `Pending_coinbase_data _ ) =
         match%map Sl.apply !sl diff' ~logger with
         | Ok x -> x
         | Error e -> Error.raise (Sl.Staged_ledger_error.to_error e)
@@ -2610,7 +2555,7 @@ let%test_module "test" =
                   ( `Hash_after_applying _hash
                   , `Ledger_proof _ledger_proof
                   , `Staged_ledger sl'
-                  , `Pending_coinbase_update _ ) ->
+                  , `Pending_coinbase_data _ ) ->
                   sl := sl' ) )
 
     let%test_unit "Snarked ledger" =

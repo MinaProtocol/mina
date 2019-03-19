@@ -286,7 +286,6 @@ module type Main_intf = sig
        and type user_command := User_command.t
        and type transaction_witness := Transaction_witness.t
        and type pending_coinbase_collection := Pending_coinbase.t
-       and type pending_coinbase_update := Pending_coinbase_update.t
 
     module Internal_transition :
       Coda_base.Internal_transition.S
@@ -551,7 +550,6 @@ struct
       module Pending_coinbase_hash = Pending_coinbase_hash
       module Pending_coinbase_stack_state = Pending_coinbase_stack_state
       module Transaction_witness = Transaction_witness
-      module Pending_coinbase_update = Pending_coinbase_update
 
       let check (Transaction_snark_work.({fee; prover; proofs}) as t) stmts =
         let message = Sok_message.create ~fee ~prover in
@@ -877,7 +875,7 @@ struct
     module State_proof = Protocol_state_proof
   end)
 
-  module Pending_coinbase_update = Pending_coinbase_update
+  module Pending_coinbase_witness = Pending_coinbase_witness
 
   module Proposer = Proposer.Make (struct
     include Inputs0
@@ -898,7 +896,7 @@ struct
     module Compressed_public_key = Public_key.Compressed
     module Consensus_mechanism = Consensus
     module Transaction_validator = Transaction_validator
-    module Pending_coinbase_update = Pending_coinbase_update
+    module Pending_coinbase_witness = Pending_coinbase_witness
 
     module Prover = struct
       let prove ~prev_state ~prev_state_proof ~next_state

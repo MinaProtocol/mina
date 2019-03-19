@@ -254,10 +254,10 @@ end = struct
     let pending_coinbase_before =
       statement.pending_coinbase_stack_state.source
     in
-    let%bind pending_coinbase_after =
+    let pending_coinbase_after =
       match transaction with
       | Coinbase c -> Pending_coinbase.Stack.push pending_coinbase_before c
-      | _ -> Ok pending_coinbase_before
+      | _ -> pending_coinbase_before
     in
     let%bind fee_excess = Transaction.fee_excess transaction in
     let%map supply_increase = Transaction.supply_increase transaction in

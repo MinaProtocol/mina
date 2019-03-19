@@ -127,7 +127,6 @@ struct
     module Pending_coinbase_hash = Pending_coinbase_hash
     module Pending_coinbase_stack_state = Pending_coinbase_stack_state
     module Transaction_witness = Transaction_witness
-    module Pending_coinbase_update = Pending_coinbase_update
   end)
 
   (* Generate valid payments for each blockchain state by having
@@ -219,7 +218,7 @@ struct
       let%bind ( `Hash_after_applying next_staged_ledger_hash
                , `Ledger_proof ledger_proof_opt
                , `Staged_ledger _
-               , `Pending_coinbase_update _pending_coinbase_update ) =
+               , `Pending_coinbase_data _ ) =
         Staged_ledger.apply_diff_unchecked parent_staged_ledger
           staged_ledger_diff
         |> Deferred.Or_error.ok_exn
