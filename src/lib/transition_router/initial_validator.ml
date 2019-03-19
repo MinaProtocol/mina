@@ -9,7 +9,7 @@ module type Inputs_intf = sig
 
   module State_proof :
     Proof_intf
-    with type input := Consensus.Protocol_state.value
+    with type input := Consensus.Protocol_state.Value.t
      and type t := Proof.t
 
   module Time : Time_intf
@@ -46,7 +46,6 @@ module Make (Inputs : Inputs_intf) :
   open Inputs
 
   let run ~logger ~transition_reader ~valid_transition_writer =
-    let logger = Logger.child logger __MODULE__ in
     Reader.iter transition_reader ~f:(fun network_transition ->
         let `Transition transition_env, `Time_received time_received =
           network_transition
@@ -65,9 +64,10 @@ module Make (Inputs : Inputs_intf) :
             , `Time_received time_received )
             |> Writer.write valid_transition_writer
         | Error e ->
-            Logger.warn logger
-              !"Got an invalid transition from peer : \
-                %{sexp:Envelope.Sender.t} %{sexp:Error.t}"
-              sender e )
+            Logger.warn logger ~module_:__MODULE__ ~location:__LOC__
+              ~metadata:
+                [ ("peer", Envelope.Sender.to_yojson sender)
+                ; ("error", `String (Error.to_string_hum e)) ]
+              !"Got an invalid transition from peer: $peer $error" )
     |> don't_wait_for
 end

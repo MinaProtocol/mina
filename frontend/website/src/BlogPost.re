@@ -50,21 +50,6 @@ var disqus_config = function () {
   };
 };
 
-module MailingList = {
-  let component = ReasonReact.statelessComponent("BlogPost.MailingList");
-  let make = _ => {
-    ...component,
-    render: _self =>
-      <a
-        href="https://goo.gl/forms/PTusW11oYpLKJrZH3"
-        className="user-select-none hover-bg-black white no-underline ttu tracked bg-silver icon-shadow ph3 pv3 br4 tc lh-copy f5 bottomrightfixed br--top"
-        name="fixed"
-        target="_blank">
-        {ReasonReact.string("Join mailing list")}
-      </a>,
-  };
-};
-
 let dot = {
   ReasonReact.string({js|•|js});
 };
@@ -88,29 +73,6 @@ let shareItems =
   </>;
 
 let component = ReasonReact.statelessComponent("BlogPost");
-
-let extraHeaders =
-  <>
-    <link
-      rel="stylesheet"
-      href="https://cdn.jsdelivr.net/npm/katex@0.10.0/dist/katex.min.css"
-      integrity="sha384-9eLZqc9ds8eNjO3TmqPeYcDj8n+Qfa4nuSiGYa6DjLNcv9BtN69ZIulL9+8CqC9Y"
-      crossOrigin="anonymous"
-    />
-    <script
-      defer=true
-      src="https://cdn.jsdelivr.net/npm/katex@0.10.0/dist/katex.min.js"
-      integrity="sha384-K3vbOmF2BtaVai+Qk37uypf7VrgBubhQreNQe9aGsz9lB63dIFiQVlJbr92dw2Lx"
-      crossOrigin="anonymous"
-    />
-    <script
-      defer=true
-      src="https://cdn.jsdelivr.net/npm/katex@0.10.0/dist/contrib/auto-render.min.js"
-      integrity="sha384-kmZOZB5ObwgQnS/DuDg6TScgOiWWBiVt0plIRkZCmE6rDZGrEOQeHM5PcHi+nyqe"
-      crossOrigin="anonymous"
-    />
-    <link rel="stylesheet" href="/static/css/blog.css" />
-  </>;
 
 let make = (~name, ~html, ~metadata, ~showComments=true, _) => {
   {
@@ -230,7 +192,6 @@ let make = (~name, ~html, ~metadata, ~showComments=true, _) => {
             {showComments ? <Comments name /> : ReasonReact.null}
           </div>
         </div>
-        <MailingList />
         <RunScript>
           {|
           document.addEventListener("DOMContentLoaded", function() {

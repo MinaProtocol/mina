@@ -5,7 +5,7 @@ module Balance = Currency.Balance
 module Account = struct
   (* want bin_io, not available with Account.t *)
   type t = Coda_base.Account.Stable.V1.t
-  [@@deriving bin_io, sexp, eq, compare, hash]
+  [@@deriving bin_io, sexp, eq, compare, hash, yojson]
 
   type key = Coda_base.Account.Stable.V1.key
   [@@deriving bin_io, sexp, eq, compare, hash]
@@ -93,6 +93,12 @@ module Receipt = Coda_base.Receipt
 module Hash = struct
   module T = struct
     type t = Md5.t [@@deriving sexp, hash, compare, bin_io, eq]
+
+    let to_yojson t = `String (Md5.to_hex t)
+
+    let of_yojson = function
+      | `String s -> Ok (Md5.of_hex_exn s)
+      | _ -> Error "expected string"
   end
 
   include T
