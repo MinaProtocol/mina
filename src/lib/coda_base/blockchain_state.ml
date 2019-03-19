@@ -10,27 +10,24 @@ module type S = sig
     { staged_ledger_hash: 'staged_ledger_hash
     ; snarked_ledger_hash: 'snarked_ledger_hash
     ; timestamp: 'time }
-  [@@deriving sexp, eq, compare, fields]
+  [@@deriving sexp, eq, compare, fields, yojson]
 
-  type t = (Staged_ledger_hash.t, Frozen_ledger_hash.t, Block_time.t) t_
-  [@@deriving sexp, eq, compare, hash]
+  module Value : sig
+    module Stable : sig
+      module V1 : sig
+        type t =
+          ( Staged_ledger_hash.Stable.V1.t
+          , Frozen_ledger_hash.Stable.V1.t
+          , Block_time.Stable.V1.t )
+          t_
+        [@@deriving bin_io, sexp, eq, compare, hash, yojson]
+      end
 
-  module Stable : sig
-    module V1 : sig
-      type nonrec ('a, 'b, 'c) t_ = ('a, 'b, 'c) t_ =
-        {staged_ledger_hash: 'a; snarked_ledger_hash: 'b; timestamp: 'c}
-      [@@deriving bin_io, sexp, eq, compare, hash]
-
-      type nonrec t =
-        ( Staged_ledger_hash.Stable.V1.t
-        , Frozen_ledger_hash.Stable.V1.t
-        , Block_time.Stable.V1.t )
-        t_
-      [@@deriving bin_io, sexp, eq, compare, hash]
+      module Latest : module type of V1
     end
-  end
 
-  type value = t [@@deriving bin_io, sexp, eq, compare, hash]
+    type t = Stable.Latest.t [@@deriving sexp, eq, compare, hash, yojson]
+  end
 
   include
     Snarkable.S
@@ -39,27 +36,27 @@ module type S = sig
                 , Frozen_ledger_hash.var
                 , Block_time.Unpacked.var )
                 t_
-     and type value := value
+     and type value := Value.t
 
   val create_value :
-       staged_ledger_hash:Staged_ledger_hash.Stable.V1.t
-    -> snarked_ledger_hash:Frozen_ledger_hash.Stable.V1.t
-    -> timestamp:Block_time.Stable.V1.t
-    -> value
+       staged_ledger_hash:Staged_ledger_hash.t
+    -> snarked_ledger_hash:Frozen_ledger_hash.t
+    -> timestamp:Block_time.t
+    -> Value.t
 
   val length_in_triples : int
 
-  val genesis : t
+  val genesis : Value.t
 
   val set_timestamp : ('a, 'b, 'c) t_ -> 'c -> ('a, 'b, 'c) t_
 
-  val fold : t -> bool Triple.t Fold.t
+  val fold : Value.t -> bool Triple.t Fold.t
 
   val var_to_triples : var -> (Boolean.var Triple.t list, _) Checked.t
 
   type display = (string, string, string) t_ [@@deriving yojson]
 
-  val display : value -> display
+  val display : Value.t -> display
 
   module Message :
     Signature_lib.Checked.Message_intf
@@ -67,7 +64,7 @@ module type S = sig
      and type boolean_var := Tick.Boolean.var
      and type curve_scalar := Inner_curve.Scalar.t
      and type curve_scalar_var := Inner_curve.Scalar.var
-     and type t = t
+     and type t = Value.t
      and type var = var
 
   module Signature :
@@ -86,50 +83,51 @@ end
 module Make (Genesis_ledger : sig
   val t : Ledger.t
 end) : S = struct
-  module Stable = struct
-    module V1 = struct
-      module T = struct
-        let version = 1
+  type ('staged_ledger_hash, 'snarked_ledger_hash, 'time) t_ =
+    { staged_ledger_hash: 'staged_ledger_hash
+    ; snarked_ledger_hash: 'snarked_ledger_hash
+    ; timestamp: 'time }
+  [@@deriving bin_io, sexp, fields, eq, compare, hash, yojson]
 
-        type ('staged_ledger_hash, 'snarked_ledger_hash, 'time) t_ =
-          { staged_ledger_hash: 'staged_ledger_hash
-          ; snarked_ledger_hash: 'snarked_ledger_hash
-          ; timestamp: 'time }
-        [@@deriving bin_io, sexp, fields, eq, compare, hash, yojson]
+  module Value = struct
+    module Stable = struct
+      module V1 = struct
+        module T = struct
+          let version = 1
 
-        type t =
-          ( Staged_ledger_hash.Stable.V1.t
-          , Frozen_ledger_hash.Stable.V1.t
-          , Block_time.Stable.V1.t )
-          t_
-        [@@deriving bin_io, sexp, eq, compare, hash]
+          type t =
+            ( Staged_ledger_hash.Stable.V1.t
+            , Frozen_ledger_hash.Stable.V1.t
+            , Block_time.Stable.V1.t )
+            t_
+          [@@deriving bin_io, sexp, eq, compare, hash, yojson]
+        end
+
+        include T
+        include Module_version.Registration.Make_latest_version (T)
       end
 
-      include T
-      include Module_version.Registration.Make_latest_version (T)
+      module Latest = V1
+
+      module Module_decl = struct
+        let name = "coda_base_blockchain_state"
+
+        type latest = Latest.t
+      end
+
+      module Registrar = Module_version.Registration.Make (Module_decl)
+      module Registered_V1 = Registrar.Register (V1)
     end
 
-    module Latest = V1
-
-    module Module_decl = struct
-      let name = "coda_base_blockchain_state"
-
-      type latest = Latest.t
-    end
-
-    module Registrar = Module_version.Registration.Make (Module_decl)
-    module Registered_V1 = Registrar.Register (V1)
+    (* bin_io omitted *)
+    type t = Stable.Latest.t [@@deriving sexp, eq, compare, hash, yojson]
   end
-
-  include Stable.Latest
 
   type var =
     ( Staged_ledger_hash.var
     , Frozen_ledger_hash.var
     , Block_time.Unpacked.var )
     t_
-
-  type value = t [@@deriving bin_io, sexp, eq, compare, hash]
 
   let create_value ~staged_ledger_hash ~snarked_ledger_hash ~timestamp =
     {staged_ledger_hash; snarked_ledger_hash; timestamp}
@@ -147,7 +145,7 @@ end) : S = struct
     let open Data_spec in
     [Staged_ledger_hash.typ; Frozen_ledger_hash.typ; Block_time.Unpacked.typ]
 
-  let typ : (var, value) Typ.t =
+  let typ : (var, Value.t) Typ.t =
     Typ.of_hlistable data_spec ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist
       ~value_to_hlist:to_hlist ~value_of_hlist:of_hlist
 
@@ -161,7 +159,7 @@ end) : S = struct
     staged_ledger_hash_triples @ ledger_hash_triples
     @ Block_time.Unpacked.var_to_triples timestamp
 
-  let fold ({staged_ledger_hash; snarked_ledger_hash; timestamp} : value) =
+  let fold ({staged_ledger_hash; snarked_ledger_hash; timestamp} : Value.t) =
     Fold.(
       Staged_ledger_hash.fold staged_ledger_hash
       +> Frozen_ledger_hash.fold snarked_ledger_hash
@@ -197,7 +195,7 @@ end) : S = struct
   module Message = struct
     open Tick
 
-    type nonrec t = t
+    type t = Value.t
 
     type nonrec var = var
 

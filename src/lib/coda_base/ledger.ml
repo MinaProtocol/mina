@@ -23,7 +23,8 @@ module Ledger_inner = struct
 
   module Hash = struct
     module T = struct
-      type t = Ledger_hash.t [@@deriving bin_io, sexp, compare, hash, eq]
+      type t = Ledger_hash.t
+      [@@deriving bin_io, sexp, compare, hash, eq, yojson]
     end
 
     include T

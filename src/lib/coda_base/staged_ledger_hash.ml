@@ -15,7 +15,7 @@ module Aux_hash = struct
       module T = struct
         let version = 1
 
-        type t = string [@@deriving bin_io, sexp, eq, compare, hash]
+        type t = string [@@deriving bin_io, sexp, eq, compare, hash, yojson]
       end
 
       include T
@@ -51,7 +51,7 @@ module Stable = struct
       let version = 1
 
       type t = {ledger_hash: Ledger_hash.Stable.V1.t; aux_hash: Aux_hash.t}
-      [@@deriving bin_io, sexp, eq, compare, hash]
+      [@@deriving bin_io, sexp, eq, compare, hash, yojson]
     end
 
     include T
