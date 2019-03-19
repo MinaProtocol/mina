@@ -127,7 +127,7 @@ def run(args):
         else:
             logproc_exe_path = os.path.join(coda_app_path, 'logproc/logproc.exe')
             logproc_exe = os.path.join(coda_build_path, logproc_exe_path)
-            build_targets = '%s %s' % (coda_exe_path, logproc_exe_path)
+            build_targets = '%s %s' % (coda_exe, logproc_exe)
 
     test_permutations = filter_test_permutations(args.whitelist_patterns, args.blacklist_patterns)
     if len(test_permutations) == 0:
