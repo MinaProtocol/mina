@@ -71,8 +71,8 @@ jobs:
                       - homebrew-v1-
             - restore_cache:
                   keys:
-                      - opam-v2-{{'{{'}} checksum "src/opam.export" {{'}}'}}
-                      - opam-v2-
+                      - opam-v3-{{'{{'}} checksum "src/opam.export" {{'}}'}}
+                      - opam-v3-
             - run: git submodule sync && git submodule update --init --recursive
             - run:
                   name: Download Deps -- make macos-setup-download
@@ -86,7 +86,7 @@ jobs:
                       - "/usr/local/Homebrew"
                       - "/Users/distiller/Library/Caches/Homebrew"
             - save_cache:
-                  key: opam-v2-{{'{{'}} checksum "src/opam.export" {{'}}'}}
+                  key: opam-v3-{{'{{'}} checksum "src/opam.export" {{'}}'}}
                   paths:
                       - "/Users/distiller/.opam"
             - run:
