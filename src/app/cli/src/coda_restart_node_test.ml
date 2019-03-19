@@ -9,8 +9,7 @@ let name = "coda-restart-node-test"
 
 let main () =
   let open Keypair in
-  let log = Logger.create () in
-  let log = Logger.child log name in
+  let logger = Logger.create () in
   let largest_account_keypair =
     Genesis_ledger.largest_account_keypair_exn ()
   in
@@ -26,12 +25,12 @@ let main () =
     else None
   in
   let%bind testnet =
-    Coda_worker_testnet.test log n proposers snark_work_public_keys
+    Coda_worker_testnet.test logger n proposers snark_work_public_keys
       Protocols.Coda_pow.Work_selection.Seq
   in
   let%bind () =
     Coda_worker_testnet.Restarts.trigger_catchup testnet
-      ~largest_account_keypair ~log ~node:1 ~payment_receiver:0
+      ~largest_account_keypair ~logger ~node:1 ~payment_receiver:0
   in
   let%bind () = after (Time.Span.of_sec 240.) in
   Coda_worker_testnet.Api.teardown testnet

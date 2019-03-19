@@ -303,12 +303,12 @@ module type Snark_pool_proof_intf = sig
 end
 
 module type User_command_intf = sig
-  type t [@@deriving sexp, eq, bin_io]
+  type t [@@deriving sexp, eq, bin_io, yojson]
 
   type public_key
 
   module With_valid_signature : sig
-    type nonrec t = private t [@@deriving sexp, eq]
+    type nonrec t = private t [@@deriving sexp, eq, yojson]
   end
 
   val check : t -> With_valid_signature.t option
@@ -325,7 +325,7 @@ module type Private_key_intf = sig
 end
 
 module type Compressed_public_key_intf = sig
-  type t [@@deriving sexp, bin_io, compare]
+  type t [@@deriving sexp, bin_io, compare, yojson]
 
   include Comparable.S with type t := t
 end
@@ -333,7 +333,7 @@ end
 module type Public_key_intf = sig
   module Private_key : Private_key_intf
 
-  type t [@@deriving sexp]
+  type t [@@deriving sexp, yojson]
 
   module Compressed : Compressed_public_key_intf
 
@@ -351,11 +351,11 @@ module type Keypair_intf = sig
 end
 
 module type Fee_transfer_intf = sig
-  type t [@@deriving sexp, compare, eq]
+  type t [@@deriving sexp, compare, eq, yojson]
 
   type public_key
 
-  type single = public_key * Fee.Unsigned.t [@@deriving sexp, bin_io]
+  type single = public_key * Fee.Unsigned.t [@@deriving sexp, bin_io, yojson]
 
   val of_single : public_key * Fee.Unsigned.t -> t
 
@@ -1108,14 +1108,14 @@ module type External_transition_intf = sig
 
   module Stable : sig
     module V1 : sig
-      type t [@@deriving sexp, bin_io]
+      type t [@@deriving sexp, bin_io, to_yojson]
     end
 
     module Latest = V1
   end
 
   (* bin_io intentionally omitted *)
-  type t = Stable.Latest.t [@@deriving sexp]
+  type t = Stable.Latest.t [@@deriving sexp, to_yojson]
 
   val create :
        protocol_state:protocol_state
@@ -1124,7 +1124,7 @@ module type External_transition_intf = sig
     -> t
 
   module Verified : sig
-    type t [@@deriving sexp]
+    type t [@@deriving sexp, to_yojson]
 
     val protocol_state : t -> protocol_state
 
