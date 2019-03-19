@@ -246,9 +246,19 @@ module type Transition_frontier_intf = sig
 
   module Extensions : sig
     module Work : sig
-      type t [@@deriving sexp, bin_io]
+      type t [@@deriving sexp]
 
-      include Hashable.S_binable with type t := t
+      module Stable :
+        sig
+          module V1 : sig
+            type t [@@deriving sexp, bin_io]
+
+            include Hashable.S_binable with type t := t
+          end
+        end
+        with type V1.t = t
+
+      include Hashable.S with type t := t
     end
 
     module Snark_pool_refcount : sig

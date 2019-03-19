@@ -368,7 +368,6 @@ module Fee_transfer = Coda_base.Fee_transfer
 module Ledger_proof_statement = Transaction_snark.Statement
 module Transaction_snark_work =
   Staged_ledger.Make_completed_work
-    (Public_key.Compressed)
     (Ledger_proof.Stable.V1)
     (Ledger_proof_statement)
 
