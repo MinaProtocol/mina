@@ -538,10 +538,27 @@ let%test_unit "Checked_tree = Unchecked_tree" =
   let open Quickcheck in
   let pending_coinbases = create () |> Or_error.ok_exn in
   test ~trials:20 Coinbase.gen ~f:(fun coinbase ->
+      let max_coinbase_amount = Protocols.Coda_praos.coinbase_amount in
       let coinbase_data = Coinbase_data.of_coinbase coinbase in
-      let unchecked =
-        add_coinbase pending_coinbases ~coinbase ~is_new_stack:true
+      let coinbase2 =
+        Coinbase.create
+          ~amount:
+            ( Amount.sub max_coinbase_amount coinbase.amount
+            |> Option.value_exn ?here:None ?message:None ?error:None )
+          ~proposer:coinbase.proposer ~fee_transfer:None
         |> Or_error.ok_exn
+      in
+      let unchecked =
+        if Amount.equal coinbase.amount Amount.zero then pending_coinbases
+        else
+          let interim_tree =
+            add_coinbase pending_coinbases ~coinbase ~is_new_stack:true
+            |> Or_error.ok_exn
+          in
+          if Amount.equal coinbase2.amount Amount.zero then interim_tree
+          else
+            add_coinbase interim_tree ~coinbase:coinbase2 ~is_new_stack:false
+            |> Or_error.ok_exn
       in
       let f_add_coinbase = Checked.add_coinbase in
       let checked =
