@@ -829,8 +829,6 @@ module Global_slot = struct
 
   include Nat.Make32 ()
 
-  let length_in_bits = 32
-
   (* Make sure this optimization makes sense versus using
      an (epoch, slot) pair *)
   let () =

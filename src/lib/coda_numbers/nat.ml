@@ -19,6 +19,8 @@ module type S = sig
     module Latest = V1
   end
 
+  val length_in_bits : int
+
   val length_in_triples : int
 
   val gen : t Quickcheck.Generator.t
