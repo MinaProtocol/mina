@@ -84,8 +84,8 @@ module Make (Inputs : Inputs_intf) :
     recieved_time |> Time.to_span_since_epoch |> Time.Span.to_ms
     |> Unix_timestamp.of_int64
 
-  let create_bufferred_pipe () =
-    Strict_pipe.create (Buffered (`Capacity 10, `Overflow Drop_head))
+  let create_bufferred_pipe ?name () =
+    Strict_pipe.create ?name (Buffered (`Capacity 10, `Overflow Drop_head))
 
   let kill reader writer =
     Strict_pipe.Reader.clear reader ;
@@ -144,7 +144,8 @@ module Make (Inputs : Inputs_intf) :
         transition_frontier_controller_writer ;
       Strict_pipe.Writer.write clear_writer `Clear |> don't_wait_for ;
       let bootstrap_controller_reader, bootstrap_controller_writer =
-        Strict_pipe.create (Buffered (`Capacity 10, `Overflow Drop_head))
+        Strict_pipe.create ~name:"bootstrap controller"
+          (Buffered (`Capacity 10, `Overflow Drop_head))
       in
       Logger.info logger ~module_:__MODULE__ ~location:__LOC__
         "Bootstrap state: starting." ;
@@ -169,7 +170,9 @@ module Make (Inputs : Inputs_intf) :
     in
     let start_transition_frontier_controller ~verified_transition_writer
         ~clear_reader ~collected_transitions frontier =
-      let transition_reader, transition_writer = create_bufferred_pipe () in
+      let transition_reader, transition_writer =
+        create_bufferred_pipe ~name:"network transitions" ()
+      in
       Logger.info logger ~module_:__MODULE__ ~location:__LOC__
         "Starting Transition Frontier Controller phase" ;
       let new_verified_transition_reader =
@@ -185,9 +188,11 @@ module Make (Inputs : Inputs_intf) :
       |> don't_wait_for ;
       (transition_reader, transition_writer)
     in
-    let clear_reader, clear_writer = Strict_pipe.create Synchronous in
+    let clear_reader, clear_writer =
+      Strict_pipe.create ~name:"clear" Synchronous
+    in
     let verified_transition_reader, verified_transition_writer =
-      create_bufferred_pipe ()
+      create_bufferred_pipe ~name:"verified transitions" ()
     in
     let ( transition_frontier_controller_reader
         , transition_frontier_controller_writer ) =
@@ -211,7 +216,7 @@ module Make (Inputs : Inputs_intf) :
     in
     let ( valid_protocol_state_transition_reader
         , valid_protocol_state_transition_writer ) =
-      create_bufferred_pipe ()
+      create_bufferred_pipe ~name:"valid transitions" ()
     in
     Initial_validator.run ~logger ~transition_reader:network_transition_reader
       ~valid_transition_writer:valid_protocol_state_transition_writer ;

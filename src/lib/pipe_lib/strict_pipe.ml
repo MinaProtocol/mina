@@ -27,7 +27,8 @@ module Reader0 = struct
   type 't t =
     { reader: 't Pipe.Reader.t
     ; mutable has_reader: bool
-    ; mutable downstreams: downstreams }
+    ; mutable downstreams: downstreams
+    ; name: string option }
 
   and downstreams =
     | [] : downstreams
@@ -41,13 +42,14 @@ module Reader0 = struct
   let to_linear_pipe {reader= pipe; has_reader; downstreams= _} =
     {Linear_pipe.Reader.pipe; has_reader}
 
-  let of_linear_pipe {Linear_pipe.Reader.pipe= reader; has_reader} =
-    {reader; has_reader; downstreams= []}
+  let of_linear_pipe ?name {Linear_pipe.Reader.pipe= reader; has_reader} =
+    {reader; has_reader; downstreams= []; name}
 
   let assert_not_read reader =
     if reader.has_reader then raise Multiple_reads_attempted
 
-  let wrap_reader reader = {reader; has_reader= false; downstreams= []}
+  let wrap_reader ?name reader =
+    {reader; has_reader= false; downstreams= []; name}
 
   let enforce_single_reader reader deferred =
     assert_not_read reader ;
@@ -169,7 +171,8 @@ module Writer = struct
   type ('t, 'type_, 'write_return) t =
     { type_: ('type_, 'write_return) type_
     ; strict_reader: 't Reader0.t
-    ; writer: 't Pipe.Writer.t }
+    ; writer: 't Pipe.Writer.t
+    ; name: string option }
 
   (* TODO: See #1281 *)
   let to_linear_pipe {writer= pipe; strict_reader= _; type_= _} = pipe
@@ -180,6 +183,12 @@ module Writer = struct
     match overflow_behavior with
     | Crash -> raise Overflow
     | Drop_head ->
+        let logger = Logger.create () in
+        let my_name = Option.value writer.name ~default:"<unnamed>" in
+        Logger.warn logger
+          ~metadata:[("pipe_name", `String my_name)]
+          ~location:__LOC__ ~module_:__MODULE__ "dropping message on pipe %s"
+          my_name ;
         ignore (Pipe.read_now writer.strict_reader.reader) ;
         Pipe.write_without_pushback writer.writer data
 
@@ -199,10 +208,12 @@ module Writer = struct
   let is_closed {writer; _} = Pipe.is_closed writer
 end
 
-let create type_ =
+let create ?name type_ =
   let reader, writer = Pipe.create () in
-  let strict_reader = Reader0.{reader; has_reader= false; downstreams= []} in
-  let strict_writer = Writer.{type_; strict_reader; writer} in
+  let strict_reader =
+    Reader0.{reader; has_reader= false; downstreams= []; name}
+  in
+  let strict_writer = Writer.{type_; strict_reader; writer; name} in
   (strict_reader, strict_writer)
 
 let transfer reader {Writer.type_= _; strict_reader; writer} ~f =

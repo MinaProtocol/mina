@@ -31,7 +31,7 @@ module Reader : sig
 
   val to_linear_pipe : 't t -> 't Linear_pipe.Reader.t
 
-  val of_linear_pipe : 't Linear_pipe.Reader.t -> 't t
+  val of_linear_pipe : ?name:string -> 't Linear_pipe.Reader.t -> 't t
 
   val map : 'a t -> f:('a -> 'b) -> 'b t
 
@@ -103,7 +103,8 @@ module Writer : sig
 end
 
 val create :
-     ('type_, 'write_return) type_
+  ?name:string
+  -> ('type_, 'write_return) type_
   -> 't Reader.t * ('t, 'type_, 'write_return) Writer.t
 
 val transfer :
