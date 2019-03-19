@@ -52,7 +52,10 @@ module Copy = {
 module Graphic = {
   module Big = {
     let svg =
-      <svg className=Css.(style([width(`px(223)), height(`px(534))]))>
+      <svg
+        className=Css.(
+          style([width(`rem(13.9375)), height(`rem(33.375))])
+        )>
         <image
           xlinkHref="/static/img/hero-illustration.svg"
           width="223"
