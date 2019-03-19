@@ -25,7 +25,7 @@ end
 
 module Worker_state = struct
   module type S = sig
-    val verify_wrap : Consensus.Protocol_state.value -> Tock.Proof.t -> bool
+    val verify_wrap : Consensus.Protocol_state.Value.t -> Tock.Proof.t -> bool
 
     val verify_transaction_snark :
       Transaction_snark.t -> message:Sok_message.t -> bool

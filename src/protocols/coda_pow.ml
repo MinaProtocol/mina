@@ -1011,7 +1011,17 @@ module type Blockchain_state_intf = sig
 
   type time
 
-  type value [@@deriving sexp, bin_io]
+  module Value : sig
+    type t [@@deriving sexp]
+
+    module Stable :
+      sig
+        module V1 : sig
+          type t [@@deriving sexp, bin_io]
+        end
+      end
+      with type V1.t = t
+  end
 
   type var
 
@@ -1019,13 +1029,13 @@ module type Blockchain_state_intf = sig
        staged_ledger_hash:staged_ledger_hash
     -> snarked_ledger_hash:frozen_ledger_hash
     -> timestamp:time
-    -> value
+    -> Value.t
 
-  val staged_ledger_hash : value -> staged_ledger_hash
+  val staged_ledger_hash : Value.t -> staged_ledger_hash
 
-  val snarked_ledger_hash : value -> frozen_ledger_hash
+  val snarked_ledger_hash : Value.t -> frozen_ledger_hash
 
-  val timestamp : value -> time
+  val timestamp : Value.t -> time
 end
 
 module type Protocol_state_intf = sig
@@ -1035,7 +1045,20 @@ module type Protocol_state_intf = sig
 
   type consensus_state
 
-  type value [@@deriving sexp, bin_io, eq, compare]
+  module Value : sig
+    (* bin_io omitted *)
+    type t [@@deriving sexp, eq, compare]
+
+    module Stable :
+      sig
+        module V1 : sig
+          type t [@@deriving sexp, bin_io, eq, compare]
+        end
+
+        module Latest = V1
+      end
+      with type V1.t = t
+  end
 
   type var
 
@@ -1043,15 +1066,15 @@ module type Protocol_state_intf = sig
        previous_state_hash:state_hash
     -> blockchain_state:blockchain_state
     -> consensus_state:consensus_state
-    -> value
+    -> Value.t
 
-  val previous_state_hash : value -> state_hash
+  val previous_state_hash : Value.t -> state_hash
 
-  val blockchain_state : value -> blockchain_state
+  val blockchain_state : Value.t -> blockchain_state
 
-  val consensus_state : value -> consensus_state
+  val consensus_state : Value.t -> consensus_state
 
-  val hash : value -> state_hash
+  val hash : Value.t -> state_hash
 end
 
 module type Internal_transition_intf = sig
@@ -1291,7 +1314,7 @@ module type Consensus_mechanism_intf = sig
   module Protocol_state :
     Protocol_state_intf
     with type state_hash := protocol_state_hash
-     and type blockchain_state := Blockchain_state.value
+     and type blockchain_state := Blockchain_state.Value.t
      and type consensus_state := Consensus_state.Value.t
 
   module Prover_state : sig
@@ -1313,26 +1336,26 @@ module type Consensus_mechanism_intf = sig
          ?sok_digest:sok_digest
       -> ?ledger_proof:proof
       -> supply_increase:Currency.Amount.t
-      -> blockchain_state:Blockchain_state.value
+      -> blockchain_state:Blockchain_state.Value.t
       -> consensus_data:Consensus_transition_data.value
       -> unit
       -> value
 
-    val blockchain_state : value -> Blockchain_state.value
+    val blockchain_state : value -> Blockchain_state.Value.t
 
     val consensus_data : value -> Consensus_transition_data.value
   end
 
   val generate_transition :
-       previous_protocol_state:Protocol_state.value
-    -> blockchain_state:Blockchain_state.value
+       previous_protocol_state:Protocol_state.Value.t
+    -> blockchain_state:Blockchain_state.Value.t
     -> time:Int64.t
     -> proposal_data:Proposal_data.t
     -> transactions:user_command list
     -> snarked_ledger_hash:frozen_ledger_hash
     -> supply_increase:Currency.Amount.t
     -> logger:Logger.t
-    -> Protocol_state.value * Consensus_transition_data.value
+    -> Protocol_state.Value.t * Consensus_transition_data.value
 
   val received_at_valid_time :
     Consensus_state.Value.t -> time_received:Unix_timestamp.t -> bool
@@ -1354,7 +1377,7 @@ module type Consensus_mechanism_intf = sig
     -> [`Keep | `Take]
 
   val genesis_protocol_state :
-    (Protocol_state.value, protocol_state_hash) With_hash.t
+    (Protocol_state.Value.t, protocol_state_hash) With_hash.t
 end
 
 module type Time_close_validator_intf = sig
@@ -1649,18 +1672,18 @@ Merge Snark:
 
   module External_transition :
     External_transition_intf
-    with type protocol_state := Consensus_mechanism.Protocol_state.value
+    with type protocol_state := Consensus_mechanism.Protocol_state.Value.t
      and type staged_ledger_diff := Staged_ledger_diff.t
      and type protocol_state_proof := Protocol_state_proof.t
 
   module Tip :
     Tip_intf
     with type staged_ledger := Staged_ledger.t
-     and type protocol_state := Consensus_mechanism.Protocol_state.value
+     and type protocol_state := Consensus_mechanism.Protocol_state.Value.t
      and type protocol_state_proof := Protocol_state_proof.t
      and type external_transition := External_transition.t
      and type serializable :=
-                Consensus_mechanism.Protocol_state.value
+                Consensus_mechanism.Protocol_state.Value.t
                 * Protocol_state_proof.t
                 * Staged_ledger.serializable
 
@@ -1679,7 +1702,8 @@ module Make
                                     with type protocol_state :=
                                                 Inputs.Consensus_mechanism
                                                 .Protocol_state
-                                                .value
+                                                .Value
+                                                .t
                                      and type protocol_state_proof :=
                                                 Inputs.Protocol_state_proof.t
                                      and type internal_transition :=
@@ -1689,7 +1713,7 @@ struct
 
   module Proof_carrying_state = struct
     type t =
-      ( Consensus_mechanism.Protocol_state.value
+      ( Consensus_mechanism.Protocol_state.Value.t
       , Protocol_state_proof.t )
       Proof_carrying_data.t
   end

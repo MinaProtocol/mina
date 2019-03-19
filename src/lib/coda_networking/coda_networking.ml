@@ -261,7 +261,15 @@ end
 
 module Message (Inputs : sig
   module Snark_pool_diff : sig
-    type t [@@deriving bin_io, sexp]
+    type t [@@deriving sexp]
+
+    module Stable :
+      sig
+        module V1 : sig
+          type t [@@deriving bin_io, sexp]
+        end
+      end
+      with type V1.t = t
   end
 
   module Transaction_pool_diff : sig
@@ -278,7 +286,7 @@ struct
       (* "master" types, do not change *)
       type content =
         | New_state of External_transition.Stable.V1.t
-        | Snark_pool_diff of Snark_pool_diff.t
+        | Snark_pool_diff of Snark_pool_diff.Stable.V1.t
         | Transaction_pool_diff of Transaction_pool_diff.t
       [@@deriving bin_io, sexp]
 
@@ -345,7 +353,15 @@ module type Inputs_intf = sig
   end
 
   module Snark_pool_diff : sig
-    type t [@@deriving sexp, bin_io]
+    type t [@@deriving sexp]
+
+    module Stable :
+      sig
+        module V1 : sig
+          type t [@@deriving sexp, bin_io]
+        end
+      end
+      with type V1.t = t
   end
 
   module Transaction_pool_diff : sig

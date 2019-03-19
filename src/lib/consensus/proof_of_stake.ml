@@ -1185,7 +1185,7 @@ module Snark_transition = Coda_base.Snark_transition.Make (struct
 end)
 
 (* TODO: only track total currency from accounts > 1% of the currency using transactions *)
-let generate_transition ~(previous_protocol_state : Protocol_state.value)
+let generate_transition ~(previous_protocol_state : Protocol_state.Value.t)
     ~blockchain_state ~time ~proposal_data ~transactions:_ ~snarked_ledger_hash
     ~supply_increase ~logger:_ =
   let previous_consensus_state =
@@ -1513,7 +1513,7 @@ module For_tests = struct
 
   let gen_consensus_state ~(gen_slot_advancement : int Quickcheck.Generator.t)
       :
-      (   previous_protocol_state:( Protocol_state.value
+      (   previous_protocol_state:( Protocol_state.Value.t
                                   , Coda_base.State_hash.t )
                                   With_hash.t
        -> snarked_ledger_hash:Coda_base.Frozen_ledger_hash.t
@@ -1525,7 +1525,7 @@ module For_tests = struct
     let%bind slot_advancement = gen_slot_advancement in
     let%map proposer_vrf_result = Vrf.Output.gen in
     fun ~(previous_protocol_state :
-           (Protocol_state.value, Coda_base.State_hash.t) With_hash.t)
+           (Protocol_state.Value.t, Coda_base.State_hash.t) With_hash.t)
         ~(snarked_ledger_hash : Coda_base.Frozen_ledger_hash.t) ->
       let prev =
         Protocol_state.consensus_state (With_hash.data previous_protocol_state)
