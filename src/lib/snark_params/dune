@@ -8,7 +8,7 @@
    core_kernel snarky snarky_verifier snarky_field_extensions snarky_curves
    snarky_pairing snark_bits dummy_values crypto_params chunked_triples)
  (preprocess
-  (pps ppx_base ppx_let ppx_deriving.std ppx_sexp_conv ppx_bin_prot
+  (pps ppx_base ppx_let ppx_deriving.std ppx_deriving_yojson ppx_sexp_conv ppx_bin_prot
     ppx_custom_printf ppx_inline_test ppx_optcomp ppx_snarky bisect_ppx --
     -conditional))
  (preprocessor_deps ../../config.mlh)

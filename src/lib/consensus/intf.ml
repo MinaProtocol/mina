@@ -43,7 +43,7 @@ module type S = sig
   end
 
   module Consensus_state : sig
-    type value [@@deriving hash, eq, compare, bin_io, sexp]
+    type value [@@deriving hash, eq, compare, bin_io, sexp, to_yojson]
 
     type display [@@deriving yojson]
 
@@ -93,7 +93,7 @@ module type S = sig
   module For_tests : sig
     val gen_consensus_state :
          gen_slot_advancement:int Quickcheck.Generator.t
-      -> (   previous_protocol_state:( Protocol_state.value
+      -> (   previous_protocol_state:( Protocol_state.Value.t
                                      , Coda_base.State_hash.t )
                                      With_hash.t
           -> snarked_ledger_hash:Coda_base.Frozen_ledger_hash.t
@@ -102,7 +102,7 @@ module type S = sig
 
     val create_genesis_protocol_state :
          Coda_base.Ledger.t
-      -> (Protocol_state.value, Coda_base.State_hash.t) With_hash.t
+      -> (Protocol_state.Value.t, Coda_base.State_hash.t) With_hash.t
   end
 
   module Configuration : sig
@@ -112,18 +112,18 @@ module type S = sig
   end
 
   val genesis_protocol_state :
-    (Protocol_state.value, Coda_base.State_hash.t) With_hash.t
+    (Protocol_state.Value.t, Coda_base.State_hash.t) With_hash.t
 
   val generate_transition :
-       previous_protocol_state:Protocol_state.value
-    -> blockchain_state:Blockchain_state.value
+       previous_protocol_state:Protocol_state.Value.t
+    -> blockchain_state:Blockchain_state.Value.t
     -> time:Unix_timestamp.t
     -> proposal_data:Proposal_data.t
     -> transactions:Coda_base.User_command.t list
     -> snarked_ledger_hash:Coda_base.Frozen_ledger_hash.t
     -> supply_increase:Currency.Amount.t
     -> logger:Logger.t
-    -> Protocol_state.value * Consensus_transition_data.value
+    -> Protocol_state.Value.t * Consensus_transition_data.value
   (**
    * Generate a new protocol state and consensus specific transition data
    * for a new transition. Called from the proposer in order to generate

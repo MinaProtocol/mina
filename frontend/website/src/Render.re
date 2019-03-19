@@ -44,12 +44,15 @@ let writeStatic = (path, rootComponent) => {
 
 let posts =
   Node.Fs.readdirSync("posts")
-  |> Js.Array.filter(s => Js.String.endsWith(Markdown.suffix, s))
-  |> Array.map(fileName => {
+  |> Array.to_list
+  |> List.filter(s => Js.String.endsWith(Markdown.suffix, s))
+  |> List.map(fileName => {
        let length = String.length(fileName) - String.length(Markdown.suffix);
        let name = String.sub(fileName, 0, length);
-       let (html, content) = Markdown.load("posts/" ++ fileName);
-       (name, content, html);
+       let path = "posts/" ++ fileName;
+       let (html, content) = Markdown.load(path);
+       let metadata = BlogPost.parseMetadata(content, path);
+       (name, html, metadata);
      });
 
 module Router = {
@@ -93,22 +96,20 @@ Router.(
     Dir(
       "site",
       [|
-        File(
-          "index",
-          <Page name="index" extraHeaders=Home.extraHeaders> <Home /> </Page>,
-        ),
+        File("index", <Page name="index"> <Home /> </Page>),
         Dir(
           "blog",
           posts
-          |> Array.map(((name, content, html)) =>
+          |> Array.of_list
+          |> Array.map(((name, html, metadata)) =>
                File(
                  name,
-                 <LegacyPage
+                 <Page
                    name
-                   extraHeaders=BlogPost.extraHeaders
-                   footerColor="bg-snow">
-                   <BlogPost name content html />
-                 </LegacyPage>,
+                   extraHeaders=Blog.extraHeaders
+                   footerColor=Style.Colors.offWhite>
+                   <BlogPost name html metadata />
+                 </Page>,
                )
              ),
         ),
@@ -118,29 +119,41 @@ Router.(
           |> Array.map(((name, _)) =>
                File(
                  name,
-                 <LegacyPage name footerColor="bg-snow">
+                 <Page
+                   name
+                   footerColor=Style.Colors.offWhite
+                   extraHeaders=Careers.extraHeaders>
                    <CareerPost path={"jobs/" ++ name ++ ".markdown"} />
-                 </LegacyPage>,
+                 </Page>,
                )
              ),
         ),
         File(
           "jobs",
-          <LegacyPage name="jobs" extraHeaders=Careers.extraHeaders>
+          <Page name="jobs" extraHeaders=Careers.extraHeaders>
             <Careers jobOpenings />
-          </LegacyPage>,
+          </Page>,
         ),
         File(
           "code",
-          <LegacyPage name="code" extraHeaders=Code.extraHeaders>
-            <Code />
-          </LegacyPage>,
+          <Page name="code" extraHeaders=Code.extraHeaders> <Code /> </Page>,
+        ),
+        File(
+          "blog",
+          <Page name="blog" extraHeaders=Blog.extraHeaders>
+            <Blog posts />
+          </Page>,
+        ),
+        File(
+          "privacy",
+          <Page name="privacy"> <RawHtml path="html/Privacy.html" /> </Page>,
+        ),
+        File(
+          "tos",
+          <Page name="tos"> <RawHtml path="html/TOS.html" /> </Page>,
         ),
       |],
     ),
   )
 );
-Fs.symlinkSync(
-  Node.Process.cwd() ++ "/../../src/app/website/static",
-  "./site/static",
-);
+Fs.symlinkSync(Node.Process.cwd() ++ "/static", "./site/static");

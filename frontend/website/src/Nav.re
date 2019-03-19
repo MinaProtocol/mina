@@ -1,13 +1,22 @@
-/* Nav styles adapted from https://medium.com/creative-technology-concepts-code/responsive-mobile-dropdown-navigation-using-css-only-7218e4498a99 */
+// Nav styles adapted from https://medium.com/creative-technology-concepts-code/responsive-mobile-dropdown-navigation-using-css-only-7218e4498a99
 
 module Style = {
-  open Style;
   open Css;
+  open Style;
 
-  let no_list = style([listStyle(`none, `inside, `none)]);
+  module MediaQuery = {
+    let menu = "(min-width: 58rem)";
+    let statusLift = "(min-width: 38rem)";
+  };
 
   let item =
-    merge([style(paddingX(`rem(1.0)) @ paddingY(`rem(1.0))), no_list]);
+    merge([
+      style(
+        paddingX(`rem(0.75))
+        @ paddingY(`rem(1.0))
+        @ [listStyle(`none, `inside, `none)],
+      ),
+    ]);
 
   let options =
     style([
@@ -20,8 +29,13 @@ module Style = {
       backgroundColor(Colors.white),
       // always visible and flexed on full
       media(
-        MediaQuery.full,
-        [display(`flex), justifyContent(`flexEnd), position(`static)],
+        MediaQuery.menu,
+        [
+          display(`flex),
+          justifyContent(`spaceBetween),
+          position(`static),
+          width(`percent(100.0)),
+        ],
       ),
     ]);
 
@@ -39,17 +53,46 @@ module Style = {
       position(`relative),
       userSelect(`none),
       // The menu is always shown on full-size
-      media(MediaQuery.full, [display(`none)]),
+      media(MediaQuery.menu, [display(`none)]),
     ]);
 
-  let menuText = style(paddingX(`rem(1.0)) @ paddingY(`rem(1.0)));
+  let menuText =
+    merge([
+      style([marginLeft(`rem(1.0)), ...paddingY(`rem(1.0))]),
+      Link.style,
+    ]);
 
   let nav =
     style([
       display(`flex),
       justifyContent(`spaceBetween),
       alignItems(`center),
+      flexWrap(`wrap),
+      media(MediaQuery.statusLift, [flexWrap(`nowrap)]),
     ]);
+};
+open Style;
+
+module Logo = {
+  let svg =
+    <svg className=Css.(style([width(`rem(7.125)), height(`rem(1.25))]))>
+      <image xlinkHref="/static/img/new-logo.svg" width="114" height="20" />
+    </svg>;
+};
+
+module Testnet = {
+  open Css;
+
+  module Placeholder = {
+    let style =
+      style([
+        backgroundColor(`rgba((45, 158, 219, 0.1))),
+        width(`percent(100.0)),
+        height(`px(40)),
+        margin(`auto),
+        media(MediaQuery.statusLift, [width(`px(341))]),
+      ]);
+  };
 };
 
 let component = ReasonReact.statelessComponent("Nav");
@@ -60,14 +103,51 @@ let make = children => {
       children |> Array.map(elem => <li className=Style.item> elem </li>);
 
     <nav className=Style.nav>
-      <p> {ReasonReact.string("TODO Logo")} </p>
-      /* we use the input to get a :checked pseudo selector
-       * that we can use to get on-click without javascript at runtime */
-      <input className=Style.menuBtn type_="checkbox" id="nav-menu-btn" />
-      <label className=Style.menuIcon htmlFor="nav-menu-btn">
-        <span className=Style.menuText> {ReasonReact.string("Menu")} </span>
-      </label>
-      <ul className=Style.options> ...items </ul>
+      <a
+        href="/"
+        className=Css.(
+          style([
+            display(`block),
+            width(`percent(50.0)),
+            media(
+              MediaQuery.statusLift,
+              [width(`auto), marginRight(`rem(0.75))],
+            ),
+          ])
+        )>
+        Logo.svg
+      </a>
+      <div
+        className=Css.(
+          style([
+            order(3),
+            width(`percent(100.0)),
+            media(MediaQuery.statusLift, [order(2), width(`auto)]),
+            media(MediaQuery.menu, [width(`percent(40.0))]),
+          ])
+        )>
+        <div className=Testnet.Placeholder.style />
+      </div>
+      <div
+        className=Css.(
+          style([
+            width(`auto),
+            order(2),
+            media(MediaQuery.statusLift, [order(3), width(`auto)]),
+            media(MediaQuery.menu, [width(`percent(50.0))]),
+          ])
+        )>
+        /* we use the input to get a :checked pseudo selector
+         * that we can use to get on-click without javascript at runtime */
+
+          <input className=Style.menuBtn type_="checkbox" id="nav-menu-btn" />
+          <label className=Style.menuIcon htmlFor="nav-menu-btn">
+            <span className=Style.menuText>
+              {ReasonReact.string("Menu")}
+            </span>
+          </label>
+          <ul className=Style.options> ...items </ul>
+        </div>
     </nav>;
   },
 };

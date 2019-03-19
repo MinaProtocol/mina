@@ -3,7 +3,6 @@ let component = ReasonReact.statelessComponent("CareerPost");
 let make = (~path, _) => {
   let (html, content) = Markdown.load(path);
   let title = Markdown.Metadata.getRequiredValue("title", content, path);
-  let date = Markdown.Metadata.getRequiredValue("date", content, path);
   {
     ...component,
     render: _self =>
@@ -37,7 +36,6 @@ let make = (~path, _) => {
             </div>
           </div>
         </section>
-        <BlogPost.MailingList />
       </div>,
   };
 };

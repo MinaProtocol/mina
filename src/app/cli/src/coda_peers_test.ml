@@ -9,8 +9,7 @@ let name = "coda-peers-test"
 let main () =
   let%bind program_dir = Unix.getcwd () in
   let n = 3 in
-  let log = Logger.create () in
-  let log = Logger.child log name in
+  let logger = Logger.create () in
   let proposal_interval = Consensus.Constants.block_window_duration_ms in
   let acceptable_delay =
     Time.Span.of_ms
@@ -31,7 +30,7 @@ let main () =
     Deferred.all_unit
       (List.map2_exn workers expected_peers ~f:(fun worker expected_peers ->
            let%map peers = Coda_process.peers_exn worker in
-           Logger.debug log
+           Logger.debug logger ~module_:__MODULE__ ~location:__LOC__
              !"got peers %{sexp: Network_peer.Peer.t list} %{sexp: \
                Host_and_port.t list}\n"
              peers expected_peers ;

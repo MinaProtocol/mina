@@ -14,7 +14,7 @@ module type S = sig
   val connect :
        initial_peers:Host_and_port.t list
     -> me:Peer.t
-    -> parent_log:Logger.t
+    -> logger:Logger.t
     -> conf_dir:string
     -> trust_system:trust_system
     -> t Deferred.Or_error.t
@@ -36,11 +36,11 @@ module type Process_intf = sig
   val create :
        initial_peers:Host_and_port.t list
     -> me:Peer.t
-    -> log:Logger.t
+    -> logger:Logger.t
     -> conf_dir:string
     -> t Deferred.Or_error.t
 
-  val output : t -> log:Logger.t -> string list Pipe.Reader.t
+  val output : t -> logger:Logger.t -> string list Pipe.Reader.t
 end
 
 (* Unfortunately, `dune runtest` runs in a pwd deep inside the build
@@ -119,7 +119,7 @@ module Haskell_process = struct
     filter_initial_peers [Peer.to_discovery_host_and_port me; other] me
     = [other]
 
-  let create ~(initial_peers : Host_and_port.t list) ~(me : Peer.t) ~log
+  let create ~(initial_peers : Host_and_port.t list) ~(me : Peer.t) ~logger
       ~conf_dir =
     let lock_path = Filename.concat conf_dir lock_file in
     let filtered_initial_peers = filter_initial_peers initial_peers me in
@@ -128,7 +128,7 @@ module Haskell_process = struct
         ["test"; cli_format me]
         @ List.map filtered_initial_peers ~f:cli_format_initial_peer
       in
-      Logger.debug log "Args: %s\n"
+      Logger.debug logger ~module_:__MODULE__ ~location:__LOC__ "Args: %s\n"
         (List.sexp_of_t String.sexp_of_t args |> Sexp.to_string_hum) ;
       (* This is where nix dumps the haskell artifact *)
       let kademlia_binary = "src/app/kademlia-haskell/result/bin/kademlia" in
@@ -153,11 +153,10 @@ module Haskell_process = struct
           Deferred.upon (Process.wait p.process) (fun code ->
               match (!(p.failure_response), code) with
               | `Ignore, _ | _, Ok () -> ()
-              | `Die, Error e ->
-                  Logger.fatal log
-                    !"Kademlia process died: %{sexp: \
-                      Unix.Exit_or_signal.error}%!"
-                    e ;
+              | `Die, (Error _ as e) ->
+                  Logger.fatal logger ~module_:__MODULE__ ~location:__LOC__
+                    !"Kademlia process died: %s%!"
+                    (Unix.Exit_or_signal.to_string_hum e) ;
                   raise Child_died ) ;
           Ok p
       | Error e ->
@@ -167,17 +166,18 @@ module Haskell_process = struct
                CODA_KADEMLIA_PATH=$PWD/src/app/kademlia-haskell/result/bin/kademlia "
             ^ Error.to_string_hum e )
     in
-    let kill_locked_process ~log =
+    let kill_locked_process ~logger =
       match%bind Sys.file_exists lock_path with
       | `Yes -> (
           let%bind p = Reader.file_contents lock_path in
           match%bind Process.run ~prog:"kill" ~args:[p] () with
           | Ok _ ->
-              Logger.debug log "Killing Dead Kademlia Process %s" p ;
+              Logger.debug logger ~module_:__MODULE__ ~location:__LOC__
+                "Killing Dead Kademlia Process %s" p ;
               let%map () = Sys.remove lock_path in
               Ok ()
           | Error _ ->
-              Logger.debug log
+              Logger.debug logger ~module_:__MODULE__ ~location:__LOC__
                 "Process %s does not exists and will not be killed" p ;
               return @@ Ok () )
       | _ -> return @@ Ok ()
@@ -187,9 +187,9 @@ module Haskell_process = struct
       ["test"; cli_format me]
       @ List.map initial_peers ~f:cli_format_initial_peer
     in
-    Logger.debug log "Args: %s\n"
+    Logger.debug logger ~module_:__MODULE__ ~location:__LOC__ "Args: %s"
       (List.sexp_of_t String.sexp_of_t args |> Sexp.to_string_hum) ;
-    let%bind () = kill_locked_process ~log in
+    let%bind () = kill_locked_process ~logger in
     match%bind
       Sys.is_directory conf_dir |> Deferred.map ~f:Or_error.return
     with
@@ -203,11 +203,13 @@ module Haskell_process = struct
         don't_wait_for
           (Pipe.iter_without_pushback
              (Reader.pipe (Process.stderr process))
-             ~f:(fun str -> Logger.error log "%s" str)) ;
+             ~f:(fun str ->
+               Logger.error logger ~module_:__MODULE__ ~location:__LOC__ "%s"
+                 str )) ;
         t
     | _ -> Deferred.Or_error.errorf "Config directory (%s) must exist" conf_dir
 
-  let output {process; _} ~log =
+  let output {process; _} ~logger =
     Pipe.filter_map
       (Reader.lines (Process.stdout process))
       ~f:(fun line ->
@@ -216,7 +218,8 @@ module Haskell_process = struct
         (* a colon and a space *)
         let prefix = String.prefix line prefix_name_size in
         let pass_through () =
-          Logger.warn log "Unexpected output from Kademlia Haskell: %s" line ;
+          Logger.warn logger ~module_:__MODULE__ ~location:__LOC__
+            "Unexpected output from Kademlia Haskell: %s" line ;
           None
         in
         if String.length line < prefix_size then pass_through ()
@@ -226,15 +229,18 @@ module Haskell_process = struct
           in
           match prefix with
           | "DBUG" ->
-              Logger.debug log "%s" line_no_prefix ;
+              Logger.debug logger ~module_:__MODULE__ ~location:__LOC__ "%s"
+                line_no_prefix ;
               None
           | "TRAC" -> (* trace is 99% ping/pong checks, omit *)
                       None
           | "EROR" ->
-              Logger.error log "%s" line_no_prefix ;
+              Logger.error logger ~module_:__MODULE__ ~location:__LOC__ "%s"
+                line_no_prefix ;
               None
           | "DATA" ->
-              Logger.info log "%s" line_no_prefix ;
+              Logger.info logger ~module_:__MODULE__ ~location:__LOC__ "%s"
+                line_no_prefix ;
               Some [line_no_prefix]
           | _ -> pass_through () )
 end
@@ -297,14 +303,13 @@ end = struct
       Linear_pipe.write t.changes_writer (Peer.Event.Disconnect deads)
     else Deferred.unit
 
-  let connect ~(initial_peers : Host_and_port.t list) ~(me : Peer.t)
-      ~parent_log ~conf_dir ~trust_system =
+  let connect ~(initial_peers : Host_and_port.t list) ~(me : Peer.t) ~logger
+      ~conf_dir ~trust_system =
     let open Deferred.Or_error.Let_syntax in
-    let log = Logger.child parent_log "membership" in
     let filtered_peers =
       List.filter initial_peers ~f:(Fn.compose not (is_banned trust_system))
     in
-    let%map p = P.create ~initial_peers:filtered_peers ~me ~log ~conf_dir in
+    let%map p = P.create ~initial_peers:filtered_peers ~me ~logger ~conf_dir in
     let peers = Peer.Table.create () in
     let changes_reader, changes_writer = Linear_pipe.create () in
     let first_peers_ivar = ref None in
@@ -315,7 +320,7 @@ end = struct
       {p; peers; changes_reader; changes_writer; first_peers; trust_system}
     in
     don't_wait_for
-      (Pipe.iter (P.output p ~log) ~f:(fun lines ->
+      (Pipe.iter (P.output p ~logger) ~f:(fun lines ->
            let lives, deads =
              List.partition_map lines ~f:(fun line ->
                  match String.split ~on:' ' line with
@@ -382,7 +387,7 @@ end = struct
   module For_tests = struct
     let node (me : Peer.t) (peers : Host_and_port.t list) conf_dir trust_system
         =
-      connect ~initial_peers:peers ~me ~parent_log:(Logger.null ()) ~conf_dir
+      connect ~initial_peers:peers ~me ~logger:(Logger.null ()) ~conf_dir
         ~trust_system
       >>| Or_error.ok_exn
   end
@@ -407,7 +412,7 @@ let%test_module "Tests" =
       val connect :
            initial_peers:Host_and_port.t list
         -> me:Peer.t
-        -> parent_log:Logger.t
+        -> logger:Logger.t
         -> conf_dir:string
         -> t Deferred.Or_error.t
     end
@@ -427,7 +432,7 @@ let%test_module "Tests" =
               ~me:
                 (Peer.create Unix.Inet_addr.localhost ~discovery_port:3001
                    ~communication_port:3000)
-              ~parent_log:(Logger.null ())
+              ~logger:(Logger.null ())
               ~conf_dir:(Filename.temp_dir_name ^/ "membership-test")
           with
           | Ok t ->
@@ -449,7 +454,7 @@ let%test_module "Tests" =
 
       let kill _ = return ()
 
-      let create ~initial_peers:_ ~me:_ ~log:_ ~conf_dir:_ =
+      let create ~initial_peers:_ ~me:_ ~logger:_ ~conf_dir:_ =
         let on p = Printf.sprintf "127.0.0.1:%d key on" p in
         let off p = Printf.sprintf "127.0.0.1:%d key off" p in
         let render cmds =
@@ -457,7 +462,7 @@ let%test_module "Tests" =
         in
         Deferred.Or_error.return (render Script.s)
 
-      let output t ~log:_log =
+      let output t ~logger:_logger =
         let r, w = Pipe.create () in
         List.iter t ~f:(fun line -> Pipe.write_without_pushback w [line]) ;
         r
@@ -474,7 +479,7 @@ let%test_module "Tests" =
         in
         ()
 
-      let create ~initial_peers:_ ~me:_ ~log:_ ~conf_dir:_ =
+      let create ~initial_peers:_ ~me:_ ~logger:_ ~conf_dir:_ =
         Process.create
           ~prog:
             ( match get_project_root () with
@@ -482,7 +487,7 @@ let%test_module "Tests" =
             | None -> failwith "Can't run tests outside of source tree." )
           ~args:[] ()
 
-      let output t ~log:_log =
+      let output t ~logger:_logger =
         Pipe.map (Reader.pipe (Process.stdout t)) ~f:String.split_lines
     end
 
