@@ -111,13 +111,29 @@ let%test_module "network pool test" =
       let gen = Int.gen
     end
 
+    module Mock_work = struct
+      (* no bin_io except in Stable versions *)
+      module T = struct
+        type t = Int.t [@@deriving sexp, hash, compare]
+
+        let gen = Int.gen
+      end
+
+      include T
+      include Hashable.Make (T)
+
+      module Stable = struct
+        module V1 = Int
+      end
+    end
+
     module Mock_transition_frontier = struct
       type t = Int.t
 
       let create () : t = 0
 
       module Extensions = struct
-        module Work = Int
+        module Work = Mock_work
       end
 
       let snark_pool_refcount_pipe _ =
@@ -128,9 +144,9 @@ let%test_module "network pool test" =
     end
 
     module Mock_fee = Int
-    module Mock_work = Int
     module Mock_snark_pool =
-      Snark_pool.Make (Mock_proof) (Mock_work) (Int) (Mock_transition_frontier)
+      Snark_pool.Make (Mock_proof) (Mock_fee) (Mock_work)
+        (Mock_transition_frontier)
     module Mock_snark_pool_diff =
       Snark_pool_diff.Make (Mock_proof) (Mock_fee) (Mock_work) (Int)
         (Mock_snark_pool)

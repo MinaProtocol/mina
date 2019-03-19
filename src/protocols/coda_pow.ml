@@ -475,9 +475,21 @@ module type Transaction_snark_work_intf = sig
 
     include Sexpable.S with type t := t
 
-    include Binable.S with type t := t
+    include Hashable.S with type t := t
 
-    include Hashable.S_binable with type t := t
+    module Stable :
+      sig
+        module V1 : sig
+          type t
+
+          include Sexpable.S with type t := t
+
+          include Binable.S with type t := t
+
+          include Hashable.S_binable with type t := t
+        end
+      end
+      with type V1.t = t
 
     val gen : t Quickcheck.Generator.t
   end
@@ -489,13 +501,25 @@ module type Transaction_snark_work_intf = sig
   *)
 
   type t = {fee: Fee.Unsigned.t; proofs: proof list; prover: public_key}
-  [@@deriving sexp, bin_io]
+  [@@deriving sexp]
+
+  module Stable :
+    sig
+      module V1 : sig
+        type t = {fee: Fee.Unsigned.t; proofs: proof list; prover: public_key}
+        [@@deriving sexp, bin_io]
+      end
+    end
+    with type V1.t = t
 
   type unchecked = t
 
   module Checked : sig
-    type t = {fee: Fee.Unsigned.t; proofs: proof list; prover: public_key}
-    [@@deriving sexp, bin_io]
+    type nonrec t = t =
+      {fee: Fee.Unsigned.t; proofs: proof list; prover: public_key}
+    [@@deriving sexp]
+
+    module Stable : module type of Stable
 
     val create_unsafe : unchecked -> t
   end
