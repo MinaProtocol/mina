@@ -834,7 +834,7 @@ module Consensus_state = struct
             , Epoch.Slot.t
             , Epoch_data.value )
             t_
-          [@@deriving sexp, bin_io, eq, compare, hash]
+          [@@deriving sexp, bin_io, eq, compare, hash, to_yojson]
         end
 
         include T
@@ -854,7 +854,7 @@ module Consensus_state = struct
     end
 
     type t = Stable.Latest.t (* bin_io omitted intentionally *)
-    [@@deriving sexp, eq, compare, hash]
+    [@@deriving sexp, eq, compare, hash, to_yojson]
   end
 
   type var =
