@@ -11,8 +11,8 @@ module Colors = {
 
   let bluishGreen = `rgb((22, 168, 85));
   let purpleBrown = `rgb((100, 46, 48));
-  let offWhite = `rgb((243, 243, 243));
-  let grey = `rgb((129, 146, 168));
+  let gandalf = `rgb((243, 243, 243));
+  let slate = `rgb((81, 102, 121));
 
   let navy = `rgb((0, 49, 90));
 };
@@ -89,14 +89,15 @@ module H3 = {
 
   let wide = {
     let wing = [
-      contentRule(" "),
-      marginLeft(`rem(0.25)),
+      contentRule(""),
+      marginLeft(`rem(2.0)),
+      marginRight(`rem(2.0)),
       fontSize(`px(5)),
       verticalAlign(`top),
       lineHeight(`rem(1.3)),
       borderTop(`pt(1), `solid, `rgba((155, 155, 155, 0.3))),
       borderBottom(`pt(1), `solid, `rgba((155, 155, 155, 0.3))),
-      ...paddingX(`rem(3.0)),
+      ...paddingX(`rem(1.5)),
     ];
 
     merge([
@@ -141,6 +142,7 @@ module Body = {
       color(Colors.metallicBlue),
       fontSize(`rem(1.0)),
       lineHeight(`rem(1.5)),
+      fontWeight(`normal),
     ]);
 
   let big =
