@@ -27,7 +27,7 @@ module type S = sig
   [@@deriving sexp]
 
   type value =
-    ( Blockchain_state.value
+    ( Blockchain_state.Value.t
     , Consensus_data.value
     , Sok_message.Digest.t
     , Currency.Amount.t )
@@ -48,7 +48,7 @@ module type S = sig
        ?sok_digest:Sok_message.Digest.t
     -> ?ledger_proof:Proof.t
     -> supply_increase:Currency.Amount.t
-    -> blockchain_state:Blockchain_state.value
+    -> blockchain_state:Blockchain_state.Value.t
     -> consensus_data:Consensus_data.value
     -> unit
     -> value
@@ -81,7 +81,7 @@ module Make (Inputs : Inputs_intf) :
   [@@deriving bin_io, sexp, fields]
 
   type value =
-    ( Blockchain_state.Stable.V1.t
+    ( Blockchain_state.Value.Stable.V1.t
     , Consensus_data.value
     , Sok_message.Digest.Stable.V1.t
     , Currency.Amount.t )

@@ -50,7 +50,7 @@ module type S = sig
       module Stable : sig
         module V1 : sig
           (* TODO : version these pieces *)
-          type nonrec t = (Blockchain_state.value, Consensus_state.value) t
+          type nonrec t = (Blockchain_state.Value.t, Consensus_state.value) t
           [@@deriving bin_io, sexp]
         end
 
@@ -94,7 +94,7 @@ module type S = sig
 
   val create_value :
        previous_state_hash:State_hash.t
-    -> blockchain_state:Blockchain_state.t
+    -> blockchain_state:Blockchain_state.Value.t
     -> consensus_state:Consensus_state.value
     -> Value.t
 
@@ -163,7 +163,8 @@ module Make
           module T = struct
             let version = 1
 
-            type tt = (Blockchain_state.Stable.V1.t, Consensus_state.value) t
+            type tt =
+              (Blockchain_state.Value.Stable.V1.t, Consensus_state.value) t
             [@@deriving eq, ord, bin_io, hash, sexp, to_yojson]
 
             type t = tt [@@deriving eq, ord, bin_io, hash, sexp, to_yojson]
