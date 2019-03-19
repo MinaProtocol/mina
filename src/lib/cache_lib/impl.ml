@@ -26,7 +26,7 @@ module Make (Inputs : Inputs_intf) : Intf.Main.S = struct
       let set =
         Hash_set.create ~growth_allowed:true ?size:None (module Elt) ()
       in
-      let logger = Logger.child logger ("Cache:" ^ name) in
+      let logger = Logger.extend logger [("cache", `String name)] in
       {name; set; logger}
 
     let register t x =
@@ -135,7 +135,7 @@ module Make (Inputs : Inputs_intf) : Intf.Main.S = struct
       match peek t with
       | Ok x -> Ok (transform t ~f:(Fn.const x))
       | Error err ->
-          Logger.error
+          Logger.error ~module_:__MODULE__ ~location:__LOC__
             (Cache.logger (cache t))
             "Cached.sequence_result called on an already consumed Cached.t" ;
           ignore (invalidate t) ;

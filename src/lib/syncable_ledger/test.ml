@@ -12,7 +12,7 @@ end
 
 module type Input_intf = sig
   module Root_hash : sig
-    type t [@@deriving bin_io, compare, hash, sexp, compare]
+    type t [@@deriving bin_io, compare, hash, sexp, compare, yojson]
 
     val equal : t -> t -> bool
   end
@@ -31,11 +31,7 @@ module type Input_intf = sig
      and type merkle_path := Ledger.path
      and type account := Ledger.account
      and type query := Ledger.addr Syncable_ledger.Query.t
-     and type answer :=
-                ( Ledger.addr
-                , Root_hash.t
-                , Ledger.account )
-                Syncable_ledger.Answer.t
+     and type answer := (Root_hash.t, Ledger.account) Syncable_ledger.Answer.t
 end
 
 module Make_test
@@ -51,24 +47,24 @@ struct
    * in before we need it. *)
   let total_queries = ref None
 
-  let parent_log = Logger.null ()
+  let logger = Logger.null ()
 
   let%test "full_sync_entirely_different" =
     let l1, _k1 = Ledger.load_ledger 1 1 in
     let l2, _k2 = Ledger.load_ledger num_accts 2 in
     let desired_root = Ledger.merkle_root l2 in
-    let lsync = Sync_ledger.create l1 ~parent_log in
+    let lsync = Sync_ledger.create l1 ~logger in
     let qr = Sync_ledger.query_reader lsync in
     let aw = Sync_ledger.answer_writer lsync in
     let seen_queries = ref [] in
     let sr =
       Sync_responder.create l2
         (fun q -> seen_queries := q :: !seen_queries)
-        ~parent_log
+        ~logger
     in
     don't_wait_for
       (Linear_pipe.iter_unordered ~max_concurrency:3 qr
-         ~f:(fun (_hash, query) ->
+         ~f:(fun (root_hash, query) ->
            let answ = Sync_responder.answer_query sr query in
            let%bind () =
              if match query with What_contents _ -> true | _ -> false then
@@ -77,7 +73,7 @@ struct
                     ~percent:(Percent.of_percentage 20.))
              else Deferred.unit
            in
-           Linear_pipe.write aw (Envelope.Incoming.local (desired_root, answ))
+           Linear_pipe.write aw (root_hash, query, Envelope.Incoming.local answ)
        )) ;
     match
       Async.Thread_safe.block_on_async_exn (fun () ->
@@ -93,7 +89,7 @@ struct
     let l2, _k2 = Ledger.load_ledger num_accts 2 in
     let l3, _k3 = Ledger.load_ledger num_accts 3 in
     let desired_root = ref @@ Ledger.merkle_root l2 in
-    let lsync = Sync_ledger.create l1 ~parent_log in
+    let lsync = Sync_ledger.create l1 ~logger in
     let qr = Sync_ledger.query_reader lsync in
     let aw = Sync_ledger.answer_writer lsync in
     let seen_queries = ref [] in
@@ -101,7 +97,7 @@ struct
       ref
       @@ Sync_responder.create l2
            (fun q -> seen_queries := q :: !seen_queries)
-           ~parent_log
+           ~logger
     in
     let ctr = ref 0 in
     don't_wait_for
@@ -113,14 +109,14 @@ struct
                  sr :=
                    Sync_responder.create l3
                      (fun q -> seen_queries := q :: !seen_queries)
-                     ~parent_log ;
+                     ~logger ;
                  desired_root := Ledger.merkle_root l3 ;
                  Sync_ledger.new_goal lsync !desired_root |> ignore ;
                  Deferred.unit )
                else
                  let answ = Sync_responder.answer_query !sr query in
                  Linear_pipe.write aw
-                   (Envelope.Incoming.local (!desired_root, answ))
+                   (!desired_root, query, Envelope.Incoming.local answ)
              in
              ctr := !ctr + 1 ;
              res )) ;
@@ -191,7 +187,7 @@ module Ledger = struct
       module MT = Ledger
       include Base_ledger_inputs
 
-      let subtree_height = 3
+      let account_subtree_height = 3
     end
 
     module Sync_ledger = Syncable_ledger.Make (Syncable_ledger_inputs)
@@ -322,7 +318,7 @@ module Db = struct
       module MT = Ledger
       include Base_ledger_inputs
 
-      let subtree_height = 3
+      let account_subtree_height = 3
     end
 
     module Sync_ledger = Syncable_ledger.Make (Syncable_ledger_inputs)
@@ -465,7 +461,7 @@ module Mask = struct
       module MT = Ledger
       include Base_ledger_inputs
 
-      let subtree_height = 3
+      let account_subtree_height = 3
     end
 
     module Sync_ledger = Syncable_ledger.Make (Syncable_ledger_inputs)

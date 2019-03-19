@@ -17,7 +17,7 @@ module Time = struct
       module T = struct
         let version = 1
 
-        type t = UInt64.t [@@deriving bin_io, sexp, compare, eq, hash]
+        type t = UInt64.t [@@deriving bin_io, sexp, compare, eq, hash, yojson]
       end
 
       include T
@@ -61,7 +61,7 @@ module Time = struct
   end
 
   (* DO NOT add bin_io the deriving list *)
-  type t = Stable.Latest.t [@@deriving sexp, compare, eq, hash]
+  type t = Stable.Latest.t [@@deriving sexp, compare, eq, hash, yojson]
 
   type t0 = t
 

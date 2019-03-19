@@ -62,7 +62,6 @@ module Make (Inputs : Inputs.With_unprocessed_transition_cache.S) :
          , synchronous
          , unit Deferred.t )
          Writer.t) ~processed_transition_writer ~unprocessed_transition_cache =
-    let logger = Logger.child logger "Transition_handler.Catchup" in
     let catchup_scheduler =
       Catchup_scheduler.create ~logger ~frontier ~time_controller
         ~catchup_job_writer ~catchup_breadcrumbs_writer
@@ -120,7 +119,8 @@ module Make (Inputs : Inputs.With_unprocessed_transition_cache.S) :
                    with
                    | Ok () -> ()
                    | Error err ->
-                       Logger.error logger
+                       Logger.error logger ~module_:__MODULE__
+                         ~location:__LOC__
                          "failed to attach all catchup breadcrumbs to \
                           transition frontier: %s"
                          (Error.to_string_hum err) )
@@ -171,7 +171,8 @@ module Make (Inputs : Inputs.With_unprocessed_transition_cache.S) :
                      with
                      | Ok () -> ()
                      | Error err ->
-                         Logger.error logger
+                         Logger.error logger ~module_:__MODULE__
+                           ~location:__LOC__
                            "error while adding transition: %s"
                            (Error.to_string_hum err) ) ) ) ))
 end
