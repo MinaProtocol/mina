@@ -896,7 +896,7 @@ module Consensus_state = struct
            -> 'epoch_data
            -> unit )
          Coda_base.H_list.t
-      -> ('length, 'vrf_output, 'amount, 'epoch, 'slot, 'epoch_data) t =
+      -> ('length, 'vrf_output, 'amount, 'epoch, 'slot, 'epoch_data) t_ =
    fun Coda_base.H_list.([ length
                          ; epoch_length
                          ; last_vrf_output
@@ -925,7 +925,7 @@ module Consensus_state = struct
     ; Epoch_data.typ
     ; Epoch_data.typ ]
 
-  let typ : (var, value) Typ.t =
+  let typ : (var, Value.t) Typ.t =
     Snark_params.Tick.Typ.of_hlistable data_spec ~var_to_hlist:to_hlist
       ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist ~value_of_hlist:of_hlist
 
@@ -972,7 +972,7 @@ module Consensus_state = struct
     + Epoch.Slot.length_in_triples + Amount.length_in_triples
     + Epoch_data.length_in_triples + Epoch_data.length_in_triples
 
-  let genesis : value =
+  let genesis : Value.t =
     { length= Length.zero
     ; epoch_length= Length.zero
     ; last_vrf_output= Vrf.Output.dummy
@@ -982,12 +982,12 @@ module Consensus_state = struct
     ; curr_epoch_data= Epoch_data.genesis
     ; last_epoch_data= Epoch_data.genesis }
 
-  let update ~(previous_consensus_state : value)
+  let update ~(previous_consensus_state : Value.t)
       ~(consensus_transition_data : Consensus_transition_data.value)
       ~(previous_protocol_state_hash : Coda_base.State_hash.t)
       ~(supply_increase : Currency.Amount.t)
       ~(snarked_ledger_hash : Coda_base.Frozen_ledger_hash.t)
-      ~(proposer_vrf_result : Random_oracle.Digest.t) : value Or_error.t =
+      ~(proposer_vrf_result : Random_oracle.Digest.t) : Value.t Or_error.t =
     let open Or_error.Let_syntax in
     let open Consensus_transition_data in
     let%map total_currency =
@@ -1112,9 +1112,9 @@ module Consensus_state = struct
         ; last_epoch_data= last_data
         ; curr_epoch_data= curr_data } )
 
-  let length (t : value) = t.length
+  let length (t : Value.t) = t.length
 
-  let time_hum (t : value) =
+  let time_hum (t : Value.t) =
     sprintf "%d:%d" (Epoch.to_int t.curr_epoch) (Epoch.Slot.to_int t.curr_slot)
 
   let to_lite = None
@@ -1127,7 +1127,7 @@ module Consensus_state = struct
     ; total_currency: int }
   [@@deriving yojson]
 
-  let display (t : value) =
+  let display (t : Value.t) =
     { length= Length.to_int t.length
     ; epoch_length= Length.to_int t.epoch_length
     ; curr_epoch= Segment_id.to_int t.curr_epoch
@@ -1695,7 +1695,7 @@ let%test_module "Proof of stake tests" =
         Or_error.ok_exn
         @@ Snark_params.Tick.run_and_check checked_computation ()
       in
-      assert (equal_value checked_value next_consensus_state) ;
+      assert (Value.equal checked_value next_consensus_state) ;
       ()
   end )
 
