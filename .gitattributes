@@ -2,4 +2,6 @@
 # libsnark is lots of c++
 src/lib/snarky/src/camlsnark_c/libsnark-caml/* linguist-vendored
 *.png filter=lfs diff=lfs merge=lfs -text
+*.jpg filter=lfs diff=lfs merge=lfs -text
+*.svg filter=lfs diff=lfs merge=lfs -text
 
