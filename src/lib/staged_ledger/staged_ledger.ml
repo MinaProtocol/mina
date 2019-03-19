@@ -438,28 +438,21 @@ end = struct
         in
         chunks_of jobs ~n:Transaction_snark_work.proofs_length)
     in
-    let rec check job_proofs prover message =
+    let check job_proofs prover message =
       let open Deferred.Let_syntax in
-      match job_proofs with
-      | [] -> Deferred.return (Ok ())
-      | (job, proof) :: js -> (
-          match%bind verify ~message job proof prover with
-          | Ok () -> check js prover message
-          | e -> Deferred.return e )
+      Deferred.List.find_map job_proofs ~f:(fun (job, proof) ->
+          match%map verify ~message job proof prover with
+          | Ok () -> None
+          | Error e -> Some e )
     in
-    let rec go (job_work_pairs : (job list * Transaction_snark_work.t) list) =
-      let open Deferred.Let_syntax in
-      match job_work_pairs with
-      | [] -> Deferred.return (Ok ())
-      | (jobs, work) :: js -> (
+    let open Deferred.Let_syntax in
+    let%map result =
+      Deferred.List.find_map (List.zip_exn jobses completed_works)
+        ~f:(fun (jobs, work) ->
           let message = Sok_message.create ~fee:work.fee ~prover:work.prover in
-          match%bind
-            check (List.zip_exn jobs work.proofs) work.prover message
-          with
-          | Ok () -> go js
-          | e -> Deferred.return e )
+          check (List.zip_exn jobs work.proofs) work.prover message )
     in
-    go (List.zip_exn jobses completed_works)
+    Option.value_map result ~default:(Ok ()) ~f:(fun e -> Error e)
 
   let create_fee_transfers completed_works delta public_key coinbase_fts =
     let open Result.Let_syntax in
