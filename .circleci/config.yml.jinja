@@ -37,7 +37,7 @@ jobs:
 
     lint:
         docker:
-            - image: codaprotocol/coda:toolchain-0c5f0ad97e6a7a4c50ef6c47b75924a24fa6e05f
+            - image: codaprotocol/coda:toolchain-af1380e0f6c8726391d82b2adb6a2a3b20dd46a0
         steps:
             - checkout
             - run: git submodule sync && git submodule update --init --recursive
@@ -82,8 +82,8 @@ jobs:
                       - homebrew-v1-
             - restore_cache:
                   keys:
-                      - opam-v2-{{'{{'}} checksum "src/opam.export" {{'}}'}}
-                      - opam-v2-
+                      - opam-v3-{{'{{'}} checksum "src/opam.export" {{'}}'}}
+                      - opam-v3-
             - run: git submodule sync && git submodule update --init --recursive
             - run:
                   name: Download Deps -- make macos-setup-download
@@ -97,7 +97,7 @@ jobs:
                       - "/usr/local/Homebrew"
                       - "/Users/distiller/Library/Caches/Homebrew"
             - save_cache:
-                  key: opam-v2-{{'{{'}} checksum "src/opam.export" {{'}}'}}
+                  key: opam-v3-{{'{{'}} checksum "src/opam.export" {{'}}'}}
                   paths:
                       - "/Users/distiller/.opam"
             - run:
@@ -114,7 +114,7 @@ jobs:
     build-artifacts--{{profile}}:
         resource_class: large
         docker:
-            - image: codaprotocol/coda:toolchain-0c5f0ad97e6a7a4c50ef6c47b75924a24fa6e05f
+            - image: codaprotocol/coda:toolchain-af1380e0f6c8726391d82b2adb6a2a3b20dd46a0
         environment:
             DUNE_PROFILE: {{profile}}
         steps:
@@ -153,7 +153,7 @@ jobs:
     test-unit--{{profile}}:
         resource_class: large
         docker:
-            - image: codaprotocol/coda:toolchain-0c5f0ad97e6a7a4c50ef6c47b75924a24fa6e05f
+            - image: codaprotocol/coda:toolchain-af1380e0f6c8726391d82b2adb6a2a3b20dd46a0
         steps:
             - checkout
             - run: git submodule sync && git submodule update --init --recursive
@@ -166,7 +166,7 @@ jobs:
     test--{{profile}}:
         resource_class: large
         docker:
-            - image: codaprotocol/coda:toolchain-0c5f0ad97e6a7a4c50ef6c47b75924a24fa6e05f
+            - image: codaprotocol/coda:toolchain-af1380e0f6c8726391d82b2adb6a2a3b20dd46a0
         steps:
             - checkout
             - run: git submodule sync && git submodule update --init --recursive

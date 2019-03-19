@@ -46,7 +46,7 @@ val gen :
 module With_valid_signature : sig
   module Stable : sig
     module V1 : sig
-      type nonrec t = private t [@@deriving sexp, eq, bin_io]
+      type nonrec t = private t [@@deriving sexp, eq, bin_io, yojson]
 
       val compare : t -> t -> int
 

@@ -3,7 +3,7 @@ open Fold_lib
 open Tuple_lib
 open Snark_params.Tick
 
-type t [@@deriving bin_io, sexp, eq, compare, hash]
+type t [@@deriving bin_io, sexp, eq, compare, hash, yojson]
 
 include Hashable_binable with type t := t
 
@@ -19,7 +19,7 @@ val fold : t -> bool Triple.t Fold.t
 
 module Stable : sig
   module V1 : sig
-    type nonrec t = t [@@deriving bin_io, sexp, eq, compare, hash]
+    type nonrec t = t [@@deriving bin_io, sexp, eq, compare, hash, yojson]
 
     include Hashable_binable with type t := t
   end
@@ -34,7 +34,7 @@ module Aux_hash : sig
 
   module Stable : sig
     module V1 : sig
-      type nonrec t = t [@@deriving bin_io, sexp, eq, compare, hash]
+      type nonrec t = t [@@deriving bin_io, sexp, eq, compare, hash, yojson]
     end
 
     module Latest : module type of V1

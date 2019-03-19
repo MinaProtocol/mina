@@ -27,7 +27,7 @@ module Peer_status : module type of Peer_status
 module type Action_intf = sig
   (** The type of trust-affecting actions. For the log messages to be
       grammatical, the constructors should be past tense verbs. *)
-  type t [@@deriving sexp_of]
+  type t [@@deriving sexp_of, yojson]
 
   val to_trust_response : t -> Trust_response.t
 end
