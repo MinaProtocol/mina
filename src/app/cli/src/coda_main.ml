@@ -1350,7 +1350,7 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
 
   let clear_hist_status ~flag t = Perf_histograms.wipe () ; get_status ~flag t
 
-  let log_shutdown ~conf_dir ~log t =
+  let log_shutdown ~conf_dir ~logger t =
     let frontier_file = conf_dir ^/ "frontier.dot" in
     let mask_file = conf_dir ^/ "registered_masks.dot" in
     Logger.info logger ~module_:__MODULE__ ~location:__LOC__ "%s"
