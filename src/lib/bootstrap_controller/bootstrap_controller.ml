@@ -35,7 +35,7 @@ module type Inputs_intf = sig
     with type peer := Network_peer.Peer.t
      and type state_hash := State_hash.t
      and type external_transition := External_transition.t
-     and type consensus_state := Consensus.Consensus_state.value
+     and type consensus_state := Consensus.Consensus_state.Value.t
      and type state_body_hash := State_body_hash.t
      and type ledger_hash := Ledger_hash.t
      and type sync_ledger_query := Sync_ledger.Query.t
@@ -69,7 +69,7 @@ module type Inputs_intf = sig
      and type external_transition := External_transition.t
      and type proof_verified_external_transition :=
                 External_transition.Proof_verified.t
-     and type consensus_state := Consensus.Consensus_state.value
+     and type consensus_state := Consensus.Consensus_state.Value.t
      and type state_hash := State_hash.t
 end
 
@@ -330,7 +330,8 @@ end = struct
             ~consensus_local_state:
               (Transition_frontier.consensus_local_state frontier)
         in
-        Logger.info logger "Bootstrap state: complete." ;
+        Logger.info logger ~module_:__MODULE__ ~location:__LOC__
+          "Bootstrap state: complete." ;
         (new_frontier, Transition_cache.data transition_graph)
     | Error err ->
         (* TODO: punish *)
