@@ -230,7 +230,8 @@ end = struct
                         ; pending_coinbases }
               else (
                 (* TODO: punish! *)
-                Logger.faulty_peer t.logger
+                Logger.faulty_peer t.logger ~module_:__MODULE__
+                  ~location:__LOC__
                   "Received wrong staged_ledger_aux from the network" ;
                 `Ignored )
           | Error e -> received_bad_proof t e |> Fn.const `Ignored )
@@ -285,8 +286,7 @@ end = struct
           | `Ignored -> ()
         else Deferred.unit )
 
-  let run ~parent_log ~network ~frontier ~ledger_db ~transition_reader =
-    let logger = Logger.child parent_log __MODULE__ in
+  let run ~logger ~network ~frontier ~ledger_db ~transition_reader =
     let initial_breadcrumb = Transition_frontier.root frontier in
     let initial_root_verified_transition =
       initial_breadcrumb |> Transition_frontier.Breadcrumb.transition_with_hash
@@ -305,7 +305,7 @@ end = struct
     let result = Mvar.create () in
     let%bind synced_db =
       let root_sync_ledger =
-        Root_sync_ledger.create ledger_db ~parent_log:t.logger
+        Root_sync_ledger.create ledger_db ~logger:t.logger
       in
       sync_ledger t ~root_sync_ledger ~transition_graph ~transition_reader
         ~result
@@ -343,16 +343,18 @@ end = struct
     with
     | Ok root_staged_ledger ->
         let%map new_frontier =
-          Transition_frontier.create ~logger:parent_log
-            ~root_transition:new_root ~root_snarked_ledger:synced_db
-            ~root_staged_ledger
+          Transition_frontier.create ~logger ~root_transition:new_root
+            ~root_snarked_ledger:synced_db ~root_staged_ledger
             ~consensus_local_state:
               (Transition_frontier.consensus_local_state frontier)
         in
+        Logger.info logger ~module_:__MODULE__ ~location:__LOC__
+          "Bootstrap state: complete." ;
         (new_frontier, Transition_cache.data transition_graph)
     | Error err ->
         (* TODO: punish *)
-        Logger.faulty_peer t.logger "received faulty scan state from the peer." ;
+        Logger.faulty_peer logger ~module_:__MODULE__ ~location:__LOC__
+          "received faulty scan state from the peer." ;
         Error.raise err
 
   module For_tests = struct

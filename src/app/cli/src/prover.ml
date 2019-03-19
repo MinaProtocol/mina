@@ -24,7 +24,7 @@ module type S = sig
   val extend_blockchain :
        t
     -> Blockchain.t
-    -> Consensus.Protocol_state.value
+    -> Consensus.Protocol_state.Value.t
     -> Consensus.Snark_transition.value
     -> Consensus.Prover_state.t
     -> Pending_coinbase_witness.t
@@ -40,13 +40,13 @@ module Worker_state = struct
 
     val extend_blockchain :
          Blockchain.t
-      -> Consensus_mechanism.Protocol_state.value
+      -> Consensus_mechanism.Protocol_state.Value.t
       -> Consensus_mechanism.Snark_transition.value
       -> Consensus_mechanism.Prover_state.t
       -> Pending_coinbase_witness.t
       -> Blockchain.t
 
-    val verify : Consensus_mechanism.Protocol_state.value -> Proof.t -> bool
+    val verify : Consensus_mechanism.Protocol_state.Value.t -> Proof.t -> bool
   end
 
   type init_arg = unit [@@deriving bin_io]
@@ -79,7 +79,7 @@ module Worker_state = struct
                    (Wrap_input.of_tick_field hash)
 
                let extend_blockchain (chain : Blockchain.t)
-                   (next_state : Consensus.Protocol_state.value)
+                   (next_state : Consensus.Protocol_state.Value.t)
                    (block : Consensus.Snark_transition.value) state_for_handler
                    pending_coinbase =
                  let next_state_top_hash =
@@ -121,7 +121,7 @@ module Worker_state = struct
                module State = Blockchain_state.Make_update (Transaction_snark)
 
                let extend_blockchain (chain : Blockchain.t)
-                   (next_state : Consensus.Protocol_state.value)
+                   (next_state : Consensus.Protocol_state.Value.t)
                    (block : Consensus.Snark_transition.value) state_for_handler
                    pending_coinbase =
                  let next_state_top_hash =
@@ -187,7 +187,7 @@ module Functions = struct
     create
       [%bin_type_class:
         Blockchain.t
-        * Consensus_mechanism.Protocol_state.value
+        * Consensus_mechanism.Protocol_state.Value.Stable.V1.t
         * Consensus_mechanism.Snark_transition.value
         * Consensus_mechanism.Prover_state.t
         * Pending_coinbase_witness.t] Blockchain.bin_t
@@ -217,7 +217,7 @@ module Worker = struct
       ; extend_blockchain:
           ( 'w
           , Blockchain.t
-            * Consensus_mechanism.Protocol_state.value
+            * Consensus_mechanism.Protocol_state.Value.t
             * Consensus_mechanism.Snark_transition.value
             * Consensus_mechanism.Prover_state.t
             * Pending_coinbase_witness.t

@@ -6,9 +6,10 @@ open Snark_params.Tick
 open Tuple_lib
 open Fold_lib
 open Coda_numbers
+open Module_version
 
 module type Consensus_state_intf = sig
-  type value [@@deriving hash, compare, bin_io, sexp]
+  type value [@@deriving hash, compare, bin_io, sexp, to_yojson]
 
   type display [@@deriving yojson]
 
@@ -45,35 +46,57 @@ module type S = sig
   module Body : sig
     type ('a, 'b) t [@@deriving bin_io, sexp]
 
-    type value = (Blockchain_state.value, Consensus_state.value) t
-    [@@deriving bin_io, sexp]
+    module Value : sig
+      module Stable : sig
+        module V1 : sig
+          (* TODO : version these pieces *)
+          type nonrec t = (Blockchain_state.Value.t, Consensus_state.value) t
+          [@@deriving bin_io, sexp]
+        end
+
+        module Latest : module type of V1
+      end
+
+      (* bin_io omitted *)
+      type t = Stable.Latest.t [@@deriving sexp, to_yojson]
+    end
 
     type var = (Blockchain_state.var, Consensus_state.var) t
 
-    val hash : value -> State_body_hash.t
+    val hash : Value.t -> State_body_hash.t
   end
 
   type ('a, 'body) t [@@deriving bin_io, sexp]
 
-  type value = (State_hash.Stable.V1.t, Body.value) t [@@deriving bin_io, sexp]
+  module Value : sig
+    module Stable : sig
+      module V1 : sig
+        type nonrec t = (State_hash.Stable.V1.t, Body.Value.Stable.V1.t) t
+        [@@deriving sexp, bin_io, compare, eq, to_yojson]
+      end
+
+      module Latest : module type of V1
+    end
+
+    (* bin_io omitted *)
+    type t = Stable.Latest.t [@@deriving sexp, compare, eq, to_yojson]
+
+    include Hashable.S with type t := t
+  end
+
+  type value = Value.t [@@deriving sexp, to_yojson]
 
   type var = (State_hash.var, Body.var) t
 
-  include Snarkable.S with type value := value and type var := var
-
-  include Hashable.S with type t := value
-
-  val equal_value : value -> value -> bool
-
-  val compare_value : value -> value -> int
+  include Snarkable.S with type value := Value.t and type var := var
 
   val create : previous_state_hash:'a -> body:'b -> ('a, 'b) t
 
   val create_value :
-       previous_state_hash:State_hash.Stable.V1.t
-    -> blockchain_state:Blockchain_state.t
+       previous_state_hash:State_hash.t
+    -> blockchain_state:Blockchain_state.Value.t
     -> consensus_state:Consensus_state.value
-    -> value
+    -> Value.t
 
   val create_var :
        previous_state_hash:State_hash.var
@@ -89,16 +112,16 @@ module type S = sig
 
   val consensus_state : (_, (_, 'a) Body.t) t -> 'a
 
-  val negative_one : value
+  val negative_one : Value.t
 
   val var_to_triples : var -> (Boolean.var Triple.t list, _) Checked.t
 
-  val hash : value -> State_hash.Stable.V1.t
+  val hash : Value.t -> State_hash.t
 end
 
 module T = struct
   type ('state_hash, 'body) t = {previous_state_hash: 'state_hash; body: 'body}
-  [@@deriving eq, ord, bin_io, hash, sexp]
+  [@@deriving eq, ord, bin_io, hash, sexp, to_yojson]
 end
 
 include T
@@ -117,7 +140,7 @@ let crypto_hash = hash
 module Body = struct
   type ('blockchain_state, 'consensus_state) t =
     {blockchain_state: 'blockchain_state; consensus_state: 'consensus_state}
-  [@@deriving eq, ord, bin_io, hash, sexp]
+  [@@deriving eq, ord, bin_io, hash, sexp, to_yojson]
 end
 
 module Make
@@ -134,8 +157,37 @@ module Make
   module Body = struct
     include Body
 
-    type value = (Blockchain_state.value, Consensus_state.value) t
-    [@@deriving eq, ord, bin_io, hash, sexp]
+    module Value = struct
+      module Stable = struct
+        module V1 = struct
+          module T = struct
+            let version = 1
+
+            type tt =
+              (Blockchain_state.Value.Stable.V1.t, Consensus_state.value) t
+            [@@deriving eq, ord, bin_io, hash, sexp, to_yojson]
+
+            type t = tt [@@deriving eq, ord, bin_io, hash, sexp, to_yojson]
+          end
+
+          include T
+          include Registration.Make_latest_version (T)
+        end
+
+        module Latest = V1
+
+        module Module_decl = struct
+          let name = "protocol_state_body"
+
+          type latest = Latest.t
+        end
+
+        module Registrar = Registration.Make (Module_decl)
+        module Registered_V1 = Registrar.Register (V1)
+      end
+
+      type t = Stable.Latest.t [@@deriving sexp, to_yojson]
+    end
 
     type var = (Blockchain_state.var, Consensus_state.var) t
 
@@ -179,15 +231,40 @@ module Make
   include T
 
   module Value = struct
-    type value = (State_hash.Stable.V1.t, Body.value) t
-    [@@deriving bin_io, sexp, hash, compare, eq]
+    module Stable = struct
+      module V1 = struct
+        module T = struct
+          let version = 1
 
-    type t = value [@@deriving bin_io, sexp, hash, compare, eq]
+          type t_ = (State_hash.Stable.V1.t, Body.Value.Stable.V1.t) t
+          [@@deriving bin_io, sexp, hash, compare, eq, to_yojson]
+
+          type t = t_ [@@deriving bin_io, sexp, hash, compare, eq, to_yojson]
+        end
+
+        include T
+        include Registration.Make_latest_version (T)
+      end
+
+      module Latest = V1
+
+      module Module_decl = struct
+        let name = "protocol_state_value"
+
+        type latest = Latest.t
+      end
+
+      module Registrar = Registration.Make (Module_decl)
+      module Registered_V1 = Registrar.Register (V1)
+    end
+
+    (* bin_io omitted *)
+    type t = Stable.Latest.t [@@deriving sexp, hash, compare, eq, to_yojson]
+
+    include Hashable.Make (Stable.Latest)
   end
 
-  type value = Value.t [@@deriving bin_io, sexp, hash, compare, eq]
-
-  include Hashable.Make (Value)
+  type value = Value.t [@@deriving sexp, to_yojson]
 
   type var = (State_hash.var, Body.var) t
 

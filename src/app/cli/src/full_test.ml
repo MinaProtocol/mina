@@ -24,11 +24,11 @@ let with_snark = false
 
 let run_test () : unit Deferred.t =
   Parallel.init_master () ;
-  let log = Logger.create () in
+  let logger = Logger.create () in
   File_system.with_temp_dir "full_test_config" ~f:(fun temp_conf_dir ->
       let keypair = Genesis_ledger.largest_account_keypair_exn () in
       let module Config = struct
-        let logger = log
+        let logger = logger
 
         let conf_dir = temp_conf_dir
 
@@ -68,11 +68,11 @@ let run_test () : unit Deferred.t =
         Inputs.Time.Controller.create Inputs.Time.Controller.basic
       in
       let net_config =
-        { Inputs.Net.Config.parent_log= log
+        { Inputs.Net.Config.logger
         ; time_controller
         ; gossip_net_params=
             { Inputs.Net.Gossip_net.Config.timeout= Time.Span.of_sec 1.
-            ; parent_log= log
+            ; logger
             ; target_peer_count= 8
             ; initial_peers= []
             ; conf_dir= temp_conf_dir
@@ -85,7 +85,7 @@ let run_test () : unit Deferred.t =
       Async.Scheduler.set_record_backtraces true ;
       let%bind coda =
         Main.create
-          (Main.Config.make ~log ~net_config ~propose_keypair:keypair
+          (Main.Config.make ~logger ~net_config ~propose_keypair:keypair
              ~run_snark_worker:true
              ~staged_ledger_persistant_location:
                (temp_conf_dir ^/ "staged_ledger")
@@ -142,8 +142,8 @@ let run_test () : unit Deferred.t =
         `With_public_key
           (Public_key.compress largest_account_keypair.public_key)
       in
-      Run.setup_local_server ~client_port ~coda ~log () ;
-      Run.run_snark_worker ~log ~client_port run_snark_worker ;
+      Run.setup_local_server ~client_port ~coda ~logger () ;
+      Run.run_snark_worker ~logger ~client_port run_snark_worker ;
       (* Let the system settle *)
       let%bind () = Async.after (Time.Span.of_ms 100.) in
       (* No proof emitted by the parallel scan at the begining *)
@@ -184,7 +184,7 @@ let run_test () : unit Deferred.t =
           |> Option.value ~default:Currency.Balance.zero
         in
         let%bind p1_res =
-          Run.send_payment log coda (payment :> User_command.t)
+          Run.send_payment logger coda (payment :> User_command.t)
         in
         assert_ok (p1_res |> Participating_state.active_exn) ;
         (* Send a similar payment twice on purpose; this second one will be rejected
@@ -194,7 +194,7 @@ let run_test () : unit Deferred.t =
             (Currency.Fee.of_int 0)
         in
         let%bind p2_res =
-          Run.send_payment log coda (payment' :> User_command.t)
+          Run.send_payment logger coda (payment' :> User_command.t)
         in
         assert_ok (p2_res |> Participating_state.active_exn) ;
         (* The payment fails, but the rpc command doesn't indicate that because that
@@ -226,7 +226,7 @@ let run_test () : unit Deferred.t =
                 (Currency.Balance.add_amount (Option.value_exn v) amount) )
         in
         let%map p_res =
-          Run.send_payment log coda (payment :> User_command.t)
+          Run.send_payment logger coda (payment :> User_command.t)
         in
         p_res |> Participating_state.active_exn |> assert_ok ;
         new_balance_sheet'

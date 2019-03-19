@@ -118,7 +118,7 @@ module type Transaction_pool_intf = sig
   val broadcasts : t -> pool_diff Linear_pipe.Reader.t
 
   val load :
-       parent_log:Logger.t
+       logger:Logger.t
     -> disk_location:string
     -> incoming_diffs:pool_diff Envelope.Incoming.t Linear_pipe.Reader.t
     -> frontier_broadcast_pipe:transition_frontier Option.t
@@ -142,7 +142,7 @@ module type Snark_pool_intf = sig
   val broadcasts : t -> pool_diff Linear_pipe.Reader.t
 
   val load :
-       parent_log:Logger.t
+       logger:Logger.t
     -> disk_location:string
     -> incoming_diffs:pool_diff Envelope.Incoming.t Linear_pipe.Reader.t
     -> frontier_broadcast_pipe:transition_frontier Option.t
@@ -187,7 +187,7 @@ module type Proposer_intf = sig
   type time
 
   val run :
-       parent_log:Logger.t
+       logger:Logger.t
     -> get_completed_work:(   completed_work_statement
                            -> completed_work_checked option)
     -> transaction_pool:transaction_pool
@@ -297,7 +297,7 @@ module type Inputs_intf = sig
     with type state_with_witness := External_transition.t
      and type staged_ledger := Staged_ledger.t
      and type staged_ledger_hash := Staged_ledger_hash.t
-     and type protocol_state := Consensus_mechanism.Protocol_state.value
+     and type protocol_state := Consensus_mechanism.Protocol_state.Value.t
      and type snark_pool_diff := Snark_pool.pool_diff
      and type transaction_pool_diff := Transaction_pool.pool_diff
      and type parallel_scan_state := Staged_ledger.Scan_state.t
@@ -337,7 +337,7 @@ module type Inputs_intf = sig
      and type ledger_hash := Ledger_hash.t
      and type staged_ledger := Staged_ledger.t
      and type transaction := User_command.With_valid_signature.t
-     and type protocol_state := Consensus_mechanism.Protocol_state.value
+     and type protocol_state := Consensus_mechanism.Protocol_state.Value.t
      and type protocol_state_proof := Protocol_state_proof.t
      and type consensus_local_state := Consensus_mechanism.Local_state.t
      and type completed_work_statement := Transaction_snark_work.Statement.t
@@ -357,7 +357,7 @@ module type Inputs_intf = sig
 
   module Genesis : sig
     val state :
-      ( Consensus_mechanism.Protocol_state.value
+      ( Consensus_mechanism.Protocol_state.Value.t
       , Protocol_state_hash.t )
       With_hash.t
 
@@ -395,7 +395,7 @@ module Make (Inputs : Inputs_intf) = struct
         , synchronous
         , unit Deferred.t )
         Writer.t
-    ; log: Logger.t
+    ; logger: Logger.t
     ; mutable seen_jobs: Work_selector.State.t
     ; receipt_chain_database: Coda_base.Receipt_chain_database.t
     ; staged_ledger_transition_backup_capacity: int
@@ -503,7 +503,7 @@ module Make (Inputs : Inputs_intf) = struct
   module Config = struct
     (** If ledger_db_location is None, will auto-generate a db based on a UUID *)
     type t =
-      { log: Logger.t
+      { logger: Logger.t
       ; propose_keypair: Keypair.t option
       ; run_snark_worker: bool
       ; net_config: Net.Config.t
@@ -523,7 +523,7 @@ module Make (Inputs : Inputs_intf) = struct
 
   let start t =
     Option.iter t.propose_keypair ~f:(fun keypair ->
-        Proposer.run ~parent_log:t.log ~transaction_pool:t.transaction_pool
+        Proposer.run ~logger:t.logger ~transaction_pool:t.transaction_pool
           ~get_completed_work:(Snark_pool.get_completed_work t.snark_pool)
           ~time_controller:t.time_controller ~keypair
           ~consensus_local_state:t.consensus_local_state
@@ -598,7 +598,7 @@ module Make (Inputs : Inputs_intf) = struct
               | Error err -> Error.raise err
             in
             let%bind transition_frontier =
-              Transition_frontier.create ~logger:config.log
+              Transition_frontier.create ~logger:config.logger
                 ~root_transition:
                   (With_hash.of_data first_transition
                      ~hash_data:
@@ -623,7 +623,7 @@ module Make (Inputs : Inputs_intf) = struct
                       peek_frontier frontier_broadcast_pipe_r
                     in
                     Sync_handler.answer_query ~frontier ledger_hash query
-                      ~logger:config.log
+                      ~logger:config.logger
                     |> Result.of_option
                          ~error:
                            (Error.createf
@@ -649,7 +649,7 @@ module Make (Inputs : Inputs_intf) = struct
                       Broadcast_pipe.Reader.peek frontier_broadcast_pipe_r
                     in
                     let%map peer_root_with_proof =
-                      Root_prover.prove ~logger:config.log ~frontier
+                      Root_prover.prove ~logger:config.logger ~frontier
                         consensus_state
                     in
                     let staged_ledger =
@@ -671,7 +671,7 @@ module Make (Inputs : Inputs_intf) = struct
                   Deferred.return result )
             in
             let valid_transitions =
-              Transition_router.run ~logger:config.log ~network:net
+              Transition_router.run ~logger:config.logger ~network:net
                 ~time_controller:config.time_controller
                 ~frontier_broadcast_pipe:
                   (frontier_broadcast_pipe_r, frontier_broadcast_pipe_w)
@@ -685,7 +685,7 @@ module Make (Inputs : Inputs_intf) = struct
               Strict_pipe.Reader.Fork.two valid_transitions
             in
             let%bind transaction_pool =
-              Transaction_pool.load ~parent_log:config.log
+              Transaction_pool.load ~logger:config.logger
                 ~disk_location:config.transaction_pool_disk_location
                 ~incoming_diffs:(Net.transaction_pool_diffs net)
                 ~frontier_broadcast_pipe:frontier_broadcast_pipe_r
@@ -707,7 +707,7 @@ module Make (Inputs : Inputs_intf) = struct
               (Strict_pipe.transfer (Net.states net)
                  external_transitions_writer ~f:ident) ;
             let%bind snark_pool =
-              Snark_pool.load ~parent_log:config.log
+              Snark_pool.load ~logger:config.logger
                 ~disk_location:config.snark_pool_disk_location
                 ~incoming_diffs:(Net.snark_pool_diffs net)
                 ~frontier_broadcast_pipe:frontier_broadcast_pipe_r
@@ -727,7 +727,7 @@ module Make (Inputs : Inputs_intf) = struct
               ; external_transitions_writer=
                   Strict_pipe.Writer.to_linear_pipe external_transitions_writer
               ; strongest_ledgers= valid_transitions_for_api
-              ; log= config.log
+              ; logger= config.logger
               ; seen_jobs= Work_selector.State.init
               ; staged_ledger_transition_backup_capacity=
                   config.staged_ledger_transition_backup_capacity

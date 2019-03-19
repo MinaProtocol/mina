@@ -23,7 +23,7 @@ module type S = sig
   val extend_blockchain :
        t
     -> Blockchain.t
-    -> Consensus.Protocol_state.value
+    -> Consensus.Protocol_state.Value.t
     -> Consensus.Snark_transition.value
     -> Consensus.Prover_state.t
     -> Pending_coinbase_witness.t

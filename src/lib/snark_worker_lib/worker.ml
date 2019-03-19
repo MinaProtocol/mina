@@ -72,29 +72,27 @@ module Make (Inputs : Intf.Inputs_intf) :
         else Or_error.of_exn exn
     | Ok res -> res
 
-  let emit_proof_metrics metrics log =
+  let emit_proof_metrics metrics logger =
     List.iter metrics ~f:(fun (total, tag) ->
         match tag with
         | `Merge ->
-            Logger.info log
+            Logger.info logger ~module_:__MODULE__ ~location:__LOC__
               !"Merge Proof Completed - %s%!"
               (Time.Span.to_string total)
         | `Transition ->
-            Logger.info log
+            Logger.info logger ~module_:__MODULE__ ~location:__LOC__
               !"Base Proof Completed - %s%!"
               (Time.Span.to_string total) )
 
   let main daemon_address public_key shutdown_on_disconnect =
-    let log =
-      Logger.create ()
-      |> Fn.flip Logger.child "snark-worker"
-      |> Fn.flip Logger.child __MODULE__
-    in
+    let logger = Logger.create () in
     let%bind state = Worker_state.create () in
     let wait ?(sec = 0.5) () = after (Time.Span.of_sec sec) in
     let rec go () =
       let log_and_retry label error =
-        Logger.error log !"Error %s:\n%{sexp:Error.t}" label error ;
+        Logger.error logger ~module_:__MODULE__ ~location:__LOC__
+          !"Error %s: %{sexp:Error.t}"
+          label error ;
         let%bind () = wait ~sec:30.0 () in
         (* FIXME: Use a backoff algo here *)
         go ()
@@ -108,13 +106,15 @@ module Make (Inputs : Intf.Inputs_intf) :
             Worker_state.worker_wait_time
             +. (0.5 *. Random.float Worker_state.worker_wait_time)
           in
-          Logger.trace log "No work received from %s - sleeping %.4fs"
+          Logger.trace logger ~module_:__MODULE__ ~location:__LOC__
+            "No work received from %s - sleeping %.4fs"
             (Host_and_port.to_string daemon_address)
             random_delay ;
           let%bind () = wait ~sec:random_delay () in
           go ()
       | Ok (Some work) -> (
-          Logger.info log !"Received work from %s%!"
+          Logger.info logger ~module_:__MODULE__ ~location:__LOC__
+            !"Received work from %s%!"
             (Host_and_port.to_string daemon_address) ;
           let%bind () = wait () in
           (* Pause to wait for stdout to flush *)
@@ -122,8 +122,9 @@ module Make (Inputs : Intf.Inputs_intf) :
           | Error e -> log_and_retry "performing work" e
           | Ok result -> (
               match%bind
-                emit_proof_metrics result.metrics log ;
-                Logger.info log !"Submitted work to %s%!"
+                emit_proof_metrics result.metrics logger ;
+                Logger.info logger ~module_:__MODULE__ ~location:__LOC__
+                  "Submitted work to %s%!"
                   (Host_and_port.to_string daemon_address) ;
                 dispatch Rpcs.Submit_work.rpc shutdown_on_disconnect result
                   daemon_address

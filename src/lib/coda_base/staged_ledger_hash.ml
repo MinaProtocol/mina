@@ -15,7 +15,8 @@ module Aux_hash = struct
       module T = struct
         let version = 1
 
-        type t = string [@@deriving bin_io, sexp, eq, compare, hash]
+        type t = string
+        [@@deriving bin_io, sexp, eq, compare, hash, yojson, yojson]
       end
 
       include T
@@ -53,7 +54,7 @@ module Pending_coinbase_aux = struct
       module T = struct
         let version = 1
 
-        type t = string [@@deriving bin_io, sexp, eq, compare, hash]
+        type t = string [@@deriving bin_io, sexp, eq, compare, hash, yojson]
       end
 
       include T
@@ -91,7 +92,7 @@ module Non_snark = struct
           { ledger_hash: Ledger_hash.Stable.V1.t
           ; aux_hash: Aux_hash.t
           ; pending_coinbase_aux: Pending_coinbase_aux.t }
-        [@@deriving bin_io, sexp, eq, compare, hash]
+        [@@deriving bin_io, sexp, eq, compare, hash, yojson]
       end
 
       include T
@@ -112,7 +113,7 @@ module Non_snark = struct
 
   include Stable.Latest
 
-  type value = t [@@deriving bin_io, sexp, compare, hash]
+  type value = t [@@deriving bin_io, sexp, compare, hash, yojson]
 
   let dummy =
     { ledger_hash= Ledger_hash.of_hash Field.zero
@@ -171,7 +172,7 @@ module Stable = struct
 
       type ('non_snark, 'pending_coinbase_hash) t_ =
         {non_snark: 'non_snark; pending_coinbase_hash: 'pending_coinbase_hash}
-      [@@deriving bin_io, sexp, eq, compare, hash]
+      [@@deriving bin_io, sexp, eq, compare, hash, yojson]
 
       (** Staged ledger hash has two parts
       1) merkle root of the pending coinbases
@@ -179,7 +180,7 @@ module Stable = struct
       Only part 1 is required for blockchain snark computation and therefore the remaining fields of the staged ledger are grouped together as "Non_snark" 
       *)
       type t = (Non_snark.Stable.V1.t, Pending_coinbase.Hash.t) t_
-      [@@deriving bin_io, sexp, eq, compare, hash]
+      [@@deriving bin_io, sexp, eq, compare, hash, yojson]
     end
 
     include T
