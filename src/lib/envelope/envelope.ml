@@ -8,7 +8,7 @@ module Sender = struct
       module T = struct
         let version = 1
 
-        type t = Local | Remote of Peer.t [@@deriving sexp, bin_io]
+        type t = Local | Remote of Peer.t [@@deriving sexp, bin_io, yojson]
       end
 
       include T
@@ -28,7 +28,8 @@ module Sender = struct
   end
 
   (* bin_io intentionally omitted in deriving list *)
-  type t = Stable.Latest.t = Local | Remote of Peer.t [@@deriving sexp]
+  type t = Stable.Latest.t = Local | Remote of Peer.t
+  [@@deriving sexp, yojson]
 end
 
 module Incoming = struct

@@ -32,7 +32,7 @@ module type Inputs_intf = sig
     with type peer := Network_peer.Peer.t
      and type state_hash := State_hash.t
      and type external_transition := External_transition.t
-     and type consensus_state := Consensus.Consensus_state.value
+     and type consensus_state := Consensus.Consensus_state.Value.t
      and type state_body_hash := State_body_hash.t
      and type ledger_hash := Ledger_hash.t
      and type sync_ledger_query := Sync_ledger.Query.t
@@ -68,7 +68,6 @@ module Make (Inputs : Inputs_intf) :
 
   let run ~logger ~network ~time_controller ~collected_transitions ~frontier
       ~network_transition_reader ~proposer_transition_reader ~clear_reader =
-    let logger = Logger.child logger __MODULE__ in
     let valid_transition_pipe_capacity = 10 in
     let valid_transition_reader, valid_transition_writer =
       Strict_pipe.create

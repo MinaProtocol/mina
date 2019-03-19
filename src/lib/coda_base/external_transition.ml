@@ -3,7 +3,7 @@ open Module_version
 
 module type Base_intf = sig
   (* TODO: delegate forget here *)
-  type t [@@deriving sexp, compare, eq]
+  type t [@@deriving sexp, compare, eq, to_yojson]
 
   include Comparable.S with type t := t
 
@@ -37,14 +37,14 @@ module type S = sig
 
   include
     Base_intf
-    with type protocol_state := Protocol_state.value
+    with type protocol_state := Protocol_state.Value.t
      and type protocol_state_proof := Proof.t
      and type staged_ledger_diff := Staged_ledger_diff.t
 
   module Stable :
     sig
       module V1 : sig
-        type t [@@deriving sexp, bin_io]
+        type t [@@deriving sexp, bin_io, to_yojson]
       end
 
       module Latest = V1
@@ -113,6 +113,13 @@ end)
           ; staged_ledger_diff: Staged_ledger_diff.Stable.V1.t }
         [@@deriving sexp, fields, bin_io]
 
+        let to_yojson
+            {protocol_state; protocol_state_proof= _; staged_ledger_diff= _} =
+          `Assoc
+            [ ("protocol_state", Protocol_state.value_to_yojson protocol_state)
+            ; ("protocol_state_proof", `String "<opaque>")
+            ; ("staged_ledger_diff", `String "<opaque>") ]
+
         (* TODO: Important for bkase to review *)
         let compare t1 t2 =
           Protocol_state.Value.Stable.V1.compare t1.protocol_state
@@ -150,6 +157,8 @@ end)
   include Comparable.Make (Stable.Latest)
   module Proof_verified = Stable.Latest
   module Verified = Stable.Latest
+
+  let to_yojson = Stable.Latest.to_yojson
 
   let to_proof_verified x = `I_swear_this_is_safe_see_my_comment x
 

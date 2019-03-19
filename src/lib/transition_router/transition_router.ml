@@ -27,7 +27,7 @@ module type Inputs_intf = sig
     with type peer := Network_peer.Peer.t
      and type state_hash := State_hash.t
      and type external_transition := External_transition.t
-     and type consensus_state := Consensus.Consensus_state.value
+     and type consensus_state := Consensus.Consensus_state.Value.t
      and type state_body_hash := State_body_hash.t
      and type ledger_hash := Ledger_hash.t
      and type sync_ledger_query := Sync_ledger.Query.t
@@ -146,7 +146,8 @@ module Make (Inputs : Inputs_intf) :
       let bootstrap_controller_reader, bootstrap_controller_writer =
         Strict_pipe.create (Buffered (`Capacity 10, `Overflow Drop_head))
       in
-      Logger.info logger "Bootstrap state: starting." ;
+      Logger.info logger ~module_:__MODULE__ ~location:__LOC__
+        "Bootstrap state: starting." ;
       let root_state = get_root_state old_frontier in
       set_bootstrap_phase ~controller_type root_state
         bootstrap_controller_writer ;
@@ -154,7 +155,7 @@ module Make (Inputs : Inputs_intf) :
         ( `Transition _incoming_transition
         , `Time_received (to_unix_timestamp _tm) ) ;
       let%map new_frontier, collected_transitions =
-        Bootstrap_controller.run ~parent_log:logger ~network ~ledger_db
+        Bootstrap_controller.run ~logger ~network ~ledger_db
           ~frontier:old_frontier ~transition_reader:bootstrap_controller_reader
       in
       kill bootstrap_controller_reader bootstrap_controller_writer ;
@@ -169,7 +170,8 @@ module Make (Inputs : Inputs_intf) :
     let start_transition_frontier_controller ~verified_transition_writer
         ~clear_reader ~collected_transitions frontier =
       let transition_reader, transition_writer = create_bufferred_pipe () in
-      Logger.info logger "Starting Transition Frontier Controller phase" ;
+      Logger.info logger ~module_:__MODULE__ ~location:__LOC__
+        "Starting Transition Frontier Controller phase" ;
       let new_verified_transition_reader =
         Transition_frontier_controller.run ~logger ~network ~time_controller
           ~collected_transitions ~frontier
