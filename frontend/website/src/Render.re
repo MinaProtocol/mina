@@ -156,7 +156,4 @@ Router.(
     ),
   )
 );
-Fs.symlinkSync(
-  Node.Process.cwd() ++ "/../../src/app/website/static",
-  "./site/static",
-);
+Fs.symlinkSync(Node.Process.cwd() ++ "/static", "./site/static");
