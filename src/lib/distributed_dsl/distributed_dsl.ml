@@ -216,14 +216,14 @@ struct
 end
 
 module type Trivial_peer_intf = sig
-  type t = int [@@deriving eq, hash, compare, sexp]
+  type t = int [@@deriving eq, hash, compare, sexp, yojson]
 
   include Hashable.S with type t := t
 end
 
 module Trivial_peer : Trivial_peer_intf = struct
   module T = struct
-    type t = int [@@deriving eq, hash, compare, sexp]
+    type t = int [@@deriving eq, hash, compare, sexp, yojson]
   end
 
   include Hashable.Make (T)
@@ -233,7 +233,7 @@ end
 module type S = functor
   (State :sig
           
-          type t [@@deriving eq, sexp]
+          type t [@@deriving eq, sexp, yojson]
         end)
   (Message :sig
             
@@ -254,7 +254,7 @@ module type S = functor
               end)
   (Condition_label :sig
                     
-                    type label [@@deriving enum, sexp]
+                    type label [@@deriving enum, sexp, yojson]
 
                     include Hashable.S with type t = label
                   end)
@@ -297,7 +297,7 @@ module type S = functor
 end
 
 module Make (State : sig
-  type t [@@deriving eq, sexp]
+  type t [@@deriving eq, sexp, yojson]
 end) (Message : sig
   type t
 end)
@@ -311,7 +311,7 @@ end) (Timer_label : sig
 
   include Hashable.S with type t = label
 end) (Condition_label : sig
-  type label [@@deriving enum, sexp]
+  type label [@@deriving enum, sexp, yojson]
 
   include Hashable.S with type t = label
 end) =
@@ -420,9 +420,8 @@ struct
       List.init count ~f:(fun i ->
           let messages = Timer_transport.listen timer ~me:i in
           let msg_commands, handle_commands = cmds_per_node i in
-          MyNode.make_node ~parent_log:(Logger.create ()) ~transport:timer
-            ~me:i ~messages ~initial_state ~timer msg_commands handle_commands
-      )
+          MyNode.make_node ~logger:(Logger.create ()) ~transport:timer ~me:i
+            ~messages ~initial_state ~timer msg_commands handle_commands )
     in
     (* Schedule cleanup *)
     don't_wait_for
@@ -445,7 +444,7 @@ let%test_module "Distributed_dsl" =
 
     module State = struct
       type t = Start | Wait_msg | Sent_msg | Got_msg of int | Timeout
-      [@@deriving eq, sexp]
+      [@@deriving eq, sexp, yojson]
     end
 
     module Message = struct
@@ -483,7 +482,7 @@ let%test_module "Distributed_dsl" =
 
     module Condition_label = struct
       type label = Init | Wait_timeout | Bigger_than_five | Failure_case
-      [@@deriving enum, sexp, compare, hash]
+      [@@deriving enum, sexp, compare, hash, yojson]
 
       module T = struct
         type t = label [@@deriving compare, hash, sexp]

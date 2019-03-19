@@ -1,0 +1,140 @@
+
+
+.gallery .item {
+  display: none;
+  position: relative;
+}
+
+.gallery .control-operator {
+  display: none;
+}
+
+.gallery .item:nth-of-type(6) {
+  display: block;
+}
+
+.gallery .control-operator:target ~ .item {
+  display: none;
+}
+
+.gallery .control-operator:nth-of-type(1):target ~ .item:nth-of-type(6),
+.gallery .control-operator:nth-of-type(2):target ~ .item:nth-of-type(7),
+.gallery .control-operator:nth-of-type(3):target ~ .item:nth-of-type(8),
+.gallery .control-operator:nth-of-type(4):target ~ .item:nth-of-type(9),
+.gallery .control-operator:nth-of-type(5):target ~ .item:nth-of-type(10) {
+  display: block;
+}
+
+.gallery .item {
+  height: 450px;
+}
+
+.gallery img {
+  max-height: 350px;
+  max-width: 100%;
+  width: auto;
+}
+
+.fixed_no_img_height {
+  height: 300px;
+}
+
+.gallery .controls {
+  width: 100%;
+  position: absolute;
+  bottom: 0;
+}
+
+.gallery .control-button {
+  display: inline-block;
+  margin: 0 .02em;
+  font-size: 6em;
+  text-align: center;
+  text-decoration: none;
+  -webkit-transition: color .1s;
+  -o-transition: color .1s;
+  transition: color .1s;
+}
+
+.gallery .jump {
+  line-height: 110px;
+  vertical-align: middle;
+  margin-left: 1em;
+  color: #8492A6;
+  text-decoration: none;
+  -webkit-transition: color .1s;
+  -o-transition: color .1s;
+  transition: color .1s;
+}
+
+.gallery .jump:hover {
+  filter: brightness(50%);
+  cursor: pointer;
+}
+
+.gallery .progress-button {
+  position: absolute;
+  right: 0;
+}
+
+.gallery .next-button {
+  position: absolute;
+  right: 0;
+  text-decoration: none;
+  vertical-align: middle;
+  line-height: 80px;
+  margin-top: 25px;
+  text-align: center;
+  border-radius: 100%;
+  height: 60px;
+  width: 60px;
+  background-color: #F9FAFC;
+  border: 1px solid #EFF2F7;
+  color: #8492A6;
+  -webkit-transition: color .1s;
+  -o-transition: color .1s;
+  transition: color .1s;
+}
+.gallery .next-button > div {
+  position: absolute;
+  top: -16px;
+  left: 2px;
+  font-size: 90px;
+  width: 100%;
+
+}
+
+.gallery .next-button:hover {
+  color: #647286;
+}
+
+.gallery .item:nth-of-type(6) .next-button {
+  animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+  0% {
+    box-shadow: 0 0 0 0 rgba(239, 242, 247, 1);
+  }
+  50% {
+    box-shadow: 0 0 2px 40px rgba(239, 242, 247, 0);
+  }
+}
+
+.gallery .control-button {
+  color: #E5E9F2;
+}
+
+.gallery .control-button.selected {
+  color: #8492A6;
+}
+
+.gallery .control-button:hover {
+  color: #8492A6;
+}
+
+.follow-button {
+  padding-left: 3em;
+  position: relative;
+}
+

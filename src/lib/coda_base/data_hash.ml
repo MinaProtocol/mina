@@ -11,7 +11,7 @@ open Module_version
 
 module type Basic = sig
   type t = private Pedersen.Digest.t
-  [@@deriving bin_io, sexp, eq, compare, hash]
+  [@@deriving bin_io, sexp, eq, compare, hash, yojson]
 
   val gen : t Quickcheck.Generator.t
 
@@ -23,7 +23,7 @@ module type Basic = sig
 
   module Stable : sig
     module V1 : sig
-      type nonrec t = t [@@deriving bin_io, sexp, compare, eq, hash]
+      type nonrec t = t [@@deriving bin_io, sexp, compare, eq, hash, yojson]
 
       include Hashable_binable with type t := t
     end
@@ -81,7 +81,8 @@ struct
       module T = struct
         let version = 1
 
-        type t = Pedersen.Digest.t [@@deriving bin_io, sexp, eq, compare, hash]
+        type t = Pedersen.Digest.t
+        [@@deriving bin_io, sexp, eq, compare, hash, yojson]
       end
 
       include T

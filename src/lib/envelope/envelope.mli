@@ -4,13 +4,14 @@ open Network_peer
 module Sender : sig
   module Stable : sig
     module V1 : sig
-      type t = Local | Remote of Peer.t [@@deriving sexp, bin_io]
+      type t = Local | Remote of Peer.t [@@deriving sexp, bin_io, yojson]
     end
 
     module Latest = V1
   end
 
-  type t = Stable.Latest.t = Local | Remote of Peer.t [@@deriving sexp]
+  type t = Stable.Latest.t = Local | Remote of Peer.t
+  [@@deriving sexp, yojson]
 end
 
 module Incoming : sig

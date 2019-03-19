@@ -4,11 +4,11 @@ open Coda_base
 open Module_version
 
 module type S = sig
-  type t = {state: Consensus.Protocol_state.value; proof: Proof.Stable.V1.t}
+  type t = {state: Consensus.Protocol_state.Value.t; proof: Proof.Stable.V1.t}
   [@@deriving bin_io, fields]
 
   val create :
-    state:Consensus.Protocol_state.value -> proof:Proof.Stable.V1.t -> t
+    state:Consensus.Protocol_state.Value.t -> proof:Proof.Stable.V1.t -> t
 end
 
 module Protocol_state = Consensus.Protocol_state
@@ -18,7 +18,8 @@ module Stable = struct
     module T = struct
       let version = 1
 
-      type t = {state: Protocol_state.value; proof: Proof.Stable.V1.t}
+      type t =
+        {state: Protocol_state.Value.Stable.V1.t; proof: Proof.Stable.V1.t}
       [@@deriving bin_io, fields]
     end
 
