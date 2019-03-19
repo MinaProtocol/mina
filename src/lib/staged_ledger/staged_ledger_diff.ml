@@ -68,14 +68,18 @@ end) :
 
   type ft = Inputs.Fee_transfer.single [@@deriving sexp, bin_io]
 
+  (* TODO: version *)
+
   type pre_diff_with_at_most_two_coinbase =
-    { completed_works: Transaction_snark_work.t list
+    { completed_works: Transaction_snark_work.Stable.V1.t list
     ; user_commands: User_command.t list
     ; coinbase: ft At_most_two.t }
   [@@deriving sexp, bin_io]
 
+  (* TODO: version *)
+
   type pre_diff_with_at_most_one_coinbase =
-    { completed_works: Transaction_snark_work.t list
+    { completed_works: Transaction_snark_work.Stable.V1.t list
     ; user_commands: User_command.t list
     ; coinbase: ft At_most_one.t }
   [@@deriving sexp, bin_io]
