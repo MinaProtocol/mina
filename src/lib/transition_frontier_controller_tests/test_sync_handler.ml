@@ -28,9 +28,7 @@ let%test_module "Sync_handler" =
                 |> Ledger.of_database
               in
               let desired_root = Ledger.merkle_root source_ledger in
-              let sync_ledger =
-                Sync_ledger.Mask.create dest_ledger ~parent_log:logger
-              in
+              let sync_ledger = Sync_ledger.Mask.create dest_ledger ~logger in
               let query_reader = Sync_ledger.Mask.query_reader sync_ledger in
               let answer_writer = Sync_ledger.Mask.answer_writer sync_ledger in
               let peer =

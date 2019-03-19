@@ -33,7 +33,7 @@ module type S = sig
   type t [@@deriving bin_io]
 
   val create :
-       parent_log:Logger.t
+       logger:Logger.t
     -> frontier_broadcast_pipe:transition_frontier Option.t
                                Broadcast_pipe.Reader.t
     -> t

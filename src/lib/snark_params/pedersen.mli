@@ -15,7 +15,7 @@ module type S = sig
   type curve
 
   module Digest : sig
-    type t [@@deriving bin_io, sexp, eq, hash, compare]
+    type t [@@deriving bin_io, sexp, eq, hash, compare, yojson]
 
     val size_in_bits : int
 
@@ -89,6 +89,8 @@ end
 
 module Make (Field : sig
   type t [@@deriving sexp, bin_io, compare, hash, eq]
+
+  include Stringable.S with type t := t
 
   include Snarky.Field_intf.S with type t := t
 
