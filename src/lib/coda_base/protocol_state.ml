@@ -11,12 +11,12 @@ open Module_version
 module type Consensus_state_intf = sig
   module Value : sig
     (* bin_io omitted *)
-    type t [@@deriving hash, compare, eq, sexp]
+    type t [@@deriving hash, compare, eq, sexp, to_yojson]
 
     module Stable :
       sig
         module V1 : sig
-          type t [@@deriving hash, compare, bin_io, sexp, eq]
+          type t [@@deriving hash, compare, bin_io, sexp, eq, to_yojson]
         end
       end
       with type V1.t = t
@@ -61,7 +61,7 @@ module type S = sig
             ( Blockchain_state.Value.Stable.V1.t
             , Consensus_state.Value.Stable.V1.t )
             t
-          [@@deriving bin_io, sexp]
+          [@@deriving bin_io, sexp, to_yojson]
         end
 
         module Latest : module type of V1
@@ -76,7 +76,7 @@ module type S = sig
     val hash : Value.t -> State_body_hash.t
   end
 
-  type ('a, 'body) t [@@deriving bin_io, sexp]
+  type ('a, 'body) t [@@deriving bin_io, sexp, to_yojson]
 
   module Value : sig
     module Stable : sig
@@ -177,7 +177,7 @@ module Make
               ( Blockchain_state.Value.Stable.V1.t
               , Consensus_state.Value.Stable.V1.t )
               t
-            [@@deriving eq, ord, bin_io, hash, sexp]
+            [@@deriving eq, ord, bin_io, hash, sexp, to_yojson]
 
             type t = tt [@@deriving eq, ord, bin_io, hash, sexp, to_yojson]
           end

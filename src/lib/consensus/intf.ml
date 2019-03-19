@@ -45,12 +45,12 @@ module type S = sig
   module Consensus_state : sig
     module Value : sig
       (* bin_io omitted *)
-      type t [@@deriving hash, eq, compare, sexp]
+      type t [@@deriving hash, eq, compare, sexp, to_yojson]
 
       module Stable :
         sig
           module V1 : sig
-            type t [@@deriving hash, eq, compare, bin_io, sexp]
+            type t [@@deriving hash, eq, compare, bin_io, sexp, to_yojson]
           end
         end
         with type V1.t = t

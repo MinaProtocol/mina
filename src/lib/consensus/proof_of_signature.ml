@@ -103,7 +103,7 @@ module Consensus_state = struct
           let version = 1
 
           type t = (Length.t, Public_key.Compressed.t) t_
-          [@@deriving bin_io, sexp, hash, compare]
+          [@@deriving bin_io, sexp, hash, compare, to_yojson]
         end
 
         include T
@@ -125,7 +125,7 @@ module Consensus_state = struct
     end
 
     type t = Stable.Latest.t (* bin_io omitted intentionally *)
-    [@@deriving sexp, hash, compare, eq]
+    [@@deriving sexp, hash, compare, eq, to_yojson]
   end
 
   type var = (Length.Unpacked.var, Public_key.Compressed.var) t_

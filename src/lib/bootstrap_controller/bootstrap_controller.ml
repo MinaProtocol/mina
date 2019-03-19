@@ -330,7 +330,8 @@ end = struct
             ~consensus_local_state:
               (Transition_frontier.consensus_local_state frontier)
         in
-        Logger.info logger "Bootstrap state: complete." ;
+        Logger.info logger ~module_:__MODULE__ ~location:__LOC__
+          "Bootstrap state: complete." ;
         (new_frontier, Transition_cache.data transition_graph)
     | Error err ->
         (* TODO: punish *)
