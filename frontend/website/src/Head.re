@@ -17,17 +17,6 @@ let legacyStylesheets =
       crossOrigin="anonymous"
     />
     <link rel="stylesheet" type_="text/css" href="/static/css/common.css" />
-    <link rel="stylesheet" type_="text/css" href="/static/css/gallery.css" />
-    <link
-      media="only screen and (min-device-width: 700px)"
-      rel="stylesheet"
-      href="/static/css/main.css"
-    />
-    <link
-      media="only screen and (max-device-width: 700px)"
-      rel="stylesheet"
-      href="/static/css/mobile.css"
-    />
   </>;
 
 let component = ReasonReact.statelessComponent("Header");
