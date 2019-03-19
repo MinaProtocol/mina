@@ -97,7 +97,9 @@ module type Network_intf = sig
   val glue_sync_ledger :
        t
     -> (ledger_hash * sync_ledger_query) Pipe_lib.Linear_pipe.Reader.t
-    -> (ledger_hash * sync_ledger_answer) Envelope.Incoming.t
+    -> ( ledger_hash
+       * sync_ledger_query
+       * sync_ledger_answer Envelope.Incoming.t )
        Pipe_lib.Linear_pipe.Writer.t
     -> unit
 end
@@ -508,7 +510,7 @@ module type Sync_handler_intf = sig
     -> ledger_hash
     -> syncable_ledger_query
     -> logger:Logger.t
-    -> (ledger_hash * syncable_ledger_answer) option
+    -> syncable_ledger_answer option
 
   val transition_catchup :
        frontier:transition_frontier

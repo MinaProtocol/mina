@@ -155,6 +155,18 @@ module Make (Inputs : Inputs.S) = struct
       Time.Timeout.create t.time_controller duration ~f:(fun _ ->
           let subtree = extract_subtree t cached_transition in
           remove_tree t parent_hash ;
+          Logger.info t.logger ~module_:__MODULE__ ~location:__LOC__
+            ~metadata:
+              [ ("parent_hash", Coda_base.State_hash.to_yojson parent_hash)
+              ; ( "duration"
+                , `Int (Inputs.Time.Span.to_ms duration |> Int64.to_int_trunc)
+                )
+              ; ( "cached_transition"
+                , Cached.peek cached_transition
+                  |> With_hash.data
+                  |> Inputs.External_transition.Verified.to_yojson ) ]
+            "timed out waiting for the parent of $cached_transition after \
+             $duration ms, signalling a catchup job" ;
           (* it's ok to create a new thread here because the thread essentially does no work *)
           don't_wait_for (Writer.write t.catchup_job_writer subtree) )
     in
