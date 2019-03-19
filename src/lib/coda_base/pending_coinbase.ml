@@ -236,16 +236,13 @@ module T = struct
         (Merkle_tree.get_req ~depth (Hash.var_to_hash_packed t) addr)
         reraise_merkle_requests
 
-    (*TODO: change this back to Coinbase_data.var after merging the coinbase-amount-to-unsigned pr *)
+    (*TODO: change the argument (pk, amount) back to Coinbase_data.var after merging the coinbase-amount-to-unsigned pr *)
     let%snarkydef add_coinbase t (pk, amount) =
       let%bind addr =
         request_witness Address.typ
           As_prover.(map (return ()) ~f:(fun _ -> Find_index_of_newest_stack))
       in
-      let equal_to_zero x =
-        let%map c = Amount.compare_var x Amount.(var_of_t zero) in
-        c.less_or_equal
-      in
+      let equal_to_zero x = Amount.(equal_var x (var_of_t zero)) in
       let chain if_ b ~then_ ~else_ =
         let%bind then_ = then_ and else_ = else_ in
         if_ b ~then_ ~else_
