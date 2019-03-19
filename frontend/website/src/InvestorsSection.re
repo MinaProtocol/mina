@@ -27,10 +27,17 @@ module Investor = {
             src=imageSrc
             className=Css.(
               style([
-                maxWidth(`rem(2.5)),
-                maxHeight(`rem(2.5)),
+                width(`rem(2.5)),
+                height(`rem(2.5)),
                 borderRadius(`percent(100.)),
                 marginRight(`em(1.)),
+                boxShadow(
+                  ~x=`zero,
+                  ~y=`zero,
+                  ~blur=`px(4),
+                  ~spread=`zero,
+                  Style.Colors.greenShadow,
+                ),
               ])
             )
           />
@@ -57,13 +64,21 @@ let make = _children => {
             maxWidth(`rem(64.)),
             display(`grid),
             gridGap(`rem(1.)),
+            marginTop(`rem(3.)),
             marginLeft(`auto),
             marginRight(`auto),
-            // bs-css doesn't allow fr in minmax: https://github.com/SentiaAnalytics/bs-css/pull/124
-            `declaration((
-              "grid-template-columns",
-              "repeat(auto-fill, minmax(15rem, 1fr))",
-            )),
+            justifyContent(`center),
+            gridTemplateColumns([`fr(1.), `fr(1.)]),
+            media(
+              Style.MediaQuery.notMobile,
+              [
+                // bs-css doesn't allow fr in minmax: https://github.com/SentiaAnalytics/bs-css/pull/124
+                `declaration((
+                  "grid-template-columns",
+                  "repeat(auto-fit, minmax(15rem, 1fr))",
+                )),
+              ],
+            ),
           ])
         )>
         <Investor name="Metastable" suffix=`Png />

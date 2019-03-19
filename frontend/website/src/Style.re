@@ -15,6 +15,9 @@ module Colors = {
   let slate = `rgb((81, 102, 121));
 
   let navy = `rgb((0, 49, 90));
+
+  // For use with box-shadow so we can't use opacity
+  let greenShadow = `rgba((136, 191, 163, 0.64));
 };
 
 module Typeface = {
@@ -30,6 +33,7 @@ module Typeface = {
 
 module MediaQuery = {
   let full = "(min-width: 48rem)";
+  let notMobile = "(min-width: 32rem)";
 };
 
 /** sets both paddingLeft and paddingRight, as one should */
@@ -90,8 +94,6 @@ module H3 = {
   let wide = {
     let wing = [
       contentRule(""),
-      marginLeft(`rem(2.0)),
-      marginRight(`rem(2.0)),
       fontSize(`px(5)),
       verticalAlign(`top),
       lineHeight(`rem(1.3)),
@@ -102,6 +104,7 @@ module H3 = {
 
     merge([
       style([
+        whiteSpace(`nowrap),
         fontSize(`rem(1.0)),
         color(Colors.fadedBlue),
         letterSpacing(`em(0.25)),
@@ -111,7 +114,10 @@ module H3 = {
         textAlign(`center),
         textTransform(`uppercase),
       ]),
-      style([before(wing), after(wing)]),
+      style([
+        before([marginRight(`rem(2.0)), ...wing]),
+        after([marginLeft(`rem(2.0)), ...wing]),
+      ]),
     ]);
   };
 };
