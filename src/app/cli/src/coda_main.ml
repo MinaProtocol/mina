@@ -336,7 +336,7 @@ module type Main_intf = sig
   val best_ledger : t -> Inputs.Ledger.t Participating_state.t
 
   val best_protocol_state :
-    t -> Consensus.Protocol_state.value Participating_state.t
+    t -> Consensus.Protocol_state.Value.t Participating_state.t
 
   val best_tip :
     t -> Inputs.Transition_frontier.Breadcrumb.t Participating_state.t
@@ -447,7 +447,7 @@ struct
   module Protocol_state_proof = struct
     include Proof.Stable.V1
 
-    type input = Protocol_state.value
+    type input = Protocol_state.Value.t
 
     let dummy = Coda_base.Proof.dummy
 
@@ -606,7 +606,7 @@ struct
 
   module Tip = struct
     type t =
-      { state: Protocol_state.value
+      { state: Protocol_state.Value.t
       ; proof: Protocol_state_proof.t
       ; staged_ledger: Staged_ledger.t sexp_opaque }
     [@@deriving sexp, fields]
@@ -620,7 +620,7 @@ struct
 
     let bin_tip =
       [%bin_type_class:
-        Protocol_state.value
+        Protocol_state.Value.Stable.V1.t
         * Protocol_state_proof.t
         * Staged_ledger.serializable]
 
@@ -731,8 +731,9 @@ struct
            ~data:
              (Add_solved_work
                 ( List.map res.spec.instances ~f:Single.Spec.statement
-                , { Diff.proof= res.proofs
-                  ; fee= {fee= res.spec.fee; prover= res.prover} } ))
+                , Diff.Priced_proof.
+                    { proof= res.proofs
+                    ; fee= {fee= res.spec.fee; prover= res.prover} } ))
            ~sender:Envelope.Sender.Local)
   end
 
