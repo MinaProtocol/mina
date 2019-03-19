@@ -74,16 +74,10 @@ module Style = {
 open Style;
 
 module Logo = {
-  open Css;
-
-  module Placeholder = {
-    let style =
-      style([
-        backgroundColor(`rgb((0, 255, 0))),
-        width(`px(116)),
-        height(`px(21)),
-      ]);
-  };
+  let svg =
+    <svg className=Css.(style([width(`rem(7.125)), height(`rem(1.25))]))>
+      <image xlinkHref="/static/img/new-logo.svg" width="114" height="20" />
+    </svg>;
 };
 
 module Testnet = {
@@ -109,9 +103,11 @@ let make = children => {
       children |> Array.map(elem => <li className=Style.item> elem </li>);
 
     <nav className=Style.nav>
-      <div
+      <a
+        href="/"
         className=Css.(
           style([
+            display(`block),
             width(`percent(50.0)),
             media(
               MediaQuery.statusLift,
@@ -119,8 +115,8 @@ let make = children => {
             ),
           ])
         )>
-        <div className=Logo.Placeholder.style />
-      </div>
+        Logo.svg
+      </a>
       <div
         className=Css.(
           style([
