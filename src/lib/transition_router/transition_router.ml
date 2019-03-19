@@ -85,7 +85,7 @@ module Make (Inputs : Inputs_intf) :
     |> Unix_timestamp.of_int64
 
   let create_bufferred_pipe ?name () =
-    Strict_pipe.create ?name (Buffered (`Capacity 10, `Overflow Crash))
+    Strict_pipe.create ?name (Buffered (`Capacity 30, `Overflow Crash))
 
   let kill reader writer =
     Strict_pipe.Reader.clear reader ;

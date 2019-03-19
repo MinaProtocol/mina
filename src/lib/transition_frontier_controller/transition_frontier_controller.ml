@@ -68,7 +68,7 @@ module Make (Inputs : Inputs_intf) :
 
   let run ~logger ~network ~time_controller ~collected_transitions ~frontier
       ~network_transition_reader ~proposer_transition_reader ~clear_reader =
-    let valid_transition_pipe_capacity = 10 in
+    let valid_transition_pipe_capacity = 30 in
     let valid_transition_reader, valid_transition_writer =
       Strict_pipe.create ~name:"valid transitions"
         (Buffered (`Capacity valid_transition_pipe_capacity, `Overflow Crash))
@@ -82,7 +82,7 @@ module Make (Inputs : Inputs_intf) :
     in
     let processed_transition_reader, processed_transition_writer =
       Strict_pipe.create ~name:"processed transitions"
-        (Buffered (`Capacity 10, `Overflow Crash))
+        (Buffered (`Capacity 30, `Overflow Crash))
     in
     let catchup_job_reader, catchup_job_writer =
       Strict_pipe.create ~name:"catchup jobs" Synchronous

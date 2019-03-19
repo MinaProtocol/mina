@@ -7,7 +7,7 @@ type 'data t =
   { job_writer: ('data, crash buffered, unit) Writer.t
   ; f: 'data -> unit Deferred.t }
 
-let create ?(buffer_capacity = 10) ~job_capacity f =
+let create ?(buffer_capacity = 30) ~job_capacity f =
   let job_reader, job_writer =
     Strict_pipe.create (Buffered (`Capacity buffer_capacity, `Overflow Crash))
   in
