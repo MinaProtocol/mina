@@ -1345,14 +1345,12 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
 
   let clear_hist_status ~flag t = Perf_histograms.wipe () ; get_status ~flag t
 
-  let visualize_registered_masks = Coda_base.Ledger.Debug.visualize
-
   let log_shutdown ~conf_dir ~log t =
     let frontier_file = conf_dir ^/ "frontier.dot" in
     let mask_file = conf_dir ^/ "registered_masks.dot" in
     Logger.info log !"%s"
       (Visualization_message.success "registered masks" frontier_file) ;
-    visualize_registered_masks ~filename:mask_file ~log ;
+    Coda_base.Ledger.Debug.visualize ~filename:mask_file ;
     match visualize_frontier ~filename:frontier_file t with
     | `Active () ->
         Logger.info log !"%s"
@@ -1429,7 +1427,7 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
             return (visualize_frontier ~filename coda) )
       ; implement Daemon_rpcs.Visualization.Registered_masks.rpc
           (fun () filename ->
-            return (Coda_base.Ledger.Debug.visualize ~filename ~log) ) ]
+            return (Coda_base.Ledger.Debug.visualize ~filename) ) ]
     in
     let snark_worker_impls =
       [ implement Snark_worker.Rpcs.Get_work.rpc (fun () () ->

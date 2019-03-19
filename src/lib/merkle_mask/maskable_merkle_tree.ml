@@ -26,8 +26,13 @@ module Make (Inputs : Inputs_intf) = struct
   module Node = struct
     type t = Mask.Attached.t
 
-    type display =
+    type attached =
       {hash: string; uuid: string; total_currency: int; num_accounts: int}
+    [@@deriving yojson]
+
+    type dangling = {uuid: string} [@@deriving yojson]
+
+    type display = [`Attached of attached | `Dangling_parent of dangling]
     [@@deriving yojson]
 
     let format_uuid mask =
@@ -36,7 +41,7 @@ module Make (Inputs : Inputs_intf) = struct
 
     let name mask = sprintf !"\"%s \"" (format_uuid mask)
 
-    let display mask =
+    let display_attached_mask mask =
       let root_hash = Mask.Attached.merkle_root mask in
       let num_accounts = Mask.Attached.num_accounts mask in
       let total_currency =
@@ -49,33 +54,25 @@ module Make (Inputs : Inputs_intf) = struct
       ; total_currency
       ; uuid }
 
+    let display mask =
+      try `Attached (display_attached_mask mask)
+      with Mask.Attached.Dangling_parent_reference _ ->
+        `Dangling_parent {uuid= format_uuid mask}
+
     let equal mask1 mask2 =
       let open Mask.Attached in
       Uuid.equal (get_uuid mask1) (get_uuid mask2)
-      && Hash.equal
-           (Mask.Attached.merkle_root mask1)
-           (Mask.Attached.merkle_root mask2)
 
     let compare mask1 mask2 =
       let open Mask.Attached in
-      match Uuid.compare (get_uuid mask1) (get_uuid mask2) with
-      | 0 -> Hash.compare (merkle_root mask1) (merkle_root mask2)
-      | x -> x
+      Uuid.compare (get_uuid mask1) (get_uuid mask2)
 
     let hash mask = Uuid.hash @@ Mask.Attached.get_uuid mask
   end
 
   module Graphviz = Visualization.Make_ocamlgraph (Node)
 
-  let to_graph ~log =
-    let try_with ~f ~default name =
-      try f () with Mask.Attached.Dangling_parent_reference uuid ->
-        Logger.warn log
-          !"Could not visualize %s, since %{sexp:Uuid.t} has a Dangling \
-            reference to an attached mask that has been detached"
-          name uuid ;
-        default
-    in
+  let to_graph () =
     let masks = List.concat @@ Uuid.Table.data registered_masks in
     let uuid_to_masks_table =
       Uuid.Table.of_alist_exn
@@ -84,23 +81,17 @@ module Make (Inputs : Inputs_intf) = struct
     let open Graphviz in
     Uuid.Table.fold uuid_to_masks_table ~init:empty
       ~f:(fun ~key:uuid ~data:mask graph ->
-        try_with "vertex" ~default:graph ~f:(fun () ->
-            let graph_with_mask = add_vertex graph mask in
-            Uuid.Table.find registered_masks uuid
-            |> Option.value_map ~default:graph_with_mask
-                 ~f:(fun children_masks ->
-                   List.fold ~init:graph_with_mask children_masks
-                     ~f:(fun graph_with_mask_and_children grandchild ->
-                       try_with "edge" ~default:graph_with_mask_and_children
-                         ~f:(fun () ->
-                           add_edge graph_with_mask_and_children mask
-                             grandchild ) ) ) ) )
+        let graph_with_mask = add_vertex graph mask in
+        Uuid.Table.find registered_masks uuid
+        |> Option.value_map ~default:graph_with_mask ~f:(fun children_masks ->
+               List.fold ~init:graph_with_mask children_masks
+                 ~f:(fun graph_with_mask_and_child ->
+                   add_edge graph_with_mask_and_child mask ) ) )
 
   module Debug = struct
-    let visualize ~filename ~log =
-      let log = Logger.child log __MODULE__ in
+    let visualize ~filename =
       Out_channel.with_file filename ~f:(fun output_channel ->
-          let graph = to_graph ~log in
+          let graph = to_graph () in
           Graphviz.output_graph output_channel graph )
   end
 
