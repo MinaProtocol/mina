@@ -136,7 +136,7 @@ module Graphic = {
         <div
           className={style([
             width(`percent(100.0)),
-            media(Style.MediaQuery.full, [maxWidth(`percent(22.625))]),
+            media(Style.MediaQuery.full, [maxWidth(`rem(22.625))]),
           ])}>
           <div
             className={style([
