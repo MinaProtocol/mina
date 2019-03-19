@@ -510,7 +510,8 @@ struct
                     , Syncable_ledger.Query.to_yojson Ledger.Addr.to_yojson
                         sync_ledger_query ) ]
                 "Found an answer for: $sync_ledger_query" ;
-              Pipe_lib.Linear_pipe.write response_writer answer )
+              Pipe_lib.Linear_pipe.write response_writer
+                (ledger_hash, sync_ledger_query, answer) )
       |> don't_wait_for
   end
 
