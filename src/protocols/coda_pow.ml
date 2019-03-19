@@ -1337,7 +1337,7 @@ module type Consensus_mechanism_intf = sig
   end
 
   val generate_transition :
-       previous_protocol_state:Protocol_state.value
+       previous_protocol_state:Protocol_state.Value.t
     -> blockchain_state:Blockchain_state.Value.t
     -> time:Int64.t
     -> proposal_data:Proposal_data.t
