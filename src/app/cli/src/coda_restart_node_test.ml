@@ -33,7 +33,7 @@ let main () =
     Coda_worker_testnet.Restarts.trigger_catchup testnet
       ~largest_account_keypair ~log ~node:1 ~payment_receiver:0
   in
-  let%bind () = after (Time.Span.of_sec 240.) in
+  let%bind () = after (Time.Span.of_sec 160.) in
   Coda_worker_testnet.Api.teardown testnet
 
 let command =

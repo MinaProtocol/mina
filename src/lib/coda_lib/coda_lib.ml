@@ -496,6 +496,21 @@ module Make (Inputs : Inputs_intf) = struct
 
   let strongest_ledgers t = t.strongest_ledgers
 
+  let root_diff t =
+    let root_diff_reader, root_diff_writer =
+      Strict_pipe.create (Buffered (`Capacity 10, `Overflow Crash))
+    in
+    don't_wait_for
+      (Broadcast_pipe.Reader.iter t.transition_frontier ~f:(function
+        | None -> Deferred.unit
+        | Some frontier ->
+            Broadcast_pipe.Reader.iter
+              (Transition_frontier.root_diff_pipe frontier)
+              ~f:(fun root_diff ->
+                Strict_pipe.Writer.write root_diff_writer root_diff
+                |> Deferred.return ) )) ;
+    root_diff_reader
+
   module Config = struct
     (** If ledger_db_location is None, will auto-generate a db based on a UUID *)
     type t =
