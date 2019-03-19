@@ -236,14 +236,44 @@ module T = struct
         (Merkle_tree.get_req ~depth (Hash.var_to_hash_packed t) addr)
         reraise_merkle_requests
 
-    let%snarkydef add_coinbase t coinbase =
+    (*TODO: change this back to Coinbase_data.var after merging the coinbase-amount-to-unsigned pr *)
+    let%snarkydef add_coinbase t (pk, amount) =
       let%bind addr =
         request_witness Address.typ
           As_prover.(map (return ()) ~f:(fun _ -> Find_index_of_newest_stack))
       in
+      let equal_to_zero x =
+        let%map c = Amount.compare_var x Amount.(var_of_t zero) in
+        c.less_or_equal
+      in
+      let chain if_ b ~then_ ~else_ =
+        let%bind then_ = then_ and else_ = else_ in
+        if_ b ~then_ ~else_
+      in
       handle
         (Merkle_tree.modify_req ~depth (Hash.var_to_hash_packed t) addr
-           ~f:(fun stack -> Coinbase_stack.Stack.Checked.push stack coinbase ))
+           ~f:(fun stack ->
+             let total_coinbase_amount =
+               Currency.Amount.var_of_t Protocols.Coda_praos.coinbase_amount
+             in
+             let%bind rem_amount, `Underflow underflowed =
+               Currency.Amount.Checked.sub_flagged total_coinbase_amount amount
+             in
+             let%bind () = Boolean.Assert.is_true (Boolean.not underflowed) in
+             let%bind amount1_equal_to_zero = equal_to_zero amount in
+             let%bind amount2_equal_to_zero = equal_to_zero rem_amount in
+             let%bind stack_with_amount1 =
+               Coinbase_stack.Stack.Checked.push stack
+                 (pk, Amount.Signed.Checked.of_unsigned amount)
+             in
+             let%bind stack_with_amount2 =
+               Coinbase_stack.Stack.Checked.push stack_with_amount1
+                 (pk, Amount.Signed.Checked.of_unsigned rem_amount)
+             in
+             chain Stack.if_ amount1_equal_to_zero ~then_:(return stack)
+               ~else_:
+                 (Stack.if_ amount2_equal_to_zero ~then_:stack_with_amount1
+                    ~else_:stack_with_amount2) ))
         reraise_merkle_requests
       >>| Hash.var_of_hash_packed
 
@@ -522,7 +552,7 @@ let%test_unit "Checked_tree = Unchecked_tree" =
             handle
               (f_add_coinbase
                  (Hash.var_of_t (merkle_root pending_coinbases))
-                 coinbase_var)
+                 (fst coinbase_var, Amount.var_of_t coinbase.amount))
               (unstage (handler pending_coinbases ~is_new_stack:true))
           in
           As_prover.read Hash.typ res

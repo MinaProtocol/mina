@@ -105,7 +105,8 @@ module type S = sig
 
     val get : var -> Address.var -> (Stack.var, _) Tick.Checked.t
 
-    val add_coinbase : var -> Coinbase_data.var -> (var, 's) Tick.Checked.t
+    val add_coinbase :
+      var -> Public_key.Compressed.var * Amount.var -> (var, 's) Tick.Checked.t
     (**
    [update_stack t ~is_new_stack updtaed_stack] implements the following spec:
    - gets the address[addr] of the latest stack or a new stack
