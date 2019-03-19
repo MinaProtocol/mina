@@ -82,10 +82,7 @@ module Make (Consensus_mechanism : Consensus.S) :
               ( transition |> Snark_transition.blockchain_state
               |> Blockchain_state.snarked_ledger_hash )
           and supply_increase_is_zero =
-            let%map c =
-              Currency.Amount.(compare_var supply_increase (var_of_t zero))
-            in
-            c.less_or_equal
+            Currency.Amount.(equal_var supply_increase (var_of_t zero))
           in
           let%bind nothing_changed =
             Boolean.(ledger_hash_didn't_change && supply_increase_is_zero)
