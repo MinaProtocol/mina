@@ -58,6 +58,7 @@ jobs:
             - run:
                 name: Install dependencies
                 command: pip install --user requests
+            - checkout
             - run:
                   name: Update branch protection rule from test configuration
                   command: ./scripts/test.py required-status >required_status && cat required_status && ./scripts/update_branch_rule.py required_status
