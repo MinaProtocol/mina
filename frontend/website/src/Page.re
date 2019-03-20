@@ -108,20 +108,10 @@ module Wrapped = {
     open Style;
 
     let s =
-      style(
-        paddingX(`rem(1.25))
-        @ [
-          margin(`auto),
-          media(
-            MediaQuery.full,
-            [
-              maxWidth(`rem(84.0)),
-              margin(`auto),
-              ...paddingX(`rem(2.0)),
-            ],
-          ),
-        ],
-      );
+      style([
+        margin(`auto),
+        media(MediaQuery.full, [maxWidth(`rem(84.0)), margin(`auto)]),
+      ]);
   };
 
   let component = ReasonReact.statelessComponent("Page.Wrapped");
@@ -145,7 +135,17 @@ let make =
   render: _ =>
     <html>
       <Head filename=name extra=extraHeaders />
-      <body>
+      <body
+        className=Css.(
+          style([
+            position(`relative),
+            maxWidth(`rem(84.0)),
+            marginRight(`auto),
+            marginLeft(`auto),
+            height(`percent(100.0)),
+            before(Grid.overlay),
+          ])
+        )>
         <Wrapped> <CodaNav /> <div> ...children </div> </Wrapped>
         <Footer bgcolor=footerColor />
       </body>
