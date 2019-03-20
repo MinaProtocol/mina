@@ -296,10 +296,10 @@ end
 
 module type Snark_pool_proof_intf = sig
   module Statement : sig
-    type t [@@deriving sexp, bin_io]
+    type t [@@deriving sexp, bin_io, yojson]
   end
 
-  type t [@@deriving sexp, bin_io]
+  type t [@@deriving sexp, bin_io, yojson]
 end
 
 module type User_command_intf = sig
@@ -426,12 +426,12 @@ module type Ledger_proof_intf = sig
   type sok_digest
 
   (* bin_io omitted intentionally *)
-  type t [@@deriving sexp]
+  type t [@@deriving sexp, yojson]
 
   module Stable :
     sig
       module V1 : sig
-        type t [@@deriving sexp, bin_io]
+        type t [@@deriving sexp, bin_io, yojson]
       end
 
       module Latest = V1
@@ -471,7 +471,7 @@ module type Transaction_snark_work_intf = sig
   type public_key
 
   module Statement : sig
-    type t = statement list
+    type t = statement list [@@deriving yojson]
 
     include Sexpable.S with type t := t
 
@@ -480,7 +480,7 @@ module type Transaction_snark_work_intf = sig
     module Stable :
       sig
         module V1 : sig
-          type t
+          type t [@@deriving yojson]
 
           include Sexpable.S with type t := t
 

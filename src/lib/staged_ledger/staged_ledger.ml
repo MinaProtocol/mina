@@ -1408,7 +1408,7 @@ let%test_module "test" =
       module Sok_message = struct
         module Stable = struct
           module V1 = struct
-            type t = unit [@@deriving bin_io, sexp]
+            type t = unit [@@deriving bin_io, sexp, yojson]
           end
 
           module Latest = V1
@@ -1416,7 +1416,7 @@ let%test_module "test" =
 
         module Digest = Unit
 
-        type t = Stable.Latest.t [@@deriving sexp]
+        type t = Stable.Latest.t [@@deriving sexp, yojson]
 
         let create ~fee:_ ~prover:_ = ()
       end
@@ -1646,7 +1646,7 @@ let%test_module "test" =
           module Latest = V1
         end
 
-        type t = Stable.Latest.t [@@deriving sexp]
+        type t = Stable.Latest.t [@@deriving sexp, yojson]
 
         type ledger_hash = Ledger_hash.t
 
@@ -1835,7 +1835,7 @@ let%test_module "test" =
             module V1 = struct
               module T = struct
                 type t = statement list
-                [@@deriving sexp, bin_io, compare, hash, eq]
+                [@@deriving sexp, bin_io, compare, hash, eq, yojson]
               end
 
               include T
@@ -1845,7 +1845,7 @@ let%test_module "test" =
             module Latest = V1
           end
 
-          type t = Stable.Latest.t [@@deriving sexp, compare, hash, eq]
+          type t = Stable.Latest.t [@@deriving sexp, compare, hash, eq, yojson]
 
           include Hashable.Make (Stable.Latest)
 
