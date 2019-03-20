@@ -879,12 +879,22 @@ module Checkpoints = struct
   let length = Constants.Checkpoint_window.per_year
 
   module Repr = struct
+    module Q = struct
+      module List = struct
+        type 'a t = 'a list [@@deriving to_yojson]
+      end
+
+      include Fqueue
+
+      let to_yojson f t = List.to_yojson f (to_list t)
+    end
+
     type t =
       { (* TODO: Make a nice way to force this to have bounded (or fixed) size for
          bin_io reasons *)
-        prefix: Coda_base.State_hash.t Fqueue.t
+        prefix: Coda_base.State_hash.t Q.t
       ; tail: Hash.t }
-    [@@deriving sexp, bin_io, compare, hash]
+    [@@deriving sexp, bin_io, compare, hash, to_yojson]
 
     let equal t1 t2 = compare t1 t2 = 0
 
@@ -899,31 +909,19 @@ module Checkpoints = struct
 
   type t = (Repr.t, Hash.t) With_hash.t [@@deriving sexp]
 
-  let compare (t1 : t) (t2 : t) = Hash.compare t1.hash t2.hash
-
-  let equal (t1 : t) (t2 : t) = Hash.equal t1.hash t2.hash
-
-  let empty : t =
-    let dummy = Hash.of_hash Snark_params.Tick.Field.zero in
-    {hash= dummy; data= {prefix= Fqueue.empty; tail= dummy}}
-
   let to_repr (t : t) = t.data
 
   let of_repr r = {With_hash.data= r; hash= Repr.digest r}
 
-  let cons sh (t : t) : t =
-    (* This kind of defeats the purpose of having a queue, but oh well. *)
-    let n = Fqueue.length t.data.prefix in
-    let hash = merge sh t.hash in
-    let {Repr.prefix; tail} = t.data in
-    if n < length then {hash; data= {prefix= Fqueue.enqueue prefix sh; tail}}
-    else
-      let sh0, prefix = Fqueue.dequeue_exn prefix in
-      {hash; data= {prefix= Fqueue.enqueue prefix sh; tail= merge sh0 tail}}
+  let compare (t1 : t) (t2 : t) = Hash.compare t1.hash t2.hash
+
+  let equal (t1 : t) (t2 : t) = Hash.equal t1.hash t2.hash
 
   let hash t = Repr.hash (to_repr t)
 
   let hash_fold_t s t = Repr.hash_fold_t s (to_repr t)
+
+  let to_yojson = Fn.compose Repr.to_yojson to_repr
 
   include Binable.Of_binable
             (Repr)
@@ -934,6 +932,20 @@ module Checkpoints = struct
 
               let of_binable = of_repr
             end)
+
+  let empty : t =
+    let dummy = Hash.of_hash Snark_params.Tick.Field.zero in
+    {hash= dummy; data= {prefix= Fqueue.empty; tail= dummy}}
+
+  let cons sh (t : t) : t =
+    (* This kind of defeats the purpose of having a queue, but oh well. *)
+    let n = Fqueue.length t.data.prefix in
+    let hash = merge sh t.hash in
+    let {Repr.prefix; tail} = t.data in
+    if n < length then {hash; data= {prefix= Fqueue.enqueue prefix sh; tail}}
+    else
+      let sh0, prefix = Fqueue.dequeue_exn prefix in
+      {hash; data= {prefix= Fqueue.enqueue prefix sh; tail= merge sh0 tail}}
 
   let fold (t : t) = Hash.fold t.hash
 
@@ -1045,7 +1057,7 @@ module Consensus_state = struct
     , Epoch_data.var
     , Boolean.var
     , Checkpoints.var )
-    t
+    t_
 
   let to_hlist
       { length
@@ -1092,7 +1104,7 @@ module Consensus_state = struct
          , 'epoch_data
          , 'bool
          , 'checkpoints )
-         t =
+         t_ =
    fun Coda_base.H_list.([ length
                          ; epoch_length
                          ; last_vrf_output
