@@ -1403,7 +1403,20 @@ let%test_module "test" =
           | _ -> Error "expected string"
       end
 
-      module Compressed_public_key = String
+      (* mirrors module structure of Public_key.Compressed *)
+      module Compressed_public_key = struct
+        type t = string [@@deriving sexp, compare, yojson]
+
+        module Stable = struct
+          module V1 = struct
+            type t = string [@@deriving sexp, bin_io, compare, eq, yojson]
+          end
+        end
+
+        let to_yojson, of_yojson = String.(to_yojson, of_yojson)
+
+        include Comparable.Make_binable (String)
+      end
 
       module Sok_message = struct
         module Stable = struct
@@ -1454,7 +1467,7 @@ let%test_module "test" =
       end
 
       module Fee_transfer = struct
-        type public_key = Compressed_public_key.t
+        type public_key = Compressed_public_key.Stable.V1.t
         [@@deriving sexp, bin_io, compare, eq, yojson]
 
         type fee = Fee.Unsigned.t
@@ -1814,7 +1827,7 @@ let%test_module "test" =
 
         type fee = Fee.Unsigned.t [@@deriving sexp, bin_io, compare, yojson]
 
-        type public_key = Compressed_public_key.t
+        type public_key = Compressed_public_key.Stable.V1.t
         [@@deriving sexp, bin_io, compare, yojson]
 
         module Stable = struct
@@ -1891,7 +1904,7 @@ let%test_module "test" =
           User_command.With_valid_signature.t
         [@@deriving sexp, bin_io, compare, yojson]
 
-        type public_key = Compressed_public_key.t
+        type public_key = Compressed_public_key.Stable.V1.t
         [@@deriving sexp, bin_io, compare, yojson]
 
         type staged_ledger_hash = Staged_ledger_hash.t

@@ -1,7 +1,15 @@
 open Core
 
 module type Key = sig
-  type t [@@deriving sexp, bin_io]
+  type t [@@deriving sexp]
+
+  module Stable :
+    sig
+      module V1 : sig
+        type t [@@deriving sexp, bin_io]
+      end
+    end
+    with type V1.t = t
 
   val empty : t
 

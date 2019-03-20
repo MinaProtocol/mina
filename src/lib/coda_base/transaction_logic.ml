@@ -117,40 +117,49 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
     module UC = User_command
 
     module User_command = struct
+      (* TODO: version *)
       module Common = struct
         type t =
-          { user_command: User_command.t
-          ; previous_receipt_chain_hash: Receipt.Chain_hash.t }
+          { user_command: User_command.Stable.V1.t
+          ; previous_receipt_chain_hash: Receipt.Chain_hash.Stable.V1.t }
         [@@deriving sexp, bin_io]
       end
 
       module Body = struct
+        (* TODO: version *)
         type t =
-          | Payment of {previous_empty_accounts: Public_key.Compressed.t list}
-          | Stake_delegation of {previous_delegate: Public_key.Compressed.t}
+          | Payment of
+              { previous_empty_accounts: Public_key.Compressed.Stable.V1.t list
+              }
+          | Stake_delegation of
+              { previous_delegate: Public_key.Compressed.Stable.V1.t }
         [@@deriving sexp, bin_io]
       end
 
       type t = {common: Common.t; body: Body.t} [@@deriving sexp, bin_io]
     end
 
+    (* TODO : version *)
     type fee_transfer =
       { fee_transfer: Fee_transfer.t
-      ; previous_empty_accounts: Public_key.Compressed.t list }
+      ; previous_empty_accounts: Public_key.Compressed.Stable.V1.t list }
     [@@deriving sexp, bin_io]
 
+    (* TODO : version *)
     type coinbase =
       { coinbase: Coinbase.Stable.V1.t
-      ; previous_empty_accounts: Public_key.Compressed.t list }
+      ; previous_empty_accounts: Public_key.Compressed.Stable.V1.t list }
     [@@deriving sexp, bin_io]
 
+    (* TODO : version *)
     type varying =
       | User_command of User_command.t
       | Fee_transfer of fee_transfer
       | Coinbase of coinbase
     [@@deriving sexp, bin_io]
 
-    type t = {previous_hash: Ledger_hash.t; varying: varying}
+    (* TODO : version *)
+    type t = {previous_hash: Ledger_hash.Stable.V1.t; varying: varying}
     [@@deriving sexp, bin_io]
 
     let transaction : t -> Transaction.t Or_error.t =

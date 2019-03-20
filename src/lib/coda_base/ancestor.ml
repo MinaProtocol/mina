@@ -7,7 +7,7 @@ module Input = struct
       module T = struct
         let version = 1
 
-        type t = {descendant: State_hash.t; generations: int}
+        type t = {descendant: State_hash.Stable.V1.t; generations: int}
         [@@deriving sexp, bin_io]
       end
 
