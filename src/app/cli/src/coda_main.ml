@@ -587,7 +587,7 @@ struct
     module Pool = Transaction_pool.Make (Staged_ledger) (Transition_frontier)
     include Network_pool.Make (Transition_frontier) (Pool) (Pool.Diff)
 
-    type pool_diff = Pool.Diff.t [@@deriving bin_io]
+    type pool_diff = Pool.Diff.t
 
     (* TODO *)
     let load ~logger ~disk_location:_ ~incoming_diffs ~frontier_broadcast_pipe

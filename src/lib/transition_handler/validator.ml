@@ -65,7 +65,7 @@ module Make (Inputs : Inputs.With_unprocessed_transition_cache.S) :
          ( ( (External_transition.Verified.t, State_hash.t) With_hash.t
            , State_hash.t )
            Cached.t
-         , drop_head buffered
+         , crash buffered
          , unit )
          Writer.t) ~unprocessed_transition_cache =
     don't_wait_for
