@@ -350,6 +350,11 @@ module type Main_intf = sig
     -> (Inputs.External_transition.Verified.t, State_hash.t) With_hash.t
        Strict_pipe.Reader.t
 
+  val root_diff :
+       t
+    -> User_command.t Protocols.Coda_transition_frontier.Root_diff_view.t
+       Strict_pipe.Reader.t
+
   val transaction_pool : t -> Inputs.Transaction_pool.t
 
   val snark_pool : t -> Inputs.Snark_pool.t

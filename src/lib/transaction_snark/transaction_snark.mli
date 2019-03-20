@@ -126,6 +126,14 @@ val check_user_command :
   -> Tick.Handler.t
   -> unit
 
+val generate_transaction_witness :
+     sok_message:Sok_message.t
+  -> source:Frozen_ledger_hash.t
+  -> target:Frozen_ledger_hash.t
+  -> Transaction.t
+  -> Tick.Handler.t
+  -> unit
+
 module type S = sig
   include Verification.S
 

@@ -96,7 +96,12 @@ Router.(
     Dir(
       "site",
       [|
-        File("index", <Page name="index"> <Home /> </Page>),
+        File(
+          "index",
+          <Page name="index" footerColor=Style.Colors.gandalf>
+            <Home />
+          </Page>,
+        ),
         Dir(
           "blog",
           posts
@@ -108,7 +113,7 @@ Router.(
                    name
                    extraHeaders=Blog.extraHeaders
                    footerColor=Style.Colors.gandalf>
-                   <BlogPost name html metadata />
+                   <Wrapped> <BlogPost name html metadata /> </Wrapped>
                  </Page>,
                )
              ),
@@ -123,7 +128,9 @@ Router.(
                    name
                    footerColor=Style.Colors.gandalf
                    extraHeaders=Careers.extraHeaders>
-                   <CareerPost path={"jobs/" ++ name ++ ".markdown"} />
+                   <Wrapped>
+                     <CareerPost path={"jobs/" ++ name ++ ".markdown"} />
+                   </Wrapped>
                  </Page>,
                )
              ),
@@ -131,17 +138,19 @@ Router.(
         File(
           "jobs",
           <Page name="jobs" extraHeaders=Careers.extraHeaders>
-            <Careers jobOpenings />
+            <Wrapped> <Careers jobOpenings /> </Wrapped>
           </Page>,
         ),
         File(
           "code",
-          <Page name="code" extraHeaders=Code.extraHeaders> <Code /> </Page>,
+          <Page name="code" extraHeaders=Code.extraHeaders>
+            <Wrapped> <Code /> </Wrapped>
+          </Page>,
         ),
         File(
           "blog",
           <Page name="blog" extraHeaders=Blog.extraHeaders>
-            <Blog posts />
+            <Wrapped> <Blog posts /> </Wrapped>
           </Page>,
         ),
         File(
