@@ -44,7 +44,8 @@ end
 
 module T = struct
   module Peers = struct
-    type t = Network_peer.Peer.t List.t [@@deriving bin_io]
+    (* TODO: version *)
+    type t = Network_peer.Peer.Stable.V1.t List.t [@@deriving bin_io]
   end
 
   module State_hashes = struct
