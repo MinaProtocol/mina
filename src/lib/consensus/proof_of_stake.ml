@@ -1558,13 +1558,10 @@ let select ~existing ~candidate ~logger =
     log_result choice msg
   in
   Logger.info logger ~module_:__MODULE__ ~location:__LOC__
-    "Selecting best consensus state" ;
-  Logger.trace logger ~module_:__MODULE__ ~location:__LOC__
-    !"existing consensus state: %{sexp:Consensus_state.Value.t}"
-    existing ;
-  Logger.trace logger ~module_:__MODULE__ ~location:__LOC__
-    !"candidate consensus state: %{sexp:Consensus_state.Value.t}"
-    candidate ;
+    "selecting best consensus state"
+    ~metadata:
+      [ ("existing", Consensus_state.Value.to_yojson existing)
+      ; ("candidate", Consensus_state.Value.to_yojson candidate) ] ;
   (* TODO: add fork_before_checkpoint check *)
   (* Each branch contains a precondition predicate and a choice predicate,
    * which takes the new state when true. Each predicate is also decorated
