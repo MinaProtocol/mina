@@ -36,12 +36,12 @@ module type Transition_frontier_intf = sig
 end
 
 module type User_command_intf = sig
-  type t [@@deriving sexp]
+  type t [@@deriving sexp, yojson]
 
   module Stable :
     sig
       module V1 : sig
-        type t [@@deriving sexp, bin_io]
+        type t [@@deriving sexp, bin_io, yojson]
       end
     end
     with type V1.t = t
@@ -288,7 +288,8 @@ struct
         module T = struct
           let version = 1
 
-          type t = User_command.Stable.V1.t list [@@deriving bin_io, sexp]
+          type t = User_command.Stable.V1.t list
+          [@@deriving bin_io, sexp, yojson]
         end
 
         include T
@@ -308,7 +309,7 @@ struct
     end
 
     (* bin_io omitted *)
-    type t = Stable.Latest.t [@@deriving sexp]
+    type t = Stable.Latest.t [@@deriving sexp, yojson]
 
     let summary t =
       Printf.sprintf "Transaction diff of length %d" (List.length t)
@@ -425,6 +426,14 @@ let%test_module _ =
               : int Best_tip_diff_view.t )
         in
         ((pipe_r, ref ([], Int.Set.empty)), pipe_w)
+    end
+
+    module Int = struct
+      include Int
+
+      let to_yojson x = `Int x
+
+      let of_yojson = function `Int x -> Ok x | _ -> Error "expected `Int"
     end
 
     module Test =

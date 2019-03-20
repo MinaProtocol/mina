@@ -24,7 +24,7 @@ module Input = struct
 end
 
 module Proof_type = struct
-  type t = [`Merge | `Base] [@@deriving bin_io, sexp, hash, compare]
+  type t = [`Merge | `Base] [@@deriving bin_io, sexp, hash, compare, yojson]
 
   let is_base = function `Base -> true | `Merge -> false
 end
@@ -37,7 +37,7 @@ module Statement = struct
       ; supply_increase: Currency.Amount.Stable.V1.t
       ; fee_excess: Currency.Fee.Signed.Stable.V1.t
       ; proof_type: Proof_type.t }
-    [@@deriving sexp, bin_io, hash, compare, fields]
+    [@@deriving sexp, bin_io, hash, compare, fields, yojson]
 
     let option lab =
       Option.value_map ~default:(Or_error.error_string lab) ~f:(fun x -> Ok x)
@@ -80,7 +80,7 @@ type t =
   ; fee_excess: Amount.Signed.Stable.V1.t
   ; sok_digest: Sok_message.Digest.Stable.V1.t
   ; proof: Proof.Stable.V1.t }
-[@@deriving fields, sexp, bin_io]
+[@@deriving fields, sexp, bin_io, yojson]
 
 let statement
     { source

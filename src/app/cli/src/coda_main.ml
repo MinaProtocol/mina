@@ -505,7 +505,7 @@ struct
   module Sparse_ledger = Coda_base.Sparse_ledger
 
   module Transaction_snark_work_proof = struct
-    type t = Ledger_proof.Stable.V1.t list [@@deriving sexp, bin_io]
+    type t = Ledger_proof.Stable.V1.t list [@@deriving sexp, bin_io, yojson]
   end
 
   module Staged_ledger = struct
@@ -670,7 +670,7 @@ struct
     module Fee = struct
       module T = struct
         type t = {fee: Fee.Unsigned.t; prover: Public_key.Compressed.t}
-        [@@deriving bin_io, sexp]
+        [@@deriving bin_io, sexp, yojson]
 
         (* TODO: Compare in a better way than with public key, like in transaction pool *)
         let compare t1 t2 =

@@ -1,3 +1,5 @@
+let enabled = false;
+
 let bgColorStr = "rgba(204, 80, 72, 0.25)";
 
 let columns = 12;

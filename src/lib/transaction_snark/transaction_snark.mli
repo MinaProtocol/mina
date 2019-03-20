@@ -3,7 +3,7 @@ open Coda_base
 open Snark_params
 
 module Proof_type : sig
-  type t = [`Merge | `Base] [@@deriving bin_io, sexp]
+  type t = [`Merge | `Base] [@@deriving bin_io, sexp, yojson]
 end
 
 module Statement : sig
@@ -13,7 +13,7 @@ module Statement : sig
     ; supply_increase: Currency.Amount.Stable.V1.t
     ; fee_excess: Currency.Fee.Signed.Stable.V1.t
     ; proof_type: Proof_type.t }
-  [@@deriving sexp, bin_io, hash, compare, eq, fields]
+  [@@deriving sexp, bin_io, hash, compare, eq, fields, yojson]
 
   val gen : t Quickcheck.Generator.t
 
@@ -24,7 +24,7 @@ module Statement : sig
   include Comparable.S with type t := t
 end
 
-type t [@@deriving bin_io, sexp]
+type t [@@deriving bin_io, sexp, yojson]
 
 val create :
      source:Frozen_ledger_hash.t
