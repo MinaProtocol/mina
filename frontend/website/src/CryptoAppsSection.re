@@ -29,7 +29,8 @@ module Code = {
 let swapQuery = "(min-width: 70rem)";
 
 module ImageCollage = {
-  let component = ReasonReact.statelessComponent("CryptoAppsSection");
+  let component =
+    ReasonReact.statelessComponent("CryptoAppsSection.ImageCollage");
   let make = (~className, _children) => {
     ...component,
     render: _self =>
