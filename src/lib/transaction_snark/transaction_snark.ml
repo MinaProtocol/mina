@@ -4,6 +4,7 @@ open Coda_base
 open Snark_params
 open Currency
 open Fold_lib
+open Module_version
 
 let state_hash_size_in_triples = Tick.Field.size_in_triples
 
@@ -72,15 +73,48 @@ module Statement = struct
     {source; target; fee_excess; proof_type; supply_increase}
 end
 
-type t =
+module Stable = struct
+  module V1 = struct
+    module T = struct
+      let version = 1
+
+      type t =
+        { source: Frozen_ledger_hash.Stable.V1.t
+        ; target: Frozen_ledger_hash.Stable.V1.t (* TODO : version *)
+        ; proof_type: Proof_type.t
+        ; supply_increase: Amount.Stable.V1.t
+        ; fee_excess: Amount.Signed.Stable.V1.t
+        ; sok_digest: Sok_message.Digest.Stable.V1.t
+        ; proof: Proof.Stable.V1.t }
+      [@@deriving fields, sexp, bin_io, yojson]
+    end
+
+    include T
+    include Registration.Make_latest_version (T)
+  end
+
+  module Latest = V1
+
+  module Module_decl = struct
+    let name = "transaction_snark"
+
+    type latest = Latest.t
+  end
+
+  module Registrar = Registration.Make (Module_decl)
+  module Registered_V1 = Registrar.Register (V1)
+end
+
+(* bin_io omitted *)
+type t = Stable.Latest.t =
   { source: Frozen_ledger_hash.Stable.V1.t
-  ; target: Frozen_ledger_hash.Stable.V1.t
+  ; target: Frozen_ledger_hash.Stable.V1.t (* TODO : version *)
   ; proof_type: Proof_type.t
   ; supply_increase: Amount.Stable.V1.t
   ; fee_excess: Amount.Signed.Stable.V1.t
   ; sok_digest: Sok_message.Digest.Stable.V1.t
   ; proof: Proof.Stable.V1.t }
-[@@deriving fields, sexp, bin_io, yojson]
+[@@deriving fields, sexp, yojson]
 
 let statement
     { source
