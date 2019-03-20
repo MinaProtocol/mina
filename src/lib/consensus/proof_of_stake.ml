@@ -1239,6 +1239,16 @@ module Consensus_state = struct
   let same_checkpoint_window ~prev ~next =
     M.make_checked (fun () -> same_checkpoint_window ~prev ~next)
 
+  (* Check that both epoch and slot are zero.
+  *)
+  let is_genesis (epoch : Epoch.Unpacked.var) (slot : Epoch.Slot.Unpacked.var)
+      =
+    let open Field in
+    Checked.equal
+      Checked.Infix.(
+        (Epoch.pack_var epoch :> Var.t) + (Epoch.Slot.pack_var slot :> Var.t))
+      (Var.constant zero)
+
   let%snarkydef update_var (previous_state : var)
       (transition_data : Consensus_transition_data.var)
       (previous_protocol_state_hash : Coda_base.State_hash.var)
@@ -1259,7 +1269,8 @@ module Consensus_state = struct
         let%map c = Epoch.Slot.compare_var prev_slot next_slot in
         c.less
       in
-      Boolean.Assert.any [epoch_increased; slot_increased]
+      let%bind is_genesis = is_genesis next_epoch next_slot in
+      Boolean.Assert.any [epoch_increased; slot_increased; is_genesis]
     in
     let%bind last_data =
       Epoch_data.if_ epoch_increased ~then_:previous_state.curr_epoch_data
