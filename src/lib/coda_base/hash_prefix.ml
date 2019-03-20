@@ -32,3 +32,5 @@ let epoch_seed = salt epoch_seed
 let vrf_message = salt vrf_message
 
 let vrf_output = salt vrf_output
+
+let checkpoint_list = salt checkpoint_list

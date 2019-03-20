@@ -5,6 +5,7 @@
   (inline_tests)
   (library_flags (-linkall))
   (libraries
+    snarky_taylor
     core_kernel
     lite_compat
     coda_base

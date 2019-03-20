@@ -240,6 +240,8 @@ module Snarkable = struct
 
     let var_of_field = unpack_var
 
+    let var_of_field_unsafe = Fn.id
+
     let unpack_value (x : Packed.value) : Unpacked.value = x
 
     let compare_var x y =
