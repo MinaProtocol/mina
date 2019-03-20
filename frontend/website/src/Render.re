@@ -107,7 +107,7 @@ Router.(
                  <Page
                    name
                    extraHeaders=Blog.extraHeaders
-                   footerColor=Style.Colors.offWhite>
+                   footerColor=Style.Colors.gandalf>
                    <BlogPost name html metadata />
                  </Page>,
                )
@@ -121,7 +121,7 @@ Router.(
                  name,
                  <Page
                    name
-                   footerColor=Style.Colors.offWhite
+                   footerColor=Style.Colors.gandalf
                    extraHeaders=Careers.extraHeaders>
                    <CareerPost path={"jobs/" ++ name ++ ".markdown"} />
                  </Page>,
