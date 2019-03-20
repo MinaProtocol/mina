@@ -292,7 +292,8 @@ module Epoch_ledger = struct
   type ('ledger_hash, 'amount) t = {hash: 'ledger_hash; total_currency: 'amount}
   [@@deriving sexp, bin_io, eq, compare, hash, to_yojson]
 
-  type value = (Coda_base.Frozen_ledger_hash.t, Amount.t) t
+  (* TODO : version *)
+  type value = (Coda_base.Frozen_ledger_hash.Stable.V1.t, Amount.t) t
   [@@deriving sexp, bin_io, eq, compare, hash, to_yojson]
 
   type var = (Coda_base.Frozen_ledger_hash.var, Amount.var) t
@@ -848,7 +849,7 @@ module Global_slot = struct
       + (UInt32.to_int Constants.Epoch.size * Epoch.to_int epoch) )
 
   module Checked = struct
-    (* TODO: It's possible to share this hash computation with 
+    (* TODO: It's possible to share this hash computation with
        the hashing of the state. Might be worth doing. *)
     let create ~(epoch : Epoch.Unpacked.var) ~(slot : Epoch.Slot.Unpacked.var)
         =
