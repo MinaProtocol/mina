@@ -110,20 +110,47 @@ let make =
   render: _ =>
     <html>
       <Head filename=name extra=extraHeaders />
-      <body
-        className=Css.(
-          style([
-            position(`relative),
-            maxWidth(`rem(84.0)),
-            marginRight(`auto),
-            marginLeft(`auto),
-            height(`percent(100.0)),
-            before(Grid.overlay),
-          ])
-        )>
-        <Wrapped> <CodaNav /> </Wrapped>
+      <body>
+        <Wrapped>
+          <div
+            className=Css.(
+              style([
+                marginTop(`rem(1.25)),
+                media(Style.MediaQuery.full, [marginTop(`rem(2.0))]),
+              ])
+            )>
+            <CodaNav />
+          </div>
+        </Wrapped>
         <div> ...children </div>
         <Footer bgcolor=footerColor />
+        {if (Grid.enabled) {
+           <div
+             className=Css.(
+               style([
+                 position(`absolute),
+                 top(`zero),
+                 width(`percent(100.0)),
+                 height(`percent(100.0)),
+               ])
+             )>
+             <div
+               className=Css.(
+                 style([
+                   position(`relative),
+                   marginRight(`auto),
+                   marginLeft(`auto),
+                   height(`percent(100.0)),
+                   width(`percent(100.0)),
+                   maxWidth(`rem(84.0)),
+                   before(Grid.overlay),
+                 ])
+               )
+             />
+           </div>;
+         } else {
+           <div />;
+         }}
       </body>
     </html>,
 };
