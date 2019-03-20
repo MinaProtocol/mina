@@ -242,6 +242,6 @@ let command =
        |> Option.value ~default:`Two_from_same
      in
      let repeats = Option.value repeats ~default:1 in
-     if witness_only then witness num_transactions
-     else if check_only then dry num_transactions
-     else main num_transactions)
+     if witness_only then witness num_transactions repeats
+     else if check_only then dry num_transactions repeats
+     else main num_transactions repeats)
