@@ -3,7 +3,7 @@ open Async_kernel
 open Pipe_lib
 
 module type Peer_intf = sig
-  type t [@@deriving eq, hash, compare, sexp]
+  type t [@@deriving eq, hash, compare, sexp, yojson]
 
   include Hashable.S with type t := t
 end
@@ -84,7 +84,7 @@ module type S = sig
 
   val make_node :
        transport:transport
-    -> parent_log:Logger.t
+    -> logger:Logger.t
     -> me:peer
     -> messages:message Linear_pipe.Reader.t
     -> ?parent:t
@@ -113,7 +113,7 @@ end
 module type F = functor
   (State :sig
           
-          type t [@@deriving eq, sexp]
+          type t [@@deriving eq, sexp, yojson]
         end)
   (Message :sig
             
@@ -135,7 +135,7 @@ module type F = functor
               end)
   (Condition_label :sig
                     
-                    type label [@@deriving enum, sexp]
+                    type label [@@deriving enum, sexp, yojson]
 
                     include Hashable.S with type t = label
                   end)

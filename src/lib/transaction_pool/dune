@@ -1,10 +1,10 @@
 (library
  (name transaction_pool)
  (public_name transaction_pool)
- (flags :standard -short-paths -warn-error -27-58)
+ (flags :standard -short-paths -warn-error -3)
  (library_flags -linkall)
  (inline_tests)
- (libraries core async async_extra coda_base envelope protocols )
+ (libraries core async async_extra coda_base envelope protocols module_version)
  (preprocess
   (pps ppx_jane ppx_deriving.std bisect_ppx -- -conditional))
  (synopsis "Ledger fetcher fetches ledgers over the network"))

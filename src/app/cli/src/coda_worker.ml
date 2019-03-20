@@ -172,9 +172,10 @@ module T = struct
         ; external_port
         ; peers
         ; discovery_port } =
-      let log = Logger.create () in
-      let log =
-        Logger.child log ("host: " ^ host ^ ":" ^ Int.to_string external_port)
+      let logger =
+        Logger.create
+          ~metadata:[("host", `String host); ("port", `Int external_port)]
+          ()
       in
       let%bind () =
         Option.value_map trace_dir
@@ -185,7 +186,7 @@ module T = struct
       in
       let%bind () = File_system.create_dir conf_dir in
       let module Config = struct
-        let logger = log
+        let logger = logger
 
         let conf_dir = conf_dir
 
@@ -212,30 +213,19 @@ module T = struct
           in
           let module Main = Coda_main.Make_coda (Init) in
           let module Run = Run (Config) (Main) in
-          let banlist_dir_name = conf_dir ^/ "banlist" in
-          let%bind () = File_system.create_dir banlist_dir_name in
-          let%bind suspicious_dir =
-            Unix.mkdtemp (banlist_dir_name ^/ "suspicious")
-          in
-          let%bind punished_dir =
-            Unix.mkdtemp (banlist_dir_name ^/ "banned")
-          in
-          let%bind trust_dir = Unix.mkdtemp (banlist_dir_name ^/ "trust") in
+          let%bind trust_dir = Unix.mkdtemp (conf_dir ^/ "trust") in
           let receipt_chain_dir_name = conf_dir ^/ "receipt_chain" in
           let%bind () = File_system.create_dir receipt_chain_dir_name in
           let receipt_chain_database =
             Coda_base.Receipt_chain_database.create
               ~directory:receipt_chain_dir_name
           in
-          let banlist =
-            Coda_base.Banlist.create ~suspicious_dir ~punished_dir
-          in
           let trust_system = Coda_base.Trust_system.create ~db_dir:trust_dir in
           let time_controller =
             Run.Inputs.Time.Controller.create Run.Inputs.Time.Controller.basic
           in
           let net_config =
-            { Main.Inputs.Net.Config.parent_log= log
+            { Main.Inputs.Net.Config.logger
             ; time_controller
             ; gossip_net_params=
                 { Main.Inputs.Net.Gossip_net.Config.timeout= Time.Span.of_sec 1.
@@ -246,17 +236,16 @@ module T = struct
                     Network_peer.Peer.create
                       (Unix.Inet_addr.of_string host)
                       ~discovery_port ~communication_port:external_port
-                ; parent_log= log
+                ; logger
                 ; trust_system } }
           in
-          let frontier_file = conf_dir ^/ "frontier.dot" in
           let monitor = Async.Monitor.create ~name:"coda" () in
           let with_monitor f input =
             Async.Scheduler.within' ~monitor (fun () -> f input)
           in
           let%bind coda =
             Main.create
-              (Main.Config.make ~log ~net_config
+              (Main.Config.make ~logger ~net_config
                  ~run_snark_worker:(Option.is_some snark_worker_config)
                  ~staged_ledger_persistant_location:
                    (conf_dir ^/ "staged_ledger")
@@ -265,9 +254,9 @@ module T = struct
                  ~snark_pool_disk_location:(conf_dir ^/ "snark_pool")
                  ~time_controller ~receipt_chain_database
                  ~snark_work_fee:(Currency.Fee.of_int 0)
-                 ?propose_keypair:Config.propose_keypair () ~banlist ~monitor)
+                 ?propose_keypair:Config.propose_keypair () ~monitor)
           in
-          Run.handle_shutdown ~monitor ~frontier_file ~log coda ;
+          Run.handle_shutdown ~monitor ~conf_dir ~logger coda ;
           let%map () =
             with_monitor
               (fun () ->
@@ -277,8 +266,8 @@ module T = struct
                          `With_public_key config.public_key
                        in
                        Run.setup_local_server ~client_port:config.port ~coda
-                         ~log () ;
-                       Run.run_snark_worker ~log ~client_port:config.port
+                         ~logger () ;
+                       Run.run_snark_worker ~logger ~client_port:config.port
                          run_snark_worker ) )
               ()
           in
@@ -305,7 +294,7 @@ module T = struct
             in
             let payment = build_txn amount sk pk fee in
             let%map receipt =
-              Run.send_payment log coda (payment :> User_command.t)
+              Run.send_payment logger coda (payment :> User_command.t)
             in
             receipt |> Participating_state.active_exn
           in
@@ -314,7 +303,7 @@ module T = struct
               Run.prove_receipt coda ~proving_receipt ~resulting_receipt
             with
             | Ok proof ->
-                Logger.info log
+                Logger.info logger ~module_:__MODULE__ ~location:__LOC__
                   !"Constructed proof for receipt: %{sexp:Receipt.Chain_hash.t}"
                   proving_receipt ;
                 proof

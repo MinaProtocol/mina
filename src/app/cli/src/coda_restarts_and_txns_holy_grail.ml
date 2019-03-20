@@ -8,8 +8,7 @@ let name = "coda-restarts-and-txns-holy-grail"
 
 let main n () =
   assert (n > 1) ;
-  let log = Logger.create () in
-  let log = Logger.child log name in
+  let logger = Logger.create () in
   let snark_work_public_keys = function
     | 0 ->
         Some
@@ -17,7 +16,7 @@ let main n () =
     | _ -> None
   in
   let%bind testnet =
-    Coda_worker_testnet.test log n Option.some snark_work_public_keys
+    Coda_worker_testnet.test logger n Option.some snark_work_public_keys
       Protocols.Coda_pow.Work_selection.Seq
   in
   (* SEND TXNS *)
@@ -36,7 +35,7 @@ let main n () =
   let%bind () =
     Coda_worker_testnet.Restarts.trigger_catchup testnet
       ~largest_account_keypair:(Genesis_ledger.largest_account_keypair_exn ())
-      ~log ~node:idx
+      ~logger ~node:idx
       ~payment_receiver:(n - 1 - idx)
   in
   (* bootstrap *)
@@ -44,7 +43,7 @@ let main n () =
   let%bind () =
     Coda_worker_testnet.Restarts.trigger_bootstrap testnet
       ~largest_account_keypair:(Genesis_ledger.largest_account_keypair_exn ())
-      ~log ~node:idx
+      ~logger ~node:idx
       ~payment_receiver:(n - 1 - idx)
   in
   (* random *)
@@ -55,12 +54,13 @@ let main n () =
         Generator.(Float.gen_incl 1. 5. >>| fun x -> Time.Span.of_min x))
   in
   let%bind () =
-    Coda_worker_testnet.Restarts.restart_node testnet ~log ~node:idx
+    Coda_worker_testnet.Restarts.restart_node testnet ~logger ~node:idx
       ~action:(Fn.const Deferred.unit) ~duration
   in
   (* settle for a few more min *)
   (* TODO: Make sure to check that catchup actually worked *)
-  after (Time.Span.of_min 3.)
+  let%bind () = after (Time.Span.of_min 3.) in
+  Coda_worker_testnet.Api.teardown testnet
 
 let command =
   let open Command.Let_syntax in

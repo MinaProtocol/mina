@@ -23,7 +23,7 @@ module Mask = Syncable_ledger.Make (struct
   module Hash = Hash
   module Root_hash = Root_hash
 
-  let subtree_height = 3
+  let account_subtree_height = 3
 end)
 
 module Db = Syncable_ledger.Make (struct
@@ -33,7 +33,7 @@ module Db = Syncable_ledger.Make (struct
   module Hash = Hash
   module Root_hash = Root_hash
 
-  let subtree_height = 3
+  let account_subtree_height = 3
 end)
 
 module Answer = struct
@@ -43,10 +43,9 @@ module Answer = struct
         let version = 1
 
         type t =
-          ( Ledger.Location.Addr.t
-          , Ledger_hash.t
+          ( Ledger_hash.Stable.V1.t
           , Account.Stable.V1.t )
-          Syncable_ledger.answer
+          Syncable_ledger.Answer.Stable.V1.t
         [@@deriving bin_io, sexp]
       end
 
@@ -76,7 +75,8 @@ module Query = struct
       module T = struct
         let version = 1
 
-        type t = Ledger.Location.Addr.t Syncable_ledger.query
+        type t =
+          Ledger.Location.Addr.Stable.V1.t Syncable_ledger.Query.Stable.V1.t
         [@@deriving bin_io, sexp]
       end
 

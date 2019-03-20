@@ -76,13 +76,35 @@ module Api = struct
         Coda_process.prove_receipt_exn worker proving_receipt resulting_receipt
         )
       t i
+
+  let teardown t = Deferred.List.iter t.workers ~f:Coda_process.disconnect
 end
 
-let start_prefix_check log workers events testnet ~acceptable_delay =
+module Tree = struct
+  type key = string
+
+  type t = {parent_map: (key, key) Hashtbl.t}
+
+  let add t ~prev ~curr = Hashtbl.add t.parent_map ~key:curr ~data:prev
+
+  let create () = {parent_map= Hashtbl.create (module String)}
+
+  let path_from t node =
+    let rec go acc cur =
+      match Hashtbl.find t.parent_map cur with
+      | Some parent -> go (parent :: acc) parent
+      | None -> List.rev acc
+    in
+    go [] node
+end
+
+let start_prefix_check logger workers events testnet ~acceptable_delay =
   let all_transitions_r, all_transitions_w = Linear_pipe.create () in
-  let chains = Array.init (List.length workers) ~f:(fun i -> []) in
+  let state_hash_tree = Tree.create () in
+  let chains = Array.init (List.length workers) ~f:(fun i -> "") in
   let check_chains chains =
     let chains = Array.filteri chains ~f:(fun i _ -> Api.synced testnet i) in
+    let chains = Array.map chains ~f:(Tree.path_from state_hash_tree) in
     let lengths =
       Array.to_list (Array.map chains ~f:(fun c -> List.length c))
     in
@@ -102,12 +124,13 @@ let start_prefix_check log workers events testnet ~acceptable_delay =
                ~f:(fun x -> fst x))
     in
     let shared_prefix_age = shared_idx in
-    Logger.info log
+    Logger.info logger ~module_:__MODULE__ ~location:__LOC__
       !"lengths: %{sexp: int list} shared_prefix: %{sexp: string option} \
         shared_prefix_age: %d"
       lengths newest_shared shared_prefix_age ;
     if not (shared_prefix_age <= 5) then (
-      Logger.fatal log "prefix too old" ;
+      Logger.fatal logger ~module_:__MODULE__ ~location:__LOC__
+        "prefix too old" ;
       ignore (exit 1) ) ;
     ()
   in
@@ -127,7 +150,8 @@ let start_prefix_check log workers events testnet ~acceptable_delay =
                   * Consensus.Constants.block_window_duration_ms )
                 /. 1000. )
        then (
-         Logger.fatal log "no recent blocks" ;
+         Logger.fatal logger ~module_:__MODULE__ ~location:__LOC__
+           "no recent blocks" ;
          ignore (exit 1) ) ;
        let%bind () = after (Time.Span.of_sec 1.0) in
        go ()
@@ -145,17 +169,18 @@ let start_prefix_check log workers events testnet ~acceptable_delay =
               Md5.to_hex hash
             in
             let curr = bits_to_str curr in
-            let chain = chains.(i) in
-            let chain = curr :: chain in
+            let prev = bits_to_str prev in
+            Tree.add state_hash_tree ~prev ~curr |> ignore ;
             last_time := Time.now () ;
-            chains.(i) <- chain ;
+            chains.(i) <- curr ;
             check_chains chains ;
             return chains ))) ;
   don't_wait_for
     (Linear_pipe.iter events ~f:(function `Transition (i, (prev, curr)) ->
          Linear_pipe.write all_transitions_w (prev, curr, i) ))
 
-let start_payment_check log events payments workers testnet ~acceptable_delay =
+let start_payment_check logger events payments workers testnet
+    ~acceptable_delay =
   let block_counts = Array.init (List.length workers) ~f:(fun _ -> 0) in
   let active_accounts = ref [] in
   let get_balances pk =
@@ -192,12 +217,13 @@ let start_payment_check log events payments workers testnet ~acceptable_delay =
                    else if balance <> send_balance then return true
                    else
                      let diff = current_block_count - send_block_count in
-                     Logger.warn log
+                     Logger.warn logger ~module_:__MODULE__ ~location:__LOC__
                        !"%d balance not yet updated %{sexp: \
                          Currency.Balance.t option option} %d"
                        i balance diff ;
                      if diff >= 7 then (
-                       Logger.fatal log "balance took too long to update" ;
+                       Logger.fatal logger ~module_:__MODULE__
+                         ~location:__LOC__ "balance took too long to update" ;
                        ignore (exit 1) ) ;
                      return false ))
           in
@@ -253,12 +279,12 @@ let events workers start_reader =
   List.iteri workers ~f:(fun i w -> don't_wait_for (connect_worker i w)) ;
   event_r
 
-let start_checks log workers payment_reader start_reader testnet
+let start_checks logger workers payment_reader start_reader testnet
     ~acceptable_delay =
   let event_pipe = events workers start_reader in
   let prefix_events, payment_events = Linear_pipe.fork2 event_pipe in
-  start_prefix_check log workers prefix_events testnet ~acceptable_delay ;
-  start_payment_check log payment_events payment_reader workers testnet
+  start_prefix_check logger workers prefix_events testnet ~acceptable_delay ;
+  start_payment_check logger payment_events payment_reader workers testnet
     ~acceptable_delay
 
 (* note: this is very declarative, maybe this should be more imperative? *)
@@ -267,8 +293,8 @@ let start_checks log workers payment_reader start_reader testnet
    *   implement stop/start
    *   change live whether nodes are producing, snark producing
    *   change network connectivity *)
-let test log n proposers snark_work_public_keys work_selection =
-  let log = Logger.child log "worker_testnet" in
+let test logger n proposers snark_work_public_keys work_selection =
+  let logger = Logger.extend logger [("worker_testnet", `Bool true)] in
   let proposal_interval = Consensus.Constants.block_window_duration_ms in
   let acceptable_delay =
     Time.Span.of_ms
@@ -287,7 +313,7 @@ let test log n proposers snark_work_public_keys work_selection =
   let payment_reader, payment_writer = Linear_pipe.create () in
   let start_reader, start_writer = Linear_pipe.create () in
   let testnet = Api.create configs workers payment_writer start_writer in
-  start_checks log workers payment_reader start_reader testnet
+  start_checks logger workers payment_reader start_reader testnet
     ~acceptable_delay ;
   testnet
 
@@ -305,7 +331,8 @@ end = struct
     let rec go i =
       let%bind () = after (Time.Span.of_sec 1.) in
       let%bind () = Api.send_payment testnet node src dest send_amount fee in
-      if i > 0 then go (i - 1) else return ()
+      if i > 0 then go (i - 1) else after (Time.Span.of_sec 1.)
+      (* ensure a sleep at the end to let the last payment through *)
     in
     go 40
 end
@@ -313,7 +340,7 @@ end
 module Restarts : sig
   val restart_node :
        Api.t
-    -> log:Logger.t
+    -> logger:Logger.t
     -> node:int
     -> action:(unit -> unit Deferred.t)
     -> duration:Time.Span.t
@@ -321,7 +348,7 @@ module Restarts : sig
 
   val trigger_catchup :
        Api.t
-    -> log:Logger.t
+    -> logger:Logger.t
     -> node:int
     -> largest_account_keypair:Keypair.t
     -> payment_receiver:int
@@ -329,7 +356,7 @@ module Restarts : sig
 
   val trigger_bootstrap :
        Api.t
-    -> log:Logger.t
+    -> logger:Logger.t
     -> node:int
     -> largest_account_keypair:Keypair.t
     -> payment_receiver:int
@@ -346,37 +373,39 @@ end = struct
     @@ ( Consensus.Constants.(c * ((2 * k) + delta) * block_window_duration_ms)
        |> Float.of_int )
 
-  let restart_node testnet ~log ~node ~action ~duration =
+  let restart_node testnet ~logger ~node ~action ~duration =
     let%bind () = after (Time.Span.of_sec 5.) in
-    Logger.info log "Stopping %d" node ;
+    Logger.info logger ~module_:__MODULE__ ~location:__LOC__ "Stopping %d" node ;
     (* Send one payment *)
     let%bind () = Api.stop testnet node in
     let%bind () = action () in
     let%bind () = after duration in
     Api.start testnet node
 
-  let restart_and_payment testnet ~node ~log ~largest_account_keypair ~duration
-      ~payment_receiver =
+  let restart_and_payment testnet ~node ~logger ~largest_account_keypair
+      ~duration ~payment_receiver =
     let sender_sk = largest_account_keypair.Keypair.private_key in
     let send_amount = Currency.Amount.of_int 10 in
     let fee = Currency.Fee.of_int 0 in
     let keypair = Keypair.create () in
-    restart_node testnet ~node ~log
+    restart_node testnet ~node ~logger
       ~action:(fun () ->
         Api.send_payment testnet payment_receiver sender_sk
           (Public_key.compress keypair.public_key)
           send_amount fee )
       ~duration
 
-  let trigger_catchup testnet ~log ~node ~largest_account_keypair
+  let trigger_catchup testnet ~logger ~node ~largest_account_keypair
       ~payment_receiver =
-    Logger.info log "Triggering catchup on %d" node ;
-    restart_and_payment testnet ~largest_account_keypair ~node ~log
+    Logger.info logger ~module_:__MODULE__ ~location:__LOC__
+      "Triggering catchup on %d" node ;
+    restart_and_payment testnet ~largest_account_keypair ~node ~logger
       ~duration:catchup_wait_duration ~payment_receiver
 
-  let trigger_bootstrap testnet ~log ~node ~largest_account_keypair
+  let trigger_bootstrap testnet ~logger ~node ~largest_account_keypair
       ~payment_receiver =
-    Logger.info log "Triggering bootstrap on %d" node ;
-    restart_and_payment testnet ~largest_account_keypair ~node ~log
-      ~duration:catchup_wait_duration ~payment_receiver
+    Logger.info logger ~module_:__MODULE__ ~location:__LOC__
+      "Triggering bootstrap on %d" node ;
+    restart_and_payment testnet ~largest_account_keypair ~node ~logger
+      ~duration:bootstrap_wait_duration ~payment_receiver
 end

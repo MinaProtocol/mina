@@ -36,7 +36,7 @@ module type Transition_frontier_extension_intf0 = sig
 
   val create : input -> t
 
-  val initial_view : view
+  val initial_view : unit -> view
   (** The first view that is ever available. *)
 
   val handle_diff :
@@ -97,13 +97,15 @@ module type Network_intf = sig
   val glue_sync_ledger :
        t
     -> (ledger_hash * sync_ledger_query) Pipe_lib.Linear_pipe.Reader.t
-    -> (ledger_hash * sync_ledger_answer) Envelope.Incoming.t
+    -> ( ledger_hash
+       * sync_ledger_query
+       * sync_ledger_answer Envelope.Incoming.t )
        Pipe_lib.Linear_pipe.Writer.t
     -> unit
 end
 
 module type Transition_frontier_Breadcrumb_intf = sig
-  type t [@@deriving sexp, eq, compare]
+  type t [@@deriving sexp, eq, compare, to_yojson]
 
   type display [@@deriving yojson]
 
@@ -180,7 +182,7 @@ module type Transition_frontier_base_intf = sig
     -> root_snarked_ledger:ledger_database
     -> root_staged_ledger:staged_ledger
     -> consensus_local_state:consensus_local_state
-    -> t
+    -> t Deferred.t
 
   val close : t -> unit
   (** Clean up internal state. *)
@@ -246,9 +248,19 @@ module type Transition_frontier_intf = sig
 
   module Extensions : sig
     module Work : sig
-      type t [@@deriving sexp, bin_io]
+      type t [@@deriving sexp]
 
-      include Hashable.S_binable with type t := t
+      module Stable :
+        sig
+          module V1 : sig
+            type t [@@deriving sexp, bin_io]
+
+            include Hashable.S_binable with type t := t
+          end
+        end
+        with type V1.t = t
+
+      include Hashable.S with type t := t
     end
 
     module Snark_pool_refcount : sig
@@ -345,7 +357,7 @@ module type Transition_handler_validator_intf = sig
                                    With_hash.t
                                  , state_hash )
                                  Cached.t
-                               , Strict_pipe.drop_head Strict_pipe.buffered
+                               , Strict_pipe.crash Strict_pipe.buffered
                                , unit )
                                Strict_pipe.Writer.t
     -> unprocessed_transition_cache:unprocessed_transition_cache
@@ -416,7 +428,7 @@ module type Transition_handler_processor_intf = sig
     -> processed_transition_writer:( ( external_transition_verified
                                      , state_hash )
                                      With_hash.t
-                                   , Strict_pipe.drop_head Strict_pipe.buffered
+                                   , Strict_pipe.crash Strict_pipe.buffered
                                    , unit )
                                    Strict_pipe.Writer.t
     -> unprocessed_transition_cache:unprocessed_transition_cache
@@ -498,7 +510,7 @@ module type Sync_handler_intf = sig
     -> ledger_hash
     -> syncable_ledger_query
     -> logger:Logger.t
-    -> (ledger_hash * syncable_ledger_answer) option
+    -> syncable_ledger_answer option
 
   val transition_catchup :
        frontier:transition_frontier
@@ -549,7 +561,7 @@ module type Bootstrap_controller_intf = sig
   type ledger_db
 
   val run :
-       parent_log:Logger.t
+       logger:Logger.t
     -> network:network
     -> frontier:transition_frontier
     -> ledger_db:ledger_db
@@ -634,7 +646,7 @@ module type Initial_validator_intf = sig
     -> valid_transition_writer:( [ `Transition of external_transition_verified
                                                   Envelope.Incoming.t ]
                                  * [`Time_received of time]
-                               , Strict_pipe.drop_head Strict_pipe.buffered
+                               , Strict_pipe.crash Strict_pipe.buffered
                                , unit )
                                Strict_pipe.Writer.t
     -> unit
