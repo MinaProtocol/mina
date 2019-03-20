@@ -27,3 +27,5 @@ val epoch_seed : Tick.Pedersen.State.t
 val vrf_message : Tick.Pedersen.State.t
 
 val vrf_output : Tick.Pedersen.State.t
+
+val checkpoint_list : Tick.Pedersen.State.t
