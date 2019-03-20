@@ -181,7 +181,7 @@ let generate_base_snarks_witness sparse_ledger0
   in
   "Base constraint system satisfied"
 
-let run profiler num_transactions =
+let run profiler num_transactions repeats =
   let ledger, transitions = create_ledger_and_transactions num_transactions in
   let sparse_ledger =
     Coda_base.Sparse_ledger.of_ledger_subset_exn ledger
@@ -195,26 +195,28 @@ let run profiler num_transactions =
            | Coinbase {proposer; fee_transfer} ->
                proposer :: Option.to_list (Option.map fee_transfer ~f:fst) ))
   in
-  let message = profiler sparse_ledger transitions in
-  Core.printf !"%s\n%!" message ;
+  for i = 1 to repeats do
+    let message = profiler sparse_ledger transitions in
+    Core.printf !"[%i] %s\n%!" i message
+  done ;
   exit 0
 
-let main num_transactions () =
+let main num_transactions repeats () =
   Snarky.Libsnark.set_no_profiling false ;
   Test_util.with_randomness 123456789 (fun () ->
       let keys = Transaction_snark.Keys.create () in
       let module T = Transaction_snark.Make (struct
         let keys = keys
       end) in
-      run (profile (module T)) num_transactions )
+      run (profile (module T)) num_transactions repeats )
 
-let dry num_transactions () =
+let dry num_transactions repeats () =
   Test_util.with_randomness 123456789 (fun () ->
-      run check_base_snarks num_transactions )
+      run check_base_snarks num_transactions repeats )
 
-let witness num_transactions () =
+let witness num_transactions repeats () =
   Test_util.with_randomness 123456789 (fun () ->
-      run generate_base_snarks_witness num_transactions )
+      run generate_base_snarks_witness num_transactions repeats )
 
 let command =
   let open Command.Let_syntax in
@@ -222,7 +224,11 @@ let command =
     (let%map_open n =
        flag "k"
          ~doc:
-           "log_2(number of transactions to snark) or none for the mocked ones"
+           "count count = log_2(number of transactions to snark) or none for \
+            the mocked ones"
+         (optional int)
+     and repeats =
+       flag "repeat" ~doc:"count number of times to repeat the profile"
          (optional int)
      and check_only =
        flag "check-only"
@@ -235,6 +241,7 @@ let command =
        Option.map n ~f:(fun n -> `Count (Int.pow 2 n))
        |> Option.value ~default:`Two_from_same
      in
-     if witness_only then witness num_transactions
-     else if check_only then dry num_transactions
-     else main num_transactions)
+     let repeats = Option.value repeats ~default:1 in
+     if witness_only then witness num_transactions repeats
+     else if check_only then dry num_transactions repeats
+     else main num_transactions repeats)
