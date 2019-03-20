@@ -43,7 +43,7 @@ let make = _ => {
           Style.paddingX(`rem(1.25))
           @ Style.paddingY(`rem(0.5))
           @ [
-            backgroundColor(Style.Colors.azure_01),
+            backgroundColor(Style.Colors.azureAlpha(0.1)),
             textDecoration(`none),
             borderRadius(`px(3)),
             display(`flex),
