@@ -60,7 +60,7 @@ jobs:
                 command: pip install --user requests
             - run:
                   name: Update branch protection rule from test configuration
-                  command: ./scripts/test.py render --required .circleci/config.yml.jinja .mergify.yml >required_status && cat required_status && ./scripts/update_branch_rule.py required_status
+                  command: ./scripts/test.py required-status >required_status && cat required_status && ./scripts/update_branch_rule.py required_status
 
     build-macos:
         macos:

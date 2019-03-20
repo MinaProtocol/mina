@@ -200,6 +200,21 @@ def run(args):
     print('Testing successfull')
 
 
+def get_required_status():
+    test_permutations = filter_test_permutations(['*'], required_blacklist, permutations=filter_test_permutations(['*'], ci_blacklist))
+    return list(filter(lambda el: el not in not_required_status_checks,
+            chain(
+            ("ci/circleci: %s" % job for job in
+                chain(("test--%s" % profile for profile in test_permutations.keys()),
+                      ("test-unit--%s" % profile for profile in unit_test_profiles),
+                      ("build-artifacts--%s" % profile for profile in build_artifact_profiles))),
+            extra_required_status_checks
+             )))
+
+
+def required_status(args):
+    print('\n'.join(get_required_status()))
+
 def render(args):
     circle_ci_conf_dir = os.path.dirname(args.circle_jinja_file)
     jinja_file_basename = os.path.basename(args.circle_jinja_file)
@@ -220,7 +235,7 @@ def render(args):
         with open(output_file, 'r') as file:
             if file.read() != rendered:
                 fail('circle CI configuration is out of date, re-render it')
-    elif not args.required:
+    else:
         with open(output_file, 'w') as file:
             file.write(rendered)
 
@@ -230,34 +245,20 @@ def render(args):
     (output_file, ext) = os.path.splitext(args.mergify_jinja_file)
     assert ext == '.jinja'
 
-    test_permutations = filter_test_permutations(['*'], required_blacklist, permutations=test_permutations)
-
     env = jinja2.Environment(loader=jinja2.FileSystemLoader(mergify_conf_dir), autoescape=False)
     template = env.get_template(jinja_file_basename)
 
-    required_status = list(filter(lambda el: el not in not_required_status_checks,
-            chain(
-            ("ci/circleci: %s" % job for job in
-                chain(("test--%s" % profile for profile in test_permutations.keys()),
-                      ("test-unit--%s" % profile for profile in unit_test_profiles),
-                      ("build-artifacts--%s" % profile for profile in build_artifact_profiles))),
-            extra_required_status_checks
-             )))
-
     rendered = template.render(
-        required_status=required_status
+        required_status=get_required_status()
     )
 
     if args.check:
         with open(output_file, 'r') as file:
             if file.read() != rendered:
                 fail('mergify configuration is out of date, re-render it')
-    elif not args.required:
+    else:
         with open(output_file, 'w') as file:
             file.write(rendered)
-
-    if args.required:
-        print('\n'.join(required_status))
 
 def list_tests(_args):
     for profile in test_permutations.keys():
@@ -269,7 +270,8 @@ def main():
     actions = {
         'run': run,
         'render': render,
-        'list': list_tests
+        'list': list_tests,
+        'required-status': required_status
     }
 
     root_parser = argparse.ArgumentParser(description='Coda integration test runner/configurator.')
@@ -311,12 +313,14 @@ def main():
         action='store_true',
         help='Check that CI configuration was rendered properly.'
     )
-    render_parser.add_argument('--required', action='store_true', help='Only print the list of required status checks on stdout')
     render_parser.add_argument('circle_jinja_file')
     render_parser.add_argument('mergify_jinja_file')
 
     list_parser = subparsers.add_parser('list', description='List available tests.')
     list_parser.set_defaults(action='list')
+
+    required_status_parser = subparsers.add_parser('required-status', description='Print required status checks')
+    required_status_parser.set_defaults(action='required-status')
 
     args = root_parser.parse_args()
     if not(hasattr(args, 'action')):
