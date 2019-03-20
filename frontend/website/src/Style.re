@@ -77,7 +77,7 @@ module H1 = {
   let hero =
     style([
       Typeface.ibmplexsans,
-      fontWeight(`num(300)),
+      fontWeight(`light),
       fontSize(`rem(2.25)),
       letterSpacing(`rem(-0.02375)),
       lineHeight(`rem(3.0)),
