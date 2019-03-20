@@ -11,7 +11,12 @@ module Colors = {
 
   let bluishGreen = `rgb((22, 168, 85));
   let purpleBrown = `rgb((100, 46, 48));
+  let offWhite = `rgb((243, 243, 243));
+  let grey = `rgb((129, 146, 168));
+
+  let azure_01 = `rgba((45, 158, 219, 0.1));
   let gandalf = `rgb((243, 243, 243));
+
   let slate = `rgb((81, 102, 121));
 
   let navy = `rgb((0, 49, 90));
@@ -45,7 +50,7 @@ let paddingY = m => Css.[paddingTop(m), paddingBottom(m)];
 module Link = {
   open Css;
 
-  let style =
+  let init =
     style([
       Typeface.ibmplexsans,
       color(Colors.hyperlink),
@@ -54,8 +59,14 @@ module Link = {
       fontSize(`rem(1.0)),
       letterSpacing(`rem(-0.0125)),
       lineHeight(`rem(1.5)),
-      hover([color(Colors.hyperlinkHover)]),
     ]);
+
+  module No_hover = {
+    let basic = init;
+  };
+
+  let basic =
+    merge([init, style([hover([color(Colors.hyperlinkHover)])])]);
 };
 
 module H1 = {
