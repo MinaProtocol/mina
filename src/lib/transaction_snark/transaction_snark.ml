@@ -908,6 +908,27 @@ let check_transaction ~sok_message ~source ~target (t : Transaction.t) handler
 let check_user_command ~sok_message ~source ~target t handler =
   check_transaction ~sok_message ~source ~target (User_command t) handler
 
+let generate_transaction_union_witness sok_message source target transaction
+    handler =
+  let sok_digest = Sok_message.digest sok_message in
+  let prover_state : Base.Prover_state.t =
+    {state1= source; state2= target; transaction; sok_digest}
+  in
+  let top_hash =
+    base_top_hash ~sok_digest ~state1:source ~state2:target
+      ~fee_excess:(Transaction_union.excess transaction)
+      ~supply_increase:(Transaction_union.supply_increase transaction)
+  in
+  let open Tick in
+  let main = handle (Base.main (Field.Var.constant top_hash)) handler in
+  ignore (run_unchecked main prover_state)
+
+let generate_transaction_witness ~sok_message ~source ~target
+    (t : Transaction.t) handler =
+  generate_transaction_union_witness sok_message source target
+    (Transaction_union.of_transaction t)
+    handler
+
 let verification_keys_of_keys {Keys0.verification; _} = verification
 
 module Make (K : sig

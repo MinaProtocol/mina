@@ -47,3 +47,5 @@ let epoch_seed = create "CodaEpochSeed"
 let vrf_message = create "CodaVrfMessage"
 
 let vrf_output = create "CodaVrfOutput"
+
+let checkpoint_list = create "CodaCheckpoints"

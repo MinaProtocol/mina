@@ -4,13 +4,12 @@ open Pipe_lib
 open Strict_pipe
 
 type 'data t =
-  { job_writer: ('data, drop_head buffered, unit) Writer.t
+  { job_writer: ('data, crash buffered, unit) Writer.t
   ; f: 'data -> unit Deferred.t }
 
-let create ?(buffer_capacity = 10) ~job_capacity f =
+let create ?(buffer_capacity = 30) ~job_capacity f =
   let job_reader, job_writer =
-    Strict_pipe.create
-      (Buffered (`Capacity buffer_capacity, `Overflow Drop_head))
+    Strict_pipe.create (Buffered (`Capacity buffer_capacity, `Overflow Crash))
   in
   let active_jobs = ref 0 in
   let pending_jobs = ref [] in

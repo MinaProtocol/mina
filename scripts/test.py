@@ -7,6 +7,7 @@ import os
 import subprocess
 import sys
 import time
+from itertools import chain
 
 build_artifact_profiles = [
     'testnet_postake',
@@ -52,6 +53,24 @@ ci_blacklist = [
     'test_posig_snarkless:*',
 ]
 
+# of all the generated CI jobs, allow these specific ones to fail (extra blacklist on top of ci_blacklist)
+required_blacklist = [
+
+]
+
+# these extra jobs are not filters, they are full status check names
+extra_required_status_checks = [
+    "ci/circleci: lint",
+    "ci/circleci: tracetool",
+    "ci/circleci: build-wallet",
+]
+
+# these are full status check names. they will not be required to succeed.
+not_required_status_checks = [
+    "ci/circleci: build-macos",
+]
+
+
 def fail(msg):
     print('ERROR: %s' % msg)
     exit(1)
@@ -76,7 +95,10 @@ def parse_filter(pattern_src):
         [profile, test] = parts
         return (profile, test)
 
-def filter_test_permutations(whitelist_filters, blacklist_filters):
+def filter_test_permutations(whitelist_filters, blacklist_filters, permutations=None):
+    if permutations is None:
+        permutations = test_permutations
+
     whitelist_patterns = list(map(parse_filter, whitelist_filters))
     blacklist_patterns = list(map(parse_filter, blacklist_filters))
 
@@ -92,7 +114,7 @@ def filter_test_permutations(whitelist_filters, blacklist_filters):
         return whitelisted and not(blacklisted)
 
     result = collections.defaultdict(list)
-    for (profile,tests) in test_permutations.items():
+    for (profile,tests) in permutations.items():
         for test in tests:
             if keep(profile, test):
                 result[profile].append(test)
@@ -178,15 +200,31 @@ def run(args):
 
     print('Testing successfull')
 
+
+def get_required_status():
+    test_permutations = filter_test_permutations(['*'], required_blacklist, permutations=filter_test_permutations(['*'], ci_blacklist))
+    return list(filter(lambda el: el not in not_required_status_checks,
+            chain(
+            ("ci/circleci: %s" % job for job in
+                chain(("test--%s" % profile for profile in test_permutations.keys()),
+                      ("test-unit--%s" % profile for profile in unit_test_profiles),
+                      ("build-artifacts--%s" % profile for profile in build_artifact_profiles))),
+            extra_required_status_checks
+             )))
+
+
+def required_status(args):
+    print('\n'.join(get_required_status()))
+
 def render(args):
-    circle_ci_conf_dir = os.path.dirname(args.jinja_file)
-    jinja_file_basename = os.path.basename(args.jinja_file)
-    (output_file, ext) = os.path.splitext(args.jinja_file)
+    circle_ci_conf_dir = os.path.dirname(args.circle_jinja_file)
+    jinja_file_basename = os.path.basename(args.circle_jinja_file)
+    (output_file, ext) = os.path.splitext(args.circle_jinja_file)
     assert ext == '.jinja'
 
     test_permutations = filter_test_permutations(['*'], ci_blacklist)
 
-    env = jinja2.Environment(loader=jinja2.FileSystemLoader(circle_ci_conf_dir))
+    env = jinja2.Environment(loader=jinja2.FileSystemLoader(circle_ci_conf_dir), autoescape=False)
     template = env.get_template(jinja_file_basename)
     rendered = template.render(
         build_artifact_profiles=build_artifact_profiles,
@@ -202,6 +240,27 @@ def render(args):
         with open(output_file, 'w') as file:
             file.write(rendered)
 
+    # now for mergify!
+    mergify_conf_dir = os.path.dirname(args.mergify_jinja_file)
+    jinja_file_basename = os.path.basename(args.mergify_jinja_file)
+    (output_file, ext) = os.path.splitext(args.mergify_jinja_file)
+    assert ext == '.jinja'
+
+    env = jinja2.Environment(loader=jinja2.FileSystemLoader(mergify_conf_dir), autoescape=False)
+    template = env.get_template(jinja_file_basename)
+
+    rendered = template.render(
+        required_status=get_required_status()
+    )
+
+    if args.check:
+        with open(output_file, 'r') as file:
+            if file.read() != rendered:
+                fail('mergify configuration is out of date, re-render it')
+    else:
+        with open(output_file, 'w') as file:
+            file.write(rendered)
+
 def list_tests(_args):
     for profile in test_permutations.keys():
         print('- ' + profile)
@@ -212,7 +271,8 @@ def main():
     actions = {
         'run': run,
         'render': render,
-        'list': list_tests
+        'list': list_tests,
+        'required-status': required_status
     }
 
     root_parser = argparse.ArgumentParser(description='Coda integration test runner/configurator.')
@@ -254,10 +314,14 @@ def main():
         action='store_true',
         help='Check that CI configuration was rendered properly.'
     )
-    render_parser.add_argument('jinja_file')
+    render_parser.add_argument('circle_jinja_file')
+    render_parser.add_argument('mergify_jinja_file')
 
     list_parser = subparsers.add_parser('list', description='List available tests.')
     list_parser.set_defaults(action='list')
+
+    required_status_parser = subparsers.add_parser('required-status', description='Print required status checks')
+    required_status_parser.set_defaults(action='required-status')
 
     args = root_parser.parse_args()
     if not(hasattr(args, 'action')):
