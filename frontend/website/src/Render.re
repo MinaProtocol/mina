@@ -96,10 +96,7 @@ Router.(
     Dir(
       "site",
       [|
-        File(
-          "index",
-          <Page name="index" extraHeaders=Home.extraHeaders> <Home /> </Page>,
-        ),
+        File("index", <Page name="index"> <Home /> </Page>),
         Dir(
           "blog",
           posts
@@ -107,12 +104,12 @@ Router.(
           |> Array.map(((name, html, metadata)) =>
                File(
                  name,
-                 <LegacyPage
+                 <Page
                    name
-                   extraHeaders=BlogPost.extraHeaders
-                   footerColor="bg-snow">
+                   extraHeaders=Blog.extraHeaders
+                   footerColor=Style.Colors.gandalf>
                    <BlogPost name html metadata />
-                 </LegacyPage>,
+                 </Page>,
                )
              ),
         ),
@@ -122,27 +119,28 @@ Router.(
           |> Array.map(((name, _)) =>
                File(
                  name,
-                 <LegacyPage name footerColor="bg-snow">
+                 <Page
+                   name
+                   footerColor=Style.Colors.gandalf
+                   extraHeaders=Careers.extraHeaders>
                    <CareerPost path={"jobs/" ++ name ++ ".markdown"} />
-                 </LegacyPage>,
+                 </Page>,
                )
              ),
         ),
         File(
           "jobs",
-          <LegacyPage name="jobs" extraHeaders=Careers.extraHeaders>
+          <Page name="jobs" extraHeaders=Careers.extraHeaders>
             <Careers jobOpenings />
-          </LegacyPage>,
+          </Page>,
         ),
         File(
           "code",
-          <LegacyPage name="code" extraHeaders=Code.extraHeaders>
-            <Code />
-          </LegacyPage>,
+          <Page name="code" extraHeaders=Code.extraHeaders> <Code /> </Page>,
         ),
         File(
           "blog",
-          <Page name="blog" extraHeaders=BlogPost.extraHeaders>
+          <Page name="blog" extraHeaders=Blog.extraHeaders>
             <Blog posts />
           </Page>,
         ),
@@ -158,7 +156,4 @@ Router.(
     ),
   )
 );
-Fs.symlinkSync(
-  Node.Process.cwd() ++ "/../../src/app/website/static",
-  "./site/static",
-);
+Fs.symlinkSync(Node.Process.cwd() ++ "/static", "./site/static");

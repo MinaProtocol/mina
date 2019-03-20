@@ -5,7 +5,7 @@ open Tuple_lib
 open Module_version
 
 module type S = sig
-  type t [@@deriving bin_io, sexp, compare, hash]
+  type t [@@deriving bin_io, sexp, compare, hash, yojson]
 
   include Comparable.S with type t := t
 
@@ -13,7 +13,7 @@ module type S = sig
 
   module Stable : sig
     module V1 : sig
-      type nonrec t = t [@@deriving bin_io, sexp, eq, compare, hash]
+      type nonrec t = t [@@deriving bin_io, sexp, eq, compare, hash, yojson]
     end
 
     module Latest = V1
@@ -85,7 +85,7 @@ struct
       module T = struct
         let version = 1
 
-        type t = N.t [@@deriving bin_io, sexp, eq, compare, hash]
+        type t = N.t [@@deriving bin_io, sexp, eq, compare, hash, yojson]
       end
 
       include T

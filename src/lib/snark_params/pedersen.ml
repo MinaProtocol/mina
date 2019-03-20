@@ -17,7 +17,7 @@ module type S = sig
   type curve
 
   module Digest : sig
-    type t [@@deriving bin_io, sexp, eq, hash, compare]
+    type t [@@deriving bin_io, sexp, eq, hash, compare, yojson]
 
     val size_in_bits : int
 
@@ -91,6 +91,8 @@ end
 module Make (Field : sig
   type t [@@deriving sexp, bin_io, compare, hash]
 
+  include Stringable.S with type t := t
+
   include Snarky.Field_intf.S with type t := t
 
   val project : bool list -> t
@@ -117,6 +119,14 @@ end) : S with type curve := Curve.t and type Digest.t = Field.t = struct
 
     module Snarkable = Bits.Snarkable.Field
     module Bits = Bits.Make_field (Field) (Bigint)
+
+    let to_yojson t = `String (Field.to_string t)
+
+    let of_yojson = function
+      | `String s -> (
+        try Ok (Field.of_string s) with exn ->
+          Error Error.(to_string_hum (of_exn exn)) )
+      | _ -> Error "expected string"
 
     let fold t = Fold.group3 ~default:false (Bits.fold t)
   end

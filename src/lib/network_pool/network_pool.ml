@@ -8,7 +8,7 @@ module type Pool_intf = sig
   type transition_frontier
 
   val create :
-       parent_log:Logger.t
+       logger:Logger.t
     -> frontier_broadcast_pipe:transition_frontier Option.t
                                Broadcast_pipe.Reader.t
     -> t
@@ -34,7 +34,7 @@ module type Network_pool_intf = sig
   type transition_frontier
 
   val create :
-       parent_log:Logger.t
+       logger:Logger.t
     -> incoming_diffs:pool_diff Envelope.Incoming.t Linear_pipe.Reader.t
     -> frontier_broadcast_pipe:transition_frontier Option.t
                                Broadcast_pipe.Reader.t
@@ -42,7 +42,7 @@ module type Network_pool_intf = sig
 
   val of_pool_and_diffs :
        pool
-    -> parent_log:Logger.t
+    -> logger:Logger.t
     -> incoming_diffs:pool_diff Envelope.Incoming.t Linear_pipe.Reader.t
     -> t
 
@@ -66,7 +66,7 @@ module Make
    and type transition_frontier := Transition_frontier.t = struct
   type t =
     { pool: Pool.t
-    ; log: Logger.t
+    ; logger: Logger.t
     ; write_broadcasts: Pool_diff.t Linear_pipe.Writer.t
     ; read_broadcasts: Pool_diff.t Linear_pipe.Reader.t }
 
@@ -77,27 +77,26 @@ module Make
   let apply_and_broadcast t pool_diff =
     match%bind Pool_diff.apply t.pool pool_diff with
     | Ok diff' ->
-        Logger.trace t.log "Broadcasting %s" (Pool_diff.summary diff') ;
+        Logger.trace t.logger ~module_:__MODULE__ ~location:__LOC__
+          "Broadcasting %s" (Pool_diff.summary diff') ;
         Linear_pipe.write t.write_broadcasts diff'
     | Error e ->
-        Logger.info t.log "Pool diff apply feedback: %s"
-          (Error.to_string_hum e) ;
+        Logger.info t.logger ~module_:__MODULE__ ~location:__LOC__
+          "Pool diff apply feedback: %s" (Error.to_string_hum e) ;
         Deferred.unit
 
-  let of_pool_and_diffs pool ~parent_log ~incoming_diffs =
-    let log = Logger.child parent_log __MODULE__ in
+  let of_pool_and_diffs pool ~logger ~incoming_diffs =
     let read_broadcasts, write_broadcasts = Linear_pipe.create () in
-    let network_pool = {pool; log; read_broadcasts; write_broadcasts} in
+    let network_pool = {pool; logger; read_broadcasts; write_broadcasts} in
     Linear_pipe.iter incoming_diffs ~f:(fun diff ->
         apply_and_broadcast network_pool diff )
     |> ignore ;
     network_pool
 
-  let create ~parent_log ~incoming_diffs ~frontier_broadcast_pipe =
-    let log = Logger.child parent_log __MODULE__ in
+  let create ~logger ~incoming_diffs ~frontier_broadcast_pipe =
     of_pool_and_diffs
-      (Pool.create ~parent_log:log ~frontier_broadcast_pipe)
-      ~parent_log ~incoming_diffs
+      (Pool.create ~logger ~frontier_broadcast_pipe)
+      ~logger ~incoming_diffs
 end
 
 let%test_module "network pool test" =
@@ -112,13 +111,29 @@ let%test_module "network pool test" =
       let gen = Int.gen
     end
 
+    module Mock_work = struct
+      (* no bin_io except in Stable versions *)
+      module T = struct
+        type t = Int.t [@@deriving sexp, hash, compare]
+
+        let gen = Int.gen
+      end
+
+      include T
+      include Hashable.Make (T)
+
+      module Stable = struct
+        module V1 = Int
+      end
+    end
+
     module Mock_transition_frontier = struct
       type t = Int.t
 
       let create () : t = 0
 
       module Extensions = struct
-        module Work = Int
+        module Work = Mock_work
       end
 
       let snark_pool_refcount_pipe _ =
@@ -129,9 +144,9 @@ let%test_module "network pool test" =
     end
 
     module Mock_fee = Int
-    module Mock_work = Int
     module Mock_snark_pool =
-      Snark_pool.Make (Mock_proof) (Mock_work) (Int) (Mock_transition_frontier)
+      Snark_pool.Make (Mock_proof) (Mock_fee) (Mock_work)
+        (Mock_transition_frontier)
     module Mock_snark_pool_diff =
       Snark_pool_diff.Make (Mock_proof) (Mock_fee) (Mock_work) (Int)
         (Mock_snark_pool)
@@ -145,12 +160,14 @@ let%test_module "network pool test" =
         Broadcast_pipe.create (Some (Mock_transition_frontier.create ()))
       in
       let network_pool =
-        Mock_network_pool.create ~parent_log:(Logger.null ())
+        Mock_network_pool.create ~logger:(Logger.null ())
           ~incoming_diffs:pool_reader
           ~frontier_broadcast_pipe:frontier_broadcast_pipe_r
       in
       let work = 1 in
-      let priced_proof = {Mock_snark_pool_diff.proof= 0; fee= 0} in
+      let priced_proof =
+        {Mock_snark_pool_diff.Priced_proof.proof= 0; fee= 0}
+      in
       let command = Snark_pool_diff.Add_solved_work (work, priced_proof) in
       (fun () ->
         don't_wait_for
@@ -173,14 +190,15 @@ let%test_module "network pool test" =
           List.map works ~f:(fun work ->
               Envelope.Incoming.local
                 (Snark_pool_diff.Add_solved_work
-                   (work, {Mock_snark_pool_diff.proof= 0; fee= 0})) )
+                   (work, Mock_snark_pool_diff.Priced_proof.{proof= 0; fee= 0}))
+          )
           |> Linear_pipe.of_list
         in
         let frontier_broadcast_pipe_r, _ =
           Broadcast_pipe.create (Some (Mock_transition_frontier.create ()))
         in
         let network_pool =
-          Mock_network_pool.create ~parent_log:(Logger.null ())
+          Mock_network_pool.create ~logger:(Logger.null ())
             ~incoming_diffs:work_diffs
             ~frontier_broadcast_pipe:frontier_broadcast_pipe_r
         in

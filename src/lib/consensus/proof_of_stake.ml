@@ -13,6 +13,7 @@ open Coda_numbers
 open Currency
 open Fold_lib
 open Signature_lib
+open Module_version
 module Time = Coda_base.Block_time
 
 module Segment_id = Nat.Make32 ()
@@ -289,10 +290,10 @@ end
 
 module Epoch_ledger = struct
   type ('ledger_hash, 'amount) t = {hash: 'ledger_hash; total_currency: 'amount}
-  [@@deriving sexp, bin_io, eq, compare, hash]
+  [@@deriving sexp, bin_io, eq, compare, hash, to_yojson]
 
   type value = (Coda_base.Frozen_ledger_hash.t, Amount.t) t
-  [@@deriving sexp, bin_io, eq, compare, hash]
+  [@@deriving sexp, bin_io, eq, compare, hash, to_yojson]
 
   type var = (Coda_base.Frozen_ledger_hash.var, Amount.var) t
 
@@ -439,7 +440,7 @@ module Vrf = struct
 
   module Output = struct
     type t = Random_oracle.Digest.t
-    [@@deriving sexp, bin_io, eq, compare, hash]
+    [@@deriving sexp, bin_io, eq, compare, hash, yojson]
 
     type var = Random_oracle.Digest.Checked.t
 
@@ -635,7 +636,8 @@ module Vrf = struct
     let open Local_state in
     let open Snapshot in
     let open Option.Let_syntax in
-    Logger.info logger "Checking vrf evaluations at %d:%d" (Epoch.to_int epoch)
+    Logger.info logger ~module_:__MODULE__ ~location:__LOC__
+      "Checking vrf evaluations at %d:%d" (Epoch.to_int epoch)
       (Epoch.Slot.to_int slot) ;
     let%bind epoch_snapshot = epoch_snapshot in
     with_return (fun {return} ->
@@ -644,7 +646,7 @@ module Vrf = struct
             let vrf_result =
               T.eval ~private_key {epoch; slot; seed; delegator}
             in
-            Logger.info logger
+            Logger.info logger ~module_:__MODULE__ ~location:__LOC__
               !"vrf result for %d: %d/%d -> %{sexp: Bignum_bigint.t}"
               (Coda_base.Account.Index.to_int delegator)
               (Balance.to_int balance)
@@ -668,11 +670,11 @@ module Epoch_data = struct
     ; start_checkpoint: 'protocol_state_hash
     ; lock_checkpoint: 'protocol_state_hash
     ; length: 'length }
-  [@@deriving sexp, bin_io, eq, compare, hash]
+  [@@deriving sexp, bin_io, eq, compare, hash, to_yojson]
 
   type value =
     (Epoch_ledger.value, Epoch_seed.t, Coda_base.State_hash.t, Length.t) t
-  [@@deriving sexp, bin_io, eq, compare, hash]
+  [@@deriving sexp, bin_io, eq, compare, hash, to_yojson]
 
   type var =
     ( Epoch_ledger.var
@@ -991,19 +993,46 @@ module Consensus_state = struct
     ; curr_epoch_data: 'epoch_data
     ; has_ancestor_in_same_checkpoint_window: 'bool
     ; checkpoints: 'checkpoints }
-  [@@deriving sexp, bin_io, eq, compare, hash]
+  [@@deriving sexp, bin_io, eq, compare, hash, to_yojson]
 
-  type value =
-    ( Length.t
-    , Vrf.Output.t
-    , Amount.t
-    , Epoch.t
-    , Epoch.Slot.t
-    , Epoch_data.value
-    , bool
-    , Checkpoints.t )
-    t
-  [@@deriving sexp, bin_io, eq, compare, hash]
+  module Value = struct
+    module Stable = struct
+      module V1 = struct
+        module T = struct
+          let version = 1
+
+          type t =
+            ( Length.t
+            , Vrf.Output.t
+            , Amount.t
+            , Epoch.t
+            , Epoch.Slot.t
+            , Epoch_data.value
+            , bool
+            , Checkpoints.t )
+            t_
+          [@@deriving sexp, bin_io, eq, compare, hash, to_yojson]
+        end
+
+        include T
+        include Registration.Make_latest_version (T)
+      end
+
+      module Latest = V1
+
+      module Module_decl = struct
+        let name = "consensus_proof_of_stake"
+
+        type latest = Latest.t
+      end
+
+      module Registrar = Registration.Make (Module_decl)
+      module Registered_V1 = Registrar.Register (V1)
+    end
+
+    type t = Stable.Latest.t (* bin_io omitted intentionally *)
+    [@@deriving sexp, eq, compare, hash, to_yojson]
+  end
 
   open Snark_params.Tick
 
@@ -1098,7 +1127,7 @@ module Consensus_state = struct
     ; Boolean.typ
     ; Checkpoints.typ ]
 
-  let typ : (var, value) Typ.t =
+  let typ : (var, Value.t) Typ.t =
     Snark_params.Tick.Typ.of_hlistable data_spec ~var_to_hlist:to_hlist
       ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist ~value_of_hlist:of_hlist
 
@@ -1145,7 +1174,7 @@ module Consensus_state = struct
     + Epoch.Slot.length_in_triples + Amount.length_in_triples
     + Epoch_data.length_in_triples + Epoch_data.length_in_triples
 
-  let genesis : value =
+  let genesis : Value.t =
     { length= Length.zero
     ; epoch_length= Length.zero
     ; last_vrf_output= Vrf.Output.dummy
@@ -1163,12 +1192,12 @@ module Consensus_state = struct
   let same_checkpoint_window_unchecked slot1 slot2 =
     Core.Int.(checkpoint_window slot1 = checkpoint_window slot2)
 
-  let update ~(previous_consensus_state : value)
+  let update ~(previous_consensus_state : Value.t)
       ~(consensus_transition_data : Consensus_transition_data.value)
       ~(previous_protocol_state_hash : Coda_base.State_hash.t)
       ~(supply_increase : Currency.Amount.t)
       ~(snarked_ledger_hash : Coda_base.Frozen_ledger_hash.t)
-      ~(proposer_vrf_result : Random_oracle.Digest.t) : value Or_error.t =
+      ~(proposer_vrf_result : Random_oracle.Digest.t) : Value.t Or_error.t =
     let open Or_error.Let_syntax in
     let open Consensus_transition_data in
     let%map total_currency =
@@ -1369,9 +1398,9 @@ module Consensus_state = struct
         ; has_ancestor_in_same_checkpoint_window
         ; checkpoints } )
 
-  let length (t : value) = t.length
+  let length (t : Value.t) = t.length
 
-  let time_hum (t : value) =
+  let time_hum (t : Value.t) =
     sprintf "%d:%d" (Epoch.to_int t.curr_epoch) (Epoch.Slot.to_int t.curr_slot)
 
   let to_lite = None
@@ -1384,7 +1413,7 @@ module Consensus_state = struct
     ; total_currency: int }
   [@@deriving yojson]
 
-  let display (t : value) =
+  let display (t : Value.t) =
     { length= Length.to_int t.length
     ; epoch_length= Length.to_int t.epoch_length
     ; curr_epoch= Segment_id.to_int t.curr_epoch
@@ -1442,7 +1471,7 @@ module Snark_transition = Coda_base.Snark_transition.Make (struct
 end)
 
 (* TODO: only track total currency from accounts > 1% of the currency using transactions *)
-let generate_transition ~(previous_protocol_state : Protocol_state.value)
+let generate_transition ~(previous_protocol_state : Protocol_state.Value.t)
     ~blockchain_state ~time ~proposal_data ~transactions:_ ~snarked_ledger_hash
     ~supply_increase ~logger:_ =
   let previous_consensus_state =
@@ -1478,7 +1507,7 @@ let received_within_window (epoch, slot) ~time_received =
   let window_end = add window_start Constants.delta_duration in
   window_start < time_received && time_received < window_end
 
-let received_at_valid_time (consensus_state : Consensus_state.value)
+let received_at_valid_time (consensus_state : Consensus_state.Value.t)
     ~time_received =
   let open Consensus_state in
   received_within_window
@@ -1501,10 +1530,10 @@ end
 let select ~existing ~candidate ~logger =
   let open Consensus_state in
   let open Epoch_data in
-  let logger = Logger.child logger "proof_of_stake" in
   let string_of_choice = function `Take -> "Take" | `Keep -> "Keep" in
   let log_result choice msg =
-    Logger.debug logger "RESULT: %s -- %s" (string_of_choice choice) msg
+    Logger.debug logger ~module_:__MODULE__ ~location:__LOC__
+      "RESULT: %s -- %s" (string_of_choice choice) msg
   in
   let log_choice ~precondition_msg ~choice_msg choice =
     let choice_msg =
@@ -1515,12 +1544,13 @@ let select ~existing ~candidate ~logger =
     let msg = Printf.sprintf "(%s) && (%s)" precondition_msg choice_msg in
     log_result choice msg
   in
-  Logger.info logger "Selecting best consensus state" ;
-  Logger.trace logger
-    !"existing consensus state: %{sexp:Consensus_state.value}"
+  Logger.info logger ~module_:__MODULE__ ~location:__LOC__
+    "Selecting best consensus state" ;
+  Logger.trace logger ~module_:__MODULE__ ~location:__LOC__
+    !"existing consensus state: %{sexp:Consensus_state.Value.t}"
     existing ;
-  Logger.trace logger
-    !"candidate consensus state: %{sexp:Consensus_state.value}"
+  Logger.trace logger ~module_:__MODULE__ ~location:__LOC__
+    !"candidate consensus state: %{sexp:Consensus_state.Value.t}"
     candidate ;
   (* TODO: add fork_before_checkpoint check *)
   (* Each branch contains a precondition predicate and a choice predicate,
@@ -1604,18 +1634,18 @@ let time_hum (now : Core_kernel.Time.t) =
   let epoch, slot = Epoch.epoch_and_slot_of_time_exn (Time.of_time now) in
   Printf.sprintf "%d:%d" (Epoch.to_int epoch) (Epoch.Slot.to_int slot)
 
-let next_proposal now (state : Consensus_state.value) ~local_state ~keypair
+let next_proposal now (state : Consensus_state.Value.t) ~local_state ~keypair
     ~logger =
   let open Consensus_state in
   let open Epoch_data in
   let open Keypair in
-  let logger = Logger.child logger "proof_of_stake" in
-  Logger.info logger "Checking for next proposal..." ;
+  Logger.info logger ~module_:__MODULE__ ~location:__LOC__
+    "Checking for next proposal..." ;
   let epoch, slot =
     Epoch.epoch_and_slot_of_time_exn
       (Time.of_span_since_epoch (Time.Span.of_ms now))
   in
-  Logger.info logger
+  Logger.info logger ~module_:__MODULE__ ~location:__LOC__
     "systime: %d, epoch-slot@systime: %08d-%04d, starttime@epoch@systime: %d"
     (Int64.to_int now) (Epoch.to_int epoch) (Epoch.Slot.to_int slot)
     ( Int64.to_int @@ Time.Span.to_ms @@ Time.to_span_since_epoch
@@ -1628,7 +1658,7 @@ let next_proposal now (state : Consensus_state.value) ~local_state ~keypair
      * up to date with the epoch, those would be the last vrf inputs.
     *)
     let epoch_data =
-      Logger.info logger
+      Logger.info logger ~module_:__MODULE__ ~location:__LOC__
         !"Selecting correct epoch data from state -- epoch by time: %d, state \
           epoch: %d, state epoch length: %d"
         (Epoch.to_int epoch)
@@ -1645,7 +1675,7 @@ let next_proposal now (state : Consensus_state.value) ~local_state ~keypair
       else if epoch_transitioning then state.curr_epoch_data
         (* If the epoch we are in is none of the above, something is wrong. *)
       else (
-        Logger.error logger
+        Logger.error logger ~module_:__MODULE__ ~location:__LOC__
           "system time is out of sync with protocol state time" ;
         failwith "System time is out of sync. (hint: setup NTP if you haven't)" )
     in
@@ -1664,12 +1694,12 @@ let next_proposal now (state : Consensus_state.value) ~local_state ~keypair
       in
       ( match snapshot with
       | None ->
-          Logger.info logger
+          Logger.info logger ~module_:__MODULE__ ~location:__LOC__
             "Unable to check vrf evaluation: %s_epoch_ledger does not exist \
              in local state"
             source
       | Some snapshot ->
-          Logger.info logger
+          Logger.info logger ~module_:__MODULE__ ~location:__LOC__
             !"using %s_epoch_snapshot root hash %{sexp:Coda_base.Ledger_hash.t}"
             source
             (Coda_base.Sparse_ledger.merkle_root snapshot.ledger) ) ;
@@ -1695,7 +1725,8 @@ let next_proposal now (state : Consensus_state.value) ~local_state ~keypair
   let ms_since_epoch = Fn.compose Time.Span.to_ms Time.to_span_since_epoch in
   match next_slot with
   | Some (next_slot, data) ->
-      Logger.info logger "Proposing in %d slots"
+      Logger.info logger ~module_:__MODULE__ ~location:__LOC__
+        "Proposing in %d slots"
         (Epoch.Slot.to_int next_slot - Epoch.Slot.to_int slot) ;
       if Epoch.Slot.equal slot next_slot then `Propose_now data
       else
@@ -1705,14 +1736,14 @@ let next_proposal now (state : Consensus_state.value) ~local_state ~keypair
           , data )
   | None ->
       let epoch_end_time = Epoch.end_time epoch |> ms_since_epoch in
-      Logger.info logger
+      Logger.info logger ~module_:__MODULE__ ~location:__LOC__
         "No slots won in this epoch. Waiting for next epoch, @%d"
         (Int64.to_int epoch_end_time) ;
       `Check_again epoch_end_time
 
 (* TODO *)
-let lock_transition (prev : Consensus_state.value)
-    (next : Consensus_state.value) ~local_state ~snarked_ledger =
+let lock_transition (prev : Consensus_state.Value.t)
+    (next : Consensus_state.Value.t) ~local_state ~snarked_ledger =
   let open Local_state in
   let open Consensus_state in
   if not (Epoch.equal prev.curr_epoch next.curr_epoch) then (
@@ -1770,11 +1801,11 @@ module For_tests = struct
 
   let gen_consensus_state ~(gen_slot_advancement : int Quickcheck.Generator.t)
       :
-      (   previous_protocol_state:( Protocol_state.value
+      (   previous_protocol_state:( Protocol_state.Value.t
                                   , Coda_base.State_hash.t )
                                   With_hash.t
        -> snarked_ledger_hash:Coda_base.Frozen_ledger_hash.t
-       -> Consensus_state.value)
+       -> Consensus_state.Value.t)
       Quickcheck.Generator.t =
     let open Consensus_state in
     let open Quickcheck.Let_syntax in
@@ -1782,7 +1813,7 @@ module For_tests = struct
     let%bind slot_advancement = gen_slot_advancement in
     let%map proposer_vrf_result = Vrf.Output.gen in
     fun ~(previous_protocol_state :
-           (Protocol_state.value, Coda_base.State_hash.t) With_hash.t)
+           (Protocol_state.Value.t, Coda_base.State_hash.t) With_hash.t)
         ~(snarked_ledger_hash : Coda_base.Frozen_ledger_hash.t) ->
       let prev =
         Protocol_state.consensus_state (With_hash.data previous_protocol_state)
@@ -1842,7 +1873,7 @@ let to_unix_timestamp recieved_time =
   |> Unix_timestamp.of_int64
 
 let%test "Receive a valid consensus_state with a bit of delay" =
-  let ({curr_epoch; curr_slot; _} : Consensus_state.value) =
+  let ({curr_epoch; curr_slot; _} : Consensus_state.Value.t) =
     Consensus_state.genesis
   in
   let delay = Constants.delta / 2 |> UInt32.of_int in
@@ -1961,7 +1992,7 @@ let%test_module "Proof of stake tests" =
         Or_error.ok_exn
         @@ Snark_params.Tick.run_and_check checked_computation ()
       in
-      assert (equal_value checked_value next_consensus_state) ;
+      assert (Value.equal checked_value next_consensus_state) ;
       ()
   end )
 

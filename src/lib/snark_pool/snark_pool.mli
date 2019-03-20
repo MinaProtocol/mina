@@ -11,9 +11,19 @@ module type Transition_frontier_intf = sig
 
   module Extensions : sig
     module Work : sig
-      type t [@@deriving sexp, bin_io]
+      type t [@@deriving sexp]
 
-      include Hashable.S_binable with type t := t
+      module Stable :
+        sig
+          module V1 : sig
+            type t [@@deriving sexp, bin_io]
+
+            include Hashable.S_binable with type t := t
+          end
+        end
+        with type V1.t = t
+
+      include Hashable.S with type t := t
     end
   end
 
@@ -33,7 +43,7 @@ module type S = sig
   type t [@@deriving bin_io]
 
   val create :
-       parent_log:Logger.t
+       logger:Logger.t
     -> frontier_broadcast_pipe:transition_frontier Option.t
                                Broadcast_pipe.Reader.t
     -> t
@@ -58,9 +68,19 @@ end) (Fee : sig
 
   include Comparable.S with type t := t
 end) (Work : sig
-  type t [@@deriving sexp, bin_io]
+  type t [@@deriving sexp]
 
-  include Hashable.S_binable with type t := t
+  module Stable :
+    sig
+      module V1 : sig
+        type t [@@deriving sexp, bin_io]
+
+        include Hashable.S_binable with type t := t
+      end
+    end
+    with type V1.t = t
+
+  include Hashable.S with type t := t
 end)
 (Transition_frontier : Transition_frontier_intf
                        with module Extensions.Work = Work) :

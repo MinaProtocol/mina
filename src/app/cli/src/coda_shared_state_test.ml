@@ -9,8 +9,7 @@ let name = "coda-shared-state-test"
 
 let main () =
   let open Keypair in
-  let log = Logger.create () in
-  let log = Logger.child log name in
+  let logger = Logger.create () in
   let largest_account_keypair =
     Genesis_ledger.largest_account_keypair_exn ()
   in
@@ -26,7 +25,7 @@ let main () =
     else None
   in
   let%bind testnet =
-    Coda_worker_testnet.test log n proposers snark_work_public_keys
+    Coda_worker_testnet.test logger n proposers snark_work_public_keys
       Protocols.Coda_pow.Work_selection.Seq
   in
   let receiver_pk = Public_key.compress another_account_keypair.public_key in

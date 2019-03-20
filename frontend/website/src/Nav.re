@@ -59,7 +59,7 @@ module Style = {
   let menuText =
     merge([
       style([marginLeft(`rem(1.0)), ...paddingY(`rem(1.0))]),
-      Link.style,
+      Link.basic,
     ]);
 
   let nav =
@@ -74,31 +74,10 @@ module Style = {
 open Style;
 
 module Logo = {
-  open Css;
-
-  module Placeholder = {
-    let style =
-      style([
-        backgroundColor(`rgb((0, 255, 0))),
-        width(`px(116)),
-        height(`px(21)),
-      ]);
-  };
-};
-
-module Testnet = {
-  open Css;
-
-  module Placeholder = {
-    let style =
-      style([
-        backgroundColor(`rgba((45, 158, 219, 0.1))),
-        width(`percent(100.0)),
-        height(`px(40)),
-        margin(`auto),
-        media(MediaQuery.statusLift, [width(`px(341))]),
-      ]);
-  };
+  let svg =
+    <svg className=Css.(style([width(`rem(7.125)), height(`rem(1.25))]))>
+      <image xlinkHref="/static/img/new-logo.svg" width="114" height="20" />
+    </svg>;
 };
 
 let component = ReasonReact.statelessComponent("Nav");
@@ -109,9 +88,11 @@ let make = children => {
       children |> Array.map(elem => <li className=Style.item> elem </li>);
 
     <nav className=Style.nav>
-      <div
+      <a
+        href="/"
         className=Css.(
           style([
+            display(`block),
             width(`percent(50.0)),
             media(
               MediaQuery.statusLift,
@@ -119,8 +100,8 @@ let make = children => {
             ),
           ])
         )>
-        <div className=Logo.Placeholder.style />
-      </div>
+        Logo.svg
+      </a>
       <div
         className=Css.(
           style([
@@ -130,7 +111,16 @@ let make = children => {
             media(MediaQuery.menu, [width(`percent(40.0))]),
           ])
         )>
-        <div className=Testnet.Placeholder.style />
+        <div
+          className=Css.(
+            style([
+              width(`percent(100.0)),
+              margin(`auto),
+              media(MediaQuery.statusLift, [width(`rem(21.25))]),
+            ])
+          )>
+          <AnnouncementBar />
+        </div>
       </div>
       <div
         className=Css.(
