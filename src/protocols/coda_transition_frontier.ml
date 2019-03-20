@@ -371,7 +371,7 @@ module type Transition_handler_validator_intf = sig
                                    With_hash.t
                                  , state_hash )
                                  Cached.t
-                               , Strict_pipe.drop_head Strict_pipe.buffered
+                               , Strict_pipe.crash Strict_pipe.buffered
                                , unit )
                                Strict_pipe.Writer.t
     -> unprocessed_transition_cache:unprocessed_transition_cache
@@ -442,7 +442,7 @@ module type Transition_handler_processor_intf = sig
     -> processed_transition_writer:( ( external_transition_verified
                                      , state_hash )
                                      With_hash.t
-                                   , Strict_pipe.drop_head Strict_pipe.buffered
+                                   , Strict_pipe.crash Strict_pipe.buffered
                                    , unit )
                                    Strict_pipe.Writer.t
     -> unprocessed_transition_cache:unprocessed_transition_cache
@@ -660,7 +660,7 @@ module type Initial_validator_intf = sig
     -> valid_transition_writer:( [ `Transition of external_transition_verified
                                                   Envelope.Incoming.t ]
                                  * [`Time_received of time]
-                               , Strict_pipe.drop_head Strict_pipe.buffered
+                               , Strict_pipe.crash Strict_pipe.buffered
                                , unit )
                                Strict_pipe.Writer.t
     -> unit

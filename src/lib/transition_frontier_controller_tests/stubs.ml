@@ -586,6 +586,6 @@ struct
 
     let make_transition_pipe () =
       Pipe_lib.Strict_pipe.create
-        (Buffered (`Capacity 10, `Overflow Drop_head))
+        (Buffered (`Capacity 30, `Overflow Drop_head))
   end
 end
