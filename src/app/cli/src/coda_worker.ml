@@ -240,104 +240,118 @@ module T = struct
                 ; trust_system } }
           in
           let monitor = Async.Monitor.create ~name:"coda" () in
-          let with_monitor f input =
+          Monitor.detach_and_iter_errors monitor ~f:(fun exn ->
+              Core.printf !"shit\n%!" ;
+              Logger.fatal logger ~module_:__MODULE__ ~location:__LOC__
+                ~metadata:[("exception", `String (Exn.to_string exn))]
+                "async monitor caught error: $exception" ;
+              Core.Out_channel.(flush stdout) ;
+              Core.exit 1 ) ;
+          let with_monitor input ~f =
             Async.Scheduler.within' ~monitor (fun () -> f input)
           in
-          let%bind coda =
-            Main.create
-              (Main.Config.make ~logger ~net_config
-                 ~run_snark_worker:(Option.is_some snark_worker_config)
-                 ~staged_ledger_persistant_location:
-                   (conf_dir ^/ "staged_ledger")
-                 ~transaction_pool_disk_location:
-                   (conf_dir ^/ "transaction_pool")
-                 ~snark_pool_disk_location:(conf_dir ^/ "snark_pool")
-                 ~time_controller ~receipt_chain_database
-                 ~snark_work_fee:(Currency.Fee.of_int 0)
-                 ?propose_keypair:Config.propose_keypair () ~monitor)
-          in
-          Run.handle_shutdown ~monitor ~conf_dir ~logger coda ;
-          let%map () =
-            with_monitor
-              (fun () ->
-                return
-                @@ Option.iter snark_worker_config ~f:(fun config ->
-                       let run_snark_worker =
-                         `With_public_key config.public_key
-                       in
-                       Run.setup_local_server ~client_port:config.port ~coda
-                         ~logger () ;
-                       Run.run_snark_worker ~logger ~client_port:config.port
-                         run_snark_worker ) )
-              ()
-          in
-          let coda_peers () = return (Main.peers coda) in
-          let coda_start () = return (Main.start coda) in
-          let coda_get_balance pk =
-            return (Run.get_balance coda pk |> Participating_state.active_exn)
-          in
-          let coda_send_payment (sk, pk, amount, fee, memo) =
-            let pk_of_sk sk =
-              Public_key.of_private_key_exn sk |> Public_key.compress
-            in
-            let build_txn amount sender_sk receiver_pk fee =
-              let nonce =
-                Run.get_nonce coda (pk_of_sk sender_sk)
-                |> Participating_state.active_exn
-                |> Option.value_exn ?here:None ?message:None ?error:None
+          with_monitor () ~f:(fun () ->
+              let%bind coda =
+                Main.create
+                  (Main.Config.make ~logger ~net_config
+                     ~run_snark_worker:(Option.is_some snark_worker_config)
+                     ~staged_ledger_persistant_location:
+                       (conf_dir ^/ "staged_ledger")
+                     ~transaction_pool_disk_location:
+                       (conf_dir ^/ "transaction_pool")
+                     ~snark_pool_disk_location:(conf_dir ^/ "snark_pool")
+                     ~time_controller ~receipt_chain_database
+                     ~snark_work_fee:(Currency.Fee.of_int 0)
+                     ?propose_keypair:Config.propose_keypair ())
               in
-              let payload : User_command.Payload.t =
-                User_command.Payload.create ~fee ~nonce ~memo
-                  ~body:(Payment {receiver= receiver_pk; amount})
-              in
-              User_command.sign (Keypair.of_private_key_exn sender_sk) payload
-            in
-            let payment = build_txn amount sk pk fee in
-            let%map receipt =
-              Run.send_payment logger coda (payment :> User_command.t)
-            in
-            receipt |> Participating_state.active_exn
-          in
-          let coda_prove_receipt (proving_receipt, resulting_receipt) =
-            match%map
-              Run.prove_receipt coda ~proving_receipt ~resulting_receipt
-            with
-            | Ok proof ->
-                Logger.info logger ~module_:__MODULE__ ~location:__LOC__
-                  !"Constructed proof for receipt: %{sexp:Receipt.Chain_hash.t}"
-                  proving_receipt ;
-                proof
-            | Error e ->
-                failwithf
-                  !"Failed to construct payment proof: %{sexp:Error.t}"
-                  e ()
-          in
-          let coda_strongest_ledgers () =
-            let r, w = Linear_pipe.create () in
-            don't_wait_for
-              (Strict_pipe.Reader.iter (Main.strongest_ledgers coda)
-                 ~f:(fun t ->
-                   let open Main.Inputs in
-                   let p =
-                     External_transition.Verified.protocol_state
-                       (With_hash.data t)
-                   in
-                   let prev_state_hash =
-                     Main.Inputs.Consensus_mechanism.Protocol_state
-                     .previous_state_hash p
-                   in
-                   let state_hash = With_hash.hash t in
-                   let prev_state_hash = State_hash.to_bits prev_state_hash in
-                   let state_hash = State_hash.to_bits state_hash in
-                   Linear_pipe.write w (prev_state_hash, state_hash) )) ;
-            return r.pipe
-          in
-          { coda_peers= with_monitor coda_peers
-          ; coda_strongest_ledgers= with_monitor coda_strongest_ledgers
-          ; coda_get_balance= with_monitor coda_get_balance
-          ; coda_send_payment= with_monitor coda_send_payment
-          ; coda_prove_receipt= with_monitor coda_prove_receipt
-          ; coda_start= with_monitor coda_start } )
+              Run.with_graceful_shutdown coda ~conf_dir ~logger ~f:(fun () ->
+                  Option.iter snark_worker_config ~f:(fun config ->
+                      let run_snark_worker =
+                        `With_public_key config.public_key
+                      in
+                      Run.setup_local_server ~client_port:config.port ~coda
+                        ~logger () ;
+                      Run.run_snark_worker ~logger ~client_port:config.port
+                        run_snark_worker ) ;
+                  let coda_peers () = return (Main.peers coda) in
+                  let coda_start () = return (Main.start coda) in
+                  let coda_get_balance pk =
+                    return
+                      ( Run.get_balance coda pk
+                      |> Participating_state.active_exn )
+                  in
+                  let coda_send_payment (sk, pk, amount, fee, memo) =
+                    let pk_of_sk sk =
+                      Public_key.of_private_key_exn sk |> Public_key.compress
+                    in
+                    let build_txn amount sender_sk receiver_pk fee =
+                      let nonce =
+                        Run.get_nonce coda (pk_of_sk sender_sk)
+                        |> Participating_state.active_exn
+                        |> Option.value_exn ?here:None ?message:None
+                             ?error:None
+                      in
+                      let payload : User_command.Payload.t =
+                        User_command.Payload.create ~fee ~nonce ~memo
+                          ~body:(Payment {receiver= receiver_pk; amount})
+                      in
+                      User_command.sign
+                        (Keypair.of_private_key_exn sender_sk)
+                        payload
+                    in
+                    let payment = build_txn amount sk pk fee in
+                    let%map receipt =
+                      Run.send_payment logger coda (payment :> User_command.t)
+                    in
+                    receipt |> Participating_state.active_exn
+                  in
+                  let coda_prove_receipt (proving_receipt, resulting_receipt) =
+                    match%map
+                      Run.prove_receipt coda ~proving_receipt
+                        ~resulting_receipt
+                    with
+                    | Ok proof ->
+                        Logger.info logger ~module_:__MODULE__
+                          ~location:__LOC__
+                          !"Constructed proof for receipt: \
+                            %{sexp:Receipt.Chain_hash.t}"
+                          proving_receipt ;
+                        proof
+                    | Error e ->
+                        failwithf
+                          !"Failed to construct payment proof: %{sexp:Error.t}"
+                          e ()
+                  in
+                  let coda_strongest_ledgers () =
+                    let r, w = Linear_pipe.create () in
+                    don't_wait_for
+                      (Strict_pipe.Reader.iter (Main.strongest_ledgers coda)
+                         ~f:(fun t ->
+                           let open Main.Inputs in
+                           let p =
+                             External_transition.Verified.protocol_state
+                               (With_hash.data t)
+                           in
+                           let prev_state_hash =
+                             Main.Inputs.Consensus_mechanism.Protocol_state
+                             .previous_state_hash p
+                           in
+                           let state_hash = With_hash.hash t in
+                           let prev_state_hash =
+                             State_hash.to_bits prev_state_hash
+                           in
+                           let state_hash = State_hash.to_bits state_hash in
+                           Linear_pipe.write w (prev_state_hash, state_hash) )) ;
+                    return r.pipe
+                  in
+                  return
+                  @@ { coda_peers= with_monitor ~f:coda_peers
+                     ; coda_strongest_ledgers=
+                         with_monitor ~f:coda_strongest_ledgers
+                     ; coda_get_balance= with_monitor ~f:coda_get_balance
+                     ; coda_send_payment= with_monitor ~f:coda_send_payment
+                     ; coda_prove_receipt= with_monitor ~f:coda_prove_receipt
+                     ; coda_start= with_monitor ~f:coda_start } ) ) )
 
     let init_connection_state ~connection:_ ~worker_state:_ = return
   end

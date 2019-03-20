@@ -1,7 +1,7 @@
 (library
  (name proposer)
  (public_name proposer)
- (flags :standard -short-paths -warn-error -58)
+ (flags :standard -short-paths -warn-error -58-21)
  (library_flags -linkall)
  (inline_tests)
  (libraries core async coda_lib coda_base envelope protocols async_extra

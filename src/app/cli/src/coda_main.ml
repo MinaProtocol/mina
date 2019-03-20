@@ -1561,8 +1561,10 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
           ~client_port
         |> ignore
 
-  let handle_shutdown ~monitor ~conf_dir ~logger t =
+  let with_graceful_shutdown t ~conf_dir ~logger ~f =
+    let monitor = Monitor.create ~name:"graceful_shutdown" () in
     Monitor.detach_and_iter_errors monitor ~f:(fun exn ->
+        printf !"XXX got it\n%!" ;
         log_shutdown ~conf_dir ~logger t ;
         raise exn ) ;
     Async_unix.Signal.(
@@ -1570,5 +1572,6 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
           log_shutdown ~conf_dir ~logger t ;
           Logger.info logger ~module_:__MODULE__ ~location:__LOC__
             !"Coda process got interrupted by signal %{sexp:t}"
-            signal ))
+            signal )) ;
+    Async.Scheduler.within' ~monitor f
 end

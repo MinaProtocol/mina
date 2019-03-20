@@ -260,6 +260,7 @@ module Make (Inputs : Inputs_intf) :
 
   let run ~logger ~get_completed_work ~transaction_pool ~time_controller
       ~keypair ~consensus_local_state ~frontier_reader ~transition_writer =
+    (* failwith "test"; *)
     trace_task "proposer" (fun () ->
         let log_bootstrap_mode () =
           Logger.info logger ~module_:__MODULE__ ~location:__LOC__
@@ -269,6 +270,7 @@ module Make (Inputs : Inputs_intf) :
         let module Breadcrumb = Transition_frontier.Breadcrumb in
         let propose ivar proposal_data =
           let open Interruptible.Let_syntax in
+          failwith "test" ;
           match Broadcast_pipe.Reader.peek frontier_reader with
           | None -> Interruptible.return (log_bootstrap_mode ())
           | Some frontier -> (
