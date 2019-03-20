@@ -675,9 +675,17 @@ struct
           else ([], [])
         in
         Logger.debug t.logger ~module_:__MODULE__ ~location:__LOC__
-          !"added: %{sexp: Breadcrumb.t list} removed: %{sexp: Breadcrumb.t \
-            list}"
-          added_to_best_tip_path removed_from_best_tip_path ;
+          "added %d breadcrumbs and removed %d making path to new best tip"
+          (List.length added_to_best_tip_path)
+          (List.length removed_from_best_tip_path)
+          ~metadata:
+            [ ( "new_breadcrumbs"
+              , `List (List.map ~f:Breadcrumb.to_yojson added_to_best_tip_path)
+              )
+            ; ( "old_breadcrumbs"
+              , `List
+                  (List.map ~f:Breadcrumb.to_yojson removed_from_best_tip_path)
+              ) ] ;
         (* 4 *)
         (* note: new_root_node is the same as root_node if the root didn't change *)
         let garbage_breadcrumbs, new_root_node =
