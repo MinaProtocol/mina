@@ -216,10 +216,7 @@ let dry num_transactions repeats () =
 
 let witness num_transactions repeats () =
   Test_util.with_randomness 123456789 (fun () ->
-      run
-        (generate_base_snarks_witness
-           Transaction_snark.generate_transaction_witness)
-        num_transactions repeats )
+      run (generate_base_snarks_witness num_transactions repeats) )
 
 let command =
   let open Command.Let_syntax in
