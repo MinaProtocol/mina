@@ -8,7 +8,8 @@ module Sender = struct
       module T = struct
         let version = 1
 
-        type t = Local | Remote of Peer.t [@@deriving sexp, bin_io, yojson]
+        type t = Local | Remote of Peer.Stable.V1.t
+        [@@deriving sexp, bin_io, yojson]
       end
 
       include T
