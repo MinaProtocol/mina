@@ -15,8 +15,9 @@ module Colors = {
   let offWhite = `rgb((243, 243, 243));
   let grey = `rgb((129, 146, 168));
 
-  let azure_01 = `rgba((45, 158, 219, 0.1));
+  let azureAlpha = a => `rgba((45, 158, 219, a));
   let gandalf = `rgb((243, 243, 243));
+  let veryLightGrey = `rgb((235, 235, 235));
 
   let slate = `rgb((81, 102, 121));
 

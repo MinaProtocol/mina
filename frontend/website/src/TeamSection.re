@@ -16,7 +16,6 @@ let iconStyle =
   );
 
 module Member = {
-  let bgColor = `rgb((235, 235, 235));
   let component = ReasonReact.statelessComponent("Team.Member");
   let make = (~name, ~title, ~description, _children) => {
     let lastName = Js.String.split(" ", name)[1];
@@ -31,7 +30,7 @@ module Member = {
               flexDirection(`column),
               width(`rem(23.75)),
               minHeight(`rem(27.5)),
-              backgroundColor(bgColor),
+              backgroundColor(Style.Colors.veryLightGrey),
               borderRadius(`px(10)),
               border(`px(1), `solid, Style.Colors.hyperlinkAlpha(0.2)),
               padding(`rem(1.5)),
