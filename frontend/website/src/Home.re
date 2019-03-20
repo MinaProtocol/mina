@@ -5,8 +5,9 @@ let make = _ => {
   ...component,
   render: _self =>
     <section>
-      <HeroSection />
-      <CryptoAppsSection />
-      <InvestorsSection />
+      <Wrapped> <HeroSection /> <CryptoAppsSection /> </Wrapped>
+      <div className=Css.(style([backgroundColor(Style.Colors.gandalf)]))>
+        <Wrapped> <TeamSection /> <InvestorsSection /> </Wrapped>
+      </div>
     </section>,
 };

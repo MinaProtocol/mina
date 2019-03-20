@@ -2,6 +2,7 @@ module Colors = {
   let fadedBlue = `rgb((111, 167, 197));
   let white = Css.white;
   let hyperlink = `hsl((201, 71, 52));
+  let hyperlinkAlpha = a => `hsla((201, 71, 52, a));
   let hyperlinkHover = `hsl((201, 71, 70));
 
   let metallicBlue = `rgb((70, 99, 131));
@@ -20,7 +21,7 @@ module Colors = {
   let slate = `rgb((81, 102, 121));
 
   let navy = `rgb((0, 49, 90));
-
+  let saville = `hsl((212, 33, 35));
   // For use with box-shadow so we can't use opacity
   let greenShadow = `rgba((136, 191, 163, 0.64));
 };
@@ -102,7 +103,20 @@ module H3 = {
       lineHeight(`rem(1.5)),
     ]);
 
-  let wide = {
+  let wide =
+    style([
+      whiteSpace(`nowrap),
+      fontSize(`rem(1.0)),
+      color(Colors.fadedBlue),
+      letterSpacing(`em(0.25)),
+      Typeface.aktivgrotesk,
+      fontWeight(`medium),
+      fontStyle(`normal),
+      textAlign(`center),
+      textTransform(`uppercase),
+    ]);
+
+  let wings = {
     let wing = [
       contentRule(""),
       fontSize(`px(5)),
@@ -114,17 +128,7 @@ module H3 = {
     ];
 
     merge([
-      style([
-        whiteSpace(`nowrap),
-        fontSize(`rem(1.0)),
-        color(Colors.fadedBlue),
-        letterSpacing(`em(0.25)),
-        Typeface.aktivgrotesk,
-        fontWeight(`medium),
-        fontStyle(`normal),
-        textAlign(`center),
-        textTransform(`uppercase),
-      ]),
+      wide,
       style([
         before([marginRight(`rem(2.0)), ...wing]),
         after([marginLeft(`rem(2.0)), ...wing]),
@@ -147,6 +151,22 @@ module H4 = {
       textTransform(`uppercase),
       fontWeight(`normal),
       color(Colors.greyishBrown),
+    ]);
+};
+
+module H5 = {
+  open Css;
+
+  let basic =
+    style([
+      Typeface.ibmplexsans,
+      textAlign(`center),
+      fontSize(`rem(0.9345)),
+      lineHeight(`rem(1.5)),
+      letterSpacing(`rem(0.125)),
+      fontWeight(`normal),
+      opacity(50.0),
+      color(`rgb((74, 74, 74))),
     ]);
 };
 
