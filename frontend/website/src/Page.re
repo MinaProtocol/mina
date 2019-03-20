@@ -124,29 +124,33 @@ let make =
         </Wrapped>
         <div> ...children </div>
         <Footer bgcolor=footerColor />
-        <div
-          className=Css.(
-            style([
-              position(`absolute),
-              top(`zero),
-              width(`percent(100.0)),
-              height(`percent(100.0)),
-            ])
-          )>
-          <div
-            className=Css.(
-              style([
-                position(`relative),
-                marginRight(`auto),
-                marginLeft(`auto),
-                height(`percent(100.0)),
-                width(`percent(100.0)),
-                maxWidth(`rem(84.0)),
-                before(Grid.overlay),
-              ])
-            )
-          />
-        </div>
+        {if (Grid.enabled) {
+           <div
+             className=Css.(
+               style([
+                 position(`absolute),
+                 top(`zero),
+                 width(`percent(100.0)),
+                 height(`percent(100.0)),
+               ])
+             )>
+             <div
+               className=Css.(
+                 style([
+                   position(`relative),
+                   marginRight(`auto),
+                   marginLeft(`auto),
+                   height(`percent(100.0)),
+                   width(`percent(100.0)),
+                   maxWidth(`rem(84.0)),
+                   before(Grid.overlay),
+                 ])
+               )
+             />
+           </div>;
+         } else {
+           <div />;
+         }}
       </body>
     </html>,
 };
