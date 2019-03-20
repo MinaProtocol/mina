@@ -9,33 +9,40 @@ open Coda_numbers
 open Module_version
 
 module type Consensus_state_intf = sig
-  type value [@@deriving hash, compare, bin_io, sexp, to_yojson]
+  module Value : sig
+    (* bin_io omitted *)
+    type t [@@deriving hash, compare, eq, sexp, to_yojson]
+
+    module Stable :
+      sig
+        module V1 : sig
+          type t [@@deriving hash, compare, bin_io, sexp, eq, to_yojson]
+        end
+      end
+      with type V1.t = t
+  end
 
   type display [@@deriving yojson]
 
-  include Snarkable.S with type value := value
+  include Snarkable.S with type value := Value.t
 
-  val equal_value : value -> value -> bool
-
-  val compare_value : value -> value -> int
-
-  val genesis : value
+  val genesis : Value.t
 
   val length_in_triples : int
 
   val var_to_triples : var -> (Boolean.var Triple.t list, _) Checked.t
 
-  val fold : value -> bool Triple.t Fold.t
+  val fold : Value.t -> bool Triple.t Fold.t
 
-  val length : value -> Length.t
+  val length : Value.t -> Length.t
   (** For status *)
 
-  val time_hum : value -> string
+  val time_hum : Value.t -> string
   (** For status *)
 
-  val to_lite : (value -> Lite_base.Consensus_state.t) option
+  val to_lite : (Value.t -> Lite_base.Consensus_state.t) option
 
-  val display : value -> display
+  val display : Value.t -> display
 end
 
 module type S = sig
@@ -50,8 +57,11 @@ module type S = sig
       module Stable : sig
         module V1 : sig
           (* TODO : version these pieces *)
-          type nonrec t = (Blockchain_state.Value.t, Consensus_state.value) t
-          [@@deriving bin_io, sexp]
+          type nonrec t =
+            ( Blockchain_state.Value.Stable.V1.t
+            , Consensus_state.Value.Stable.V1.t )
+            t
+          [@@deriving bin_io, sexp, to_yojson]
         end
 
         module Latest : module type of V1
@@ -66,7 +76,7 @@ module type S = sig
     val hash : Value.t -> State_body_hash.t
   end
 
-  type ('a, 'body) t [@@deriving bin_io, sexp]
+  type ('a, 'body) t [@@deriving bin_io, sexp, to_yojson]
 
   module Value : sig
     module Stable : sig
@@ -95,7 +105,7 @@ module type S = sig
   val create_value :
        previous_state_hash:State_hash.t
     -> blockchain_state:Blockchain_state.Value.t
-    -> consensus_state:Consensus_state.value
+    -> consensus_state:Consensus_state.Value.t
     -> Value.t
 
   val create_var :
@@ -164,7 +174,9 @@ module Make
             let version = 1
 
             type tt =
-              (Blockchain_state.Value.Stable.V1.t, Consensus_state.value) t
+              ( Blockchain_state.Value.Stable.V1.t
+              , Consensus_state.Value.Stable.V1.t )
+              t
             [@@deriving eq, ord, bin_io, hash, sexp, to_yojson]
 
             type t = tt [@@deriving eq, ord, bin_io, hash, sexp, to_yojson]
@@ -188,6 +200,8 @@ module Make
 
       type t = Stable.Latest.t [@@deriving sexp, to_yojson]
     end
+
+    type value = Value.t [@@deriving sexp]
 
     type var = (Blockchain_state.var, Consensus_state.var) t
 

@@ -28,10 +28,7 @@ let make = _children => {
       <SimpleButton name="Testnet" link="/testnet.html" />
       <SimpleButton name="GitHub" link="/code.html" />
       <SimpleButton name="Careers" link="/jobs.html" />
-      <SimpleButton
-        name="Sign up"
-        link="https://goo.gl/forms/PTusW11oYpLKJrZH3"
-      />
+      <SimpleButton name="Sign up" link=Links.mailingList />
     </Nav>;
   },
 };

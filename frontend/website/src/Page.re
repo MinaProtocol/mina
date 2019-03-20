@@ -5,9 +5,9 @@ module Footer = {
       Css.(
         style([
           Style.Typeface.ibmplexsans,
-          color(Style.Colors.grey),
+          color(Style.Colors.slate),
           textDecoration(`none),
-          hover([color(Style.Colors.darkGreyBlue)]),
+          hover([color(Style.Colors.hyperlink)]),
           fontSize(`rem(1.0)),
           fontWeight(`light),
           lineHeight(`rem(1.56)),

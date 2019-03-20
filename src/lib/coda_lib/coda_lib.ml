@@ -64,7 +64,9 @@ module type Network_intf = sig
   val glue_sync_ledger :
        t
     -> (ledger_hash * sync_ledger_query) Linear_pipe.Reader.t
-    -> (ledger_hash * sync_ledger_answer) Envelope.Incoming.t
+    -> ( ledger_hash
+       * sync_ledger_query
+       * sync_ledger_answer Envelope.Incoming.t )
        Linear_pipe.Writer.t
     -> unit
 
@@ -80,8 +82,7 @@ module type Network_intf = sig
                                          Deferred.t)
     -> answer_sync_ledger_query:(   (ledger_hash * sync_ledger_query)
                                     Envelope.Incoming.t
-                                 -> (ledger_hash * sync_ledger_answer)
-                                    Deferred.Or_error.t)
+                                 -> sync_ledger_answer Deferred.Or_error.t)
     -> transition_catchup:(   state_hash Envelope.Incoming.t
                            -> state_with_witness Non_empty_list.t
                               Deferred.Option.t)
@@ -304,7 +305,7 @@ module type Inputs_intf = sig
      and type time := Time.t
      and type state_hash := Coda_base.State_hash.t
      and type state_body_hash := State_body_hash.t
-     and type consensus_state := Consensus_mechanism.Consensus_state.value
+     and type consensus_state := Consensus_mechanism.Consensus_state.Value.t
 
   module Transition_router :
     Protocols.Coda_transition_frontier.Transition_router_intf
@@ -324,7 +325,7 @@ module type Inputs_intf = sig
      and type external_transition := External_transition.t
      and type proof_verified_external_transition :=
                 External_transition.Proof_verified.t
-     and type consensus_state := Consensus_mechanism.Consensus_state.value
+     and type consensus_state := Consensus_mechanism.Consensus_state.Value.t
      and type state_hash := Coda_base.State_hash.t
 
   module Proposer :
@@ -606,23 +607,20 @@ module Make (Inputs : Inputs_intf) = struct
                   failwith "shouldn't be necessary right now?" )
                 ~answer_sync_ledger_query:(fun query_env ->
                   let open Or_error.Let_syntax in
-                  let result =
-                    let ledger_hash, query =
-                      Envelope.Incoming.data query_env
-                    in
-                    let%bind frontier =
-                      peek_frontier frontier_broadcast_pipe_r
-                    in
-                    Sync_handler.answer_query ~frontier ledger_hash query
-                      ~logger:config.logger
-                    |> Result.of_option
-                         ~error:
-                           (Error.createf
-                              !"Could not answer query for ledger_hash: \
-                                %{sexp:Ledger_hash.t}"
-                              ledger_hash)
+                  Deferred.return
+                  @@
+                  let ledger_hash, query = Envelope.Incoming.data query_env in
+                  let%bind frontier =
+                    peek_frontier frontier_broadcast_pipe_r
                   in
-                  result |> Deferred.return )
+                  Sync_handler.answer_query ~frontier ledger_hash query
+                    ~logger:config.logger
+                  |> Result.of_option
+                       ~error:
+                         (Error.createf
+                            !"Could not answer query for ledger_hash: \
+                              %{sexp:Ledger_hash.t}"
+                            ledger_hash) )
                 ~transition_catchup:(fun enveloped_hash ->
                   let open Deferred.Option.Let_syntax in
                   let hash = Envelope.Incoming.data enveloped_hash in

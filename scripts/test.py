@@ -142,18 +142,19 @@ def run(args):
     coda_exe_path = os.path.join(coda_app_path, 'cli/src/coda.exe')
     coda_exe = os.path.join(coda_build_path, coda_exe_path)
 
-    if os.system('which logproc') == 0:
-        logproc_exe = 'logproc'
-        build_targets = coda_exe
-    else:
-        logproc_exe_path = os.path.join(coda_app_path, 'logproc/logproc.exe')
-        logproc_exe = os.path.join(coda_build_path, logproc_exe_path)
-        build_targets = '%s %s' % (coda_exe_path, logproc_exe_path)
+    with open(os.devnull, 'w') as null:
+        if subprocess.call(['which', 'logproc'], stdout=null, stderr=null) == 0:
+            logproc_exe = 'logproc'
+            build_targets = coda_exe
+        else:
+            logproc_exe_path = os.path.join(coda_app_path, 'logproc/logproc.exe')
+            logproc_exe = os.path.join(coda_build_path, logproc_exe_path)
+            build_targets = '%s %s' % (coda_exe, logproc_exe)
 
     test_permutations = filter_test_permutations(args.whitelist_patterns, args.blacklist_patterns)
     if len(test_permutations) == 0:
         # TODO: support direct test dispatching
-        if args.test_pattern:
+        if args.whitelist_patterns != ['*']:
             fail('no tests were selected -- whitelist pattern did not match any known tests')
         else:
             fail('no tests were selected -- blacklist is too restrictive')
