@@ -111,8 +111,11 @@ let%test_module "Ledger catchup" =
           let best_transition =
             Transition_frontier.Breadcrumb.transition_with_hash best_breadcrumb
           in
-          Logger.info logger !"Best transition of peer: %{sexp:State_hash.t}"
-          @@ With_hash.hash best_transition ;
+          Logger.info logger ~module_:__MODULE__ ~location:__LOC__
+            ~metadata:
+              [ ( "state_hash"
+                , State_hash.to_yojson (With_hash.hash best_transition) ) ]
+            "Best transition of peer: $state_hash" ;
           let history =
             Transition_frontier.root_history_path_map peer.frontier
               (With_hash.hash best_transition)

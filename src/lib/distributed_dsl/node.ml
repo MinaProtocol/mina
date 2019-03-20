@@ -3,7 +3,7 @@ open Async_kernel
 open Pipe_lib
 
 module type Peer_intf = sig
-  type t [@@deriving eq, hash, compare, sexp]
+  type t [@@deriving eq, hash, compare, sexp, yojson]
 
   include Hashable.S with type t := t
 end
@@ -86,7 +86,7 @@ module type S = sig
 
   val make_node :
        transport:transport
-    -> parent_log:Logger.t
+    -> logger:Logger.t
     -> me:peer
     -> messages:message Linear_pipe.Reader.t
     -> ?parent:t
@@ -115,7 +115,7 @@ end
 module type F = functor
   (State :sig
           
-          type t [@@deriving eq, sexp]
+          type t [@@deriving eq, sexp, yojson]
         end)
   (Message :sig
             
@@ -137,7 +137,7 @@ module type F = functor
               end)
   (Condition_label :sig
                     
-                    type label [@@deriving enum, sexp]
+                    type label [@@deriving enum, sexp, yojson]
 
                     include Hashable.S with type t = label
                   end)
@@ -154,7 +154,7 @@ module type F = functor
       and module Timer := Timer
 
 module Make (State : sig
-  type t [@@deriving eq, sexp]
+  type t [@@deriving eq, sexp, yojson]
 end) (Message : sig
   type t
 end)
@@ -168,7 +168,7 @@ end) (Timer_label : sig
 
   include Hashable.S with type t = label
 end) (Condition_label : sig
-  type label [@@deriving enum, sexp]
+  type label [@@deriving enum, sexp, yojson]
 
   include Hashable.S with type t = label
 end)
@@ -266,11 +266,9 @@ struct
     in
     b
 
-  let make_node ~transport ~parent_log ~me ~messages ?parent ~initial_state
-      ~timer message_conditions handle_conditions =
-    let logger =
-      Logger.child parent_log (Printf.sprintf !"dsl_node:%{sexp:Peer.t}" me)
-    in
+  let make_node ~transport ~logger ~me ~messages ?parent ~initial_state ~timer
+      message_conditions handle_conditions =
+    let logger = Logger.extend logger [("dsl_node", Peer.to_yojson me)] in
     let conditions = Condition_label.Table.create () in
     List.iter handle_conditions ~f:(fun (l, c, h) ->
         match Condition_label.Table.add conditions ~key:l ~data:(c, h) with
@@ -322,11 +320,14 @@ struct
         | [] -> return (with_new_state t t.state)
         | [(label, (_, transition))] ->
             let%map t' = transition t t.state >>| with_new_state t in
-            Logger.debug t.logger
-              !"Making transition from %{sexp:State.t} to %{sexp:State.t} at \
-                %{sexp:Peer.t} label: %{sexp:Condition_label.label}\n\
-                %!"
-              t.state t'.state t.ident label ;
+            Logger.debug t.logger ~module_:__MODULE__ ~location:__LOC__
+              ~metadata:
+                [ ("source", State.to_yojson t.state)
+                ; ("destination", State.to_yojson t'.state)
+                ; ("peer", Peer.to_yojson t.ident)
+                ; ("label", Condition_label.label_to_yojson label) ]
+              "Making transition from $source to $destination at $peer label: \
+               $label" ;
             t'
         | _ :: _ :: xs as l ->
             failwithf "Multiple conditions matched current state: %s"
@@ -337,11 +338,12 @@ struct
     | false, Some transition, _ ->
         let _ = Linear_pipe.read_now t.triggered_timers_r in
         let%map t' = transition t t.state >>| with_new_state t in
-        Logger.debug t.logger
-          !"Making transition from %{sexp:State.t} to %{sexp:State.t} at \
-            %{sexp:Peer.t} via timer\n\
-            %!"
-          t.state t'.state t.ident ;
+        Logger.debug t.logger ~module_:__MODULE__ ~location:__LOC__
+          ~metadata:
+            [ ("source", State.to_yojson t.state)
+            ; ("destination", State.to_yojson t'.state)
+            ; ("peer", Peer.to_yojson t.ident) ]
+          "Making transition from $source to $destination at $peer via timer" ;
         t'
     | false, None, Some msg -> (
         let _ = Linear_pipe.read_now t.message_pipe in
@@ -353,7 +355,7 @@ struct
         | [] -> return (with_new_state t t.state)
         | [(label, (_, transition))] ->
             let%map t' = transition t msg t.state >>| with_new_state t in
-            Logger.debug t.logger
+            Logger.debug t.logger ~module_:__MODULE__ ~location:__LOC__
               !"Making transition from %{sexp:State.t} to %{sexp:State.t} at \
                 %{sexp:Peer.t} label: %{sexp:Message_label.label}\n\
                 %!"

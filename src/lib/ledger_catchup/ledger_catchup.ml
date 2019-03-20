@@ -64,7 +64,7 @@ module Make (Inputs : Inputs.S) :
                 %{sexp: Coda_base.State_hash.t}"
               initial_state_hash
           in
-          Logger.error logger !"%s" msg ;
+          Logger.error logger ~module_:__MODULE__ ~location:__LOC__ !"%s" msg ;
           Or_error.error_string msg
       | Some crumb -> Or_error.return crumb
     in
@@ -150,7 +150,8 @@ module Make (Inputs : Inputs.S) :
               %{sexp:Network_peer.Peer.t} is seen as malicious"
             initial_state_hash peer
         in
-        Logger.faulty_peer logger !"%s" message ;
+        Logger.faulty_peer logger ~module_:__MODULE__ ~location:__LOC__ "%s"
+          message ;
         Deferred.return @@ Or_error.error_string message
     | Some _ ->
         construct_breadcrumb_path ~logger frontier initial_state_hash tree
@@ -186,12 +187,12 @@ module Make (Inputs : Inputs.S) :
     match%map cached_verified_transition with
     | Ok x -> Ok (Some x)
     | Error `Duplicate ->
-        Logger.info logger
-          !"transition queried during ledger catchup has already been seen" ;
+        Logger.info logger ~module_:__MODULE__ ~location:__LOC__
+          "transition queried during ledger catchup has already been seen" ;
         Ok None
     | Error (`Invalid reason) ->
-        Logger.faulty_peer logger
-          !"transition queried during ledger catchup was not valid because %s"
+        Logger.faulty_peer logger ~module_:__MODULE__ ~location:__LOC__
+          "transition queried during ledger catchup was not valid because %s"
           reason ;
         Error (Error.of_string reason)
 
@@ -238,7 +239,7 @@ module Make (Inputs : Inputs.S) :
                   target_hash
               then return ()
               else (
-                Logger.faulty_peer logger
+                Logger.faulty_peer logger ~module_:__MODULE__ ~location:__LOC__
                   !"Peer %{sexp:Network_peer.Peer.t} returned an different \
                     target transition than we requested"
                   peer ;
@@ -258,7 +259,8 @@ module Make (Inputs : Inputs.S) :
                     "Peer should have given us some new transitions that are \
                      not in our transition frontier"
                   in
-                  Logger.faulty_peer logger "%s" error ;
+                  Logger.faulty_peer logger ~module_:__MODULE__
+                    ~location:__LOC__ "%s" error ;
                   Error (Error.of_string error) )
             in
             let full_subtree =
@@ -269,7 +271,6 @@ module Make (Inputs : Inputs.S) :
 
   let run ~logger ~network ~frontier ~catchup_job_reader
       ~catchup_breadcrumbs_writer ~unprocessed_transition_cache =
-    let logger = Logger.child logger __MODULE__ in
     Strict_pipe.Reader.iter catchup_job_reader ~f:(fun subtree ->
         match%bind
           get_transitions_and_compute_breadcrumbs ~logger ~network ~frontier
@@ -277,7 +278,7 @@ module Make (Inputs : Inputs.S) :
         with
         | Ok tree -> Strict_pipe.Writer.write catchup_breadcrumbs_writer [tree]
         | Error e ->
-            Logger.info logger
+            Logger.info logger ~module_:__MODULE__ ~location:__LOC__
               !"All peers either sent us bad data, didn't have the info, or \
                 our transition frontier moved too fast: %s"
               (Error.to_string_hum e) ;

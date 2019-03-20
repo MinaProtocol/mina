@@ -4,6 +4,7 @@
 [%%import "config/scan_state/small.mlh"]
 [%%import "config/debug_level/some.mlh"]
 [%%import "config/proof_level/check.mlh"]
+[%%import "config/curve_size/small.mlh"]
 
 [%%define time_offsets false]
 [%%define fake_hash false]

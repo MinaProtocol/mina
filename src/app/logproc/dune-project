@@ -1,3 +1,2 @@
 (lang dune 1.6)
 (name logproc)
-(using menhir 2.0)

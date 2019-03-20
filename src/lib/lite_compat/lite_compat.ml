@@ -18,7 +18,7 @@ module Make (Blockchain_state : Coda_base.Blockchain_state.S) = struct
     let x, y = Tick.Inner_curve.to_affine_coordinates t in
     {x= field x; y= field y; z= LTock.Fq.one}
 
-  let g2 (t : Snarky.Libsnark.Mnt6.G2.t) : LTock.G2.t =
+  let g2 (t : Crypto_params.Cycle.Mnt6.G2.t) : LTock.G2.t =
     let x, y =
       Crypto_params.Tick_backend.Inner_twisted_curve.to_affine_coordinates t
     in
@@ -98,7 +98,7 @@ module Make (Blockchain_state : Coda_base.Blockchain_state.S) = struct
 
   let blockchain_state
       ({staged_ledger_hash= lbh; snarked_ledger_hash= lh; timestamp} :
-        Blockchain_state.t) : Lite_base.Blockchain_state.t =
+        Blockchain_state.Value.t) : Lite_base.Blockchain_state.t =
     { staged_ledger_hash= ledger_builder_hash lbh
     ; ledger_hash= frozen_ledger_hash lh
     ; timestamp= time timestamp }

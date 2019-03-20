@@ -1,0 +1,13 @@
+pull_request_rules:
+    - name: automatically merge approved PRs with the ready-to-merge label
+      conditions:
+          {%- for status in required_status %}
+          - "status-success={{status}}"
+          {%- endfor %}
+          - "#approved-reviews-by>=1"
+          - label=ready-to-merge
+      actions:
+          merge:
+              method: squash
+              strict: smart
+          delete_head_branch: {}

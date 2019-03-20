@@ -37,7 +37,7 @@ module type Fake_timer_transport_s = functor
       and type peer := Peer.t
 
 module type Trivial_peer_intf = sig
-  type t = int [@@deriving eq, hash, compare, sexp]
+  type t = int [@@deriving eq, hash, compare, sexp, yojson]
 
   include Hashable.S with type t := t
 end
@@ -47,7 +47,7 @@ module Trivial_peer : Trivial_peer_intf
 module type S = functor
   (State :sig
           
-          type t [@@deriving eq, sexp]
+          type t [@@deriving eq, sexp, yojson]
         end)
   (Message :sig
             
@@ -68,7 +68,7 @@ module type S = functor
               end)
   (Condition_label :sig
                     
-                    type label [@@deriving enum, sexp]
+                    type label [@@deriving enum, sexp, yojson]
 
                     include Hashable.S with type t = label
                   end)
