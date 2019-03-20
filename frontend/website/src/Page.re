@@ -7,6 +7,7 @@ module Footer = {
           Style.Typeface.ibmplexsans,
           color(Style.Colors.slate),
           textDecoration(`none),
+          display(`inline),
           hover([color(Style.Colors.hyperlink)]),
           fontSize(`rem(1.0)),
           fontWeight(`light),
@@ -37,16 +38,11 @@ module Footer = {
   let make = (~bgcolor, _children) => {
     ...component,
     render: _self =>
-      <div
-        className=Css.(
-          style([backgroundColor(bgcolor), boxSizing(`contentBox)])
-        )>
+      <div className=Css.(style([backgroundColor(bgcolor)]))>
         <section
           className=Css.(
             style(
               [
-                marginTop(`rem(2.)),
-                boxSizing(`borderBox),
                 maxWidth(`rem(96.0)),
                 marginLeft(`auto),
                 marginRight(`auto),
@@ -102,27 +98,6 @@ module Footer = {
   };
 };
 
-module Wrapped = {
-  module Style = {
-    open Css;
-    open Style;
-
-    let s =
-      style([
-        margin(`auto),
-        media(MediaQuery.full, [maxWidth(`rem(84.0)), margin(`auto)]),
-      ]);
-  };
-
-  let component = ReasonReact.statelessComponent("Page.Wrapped");
-  let make = children => {
-    ...component,
-    render: _ => {
-      <div className=Style.s> ...children </div>;
-    },
-  };
-};
-
 let component = ReasonReact.statelessComponent("Page");
 let make =
     (
@@ -146,7 +121,8 @@ let make =
             before(Grid.overlay),
           ])
         )>
-        <Wrapped> <CodaNav /> <div> ...children </div> </Wrapped>
+        <Wrapped> <CodaNav /> </Wrapped>
+        <div> ...children </div>
         <Footer bgcolor=footerColor />
       </body>
     </html>,
