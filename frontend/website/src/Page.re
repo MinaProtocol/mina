@@ -38,7 +38,7 @@ module Footer = {
   let make = (~bgcolor, _children) => {
     ...component,
     render: _self =>
-      <div className=Css.(style([backgroundColor(bgcolor)]))>
+      <footer className=Css.(style([backgroundColor(bgcolor)]))>
         <section
           className=Css.(
             style(
@@ -94,7 +94,7 @@ module Footer = {
             </ul>
           </div>
         </section>
-      </div>,
+      </footer>,
   };
 };
 
