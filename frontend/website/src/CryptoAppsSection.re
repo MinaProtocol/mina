@@ -54,7 +54,7 @@ let make = _ => {
       <a
         href=Links.mailingList
         className=Css.(
-          merge([Style.Link.style, style([marginTop(`rem(1.5))])])
+          merge([Style.Link.basic, style([marginTop(`rem(1.5))])])
         )>
         {ReasonReact.string(
            {j|Stay updated about developing with Coda\u00A0→|j},
