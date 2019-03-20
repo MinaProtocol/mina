@@ -982,7 +982,7 @@ module Consensus_state = struct
        , 'slot
        , 'epoch_data
        , 'bool
-       , 'checkpoints ) t =
+       , 'checkpoints ) t_ =
     { length: 'length
     ; epoch_length: 'length
     ; last_vrf_output: 'vrf_output
