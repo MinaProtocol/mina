@@ -10,7 +10,15 @@ module Make (Proof : sig
 end) (Fee : sig
   type t [@@deriving bin_io, sexp]
 end) (Work : sig
-  type t [@@deriving sexp, bin_io]
+  type t [@@deriving sexp]
+
+  module Stable :
+    sig
+      module V1 : sig
+        type t [@@deriving sexp, bin_io]
+      end
+    end
+    with type V1.t = t
 end)
 (Transition_frontier : T)
 (Pool : Snark_pool.S
@@ -56,8 +64,7 @@ struct
       module T = struct
         let version = 1
 
-        (* TODO : version Work *)
-        type t = (Work.t, Priced_proof.Stable.V1.t) diff
+        type t = (Work.Stable.V1.t, Priced_proof.Stable.V1.t) diff
         [@@deriving bin_io, sexp]
       end
 

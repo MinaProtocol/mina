@@ -43,13 +43,24 @@ module type S = sig
   end
 
   module Consensus_state : sig
-    type value [@@deriving hash, eq, compare, bin_io, sexp, to_yojson]
+    module Value : sig
+      (* bin_io omitted *)
+      type t [@@deriving hash, eq, compare, sexp, to_yojson]
+
+      module Stable :
+        sig
+          module V1 : sig
+            type t [@@deriving hash, eq, compare, bin_io, sexp, to_yojson]
+          end
+        end
+        with type V1.t = t
+    end
 
     type display [@@deriving yojson]
 
-    include Snark_params.Tick.Snarkable.S with type value := value
+    include Snark_params.Tick.Snarkable.S with type value := Value.t
 
-    val genesis : value
+    val genesis : Value.t
 
     val length_in_triples : int
 
@@ -59,15 +70,15 @@ module type S = sig
          , _ )
          Snark_params.Tick.Checked.t
 
-    val fold : value -> bool Triple.t Fold.t
+    val fold : Value.t -> bool Triple.t Fold.t
 
-    val length : value -> Length.t
+    val length : Value.t -> Length.t
 
-    val time_hum : value -> string
+    val time_hum : Value.t -> string
 
-    val to_lite : (value -> Lite_base.Consensus_state.t) option
+    val to_lite : (Value.t -> Lite_base.Consensus_state.t) option
 
-    val display : value -> display
+    val display : Value.t -> display
   end
 
   module Blockchain_state : Coda_base.Blockchain_state.S
@@ -97,7 +108,7 @@ module type S = sig
                                      , Coda_base.State_hash.t )
                                      With_hash.t
           -> snarked_ledger_hash:Coda_base.Frozen_ledger_hash.t
-          -> Consensus_state.value)
+          -> Consensus_state.Value.t)
          Quickcheck.Generator.t
 
     val create_genesis_protocol_state :
@@ -132,7 +143,7 @@ module type S = sig
    *)
 
   val received_at_valid_time :
-    Consensus_state.value -> time_received:Unix_timestamp.t -> bool
+    Consensus_state.Value.t -> time_received:Unix_timestamp.t -> bool
   (**
    * Check that a consensus state was received at a valid time.
   *)
@@ -151,8 +162,8 @@ module type S = sig
   *)
 
   val select :
-       existing:Consensus_state.value
-    -> candidate:Consensus_state.value
+       existing:Consensus_state.Value.t
+    -> candidate:Consensus_state.Value.t
     -> logger:Logger.t
     -> [`Keep | `Take]
   (**
@@ -163,7 +174,7 @@ module type S = sig
 
   val next_proposal :
        Unix_timestamp.t
-    -> Consensus_state.value
+    -> Consensus_state.Value.t
     -> local_state:Local_state.t
     -> keypair:Signature_lib.Keypair.t
     -> logger:Logger.t
@@ -178,8 +189,8 @@ module type S = sig
   *)
 
   val lock_transition :
-       Consensus_state.value
-    -> Consensus_state.value
+       Consensus_state.Value.t
+    -> Consensus_state.Value.t
     -> local_state:Local_state.t
     -> snarked_ledger:Coda_base.Ledger.Any_ledger.witness
     -> unit
@@ -188,7 +199,9 @@ module type S = sig
   *)
 
   val should_bootstrap :
-    existing:Consensus_state.value -> candidate:Consensus_state.value -> bool
+       existing:Consensus_state.Value.t
+    -> candidate:Consensus_state.Value.t
+    -> bool
   (**
      * Indicator of when we should bootstrap
     *)

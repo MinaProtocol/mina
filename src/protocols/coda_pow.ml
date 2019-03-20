@@ -475,9 +475,21 @@ module type Transaction_snark_work_intf = sig
 
     include Sexpable.S with type t := t
 
-    include Binable.S with type t := t
+    include Hashable.S with type t := t
 
-    include Hashable.S_binable with type t := t
+    module Stable :
+      sig
+        module V1 : sig
+          type t
+
+          include Sexpable.S with type t := t
+
+          include Binable.S with type t := t
+
+          include Hashable.S_binable with type t := t
+        end
+      end
+      with type V1.t = t
 
     val gen : t Quickcheck.Generator.t
   end
@@ -489,13 +501,25 @@ module type Transaction_snark_work_intf = sig
   *)
 
   type t = {fee: Fee.Unsigned.t; proofs: proof list; prover: public_key}
-  [@@deriving sexp, bin_io]
+  [@@deriving sexp]
+
+  module Stable :
+    sig
+      module V1 : sig
+        type t = {fee: Fee.Unsigned.t; proofs: proof list; prover: public_key}
+        [@@deriving sexp, bin_io]
+      end
+    end
+    with type V1.t = t
 
   type unchecked = t
 
   module Checked : sig
-    type t = {fee: Fee.Unsigned.t; proofs: proof list; prover: public_key}
-    [@@deriving sexp, bin_io]
+    type nonrec t = t =
+      {fee: Fee.Unsigned.t; proofs: proof list; prover: public_key}
+    [@@deriving sexp]
+
+    module Stable : module type of Stable
 
     val create_unsafe : unchecked -> t
   end
@@ -672,7 +696,7 @@ module type Transaction_snark_scan_state_intf = sig
   end
 
   module Available_job : sig
-    type t
+    type t [@@deriving sexp]
   end
 
   module Space_partition : sig
@@ -779,6 +803,10 @@ module type Staged_ledger_base_intf = sig
   (** The ledger in a staged ledger is always a mask *)
   type ledger
 
+  type ledger_proof_statement
+
+  type public_key
+
   type serializable [@@deriving bin_io]
 
   module Scan_state : sig
@@ -826,6 +854,7 @@ module type Staged_ledger_base_intf = sig
       | Bad_prev_hash of staged_ledger_hash * staged_ledger_hash
       | Insufficient_fee of Currency.Fee.t * Currency.Fee.t
       | Non_zero_fee_excess of Scan_state.Space_partition.t * transaction list
+      | Invalid_proof of ledger_proof * ledger_proof_statement * public_key
       | Unexpected of Error.t
     [@@deriving sexp]
 
@@ -890,15 +919,11 @@ module type Staged_ledger_intf = sig
 
   type user_command_with_valid_signature
 
-  type ledger_proof_statement
-
   type ledger_proof_statement_set
 
   type sparse_ledger
 
   type completed_work_checked
-
-  type public_key
 
   val current_ledger_proof : t -> ledger_proof option
 
@@ -989,7 +1014,17 @@ module type Tip_intf = sig
 end
 
 module type Consensus_state_intf = sig
-  type value
+  module Value : sig
+    type t
+
+    module Stable :
+      sig
+        module V1 : sig
+          type t [@@deriving bin_io]
+        end
+      end
+      with type V1.t = t
+  end
 
   type var
 end
@@ -1305,7 +1340,7 @@ module type Consensus_mechanism_intf = sig
     Protocol_state_intf
     with type state_hash := protocol_state_hash
      and type blockchain_state := Blockchain_state.Value.t
-     and type consensus_state := Consensus_state.value
+     and type consensus_state := Consensus_state.Value.t
 
   module Prover_state : sig
     type t [@@deriving bin_io]
@@ -1348,11 +1383,11 @@ module type Consensus_mechanism_intf = sig
     -> Protocol_state.Value.t * Consensus_transition_data.value
 
   val received_at_valid_time :
-    Consensus_state.value -> time_received:Unix_timestamp.t -> bool
+    Consensus_state.Value.t -> time_received:Unix_timestamp.t -> bool
 
   val next_proposal :
        Int64.t
-    -> Consensus_state.value
+    -> Consensus_state.Value.t
     -> local_state:Local_state.t
     -> keypair:keypair
     -> logger:Logger.t
@@ -1361,8 +1396,8 @@ module type Consensus_mechanism_intf = sig
        | `Propose of Int64.t * Proposal_data.t ]
 
   val select :
-       existing:Consensus_state.value
-    -> candidate:Consensus_state.value
+       existing:Consensus_state.Value.t
+    -> candidate:Consensus_state.Value.t
     -> logger:Logger.t
     -> [`Keep | `Take]
 
