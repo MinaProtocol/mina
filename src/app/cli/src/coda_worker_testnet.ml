@@ -200,6 +200,8 @@ let start_prefix_check logger workers events testnet ~acceptable_delay =
     (Linear_pipe.iter events ~f:(function `Transition (i, (prev, curr)) ->
          Linear_pipe.write all_transitions_w (prev, curr, i) ))
 
+type user_cmd_status = {snapshots: int option array; passed_root: bool array}
+
 let start_payment_check logger root_pipe payment_pipe workers testnet
     ~acceptable_delay =
   let root_lengths = Array.init (List.length workers) ~f:(Fn.const 0) in
@@ -210,7 +212,7 @@ let start_payment_check logger root_pipe payment_pipe workers testnet
           if Api.synced testnet i then Some root_lengths.(i) else None )
     in
     Hashtbl.add user_commands_under_inspection ~key:user_cmd
-      ~data:(snapshots, Array.map snapshots ~f:Option.is_none)
+      ~data:{snapshots; passed_root= Array.map snapshots ~f:Option.is_none}
     |> ignore
   in
   Linear_pipe.iter root_pipe ~f:(function
@@ -224,13 +226,13 @@ let start_payment_check logger root_pipe payment_pipe workers testnet
       let user_commands_pass_inspection =
         Hashtbl.fold user_commands_under_inspection ~init:[]
           ~f:(fun ~key:user_cmd
-             ~data:(snapshots, in_root)
+             ~data:{snapshots; passed_root}
              user_commands_pass_inspection
              ->
             match snapshots.(i) with
             | None -> user_commands_pass_inspection
             | Some root_length_when_send_payment ->
-                if in_root.(i) then user_commands_pass_inspection
+                if passed_root.(i) then user_commands_pass_inspection
                 else if
                   root_lengths.(i)
                   <= root_length_when_send_payment + Consensus.Constants.k
@@ -238,12 +240,12 @@ let start_payment_check logger root_pipe payment_pipe workers testnet
                 then
                   if List.mem user_commands user_cmd ~equal:User_command.equal
                   then (
-                    in_root.(i) <- true ;
+                    passed_root.(i) <- true ;
                     Logger.info logger ~module_:__MODULE__ ~location:__LOC__
                       !"transaction %{sexp:User_command.t} finally gets into \
                         the root of node %d, when root length is %d"
                       user_cmd i root_lengths.(i) ;
-                    if Array.for_all in_root ~f:Fn.id then
+                    if Array.for_all passed_root ~f:Fn.id then
                       user_cmd :: user_commands_pass_inspection
                     else user_commands_pass_inspection )
                   else user_commands_pass_inspection
