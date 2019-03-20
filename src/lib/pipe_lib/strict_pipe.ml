@@ -1,9 +1,9 @@
 open Async_kernel
 open Core_kernel
 
-exception Overflow
+exception Overflow of string option
 
-exception Multiple_reads_attempted
+exception Multiple_reads_attempted of string option
 
 type crash = Overflow_behavior_crash
 
@@ -27,7 +27,8 @@ module Reader0 = struct
   type 't t =
     { reader: 't Pipe.Reader.t
     ; mutable has_reader: bool
-    ; mutable downstreams: downstreams }
+    ; mutable downstreams: downstreams
+    ; name: string option }
 
   and downstreams =
     | [] : downstreams
@@ -41,13 +42,14 @@ module Reader0 = struct
   let to_linear_pipe {reader= pipe; has_reader; downstreams= _} =
     {Linear_pipe.Reader.pipe; has_reader}
 
-  let of_linear_pipe {Linear_pipe.Reader.pipe= reader; has_reader} =
-    {reader; has_reader; downstreams= []}
+  let of_linear_pipe ?name {Linear_pipe.Reader.pipe= reader; has_reader} =
+    {reader; has_reader; downstreams= []; name}
 
   let assert_not_read reader =
-    if reader.has_reader then raise Multiple_reads_attempted
+    if reader.has_reader then raise (Multiple_reads_attempted reader.name)
 
-  let wrap_reader reader = {reader; has_reader= false; downstreams= []}
+  let wrap_reader ?name reader =
+    {reader; has_reader= false; downstreams= []; name}
 
   let enforce_single_reader reader deferred =
     assert_not_read reader ;
@@ -81,14 +83,18 @@ module Reader0 = struct
   let map reader ~f =
     assert_not_read reader ;
     reader.has_reader <- true ;
-    let strict_reader = wrap_reader (Pipe.map reader.reader ~f) in
+    let strict_reader =
+      wrap_reader ?name:reader.name (Pipe.map reader.reader ~f)
+    in
     reader.downstreams <- [strict_reader] ;
     strict_reader
 
   let filter_map reader ~f =
     assert_not_read reader ;
     reader.has_reader <- true ;
-    let strict_reader = wrap_reader (Pipe.filter_map reader.reader ~f) in
+    let strict_reader =
+      wrap_reader ?name:reader.name (Pipe.filter_map reader.reader ~f)
+    in
     reader.downstreams <- [strict_reader] ;
     strict_reader
 
@@ -147,7 +153,9 @@ module Reader0 = struct
       don't_wait_for
         (let%map () = Deferred.List.iter readers ~f:Pipe.closed in
          Pipe.close_read reader.reader) ;
-      let strict_readers = List.map readers ~f:wrap_reader in
+      let strict_readers =
+        List.map readers ~f:(wrap_reader ?name:reader.name)
+      in
       reader.downstreams <- downstreams_from_list strict_readers ;
       strict_readers
 
@@ -169,7 +177,8 @@ module Writer = struct
   type ('t, 'type_, 'write_return) t =
     { type_: ('type_, 'write_return) type_
     ; strict_reader: 't Reader0.t
-    ; writer: 't Pipe.Writer.t }
+    ; writer: 't Pipe.Writer.t
+    ; name: string option }
 
   (* TODO: See #1281 *)
   let to_linear_pipe {writer= pipe; strict_reader= _; type_= _} = pipe
@@ -178,8 +187,14 @@ module Writer = struct
       ('t, b buffered, unit) t -> 't -> b overflow_behavior -> unit =
    fun writer data overflow_behavior ->
     match overflow_behavior with
-    | Crash -> raise Overflow
+    | Crash -> raise (Overflow writer.name)
     | Drop_head ->
+        let logger = Logger.create () in
+        let my_name = Option.value writer.name ~default:"<unnamed>" in
+        Logger.warn logger
+          ~metadata:[("pipe_name", `String my_name)]
+          ~location:__LOC__ ~module_:__MODULE__ "dropping message on pipe %s"
+          my_name ;
         ignore (Pipe.read_now writer.strict_reader.reader) ;
         Pipe.write_without_pushback writer.writer data
 
@@ -199,10 +214,12 @@ module Writer = struct
   let is_closed {writer; _} = Pipe.is_closed writer
 end
 
-let create type_ =
+let create ?name type_ =
   let reader, writer = Pipe.create () in
-  let strict_reader = Reader0.{reader; has_reader= false; downstreams= []} in
-  let strict_writer = Writer.{type_; strict_reader; writer} in
+  let strict_reader =
+    Reader0.{reader; has_reader= false; downstreams= []; name}
+  in
+  let strict_writer = Writer.{type_; strict_reader; writer; name} in
   (strict_reader, strict_writer)
 
 let transfer reader {Writer.type_= _; strict_reader; writer} ~f =

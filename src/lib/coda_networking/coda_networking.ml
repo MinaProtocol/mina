@@ -48,7 +48,8 @@ struct
         type query =
           Staged_ledger_hash.Stable.V1.t Envelope.Incoming.Stable.V1.t
 
-        type response = (Staged_ledger_aux.Stable.V1.t * Ledger_hash.t) option
+        type response =
+          (Staged_ledger_aux.Stable.V1.t * Ledger_hash.Stable.V1.t) option
       end
 
       module Caller = T
@@ -205,7 +206,7 @@ struct
         type response =
           ( ( External_transition.Stable.V1.t
             , State_body_hash.t list * External_transition.t )
-            Proof_carrying_data.t
+            Proof_carrying_data.Stable.V1.t
           * Staged_ledger_aux.Stable.V1.t
           * Ledger_hash.Stable.V1.t )
           option
@@ -234,7 +235,7 @@ struct
         type response =
           ( ( External_transition.Stable.V1.t
             , State_body_hash.t list * External_transition.Stable.V1.t )
-            Proof_carrying_data.t
+            Proof_carrying_data.Stable.V1.t
           * Staged_ledger_aux.Stable.V1.t
           * Ledger_hash.Stable.V1.t )
           option
@@ -271,7 +272,15 @@ module Message (Inputs : sig
   end
 
   module Transaction_pool_diff : sig
-    type t [@@deriving bin_io, sexp]
+    type t [@@deriving sexp]
+
+    module Stable :
+      sig
+        module V1 : sig
+          type t [@@deriving bin_io, sexp]
+        end
+      end
+      with type V1.t = t
   end
 
   module External_transition : External_transition.S
@@ -285,7 +294,7 @@ struct
       type content =
         | New_state of External_transition.Stable.V1.t
         | Snark_pool_diff of Snark_pool_diff.Stable.V1.t
-        | Transaction_pool_diff of Transaction_pool_diff.t
+        | Transaction_pool_diff of Transaction_pool_diff.Stable.V1.t
       [@@deriving bin_io, sexp]
 
       type msg = content Envelope.Incoming.Stable.V1.t [@@deriving sexp]
@@ -363,7 +372,15 @@ module type Inputs_intf = sig
   end
 
   module Transaction_pool_diff : sig
-    type t [@@deriving sexp, bin_io]
+    type t [@@deriving sexp]
+
+    module Stable :
+      sig
+        module V1 : sig
+          type t [@@deriving sexp, bin_io]
+        end
+      end
+      with type V1.t = t
   end
 
   module Time : Protocols.Coda_pow.Time_intf
