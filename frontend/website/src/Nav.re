@@ -13,7 +13,7 @@ module Style = {
     merge([
       style(
         paddingX(`rem(0.75))
-        @ paddingY(`rem(1.0))
+        @ paddingY(`zero)
         @ [listStyle(`none, `inside, `none)],
       ),
     ]);
@@ -56,11 +56,7 @@ module Style = {
       media(MediaQuery.menu, [display(`none)]),
     ]);
 
-  let menuText =
-    merge([
-      style([marginLeft(`rem(1.0)), ...paddingY(`rem(1.0))]),
-      Link.style,
-    ]);
+  let menuText = merge([style([marginLeft(`rem(1.0))]), Link.basic]);
 
   let nav =
     style([
@@ -80,21 +76,6 @@ module Logo = {
     </svg>;
 };
 
-module Testnet = {
-  open Css;
-
-  module Placeholder = {
-    let style =
-      style([
-        backgroundColor(`rgba((45, 158, 219, 0.1))),
-        width(`percent(100.0)),
-        height(`px(40)),
-        margin(`auto),
-        media(MediaQuery.statusLift, [width(`px(341))]),
-      ]);
-  };
-};
-
 let component = ReasonReact.statelessComponent("Nav");
 let make = children => {
   ...component,
@@ -102,12 +83,15 @@ let make = children => {
     let items =
       children |> Array.map(elem => <li className=Style.item> elem </li>);
 
+    let bottomNudge = Css.marginBottom(`rem(1.25));
+
     <nav className=Style.nav>
       <a
         href="/"
         className=Css.(
           style([
             display(`block),
+            bottomNudge,
             width(`percent(50.0)),
             media(
               MediaQuery.statusLift,
@@ -122,11 +106,21 @@ let make = children => {
           style([
             order(3),
             width(`percent(100.0)),
+            bottomNudge,
             media(MediaQuery.statusLift, [order(2), width(`auto)]),
             media(MediaQuery.menu, [width(`percent(40.0))]),
           ])
         )>
-        <div className=Testnet.Placeholder.style />
+        <div
+          className=Css.(
+            style([
+              width(`percent(100.0)),
+              margin(`auto),
+              media(MediaQuery.statusLift, [width(`rem(21.25))]),
+            ])
+          )>
+          <AnnouncementBar />
+        </div>
       </div>
       <div
         className=Css.(
@@ -142,11 +136,17 @@ let make = children => {
 
           <input className=Style.menuBtn type_="checkbox" id="nav-menu-btn" />
           <label className=Style.menuIcon htmlFor="nav-menu-btn">
-            <span className=Style.menuText>
+            <span
+              className=Css.(merge([Style.menuText, style([bottomNudge])]))>
               {ReasonReact.string("Menu")}
             </span>
           </label>
-          <ul className=Style.options> ...items </ul>
+          <ul
+            className=Css.(
+              merge([Style.options, style([marginTop(`zero), bottomNudge])])
+            )>
+            ...items
+          </ul>
         </div>
     </nav>;
   },

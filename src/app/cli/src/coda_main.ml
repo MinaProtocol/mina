@@ -180,7 +180,7 @@ module type Main_intf = sig
           ; discovery_port: int (* UDP *)
           ; communication_port: int
           (* TCP *) }
-        [@@deriving bin_io, sexp, compare, hash]
+        [@@deriving sexp, compare, hash]
       end
 
       module Gossip_net : sig
@@ -350,6 +350,11 @@ module type Main_intf = sig
     -> (Inputs.External_transition.Verified.t, State_hash.t) With_hash.t
        Strict_pipe.Reader.t
 
+  val root_diff :
+       t
+    -> User_command.t Protocols.Coda_transition_frontier.Root_diff_view.t
+       Strict_pipe.Reader.t
+
   val transaction_pool : t -> Inputs.Transaction_pool.t
 
   val snark_pool : t -> Inputs.Snark_pool.t
@@ -500,7 +505,7 @@ struct
   module Sparse_ledger = Coda_base.Sparse_ledger
 
   module Transaction_snark_work_proof = struct
-    type t = Ledger_proof.Stable.V1.t list [@@deriving sexp, bin_io]
+    type t = Ledger_proof.Stable.V1.t list [@@deriving sexp, bin_io, yojson]
   end
 
   module Staged_ledger = struct
@@ -665,7 +670,7 @@ struct
     module Fee = struct
       module T = struct
         type t = {fee: Fee.Unsigned.t; prover: Public_key.Compressed.t}
-        [@@deriving bin_io, sexp]
+        [@@deriving bin_io, sexp, yojson]
 
         (* TODO: Compare in a better way than with public key, like in transaction pool *)
         let compare t1 t2 =

@@ -3,7 +3,7 @@ open Coda_base
 open Snark_params
 
 module Proof_type : sig
-  type t = [`Merge | `Base] [@@deriving bin_io, sexp]
+  type t = [`Merge | `Base] [@@deriving bin_io, sexp, yojson]
 end
 
 module Statement : sig
@@ -13,7 +13,7 @@ module Statement : sig
     ; supply_increase: Currency.Amount.Stable.V1.t
     ; fee_excess: Currency.Fee.Signed.Stable.V1.t
     ; proof_type: Proof_type.t }
-  [@@deriving sexp, bin_io, hash, compare, eq, fields]
+  [@@deriving sexp, bin_io, hash, compare, eq, fields, yojson]
 
   val gen : t Quickcheck.Generator.t
 
@@ -24,7 +24,7 @@ module Statement : sig
   include Comparable.S with type t := t
 end
 
-type t [@@deriving bin_io, sexp]
+type t [@@deriving bin_io, sexp, yojson]
 
 val create :
      source:Frozen_ledger_hash.t
@@ -123,6 +123,14 @@ val check_user_command :
   -> source:Frozen_ledger_hash.t
   -> target:Frozen_ledger_hash.t
   -> User_command.With_valid_signature.t
+  -> Tick.Handler.t
+  -> unit
+
+val generate_transaction_witness :
+     sok_message:Sok_message.t
+  -> source:Frozen_ledger_hash.t
+  -> target:Frozen_ledger_hash.t
+  -> Transaction.t
   -> Tick.Handler.t
   -> unit
 
