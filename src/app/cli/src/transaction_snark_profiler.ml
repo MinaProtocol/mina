@@ -158,6 +158,29 @@ let check_base_snarks sparse_ledger0 (transitions : Transaction.t list) =
   in
   "Base constraint system satisfied"
 
+let generate_base_snarks_witness sparse_ledger0
+    (transitions : Transaction.t list) =
+  let _ =
+    let sok_message =
+      Sok_message.create ~fee:Currency.Fee.zero
+        ~prover:
+          Public_key.(compress (of_private_key_exn (Private_key.create ())))
+    in
+    List.fold transitions ~init:sparse_ledger0 ~f:(fun sparse_ledger t ->
+        let sparse_ledger' =
+          Sparse_ledger.apply_transaction_exn sparse_ledger t
+        in
+        let () =
+          Transaction_snark.generate_transaction_witness ~sok_message
+            ~source:(Sparse_ledger.merkle_root sparse_ledger)
+            ~target:(Sparse_ledger.merkle_root sparse_ledger')
+            t
+            (unstage (Sparse_ledger.handler sparse_ledger))
+        in
+        sparse_ledger' )
+  in
+  "Base constraint system satisfied"
+
 let run profiler num_transactions =
   let ledger, transitions = create_ledger_and_transactions num_transactions in
   let sparse_ledger =
@@ -189,6 +212,10 @@ let dry num_transactions () =
   Test_util.with_randomness 123456789 (fun () ->
       run check_base_snarks num_transactions )
 
+let witness num_transactions () =
+  Test_util.with_randomness 123456789 (fun () ->
+      run generate_base_snarks_witness num_transactions )
+
 let command =
   let open Command.Let_syntax in
   Command.basic ~summary:"transaction snark profiler"
@@ -200,9 +227,14 @@ let command =
      and check_only =
        flag "check-only"
          ~doc:"Just check base snarks, don't keys or time anything" no_arg
+     and witness_only =
+       flag "witness-only"
+         ~doc:"Just generate the witnesses for the base snarks" no_arg
      in
      let num_transactions =
        Option.map n ~f:(fun n -> `Count (Int.pow 2 n))
        |> Option.value ~default:`Two_from_same
      in
-     if check_only then dry num_transactions else main num_transactions)
+     if witness_only then witness num_transactions
+     else if check_only then dry num_transactions
+     else main num_transactions)
