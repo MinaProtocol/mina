@@ -180,7 +180,7 @@ module type Main_intf = sig
           ; discovery_port: int (* UDP *)
           ; communication_port: int
           (* TCP *) }
-        [@@deriving bin_io, sexp, compare, hash]
+        [@@deriving sexp, compare, hash]
       end
 
       module Gossip_net : sig
