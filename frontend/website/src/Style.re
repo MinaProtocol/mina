@@ -16,7 +16,7 @@ module Colors = {
 
   let azure_01 = `rgba((45, 158, 219, 0.1));
   let gandalf = `rgb((243, 243, 243));
-  
+
   let slate = `rgb((81, 102, 121));
 
   let navy = `rgb((0, 49, 90));
