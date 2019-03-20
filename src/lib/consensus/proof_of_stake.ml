@@ -673,8 +673,13 @@ module Epoch_data = struct
     ; length: 'length }
   [@@deriving sexp, bin_io, eq, compare, hash, to_yojson]
 
+  (* TODO : version *)
   type value =
-    (Epoch_ledger.value, Epoch_seed.t, Coda_base.State_hash.t, Length.t) t
+    ( Epoch_ledger.value
+    , Epoch_seed.Stable.V1.t
+    , Coda_base.State_hash.Stable.V1.t
+    , Length.t )
+    t
   [@@deriving sexp, bin_io, eq, compare, hash, to_yojson]
 
   type var =
@@ -890,11 +895,12 @@ module Checkpoints = struct
       let to_yojson f t = List.to_yojson f (to_list t)
     end
 
+    (* TODO : version *)
     type t =
       { (* TODO: Make a nice way to force this to have bounded (or fixed) size for
          bin_io reasons *)
-        prefix: Coda_base.State_hash.t Q.t
-      ; tail: Hash.t }
+        prefix: Coda_base.State_hash.Stable.V1.t Q.t
+      ; tail: Hash.Stable.V1.t }
     [@@deriving sexp, bin_io, compare, hash, to_yojson]
 
     let equal t1 t2 = compare t1 t2 = 0
