@@ -29,13 +29,13 @@ val of_private_key_exn : Private_key.t -> t
 module Compressed : sig
   type ('field, 'boolean) t_ = {x: 'field; is_odd: 'boolean}
 
-  type t = (Field.t, bool) t_ [@@deriving sexp, hash, yojson]
+  type t = (Field.t, bool) t_ [@@deriving sexp, hash]
 
   include Codable.S with type t := t
 
   module Stable : sig
     module V1 : sig
-      type nonrec t = t [@@deriving sexp, bin_io, eq, compare, hash, yojson]
+      type nonrec t = t [@@deriving sexp, bin_io, eq, compare, hash]
 
       include Codable.S with type t := t
     end
