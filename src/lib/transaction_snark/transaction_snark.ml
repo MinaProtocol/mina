@@ -30,7 +30,7 @@ module Proof_type = struct
       module T = struct
         let version = 1
 
-        type t = [`Merge | `Base]
+        type t = [`Base | `Merge]
         [@@deriving bin_io, sexp, hash, compare, yojson]
       end
 

@@ -416,7 +416,7 @@ module type Ledger_proof_statement_intf = sig
     ; target: ledger_hash
     ; supply_increase: Currency.Amount.t
     ; fee_excess: Fee.Signed.t
-    ; proof_type: [`Merge | `Base] }
+    ; proof_type: [`Base | `Merge] }
   [@@deriving sexp, bin_io, compare]
 
   val merge : t -> t -> t Or_error.t
