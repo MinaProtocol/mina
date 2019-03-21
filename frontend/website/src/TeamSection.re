@@ -49,7 +49,10 @@ module Member = {
                 ])
               )>
               <div className=Style.H3.wide> {ReasonReact.string(name)} </div>
-              <div className=Style.H5.basic>
+              <div
+                className=Css.(
+                  merge([Style.H5.basic, style([textAlign(`center)])])
+                )>
                 {ReasonReact.string(title)}
               </div>
             </div>
@@ -72,11 +75,52 @@ module Member = {
 };
 
 let advisor = "Advisor";
+let headerHeight = `rem(6.125);
 let component = ReasonReact.statelessComponent("TeamSection");
+let headerStyle =
+  Css.(
+    style([
+      lineHeight(headerHeight),
+      color(Style.Colors.white),
+      Style.Typeface.rubik,
+      fontSize(`rem(2.1)),
+      textAlign(`center),
+      display(`inlineBlock),
+      media(Style.MediaQuery.notMobile, [fontSize(`rem(2.8))]),
+    ])
+  );
 let make = _children => {
   ...component,
   render: _self =>
     <>
+      <div
+        className=Css.(
+          style([
+            transforms([`translateY(`percent(-50.0))]),
+            height(headerHeight),
+            marginLeft(`auto),
+            marginRight(`auto),
+            marginBottom(`rem(3.0)),
+            maxWidth(`rem(27.125)),
+            backgroundColor(Style.Colors.navy),
+            textAlign(`center),
+            whiteSpace(`nowrap),
+          ])
+        )>
+        <span
+          className=Css.(
+            merge([
+              headerStyle,
+              style([fontWeight(`light), marginRight(`rem(1.))]),
+            ])
+          )>
+          {ReasonReact.string("Built by ")}
+        </span>
+        <span
+          className=Css.(merge([headerStyle, style([fontWeight(`medium)])]))>
+          {ReasonReact.string(" O(1) Labs")}
+        </span>
+      </div>
       <h3 className=Style.H3.wings> {ReasonReact.string("Team")} </h3>
       <div
         className=Css.(
@@ -86,6 +130,8 @@ let make = _children => {
             marginLeft(`auto),
             marginRight(`auto),
             justifyContent(`center),
+            marginLeft(`rem(-1.5625)),
+            marginRight(`rem(-1.5625)),
           ])
         )>
         <Member
@@ -286,6 +332,8 @@ let make = _children => {
             marginLeft(`auto),
             marginRight(`auto),
             justifyContent(`center),
+            marginLeft(`rem(-1.5625)),
+            marginRight(`rem(-1.5625)),
           ])
         )>
         <Member

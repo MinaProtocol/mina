@@ -19,12 +19,18 @@ module Colors = {
   let gandalf = `rgb((243, 243, 243));
   let veryLightGrey = `rgb((235, 235, 235));
 
-  let slate = `rgb((81, 102, 121));
+  let slate = `hsl((209, 20, 40));
+  let slateAlpha = a => `hsla((209, 20, 40, a));
 
   let navy = `rgb((0, 49, 90));
   let saville = `hsl((212, 33, 35));
   // For use with box-shadow so we can't use opacity
   let greenShadow = `rgba((136, 191, 163, 0.64));
+
+  let clover = `rgb((22, 168, 85));
+  let lightClover = `rgba((118, 205, 135, 0.12));
+
+  let teal = `rgb((71, 130, 160));
 };
 
 module Typeface = {
@@ -36,6 +42,8 @@ module Typeface = {
   let ibmplexmono = fontFamily("IBM Plex Mono, Menlo, monospace");
 
   let aktivgrotesk = fontFamily("aktiv-grotesk-extended, sans-serif");
+
+  let rubik = fontFamily("Rubik, sans-serif");
 };
 
 module MediaQuery = {
@@ -161,13 +169,12 @@ module H5 = {
   let basic =
     style([
       Typeface.ibmplexsans,
-      textAlign(`center),
       fontSize(`rem(0.9345)),
       lineHeight(`rem(1.5)),
       letterSpacing(`rem(0.125)),
       fontWeight(`normal),
-      opacity(50.0),
-      color(`rgb((74, 74, 74))),
+      color(Colors.slateAlpha(0.5)),
+      textTransform(`uppercase),
     ]);
 };
 

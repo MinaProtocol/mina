@@ -1,4 +1,5 @@
 open Core
+open Logproc_lib
 
 let find_timezone () =
   let ch = Unix.open_process_in {|date +"%z"|} in
