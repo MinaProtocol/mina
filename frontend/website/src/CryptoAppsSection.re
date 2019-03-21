@@ -11,9 +11,10 @@ module Code = {
             @ [
               backgroundColor(Style.Colors.navy),
               color(Style.Colors.white),
-              Style.Typeface.ibmplexmono,
-              fontSize(`rem(0.75)),
-              borderRadius(`px(5)),
+              Style.Typeface.ibmplexsans,
+              fontSize(`rem(0.8125)),
+              borderRadius(`px(12)),
+              lineHeight(`rem(1.25)),
               // nudge so code background looks nicer
               marginRight(`rem(-0.25)),
               marginLeft(`rem(-0.25)),
@@ -25,10 +26,76 @@ module Code = {
   };
 };
 
+let swapQuery = "(min-width: 70rem)";
+
+module ImageCollage = {
+  let component =
+    ReasonReact.statelessComponent("CryptoAppsSection.ImageCollage");
+  let make = (~className, _children) => {
+    ...component,
+    render: _self =>
+      <div
+        className=Css.(
+          merge([
+            className,
+            style([
+              position(`relative),
+              top(`zero),
+              left(`zero),
+              media(swapQuery, [position(`static)]),
+            ]),
+          ])
+        )>
+        <Image
+          className=Css.(
+            style([
+              position(`relative),
+              top(`zero),
+              left(`zero),
+              right(`zero),
+              bottom(`zero),
+              margin(`auto),
+              maxWidth(`percent(100.0)),
+            ])
+          )
+          name="/static/img/map"
+        />
+        <Image
+          className=Css.(
+            style([
+              position(`absolute),
+              top(`zero),
+              left(`zero),
+              right(`zero),
+              bottom(`zero),
+              margin(`auto),
+              maxWidth(`percent(100.0)),
+            ])
+          )
+          name="/static/img/build-illustration"
+        />
+        <Image
+          className=Css.(
+            style([
+              position(`absolute),
+              top(`zero),
+              left(`zero),
+              right(`zero),
+              bottom(`zero),
+              margin(`auto),
+              maxWidth(`percent(100.0)),
+            ])
+          )
+          name="/static/img/coda"
+        />
+      </div>,
+  };
+};
+
 let component = ReasonReact.statelessComponent("CryptoAppsSection");
 let make = _ => {
   ...component,
-  render: _self =>
+  render: _self => {
     <div
       className=Css.(
         style([
@@ -36,37 +103,72 @@ let make = _ => {
           media(Style.MediaQuery.full, [marginTop(`rem(8.0))]),
         ])
       )>
-      <h1 className=Style.H1.hero>
+      <h1
+        className=Css.(merge([Style.H1.hero, style([textAlign(`center)])]))>
         {ReasonReact.string("Build global cryptocurrency apps with Coda")}
       </h1>
-      <div>
-        <p className=Style.Body.basic>
-          {ReasonReact.string(
-             "Empower your users with a direct secure connection to the Coda network.",
-           )}
-          <br />
-          <br />
-          {ReasonReact.string(
-             "Coda will be able to be embedded into any webpage or app with just a script tag and a couple lines of JavaScript.",
-           )}
-        </p>
-      </div>
-      <a
-        href=Links.mailingList
+      <div
         className=Css.(
-          merge([Style.Link.basic, style([marginTop(`rem(1.5))])])
+          style([position(`relative), top(`zero), left(`zero)])
         )>
-        {ReasonReact.string(
-           {j|Stay updated about developing with Coda\u00A0→|j},
-         )}
-      </a>
-      <Code
-        src={|<script src="https://codaprotocol.com/api.js"></script>
+        <ImageCollage
+          className=Css.(
+            style([display(`none), media(swapQuery, [display(`block)])])
+          )
+        />
+        <div
+          className=Css.(
+            style([
+              display(`flex),
+              flexWrap(`wrapReverse),
+              justifyContent(`spaceBetween),
+              alignItems(`center),
+              marginLeft(`auto),
+              marginRight(`auto),
+              marginBottom(`rem(4.0)),
+              maxWidth(`rem(78.0)),
+              // vertically/horiz center absolutely
+              media(
+                swapQuery,
+                [
+                  position(`absolute),
+                  top(`percent(50.0)),
+                  left(`percent(50.0)),
+                  transforms([
+                    `translateX(`percent(-50.0)),
+                    `translateY(`percent(-50.0)),
+                  ]),
+                  width(`percent(100.0)),
+                ],
+              ),
+            ])
+          )>
+          <Code
+            src={|<script src="https://codaprotocol.com/api.js"></script>
 <script>
   onClick(button)
      .then(() => Coda.requestWallet())
      .then((wallet) => Coda.sendTransaction(wallet, ...))
 </script>|}
-      />
-    </div>,
+          />
+          <SideText
+            paragraphs=[|
+              "Empower your users with a direct secure connection to the Coda network.",
+              "Coda will be able to be embedded into any webpage or app with just a script tag and a couple lines of JavaScript.",
+            |]
+            cta="Stay updated about developing with Coda"
+          />
+        </div>
+        <ImageCollage
+          className=Css.(
+            style([
+              display(`block),
+              marginBottom(`rem(4.0)),
+              media(swapQuery, [display(`none)]),
+            ])
+          )
+        />
+      </div>
+    </div>;
+  },
 };
