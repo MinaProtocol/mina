@@ -102,7 +102,7 @@ module Consensus_state = struct
         module T = struct
           let version = 1
 
-          type t = (Length.t, Public_key.Compressed.t) t_
+          type t = (Length.t, Public_key.Compressed.Stable.V1.t) t_
           [@@deriving bin_io, sexp, hash, compare, to_yojson]
         end
 

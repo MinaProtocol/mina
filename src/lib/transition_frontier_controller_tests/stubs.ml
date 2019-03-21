@@ -62,11 +62,18 @@ struct
   module Transaction_snark_work =
     Staged_ledger.Make_completed_work (Ledger_proof) (Ledger_proof_statement)
 
+  module Staged_ledger_hash_binable = struct
+    include Staged_ledger_hash.Stable.V1
+
+    let of_aux_and_ledger_hash, aux_hash, ledger_hash =
+      Staged_ledger_hash.(of_aux_and_ledger_hash, aux_hash, ledger_hash)
+  end
+
   module Staged_ledger_diff = Staged_ledger.Make_diff (struct
     module Fee_transfer = Fee_transfer
     module Ledger_proof = Ledger_proof
     module Ledger_hash = Ledger_hash
-    module Staged_ledger_hash = Staged_ledger_hash
+    module Staged_ledger_hash = Staged_ledger_hash_binable
     module Staged_ledger_aux_hash = Staged_ledger_aux_hash
     module Compressed_public_key = Public_key.Compressed
     module User_command = User_command
@@ -108,7 +115,7 @@ struct
     module Ledger_proof = Ledger_proof
     module Ledger_proof_verifier = Ledger_proof_verifier
     module Staged_ledger_aux_hash = Staged_ledger_aux_hash
-    module Staged_ledger_hash = Coda_base.Staged_ledger_hash
+    module Staged_ledger_hash = Staged_ledger_hash_binable
     module Transaction_snark_work = Transaction_snark_work
     module Transaction_validator = Transaction_validator
     module Staged_ledger_diff = Staged_ledger_diff

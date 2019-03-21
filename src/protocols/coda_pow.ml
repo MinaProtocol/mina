@@ -130,7 +130,7 @@ module type Ledger_hash_intf = sig
 
   val to_bytes : t -> string
 
-  include Hashable.S_binable with type t := t
+  include Hashable.S with type t := t
 end
 
 module type Frozen_ledger_hash_intf = sig
@@ -325,7 +325,15 @@ module type Private_key_intf = sig
 end
 
 module type Compressed_public_key_intf = sig
-  type t [@@deriving sexp, bin_io, compare, yojson]
+  type t [@@deriving sexp, compare, yojson]
+
+  module Stable :
+    sig
+      module V1 : sig
+        type t [@@deriving sexp, bin_io, compare, yojson]
+      end
+    end
+    with type V1.t = t
 
   include Comparable.S with type t := t
 end

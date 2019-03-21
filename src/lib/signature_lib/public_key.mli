@@ -4,13 +4,13 @@ open Tick
 open Tuple_lib
 open Fold_lib
 
-type t = Field.t * Field.t [@@deriving bin_io, sexp, hash]
+type t = Field.t * Field.t [@@deriving sexp, hash]
 
 include Codable.S with type t := t
 
 module Stable : sig
   module V1 : sig
-    type nonrec t = t [@@deriving bin_io, sexp, compare, eq, hash]
+    type nonrec t = t [@@deriving bin_io, sexp, compare, eq, hash, yojson]
   end
 
   module Latest = V1
@@ -29,7 +29,7 @@ val of_private_key_exn : Private_key.t -> t
 module Compressed : sig
   type ('field, 'boolean) t_ = {x: 'field; is_odd: 'boolean}
 
-  type t = (Field.t, bool) t_ [@@deriving bin_io, sexp, hash, yojson]
+  type t = (Field.t, bool) t_ [@@deriving sexp, hash, yojson]
 
   include Codable.S with type t := t
 
@@ -55,7 +55,7 @@ module Compressed : sig
 
   val var_of_t : t -> var
 
-  include Comparable.S_binable with type t := t
+  include Comparable.S with type t := t
 
   include Hashable.S_binable with type t := t
 
