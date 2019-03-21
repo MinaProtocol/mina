@@ -14,7 +14,7 @@ let main () =
     Genesis_ledger.largest_account_keypair_exn ()
   in
   let n = 2 in
-  let proposers i = if i = 0 then Some i else None in
+  let proposers i = Some i in
   let snark_work_public_keys i =
     if i = 0 then Some (Public_key.compress largest_account_keypair.public_key)
     else None

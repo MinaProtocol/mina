@@ -52,9 +52,10 @@ end = struct
           let version = 1
 
           (* TODO: The statement is redundant here - it can be computed from the witness and the transaction *)
+          (* TODO : version all fields *)
           type t =
-            { transaction_with_info: Ledger.Undo.t
-            ; statement: Ledger_proof_statement.t
+            { transaction_with_info: Ledger.Undo.Stable.V1.t
+            ; statement: Ledger_proof_statement.Stable.V1.t
             ; witness: Inputs.Sparse_ledger.t }
           [@@deriving sexp, bin_io]
         end
@@ -225,7 +226,7 @@ end = struct
 
   type t = Stable.Latest.t =
     { tree:
-        ( Ledger_proof_with_sok_message.t
+        ( Ledger_proof_with_sok_message.Stable.V1.t
         , Transaction_with_witness.Stable.V1.t )
         Parallel_scan.State.Stable.V1.t
     ; mutable job_count: int }

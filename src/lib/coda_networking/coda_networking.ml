@@ -234,7 +234,8 @@ struct
 
         type response =
           ( ( External_transition.Stable.V1.t
-            , State_body_hash.t list * External_transition.Stable.V1.t )
+            , State_body_hash.Stable.V1.t list
+              * External_transition.Stable.V1.t )
             Proof_carrying_data.Stable.V1.t
           * Staged_ledger_aux.Stable.V1.t
           * Ledger_hash.Stable.V1.t )
@@ -260,7 +261,7 @@ end
 
 module Message (Inputs : sig
   module Snark_pool_diff : sig
-    type t [@@deriving sexp, to_yojson]
+    type t [@@deriving sexp]
 
     module Stable :
       sig
@@ -272,7 +273,7 @@ module Message (Inputs : sig
   end
 
   module Transaction_pool_diff : sig
-    type t [@@deriving sexp, to_yojson]
+    type t [@@deriving sexp]
 
     module Stable :
       sig

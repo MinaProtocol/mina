@@ -8,7 +8,15 @@ open Module_version
 module Make (Ledger_proof : sig
   type t [@@deriving sexp, bin_io]
 end) (Ledger_proof_statement : sig
-  type t [@@deriving sexp, bin_io, hash, compare, yojson]
+  type t [@@deriving sexp, hash, compare]
+
+  module Stable :
+    sig
+      module V1 : sig
+        type t [@@deriving sexp, bin_io, hash, compare, yojson]
+      end
+    end
+    with type V1.t = t
 
   val gen : t Quickcheck.Generator.t
 end) :
@@ -24,8 +32,7 @@ end) :
         module T = struct
           let version = 1
 
-          (* TODO : version Ledger_proof_statement *)
-          type t = Ledger_proof_statement.t list
+          type t = Ledger_proof_statement.Stable.V1.t list
           [@@deriving bin_io, sexp, hash, compare, yojson]
         end
 
