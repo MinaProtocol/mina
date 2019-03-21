@@ -119,8 +119,17 @@ module Undo : sig
     | Coinbase of coinbase
   [@@deriving sexp, bin_io]
 
-  type t = {previous_hash: Ledger_hash.t; varying: varying}
-  [@@deriving sexp, bin_io]
+  type t = {previous_hash: Ledger_hash.t; varying: varying} [@@deriving sexp]
+
+  module Stable :
+    sig
+      module V1 : sig
+        type t [@@deriving bin_io, sexp]
+      end
+
+      module Latest = V1
+    end
+    with type V1.t = t
 
   val transaction : t -> Transaction.t Or_error.t
 end

@@ -139,7 +139,7 @@ let make = _ => {
   ...component,
   render: _self =>
     <div className=Css.(style([marginTop(`rem(2.5))]))>
-      <Title text="Inclusive consensus" />
+      <Title fontColor=Style.Colors.denimTwo text="Inclusive consensus" />
       <Legend />
       <div
         className=Css.(

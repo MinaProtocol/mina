@@ -245,7 +245,17 @@ module type Ledger_intf = sig
      and type unattached_mask := unattached_mask
 
   module Undo : sig
-    type t [@@deriving sexp, bin_io]
+    type t [@@deriving sexp]
+
+    module Stable :
+      sig
+        module V1 : sig
+          type t [@@deriving sexp, bin_io]
+        end
+
+        module Latest = V1
+      end
+      with type V1.t = t
 
     val transaction : t -> transaction Or_error.t
   end

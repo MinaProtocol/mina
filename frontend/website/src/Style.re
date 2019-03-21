@@ -135,7 +135,6 @@ module H1 = {
       fontSize(`rem(2.25)),
       letterSpacing(`rem(-0.02375)),
       lineHeight(`rem(3.0)),
-      color(Colors.denimTwo),
       media(
         MediaQuery.full,
         [
