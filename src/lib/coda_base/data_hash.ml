@@ -11,7 +11,7 @@ open Module_version
 
 module type Basic = sig
   type t = private Pedersen.Digest.t
-  [@@deriving bin_io, sexp, eq, compare, hash, yojson]
+  [@@deriving sexp, eq, compare, hash, yojson]
 
   val gen : t Quickcheck.Generator.t
 
@@ -49,7 +49,7 @@ module type Basic = sig
 
   include Bits_intf.S with type t := t
 
-  include Hashable_binable with type t := t
+  include Hashable with type t := t
 
   val fold : t -> bool Triple.t Fold.t
 end
@@ -81,6 +81,7 @@ struct
       module T = struct
         let version = 1
 
+        (* TODO : will this type be versioned? *)
         type t = Pedersen.Digest.t
         [@@deriving bin_io, sexp, eq, compare, hash, yojson]
       end
@@ -102,7 +103,9 @@ struct
     module Registered_V1 = Registrar.Register (V1)
   end
 
-  include Stable.Latest
+  type t = Stable.Latest.t [@@deriving sexp, eq, compare, hash, yojson]
+
+  include Hashable.Make (Stable.Latest)
 
   let to_bytes t =
     Fold_lib.Fold.bool_t_to_string (Fold.of_list (Field.unpack t))
@@ -123,7 +126,7 @@ struct
       Bignum_bigint.(gen_incl zero m)
       ~f:(fun x -> Bigint.(to_field (of_bignum_bigint x)))
 
-  let ( = ) = equal
+  let ( = ) = Stable.Latest.equal
 
   type var =
     { digest: Pedersen.Checked.Digest.var

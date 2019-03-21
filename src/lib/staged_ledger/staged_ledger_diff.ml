@@ -96,8 +96,8 @@ end) :
 
         type t =
           { diff: diff
-          ; prev_hash: Staged_ledger_hash.t
-          ; creator: Compressed_public_key.t }
+          ; prev_hash: Staged_ledger_hash.t (* TODO : version *)
+          ; creator: Compressed_public_key.Stable.V1.t }
         [@@deriving sexp, bin_io]
       end
 

@@ -2,6 +2,7 @@ module Colors = {
   let fadedBlue = `rgb((111, 167, 197));
   let white = Css.white;
   let hyperlink = `hsl((201, 71, 52));
+  let hyperlinkAlpha = a => `hsla((201, 71, 52, a));
   let hyperlinkHover = `hsl((201, 71, 70));
 
   let metallicBlue = `rgb((70, 99, 131));
@@ -14,15 +15,22 @@ module Colors = {
   let offWhite = `rgb((243, 243, 243));
   let grey = `rgb((129, 146, 168));
 
-  let azure_01 = `rgba((45, 158, 219, 0.1));
+  let azureAlpha = a => `rgba((45, 158, 219, a));
   let gandalf = `rgb((243, 243, 243));
+  let veryLightGrey = `rgb((235, 235, 235));
 
-  let slate = `rgb((81, 102, 121));
+  let slate = `hsl((209, 20, 40));
+  let slateAlpha = a => `hsla((209, 20, 40, a));
 
   let navy = `rgb((0, 49, 90));
-
+  let saville = `hsl((212, 33, 35));
   // For use with box-shadow so we can't use opacity
   let greenShadow = `rgba((136, 191, 163, 0.64));
+
+  let clover = `rgb((22, 168, 85));
+  let lightClover = `rgba((118, 205, 135, 0.12));
+
+  let teal = `rgb((71, 130, 160));
 };
 
 module Typeface = {
@@ -34,6 +42,8 @@ module Typeface = {
   let ibmplexmono = fontFamily("IBM Plex Mono, Menlo, monospace");
 
   let aktivgrotesk = fontFamily("aktiv-grotesk-extended, sans-serif");
+
+  let rubik = fontFamily("Rubik, sans-serif");
 };
 
 module MediaQuery = {
@@ -102,7 +112,20 @@ module H3 = {
       lineHeight(`rem(1.5)),
     ]);
 
-  let wide = {
+  let wide =
+    style([
+      whiteSpace(`nowrap),
+      fontSize(`rem(1.0)),
+      color(Colors.fadedBlue),
+      letterSpacing(`em(0.25)),
+      Typeface.aktivgrotesk,
+      fontWeight(`medium),
+      fontStyle(`normal),
+      textAlign(`center),
+      textTransform(`uppercase),
+    ]);
+
+  let wings = {
     let wing = [
       contentRule(""),
       fontSize(`px(5)),
@@ -114,17 +137,7 @@ module H3 = {
     ];
 
     merge([
-      style([
-        whiteSpace(`nowrap),
-        fontSize(`rem(1.0)),
-        color(Colors.fadedBlue),
-        letterSpacing(`em(0.25)),
-        Typeface.aktivgrotesk,
-        fontWeight(`medium),
-        fontStyle(`normal),
-        textAlign(`center),
-        textTransform(`uppercase),
-      ]),
+      wide,
       style([
         before([marginRight(`rem(2.0)), ...wing]),
         after([marginLeft(`rem(2.0)), ...wing]),
@@ -147,6 +160,21 @@ module H4 = {
       textTransform(`uppercase),
       fontWeight(`normal),
       color(Colors.greyishBrown),
+    ]);
+};
+
+module H5 = {
+  open Css;
+
+  let basic =
+    style([
+      Typeface.ibmplexsans,
+      fontSize(`rem(0.9345)),
+      lineHeight(`rem(1.5)),
+      letterSpacing(`rem(0.125)),
+      fontWeight(`normal),
+      color(Colors.slateAlpha(0.5)),
+      textTransform(`uppercase),
     ]);
 };
 

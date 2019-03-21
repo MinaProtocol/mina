@@ -51,15 +51,7 @@ end
 module Ledger_hash = struct
   include Ledger_hash
 
-  let of_digest = Ledger_hash.of_digest
-
-  let merge = Ledger_hash.merge
-
-  let to_bytes = Ledger_hash.to_bytes
-
-  let of_digest = Ledger_hash.of_digest
-
-  let merge = Ledger_hash.merge
+  let of_digest, merge, to_bytes = Ledger_hash.(of_digest, merge, to_bytes)
 end
 
 module Frozen_ledger_hash = struct
@@ -668,8 +660,10 @@ struct
     module Proof = Transaction_snark_work_proof
 
     module Fee = struct
+      (* TODO : version Fee *)
       module T = struct
-        type t = {fee: Fee.Unsigned.t; prover: Public_key.Compressed.t}
+        type t =
+          {fee: Fee.Unsigned.t; prover: Public_key.Compressed.Stable.V1.t}
         [@@deriving bin_io, sexp, yojson]
 
         (* TODO: Compare in a better way than with public key, like in transaction pool *)
@@ -1088,10 +1082,17 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
            collision should not happen." ;
         Core.exit 1
 
+  module Receipt_chain_hash = struct
+    (* Receipt.Chain_hash does not have bin_io *)
+    include Receipt.Chain_hash.Stable.V1
+
+    let cons, empty = Receipt.Chain_hash.(cons, empty)
+  end
+
   module Payment_verifier =
     Receipt_chain_database_lib.Verifier.Make
       (User_command)
-      (Receipt.Chain_hash)
+      (Receipt_chain_hash)
 
   let verify_payment t log (addr : Public_key.Compressed.Stable.Latest.t)
       (verifying_txn : User_command.t) proof =

@@ -4,7 +4,7 @@
  (flags :standard -short-paths -warn-error -9-32-27-58)
  (library_flags -linkall)
  (inline_tests)
- (libraries core cache_dir cached snarky coda_base bignum)
+ (libraries core cache_dir cached snarky coda_base bignum module_version)
  (preprocess
   (pps ppx_snarky ppx_jane ppx_deriving.std ppx_deriving_yojson bisect_ppx -- -conditional))
  (synopsis "Transaction state transition snarking library"))

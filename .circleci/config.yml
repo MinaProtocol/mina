@@ -57,7 +57,7 @@ jobs:
         steps:
             - run:
                 name: Install dependencies
-                command: pip install --user requests
+                command: pip install --user requests jinja2
             - checkout
             - run:
                   name: Update branch protection rule from test configuration

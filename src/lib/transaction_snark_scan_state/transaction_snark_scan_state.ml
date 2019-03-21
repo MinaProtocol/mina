@@ -225,7 +225,7 @@ end = struct
 
   type t = Stable.Latest.t =
     { tree:
-        ( Ledger_proof_with_sok_message.t
+        ( Ledger_proof_with_sok_message.Stable.V1.t
         , Transaction_with_witness.Stable.V1.t )
         Parallel_scan.State.Stable.V1.t
     ; mutable job_count: int }

@@ -767,10 +767,15 @@ end = struct
         |> to_staged_ledger_or_error )
     in
     Logger.info logger ~module_:__MODULE__ ~location:__LOC__
-      "Block info: No of transactions included:%d Coinbase parts:%d Work \
-       count:%d Spots available:%d Proofs waiting to be solved:%d"
-      user_commands_count cb_parts_count (List.length works) spots_available
-      proofs_waiting ;
+      ~metadata:
+        [ ("user_command_count", `Int user_commands_count)
+        ; ("coinbase_count", `Int cb_parts_count)
+        ; ("work_count", `Int (List.length works))
+        ; ("spots_available", `Int spots_available)
+        ; ("proofs_waiting", `Int proofs_waiting) ]
+      "apply_diff block info: No of transactions included:$user_command_count \
+       Coinbase parts:$coinbase_count Work count:$work_count Spots \
+       available:$spots_available Proofs waiting to be solved:$proofs_waiting" ;
     let new_staged_ledger = {scan_state= scan_state'; ledger= new_ledger} in
     ( `Hash_after_applying (hash new_staged_ledger)
     , `Ledger_proof res_opt
@@ -1403,7 +1408,20 @@ let%test_module "test" =
           | _ -> Error "expected string"
       end
 
-      module Compressed_public_key = String
+      (* mirrors module structure of Public_key.Compressed *)
+      module Compressed_public_key = struct
+        type t = string [@@deriving sexp, compare, yojson]
+
+        module Stable = struct
+          module V1 = struct
+            type t = string [@@deriving sexp, bin_io, compare, eq, yojson]
+          end
+        end
+
+        let to_yojson, of_yojson = String.(to_yojson, of_yojson)
+
+        include Comparable.Make_binable (String)
+      end
 
       module Sok_message = struct
         module Stable = struct
@@ -1454,7 +1472,7 @@ let%test_module "test" =
       end
 
       module Fee_transfer = struct
-        type public_key = Compressed_public_key.t
+        type public_key = Compressed_public_key.Stable.V1.t
         [@@deriving sexp, bin_io, compare, eq, yojson]
 
         type fee = Fee.Unsigned.t
@@ -1814,7 +1832,7 @@ let%test_module "test" =
 
         type fee = Fee.Unsigned.t [@@deriving sexp, bin_io, compare, yojson]
 
-        type public_key = Compressed_public_key.t
+        type public_key = Compressed_public_key.Stable.V1.t
         [@@deriving sexp, bin_io, compare, yojson]
 
         module Stable = struct
@@ -1891,7 +1909,7 @@ let%test_module "test" =
           User_command.With_valid_signature.t
         [@@deriving sexp, bin_io, compare, yojson]
 
-        type public_key = Compressed_public_key.t
+        type public_key = Compressed_public_key.Stable.V1.t
         [@@deriving sexp, bin_io, compare, yojson]
 
         type staged_ledger_hash = Staged_ledger_hash.t

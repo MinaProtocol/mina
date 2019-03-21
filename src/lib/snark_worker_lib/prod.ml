@@ -37,7 +37,7 @@ module Inputs = struct
     let worker_wait_time = 5.
   end
 
-  module Proof = Transaction_snark
+  module Proof = Transaction_snark.Stable.V1
   module Statement = Transaction_snark.Statement
 
   module Public_key = struct
