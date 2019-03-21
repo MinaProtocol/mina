@@ -10,34 +10,26 @@ let name = "coda-shared-state-test"
 let main () =
   let open Keypair in
   let logger = Logger.create () in
-  let largest_account_keypair =
-    Genesis_ledger.largest_account_keypair_exn ()
-  in
-  let another_account_keypair =
-    Genesis_ledger.find_new_account_record_exn
-      [largest_account_keypair.public_key]
-    |> Genesis_ledger.keypair_of_account_record_exn
-  in
   let n = 2 in
   let proposers i = if i = 0 then Some i else None in
+  let keypairs =
+    List.map Genesis_ledger.accounts
+      ~f:Genesis_ledger.keypair_of_account_record_exn
+  in
   let snark_work_public_keys i =
-    if i = 0 then Some (Public_key.compress largest_account_keypair.public_key)
-    else None
+    Some ((List.nth_exn keypairs i).public_key |> Public_key.compress)
   in
   let%bind testnet =
     Coda_worker_testnet.test logger n proposers snark_work_public_keys
       Protocols.Coda_pow.Work_selection.Seq
   in
-  let receiver_pk = Public_key.compress another_account_keypair.public_key in
-  let sender_sk = largest_account_keypair.private_key in
   let%bind receipts_and_results =
     Coda_worker_testnet.Payments.send_several_payments testnet ~node:0
-      ~sender_sk ~receiver_pk
+      ~keypairs
     |> Deferred.map ~f:(fun x -> Option.value_exn x)
   in
   let _, results = List.unzip receipts_and_results in
   let%bind _ = Deferred.all (List.map results ~f:Ivar.read) in
-  Logger.info logger ~module_:__MODULE__ ~location:__LOC__ "SUCCESS" ;
   Coda_worker_testnet.Api.teardown testnet
 
 let command =

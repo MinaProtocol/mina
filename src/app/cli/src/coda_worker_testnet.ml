@@ -352,55 +352,34 @@ module Payments : sig
   val send_several_payments :
        Api.t
     -> node:int
-    -> sender_sk:Private_key.t
-    -> receiver_pk:Public_key.Compressed.t
+    -> keypairs:Keypair.t list
     -> (Receipt.Chain_hash.t * unit Ivar.t) list Option.t Deferred.t
 end = struct
-  let send_several_payments (t : Api.t) ~node:i ~sender_sk ~receiver_pk =
-    let open Deferred.Option.Let_syntax in
-    let worker = List.nth_exn t.workers i in
-    let sender_pk =
-      Public_key.of_private_key_exn sender_sk |> Public_key.compress
-    in
-    let%bind nonce0 = Coda_process.get_nonce_exn worker sender_pk in
-    let nonces =
-      List.(
-        rev @@ snd
-        @@ fold (init 40 ~f:Fn.id) ~init:(nonce0, [])
-             ~f:(fun (nonce, nonces) _ ->
-               (Account.Nonce.succ nonce, nonce :: nonces) ))
-    in
+  let send_several_payments testnet ~node ~keypairs =
     let amount = Currency.Amount.of_int 10 in
-    let fee = Currency.Fee.of_int 0 in
-    let payloads =
-      List.map nonces ~f:(fun nonce ->
-          User_command.Payload.create ~fee ~nonce ~memo:User_command_memo.dummy
-            ~body:(Payment {receiver= receiver_pk; amount}) )
+    let fee = Currency.Fee.of_int 1 in
+    let rec go i =
+      let open Deferred.Let_syntax in
+      let%bind receipts_and_results =
+        List.map
+          (keypairs : Keypair.t list)
+          ~f:(fun sender_keypair ->
+            let receiver_keypair = List.random_element_exn keypairs in
+            let sender_sk = sender_keypair.private_key in
+            let receiver_pk =
+              receiver_keypair.public_key |> Public_key.compress
+            in
+            Api.send_payment testnet node sender_sk receiver_pk amount fee )
+        |> Deferred.all |> Deferred.map ~f:Option.all
+      in
+      let%bind () =
+        after
+          (Time.Span.of_ms
+             (Consensus.Constants.block_window_duration_ms * 2 |> Float.of_int))
+      in
+      if i > 0 then go (i - 1) else Deferred.return receipts_and_results
     in
-    let user_cmds =
-      List.map payloads ~f:(fun payload ->
-          ( User_command.sign (Keypair.of_private_key_exn sender_sk) payload
-            :> User_command.t ) )
-    in
-    let%map receipts_and_results =
-      let open Deferred.Or_error in
-      List.fold user_cmds ~init:[] ~f:(fun receipts_and_results user_cmd ->
-          after
-            (Time.Span.of_ms
-               ( Consensus.Constants.block_window_duration_ms * 2
-               |> Float.of_int ))
-          |> Deferred.map ~f:Or_error.return
-          >>= fun () ->
-          Coda_process.process_payment_exn worker user_cmd
-          >>= fun receipt ->
-          let result = Ivar.create () in
-          Linear_pipe.write t.payment_writer (user_cmd, result)
-          |> don't_wait_for ;
-          return @@ Core.List.append receipts_and_results [(receipt, result)]
-      )
-      |> Deferred.map ~f:Or_error.ok
-    in
-    receipts_and_results
+    go 5
 end
 
 module Restarts : sig
