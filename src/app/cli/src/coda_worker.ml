@@ -10,7 +10,9 @@ open Signature_lib
 open Pipe_lib
 
 module Snark_worker_config = struct
-  type t = {port: int; public_key: Public_key.Compressed.t} [@@deriving bin_io]
+  (* TODO : version *)
+  type t = {port: int; public_key: Public_key.Compressed.Stable.V1.t}
+  [@@deriving bin_io]
 end
 
 module Input = struct
@@ -35,7 +37,7 @@ open Input
 module Send_payment_input = struct
   type t =
     Private_key.t
-    * Public_key.Compressed.t
+    * Public_key.Compressed.Stable.V1.t
     * Currency.Amount.t
     * Currency.Fee.t
     * User_command_memo.t
@@ -57,8 +59,10 @@ module T = struct
   end
 
   module Prove_receipt = struct
+    (* TODO : version *)
     module Input = struct
-      type t = Receipt.Chain_hash.t * Receipt.Chain_hash.t [@@deriving bin_io]
+      type t = Receipt.Chain_hash.Stable.V1.t * Receipt.Chain_hash.Stable.V1.t
+      [@@deriving bin_io]
     end
 
     module Output = struct
@@ -174,11 +178,13 @@ module T = struct
         ()
 
     let get_balance =
-      C.create_rpc ~f:get_balance_impl ~bin_input:Public_key.Compressed.bin_t
+      C.create_rpc ~f:get_balance_impl
+        ~bin_input:Public_key.Compressed.Stable.V1.bin_t
         ~bin_output:Maybe_currency.bin_t ()
 
     let get_nonce =
-      C.create_rpc ~f:get_nonce_impl ~bin_input:Public_key.Compressed.bin_t
+      C.create_rpc ~f:get_nonce_impl
+        ~bin_input:Public_key.Compressed.Stable.V1.bin_t
         ~bin_output:[%bin_type_class: Coda_numbers.Account_nonce.t option] ()
 
     let prove_receipt =
@@ -187,11 +193,13 @@ module T = struct
 
     let send_payment =
       C.create_rpc ~f:send_payment_impl ~bin_input:Send_payment_input.bin_t
-        ~bin_output:[%bin_type_class: Receipt.Chain_hash.t Or_error.t] ()
+        ~bin_output:
+          [%bin_type_class: Receipt.Chain_hash.Stable.V1.t Or_error.t] ()
 
     let process_payment =
       C.create_rpc ~f:process_payment_impl ~bin_input:User_command.bin_t
-        ~bin_output:[%bin_type_class: Receipt.Chain_hash.t Or_error.t] ()
+        ~bin_output:
+          [%bin_type_class: Receipt.Chain_hash.Stable.V1.t Or_error.t] ()
 
     let strongest_ledgers =
       C.create_pipe ~f:strongest_ledgers_impl ~bin_input:Unit.bin_t
