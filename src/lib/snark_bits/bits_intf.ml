@@ -91,6 +91,8 @@ module Snarkable = struct
 
     val var_of_field : field_var -> (Unpacked.var, _) checked
 
+    val var_of_field_unsafe : field_var -> Packed.var
+
     val if_ :
          boolean_var
       -> then_:Unpacked.var

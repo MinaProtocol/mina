@@ -2,6 +2,7 @@ module Colors = {
   let fadedBlue = `rgb((111, 167, 197));
   let white = Css.white;
   let hyperlink = `hsl((201, 71, 52));
+  let hyperlinkAlpha = a => `hsla((201, 71, 52, a));
   let hyperlinkHover = `hsl((201, 71, 70));
 
   let metallicBlue = `rgb((70, 99, 131));
@@ -14,7 +15,22 @@ module Colors = {
   let offWhite = `rgb((243, 243, 243));
   let grey = `rgb((129, 146, 168));
 
+  let azureAlpha = a => `rgba((45, 158, 219, a));
+  let gandalf = `rgb((243, 243, 243));
+  let veryLightGrey = `rgb((235, 235, 235));
+
+  let slate = `hsl((209, 20, 40));
+  let slateAlpha = a => `hsla((209, 20, 40, a));
+
   let navy = `rgb((0, 49, 90));
+  let saville = `hsl((212, 33, 35));
+  // For use with box-shadow so we can't use opacity
+  let greenShadow = `rgba((136, 191, 163, 0.64));
+
+  let clover = `rgb((22, 168, 85));
+  let lightClover = `rgba((118, 205, 135, 0.12));
+
+  let teal = `rgb((71, 130, 160));
 };
 
 module Typeface = {
@@ -26,10 +42,13 @@ module Typeface = {
   let ibmplexmono = fontFamily("IBM Plex Mono, Menlo, monospace");
 
   let aktivgrotesk = fontFamily("aktiv-grotesk-extended, sans-serif");
+
+  let rubik = fontFamily("Rubik, sans-serif");
 };
 
 module MediaQuery = {
   let full = "(min-width: 48rem)";
+  let notMobile = "(min-width: 32rem)";
 };
 
 /** sets both paddingLeft and paddingRight, as one should */
@@ -41,7 +60,7 @@ let paddingY = m => Css.[paddingTop(m), paddingBottom(m)];
 module Link = {
   open Css;
 
-  let style =
+  let init =
     style([
       Typeface.ibmplexsans,
       color(Colors.hyperlink),
@@ -50,8 +69,14 @@ module Link = {
       fontSize(`rem(1.0)),
       letterSpacing(`rem(-0.0125)),
       lineHeight(`rem(1.5)),
-      hover([color(Colors.hyperlinkHover)]),
     ]);
+
+  module No_hover = {
+    let basic = init;
+  };
+
+  let basic =
+    merge([init, style([hover([color(Colors.hyperlinkHover)])])]);
 };
 
 module H1 = {
@@ -87,30 +112,36 @@ module H3 = {
       lineHeight(`rem(1.5)),
     ]);
 
-  let wide = {
+  let wide =
+    style([
+      whiteSpace(`nowrap),
+      fontSize(`rem(1.0)),
+      color(Colors.fadedBlue),
+      letterSpacing(`em(0.25)),
+      Typeface.aktivgrotesk,
+      fontWeight(`medium),
+      fontStyle(`normal),
+      textAlign(`center),
+      textTransform(`uppercase),
+    ]);
+
+  let wings = {
     let wing = [
-      contentRule(" "),
-      marginLeft(`rem(0.25)),
+      contentRule(""),
       fontSize(`px(5)),
       verticalAlign(`top),
       lineHeight(`rem(1.3)),
       borderTop(`pt(1), `solid, `rgba((155, 155, 155, 0.3))),
       borderBottom(`pt(1), `solid, `rgba((155, 155, 155, 0.3))),
-      ...paddingX(`rem(3.0)),
+      ...paddingX(`rem(1.5)),
     ];
 
     merge([
+      wide,
       style([
-        fontSize(`rem(1.0)),
-        color(Colors.fadedBlue),
-        letterSpacing(`em(0.25)),
-        Typeface.aktivgrotesk,
-        fontWeight(`medium),
-        fontStyle(`normal),
-        textAlign(`center),
-        textTransform(`uppercase),
+        before([marginRight(`rem(2.0)), ...wing]),
+        after([marginLeft(`rem(2.0)), ...wing]),
       ]),
-      style([before(wing), after(wing)]),
     ]);
   };
 };
@@ -132,6 +163,21 @@ module H4 = {
     ]);
 };
 
+module H5 = {
+  open Css;
+
+  let basic =
+    style([
+      Typeface.ibmplexsans,
+      fontSize(`rem(0.9345)),
+      lineHeight(`rem(1.5)),
+      letterSpacing(`rem(0.125)),
+      fontWeight(`normal),
+      color(Colors.slateAlpha(0.5)),
+      textTransform(`uppercase),
+    ]);
+};
+
 module Body = {
   open Css;
 
@@ -141,6 +187,7 @@ module Body = {
       color(Colors.metallicBlue),
       fontSize(`rem(1.0)),
       lineHeight(`rem(1.5)),
+      fontWeight(`normal),
     ]);
 
   let big =
@@ -153,3 +200,9 @@ module Body = {
 
   let big_semibold = merge([big, style([fontWeight(`semiBold)])]);
 };
+
+// Match Tachyons setting pretty much everything to border-box
+Css.global(
+  "a,article,aside,blockquote,body,code,dd,div,dl,dt,fieldset,figcaption,figure,footer,form,h1,h2,h3,h4,h5,h6,header,html,input[type=email],input[type=number],input[type=password],input[type=tel],input[type=text],input[type=url],legend,li,main,nav,ol,p,pre,section,table,td,textarea,th,tr,ul",
+  [Css.boxSizing(`borderBox)],
+);

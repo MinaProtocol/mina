@@ -3,7 +3,15 @@ open Coda_base
 open Snark_params
 
 module Proof_type : sig
-  type t = [`Merge | `Base] [@@deriving bin_io, sexp]
+  module Stable : sig
+    module V1 : sig
+      type t = [`Base | `Merge] [@@deriving bin_io, sexp, yojson]
+    end
+
+    module Latest = V1
+  end
+
+  type t = Stable.Latest.t [@@deriving sexp, yojson]
 end
 
 module Statement : sig
@@ -12,8 +20,8 @@ module Statement : sig
     ; target: Coda_base.Frozen_ledger_hash.Stable.V1.t
     ; supply_increase: Currency.Amount.Stable.V1.t
     ; fee_excess: Currency.Fee.Signed.Stable.V1.t
-    ; proof_type: Proof_type.t }
-  [@@deriving sexp, bin_io, hash, compare, eq, fields]
+    ; proof_type: Proof_type.Stable.V1.t }
+  [@@deriving sexp, bin_io, hash, compare, fields, yojson]
 
   val gen : t Quickcheck.Generator.t
 
@@ -24,7 +32,17 @@ module Statement : sig
   include Comparable.S with type t := t
 end
 
-type t [@@deriving bin_io, sexp]
+type t [@@deriving sexp, yojson]
+
+module Stable :
+  sig
+    module V1 : sig
+      type t [@@deriving bin_io, sexp, yojson]
+    end
+
+    module Latest = V1
+  end
+  with type V1.t = t
 
 val create :
      source:Frozen_ledger_hash.t
@@ -123,6 +141,14 @@ val check_user_command :
   -> source:Frozen_ledger_hash.t
   -> target:Frozen_ledger_hash.t
   -> User_command.With_valid_signature.t
+  -> Tick.Handler.t
+  -> unit
+
+val generate_transaction_witness :
+     sok_message:Sok_message.t
+  -> source:Frozen_ledger_hash.t
+  -> target:Frozen_ledger_hash.t
+  -> Transaction.t
   -> Tick.Handler.t
   -> unit
 

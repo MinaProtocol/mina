@@ -2,7 +2,9 @@ open Core_kernel
 open Module_version
 
 module Hash = struct
-  include Ledger_hash
+  include Ledger_hash.Stable.V1
+
+  let merge = Ledger_hash.merge
 
   let hash_account = Fn.compose Ledger_hash.of_digest Account.digest
 

@@ -4,6 +4,7 @@ open Coda_base
 open Snark_params
 open Currency
 open Fold_lib
+open Module_version
 
 let state_hash_size_in_triples = Tick.Field.size_in_triples
 
@@ -24,7 +25,33 @@ module Input = struct
 end
 
 module Proof_type = struct
-  type t = [`Merge | `Base] [@@deriving bin_io, sexp, hash, compare]
+  module Stable = struct
+    module V1 = struct
+      module T = struct
+        let version = 1
+
+        type t = [`Base | `Merge]
+        [@@deriving bin_io, sexp, hash, compare, yojson]
+      end
+
+      include T
+      include Registration.Make_latest_version (T)
+    end
+
+    module Latest = V1
+
+    module Module_decl = struct
+      let name = "transaction_snark_proof_type"
+
+      type latest = Latest.t
+    end
+
+    module Registrar = Registration.Make (Module_decl)
+    module Registered_V1 = Registrar.Register (V1)
+  end
+
+  (* bin_io omitted *)
+  type t = Stable.Latest.t [@@deriving sexp, hash, compare, yojson]
 
   let is_base = function `Base -> true | `Merge -> false
 end
@@ -36,8 +63,8 @@ module Statement = struct
       ; target: Coda_base.Frozen_ledger_hash.Stable.V1.t
       ; supply_increase: Currency.Amount.Stable.V1.t
       ; fee_excess: Currency.Fee.Signed.Stable.V1.t
-      ; proof_type: Proof_type.t }
-    [@@deriving sexp, bin_io, hash, compare, fields]
+      ; proof_type: Proof_type.Stable.V1.t }
+    [@@deriving sexp, bin_io, hash, compare, fields, yojson]
 
     let option lab =
       Option.value_map ~default:(Or_error.error_string lab) ~f:(fun x -> Ok x)
@@ -72,15 +99,48 @@ module Statement = struct
     {source; target; fee_excess; proof_type; supply_increase}
 end
 
-type t =
+module Stable = struct
+  module V1 = struct
+    module T = struct
+      let version = 1
+
+      type t =
+        { source: Frozen_ledger_hash.Stable.V1.t
+        ; target: Frozen_ledger_hash.Stable.V1.t
+        ; proof_type: Proof_type.Stable.V1.t
+        ; supply_increase: Amount.Stable.V1.t
+        ; fee_excess: Amount.Signed.Stable.V1.t
+        ; sok_digest: Sok_message.Digest.Stable.V1.t
+        ; proof: Proof.Stable.V1.t }
+      [@@deriving fields, sexp, bin_io, yojson]
+    end
+
+    include T
+    include Registration.Make_latest_version (T)
+  end
+
+  module Latest = V1
+
+  module Module_decl = struct
+    let name = "transaction_snark"
+
+    type latest = Latest.t
+  end
+
+  module Registrar = Registration.Make (Module_decl)
+  module Registered_V1 = Registrar.Register (V1)
+end
+
+(* bin_io omitted *)
+type t = Stable.Latest.t =
   { source: Frozen_ledger_hash.Stable.V1.t
   ; target: Frozen_ledger_hash.Stable.V1.t
-  ; proof_type: Proof_type.t
+  ; proof_type: Proof_type.Stable.V1.t
   ; supply_increase: Amount.Stable.V1.t
   ; fee_excess: Amount.Signed.Stable.V1.t
   ; sok_digest: Sok_message.Digest.Stable.V1.t
   ; proof: Proof.Stable.V1.t }
-[@@deriving fields, sexp, bin_io]
+[@@deriving fields, sexp, yojson]
 
 let statement
     { source
@@ -907,6 +967,27 @@ let check_transaction ~sok_message ~source ~target (t : Transaction.t) handler
 
 let check_user_command ~sok_message ~source ~target t handler =
   check_transaction ~sok_message ~source ~target (User_command t) handler
+
+let generate_transaction_union_witness sok_message source target transaction
+    handler =
+  let sok_digest = Sok_message.digest sok_message in
+  let prover_state : Base.Prover_state.t =
+    {state1= source; state2= target; transaction; sok_digest}
+  in
+  let top_hash =
+    base_top_hash ~sok_digest ~state1:source ~state2:target
+      ~fee_excess:(Transaction_union.excess transaction)
+      ~supply_increase:(Transaction_union.supply_increase transaction)
+  in
+  let open Tick in
+  let main = handle (Base.main (Field.Var.constant top_hash)) handler in
+  ignore (run_unchecked main prover_state)
+
+let generate_transaction_witness ~sok_message ~source ~target
+    (t : Transaction.t) handler =
+  generate_transaction_union_witness sok_message source target
+    (Transaction_union.of_transaction t)
+    handler
 
 let verification_keys_of_keys {Keys0.verification; _} = verification
 

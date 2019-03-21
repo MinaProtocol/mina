@@ -22,8 +22,9 @@ module Ledger_inner = struct
   end
 
   module Hash = struct
+    (* TODO : version *)
     module T = struct
-      type t = Ledger_hash.t
+      type t = Ledger_hash.Stable.V1.t
       [@@deriving bin_io, sexp, compare, hash, eq, yojson]
     end
 

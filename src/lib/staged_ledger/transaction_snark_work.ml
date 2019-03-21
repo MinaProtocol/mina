@@ -8,7 +8,7 @@ open Module_version
 module Make (Ledger_proof : sig
   type t [@@deriving sexp, bin_io]
 end) (Ledger_proof_statement : sig
-  type t [@@deriving sexp, bin_io, hash, compare]
+  type t [@@deriving sexp, bin_io, hash, compare, yojson]
 
   val gen : t Quickcheck.Generator.t
 end) :
@@ -26,7 +26,7 @@ end) :
 
           (* TODO : version Ledger_proof_statement *)
           type t = Ledger_proof_statement.t list
-          [@@deriving bin_io, sexp, hash, compare]
+          [@@deriving bin_io, sexp, hash, compare, yojson]
         end
 
         include T
@@ -47,7 +47,7 @@ end) :
     end
 
     (* bin_io omitted *)
-    type t = Stable.Latest.t [@@deriving sexp, hash, compare]
+    type t = Stable.Latest.t [@@deriving sexp, hash, compare, yojson]
 
     include Hashable.Make (Stable.Latest)
 

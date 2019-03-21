@@ -21,7 +21,7 @@ let run ~f port arg =
         Print.printf !"Error: daemon not running. See `coda daemon`\n" ;
         go Abort
     | Run_client -> f port arg
-    | Abort -> Deferred.unit
+    | Abort -> exit 1
   in
   go Start
 
