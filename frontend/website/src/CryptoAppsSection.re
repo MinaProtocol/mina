@@ -103,10 +103,7 @@ let make = _ => {
           media(Style.MediaQuery.full, [marginTop(`rem(8.0))]),
         ])
       )>
-      <h1
-        className=Css.(merge([Style.H1.hero, style([textAlign(`center)])]))>
-        {ReasonReact.string("Build global cryptocurrency apps with Coda")}
-      </h1>
+      <Title text="Build global cryptocurrency apps with Coda" />
       <div
         className=Css.(
           style([position(`relative), top(`zero), left(`zero)])

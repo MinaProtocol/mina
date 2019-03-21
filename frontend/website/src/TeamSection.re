@@ -49,7 +49,10 @@ module Member = {
                 ])
               )>
               <div className=Style.H3.wide> {ReasonReact.string(name)} </div>
-              <div className=Style.H5.basic>
+              <div
+                className=Css.(
+                  merge([Style.H5.basic, style([textAlign(`center)])])
+                )>
                 {ReasonReact.string(title)}
               </div>
             </div>
