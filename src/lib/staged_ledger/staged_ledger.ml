@@ -1699,7 +1699,15 @@ let%test_module "test" =
         type transaction = Transaction.t [@@deriving sexp, bin_io]
 
         module Undo = struct
-          type t = transaction [@@deriving sexp, bin_io]
+          type t = transaction [@@deriving sexp]
+
+          module Stable = struct
+            module V1 = struct
+              type t = transaction [@@deriving sexp, bin_io]
+            end
+
+            module Latest = V1
+          end
 
           module User_command = struct end
 
