@@ -6,7 +6,7 @@ module Stable : sig
     type t = private
       { proposer: Public_key.Compressed.t
       ; amount: Currency.Amount.t
-      ; fee_transfer: Fee_transfer.single option }
+      ; fee_transfer: Fee_transfer.Single.Stable.V1.t option }
     [@@deriving sexp, bin_io, compare, eq]
   end
 
@@ -17,13 +17,13 @@ end
 type t = Stable.Latest.t = private
   { proposer: Public_key.Compressed.t
   ; amount: Currency.Amount.t
-  ; fee_transfer: Fee_transfer.single option }
+  ; fee_transfer: Fee_transfer.Single.Stable.V1.t option }
 [@@deriving sexp, compare, eq]
 
 val create :
      amount:Currency.Amount.t
   -> proposer:Public_key.Compressed.t
-  -> fee_transfer:Fee_transfer.single option
+  -> fee_transfer:Fee_transfer.Single.Stable.V1.t option
   -> t Or_error.t
 
 val supply_increase : t -> Currency.Amount.t Or_error.t
