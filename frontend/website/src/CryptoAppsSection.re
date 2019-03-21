@@ -103,7 +103,10 @@ let make = _ => {
           media(Style.MediaQuery.full, [marginTop(`rem(8.0))]),
         ])
       )>
-      <Title text="Build global cryptocurrency apps with Coda" />
+      <Title
+        fontColor=Style.Colors.denimTwo
+        text="Build global cryptocurrency apps with Coda"
+      />
       <div
         className=Css.(
           style([position(`relative), top(`zero), left(`zero)])
