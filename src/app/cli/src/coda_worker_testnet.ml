@@ -385,7 +385,7 @@ end = struct
     let%map receipts_and_results =
       let open Deferred.Or_error in
       List.fold user_cmds ~init:[] ~f:(fun receipts_and_results user_cmd ->
-          after (Time.Span.of_sec 10.)
+          after (Time.Span.of_sec 15.)
           |> Deferred.map ~f:Or_error.return
           >>= fun () ->
           Coda_process.process_payment_exn worker user_cmd
