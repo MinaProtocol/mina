@@ -55,8 +55,8 @@ let local_config ?proposal_interval ~peers ~discovery_port ~external_port
 
 let disconnect (conn, proc, _) =
   let%bind () = Coda_worker.Connection.close conn in
-  let%bind _ : Unix.Exit_or_signal.t = Process.wait proc in
-  return ()
+  let%map _ : Unix.Exit_or_signal.t = Process.wait proc in
+  ()
 
 let peers_exn (conn, proc, _) =
   Coda_worker.Connection.run_exn conn ~f:Coda_worker.functions.peers ~arg:()
@@ -65,9 +65,17 @@ let get_balance_exn (conn, proc, _) pk =
   Coda_worker.Connection.run_exn conn ~f:Coda_worker.functions.get_balance
     ~arg:pk
 
+let get_nonce_exn (conn, proc, _) pk =
+  Coda_worker.Connection.run_exn conn ~f:Coda_worker.functions.get_nonce
+    ~arg:pk
+
 let send_payment_exn (conn, proc, _) sk pk amount fee memo =
   Coda_worker.Connection.run_exn conn ~f:Coda_worker.functions.send_payment
     ~arg:(sk, pk, amount, fee, memo)
+
+let process_payment_exn (conn, proc, _) cmd =
+  Coda_worker.Connection.run_exn conn ~f:Coda_worker.functions.process_payment
+    ~arg:cmd
 
 let prove_receipt_exn (conn, proc, _) proving_receipt resulting_receipt =
   Coda_worker.Connection.run_exn conn ~f:Coda_worker.functions.prove_receipt
@@ -77,6 +85,13 @@ let strongest_ledgers_exn (conn, proc, _) =
   let%map r =
     Coda_worker.Connection.run_exn conn
       ~f:Coda_worker.functions.strongest_ledgers ~arg:()
+  in
+  Linear_pipe.wrap_reader r
+
+let root_diff_exn (conn, proc, _) =
+  let%map r =
+    Coda_worker.Connection.run_exn conn ~f:Coda_worker.functions.root_diff
+      ~arg:()
   in
   Linear_pipe.wrap_reader r
 

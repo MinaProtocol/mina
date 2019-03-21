@@ -19,7 +19,7 @@ module Stable = struct
         {payload: 'payload; sender: 'pk; signature: 'signature}
       [@@deriving bin_io, eq, sexp, hash, yojson]
 
-      type t = (Payload.Stable.V1.t, Public_key.t, Signature.t) t_
+      type t = (Payload.Stable.V1.t, Public_key.Stable.V1.t, Signature.t) t_
       [@@deriving bin_io, eq, sexp, hash, yojson]
 
       type with_seed = string * t [@@deriving hash]
@@ -103,7 +103,7 @@ module With_valid_signature = struct
       module T = struct
         let version = 1
 
-        type t = Stable.V1.t [@@deriving sexp, eq, bin_io]
+        type t = Stable.V1.t [@@deriving sexp, eq, bin_io, yojson]
       end
 
       include T

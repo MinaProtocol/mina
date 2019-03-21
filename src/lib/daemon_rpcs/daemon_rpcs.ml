@@ -144,99 +144,134 @@ module Types = struct
         digest_entries ~title:"Performance Histograms" entries
     end
 
-    (* NOTE: yojson deriving generates code that violates warning 39 *)
+    module Make_entries (FieldT : sig
+      type 'a t
+
+      val get : 'a t -> 'a
+    end) =
+    struct
+      let map_entry ~f (name : string) field =
+        Some (name, f @@ FieldT.get field)
+
+      let string_entry (name : string) (field : string FieldT.t) =
+        map_entry ~f:Fn.id name field
+
+      let int_entry = map_entry ~f:Int.to_string
+
+      let bool_entry = map_entry ~f:Bool.to_string
+
+      let option_entry ~(f : 'a -> string) (name : string)
+          (field : 'a option FieldT.t) =
+        match FieldT.get field with None -> None | Some x -> Some (name, f x)
+
+      let string_option_entry = option_entry ~f:Fn.id
+
+      let int_option_entry = option_entry ~f:Int.to_string
+
+      let num_accounts = int_option_entry "Global Number of Accounts"
+
+      let block_count = int_option_entry "Block Count"
+
+      let uptime_secs = map_entry "Local Uptime" ~f:(sprintf "%ds")
+
+      let ledger_merkle_root = string_option_entry "Ledger Merkle Root"
+
+      let staged_ledger_hash = string_option_entry "Staged-ledger Hash"
+
+      let state_hash = string_option_entry "Staged Hash"
+
+      let commit_id =
+        option_entry "GIT SHA1"
+          ~f:(Fn.compose Sexp.to_string Git_sha.sexp_of_t)
+
+      let conf_dir = string_entry "Configuration Directory"
+
+      let peers =
+        map_entry "Peers" ~f:(fun peers ->
+            Printf.sprintf "Total: %d " (List.length peers)
+            ^ List.to_string ~f:Fn.id peers )
+
+      let user_commands_sent = int_entry "User_commands Sent"
+
+      let run_snark_worker = bool_entry "Snark Worker Running"
+
+      let is_bootstrapping = bool_entry "Is Bootstrapping"
+
+      let propose_pubkey =
+        map_entry "Proposer Running"
+          ~f:
+            (Option.value_map ~default:"false"
+               ~f:(Printf.sprintf !"%{sexp: Public_key.t}"))
+
+      let histograms = option_entry "Histograms" ~f:Histograms.to_text
+
+      let consensus_time_best_tip =
+        string_option_entry "Best Tip Consensus Time"
+
+      let consensus_time_now = string_entry "Consensus Time Now"
+
+      let consensus_mechanism = string_entry "Consensus Mechanism"
+
+      let consensus_configuration =
+        let render conf =
+          match Consensus.Configuration.to_yojson conf with
+          | `Assoc ls ->
+              List.fold_left ls ~init:"" ~f:(fun acc (k, v) ->
+                  acc ^ sprintf "\n    %s = %s" k (Yojson.Safe.to_string v) )
+              ^ "\n"
+          | _ -> failwith "unexpected consensus configuration json format"
+        in
+        map_entry "Consensus Configuration" ~f:render
+    end
+
     type t =
-      { num_accounts: int
-      ; block_count: int
+      { num_accounts: int option
+      ; block_count: int option
       ; uptime_secs: int
-      ; ledger_merkle_root: string
-      ; staged_ledger_hash: string
-      ; state_hash: string
+      ; ledger_merkle_root: string option
+      ; staged_ledger_hash: string option
+      ; state_hash: string option
       ; commit_id: Git_sha.t option
       ; conf_dir: string
       ; peers: string list
       ; user_commands_sent: int
       ; run_snark_worker: bool
-      ; propose_pubkey: Public_key.t option
+      ; is_bootstrapping: bool
+      ; propose_pubkey: Public_key.Stable.Latest.t option
       ; histograms: Histograms.t option
-      ; consensus_time_best_tip: string
+      ; consensus_time_best_tip: string option
       ; consensus_time_now: string
       ; consensus_mechanism: string
       ; consensus_configuration: Consensus.Configuration.t }
     [@@deriving to_yojson, bin_io, fields]
 
-    (* Text response *)
-    let to_text s =
+    let entries (s : t) =
+      let module M = Make_entries (struct
+        type nonrec 'a t = ([`Read | `Set_and_create], t, 'a) Field.t_with_perm
+
+        let get field = Field.get field s
+      end) in
+      let open M in
+      Fields.to_list ~is_bootstrapping ~num_accounts ~block_count ~uptime_secs
+        ~ledger_merkle_root ~staged_ledger_hash ~state_hash ~commit_id
+        ~conf_dir ~peers ~user_commands_sent ~run_snark_worker ~propose_pubkey
+        ~histograms ~consensus_time_best_tip ~consensus_time_now
+        ~consensus_mechanism ~consensus_configuration
+      |> List.filter_map ~f:Fn.id
+
+    let to_text (t : t) =
       let title =
         "Coda Daemon Status\n-----------------------------------\n"
       in
-      let entries =
-        let f x = Field.get x s in
-        Fields.fold ~init:[]
-          ~num_accounts:(fun acc x ->
-            ("Global Number of Accounts", Int.to_string (f x)) :: acc )
-          ~block_count:(fun acc x ->
-            ("Block Count", Int.to_string (f x)) :: acc )
-          ~uptime_secs:(fun acc x ->
-            ("Local Uptime", sprintf "%ds" (f x)) :: acc )
-          ~ledger_merkle_root:(fun acc x -> ("Ledger Merkle Root", f x) :: acc)
-          ~staged_ledger_hash:(fun acc x -> ("Staged-ledger Hash", f x) :: acc)
-          ~state_hash:(fun acc x -> ("State Hash", f x) :: acc)
-          ~commit_id:(fun acc x ->
-            match f x with
-            | None -> acc
-            | Some sha1 ->
-                ("Git SHA1", Git_sha.sexp_of_t sha1 |> Sexp.to_string) :: acc
-            )
-          ~conf_dir:(fun acc x -> ("Configuration Directory", f x) :: acc)
-          ~peers:(fun acc x ->
-            let peers = f x in
-            ( "Peers"
-            , Printf.sprintf "Total: %d " (List.length peers)
-              ^ List.to_string ~f:Fn.id peers )
-            :: acc )
-          ~user_commands_sent:(fun acc x ->
-            ("User_commands Sent", Int.to_string (f x)) :: acc )
-          ~run_snark_worker:(fun acc x ->
-            ("Snark Worker Running", Bool.to_string (f x)) :: acc )
-          ~propose_pubkey:(fun acc x ->
-            match f x with
-            | None -> ("Proposer Running", "false") :: acc
-            | Some pubkey ->
-                ( "Proposer Running"
-                , Printf.sprintf !"%{sexp: Public_key.t}" pubkey )
-                :: acc )
-          ~histograms:(fun acc x ->
-            match f x with
-            | None -> acc
-            | Some histograms ->
-                ("Histograms", Histograms.to_text histograms) :: acc )
-          ~consensus_time_best_tip:(fun acc x ->
-            ("Best Tip Consensus Time", f x) :: acc )
-          ~consensus_time_now:(fun acc x -> ("Consensus Time Now", f x) :: acc)
-          ~consensus_mechanism:(fun acc x ->
-            ("Consensus Mechanism", f x) :: acc )
-          ~consensus_configuration:(fun acc x ->
-            let render conf =
-              match Consensus.Configuration.to_yojson conf with
-              | `Assoc ls ->
-                  List.fold_left ls ~init:"" ~f:(fun acc (k, v) ->
-                      acc
-                      ^ sprintf "\n    %s = %s" k (Yojson.Safe.to_string v) )
-                  ^ "\n"
-              | _ -> failwith "unexpected consensus configuration json format"
-            in
-            ("Consensus Configuration", render (f x)) :: acc )
-        |> List.rev
-      in
-      digest_entries ~title entries
+      digest_entries ~title (entries t)
   end
 end
 
 module Send_user_command = struct
   type query = User_command.Stable.Latest.t [@@deriving bin_io]
 
-  type response = Receipt.Chain_hash.t Or_error.t [@@deriving bin_io]
+  type response = Receipt.Chain_hash.Stable.Latest.t Or_error.t
+  [@@deriving bin_io]
 
   type error = unit [@@deriving bin_io]
 
@@ -260,7 +295,7 @@ end
 module Get_ledger = struct
   type query = Staged_ledger_hash.Stable.Latest.t [@@deriving bin_io]
 
-  type response = Account.Stable.V1.t list Or_error.t [@@deriving bin_io]
+  type response = Account.Stable.Latest.t list Or_error.t [@@deriving bin_io]
 
   type error = unit [@@deriving bin_io]
 
@@ -293,7 +328,8 @@ module Verify_proof = struct
 end
 
 module Prove_receipt = struct
-  type query = Receipt.Chain_hash.t * Public_key.Compressed.Stable.Latest.t
+  type query =
+    Receipt.Chain_hash.Stable.Latest.t * Public_key.Compressed.Stable.Latest.t
   [@@deriving bin_io]
 
   type response = Payment_proof.t Or_error.t [@@deriving bin_io]
@@ -405,12 +441,24 @@ module Stop_tracing = struct
     Rpc.Rpc.create ~name:"Stop_tracing" ~version:0 ~bin_query ~bin_response
 end
 
-module Visualize_frontier = struct
-  type query = string [@@deriving bin_io]
+module Visualization = struct
+  module Frontier = struct
+    type query = string [@@deriving bin_io]
 
-  type response = unit [@@deriving bin_io]
+    type response = [`Active of unit | `Bootstrapping] [@@deriving bin_io]
 
-  let rpc : (query, response) Rpc.Rpc.t =
-    Rpc.Rpc.create ~name:"Visualize_frontier" ~version:0 ~bin_query
-      ~bin_response
+    let rpc : (query, response) Rpc.Rpc.t =
+      Rpc.Rpc.create ~name:"Visualize_frontier" ~version:0 ~bin_query
+        ~bin_response
+  end
+
+  module Registered_masks = struct
+    type query = string [@@deriving bin_io]
+
+    type response = unit [@@deriving bin_io]
+
+    let rpc : (query, response) Rpc.Rpc.t =
+      Rpc.Rpc.create ~name:"Visualize_registered_masks" ~version:0 ~bin_query
+        ~bin_response
+  end
 end

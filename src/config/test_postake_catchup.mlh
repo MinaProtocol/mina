@@ -1,4 +1,5 @@
 [%%import "config/ledger_depth/full.mlh"]
+[%%import "config/curve_size/small.mlh"]
 [%%import "config/coinbase/standard.mlh"]
 [%%import "config/consensus/postake_short.mlh"]
 [%%import "config/scan_state/small.mlh"]
@@ -10,7 +11,7 @@
 
 [%%define genesis_ledger "test"]
 [%%define genesis_state_timestamp "2019-01-30 12:00:00-08:00"]
-[%%define block_window_duration 2000]
+[%%define block_window_duration 800]
 
 [%%define integration_tests true]
 [%%define force_updates false]

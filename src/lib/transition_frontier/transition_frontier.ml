@@ -53,6 +53,15 @@ struct
       ; just_emitted_a_proof: bool }
     [@@deriving sexp, fields]
 
+    let to_yojson {transition_with_hash; staged_ledger= _; just_emitted_a_proof}
+        =
+      `Assoc
+        [ ( "transition_with_hash"
+          , With_hash.to_yojson Inputs.External_transition.Verified.to_yojson
+              State_hash.to_yojson transition_with_hash )
+        ; ("staged_ledger", `String "<opaque>")
+        ; ("just_emitted_a_proof", `Bool just_emitted_a_proof) ]
+
     let create transition_with_hash staged_ledger =
       {transition_with_hash; staged_ledger; just_emitted_a_proof= false}
 
@@ -62,7 +71,6 @@ struct
     let build ~logger ~parent ~transition_with_hash =
       O1trace.measure "Breadcrumb.build" (fun () ->
           let open Deferred.Result.Let_syntax in
-          let logger = Logger.child logger __MODULE__ in
           let staged_ledger = parent.staged_ledger in
           let transition = With_hash.data transition_with_hash in
           let transition_protocol_state =
@@ -205,25 +213,30 @@ struct
     end
 
     module Best_tip_diff = Best_tip_diff.Make (Breadcrumb)
+    module Root_diff = Root_diff.Make (Breadcrumb)
 
     type t =
       { root_history: Root_history.t
       ; snark_pool_refcount: Snark_pool_refcount.t
-      ; best_tip_diff: Best_tip_diff.t }
+      ; best_tip_diff: Best_tip_diff.t
+      ; root_diff: Root_diff.t }
     [@@deriving fields]
 
     let create () =
       { snark_pool_refcount= Snark_pool_refcount.create ()
       ; best_tip_diff= Best_tip_diff.create ()
-      ; root_history= Root_history.create (2 * Inputs.max_length) }
+      ; root_history= Root_history.create (2 * Inputs.max_length)
+      ; root_diff= Root_diff.create () }
 
     type writers =
       { snark_pool: Snark_pool_refcount.view Broadcast_pipe.Writer.t
-      ; best_tip_diff: Best_tip_diff.view Broadcast_pipe.Writer.t }
+      ; best_tip_diff: Best_tip_diff.view Broadcast_pipe.Writer.t
+      ; root_diff: Root_diff.view Broadcast_pipe.Writer.t }
 
     type readers =
       { snark_pool: Snark_pool_refcount.view Broadcast_pipe.Reader.t
-      ; best_tip_diff: Best_tip_diff.view Broadcast_pipe.Reader.t }
+      ; best_tip_diff: Best_tip_diff.view Broadcast_pipe.Reader.t
+      ; root_diff: Root_diff.view Broadcast_pipe.Reader.t }
     [@@deriving fields]
 
     let make_pipes () : readers * writers =
@@ -231,13 +244,20 @@ struct
         Broadcast_pipe.create (Snark_pool_refcount.initial_view ())
       and best_tip_reader, best_tip_writer =
         Broadcast_pipe.create (Best_tip_diff.initial_view ())
+      and root_diff_reader, root_diff_writer =
+        Broadcast_pipe.create (Root_diff.initial_view ())
       in
-      ( {snark_pool= snark_reader; best_tip_diff= best_tip_reader}
-      , {snark_pool= snark_writer; best_tip_diff= best_tip_writer} )
+      ( { snark_pool= snark_reader
+        ; best_tip_diff= best_tip_reader
+        ; root_diff= root_diff_reader }
+      , { snark_pool= snark_writer
+        ; best_tip_diff= best_tip_writer
+        ; root_diff= root_diff_writer } )
 
-    let close_pipes ({snark_pool; best_tip_diff} : writers) =
+    let close_pipes ({snark_pool; best_tip_diff; root_diff} : writers) =
       Broadcast_pipe.Writer.close snark_pool ;
-      Broadcast_pipe.Writer.close best_tip_diff
+      Broadcast_pipe.Writer.close best_tip_diff ;
+      Broadcast_pipe.Writer.close root_diff
 
     let mb_write_to_pipe diff ext_t handle pipe =
       Option.value ~default:Deferred.unit
@@ -261,6 +281,7 @@ struct
         ~snark_pool_refcount:
           (use Snark_pool_refcount.handle_diff pipes.snark_pool)
         ~best_tip_diff:(use Best_tip_diff.handle_diff pipes.best_tip_diff)
+        ~root_diff:(use Root_diff.handle_diff pipes.root_diff)
   end
 
   module Node = struct
@@ -317,13 +338,14 @@ struct
   let best_tip_diff_pipe {extension_readers; _} =
     extension_readers.best_tip_diff
 
+  let root_diff_pipe {extension_readers; _} = extension_readers.root_diff
+
   (* TODO: load from and write to disk *)
   let create ~logger
       ~(root_transition :
          (Inputs.External_transition.Verified.t, State_hash.t) With_hash.t)
       ~root_snarked_ledger ~root_staged_ledger ~consensus_local_state =
     let open Consensus in
-    let logger = Logger.child logger __MODULE__ in
     let root_hash = With_hash.hash root_transition in
     let root_protocol_state =
       Inputs.External_transition.Verified.protocol_state
@@ -461,12 +483,19 @@ struct
           let graph_with_node = add_vertex graph node in
           List.fold node.successor_hashes ~init:graph_with_node
             ~f:(fun acc_graph successor_state_hash ->
-              add_edge acc_graph node
-                ( State_hash.Table.find t.table successor_state_hash
-                |> Option.value_exn ) ) )
+              match State_hash.Table.find t.table successor_state_hash with
+              | Some child_node -> add_edge acc_graph node child_node
+              | None ->
+                  Logger.info t.logger ~module_:__MODULE__ ~location:__LOC__
+                    ~metadata:
+                      [ ( "state_hash"
+                        , State_hash.to_yojson successor_state_hash ) ]
+                    "Could not visualize node $state_hash. Looks like the \
+                     node did not get garbage collected properly" ;
+                  acc_graph ) )
   end
 
-  let visualize ~filename t =
+  let visualize ~filename (t : t) =
     Out_channel.with_file filename ~f:(fun output_channel ->
         let graph = Visualizor.to_graph t in
         Visualizor.output_graph output_channel graph )
@@ -483,10 +512,10 @@ struct
     (* We only want to update the parent node if we don't have a dupe *)
     Hashtbl.change t.table hash ~f:(function
       | Some x ->
-          Logger.warn t.logger
-            !"attach_node_to with breadcrumb for state %{sexp:State_hash.t} \
-              already present; catchup scheduler bug?"
-            hash ;
+          Logger.warn t.logger ~module_:__MODULE__ ~location:__LOC__
+            ~metadata:[("state_hash", State_hash.to_yojson hash)]
+            "attach_node_to with breadcrumb for state $state_hash already \
+             present; catchup scheduler bug?" ;
           Some x
       | None ->
           Hashtbl.set t.table ~key:parent_hash
@@ -599,7 +628,7 @@ struct
       in
       go bc2 []
     in
-    Logger.debug t.logger
+    Logger.debug t.logger ~module_:__MODULE__ ~location:__LOC__
       !"Common ancestor: %{sexp: State_hash.t}"
       common_ancestor ;
     ( path_from_to (find_exn t common_ancestor) bc1
@@ -645,15 +674,23 @@ struct
             get_path_diff t breadcrumb best_tip_node.breadcrumb )
           else ([], [])
         in
-        Logger.debug t.logger
-          !"added: %{sexp: Breadcrumb.t list} removed: %{sexp: Breadcrumb.t \
-            list}"
-          added_to_best_tip_path removed_from_best_tip_path ;
+        Logger.debug t.logger ~module_:__MODULE__ ~location:__LOC__
+          "added %d breadcrumbs and removed %d making path to new best tip"
+          (List.length added_to_best_tip_path)
+          (List.length removed_from_best_tip_path)
+          ~metadata:
+            [ ( "new_breadcrumbs"
+              , `List (List.map ~f:Breadcrumb.to_yojson added_to_best_tip_path)
+              )
+            ; ( "old_breadcrumbs"
+              , `List
+                  (List.map ~f:Breadcrumb.to_yojson removed_from_best_tip_path)
+              ) ] ;
         (* 4 *)
         (* note: new_root_node is the same as root_node if the root didn't change *)
         let garbage_breadcrumbs, new_root_node =
           if distance_to_parent > max_length then (
-            Logger.info t.logger
+            Logger.info t.logger ~module_:__MODULE__ ~location:__LOC__
               !"Distance to parent: %d exceeded max_lenth %d"
               distance_to_parent max_length ;
             (* 4.I *)
@@ -770,7 +807,7 @@ struct
     match Hashtbl.find t.table parent_hash with
     | Some _ -> add_breadcrumb_exn t breadcrumb
     | None ->
-        Logger.warn t.logger
+        Logger.warn t.logger ~module_:__MODULE__ ~location:__LOC__
           !"When trying to add breadcrumb, its parent had been removed from \
             transition frontier: %{sexp: State_hash.t}"
           parent_hash ;

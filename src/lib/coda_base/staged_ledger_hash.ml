@@ -15,7 +15,7 @@ module Aux_hash = struct
       module T = struct
         let version = 1
 
-        type t = string [@@deriving bin_io, sexp, eq, compare, hash]
+        type t = string [@@deriving bin_io, sexp, eq, compare, hash, yojson]
       end
 
       include T
@@ -34,7 +34,8 @@ module Aux_hash = struct
     module Registered_V1 = Registrar.Register (V1)
   end
 
-  include Stable.Latest
+  (* bin_io omitted *)
+  type t = Stable.Latest.t [@@deriving sexp, eq, compare, hash, yojson]
 
   let of_bytes = Fn.id
 
@@ -50,8 +51,9 @@ module Stable = struct
     module T = struct
       let version = 1
 
-      type t = {ledger_hash: Ledger_hash.Stable.V1.t; aux_hash: Aux_hash.t}
-      [@@deriving bin_io, sexp, eq, compare, hash]
+      type t =
+        {ledger_hash: Ledger_hash.Stable.V1.t; aux_hash: Aux_hash.Stable.V1.t}
+      [@@deriving bin_io, sexp, eq, compare, hash, yojson]
     end
 
     include T
@@ -71,7 +73,11 @@ module Stable = struct
   module Registered_V1 = Registrar.Register (V1)
 end
 
-include Stable.Latest
+(* bin_io omitted *)
+type t = Stable.Latest.t = {ledger_hash: Ledger_hash.t; aux_hash: Aux_hash.t}
+[@@deriving sexp, eq, compare, hash, yojson]
+
+include Hashable.Make (Stable.Latest)
 
 let ledger_hash {ledger_hash; _} = ledger_hash
 

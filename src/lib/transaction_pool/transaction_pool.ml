@@ -6,6 +6,7 @@ open Core_kernel
 open Async
 open Protocols.Coda_transition_frontier
 open Pipe_lib
+open Module_version
 
 module type Transition_frontier_intf = sig
   type t
@@ -35,13 +36,15 @@ module type Transition_frontier_intf = sig
 end
 
 module type User_command_intf = sig
-  module Stable : sig
-    module Latest : sig
-      type t [@@deriving sexp, bin_io]
-    end
-  end
+  type t [@@deriving sexp, yojson]
 
-  type t = Stable.Latest.t [@@deriving sexp]
+  module Stable :
+    sig
+      module V1 : sig
+        type t [@@deriving sexp, bin_io, yojson]
+      end
+    end
+    with type V1.t = t
 
   include Comparable.S with type t := t
 
@@ -113,7 +116,7 @@ struct
 
   type t =
     { mutable pool: pool
-    ; log: Logger.t
+    ; logger: Logger.t
     ; mutable diff_reader:
         unit Deferred.t Option.t
         (* TODO we want to validate against the best tip + any relevant commands
@@ -166,7 +169,7 @@ struct
        transactions are carried from losing forks to winning ones as much as
        possible. *)
     let validation_ledger = get_validation_ledger_and_update t frontier in
-    Logger.trace t.log
+    Logger.trace t.logger ~module_:__MODULE__ ~location:__LOC__
       !"Diff: removed: %{sexp:User_command.t list} added: \
         %{sexp:User_command.t list} from best tip"
       removed_user_commands new_user_commands ;
@@ -177,7 +180,7 @@ struct
        is an optimization, we have the invariant that a command in the pool is
        never in the best tip. *)
     let added_but_not_removed = User_command.Set.diff added_set removed_set in
-    Logger.trace t.log
+    Logger.trace t.logger ~module_:__MODULE__ ~location:__LOC__
       !"Re-adding: %{sexp:User_command.Set.t}"
       removed_but_not_added ;
     Sequence.iter
@@ -199,23 +202,23 @@ struct
         with
         | Ok () -> add t tx
         | Error err ->
-            Logger.trace t.log
+            Logger.trace t.logger ~module_:__MODULE__ ~location:__LOC__
               !"Transaction %{sexp: User_command.With_valid_signature.t} \
                 removed from best tip not valid against new best tip because: \
                 %{sexp: Error.t}. (This is not necessarily an error.)"
               tx err ) ;
     User_command.Set.iter added_but_not_removed ~f:(fun tx -> remove_tx t tx) ;
-    Logger.trace t.log
+    Logger.trace t.logger ~module_:__MODULE__ ~location:__LOC__
       !"Current pool is: %{sexp: User_command.With_valid_signature.t list}"
     @@ Fheap.to_list t.pool.heap ;
     Deferred.unit
 
-  let create ~parent_log ~frontier_broadcast_pipe =
+  let create ~logger ~frontier_broadcast_pipe =
     let t =
       { pool=
           { heap= Fheap.create ~cmp:User_command.With_valid_signature.compare
           ; set= User_command.With_valid_signature.Set.empty }
-      ; log= Logger.child parent_log __MODULE__
+      ; logger
       ; diff_reader= None
       ; best_tip_ledger= None }
     in
@@ -224,7 +227,8 @@ struct
          ~f:(fun frontier_opt ->
            match frontier_opt with
            | None -> (
-               Logger.debug t.log "no frontier" ;
+               Logger.debug t.logger ~module_:__MODULE__ ~location:__LOC__
+                 "no frontier" ;
                (* Sanity check: the view pipe should have been closed before the
                     frontier was destroyed. *)
                match t.diff_reader with
@@ -238,13 +242,15 @@ struct
                         is_finished := true)
                      ; (let%map () = Async.after (Time.Span.of_sec 5.) in
                         if not !is_finished then (
-                          Logger.fatal t.log
+                          Logger.fatal t.logger ~module_:__MODULE__
+                            ~location:__LOC__
                             "Transition frontier closed without first closing \
                              best tip view pipe" ;
                           assert false )
                         else ()) ] )
            | Some frontier ->
-               Logger.debug t.log "Got frontier!\n" ;
+               Logger.debug t.logger ~module_:__MODULE__ ~location:__LOC__
+                 "Got frontier!\n" ;
                let validation_ledger =
                  get_validation_ledger_and_update t frontier
                in
@@ -262,7 +268,7 @@ struct
                         ~cmp:User_command.With_valid_signature.compare
                   ; set= User_command.With_valid_signature.Set.of_list new_txs
                   } ;
-               Logger.debug t.log
+               Logger.debug t.logger ~module_:__MODULE__ ~location:__LOC__
                  !"Re-validated transaction pool after restart: %i of %i \
                    still valid"
                  (List.length new_txs) (Sequence.length old_txs) ;
@@ -277,7 +283,33 @@ struct
   let transactions t = Sequence.unfold ~init:t.pool.heap ~f:Fheap.pop
 
   module Diff = struct
-    type t = User_command.Stable.Latest.t list [@@deriving bin_io, sexp]
+    module Stable = struct
+      module V1 = struct
+        module T = struct
+          let version = 1
+
+          type t = User_command.Stable.V1.t list
+          [@@deriving bin_io, sexp, yojson]
+        end
+
+        include T
+        include Registration.Make_latest_version (T)
+      end
+
+      module Latest = V1
+
+      module Module_decl = struct
+        let name = "transaction_pool_diff"
+
+        type latest = Latest.t
+      end
+
+      module Registrar = Registration.Make (Module_decl)
+      module Registered_V1 = Registrar.Register (V1)
+    end
+
+    (* bin_io omitted *)
+    type t = Stable.Latest.t [@@deriving sexp, yojson]
 
     let summary t =
       Printf.sprintf "Transaction diff of length %d" (List.length t)
@@ -289,13 +321,14 @@ struct
         List.fold txns ~init:(pool0, []) ~f:(fun (pool, acc) txn ->
             match User_command.check txn with
             | None ->
-                Logger.faulty_peer t.log
+                Logger.faulty_peer t.logger ~module_:__MODULE__
+                  ~location:__LOC__
                   !"Transaction doesn't check %{sexp: Envelope.Sender.t}"
                   (Envelope.Incoming.sender env) ;
                 (pool, acc)
             | Some txn -> (
                 if Set.mem pool.set txn then (
-                  Logger.debug t.log
+                  Logger.debug t.logger ~module_:__MODULE__ ~location:__LOC__
                     !"Skipping txn %{sexp: \
                       User_command.With_valid_signature.t} because I've \
                       already seen it"
@@ -306,7 +339,8 @@ struct
                      from one account. Fix this in #1734. *)
                   match get_validation_ledger t with
                   | None ->
-                      Logger.debug t.log
+                      Logger.debug t.logger ~module_:__MODULE__
+                        ~location:__LOC__
                         !"Transition frontier not available, rejecting \
                           transaction %{sexp: \
                           User_command.With_valid_signature.t}"
@@ -318,14 +352,16 @@ struct
                         validation_ledger txn
                     with
                     | Ok () ->
-                        Logger.debug t.log
+                        Logger.debug t.logger ~module_:__MODULE__
+                          ~location:__LOC__
                           !"Adding %{sexp: \
                             User_command.With_valid_signature.t} to my pool \
                             locally, and scheduling for rebroadcast"
                           txn ;
                         (add' pool txn, (txn :> User_command.t) :: acc)
                     | Error err ->
-                        Logger.faulty_peer t.log
+                        Logger.faulty_peer t.logger ~module_:__MODULE__
+                          ~location:__LOC__
                           !"Got transaction not valid against strongest \
                             ledger: %{sexp: \
                             User_command.With_valid_signature.t}, because \
@@ -340,8 +376,8 @@ struct
   end
 
   (* TODO: Actually back this by the file-system *)
-  let load ~disk_location:_ ~parent_log ~frontier_broadcast_pipe:_ =
-    return (create ~parent_log)
+  let load ~disk_location:_ ~logger ~frontier_broadcast_pipe:_ =
+    return (create ~logger)
 end
 
 (* Use this one in downstream consumers *)
@@ -392,10 +428,18 @@ let%test_module _ =
         ((pipe_r, ref ([], Int.Set.empty)), pipe_w)
     end
 
+    module Int = struct
+      include Int
+
+      let to_yojson x = `Int x
+
+      let of_yojson = function `Int x -> Ok x | _ -> Error "expected `Int"
+    end
+
     module Test =
       Make0 (struct
           module Stable = struct
-            module Latest = Int
+            module V1 = Int
           end
 
           include (Int : module type of Int with module Stable := Int.Stable)
@@ -435,8 +479,7 @@ let%test_module _ =
       let tf, best_tip_diff_w = Mock_transition_frontier.create () in
       let tf_pipe_r, _tf_pipe_w = Broadcast_pipe.create @@ Some tf in
       let pool =
-        Test.create ~parent_log:(Logger.null ())
-          ~frontier_broadcast_pipe:tf_pipe_r
+        Test.create ~logger:(Logger.null ()) ~frontier_broadcast_pipe:tf_pipe_r
       in
       ( (fun txs ->
           [%test_eq: int Sequence.t] (Test.transactions pool)
@@ -527,7 +570,7 @@ let%test_module _ =
           (* Set up initial frontier *)
           let frontier_pipe_r, frontier_pipe_w = Broadcast_pipe.create None in
           let pool =
-            Test.create ~parent_log:(Logger.null ())
+            Test.create ~logger:(Logger.null ())
               ~frontier_broadcast_pipe:frontier_pipe_r
           in
           let assert_pool_txs txs =

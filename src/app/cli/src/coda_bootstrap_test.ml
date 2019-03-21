@@ -9,8 +9,7 @@ let name = "coda-bootstrap-test"
 
 let main () =
   let open Keypair in
-  let log = Logger.create () in
-  let log = Logger.child log name in
+  let logger = Logger.create () in
   let largest_account_keypair =
     Genesis_ledger.largest_account_keypair_exn ()
   in
@@ -21,15 +20,16 @@ let main () =
     else None
   in
   let%bind testnet =
-    Coda_worker_testnet.test log n proposers snark_work_public_keys
+    Coda_worker_testnet.test logger n proposers snark_work_public_keys
       Protocols.Coda_pow.Work_selection.Seq
   in
   let%bind () =
-    Coda_worker_testnet.Restarts.trigger_bootstrap testnet ~log ~node:1
+    Coda_worker_testnet.Restarts.trigger_bootstrap testnet ~logger ~node:1
       ~largest_account_keypair ~payment_receiver:0
   in
-  let%map () = after (Time.Span.of_sec 60.) in
-  Logger.info log "SUCCEEDED" ;
+  let%bind () = after (Time.Span.of_sec 180.) in
+  let%map () = Coda_worker_testnet.Api.teardown testnet in
+  Logger.info logger ~module_:__MODULE__ ~location:__LOC__ "SUCCEEDED" ;
   ()
 
 let command =

@@ -32,7 +32,7 @@ module type Inputs_intf = sig
     with type peer := Network_peer.Peer.t
      and type state_hash := State_hash.t
      and type external_transition := External_transition.t
-     and type consensus_state := Consensus.Consensus_state.value
+     and type consensus_state := Consensus.Consensus_state.Value.t
      and type state_body_hash := State_body_hash.t
      and type ledger_hash := Ledger_hash.t
      and type sync_ledger_query := Sync_ledger.Query.t
@@ -68,32 +68,30 @@ module Make (Inputs : Inputs_intf) :
 
   let run ~logger ~network ~time_controller ~collected_transitions ~frontier
       ~network_transition_reader ~proposer_transition_reader ~clear_reader =
-    let logger = Logger.child logger __MODULE__ in
-    let valid_transition_pipe_capacity = 10 in
+    let valid_transition_pipe_capacity = 30 in
     let valid_transition_reader, valid_transition_writer =
-      Strict_pipe.create
-        (Buffered
-           (`Capacity valid_transition_pipe_capacity, `Overflow Drop_head))
+      Strict_pipe.create ~name:"valid transitions"
+        (Buffered (`Capacity valid_transition_pipe_capacity, `Overflow Crash))
     in
     let primary_transition_pipe_capacity =
       valid_transition_pipe_capacity + List.length collected_transitions
     in
     let primary_transition_reader, primary_transition_writer =
-      Strict_pipe.create
-        (Buffered
-           (`Capacity primary_transition_pipe_capacity, `Overflow Drop_head))
+      Strict_pipe.create ~name:"primary transitions"
+        (Buffered (`Capacity primary_transition_pipe_capacity, `Overflow Crash))
     in
     let processed_transition_reader, processed_transition_writer =
-      Strict_pipe.create (Buffered (`Capacity 10, `Overflow Drop_head))
+      Strict_pipe.create ~name:"processed transitions"
+        (Buffered (`Capacity 30, `Overflow Crash))
     in
     let catchup_job_reader, catchup_job_writer =
-      Strict_pipe.create Synchronous
+      Strict_pipe.create ~name:"catchup jobs" Synchronous
     in
     let catchup_breadcrumbs_reader, catchup_breadcrumbs_writer =
-      Strict_pipe.create Synchronous
+      Strict_pipe.create ~name:"catchup breadcrumbs" Synchronous
     in
     let proposer_transition_reader_copy, proposer_transition_writer_copy =
-      Strict_pipe.create Synchronous
+      Strict_pipe.create ~name:"proposer transition copy" Synchronous
     in
     Strict_pipe.transfer proposer_transition_reader
       proposer_transition_writer_copy ~f:Fn.id

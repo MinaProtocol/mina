@@ -30,23 +30,38 @@ jobs:
                   command: cd frontend/website && npm run reformat && git diff --exit-code src
             - run:
                   name: Build website
-                  command: cd frontend/website && npm run build && brew install pandoc && node ./lib/js/src/Render.js
+                  command: cd frontend/website && npm run build && (env HOMEBREW_NO_AUTO_UPDATE=1 brew install pandoc) && node ./lib/js/src/Render.js
+            - run:
+                  name: Deploy staging
+                  command: cd frontend/website && (if [ "$CIRCLE_BRANCH" == "master" ]; then npm run deploy-ci; fi)
 
     lint:
         docker:
-            - image: codaprotocol/coda:toolchain-0c5f0ad97e6a7a4c50ef6c47b75924a24fa6e05f
+            - image: codaprotocol/coda:toolchain-af1380e0f6c8726391d82b2adb6a2a3b20dd46a0
         steps:
             - checkout
             - run: git submodule sync && git submodule update --init --recursive
             - run:
                   name: Check circle CI configuration rendering
-                  command: ./scripts/test.py render --check .circleci/config.yml.jinja
+                  command: ./scripts/test.py render --check .circleci/config.yml.jinja .mergify.yml.jinja
             - run:
                   name: OCamlformat (make check-format)
                   command: eval `opam config env` && make check-format
             - run:
                   name: Snarky tracks master (make check-snarky-submodule)
                   command: make check-snarky-submodule
+
+    update-branch-protection:
+        docker:
+            - image: python:3
+        steps:
+            - run:
+                name: Install dependencies
+                command: pip install --user requests jinja2
+            - checkout
+            - run:
+                  name: Update branch protection rule from test configuration
+                  command: ./scripts/test.py required-status >required_status && cat required_status && ./scripts/update_branch_rule.py required_status
 
     build-macos:
         macos:
@@ -68,8 +83,8 @@ jobs:
                       - homebrew-v1-
             - restore_cache:
                   keys:
-                      - opam-v2-{{ checksum "src/opam.export" }}
-                      - opam-v2-
+                      - opam-v3-{{ checksum "src/opam.export" }}
+                      - opam-v3-
             - run: git submodule sync && git submodule update --init --recursive
             - run:
                   name: Download Deps -- make macos-setup-download
@@ -83,7 +98,7 @@ jobs:
                       - "/usr/local/Homebrew"
                       - "/Users/distiller/Library/Caches/Homebrew"
             - save_cache:
-                  key: opam-v2-{{ checksum "src/opam.export" }}
+                  key: opam-v3-{{ checksum "src/opam.export" }}
                   paths:
                       - "/Users/distiller/.opam"
             - run:
@@ -98,7 +113,7 @@ jobs:
     build-artifacts--testnet_postake:
         resource_class: large
         docker:
-            - image: codaprotocol/coda:toolchain-0c5f0ad97e6a7a4c50ef6c47b75924a24fa6e05f
+            - image: codaprotocol/coda:toolchain-af1380e0f6c8726391d82b2adb6a2a3b20dd46a0
         environment:
             DUNE_PROFILE: testnet_postake
         steps:
@@ -134,7 +149,7 @@ jobs:
     build-artifacts--testnet_postake_snarkless_fake_hash:
         resource_class: large
         docker:
-            - image: codaprotocol/coda:toolchain-0c5f0ad97e6a7a4c50ef6c47b75924a24fa6e05f
+            - image: codaprotocol/coda:toolchain-af1380e0f6c8726391d82b2adb6a2a3b20dd46a0
         environment:
             DUNE_PROFILE: testnet_postake_snarkless_fake_hash
         steps:
@@ -170,7 +185,7 @@ jobs:
     test-unit--test_posig_snarkless:
         resource_class: large
         docker:
-            - image: codaprotocol/coda:toolchain-0c5f0ad97e6a7a4c50ef6c47b75924a24fa6e05f
+            - image: codaprotocol/coda:toolchain-af1380e0f6c8726391d82b2adb6a2a3b20dd46a0
         steps:
             - checkout
             - run: git submodule sync && git submodule update --init --recursive
@@ -180,7 +195,7 @@ jobs:
     test-unit--test_postake_snarkless:
         resource_class: large
         docker:
-            - image: codaprotocol/coda:toolchain-0c5f0ad97e6a7a4c50ef6c47b75924a24fa6e05f
+            - image: codaprotocol/coda:toolchain-af1380e0f6c8726391d82b2adb6a2a3b20dd46a0
         steps:
             - checkout
             - run: git submodule sync && git submodule update --init --recursive
@@ -190,17 +205,19 @@ jobs:
     test--fake_hash:
         resource_class: large
         docker:
-            - image: codaprotocol/coda:toolchain-0c5f0ad97e6a7a4c50ef6c47b75924a24fa6e05f
+            - image: codaprotocol/coda:toolchain-af1380e0f6c8726391d82b2adb6a2a3b20dd46a0
         steps:
             - checkout
             - run: git submodule sync && git submodule update --init --recursive
             - run:
                   name: Running test -- fake_hash:full-test
                   command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run "fake_hash:full-test"'
+            - store_artifacts:
+                  path: test_logs
     test--test_postake:
         resource_class: large
         docker:
-            - image: codaprotocol/coda:toolchain-0c5f0ad97e6a7a4c50ef6c47b75924a24fa6e05f
+            - image: codaprotocol/coda:toolchain-af1380e0f6c8726391d82b2adb6a2a3b20dd46a0
         steps:
             - checkout
             - run: git submodule sync && git submodule update --init --recursive
@@ -210,30 +227,36 @@ jobs:
             - run:
                   name: Running test -- test_postake:transaction-snark-profiler -check-only
                   command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run "test_postake:transaction-snark-profiler -check-only"'
+            - store_artifacts:
+                  path: test_logs
     test--test_postake_bootstrap:
         resource_class: large
         docker:
-            - image: codaprotocol/coda:toolchain-0c5f0ad97e6a7a4c50ef6c47b75924a24fa6e05f
+            - image: codaprotocol/coda:toolchain-af1380e0f6c8726391d82b2adb6a2a3b20dd46a0
         steps:
             - checkout
             - run: git submodule sync && git submodule update --init --recursive
             - run:
                   name: Running test -- test_postake_bootstrap:coda-bootstrap-test
                   command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run "test_postake_bootstrap:coda-bootstrap-test"'
+            - store_artifacts:
+                  path: test_logs
     test--test_postake_catchup:
         resource_class: large
         docker:
-            - image: codaprotocol/coda:toolchain-0c5f0ad97e6a7a4c50ef6c47b75924a24fa6e05f
+            - image: codaprotocol/coda:toolchain-af1380e0f6c8726391d82b2adb6a2a3b20dd46a0
         steps:
             - checkout
             - run: git submodule sync && git submodule update --init --recursive
             - run:
                   name: Running test -- test_postake_catchup:coda-restart-node-test
                   command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run "test_postake_catchup:coda-restart-node-test"'
+            - store_artifacts:
+                  path: test_logs
     test--test_postake_snarkless:
         resource_class: large
         docker:
-            - image: codaprotocol/coda:toolchain-0c5f0ad97e6a7a4c50ef6c47b75924a24fa6e05f
+            - image: codaprotocol/coda:toolchain-af1380e0f6c8726391d82b2adb6a2a3b20dd46a0
         steps:
             - checkout
             - run: git submodule sync && git submodule update --init --recursive
@@ -243,10 +266,24 @@ jobs:
             - run:
                   name: Running test -- test_postake_snarkless:transaction-snark-profiler -check-only
                   command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run "test_postake_snarkless:transaction-snark-profiler -check-only"'
+            - store_artifacts:
+                  path: test_logs
+    test--test_postake_split:
+        resource_class: large
+        docker:
+            - image: codaprotocol/coda:toolchain-af1380e0f6c8726391d82b2adb6a2a3b20dd46a0
+        steps:
+            - checkout
+            - run: git submodule sync && git submodule update --init --recursive
+            - run:
+                  name: Running test -- test_postake_split:coda-shared-prefix-multiproposer-test
+                  command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run "test_postake_split:coda-shared-prefix-multiproposer-test"'
+            - store_artifacts:
+                  path: test_logs
     test--test_postake_split_snarkless:
         resource_class: large
         docker:
-            - image: codaprotocol/coda:toolchain-0c5f0ad97e6a7a4c50ef6c47b75924a24fa6e05f
+            - image: codaprotocol/coda:toolchain-af1380e0f6c8726391d82b2adb6a2a3b20dd46a0
         steps:
             - checkout
             - run: git submodule sync && git submodule update --init --recursive
@@ -268,12 +305,21 @@ jobs:
             - run:
                   name: Running test -- test_postake_split_snarkless:coda-shared-state-test
                   command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run "test_postake_split_snarkless:coda-shared-state-test"'
+            - run:
+                  name: Running test -- test_postake_split_snarkless:coda-restart-node-test
+                  command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run "test_postake_split_snarkless:coda-restart-node-test"'
+            - store_artifacts:
+                  path: test_logs
 
 workflows:
     version: 2
     coda_parallel:
         jobs:
             - lint
+            - update-branch-protection:
+                filters:
+                  branches:
+                    only: master
             - tracetool
             - build-macos
             - build-wallet
@@ -286,4 +332,5 @@ workflows:
             - test--test_postake_bootstrap
             - test--test_postake_catchup
             - test--test_postake_snarkless
+            - test--test_postake_split
             - test--test_postake_split_snarkless

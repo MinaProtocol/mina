@@ -31,7 +31,7 @@ module type Config_intf = sig
     ; initial_peers: Host_and_port.t list
     ; me: Peer.t
     ; conf_dir: string
-    ; parent_log: Logger.t
+    ; logger: Logger.t
     ; trust_system: Coda_base.Trust_system.t }
   [@@deriving make]
 end
@@ -43,12 +43,13 @@ module type S = sig
 
   type t =
     { timeout: Time.Span.t
-    ; log: Logger.t
+    ; logger: Logger.t
     ; target_peer_count: int
     ; broadcast_writer: msg Linear_pipe.Writer.t
     ; received_reader: content Envelope.Incoming.t Strict_pipe.Reader.t
     ; me: Peer.t
-    ; peers: Peer.Hash_set.t }
+    ; peers: Peer.Hash_set.t
+    ; connections: (Unix.Inet_addr.t, Rpc.Connection.t) Hashtbl.t }
 
   module Config : Config_intf
 
@@ -79,12 +80,13 @@ module Make (Message : Message_intf) :
   S with type msg := Message.msg and type content := Message.content = struct
   type t =
     { timeout: Time.Span.t
-    ; log: Logger.t
+    ; logger: Logger.t
     ; target_peer_count: int
     ; broadcast_writer: Message.msg Linear_pipe.Writer.t
     ; received_reader: Message.content Envelope.Incoming.t Strict_pipe.Reader.t
     ; me: Peer.t
-    ; peers: Peer.Hash_set.t }
+    ; peers: Peer.Hash_set.t
+    ; connections: (Unix.Inet_addr.t, Rpc.Connection.t) Hashtbl.t }
 
   module Config = struct
     type t =
@@ -93,7 +95,7 @@ module Make (Message : Message_intf) :
       ; initial_peers: Host_and_port.t list
       ; me: Peer.t
       ; conf_dir: string
-      ; parent_log: Logger.t
+      ; logger: Logger.t
       ; trust_system: Coda_base.Trust_system.t }
     [@@deriving make]
   end
@@ -130,7 +132,9 @@ module Make (Message : Message_intf) :
     Deferred.List.iter ~how:`Parallel peers ~f:(fun p ->
         match%map send p with
         | Ok () -> ()
-        | Error e -> Logger.error t.log "%s" (Error.to_string_hum e) )
+        | Error e ->
+            Logger.error t.logger ~module_:__MODULE__ ~location:__LOC__ "%s"
+              (Error.to_string_hum e) )
 
   let broadcast_random t n msg =
     let selected_peers = random_sublist (Hash_set.to_list t.peers) n in
@@ -138,13 +142,12 @@ module Make (Message : Message_intf) :
 
   let create (config : Config.t)
       (implementations : Host_and_port.t Rpc.Implementation.t list) =
-    let log = Logger.child config.parent_log __MODULE__ in
     trace_task "gossip net" (fun () ->
-        let%map membership =
+        let%bind membership =
           match%map
             trace_task "membership" (fun () ->
                 Membership.connect ~initial_peers:config.initial_peers
-                  ~me:config.me ~conf_dir:config.conf_dir ~parent_log:log
+                  ~me:config.me ~conf_dir:config.conf_dir ~logger:config.logger
                   ~trust_system:config.trust_system )
           with
           | Ok membership -> membership
@@ -156,22 +159,36 @@ module Make (Message : Message_intf) :
         let peer_events = Membership.changes membership in
         let broadcast_reader, broadcast_writer = Linear_pipe.create () in
         let received_reader, received_writer =
-          Strict_pipe.create (Buffered (`Capacity 64, `Overflow Drop_head))
+          Strict_pipe.create ~name:"received gossip messages"
+            (Buffered (`Capacity 64, `Overflow Crash))
         in
         let t =
           { timeout= config.timeout
-          ; log
+          ; logger= config.logger
           ; target_peer_count= config.target_peer_count
           ; broadcast_writer
           ; received_reader
           ; me= config.me
-          ; peers= Peer.Hash_set.create () }
+          ; peers= Peer.Hash_set.create ()
+          ; connections= Hashtbl.create (module Unix.Inet_addr) }
         in
+        don't_wait_for
+          (Strict_pipe.Reader.iter
+             (Coda_base.Trust_system.ban_pipe config.trust_system)
+             ~f:(fun addr ->
+               match Hashtbl.find_and_remove t.connections addr with
+               | None -> Deferred.unit
+               | Some conn ->
+                   Logger.debug t.logger ~module_:__MODULE__ ~location:__LOC__
+                     !"Peer %{sexp: Unix.Inet_addr.t} banned, disconnecting."
+                     addr ;
+                   Rpc.Connection.close conn )) ;
         trace_task "rebroadcasting messages" (fun () ->
             don't_wait_for
               (Linear_pipe.iter_unordered ~max_concurrency:64 broadcast_reader
                  ~f:(fun m ->
-                   Logger.trace log "broadcasting message" ;
+                   Logger.trace t.logger ~module_:__MODULE__ ~location:__LOC__
+                     "broadcasting message" ;
                    broadcast_random t t.target_peer_count m )) ) ;
         let implementations =
           let implementations =
@@ -193,35 +210,48 @@ module Make (Message : Message_intf) :
             Linear_pipe.iter_unordered ~max_concurrency:64 peer_events
               ~f:(function
               | Connect peers ->
-                  Logger.info log "Some peers connected %s"
+                  Logger.info t.logger ~module_:__MODULE__ ~location:__LOC__
+                    "Some peers connected %s"
                     (List.sexp_of_t Peer.sexp_of_t peers |> Sexp.to_string_hum) ;
                   List.iter peers ~f:(fun peer -> Hash_set.add t.peers peer) ;
                   Deferred.unit
               | Disconnect peers ->
-                  Logger.info log "Some peers disconnected %s"
+                  Logger.info t.logger ~module_:__MODULE__ ~location:__LOC__
+                    "Some peers disconnected %s"
                     (List.sexp_of_t Peer.sexp_of_t peers |> Sexp.to_string_hum) ;
                   List.iter peers ~f:(fun peer -> Hash_set.remove t.peers peer) ;
                   Deferred.unit )
             |> ignore ) ;
-        ignore
-          (Tcp.Server.create
-             ~on_handler_error:
-               (`Call
-                 (fun _ exn -> Logger.error log "%s" (Exn.to_string_mach exn)))
-             (Tcp.Where_to_listen.of_port config.me.Peer.communication_port)
-             (fun client reader writer ->
-               Rpc.Connection.server_with_close reader writer ~implementations
-                 ~connection_state:(fun _ ->
-                   (* connection state is the client's IP and ephemeral port when
-                 connecting to the server over TCP; the ephemeral port is
-                 distinct from the client's discovery and communication ports
-              *)
-                   Socket.Address.Inet.to_host_and_port client )
-                 ~on_handshake_error:
-                   (`Call
-                     (fun exn ->
-                       Logger.error log "%s" (Exn.to_string_mach exn) ;
-                       Deferred.unit )) )) ;
+        let%map _ =
+          Tcp.Server.create
+            ~on_handler_error:
+              (`Call
+                (fun _ exn ->
+                  Logger.error t.logger ~module_:__MODULE__ ~location:__LOC__
+                    "%s" (Exn.to_string_mach exn) ))
+            (Tcp.Where_to_listen.of_port config.me.Peer.communication_port)
+            (fun client reader writer ->
+              let%map _ =
+                Rpc.Connection.server_with_close reader writer ~implementations
+                  ~connection_state:(fun conn ->
+                    (* connection state is the client's IP and ephemeral port
+                        when connecting to the server over TCP; the ephemeral
+                        port is distinct from the client's discovery and
+                        communication ports *)
+                    Hashtbl.set t.connections
+                      ~key:(Socket.Address.Inet.addr client)
+                      ~data:conn ;
+                    Socket.Address.Inet.to_host_and_port client )
+                  ~on_handshake_error:
+                    (`Call
+                      (fun exn ->
+                        Logger.error t.logger ~module_:__MODULE__
+                          ~location:__LOC__ "%s" (Exn.to_string_mach exn) ;
+                        Deferred.unit ))
+              in
+              Hashtbl.remove t.connections @@ Socket.Address.Inet.addr client
+              )
+        in
         t )
 
   let received t = t.received_reader
@@ -245,12 +275,16 @@ module Make (Message : Message_intf) :
     random_sublist new_peers n
 
   let query_peer t (peer : Peer.t) rpc query =
-    Logger.trace t.log !"Querying peer %{sexp: Peer.t}" peer ;
+    Logger.trace t.logger ~module_:__MODULE__ ~location:__LOC__
+      !"Querying peer %{sexp: Peer.t}"
+      peer ;
     let peer = Peer.to_communications_host_and_port peer in
     try_call_rpc t peer rpc query
 
   let query_random_peers t n rpc query =
     let peers = random_sublist (Hash_set.to_list t.peers) n in
-    Logger.trace t.log !"Querying random peers: %{sexp: Peer.t list}" peers ;
+    Logger.trace t.logger ~module_:__MODULE__ ~location:__LOC__
+      !"Querying random peers: %{sexp: Peer.t list}"
+      peers ;
     List.map peers ~f:(fun peer -> query_peer t peer rpc query)
 end

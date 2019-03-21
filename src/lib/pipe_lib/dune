@@ -1,6 +1,7 @@
 (library
   (name pipe_lib)
+  (flags :standard -short-paths -safe-string -warn-error -9)
   (inline_tests)
   (public_name pipe_lib)
-  (libraries core_kernel async o1trace)
+  (libraries core_kernel async o1trace logger)
   (preprocess (pps ppx_jane ppx_deriving.make)))

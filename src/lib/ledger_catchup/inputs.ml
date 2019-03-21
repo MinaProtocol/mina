@@ -36,10 +36,11 @@ module type S = sig
     with type peer := Network_peer.Peer.t
      and type state_hash := State_hash.t
      and type external_transition := External_transition.t
-     and type consensus_state := Consensus.Consensus_state.value
+     and type consensus_state := Consensus.Consensus_state.Value.t
      and type state_body_hash := State_body_hash.t
      and type ledger_hash := Ledger_hash.t
-     and type sync_ledger_query := Ledger.Location.Addr.t Syncable_ledger.query
+     and type sync_ledger_query :=
+                Ledger.Location.Addr.t Syncable_ledger.Query.t
      and type sync_ledger_answer := Sync_ledger.Answer.t
      and type parallel_scan_state := Staged_ledger.Scan_state.t
 
