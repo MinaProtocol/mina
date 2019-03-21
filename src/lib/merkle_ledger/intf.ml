@@ -71,7 +71,11 @@ module type Key_value_database = sig
 
   val get_uuid : t -> Uuid.t
 
-  val set_batch : t -> key_data_pairs:(Bigstring.t * Bigstring.t) list -> unit
+  val set_batch :
+       t
+    -> ?remove_keys:Bigstring.t list
+    -> key_data_pairs:(Bigstring.t * Bigstring.t) list
+    -> unit
 
   val to_alist : t -> (Bigstring.t * Bigstring.t) list
   (* an association list, sorted by key *)

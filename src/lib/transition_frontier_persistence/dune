@@ -1,0 +1,5 @@
+(library
+  (name transition_frontier_persistence)
+  (public_name transition_frontier_persistence)
+  (libraries coda_base core async rocksdb protocols signature_lib consensus storage transition_frontier)
+  (preprocess (pps ppx_jane ppx_deriving.eq)))

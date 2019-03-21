@@ -16,6 +16,11 @@ module type S = sig
   val set : t -> key:key -> data:value -> unit
 
   val remove : t -> key:key -> unit
+
+  val set_batch :
+    t -> ?remove_keys:key list -> update_pairs:(key * value) list -> unit
+
+  val to_alist : t -> (key * value) list
 end
 
 module type Mock_intf = sig
@@ -56,4 +61,10 @@ module Make_mock
   let random_key t =
     let keys = Key.Table.keys t in
     List.random_element keys
+
+  let set_batch t ?(remove_keys = []) ~update_pairs =
+    List.iter update_pairs ~f:(fun (key, data) -> set t ~key ~data) ;
+    List.iter remove_keys ~f:(fun key -> remove t ~key)
+
+  let to_alist = Key.Table.to_alist
 end
