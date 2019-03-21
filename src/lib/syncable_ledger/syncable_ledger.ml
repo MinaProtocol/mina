@@ -149,26 +149,6 @@ module type S = sig
   val get_account_at_addr : t -> addr -> account Or_error.t
 end
 
-module type Validity_intf = sig
-  type t
-
-  type addr
-
-  type hash
-
-  type hash_status = Fresh | Stale
-
-  type hash' = hash_status * hash [@@deriving eq]
-
-  val create : unit -> t
-
-  val set : t -> addr -> hash' -> bool
-
-  val get : t -> addr -> hash' option
-
-  val completely_fresh : t -> bool
-end
-
 (*
 
 Every node of the merkle tree is always in one of three states:
