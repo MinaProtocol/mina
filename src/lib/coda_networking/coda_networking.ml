@@ -261,7 +261,7 @@ end
 
 module Message (Inputs : sig
   module Snark_pool_diff : sig
-    type t [@@deriving sexp, to_yojson]
+    type t [@@deriving sexp]
 
     module Stable :
       sig
@@ -273,7 +273,7 @@ module Message (Inputs : sig
   end
 
   module Transaction_pool_diff : sig
-    type t [@@deriving sexp, to_yojson]
+    type t [@@deriving sexp]
 
     module Stable :
       sig
