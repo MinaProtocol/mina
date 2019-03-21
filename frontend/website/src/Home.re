@@ -10,7 +10,13 @@ let make = _ => {
         <CryptoAppsSection />
         <InclusiveSection />
       </Wrapped>
-      <div className=Css.(style([backgroundColor(Style.Colors.gandalf)]))>
+      <div
+        className=Css.(
+          style([
+            backgroundColor(Style.Colors.gandalf),
+            marginTop(`rem(10.)),
+          ])
+        )>
         <Wrapped> <TeamSection /> <InvestorsSection /> </Wrapped>
       </div>
     </section>,

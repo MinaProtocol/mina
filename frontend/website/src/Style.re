@@ -42,6 +42,8 @@ module Typeface = {
   let ibmplexmono = fontFamily("IBM Plex Mono, Menlo, monospace");
 
   let aktivgrotesk = fontFamily("aktiv-grotesk-extended, sans-serif");
+
+  let rubik = fontFamily("Rubik, sans-serif");
 };
 
 module MediaQuery = {
