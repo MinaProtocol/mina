@@ -43,13 +43,25 @@ jobs:
             - run: git submodule sync && git submodule update --init --recursive
             - run:
                   name: Check circle CI configuration rendering
-                  command: ./scripts/test.py render --check .circleci/config.yml.jinja
+                  command: ./scripts/test.py render --check .circleci/config.yml.jinja .mergify.yml.jinja
             - run:
                   name: OCamlformat (make check-format)
                   command: eval `opam config env` && make check-format
             - run:
                   name: Snarky tracks master (make check-snarky-submodule)
                   command: make check-snarky-submodule
+
+    update-branch-protection:
+        docker:
+            - image: python:3
+        steps:
+            - run:
+                name: Install dependencies
+                command: pip install --user requests jinja2
+            - checkout
+            - run:
+                  name: Update branch protection rule from test configuration
+                  command: ./scripts/test.py required-status >required_status && cat required_status && ./scripts/update_branch_rule.py required_status
 
     build-macos:
         macos:
@@ -304,6 +316,10 @@ workflows:
     coda_parallel:
         jobs:
             - lint
+            - update-branch-protection:
+                filters:
+                  branches:
+                    only: master
             - tracetool
             - build-macos
             - build-wallet

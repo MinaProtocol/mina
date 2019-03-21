@@ -48,7 +48,8 @@ struct
         type query =
           Staged_ledger_hash.Stable.V1.t Envelope.Incoming.Stable.V1.t
 
-        type response = (Staged_ledger_aux.Stable.V1.t * Ledger_hash.t) option
+        type response =
+          (Staged_ledger_aux.Stable.V1.t * Ledger_hash.Stable.V1.t) option
       end
 
       module Caller = T
@@ -205,7 +206,7 @@ struct
         type response =
           ( ( External_transition.Stable.V1.t
             , State_body_hash.t list * External_transition.t )
-            Proof_carrying_data.t
+            Proof_carrying_data.Stable.V1.t
           * Staged_ledger_aux.Stable.V1.t
           * Ledger_hash.Stable.V1.t )
           option
@@ -233,8 +234,9 @@ struct
 
         type response =
           ( ( External_transition.Stable.V1.t
-            , State_body_hash.t list * External_transition.Stable.V1.t )
-            Proof_carrying_data.t
+            , State_body_hash.Stable.V1.t list
+              * External_transition.Stable.V1.t )
+            Proof_carrying_data.Stable.V1.t
           * Staged_ledger_aux.Stable.V1.t
           * Ledger_hash.Stable.V1.t )
           option
@@ -259,19 +261,27 @@ end
 
 module Message (Inputs : sig
   module Snark_pool_diff : sig
-    type t [@@deriving sexp]
+    type t [@@deriving sexp, to_yojson]
 
     module Stable :
       sig
         module V1 : sig
-          type t [@@deriving bin_io, sexp]
+          type t [@@deriving bin_io, sexp, to_yojson]
         end
       end
       with type V1.t = t
   end
 
   module Transaction_pool_diff : sig
-    type t [@@deriving bin_io, sexp]
+    type t [@@deriving sexp, to_yojson]
+
+    module Stable :
+      sig
+        module V1 : sig
+          type t [@@deriving bin_io, sexp, to_yojson]
+        end
+      end
+      with type V1.t = t
   end
 
   module External_transition : External_transition.S
@@ -285,10 +295,11 @@ struct
       type content =
         | New_state of External_transition.Stable.V1.t
         | Snark_pool_diff of Snark_pool_diff.Stable.V1.t
-        | Transaction_pool_diff of Transaction_pool_diff.t
-      [@@deriving bin_io, sexp]
+        | Transaction_pool_diff of Transaction_pool_diff.Stable.V1.t
+      [@@deriving bin_io, sexp, to_yojson]
 
-      type msg = content Envelope.Incoming.Stable.V1.t [@@deriving sexp]
+      type msg = content Envelope.Incoming.Stable.V1.t
+      [@@deriving sexp, to_yojson]
     end
 
     let name = "message"
@@ -321,6 +332,12 @@ struct
 
     include Register (T)
   end
+
+  let summary msg =
+    match Envelope.Incoming.data msg with
+    | New_state _ -> "new state"
+    | Snark_pool_diff _ -> "snark pool diff"
+    | Transaction_pool_diff _ -> "transaction pool diff"
 end
 
 module type Inputs_intf = sig
@@ -351,19 +368,27 @@ module type Inputs_intf = sig
   end
 
   module Snark_pool_diff : sig
-    type t [@@deriving sexp]
+    type t [@@deriving sexp, to_yojson]
 
     module Stable :
       sig
         module V1 : sig
-          type t [@@deriving sexp, bin_io]
+          type t [@@deriving sexp, bin_io, to_yojson]
         end
       end
       with type V1.t = t
   end
 
   module Transaction_pool_diff : sig
-    type t [@@deriving sexp, bin_io]
+    type t [@@deriving sexp, to_yojson]
+
+    module Stable :
+      sig
+        module V1 : sig
+          type t [@@deriving sexp, bin_io, to_yojson]
+        end
+      end
+      with type V1.t = t
   end
 
   module Time : Protocols.Coda_pow.Time_intf
@@ -499,8 +524,9 @@ module Make (Inputs : Inputs_intf) = struct
   (* TODO: Have better pushback behavior *)
   let broadcast t x =
     Logger.trace t.logger ~module_:__MODULE__ ~location:__LOC__
-      !"Broadcasting %{sexp: Message.msg} over gossip net"
-      x ;
+      ~metadata:[("message", Message.msg_to_yojson x)]
+      !"Broadcasting %s over gossip net"
+      (Message.summary x) ;
     Linear_pipe.write_without_pushback (Gossip_net.broadcast t.gossip_net) x
 
   let broadcast_from_me t content = broadcast t (envelope_from_me t content)

@@ -6,9 +6,10 @@ module Stable = struct
     module T = struct
       let version = 1
 
+      (* TODO : use version for Fee_transfer *)
       type t =
-        { proposer: Public_key.Compressed.t
-        ; amount: Currency.Amount.t
+        { proposer: Public_key.Compressed.Stable.V1.t
+        ; amount: Currency.Amount.Stable.V1.t
         ; fee_transfer: Fee_transfer.single option }
       [@@deriving sexp, bin_io, compare, eq]
     end

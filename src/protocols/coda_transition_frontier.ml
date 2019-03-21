@@ -53,6 +53,11 @@ module Best_tip_diff_view = struct
   type 'b t = {new_user_commands: 'b list; removed_user_commands: 'b list}
 end
 
+module Root_diff_view = struct
+  type 'b t = {user_commands: 'b list; root_length: int option}
+  [@@deriving bin_io]
+end
+
 module type Network_intf = sig
   type t
 
@@ -140,6 +145,8 @@ module type Transition_frontier_Breadcrumb_intf = sig
   val staged_ledger : t -> staged_ledger
 
   val hash : t -> int
+
+  val state_hash : t -> state_hash
 
   val display : t -> display
 
@@ -273,9 +280,14 @@ module type Transition_frontier_intf = sig
       Transition_frontier_extension_intf
       with type view = user_command Best_tip_diff_view.t
 
+    module Root_diff :
+      Transition_frontier_extension_intf
+      with type view = user_command Root_diff_view.t
+
     type readers =
       { snark_pool: Snark_pool_refcount.view Broadcast_pipe.Reader.t
-      ; best_tip_diff: Best_tip_diff.view Broadcast_pipe.Reader.t }
+      ; best_tip_diff: Best_tip_diff.view Broadcast_pipe.Reader.t
+      ; root_diff: Root_diff.view Broadcast_pipe.Reader.t }
     [@@deriving fields]
   end
 
@@ -284,6 +296,8 @@ module type Transition_frontier_intf = sig
 
   val best_tip_diff_pipe :
     t -> Extensions.Best_tip_diff.view Broadcast_pipe.Reader.t
+
+  val root_diff_pipe : t -> Extensions.Root_diff.view Broadcast_pipe.Reader.t
 
   val visualize : filename:string -> t -> unit
 
@@ -357,7 +371,7 @@ module type Transition_handler_validator_intf = sig
                                    With_hash.t
                                  , state_hash )
                                  Cached.t
-                               , Strict_pipe.drop_head Strict_pipe.buffered
+                               , Strict_pipe.crash Strict_pipe.buffered
                                , unit )
                                Strict_pipe.Writer.t
     -> unprocessed_transition_cache:unprocessed_transition_cache
@@ -428,7 +442,7 @@ module type Transition_handler_processor_intf = sig
     -> processed_transition_writer:( ( external_transition_verified
                                      , state_hash )
                                      With_hash.t
-                                   , Strict_pipe.drop_head Strict_pipe.buffered
+                                   , Strict_pipe.crash Strict_pipe.buffered
                                    , unit )
                                    Strict_pipe.Writer.t
     -> unprocessed_transition_cache:unprocessed_transition_cache
@@ -646,7 +660,7 @@ module type Initial_validator_intf = sig
     -> valid_transition_writer:( [ `Transition of external_transition_verified
                                                   Envelope.Incoming.t ]
                                  * [`Time_received of time]
-                               , Strict_pipe.drop_head Strict_pipe.buffered
+                               , Strict_pipe.crash Strict_pipe.buffered
                                , unit )
                                Strict_pipe.Writer.t
     -> unit
