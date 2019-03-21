@@ -26,9 +26,10 @@ let main n () =
   let receiver_pk =
     Genesis_ledger.largest_account_exn () |> snd |> Account.public_key
   in
-  don't_wait_for
-  @@ Coda_worker_testnet.Payments.send_several_payments testnet ~node:0
-       ~src:sender_sk ~dest:receiver_pk ;
+  Coda_worker_testnet.Payments.send_several_payments testnet ~node:0 ~sender_sk
+    ~receiver_pk
+  |> Deferred.map ~f:(Fn.const ())
+  |> don't_wait_for ;
   (* RESTART NODES *)
   (* catchup *)
   let idx = Quickcheck.random_value (Int.gen_incl 1 (n - 1)) in

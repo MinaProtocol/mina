@@ -30,10 +30,14 @@ let main () =
   in
   let receiver_pk = Public_key.compress another_account_keypair.public_key in
   let sender_sk = largest_account_keypair.private_key in
-  let%bind () =
+  let%bind receipts_and_results =
     Coda_worker_testnet.Payments.send_several_payments testnet ~node:0
-      ~src:sender_sk ~dest:receiver_pk
+      ~sender_sk ~receiver_pk
+    |> Deferred.map ~f:(fun x -> Option.value_exn x)
   in
+  let _, results = List.unzip receipts_and_results in
+  let%bind _ = Deferred.all (List.map results ~f:Ivar.read) in
+  Logger.info logger ~module_:__MODULE__ ~location:__LOC__ "SUCCESS" ;
   Coda_worker_testnet.Api.teardown testnet
 
 let command =
