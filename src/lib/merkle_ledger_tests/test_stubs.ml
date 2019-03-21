@@ -29,7 +29,7 @@ end
 (* below are alternative modules that use strings as public keys and UInt64 as balances for
    in accounts
 
-   using these modules instead of Account and Balance above speeds up the 
+   using these modules instead of Account and Balance above speeds up the
    ledger tests
 
    we don't use the alternatives for testing currently, because Account
@@ -173,9 +173,15 @@ module Storage_locations : Intf.Storage_locations = struct
 end
 
 module Key = struct
-  module T = struct
-    type t = Account.key [@@deriving sexp, bin_io, eq, compare, hash]
+  module Stable = struct
+    module V1 = struct
+      type t = Account.key [@@deriving sexp, bin_io, eq, compare, hash]
+    end
+
+    module Latest = V1
   end
+
+  type t = Stable.Latest.t [@@deriving sexp, eq, compare, hash]
 
   let to_string = Signature_lib.Public_key.Compressed.to_base64
 
@@ -194,14 +200,13 @@ module Key = struct
         (Quickcheck.Generator.list_with_length num_to_gen gen)
     in
     let unique_keys =
-      List.dedup_and_sort ~compare:T.compare more_than_enough_keys
+      List.dedup_and_sort ~compare:Stable.Latest.compare more_than_enough_keys
     in
     assert (List.length unique_keys >= num_keys) ;
     List.take unique_keys num_keys
 
-  include T
-  include Hashable.Make_binable (T)
-  include Comparable.Make (T)
+  include Hashable.Make_binable (Stable.Latest)
+  include Comparable.Make (Stable.Latest)
 end
 
 module Base_inputs = struct

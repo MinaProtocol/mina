@@ -234,7 +234,8 @@ struct
 
         type response =
           ( ( External_transition.Stable.V1.t
-            , State_body_hash.t list * External_transition.Stable.V1.t )
+            , State_body_hash.Stable.V1.t list
+              * External_transition.Stable.V1.t )
             Proof_carrying_data.Stable.V1.t
           * Staged_ledger_aux.Stable.V1.t
           * Ledger_hash.Stable.V1.t )
