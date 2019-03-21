@@ -680,6 +680,8 @@ module Balance = struct
   let ( - ) = sub_amount
 
   module Checked = struct
+    let to_amount = Fn.id
+
     let add_signed_amount = Amount.Checked.add_signed
 
     let add_amount = Amount.Checked.add

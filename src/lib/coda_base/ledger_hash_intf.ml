@@ -38,4 +38,7 @@ module type S = sig
           -> Account.var
           -> (Account.var, 's) Checked.t)
     -> (var, 's) Checked.t
+
+  val get_account_and_update_pariticipation :
+    var -> Account.Index.Unpacked.var -> (Account.var * var, _) Checked.t
 end

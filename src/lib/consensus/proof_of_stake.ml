@@ -553,8 +553,10 @@ module Vrf = struct
       request_witness Scalar.typ (As_prover.return Private_key)
     in
     let winner_addr = message.Message.delegator in
-    let%bind account =
-      with_label __LOC__ (Frozen_ledger_hash.get ledger winner_addr)
+    let%bind account, _ =
+      with_label __LOC__
+        (Frozen_ledger_hash.get_account_and_update_pariticipation ledger
+           winner_addr)
     in
     let%bind delegate =
       with_label __LOC__ (Public_key.decompress_var account.delegate)
@@ -564,7 +566,7 @@ module Vrf = struct
         (T.Checked.eval_and_check_public_key shifted ~private_key
            ~public_key:delegate message)
     in
-    (evaluation, account.balance)
+    (evaluation, account.balance, account.participated)
 
   module Checked = struct
     let%snarkydef check shifted ~(epoch_ledger : Epoch_ledger.var) ~epoch ~slot
@@ -575,7 +577,7 @@ module Vrf = struct
         request_witness Coda_base.Account.Index.Unpacked.typ
           (As_prover.return Winner_address)
       in
-      let%bind result, my_stake =
+      let%bind result, my_stake, participated_before =
         get_vrf_evaluation shifted ~ledger:epoch_ledger.hash
           ~message:{Message.epoch; slot; seed; delegator= winner_addr}
       in
@@ -583,7 +585,7 @@ module Vrf = struct
         Threshold.Checked.is_satisfied ~my_stake
           ~total_stake:epoch_ledger.total_currency result
       in
-      (satisifed, result)
+      (satisifed, result, my_stake, participated_before)
   end
 
   let eval = T.eval
@@ -646,27 +648,46 @@ module Vrf = struct
 end
 
 module Epoch_data = struct
-  type ('epoch_ledger, 'epoch_seed, 'protocol_state_hash, 'length) t =
+  type ('epoch_ledger, 'epoch_seed, 'protocol_state_hash, 'length, 'amount) t =
     { ledger: 'epoch_ledger
     ; seed: 'epoch_seed
     ; start_checkpoint: 'protocol_state_hash
     ; lock_checkpoint: 'protocol_state_hash
-    ; length: 'length }
+    ; length: 'length
+    ; participated_stake: 'amount }
   [@@deriving sexp, bin_io, eq, compare, hash, to_yojson]
 
   type value =
-    (Epoch_ledger.value, Epoch_seed.t, Coda_base.State_hash.t, Length.t) t
+    ( Epoch_ledger.value
+    , Epoch_seed.t
+    , Coda_base.State_hash.t
+    , Length.t
+    , Amount.t )
+    t
   [@@deriving sexp, bin_io, eq, compare, hash, to_yojson]
 
   type var =
     ( Epoch_ledger.var
     , Epoch_seed.var
     , Coda_base.State_hash.var
-    , Length.Unpacked.var )
+    , Length.Unpacked.var
+    , Amount.var )
     t
 
-  let to_hlist {ledger; seed; start_checkpoint; lock_checkpoint; length} =
-    Coda_base.H_list.[ledger; seed; start_checkpoint; lock_checkpoint; length]
+  let to_hlist
+      { ledger
+      ; seed
+      ; start_checkpoint
+      ; lock_checkpoint
+      ; length
+      ; participated_stake } =
+    Coda_base.H_list.
+      [ ledger
+      ; seed
+      ; start_checkpoint
+      ; lock_checkpoint
+      ; length
+      ; participated_stake ]
 
   let of_hlist :
          ( unit
@@ -675,15 +696,22 @@ module Epoch_data = struct
            -> 'protocol_state_hash
            -> 'protocol_state_hash
            -> 'length
+           -> 'amount
            -> unit )
          Coda_base.H_list.t
-      -> ('ledger, 'seed, 'protocol_state_hash, 'length) t =
+      -> ('ledger, 'seed, 'protocol_state_hash, 'length, 'amount) t =
    fun Coda_base.H_list.([ ledger
                          ; seed
                          ; start_checkpoint
                          ; lock_checkpoint
-                         ; length ]) ->
-    {ledger; seed; start_checkpoint; lock_checkpoint; length}
+                         ; length
+                         ; participated_stake ]) ->
+    { ledger
+    ; seed
+    ; start_checkpoint
+    ; lock_checkpoint
+    ; length
+    ; participated_stake }
 
   let data_spec =
     let open Snark_params.Tick.Data_spec in
@@ -691,14 +719,20 @@ module Epoch_data = struct
     ; Epoch_seed.typ
     ; Coda_base.State_hash.typ
     ; Coda_base.State_hash.typ
-    ; Length.Unpacked.typ ]
+    ; Length.Unpacked.typ
+    ; Amount.typ ]
 
   let typ : (var, value) Typ.t =
     Snark_params.Tick.Typ.of_hlistable data_spec ~var_to_hlist:to_hlist
       ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist ~value_of_hlist:of_hlist
 
-  let var_to_triples {ledger; seed; start_checkpoint; lock_checkpoint; length}
-      =
+  let var_to_triples
+      { ledger
+      ; seed
+      ; start_checkpoint
+      ; lock_checkpoint
+      ; length
+      ; participated_stake } =
     let open Snark_params.Tick.Checked.Let_syntax in
     let%map ledger_triples = Epoch_ledger.var_to_triples ledger
     and seed_triples = Epoch_seed.var_to_triples seed
@@ -710,18 +744,27 @@ module Epoch_data = struct
     ledger_triples @ seed_triples @ start_checkpoint_triples
     @ lock_checkpoint_triples
     @ Length.Unpacked.var_to_triples length
+    @ Amount.var_to_triples participated_stake
 
-  let fold {ledger; seed; start_checkpoint; lock_checkpoint; length} =
+  let fold
+      { ledger
+      ; seed
+      ; start_checkpoint
+      ; lock_checkpoint
+      ; length
+      ; participated_stake } =
     let open Fold in
     Epoch_ledger.fold ledger +> Epoch_seed.fold seed
     +> Coda_base.State_hash.fold start_checkpoint
     +> Coda_base.State_hash.fold lock_checkpoint
     +> Length.fold length
+    +> Amount.fold participated_stake
 
   let length_in_triples =
     Epoch_ledger.length_in_triples + Epoch_seed.length_in_triples
     + Coda_base.State_hash.length_in_triples
     + Coda_base.State_hash.length_in_triples + Length.length_in_triples
+    + Amount.length_in_triples
 
   let if_ cond ~then_ ~else_ =
     let open Snark_params.Tick.Checked.Let_syntax in
@@ -734,8 +777,17 @@ module Epoch_data = struct
     and lock_checkpoint =
       Coda_base.State_hash.if_ cond ~then_:then_.lock_checkpoint
         ~else_:else_.lock_checkpoint
-    and length = Length.if_ cond ~then_:then_.length ~else_:else_.length in
-    {ledger; seed; start_checkpoint; lock_checkpoint; length}
+    and length = Length.if_ cond ~then_:then_.length ~else_:else_.length
+    and participated_stake =
+      Amount.Checked.if_ cond ~then_:then_.participated_stake
+        ~else_:else_.participated_stake
+    in
+    { ledger
+    ; seed
+    ; start_checkpoint
+    ; lock_checkpoint
+    ; length
+    ; participated_stake }
 
   let genesis =
     { ledger=
@@ -744,7 +796,8 @@ module Epoch_data = struct
     ; seed= Epoch_seed.initial
     ; start_checkpoint= Coda_base.State_hash.(of_hash zero)
     ; lock_checkpoint= Coda_base.State_hash.(of_hash zero)
-    ; length= Length.of_int 1 }
+    ; length= Length.of_int 1
+    ; participated_stake= Amount.zero }
 
   let update_pair (last_data, curr_data) epoch_length ~prev_epoch ~next_epoch
       ~prev_slot ~prev_protocol_state_hash ~proposer_vrf_result
@@ -757,12 +810,18 @@ module Epoch_data = struct
           ; ledger= {hash= snarked_ledger_hash; total_currency}
           ; start_checkpoint= prev_protocol_state_hash
           ; lock_checkpoint= Coda_base.State_hash.(of_hash zero)
-          ; length= Length.of_int 1 }
+          ; length= Length.of_int 1
+          ; participated_stake=
+              Amount.zero (*TODO: assign the delegate's balance *) }
         , Length.succ epoch_length )
       else (
         assert (Epoch.equal next_epoch prev_epoch) ;
         ( last_data
-        , {curr_data with length= Length.succ curr_data.length}
+        , { curr_data with
+            length=
+              Length.succ curr_data.length
+              (*TODO: update the participated_stake with the delegate's balance if they did not participate in this epoch before*)
+          }
         , epoch_length ) )
     in
     let curr_seed, curr_lock_checkpoint =
@@ -1036,7 +1095,7 @@ module Consensus_state = struct
       Epoch_data.if_ epoch_increased ~then_:previous_state.curr_epoch_data
         ~else_:previous_state.last_epoch_data
     in
-    let%bind threshold_satisfied, vrf_result =
+    let%bind threshold_satisfied, vrf_result, balance, participated_before =
       let%bind (module M) = Inner_curve.Checked.Shifted.create () in
       Vrf.Checked.check
         (module M)
@@ -1091,8 +1150,26 @@ module Consensus_state = struct
         in
         Coda_base.State_hash.if_ in_seed_update_range
           ~then_:previous_protocol_state_hash ~else_:base
+      and participated_stake =
+        let balance = Balance.Checked.to_amount balance in
+        let%bind participated_stake =
+          let%bind new_participated_stake =
+            Amount.Checked.add
+              previous_state.curr_epoch_data.participated_stake balance
+          in
+          Amount.Checked.if_ participated_before
+            ~then_:previous_state.curr_epoch_data.participated_stake
+            ~else_:new_participated_stake
+        in
+        Amount.Checked.if_ epoch_increased ~then_:balance
+          ~else_:participated_stake
       in
-      {Epoch_data.seed; length; ledger; start_checkpoint; lock_checkpoint}
+      { Epoch_data.seed
+      ; length
+      ; ledger
+      ; start_checkpoint
+      ; lock_checkpoint
+      ; participated_stake }
     and length = Length.increment_var previous_state.length
     (* TODO: keep track of total_currency in transaction snark. The current_slot
      * implementation would allow an adversary to make then total_currency incorrect by
