@@ -35,7 +35,37 @@ module Colors = {
 
 module Typeface = {
   open Css;
+  let weights = [
+    (`thin, "Thin"),
+    (`extraLight, "ExtraLight"),
+    (`light, "Light"),
+    (`normal, "Regular"),
+    (`medium, "Medium"),
+    (`semiBold, "SemiBold"),
+    (`bold, "Bold"),
+    (`extraBold, "ExtraBold"),
+  ];
 
+  // TODO: add format("woff") and unicode ranges
+  let () =
+    List.iter(
+      ((weight, name)) =>
+        ignore @@
+        Css.(
+          fontFace(
+            ~fontFamily="IBM Plex Sans",
+            ~src=[
+              localUrl("IBMPlexSans-" ++ name),
+              url("/static/font/IBMPlexSans-" ++ name ++ "-Latin1.woff2"),
+              url("/static/font/IBMPlexSans-" ++ name ++ "-Latin1.woff"),
+            ],
+            ~fontStyle=`normal,
+            ~fontWeight=weight,
+            (),
+          )
+        ),
+      weights,
+    );
   let ibmplexsans =
     fontFamily("IBM Plex Sans, Helvetica Neue, Arial, sans-serif");
 
