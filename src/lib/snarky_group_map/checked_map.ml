@@ -22,11 +22,11 @@ struct
     (* z = sqrt of x (if one exists) *)
     let z =
       exists Field.typ
-        ~compute:
-          As_prover.(
-            map (read_var x) ~f:(fun x ->
+        ~compute:(fun () ->
+          let x = (As_prover.read_var x) in
                 if M.Field.Constant.is_square x then M.Field.Constant.sqrt x
-                else M.Field.Constant.one ))
+                else M.Field.Constant.one )
+
     in
     let z2 = Field.(z * z) in
     let b = Field.equal z2 x in
