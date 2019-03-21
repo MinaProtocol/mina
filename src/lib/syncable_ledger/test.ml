@@ -43,11 +43,16 @@ struct
   open Input'
   module Sync_responder = Sync_ledger.Responder
 
-  (* not really kosher but the tests are run in-order, so this will get filled
-   * in before we need it. *)
+  (* Will contain the total number of queries need to sync to l2. Not really
+     kosher but the tests are run in-order, so this will get filled in before we
+     need it. *)
   let total_queries = ref None
 
   let logger = Logger.null ()
+
+  let () =
+    Async.Scheduler.set_record_backtraces true ;
+    Core.Backtrace.elide := false
 
   let%test "full_sync_entirely_different" =
     let l1, _k1 = Ledger.load_ledger 1 1 in
@@ -84,10 +89,15 @@ struct
         Root_hash.equal desired_root (Ledger.merkle_root mt)
     | `Target_changed _ -> false
 
-  let%test_unit "new_goal_soon" =
-    let l1, _k1 = Ledger.load_ledger num_accts 1 in
-    let l2, _k2 = Ledger.load_ledger num_accts 2 in
-    let l3, _k3 = Ledger.load_ledger num_accts 3 in
+  let%test_unit "changing goals" =
+    let l1, _k1 = Ledger.load_ledger 1 1 in
+    let l2, _k2 = Ledger.load_ledger (num_accts - 1) 2 in
+    let change_goal_ledgers =
+      List.map ~f:Tuple2.get1
+        [ Ledger.load_ledger num_accts 3
+        ; Ledger.load_ledger (max (num_accts - 2) 2) 4 ]
+    in
+    let change_goal_ledgers_ref = ref change_goal_ledgers in
     let desired_root = ref @@ Ledger.merkle_root l2 in
     let lsync = Sync_ledger.create l1 ~logger in
     let qr = Sync_ledger.query_reader lsync in
@@ -105,35 +115,39 @@ struct
            if not (Root_hash.equal hash !desired_root) then Deferred.unit
            else
              let res =
-               if !ctr = (!total_queries |> Option.value_exn) / 2 then (
-                 sr :=
-                   Sync_responder.create l3
-                     (fun q -> seen_queries := q :: !seen_queries)
-                     ~logger ;
-                 desired_root := Ledger.merkle_root l3 ;
-                 Sync_ledger.new_goal lsync !desired_root |> ignore ;
-                 Deferred.unit )
-               else
-                 let answ = Sync_responder.answer_query !sr query in
-                 Linear_pipe.write aw
-                   (!desired_root, query, Envelope.Incoming.local answ)
+               ( if !ctr = (!total_queries |> Option.value_exn) / 2 then
+                 match !change_goal_ledgers_ref with
+                 | [] -> ()
+                 | goal_ledger :: rest ->
+                     sr :=
+                       Sync_responder.create goal_ledger
+                         (fun q -> seen_queries := q :: !seen_queries)
+                         ~logger ;
+                     desired_root := Ledger.merkle_root goal_ledger ;
+                     Sync_ledger.new_goal lsync !desired_root |> ignore ;
+                     change_goal_ledgers_ref := rest ;
+                     ctr := 0 ) ;
+               let answ = Sync_responder.answer_query !sr query in
+               Linear_pipe.write aw
+                 (!desired_root, query, Envelope.Incoming.local answ)
              in
              ctr := !ctr + 1 ;
              res )) ;
-    match
-      Async.Thread_safe.block_on_async_exn (fun () ->
-          Sync_ledger.fetch lsync !desired_root )
-    with
-    | `Ok _ -> failwith "shouldn't happen"
-    | `Target_changed _ -> (
+    let rec go () =
       match
         Async.Thread_safe.block_on_async_exn (fun () ->
-            Sync_ledger.wait_until_valid lsync !desired_root )
+            Sync_ledger.fetch lsync !desired_root )
       with
-      | `Ok mt ->
-          [%test_result: Root_hash.t] ~expect:(Ledger.merkle_root l3)
-            (Ledger.merkle_root mt)
-      | `Target_changed _ -> failwith "the target changed again" )
+      | `Ok l -> (
+        match !change_goal_ledgers_ref with
+        | [] ->
+            [%test_result: Root_hash.t]
+              ~expect:(Ledger.merkle_root @@ List.last_exn change_goal_ledgers)
+              (Ledger.merkle_root l)
+        | _ :: _ -> failwith "shouldn't be done yet" )
+      | `Target_changed (_, _) -> go ()
+    in
+    go ()
 end
 
 module Root_hash = struct
