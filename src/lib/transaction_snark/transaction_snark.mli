@@ -21,7 +21,23 @@ module Statement : sig
     ; supply_increase: Currency.Amount.Stable.V1.t
     ; fee_excess: Currency.Fee.Signed.Stable.V1.t
     ; proof_type: Proof_type.Stable.V1.t }
-  [@@deriving sexp, bin_io, hash, compare, fields, yojson]
+  [@@deriving sexp, hash, compare, yojson]
+
+  module Stable :
+    sig
+      module V1 : sig
+        type t =
+          { source: Coda_base.Frozen_ledger_hash.Stable.V1.t
+          ; target: Coda_base.Frozen_ledger_hash.Stable.V1.t
+          ; supply_increase: Currency.Amount.Stable.V1.t
+          ; fee_excess: Currency.Fee.Signed.Stable.V1.t
+          ; proof_type: Proof_type.Stable.V1.t }
+        [@@deriving sexp, bin_io, hash, compare, yojson]
+      end
+
+      module Latest = V1
+    end
+    with type V1.t = t
 
   val gen : t Quickcheck.Generator.t
 

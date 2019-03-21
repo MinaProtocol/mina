@@ -1,6 +1,7 @@
 open Core
 open Currency
 open Signature_lib
+open Module_version
 
 module type S = sig
   type ledger
@@ -38,8 +39,18 @@ module type S = sig
       | Coinbase of coinbase
     [@@deriving sexp, bin_io]
 
-    type t = {previous_hash: Ledger_hash.t; varying: varying}
-    [@@deriving sexp, bin_io]
+    type t = {previous_hash: Ledger_hash.Stable.V1.t; varying: varying}
+    [@@deriving sexp]
+
+    module Stable :
+      sig
+        module V1 : sig
+          type t [@@deriving sexp, bin_io]
+        end
+
+        module Latest = V1
+      end
+      with type V1.t = t
 
     val transaction : t -> Transaction.t Or_error.t
   end
@@ -158,9 +169,26 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
       | Coinbase of coinbase
     [@@deriving sexp, bin_io]
 
-    (* TODO : version *)
-    type t = {previous_hash: Ledger_hash.Stable.V1.t; varying: varying}
-    [@@deriving sexp, bin_io]
+    module Stable = struct
+      module V1 = struct
+        module T = struct
+          let version = 1
+
+          type t = {previous_hash: Ledger_hash.Stable.V1.t; varying: varying}
+          [@@deriving sexp, bin_io]
+        end
+
+        include T
+        include Registration.Make_latest_version (T)
+      end
+
+      module Latest = V1
+    end
+
+    (* bin_io omitted *)
+    type t = Stable.Latest.t =
+      {previous_hash: Ledger_hash.Stable.V1.t; varying: varying}
+    [@@deriving sexp]
 
     let transaction : t -> Transaction.t Or_error.t =
      fun {varying; _} ->

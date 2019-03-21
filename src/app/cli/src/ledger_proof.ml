@@ -76,7 +76,9 @@ module Debug :
       module T = struct
         let version = 1
 
-        type t = Transaction_snark.Statement.t * Sok_message.Digest.Stable.V1.t
+        type t =
+          Transaction_snark.Statement.Stable.V1.t
+          * Sok_message.Digest.Stable.V1.t
         [@@deriving sexp, bin_io, yojson]
       end
 

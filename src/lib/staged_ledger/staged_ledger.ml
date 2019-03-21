@@ -1607,40 +1607,44 @@ let%test_module "test" =
       end
 
       module Ledger_proof_statement = struct
-        module T = struct
-          type t =
-            { source: Ledger_hash.Stable.V1.t
-            ; target: Ledger_hash.Stable.V1.t
-            ; supply_increase: Currency.Amount.t
-            ; fee_excess: Fee.Signed.t
-            ; proof_type: [`Base | `Merge] }
-          [@@deriving sexp, bin_io, compare, hash, yojson]
+        module Stable = struct
+          module V1 = struct
+            type t =
+              { source: Ledger_hash.Stable.V1.t
+              ; target: Ledger_hash.Stable.V1.t
+              ; supply_increase: Currency.Amount.t
+              ; fee_excess: Fee.Signed.t
+              ; proof_type: [`Base | `Merge] }
+            [@@deriving sexp, bin_io, compare, hash, yojson]
 
-          let merge s1 s2 =
-            let open Or_error.Let_syntax in
-            let%bind _ =
-              if s1.target = s2.source then Ok ()
-              else
-                Or_error.errorf
-                  !"Invalid merge: target: %s source %s"
-                  (Int.to_string s1.target) (Int.to_string s2.source)
-            in
-            let%map fee_excess =
-              Fee.Signed.add s1.fee_excess s2.fee_excess
-              |> option "Error adding fees"
-            and supply_increase =
-              Currency.Amount.add s1.supply_increase s2.supply_increase
-              |> option "Error adding supply increases"
-            in
-            { source= s1.source
-            ; target= s2.target
-            ; supply_increase
-            ; fee_excess
-            ; proof_type= `Merge }
+            let merge s1 s2 =
+              let open Or_error.Let_syntax in
+              let%bind _ =
+                if s1.target = s2.source then Ok ()
+                else
+                  Or_error.errorf
+                    !"Invalid merge: target: %s source %s"
+                    (Int.to_string s1.target) (Int.to_string s2.source)
+              in
+              let%map fee_excess =
+                Fee.Signed.add s1.fee_excess s2.fee_excess
+                |> option "Error adding fees"
+              and supply_increase =
+                Currency.Amount.add s1.supply_increase s2.supply_increase
+                |> option "Error adding supply increases"
+              in
+              { source= s1.source
+              ; target= s2.target
+              ; supply_increase
+              ; fee_excess
+              ; proof_type= `Merge }
+          end
+
+          module Latest = V1
         end
 
-        include T
-        include Comparable.Make (T)
+        include Stable.Latest
+        include Comparable.Make (Stable.Latest)
 
         let gen =
           let open Quickcheck.Generator.Let_syntax in
@@ -1695,7 +1699,15 @@ let%test_module "test" =
         type transaction = Transaction.t [@@deriving sexp, bin_io]
 
         module Undo = struct
-          type t = transaction [@@deriving sexp, bin_io]
+          type t = transaction [@@deriving sexp]
+
+          module Stable = struct
+            module V1 = struct
+              type t = transaction [@@deriving sexp, bin_io]
+            end
+
+            module Latest = V1
+          end
 
           module User_command = struct end
 
