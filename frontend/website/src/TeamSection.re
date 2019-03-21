@@ -83,10 +83,10 @@ let headerStyle =
       lineHeight(headerHeight),
       color(Style.Colors.white),
       Style.Typeface.rubik,
-      fontSize(`em(2.5)),
+      fontSize(`rem(2.1)),
       textAlign(`center),
       display(`inlineBlock),
-      media(Style.MediaQuery.notMobile, [fontSize(`em(2.8))]),
+      media(Style.MediaQuery.notMobile, [fontSize(`rem(2.8))]),
     ])
   );
 let make = _children => {
@@ -96,7 +96,6 @@ let make = _children => {
       <div
         className=Css.(
           style([
-            // position(`absolute),
             transforms([`translateY(`percent(-50.0))]),
             height(headerHeight),
             marginLeft(`auto),
