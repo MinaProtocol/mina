@@ -292,7 +292,8 @@ module Epoch_ledger = struct
   type ('ledger_hash, 'amount) t = {hash: 'ledger_hash; total_currency: 'amount}
   [@@deriving sexp, bin_io, eq, compare, hash, to_yojson]
 
-  type value = (Coda_base.Frozen_ledger_hash.t, Amount.t) t
+  (* TODO : version *)
+  type value = (Coda_base.Frozen_ledger_hash.Stable.V1.t, Amount.t) t
   [@@deriving sexp, bin_io, eq, compare, hash, to_yojson]
 
   type var = (Coda_base.Frozen_ledger_hash.var, Amount.var) t
@@ -672,8 +673,13 @@ module Epoch_data = struct
     ; length: 'length }
   [@@deriving sexp, bin_io, eq, compare, hash, to_yojson]
 
+  (* TODO : version *)
   type value =
-    (Epoch_ledger.value, Epoch_seed.t, Coda_base.State_hash.t, Length.t) t
+    ( Epoch_ledger.value
+    , Epoch_seed.Stable.V1.t
+    , Coda_base.State_hash.Stable.V1.t
+    , Length.t )
+    t
   [@@deriving sexp, bin_io, eq, compare, hash, to_yojson]
 
   type var =
@@ -848,7 +854,7 @@ module Global_slot = struct
       + (UInt32.to_int Constants.Epoch.size * Epoch.to_int epoch) )
 
   module Checked = struct
-    (* TODO: It's possible to share this hash computation with 
+    (* TODO: It's possible to share this hash computation with
        the hashing of the state. Might be worth doing. *)
     let create ~(epoch : Epoch.Unpacked.var) ~(slot : Epoch.Slot.Unpacked.var)
         =
@@ -889,11 +895,12 @@ module Checkpoints = struct
       let to_yojson f t = List.to_yojson f (to_list t)
     end
 
+    (* TODO : version *)
     type t =
       { (* TODO: Make a nice way to force this to have bounded (or fixed) size for
          bin_io reasons *)
-        prefix: Coda_base.State_hash.t Q.t
-      ; tail: Hash.t }
+        prefix: Coda_base.State_hash.Stable.V1.t Q.t
+      ; tail: Hash.Stable.V1.t }
     [@@deriving sexp, bin_io, compare, hash, to_yojson]
 
     let equal t1 t2 = compare t1 t2 = 0
@@ -1557,13 +1564,10 @@ let select ~existing ~candidate ~logger =
     log_result choice msg
   in
   Logger.info logger ~module_:__MODULE__ ~location:__LOC__
-    "Selecting best consensus state" ;
-  Logger.trace logger ~module_:__MODULE__ ~location:__LOC__
-    !"existing consensus state: %{sexp:Consensus_state.Value.t}"
-    existing ;
-  Logger.trace logger ~module_:__MODULE__ ~location:__LOC__
-    !"candidate consensus state: %{sexp:Consensus_state.Value.t}"
-    candidate ;
+    "selecting best consensus state"
+    ~metadata:
+      [ ("existing", Consensus_state.Value.to_yojson existing)
+      ; ("candidate", Consensus_state.Value.to_yojson candidate) ] ;
   (* TODO: add fork_before_checkpoint check *)
   (* Each branch contains a precondition predicate and a choice predicate,
    * which takes the new state when true. Each predicate is also decorated

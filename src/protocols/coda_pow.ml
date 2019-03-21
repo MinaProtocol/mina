@@ -130,7 +130,7 @@ module type Ledger_hash_intf = sig
 
   val to_bytes : t -> string
 
-  include Hashable.S_binable with type t := t
+  include Hashable.S with type t := t
 end
 
 module type Frozen_ledger_hash_intf = sig
@@ -296,10 +296,10 @@ end
 
 module type Snark_pool_proof_intf = sig
   module Statement : sig
-    type t [@@deriving sexp, bin_io]
+    type t [@@deriving sexp, bin_io, yojson]
   end
 
-  type t [@@deriving sexp, bin_io]
+  type t [@@deriving sexp, bin_io, yojson]
 end
 
 module type User_command_intf = sig
@@ -325,7 +325,15 @@ module type Private_key_intf = sig
 end
 
 module type Compressed_public_key_intf = sig
-  type t [@@deriving sexp, bin_io, compare, yojson]
+  type t [@@deriving sexp, compare, yojson]
+
+  module Stable :
+    sig
+      module V1 : sig
+        type t [@@deriving sexp, bin_io, compare, yojson]
+      end
+    end
+    with type V1.t = t
 
   include Comparable.S with type t := t
 end
@@ -426,12 +434,12 @@ module type Ledger_proof_intf = sig
   type sok_digest
 
   (* bin_io omitted intentionally *)
-  type t [@@deriving sexp]
+  type t [@@deriving sexp, yojson]
 
   module Stable :
     sig
       module V1 : sig
-        type t [@@deriving sexp, bin_io]
+        type t [@@deriving sexp, bin_io, yojson]
       end
 
       module Latest = V1
@@ -471,7 +479,7 @@ module type Transaction_snark_work_intf = sig
   type public_key
 
   module Statement : sig
-    type t = statement list
+    type t = statement list [@@deriving yojson]
 
     include Sexpable.S with type t := t
 
@@ -480,7 +488,7 @@ module type Transaction_snark_work_intf = sig
     module Stable :
       sig
         module V1 : sig
-          type t
+          type t [@@deriving yojson]
 
           include Sexpable.S with type t := t
 

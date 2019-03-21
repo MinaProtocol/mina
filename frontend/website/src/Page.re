@@ -7,6 +7,7 @@ module Footer = {
           Style.Typeface.ibmplexsans,
           color(Style.Colors.slate),
           textDecoration(`none),
+          display(`inline),
           hover([color(Style.Colors.hyperlink)]),
           fontSize(`rem(1.0)),
           fontWeight(`light),
@@ -37,16 +38,11 @@ module Footer = {
   let make = (~bgcolor, _children) => {
     ...component,
     render: _self =>
-      <div
-        className=Css.(
-          style([backgroundColor(bgcolor), boxSizing(`contentBox)])
-        )>
+      <footer className=Css.(style([backgroundColor(bgcolor)]))>
         <section
           className=Css.(
             style(
               [
-                marginTop(`rem(2.)),
-                boxSizing(`borderBox),
                 maxWidth(`rem(96.0)),
                 marginLeft(`auto),
                 marginRight(`auto),
@@ -98,28 +94,7 @@ module Footer = {
             </ul>
           </div>
         </section>
-      </div>,
-  };
-};
-
-module Wrapped = {
-  module Style = {
-    open Css;
-    open Style;
-
-    let s =
-      style([
-        margin(`auto),
-        media(MediaQuery.full, [maxWidth(`rem(84.0)), margin(`auto)]),
-      ]);
-  };
-
-  let component = ReasonReact.statelessComponent("Page.Wrapped");
-  let make = children => {
-    ...component,
-    render: _ => {
-      <div className=Style.s> ...children </div>;
-    },
+      </footer>,
   };
 };
 
@@ -135,19 +110,47 @@ let make =
   render: _ =>
     <html>
       <Head filename=name extra=extraHeaders />
-      <body
-        className=Css.(
-          style([
-            position(`relative),
-            maxWidth(`rem(84.0)),
-            marginRight(`auto),
-            marginLeft(`auto),
-            height(`percent(100.0)),
-            before(Grid.overlay),
-          ])
-        )>
-        <Wrapped> <CodaNav /> <div> ...children </div> </Wrapped>
+      <body>
+        <Wrapped>
+          <div
+            className=Css.(
+              style([
+                marginTop(`rem(1.25)),
+                media(Style.MediaQuery.full, [marginTop(`rem(2.0))]),
+              ])
+            )>
+            <CodaNav />
+          </div>
+        </Wrapped>
+        <div> ...children </div>
         <Footer bgcolor=footerColor />
+        {if (Grid.enabled) {
+           <div
+             className=Css.(
+               style([
+                 position(`absolute),
+                 top(`zero),
+                 width(`percent(100.0)),
+                 height(`percent(100.0)),
+               ])
+             )>
+             <div
+               className=Css.(
+                 style([
+                   position(`relative),
+                   marginRight(`auto),
+                   marginLeft(`auto),
+                   height(`percent(100.0)),
+                   width(`percent(100.0)),
+                   maxWidth(`rem(84.0)),
+                   before(Grid.overlay),
+                 ])
+               )
+             />
+           </div>;
+         } else {
+           <div />;
+         }}
       </body>
     </html>,
 };

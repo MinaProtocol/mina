@@ -237,7 +237,7 @@ module Types = struct
       ; user_commands_sent: int
       ; run_snark_worker: bool
       ; is_bootstrapping: bool
-      ; propose_pubkey: Public_key.t option
+      ; propose_pubkey: Public_key.Stable.Latest.t option
       ; histograms: Histograms.t option
       ; consensus_time_best_tip: string option
       ; consensus_time_now: string
@@ -270,7 +270,8 @@ end
 module Send_user_command = struct
   type query = User_command.Stable.Latest.t [@@deriving bin_io]
 
-  type response = Receipt.Chain_hash.t Or_error.t [@@deriving bin_io]
+  type response = Receipt.Chain_hash.Stable.Latest.t Or_error.t
+  [@@deriving bin_io]
 
   type error = unit [@@deriving bin_io]
 
@@ -294,7 +295,7 @@ end
 module Get_ledger = struct
   type query = Staged_ledger_hash.Stable.Latest.t [@@deriving bin_io]
 
-  type response = Account.Stable.V1.t list Or_error.t [@@deriving bin_io]
+  type response = Account.Stable.Latest.t list Or_error.t [@@deriving bin_io]
 
   type error = unit [@@deriving bin_io]
 
@@ -327,7 +328,8 @@ module Verify_proof = struct
 end
 
 module Prove_receipt = struct
-  type query = Receipt.Chain_hash.t * Public_key.Compressed.Stable.Latest.t
+  type query =
+    Receipt.Chain_hash.Stable.Latest.t * Public_key.Compressed.Stable.Latest.t
   [@@deriving bin_io]
 
   type response = Payment_proof.t Or_error.t [@@deriving bin_io]

@@ -23,24 +23,7 @@ module Investor = {
               alignItems(`center),
             ])
           )>
-          <img
-            src=imageSrc
-            className=Css.(
-              style([
-                width(`rem(2.5)),
-                height(`rem(2.5)),
-                borderRadius(`percent(100.)),
-                marginRight(`rem(1.)),
-                boxShadow(
-                  ~x=`zero,
-                  ~y=`zero,
-                  ~blur=`px(4),
-                  ~spread=`zero,
-                  Style.Colors.greenShadow,
-                ),
-              ])
-            )
-          />
+          <img src=imageSrc className=TeamSection.iconStyle />
           <h4
             className=Css.(
               merge([Style.Body.basic, style([color(Style.Colors.slate)])])
@@ -57,7 +40,7 @@ let make = _children => {
   ...component,
   render: _self =>
     <div>
-      <h3 className=Style.H3.wide> {ReasonReact.string("Investors")} </h3>
+      <h3 className=Style.H3.wings> {ReasonReact.string("Investors")} </h3>
       <div
         className=Css.(
           style([

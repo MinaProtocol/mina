@@ -101,10 +101,18 @@ end
 
 let%test_module "network pool test" =
   ( module struct
+    module Int = struct
+      include Int
+
+      let to_yojson x = `Int x
+
+      let of_yojson = function `Int x -> Ok x | _ -> Error "expected `Int"
+    end
+
     module Mock_proof = struct
       type input = Int.t
 
-      type t = Int.t [@@deriving sexp, bin_io]
+      type t = Int.t [@@deriving sexp, bin_io, yojson]
 
       let verify _ _ = return true
 
@@ -114,7 +122,7 @@ let%test_module "network pool test" =
     module Mock_work = struct
       (* no bin_io except in Stable versions *)
       module T = struct
-        type t = Int.t [@@deriving sexp, hash, compare]
+        type t = Int.t [@@deriving sexp, hash, compare, yojson]
 
         let gen = Int.gen
       end
