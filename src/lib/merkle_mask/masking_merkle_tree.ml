@@ -226,6 +226,8 @@ module Make (Inputs : Inputs_intf.S) = struct
         ~init:[(starting_address, starting_hash)]
         ~f:get_addresses_hashes
 
+    let has_unset_slots t = Base.has_unset_slots @@ get_parent t
+
     (* use mask Merkle root, if it exists, else get from parent *)
     let merkle_root t =
       assert_is_attached t ;

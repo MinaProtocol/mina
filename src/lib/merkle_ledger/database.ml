@@ -369,6 +369,8 @@ module Make (Inputs : Inputs_intf) :
 
   let fold_until = C.fold_until
 
+  let has_unset_slots _ = false
+
   let merkle_root mdb = get_hash mdb Location.root_hash
 
   let remove_accounts_exn t keys =

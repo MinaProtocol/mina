@@ -105,6 +105,8 @@ module Make_base (Inputs : Inputs_intf) :
 
     let merkle_path (T ((module Base), t)) = Base.merkle_path t
 
+    let has_unset_slots (T ((module Base), t)) = Base.has_unset_slots t
+
     let merkle_root (T ((module Base), t)) = Base.merkle_root t
 
     let index_of_key_exn (T ((module Base), t)) = Base.index_of_key_exn t

@@ -25,11 +25,16 @@ module type S = sig
 
   val set_batch_accounts : t -> (addr * account) list -> unit
 
-  (* Get all of the accounts that is in a subtree of the underlying merkle tree where it's root is `address`. 
-    The accounts are ordered from their address in the merkle tree *)
   val get_all_accounts_rooted_at_exn : t -> addr -> (addr * account) list
+  (** Get all of the accounts that are in a subtree of the underlying Merkle
+    tree rooted at `address`. The accounts are ordered by their addresses. *)
+
+  val has_unset_slots : t -> bool
+  (** In some ledgers, it's possible to preallocate account slots before filling
+      them in. Returns true if there are any unset slots, false otherwise. *)
 
   val merkle_root : t -> root_hash
+  (** Get the root hash of the ledger. May throw if there are unset slots. *)
 
   val make_space_for : t -> int -> unit
 end

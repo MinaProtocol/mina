@@ -10,7 +10,8 @@ module Query = struct
   module Stable = struct
     module V1 = struct
       type 'addr t =
-        | What_hash of 'addr  (** What is the hash at this address? *)
+        | What_child_hashes of 'addr
+            (** What are the hashes of the children of this address? *)
         | What_contents of 'addr
             (** What accounts are at this address? addr must have depth
             tree_depth - account_subtree_height *)
@@ -25,7 +26,7 @@ module Query = struct
 
   (* bin_io omitted intentionally *)
   type 'addr t = 'addr Stable.Latest.t =
-    | What_hash of 'addr
+    | What_child_hashes of 'addr
     | What_contents of 'addr
     | Num_accounts
   [@@deriving sexp, yojson]
@@ -35,7 +36,8 @@ module Answer = struct
   module Stable = struct
     module V1 = struct
       type ('hash, 'account) t =
-        | Has_hash of 'hash  (** The requested address has this hash **)
+        | Child_hashes_are of 'hash * 'hash
+            (** The requested address's children have these hashes **)
         | Contents_are of 'account list
             (** The requested address has these accounts *)
         | Num_accounts of int * 'hash
@@ -49,7 +51,7 @@ module Answer = struct
 
   (* bin_io omitted intentionally *)
   type ('hash, 'account) t = ('hash, 'account) Stable.Latest.t =
-    | Has_hash of 'hash
+    | Child_hashes_are of 'hash * 'hash
     | Contents_are of 'account list
     | Num_accounts of int * 'hash
   [@@deriving sexp, yojson]
@@ -110,7 +112,7 @@ module type S = sig
 
     val create : merkle_tree -> (query -> unit) -> logger:Logger.t -> t
 
-    val answer_query : t -> query -> answer
+    val answer_query : t -> query -> answer option
   end
 
   val create : merkle_tree -> logger:Logger.t -> t
@@ -226,89 +228,6 @@ end = struct
 
   type index = int
 
-  module Valid :
-    Validity_intf with type hash := Hash.t and type addr := Addr.t = struct
-    type hash_status = Fresh | Stale [@@deriving sexp, eq]
-
-    type hash' = hash_status * Hash.t [@@deriving sexp, eq]
-
-    type tree = Leaf of hash' option | Node of hash' * tree ref * tree ref
-    [@@deriving sexp]
-
-    type t = tree ref [@@deriving sexp]
-
-    let create () = ref (Leaf None)
-
-    let set t a (s, h) =
-      let rec go node dirs depth =
-        match dirs with
-        | d :: ds -> (
-            let accessor =
-              match d with Direction.Left -> fst | Direction.Right -> snd
-            in
-            match !node with
-            | Leaf (Some (Fresh, _)) ->
-                failwith
-                  "why are we descending into the children of a fresh leaf?"
-            | Leaf None ->
-                failwith
-                  "why are we descending into the unknown? take care of this \
-                   leaf first"
-            | Leaf (Some (Stale, l)) ->
-                (* otherwise we'd have to synthesize hashes *)
-                assert (ds = []) ;
-                node := Node ((Stale, l), ref (Leaf None), ref (Leaf None)) ;
-                go node dirs depth
-            | Node (_, l, r) -> (
-                let res = go (accessor (l, r)) ds (depth + 1) in
-                match !node with
-                | Node
-                    ( (Stale, h)
-                    , {contents= Leaf (Some (Fresh, lh))}
-                    , {contents= Leaf (Some (Fresh, rh))} ) ->
-                    (* we _must_ check if the hashes match first, because we could be
-                       in validation mode and there might be some leftover junk. *)
-                    let mh =
-                      Hash.merge ~height:(max 0 (MT.depth - depth - 1)) lh rh
-                    in
-                    if Hash.equal mh h then (
-                      node := Leaf (Some (Fresh, h)) ;
-                      res )
-                    else res
-                | _ -> res ) )
-        | [] ->
-            let changed =
-              match !node with
-              | Leaf (Some (_, h')) | Node ((_, h'), _, _) ->
-                  not @@ Hash.equal h h'
-              | Leaf None -> false
-            in
-            node := Leaf (Some (s, h)) ;
-            changed
-      in
-      go t (Addr.dirs_from_root a) 0
-
-    let get t a =
-      let rec go node dirs =
-        match dirs with
-        | d :: ds -> (
-            let accessor =
-              match d with Direction.Left -> fst | Direction.Right -> snd
-            in
-            match !node with
-            | Leaf _ -> None
-            | Node (_, l, r) -> go (accessor (l, r)) ds )
-        | [] -> ( match !node with Leaf c -> c | Node (c, _, _) -> Some c )
-      in
-      go t (Addr.dirs_from_root a)
-
-    let completely_fresh t =
-      match !t with
-      | Leaf (Some (Fresh, _)) -> true
-      | Node ((Fresh, _), _, _) -> true
-      | _ -> false
-  end
-
   type answer = (Hash.t, Account.t) Answer.t
 
   type query = Addr.t Query.t
@@ -319,11 +238,25 @@ end = struct
     let create : MT.t -> (query -> unit) -> logger:Logger.t -> t =
      fun mt f ~logger -> {mt; f; logger}
 
-    let answer_query : t -> query -> answer =
+    let answer_query : t -> query -> answer option =
      fun {mt; f; logger} q ->
       f q ;
       match q with
-      | What_hash a -> Has_hash (MT.get_inner_hash_at_addr_exn mt a)
+      | What_child_hashes a -> (
+        match
+          let open Or_error.Let_syntax in
+          let%bind lchild = Addr.child a Direction.Left in
+          let%map rchild = Addr.child a Direction.Right in
+          Answer.Child_hashes_are
+            ( MT.get_inner_hash_at_addr_exn mt lchild
+            , MT.get_inner_hash_at_addr_exn mt rchild )
+        with
+        | Ok answer -> Some answer
+        | Error _ ->
+            (* TODO: punish *)
+            Logger.faulty_peer logger ~module_:__MODULE__ ~location:__LOC__
+              "Peer requested child hashes of invalid address!" ;
+            None )
       | What_contents a ->
           let addresses_and_accounts =
             List.sort ~compare:(fun (addr1, _) (addr2, _) ->
@@ -359,7 +292,7 @@ end = struct
                  list: $addresses_and_accounts"
             else ()
           else () ;
-          Contents_are accounts
+          Some (Contents_are accounts)
       | Num_accounts ->
           let len = MT.num_accounts mt in
           let height = Int.ceil_log2 len in
@@ -369,15 +302,14 @@ end = struct
               (fun a -> Addr.child_exn a Direction.Left)
               (Addr.root ())
           in
-          Num_accounts (len, MT.get_inner_hash_at_addr_exn mt content_root_addr)
+          Some
+            (Num_accounts
+               (len, MT.get_inner_hash_at_addr_exn mt content_root_addr))
   end
-
-  type waiting = {expected: Hash.t; children: (Addr.t * Hash.t) list}
 
   type t =
     { mutable desired_root: Root_hash.t option
     ; tree: MT.t
-    ; mutable validity: Valid.t
     ; logger: Logger.t
     ; answers:
         (Root_hash.t * query * answer Envelope.Incoming.t) Linear_pipe.Reader.t
@@ -385,7 +317,9 @@ end = struct
         (Root_hash.t * query * answer Envelope.Incoming.t) Linear_pipe.Writer.t
     ; queries: (Root_hash.t * query) Linear_pipe.Writer.t
     ; query_reader: (Root_hash.t * query) Linear_pipe.Reader.t
-    ; waiting_parents: waiting Addr.Table.t
+    ; waiting_parents: Hash.t Addr.Table.t
+          (** Addresses we are waiting for the children of, and the expected
+              hash of the node with the address. *)
     ; waiting_content: Hash.t Addr.Table.t
     ; mutable validity_listener:
         [`Ok | `Target_changed of Root_hash.t option * Root_hash.t] Ivar.t }
@@ -411,8 +345,7 @@ end = struct
         [ ("parent_address", Addr.to_yojson parent_addr)
         ; ("hash", Hash.to_yojson expected) ]
       "Expecting children parent $parent_address, expected: $hash" ;
-    Addr.Table.add_exn t.waiting_parents ~key:parent_addr
-      ~data:{expected; children= []}
+    Addr.Table.add_exn t.waiting_parents ~key:parent_addr ~data:expected
 
   let expect_content : t -> Addr.t -> Hash.t -> unit =
    fun t addr expected ->
@@ -434,64 +367,48 @@ end = struct
     Addr.Table.remove t.waiting_content addr ;
     Ok expected
 
-  let validity_changed_at t a =
-    (* TODO #537: This is probably obnoxiously slow. *)
-    let filter a' = not @@ Addr.is_parent_of a ~maybe_child:a' in
-    Addr.Table.filter_keys_inplace t.waiting_content ~f:filter ;
-    Addr.Table.filter_keys_inplace t.waiting_parents ~f:filter
-
-  (** Try to add the hash at an address to the ledger. If after adding the hash
-      we have both children of the parent, check that the children hash to the
-      correct value. If everything is kosher, return the children of the added
-      node and its sibling for so they can be queued for retrieval. *)
-  let add_child_hash_to :
+  (** Given an address and the hashes of the children of the corresponding node,
+      check the children hash to the expected value. If they do, queue the
+      children for retrieval if the values in the underlying ledger don't match
+      the hashes we got from the network. *)
+  let add_child_hashes_to :
          t
       -> Addr.t
       -> Hash.t
+      -> Hash.t
       -> [ `Good of (Addr.t * Hash.t) list
            (** The addresses and expected hashes of the now-retrievable children *)
-         | `More  (** We need the sibling in order to validate *)
-         | `Hash_mismatch  (** Hash check failed, somebody lied. *) ]
-         Or_error.t =
-   fun t child_addr h ->
-    (* lots of _exn called on attacker data. it's not clear how to handle these regardless *)
-    let open Or_error.Let_syntax in
-    let%map parent = Addr.parent child_addr in
-    Addr.Table.change t.waiting_parents parent ~f:(function
-      | None -> failwith "forgot to expect_children"
-      | Some {expected; children} ->
-          Some {expected; children= (child_addr, h) :: children} ) ;
-    let {expected; children} = Addr.Table.find_exn t.waiting_parents parent in
-    let validate addr hash =
-      let should_skip =
-        match Valid.get t.validity addr with
-        | Some (Fresh, vh) -> Hash.equal hash vh
-        | _ -> false
-      in
-      (* we check the validity tree first because the underlying MT hashes might not be current *)
-      if should_skip then []
-      else if Hash.equal (MT.get_inner_hash_at_addr_exn t.tree addr) hash then (
-        if Valid.set t.validity addr (Fresh, hash) then
-          validity_changed_at t addr ;
-        [] )
-      else (
-        if Valid.set t.validity addr (Stale, hash) then
-          validity_changed_at t addr ;
-        [(addr, hash)] )
+         | `Hash_mismatch  (** Hash check failed, peer lied. *) ] =
+   fun t parent_addr lh rh ->
+    let la, ra =
+      Option.value_exn ~message:"Tried to fetch a leaf as if it was a node"
+        ( Or_error.ok
+        @@ Or_error.both
+             (Addr.child parent_addr Direction.Left)
+             (Addr.child parent_addr Direction.Right) )
     in
-    match children with
-    | [(l1, h1); (l2, h2)] ->
-        let (l1, h1), (l2, h2) =
-          if List.last_exn (Addr.dirs_from_root l1) = Direction.Left then
-            ((l1, h1), (l2, h2))
-          else ((l2, h2), (l1, h1))
-        in
-        let merged = Hash.merge ~height:(MT.depth - Addr.depth l1) h1 h2 in
-        if Hash.equal merged expected then (
-          Addr.Table.remove t.waiting_parents parent ;
-          `Good (List.rev_append (validate l1 h1) (validate l2 h2)) )
-        else `Hash_mismatch
-    | _ -> `More
+    let expected =
+      Option.value_exn ~message:"Forgot to wait for a node"
+        (Addr.Table.find t.waiting_parents parent_addr)
+    in
+    let merged_hash =
+      (* Height here is the height of the things we're merging, so one less than
+         the parent height. *)
+      Hash.merge ~height:(MT.depth - Addr.depth parent_addr - 1) lh rh
+    in
+    if Hash.equal merged_hash expected then (
+      (* Fetch the children of a node if the hash in the underlying ledger
+         doesn't match what we got. *)
+      let should_fetch_children addr hash =
+        not @@ Hash.equal (MT.get_inner_hash_at_addr_exn t.tree addr) hash
+      in
+      let subtrees_to_fetch =
+        [(la, lh); (ra, rh)]
+        |> List.filter ~f:(Tuple2.uncurry should_fetch_children)
+      in
+      Addr.Table.remove t.waiting_parents parent_addr ;
+      `Good subtrees_to_fetch )
+    else `Hash_mismatch
 
   let all_done t res =
     if not (Root_hash.equal (MT.merkle_root t.tree) (desired_root_exn t)) then
@@ -529,10 +446,8 @@ end = struct
         (desired_root_exn t, What_contents addr) )
     else (
       expect_children t addr exp_hash ;
-      Linear_pipe.write_without_pushback t.queries
-        (desired_root_exn t, What_hash (Addr.child_exn addr Direction.Left)) ;
-      Linear_pipe.write_without_pushback t.queries
-        (desired_root_exn t, What_hash (Addr.child_exn addr Direction.Right)) )
+      Linear_pipe.write_without_pushback_if_open t.queries
+        (desired_root_exn t, What_child_hashes addr) )
 
   (** Handle the initial Num_accounts message, starting the main syncing
       process. *)
@@ -545,16 +460,18 @@ end = struct
     (* TODO: punish *)
     MT.make_space_for t.tree n ;
     Addr.Table.clear t.waiting_parents ;
+    (* We should use this information to set the empty account slots empty and
+       start syncing at the content root. See #1972. *)
     Addr.Table.clear t.waiting_content ;
-    Valid.set t.validity (Addr.root ()) (Stale, rh) |> ignore ;
     handle_node t (Addr.root ()) rh
 
-  (* Assumption: only ever one answer is received for a given query
-     When violated, waiting_parents can get junk added to it, which
-     will stick around until the SL is destroyed, or else cause a
-     node to never be verified *)
   let main_loop t =
     let handle_answer (root_hash, query, env) =
+      let already_done =
+        match Ivar.peek t.validity_listener with
+        | Some `Ok -> true
+        | _ -> false
+      in
       let answer = Envelope.Incoming.data env in
       Logger.trace t.logger ~module_:__MODULE__ ~location:__LOC__
         ~metadata:[("root_hash", Root_hash.to_yojson root_hash)]
@@ -566,39 +483,35 @@ end = struct
             ; ("ignored_hash", Root_hash.to_yojson root_hash) ]
           "My desired root was $desired_hash, so I'm ignoring $ignored_hash" ;
         () )
+      else if already_done then
+        (* This can happen if we asked for hashes that turn out to be equal in
+           underlying ledger and the target. *)
+        Logger.debug t.logger ~module_:__MODULE__ ~location:__LOC__
+          "Got sync response when we're already finished syncing"
       else
         let res =
           match (query, answer) with
-          | Query.What_hash addr, Answer.Has_hash h -> (
-            match add_child_hash_to t addr h with
+          | Query.What_child_hashes addr, Answer.Child_hashes_are (lh, rh) -> (
+            match add_child_hashes_to t addr lh rh with
             (* TODO #435: Stick this in a log, punish the sender *)
-            | Error e ->
+            | `Hash_mismatch ->
                 Logger.faulty_peer t.logger ~module_:__MODULE__
                   ~location:__LOC__
                   ~metadata:
-                    [ ("child_hash", Hash.to_yojson h)
+                    [ ("left_child_hash", Hash.to_yojson lh)
+                    ; ("right_child_hash", Hash.to_yojson rh)
                     ; ( "sender"
                       , Envelope.Sender.to_yojson
                           (Envelope.Incoming.sender env) ) ]
-                  "Got error from when trying to add child_hash $child_hash \
-                   %s $sender"
-                  (Error.to_string_hum e)
-            | Ok (`Good children_to_verify) ->
+                  "Peer lied when trying to add child hashes $left_child_hash \
+                   and $right_child_hash. Sender was: $sender"
+            | `Good children_to_verify ->
                 (* TODO #312: Make sure we don't write too much *)
                 List.iter children_to_verify ~f:(fun (addr, hash) ->
-                    handle_node t addr hash )
-            | Ok `More -> () (* wait for the other answer to come in *)
-            | Ok `Hash_mismatch ->
-                (* just ask again for both children of the parent? this is the
-                 only case where we can't immediately pin blame on a single
-                 node. *)
-                failwith "figure out how to handle peers lying" )
+                    handle_node t addr hash ) )
           | Query.What_contents addr, Answer.Contents_are leaves ->
               (* FIXME untrusted _exn *)
-              let subtree_hash =
-                add_content t addr leaves |> Or_error.ok_exn
-              in
-              Valid.set t.validity addr (Fresh, subtree_hash) |> ignore
+              add_content t addr leaves |> Or_error.ok_exn |> ignore
           | Query.Num_accounts, Answer.Num_accounts (count, content_root) ->
               handle_num_accounts t count content_root
           | query, answer ->
@@ -614,9 +527,14 @@ end = struct
                 "Peer $peer answered question we didn't ask! Query was $query \
                  answer was $answer"
         in
-        if Valid.completely_fresh t.validity then (
+        if
+          (not (MT.has_unset_slots t.tree))
+          && Root_hash.equal
+               (Option.value_exn t.desired_root)
+               (MT.merkle_root t.tree)
+        then (
           Logger.trace t.logger ~module_:__MODULE__ ~location:__LOC__
-            "Snarked database sync'd. Completely fresh, all done" ;
+            "Snarked database sync'd. All done" ;
           all_done t res )
         else res
     in
@@ -640,8 +558,6 @@ end = struct
         (`Target_changed (t.desired_root, h)) ;
       t.validity_listener <- Ivar.create () ;
       t.desired_root <- Some h ;
-      Valid.set t.validity (Addr.root ()) (Stale, Root_hash.to_hash h)
-      |> ignore ;
       Linear_pipe.write_without_pushback_if_open t.queries (h, Num_accounts) ;
       `New )
     else (
@@ -678,7 +594,6 @@ end = struct
       { desired_root= None
       ; tree= mt
       ; logger
-      ; validity= Valid.create ()
       ; answers= ar
       ; answer_writer= aw
       ; queries= qw

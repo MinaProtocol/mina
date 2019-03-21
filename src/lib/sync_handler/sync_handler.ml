@@ -60,7 +60,7 @@ module Make (Inputs : Inputs_intf) :
 
   let answer_query ~frontier hash query ~logger =
     let open Option.Let_syntax in
-    let%map ledger = get_ledger_by_hash ~frontier hash in
+    let%bind ledger = get_ledger_by_hash ~frontier hash in
     let responder = Sync_ledger.Mask.Responder.create ledger ignore ~logger in
     Sync_ledger.Mask.Responder.answer_query responder query
 
