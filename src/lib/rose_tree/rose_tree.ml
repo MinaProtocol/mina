@@ -1,6 +1,6 @@
 open Core_kernel
 
-type 'a t = T of 'a * 'a t list
+type 'a t = T of 'a * 'a t list [@@deriving yojson]
 
 let rec of_list_exn = function
   | [] ->
