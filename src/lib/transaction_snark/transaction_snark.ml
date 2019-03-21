@@ -4,6 +4,7 @@ open Coda_base
 open Snark_params
 open Currency
 open Fold_lib
+open Module_version
 
 let state_hash_size_in_triples = Tick.Field.size_in_triples
 
@@ -24,7 +25,33 @@ module Input = struct
 end
 
 module Proof_type = struct
-  type t = [`Merge | `Base] [@@deriving bin_io, sexp, hash, compare, yojson]
+  module Stable = struct
+    module V1 = struct
+      module T = struct
+        let version = 1
+
+        type t = [`Merge | `Base]
+        [@@deriving bin_io, sexp, hash, compare, yojson]
+      end
+
+      include T
+      include Registration.Make_latest_version (T)
+    end
+
+    module Latest = V1
+
+    module Module_decl = struct
+      let name = "transaction_snark_proof_type"
+
+      type latest = Latest.t
+    end
+
+    module Registrar = Registration.Make (Module_decl)
+    module Registered_V1 = Registrar.Register (V1)
+  end
+
+  (* bin_io omitted *)
+  type t = Stable.Latest.t [@@deriving sexp, hash, compare, yojson]
 
   let is_base = function `Base -> true | `Merge -> false
 end
@@ -36,7 +63,7 @@ module Statement = struct
       ; target: Coda_base.Frozen_ledger_hash.Stable.V1.t
       ; supply_increase: Currency.Amount.Stable.V1.t
       ; fee_excess: Currency.Fee.Signed.Stable.V1.t
-      ; proof_type: Proof_type.t }
+      ; proof_type: Proof_type.Stable.V1.t }
     [@@deriving sexp, bin_io, hash, compare, fields, yojson]
 
     let option lab =
@@ -75,7 +102,7 @@ end
 type t =
   { source: Frozen_ledger_hash.Stable.V1.t
   ; target: Frozen_ledger_hash.Stable.V1.t
-  ; proof_type: Proof_type.t
+  ; proof_type: Proof_type.Stable.V1.t
   ; supply_increase: Amount.Stable.V1.t
   ; fee_excess: Amount.Signed.Stable.V1.t
   ; sok_digest: Sok_message.Digest.Stable.V1.t
