@@ -245,7 +245,17 @@ module type Ledger_intf = sig
      and type unattached_mask := unattached_mask
 
   module Undo : sig
-    type t [@@deriving sexp, bin_io]
+    type t [@@deriving sexp]
+
+    module Stable :
+      sig
+        module V1 : sig
+          type t [@@deriving sexp, bin_io]
+        end
+
+        module Latest = V1
+      end
+      with type V1.t = t
 
     val transaction : t -> transaction Or_error.t
   end
@@ -417,7 +427,21 @@ module type Ledger_proof_statement_intf = sig
     ; supply_increase: Currency.Amount.t
     ; fee_excess: Fee.Signed.t
     ; proof_type: [`Base | `Merge] }
-  [@@deriving sexp, bin_io, compare]
+  [@@deriving sexp, compare]
+
+  module Stable :
+    sig
+      module V1 : sig
+        type t =
+          { source: ledger_hash
+          ; target: ledger_hash
+          ; supply_increase: Currency.Amount.t
+          ; fee_excess: Fee.Signed.t
+          ; proof_type: [`Base | `Merge] }
+        [@@deriving sexp, bin_io, compare]
+      end
+    end
+    with type V1.t = t
 
   val merge : t -> t -> t Or_error.t
 

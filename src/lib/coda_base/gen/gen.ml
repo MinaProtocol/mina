@@ -27,7 +27,7 @@ let rec random_scalar () =
   else random_scalar ()
 
 let keypairs =
-  let n = 40 in
+  let n = 120 in
   List.init n ~f:(fun _ ->
       let pk = random_scalar () in
       Keypair.of_private_key_exn pk )

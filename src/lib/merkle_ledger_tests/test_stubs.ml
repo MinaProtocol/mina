@@ -181,7 +181,7 @@ module Key = struct
     module Latest = V1
   end
 
-  type t = Stable.Latest.t [@@deriving sexp, eq, compare, hash]
+  type t = Stable.Latest.t [@@deriving sexp, compare, hash]
 
   let to_string = Signature_lib.Public_key.Compressed.to_base64
 
