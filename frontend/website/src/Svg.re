@@ -1,12 +1,12 @@
 module Size = {
-  // pixels (width, height)
-  type t = (int, int);
+  // rem (width, height)
+  type t = (float, float);
 
-  let remX = ((x, _)) => Js.Int.toFloat(x) /. 16.0;
-  let remY = ((_, y)) => Js.Int.toFloat(y) /. 16.0;
+  let remX = fst;
+  let remY = snd;
 
-  let pixelsX = fst;
-  let pixelsY = snd;
+  let pixelsX = ((x, _)) => x *. 16.0 |> Js.Math.ceil;
+  let pixelsY = ((_, y)) => y *. 16.0 |> Js.Math.ceil;
 };
 
 let component = ReasonReact.statelessComponent("Svg");

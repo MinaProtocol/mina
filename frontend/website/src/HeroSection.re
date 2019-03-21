@@ -52,11 +52,11 @@ module Copy = {
 module Graphic = {
   module Big = {
     let svg =
-      <Svg link="/static/img/hero-illustration.svg" dims=(223, 534) />;
+      <Svg link="/static/img/hero-illustration.svg" dims=(13.9375, 33.375) />;
   };
 
   module Small = {
-    let svg = <Svg link="/static/img/icon.svg" dims=(10, 10) />;
+    let svg = <Svg link="/static/img/icon.svg" dims=(0.625, 0.625) />;
   };
 
   module Info = {

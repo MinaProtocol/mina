@@ -152,13 +152,13 @@ let make = _ => {
         )>
         <Figure
           link="/static/img/coda-figure.svg"
-          dims=(242, 242)
+          dims=(15.125, 15.125)
           caption="Coda"
           captionColor=Style.Colors.clover
         />
         <Figure
           link="/static/img/other-blockchains-figure.svg"
-          dims=(220, 220)
+          dims=(13.75, 13.75)
           caption="Other Blockchains"
           captionColor=Style.Colors.navy
         />
