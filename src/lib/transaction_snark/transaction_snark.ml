@@ -919,9 +919,9 @@ let generate_transaction_union_witness sok_message source target transaction
       ~fee_excess:(Transaction_union.excess transaction)
       ~supply_increase:(Transaction_union.supply_increase transaction)
   in
-  let open Tick in
-  let main = handle (Base.main (Field.Var.constant top_hash)) handler in
-  ignore (run_unchecked main prover_state)
+  let open Tick.Groth16 in
+  let main x = handle (Base.main x) handler in
+  generate_auxiliary_input (tick_input ()) prover_state main top_hash
 
 let generate_transaction_witness ~sok_message ~source ~target
     (t : Transaction.t) handler =
