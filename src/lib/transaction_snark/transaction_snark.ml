@@ -106,8 +106,8 @@ module Stable = struct
 
       type t =
         { source: Frozen_ledger_hash.Stable.V1.t
-        ; target: Frozen_ledger_hash.Stable.V1.t (* TODO : version *)
-        ; proof_type: Proof_type.t
+        ; target: Frozen_ledger_hash.Stable.V1.t
+        ; proof_type: Proof_type.Stable.V1.t
         ; supply_increase: Amount.Stable.V1.t
         ; fee_excess: Amount.Signed.Stable.V1.t
         ; sok_digest: Sok_message.Digest.Stable.V1.t
