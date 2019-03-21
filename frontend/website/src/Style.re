@@ -66,6 +66,22 @@ module Typeface = {
         ),
       weights,
     );
+
+  let _ =
+    Css.(
+      fontFace(
+        ~fontFamily="IBM Plex Mono",
+        ~src=[
+          localUrl("IBMPlexMono-Regular"),
+          url("/static/font/IBMPlexMono-SemiBold-Latin1.woff2"),
+          url("/static/font/IBMPlexMono-SemiBold-Latin1.woff"),
+        ],
+        ~fontStyle=`normal,
+        ~fontWeight=`num(600),
+        (),
+      )
+    );
+
   let ibmplexsans =
     fontFamily("IBM Plex Sans, Helvetica Neue, Arial, sans-serif");
 
