@@ -16,8 +16,8 @@ module Legend = {
             merge([
               className,
               style([
-                width(`rem(Size.remX(dims))),
-                height(`rem(Size.remY(dims))),
+                width(fst(dims)),
+                height(snd(dims)),
                 backgroundColor(fillColor),
                 ...borderRule,
               ]),
@@ -39,7 +39,7 @@ module Legend = {
             className=Css.(style([marginRight(`rem(0.75))]))
             borderColor=None
             fillColor=themeColor
-            dims=(16, 16)
+            dims=(`rem(1.0), `rem(1.0))
           />
           <h3
             className=Css.(
@@ -84,7 +84,7 @@ module Legend = {
             className=Css.(style([marginRight(`rem(0.75))]))
             borderColor={Some(Style.Colors.clover)}
             fillColor=Style.Colors.lightClover
-            dims=(36, 36)
+            dims=(`rem(2.25), `rem(2.25))
           />
           <h5
             className=Css.(
