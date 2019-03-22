@@ -31,6 +31,7 @@ module Colors = {
   let lightClover = `rgba((118, 205, 135, 0.12));
 
   let teal = `rgb((71, 130, 160));
+  let tealAlpha = a => `rgba((71, 130, 160, a));
 };
 
 module Typeface = {
