@@ -6,7 +6,7 @@ module Code = {
       <pre
         className=Css.(
           style(
-            Style.paddingX(`rem(0.5))
+            Style.paddingX(`rem(1.0))
             @ Style.paddingY(`rem(1.0))
             @ [
               backgroundColor(Style.Colors.navy),
@@ -16,7 +16,7 @@ module Code = {
               borderRadius(`px(12)),
               lineHeight(`rem(1.25)),
               // nudge so code background looks nicer
-              marginRight(`rem(-0.25)),
+              marginRight(`rem(0.25)),
               marginLeft(`rem(-0.25)),
             ],
           )
@@ -70,6 +70,7 @@ module ImageCollage = {
               bottom(`zero),
               margin(`auto),
               maxWidth(`percent(100.0)),
+              media(swapQuery, [paddingLeft(`rem(4.))]),
             ])
           )
           name="/static/img/build-illustration"
@@ -121,7 +122,7 @@ let make = _ => {
             style([
               display(`flex),
               flexWrap(`wrapReverse),
-              justifyContent(`spaceBetween),
+              justifyContent(`spaceAround),
               alignItems(`center),
               marginLeft(`auto),
               marginRight(`auto),
@@ -150,6 +151,16 @@ let make = _ => {
      .then(() => Coda.requestWallet())
      .then((wallet) => Coda.sendTransaction(wallet, ...))
 </script>|}
+          />
+          <div
+            className=Css.(
+              style([
+                width(`rem(13.75)),
+                height(`rem(0.)),
+                display(`none),
+                media(swapQuery, [display(`block)]),
+              ])
+            )
           />
           <SideText
             paragraphs=[|

@@ -145,7 +145,7 @@ let make = _ => {
         className=Css.(
           style([
             display(`flex),
-            justifyContent(`spaceBetween),
+            justifyContent(`spaceAround),
             alignItems(`center),
             flexWrap(`wrapReverse),
           ])

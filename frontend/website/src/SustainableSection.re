@@ -52,7 +52,7 @@ let make = _children => {
           style([
             marginTop(`rem(2.375)),
             display(`flex),
-            justifyContent(`spaceBetween),
+            justifyContent(`spaceAround),
             alignItems(`center),
             flexWrap(`wrapReverse),
             media(Style.MediaQuery.full, [marginTop(`rem(4.375))]),
