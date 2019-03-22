@@ -24,9 +24,10 @@ let main n () =
     List.map Genesis_ledger.accounts
       ~f:Genesis_ledger.keypair_of_account_record_exn
   in
-  Coda_worker_testnet.Payments.send_several_payments testnet ~node:0 ~keypairs
-    ~n:3
-  |> don't_wait_for ;
+  let%bind () =
+    Coda_worker_testnet.Payments.send_several_payments testnet ~node:0
+      ~keypairs ~n:3
+  in
   (* RESTART NODES *)
   (* catchup *)
   let idx = Quickcheck.random_value (Int.gen_incl 1 (n - 1)) in

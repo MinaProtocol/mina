@@ -327,6 +327,8 @@ module type Main_intf = sig
 
   val best_ledger : t -> Inputs.Ledger.t Participating_state.t
 
+  val root_length : t -> int Participating_state.t
+
   val best_protocol_state :
     t -> Consensus.Protocol_state.Value.t Participating_state.t
 

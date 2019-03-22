@@ -452,6 +452,8 @@ struct
 
   let root t = find_exn t t.root
 
+  let root_length t = (Hashtbl.find_exn t.table t.root).length
+
   let best_tip t = find_exn t t.best_tip
 
   let successor_hashes t hash =

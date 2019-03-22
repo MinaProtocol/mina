@@ -83,6 +83,7 @@ module T = struct
         , Public_key.Compressed.t
         , Coda_numbers.Account_nonce.t option )
         Rpc_parallel.Function.t
+    ; root_length: ('worker, unit, int) Rpc_parallel.Function.t
     ; send_payment:
         ( 'worker
         , Send_payment_input.t
@@ -114,6 +115,7 @@ module T = struct
     ; coda_get_nonce:
            Public_key.Compressed.t
         -> Coda_numbers.Account_nonce.t option Deferred.t
+    ; coda_root_length: unit -> int Deferred.t
     ; coda_send_payment:
         Send_payment_input.t -> Receipt.Chain_hash.t Or_error.t Deferred.t
     ; coda_process_payment:
@@ -155,6 +157,9 @@ module T = struct
     let get_balance_impl ~worker_state ~conn_state:() pk =
       worker_state.coda_get_balance pk
 
+    let root_length_impl ~worker_state ~conn_state:() () =
+      worker_state.coda_root_length ()
+
     let get_nonce_impl ~worker_state ~conn_state:() pk =
       worker_state.coda_get_nonce pk
 
@@ -186,6 +191,10 @@ module T = struct
       C.create_rpc ~f:get_nonce_impl
         ~bin_input:Public_key.Compressed.Stable.V1.bin_t
         ~bin_output:[%bin_type_class: Coda_numbers.Account_nonce.t option] ()
+
+    let root_length =
+      C.create_rpc ~f:root_length_impl ~bin_input:Unit.bin_t
+        ~bin_output:Int.bin_t ()
 
     let prove_receipt =
       C.create_rpc ~f:prove_receipt_impl ~bin_input:Prove_receipt.Input.bin_t
@@ -219,6 +228,7 @@ module T = struct
       ; root_diff
       ; get_balance
       ; get_nonce
+      ; root_length
       ; send_payment
       ; process_payment
       ; prove_receipt }
@@ -341,6 +351,9 @@ module T = struct
           let coda_get_nonce pk =
             return (Run.get_nonce coda pk |> Participating_state.active_exn)
           in
+          let coda_root_length () =
+            return (Main.root_length coda |> Participating_state.active_exn)
+          in
           let coda_send_payment (sk, pk, amount, fee, memo) =
             let pk_of_sk sk =
               Public_key.of_private_key_exn sk |> Public_key.compress
@@ -415,6 +428,7 @@ module T = struct
           ; coda_root_diff= with_monitor coda_root_diff
           ; coda_get_balance= with_monitor coda_get_balance
           ; coda_get_nonce= with_monitor coda_get_nonce
+          ; coda_root_length= with_monitor coda_root_length
           ; coda_send_payment= with_monitor coda_send_payment
           ; coda_process_payment= with_monitor coda_process_payment
           ; coda_prove_receipt= with_monitor coda_prove_receipt

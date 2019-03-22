@@ -7,24 +7,35 @@ open Coda_base
 open Pipe_lib
 
 module Api = struct
+  type user_cmds_under_inspection =
+    (User_command.t, int * unit Ivar.t) Hashtbl.t
+
   type t =
     { workers: Coda_process.t list
     ; configs: Coda_worker.Input.t list
     ; start_writer:
         (int * Coda_worker.Input.t * (unit -> unit) * (unit -> unit))
         Linear_pipe.Writer.t
-    ; status: [`On of [`Synced | `Catchup] | `Off] Array.t
+    ; status:
+        [`On of [`Synced of user_cmds_under_inspection | `Catchup] | `Off]
+        Array.t
     ; payment_writer: (User_command.t * unit Ivar.t) Linear_pipe.Writer.t }
 
   let create configs workers payment_writer start_writer =
-    let status = Array.init (List.length workers) ~f:(fun _ -> `On `Synced) in
+    let status =
+      Array.init (List.length workers) ~f:(fun _ ->
+          let user_cmds_under_inspection =
+            Hashtbl.create (module User_command)
+          in
+          `On (`Synced user_cmds_under_inspection) )
+    in
     {workers; configs; start_writer; status; payment_writer}
 
   let online t i = match t.status.(i) with `On _ -> true | `Off -> false
 
   let synced t i =
     match t.status.(i) with
-    | `On `Synced -> true
+    | `On (`Synced _) -> true
     | `On `Catchup -> false
     | `Off -> false
 
@@ -48,9 +59,18 @@ module Api = struct
       ( i
       , List.nth_exn t.configs i
       , (fun () -> t.status.(i) <- `On `Catchup)
-      , fun () -> t.status.(i) <- `On `Synced )
+      , fun () ->
+          let user_cmds_under_inspection =
+            Hashtbl.create (module User_command)
+          in
+          t.status.(i) <- `On (`Synced user_cmds_under_inspection) )
 
   let stop t i =
+    ( match t.status.(i) with
+    | `On (`Synced user_cmds_under_inspection) ->
+        Hashtbl.iter user_cmds_under_inspection ~f:(fun (_, in_root) ->
+            Ivar.fill in_root () )
+    | _ -> () ) ;
     t.status.(i) <- `Off ;
     Coda_process.disconnect (List.nth_exn t.workers i)
 
@@ -69,20 +89,25 @@ module Api = struct
       ( User_command.sign (Keypair.of_private_key_exn sender_sk) payload
         :> User_command.t )
     in
-    let%map receipt =
+    let%bind receipt =
       Coda_process.process_payment_exn worker user_cmd
       |> Deferred.map ~f:Or_error.ok
     in
-    let result = Ivar.create () in
-    Linear_pipe.write t.payment_writer (user_cmd, result) |> don't_wait_for ;
-    (receipt, result)
-
-  let send_payment_with_receipt t i sk pk amount fee =
-    run_online_worker ~arg:(sk, pk, amount, fee)
-      ~f:(fun ~worker (sk, pk, amount, fee) ->
-        Coda_process.send_payment_exn worker sk pk amount fee
-          User_command_memo.dummy )
-      t i
+    let%map (all_in_root : unit Ivar.t list) =
+      let open Deferred.Let_syntax in
+      Deferred.List.filter_map (t.status |> Array.to_list) ~f:(function
+        | `On (`Synced user_cmds_under_inspection) ->
+            let%map root_length_when_send_payment =
+              Coda_process.root_length_exn worker
+            in
+            let in_root = Ivar.create () in
+            Hashtbl.add_exn user_cmds_under_inspection ~key:user_cmd
+              ~data:(root_length_when_send_payment, in_root) ;
+            Option.return in_root
+        | _ -> return None )
+      >>| Option.return
+    in
+    (receipt, all_in_root)
 
   (* TODO: resulting_receipt should be replaced with the sender's pk so that we prove the
       merkle_list of receipts up to the current state of a sender's receipt_chain hash for some blockchain.
@@ -354,7 +379,7 @@ end = struct
     let%bind _ : unit option list =
       Deferred.List.init n ~f:(fun _ ->
           let open Deferred.Option.Let_syntax in
-          let%bind receipts_and_results =
+          let%bind receipts_and_all_in_root's =
             List.map
               (keypairs : Keypair.t list)
               ~f:(fun sender_keypair ->
@@ -367,9 +392,9 @@ end = struct
                 )
             |> Deferred.Option.all
           in
-          let _, results = List.unzip receipts_and_results in
+          let _, all_in_root's = List.unzip receipts_and_all_in_root's in
           Deferred.map
-            (Deferred.List.iter results ~f:Ivar.read)
+            (Deferred.List.iter (List.concat all_in_root's) ~f:Ivar.read)
             ~f:(Fn.const (Some ())) )
     in
     Deferred.unit
