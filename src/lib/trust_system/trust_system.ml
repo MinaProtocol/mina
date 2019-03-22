@@ -9,5 +9,7 @@ module Actions = struct
     match t with Sent_bad_hash -> Insta_ban | Etc -> Trust_decrease 0.1
 end
 
+module Banned_status = Banned_status
+module Peer_status = Peer_status
 module Peer_trust = Peer_trust.Make (Actions)
 include Peer_trust

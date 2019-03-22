@@ -7,7 +7,6 @@
     or actually do anything when a peer should be banned. That's the
     responsibility of the caller, which is coda_base. *)
 
-open Core
 open Async
 open Pipe_lib
 
@@ -18,10 +17,6 @@ module Trust_response : sig
     | Trust_increase of float  (** Increase trust by the specified amount. *)
     | Trust_decrease of float  (** Decrease trust by the specified amount. *)
 end
-
-module Banned_status : module type of Banned_status
-
-module Peer_status : module type of Peer_status
 
 (** Interface for trust-affecting actions. *)
 module type Action_intf = sig

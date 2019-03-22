@@ -56,7 +56,7 @@ let run_test () : unit Deferred.t =
       let module Run = Run (Config) (Main) in
       let open Main in
       let%bind trust_dir = Async.Unix.mkdtemp (temp_conf_dir ^/ "trust_db") in
-      let trust_system = Coda_base.Trust_system.create ~db_dir:trust_dir in
+      let trust_system = Trust_system.create ~db_dir:trust_dir in
       let%bind receipt_chain_dir_name =
         Async.Unix.mkdtemp (temp_conf_dir ^/ "receipt_chain")
       in

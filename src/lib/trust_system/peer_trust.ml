@@ -6,9 +6,6 @@ module Trust_response = struct
   type t = Insta_ban | Trust_increase of float | Trust_decrease of float
 end
 
-module Banned_status = Banned_status
-module Peer_status = Peer_status
-
 module type Action_intf = sig
   type t [@@deriving sexp_of, yojson]
 

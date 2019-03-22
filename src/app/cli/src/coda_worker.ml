@@ -320,7 +320,7 @@ module T = struct
             Coda_base.Receipt_chain_database.create
               ~directory:receipt_chain_dir_name
           in
-          let trust_system = Coda_base.Trust_system.create ~db_dir:trust_dir in
+          let trust_system = Trust_system.create ~db_dir:trust_dir in
           let time_controller =
             Run.Inputs.Time.Controller.create Run.Inputs.Time.Controller.basic
           in

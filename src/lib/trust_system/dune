@@ -1,6 +1,6 @@
 (library
- (name peer_trust)
-  (public_name peer_trust)
+ (name trust_system)
+  (public_name trust_system)
   (library_flags (-linkall))
   (flags (-warn-error -27))
   (libraries core async key_value_database logger pipe_lib rocksdb)
