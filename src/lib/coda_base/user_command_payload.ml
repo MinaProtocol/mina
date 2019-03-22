@@ -6,13 +6,13 @@ module Account_nonce = Coda_numbers.Account_nonce
 module Memo = User_command_memo
 
 module Common = struct
+  type ('fee, 'nonce, 'memo) t_ = {fee: 'fee; nonce: 'nonce; memo: 'memo}
+  [@@deriving bin_io, eq, sexp, hash, yojson]
+
   module Stable = struct
     module V1 = struct
       module T = struct
         let version = 1
-
-        type ('fee, 'nonce, 'memo) t_ = {fee: 'fee; nonce: 'nonce; memo: 'memo}
-        [@@deriving bin_io, eq, sexp, hash, yojson]
 
         type t = (Currency.Fee.Stable.V1.t, Account_nonce.t, Memo.t) t_
         [@@deriving bin_io, eq, sexp, hash, yojson]
@@ -34,7 +34,7 @@ module Common = struct
     module Registered_V1 = Registrar.Register (V1)
   end
 
-  include Stable.Latest
+  type t = Stable.Latest.t [@@deriving eq, sexp, hash, yojson]
 
   let fold ({fee; nonce; memo} : t) =
     Fold.(Currency.Fee.fold fee +> Account_nonce.fold nonce +> Memo.fold memo)
@@ -108,7 +108,10 @@ module Body = struct
     module Registered_V1 = Registrar.Register (V1)
   end
 
-  include Stable.Latest
+  type t = Stable.Latest.t =
+    | Payment of Payment_payload.Stable.V1.t
+    | Stake_delegation of Stake_delegation.Stable.V1.t
+  [@@deriving eq, sexp, hash, yojson]
 
   let max_variant_size =
     List.reduce_exn ~f:Int.max
@@ -137,13 +140,13 @@ module Body = struct
       ~f:(function `A p -> Payment p | `B d -> Stake_delegation d)
 end
 
+type ('common, 'body) t_ = {common: 'common; body: 'body}
+[@@deriving bin_io, eq, sexp, hash, yojson, compare]
+
 module Stable = struct
   module V1 = struct
     module T = struct
       let version = 1
-
-      type ('common, 'body) t_ = {common: 'common; body: 'body}
-      [@@deriving bin_io, eq, sexp, hash, yojson, compare]
 
       type t = (Common.Stable.V1.t, Body.Stable.V1.t) t_
       [@@deriving bin_io, eq, sexp, hash, yojson]
@@ -165,7 +168,8 @@ module Stable = struct
   module Registered_V1 = Registrar.Register (V1)
 end
 
-include Stable.Latest
+(* bin_io omitted *)
+type t = Stable.Latest.t [@@deriving eq, sexp, hash, yojson]
 
 let create ~fee ~nonce ~memo ~body : t = {common= {fee; nonce; memo}; body}
 
