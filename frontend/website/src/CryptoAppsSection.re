@@ -1,3 +1,5 @@
+let middleElementWidthRems = 13.75;
+
 module Code = {
   let component = ReasonReact.statelessComponent("CryptoAppsSection.Code");
   let make = (~src, _children) => {
@@ -17,7 +19,7 @@ module Code = {
               lineHeight(`rem(1.25)),
               // nudge so code background looks nicer
               marginRight(`rem(0.25)),
-              marginLeft(`rem(-0.25)),
+              marginLeft(`rem(0.25)),
             ],
           )
         )>
@@ -152,10 +154,11 @@ let make = _ => {
      .then((wallet) => Coda.sendTransaction(wallet, ...))
 </script>|}
           />
+          // This keeps the right hand text aligned with the inclusive app section.
           <div
             className=Css.(
               style([
-                width(`rem(13.75)),
+                width(`rem(middleElementWidthRems)),
                 height(`rem(0.)),
                 display(`none),
                 media(swapQuery, [display(`block)]),
