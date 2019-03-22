@@ -52,35 +52,31 @@ module Typeface = {
     List.iter(
       ((weight, name)) =>
         ignore @@
-        Css.(
-          fontFace(
-            ~fontFamily="IBM Plex Sans",
-            ~src=[
-              localUrl("IBMPlexSans-" ++ name),
-              url("/static/font/IBMPlexSans-" ++ name ++ "-Latin1.woff2"),
-              url("/static/font/IBMPlexSans-" ++ name ++ "-Latin1.woff"),
-            ],
-            ~fontStyle=`normal,
-            ~fontWeight=weight,
-            (),
-          )
+        fontFace(
+          ~fontFamily="IBM Plex Sans",
+          ~src=[
+            localUrl("IBMPlexSans-" ++ name),
+            url("/static/font/IBMPlexSans-" ++ name ++ "-Latin1.woff2"),
+            url("/static/font/IBMPlexSans-" ++ name ++ "-Latin1.woff"),
+          ],
+          ~fontStyle=`normal,
+          ~fontWeight=weight,
+          (),
         ),
       weights,
     );
 
   let _ =
-    Css.(
-      fontFace(
-        ~fontFamily="IBM Plex Mono",
-        ~src=[
-          localUrl("IBMPlexMono-Regular"),
-          url("/static/font/IBMPlexMono-SemiBold-Latin1.woff2"),
-          url("/static/font/IBMPlexMono-SemiBold-Latin1.woff"),
-        ],
-        ~fontStyle=`normal,
-        ~fontWeight=`num(600),
-        (),
-      )
+    fontFace(
+      ~fontFamily="IBM Plex Mono",
+      ~src=[
+        localUrl("IBMPlexMono-Regular"),
+        url("/static/font/IBMPlexMono-SemiBold-Latin1.woff2"),
+        url("/static/font/IBMPlexMono-SemiBold-Latin1.woff"),
+      ],
+      ~fontStyle=`normal,
+      ~fontWeight=`num(600),
+      (),
     );
 
   let ibmplexsans =
