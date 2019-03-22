@@ -3,7 +3,7 @@ let extraHeaders = <> Head.legacyStylesheets </>;
 Css.global("#block-explorer div div a", [Css.display(`none)]);
 Css.global("#block-explorer div h2", [Css.display(`none)]);
 
-let component = ReasonReact.statelessComponent("CodePage");
+let component = ReasonReact.statelessComponent("Testnet");
 let make = _ => {
   ...component,
   render: _self =>
