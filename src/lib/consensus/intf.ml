@@ -104,6 +104,7 @@ module type S = sig
   module For_tests : sig
     val gen_consensus_state :
          gen_slot_advancement:int Quickcheck.Generator.t
+      -> proposer_pk:Signature_lib.Public_key.Compressed.t
       -> (   previous_protocol_state:( Protocol_state.Value.t
                                      , Coda_base.State_hash.t )
                                      With_hash.t
@@ -134,6 +135,7 @@ module type S = sig
     -> snarked_ledger_hash:Coda_base.Frozen_ledger_hash.t
     -> supply_increase:Currency.Amount.t
     -> logger:Logger.t
+    -> local_state:Local_state.t
     -> Protocol_state.Value.t * Consensus_transition_data.value
   (**
    * Generate a new protocol state and consensus specific transition data

@@ -151,16 +151,17 @@ let modify_account_recv t pk ~f =
 
 let get_account_and_update_pariticipation t addr =
   let open Let_syntax in
-  let open Merkle_tree in
   let%bind prev, prev_path =
     request_witness
-      Typ.(Account.typ * Path.typ ~depth)
+      Typ.(Account.typ * Merkle_tree.Path.typ ~depth)
       As_prover.(
-        map (read (Address.typ ~depth) addr) ~f:(fun a -> Get_element a))
+        map
+          (read (Merkle_tree.Address.typ ~depth) addr)
+          ~f:(fun a -> Get_element a))
   in
   let%bind () =
     let%bind prev_entry_hash = Account.Checked.digest prev in
-    implied_root prev_entry_hash addr prev_path
+    Merkle_tree.implied_root prev_entry_hash addr prev_path
     >>= Field.Checked.Assert.equal (var_to_hash_packed t)
   in
   let next = {prev with participated= Boolean.true_} in
@@ -169,9 +170,9 @@ let get_account_and_update_pariticipation t addr =
     perform
       (let open As_prover in
       let open Let_syntax in
-      let%map addr = read (Address.typ ~depth) addr
+      let%map addr = read (Merkle_tree.Address.typ ~depth) addr
       and next = read Account.typ next in
       Set (addr, next))
   in
-  let%map new_root = implied_root next_entry_hash addr prev_path in
+  let%map new_root = Merkle_tree.implied_root next_entry_hash addr prev_path in
   (prev, var_of_hash_packed new_root)

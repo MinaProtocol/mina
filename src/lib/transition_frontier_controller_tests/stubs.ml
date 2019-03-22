@@ -176,8 +176,15 @@ struct
       Quickcheck.Generator.t =
     let open Quickcheck.Let_syntax in
     let gen_slot_advancement = Int.gen_incl 1 10 in
+    let _, largest_account =
+      List.max_elt accounts_with_secret_keys
+        ~compare:(fun (_, acc1) (_, acc2) -> Account.compare acc1 acc2 )
+      |> Option.value_exn
+    in
+    let largest_account_public_key = Account.public_key largest_account in
     let%map make_next_consensus_state =
       Consensus.For_tests.gen_consensus_state ~gen_slot_advancement
+        ~proposer_pk:largest_account_public_key
     in
     fun parent_breadcrumb_deferred ->
       let open Deferred.Let_syntax in
@@ -186,12 +193,6 @@ struct
         Transition_frontier.Breadcrumb.staged_ledger parent_breadcrumb
       in
       let transactions = gen_payments accounts_with_secret_keys in
-      let _, largest_account =
-        List.max_elt accounts_with_secret_keys
-          ~compare:(fun (_, acc1) (_, acc2) -> Account.compare acc1 acc2 )
-        |> Option.value_exn
-      in
-      let largest_account_public_key = Account.public_key largest_account in
       let get_completed_work stmts =
         let {Keypair.public_key; _} = Keypair.create () in
         let prover = Public_key.compress public_key in

@@ -821,8 +821,30 @@ module Epoch_data = struct
 
   let update_pair (last_data, curr_data) epoch_length ~prev_epoch ~next_epoch
       ~prev_slot ~prev_protocol_state_hash ~proposer_vrf_result
-      ~snarked_ledger_hash ~total_currency =
+      ~snarked_ledger_hash ~total_currency ~delegator_addr ~local_state =
+    let open Or_error.Let_syntax in
     let open Epoch_ledger in
+    let delegator_account curr_epoch_data =
+      let epoch_snapshot =
+        if
+          Coda_base.Frozen_ledger_hash.equal curr_epoch_data.ledger.hash
+            genesis_ledger_hash
+        then Some local_state.Local_state.genesis_epoch_snapshot
+        else if
+          next_epoch > prev_epoch
+          || curr_epoch_data.length <= Length.of_int Constants.k
+        then local_state.curr_epoch_snapshot
+        else local_state.Local_state.last_epoch_snapshot
+      in
+      let%map epoch_ledger =
+        match epoch_snapshot with
+        | None ->
+            Or_error.error_string
+              "Got invalid snapshot when updating participated stake"
+        | Some snapshot -> Ok snapshot.ledger
+      in
+      Coda_base.Sparse_ledger.get_exn epoch_ledger delegator_addr
+    in
     let last_data, curr_data, epoch_length =
       if next_epoch > prev_epoch then
         ( curr_data
@@ -831,17 +853,12 @@ module Epoch_data = struct
           ; start_checkpoint= prev_protocol_state_hash
           ; lock_checkpoint= Coda_base.State_hash.(of_hash zero)
           ; length= Length.of_int 1
-          ; participated_stake=
-              Amount.zero (*TODO: assign the delegate's balance *) }
+          ; participated_stake= Amount.zero }
         , Length.succ epoch_length )
       else (
         assert (Epoch.equal next_epoch prev_epoch) ;
         ( last_data
-        , { curr_data with
-            length=
-              Length.succ curr_data.length
-              (*TODO: update the participated_stake with the delegate's balance if they did not participate in this epoch before*)
-          }
+        , {curr_data with length= Length.succ curr_data.length}
         , epoch_length ) )
     in
     let curr_seed, curr_lock_checkpoint =
@@ -850,8 +867,19 @@ module Epoch_data = struct
         , prev_protocol_state_hash )
       else (curr_data.seed, curr_data.lock_checkpoint)
     in
+    let%map delegator = delegator_account curr_data in
+    let new_participated_stake =
+      if delegator.participated then curr_data.participated_stake
+      else
+        Option.value_exn
+          (Amount.add curr_data.participated_stake
+             (Balance.to_amount delegator.balance))
+    in
     let curr_data =
-      {curr_data with seed= curr_seed; lock_checkpoint= curr_lock_checkpoint}
+      { curr_data with
+        seed= curr_seed
+      ; lock_checkpoint= curr_lock_checkpoint
+      ; participated_stake= new_participated_stake }
     in
     (last_data, curr_data, epoch_length)
 end
@@ -1271,16 +1299,17 @@ module Consensus_state = struct
       ~(previous_protocol_state_hash : Coda_base.State_hash.t)
       ~(supply_increase : Currency.Amount.t)
       ~(snarked_ledger_hash : Coda_base.Frozen_ledger_hash.t)
-      ~(proposer_vrf_result : Random_oracle.Digest.t) : Value.t Or_error.t =
+      ~(proposer_vrf_result : Random_oracle.Digest.t)
+      ~(local_state : Local_state.t) ~delegator_addr : Value.t Or_error.t =
     let open Or_error.Let_syntax in
     let open Consensus_transition_data in
-    let%map total_currency =
+    let%bind total_currency =
       Amount.add previous_consensus_state.total_currency supply_increase
       |> Option.map ~f:Or_error.return
       |> Option.value
            ~default:(Or_error.error_string "failed to add total_currency")
     in
-    let last_epoch_data, curr_epoch_data, epoch_length =
+    let%map last_epoch_data, curr_epoch_data, epoch_length =
       Epoch_data.update_pair
         ( previous_consensus_state.last_epoch_data
         , previous_consensus_state.curr_epoch_data )
@@ -1290,6 +1319,7 @@ module Consensus_state = struct
         ~prev_slot:previous_consensus_state.curr_slot
         ~prev_protocol_state_hash:previous_protocol_state_hash
         ~proposer_vrf_result ~snarked_ledger_hash ~total_currency
+        ~delegator_addr ~local_state
     in
     let checkpoints =
       if previous_consensus_state.has_ancestor_in_same_checkpoint_window then
@@ -1565,7 +1595,7 @@ end)
 (* TODO: only track total currency from accounts > 1% of the currency using transactions *)
 let generate_transition ~(previous_protocol_state : Protocol_state.Value.t)
     ~blockchain_state ~time ~proposal_data ~transactions:_ ~snarked_ledger_hash
-    ~supply_increase ~logger:_ =
+    ~supply_increase ~logger:_ ~local_state =
   let previous_consensus_state =
     Protocol_state.consensus_state previous_protocol_state
   in
@@ -1581,7 +1611,8 @@ let generate_transition ~(previous_protocol_state : Protocol_state.Value.t)
          ~proposer_vrf_result:proposal_data.Proposal_data.vrf_result
          ~previous_protocol_state_hash:
            (Protocol_state.hash previous_protocol_state)
-         ~supply_increase ~snarked_ledger_hash)
+         ~supply_increase ~snarked_ledger_hash ~local_state
+         ~delegator_addr:proposal_data.stake_proof.delegator)
   in
   let protocol_state =
     Protocol_state.create_value
@@ -1855,14 +1886,17 @@ let lock_transition (prev : Consensus_state.Value.t)
     local_state.curr_epoch_snapshot <- epoch_snapshot )
 
 let create_genesis_protocol_state consensus_transition_data blockchain_state =
-  let consensus_state =
+  let pk, _ = Coda_base.Sample_keypairs.keypairs.(0) in
+  let consensus_state : Consensus_state.Value.t =
     Or_error.ok_exn
       (Consensus_state.update ~proposer_vrf_result:Vrf.Precomputed.vrf_output
          ~previous_consensus_state:
            Protocol_state.(consensus_state negative_one)
          ~previous_protocol_state_hash:Protocol_state.(hash negative_one)
          ~consensus_transition_data ~supply_increase:Currency.Amount.zero
-         ~snarked_ledger_hash:genesis_ledger_hash)
+         ~snarked_ledger_hash:genesis_ledger_hash
+         ~local_state:(Local_state.create (Some pk))
+         ~delegator_addr:0)
   in
   let state =
     Protocol_state.create_value
@@ -1889,7 +1923,7 @@ module For_tests = struct
           Coda_base.Frozen_ledger_hash.of_ledger_hash root_ledger_hash }
 
   let gen_consensus_state ~(gen_slot_advancement : int Quickcheck.Generator.t)
-      :
+      ~proposer_pk :
       (   previous_protocol_state:( Protocol_state.Value.t
                                   , Coda_base.State_hash.t )
                                   With_hash.t
@@ -1923,6 +1957,9 @@ module For_tests = struct
           ~prev_slot:prev.curr_slot
           ~prev_protocol_state_hash:(With_hash.hash previous_protocol_state)
           ~proposer_vrf_result ~snarked_ledger_hash ~total_currency
+          ~delegator_addr:0
+          ~local_state:(Local_state.create (Some proposer_pk))
+        |> Or_error.ok_exn
       in
       let checkpoints =
         if prev.has_ancestor_in_same_checkpoint_window then prev.checkpoints
@@ -2029,10 +2066,11 @@ let%test_module "Proof of stake tests" =
       let proposer_vrf_result =
         Vrf.eval ~private_key {epoch; slot; seed= Epoch_seed.initial; delegator}
       in
+      let local_state = Local_state.create (Some public_key) in
       let next_consensus_state =
         update ~previous_consensus_state ~consensus_transition_data
           ~previous_protocol_state_hash ~supply_increase ~snarked_ledger_hash
-          ~proposer_vrf_result
+          ~proposer_vrf_result ~delegator_addr:delegator ~local_state
         |> Or_error.ok_exn
       in
       (* build pieces needed to apply "update_var" *)

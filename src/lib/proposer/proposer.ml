@@ -171,7 +171,7 @@ module Make (Inputs : Inputs_intf) :
 
   let generate_next_state ~previous_protocol_state ~time_controller
       ~staged_ledger ~transactions ~get_completed_work ~logger
-      ~(keypair : Keypair.t) ~proposal_data =
+      ~(keypair : Keypair.t) ~proposal_data ~local_state =
     let open Interruptible.Let_syntax in
     let%bind diff, next_staged_ledger_hash, ledger_proof_opt =
       Interruptible.uninterruptible
@@ -230,7 +230,7 @@ module Make (Inputs : Inputs_intf) :
                     .user_commands diff
                     :> User_command.t list )
                 ~snarked_ledger_hash:previous_ledger_hash ~supply_increase
-                ~logger ) )
+                ~logger ~local_state ) )
     in
     lift_sync (fun () ->
         measure "making Snark and Internal transitions" (fun () ->
@@ -295,6 +295,7 @@ module Make (Inputs : Inputs_intf) :
                   ~transactions:
                     (Transaction_pool.transactions transaction_pool)
                   ~get_completed_work ~logger ~keypair
+                  ~local_state:consensus_local_state
               in
               trace_event "next state generated" ;
               match next_state_opt with

@@ -195,7 +195,7 @@ end)
 
 let generate_transition ~previous_protocol_state ~blockchain_state ~time:_
     ~proposal_data ~transactions:_ ~snarked_ledger_hash:_ ~supply_increase:_
-    ~logger:_ =
+    ~logger:_ ~local_state:_ =
   let previous_consensus_state : Consensus_state.Value.t =
     Protocol_state.consensus_state previous_protocol_state
   in
@@ -287,7 +287,7 @@ let genesis_protocol_state =
   With_hash.of_data ~hash_data:Protocol_state.hash state
 
 module For_tests = struct
-  let gen_consensus_state ~gen_slot_advancement:_ =
+  let gen_consensus_state ~gen_slot_advancement:_ ~proposer_pk:_ =
     let open Consensus_state in
     Quickcheck.Generator.return
     @@ fun ~previous_protocol_state ~snarked_ledger_hash:_ ->

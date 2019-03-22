@@ -1388,6 +1388,7 @@ module type Consensus_mechanism_intf = sig
     -> snarked_ledger_hash:frozen_ledger_hash
     -> supply_increase:Currency.Amount.t
     -> logger:Logger.t
+    -> local_state:Local_state.t
     -> Protocol_state.Value.t * Consensus_transition_data.value
 
   val received_at_valid_time :

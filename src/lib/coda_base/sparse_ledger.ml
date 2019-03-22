@@ -158,6 +158,11 @@ let apply_transaction_exn t transition =
   | User_command cmd -> apply_user_command_exn t (cmd :> User_command.t)
   | Coinbase c -> apply_coinbase_exn t c
 
+let update_participation_exn t delegator =
+  let delegator_idx = find_index_exn t delegator in
+  let delegator_account = get_exn t delegator_idx in
+  set_exn t delegator_idx {delegator_account with participated= true}
+
 let merkle_root t = Ledger_hash.of_hash (merkle_root t :> Pedersen.Digest.t)
 
 let handler t =
