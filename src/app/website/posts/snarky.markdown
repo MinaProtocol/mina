@@ -1,5 +1,5 @@
 ---
-title: Snarky: A high-level language for verifiable computation
+title: Snarky&#58; A high-level language for verifiable computation
 date: 2018-03-11
 author: Izaak Meckler
 ---

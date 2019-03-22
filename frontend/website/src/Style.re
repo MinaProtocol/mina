@@ -1,6 +1,7 @@
 module Colors = {
   let fadedBlue = `rgb((111, 167, 197));
   let white = Css.white;
+  let whiteAlpha = a => `rgba((255, 255, 255, a));
   let hyperlink = `hsl((201, 71, 52));
   let hyperlinkAlpha = a => `hsla((201, 71, 52, a));
   let hyperlinkHover = `hsl((201, 71, 70));
@@ -52,35 +53,31 @@ module Typeface = {
     List.iter(
       ((weight, name)) =>
         ignore @@
-        Css.(
-          fontFace(
-            ~fontFamily="IBM Plex Sans",
-            ~src=[
-              localUrl("IBMPlexSans-" ++ name),
-              url("/static/font/IBMPlexSans-" ++ name ++ "-Latin1.woff2"),
-              url("/static/font/IBMPlexSans-" ++ name ++ "-Latin1.woff"),
-            ],
-            ~fontStyle=`normal,
-            ~fontWeight=weight,
-            (),
-          )
+        fontFace(
+          ~fontFamily="IBM Plex Sans",
+          ~src=[
+            localUrl("IBMPlexSans-" ++ name),
+            url("/static/font/IBMPlexSans-" ++ name ++ "-Latin1.woff2"),
+            url("/static/font/IBMPlexSans-" ++ name ++ "-Latin1.woff"),
+          ],
+          ~fontStyle=`normal,
+          ~fontWeight=weight,
+          (),
         ),
       weights,
     );
 
   let _ =
-    Css.(
-      fontFace(
-        ~fontFamily="IBM Plex Mono",
-        ~src=[
-          localUrl("IBMPlexMono-Regular"),
-          url("/static/font/IBMPlexMono-SemiBold-Latin1.woff2"),
-          url("/static/font/IBMPlexMono-SemiBold-Latin1.woff"),
-        ],
-        ~fontStyle=`normal,
-        ~fontWeight=`num(600),
-        (),
-      )
+    fontFace(
+      ~fontFamily="IBM Plex Mono",
+      ~src=[
+        localUrl("IBMPlexMono-Regular"),
+        url("/static/font/IBMPlexMono-SemiBold-Latin1.woff2"),
+        url("/static/font/IBMPlexMono-SemiBold-Latin1.woff"),
+      ],
+      ~fontStyle=`normal,
+      ~fontWeight=`num(600),
+      (),
     );
 
   let ibmplexsans =
@@ -206,6 +203,18 @@ module H4 = {
       textTransform(`uppercase),
       fontWeight(`normal),
       color(Colors.greyishBrown),
+    ]);
+
+  let wide =
+    style([
+      whiteSpace(`nowrap),
+      fontSize(`rem(0.75)),
+      letterSpacing(`rem(0.125)),
+      Typeface.aktivgrotesk,
+      fontWeight(`medium),
+      fontStyle(`normal),
+      textAlign(`center),
+      textTransform(`uppercase),
     ]);
 };
 

@@ -47,7 +47,7 @@ let previousPost = (metadata: BlogPost.metadata) =>
     </h5>
   </>;
 
-let make = (~posts, children) => {
+let make = (~posts, _children) => {
   let sortedPosts =
     List.sort(
       ((_, _, metadata1), (_, _, metadata2)) => {
@@ -81,7 +81,7 @@ let make = (~posts, children) => {
             <ul className="list lh-copy">
               ...{Array.of_list(
                 List.map(
-                  ((name, html, metadata)) =>
+                  ((name, _, metadata)) =>
                     <li>
                       <a
                         href={"/blog/" ++ name ++ ".html"}
