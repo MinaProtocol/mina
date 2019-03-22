@@ -26,7 +26,7 @@ module type S = sig
     module Fee_transfer_undo : sig
       type t =
         { fee_transfer: Fee_transfer.Stable.V1.t
-        ; previous_empty_accounts: Public_key.Compressed.t list }
+        ; previous_empty_accounts: Public_key.Compressed.Stable.V1.t list }
       [@@deriving sexp]
 
       module Stable :
@@ -40,15 +40,27 @@ module type S = sig
         with type V1.t = t
     end
 
-    type coinbase =
-      { coinbase: Coinbase.Stable.V1.t
-      ; previous_empty_accounts: Public_key.Compressed.t list }
-    [@@deriving sexp, bin_io]
+    module Coinbase_undo : sig
+      type t =
+        { coinbase: Coinbase.Stable.V1.t
+        ; previous_empty_accounts: Public_key.Compressed.Stable.V1.t list }
+      [@@deriving sexp]
+
+      module Stable :
+        sig
+          module V1 : sig
+            type t [@@deriving sexp, bin_io]
+          end
+
+          module Latest = V1
+        end
+        with type V1.t = t
+    end
 
     type varying =
       | User_command of User_command.t
       | Fee_transfer of Fee_transfer_undo.Stable.V1.t
-      | Coinbase of coinbase
+      | Coinbase of Coinbase_undo.Stable.V1.t
     [@@deriving sexp, bin_io]
 
     type t = {previous_hash: Ledger_hash.Stable.V1.t; varying: varying}
@@ -197,17 +209,47 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
       [@@deriving sexp]
     end
 
-    (* TODO : version *)
-    type coinbase =
-      { coinbase: Coinbase.Stable.V1.t
-      ; previous_empty_accounts: Public_key.Compressed.Stable.V1.t list }
-    [@@deriving sexp, bin_io]
+    module Coinbase_undo = struct
+      module Stable = struct
+        module V1 = struct
+          module T = struct
+            let version = 1
+
+            type t =
+              { coinbase: Coinbase.Stable.V1.t
+              ; previous_empty_accounts: Public_key.Compressed.Stable.V1.t list
+              }
+            [@@deriving sexp, bin_io]
+          end
+
+          include T
+          include Registration.Make_latest_version (T)
+        end
+
+        module Latest = V1
+
+        module Module_decl = struct
+          let name = "transaction_logic_coinbase_undo"
+
+          type latest = Latest.t
+        end
+
+        module Registrar = Registration.Make (Module_decl)
+        module Registered_V1 = Registrar.Register (V1)
+      end
+
+      (* bin_io omitted *)
+      type t = Stable.Latest.t =
+        { coinbase: Coinbase.Stable.V1.t
+        ; previous_empty_accounts: Public_key.Compressed.Stable.V1.t list }
+      [@@deriving sexp]
+    end
 
     (* TODO : version *)
     type varying =
       | User_command of User_command.t
       | Fee_transfer of Fee_transfer_undo.Stable.V1.t
-      | Coinbase of coinbase
+      | Coinbase of Coinbase_undo.Stable.V1.t
     [@@deriving sexp, bin_io]
 
     module Stable = struct
@@ -376,13 +418,15 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
     let%map balance = add_amount proposer_account.balance proposer_reward in
     set t proposer_location {proposer_account with balance} ;
     Option.iter receiver_update ~f:(fun (l, a) -> set t l a) ;
-    {Undo.coinbase= cb; previous_empty_accounts= emptys1 @ emptys2}
+    Undo.Coinbase_undo.
+      {coinbase= cb; previous_empty_accounts= emptys1 @ emptys2}
 
   (* Don't have to be atomic here because these should never fail. In fact, none of
   the undo functions should ever return an error. This should be fixed in the types. *)
   let undo_coinbase t
-      { Undo.coinbase= {proposer; fee_transfer; amount= coinbase_amount}
-      ; previous_empty_accounts } =
+      Undo.Coinbase_undo.({ coinbase=
+                              {proposer; fee_transfer; amount= coinbase_amount}
+                          ; previous_empty_accounts }) =
     let proposer_reward =
       match fee_transfer with
       | None -> coinbase_amount
