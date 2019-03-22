@@ -145,7 +145,7 @@ let make = _ => {
         className=Css.(
           style([
             display(`flex),
-            justifyContent(`spaceBetween),
+            justifyContent(`spaceAround),
             alignItems(`center),
             flexWrap(`wrapReverse),
           ])
@@ -158,7 +158,7 @@ let make = _ => {
         />
         <Figure
           link="/static/img/other-blockchains-figure.svg"
-          dims=(13.75, 13.75)
+          dims=(CryptoAppsSection.middleElementWidthRems, 13.75)
           caption="Other Blockchains"
           captionColor=Style.Colors.navy
         />

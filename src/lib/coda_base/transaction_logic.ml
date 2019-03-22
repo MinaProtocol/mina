@@ -7,26 +7,45 @@ module type S = sig
   type ledger
 
   module Undo : sig
-    module User_command : sig
+    module User_command_undo : sig
       module Common : sig
         type t =
-          { user_command: User_command.t
-          ; previous_receipt_chain_hash: Receipt.Chain_hash.t }
+          { user_command: User_command.Stable.V1.t
+          ; previous_receipt_chain_hash: Receipt.Chain_hash.Stable.V1.t }
+        [@@deriving sexp]
+
+        module Stable :
+          sig
+            module V1 : sig
+              type t [@@deriving bin_io, sexp]
+            end
+
+            module Latest = V1
+          end
+          with type V1.t = t
       end
 
       module Body : sig
         type t =
-          | Payment of {previous_empty_accounts: Public_key.Compressed.t list}
-          | Stake_delegation of {previous_delegate: Public_key.Compressed.t}
+          | Payment of
+              { previous_empty_accounts: Public_key.Compressed.Stable.V1.t list
+              }
+          | Stake_delegation of
+              { previous_delegate: Public_key.Compressed.Stable.V1.t }
+        [@@deriving sexp]
+
+        module Stable :
+          sig
+            module V1 : sig
+              type t [@@deriving bin_io, sexp]
+            end
+
+            module Latest = V1
+          end
+          with type V1.t = t
       end
 
-      type t = {common: Common.t; body: Body.t} [@@deriving sexp, bin_io]
-    end
-
-    module Fee_transfer_undo : sig
-      type t =
-        { fee_transfer: Fee_transfer.Stable.V1.t
-        ; previous_empty_accounts: Public_key.Compressed.t list }
+      type t = {common: Common.Stable.V1.t; body: Body.Stable.V1.t}
       [@@deriving sexp]
 
       module Stable :
@@ -40,18 +59,60 @@ module type S = sig
         with type V1.t = t
     end
 
-    type coinbase =
-      { coinbase: Coinbase.Stable.V1.t
-      ; previous_empty_accounts: Public_key.Compressed.t list }
-    [@@deriving sexp, bin_io]
+    module Fee_transfer_undo : sig
+      type t =
+        { fee_transfer: Fee_transfer.Stable.V1.t
+        ; previous_empty_accounts: Public_key.Compressed.Stable.V1.t list }
+      [@@deriving sexp]
 
-    type varying =
-      | User_command of User_command.t
-      | Fee_transfer of Fee_transfer_undo.Stable.V1.t
-      | Coinbase of coinbase
-    [@@deriving sexp, bin_io]
+      module Stable :
+        sig
+          module V1 : sig
+            type t [@@deriving sexp, bin_io]
+          end
 
-    type t = {previous_hash: Ledger_hash.Stable.V1.t; varying: varying}
+          module Latest = V1
+        end
+        with type V1.t = t
+    end
+
+    module Coinbase_undo : sig
+      type t =
+        { coinbase: Coinbase.Stable.V1.t
+        ; previous_empty_accounts: Public_key.Compressed.Stable.V1.t list }
+      [@@deriving sexp]
+
+      module Stable :
+        sig
+          module V1 : sig
+            type t [@@deriving sexp, bin_io]
+          end
+
+          module Latest = V1
+        end
+        with type V1.t = t
+    end
+
+    module Varying : sig
+      type t =
+        | User_command of User_command_undo.Stable.V1.t
+        | Fee_transfer of Fee_transfer_undo.Stable.V1.t
+        | Coinbase of Coinbase_undo.Stable.V1.t
+      [@@deriving sexp]
+
+      module Stable :
+        sig
+          module V1 : sig
+            type t [@@deriving sexp, bin_io]
+          end
+
+          module Latest = V1
+        end
+        with type V1.t = t
+    end
+
+    type t =
+      {previous_hash: Ledger_hash.Stable.V1.t; varying: Varying.Stable.V1.t}
     [@@deriving sexp]
 
     module Stable :
@@ -70,7 +131,7 @@ module type S = sig
   val apply_user_command :
        ledger
     -> User_command.With_valid_signature.t
-    -> Undo.User_command.t Or_error.t
+    -> Undo.User_command_undo.t Or_error.t
 
   val apply_transaction : ledger -> Transaction.t -> Undo.t Or_error.t
 
@@ -139,27 +200,113 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
   module Undo = struct
     module UC = User_command
 
-    module User_command = struct
-      (* TODO: version *)
+    module User_command_undo = struct
       module Common = struct
-        type t =
+        module Stable = struct
+          module V1 = struct
+            module T = struct
+              let version = 1
+
+              type t =
+                { user_command: User_command.Stable.V1.t
+                ; previous_receipt_chain_hash: Receipt.Chain_hash.Stable.V1.t
+                }
+              [@@deriving sexp, bin_io]
+            end
+
+            include T
+            include Registration.Make_latest_version (T)
+          end
+
+          module Latest = V1
+
+          module Module_decl = struct
+            let name = "transaction_logic_undo_user_command_common"
+
+            type latest = Latest.t
+          end
+
+          module Registrar = Registration.Make (Module_decl)
+          module Registered_V1 = Registrar.Register (V1)
+        end
+
+        (* bin_io omitted *)
+        type t = Stable.Latest.t =
           { user_command: User_command.Stable.V1.t
           ; previous_receipt_chain_hash: Receipt.Chain_hash.Stable.V1.t }
-        [@@deriving sexp, bin_io]
+        [@@deriving sexp]
       end
 
       module Body = struct
-        (* TODO: version *)
-        type t =
+        module Stable = struct
+          module V1 = struct
+            module T = struct
+              let version = 1
+
+              type t =
+                | Payment of
+                    { previous_empty_accounts:
+                        Public_key.Compressed.Stable.V1.t list }
+                | Stake_delegation of
+                    { previous_delegate: Public_key.Compressed.Stable.V1.t }
+              [@@deriving sexp, bin_io]
+            end
+
+            include T
+            include Registration.Make_latest_version (T)
+          end
+
+          module Latest = V1
+
+          module Module_decl = struct
+            let name = "transaction_logic_undo_user_command_body"
+
+            type latest = Latest.t
+          end
+
+          module Registrar = Registration.Make (Module_decl)
+          module Registered_V1 = Registrar.Register (V1)
+        end
+
+        (* bin_io omitted *)
+        type t = Stable.Latest.t =
           | Payment of
               { previous_empty_accounts: Public_key.Compressed.Stable.V1.t list
               }
           | Stake_delegation of
               { previous_delegate: Public_key.Compressed.Stable.V1.t }
-        [@@deriving sexp, bin_io]
+        [@@deriving sexp]
       end
 
-      type t = {common: Common.t; body: Body.t} [@@deriving sexp, bin_io]
+      module Stable = struct
+        module V1 = struct
+          module T = struct
+            let version = 1
+
+            type t = {common: Common.Stable.V1.t; body: Body.Stable.V1.t}
+            [@@deriving sexp, bin_io]
+          end
+
+          include T
+          include Registration.Make_latest_version (T)
+        end
+
+        module Latest = V1
+
+        module Module_decl = struct
+          let name = "transaction_logic_undo_user_command"
+
+          type latest = Latest.t
+        end
+
+        module Registrar = Registration.Make (Module_decl)
+        module Registered_V1 = Registrar.Register (V1)
+      end
+
+      (* bin_io omitted *)
+      type t = Stable.Latest.t =
+        {common: Common.Stable.V1.t; body: Body.Stable.V1.t}
+      [@@deriving sexp]
     end
 
     module Fee_transfer_undo = struct
@@ -197,25 +344,87 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
       [@@deriving sexp]
     end
 
-    (* TODO : version *)
-    type coinbase =
-      { coinbase: Coinbase.Stable.V1.t
-      ; previous_empty_accounts: Public_key.Compressed.Stable.V1.t list }
-    [@@deriving sexp, bin_io]
+    module Coinbase_undo = struct
+      module Stable = struct
+        module V1 = struct
+          module T = struct
+            let version = 1
 
-    (* TODO : version *)
-    type varying =
-      | User_command of User_command.t
-      | Fee_transfer of Fee_transfer_undo.Stable.V1.t
-      | Coinbase of coinbase
-    [@@deriving sexp, bin_io]
+            type t =
+              { coinbase: Coinbase.Stable.V1.t
+              ; previous_empty_accounts: Public_key.Compressed.Stable.V1.t list
+              }
+            [@@deriving sexp, bin_io]
+          end
+
+          include T
+          include Registration.Make_latest_version (T)
+        end
+
+        module Latest = V1
+
+        module Module_decl = struct
+          let name = "transaction_logic_coinbase_undo"
+
+          type latest = Latest.t
+        end
+
+        module Registrar = Registration.Make (Module_decl)
+        module Registered_V1 = Registrar.Register (V1)
+      end
+
+      (* bin_io omitted *)
+      type t = Stable.Latest.t =
+        { coinbase: Coinbase.Stable.V1.t
+        ; previous_empty_accounts: Public_key.Compressed.Stable.V1.t list }
+      [@@deriving sexp]
+    end
+
+    module Varying = struct
+      module Stable = struct
+        module V1 = struct
+          module T = struct
+            let version = 1
+
+            type t =
+              | User_command of User_command_undo.Stable.V1.t
+              | Fee_transfer of Fee_transfer_undo.Stable.V1.t
+              | Coinbase of Coinbase_undo.Stable.V1.t
+            [@@deriving sexp, bin_io]
+          end
+
+          include T
+          include Registration.Make_latest_version (T)
+        end
+
+        module Latest = V1
+
+        module Module_decl = struct
+          let name = "transaction_logic_undo_varying"
+
+          type latest = Latest.t
+        end
+
+        module Registrar = Registration.Make (Module_decl)
+        module Registered_V1 = Registrar.Register (V1)
+      end
+
+      (* bin_io omitted *)
+      type t = Stable.Latest.t =
+        | User_command of User_command_undo.Stable.V1.t
+        | Fee_transfer of Fee_transfer_undo.Stable.V1.t
+        | Coinbase of Coinbase_undo.Stable.V1.t
+      [@@deriving sexp]
+    end
 
     module Stable = struct
       module V1 = struct
         module T = struct
           let version = 1
 
-          type t = {previous_hash: Ledger_hash.Stable.V1.t; varying: varying}
+          type t =
+            { previous_hash: Ledger_hash.Stable.V1.t
+            ; varying: Varying.Stable.V1.t }
           [@@deriving sexp, bin_io]
         end
 
@@ -228,7 +437,7 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
 
     (* bin_io omitted *)
     type t = Stable.Latest.t =
-      {previous_hash: Ledger_hash.Stable.V1.t; varying: varying}
+      {previous_hash: Ledger_hash.Stable.V1.t; varying: Varying.Stable.V1.t}
     [@@deriving sexp]
 
     let transaction : t -> Transaction.t Or_error.t =
@@ -258,7 +467,7 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
         sub_amount account.balance
           (Amount.of_fee (User_command.Payload.fee payload))
       in
-      let common : Undo.User_command.Common.t =
+      let common : Undo.User_command_undo.Common.t =
         {user_command; previous_receipt_chain_hash= account.receipt_chain_hash}
       in
       let%bind () = validate_nonces nonce account.nonce in
@@ -274,12 +483,12 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
     | Stake_delegation (Set_delegate {new_delegate}) ->
         set ledger sender_location {sender_account with delegate= new_delegate} ;
         return
-          { Undo.User_command.common
+          { Undo.User_command_undo.common
           ; body= Stake_delegation {previous_delegate= sender_account.delegate}
           }
     | Payment {Payment_payload.amount; receiver} ->
         let%bind sender_balance' = sub_amount sender_account.balance amount in
-        let undo emptys : Undo.User_command.t =
+        let undo emptys : Undo.User_command_undo.t =
           {common; body= Payment {previous_empty_accounts= emptys}}
         in
         if Public_key.Compressed.equal sender receiver then (
@@ -376,13 +585,15 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
     let%map balance = add_amount proposer_account.balance proposer_reward in
     set t proposer_location {proposer_account with balance} ;
     Option.iter receiver_update ~f:(fun (l, a) -> set t l a) ;
-    {Undo.coinbase= cb; previous_empty_accounts= emptys1 @ emptys2}
+    Undo.Coinbase_undo.
+      {coinbase= cb; previous_empty_accounts= emptys1 @ emptys2}
 
   (* Don't have to be atomic here because these should never fail. In fact, none of
   the undo functions should ever return an error. This should be fixed in the types. *)
   let undo_coinbase t
-      { Undo.coinbase= {proposer; fee_transfer; amount= coinbase_amount}
-      ; previous_empty_accounts } =
+      Undo.Coinbase_undo.({ coinbase=
+                              {proposer; fee_transfer; amount= coinbase_amount}
+                          ; previous_empty_accounts }) =
     let proposer_reward =
       match fee_transfer with
       | None -> coinbase_amount
@@ -415,7 +626,7 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
     remove_accounts_exn t previous_empty_accounts
 
   let undo_user_command ledger
-      { Undo.User_command.common=
+      { Undo.User_command_undo.common=
           { user_command= {payload; sender; signature= _}
           ; previous_receipt_chain_hash }
       ; body } =
@@ -481,13 +692,13 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
       ( match t with
       | User_command txn ->
           Or_error.map (apply_user_command ledger txn) ~f:(fun u ->
-              Undo.User_command u )
+              Undo.Varying.User_command u )
       | Fee_transfer t ->
           Or_error.map (apply_fee_transfer ledger t) ~f:(fun u ->
-              Undo.Fee_transfer u )
+              Undo.Varying.Fee_transfer u )
       | Coinbase t ->
-          Or_error.map (apply_coinbase ledger t) ~f:(fun u -> Undo.Coinbase u)
-      )
+          Or_error.map (apply_coinbase ledger t) ~f:(fun u ->
+              Undo.Varying.Coinbase u ) )
       ~f:(fun varying -> {Undo.previous_hash; varying})
 
   let merkle_root_after_user_command_exn ledger payment =
