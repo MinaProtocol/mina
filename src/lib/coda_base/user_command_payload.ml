@@ -13,6 +13,7 @@ module Common = struct
     module V1 = struct
       module T = struct
         let version = 1
+
         type t =
           (Currency.Fee.Stable.V1.t, Account_nonce.Stable.V1.t, Memo.t) t_
         [@@deriving bin_io, eq, sexp, hash, yojson]
