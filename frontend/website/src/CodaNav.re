@@ -10,7 +10,11 @@ module SimpleButton = {
         className=Css.(
           merge([
             Body.basic,
-            style([textDecoration(`none), whiteSpace(`nowrap)]),
+            style([
+              textDecoration(`none),
+              whiteSpace(`nowrap),
+              hover([color(Style.Colors.hyperlinkHover)]),
+            ]),
           ])
         )>
         {ReasonReact.string(name)}
