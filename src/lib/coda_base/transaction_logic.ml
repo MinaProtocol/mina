@@ -57,13 +57,26 @@ module type S = sig
         with type V1.t = t
     end
 
-    type varying =
-      | User_command of User_command.t
-      | Fee_transfer of Fee_transfer_undo.Stable.V1.t
-      | Coinbase of Coinbase_undo.Stable.V1.t
-    [@@deriving sexp, bin_io]
+    module Varying : sig
+      type t =
+        | User_command of User_command.t
+        | Fee_transfer of Fee_transfer_undo.Stable.V1.t
+        | Coinbase of Coinbase_undo.Stable.V1.t
+      [@@deriving sexp]
 
-    type t = {previous_hash: Ledger_hash.Stable.V1.t; varying: varying}
+      module Stable :
+        sig
+          module V1 : sig
+            type t [@@deriving sexp, bin_io]
+          end
+
+          module Latest = V1
+        end
+        with type V1.t = t
+    end
+
+    type t =
+      {previous_hash: Ledger_hash.Stable.V1.t; varying: Varying.Stable.V1.t}
     [@@deriving sexp]
 
     module Stable :
@@ -245,19 +258,51 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
       [@@deriving sexp]
     end
 
-    (* TODO : version *)
-    type varying =
-      | User_command of User_command.t
-      | Fee_transfer of Fee_transfer_undo.Stable.V1.t
-      | Coinbase of Coinbase_undo.Stable.V1.t
-    [@@deriving sexp, bin_io]
+    module Varying = struct
+      module Stable = struct
+        module V1 = struct
+          module T = struct
+            let version = 1
+
+            type t =
+              | User_command of User_command.t
+              | Fee_transfer of Fee_transfer_undo.Stable.V1.t
+              | Coinbase of Coinbase_undo.Stable.V1.t
+            [@@deriving sexp, bin_io]
+          end
+
+          include T
+          include Registration.Make_latest_version (T)
+        end
+
+        module Latest = V1
+
+        module Module_decl = struct
+          let name = "some_data"
+
+          type latest = Latest.t
+        end
+
+        module Registrar = Registration.Make (Module_decl)
+        module Registered_V1 = Registrar.Register (V1)
+      end
+
+      (* bin_io omitted *)
+      type t = Stable.Latest.t =
+        | User_command of User_command.t
+        | Fee_transfer of Fee_transfer_undo.Stable.V1.t
+        | Coinbase of Coinbase_undo.Stable.V1.t
+      [@@deriving sexp]
+    end
 
     module Stable = struct
       module V1 = struct
         module T = struct
           let version = 1
 
-          type t = {previous_hash: Ledger_hash.Stable.V1.t; varying: varying}
+          type t =
+            { previous_hash: Ledger_hash.Stable.V1.t
+            ; varying: Varying.Stable.V1.t }
           [@@deriving sexp, bin_io]
         end
 
@@ -270,7 +315,7 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
 
     (* bin_io omitted *)
     type t = Stable.Latest.t =
-      {previous_hash: Ledger_hash.Stable.V1.t; varying: varying}
+      {previous_hash: Ledger_hash.Stable.V1.t; varying: Varying.Stable.V1.t}
     [@@deriving sexp]
 
     let transaction : t -> Transaction.t Or_error.t =
@@ -525,13 +570,13 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
       ( match t with
       | User_command txn ->
           Or_error.map (apply_user_command ledger txn) ~f:(fun u ->
-              Undo.User_command u )
+              Undo.Varying.User_command u )
       | Fee_transfer t ->
           Or_error.map (apply_fee_transfer ledger t) ~f:(fun u ->
-              Undo.Fee_transfer u )
+              Undo.Varying.Fee_transfer u )
       | Coinbase t ->
-          Or_error.map (apply_coinbase ledger t) ~f:(fun u -> Undo.Coinbase u)
-      )
+          Or_error.map (apply_coinbase ledger t) ~f:(fun u ->
+              Undo.Varying.Coinbase u ) )
       ~f:(fun varying -> {Undo.previous_hash; varying})
 
   let merkle_root_after_user_command_exn ledger payment =
