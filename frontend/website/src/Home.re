@@ -10,6 +10,7 @@ let make = _ => {
         <CryptoAppsSection />
         <InclusiveSection />
         <SustainableSection />
+        <GetInvolvedSection />
       </Wrapped>
       <div
         className=Css.(
