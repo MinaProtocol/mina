@@ -287,8 +287,7 @@ let genesis_protocol_state =
   With_hash.of_data ~hash_data:Protocol_state.hash state
 
 module For_tests = struct
-  let gen_consensus_state ~gen_slot_advancement:_ ~proposer_pk:_ ~local_state:_
-      =
+  let gen_consensus_state ~gen_slot_advancement:_ ~local_state:_ =
     let open Consensus_state in
     Quickcheck.Generator.return
     @@ fun ~previous_protocol_state ~snarked_ledger_hash:_ ->
