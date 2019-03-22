@@ -1,6 +1,7 @@
 module Colors = {
   let fadedBlue = `rgb((111, 167, 197));
   let white = Css.white;
+  let whiteAlpha = a => `rgba((255, 255, 255, a));
   let hyperlink = `hsl((201, 71, 52));
   let hyperlinkAlpha = a => `hsla((201, 71, 52, a));
   let hyperlinkHover = `hsl((201, 71, 70));
@@ -202,6 +203,18 @@ module H4 = {
       textTransform(`uppercase),
       fontWeight(`normal),
       color(Colors.greyishBrown),
+    ]);
+
+  let wide =
+    style([
+      whiteSpace(`nowrap),
+      fontSize(`rem(0.75)),
+      letterSpacing(`rem(0.125)),
+      Typeface.aktivgrotesk,
+      fontWeight(`medium),
+      fontStyle(`normal),
+      textAlign(`center),
+      textTransform(`uppercase),
     ]);
 };
 
