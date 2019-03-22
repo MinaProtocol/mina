@@ -210,10 +210,6 @@ let start_payment_check logger root_pipe payment_pipe workers testnet
       Array.init (List.length workers) ~f:(fun i ->
           if Api.synced testnet i then Some root_lengths.(i) else None )
     in
-    Logger.debug logger ~module_:__MODULE__ ~location:__LOC__
-      !"user command %{sexp:User_command.t} is added and snapshots are \
-        %{sexp:int option Array.t}"
-      user_cmd snapshots ;
     Hashtbl.add user_commands_under_inspection ~key:user_cmd
       ~data:
         {snapshots; passed_root= Array.map snapshots ~f:Option.is_none; result}
@@ -227,10 +223,6 @@ let start_payment_check logger root_pipe payment_pipe workers testnet
           )
       ->
       Option.iter root_length ~f:(fun l -> root_lengths.(i) <- l) ;
-      Logger.info logger ~module_:__MODULE__ ~location:__LOC__
-        !"root length %{sexp:int option}, transactions %{sexp: User_command.t \
-          list} for node %d"
-        root_length user_commands i ;
       let user_commands_pass_inspection =
         Hashtbl.fold user_commands_under_inspection ~init:[]
           ~f:(fun ~key:user_cmd
@@ -250,18 +242,23 @@ let start_payment_check logger root_pipe payment_pipe workers testnet
                   then (
                     passed_root.(i) <- true ;
                     Logger.info logger ~module_:__MODULE__ ~location:__LOC__
-                      !"transaction %{sexp:User_command.t} finally gets into \
-                        the root of node %d, when root length is %d"
-                      user_cmd i root_lengths.(i) ;
+                      ~metadata:
+                        [ ("user_cmd", User_command.to_yojson user_cmd)
+                        ; ("i", `Int i)
+                        ; ("length", `Int root_lengths.(i)) ]
+                      "transaction $user_cmd finally gets into the root of \
+                       node $i, when root length is $length" ;
                     if Array.for_all passed_root ~f:Fn.id then
                       user_cmd :: user_commands_pass_inspection
                     else user_commands_pass_inspection )
                   else user_commands_pass_inspection
                 else (
                   Logger.fatal logger ~module_:__MODULE__ ~location:__LOC__
-                    !"transaction %{sexp:User_command.t} took too long to get \
-                      into the root of node %d"
-                    user_cmd i ;
+                    ~metadata:
+                      [ ("user_cmd", User_command.to_yojson user_cmd)
+                      ; ("i", `Int i) ]
+                    "transaction $user_cmd took too long to get into the root \
+                     of node $i" ;
                   exit 1 |> don't_wait_for ;
                   user_commands_pass_inspection ) )
       in
@@ -270,9 +267,8 @@ let start_payment_check logger root_pipe payment_pipe workers testnet
             Hashtbl.find_exn user_commands_under_inspection user_cmd
           in
           Logger.info logger ~module_:__MODULE__ ~location:__LOC__
-            !"transaction %{sexp:User_command.t} is included in the root for \
-              all workers"
-            user_cmd ;
+            ~metadata:[("user_cmd", User_command.to_yojson user_cmd)]
+            "transaction $user_cmd is included in the root for all workers" ;
           Ivar.fill result () ;
           Hashtbl.remove user_commands_under_inspection user_cmd )
       |> Deferred.return )
@@ -350,36 +346,33 @@ let test logger n proposers snark_work_public_keys work_selection =
 
 module Payments : sig
   val send_several_payments :
-       Api.t
-    -> node:int
-    -> keypairs:Keypair.t list
-    -> (Receipt.Chain_hash.t * unit Ivar.t) list Option.t Deferred.t
+    Api.t -> node:int -> keypairs:Keypair.t list -> n:int -> unit Deferred.t
 end = struct
-  let send_several_payments testnet ~node ~keypairs =
+  let send_several_payments testnet ~node ~keypairs ~n =
     let amount = Currency.Amount.of_int 10 in
     let fee = Currency.Fee.of_int 1 in
-    let rec go i =
-      let open Deferred.Let_syntax in
-      let%bind receipts_and_results =
-        List.map
-          (keypairs : Keypair.t list)
-          ~f:(fun sender_keypair ->
-            let receiver_keypair = List.random_element_exn keypairs in
-            let sender_sk = sender_keypair.private_key in
-            let receiver_pk =
-              receiver_keypair.public_key |> Public_key.compress
-            in
-            Api.send_payment testnet node sender_sk receiver_pk amount fee )
-        |> Deferred.all |> Deferred.map ~f:Option.all
-      in
-      let%bind () =
-        after
-          (Time.Span.of_ms
-             (Consensus.Constants.block_window_duration_ms * 2 |> Float.of_int))
-      in
-      if i > 0 then go (i - 1) else Deferred.return receipts_and_results
+    let%bind _ : unit option list =
+      Deferred.List.init n ~f:(fun _ ->
+          let open Deferred.Option.Let_syntax in
+          let%bind receipts_and_results =
+            List.map
+              (keypairs : Keypair.t list)
+              ~f:(fun sender_keypair ->
+                let receiver_keypair = List.random_element_exn keypairs in
+                let sender_sk = sender_keypair.private_key in
+                let receiver_pk =
+                  receiver_keypair.public_key |> Public_key.compress
+                in
+                Api.send_payment testnet node sender_sk receiver_pk amount fee
+                )
+            |> Deferred.Option.all
+          in
+          let _, results = List.unzip receipts_and_results in
+          Deferred.map
+            (Deferred.List.iter results ~f:Ivar.read)
+            ~f:(Fn.const (Some ())) )
     in
-    go 5
+    Deferred.unit
 end
 
 module Restarts : sig

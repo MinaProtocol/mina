@@ -30,8 +30,7 @@ integration_tests = [
     'coda-block-production-test',
     'coda-shared-prefix-test -who-proposes 0',
     'coda-shared-prefix-test -who-proposes 1',
-    'coda-shared-state-test',
-    'coda-restart-node-test'
+    'coda-restart-node-test',
 ]
 
 all_tests = simple_tests + integration_tests
@@ -45,7 +44,8 @@ test_permutations = {
     'test_posig': simple_tests,
     'test_postake': simple_tests,
     'test_postake_catchup': ['coda-restart-node-test'],
-    'test_postake_bootstrap' : ['coda-bootstrap-test']
+    'test_postake_bootstrap' : ['coda-bootstrap-test'],
+    'test_postake_txns': ['coda-shared-state-test']
 }
 
 ci_blacklist = [

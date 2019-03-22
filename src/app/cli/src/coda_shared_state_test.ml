@@ -23,13 +23,10 @@ let main () =
     Coda_worker_testnet.test logger n proposers snark_work_public_keys
       Protocols.Coda_pow.Work_selection.Seq
   in
-  let%bind receipts_and_results =
+  let%bind () =
     Coda_worker_testnet.Payments.send_several_payments testnet ~node:0
-      ~keypairs
-    |> Deferred.map ~f:(fun x -> Option.value_exn x)
+      ~keypairs ~n:3
   in
-  let _, results = List.unzip receipts_and_results in
-  let%bind _ = Deferred.all (List.map results ~f:Ivar.read) in
   Coda_worker_testnet.Api.teardown testnet
 
 let command =
