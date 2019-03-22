@@ -1,8 +1,4 @@
-let extraHeaders =
-  <>
-    <link rel="stylesheet" type_="text/css" href="/static/css/careers.css" />
-    Head.legacyStylesheets
-  </>;
+let extraHeaders = <> Head.legacyStylesheets </>;
 
 let border =
   Css.(
