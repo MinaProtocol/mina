@@ -1,6 +1,6 @@
 (* registration.ml -- register module versions *)
 
-(* see RFC 0014 for design discussion; see tests below for usage
+(* see RFC 0015 for design discussion; see tests below for usage
  *)
 
 open Core_kernel
