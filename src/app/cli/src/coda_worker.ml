@@ -190,7 +190,8 @@ module T = struct
     let get_nonce =
       C.create_rpc ~f:get_nonce_impl
         ~bin_input:Public_key.Compressed.Stable.V1.bin_t
-        ~bin_output:[%bin_type_class: Coda_numbers.Account_nonce.t option] ()
+        ~bin_output:
+          [%bin_type_class: Coda_numbers.Account_nonce.Stable.V1.t option] ()
 
     let prove_receipt =
       C.create_rpc ~f:prove_receipt_impl ~bin_input:Prove_receipt.Input.bin_t
