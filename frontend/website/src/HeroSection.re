@@ -6,6 +6,9 @@ module Copy = {
       <div
         className=Css.(
           style([
+            display(`flex),
+            flexDirection(`column),
+            justifyContent(`center),
             width(`percent(100.0)),
             maxWidth(`rem(37.0)),
             minWidth(`rem(17.5)),
@@ -21,7 +24,9 @@ module Copy = {
             merge([
               Style.H1.hero,
               style([
+                color(Style.Colors.denimTwo),
                 marginTop(`rem(1.0)),
+                marginBottom(`zero),
                 media(Style.MediaQuery.full, [marginTop(`rem(1.5))]),
               ]),
             ])
@@ -30,7 +35,10 @@ module Copy = {
              "A cryptocurrency with a tiny, portable blockchain.",
            )}
         </h1>
-        <p className=Style.Body.big>
+        <p
+          className=Css.(
+            merge([Style.Body.big, style([marginTop(`rem(2.0))])])
+          )>
           <span>
             {ReasonReact.string(
                "Coda is the first cryptocurrency with a succinct blockchain. Out lightweight blockchain means ",
