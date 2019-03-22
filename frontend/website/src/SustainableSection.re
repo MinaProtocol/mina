@@ -62,12 +62,14 @@ let make = _children => {
           <Svg
             link="/static/img/chart-blockchain-size.svg"
             dims=(23.125, 17.3125)
+            inline=true
           />
         </div>
         <div className=Css.(style([marginBottom(`rem(2.375))]))>
           <Svg
             link="/static/img/chart-blockchain-energy.svg"
             dims=(23.9375, 18.1875)
+            inline=true
           />
         </div>
         <div className=Css.(style([marginBottom(`rem(2.375))]))>
