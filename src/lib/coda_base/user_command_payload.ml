@@ -14,7 +14,8 @@ module Common = struct
         type ('fee, 'nonce, 'memo) t_ = {fee: 'fee; nonce: 'nonce; memo: 'memo}
         [@@deriving bin_io, eq, sexp, hash, yojson]
 
-        type t = (Currency.Fee.Stable.V1.t, Account_nonce.t, Memo.t) t_
+        type t =
+          (Currency.Fee.Stable.V1.t, Account_nonce.Stable.V1.t, Memo.t) t_
         [@@deriving bin_io, eq, sexp, hash, yojson]
       end
 
