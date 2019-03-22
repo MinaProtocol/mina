@@ -1,17 +1,40 @@
 open Core_kernel
 open Import
 
-type single = Public_key.Compressed.t * Currency.Fee.t
-[@@deriving bin_io, sexp, compare, eq, yojson]
+module Single : sig
+  module Stable : sig
+    module V1 : sig
+      type t = Public_key.Compressed.t * Currency.Fee.t
+      [@@deriving bin_io, sexp, compare, eq, yojson]
+    end
 
-type t = One of single | Two of single * single
-[@@deriving bin_io, sexp, compare, eq, yojson]
+    module Latest = V1
+  end
 
-val to_list : t -> single list
+  type t = Stable.Latest.t [@@deriving sexp, compare, eq, yojson]
+end
 
-val of_single : single -> t
+module Stable : sig
+  module V1 : sig
+    type t =
+      | One of Single.Stable.V1.t
+      | Two of Single.Stable.V1.t * Single.Stable.V1.t
+    [@@deriving bin_io, sexp, compare, eq, yojson]
+  end
 
-val of_single_list : single list -> t list
+  module Latest = V1
+end
+
+type t = Stable.Latest.t =
+  | One of Single.Stable.V1.t
+  | Two of Single.Stable.V1.t * Single.Stable.V1.t
+[@@deriving sexp, compare, eq, yojson]
+
+val to_list : t -> Single.t list
+
+val of_single : Single.t -> t
+
+val of_single_list : Single.t list -> t list
 
 val fee_excess : t -> Currency.Fee.Signed.t Or_error.t
 

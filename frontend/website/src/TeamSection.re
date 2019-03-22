@@ -29,6 +29,7 @@ module Member = {
               display(`flex),
               flexDirection(`column),
               width(`rem(23.75)),
+              minWidth(`rem(19.)),
               minHeight(`rem(27.5)),
               backgroundColor(Style.Colors.veryLightGrey),
               borderRadius(`px(10)),
@@ -48,10 +49,27 @@ module Member = {
                   justifyContent(`flexStart),
                 ])
               )>
-              <div className=Style.H3.wide> {ReasonReact.string(name)} </div>
               <div
                 className=Css.(
-                  merge([Style.H5.basic, style([textAlign(`center)])])
+                  merge([
+                    Style.H3.wide,
+                    style([
+                      letterSpacing(`em(0.2)),
+                      media(
+                        Style.MediaQuery.notMobile,
+                        [letterSpacing(`em(0.25))],
+                      ),
+                    ]),
+                  ])
+                )>
+                {ReasonReact.string(name)}
+              </div>
+              <div
+                className=Css.(
+                  merge([
+                    Style.H5.basic,
+                    style([textAlign(`left), whiteSpace(`nowrap)]),
+                  ])
                 )>
                 {ReasonReact.string(title)}
               </div>
@@ -220,7 +238,7 @@ let make = _children => {
         />
         <Member
           name="Joel Krauska"
-          title="Protocol Reliability Engineer"
+          title="Protocol Reliability Eng"
           description="Joel builds networks. He loves open source technologies, automation \
        and monitoring large systems at scale. Over the years, he has worked \
        for ISPs, network hardware and software vendors, online gaming \

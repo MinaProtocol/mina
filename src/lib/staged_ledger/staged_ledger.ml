@@ -1478,11 +1478,34 @@ let%test_module "test" =
         type fee = Fee.Unsigned.t
         [@@deriving sexp, bin_io, compare, eq, yojson]
 
-        type single = public_key * fee
-        [@@deriving bin_io, sexp, compare, eq, yojson]
+        module Single = struct
+          module Stable = struct
+            module V1 = struct
+              type t = public_key * fee
+              [@@deriving bin_io, sexp, compare, eq, yojson]
+            end
 
-        type t = One of single | Two of single * single
-        [@@deriving bin_io, sexp, compare, eq, yojson]
+            module Latest = V1
+          end
+
+          type t = Stable.Latest.t [@@deriving sexp, compare, yojson]
+        end
+
+        module Stable = struct
+          module V1 = struct
+            type t =
+              | One of Single.Stable.V1.t
+              | Two of Single.Stable.V1.t * Single.Stable.V1.t
+            [@@deriving bin_io, sexp, compare, eq, yojson]
+          end
+
+          module Latest = V1
+        end
+
+        type t = Stable.Latest.t =
+          | One of Single.Stable.V1.t
+          | Two of Single.Stable.V1.t * Single.Stable.V1.t
+        [@@deriving sexp, compare, eq, yojson]
 
         let to_list = function One x -> [x] | Two (x, y) -> [x; y]
 
@@ -1513,7 +1536,7 @@ let%test_module "test" =
       module Coinbase = struct
         type public_key = string [@@deriving sexp, bin_io, compare, eq]
 
-        type fee_transfer = Fee_transfer.single
+        type fee_transfer = Fee_transfer.Single.Stable.V1.t
         [@@deriving sexp, bin_io, compare, eq]
 
         type t =
@@ -1550,7 +1573,7 @@ let%test_module "test" =
         type valid_user_command = User_command.With_valid_signature.t
         [@@deriving sexp, bin_io, compare, eq]
 
-        type fee_transfer = Fee_transfer.t
+        type fee_transfer = Fee_transfer.Stable.V1.t
         [@@deriving sexp, bin_io, compare, eq]
 
         type coinbase = Coinbase.t [@@deriving sexp, bin_io, compare, eq]
@@ -1914,7 +1937,7 @@ let%test_module "test" =
         type user_command = User_command.t
         [@@deriving sexp, bin_io, compare, yojson]
 
-        type fee_transfer_single = Fee_transfer.single
+        type fee_transfer_single = Fee_transfer.Single.Stable.V1.t
         [@@deriving sexp, bin_io, yojson]
 
         type user_command_with_valid_signature =

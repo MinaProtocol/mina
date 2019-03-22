@@ -23,10 +23,22 @@ module type S = sig
       type t = {common: Common.t; body: Body.t} [@@deriving sexp, bin_io]
     end
 
-    type fee_transfer =
-      { fee_transfer: Fee_transfer.t
-      ; previous_empty_accounts: Public_key.Compressed.t list }
-    [@@deriving sexp, bin_io]
+    module Fee_transfer_undo : sig
+      type t =
+        { fee_transfer: Fee_transfer.Stable.V1.t
+        ; previous_empty_accounts: Public_key.Compressed.t list }
+      [@@deriving sexp]
+
+      module Stable :
+        sig
+          module V1 : sig
+            type t [@@deriving sexp, bin_io]
+          end
+
+          module Latest = V1
+        end
+        with type V1.t = t
+    end
 
     type coinbase =
       { coinbase: Coinbase.Stable.V1.t
@@ -35,7 +47,7 @@ module type S = sig
 
     type varying =
       | User_command of User_command.t
-      | Fee_transfer of fee_transfer
+      | Fee_transfer of Fee_transfer_undo.Stable.V1.t
       | Coinbase of coinbase
     [@@deriving sexp, bin_io]
 
@@ -150,11 +162,40 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
       type t = {common: Common.t; body: Body.t} [@@deriving sexp, bin_io]
     end
 
-    (* TODO : version *)
-    type fee_transfer =
-      { fee_transfer: Fee_transfer.t
-      ; previous_empty_accounts: Public_key.Compressed.Stable.V1.t list }
-    [@@deriving sexp, bin_io]
+    module Fee_transfer_undo = struct
+      module Stable = struct
+        module V1 = struct
+          module T = struct
+            let version = 1
+
+            type t =
+              { fee_transfer: Fee_transfer.Stable.V1.t
+              ; previous_empty_accounts: Public_key.Compressed.Stable.V1.t list
+              }
+            [@@deriving sexp, bin_io]
+          end
+
+          include T
+          include Registration.Make_latest_version (T)
+        end
+
+        module Latest = V1
+
+        module Module_decl = struct
+          let name = "transaction_logic_fee_transfer_undo"
+
+          type latest = Latest.t
+        end
+
+        module Registrar = Registration.Make (Module_decl)
+        module Registered_V1 = Registrar.Register (V1)
+      end
+
+      type t = Stable.Latest.t =
+        { fee_transfer: Fee_transfer.t
+        ; previous_empty_accounts: Public_key.Compressed.Stable.V1.t list }
+      [@@deriving sexp]
+    end
 
     (* TODO : version *)
     type coinbase =
@@ -165,7 +206,7 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
     (* TODO : version *)
     type varying =
       | User_command of User_command.t
-      | Fee_transfer of fee_transfer
+      | Fee_transfer of Fee_transfer_undo.Stable.V1.t
       | Coinbase of coinbase
     [@@deriving sexp, bin_io]
 
@@ -290,10 +331,10 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
       process_fee_transfer t transfer ~modify_balance:(fun b f ->
           add_amount b (Amount.of_fee f) )
     in
-    {Undo.fee_transfer= transfer; previous_empty_accounts}
+    Undo.Fee_transfer_undo.{fee_transfer= transfer; previous_empty_accounts}
 
   let undo_fee_transfer t
-      ({previous_empty_accounts; fee_transfer} : Undo.fee_transfer) =
+      ({previous_empty_accounts; fee_transfer} : Undo.Fee_transfer_undo.t) =
     let open Or_error.Let_syntax in
     let%map _ =
       process_fee_transfer t fee_transfer ~modify_balance:(fun b f ->
@@ -301,8 +342,8 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
     in
     remove_accounts_exn t previous_empty_accounts
 
-  (* TODO: Better system needed for making atomic changes. Could use a monad. *)
   let apply_coinbase t
+      (* TODO: Better system needed for making atomic changes. Could use a monad. *)
       ({proposer; fee_transfer; amount= coinbase_amount} as cb : Coinbase.t) =
     let get_or_initialize pk =
       let initial_account = Account.initialize pk in
