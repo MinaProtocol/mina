@@ -34,6 +34,7 @@ module Common = struct
     module Registered_V1 = Registrar.Register (V1)
   end
 
+  (* bin_io omitted *)
   type t = Stable.Latest.t [@@deriving eq, sexp, hash, yojson]
 
   let fold ({fee; nonce; memo} : t) =
@@ -108,6 +109,7 @@ module Body = struct
     module Registered_V1 = Registrar.Register (V1)
   end
 
+  (* bin_io omitted *)
   type t = Stable.Latest.t =
     | Payment of Payment_payload.Stable.V1.t
     | Stake_delegation of Stake_delegation.Stable.V1.t
