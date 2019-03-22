@@ -120,17 +120,28 @@ module Undo : sig
       with type V1.t = t
   end
 
-  (* TODO : version *)
-  type coinbase =
-    { coinbase: Coinbase.t
-    ; previous_empty_accounts: Public_key.Compressed.t list }
-  [@@deriving sexp, bin_io]
+  module Coinbase_undo : sig
+    type t =
+      { coinbase: Coinbase.Stable.V1.t
+      ; previous_empty_accounts: Public_key.Compressed.Stable.V1.t list }
+    [@@deriving sexp]
+
+    module Stable :
+      sig
+        module V1 : sig
+          type t [@@deriving sexp, bin_io]
+        end
+
+        module Latest = V1
+      end
+      with type V1.t = t
+  end
 
   (* TODO : version *)
   type varying =
     | User_command of User_command.t
     | Fee_transfer of Fee_transfer_undo.t
-    | Coinbase of coinbase
+    | Coinbase of Coinbase_undo.t
   [@@deriving sexp, bin_io]
 
   type t = {previous_hash: Ledger_hash.t; varying: varying} [@@deriving sexp]
