@@ -54,7 +54,7 @@ end = struct
           (* TODO: The statement is redundant here - it can be computed from the witness and the transaction *)
           (* TODO : version all fields *)
           type t =
-            { transaction_with_info: Ledger.Undo.t
+            { transaction_with_info: Ledger.Undo.Stable.V1.t
             ; statement: Ledger_proof_statement.Stable.V1.t
             ; witness: Inputs.Sparse_ledger.t }
           [@@deriving sexp, bin_io]

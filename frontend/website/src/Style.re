@@ -31,10 +31,57 @@ module Colors = {
   let lightClover = `rgba((118, 205, 135, 0.12));
 
   let teal = `rgb((71, 130, 160));
+  let tealAlpha = a => `rgba((71, 130, 160, a));
 };
 
 module Typeface = {
   open Css;
+  let weights = [
+    (`thin, "Thin"),
+    (`extraLight, "ExtraLight"),
+    (`light, "Light"),
+    (`normal, "Regular"),
+    (`medium, "Medium"),
+    (`semiBold, "SemiBold"),
+    (`bold, "Bold"),
+    (`extraBold, "ExtraBold"),
+  ];
+
+  // TODO: add format("woff") and unicode ranges
+  let () =
+    List.iter(
+      ((weight, name)) =>
+        ignore @@
+        Css.(
+          fontFace(
+            ~fontFamily="IBM Plex Sans",
+            ~src=[
+              localUrl("IBMPlexSans-" ++ name),
+              url("/static/font/IBMPlexSans-" ++ name ++ "-Latin1.woff2"),
+              url("/static/font/IBMPlexSans-" ++ name ++ "-Latin1.woff"),
+            ],
+            ~fontStyle=`normal,
+            ~fontWeight=weight,
+            (),
+          )
+        ),
+      weights,
+    );
+
+  let _ =
+    Css.(
+      fontFace(
+        ~fontFamily="IBM Plex Mono",
+        ~src=[
+          localUrl("IBMPlexMono-Regular"),
+          url("/static/font/IBMPlexMono-SemiBold-Latin1.woff2"),
+          url("/static/font/IBMPlexMono-SemiBold-Latin1.woff"),
+        ],
+        ~fontStyle=`normal,
+        ~fontWeight=`num(600),
+        (),
+      )
+    );
 
   let ibmplexsans =
     fontFamily("IBM Plex Sans, Helvetica Neue, Arial, sans-serif");
@@ -89,7 +136,6 @@ module H1 = {
       fontSize(`rem(2.25)),
       letterSpacing(`rem(-0.02375)),
       lineHeight(`rem(3.0)),
-      color(Colors.denimTwo),
       media(
         MediaQuery.full,
         [

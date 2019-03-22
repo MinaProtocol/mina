@@ -202,6 +202,16 @@ jobs:
             - run:
                   name: Run unit tests
                   command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && dune build --profile=test_postake_snarkless -j8 && dune runtest --profile=test_postake_snarkless -j8'
+    test-unit--dev:
+        resource_class: large
+        docker:
+            - image: codaprotocol/coda:toolchain-af1380e0f6c8726391d82b2adb6a2a3b20dd46a0
+        steps:
+            - checkout
+            - run: git submodule sync && git submodule update --init --recursive
+            - run:
+                  name: Run unit tests
+                  command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && dune build --profile=dev -j8 && dune runtest --profile=dev -j8'
     test--fake_hash:
         resource_class: large
         docker:
@@ -327,6 +337,7 @@ workflows:
             - build-artifacts--testnet_postake_snarkless_fake_hash
             - test-unit--test_posig_snarkless
             - test-unit--test_postake_snarkless
+            - test-unit--dev
             - test--fake_hash
             - test--test_postake
             - test--test_postake_bootstrap

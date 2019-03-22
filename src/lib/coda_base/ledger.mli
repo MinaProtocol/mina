@@ -103,24 +103,47 @@ module Undo : sig
     type t = {common: Common.t; body: Body.t} [@@deriving sexp, bin_io]
   end
 
-  type fee_transfer =
-    { fee_transfer: Fee_transfer.t
-    ; previous_empty_accounts: Public_key.Compressed.t list }
-  [@@deriving sexp, bin_io]
+  module Fee_transfer_undo : sig
+    type t =
+      { fee_transfer: Fee_transfer.Stable.V1.t
+      ; previous_empty_accounts: Public_key.Compressed.t list }
+    [@@deriving sexp]
 
+    module Stable :
+      sig
+        module V1 : sig
+          type t [@@deriving sexp, bin_io]
+        end
+
+        module Latest = V1
+      end
+      with type V1.t = t
+  end
+
+  (* TODO : version *)
   type coinbase =
     { coinbase: Coinbase.t
     ; previous_empty_accounts: Public_key.Compressed.t list }
   [@@deriving sexp, bin_io]
 
+  (* TODO : version *)
   type varying =
     | User_command of User_command.t
-    | Fee_transfer of fee_transfer
+    | Fee_transfer of Fee_transfer_undo.t
     | Coinbase of coinbase
   [@@deriving sexp, bin_io]
 
-  type t = {previous_hash: Ledger_hash.t; varying: varying}
-  [@@deriving sexp, bin_io]
+  type t = {previous_hash: Ledger_hash.t; varying: varying} [@@deriving sexp]
+
+  module Stable :
+    sig
+      module V1 : sig
+        type t [@@deriving bin_io, sexp]
+      end
+
+      module Latest = V1
+    end
+    with type V1.t = t
 
   val transaction : t -> Transaction.t Or_error.t
 end

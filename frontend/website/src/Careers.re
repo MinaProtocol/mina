@@ -171,11 +171,6 @@ let dot = {
 let extraHeaders =
   <>
     <link rel="stylesheet" type_="text/css" href="/static/css/careers.css" />
-    <link
-      rel="stylesheet"
-      type_="text/css"
-      href="https://use.typekit.net/mta7mwm.css"
-    />
     Head.legacyStylesheets
   </>;
 

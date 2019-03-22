@@ -117,7 +117,7 @@ let apply_user_command_exn t ({sender; payload; signature= _} : User_command.t)
               (Balance.add_amount receiver_account.balance amount) }
 
 let apply_fee_transfer_exn =
-  let apply_single t ((pk, fee) : Fee_transfer.single) =
+  let apply_single t ((pk, fee) : Fee_transfer.Single.t) =
     let index = find_index_exn t pk in
     let account = get_or_initialize_exn pk t index in
     let open Currency in
