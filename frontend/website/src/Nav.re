@@ -1,6 +1,6 @@
 // Nav styles adapted from https://medium.com/creative-technology-concepts-code/responsive-mobile-dropdown-navigation-using-css-only-7218e4498a99
 
-module Style = {
+module NavStyle = {
   open Css;
   open Style;
 
@@ -8,15 +8,6 @@ module Style = {
     let menu = "(min-width: 58rem)";
     let statusLift = "(min-width: 38rem)";
   };
-
-  let item =
-    merge([
-      style(
-        paddingX(`rem(0.75))
-        @ paddingY(`zero)
-        @ [listStyle(`none, `inside, `none)],
-      ),
-    ]);
 
   let options =
     style([
@@ -67,7 +58,6 @@ module Style = {
       media(MediaQuery.statusLift, [flexWrap(`nowrap)]),
     ]);
 };
-open Style;
 
 module Logo = {
   let svg =
@@ -81,11 +71,23 @@ let make = children => {
   ...component,
   render: _self => {
     let items =
-      children |> Array.map(elem => <li className=Style.item> elem </li>);
+      children
+      |> Array.map(elem =>
+           <li
+             className=Css.(
+               style(
+                 Style.paddingX(`rem(0.75))
+                 @ Style.paddingY(`zero)
+                 @ [listStyle(`none, `inside, `none)],
+               )
+             )>
+             elem
+           </li>
+         );
 
     let bottomNudge = Css.marginBottom(`rem(1.25));
 
-    <nav className=Style.nav>
+    <nav className=NavStyle.nav>
       <a
         href="/"
         className=Css.(
@@ -94,7 +96,7 @@ let make = children => {
             bottomNudge,
             width(`percent(50.0)),
             media(
-              MediaQuery.statusLift,
+              NavStyle.MediaQuery.statusLift,
               [width(`auto), marginRight(`rem(0.75))],
             ),
           ])
@@ -107,8 +109,11 @@ let make = children => {
             order(3),
             width(`percent(100.0)),
             bottomNudge,
-            media(MediaQuery.statusLift, [order(2), width(`auto)]),
-            media(MediaQuery.menu, [width(`percent(40.0))]),
+            media(
+              NavStyle.MediaQuery.statusLift,
+              [order(2), width(`auto)],
+            ),
+            media(NavStyle.MediaQuery.menu, [width(`percent(40.0))]),
           ])
         )>
         <div
@@ -116,7 +121,7 @@ let make = children => {
             style([
               width(`percent(100.0)),
               margin(`auto),
-              media(MediaQuery.statusLift, [width(`rem(21.25))]),
+              media(NavStyle.MediaQuery.statusLift, [width(`rem(21.25))]),
             ])
           )>
           <AnnouncementBar />
@@ -127,23 +132,35 @@ let make = children => {
           style([
             width(`auto),
             order(2),
-            media(MediaQuery.statusLift, [order(3), width(`auto)]),
-            media(MediaQuery.menu, [width(`percent(50.0))]),
+            media(
+              NavStyle.MediaQuery.statusLift,
+              [order(3), width(`auto)],
+            ),
+            media(NavStyle.MediaQuery.menu, [width(`percent(50.0))]),
           ])
         )>
         /* we use the input to get a :checked pseudo selector
          * that we can use to get on-click without javascript at runtime */
 
-          <input className=Style.menuBtn type_="checkbox" id="nav-menu-btn" />
-          <label className=Style.menuIcon htmlFor="nav-menu-btn">
+          <input
+            className=NavStyle.menuBtn
+            type_="checkbox"
+            id="nav-menu-btn"
+          />
+          <label className=NavStyle.menuIcon htmlFor="nav-menu-btn">
             <span
-              className=Css.(merge([Style.menuText, style([bottomNudge])]))>
+              className=Css.(
+                merge([NavStyle.menuText, style([bottomNudge])])
+              )>
               {ReasonReact.string("Menu")}
             </span>
           </label>
           <ul
             className=Css.(
-              merge([Style.options, style([marginTop(`zero), bottomNudge])])
+              merge([
+                NavStyle.options,
+                style([marginTop(`zero), bottomNudge]),
+              ])
             )>
             ...items
           </ul>

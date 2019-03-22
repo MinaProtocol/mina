@@ -48,7 +48,10 @@ let make = _ => {
             borderRadius(`px(3)),
             display(`flex),
             justifyContent(`spaceBetween),
-            hover([opacity(0.9)]),
+            hover([
+              opacity(0.9),
+              backgroundColor(Style.Colors.azureAlpha(0.2)),
+            ]),
           ],
         )
       )>
