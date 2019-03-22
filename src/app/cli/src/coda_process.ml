@@ -97,3 +97,6 @@ let root_diff_exn (conn, proc, _) =
 
 let start_exn (conn, proc, _) =
   Coda_worker.Connection.run_exn conn ~f:Coda_worker.functions.start ~arg:()
+
+let dump_tf (conn, proc, _) =
+  Coda_worker.Connection.run_exn conn ~f:Coda_worker.functions.dump_tf ~arg:()
