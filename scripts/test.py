@@ -16,7 +16,8 @@ build_artifact_profiles = [
 
 unit_test_profiles = [
     'test_posig_snarkless',
-    'test_postake_snarkless'
+    'test_postake_snarkless',
+    'dev'
 ]
 
 simple_tests = [
