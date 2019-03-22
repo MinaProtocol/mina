@@ -143,7 +143,15 @@ Router.(
         ),
         File(
           "code",
-          <Page name="code"> <Wrapped> <Code /> </Wrapped> </Page>,
+          <Page name="code" extraHeaders=Code.extraHeaders>
+            <Wrapped> <Code /> </Wrapped>
+          </Page>,
+        ),
+        File(
+          "testnet",
+          <Page name="testnet" extraHeaders=Testnet.extraHeaders>
+            <Wrapped> <Testnet /> </Wrapped>
+          </Page>,
         ),
         File(
           "blog",
