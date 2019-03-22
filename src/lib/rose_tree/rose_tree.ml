@@ -2,6 +2,19 @@ open Core_kernel
 
 type 'a t = T of 'a * 'a t list
 
+type 'a display = {value: 'a; children: 'a display list} [@@deriving yojson]
+
+let rec to_display (T (value, children)) =
+  {value; children= List.map ~f:to_display children}
+
+let rec of_display {value; children} =
+  T (value, List.map ~f:of_display children)
+
+let to_yojson conv t = display_to_yojson conv (to_display t)
+
+let of_yojson conv json =
+  Result.map ~f:of_display (display_of_yojson conv json)
+
 let rec of_list_exn = function
   | [] ->
       raise
