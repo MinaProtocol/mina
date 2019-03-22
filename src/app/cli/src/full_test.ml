@@ -67,9 +67,14 @@ let run_test () : unit Deferred.t =
       let time_controller =
         Inputs.Time.Controller.create Inputs.Time.Controller.basic
       in
+      let consensus_local_state =
+        Consensus.Local_state.create
+          (Some (Public_key.compress keypair.public_key))
+      in
       let net_config =
         { Inputs.Net.Config.logger
         ; time_controller
+        ; consensus_local_state
         ; gossip_net_params=
             { Inputs.Net.Gossip_net.Config.timeout= Time.Span.of_sec 3.
             ; logger
@@ -91,8 +96,8 @@ let run_test () : unit Deferred.t =
              ~transaction_pool_disk_location:
                (temp_conf_dir ^/ "transaction_pool")
              ~snark_pool_disk_location:(temp_conf_dir ^/ "snark_pool")
-             ~time_controller ~receipt_chain_database ()
-             ~snark_work_fee:(Currency.Fee.of_int 0))
+             ~time_controller ~receipt_chain_database
+             ~snark_work_fee:(Currency.Fee.of_int 0) ~consensus_local_state ())
       in
       Main.start coda ;
       don't_wait_for

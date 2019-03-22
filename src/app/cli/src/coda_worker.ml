@@ -329,9 +329,16 @@ module T = struct
           let time_controller =
             Run.Inputs.Time.Controller.create Run.Inputs.Time.Controller.basic
           in
+          let consensus_local_state =
+            Consensus.Local_state.create
+              (Option.map Config.propose_keypair ~f:(fun keypair ->
+                   let open Keypair in
+                   Public_key.compress keypair.public_key ))
+          in
           let net_config =
             { Main.Inputs.Net.Config.logger
             ; time_controller
+            ; consensus_local_state
             ; gossip_net_params=
                 { Main.Inputs.Net.Gossip_net.Config.timeout= Time.Span.of_sec 3.
                 ; target_peer_count= 8
@@ -358,7 +365,8 @@ module T = struct
                  ~snark_pool_disk_location:(conf_dir ^/ "snark_pool")
                  ~time_controller ~receipt_chain_database
                  ~snark_work_fee:(Currency.Fee.of_int 0)
-                 ?propose_keypair:Config.propose_keypair () ~monitor)
+                 ?propose_keypair:Config.propose_keypair ~monitor
+                 ~consensus_local_state ())
           in
           Run.handle_shutdown ~monitor ~conf_dir ~logger coda ;
           let%map () =

@@ -185,6 +185,10 @@ module Consensus_state = struct
   let display (t : Value.t) : display = {length= Length.to_string t.length}
 end
 
+module Rpcs = struct
+  let implementations ~logger:_ ~local_state:_ = []
+end
+
 module Protocol_state =
   Protocol_state.Make (Blockchain_state) (Consensus_state)
 

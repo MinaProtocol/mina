@@ -1,4 +1,5 @@
 open Core_kernel
+open Async
 open Tuple_lib
 open Fold_lib
 open Coda_numbers
@@ -85,6 +86,13 @@ module type S = sig
     val to_lite : (Value.t -> Lite_base.Consensus_state.t) option
 
     val display : Value.t -> display
+  end
+
+  module Rpcs : sig
+    val implementations :
+         logger:Logger.t
+      -> local_state:Local_state.t
+      -> Host_and_port.t Rpc.Implementation.t list
   end
 
   module Blockchain_state : Coda_base.Blockchain_state.S

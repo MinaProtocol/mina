@@ -263,13 +263,7 @@ module Local_state = struct
                 Ledger.foldi ~init:() Genesis_ledger.t ~f:(fun i () acct ->
                     f (Ledger.Addr.to_int i) acct ) )
           in
-          let ledger =
-            Coda_base.Sparse_ledger.of_ledger_index_subset_exn
-              (Coda_base.Ledger.Any_ledger.cast
-                 (module Coda_base.Ledger)
-                 Genesis_ledger.t)
-              (Coda_base.Account.Index.Table.keys delegators)
-          in
+          let ledger = Coda_base.Sparse_ledger.of_ledger Genesis_ledger.t in
           {delegators; ledger}
     in
     { last_epoch_snapshot= None
@@ -1528,6 +1522,82 @@ module Snark_transition = Coda_base.Snark_transition.Make (struct
   module Consensus_data = Consensus_transition_data
 end)
 
+module Rpcs = struct
+  module Get_epoch_ledger = struct
+    module T = struct
+      let name = "get_epoch_ledger"
+
+      module T = struct
+        type query = Ledger_hash.t
+
+        type response = Sparse_ledger.t option
+      end
+
+      module Caller = T
+      module Callee = T
+    end
+
+    include T.T
+    module M = Versioned_rpc.Both_convert.Plan.Make (T)
+    include M
+
+    include Perf_histograms.Rpc.Plain.Extend (struct
+      include M
+      include T
+    end)
+
+    module V1 = struct
+      module T = struct
+        type query = State_hash.t [@@deriving bin_io]
+
+        type response = (Sparse_ledger.t, string) Result.t [@@deriving bin_io]
+
+        let version = 1
+
+        let query_of_caller_model = Fn.id
+
+        let callee_model_of_query = Fn.id
+
+        let response_of_callee_model = Fn.id
+
+        let caller_model_of_response = Fn.id
+      end
+
+      include T
+      include Register (T)
+    end
+  end
+
+  let implementations ~logger ~local_state =
+    let open Host_and_peer in
+    let open Local_state in
+    let open Snapshot in
+    Get_epoch_ledger.implement_multi (fun conn ledger_hash ->
+        Logger.info logger ~module_:__MODULE__ ~location:__LOC__
+          ~metadata:[("peer", Network_peer.to_yojson conn.peer)]
+          "serving epoch ledger query from $peer" ;
+        let response =
+          if Ledger_hash.eq ledger_hash genesis_ledger_hash then
+            Error "refusing to serve genesis epoch ledger"
+          else if
+            Ledger_hash.eq ledger_hash
+              (Sparse_ledger.merkle_root local_state.last_epoch_snapshot.ledger)
+          then Ok local_state.last_epoch_snapshot.ledger
+          else if
+            Ledger_hash.eq ledger_hash
+              (Sparse_ledger.merkle_root local_state.curr_epoch_snapshot.ledger)
+          then Ok local_state.curr_epoch_snapshot.ledger
+          else Error "epoch ledger not found"
+        in
+        Result.iter_error response ~f:(fun err ->
+            Logger.info logger ~module_:__MODULE__ ~location:__LOC__
+              ~metadata:
+                [ ("peer", Network_peer.to_yojson conn.peer)
+                ; ("error", `String err) ]
+              "failed to serve epoch ledger query from $peer: $error" ) ;
+        response )
+end
+
 (* TODO: only track total currency from accounts > 1% of the currency using transactions *)
 let generate_transition ~(previous_protocol_state : Protocol_state.Value.t)
     ~blockchain_state ~time ~proposal_data ~transactions:_ ~snarked_ledger_hash
@@ -1811,10 +1881,7 @@ let lock_transition (prev : Consensus_state.Value.t)
               ~iter_accounts:(fun f ->
                 Coda_base.Ledger.Any_ledger.M.iteri snarked_ledger ~f )
           in
-          let ledger =
-            Coda_base.Sparse_ledger.of_ledger_index_subset_exn snarked_ledger
-              (Coda_base.Account.Index.Table.keys delegators)
-          in
+          let ledger = Coda_base.Sparse_ledger.of_ledger snarked_ledger in
           {delegators; ledger} )
     in
     local_state.last_epoch_snapshot <- local_state.curr_epoch_snapshot ;
