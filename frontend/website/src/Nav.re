@@ -25,6 +25,7 @@ module NavStyle = {
           display(`flex),
           justifyContent(`spaceBetween),
           position(`static),
+          alignItems(`center),
           width(`percent(100.0)),
         ],
       ),
