@@ -500,6 +500,14 @@ struct
         let graph = Visualizor.to_graph t in
         Visualizor.output_graph output_channel graph )
 
+  let visualize_to_string t =
+    let graph = Visualizor.to_graph t in
+    let buf = Buffer.create 0 in
+    let formatter = Format.formatter_of_buffer buf in
+    Visualizor.fprint_graph formatter graph ;
+    Format.pp_print_flush formatter () ;
+    Buffer.to_bytes buf |> Bytes.to_string
+
   let attach_node_to t ~(parent_node : Node.t) ~(node : Node.t) =
     let hash = Breadcrumb.state_hash (Node.breadcrumb node) in
     let parent_hash = Breadcrumb.state_hash parent_node.breadcrumb in
