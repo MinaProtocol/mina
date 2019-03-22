@@ -441,7 +441,8 @@ struct
     let rec find_path b =
       let elem = f b in
       let parent_hash = Breadcrumb.parent_hash b in
-      if State_hash.equal parent_hash t.root then [elem]
+      if State_hash.equal (Breadcrumb.state_hash b) t.root then []
+      else if State_hash.equal parent_hash t.root then [elem]
       else elem :: find_path (find_exn t parent_hash)
     in
     List.rev (find_path breadcrumb)

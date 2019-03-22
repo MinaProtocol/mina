@@ -125,71 +125,60 @@ module Api = struct
   let teardown t = Deferred.List.iter t.workers ~f:Coda_process.disconnect
 end
 
-module Tree = struct
-  type key = string
+(** the prefix check keeps track of the "best path" for each worker. the
+    best path being the list of state hashes from the root to the best tip.
+    the check is satisfied as long as the paths are not disjoint, ie, overlap
+    on some node (in the worst case, this will be the root).
 
-  type t = {parent_map: (key, key) Hashtbl.t}
-
-  let add t ~prev ~curr = Hashtbl.add t.parent_map ~key:curr ~data:prev
-
-  let create () = {parent_map= Hashtbl.create (module String)}
-
-  let path_from t node =
-    let rec go acc cur =
-      match Hashtbl.find t.parent_map cur with
-      | Some parent -> go (parent :: acc) parent
-      | None -> List.rev acc
-    in
-    go [] node
-end
-
+    the check will time out and fail if c-1 slots pass without a new block. *)
 let start_prefix_check logger workers events testnet ~acceptable_delay =
   let all_transitions_r, all_transitions_w = Linear_pipe.create () in
-  let state_hash_tree = Tree.create () in
-  let chains = Array.init (List.length workers) ~f:(fun i -> "") in
-  let check_chains chains =
-    let chains = Array.filteri chains ~f:(fun i _ -> Api.synced testnet i) in
-    let chains = Array.map chains ~f:(Tree.path_from state_hash_tree) in
-    let lengths =
-      Array.to_list (Array.map chains ~f:(fun c -> List.length c))
+  let%map chains = Deferred.Array.init (List.length workers) (fun i -> Coda_process.best_path (List.nth_exn workers i)) in
+  let check_chains (chains : State_hash.Stable.Latest.t list array) =
+    let online_chains =
+      Array.filteri chains ~f:(fun i el ->
+          Api.synced testnet i && not (List.is_empty el) )
     in
-    let first = chains.(0) in
-    let rest = Array.slice chains 1 0 in
-    let newest_shared =
-      List.find first ~f:(fun x ->
-          Array.for_all rest ~f:(fun c -> List.exists c ~f:(fun y -> x = y)) )
+    let chain_sets =
+      Array.map online_chains
+        ~f:(Hash_set.of_list (module State_hash.Stable.Latest))
     in
-    let shared_idx =
-      match newest_shared with
-      | None -> List.length first
-      | Some shared ->
-          Option.value_exn
-            (Option.map
-               (List.findi first ~f:(fun _ x -> x = shared))
-               ~f:(fun x -> fst x))
+    let chains_json () =
+      `List
+        ( Array.to_list chains
+        |> List.map ~f:(fun chain ->
+               `List (List.map ~f:State_hash.Stable.Latest.to_yojson chain) )
+        )
     in
-    let shared_prefix_age = shared_idx in
-    Logger.info logger ~module_:__MODULE__ ~location:__LOC__
-      !"lengths: %{sexp: int list} shared_prefix: %{sexp: string option} \
-        shared_prefix_age: %d"
-      lengths newest_shared shared_prefix_age ;
-    let chains_list = Array.to_list chains in
-    let list_of_list =
-      List.map chains_list ~f:(fun chain ->
-          `List (List.map ~f:(fun s -> `String s) chain) )
-    in
-    if not (shared_prefix_age <= 5) then
-      (let%bind tfs =
-         Deferred.List.map workers ~f:(fun p ->
-             let%map tf_string = Coda_process.dump_tf p in
-             `String tf_string )
-       in
-       Logger.fatal logger ~module_:__MODULE__ ~location:__LOC__
-         "prefix too old"
-         ~metadata:[("chains", `List list_of_list); ("tf_vizs", `List tfs)] ;
-       exit 1)
-      |> don't_wait_for ;
-    ()
+    match
+      Array.fold ~init:None
+        ~f:(fun acc chain ->
+          match acc with
+          | None -> Some chain
+          | Some acc -> Some (Hash_set.inter acc chain) )
+        chain_sets
+    with
+    | Some hashes_in_common ->
+        if Hash_set.is_empty hashes_in_common then (
+          (let%bind tfs = Deferred.List.map workers ~f:Coda_process.dump_tf in
+          Logger.fatal logger ~module_:__MODULE__ ~location:__LOC__
+            "best paths diverged completely, network is forked"
+            ~metadata:[("chains", chains_json ()); ("tf_vizs", `List tfs)] ;
+          exit 1) |> don't_wait_for )
+        else
+          Logger.info logger ~module_:__MODULE__ ~location:__LOC__
+            "chains are ok, they have $hashes in common"
+            ~metadata:
+              [ ( "hashes"
+                , `List
+                    ( Hash_set.to_list hashes_in_common
+                    |> List.map ~f:State_hash.Stable.Latest.to_yojson ) )
+              ; ("chains", chains_json ()) ]
+    | None ->
+        Logger.warn logger ~module_:__MODULE__ ~location:__LOC__
+          "empty list of online chains, this is OK if we're still starting \
+           the network"
+          ~metadata:[("chains", chains_json ())]
   in
   let last_time = ref (Time.now ()) in
   don't_wait_for
@@ -217,19 +206,10 @@ let start_prefix_check logger workers events testnet ~acceptable_delay =
   don't_wait_for
     (Deferred.ignore
        (Linear_pipe.fold ~init:chains all_transitions_r
-          ~f:(fun chains (prev, curr, i) ->
-            let bits_to_str b =
-              let str =
-                String.concat (List.map b ~f:(fun x -> if x then "1" else "0"))
-              in
-              let hash = Md5.digest_string str in
-              Md5.to_hex hash
-            in
-            let curr = bits_to_str curr in
-            let prev = bits_to_str prev in
-            Tree.add state_hash_tree ~prev ~curr |> ignore ;
+          ~f:(fun chains (_, _, i) ->
+            let%bind path = Coda_process.best_path (List.nth_exn workers i) in
+            chains.(i) <- path ;
             last_time := Time.now () ;
-            chains.(i) <- curr ;
             check_chains chains ;
             return chains ))) ;
   don't_wait_for
@@ -316,7 +296,7 @@ let events workers start_reader =
 
 let start_checks logger workers start_reader testnet ~acceptable_delay =
   let event_reader, root_reader = events workers start_reader in
-  start_prefix_check logger workers event_reader testnet ~acceptable_delay ;
+  start_prefix_check logger workers event_reader testnet ~acceptable_delay |> don't_wait_for;
   start_payment_check logger root_reader workers testnet
 
 (* note: this is very declarative, maybe this should be more imperative? *)
