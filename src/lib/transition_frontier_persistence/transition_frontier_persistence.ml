@@ -94,36 +94,58 @@ end = struct
   end
 
   module Diff_mutant = struct
+    type serialized_consensus_state = string
+
     type move_root =
-      { parent: State_body_hash.t
-      ; removed_transitions: State_body_hash.t list
+      { parent: serialized_consensus_state
+      ; removed_transitions: serialized_consensus_state list
       ; old_root: State_hash.Stable.Latest.t
       ; old_scan_state: Staged_ledger.Scan_state.Stable.Latest.t }
 
+    (** Diff_mutant is a GADT that represents operations that affect the
+        changes on the transition_frontier. Only two types of changes can occur
+        when updating the transition_frontier: Add_transition and Move_root.
+        Add_transition would simply add a transition to the frontier with no
+        other side effects. So, the input of Add_transition GADT is an
+        external_transition. To add the transition, we need to know its parent.
+        To certify that we added it to the right parent, we need some
+        representation of the parent. A serialized form of the consensus_state
+        can accomplish this. Therefore, the type of the GADT will be
+        parameterized by a serialized type of the consensus state. The
+        Move_root data type is an operation where we have a new best tip
+        external_transition, remove external_transitions based on their
+        state_hash and update some root data with new root data. Like
+        Add_transition, we can certify that we added the transition into the
+        right parent by showing the serialized_consensus_state of the parent.
+        We can indicate that we removed the external transitions with a certain
+        state_hash by indicating the serialized consensus state of the
+        transition. We can also note which root we are going to replace by
+        indicating the old root *)
     type _ t =
-      | Add_transition : Frontier_diff.add_transition -> State_body_hash.t t
+      | Add_transition :
+          Frontier_diff.add_transition
+          -> serialized_consensus_state t
       | Move_root : Frontier_diff.move_root -> move_root t
 
     let hash (type mutant) acc_hash (t : mutant t) (mutant : mutant) =
       let merge string acc = Digestif.SHA256.feed_string acc string in
       match (t, mutant) with
-      | Add_transition _, parent_hash ->
-          merge (State_body_hash.to_bytes parent_hash) acc_hash
+      | Add_transition _, parent_hash -> merge parent_hash acc_hash
       | Move_root _, {parent; removed_transitions; old_root; old_scan_state} ->
-          let acc_hash = merge (State_body_hash.to_bytes parent) acc_hash in
+          let acc_hash = merge parent acc_hash in
           List.fold removed_transitions ~init:acc_hash
-            ~f:(fun acc_hash removed_hash ->
-              merge (State_body_hash.to_bytes removed_hash) acc_hash )
+            ~f:(fun acc_hash removed_hash -> merge removed_hash acc_hash )
           |> merge (State_hash.to_bytes old_root)
           |> merge
                ( Staged_ledger.Scan_state.hash old_scan_state
                |> Staged_ledger_aux_hash.to_bytes )
   end
 
-  let protocol_state_body_hash transition =
+  let consensus_state transition =
     let open External_transition in
-    transition |> of_verified |> protocol_state |> Protocol_state.body
-    |> Protocol_state.Body.hash
+    transition |> of_verified |> protocol_state
+    |> Protocol_state.consensus_state
+    |> Binable.to_string (module Consensus.Consensus_state.Value.Stable.V1)
 
   let apply_add_transition t
       (With_hash.({hash; data= external_transition}) as transition_with_hash)
@@ -140,7 +162,7 @@ end = struct
              parent_hash hash)
     in
     write transition_with_hash ;
-    protocol_state_body_hash parent_transition
+    consensus_state parent_transition
 
   (* We would like the operation for moving a root to be atomic to avoid phantom
      write and having our persistent data to be left in a weird state. To do this, we
@@ -169,9 +191,7 @@ end = struct
                   let removed_transition =
                     read_transition t state_hash |> Option.value_exn
                   in
-                  let body_hash =
-                    protocol_state_body_hash removed_transition
-                  in
+                  let body_hash = consensus_state removed_transition in
                   Batch.remove_transition batch state_hash ;
                   body_hash )
             in
