@@ -15,7 +15,7 @@ module type S = sig
   module Coinbase :
     Coda_pow.Coinbase_intf
     with type public_key := Compressed_public_key.t
-     and type fee_transfer := Fee_transfer.single
+     and type fee_transfer := Fee_transfer.Single.t
 
   module Transaction :
     Coda_pow.Transaction_intf

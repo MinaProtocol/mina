@@ -103,24 +103,71 @@ module Undo : sig
     type t = {common: Common.t; body: Body.t} [@@deriving sexp, bin_io]
   end
 
-  type fee_transfer =
-    { fee_transfer: Fee_transfer.t
-    ; previous_empty_accounts: Public_key.Compressed.t list }
-  [@@deriving sexp, bin_io]
+  module Fee_transfer_undo : sig
+    type t =
+      { fee_transfer: Fee_transfer.Stable.V1.t
+      ; previous_empty_accounts: Public_key.Compressed.t list }
+    [@@deriving sexp]
 
-  type coinbase =
-    { coinbase: Coinbase.t
-    ; previous_empty_accounts: Public_key.Compressed.t list }
-  [@@deriving sexp, bin_io]
+    module Stable :
+      sig
+        module V1 : sig
+          type t [@@deriving sexp, bin_io]
+        end
 
-  type varying =
-    | User_command of User_command.t
-    | Fee_transfer of fee_transfer
-    | Coinbase of coinbase
-  [@@deriving sexp, bin_io]
+        module Latest = V1
+      end
+      with type V1.t = t
+  end
 
-  type t = {previous_hash: Ledger_hash.t; varying: varying}
-  [@@deriving sexp, bin_io]
+  module Coinbase_undo : sig
+    type t =
+      { coinbase: Coinbase.Stable.V1.t
+      ; previous_empty_accounts: Public_key.Compressed.Stable.V1.t list }
+    [@@deriving sexp]
+
+    module Stable :
+      sig
+        module V1 : sig
+          type t [@@deriving sexp, bin_io]
+        end
+
+        module Latest = V1
+      end
+      with type V1.t = t
+  end
+
+  module Varying : sig
+    type t =
+      | User_command of User_command.t
+      | Fee_transfer of Fee_transfer_undo.Stable.V1.t
+      | Coinbase of Coinbase_undo.Stable.V1.t
+    [@@deriving sexp]
+
+    module Stable :
+      sig
+        module V1 : sig
+          type t [@@deriving sexp, bin_io]
+        end
+
+        module Latest = V1
+      end
+      with type V1.t = t
+  end
+
+  type t =
+    {previous_hash: Ledger_hash.Stable.V1.t; varying: Varying.Stable.V1.t}
+  [@@deriving sexp]
+
+  module Stable :
+    sig
+      module V1 : sig
+        type t [@@deriving bin_io, sexp]
+      end
+
+      module Latest = V1
+    end
+    with type V1.t = t
 
   val transaction : t -> Transaction.t Or_error.t
 end

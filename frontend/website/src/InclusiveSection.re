@@ -139,13 +139,13 @@ let make = _ => {
   ...component,
   render: _self =>
     <div className=Css.(style([marginTop(`rem(2.5))]))>
-      <Title text="Inclusive consensus" />
+      <Title fontColor=Style.Colors.denimTwo text="Inclusive consensus" />
       <Legend />
       <div
         className=Css.(
           style([
             display(`flex),
-            justifyContent(`spaceBetween),
+            justifyContent(`spaceAround),
             alignItems(`center),
             flexWrap(`wrapReverse),
           ])
@@ -158,7 +158,7 @@ let make = _ => {
         />
         <Figure
           link="/static/img/other-blockchains-figure.svg"
-          dims=(13.75, 13.75)
+          dims=(CryptoAppsSection.middleElementWidthRems, 13.75)
           caption="Other Blockchains"
           captionColor=Style.Colors.navy
         />
