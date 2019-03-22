@@ -14,7 +14,8 @@ module Common = struct
       module T = struct
         let version = 1
 
-        type t = (Currency.Fee.Stable.V1.t, Account_nonce.t, Memo.t) t_
+        type t =
+          (Currency.Fee.Stable.V1.t, Account_nonce.Stable.V1.t, Memo.t) t_
         [@@deriving bin_io, eq, sexp, hash, yojson]
       end
 
