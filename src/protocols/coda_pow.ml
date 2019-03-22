@@ -371,13 +371,31 @@ end
 module type Fee_transfer_intf = sig
   type t [@@deriving sexp, compare, eq, yojson]
 
+  module Stable :
+    sig
+      module V1 : sig
+        type t [@@deriving sexp, compare, eq, yojson]
+      end
+    end
+    with type V1.t = t
+
   type public_key
 
-  type single = public_key * Fee.Unsigned.t [@@deriving sexp, bin_io, yojson]
+  module Single : sig
+    type t = public_key * Fee.Unsigned.t [@@deriving sexp, yojson]
 
-  val of_single : public_key * Fee.Unsigned.t -> t
+    module Stable :
+      sig
+        module V1 : sig
+          type t [@@deriving sexp, bin_io, yojson]
+        end
+      end
+      with type V1.t = t
+  end
 
-  val of_single_list : (public_key * Fee.Unsigned.t) list -> t list
+  val of_single : Single.t -> t
+
+  val of_single_list : Single.t list -> t list
 
   val receivers : t -> public_key list
 end
@@ -1557,7 +1575,7 @@ module type Inputs_intf = sig
   module Coinbase :
     Coinbase_intf
     with type public_key := Public_key.Compressed.t
-     and type fee_transfer := Fee_transfer.single
+     and type fee_transfer := Fee_transfer.Single.t
 
   module Transaction :
     Transaction_intf
@@ -1667,7 +1685,7 @@ Merge Snark:
      and type public_key := Public_key.Compressed.t
      and type completed_work := Transaction_snark_work.t
      and type completed_work_checked := Transaction_snark_work.Checked.t
-     and type fee_transfer_single := Fee_transfer.single
+     and type fee_transfer_single := Fee_transfer.Single.t
 
   module Sparse_ledger : sig
     type t

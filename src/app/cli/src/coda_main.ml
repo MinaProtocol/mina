@@ -117,7 +117,7 @@ module type Init_intf = sig
      and type user_command := User_command.t
      and type user_command_with_valid_signature :=
                 User_command.With_valid_signature.t
-     and type fee_transfer_single := Fee_transfer.single
+     and type fee_transfer_single := Fee_transfer.Single.t
 
   module Make_work_selector : Work_selector_F
 
@@ -246,7 +246,7 @@ module type Main_intf = sig
                   User_command.With_valid_signature.t
        and type public_key := Public_key.Compressed.t
        and type staged_ledger_hash := Staged_ledger_hash.t
-       and type fee_transfer_single := Fee_transfer.single
+       and type fee_transfer_single := Fee_transfer.Single.t
 
     module Staged_ledger :
       Protocols.Coda_pow.Staged_ledger_intf
