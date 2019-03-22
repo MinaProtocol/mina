@@ -3,7 +3,12 @@
 open Core
 
 (* Uuid.t deprecates sexp functions; use Uuid.Stable.V1 *)
-type t = {uuid: Uuid.Stable.V1.t; db: Rocks.t sexp_opaque} [@@deriving sexp]
+
+module T = struct
+  type t = {uuid: Uuid.Stable.V1.t; db: Rocks.t sexp_opaque} [@@deriving sexp]
+end
+
+include T
 
 let create ~directory =
   let opts = Rocks.Options.create () in
@@ -31,6 +36,19 @@ let set_batch t ?(remove_keys = [])
   List.iter remove_keys ~f:(fun key -> Rocks.WriteBatch.delete batch key) ;
   (* commit batch *)
   Rocks.write t.db batch
+
+module Batch = struct
+  type t = Rocks.WriteBatch.t
+
+  let remove = Rocks.WriteBatch.delete
+
+  let set = Rocks.WriteBatch.put
+
+  let with_batch t ~f =
+    let batch = Rocks.WriteBatch.create () in
+    let result = f batch in
+    Rocks.write t.db batch ; result
+end
 
 let copy _t = failwith "copy: not implemented"
 

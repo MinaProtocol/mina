@@ -1,5 +1,25 @@
 open Core_kernel
 
+module type S = sig
+  include Key_value_database.S
+
+  module T : sig
+    type nonrec t = t
+  end
+
+  module Batch : sig
+    type t
+
+    val get : t -> key:key -> value option
+
+    val set : t -> key:key -> data:value -> unit
+
+    val remove : t -> key:key -> unit
+
+    val with_batch : T.t -> f:(t -> 'a) -> 'a
+  end
+end
+
 module Make (Key : Binable.S) (Value : Binable.S) :
   Key_value_database.S with type key := Key.t and type value := Value.t =
 struct
