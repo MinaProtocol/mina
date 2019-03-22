@@ -19,40 +19,49 @@ module Copy = {
             media("(min-width: 30rem)", [minWidth(`rem(24.0))]),
           ])
         )>
-        <h1
-          className=Css.(
-            merge([
-              Style.H1.hero,
-              style([
-                color(Style.Colors.denimTwo),
-                marginTop(`rem(1.0)),
-                marginBottom(`zero),
-                media(Style.MediaQuery.full, [marginTop(`rem(1.5))]),
-              ]),
-            ])
-          )>
-          {ReasonReact.string(
-             "A cryptocurrency with a tiny, portable blockchain.",
-           )}
-        </h1>
-        <p
-          className=Css.(
-            merge([Style.Body.big, style([marginTop(`rem(2.0))])])
-          )>
-          <span>
+        <div>
+          <h1
+            className=Css.(
+              merge([
+                Style.H1.hero,
+                style([
+                  color(Style.Colors.denimTwo),
+                  marginTop(`rem(1.0)),
+                  marginBottom(`zero),
+                  media(Style.MediaQuery.full, [marginTop(`rem(1.5))]),
+                ]),
+              ])
+            )>
             {ReasonReact.string(
-               "Coda is the first cryptocurrency with a succinct blockchain. Out lightweight blockchain means ",
+               "A cryptocurrency with a tiny, portable blockchain.",
              )}
-          </span>
-          <span className=Style.Body.big_semibold>
-            {ReasonReact.string("anyone can use Coda directly")}
-          </span>
-          <span>
-            {ReasonReact.string(
-               " from any device, in less data than a few tweets.",
-             )}
-          </span>
-        </p>
+          </h1>
+          <p
+            className=Css.(
+              merge([
+                Style.Body.big,
+                style([
+                  marginTop(`rem(1.75)),
+                  // align with the grid
+                  marginBottom(`px(190)),
+                ]),
+              ])
+            )>
+            <span>
+              {ReasonReact.string(
+                 "Coda is the first cryptocurrency with a succinct blockchain. Out lightweight blockchain means ",
+               )}
+            </span>
+            <span className=Style.Body.big_semibold>
+              {ReasonReact.string("anyone can use Coda directly")}
+            </span>
+            <span>
+              {ReasonReact.string(
+                 " from any device, in less data than a few tweets.",
+               )}
+            </span>
+          </p>
+        </div>
       </div>,
   };
 };
@@ -60,7 +69,11 @@ module Copy = {
 module Graphic = {
   module Big = {
     let svg =
-      <Svg link="/static/img/hero-illustration.svg" dims=(13.9375, 33.375) />;
+      <Svg
+        className=Css.(style([marginTop(`px(-10))]))
+        link="/static/img/hero-illustration.svg"
+        dims=(13.9375, 33.375)
+      />;
   };
 
   module Small = {
@@ -118,7 +131,7 @@ module Graphic = {
             className=Css.(
               merge([
                 Style.H4.basic,
-                style([marginTop(`rem(1.5)), marginBottom(`px(0))]),
+                style([marginTop(`px(18)), marginBottom(`px(6))]),
               ])
             )>
             {ReasonReact.string(label)}

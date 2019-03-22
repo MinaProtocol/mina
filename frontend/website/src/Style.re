@@ -39,13 +39,13 @@ module Typeface = {
   open Css;
   let weights = [
     (`thin, "Thin"),
-    (`extraLight, "ExtraLight"),
-    (`light, "Light"),
-    (`normal, "Regular"),
-    (`medium, "Medium"),
-    (`semiBold, "SemiBold"),
-    (`bold, "Bold"),
-    (`extraBold, "ExtraBold"),
+    (`extraLight, "Thin"),
+    (`light, "ExtraLight"),
+    (`normal, "Light"),
+    (`medium, "Regular"),
+    (`semiBold, "Medium"),
+    (`bold, "SemiBold"),
+    (`extraBold, "Bold"),
   ];
 
   // TODO: add format("woff") and unicode ranges
