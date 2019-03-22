@@ -17,11 +17,13 @@ let%test_module "Root_history and Transition_frontier" =
 
     let create_root_frontier = create_root_frontier accounts_with_secret_keys
 
-    let create_breadcrumbs ~logger ~size root =
+    let create_breadcrumbs ~logger ~size root ~frontier =
       Deferred.all
       @@ Quickcheck.random_value
            (gen_linear_breadcrumbs ~logger ~size ~accounts_with_secret_keys
-              root)
+              root
+              ~consensus_local_state:
+                (Transition_frontier.consensus_local_state frontier))
 
     let breadcrumb_trail_equals =
       List.equal ~equal:Transition_frontier.Breadcrumb.equal
@@ -33,7 +35,7 @@ let%test_module "Root_history and Transition_frontier" =
           let%bind frontier = create_root_frontier ~logger in
           let root = Transition_frontier.root frontier in
           let%bind breadcrumbs =
-            create_breadcrumbs ~logger ~size:max_length root
+            create_breadcrumbs ~logger ~size:max_length root ~frontier
           in
           let last_breadcrumb, breadcrumbs_to_add =
             let rev_breadcrumbs = List.rev breadcrumbs in
@@ -57,7 +59,7 @@ let%test_module "Root_history and Transition_frontier" =
           let%bind frontier = create_root_frontier ~logger in
           let root = Transition_frontier.root frontier in
           let%bind breadcrumbs =
-            create_breadcrumbs ~logger ~size:max_length root
+            create_breadcrumbs ~logger ~size:max_length root ~frontier
           in
           let%map () =
             Deferred.List.iter breadcrumbs ~f:(fun breadcrumb ->
@@ -88,7 +90,9 @@ let%test_module "Root_history and Transition_frontier" =
           let root = Transition_frontier.root frontier in
           let query_index = 1 in
           let size = max_length + query_index + 2 in
-          let%bind breadcrumbs = create_breadcrumbs ~logger ~size root in
+          let%bind breadcrumbs =
+            create_breadcrumbs ~logger ~size root ~frontier
+          in
           let%map () =
             Deferred.List.iter breadcrumbs ~f:(fun breadcrumb ->
                 Transition_frontier.add_breadcrumb_exn frontier breadcrumb )
@@ -124,7 +128,9 @@ let%test_module "Root_history and Transition_frontier" =
             build_frontier_randomly frontier
               ~gen_root_breadcrumb_builder:
                 (gen_linear_breadcrumbs ~logger ~size
-                   ~accounts_with_secret_keys)
+                   ~accounts_with_secret_keys
+                   ~consensus_local_state:
+                     (Transition_frontier.consensus_local_state frontier))
           in
           assert (
             not
@@ -142,13 +148,14 @@ let%test_module "Root_history and Transition_frontier" =
           in
           let%bind root_history_breadcrumbs =
             create_breadcrumbs ~logger ~size:num_root_history_breadcrumbs root
+              ~frontier
           in
           let most_recent_breadcrumb_in_root_history_breadcrumb =
             List.last_exn root_history_breadcrumbs
           in
           let%bind transition_frontier_breadcrumbs =
             create_breadcrumbs ~logger ~size:max_length
-              most_recent_breadcrumb_in_root_history_breadcrumb
+              most_recent_breadcrumb_in_root_history_breadcrumb ~frontier
           in
           let random_breadcrumb_index =
             Quickcheck.random_value (Int.gen_incl 0 (max_length - 1))

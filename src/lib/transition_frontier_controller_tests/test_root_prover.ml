@@ -26,7 +26,9 @@ let%test_module "Root_prover" =
             build_frontier_randomly frontier
               ~gen_root_breadcrumb_builder:
                 (gen_linear_breadcrumbs ~logger ~size:num_breadcrumbs
-                   ~accounts_with_secret_keys:Genesis_ledger.accounts)
+                   ~accounts_with_secret_keys:Genesis_ledger.accounts
+                   ~consensus_local_state:
+                     (Transition_frontier.consensus_local_state frontier))
           in
           let seen_transition =
             Transition_frontier.(

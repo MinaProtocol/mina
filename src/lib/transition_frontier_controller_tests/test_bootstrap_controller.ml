@@ -65,6 +65,8 @@ let%test_module "Bootstrap Controller" =
             gen_linear_breadcrumbs ~logger ~size:num_breadcrumbs
               ~accounts_with_secret_keys:Genesis_ledger.accounts
               parent_breadcrumb
+              ~consensus_local_state:
+                (Transition_frontier.consensus_local_state frontier)
             |> Quickcheck.Generator.with_size ~size:num_breadcrumbs
           in
           let%bind breadcrumbs =
@@ -141,7 +143,9 @@ let%test_module "Bootstrap Controller" =
             build_frontier_randomly frontier
               ~gen_root_breadcrumb_builder:
                 (gen_linear_breadcrumbs ~logger ~size:num_breadcrumbs
-                   ~accounts_with_secret_keys:accounts)
+                   ~accounts_with_secret_keys:accounts
+                   ~consensus_local_state:
+                     (Transition_frontier.consensus_local_state frontier))
           in
           Deferred.List.iter (Transition_frontier.all_breadcrumbs frontier)
             ~f:(fun breadcrumb ->

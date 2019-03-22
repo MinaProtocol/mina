@@ -43,7 +43,9 @@ let%test_module "Transition_handler.Catchup_scheduler tests" =
             Quickcheck.Generator.with_size ~size:num_breadcrumbs
             @@ Quickcheck_lib.gen_imperative_ktree
                  (root_breadcrumb |> return |> Quickcheck.Generator.return)
-                 (gen_breadcrumb ~logger ~accounts_with_secret_keys) )
+                 (gen_breadcrumb ~logger ~accounts_with_secret_keys
+                    ~consensus_local_state:
+                      (Transition_frontier.consensus_local_state frontier)) )
           frontier
       in
       frontier
@@ -82,7 +84,9 @@ let%test_module "Transition_handler.Catchup_scheduler tests" =
             Deferred.all
             @@ Quickcheck.random_value
                  (gen_linear_breadcrumbs ~logger ~size:2
-                    ~accounts_with_secret_keys randomly_chosen_breadcrumb)
+                    ~accounts_with_secret_keys randomly_chosen_breadcrumb
+                    ~consensus_local_state:
+                      (Transition_frontier.consensus_local_state frontier))
           in
           let missing_hash =
             List.hd_exn upcoming_breadcrumbs
@@ -143,7 +147,9 @@ let%test_module "Transition_handler.Catchup_scheduler tests" =
             Deferred.all
             @@ Quickcheck.random_value
                  (gen_linear_breadcrumbs ~logger ~size
-                    ~accounts_with_secret_keys randomly_chosen_breadcrumb)
+                    ~accounts_with_secret_keys randomly_chosen_breadcrumb
+                    ~consensus_local_state:
+                      (Transition_frontier.consensus_local_state frontier))
           in
           let upcoming_transitions =
             List.map ~f:Transition_frontier.Breadcrumb.transition_with_hash
@@ -222,6 +228,8 @@ let%test_module "Transition_handler.Catchup_scheduler tests" =
             Rose_tree.Deferred.all
             @@ Quickcheck.random_value
                  (gen_tree ~logger ~size:5 ~accounts_with_secret_keys
+                    ~consensus_local_state:
+                      (Transition_frontier.consensus_local_state frontier)
                     randomly_chosen_breadcrumb)
           in
           let upcoming_breadcrumbs = Rose_tree.flatten upcoming_rose_tree in

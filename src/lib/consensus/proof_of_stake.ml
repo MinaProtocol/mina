@@ -1923,7 +1923,7 @@ module For_tests = struct
           Coda_base.Frozen_ledger_hash.of_ledger_hash root_ledger_hash }
 
   let gen_consensus_state ~(gen_slot_advancement : int Quickcheck.Generator.t)
-      ~proposer_pk :
+      ~local_state :
       (   previous_protocol_state:( Protocol_state.Value.t
                                   , Coda_base.State_hash.t )
                                   With_hash.t
@@ -1957,8 +1957,7 @@ module For_tests = struct
           ~prev_slot:prev.curr_slot
           ~prev_protocol_state_hash:(With_hash.hash previous_protocol_state)
           ~proposer_vrf_result ~snarked_ledger_hash ~total_currency
-          ~delegator_addr:0
-          ~local_state:(Local_state.create (Some proposer_pk))
+          ~delegator_addr:0 ~local_state
         |> Or_error.ok_exn
       in
       let checkpoints =

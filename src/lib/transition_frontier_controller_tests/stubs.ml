@@ -171,21 +171,16 @@ struct
   module Transition_frontier =
     Transition_frontier.Make (Transition_frontier_inputs)
 
-  let gen_breadcrumb ~logger ~accounts_with_secret_keys :
+  let gen_breadcrumb ~logger ~accounts_with_secret_keys ~consensus_local_state
+      :
       (   Transition_frontier.Breadcrumb.t Deferred.t
        -> Transition_frontier.Breadcrumb.t Deferred.t)
       Quickcheck.Generator.t =
     let open Quickcheck.Let_syntax in
     let gen_slot_advancement = Int.gen_incl 1 10 in
-    let _, largest_account =
-      List.max_elt accounts_with_secret_keys
-        ~compare:(fun (_, acc1) (_, acc2) -> Account.compare acc1 acc2 )
-      |> Option.value_exn
-    in
-    let largest_account_public_key = Account.public_key largest_account in
     let%map make_next_consensus_state =
       Consensus.For_tests.gen_consensus_state ~gen_slot_advancement
-        ~proposer_pk:largest_account_public_key
+        ~local_state:consensus_local_state
     in
     fun parent_breadcrumb_deferred ->
       let open Deferred.Let_syntax in
@@ -194,6 +189,12 @@ struct
         Transition_frontier.Breadcrumb.staged_ledger parent_breadcrumb
       in
       let transactions = gen_payments accounts_with_secret_keys in
+      let _, largest_account =
+        List.max_elt accounts_with_secret_keys
+          ~compare:(fun (_, acc1) (_, acc2) -> Account.compare acc1 acc2 )
+        |> Option.value_exn
+      in
+      let largest_account_public_key = Account.public_key largest_account in
       let get_completed_work stmts =
         let {Keypair.public_key; _} = Keypair.create () in
         let prover = Public_key.compress public_key in
@@ -373,17 +374,20 @@ struct
         Transition_frontier.add_breadcrumb_exn frontier breadcrumb )
 
   let gen_linear_breadcrumbs ~logger ~size ~accounts_with_secret_keys
-      root_breadcrumb =
+      root_breadcrumb ~consensus_local_state =
     Quickcheck.Generator.with_size ~size
     @@ Quickcheck_lib.gen_imperative_list
          (root_breadcrumb |> return |> Quickcheck.Generator.return)
-         (gen_breadcrumb ~logger ~accounts_with_secret_keys)
+         (gen_breadcrumb ~logger ~accounts_with_secret_keys
+            ~consensus_local_state)
 
-  let gen_tree ~logger ~size ~accounts_with_secret_keys root_breadcrumb =
+  let gen_tree ~logger ~size ~accounts_with_secret_keys root_breadcrumb
+      ~consensus_local_state =
     Quickcheck.Generator.with_size ~size
     @@ Quickcheck_lib.gen_imperative_rose_tree
          (root_breadcrumb |> return |> Quickcheck.Generator.return)
-         (gen_breadcrumb ~logger ~accounts_with_secret_keys)
+         (gen_breadcrumb ~logger ~accounts_with_secret_keys
+            ~consensus_local_state)
 
   module Protocol_state_validator = Protocol_state_validator.Make (struct
     include Transition_frontier_inputs
@@ -544,12 +548,16 @@ struct
       let%map _, peers =
         Deferred.List.fold ~init:(Constants.init_address, []) configs
           ~f:(fun (discovery_port, acc_peers) {num_breadcrumbs; accounts} ->
-            let%bind frontier = create_root_frontier ~logger accounts in
+            let%bind (frontier : Transition_frontier.t) =
+              create_root_frontier ~logger accounts
+            in
             let%map () =
               build_frontier_randomly frontier
                 ~gen_root_breadcrumb_builder:
                   (gen_linear_breadcrumbs ~logger ~size:num_breadcrumbs
-                     ~accounts_with_secret_keys:accounts)
+                     ~accounts_with_secret_keys:accounts
+                     ~consensus_local_state:
+                       (Transition_frontier.consensus_local_state frontier))
             in
             let address =
               Network_peer.Peer.create Unix.Inet_addr.localhost ~discovery_port
