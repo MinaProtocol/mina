@@ -102,7 +102,7 @@ let make = children => {
              className=Css.(
                style(
                  Style.paddingX(`rem(0.75))
-                 @ Style.paddingY(`zero)
+                 @ Style.paddingY(`rem(0.75))
                  @ [listStyle(`none, `inside, `none)],
                )
              )>
