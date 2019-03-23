@@ -111,19 +111,6 @@ let make =
     <html>
       <Head filename=name extra=extraHeaders />
       <body>
-        <Wrapped>
-          <div
-            className=Css.(
-              style([
-                marginTop(`rem(1.25)),
-                media(Style.MediaQuery.full, [marginTop(`rem(2.0))]),
-              ])
-            )>
-            <CodaNav />
-          </div>
-        </Wrapped>
-        <div> ...children </div>
-        <Footer bgcolor=footerColor />
         {if (Grid.enabled) {
            <div
              className=Css.(
@@ -151,6 +138,19 @@ let make =
          } else {
            <div />;
          }}
+        <Wrapped>
+          <div
+            className=Css.(
+              style([
+                marginTop(`rem(1.25)),
+                media(Style.MediaQuery.full, [marginTop(`rem(2.0))]),
+              ])
+            )>
+            <CodaNav />
+          </div>
+        </Wrapped>
+        <div> ...children </div>
+        <Footer bgcolor=footerColor />
       </body>
     </html>,
 };
