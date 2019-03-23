@@ -239,21 +239,33 @@ let start_payment_check logger root_pipe workers (testnet : Api.t) =
       ( match testnet.status.(i) with
       | `On (`Synced user_cmds_under_inspection) ->
           let earliest_user_cmd =
-            List.min_elt (Hashtbl.data user_cmds_under_inspection)
-              ~compare:(fun user_cmd_status1 user_cmd_status2 ->
-                Int.compare user_cmd_status1.expected_deadline
-                  user_cmd_status2.expected_deadline )
+            List.min_elt (Hashtbl.to_alist user_cmds_under_inspection)
+              ~compare:(fun (user_cmd1, status1) (user_cmd2, status2) ->
+                Int.compare status1.expected_deadline status2.expected_deadline
+            )
           in
-          Option.iter earliest_user_cmd ~f:(fun {expected_deadline; _} ->
+          Option.iter earliest_user_cmd
+            ~f:(fun (user_cmd, {expected_deadline; _}) ->
               if expected_deadline < root_lengths.(i) then (
                 Logger.fatal logger ~module_:__MODULE__ ~location:__LOC__
-                  ~metadata:[("i", `Int i)]
+                  ~metadata:
+                    [ ("i", `Int i)
+                    ; ("user_cmd", User_command.to_yojson user_cmd) ]
                   "transaction $user_cmd took too long to get into the root \
                    of node $i" ;
                 exit 1 |> ignore ) ) ;
           List.iter user_commands ~f:(fun user_cmd ->
               Hashtbl.change user_cmds_under_inspection user_cmd ~f:(function
-                | Some {passed_root; _} -> Ivar.fill passed_root () ; None
+                | Some {passed_root; _} ->
+                    Ivar.fill passed_root () ;
+                    Logger.info logger ~module_:__MODULE__ ~location:__LOC__
+                      ~metadata:
+                        [ ("user_cmd", User_command.to_yojson user_cmd)
+                        ; ("i", `Int i)
+                        ; ("length", `Int root_lengths.(i)) ]
+                      "transaction $user_cmd finally gets into the root of \
+                       node $i, when root length is $length" ;
+                    None
                 | None -> None ) ) ;
           Deferred.unit
       | _ -> Deferred.unit ) )
