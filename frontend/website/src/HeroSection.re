@@ -49,7 +49,7 @@ module Copy = {
             )>
             <span>
               {ReasonReact.string(
-                 "Coda is the first cryptocurrency with a succinct blockchain. Out lightweight blockchain means ",
+                 "Coda is the first cryptocurrency with a succinct blockchain. Our lightweight blockchain means ",
                )}
             </span>
             <span className=Style.Body.big_semibold>
