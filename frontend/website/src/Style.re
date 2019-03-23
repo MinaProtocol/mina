@@ -81,6 +81,21 @@ module Typeface = {
       (),
     );
 
+  let ibmplexserif =
+    fontFamily(
+      fontFace(
+        ~fontFamily="IBM Plex Serif",
+        ~src=[
+          localUrl("IBM Plex Serif Medium"),
+          url("/static/font/IBMPlexSerif-Medium-Latin1.woff2"),
+          url("/static/font/IBMPlexSerif-Medium-Latin1.woff"),
+        ],
+        ~fontStyle=`normal,
+        ~fontWeight=`medium,
+        (),
+      ),
+    );
+
   let ibmplexsans =
     fontFamily("IBM Plex Sans, Helvetica Neue, Arial, sans-serif");
 
