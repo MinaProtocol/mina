@@ -681,7 +681,7 @@ module Epoch_data = struct
     ( Epoch_ledger.value
     , Epoch_seed.Stable.V1.t
     , Coda_base.State_hash.Stable.V1.t
-    , Length.t
+    , Length.Stable.V1.t
     , Amount.t )
     t
   [@@deriving sexp, bin_io, eq, compare, hash, to_yojson]
@@ -898,7 +898,8 @@ module Consensus_transition_data = struct
   type ('epoch, 'slot) t = {epoch: 'epoch; slot: 'slot}
   [@@deriving sexp, bin_io, compare]
 
-  type value = (Epoch.t, Epoch.Slot.t) t [@@deriving sexp, bin_io, compare]
+  type value = (Epoch.Stable.V1.t, Epoch.Slot.Stable.V1.t) t
+  [@@deriving sexp, bin_io, compare]
 
   type var = (Epoch.Unpacked.var, Epoch.Slot.Unpacked.var) t
 
@@ -1114,11 +1115,11 @@ module Consensus_state = struct
           let version = 1
 
           type t =
-            ( Length.t
+            ( Length.Stable.V1.t
             , Vrf.Output.t
             , Amount.t
-            , Epoch.t
-            , Epoch.Slot.t
+            , Epoch.Stable.V1.t
+            , Epoch.Slot.Stable.V1.t
             , Epoch_data.value
             , bool
             , Checkpoints.t )
