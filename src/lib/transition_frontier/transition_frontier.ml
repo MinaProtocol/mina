@@ -665,30 +665,57 @@ struct
   *)
   let add_breadcrumb_exn t breadcrumb =
     O1trace.measure "add_breadcrumb" (fun () ->
-        let hash =
-          With_hash.hash (Breadcrumb.transition_with_hash breadcrumb)
-        in
-        let root_node = Hashtbl.find_exn t.table t.root in
-        (* 1 *)
-        attach_breadcrumb_exn t breadcrumb ;
-        let node = Hashtbl.find_exn t.table hash in
-        (* 2 *)
-        let distance_to_parent = node.length - root_node.length in
-        let best_tip_node = Hashtbl.find_exn t.table t.best_tip in
-        (* 3 *)
         let consensus_state_of_breadcrumb b =
           Breadcrumb.transition_with_hash b
           |> With_hash.data
           |> Inputs.External_transition.Verified.protocol_state
           |> Inputs.External_transition.Protocol_state.consensus_state
         in
+        let hash =
+          With_hash.hash (Breadcrumb.transition_with_hash breadcrumb)
+        in
+        let root_node = Hashtbl.find_exn t.table t.root in
+        (* 1 *)
+        attach_breadcrumb_exn t breadcrumb ;
+        let parent_hash = Breadcrumb.parent_hash breadcrumb in
+        let parent_node =
+          Option.value_exn
+            (Hashtbl.find t.table parent_hash)
+            ~error:
+              (Error.of_exn
+                 (Parent_not_found (`Parent parent_hash, `Target hash)))
+        in
+        Debug_assert.debug_assert (fun () ->
+            (* if the proof verified, then this should always hold*)
+            assert (
+              Consensus.select
+                ~existing:
+                  (consensus_state_of_breadcrumb parent_node.breadcrumb)
+                ~candidate:(consensus_state_of_breadcrumb breadcrumb)
+                ~logger:
+                  (Logger.create ()
+                     ~metadata:
+                       [ ( "selection context"
+                         , `String
+                             "debug_assert that child is preferred over parent"
+                         ) ])
+              = `Take ) ) ;
+        let node = Hashtbl.find_exn t.table hash in
+        (* 2 *)
+        let distance_to_parent = node.length - root_node.length in
+        let best_tip_node = Hashtbl.find_exn t.table t.best_tip in
+        (* 3 *)
         let added_to_best_tip_path, removed_from_best_tip_path =
           match
             Consensus.select
               ~existing:
                 (consensus_state_of_breadcrumb best_tip_node.breadcrumb)
               ~candidate:(consensus_state_of_breadcrumb breadcrumb)
-              ~logger:(Logger.create ())
+              ~logger:
+                (Logger.create ()
+                   ~metadata:
+                     [ ( "selection context"
+                       , `String "comparing new breadcrumb to best tip" ) ])
           with
           | `Keep -> ([], [])
           | `Take ->
