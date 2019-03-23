@@ -50,6 +50,29 @@ module SignupButton = {
                   backgroundColor(Style.Colors.hyperlink),
                   color(Style.Colors.whiteAlpha(0.95)),
                 ]),
+                // Make this display the same as a SimpleButton
+                // when the screen is small enough to show a menu
+                media(
+                  Nav.NavStyle.MediaQuery.menuMax,
+                  [
+                    height(`auto),
+                    paddingLeft(`rem(0.)),
+                    paddingRight(`zero),
+                    borderWidth(`zero),
+                    Typeface.ibmplexsans,
+                    color(Colors.metallicBlue),
+                    fontSize(`rem(1.0)),
+                    lineHeight(`rem(1.5)),
+                    fontWeight(`normal),
+                    letterSpacing(`rem(0.)),
+                    fontStyle(`normal),
+                    textTransform(`none),
+                    hover([
+                      backgroundColor(`transparent),
+                      color(Style.Colors.hyperlinkHover),
+                    ]),
+                  ],
+                ),
               ],
             ),
           ])
