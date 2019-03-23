@@ -148,6 +148,12 @@ Router.(
           </Page>,
         ),
         File(
+          "testnet",
+          <Page name="testnet" extraHeaders=Testnet.extraHeaders>
+            <Wrapped> <Testnet /> </Wrapped>
+          </Page>,
+        ),
+        File(
           "blog",
           <Page name="blog" extraHeaders=Blog.extraHeaders>
             <Wrapped> <Blog posts /> </Wrapped>

@@ -109,7 +109,8 @@ module Worker = struct
         { verify_blockchain= f (Blockchain.bin_t, Bool.bin_t, verify_blockchain)
         ; verify_transaction_snark=
             f
-              ( [%bin_type_class: Transaction_snark.t * Sok_message.Stable.V1.t]
+              ( [%bin_type_class:
+                  Transaction_snark.Stable.V1.t * Sok_message.Stable.V1.t]
               , Bool.bin_t
               , verify_transaction_snark ) }
 

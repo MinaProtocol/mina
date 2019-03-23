@@ -57,7 +57,8 @@ jobs:
         steps:
             - run:
                 name: Install dependencies
-                command: pip install --user requests
+                command: pip install --user requests jinja2
+            - checkout
             - run:
                   name: Update branch protection rule from test configuration
                   command: ./scripts/test.py required-status >required_status && cat required_status && ./scripts/update_branch_rule.py required_status
