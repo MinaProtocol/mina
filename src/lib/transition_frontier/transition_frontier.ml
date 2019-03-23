@@ -676,11 +676,24 @@ struct
         let distance_to_parent = node.length - root_node.length in
         let best_tip_node = Hashtbl.find_exn t.table t.best_tip in
         (* 3 *)
+        let consensus_state_of_breadcrumb b =
+          Breadcrumb.transition_with_hash b
+          |> With_hash.data
+          |> Inputs.External_transition.Verified.protocol_state
+          |> Inputs.External_transition.Protocol_state.consensus_state
+        in
         let added_to_best_tip_path, removed_from_best_tip_path =
-          if node.length > best_tip_node.length then (
-            t.best_tip <- hash ;
-            get_path_diff t breadcrumb best_tip_node.breadcrumb )
-          else ([], [])
+          match
+            Consensus.select
+              ~existing:
+                (consensus_state_of_breadcrumb best_tip_node.breadcrumb)
+              ~candidate:(consensus_state_of_breadcrumb breadcrumb)
+              ~logger:(Logger.create ())
+          with
+          | `Keep -> ([], [])
+          | `Take ->
+              t.best_tip <- hash ;
+              get_path_diff t breadcrumb best_tip_node.breadcrumb
         in
         Logger.debug t.logger ~module_:__MODULE__ ~location:__LOC__
           "added %d breadcrumbs and removed %d making path to new best tip"
