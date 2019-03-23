@@ -214,7 +214,10 @@ let make = _ => {
         className=Css.(
           merge([
             Style.H1.hero,
-            style([color(Style.Colors.denimTwo), textAlign(`center)]),
+            style([
+              color(Style.Colors.denimTwo),
+              media(Style.MediaQuery.notSmallMobile, [textAlign(`center)]),
+            ]),
           ])
         )>
         {ReasonReact.string("Get Involved")}

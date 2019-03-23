@@ -28,8 +28,6 @@ module Code = {
   };
 };
 
-let swapQuery = "(min-width: 70rem)";
-
 module ImageCollage = {
   let component =
     ReasonReact.statelessComponent("CryptoAppsSection.ImageCollage");
@@ -44,7 +42,7 @@ module ImageCollage = {
               position(`relative),
               top(`zero),
               left(`zero),
-              media(swapQuery, [position(`static)]),
+              media(Style.MediaQuery.veryLarge, [position(`static)]),
             ]),
           ])
         )>
@@ -72,10 +70,9 @@ module ImageCollage = {
               bottom(`zero),
               margin(`auto),
               maxWidth(`percent(100.0)),
-              media(swapQuery, [paddingLeft(`rem(4.))]),
             ])
           )
-          name="/static/img/build-illustration"
+          name="/static/img/centering-rectangle"
         />
         <Image
           className=Css.(
@@ -108,15 +105,29 @@ let make = _ => {
       )>
       <Title
         fontColor=Style.Colors.denimTwo
-        text="Build global cryptocurrency apps with Coda"
+        text={js|Build global cryptocurrency apps with\u00A0Coda|js}
       />
       <div
         className=Css.(
-          style([position(`relative), top(`zero), left(`zero)])
+          style([
+            position(`relative),
+            left(`zero),
+            top(`zero),
+            media(
+              Style.MediaQuery.veryLarge,
+              [
+                top(`rem(-2.0)),
+                zIndex(-1) // the background of the map isn't fully transparent
+              ],
+            ),
+          ])
         )>
         <ImageCollage
           className=Css.(
-            style([display(`none), media(swapQuery, [display(`block)])])
+            style([
+              display(`none),
+              media(Style.MediaQuery.veryLarge, [display(`block)]),
+            ])
           )
         />
         <div
@@ -128,11 +139,11 @@ let make = _ => {
               alignItems(`center),
               marginLeft(`auto),
               marginRight(`auto),
-              marginBottom(`rem(4.0)),
+              marginBottom(`rem(2.0)),
               maxWidth(`rem(78.0)),
               // vertically/horiz center absolutely
               media(
-                swapQuery,
+                Style.MediaQuery.veryLarge,
                 [
                   position(`absolute),
                   top(`percent(50.0)),
@@ -161,7 +172,7 @@ let make = _ => {
                 width(`rem(middleElementWidthRems)),
                 height(`rem(0.)),
                 display(`none),
-                media(swapQuery, [display(`block)]),
+                media(Style.MediaQuery.veryLarge, [display(`block)]),
               ])
             )
           />
@@ -178,7 +189,7 @@ let make = _ => {
             style([
               display(`block),
               marginBottom(`rem(4.0)),
-              media(swapQuery, [display(`none)]),
+              media(Style.MediaQuery.veryLarge, [display(`none)]),
             ])
           )
         />
