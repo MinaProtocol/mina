@@ -133,7 +133,10 @@ end
     the check will time out and fail if c-1 slots pass without a new block. *)
 let start_prefix_check logger workers events testnet ~acceptable_delay =
   let all_transitions_r, all_transitions_w = Linear_pipe.create () in
-  let%map chains = Deferred.Array.init (List.length workers) (fun i -> Coda_process.best_path (List.nth_exn workers i)) in
+  let%map chains =
+    Deferred.Array.init (List.length workers) (fun i ->
+        Coda_process.best_path (List.nth_exn workers i) )
+  in
   let check_chains (chains : State_hash.Stable.Latest.t list array) =
     let online_chains =
       Array.filteri chains ~f:(fun i el ->
@@ -159,12 +162,15 @@ let start_prefix_check logger workers events testnet ~acceptable_delay =
         chain_sets
     with
     | Some hashes_in_common ->
-        if Hash_set.is_empty hashes_in_common then (
+        if Hash_set.is_empty hashes_in_common then
           (let%bind tfs = Deferred.List.map workers ~f:Coda_process.dump_tf in
-          Logger.fatal logger ~module_:__MODULE__ ~location:__LOC__
-            "best paths diverged completely, network is forked"
-            ~metadata:[("chains", chains_json ()); ("tf_vizs", `List tfs)] ;
-          exit 1) |> don't_wait_for )
+           Logger.fatal logger ~module_:__MODULE__ ~location:__LOC__
+             "best paths diverged completely, network is forked"
+             ~metadata:
+               [ ("chains", chains_json ())
+               ; ("tf_vizs", `List (List.map ~f:(fun s -> `String s) tfs)) ] ;
+           exit 1)
+          |> don't_wait_for
         else
           Logger.info logger ~module_:__MODULE__ ~location:__LOC__
             "chains are ok, they have $hashes in common"

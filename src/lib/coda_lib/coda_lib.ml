@@ -522,13 +522,14 @@ module Make (Inputs : Inputs_intf) = struct
   let dump_tf t =
     peek_frontier t.transition_frontier
     |> Or_error.map ~f:Transition_frontier.visualize_to_string
+
   (** The [best_path coda] is the list of state hashes from the root to the best_tip in the transition frontier. It includes the root hash and the hash *)
   let best_path t =
     let open Option.Let_syntax in
     let%map tf = Broadcast_pipe.Reader.peek t.transition_frontier in
     let bt = Transition_frontier.best_tip tf in
     List.cons
-      (Transition_frontier.(root tf |> Breadcrumb.state_hash))
+      Transition_frontier.(root tf |> Breadcrumb.state_hash)
       (Transition_frontier.hash_path tf bt)
 
   module Config = struct

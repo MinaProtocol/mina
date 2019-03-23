@@ -185,6 +185,7 @@ module T = struct
 
     let dump_tf_impl ~worker_state ~conn_state:() () =
       worker_state.coda_dump_tf ()
+
     let best_path_impl ~worker_state ~conn_state:() () =
       worker_state.coda_best_path ()
 
@@ -239,6 +240,7 @@ module T = struct
     let dump_tf =
       C.create_rpc ~f:dump_tf_impl ~bin_input:Unit.bin_t
         ~bin_output:String.bin_t ()
+
     let best_path =
       C.create_rpc ~f:best_path_impl ~bin_input:Unit.bin_t
         ~bin_output:[%bin_type_class: State_hash.Stable.Latest.t list] ()
@@ -451,6 +453,7 @@ module T = struct
             Deferred.return
               ( Main.dump_tf coda |> Or_error.ok
               |> Option.value ~default:"<failed to visualize>" )
+          in
           let coda_best_path () =
             let path = Main.best_path coda in
             Deferred.return (Option.value ~default:[] path)
