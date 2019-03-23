@@ -843,7 +843,7 @@ module Epoch_data = struct
               "No snapshot found to retrieve delegator's balance"
         | Some snapshot ->
             if
-              Coda_base.Frozen_ledger_hash.equal snarked_ledger_hash
+              Coda_base.Frozen_ledger_hash.equal curr_epoch_data.ledger.hash
                 Coda_base.(
                   Frozen_ledger_hash.of_ledger_hash
                   @@ Sparse_ledger.merkle_root snapshot.ledger)
