@@ -7,6 +7,10 @@ open Signature_lib
 
 let name = "coda-bootstrap-test"
 
+let () =
+  Async.Scheduler.set_record_backtraces true ;
+  Core.Backtrace.elide := false
+
 let main () =
   let open Keypair in
   let logger = Logger.create () in
