@@ -38,8 +38,8 @@ module Send_payment_input = struct
   type t =
     Private_key.t
     * Public_key.Compressed.Stable.V1.t
-    * Currency.Amount.t
-    * Currency.Fee.t
+    * Currency.Amount.Stable.V1.t
+    * Currency.Fee.Stable.V1.t
     * User_command_memo.t
   [@@deriving bin_io]
 end
@@ -55,7 +55,8 @@ module T = struct
   end
 
   module Maybe_currency = struct
-    type t = Currency.Balance.t option [@@deriving bin_io]
+    (* TODO: version *)
+    type t = Currency.Balance.Stable.V1.t option [@@deriving bin_io]
   end
 
   module Prove_receipt = struct
