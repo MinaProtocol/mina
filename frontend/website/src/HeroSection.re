@@ -43,7 +43,7 @@ module Copy = {
                 style([
                   marginTop(`rem(1.75)),
                   // align with the grid
-                  marginBottom(`px(190)),
+                  marginBottom(`rem(11.875)),
                 ]),
               ])
             )>
@@ -70,7 +70,7 @@ module Graphic = {
   module Big = {
     let svg =
       <Svg
-        className=Css.(style([marginTop(`px(-10))]))
+        className=Css.(style([marginTop(`rem(-0.625))]))
         link="/static/img/hero-illustration.svg"
         dims=(13.9375, 33.375)
       />;
@@ -106,7 +106,7 @@ module Graphic = {
                     color(textColor),
                     fontWeight(`medium),
                     marginTop(`rem(1.25)),
-                    marginBottom(`px(0)),
+                    marginBottom(`zero),
                   ]),
                 ])
               )>
@@ -118,8 +118,8 @@ module Graphic = {
                   Style.H3.basic,
                   style([
                     color(textColor),
-                    marginTop(`px(0)),
-                    marginBottom(`px(0)),
+                    marginTop(`zero),
+                    marginBottom(`zero),
                     fontWeight(sizeEmphasis ? `bold : `normal),
                   ]),
                 ])
@@ -131,7 +131,10 @@ module Graphic = {
             className=Css.(
               merge([
                 Style.H4.basic,
-                style([marginTop(`px(18)), marginBottom(`px(6))]),
+                style([
+                  marginTop(`rem(1.125)),
+                  marginBottom(`rem(0.375)),
+                ]),
               ])
             )>
             {ReasonReact.string(label)}

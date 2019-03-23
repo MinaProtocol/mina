@@ -38,6 +38,7 @@ module Colors = {
 module Typeface = {
   open Css;
   let weights = [
+    // The weights are inentionally shifted thinner one unit
     (`thin, "Thin"),
     (`extraLight, "Thin"),
     (`light, "ExtraLight"),
