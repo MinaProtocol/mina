@@ -92,8 +92,10 @@ module Typeface = {
 };
 
 module MediaQuery = {
+  let veryLarge = "(min-width: 70rem)";
   let full = "(min-width: 48rem)";
   let notMobile = "(min-width: 32rem)";
+  let notSmallMobile = "(min-width: 25rem)";
 };
 
 /** sets both paddingLeft and paddingRight, as one should */
