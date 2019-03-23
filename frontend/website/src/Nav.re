@@ -6,6 +6,7 @@ module NavStyle = {
 
   module MediaQuery = {
     let menu = "(min-width: 58rem)";
+    let menuMax = "(max-width: 58rem)";
     let statusLift = "(min-width: 38rem)";
   };
   let bottomNudge = Css.marginBottom(`rem(1.25));
@@ -40,11 +41,13 @@ module NavStyle = {
       display(`none),
       media(
         // Make expanded menu not show up on a wide screen
-        "(max-width: 58rem)",
+        MediaQuery.menuMax,
         [
           selector(
             {j|:checked ~ .$dropDownOptions|j},
             [
+              border(`px(2), `solid, Style.Colors.gandalf),
+              borderRadius(`px(3)),
               paddingLeft(`rem(0.5)),
               marginTop(`rem(2.)),
               marginRight(`rem(-0.6)),
