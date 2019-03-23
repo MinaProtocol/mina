@@ -834,14 +834,21 @@ module Epoch_data = struct
           next_epoch > prev_epoch
           || curr_epoch_data.length <= Length.of_int Constants.k
         then local_state.curr_epoch_snapshot
-        else local_state.Local_state.last_epoch_snapshot
+        else local_state.last_epoch_snapshot
       in
       let%map epoch_ledger =
         match epoch_snapshot with
         | None ->
             Or_error.error_string
-              "Got invalid snapshot when updating participated stake"
-        | Some snapshot -> Ok snapshot.ledger
+              "No snapshot found to retrieve delegator's balance"
+        | Some snapshot ->
+            if
+              Coda_base.Frozen_ledger_hash.equal snarked_ledger_hash
+                Coda_base.(
+                  Frozen_ledger_hash.of_ledger_hash
+                  @@ Sparse_ledger.merkle_root snapshot.ledger)
+            then Ok snapshot.ledger
+            else Or_error.error_string "Invalid ledger"
       in
       Coda_base.Sparse_ledger.get_exn epoch_ledger delegator_addr
     in
@@ -867,13 +874,16 @@ module Epoch_data = struct
         , prev_protocol_state_hash )
       else (curr_data.seed, curr_data.lock_checkpoint)
     in
-    let%map delegator = delegator_account curr_data in
-    let new_participated_stake =
-      if delegator.participated then curr_data.participated_stake
+    let%bind delegator = delegator_account curr_data in
+    let%map new_participated_stake =
+      if delegator.participated then Ok curr_data.participated_stake
       else
-        Option.value_exn
-          (Amount.add curr_data.participated_stake
-             (Balance.to_amount delegator.balance))
+        match
+          Amount.add curr_data.participated_stake
+            (Balance.to_amount delegator.balance)
+        with
+        | Some new_stake -> Ok new_stake
+        | None -> Or_error.error_string "Participated stake amount overflowed"
     in
     let curr_data =
       { curr_data with
@@ -1810,7 +1820,7 @@ let next_proposal now (state : Consensus_state.Value.t) ~local_state ~keypair
           epoch_transitioning
           || state.curr_epoch_data.length <= Length.of_int Constants.k
         then ("curr", local_state.curr_epoch_snapshot)
-        else ("last", local_state.Local_state.last_epoch_snapshot)
+        else ("last", local_state.last_epoch_snapshot)
       in
       ( match snapshot with
       | None ->
