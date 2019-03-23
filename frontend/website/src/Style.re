@@ -38,14 +38,15 @@ module Colors = {
 module Typeface = {
   open Css;
   let weights = [
+    // The weights are inentionally shifted thinner one unit
     (`thin, "Thin"),
-    (`extraLight, "ExtraLight"),
-    (`light, "Light"),
-    (`normal, "Regular"),
-    (`medium, "Medium"),
-    (`semiBold, "SemiBold"),
-    (`bold, "Bold"),
-    (`extraBold, "ExtraBold"),
+    (`extraLight, "Thin"),
+    (`light, "ExtraLight"),
+    (`normal, "Light"),
+    (`medium, "Regular"),
+    (`semiBold, "Medium"),
+    (`bold, "SemiBold"),
+    (`extraBold, "Bold"),
   ];
 
   // TODO: add format("woff") and unicode ranges
