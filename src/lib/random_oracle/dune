@@ -8,4 +8,5 @@
     snarky
     snarky_blake2
     coda_digestif
-    snark_params ))
+    snark_params
+    module_version))
