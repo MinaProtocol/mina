@@ -213,11 +213,15 @@ let start_prefix_check logger workers events testnet ~acceptable_delay =
     (Deferred.ignore
        (Linear_pipe.fold ~init:chains all_transitions_r
           ~f:(fun chains (_, _, i) ->
-            let%bind path = Coda_process.best_path (List.nth_exn workers i) in
-            chains.(i) <- path ;
-            last_time := Time.now () ;
-            check_chains chains ;
-            return chains ))) ;
+            if Api.synced testnet i then (
+              let%bind path =
+                Coda_process.best_path (List.nth_exn workers i)
+              in
+              chains.(i) <- path ;
+              last_time := Time.now () ;
+              check_chains chains ;
+              return chains )
+            else return chains ))) ;
   don't_wait_for
     (Linear_pipe.iter events ~f:(function `Transition (i, (prev, curr)) ->
          Linear_pipe.write all_transitions_w (prev, curr, i) ))
