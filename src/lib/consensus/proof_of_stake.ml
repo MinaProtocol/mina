@@ -293,7 +293,7 @@ module Epoch_ledger = struct
   [@@deriving sexp, bin_io, eq, compare, hash, to_yojson]
 
   (* TODO : version *)
-  type value = (Coda_base.Frozen_ledger_hash.Stable.V1.t, Amount.t) t
+  type value = (Coda_base.Frozen_ledger_hash.Stable.V1.t, Amount.Stable.V1.t) t
   [@@deriving sexp, bin_io, eq, compare, hash, to_yojson]
 
   type var = (Coda_base.Frozen_ledger_hash.var, Amount.var) t
@@ -1021,10 +1021,11 @@ module Consensus_state = struct
         module T = struct
           let version = 1
 
+          (* TODO : version components *)
           type t =
             ( Length.Stable.V1.t
             , Vrf.Output.t
-            , Amount.t
+            , Amount.Stable.V1.t
             , Epoch.Stable.V1.t
             , Epoch.Slot.Stable.V1.t
             , Epoch_data.value
