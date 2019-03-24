@@ -40,9 +40,9 @@ let set_batch t ?(remove_keys = [])
 module Batch = struct
   type t = Rocks.WriteBatch.t
 
-  let remove = Rocks.WriteBatch.delete
+  let remove t ~key = Rocks.WriteBatch.delete t key
 
-  let set = Rocks.WriteBatch.put
+  let set t ~key ~data = Rocks.WriteBatch.put t key data
 
   let with_batch t ~f =
     let batch = Rocks.WriteBatch.create () in

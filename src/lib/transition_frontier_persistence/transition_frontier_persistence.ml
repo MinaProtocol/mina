@@ -7,7 +7,7 @@ module Make (Inputs : Intf.Inputs) : sig
 
   include
     Intf.S
-    with type external_transition_verified := External_transition.Verified.t
+    with type external_transition := External_transition.Stable.Latest.t
      and type scan_state := Staged_ledger.Scan_state.t
      and type state_hash := State_hash.t
      and type frontier := Transition_frontier.t
@@ -17,266 +17,166 @@ module Make (Inputs : Intf.Inputs) : sig
 end = struct
   open Inputs
 
-  type root_storage =
-    { path: String.t
-    ; controller:
-        (State_hash.t * Staged_ledger.Scan_state.t) Root_storage.Controller.t
-    }
-
   type t =
     { transition_storage: Transition_storage.t
     ; root_snarked_ledger: Ledger.Db.t
-    ; root_storage: root_storage
     ; logger: Logger.t }
 
-  let create ~logger ~root_snarked_ledger ~transition_storage ~root_storage =
-    {transition_storage; root_snarked_ledger; root_storage; logger}
-
-  let set_transition {transition_storage; _}
-      {With_hash.hash= state_hash; data= external_transition} =
-    Transition_storage.set transition_storage ~key:state_hash
-      ~data:(External_transition.of_verified external_transition)
-
-  let set_root t state_hash scan_state =
-    Root_storage.store t.root_storage.controller t.root_storage.path
-      (state_hash, scan_state)
-
-  let to_verified transition =
-    (* We read a transition that was already verified before it was written to disk *)
-    let (`I_swear_this_is_safe_see_my_comment verified_transition) =
-      External_transition.to_verified transition
-    in
-    verified_transition
-
-  let read_transition {transition_storage; _} state_hash =
-    Option.map
-      (Transition_storage.get transition_storage ~key:state_hash)
-      ~f:to_verified
-
-  let read_root {root_storage; _} =
-    Deferred.Result.map_error
-      (Root_storage.load root_storage.controller root_storage.path)
-      ~f:(function
-      | `Checksum_no_match -> Error.of_string "Checksum did not match"
-      | `IO_error e -> Error.createf !"IO_error: %s" (Error.to_string_hum e)
-      | `No_exist -> Error.createf !"File %s does not exist" root_storage.path )
-
-  let lift_or_error deferred_x =
-    let%map x = deferred_x in
-    Or_error.return x
-
-  module Batch = struct
-    let set_transition batch
-        {With_hash.hash= state_hash; data= external_transition} =
-      Transition_storage.Batch.set batch ~key:state_hash
-        ~data:(External_transition.of_verified external_transition)
-
-    let remove_transition batch state_hash =
-      Transition_storage.Batch.remove batch ~key:state_hash
-  end
-
-  let parent_hash transition =
-    let open External_transition.Verified in
-    let protocol_state = protocol_state transition in
-    External_transition.Protocol_state.(previous_state_hash protocol_state)
-
-  module Frontier_diff = struct
-    type add_transition =
-      (External_transition.Verified.t, State_hash.t) With_hash.t
-
-    type move_root =
-      { best_tip: (External_transition.Verified.t, State_hash.t) With_hash.t
-      ; removed_transitions: State_hash.Stable.Latest.t list
-      ; new_root: State_hash.Stable.Latest.t
-      ; new_scan_state: Staged_ledger.Scan_state.Stable.Latest.t }
-
-    type t = Add_transition of add_transition | Move_root of move_root
-  end
+  let create ~logger ~root_snarked_ledger ~transition_storage =
+    {transition_storage; root_snarked_ledger; logger}
 
   module Diff_mutant = struct
-    type serialized_consensus_state = string
+    type serialized = string
 
-    type move_root =
-      { parent: serialized_consensus_state
-      ; removed_transitions: serialized_consensus_state list
-      ; old_root: State_hash.Stable.Latest.t
-      ; old_scan_state: Staged_ledger.Scan_state.Stable.Latest.t }
+    module Move_root = struct
+      type request =
+        { best_tip:
+            ( External_transition.Stable.Latest.t
+            , State_hash.Stable.Latest.t )
+            With_hash.t
+        ; removed_transitions: State_hash.Stable.Latest.t list
+        ; new_root: State_hash.Stable.Latest.t
+        ; new_scan_state: Staged_ledger.Scan_state.Stable.Latest.t }
+
+      type response =
+        { parent: serialized
+        ; removed_transitions: serialized list
+        ; old_root_data: serialized }
+    end
 
     (** Diff_mutant is a GADT that represents operations that affect the
         changes on the transition_frontier. Only two types of changes can occur
         when updating the transition_frontier: Add_transition and Move_root.
-        Add_transition would simply add a transition to the frontier with no
-        other side effects. So, the input of Add_transition GADT is an
-        external_transition. To add the transition, we need to know its parent.
+        Add_transition would simply add a transition to the frontier. So, the
+        input of Add_transition GADT is an external_transition. After adding
+        the transition, we add the transition to its parent list of successors.
         To certify that we added it to the right parent, we need some
-        representation of the parent. A serialized form of the consensus_state
-        can accomplish this. Therefore, the type of the GADT will be
-        parameterized by a serialized type of the consensus state. The
-        Move_root data type is an operation where we have a new best tip
-        external_transition, remove external_transitions based on their
-        state_hash and update some root data with new root data. Like
-        Add_transition, we can certify that we added the transition into the
-        right parent by showing the serialized_consensus_state of the parent.
-        We can indicate that we removed the external transitions with a certain
-        state_hash by indicating the serialized consensus state of the
-        transition. We can also note which root we are going to replace by
-        indicating the old root *)
+        representation of the parent. A serialized form of the consensus_state,
+        which is a string, can accomplish this. Therefore, the type of the GADT
+        case will be parameterized by a string. The Move_root data type is an
+        operation where we have a new best tip external_transition, remove
+        external_transitions based on their state_hash and update some root
+        data with new root data. Like Add_transition, we can certify that we
+        added the transition into the right parent by showing the serialized
+        consensus_state of the parent. We can indicate that we removed the
+        external transitions with a certain state_hash by indicating the
+        serialized consensus state of the transition. We can also note which
+        root we are going to replace by indicating the old root *)
     type _ t =
       | Add_transition :
-          Frontier_diff.add_transition
-          -> serialized_consensus_state t
-      | Move_root : Frontier_diff.move_root -> move_root t
+          ( External_transition.Stable.Latest.t
+          , State_hash.Stable.Latest.t )
+          With_hash.t
+          -> serialized t
+      | Move_root : Move_root.request -> Move_root.response t
 
     let hash (type mutant) acc_hash (t : mutant t) (mutant : mutant) =
       let merge string acc = Digestif.SHA256.feed_string acc string in
       match (t, mutant) with
       | Add_transition _, parent_hash -> merge parent_hash acc_hash
-      | Move_root _, {parent; removed_transitions; old_root; old_scan_state} ->
+      | Move_root _, {parent; removed_transitions; old_root_data} ->
           let acc_hash = merge parent acc_hash in
           List.fold removed_transitions ~init:acc_hash
             ~f:(fun acc_hash removed_hash -> merge removed_hash acc_hash )
-          |> merge (State_hash.to_bytes old_root)
-          |> merge
-               ( Staged_ledger.Scan_state.hash old_scan_state
-               |> Staged_ledger_aux_hash.to_bytes )
+          |> merge old_root_data
   end
 
   let consensus_state transition =
     let open External_transition in
-    transition |> of_verified |> protocol_state
-    |> Protocol_state.consensus_state
+    transition |> protocol_state |> Protocol_state.consensus_state
     |> Binable.to_string (module Consensus.Consensus_state.Value.Stable.V1)
 
-  let apply_add_transition t
-      (With_hash.({hash; data= external_transition}) as transition_with_hash)
-      ~write =
-    let open Result.Let_syntax in
+  let get (type a) t ?(location = __LOC__)
+      (key : a Transition_storage.Schema.t) : a =
+    match Transition_storage.get t.transition_storage ~key with
+    | Some value -> value
+    | None -> (
+        let log_error = Logger.error t.logger ~module_:__MODULE__ ~location in
+        match key with
+        | Transition hash ->
+            log_error
+              ~metadata:[("hash", State_hash.to_yojson hash)]
+              "Could not retrieve external transition: $hash" ;
+            raise (Not_found_s ([%sexp_of: State_hash.t] hash))
+        | Root ->
+            log_error "Could not retrieve root" ;
+            failwith "Could not retrieve root" )
+
+  let parent_hash transition =
+    let open External_transition in
+    let protocol_state = protocol_state transition in
+    Protocol_state.(previous_state_hash protocol_state)
+
+  let apply_add_transition (t, batch)
+      With_hash.({hash; data= external_transition}) =
+    let open Transition_storage.Schema in
     let parent_hash = parent_hash external_transition in
-    let%map parent_transition =
-      Result.of_option
-        (read_transition t parent_hash)
-        ~error:
-          (Error.createf
-             !"Could not find parent (%{sexp:State_hash.t}) of transition \
-               %{sexp:State_hash.t}"
-             parent_hash hash)
+    let parent_transition, children_hashes =
+      get t (Transition parent_hash) ~location:__LOC__
     in
-    write transition_with_hash ;
+    Transition_storage.Batch.set batch ~key:(Transition hash)
+      ~data:(external_transition, []) ;
+    Transition_storage.Batch.set batch ~key:(Transition parent_hash)
+      ~data:(parent_transition, hash :: children_hashes) ;
     consensus_state parent_transition
 
-  (* We would like the operation for moving a root to be atomic to avoid phantom
-     write and having our persistent data to be left in a weird state. To do this, we
-     first write our data new root data into a temp file. Then, we add the best
-     tip and remove old transitions in batch manner in transition_storage.
-     Afterwards, we requickly rename our file of the new root_data as the old
-     file *)
-  let atomic_move_root
-      ( {transition_storage; root_snarked_ledger= _; root_storage; logger= _}
-      as t )
-      {Frontier_diff.best_tip; removed_transitions; new_root; new_scan_state} =
-    let open Deferred.Or_error.Let_syntax in
-    let temp_location = root_storage.path ^ ".temp" in
-    let%bind old_root, old_scan_state = read_root t in
-    let%bind () = lift_or_error @@ set_root t new_root new_scan_state in
-    Deferred.return
-      (let open Result.Let_syntax in
-      let%map response =
-        Transition_storage.Batch.with_batch transition_storage ~f:(fun batch ->
-            let%map parent =
-              apply_add_transition t best_tip
-                ~write:(Batch.set_transition batch)
-            in
-            let removed_transitions =
-              List.map removed_transitions ~f:(fun state_hash ->
-                  let removed_transition =
-                    read_transition t state_hash |> Option.value_exn
-                  in
-                  let body_hash = consensus_state removed_transition in
-                  Batch.remove_transition batch state_hash ;
-                  body_hash )
-            in
-            {Diff_mutant.parent; removed_transitions; old_root; old_scan_state}
-        )
-      in
-      (* HACK: We would like to have this synchronous and not context switch to
-          another task by the async scheduler because we would like the original
-          file of the root data to updated as quickly as possible. Renaming a
-          file should be very fast so it's okay to wait for a bit *)
-      Core.Sys.rename temp_location root_storage.path ;
-      response)
+  let atomic_move_root ({transition_storage; _} as t)
+      (Diff_mutant.Move_root
+        {best_tip; removed_transitions; new_root; new_scan_state}) =
+    let open Transition_storage.Schema in
+    Transition_storage.Batch.with_batch transition_storage ~f:(fun batch ->
+        let old_root_data =
+          Transition_storage.get_raw transition_storage ~key:Root
+          |> Option.value_exn ~message:"Unable to retrieve old root"
+          |> Bigstring.to_string
+        in
+        Transition_storage.Batch.set batch ~key:Root
+          ~data:(new_root, new_scan_state) ;
+        let parent = apply_add_transition (t, batch) best_tip in
+        let removed_transitions =
+          List.map removed_transitions ~f:(fun state_hash ->
+              let removed_transition, _ = get t (Transition state_hash) in
+              let consensus_state = consensus_state removed_transition in
+              Transition_storage.Batch.remove batch
+                ~key:(Transition state_hash) ;
+              consensus_state )
+        in
+        {Diff_mutant.Move_root.parent; removed_transitions; old_root_data} )
 
-  let apply_diff (type mutant) t (diff : mutant Diff_mutant.t) :
-      mutant Deferred.Or_error.t =
+  let apply_diff (type mutant) t (diff : mutant Diff_mutant.t) : mutant =
     match diff with
-    | Move_root request -> atomic_move_root t request
-    | Add_transition
-        (transition_with_hash :
-          (External_transition.Verified.t, State_hash.t) With_hash.t) ->
-        Deferred.return
-        @@ apply_add_transition t transition_with_hash
-             ~write:(set_transition t)
+    | Move_root request -> atomic_move_root t (Diff_mutant.Move_root request)
+    | Add_transition transition_with_hash ->
+        Transition_storage.Batch.with_batch t.transition_storage
+          ~f:(fun batch -> apply_add_transition (t, batch) transition_with_hash
+        )
 
-  let handle_diff (t : t) acc_hash (frontier_diff : Frontier_diff.t) =
-    let open Deferred.Or_error.Let_syntax in
-    let compute_hash diff_mutant =
-      let%map mutant = apply_diff t diff_mutant in
-      Diff_mutant.hash acc_hash diff_mutant mutant
-    in
-    match frontier_diff with
-    | Add_transition transition ->
-        compute_hash (Diff_mutant.Add_transition transition)
-    | Move_root move_root -> compute_hash (Diff_mutant.Move_root move_root)
+  let handle_diff (t : t) acc_hash diff_mutant =
+    let mutant = apply_diff t diff_mutant in
+    Diff_mutant.hash acc_hash diff_mutant mutant
 
   let directly_add_breadcrumb ~logger transition_frontier transition_with_hash
       parent =
-    let open Deferred.Or_error.Let_syntax in
+    let log_error () =
+      Logger.fatal logger ~module_:__MODULE__ ~location:__LOC__
+        ~metadata:
+          [("hash", State_hash.to_yojson (With_hash.hash transition_with_hash))]
+        "Failed to add breadcrumb into $hash"
+    in
     let%bind child_breadcrumb =
-      Deferred.Result.map_error
-        (Transition_frontier.Breadcrumb.build ~logger ~parent
-           ~transition_with_hash) ~f:(function
-        | `Fatal_error exn ->
-            Error.createf !"Adding Breadcrumb Error: %s" (Exn.to_string exn)
-        | `Validation_error error ->
-            Error.createf "Validating Breadcrumb Error: %s"
-              (Error.to_string_hum error) )
+      match%map
+        Transition_frontier.Breadcrumb.build ~logger ~parent
+          ~transition_with_hash
+      with
+      | Ok child_breadcrumb -> child_breadcrumb
+      | Error (`Fatal_error exn) -> log_error () ; raise exn
+      | Error (`Validation_error error) -> log_error () ; Error.raise error
     in
     let%map () =
       Transition_frontier.add_breadcrumb_exn transition_frontier
         child_breadcrumb
-      |> lift_or_error
     in
     child_breadcrumb
-
-  let rec add_breadcrumb ~logger ~in_memory_transition_storage
-      transition_frontier
-      ({With_hash.hash= _; data= external_transition} as transition_with_hash)
-      =
-    let open Deferred.Or_error.Let_syntax in
-    let parent_hash = parent_hash external_transition in
-    match Transition_frontier.find transition_frontier parent_hash with
-    | Some parent ->
-        directly_add_breadcrumb ~logger transition_frontier
-          transition_with_hash parent
-    | None ->
-        let%bind parent_external_transition =
-          match Hashtbl.find in_memory_transition_storage parent_hash with
-          | Some parent_external_transition ->
-              Deferred.Or_error.return parent_external_transition
-          | None ->
-              Deferred.Or_error.errorf
-                !"Parent transition %{sexp:State_hash.t} does not exist in \
-                  the transition storage"
-                parent_hash
-        in
-        let parent_external_transition_with_hash =
-          {With_hash.hash= parent_hash; data= parent_external_transition}
-        in
-        let%bind parent =
-          add_breadcrumb ~logger ~in_memory_transition_storage
-            transition_frontier parent_external_transition_with_hash
-        in
-        directly_add_breadcrumb ~logger transition_frontier
-          parent_external_transition_with_hash parent
 
   let staged_ledger_hash transition =
     let open External_transition.Verified in
@@ -285,62 +185,59 @@ end = struct
       External_transition.Protocol_state.(
         Blockchain_state.staged_ledger_hash @@ blockchain_state protocol_state)
 
-  let deserialize
-      ({transition_storage; root_snarked_ledger; root_storage; logger} as t)
+  let deserialize ({transition_storage= _; root_snarked_ledger; logger} as t)
       ~consensus_local_state =
-    let open Deferred.Or_error.Let_syntax in
-    let%bind state_hash, scan_state =
-      Deferred.Result.map_error
-        (Root_storage.load root_storage.controller root_storage.path)
-        ~f:(function
-        | `Checksum_no_match -> Error.of_string "Checksum did not match"
-        | `IO_error e -> Error.createf !"IO_error: %s" (Error.to_string_hum e)
-        | `No_exist ->
-            Error.createf !"File %s does not exist" root_storage.path )
+    let open Transition_storage.Schema in
+    let state_hash, scan_state = get t Root in
+    let get_verified_transition state_hash =
+      let transition, root_successor_hashes = get t (Transition state_hash) in
+      (* We read a transition that was already verified before it was written to disk *)
+      let (`I_swear_this_is_safe_see_my_comment verified_transition) =
+        External_transition.to_verified transition
+      in
+      (verified_transition, root_successor_hashes)
     in
-    let%bind root_transition =
-      Deferred.return
-        (let open Or_error.Let_syntax in
-        let%map verified_transition =
-          Result.of_option
-            (read_transition t state_hash)
-            ~error:
-              (Error.createf
-                 !"Could not find root transition %{sexp:State_hash.t}"
-                 state_hash)
-        in
-        {With_hash.data= verified_transition; hash= state_hash})
+    let root_transition, root_successor_hashes =
+      let verified_transition, children_hashes =
+        get_verified_transition state_hash
+      in
+      ({With_hash.data= verified_transition; hash= state_hash}, children_hashes)
     in
     let%bind root_staged_ledger =
       Staged_ledger.of_scan_state_and_snarked_ledger ~scan_state
         ~snarked_ledger:(Ledger.of_database root_snarked_ledger)
         ~expected_merkle_root:
           (staged_ledger_hash @@ With_hash.data root_transition)
+      |> Deferred.Or_error.ok_exn
     in
     let%bind transition_frontier =
-      lift_or_error
-      @@ Transition_frontier.create ~logger ~consensus_local_state
-           ~root_transition ~root_snarked_ledger ~root_staged_ledger
+      Transition_frontier.create ~logger ~consensus_local_state
+        ~root_transition ~root_snarked_ledger ~root_staged_ledger
     in
-    let hashed_transitions =
-      List.map (Transition_storage.to_alist transition_storage)
-        ~f:(fun (hash, external_transition) ->
-          {With_hash.hash; data= to_verified external_transition} )
+    let create_job breadcrumb child_hashes =
+      List.map child_hashes ~f:(fun child_hash -> (child_hash, breadcrumb))
     in
-    let in_memory_transition_storage = State_hash.Table.create () in
-    List.iter hashed_transitions ~f:(fun {With_hash.hash; data} ->
-        State_hash.Table.add_exn in_memory_transition_storage ~key:hash ~data
-    ) ;
+    let rec dfs = function
+      | [] -> Deferred.unit
+      | (state_hash, parent_breadcrumb) :: remaining_jobs ->
+          let verified_transition, child_hashes =
+            get_verified_transition state_hash
+          in
+          let%bind new_breadcrumb =
+            directly_add_breadcrumb ~logger transition_frontier
+              With_hash.{data= verified_transition; hash= state_hash}
+              parent_breadcrumb
+          in
+          dfs
+            ( List.map child_hashes ~f:(fun child_hash ->
+                  (child_hash, new_breadcrumb) )
+            @ remaining_jobs )
+    in
     let%map () =
-      Deferred.Or_error.List.iter hashed_transitions
-        ~f:(fun ({With_hash.hash= state_hash; data= _} as transition_with_hash)
-           ->
-          match Transition_frontier.find transition_frontier state_hash with
-          | Some _ -> Deferred.Or_error.return ()
-          | None ->
-              add_breadcrumb ~logger ~in_memory_transition_storage
-                transition_frontier transition_with_hash
-              |> Deferred.Or_error.ignore )
+      dfs
+        (create_job
+           (Transition_frontier.root transition_frontier)
+           root_successor_hashes)
     in
     transition_frontier
 end

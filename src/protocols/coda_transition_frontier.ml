@@ -19,6 +19,35 @@ module Transition_frontier_diff = struct
   [@@deriving sexp]
 end
 
+module type Diff_mutant = sig
+  type external_transition
+
+  type state_hash
+
+  type scan_state
+
+  module Move_root : sig
+    type request =
+      { best_tip: (external_transition, state_hash) With_hash.t
+      ; removed_transitions: state_hash list
+      ; new_root: state_hash
+      ; new_scan_state: scan_state }
+
+    type response =
+      {parent: string; removed_transitions: string list; old_root_data: string}
+  end
+
+  type _ t =
+    | Add_transition :
+        (external_transition, state_hash) With_hash.t
+        -> string t
+    | Move_root : Move_root.request -> Move_root.response t
+
+  type hash
+
+  val hash : hash -> 'a t -> 'a -> hash
+end
+
 (** An extension to the transition frontier that provides a view onto the data
     other components can use. These are exposed through the broadcast pipes
     accessible by calling extension_pipes on a Transition_frontier.t. *)
@@ -44,7 +73,7 @@ module type Transition_frontier_extension_intf0 = sig
     -> transition_frontier_breadcrumb Transition_frontier_diff.t
     -> view Option.t
   (** Handle a transition frontier diff, and return the new version of the
-        computed view, if it's updated. *)
+          computed view, if it's updated. *)
 end
 
 (** The type of the view onto the changes to the current best tip. This type

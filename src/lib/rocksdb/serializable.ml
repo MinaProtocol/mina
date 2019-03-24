@@ -60,3 +60,93 @@ struct
         ( Binable.of_bigstring (module Key) key
         , Binable.of_bigstring (module Value) value ) )
 end
+
+module type Database_intf = sig
+  type t
+
+  type 'a g
+
+  val set : t -> key:'a g -> data:'a -> unit
+
+  val remove : t -> key:'a g -> unit
+end
+
+(** Database Interface for storing heterogeneous key-value pairs. Similar to
+    Janestreet's Core.Univ_map *)
+module GADT = struct
+  module type S = sig
+    include Database_intf
+
+    module T : sig
+      type nonrec t = t
+    end
+
+    val create : directory:string -> t
+
+    val close : t -> unit
+
+    val get : t -> key:'a g -> 'a option
+
+    val get_raw : t -> key:'a g -> Bigstring.t option
+
+    module Batch : sig
+      include Database_intf with type 'a g := 'a g
+
+      val with_batch : T.t -> f:(t -> 'a) -> 'a
+    end
+  end
+
+  module type Key_intf = sig
+    type 'a t
+
+    val binable_key_type : 'a t -> 'a t Bin_prot.Type_class.t
+
+    val binable_data_type : 'a t -> 'a Bin_prot.Type_class.t
+  end
+
+  module Make (Key : Key_intf) : S with type 'a g := 'a Key.t = struct
+    let bin_key_dump (key : 'a Key.t) =
+      Bin_prot.Utils.bin_dump (Key.binable_key_type key).writer key
+
+    let bin_data_dump (key : 'a Key.t) (data : 'a) =
+      Bin_prot.Utils.bin_dump (Key.binable_data_type key).writer data
+
+    module Make_Serializer (Database : sig
+      type t
+
+      val set : t -> key:Bigstring.t -> data:Bigstring.t -> unit
+
+      val remove : t -> key:Bigstring.t -> unit
+    end) =
+    struct
+      type t = Database.t
+
+      let set t ~(key : 'a Key.t) ~(data : 'a) : unit =
+        Database.set t ~key:(bin_key_dump key) ~data:(bin_data_dump key data)
+
+      let remove t ~(key : 'a Key.t) =
+        Database.remove t ~key:(bin_key_dump key)
+    end
+
+    let create ~directory = Database.create ~directory
+
+    let close = Database.close
+
+    module T = Make_Serializer (Database)
+    include T
+
+    let get_raw t ~(key : 'a Key.t) = Database.get t ~key:(bin_key_dump key)
+
+    let get t ~(key : 'a Key.t) =
+      let open Option.Let_syntax in
+      let%map serialized_value = Database.get t ~key:(bin_key_dump key) in
+      let bin_key = Key.binable_data_type key in
+      bin_key.reader.read serialized_value ~pos_ref:(ref 0)
+
+    module Batch = struct
+      include Make_Serializer (Database.Batch)
+
+      let with_batch = Database.Batch.with_batch
+    end
+  end
+end
