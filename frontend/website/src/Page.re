@@ -108,7 +108,12 @@ let make =
     ) => {
   ...component,
   render: _ =>
-    <html>
+    <html
+      className=Css.(
+        style([
+          media(Style.MediaQuery.iphoneSEorSmaller, [fontSize(`px(13))]),
+        ])
+      )>
       <Head filename=name extra=extraHeaders />
       <body>
         {if (Grid.enabled) {
