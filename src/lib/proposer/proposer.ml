@@ -305,7 +305,7 @@ module Make (Inputs : Inputs_intf) :
         let propose ivar proposal_data =
           let open Interruptible.Let_syntax in
           match Broadcast_pipe.Reader.peek frontier_reader with
-          | None -> Interruptible.return (log_bootstrap_mode ())
+          | None -> log_bootstrap_mode () ; Interruptible.return ()
           | Some frontier -> (
               let crumb = Transition_frontier.best_tip frontier in
               Logger.trace logger ~module_:__MODULE__ ~location:__LOC__
@@ -342,10 +342,10 @@ module Make (Inputs : Inputs_intf) :
                       [%test_result: [`Take | `Keep]]
                         (Consensus_mechanism.select
                            ~existing:
-                             ( previous_protocol_state
-                             |> Protocol_state.consensus_state )
+                             (Protocol_state.consensus_state
+                                previous_protocol_state)
                            ~candidate:
-                             (protocol_state |> Protocol_state.consensus_state)
+                             (Protocol_state.consensus_state protocol_state)
                            ~logger)
                         ~expect:`Take
                         ~message:
@@ -361,7 +361,7 @@ module Make (Inputs : Inputs_intf) :
                         (Consensus_mechanism.select
                            ~existing:root_consensus_state
                            ~candidate:
-                             (protocol_state |> Protocol_state.consensus_state)
+                             (Protocol_state.consensus_state protocol_state)
                            ~logger)
                         ~expect:`Take
                         ~message:
@@ -415,7 +415,14 @@ module Make (Inputs : Inputs_intf) :
         let rec check_for_proposal () =
           trace_recurring_task "check for proposal" (fun () ->
               match Broadcast_pipe.Reader.peek frontier_reader with
-              | None -> log_bootstrap_mode ()
+              | None ->
+                  log_bootstrap_mode () ;
+                  don't_wait_for
+                    (let%map () =
+                       Broadcast_pipe.Reader.iter_until frontier_reader
+                         ~f:(Fn.compose Deferred.return Option.is_some)
+                     in
+                     check_for_proposal ())
               | Some transition_frontier -> (
                   let breadcrumb =
                     Transition_frontier.best_tip transition_frontier
@@ -426,30 +433,46 @@ module Make (Inputs : Inputs_intf) :
                   let protocol_state =
                     External_transition.Verified.protocol_state transition
                   in
-                  match
-                    measure "asking conensus what to do" (fun () ->
-                        Consensus_mechanism.next_proposal
-                          (time_to_ms (Time.now time_controller))
-                          (Protocol_state.consensus_state protocol_state)
-                          ~local_state:consensus_local_state ~keypair ~logger
-                    )
-                  with
-                  | `Check_again time ->
-                      Singleton_scheduler.schedule scheduler (time_of_ms time)
-                        ~f:check_for_proposal
-                  | `Propose_now data ->
-                      Interruptible.finally
-                        (Singleton_supervisor.dispatch proposal_supervisor data)
-                        ~f:check_for_proposal
-                      |> ignore
-                  | `Propose (time, data) ->
-                      Singleton_scheduler.schedule scheduler (time_of_ms time)
-                        ~f:(fun () ->
-                          ignore
-                            (Interruptible.finally
-                               (Singleton_supervisor.dispatch
-                                  proposal_supervisor data)
-                               ~f:check_for_proposal) ) ) )
+                  let consensus_state =
+                    Protocol_state.consensus_state protocol_state
+                  in
+                  if
+                    Consensus_mechanism.local_state_out_of_sync
+                      ~consensus_state ~local_state:consensus_local_state
+                  then (
+                    Logger.info logger ~module_:__MODULE__ ~location:__LOC__
+                      "Synchronizing consensus local state" ;
+                    don't_wait_for
+                      (let%map () =
+                         Consensus_mechanism.sync_local_state ~consensus_state
+                           ~local_state:consensus_local_state
+                       in
+                       check_for_proposal ()) )
+                  else
+                    match
+                      measure "asking conensus what to do" (fun () ->
+                          Consensus_mechanism.next_proposal
+                            (time_to_ms (Time.now time_controller))
+                            consensus_state ~local_state:consensus_local_state
+                            ~keypair ~logger )
+                    with
+                    | `Check_again time ->
+                        Singleton_scheduler.schedule scheduler
+                          (time_of_ms time) ~f:check_for_proposal
+                    | `Propose_now data ->
+                        Interruptible.finally
+                          (Singleton_supervisor.dispatch proposal_supervisor
+                             data)
+                          ~f:check_for_proposal
+                        |> ignore
+                    | `Propose (time, data) ->
+                        Singleton_scheduler.schedule scheduler
+                          (time_of_ms time) ~f:(fun () ->
+                            ignore
+                              (Interruptible.finally
+                                 (Singleton_supervisor.dispatch
+                                    proposal_supervisor data)
+                                 ~f:check_for_proposal) ) ) )
         in
         check_for_proposal () )
 end

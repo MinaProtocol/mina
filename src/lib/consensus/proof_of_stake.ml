@@ -1598,6 +1598,74 @@ module Rpcs = struct
         response )
 end
 
+(* TODO: integrate these helpers everywhere, kill *all* duplication! *)
+(* Select the correct epoch data to use from a consensus state for a given epoch.
+ * The rule for selecting the correct epoch data changes based on whether or not
+ * the consensus state we are selecting from is in the epoch we want to select.
+ * There is also a special case for when the consensus state we are selecting
+ * from is in the genesis epoch.
+ *)
+let select_epoch_data ~consensus_state ~epoch =
+  (* are we in the same epoch as the consensus state? *)
+  let in_same_epoch = Epoch.equal epoch consensus_state.curr_epoch in
+  (* are we in the next epoch after the consensus state? *)
+  let in_next_epoch =
+    Epoch.equal epoch (Epoch.succ consensus_state.curr_epoch)
+  in
+  (* is the consensus state from the genesis epoch? *)
+  let from_genesis_epoch =
+    Length.equal consensus_state.epoch_length Length.zero
+  in
+  if in_same_epoch || from_genesis_epoch then Ok state.last_epoch_data
+  else if in_next_epoch then Ok state.curr_epoch_data
+  else Error ()
+
+(* Select the correct epoch snapshot to use from local state for an epoch.
+ * The rule for selecting the correct epoch snapshot is predicated off of
+ * whether or not the first transition in the epoch in question has been
+ * finalized yet, as the local state epoch snapshot pointers are not
+ * updated until the consensus state reaches the root of the transition frontier.
+ * This function does not guarantee that the selected epoch snapshot is valid
+ * (i.e. it does not check that the epoch snapshot's ledger hash is the same
+ * as the ledger hash specified by the epoch data).
+ *)
+let select_epoch_snapshot ~consensus_state ~local_state ~epoch ~epoch_data =
+  (* is the snapshot we need the genesis snapshot? *)
+  let is_genesis_snapshot =
+    Frozen_ledger_hash.equal epoch_data.ledger.hash genesis_ledger_hash
+  in
+  (* are we in the next epoch after the consensus state? *)
+  let in_next_epoch =
+    Epoch.equal epoch (Epoch.succ consensus_state.curr_epoch)
+  in
+  (* has the first transition in the epoch reached finalization? *)
+  let epoch_is_finalized =
+    consensus_state.curr_epoch_data.length > Length.of_int Constants.k
+  in
+  if is_genesis_snapshot then
+    ("genesis", Some local_state.genesis_epoch_snapshot)
+  else if in_next_epoch || not epoch_is_finalized then
+    ("curr", local_state.curr_epoch_snapshot)
+  else ("last", local_state.last_epoch_snapshot)
+
+let local_state_out_of_sync ~consensus_state ~local_state =
+  let epoch = consensus_state.curr_epoch in
+  let epoch_data =
+    (* TODO: handle gracefully like a ballerina  *)
+    Result.ok_exn (select_epoch_data ~consensus_state ~epoch)
+  in
+  match
+    select_epoch_snapshot ~consensus_state ~local_state ~epoch ~epoch_data
+  with
+  | None -> true
+  | Some snapshot ->
+      if Ledger_hash.equal epoch_snapshot.ledger epoch_data.ledger_hash then
+        false
+      else
+        failwith
+          "woops, this probably shouldn't happen... or maybe we should sync \
+           anyway?"
+
 (* TODO: only track total currency from accounts > 1% of the currency using transactions *)
 let generate_transition ~(previous_protocol_state : Protocol_state.Value.t)
     ~blockchain_state ~time ~proposal_data ~transactions:_ ~snarked_ledger_hash
@@ -1777,45 +1845,25 @@ let next_proposal now (state : Consensus_state.Value.t) ~local_state ~keypair
     @@ Epoch.start_time epoch ) ;
   let epoch_transitioning = Epoch.equal epoch (Epoch.succ state.curr_epoch) in
   let next_slot =
-    (* When we first enter an epoch, the protocol state may still be a previous
-     * epoch. If that is the case, we need to select the staged vrf inputs
-     * instead of the last vrf inputs, since if the protocol state were actually
-     * up to date with the epoch, those would be the last vrf inputs.
-    *)
+    Logger.info logger ~module_:__MODULE__ ~location:__LOC__
+      !"Selecting correct epoch data from state -- epoch by time: %d, state \
+        epoch: %d, state epoch length: %d"
+      (Epoch.to_int epoch)
+      (Epoch.to_int state.curr_epoch)
+      (Length.to_int state.epoch_length) ;
     let epoch_data =
-      Logger.info logger ~module_:__MODULE__ ~location:__LOC__
-        !"Selecting correct epoch data from state -- epoch by time: %d, state \
-          epoch: %d, state epoch length: %d"
-        (Epoch.to_int epoch)
-        (Epoch.to_int state.curr_epoch)
-        (Length.to_int state.epoch_length) ;
-      (* If we are in the current epoch or we are in the first epoch (before any
-       * transitions), use the last epoch data.
-      *)
-      if
-        Epoch.equal epoch state.curr_epoch
-        || Length.equal state.epoch_length Length.zero
-      then state.last_epoch_data
-        (* If we are in the next epoch, use the current epoch data. *)
-      else if epoch_transitioning then state.curr_epoch_data
-        (* If the epoch we are in is none of the above, something is wrong. *)
-      else (
-        Logger.error logger ~module_:__MODULE__ ~location:__LOC__
-          "system time is out of sync with protocol state time" ;
-        failwith "System time is out of sync. (hint: setup NTP if you haven't)" )
+      match select_epoch_data ~consensus_state ~epoch with
+      | Ok epoch_data -> epoch_data
+      | Error () ->
+          Logger.error logger ~module_:__MODULE__ ~location:__LOC__
+            "system time is out of sync with protocol state time" ;
+          failwith
+            "System time is out of sync. (hint: setup NTP if you haven't)"
     in
     let total_stake = epoch_data.ledger.total_currency in
     let epoch_snapshot =
       let source, snapshot =
-        if
-          Coda_base.Frozen_ledger_hash.equal epoch_data.ledger.hash
-            genesis_ledger_hash
-        then ("genesis", Some local_state.Local_state.genesis_epoch_snapshot)
-        else if
-          epoch_transitioning
-          || state.curr_epoch_data.length <= Length.of_int Constants.k
-        then ("curr", local_state.curr_epoch_snapshot)
-        else ("last", local_state.Local_state.last_epoch_snapshot)
+        select_epoch_snapshot ~consensus_state ~local_state ~epoch ~epoch_data
       in
       ( match snapshot with
       | None ->

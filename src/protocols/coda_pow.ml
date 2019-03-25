@@ -1555,6 +1555,16 @@ module type Consensus_mechanism_intf = sig
     -> logger:Logger.t
     -> [`Keep | `Take]
 
+  val local_state_out_of_sync :
+       consensus_state:Consensus_state.Value.t
+    -> local_state:Local_state.t
+    -> bool
+
+  val sync_local_state :
+       consensus_state:Consensus_state.Value.t
+    -> local_state:Local_state.t
+    -> unit Deferred.t
+
   val genesis_protocol_state :
     (Protocol_state.Value.t, protocol_state_hash) With_hash.t
 end

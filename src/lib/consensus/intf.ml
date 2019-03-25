@@ -222,6 +222,22 @@ module type S = sig
     -> candidate:Consensus_state.Value.t
     -> bool
 
+  (**
+    * Predicate indicating whether or not the local state requires synchronization.
+    *)
+  val local_state_out_of_sync :
+       consensus_state:Consensus_state.Value.t
+    -> local_state:Local_state.t
+    -> bool
+
+  (**
+    * Synchronize local state over the network.
+    *)
+  val sync_local_state :
+       consensus_state:Consensus_state.Value.t
+    -> local_state:Local_state.t
+    -> unit Deferred.t
+
   (** Return a string that tells a human what the consensus view of an instant in time is.
     *
     * This is mostly useful for PoStake and other consensus mechanisms that have their own

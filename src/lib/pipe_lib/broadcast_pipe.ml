@@ -83,6 +83,20 @@ module Reader = struct
         Pipe.iter ~consumer r ~f:(fun v ->
             let%map () = f v in
             Pipe.Consumer.values_sent_downstream consumer ) )
+
+  let iter_until t ~f =
+    let rec loop ~consumer reader =
+      match%bind Pipe.read ~consumer reader with
+      | `Eof -> return ()
+      | `Ok v ->
+          if%bind f v then return ()
+          else (
+            Pipe.Consumer.values_sent_downstream consumer ;
+            loop ~consumer reader )
+    in
+    prepare_pipe t ~f:(fun reader ->
+        let consumer = add_trivial_consumer reader in
+        loop ~consumer reader )
 end
 
 module Writer = struct

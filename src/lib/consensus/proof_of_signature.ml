@@ -322,6 +322,11 @@ end
 
 let should_bootstrap ~existing:_ ~candidate:_ = false
 
+let local_state_out_of_sync ~consensus_state:_ ~local_state:_ = false
+
+let sync_local_state ~consensus_state:_ ~local_state:_ =
+  failwith "cannot call sync_local_state on Consensus.Proof_of_signature"
+
 let time_hum now = Core_kernel.Time.to_string now
 
 [%%endif]
