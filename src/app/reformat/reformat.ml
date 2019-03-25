@@ -39,7 +39,7 @@ let main dry_run check path =
           return ()
         in
         if check then
-          let prog, args = ("ocamlformat", [file]) in
+          let prog, args = ("ocamlformat", ["--doc-comments=before"; file]) in
           let%bind formatted = Process.run_exn ~prog ~args () in
           let%bind raw = Reader.file_contents file in
           if formatted <> raw then (
@@ -47,7 +47,9 @@ let main dry_run check path =
             exit 1 )
           else return ()
         else
-          let prog, args = ("ocamlformat", ["-i"; file]) in
+          let prog, args =
+            ("ocamlformat", ["--doc-comments=before"; "-i"; file])
+          in
           if dry_run then dump prog args
           else
             let%map _stdout = Process.run_exn ~prog ~args () in
