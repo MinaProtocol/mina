@@ -364,9 +364,21 @@ let make = _ => {
             alignItems(`center),
           ])
         )>
-        <SocialLink link="#" name="Twitter" svg=SocialLink.Svg.twitter />
-        <SocialLink link="#" name="Discord" svg=SocialLink.Svg.discord />
-        <SocialLink link="#" name="Telegram" svg=SocialLink.Svg.telegram />
+        <SocialLink
+          link="https://twitter.com/codaprotocol"
+          name="Twitter"
+          svg=SocialLink.Svg.twitter
+        />
+        <SocialLink
+          link="https://discord.gg/wz7zQyc"
+          name="Discord"
+          svg=SocialLink.Svg.discord
+        />
+        <SocialLink
+          link="https://t.me/codaprotocol"
+          name="Telegram"
+          svg=SocialLink.Svg.telegram
+        />
       </div>
       <KnowledgeBase />
     </div>,
