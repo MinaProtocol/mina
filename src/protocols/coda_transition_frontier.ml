@@ -215,6 +215,8 @@ module type Transition_frontier_intf = sig
 
   val root : t -> Breadcrumb.t
 
+  val root_length : t -> int
+
   val best_tip : t -> Breadcrumb.t
 
   val path_map : t -> Breadcrumb.t -> f:(Breadcrumb.t -> 'a) -> 'a list

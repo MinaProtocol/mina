@@ -7,24 +7,35 @@ open Coda_base
 open Pipe_lib
 
 module Api = struct
+  type user_cmd_status = {expected_deadline: int; passed_root: unit Ivar.t}
+
+  type user_cmds_under_inspection = (User_command.t, user_cmd_status) Hashtbl.t
+
   type t =
     { workers: Coda_process.t list
     ; configs: Coda_worker.Input.t list
     ; start_writer:
         (int * Coda_worker.Input.t * (unit -> unit) * (unit -> unit))
         Linear_pipe.Writer.t
-    ; status: [`On of [`Synced | `Catchup] | `Off] Array.t
-    ; payment_writer: User_command.t Linear_pipe.Writer.t }
+    ; status:
+        [`On of [`Synced of user_cmds_under_inspection | `Catchup] | `Off]
+        Array.t }
 
-  let create configs workers payment_writer start_writer =
-    let status = Array.init (List.length workers) ~f:(fun _ -> `On `Synced) in
-    {workers; configs; start_writer; status; payment_writer}
+  let create configs workers start_writer =
+    let status =
+      Array.init (List.length workers) ~f:(fun _ ->
+          let user_cmds_under_inspection =
+            Hashtbl.create (module User_command)
+          in
+          `On (`Synced user_cmds_under_inspection) )
+    in
+    {workers; configs; start_writer; status}
 
   let online t i = match t.status.(i) with `On _ -> true | `Off -> false
 
   let synced t i =
     match t.status.(i) with
-    | `On `Synced -> true
+    | `On (`Synced _) -> true
     | `On `Catchup -> false
     | `Off -> false
 
@@ -48,43 +59,56 @@ module Api = struct
       ( i
       , List.nth_exn t.configs i
       , (fun () -> t.status.(i) <- `On `Catchup)
-      , fun () -> t.status.(i) <- `On `Synced )
+      , fun () ->
+          let user_cmds_under_inspection =
+            Hashtbl.create (module User_command)
+          in
+          t.status.(i) <- `On (`Synced user_cmds_under_inspection) )
 
   let stop t i =
+    ( match t.status.(i) with
+    | `On (`Synced user_cmds_under_inspection) ->
+        Hashtbl.iter user_cmds_under_inspection ~f:(fun {passed_root; _} ->
+            Ivar.fill passed_root () )
+    | _ -> () ) ;
     t.status.(i) <- `Off ;
     Coda_process.disconnect (List.nth_exn t.workers i)
 
-  let send_payment t i sender_sk receiver_pk amount fee =
+  let send_payment t i ?acceptable_delay:(delay = 7) sender_sk receiver_pk
+      amount fee =
+    let open Deferred.Option.Let_syntax in
+    let worker = List.nth_exn t.workers i in
     let sender_pk =
       Public_key.of_private_key_exn sender_sk |> Public_key.compress
     in
-    (let open Deferred.Option.Let_syntax in
-    let%bind maybe_nonce = get_nonce t i sender_pk in
-    let nonce = Option.value_exn maybe_nonce in
+    let%bind nonce = Coda_process.get_nonce_exn worker sender_pk in
     let payload =
       User_command.Payload.create ~fee ~nonce ~memo:User_command_memo.dummy
         ~body:(Payment {receiver= receiver_pk; amount})
     in
-    let cmd =
-      User_command.sign (Keypair.of_private_key_exn sender_sk) payload
+    let user_cmd =
+      ( User_command.sign (Keypair.of_private_key_exn sender_sk) payload
+        :> User_command.t )
     in
-    let%map _ =
-      run_online_worker
-        ~arg:(cmd :> User_command.t)
-        ~f:(fun ~worker cmd -> Coda_process.process_payment_exn worker cmd)
-        t i
+    let%bind receipt =
+      Coda_process.process_payment_exn worker user_cmd
+      |> Deferred.map ~f:Or_error.ok
     in
-    Linear_pipe.write t.payment_writer (cmd :> User_command.t)
-    |> don't_wait_for)
-    |> ignore ;
-    Deferred.unit
-
-  let send_payment_with_receipt t i sk pk amount fee =
-    run_online_worker ~arg:(sk, pk, amount, fee)
-      ~f:(fun ~worker (sk, pk, amount, fee) ->
-        Coda_process.send_payment_exn worker sk pk amount fee
-          User_command_memo.dummy )
-      t i
+    let%map (all_passed_root : unit Ivar.t list) =
+      let open Deferred.Let_syntax in
+      Deferred.List.filter_map (t.status |> Array.to_list) ~f:(function
+        | `On (`Synced user_cmds_under_inspection) ->
+            let%map root_length = Coda_process.root_length_exn worker in
+            let passed_root = Ivar.create () in
+            Hashtbl.add_exn user_cmds_under_inspection ~key:user_cmd
+              ~data:
+                { expected_deadline= root_length + Consensus.Constants.k + delay
+                ; passed_root } ;
+            Option.return passed_root
+        | _ -> return None )
+      >>| Option.return
+    in
+    all_passed_root
 
   (* TODO: resulting_receipt should be replaced with the sender's pk so that we prove the
       merkle_list of receipts up to the current state of a sender's receipt_chain hash for some blockchain.
@@ -212,67 +236,53 @@ let start_prefix_check logger workers events testnet ~acceptable_delay =
     (Linear_pipe.iter events ~f:(function `Transition (i, (prev, curr)) ->
          Linear_pipe.write all_transitions_w (prev, curr, i) ))
 
-type user_cmd_status = {snapshots: int option array; passed_root: bool array}
+type user_cmd_status =
+  {snapshots: int option array; passed_root: bool array; result: unit Ivar.t}
 
-let start_payment_check logger root_pipe payment_pipe workers testnet
-    ~acceptable_delay =
-  let root_lengths = Array.init (List.length workers) ~f:(Fn.const 0) in
-  let user_commands_under_inspection = Hashtbl.create (module User_command) in
-  let add_to_user_commands_under_inspection user_cmd =
-    let snapshots =
-      Array.init (List.length workers) ~f:(fun i ->
-          if Api.synced testnet i then Some root_lengths.(i) else None )
-    in
-    Hashtbl.add user_commands_under_inspection ~key:user_cmd
-      ~data:{snapshots; passed_root= Array.map snapshots ~f:Option.is_none}
-    |> ignore
-  in
+let start_payment_check logger root_pipe workers (testnet : Api.t) =
   Linear_pipe.iter root_pipe ~f:(function
       | `Root
-          ( i
+          ( worker_id
           , Protocols.Coda_transition_frontier.Root_diff_view.({ user_commands
                                                                ; root_length })
           )
       ->
-      Option.iter root_length ~f:(fun l -> root_lengths.(i) <- l) ;
-      let user_commands_pass_inspection =
-        Hashtbl.fold user_commands_under_inspection ~init:[]
-          ~f:(fun ~key:user_cmd
-             ~data:{snapshots; passed_root}
-             user_commands_pass_inspection
-             ->
-            match snapshots.(i) with
-            | None -> user_commands_pass_inspection
-            | Some root_length_when_send_payment ->
-                if passed_root.(i) then user_commands_pass_inspection
-                else if
-                  root_lengths.(i)
-                  <= root_length_when_send_payment + Consensus.Constants.k
-                     + acceptable_delay
-                then
-                  if List.mem user_commands user_cmd ~equal:User_command.equal
-                  then (
-                    passed_root.(i) <- true ;
-                    Logger.info logger ~module_:__MODULE__ ~location:__LOC__
-                      !"transaction %{sexp:User_command.t} finally gets into \
-                        the root of node %d, when root length is %d"
-                      user_cmd i root_lengths.(i) ;
-                    if Array.for_all passed_root ~f:Fn.id then
-                      user_cmd :: user_commands_pass_inspection
-                    else user_commands_pass_inspection )
-                  else user_commands_pass_inspection
-                else (
-                  Logger.fatal logger ~module_:__MODULE__ ~location:__LOC__
-                    !"transaction took too long to get into the root of node %d"
-                    i ;
-                  Core.exit 1 ) )
-      in
-      List.iter user_commands_pass_inspection
-        ~f:(Hashtbl.remove user_commands_under_inspection)
-      |> Deferred.return )
-  |> don't_wait_for ;
-  Linear_pipe.iter payment_pipe ~f:(fun user_cmd ->
-      add_to_user_commands_under_inspection user_cmd |> Deferred.return )
+      Option.fold root_length ~init:Deferred.unit ~f:(fun _ length ->
+          match testnet.status.(worker_id) with
+          | `On (`Synced user_cmds_under_inspection) ->
+              let earliest_user_cmd =
+                List.min_elt (Hashtbl.to_alist user_cmds_under_inspection)
+                  ~compare:(fun (user_cmd1, status1) (user_cmd2, status2) ->
+                    Int.compare status1.expected_deadline
+                      status2.expected_deadline )
+              in
+              Option.iter earliest_user_cmd
+                ~f:(fun (user_cmd, {expected_deadline; _}) ->
+                  if expected_deadline < length then (
+                    Logger.fatal logger ~module_:__MODULE__ ~location:__LOC__
+                      ~metadata:
+                        [ ("worker_id", `Int worker_id)
+                        ; ("user_cmd", User_command.to_yojson user_cmd) ]
+                      "transaction $user_cmd took too long to get into the \
+                       root of node $worker_id" ;
+                    exit 1 |> ignore ) ) ;
+              List.iter user_commands ~f:(fun user_cmd ->
+                  Hashtbl.change user_cmds_under_inspection user_cmd
+                    ~f:(function
+                    | Some {passed_root; _} ->
+                        Ivar.fill passed_root () ;
+                        Logger.info logger ~module_:__MODULE__
+                          ~location:__LOC__
+                          ~metadata:
+                            [ ("user_cmd", User_command.to_yojson user_cmd)
+                            ; ("worker_id", `Int worker_id)
+                            ; ("length", `Int length) ]
+                          "transaction $user_cmd finally gets into the root \
+                           of node $worker_id, when root length is $length" ;
+                        None
+                    | None -> None ) ) ;
+              Deferred.unit
+          | _ -> Deferred.unit ) )
   |> don't_wait_for
 
 let events workers start_reader =
@@ -304,12 +314,10 @@ let events workers start_reader =
   List.iteri workers ~f:(fun i w -> don't_wait_for (connect_worker i w)) ;
   (event_r, root_r)
 
-let start_checks logger workers payment_reader start_reader testnet
-    ~acceptable_delay =
+let start_checks logger workers start_reader testnet ~acceptable_delay =
   let event_reader, root_reader = events workers start_reader in
   start_prefix_check logger workers event_reader testnet ~acceptable_delay ;
-  start_payment_check logger root_reader payment_reader workers testnet
-    ~acceptable_delay:7
+  start_payment_check logger root_reader workers testnet
 
 (* note: this is very declarative, maybe this should be more imperative? *)
 (* next steps:
@@ -334,31 +342,39 @@ let test logger n proposers snark_work_public_keys work_selection =
       ~trace_dir:(Unix.getenv "CODA_TRACING")
   in
   let%map workers = Coda_processes.spawn_local_processes_exn configs in
-  let payment_reader, payment_writer = Linear_pipe.create () in
   let start_reader, start_writer = Linear_pipe.create () in
-  let testnet = Api.create configs workers payment_writer start_writer in
-  start_checks logger workers payment_reader start_reader testnet
-    ~acceptable_delay ;
+  let testnet = Api.create configs workers start_writer in
+  start_checks logger workers start_reader testnet ~acceptable_delay ;
   testnet
 
 module Payments : sig
   val send_several_payments :
-       Api.t
-    -> node:int
-    -> src:Private_key.t
-    -> dest:Public_key.Compressed.t
-    -> unit Deferred.t
+    Api.t -> node:int -> keypairs:Keypair.t list -> n:int -> unit Deferred.t
 end = struct
-  let send_several_payments testnet ~node ~src ~dest =
-    let send_amount = Currency.Amount.of_int 10 in
-    let fee = Currency.Fee.of_int 0 in
-    let rec go i =
-      let%bind () = after (Time.Span.of_sec 1.) in
-      let%bind () = Api.send_payment testnet node src dest send_amount fee in
-      if i > 0 then go (i - 1) else after (Time.Span.of_sec 1.)
-      (* ensure a sleep at the end to let the last payment through *)
+  let send_several_payments testnet ~node ~keypairs ~n =
+    let amount = Currency.Amount.of_int 10 in
+    let fee = Currency.Fee.of_int 1 in
+    let%bind _ : unit option list =
+      Deferred.List.init n ~f:(fun _ ->
+          let open Deferred.Option.Let_syntax in
+          let%bind all_passed_root's =
+            List.map
+              (keypairs : Keypair.t list)
+              ~f:(fun sender_keypair ->
+                let receiver_keypair = List.random_element_exn keypairs in
+                let sender_sk = sender_keypair.private_key in
+                let receiver_pk =
+                  receiver_keypair.public_key |> Public_key.compress
+                in
+                Api.send_payment testnet node sender_sk receiver_pk amount fee
+                )
+            |> Deferred.Option.all
+          in
+          Deferred.map
+            (Deferred.List.iter (List.concat all_passed_root's) ~f:Ivar.read)
+            ~f:(Fn.const (Some ())) )
     in
-    go 40
+    Deferred.unit
 end
 
 module Restarts : sig
@@ -366,7 +382,7 @@ module Restarts : sig
        Api.t
     -> logger:Logger.t
     -> node:int
-    -> action:(unit -> unit Deferred.t)
+    -> action:(unit -> 'a Deferred.t)
     -> duration:Time.Span.t
     -> unit Deferred.t
 
@@ -402,7 +418,7 @@ end = struct
     Logger.info logger ~module_:__MODULE__ ~location:__LOC__ "Stopping %d" node ;
     (* Send one payment *)
     let%bind () = Api.stop testnet node in
-    let%bind () = action () in
+    let%bind _ = action () in
     let%bind () = after duration in
     Api.start testnet node
 
