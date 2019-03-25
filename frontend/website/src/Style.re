@@ -81,6 +81,21 @@ module Typeface = {
       (),
     );
 
+  let ibmplexserif =
+    fontFamily(
+      fontFace(
+        ~fontFamily="IBM Plex Serif",
+        ~src=[
+          localUrl("IBM Plex Serif Medium"),
+          url("/static/font/IBMPlexSerif-Medium-Latin1.woff2"),
+          url("/static/font/IBMPlexSerif-Medium-Latin1.woff"),
+        ],
+        ~fontStyle=`normal,
+        ~fontWeight=`medium,
+        (),
+      ),
+    );
+
   let ibmplexsans =
     fontFamily("IBM Plex Sans, Helvetica Neue, Arial, sans-serif");
 
@@ -92,8 +107,10 @@ module Typeface = {
 };
 
 module MediaQuery = {
+  let veryLarge = "(min-width: 70rem)";
   let full = "(min-width: 48rem)";
   let notMobile = "(min-width: 32rem)";
+  let notSmallMobile = "(min-width: 25rem)";
 };
 
 /** sets both paddingLeft and paddingRight, as one should */
