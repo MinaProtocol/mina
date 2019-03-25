@@ -105,7 +105,8 @@ module T = struct
         ( 'worker
         , Prove_receipt.Input.t
         , Prove_receipt.Output.t )
-        Rpc_parallel.Function.t }
+        Rpc_parallel.Function.t
+    ; dump_tf: ('worker, unit, string) Rpc_parallel.Function.t }
 
   type coda_functions =
     { coda_peers: unit -> Peers.t Deferred.t
@@ -125,7 +126,8 @@ module T = struct
            Pipe.Reader.t
            Deferred.t
     ; coda_prove_receipt:
-        Prove_receipt.Input.t -> Prove_receipt.Output.t Deferred.t }
+        Prove_receipt.Input.t -> Prove_receipt.Output.t Deferred.t
+    ; coda_dump_tf: unit -> string Deferred.t }
 
   module Worker_state = struct
     type init_arg = Input.t [@@deriving bin_io]
@@ -169,6 +171,9 @@ module T = struct
 
     let start_impl ~worker_state ~conn_state:() () = worker_state.coda_start ()
 
+    let dump_tf_impl ~worker_state ~conn_state:() () =
+      worker_state.coda_dump_tf ()
+
     let peers =
       C.create_rpc ~f:peers_impl ~bin_input:Unit.bin_t ~bin_output:Peers.bin_t
         ()
@@ -185,7 +190,8 @@ module T = struct
     let get_nonce =
       C.create_rpc ~f:get_nonce_impl
         ~bin_input:Public_key.Compressed.Stable.V1.bin_t
-        ~bin_output:[%bin_type_class: Coda_numbers.Account_nonce.t option] ()
+        ~bin_output:
+          [%bin_type_class: Coda_numbers.Account_nonce.Stable.V1.t option] ()
 
     let prove_receipt =
       C.create_rpc ~f:prove_receipt_impl ~bin_input:Prove_receipt.Input.bin_t
@@ -212,6 +218,10 @@ module T = struct
             User_command.t Protocols.Coda_transition_frontier.Root_diff_view.t]
         ()
 
+    let dump_tf =
+      C.create_rpc ~f:dump_tf_impl ~bin_input:Unit.bin_t
+        ~bin_output:String.bin_t ()
+
     let functions =
       { peers
       ; start
@@ -221,7 +231,8 @@ module T = struct
       ; get_nonce
       ; send_payment
       ; process_payment
-      ; prove_receipt }
+      ; prove_receipt
+      ; dump_tf }
 
     let init_worker_state
         { host
@@ -410,6 +421,11 @@ module T = struct
                    Linear_pipe.write w diff )) ;
             return r.pipe
           in
+          let coda_dump_tf () =
+            Deferred.return
+              ( Main.dump_tf coda |> Or_error.ok
+              |> Option.value ~default:"<failed to visualize>" )
+          in
           { coda_peers= with_monitor coda_peers
           ; coda_strongest_ledgers= with_monitor coda_strongest_ledgers
           ; coda_root_diff= with_monitor coda_root_diff
@@ -418,7 +434,8 @@ module T = struct
           ; coda_send_payment= with_monitor coda_send_payment
           ; coda_process_payment= with_monitor coda_process_payment
           ; coda_prove_receipt= with_monitor coda_prove_receipt
-          ; coda_start= with_monitor coda_start } )
+          ; coda_start= with_monitor coda_start
+          ; coda_dump_tf= with_monitor coda_dump_tf } )
 
     let init_connection_state ~connection:_ ~worker_state:_ = return
   end

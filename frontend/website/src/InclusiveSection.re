@@ -60,15 +60,14 @@ module Legend = {
   };
 
   let component = ReasonReact.statelessComponent("InclusiveSection.Legend");
-  let make = _ => {
+  let make = (~className, _children) => {
     ...component,
     render: _self => {
       <div
         className=Css.(
-          style([
-            display(`flex),
-            justifyContent(`center),
-            alignItems(`center),
+          merge([
+            className,
+            style([justifyContent(`center), alignItems(`center)]),
           ])
         )>
         <div
@@ -77,7 +76,8 @@ module Legend = {
               display(`flex),
               marginTop(`zero),
               marginBottom(`zero),
-              marginRight(`rem(2.25)),
+              marginRight(`zero),
+              media(Style.MediaQuery.notMobile, [marginRight(`rem(2.25))]),
             ])
           )>
           <Square
@@ -134,18 +134,24 @@ module Figure = {
   };
 };
 
+let legendQuery = "(min-width: 66.8125rem)";
+
 let component = ReasonReact.statelessComponent("InclusiveSection");
 let make = _ => {
   ...component,
   render: _self =>
     <div className=Css.(style([marginTop(`rem(2.5))]))>
-      <Title text="Inclusive consensus" />
-      <Legend />
+      <Title fontColor=Style.Colors.denimTwo text="Inclusive consensus" />
+      <Legend
+        className=Css.(
+          style([display(`none), media(legendQuery, [display(`flex)])])
+        )
+      />
       <div
         className=Css.(
           style([
             display(`flex),
-            justifyContent(`spaceBetween),
+            justifyContent(`spaceAround),
             alignItems(`center),
             flexWrap(`wrapReverse),
           ])
@@ -158,17 +164,31 @@ let make = _ => {
         />
         <Figure
           link="/static/img/other-blockchains-figure.svg"
-          dims=(13.75, 13.75)
+          dims=(CryptoAppsSection.middleElementWidthRems, 13.75)
           caption="Other Blockchains"
           captionColor=Style.Colors.navy
         />
-        <SideText
-          paragraphs=[|
-            "Simple, fair consensus. Participation is proportional to how much stake you have in the protocol with no lockups, no forced delegation, and low bandwidth requirements.",
-            "With just a small stake, you'll be able to participate directly in consensus and earn Coda.",
-          |]
-          cta="Stay updated about participating in consensus"
-        />
+        <div>
+          <div
+            className=Css.(style([display(`flex), justifyContent(`center)]))>
+            <SideText
+              paragraphs=[|
+                "Simple, fair consensus. Participation is proportional to how much stake you have in the protocol with no lockups, no forced delegation, and low bandwidth requirements.",
+                "With just a small stake, you'll be able to participate directly in consensus and earn Coda.",
+              |]
+              cta="Stay updated about participating in consensus"
+            />
+          </div>
+          <Legend
+            className=Css.(
+              style([
+                display(`flex),
+                marginTop(`rem(2.0)),
+                media(legendQuery, [display(`none)]),
+              ])
+            )
+          />
+        </div>
       </div>
     </div>,
 };

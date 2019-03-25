@@ -1,3 +1,5 @@
+let twoColumnMedia = "(min-width: 34rem)";
+
 module Investor = {
   let component = ReasonReact.statelessComponent("Investors.Investor");
   let make = (~name, ~suffix, _) => {
@@ -21,6 +23,7 @@ module Investor = {
               display(`flex),
               flexDirection(`row),
               alignItems(`center),
+              media(twoColumnMedia, [marginLeft(`rem(3.))]),
             ])
           )>
           <img src=imageSrc className=TeamSection.iconStyle />
@@ -53,7 +56,7 @@ let make = _children => {
             justifyContent(`center),
             gridTemplateColumns([`fr(1.), `fr(1.)]),
             media(
-              Style.MediaQuery.notMobile,
+              twoColumnMedia,
               [
                 // bs-css doesn't allow fr in minmax: https://github.com/SentiaAnalytics/bs-css/pull/124
                 unsafe(

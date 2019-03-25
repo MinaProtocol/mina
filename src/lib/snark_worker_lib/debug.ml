@@ -11,8 +11,10 @@ module Inputs = struct
   end
 
   module Proof = struct
+    (* TODO : version *)
     type t =
-      Transaction_snark.Statement.t * Coda_base.Sok_message.Digest.Stable.V1.t
+      Transaction_snark.Statement.Stable.V1.t
+      * Coda_base.Sok_message.Digest.Stable.V1.t
     [@@deriving bin_io, sexp]
   end
 

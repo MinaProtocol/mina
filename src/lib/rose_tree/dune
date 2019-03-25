@@ -2,4 +2,4 @@
   (name rose_tree)
   (public_name rose_tree)
   (libraries core_kernel async_kernel)
-  (preprocess (pps ppx_jane)))
+  (preprocess (pps ppx_jane ppx_deriving_yojson)))
