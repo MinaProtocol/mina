@@ -36,8 +36,8 @@ let make = (~link, ~dims, ~inline=false, ~className="", _children) => {
         )>
         <image
           xlinkHref=link
-          width={Js.Int.toString(Size.pixelsX(dims))}
-          height={Js.Int.toString(Size.pixelsY(dims))}
+          width={Js.Float.toString(Size.remX(dims)) ++ "rem"}
+          height={Js.Float.toString(Size.remY(dims)) ++ "rem"}
         />
       </svg>;
     },

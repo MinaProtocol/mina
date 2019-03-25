@@ -43,13 +43,16 @@ module Copy = {
                 style([
                   marginTop(`rem(1.75)),
                   // align with the grid
-                  marginBottom(`rem(11.875)),
+                  media(
+                    Style.MediaQuery.full,
+                    [marginBottom(`rem(11.875))],
+                  ),
                 ]),
               ])
             )>
             <span>
               {ReasonReact.string(
-                 "Coda is the first cryptocurrency with a succinct blockchain. Out lightweight blockchain means ",
+                 "Coda is the first cryptocurrency with a succinct blockchain. Our lightweight blockchain means ",
                )}
             </span>
             <span className=Style.Body.big_semibold>
