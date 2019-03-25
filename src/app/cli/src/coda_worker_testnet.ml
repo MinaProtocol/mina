@@ -253,7 +253,7 @@ let start_payment_check logger root_pipe workers (testnet : Api.t) =
                         ; ("user_cmd", User_command.to_yojson user_cmd) ]
                       "transaction $user_cmd took too long to get into the \
                        root of node $worker_id" ;
-                    (*exit 1 |> ignore*) failwith "fail here" ) ) ;
+                    exit 1 |> ignore ) ) ;
               List.iter user_commands ~f:(fun user_cmd ->
                   Hashtbl.change user_cmds_under_inspection user_cmd
                     ~f:(function
