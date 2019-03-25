@@ -682,7 +682,7 @@ module Epoch_data = struct
     , Epoch_seed.Stable.V1.t
     , Coda_base.State_hash.Stable.V1.t
     , Length.Stable.V1.t
-    , Amount.t )
+    , Amount.Stable.V1.t )
     t
   [@@deriving sexp, bin_io, eq, compare, hash, to_yojson]
 
