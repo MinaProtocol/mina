@@ -62,7 +62,11 @@ let make = _children => {
         )>
         <div
           className=Css.(
-            style([marginBottom(`rem(2.375)), userSelect(`none)])
+            style([
+              marginBottom(`rem(2.375)),
+              userSelect(`none),
+              maxWidth(`rem(23.875)),
+            ])
           )>
           <Svg
             link="/static/img/chart-blockchain-size.svg"
@@ -72,7 +76,11 @@ let make = _children => {
         </div>
         <div
           className=Css.(
-            style([marginBottom(`rem(2.375)), userSelect(`none)])
+            style([
+              marginBottom(`rem(2.375)),
+              userSelect(`none),
+              maxWidth(`rem(23.125)),
+            ])
           )>
           <Svg
             link="/static/img/chart-blockchain-energy.svg"

@@ -85,10 +85,7 @@ module NavStyle = {
 };
 
 module Logo = {
-  let svg =
-    <svg className=Css.(style([width(`rem(7.125)), height(`rem(1.25))]))>
-      <image xlinkHref="/static/img/new-logo.svg" width="114" height="20" />
-    </svg>;
+  let svg = <Svg link="/static/img/new-logo.svg" dims=(7.125, 1.25) />;
 };
 
 let component = ReasonReact.statelessComponent("Nav");

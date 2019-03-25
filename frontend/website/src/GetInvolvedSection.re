@@ -3,7 +3,8 @@ module Link = {
   let make = (~message, _) => {
     ...component,
     render: _ => {
-      <a className=Style.Link.basic>
+      <a
+        className=Css.(merge([Style.Link.basic, style([cursor(`pointer)])]))>
         {ReasonReact.string(message ++ {js|\u00A0→|js})}
       </a>;
     },
@@ -14,31 +15,64 @@ module KnowledgeBase = {
   module SubSection = {
     let component =
       ReasonReact.statelessComponent("GetInvolved.KnowledgeBase.SubSection");
-    let make = (~title, ~content, _) => {
+    let make = (~className="", ~title, ~content, _) => {
       ...component,
       render: _ => {
         let items =
           Belt.Array.map(content, ((copy, link)) =>
             <li className={Css.style([Css.color(Style.Colors.hyperlink)])}>
-              <a href=link className=Style.Link.basic>
+              <a
+                href=link
+                className=Css.(
+                  merge([Style.Link.basic, style([cursor(`pointer)])])
+                )>
                 {ReasonReact.string(copy)}
               </a>
             </li>
           );
 
-        <div>
+        <div className>
           <h5
             className=Css.(
               merge([
                 Style.H5.basic,
-                style([marginLeft(`rem(3.)), marginRight(`rem(1.5))]),
+                style([
+                  marginLeft(`zero),
+                  marginRight(`zero),
+                  marginTop(`zero),
+                  marginBottom(`rem(0.75)),
+                  media(
+                    Style.MediaQuery.notMobile,
+                    [
+                      marginTop(`rem(1.5)),
+                      marginLeft(`rem(3.)),
+                      marginRight(`rem(1.5)),
+                    ],
+                  ),
+                ]),
               ])
             )>
             {ReasonReact.string(title)}
           </h5>
           <ul
             className=Css.(
-              style([marginLeft(`rem(1.5)), marginRight(`rem(1.5))])
+              style([
+                marginLeft(`zero),
+                marginRight(`zero),
+                paddingBottom(`zero),
+                marginBottom(`zero),
+                unsafe("padding-inline-start", "0.0rem"),
+                listStyle(`none, `inside, `none),
+                media(
+                  Style.MediaQuery.notMobile,
+                  [
+                    unsafe("padding-inline-start", "40px"), // browser default
+                    marginLeft(`rem(1.5)),
+                    marginRight(`rem(1.5)),
+                    listStyle(`disc, `outside, `none),
+                  ],
+                ),
+              ])
             )>
             ...items
           </ul>
@@ -58,9 +92,17 @@ module KnowledgeBase = {
             Style.Typeface.ibmplexserif,
             border(`px(1), `solid, Style.Colors.hyperlinkAlpha(0.3)),
             borderRadius(`px(18)),
-            paddingBottom(`rem(3.)),
-            marginLeft(`rem(3.)),
-            marginRight(`rem(3.)),
+            paddingBottom(`rem(1.)),
+            marginLeft(`zero),
+            marginRight(`zero),
+            media(
+              Style.MediaQuery.notMobile,
+              [
+                paddingBottom(`rem(3.)),
+                marginLeft(`rem(3.)),
+                marginRight(`rem(3.)),
+              ],
+            ),
           ])
         )>
         <legend>
@@ -90,6 +132,7 @@ module KnowledgeBase = {
             ])
           )>
           <SubSection
+            className=Css.(style([marginBottom(`rem(2.0))]))
             title="Articles"
             content=[|
               ("Fast Accumulation on Streams", "#"),
@@ -226,20 +269,32 @@ module SocialLink = {
   };
 
   let component = ReasonReact.statelessComponent("GetInvolved.SocialLink");
-  let make = (~name, ~svg, _children) => {
+  let make = (~link, ~name, ~svg, _children) => {
     ...component,
     render: _ => {
-      <div
+      <a
+        href=link
         className=Css.(
           style([
+            cursor(`pointer),
             display(`flex),
+            textDecoration(`none),
             justifyContent(`center),
             alignItems(`center),
+            hover([color(Style.Colors.hyperlinkHover)]),
           ])
         )>
         <div className=Css.(style([margin(`rem(1.))]))> svg </div>
-        <h3 className=Style.H3.wide> {ReasonReact.string(name)} </h3>
-      </div>;
+        <h3
+          className=Css.(
+            merge([
+              Style.H3.wide,
+              style([hover([color(Style.Colors.hyperlinkHover)])]),
+            ])
+          )>
+          {ReasonReact.string(name)}
+        </h3>
+      </a>;
     },
   };
 };
@@ -268,13 +323,28 @@ let make = _ => {
         )>
         <p
           className=Css.(
-            merge([Style.Body.basic, style([maxWidth(`rem(22.5))])])
+            merge([
+              Style.Body.basic,
+              style([
+                maxWidth(`rem(22.5)),
+                media(
+                  Style.MediaQuery.full,
+                  [marginRight(`rem(3.75)), marginLeft(`rem(3.75))],
+                ),
+              ]),
+            ])
           )>
           {ReasonReact.string(
              "Help us build a more accessible, sustainable cryptocurrency. Join our community on discord, and follow our progress on twitter.",
            )}
         </p>
-        <ul className=Css.(style([listStyle(`none, `inside, `none)]))>
+        <ul
+          className=Css.(
+            style([
+              listStyle(`none, `inside, `none),
+              unsafe("padding-inline-start", "0"),
+            ])
+          )>
           <li> <Link message="Stay updated about developing with Coda" /> </li>
           <li>
             <Link message="Notify me about participating in consensus" />
@@ -294,9 +364,21 @@ let make = _ => {
             alignItems(`center),
           ])
         )>
-        <SocialLink name="Twitter" svg=SocialLink.Svg.twitter />
-        <SocialLink name="Discord" svg=SocialLink.Svg.discord />
-        <SocialLink name="Telegram" svg=SocialLink.Svg.telegram />
+        <SocialLink
+          link="https://twitter.com/codaprotocol"
+          name="Twitter"
+          svg=SocialLink.Svg.twitter
+        />
+        <SocialLink
+          link="https://discord.gg/wz7zQyc"
+          name="Discord"
+          svg=SocialLink.Svg.discord
+        />
+        <SocialLink
+          link="https://t.me/codaprotocol"
+          name="Telegram"
+          svg=SocialLink.Svg.telegram
+        />
       </div>
       <KnowledgeBase />
     </div>,
