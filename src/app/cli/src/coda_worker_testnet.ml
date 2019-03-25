@@ -108,7 +108,7 @@ module Api = struct
         | _ -> return None )
       >>| Option.return
     in
-    (receipt, all_passed_root)
+    all_passed_root
 
   (* TODO: resulting_receipt should be replaced with the sender's pk so that we prove the
       merkle_list of receipts up to the current state of a sender's receipt_chain hash for some blockchain.
@@ -228,48 +228,49 @@ type user_cmd_status =
   {snapshots: int option array; passed_root: bool array; result: unit Ivar.t}
 
 let start_payment_check logger root_pipe workers (testnet : Api.t) =
-  let root_lengths = Array.init (List.length workers) ~f:(Fn.const 0) in
   Linear_pipe.iter root_pipe ~f:(function
       | `Root
-          ( i
+          ( worker_id
           , Protocols.Coda_transition_frontier.Root_diff_view.({ user_commands
                                                                ; root_length })
           )
       ->
-      ( Option.iter root_length ~f:(fun l -> root_lengths.(i) <- l) ;
-        match testnet.status.(i) with
-        | `On (`Synced user_cmds_under_inspection) ->
-            let earliest_user_cmd =
-              List.min_elt (Hashtbl.to_alist user_cmds_under_inspection)
-                ~compare:(fun (user_cmd1, status1) (user_cmd2, status2) ->
-                  Int.compare status1.expected_deadline
-                    status2.expected_deadline )
-            in
-            Option.iter earliest_user_cmd
-              ~f:(fun (user_cmd, {expected_deadline; _}) ->
-                if expected_deadline < root_lengths.(i) then (
-                  Logger.fatal logger ~module_:__MODULE__ ~location:__LOC__
-                    ~metadata:
-                      [ ("i", `Int i)
-                      ; ("user_cmd", User_command.to_yojson user_cmd) ]
-                    "transaction $user_cmd took too long to get into the root \
-                     of node $i" ;
-                  exit 1 |> ignore ) ) ;
-            List.iter user_commands ~f:(fun user_cmd ->
-                Hashtbl.change user_cmds_under_inspection user_cmd ~f:(function
-                  | Some {passed_root; _} ->
-                      Ivar.fill passed_root () ;
-                      Logger.info logger ~module_:__MODULE__ ~location:__LOC__
-                        ~metadata:
-                          [ ("user_cmd", User_command.to_yojson user_cmd)
-                          ; ("i", `Int i)
-                          ; ("length", `Int root_lengths.(i)) ]
-                        "transaction $user_cmd finally gets into the root of \
-                         node $i, when root length is $length" ;
-                      None
-                  | None -> None ) ) ;
-            Deferred.unit
-        | _ -> Deferred.unit ) )
+      Option.fold root_length ~init:Deferred.unit ~f:(fun _ length ->
+          match testnet.status.(worker_id) with
+          | `On (`Synced user_cmds_under_inspection) ->
+              let earliest_user_cmd =
+                List.min_elt (Hashtbl.to_alist user_cmds_under_inspection)
+                  ~compare:(fun (user_cmd1, status1) (user_cmd2, status2) ->
+                    Int.compare status1.expected_deadline
+                      status2.expected_deadline )
+              in
+              Option.iter earliest_user_cmd
+                ~f:(fun (user_cmd, {expected_deadline; _}) ->
+                  if expected_deadline < length then (
+                    Logger.fatal logger ~module_:__MODULE__ ~location:__LOC__
+                      ~metadata:
+                        [ ("worker_id", `Int worker_id)
+                        ; ("user_cmd", User_command.to_yojson user_cmd) ]
+                      "transaction $user_cmd took too long to get into the \
+                       root of node $worker_id" ;
+                    (*exit 1 |> ignore*) failwith "fail here" ) ) ;
+              List.iter user_commands ~f:(fun user_cmd ->
+                  Hashtbl.change user_cmds_under_inspection user_cmd
+                    ~f:(function
+                    | Some {passed_root; _} ->
+                        Ivar.fill passed_root () ;
+                        Logger.info logger ~module_:__MODULE__
+                          ~location:__LOC__
+                          ~metadata:
+                            [ ("user_cmd", User_command.to_yojson user_cmd)
+                            ; ("worker_id", `Int worker_id)
+                            ; ("length", `Int length) ]
+                          "transaction $user_cmd finally gets into the root \
+                           of node $worker_id, when root length is $length" ;
+                        None
+                    | None -> None ) ) ;
+              Deferred.unit
+          | _ -> Deferred.unit ) )
   |> don't_wait_for
 
 let events workers start_reader =
@@ -303,7 +304,7 @@ let events workers start_reader =
 
 let start_checks logger workers start_reader testnet ~acceptable_delay =
   let event_reader, root_reader = events workers start_reader in
-  start_prefix_check logger workers event_reader testnet ~acceptable_delay ;
+  (*start_prefix_check logger workers event_reader testnet ~acceptable_delay ;*)
   start_payment_check logger root_reader workers testnet
 
 (* note: this is very declarative, maybe this should be more imperative? *)
@@ -344,7 +345,7 @@ end = struct
     let%bind _ : unit option list =
       Deferred.List.init n ~f:(fun _ ->
           let open Deferred.Option.Let_syntax in
-          let%bind receipts_and_all_passed_root's =
+          let%bind all_passed_root's =
             List.map
               (keypairs : Keypair.t list)
               ~f:(fun sender_keypair ->
@@ -356,9 +357,6 @@ end = struct
                 Api.send_payment testnet node sender_sk receiver_pk amount fee
                 )
             |> Deferred.Option.all
-          in
-          let _, all_passed_root's =
-            List.unzip receipts_and_all_passed_root's
           in
           Deferred.map
             (Deferred.List.iter (List.concat all_passed_root's) ~f:Ivar.read)
