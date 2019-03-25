@@ -187,7 +187,7 @@ let make = (~jobOpenings, _) => {
     <div>
       <div className="mw960 pv3 center ph3 ibmplex oceanblack">
         <h1
-          className="fadedblue aktivgroteskex careers-double-line-header ttu f5 fw5 tracked-more mb4">
+          className="fadedblue aktivgroteskex careers-double-line-header ttu f5 fw5 tracked-more mb4 nowrap">
           {ReasonReact.string("Work with us!")}
         </h1>
         <div>
