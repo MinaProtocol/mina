@@ -519,6 +519,10 @@ module Make (Inputs : Inputs_intf) = struct
                 |> Deferred.return ) )) ;
     root_diff_reader
 
+  let dump_tf t =
+    peek_frontier t.transition_frontier
+    |> Or_error.map ~f:Transition_frontier.visualize_to_string
+
   module Config = struct
     (** If ledger_db_location is None, will auto-generate a db based on a UUID *)
     type t =

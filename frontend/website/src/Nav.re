@@ -6,8 +6,10 @@ module NavStyle = {
 
   module MediaQuery = {
     let menu = "(min-width: 58rem)";
+    let menuMax = "(max-width: 58rem)";
     let statusLift = "(min-width: 38rem)";
   };
+  let bottomNudge = Css.marginBottom(`rem(1.25));
 
   let options =
     style([
@@ -16,7 +18,7 @@ module NavStyle = {
       // when it's not hidden, make the dropdown appear
       position(`absolute),
       right(`rem(0.0)),
-      top(`rem(2.0)),
+      top(`rem(0.0)),
       backgroundColor(Colors.white),
       // always visible and flexed on full
       media(
@@ -31,10 +33,32 @@ module NavStyle = {
       ),
     ]);
 
+  let dropDownOptions =
+    merge([options, style([marginTop(`zero), bottomNudge])]);
+
   let menuBtn =
     style([
       display(`none),
-      selector({j|:checked ~ .$options|j}, [display(`block)]),
+      media(
+        // Make expanded menu not show up on a wide screen
+        MediaQuery.menuMax,
+        [
+          selector(
+            {j|:checked ~ .$dropDownOptions|j},
+            [
+              border(`px(2), `solid, Style.Colors.gandalf),
+              borderRadius(`px(3)),
+              paddingLeft(`rem(0.5)),
+              marginTop(`rem(2.)),
+              marginRight(`rem(-0.6)),
+              display(`flex),
+              maxWidth(`rem(10.)),
+              flexDirection(`column),
+              alignItems(`flexEnd),
+            ],
+          ),
+        ],
+      ),
     ]);
 
   let menuIcon =
@@ -61,10 +85,7 @@ module NavStyle = {
 };
 
 module Logo = {
-  let svg =
-    <svg className=Css.(style([width(`rem(7.125)), height(`rem(1.25))]))>
-      <image xlinkHref="/static/img/new-logo.svg" width="114" height="20" />
-    </svg>;
+  let svg = <Svg link="/static/img/new-logo.svg" dims=(7.125, 1.25) />;
 };
 
 let component = ReasonReact.statelessComponent("Nav");
@@ -78,7 +99,7 @@ let make = children => {
              className=Css.(
                style(
                  Style.paddingX(`rem(0.75))
-                 @ Style.paddingY(`zero)
+                 @ Style.paddingY(`rem(0.75))
                  @ [listStyle(`none, `inside, `none)],
                )
              )>
@@ -86,15 +107,13 @@ let make = children => {
            </li>
          );
 
-    let bottomNudge = Css.marginBottom(`rem(1.25));
-
     <nav className=NavStyle.nav>
       <a
         href="/"
         className=Css.(
           style([
             display(`block),
-            bottomNudge,
+            NavStyle.bottomNudge,
             width(`percent(50.0)),
             media(
               NavStyle.MediaQuery.statusLift,
@@ -109,7 +128,7 @@ let make = children => {
           style([
             order(3),
             width(`percent(100.0)),
-            bottomNudge,
+            NavStyle.bottomNudge,
             media(
               NavStyle.MediaQuery.statusLift,
               [order(2), width(`auto)],
@@ -131,6 +150,7 @@ let make = children => {
       <div
         className=Css.(
           style([
+            position(`relative),
             width(`auto),
             order(2),
             media(
@@ -151,20 +171,12 @@ let make = children => {
           <label className=NavStyle.menuIcon htmlFor="nav-menu-btn">
             <span
               className=Css.(
-                merge([NavStyle.menuText, style([bottomNudge])])
+                merge([NavStyle.menuText, style([NavStyle.bottomNudge])])
               )>
               {ReasonReact.string("Menu")}
             </span>
           </label>
-          <ul
-            className=Css.(
-              merge([
-                NavStyle.options,
-                style([marginTop(`zero), bottomNudge]),
-              ])
-            )>
-            ...items
-          </ul>
+          <ul className=NavStyle.dropDownOptions> ...items </ul>
         </div>
     </nav>;
   },

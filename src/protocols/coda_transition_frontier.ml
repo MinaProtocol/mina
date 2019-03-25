@@ -301,6 +301,8 @@ module type Transition_frontier_intf = sig
 
   val root_diff_pipe : t -> Extensions.Root_diff.view Broadcast_pipe.Reader.t
 
+  val visualize_to_string : t -> string
+
   val visualize : filename:string -> t -> unit
 
   module For_tests : sig

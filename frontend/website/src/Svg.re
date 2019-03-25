@@ -10,7 +10,7 @@ module Size = {
 };
 
 let component = ReasonReact.statelessComponent("Svg");
-let make = (~link, ~dims, ~inline=false, _children) => {
+let make = (~link, ~dims, ~inline=false, ~className="", _children) => {
   ...component,
   render: _self =>
     if (inline) {
@@ -26,15 +26,18 @@ let make = (~link, ~dims, ~inline=false, _children) => {
         baseProfile="full"
         xmlns="http://www.w3.org/2000/svg"
         className=Css.(
-          style([
-            width(`rem(Size.remX(dims))),
-            height(`rem(Size.remY(dims))),
+          merge([
+            className,
+            style([
+              width(`rem(Size.remX(dims))),
+              height(`rem(Size.remY(dims))),
+            ]),
           ])
         )>
         <image
           xlinkHref=link
-          width={Js.Int.toString(Size.pixelsX(dims))}
-          height={Js.Int.toString(Size.pixelsY(dims))}
+          width={Js.Float.toString(Size.remX(dims)) ++ "rem"}
+          height={Js.Float.toString(Size.remY(dims)) ++ "rem"}
         />
       </svg>;
     },

@@ -173,10 +173,22 @@ let start_prefix_check logger workers events testnet ~acceptable_delay =
       !"lengths: %{sexp: int list} shared_prefix: %{sexp: string option} \
         shared_prefix_age: %d"
       lengths newest_shared shared_prefix_age ;
-    if not (shared_prefix_age <= 5) then (
-      Logger.fatal logger ~module_:__MODULE__ ~location:__LOC__
-        "prefix too old" ;
-      ignore (exit 1) ) ;
+    let chains_list = Array.to_list chains in
+    let list_of_list =
+      List.map chains_list ~f:(fun chain ->
+          `List (List.map ~f:(fun s -> `String s) chain) )
+    in
+    if not (shared_prefix_age <= 5) then
+      (let%bind tfs =
+         Deferred.List.map workers ~f:(fun p ->
+             let%map tf_string = Coda_process.dump_tf p in
+             `String tf_string )
+       in
+       Logger.fatal logger ~module_:__MODULE__ ~location:__LOC__
+         "prefix too old"
+         ~metadata:[("chains", `List list_of_list); ("tf_vizs", `List tfs)] ;
+       exit 1)
+      |> don't_wait_for ;
     ()
   in
   let last_time = ref (Time.now ()) in

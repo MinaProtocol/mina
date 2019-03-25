@@ -84,7 +84,7 @@ module Make (Inputs : Inputs_intf) :
     ( Blockchain_state.Value.Stable.V1.t
     , Consensus_data.value
     , Sok_message.Digest.Stable.V1.t
-    , Currency.Amount.t )
+    , Currency.Amount.Stable.V1.t )
     t
   [@@deriving bin_io, sexp]
 
