@@ -36,15 +36,15 @@ module type Transition_frontier_extension_intf0 = sig
 
   val create : input -> t
 
-  val initial_view : unit -> view
   (** The first view that is ever available. *)
+  val initial_view : unit -> view
 
+  (** Handle a transition frontier diff, and return the new version of the
+        computed view, if it's updated. *)
   val handle_diff :
        t
     -> transition_frontier_breadcrumb Transition_frontier_diff.t
     -> view Option.t
-  (** Handle a transition frontier diff, and return the new version of the
-        computed view, if it's updated. *)
 end
 
 (** The type of the view onto the changes to the current best tip. This type
@@ -127,8 +127,8 @@ module type Transition_frontier_Breadcrumb_intf = sig
     -> staged_ledger
     -> t
 
-  val copy : t -> t
   (** The copied breadcrumb delegates to [Staged_ledger.copy], the other fields are already immutable *)
+  val copy : t -> t
 
   val build :
        logger:Logger.t
@@ -191,8 +191,8 @@ module type Transition_frontier_base_intf = sig
     -> consensus_local_state:consensus_local_state
     -> t Deferred.t
 
-  val close : t -> unit
   (** Clean up internal state. *)
+  val close : t -> unit
 
   val find_exn : t -> state_hash -> Breadcrumb.t
 
@@ -236,14 +236,14 @@ module type Transition_frontier_intf = sig
 
   val iter : t -> f:(Breadcrumb.t -> unit) -> unit
 
-  val add_breadcrumb_exn : t -> Breadcrumb.t -> unit Deferred.t
   (** Adds a breadcrumb to the transition frontier or throws. It possibly
    * triggers a root move and it triggers any extensions that are listening to
    * events on the frontier. *)
+  val add_breadcrumb_exn : t -> Breadcrumb.t -> unit Deferred.t
 
-  val add_breadcrumb_if_present_exn : t -> Breadcrumb.t -> unit Deferred.t
   (** Like add_breadcrumb_exn except it doesn't throw if the parent hash is
    * missing from the transition frontier *)
+  val add_breadcrumb_if_present_exn : t -> Breadcrumb.t -> unit Deferred.t
 
   val best_tip_path_length_exn : t -> int
 
