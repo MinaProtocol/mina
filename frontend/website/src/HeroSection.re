@@ -42,6 +42,7 @@ module Copy = {
                 Style.Body.big,
                 style([
                   marginTop(`rem(1.75)),
+                  maxWidth(`rem(28.0)),
                   // align with the grid
                   media(
                     Style.MediaQuery.full,
