@@ -304,7 +304,7 @@ let events workers start_reader =
 
 let start_checks logger workers start_reader testnet ~acceptable_delay =
   let event_reader, root_reader = events workers start_reader in
-  (*start_prefix_check logger workers event_reader testnet ~acceptable_delay ;*)
+  start_prefix_check logger workers event_reader testnet ~acceptable_delay ;
   start_payment_check logger root_reader workers testnet
 
 (* note: this is very declarative, maybe this should be more imperative? *)
