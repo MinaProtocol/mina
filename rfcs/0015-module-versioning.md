@@ -22,7 +22,7 @@ annotation on types.
 ### Explicit versioning
 
 The `bin_io` representation and associated `bin_prot` library are
-claimed to be type-safe when used in OCaml (see 
+claimed to be type-safe when used in OCaml (see
 [Jane Street bin\_prot](https://github.com/janestreet/bin_prot/).
 Moreover, other programming languages don't appear to be able to
 produce or consume this representation. Therefore, type and versioning
@@ -63,7 +63,7 @@ module Some_data = struct
       type latest = t
 
       let to_latest t = t
-	  
+
 	  include Make_version (T)
     end
 
@@ -140,7 +140,7 @@ module Some_data = struct
       type latest = Latest.t (* changed, was t *)
 
       let to_latest = ...    (* changed, was the identity *)
-	  
+
 	  include Make_version (T)
     end
 
@@ -248,7 +248,7 @@ The file `docs/style-guide.md` mentions versioning of stable module
 types.
 
 PR #1645, already merged, partially implements a module registration
-mechanism.  That implementation deals only with the `bin_io` 
+mechanism.  That implementation deals only with the `bin_io`
 representation, not `yojson` or `sexp`.
 
 PR #1653, already merged, more completely implements a module
