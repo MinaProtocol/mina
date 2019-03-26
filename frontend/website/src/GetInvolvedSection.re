@@ -20,7 +20,13 @@ module KnowledgeBase = {
       render: _ => {
         let items =
           Belt.Array.map(content, ((copy, link)) =>
-            <li className={Css.style([Css.color(Style.Colors.hyperlink)])}>
+            <li
+              className=Css.(
+                style([
+                  marginBottom(`rem(0.5)),
+                  color(Style.Colors.hyperlink),
+                ])
+              )>
               <a
                 href=link
                 className=Css.(
@@ -57,19 +63,16 @@ module KnowledgeBase = {
           <ul
             className=Css.(
               style([
-                marginLeft(`zero),
+                marginLeft(`rem(1.5)),
                 marginRight(`zero),
                 paddingBottom(`zero),
                 marginBottom(`zero),
                 unsafe("padding-inline-start", "0.0rem"),
-                listStyle(`none, `inside, `none),
                 media(
                   Style.MediaQuery.notMobile,
                   [
                     unsafe("padding-inline-start", "40px"), // browser default
-                    marginLeft(`rem(1.5)),
                     marginRight(`rem(1.5)),
-                    listStyle(`disc, `outside, `none),
                   ],
                 ),
               ])
@@ -117,6 +120,7 @@ module KnowledgeBase = {
                 paddingBottom(`rem(0.5)),
                 textTransform(`uppercase),
                 fontWeight(`medium),
+                color(Style.Colors.midnight),
               ])
             )>
             {ReasonReact.string("Knowledge base")}
@@ -299,6 +303,8 @@ module SocialLink = {
   };
 };
 
+let marginBelow = Css.(style([marginBottom(`rem(0.5))]));
+
 let component = ReasonReact.statelessComponent("GetInvolved");
 let make = _ => {
   ...component,
@@ -345,19 +351,27 @@ let make = _ => {
               unsafe("padding-inline-start", "0"),
             ])
           )>
-          <li> <Link message="Stay updated about developing with Coda" /> </li>
-          <li>
+          <li className=marginBelow>
+            <Link message="Stay updated about developing with Coda" />
+          </li>
+          <li className=marginBelow>
             <Link message="Notify me about participating in consensus" />
           </li>
-          <li>
+          <li className=marginBelow>
             <Link message="Earn Coda by helping to compress the blockchain" />
           </li>
-          <li> <Link message="Join our mailing list for updates" /> </li>
+          <li className=marginBelow>
+            <Link message="Join our mailing list for updates" />
+          </li>
         </ul>
       </div>
       <div
         className=Css.(
           style([
+            media(
+              Style.MediaQuery.notMobile,
+              [marginTop(`rem(2.0)), marginBottom(`rem(3.))],
+            ),
             display(`flex),
             flexWrap(`wrap),
             justifyContent(`spaceAround),
