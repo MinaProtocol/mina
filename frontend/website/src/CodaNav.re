@@ -1,3 +1,24 @@
+let menuStyle =
+  Style.paddingX(`zero)
+  @ Css.[
+      height(`auto),
+      borderWidth(`zero),
+      Style.Typeface.ibmplexsans,
+      color(Style.Colors.hyperlink),
+      fontSize(`rem(1.0)),
+      lineHeight(`rem(1.5)),
+      fontWeight(`medium),
+      letterSpacing(`rem(0.)),
+      fontStyle(`normal),
+      textTransform(`none),
+      outline(`zero, `none, `transparent),
+      focus([color(Style.Colors.hyperlinkHover)]),
+      hover([
+        backgroundColor(`transparent),
+        color(Style.Colors.hyperlinkHover),
+      ]),
+    ];
+
 module SimpleButton = {
   open Style;
 
@@ -17,6 +38,7 @@ module SimpleButton = {
                 textDecoration(`none),
                 whiteSpace(`nowrap),
                 hover([color(Style.Colors.hyperlinkHover)]),
+                media(Nav.NavStyle.MediaQuery.menuMax, menuStyle),
               ],
             ),
           ])
@@ -56,26 +78,7 @@ module SignupButton = {
                 ]),
                 // Make this display the same as a SimpleButton
                 // when the screen is small enough to show a menu
-                media(
-                  Nav.NavStyle.MediaQuery.menuMax,
-                  paddingX(`zero)
-                  @ [
-                    height(`auto),
-                    borderWidth(`zero),
-                    Typeface.ibmplexsans,
-                    color(Colors.metallicBlue),
-                    fontSize(`rem(1.0)),
-                    lineHeight(`rem(1.5)),
-                    fontWeight(`normal),
-                    letterSpacing(`rem(0.)),
-                    fontStyle(`normal),
-                    textTransform(`none),
-                    hover([
-                      backgroundColor(`transparent),
-                      color(Style.Colors.hyperlinkHover),
-                    ]),
-                  ],
-                ),
+                media(Nav.NavStyle.MediaQuery.menuMax, menuStyle),
               ],
             ),
           ])

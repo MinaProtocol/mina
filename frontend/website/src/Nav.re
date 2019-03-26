@@ -11,9 +11,10 @@ module NavStyle = {
   };
   let bottomNudge = Css.marginBottom(`rem(1.25));
 
-  let options =
+  let collapsedMenuItems =
     style([
-      // hidden on mobile by default
+      marginTop(`zero),
+      bottomNudge,
       display(`none),
       // when it's not hidden, make the dropdown appear
       position(`absolute),
@@ -33,55 +34,96 @@ module NavStyle = {
       ),
     ]);
 
-  let dropDownOptions =
-    merge([options, style([marginTop(`zero), bottomNudge])]);
-
-  let menuBtn =
-    style([
-      display(`none),
-      media(
-        // Make expanded menu not show up on a wide screen
-        MediaQuery.menuMax,
-        [
-          selector(
-            {j|:checked ~ .$dropDownOptions|j},
-            [
-              border(`px(2), `solid, Style.Colors.gandalf),
-              borderRadius(`px(3)),
-              paddingLeft(`rem(0.5)),
-              marginTop(`rem(2.)),
-              marginRight(`rem(-0.6)),
-              display(`flex),
-              maxWidth(`rem(10.)),
-              flexDirection(`column),
-              alignItems(`flexEnd),
-            ],
-          ),
-        ],
-      ),
+  let expandedMenuItems =
+    merge([
+      collapsedMenuItems,
+      style([
+        media(
+          // Make expanded menu not show up on a wide screen
+          MediaQuery.menuMax,
+          [
+            border(`px(1), `solid, Style.Colors.hyperlinkHover),
+            boxShadow(
+              ~x=`zero,
+              ~y=`zero,
+              ~blur=`px(12),
+              ~spread=`zero,
+              `rgba((0, 0, 0, 0.12)),
+            ),
+            borderRadius(`px(10)),
+            paddingLeft(`rem(0.5)),
+            marginTop(`rem(2.)),
+            marginRight(`rem(-0.6)),
+            display(`flex),
+            maxWidth(`rem(10.)),
+            flexDirection(`column),
+            alignItems(`flexStart),
+          ],
+        ),
+      ]),
     ]);
+};
 
-  let menuIcon =
-    style([
-      cursor(`pointer),
-      display(`flex),
-      justifyContent(`flexEnd),
-      position(`relative),
-      userSelect(`none),
-      // The menu is always shown on full-size
-      media(MediaQuery.menu, [display(`none)]),
-    ]);
+module DropdownMenu = {
+  let component = ReasonReact.statelessComponent("Nav.DropdownMenu");
+  let make = children => {
+    ...component,
+    render: _self => {
+      <>
+        <button
+          className=Css.(
+            merge([
+              Style.Link.basic,
+              style([
+                NavStyle.bottomNudge,
+                marginLeft(`rem(1.0)),
+                border(`zero, `solid, `transparent),
+                cursor(`pointer),
+                display(`flex),
+                justifyContent(`flexEnd),
+                position(`relative),
+                userSelect(`none),
+                backgroundColor(`transparent),
+                outline(`zero, `none, `transparent),
+                focus([color(Style.Colors.hyperlinkHover)]),
+                // The menu is always shown on full-size
+                media(NavStyle.MediaQuery.menu, [display(`none)]),
+              ]),
+            ])
+          )
+          id="nav-menu-btn">
+          {ReasonReact.string("Menu")}
+        </button>
+        <ul id="nav-menu" className=NavStyle.collapsedMenuItems>
+          ...children
+        </ul>
+        <RunScript>
+          {Printf.sprintf(
+             {|
+              var menuState = false;
+              var menuBtn = document.getElementById("nav-menu-btn");
+              function setMenuOpen(open) {
+                menuState = open;
+                document.getElementById("nav-menu").className =
+                  (open ? "%s" : "%s");
+              };
 
-  let menuText = merge([style([marginLeft(`rem(1.0))]), Link.basic]);
+              document.onclick = (e) => {
+                if (e.target != menuBtn) {
+                  var previousState = menuState;
+                  setMenuOpen(false);
+                }
+              };
 
-  let nav =
-    style([
-      display(`flex),
-      justifyContent(`spaceBetween),
-      alignItems(`center),
-      flexWrap(`wrap),
-      media(MediaQuery.statusLift, [flexWrap(`nowrap)]),
-    ]);
+              menuBtn.onclick = () => setMenuOpen(!menuState);
+            |},
+             NavStyle.expandedMenuItems,
+             NavStyle.collapsedMenuItems,
+           )}
+        </RunScript>
+      </>;
+    },
+  };
 };
 
 module Logo = {
@@ -107,7 +149,16 @@ let make = children => {
            </li>
          );
 
-    <nav className=NavStyle.nav>
+    <nav
+      className=Css.(
+        style([
+          display(`flex),
+          justifyContent(`spaceBetween),
+          alignItems(`center),
+          flexWrap(`wrap),
+          media(NavStyle.MediaQuery.statusLift, [flexWrap(`nowrap)]),
+        ])
+      )>
       <a
         href="/"
         className=Css.(
@@ -160,24 +211,8 @@ let make = children => {
             media(NavStyle.MediaQuery.menu, [width(`percent(50.0))]),
           ])
         )>
-        /* we use the input to get a :checked pseudo selector
-         * that we can use to get on-click without javascript at runtime */
-
-          <input
-            className=NavStyle.menuBtn
-            type_="checkbox"
-            id="nav-menu-btn"
-          />
-          <label className=NavStyle.menuIcon htmlFor="nav-menu-btn">
-            <span
-              className=Css.(
-                merge([NavStyle.menuText, style([NavStyle.bottomNudge])])
-              )>
-              {ReasonReact.string("Menu")}
-            </span>
-          </label>
-          <ul className=NavStyle.dropDownOptions> ...items </ul>
-        </div>
+        <DropdownMenu> ...items </DropdownMenu>
+      </div>
     </nav>;
   },
 };
