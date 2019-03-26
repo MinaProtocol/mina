@@ -253,12 +253,12 @@ module T = struct
              let total_coinbase_amount =
                Currency.Amount.var_of_t Protocols.Coda_praos.coinbase_amount
              in
-             let%bind rem_amount, `Underflow underflowed =
-               Currency.Amount.Checked.sub_flagged total_coinbase_amount amount
+             let%bind rem_amount =
+               Currency.Amount.Checked.sub total_coinbase_amount amount
              in
-             let%bind () = Boolean.Assert.is_true (Boolean.not underflowed) in
              let%bind amount1_equal_to_zero = equal_to_zero amount in
              let%bind amount2_equal_to_zero = equal_to_zero rem_amount in
+             (*TODO:Optimize here since we are pushing twice to the same stack*)
              let%bind stack_with_amount1 =
                Coinbase_stack.Stack.Checked.push stack
                  (pk, Amount.Signed.Checked.of_unsigned amount)
