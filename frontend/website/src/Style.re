@@ -34,6 +34,7 @@ module Colors = {
   let tealAlpha = a => `rgba((71, 130, 160, a));
 
   let rosebud = `rgb((163, 83, 111));
+  let midnight = `rgb((31, 45, 61));
 };
 
 module Typeface = {
