@@ -111,7 +111,6 @@ let make =
     <html
       className=Css.(
         style([
-          media(Style.MediaQuery.iphoneXorSmaller, [fontSize(`px(15))]),
           media(Style.MediaQuery.iphoneSEorSmaller, [fontSize(`px(13))]),
         ])
       )>
