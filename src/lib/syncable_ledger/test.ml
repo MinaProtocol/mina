@@ -49,6 +49,10 @@ struct
 
   let logger = Logger.null ()
 
+  let () =
+    Async.Scheduler.set_record_backtraces true ;
+    Core.Backtrace.elide := false
+
   let%test "full_sync_entirely_different" =
     let l1, _k1 = Ledger.load_ledger 1 1 in
     let l2, _k2 = Ledger.load_ledger num_accts 2 in
@@ -65,7 +69,10 @@ struct
     don't_wait_for
       (Linear_pipe.iter_unordered ~max_concurrency:3 qr
          ~f:(fun (root_hash, query) ->
-           let answ = Sync_responder.answer_query sr query in
+           let answ =
+             Option.value_exn ~message:"refused to answer query"
+               (Sync_responder.answer_query sr query)
+           in
            let%bind () =
              if match query with What_contents _ -> true | _ -> false then
                Clock_ns.after
@@ -114,7 +121,10 @@ struct
                  Sync_ledger.new_goal lsync !desired_root |> ignore ;
                  Deferred.unit )
                else
-                 let answ = Sync_responder.answer_query !sr query in
+                 let answ =
+                   Option.value_exn ~message:"refused to answer query"
+                     (Sync_responder.answer_query !sr query)
+                 in
                  Linear_pipe.write aw
                    (!desired_root, query, Envelope.Incoming.local answ)
              in
@@ -148,6 +158,100 @@ module Base_ledger_inputs = struct
 end
 
 (* Testing different ledger instantiations on Syncable_ledger *)
+
+module Db = struct
+  module Make (Depth : sig
+    val depth : int
+  end) =
+  struct
+    open Merkle_ledger_tests.Test_stubs
+
+    module Root_hash = struct
+      include Hash
+
+      let to_hash = Fn.id
+    end
+
+    module Base_ledger_inputs = struct
+      include Base_ledger_inputs
+      module Depth = Depth
+      module Location = Merkle_ledger.Location.Make (Depth)
+      module Kvdb = In_memory_kvdb
+    end
+
+    module Ledger = struct
+      include Merkle_ledger.Database.Make (Base_ledger_inputs)
+
+      type hash = Hash.t
+
+      type account = Account.t
+
+      type addr = Addr.t
+
+      let load_ledger num_accounts (balance : int) =
+        let ledger = create () in
+        let keys = Key.gen_keys num_accounts in
+        let currency_balance = Currency.Balance.of_int balance in
+        List.iter keys ~f:(fun key ->
+            let account = Account.create key currency_balance in
+            get_or_create_account_exn ledger key account |> ignore ) ;
+        (ledger, keys)
+    end
+
+    module Syncable_ledger_inputs = struct
+      module Addr = Ledger.Addr
+      module MT = Ledger
+      include Base_ledger_inputs
+
+      let account_subtree_height = 3
+    end
+
+    module Sync_ledger = Syncable_ledger.Make (Syncable_ledger_inputs)
+  end
+
+  module DB3 = Make (struct
+    let depth = 3
+  end)
+
+  module DB16 = Make (struct
+    let depth = 16
+  end)
+
+  module TestDB3_3 =
+    Make_test
+      (DB3)
+      (struct
+        let num_accts = 3
+      end)
+
+  module TestDB3_8 =
+    Make_test
+      (DB3)
+      (struct
+        let num_accts = 8
+      end)
+
+  module TestDB16_20 =
+    Make_test
+      (DB16)
+      (struct
+        let num_accts = 20
+      end)
+
+  module TestDB16_1024 =
+    Make_test
+      (DB16)
+      (struct
+        let num_accts = 1024
+      end)
+
+  module TestDB16_1026 =
+    Make_test
+      (DB16)
+      (struct
+        let num_accts = 1026
+      end)
+end
 
 module Mask = struct
   module Make (Input : sig
