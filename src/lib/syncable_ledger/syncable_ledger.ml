@@ -226,22 +226,25 @@ end = struct
         match
           let open Or_error.Let_syntax in
           let%bind lchild = Addr.child a Direction.Left in
-          let%map rchild = Addr.child a Direction.Right in
-          Answer.Child_hashes_are
-            ( MT.get_inner_hash_at_addr_exn mt lchild
-            , MT.get_inner_hash_at_addr_exn mt rchild )
+          let%bind rchild = Addr.child a Direction.Right in
+          Or_error.try_with (fun () ->
+              Answer.Child_hashes_are
+                ( MT.get_inner_hash_at_addr_exn mt lchild
+                , MT.get_inner_hash_at_addr_exn mt rchild ) )
         with
         | Ok answer -> Some answer
         | Error _ ->
             (* TODO: punish *)
             Logger.faulty_peer logger ~module_:__MODULE__ ~location:__LOC__
-              "Peer requested child hashes of invalid address!" ;
+              "Peer requested child hashes of invalid address $addr !"
+              ~metadata:[("addr", Addr.to_yojson a)] ;
             None )
       | What_contents a ->
           let addresses_and_accounts =
             List.sort ~compare:(fun (addr1, _) (addr2, _) ->
                 Addr.compare addr1 addr2 )
             @@ MT.get_all_accounts_rooted_at_exn mt a
+            (* can't actually throw *)
           in
           let addresses, accounts = List.unzip addresses_and_accounts in
           if not (List.is_empty addresses) then
