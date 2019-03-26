@@ -170,9 +170,12 @@ struct
        possible. *)
     let validation_ledger = get_validation_ledger_and_update t frontier in
     Logger.trace t.logger ~module_:__MODULE__ ~location:__LOC__
-      !"Diff: removed: %{sexp:User_command.t list} added: \
-        %{sexp:User_command.t list} from best tip"
-      removed_user_commands new_user_commands ;
+      ~metadata:
+        [ ( "removed"
+          , `List (List.map removed_user_commands ~f:User_command.to_yojson) )
+        ; ( "added"
+          , `List (List.map new_user_commands ~f:User_command.to_yojson) ) ]
+      "Diff: removed: $removed added: $added from best tip" ;
     let removed_set = User_command.Set.of_list removed_user_commands in
     let added_set = User_command.Set.of_list new_user_commands in
     let removed_but_not_added = User_command.Set.diff removed_set added_set in
@@ -354,10 +357,12 @@ struct
                     | Ok () ->
                         Logger.debug t.logger ~module_:__MODULE__
                           ~location:__LOC__
-                          !"Adding %{sexp: \
-                            User_command.With_valid_signature.t} to my pool \
-                            locally, and scheduling for rebroadcast"
-                          txn ;
+                          ~metadata:
+                            [ ( "user_cmd"
+                              , User_command.to_yojson (txn :> User_command.t)
+                              ) ]
+                          "Adding $user_cmd to my pool locally, and \
+                           scheduling for rebroadcast" ;
                         (add' pool txn, (txn :> User_command.t) :: acc)
                     | Error err ->
                         Logger.faulty_peer t.logger ~module_:__MODULE__
@@ -519,7 +524,7 @@ let%test_module _ =
           List.iter ~f:(Test.add pool) txs ;
           let%bind () =
             Broadcast_pipe.Writer.write best_tip_diff_w
-              {new_user_commands= [0; 3]; removed_user_commands= [5; 6]}
+              {new_user_commands= [0; 3; 4]; removed_user_commands= [4; 5; 6]}
           in
           assert_pool_txs [1; 2; 4; 5; 6] ;
           Deferred.return true )

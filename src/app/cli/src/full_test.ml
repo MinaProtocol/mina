@@ -98,7 +98,7 @@ let run_test () : unit Deferred.t =
       Main.start coda ;
       don't_wait_for
         (Strict_pipe.Reader.iter_without_pushback
-           (Main.strongest_ledgers coda)
+           (Main.verified_transitions coda)
            ~f:ignore) ;
       let wait_until_cond ~(f : t -> bool) ~(timeout : Float.t) =
         let rec go () =
