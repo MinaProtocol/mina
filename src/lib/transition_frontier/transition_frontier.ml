@@ -707,18 +707,18 @@ struct
         let distance_to_parent = node.length - root_node.length in
         let best_tip_node = Hashtbl.find_exn t.table t.best_tip in
         (* 3 *)
+        let best_tip_change =
+          Consensus.select
+            ~existing:(consensus_state_of_breadcrumb best_tip_node.breadcrumb)
+            ~candidate:(consensus_state_of_breadcrumb node.breadcrumb)
+            ~logger:
+              (Logger.create ()
+                 ~metadata:
+                   [ ( "selection context"
+                     , `String "comparing new breadcrumb to best tip" ) ])
+        in
         let added_to_best_tip_path, removed_from_best_tip_path =
-          match
-            Consensus.select
-              ~existing:
-                (consensus_state_of_breadcrumb best_tip_node.breadcrumb)
-              ~candidate:(consensus_state_of_breadcrumb breadcrumb)
-              ~logger:
-                (Logger.create ()
-                   ~metadata:
-                     [ ( "selection context"
-                       , `String "comparing new breadcrumb to best tip" ) ])
-          with
+          match best_tip_change with
           | `Keep -> ([], [])
           | `Take ->
               t.best_tip <- hash ;
@@ -839,17 +839,7 @@ struct
         in
         (* 5 *)
         Extensions.handle_diff t.extensions t.extension_writers
-          ( match
-              Consensus.select
-                ~existing:
-                  (consensus_state_of_breadcrumb best_tip_node.breadcrumb)
-                ~candidate:(consensus_state_of_breadcrumb breadcrumb)
-                ~logger:
-                  (Logger.create ()
-                     ~metadata:
-                       [ ( "selection context"
-                         , `String "comparing new breadcrumb to best tip" ) ])
-            with
+          ( match best_tip_change with
           | `Keep -> Transition_frontier_diff.New_breadcrumb node.breadcrumb
           | `Take ->
               Transition_frontier_diff.New_best_tip
