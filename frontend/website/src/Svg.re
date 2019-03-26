@@ -21,10 +21,11 @@ let make = (~link, ~dims, ~inline=false, ~className="", _children) => {
         );
       <div dangerouslySetInnerHTML={"__html": content} />;
     } else {
-      <svg
-        version="1.1"
-        baseProfile="full"
-        xmlns="http://www.w3.org/2000/svg"
+      <object
+        data=link
+        type_="image/svg+xml"
+        width={Js.Float.toString(Size.remX(dims)) ++ "rem"}
+        height={Js.Float.toString(Size.remY(dims)) ++ "rem"}
         className=Css.(
           merge([
             className,
@@ -33,12 +34,7 @@ let make = (~link, ~dims, ~inline=false, ~className="", _children) => {
               height(`rem(Size.remY(dims))),
             ]),
           ])
-        )>
-        <image
-          xlinkHref=link
-          width={Js.Float.toString(Size.remX(dims)) ++ "rem"}
-          height={Js.Float.toString(Size.remY(dims)) ++ "rem"}
-        />
-      </svg>;
+        )
+      />;
     },
 };
