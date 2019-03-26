@@ -25,7 +25,16 @@ module Digest = struct
           go init 0 ) }
 
   module T = struct
-    type t = string [@@deriving sexp, bin_io, compare, hash, yojson]
+    type t = string [@@deriving sexp, bin_io, compare, hash]
+
+    let to_yojson s = `String (Base64.encode_string s)
+
+    let of_yojson = function
+      | `String s -> (
+        match Base64.decode s with
+        | Ok s -> Ok s
+        | Error (`Msg e) -> Error (sprintf "bad base64: %s" e) )
+      | _ -> Error "expected `String"
   end
 
   let to_bits = Snarky_blake2.string_to_bits
