@@ -290,8 +290,6 @@ end = struct
       (t.tree).nodes <- [] ;
       recompute_tree t )
 
-  let has_unset_slots t = not @@ Int.Set.is_empty t.tree.unset_slots
-
   let merkle_root t =
     recompute_tree t ;
     if not (Int.Set.is_empty t.tree.unset_slots) then

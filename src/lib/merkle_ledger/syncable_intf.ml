@@ -29,12 +29,7 @@ module type S = sig
   (** Get all of the accounts that are in a subtree of the underlying Merkle
     tree rooted at `address`. The accounts are ordered by their addresses. *)
 
-  val has_unset_slots : t -> bool
-  (** In some ledgers, it's possible to preallocate account slots before filling
-      them in. Returns true if there are any unset slots, false otherwise. *)
-
   val merkle_root : t -> root_hash
-  (** Get the root hash of the ledger. May throw if there are unset slots. *)
 
   val make_space_for : t -> int -> unit
 end

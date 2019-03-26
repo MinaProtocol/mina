@@ -508,10 +508,9 @@ end = struct
                  answer was $answer"
         in
         if
-          (not (MT.has_unset_slots t.tree))
-          && Root_hash.equal
-               (Option.value_exn t.desired_root)
-               (MT.merkle_root t.tree)
+          Root_hash.equal
+            (Option.value_exn t.desired_root)
+            (MT.merkle_root t.tree)
         then (
           Logger.trace t.logger ~module_:__MODULE__ ~location:__LOC__
             "Snarked database sync'd. All done" ;

@@ -73,8 +73,6 @@ end = struct
     in
     loop location
 
-  let has_unset_slots _t = false
-
   let merkle_root _t = empty_hash_at_height Depth.depth
 
   let merkle_path_at_addr_exn t addr = merkle_path t (Location.Hash addr)
