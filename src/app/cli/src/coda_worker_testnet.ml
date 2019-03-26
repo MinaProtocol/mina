@@ -51,9 +51,9 @@ module Api = struct
     let worker = t.workers.(i) in
     if online t i then (
       let ongoing_rpcs, cond = t.locks.(i) in
-      ongoing_rpcs := !ongoing_rpcs + 1 ;
+      incr ongoing_rpcs ;
       let%map res = f ~worker arg in
-      ongoing_rpcs := !ongoing_rpcs - 1 ;
+      decr ongoing_rpcs ;
       if !ongoing_rpcs = 0 then Condition.broadcast cond () ;
       Some res )
     else return None
