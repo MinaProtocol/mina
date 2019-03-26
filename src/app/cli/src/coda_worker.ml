@@ -326,7 +326,7 @@ module T = struct
             { Main.Inputs.Net.Config.logger
             ; time_controller
             ; gossip_net_params=
-                { Main.Inputs.Net.Gossip_net.Config.timeout= Time.Span.of_sec 1.
+                { Main.Inputs.Net.Gossip_net.Config.timeout= Time.Span.of_sec 3.
                 ; target_peer_count= 8
                 ; conf_dir
                 ; initial_peers= peers
