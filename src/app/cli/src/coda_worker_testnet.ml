@@ -305,7 +305,7 @@ let events workers start_reader =
   let event_r, event_w = Linear_pipe.create () in
   let root_r, root_w = Linear_pipe.create () in
   let connect_worker i worker =
-    let%bind transitions = Coda_process.strongest_ledgers_exn worker in
+    let%bind transitions = Coda_process.verified_transitions_exn worker in
     let%bind roots = Coda_process.root_diff_exn worker in
     Linear_pipe.transfer transitions event_w ~f:(fun t -> `Transition (i, t))
     |> don't_wait_for ;
