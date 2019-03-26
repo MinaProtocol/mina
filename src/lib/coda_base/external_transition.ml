@@ -13,11 +13,19 @@ module type Base_intf = sig
 
   type staged_ledger_diff
 
+  type state_hash
+
+  type consensus_state
+
   val protocol_state : t -> protocol_state
 
   val protocol_state_proof : t -> protocol_state_proof
 
   val staged_ledger_diff : t -> staged_ledger_diff
+
+  val parent_hash : t -> state_hash
+
+  val consensus_state : t -> consensus_state
 end
 
 module type S = sig
@@ -40,6 +48,8 @@ module type S = sig
     with type protocol_state := Protocol_state.Value.t
      and type protocol_state_proof := Proof.t
      and type staged_ledger_diff := Staged_ledger_diff.t
+     and type consensus_state := Protocol_state.Consensus_state.Value.t
+     and type state_hash := State_hash.t
 
   module Stable :
     sig
@@ -56,12 +66,16 @@ module type S = sig
     with type protocol_state := Protocol_state.Value.t
      and type protocol_state_proof := Proof.t
      and type staged_ledger_diff := Staged_ledger_diff.t
+     and type consensus_state := Protocol_state.Consensus_state.Value.t
+     and type state_hash := State_hash.t
 
   module Verified :
     Base_intf
     with type protocol_state := Protocol_state.Value.t
      and type protocol_state_proof := Proof.t
      and type staged_ledger_diff := Staged_ledger_diff.t
+     and type consensus_state := Protocol_state.Consensus_state.Value.t
+     and type state_hash := State_hash.t
 
   val create :
        protocol_state:Protocol_state.Value.t
@@ -128,6 +142,12 @@ end)
         let equal t1 t2 =
           Protocol_state.Value.Stable.V1.equal t1.protocol_state
             t2.protocol_state
+
+        let consensus_state {protocol_state; _} =
+          Protocol_state.consensus_state protocol_state
+
+        let parent_hash {protocol_state; _} =
+          Protocol_state.previous_state_hash protocol_state
       end
 
       include T
@@ -176,4 +196,8 @@ end)
   let timestamp {protocol_state; _} =
     Protocol_state.blockchain_state (Obj.magic protocol_state)
     |> Blockchain_state.timestamp
+
+  let consensus_state = Stable.Latest.consensus_state
+
+  let parent_hash = Stable.Latest.parent_hash
 end

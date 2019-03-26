@@ -568,6 +568,27 @@ struct
 
   let max_length = Consensus.Constants.k
 
+  module Diff_hash = struct
+    open Digestif.SHA256
+
+    type t = ctx
+
+    let equal t1 t2 = eq (get t1) (get t2)
+
+    let empty = empty
+
+    let merge t1 string = feed_string t1 string
+  end
+
+  module Diff_mutant_inputs = struct
+    module Diff_hash = Diff_hash
+    module Scan_state = Staged_ledger.Scan_state
+    module External_transition = External_transition
+  end
+
+  module Diff_mutant =
+    Transition_frontier_persistence.Diff_mutant.Make (Diff_mutant_inputs)
+
   module Transition_frontier = Transition_frontier.Make (struct
     module Staged_ledger_aux_hash = Staged_ledger_aux_hash
     module Ledger_proof_statement = Ledger_proof_statement
@@ -576,6 +597,8 @@ struct
     module Staged_ledger_diff = Staged_ledger_diff
     module External_transition = External_transition
     module Staged_ledger = Staged_ledger
+    module Diff_hash = Diff_hash
+    module Diff_mutant = Diff_mutant
 
     let max_length = max_length
   end)

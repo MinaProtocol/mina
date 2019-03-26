@@ -215,28 +215,39 @@ struct
     module Best_tip_diff = Best_tip_diff.Make (Breadcrumb)
     module Root_diff = Root_diff.Make (Breadcrumb)
 
+    type diff_mutant = Inputs.Diff_mutant.e
+
+    module Persistence_diff = Persistence_diff.Make (struct
+      include Inputs
+      module Breadcrumb = Breadcrumb
+    end)
+
     type t =
       { root_history: Root_history.t
       ; snark_pool_refcount: Snark_pool_refcount.t
       ; best_tip_diff: Best_tip_diff.t
-      ; root_diff: Root_diff.t }
+      ; root_diff: Root_diff.t
+      ; persistence_diff: Persistence_diff.t }
     [@@deriving fields]
 
     let create () =
       { snark_pool_refcount= Snark_pool_refcount.create ()
       ; best_tip_diff= Best_tip_diff.create ()
       ; root_history= Root_history.create (2 * Inputs.max_length)
-      ; root_diff= Root_diff.create () }
+      ; root_diff= Root_diff.create ()
+      ; persistence_diff= Persistence_diff.create () }
 
     type writers =
       { snark_pool: Snark_pool_refcount.view Broadcast_pipe.Writer.t
       ; best_tip_diff: Best_tip_diff.view Broadcast_pipe.Writer.t
-      ; root_diff: Root_diff.view Broadcast_pipe.Writer.t }
+      ; root_diff: Root_diff.view Broadcast_pipe.Writer.t
+      ; persistence_diff: Persistence_diff.view Broadcast_pipe.Writer.t }
 
     type readers =
       { snark_pool: Snark_pool_refcount.view Broadcast_pipe.Reader.t
       ; best_tip_diff: Best_tip_diff.view Broadcast_pipe.Reader.t
-      ; root_diff: Root_diff.view Broadcast_pipe.Reader.t }
+      ; root_diff: Root_diff.view Broadcast_pipe.Reader.t
+      ; persistence_diff: Persistence_diff.view Broadcast_pipe.Reader.t }
     [@@deriving fields]
 
     let make_pipes () : readers * writers =
@@ -246,18 +257,24 @@ struct
         Broadcast_pipe.create (Best_tip_diff.initial_view ())
       and root_diff_reader, root_diff_writer =
         Broadcast_pipe.create (Root_diff.initial_view ())
+      and persistence_diff_reader, persistence_diff_writer =
+        Broadcast_pipe.create (Persistence_diff.initial_view ())
       in
       ( { snark_pool= snark_reader
         ; best_tip_diff= best_tip_reader
-        ; root_diff= root_diff_reader }
+        ; root_diff= root_diff_reader
+        ; persistence_diff= persistence_diff_reader }
       , { snark_pool= snark_writer
         ; best_tip_diff= best_tip_writer
-        ; root_diff= root_diff_writer } )
+        ; root_diff= root_diff_writer
+        ; persistence_diff= persistence_diff_writer } )
 
-    let close_pipes ({snark_pool; best_tip_diff; root_diff} : writers) =
+    let close_pipes
+        ({snark_pool; best_tip_diff; root_diff; persistence_diff} : writers) =
       Broadcast_pipe.Writer.close snark_pool ;
       Broadcast_pipe.Writer.close best_tip_diff ;
-      Broadcast_pipe.Writer.close root_diff
+      Broadcast_pipe.Writer.close root_diff ;
+      Broadcast_pipe.Writer.close persistence_diff
 
     let mb_write_to_pipe diff ext_t handle pipe =
       Option.value ~default:Deferred.unit
@@ -282,6 +299,8 @@ struct
           (use Snark_pool_refcount.handle_diff pipes.snark_pool)
         ~best_tip_diff:(use Best_tip_diff.handle_diff pipes.best_tip_diff)
         ~root_diff:(use Root_diff.handle_diff pipes.root_diff)
+        ~persistence_diff:
+          (use Persistence_diff.handle_diff pipes.persistence_diff)
   end
 
   module Node = struct
@@ -339,6 +358,9 @@ struct
     extension_readers.best_tip_diff
 
   let root_diff_pipe {extension_readers; _} = extension_readers.root_diff
+
+  let persistence_diff_pipe {extension_readers; _} =
+    extension_readers.persistence_diff
 
   (* TODO: load from and write to disk *)
   let create ~logger

@@ -64,5 +64,14 @@ module type Inputs_intf = sig
      and type transaction := Transaction.t
      and type user_command := User_command.t
 
+  module Diff_hash : Diff_hash
+
+  module Diff_mutant :
+    Diff_mutant
+    with type external_transition := External_transition.Stable.Latest.t
+     and type state_hash := State_hash.t
+     and type scan_state := Staged_ledger.Scan_state.t
+     and type hash := Diff_hash.t
+
   val max_length : int
 end

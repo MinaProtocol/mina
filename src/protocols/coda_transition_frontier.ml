@@ -19,6 +19,16 @@ module Transition_frontier_diff = struct
   [@@deriving sexp]
 end
 
+module type Diff_hash = sig
+  type t
+
+  val merge : t -> string -> t
+
+  val empty : t
+
+  val equal : t -> t -> bool
+end
+
 module type Diff_mutant = sig
   type external_transition
 
@@ -32,9 +42,11 @@ module type Diff_mutant = sig
       ; removed_transitions: state_hash list
       ; new_root: state_hash
       ; new_scan_state: scan_state }
+    [@@deriving to_yojson]
 
     type response =
       {parent: string; removed_transitions: string list; old_root_data: string}
+    [@@deriving to_yojson]
   end
 
   type _ t =
@@ -45,7 +57,13 @@ module type Diff_mutant = sig
 
   type hash
 
+  val yojson_of_key : 'a t -> Yojson.Safe.json
+
+  val yojson_of_value : 'a t -> 'a -> Yojson.Safe.json
+
   val hash : hash -> 'a t -> 'a -> hash
+
+  type e = E : 'a t -> e
 end
 
 (** An extension to the transition frontier that provides a view onto the data
@@ -73,7 +91,7 @@ module type Transition_frontier_extension_intf0 = sig
     -> transition_frontier_breadcrumb Transition_frontier_diff.t
     -> view Option.t
   (** Handle a transition frontier diff, and return the new version of the
-          computed view, if it's updated. *)
+            computed view, if it's updated. *)
 end
 
 (** The type of the view onto the changes to the current best tip. This type
@@ -313,10 +331,16 @@ module type Transition_frontier_intf = sig
       Transition_frontier_extension_intf
       with type view = user_command Root_diff_view.t
 
+    type diff_mutant
+
+    module Persistence_diff :
+      Transition_frontier_extension_intf with type view = diff_mutant option
+
     type readers =
       { snark_pool: Snark_pool_refcount.view Broadcast_pipe.Reader.t
       ; best_tip_diff: Best_tip_diff.view Broadcast_pipe.Reader.t
-      ; root_diff: Root_diff.view Broadcast_pipe.Reader.t }
+      ; root_diff: Root_diff.view Broadcast_pipe.Reader.t
+      ; persistence_diff: Persistence_diff.view Broadcast_pipe.Reader.t }
     [@@deriving fields]
   end
 
@@ -327,6 +351,9 @@ module type Transition_frontier_intf = sig
     t -> Extensions.Best_tip_diff.view Broadcast_pipe.Reader.t
 
   val root_diff_pipe : t -> Extensions.Root_diff.view Broadcast_pipe.Reader.t
+
+  val persistence_diff_pipe :
+    t -> Extensions.Persistence_diff.view Broadcast_pipe.Reader.t
 
   val visualize : filename:string -> t -> unit
 

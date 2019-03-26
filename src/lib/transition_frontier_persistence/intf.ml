@@ -14,20 +14,8 @@ module type Transition_database_schema = sig
     | Root : (state_hash * scan_state) t
 end
 
-module type Inputs = sig
+module type Base_inputs = sig
   include Transition_frontier.Inputs_intf
-
-  val max_length : int
-
-  module Transition_storage : sig
-    module Schema :
-      Transition_database_schema
-      with type external_transition := External_transition.Stable.Latest.t
-       and type state_hash := State_hash.Stable.Latest.t
-       and type scan_state := Staged_ledger.Scan_state.Stable.Latest.t
-
-    include Rocksdb.Serializable.GADT.S with type 'a g := 'a Schema.t
-  end
 
   module Transition_frontier :
     Transition_frontier_intf
@@ -41,6 +29,20 @@ module type Inputs = sig
      and type consensus_local_state := Consensus.Local_state.t
      and type user_command := User_command.t
      and module Extensions.Work = Transaction_snark_work.Statement
+end
+
+module type Worker_inputs = sig
+  include Base_inputs
+
+  module Transition_storage : sig
+    module Schema :
+      Transition_database_schema
+      with type external_transition := External_transition.Stable.Latest.t
+       and type state_hash := State_hash.Stable.Latest.t
+       and type scan_state := Staged_ledger.Scan_state.Stable.Latest.t
+
+    include Rocksdb.Serializable.GADT.S with type 'a g := 'a Schema.t
+  end
 end
 
 module type Frontier_diff = sig
@@ -61,7 +63,7 @@ module type Frontier_diff = sig
   type t = Add_transition of add_transition | Move_root of move_root
 end
 
-module type S = sig
+module type Worker = sig
   type external_transition
 
   type scan_state
@@ -76,12 +78,7 @@ module type S = sig
 
   type hash
 
-  module Diff_mutant :
-    Diff_mutant
-    with type external_transition := external_transition
-     and type state_hash := state_hash
-     and type scan_state := scan_state
-     and type hash := hash
+  type 'a diff
 
   type t
 
@@ -94,5 +91,19 @@ module type S = sig
   val deserialize :
     t -> consensus_local_state:Consensus.Local_state.t -> frontier Deferred.t
 
-  val handle_diff : t -> hash -> 'a Diff_mutant.t -> hash
+  val handle_diff : t -> hash -> 'a diff -> hash
+end
+
+(* TODO: Make an RPC_parallel version of Worker.ml *)
+module type Main_inputs = sig
+  include Base_inputs
+
+  module Worker : sig
+    type t
+
+    val handle_diff :
+      t -> Diff_hash.t -> 'a Diff_mutant.t -> Diff_hash.t Deferred.Or_error.t
+  end
+
+  val diff_mutant_reader : Diff_mutant.e Pipe_lib.Broadcast_pipe.Reader.t
 end

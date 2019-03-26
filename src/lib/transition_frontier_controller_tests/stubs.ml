@@ -155,7 +155,19 @@ struct
   module Blockchain_state = External_transition.Protocol_state.Blockchain_state
   module Protocol_state = External_transition.Protocol_state
 
-  module Transition_frontier_inputs = struct
+  module Diff_hash = struct
+    open Digestif.SHA256
+
+    type t = ctx
+
+    let equal t1 t2 = eq (get t1) (get t2)
+
+    let empty = empty
+
+    let merge t1 string = feed_string t1 string
+  end
+
+  module Diff_mutant_inputs = struct
     module Staged_ledger_aux_hash = Staged_ledger_aux_hash
     module Ledger_proof_statement = Ledger_proof_statement
     module Ledger_proof = Ledger_proof
@@ -163,6 +175,16 @@ struct
     module Staged_ledger_diff = Staged_ledger_diff
     module External_transition = External_transition
     module Staged_ledger = Staged_ledger
+    module Diff_hash = Diff_hash
+    module Scan_state = Staged_ledger.Scan_state
+  end
+
+  module Diff_mutant =
+    Transition_frontier_persistence.Diff_mutant.Make (Diff_mutant_inputs)
+
+  module Transition_frontier_inputs = struct
+    include Diff_mutant_inputs
+    module Diff_mutant = Diff_mutant
 
     let max_length = Inputs.max_length
   end
