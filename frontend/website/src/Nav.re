@@ -18,7 +18,7 @@ module NavStyle = {
       display(`none),
       // when it's not hidden, make the dropdown appear
       position(`absolute),
-      right(`rem(0.0)),
+      right(`rem(1.0)),
       top(`rem(0.0)),
       backgroundColor(Colors.white),
       // always visible and flexed on full
@@ -28,11 +28,26 @@ module NavStyle = {
           display(`flex),
           justifyContent(`spaceBetween),
           position(`static),
-          alignItems(`center),
+          alignItems(`flexStart),
           width(`percent(100.0)),
         ],
       ),
     ]);
+
+  let triangle = (c, offset) => [
+    unsafe("content", ""),
+    width(`zero),
+    height(`zero),
+    position(`absolute),
+    borderLeft(`px(4 + offset), `solid, c),
+    borderRight(`px(4 + offset), `solid, transparent),
+    borderTop(`px(4 + offset), `solid, c),
+    borderBottom(`px(4 + offset), `solid, transparent),
+    right(`px(15 - offset)),
+    top(`px((-3) - offset)),
+    transforms([`rotate(`deg(45))]),
+    media(MediaQuery.menu, [display(`none)]),
+  ];
 
   let expandedMenuItems =
     merge([
@@ -58,6 +73,20 @@ module NavStyle = {
             maxWidth(`rem(10.)),
             flexDirection(`column),
             alignItems(`flexStart),
+            before(
+              triangle(Style.Colors.hyperlinkHover, 1)
+              @ [
+                boxShadow(
+                  ~x=`zero,
+                  ~y=`zero,
+                  ~blur=`px(12),
+                  ~spread=`zero,
+                  `rgba((0, 0, 0, 0.12)),
+                ),
+                zIndex(-10),
+              ],
+            ),
+            after(triangle(white, 0) @ []),
           ],
         ),
       ]),

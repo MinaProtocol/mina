@@ -1,7 +1,8 @@
 let menuStyle =
-  Style.paddingX(`zero)
+  Style.paddingX(`rem(1.5))
   @ Css.[
       height(`auto),
+      margin(`zero),
       borderWidth(`zero),
       Style.Typeface.ibmplexsans,
       color(Style.Colors.hyperlink),
@@ -85,7 +86,11 @@ module SignupButton = {
         )>
         <span
           className=Css.(
-            style([marginLeft(`rem(0.25)), marginRight(`rem(0.0625))])
+            style([
+              marginLeft(`rem(0.25)),
+              marginRight(`rem(0.0625)),
+              media(Nav.NavStyle.MediaQuery.menuMax, [margin(`zero)]),
+            ])
           )>
           {ReasonReact.string(name)}
         </span>
