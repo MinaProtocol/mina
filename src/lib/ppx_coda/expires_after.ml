@@ -9,7 +9,7 @@ open Asttypes
 
     Usage: [%%expires_after "20201231"]
 
-    There will be a compile-time error if 
+    There will be a compile-time error if
       - the date of compilation is past the given date, or
       - the date is not of the form YYYYMMDD
  *)

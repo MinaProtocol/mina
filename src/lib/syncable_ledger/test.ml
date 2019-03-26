@@ -206,7 +206,7 @@ module Ledger = struct
     let depth = 10
   end)
 
-  (* 
+  (*
   TODO : put this test along with other lengthy tests
 
   See issue #1088 in Github.

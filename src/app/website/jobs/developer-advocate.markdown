@@ -7,7 +7,7 @@ O(1) Labs is aiming to develop the first cryptocurrency protocol that can delive
 
 We're bringing Coda Protocol to market, a cryptocurrency that compresses the blockchain from hundreds of gigabytes down to the size of a few tweets. It can scale to thousands of transactions per second and millions of users while remaining decentralized enough for cellphones to be fully verifying nodes.
 
-We’re working on technologies with the potential to reimagine social structures, and ramifications that could match the influence of the internet’s development. We believe it’s important to incorporate diverse perspectives from conception through realization. 
+We’re working on technologies with the potential to reimagine social structures, and ramifications that could match the influence of the internet’s development. We believe it’s important to incorporate diverse perspectives from conception through realization.
 
 Coda enables a new class of applications where users can securely and frictionlessly interact with the network while developers can add functionality to their applications in a few lines of client-side code. We're looking for someone who wants to work hand-in-hand with a vibrant developer community to create a new generation of cryptocurrency-enabled applications.
 

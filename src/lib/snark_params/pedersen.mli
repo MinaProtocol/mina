@@ -65,17 +65,17 @@ module type S = sig
       -> get_chunk_table:chunk_table_fun
       -> t
 
-    val update_fold_chunked : t -> bool Triple.t Fold.t -> t
     (** use precomputed table of curve values *)
+    val update_fold_chunked : t -> bool Triple.t Fold.t -> t
 
-    val update_fold_unchunked : t -> bool Triple.t Fold.t -> t
     (** compute hash one triple at a time *)
+    val update_fold_unchunked : t -> bool Triple.t Fold.t -> t
 
-    val update_fold : t -> bool Triple.t Fold.t -> t
     (** dispatches to chunked or unchunked (default) version *)
+    val update_fold : t -> bool Triple.t Fold.t -> t
 
-    val set_chunked_fold : bool -> unit
     (** use chunked folding iff b; called by daemon startup to use chunked version *)
+    val set_chunked_fold : bool -> unit
 
     val digest : t -> Digest.t
 
