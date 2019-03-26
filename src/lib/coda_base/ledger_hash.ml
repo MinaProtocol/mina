@@ -149,6 +149,15 @@ let modify_account_recv t pk ~f =
       return account_not_there )
     ~f:(fun is_empty_and_writeable x -> f ~is_empty_and_writeable x)
 
+(*
+  [get_account_and_update_participation t addr] implements the following spec:
+
+  1. finds an account [prev] at path [addr]
+  2. sets the participation bit of the account to true [next]
+  3. returns
+    a) account [prev] at addr (before setting the participation bit)
+    b) the root [t'] which has the updated account [next] at [addr]
+*)
 let get_account_and_update_pariticipation t addr =
   let open Let_syntax in
   let%bind prev, prev_path =

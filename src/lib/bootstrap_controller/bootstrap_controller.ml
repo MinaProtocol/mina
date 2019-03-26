@@ -329,6 +329,7 @@ end = struct
             ~root_snarked_ledger:synced_db ~root_staged_ledger
             ~consensus_local_state:
               (Transition_frontier.consensus_local_state frontier)
+          (*TODO: consensus local state also needs to be synced*)
         in
         Logger.info logger ~module_:__MODULE__ ~location:__LOC__
           "Bootstrap state: complete." ;

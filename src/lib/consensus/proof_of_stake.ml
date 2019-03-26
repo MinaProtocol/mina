@@ -819,6 +819,7 @@ module Epoch_data = struct
     ; length= Length.of_int 1
     ; participated_stake= Amount.zero }
 
+  (*TODO: update the participation bit in the epoch ledger*)
   let update_pair (last_data, curr_data) epoch_length ~prev_epoch ~next_epoch
       ~prev_slot ~prev_protocol_state_hash ~proposer_vrf_result
       ~snarked_ledger_hash ~total_currency ~delegator_addr ~local_state =
@@ -842,13 +843,22 @@ module Epoch_data = struct
             Or_error.error_string
               "No snapshot found to retrieve delegator's balance"
         | Some snapshot ->
+            let snapshot_ledger_hash =
+              Coda_base.(
+                Frozen_ledger_hash.of_ledger_hash
+                @@ Sparse_ledger.merkle_root snapshot.ledger)
+            in
             if
               Coda_base.Frozen_ledger_hash.equal curr_epoch_data.ledger.hash
-                Coda_base.(
-                  Frozen_ledger_hash.of_ledger_hash
-                  @@ Sparse_ledger.merkle_root snapshot.ledger)
+                snapshot_ledger_hash
             then Ok snapshot.ledger
-            else Or_error.error_string "Invalid ledger"
+            else
+              Or_error.error_string
+                (Format.asprintf
+                   !"Invalid epoch ledger. Expected hash: %{sexp: \
+                     Coda_base.Frozen_ledger_hash.t} got: %{sexp: \
+                     Coda_base.Frozen_ledger_hash.t}"
+                   curr_epoch_data.ledger.hash snapshot_ledger_hash)
       in
       Coda_base.Sparse_ledger.get_exn epoch_ledger delegator_addr
     in
@@ -874,7 +884,7 @@ module Epoch_data = struct
         , prev_protocol_state_hash )
       else (curr_data.seed, curr_data.lock_checkpoint)
     in
-    let%bind delegator = delegator_account curr_data in
+    let%bind delegator = delegator_account last_data in
     let%map new_participated_stake =
       if delegator.participated then Ok curr_data.participated_stake
       else
@@ -1831,10 +1841,25 @@ let next_proposal now (state : Consensus_state.Value.t) ~local_state ~keypair
              in local state"
             source
       | Some snapshot ->
-          Logger.info logger ~module_:__MODULE__ ~location:__LOC__
-            !"using %s_epoch_snapshot root hash %{sexp:Coda_base.Ledger_hash.t}"
-            source
-            (Coda_base.Sparse_ledger.merkle_root snapshot.ledger) ) ;
+          let snapshot_ledger_hash =
+            Coda_base.(
+              Frozen_ledger_hash.of_ledger_hash
+              @@ Sparse_ledger.merkle_root snapshot.ledger)
+          in
+          if
+            Coda_base.Frozen_ledger_hash.equal epoch_data.ledger.hash
+              snapshot_ledger_hash
+          then
+            Logger.info logger ~module_:__MODULE__ ~location:__LOC__
+              !"using %s_epoch_snapshot root hash \
+                %{sexp:Coda_base.Frozen_ledger_hash.t}"
+              source snapshot_ledger_hash
+          else
+            failwithf
+              !"Invalid epoch ledger. Expected hash: %{sexp: \
+                Coda_base.Frozen_ledger_hash.t} got: %{sexp: \
+                Coda_base.Frozen_ledger_hash.t}"
+              epoch_data.ledger.hash snapshot_ledger_hash () ) ;
       snapshot
     in
     let proposal_data slot =
