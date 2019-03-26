@@ -384,7 +384,7 @@ module Make (Inputs : Inputs_intf) = struct
     ; transaction_pool: Transaction_pool.t
     ; snark_pool: Snark_pool.t
     ; transition_frontier: Transition_frontier.t option Broadcast_pipe.Reader.t
-    ; strongest_ledgers:
+    ; verified_transitions:
         (External_transition.Verified.t, Protocol_state_hash.t) With_hash.t
         Strict_pipe.Reader.t
     ; proposer_transition_writer:
@@ -502,7 +502,7 @@ module Make (Inputs : Inputs_intf) = struct
     let%bind sl = best_staged_ledger_opt t in
     Staged_ledger.current_ledger_proof sl
 
-  let strongest_ledgers t = t.strongest_ledgers
+  let verified_transitions t = t.verified_transitions
 
   let root_diff t =
     let root_diff_reader, root_diff_writer =
@@ -744,7 +744,7 @@ module Make (Inputs : Inputs_intf) = struct
               ; time_controller= config.time_controller
               ; external_transitions_writer=
                   Strict_pipe.Writer.to_linear_pipe external_transitions_writer
-              ; strongest_ledgers= valid_transitions_for_api
+              ; verified_transitions= valid_transitions_for_api
               ; logger= config.logger
               ; seen_jobs= Work_selector.State.init
               ; staged_ledger_transition_backup_capacity=
