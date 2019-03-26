@@ -145,7 +145,8 @@ module Verification : sig
 end
 
 val check_transaction :
-     sok_message:Sok_message.t
+     ?preeval:bool
+  -> sok_message:Sok_message.t
   -> source:Frozen_ledger_hash.t
   -> target:Frozen_ledger_hash.t
   -> Transaction.t
@@ -161,7 +162,8 @@ val check_user_command :
   -> unit
 
 val generate_transaction_witness :
-     sok_message:Sok_message.t
+     ?preeval:bool
+  -> sok_message:Sok_message.t
   -> source:Frozen_ledger_hash.t
   -> target:Frozen_ledger_hash.t
   -> Transaction.t
@@ -172,7 +174,8 @@ module type S = sig
   include Verification.S
 
   val of_transaction :
-       sok_digest:Sok_message.Digest.t
+       ?preeval:bool
+    -> sok_digest:Sok_message.Digest.t
     -> source:Frozen_ledger_hash.t
     -> target:Frozen_ledger_hash.t
     -> Transaction.t
