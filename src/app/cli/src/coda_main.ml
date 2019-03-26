@@ -327,6 +327,8 @@ module type Main_intf = sig
 
   val best_ledger : t -> Inputs.Ledger.t Participating_state.t
 
+  val root_length : t -> int Participating_state.t
+
   val best_protocol_state :
     t -> Consensus.Protocol_state.Value.t Participating_state.t
 
@@ -1359,7 +1361,7 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
     let frontier_file = conf_dir ^/ "frontier.dot" in
     let mask_file = conf_dir ^/ "registered_masks.dot" in
     Logger.info logger ~module_:__MODULE__ ~location:__LOC__ "%s"
-      (Visualization_message.success "registered masks" frontier_file) ;
+      (Visualization_message.success "registered masks" mask_file) ;
     Coda_base.Ledger.Debug.visualize ~filename:mask_file ;
     match visualize_frontier ~filename:frontier_file t with
     | `Active () ->

@@ -7,9 +7,9 @@ open Pipe_lib
 include Coda_transition_frontier
 
 module type Security_intf = sig
-  val max_depth : [`Infinity | `Finite of int]
   (** In production we set this to (hopefully a prefix of) k for our consensus
    * mechanism; infinite is for tests *)
+  val max_depth : [`Infinity | `Finite of int]
 end
 
 module type Time_controller_intf = sig

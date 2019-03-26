@@ -108,7 +108,7 @@ module Make_version (Version : Version_intf) = struct
 
      deserializing gives back just t, without the version
 
-     that allows use of a type from a versioned module in data structures 
+     that allows use of a type from a versioned module in data structures
        that themselves derive bin_io
    *)
 
