@@ -14,6 +14,9 @@ positive-tests : unexpired.ml
 	@ echo -n "Versioned type, should succeed..."
 	@ dune build versioned_good.cma > /dev/null 2>&1
 	@ echo "OK"
+	@ echo -n "Versioned type with deriving option, should succeed..."
+	@ dune build versioned_good_with_option.cma > /dev/null 2>&1
+	@ echo "OK"
 
 negative-tests :
 	@ echo -n "Expired, should fail..."
@@ -36,4 +39,7 @@ negative-tests :
 	@ echo "OK"
 	@ echo -n "Versioned type has wrong name, should fail..."
 	@ ! dune build versioned_bad_type_name.cma > /dev/null 2>&1
+	@ echo "OK"
+	@ echo -n "Versioned type with option, bad module structure, should fail..."
+	@ ! dune build versioned_bad_with_option.cma > /dev/null 2>&1
 	@ echo "OK"
