@@ -170,7 +170,10 @@ module Graphic = {
               size="22kB"
               label="Fixed"
               textColor=Style.Colors.bluishGreen>
-              Small.svg
+              <Image
+                className={style([width(`rem(0.625))])}
+                name="/static/img/coda-icon"
+              />
             </Info>
             <Info
               sizeEmphasis=true
