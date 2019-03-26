@@ -147,7 +147,7 @@ module Api = struct
         )
       t i
 
-  let teardown t = Deferred.List.iter t.workers ~f:Coda_process.disconnect
+  let teardown t = Deferred.List.iteri t.workers ~f:(fun i _ -> stop t i)
 end
 
 (** the prefix check keeps track of the "best path" for each worker. the
