@@ -5,26 +5,52 @@ module Code = {
   let make = (~src, _children) => {
     ...component,
     render: _self =>
-      <pre
+      <div
         className=Css.(
-          style(
-            Style.paddingX(`rem(1.0))
-            @ Style.paddingY(`rem(1.0))
-            @ [
-              backgroundColor(Style.Colors.navy),
-              color(Style.Colors.white),
-              Style.Typeface.ibmplexsans,
-              fontSize(`rem(0.8125)),
-              borderRadius(`px(12)),
-              lineHeight(`rem(1.25)),
-              // nudge so code background looks nicer
-              marginRight(`rem(0.25)),
-              marginLeft(`rem(0.25)),
-            ],
-          )
+          style([
+            display(`block),
+            position(`relative),
+            media(Style.MediaQuery.veryLarge, [width(`percent(40.0))]),
+            before([
+              contentRule(""),
+              display(`none),
+              media(
+                Style.MediaQuery.veryLarge,
+                [
+                  display(`block),
+                  position(`absolute),
+                  top(`percent(50.0)),
+                  left(`percent(11.4)), // determined experimentally
+                  width(`percent(100.0)),
+                  height(`rem(0.125)),
+                  backgroundColor(Style.Colors.navy),
+                ],
+              ),
+            ]),
+          ])
         )>
-        {ReasonReact.string(src)}
-      </pre>,
+        <pre
+          className=Css.(
+            style(
+              Style.paddingX(`rem(1.0))
+              @ Style.paddingY(`rem(1.0))
+              @ [
+                backgroundColor(Style.Colors.navy),
+                color(Style.Colors.white),
+                Style.Typeface.ibmplexsans,
+                fontSize(`rem(0.8125)),
+                borderRadius(`px(12)),
+                lineHeight(`rem(1.25)),
+                // nudge so code background looks nicer
+                marginRight(`rem(0.25)),
+                marginLeft(`rem(0.25)),
+                media(Style.MediaQuery.notMobile, [width(`rem(23.0))]),
+              ],
+            )
+          )>
+          {ReasonReact.string(src)}
+        </pre>
+      </div>,
   };
 };
 

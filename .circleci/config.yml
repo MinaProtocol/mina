@@ -313,11 +313,20 @@ jobs:
                   name: Running test -- test_postake_split_snarkless:coda-shared-prefix-test -who-proposes 1
                   command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run "test_postake_split_snarkless:coda-shared-prefix-test -who-proposes 1"'
             - run:
-                  name: Running test -- test_postake_split_snarkless:coda-shared-state-test
-                  command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run "test_postake_split_snarkless:coda-shared-state-test"'
-            - run:
                   name: Running test -- test_postake_split_snarkless:coda-restart-node-test
                   command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run "test_postake_split_snarkless:coda-restart-node-test"'
+            - store_artifacts:
+                  path: test_logs
+    test--test_postake_txns:
+        resource_class: large
+        docker:
+            - image: codaprotocol/coda:toolchain-af1380e0f6c8726391d82b2adb6a2a3b20dd46a0
+        steps:
+            - checkout
+            - run: git submodule sync && git submodule update --init --recursive
+            - run:
+                  name: Running test -- test_postake_txns:coda-shared-state-test
+                  command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run "test_postake_txns:coda-shared-state-test"'
             - store_artifacts:
                   path: test_logs
 
@@ -345,3 +354,4 @@ workflows:
             - test--test_postake_snarkless
             - test--test_postake_split
             - test--test_postake_split_snarkless
+            - test--test_postake_txns
