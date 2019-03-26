@@ -21,7 +21,7 @@ module Api = struct
         [`On of [`Synced of user_cmds_under_inspection | `Catchup] | `Off]
         Array.t
     ; locks: (int ref * unit Condition.t) Array.t
-    (** The int counts the number of ongoing RPCs. when it is 0, it is safe to take the worker offline.
+          (** The int counts the number of ongoing RPCs. when it is 0, it is safe to take the worker offline.
         [stop] below will set the status to `Off, and we only try doing an RPC if the status is `On,
         so eventually the counter _must_ become 0, ensuring progress. *)
     }
@@ -34,7 +34,9 @@ module Api = struct
           in
           `On (`Synced user_cmds_under_inspection) )
     in
-    let locks = Array.init (List.length workers) (fun _ -> ref 0, Condition.create ()) in
+    let locks =
+      Array.init (List.length workers) (fun _ -> (ref 0, Condition.create ()))
+    in
     {workers; configs; start_writer; status; locks}
 
   let online t i = match t.status.(i) with `On _ -> true | `Off -> false
@@ -47,17 +49,13 @@ module Api = struct
 
   let run_online_worker ~f ~arg t i =
     let worker = List.nth_exn t.workers i in
-    if online t i then
-    (
+    if online t i then (
       let ongoing_rpcs, cond = t.locks.(i) in
       ongoing_rpcs := !ongoing_rpcs + 1 ;
       let%map res = f ~worker arg in
       ongoing_rpcs := !ongoing_rpcs - 1 ;
-      if !ongoing_rpcs = 0 then
-        Condition.broadcast cond ()
-      ;
-      Some res
-    )
+      if !ongoing_rpcs = 0 then Condition.broadcast cond () ;
+      Some res )
     else return None
 
   let get_balance t i pk =
@@ -72,8 +70,8 @@ module Api = struct
 
   let best_path t i =
     run_online_worker ~arg:()
-    ~f:(fun ~worker () -> Coda_process.best_path worker)
-    t i
+      ~f:(fun ~worker () -> Coda_process.best_path worker)
+      t i
 
   let start t i =
     Linear_pipe.write t.start_writer
@@ -95,10 +93,8 @@ module Api = struct
     t.status.(i) <- `Off ;
     let ongoing_rpcs, lock = t.locks.(i) in
     let rec wait_for_no_rpcs () =
-      if !ongoing_rpcs = 0 then
-        Deferred.unit
-      else
-        Deferred.bind (Condition.wait lock) ~f:(wait_for_no_rpcs)
+      if !ongoing_rpcs = 0 then Deferred.unit
+      else Deferred.bind (Condition.wait lock) ~f:wait_for_no_rpcs
     in
     let%bind () = wait_for_no_rpcs () in
     Coda_process.disconnect (List.nth_exn t.workers i)
@@ -242,14 +238,12 @@ let start_prefix_check logger workers events testnet ~acceptable_delay =
     (Deferred.ignore
        (Linear_pipe.fold ~init:chains all_transitions_r
           ~f:(fun chains (_, _, i) ->
-              let%map path =
-                Api.best_path testnet i
-              in
-              Option.value_map path ~default:chains ~f:(fun path ->
-              chains.(i) <- path ;
-              last_time := Time.now () ;
-              check_chains chains ;
-              chains )))) ;
+            let%map path = Api.best_path testnet i in
+            Option.value_map path ~default:chains ~f:(fun path ->
+                chains.(i) <- path ;
+                last_time := Time.now () ;
+                check_chains chains ;
+                chains ) ))) ;
   don't_wait_for
     (Linear_pipe.iter events ~f:(function `Transition (i, (prev, curr)) ->
          Linear_pipe.write all_transitions_w (prev, curr, i) ))
@@ -334,7 +328,8 @@ let events workers start_reader =
 
 let start_checks logger workers start_reader testnet ~acceptable_delay =
   let event_reader, root_reader = events workers start_reader in
-  start_prefix_check logger workers event_reader testnet ~acceptable_delay |> don't_wait_for;
+  start_prefix_check logger workers event_reader testnet ~acceptable_delay
+  |> don't_wait_for ;
   start_payment_check logger root_reader workers testnet
 
 (* note: this is very declarative, maybe this should be more imperative? *)
