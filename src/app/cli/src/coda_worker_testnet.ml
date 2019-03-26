@@ -12,7 +12,7 @@ module Api = struct
   type user_cmds_under_inspection = (User_command.t, user_cmd_status) Hashtbl.t
 
   type t =
-    { workers: Coda_process.t list
+    { workers: Coda_process.t Array.t
     ; configs: Coda_worker.Input.t list
     ; start_writer:
         (int * Coda_worker.Input.t * (unit -> unit) * (unit -> unit))
@@ -28,14 +28,14 @@ module Api = struct
 
   let create configs workers start_writer =
     let status =
-      Array.init (List.length workers) ~f:(fun _ ->
+      Array.init (Array.length workers) ~f:(fun _ ->
           let user_cmds_under_inspection =
             Hashtbl.create (module User_command)
           in
           `On (`Synced user_cmds_under_inspection) )
     in
     let locks =
-      Array.init (List.length workers) (fun _ -> (ref 0, Condition.create ()))
+      Array.init (Array.length workers) (fun _ -> (ref 0, Condition.create ()))
     in
     {workers; configs; start_writer; status; locks}
 
@@ -48,7 +48,7 @@ module Api = struct
     | `Off -> false
 
   let run_online_worker ~f ~arg t i =
-    let worker = List.nth_exn t.workers i in
+    let worker = t.workers.(i) in
     if online t i then (
       let ongoing_rpcs, cond = t.locks.(i) in
       ongoing_rpcs := !ongoing_rpcs + 1 ;
@@ -97,12 +97,12 @@ module Api = struct
       else Deferred.bind (Condition.wait lock) ~f:wait_for_no_rpcs
     in
     let%bind () = wait_for_no_rpcs () in
-    Coda_process.disconnect (List.nth_exn t.workers i)
+    Coda_process.disconnect t.workers.(i)
 
   let send_payment t i ?acceptable_delay:(delay = 7) sender_sk receiver_pk
       amount fee =
     let open Deferred.Option.Let_syntax in
-    let worker = List.nth_exn t.workers i in
+    let worker = t.workers.(i) in
     let sender_pk =
       Public_key.of_private_key_exn sender_sk |> Public_key.compress
     in
@@ -147,7 +147,8 @@ module Api = struct
         )
       t i
 
-  let teardown t = Deferred.List.iteri t.workers ~f:(fun i _ -> stop t i)
+  let teardown t =
+    Deferred.Array.iteri ~how:`Parallel t.workers ~f:(fun i _ -> stop t i)
 end
 
 (** the prefix check keeps track of the "best path" for each worker. the
@@ -159,8 +160,8 @@ end
 let start_prefix_check logger workers events testnet ~acceptable_delay =
   let all_transitions_r, all_transitions_w = Linear_pipe.create () in
   let%map chains =
-    Deferred.Array.init (List.length workers) (fun i ->
-        Coda_process.best_path (List.nth_exn workers i) )
+    Deferred.Array.init (Array.length workers) (fun i ->
+        Coda_process.best_path workers.(i) )
   in
   let check_chains (chains : State_hash.Stable.Latest.t list array) =
     let online_chains =
@@ -188,7 +189,10 @@ let start_prefix_check logger workers events testnet ~acceptable_delay =
     with
     | Some hashes_in_common ->
         if Hash_set.is_empty hashes_in_common then
-          (let%bind tfs = Deferred.List.map workers ~f:Coda_process.dump_tf in
+          (let%bind tfs =
+             Deferred.Array.map workers ~f:Coda_process.dump_tf
+             >>| Array.to_list
+           in
            Logger.fatal logger ~module_:__MODULE__ ~location:__LOC__
              "best paths diverged completely, network is forked"
              ~metadata:
@@ -311,6 +315,7 @@ let events workers start_reader =
     (Linear_pipe.iter start_reader ~f:(fun (i, config, started, synced) ->
          don't_wait_for
            (let%bind worker = Coda_process.spawn_exn config in
+            workers.(i) <- worker ;
             started () ;
             don't_wait_for
               (let ms_to_catchup =
@@ -323,10 +328,11 @@ let events workers start_reader =
                synced ()) ;
             connect_worker i worker) ;
          Deferred.unit )) ;
-  List.iteri workers ~f:(fun i w -> don't_wait_for (connect_worker i w)) ;
+  Array.iteri workers ~f:(fun i w -> don't_wait_for (connect_worker i w)) ;
   (event_r, root_r)
 
-let start_checks logger workers start_reader testnet ~acceptable_delay =
+let start_checks logger (workers : Coda_process.t array) start_reader testnet
+    ~acceptable_delay =
   let event_reader, root_reader = events workers start_reader in
   start_prefix_check logger workers event_reader testnet ~acceptable_delay
   |> don't_wait_for ;
@@ -355,6 +361,7 @@ let test logger n proposers snark_work_public_keys work_selection =
       ~trace_dir:(Unix.getenv "CODA_TRACING")
   in
   let%map workers = Coda_processes.spawn_local_processes_exn configs in
+  let workers = List.to_array workers in
   let start_reader, start_writer = Linear_pipe.create () in
   let testnet = Api.create configs workers start_writer in
   start_checks logger workers start_reader testnet ~acceptable_delay ;
