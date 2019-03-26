@@ -19,7 +19,12 @@ module Api = struct
         Linear_pipe.Writer.t
     ; status:
         [`On of [`Synced of user_cmds_under_inspection | `Catchup] | `Off]
-        Array.t }
+        Array.t
+    ; locks: (int ref * unit Condition.t) Array.t
+    (** The int counts the number of ongoing RPCs. when it is 0, it is safe to take the worker offline.
+        [stop] below will set the status to `Off, and we only try doing an RPC if the status is `On,
+        so eventually the counter _must_ become 0, ensuring progress. *)
+    }
 
   let create configs workers start_writer =
     let status =
@@ -29,7 +34,8 @@ module Api = struct
           in
           `On (`Synced user_cmds_under_inspection) )
     in
-    {workers; configs; start_writer; status}
+    let locks = Array.init (List.length workers) (fun _ -> ref 0, Condition.create ()) in
+    {workers; configs; start_writer; status; locks}
 
   let online t i = match t.status.(i) with `On _ -> true | `Off -> false
 
@@ -41,7 +47,17 @@ module Api = struct
 
   let run_online_worker ~f ~arg t i =
     let worker = List.nth_exn t.workers i in
-    if online t i then Deferred.map (f ~worker arg) ~f:(fun x -> Some x)
+    if online t i then
+    (
+      let ongoing_rpcs, cond = t.locks.(i) in
+      ongoing_rpcs := !ongoing_rpcs + 1 ;
+      let%map res = f ~worker arg in
+      ongoing_rpcs := !ongoing_rpcs - 1 ;
+      if !ongoing_rpcs = 0 then
+        Condition.broadcast cond ()
+      ;
+      Some res
+    )
     else return None
 
   let get_balance t i pk =
@@ -72,6 +88,14 @@ module Api = struct
             Ivar.fill passed_root () )
     | _ -> () ) ;
     t.status.(i) <- `Off ;
+    let ongoing_rpcs, lock = t.locks.(i) in
+    let rec wait_for_no_rpcs () =
+      if !ongoing_rpcs = 0 then
+        Deferred.unit
+      else
+        Deferred.bind (Condition.wait lock) ~f:(wait_for_no_rpcs)
+    in
+    let%bind () = wait_for_no_rpcs () in
     Coda_process.disconnect (List.nth_exn t.workers i)
 
   let send_payment t i ?acceptable_delay:(delay = 7) sender_sk receiver_pk
