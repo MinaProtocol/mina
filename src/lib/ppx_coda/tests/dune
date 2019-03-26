@@ -10,6 +10,11 @@
   (preprocess (pps ppx_coda))
   (modules unexpired_in_module))
 
+(library
+  (name versioned_good)
+  (preprocess (pps ppx_coda))
+  (modules versioned_good))
+
 ;; should fail
 
 (library
@@ -32,3 +37,17 @@
   (preprocess (pps ppx_coda))
   (modules expiry_invalid_format))
 
+(library
+ (name versioned_bad_module_structure)
+ (preprocess (pps ppx_coda))
+ (modules versioned_bad_module_structure))
+
+(library
+ (name versioned_bad_version_name)
+ (preprocess (pps ppx_coda))
+ (modules versioned_bad_version_name))
+
+(library
+  (name versioned_bad_type_name)
+  (preprocess (pps ppx_coda))
+  (modules versioned_bad_type_name))
