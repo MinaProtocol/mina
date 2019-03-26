@@ -49,6 +49,10 @@ struct
 
   let logger = Logger.null ()
 
+  let () =
+    Async.Scheduler.set_record_backtraces true ;
+    Core.Backtrace.elide := false
+
   let%test "full_sync_entirely_different" =
     let l1, _k1 = Ledger.load_ledger 1 1 in
     let l2, _k2 = Ledger.load_ledger num_accts 2 in
@@ -65,7 +69,10 @@ struct
     don't_wait_for
       (Linear_pipe.iter_unordered ~max_concurrency:3 qr
          ~f:(fun (root_hash, query) ->
-           let answ = Sync_responder.answer_query sr query in
+           let answ =
+             Option.value_exn ~message:"refused to answer query"
+               (Sync_responder.answer_query sr query)
+           in
            let%bind () =
              if match query with What_contents _ -> true | _ -> false then
                Clock_ns.after
@@ -114,7 +121,10 @@ struct
                  Sync_ledger.new_goal lsync !desired_root |> ignore ;
                  Deferred.unit )
                else
-                 let answ = Sync_responder.answer_query !sr query in
+                 let answ =
+                   Option.value_exn ~message:"refused to answer query"
+                     (Sync_responder.answer_query !sr query)
+                 in
                  Linear_pipe.write aw
                    (!desired_root, query, Envelope.Incoming.local answ)
              in
