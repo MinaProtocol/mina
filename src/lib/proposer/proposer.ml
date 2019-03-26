@@ -14,6 +14,15 @@ module type Inputs_intf = sig
     type t
   end
 
+  module Diff_hash : Protocols.Coda_transition_frontier.Diff_hash
+
+  module Diff_mutant :
+    Protocols.Coda_transition_frontier.Diff_mutant
+    with type external_transition := External_transition.Stable.Latest.t
+     and type state_hash := Coda_base.State_hash.t
+     and type scan_state := Staged_ledger.Scan_state.t
+     and type hash := Diff_hash.t
+
   module Transition_frontier :
     Protocols.Coda_transition_frontier.Transition_frontier_intf
     with type state_hash := Protocol_state_hash.t
@@ -25,6 +34,7 @@ module type Inputs_intf = sig
      and type masked_ledger := Masked_ledger.t
      and type consensus_local_state := Consensus.Local_state.t
      and type user_command := User_command.t
+     and type diff_mutant := Diff_mutant.e
 
   module Transaction_pool :
     Coda_lib.Transaction_pool_read_intf

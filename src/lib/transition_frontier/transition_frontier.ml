@@ -18,6 +18,7 @@ module Make (Inputs : Inputs_intf) :
    and type transaction_snark_scan_state := Inputs.Staged_ledger.Scan_state.t
    and type consensus_local_state := Consensus.Local_state.t
    and type user_command := User_command.t
+   and type diff_mutant := Inputs.Diff_mutant.e
    and module Extensions.Work = Inputs.Transaction_snark_work.Statement =
 struct
   (* NOTE: is Consensus_mechanism.select preferable over distance? *)
@@ -214,8 +215,6 @@ struct
 
     module Best_tip_diff = Best_tip_diff.Make (Breadcrumb)
     module Root_diff = Root_diff.Make (Breadcrumb)
-
-    type diff_mutant = Inputs.Diff_mutant.e
 
     module Persistence_diff = Persistence_diff.Make (struct
       include Inputs

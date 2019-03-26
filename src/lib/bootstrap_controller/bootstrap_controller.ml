@@ -18,6 +18,7 @@ module type Inputs_intf = sig
      and type staged_ledger := Staged_ledger.t
      and type consensus_local_state := Consensus.Local_state.t
      and type user_command := User_command.t
+     and type diff_mutant := Diff_mutant.e
 
   module Root_sync_ledger :
     Syncable_ledger.S

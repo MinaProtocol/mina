@@ -221,6 +221,8 @@ module type Transition_frontier_base_intf = sig
 
   type staged_ledger_diff
 
+  type diff_mutant
+
   type t
 
   module Breadcrumb :
@@ -330,8 +332,6 @@ module type Transition_frontier_intf = sig
     module Root_diff :
       Transition_frontier_extension_intf
       with type view = user_command Root_diff_view.t
-
-    type diff_mutant
 
     module Persistence_diff :
       Transition_frontier_extension_intf with type view = diff_mutant option

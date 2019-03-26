@@ -249,6 +249,15 @@ module type Inputs_intf = sig
 
   module Ledger_db : Coda_pow.Ledger_creatable_intf
 
+  module Diff_hash : Protocols.Coda_transition_frontier.Diff_hash
+
+  module Diff_mutant :
+    Protocols.Coda_transition_frontier.Diff_mutant
+    with type external_transition := External_transition.Stable.Latest.t
+     and type state_hash := Coda_base.State_hash.t
+     and type scan_state := Staged_ledger.Scan_state.t
+     and type hash := Diff_hash.t
+
   module Transition_frontier :
     Protocols.Coda_transition_frontier.Transition_frontier_intf
     with type state_hash := Protocol_state_hash.t
@@ -260,6 +269,7 @@ module type Inputs_intf = sig
      and type transaction_snark_scan_state := Staged_ledger.Scan_state.t
      and type consensus_local_state := Consensus_mechanism.Local_state.t
      and type user_command := User_command.t
+     and type diff_mutant := Diff_mutant.e
 
   module Transaction_pool :
     Transaction_pool_intf

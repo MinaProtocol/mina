@@ -9,6 +9,8 @@ module Make (Inputs : sig
 end) =
 struct
   (** [Stubs] is a set of modules used for testing different components of tfc  *)
+  let max_length = Inputs.max_length
+
   module Time = Coda_base.Block_time
 
   module State_proof = struct

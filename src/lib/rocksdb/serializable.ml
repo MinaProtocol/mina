@@ -61,19 +61,19 @@ struct
         , Binable.of_bigstring (module Value) value ) )
 end
 
-module type Database_intf = sig
-  type t
-
-  type 'a g
-
-  val set : t -> key:'a g -> data:'a -> unit
-
-  val remove : t -> key:'a g -> unit
-end
-
 (** Database Interface for storing heterogeneous key-value pairs. Similar to
     Janestreet's Core.Univ_map *)
 module GADT = struct
+  module type Database_intf = sig
+    type t
+
+    type 'a g
+
+    val set : t -> key:'a g -> data:'a -> unit
+
+    val remove : t -> key:'a g -> unit
+  end
+
   module type S = sig
     include Database_intf
 

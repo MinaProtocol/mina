@@ -281,6 +281,15 @@ module type Main_intf = sig
       with module Protocol_state = Consensus.Protocol_state
        and module Staged_ledger_diff := Staged_ledger_diff
 
+    module Diff_hash : Protocols.Coda_transition_frontier.Diff_hash
+
+    module Diff_mutant :
+      Protocols.Coda_transition_frontier.Diff_mutant
+      with type external_transition := External_transition.Stable.Latest.t
+       and type state_hash := State_hash.t
+       and type scan_state := Staged_ledger.Scan_state.t
+       and type hash := Diff_hash.t
+
     module Transition_frontier :
       Protocols.Coda_pow.Transition_frontier_intf
       with type state_hash := State_hash.t
@@ -292,6 +301,7 @@ module type Main_intf = sig
        and type transaction_snark_scan_state := Staged_ledger.Scan_state.t
        and type consensus_local_state := Consensus.Local_state.t
        and type user_command := User_command.t
+       and type diff_mutant := Diff_mutant.e
        and type Extensions.Work.t = Transaction_snark_work.Statement.t
   end
 

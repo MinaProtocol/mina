@@ -1,19 +1,11 @@
 open Core_kernel
 open Coda_base
 
-module type Transition_database_schema = sig
-  type external_transition
-
-  type state_hash
-
-  type scan_state
-
-  type _ t =
-    | Transition : (external_transition * state_hash list) -> state_hash t
-    | Root : (state_hash * scan_state) t
-end
-
-module Make (Inputs : Transition_frontier.Inputs_intf) = struct
+module Make (Inputs : Transition_frontier.Inputs_intf) :
+  Intf.Transition_database_schema
+  with type external_transition := Inputs.External_transition.Stable.Latest.t
+   and type scan_state := Inputs.Staged_ledger.Scan_state.t
+   and type state_hash := State_hash.t = struct
   open Inputs
 
   module Transition = struct
@@ -32,13 +24,9 @@ module Make (Inputs : Transition_frontier.Inputs_intf) = struct
     end
   end
 
-  type root_data =
-    State_hash.Stable.Latest.t * Staged_ledger.Scan_state.Stable.Latest.t
-  [@@deriving bin_io]
-
   type _ t =
-    | Transition : Transition.Data.t -> State_hash.Stable.Latest.t t
-    | Root : Root_data.Data.t -> unit t
+    | Transition : State_hash.Stable.Latest.t -> Transition.Data.t t
+    | Root : Root_data.Data.t t
 
   module Root_binable = struct
     type t =
@@ -47,8 +35,8 @@ module Make (Inputs : Transition_frontier.Inputs_intf) = struct
   end
 
   let binable_data_type (type a) : a t -> a Bin_prot.Type_class.t = function
-    | Transition _ -> [%bin_type_class: State_hash.Stable.Latest.t]
-    | Root _ -> [%bin_type_class: unit]
+    | Transition _ -> [%bin_type_class: Transition.Data.t]
+    | Root -> [%bin_type_class: Root_data.Data.t]
 
   (* HACK: a simple way to derive Bin_prot.Type_class.t for each case of a GADT *)
   let gadt_input_type_class (type data a) :
@@ -78,12 +66,12 @@ module Make (Inputs : Transition_frontier.Inputs_intf) = struct
       a t -> a t Bin_prot.Type_class.t = function
     | Transition _ ->
         gadt_input_type_class
-          (module Transition.Data)
+          (module State_hash.Stable.Latest)
           ~to_gadt:(fun transition -> Transition transition)
           ~of_gadt:(fun (Transition transition) -> transition)
-    | Root _ ->
+    | Root ->
         gadt_input_type_class
-          (module Root_data.Data)
-          ~to_gadt:(fun root_data -> Root root_data)
-          ~of_gadt:(fun (Root root_data) -> root_data)
+          (module Unit)
+          ~to_gadt:(fun _ -> Root)
+          ~of_gadt:(fun Root -> ())
 end

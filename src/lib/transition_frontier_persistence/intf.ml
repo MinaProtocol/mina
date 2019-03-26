@@ -12,6 +12,8 @@ module type Transition_database_schema = sig
   type _ t =
     | Transition : state_hash -> (external_transition * state_hash list) t
     | Root : (state_hash * scan_state) t
+
+  include Rocksdb.Serializable.GADT.Key_intf with type 'a t := 'a t
 end
 
 module type Base_inputs = sig
@@ -28,6 +30,7 @@ module type Base_inputs = sig
      and type transaction_snark_scan_state := Staged_ledger.Scan_state.t
      and type consensus_local_state := Consensus.Local_state.t
      and type user_command := User_command.t
+     and type diff_mutant := Diff_mutant.e
      and module Extensions.Work = Transaction_snark_work.Statement
 end
 
@@ -104,6 +107,4 @@ module type Main_inputs = sig
     val handle_diff :
       t -> Diff_hash.t -> 'a Diff_mutant.t -> Diff_hash.t Deferred.Or_error.t
   end
-
-  val diff_mutant_reader : Diff_mutant.e Pipe_lib.Broadcast_pipe.Reader.t
 end
