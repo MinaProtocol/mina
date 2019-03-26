@@ -168,7 +168,7 @@ module State = struct
    * execution at parallelism of size n. Assume we're always working on the
    * second step, and can refer to the work done at the prior step.
    *
-   * 
+   *
    * Example trace: Jobs buffer at some state t
    *                      0
    *                   M(1,8)
@@ -212,12 +212,12 @@ module State = struct
       | _, Base _ -> failwith "This shouldn't have occured"
       | _ -> false )
 
-  (*Level_pointer stores a start index for each level. These are, at first, 
-    the indices of the first node on each level and get incremented when a job is 
-    completed at the specific index. The tree is still traveresed breadth-first 
-    but the order of nodes on each level is determined using the start index that 
-    is kept track of in the level_pointer. if the cur_pos is the last node on the 
-    current level then next node is the first node on the next level otherwise 
+  (*Level_pointer stores a start index for each level. These are, at first,
+    the indices of the first node on each level and get incremented when a job is
+    completed at the specific index. The tree is still traveresed breadth-first
+    but the order of nodes on each level is determined using the start index that
+    is kept track of in the level_pointer. if the cur_pos is the last node on the
+    current level then next node is the first node on the next level otherwise
     return the next node on the same level*)
 
   let next_position_info parallelism level_pointer cur_pos =
@@ -237,9 +237,9 @@ module State = struct
     | `Same_level pos -> pos
     | `Next_level pos -> pos
 
-  (*On each level, the jobs are completed starting from a specific index that 
-    is stored in levels_pointer. When a job at that index is completed, it points 
-    to the next job on the same level. After the last node of the level, the 
+  (*On each level, the jobs are completed starting from a specific index that
+    is stored in levels_pointer. When a job at that index is completed, it points
+    to the next job on the same level. After the last node of the level, the
     index is set back to first node*)
   let incr_level_pointer t cur_pos =
     let cur_level = Int.floor_log2 (cur_pos + 1) in
@@ -443,8 +443,8 @@ module State = struct
       ~finish:Fn.id
 
   (* Reset the sequence number starting from 1
-     If [997;997;998;998;998;999;999] is sequence number of the current 
-     available jobs 
+     If [997;997;998;998;998;999;999] is sequence number of the current
+     available jobs
      then [1;1;2;2;2;3;3] will be the new sequence numbers of the same jobs *)
   let reset_seq_no t =
     let open Or_error.Let_syntax in

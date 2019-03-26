@@ -3,6 +3,7 @@ open Import
 open Snarky
 open Snark_params
 open Snark_params.Tick
+open Tuple_lib
 open Let_syntax
 open Currency
 open Fold_lib
@@ -13,7 +14,8 @@ let coinbase_tree_depth = Snark_params.pending_coinbase_depth
 let coinbase_stacks = Int.pow 2 coinbase_tree_depth
 
 module Coinbase_data = struct
-  type t = Public_key.Compressed.t * Amount.Signed.t [@@deriving bin_io, sexp]
+  type t = Public_key.Compressed.Stable.V1.t * Amount.Signed.Stable.V1.t
+  [@@deriving bin_io, sexp]
 
   let of_coinbase (cb : Coinbase.t) : t =
     (cb.proposer, Amount.Signed.of_unsigned cb.amount)
@@ -79,9 +81,71 @@ end = struct
     if t2 < t1 then Or_error.error_string "Stack_id overflow" else Ok t2
 end
 
+module type Data_hash_binable_intf = sig
+  type t [@@deriving bin_io, sexp, hash, compare, eq, yojson]
+
+  type var
+
+  val var_of_t : t -> var
+
+  val typ : (var, t) Typ.t
+
+  val var_to_triples : var -> (Boolean.var Triple.t list, _) Tick.Checked.t
+
+  val length_in_triples : int
+
+  val equal_var : var -> var -> (Boolean.var, _) Tick.Checked.t
+
+  val fold : t -> bool Triple.t Fold.t
+
+  val to_bytes : t -> string
+
+  val to_bits : t -> bool list
+
+  val gen : t Quickcheck.Generator.t
+end
+
+module Data_hash_binable = struct
+  module T = struct
+    include Data_hash.Make_full_size ()
+  end
+
+  include T.Stable.V1
+
+  type var = T.var
+
+  let ( var_to_hash_packed
+      , var_of_hash_packed
+      , typ
+      , var_of_t
+      , of_hash
+      , equal_var
+      , length_in_triples
+      , var_to_triples
+      , fold
+      , to_bytes
+      , to_bits
+      , if_
+      , gen ) =
+    T.
+      ( var_to_hash_packed
+      , var_of_hash_packed
+      , typ
+      , var_of_t
+      , of_hash
+      , equal_var
+      , length_in_triples
+      , var_to_triples
+      , fold
+      , to_bytes
+      , to_bits
+      , if_
+      , gen )
+end
+
 module Coinbase_stack = struct
   module Stack = struct
-    include Data_hash.Make_full_size ()
+    include Data_hash_binable
 
     let push (h : t) cb =
       let coinbase = Coinbase_data.of_coinbase cb in
@@ -133,7 +197,7 @@ end
 
 (*Pending coinbase hash*)
 module Hash = struct
-  include Data_hash.Make_full_size ()
+  include Data_hash_binable
 
   let merge ~height (h1 : t) (h2 : t) =
     let open Tick.Pedersen in

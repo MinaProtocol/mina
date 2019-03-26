@@ -14,6 +14,8 @@ open Core
 open Snark_params
 open Snarky
 open Tick
+open Tuple_lib
+open Fold_lib
 open Signature_lib
 open Currency
 
@@ -37,8 +39,32 @@ module type S = sig
     val genesis : t
   end
 
+  module type Data_hash_binable_intf = sig
+    type t [@@deriving bin_io, sexp, hash, compare, eq, yojson]
+
+    type var
+
+    val var_of_t : t -> var
+
+    val typ : (var, t) Typ.t
+
+    val var_to_triples : var -> (Boolean.var Triple.t list, _) Tick.Checked.t
+
+    val length_in_triples : int
+
+    val equal_var : var -> var -> (Boolean.var, _) Tick.Checked.t
+
+    val fold : t -> bool Triple.t Fold.t
+
+    val to_bytes : t -> string
+
+    val to_bits : t -> bool list
+
+    val gen : t Quickcheck.Generator.t
+  end
+
   module rec Hash : sig
-    include Data_hash.Full_size
+    include Data_hash_binable_intf
 
     val merge : height:int -> t -> t -> t
 
@@ -48,7 +74,7 @@ module type S = sig
   end
   
   and Stack : sig
-    include Data_hash.Full_size
+    include Data_hash_binable_intf
 
     val push : t -> Coinbase.t -> t
 
@@ -105,16 +131,14 @@ module type S = sig
 
     val get : var -> Address.var -> (Stack.var, _) Tick.Checked.t
 
-    val add_coinbase : var -> Coinbase_data.var -> (var, 's) Tick.Checked.t
     (**
    [update_stack t ~is_new_stack updtaed_stack] implements the following spec:
    - gets the address[addr] of the latest stack or a new stack
    - finds a coinbase stack in [t] at path [addr] and pushes the coinbase_data on to the stack
    - returns a root [t'] of the tree
   *)
+    val add_coinbase : var -> Coinbase_data.var -> (var, 's) Tick.Checked.t
 
-    val pop_coinbases :
-      var -> proof_emitted:Boolean.var -> (var * Stack.var, 's) Tick.Checked.t
     (**
    [pop_coinbases t pk updated_stack] implements the following spec:
 
@@ -122,5 +146,7 @@ module type S = sig
    - finds a coinbase stack in [t] at path [addr] and replaces it with empty stack if a [proof_emitted] is true
    - returns a root [t'] of the tree
   *)
+    val pop_coinbases :
+      var -> proof_emitted:Boolean.var -> (var * Stack.var, 's) Tick.Checked.t
   end
 end

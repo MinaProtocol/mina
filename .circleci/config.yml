@@ -43,13 +43,25 @@ jobs:
             - run: git submodule sync && git submodule update --init --recursive
             - run:
                   name: Check circle CI configuration rendering
-                  command: ./scripts/test.py render --check .circleci/config.yml.jinja
+                  command: ./scripts/test.py render --check .circleci/config.yml.jinja .mergify.yml.jinja
             - run:
                   name: OCamlformat (make check-format)
                   command: eval `opam config env` && make check-format
             - run:
                   name: Snarky tracks master (make check-snarky-submodule)
                   command: make check-snarky-submodule
+
+    update-branch-protection:
+        docker:
+            - image: python:3
+        steps:
+            - run:
+                name: Install dependencies
+                command: pip install --user requests jinja2
+            - checkout
+            - run:
+                  name: Update branch protection rule from test configuration
+                  command: ./scripts/test.py required-status >required_status && cat required_status && ./scripts/update_branch_rule.py required_status
 
     build-macos:
         macos:
@@ -190,6 +202,16 @@ jobs:
             - run:
                   name: Run unit tests
                   command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && dune build --profile=test_postake_snarkless -j8 && dune runtest --profile=test_postake_snarkless -j8'
+    test-unit--dev:
+        resource_class: large
+        docker:
+            - image: codaprotocol/coda:toolchain-af1380e0f6c8726391d82b2adb6a2a3b20dd46a0
+        steps:
+            - checkout
+            - run: git submodule sync && git submodule update --init --recursive
+            - run:
+                  name: Run unit tests
+                  command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && dune build --profile=dev -j8 && dune runtest --profile=dev -j8'
     test--fake_hash:
         resource_class: large
         docker:
@@ -291,11 +313,20 @@ jobs:
                   name: Running test -- test_postake_split_snarkless:coda-shared-prefix-test -who-proposes 1
                   command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run "test_postake_split_snarkless:coda-shared-prefix-test -who-proposes 1"'
             - run:
-                  name: Running test -- test_postake_split_snarkless:coda-shared-state-test
-                  command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run "test_postake_split_snarkless:coda-shared-state-test"'
-            - run:
                   name: Running test -- test_postake_split_snarkless:coda-restart-node-test
                   command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run "test_postake_split_snarkless:coda-restart-node-test"'
+            - store_artifacts:
+                  path: test_logs
+    test--test_postake_txns:
+        resource_class: large
+        docker:
+            - image: codaprotocol/coda:toolchain-af1380e0f6c8726391d82b2adb6a2a3b20dd46a0
+        steps:
+            - checkout
+            - run: git submodule sync && git submodule update --init --recursive
+            - run:
+                  name: Running test -- test_postake_txns:coda-shared-state-test
+                  command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run "test_postake_txns:coda-shared-state-test"'
             - store_artifacts:
                   path: test_logs
 
@@ -304,6 +335,10 @@ workflows:
     coda_parallel:
         jobs:
             - lint
+            - update-branch-protection:
+                filters:
+                  branches:
+                    only: master
             - tracetool
             - build-macos
             - build-wallet
@@ -311,6 +346,7 @@ workflows:
             - build-artifacts--testnet_postake_snarkless_fake_hash
             - test-unit--test_posig_snarkless
             - test-unit--test_postake_snarkless
+            - test-unit--dev
             - test--fake_hash
             - test--test_postake
             - test--test_postake_bootstrap
@@ -318,3 +354,4 @@ workflows:
             - test--test_postake_snarkless
             - test--test_postake_split
             - test--test_postake_split_snarkless
+            - test--test_postake_txns

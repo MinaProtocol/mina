@@ -2,7 +2,9 @@ open Core_kernel
 open Module_version
 
 module Hash = struct
-  include Ledger_hash
+  include Ledger_hash.Stable.V1
+
+  let merge = Ledger_hash.merge
 
   let hash_account = Fn.compose Ledger_hash.of_digest Account.digest
 
@@ -23,7 +25,7 @@ module Mask = Syncable_ledger.Make (struct
   module Hash = Hash
   module Root_hash = Root_hash
 
-  let subtree_height = 3
+  let account_subtree_height = 3
 end)
 
 module Db = Syncable_ledger.Make (struct
@@ -33,7 +35,7 @@ module Db = Syncable_ledger.Make (struct
   module Hash = Hash
   module Root_hash = Root_hash
 
-  let subtree_height = 3
+  let account_subtree_height = 3
 end)
 
 module Answer = struct
@@ -43,8 +45,7 @@ module Answer = struct
         let version = 1
 
         type t =
-          ( Ledger.Location.Addr.t
-          , Ledger_hash.Stable.V1.t
+          ( Ledger_hash.Stable.V1.t
           , Account.Stable.V1.t )
           Syncable_ledger.Answer.Stable.V1.t
         [@@deriving bin_io, sexp]

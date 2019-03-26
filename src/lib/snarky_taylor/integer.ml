@@ -5,6 +5,8 @@ open Util
 
 type 'f t = {value: 'f Cvar.t; upper_bound: B.t (* A strict upper bound *)}
 
+let create ~value ~upper_bound = {value; upper_bound}
+
 let to_field t = t.value
 
 let constant (type f) ~m:((module M) as m : f m) x =

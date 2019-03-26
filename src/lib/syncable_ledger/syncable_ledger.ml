@@ -2,15 +2,21 @@ open Core
 open Async_kernel
 open Pipe_lib
 
+(** Run f recursively n times, starting with value r.
+    e.g. funpow 3 f r = f (f (f r)) *)
 let rec funpow n f r = if n > 0 then funpow (n - 1) f (f r) else r
 
 module Query = struct
   module Stable = struct
     module V1 = struct
       type 'addr t =
-        | What_hash of 'addr
+        | What_hash of 'addr  (** What is the hash at this address? *)
         | What_contents of 'addr
+            (** What accounts are at this address? addr must have depth
+            tree_depth - account_subtree_height *)
         | Num_accounts
+            (** How many accounts are there? Used to size data structure and
+            figure out what part of the tree is filled in. *)
       [@@deriving bin_io, sexp, yojson]
     end
 
@@ -28,10 +34,13 @@ end
 module Answer = struct
   module Stable = struct
     module V1 = struct
-      type ('addr, 'hash, 'account) t =
-        | Has_hash of 'addr * 'hash
-        | Contents_are of 'addr * 'account list
+      type ('hash, 'account) t =
+        | Has_hash of 'hash  (** The requested address has this hash **)
+        | Contents_are of 'account list
+            (** The requested address has these accounts *)
         | Num_accounts of int * 'hash
+            (** There are this many accounts and the smallest subtree that
+                contains all non-empty nodes has this hash. *)
       [@@deriving bin_io, sexp, yojson]
     end
 
@@ -39,9 +48,9 @@ module Answer = struct
   end
 
   (* bin_io omitted intentionally *)
-  type ('addr, 'hash, 'account) t = ('addr, 'hash, 'account) Stable.Latest.t =
-    | Has_hash of 'addr * 'hash
-    | Contents_are of 'addr * 'account list
+  type ('hash, 'account) t = ('hash, 'account) Stable.Latest.t =
+    | Has_hash of 'hash
+    | Contents_are of 'account list
     | Num_accounts of int * 'hash
   [@@deriving sexp, yojson]
 end
@@ -68,7 +77,9 @@ module type Inputs_intf = sig
      and type addr := Addr.t
      and type account := Account.t
 
-  val subtree_height : int
+  (** Fetch all the accounts in subtrees of this size at once, rather than
+      recursively one at a time *)
+  val account_subtree_height : int
 end
 
 module type S = sig
@@ -105,7 +116,7 @@ module type S = sig
   val create : merkle_tree -> logger:Logger.t -> t
 
   val answer_writer :
-    t -> (root_hash * answer) Envelope.Incoming.t Linear_pipe.Writer.t
+    t -> (root_hash * query * answer Envelope.Incoming.t) Linear_pipe.Writer.t
 
   val query_reader : t -> (root_hash * query) Linear_pipe.Reader.t
 
@@ -207,7 +218,7 @@ module Make (Inputs : Inputs_intf) : sig
      and type merkle_path := MT.path
      and type account := Account.t
      and type query := Addr.t Query.t
-     and type answer := (Addr.t, Hash.t, Account.t) Answer.t
+     and type answer := (Hash.t, Account.t) Answer.t
 end = struct
   open Inputs
 
@@ -215,7 +226,6 @@ end = struct
 
   type index = int
 
-  (* TODO #434: This is a waste of memory. *)
   module Valid :
     Validity_intf with type hash := Hash.t and type addr := Addr.t = struct
     type hash_status = Fresh | Stale [@@deriving sexp, eq]
@@ -299,12 +309,9 @@ end = struct
       | _ -> false
   end
 
-  type answer = (Addr.t, Hash.t, Account.t) Answer.t
+  type answer = (Hash.t, Account.t) Answer.t
 
   type query = Addr.t Query.t
-
-  (* idea: make this verifiable by including the merkle path to the rightmost account, and verify that
-       filling in empty hashes for the rest amounts to the correct hash. *)
 
   module Responder = struct
     type t = {mt: MT.t; f: query -> unit; logger: Logger.t}
@@ -316,7 +323,7 @@ end = struct
      fun {mt; f; logger} q ->
       f q ;
       match q with
-      | What_hash a -> Has_hash (a, MT.get_inner_hash_at_addr_exn mt a)
+      | What_hash a -> Has_hash (MT.get_inner_hash_at_addr_exn mt a)
       | What_contents a ->
           let addresses_and_accounts =
             List.sort ~compare:(fun (addr1, _) (addr2, _) ->
@@ -352,7 +359,7 @@ end = struct
                  list: $addresses_and_accounts"
             else ()
           else () ;
-          Contents_are (a, accounts)
+          Contents_are accounts
       | Num_accounts ->
           let len = MT.num_accounts mt in
           let height = Int.ceil_log2 len in
@@ -372,9 +379,10 @@ end = struct
     ; tree: MT.t
     ; mutable validity: Valid.t
     ; logger: Logger.t
-    ; answers: (Root_hash.t * answer) Envelope.Incoming.t Linear_pipe.Reader.t
+    ; answers:
+        (Root_hash.t * query * answer Envelope.Incoming.t) Linear_pipe.Reader.t
     ; answer_writer:
-        (Root_hash.t * answer) Envelope.Incoming.t Linear_pipe.Writer.t
+        (Root_hash.t * query * answer Envelope.Incoming.t) Linear_pipe.Writer.t
     ; queries: (Root_hash.t * query) Linear_pipe.Writer.t
     ; query_reader: (Root_hash.t * query) Linear_pipe.Reader.t
     ; waiting_parents: waiting Addr.Table.t
@@ -415,6 +423,9 @@ end = struct
     Addr.Table.add_exn t.waiting_content ~key:addr ~data:expected
 
   (* TODO #435: verify content hash matches expected and blame the peer who gave it to us *)
+
+  (** Given an address and the accounts below that address, fill in the tree
+      with them. *)
   let add_content : t -> Addr.t -> Account.t list -> Hash.t Or_error.t =
    fun t addr content ->
     let expected = Addr.Table.find_exn t.waiting_content addr in
@@ -429,12 +440,19 @@ end = struct
     Addr.Table.filter_keys_inplace t.waiting_content ~f:filter ;
     Addr.Table.filter_keys_inplace t.waiting_parents ~f:filter
 
+  (** Try to add the hash at an address to the ledger. If after adding the hash
+      we have both children of the parent, check that the children hash to the
+      correct value. If everything is kosher, return the children of the added
+      node and its sibling for so they can be queued for retrieval. *)
   let add_child_hash_to :
          t
       -> Addr.t
       -> Hash.t
-      -> [`Good of (Addr.t * Hash.t) list | `More | `Hash_mismatch] Or_error.t
-      =
+      -> [ `Good of (Addr.t * Hash.t) list
+           (** The addresses and expected hashes of the now-retrievable children *)
+         | `More  (** We need the sibling in order to validate *)
+         | `Hash_mismatch  (** Hash check failed, somebody lied. *) ]
+         Or_error.t =
    fun t child_addr h ->
     (* lots of _exn called on attacker data. it's not clear how to handle these regardless *)
     let open Or_error.Let_syntax in
@@ -481,12 +499,16 @@ end = struct
     else Ivar.fill t.validity_listener `Ok ;
     res
 
+  (** Compute the hash of an empty tree of the specified height. *)
   let empty_hash_at_height h =
     let rec go prev ctr =
       if ctr = h then prev else go (Hash.merge ~height:ctr prev prev) (ctr + 1)
     in
     go Hash.empty_account 0
 
+  (** Given the hash of the smallest subtree that contains all accounts, the
+      height of that hash in the tree and the height of the whole tree, compute
+      the hash of the whole tree. *)
   let complete_with_empties hash start_height result_height =
     let rec go cur_empty prev_hash height =
       if height = result_height then prev_hash
@@ -497,19 +519,24 @@ end = struct
     in
     go (empty_hash_at_height start_height) hash start_height
 
+  (** Given an address and the hash of the corresponding subtree, start getting
+      the children.
+  *)
   let handle_node t addr exp_hash =
-    if Addr.depth addr >= MT.depth - subtree_height then (
+    if Addr.depth addr >= MT.depth - account_subtree_height then (
       expect_content t addr exp_hash ;
       Linear_pipe.write_without_pushback_if_open t.queries
         (desired_root_exn t, What_contents addr) )
     else (
       expect_children t addr exp_hash ;
-      Linear_pipe.write_without_pushback_if_open t.queries
+      Linear_pipe.write_without_pushback t.queries
         (desired_root_exn t, What_hash (Addr.child_exn addr Direction.Left)) ;
-      Linear_pipe.write_without_pushback_if_open t.queries
+      Linear_pipe.write_without_pushback t.queries
         (desired_root_exn t, What_hash (Addr.child_exn addr Direction.Right)) )
 
-  let num_accounts t n content_hash =
+  (** Handle the initial Num_accounts message, starting the main syncing
+      process. *)
+  let handle_num_accounts t n content_hash =
     let rh = Root_hash.to_hash (desired_root_exn t) in
     let height = Int.ceil_log2 n in
     (* FIXME: bug when height=0 https://github.com/o1-labs/nanobit/issues/365 *)
@@ -527,8 +554,8 @@ end = struct
      will stick around until the SL is destroyed, or else cause a
      node to never be verified *)
   let main_loop t =
-    let handle_answer env =
-      let root_hash, a = Envelope.Incoming.data env in
+    let handle_answer (root_hash, query, env) =
+      let answer = Envelope.Incoming.data env in
       Logger.trace t.logger ~module_:__MODULE__ ~location:__LOC__
         ~metadata:[("root_hash", Root_hash.to_yojson root_hash)]
         "Handle answer for $root_hash" ;
@@ -541,15 +568,15 @@ end = struct
         () )
       else
         let res =
-          match a with
-          | Answer.Has_hash (addr, h') -> (
-            match add_child_hash_to t addr h' with
+          match (query, answer) with
+          | Query.What_hash addr, Answer.Has_hash h -> (
+            match add_child_hash_to t addr h with
             (* TODO #435: Stick this in a log, punish the sender *)
             | Error e ->
                 Logger.faulty_peer t.logger ~module_:__MODULE__
                   ~location:__LOC__
                   ~metadata:
-                    [ ("child_hash", Hash.to_yojson h')
+                    [ ("child_hash", Hash.to_yojson h)
                     ; ( "sender"
                       , Envelope.Sender.to_yojson
                           (Envelope.Incoming.sender env) ) ]
@@ -562,14 +589,30 @@ end = struct
                     handle_node t addr hash )
             | Ok `More -> () (* wait for the other answer to come in *)
             | Ok `Hash_mismatch ->
-                (* just ask again for both children of the parent?
-             this is the only case where we can't immediately
-             pin blame on a single node. *)
+                (* just ask again for both children of the parent? this is the
+                 only case where we can't immediately pin blame on a single
+                 node. *)
                 failwith "figure out how to handle peers lying" )
-          | Contents_are (addr, leafs) ->
-              let subtree_hash = add_content t addr leafs |> Or_error.ok_exn in
+          | Query.What_contents addr, Answer.Contents_are leaves ->
+              (* FIXME untrusted _exn *)
+              let subtree_hash =
+                add_content t addr leaves |> Or_error.ok_exn
+              in
               Valid.set t.validity addr (Fresh, subtree_hash) |> ignore
-          | Num_accounts (n, h) -> num_accounts t n h
+          | Query.Num_accounts, Answer.Num_accounts (count, content_root) ->
+              handle_num_accounts t count content_root
+          | query, answer ->
+              Logger.faulty_peer t.logger ~module_:__MODULE__ ~location:__LOC__
+                ~metadata:
+                  [ ( "peer"
+                    , Envelope.Sender.to_yojson @@ Envelope.Incoming.sender env
+                    )
+                  ; ("query", Query.to_yojson Addr.to_yojson query)
+                  ; ( "answer"
+                    , Answer.to_yojson Hash.to_yojson Account.to_yojson answer
+                    ) ]
+                "Peer $peer answered question we didn't ask! Query was $query \
+                 answer was $answer"
         in
         if Valid.completely_fresh t.validity then (
           Logger.trace t.logger ~module_:__MODULE__ ~location:__LOC__

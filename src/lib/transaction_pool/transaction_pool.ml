@@ -6,6 +6,7 @@ open Core_kernel
 open Async
 open Protocols.Coda_transition_frontier
 open Pipe_lib
+open Module_version
 
 module type Transition_frontier_intf = sig
   type t
@@ -35,13 +36,15 @@ module type Transition_frontier_intf = sig
 end
 
 module type User_command_intf = sig
-  module Stable : sig
-    module Latest : sig
-      type t [@@deriving sexp, bin_io]
-    end
-  end
+  type t [@@deriving sexp, yojson]
 
-  type t = Stable.Latest.t [@@deriving sexp]
+  module Stable :
+    sig
+      module V1 : sig
+        type t [@@deriving sexp, bin_io, yojson]
+      end
+    end
+    with type V1.t = t
 
   include Comparable.S with type t := t
 
@@ -280,7 +283,33 @@ struct
   let transactions t = Sequence.unfold ~init:t.pool.heap ~f:Fheap.pop
 
   module Diff = struct
-    type t = User_command.Stable.Latest.t list [@@deriving bin_io, sexp]
+    module Stable = struct
+      module V1 = struct
+        module T = struct
+          let version = 1
+
+          type t = User_command.Stable.V1.t list
+          [@@deriving bin_io, sexp, yojson]
+        end
+
+        include T
+        include Registration.Make_latest_version (T)
+      end
+
+      module Latest = V1
+
+      module Module_decl = struct
+        let name = "transaction_pool_diff"
+
+        type latest = Latest.t
+      end
+
+      module Registrar = Registration.Make (Module_decl)
+      module Registered_V1 = Registrar.Register (V1)
+    end
+
+    (* bin_io omitted *)
+    type t = Stable.Latest.t [@@deriving sexp, yojson]
 
     let summary t =
       Printf.sprintf "Transaction diff of length %d" (List.length t)
@@ -399,10 +428,18 @@ let%test_module _ =
         ((pipe_r, ref ([], Int.Set.empty)), pipe_w)
     end
 
+    module Int = struct
+      include Int
+
+      let to_yojson x = `Int x
+
+      let of_yojson = function `Int x -> Ok x | _ -> Error "expected `Int"
+    end
+
     module Test =
       Make0 (struct
           module Stable = struct
-            module Latest = Int
+            module V1 = Int
           end
 
           include (Int : module type of Int with module Stable := Int.Stable)

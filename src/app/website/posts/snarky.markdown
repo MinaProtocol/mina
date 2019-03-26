@@ -1,5 +1,5 @@
 ---
-title: Snarky: A high-level language for verifiable computation
+title: Snarky&#58; A high-level language for verifiable computation
 date: 2018-03-11
 author: Izaak Meckler
 ---
@@ -18,7 +18,7 @@ One such tool is **verifiable computation**.
 A **verifiable computation** is a computation that
 produces an output along with a proof certifying *something* about that output.
 Until very recently, verifiable computation has been mostly theoretical, but recent
-developments in zk-SNARK constructions have helped maked it practical. 
+developments in zk-SNARK constructions have helped maked it practical.
 
 Verifiable computation makes it possible for you to be confident about exactly
 what other people are doing with your data. For example, it enables
@@ -52,10 +52,10 @@ for specifying verifiable computation.
 As mentioned above, a **verifiable computation** is a computation that
 **computes** an output along with a **proof** certifying *something* about that output.
 
-For example, 
+For example,
 
 - A government could **compute** the winner of an election and **prove** that they counted
-  all the votes correctly. 
+  all the votes correctly.
 - An advertising service could **compute** an ad to serve to you and **prove** that the ad
   was generated without using personal data (i.e., your race, income, political views, etc.)
 - A website could **compute** a news-feed to send to you and **prove** that it
@@ -284,7 +284,7 @@ Snarky helps us bridge the gap between high-level properties we want to prove us
 verifiable computations, and the low-level constraint systems we need to provide to SNARK constructions.
 It brings the promise of accountability and control over personal data through
 verifiable computing one step closer to practicality.
-The code is available on [github](https://github.com/o1-labs/snarky), and we at O(1) 
+The code is available on [github](https://github.com/o1-labs/snarky), and we at O(1)
 Labs are using it in the development of our new cryptocurrency protocol that aims
 to power the examples described above and more.
 

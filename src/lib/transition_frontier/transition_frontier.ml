@@ -214,25 +214,30 @@ struct
     end
 
     module Best_tip_diff = Best_tip_diff.Make (Breadcrumb)
+    module Root_diff = Root_diff.Make (Breadcrumb)
 
     type t =
       { root_history: Root_history.t
       ; snark_pool_refcount: Snark_pool_refcount.t
-      ; best_tip_diff: Best_tip_diff.t }
+      ; best_tip_diff: Best_tip_diff.t
+      ; root_diff: Root_diff.t }
     [@@deriving fields]
 
     let create () =
       { snark_pool_refcount= Snark_pool_refcount.create ()
       ; best_tip_diff= Best_tip_diff.create ()
-      ; root_history= Root_history.create (2 * Inputs.max_length) }
+      ; root_history= Root_history.create (2 * Inputs.max_length)
+      ; root_diff= Root_diff.create () }
 
     type writers =
       { snark_pool: Snark_pool_refcount.view Broadcast_pipe.Writer.t
-      ; best_tip_diff: Best_tip_diff.view Broadcast_pipe.Writer.t }
+      ; best_tip_diff: Best_tip_diff.view Broadcast_pipe.Writer.t
+      ; root_diff: Root_diff.view Broadcast_pipe.Writer.t }
 
     type readers =
       { snark_pool: Snark_pool_refcount.view Broadcast_pipe.Reader.t
-      ; best_tip_diff: Best_tip_diff.view Broadcast_pipe.Reader.t }
+      ; best_tip_diff: Best_tip_diff.view Broadcast_pipe.Reader.t
+      ; root_diff: Root_diff.view Broadcast_pipe.Reader.t }
     [@@deriving fields]
 
     let make_pipes () : readers * writers =
@@ -240,13 +245,20 @@ struct
         Broadcast_pipe.create (Snark_pool_refcount.initial_view ())
       and best_tip_reader, best_tip_writer =
         Broadcast_pipe.create (Best_tip_diff.initial_view ())
+      and root_diff_reader, root_diff_writer =
+        Broadcast_pipe.create (Root_diff.initial_view ())
       in
-      ( {snark_pool= snark_reader; best_tip_diff= best_tip_reader}
-      , {snark_pool= snark_writer; best_tip_diff= best_tip_writer} )
+      ( { snark_pool= snark_reader
+        ; best_tip_diff= best_tip_reader
+        ; root_diff= root_diff_reader }
+      , { snark_pool= snark_writer
+        ; best_tip_diff= best_tip_writer
+        ; root_diff= root_diff_writer } )
 
-    let close_pipes ({snark_pool; best_tip_diff} : writers) =
+    let close_pipes ({snark_pool; best_tip_diff; root_diff} : writers) =
       Broadcast_pipe.Writer.close snark_pool ;
-      Broadcast_pipe.Writer.close best_tip_diff
+      Broadcast_pipe.Writer.close best_tip_diff ;
+      Broadcast_pipe.Writer.close root_diff
 
     let mb_write_to_pipe diff ext_t handle pipe =
       Option.value ~default:Deferred.unit
@@ -270,6 +282,7 @@ struct
         ~snark_pool_refcount:
           (use Snark_pool_refcount.handle_diff pipes.snark_pool)
         ~best_tip_diff:(use Best_tip_diff.handle_diff pipes.best_tip_diff)
+        ~root_diff:(use Root_diff.handle_diff pipes.root_diff)
   end
 
   module Node = struct
@@ -325,6 +338,8 @@ struct
 
   let best_tip_diff_pipe {extension_readers; _} =
     extension_readers.best_tip_diff
+
+  let root_diff_pipe {extension_readers; _} = extension_readers.root_diff
 
   (* TODO: load from and write to disk *)
   let create ~logger
@@ -438,6 +453,8 @@ struct
 
   let root t = find_exn t t.root
 
+  let root_length t = (Hashtbl.find_exn t.table t.root).length
+
   let best_tip t = find_exn t t.best_tip
 
   let successor_hashes t hash =
@@ -485,6 +502,14 @@ struct
     Out_channel.with_file filename ~f:(fun output_channel ->
         let graph = Visualizor.to_graph t in
         Visualizor.output_graph output_channel graph )
+
+  let visualize_to_string t =
+    let graph = Visualizor.to_graph t in
+    let buf = Buffer.create 0 in
+    let formatter = Format.formatter_of_buffer buf in
+    Visualizor.fprint_graph formatter graph ;
+    Format.pp_print_flush formatter () ;
+    Buffer.to_bytes buf |> Bytes.to_string
 
   let attach_node_to t ~(parent_node : Node.t) ~(node : Node.t) =
     let hash = Breadcrumb.state_hash (Node.breadcrumb node) in
@@ -643,27 +668,75 @@ struct
   *)
   let add_breadcrumb_exn t breadcrumb =
     O1trace.measure "add_breadcrumb" (fun () ->
+        let consensus_state_of_breadcrumb b =
+          Breadcrumb.transition_with_hash b
+          |> With_hash.data
+          |> Inputs.External_transition.Verified.protocol_state
+          |> Inputs.External_transition.Protocol_state.consensus_state
+        in
         let hash =
           With_hash.hash (Breadcrumb.transition_with_hash breadcrumb)
         in
         let root_node = Hashtbl.find_exn t.table t.root in
         (* 1 *)
         attach_breadcrumb_exn t breadcrumb ;
+        let parent_hash = Breadcrumb.parent_hash breadcrumb in
+        let parent_node =
+          Option.value_exn
+            (Hashtbl.find t.table parent_hash)
+            ~error:
+              (Error.of_exn
+                 (Parent_not_found (`Parent parent_hash, `Target hash)))
+        in
+        Debug_assert.debug_assert (fun () ->
+            (* if the proof verified, then this should always hold*)
+            assert (
+              Consensus.select
+                ~existing:
+                  (consensus_state_of_breadcrumb parent_node.breadcrumb)
+                ~candidate:(consensus_state_of_breadcrumb breadcrumb)
+                ~logger:
+                  (Logger.create ()
+                     ~metadata:
+                       [ ( "selection context"
+                         , `String
+                             "debug_assert that child is preferred over parent"
+                         ) ])
+              = `Take ) ) ;
         let node = Hashtbl.find_exn t.table hash in
         (* 2 *)
         let distance_to_parent = node.length - root_node.length in
         let best_tip_node = Hashtbl.find_exn t.table t.best_tip in
         (* 3 *)
+        let best_tip_change =
+          Consensus.select
+            ~existing:(consensus_state_of_breadcrumb best_tip_node.breadcrumb)
+            ~candidate:(consensus_state_of_breadcrumb node.breadcrumb)
+            ~logger:
+              (Logger.create ()
+                 ~metadata:
+                   [ ( "selection context"
+                     , `String "comparing new breadcrumb to best tip" ) ])
+        in
         let added_to_best_tip_path, removed_from_best_tip_path =
-          if node.length > best_tip_node.length then (
-            t.best_tip <- hash ;
-            get_path_diff t breadcrumb best_tip_node.breadcrumb )
-          else ([], [])
+          match best_tip_change with
+          | `Keep -> ([], [])
+          | `Take ->
+              t.best_tip <- hash ;
+              get_path_diff t breadcrumb best_tip_node.breadcrumb
         in
         Logger.debug t.logger ~module_:__MODULE__ ~location:__LOC__
-          !"added: %{sexp: Breadcrumb.t list} removed: %{sexp: Breadcrumb.t \
-            list}"
-          added_to_best_tip_path removed_from_best_tip_path ;
+          "added %d breadcrumbs and removed %d making path to new best tip"
+          (List.length added_to_best_tip_path)
+          (List.length removed_from_best_tip_path)
+          ~metadata:
+            [ ( "new_breadcrumbs"
+              , `List (List.map ~f:Breadcrumb.to_yojson added_to_best_tip_path)
+              )
+            ; ( "old_breadcrumbs"
+              , `List
+                  (List.map ~f:Breadcrumb.to_yojson removed_from_best_tip_path)
+              ) ] ;
         (* 4 *)
         (* note: new_root_node is the same as root_node if the root didn't change *)
         let garbage_breadcrumbs, new_root_node =
@@ -767,18 +840,19 @@ struct
         in
         (* 5 *)
         Extensions.handle_diff t.extensions t.extension_writers
-          ( if node.length > best_tip_node.length then
-            Transition_frontier_diff.New_best_tip
-              { old_root= root_node.breadcrumb
-              ; old_root_length= root_node.length
-              ; new_root= new_root_node.breadcrumb
-              ; added_to_best_tip_path=
-                  Non_empty_list.of_list_opt added_to_best_tip_path
-                  |> Option.value_exn
-              ; new_best_tip_length= node.length
-              ; removed_from_best_tip_path
-              ; garbage= garbage_breadcrumbs }
-          else Transition_frontier_diff.New_breadcrumb node.breadcrumb ) )
+          ( match best_tip_change with
+          | `Keep -> Transition_frontier_diff.New_breadcrumb node.breadcrumb
+          | `Take ->
+              Transition_frontier_diff.New_best_tip
+                { old_root= root_node.breadcrumb
+                ; old_root_length= root_node.length
+                ; new_root= new_root_node.breadcrumb
+                ; added_to_best_tip_path=
+                    Non_empty_list.of_list_opt added_to_best_tip_path
+                    |> Option.value_exn
+                ; new_best_tip_length= node.length
+                ; removed_from_best_tip_path
+                ; garbage= garbage_breadcrumbs } ) )
 
   let add_breadcrumb_if_present_exn t breadcrumb =
     let parent_hash = Breadcrumb.parent_hash breadcrumb in

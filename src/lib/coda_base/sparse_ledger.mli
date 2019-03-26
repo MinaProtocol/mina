@@ -2,7 +2,8 @@ open Core
 open Import
 open Snark_params.Tick
 
-type t [@@deriving bin_io, sexp]
+(* TODO : version *)
+type t [@@deriving sexp, bin_io]
 
 val merkle_root : t -> Ledger_hash.t
 

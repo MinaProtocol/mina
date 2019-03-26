@@ -4,6 +4,7 @@ open Coda_base
 open Snark_params
 open Currency
 open Fold_lib
+open Module_version
 
 let state_hash_size_in_triples = Tick.Field.size_in_triples
 
@@ -26,7 +27,33 @@ module Input = struct
 end
 
 module Proof_type = struct
-  type t = [`Merge | `Base] [@@deriving bin_io, sexp, hash, compare]
+  module Stable = struct
+    module V1 = struct
+      module T = struct
+        let version = 1
+
+        type t = [`Base | `Merge]
+        [@@deriving bin_io, sexp, hash, compare, yojson]
+      end
+
+      include T
+      include Registration.Make_latest_version (T)
+    end
+
+    module Latest = V1
+
+    module Module_decl = struct
+      let name = "transaction_snark_proof_type"
+
+      type latest = Latest.t
+    end
+
+    module Registrar = Registration.Make (Module_decl)
+    module Registered_V1 = Registrar.Register (V1)
+  end
+
+  (* bin_io omitted *)
+  type t = Stable.Latest.t [@@deriving sexp, hash, compare, yojson]
 
   let is_base = function `Base -> true | `Merge -> false
 end
@@ -36,7 +63,7 @@ module Pending_coinbase_stack_state = struct
   module T = struct
     type t =
       {source: Pending_coinbase.Stack.t; target: Pending_coinbase.Stack.t}
-    [@@deriving sexp, bin_io, hash, compare, eq, fields]
+    [@@deriving sexp, bin_io, hash, compare, eq, fields, yojson]
   end
 
   include T
@@ -45,41 +72,70 @@ module Pending_coinbase_stack_state = struct
 end
 
 module Statement = struct
-  module T = struct
-    type t =
-      { source: Coda_base.Frozen_ledger_hash.Stable.V1.t
-      ; target: Coda_base.Frozen_ledger_hash.Stable.V1.t
-      ; supply_increase: Currency.Amount.t
-      ; pending_coinbase_stack_state: Pending_coinbase_stack_state.t
-      ; fee_excess: Currency.Fee.Signed.Stable.V1.t
-      ; proof_type: Proof_type.t }
-    [@@deriving sexp, bin_io, hash, compare, fields]
+  module Stable = struct
+    module V1 = struct
+      module T = struct
+        let version = 1
 
-    let option lab =
-      Option.value_map ~default:(Or_error.error_string lab) ~f:(fun x -> Ok x)
+        type t =
+          { source: Coda_base.Frozen_ledger_hash.Stable.V1.t
+          ; target: Coda_base.Frozen_ledger_hash.Stable.V1.t
+          ; supply_increase: Currency.Amount.Stable.V1.t
+          ; pending_coinbase_stack_state: Pending_coinbase_stack_state.t
+          ; fee_excess: Currency.Fee.Signed.Stable.V1.t
+          ; proof_type: Proof_type.Stable.V1.t }
+        [@@deriving sexp, bin_io, hash, compare, yojson]
+      end
 
-    let merge s1 s2 =
-      let open Or_error.Let_syntax in
-      let%map fee_excess =
-        Currency.Fee.Signed.add s1.fee_excess s2.fee_excess
-        |> option "Error adding fees"
-      and supply_increase =
-        Currency.Amount.add s1.supply_increase s2.supply_increase
-        |> option "Error adding supply_increase"
-      in
-      { source= s1.source
-      ; target= s2.target
-      ; fee_excess
-      ; proof_type= `Merge
-      ; supply_increase
-      ; pending_coinbase_stack_state=
-          { source= s1.pending_coinbase_stack_state.source
-          ; target= s2.pending_coinbase_stack_state.target } }
+      include T
+      include Registration.Make_latest_version (T)
+    end
+
+    module Latest = V1
+
+    module Module_decl = struct
+      let name = "transaction_snark_statement"
+
+      type latest = Latest.t
+    end
+
+    module Registrar = Registration.Make (Module_decl)
+    module Registered_V1 = Registrar.Register (V1)
   end
 
-  include T
-  include Hashable.Make_binable (T)
-  include Comparable.Make (T)
+  (* bin_io omitted *)
+  type t = Stable.Latest.t =
+    { source: Coda_base.Frozen_ledger_hash.Stable.V1.t
+    ; target: Coda_base.Frozen_ledger_hash.Stable.V1.t
+    ; supply_increase: Currency.Amount.Stable.V1.t
+    ; pending_coinbase_stack_state: Pending_coinbase_stack_state.t
+    ; fee_excess: Currency.Fee.Signed.Stable.V1.t
+    ; proof_type: Proof_type.Stable.V1.t }
+  [@@deriving sexp, hash, compare, yojson]
+
+  let option lab =
+    Option.value_map ~default:(Or_error.error_string lab) ~f:(fun x -> Ok x)
+
+  let merge s1 s2 =
+    let open Or_error.Let_syntax in
+    let%map fee_excess =
+      Currency.Fee.Signed.add s1.fee_excess s2.fee_excess
+      |> option "Error adding fees"
+    and supply_increase =
+      Currency.Amount.add s1.supply_increase s2.supply_increase
+      |> option "Error adding supply_increase"
+    in
+    { source= s1.source
+    ; target= s2.target
+    ; fee_excess
+    ; proof_type= `Merge
+    ; supply_increase
+    ; pending_coinbase_stack_state=
+        { source= s1.pending_coinbase_stack_state.source
+        ; target= s2.pending_coinbase_stack_state.target } }
+
+  include Hashable.Make_binable (Stable.Latest)
+  include Comparable.Make (Stable.Latest)
 
   let gen =
     let open Quickcheck.Generator.Let_syntax in
@@ -99,16 +155,50 @@ module Statement = struct
         {source= pending_coinbase_before; target= pending_coinbase_after} }
 end
 
-type t =
+module Stable = struct
+  module V1 = struct
+    module T = struct
+      let version = 1
+
+      type t =
+        { source: Frozen_ledger_hash.Stable.V1.t
+        ; target: Frozen_ledger_hash.Stable.V1.t
+        ; proof_type: Proof_type.Stable.V1.t
+        ; supply_increase: Amount.Stable.V1.t
+        ; pending_coinbase_stack_state: Pending_coinbase_stack_state.t
+        ; fee_excess: Amount.Signed.Stable.V1.t
+        ; sok_digest: Sok_message.Digest.Stable.V1.t
+        ; proof: Proof.Stable.V1.t }
+      [@@deriving fields, sexp, bin_io, yojson]
+    end
+
+    include T
+    include Registration.Make_latest_version (T)
+  end
+
+  module Latest = V1
+
+  module Module_decl = struct
+    let name = "transaction_snark"
+
+    type latest = Latest.t
+  end
+
+  module Registrar = Registration.Make (Module_decl)
+  module Registered_V1 = Registrar.Register (V1)
+end
+
+(* bin_io omitted *)
+type t = Stable.Latest.t =
   { source: Frozen_ledger_hash.Stable.V1.t
   ; target: Frozen_ledger_hash.Stable.V1.t
-  ; proof_type: Proof_type.t
+  ; proof_type: Proof_type.Stable.V1.t
   ; supply_increase: Amount.Stable.V1.t
   ; pending_coinbase_stack_state: Pending_coinbase_stack_state.t
   ; fee_excess: Amount.Signed.Stable.V1.t
   ; sok_digest: Sok_message.Digest.Stable.V1.t
   ; proof: Proof.Stable.V1.t }
-[@@deriving fields, sexp, bin_io]
+[@@deriving fields, sexp, yojson]
 
 let statement
     { source
@@ -1038,6 +1128,32 @@ let check_user_command ~sok_message ~source ~target pending_coinbase_stack t
       { Pending_coinbase_stack_state.source= pending_coinbase_stack
       ; target= pending_coinbase_stack }
     (User_command t) handler
+
+let generate_transaction_union_witness sok_message source target transaction
+    pending_coinbase_stack_state handler =
+  let sok_digest = Sok_message.digest sok_message in
+  let prover_state : Base.Prover_state.t =
+    { state1= source
+    ; state2= target
+    ; transaction
+    ; sok_digest
+    ; pending_coinbase_stack_state }
+  in
+  let top_hash =
+    base_top_hash ~sok_digest ~state1:source ~state2:target
+      ~fee_excess:(Transaction_union.excess transaction)
+      ~supply_increase:(Transaction_union.supply_increase transaction)
+      ~pending_coinbase_stack_state
+  in
+  let open Tick.Groth16 in
+  let main x = handle (Base.main x) handler in
+  generate_auxiliary_input (tick_input ()) prover_state main top_hash
+
+let generate_transaction_witness ~sok_message ~source ~target
+    pending_coinbase_stack_state (t : Transaction.t) handler =
+  generate_transaction_union_witness sok_message source target
+    (Transaction_union.of_transaction t)
+    pending_coinbase_stack_state handler
 
 let verification_keys_of_keys {Keys0.verification; _} = verification
 

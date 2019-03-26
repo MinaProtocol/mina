@@ -37,7 +37,7 @@ module type S = sig
 
   include
     Base_intf
-    with type protocol_state := Protocol_state.value
+    with type protocol_state := Protocol_state.Value.t
      and type protocol_state_proof := Proof.t
      and type staged_ledger_diff := Staged_ledger_diff.t
 

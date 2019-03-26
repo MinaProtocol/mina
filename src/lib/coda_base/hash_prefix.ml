@@ -42,3 +42,5 @@ let coinbase = salt coinbase
 let pending_coinbases = salt pending_coinbases
 
 let coinbase_stack = salt coinbase_stack
+
+let checkpoint_list = salt checkpoint_list

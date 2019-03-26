@@ -15,8 +15,16 @@ module Aux_hash = struct
       module T = struct
         let version = 1
 
-        type t = string
-        [@@deriving bin_io, sexp, eq, compare, hash, yojson, yojson]
+        type t = string [@@deriving bin_io, sexp, eq, compare, hash]
+
+        let to_yojson s = `String (Base64.encode_string s)
+
+        let of_yojson = function
+          | `String s -> (
+            match Base64.decode s with
+            | Ok s -> Ok s
+            | Error (`Msg e) -> Error (sprintf "bad base64: %s" e) )
+          | _ -> Error "expected `String"
       end
 
       include T
@@ -35,7 +43,8 @@ module Aux_hash = struct
     module Registered_V1 = Registrar.Register (V1)
   end
 
-  include Stable.Latest
+  (* bin_io omitted *)
+  type t = Stable.Latest.t [@@deriving sexp, eq, compare, hash, yojson]
 
   let of_bytes = Fn.id
 
@@ -73,7 +82,8 @@ module Pending_coinbase_aux = struct
     module Registered_V1 = Registrar.Register (V1)
   end
 
-  include Stable.Latest
+  (* bin_io omitted *)
+  type t = Stable.Latest.t [@@deriving sexp, eq, compare, hash, yojson]
 
   let of_bytes = Fn.id
 
@@ -90,8 +100,8 @@ module Non_snark = struct
 
         type t =
           { ledger_hash: Ledger_hash.Stable.V1.t
-          ; aux_hash: Aux_hash.t
-          ; pending_coinbase_aux: Pending_coinbase_aux.t }
+          ; aux_hash: Aux_hash.Stable.V1.t
+          ; pending_coinbase_aux: Pending_coinbase_aux.Stable.V1.t }
         [@@deriving bin_io, sexp, eq, compare, hash, yojson]
       end
 
@@ -111,11 +121,12 @@ module Non_snark = struct
     module Registered_V1 = Registrar.Register (V1)
   end
 
-  include Stable.Latest
+  (* bin_io omitted *)
+  type t = Stable.Latest.t [@@deriving sexp, eq, compare, hash, yojson]
 
-  type value = t [@@deriving bin_io, sexp, compare, hash, yojson]
+  type value = t [@@deriving sexp, compare, hash, yojson]
 
-  let dummy =
+  let dummy : t =
     { ledger_hash= Ledger_hash.of_hash Field.zero
     ; aux_hash= Aux_hash.dummy
     ; pending_coinbase_aux= Pending_coinbase_aux.dummy }
@@ -126,7 +137,7 @@ module Non_snark = struct
 
   let length_in_triples = (length_in_bits + 2) / 3
 
-  let digest {ledger_hash; aux_hash; pending_coinbase_aux} =
+  let digest ({ledger_hash; aux_hash; pending_coinbase_aux} : t) =
     let h = Digestif.SHA256.init () in
     let h = Digestif.SHA256.feed_string h (Ledger_hash.to_bytes ledger_hash) in
     let h = Digestif.SHA256.feed_string h aux_hash in
@@ -135,11 +146,12 @@ module Non_snark = struct
 
   let fold t = Fold.string_triples (digest t)
 
-  let ledger_hash {ledger_hash; _} = ledger_hash
+  let ledger_hash ({ledger_hash; _} : t) = ledger_hash
 
-  let aux_hash {aux_hash; _} = aux_hash
+  let aux_hash ({aux_hash; _} : t) = aux_hash
 
-  let of_ledger_aux_coinbase_hash aux_hash ledger_hash pending_coinbase_aux =
+  let of_ledger_aux_coinbase_hash aux_hash ledger_hash pending_coinbase_aux : t
+      =
     {aux_hash; ledger_hash; pending_coinbase_aux}
 
   let var_to_triples = Checked.return
@@ -200,34 +212,42 @@ module Stable = struct
   module Registered_V1 = Registrar.Register (V1)
 end
 
-include Stable.Latest
+(* bin_io omitted *)
+type t =
+  Stable.Latest.t
+  (*= {non_snark: Non_snark.t; pending_coinbase_hash: Pending_coinbase.Hash.t}*)
+[@@deriving sexp, eq, compare, hash, yojson]
 
-let ledger_hash {non_snark; _} = Non_snark.ledger_hash non_snark
+type ('a, 'b) t_ = ('a, 'b) Stable.Latest.t_
 
-let aux_hash {non_snark; _} = Non_snark.aux_hash non_snark
+type value = t [@@deriving sexp, eq, compare, hash]
 
-let pending_coinbase_hash {pending_coinbase_hash; _} = pending_coinbase_hash
+type var = (Non_snark.var, Pending_coinbase.Hash.var) t_
 
-let pending_coinbase_hash_var {pending_coinbase_hash; _} =
+include Hashable.Make (Stable.Latest)
+
+let ledger_hash ({non_snark; _} : t) = Non_snark.ledger_hash non_snark
+
+let aux_hash ({non_snark; _} : t) = Non_snark.aux_hash non_snark
+
+let pending_coinbase_hash ({pending_coinbase_hash; _} : t) =
   pending_coinbase_hash
 
-let of_aux_ledger_and_coinbase_hash aux_hash ledger_hash pending_coinbase =
+let pending_coinbase_hash_var ({pending_coinbase_hash; _} : var) =
+  pending_coinbase_hash
+
+let of_aux_ledger_and_coinbase_hash aux_hash ledger_hash pending_coinbase : t =
   { non_snark=
       Non_snark.of_ledger_aux_coinbase_hash aux_hash ledger_hash
         (Pending_coinbase.hash_extra pending_coinbase)
   ; pending_coinbase_hash= Pending_coinbase.merkle_root pending_coinbase }
 
-type value = (Non_snark.t, Pending_coinbase.Hash.t) t_
-[@@deriving bin_io, sexp, eq, compare, hash]
-
-type var = (Non_snark.var, Pending_coinbase.Hash.var) t_
-
-let genesis =
+let genesis : t =
   let pending_coinbase = Pending_coinbase.create () |> Or_error.ok_exn in
   { non_snark= Non_snark.dummy
   ; pending_coinbase_hash= Pending_coinbase.merkle_root pending_coinbase }
 
-let var_of_t ({pending_coinbase_hash; non_snark} : t) =
+let var_of_t ({pending_coinbase_hash; non_snark} : t) : var =
   let non_snark = Non_snark.var_of_t non_snark in
   let pending_coinbase_hash =
     Pending_coinbase.Hash.var_of_t pending_coinbase_hash
@@ -249,7 +269,8 @@ let var_to_triples (t : var) =
   in
   non_snark_triples @ pending_coinbase_hash_triples
 
-let to_hlist {non_snark; pending_coinbase_hash} =
+let to_hlist : ('lx, 'ph) t_ -> (unit, 'lx -> 'ph -> unit) H_list.t =
+ fun {non_snark; pending_coinbase_hash} ->
   H_list.[non_snark; pending_coinbase_hash]
 
 let of_hlist : (unit, 'lx -> 'ph -> unit) H_list.t -> ('lx, 'ph) t_ =

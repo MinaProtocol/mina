@@ -8,7 +8,7 @@ module Body : sig
   type t =
     | Payment of Payment_payload.Stable.V1.t
     | Stake_delegation of Stake_delegation.Stable.V1.t
-  [@@deriving bin_io, eq, sexp, hash, yojson]
+  [@@deriving eq, sexp, hash, yojson]
 
   module Stable : sig
     module V1 : sig
@@ -28,7 +28,15 @@ module Common : sig
     , Coda_numbers.Account_nonce.Stable.V1.t
     , User_command_memo.t )
     t_
-  [@@deriving bin_io, eq, sexp, hash]
+  [@@deriving eq, sexp, hash]
+
+  module Stable : sig
+    module V1 : sig
+      type nonrec t = t [@@deriving bin_io, eq, sexp, hash]
+    end
+
+    module Latest = V1
+  end
 
   val gen : t Quickcheck.Generator.t
 
@@ -42,14 +50,6 @@ module Common : sig
 
   val fold : t -> bool Triple.t Fold.t
 
-  module Stable : sig
-    module V1 : sig
-      type nonrec t = t [@@deriving bin_io, eq, sexp, hash]
-    end
-
-    module Latest = V1
-  end
-
   module Checked : sig
     val to_triples : var -> Boolean.var Triple.t list
 
@@ -60,7 +60,7 @@ end
 type ('common, 'body) t_ = {common: 'common; body: 'body}
 [@@deriving bin_io, eq, sexp, hash]
 
-type t = (Common.t, Body.t) t_ [@@deriving bin_io, eq, sexp, hash]
+type t = (Common.t, Body.t) t_ [@@deriving eq, sexp, hash]
 
 val create :
      fee:Currency.Fee.t
