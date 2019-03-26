@@ -35,7 +35,7 @@ use EventKind::*;
 
 named!(parse_trace_event<&[u8], TraceEvent>,
        switch!(le_u8,
-       0 => do_parse!(ns: le_u64 >> tid: le_u64 >> 
+       0 => do_parse!(ns: le_u64 >> tid: le_u64 >>
                           s: length_data!(le_u64) >>
                           (TraceEvent {
                               ns_since_epoch: ns as f64,

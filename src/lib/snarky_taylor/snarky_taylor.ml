@@ -5,7 +5,7 @@ open Util
 module Floating_point = Floating_point
 module Integer = Integer
 
-(* 
+(*
     Given
     p / q = 0.b1 b2 b3 ...
 
@@ -50,7 +50,7 @@ let log ~terms x =
 
 (* This computes the number of terms of a taylor series one needs to compute
    if the output is to be within 1/2^k of the actual value.
-   It requires one give an upper bound on the absolute value of the 
+   It requires one give an upper bound on the absolute value of the
    derivatives of the function *)
 let terms_needed ~derivative_magnitude_upper_bound ~bits_of_precision:k =
   (*
@@ -107,7 +107,7 @@ module Exp = struct
 
   (* This figures out how many bits we can hope to calculate given our field
    size. This is because computing the terms
-   
+
    x^k
 
    in the taylor series will start to overflow when k is too large. E.g.,
@@ -133,7 +133,7 @@ module Exp = struct
     let {total_precision; terms_needed; per_term_precision} =
       bit_params ~field_size_in_bits ~log_base:abs_log_base
     in
-    (* Precompute the coefficeints 
+    (* Precompute the coefficeints
 
        log(base)^i / i !
 
