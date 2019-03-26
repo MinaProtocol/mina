@@ -79,8 +79,8 @@ val create_ephemeral : unit -> t
 
 val of_database : Db.t -> t
 
-val copy : t -> t
 (** This is not _really_ copy, merely a stop-gap until we remove usages of copy in our codebase. What this actually does is creates a new empty mask on top of the current ledger *)
+val copy : t -> t
 
 val register_mask : t -> Mask.t -> Mask.Attached.t
 

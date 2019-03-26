@@ -89,7 +89,7 @@ module Legend = {
           <h5
             className=Css.(
               merge([
-                Style.H5.basic,
+                Style.H5.tight,
                 style([
                   width(`rem(8.0)),
                   marginTop(`zero),

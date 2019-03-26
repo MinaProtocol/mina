@@ -11,7 +11,6 @@ let main () =
   let open Keypair in
   let logger = Logger.create () in
   let n = 2 in
-  let proposers i = if i = 0 then Some i else None in
   let keypairs =
     List.map Genesis_ledger.accounts
       ~f:Genesis_ledger.keypair_of_account_record_exn
@@ -20,7 +19,7 @@ let main () =
     Some ((List.nth_exn keypairs i).public_key |> Public_key.compress)
   in
   let%bind testnet =
-    Coda_worker_testnet.test logger n proposers snark_work_public_keys
+    Coda_worker_testnet.test logger n Option.some snark_work_public_keys
       Protocols.Coda_pow.Work_selection.Seq
   in
   let%bind () =
