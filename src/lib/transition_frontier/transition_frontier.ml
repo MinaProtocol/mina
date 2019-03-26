@@ -839,18 +839,29 @@ struct
         in
         (* 5 *)
         Extensions.handle_diff t.extensions t.extension_writers
-          ( if node.length > best_tip_node.length then
-            Transition_frontier_diff.New_best_tip
-              { old_root= root_node.breadcrumb
-              ; old_root_length= root_node.length
-              ; new_root= new_root_node.breadcrumb
-              ; added_to_best_tip_path=
-                  Non_empty_list.of_list_opt added_to_best_tip_path
-                  |> Option.value_exn
-              ; new_best_tip_length= node.length
-              ; removed_from_best_tip_path
-              ; garbage= garbage_breadcrumbs }
-          else Transition_frontier_diff.New_breadcrumb node.breadcrumb ) )
+          ( match
+              Consensus.select
+                ~existing:
+                  (consensus_state_of_breadcrumb best_tip_node.breadcrumb)
+                ~candidate:(consensus_state_of_breadcrumb breadcrumb)
+                ~logger:
+                  (Logger.create ()
+                     ~metadata:
+                       [ ( "selection context"
+                         , `String "comparing new breadcrumb to best tip" ) ])
+            with
+          | `Keep -> Transition_frontier_diff.New_breadcrumb node.breadcrumb
+          | `Take ->
+              Transition_frontier_diff.New_best_tip
+                { old_root= root_node.breadcrumb
+                ; old_root_length= root_node.length
+                ; new_root= new_root_node.breadcrumb
+                ; added_to_best_tip_path=
+                    Non_empty_list.of_list_opt added_to_best_tip_path
+                    |> Option.value_exn
+                ; new_best_tip_length= node.length
+                ; removed_from_best_tip_path
+                ; garbage= garbage_breadcrumbs } ) )
 
   let add_breadcrumb_if_present_exn t breadcrumb =
     let parent_hash = Breadcrumb.parent_hash breadcrumb in
