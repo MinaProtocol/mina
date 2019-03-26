@@ -19,7 +19,7 @@ Engineering managers will:
 * Help decide who works on what and when, minimizing unnecessary process and developing nurturing environments where engineers feel empowered to contribute their best work
 * Collaborate broadly to design well-informed engineering roadmaps
 * Contribute to the project technically (as an estimated percent of time, perhaps 30% engineering and 70% management)
-* Provide empathetic leadership and impactful mentoring   
+* Provide empathetic leadership and impactful mentoring
 
 Ideal candidates will be interested in:
 
