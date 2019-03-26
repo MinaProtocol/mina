@@ -441,7 +441,7 @@ let
            homepage = "http://github.com/ryantm/hdbc-mysql";
            description = "MySQL driver for HDBC";
            license = "LGPL";
-         }) {inherit (pkgs) mysqlclient; inherit (pkgs) openssl; 
+         }) {inherit (pkgs) mysqlclient; inherit (pkgs) openssl;
 inherit (pkgs) zlib;};
       "HDBC-session" = callPackage
         ({ mkDerivation, base, HDBC, stdenv }:
@@ -1361,7 +1361,7 @@ inherit (pkgs) zlib;};
            homepage = "https://github.com/xmonad/X11";
            description = "A binding to the X11 graphics library";
            license = stdenv.lib.licenses.bsd3;
-         }) {inherit (pkgs.xorg) libXScrnSaver; inherit (pkgs.xorg) libXext; 
+         }) {inherit (pkgs.xorg) libXScrnSaver; inherit (pkgs.xorg) libXext;
 inherit (pkgs.xorg) libXinerama; inherit (pkgs.xorg) libXrender;};
       "X11-xft" = callPackage
         ({ mkDerivation, base, libXft, stdenv, utf8-string, X11 }:
@@ -5022,7 +5022,7 @@ inherit (pkgs.xorg) libXinerama; inherit (pkgs.xorg) libXrender;};
            doCheck = false;
            description = "Low-level bindings to GLFW OpenGL library";
            license = stdenv.lib.licenses.bsd3;
-         }) {inherit (pkgs) libGL; inherit (pkgs.xorg) libXext; 
+         }) {inherit (pkgs) libGL; inherit (pkgs.xorg) libXext;
 inherit (pkgs.xorg) libXfixes;};
       "bindings-libzip" = callPackage
         ({ mkDerivation, base, bindings-DSL, libzip, stdenv }:
@@ -12678,7 +12678,7 @@ inherit (pkgs.xorg) libXfixes;};
            homepage = "https://github.com/chrisdone/freenect";
            description = "Interface to the Kinect device";
            license = stdenv.lib.licenses.bsd3;
-         }) {inherit (pkgs) freenect; inherit (pkgs) freenect_sync; 
+         }) {inherit (pkgs) freenect; inherit (pkgs) freenect_sync;
 inherit (pkgs) libfreenect;};
       "freer-simple" = callPackage
         ({ mkDerivation, base, natural-transformation, stdenv
@@ -12982,8 +12982,8 @@ inherit (pkgs) libfreenect;};
            doCheck = false;
            description = "A Haskell binding to a subset of the GD graphics library";
            license = stdenv.lib.licenses.bsd3;
-         }) {inherit (pkgs) expat; inherit (pkgs) fontconfig; 
-inherit (pkgs) freetype; inherit (pkgs) gd; 
+         }) {inherit (pkgs) expat; inherit (pkgs) fontconfig;
+inherit (pkgs) freetype; inherit (pkgs) gd;
 inherit (pkgs) libjpeg; inherit (pkgs) libpng; inherit (pkgs) zlib;};
       "gdp" = callPackage
         ({ mkDerivation, base, lawful, stdenv }:

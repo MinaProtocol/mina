@@ -34,11 +34,11 @@ module type Consensus_state_intf = sig
 
   val fold : Value.t -> bool Triple.t Fold.t
 
+  (** For status *)
   val length : Value.t -> Length.t
-  (** For status *)
 
-  val time_hum : Value.t -> string
   (** For status *)
+  val time_hum : Value.t -> string
 
   val to_lite : (Value.t -> Lite_base.Consensus_state.t) option
 
