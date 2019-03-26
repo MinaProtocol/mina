@@ -382,25 +382,13 @@ module Restarts : sig
        Api.t
     -> logger:Logger.t
     -> node:int
-    -> action:(unit -> 'a Deferred.t)
     -> duration:Time.Span.t
     -> unit Deferred.t
 
-  val trigger_catchup :
-       Api.t
-    -> logger:Logger.t
-    -> node:int
-    -> largest_account_keypair:Keypair.t
-    -> payment_receiver:int
-    -> unit Deferred.t
+  val trigger_catchup : Api.t -> logger:Logger.t -> node:int -> unit Deferred.t
 
   val trigger_bootstrap :
-       Api.t
-    -> logger:Logger.t
-    -> node:int
-    -> largest_account_keypair:Keypair.t
-    -> payment_receiver:int
-    -> unit Deferred.t
+    Api.t -> logger:Logger.t -> node:int -> unit Deferred.t
 end = struct
   let catchup_wait_duration =
     Time.Span.of_ms
@@ -413,39 +401,21 @@ end = struct
     @@ ( Consensus.Constants.(c * ((2 * k) + delta) * block_window_duration_ms)
        |> Float.of_int )
 
-  let restart_node testnet ~logger ~node ~action ~duration =
+  let restart_node testnet ~logger ~node ~duration =
     let%bind () = after (Time.Span.of_sec 5.) in
     Logger.info logger ~module_:__MODULE__ ~location:__LOC__ "Stopping %d" node ;
     (* Send one payment *)
     let%bind () = Api.stop testnet node in
-    let%bind _ = action () in
     let%bind () = after duration in
     Api.start testnet node
 
-  let restart_and_payment testnet ~node ~logger ~largest_account_keypair
-      ~duration ~payment_receiver =
-    let sender_sk = largest_account_keypair.Keypair.private_key in
-    let send_amount = Currency.Amount.of_int 10 in
-    let fee = Currency.Fee.of_int 0 in
-    let keypair = Keypair.create () in
-    restart_node testnet ~node ~logger
-      ~action:(fun () ->
-        Api.send_payment testnet payment_receiver sender_sk
-          (Public_key.compress keypair.public_key)
-          send_amount fee )
-      ~duration
-
-  let trigger_catchup testnet ~logger ~node ~largest_account_keypair
-      ~payment_receiver =
+  let trigger_catchup testnet ~logger ~node =
     Logger.info logger ~module_:__MODULE__ ~location:__LOC__
       "Triggering catchup on %d" node ;
-    restart_and_payment testnet ~largest_account_keypair ~node ~logger
-      ~duration:catchup_wait_duration ~payment_receiver
+    restart_node testnet ~logger ~node ~duration:catchup_wait_duration
 
-  let trigger_bootstrap testnet ~logger ~node ~largest_account_keypair
-      ~payment_receiver =
+  let trigger_bootstrap testnet ~logger ~node =
     Logger.info logger ~module_:__MODULE__ ~location:__LOC__
       "Triggering bootstrap on %d" node ;
-    restart_and_payment testnet ~largest_account_keypair ~node ~logger
-      ~duration:bootstrap_wait_duration ~payment_receiver
+    restart_node testnet ~node ~logger ~duration:bootstrap_wait_duration
 end
