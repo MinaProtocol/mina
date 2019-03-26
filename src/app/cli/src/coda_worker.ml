@@ -108,7 +108,12 @@ module T = struct
         , Prove_receipt.Input.t
         , Prove_receipt.Output.t )
         Rpc_parallel.Function.t
-    ; dump_tf: ('worker, unit, string) Rpc_parallel.Function.t }
+    ; dump_tf: ('worker, unit, string) Rpc_parallel.Function.t
+    ; best_path:
+        ( 'worker
+        , unit
+        , State_hash.Stable.Latest.t list )
+        Rpc_parallel.Function.t }
 
   type coda_functions =
     { coda_peers: unit -> Peers.t Deferred.t
@@ -130,7 +135,8 @@ module T = struct
            Deferred.t
     ; coda_prove_receipt:
         Prove_receipt.Input.t -> Prove_receipt.Output.t Deferred.t
-    ; coda_dump_tf: unit -> string Deferred.t }
+    ; coda_dump_tf: unit -> string Deferred.t
+    ; coda_best_path: unit -> State_hash.Stable.Latest.t list Deferred.t }
 
   module Worker_state = struct
     type init_arg = Input.t [@@deriving bin_io]
@@ -179,6 +185,9 @@ module T = struct
 
     let dump_tf_impl ~worker_state ~conn_state:() () =
       worker_state.coda_dump_tf ()
+
+    let best_path_impl ~worker_state ~conn_state:() () =
+      worker_state.coda_best_path ()
 
     let peers =
       C.create_rpc ~f:peers_impl ~bin_input:Unit.bin_t ~bin_output:Peers.bin_t
@@ -232,6 +241,10 @@ module T = struct
       C.create_rpc ~f:dump_tf_impl ~bin_input:Unit.bin_t
         ~bin_output:String.bin_t ()
 
+    let best_path =
+      C.create_rpc ~f:best_path_impl ~bin_input:Unit.bin_t
+        ~bin_output:[%bin_type_class: State_hash.Stable.Latest.t list] ()
+
     let functions =
       { peers
       ; start
@@ -243,7 +256,8 @@ module T = struct
       ; send_payment
       ; process_payment
       ; prove_receipt
-      ; dump_tf }
+      ; dump_tf
+      ; best_path }
 
     let init_worker_state
         { host
@@ -440,6 +454,10 @@ module T = struct
               ( Main.dump_tf coda |> Or_error.ok
               |> Option.value ~default:"<failed to visualize>" )
           in
+          let coda_best_path () =
+            let path = Main.best_path coda in
+            Deferred.return (Option.value ~default:[] path)
+          in
           { coda_peers= with_monitor coda_peers
           ; coda_strongest_ledgers= with_monitor coda_strongest_ledgers
           ; coda_root_diff= with_monitor coda_root_diff
@@ -450,7 +468,8 @@ module T = struct
           ; coda_process_payment= with_monitor coda_process_payment
           ; coda_prove_receipt= with_monitor coda_prove_receipt
           ; coda_start= with_monitor coda_start
-          ; coda_dump_tf= with_monitor coda_dump_tf } )
+          ; coda_dump_tf= with_monitor coda_dump_tf
+          ; coda_best_path= with_monitor coda_best_path } )
 
     let init_connection_state ~connection:_ ~worker_state:_ = return
   end
