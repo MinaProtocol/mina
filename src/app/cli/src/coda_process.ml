@@ -85,10 +85,10 @@ let prove_receipt_exn (conn, proc, _) proving_receipt resulting_receipt =
   Coda_worker.Connection.run_exn conn ~f:Coda_worker.functions.prove_receipt
     ~arg:(proving_receipt, resulting_receipt)
 
-let strongest_ledgers_exn (conn, proc, _) =
+let verified_transitions_exn (conn, proc, _) =
   let%map r =
     Coda_worker.Connection.run_exn conn
-      ~f:Coda_worker.functions.strongest_ledgers ~arg:()
+      ~f:Coda_worker.functions.verified_transitions ~arg:()
   in
   Linear_pipe.wrap_reader r
 
