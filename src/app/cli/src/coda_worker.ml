@@ -95,7 +95,7 @@ module T = struct
         , User_command.t
         , Receipt.Chain_hash.t Or_error.t )
         Rpc_parallel.Function.t
-    ; strongest_ledgers:
+    ; verified_transitions:
         ('worker, unit, State_hashes.t Pipe.Reader.t) Rpc_parallel.Function.t
     ; root_diff:
         ( 'worker
@@ -127,7 +127,8 @@ module T = struct
         Send_payment_input.t -> Receipt.Chain_hash.t Or_error.t Deferred.t
     ; coda_process_payment:
         User_command.t -> Receipt.Chain_hash.t Or_error.t Deferred.t
-    ; coda_strongest_ledgers: unit -> State_hashes.t Pipe.Reader.t Deferred.t
+    ; coda_verified_transitions:
+        unit -> State_hashes.t Pipe.Reader.t Deferred.t
     ; coda_root_diff:
            unit
         -> User_command.t Protocols.Coda_transition_frontier.Root_diff_view.t
@@ -157,8 +158,8 @@ module T = struct
   struct
     let peers_impl ~worker_state ~conn_state:() () = worker_state.coda_peers ()
 
-    let strongest_ledgers_impl ~worker_state ~conn_state:() () =
-      worker_state.coda_strongest_ledgers ()
+    let verified_transitions_impl ~worker_state ~conn_state:() () =
+      worker_state.coda_verified_transitions ()
 
     let root_diff_impl ~worker_state ~conn_state:() () =
       worker_state.coda_root_diff ()
@@ -226,8 +227,8 @@ module T = struct
         ~bin_output:
           [%bin_type_class: Receipt.Chain_hash.Stable.V1.t Or_error.t] ()
 
-    let strongest_ledgers =
-      C.create_pipe ~f:strongest_ledgers_impl ~bin_input:Unit.bin_t
+    let verified_transitions =
+      C.create_pipe ~f:verified_transitions_impl ~bin_input:Unit.bin_t
         ~bin_output:State_hashes.bin_t ()
 
     let root_diff =
@@ -248,7 +249,7 @@ module T = struct
     let functions =
       { peers
       ; start
-      ; strongest_ledgers
+      ; verified_transitions
       ; root_diff
       ; get_balance
       ; get_nonce
@@ -422,10 +423,10 @@ module T = struct
                   !"Failed to construct payment proof: %{sexp:Error.t}"
                   e ()
           in
-          let coda_strongest_ledgers () =
+          let coda_verified_transitions () =
             let r, w = Linear_pipe.create () in
             don't_wait_for
-              (Strict_pipe.Reader.iter (Main.strongest_ledgers coda)
+              (Strict_pipe.Reader.iter (Main.verified_transitions coda)
                  ~f:(fun t ->
                    let open Main.Inputs in
                    let p =
@@ -459,7 +460,7 @@ module T = struct
             Deferred.return (Option.value ~default:[] path)
           in
           { coda_peers= with_monitor coda_peers
-          ; coda_strongest_ledgers= with_monitor coda_strongest_ledgers
+          ; coda_verified_transitions= with_monitor coda_verified_transitions
           ; coda_root_diff= with_monitor coda_root_diff
           ; coda_get_balance= with_monitor coda_get_balance
           ; coda_get_nonce= with_monitor coda_get_nonce
