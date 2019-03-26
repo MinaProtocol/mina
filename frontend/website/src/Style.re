@@ -12,7 +12,6 @@ module Colors = {
   let greyishBrown = `rgb((74, 74, 74));
 
   let bluishGreen = `rgb((22, 168, 85));
-  let purpleBrown = `rgb((100, 46, 48));
   let offWhite = `rgb((243, 243, 243));
   let grey = `rgb((129, 146, 168));
 
@@ -33,6 +32,8 @@ module Colors = {
 
   let teal = `rgb((71, 130, 160));
   let tealAlpha = a => `rgba((71, 130, 160, a));
+
+  let rosebud = `rgb((163, 83, 111));
 };
 
 module Typeface = {
@@ -111,8 +112,9 @@ module MediaQuery = {
   let full = "(min-width: 48rem)";
   let notMobile = "(min-width: 32rem)";
   let notSmallMobile = "(min-width: 25rem)";
-  // to adjust root font size
-  let iphoneSEorSmaller = "(max-width: 24rem)";
+  // to adjust root font size (therefore pixels)
+  let iphoneSEorSmaller = "(max-width: 374px)";
+  let iphoneXorSmaller = "(max-width: 384px)";
 };
 
 /** sets both paddingLeft and paddingRight, as one should */
@@ -241,16 +243,19 @@ module H4 = {
 module H5 = {
   open Css;
 
-  let basic =
+  let init =
     style([
       Typeface.ibmplexsans,
       fontSize(`rem(0.9345)),
-      lineHeight(`rem(1.5)),
       letterSpacing(`rem(0.125)),
       fontWeight(`normal),
       color(Colors.slateAlpha(0.5)),
       textTransform(`uppercase),
     ]);
+
+  let basic = merge([init, style([lineHeight(`rem(1.5))])]);
+
+  let tight = merge([init, style([lineHeight(`rem(1.25))])]);
 };
 
 module Body = {

@@ -1539,9 +1539,10 @@ let%test_module "test" =
         type fee_transfer = Fee_transfer.Single.Stable.V1.t
         [@@deriving sexp, bin_io, compare, eq]
 
+        (* TODO : version *)
         type t =
           { proposer: public_key
-          ; amount: Currency.Amount.t
+          ; amount: Currency.Amount.Stable.V1.t
           ; fee_transfer: fee_transfer option }
         [@@deriving sexp, bin_io, compare, eq]
 
@@ -1635,7 +1636,7 @@ let%test_module "test" =
             type t =
               { source: Ledger_hash.Stable.V1.t
               ; target: Ledger_hash.Stable.V1.t
-              ; supply_increase: Currency.Amount.t
+              ; supply_increase: Currency.Amount.Stable.V1.t
               ; fee_excess: Fee.Signed.t
               ; proof_type: [`Base | `Merge] }
             [@@deriving sexp, bin_io, compare, hash, yojson]

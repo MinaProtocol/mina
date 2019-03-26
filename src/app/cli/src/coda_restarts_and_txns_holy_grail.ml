@@ -20,15 +20,14 @@ let main n () =
       Protocols.Coda_pow.Work_selection.Seq
   in
   (* SEND TXNS *)
-  let sender_sk =
-    Option.value_exn (Genesis_ledger.largest_account_exn () |> fst)
+  let keypairs =
+    List.map Genesis_ledger.accounts
+      ~f:Genesis_ledger.keypair_of_account_record_exn
   in
-  let receiver_pk =
-    Genesis_ledger.largest_account_exn () |> snd |> Account.public_key
+  let%bind () =
+    Coda_worker_testnet.Payments.send_several_payments testnet ~node:0
+      ~keypairs ~n:3
   in
-  don't_wait_for
-  @@ Coda_worker_testnet.Payments.send_several_payments testnet ~node:0
-       ~src:sender_sk ~dest:receiver_pk ;
   (* RESTART NODES *)
   (* catchup *)
   let idx = Quickcheck.random_value (Int.gen_incl 1 (n - 1)) in
