@@ -79,47 +79,116 @@ val create_ephemeral : unit -> t
 
 val of_database : Db.t -> t
 
-val copy : t -> t
 (** This is not _really_ copy, merely a stop-gap until we remove usages of copy in our codebase. What this actually does is creates a new empty mask on top of the current ledger *)
+val copy : t -> t
 
 val register_mask : t -> Mask.t -> Mask.Attached.t
 
 val commit : Mask.Attached.t -> unit
 
 module Undo : sig
-  module User_command : sig
+  module User_command_undo : sig
     module Common : sig
       type t =
-        { user_command: User_command.t
-        ; previous_receipt_chain_hash: Receipt.Chain_hash.t }
+        { user_command: User_command.Stable.V1.t
+        ; previous_receipt_chain_hash: Receipt.Chain_hash.Stable.V1.t }
+      [@@deriving sexp]
+
+      module Stable :
+        sig
+          module V1 : sig
+            type t [@@deriving bin_io, sexp]
+          end
+
+          module Latest = V1
+        end
+        with type V1.t = t
     end
 
     module Body : sig
       type t =
         | Payment of {previous_empty_accounts: Public_key.Compressed.t list}
         | Stake_delegation of {previous_delegate: Public_key.Compressed.t}
+      [@@deriving sexp]
+
+      module Stable :
+        sig
+          module V1 : sig
+            type t [@@deriving bin_io, sexp]
+          end
+        end
+        with type V1.t = t
     end
 
-    type t = {common: Common.t; body: Body.t} [@@deriving sexp, bin_io]
+    type t = {common: Common.Stable.V1.t; body: Body.Stable.V1.t}
+    [@@deriving sexp]
+
+    module Stable :
+      sig
+        module V1 : sig
+          type t [@@deriving sexp, bin_io]
+        end
+
+        module Latest = V1
+      end
+      with type V1.t = t
   end
 
-  type fee_transfer =
-    { fee_transfer: Fee_transfer.t
-    ; previous_empty_accounts: Public_key.Compressed.t list }
-  [@@deriving sexp, bin_io]
+  module Fee_transfer_undo : sig
+    type t =
+      { fee_transfer: Fee_transfer.Stable.V1.t
+      ; previous_empty_accounts: Public_key.Compressed.Stable.V1.t list }
+    [@@deriving sexp]
 
-  type coinbase =
-    { coinbase: Coinbase.t
-    ; previous_empty_accounts: Public_key.Compressed.t list }
-  [@@deriving sexp, bin_io]
+    module Stable :
+      sig
+        module V1 : sig
+          type t [@@deriving sexp, bin_io]
+        end
 
-  type varying =
-    | User_command of User_command.t
-    | Fee_transfer of fee_transfer
-    | Coinbase of coinbase
-  [@@deriving sexp, bin_io]
+        module Latest = V1
+      end
+      with type V1.t = t
+  end
 
-  type t = {previous_hash: Ledger_hash.t; varying: varying} [@@deriving sexp]
+  module Coinbase_undo : sig
+    type t =
+      { coinbase: Coinbase.Stable.V1.t
+      ; previous_empty_accounts: Public_key.Compressed.Stable.V1.t list }
+    [@@deriving sexp]
+
+    module Stable :
+      sig
+        module V1 : sig
+          type t [@@deriving sexp, bin_io]
+        end
+
+        module Latest = V1
+      end
+      with type V1.t = t
+  end
+
+  module Varying : sig
+    type t =
+      | User_command of User_command_undo.Stable.V1.t
+      | Fee_transfer of Fee_transfer_undo.Stable.V1.t
+      | Coinbase of Coinbase_undo.Stable.V1.t
+    [@@deriving sexp]
+
+    module Stable :
+      sig
+        module V1 : sig
+          type t [@@deriving sexp, bin_io]
+        end
+
+        module Latest = V1
+      end
+      with type V1.t = t
+  end
+
+  type t =
+    {previous_hash: Ledger_hash.Stable.V1.t; varying: Varying.Stable.V1.t}
+  [@@deriving sexp]
 
   module Stable :
     sig
@@ -137,7 +206,9 @@ end
 val create_new_account_exn : t -> Public_key.Compressed.t -> Account.t -> unit
 
 val apply_user_command :
-  t -> User_command.With_valid_signature.t -> Undo.User_command.t Or_error.t
+     t
+  -> User_command.With_valid_signature.t
+  -> Undo.User_command_undo.t Or_error.t
 
 val apply_transaction : t -> Transaction.t -> Undo.t Or_error.t
 

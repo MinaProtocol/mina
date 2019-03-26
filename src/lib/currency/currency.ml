@@ -11,7 +11,7 @@ open Module_version
 type uint64 = Unsigned.uint64
 
 module type Basic = sig
-  type t [@@deriving bin_io, sexp, compare, hash, yojson]
+  type t [@@deriving sexp, compare, hash, yojson]
 
   val max_int : t
 
@@ -60,6 +60,8 @@ module type Basic = sig
   val var_to_number : var -> Number.t
 
   val var_to_triples : var -> Boolean.var Triple.t list
+
+  val equal_var : var -> var -> (Boolean.var, _) Checked.t
 end
 
 module type Arithmetic_intf = sig

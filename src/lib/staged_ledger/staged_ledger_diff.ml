@@ -39,7 +39,7 @@ end) :
    and type public_key := Inputs.Compressed_public_key.t
    and type completed_work := Inputs.Transaction_snark_work.t
    and type completed_work_checked := Inputs.Transaction_snark_work.Checked.t
-   and type fee_transfer_single := Inputs.Fee_transfer.single = struct
+   and type fee_transfer_single := Inputs.Fee_transfer.Single.t = struct
   open Inputs
 
   module At_most_two = struct
@@ -66,7 +66,9 @@ end) :
       | _ -> Or_error.error_string "Error incrementing coinbase parts"
   end
 
-  type ft = Inputs.Fee_transfer.single [@@deriving sexp, bin_io]
+  (* TODO: version *)
+
+  type ft = Inputs.Fee_transfer.Single.Stable.V1.t [@@deriving sexp, bin_io]
 
   (* TODO: version *)
 

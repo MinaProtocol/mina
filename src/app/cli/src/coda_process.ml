@@ -69,6 +69,10 @@ let get_nonce_exn (conn, proc, _) pk =
   Coda_worker.Connection.run_exn conn ~f:Coda_worker.functions.get_nonce
     ~arg:pk
 
+let root_length_exn (conn, proc, _) =
+  Coda_worker.Connection.run_exn conn ~f:Coda_worker.functions.root_length
+    ~arg:()
+
 let send_payment_exn (conn, proc, _) sk pk amount fee memo =
   Coda_worker.Connection.run_exn conn ~f:Coda_worker.functions.send_payment
     ~arg:(sk, pk, amount, fee, memo)
@@ -97,3 +101,6 @@ let root_diff_exn (conn, proc, _) =
 
 let start_exn (conn, proc, _) =
   Coda_worker.Connection.run_exn conn ~f:Coda_worker.functions.start ~arg:()
+
+let dump_tf (conn, proc, _) =
+  Coda_worker.Connection.run_exn conn ~f:Coda_worker.functions.dump_tf ~arg:()

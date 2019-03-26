@@ -117,7 +117,7 @@ module type Init_intf = sig
      and type user_command := User_command.t
      and type user_command_with_valid_signature :=
                 User_command.With_valid_signature.t
-     and type fee_transfer_single := Fee_transfer.single
+     and type fee_transfer_single := Fee_transfer.Single.t
 
   module Make_work_selector : Work_selector_F
 
@@ -246,7 +246,7 @@ module type Main_intf = sig
                   User_command.With_valid_signature.t
        and type public_key := Public_key.Compressed.t
        and type staged_ledger_hash := Staged_ledger_hash.t
-       and type fee_transfer_single := Fee_transfer.single
+       and type fee_transfer_single := Fee_transfer.Single.t
 
     module Staged_ledger :
       Protocols.Coda_pow.Staged_ledger_intf
@@ -326,6 +326,8 @@ module type Main_intf = sig
   val best_staged_ledger : t -> Inputs.Staged_ledger.t Participating_state.t
 
   val best_ledger : t -> Inputs.Ledger.t Participating_state.t
+
+  val root_length : t -> int Participating_state.t
 
   val best_protocol_state :
     t -> Consensus.Protocol_state.Value.t Participating_state.t
@@ -1359,7 +1361,7 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
     let frontier_file = conf_dir ^/ "frontier.dot" in
     let mask_file = conf_dir ^/ "registered_masks.dot" in
     Logger.info logger ~module_:__MODULE__ ~location:__LOC__ "%s"
-      (Visualization_message.success "registered masks" frontier_file) ;
+      (Visualization_message.success "registered masks" mask_file) ;
     Coda_base.Ledger.Debug.visualize ~filename:mask_file ;
     match visualize_frontier ~filename:frontier_file t with
     | `Active () ->

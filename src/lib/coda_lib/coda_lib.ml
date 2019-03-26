@@ -420,6 +420,11 @@ module Make (Inputs : Inputs_intf) = struct
     let%map frontier = Broadcast_pipe.Reader.peek t.transition_frontier in
     Transition_frontier.best_tip frontier
 
+  let root_length_opt t =
+    let open Option.Let_syntax in
+    let%map frontier = Broadcast_pipe.Reader.peek t.transition_frontier in
+    Transition_frontier.root_length frontier
+
   let best_staged_ledger_opt t =
     let open Option.Let_syntax in
     let%map tip = best_tip_opt t in
@@ -442,6 +447,8 @@ module Make (Inputs : Inputs_intf) = struct
       f
 
   let best_tip = compose_of_option best_tip_opt
+
+  let root_length = compose_of_option root_length_opt
 
   let visualize_frontier ~filename =
     compose_of_option
@@ -511,6 +518,10 @@ module Make (Inputs : Inputs_intf) = struct
                 Strict_pipe.Writer.write root_diff_writer root_diff
                 |> Deferred.return ) )) ;
     root_diff_reader
+
+  let dump_tf t =
+    peek_frontier t.transition_frontier
+    |> Or_error.map ~f:Transition_frontier.visualize_to_string
 
   module Config = struct
     (** If ledger_db_location is None, will auto-generate a db based on a UUID *)

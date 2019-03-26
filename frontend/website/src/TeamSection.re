@@ -28,13 +28,16 @@ module Member = {
             style([
               display(`flex),
               flexDirection(`column),
-              width(`rem(23.75)),
-              minHeight(`rem(27.5)),
+              width(`rem(20.5)),
+              minWidth(`rem(20.5)),
+              flexGrow(1.),
+              maxWidth(`rem(23.75)),
               backgroundColor(Style.Colors.veryLightGrey),
               borderRadius(`px(10)),
               border(`px(1), `solid, Style.Colors.hyperlinkAlpha(0.2)),
               padding(`rem(1.5)),
               margin(`rem(1.5625)),
+              media(Style.MediaQuery.notMobile, [minHeight(`rem(27.5))]),
             ])
           )>
           <div className=Css.(style([display(`flex), flexDirection(`row)]))>
@@ -48,10 +51,18 @@ module Member = {
                   justifyContent(`flexStart),
                 ])
               )>
-              <div className=Style.H3.wide> {ReasonReact.string(name)} </div>
               <div
                 className=Css.(
-                  merge([Style.H5.basic, style([textAlign(`center)])])
+                  merge([Style.H3.wide, style([letterSpacing(`em(0.2))])])
+                )>
+                {ReasonReact.string(name)}
+              </div>
+              <div
+                className=Css.(
+                  merge([
+                    Style.H5.basic,
+                    style([textAlign(`left), whiteSpace(`nowrap)]),
+                  ])
                 )>
                 {ReasonReact.string(title)}
               </div>
@@ -220,7 +231,7 @@ let make = _children => {
         />
         <Member
           name="Joel Krauska"
-          title="Protocol Reliability Engineer"
+          title="Protocol Reliability Eng"
           description="Joel builds networks. He loves open source technologies, automation \
        and monitoring large systems at scale. Over the years, he has worked \
        for ISPs, network hardware and software vendors, online gaming \

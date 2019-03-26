@@ -38,8 +38,8 @@ module Send_payment_input = struct
   type t =
     Private_key.t
     * Public_key.Compressed.Stable.V1.t
-    * Currency.Amount.t
-    * Currency.Fee.t
+    * Currency.Amount.Stable.V1.t
+    * Currency.Fee.Stable.V1.t
     * User_command_memo.t
   [@@deriving bin_io]
 end
@@ -55,7 +55,8 @@ module T = struct
   end
 
   module Maybe_currency = struct
-    type t = Currency.Balance.t option [@@deriving bin_io]
+    (* TODO: version *)
+    type t = Currency.Balance.Stable.V1.t option [@@deriving bin_io]
   end
 
   module Prove_receipt = struct
@@ -83,6 +84,7 @@ module T = struct
         , Public_key.Compressed.t
         , Coda_numbers.Account_nonce.t option )
         Rpc_parallel.Function.t
+    ; root_length: ('worker, unit, int) Rpc_parallel.Function.t
     ; send_payment:
         ( 'worker
         , Send_payment_input.t
@@ -105,7 +107,8 @@ module T = struct
         ( 'worker
         , Prove_receipt.Input.t
         , Prove_receipt.Output.t )
-        Rpc_parallel.Function.t }
+        Rpc_parallel.Function.t
+    ; dump_tf: ('worker, unit, string) Rpc_parallel.Function.t }
 
   type coda_functions =
     { coda_peers: unit -> Peers.t Deferred.t
@@ -114,6 +117,7 @@ module T = struct
     ; coda_get_nonce:
            Public_key.Compressed.t
         -> Coda_numbers.Account_nonce.t option Deferred.t
+    ; coda_root_length: unit -> int Deferred.t
     ; coda_send_payment:
         Send_payment_input.t -> Receipt.Chain_hash.t Or_error.t Deferred.t
     ; coda_process_payment:
@@ -125,7 +129,8 @@ module T = struct
            Pipe.Reader.t
            Deferred.t
     ; coda_prove_receipt:
-        Prove_receipt.Input.t -> Prove_receipt.Output.t Deferred.t }
+        Prove_receipt.Input.t -> Prove_receipt.Output.t Deferred.t
+    ; coda_dump_tf: unit -> string Deferred.t }
 
   module Worker_state = struct
     type init_arg = Input.t [@@deriving bin_io]
@@ -155,6 +160,9 @@ module T = struct
     let get_balance_impl ~worker_state ~conn_state:() pk =
       worker_state.coda_get_balance pk
 
+    let root_length_impl ~worker_state ~conn_state:() () =
+      worker_state.coda_root_length ()
+
     let get_nonce_impl ~worker_state ~conn_state:() pk =
       worker_state.coda_get_nonce pk
 
@@ -168,6 +176,9 @@ module T = struct
       worker_state.coda_prove_receipt input
 
     let start_impl ~worker_state ~conn_state:() () = worker_state.coda_start ()
+
+    let dump_tf_impl ~worker_state ~conn_state:() () =
+      worker_state.coda_dump_tf ()
 
     let peers =
       C.create_rpc ~f:peers_impl ~bin_input:Unit.bin_t ~bin_output:Peers.bin_t
@@ -185,7 +196,12 @@ module T = struct
     let get_nonce =
       C.create_rpc ~f:get_nonce_impl
         ~bin_input:Public_key.Compressed.Stable.V1.bin_t
-        ~bin_output:[%bin_type_class: Coda_numbers.Account_nonce.t option] ()
+        ~bin_output:
+          [%bin_type_class: Coda_numbers.Account_nonce.Stable.V1.t option] ()
+
+    let root_length =
+      C.create_rpc ~f:root_length_impl ~bin_input:Unit.bin_t
+        ~bin_output:Int.bin_t ()
 
     let prove_receipt =
       C.create_rpc ~f:prove_receipt_impl ~bin_input:Prove_receipt.Input.bin_t
@@ -212,6 +228,10 @@ module T = struct
             User_command.t Protocols.Coda_transition_frontier.Root_diff_view.t]
         ()
 
+    let dump_tf =
+      C.create_rpc ~f:dump_tf_impl ~bin_input:Unit.bin_t
+        ~bin_output:String.bin_t ()
+
     let functions =
       { peers
       ; start
@@ -219,9 +239,11 @@ module T = struct
       ; root_diff
       ; get_balance
       ; get_nonce
+      ; root_length
       ; send_payment
       ; process_payment
-      ; prove_receipt }
+      ; prove_receipt
+      ; dump_tf }
 
     let init_worker_state
         { host
@@ -341,6 +363,9 @@ module T = struct
           let coda_get_nonce pk =
             return (Run.get_nonce coda pk |> Participating_state.active_exn)
           in
+          let coda_root_length () =
+            return (Main.root_length coda |> Participating_state.active_exn)
+          in
           let coda_send_payment (sk, pk, amount, fee, memo) =
             let pk_of_sk sk =
               Public_key.of_private_key_exn sk |> Public_key.compress
@@ -410,15 +435,22 @@ module T = struct
                    Linear_pipe.write w diff )) ;
             return r.pipe
           in
+          let coda_dump_tf () =
+            Deferred.return
+              ( Main.dump_tf coda |> Or_error.ok
+              |> Option.value ~default:"<failed to visualize>" )
+          in
           { coda_peers= with_monitor coda_peers
           ; coda_strongest_ledgers= with_monitor coda_strongest_ledgers
           ; coda_root_diff= with_monitor coda_root_diff
           ; coda_get_balance= with_monitor coda_get_balance
           ; coda_get_nonce= with_monitor coda_get_nonce
+          ; coda_root_length= with_monitor coda_root_length
           ; coda_send_payment= with_monitor coda_send_payment
           ; coda_process_payment= with_monitor coda_process_payment
           ; coda_prove_receipt= with_monitor coda_prove_receipt
-          ; coda_start= with_monitor coda_start } )
+          ; coda_start= with_monitor coda_start
+          ; coda_dump_tf= with_monitor coda_dump_tf } )
 
     let init_connection_state ~connection:_ ~worker_state:_ = return
   end

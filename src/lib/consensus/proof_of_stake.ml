@@ -293,7 +293,7 @@ module Epoch_ledger = struct
   [@@deriving sexp, bin_io, eq, compare, hash, to_yojson]
 
   (* TODO : version *)
-  type value = (Coda_base.Frozen_ledger_hash.Stable.V1.t, Amount.t) t
+  type value = (Coda_base.Frozen_ledger_hash.Stable.V1.t, Amount.Stable.V1.t) t
   [@@deriving sexp, bin_io, eq, compare, hash, to_yojson]
 
   type var = (Coda_base.Frozen_ledger_hash.var, Amount.var) t
@@ -678,7 +678,7 @@ module Epoch_data = struct
     ( Epoch_ledger.value
     , Epoch_seed.Stable.V1.t
     , Coda_base.State_hash.Stable.V1.t
-    , Length.t )
+    , Length.Stable.V1.t )
     t
   [@@deriving sexp, bin_io, eq, compare, hash, to_yojson]
 
@@ -805,7 +805,8 @@ module Consensus_transition_data = struct
   type ('epoch, 'slot) t = {epoch: 'epoch; slot: 'slot}
   [@@deriving sexp, bin_io, compare]
 
-  type value = (Epoch.t, Epoch.Slot.t) t [@@deriving sexp, bin_io, compare]
+  type value = (Epoch.Stable.V1.t, Epoch.Slot.Stable.V1.t) t
+  [@@deriving sexp, bin_io, compare]
 
   type var = (Epoch.Unpacked.var, Epoch.Slot.Unpacked.var) t
 
@@ -1020,12 +1021,13 @@ module Consensus_state = struct
         module T = struct
           let version = 1
 
+          (* TODO : version components *)
           type t =
-            ( Length.t
+            ( Length.Stable.V1.t
             , Vrf.Output.t
-            , Amount.t
-            , Epoch.t
-            , Epoch.Slot.t
+            , Amount.Stable.V1.t
+            , Epoch.Stable.V1.t
+            , Epoch.Slot.Stable.V1.t
             , Epoch_data.value
             , bool
             , Checkpoints.t )

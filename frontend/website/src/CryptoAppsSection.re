@@ -1,32 +1,58 @@
+let middleElementWidthRems = 13.75;
+
 module Code = {
   let component = ReasonReact.statelessComponent("CryptoAppsSection.Code");
   let make = (~src, _children) => {
     ...component,
     render: _self =>
-      <pre
+      <div
         className=Css.(
-          style(
-            Style.paddingX(`rem(0.5))
-            @ Style.paddingY(`rem(1.0))
-            @ [
-              backgroundColor(Style.Colors.navy),
-              color(Style.Colors.white),
-              Style.Typeface.ibmplexsans,
-              fontSize(`rem(0.8125)),
-              borderRadius(`px(12)),
-              lineHeight(`rem(1.25)),
-              // nudge so code background looks nicer
-              marginRight(`rem(-0.25)),
-              marginLeft(`rem(-0.25)),
-            ],
-          )
+          style([
+            display(`block),
+            position(`relative),
+            media(Style.MediaQuery.veryLarge, [width(`percent(40.0))]),
+            before([
+              contentRule(""),
+              display(`none),
+              media(
+                Style.MediaQuery.veryLarge,
+                [
+                  display(`block),
+                  position(`absolute),
+                  top(`percent(50.0)),
+                  left(`percent(11.4)), // determined experimentally
+                  width(`percent(100.0)),
+                  height(`rem(0.125)),
+                  backgroundColor(Style.Colors.navy),
+                ],
+              ),
+            ]),
+          ])
         )>
-        {ReasonReact.string(src)}
-      </pre>,
+        <pre
+          className=Css.(
+            style(
+              Style.paddingX(`rem(1.0))
+              @ Style.paddingY(`rem(1.0))
+              @ [
+                backgroundColor(Style.Colors.navy),
+                color(Style.Colors.white),
+                Style.Typeface.ibmplexsans,
+                fontSize(`rem(0.8125)),
+                borderRadius(`px(12)),
+                lineHeight(`rem(1.25)),
+                // nudge so code background looks nicer
+                marginRight(`rem(0.25)),
+                marginLeft(`rem(0.25)),
+                media(Style.MediaQuery.notMobile, [width(`rem(23.0))]),
+              ],
+            )
+          )>
+          {ReasonReact.string(src)}
+        </pre>
+      </div>,
   };
 };
-
-let swapQuery = "(min-width: 70rem)";
 
 module ImageCollage = {
   let component =
@@ -42,7 +68,7 @@ module ImageCollage = {
               position(`relative),
               top(`zero),
               left(`zero),
-              media(swapQuery, [position(`static)]),
+              media(Style.MediaQuery.veryLarge, [position(`static)]),
             ]),
           ])
         )>
@@ -72,7 +98,7 @@ module ImageCollage = {
               maxWidth(`percent(100.0)),
             ])
           )
-          name="/static/img/build-illustration"
+          name="/static/img/centering-rectangle"
         />
         <Image
           className=Css.(
@@ -103,14 +129,31 @@ let make = _ => {
           media(Style.MediaQuery.full, [marginTop(`rem(8.0))]),
         ])
       )>
-      <Title text="Build global cryptocurrency apps with Coda" />
+      <Title
+        fontColor=Style.Colors.denimTwo
+        text={js|Build global cryptocurrency apps with\u00A0Coda|js}
+      />
       <div
         className=Css.(
-          style([position(`relative), top(`zero), left(`zero)])
+          style([
+            position(`relative),
+            left(`zero),
+            top(`zero),
+            media(
+              Style.MediaQuery.veryLarge,
+              [
+                top(`rem(-2.0)),
+                zIndex(-1) // the background of the map isn't fully transparent
+              ],
+            ),
+          ])
         )>
         <ImageCollage
           className=Css.(
-            style([display(`none), media(swapQuery, [display(`block)])])
+            style([
+              display(`none),
+              media(Style.MediaQuery.veryLarge, [display(`block)]),
+            ])
           )
         />
         <div
@@ -118,15 +161,15 @@ let make = _ => {
             style([
               display(`flex),
               flexWrap(`wrapReverse),
-              justifyContent(`spaceBetween),
+              justifyContent(`spaceAround),
               alignItems(`center),
               marginLeft(`auto),
               marginRight(`auto),
-              marginBottom(`rem(4.0)),
+              marginBottom(`rem(2.0)),
               maxWidth(`rem(78.0)),
               // vertically/horiz center absolutely
               media(
-                swapQuery,
+                Style.MediaQuery.veryLarge,
                 [
                   position(`absolute),
                   top(`percent(50.0)),
@@ -148,6 +191,17 @@ let make = _ => {
      .then((wallet) => Coda.sendTransaction(wallet, ...))
 </script>|}
           />
+          // This keeps the right hand text aligned with the inclusive app section.
+          <div
+            className=Css.(
+              style([
+                width(`rem(middleElementWidthRems)),
+                height(`rem(0.)),
+                display(`none),
+                media(Style.MediaQuery.veryLarge, [display(`block)]),
+              ])
+            )
+          />
           <SideText
             paragraphs=[|
               "Empower your users with a direct secure connection to the Coda network.",
@@ -161,7 +215,7 @@ let make = _ => {
             style([
               display(`block),
               marginBottom(`rem(4.0)),
-              media(swapQuery, [display(`none)]),
+              media(Style.MediaQuery.veryLarge, [display(`none)]),
             ])
           )
         />
