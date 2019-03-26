@@ -70,6 +70,11 @@ module Api = struct
       ~f:(fun ~worker pk -> Coda_process.get_nonce_exn worker pk)
       t i
 
+  let best_path t i =
+    run_online_worker ~arg:()
+    ~f:(fun ~worker () -> Coda_process.best_path worker)
+    t i
+
   let start t i =
     Linear_pipe.write t.start_writer
       ( i
@@ -237,15 +242,14 @@ let start_prefix_check logger workers events testnet ~acceptable_delay =
     (Deferred.ignore
        (Linear_pipe.fold ~init:chains all_transitions_r
           ~f:(fun chains (_, _, i) ->
-            if Api.synced testnet i then (
-              let%bind path =
-                Coda_process.best_path (List.nth_exn workers i)
+              let%map path =
+                Api.best_path testnet i
               in
+              Option.value_map path ~default:chains ~f:(fun path ->
               chains.(i) <- path ;
               last_time := Time.now () ;
               check_chains chains ;
-              return chains )
-            else return chains ))) ;
+              chains )))) ;
   don't_wait_for
     (Linear_pipe.iter events ~f:(function `Transition (i, (prev, curr)) ->
          Linear_pipe.write all_transitions_w (prev, curr, i) ))
