@@ -40,7 +40,7 @@ module SignupButton = {
           merge([
             H4.wide,
             style(
-              paddingX(`rem(1.0))
+              paddingX(`rem(0.75))
               @ paddingY(`rem(0.75))
               @ [
                 width(`rem(6.25)),
@@ -58,10 +58,9 @@ module SignupButton = {
                 // when the screen is small enough to show a menu
                 media(
                   Nav.NavStyle.MediaQuery.menuMax,
-                  [
+                  paddingX(`zero)
+                  @ [
                     height(`auto),
-                    paddingLeft(`rem(0.)),
-                    paddingRight(`zero),
                     borderWidth(`zero),
                     Typeface.ibmplexsans,
                     color(Colors.metallicBlue),
@@ -81,7 +80,12 @@ module SignupButton = {
             ),
           ])
         )>
-        {ReasonReact.string(name)}
+        <span
+          className=Css.(
+            style([marginLeft(`rem(0.25)), marginRight(`rem(0.0625))])
+          )>
+          {ReasonReact.string(name)}
+        </span>
       </a>;
     },
   };

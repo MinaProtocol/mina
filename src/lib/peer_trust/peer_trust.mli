@@ -32,10 +32,9 @@ module type Action_intf = sig
   val to_trust_response : t -> Trust_response.t
 end
 
-val max_rate : float -> float
 (** Trust increment that sets a maximum rate of doing a bad thing (presuming the
     peer does no good things) in actions/second. *)
-
+val max_rate : float -> float
 (* TODO consider deduplicating somehow, maybe with an intf.ml, or by getting rid
    of this definition entirely. *)
 
@@ -49,25 +48,25 @@ module type S = sig
   (** Some action a peer took that affects trust. *)
   type action
 
-  val create : db_dir:string -> t
   (** Set up the trust system. Pass the directory to store the trust database
       in. *)
+  val create : db_dir:string -> t
 
-  val ban_pipe : t -> peer Strict_pipe.Reader.t
   (** Get the pipe of ban events. The purpose of this is to allow us to
       proactively disconnect from peers when they're banned. You *must* consume
       this, otherwise the program will block indefinitely when a peer is
       banned. *)
+  val ban_pipe : t -> peer Strict_pipe.Reader.t
 
-  val record : t -> Logger.t -> peer -> action -> unit Deferred.t
   (** Record an action a peer took. This may result in a ban event being
       emitted *)
+  val record : t -> Logger.t -> peer -> action -> unit Deferred.t
 
-  val lookup : t -> peer -> Peer_status.t
   (** Look up the score of a peer and whether it's banned .*)
+  val lookup : t -> peer -> Peer_status.t
 
-  val close : t -> unit
   (** Shut down. *)
+  val close : t -> unit
 end
 (* FIXME The parameter docs don't render :( *)
 

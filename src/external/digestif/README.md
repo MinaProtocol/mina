@@ -19,7 +19,7 @@ implementation he wants to use. We provide 2 implementations:
 
  * C implementation with `digestif.c`
  * OCaml implementation with `digestif.ocaml`
- 
+
 Both are well-tested. However, OCaml implementation is slower than the C
 implementation.
 
@@ -40,7 +40,7 @@ destruct GADT to a `string`).
  * `base-bytes` meta-package
  * Bigarray module (provided by the standard library of OCaml)
  * `dime` to build the project
- 
+
 If you want to compile the test program, you need:
 
  * `alcotest`

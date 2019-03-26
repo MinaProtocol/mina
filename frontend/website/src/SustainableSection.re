@@ -65,6 +65,7 @@ let make = _children => {
             style([
               marginBottom(`rem(2.375)),
               userSelect(`none),
+              marginRight(`rem(2.0)),
               maxWidth(`rem(23.875)),
             ])
           )>
@@ -79,6 +80,7 @@ let make = _children => {
             style([
               marginBottom(`rem(2.375)),
               userSelect(`none),
+              marginRight(`rem(2.0)),
               maxWidth(`rem(23.125)),
             ])
           )>

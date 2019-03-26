@@ -852,7 +852,7 @@ let state_html state =
   else div [Style.(render (of_class "animate-opacity o-100"))] contents
 
 (* HACK: To get a web worker running for the verifier from s3 and avoid remote origin issues,
-  we have to download the code via a get request, encapsulate it in a Blob object to get 
+  we have to download the code via a get request, encapsulate it in a Blob object to get
   an url link and then feed the url link into verifier*)
 let run_verifier ~f =
   let verifier_url = sprintf !"%s/verifier_main.bc.js" Web_response.s3_link in
