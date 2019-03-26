@@ -69,7 +69,7 @@ val sign : Signature_keypair.t -> Payload.t -> With_valid_signature.t
 
 val check : t -> With_valid_signature.t option
 
-val forget_check : With_valid_signature.t -> t
 (** Forget the signature check. *)
+val forget_check : With_valid_signature.t -> t
 
 val accounts_accessed : t -> Public_key.Compressed.t list

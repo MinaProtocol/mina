@@ -42,6 +42,7 @@ module Copy = {
                 Style.Body.big,
                 style([
                   marginTop(`rem(1.75)),
+                  maxWidth(`rem(28.0)),
                   // align with the grid
                   media(
                     Style.MediaQuery.full,
@@ -130,10 +131,10 @@ module Graphic = {
               {ReasonReact.string(size)}
             </h3>
           </div>
-          <h4
+          <h5
             className=Css.(
               merge([
-                Style.H4.basic,
+                Style.H5.basic,
                 style([
                   marginTop(`rem(1.125)),
                   marginBottom(`rem(0.375)),
@@ -141,7 +142,7 @@ module Graphic = {
               ])
             )>
             {ReasonReact.string(label)}
-          </h4>
+          </h5>
         </div>,
     };
   };
@@ -176,7 +177,7 @@ module Graphic = {
               name="Other blockchains"
               size="2TB+"
               label="Increasing"
-              textColor=Style.Colors.purpleBrown>
+              textColor=Style.Colors.rosebud>
               Big.svg
             </Info>
           </div>
