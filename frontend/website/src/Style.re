@@ -111,6 +111,8 @@ module MediaQuery = {
   let full = "(min-width: 48rem)";
   let notMobile = "(min-width: 32rem)";
   let notSmallMobile = "(min-width: 25rem)";
+  // to adjust root font size
+  let iphoneSEorSmaller = "(max-width: 24rem)";
 };
 
 /** sets both paddingLeft and paddingRight, as one should */

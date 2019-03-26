@@ -22,7 +22,13 @@ let make = (~paragraphs, ~cta, _children) => {
         </p>
       );
 
-    <div className=Css.(style([width(`rem(21.0))]))>
+    <div
+      className=Css.(
+        style([
+          width(`rem(20.625)),
+          media(Style.MediaQuery.notSmallMobile, [width(`rem(21.0))]),
+        ])
+      )>
       {ReasonReact.array(ps)}
       <a
         href=Links.mailingList
