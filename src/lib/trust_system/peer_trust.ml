@@ -27,6 +27,8 @@ module type S = sig
 
   val create : db_dir:string -> t
 
+  val null : unit -> t
+
   val ban_pipe : t -> peer Strict_pipe.Reader.t
 
   val record : t -> Logger.t -> peer -> action -> unit Deferred.t
@@ -47,7 +49,11 @@ end)
 (Action : Action_intf) =
 struct
   type t =
-    { db: Db.t
+    { db:
+        Db.t option
+        (* This is an option to allow using a fake trust system in tests. This is
+       ugly, but the alternative is functoring half of Coda over the trust
+       system. *)
     ; bans_reader: Peer_id.t Strict_pipe.Reader.t
     ; bans_writer:
         ( Peer_id.t
@@ -59,22 +65,33 @@ struct
 
   let create ~db_dir =
     let reader, writer = Strict_pipe.create Strict_pipe.Synchronous in
-    {db= Db.create ~directory:db_dir; bans_reader= reader; bans_writer= writer}
+    { db= Some (Db.create ~directory:db_dir)
+    ; bans_reader= reader
+    ; bans_writer= writer }
+
+  let null : unit -> t =
+   fun () ->
+    let bans_reader, bans_writer =
+      Strict_pipe.create Strict_pipe.Synchronous
+    in
+    {db= None; bans_reader; bans_writer}
 
   let ban_pipe {bans_reader} = bans_reader
 
-  let lookup {db} peer =
-    match Db.get db peer with
+  let get_db {db} peer = Option.bind db (fun db' -> Db.get db' peer)
+
+  let lookup t peer =
+    match get_db t peer with
     | Some record -> Record_inst.to_peer_status record
     | None -> Record_inst.to_peer_status @@ Record_inst.init ()
 
   let close {db; bans_writer} =
-    Db.close db ;
+    Option.iter db ~f:Db.close ;
     Strict_pipe.Writer.close bans_writer
 
-  let record {db; bans_writer} logger peer action =
+  let record ({db; bans_writer} as t) logger peer action =
     let old_record =
-      match Db.get db peer with
+      match get_db t peer with
       | None -> Record_inst.init ()
       | Some trust_record -> trust_record
     in
@@ -116,7 +133,7 @@ struct
             verb simple_new.trust ;
           Deferred.unit
     in
-    Db.set db ~key:peer ~data:new_record
+    Option.iter db ~f:(fun db' -> Db.set db' ~key:peer ~data:new_record)
 end
 
 let%test_module "peer_trust" =

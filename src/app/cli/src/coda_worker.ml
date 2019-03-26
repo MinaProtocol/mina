@@ -345,7 +345,7 @@ module T = struct
           in
           let%bind coda =
             Main.create
-              (Main.Config.make ~logger ~net_config
+              (Main.Config.make ~logger ~trust_system ~net_config
                  ~run_snark_worker:(Option.is_some snark_worker_config)
                  ~staged_ledger_persistant_location:
                    (conf_dir ^/ "staged_ledger")

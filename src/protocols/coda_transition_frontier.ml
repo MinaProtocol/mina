@@ -585,6 +585,7 @@ module type Bootstrap_controller_intf = sig
 
   val run :
        logger:Logger.t
+    -> trust_system:Trust_system.t
     -> network:network
     -> frontier:transition_frontier
     -> ledger_db:ledger_db
@@ -694,6 +695,7 @@ module type Transition_router_intf = sig
 
   val run :
        logger:Logger.t
+    -> trust_system:Trust_system.t
     -> network:network
     -> time_controller:time_controller
     -> frontier_broadcast_pipe:transition_frontier option

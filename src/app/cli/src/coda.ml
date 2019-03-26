@@ -318,7 +318,7 @@ let daemon logger =
        let monitor = Async.Monitor.create ~name:"coda" () in
        let%bind coda =
          Run.create
-           (Run.Config.make ~logger ~net_config
+           (Run.Config.make ~logger ~trust_system ~net_config
               ~run_snark_worker:(Option.is_some run_snark_worker_flag)
               ~staged_ledger_persistant_location:(conf_dir ^/ "staged_ledger")
               ~transaction_pool_disk_location:(conf_dir ^/ "transaction_pool")

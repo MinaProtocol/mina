@@ -85,8 +85,8 @@ let run_test () : unit Deferred.t =
       Async.Scheduler.set_record_backtraces true ;
       let%bind coda =
         Main.create
-          (Main.Config.make ~logger ~net_config ~propose_keypair:keypair
-             ~run_snark_worker:true
+          (Main.Config.make ~logger ~trust_system ~net_config
+             ~propose_keypair:keypair ~run_snark_worker:true
              ~staged_ledger_persistant_location:
                (temp_conf_dir ^/ "staged_ledger")
              ~transaction_pool_disk_location:

@@ -47,6 +47,9 @@ module type S = sig
       in. *)
   val create : db_dir:string -> t
 
+  (** Get a fake trust system, for tests. *)
+  val null : unit -> t
+
   (** Get the pipe of ban events. The purpose of this is to allow us to
       proactively disconnect from peers when they're banned. You *must* consume
       this, otherwise the program will block indefinitely when a peer is

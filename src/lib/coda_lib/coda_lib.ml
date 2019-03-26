@@ -540,6 +540,7 @@ module Make (Inputs : Inputs_intf) = struct
     (** If ledger_db_location is None, will auto-generate a db based on a UUID *)
     type t =
       { logger: Logger.t
+      ; trust_system: Trust_system.t
       ; propose_keypair: Keypair.t option
       ; run_snark_worker: bool
       ; net_config: Net.Config.t
@@ -548,7 +549,7 @@ module Make (Inputs : Inputs_intf) = struct
       ; snark_pool_disk_location: string
       ; ledger_db_location: string option
       ; staged_ledger_transition_backup_capacity: int [@default 10]
-      ; time_controller: Time.Controller.t (* FIXME trust system goes here? *)
+      ; time_controller: Time.Controller.t
       ; receipt_chain_database: Coda_base.Receipt_chain_database.t
       ; snark_work_fee: Currency.Fee.t
       ; monitor: Monitor.t option
@@ -704,7 +705,8 @@ module Make (Inputs : Inputs_intf) = struct
                   Deferred.return result )
             in
             let valid_transitions =
-              Transition_router.run ~logger:config.logger ~network:net
+              Transition_router.run ~logger:config.logger
+                ~trust_system:config.trust_system ~network:net
                 ~time_controller:config.time_controller
                 ~frontier_broadcast_pipe:
                   (frontier_broadcast_pipe_r, frontier_broadcast_pipe_w)

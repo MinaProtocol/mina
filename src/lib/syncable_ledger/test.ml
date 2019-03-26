@@ -49,6 +49,8 @@ struct
 
   let logger = Logger.null ()
 
+  let trust_system = Trust_system.null ()
+
   let () =
     Async.Scheduler.set_record_backtraces true ;
     Core.Backtrace.elide := false
@@ -57,7 +59,7 @@ struct
     let l1, _k1 = Ledger.load_ledger 1 1 in
     let l2, _k2 = Ledger.load_ledger num_accts 2 in
     let desired_root = Ledger.merkle_root l2 in
-    let lsync = Sync_ledger.create l1 ~logger in
+    let lsync = Sync_ledger.create l1 ~logger ~trust_system in
     let qr = Sync_ledger.query_reader lsync in
     let aw = Sync_ledger.answer_writer lsync in
     let seen_queries = ref [] in
@@ -96,7 +98,7 @@ struct
     let l2, _k2 = Ledger.load_ledger num_accts 2 in
     let l3, _k3 = Ledger.load_ledger num_accts 3 in
     let desired_root = ref @@ Ledger.merkle_root l2 in
-    let lsync = Sync_ledger.create l1 ~logger in
+    let lsync = Sync_ledger.create l1 ~logger ~trust_system in
     let qr = Sync_ledger.query_reader lsync in
     let aw = Sync_ledger.answer_writer lsync in
     let seen_queries = ref [] in

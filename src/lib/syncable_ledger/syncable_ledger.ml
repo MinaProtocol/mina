@@ -115,7 +115,8 @@ module type S = sig
     val answer_query : t -> query -> answer option
   end
 
-  val create : merkle_tree -> logger:Logger.t -> 'a t
+  val create :
+    merkle_tree -> logger:Logger.t -> trust_system:Trust_system.t -> 'a t
 
   val answer_writer :
        'a t
@@ -297,6 +298,7 @@ end = struct
     ; mutable auxiliary_data: 'a option
     ; tree: MT.t
     ; logger: Logger.t
+    ; trust_system: Trust_system.t
     ; answers:
         (Root_hash.t * query * answer Envelope.Incoming.t) Linear_pipe.Reader.t
     ; answer_writer:
@@ -573,7 +575,7 @@ end = struct
     new_goal t rh ~data |> ignore ;
     wait_until_valid t rh
 
-  let create mt ~logger =
+  let create mt ~logger ~trust_system =
     let qr, qw = Linear_pipe.create () in
     let ar, aw = Linear_pipe.create () in
     let t =
@@ -581,6 +583,7 @@ end = struct
       ; auxiliary_data= None
       ; tree= mt
       ; logger
+      ; trust_system
       ; answers= ar
       ; answer_writer= aw
       ; queries= qw
