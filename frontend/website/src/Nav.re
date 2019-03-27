@@ -246,11 +246,11 @@ let make = children => {
             width(`auto),
             order(2),
             NavStyle.bottomNudgeOffset(0.5),
-            media(NavStyle.MediaQuery.menu, [width(`percent(50.0))]),
             media(
               NavStyle.MediaQuery.statusLift,
               [order(3), width(`auto), NavStyle.bottomNudge],
             ),
+            media(NavStyle.MediaQuery.menu, [width(`percent(50.0))]),
           ])
         )>
         <DropdownMenu> ...items </DropdownMenu>
