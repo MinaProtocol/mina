@@ -44,12 +44,12 @@ module Copy = {
               merge([
                 Style.Body.big,
                 style([
-                  marginTop(`rem(1.75)),
+                  marginTop(`rem(2.0)),
                   maxWidth(`rem(28.0)),
                   // align with the grid
                   media(
                     Style.MediaQuery.full,
-                    [marginBottom(`rem(11.875))],
+                    [marginTop(`rem(1.75)), marginBottom(`rem(11.875))],
                   ),
                 ]),
               ])

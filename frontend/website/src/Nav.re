@@ -5,11 +5,11 @@ module NavStyle = {
   open Style;
 
   module MediaQuery = {
-    let menu = "(min-width: 58rem)";
-    let menuMax = "(max-width: 58rem)";
+    let menu = "(min-width: 62rem)";
+    let menuMax = "(max-width: 62rem)";
     let statusLift = "(min-width: 38rem)";
   };
-  let bottomNudge = Css.marginBottom(`rem(1.25));
+  let bottomNudge = Css.marginBottom(`rem(2.25));
 
   let collapsedMenuItems =
     style([
@@ -28,7 +28,7 @@ module NavStyle = {
           display(`flex),
           justifyContent(`spaceBetween),
           position(`static),
-          alignItems(`flexStart),
+          alignItems(`center),
           width(`percent(100.0)),
         ],
       ),
@@ -166,7 +166,7 @@ let make = children => {
              className=Css.(
                style(
                  Style.paddingX(`rem(0.75))
-                 @ Style.paddingY(`rem(0.75))
+                 @ Style.paddingY(`rem(0.5))
                  @ [listStyle(`none, `inside, `none)],
                )
              )>
@@ -179,9 +179,12 @@ let make = children => {
         style([
           display(`flex),
           justifyContent(`spaceBetween),
-          alignItems(`center),
+          alignItems(`flexEnd),
           flexWrap(`wrap),
-          media(NavStyle.MediaQuery.statusLift, [flexWrap(`nowrap)]),
+          media(
+            NavStyle.MediaQuery.statusLift,
+            [flexWrap(`nowrap), alignItems(`center)],
+          ),
         ])
       )>
       <a
@@ -205,9 +208,10 @@ let make = children => {
             order(3),
             width(`percent(100.0)),
             NavStyle.bottomNudge,
+            marginLeft(`rem(-0.125)), // nudge left for optical alignment
             media(
               NavStyle.MediaQuery.statusLift,
-              [order(2), width(`auto)],
+              [order(2), width(`auto), marginLeft(`zero)],
             ),
             media(NavStyle.MediaQuery.menu, [width(`percent(40.0))]),
           ])
@@ -215,9 +219,11 @@ let make = children => {
         <div
           className=Css.(
             style([
-              width(`percent(100.0)),
-              margin(`auto),
-              media(NavStyle.MediaQuery.statusLift, [width(`rem(21.25))]),
+              width(`rem(21.25)),
+              media(
+                NavStyle.MediaQuery.statusLift,
+                [width(`rem(21.25)), margin(`auto)],
+              ),
             ])
           )>
           <AnnouncementBar />

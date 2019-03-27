@@ -117,7 +117,6 @@ module MediaQuery = {
   let notSmallMobile = "(min-width: 25rem)";
   // to adjust root font size (therefore pixels)
   let iphoneSEorSmaller = "(max-width: 374px)";
-  let iphoneXorSmaller = "(max-width: 384px)";
 };
 
 /** sets both paddingLeft and paddingRight, as one should */
