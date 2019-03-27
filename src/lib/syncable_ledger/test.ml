@@ -31,11 +31,7 @@ module type Input_intf = sig
      and type merkle_path := Ledger.path
      and type account := Ledger.account
      and type query := Ledger.addr Syncable_ledger.Query.t
-     and type answer :=
-                ( Ledger.addr
-                , Root_hash.t
-                , Ledger.account )
-                Syncable_ledger.Answer.t
+     and type answer := (Root_hash.t, Ledger.account) Syncable_ledger.Answer.t
 end
 
 module Make_test
@@ -53,6 +49,10 @@ struct
 
   let logger = Logger.null ()
 
+  let () =
+    Async.Scheduler.set_record_backtraces true ;
+    Core.Backtrace.elide := false
+
   let%test "full_sync_entirely_different" =
     let l1, _k1 = Ledger.load_ledger 1 1 in
     let l2, _k2 = Ledger.load_ledger num_accts 2 in
@@ -68,8 +68,11 @@ struct
     in
     don't_wait_for
       (Linear_pipe.iter_unordered ~max_concurrency:3 qr
-         ~f:(fun (_hash, query) ->
-           let answ = Sync_responder.answer_query sr query in
+         ~f:(fun (root_hash, query) ->
+           let answ =
+             Option.value_exn ~message:"refused to answer query"
+               (Sync_responder.answer_query sr query)
+           in
            let%bind () =
              if match query with What_contents _ -> true | _ -> false then
                Clock_ns.after
@@ -77,7 +80,7 @@ struct
                     ~percent:(Percent.of_percentage 20.))
              else Deferred.unit
            in
-           Linear_pipe.write aw (Envelope.Incoming.local (desired_root, answ))
+           Linear_pipe.write aw (root_hash, query, Envelope.Incoming.local answ)
        )) ;
     match
       Async.Thread_safe.block_on_async_exn (fun () ->
@@ -118,9 +121,12 @@ struct
                  Sync_ledger.new_goal lsync !desired_root |> ignore ;
                  Deferred.unit )
                else
-                 let answ = Sync_responder.answer_query !sr query in
+                 let answ =
+                   Option.value_exn ~message:"refused to answer query"
+                     (Sync_responder.answer_query !sr query)
+                 in
                  Linear_pipe.write aw
-                   (Envelope.Incoming.local (!desired_root, answ))
+                   (!desired_root, query, Envelope.Incoming.local answ)
              in
              ctr := !ctr + 1 ;
              res )) ;
@@ -152,131 +158,6 @@ module Base_ledger_inputs = struct
 end
 
 (* Testing different ledger instantiations on Syncable_ledger *)
-
-module Ledger = struct
-  module Make (Depth : sig
-    val depth : int
-  end) =
-  struct
-    open Merkle_ledger_tests.Test_stubs
-    module Root_hash = Root_hash
-
-    module Base_ledger_inputs = struct
-      include Base_ledger_inputs
-      module Depth = Depth
-    end
-
-    module Ledger = struct
-      include Merkle_ledger.Ledger.Make (Base_ledger_inputs)
-
-      type addr = Addr.t
-
-      type account = Account.t
-
-      type hash = Root_hash.t
-
-      let load_ledger n b =
-        let ledger = create () in
-        let keys = Key.gen_keys n in
-        let balance = Currency.Balance.of_int b in
-        List.iter keys ~f:(fun public_key ->
-            ignore
-            @@ get_or_create_account_exn ledger public_key
-                 (Account.create public_key balance) ) ;
-        (ledger, keys)
-    end
-
-    module Syncable_ledger_inputs = struct
-      module Addr = Ledger.Addr
-      module MT = Ledger
-      include Base_ledger_inputs
-
-      let subtree_height = 3
-    end
-
-    module Sync_ledger = Syncable_ledger.Make (Syncable_ledger_inputs)
-    module Sync_responder = Sync_ledger.Responder
-  end
-
-  module L3 = Make (struct
-    let depth = 3
-  end)
-
-  module L16 = Make (struct
-    let depth = 16
-  end)
-
-  module L10 = Make (struct
-    let depth = 10
-  end)
-
-  (* 
-  TODO : put this test along with other lengthy tests
-
-  See issue #1088 in Github.
-
-  let%test_unit "exhaustive depth=10 testing" =
-  for i = 3 to 1 lsl 10 do
-    let module M =
-      Make
-        (L10)
-        (struct
-          let num_accts = i
-        end)
-    in
-    ()
-  done
- *)
-
-  module TestL3_3 =
-    Make_test
-      (L3)
-      (struct
-        let num_accts = 3
-      end)
-
-  module TestL3_8 =
-    Make_test
-      (L3)
-      (struct
-        let num_accts = 8
-      end)
-
-  module TestL16_2 =
-    Make_test
-      (L16)
-      (struct
-        let num_accts = 2
-      end)
-
-  module TestL16_3 =
-    Make_test
-      (L16)
-      (struct
-        let num_accts = 3
-      end)
-
-  module TestL16_20 =
-    Make_test
-      (L16)
-      (struct
-        let num_accts = 20
-      end)
-
-  module TestL16_1024 =
-    Make_test
-      (L16)
-      (struct
-        let num_accts = 1024
-      end)
-
-  module TestL16_1025 =
-    Make_test
-      (L16)
-      (struct
-        let num_accts = 80
-      end)
-end
 
 module Db = struct
   module Make (Depth : sig
@@ -322,7 +203,7 @@ module Db = struct
       module MT = Ledger
       include Base_ledger_inputs
 
-      let subtree_height = 3
+      let account_subtree_height = 3
     end
 
     module Sync_ledger = Syncable_ledger.Make (Syncable_ledger_inputs)
@@ -465,7 +346,7 @@ module Mask = struct
       module MT = Ledger
       include Base_ledger_inputs
 
-      let subtree_height = 3
+      let account_subtree_height = 3
     end
 
     module Sync_ledger = Syncable_ledger.Make (Syncable_ledger_inputs)

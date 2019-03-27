@@ -39,7 +39,7 @@ end) :
    and type public_key := Inputs.Compressed_public_key.t
    and type completed_work := Inputs.Transaction_snark_work.t
    and type completed_work_checked := Inputs.Transaction_snark_work.Checked.t
-   and type fee_transfer_single := Inputs.Fee_transfer.single = struct
+   and type fee_transfer_single := Inputs.Fee_transfer.Single.t = struct
   open Inputs
 
   module At_most_two = struct
@@ -66,16 +66,22 @@ end) :
       | _ -> Or_error.error_string "Error incrementing coinbase parts"
   end
 
-  type ft = Inputs.Fee_transfer.single [@@deriving sexp, bin_io]
+  (* TODO: version *)
+
+  type ft = Inputs.Fee_transfer.Single.Stable.V1.t [@@deriving sexp, bin_io]
+
+  (* TODO: version *)
 
   type pre_diff_with_at_most_two_coinbase =
-    { completed_works: Transaction_snark_work.t list
+    { completed_works: Transaction_snark_work.Stable.V1.t list
     ; user_commands: User_command.t list
     ; coinbase: ft At_most_two.t }
   [@@deriving sexp, bin_io]
 
+  (* TODO: version *)
+
   type pre_diff_with_at_most_one_coinbase =
-    { completed_works: Transaction_snark_work.t list
+    { completed_works: Transaction_snark_work.Stable.V1.t list
     ; user_commands: User_command.t list
     ; coinbase: ft At_most_one.t }
   [@@deriving sexp, bin_io]
@@ -92,8 +98,8 @@ end) :
 
         type t =
           { diff: diff
-          ; prev_hash: Staged_ledger_hash.t
-          ; creator: Compressed_public_key.t }
+          ; prev_hash: Staged_ledger_hash.t (* TODO : version *)
+          ; creator: Compressed_public_key.Stable.V1.t }
         [@@deriving sexp, bin_io]
       end
 

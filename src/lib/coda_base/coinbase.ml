@@ -6,10 +6,11 @@ module Stable = struct
     module T = struct
       let version = 1
 
+      (* TODO : use version for Fee_transfer *)
       type t =
-        { proposer: Public_key.Compressed.t
-        ; amount: Currency.Amount.t
-        ; fee_transfer: Fee_transfer.single option }
+        { proposer: Public_key.Compressed.Stable.V1.t
+        ; amount: Currency.Amount.Stable.V1.t
+        ; fee_transfer: Fee_transfer.Single.Stable.V1.t option }
       [@@deriving sexp, bin_io, compare, eq]
     end
 
@@ -53,9 +54,9 @@ end
 
 (* DO NOT add bin_io to the deriving list *)
 type t = Stable.Latest.t =
-  { proposer: Public_key.Compressed.t
-  ; amount: Currency.Amount.t
-  ; fee_transfer: Fee_transfer.single option }
+  { proposer: Public_key.Compressed.Stable.V1.t
+  ; amount: Currency.Amount.Stable.V1.t
+  ; fee_transfer: Fee_transfer.Single.Stable.V1.t option }
 [@@deriving sexp, compare, eq]
 
 let is_valid = Stable.Latest.is_valid

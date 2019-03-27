@@ -22,15 +22,16 @@ struct
   module Ledger_proof = struct
     module Stable = struct
       module V1 = struct
-        type t = Ledger_proof_statement.t * Sok_message.Digest.Stable.V1.t
-        [@@deriving sexp, bin_io]
+        type t =
+          Ledger_proof_statement.Stable.V1.t * Sok_message.Digest.Stable.V1.t
+        [@@deriving sexp, bin_io, yojson]
       end
 
       module Latest = V1
     end
 
     (* TODO: remove bin_io, after fixing functors to accept this *)
-    type t = Stable.V1.t [@@deriving sexp, bin_io]
+    type t = Stable.V1.t [@@deriving sexp, bin_io, yojson]
 
     let underlying_proof (_ : t) = Proof.dummy
 
@@ -60,14 +61,20 @@ struct
   end
 
   module Transaction_snark_work =
-    Staged_ledger.Make_completed_work (Public_key.Compressed) (Ledger_proof)
-      (Ledger_proof_statement)
+    Staged_ledger.Make_completed_work (Ledger_proof) (Ledger_proof_statement)
+
+  module Staged_ledger_hash_binable = struct
+    include Staged_ledger_hash.Stable.V1
+
+    let of_aux_and_ledger_hash, aux_hash, ledger_hash =
+      Staged_ledger_hash.(of_aux_and_ledger_hash, aux_hash, ledger_hash)
+  end
 
   module Staged_ledger_diff = Staged_ledger.Make_diff (struct
     module Fee_transfer = Fee_transfer
     module Ledger_proof = Ledger_proof
     module Ledger_hash = Ledger_hash
-    module Staged_ledger_hash = Staged_ledger_hash
+    module Staged_ledger_hash = Staged_ledger_hash_binable
     module Staged_ledger_aux_hash = Staged_ledger_aux_hash
     module Compressed_public_key = Public_key.Compressed
     module User_command = User_command
@@ -109,7 +116,7 @@ struct
     module Ledger_proof = Ledger_proof
     module Ledger_proof_verifier = Ledger_proof_verifier
     module Staged_ledger_aux_hash = Staged_ledger_aux_hash
-    module Staged_ledger_hash = Coda_base.Staged_ledger_hash
+    module Staged_ledger_hash = Staged_ledger_hash_binable
     module Transaction_snark_work = Transaction_snark_work
     module Transaction_validator = Transaction_validator
     module Staged_ledger_diff = Staged_ledger_diff
@@ -190,10 +197,12 @@ struct
         let {Keypair.public_key; _} = Keypair.create () in
         let prover = Public_key.compress public_key in
         Some
-          { Transaction_snark_work.Checked.fee= Fee.Unsigned.of_int 1
-          ; proofs=
-              List.map stmts ~f:(fun stmt -> (stmt, Sok_message.Digest.default))
-          ; prover }
+          Transaction_snark_work.Checked.
+            { fee= Fee.Unsigned.of_int 1
+            ; proofs=
+                List.map stmts ~f:(fun stmt ->
+                    (stmt, Sok_message.Digest.default) )
+            ; prover }
       in
       let staged_ledger_diff =
         Staged_ledger.create_diff parent_staged_ledger ~logger
@@ -510,7 +519,8 @@ struct
                     , Syncable_ledger.Query.to_yojson Ledger.Addr.to_yojson
                         sync_ledger_query ) ]
                 "Found an answer for: $sync_ledger_query" ;
-              Pipe_lib.Linear_pipe.write response_writer answer )
+              Pipe_lib.Linear_pipe.write response_writer
+                (ledger_hash, sync_ledger_query, answer) )
       |> don't_wait_for
   end
 
@@ -584,6 +594,6 @@ struct
 
     let make_transition_pipe () =
       Pipe_lib.Strict_pipe.create
-        (Buffered (`Capacity 10, `Overflow Drop_head))
+        (Buffered (`Capacity 30, `Overflow Drop_head))
   end
 end

@@ -3,5 +3,5 @@
   (public_name transition_frontier_controller_tests)
   (inline_tests)
   (libraries core_kernel consensus protocols coda_base sync_handler transition_handler transition_frontier_controller bootstrap_controller genesis_ledger quickcheck_lib protocol_state_validator root_prover ledger_catchup)
-  (preprocess (pps ppx_jane ppx_deriving.eq)))
+  (preprocess (pps ppx_jane ppx_deriving.eq ppx_deriving_yojson)))
   

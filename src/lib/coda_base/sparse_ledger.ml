@@ -2,14 +2,24 @@ open Core
 open Import
 open Snark_params.Tick
 
-include Sparse_ledger_lib.Sparse_ledger.Make
-          (Ledger_hash)
-          (Public_key.Compressed.Stable.V1)
-          (struct
-            include Account.Stable.Latest
+module Ledger_hash_binable = struct
+  (* Ledger_hash.t not bin_io *)
+  include Ledger_hash.Stable.V1
 
-            let hash = Fn.compose Ledger_hash.of_digest Account.digest
-          end)
+  let merge = Ledger_hash.merge
+end
+
+module Account_binable = struct
+  (* Account.t not bin_io *)
+  include Account.Stable.V1
+
+  let hash = Fn.compose Ledger_hash.of_digest Account.digest
+end
+
+include Sparse_ledger_lib.Sparse_ledger.Make
+          (Ledger_hash_binable)
+          (Public_key.Compressed.Stable.V1)
+          (Account_binable)
 
 let of_root (h : Ledger_hash.t) =
   of_hash ~depth:Ledger.depth (Ledger_hash.of_digest (h :> Pedersen.Digest.t))
@@ -107,7 +117,7 @@ let apply_user_command_exn t ({sender; payload; signature= _} : User_command.t)
               (Balance.add_amount receiver_account.balance amount) }
 
 let apply_fee_transfer_exn =
-  let apply_single t ((pk, fee) : Fee_transfer.single) =
+  let apply_single t ((pk, fee) : Fee_transfer.Single.t) =
     let index = find_index_exn t pk in
     let account = get_or_initialize_exn pk t index in
     let open Currency in

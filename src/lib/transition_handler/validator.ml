@@ -65,7 +65,7 @@ module Make (Inputs : Inputs.With_unprocessed_transition_cache.S) :
          ( ( (External_transition.Verified.t, State_hash.t) With_hash.t
            , State_hash.t )
            Cached.t
-         , drop_head buffered
+         , crash buffered
          , unit )
          Writer.t) ~unprocessed_transition_cache =
     don't_wait_for
@@ -86,8 +86,11 @@ module Make (Inputs : Inputs.With_unprocessed_transition_cache.S) :
                with
              | Ok cached_transition ->
                  Logger.info logger ~module_:__MODULE__ ~location:__LOC__
-                   !"accepting transition %{sexp:State_hash.t}"
-                   hash ;
+                   "transition $state_hash passed validation"
+                   ~metadata:
+                     [ ("state_hash", State_hash.to_yojson hash)
+                     ; ( "transition"
+                       , External_transition.Verified.to_yojson transition ) ] ;
                  let transition_time =
                    External_transition.Verified.protocol_state transition
                    |> Protocol_state.blockchain_state
@@ -106,15 +109,23 @@ module Make (Inputs : Inputs.With_unprocessed_transition_cache.S) :
                  Writer.write valid_transition_writer cached_transition
              | Error `Duplicate ->
                  Logger.info logger ~module_:__MODULE__ ~location:__LOC__
-                   !"ignoring transition we've already seen \
-                     %{sexp:State_hash.t}"
-                   hash
+                   "ignoring transition we've already seen $state_hash"
+                   ~metadata:
+                     [ ("state_hash", State_hash.to_yojson hash)
+                     ; ( "transition"
+                       , External_transition.Verified.to_yojson transition ) ]
              | Error (`Invalid reason) ->
                  Logger.warn logger ~module_:__MODULE__ ~location:__LOC__
-                   !"rejecting transitions because \"%s\" -- sent by %{sexp: \
-                     Envelope.Sender.t}"
-                   reason
-                   (Envelope.Incoming.sender transition_env) ) ))
+                   !"rejecting transition because \"$reason\" -- received \
+                     from $sender"
+                   ~metadata:
+                     [ ("reason", `String reason)
+                     ; ( "sender"
+                       , Envelope.Sender.to_yojson
+                           (Envelope.Incoming.sender transition_env) )
+                     ; ( "transition"
+                       , External_transition.Verified.to_yojson transition ) ]
+             ) ))
 end
 
 (*

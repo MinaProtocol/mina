@@ -167,9 +167,9 @@ module Parser = struct
       (fun value f -> f value)
       (value_exp <* commit)
       (choice
-         [ pad ws (stringc "==") *> value_exp >>| Ast.cmp_eq
-         ; pad ws (stringc "!=") *> value_exp >>| Ast.cmp_neq
-         ; pad ws (stringc "in") *> value_exp >>| Ast.cmp_in
+         [ pad ws (stringc "==") *> value_exp >>| Fn.flip Ast.cmp_eq
+         ; pad ws (stringc "!=") *> value_exp >>| Fn.flip Ast.cmp_neq
+         ; pad ws (stringc "in") *> value_exp >>| Fn.flip Ast.cmp_in
          ; pad ws (stringc "match") *> regex >>| Fn.flip Ast.cmp_match ])
     <* commit <?> "cmp_exp"
 
@@ -179,7 +179,7 @@ module Parser = struct
           choice
             [ wrap parens (pad ws bool_exp)
             ; bool >>| Ast.bool_lit
-            ; char '!' *> bool_exp >>| Ast.bool_not
+            ; char '!' *> ws *> bool_exp >>| Ast.bool_not
             ; cmp_exp >>| Ast.bool_cmp ]
         in
         let infix_op =
@@ -275,3 +275,16 @@ module Interpreter = struct
 
   let matches filter json = interpret_bool_exp json filter
 end
+
+let%test_module "filter tests" =
+  ( module struct
+    let test ~filter ~data ~expect =
+      let filter' = Result.ok_or_failwith (Parser.parse filter) in
+      let data' = Yojson.Safe.from_string data in
+      [%test_result: bool] ~expect (Interpreter.matches filter' data')
+
+    let%test_unit "negation + in" =
+      let filter = {|! .source.module in ["a", "c"]|} in
+      test ~filter ~data:{|{ "source": { "module": "b" }}|} ~expect:true ;
+      test ~filter ~data:{|{ "source": { "module": "a" }}|} ~expect:false
+  end )

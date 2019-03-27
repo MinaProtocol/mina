@@ -7,9 +7,9 @@ open Pipe_lib
 include Coda_transition_frontier
 
 module type Security_intf = sig
-  val max_depth : [`Infinity | `Finite of int]
   (** In production we set this to (hopefully a prefix of) k for our consensus
    * mechanism; infinite is for tests *)
+  val max_depth : [`Infinity | `Finite of int]
 end
 
 module type Time_controller_intf = sig
@@ -130,7 +130,7 @@ module type Ledger_hash_intf = sig
 
   val to_bytes : t -> string
 
-  include Hashable.S_binable with type t := t
+  include Hashable.S with type t := t
 end
 
 module type Frozen_ledger_hash_intf = sig
@@ -245,7 +245,17 @@ module type Ledger_intf = sig
      and type unattached_mask := unattached_mask
 
   module Undo : sig
-    type t [@@deriving sexp, bin_io]
+    type t [@@deriving sexp]
+
+    module Stable :
+      sig
+        module V1 : sig
+          type t [@@deriving sexp, bin_io]
+        end
+
+        module Latest = V1
+      end
+      with type V1.t = t
 
     val transaction : t -> transaction Or_error.t
   end
@@ -296,10 +306,10 @@ end
 
 module type Snark_pool_proof_intf = sig
   module Statement : sig
-    type t [@@deriving sexp, bin_io]
+    type t [@@deriving sexp, bin_io, yojson]
   end
 
-  type t [@@deriving sexp, bin_io]
+  type t [@@deriving sexp, bin_io, yojson]
 end
 
 module type User_command_intf = sig
@@ -325,7 +335,15 @@ module type Private_key_intf = sig
 end
 
 module type Compressed_public_key_intf = sig
-  type t [@@deriving sexp, bin_io, compare, yojson]
+  type t [@@deriving sexp, compare, yojson]
+
+  module Stable :
+    sig
+      module V1 : sig
+        type t [@@deriving sexp, bin_io, compare, yojson]
+      end
+    end
+    with type V1.t = t
 
   include Comparable.S with type t := t
 end
@@ -353,13 +371,31 @@ end
 module type Fee_transfer_intf = sig
   type t [@@deriving sexp, compare, eq, yojson]
 
+  module Stable :
+    sig
+      module V1 : sig
+        type t [@@deriving sexp, compare, eq, yojson]
+      end
+    end
+    with type V1.t = t
+
   type public_key
 
-  type single = public_key * Fee.Unsigned.t [@@deriving sexp, bin_io, yojson]
+  module Single : sig
+    type t = public_key * Fee.Unsigned.t [@@deriving sexp, yojson]
 
-  val of_single : public_key * Fee.Unsigned.t -> t
+    module Stable :
+      sig
+        module V1 : sig
+          type t [@@deriving sexp, bin_io, yojson]
+        end
+      end
+      with type V1.t = t
+  end
 
-  val of_single_list : (public_key * Fee.Unsigned.t) list -> t list
+  val of_single : Single.t -> t
+
+  val of_single_list : Single.t list -> t list
 
   val receivers : t -> public_key list
 end
@@ -409,7 +445,21 @@ module type Ledger_proof_statement_intf = sig
     ; supply_increase: Currency.Amount.t
     ; fee_excess: Fee.Signed.t
     ; proof_type: [`Base | `Merge] }
-  [@@deriving sexp, bin_io, compare]
+  [@@deriving sexp, compare]
+
+  module Stable :
+    sig
+      module V1 : sig
+        type t =
+          { source: ledger_hash
+          ; target: ledger_hash
+          ; supply_increase: Currency.Amount.t
+          ; fee_excess: Fee.Signed.t
+          ; proof_type: [`Base | `Merge] }
+        [@@deriving sexp, bin_io, compare]
+      end
+    end
+    with type V1.t = t
 
   val merge : t -> t -> t Or_error.t
 
@@ -426,12 +476,12 @@ module type Ledger_proof_intf = sig
   type sok_digest
 
   (* bin_io omitted intentionally *)
-  type t [@@deriving sexp]
+  type t [@@deriving sexp, yojson]
 
   module Stable :
     sig
       module V1 : sig
-        type t [@@deriving sexp, bin_io]
+        type t [@@deriving sexp, bin_io, yojson]
       end
 
       module Latest = V1
@@ -471,13 +521,25 @@ module type Transaction_snark_work_intf = sig
   type public_key
 
   module Statement : sig
-    type t = statement list
+    type t = statement list [@@deriving yojson]
 
     include Sexpable.S with type t := t
 
-    include Binable.S with type t := t
+    include Hashable.S with type t := t
 
-    include Hashable.S_binable with type t := t
+    module Stable :
+      sig
+        module V1 : sig
+          type t [@@deriving yojson]
+
+          include Sexpable.S with type t := t
+
+          include Binable.S with type t := t
+
+          include Hashable.S_binable with type t := t
+        end
+      end
+      with type V1.t = t
 
     val gen : t Quickcheck.Generator.t
   end
@@ -489,13 +551,25 @@ module type Transaction_snark_work_intf = sig
   *)
 
   type t = {fee: Fee.Unsigned.t; proofs: proof list; prover: public_key}
-  [@@deriving sexp, bin_io]
+  [@@deriving sexp]
+
+  module Stable :
+    sig
+      module V1 : sig
+        type t = {fee: Fee.Unsigned.t; proofs: proof list; prover: public_key}
+        [@@deriving sexp, bin_io]
+      end
+    end
+    with type V1.t = t
 
   type unchecked = t
 
   module Checked : sig
-    type t = {fee: Fee.Unsigned.t; proofs: proof list; prover: public_key}
-    [@@deriving sexp, bin_io]
+    type nonrec t = t =
+      {fee: Fee.Unsigned.t; proofs: proof list; prover: public_key}
+    [@@deriving sexp]
+
+    module Stable : module type of Stable
 
     val create_unsafe : unchecked -> t
   end
@@ -672,7 +746,7 @@ module type Transaction_snark_scan_state_intf = sig
   end
 
   module Available_job : sig
-    type t
+    type t [@@deriving sexp]
   end
 
   module Space_partition : sig
@@ -779,6 +853,10 @@ module type Staged_ledger_base_intf = sig
   (** The ledger in a staged ledger is always a mask *)
   type ledger
 
+  type ledger_proof_statement
+
+  type public_key
+
   type serializable [@@deriving bin_io]
 
   module Scan_state : sig
@@ -826,6 +904,7 @@ module type Staged_ledger_base_intf = sig
       | Bad_prev_hash of staged_ledger_hash * staged_ledger_hash
       | Insufficient_fee of Currency.Fee.t * Currency.Fee.t
       | Non_zero_fee_excess of Scan_state.Space_partition.t * transaction list
+      | Invalid_proof of ledger_proof * ledger_proof_statement * public_key
       | Unexpected of Error.t
     [@@deriving sexp]
 
@@ -890,15 +969,11 @@ module type Staged_ledger_intf = sig
 
   type user_command_with_valid_signature
 
-  type ledger_proof_statement
-
   type ledger_proof_statement_set
 
   type sparse_ledger
 
   type completed_work_checked
-
-  type public_key
 
   val current_ledger_proof : t -> ledger_proof option
 
@@ -1500,7 +1575,7 @@ module type Inputs_intf = sig
   module Coinbase :
     Coinbase_intf
     with type public_key := Public_key.Compressed.t
-     and type fee_transfer := Fee_transfer.single
+     and type fee_transfer := Fee_transfer.Single.t
 
   module Transaction :
     Transaction_intf
@@ -1610,7 +1685,7 @@ Merge Snark:
      and type public_key := Public_key.Compressed.t
      and type completed_work := Transaction_snark_work.t
      and type completed_work_checked := Transaction_snark_work.Checked.t
-     and type fee_transfer_single := Fee_transfer.single
+     and type fee_transfer_single := Fee_transfer.Single.t
 
   module Sparse_ledger : sig
     type t

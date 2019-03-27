@@ -217,57 +217,68 @@ module Make (Inputs : Inputs.S) :
     let (Rose_tree.T (target_transition, _)) = target_subtree in
     let target_hash = With_hash.hash (Cached.peek target_transition) in
     let open Deferred.Or_error.Let_syntax in
+    Logger.trace logger "doing a catchup job with target $target_hash"
+      ~module_:__MODULE__ ~location:__LOC__
+      ~metadata:
+        [ ("target_hash", State_hash.to_yojson target_hash)
+        ; ( "target_subtree"
+          , Rose_tree.to_yojson
+              (fun elem ->
+                Cached.peek elem |> With_hash.data
+                |> Inputs.External_transition.Verified.to_yojson )
+              target_subtree ) ] ;
     Deferred.Or_error.find_map_ok peers ~f:(fun peer ->
-        match%bind
-          O1trace.trace_recurring_task "ledger catchup" (fun () ->
-              Network.catchup_transition network peer target_hash )
-        with
-        | None ->
-            Deferred.return
-            @@ Or_error.errorf
-                 !"Peer %{sexp:Network_peer.Peer.t} did not have transition"
-                 peer
-        | Some queried_transitions ->
-            let last, rest =
-              Non_empty_list.(uncons @@ rev queried_transitions)
-            in
-            let%bind () =
-              if
-                State_hash.equal
-                  (Consensus.Protocol_state.hash
-                     (External_transition.protocol_state last))
-                  target_hash
-              then return ()
-              else (
-                Logger.faulty_peer logger ~module_:__MODULE__ ~location:__LOC__
-                  !"Peer %{sexp:Network_peer.Peer.t} returned an different \
-                    target transition than we requested"
-                  peer ;
-                Deferred.return (Error (Error.of_string "")) )
-            in
-            let%bind verified_transitions =
-              take_while_map_result_rev rest
-                ~f:
-                  (verify_transition ~logger ~frontier
-                     ~unprocessed_transition_cache)
-            in
-            let%bind () =
-              Deferred.return
-                ( if List.length verified_transitions > 0 then Ok ()
-                else
-                  let error =
-                    "Peer should have given us some new transitions that are \
-                     not in our transition frontier"
-                  in
-                  Logger.faulty_peer logger ~module_:__MODULE__
-                    ~location:__LOC__ "%s" error ;
-                  Error (Error.of_string error) )
-            in
-            let full_subtree =
-              List.fold_right verified_transitions ~init:target_subtree
-                ~f:(fun transition acc -> Rose_tree.T (transition, [acc]) )
-            in
-            materialize_breadcrumbs ~frontier ~logger ~peer full_subtree )
+        O1trace.trace_recurring_task "ledger catchup" (fun () ->
+            match%bind Network.catchup_transition network peer target_hash with
+            | None ->
+                Deferred.return
+                @@ Or_error.errorf
+                     !"Peer %{sexp:Network_peer.Peer.t} did not have transition"
+                     peer
+            | Some queried_transitions ->
+                let last, rest =
+                  Non_empty_list.(uncons @@ rev queried_transitions)
+                in
+                let%bind () =
+                  if
+                    State_hash.equal
+                      (Consensus.Protocol_state.hash
+                         (External_transition.protocol_state last))
+                      target_hash
+                  then return ()
+                  else (
+                    Logger.faulty_peer logger ~module_:__MODULE__
+                      ~location:__LOC__
+                      !"Peer %{sexp:Network_peer.Peer.t} returned an \
+                        different target transition than we requested"
+                      peer ;
+                    Deferred.return (Error (Error.of_string "")) )
+                in
+                let%bind verified_transitions =
+                  take_while_map_result_rev rest
+                    ~f:
+                      (verify_transition ~logger ~frontier
+                         ~unprocessed_transition_cache)
+                in
+                let%bind () =
+                  Deferred.return
+                    ( if List.length verified_transitions > 0 then Ok ()
+                    else
+                      let error =
+                        "Peer should have given us some new transitions that \
+                         are not in our transition frontier"
+                      in
+                      Logger.faulty_peer logger ~module_:__MODULE__
+                        ~location:__LOC__ "%s" error ;
+                      Error (Error.of_string error) )
+                in
+                let full_subtree =
+                  List.fold_right verified_transitions ~init:target_subtree
+                    ~f:(fun transition acc -> Rose_tree.T (transition, [acc])
+                  )
+                in
+                materialize_breadcrumbs ~frontier ~logger ~peer full_subtree )
+    )
 
   let run ~logger ~network ~frontier ~catchup_job_reader
       ~catchup_breadcrumbs_writer ~unprocessed_transition_cache =

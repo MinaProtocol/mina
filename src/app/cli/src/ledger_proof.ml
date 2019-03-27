@@ -21,7 +21,8 @@ module Prod :
       module T = struct
         let version = 1
 
-        type t = Transaction_snark.t [@@deriving bin_io, sexp]
+        type t = Transaction_snark.Stable.V1.t
+        [@@deriving bin_io, sexp, yojson]
       end
 
       include T
@@ -40,7 +41,7 @@ module Prod :
     module Registered_V1 = Registrar.Register (V1)
   end
 
-  type t = Stable.Latest.t [@@deriving sexp]
+  type t = Stable.Latest.t [@@deriving sexp, yojson]
 
   type statement = Transaction_snark.Statement.t
 
@@ -75,8 +76,10 @@ module Debug :
       module T = struct
         let version = 1
 
-        type t = Transaction_snark.Statement.t * Sok_message.Digest.Stable.V1.t
-        [@@deriving sexp, bin_io]
+        type t =
+          Transaction_snark.Statement.Stable.V1.t
+          * Sok_message.Digest.Stable.V1.t
+        [@@deriving sexp, bin_io, yojson]
       end
 
       include T
@@ -95,7 +98,7 @@ module Debug :
     module Registered_V1 = Registrar.Register (V1)
   end
 
-  type t = Stable.Latest.t [@@deriving sexp]
+  type t = Stable.Latest.t [@@deriving sexp, yojson]
 
   type statement = Transaction_snark.Statement.t
 

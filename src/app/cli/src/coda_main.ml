@@ -51,15 +51,7 @@ end
 module Ledger_hash = struct
   include Ledger_hash
 
-  let of_digest = Ledger_hash.of_digest
-
-  let merge = Ledger_hash.merge
-
-  let to_bytes = Ledger_hash.to_bytes
-
-  let of_digest = Ledger_hash.of_digest
-
-  let merge = Ledger_hash.merge
+  let of_digest, merge, to_bytes = Ledger_hash.(of_digest, merge, to_bytes)
 end
 
 module Frozen_ledger_hash = struct
@@ -125,7 +117,7 @@ module type Init_intf = sig
      and type user_command := User_command.t
      and type user_command_with_valid_signature :=
                 User_command.With_valid_signature.t
-     and type fee_transfer_single := Fee_transfer.single
+     and type fee_transfer_single := Fee_transfer.Single.t
 
   module Make_work_selector : Work_selector_F
 
@@ -180,7 +172,7 @@ module type Main_intf = sig
           ; discovery_port: int (* UDP *)
           ; communication_port: int
           (* TCP *) }
-        [@@deriving bin_io, sexp, compare, hash]
+        [@@deriving sexp, compare, hash]
       end
 
       module Gossip_net : sig
@@ -254,7 +246,7 @@ module type Main_intf = sig
                   User_command.With_valid_signature.t
        and type public_key := Public_key.Compressed.t
        and type staged_ledger_hash := Staged_ledger_hash.t
-       and type fee_transfer_single := Fee_transfer.single
+       and type fee_transfer_single := Fee_transfer.Single.t
 
     module Staged_ledger :
       Protocols.Coda_pow.Staged_ledger_intf
@@ -335,6 +327,8 @@ module type Main_intf = sig
 
   val best_ledger : t -> Inputs.Ledger.t Participating_state.t
 
+  val root_length : t -> int Participating_state.t
+
   val best_protocol_state :
     t -> Consensus.Protocol_state.Value.t Participating_state.t
 
@@ -345,9 +339,14 @@ module type Main_intf = sig
 
   val peers : t -> Network_peer.Peer.t list
 
-  val strongest_ledgers :
+  val verified_transitions :
        t
     -> (Inputs.External_transition.Verified.t, State_hash.t) With_hash.t
+       Strict_pipe.Reader.t
+
+  val root_diff :
+       t
+    -> User_command.t Protocols.Coda_transition_frontier.Root_diff_view.t
        Strict_pipe.Reader.t
 
   val transaction_pool : t -> Inputs.Transaction_pool.t
@@ -368,7 +367,6 @@ module Fee_transfer = Coda_base.Fee_transfer
 module Ledger_proof_statement = Transaction_snark.Statement
 module Transaction_snark_work =
   Staged_ledger.Make_completed_work
-    (Public_key.Compressed)
     (Ledger_proof.Stable.V1)
     (Ledger_proof_statement)
 
@@ -501,7 +499,7 @@ struct
   module Sparse_ledger = Coda_base.Sparse_ledger
 
   module Transaction_snark_work_proof = struct
-    type t = Ledger_proof.Stable.V1.t list [@@deriving sexp, bin_io]
+    type t = Ledger_proof.Stable.V1.t list [@@deriving sexp, bin_io, yojson]
   end
 
   module Staged_ledger = struct
@@ -588,7 +586,7 @@ struct
     module Pool = Transaction_pool.Make (Staged_ledger) (Transition_frontier)
     include Network_pool.Make (Transition_frontier) (Pool) (Pool.Diff)
 
-    type pool_diff = Pool.Diff.t [@@deriving bin_io]
+    type pool_diff = Pool.Diff.t
 
     (* TODO *)
     let load ~logger ~disk_location:_ ~incoming_diffs ~frontier_broadcast_pipe
@@ -664,9 +662,11 @@ struct
     module Proof = Transaction_snark_work_proof
 
     module Fee = struct
+      (* TODO : version Fee *)
       module T = struct
-        type t = {fee: Fee.Unsigned.t; prover: Public_key.Compressed.t}
-        [@@deriving bin_io, sexp]
+        type t =
+          {fee: Fee.Unsigned.t; prover: Public_key.Compressed.Stable.V1.t}
+        [@@deriving bin_io, sexp, yojson]
 
         (* TODO: Compare in a better way than with public key, like in transaction pool *)
         let compare t1 t2 =
@@ -1084,10 +1084,17 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
            collision should not happen." ;
         Core.exit 1
 
+  module Receipt_chain_hash = struct
+    (* Receipt.Chain_hash does not have bin_io *)
+    include Receipt.Chain_hash.Stable.V1
+
+    let cons, empty = Receipt.Chain_hash.(cons, empty)
+  end
+
   module Payment_verifier =
     Receipt_chain_database_lib.Verifier.Make
       (User_command)
-      (Receipt.Chain_hash)
+      (Receipt_chain_hash)
 
   let verify_payment t log (addr : Public_key.Compressed.Stable.Latest.t)
       (verifying_txn : User_command.t) proof =
@@ -1350,14 +1357,12 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
 
   let clear_hist_status ~flag t = Perf_histograms.wipe () ; get_status ~flag t
 
-  let visualize_registered_masks = Coda_base.Ledger.Debug.visualize
-
   let log_shutdown ~conf_dir ~logger t =
     let frontier_file = conf_dir ^/ "frontier.dot" in
     let mask_file = conf_dir ^/ "registered_masks.dot" in
     Logger.info logger ~module_:__MODULE__ ~location:__LOC__ "%s"
-      (Visualization_message.success "registered masks" frontier_file) ;
-    visualize_registered_masks ~filename:mask_file ;
+      (Visualization_message.success "registered masks" mask_file) ;
+    Coda_base.Ledger.Debug.visualize ~filename:mask_file ;
     match visualize_frontier ~filename:frontier_file t with
     | `Active () ->
         Logger.info logger ~module_:__MODULE__ ~location:__LOC__ "%s"

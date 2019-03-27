@@ -6,6 +6,7 @@ open Core_kernel
 open Async
 open Protocols.Coda_transition_frontier
 open Pipe_lib
+open Module_version
 
 module type Transition_frontier_intf = sig
   type t
@@ -35,13 +36,15 @@ module type Transition_frontier_intf = sig
 end
 
 module type User_command_intf = sig
-  module Stable : sig
-    module Latest : sig
-      type t [@@deriving sexp, bin_io]
-    end
-  end
+  type t [@@deriving sexp, yojson]
 
-  type t = Stable.Latest.t [@@deriving sexp]
+  module Stable :
+    sig
+      module V1 : sig
+        type t [@@deriving sexp, bin_io, yojson]
+      end
+    end
+    with type V1.t = t
 
   include Comparable.S with type t := t
 
@@ -167,9 +170,12 @@ struct
        possible. *)
     let validation_ledger = get_validation_ledger_and_update t frontier in
     Logger.trace t.logger ~module_:__MODULE__ ~location:__LOC__
-      !"Diff: removed: %{sexp:User_command.t list} added: \
-        %{sexp:User_command.t list} from best tip"
-      removed_user_commands new_user_commands ;
+      ~metadata:
+        [ ( "removed"
+          , `List (List.map removed_user_commands ~f:User_command.to_yojson) )
+        ; ( "added"
+          , `List (List.map new_user_commands ~f:User_command.to_yojson) ) ]
+      "Diff: removed: $removed added: $added from best tip" ;
     let removed_set = User_command.Set.of_list removed_user_commands in
     let added_set = User_command.Set.of_list new_user_commands in
     let removed_but_not_added = User_command.Set.diff removed_set added_set in
@@ -280,7 +286,33 @@ struct
   let transactions t = Sequence.unfold ~init:t.pool.heap ~f:Fheap.pop
 
   module Diff = struct
-    type t = User_command.Stable.Latest.t list [@@deriving bin_io, sexp]
+    module Stable = struct
+      module V1 = struct
+        module T = struct
+          let version = 1
+
+          type t = User_command.Stable.V1.t list
+          [@@deriving bin_io, sexp, yojson]
+        end
+
+        include T
+        include Registration.Make_latest_version (T)
+      end
+
+      module Latest = V1
+
+      module Module_decl = struct
+        let name = "transaction_pool_diff"
+
+        type latest = Latest.t
+      end
+
+      module Registrar = Registration.Make (Module_decl)
+      module Registered_V1 = Registrar.Register (V1)
+    end
+
+    (* bin_io omitted *)
+    type t = Stable.Latest.t [@@deriving sexp, yojson]
 
     let summary t =
       Printf.sprintf "Transaction diff of length %d" (List.length t)
@@ -325,10 +357,12 @@ struct
                     | Ok () ->
                         Logger.debug t.logger ~module_:__MODULE__
                           ~location:__LOC__
-                          !"Adding %{sexp: \
-                            User_command.With_valid_signature.t} to my pool \
-                            locally, and scheduling for rebroadcast"
-                          txn ;
+                          ~metadata:
+                            [ ( "user_cmd"
+                              , User_command.to_yojson (txn :> User_command.t)
+                              ) ]
+                          "Adding $user_cmd to my pool locally, and \
+                           scheduling for rebroadcast" ;
                         (add' pool txn, (txn :> User_command.t) :: acc)
                     | Error err ->
                         Logger.faulty_peer t.logger ~module_:__MODULE__
@@ -399,10 +433,18 @@ let%test_module _ =
         ((pipe_r, ref ([], Int.Set.empty)), pipe_w)
     end
 
+    module Int = struct
+      include Int
+
+      let to_yojson x = `Int x
+
+      let of_yojson = function `Int x -> Ok x | _ -> Error "expected `Int"
+    end
+
     module Test =
       Make0 (struct
           module Stable = struct
-            module Latest = Int
+            module V1 = Int
           end
 
           include (Int : module type of Int with module Stable := Int.Stable)
@@ -482,7 +524,7 @@ let%test_module _ =
           List.iter ~f:(Test.add pool) txs ;
           let%bind () =
             Broadcast_pipe.Writer.write best_tip_diff_w
-              {new_user_commands= [0; 3]; removed_user_commands= [5; 6]}
+              {new_user_commands= [0; 3; 4]; removed_user_commands= [4; 5; 6]}
           in
           assert_pool_txs [1; 2; 4; 5; 6] ;
           Deferred.return true )

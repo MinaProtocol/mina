@@ -2,29 +2,61 @@ open Core_kernel
 open Async_kernel
 open Protocols
 open Coda_pow
+open Signature_lib
+open Module_version
 
-module Make
-    (Compressed_public_key : Compressed_public_key_intf) (Ledger_proof : sig
-        type t [@@deriving sexp, bin_io]
-    end) (Ledger_proof_statement : sig
-      type t [@@deriving sexp, bin_io, hash, compare]
+module Make (Ledger_proof : sig
+  type t [@@deriving sexp, bin_io]
+end) (Ledger_proof_statement : sig
+  type t [@@deriving sexp, hash, compare]
 
-      val gen : t Quickcheck.Generator.t
-    end) :
+  module Stable :
+    sig
+      module V1 : sig
+        type t [@@deriving sexp, bin_io, hash, compare, yojson]
+      end
+    end
+    with type V1.t = t
+
+  val gen : t Quickcheck.Generator.t
+end) :
   Coda_pow.Transaction_snark_work_intf
   with type proof := Ledger_proof.t
    and type statement := Ledger_proof_statement.t
-   and type public_key := Compressed_public_key.t = struct
+   and type public_key := Public_key.Compressed.t = struct
   let proofs_length = 2
 
   module Statement = struct
-    module T = struct
-      type t = Ledger_proof_statement.t list
-      [@@deriving bin_io, sexp, hash, compare]
+    module Stable = struct
+      module V1 = struct
+        module T = struct
+          let version = 1
+
+          type t = Ledger_proof_statement.Stable.V1.t list
+          [@@deriving bin_io, sexp, hash, compare, yojson]
+        end
+
+        include T
+        include Registration.Make_latest_version (T)
+        include Hashable.Make_binable (T)
+      end
+
+      module Latest = V1
+
+      module Module_decl = struct
+        let name = "transaction_snark_work_statement"
+
+        type latest = Latest.t
+      end
+
+      module Registrar = Registration.Make (Module_decl)
+      module Registered_V1 = Registrar.Register (V1)
     end
 
-    include T
-    include Hashable.Make_binable (T)
+    (* bin_io omitted *)
+    type t = Stable.Latest.t [@@deriving sexp, hash, compare, yojson]
+
+    include Hashable.Make (Stable.Latest)
 
     let gen =
       Quickcheck.Generator.list_with_length proofs_length
@@ -32,11 +64,40 @@ module Make
   end
 
   module T = struct
-    type t =
+    module Stable = struct
+      module V1 = struct
+        module T = struct
+          let version = 1
+
+          type t =
+            { fee: Fee.Unsigned.t
+            ; proofs: Ledger_proof.t list
+            ; prover: Public_key.Compressed.Stable.V1.t }
+          [@@deriving sexp, bin_io]
+        end
+
+        include T
+        include Registration.Make_latest_version (T)
+      end
+
+      module Latest = V1
+
+      module Module_decl = struct
+        let name = "transaction_snark_work"
+
+        type latest = Latest.t
+      end
+
+      module Registrar = Registration.Make (Module_decl)
+      module Registered_V1 = Registrar.Register (V1)
+    end
+
+    (* bin_io omitted *)
+    type t = Stable.Latest.t =
       { fee: Fee.Unsigned.t
       ; proofs: Ledger_proof.t list
-      ; prover: Compressed_public_key.t }
-    [@@deriving sexp, bin_io]
+      ; prover: Public_key.Compressed.t }
+    [@@deriving sexp]
   end
 
   include T

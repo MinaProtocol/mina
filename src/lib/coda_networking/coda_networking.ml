@@ -48,7 +48,8 @@ struct
         type query =
           Staged_ledger_hash.Stable.V1.t Envelope.Incoming.Stable.V1.t
 
-        type response = (Staged_ledger_aux.Stable.V1.t * Ledger_hash.t) option
+        type response =
+          (Staged_ledger_aux.Stable.V1.t * Ledger_hash.Stable.V1.t) option
       end
 
       module Caller = T
@@ -100,8 +101,7 @@ struct
           (Ledger_hash.Stable.V1.t * Sync_ledger.Query.Stable.V1.t)
           Envelope.Incoming.Stable.V1.t
 
-        type response =
-          (Ledger_hash.Stable.V1.t * Sync_ledger.Answer.Stable.V1.t) Or_error.t
+        type response = Sync_ledger.Answer.Stable.V1.t Or_error.t
       end
 
       module Caller = T
@@ -124,8 +124,7 @@ struct
           Envelope.Incoming.Stable.V1.t
         [@@deriving bin_io, sexp]
 
-        type response =
-          (Ledger_hash.Stable.V1.t * Sync_ledger.Answer.Stable.V1.t) Or_error.t
+        type response = Sync_ledger.Answer.Stable.V1.t Or_error.t
         [@@deriving bin_io, sexp]
 
         let version = 1
@@ -207,7 +206,7 @@ struct
         type response =
           ( ( External_transition.Stable.V1.t
             , State_body_hash.t list * External_transition.t )
-            Proof_carrying_data.t
+            Proof_carrying_data.Stable.V1.t
           * Staged_ledger_aux.Stable.V1.t
           * Ledger_hash.Stable.V1.t )
           option
@@ -235,8 +234,9 @@ struct
 
         type response =
           ( ( External_transition.Stable.V1.t
-            , State_body_hash.t list * External_transition.Stable.V1.t )
-            Proof_carrying_data.t
+            , State_body_hash.Stable.V1.t list
+              * External_transition.Stable.V1.t )
+            Proof_carrying_data.Stable.V1.t
           * Staged_ledger_aux.Stable.V1.t
           * Ledger_hash.Stable.V1.t )
           option
@@ -266,14 +266,22 @@ module Message (Inputs : sig
     module Stable :
       sig
         module V1 : sig
-          type t [@@deriving bin_io, sexp]
+          type t [@@deriving bin_io, sexp, to_yojson]
         end
       end
       with type V1.t = t
   end
 
   module Transaction_pool_diff : sig
-    type t [@@deriving bin_io, sexp]
+    type t [@@deriving sexp]
+
+    module Stable :
+      sig
+        module V1 : sig
+          type t [@@deriving bin_io, sexp, to_yojson]
+        end
+      end
+      with type V1.t = t
   end
 
   module External_transition : External_transition.S
@@ -287,10 +295,11 @@ struct
       type content =
         | New_state of External_transition.Stable.V1.t
         | Snark_pool_diff of Snark_pool_diff.Stable.V1.t
-        | Transaction_pool_diff of Transaction_pool_diff.t
-      [@@deriving bin_io, sexp]
+        | Transaction_pool_diff of Transaction_pool_diff.Stable.V1.t
+      [@@deriving bin_io, sexp, to_yojson]
 
-      type msg = content Envelope.Incoming.Stable.V1.t [@@deriving sexp]
+      type msg = content Envelope.Incoming.Stable.V1.t
+      [@@deriving sexp, to_yojson]
     end
 
     let name = "message"
@@ -323,6 +332,12 @@ struct
 
     include Register (T)
   end
+
+  let summary msg =
+    match Envelope.Incoming.data msg with
+    | New_state _ -> "new state"
+    | Snark_pool_diff _ -> "snark pool diff"
+    | Transaction_pool_diff _ -> "transaction pool diff"
 end
 
 module type Inputs_intf = sig
@@ -353,19 +368,27 @@ module type Inputs_intf = sig
   end
 
   module Snark_pool_diff : sig
-    type t [@@deriving sexp]
+    type t [@@deriving sexp, to_yojson]
 
     module Stable :
       sig
         module V1 : sig
-          type t [@@deriving sexp, bin_io]
+          type t [@@deriving sexp, bin_io, to_yojson]
         end
       end
       with type V1.t = t
   end
 
   module Transaction_pool_diff : sig
-    type t [@@deriving sexp, bin_io]
+    type t [@@deriving sexp, to_yojson]
+
+    module Stable :
+      sig
+        module V1 : sig
+          type t [@@deriving sexp, bin_io, to_yojson]
+        end
+      end
+      with type V1.t = t
   end
 
   module Time : Protocols.Coda_pow.Time_intf
@@ -420,7 +443,7 @@ module Make (Inputs : Inputs_intf) = struct
       ~(answer_sync_ledger_query :
             (Ledger_hash.t * Ledger.Location.Addr.t Syncable_ledger.Query.t)
             Envelope.Incoming.t
-         -> (Ledger_hash.t * Sync_ledger.Answer.t) Deferred.Or_error.t)
+         -> Sync_ledger.Answer.t Deferred.Or_error.t)
       ~(transition_catchup :
             State_hash.t Envelope.Incoming.t
          -> External_transition.t Non_empty_list.t option Deferred.t)
@@ -501,8 +524,9 @@ module Make (Inputs : Inputs_intf) = struct
   (* TODO: Have better pushback behavior *)
   let broadcast t x =
     Logger.trace t.logger ~module_:__MODULE__ ~location:__LOC__
-      !"Broadcasting %{sexp: Message.msg} over gossip net"
-      x ;
+      ~metadata:[("message", Message.msg_to_yojson x)]
+      !"Broadcasting %s over gossip net"
+      (Message.summary x) ;
     Linear_pipe.write_without_pushback (Gossip_net.broadcast t.gossip_net) x
 
   let broadcast_from_me t content = broadcast t (envelope_from_me t content)
@@ -623,10 +647,9 @@ module Make (Inputs : Inputs_intf) = struct
             let peers = get_random_peers () in
             get_ancestry_non_preferred_peers t input_in_envelope peers )
 
-  (* TODO: Check whether responses are good or not. *)
   let glue_sync_ledger t query_reader response_writer =
-    (* We attempt to query 3 random peers, retry_max times. We keep track
-       of the peers that couldn't answer a particular query and won't try them
+    (* We attempt to query 3 random peers, retry_max times. We keep track of the
+       peers that couldn't answer a particular query and won't try them
        again. *)
     let retry_max = 6 in
     let retry_interval = Core.Time.Span.of_ms 200. in
@@ -653,7 +676,7 @@ module Make (Inputs : Inputs_intf) = struct
                 Logger.trace t.logger ~module_:__MODULE__ ~location:__LOC__
                   !"Received answer from peer %{sexp: Peer.t} on ledger_hash \
                     %{sexp: Ledger_hash.t}"
-                  peer (fst answer) ;
+                  peer (fst query) ;
                 Some
                   (Envelope.Incoming.wrap ~data:answer
                      ~sender:(Envelope.Sender.Remote peer))
@@ -670,9 +693,10 @@ module Make (Inputs : Inputs_intf) = struct
       | Some answer ->
           Logger.trace t.logger ~module_:__MODULE__ ~location:__LOC__
             !"Succeeding with answer on ledger_hash %{sexp: Ledger_hash.t}"
-            (fst answer.data) ;
+            (fst query) ;
           (* TODO *)
-          Linear_pipe.write_if_open response_writer answer
+          Linear_pipe.write_if_open response_writer
+            (fst query, snd query, answer)
       | None ->
           Logger.info t.logger ~module_:__MODULE__ ~location:__LOC__
             !"None of the peers I asked knew; trying more" ;
