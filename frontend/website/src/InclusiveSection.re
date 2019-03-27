@@ -36,7 +36,15 @@ module Legend = {
       render: _self => {
         <div className=Css.(style([display(`flex), alignItems(`center)]))>
           <Square
-            className=Css.(style([marginRight(`rem(0.75))]))
+            className=Css.(
+              style([
+                marginRight(`rem(0.5)),
+                media(
+                  Style.MediaQuery.notMobile,
+                  [marginRight(`rem(0.75))],
+                ),
+              ])
+            )
             borderColor=None
             fillColor=themeColor
             dims=(`rem(1.0), `rem(1.0))
@@ -46,6 +54,7 @@ module Legend = {
               merge([
                 Style.H3.basic,
                 style([
+                  fontWeight(`medium),
                   marginTop(`zero),
                   marginBottom(`zero),
                   color(themeColor),
@@ -76,7 +85,7 @@ module Legend = {
               display(`flex),
               marginTop(`zero),
               marginBottom(`zero),
-              marginRight(`zero),
+              marginRight(`rem(0.25)),
               media(Style.MediaQuery.notMobile, [marginRight(`rem(2.25))]),
             ])
           )>
@@ -123,6 +132,7 @@ module Figure = {
               style([
                 marginTop(`rem(1.5)),
                 color(captionColor),
+                fontWeight(`medium),
                 textAlign(`center),
               ]),
             ])
