@@ -71,7 +71,7 @@ let run_test () : unit Deferred.t =
         { Inputs.Net.Config.logger
         ; time_controller
         ; gossip_net_params=
-            { Inputs.Net.Gossip_net.Config.timeout= Time.Span.of_sec 1.
+            { Inputs.Net.Gossip_net.Config.timeout= Time.Span.of_sec 3.
             ; logger
             ; target_peer_count= 8
             ; initial_peers= []

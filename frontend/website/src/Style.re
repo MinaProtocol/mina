@@ -34,32 +34,35 @@ module Colors = {
   let tealAlpha = a => `rgba((71, 130, 160, a));
 
   let rosebud = `rgb((163, 83, 111));
+
+  let blueBlue = `rgb((42, 81, 224));
   let midnight = `rgb((31, 45, 61));
 };
 
 module Typeface = {
   open Css;
   let weights = [
-    // The weights are inentionally shifted thinner one unit
-    (`thin, "Thin"),
-    (`extraLight, "Thin"),
-    (`light, "ExtraLight"),
-    (`normal, "Light"),
-    (`medium, "Regular"),
-    (`semiBold, "Medium"),
-    (`bold, "SemiBold"),
-    (`extraBold, "Bold"),
+    // The weights are intentionally shifted thinner one unit
+    (`thin, "Thin", "Thin"),
+    (`extraLight, "ExtraLight", "Thin"),
+    (`light, "Light", "ExtraLight"),
+    (`normal, "Regular", "Light"),
+    (`medium, "Medium", "Regular"),
+    (`semiBold, "SemiBold", "Medium"),
+    (`bold, "Bold", "SemiBold"),
+    (`extraBold, "ExtraBold", "Bold"),
   ];
 
   // TODO: add format("woff") and unicode ranges
   let () =
     List.iter(
-      ((weight, name)) =>
+      ((weight, localName, name)) =>
         ignore @@
         fontFace(
           ~fontFamily="IBM Plex Sans",
           ~src=[
-            localUrl("IBMPlexSans-" ++ name),
+            localUrl("IBM Plex Sans " ++ localName),
+            localUrl("IBMPlexSans-" ++ localName),
             url("/static/font/IBMPlexSans-" ++ name ++ "-Latin1.woff2"),
             url("/static/font/IBMPlexSans-" ++ name ++ "-Latin1.woff"),
           ],
@@ -74,12 +77,26 @@ module Typeface = {
     fontFace(
       ~fontFamily="IBM Plex Mono",
       ~src=[
-        localUrl("IBMPlexMono-Regular"),
+        localUrl("IBM Plex Mono SemiBold"),
+        localUrl("IBMPlexMono-SemiBold"),
+        url("/static/font/IBMPlexMono-Medium-Latin1.woff2"),
+        url("/static/font/IBMPlexMono-Medium-Latin1.woff"),
+      ],
+      ~fontStyle=`normal,
+      ~fontWeight=`semiBold,
+      (),
+    );
+  let _ =
+    fontFace(
+      ~fontFamily="IBM Plex Mono",
+      ~src=[
+        localUrl("IBM Plex Mono Bold"),
+        localUrl("IBMPlexMono-Bold"),
         url("/static/font/IBMPlexMono-SemiBold-Latin1.woff2"),
         url("/static/font/IBMPlexMono-SemiBold-Latin1.woff"),
       ],
       ~fontStyle=`normal,
-      ~fontWeight=`num(600),
+      ~fontWeight=`bold,
       (),
     );
 
@@ -89,6 +106,7 @@ module Typeface = {
         ~fontFamily="IBM Plex Serif",
         ~src=[
           localUrl("IBM Plex Serif Medium"),
+          localUrl("IBMPlexSerif-Medium"),
           url("/static/font/IBMPlexSerif-Medium-Latin1.woff2"),
           url("/static/font/IBMPlexSerif-Medium-Latin1.woff"),
         ],
@@ -115,7 +133,6 @@ module MediaQuery = {
   let notSmallMobile = "(min-width: 25rem)";
   // to adjust root font size (therefore pixels)
   let iphoneSEorSmaller = "(max-width: 374px)";
-  let iphoneXorSmaller = "(max-width: 384px)";
 };
 
 /** sets both paddingLeft and paddingRight, as one should */

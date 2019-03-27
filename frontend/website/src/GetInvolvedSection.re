@@ -25,6 +25,13 @@ module KnowledgeBase = {
                 style([
                   marginBottom(`rem(0.5)),
                   color(Style.Colors.hyperlink),
+                  listStyle(`none, `inside, `none),
+                  before([
+                    unsafe("content", {js|"•"|js}),
+                    color(Style.Colors.hyperlink),
+                    marginRight(`rem(1.)),
+                    display(`inlineBlock),
+                  ]),
                 ])
               )>
               <a
@@ -49,11 +56,7 @@ module KnowledgeBase = {
                   marginBottom(`rem(0.75)),
                   media(
                     Style.MediaQuery.notMobile,
-                    [
-                      marginTop(`rem(1.5)),
-                      marginLeft(`rem(3.)),
-                      marginRight(`rem(1.5)),
-                    ],
+                    [marginTop(`rem(1.5)), marginRight(`rem(1.5))],
                   ),
                 ]),
               ])
@@ -63,17 +66,14 @@ module KnowledgeBase = {
           <ul
             className=Css.(
               style([
-                marginLeft(`rem(1.5)),
                 marginRight(`zero),
                 paddingBottom(`zero),
+                paddingLeft(`zero),
+                paddingRight(`zero),
                 marginBottom(`zero),
-                unsafe("padding-inline-start", "0.0rem"),
                 media(
                   Style.MediaQuery.notMobile,
-                  [
-                    unsafe("padding-inline-start", "40px"), // browser default
-                    marginRight(`rem(1.5)),
-                  ],
+                  [marginRight(`rem(1.5))],
                 ),
               ])
             )>
@@ -98,6 +98,8 @@ module KnowledgeBase = {
             paddingBottom(`rem(1.)),
             marginLeft(`zero),
             marginRight(`zero),
+            paddingTop(`rem(1.0)),
+            unsafe("min-width", "min-content"),
             media(
               Style.MediaQuery.notMobile,
               [
@@ -113,7 +115,7 @@ module KnowledgeBase = {
             className=Css.(
               style([
                 letterSpacing(`rem(0.1875)),
-                border(`px(1), `solid, black),
+                border(`px(1), `solid, Style.Colors.midnight),
                 paddingLeft(`rem(1.0)),
                 paddingRight(`rem(1.0)),
                 paddingTop(`rem(0.5)),
@@ -348,7 +350,7 @@ let make = _ => {
           className=Css.(
             style([
               listStyle(`none, `inside, `none),
-              unsafe("padding-inline-start", "0"),
+              unsafe("padding-left", "0"),
             ])
           )>
           <li className=marginBelow>
@@ -376,6 +378,7 @@ let make = _ => {
             flexWrap(`wrap),
             justifyContent(`spaceAround),
             alignItems(`center),
+            marginBottom(`rem(1.)),
           ])
         )>
         <SocialLink
