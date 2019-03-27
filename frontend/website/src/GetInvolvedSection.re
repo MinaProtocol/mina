@@ -20,7 +20,20 @@ module KnowledgeBase = {
       render: _ => {
         let items =
           Belt.Array.map(content, ((copy, link)) =>
-            <li className={Css.style([Css.color(Style.Colors.hyperlink)])}>
+            <li
+              className=Css.(
+                style([
+                  marginBottom(`rem(0.5)),
+                  color(Style.Colors.hyperlink),
+                  listStyle(`none, `inside, `none),
+                  before([
+                    unsafe("content", {js|"•"|js}),
+                    color(Style.Colors.hyperlink),
+                    marginRight(`rem(1.)),
+                    display(`inlineBlock),
+                  ]),
+                ])
+              )>
               <a
                 href=link
                 className=Css.(
@@ -43,11 +56,7 @@ module KnowledgeBase = {
                   marginBottom(`rem(0.75)),
                   media(
                     Style.MediaQuery.notMobile,
-                    [
-                      marginTop(`rem(1.5)),
-                      marginLeft(`rem(3.)),
-                      marginRight(`rem(1.5)),
-                    ],
+                    [marginTop(`rem(1.5)), marginRight(`rem(1.5))],
                   ),
                 ]),
               ])
@@ -57,20 +66,14 @@ module KnowledgeBase = {
           <ul
             className=Css.(
               style([
-                marginLeft(`zero),
                 marginRight(`zero),
                 paddingBottom(`zero),
+                paddingLeft(`zero),
+                paddingRight(`zero),
                 marginBottom(`zero),
-                unsafe("padding-inline-start", "0.0rem"),
-                listStyle(`none, `inside, `none),
                 media(
                   Style.MediaQuery.notMobile,
-                  [
-                    unsafe("padding-inline-start", "40px"), // browser default
-                    marginLeft(`rem(1.5)),
-                    marginRight(`rem(1.5)),
-                    listStyle(`disc, `outside, `none),
-                  ],
+                  [marginRight(`rem(1.5))],
                 ),
               ])
             )>
@@ -95,6 +98,8 @@ module KnowledgeBase = {
             paddingBottom(`rem(1.)),
             marginLeft(`zero),
             marginRight(`zero),
+            paddingTop(`rem(1.0)),
+            unsafe("min-width", "min-content"),
             media(
               Style.MediaQuery.notMobile,
               [
@@ -110,13 +115,14 @@ module KnowledgeBase = {
             className=Css.(
               style([
                 letterSpacing(`rem(0.1875)),
-                border(`px(1), `solid, black),
+                border(`px(1), `solid, Style.Colors.midnight),
                 paddingLeft(`rem(1.0)),
                 paddingRight(`rem(1.0)),
                 paddingTop(`rem(0.5)),
                 paddingBottom(`rem(0.5)),
                 textTransform(`uppercase),
                 fontWeight(`medium),
+                color(Style.Colors.midnight),
               ])
             )>
             {ReasonReact.string("Knowledge base")}
@@ -299,6 +305,8 @@ module SocialLink = {
   };
 };
 
+let marginBelow = Css.(style([marginBottom(`rem(0.5))]));
+
 let component = ReasonReact.statelessComponent("GetInvolved");
 let make = _ => {
   ...component,
@@ -342,26 +350,35 @@ let make = _ => {
           className=Css.(
             style([
               listStyle(`none, `inside, `none),
-              unsafe("padding-inline-start", "0"),
+              unsafe("padding-left", "0"),
             ])
           )>
-          <li> <Link message="Stay updated about developing with Coda" /> </li>
-          <li>
+          <li className=marginBelow>
+            <Link message="Stay updated about developing with Coda" />
+          </li>
+          <li className=marginBelow>
             <Link message="Notify me about participating in consensus" />
           </li>
-          <li>
+          <li className=marginBelow>
             <Link message="Earn Coda by helping to compress the blockchain" />
           </li>
-          <li> <Link message="Join our mailing list for updates" /> </li>
+          <li className=marginBelow>
+            <Link message="Join our mailing list for updates" />
+          </li>
         </ul>
       </div>
       <div
         className=Css.(
           style([
+            media(
+              Style.MediaQuery.notMobile,
+              [marginTop(`rem(2.0)), marginBottom(`rem(3.))],
+            ),
             display(`flex),
             flexWrap(`wrap),
             justifyContent(`spaceAround),
             alignItems(`center),
+            marginBottom(`rem(1.)),
           ])
         )>
         <SocialLink

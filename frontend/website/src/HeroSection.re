@@ -19,7 +19,10 @@ module Copy = {
             media("(min-width: 30rem)", [minWidth(`rem(24.0))]),
           ])
         )>
-        <div>
+        <div
+          className=Css.(
+            style([media(Style.MediaQuery.full, [minWidth(`rem(25.5))])])
+          )>
           <h1
             className=Css.(
               merge([
@@ -41,12 +44,12 @@ module Copy = {
               merge([
                 Style.Body.big,
                 style([
-                  marginTop(`rem(1.75)),
+                  marginTop(`rem(2.0)),
                   maxWidth(`rem(28.0)),
                   // align with the grid
                   media(
                     Style.MediaQuery.full,
-                    [marginBottom(`rem(11.875))],
+                    [marginTop(`rem(1.75)), marginBottom(`rem(11.875))],
                   ),
                 ]),
               ])
@@ -170,7 +173,10 @@ module Graphic = {
               size="22kB"
               label="Fixed"
               textColor=Style.Colors.bluishGreen>
-              Small.svg
+              <Image
+                className={style([width(`rem(0.625))])}
+                name="/static/img/coda-icon"
+              />
             </Info>
             <Info
               sizeEmphasis=true
@@ -194,10 +200,13 @@ let make = _ => {
       className=Css.(
         style([
           display(`flex),
-          marginTop(`rem(1.5)),
+          marginTop(`rem(0.25)),
           justifyContent(`spaceAround),
           flexWrap(`wrap),
-          media(Style.MediaQuery.full, [marginTop(`rem(4.5))]),
+          media(
+            Style.MediaQuery.full,
+            [marginTop(`rem(2.5)), flexWrap(`nowrap)],
+          ),
         ])
       )>
       <Copy />
