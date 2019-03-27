@@ -19,6 +19,11 @@ let make = (~extra, ~filename, _children) => {
   ...component,
   render: _self =>
     <head>
+      {ReactDOMRe.createElement(
+         "meta",
+         ~props=ReactDOMRe.objToDOMProps({"charSet": "utf-8"}),
+         [||],
+       )}
       <meta name="viewport" content="width=device-width, initial-scale=1" />
       <meta
         property="og:image"

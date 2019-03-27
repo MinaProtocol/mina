@@ -43,26 +43,24 @@ module Typeface = {
   open Css;
   let weights = [
     // The weights are intentionally shifted thinner one unit
-    (`thin, "Thin", "Thin"),
-    (`extraLight, "ExtraLight", "Thin"),
-    (`light, "Light", "ExtraLight"),
-    (`normal, "Regular", "Light"),
-    (`medium, "Medium", "Regular"),
-    (`semiBold, "SemiBold", "Medium"),
-    (`bold, "Bold", "SemiBold"),
-    (`extraBold, "ExtraBold", "Bold"),
+    (`thin, "Thin"),
+    (`extraLight, "Thin"),
+    (`light, "ExtraLight"),
+    (`normal, "Light"),
+    (`medium, "Regular"),
+    (`semiBold, "Medium"),
+    (`bold, "SemiBold"),
+    (`extraBold, "Bold"),
   ];
 
   // TODO: add format("woff") and unicode ranges
   let () =
     List.iter(
-      ((weight, localName, name)) =>
+      ((weight, name)) =>
         ignore @@
         fontFace(
           ~fontFamily="IBM Plex Sans",
           ~src=[
-            localUrl("IBM Plex Sans " ++ localName),
-            localUrl("IBMPlexSans-" ++ localName),
             url("/static/font/IBMPlexSans-" ++ name ++ "-Latin1.woff2"),
             url("/static/font/IBMPlexSans-" ++ name ++ "-Latin1.woff"),
           ],
@@ -77,8 +75,6 @@ module Typeface = {
     fontFace(
       ~fontFamily="IBM Plex Mono",
       ~src=[
-        localUrl("IBM Plex Mono SemiBold"),
-        localUrl("IBMPlexMono-SemiBold"),
         url("/static/font/IBMPlexMono-Medium-Latin1.woff2"),
         url("/static/font/IBMPlexMono-Medium-Latin1.woff"),
       ],
@@ -90,8 +86,6 @@ module Typeface = {
     fontFace(
       ~fontFamily="IBM Plex Mono",
       ~src=[
-        localUrl("IBM Plex Mono Bold"),
-        localUrl("IBMPlexMono-Bold"),
         url("/static/font/IBMPlexMono-SemiBold-Latin1.woff2"),
         url("/static/font/IBMPlexMono-SemiBold-Latin1.woff"),
       ],
@@ -105,8 +99,6 @@ module Typeface = {
       fontFace(
         ~fontFamily="IBM Plex Serif",
         ~src=[
-          localUrl("IBM Plex Serif Medium"),
-          localUrl("IBMPlexSerif-Medium"),
           url("/static/font/IBMPlexSerif-Medium-Latin1.woff2"),
           url("/static/font/IBMPlexSerif-Medium-Latin1.woff"),
         ],
