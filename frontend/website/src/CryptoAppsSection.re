@@ -11,8 +11,10 @@ module Code = {
             display(`block),
             position(`relative),
             media(Style.MediaQuery.veryLarge, [width(`percent(40.0))]),
+            // the "line"
             before([
               contentRule(""),
+              zIndex(-1),
               display(`none),
               media(
                 Style.MediaQuery.veryLarge,
@@ -20,10 +22,10 @@ module Code = {
                   display(`block),
                   position(`absolute),
                   top(`percent(50.0)),
-                  left(`percent(11.4)), // determined experimentally
+                  left(`percent(10.5)), // determined experimentally
                   width(`percent(100.0)),
                   height(`rem(0.125)),
-                  backgroundColor(Style.Colors.navy),
+                  backgroundColor(Style.Colors.blueBlue),
                 ],
               ),
             ]),
@@ -112,7 +114,7 @@ module ImageCollage = {
               maxWidth(`percent(100.0)),
             ])
           )
-          name="/static/img/coda"
+          name="/static/img/montage"
         />
       </div>,
   };
