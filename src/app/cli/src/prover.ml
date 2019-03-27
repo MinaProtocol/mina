@@ -136,11 +136,10 @@ module Worker_state = struct
                      (Consensus_mechanism.Prover_state.handler
                         state_for_handler)
                  in
-                 let _ =
-                   Tick.Groth16.check
-                     (main @@ Tick.Field.Var.constant next_state_top_hash)
-                     prover_state
-                 in
+                 [%test_result: bool] ~expect:true
+                   (Tick.Groth16.check
+                      (main @@ Tick.Field.Var.constant next_state_top_hash)
+                      prover_state) ;
                  { Blockchain.state= next_state
                  ; proof= Precomputed_values.base_proof }
 
