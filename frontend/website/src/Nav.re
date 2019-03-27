@@ -155,10 +155,6 @@ module DropdownMenu = {
   };
 };
 
-module Logo = {
-  let svg = <Svg link="/static/img/new-logo.svg" dims=(7.125, 1.25) />;
-};
-
 let component = ReasonReact.statelessComponent("Nav");
 let make = children => {
   ...component,
@@ -201,7 +197,7 @@ let make = children => {
             ),
           ])
         )>
-        Logo.svg
+        <Image className="" name="/static/img/coda-logo" />
       </a>
       <div
         className=Css.(
