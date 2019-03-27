@@ -147,7 +147,7 @@ let make =
           <div
             className=Css.(
               style([
-                marginTop(`rem(1.0)),
+                marginTop(`rem(0.5)),
                 media(Style.MediaQuery.full, [marginTop(`rem(2.0))]),
               ])
             )>
