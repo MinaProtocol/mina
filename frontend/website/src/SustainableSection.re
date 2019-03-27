@@ -9,7 +9,20 @@ let make = _children => {
           media(Style.MediaQuery.full, [marginTop(`rem(11.25))]),
         ])
       )>
-      <div className=Css.(style([width(`percent(100.0)), display(`flex)]))>
+      <div
+        className=Css.(
+          style([
+            width(`percent(100.0)),
+            media(
+              Style.MediaQuery.notMobile,
+              [
+                display(`flex),
+                justifyContent(`center),
+                width(`percent(100.0)),
+              ],
+            ),
+          ])
+        )>
         <h1
           className=Css.(
             merge([
@@ -54,10 +67,14 @@ let make = _children => {
           style([
             marginTop(`rem(2.375)),
             display(`flex),
-            justifyContent(`spaceAround),
+            justifyContent(`spaceBetween),
             alignItems(`center),
             flexWrap(`wrapReverse),
             media(Style.MediaQuery.full, [marginTop(`rem(4.375))]),
+            media(
+              Style.MediaQuery.notMobile,
+              [justifyContent(`spaceAround)],
+            ),
           ])
         )>
         <div
@@ -65,6 +82,7 @@ let make = _children => {
             style([
               marginBottom(`rem(2.375)),
               userSelect(`none),
+              marginRight(`rem(2.0)),
               maxWidth(`rem(23.875)),
             ])
           )>
@@ -79,6 +97,7 @@ let make = _children => {
             style([
               marginBottom(`rem(2.375)),
               userSelect(`none),
+              marginRight(`rem(2.0)),
               maxWidth(`rem(23.125)),
             ])
           )>

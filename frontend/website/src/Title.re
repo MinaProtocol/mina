@@ -9,7 +9,7 @@ let make = (~fontColor, ~text, _children) => {
         style([
           marginBottom(`rem(2.25)),
           media(
-            Style.MediaQuery.notSmallMobile,
+            Style.MediaQuery.notMobile,
             [
               display(`flex),
               justifyContent(`center),

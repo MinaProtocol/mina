@@ -339,7 +339,7 @@ module type Main_intf = sig
 
   val peers : t -> Network_peer.Peer.t list
 
-  val strongest_ledgers :
+  val verified_transitions :
        t
     -> (Inputs.External_transition.Verified.t, State_hash.t) With_hash.t
        Strict_pipe.Reader.t
