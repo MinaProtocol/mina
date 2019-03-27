@@ -37,6 +37,9 @@ module type S = sig
     val instance_hash : Consensus.Protocol_state.value -> Tick.Field.t
 
     val main : Tick.Field.Var.t -> (unit, Prover_state.t) Tick.Checked.t
+
+    val reduced_main :
+      (Tick.Field.Var.t -> (unit, Prover_state.t) Tick.Checked.t) Lazy.t
   end
 
   module Wrap : sig
@@ -48,6 +51,9 @@ module type S = sig
     module Prover_state = Wrap_prover_state
 
     val main : Wrap_input.var -> (unit, Prover_state.t) Tock.Checked.t
+
+    val reduced_main :
+      (Wrap_input.var -> (unit, Prover_state.t) Tock.Checked.t) Lazy.t
   end
 end
 
@@ -137,6 +143,8 @@ let create () : (module S) Async.Deferred.t =
               ~and_then:(fun s -> As_prover.set_state (back s))
               As_prover.(map get_state ~f:there)
               (main x)
+
+          let reduced_main = lazy Tick.(reduce_to_prover [Field.typ] main)
         end
 
         module Wrap = struct
@@ -154,6 +162,8 @@ let create () : (module S) Async.Deferred.t =
               ~and_then:(fun s -> As_prover.set_state (back s))
               As_prover.(map get_state ~f:there)
               (main x)
+
+          let reduced_main = lazy Tock.(reduce_to_prover [Wrap_input.typ] main)
         end
       end in
       (module M : S)

@@ -790,6 +790,8 @@ module Merge = struct
     in
     Boolean.Assert.all [verify_12; verify_23]
 
+  let reduced_main = lazy (Groth16.reduce_to_prover (tick_input ()) main)
+
   let create_keys () = Groth16.generate_keypair ~exposing:(input ()) main
 
   let cached =
@@ -1038,6 +1040,8 @@ struct
     in
     with_label __LOC__ (Boolean.Assert.is_true result)
 
+  let reduced_main = lazy (reduce_to_prover wrap_input main)
+
   let create_keys () = generate_keypair ~exposing:wrap_input main
 
   let cached =
@@ -1093,7 +1097,7 @@ module type S = sig
   val merge : t -> t -> sok_digest:Sok_message.Digest.t -> t Or_error.t
 end
 
-let check_transaction_union ?(preeval = false) sok_message source target
+let check_transaction_union ?(preeval = true) sok_message source target
     pending_coinbase_stack_state transaction handler =
   let sok_digest = Sok_message.digest sok_message in
   let prover_state : Base.Prover_state.t =
@@ -1133,7 +1137,7 @@ let check_user_command ~sok_message ~source ~target pending_coinbase_stack t
       ; target= pending_coinbase_stack }
     (User_command t) handler
 
-let generate_transaction_union_witness ?(preeval = false) sok_message source
+let generate_transaction_union_witness ?(preeval = true) sok_message source
     target transaction pending_coinbase_stack_state handler =
   let sok_digest = Sok_message.digest sok_message in
   let prover_state : Base.Prover_state.t =
@@ -1180,7 +1184,8 @@ struct
 
   let wrap proof_type proof input =
     let prover_state = {Wrap.Prover_state.proof; proof_type} in
-    Tock.prove keys.proving.wrap wrap_input prover_state Wrap.main
+    Tock.prove keys.proving.wrap wrap_input prover_state
+      (Lazy.force Wrap.reduced_main)
       (Wrap_input.of_tick_field input)
 
   let merge_proof sok_digest ledger_hash1 ledger_hash2 ledger_hash3
@@ -1222,7 +1227,8 @@ struct
     in
     ( top_hash
     , Tick.Groth16.prove keys.proving.merge (tick_input ()) prover_state
-        Merge.main top_hash )
+        (Lazy.force Merge.reduced_main)
+        top_hash )
 
   let of_transaction_union ?preeval sok_digest source target
       ~pending_coinbase_stack_state transaction handler =
