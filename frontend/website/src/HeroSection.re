@@ -19,7 +19,10 @@ module Copy = {
             media("(min-width: 30rem)", [minWidth(`rem(24.0))]),
           ])
         )>
-        <div>
+        <div
+          className=Css.(
+            style([media(Style.MediaQuery.full, [minWidth(`rem(25.5))])])
+          )>
           <h1
             className=Css.(
               merge([
@@ -197,10 +200,13 @@ let make = _ => {
       className=Css.(
         style([
           display(`flex),
-          marginTop(`rem(1.5)),
+          marginTop(`rem(0.25)),
           justifyContent(`spaceAround),
           flexWrap(`wrap),
-          media(Style.MediaQuery.full, [marginTop(`rem(4.5))]),
+          media(
+            Style.MediaQuery.full,
+            [marginTop(`rem(2.5)), flexWrap(`nowrap)],
+          ),
         ])
       )>
       <Copy />

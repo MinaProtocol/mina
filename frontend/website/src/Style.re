@@ -36,6 +36,7 @@ module Colors = {
   let rosebud = `rgb((163, 83, 111));
 
   let blueBlue = `rgb((42, 81, 224));
+  let midnight = `rgb((31, 45, 61));
 };
 
 module Typeface = {
