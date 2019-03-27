@@ -43,10 +43,16 @@ module Code = {
                 fontSize(`rem(0.8125)),
                 borderRadius(`px(12)),
                 lineHeight(`rem(1.25)),
-                // nudge so code background looks nicer
-                marginRight(`rem(0.25)),
-                marginLeft(`rem(0.25)),
-                media(Style.MediaQuery.notMobile, [width(`rem(23.0))]),
+                marginLeft(`rem(-0.25)), // optical centering
+                media(
+                  Style.MediaQuery.notMobile,
+                  [
+                    width(`rem(23.0)),
+                    // nudge so code background looks nicer
+                    marginRight(`rem(0.25)),
+                    marginLeft(`rem(0.25)),
+                  ],
+                ),
               ],
             )
           )>
@@ -163,12 +169,16 @@ let make = _ => {
             style([
               display(`flex),
               flexWrap(`wrapReverse),
-              justifyContent(`spaceAround),
+              justifyContent(`spaceBetween),
               alignItems(`center),
               marginLeft(`auto),
               marginRight(`auto),
               marginBottom(`rem(2.0)),
               maxWidth(`rem(78.0)),
+              media(
+                Style.MediaQuery.notMobile,
+                [justifyContent(`spaceAround)],
+              ),
               // vertically/horiz center absolutely
               media(
                 Style.MediaQuery.veryLarge,

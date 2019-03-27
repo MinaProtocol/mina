@@ -76,7 +76,11 @@ module Legend = {
         className=Css.(
           merge([
             className,
-            style([justifyContent(`center), alignItems(`center)]),
+            style([
+              justifyContent(`flexStart),
+              alignItems(`center),
+              media(Style.MediaQuery.notMobile, [justifyContent(`center)]),
+            ]),
           ])
         )>
         <div
@@ -123,7 +127,21 @@ module Figure = {
   let make = (~captionColor, ~link, ~dims, ~caption, _children) => {
     ...component,
     render: _self => {
-      <figure>
+      <figure
+        className=Css.(
+          style([
+            unsafe("margin-block-start", "0"),
+            unsafe("margin-block-end", "0"),
+            unsafe("margin-inline-start", "0"),
+            unsafe("margin-inline-end", "0"),
+            marginTop(`rem(2.0)),
+            display(`flex),
+            flexDirection(`column),
+            alignItems(`center),
+            justifyContent(`center),
+            width(`rem(20.625)),
+          ])
+        )>
         <Svg dims link />
         <figcaption
           className=Css.(
@@ -161,9 +179,13 @@ let make = _ => {
         className=Css.(
           style([
             display(`flex),
-            justifyContent(`spaceAround),
+            justifyContent(`spaceBetween),
             alignItems(`center),
             flexWrap(`wrapReverse),
+            media(
+              Style.MediaQuery.notMobile,
+              [justifyContent(`spaceAround)],
+            ),
           ])
         )>
         <Figure
