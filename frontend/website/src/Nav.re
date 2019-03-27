@@ -211,7 +211,7 @@ let make = children => {
             media(NavStyle.MediaQuery.menu, [marginTop(`zero)]),
           ])
         )>
-        <Image className="" name="/static/img/coda-logo" />
+        <Image className="" name="/static/img/coda-logo" alt="Coda Home" />
       </a>
       <div
         className=Css.(

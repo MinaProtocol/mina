@@ -26,14 +26,24 @@ module Investor = {
               media(twoColumnMedia, [marginLeft(`rem(3.))]),
             ])
           )>
-          <img src=imageSrc className=TeamSection.iconStyle />
-          <h4
-            className=Css.(
-              merge([Style.Body.basic, style([color(Style.Colors.slate)])])
-            )>
-            {ReasonReact.string(name)}
-          </h4>
-        </div>,
+          // Note: change this alt text if we ever hide the investor name
+
+            <img
+              src=imageSrc
+              className=TeamSection.iconStyle
+              alt=""
+              ariaHidden=true
+            />
+            <h4
+              className=Css.(
+                merge([
+                  Style.Body.basic,
+                  style([color(Style.Colors.slate)]),
+                ])
+              )>
+              {ReasonReact.string(name)}
+            </h4>
+          </div>,
     };
   };
 };

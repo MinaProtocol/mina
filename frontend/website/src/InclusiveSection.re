@@ -84,6 +84,7 @@ module Legend = {
           ])
         )>
         <div
+          ariaHidden=true
           className=Css.(
             style([
               display(`flex),
@@ -113,7 +114,7 @@ module Legend = {
             {ReasonReact.string("Consensus Participants")}
           </h5>
         </div>
-        <div>
+        <div ariaHidden=true>
           <SmallRow themeColor=Style.Colors.teal copy="Individuals" />
           <SmallRow themeColor=Style.Colors.navy copy="Organizations" />
         </div>
@@ -124,7 +125,7 @@ module Legend = {
 
 module Figure = {
   let component = ReasonReact.statelessComponent("InclusiveSection.Figure");
-  let make = (~captionColor, ~link, ~dims, ~caption, _children) => {
+  let make = (~captionColor, ~link, ~dims, ~caption, ~alt, _children) => {
     ...component,
     render: _self => {
       <figure
@@ -142,7 +143,7 @@ module Figure = {
             width(`rem(20.625)),
           ])
         )>
-        <Svg dims link />
+        <Svg dims link alt />
         <figcaption
           className=Css.(
             merge([
@@ -192,12 +193,14 @@ let make = _ => {
           link="/static/img/coda-figure.svg"
           dims=(15.125, 15.125)
           caption="Coda"
+          alt="Figure showing everyone participating in consensus, including all individual users of Coda."
           captionColor=Style.Colors.clover
         />
         <Figure
           link="/static/img/other-blockchains-figure.svg"
           dims=(CryptoAppsSection.middleElementWidthRems, 13.75)
           caption="Other Blockchains"
+          alt="Figure showing few participants in consensus, most of which are organizations, rather than individuals."
           captionColor=Style.Colors.navy
         />
         <div>
