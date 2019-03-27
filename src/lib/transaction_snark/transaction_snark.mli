@@ -155,8 +155,7 @@ module Verification : sig
 end
 
 val check_transaction :
-     ?preeval:bool
-  -> sok_message:Sok_message.t
+     sok_message:Sok_message.t
   -> source:Frozen_ledger_hash.t
   -> target:Frozen_ledger_hash.t
   -> pending_coinbase_stack_state:Pending_coinbase_stack_state.t

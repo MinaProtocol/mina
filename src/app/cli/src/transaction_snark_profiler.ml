@@ -144,8 +144,8 @@ let profile (module T : Transaction_snark.S) sparse_ledger0
   let total_time = merge_all base_proof_time base_proofs in
   Printf.sprintf !"Total time was: %{Time.Span}" total_time
 
-let check_base_snarks sparse_ledger0 (transitions : Transaction.t list) preeval
-    =
+let check_base_snarks sparse_ledger0 (transitions : Transaction.t list)
+    _preeval =
   let _ =
     let sok_message =
       Sok_message.create ~fee:Currency.Fee.zero
@@ -162,7 +162,7 @@ let check_base_snarks sparse_ledger0 (transitions : Transaction.t list) preeval
           | _ -> Pending_coinbase.Stack.empty
         in
         let () =
-          Transaction_snark.check_transaction ?preeval ~sok_message
+          Transaction_snark.check_transaction ~sok_message
             ~source:(Sparse_ledger.merkle_root sparse_ledger)
             ~target:(Sparse_ledger.merkle_root sparse_ledger')
             ~pending_coinbase_stack_state:
