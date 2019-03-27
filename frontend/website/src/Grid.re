@@ -1,4 +1,4 @@
-let enabled = true;
+let enabled = false;
 
 let bgColorStr = "rgba(204, 80, 72, 0.25)";
 
