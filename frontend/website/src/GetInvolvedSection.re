@@ -110,24 +110,28 @@ module KnowledgeBase = {
             ),
           ])
         )>
-        <legend>
-          <h4
-            className=Css.(
-              style([
-                letterSpacing(`rem(0.1875)),
-                border(`px(1), `solid, Style.Colors.midnight),
-                paddingLeft(`rem(1.0)),
-                paddingRight(`rem(1.0)),
-                paddingTop(`rem(0.5)),
-                paddingBottom(`rem(0.5)),
-                textTransform(`uppercase),
-                fontWeight(`medium),
-                color(Style.Colors.midnight),
-              ])
-            )>
-            {ReasonReact.string("Knowledge base")}
-          </h4>
-        </legend>
+        {ReactDOMRe.createElement(
+           "legend",
+           ~props=ReactDOMRe.objToDOMProps({"align": "center"}),
+           [|
+             <h4
+               className=Css.(
+                 style([
+                   letterSpacing(`rem(0.1875)),
+                   border(`px(1), `solid, Style.Colors.midnight),
+                   paddingLeft(`rem(1.0)),
+                   paddingRight(`rem(1.0)),
+                   paddingTop(`rem(0.5)),
+                   paddingBottom(`rem(0.5)),
+                   textTransform(`uppercase),
+                   fontWeight(`medium),
+                   color(Style.Colors.midnight),
+                 ])
+               )>
+               {ReasonReact.string("Knowledge base")}
+             </h4>,
+           |],
+         )}
         <div
           className=Css.(
             style([
