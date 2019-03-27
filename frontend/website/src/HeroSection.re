@@ -79,7 +79,7 @@ module Graphic = {
       <Svg
         className=Css.(style([marginTop(`rem(-0.625))]))
         link="/static/img/hero-illustration.svg"
-        dims=(13.9375, 33.375)
+        dims=(9.5625, 33.375)
       />;
   };
 
@@ -91,16 +91,28 @@ module Graphic = {
     let component =
       ReasonReact.statelessComponent("HeroSection.Graphic.Info");
 
-    let make = (~sizeEmphasis, ~name, ~size, ~label, ~textColor, children) => {
+    let make =
+        (
+          ~className="",
+          ~sizeEmphasis,
+          ~name,
+          ~size,
+          ~label,
+          ~textColor,
+          children,
+        ) => {
       ...component,
       render: _ =>
         <div
           className=Css.(
-            style([
-              display(`flex),
-              flexDirection(`column),
-              justifyContent(`flexEnd),
-              alignItems(`center),
+            merge([
+              className,
+              style([
+                display(`flex),
+                flexDirection(`column),
+                justifyContent(`flexEnd),
+                alignItems(`center),
+              ]),
             ])
           )>
           {children[0]}
@@ -179,6 +191,10 @@ module Graphic = {
               />
             </Info>
             <Info
+              className={style([
+                marginRight(`rem(-1.5)),
+                media(Style.MediaQuery.full, [marginRight(`zero)]),
+              ])}
               sizeEmphasis=true
               name="Other blockchains"
               size="2TB+"
