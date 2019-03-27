@@ -5,19 +5,20 @@ module NavStyle = {
   open Style;
 
   module MediaQuery = {
-    let menu = "(min-width: 58rem)";
-    let menuMax = "(max-width: 58rem)";
+    let menu = "(min-width: 62rem)";
+    let menuMax = "(max-width: 62rem)";
     let statusLift = "(min-width: 38rem)";
   };
-  let bottomNudge = Css.marginBottom(`rem(1.25));
+  let bottomNudge = Css.marginBottom(`rem(2.25));
 
-  let options =
+  let collapsedMenuItems =
     style([
-      // hidden on mobile by default
+      marginTop(`zero),
+      bottomNudge,
       display(`none),
       // when it's not hidden, make the dropdown appear
       position(`absolute),
-      right(`rem(0.0)),
+      right(`rem(1.0)),
       top(`rem(0.0)),
       backgroundColor(Colors.white),
       // always visible and flexed on full
@@ -33,59 +34,125 @@ module NavStyle = {
       ),
     ]);
 
-  let dropDownOptions =
-    merge([options, style([marginTop(`zero), bottomNudge])]);
+  let triangle = (c, offset) => [
+    unsafe("content", ""),
+    width(`zero),
+    height(`zero),
+    position(`absolute),
+    borderLeft(`px(4 + offset), `solid, c),
+    borderRight(`px(4 + offset), `solid, transparent),
+    borderTop(`px(4 + offset), `solid, c),
+    borderBottom(`px(4 + offset), `solid, transparent),
+    right(`px(15 - offset)),
+    top(`px((-3) - offset)),
+    transforms([`rotate(`deg(45))]),
+    media(MediaQuery.menu, [display(`none)]),
+  ];
 
-  let menuBtn =
-    style([
-      display(`none),
-      media(
-        // Make expanded menu not show up on a wide screen
-        MediaQuery.menuMax,
-        [
-          selector(
-            {j|:checked ~ .$dropDownOptions|j},
-            [
-              border(`px(2), `solid, Style.Colors.gandalf),
-              borderRadius(`px(3)),
-              paddingLeft(`rem(0.5)),
-              marginTop(`rem(2.)),
-              marginRight(`rem(-0.6)),
-              display(`flex),
-              maxWidth(`rem(10.)),
-              flexDirection(`column),
-              alignItems(`flexEnd),
-            ],
-          ),
-        ],
-      ),
-    ]);
-
-  let menuIcon =
-    style([
-      cursor(`pointer),
-      display(`flex),
-      justifyContent(`flexEnd),
-      position(`relative),
-      userSelect(`none),
-      // The menu is always shown on full-size
-      media(MediaQuery.menu, [display(`none)]),
-    ]);
-
-  let menuText = merge([style([marginLeft(`rem(1.0))]), Link.basic]);
-
-  let nav =
-    style([
-      display(`flex),
-      justifyContent(`spaceBetween),
-      alignItems(`center),
-      flexWrap(`wrap),
-      media(MediaQuery.statusLift, [flexWrap(`nowrap)]),
+  let expandedMenuItems =
+    merge([
+      collapsedMenuItems,
+      style([
+        media(
+          // Make expanded menu not show up on a wide screen
+          MediaQuery.menuMax,
+          [
+            border(`px(1), `solid, Style.Colors.hyperlinkHover),
+            boxShadow(
+              ~x=`zero,
+              ~y=`zero,
+              ~blur=`px(12),
+              ~spread=`zero,
+              `rgba((0, 0, 0, 0.12)),
+            ),
+            borderRadius(`px(10)),
+            paddingLeft(`rem(0.5)),
+            marginTop(`rem(2.)),
+            marginRight(`rem(-0.6)),
+            display(`flex),
+            maxWidth(`rem(10.)),
+            flexDirection(`column),
+            alignItems(`flexStart),
+            before(
+              triangle(Style.Colors.hyperlinkHover, 1)
+              @ [
+                boxShadow(
+                  ~x=`zero,
+                  ~y=`zero,
+                  ~blur=`px(12),
+                  ~spread=`zero,
+                  `rgba((0, 0, 0, 0.12)),
+                ),
+                zIndex(-10),
+              ],
+            ),
+            after(triangle(white, 0) @ []),
+          ],
+        ),
+      ]),
     ]);
 };
 
-module Logo = {
-  let svg = <Svg link="/static/img/new-logo.svg" dims=(7.125, 1.25) />;
+module DropdownMenu = {
+  let component = ReasonReact.statelessComponent("Nav.DropdownMenu");
+  let make = children => {
+    ...component,
+    render: _self => {
+      <>
+        <button
+          className=Css.(
+            merge([
+              Style.Link.basic,
+              style([
+                NavStyle.bottomNudge,
+                marginLeft(`rem(1.0)),
+                border(`zero, `solid, `transparent),
+                cursor(`pointer),
+                display(`flex),
+                justifyContent(`flexEnd),
+                position(`relative),
+                userSelect(`none),
+                backgroundColor(`transparent),
+                outline(`zero, `none, `transparent),
+                focus([color(Style.Colors.hyperlinkHover)]),
+                // The menu is always shown on full-size
+                media(NavStyle.MediaQuery.menu, [display(`none)]),
+              ]),
+            ])
+          )
+          id="nav-menu-btn">
+          {ReasonReact.string("Menu")}
+        </button>
+        <ul id="nav-menu" className=NavStyle.collapsedMenuItems>
+          ...children
+        </ul>
+        <RunScript>
+          {Printf.sprintf(
+             {|
+              var menuState = false;
+              var menuBtn = document.getElementById("nav-menu-btn");
+              function setMenuOpen(open) {
+                menuState = open;
+                document.getElementById("nav-menu").className =
+                  (open ? "%s" : "%s");
+              };
+
+              document.onclick = (e) => {
+                if (e.target != menuBtn) {
+                  var previousState = menuState;
+                  setMenuOpen(false);
+                }
+              };
+
+              menuBtn.onclick = () => setMenuOpen(!menuState);
+            |},
+             NavStyle.expandedMenuItems,
+             NavStyle.collapsedMenuItems,
+           )}
+        </RunScript>
+      </>;
+    },
+  };
 };
 
 let component = ReasonReact.statelessComponent("Nav");
@@ -99,7 +166,7 @@ let make = children => {
              className=Css.(
                style(
                  Style.paddingX(`rem(0.75))
-                 @ Style.paddingY(`rem(0.75))
+                 @ Style.paddingY(`rem(0.5))
                  @ [listStyle(`none, `inside, `none)],
                )
              )>
@@ -107,7 +174,19 @@ let make = children => {
            </li>
          );
 
-    <nav className=NavStyle.nav>
+    <nav
+      className=Css.(
+        style([
+          display(`flex),
+          justifyContent(`spaceBetween),
+          alignItems(`flexEnd),
+          flexWrap(`wrap),
+          media(
+            NavStyle.MediaQuery.statusLift,
+            [flexWrap(`nowrap), alignItems(`center)],
+          ),
+        ])
+      )>
       <a
         href="/"
         className=Css.(
@@ -121,7 +200,7 @@ let make = children => {
             ),
           ])
         )>
-        Logo.svg
+        <Image className="" name="/static/img/coda-logo" />
       </a>
       <div
         className=Css.(
@@ -129,9 +208,10 @@ let make = children => {
             order(3),
             width(`percent(100.0)),
             NavStyle.bottomNudge,
+            marginLeft(`rem(-0.125)), // nudge left for optical alignment
             media(
               NavStyle.MediaQuery.statusLift,
-              [order(2), width(`auto)],
+              [order(2), width(`auto), marginLeft(`zero)],
             ),
             media(NavStyle.MediaQuery.menu, [width(`percent(40.0))]),
           ])
@@ -139,9 +219,11 @@ let make = children => {
         <div
           className=Css.(
             style([
-              width(`percent(100.0)),
-              margin(`auto),
-              media(NavStyle.MediaQuery.statusLift, [width(`rem(21.25))]),
+              width(`rem(21.25)),
+              media(
+                NavStyle.MediaQuery.statusLift,
+                [width(`rem(21.25)), margin(`auto)],
+              ),
             ])
           )>
           <AnnouncementBar />
@@ -160,24 +242,8 @@ let make = children => {
             media(NavStyle.MediaQuery.menu, [width(`percent(50.0))]),
           ])
         )>
-        /* we use the input to get a :checked pseudo selector
-         * that we can use to get on-click without javascript at runtime */
-
-          <input
-            className=NavStyle.menuBtn
-            type_="checkbox"
-            id="nav-menu-btn"
-          />
-          <label className=NavStyle.menuIcon htmlFor="nav-menu-btn">
-            <span
-              className=Css.(
-                merge([NavStyle.menuText, style([NavStyle.bottomNudge])])
-              )>
-              {ReasonReact.string("Menu")}
-            </span>
-          </label>
-          <ul className=NavStyle.dropDownOptions> ...items </ul>
-        </div>
+        <DropdownMenu> ...items </DropdownMenu>
+      </div>
     </nav>;
   },
 };

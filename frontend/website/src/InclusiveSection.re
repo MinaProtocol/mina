@@ -36,7 +36,15 @@ module Legend = {
       render: _self => {
         <div className=Css.(style([display(`flex), alignItems(`center)]))>
           <Square
-            className=Css.(style([marginRight(`rem(0.75))]))
+            className=Css.(
+              style([
+                marginRight(`rem(0.5)),
+                media(
+                  Style.MediaQuery.notMobile,
+                  [marginRight(`rem(0.75))],
+                ),
+              ])
+            )
             borderColor=None
             fillColor=themeColor
             dims=(`rem(1.0), `rem(1.0))
@@ -46,6 +54,7 @@ module Legend = {
               merge([
                 Style.H3.basic,
                 style([
+                  fontWeight(`medium),
                   marginTop(`zero),
                   marginBottom(`zero),
                   color(themeColor),
@@ -67,7 +76,11 @@ module Legend = {
         className=Css.(
           merge([
             className,
-            style([justifyContent(`center), alignItems(`center)]),
+            style([
+              justifyContent(`flexStart),
+              alignItems(`center),
+              media(Style.MediaQuery.notMobile, [justifyContent(`center)]),
+            ]),
           ])
         )>
         <div
@@ -76,7 +89,7 @@ module Legend = {
               display(`flex),
               marginTop(`zero),
               marginBottom(`zero),
-              marginRight(`zero),
+              marginRight(`rem(0.25)),
               media(Style.MediaQuery.notMobile, [marginRight(`rem(2.25))]),
             ])
           )>
@@ -114,7 +127,21 @@ module Figure = {
   let make = (~captionColor, ~link, ~dims, ~caption, _children) => {
     ...component,
     render: _self => {
-      <figure>
+      <figure
+        className=Css.(
+          style([
+            unsafe("margin-block-start", "0"),
+            unsafe("margin-block-end", "0"),
+            unsafe("margin-inline-start", "0"),
+            unsafe("margin-inline-end", "0"),
+            marginTop(`rem(2.0)),
+            display(`flex),
+            flexDirection(`column),
+            alignItems(`center),
+            justifyContent(`center),
+            width(`rem(20.625)),
+          ])
+        )>
         <Svg dims link />
         <figcaption
           className=Css.(
@@ -123,6 +150,7 @@ module Figure = {
               style([
                 marginTop(`rem(1.5)),
                 color(captionColor),
+                fontWeight(`medium),
                 textAlign(`center),
               ]),
             ])
@@ -151,9 +179,13 @@ let make = _ => {
         className=Css.(
           style([
             display(`flex),
-            justifyContent(`spaceAround),
+            justifyContent(`spaceBetween),
             alignItems(`center),
             flexWrap(`wrapReverse),
+            media(
+              Style.MediaQuery.notMobile,
+              [justifyContent(`spaceAround)],
+            ),
           ])
         )>
         <Figure
