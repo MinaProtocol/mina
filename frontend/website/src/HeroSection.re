@@ -44,12 +44,12 @@ module Copy = {
               merge([
                 Style.Body.big,
                 style([
-                  marginTop(`rem(1.75)),
+                  marginTop(`rem(2.0)),
                   maxWidth(`rem(28.0)),
                   // align with the grid
                   media(
                     Style.MediaQuery.full,
-                    [marginBottom(`rem(11.875))],
+                    [marginTop(`rem(1.75)), marginBottom(`rem(11.875))],
                   ),
                 ]),
               ])
@@ -173,7 +173,10 @@ module Graphic = {
               size="22kB"
               label="Fixed"
               textColor=Style.Colors.bluishGreen>
-              Small.svg
+              <Image
+                className={style([width(`rem(0.625))])}
+                name="/static/img/coda-icon"
+              />
             </Info>
             <Info
               sizeEmphasis=true

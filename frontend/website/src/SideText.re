@@ -24,10 +24,7 @@ let make = (~paragraphs, ~cta, _children) => {
 
     <div
       className=Css.(
-        style([
-          width(`rem(20.625)),
-          media(Style.MediaQuery.notSmallMobile, [width(`rem(21.0))]),
-        ])
+        style([media(Style.MediaQuery.notMobile, [width(`rem(20.625))])])
       )>
       {ReasonReact.array(ps)}
       <a

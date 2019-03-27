@@ -4,7 +4,14 @@ let component = ReasonReact.statelessComponent("Home");
 let make = _ => {
   ...component,
   render: _self =>
-    <section>
+    // nudge this up one half unit on mobile
+    <section
+      className=Css.(
+        style([
+          marginTop(`rem(-0.5)),
+          media(Style.MediaQuery.full, [marginTop(`zero)]),
+        ])
+      )>
       <Wrapped>
         <HeroSection />
         <CryptoAppsSection />
