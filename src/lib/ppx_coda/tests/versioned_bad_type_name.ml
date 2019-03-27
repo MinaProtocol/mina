@@ -4,7 +4,7 @@ module Foo = struct
       module V1 = struct
         module T = struct
           (* type name must be t *)
-          type not_t [@@deriving versioned]
+          type not_t [@@deriving version {n= 1}]
         end
 
         include T

@@ -1,5 +1,6 @@
-;; should succeed
+;;; should succeed
 
+;; expiration
 (library
   (name unexpired)
   (preprocess (pps ppx_coda))
@@ -10,18 +11,15 @@
   (preprocess (pps ppx_coda))
   (modules unexpired_in_module))
 
+;; versioning
 (library
   (name versioned_good)
   (preprocess (pps ppx_coda))
   (modules versioned_good))
 
-(library
-  (name versioned_good_with_option)
-  (preprocess (pps ppx_coda))
-  (modules versioned_good_with_option))
+;;; should fail
 
-;; should fail
-
+;; expiration
 (library
   (name expired)
   (preprocess (pps ppx_coda))
@@ -42,6 +40,7 @@
   (preprocess (pps ppx_coda))
   (modules expiry_invalid_format))
 
+;; versioning
 (library
  (name versioned_bad_module_structure)
  (preprocess (pps ppx_coda))
@@ -63,6 +62,6 @@
   (modules versioned_bad_type_name))
 
 (library
-  (name versioned_bad_with_option)
+  (name versioned_bad_option)
   (preprocess (pps ppx_coda))
-  (modules versioned_bad_with_option))
+  (modules versioned_bad_option))

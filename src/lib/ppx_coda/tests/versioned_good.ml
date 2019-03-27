@@ -3,7 +3,7 @@ module Foo = struct
     module Stable = struct
       module V1 = struct
         module T = struct
-          type t [@@deriving yojson, bin_io, versioned]
+          type t [@@deriving yojson, bin_io, version {n= 1}]
         end
 
         include T

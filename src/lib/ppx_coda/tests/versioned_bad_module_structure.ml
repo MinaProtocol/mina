@@ -3,7 +3,7 @@ module Foo = struct
     module Stable = struct
       module V1 = struct
         (* type t must be in module T *)
-        type t [@@deriving versioned]
+        type t [@@deriving version {n= 42}]
       end
     end
   end

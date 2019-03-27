@@ -3,7 +3,7 @@ module Foo = struct
     module Stable = struct
       module Vx = struct
         module T = struct
-          type t [@@deriving versioned]
+          type t [@@deriving version {n= 1}]
         end
       end
     end
