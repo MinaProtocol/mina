@@ -44,7 +44,6 @@ module Code = {
                 fontSize(`rem(0.8125)),
                 borderRadius(`px(12)),
                 lineHeight(`rem(1.25)),
-                marginLeft(`rem(-0.25)), // optical centering
                 media(
                   Style.MediaQuery.notMobile,
                   [

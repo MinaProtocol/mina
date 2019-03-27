@@ -29,7 +29,7 @@ module Copy = {
                 Style.H1.hero,
                 style([
                   color(Style.Colors.denimTwo),
-                  marginTop(`rem(1.0)),
+                  marginTop(`zero),
                   marginBottom(`zero),
                   media(Style.MediaQuery.full, [marginTop(`rem(1.5))]),
                 ]),
@@ -200,13 +200,9 @@ let make = _ => {
       className=Css.(
         style([
           display(`flex),
-          marginTop(`rem(0.25)),
           justifyContent(`spaceAround),
           flexWrap(`wrap),
-          media(
-            Style.MediaQuery.full,
-            [marginTop(`rem(2.5)), flexWrap(`nowrap)],
-          ),
+          media(Style.MediaQuery.full, [flexWrap(`nowrap)]),
         ])
       )>
       <Copy />
