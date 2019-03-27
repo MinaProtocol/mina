@@ -1120,6 +1120,7 @@ let check_transaction_union ?(preeval = false) sok_message source target
 let check_transaction ?preeval ~sok_message ~source ~target
     ~pending_coinbase_stack_state (t : Transaction.t) handler =
   check_transaction_union ?preeval sok_message source target
+    pending_coinbase_stack_state
     (Transaction_union.of_transaction t)
     handler
 
