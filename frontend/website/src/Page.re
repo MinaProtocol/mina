@@ -111,7 +111,6 @@ let make =
     <html
       className=Css.(
         style([
-          media(Style.MediaQuery.iphoneXorSmaller, [fontSize(`px(15))]),
           media(Style.MediaQuery.iphoneSEorSmaller, [fontSize(`px(13))]),
         ])
       )>
@@ -148,7 +147,7 @@ let make =
           <div
             className=Css.(
               style([
-                marginTop(`rem(1.25)),
+                marginTop(`rem(1.0)),
                 media(Style.MediaQuery.full, [marginTop(`rem(2.0))]),
               ])
             )>

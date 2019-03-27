@@ -36,8 +36,18 @@ module Member = {
               borderRadius(`px(10)),
               border(`px(1), `solid, Style.Colors.hyperlinkAlpha(0.2)),
               padding(`rem(1.5)),
-              margin(`rem(1.5625)),
-              media(Style.MediaQuery.notMobile, [minHeight(`rem(27.5))]),
+              marginTop(`rem(1.5625)),
+              marginBottom(`rem(1.5625)),
+              marginLeft(`zero),
+              marginRight(`zero),
+              media(
+                Style.MediaQuery.notMobile,
+                [
+                  minHeight(`rem(27.5)),
+                  marginLeft(`rem(1.5625)),
+                  marginRight(`rem(1.5625)),
+                ],
+              ),
             ])
           )>
           <div className=Css.(style([display(`flex), flexDirection(`row)]))>
@@ -141,8 +151,6 @@ let make = _children => {
             marginLeft(`auto),
             marginRight(`auto),
             justifyContent(`center),
-            marginLeft(`rem(-1.5625)),
-            marginRight(`rem(-1.5625)),
           ])
         )>
         <Member
@@ -343,8 +351,6 @@ let make = _children => {
             marginLeft(`auto),
             marginRight(`auto),
             justifyContent(`center),
-            marginLeft(`rem(-1.5625)),
-            marginRight(`rem(-1.5625)),
           ])
         )>
         <Member

@@ -11,8 +11,10 @@ module Code = {
             display(`block),
             position(`relative),
             media(Style.MediaQuery.veryLarge, [width(`percent(40.0))]),
+            // the "line"
             before([
               contentRule(""),
+              zIndex(-1),
               display(`none),
               media(
                 Style.MediaQuery.veryLarge,
@@ -20,10 +22,10 @@ module Code = {
                   display(`block),
                   position(`absolute),
                   top(`percent(50.0)),
-                  left(`percent(11.4)), // determined experimentally
+                  left(`percent(10.5)), // determined experimentally
                   width(`percent(100.0)),
                   height(`rem(0.125)),
-                  backgroundColor(Style.Colors.navy),
+                  backgroundColor(Style.Colors.blueBlue),
                 ],
               ),
             ]),
@@ -37,14 +39,21 @@ module Code = {
               @ [
                 backgroundColor(Style.Colors.navy),
                 color(Style.Colors.white),
-                Style.Typeface.ibmplexsans,
+                Style.Typeface.ibmplexmono,
+                fontWeight(`medium),
                 fontSize(`rem(0.8125)),
                 borderRadius(`px(12)),
                 lineHeight(`rem(1.25)),
-                // nudge so code background looks nicer
-                marginRight(`rem(0.25)),
-                marginLeft(`rem(0.25)),
-                media(Style.MediaQuery.notMobile, [width(`rem(23.0))]),
+                marginLeft(`rem(-0.25)), // optical centering
+                media(
+                  Style.MediaQuery.notMobile,
+                  [
+                    width(`rem(23.0)),
+                    // nudge so code background looks nicer
+                    marginRight(`rem(0.25)),
+                    marginLeft(`rem(0.25)),
+                  ],
+                ),
               ],
             )
           )>
@@ -68,6 +77,7 @@ module ImageCollage = {
               position(`relative),
               top(`zero),
               left(`zero),
+              zIndex(-1),
               media(Style.MediaQuery.veryLarge, [position(`static)]),
             ]),
           ])
@@ -112,7 +122,7 @@ module ImageCollage = {
               maxWidth(`percent(100.0)),
             ])
           )
-          name="/static/img/coda"
+          name="/static/img/montage"
         />
       </div>,
   };
@@ -139,13 +149,7 @@ let make = _ => {
             position(`relative),
             left(`zero),
             top(`zero),
-            media(
-              Style.MediaQuery.veryLarge,
-              [
-                top(`rem(-2.0)),
-                zIndex(-1) // the background of the map isn't fully transparent
-              ],
-            ),
+            media(Style.MediaQuery.veryLarge, [top(`rem(-2.0))]),
           ])
         )>
         <ImageCollage
@@ -161,12 +165,16 @@ let make = _ => {
             style([
               display(`flex),
               flexWrap(`wrapReverse),
-              justifyContent(`spaceAround),
+              justifyContent(`spaceBetween),
               alignItems(`center),
               marginLeft(`auto),
               marginRight(`auto),
               marginBottom(`rem(2.0)),
               maxWidth(`rem(78.0)),
+              media(
+                Style.MediaQuery.notMobile,
+                [justifyContent(`spaceAround)],
+              ),
               // vertically/horiz center absolutely
               media(
                 Style.MediaQuery.veryLarge,
@@ -184,11 +192,12 @@ let make = _ => {
             ])
           )>
           <Code
-            src={|<script src="https://codaprotocol.com/api.js"></script>
+            src={|<script src="coda_api.js"></script>
 <script>
   onClick(button)
      .then(() => Coda.requestWallet())
-     .then((wallet) => Coda.sendTransaction(wallet, ...))
+     .then((wallet) =>
+       Coda.sendTransaction(wallet, ...))
 </script>|}
           />
           // This keeps the right hand text aligned with the inclusive app section.
