@@ -115,7 +115,7 @@ module KnowledgeBase = {
             className=Css.(
               style([
                 letterSpacing(`rem(0.1875)),
-                border(`px(1), `solid, black),
+                border(`px(1), `solid, Style.Colors.midnight),
                 paddingLeft(`rem(1.0)),
                 paddingRight(`rem(1.0)),
                 paddingTop(`rem(0.5)),
