@@ -6,7 +6,7 @@ module NavStyle = {
 
   module MediaQuery = {
     let menu = "(min-width: 62rem)";
-    let menuMax = "(max-width: 62rem)";
+    let menuMax = "(max-width: 61.9375rem)";
     let statusLift = "(min-width: 38rem)";
   };
   let bottomNudge = Css.marginBottom(`rem(2.0));
