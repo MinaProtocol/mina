@@ -37,7 +37,7 @@ let writeStatic = (path, rootComponent) => {
     extractCritical(ReactDOMServerRe.renderToStaticMarkup(rootComponent));
   Node.Fs.writeFileAsUtf8Sync(
     path ++ ".html",
-    "<!doctype html><meta charset=\"utf-8\" />\n" ++ rendered##html,
+    "<!doctype html>\n" ++ rendered##html,
   );
   Node.Fs.writeFileAsUtf8Sync(path ++ ".css", rendered##css);
 };
