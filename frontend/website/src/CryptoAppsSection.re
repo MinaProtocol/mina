@@ -39,7 +39,8 @@ module Code = {
               @ [
                 backgroundColor(Style.Colors.navy),
                 color(Style.Colors.white),
-                Style.Typeface.ibmplexsans,
+                Style.Typeface.ibmplexmono,
+                fontWeight(`medium),
                 fontSize(`rem(0.8125)),
                 borderRadius(`px(12)),
                 lineHeight(`rem(1.25)),
@@ -76,6 +77,7 @@ module ImageCollage = {
               position(`relative),
               top(`zero),
               left(`zero),
+              zIndex(-1),
               media(Style.MediaQuery.veryLarge, [position(`static)]),
             ]),
           ])
@@ -147,13 +149,7 @@ let make = _ => {
             position(`relative),
             left(`zero),
             top(`zero),
-            media(
-              Style.MediaQuery.veryLarge,
-              [
-                top(`rem(-2.0)),
-                zIndex(-1) // the background of the map isn't fully transparent
-              ],
-            ),
+            media(Style.MediaQuery.veryLarge, [top(`rem(-2.0))]),
           ])
         )>
         <ImageCollage
@@ -196,11 +192,12 @@ let make = _ => {
             ])
           )>
           <Code
-            src={|<script src="https://codaprotocol.com/api.js"></script>
+            src={|<script src="coda_api.js"></script>
 <script>
   onClick(button)
      .then(() => Coda.requestWallet())
-     .then((wallet) => Coda.sendTransaction(wallet, ...))
+     .then((wallet) =>
+       Coda.sendTransaction(wallet, ...))
 </script>|}
           />
           // This keeps the right hand text aligned with the inclusive app section.
