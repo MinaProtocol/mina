@@ -27,7 +27,7 @@ module KnowledgeBase = {
                   color(Style.Colors.hyperlink),
                   listStyle(`none, `inside, `none),
                   before([
-                    unsafe("content", {js|"•"|js}),
+                    unsafe("content", {js|"*"|js}),
                     color(Style.Colors.hyperlink),
                     marginRight(`rem(1.)),
                     display(`inlineBlock),
@@ -51,6 +51,7 @@ module KnowledgeBase = {
                 Style.H5.basic,
                 style([
                   marginLeft(`zero),
+                  color(Style.Colors.slate),
                   marginRight(`zero),
                   marginTop(`zero),
                   marginBottom(`rem(0.75)),
@@ -71,10 +72,6 @@ module KnowledgeBase = {
                 paddingLeft(`zero),
                 paddingRight(`zero),
                 marginBottom(`zero),
-                media(
-                  Style.MediaQuery.notMobile,
-                  [marginRight(`rem(1.5))],
-                ),
               ])
             )>
             ...items
@@ -96,28 +93,44 @@ module KnowledgeBase = {
             display(`block),
             border(`px(1), `solid, Style.Colors.hyperlinkAlpha(0.3)),
             borderRadius(`px(18)),
-            paddingBottom(`rem(1.)),
             maxWidth(`rem(58.625)),
             marginLeft(`auto),
             marginRight(`auto),
             paddingTop(`rem(1.0)),
+            paddingBottom(`rem(1.)),
             unsafe("min-width", "min-content"),
-            media(Style.MediaQuery.notMobile, [paddingBottom(`rem(3.))]),
+            media(Style.MediaQuery.notMobile, [paddingBottom(`rem(2.))]),
           ])
         )>
         {ReactDOMRe.createElement(
            "legend",
-           ~props=ReactDOMRe.objToDOMProps({"align": "center"}),
+           ~props=
+             ReactDOMRe.objToDOMProps({
+               "align": "center",
+               "className":
+                 Css.(
+                   style([
+                     textAlign(`center),
+                     marginTop(`zero),
+                     marginBottom(`zero),
+                     media(
+                       Style.MediaQuery.notMobile,
+                       [marginTop(`rem(-1.)), marginBottom(`rem(-1.))],
+                     ),
+                   ])
+                 ),
+             }),
            [|
              <h4
                className=Css.(
                  style([
+                   textAlign(`center),
                    letterSpacing(`rem(0.1875)),
                    border(`px(1), `solid, Style.Colors.saville),
-                   paddingLeft(`rem(1.0)),
-                   paddingRight(`rem(1.0)),
-                   paddingTop(`rem(0.5)),
-                   paddingBottom(`rem(0.5)),
+                   paddingLeft(`rem(1.25)),
+                   paddingRight(`rem(1.25)),
+                   paddingTop(`rem(0.25)),
+                   paddingBottom(`rem(0.25)),
                    textTransform(`uppercase),
                    fontWeight(`medium),
                    color(Style.Colors.midnight),
@@ -131,15 +144,17 @@ module KnowledgeBase = {
           className=Css.(
             style([
               display(`flex),
-              justifyContent(`center),
+              justifyContent(`spaceAround),
               flexWrap(`wrap),
               textAlign(`left),
+              paddingLeft(`rem(1.0)),
+              paddingRight(`rem(1.0)),
             ])
           )>
           <SubSection
-            className=Css.(style([marginBottom(`rem(2.0))]))
             title="Articles"
             content=[|
+              ("Read the Coda Whitepaper", "#"),
               ("Fast Accumulation on Streams", "#"),
               ("Coindesk: This Blockchain Tosses Blocks", "#"),
               ("TokenDaily: Deep Dive with O(1) on Coda Protocol", "#"),
@@ -314,7 +329,7 @@ let component = ReasonReact.statelessComponent("GetInvolved");
 let make = _ => {
   ...component,
   render: _self =>
-    <div>
+    <div className=Css.(style([marginBottom(`rem(13.0))]))>
       <h1
         className=Css.(
           merge([
@@ -375,14 +390,14 @@ let make = _ => {
           style([
             media(
               Style.MediaQuery.notMobile,
-              [marginTop(`rem(2.0)), marginBottom(`rem(3.))],
+              [marginTop(`rem(2.0)), marginBottom(`rem(2.4))],
             ),
             display(`flex),
             flexWrap(`wrap),
             justifyContent(`spaceAround),
             alignItems(`center),
-            marginBottom(`rem(1.)),
-            maxWidth(`rem(58.625)),
+            marginBottom(`rem(1.25)),
+            maxWidth(`rem(63.)),
             marginLeft(`auto),
             marginRight(`auto),
           ])
