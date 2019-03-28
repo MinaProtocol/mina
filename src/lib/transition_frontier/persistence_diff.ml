@@ -20,14 +20,24 @@ module Make (Inputs : Inputs_intf) :
   Transition_frontier_extension_intf0
   with type transition_frontier_breadcrumb := Inputs.Breadcrumb.t
    and type input = unit
-   and type view = Inputs.Diff_mutant.e list = struct
+   and type view =
+              ( Inputs.External_transition.Stable.Latest.t
+              , State_hash.Stable.Latest.t )
+              With_hash.t
+              Inputs.Diff_mutant.e
+              list = struct
   open Inputs
 
   type t = unit
 
   type input = unit
 
-  type view = Diff_mutant.e list
+  type view =
+    ( External_transition.Stable.Latest.t
+    , State_hash.Stable.Latest.t )
+    With_hash.t
+    Diff_mutant.e
+    list
 
   let create () = ()
 

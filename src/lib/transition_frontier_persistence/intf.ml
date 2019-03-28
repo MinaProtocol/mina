@@ -48,7 +48,11 @@ module type Worker_inputs = sig
      and type transaction_snark_scan_state := Staged_ledger.Scan_state.t
      and type consensus_local_state := Consensus.Local_state.t
      and type user_command := User_command.t
-     and type diff_mutant := Diff_mutant.e
+     and type diff_mutant :=
+                ( External_transition.Stable.Latest.t
+                , State_hash.Stable.Latest.t )
+                With_hash.t
+                Diff_mutant.e
      and module Extensions.Work = Transaction_snark_work.Statement
 end
 
@@ -67,7 +71,7 @@ module type Worker = sig
 
   type breadcrumb
 
-  type 'a diff
+  type 'output diff
 
   type t
 
@@ -79,7 +83,7 @@ module type Worker = sig
     -> consensus_local_state:Consensus.Local_state.t
     -> frontier Deferred.t
 
-  val handle_diff : t -> hash -> 'a diff -> hash
+  val handle_diff : t -> hash -> 'output diff -> hash
 
   module For_tests : sig
     module Transition_storage : sig
@@ -104,6 +108,9 @@ module type Main_inputs = sig
     type t
 
     val handle_diff :
-      t -> Diff_hash.t -> 'a Diff_mutant.t -> Diff_hash.t Deferred.Or_error.t
+         t
+      -> Diff_hash.t
+      -> (State_hash.t, 'output) Diff_mutant.t
+      -> Diff_hash.t Deferred.Or_error.t
   end
 end

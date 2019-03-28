@@ -40,27 +40,39 @@ module type Diff_mutant = sig
 
   type consensus_state
 
-  type _ t =
+  type ('external_transition, _) t =
     | New_frontier :
         ((external_transition, state_hash) With_hash.t * scan_state)
-        -> unit t
+        -> ('external_transition, unit) t
     | Add_transition :
         (external_transition, state_hash) With_hash.t
-        -> consensus_state t
+        -> ('external_transition, consensus_state) t
     | Remove_transitions :
-        (external_transition, state_hash) With_hash.t list
-        -> consensus_state list t
-    | Update_root : (state_hash * scan_state) -> (state_hash * scan_state) t
+        'external_transition list
+        -> ('external_transition, consensus_state list) t
+    | Update_root :
+        (state_hash * scan_state)
+        -> ('external_transition, state_hash * scan_state) t
 
   type hash
 
-  val yojson_of_key : 'a t -> Yojson.Safe.json
+  val yojson_of_key :
+       ('external_transition, 'output) t
+    -> f:('external_transition -> Yojson.Safe.json)
+    -> Yojson.Safe.json
 
-  val yojson_of_value : 'a t -> 'a -> Yojson.Safe.json
+  val yojson_of_value :
+    ('external_transition, 'output) t -> 'output -> Yojson.Safe.json
 
-  val hash : hash -> 'a t -> 'a -> hash
+  val hash :
+       hash
+    -> ('external_transition, 'output) t
+    -> f:('external_transition -> string)
+    -> 'output
+    -> hash
 
-  type e = E : 'a t -> e
+  type 'external_transition e =
+    | E : ('external_transition, 'output) t -> 'external_transition e
 end
 
 (** An extension to the transition frontier that provides a view onto the data

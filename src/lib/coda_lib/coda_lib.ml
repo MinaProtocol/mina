@@ -270,7 +270,11 @@ module type Inputs_intf = sig
      and type transaction_snark_scan_state := Staged_ledger.Scan_state.t
      and type consensus_local_state := Consensus_mechanism.Local_state.t
      and type user_command := User_command.t
-     and type diff_mutant := Diff_mutant.e
+     and type diff_mutant :=
+                ( External_transition.Stable.Latest.t
+                , Coda_base.State_hash.Stable.Latest.t )
+                With_hash.t
+                Diff_mutant.e
 
   module Transaction_pool :
     Transaction_pool_intf

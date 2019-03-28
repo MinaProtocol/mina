@@ -22,7 +22,11 @@ module type S = sig
      and type transaction_snark_scan_state := Staged_ledger.Scan_state.t
      and type consensus_local_state := Consensus.Local_state.t
      and type user_command := User_command.t
-     and type diff_mutant := Diff_mutant.e
+     and type diff_mutant :=
+                ( External_transition.Stable.Latest.t
+                , State_hash.Stable.Latest.t )
+                With_hash.t
+                Diff_mutant.e
 end
 
 module With_unprocessed_transition_cache = struct

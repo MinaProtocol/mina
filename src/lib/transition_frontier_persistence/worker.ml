@@ -14,7 +14,7 @@ module Make (Inputs : Intf.Worker_inputs) : sig
      and type root_snarked_ledger := Ledger.Db.t
      and type breadcrumb := Transition_frontier.Breadcrumb.t
      and type hash := Diff_hash.t
-     and type 'a diff := 'a Diff_mutant.t
+     and type 'output diff := (State_hash.t, 'output) Diff_mutant.t
 end = struct
   open Inputs
 
@@ -68,7 +68,8 @@ end = struct
       "Added transition $hash and $parent_hash !" ;
     External_transition.consensus_state parent_transition
 
-  let handle_diff (type a) (t : t) acc_hash (diff : a Diff_mutant.t) =
+  let handle_diff (type a) (t : t) acc_hash
+      (diff : (State_hash.t, a) Diff_mutant.t) =
     let log ~location diff mutant =
       Debug_assert.debug_assert
       @@ fun () ->
@@ -86,7 +87,7 @@ end = struct
             Transition_storage.Batch.set batch
               ~key:(Transition first_root_hash) ~data:(first_root, []) ;
             log ~location:__LOC__ diff () ;
-            Diff_mutant.hash acc_hash diff () )
+            Diff_mutant.hash ~f:State_hash.to_bytes acc_hash diff () )
     | Add_transition transition_with_hash ->
         Transition_storage.Batch.with_batch t.transition_storage
           ~f:(fun batch ->
@@ -94,20 +95,19 @@ end = struct
               apply_add_transition (t, batch) transition_with_hash
             in
             log ~location:__LOC__ diff mutant ;
-            Diff_mutant.hash acc_hash diff mutant )
-    | Remove_transitions removed_transitions_with_hash ->
+            Diff_mutant.hash ~f:State_hash.to_bytes acc_hash diff mutant )
+    | Remove_transitions removed_transitions ->
         let mutant =
           Transition_storage.Batch.with_batch t.transition_storage
             ~f:(fun batch ->
-              List.map removed_transitions_with_hash
-                ~f:(fun {With_hash.hash= state_hash; _} ->
+              List.map removed_transitions ~f:(fun state_hash ->
                   let removed_transition, _ = get t (Transition state_hash) in
                   Transition_storage.Batch.remove batch
                     ~key:(Transition state_hash) ;
                   External_transition.consensus_state removed_transition ) )
         in
         log ~location:__LOC__ diff mutant ;
-        Diff_mutant.hash acc_hash diff mutant
+        Diff_mutant.hash ~f:State_hash.to_bytes acc_hash diff mutant
     | Update_root new_root_data ->
         (* We can get the serialized root_data from the database and then hash it, rather than using `Transition_storage.get` to deserialize the data and then hash it again which is slower *)
         let old_root_data =

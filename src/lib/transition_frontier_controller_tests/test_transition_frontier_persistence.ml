@@ -52,7 +52,15 @@ let%test_module "Transition Frontier Persistence" =
       in
       Broadcast_pipe.Reader.fold
         (Transition_frontier.persistence_diff_pipe frontier)
-        ~init:Diff_hash.empty ~f:(fun acc_hash (diffs : Diff_mutant.e list) ->
+        ~init:Diff_hash.empty
+        ~f:(fun acc_hash
+           (diffs :
+             ( External_transition.Stable.Latest.t
+             , State_hash.Stable.Latest.t )
+             With_hash.t
+             Diff_mutant.e
+             list)
+           ->
           Deferred.List.fold diffs ~init:acc_hash ~f:(fun acc_hash -> function
             | E mutant_diff ->
                 let%map new_hash =

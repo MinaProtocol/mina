@@ -16,7 +16,11 @@ module type S = sig
      and type staged_ledger := Staged_ledger.t
      and type consensus_local_state := Consensus.Local_state.t
      and type user_command := User_command.t
-     and type diff_mutant := Diff_mutant.e
+     and type diff_mutant :=
+                ( External_transition.Stable.Latest.t
+                , State_hash.Stable.Latest.t )
+                With_hash.t
+                Diff_mutant.e
 
   module Unprocessed_transition_cache :
     Unprocessed_transition_cache_intf
