@@ -90,7 +90,7 @@ module Legend = {
               display(`flex),
               marginTop(`zero),
               marginBottom(`zero),
-              marginRight(`rem(0.25)),
+              marginRight(`rem(1.0)),
               media(Style.MediaQuery.notMobile, [marginRight(`rem(2.25))]),
             ])
           )>
@@ -98,7 +98,7 @@ module Legend = {
             className=Css.(style([marginRight(`rem(0.75))]))
             borderColor={Some(Style.Colors.clover)}
             fillColor=Style.Colors.lightClover
-            dims=(`rem(2.25), `rem(2.25))
+            dims=(`rem(2.5), `rem(2.5))
           />
           <h5
             className=Css.(
@@ -163,7 +163,7 @@ module Figure = {
   };
 };
 
-let legendQuery = "(min-width: 66.8125rem)";
+let legendQuery = "(min-width: 68.8125rem)";
 
 let component = ReasonReact.statelessComponent("InclusiveSection");
 let make = _ => {
