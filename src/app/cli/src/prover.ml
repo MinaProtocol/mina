@@ -136,13 +136,15 @@ module Worker_state = struct
                      (Consensus_mechanism.Prover_state.handler
                         state_for_handler)
                  in
-                 let _ =
+                 match
                    Tick.Groth16.check
                      (main @@ Tick.Field.Var.constant next_state_top_hash)
                      prover_state
-                 in
-                 { Blockchain.state= next_state
-                 ; proof= Precomputed_values.base_proof }
+                 with
+                 | Ok () ->
+                     { Blockchain.state= next_state
+                     ; proof= Precomputed_values.base_proof }
+                 | Error e -> Error.raise e
 
                let verify state proof = true
              end

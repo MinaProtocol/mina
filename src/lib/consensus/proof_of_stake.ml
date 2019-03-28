@@ -91,8 +91,10 @@ module Constants = struct
 end
 
 module Proposal_data = struct
+  (* TODO : version *)
   type t =
-    {stake_proof: Coda_base.Stake_proof.t; vrf_result: Random_oracle.Digest.t}
+    { stake_proof: Coda_base.Stake_proof.t
+    ; vrf_result: Random_oracle.Digest.Stable.V1.t }
   [@@deriving bin_io]
 
   let prover_state {stake_proof; _} = stake_proof
@@ -440,7 +442,8 @@ module Vrf = struct
   end
 
   module Output = struct
-    type t = Random_oracle.Digest.t
+    (* TODO : version *)
+    type t = Random_oracle.Digest.Stable.V1.t
     [@@deriving sexp, bin_io, eq, compare, hash, yojson]
 
     type var = Random_oracle.Digest.Checked.t

@@ -63,53 +63,53 @@ jobs:
                   name: Update branch protection rule from test configuration
                   command: ./scripts/test.py required-status >required_status && cat required_status && ./scripts/update_branch_rule.py required_status
 
-    build-macos:
-        macos:
-            xcode: "10.1.0"
-        working_directory: /Users/distiller/coda
-        environment:
-            HOMEBREW_LOGS: /Users/distiller/homebrew.log
-            OPAMYES: 1
-        steps:
-            - run:
-                name: Make /nix paths
-                command: |
-                    sudo mkdir /nix
-                    sudo chown distiller /nix
-            - checkout
-            - restore_cache:
-                  keys:
-                      - homebrew-v1-{{ checksum "scripts/macos-setup.sh" }}
-                      - homebrew-v1-
-            - restore_cache:
-                  keys:
-                      - opam-v3-{{ checksum "src/opam.export" }}
-                      - opam-v3-
-            - run: git submodule sync && git submodule update --init --recursive
-            - run:
-                  name: Download Deps -- make macos-setup-download
-                  command: ./scripts/skip_if_only_frontend.sh make macos-setup-download
-            - run:
-                  name: Compile Deps -- make macos-setup-compile
-                  command: ./scripts/skip_if_only_frontend.sh make macos-setup-compile
-            - save_cache:
-                  key: homebrew-v1-{{ checksum "scripts/macos-setup.sh" }}
-                  paths:
-                      - "/usr/local/Homebrew"
-                      - "/Users/distiller/Library/Caches/Homebrew"
-            - save_cache:
-                  key: opam-v3-{{ checksum "src/opam.export" }}
-                  paths:
-                      - "/Users/distiller/.opam"
-            - run:
-                  name: Build OCaml
-                  command: ./scripts/skip_if_only_frontend.sh bash -c 'eval `opam config env` && make build 2>&1 | tee /tmp/buildocaml.log'
-            - run:
-                  name: Record Constraint System Digests
-                  command: ./scripts/skip_if_only_frontend.sh bash -c 'src/_build/default/app/cli/src/coda.exe client constraint-system-digests | tee /tmp/constraint-system-digests.log'
-            - run:
-                  name: Run all tests (on master)
-                  command: echo "FIXME Tests not yet working on mac"
+    #build-macos:
+    #    macos:
+    #        xcode: "10.1.0"
+    #    working_directory: /Users/distiller/coda
+    #    environment:
+    #        HOMEBREW_LOGS: /Users/distiller/homebrew.log
+    #        OPAMYES: 1
+    #    steps:
+    #        - run:
+    #            name: Make /nix paths
+    #            command: |
+    #                sudo mkdir /nix
+    #                sudo chown distiller /nix
+    #        - checkout
+    #        - restore_cache:
+    #              keys:
+    #                  - homebrew-v1-{{ checksum "scripts/macos-setup.sh" }}
+    #                  - homebrew-v1-
+    #        - restore_cache:
+    #              keys:
+    #                  - opam-v3-{{ checksum "src/opam.export" }}
+    #                  - opam-v3-
+    #        - run: git submodule sync && git submodule update --init --recursive
+    #        - run:
+    #              name: Download Deps -- make macos-setup-download
+    #              command: ./scripts/skip_if_only_frontend.sh make macos-setup-download
+    #        - run:
+    #              name: Compile Deps -- make macos-setup-compile
+    #              command: ./scripts/skip_if_only_frontend.sh make macos-setup-compile
+    #        - save_cache:
+    #              key: homebrew-v1-{{ checksum "scripts/macos-setup.sh" }}
+    #              paths:
+    #                  - "/usr/local/Homebrew"
+    #                  - "/Users/distiller/Library/Caches/Homebrew"
+    #        - save_cache:
+    #              key: opam-v3-{{ checksum "src/opam.export" }}
+    #              paths:
+    #                  - "/Users/distiller/.opam"
+    #        - run:
+    #              name: Build OCaml
+    #              command: ./scripts/skip_if_only_frontend.sh bash -c 'eval `opam config env` && make build 2>&1 | tee /tmp/buildocaml.log'
+    #        - run:
+    #              name: Record Constraint System Digests
+    #              command: ./scripts/skip_if_only_frontend.sh bash -c 'src/_build/default/app/cli/src/coda.exe client constraint-system-digests | tee /tmp/constraint-system-digests.log'
+    #        - run:
+    #              name: Run all tests (on master)
+    #              command: echo "FIXME Tests not yet working on mac"
     build-artifacts--testnet_postake:
         resource_class: large
         docker:
@@ -275,6 +275,18 @@ jobs:
                   command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run "test_postake_five_even_snarkless:coda-shared-prefix-multiproposer-test -num-proposers 5"'
             - store_artifacts:
                   path: test_logs
+    test--test_postake_five_even_txns:
+        resource_class: large
+        docker:
+            - image: codaprotocol/coda:toolchain-af1380e0f6c8726391d82b2adb6a2a3b20dd46a0
+        steps:
+            - checkout
+            - run: git submodule sync && git submodule update --init --recursive
+            - run:
+                  name: Running test -- test_postake_five_even_txns:coda-shared-prefix-multiproposer-test -num-proposers 5 -payments
+                  command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run "test_postake_five_even_txns:coda-shared-prefix-multiproposer-test -num-proposers 5 -payments"'
+            - store_artifacts:
+                  path: test_logs
     test--test_postake_snarkless:
         resource_class: large
         docker:
@@ -352,7 +364,6 @@ workflows:
                   branches:
                     only: master
             - tracetool
-            - build-macos
             - build-wallet
             - build-artifacts--testnet_postake
             - build-artifacts--testnet_postake_snarkless_fake_hash
@@ -364,6 +375,7 @@ workflows:
             - test--test_postake_bootstrap
             - test--test_postake_catchup
             - test--test_postake_five_even_snarkless
+            - test--test_postake_five_even_txns
             - test--test_postake_snarkless
             - test--test_postake_split
             - test--test_postake_split_snarkless

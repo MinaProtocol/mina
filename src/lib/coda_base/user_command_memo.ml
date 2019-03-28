@@ -1,7 +1,7 @@
 open Core
 include Random_oracle.Digest
 
-(*TODO Currently sha-ing a string. Actula data in the memo needs to be decided *)
+(*TODO Currently sha-ing a string. Actual data in the memo needs to be decided *)
 let max_size_in_bytes = 1000
 
 let create_exn s =
