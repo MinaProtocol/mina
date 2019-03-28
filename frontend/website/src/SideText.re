@@ -1,5 +1,5 @@
 let component = ReasonReact.statelessComponent("SideText");
-let make = (~paragraphs, ~cta, _children) => {
+let make = (~className="", ~paragraphs, ~cta, _children) => {
   ...component,
   render: _self => {
     let ps =
@@ -24,7 +24,12 @@ let make = (~paragraphs, ~cta, _children) => {
 
     <div
       className=Css.(
-        style([media(Style.MediaQuery.notMobile, [width(`rem(20.625))])])
+        merge([
+          className,
+          style([
+            media(Style.MediaQuery.notMobile, [width(`rem(20.625))]),
+          ]),
+        ])
       )>
       {ReasonReact.array(ps)}
       <a
