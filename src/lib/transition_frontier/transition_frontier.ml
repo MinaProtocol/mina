@@ -612,6 +612,8 @@ struct
       if Breadcrumb.equal bc1 bc2 then Breadcrumb.state_hash bc1
       else
         let rec go ancestors1 ancestors2 sh1 sh2 =
+          Hash_set.add ancestors1 sh1 ;
+          Hash_set.add ancestors2 sh2 ;
           if Hash_set.mem ancestors1 sh2 then sh2
           else if Hash_set.mem ancestors2 sh1 then sh1
           else
@@ -619,8 +621,6 @@ struct
               if State_hash.equal h t.root then h
               else find_exn t h |> Breadcrumb.parent_hash
             in
-            Hash_set.add ancestors1 sh1 ;
-            Hash_set.add ancestors2 sh2 ;
             go ancestors1 ancestors2 (parent_unless_root sh1)
               (parent_unless_root sh2)
         in
@@ -770,6 +770,13 @@ struct
             let new_root_node = move_root t heir_node in
             (* 4.V *)
             let garbage = List.bind bad_hashes ~f:(successor_hashes_rec t) in
+            Logger.info t.logger ~module_:__MODULE__ ~location:__LOC__
+              ~metadata:
+                [ ("garbage", `List (List.map garbage ~f:State_hash.to_yojson))
+                ; ("length_of_garbage", `Int (List.length garbage))
+                ; ( "bad_hashes"
+                  , `List (List.map bad_hashes ~f:State_hash.to_yojson) ) ]
+              "garbage are $garbage" ;
             let garbage_breadcrumbs =
               List.map garbage ~f:(fun g ->
                   (Hashtbl.find_exn t.table g).breadcrumb )
