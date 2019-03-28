@@ -39,8 +39,8 @@ module Send_payment_input = struct
   type t =
     Private_key.t
     * Public_key.Compressed.Stable.V1.t
-    * Currency.Amount.t
-    * Currency.Fee.t
+    * Currency.Amount.Stable.V1.t
+    * Currency.Fee.Stable.V1.t
     * User_command_memo.Stable.V1.t
   [@@deriving bin_io]
 end
@@ -56,7 +56,8 @@ module T = struct
   end
 
   module Maybe_currency = struct
-    type t = Currency.Balance.t option [@@deriving bin_io]
+    (* TODO: version *)
+    type t = Currency.Balance.Stable.V1.t option [@@deriving bin_io]
   end
 
   module Prove_receipt = struct
@@ -84,6 +85,7 @@ module T = struct
         , Public_key.Compressed.t
         , Coda_numbers.Account_nonce.t option )
         Rpc_parallel.Function.t
+    ; root_length: ('worker, unit, int) Rpc_parallel.Function.t
     ; send_payment:
         ( 'worker
         , Send_payment_input.t
@@ -94,7 +96,7 @@ module T = struct
         , User_command.t
         , Receipt.Chain_hash.t Or_error.t )
         Rpc_parallel.Function.t
-    ; strongest_ledgers:
+    ; verified_transitions:
         ('worker, unit, State_hashes.t Pipe.Reader.t) Rpc_parallel.Function.t
     ; root_diff:
         ( 'worker
@@ -107,7 +109,12 @@ module T = struct
         , Prove_receipt.Input.t
         , Prove_receipt.Output.t )
         Rpc_parallel.Function.t
-    ; dump_tf: ('worker, unit, string) Rpc_parallel.Function.t }
+    ; dump_tf: ('worker, unit, string) Rpc_parallel.Function.t
+    ; best_path:
+        ( 'worker
+        , unit
+        , State_hash.Stable.Latest.t list )
+        Rpc_parallel.Function.t }
 
   type coda_functions =
     { coda_peers: unit -> Peers.t Deferred.t
@@ -116,11 +123,13 @@ module T = struct
     ; coda_get_nonce:
            Public_key.Compressed.t
         -> Coda_numbers.Account_nonce.t option Deferred.t
+    ; coda_root_length: unit -> int Deferred.t
     ; coda_send_payment:
         Send_payment_input.t -> Receipt.Chain_hash.t Or_error.t Deferred.t
     ; coda_process_payment:
         User_command.t -> Receipt.Chain_hash.t Or_error.t Deferred.t
-    ; coda_strongest_ledgers: unit -> State_hashes.t Pipe.Reader.t Deferred.t
+    ; coda_verified_transitions:
+        unit -> State_hashes.t Pipe.Reader.t Deferred.t
     ; coda_root_diff:
            unit
         -> User_command.t Protocols.Coda_transition_frontier.Root_diff_view.t
@@ -128,7 +137,8 @@ module T = struct
            Deferred.t
     ; coda_prove_receipt:
         Prove_receipt.Input.t -> Prove_receipt.Output.t Deferred.t
-    ; coda_dump_tf: unit -> string Deferred.t }
+    ; coda_dump_tf: unit -> string Deferred.t
+    ; coda_best_path: unit -> State_hash.Stable.Latest.t list Deferred.t }
 
   module Worker_state = struct
     type init_arg = Input.t [@@deriving bin_io]
@@ -149,14 +159,17 @@ module T = struct
   struct
     let peers_impl ~worker_state ~conn_state:() () = worker_state.coda_peers ()
 
-    let strongest_ledgers_impl ~worker_state ~conn_state:() () =
-      worker_state.coda_strongest_ledgers ()
+    let verified_transitions_impl ~worker_state ~conn_state:() () =
+      worker_state.coda_verified_transitions ()
 
     let root_diff_impl ~worker_state ~conn_state:() () =
       worker_state.coda_root_diff ()
 
     let get_balance_impl ~worker_state ~conn_state:() pk =
       worker_state.coda_get_balance pk
+
+    let root_length_impl ~worker_state ~conn_state:() () =
+      worker_state.coda_root_length ()
 
     let get_nonce_impl ~worker_state ~conn_state:() pk =
       worker_state.coda_get_nonce pk
@@ -174,6 +187,9 @@ module T = struct
 
     let dump_tf_impl ~worker_state ~conn_state:() () =
       worker_state.coda_dump_tf ()
+
+    let best_path_impl ~worker_state ~conn_state:() () =
+      worker_state.coda_best_path ()
 
     let peers =
       C.create_rpc ~f:peers_impl ~bin_input:Unit.bin_t ~bin_output:Peers.bin_t
@@ -194,6 +210,10 @@ module T = struct
         ~bin_output:
           [%bin_type_class: Coda_numbers.Account_nonce.Stable.V1.t option] ()
 
+    let root_length =
+      C.create_rpc ~f:root_length_impl ~bin_input:Unit.bin_t
+        ~bin_output:Int.bin_t ()
+
     let prove_receipt =
       C.create_rpc ~f:prove_receipt_impl ~bin_input:Prove_receipt.Input.bin_t
         ~bin_output:Prove_receipt.Output.bin_t ()
@@ -208,8 +228,8 @@ module T = struct
         ~bin_output:
           [%bin_type_class: Receipt.Chain_hash.Stable.V1.t Or_error.t] ()
 
-    let strongest_ledgers =
-      C.create_pipe ~f:strongest_ledgers_impl ~bin_input:Unit.bin_t
+    let verified_transitions =
+      C.create_pipe ~f:verified_transitions_impl ~bin_input:Unit.bin_t
         ~bin_output:State_hashes.bin_t ()
 
     let root_diff =
@@ -223,17 +243,23 @@ module T = struct
       C.create_rpc ~f:dump_tf_impl ~bin_input:Unit.bin_t
         ~bin_output:String.bin_t ()
 
+    let best_path =
+      C.create_rpc ~f:best_path_impl ~bin_input:Unit.bin_t
+        ~bin_output:[%bin_type_class: State_hash.Stable.Latest.t list] ()
+
     let functions =
       { peers
       ; start
-      ; strongest_ledgers
+      ; verified_transitions
       ; root_diff
       ; get_balance
       ; get_nonce
+      ; root_length
       ; send_payment
       ; process_payment
       ; prove_receipt
-      ; dump_tf }
+      ; dump_tf
+      ; best_path }
 
     let init_worker_state
         { host
@@ -302,7 +328,7 @@ module T = struct
             { Main.Inputs.Net.Config.logger
             ; time_controller
             ; gossip_net_params=
-                { Main.Inputs.Net.Gossip_net.Config.timeout= Time.Span.of_sec 1.
+                { Main.Inputs.Net.Gossip_net.Config.timeout= Time.Span.of_sec 3.
                 ; target_peer_count= 8
                 ; conf_dir
                 ; initial_peers= peers
@@ -353,6 +379,9 @@ module T = struct
           let coda_get_nonce pk =
             return (Run.get_nonce coda pk |> Participating_state.active_exn)
           in
+          let coda_root_length () =
+            return (Main.root_length coda |> Participating_state.active_exn)
+          in
           let coda_send_payment (sk, pk, amount, fee, memo) =
             let pk_of_sk sk =
               Public_key.of_private_key_exn sk |> Public_key.compress
@@ -395,10 +424,10 @@ module T = struct
                   !"Failed to construct payment proof: %{sexp:Error.t}"
                   e ()
           in
-          let coda_strongest_ledgers () =
+          let coda_verified_transitions () =
             let r, w = Linear_pipe.create () in
             don't_wait_for
-              (Strict_pipe.Reader.iter (Main.strongest_ledgers coda)
+              (Strict_pipe.Reader.iter (Main.verified_transitions coda)
                  ~f:(fun t ->
                    let open Main.Inputs in
                    let p =
@@ -427,16 +456,22 @@ module T = struct
               ( Main.dump_tf coda |> Or_error.ok
               |> Option.value ~default:"<failed to visualize>" )
           in
+          let coda_best_path () =
+            let path = Main.best_path coda in
+            Deferred.return (Option.value ~default:[] path)
+          in
           { coda_peers= with_monitor coda_peers
-          ; coda_strongest_ledgers= with_monitor coda_strongest_ledgers
+          ; coda_verified_transitions= with_monitor coda_verified_transitions
           ; coda_root_diff= with_monitor coda_root_diff
           ; coda_get_balance= with_monitor coda_get_balance
           ; coda_get_nonce= with_monitor coda_get_nonce
+          ; coda_root_length= with_monitor coda_root_length
           ; coda_send_payment= with_monitor coda_send_payment
           ; coda_process_payment= with_monitor coda_process_payment
           ; coda_prove_receipt= with_monitor coda_prove_receipt
           ; coda_start= with_monitor coda_start
-          ; coda_dump_tf= with_monitor coda_dump_tf } )
+          ; coda_dump_tf= with_monitor coda_dump_tf
+          ; coda_best_path= with_monitor coda_best_path } )
 
     let init_connection_state ~connection:_ ~worker_state:_ = return
   end

@@ -384,7 +384,7 @@ module Make (Inputs : Inputs_intf) = struct
     ; transaction_pool: Transaction_pool.t
     ; snark_pool: Snark_pool.t
     ; transition_frontier: Transition_frontier.t option Broadcast_pipe.Reader.t
-    ; strongest_ledgers:
+    ; verified_transitions:
         (External_transition.Verified.t, Protocol_state_hash.t) With_hash.t
         Strict_pipe.Reader.t
     ; proposer_transition_writer:
@@ -420,6 +420,11 @@ module Make (Inputs : Inputs_intf) = struct
     let%map frontier = Broadcast_pipe.Reader.peek t.transition_frontier in
     Transition_frontier.best_tip frontier
 
+  let root_length_opt t =
+    let open Option.Let_syntax in
+    let%map frontier = Broadcast_pipe.Reader.peek t.transition_frontier in
+    Transition_frontier.root_length frontier
+
   let best_staged_ledger_opt t =
     let open Option.Let_syntax in
     let%map tip = best_tip_opt t in
@@ -442,6 +447,8 @@ module Make (Inputs : Inputs_intf) = struct
       f
 
   let best_tip = compose_of_option best_tip_opt
+
+  let root_length = compose_of_option root_length_opt
 
   let visualize_frontier ~filename =
     compose_of_option
@@ -495,7 +502,7 @@ module Make (Inputs : Inputs_intf) = struct
     let%bind sl = best_staged_ledger_opt t in
     Staged_ledger.current_ledger_proof sl
 
-  let strongest_ledgers t = t.strongest_ledgers
+  let verified_transitions t = t.verified_transitions
 
   let root_diff t =
     let root_diff_reader, root_diff_writer =
@@ -515,6 +522,15 @@ module Make (Inputs : Inputs_intf) = struct
   let dump_tf t =
     peek_frontier t.transition_frontier
     |> Or_error.map ~f:Transition_frontier.visualize_to_string
+
+  (** The [best_path coda] is the list of state hashes from the root to the best_tip in the transition frontier. It includes the root hash and the hash *)
+  let best_path t =
+    let open Option.Let_syntax in
+    let%map tf = Broadcast_pipe.Reader.peek t.transition_frontier in
+    let bt = Transition_frontier.best_tip tf in
+    List.cons
+      Transition_frontier.(root tf |> Breadcrumb.state_hash)
+      (Transition_frontier.hash_path tf bt)
 
   module Config = struct
     (** If ledger_db_location is None, will auto-generate a db based on a UUID *)
@@ -728,7 +744,7 @@ module Make (Inputs : Inputs_intf) = struct
               ; time_controller= config.time_controller
               ; external_transitions_writer=
                   Strict_pipe.Writer.to_linear_pipe external_transitions_writer
-              ; strongest_ledgers= valid_transitions_for_api
+              ; verified_transitions= valid_transitions_for_api
               ; logger= config.logger
               ; seen_jobs= Work_selector.State.init
               ; staged_ledger_transition_backup_capacity=

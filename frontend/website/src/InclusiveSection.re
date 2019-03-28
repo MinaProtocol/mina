@@ -36,7 +36,15 @@ module Legend = {
       render: _self => {
         <div className=Css.(style([display(`flex), alignItems(`center)]))>
           <Square
-            className=Css.(style([marginRight(`rem(0.75))]))
+            className=Css.(
+              style([
+                marginRight(`rem(0.5)),
+                media(
+                  Style.MediaQuery.notMobile,
+                  [marginRight(`rem(0.75))],
+                ),
+              ])
+            )
             borderColor=None
             fillColor=themeColor
             dims=(`rem(1.0), `rem(1.0))
@@ -46,6 +54,7 @@ module Legend = {
               merge([
                 Style.H3.basic,
                 style([
+                  fontWeight(`medium),
                   marginTop(`zero),
                   marginBottom(`zero),
                   color(themeColor),
@@ -60,15 +69,18 @@ module Legend = {
   };
 
   let component = ReasonReact.statelessComponent("InclusiveSection.Legend");
-  let make = _ => {
+  let make = (~className, _children) => {
     ...component,
     render: _self => {
       <div
         className=Css.(
-          style([
-            display(`flex),
-            justifyContent(`center),
-            alignItems(`center),
+          merge([
+            className,
+            style([
+              justifyContent(`flexStart),
+              alignItems(`center),
+              media(Style.MediaQuery.notMobile, [justifyContent(`center)]),
+            ]),
           ])
         )>
         <div
@@ -77,7 +89,8 @@ module Legend = {
               display(`flex),
               marginTop(`zero),
               marginBottom(`zero),
-              marginRight(`rem(2.25)),
+              marginRight(`rem(0.25)),
+              media(Style.MediaQuery.notMobile, [marginRight(`rem(2.25))]),
             ])
           )>
           <Square
@@ -89,7 +102,7 @@ module Legend = {
           <h5
             className=Css.(
               merge([
-                Style.H5.basic,
+                Style.H5.tight,
                 style([
                   width(`rem(8.0)),
                   marginTop(`zero),
@@ -114,7 +127,21 @@ module Figure = {
   let make = (~captionColor, ~link, ~dims, ~caption, _children) => {
     ...component,
     render: _self => {
-      <figure>
+      <figure
+        className=Css.(
+          style([
+            unsafe("margin-block-start", "0"),
+            unsafe("margin-block-end", "0"),
+            unsafe("margin-inline-start", "0"),
+            unsafe("margin-inline-end", "0"),
+            marginTop(`rem(2.0)),
+            display(`flex),
+            flexDirection(`column),
+            alignItems(`center),
+            justifyContent(`center),
+            width(`rem(20.625)),
+          ])
+        )>
         <Svg dims link />
         <figcaption
           className=Css.(
@@ -123,6 +150,7 @@ module Figure = {
               style([
                 marginTop(`rem(1.5)),
                 color(captionColor),
+                fontWeight(`medium),
                 textAlign(`center),
               ]),
             ])
@@ -134,20 +162,30 @@ module Figure = {
   };
 };
 
+let legendQuery = "(min-width: 66.8125rem)";
+
 let component = ReasonReact.statelessComponent("InclusiveSection");
 let make = _ => {
   ...component,
   render: _self =>
     <div className=Css.(style([marginTop(`rem(2.5))]))>
       <Title fontColor=Style.Colors.denimTwo text="Inclusive consensus" />
-      <Legend />
+      <Legend
+        className=Css.(
+          style([display(`none), media(legendQuery, [display(`flex)])])
+        )
+      />
       <div
         className=Css.(
           style([
             display(`flex),
-            justifyContent(`spaceAround),
+            justifyContent(`spaceBetween),
             alignItems(`center),
             flexWrap(`wrapReverse),
+            media(
+              Style.MediaQuery.notMobile,
+              [justifyContent(`spaceAround)],
+            ),
           ])
         )>
         <Figure
@@ -162,13 +200,27 @@ let make = _ => {
           caption="Other Blockchains"
           captionColor=Style.Colors.navy
         />
-        <SideText
-          paragraphs=[|
-            "Simple, fair consensus. Participation is proportional to how much stake you have in the protocol with no lockups, no forced delegation, and low bandwidth requirements.",
-            "With just a small stake, you'll be able to participate directly in consensus and earn Coda.",
-          |]
-          cta="Stay updated about participating in consensus"
-        />
+        <div>
+          <div
+            className=Css.(style([display(`flex), justifyContent(`center)]))>
+            <SideText
+              paragraphs=[|
+                "Simple, fair consensus. Participation is proportional to how much stake you have in the protocol with no lockups, no forced delegation, and low bandwidth requirements.",
+                "With just a small stake, you'll be able to participate directly in consensus and earn Coda.",
+              |]
+              cta="Stay updated about participating in consensus"
+            />
+          </div>
+          <Legend
+            className=Css.(
+              style([
+                display(`flex),
+                marginTop(`rem(2.0)),
+                media(legendQuery, [display(`none)]),
+              ])
+            )
+          />
+        </div>
       </div>
     </div>,
 };

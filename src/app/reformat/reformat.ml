@@ -4,6 +4,16 @@ open Async
 (* If OCamlformat ever breaks on any files add their paths here *)
 let whitelist = []
 
+let dirs_whitelist =
+  [ ".git"
+  ; "_build"
+  ; "stationary"
+  ; ".un~"
+  ; "external"
+  ; "ocamlformat"
+  ; "node_modules"
+  ; "snarky" ]
+
 let rec fold_over_files ~path ~process_path ~init ~f =
   let%bind all = Sys.ls_dir path in
   Deferred.List.fold all ~init ~f:(fun acc x ->
@@ -20,13 +30,9 @@ let main dry_run check path =
       ~process_path:(fun kind path ->
         match kind with
         | `Dir ->
-            (not (String.is_suffix ~suffix:".git" path))
-            && (not (String.is_suffix ~suffix:"_build" path))
-            && (not (String.is_suffix ~suffix:"stationary" path))
-            && (not (String.is_suffix ~suffix:".un~" path))
-            && (not (String.is_suffix ~suffix:"external" path))
-            && (not (String.is_suffix ~suffix:"ocamlformat" path))
-            && not (String.is_suffix ~suffix:"node_modules" path)
+            not
+              (List.exists dirs_whitelist ~f:(fun s ->
+                   String.is_suffix ~suffix:s path ))
         | `File ->
             (not
                (List.exists whitelist ~f:(fun s ->
@@ -39,7 +45,7 @@ let main dry_run check path =
           return ()
         in
         if check then
-          let prog, args = ("ocamlformat", [file]) in
+          let prog, args = ("ocamlformat", ["--doc-comments=before"; file]) in
           let%bind formatted = Process.run_exn ~prog ~args () in
           let%bind raw = Reader.file_contents file in
           if formatted <> raw then (
@@ -47,7 +53,9 @@ let main dry_run check path =
             exit 1 )
           else return ()
         else
-          let prog, args = ("ocamlformat", ["-i"; file]) in
+          let prog, args =
+            ("ocamlformat", ["--doc-comments=before"; "-i"; file])
+          in
           if dry_run then dump prog args
           else
             let%map _stdout = Process.run_exn ~prog ~args () in

@@ -3,11 +3,6 @@ let legacyStylesheets =
     <link
       rel="stylesheet"
       type_="text/css"
-      href="https://fonts.googleapis.com/css?family=Rubik:500"
-    />
-    <link
-      rel="stylesheet"
-      type_="text/css"
       href="https://fonts.googleapis.com/css?family=Alegreya+Sans:300,300i,400,400i,500,500i,700,700i,800,800i,900,900i"
     />
     <link
@@ -24,6 +19,11 @@ let make = (~extra, ~filename, _children) => {
   ...component,
   render: _self =>
     <head>
+      {ReactDOMRe.createElement(
+         "meta",
+         ~props=ReactDOMRe.objToDOMProps({"charSet": "utf-8"}),
+         [||],
+       )}
       <meta name="viewport" content="width=device-width, initial-scale=1" />
       <meta
         property="og:image"
@@ -47,6 +47,11 @@ let make = (~extra, ~filename, _children) => {
         rel="stylesheet"
         type_="text/css"
         href="https://use.typekit.net/mta7mwm.css"
+      />
+      <link
+        rel="stylesheet"
+        type_="text/css"
+        href="https://fonts.googleapis.com/css?family=Rubik:300,500"
       />
       <link
         rel="stylesheet"

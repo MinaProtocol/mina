@@ -28,14 +28,26 @@ module Member = {
             style([
               display(`flex),
               flexDirection(`column),
-              width(`rem(23.75)),
-              minWidth(`rem(19.)),
-              minHeight(`rem(27.5)),
+              width(`rem(20.5)),
+              minWidth(`rem(20.5)),
+              flexGrow(1.),
+              maxWidth(`rem(23.75)),
               backgroundColor(Style.Colors.veryLightGrey),
               borderRadius(`px(10)),
               border(`px(1), `solid, Style.Colors.hyperlinkAlpha(0.2)),
               padding(`rem(1.5)),
-              margin(`rem(1.5625)),
+              marginTop(`rem(1.5625)),
+              marginBottom(`rem(1.5625)),
+              marginLeft(`zero),
+              marginRight(`zero),
+              media(
+                Style.MediaQuery.notMobile,
+                [
+                  minHeight(`rem(27.5)),
+                  marginLeft(`rem(1.5625)),
+                  marginRight(`rem(1.5625)),
+                ],
+              ),
             ])
           )>
           <div className=Css.(style([display(`flex), flexDirection(`row)]))>
@@ -51,16 +63,7 @@ module Member = {
               )>
               <div
                 className=Css.(
-                  merge([
-                    Style.H3.wide,
-                    style([
-                      letterSpacing(`em(0.2)),
-                      media(
-                        Style.MediaQuery.notMobile,
-                        [letterSpacing(`em(0.25))],
-                      ),
-                    ]),
-                  ])
+                  merge([Style.H3.wide, style([letterSpacing(`em(0.2))])])
                 )>
                 {ReasonReact.string(name)}
               </div>
@@ -148,8 +151,6 @@ let make = _children => {
             marginLeft(`auto),
             marginRight(`auto),
             justifyContent(`center),
-            marginLeft(`rem(-1.5625)),
-            marginRight(`rem(-1.5625)),
           ])
         )>
         <Member
@@ -350,8 +351,6 @@ let make = _children => {
             marginLeft(`auto),
             marginRight(`auto),
             justifyContent(`center),
-            marginLeft(`rem(-1.5625)),
-            marginRight(`rem(-1.5625)),
           ])
         )>
         <Member

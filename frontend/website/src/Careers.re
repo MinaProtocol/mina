@@ -6,7 +6,10 @@ module ApplyItem = {
       <li className="list lh-copy">
         <a
           href={"/jobs/" ++ filename ++ ".html"}
-          className="f5 dodgerblue fw5 no-underline hover-link">
+          className={
+            "f5 dodgerblue fw5 no-underline "
+            ++ Css.(style([hover([color(Style.Colors.hyperlinkHover)])]))
+          }>
           {ReasonReact.string(name)}
         </a>
       </li>,
@@ -187,7 +190,7 @@ let make = (~jobOpenings, _) => {
     <div>
       <div className="mw960 pv3 center ph3 ibmplex oceanblack">
         <h1
-          className="fadedblue aktivgroteskex careers-double-line-header ttu f5 fw5 tracked-more mb4">
+          className="fadedblue aktivgroteskex careers-double-line-header ttu f5 fw5 tracked-more mb4 nowrap">
           {ReasonReact.string("Work with us!")}
         </h1>
         <div>
@@ -219,11 +222,18 @@ let make = (~jobOpenings, _) => {
             <div className="mt45">
               <HeadingItem title="Open Source">
                 {ReasonReact.string(
-                   {js|We passionately believe in the open-source philosophy, and make our software free for the entire world to\u00A0use.|js},
+                   {js|We passionately believe in the open-source philosophy, and make our software free for the entire world to\u00A0use. |js},
                  )}
                 <a
-                  href="/static/code.html"
-                  className="dodgerblue fw5 no-underline hover-link nowrap">
+                  href="/code.html"
+                  className={
+                    "dodgerblue fw5 no-underline nowrap "
+                    ++ Css.(
+                         style([
+                           hover([color(Style.Colors.hyperlinkHover)]),
+                         ])
+                       )
+                  }>
                   {ReasonReact.string({js|Take a look →|js})}
                 </a>
               </HeadingItem>

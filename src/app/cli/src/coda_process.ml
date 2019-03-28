@@ -69,6 +69,10 @@ let get_nonce_exn (conn, proc, _) pk =
   Coda_worker.Connection.run_exn conn ~f:Coda_worker.functions.get_nonce
     ~arg:pk
 
+let root_length_exn (conn, proc, _) =
+  Coda_worker.Connection.run_exn conn ~f:Coda_worker.functions.root_length
+    ~arg:()
+
 let send_payment_exn (conn, proc, _) sk pk amount fee memo =
   Coda_worker.Connection.run_exn conn ~f:Coda_worker.functions.send_payment
     ~arg:(sk, pk, amount, fee, memo)
@@ -81,10 +85,10 @@ let prove_receipt_exn (conn, proc, _) proving_receipt resulting_receipt =
   Coda_worker.Connection.run_exn conn ~f:Coda_worker.functions.prove_receipt
     ~arg:(proving_receipt, resulting_receipt)
 
-let strongest_ledgers_exn (conn, proc, _) =
+let verified_transitions_exn (conn, proc, _) =
   let%map r =
     Coda_worker.Connection.run_exn conn
-      ~f:Coda_worker.functions.strongest_ledgers ~arg:()
+      ~f:Coda_worker.functions.verified_transitions ~arg:()
   in
   Linear_pipe.wrap_reader r
 
@@ -100,3 +104,7 @@ let start_exn (conn, proc, _) =
 
 let dump_tf (conn, proc, _) =
   Coda_worker.Connection.run_exn conn ~f:Coda_worker.functions.dump_tf ~arg:()
+
+let best_path (conn, proc, _) =
+  Coda_worker.Connection.run_exn conn ~f:Coda_worker.functions.best_path
+    ~arg:()

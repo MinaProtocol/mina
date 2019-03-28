@@ -30,10 +30,20 @@ module Digest = struct
       module T = struct
         let version = 1
 
-        type t = string [@@deriving sexp, bin_io, compare, hash, yojson]
+        type t = string [@@deriving sexp, bin_io, compare, hash]
       end
 
       include T
+
+      let to_yojson s = `String (Base64.encode_string s)
+
+      let of_yojson = function
+        | `String s -> (
+          match Base64.decode s with
+          | Ok s -> Ok s
+          | Error (`Msg e) -> Error (sprintf "bad base64: %s" e) )
+        | _ -> Error "expected `String"
+
       include Comparable.Make (T)
       include Registration.Make_latest_version (T)
     end

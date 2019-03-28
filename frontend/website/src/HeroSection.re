@@ -19,40 +19,56 @@ module Copy = {
             media("(min-width: 30rem)", [minWidth(`rem(24.0))]),
           ])
         )>
-        <h1
+        <div
           className=Css.(
-            merge([
-              Style.H1.hero,
-              style([
-                color(Style.Colors.denimTwo),
-                marginTop(`rem(1.0)),
-                marginBottom(`zero),
-                media(Style.MediaQuery.full, [marginTop(`rem(1.5))]),
-              ]),
-            ])
+            style([media(Style.MediaQuery.full, [minWidth(`rem(25.5))])])
           )>
-          {ReasonReact.string(
-             "A cryptocurrency with a tiny, portable blockchain.",
-           )}
-        </h1>
-        <p
-          className=Css.(
-            merge([Style.Body.big, style([marginTop(`rem(2.0))])])
-          )>
-          <span>
+          <h1
+            className=Css.(
+              merge([
+                Style.H1.hero,
+                style([
+                  color(Style.Colors.denimTwo),
+                  marginTop(`zero),
+                  marginBottom(`zero),
+                  media(Style.MediaQuery.full, [marginTop(`rem(1.5))]),
+                ]),
+              ])
+            )>
             {ReasonReact.string(
-               "Coda is the first cryptocurrency with a succinct blockchain. Out lightweight blockchain means ",
+               "A cryptocurrency with a tiny, portable blockchain.",
              )}
-          </span>
-          <span className=Style.Body.big_semibold>
-            {ReasonReact.string("anyone can use Coda directly")}
-          </span>
-          <span>
-            {ReasonReact.string(
-               " from any device, in less data than a few tweets.",
-             )}
-          </span>
-        </p>
+          </h1>
+          <p
+            className=Css.(
+              merge([
+                Style.Body.big,
+                style([
+                  marginTop(`rem(2.0)),
+                  maxWidth(`rem(28.0)),
+                  // align with the grid
+                  media(
+                    Style.MediaQuery.full,
+                    [marginTop(`rem(1.75)), marginBottom(`rem(11.875))],
+                  ),
+                ]),
+              ])
+            )>
+            <span>
+              {ReasonReact.string(
+                 "Coda is the first cryptocurrency with a succinct blockchain. Our lightweight blockchain means ",
+               )}
+            </span>
+            <span className=Style.Body.big_semibold>
+              {ReasonReact.string("anyone can use Coda directly")}
+            </span>
+            <span>
+              {ReasonReact.string(
+                 " from any device, in less data than a few tweets.",
+               )}
+            </span>
+          </p>
+        </div>
       </div>,
   };
 };
@@ -60,7 +76,11 @@ module Copy = {
 module Graphic = {
   module Big = {
     let svg =
-      <Svg link="/static/img/hero-illustration.svg" dims=(13.9375, 33.375) />;
+      <Svg
+        className=Css.(style([marginTop(`rem(-0.625))]))
+        link="/static/img/hero-illustration.svg"
+        dims=(9.5625, 33.375)
+      />;
   };
 
   module Small = {
@@ -71,16 +91,28 @@ module Graphic = {
     let component =
       ReasonReact.statelessComponent("HeroSection.Graphic.Info");
 
-    let make = (~sizeEmphasis, ~name, ~size, ~label, ~textColor, children) => {
+    let make =
+        (
+          ~className="",
+          ~sizeEmphasis,
+          ~name,
+          ~size,
+          ~label,
+          ~textColor,
+          children,
+        ) => {
       ...component,
       render: _ =>
         <div
           className=Css.(
-            style([
-              display(`flex),
-              flexDirection(`column),
-              justifyContent(`flexEnd),
-              alignItems(`center),
+            merge([
+              className,
+              style([
+                display(`flex),
+                flexDirection(`column),
+                justifyContent(`flexEnd),
+                alignItems(`center),
+              ]),
             ])
           )>
           {children[0]}
@@ -93,7 +125,7 @@ module Graphic = {
                     color(textColor),
                     fontWeight(`medium),
                     marginTop(`rem(1.25)),
-                    marginBottom(`px(0)),
+                    marginBottom(`zero),
                   ]),
                 ])
               )>
@@ -105,8 +137,8 @@ module Graphic = {
                   Style.H3.basic,
                   style([
                     color(textColor),
-                    marginTop(`px(0)),
-                    marginBottom(`px(0)),
+                    marginTop(`zero),
+                    marginBottom(`zero),
                     fontWeight(sizeEmphasis ? `bold : `normal),
                   ]),
                 ])
@@ -114,15 +146,18 @@ module Graphic = {
               {ReasonReact.string(size)}
             </h3>
           </div>
-          <h4
+          <h5
             className=Css.(
               merge([
-                Style.H4.basic,
-                style([marginTop(`rem(1.5)), marginBottom(`px(0))]),
+                Style.H5.basic,
+                style([
+                  marginTop(`rem(1.125)),
+                  marginBottom(`rem(0.375)),
+                ]),
               ])
             )>
             {ReasonReact.string(label)}
-          </h4>
+          </h5>
         </div>,
     };
   };
@@ -150,14 +185,21 @@ module Graphic = {
               size="22kB"
               label="Fixed"
               textColor=Style.Colors.bluishGreen>
-              Small.svg
+              <Image
+                className={style([width(`rem(0.625))])}
+                name="/static/img/coda-icon"
+              />
             </Info>
             <Info
+              className={style([
+                marginRight(`rem(-1.5)),
+                media(Style.MediaQuery.full, [marginRight(`zero)]),
+              ])}
               sizeEmphasis=true
               name="Other blockchains"
               size="2TB+"
               label="Increasing"
-              textColor=Style.Colors.purpleBrown>
+              textColor=Style.Colors.rosebud>
               Big.svg
             </Info>
           </div>
@@ -174,10 +216,9 @@ let make = _ => {
       className=Css.(
         style([
           display(`flex),
-          marginTop(`rem(1.5)),
           justifyContent(`spaceAround),
           flexWrap(`wrap),
-          media(Style.MediaQuery.full, [marginTop(`rem(4.5))]),
+          media(Style.MediaQuery.full, [flexWrap(`nowrap)]),
         ])
       )>
       <Copy />

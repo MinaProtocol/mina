@@ -5,30 +5,62 @@ module Code = {
   let make = (~src, _children) => {
     ...component,
     render: _self =>
-      <pre
+      <div
         className=Css.(
-          style(
-            Style.paddingX(`rem(1.0))
-            @ Style.paddingY(`rem(1.0))
-            @ [
-              backgroundColor(Style.Colors.navy),
-              color(Style.Colors.white),
-              Style.Typeface.ibmplexsans,
-              fontSize(`rem(0.8125)),
-              borderRadius(`px(12)),
-              lineHeight(`rem(1.25)),
-              // nudge so code background looks nicer
-              marginRight(`rem(0.25)),
-              marginLeft(`rem(0.25)),
-            ],
-          )
+          style([
+            display(`block),
+            position(`relative),
+            media(Style.MediaQuery.veryLarge, [width(`percent(40.0))]),
+            // the "line"
+            before([
+              contentRule(""),
+              zIndex(-1),
+              display(`none),
+              media(
+                Style.MediaQuery.veryLarge,
+                [
+                  display(`block),
+                  position(`absolute),
+                  top(`percent(50.0)),
+                  left(`percent(10.5)), // determined experimentally
+                  width(`percent(100.0)),
+                  height(`rem(0.125)),
+                  backgroundColor(Style.Colors.blueBlue),
+                ],
+              ),
+            ]),
+          ])
         )>
-        {ReasonReact.string(src)}
-      </pre>,
+        <pre
+          className=Css.(
+            style(
+              Style.paddingX(`rem(1.0))
+              @ Style.paddingY(`rem(1.0))
+              @ [
+                backgroundColor(Style.Colors.navy),
+                color(Style.Colors.white),
+                Style.Typeface.ibmplexmono,
+                fontWeight(`medium),
+                fontSize(`rem(0.8125)),
+                borderRadius(`px(12)),
+                lineHeight(`rem(1.25)),
+                media(
+                  Style.MediaQuery.notMobile,
+                  [
+                    width(`rem(23.0)),
+                    // nudge so code background looks nicer
+                    marginRight(`rem(0.25)),
+                    marginLeft(`rem(0.25)),
+                  ],
+                ),
+              ],
+            )
+          )>
+          {ReasonReact.string(src)}
+        </pre>
+      </div>,
   };
 };
-
-let swapQuery = "(min-width: 70rem)";
 
 module ImageCollage = {
   let component =
@@ -44,7 +76,8 @@ module ImageCollage = {
               position(`relative),
               top(`zero),
               left(`zero),
-              media(swapQuery, [position(`static)]),
+              zIndex(-1),
+              media(Style.MediaQuery.veryLarge, [position(`static)]),
             ]),
           ])
         )>
@@ -72,10 +105,9 @@ module ImageCollage = {
               bottom(`zero),
               margin(`auto),
               maxWidth(`percent(100.0)),
-              media(swapQuery, [paddingLeft(`rem(4.))]),
             ])
           )
-          name="/static/img/build-illustration"
+          name="/static/img/centering-rectangle"
         />
         <Image
           className=Css.(
@@ -89,7 +121,7 @@ module ImageCollage = {
               maxWidth(`percent(100.0)),
             ])
           )
-          name="/static/img/coda"
+          name="/static/img/montage"
         />
       </div>,
   };
@@ -108,15 +140,23 @@ let make = _ => {
       )>
       <Title
         fontColor=Style.Colors.denimTwo
-        text="Build global cryptocurrency apps with Coda"
+        text={js|Build global cryptocurrency apps with\u00A0Coda|js}
       />
       <div
         className=Css.(
-          style([position(`relative), top(`zero), left(`zero)])
+          style([
+            position(`relative),
+            left(`zero),
+            top(`zero),
+            media(Style.MediaQuery.veryLarge, [top(`rem(-2.0))]),
+          ])
         )>
         <ImageCollage
           className=Css.(
-            style([display(`none), media(swapQuery, [display(`block)])])
+            style([
+              display(`none),
+              media(Style.MediaQuery.veryLarge, [display(`block)]),
+            ])
           )
         />
         <div
@@ -124,15 +164,19 @@ let make = _ => {
             style([
               display(`flex),
               flexWrap(`wrapReverse),
-              justifyContent(`spaceAround),
+              justifyContent(`spaceBetween),
               alignItems(`center),
               marginLeft(`auto),
               marginRight(`auto),
-              marginBottom(`rem(4.0)),
+              marginBottom(`rem(2.0)),
               maxWidth(`rem(78.0)),
+              media(
+                Style.MediaQuery.notMobile,
+                [justifyContent(`spaceAround)],
+              ),
               // vertically/horiz center absolutely
               media(
-                swapQuery,
+                Style.MediaQuery.veryLarge,
                 [
                   position(`absolute),
                   top(`percent(50.0)),
@@ -147,11 +191,12 @@ let make = _ => {
             ])
           )>
           <Code
-            src={|<script src="https://codaprotocol.com/api.js"></script>
+            src={|<script src="coda_api.js"></script>
 <script>
   onClick(button)
      .then(() => Coda.requestWallet())
-     .then((wallet) => Coda.sendTransaction(wallet, ...))
+     .then((wallet) =>
+       Coda.sendTransaction(wallet, ...))
 </script>|}
           />
           // This keeps the right hand text aligned with the inclusive app section.
@@ -161,7 +206,7 @@ let make = _ => {
                 width(`rem(middleElementWidthRems)),
                 height(`rem(0.)),
                 display(`none),
-                media(swapQuery, [display(`block)]),
+                media(Style.MediaQuery.veryLarge, [display(`block)]),
               ])
             )
           />
@@ -178,7 +223,7 @@ let make = _ => {
             style([
               display(`block),
               marginBottom(`rem(4.0)),
-              media(swapQuery, [display(`none)]),
+              media(Style.MediaQuery.veryLarge, [display(`none)]),
             ])
           )
         />

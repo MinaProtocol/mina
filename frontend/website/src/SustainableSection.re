@@ -9,7 +9,20 @@ let make = _children => {
           media(Style.MediaQuery.full, [marginTop(`rem(11.25))]),
         ])
       )>
-      <div className=Css.(style([width(`percent(100.0)), display(`flex)]))>
+      <div
+        className=Css.(
+          style([
+            width(`percent(100.0)),
+            media(
+              Style.MediaQuery.notMobile,
+              [
+                display(`flex),
+                justifyContent(`center),
+                width(`percent(100.0)),
+              ],
+            ),
+          ])
+        )>
         <h1
           className=Css.(
             merge([
@@ -18,7 +31,9 @@ let make = _children => {
                 color(Style.Colors.denimTwo),
                 position(`relative),
                 display(`inlineBlock),
-                margin(`auto),
+                marginTop(`zero),
+                marginBottom(`zero),
+                media(Style.MediaQuery.notSmallMobile, [margin(`auto)]),
                 media(Style.MediaQuery.full, [color(Style.Colors.clover)]),
               ]),
             ])
@@ -52,20 +67,40 @@ let make = _children => {
           style([
             marginTop(`rem(2.375)),
             display(`flex),
-            justifyContent(`spaceAround),
+            justifyContent(`spaceBetween),
             alignItems(`center),
             flexWrap(`wrapReverse),
             media(Style.MediaQuery.full, [marginTop(`rem(4.375))]),
+            media(
+              Style.MediaQuery.notMobile,
+              [justifyContent(`spaceAround)],
+            ),
           ])
         )>
-        <div className=Css.(style([marginBottom(`rem(2.375))]))>
+        <div
+          className=Css.(
+            style([
+              marginBottom(`rem(2.375)),
+              userSelect(`none),
+              marginRight(`rem(2.0)),
+              maxWidth(`rem(23.875)),
+            ])
+          )>
           <Svg
             link="/static/img/chart-blockchain-size.svg"
             dims=(23.125, 17.3125)
             inline=true
           />
         </div>
-        <div className=Css.(style([marginBottom(`rem(2.375))]))>
+        <div
+          className=Css.(
+            style([
+              marginBottom(`rem(2.375)),
+              userSelect(`none),
+              marginRight(`rem(2.0)),
+              maxWidth(`rem(23.125)),
+            ])
+          )>
           <Svg
             link="/static/img/chart-blockchain-energy.svg"
             dims=(23.9375, 18.1875)

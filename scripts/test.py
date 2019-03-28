@@ -11,13 +11,13 @@ from itertools import chain
 
 build_artifact_profiles = [
     'testnet_postake',
-    'testnet_postake_snarkless_fake_hash'
+    'testnet_postake_snarkless_fake_hash',
 ]
 
 unit_test_profiles = [
     'test_posig_snarkless',
     'test_postake_snarkless',
-    'dev'
+    'dev',
 ]
 
 simple_tests = [
@@ -31,8 +31,7 @@ integration_tests = [
     'coda-block-production-test',
     'coda-shared-prefix-test -who-proposes 0',
     'coda-shared-prefix-test -who-proposes 1',
-    'coda-shared-state-test',
-    'coda-restart-node-test'
+    'coda-restart-node-test',
 ]
 
 all_tests = simple_tests + integration_tests
@@ -42,11 +41,14 @@ test_permutations = {
     'test_posig_snarkless': all_tests,
     'test_postake_snarkless': simple_tests,
     'test_postake_split_snarkless': integration_tests,
-    'test_postake_split': ['coda-shared-prefix-multiproposer-test'],
+    'test_postake_split': ['coda-shared-prefix-multiproposer-test -num-proposers 2'],
     'test_posig': simple_tests,
     'test_postake': simple_tests,
     'test_postake_catchup': ['coda-restart-node-test'],
-    'test_postake_bootstrap' : ['coda-bootstrap-test']
+    'test_postake_bootstrap' : ['coda-bootstrap-test'],
+    'test_postake_txns': ['coda-shared-state-test'],
+    'test_postake_five_even_snarkless': ['coda-shared-prefix-multiproposer-test -num-proposers 5'],
+    'test_postake_five_even_txns': ['coda-shared-prefix-multiproposer-test -num-proposers 5 -payments'],
 }
 
 ci_blacklist = [
@@ -56,7 +58,7 @@ ci_blacklist = [
 
 # of all the generated CI jobs, allow these specific ones to fail (extra blacklist on top of ci_blacklist)
 required_blacklist = [
-
+    'test_postake_five_even_snarkless:*',
 ]
 
 # these extra jobs are not filters, they are full status check names

@@ -441,7 +441,8 @@ struct
     let rec find_path b =
       let elem = f b in
       let parent_hash = Breadcrumb.parent_hash b in
-      if State_hash.equal parent_hash t.root then [elem]
+      if State_hash.equal (Breadcrumb.state_hash b) t.root then []
+      else if State_hash.equal parent_hash t.root then [elem]
       else elem :: find_path (find_exn t parent_hash)
     in
     List.rev (find_path breadcrumb)
@@ -451,6 +452,8 @@ struct
   let iter t ~f = Hashtbl.iter t.table ~f:(fun n -> f n.breadcrumb)
 
   let root t = find_exn t t.root
+
+  let root_length t = (Hashtbl.find_exn t.table t.root).length
 
   let best_tip t = find_exn t t.best_tip
 
@@ -665,22 +668,62 @@ struct
   *)
   let add_breadcrumb_exn t breadcrumb =
     O1trace.measure "add_breadcrumb" (fun () ->
+        let consensus_state_of_breadcrumb b =
+          Breadcrumb.transition_with_hash b
+          |> With_hash.data
+          |> Inputs.External_transition.Verified.protocol_state
+          |> Inputs.External_transition.Protocol_state.consensus_state
+        in
         let hash =
           With_hash.hash (Breadcrumb.transition_with_hash breadcrumb)
         in
         let root_node = Hashtbl.find_exn t.table t.root in
         (* 1 *)
         attach_breadcrumb_exn t breadcrumb ;
+        let parent_hash = Breadcrumb.parent_hash breadcrumb in
+        let parent_node =
+          Option.value_exn
+            (Hashtbl.find t.table parent_hash)
+            ~error:
+              (Error.of_exn
+                 (Parent_not_found (`Parent parent_hash, `Target hash)))
+        in
+        Debug_assert.debug_assert (fun () ->
+            (* if the proof verified, then this should always hold*)
+            assert (
+              Consensus.select
+                ~existing:
+                  (consensus_state_of_breadcrumb parent_node.breadcrumb)
+                ~candidate:(consensus_state_of_breadcrumb breadcrumb)
+                ~logger:
+                  (Logger.create ()
+                     ~metadata:
+                       [ ( "selection context"
+                         , `String
+                             "debug_assert that child is preferred over parent"
+                         ) ])
+              = `Take ) ) ;
         let node = Hashtbl.find_exn t.table hash in
         (* 2 *)
         let distance_to_parent = node.length - root_node.length in
         let best_tip_node = Hashtbl.find_exn t.table t.best_tip in
         (* 3 *)
+        let best_tip_change =
+          Consensus.select
+            ~existing:(consensus_state_of_breadcrumb best_tip_node.breadcrumb)
+            ~candidate:(consensus_state_of_breadcrumb node.breadcrumb)
+            ~logger:
+              (Logger.create ()
+                 ~metadata:
+                   [ ( "selection context"
+                     , `String "comparing new breadcrumb to best tip" ) ])
+        in
         let added_to_best_tip_path, removed_from_best_tip_path =
-          if node.length > best_tip_node.length then (
-            t.best_tip <- hash ;
-            get_path_diff t breadcrumb best_tip_node.breadcrumb )
-          else ([], [])
+          match best_tip_change with
+          | `Keep -> ([], [])
+          | `Take ->
+              t.best_tip <- hash ;
+              get_path_diff t breadcrumb best_tip_node.breadcrumb
         in
         Logger.debug t.logger ~module_:__MODULE__ ~location:__LOC__
           "added %d breadcrumbs and removed %d making path to new best tip"
@@ -797,18 +840,19 @@ struct
         in
         (* 5 *)
         Extensions.handle_diff t.extensions t.extension_writers
-          ( if node.length > best_tip_node.length then
-            Transition_frontier_diff.New_best_tip
-              { old_root= root_node.breadcrumb
-              ; old_root_length= root_node.length
-              ; new_root= new_root_node.breadcrumb
-              ; added_to_best_tip_path=
-                  Non_empty_list.of_list_opt added_to_best_tip_path
-                  |> Option.value_exn
-              ; new_best_tip_length= node.length
-              ; removed_from_best_tip_path
-              ; garbage= garbage_breadcrumbs }
-          else Transition_frontier_diff.New_breadcrumb node.breadcrumb ) )
+          ( match best_tip_change with
+          | `Keep -> Transition_frontier_diff.New_breadcrumb node.breadcrumb
+          | `Take ->
+              Transition_frontier_diff.New_best_tip
+                { old_root= root_node.breadcrumb
+                ; old_root_length= root_node.length
+                ; new_root= new_root_node.breadcrumb
+                ; added_to_best_tip_path=
+                    Non_empty_list.of_list_opt added_to_best_tip_path
+                    |> Option.value_exn
+                ; new_best_tip_length= node.length
+                ; removed_from_best_tip_path
+                ; garbage= garbage_breadcrumbs } ) )
 
   let add_breadcrumb_if_present_exn t breadcrumb =
     let parent_hash = Breadcrumb.parent_hash breadcrumb in
