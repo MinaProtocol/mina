@@ -3,8 +3,9 @@ module Colors = {
   let white = Css.white;
   let whiteAlpha = a => `rgba((255, 255, 255, a));
   let hyperlink = `hsl((201, 71, 52));
+  let hyperlinkString = "hsl(201, 71%, 52%)";
   let hyperlinkAlpha = a => `hsla((201, 71, 52, a));
-  let hyperlinkHover = `hsl((201, 71, 70));
+  let hyperlinkHover = `hsl((201, 71, 40));
 
   let metallicBlue = `rgb((70, 99, 131));
   let denimTwo = `rgb((61, 88, 120));
@@ -187,11 +188,10 @@ module H3 = {
       lineHeight(`rem(1.5)),
     ]);
 
-  let wide =
+  let wideNoColor =
     style([
       whiteSpace(`nowrap),
       fontSize(`rem(1.0)),
-      color(Colors.fadedBlue),
       letterSpacing(`em(0.25)),
       Typeface.aktivgrotesk,
       fontWeight(`medium),
@@ -199,6 +199,8 @@ module H3 = {
       textAlign(`center),
       textTransform(`uppercase),
     ]);
+
+  let wide = merge([wideNoColor, style([color(Colors.fadedBlue)])]);
 
   let wings = {
     let wing = [
