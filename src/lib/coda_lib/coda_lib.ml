@@ -66,7 +66,9 @@ module type Network_intf = sig
   val glue_sync_ledger :
        t
     -> (ledger_hash * sync_ledger_query) Linear_pipe.Reader.t
-    -> (ledger_hash * sync_ledger_answer) Envelope.Incoming.t
+    -> ( ledger_hash
+       * sync_ledger_query
+       * sync_ledger_answer Envelope.Incoming.t )
        Linear_pipe.Writer.t
     -> unit
 
@@ -82,8 +84,7 @@ module type Network_intf = sig
                                          Deferred.t)
     -> answer_sync_ledger_query:(   (ledger_hash * sync_ledger_query)
                                     Envelope.Incoming.t
-                                 -> (ledger_hash * sync_ledger_answer)
-                                    Deferred.Or_error.t)
+                                 -> sync_ledger_answer Deferred.Or_error.t)
     -> transition_catchup:(   state_hash Envelope.Incoming.t
                            -> state_with_witness Non_empty_list.t
                               Deferred.Option.t)
@@ -307,7 +308,7 @@ module type Inputs_intf = sig
      and type time := Time.t
      and type state_hash := Coda_base.State_hash.t
      and type state_body_hash := State_body_hash.t
-     and type consensus_state := Consensus_mechanism.Consensus_state.value
+     and type consensus_state := Consensus_mechanism.Consensus_state.Value.t
      and type pending_coinbases := Pending_coinbase.t
 
   module Transition_router :
@@ -328,7 +329,7 @@ module type Inputs_intf = sig
      and type external_transition := External_transition.t
      and type proof_verified_external_transition :=
                 External_transition.Proof_verified.t
-     and type consensus_state := Consensus_mechanism.Consensus_state.value
+     and type consensus_state := Consensus_mechanism.Consensus_state.Value.t
      and type state_hash := Coda_base.State_hash.t
 
   module Proposer :
@@ -387,7 +388,7 @@ module Make (Inputs : Inputs_intf) = struct
     ; transaction_pool: Transaction_pool.t
     ; snark_pool: Snark_pool.t
     ; transition_frontier: Transition_frontier.t option Broadcast_pipe.Reader.t
-    ; strongest_ledgers:
+    ; verified_transitions:
         (External_transition.Verified.t, Protocol_state_hash.t) With_hash.t
         Strict_pipe.Reader.t
     ; proposer_transition_writer:
@@ -423,6 +424,11 @@ module Make (Inputs : Inputs_intf) = struct
     let%map frontier = Broadcast_pipe.Reader.peek t.transition_frontier in
     Transition_frontier.best_tip frontier
 
+  let root_length_opt t =
+    let open Option.Let_syntax in
+    let%map frontier = Broadcast_pipe.Reader.peek t.transition_frontier in
+    Transition_frontier.root_length frontier
+
   let best_staged_ledger_opt t =
     let open Option.Let_syntax in
     let%map tip = best_tip_opt t in
@@ -445,6 +451,8 @@ module Make (Inputs : Inputs_intf) = struct
       f
 
   let best_tip = compose_of_option best_tip_opt
+
+  let root_length = compose_of_option root_length_opt
 
   let visualize_frontier ~filename =
     compose_of_option
@@ -498,7 +506,35 @@ module Make (Inputs : Inputs_intf) = struct
     let%bind sl = best_staged_ledger_opt t in
     Staged_ledger.current_ledger_proof sl
 
-  let strongest_ledgers t = t.strongest_ledgers
+  let verified_transitions t = t.verified_transitions
+
+  let root_diff t =
+    let root_diff_reader, root_diff_writer =
+      Strict_pipe.create (Buffered (`Capacity 10, `Overflow Crash))
+    in
+    don't_wait_for
+      (Broadcast_pipe.Reader.iter t.transition_frontier ~f:(function
+        | None -> Deferred.unit
+        | Some frontier ->
+            Broadcast_pipe.Reader.iter
+              (Transition_frontier.root_diff_pipe frontier)
+              ~f:(fun root_diff ->
+                Strict_pipe.Writer.write root_diff_writer root_diff
+                |> Deferred.return ) )) ;
+    root_diff_reader
+
+  let dump_tf t =
+    peek_frontier t.transition_frontier
+    |> Or_error.map ~f:Transition_frontier.visualize_to_string
+
+  (** The [best_path coda] is the list of state hashes from the root to the best_tip in the transition frontier. It includes the root hash and the hash *)
+  let best_path t =
+    let open Option.Let_syntax in
+    let%map tf = Broadcast_pipe.Reader.peek t.transition_frontier in
+    let bt = Transition_frontier.best_tip tf in
+    List.cons
+      Transition_frontier.(root tf |> Breadcrumb.state_hash)
+      (Transition_frontier.hash_path tf bt)
 
   module Config = struct
     (** If ledger_db_location is None, will auto-generate a db based on a UUID *)
@@ -615,23 +651,20 @@ module Make (Inputs : Inputs_intf) = struct
                   failwith "shouldn't be necessary right now?" )
                 ~answer_sync_ledger_query:(fun query_env ->
                   let open Or_error.Let_syntax in
-                  let result =
-                    let ledger_hash, query =
-                      Envelope.Incoming.data query_env
-                    in
-                    let%bind frontier =
-                      peek_frontier frontier_broadcast_pipe_r
-                    in
-                    Sync_handler.answer_query ~frontier ledger_hash query
-                      ~logger:config.logger
-                    |> Result.of_option
-                         ~error:
-                           (Error.createf
-                              !"Could not answer query for ledger_hash: \
-                                %{sexp:Ledger_hash.t}"
-                              ledger_hash)
+                  Deferred.return
+                  @@
+                  let ledger_hash, query = Envelope.Incoming.data query_env in
+                  let%bind frontier =
+                    peek_frontier frontier_broadcast_pipe_r
                   in
-                  result |> Deferred.return )
+                  Sync_handler.answer_query ~frontier ledger_hash query
+                    ~logger:config.logger
+                  |> Result.of_option
+                       ~error:
+                         (Error.createf
+                            !"Could not answer query for ledger_hash: \
+                              %{sexp:Ledger_hash.t}"
+                            ledger_hash) )
                 ~transition_catchup:(fun enveloped_hash ->
                   let open Deferred.Option.Let_syntax in
                   let hash = Envelope.Incoming.data enveloped_hash in
@@ -726,7 +759,7 @@ module Make (Inputs : Inputs_intf) = struct
               ; time_controller= config.time_controller
               ; external_transitions_writer=
                   Strict_pipe.Writer.to_linear_pipe external_transitions_writer
-              ; strongest_ledgers= valid_transitions_for_api
+              ; verified_transitions= valid_transitions_for_api
               ; logger= config.logger
               ; seen_jobs= Work_selector.State.init
               ; staged_ledger_transition_backup_capacity=

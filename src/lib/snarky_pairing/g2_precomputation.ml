@@ -173,7 +173,7 @@ struct
              res
            in
            let%map ry =
-             (* 
+             (*
            ry = c.gamma * (s.rx - rx) - s.ry
            ry + s.ry = c.gamma * (s.rx - rx)
         *)

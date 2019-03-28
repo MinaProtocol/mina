@@ -11,38 +11,38 @@ end
 (* no bin_io on purpose *)
 type 'a t = 'a Stable.Latest.t [@@deriving sexp, compare, eq, hash]
 
-val init : 'a -> 'a list -> 'a t
 (** Create a non-empty list by proving you have a head element *)
+val init : 'a -> 'a list -> 'a t
 
-val singleton : 'a -> 'a t
 (** Create a non-empty list with a single element *)
+val singleton : 'a -> 'a t
 
-val uncons : 'a t -> 'a * 'a list
 (** Deconstruct a non-empty list into the head and tail *)
+val uncons : 'a t -> 'a * 'a list
 
-val cons : 'a -> 'a t -> 'a t
 (** Prepend a new element *)
+val cons : 'a -> 'a t -> 'a t
 
-val head : 'a t -> 'a
 (** The first element of the container *)
+val head : 'a t -> 'a
 
-val tail : 'a t -> 'a list
 (** The zero or more tail elements of the container *)
+val tail : 'a t -> 'a list
 
 val last : 'a t -> 'a
 
-val rev : 'a t -> 'a t
 (** The reverse ordered list *)
+val rev : 'a t -> 'a t
 
-val of_list_opt : 'a list -> 'a t option
 (** Convert a list into a non-empty-list, returning [None] if the list is
  * empty *)
+val of_list_opt : 'a list -> 'a t option
 
-val tail_opt : 'a t -> 'a t option
 (** Get the tail as a non-empty-list *)
+val tail_opt : 'a t -> 'a t option
 
-val map : 'a t -> f:('a -> 'b) -> 'b t
 (** Apply a function to each element of the non empty list *)
+val map : 'a t -> f:('a -> 'b) -> 'b t
 
 (* The following functions are computed from {!module:Base.Container.Make}. See
  * {!modtype:Base.Container_intf} for more information *)
@@ -57,8 +57,8 @@ val iter : 'a t -> f:('a -> unit) -> unit
 
 val length : 'a t -> int
 
-val to_list : 'a t -> 'a list
 (** Note: This is O(1) not O(n) like on most container *)
+val to_list : 'a t -> 'a list
 
 val append : 'a t -> 'a t -> 'a t
 

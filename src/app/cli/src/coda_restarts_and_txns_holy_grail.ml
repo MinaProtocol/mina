@@ -20,31 +20,23 @@ let main n () =
       Protocols.Coda_pow.Work_selection.Seq
   in
   (* SEND TXNS *)
-  let sender_sk =
-    Option.value_exn (Genesis_ledger.largest_account_exn () |> fst)
+  let keypairs =
+    List.map Genesis_ledger.accounts
+      ~f:Genesis_ledger.keypair_of_account_record_exn
   in
-  let receiver_pk =
-    Genesis_ledger.largest_account_exn () |> snd |> Account.public_key
-  in
-  don't_wait_for
-  @@ Coda_worker_testnet.Payments.send_several_payments testnet ~node:0
-       ~src:sender_sk ~dest:receiver_pk ;
+  Coda_worker_testnet.Payments.send_several_payments testnet ~node:0 ~keypairs
+    ~n:3
+  |> don't_wait_for ;
   (* RESTART NODES *)
   (* catchup *)
   let idx = Quickcheck.random_value (Int.gen_incl 1 (n - 1)) in
   let%bind () =
-    Coda_worker_testnet.Restarts.trigger_catchup testnet
-      ~largest_account_keypair:(Genesis_ledger.largest_account_keypair_exn ())
-      ~logger ~node:idx
-      ~payment_receiver:(n - 1 - idx)
+    Coda_worker_testnet.Restarts.trigger_catchup testnet ~logger ~node:idx
   in
   (* bootstrap *)
   let idx = Quickcheck.random_value (Int.gen_incl 1 (n - 1)) in
   let%bind () =
-    Coda_worker_testnet.Restarts.trigger_bootstrap testnet
-      ~largest_account_keypair:(Genesis_ledger.largest_account_keypair_exn ())
-      ~logger ~node:idx
-      ~payment_receiver:(n - 1 - idx)
+    Coda_worker_testnet.Restarts.trigger_bootstrap testnet ~logger ~node:idx
   in
   (* random *)
   let idx = Quickcheck.random_value (Int.gen_incl 1 (n - 1)) in
@@ -55,7 +47,7 @@ let main n () =
   in
   let%bind () =
     Coda_worker_testnet.Restarts.restart_node testnet ~logger ~node:idx
-      ~action:(Fn.const Deferred.unit) ~duration
+      ~duration
   in
   (* settle for a few more min *)
   (* TODO: Make sure to check that catchup actually worked *)

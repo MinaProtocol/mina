@@ -1,31 +1,25 @@
 // Nav styles adapted from https://medium.com/creative-technology-concepts-code/responsive-mobile-dropdown-navigation-using-css-only-7218e4498a99
 
-module Style = {
+module NavStyle = {
   open Css;
   open Style;
 
   module MediaQuery = {
-    let menu = "(min-width: 58rem)";
+    let menu = "(min-width: 62rem)";
+    let menuMax = "(max-width: 62rem)";
     let statusLift = "(min-width: 38rem)";
   };
+  let bottomNudge = Css.marginBottom(`rem(2.25));
 
-  let item =
-    merge([
-      style(
-        paddingX(`rem(0.75))
-        @ paddingY(`rem(1.0))
-        @ [listStyle(`none, `inside, `none)],
-      ),
-    ]);
-
-  let options =
+  let collapsedMenuItems =
     style([
-      // hidden on mobile by default
+      marginTop(`zero),
+      bottomNudge,
       display(`none),
       // when it's not hidden, make the dropdown appear
       position(`absolute),
-      right(`rem(0.0)),
-      top(`rem(2.0)),
+      right(`rem(1.0)),
+      top(`rem(0.0)),
       backgroundColor(Colors.white),
       // always visible and flexed on full
       media(
@@ -34,64 +28,130 @@ module Style = {
           display(`flex),
           justifyContent(`spaceBetween),
           position(`static),
+          alignItems(`center),
           width(`percent(100.0)),
         ],
       ),
     ]);
 
-  let menuBtn =
-    style([
-      display(`none),
-      selector({j|:checked ~ .$options|j}, [display(`block)]),
-    ]);
+  let triangle = (c, offset) => [
+    unsafe("content", ""),
+    width(`zero),
+    height(`zero),
+    position(`absolute),
+    borderLeft(`px(4 + offset), `solid, c),
+    borderRight(`px(4 + offset), `solid, transparent),
+    borderTop(`px(4 + offset), `solid, c),
+    borderBottom(`px(4 + offset), `solid, transparent),
+    right(`px(15 - offset)),
+    top(`px((-3) - offset)),
+    transforms([`rotate(`deg(45))]),
+    media(MediaQuery.menu, [display(`none)]),
+  ];
 
-  let menuIcon =
-    style([
-      cursor(`pointer),
-      display(`flex),
-      justifyContent(`flexEnd),
-      position(`relative),
-      userSelect(`none),
-      // The menu is always shown on full-size
-      media(MediaQuery.menu, [display(`none)]),
-    ]);
-
-  let menuText =
+  let expandedMenuItems =
     merge([
-      style([marginLeft(`rem(1.0)), ...paddingY(`rem(1.0))]),
-      Link.style,
-    ]);
-
-  let nav =
-    style([
-      display(`flex),
-      justifyContent(`spaceBetween),
-      alignItems(`center),
-      flexWrap(`wrap),
-      media(MediaQuery.statusLift, [flexWrap(`nowrap)]),
-    ]);
-};
-open Style;
-
-module Logo = {
-  let svg =
-    <svg className=Css.(style([width(`rem(7.125)), height(`rem(1.25))]))>
-      <image xlinkHref="/static/img/new-logo.svg" width="114" height="20" />
-    </svg>;
-};
-
-module Testnet = {
-  open Css;
-
-  module Placeholder = {
-    let style =
+      collapsedMenuItems,
       style([
-        backgroundColor(`rgba((45, 158, 219, 0.1))),
-        width(`percent(100.0)),
-        height(`px(40)),
-        margin(`auto),
-        media(MediaQuery.statusLift, [width(`px(341))]),
-      ]);
+        media(
+          // Make expanded menu not show up on a wide screen
+          MediaQuery.menuMax,
+          [
+            border(`px(1), `solid, Style.Colors.hyperlinkHover),
+            boxShadow(
+              ~x=`zero,
+              ~y=`zero,
+              ~blur=`px(12),
+              ~spread=`zero,
+              `rgba((0, 0, 0, 0.12)),
+            ),
+            borderRadius(`px(10)),
+            paddingLeft(`rem(0.5)),
+            marginTop(`rem(2.)),
+            marginRight(`rem(-0.6)),
+            display(`flex),
+            maxWidth(`rem(10.)),
+            flexDirection(`column),
+            alignItems(`flexStart),
+            before(
+              triangle(Style.Colors.hyperlinkHover, 1)
+              @ [
+                boxShadow(
+                  ~x=`zero,
+                  ~y=`zero,
+                  ~blur=`px(12),
+                  ~spread=`zero,
+                  `rgba((0, 0, 0, 0.12)),
+                ),
+                zIndex(-10),
+              ],
+            ),
+            after(triangle(white, 0) @ []),
+          ],
+        ),
+      ]),
+    ]);
+};
+
+module DropdownMenu = {
+  let component = ReasonReact.statelessComponent("Nav.DropdownMenu");
+  let make = children => {
+    ...component,
+    render: _self => {
+      <>
+        <button
+          className=Css.(
+            merge([
+              Style.Link.basic,
+              style([
+                NavStyle.bottomNudge,
+                marginLeft(`rem(1.0)),
+                border(`zero, `solid, `transparent),
+                cursor(`pointer),
+                display(`flex),
+                justifyContent(`flexEnd),
+                position(`relative),
+                userSelect(`none),
+                backgroundColor(`transparent),
+                outline(`zero, `none, `transparent),
+                focus([color(Style.Colors.hyperlinkHover)]),
+                // The menu is always shown on full-size
+                media(NavStyle.MediaQuery.menu, [display(`none)]),
+              ]),
+            ])
+          )
+          id="nav-menu-btn">
+          {ReasonReact.string("Menu")}
+        </button>
+        <ul id="nav-menu" className=NavStyle.collapsedMenuItems>
+          ...children
+        </ul>
+        <RunScript>
+          {Printf.sprintf(
+             {|
+              var menuState = false;
+              var menuBtn = document.getElementById("nav-menu-btn");
+              function setMenuOpen(open) {
+                menuState = open;
+                document.getElementById("nav-menu").className =
+                  (open ? "%s" : "%s");
+              };
+
+              document.onclick = (e) => {
+                if (e.target != menuBtn) {
+                  var previousState = menuState;
+                  setMenuOpen(false);
+                }
+              };
+
+              menuBtn.onclick = () => setMenuOpen(!menuState);
+            |},
+             NavStyle.expandedMenuItems,
+             NavStyle.collapsedMenuItems,
+           )}
+        </RunScript>
+      </>;
+    },
   };
 };
 
@@ -100,54 +160,90 @@ let make = children => {
   ...component,
   render: _self => {
     let items =
-      children |> Array.map(elem => <li className=Style.item> elem </li>);
+      children
+      |> Array.map(elem =>
+           <li
+             className=Css.(
+               style(
+                 Style.paddingX(`rem(0.75))
+                 @ Style.paddingY(`rem(0.5))
+                 @ [listStyle(`none, `inside, `none)],
+               )
+             )>
+             elem
+           </li>
+         );
 
-    <nav className=Style.nav>
+    <nav
+      className=Css.(
+        style([
+          display(`flex),
+          justifyContent(`spaceBetween),
+          alignItems(`flexEnd),
+          flexWrap(`wrap),
+          media(
+            NavStyle.MediaQuery.statusLift,
+            [flexWrap(`nowrap), alignItems(`center)],
+          ),
+        ])
+      )>
       <a
         href="/"
         className=Css.(
           style([
             display(`block),
+            NavStyle.bottomNudge,
             width(`percent(50.0)),
             media(
-              MediaQuery.statusLift,
+              NavStyle.MediaQuery.statusLift,
               [width(`auto), marginRight(`rem(0.75))],
             ),
           ])
         )>
-        Logo.svg
+        <Image className="" name="/static/img/coda-logo" />
       </a>
       <div
         className=Css.(
           style([
             order(3),
             width(`percent(100.0)),
-            media(MediaQuery.statusLift, [order(2), width(`auto)]),
-            media(MediaQuery.menu, [width(`percent(40.0))]),
+            NavStyle.bottomNudge,
+            marginLeft(`rem(-0.125)), // nudge left for optical alignment
+            media(
+              NavStyle.MediaQuery.statusLift,
+              [order(2), width(`auto), marginLeft(`zero)],
+            ),
+            media(NavStyle.MediaQuery.menu, [width(`percent(40.0))]),
           ])
         )>
-        <div className=Testnet.Placeholder.style />
+        <div
+          className=Css.(
+            style([
+              width(`rem(21.25)),
+              media(
+                NavStyle.MediaQuery.statusLift,
+                [width(`rem(21.25)), margin(`auto)],
+              ),
+            ])
+          )>
+          <AnnouncementBar />
+        </div>
       </div>
       <div
         className=Css.(
           style([
+            position(`relative),
             width(`auto),
             order(2),
-            media(MediaQuery.statusLift, [order(3), width(`auto)]),
-            media(MediaQuery.menu, [width(`percent(50.0))]),
+            media(
+              NavStyle.MediaQuery.statusLift,
+              [order(3), width(`auto)],
+            ),
+            media(NavStyle.MediaQuery.menu, [width(`percent(50.0))]),
           ])
         )>
-        /* we use the input to get a :checked pseudo selector
-         * that we can use to get on-click without javascript at runtime */
-
-          <input className=Style.menuBtn type_="checkbox" id="nav-menu-btn" />
-          <label className=Style.menuIcon htmlFor="nav-menu-btn">
-            <span className=Style.menuText>
-              {ReasonReact.string("Menu")}
-            </span>
-          </label>
-          <ul className=Style.options> ...items </ul>
-        </div>
+        <DropdownMenu> ...items </DropdownMenu>
+      </div>
     </nav>;
   },
 };

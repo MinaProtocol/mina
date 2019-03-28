@@ -55,3 +55,5 @@ let pending_coinbases = create "PendingCoinbases"
 let coinbase_stack = create "CoinbaseStack"
 
 let coinbase = create "Coinbase"
+
+let checkpoint_list = create "CodaCheckpoints"

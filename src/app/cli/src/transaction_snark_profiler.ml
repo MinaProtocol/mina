@@ -100,7 +100,7 @@ let rec pair_up = function
 (* This gives the "wall-clock time" to snarkify the given list of transactions, assuming
    unbounded parallelism. *)
 let profile (module T : Transaction_snark.S) sparse_ledger0
-    (transitions : Transaction.t list) =
+    (transitions : Transaction.t list) preeval =
   let (base_proof_time, _), base_proofs =
     List.fold_map transitions ~init:(Time.Span.zero, sparse_ledger0)
       ~f:(fun (max_span, sparse_ledger) t ->
@@ -114,7 +114,7 @@ let profile (module T : Transaction_snark.S) sparse_ledger0
         in
         let span, proof =
           time (fun () ->
-              T.of_transaction ~sok_digest:Sok_message.Digest.default
+              T.of_transaction ?preeval ~sok_digest:Sok_message.Digest.default
                 ~source:(Sparse_ledger.merkle_root sparse_ledger)
                 ~target:(Sparse_ledger.merkle_root sparse_ledger')
                 ~pending_coinbase_stack_state:
@@ -144,7 +144,8 @@ let profile (module T : Transaction_snark.S) sparse_ledger0
   let total_time = merge_all base_proof_time base_proofs in
   Printf.sprintf !"Total time was: %{Time.Span}" total_time
 
-let check_base_snarks sparse_ledger0 (transitions : Transaction.t list) =
+let check_base_snarks sparse_ledger0 (transitions : Transaction.t list) preeval
+    =
   let _ =
     let sok_message =
       Sok_message.create ~fee:Currency.Fee.zero
@@ -155,13 +156,18 @@ let check_base_snarks sparse_ledger0 (transitions : Transaction.t list) =
         let sparse_ledger' =
           Sparse_ledger.apply_transaction_exn sparse_ledger t
         in
+        let coinbase_stack_target =
+          match t with
+          | Coinbase c -> Pending_coinbase.(Stack.push Stack.empty c)
+          | _ -> Pending_coinbase.Stack.empty
+        in
         let () =
-          Transaction_snark.check_transaction ~sok_message
+          Transaction_snark.check_transaction ?preeval ~sok_message
             ~source:(Sparse_ledger.merkle_root sparse_ledger)
             ~target:(Sparse_ledger.merkle_root sparse_ledger')
             ~pending_coinbase_stack_state:
               { source= Pending_coinbase.Stack.empty
-              ; target= Pending_coinbase.Stack.empty }
+              ; target= coinbase_stack_target }
             t
             (unstage (Sparse_ledger.handler sparse_ledger))
         in
@@ -169,7 +175,38 @@ let check_base_snarks sparse_ledger0 (transitions : Transaction.t list) =
   in
   "Base constraint system satisfied"
 
-let run profiler num_transactions =
+let generate_base_snarks_witness sparse_ledger0
+    (transitions : Transaction.t list) preeval =
+  let _ =
+    let sok_message =
+      Sok_message.create ~fee:Currency.Fee.zero
+        ~prover:
+          Public_key.(compress (of_private_key_exn (Private_key.create ())))
+    in
+    List.fold transitions ~init:sparse_ledger0 ~f:(fun sparse_ledger t ->
+        let sparse_ledger' =
+          Sparse_ledger.apply_transaction_exn sparse_ledger t
+        in
+        let coinbase_stack_target =
+          match t with
+          | Coinbase c -> Pending_coinbase.(Stack.push Stack.empty c)
+          | _ -> Pending_coinbase.Stack.empty
+        in
+        let () =
+          Transaction_snark.generate_transaction_witness ?preeval ~sok_message
+            ~source:(Sparse_ledger.merkle_root sparse_ledger)
+            ~target:(Sparse_ledger.merkle_root sparse_ledger')
+            { Transaction_snark.Pending_coinbase_stack_state.source=
+                Pending_coinbase.Stack.empty
+            ; target= coinbase_stack_target }
+            t
+            (unstage (Sparse_ledger.handler sparse_ledger))
+        in
+        sparse_ledger' )
+  in
+  "Base constraint system satisfied"
+
+let run profiler num_transactions repeats preeval =
   let ledger, transitions = create_ledger_and_transactions num_transactions in
   let sparse_ledger =
     Coda_base.Sparse_ledger.of_ledger_subset_exn ledger
@@ -183,22 +220,28 @@ let run profiler num_transactions =
            | Coinbase {proposer; fee_transfer} ->
                proposer :: Option.to_list (Option.map fee_transfer ~f:fst) ))
   in
-  let message = profiler sparse_ledger transitions in
-  Core.printf !"%s\n%!" message ;
+  for i = 1 to repeats do
+    let message = profiler sparse_ledger transitions preeval in
+    Core.printf !"[%i] %s\n%!" i message
+  done ;
   exit 0
 
-let main num_transactions () =
+let main num_transactions repeats preeval () =
   Snarky.Libsnark.set_no_profiling false ;
   Test_util.with_randomness 123456789 (fun () ->
       let keys = Transaction_snark.Keys.create () in
       let module T = Transaction_snark.Make (struct
         let keys = keys
       end) in
-      run (profile (module T)) num_transactions )
+      run (profile (module T)) num_transactions repeats preeval )
 
-let dry num_transactions () =
+let dry num_transactions repeats preeval () =
   Test_util.with_randomness 123456789 (fun () ->
-      run check_base_snarks num_transactions )
+      run check_base_snarks num_transactions repeats preeval )
+
+let witness num_transactions repeats preeval () =
+  Test_util.with_randomness 123456789 (fun () ->
+      run generate_base_snarks_witness num_transactions repeats preeval )
 
 let command =
   let open Command.Let_syntax in
@@ -206,14 +249,30 @@ let command =
     (let%map_open n =
        flag "k"
          ~doc:
-           "log_2(number of transactions to snark) or none for the mocked ones"
+           "count count = log_2(number of transactions to snark) or none for \
+            the mocked ones"
          (optional int)
+     and repeats =
+       flag "repeat" ~doc:"count number of times to repeat the profile"
+         (optional int)
+     and preeval =
+       flag "preeval"
+         ~doc:
+           "true/false whether to pre-evaluate the checked computation to \
+            cache interpreter and computation state"
+         (optional bool)
      and check_only =
        flag "check-only"
          ~doc:"Just check base snarks, don't keys or time anything" no_arg
+     and witness_only =
+       flag "witness-only"
+         ~doc:"Just generate the witnesses for the base snarks" no_arg
      in
      let num_transactions =
        Option.map n ~f:(fun n -> `Count (Int.pow 2 n))
        |> Option.value ~default:`Two_from_same
      in
-     if check_only then dry num_transactions else main num_transactions)
+     let repeats = Option.value repeats ~default:1 in
+     if witness_only then witness num_transactions repeats preeval
+     else if check_only then dry num_transactions repeats preeval
+     else main num_transactions repeats preeval)

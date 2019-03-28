@@ -22,7 +22,15 @@ module type Inputs_intf = sig
   end
 
   module Statement : sig
-    type t [@@deriving bin_io, sexp]
+    type t [@@deriving sexp]
+
+    module Stable :
+      sig
+        module V1 : sig
+          type t [@@deriving bin_io, sexp]
+        end
+      end
+      with type V1.t = t
   end
 
   module Pending_coinbase : sig

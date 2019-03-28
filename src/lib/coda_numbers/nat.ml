@@ -5,7 +5,7 @@ open Tuple_lib
 open Module_version
 
 module type S = sig
-  type t [@@deriving bin_io, sexp, compare, hash, yojson]
+  type t [@@deriving sexp, compare, hash, yojson]
 
   include Comparable.S with type t := t
 
@@ -18,6 +18,8 @@ module type S = sig
 
     module Latest = V1
   end
+
+  val length_in_bits : int
 
   val length_in_triples : int
 
@@ -102,7 +104,8 @@ struct
     module Registered_V1 = Registrar.Register (V1)
   end
 
-  include Stable.Latest
+  type t = Stable.Latest.t [@@deriving sexp, compare, hash, yojson]
+
   include Comparable.Make (Stable.Latest)
 
   include (N : module type of N with type t := t)

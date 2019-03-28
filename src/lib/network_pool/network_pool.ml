@@ -101,14 +101,38 @@ end
 
 let%test_module "network pool test" =
   ( module struct
+    module Int = struct
+      include Int
+
+      let to_yojson x = `Int x
+
+      let of_yojson = function `Int x -> Ok x | _ -> Error "expected `Int"
+    end
+
     module Mock_proof = struct
       type input = Int.t
 
-      type t = Int.t [@@deriving sexp, bin_io]
+      type t = Int.t [@@deriving sexp, bin_io, yojson]
 
       let verify _ _ = return true
 
       let gen = Int.gen
+    end
+
+    module Mock_work = struct
+      (* no bin_io except in Stable versions *)
+      module T = struct
+        type t = Int.t [@@deriving sexp, hash, compare, yojson]
+
+        let gen = Int.gen
+      end
+
+      include T
+      include Hashable.Make (T)
+
+      module Stable = struct
+        module V1 = Int
+      end
     end
 
     module Mock_transition_frontier = struct
@@ -117,7 +141,7 @@ let%test_module "network pool test" =
       let create () : t = 0
 
       module Extensions = struct
-        module Work = Int
+        module Work = Mock_work
       end
 
       let snark_pool_refcount_pipe _ =
@@ -128,9 +152,9 @@ let%test_module "network pool test" =
     end
 
     module Mock_fee = Int
-    module Mock_work = Int
     module Mock_snark_pool =
-      Snark_pool.Make (Mock_proof) (Mock_work) (Int) (Mock_transition_frontier)
+      Snark_pool.Make (Mock_proof) (Mock_fee) (Mock_work)
+        (Mock_transition_frontier)
     module Mock_snark_pool_diff =
       Snark_pool_diff.Make (Mock_proof) (Mock_fee) (Mock_work) (Int)
         (Mock_snark_pool)

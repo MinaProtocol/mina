@@ -63,7 +63,15 @@ module Stable = struct
   module Registered_V1 = Registrar.Register (V1)
 end
 
-include Stable.Latest
+(* bin_io omitted *)
+type t = Stable.Latest.t =
+  { host: Unix.Inet_addr.Blocking_sexp.t
+  ; discovery_port: int
+  ; communication_port: int }
+[@@deriving compare, hash, sexp]
+
+let of_yojson, to_yojson = Stable.Latest.(of_yojson, to_yojson)
+
 include Hashable.Make (Stable.Latest)
 include Comparable.Make_binable (Stable.Latest)
 

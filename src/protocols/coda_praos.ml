@@ -134,9 +134,9 @@ module type Slot_intf = sig
 
   val ( * ) : t -> t -> t
 
+  (** slot + (epoch_slots * inside_epoch) *)
   val true_slot_position :
     slot:t -> inside_epoch:epoch -> epoch_slots:int -> Int64.t
-  (** slot + (epoch_slots * inside_epoch) *)
 
   val increment : t -> t
 end
@@ -330,19 +330,19 @@ module type Inputs_intf = sig
   end
 
   module Validator : sig
-    val validate : State.t -> State.Proof.t -> bool Deferred.t
     (** This includes the State.Proof.t validation *)
+    val validate : State.t -> State.Proof.t -> bool Deferred.t
 
+    (** This invariant is only checked during tests, in production we just believe this happens *)
     val prefix_of :
          candidate_locked:State_hash.t
       -> curr_locked:State_hash.t
       -> bool Deferred.t
-    (** This invariant is only checked during tests, in production we just believe this happens *)
   end
 
   module State_history : sig
-    val ancestors : State.t -> State.t Sequence.t
     (** Lazy sequence sorted by slot number descending *)
+    val ancestors : State.t -> State.t Sequence.t
   end
 end
 

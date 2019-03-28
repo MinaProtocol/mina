@@ -14,7 +14,7 @@ let main () =
     Genesis_ledger.largest_account_keypair_exn ()
   in
   let n = 2 in
-  let proposers i = if i = 0 then Some i else None in
+  let proposers i = Some i in
   let snark_work_public_keys i =
     if i = 0 then Some (Public_key.compress largest_account_keypair.public_key)
     else None
@@ -25,12 +25,9 @@ let main () =
   in
   let%bind () =
     Coda_worker_testnet.Restarts.trigger_bootstrap testnet ~logger ~node:1
-      ~largest_account_keypair ~payment_receiver:0
   in
   let%bind () = after (Time.Span.of_sec 180.) in
-  let%map () = Coda_worker_testnet.Api.teardown testnet in
-  Logger.info logger ~module_:__MODULE__ ~location:__LOC__ "SUCCEEDED" ;
-  ()
+  Coda_worker_testnet.Api.teardown testnet
 
 let command =
   let open Command.Let_syntax in

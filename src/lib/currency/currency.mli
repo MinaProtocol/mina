@@ -7,7 +7,7 @@ open Tuple_lib
 type uint64 = Unsigned.uint64
 
 module type Basic = sig
-  type t [@@deriving bin_io, sexp, compare, hash, yojson]
+  type t [@@deriving sexp, compare, hash, yojson]
 
   val max_int : t
 

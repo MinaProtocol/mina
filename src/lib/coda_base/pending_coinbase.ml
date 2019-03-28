@@ -3,6 +3,7 @@ open Import
 open Snarky
 open Snark_params
 open Snark_params.Tick
+open Tuple_lib
 open Let_syntax
 open Currency
 open Fold_lib
@@ -13,36 +14,34 @@ let coinbase_tree_depth = Snark_params.pending_coinbase_depth
 let coinbase_stacks = Int.pow 2 coinbase_tree_depth
 
 module Coinbase_data = struct
-  type t = Public_key.Compressed.t * Amount.Signed.t [@@deriving bin_io, sexp]
+  type t = Public_key.Compressed.Stable.V1.t * Amount.Stable.V1.t
+  [@@deriving bin_io, sexp]
 
-  let of_coinbase (cb : Coinbase.t) : t =
-    (cb.proposer, Amount.Signed.of_unsigned cb.amount)
+  let of_coinbase (cb : Coinbase.t) : t = (cb.proposer, cb.amount)
 
-  type var = Public_key.Compressed.var * Amount.Signed.var
+  type var = Public_key.Compressed.var * Amount.var
 
   type value = t [@@deriving bin_io, sexp]
 
   let length_in_triples =
-    Public_key.Compressed.length_in_triples + Amount.Signed.length_in_triples
+    Public_key.Compressed.length_in_triples + Amount.length_in_triples
 
   let var_of_t ((public_key, amount) : value) =
-    ( Public_key.Compressed.var_of_t public_key
-    , Amount.Signed.Checked.of_unsigned @@ Amount.var_of_t
-      @@ Amount.Signed.magnitude amount )
+    (Public_key.Compressed.var_of_t public_key, Amount.var_of_t amount)
 
   let var_to_triples (public_key, amount) =
     let%map public_key = Public_key.Compressed.var_to_triples public_key in
-    let amount = Amount.Signed.Checked.to_triples amount in
+    let amount = Amount.var_to_triples amount in
     public_key @ amount
 
   let fold ((public_key, amount) : t) =
     let open Fold in
-    Public_key.Compressed.fold public_key +> Amount.Signed.fold amount
+    Public_key.Compressed.fold public_key +> Amount.fold amount
 
   let typ : (var, value) Typ.t =
     let spec =
       let open Data_spec in
-      [Public_key.Compressed.typ; Amount.Signed.typ]
+      [Public_key.Compressed.typ; Amount.typ]
     in
     let of_hlist : 'a 'b. (unit, 'a -> 'b -> unit) H_list.t -> 'a * 'b =
       let open H_list in
@@ -52,7 +51,7 @@ module Coinbase_data = struct
     Typ.of_hlistable spec ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist
       ~value_to_hlist:to_hlist ~value_of_hlist:of_hlist
 
-  let empty = (Public_key.Compressed.empty, Amount.Signed.zero)
+  let empty = (Public_key.Compressed.empty, Amount.zero)
 
   let genesis = empty
 end
@@ -79,9 +78,71 @@ end = struct
     if t2 < t1 then Or_error.error_string "Stack_id overflow" else Ok t2
 end
 
+module type Data_hash_binable_intf = sig
+  type t [@@deriving bin_io, sexp, hash, compare, eq, yojson]
+
+  type var
+
+  val var_of_t : t -> var
+
+  val typ : (var, t) Typ.t
+
+  val var_to_triples : var -> (Boolean.var Triple.t list, _) Tick.Checked.t
+
+  val length_in_triples : int
+
+  val equal_var : var -> var -> (Boolean.var, _) Tick.Checked.t
+
+  val fold : t -> bool Triple.t Fold.t
+
+  val to_bytes : t -> string
+
+  val to_bits : t -> bool list
+
+  val gen : t Quickcheck.Generator.t
+end
+
+module Data_hash_binable = struct
+  module T = struct
+    include Data_hash.Make_full_size ()
+  end
+
+  include T.Stable.V1
+
+  type var = T.var
+
+  let ( var_to_hash_packed
+      , var_of_hash_packed
+      , typ
+      , var_of_t
+      , of_hash
+      , equal_var
+      , length_in_triples
+      , var_to_triples
+      , fold
+      , to_bytes
+      , to_bits
+      , if_
+      , gen ) =
+    T.
+      ( var_to_hash_packed
+      , var_of_hash_packed
+      , typ
+      , var_of_t
+      , of_hash
+      , equal_var
+      , length_in_triples
+      , var_to_triples
+      , fold
+      , to_bytes
+      , to_bits
+      , if_
+      , gen )
+end
+
 module Coinbase_stack = struct
   module Stack = struct
-    include Data_hash.Make_full_size ()
+    include Data_hash_binable
 
     let push (h : t) cb =
       let coinbase = Coinbase_data.of_coinbase cb in
@@ -133,7 +194,7 @@ end
 
 (*Pending coinbase hash*)
 module Hash = struct
-  include Data_hash.Make_full_size ()
+  include Data_hash_binable
 
   let merge ~height (h1 : t) (h2 : t) =
     let open Tick.Pedersen in
@@ -236,7 +297,6 @@ module T = struct
         (Merkle_tree.get_req ~depth (Hash.var_to_hash_packed t) addr)
         reraise_merkle_requests
 
-    (*TODO: change the argument (pk, amount) back to Coinbase_data.var after merging the coinbase-amount-to-unsigned pr *)
     let%snarkydef add_coinbase t (pk, amount) =
       let%bind addr =
         request_witness Address.typ
@@ -260,12 +320,11 @@ module T = struct
              let%bind amount2_equal_to_zero = equal_to_zero rem_amount in
              (*TODO:Optimize here since we are pushing twice to the same stack*)
              let%bind stack_with_amount1 =
-               Coinbase_stack.Stack.Checked.push stack
-                 (pk, Amount.Signed.Checked.of_unsigned amount)
+               Coinbase_stack.Stack.Checked.push stack (pk, amount)
              in
              let%bind stack_with_amount2 =
                Coinbase_stack.Stack.Checked.push stack_with_amount1
-                 (pk, Amount.Signed.Checked.of_unsigned rem_amount)
+                 (pk, rem_amount)
              in
              chain Stack.if_ amount1_equal_to_zero ~then_:(return stack)
                ~else_:

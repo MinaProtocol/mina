@@ -75,6 +75,11 @@ module Make (Consensus_mechanism : Consensus.S) :
               |> Blockchain_state.snarked_ledger_hash )
               ( transition |> Snark_transition.blockchain_state
               |> Blockchain_state.snarked_ledger_hash )
+          and supply_increase_is_zero =
+            Currency.Amount.(equal_var supply_increase (var_of_t zero))
+          in
+          let%bind nothing_changed =
+            Boolean.(ledger_hash_didn't_change && supply_increase_is_zero)
           in
           let%bind new_pending_coinbase_hash, deleted_stack =
             let%bind root_after_delete, deleted_stack =
@@ -111,7 +116,7 @@ module Make (Consensus_mechanism : Consensus.S) :
                     (Snark_transition.ledger_proof transition)))
           in
           let%bind correct_snark =
-            Boolean.(correct_transaction_snark || ledger_hash_didn't_change)
+            Boolean.(correct_transaction_snark || nothing_changed)
           in
           Boolean.all
             [correct_snark; updated_consensus_state; correct_coinbase_status]
