@@ -98,7 +98,7 @@ Router.(
       [|
         File(
           "index",
-          <Page name="index" footerColor=Style.Colors.gandalf>
+          <Page mainPage=true name="index" footerColor=Style.Colors.gandalf>
             <Home />
           </Page>,
         ),
