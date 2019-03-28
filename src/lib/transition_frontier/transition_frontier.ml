@@ -769,7 +769,16 @@ struct
             (* 4.IV *)
             let new_root_node = move_root t heir_node in
             (* 4.V *)
-            let garbage = List.bind bad_hashes ~f:(successor_hashes_rec t) in
+            let garbage =
+              bad_hashes @ List.bind bad_hashes ~f:(successor_hashes_rec t)
+            in
+            Logger.trace t.logger ~module_:__MODULE__ ~location:__LOC__
+              ~metadata:
+                [ ("garbage", `List (List.map garbage ~f:State_hash.to_yojson))
+                ; ("length_of_garbage", `Int (List.length garbage))
+                ; ( "bad_hashes"
+                  , `List (List.map bad_hashes ~f:State_hash.to_yojson) ) ]
+              "collecting $length_of_garbage nodes rooted from $bad_hashes" ;
             let garbage_breadcrumbs =
               List.map garbage ~f:(fun g ->
                   (Hashtbl.find_exn t.table g).breadcrumb )
