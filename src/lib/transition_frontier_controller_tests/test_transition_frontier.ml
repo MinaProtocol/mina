@@ -44,10 +44,14 @@ let%test_module "Root_history and Transition_frontier" =
                 Transition_frontier.add_breadcrumb_exn frontier ancestor )
           in
           let%bind branch1 =
-            create_breadcrumbs ~logger ~size:(max_length / 2) youngest_ancestor
+            create_breadcrumbs ~logger
+              ~size:(1 + Random.int ((max_length / 2) - 1))
+              youngest_ancestor
           in
           let%bind branch2 =
-            create_breadcrumbs ~logger ~size:(max_length / 2) youngest_ancestor
+            create_breadcrumbs ~logger
+              ~size:(1 + Random.int ((max_length / 2) - 1))
+              youngest_ancestor
           in
           let bc1, bc2 = (List.last_exn branch1, List.last_exn branch2) in
           let%map () =
