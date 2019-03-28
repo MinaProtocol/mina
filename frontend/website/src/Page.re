@@ -104,7 +104,7 @@ let make =
       ~name,
       ~extraHeaders=ReasonReact.null,
       ~footerColor=Style.Colors.white,
-      ~mainPage=false,
+      ~page,
       children,
     ) => {
   ...component,
@@ -153,7 +153,7 @@ let make =
                 media(Style.MediaQuery.full, [marginTop(`rem(2.0))]),
               ])
             )>
-            <CodaNav mainPage />
+            <CodaNav mainPage={page == `Home} />
           </div>
         </Wrapped>
         <main> ...children </main>

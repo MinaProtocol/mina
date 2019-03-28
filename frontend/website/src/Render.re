@@ -98,7 +98,7 @@ Router.(
       [|
         File(
           "index",
-          <Page mainPage=true name="index" footerColor=Style.Colors.gandalf>
+          <Page page=`Home name="index" footerColor=Style.Colors.gandalf>
             <Home />
           </Page>,
         ),
@@ -110,6 +110,7 @@ Router.(
                File(
                  name,
                  <Page
+                   page=`Blog
                    name
                    extraHeaders=Blog.extraHeaders
                    footerColor=Style.Colors.gandalf>
@@ -125,6 +126,7 @@ Router.(
                File(
                  name,
                  <Page
+                   page=`Jobs
                    name
                    footerColor=Style.Colors.gandalf
                    extraHeaders=Careers.extraHeaders>
@@ -137,35 +139,37 @@ Router.(
         ),
         File(
           "jobs",
-          <Page name="jobs" extraHeaders=Careers.extraHeaders>
+          <Page page=`Jobs name="jobs" extraHeaders=Careers.extraHeaders>
             <Wrapped> <Careers jobOpenings /> </Wrapped>
           </Page>,
         ),
         File(
           "code",
-          <Page name="code" extraHeaders=Code.extraHeaders>
+          <Page page=`Code name="code" extraHeaders=Code.extraHeaders>
             <Wrapped> <Code /> </Wrapped>
           </Page>,
         ),
         File(
           "testnet",
-          <Page name="testnet" extraHeaders=Testnet.extraHeaders>
+          <Page page=`Testnet name="testnet" extraHeaders=Testnet.extraHeaders>
             <Wrapped> <Testnet /> </Wrapped>
           </Page>,
         ),
         File(
           "blog",
-          <Page name="blog" extraHeaders=Blog.extraHeaders>
+          <Page page=`Blog name="blog" extraHeaders=Blog.extraHeaders>
             <Wrapped> <Blog posts /> </Wrapped>
           </Page>,
         ),
         File(
           "privacy",
-          <Page name="privacy"> <RawHtml path="html/Privacy.html" /> </Page>,
+          <Page page=`Privacy name="privacy">
+            <RawHtml path="html/Privacy.html" />
+          </Page>,
         ),
         File(
           "tos",
-          <Page name="tos"> <RawHtml path="html/TOS.html" /> </Page>,
+          <Page page=`Tos name="tos"> <RawHtml path="html/TOS.html" /> </Page>,
         ),
       |],
     ),
