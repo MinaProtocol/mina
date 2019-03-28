@@ -82,8 +82,16 @@ struct
         let version = 1
 
         (* TODO : will this type be versioned? *)
-        type t = Pedersen.Digest.t
-        [@@deriving bin_io, sexp, eq, compare, hash, yojson]
+        type t = Pedersen.Digest.t [@@deriving bin_io, sexp, eq, compare, hash]
+
+        type yojson = {value: Pedersen.Digest.t; logproc_interp: string}
+        [@@deriving yojson]
+
+        let to_yojson value =
+          yojson_to_yojson {value; logproc_interp= "data_hash"}
+
+        let of_yojson json =
+          Result.map ~f:(fun yojson -> yojson.value) (yojson_of_yojson json)
       end
 
       include T

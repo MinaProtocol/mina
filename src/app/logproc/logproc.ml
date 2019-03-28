@@ -52,10 +52,14 @@ let yojson_from_string_result str =
     print_string "exn!" ;
     Error (Exn.to_string exn)
 
-let process_line ~timezone ~interpolation_config ~filter line =
+let process_line ~timezone ~interpolation_config ~filter ~farm line =
   let open Result.Let_syntax in
   match
     let%bind json = yojson_from_string_result line in
+    let json =
+      if farm then Hashfarm.translate_json json
+      else Hashfarm.fix_data_hashes json
+    in
     let%map msg = Logger.Message.of_yojson json in
     (json, msg)
   with
@@ -65,7 +69,12 @@ let process_line ~timezone ~interpolation_config ~filter line =
         format_msg ~timezone ~interpolation_config msg
 
 (* TODO: check for common filter errors (e.g. invalid level provided) *)
-let main timezone_str interpolation_config filter_str =
+let main timezone_str interpolation_config filter_str farm name_value =
+  ( match name_value with
+  | Some hash ->
+      printf "%s\n" (Hashfarm.select_name hash) ;
+      exit 0
+  | None -> () ) ;
   let filter =
     if filter_str = "" then Result.ok_or_failwith (Filter.Parser.parse "true")
     else
@@ -87,7 +96,8 @@ let main timezone_str interpolation_config filter_str =
     else Time.Zone.of_string timezone_str
   in
   In_channel.(
-    iter_lines stdin ~f:(process_line ~timezone ~interpolation_config ~filter))
+    iter_lines stdin
+      ~f:(process_line ~timezone ~interpolation_config ~filter ~farm))
 
 let () =
   let open Cmdliner in
@@ -128,17 +138,23 @@ let () =
     Term.(
       const lift_interpolation_config
       $ interpolation_mode $ max_interpolation_length $ pretty_print)
-  in
-  let timezone =
+  and timezone =
     let doc = "Timezone to display timestamps in." in
     Arg.(value & opt string "" & info ["z"; "zone"] ~docv:"TIMEZONE" ~doc)
-  in
-  let filter =
+  and filter =
     let doc = "Filter displayed log lines." in
     Arg.(value & opt string "" & info ["f"; "filter"] ~docv:"FILTER" ~doc)
+  and farm =
+    let doc = "Give names to data_hash objects found in object metadata." in
+    Arg.(value & flag & info ["farm"] ~docv:"FARM" ~doc)
+  and name_value =
+    let doc = "Print out the name assigned to a data_hash" in
+    Arg.(
+      value & opt (some string) None & info ["name-value"] ~docv:"VALUE" ~doc)
   in
   let main_term =
-    Term.(const main $ timezone $ interpolation_config $ filter)
+    Term.(
+      const main $ timezone $ interpolation_config $ filter $ farm $ name_value)
   in
   let main_info =
     let doc = "Process coda log statements from standard input" in
