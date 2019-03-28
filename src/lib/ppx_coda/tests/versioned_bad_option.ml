@@ -3,8 +3,8 @@ module Foo = struct
     module Stable = struct
       module V1 = struct
         module T = struct
-          (* "versioned" with invalid option *)
-          type t [@@deriving yojson, bin_io, version {n= "not a number"}]
+          (* "version" with invalid option *)
+          type t [@@deriving yojson, bin_io, version {unwrapped}]
         end
       end
     end

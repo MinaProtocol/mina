@@ -17,6 +17,11 @@
   (preprocess (pps ppx_coda))
   (modules versioned_good))
 
+(library
+  (name versioned_good_wrapped)
+  (preprocess (pps ppx_coda))
+  (modules versioned_good_wrapped))
+
 ;;; should fail
 
 ;; expiration

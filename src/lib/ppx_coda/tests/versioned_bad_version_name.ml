@@ -4,7 +4,7 @@ module Foo = struct
       (* module name can't have 0 as first digit after V *)
       module V01 = struct
         module T = struct
-          type t [@@deriving version {n= 19}]
+          type t [@@deriving version]
         end
       end
     end
