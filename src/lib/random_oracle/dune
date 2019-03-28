@@ -9,4 +9,5 @@
     snarky_blake2
     coda_digestif
     snark_params
-    base64 ))
+    base64
+    module_version))

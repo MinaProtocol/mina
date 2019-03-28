@@ -29,7 +29,7 @@ module Copy = {
                 Style.H1.hero,
                 style([
                   color(Style.Colors.denimTwo),
-                  marginTop(`rem(1.0)),
+                  marginTop(`zero),
                   marginBottom(`zero),
                   media(Style.MediaQuery.full, [marginTop(`rem(1.5))]),
                 ]),
@@ -79,28 +79,37 @@ module Graphic = {
       <Svg
         className=Css.(style([marginTop(`rem(-0.625))]))
         link="/static/img/hero-illustration.svg"
-        dims=(13.9375, 33.375)
+        dims=(9.5625, 33.375)
+        alt="Huge tower of blocks representing the data required by other blockchains."
       />;
-  };
-
-  module Small = {
-    let svg = <Svg link="/static/img/icon.svg" dims=(0.625, 0.625) />;
   };
 
   module Info = {
     let component =
       ReasonReact.statelessComponent("HeroSection.Graphic.Info");
 
-    let make = (~sizeEmphasis, ~name, ~size, ~label, ~textColor, children) => {
+    let make =
+        (
+          ~className="",
+          ~sizeEmphasis,
+          ~name,
+          ~size,
+          ~label,
+          ~textColor,
+          children,
+        ) => {
       ...component,
       render: _ =>
         <div
           className=Css.(
-            style([
-              display(`flex),
-              flexDirection(`column),
-              justifyContent(`flexEnd),
-              alignItems(`center),
+            merge([
+              className,
+              style([
+                display(`flex),
+                flexDirection(`column),
+                justifyContent(`flexEnd),
+                alignItems(`center),
+              ]),
             ])
           )>
           {children[0]}
@@ -176,9 +185,14 @@ module Graphic = {
               <Image
                 className={style([width(`rem(0.625))])}
                 name="/static/img/coda-icon"
+                alt="Small Coda logo representing its small, fixed blockchain size."
               />
             </Info>
             <Info
+              className={style([
+                marginRight(`rem(-1.5)),
+                media(Style.MediaQuery.full, [marginRight(`zero)]),
+              ])}
               sizeEmphasis=true
               name="Other blockchains"
               size="2TB+"
@@ -200,13 +214,9 @@ let make = _ => {
       className=Css.(
         style([
           display(`flex),
-          marginTop(`rem(0.25)),
           justifyContent(`spaceAround),
           flexWrap(`wrap),
-          media(
-            Style.MediaQuery.full,
-            [marginTop(`rem(2.5)), flexWrap(`nowrap)],
-          ),
+          media(Style.MediaQuery.full, [flexWrap(`nowrap)]),
         ])
       )>
       <Copy />
