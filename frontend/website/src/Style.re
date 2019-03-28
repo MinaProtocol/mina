@@ -40,25 +40,8 @@ module Colors = {
   let midnight = `rgb((31, 45, 61));
 };
 
-module Emotion = {
-  [@bs.module "emotion"]
-  external rawInjectGlobal: string => unit = "injectGlobal";
-};
-
 module Typeface = {
   open Css;
-  let weights = [
-    // The weights are intentionally shifted thinner one unit
-    (`thin, "Thin"),
-    (`extraLight, "Thin"),
-    (`light, "ExtraLight"),
-    (`normal, "Light"),
-    (`medium, "Regular"),
-    (`semiBold, "Medium"),
-    (`bold, "SemiBold"),
-    (`extraBold, "Bold"),
-  ];
-
   // To prevent "flash of unstyled text" on some browsers (firefox), we need
   // to do insane things to mitigate it. Even though the CSS working group
   // created `font-display: block` for this purpose, Firefox chooses to not
@@ -72,7 +55,6 @@ module Typeface = {
   module Loader = {
     let string_of_fontWeight = x =>
       switch (x) {
-      | `num(n) => string_of_int(n)
       | `thin => "100"
       | `extraLight => "200"
       | `light => "300"
@@ -81,27 +63,9 @@ module Typeface = {
       | `semiBold => "600"
       | `bold => "700"
       | `extraBold => "800"
-      | `black => "900"
-      | `lighter => "lighter"
-      | `bolder => "bolder"
-      | `initial => "initial"
-      | `inherit_ => "inherit"
-      | `unset => "unset"
       };
 
-    let string_of_fontStyle =
-      fun
-      | `normal => "normal"
-      | `italic => "italic"
-      | `oblique => "oblique"
-      | `initial => "initial"
-      | `inherit_ => "inherit"
-      | `unset => "unset";
-
-    let genFontFace = (~fontFamily, ~src, ~fontStyle=?, ~fontWeight=?, ()) => {
-      let fontStyle =
-        Js.Option.map((. value) => string_of_fontStyle(value), fontStyle);
-
+    let genFontFace = (~fontFamily, ~src, ~fontWeight=?, ()) => {
       let src =
         src
         |> List.map(s => {
@@ -120,8 +84,6 @@ module Typeface = {
            })
         |> String.concat(", ");
 
-      let fontStyle =
-        Belt.Option.mapWithDefault(fontStyle, "", s => "font-style: " ++ s);
       let fontWeight =
         Belt.Option.mapWithDefault(fontWeight, "", w =>
           "font-weight: " ++ string_of_fontWeight(w)
@@ -130,7 +92,7 @@ module Typeface = {
       font-family: $fontFamily;
       src: $src;
       font-display: block;
-      $(fontStyle);
+      font-style: normal;
       $(fontWeight);
   }|j};
 
@@ -138,6 +100,18 @@ module Typeface = {
     };
 
     let load = () => {
+      let weights = [
+        // The weights are intentionally shifted thinner one unit
+        (`thin, "Thin"),
+        (`extraLight, "Thin"),
+        (`light, "ExtraLight"),
+        (`normal, "Light"),
+        (`medium, "Regular"),
+        (`semiBold, "Medium"),
+        (`bold, "SemiBold"),
+        (`extraBold, "Bold"),
+      ];
+
       String.concat(
         "\n",
         [
@@ -147,7 +121,6 @@ module Typeface = {
               "/static/font/IBMPlexSerif-Medium-Latin1.woff2",
               "/static/font/IBMPlexSerif-Medium-Latin1.woff",
             ],
-            ~fontStyle=`normal,
             ~fontWeight=`medium,
             (),
           ),
@@ -157,7 +130,6 @@ module Typeface = {
               "/static/font/IBMPlexMono-SemiBold-Latin1.woff2",
               "/static/font/IBMPlexMono-SemiBold-Latin1.woff",
             ],
-            ~fontStyle=`normal,
             ~fontWeight=`bold,
             (),
           ),
@@ -167,7 +139,6 @@ module Typeface = {
               "/static/font/IBMPlexMono-Medium-Latin1.woff2",
               "/static/font/IBMPlexMono-Medium-Latin1.woff",
             ],
-            ~fontStyle=`normal,
             ~fontWeight=`semiBold,
             (),
           ),
@@ -179,7 +150,6 @@ module Typeface = {
                      "/static/font/IBMPlexSans-" ++ name ++ "-Latin1.woff2",
                      "/static/font/IBMPlexSans-" ++ name ++ "-Latin1.woff",
                    ],
-                   ~fontStyle=`normal,
                    ~fontWeight=weight,
                    (),
                  ),
