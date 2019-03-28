@@ -236,6 +236,8 @@ module type Transition_frontier_intf = sig
 
   val successors_rec : t -> Breadcrumb.t -> Breadcrumb.t list
 
+  val common_ancestor : t -> Breadcrumb.t -> Breadcrumb.t -> state_hash
+
   val iter : t -> f:(Breadcrumb.t -> unit) -> unit
 
   (** Adds a breadcrumb to the transition frontier or throws. It possibly
