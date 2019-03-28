@@ -115,8 +115,8 @@ end = struct
     |> merge
          ( Bin_prot.Utils.bin_dump
              [%bin_type_class:
-               Scan_state.Stable.Latest.t * State_hash.Stable.Latest.t]
-               .writer (scan_state, hash)
+               State_hash.Stable.Latest.t * Scan_state.Stable.Latest.t]
+               .writer (hash, scan_state)
          |> Bigstring.to_string )
 
   let hash_diff_contents (type mutant) (t : mutant t) acc =

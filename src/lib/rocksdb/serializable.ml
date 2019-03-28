@@ -71,6 +71,8 @@ module GADT = struct
 
     val set : t -> key:'a g -> data:'a -> unit
 
+    val set_raw : t -> key:'a g -> data:Bigstring.t -> unit
+
     val remove : t -> key:'a g -> unit
   end
 
@@ -121,8 +123,11 @@ module GADT = struct
     struct
       type t = Database.t
 
+      let set_raw t ~(key : 'a Key.t) ~(data : Bigstring.t) : unit =
+        Database.set t ~key:(bin_key_dump key) ~data
+
       let set t ~(key : 'a Key.t) ~(data : 'a) : unit =
-        Database.set t ~key:(bin_key_dump key) ~data:(bin_data_dump key data)
+        set_raw t ~key ~data:(bin_data_dump key data)
 
       let remove t ~(key : 'a Key.t) =
         Database.remove t ~key:(bin_key_dump key)

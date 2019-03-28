@@ -68,7 +68,14 @@ end = struct
       "Added transition $hash and $parent_hash !" ;
     External_transition.consensus_state parent_transition
 
-  let apply_diff (type mutant) t (diff : mutant Diff_mutant.t) : mutant =
+  let handle_diff (type a) (t : t) acc_hash (diff : a Diff_mutant.t) =
+    let log ~location diff mutant =
+      Debug_assert.debug_assert
+      @@ fun () ->
+      Logger.trace ~module_:__MODULE__ ~location t.logger
+        ~metadata:[("diff_response", Diff_mutant.yojson_of_value diff mutant)]
+        "Worker processed diff_mutant and created mutant: $diff_response"
+    in
     match diff with
     | New_frontier
         ({With_hash.hash= first_root_hash; data= first_root}, scan_state) ->
@@ -77,37 +84,55 @@ end = struct
             Transition_storage.Batch.set batch ~key:Root
               ~data:(first_root_hash, scan_state) ;
             Transition_storage.Batch.set batch
-              ~key:(Transition first_root_hash) ~data:(first_root, []) )
+              ~key:(Transition first_root_hash) ~data:(first_root, []) ;
+            log ~location:__LOC__ diff () ;
+            Diff_mutant.hash acc_hash diff () )
     | Add_transition transition_with_hash ->
         Transition_storage.Batch.with_batch t.transition_storage
-          ~f:(fun batch -> apply_add_transition (t, batch) transition_with_hash
-        )
-    | Remove_transitions removed_transitions_with_hash ->
-        Transition_storage.Batch.with_batch t.transition_storage
           ~f:(fun batch ->
-            List.map removed_transitions_with_hash
-              ~f:(fun {With_hash.hash= state_hash; _} ->
-                let removed_transition, _ = get t (Transition state_hash) in
-                Transition_storage.Batch.remove batch
-                  ~key:(Transition state_hash) ;
-                External_transition.consensus_state removed_transition ) )
-    | Update_root new_root_data ->
-        let old_root_data =
-          get t Transition_storage.Schema.Root ~location:__LOC__
+            let mutant =
+              apply_add_transition (t, batch) transition_with_hash
+            in
+            log ~location:__LOC__ diff mutant ;
+            Diff_mutant.hash acc_hash diff mutant )
+    | Remove_transitions removed_transitions_with_hash ->
+        let mutant =
+          Transition_storage.Batch.with_batch t.transition_storage
+            ~f:(fun batch ->
+              List.map removed_transitions_with_hash
+                ~f:(fun {With_hash.hash= state_hash; _} ->
+                  let removed_transition, _ = get t (Transition state_hash) in
+                  Transition_storage.Batch.remove batch
+                    ~key:(Transition state_hash) ;
+                  External_transition.consensus_state removed_transition ) )
         in
-        Transition_storage.set t.transition_storage ~key:Root
-          ~data:new_root_data ;
-        old_root_data
-
-  let handle_diff (t : t) acc_hash diff_mutant =
-    let mutant = apply_diff t diff_mutant in
-    ( Debug_assert.debug_assert
-    @@ fun () ->
-    Logger.trace ~module_:__MODULE__ ~location:__LOC__ t.logger
-      ~metadata:
-        [("diff_response", Diff_mutant.yojson_of_value diff_mutant mutant)]
-      "Worker processed diff_mutant and created mutant: $diff_response" ) ;
-    Diff_mutant.hash acc_hash diff_mutant mutant
+        log ~location:__LOC__ diff mutant ;
+        Diff_mutant.hash acc_hash diff mutant
+    | Update_root new_root_data ->
+        (* We can get the serialized root_data from the database and then hash it, rather than using `Transition_storage.get` to deserialize the data and then hash it again which is slower *)
+        let old_root_data =
+          Transition_storage.get_raw t.transition_storage
+            ~key:Transition_storage.Schema.Root
+          |> Option.value_exn
+        in
+        let bin =
+          [%bin_type_class:
+            State_hash.Stable.Latest.t
+            * Staged_ledger.Scan_state.Stable.Latest.t]
+        in
+        let serialized_new_root_data =
+          Bin_prot.Utils.bin_dump bin.writer new_root_data
+        in
+        Transition_storage.set_raw t.transition_storage ~key:Root
+          ~data:serialized_new_root_data ;
+        Logger.info t.logger ~module_:__MODULE__ ~location:__LOC__
+          "Worker updated root" ;
+        let diff_contents_hash =
+          Diff_hash.merge acc_hash
+            (serialized_new_root_data |> Bigstring.to_string)
+        in
+        Diff_hash.merge diff_contents_hash
+          (old_root_data |> Bigstring.to_string)
 
   let directly_add_breadcrumb ~logger transition_frontier transition_with_hash
       parent =
