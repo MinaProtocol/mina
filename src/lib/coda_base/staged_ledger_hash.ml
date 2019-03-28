@@ -213,10 +213,7 @@ module Stable = struct
 end
 
 (* bin_io omitted *)
-type t =
-  Stable.Latest.t
-  (*= {non_snark: Non_snark.t; pending_coinbase_hash: Pending_coinbase.Hash.t}*)
-[@@deriving sexp, eq, compare, hash, yojson]
+type t = Stable.Latest.t [@@deriving sexp, eq, compare, hash, yojson]
 
 type ('a, 'b) t_ = ('a, 'b) Stable.Latest.t_
 

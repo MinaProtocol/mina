@@ -87,16 +87,10 @@ module Make (Consensus_mechanism : Consensus.S) :
                 ~proof_emitted:(Boolean.not ledger_hash_didn't_change)
             in
             (*new stack or update one*)
-            let%bind coinbase_amount =
-              exists Currency.Amount.typ
-                ~compute:
-                  As_prover.(
-                    map get_state ~f:(fun _ ->
-                        Protocols.Coda_praos.coinbase_amount ))
-            in
             let%map new_root =
               Pending_coinbase.Checked.add_coinbase root_after_delete
-                (Snark_transition.proposer transition, coinbase_amount)
+                ( Snark_transition.proposer transition
+                , Snark_transition.coinbase transition )
             in
             (new_root, deleted_stack)
           in

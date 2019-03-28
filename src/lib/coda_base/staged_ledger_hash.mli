@@ -13,8 +13,6 @@ type var
 
 val var_of_t : t -> var
 
-(*val value_of_t : t -> value*)
-
 val typ : (var, t) Typ.t
 
 val var_to_triples : var -> (Boolean.var Triple.t list, _) Checked.t

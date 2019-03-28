@@ -297,14 +297,39 @@ module T = struct
         (Merkle_tree.get_req ~depth (Hash.var_to_hash_packed t) addr)
         reraise_merkle_requests
 
-    let%snarkydef add_coinbase t coinbase =
+    let%snarkydef add_coinbase t (pk, amount) =
       let%bind addr =
         request_witness Address.typ
           As_prover.(map (return ()) ~f:(fun _ -> Find_index_of_newest_stack))
       in
+      let equal_to_zero x = Amount.(equal_var x (var_of_t zero)) in
+      let chain if_ b ~then_ ~else_ =
+        let%bind then_ = then_ and else_ = else_ in
+        if_ b ~then_ ~else_
+      in
       handle
         (Merkle_tree.modify_req ~depth (Hash.var_to_hash_packed t) addr
-           ~f:(fun stack -> Coinbase_stack.Stack.Checked.push stack coinbase ))
+           ~f:(fun stack ->
+             let total_coinbase_amount =
+               Currency.Amount.var_of_t Protocols.Coda_praos.coinbase_amount
+             in
+             let%bind rem_amount =
+               Currency.Amount.Checked.sub total_coinbase_amount amount
+             in
+             let%bind amount1_equal_to_zero = equal_to_zero amount in
+             let%bind amount2_equal_to_zero = equal_to_zero rem_amount in
+             (*TODO:Optimize here since we are pushing twice to the same stack*)
+             let%bind stack_with_amount1 =
+               Coinbase_stack.Stack.Checked.push stack (pk, amount)
+             in
+             let%bind stack_with_amount2 =
+               Coinbase_stack.Stack.Checked.push stack_with_amount1
+                 (pk, rem_amount)
+             in
+             chain Stack.if_ amount1_equal_to_zero ~then_:(return stack)
+               ~else_:
+                 (Stack.if_ amount2_equal_to_zero ~then_:stack_with_amount1
+                    ~else_:stack_with_amount2) ))
         reraise_merkle_requests
       >>| Hash.var_of_hash_packed
 
@@ -569,10 +594,27 @@ let%test_unit "Checked_tree = Unchecked_tree" =
   let open Quickcheck in
   let pending_coinbases = create () |> Or_error.ok_exn in
   test ~trials:20 Coinbase.gen ~f:(fun coinbase ->
+      let max_coinbase_amount = Protocols.Coda_praos.coinbase_amount in
       let coinbase_data = Coinbase_data.of_coinbase coinbase in
-      let unchecked =
-        add_coinbase pending_coinbases ~coinbase ~is_new_stack:true
+      let coinbase2 =
+        Coinbase.create
+          ~amount:
+            ( Amount.sub max_coinbase_amount coinbase.amount
+            |> Option.value_exn ?here:None ?message:None ?error:None )
+          ~proposer:coinbase.proposer ~fee_transfer:None
         |> Or_error.ok_exn
+      in
+      let unchecked =
+        if Amount.equal coinbase.amount Amount.zero then pending_coinbases
+        else
+          let interim_tree =
+            add_coinbase pending_coinbases ~coinbase ~is_new_stack:true
+            |> Or_error.ok_exn
+          in
+          if Amount.equal coinbase2.amount Amount.zero then interim_tree
+          else
+            add_coinbase interim_tree ~coinbase:coinbase2 ~is_new_stack:false
+            |> Or_error.ok_exn
       in
       let f_add_coinbase = Checked.add_coinbase in
       let checked =
@@ -583,7 +625,7 @@ let%test_unit "Checked_tree = Unchecked_tree" =
             handle
               (f_add_coinbase
                  (Hash.var_of_t (merkle_root pending_coinbases))
-                 coinbase_var)
+                 (fst coinbase_var, Amount.var_of_t coinbase.amount))
               (unstage (handler pending_coinbases ~is_new_stack:true))
           in
           As_prover.read Hash.typ res
