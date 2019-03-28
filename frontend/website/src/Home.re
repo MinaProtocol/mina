@@ -12,7 +12,7 @@ let make = _ => {
           media(Style.MediaQuery.full, [marginTop(`rem(-0.25))]),
         ])
       )>
-      <Wrapped>
+      <Wrapped overflowHidden=true>
         <HeroSection />
         <CryptoAppsSection />
         <InclusiveSection />

@@ -90,7 +90,12 @@ module SignupButton = {
             style([
               marginLeft(`rem(0.25)),
               marginRight(`rem(0.0625)),
-              media(Nav.NavStyle.MediaQuery.menuMax, [margin(`zero)]),
+              // HACK: vertically centering leaves it 1px too high
+              paddingTop(`rem(0.0625)),
+              media(
+                Nav.NavStyle.MediaQuery.menuMax,
+                [margin(`zero), ...Style.paddingY(`zero)],
+              ),
             ])
           )>
           {ReasonReact.string(name)}
@@ -101,10 +106,10 @@ module SignupButton = {
 };
 
 let component = ReasonReact.statelessComponent("CodaNav");
-let make = _children => {
+let make = (~mainPage, _children) => {
   ...component,
   render: _self => {
-    <Nav>
+    <Nav mainPage>
       <SimpleButton name="Blog" link="/blog.html" />
       <SimpleButton name="Testnet" link="/testnet.html" />
       <SimpleButton name="GitHub" link="/code.html" />
