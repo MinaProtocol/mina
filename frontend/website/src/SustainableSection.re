@@ -38,7 +38,7 @@ let make = _children => {
               ]),
             ])
           )>
-          {ReasonReact.string("Sustainable Scalability")}
+          {ReasonReact.string("Sustainable scalability")}
           <div
             className=Css.(
               style([
@@ -108,8 +108,8 @@ let make = _children => {
             link="/static/img/chart-blockchain-energy.svg"
             dims=(23.9375, 18.1875)
             alt="Line graph comparing the energy usage of Coda to other blockchains. \
-            Over time, the energy requirements for other blockchains to process a single \
-            transaction will go up, whereas the Coda network will remain constant."
+            Over time, the energy requirements for proof of work blockchains to process \
+            a single transaction will go up, whereas the Coda network will remain constant."
           />
         </div>
         <div className=Css.(style([marginBottom(`rem(2.375))]))>

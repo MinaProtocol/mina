@@ -7,7 +7,8 @@ module NavStyle = {
   module MediaQuery = {
     let menu = "(min-width: 62rem)";
     let menuMax = "(max-width: 61.9375rem)";
-    let statusLift = "(min-width: 38rem)";
+    let statusLift = mainPage =>
+      mainPage ? "(min-width: 38rem)" : "(min-width: 0rem)";
   };
   let bottomNudge = Css.marginBottom(`rem(2.0));
   let bottomNudgeOffset = offset => Css.marginBottom(`rem(2.0 -. offset));
@@ -159,7 +160,7 @@ module DropdownMenu = {
 };
 
 let component = ReasonReact.statelessComponent("Nav");
-let make = children => {
+let make = (~mainPage, children) => {
   ...component,
   render: _self => {
     let items =
@@ -186,7 +187,7 @@ let make = children => {
           alignItems(`flexEnd),
           flexWrap(`wrap),
           media(
-            NavStyle.MediaQuery.statusLift,
+            NavStyle.MediaQuery.statusLift(mainPage),
             [flexWrap(`nowrap), alignItems(`center)],
           ),
         ])
@@ -200,7 +201,7 @@ let make = children => {
             width(`percent(50.0)),
             marginTop(`zero),
             media(
-              NavStyle.MediaQuery.statusLift,
+              NavStyle.MediaQuery.statusLift(mainPage),
               [
                 width(`auto),
                 marginRight(`rem(0.75)),
@@ -220,10 +221,11 @@ let make = children => {
             width(`percent(100.0)),
             NavStyle.bottomNudge,
             media(
-              NavStyle.MediaQuery.statusLift,
+              NavStyle.MediaQuery.statusLift(mainPage),
               [order(2), width(`auto), marginLeft(`zero)],
             ),
             media(NavStyle.MediaQuery.menu, [width(`percent(40.0))]),
+            ...mainPage ? [] : [display(`none)],
           ])
         )>
         <div
@@ -231,7 +233,7 @@ let make = children => {
             style([
               width(`rem(21.25)),
               media(
-                NavStyle.MediaQuery.statusLift,
+                NavStyle.MediaQuery.statusLift(mainPage),
                 [width(`rem(21.25)), margin(`auto)],
               ),
             ])
@@ -247,10 +249,13 @@ let make = children => {
             order(2),
             NavStyle.bottomNudgeOffset(0.5),
             media(
-              NavStyle.MediaQuery.statusLift,
+              NavStyle.MediaQuery.statusLift(mainPage),
               [order(3), width(`auto), NavStyle.bottomNudge],
             ),
-            media(NavStyle.MediaQuery.menu, [width(`percent(50.0))]),
+            media(
+              NavStyle.MediaQuery.menu,
+              [mainPage ? width(`percent(50.0)) : width(`percent(70.0))],
+            ),
           ])
         )>
         <DropdownMenu> ...items </DropdownMenu>
