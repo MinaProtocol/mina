@@ -80,11 +80,8 @@ module Graphic = {
         className=Css.(style([marginTop(`rem(-0.625))]))
         link="/static/img/hero-illustration.svg"
         dims=(9.5625, 33.375)
+        alt="Huge tower of blocks representing the data required by other blockchains."
       />;
-  };
-
-  module Small = {
-    let svg = <Svg link="/static/img/icon.svg" dims=(0.625, 0.625) />;
   };
 
   module Info = {
@@ -188,6 +185,7 @@ module Graphic = {
               <Image
                 className={style([width(`rem(0.625))])}
                 name="/static/img/coda-icon"
+                alt="Small Coda logo representing its small, fixed blockchain size."
               />
             </Info>
             <Info

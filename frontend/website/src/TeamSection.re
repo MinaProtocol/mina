@@ -51,7 +51,11 @@ module Member = {
             ])
           )>
           <div className=Css.(style([display(`flex), flexDirection(`row)]))>
-            <img className=iconStyle src=imageSrc />
+            <img
+              className=iconStyle
+              src=imageSrc
+              alt={j|Portrait photo of $name.|j}
+            />
             <div
               className=Css.(
                 style([
