@@ -206,7 +206,7 @@ end = struct
                   let to_binable = Fn.id
 
                   let of_binable t =
-                    assert (is_valid t) ;
+                    (* assert (is_valid t) ; *)
                     t
                 end)
     end

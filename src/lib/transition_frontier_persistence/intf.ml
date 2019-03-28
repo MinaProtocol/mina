@@ -16,38 +16,6 @@ module type Transition_database_schema = sig
   include Rocksdb.Serializable.GADT.Key_intf with type 'a t := 'a t
 end
 
-module type Base_inputs = sig
-  include Transition_frontier.Inputs_intf
-
-  module Transition_frontier :
-    Transition_frontier_intf
-    with type state_hash := State_hash.t
-     and type external_transition_verified := External_transition.Verified.t
-     and type ledger_database := Ledger.Db.t
-     and type staged_ledger_diff := Staged_ledger_diff.t
-     and type staged_ledger := Staged_ledger.t
-     and type masked_ledger := Ledger.Mask.Attached.t
-     and type transaction_snark_scan_state := Staged_ledger.Scan_state.t
-     and type consensus_local_state := Consensus.Local_state.t
-     and type user_command := User_command.t
-     and type diff_mutant := Diff_mutant.e
-     and module Extensions.Work = Transaction_snark_work.Statement
-end
-
-module type Worker_inputs = sig
-  include Base_inputs
-
-  module Transition_storage : sig
-    module Schema :
-      Transition_database_schema
-      with type external_transition := External_transition.Stable.Latest.t
-       and type state_hash := State_hash.Stable.Latest.t
-       and type scan_state := Staged_ledger.Scan_state.Stable.Latest.t
-
-    include Rocksdb.Serializable.GADT.S with type 'a g := 'a Schema.t
-  end
-end
-
 module type Frontier_diff = sig
   type external_transition_verified
 
@@ -66,6 +34,24 @@ module type Frontier_diff = sig
   type t = Add_transition of add_transition | Move_root of move_root
 end
 
+module type Worker_inputs = sig
+  include Transition_frontier.Inputs_intf
+
+  module Transition_frontier :
+    Transition_frontier_intf
+    with type state_hash := State_hash.t
+     and type external_transition_verified := External_transition.Verified.t
+     and type ledger_database := Ledger.Db.t
+     and type staged_ledger_diff := Staged_ledger_diff.t
+     and type staged_ledger := Staged_ledger.t
+     and type masked_ledger := Ledger.Mask.Attached.t
+     and type transaction_snark_scan_state := Staged_ledger.Scan_state.t
+     and type consensus_local_state := Consensus.Local_state.t
+     and type user_command := User_command.t
+     and type diff_mutant := Diff_mutant.e
+     and module Extensions.Work = Transaction_snark_work.Statement
+end
+
 module type Worker = sig
   type external_transition
 
@@ -77,29 +63,47 @@ module type Worker = sig
 
   type root_snarked_ledger
 
-  type transition_storage
-
   type hash
+
+  type breadcrumb
 
   type 'a diff
 
   type t
 
-  val create :
-       logger:Logger.t
-    -> root_snarked_ledger:root_snarked_ledger
-    -> transition_storage:transition_storage
-    -> t
+  val create : ?directory_name:string -> logger:Logger.t -> unit -> t
 
   val deserialize :
-    t -> consensus_local_state:Consensus.Local_state.t -> frontier Deferred.t
+       t
+    -> root_snarked_ledger:root_snarked_ledger
+    -> consensus_local_state:Consensus.Local_state.t
+    -> frontier Deferred.t
 
   val handle_diff : t -> hash -> 'a diff -> hash
+
+  module For_tests : sig
+    module Transition_storage : sig
+      module Schema :
+        Transition_database_schema
+        with type external_transition := external_transition
+         and type state_hash := state_hash
+         and type scan_state := scan_state
+
+      include Rocksdb.Serializable.GADT.S with type 'a g := 'a Schema.t
+    end
+
+    val transition_storage : t -> Transition_storage.t
+
+    val apply_add_transition :
+         t * Transition_storage.Batch.t
+      -> (external_transition, state_hash) With_hash.t
+      -> external_transition
+  end
 end
 
 (* TODO: Make an RPC_parallel version of Worker.ml *)
 module type Main_inputs = sig
-  include Base_inputs
+  include Worker_inputs
 
   module Worker : sig
     type t

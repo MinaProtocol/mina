@@ -308,8 +308,7 @@ struct
       | Error (`Validation_error e) ->
           failwithf !"Validation Error : %{sexp:Error.t}" e ()
 
-  let create_root_frontier ~logger accounts_with_secret_keys :
-      Transition_frontier.t Deferred.t =
+  let create_snarked_ledger accounts_with_secret_keys =
     let accounts = List.map ~f:snd accounts_with_secret_keys in
     let proposer_account = List.hd_exn accounts in
     let root_snarked_ledger = Coda_base.Ledger.Db.create () in
@@ -320,6 +319,13 @@ struct
             account
         in
         assert (status = `Added) ) ;
+    (root_snarked_ledger, proposer_account)
+
+  let create_root_frontier ~logger accounts_with_secret_keys :
+      Transition_frontier.t Deferred.t =
+    let root_snarked_ledger, proposer_account =
+      create_snarked_ledger accounts_with_secret_keys
+    in
     let root_transaction_snark_scan_state =
       Staged_ledger.Scan_state.empty ()
     in
@@ -398,6 +404,13 @@ struct
       root_breadcrumb =
     Quickcheck.Generator.with_size ~size
     @@ Quickcheck_lib.gen_imperative_list
+         (root_breadcrumb |> return |> Quickcheck.Generator.return)
+         (gen_breadcrumb ~logger ~accounts_with_secret_keys)
+
+  let gen_flattened_tree ~logger ~size ~accounts_with_secret_keys
+      root_breadcrumb =
+    Quickcheck.Generator.with_size ~size
+    @@ Quickcheck_lib.gen_imperative_ktree
          (root_breadcrumb |> return |> Quickcheck.Generator.return)
          (gen_breadcrumb ~logger ~accounts_with_secret_keys)
 

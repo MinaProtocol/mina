@@ -12,24 +12,27 @@ module Make (Inputs : Intf.Worker_inputs) : sig
      and type state_hash := State_hash.t
      and type frontier := Transition_frontier.t
      and type root_snarked_ledger := Ledger.Db.t
-     and type transition_storage := Transition_storage.t
+     and type breadcrumb := Transition_frontier.Breadcrumb.t
      and type hash := Diff_hash.t
      and type 'a diff := 'a Diff_mutant.t
 end = struct
   open Inputs
 
-  type t =
-    { transition_storage: Transition_storage.t
-    ; root_snarked_ledger: Ledger.Db.t
-    ; logger: Logger.t }
+  module Transition_storage = struct
+    module Schema = Transition_database_schema.Make (Inputs)
+    include Rocksdb.Serializable.GADT.Make (Schema)
+  end
 
-  let create ~logger ~root_snarked_ledger ~transition_storage =
-    {transition_storage; root_snarked_ledger; logger}
+  type t = {transition_storage: Transition_storage.t; logger: Logger.t}
 
-  let consensus_state =
-    Fn.compose
-      (Binable.to_string (module Consensus.Consensus_state.Value.Stable.V1))
-      External_transition.consensus_state
+  let create ?directory_name ~logger () =
+    let directory =
+      match directory_name with
+      | None -> Uuid.to_string (Uuid.create ())
+      | Some name -> name
+    in
+    let transition_storage = Transition_storage.create ~directory in
+    {transition_storage; logger}
 
   let get (type a) t ?(location = __LOC__)
       (key : a Transition_storage.Schema.t) : a =
@@ -41,7 +44,7 @@ end = struct
         | Transition hash ->
             log_error
               ~metadata:[("hash", State_hash.to_yojson hash)]
-              "Could not retrieve external transition: $hash" ;
+              "Could not retrieve external transition: $hash !" ;
             raise (Not_found_s ([%sexp_of: State_hash.t] hash))
         | Root ->
             log_error "Could not retrieve root" ;
@@ -58,41 +61,52 @@ end = struct
       ~data:(external_transition, []) ;
     Transition_storage.Batch.set batch ~key:(Transition parent_hash)
       ~data:(parent_transition, hash :: children_hashes) ;
-    consensus_state parent_transition
-
-  let atomic_move_root ({transition_storage; _} as t)
-      (Diff_mutant.Move_root
-        {best_tip; removed_transitions; new_root; new_scan_state}) =
-    let open Transition_storage.Schema in
-    Transition_storage.Batch.with_batch transition_storage ~f:(fun batch ->
-        let old_root_data =
-          Transition_storage.get_raw transition_storage ~key:Root
-          |> Option.value_exn ~message:"Unable to retrieve old root"
-          |> Bigstring.to_string
-        in
-        Transition_storage.Batch.set batch ~key:Root
-          ~data:(new_root, new_scan_state) ;
-        let parent = apply_add_transition (t, batch) best_tip in
-        let removed_transitions =
-          List.map removed_transitions ~f:(fun state_hash ->
-              let removed_transition, _ = get t (Transition state_hash) in
-              let consensus_state = consensus_state removed_transition in
-              Transition_storage.Batch.remove batch
-                ~key:(Transition state_hash) ;
-              consensus_state )
-        in
-        {Diff_mutant.Move_root.parent; removed_transitions; old_root_data} )
+    Logger.trace t.logger ~module_:__MODULE__ ~location:__LOC__
+      ~metadata:
+        [ ("hash", State_hash.to_yojson hash)
+        ; ("parent_hash", State_hash.to_yojson parent_hash) ]
+      "Added transition $hash and $parent_hash !" ;
+    parent_transition
 
   let apply_diff (type mutant) t (diff : mutant Diff_mutant.t) : mutant =
     match diff with
-    | Move_root request -> atomic_move_root t (Diff_mutant.Move_root request)
+    | New_frontier
+        ({With_hash.hash= first_root_hash; data= first_root}, scan_state) ->
+        Transition_storage.Batch.with_batch t.transition_storage
+          ~f:(fun batch ->
+            Transition_storage.Batch.set batch ~key:Root
+              ~data:(first_root_hash, scan_state) ;
+            Transition_storage.Batch.set batch
+              ~key:(Transition first_root_hash) ~data:(first_root, []) )
     | Add_transition transition_with_hash ->
         Transition_storage.Batch.with_batch t.transition_storage
           ~f:(fun batch -> apply_add_transition (t, batch) transition_with_hash
         )
+    | Remove_transitions removed_transitions_with_hash ->
+        Transition_storage.Batch.with_batch t.transition_storage
+          ~f:(fun batch ->
+            List.map removed_transitions_with_hash
+              ~f:(fun {With_hash.hash= state_hash; _} ->
+                let removed_transition, _ = get t (Transition state_hash) in
+                Transition_storage.Batch.remove batch
+                  ~key:(Transition state_hash) ;
+                removed_transition ) )
+    | Update_root new_root_data ->
+        let old_root_data =
+          get t Transition_storage.Schema.Root ~location:__LOC__
+        in
+        Transition_storage.set t.transition_storage ~key:Root
+          ~data:new_root_data ;
+        old_root_data
 
   let handle_diff (t : t) acc_hash diff_mutant =
     let mutant = apply_diff t diff_mutant in
+    ( Debug_assert.debug_assert
+    @@ fun () ->
+    Logger.trace ~module_:__MODULE__ ~location:__LOC__ t.logger
+      ~metadata:
+        [("diff_response", Diff_mutant.yojson_of_value diff_mutant mutant)]
+      "Worker processed diff_mutant and created mutant: $diff_response" ) ;
     Diff_mutant.hash acc_hash diff_mutant mutant
 
   let directly_add_breadcrumb ~logger transition_frontier transition_with_hash
@@ -125,7 +139,7 @@ end = struct
       External_transition.Protocol_state.(
         Blockchain_state.staged_ledger_hash @@ blockchain_state protocol_state)
 
-  let deserialize ({transition_storage= _; root_snarked_ledger; logger} as t)
+  let deserialize ({transition_storage= _; logger} as t) ~root_snarked_ledger
       ~consensus_local_state =
     let open Transition_storage.Schema in
     let state_hash, scan_state = get t Root in
@@ -180,4 +194,12 @@ end = struct
            root_successor_hashes)
     in
     transition_frontier
+
+  module For_tests = struct
+    module Transition_storage = Transition_storage
+
+    let transition_storage {transition_storage; _} = transition_storage
+
+    let apply_add_transition = apply_add_transition
+  end
 end

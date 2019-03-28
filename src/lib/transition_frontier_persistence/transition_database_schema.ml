@@ -28,12 +28,6 @@ module Make (Inputs : Transition_frontier.Inputs_intf) :
     | Transition : State_hash.Stable.Latest.t -> Transition.Data.t t
     | Root : Root_data.Data.t t
 
-  module Root_binable = struct
-    type t =
-      State_hash.Stable.Latest.t * Staged_ledger.Scan_state.Stable.Latest.t
-    [@@deriving bin_io]
-  end
-
   let binable_data_type (type a) : a t -> a Bin_prot.Type_class.t = function
     | Transition _ -> [%bin_type_class: Transition.Data.t]
     | Root -> [%bin_type_class: Root_data.Data.t]

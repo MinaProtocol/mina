@@ -4,7 +4,6 @@ open Async_kernel
 open Pipe_lib
 module Diff_mutant = Diff_mutant
 module Worker = Worker
-module Transition_database_schema = Transition_database_schema
 
 module Make (Inputs : Intf.Main_inputs) = struct
   open Inputs
@@ -21,64 +20,55 @@ module Make (Inputs : Intf.Main_inputs) = struct
     in
     Bin_prot.Utils.bin_dump bin_type.writer (new_root, new_scan_state)
 
-  let find_consensus_state_exn frontier hash =
-    Transition_frontier.find_exn frontier hash
-    |> Transition_frontier.Breadcrumb.transition_with_hash |> With_hash.data
-    |> consensus_state
-
   let apply_diff (type mutant) frontier (diff : mutant Diff_mutant.t) : mutant
       =
     match diff with
+    | New_frontier _ -> ()
     | Add_transition {data= transition; _} ->
         let parent_hash = External_transition.parent_hash transition in
-        find_consensus_state_exn frontier parent_hash
-    | Move_root
-        { best_tip= {hash= best_tip_hash; _}
-        ; removed_transitions
-        ; new_root
-        ; new_scan_state } ->
-        let parent = find_consensus_state_exn frontier best_tip_hash in
-        let removed_transitions =
-          List.map removed_transitions ~f:(find_consensus_state_exn frontier)
+        Transition_frontier.find_exn frontier parent_hash
+        |> Transition_frontier.Breadcrumb.transition_with_hash
+        |> With_hash.data |> External_transition.of_verified
+    | Remove_transitions external_transitions_with_hashes ->
+        List.map external_transitions_with_hashes ~f:With_hash.data
+    | Update_root _ ->
+        let previous_root =
+          Transition_frontier.previous_root frontier |> Option.value_exn
         in
-        let old_root_data =
-          serialize_root_data new_root new_scan_state |> Bigstring.to_string
+        let state_hash =
+          Transition_frontier.Breadcrumb.state_hash previous_root
         in
-        {parent; removed_transitions; old_root_data}
+        ( state_hash
+        , Transition_frontier.Breadcrumb.staged_ledger previous_root
+          |> Staged_ledger.scan_state )
 
-  let write_diff_and_verify ~logger ~init_hash frontier worker =
-    Broadcast_pipe.Reader.fold
-      (Transition_frontier.persistence_diff_pipe frontier) ~init:init_hash
-      ~f:(fun acc_hash ->
-        Option.value_map ~default:(Deferred.return acc_hash)
-          ~f:(fun (Diff_mutant.E diff_mutant) ->
-            Logger.info logger ~module_:__MODULE__ ~location:__LOC__
-              ~metadata:
-                [("diff_request", Diff_mutant.yojson_of_key diff_mutant)]
-              "Applying mutant diff; $diff_request" ;
-            let ground_truth_diff = apply_diff frontier diff_mutant in
-            let ground_truth_hash =
-              Diff_mutant.hash acc_hash diff_mutant ground_truth_diff
-            in
-            match%map Worker.handle_diff worker acc_hash diff_mutant with
-            | Error e ->
-                Logger.error ~module_:__MODULE__ ~location:__LOC__ logger
-                  "Could not connect to worker" ;
-                Error.raise e
-            | Ok new_hash ->
-                if Diff_hash.equal new_hash ground_truth_hash then (
-                  (* TODO: create function to yojson  *)
-                  Logger.trace ~module_:__MODULE__ ~location:__LOC__ logger
-                    ~metadata:
-                      [ ( "diff_response"
-                        , Diff_mutant.yojson_of_value diff_mutant
-                            ground_truth_diff ) ]
-                    "Processed diff correctly. Got answer $diff_response" ;
-                  ground_truth_hash )
-                else
-                  failwith
-                    "Unable to write mutant diff correctly as hashes are \
-                     different" ) )
+  let write_diff_and_verify ~logger ~acc_hash worker frontier diff_mutant =
+    ( Debug_assert.debug_assert
+    @@ fun () ->
+    Logger.info logger ~module_:__MODULE__ ~location:__LOC__
+      ~metadata:[("diff_request", Diff_mutant.yojson_of_key diff_mutant)]
+      "Applying mutant diff; $diff_request" ) ;
+    let ground_truth_diff = apply_diff frontier diff_mutant in
+    let ground_truth_hash =
+      Diff_mutant.hash acc_hash diff_mutant ground_truth_diff
+    in
+    ( Debug_assert.debug_assert
+    @@ fun () ->
+    Logger.trace ~module_:__MODULE__ ~location:__LOC__ logger
+      ~metadata:
+        [ ( "diff_response"
+          , Diff_mutant.yojson_of_value diff_mutant ground_truth_diff ) ]
+      "Ground truth diff mutant" ) ;
+    match%map Worker.handle_diff worker acc_hash diff_mutant with
+    | Error e ->
+        Logger.error ~module_:__MODULE__ ~location:__LOC__ logger
+          "Could not connect to worker" ;
+        Error.raise e
+    | Ok new_hash ->
+        if Diff_hash.equal new_hash ground_truth_hash then ground_truth_hash
+        else
+          failwith
+            "Unable to write mutant diff correctly as hashes are different"
 
   let listen_to_frontier_broadcast_pipe ~logger
       (frontier_broadcast_pipe :
@@ -87,7 +77,13 @@ module Make (Inputs : Intf.Main_inputs) = struct
       ~f:(fun acc_hash frontier_opt ->
         match frontier_opt with
         | Some frontier ->
-            write_diff_and_verify ~logger ~init_hash:acc_hash frontier worker
+            Broadcast_pipe.Reader.fold
+              (Transition_frontier.persistence_diff_pipe frontier)
+              ~init:acc_hash ~f:(fun acc_hash diffs ->
+                Deferred.List.fold diffs ~init:acc_hash
+                  ~f:(fun acc_hash (E mutant) ->
+                    write_diff_and_verify ~logger ~acc_hash worker frontier
+                      mutant ) )
         | None ->
             (* TODO: need to delete persistence once it get's back up *)
             Deferred.return Diff_hash.empty )

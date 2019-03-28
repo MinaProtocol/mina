@@ -120,6 +120,9 @@ struct
           ; staged_ledger= transitioned_staged_ledger
           ; just_emitted_a_proof } )
 
+    let external_transition {transition_with_hash; _} =
+      With_hash.data transition_with_hash
+
     let state_hash {transition_with_hash; _} =
       With_hash.hash transition_with_hash
 
@@ -195,20 +198,26 @@ struct
     module Root_history = struct
       module Queue = Hash_queue.Make (State_hash)
 
-      type t = {history: Breadcrumb.t Queue.t; capacity: int}
+      type t =
+        { history: Breadcrumb.t Queue.t
+        ; capacity: int
+        ; mutable last: Breadcrumb.t option }
 
       let create capacity =
         let history = Queue.create () in
-        {history; capacity}
+        {history; capacity; last= None}
 
       let lookup {history; _} = Queue.lookup history
 
+      let most_recent {last; _} = last
+
       let mem {history; _} = Queue.mem history
 
-      let enqueue {history; capacity} state_hash breadcrumb =
+      let enqueue ({history; capacity; _} as t) state_hash breadcrumb =
         if Queue.length history >= capacity then
           Queue.dequeue_exn history |> ignore ;
-        Queue.enqueue history state_hash breadcrumb |> ignore
+        Queue.enqueue history state_hash breadcrumb |> ignore ;
+        t.last <- Some breadcrumb
 
       let is_empty {history; _} = Queue.is_empty history
     end
@@ -286,7 +295,9 @@ struct
         mb_write_to_pipe diff (Field.get field t) handler pipe
       in
       ( match diff with
-      | Transition_frontier_diff.New_breadcrumb _ -> ()
+      | Transition_frontier_diff.New_breadcrumb _
+       |Transition_frontier_diff.New_frontier _ ->
+          ()
       | Transition_frontier_diff.New_best_tip
           {old_root; old_root_length; new_best_tip_length; _} ->
           if new_best_tip_length - old_root_length > max_length then
@@ -406,7 +417,7 @@ struct
     in
     let%map () =
       Extensions.handle_diff t.extensions t.extension_writers
-        (Transition_frontier_diff.New_breadcrumb root_breadcrumb)
+        (Transition_frontier_diff.New_frontier root_breadcrumb)
     in
     t
 
@@ -436,6 +447,9 @@ struct
       | None -> Non_empty_list.singleton elem
     in
     Option.map ~f:Non_empty_list.rev (go state_hash)
+
+  let previous_root t =
+    Extensions.Root_history.most_recent t.extensions.root_history
 
   let get_path_inclusively_in_root_history t state_hash ~f =
     path_search t state_hash
@@ -845,6 +859,30 @@ struct
 
   let shallow_copy_root_snarked_ledger {root_snarked_ledger; _} =
     Ledger.of_database root_snarked_ledger
+
+  let equal t1 t2 =
+    let open Sequence in
+    unfold_step
+      ~init:[(root t1, root t2)]
+      ~f:(function
+        | [] -> Done
+        | (breadcrumb1, breadcrumb2) :: remaining_jobs ->
+            if not (Breadcrumb.equal breadcrumb1 breadcrumb2) then
+              Step.Yield (false, [])
+            else
+              let sort =
+                List.sort ~compare:(fun b1 b2 ->
+                    State_hash.compare (Breadcrumb.state_hash b1)
+                      (Breadcrumb.state_hash b2) )
+              in
+              List.zip
+                (sort (successors t1 breadcrumb1))
+                (sort (successors t2 breadcrumb2))
+              |> Option.value_map
+                   ~default:(Step.Yield (false, []))
+                   ~f:(fun new_jobs ->
+                     Step.Yield (true, new_jobs @ remaining_jobs) ))
+    |> for_all ~f:Fn.id
 
   module For_tests = struct
     let root_snarked_ledger {root_snarked_ledger; _} = root_snarked_ledger

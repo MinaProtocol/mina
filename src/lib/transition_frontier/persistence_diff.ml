@@ -20,20 +20,18 @@ module Make (Inputs : Inputs_intf) :
   Transition_frontier_extension_intf0
   with type transition_frontier_breadcrumb := Inputs.Breadcrumb.t
    and type input = unit
-   and type view = Inputs.Diff_mutant.e option = struct
+   and type view = Inputs.Diff_mutant.e list = struct
   open Inputs
 
   type t = unit
 
   type input = unit
 
-  type view = Diff_mutant.e option
+  type view = Diff_mutant.e list
 
   let create () = ()
 
-  let initial_view () = None
-
-  let state_hash = Fn.compose With_hash.hash Breadcrumb.transition_with_hash
+  let initial_view () = []
 
   let get_transition breadcrumb =
     let {With_hash.data= external_transition; hash} =
@@ -44,19 +42,34 @@ module Make (Inputs : Inputs_intf) :
   let scan_state breadcrumb =
     breadcrumb |> Breadcrumb.staged_ledger |> Staged_ledger.scan_state
 
-  let handle_diff () diff : view option =
+  let handle_diff () (diff : Breadcrumb.t Transition_frontier_diff.t) :
+      view option =
     let open Transition_frontier_diff in
-    Option.return @@ Option.return
+    let open Diff_mutant in
+    Option.return
     @@
     match diff with
+    | New_frontier breadcrumb ->
+        [E (New_frontier (get_transition breadcrumb, scan_state breadcrumb))]
     | New_breadcrumb breadcrumb ->
-        Diff_mutant.E (Add_transition (get_transition breadcrumb))
-    | New_best_tip {garbage; added_to_best_tip_path; new_root; _} ->
-        let removed_transitions = List.map garbage ~f:state_hash in
-        let best_tip =
-          Non_empty_list.last added_to_best_tip_path |> get_transition
+        [E (Add_transition (get_transition breadcrumb))]
+    | New_best_tip {garbage; added_to_best_tip_path; new_root; old_root; _} ->
+        let added_transition =
+          E
+            (Add_transition
+               (Non_empty_list.last added_to_best_tip_path |> get_transition))
         in
-        let new_scan_state = scan_state new_root in
-        let new_root = state_hash new_root in
-        E (Move_root {removed_transitions; best_tip; new_scan_state; new_root})
+        let remove_transition =
+          E (Remove_transitions (List.map garbage ~f:get_transition))
+        in
+        if
+          State_hash.equal
+            (Breadcrumb.state_hash old_root)
+            (Breadcrumb.state_hash new_root)
+        then [added_transition; remove_transition]
+        else
+          [ added_transition
+          ; E
+              (Update_root (Breadcrumb.state_hash new_root, scan_state new_root))
+          ; remove_transition ]
 end

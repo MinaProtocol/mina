@@ -25,6 +25,11 @@ end) :
   let handle_diff () diff =
     match diff with
     | Transition_frontier_diff.New_breadcrumb _ -> None
+    | Transition_frontier_diff.New_frontier root ->
+        Some
+          Root_diff_view.
+            { user_commands= Breadcrumb.to_user_commands root
+            ; root_length= Some 0 }
     | Transition_frontier_diff.New_best_tip
         {old_root; new_root; old_root_length; _} ->
         if

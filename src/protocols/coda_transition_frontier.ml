@@ -7,6 +7,8 @@ module Transition_frontier_diff = struct
   type 'a t =
     | New_breadcrumb of 'a
         (** Triggered when a new breadcrumb is added without changing the root or best_tip *)
+    | New_frontier of 'a
+        (** First breadcrumb to become the root of the frontier  *)
     | New_best_tip of
         { old_root: 'a
         ; old_root_length: int
@@ -36,24 +38,17 @@ module type Diff_mutant = sig
 
   type scan_state
 
-  module Move_root : sig
-    type request =
-      { best_tip: (external_transition, state_hash) With_hash.t
-      ; removed_transitions: state_hash list
-      ; new_root: state_hash
-      ; new_scan_state: scan_state }
-    [@@deriving to_yojson]
-
-    type response =
-      {parent: string; removed_transitions: string list; old_root_data: string}
-    [@@deriving to_yojson]
-  end
-
   type _ t =
+    | New_frontier :
+        ((external_transition, state_hash) With_hash.t * scan_state)
+        -> unit t
     | Add_transition :
         (external_transition, state_hash) With_hash.t
-        -> string t
-    | Move_root : Move_root.request -> Move_root.response t
+        -> external_transition t
+    | Remove_transitions :
+        (external_transition, state_hash) With_hash.t list
+        -> external_transition list t
+    | Update_root : (state_hash * scan_state) -> (state_hash * scan_state) t
 
   type hash
 
@@ -193,6 +188,8 @@ module type Transition_frontier_Breadcrumb_intf = sig
 
   val hash : t -> int
 
+  val external_transition : t -> external_transition_verified
+
   val state_hash : t -> state_hash
 
   val display : t -> display
@@ -223,7 +220,7 @@ module type Transition_frontier_base_intf = sig
 
   type diff_mutant
 
-  type t
+  type t [@@deriving eq]
 
   module Breadcrumb :
     Transition_frontier_Breadcrumb_intf
@@ -263,6 +260,8 @@ module type Transition_frontier_intf = sig
   val all_breadcrumbs : t -> Breadcrumb.t list
 
   val root : t -> Breadcrumb.t
+
+  val previous_root : t -> Breadcrumb.t option
 
   val best_tip : t -> Breadcrumb.t
 
@@ -334,7 +333,7 @@ module type Transition_frontier_intf = sig
       with type view = user_command Root_diff_view.t
 
     module Persistence_diff :
-      Transition_frontier_extension_intf with type view = diff_mutant option
+      Transition_frontier_extension_intf with type view = diff_mutant list
 
     type readers =
       { snark_pool: Snark_pool_refcount.view Broadcast_pipe.Reader.t
