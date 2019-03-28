@@ -66,7 +66,7 @@ end = struct
         [ ("hash", State_hash.to_yojson hash)
         ; ("parent_hash", State_hash.to_yojson parent_hash) ]
       "Added transition $hash and $parent_hash !" ;
-    parent_transition
+    External_transition.consensus_state parent_transition
 
   let apply_diff (type mutant) t (diff : mutant Diff_mutant.t) : mutant =
     match diff with
@@ -90,7 +90,7 @@ end = struct
                 let removed_transition, _ = get t (Transition state_hash) in
                 Transition_storage.Batch.remove batch
                   ~key:(Transition state_hash) ;
-                removed_transition ) )
+                External_transition.consensus_state removed_transition ) )
     | Update_root new_root_data ->
         let old_root_data =
           get t Transition_storage.Schema.Root ~location:__LOC__
@@ -199,7 +199,5 @@ end = struct
     module Transition_storage = Transition_storage
 
     let transition_storage {transition_storage; _} = transition_storage
-
-    let apply_add_transition = apply_add_transition
   end
 end

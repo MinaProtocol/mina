@@ -93,11 +93,6 @@ module type Worker = sig
     end
 
     val transition_storage : t -> Transition_storage.t
-
-    val apply_add_transition :
-         t * Transition_storage.Batch.t
-      -> (external_transition, state_hash) With_hash.t
-      -> external_transition
   end
 end
 

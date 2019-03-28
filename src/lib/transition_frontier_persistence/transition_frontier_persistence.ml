@@ -28,9 +28,10 @@ module Make (Inputs : Intf.Main_inputs) = struct
         let parent_hash = External_transition.parent_hash transition in
         Transition_frontier.find_exn frontier parent_hash
         |> Transition_frontier.Breadcrumb.transition_with_hash
-        |> With_hash.data |> External_transition.of_verified
+        |> With_hash.data |> External_transition.Verified.consensus_state
     | Remove_transitions external_transitions_with_hashes ->
-        List.map external_transitions_with_hashes ~f:With_hash.data
+        List.map external_transitions_with_hashes
+          ~f:(Fn.compose External_transition.consensus_state With_hash.data)
     | Update_root _ ->
         let previous_root =
           Transition_frontier.previous_root frontier |> Option.value_exn

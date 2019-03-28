@@ -72,6 +72,7 @@ module type Inputs_intf = sig
      and type state_hash := State_hash.t
      and type scan_state := Staged_ledger.Scan_state.t
      and type hash := Diff_hash.t
+     and type consensus_state := Consensus.Consensus_state.Value.Stable.V1.t
 
   val max_length : int
 end

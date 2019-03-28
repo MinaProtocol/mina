@@ -289,6 +289,7 @@ module type Main_intf = sig
        and type state_hash := State_hash.t
        and type scan_state := Staged_ledger.Scan_state.t
        and type hash := Diff_hash.t
+       and type consensus_state := Consensus.Consensus_state.Value.Stable.V1.t
 
     module Transition_frontier :
       Protocols.Coda_pow.Transition_frontier_intf

@@ -38,16 +38,18 @@ module type Diff_mutant = sig
 
   type scan_state
 
+  type consensus_state
+
   type _ t =
     | New_frontier :
         ((external_transition, state_hash) With_hash.t * scan_state)
         -> unit t
     | Add_transition :
         (external_transition, state_hash) With_hash.t
-        -> external_transition t
+        -> consensus_state t
     | Remove_transitions :
         (external_transition, state_hash) With_hash.t list
-        -> external_transition list t
+        -> consensus_state list t
     | Update_root : (state_hash * scan_state) -> (state_hash * scan_state) t
 
   type hash

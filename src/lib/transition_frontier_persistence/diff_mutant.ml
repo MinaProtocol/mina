@@ -34,6 +34,7 @@ module Make (Inputs : Inputs) : sig
      and type state_hash := State_hash.t
      and type scan_state := Scan_state.Stable.Latest.t
      and type hash := Diff_hash.t
+     and type consensus_state := Consensus.Consensus_state.Value.Stable.V1.t
 end = struct
   open Inputs
 
@@ -51,13 +52,13 @@ end = struct
         ( External_transition.Stable.Latest.t
         , State_hash.Stable.Latest.t )
         With_hash.t
-        -> External_transition.Stable.Latest.t t
+        -> Consensus.Consensus_state.Value.Stable.V1.t t
     | Remove_transitions :
         ( External_transition.Stable.Latest.t
         , State_hash.Stable.Latest.t )
         With_hash.t
         list
-        -> External_transition.Stable.Latest.t list t
+        -> Consensus.Consensus_state.Value.Stable.V1.t list t
     | Update_root :
         (State_hash.Stable.Latest.t * Scan_state.Stable.Latest.t)
         -> (State_hash.Stable.Latest.t * Scan_state.Stable.Latest.t) t
@@ -65,9 +66,7 @@ end = struct
   type e = E : 'a t -> e
 
   let serialize_consensus_state =
-    Fn.compose
-      (Binable.to_string (module Consensus.Consensus_state.Value.Stable.V1))
-      External_transition.consensus_state
+    Binable.to_string (module Consensus.Consensus_state.Value.Stable.V1)
 
   (* Makes displaying consensus state nicely when we don't care about it's exact contents  *)
   let json_consensus_state external_transition =
@@ -113,10 +112,11 @@ end = struct
 
   let hash_root_data acc hash scan_state =
     acc
-    |> merge (State_hash.to_bytes hash)
     |> merge
          ( Bin_prot.Utils.bin_dump
-             [%bin_type_class: Scan_state.Stable.Latest.t].writer scan_state
+             [%bin_type_class:
+               Scan_state.Stable.Latest.t * State_hash.Stable.Latest.t]
+               .writer (scan_state, hash)
          |> Bigstring.to_string )
 
   let hash_diff_contents (type mutant) (t : mutant t) acc =
