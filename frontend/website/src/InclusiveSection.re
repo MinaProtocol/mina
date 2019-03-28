@@ -193,7 +193,7 @@ let make = _ => {
           link="/static/img/coda-figure.svg"
           dims=(15.125, 15.125)
           caption="Coda"
-          alt="Figure showing everyone participating in consensus, including all individual users of Coda."
+          alt="Figure showing everyone participating in consensus, including individual users of Coda."
           captionColor=Style.Colors.clover
         />
         <Figure
