@@ -66,6 +66,7 @@ module SignupButton = {
               paddingX(`rem(0.75))
               @ paddingY(`rem(0.75))
               @ [
+                display(`flex),
                 width(`rem(6.25)),
                 height(`rem(2.5)),
                 borderRadius(`px(5)),

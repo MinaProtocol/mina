@@ -48,6 +48,7 @@ test_permutations = {
     'test_postake_bootstrap' : ['coda-bootstrap-test'],
     'test_postake_txns': ['coda-shared-state-test'],
     'test_postake_five_even_snarkless': ['coda-shared-prefix-multiproposer-test -num-proposers 5'],
+    'test_postake_five_even_txns': ['coda-shared-prefix-multiproposer-test -num-proposers 5 -payments'],
 }
 
 ci_blacklist = [

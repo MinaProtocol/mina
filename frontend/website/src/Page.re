@@ -27,7 +27,7 @@ module Footer = {
           </a>
           {last
              ? ReasonReact.null
-             : <span className=footerStyle>
+             : <span className=footerStyle ariaHidden=true>
                  {ReasonReact.string({js| · |js})}
                </span>}
         </li>,
@@ -109,6 +109,7 @@ let make =
   ...component,
   render: _ =>
     <html
+      lang="en"
       className=Css.(
         style([
           media(Style.MediaQuery.iphoneSEorSmaller, [fontSize(`px(13))]),
@@ -147,14 +148,14 @@ let make =
           <div
             className=Css.(
               style([
-                marginTop(`rem(1.0)),
+                marginTop(`rem(0.5)),
                 media(Style.MediaQuery.full, [marginTop(`rem(2.0))]),
               ])
             )>
             <CodaNav />
           </div>
         </Wrapped>
-        <div> ...children </div>
+        <main> ...children </main>
         <Footer bgcolor=footerColor />
       </body>
     </html>,

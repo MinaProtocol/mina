@@ -6,6 +6,7 @@ module Code = {
     ...component,
     render: _self =>
       <div
+        ariaLabel="Code example showing usage of coda on a webpage"
         className=Css.(
           style([
             display(`block),
@@ -44,7 +45,6 @@ module Code = {
                 fontSize(`rem(0.8125)),
                 borderRadius(`px(12)),
                 lineHeight(`rem(1.25)),
-                marginLeft(`rem(-0.25)), // optical centering
                 media(
                   Style.MediaQuery.notMobile,
                   [
@@ -94,6 +94,7 @@ module ImageCollage = {
               maxWidth(`percent(100.0)),
             ])
           )
+          alt=""
           name="/static/img/map"
         />
         <Image
@@ -108,6 +109,7 @@ module ImageCollage = {
               maxWidth(`percent(100.0)),
             ])
           )
+          alt=""
           name="/static/img/centering-rectangle"
         />
         <Image
@@ -122,6 +124,7 @@ module ImageCollage = {
               maxWidth(`percent(100.0)),
             ])
           )
+          alt="Coda icon on a phone, connected to devices all around the world."
           name="/static/img/montage"
         />
       </div>,

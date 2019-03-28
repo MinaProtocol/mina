@@ -8,7 +8,6 @@ open Signature_lib
 let name = "coda-shared-state-test"
 
 let main () =
-  let open Keypair in
   let logger = Logger.create () in
   let n = 2 in
   let keypairs =
