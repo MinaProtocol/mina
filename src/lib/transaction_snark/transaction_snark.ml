@@ -340,9 +340,10 @@ module Base = struct
       Transaction_union.Tag.Checked.is_stake_delegation tag
     in
     let%bind sender_compressed = Public_key.compress_var sender in
+    let proposer = payload.body.public_key in
     let%bind is_coinbase = Transaction_union.Tag.Checked.is_coinbase tag in
     let%bind pending_coinbase_stack_after =
-      let coinbase = (sender_compressed, sender_delta) in
+      let coinbase = (proposer, receiver_increase) in
       let%bind stack' =
         Pending_coinbase.Stack.Checked.push pending_coinbase_stack_before
           coinbase

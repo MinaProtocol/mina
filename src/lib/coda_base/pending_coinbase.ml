@@ -14,37 +14,34 @@ let coinbase_tree_depth = Snark_params.pending_coinbase_depth
 let coinbase_stacks = Int.pow 2 coinbase_tree_depth
 
 module Coinbase_data = struct
-  type t = Public_key.Compressed.Stable.V1.t * Amount.Signed.Stable.V1.t
+  type t = Public_key.Compressed.Stable.V1.t * Amount.Stable.V1.t
   [@@deriving bin_io, sexp]
 
-  let of_coinbase (cb : Coinbase.t) : t =
-    (cb.proposer, Amount.Signed.of_unsigned cb.amount)
+  let of_coinbase (cb : Coinbase.t) : t = (cb.proposer, cb.amount)
 
-  type var = Public_key.Compressed.var * Amount.Signed.var
+  type var = Public_key.Compressed.var * Amount.var
 
   type value = t [@@deriving bin_io, sexp]
 
   let length_in_triples =
-    Public_key.Compressed.length_in_triples + Amount.Signed.length_in_triples
+    Public_key.Compressed.length_in_triples + Amount.length_in_triples
 
   let var_of_t ((public_key, amount) : value) =
-    ( Public_key.Compressed.var_of_t public_key
-    , Amount.Signed.Checked.of_unsigned @@ Amount.var_of_t
-      @@ Amount.Signed.magnitude amount )
+    (Public_key.Compressed.var_of_t public_key, Amount.var_of_t amount)
 
   let var_to_triples (public_key, amount) =
     let%map public_key = Public_key.Compressed.var_to_triples public_key in
-    let amount = Amount.Signed.Checked.to_triples amount in
+    let amount = Amount.var_to_triples amount in
     public_key @ amount
 
   let fold ((public_key, amount) : t) =
     let open Fold in
-    Public_key.Compressed.fold public_key +> Amount.Signed.fold amount
+    Public_key.Compressed.fold public_key +> Amount.fold amount
 
   let typ : (var, value) Typ.t =
     let spec =
       let open Data_spec in
-      [Public_key.Compressed.typ; Amount.Signed.typ]
+      [Public_key.Compressed.typ; Amount.typ]
     in
     let of_hlist : 'a 'b. (unit, 'a -> 'b -> unit) H_list.t -> 'a * 'b =
       let open H_list in
@@ -54,7 +51,7 @@ module Coinbase_data = struct
     Typ.of_hlistable spec ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist
       ~value_to_hlist:to_hlist ~value_of_hlist:of_hlist
 
-  let empty = (Public_key.Compressed.empty, Amount.Signed.zero)
+  let empty = (Public_key.Compressed.empty, Amount.zero)
 
   let genesis = empty
 end

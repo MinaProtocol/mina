@@ -88,12 +88,11 @@ module Make (Consensus_mechanism : Consensus.S) :
             in
             (*new stack or update one*)
             let%bind coinbase_amount =
-              exists Currency.Amount.Signed.typ
+              exists Currency.Amount.typ
                 ~compute:
                   As_prover.(
                     map get_state ~f:(fun _ ->
-                        Currency.Amount.Signed.of_unsigned
-                          Protocols.Coda_praos.coinbase_amount ))
+                        Protocols.Coda_praos.coinbase_amount ))
             in
             let%map new_root =
               Pending_coinbase.Checked.add_coinbase root_after_delete
