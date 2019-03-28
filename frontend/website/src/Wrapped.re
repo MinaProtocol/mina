@@ -6,6 +6,7 @@ let make = children => {
       className=Css.(
         style([
           margin(`auto),
+          overflow(`hidden),
           media(
             Style.MediaQuery.full,
             [
