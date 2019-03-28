@@ -93,7 +93,7 @@ module Worker_state = struct
                    ; update= block }
                  in
                  let main x =
-                   Tick.handle Keys.Step.main
+                   Tick.handle (Keys.Step.main x)
                      (Consensus_mechanism.Prover_state.handler
                         state_for_handler ~pending_coinbase)
                  in
