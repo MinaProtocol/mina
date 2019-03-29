@@ -40,7 +40,7 @@ module Code = {
                   display(`block),
                   position(`absolute),
                   top(`percent(50.0)),
-                  left(`percent(10.5)), // determined experimentally
+                  left(`percent(10.0)), // determined experimentally
                   width(`percent(100.0)),
                   height(`rem(0.125)),
                   backgroundColor(Style.Colors.blueBlue),
