@@ -222,21 +222,31 @@ module type S = sig
     -> candidate:Consensus_state.Value.t
     -> bool
 
+  type local_state_sync
+
   (**
     * Predicate indicating whether or not the local state requires synchronization.
     *)
-  val local_state_out_of_sync :
+  val required_local_state_sync :
        consensus_state:Consensus_state.Value.t
     -> local_state:Local_state.t
-    -> bool
+    -> local_state_sync list option
 
   (**
     * Synchronize local state over the network.
     *)
   val sync_local_state :
-       consensus_state:Consensus_state.Value.t
+       logger:Logger.t
     -> local_state:Local_state.t
-    -> unit Deferred.t
+    -> random_peers:(int -> Network_peer.Peer.t list)
+    -> query_peer:(   Network_peer.Peer.t
+                   -> (   Versioned_rpc.Connection_with_menu.t
+                       -> 'q
+                       -> 'r Deferred.Or_error.t)
+                   -> 'q
+                   -> 'r Deferred.t)
+    -> local_state_sync list
+    -> unit Deferred.Or_error.t
 
   (** Return a string that tells a human what the consensus view of an instant in time is.
     *

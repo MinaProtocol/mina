@@ -10,6 +10,8 @@
     lite_compat
     coda_base
     snark_params
+    gossip_net
+    perf_histograms
     rc_pool
     test_util
     vrf_lib

@@ -6,6 +6,7 @@ consensus_mechanism = "proof_of_stake"]
 
 let name = "proof_of_stake"
 
+open Async_kernel
 open Core_kernel
 open Signed
 open Unsigned
@@ -263,7 +264,12 @@ module Local_state = struct
                 Ledger.foldi ~init:() Genesis_ledger.t ~f:(fun i () acct ->
                     f (Ledger.Addr.to_int i) acct ) )
           in
-          let ledger = Coda_base.Sparse_ledger.of_ledger Genesis_ledger.t in
+          let ledger =
+            Coda_base.Sparse_ledger.of_any_ledger
+              (Coda_base.Ledger.Any_ledger.cast
+                 (module Coda_base.Ledger)
+                 Genesis_ledger.t)
+          in
           {delegators; ledger}
     in
     { last_epoch_snapshot= None
@@ -271,6 +277,18 @@ module Local_state = struct
     ; genesis_epoch_snapshot
     ; last_checked_slot_and_epoch= (Epoch.zero, Epoch.Slot.zero)
     ; proposer_public_key }
+
+  type snapshot_identifier = Last_epoch_snapshot | Curr_epoch_snapshot
+
+  let get_snapshot t id =
+    match id with
+    | Last_epoch_snapshot -> t.last_epoch_snapshot
+    | Curr_epoch_snapshot -> t.curr_epoch_snapshot
+
+  let set_snapshot t id v =
+    match id with
+    | Last_epoch_snapshot -> t.last_epoch_snapshot <- v
+    | Curr_epoch_snapshot -> t.curr_epoch_snapshot <- v
 
   let seen_slot t epoch slot =
     match
@@ -1523,14 +1541,16 @@ module Snark_transition = Coda_base.Snark_transition.Make (struct
 end)
 
 module Rpcs = struct
+  open Async
+
   module Get_epoch_ledger = struct
     module T = struct
       let name = "get_epoch_ledger"
 
       module T = struct
-        type query = Ledger_hash.t
+        type query = Coda_base.Ledger_hash.Stable.V1.t
 
-        type response = Sparse_ledger.t option
+        type response = (Coda_base.Sparse_ledger.t, string) Result.t
       end
 
       module Caller = T
@@ -1538,7 +1558,7 @@ module Rpcs = struct
     end
 
     include T.T
-    module M = Versioned_rpc.Both_convert.Plan.Make (T)
+    module M = Versioned_rpc.Both_convert.Plain.Make (T)
     include M
 
     include Perf_histograms.Rpc.Plain.Extend (struct
@@ -1548,9 +1568,10 @@ module Rpcs = struct
 
     module V1 = struct
       module T = struct
-        type query = State_hash.t [@@deriving bin_io]
+        type query = Coda_base.Ledger_hash.Stable.V1.t [@@deriving bin_io]
 
-        type response = (Sparse_ledger.t, string) Result.t [@@deriving bin_io]
+        type response = (Coda_base.Sparse_ledger.t, string) Result.t
+        [@@deriving bin_io]
 
         let version = 1
 
@@ -1566,46 +1587,62 @@ module Rpcs = struct
       include T
       include Register (T)
     end
+
+    let implementation ~logger ~local_state conn ~version:_ ledger_hash =
+      let open Coda_base in
+      let open Host_and_port in
+      let open Local_state in
+      let open Snapshot in
+      let open Option.Let_syntax in
+      Deferred.create (fun ivar ->
+          Logger.info logger ~module_:__MODULE__ ~location:__LOC__
+            ~metadata:
+              [ ("peer", `String (sprintf "%s:%d" conn.host conn.port))
+              ; ("ledger_hash", Coda_base.Ledger_hash.to_yojson ledger_hash) ]
+            "serving epoch ledger query with hash $ledger_hash from $peer" ;
+          let response =
+            if
+              Ledger_hash.equal ledger_hash
+                (Frozen_ledger_hash.to_ledger_hash genesis_ledger_hash)
+            then Error "refusing to serve genesis epoch ledger"
+            else
+              let candidate_snapshots =
+                [ local_state.last_epoch_snapshot
+                ; local_state.curr_epoch_snapshot ]
+              in
+              List.find_map candidate_snapshots ~f:(fun snapshot_opt ->
+                  let%map snapshot = snapshot_opt in
+                  if
+                    Ledger_hash.equal ledger_hash
+                      (Sparse_ledger.merkle_root snapshot.ledger)
+                  then Ok snapshot.ledger
+                  else Error "missing epoch ledger" )
+              |> Option.value ~default:(Error "epoch ledger not found")
+          in
+          Result.iter_error response ~f:(fun err ->
+              Logger.info logger ~module_:__MODULE__ ~location:__LOC__
+                ~metadata:
+                  [ ("peer", `String (sprintf "%s:%d" conn.host conn.port))
+                  ; ("error", `String err)
+                  ; ("ledger_hash", Coda_base.Ledger_hash.to_yojson ledger_hash)
+                  ]
+                "failed to serve epoch ledger query with hash $ledger_hash \
+                 from $peer: $error" ) ;
+          Ivar.fill ivar response )
   end
 
   let implementations ~logger ~local_state =
-    let open Host_and_peer in
-    let open Local_state in
-    let open Snapshot in
-    Get_epoch_ledger.implement_multi (fun conn ledger_hash ->
-        Logger.info logger ~module_:__MODULE__ ~location:__LOC__
-          ~metadata:[("peer", Network_peer.to_yojson conn.peer)]
-          "serving epoch ledger query from $peer" ;
-        let response =
-          if Ledger_hash.eq ledger_hash genesis_ledger_hash then
-            Error "refusing to serve genesis epoch ledger"
-          else if
-            Ledger_hash.eq ledger_hash
-              (Sparse_ledger.merkle_root local_state.last_epoch_snapshot.ledger)
-          then Ok local_state.last_epoch_snapshot.ledger
-          else if
-            Ledger_hash.eq ledger_hash
-              (Sparse_ledger.merkle_root local_state.curr_epoch_snapshot.ledger)
-          then Ok local_state.curr_epoch_snapshot.ledger
-          else Error "epoch ledger not found"
-        in
-        Result.iter_error response ~f:(fun err ->
-            Logger.info logger ~module_:__MODULE__ ~location:__LOC__
-              ~metadata:
-                [ ("peer", Network_peer.to_yojson conn.peer)
-                ; ("error", `String err) ]
-              "failed to serve epoch ledger query from $peer: $error" ) ;
-        response )
+    Get_epoch_ledger.(implement_multi (implementation ~logger ~local_state))
 end
 
-(* TODO: integrate these helpers everywhere, kill *all* duplication! *)
 (* Select the correct epoch data to use from a consensus state for a given epoch.
  * The rule for selecting the correct epoch data changes based on whether or not
  * the consensus state we are selecting from is in the epoch we want to select.
  * There is also a special case for when the consensus state we are selecting
  * from is in the genesis epoch.
  *)
-let select_epoch_data ~consensus_state ~epoch =
+let select_epoch_data ~(consensus_state : Consensus_state.Value.t) ~epoch =
+  let open Consensus_state in
   (* are we in the same epoch as the consensus state? *)
   let in_same_epoch = Epoch.equal epoch consensus_state.curr_epoch in
   (* are we in the next epoch after the consensus state? *)
@@ -1616,8 +1653,9 @@ let select_epoch_data ~consensus_state ~epoch =
   let from_genesis_epoch =
     Length.equal consensus_state.epoch_length Length.zero
   in
-  if in_same_epoch || from_genesis_epoch then Ok state.last_epoch_data
-  else if in_next_epoch then Ok state.curr_epoch_data
+  if in_same_epoch || from_genesis_epoch then
+    Ok consensus_state.last_epoch_data
+  else if in_next_epoch then Ok consensus_state.curr_epoch_data
   else Error ()
 
 (* Select the correct epoch snapshot to use from local state for an epoch.
@@ -1629,10 +1667,16 @@ let select_epoch_data ~consensus_state ~epoch =
  * (i.e. it does not check that the epoch snapshot's ledger hash is the same
  * as the ledger hash specified by the epoch data).
  *)
-let select_epoch_snapshot ~consensus_state ~local_state ~epoch ~epoch_data =
+let select_epoch_snapshot ~(consensus_state : Consensus_state.Value.t)
+    ~local_state ~epoch ~epoch_data =
+  let open Consensus_state in
+  let open Local_state in
+  let open Epoch_data in
+  let open Epoch_ledger in
   (* is the snapshot we need the genesis snapshot? *)
   let is_genesis_snapshot =
-    Frozen_ledger_hash.equal epoch_data.ledger.hash genesis_ledger_hash
+    Coda_base.Frozen_ledger_hash.equal epoch_data.ledger.hash
+      genesis_ledger_hash
   in
   (* are we in the next epoch after the consensus state? *)
   let in_next_epoch =
@@ -1648,23 +1692,92 @@ let select_epoch_snapshot ~consensus_state ~local_state ~epoch ~epoch_data =
     ("curr", local_state.curr_epoch_snapshot)
   else ("last", local_state.last_epoch_snapshot)
 
-let local_state_out_of_sync ~consensus_state ~local_state =
+type local_state_sync =
+  { snapshot_id: Local_state.snapshot_identifier
+  ; expected_root: Coda_base.Frozen_ledger_hash.t }
+
+let required_local_state_sync ~(consensus_state : Consensus_state.Value.t)
+    ~local_state =
+  let open Coda_base in
+  let open Consensus_state in
+  (*
   let epoch = consensus_state.curr_epoch in
   let epoch_data =
-    (* TODO: handle gracefully like a ballerina  *)
-    Result.ok_exn (select_epoch_data ~consensus_state ~epoch)
+    (* This should not fail since we are getting epoch data for the
+     * same epoch that the consensus state is in. *)
+    select_epoch_data ~consensus_state ~epoch
+    |> Result.map_error ~f:(Fn.const "unexpected failure while selecting epoch data from consensus state")
+    |> Result.ok_or_failwith
   in
-  match
-    select_epoch_snapshot ~consensus_state ~local_state ~epoch ~epoch_data
-  with
-  | None -> true
-  | Some snapshot ->
-      if Ledger_hash.equal epoch_snapshot.ledger epoch_data.ledger_hash then
-        false
-      else
-        failwith
-          "woops, this probably shouldn't happen... or maybe we should sync \
-           anyway?"
+  *)
+  let required_snapshot_sync snapshot_id expected_root =
+    match Local_state.get_snapshot local_state snapshot_id with
+    | None -> Some {snapshot_id; expected_root}
+    | Some s ->
+        if
+          Ledger_hash.equal
+            (Frozen_ledger_hash.to_ledger_hash expected_root)
+            (Sparse_ledger.merkle_root s.ledger)
+        then None
+        else Some {snapshot_id; expected_root}
+  in
+  if consensus_state.curr_epoch_data.length <= Length.of_int Constants.k then
+    Option.map
+      (required_snapshot_sync Curr_epoch_snapshot
+         consensus_state.last_epoch_data.ledger.hash) ~f:(fun x -> [x] )
+  else
+    match
+      Core.List.filter_map
+        [ required_snapshot_sync Curr_epoch_snapshot
+            consensus_state.curr_epoch_data.ledger.hash
+        ; required_snapshot_sync Last_epoch_snapshot
+            consensus_state.last_epoch_data.ledger.hash ]
+        ~f:Fn.id
+    with
+    | [] -> None
+    | ls -> Some ls
+
+let sync_local_state ~logger ~local_state ~random_peers ~query_peer
+    requested_syncs =
+  let open Local_state in
+  let open Snapshot in
+  let open Deferred.Let_syntax in
+  let sync {snapshot_id; expected_root= target_ledger_hash} =
+    Deferred.List.exists (random_peers 3) ~f:(fun peer ->
+        match%map
+          query_peer peer Rpcs.Get_epoch_ledger.dispatch_multi
+            target_ledger_hash
+        with
+        | Ok (Ok snapshot_ledger) ->
+            let delegators =
+              Option.map local_state.proposer_public_key ~f:(fun pk ->
+                  compute_delegators
+                    (`Include_self, pk)
+                    ~iter_accounts:(fun f ->
+                      Coda_base.Sparse_ledger.iteri snapshot_ledger ~f ) )
+              |> Option.value
+                   ~default:(Coda_base.Account.Index.Table.create ())
+            in
+            set_snapshot local_state snapshot_id
+              (Some {ledger= snapshot_ledger; delegators}) ;
+            true
+        | Ok (Error err) ->
+            Logger.faulty_peer logger ~module_:__MODULE__ ~location:__LOC__
+              ~metadata:
+                [ ("peer", Network_peer.Peer.to_yojson peer)
+                ; ("error", `String err) ]
+              "peer $peer failed to serve requested epoch ledger: $error" ;
+            false
+        | Error err ->
+            Logger.faulty_peer logger ~module_:__MODULE__ ~location:__LOC__
+              ~metadata:
+                [ ("peer", Network_peer.Peer.to_yojson peer)
+                ; ("error", `String (Error.to_string_hum err)) ]
+              "error querying peer $peer: $error" ;
+            false )
+  in
+  if%map Deferred.List.for_all requested_syncs ~f:sync then Ok ()
+  else Error (Error.of_string "failed to synchronize epoch ledger")
 
 (* TODO: only track total currency from accounts > 1% of the currency using transactions *)
 let generate_transition ~(previous_protocol_state : Protocol_state.Value.t)
@@ -1852,7 +1965,7 @@ let next_proposal now (state : Consensus_state.Value.t) ~local_state ~keypair
       (Epoch.to_int state.curr_epoch)
       (Length.to_int state.epoch_length) ;
     let epoch_data =
-      match select_epoch_data ~consensus_state ~epoch with
+      match select_epoch_data ~consensus_state:state ~epoch with
       | Ok epoch_data -> epoch_data
       | Error () ->
           Logger.error logger ~module_:__MODULE__ ~location:__LOC__
@@ -1863,7 +1976,8 @@ let next_proposal now (state : Consensus_state.Value.t) ~local_state ~keypair
     let total_stake = epoch_data.ledger.total_currency in
     let epoch_snapshot =
       let source, snapshot =
-        select_epoch_snapshot ~consensus_state ~local_state ~epoch ~epoch_data
+        select_epoch_snapshot ~consensus_state:state ~local_state ~epoch
+          ~epoch_data
       in
       ( match snapshot with
       | None ->
@@ -1929,7 +2043,7 @@ let lock_transition (prev : Consensus_state.Value.t)
               ~iter_accounts:(fun f ->
                 Coda_base.Ledger.Any_ledger.M.iteri snarked_ledger ~f )
           in
-          let ledger = Coda_base.Sparse_ledger.of_ledger snarked_ledger in
+          let ledger = Coda_base.Sparse_ledger.of_any_ledger snarked_ledger in
           {delegators; ledger} )
     in
     local_state.last_epoch_snapshot <- local_state.curr_epoch_snapshot ;
