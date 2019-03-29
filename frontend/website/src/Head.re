@@ -27,7 +27,7 @@ let make = (~extra, ~filename, _children) => {
       <meta name="viewport" content="width=device-width, initial-scale=1" />
       <meta
         property="og:image"
-        content="https://codaprotocol.com/static/img/compare-outlined-png.png"
+        content="https://codaprotocol.com/static/img/coda_facebook_OG.jpg"
       />
       <meta property="og:updated_time" content="1526001445" />
       <meta property="og:type" content="website" />
@@ -35,11 +35,11 @@ let make = (~extra, ~filename, _children) => {
       <meta property="og:title" content="Coda Cryptocurrency Protocol" />
       <meta
         property="og:description"
-        content="That means that no matter how many transactions are performed, verifying the blockchain remains inexpensive and accessible to everyone."
+        content="Coda is the first cryptocurrency with a succinct blockchain. Our lightweight blockchain means anyone can use Coda directly from any device, in less data than a few tweets."
       />
       <meta
         name="description"
-        content="That means that no matter how many transactions are performed, verifying the blockchain remains inexpensive and accessible to everyone."
+        content="Coda is the first cryptocurrency with a succinct blockchain. Our lightweight blockchain means anyone can use Coda directly from any device, in less data than a few tweets."
       />
       extra
       <title> {ReasonReact.string("Coda Cryptocurrency Protocol")} </title>
