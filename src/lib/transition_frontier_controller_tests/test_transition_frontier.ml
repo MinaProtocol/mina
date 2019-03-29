@@ -114,8 +114,9 @@ let%test_module "Root_history and Transition_frontier" =
       Async.Thread_safe.block_on_async_exn (fun () ->
           let%bind frontier = create_root_frontier ~logger in
           let%bind () =
-            add_linear_breadcrumbs ~logger ~size:5 ~accounts_with_secret_keys
-              frontier
+            add_linear_breadcrumbs ~logger ~size:max_length
+              ~accounts_with_secret_keys ~frontier
+              ~parent:(Transition_frontier.root frontier)
           in
           let root = Transition_frontier.root frontier in
           let add_child =

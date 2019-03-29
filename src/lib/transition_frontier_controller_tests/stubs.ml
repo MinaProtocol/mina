@@ -378,15 +378,15 @@ struct
          (root_breadcrumb |> return |> Quickcheck.Generator.return)
          (gen_breadcrumb ~logger ~accounts_with_secret_keys)
 
-  let add_linear_breadcrumbs ~logger ~size ~accounts_with_secret_keys tf =
-    let root = Transition_frontier.root tf in
-    let bcs =
-      gen_linear_breadcrumbs ~logger ~size ~accounts_with_secret_keys root
+  let add_linear_breadcrumbs ~logger ~size ~accounts_with_secret_keys ~frontier
+      ~parent =
+    let new_breadcrumbs =
+      gen_linear_breadcrumbs ~logger ~size ~accounts_with_secret_keys parent
       |> Quickcheck.random_value
     in
-    Deferred.List.iter bcs ~f:(fun bc ->
-        let%bind bc = bc in
-        Transition_frontier.add_breadcrumb_exn tf bc )
+    Deferred.List.iter new_breadcrumbs ~f:(fun breadcrumb ->
+        let%bind breadcrumb = breadcrumb in
+        Transition_frontier.add_breadcrumb_exn frontier breadcrumb )
 
   let add_child ~logger ~accounts_with_secret_keys ~frontier ~parent =
     let%bind new_node =
