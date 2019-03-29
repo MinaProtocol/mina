@@ -74,7 +74,7 @@ module Constants = struct
       let one_year_ms =
         Core.Time.Span.(to_ms (of_day 365.)) |> Float.to_int |> Int.to_int64
       in
-      Int64.((one_year_ms / Slot.duration_ms) |> to_int_exn)
+      Int64.(one_year_ms / Slot.duration_ms |> to_int_exn)
 
     let size_in_slots =
       assert (slots_per_year mod per_year = 0) ;
