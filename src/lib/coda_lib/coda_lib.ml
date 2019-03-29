@@ -18,6 +18,8 @@ module type Network_intf = sig
 
   type ledger_hash
 
+  type pending_coinbases
+
   type staged_ledger_hash
 
   type parallel_scan_state
@@ -91,7 +93,8 @@ module type Network_intf = sig
                           , state_body_hash list * state_with_witness )
                           Proof_carrying_data.t
                         * parallel_scan_state
-                        * ledger_hash )
+                        * ledger_hash
+                        * pending_coinbases )
                         Deferred.Option.t)
     -> t Deferred.t
 end
@@ -280,7 +283,7 @@ module type Inputs_intf = sig
      and type work :=
                 ( Ledger_proof_statement.t
                 , Transaction.t
-                , Sparse_ledger.t
+                , Transaction_witness.t
                 , Ledger_proof.t )
                 Snark_work_lib.Work.Single.Spec.t
      and type snark_pool := Snark_pool.t
@@ -306,6 +309,7 @@ module type Inputs_intf = sig
      and type state_hash := Coda_base.State_hash.t
      and type state_body_hash := State_body_hash.t
      and type consensus_state := Consensus_mechanism.Consensus_state.Value.t
+     and type pending_coinbases := Pending_coinbase.t
 
   module Transition_router :
     Protocols.Coda_transition_frontier.Transition_router_intf
@@ -579,6 +583,9 @@ module Make (Inputs : Inputs_intf) = struct
               Strict_pipe.create Synchronous
             in
             let net_ivar = Ivar.create () in
+            let pending_coinbases =
+              Pending_coinbase.create () |> Or_error.ok_exn
+            in
             let empty_diff =
               { Staged_ledger_diff.diff=
                   ( { completed_works= []
@@ -586,9 +593,10 @@ module Make (Inputs : Inputs_intf) = struct
                     ; coinbase= Staged_ledger_diff.At_most_two.Zero }
                   , None )
               ; prev_hash=
-                  Staged_ledger_hash.of_aux_and_ledger_hash
+                  Staged_ledger_hash.of_aux_ledger_and_coinbase_hash
                     (Staged_ledger_aux_hash.of_bytes "")
                     (Ledger.merkle_root Genesis_ledger.t)
+                    pending_coinbases
               ; creator=
                   Account.public_key
                     (snd (List.hd_exn Genesis_ledger.accounts)) }
@@ -620,6 +628,7 @@ module Make (Inputs : Inputs_intf) = struct
                 Staged_ledger.of_scan_state_and_ledger ~snarked_ledger_hash
                   ~ledger:Genesis.ledger
                   ~scan_state:(Staged_ledger.Scan_state.empty ())
+                  ~pending_coinbase_collection:pending_coinbases
               with
               | Ok staged_ledger -> staged_ledger
               | Error err -> Error.raise err
@@ -681,10 +690,16 @@ module Make (Inputs : Inputs_intf) = struct
                         (Transition_frontier.root frontier)
                     in
                     let scan_state = Staged_ledger.scan_state staged_ledger in
+                    let pending_coinbase_collection =
+                      Staged_ledger.pending_coinbase_collection staged_ledger
+                    in
                     let merkle_root =
                       Ledger.merkle_root (Staged_ledger.ledger staged_ledger)
                     in
-                    (peer_root_with_proof, scan_state, merkle_root)
+                    ( peer_root_with_proof
+                    , scan_state
+                    , merkle_root
+                    , pending_coinbase_collection )
                   in
                   Deferred.return result )
             in

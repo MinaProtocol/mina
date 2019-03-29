@@ -87,3 +87,16 @@ let supply_increase {proposer= _; amount; fee_transfer} =
 let fee_excess t =
   Or_error.map (supply_increase t) ~f:(fun _increase ->
       Currency.Fee.Signed.zero )
+
+let gen =
+  let open Quickcheck.Let_syntax in
+  let%bind proposer = Public_key.Compressed.gen in
+  let%bind amount =
+    Currency.Amount.(gen_incl zero Protocols.Coda_praos.coinbase_amount)
+  in
+  let fee =
+    Currency.Fee.gen_incl Currency.Fee.zero (Currency.Amount.to_fee amount)
+  in
+  let prover = Public_key.Compressed.gen in
+  let%map fee_transfer = Option.gen (Quickcheck.Generator.tuple2 prover fee) in
+  {proposer; amount; fee_transfer}
