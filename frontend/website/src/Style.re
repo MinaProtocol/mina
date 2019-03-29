@@ -6,9 +6,11 @@ module Colors = {
   let hyperlinkString = "hsl(201, 71%, 52%)";
   let hyperlinkAlpha = a => `hsla((201, 71, 52, a));
   let hyperlinkHover = `hsl((201, 71, 40));
+  let hyperlinkLight = `hsl((201, 71, 70));
 
   let metallicBlue = `rgb((70, 99, 131));
   let denimTwo = `rgb((61, 88, 120));
+  let greyBlueString = "rgb(118, 147, 190)";
   let darkGreyBlue = `rgb((61, 88, 120));
   let greyishBrown = `rgb((74, 74, 74));
 
@@ -42,72 +44,125 @@ module Colors = {
 
 module Typeface = {
   open Css;
-  let weights = [
-    // The weights are intentionally shifted thinner one unit
-    (`thin, "Thin"),
-    (`extraLight, "Thin"),
-    (`light, "ExtraLight"),
-    (`normal, "Light"),
-    (`medium, "Regular"),
-    (`semiBold, "Medium"),
-    (`bold, "SemiBold"),
-    (`extraBold, "Bold"),
-  ];
+  // To prevent "flash of unstyled text" on some browsers (firefox), we need
+  // to do insane things to mitigate it. Even though the CSS working group
+  // created `font-display: block` for this purpose, Firefox chooses to not
+  // follow the standard "wait for 3seconds before showing fallback fonts."
+  //
+  // Instead we can base64 the woff and woff2 fonts and include those directly
+  // in our stylesheets. Now those browsers have no choice but to show us the
+  // font correctly.
+  //
+  // Scafolding code adapted from Bs-css Css.re.
+  module Loader = {
+    let string_of_fontWeight = x =>
+      switch (x) {
+      | `thin => "100"
+      | `extraLight => "200"
+      | `light => "300"
+      | `normal => "400"
+      | `medium => "500"
+      | `semiBold => "600"
+      | `bold => "700"
+      | `extraBold => "800"
+      };
 
-  // TODO: add format("woff") and unicode ranges
-  let () =
-    List.iter(
-      ((weight, name)) =>
-        ignore @@
-        fontFace(
-          ~fontFamily="IBM Plex Sans",
-          ~src=[
-            url("/static/font/IBMPlexSans-" ++ name ++ "-Latin1.woff2"),
-            url("/static/font/IBMPlexSans-" ++ name ++ "-Latin1.woff"),
-          ],
-          ~fontStyle=`normal,
-          ~fontWeight=weight,
-          (),
-        ),
-      weights,
-    );
+    let genFontFace = (~fontFamily, ~src, ~fontWeight=?, ()) => {
+      let src =
+        src
+        |> List.map(s => {
+             let ext = {
+               let arr = Js.String.split(".", s);
+               arr[Array.length(arr) - 1];
+             };
+             let b64 = Node.Fs.readFileSync("./" ++ s, `base64);
+             "url(\"data:font/"
+             ++ ext
+             ++ ";base64,"
+             ++ b64
+             ++ "\") format(\""
+             ++ ext
+             ++ "\")";
+           })
+        |> String.concat(", ");
 
-  let _ =
-    fontFace(
-      ~fontFamily="IBM Plex Mono",
-      ~src=[
-        url("/static/font/IBMPlexMono-Medium-Latin1.woff2"),
-        url("/static/font/IBMPlexMono-Medium-Latin1.woff"),
-      ],
-      ~fontStyle=`normal,
-      ~fontWeight=`semiBold,
-      (),
-    );
-  let _ =
-    fontFace(
-      ~fontFamily="IBM Plex Mono",
-      ~src=[
-        url("/static/font/IBMPlexMono-SemiBold-Latin1.woff2"),
-        url("/static/font/IBMPlexMono-SemiBold-Latin1.woff"),
-      ],
-      ~fontStyle=`normal,
-      ~fontWeight=`bold,
-      (),
-    );
+      let fontWeight =
+        Belt.Option.mapWithDefault(fontWeight, "", w =>
+          "font-weight: " ++ string_of_fontWeight(w)
+        );
+      let asString = {j|@font-face {
+      font-family: $fontFamily;
+      src: $src;
+      font-display: block;
+      font-style: normal;
+      $(fontWeight);
+  }|j};
 
-  let ibmplexserif =
-    fontFamily(
-      fontFace(
-        ~fontFamily="IBM Plex Serif",
-        ~src=[
-          url("/static/font/IBMPlexSerif-Medium-Latin1.woff2"),
-          url("/static/font/IBMPlexSerif-Medium-Latin1.woff"),
+      asString;
+    };
+
+    let load = () => {
+      let weights = [
+        // The weights are intentionally shifted thinner one unit
+        (`thin, "Thin"),
+        (`extraLight, "Thin"),
+        (`light, "ExtraLight"),
+        (`normal, "Light"),
+        (`medium, "Regular"),
+        (`semiBold, "Medium"),
+        (`bold, "SemiBold"),
+        (`extraBold, "Bold"),
+      ];
+
+      String.concat(
+        "\n",
+        [
+          genFontFace(
+            ~fontFamily="IBM Plex Serif",
+            ~src=[
+              "/static/font/IBMPlexSerif-Medium-Latin1.woff2",
+              "/static/font/IBMPlexSerif-Medium-Latin1.woff",
+            ],
+            ~fontWeight=`medium,
+            (),
+          ),
+          genFontFace(
+            ~fontFamily="IBM Plex Mono",
+            ~src=[
+              "/static/font/IBMPlexMono-SemiBold-Latin1.woff2",
+              "/static/font/IBMPlexMono-SemiBold-Latin1.woff",
+            ],
+            ~fontWeight=`bold,
+            (),
+          ),
+          genFontFace(
+            ~fontFamily="IBM Plex Mono",
+            ~src=[
+              "/static/font/IBMPlexMono-Medium-Latin1.woff2",
+              "/static/font/IBMPlexMono-Medium-Latin1.woff",
+            ],
+            ~fontWeight=`semiBold,
+            (),
+          ),
+          ...List.map(
+               ((weight, name)) =>
+                 genFontFace(
+                   ~fontFamily="IBM Plex Sans",
+                   ~src=[
+                     "/static/font/IBMPlexSans-" ++ name ++ "-Latin1.woff2",
+                     "/static/font/IBMPlexSans-" ++ name ++ "-Latin1.woff",
+                   ],
+                   ~fontWeight=weight,
+                   (),
+                 ),
+               weights,
+             ),
         ],
-        ~fontStyle=`normal,
-        ~fontWeight=`medium,
-        (),
-      ),
-    );
+      );
+    };
+  };
+
+  let ibmplexserif = fontFamily("IBM Plex Serif, serif");
 
   let ibmplexsans =
     fontFamily("IBM Plex Sans, Helvetica Neue, Arial, sans-serif");

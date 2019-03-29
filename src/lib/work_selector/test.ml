@@ -39,7 +39,7 @@ module type Work_selector_F = functor (Inputs : Inputs.Inputs_intf) -> Work_sele
                                                                            .Transaction
                                                                            .t
                                                                          , Inputs
-                                                                           .Sparse_ledger
+                                                                           .Transaction_witness
                                                                            .t
                                                                          , Inputs
                                                                            .Ledger_proof
