@@ -64,8 +64,9 @@ let%test_module "Transition Frontier Persistence" =
           Deferred.List.fold diffs ~init:acc_hash ~f:(fun acc_hash -> function
             | E mutant_diff ->
                 let%map new_hash =
-                  Transition_frontier_persistence.write_diff_and_verify ~logger
-                    ~acc_hash worker frontier mutant_diff
+                  Transition_frontier_persistence.For_tests
+                  .write_diff_and_verify ~logger ~acc_hash worker frontier
+                    mutant_diff
                 in
                 ( match mutant_diff with
                 | Add_transition {With_hash.hash; _} -> remove_job hash

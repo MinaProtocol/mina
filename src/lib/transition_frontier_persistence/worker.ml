@@ -9,6 +9,7 @@ module Make (Inputs : Intf.Worker_inputs) : sig
     Intf.Worker
     with type external_transition := External_transition.Stable.Latest.t
      and type scan_state := Staged_ledger.Scan_state.t
+     and type consensus_local_state := Consensus.Local_state.t
      and type state_hash := State_hash.t
      and type frontier := Transition_frontier.t
      and type root_snarked_ledger := Ledger.Db.t

@@ -276,6 +276,35 @@ module type Inputs_intf = sig
                 With_hash.t
                 Diff_mutant.e
 
+  module Transition_frontier_persistence : sig
+    module Worker : sig
+      include
+        Transition_frontier_persistence.Intf.Worker
+        with type external_transition := External_transition.Stable.Latest.t
+         and type scan_state := Staged_ledger.Scan_state.t
+         and type state_hash := Coda_base.State_hash.t
+         and type frontier := Transition_frontier.t
+         and type consensus_local_state := Consensus_mechanism.Local_state.t
+         and type root_snarked_ledger := Ledger_db.t
+         and type breadcrumb := Transition_frontier.Breadcrumb.t
+         and type hash := Diff_hash.t
+         and type 'output diff :=
+                    (Coda_base.State_hash.t, 'output) Diff_mutant.t
+
+      val handle_diff :
+           t
+        -> Diff_hash.t
+        -> (Coda_base.State_hash.t, 'output) Diff_mutant.t
+        -> Diff_hash.t Deferred.Or_error.t
+    end
+
+    val listen_to_frontier_broadcast_pipe :
+         logger:Logger.t
+      -> Transition_frontier.t sexp_option Broadcast_pipe.Reader.t
+      -> Worker.t
+      -> unit Deferred.t
+  end
+
   module Transaction_pool :
     Transaction_pool_intf
     with type transaction_with_valid_signature :=
@@ -534,10 +563,10 @@ module Make (Inputs : Inputs_intf) = struct
       ; propose_keypair: Keypair.t option
       ; run_snark_worker: bool
       ; net_config: Net.Config.t
-      ; staged_ledger_persistant_location: string
       ; transaction_pool_disk_location: string
       ; snark_pool_disk_location: string
       ; ledger_db_location: string option
+      ; transition_frontier_location: string
       ; staged_ledger_transition_backup_capacity: int [@default 10]
       ; time_controller: Time.Controller.t (* FIXME trust system goes here? *)
       ; receipt_chain_database: Coda_base.Receipt_chain_database.t
@@ -619,18 +648,51 @@ module Make (Inputs : Inputs_intf) = struct
               | Ok staged_ledger -> staged_ledger
               | Error err -> Error.raise err
             in
-            let%bind transition_frontier =
-              Transition_frontier.create ~logger:config.logger
-                ~root_transition:
-                  (With_hash.of_data first_transition
-                     ~hash_data:
-                       (Fn.compose Consensus_mechanism.Protocol_state.hash
-                          External_transition.Verified.protocol_state))
-                ~root_staged_ledger ~root_snarked_ledger ~consensus_local_state
+            let%bind worker, transition_frontier =
+              match%bind
+                Async.Sys.file_exists config.transition_frontier_location
+              with
+              | `No | `Unknown ->
+                  Logger.info config.logger ~module_:__MODULE__
+                    ~location:__LOC__
+                    !"Persistence database does not exist yet. Creating it at \
+                      %s"
+                    config.transition_frontier_location ;
+                  let worker =
+                    Transition_frontier_persistence.Worker.create
+                      ~logger:config.logger
+                      ~directory_name:config.transition_frontier_location ()
+                  in
+                  let%map transition_frontier =
+                    Transition_frontier.create ~logger:config.logger
+                      ~root_transition:
+                        (With_hash.of_data first_transition
+                           ~hash_data:
+                             (Fn.compose
+                                Consensus_mechanism.Protocol_state.hash
+                                External_transition.Verified.protocol_state))
+                      ~root_staged_ledger ~root_snarked_ledger
+                      ~consensus_local_state
+                  in
+                  (worker, transition_frontier)
+              | `Yes ->
+                  let directory_name = config.transition_frontier_location in
+                  let worker =
+                    Transition_frontier_persistence.Worker.create
+                      ~logger:config.logger ~directory_name ()
+                  in
+                  let%map frontier =
+                    Transition_frontier_persistence.Worker.deserialize worker
+                      ~root_snarked_ledger ~consensus_local_state
+                  in
+                  (worker, frontier)
             in
             let frontier_broadcast_pipe_r, frontier_broadcast_pipe_w =
               Broadcast_pipe.create (Some transition_frontier)
             in
+            Transition_frontier_persistence.listen_to_frontier_broadcast_pipe
+              ~logger:config.logger frontier_broadcast_pipe_r worker
+            |> don't_wait_for ;
             let%bind net =
               Net.create config.net_config
                 ~get_staged_ledger_aux_at_hash:(fun _hash ->

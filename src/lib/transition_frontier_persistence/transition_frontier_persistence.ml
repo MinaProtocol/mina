@@ -4,21 +4,18 @@ open Async_kernel
 open Pipe_lib
 module Diff_mutant = Diff_mutant
 module Worker = Worker
+module Intf = Intf
 
-module Make (Inputs : Intf.Main_inputs) = struct
+module Make (Inputs : Intf.Main_inputs) :
+  Intf.S
+  with type frontier := Inputs.Transition_frontier.t
+   and type worker := Inputs.Worker.t
+   and type diff_hash := Inputs.Diff_hash.t
+   and type 'output diff :=
+              ( (Inputs.External_transition.t, State_hash.t) With_hash.t
+              , 'output )
+              Inputs.Diff_mutant.t = struct
   open Inputs
-
-  let consensus_state transition =
-    let open External_transition in
-    transition |> of_verified |> consensus_state
-    |> Binable.to_string (module Consensus.Consensus_state.Value.Stable.V1)
-
-  let serialize_root_data new_root new_scan_state =
-    let bin_type =
-      [%bin_type_class:
-        State_hash.Stable.Latest.t * Staged_ledger.Scan_state.Stable.Latest.t]
-    in
-    Bin_prot.Utils.bin_dump bin_type.writer (new_root, new_scan_state)
 
   let apply_diff (type mutant) frontier
       (diff :
@@ -98,18 +95,25 @@ module Make (Inputs : Intf.Main_inputs) = struct
   let listen_to_frontier_broadcast_pipe ~logger
       (frontier_broadcast_pipe :
         Transition_frontier.t option Broadcast_pipe.Reader.t) worker =
-    Broadcast_pipe.Reader.fold frontier_broadcast_pipe ~init:Diff_hash.empty
-      ~f:(fun acc_hash frontier_opt ->
-        match frontier_opt with
-        | Some frontier ->
-            Broadcast_pipe.Reader.fold
-              (Transition_frontier.persistence_diff_pipe frontier)
-              ~init:acc_hash ~f:(fun acc_hash diffs ->
-                Deferred.List.fold diffs ~init:acc_hash
-                  ~f:(fun acc_hash (E mutant) ->
-                    write_diff_and_verify ~logger ~acc_hash worker frontier
-                      mutant ) )
-        | None ->
-            (* TODO: need to delete persistence once it get's back up *)
-            Deferred.return Diff_hash.empty )
+    let%bind _ : Diff_hash.t =
+      Broadcast_pipe.Reader.fold frontier_broadcast_pipe ~init:Diff_hash.empty
+        ~f:(fun acc_hash frontier_opt ->
+          match frontier_opt with
+          | Some frontier ->
+              Broadcast_pipe.Reader.fold
+                (Transition_frontier.persistence_diff_pipe frontier)
+                ~init:acc_hash ~f:(fun acc_hash diffs ->
+                  Deferred.List.fold diffs ~init:acc_hash
+                    ~f:(fun acc_hash (E mutant) ->
+                      write_diff_and_verify ~logger ~acc_hash worker frontier
+                        mutant ) )
+          | None ->
+              (* TODO: need to delete persistence once it get's back up *)
+              Deferred.return Diff_hash.empty )
+    in
+    Deferred.unit
+
+  module For_tests = struct
+    let write_diff_and_verify = write_diff_and_verify
+  end
 end

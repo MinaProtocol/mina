@@ -1,6 +1,7 @@
 open Protocols.Coda_transition_frontier
 open Coda_base
 open Async_kernel
+open Pipe_lib
 
 module type Transition_database_schema = sig
   type external_transition
@@ -63,6 +64,8 @@ module type Worker = sig
 
   type state_hash
 
+  type consensus_local_state
+
   type frontier
 
   type root_snarked_ledger
@@ -80,7 +83,7 @@ module type Worker = sig
   val deserialize :
        t
     -> root_snarked_ledger:root_snarked_ledger
-    -> consensus_local_state:Consensus.Local_state.t
+    -> consensus_local_state:consensus_local_state
     -> frontier Deferred.t
 
   val handle_diff : t -> hash -> 'output diff -> hash
@@ -112,5 +115,31 @@ module type Main_inputs = sig
       -> Diff_hash.t
       -> (State_hash.t, 'output) Diff_mutant.t
       -> Diff_hash.t Deferred.Or_error.t
+  end
+end
+
+module type S = sig
+  type frontier
+
+  type worker
+
+  type 'output diff
+
+  type diff_hash
+
+  val listen_to_frontier_broadcast_pipe :
+       logger:Logger.t
+    -> frontier option Broadcast_pipe.Reader.t
+    -> worker
+    -> unit Deferred.t
+
+  module For_tests : sig
+    val write_diff_and_verify :
+         logger:Logger.t
+      -> acc_hash:diff_hash
+      -> worker
+      -> frontier
+      -> 'output diff
+      -> diff_hash Deferred.t
   end
 end

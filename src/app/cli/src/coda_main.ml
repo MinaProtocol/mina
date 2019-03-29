@@ -317,10 +317,10 @@ module type Main_intf = sig
       ; propose_keypair: Keypair.t option
       ; run_snark_worker: bool
       ; net_config: Inputs.Net.Config.t
-      ; staged_ledger_persistant_location: string
       ; transaction_pool_disk_location: string
       ; snark_pool_disk_location: string
       ; ledger_db_location: string option
+      ; transition_frontier_location: string
       ; staged_ledger_transition_backup_capacity: int [@default 10]
       ; time_controller:
           Inputs.Time.Controller.t (* FIXME trust system goes here? *)
@@ -604,7 +604,7 @@ struct
   module Diff_mutant =
     Transition_frontier_persistence.Diff_mutant.Make (Diff_mutant_inputs)
 
-  module Transition_frontier = Transition_frontier.Make (struct
+  module Transition_frontier_inputs = struct
     module Staged_ledger_aux_hash = Staged_ledger_aux_hash
     module Ledger_proof_statement = Ledger_proof_statement
     module Ledger_proof = Ledger_proof
@@ -616,7 +616,28 @@ struct
     module Diff_mutant = Diff_mutant
 
     let max_length = max_length
-  end)
+  end
+
+  module Transition_frontier =
+    Transition_frontier.Make (Transition_frontier_inputs)
+
+  module Transition_frontier_persistence = struct
+    module Worker = struct
+      include Transition_frontier_persistence.Worker.Make (struct
+        include Transition_frontier_inputs
+        module Transition_frontier = Transition_frontier
+      end)
+
+      let handle_diff t acc_hash diff_mutant =
+        Deferred.Or_error.return (handle_diff t acc_hash diff_mutant)
+    end
+
+    include Transition_frontier_persistence.Make (struct
+      include Transition_frontier_inputs
+      module Transition_frontier = Transition_frontier
+      module Worker = Worker
+    end)
+  end
 
   module Transaction_pool = struct
     module Pool = Transaction_pool.Make (Staged_ledger) (Transition_frontier)

@@ -293,6 +293,8 @@ let daemon logger =
        let trust_dir = conf_dir ^/ "trust" in
        let () = Snark_params.set_chunked_hashing true in
        let%bind () = Async.Unix.mkdir ~p:() trust_dir in
+       let transition_frontier_location = conf_dir ^/ "transition_frontier" in
+       let%bind () = Async.Unix.mkdir ~p:() transition_frontier_location in
        let trust_system = Coda_base.Trust_system.create ~db_dir:trust_dir in
        let time_controller =
          M.Inputs.Time.Controller.create M.Inputs.Time.Controller.basic
@@ -320,13 +322,12 @@ let daemon logger =
          Run.create
            (Run.Config.make ~logger ~net_config
               ~run_snark_worker:(Option.is_some run_snark_worker_flag)
-              ~staged_ledger_persistant_location:(conf_dir ^/ "staged_ledger")
               ~transaction_pool_disk_location:(conf_dir ^/ "transaction_pool")
               ~snark_pool_disk_location:(conf_dir ^/ "snark_pool")
               ~ledger_db_location:(conf_dir ^/ "ledger_db")
               ~snark_work_fee:snark_work_fee_flag ~receipt_chain_database
-              ~time_controller ?propose_keypair:Config0.propose_keypair ()
-              ~monitor)
+              ~transition_frontier_location ~time_controller
+              ?propose_keypair:Config0.propose_keypair () ~monitor)
        in
        Run.handle_shutdown ~monitor ~conf_dir ~logger coda ;
        Async.Scheduler.within' ~monitor
