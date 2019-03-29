@@ -404,6 +404,25 @@ struct
          (root_breadcrumb |> return |> Quickcheck.Generator.return)
          (gen_breadcrumb ~logger ~accounts_with_secret_keys)
 
+  let add_linear_breadcrumbs ~logger ~size ~accounts_with_secret_keys ~frontier
+      ~parent =
+    let new_breadcrumbs =
+      gen_linear_breadcrumbs ~logger ~size ~accounts_with_secret_keys parent
+      |> Quickcheck.random_value
+    in
+    Deferred.List.iter new_breadcrumbs ~f:(fun breadcrumb ->
+        let%bind breadcrumb = breadcrumb in
+        Transition_frontier.add_breadcrumb_exn frontier breadcrumb )
+
+  let add_child ~logger ~accounts_with_secret_keys ~frontier ~parent =
+    let%bind new_node =
+      ( gen_breadcrumb ~logger ~accounts_with_secret_keys
+      |> Quickcheck.random_value )
+      @@ Deferred.return parent
+    in
+    let%map () = Transition_frontier.add_breadcrumb_exn frontier new_node in
+    new_node
+
   let gen_tree ~logger ~size ~accounts_with_secret_keys root_breadcrumb =
     Quickcheck.Generator.with_size ~size
     @@ Quickcheck_lib.gen_imperative_rose_tree
