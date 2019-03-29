@@ -8,11 +8,11 @@ let make = _ => {
     <section
       className=Css.(
         style([
-          marginTop(`rem(-0.5)),
-          media(Style.MediaQuery.full, [marginTop(`zero)]),
+          marginTop(`rem(-0.8125)),
+          media(Style.MediaQuery.full, [marginTop(`rem(-0.25))]),
         ])
       )>
-      <Wrapped>
+      <Wrapped overflowHidden=true>
         <HeroSection />
         <CryptoAppsSection />
         <InclusiveSection />

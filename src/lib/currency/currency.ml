@@ -551,6 +551,8 @@ end = struct
 
     let%test_module "currency_test" =
       ( module struct
+        let check c () = Or_error.is_ok (check c ())
+
         let expect_failure err c = if check c () then failwith err
 
         let expect_success err c = if not (check c ()) then failwith err

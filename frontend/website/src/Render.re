@@ -37,7 +37,7 @@ let writeStatic = (path, rootComponent) => {
     extractCritical(ReactDOMServerRe.renderToStaticMarkup(rootComponent));
   Node.Fs.writeFileAsUtf8Sync(
     path ++ ".html",
-    "<!doctype html><meta charset=\"utf-8\" />\n" ++ rendered##html,
+    "<!doctype html>\n" ++ rendered##html,
   );
   Node.Fs.writeFileAsUtf8Sync(path ++ ".css", rendered##css);
 };
@@ -58,6 +58,7 @@ let posts =
 module Router = {
   type t =
     | File(string, ReasonReact.reactElement)
+    | Css_file(string, string)
     | Dir(string, array(t));
 
   let generateStatic = {
@@ -65,6 +66,9 @@ module Router = {
       fun
       | File(name, elem) => {
           writeStatic(path ++ "/" ++ name, elem);
+        }
+      | Css_file(name, content) => {
+          Node.Fs.writeFileAsUtf8Sync(path ++ "/" ++ name ++ ".css", content);
         }
       | Dir(name, routes) => {
           let path_ = path ++ "/" ++ name;
@@ -91,14 +95,16 @@ let jobOpenings = [|
 // GENERATE
 
 Rimraf.sync("site");
+
 Router.(
   generateStatic(
     Dir(
       "site",
       [|
+        Css_file("fonts", Style.Typeface.Loader.load()),
         File(
           "index",
-          <Page name="index" footerColor=Style.Colors.gandalf>
+          <Page page=`Home name="index" footerColor=Style.Colors.gandalf>
             <Home />
           </Page>,
         ),
@@ -110,6 +116,7 @@ Router.(
                File(
                  name,
                  <Page
+                   page=`Blog
                    name
                    extraHeaders=Blog.extraHeaders
                    footerColor=Style.Colors.gandalf>
@@ -125,6 +132,7 @@ Router.(
                File(
                  name,
                  <Page
+                   page=`Jobs
                    name
                    footerColor=Style.Colors.gandalf
                    extraHeaders=Careers.extraHeaders>
@@ -137,35 +145,37 @@ Router.(
         ),
         File(
           "jobs",
-          <Page name="jobs" extraHeaders=Careers.extraHeaders>
+          <Page page=`Jobs name="jobs" extraHeaders=Careers.extraHeaders>
             <Wrapped> <Careers jobOpenings /> </Wrapped>
           </Page>,
         ),
         File(
           "code",
-          <Page name="code" extraHeaders=Code.extraHeaders>
+          <Page page=`Code name="code" extraHeaders=Code.extraHeaders>
             <Wrapped> <Code /> </Wrapped>
           </Page>,
         ),
         File(
           "testnet",
-          <Page name="testnet" extraHeaders=Testnet.extraHeaders>
+          <Page page=`Testnet name="testnet" extraHeaders=Testnet.extraHeaders>
             <Wrapped> <Testnet /> </Wrapped>
           </Page>,
         ),
         File(
           "blog",
-          <Page name="blog" extraHeaders=Blog.extraHeaders>
+          <Page page=`Blog name="blog" extraHeaders=Blog.extraHeaders>
             <Wrapped> <Blog posts /> </Wrapped>
           </Page>,
         ),
         File(
           "privacy",
-          <Page name="privacy"> <RawHtml path="html/Privacy.html" /> </Page>,
+          <Page page=`Privacy name="privacy">
+            <RawHtml path="html/Privacy.html" />
+          </Page>,
         ),
         File(
           "tos",
-          <Page name="tos"> <RawHtml path="html/TOS.html" /> </Page>,
+          <Page page=`Tos name="tos"> <RawHtml path="html/TOS.html" /> </Page>,
         ),
       |],
     ),

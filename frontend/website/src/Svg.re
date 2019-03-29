@@ -10,7 +10,7 @@ module Size = {
 };
 
 let component = ReasonReact.statelessComponent("Svg");
-let make = (~link, ~dims, ~inline=false, ~className="", _children) => {
+let make = (~link, ~dims, ~inline=false, ~className=?, ~alt, _children) => {
   ...component,
   render: _self =>
     if (inline) {
@@ -19,22 +19,29 @@ let make = (~link, ~dims, ~inline=false, ~className="", _children) => {
         Node.Fs.readFileAsUtf8Sync(
           String.sub(link, 1, String.length(link) - 1),
         );
-      <div dangerouslySetInnerHTML={"__html": content} />;
+      <div dangerouslySetInnerHTML={"__html": content} alt />;
     } else {
       <object
         data=link
         type_="image/svg+xml"
-        width={Js.Float.toString(Size.remX(dims)) ++ "rem"}
-        height={Js.Float.toString(Size.remY(dims)) ++ "rem"}
-        className=Css.(
-          merge([
-            className,
-            style([
-              width(`rem(Size.remX(dims))),
-              height(`rem(Size.remY(dims))),
-            ]),
-          ])
-        )
+        width={Js.Int.toString(Size.pixelsX(dims))}
+        height={Js.Int.toString(Size.pixelsY(dims))}
+        role={String.length(alt) == 0 ? "presentation" : "img"}
+        ariaHidden={String.length(alt) == 0}
+        alt
+        ariaLabel=alt
+        className={
+          switch (className) {
+          | None =>
+            Css.(
+              style([
+                width(`rem(Size.remX(dims))),
+                height(`rem(Size.remY(dims))),
+              ])
+            )
+          | Some(className) => className
+          }
+        }
       />;
     },
 };

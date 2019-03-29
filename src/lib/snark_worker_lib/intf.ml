@@ -9,6 +9,10 @@ module type Inputs_intf = sig
     type t [@@deriving bin_io, sexp]
   end
 
+  module Transaction_witness : sig
+    type t [@@deriving bin_io, sexp]
+  end
+
   module Transaction : sig
     type t [@@deriving bin_io, sexp]
   end
@@ -29,6 +33,10 @@ module type Inputs_intf = sig
       with type V1.t = t
   end
 
+  module Pending_coinbase : sig
+    type t [@@deriving bin_io, sexp]
+  end
+
   open Snark_work_lib
 
   module Worker_state : sig
@@ -44,7 +52,7 @@ module type Inputs_intf = sig
     -> message:Coda_base.Sok_message.t
     -> ( Statement.t
        , Transaction.t
-       , Sparse_ledger.t
+       , Transaction_witness.t
        , Proof.t )
        Work.Single.Spec.t
     -> (Proof.t * Time.Span.t) Or_error.t
@@ -57,7 +65,7 @@ module type S = sig
 
   type transition
 
-  type sparse_ledger
+  type transaction_witness
 
   module Work : sig
     open Snark_work_lib
@@ -65,7 +73,11 @@ module type S = sig
     module Single : sig
       module Spec : sig
         type t =
-          (statement, transition, sparse_ledger, proof) Work.Single.Spec.t
+          ( statement
+          , transition
+          , transaction_witness
+          , proof )
+          Work.Single.Spec.t
         [@@deriving sexp]
       end
     end
