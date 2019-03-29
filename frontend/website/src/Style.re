@@ -10,6 +10,7 @@ module Colors = {
 
   let metallicBlue = `rgb((70, 99, 131));
   let denimTwo = `rgb((61, 88, 120));
+  let greyBlueString = "rgb(118, 147, 190)";
   let darkGreyBlue = `rgb((61, 88, 120));
   let greyishBrown = `rgb((74, 74, 74));
 
