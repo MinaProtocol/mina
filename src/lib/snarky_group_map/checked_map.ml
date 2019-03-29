@@ -30,9 +30,14 @@ struct
     let b = Field.equal z2 x in
     (z, b)
 
-  (* with (x1, b1), (x2, b2), (x3, b3), we need to take
-   * only the first square. this means we can do
+  (* with (x1, b1), (x2, b2), (x3, b3), we need to take only 
+   * the first square. this means we can do
    * x1 * f1 + (x2 * f2 * not f1) + (x3 * f3 * not f1 * not f2)
+   * NOTE : in case all three of f x1, f x2, f x3 are square
+   * and a malicious prover submits the wrong z to sqrt_flagged, 
+   * meaning it returns 0 instead of 1, the adversary gets 3 chances 
+   * rather than one. This is solved by ensuring external verifiers
+   * only accept proofs that use the *first* square in f x1, f x2, f x3
    *)
 
   let to_group x =

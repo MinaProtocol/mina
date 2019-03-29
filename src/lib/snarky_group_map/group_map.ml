@@ -1,10 +1,10 @@
 (* Points on elliptic curves over finite fields by M. SKALBA
- * found at eg https://www.impan.pl/pl/wydawnictwa/czasopisma-i-serie-wydawnicze/acta-arithmetica/all/117/3/82159/points-on-elliptic-curves-over-finite-fields
+ * https://www.impan.pl/pl/wydawnictwa/czasopisma-i-serie-wydawnicze/acta-arithmetica/all/117/3/82159/points-on-elliptic-curves-over-finite-fields
  *
  * Thm 1.
- * have f(X1)f(X2)f(X3) = U^2 => one on f(X1), f(X2) or f(X3) is square.
- * take that Xi as the x coordinate and solve for y ( which can be done
- * because f(Xi) is square :) )
+ * have f(X1)f(X2)f(X3) = U^2 => at least one of f(X1), f(X2) or f(X3) 
+ * is square. Take that Xi as the x coordinate and solve for y to 
+ * find a point on the curve.
  *
  * Thm 2.
  * if we take map(t) = (Xj(t^2), sqrt(f(Xj(t^2)),
@@ -413,6 +413,12 @@ struct
     let y = f x in
     if F.is_square y then Some (x, F.sqrt y) else None
 
+  (** NOTE : in case all three of f x1, f x2, f x3 are square
+   * and a malicious prover submits the wrong z to sqrt_flagged,
+   * meaning it returns 0 instead of 1, the adversary gets 3 chances
+   * rather than one. This is solved by ensuring external verifiers                      
+   * only accept proofs that use the *first* square in f x1, f x2, f x3                  
+   *)
   let to_group t =
     List.find_map [make_x1; make_x2; make_x3] ~f:(fun mk -> try_decode (mk t))
     |> Option.value_exn
