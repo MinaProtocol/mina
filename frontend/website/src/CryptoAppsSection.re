@@ -272,7 +272,7 @@ let make = _ => {
             |]
             cta={
               SideText.Cta.copy: "Stay updated about developing with Coda",
-              link: Links.developingWithCoda,
+              link: Links.Forms.developingWithCoda,
             }
           />
         </div>

@@ -423,7 +423,7 @@ let make = (~page, _children) => {
         link="/jobs.html"
         activePage={page == `Jobs}
       />
-      <SignupButton name="Sign up" link=Links.mailingList />
+      <SignupButton name="Sign up" link=Links.Forms.mailingList />
     </NavWrapper>;
   },
 };

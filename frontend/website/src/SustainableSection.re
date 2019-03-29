@@ -131,7 +131,7 @@ let make = _children => {
             |]
             cta={
               SideText.Cta.copy: "Notify me about participating in consensus",
-              link: Links.participateInConsensus,
+              link: Links.Forms.participateInConsensus,
             }
           />
         </div>

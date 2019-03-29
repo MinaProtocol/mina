@@ -213,7 +213,7 @@ let make = _ => {
               |]
               cta={
                 SideText.Cta.copy: "Stay updated about participating in consensus",
-                link: Links.participateInConsensus,
+                link: Links.Forms.participateInConsensus,
               }
             />
           </div>
