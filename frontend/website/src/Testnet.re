@@ -121,6 +121,7 @@ let rightSideText =
       color(Style.Colors.saville),
       fontWeight(`medium),
       lineHeight(`rem(1.5)),
+      marginTop(`rem(1.)),
     ])
   );
 let rightSideLink =
@@ -174,7 +175,7 @@ let make = _ => {
                 maxWidth(`rem(20.)),
                 marginLeft(`rem(1.)),
                 marginRight(`rem(1.)),
-                marginTop(`zero),
+                marginTop(`rem(1.)),
                 marginBottom(`zero),
               ]),
             ])
