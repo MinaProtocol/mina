@@ -43,6 +43,7 @@ let make = (~extra, ~filename, _children) => {
       />
       extra
       <title> {ReasonReact.string("Coda Cryptocurrency Protocol")} </title>
+      <link rel="stylesheet" type_="text/css" href="/fonts.css" />
       <link
         rel="stylesheet"
         type_="text/css"
@@ -74,6 +75,17 @@ let make = (~extra, ~filename, _children) => {
       <script
         src="https://www.googletagmanager.com/gtag/js?id=UA-115553548-2"
       />
+      // On recent versions of firefox, the browser will do a "flash of
+      // unstyled content" for images by displaying the alt text(!) before the
+      // image loads. Of course, we must disable this.
+      <style>
+        {ReasonReact.string(
+           {|
+      img:-moz-loading {
+        visibility: hidden;
+      }|},
+         )}
+      </style>
       <RunScript>
         {|
   window.dataLayer = window.dataLayer || [];

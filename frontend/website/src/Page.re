@@ -153,7 +153,7 @@ let make =
                 media(Style.MediaQuery.full, [marginTop(`rem(2.0))]),
               ])
             )>
-            <CodaNav mainPage={page == `Home} />
+            <Nav page />
           </div>
         </Wrapped>
         <main> ...children </main>

@@ -45,7 +45,10 @@ module Staged_ledger_hash = struct
 
   let aux_hash = Staged_ledger_hash.aux_hash
 
-  let of_aux_and_ledger_hash = Staged_ledger_hash.of_aux_and_ledger_hash
+  let pending_coinbase_hash = Staged_ledger_hash.pending_coinbase_hash
+
+  let of_aux_ledger_and_coinbase_hash =
+    Staged_ledger_hash.of_aux_ledger_and_coinbase_hash
 end
 
 module Ledger_hash = struct
@@ -77,7 +80,7 @@ module type Work_selector_F = functor
       and type work :=
                  ( Inputs.Ledger_proof_statement.t
                  , Inputs.Transaction.t
-                 , Inputs.Sparse_ledger.t
+                 , Inputs.Transaction_witness.t
                  , Inputs.Ledger_proof.t )
                  Snark_work_lib.Work.Single.Spec.t
       and type snark_pool := Inputs.Snark_pool.t
@@ -189,6 +192,10 @@ module type Main_intf = sig
       type t
     end
 
+    module Transaction_witness : sig
+      type t
+    end
+
     module Ledger_proof : sig
       type t
 
@@ -210,7 +217,7 @@ module type Main_intf = sig
       with type proof := Ledger_proof.t
        and type statement := Ledger_proof.statement
        and type transition := Transaction.t
-       and type sparse_ledger := Sparse_ledger.t
+       and type transaction_witness := Transaction_witness.t
 
     module Snark_pool : sig
       type t
@@ -269,6 +276,8 @@ module type Main_intf = sig
        and type ledger_proof_statement_set := Ledger_proof_statement.Set.t
        and type transaction := Transaction.t
        and type user_command := User_command.t
+       and type transaction_witness := Transaction_witness.t
+       and type pending_coinbase_collection := Pending_coinbase.t
 
     module Internal_transition :
       Coda_base.Internal_transition.S
@@ -365,6 +374,8 @@ end
 
 module Fee_transfer = Coda_base.Fee_transfer
 module Ledger_proof_statement = Transaction_snark.Statement
+module Pending_coinbase_stack_state =
+  Transaction_snark.Pending_coinbase_stack_state
 module Transaction_snark_work =
   Staged_ledger.Make_completed_work
     (Ledger_proof.Stable.V1)
@@ -379,6 +390,8 @@ module Staged_ledger_diff = Staged_ledger.Make_diff (struct
   module User_command = User_command
   module Transaction_snark_work = Transaction_snark_work
   module Fee_transfer = Fee_transfer
+  module Pending_coinbase_hash = Pending_coinbase.Hash
+  module Pending_coinbase = Pending_coinbase
 end)
 
 let make_init ~should_propose (module Config : Config_intf) :
@@ -502,6 +515,11 @@ struct
     type t = Ledger_proof.Stable.V1.t list [@@deriving sexp, bin_io, yojson]
   end
 
+  module Pending_coinbase_hash = Pending_coinbase.Hash
+  module Pending_coinbase = Pending_coinbase
+  module Pending_coinbase_stack_state = Pending_coinbase_stack_state
+  module Transaction_witness = Coda_base.Transaction_witness
+
   module Staged_ledger = struct
     module Inputs = struct
       module Sok_message = Sok_message
@@ -526,6 +544,10 @@ struct
       module Staged_ledger_aux_hash = Staged_ledger_aux_hash
       module Transaction_validator = Transaction_validator
       module Config = Init
+      module Pending_coinbase = Pending_coinbase
+      module Pending_coinbase_hash = Pending_coinbase_hash
+      module Pending_coinbase_stack_state = Pending_coinbase_stack_state
+      module Transaction_witness = Transaction_witness
 
       let check (Transaction_snark_work.({fee; prover; proofs}) as t) stmts =
         let message = Sok_message.create ~fee ~prover in
@@ -571,6 +593,8 @@ struct
   let max_length = Consensus.Constants.k
 
   module Transition_frontier = Transition_frontier.Make (struct
+    module Pending_coinbase_hash = Pending_coinbase_hash
+    module Transaction_witness = Transaction_witness
     module Staged_ledger_aux_hash = Staged_ledger_aux_hash
     module Ledger_proof_statement = Ledger_proof_statement
     module Ledger_proof = Ledger_proof
@@ -578,6 +602,8 @@ struct
     module Staged_ledger_diff = Staged_ledger_diff
     module External_transition = External_transition
     module Staged_ledger = Staged_ledger
+    module Pending_coinbase_stack_state = Pending_coinbase_stack_state
+    module Pending_coinbase = Pending_coinbase
 
     let max_length = max_length
   end)
@@ -847,6 +873,8 @@ struct
     module State_proof = Protocol_state_proof
   end)
 
+  module Pending_coinbase_witness = Pending_coinbase_witness
+
   module Proposer = Proposer.Make (struct
     include Inputs0
     module Genesis_ledger = Genesis_ledger
@@ -866,10 +894,11 @@ struct
     module Compressed_public_key = Public_key.Compressed
     module Consensus_mechanism = Consensus
     module Transaction_validator = Transaction_validator
+    module Pending_coinbase_witness = Pending_coinbase_witness
 
     module Prover = struct
       let prove ~prev_state ~prev_state_proof ~next_state
-          (transition : Internal_transition.t) =
+          (transition : Internal_transition.t) pending_coinbase =
         match Init.proposer_prover with
         | `Non_proposer -> failwith "prove: Coda not run as proposer"
         | `Proposer prover ->
@@ -879,11 +908,13 @@ struct
               next_state
               (Internal_transition.snark_transition transition)
               (Internal_transition.prover_state transition)
+              pending_coinbase
             >>| fun {Blockchain.proof; _} -> proof
     end
   end)
 
   module Work_selector_inputs = struct
+    module Transaction_witness = Transaction_witness
     module Ledger_proof_statement = Ledger_proof_statement
     module Sparse_ledger = Sparse_ledger
     module Transaction = Transaction

@@ -155,9 +155,13 @@ let%test_module "Bootstrap Controller" =
                 Transition_frontier.shallow_copy_root_snarked_ledger frontier
               in
               let scan_state = Staged_ledger.scan_state staged_ledger in
+              let pending_coinbases =
+                Staged_ledger.pending_coinbase_collection staged_ledger
+              in
               let%map actual_staged_ledger =
-                Staged_ledger.of_scan_state_and_snarked_ledger ~scan_state
-                  ~snarked_ledger ~expected_merkle_root
+                Staged_ledger
+                .of_scan_state_pending_coinbases_and_snarked_ledger ~scan_state
+                  ~snarked_ledger ~expected_merkle_root ~pending_coinbases
                 |> Deferred.Or_error.ok_exn
               in
               assert (
