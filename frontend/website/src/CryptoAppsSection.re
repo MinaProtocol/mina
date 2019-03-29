@@ -270,7 +270,10 @@ let make = _ => {
               "Empower your users with a direct secure connection to the Coda network.",
               "Coda will be able to be embedded into any webpage or app with just a script tag and a couple lines of JavaScript.",
             |]
-            cta="Stay updated about developing with Coda"
+            cta={
+              SideText.Cta.copy: "Stay updated about developing with Coda",
+              link: Links.Forms.developingWithCoda,
+            }
           />
         </div>
         <ImageCollage
