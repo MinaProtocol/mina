@@ -18,6 +18,8 @@ struct
   end
 
   module Ledger_proof_statement = Transaction_snark.Statement
+  module Pending_coinbase_stack_state =
+    Transaction_snark.Pending_coinbase_stack_state
 
   module Ledger_proof = struct
     module Stable = struct
@@ -60,14 +62,24 @@ struct
     let to_bytes = Staged_ledger_hash.Aux_hash.to_bytes
   end
 
+  module Transaction_witness = Coda_base.Transaction_witness
+  module Pending_coinbase = Coda_base.Pending_coinbase
+  module Pending_coinbase_hash = Coda_base.Pending_coinbase.Hash
   module Transaction_snark_work =
     Staged_ledger.Make_completed_work (Ledger_proof) (Ledger_proof_statement)
 
   module Staged_ledger_hash_binable = struct
     include Staged_ledger_hash.Stable.V1
 
-    let of_aux_and_ledger_hash, aux_hash, ledger_hash =
-      Staged_ledger_hash.(of_aux_and_ledger_hash, aux_hash, ledger_hash)
+    let ( of_aux_ledger_and_coinbase_hash
+        , aux_hash
+        , ledger_hash
+        , pending_coinbase_hash ) =
+      Staged_ledger_hash.
+        ( of_aux_ledger_and_coinbase_hash
+        , aux_hash
+        , ledger_hash
+        , pending_coinbase_hash )
   end
 
   module Staged_ledger_diff = Staged_ledger.Make_diff (struct
@@ -79,6 +91,8 @@ struct
     module Compressed_public_key = Public_key.Compressed
     module User_command = User_command
     module Transaction_snark_work = Transaction_snark_work
+    module Pending_coinbase = Pending_coinbase
+    module Pending_coinbase_hash = Pending_coinbase_hash
   end)
 
   module External_transition =
@@ -123,6 +137,10 @@ struct
     module Account = Coda_base.Account
     module Ledger = Coda_base.Ledger
     module Sparse_ledger = Coda_base.Sparse_ledger
+    module Pending_coinbase = Pending_coinbase
+    module Pending_coinbase_hash = Pending_coinbase_hash
+    module Pending_coinbase_stack_state = Pending_coinbase_stack_state
+    module Transaction_witness = Transaction_witness
   end)
 
   (* Generate valid payments for each blockchain state by having
@@ -163,7 +181,11 @@ struct
     module Transaction_snark_work = Transaction_snark_work
     module Staged_ledger_diff = Staged_ledger_diff
     module External_transition = External_transition
+    module Transaction_witness = Transaction_witness
     module Staged_ledger = Staged_ledger
+    module Pending_coinbase_stack_state = Pending_coinbase_stack_state
+    module Pending_coinbase_hash = Pending_coinbase_hash
+    module Pending_coinbase = Pending_coinbase
 
     let max_length = Inputs.max_length
   end
@@ -211,7 +233,8 @@ struct
       in
       let%bind ( `Hash_after_applying next_staged_ledger_hash
                , `Ledger_proof ledger_proof_opt
-               , `Staged_ledger _ ) =
+               , `Staged_ledger _
+               , `Pending_coinbase_data _ ) =
         Staged_ledger.apply_diff_unchecked parent_staged_ledger
           staged_ledger_diff
         |> Deferred.Or_error.ok_exn
@@ -300,6 +323,9 @@ struct
     let root_transaction_snark_scan_state =
       Staged_ledger.Scan_state.empty ()
     in
+    let root_pending_coinbases =
+      Pending_coinbase.create () |> Or_error.ok_exn
+    in
     let genesis_protocol_state_with_hash =
       Consensus.For_tests.create_genesis_protocol_state
         (Ledger.of_database root_snarked_ledger)
@@ -327,7 +353,7 @@ struct
             ; user_commands= []
             ; coinbase= Staged_ledger_diff.At_most_two.Zero }
           , None )
-      ; prev_hash= Coda_base.Staged_ledger_hash.dummy
+      ; prev_hash= Coda_base.Staged_ledger_hash.genesis
       ; creator }
     in
     (* the genesis transition is assumed to be valid *)
@@ -343,10 +369,10 @@ struct
     let open Deferred.Let_syntax in
     let expected_merkle_root = Ledger.Db.merkle_root root_snarked_ledger in
     match%bind
-      Staged_ledger.of_scan_state_and_snarked_ledger
+      Staged_ledger.of_scan_state_pending_coinbases_and_snarked_ledger
         ~scan_state:root_transaction_snark_scan_state
         ~snarked_ledger:(Ledger.of_database root_snarked_ledger)
-        ~expected_merkle_root
+        ~expected_merkle_root ~pending_coinbases:root_pending_coinbases
     with
     | Ok root_staged_ledger ->
         let%map frontier =
@@ -480,7 +506,10 @@ struct
            let merkle_root =
              Ledger.merkle_root (Staged_ledger.ledger staged_ledger)
            in
-           (peer_root_with_proof, scan_state, merkle_root))
+           let pending_coinbases =
+             Staged_ledger.pending_coinbase_collection staged_ledger
+           in
+           (peer_root_with_proof, scan_state, merkle_root, pending_coinbases))
 
     let glue_sync_ledger {table; logger; _} query_reader response_writer : unit
         =

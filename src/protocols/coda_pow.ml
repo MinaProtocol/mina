@@ -133,6 +133,52 @@ module type Ledger_hash_intf = sig
   include Hashable.S with type t := t
 end
 
+module type Pending_coinbase_hash_intf = sig
+  type t [@@deriving bin_io, eq, sexp, compare, hash]
+
+  val to_bytes : t -> string
+
+  val empty_hash : t
+end
+
+module type Pending_coinbase_intf = sig
+  type t [@@deriving sexp, bin_io]
+
+  type pending_coinbase_hash
+
+  type coinbase
+
+  module Coinbase_data : sig
+    type t [@@deriving bin_io, sexp]
+
+    val empty : t
+
+    val of_coinbase : coinbase -> t
+  end
+
+  module Stack : sig
+    type t [@@deriving sexp, bin_io, eq]
+
+    val push : t -> coinbase -> t
+
+    val empty : t
+  end
+
+  val merkle_root : t -> pending_coinbase_hash
+
+  val update_coinbase_stack : t -> Stack.t -> is_new_stack:bool -> t Or_error.t
+
+  val remove_coinbase_stack : t -> (Stack.t * t) Or_error.t
+
+  val create : unit -> t Or_error.t
+
+  val latest_stack : t -> is_new_stack:bool -> Stack.t Or_error.t
+
+  val oldest_stack : t -> Stack.t Or_error.t
+
+  val hash_extra : t -> string
+end
+
 module type Frozen_ledger_hash_intf = sig
   type ledger_hash
 
@@ -141,6 +187,12 @@ module type Frozen_ledger_hash_intf = sig
   val of_ledger_hash : ledger_hash -> t
 
   val to_ledger_hash : t -> ledger_hash
+end
+
+module type Transaction_witness_intf = sig
+  type sparse_ledger
+
+  type t = {ledger: sparse_ledger} [@@deriving bin_io, sexp]
 end
 
 module type Protocol_state_hash_intf = sig
@@ -170,11 +222,18 @@ module type Staged_ledger_hash_intf = sig
 
   type staged_ledger_aux_hash
 
+  type pending_coinbase
+
+  type pending_coinbase_hash
+
   val ledger_hash : t -> ledger_hash
 
   val aux_hash : t -> staged_ledger_aux_hash
 
-  val of_aux_and_ledger_hash : staged_ledger_aux_hash -> ledger_hash -> t
+  val pending_coinbase_hash : t -> pending_coinbase_hash
+
+  val of_aux_ledger_and_coinbase_hash :
+    staged_ledger_aux_hash -> ledger_hash -> pending_coinbase -> t
 
   include Hashable.S_binable with type t := t
 end
@@ -346,6 +405,8 @@ module type Compressed_public_key_intf = sig
     with type V1.t = t
 
   include Comparable.S with type t := t
+
+  val empty : t
 end
 
 module type Public_key_intf = sig
@@ -436,13 +497,23 @@ module type Transaction_intf = sig
   val supply_increase : t -> Currency.Amount.t Or_error.t
 end
 
+module type Pending_coinbase_stack_state_intf = sig
+  type pending_coinbase_stack
+
+  type t = {source: pending_coinbase_stack; target: pending_coinbase_stack}
+  [@@deriving sexp, bin_io, compare]
+end
+
 module type Ledger_proof_statement_intf = sig
   type ledger_hash
+
+  type pending_coinbase_stack_state
 
   type t =
     { source: ledger_hash
     ; target: ledger_hash
     ; supply_increase: Currency.Amount.t
+    ; pending_coinbase_stack_state: pending_coinbase_stack_state
     ; fee_excess: Fee.Signed.t
     ; proof_type: [`Base | `Merge] }
   [@@deriving sexp, compare]
@@ -454,6 +525,7 @@ module type Ledger_proof_statement_intf = sig
           { source: ledger_hash
           ; target: ledger_hash
           ; supply_increase: Currency.Amount.t
+          ; pending_coinbase_stack_state: pending_coinbase_stack_state
           ; fee_excess: Fee.Signed.t
           ; proof_type: [`Base | `Merge] }
         [@@deriving sexp, bin_io, compare]
@@ -733,12 +805,14 @@ module type Transaction_snark_scan_state_intf = sig
 
   type frozen_ledger_hash
 
+  type transaction_witness
+
   module Transaction_with_witness : sig
     (* TODO: The statement is redundant here - it can be computed from the witness and the transaction *)
     type t =
       { transaction_with_info: transaction_with_info
       ; statement: ledger_proof_statement
-      ; witness: sparse_ledger }
+      ; witness: transaction_witness }
   end
 
   module Ledger_proof_with_sok_message : sig
@@ -797,6 +871,8 @@ module type Transaction_snark_scan_state_intf = sig
 
   val next_jobs_sequence : t -> Available_job.t Sequence.t Or_error.t
 
+  val base_jobs_on_latest_tree : t -> Transaction_with_witness.t list
+
   val is_valid : t -> bool
 
   val hash : t -> staged_ledger_aux_hash
@@ -807,7 +883,7 @@ module type Transaction_snark_scan_state_intf = sig
 
   val extract_from_job :
        Available_job.t
-    -> ( transaction_with_info * ledger_proof_statement * sparse_ledger
+    -> ( transaction_with_info * ledger_proof_statement * transaction_witness
        , ledger_proof * ledger_proof )
        Either.t
 
@@ -850,12 +926,16 @@ module type Staged_ledger_base_intf = sig
 
   type transaction
 
+  type transaction_witness
+
   (** The ledger in a staged ledger is always a mask *)
   type ledger
 
   type ledger_proof_statement
 
   type public_key
+
+  type pending_coinbase_collection
 
   type serializable [@@deriving bin_io]
 
@@ -917,12 +997,15 @@ module type Staged_ledger_base_intf = sig
 
   val scan_state : t -> Scan_state.t
 
-  val create : ledger:ledger -> t
+  val pending_coinbase_collection : t -> pending_coinbase_collection
+
+  val create_exn : ledger:ledger -> t
 
   val of_scan_state_and_ledger :
        snarked_ledger_hash:frozen_ledger_hash
     -> ledger:ledger
     -> scan_state:Scan_state.t
+    -> pending_coinbase_collection:pending_coinbase_collection
     -> t Or_error.t Deferred.t
 
   val of_serialized_and_unserialized :
@@ -945,6 +1028,7 @@ module type Staged_ledger_base_intf = sig
     -> ( [`Hash_after_applying of staged_ledger_hash]
          * [`Ledger_proof of (ledger_proof * transaction list) option]
          * [`Staged_ledger of t]
+         * [`Pending_coinbase_data of bool * Currency.Amount.t]
        , Staged_ledger_error.t )
        Deferred.Result.t
 
@@ -953,7 +1037,8 @@ module type Staged_ledger_base_intf = sig
     -> valid_diff
     -> ( [`Hash_after_applying of staged_ledger_hash]
        * [`Ledger_proof of (ledger_proof * transaction list) option]
-       * [`Staged_ledger of t] )
+       * [`Staged_ledger of t]
+       * [`Pending_coinbase_data of bool * Currency.Amount.t] )
        Deferred.Or_error.t
 
   module For_tests : sig
@@ -991,12 +1076,12 @@ module type Staged_ledger_intf = sig
        t
     -> ( ( ledger_proof_statement
          , transaction
-         , sparse_ledger
+         , transaction_witness
          , ledger_proof )
          Snark_work_lib.Work.Single.Spec.t
        * ( ledger_proof_statement
          , transaction
-         , sparse_ledger
+         , transaction_witness
          , ledger_proof )
          Snark_work_lib.Work.Single.Spec.t
          option )
@@ -1004,10 +1089,11 @@ module type Staged_ledger_intf = sig
 
   val statement_exn : t -> [`Non_empty of ledger_proof_statement | `Empty]
 
-  val of_scan_state_and_snarked_ledger :
+  val of_scan_state_pending_coinbases_and_snarked_ledger :
        scan_state:Scan_state.t
     -> snarked_ledger:ledger
     -> expected_merkle_root:ledger_hash
+    -> pending_coinbases:pending_coinbase_collection
     -> t Or_error.t Deferred.t
 end
 
@@ -1077,6 +1163,12 @@ module type Consensus_state_intf = sig
   end
 
   type var
+end
+
+module type Pending_coinbase_witness_intf = sig
+  type pending_coinbases
+
+  type t = {pending_coinbases: pending_coinbases; is_new_stack: bool}
 end
 
 module type Blockchain_state_intf = sig
@@ -1413,6 +1505,8 @@ module type Consensus_mechanism_intf = sig
       -> supply_increase:Currency.Amount.t
       -> blockchain_state:Blockchain_state.Value.t
       -> consensus_data:Consensus_transition_data.value
+      -> proposer:compressed_public_key
+      -> coinbase:Currency.Amount.t
       -> unit
       -> value
 
@@ -1591,6 +1685,13 @@ module type Inputs_intf = sig
     val of_ledger_hash : Ledger_hash.t -> t
   end
 
+  module Pending_coinbase_hash : Pending_coinbase_hash_intf
+
+  module Pending_coinbase :
+    Pending_coinbase_intf
+    with type pending_coinbase_hash := Pending_coinbase_hash.t
+     and type coinbase := Coinbase.t
+
   module Proof : sig
     type t
   end
@@ -1598,8 +1699,14 @@ module type Inputs_intf = sig
   module Sok_message :
     Sok_message_intf with type public_key_compressed := Public_key.Compressed.t
 
+  module Pending_coinbase_stack_state :
+    Pending_coinbase_stack_state_intf
+    with type pending_coinbase_stack := Pending_coinbase.Stack.t
+
   module Ledger_proof_statement :
-    Ledger_proof_statement_intf with type ledger_hash := Frozen_ledger_hash.t
+    Ledger_proof_statement_intf
+    with type ledger_hash := Frozen_ledger_hash.t
+     and type pending_coinbase_stack_state := Pending_coinbase_stack_state.t
 
   module Ledger_proof :
     Ledger_proof_intf
@@ -1639,6 +1746,8 @@ module type Inputs_intf = sig
     Staged_ledger_hash_intf
     with type staged_ledger_aux_hash := Staged_ledger_aux_hash.t
      and type ledger_hash := Ledger_hash.t
+     and type pending_coinbase := Pending_coinbase.t
+     and type pending_coinbase_hash := Pending_coinbase_hash.t
 
   (*
 Bundle Snark:
@@ -1691,6 +1800,9 @@ Merge Snark:
     type t
   end
 
+  module Transaction_witness :
+    Transaction_witness_intf with type sparse_ledger := Sparse_ledger.t
+
   module Staged_ledger :
     Staged_ledger_intf
     with type diff := Staged_ledger_diff.t
@@ -1712,6 +1824,8 @@ Merge Snark:
      and type ledger_proof_statement_set := Ledger_proof_statement.Set.t
      and type transaction := Transaction.t
      and type user_command := User_command.t
+     and type transaction_witness := Transaction_witness.t
+     and type pending_coinbase_collection := Pending_coinbase.t
 
   module Staged_ledger_transition :
     Staged_ledger_transition_intf
