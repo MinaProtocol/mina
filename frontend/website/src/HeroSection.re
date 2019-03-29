@@ -14,7 +14,7 @@ module Copy = {
             minWidth(`rem(17.5)),
             media(
               Style.MediaQuery.full,
-              [width(`percent(50.0)), minWidth(`rem(24.0))],
+              [width(`percent(60.0)), minWidth(`rem(24.0))],
             ),
             media("(min-width: 30rem)", [minWidth(`rem(24.0))]),
           ])
@@ -49,7 +49,7 @@ module Copy = {
                   // align with the grid
                   media(
                     Style.MediaQuery.full,
-                    [marginTop(`rem(1.75)), marginBottom(`rem(11.875))],
+                    [marginTop(`rem(1.75)), marginBottom(`rem(4.0))],
                   ),
                 ]),
               ])
@@ -167,7 +167,7 @@ module Graphic = {
         <div
           className={style([
             width(`percent(100.0)),
-            media(Style.MediaQuery.full, [maxWidth(`rem(22.625))]),
+            maxWidth(`rem(20.0)),
           ])}>
           <div
             className={style([
@@ -216,6 +216,7 @@ let make = _ => {
           display(`flex),
           justifyContent(`spaceAround),
           flexWrap(`wrap),
+          maxWidth(`rem(69.0)),
           media(Style.MediaQuery.full, [flexWrap(`nowrap)]),
         ])
       )>

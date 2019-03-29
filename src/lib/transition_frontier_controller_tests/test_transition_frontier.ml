@@ -27,8 +27,9 @@ let%test_module "Root_history and Transition_frontier" =
     let breadcrumb_trail_equals =
       List.equal ~equal:Transition_frontier.Breadcrumb.equal
 
+    let logger = Logger.null ()
+
     let common_ancestor_test ancestor_length branch1_length branch2_length =
-      let logger = Logger.null () in
       Async.Thread_safe.block_on_async_exn (fun () ->
           let%bind frontier = create_root_frontier ~logger in
           let root = Transition_frontier.root frontier in
@@ -72,7 +73,6 @@ let%test_module "Root_history and Transition_frontier" =
 
     let%test "If a transition does not exists in the transition_frontier or \
               in the root_history, then we should not get an answer" =
-      let logger = Logger.null () in
       Async.Thread_safe.block_on_async_exn (fun () ->
           let%bind frontier = create_root_frontier ~logger in
           let root = Transition_frontier.root frontier in
@@ -96,7 +96,6 @@ let%test_module "Root_history and Transition_frontier" =
 
     let%test "Query transition only from transition_frontier if the \
               root_history is empty" =
-      let logger = Logger.null () in
       Async.Thread_safe.block_on_async_exn (fun () ->
           let%bind frontier = create_root_frontier ~logger in
           let root = Transition_frontier.root frontier in
@@ -126,7 +125,6 @@ let%test_module "Root_history and Transition_frontier" =
           breadcrumb_trail_equals expected_breadcrumbs queried_breadcrumbs )
 
     let%test "Query transitions only from root_history" =
-      let logger = Logger.null () in
       Async.Thread_safe.block_on_async_exn (fun () ->
           let%bind frontier = create_root_frontier ~logger in
           let root = Transition_frontier.root frontier in
@@ -154,8 +152,28 @@ let%test_module "Root_history and Transition_frontier" =
             ( breadcrumbs_path frontier query_hash
             |> Option.value_exn |> Non_empty_list.to_list ) )
 
+    let%test "moving the root removes the old root's non-heir children as \
+              garbage" =
+      Async.Thread_safe.block_on_async_exn (fun () ->
+          let%bind frontier = create_root_frontier ~logger in
+          let%bind () =
+            add_linear_breadcrumbs ~logger ~size:max_length
+              ~accounts_with_secret_keys ~frontier
+              ~parent:(Transition_frontier.root frontier)
+          in
+          let root = Transition_frontier.root frontier in
+          let add_child =
+            add_child ~logger ~accounts_with_secret_keys ~frontier
+          in
+          let%bind soon_garbage = add_child ~parent:root in
+          let%map _ =
+            add_child ~parent:(Transition_frontier.best_tip frontier)
+          in
+          Transition_frontier.(
+            find frontier @@ Breadcrumb.state_hash soon_garbage)
+          |> Option.is_none )
+
     let%test "Transitions get popped off from root history" =
-      let logger = Logger.null () in
       Async.Thread_safe.block_on_async_exn (fun () ->
           let%bind frontier = create_root_frontier ~logger in
           let root = Transition_frontier.root frontier in
@@ -177,7 +195,6 @@ let%test_module "Root_history and Transition_frontier" =
           Transition_frontier.find frontier root_hash |> Option.is_empty )
 
     let%test "Get transitions from both transition frontier and root history" =
-      let logger = Logger.null () in
       Async.Thread_safe.block_on_async_exn (fun () ->
           let%bind frontier = create_root_frontier ~logger in
           let root = Transition_frontier.root frontier in

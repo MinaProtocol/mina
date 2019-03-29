@@ -172,7 +172,7 @@ end) : S = struct
   let set_timestamp t timestamp = {t with timestamp}
 
   let genesis =
-    { staged_ledger_hash= Staged_ledger_hash.dummy
+    { staged_ledger_hash= Staged_ledger_hash.genesis
     ; snarked_ledger_hash=
         Frozen_ledger_hash.of_ledger_hash
         @@ Ledger.merkle_root Genesis_ledger.t

@@ -67,6 +67,8 @@ module type Network_intf = sig
 
   type ledger_hash
 
+  type pending_coinbases
+
   type consensus_state
 
   type sync_ledger_query
@@ -95,7 +97,8 @@ module type Network_intf = sig
          , state_body_hash list * external_transition )
          Proof_carrying_data.t
        * parallel_scan_state
-       * ledger_hash )
+       * ledger_hash
+       * pending_coinbases )
        Deferred.Or_error.t
 
   (* TODO: Change this to strict_pipe *)
