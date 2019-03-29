@@ -227,9 +227,9 @@ let make = _ => {
             src={|<script src="coda_api.js"></script>
 <script>
   onClick(button)
-     .then(() => Coda.requestWallet())
-     .then((wallet) =>
-  Coda.sendTransaction(wallet, ...))
+    .then(() => Coda.requestWallet())
+    .then((wallet) =>
+        wallet.sendTransaction(...))
 </script>|}
           />
           // This keeps the right hand text aligned with the inclusive app section.
