@@ -1,9 +1,12 @@
+;;; each library below has an identical preprocess clause, because of this
+;;; dune bug: https://github.com/ocaml/dune/issues/1946
+
 ;;; should succeed
 
 ;; expiration
 (library
   (name unexpired)
-  (preprocess (pps ppx_coda))
+  (preprocess (pps ppx_jane ppx_deriving_yojson ppx_coda))
   (modules unexpired))
 
 (library
@@ -14,12 +17,14 @@
 ;; versioning
 (library
   (name versioned_good)
-  (preprocess (pps ppx_coda))
+  (preprocess (pps ppx_jane ppx_deriving_yojson ppx_coda))
+  (libraries core_kernel)
   (modules versioned_good))
 
 (library
   (name versioned_good_wrapped)
-  (preprocess (pps ppx_coda))
+  (preprocess (pps ppx_jane ppx_deriving_yojson ppx_coda))
+  (libraries core_kernel)
   (modules versioned_good_wrapped))
 
 ;;; should fail
@@ -27,46 +32,52 @@
 ;; expiration
 (library
   (name expired)
-  (preprocess (pps ppx_coda))
+  (preprocess (pps ppx_jane ppx_deriving_yojson ppx_coda))
   (modules expired))
 
 (library
   (name expiry_in_module)
-  (preprocess (pps ppx_coda))
+  (preprocess (pps ppx_jane ppx_deriving_yojson ppx_coda))
   (modules expiry_in_module))
 
 (library
   (name expiry_invalid_date)
-  (preprocess (pps ppx_coda))
+  (preprocess (pps ppx_jane ppx_deriving_yojson ppx_coda))
   (modules expiry_invalid_date))
 
 (library
   (name expiry_invalid_format)
-  (preprocess (pps ppx_coda))
+  (preprocess (pps ppx_jane ppx_deriving_yojson ppx_coda))
   (modules expiry_invalid_format))
 
 ;; versioning
 (library
  (name versioned_bad_module_structure)
- (preprocess (pps ppx_coda))
+ (preprocess (pps ppx_jane ppx_deriving_yojson ppx_coda))
  (modules versioned_bad_module_structure))
 
 (library
+ (name versioned_bad_wrapped_module_structure)
+ (preprocess (pps ppx_jane ppx_deriving_yojson ppx_coda))
+ (modules versioned_bad_wrapped_module_structure))
+
+(library
  (name versioned_bad_module_name)
- (preprocess (pps ppx_coda))
+ (preprocess (pps ppx_jane ppx_deriving_yojson ppx_coda))
  (modules versioned_bad_module_name))
 
 (library
  (name versioned_bad_version_name)
- (preprocess (pps ppx_coda))
+ (preprocess (pps ppx_jane ppx_deriving_yojson ppx_coda))
  (modules versioned_bad_version_name))
 
 (library
   (name versioned_bad_type_name)
-  (preprocess (pps ppx_coda))
+  (preprocess (pps ppx_jane ppx_deriving_yojson ppx_coda))
   (modules versioned_bad_type_name))
 
 (library
   (name versioned_bad_option)
-  (preprocess (pps ppx_coda))
+  (preprocess (pps ppx_jane ppx_deriving_yojson ppx_coda))
+  (libraries core_kernel)
   (modules versioned_bad_option))
