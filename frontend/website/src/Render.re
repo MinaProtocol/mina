@@ -58,6 +58,7 @@ let posts =
 module Router = {
   type t =
     | File(string, ReasonReact.reactElement)
+    | Css_file(string, string)
     | Dir(string, array(t));
 
   let generateStatic = {
@@ -65,6 +66,9 @@ module Router = {
       fun
       | File(name, elem) => {
           writeStatic(path ++ "/" ++ name, elem);
+        }
+      | Css_file(name, content) => {
+          Node.Fs.writeFileAsUtf8Sync(path ++ "/" ++ name ++ ".css", content);
         }
       | Dir(name, routes) => {
           let path_ = path ++ "/" ++ name;
@@ -91,11 +95,13 @@ let jobOpenings = [|
 // GENERATE
 
 Rimraf.sync("site");
+
 Router.(
   generateStatic(
     Dir(
       "site",
       [|
+        Css_file("fonts", Style.Typeface.Loader.load()),
         File(
           "index",
           <Page page=`Home name="index" footerColor=Style.Colors.gandalf>

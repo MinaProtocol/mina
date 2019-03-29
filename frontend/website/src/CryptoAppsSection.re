@@ -181,7 +181,12 @@ let make = _ => {
       />
       <div
         className=Css.(
-          style([position(`relative), left(`zero), top(`zero)])
+          style([
+            position(`relative),
+            left(`zero),
+            top(`zero),
+            minHeight(`rem(38.)),
+          ])
         )>
         <ImageCollage
           className=Css.(
