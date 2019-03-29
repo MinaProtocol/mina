@@ -34,11 +34,11 @@ let%test_module "Ledger catchup" =
     let test_catchup ~logger ~network (me : Transition_frontier.t) transition
         expected_breadcrumbs =
       let catchup_job_reader, catchup_job_writer =
-        Pipe_lib.Strict_pipe.create
+        Pipe_lib.Strict_pipe.create ~name:(__MODULE__ ^ __LOC__)
           (Buffered (`Capacity 10, `Overflow Drop_head))
       in
       let catchup_breadcrumbs_reader, catchup_breadcrumbs_writer =
-        Strict_pipe.create Synchronous
+        Strict_pipe.create ~name:(__MODULE__ ^ __LOC__) Synchronous
       in
       let unprocessed_transition_cache =
         Transition_handler.Unprocessed_transition_cache.create ~logger
