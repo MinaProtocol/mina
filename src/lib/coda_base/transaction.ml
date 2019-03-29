@@ -8,7 +8,7 @@ type t =
   | User_command of User_command.With_valid_signature.t
   | Fee_transfer of Fee_transfer.Stable.V1.t
   | Coinbase of Coinbase.Stable.V1.t
-[@@deriving bin_io, sexp]
+[@@deriving bin_io, compare, eq, sexp]
 
 let fee_excess = function
   | User_command t ->

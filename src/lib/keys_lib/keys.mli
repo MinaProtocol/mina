@@ -1,4 +1,5 @@
 open Snark_params
+open Coda_base
 
 module type S = sig
   module Step_prover_state : sig

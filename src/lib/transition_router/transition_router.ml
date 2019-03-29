@@ -13,7 +13,7 @@ module type Inputs_intf = sig
   module Transition_frontier :
     Transition_frontier_intf
     with type state_hash := State_hash.t
-     and type external_transition_verified := External_transition.Verified.t
+     and type external_transition_verified := Consensus.External_transition.Verified.t
      and type ledger_database := Ledger.Db.t
      and type staged_ledger := Staged_ledger.t
      and type staged_ledger_diff := Staged_ledger_diff.t
@@ -26,7 +26,7 @@ module type Inputs_intf = sig
     Network_intf
     with type peer := Network_peer.Peer.t
      and type state_hash := State_hash.t
-     and type external_transition := External_transition.t
+     and type external_transition := Consensus.External_transition.t
      and type consensus_state := Consensus.Consensus_state.Value.t
      and type state_body_hash := State_body_hash.t
      and type ledger_hash := Ledger_hash.t
@@ -37,7 +37,7 @@ module type Inputs_intf = sig
   module Transition_frontier_controller :
     Transition_frontier_controller_intf
     with type time_controller := Time.Controller.t
-     and type external_transition_verified := External_transition.Verified.t
+     and type external_transition_verified := Consensus.External_transition.Verified.t
      and type transition_frontier := Transition_frontier.t
      and type time := Time.t
      and type state_hash := State_hash.t
@@ -47,7 +47,7 @@ module type Inputs_intf = sig
     Bootstrap_controller_intf
     with type network := Network.t
      and type transition_frontier := Transition_frontier.t
-     and type external_transition_verified := External_transition.Verified.t
+     and type external_transition_verified := Consensus.External_transition.Verified.t
      and type ledger_db := Ledger.Db.t
 
   module State_proof :
@@ -59,18 +59,18 @@ module type Inputs_intf = sig
     Protocol_state_validator_intf
     with type time := Time.t
      and type state_hash := State_hash.t
-     and type external_transition := External_transition.t
+     and type external_transition := Consensus.External_transition.t
      and type external_transition_proof_verified :=
-                External_transition.Proof_verified.t
-     and type external_transition_verified := External_transition.Verified.t
+                Consensus.External_transition.Proof_verified.t
+     and type external_transition_verified := Consensus.External_transition.Verified.t
 end
 
 module Make (Inputs : Inputs_intf) :
   Transition_router_intf
   with type time_controller := Inputs.Time.Controller.t
-   and type external_transition := Inputs.External_transition.t
+   and type external_transition := Consensus.External_transition.t
    and type external_transition_verified :=
-              Inputs.External_transition.Verified.t
+              Consensus.External_transition.Verified.t
    and type transition_frontier := Inputs.Transition_frontier.t
    and type time := Inputs.Time.t
    and type state_hash := State_hash.t
@@ -92,11 +92,11 @@ module Make (Inputs : Inputs_intf) :
     Strict_pipe.Writer.close writer
 
   let is_transition_for_bootstrap root_state new_transition =
-    let open External_transition.Verified in
+    let open Consensus.External_transition.Verified in
     let new_state = protocol_state new_transition in
     Consensus.should_bootstrap
-      ~existing:(External_transition.Protocol_state.consensus_state root_state)
-      ~candidate:(External_transition.Protocol_state.consensus_state new_state)
+      ~existing:(Consensus.External_transition.Protocol_state.consensus_state root_state)
+      ~candidate:(Consensus.External_transition.Protocol_state.consensus_state new_state)
 
   let is_bootstrapping = function
     | `Bootstrap_controller (_, _) -> true
@@ -105,7 +105,7 @@ module Make (Inputs : Inputs_intf) :
   let get_root_state frontier =
     Transition_frontier.root frontier
     |> Transition_frontier.Breadcrumb.transition_with_hash |> With_hash.data
-    |> External_transition.of_verified |> External_transition.protocol_state
+    |> Consensus.External_transition.of_verified |> Consensus.External_transition.protocol_state
 
   module Broadcaster = struct
     type 'a t = {mutable var: 'a; f: 'a -> unit}
@@ -166,7 +166,7 @@ module Make (Inputs : Inputs_intf) :
             (With_hash.of_data
                ~hash_data:
                  (Fn.compose Consensus.Protocol_state.hash
-                    External_transition.Verified.protocol_state)) )
+                    Consensus.External_transition.Verified.protocol_state)) )
     in
     let start_transition_frontier_controller ~verified_transition_writer
         ~clear_reader ~collected_transitions frontier =

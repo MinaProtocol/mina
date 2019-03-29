@@ -164,7 +164,7 @@ module Make (Inputs : Inputs.S) = struct
               ; ( "cached_transition"
                 , Cached.peek cached_transition
                   |> With_hash.data
-                  |> Inputs.External_transition.Verified.to_yojson ) ]
+                  |> Consensus.External_transition.Verified.to_yojson ) ]
             "timed out waiting for the parent of $cached_transition after \
              $duration ms, signalling a catchup job" ;
           (* it's ok to create a new thread here because the thread essentially does no work *)

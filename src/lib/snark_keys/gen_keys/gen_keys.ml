@@ -5,6 +5,7 @@ open Ppxlib
 open Asttypes
 open Parsetree
 open Longident
+open Coda_base
 open Signature_lib
 open Core
 
@@ -181,6 +182,8 @@ let main () =
   Pprintast.top_phrase fmt
     (Ptop_def
        [%str
+         open Coda_base
+
          let blockchain_proving () = [%e bc_proving]
 
          let blockchain_verification () = [%e bc_verification]

@@ -1,0 +1,5 @@
+(library
+  (name verifier)
+  (public_name verifier)
+  (libraries core_kernel coda_base blockchain_snark cli_lib snark_keys snark_params)
+  (preprocess (pps ppx_jane)))

@@ -30,7 +30,7 @@ end
 val dummy : t
 
 module Aux_hash : sig
-  type t
+  type t [@@deriving sexp, eq, compare, hash, yojson]
 
   module Stable : sig
     module V1 : sig

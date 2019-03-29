@@ -4,6 +4,7 @@ open Kademlia
 open Coda_base
 open Pipe_lib
 open Network_peer
+open Consensus
 
 (* assumption: the Rpcs functor is applied only once in the codebase, so that
    any versions appearing in Inputs represent unique types
@@ -13,20 +14,11 @@ open Network_peer
 *)
 
 module Rpcs (Inputs : sig
-  module Staged_ledger_aux_hash :
-    Protocols.Coda_pow.Staged_ledger_aux_hash_intf
-
   module Staged_ledger_aux : sig
     module Stable : sig
       module V1 : Binable.S
     end
   end
-
-  module Ledger_hash : Protocols.Coda_pow.Ledger_hash_intf
-
-  module Blockchain_state : Blockchain_state.S
-
-  module External_transition : External_transition.S
 end) =
 struct
   open Inputs
@@ -259,100 +251,7 @@ struct
   end
 end
 
-module Message (Inputs : sig
-  module Snark_pool_diff : sig
-    type t [@@deriving sexp]
-
-    module Stable :
-      sig
-        module V1 : sig
-          type t [@@deriving bin_io, sexp, to_yojson]
-        end
-      end
-      with type V1.t = t
-  end
-
-  module Transaction_pool_diff : sig
-    type t [@@deriving sexp]
-
-    module Stable :
-      sig
-        module V1 : sig
-          type t [@@deriving bin_io, sexp, to_yojson]
-        end
-      end
-      with type V1.t = t
-  end
-
-  module External_transition : External_transition.S
-end) =
-struct
-  open Inputs
-
-  module T = struct
-    module T = struct
-      (* "master" types, do not change *)
-      type content =
-        | New_state of External_transition.Stable.V1.t
-        | Snark_pool_diff of Snark_pool_diff.Stable.V1.t
-        | Transaction_pool_diff of Transaction_pool_diff.Stable.V1.t
-      [@@deriving bin_io, sexp, to_yojson]
-
-      type msg = content Envelope.Incoming.Stable.V1.t
-      [@@deriving sexp, to_yojson]
-    end
-
-    let name = "message"
-
-    module Caller = T
-    module Callee = T
-  end
-
-  include T.T
-
-  let content ({data; _} : msg) = data
-
-  let sender ({sender; _} : msg) = sender
-
-  include Versioned_rpc.Both_convert.One_way.Make (T)
-
-  module V1 = struct
-    module T = struct
-      type content = T.T.content [@@deriving bin_io, sexp]
-
-      type msg = content Envelope.Incoming.Stable.V1.t
-      [@@deriving bin_io, sexp]
-
-      let version = 1
-
-      let callee_model_of_msg = Fn.id
-
-      let msg_of_caller_model = Fn.id
-    end
-
-    include Register (T)
-  end
-
-  let summary msg =
-    match Envelope.Incoming.data msg with
-    | New_state _ -> "new state"
-    | Snark_pool_diff _ -> "snark pool diff"
-    | Transaction_pool_diff _ -> "transaction pool diff"
-end
-
 module type Inputs_intf = sig
-  module External_transition : External_transition.S
-
-  module Staged_ledger_aux_hash :
-    Protocols.Coda_pow.Staged_ledger_aux_hash_intf
-
-  module Ledger_hash : Protocols.Coda_pow.Ledger_hash_intf
-
-  (* we omit Staged_ledger_hash, because the available module in Inputs is not versioned; instead, in the
-     versioned RPC modules, we use a specific version
-   *)
-  module Blockchain_state : Coda_base.Blockchain_state.S
-
   module Staged_ledger_aux : sig
     type t
 
@@ -364,31 +263,7 @@ module type Inputs_intf = sig
       end
       with type V1.t = t
 
-    val hash : t -> Staged_ledger_aux_hash.t
-  end
-
-  module Snark_pool_diff : sig
-    type t [@@deriving sexp, to_yojson]
-
-    module Stable :
-      sig
-        module V1 : sig
-          type t [@@deriving sexp, bin_io, to_yojson]
-        end
-      end
-      with type V1.t = t
-  end
-
-  module Transaction_pool_diff : sig
-    type t [@@deriving sexp, to_yojson]
-
-    module Stable :
-      sig
-        module V1 : sig
-          type t [@@deriving sexp, bin_io, to_yojson]
-        end
-      end
-      with type V1.t = t
+    val hash : t -> Staged_ledger_hash.Aux_hash.t
   end
 
   module Time : Protocols.Coda_pow.Time_intf
@@ -407,9 +282,6 @@ end
 
 module Make (Inputs : Inputs_intf) = struct
   open Inputs
-  module Message = Message (Inputs)
-  module Gossip_net = Gossip_net.Make (Message)
-  module Peer = Peer
 
   module Config :
     Config_intf
@@ -431,7 +303,7 @@ module Make (Inputs : Inputs_intf) = struct
         (External_transition.t Envelope.Incoming.t * Time.t)
         Strict_pipe.Reader.t
     ; transaction_pool_diffs:
-        Transaction_pool_diff.t Envelope.Incoming.t Linear_pipe.Reader.t
+        Transaction_pool.Pool.Diff.t Envelope.Incoming.t Linear_pipe.Reader.t
     ; snark_pool_diffs:
         Snark_pool_diff.t Envelope.Incoming.t Linear_pipe.Reader.t }
   [@@deriving fields]

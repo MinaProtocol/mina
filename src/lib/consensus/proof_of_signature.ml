@@ -181,17 +181,23 @@ end
 module Protocol_state =
   Protocol_state.Make (Blockchain_state) (Consensus_state)
 
-module Configuration = struct
-  type t = {proposal_interval: int} [@@deriving yojson, bin_io]
-
-  let t = {proposal_interval= Constants.block_window_duration_ms}
-end
-
 module Snark_transition = Coda_base.Snark_transition.Make (struct
   module Genesis_ledger = Genesis_ledger
   module Blockchain_state = Blockchain_state
   module Consensus_data = Consensus_transition_data
 end)
+
+module Internal_transition =
+  Internal_transition.Make (Snark_transition) (Prover_state)
+
+module External_transition =
+  External_transition.Make (Protocol_state)
+
+module Configuration = struct
+  type t = {proposal_interval: int} [@@deriving yojson, bin_io]
+
+  let t = {proposal_interval= Constants.block_window_duration_ms}
+end
 
 let generate_transition ~previous_protocol_state ~blockchain_state ~time:_
     ~proposal_data ~transactions:_ ~snarked_ledger_hash:_ ~supply_increase:_

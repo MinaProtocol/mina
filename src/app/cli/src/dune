@@ -4,7 +4,7 @@
  (libraries base64 core debug_assert daemon_rpcs pipe_lib coda_networking
    proposer gossip_net kademlia coda_lib coda_numbers protocols lite_lib
    lite_compat coda_base test_util staged_ledger sparse_ledger_lib
-   syncable_ledger blockchain_snark transaction_snark transaction_pool snarky
+   syncable_ledger blockchain_snark transaction_pool snarky
    snark_keys snark_params snark_pool precomputed_values network_peer
    network_pool snark_worker_lib keys_lib storage logger transition_frontier
    transition_frontier_controller sync_handler ledger_catchup

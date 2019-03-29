@@ -1,5 +1,6 @@
 open Core
 open Async
+open Coda_base
 
 module Inputs = struct
   module Worker_state = struct

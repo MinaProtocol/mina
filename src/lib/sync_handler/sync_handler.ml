@@ -8,7 +8,7 @@ module type Inputs_intf = sig
   module Transition_frontier :
     Transition_frontier_intf
     with type state_hash := State_hash.t
-     and type external_transition_verified := External_transition.Verified.t
+     and type external_transition_verified := Consensus.External_transition.Verified.t
      and type ledger_database := Ledger.Db.t
      and type staged_ledger := Staged_ledger.t
      and type masked_ledger := Ledger.Mask.Attached.t
@@ -23,17 +23,18 @@ module type Inputs_intf = sig
     Protocol_state_validator_intf
     with type time := Time.t
      and type state_hash := State_hash.t
-     and type external_transition := External_transition.t
+     and type external_transition := Consensus.External_transition.t
      and type external_transition_proof_verified :=
-                External_transition.Proof_verified.t
-     and type external_transition_verified := External_transition.Verified.t
+                
+       Consensus.External_transition.Proof_verified.t
+     and type external_transition_verified := Consensus.External_transition.Verified.t
 end
 
 module Make (Inputs : Inputs_intf) :
   Sync_handler_intf
   with type ledger_hash := Ledger_hash.t
    and type state_hash := State_hash.t
-   and type external_transition := Inputs.External_transition.t
+   and type external_transition := Consensus.External_transition.t
    and type transition_frontier := Inputs.Transition_frontier.t
    and type syncable_ledger_query := Sync_ledger.Query.t
    and type syncable_ledger_answer := Sync_ledger.Answer.t = struct
@@ -70,7 +71,7 @@ module Make (Inputs : Inputs_intf) :
       Transition_frontier.root_history_path_map frontier
         ~f:(fun b ->
           Transition_frontier.Breadcrumb.transition_with_hash b
-          |> With_hash.data |> External_transition.of_verified )
+          |> With_hash.data |> Consensus.External_transition.of_verified )
         state_hash
     in
     let length =

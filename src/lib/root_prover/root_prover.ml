@@ -10,7 +10,7 @@ module type Inputs_intf = sig
   module Transition_frontier :
     Transition_frontier_intf
     with type state_hash := State_hash.t
-     and type external_transition_verified := External_transition.Verified.t
+     and type external_transition_verified := Consensus.External_transition.Verified.t
      and type ledger_database := Ledger.Db.t
      and type staged_ledger := Staged_ledger.t
      and type masked_ledger := Ledger.Mask.Attached.t
@@ -25,32 +25,32 @@ module type Inputs_intf = sig
     Protocol_state_validator_intf
     with type time := Time.t
      and type state_hash := State_hash.t
-     and type external_transition := External_transition.t
+     and type external_transition := Consensus.External_transition.t
      and type external_transition_proof_verified :=
-                External_transition.Proof_verified.t
-     and type external_transition_verified := External_transition.Verified.t
+                Consensus.External_transition.Proof_verified.t
+     and type external_transition_verified := Consensus.External_transition.Verified.t
 end
 
 module Make (Inputs : Inputs_intf) :
   Coda_transition_frontier.Root_prover_intf
   with type state_body_hash := State_body_hash.t
    and type transition_frontier := Inputs.Transition_frontier.t
-   and type external_transition := Inputs.External_transition.t
+   and type external_transition := Consensus.External_transition.t
    and type proof_verified_external_transition :=
-              Inputs.External_transition.Proof_verified.t
+              Consensus.External_transition.Proof_verified.t
    and type consensus_state := Consensus.Consensus_state.Value.t
    and type state_hash := State_hash.t = struct
   open Inputs
 
   let hash_transition =
-    Fn.compose Consensus.Protocol_state.hash External_transition.protocol_state
+    Fn.compose Consensus.Protocol_state.hash Consensus.External_transition.protocol_state
 
   let consensus_state transition =
-    External_transition.(
-      protocol_state transition |> Protocol_state.consensus_state)
+    Consensus.External_transition.(
+      protocol_state transition |> Consensus.Protocol_state.consensus_state)
 
   module Merkle_list = Merkle_list.Make (struct
-    type value = External_transition.Verified.t
+    type value = Consensus.External_transition.Verified.t
 
     type context = Transition_frontier.t
 
@@ -59,13 +59,13 @@ module Make (Inputs : Inputs_intf) :
     type hash = State_hash.t [@@deriving eq]
 
     let to_proof_elem external_transition =
-      let open External_transition in
+      let open Consensus.External_transition in
       external_transition |> Verified.protocol_state |> Protocol_state.body
       |> Protocol_state.Body.hash
 
     let get_previous ~context transition =
       let parent_hash =
-        transition |> External_transition.Verified.protocol_state
+        transition |> Consensus.External_transition.Verified.protocol_state
         |> Consensus.Protocol_state.previous_state_hash
       in
       let open Option.Let_syntax in
@@ -79,8 +79,8 @@ module Make (Inputs : Inputs_intf) :
   end)
 
   let prove ~logger ~frontier seen_consensus_state :
-      ( External_transition.t
-      , State_body_hash.t List.t * External_transition.t )
+      ( Consensus.External_transition.t
+      , State_body_hash.t List.t * Consensus.External_transition.t )
       Proof_carrying_data.t
       option =
     let open Option.Let_syntax in
@@ -95,7 +95,7 @@ module Make (Inputs : Inputs_intf) :
       Transition_frontier.Breadcrumb.transition_with_hash best_tip_breadcrumb
       |> With_hash.data
     in
-    let best_tip = External_transition.of_verified best_verified_tip in
+    let best_tip = Consensus.External_transition.of_verified best_verified_tip in
     let is_tip_better =
       Consensus.select ~logger ~existing:(consensus_state best_tip)
         ~candidate:seen_consensus_state
@@ -114,7 +114,7 @@ module Make (Inputs : Inputs_intf) :
       "Produced a merkle list of $merkle_list" ;
     Some
       Proof_carrying_data.
-        { data= root |> External_transition.of_verified
+        { data= root |> Consensus.External_transition.of_verified
         ; proof= (merkle_list, best_tip) }
 
   let check_error ~message cond =

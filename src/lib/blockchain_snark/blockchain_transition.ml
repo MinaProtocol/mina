@@ -121,30 +121,27 @@ module Keys = struct
 end
 
 module Make
-    (Consensus_mechanism : Consensus.S)
-    (T : Transaction_snark.Verification.S) =
+    (T : Coda_base.Transaction_snark.Verification.S) =
 struct
-  module Blockchain = Blockchain_state.Make (Consensus_mechanism)
-
   module System = struct
-    module U = Blockchain.Make_update (T)
-    module Update = Consensus_mechanism.Snark_transition
+    module U = Blockchain_state.Make_update (T)
+    module Update = Consensus.Snark_transition
 
     module State = struct
-      include Consensus_mechanism.Protocol_state
-
       include (
-        Blockchain :
-          module type of Blockchain with module Checked := Blockchain.Checked )
+        Blockchain_state :
+          module type of Blockchain_state with module Checked := Blockchain_state.Checked )
+
+      module Checked = struct
+        include Blockchain_state.Checked
+        include U.Checked
+      end
+
+      include Consensus.Protocol_state
 
       include (U : module type of U with module Checked := U.Checked)
 
       module Hash = Coda_base.State_hash
-
-      module Checked = struct
-        include Blockchain.Checked
-        include U.Checked
-      end
     end
   end
 
@@ -267,9 +264,8 @@ end
 let constraint_system_digests () =
   let module M =
     Make
-      (Consensus)
-      (Transaction_snark.Verification.Make (struct
-        let keys = Transaction_snark.Keys.Verification.dummy
+      (Coda_base.Transaction_snark.Verification.Make (struct
+        let keys = Coda_base.Transaction_snark.Keys.Verification.dummy
       end))
   in
   let module W = M.Wrap_base (struct

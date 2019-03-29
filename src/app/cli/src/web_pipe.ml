@@ -9,34 +9,13 @@ let request_service_name = "CODA_WEB_CLIENT_SERVICE"
 module type Coda_intf = sig
   type t
 
-  module Inputs : sig
-    module Ledger : sig
-      type t
-
-      val fold_until :
-           t
-        -> init:'accum
-        -> f:('accum -> Account.t -> ('accum, 'stop) Base.Continue_or_stop.t)
-        -> finish:('accum -> 'stop)
-        -> 'stop
-    end
-
-    module External_transition : sig
-      type t
-
-      module Verified : sig
-        type t
-      end
-    end
-  end
-
   val get_lite_chain :
     (t -> Signature_lib.Public_key.Compressed.t list -> Lite_base.Lite_chain.t)
     option
 
   val verified_transitions :
        t
-    -> (Inputs.External_transition.Verified.t, State_hash.t) With_hash.t
+    -> (Consensus.External_transition.Verified.t, State_hash.t) With_hash.t
        Strict_pipe.Reader.t
 end
 

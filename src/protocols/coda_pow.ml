@@ -1380,6 +1380,16 @@ module type Consensus_mechanism_intf = sig
 
   module Consensus_state : Consensus_state_intf
 
+  module Prover_state : sig
+    type t [@@deriving bin_io]
+  end
+
+  module Proposal_data : sig
+    type t
+
+    val prover_state : t -> Prover_state.t
+  end
+
   module Blockchain_state :
     Blockchain_state_intf
     with type staged_ledger_hash := staged_ledger_hash
@@ -1391,16 +1401,6 @@ module type Consensus_mechanism_intf = sig
     with type state_hash := protocol_state_hash
      and type blockchain_state := Blockchain_state.Value.t
      and type consensus_state := Consensus_state.Value.t
-
-  module Prover_state : sig
-    type t [@@deriving bin_io]
-  end
-
-  module Proposal_data : sig
-    type t
-
-    val prover_state : t -> Prover_state.t
-  end
 
   module Snark_transition : sig
     type value
@@ -1420,6 +1420,18 @@ module type Consensus_mechanism_intf = sig
 
     val consensus_data : value -> Consensus_transition_data.value
   end
+
+  module Internal_transition :
+    Internal_transition_intf
+    with type snark_transition := Snark_transition.value
+     and type prover_state := Prover_state.t
+     and type staged_ledger_diff := staged_ledger_diff
+
+  module External_transition :
+    External_transition_intf
+    with type protocol_state := Protocol_state.Value.t
+     and type staged_ledger_diff := staged_ledger_diff
+     and type protocol_state_proof := protocol_state_proof
 
   val generate_transition :
        previous_protocol_state:Protocol_state.Value.t
@@ -1739,24 +1751,12 @@ Merge Snark:
      and type keypair := Keypair.t
      and type time := Time.t
 
-  module Internal_transition :
-    Internal_transition_intf
-    with type snark_transition := Consensus_mechanism.Snark_transition.value
-     and type prover_state := Consensus_mechanism.Prover_state.t
-     and type staged_ledger_diff := Staged_ledger_diff.t
-
-  module External_transition :
-    External_transition_intf
-    with type protocol_state := Consensus_mechanism.Protocol_state.Value.t
-     and type staged_ledger_diff := Staged_ledger_diff.t
-     and type protocol_state_proof := Protocol_state_proof.t
-
   module Tip :
     Tip_intf
     with type staged_ledger := Staged_ledger.t
      and type protocol_state := Consensus_mechanism.Protocol_state.Value.t
      and type protocol_state_proof := Protocol_state_proof.t
-     and type external_transition := External_transition.t
+     and type external_transition := Consensus_mechanism.External_transition.t
      and type serializable :=
                 Consensus_mechanism.Protocol_state.Value.t
                 * Protocol_state_proof.t
@@ -1782,7 +1782,7 @@ module Make
                                      and type protocol_state_proof :=
                                                 Inputs.Protocol_state_proof.t
                                      and type internal_transition :=
-                                                Inputs.Internal_transition.t) =
+                                                Inputs.Consensus_mechanism.Internal_transition.t) =
 struct
   open Inputs
 
@@ -1795,7 +1795,7 @@ struct
 
   module Event = struct
     type t =
-      | Found of Internal_transition.t
+      | Found of Consensus_mechanism.Internal_transition.t
       | New_state of Proof_carrying_state.t * Staged_ledger_transition.t
   end
 

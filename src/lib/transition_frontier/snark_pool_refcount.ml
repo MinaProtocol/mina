@@ -11,7 +11,7 @@ module type Inputs_intf = sig
   module Breadcrumb :
     Transition_frontier_Breadcrumb_intf
     with type state_hash := State_hash.t
-     and type external_transition_verified := External_transition.Verified.t
+     and type external_transition_verified := Consensus.External_transition.Verified.t
      and type staged_ledger := Staged_ledger.t
      and type user_command := User_command.t
 end

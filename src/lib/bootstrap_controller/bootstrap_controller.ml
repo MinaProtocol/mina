@@ -10,7 +10,7 @@ module type Inputs_intf = sig
   module Transition_frontier :
     Transition_frontier_intf
     with type state_hash := State_hash.t
-     and type external_transition_verified := External_transition.Verified.t
+     and type external_transition_verified := Consensus.External_transition.Verified.t
      and type ledger_database := Ledger.Db.t
      and type masked_ledger := Ledger.Mask.Attached.t
      and type transaction_snark_scan_state := Staged_ledger.Scan_state.t
@@ -34,7 +34,7 @@ module type Inputs_intf = sig
     Network_intf
     with type peer := Network_peer.Peer.t
      and type state_hash := State_hash.t
-     and type external_transition := External_transition.t
+     and type external_transition := Consensus.External_transition.t
      and type consensus_state := Consensus.Consensus_state.Value.t
      and type state_body_hash := State_body_hash.t
      and type ledger_hash := Ledger_hash.t
@@ -48,16 +48,16 @@ module type Inputs_intf = sig
     Protocol_state_validator_intf
     with type time := Time.t
      and type state_hash := State_hash.t
-     and type external_transition := External_transition.t
+     and type external_transition := Consensus.External_transition.t
      and type external_transition_proof_verified :=
-                External_transition.Proof_verified.t
-     and type external_transition_verified := External_transition.Verified.t
+                Consensus.External_transition.Proof_verified.t
+     and type external_transition_verified := Consensus.External_transition.Verified.t
 
   module Sync_handler :
     Sync_handler_intf
     with type ledger_hash := Ledger_hash.t
      and type state_hash := State_hash.t
-     and type external_transition := External_transition.t
+     and type external_transition := Consensus.External_transition.t
      and type transition_frontier := Transition_frontier.t
      and type syncable_ledger_query := Sync_ledger.Query.t
      and type syncable_ledger_answer := Sync_ledger.Answer.t
@@ -66,9 +66,9 @@ module type Inputs_intf = sig
     Root_prover_intf
     with type state_body_hash := State_body_hash.t
      and type transition_frontier := Transition_frontier.t
-     and type external_transition := External_transition.t
+     and type external_transition := Consensus.External_transition.t
      and type proof_verified_external_transition :=
-                External_transition.Proof_verified.t
+                Consensus.External_transition.Proof_verified.t
      and type consensus_state := Consensus.Consensus_state.Value.t
      and type state_hash := State_hash.t
 end
@@ -81,7 +81,7 @@ module Make (Inputs : Inputs_intf) : sig
     with type network := Inputs.Network.t
      and type transition_frontier := Inputs.Transition_frontier.t
      and type external_transition_verified :=
-                Inputs.External_transition.Verified.t
+                Consensus.External_transition.Verified.t
      and type ledger_db := Ledger.Db.t
 
   module For_tests : sig
@@ -89,7 +89,7 @@ module Make (Inputs : Inputs_intf) : sig
 
     val make_bootstrap :
          logger:Logger.t
-      -> genesis_root:Inputs.External_transition.Proof_verified.t
+      -> genesis_root:Consensus.External_transition.Proof_verified.t
       -> network:Inputs.Network.t
       -> t
 
@@ -99,14 +99,14 @@ module Make (Inputs : Inputs_intf) : sig
          t
       -> sender:Network_peer.Peer.t
       -> root_sync_ledger:Root_sync_ledger.t
-      -> External_transition.Proof_verified.t
+      -> Consensus.External_transition.Proof_verified.t
       -> [> `Syncing of syncing_data | `Ignored] Deferred.t
 
     module Transition_cache : sig
       include
         Transition_cache.S
         with type external_transition_verified :=
-                    Inputs.External_transition.Verified.t
+                    Consensus.External_transition.Verified.t
          and type state_hash := State_hash.t
     end
 
@@ -114,7 +114,7 @@ module Make (Inputs : Inputs_intf) : sig
          t
       -> root_sync_ledger:Inputs.Root_sync_ledger.t
       -> transition_graph:Transition_cache.t
-      -> transition_reader:( [< `Transition of Inputs.External_transition
+      -> transition_reader:( [< `Transition of Consensus.External_transition
                                                .Verified
                                                .t
                                                Envelope.Incoming.t ]
@@ -132,9 +132,9 @@ end = struct
   type t =
     { logger: Logger.t
     ; mutable best_seen_transition:
-        (External_transition.Proof_verified.t, State_hash.t) With_hash.t
+        (Consensus.External_transition.Proof_verified.t, State_hash.t) With_hash.t
     ; mutable current_root:
-        (External_transition.Proof_verified.t, State_hash.t) With_hash.t
+        (Consensus.External_transition.Proof_verified.t, State_hash.t) With_hash.t
     ; network: Network.t }
 
   type syncing_data =
@@ -149,7 +149,7 @@ end = struct
     = Consensus.select ~logger:t.logger
         ~existing:
           ( t.best_seen_transition |> With_hash.data
-          |> External_transition.Proof_verified.protocol_state
+          |> Consensus.External_transition.Proof_verified.protocol_state
           |> Consensus.Protocol_state.consensus_state )
         ~candidate
 
@@ -161,9 +161,9 @@ end = struct
     Option.is_some (Root_sync_ledger.peek_valid_tree root_sync_ledger)
 
   let on_transition t ~sender ~root_sync_ledger
-      (candidate_transition : External_transition.Proof_verified.t) =
+      (candidate_transition : Consensus.External_transition.Proof_verified.t) =
     let candidate_state =
-      External_transition.Proof_verified.protocol_state candidate_transition
+      Consensus.External_transition.Proof_verified.protocol_state candidate_transition
       |> Consensus.Protocol_state.consensus_state
     in
     if
@@ -187,14 +187,14 @@ end = struct
               t.best_seen_transition <- peer_best_tip ;
               t.current_root <- peer_root ;
               let blockchain_state =
-                let open External_transition in
+                let open Consensus.External_transition in
                 t.current_root |> With_hash.data
                 |> Proof_verified.protocol_state
                 |> Protocol_state.blockchain_state
               in
               let expected_staged_ledger_hash =
                 blockchain_state
-                |> External_transition.Protocol_state.Blockchain_state
+                |> Consensus.External_transition.Protocol_state.Blockchain_state
                    .staged_ledger_hash
               in
               let received_staged_ledger_hash =
@@ -210,7 +210,7 @@ end = struct
               then
                 let snarked_ledger_hash =
                   blockchain_state
-                  |> External_transition.Protocol_state.Blockchain_state
+                  |> Consensus.External_transition.Protocol_state.Blockchain_state
                      .snarked_ledger_hash
                 in
                 Root_sync_ledger.new_goal root_sync_ledger
@@ -235,7 +235,7 @@ end = struct
     Network.glue_sync_ledger t.network query_reader response_writer ;
     Reader.iter transition_reader
       ~f:(fun (`Transition incoming_transition, `Time_received _) ->
-        let (transition : External_transition.Verified.t) =
+        let (transition : Consensus.External_transition.Verified.t) =
           Envelope.Incoming.data incoming_transition
         in
         let sender =
@@ -247,10 +247,10 @@ end = struct
           | Envelope.Sender.Remote peer -> peer
         in
         let protocol_state =
-          External_transition.Verified.protocol_state transition
+          Consensus.External_transition.Verified.protocol_state transition
         in
         let previous_state_hash =
-          External_transition.Protocol_state.previous_state_hash protocol_state
+          Consensus.External_transition.Protocol_state.previous_state_hash protocol_state
         in
         Transition_cache.add transition_graph ~parent:previous_state_hash
           transition ;
@@ -262,7 +262,7 @@ end = struct
           let open Deferred.Let_syntax in
           match%map
             on_transition t ~sender ~root_sync_ledger
-              (External_transition.forget_consensus_state_verification
+              (Consensus.External_transition.forget_consensus_state_verification
                  transition)
           with
           | `Syncing
@@ -279,7 +279,7 @@ end = struct
     in
     let initial_root_transition =
       With_hash.map initial_root_verified_transition
-        ~f:External_transition.forget_consensus_state_verification
+        ~f:Consensus.External_transition.forget_consensus_state_verification
     in
     let t =
       { network
@@ -314,7 +314,7 @@ end = struct
              fully verified transition because it will be added into transition
              frontier*)
           let (`I_swear_this_is_safe_see_my_comment verified_root) =
-            External_transition.(root |> of_proof_verified |> to_verified)
+            Consensus.External_transition.(root |> of_proof_verified |> to_verified)
           in
           verified_root )
     in
@@ -346,7 +346,7 @@ end = struct
 
     let hash_data =
       Fn.compose Consensus.Protocol_state.hash
-        External_transition.Proof_verified.protocol_state
+        Consensus.External_transition.Proof_verified.protocol_state
 
     let make_bootstrap ~logger ~genesis_root ~network =
       let transition = With_hash.of_data genesis_root ~hash_data in

@@ -1,6 +1,7 @@
 open Core
 open Async
 open Signature_lib
+open Coda_base
 
 module Cache = struct
   module T = Hash_heap.Make (Transaction_snark.Statement)

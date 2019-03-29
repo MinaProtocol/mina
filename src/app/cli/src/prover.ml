@@ -66,7 +66,6 @@ module Worker_state = struct
                open Keys
                module Consensus_mechanism = Consensus
                module Transaction_snark = Transaction_snark
-               module Blockchain_state = Blockchain_state.Make (Consensus)
                module State = Blockchain_state.Make_update (Transaction_snark)
 
                let wrap hash proof =
@@ -115,7 +114,6 @@ module Worker_state = struct
                open Keys
                module Consensus_mechanism = Consensus
                module Transaction_snark = Transaction_snark
-               module Blockchain_state = Blockchain_state.Make (Consensus)
                module State = Blockchain_state.Make_update (Transaction_snark)
 
                let extend_blockchain (chain : Blockchain.t)

@@ -1,6 +1,7 @@
+module Coda_base_util = Util
+
 open Core
 open Signature_lib
-open Coda_base
 open Snark_params
 open Currency
 open Fold_lib
@@ -63,8 +64,8 @@ module Statement = struct
         let version = 1
 
         type t =
-          { source: Coda_base.Frozen_ledger_hash.Stable.V1.t
-          ; target: Coda_base.Frozen_ledger_hash.Stable.V1.t
+          { source: Frozen_ledger_hash.Stable.V1.t
+          ; target: Frozen_ledger_hash.Stable.V1.t
           ; supply_increase: Currency.Amount.Stable.V1.t
           ; fee_excess: Currency.Fee.Signed.Stable.V1.t
           ; proof_type: Proof_type.Stable.V1.t }
@@ -89,8 +90,8 @@ module Statement = struct
 
   (* bin_io omitted *)
   type t = Stable.Latest.t =
-    { source: Coda_base.Frozen_ledger_hash.Stable.V1.t
-    ; target: Coda_base.Frozen_ledger_hash.Stable.V1.t
+    { source: Frozen_ledger_hash.Stable.V1.t
+    ; target: Frozen_ledger_hash.Stable.V1.t
     ; supply_increase: Currency.Amount.Stable.V1.t
     ; fee_excess: Currency.Fee.Signed.Stable.V1.t
     ; proof_type: Proof_type.Stable.V1.t }
@@ -119,8 +120,8 @@ module Statement = struct
 
   let gen =
     let open Quickcheck.Generator.Let_syntax in
-    let%map source = Coda_base.Frozen_ledger_hash.gen
-    and target = Coda_base.Frozen_ledger_hash.gen
+    let%map source = Frozen_ledger_hash.gen
+    and target = Frozen_ledger_hash.gen
     and fee_excess = Currency.Fee.Signed.gen
     and supply_increase = Currency.Amount.gen
     and proof_type = Bool.gen >>| fun b -> if b then `Merge else `Base in
@@ -820,7 +821,7 @@ module Verification = struct
             + Sok_message.Digest.length_in_triples
             + (2 * Frozen_ledger_hash.length_in_triples)
             + Amount.length_in_triples + Amount.Signed.length_in_triples
-            + Coda_base.Util.bit_length_to_triple_length
+            + Coda_base_util.bit_length_to_triple_length
                 (List.length wrap_vk_bits)
         then digest
         else
@@ -834,12 +835,12 @@ module Verification = struct
             Sok_message.Digest.length_in_triples
             (2 * Frozen_ledger_hash.length_in_triples)
             Amount.length_in_triples Amount.Signed.length_in_triples
-            (Coda_base.Util.bit_length_to_triple_length
+            (Coda_base_util.bit_length_to_triple_length
                (List.length wrap_vk_bits))
             ( Hash_prefix.length_in_triples
             + (2 * Frozen_ledger_hash.length_in_triples)
             + Amount.length_in_triples + Amount.Signed.length_in_triples
-            + Coda_base.Util.bit_length_to_triple_length
+            + Coda_base_util.bit_length_to_triple_length
                 (List.length wrap_vk_bits) )
             ()
       in
@@ -1048,13 +1049,13 @@ struct
   let merge_proof sok_digest ledger_hash1 ledger_hash2 ledger_hash3
       transition12 transition23 =
     let fee_excess =
-      Amount.Signed.add transition12.Transition_data.fee_excess
-        transition23.Transition_data.fee_excess
-      |> Option.value_exn
+      Option.value_exn
+        (Amount.Signed.add transition12.Transition_data.fee_excess
+          transition23.Transition_data.fee_excess)
     in
     let supply_increase =
-      Amount.add transition12.supply_increase transition23.supply_increase
-      |> Option.value_exn
+      Option.value_exn
+        (Amount.add transition12.supply_increase transition23.supply_increase)
     in
     let top_hash =
       merge_top_hash wrap_vk_bits ~sok_digest ~state1:ledger_hash1
@@ -1348,11 +1349,11 @@ let%test_module "transaction_snark" =
                ; amount= Amount.of_int amt })
       in
       let signature = Schnorr.sign sender.private_key payload in
-      User_command.check
-        { User_command.payload
-        ; sender= Public_key.of_private_key_exn sender.private_key
-        ; signature }
-      |> Option.value_exn
+      Option.value_exn
+        (User_command.check
+          { User_command.payload
+          ; sender= Public_key.of_private_key_exn sender.private_key
+          ; signature })
 
     let keys = Keys.create ()
 
@@ -1465,11 +1466,11 @@ let%test_module "transaction_snark" =
               let total_fees =
                 let open Amount in
                 let magnitude =
-                  of_fee
-                    (User_command_payload.fee (t1 :> User_command.t).payload)
-                  + of_fee
-                      (User_command_payload.fee (t2 :> User_command.t).payload)
-                  |> Option.value_exn
+                  Option.value_exn
+                    (of_fee
+                      (User_command_payload.fee (t1 :> User_command.t).payload)
+                    + of_fee
+                        (User_command_payload.fee (t2 :> User_command.t).payload))
                 in
                 Signed.create ~magnitude ~sgn:Sgn.Pos
               in

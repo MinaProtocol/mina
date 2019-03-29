@@ -17,7 +17,7 @@ module type Inputs_intf = sig
   module Transition_frontier :
     Protocols.Coda_transition_frontier.Transition_frontier_intf
     with type state_hash := Protocol_state_hash.t
-     and type external_transition_verified := External_transition.Verified.t
+     and type external_transition_verified := Consensus_mechanism.External_transition.Verified.t
      and type ledger_database := Ledger_db.t
      and type staged_ledger := Staged_ledger.t
      and type staged_ledger_diff := Staged_ledger_diff.t
@@ -36,7 +36,7 @@ module type Inputs_intf = sig
          prev_state:Consensus_mechanism.Protocol_state.Value.t
       -> prev_state_proof:Protocol_state_proof.t
       -> next_state:Consensus_mechanism.Protocol_state.Value.t
-      -> Internal_transition.t
+      -> Consensus_mechanism.Internal_transition.t
       -> Protocol_state_proof.t Deferred.Or_error.t
   end
 end
@@ -109,9 +109,9 @@ end
 
 module Make (Inputs : Inputs_intf) :
   Coda_lib.Proposer_intf
-  with type external_transition := Inputs.External_transition.t
+  with type external_transition := Inputs.Consensus_mechanism.External_transition.t
    and type external_transition_verified :=
-              Inputs.External_transition.Verified.t
+              Inputs.Consensus_mechanism.External_transition.Verified.t
    and type state_hash := Inputs.Protocol_state_hash.t
    and type ledger_hash := Inputs.Ledger_hash.t
    and type staged_ledger := Inputs.Staged_ledger.t

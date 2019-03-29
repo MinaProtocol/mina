@@ -430,7 +430,7 @@ module T = struct
                  ~f:(fun t ->
                    let open Main.Inputs in
                    let p =
-                     External_transition.Verified.protocol_state
+                     Consensus.External_transition.Verified.protocol_state
                        (With_hash.data t)
                    in
                    let prev_state_hash =

@@ -10,7 +10,7 @@ module Make (Inputs : Inputs.With_unprocessed_transition_cache.S) :
   with type time := Inputs.Time.t
    and type state_hash := State_hash.t
    and type external_transition_verified :=
-              Inputs.External_transition.Verified.t
+              Consensus.External_transition.Verified.t
    and type unprocessed_transition_cache :=
               Inputs.Unprocessed_transition_cache.t
    and type transition_frontier := Inputs.Transition_frontier.t

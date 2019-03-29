@@ -4,7 +4,7 @@
  (library_flags -linkall)
  (flags :standard -short-paths -warn-error -58)
  (inline_tests)
- (libraries core transaction_snark_scan_state sgn transaction_snark coda_base
+ (libraries core transaction_snark_scan_state sgn coda_base
    protocols merkle_mask pipe_lib logger async async_extra module_version)
  (preprocessor_deps ../../config.mlh)
  (preprocess

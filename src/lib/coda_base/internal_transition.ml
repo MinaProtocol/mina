@@ -2,18 +2,6 @@ open Core_kernel
 open Module_version
 
 module type S = sig
-  module Staged_ledger_diff : sig
-    type t [@@deriving sexp]
-
-    module Stable :
-      sig
-        module V1 : sig
-          type t [@@deriving bin_io, sexp]
-        end
-      end
-      with type V1.t = t
-  end
-
   module Prover_state : sig
     type t [@@deriving sexp, bin_io]
   end
@@ -45,25 +33,12 @@ module type S = sig
   val staged_ledger_diff : t -> Staged_ledger_diff.t
 end
 
-module Make (Staged_ledger_diff : sig
-  type t [@@deriving sexp]
-
-  module Stable :
-    sig
-      module V1 : sig
-        type t [@@deriving bin_io, sexp]
-      end
-    end
-    with type V1.t = t
-end)
-(Snark_transition : Snark_transition.S) (Prover_state : sig
+module Make (Snark_transition : Snark_transition.S) (Prover_state : sig
     type t [@@deriving sexp, bin_io]
 end) :
   S
-  with module Staged_ledger_diff = Staged_ledger_diff
-   and module Snark_transition = Snark_transition
+  with module Snark_transition = Snark_transition
    and module Prover_state = Prover_state = struct
-  module Staged_ledger_diff = Staged_ledger_diff
   module Snark_transition = Snark_transition
   module Prover_state = Prover_state
 

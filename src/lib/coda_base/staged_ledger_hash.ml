@@ -43,8 +43,10 @@ module Aux_hash = struct
     module Registered_V1 = Registrar.Register (V1)
   end
 
-  (* bin_io omitted *)
-  type t = Stable.Latest.t [@@deriving sexp, eq, compare, hash, yojson]
+  include (Stable.Latest : sig
+    (* bin_io omitted *)
+    type t = Stable.Latest.t [@@deriving sexp, eq, compare, hash, yojson]
+  end)
 
   let of_bytes = Fn.id
 

@@ -22,9 +22,9 @@ module type Inputs_intf = Transition_frontier.Inputs_intf
 module Make (Inputs : Inputs_intf) :
   S
   with type external_transition_verified :=
-              Inputs.External_transition.Verified.t
+              Consensus.External_transition.Verified.t
    and type state_hash := State_hash.t = struct
-  type t = Inputs.External_transition.Verified.t list State_hash.Table.t
+  type t = Consensus.External_transition.Verified.t list State_hash.Table.t
 
   let create () = State_hash.Table.create ()
 
@@ -34,7 +34,7 @@ module Make (Inputs : Inputs_intf) :
       | Some children ->
           if
             List.mem children new_child
-              ~equal:Inputs.External_transition.Verified.equal
+              ~equal:Consensus.External_transition.Verified.equal
           then children
           else new_child :: children )
 

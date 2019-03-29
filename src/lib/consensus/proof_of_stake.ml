@@ -1445,6 +1445,8 @@ end
 module Blockchain_state = Coda_base.Blockchain_state.Make (Genesis_ledger)
 module Protocol_state =
   Coda_base.Protocol_state.Make (Blockchain_state) (Consensus_state)
+module External_transition =
+  Coda_base.External_transition.Make (Protocol_state)
 
 module Configuration = struct
   type t =

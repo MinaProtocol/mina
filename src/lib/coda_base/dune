@@ -7,6 +7,8 @@
  (libraries
     lite_base
     linked_tree
+    cached
+    cache_dir
     hash_prefixes
     syncable_ledger
     base64

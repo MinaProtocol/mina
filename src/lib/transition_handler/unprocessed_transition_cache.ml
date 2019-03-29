@@ -14,13 +14,13 @@ module Transmuter = struct
   module Make (Inputs : Inputs.S) :
     Cache_lib.Intf.Transmuter.S
     with type Source.t =
-                ( Inputs.External_transition.Verified.t
+                ( Consensus.External_transition.Verified.t
                 , State_hash.t )
                 With_hash.t
      and type Target.t = State_hash.t = struct
     module Source = struct
       type t =
-        (Inputs.External_transition.Verified.t, State_hash.t) With_hash.t
+        (Consensus.External_transition.Verified.t, State_hash.t) With_hash.t
     end
 
     module Target = State_hash
@@ -34,6 +34,6 @@ module Make (Inputs : Inputs.S) :
   with module Cached := Cache_lib.Cached
    and module Cache := Cache_lib.Cache
    and type source =
-              (Inputs.External_transition.Verified.t, State_hash.t) With_hash.t
+              (Consensus.External_transition.Verified.t, State_hash.t) With_hash.t
    and type target = State_hash.t =
   Cache_lib.Transmuter_cache.Make (Transmuter.Make (Inputs)) (Name)

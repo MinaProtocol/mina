@@ -23,18 +23,6 @@ end
 module type S = sig
   module Protocol_state : Protocol_state.S
 
-  module Staged_ledger_diff : sig
-    type t [@@deriving sexp]
-
-    module Stable :
-      sig
-        module V1 : sig
-          type t [@@deriving bin_io, sexp]
-        end
-      end
-      with type V1.t = t
-  end
-
   include
     Base_intf
     with type protocol_state := Protocol_state.Value.t
@@ -83,22 +71,8 @@ module type S = sig
   val forget_consensus_state_verification : Verified.t -> Proof_verified.t
 end
 
-module Make (Staged_ledger_diff : sig
-  type t [@@deriving sexp]
-
-  module Stable :
-    sig
-      module V1 : sig
-        type t [@@deriving bin_io, sexp]
-      end
-    end
-    with type V1.t = t
-end)
-(Protocol_state : Protocol_state.S) :
-  S
-  with module Staged_ledger_diff = Staged_ledger_diff
-   and module Protocol_state = Protocol_state = struct
-  module Staged_ledger_diff = Staged_ledger_diff
+module Make (Protocol_state : Protocol_state.S) :
+  S with module Protocol_state = Protocol_state = struct
   module Protocol_state = Protocol_state
   module Blockchain_state = Protocol_state.Blockchain_state
 

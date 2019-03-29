@@ -11,7 +11,7 @@ module type Inputs_intf = sig
     Sync_handler_intf
     with type ledger_hash := Ledger_hash.t
      and type state_hash := State_hash.t
-     and type external_transition := External_transition.t
+     and type external_transition := Consensus.External_transition.t
      and type transition_frontier := Transition_frontier.t
      and type syncable_ledger_query := Sync_ledger.Query.t
      and type syncable_ledger_answer := Sync_ledger.Answer.t
@@ -19,7 +19,7 @@ module type Inputs_intf = sig
   module Transition_handler :
     Transition_handler_intf
     with type time_controller := Time.Controller.t
-     and type external_transition_verified := External_transition.Verified.t
+     and type external_transition_verified := Consensus.External_transition.Verified.t
      and type staged_ledger := Staged_ledger.t
      and type state_hash := State_hash.t
      and type transition_frontier := Transition_frontier.t
@@ -31,7 +31,7 @@ module type Inputs_intf = sig
     Network_intf
     with type peer := Network_peer.Peer.t
      and type state_hash := State_hash.t
-     and type external_transition := External_transition.t
+     and type external_transition := Consensus.External_transition.t
      and type consensus_state := Consensus.Consensus_state.Value.t
      and type state_body_hash := State_body_hash.t
      and type ledger_hash := Ledger_hash.t
@@ -41,7 +41,7 @@ module type Inputs_intf = sig
 
   module Catchup :
     Catchup_intf
-    with type external_transition_verified := External_transition.Verified.t
+    with type external_transition_verified := Consensus.External_transition.Verified.t
      and type state_hash := State_hash.t
      and type unprocessed_transition_cache :=
                 Transition_handler.Unprocessed_transition_cache.t
@@ -55,7 +55,7 @@ module Make (Inputs : Inputs_intf) :
   Transition_frontier_controller_intf
   with type time_controller := Inputs.Time.Controller.t
    and type external_transition_verified :=
-              Inputs.External_transition.Verified.t
+              Consensus.External_transition.Verified.t
    and type transition_frontier := Inputs.Transition_frontier.t
    and type time := Inputs.Time.t
    and type state_hash := State_hash.t

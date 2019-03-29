@@ -26,7 +26,7 @@ end
 module Make (Inputs : Inputs_intf) :
   External_transition_validation_intf
   with type state_hash := State_hash.t
-   and type external_transition := Inputs.External_transition.t
+   and type external_transition := Consensus.External_transition.t
    and type staged_ledger := Inputs.Staged_ledger.t
    and type staged_ledger_error := Inputs.Staged_ledger.Staged_ledger_error.t
    and type transition_frontier := Inputs.Transition_frontier.t = struct

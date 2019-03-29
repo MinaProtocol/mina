@@ -9,43 +9,12 @@ module Make (Inputs : sig
 end) =
 struct
   (** [Stubs] is a set of modules used for testing different components of tfc  *)
-  module Time = Coda_base.Block_time
+  module Time = Block_time
 
   module State_proof = struct
-    include Coda_base.Proof
+    include Proof
 
     let verify _ _ = return true
-  end
-
-  module Ledger_proof_statement = Transaction_snark.Statement
-
-  module Ledger_proof = struct
-    module Stable = struct
-      module V1 = struct
-        type t =
-          Ledger_proof_statement.Stable.V1.t * Sok_message.Digest.Stable.V1.t
-        [@@deriving sexp, bin_io, yojson]
-      end
-
-      module Latest = V1
-    end
-
-    (* TODO: remove bin_io, after fixing functors to accept this *)
-    type t = Stable.V1.t [@@deriving sexp, bin_io, yojson]
-
-    let underlying_proof (_ : t) = Proof.dummy
-
-    let statement ((t, _) : t) : Ledger_proof_statement.t = t
-
-    let statement_target (t : Ledger_proof_statement.t) = t.target
-
-    let sok_digest (_, d) = d
-
-    let dummy =
-      ( Ledger_proof_statement.gen |> Quickcheck.random_value
-      , Sok_message.Digest.default )
-
-    let create ~statement ~sok_digest ~proof:_ = (statement, sok_digest)
   end
 
   module Ledger_proof_verifier = struct
@@ -53,42 +22,21 @@ struct
   end
 
   module Staged_ledger_aux_hash = struct
-    include Staged_ledger_hash.Aux_hash.Stable.V1
-
-    let of_bytes = Staged_ledger_hash.Aux_hash.of_bytes
-
-    let to_bytes = Staged_ledger_hash.Aux_hash.to_bytes
+    include Staged_ledger_hash.Aux_hash.Stable.Latest
+    include (Staged_ledger_hash.Aux_hash :
+      module type of Staged_ledger_hash.Aux_hash
+        with type t := t)
   end
 
-  module Transaction_snark_work =
-    Staged_ledger.Make_completed_work (Ledger_proof) (Ledger_proof_statement)
-
-  module Staged_ledger_hash_binable = struct
-    include Staged_ledger_hash.Stable.V1
-
+  module Staged_ledger_hash = struct
+    include Staged_ledger_hash.Stable.Latest
     let of_aux_and_ledger_hash, aux_hash, ledger_hash =
       Staged_ledger_hash.(of_aux_and_ledger_hash, aux_hash, ledger_hash)
   end
 
-  module Staged_ledger_diff = Staged_ledger.Make_diff (struct
-    module Fee_transfer = Fee_transfer
-    module Ledger_proof = Ledger_proof
-    module Ledger_hash = Ledger_hash
-    module Staged_ledger_hash = Staged_ledger_hash_binable
-    module Staged_ledger_aux_hash = Staged_ledger_aux_hash
-    module Compressed_public_key = Public_key.Compressed
-    module User_command = User_command
-    module Transaction_snark_work = Transaction_snark_work
-  end)
-
-  module External_transition =
-    Coda_base.External_transition.Make
-      (Staged_ledger_diff)
-      (Consensus.Protocol_state)
-
   module Transaction = struct
     module T = struct
-      type t = Coda_base.Transaction.t =
+      type t = Transaction.t =
         | User_command of User_command.With_valid_signature.t
         | Fee_transfer of Fee_transfer.t
         | Coinbase of Coinbase.t
@@ -98,31 +46,31 @@ struct
     include T
 
     include (
-      Coda_base.Transaction :
-        module type of Coda_base.Transaction with type t := t )
+      Transaction :
+        module type of Transaction with type t := t )
   end
 
   module Staged_ledger = Staged_ledger.Make (struct
     module Compressed_public_key = Signature_lib.Public_key.Compressed
     module User_command = User_command
-    module Fee_transfer = Coda_base.Fee_transfer
-    module Coinbase = Coda_base.Coinbase
+    module Fee_transfer = Fee_transfer
+    module Coinbase = Coinbase
     module Transaction = Transaction
-    module Ledger_hash = Coda_base.Ledger_hash
-    module Frozen_ledger_hash = Coda_base.Frozen_ledger_hash
-    module Ledger_proof_statement = Ledger_proof_statement
+    module Ledger_hash = Ledger_hash
+    module Frozen_ledger_hash = Frozen_ledger_hash
+    module Ledger_proof_statement = Transaction_snark.Statement
     module Proof = Proof
-    module Sok_message = Coda_base.Sok_message
+    module Sok_message = Sok_message
     module Ledger_proof = Ledger_proof
     module Ledger_proof_verifier = Ledger_proof_verifier
     module Staged_ledger_aux_hash = Staged_ledger_aux_hash
-    module Staged_ledger_hash = Staged_ledger_hash_binable
+    module Staged_ledger_hash = Staged_ledger_hash
     module Transaction_snark_work = Transaction_snark_work
     module Transaction_validator = Transaction_validator
     module Staged_ledger_diff = Staged_ledger_diff
-    module Account = Coda_base.Account
-    module Ledger = Coda_base.Ledger
-    module Sparse_ledger = Coda_base.Sparse_ledger
+    module Account = Account
+    module Ledger = Ledger
+    module Sparse_ledger = Sparse_ledger
   end)
 
   (* Generate valid payments for each blockchain state by having
@@ -153,12 +101,13 @@ struct
         in
         User_command.sign sender_keypair payload )
 
-  module Blockchain_state = External_transition.Protocol_state.Blockchain_state
-  module Protocol_state = External_transition.Protocol_state
+  module Blockchain_state = Consensus.Blockchain_state
+  module Protocol_state = Consensus.Protocol_state
+  module External_transition = Consensus.External_transition
 
   module Transition_frontier_inputs = struct
     module Staged_ledger_aux_hash = Staged_ledger_aux_hash
-    module Ledger_proof_statement = Ledger_proof_statement
+    module Ledger_proof_statement = Transaction_snark.Statement
     module Ledger_proof = Ledger_proof
     module Transaction_snark_work = Transaction_snark_work
     module Staged_ledger_diff = Staged_ledger_diff

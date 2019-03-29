@@ -385,16 +385,10 @@ struct
     return (create ~logger)
 end
 
-(* Use this one in downstream consumers *)
-module Make (Staged_ledger : sig
-  type t
-
-  val ledger : t -> Coda_base.Ledger.t
-end)
-(Transition_frontier : Transition_frontier_intf
-                       with type user_command := Coda_base.User_command.t
-                       with type staged_ledger := Staged_ledger.t) =
-  Make0 (Coda_base.User_command) (Coda_base.Ledger) (Staged_ledger)
+include Make
+    (Coda_base.User_command)
+    (Coda_base.Ledger)
+    (Staged_ledger)
     (Coda_base.Transaction_validator)
     (Transition_frontier)
 

@@ -33,7 +33,7 @@ open Coda_base
 module Make (Inputs : Inputs.S) :
   Catchup_intf
   with type external_transition_verified :=
-              Inputs.External_transition.Verified.t
+              Consensus.External_transition.Verified.t
    and type unprocessed_transition_cache :=
               Inputs.Unprocessed_transition_cache.t
    and type transition_frontier := Inputs.Transition_frontier.t
@@ -44,8 +44,8 @@ module Make (Inputs : Inputs.S) :
   open Inputs
 
   let get_previous_state_hash transition =
-    transition |> With_hash.data |> External_transition.Verified.protocol_state
-    |> External_transition.Protocol_state.previous_state_hash
+    transition |> With_hash.data |> Consensus.External_transition.Verified.protocol_state
+    |> Consensus.External_transition.Protocol_state.previous_state_hash
 
   (* We would like the async scheduler to context switch between each iteration
      of external transitions when trying to build breadcrumb_path. Therefore,
@@ -139,8 +139,8 @@ module Make (Inputs : Inputs.S) :
       (Rose_tree.T (foreign_transition_head, _) as tree) =
     let initial_state_hash =
       With_hash.data (Cached.peek foreign_transition_head)
-      |> External_transition.Verified.protocol_state
-      |> External_transition.Protocol_state.previous_state_hash
+      |> Consensus.External_transition.Verified.protocol_state
+      |> Consensus.External_transition.Protocol_state.previous_state_hash
     in
     match Transition_frontier.find frontier initial_state_hash with
     | None ->
@@ -160,7 +160,7 @@ module Make (Inputs : Inputs.S) :
       transition =
     let cached_verified_transition =
       let open Deferred.Result.Let_syntax in
-      let%bind _ : External_transition.Proof_verified.t =
+      let%bind _ : Consensus.External_transition.Proof_verified.t =
         Protocol_state_validator.validate_proof transition
         |> Deferred.Result.map_error ~f:(fun error ->
                `Invalid (Error.to_string_hum error) )
@@ -171,13 +171,13 @@ module Make (Inputs : Inputs.S) :
          transition frontier and to be fed through the
          transition_handler_validator. *)
       let (`I_swear_this_is_safe_see_my_comment verified_transition) =
-        External_transition.to_verified transition
+        Consensus.External_transition.to_verified transition
       in
       let verified_transition_with_hash =
         With_hash.of_data verified_transition
           ~hash_data:
             (Fn.compose Consensus.Protocol_state.hash
-               External_transition.Verified.protocol_state)
+               Consensus.External_transition.Verified.protocol_state)
       in
       Deferred.return
       @@ Transition_handler_validator.validate_transition ~logger ~frontier
@@ -225,7 +225,7 @@ module Make (Inputs : Inputs.S) :
           , Rose_tree.to_yojson
               (fun elem ->
                 Cached.peek elem |> With_hash.data
-                |> Inputs.External_transition.Verified.to_yojson )
+                |> Consensus.External_transition.Verified.to_yojson )
               target_subtree ) ] ;
     Deferred.Or_error.find_map_ok peers ~f:(fun peer ->
         O1trace.trace_recurring_task "ledger catchup" (fun () ->
@@ -243,7 +243,7 @@ module Make (Inputs : Inputs.S) :
                   if
                     State_hash.equal
                       (Consensus.Protocol_state.hash
-                         (External_transition.protocol_state last))
+                         (Consensus.External_transition.protocol_state last))
                       target_hash
                   then return ()
                   else (

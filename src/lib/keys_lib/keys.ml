@@ -1,6 +1,7 @@
 open Core
 open Snark_params
 open Fold_lib
+open Coda_base
 
 module type S = sig
   module Step_prover_state : sig
@@ -71,7 +72,7 @@ let create () : (module S) Async.Deferred.t =
         let keys = tx_vk
       end) in
       let module B =
-        Blockchain_snark.Blockchain_transition.Make (Consensus) (T)
+        Blockchain_snark.Blockchain_transition.Make (T)
       in
       let module Step = B.Step (struct
         let keys = Tick.Groth16.Keypair.create ~pk:bc_pk.step ~vk:bc_vk.step

@@ -252,7 +252,7 @@ module type Inputs_intf = sig
   module Transition_frontier :
     Protocols.Coda_transition_frontier.Transition_frontier_intf
     with type state_hash := Protocol_state_hash.t
-     and type external_transition_verified := External_transition.Verified.t
+     and type external_transition_verified := Consensus_mechanism.External_transition.Verified.t
      and type ledger_database := Ledger_db.t
      and type masked_ledger := Masked_ledger.t
      and type staged_ledger := Staged_ledger.t
@@ -292,7 +292,7 @@ module type Inputs_intf = sig
 
   module Net :
     Network_intf
-    with type state_with_witness := External_transition.t
+    with type state_with_witness := Consensus_mechanism.External_transition.t
      and type staged_ledger := Staged_ledger.t
      and type staged_ledger_hash := Staged_ledger_hash.t
      and type protocol_state := Consensus_mechanism.Protocol_state.Value.t
@@ -310,8 +310,8 @@ module type Inputs_intf = sig
   module Transition_router :
     Protocols.Coda_transition_frontier.Transition_router_intf
     with type time_controller := Time.Controller.t
-     and type external_transition := External_transition.t
-     and type external_transition_verified := External_transition.Verified.t
+     and type external_transition := Consensus_mechanism.External_transition.t
+     and type external_transition_verified := Consensus_mechanism.External_transition.Verified.t
      and type transition_frontier := Transition_frontier.t
      and type state_hash := Protocol_state_hash.t
      and type time := Time.t
@@ -322,9 +322,9 @@ module type Inputs_intf = sig
     Protocols.Coda_transition_frontier.Root_prover_intf
     with type state_body_hash := State_body_hash.t
      and type transition_frontier := Transition_frontier.t
-     and type external_transition := External_transition.t
+     and type external_transition := Consensus_mechanism.External_transition.t
      and type proof_verified_external_transition :=
-                External_transition.Proof_verified.t
+                Consensus_mechanism.External_transition.Proof_verified.t
      and type consensus_state := Consensus_mechanism.Consensus_state.Value.t
      and type state_hash := Coda_base.State_hash.t
 
@@ -339,8 +339,8 @@ module type Inputs_intf = sig
      and type consensus_local_state := Consensus_mechanism.Local_state.t
      and type completed_work_statement := Transaction_snark_work.Statement.t
      and type completed_work_checked := Transaction_snark_work.Checked.t
-     and type external_transition := External_transition.t
-     and type external_transition_verified := External_transition.Verified.t
+     and type external_transition := Consensus_mechanism.External_transition.t
+     and type external_transition_verified := Consensus_mechanism.External_transition.Verified.t
      and type time_controller := Time.Controller.t
      and type keypair := Keypair.t
      and type transition_frontier := Transition_frontier.t
@@ -367,7 +367,7 @@ module type Inputs_intf = sig
     Protocols.Coda_transition_frontier.Sync_handler_intf
     with type ledger_hash := Ledger_hash.t
      and type state_hash := Coda_base.State_hash.t
-     and type external_transition := External_transition.t
+     and type external_transition := Consensus_mechanism.External_transition.t
      and type transition_frontier := Transition_frontier.t
      and type syncable_ledger_query := Coda_base.Sync_ledger.Query.t
      and type syncable_ledger_answer := Coda_base.Sync_ledger.Answer.t
@@ -375,6 +375,7 @@ end
 
 module Make (Inputs : Inputs_intf) = struct
   open Inputs
+  module External_transition = Consensus_mechanism.External_transition
 
   type t =
     { propose_keypair: Keypair.t option
