@@ -211,7 +211,10 @@ let make = _ => {
                 "Simple, fair consensus. Participation is proportional to how much stake you have in the protocol with no lockups, no forced delegation, and low bandwidth requirements.",
                 "With just a small stake, you'll be able to participate directly in consensus and earn Coda.",
               |]
-              cta="Stay updated about participating in consensus"
+              cta={
+                SideText.Cta.copy: "Stay updated about participating in consensus",
+                link: Links.participateInConsensus,
+              }
             />
           </div>
           <Legend

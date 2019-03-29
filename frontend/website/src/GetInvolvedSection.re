@@ -1,9 +1,10 @@
 module Link = {
   let component = ReasonReact.statelessComponent("GetInvolved.Link");
-  let make = (~message, _) => {
+  let make = (~link, ~message, _) => {
     ...component,
     render: _ => {
       <a
+        href=link
         className=Css.(merge([Style.Link.basic, style([cursor(`pointer)])]))>
         {ReasonReact.string(message ++ {js|\u00A0→|js})}
       </a>;
@@ -165,19 +166,48 @@ module KnowledgeBase = {
           <SubSection
             title="Articles"
             content=[|
-              ("Read the Coda Whitepaper", "#"),
-              ("Fast Accumulation on Streams", "#"),
-              ("Coindesk: This Blockchain Tosses Blocks", "#"),
-              ("TokenDaily: Deep Dive with O(1) on Coda Protocol", "#"),
+              (
+                "Read the Coda Whitepaper",
+                "/static/coda-whitepaper-05-10-2018-0.pdf",
+              ),
+              ("A SNARKy Exponential Function", "/blog/taylor.html"),
+              (
+                "Fast Accumulation on Streams",
+                "/blog/scanning_for_scans.html",
+              ),
+              (
+                "Coindesk: This Blockchain Tosses Blocks",
+                "https://www.coindesk.com/blockchain-tosses-blocks-naval-metastable-back-twist-crypto-cash/",
+              ),
+              (
+                "TokenDaily: Deep Dive with O(1) on Coda Protocol",
+                "https://www.tokendaily.co/p/q-as-with-o-1-on-coda-protocol",
+              ),
             |]
           />
           <SubSection
             title="Videos & Podcasts"
             content=[|
-              ("Hack Summit 2018: Coda Talk", "#"),
-              ("Token Talks - Interview with Coda", "#"),
-              ("A High-Level Language for Verifiable Computation", "#"),
-              ("Snarky, a DSL for Writing SNARKs", "#"),
+              (
+                "Hack Summit 2018: Coda Talk",
+                "https://www.youtube.com/watch?v=eWVGATxEB6M",
+              ),
+              (
+                "Scanning for Scans",
+                "https://www.youtube.com/watch?v=YSnQ8N760mI",
+              ),
+              (
+                "Token Talks - Interview with Coda",
+                "https://simplecast.com/s/17ed0e8d",
+              ),
+              (
+                "A High-Level Language for Verifiable Computation",
+                "https://www.youtube.com/watch?v=gYn6mTwJriw",
+              ),
+              (
+                "Snarky, a DSL for Writing SNARKs",
+                "https://www.youtube.com/watch?v=h0PUVR0s6Vg",
+              ),
             |]
           />
         </div>
@@ -374,16 +404,28 @@ let make = _ => {
             ])
           )>
           <li className=marginBelow>
-            <Link message="Stay updated about developing with Coda" />
+            <Link
+              link=Links.developingWithCoda
+              message="Stay updated about developing with Coda"
+            />
           </li>
           <li className=marginBelow>
-            <Link message="Notify me about participating in consensus" />
+            <Link
+              link=Links.participateInConsensus
+              message="Notify me about participating in consensus"
+            />
           </li>
           <li className=marginBelow>
-            <Link message="Earn Coda by helping to compress the blockchain" />
+            <Link
+              link=Links.compressTheBlockchain
+              message="Earn Coda by helping to compress the blockchain"
+            />
           </li>
           <li className=marginBelow>
-            <Link message="Join our mailing list for updates" />
+            <Link
+              link=Links.mailingList
+              message="Join our mailing list for updates"
+            />
           </li>
         </ul>
       </div>
