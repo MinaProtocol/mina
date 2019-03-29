@@ -63,8 +63,9 @@ module Code = {
                 fontWeight(`medium),
                 fontSize(`rem(0.8125)),
                 borderRadius(`px(12)),
-                lineHeight(`rem(1.25)),
-                maxWidth(`rem(21.4375)),
+                lineHeight(`rem(1.0)),
+                letterSpacing(`zero),
+                maxWidth(`rem(23.0)),
                 // the width demands it stick out a bit
                 marginLeft(`rem(-0.25)),
                 media(
@@ -228,7 +229,7 @@ let make = _ => {
   onClick(button)
      .then(() => Coda.requestWallet())
      .then((wallet) =>
-       Coda.sendTransaction(wallet, ...))
+  Coda.sendTransaction(wallet, ...))
 </script>|}
           />
           // This keeps the right hand text aligned with the inclusive app section.
