@@ -239,26 +239,36 @@ module Make (Message : Message_intf) :
                     "%s" (Exn.to_string_mach exn) ))
             (Tcp.Where_to_listen.of_port config.me.Peer.communication_port)
             (fun client reader writer ->
-              let%map _ =
-                Rpc.Connection.server_with_close reader writer ~implementations
-                  ~connection_state:(fun conn ->
-                    (* connection state is the client's IP and ephemeral port
+              match
+                Hashtbl.find t.connections (Socket.Address.Inet.addr client)
+              with
+              | Some _ ->
+                  Logger.error t.logger ~module_:__MODULE__ ~location:__LOC__
+                    "Connection from %s already exists"
+                    (Socket.Address.Inet.to_string client) ;
+                  Deferred.unit
+              | None ->
+                  let%map _ =
+                    Rpc.Connection.server_with_close reader writer
+                      ~implementations
+                      ~connection_state:(fun conn ->
+                        (* connection state is the client's IP and ephemeral port
                         when connecting to the server over TCP; the ephemeral
                         port is distinct from the client's discovery and
                         communication ports *)
-                    Hashtbl.set t.connections
-                      ~key:(Socket.Address.Inet.addr client)
-                      ~data:conn ;
-                    Socket.Address.Inet.to_host_and_port client )
-                  ~on_handshake_error:
-                    (`Call
-                      (fun exn ->
-                        Logger.error t.logger ~module_:__MODULE__
-                          ~location:__LOC__ "%s" (Exn.to_string_mach exn) ;
-                        Deferred.unit ))
-              in
-              Hashtbl.remove t.connections @@ Socket.Address.Inet.addr client
-              )
+                        Hashtbl.add_exn t.connections
+                          ~key:(Socket.Address.Inet.addr client)
+                          ~data:conn ;
+                        Socket.Address.Inet.to_host_and_port client )
+                      ~on_handshake_error:
+                        (`Call
+                          (fun exn ->
+                            Logger.error t.logger ~module_:__MODULE__
+                              ~location:__LOC__ "%s" (Exn.to_string_mach exn) ;
+                            Deferred.unit ))
+                  in
+                  Hashtbl.remove t.connections
+                  @@ Socket.Address.Inet.addr client )
         in
         t )
 
