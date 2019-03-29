@@ -27,16 +27,13 @@ let%test_module "Root_history and Transition_frontier" =
     let breadcrumb_trail_equals =
       List.equal ~equal:Transition_frontier.Breadcrumb.equal
 
-    let%test "Common ancestor should return the youngest ancestor of two \
-              breadcrumbs" =
+    let common_ancestor_test ancestor_length branch1_length branch2_length =
       let logger = Logger.null () in
       Async.Thread_safe.block_on_async_exn (fun () ->
           let%bind frontier = create_root_frontier ~logger in
           let root = Transition_frontier.root frontier in
           let%bind ancestors =
-            create_breadcrumbs ~logger
-              ~size:(max_length - (max_length / 2))
-              root
+            create_breadcrumbs ~logger ~size:ancestor_length root
           in
           let youngest_ancestor = List.last_exn ancestors in
           let%bind () =
@@ -44,14 +41,10 @@ let%test_module "Root_history and Transition_frontier" =
                 Transition_frontier.add_breadcrumb_exn frontier ancestor )
           in
           let%bind branch1 =
-            create_breadcrumbs ~logger
-              ~size:(1 + Random.int ((max_length / 2) - 1))
-              youngest_ancestor
+            create_breadcrumbs ~logger ~size:branch1_length youngest_ancestor
           in
           let%bind branch2 =
-            create_breadcrumbs ~logger
-              ~size:(1 + Random.int ((max_length / 2) - 1))
-              youngest_ancestor
+            create_breadcrumbs ~logger ~size:branch2_length youngest_ancestor
           in
           let bc1, bc2 = (List.last_exn branch1, List.last_exn branch2) in
           let%map () =
@@ -62,6 +55,20 @@ let%test_module "Root_history and Transition_frontier" =
           State_hash.equal
             (Transition_frontier.common_ancestor frontier bc1 bc2)
             (Transition_frontier.Breadcrumb.state_hash youngest_ancestor) )
+
+    let%test "common_ancestor should find the youngest ancestor when two \
+              branches have the same lengths" =
+      let ancestor_length = max_length / 2 in
+      common_ancestor_test ancestor_length
+        (max_length - ancestor_length)
+        (max_length - ancestor_length)
+
+    let%test "common_ancestor should find the youngest ancestor when two \
+              branches have randomized lengths" =
+      let ancestor_length = max_length / 2 in
+      common_ancestor_test ancestor_length
+        (1 + Random.int (max_length - ancestor_length))
+        (1 + Random.int (max_length - ancestor_length))
 
     let%test "If a transition does not exists in the transition_frontier or \
               in the root_history, then we should not get an answer" =

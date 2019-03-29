@@ -87,7 +87,8 @@ let%test_module "Bootstrap Controller" =
               input_transitions_verified
           in
           let transition_reader, transition_writer =
-            Pipe_lib.Strict_pipe.create Synchronous
+            Pipe_lib.Strict_pipe.create ~name:(__MODULE__ ^ __LOC__)
+              Synchronous
           in
           let () =
             List.iter
@@ -119,7 +120,7 @@ let%test_module "Bootstrap Controller" =
     let is_syncing = function `Ignored -> false | `Syncing _ -> true
 
     let make_transition_pipe () =
-      Pipe_lib.Strict_pipe.create
+      Pipe_lib.Strict_pipe.create ~name:(__MODULE__ ^ __LOC__)
         (Buffered (`Capacity 10, `Overflow Drop_head))
 
     let get_best_tip_hash (peer : Network_builder.peer) =

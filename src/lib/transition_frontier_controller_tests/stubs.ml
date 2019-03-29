@@ -593,7 +593,7 @@ struct
         (`Transition enveloped_transition, `Time_received Constants.time)
 
     let make_transition_pipe () =
-      Pipe_lib.Strict_pipe.create
+      Pipe_lib.Strict_pipe.create ~name:(__MODULE__ ^ __LOC__)
         (Buffered (`Capacity 30, `Overflow Drop_head))
   end
 end
