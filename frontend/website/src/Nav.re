@@ -51,6 +51,7 @@ module NavStyle = {
     media(MediaQuery.menu, [display(`none)]),
   ];
 
+  let expandedMenuBorderColor = Style.Colors.hyperlinkLight;
   let expandedMenuItems =
     merge([
       collapsedMenuItems,
@@ -58,8 +59,9 @@ module NavStyle = {
         media(
           // Make expanded menu not show up on a wide screen
           MediaQuery.menuMax,
-          [
-            border(`px(1), `solid, Style.Colors.hyperlinkHover),
+          Style.paddingY(`rem(0.25))
+          @ [
+            border(`px(1), `solid, expandedMenuBorderColor),
             boxShadow(
               ~x=`zero,
               ~y=`zero,
@@ -68,15 +70,16 @@ module NavStyle = {
               `rgba((0, 0, 0, 0.12)),
             ),
             borderRadius(`px(10)),
-            paddingLeft(`rem(0.5)),
-            marginTop(`rem(2.)),
+            marginTop(`rem(2.25)),
             marginRight(`rem(-0.6)),
             display(`flex),
             maxWidth(`rem(10.)),
             flexDirection(`column),
             alignItems(`flexStart),
+            unsafe("padding-inline-start", "0"),
+            unsafe("-webkit-padding-start", "0"),
             before(
-              triangle(Style.Colors.hyperlinkHover, 1)
+              triangle(expandedMenuBorderColor, 1)
               @ [
                 boxShadow(
                   ~x=`zero,
@@ -159,107 +162,273 @@ module DropdownMenu = {
   };
 };
 
-let component = ReasonReact.statelessComponent("Nav");
-let make = (~mainPage, children) => {
-  ...component,
-  render: _self => {
-    let items =
-      children
-      |> Array.mapi((idx, elem) =>
-           <li
-             className={Css.style(
-               Style.paddingX(`rem(0.75))
-               @ (
-                 idx != Array.length(children) - 1
-                   ? Style.paddingY(`rem(0.5)) : []
-               )
-               @ [Css.listStyle(`none, `inside, `none)],
-             )}>
-             elem
-           </li>
-         );
+module NavWrapper = {
+  let component = ReasonReact.statelessComponent("Nav");
+  let make = (~mainPage, children) => {
+    ...component,
+    render: _self => {
+      let items =
+        children
+        |> Array.mapi((idx, elem) =>
+             if (idx == Array.length(children) - 1) {
+               <li
+                 className={Css.style(
+                   Style.paddingX(`rem(0.75))
+                   @ [Css.listStyle(`none, `inside, `none)],
+                 )}>
+                 elem
+               </li>;
+             } else {
+               <>
+                 <li
+                   className={Css.style(
+                     Style.paddingX(`rem(0.75))
+                     @ Style.paddingY(`rem(0.5))
+                     @ [Css.listStyle(`none, `inside, `none)],
+                   )}>
+                   elem
+                 </li>
+                 <hr
+                   ariaHidden=true
+                   className=Css.(
+                     style([
+                       borderTop(
+                         `rem(0.0625),
+                         `solid,
+                         Style.Colors.hyperlinkAlpha(0.15),
+                       ),
+                       marginTop(`zero),
+                       marginBottom(`zero),
+                       borderBottomWidth(`zero),
+                       borderLeftWidth(`zero),
+                       borderRightWidth(`zero),
+                       width(`percent(85.)),
+                       media(NavStyle.MediaQuery.menu, [display(`none)]),
+                     ])
+                   )
+                 />
+               </>;
+             }
+           );
 
-    <nav
-      className=Css.(
-        style([
-          display(`flex),
-          justifyContent(`spaceBetween),
-          alignItems(`flexEnd),
-          flexWrap(`wrap),
-          media(
-            NavStyle.MediaQuery.statusLift(mainPage),
-            [flexWrap(`nowrap), alignItems(`center)],
-          ),
-        ])
-      )>
-      <a
-        href="/"
+      <nav
         className=Css.(
           style([
             display(`flex),
-            NavStyle.bottomNudge,
-            width(`percent(50.0)),
-            marginTop(`zero),
+            justifyContent(`spaceBetween),
+            alignItems(`flexEnd),
+            flexWrap(`wrap),
             media(
               NavStyle.MediaQuery.statusLift(mainPage),
-              [
-                width(`auto),
-                marginRight(`rem(0.75)),
-                marginTop(`zero),
-                NavStyle.bottomNudgeOffset(0.1875),
-              ],
+              [flexWrap(`nowrap), alignItems(`center)],
             ),
-            media(NavStyle.MediaQuery.menu, [marginTop(`zero)]),
           ])
         )>
-        <Image className="" name="/static/img/coda-logo" alt="Coda Home" />
-      </a>
-      <div
-        className=Css.(
-          style([
-            order(3),
-            width(`percent(100.0)),
-            NavStyle.bottomNudge,
-            media(
-              NavStyle.MediaQuery.statusLift(mainPage),
-              [order(2), width(`auto), marginLeft(`zero)],
-            ),
-            media(NavStyle.MediaQuery.menu, [width(`percent(40.0))]),
-            ...mainPage ? [] : [display(`none)],
-          ])
-        )>
+        <a
+          href="/"
+          className=Css.(
+            style([
+              display(`flex),
+              NavStyle.bottomNudge,
+              width(`percent(50.0)),
+              marginTop(`zero),
+              media(
+                NavStyle.MediaQuery.statusLift(mainPage),
+                [
+                  width(`auto),
+                  marginRight(`rem(0.75)),
+                  marginTop(`zero),
+                  NavStyle.bottomNudgeOffset(0.1875),
+                ],
+              ),
+              media(NavStyle.MediaQuery.menu, [marginTop(`zero)]),
+            ])
+          )>
+          <Image className="" name="/static/img/coda-logo" alt="Coda Home" />
+        </a>
         <div
           className=Css.(
             style([
-              width(`rem(21.25)),
+              order(3),
+              width(`percent(100.0)),
+              NavStyle.bottomNudge,
               media(
                 NavStyle.MediaQuery.statusLift(mainPage),
-                [width(`rem(21.25)), margin(`auto)],
+                [order(2), width(`auto), marginLeft(`zero)],
+              ),
+              media(NavStyle.MediaQuery.menu, [width(`percent(40.0))]),
+              ...mainPage ? [] : [display(`none)],
+            ])
+          )>
+          <div
+            className=Css.(
+              style([
+                width(`rem(21.25)),
+                media(
+                  NavStyle.MediaQuery.statusLift(mainPage),
+                  [width(`rem(21.25)), margin(`auto)],
+                ),
+              ])
+            )>
+            <AnnouncementBar />
+          </div>
+        </div>
+        <div
+          className=Css.(
+            style([
+              position(`relative),
+              width(`auto),
+              order(2),
+              NavStyle.bottomNudgeOffset(0.5),
+              media(
+                NavStyle.MediaQuery.statusLift(mainPage),
+                [order(3), width(`auto), NavStyle.bottomNudge],
+              ),
+              media(
+                NavStyle.MediaQuery.menu,
+                [
+                  mainPage ? width(`percent(50.0)) : width(`percent(70.0)),
+                ],
               ),
             ])
           )>
-          <AnnouncementBar />
+          <DropdownMenu> ...items </DropdownMenu>
         </div>
-      </div>
-      <div
+      </nav>;
+    },
+  };
+};
+
+let menuStyle =
+  Style.paddingX(`rem(1.75))
+  @ Style.paddingY(`rem(0.75))
+  @ Css.[
+      height(`auto),
+      margin(`zero),
+      borderWidth(`zero),
+      Style.Typeface.ibmplexsans,
+      color(Style.Colors.saville),
+      fontSize(`rem(1.0)),
+      lineHeight(`rem(1.5)),
+      fontWeight(`medium),
+      letterSpacing(`rem(0.)),
+      fontStyle(`normal),
+      textTransform(`none),
+      outline(`zero, `none, `transparent),
+      focus([color(Style.Colors.hyperlink)]),
+      hover([backgroundColor(`transparent), color(Style.Colors.hyperlink)]),
+    ];
+
+module SimpleButton = {
+  open Style;
+
+  let component = ReasonReact.statelessComponent("Nav.SimpleButton");
+  let make = (~name, ~activePage=false, ~link, _children) => {
+    ...component,
+    render: _self => {
+      <a
+        href=link
         className=Css.(
-          style([
-            position(`relative),
-            width(`auto),
-            order(2),
-            NavStyle.bottomNudgeOffset(0.5),
-            media(
-              NavStyle.MediaQuery.statusLift(mainPage),
-              [order(3), width(`auto), NavStyle.bottomNudge],
-            ),
-            media(
-              NavStyle.MediaQuery.menu,
-              [mainPage ? width(`percent(50.0)) : width(`percent(70.0))],
+          merge([
+            Body.basic,
+            style(
+              Style.paddingY(`rem(0.75))
+              @ [
+                margin(`zero),
+                textDecoration(`none),
+                whiteSpace(`nowrap),
+                color(Colors.hyperlink),
+                activePage
+                  ? color(Colors.hyperlink) : color(Colors.metallicBlue),
+                hover([color(Style.Colors.hyperlink)]),
+                media(NavStyle.MediaQuery.menuMax, menuStyle),
+              ],
             ),
           ])
         )>
-        <DropdownMenu> ...items </DropdownMenu>
-      </div>
-    </nav>;
+        {ReasonReact.string(name)}
+      </a>;
+    },
+  };
+};
+
+module SignupButton = {
+  open Style;
+
+  let component = ReasonReact.statelessComponent("Nav.SignupButton");
+  let make = (~name, ~link, _children) => {
+    ...component,
+    render: _self => {
+      <a
+        href=link
+        className=Css.(
+          merge([
+            H4.wide,
+            style(
+              paddingX(`rem(0.75))
+              @ paddingY(`rem(0.75))
+              @ [
+                display(`flex),
+                width(`rem(6.25)),
+                height(`rem(2.5)),
+                borderRadius(`px(5)),
+                color(Style.Colors.hyperlink),
+                border(`px(1), `solid, Style.Colors.hyperlink),
+                textDecoration(`none),
+                whiteSpace(`nowrap),
+                hover([
+                  backgroundColor(Style.Colors.hyperlink),
+                  color(Style.Colors.whiteAlpha(0.95)),
+                ]),
+                // Make this display the same as a SimpleButton
+                // when the screen is small enough to show a menu
+                media(NavStyle.MediaQuery.menuMax, menuStyle),
+              ],
+            ),
+          ])
+        )>
+        <span
+          className=Css.(
+            style([
+              marginLeft(`rem(0.25)),
+              marginRight(`rem(0.0625)),
+              // HACK: vertically centering leaves it 1px too high
+              paddingTop(`rem(0.0625)),
+              media(
+                NavStyle.MediaQuery.menuMax,
+                [margin(`zero), ...Style.paddingY(`zero)],
+              ),
+            ])
+          )>
+          {ReasonReact.string(name)}
+        </span>
+      </a>;
+    },
+  };
+};
+
+let component = ReasonReact.statelessComponent("CodaNav");
+let make = (~page, _children) => {
+  ...component,
+  render: _self => {
+    <NavWrapper mainPage={page == `Home}>
+      <SimpleButton name="Blog" link="/blog.html" activePage={page == `Blog} />
+      <SimpleButton
+        name="Testnet"
+        link="/testnet.html"
+        activePage={page == `Testnet}
+      />
+      <SimpleButton
+        name="GitHub"
+        link="/code.html"
+        activePage={page == `Code}
+      />
+      <SimpleButton
+        name="Careers"
+        link="/jobs.html"
+        activePage={page == `Jobs}
+      />
+      <SignupButton name="Sign up" link=Links.mailingList />
+    </NavWrapper>;
   },
 };
