@@ -56,7 +56,7 @@ module Account_not_used = struct
 
   type t =
     { public_key: key
-    ; balance: Balance.t
+    ; balance: Balance.Stable.V1.t
            [@printer
              fun fmt balance ->
                Format.pp_print_string fmt (Balance.to_string balance)] }

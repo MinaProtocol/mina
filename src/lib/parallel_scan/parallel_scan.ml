@@ -168,7 +168,7 @@ module State = struct
    * execution at parallelism of size n. Assume we're always working on the
    * second step, and can refer to the work done at the prior step.
    *
-   * 
+   *
    * Example trace: Jobs buffer at some state t
    *                      0
    *                   M(1,8)
@@ -212,12 +212,12 @@ module State = struct
       | _, Base _ -> failwith "This shouldn't have occured"
       | _ -> false )
 
-  (*Level_pointer stores a start index for each level. These are, at first, 
-    the indices of the first node on each level and get incremented when a job is 
-    completed at the specific index. The tree is still traveresed breadth-first 
-    but the order of nodes on each level is determined using the start index that 
-    is kept track of in the level_pointer. if the cur_pos is the last node on the 
-    current level then next node is the first node on the next level otherwise 
+  (*Level_pointer stores a start index for each level. These are, at first,
+    the indices of the first node on each level and get incremented when a job is
+    completed at the specific index. The tree is still traveresed breadth-first
+    but the order of nodes on each level is determined using the start index that
+    is kept track of in the level_pointer. if the cur_pos is the last node on the
+    current level then next node is the first node on the next level otherwise
     return the next node on the same level*)
 
   let next_position_info parallelism level_pointer cur_pos =
@@ -237,9 +237,9 @@ module State = struct
     | `Same_level pos -> pos
     | `Next_level pos -> pos
 
-  (*On each level, the jobs are completed starting from a specific index that 
-    is stored in levels_pointer. When a job at that index is completed, it points 
-    to the next job on the same level. After the last node of the level, the 
+  (*On each level, the jobs are completed starting from a specific index that
+    is stored in levels_pointer. When a job at that index is completed, it points
+    to the next job on the same level. After the last node of the level, the
     index is set back to first node*)
   let incr_level_pointer t cur_pos =
     let cur_level = Int.floor_log2 (cur_pos + 1) in
@@ -284,6 +284,24 @@ module State = struct
           if parent_empty state.jobs index then elt :: lst else lst )
     in
     List.rev lst
+
+  let base_jobs_on_latest_tree (state : ('a, 'd) t) : 'd list =
+    let leaves_start_at = parallelism state - 1 in
+    let rec go pos jobs =
+      (*Get jobs from leaf-0 to the leaf at current enqueue position. The ones that are after base_pos are pending jobs from previous tree *)
+      if
+        Option.is_none state.base_none_pos
+        || pos >= Option.value_exn state.base_none_pos
+      then jobs
+      else
+        let jobs =
+          match Ring_buffer.read_i state.jobs pos with
+          | Job.Base (Some (j, _)) -> j :: jobs
+          | _ -> jobs
+        in
+        go (pos + 1) jobs
+    in
+    go leaves_start_at []
 
   let update_new_job t z dir pos =
     let new_job (cur_job : ('a, 'd) Job.t) : ('a, 'd) Job.t Or_error.t =
@@ -425,8 +443,8 @@ module State = struct
       ~finish:Fn.id
 
   (* Reset the sequence number starting from 1
-     If [997;997;998;998;998;999;999] is sequence number of the current 
-     available jobs 
+     If [997;997;998;998;998;999;999] is sequence number of the current
+     available jobs
      then [1;1;2;2;2;3;3] will be the new sequence numbers of the same jobs *)
   let reset_seq_no t =
     let open Or_error.Let_syntax in
@@ -516,6 +534,8 @@ let enqueue_data : state:('a, 'd) State.t -> data:'d list -> unit Or_error.t =
   else (
     state.current_data_length <- state.current_data_length + List.length data ;
     State.include_many_data state data )
+
+let base_jobs_on_latest_tree = State.base_jobs_on_latest_tree
 
 let is_valid t =
   let p = State.parallelism t in

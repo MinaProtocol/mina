@@ -8,7 +8,7 @@
 open Core_kernel
 open Async_kernel
 
-type 'a t = T of 'a * 'a t list
+type 'a t = T of 'a * 'a t list [@@deriving yojson]
 
 val of_list_exn : 'a list -> 'a t
 

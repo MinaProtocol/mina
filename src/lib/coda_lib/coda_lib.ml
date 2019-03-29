@@ -18,6 +18,8 @@ module type Network_intf = sig
 
   type ledger_hash
 
+  type pending_coinbases
+
   type staged_ledger_hash
 
   type parallel_scan_state
@@ -91,7 +93,8 @@ module type Network_intf = sig
                           , state_body_hash list * state_with_witness )
                           Proof_carrying_data.t
                         * parallel_scan_state
-                        * ledger_hash )
+                        * ledger_hash
+                        * pending_coinbases )
                         Deferred.Option.t)
     -> t Deferred.t
 end
@@ -280,7 +283,7 @@ module type Inputs_intf = sig
      and type work :=
                 ( Ledger_proof_statement.t
                 , Transaction.t
-                , Sparse_ledger.t
+                , Transaction_witness.t
                 , Ledger_proof.t )
                 Snark_work_lib.Work.Single.Spec.t
      and type snark_pool := Snark_pool.t
@@ -306,6 +309,7 @@ module type Inputs_intf = sig
      and type state_hash := Coda_base.State_hash.t
      and type state_body_hash := State_body_hash.t
      and type consensus_state := Consensus_mechanism.Consensus_state.Value.t
+     and type pending_coinbases := Pending_coinbase.t
 
   module Transition_router :
     Protocols.Coda_transition_frontier.Transition_router_intf
@@ -384,7 +388,7 @@ module Make (Inputs : Inputs_intf) = struct
     ; transaction_pool: Transaction_pool.t
     ; snark_pool: Snark_pool.t
     ; transition_frontier: Transition_frontier.t option Broadcast_pipe.Reader.t
-    ; strongest_ledgers:
+    ; verified_transitions:
         (External_transition.Verified.t, Protocol_state_hash.t) With_hash.t
         Strict_pipe.Reader.t
     ; proposer_transition_writer:
@@ -420,6 +424,11 @@ module Make (Inputs : Inputs_intf) = struct
     let%map frontier = Broadcast_pipe.Reader.peek t.transition_frontier in
     Transition_frontier.best_tip frontier
 
+  let root_length_opt t =
+    let open Option.Let_syntax in
+    let%map frontier = Broadcast_pipe.Reader.peek t.transition_frontier in
+    Transition_frontier.root_length frontier
+
   let best_staged_ledger_opt t =
     let open Option.Let_syntax in
     let%map tip = best_tip_opt t in
@@ -442,6 +451,8 @@ module Make (Inputs : Inputs_intf) = struct
       f
 
   let best_tip = compose_of_option best_tip_opt
+
+  let root_length = compose_of_option root_length_opt
 
   let visualize_frontier ~filename =
     compose_of_option
@@ -495,7 +506,7 @@ module Make (Inputs : Inputs_intf) = struct
     let%bind sl = best_staged_ledger_opt t in
     Staged_ledger.current_ledger_proof sl
 
-  let strongest_ledgers t = t.strongest_ledgers
+  let verified_transitions t = t.verified_transitions
 
   let root_diff t =
     let root_diff_reader, root_diff_writer =
@@ -511,6 +522,19 @@ module Make (Inputs : Inputs_intf) = struct
                 Strict_pipe.Writer.write root_diff_writer root_diff
                 |> Deferred.return ) )) ;
     root_diff_reader
+
+  let dump_tf t =
+    peek_frontier t.transition_frontier
+    |> Or_error.map ~f:Transition_frontier.visualize_to_string
+
+  (** The [best_path coda] is the list of state hashes from the root to the best_tip in the transition frontier. It includes the root hash and the hash *)
+  let best_path t =
+    let open Option.Let_syntax in
+    let%map tf = Broadcast_pipe.Reader.peek t.transition_frontier in
+    let bt = Transition_frontier.best_tip tf in
+    List.cons
+      Transition_frontier.(root tf |> Breadcrumb.state_hash)
+      (Transition_frontier.hash_path tf bt)
 
   module Config = struct
     (** If ledger_db_location is None, will auto-generate a db based on a UUID *)
@@ -559,6 +583,9 @@ module Make (Inputs : Inputs_intf) = struct
               Strict_pipe.create Synchronous
             in
             let net_ivar = Ivar.create () in
+            let pending_coinbases =
+              Pending_coinbase.create () |> Or_error.ok_exn
+            in
             let empty_diff =
               { Staged_ledger_diff.diff=
                   ( { completed_works= []
@@ -566,9 +593,10 @@ module Make (Inputs : Inputs_intf) = struct
                     ; coinbase= Staged_ledger_diff.At_most_two.Zero }
                   , None )
               ; prev_hash=
-                  Staged_ledger_hash.of_aux_and_ledger_hash
+                  Staged_ledger_hash.of_aux_ledger_and_coinbase_hash
                     (Staged_ledger_aux_hash.of_bytes "")
                     (Ledger.merkle_root Genesis_ledger.t)
+                    pending_coinbases
               ; creator=
                   Account.public_key
                     (snd (List.hd_exn Genesis_ledger.accounts)) }
@@ -600,6 +628,7 @@ module Make (Inputs : Inputs_intf) = struct
                 Staged_ledger.of_scan_state_and_ledger ~snarked_ledger_hash
                   ~ledger:Genesis.ledger
                   ~scan_state:(Staged_ledger.Scan_state.empty ())
+                  ~pending_coinbase_collection:pending_coinbases
               with
               | Ok staged_ledger -> staged_ledger
               | Error err -> Error.raise err
@@ -661,10 +690,16 @@ module Make (Inputs : Inputs_intf) = struct
                         (Transition_frontier.root frontier)
                     in
                     let scan_state = Staged_ledger.scan_state staged_ledger in
+                    let pending_coinbase_collection =
+                      Staged_ledger.pending_coinbase_collection staged_ledger
+                    in
                     let merkle_root =
                       Ledger.merkle_root (Staged_ledger.ledger staged_ledger)
                     in
-                    (peer_root_with_proof, scan_state, merkle_root)
+                    ( peer_root_with_proof
+                    , scan_state
+                    , merkle_root
+                    , pending_coinbase_collection )
                   in
                   Deferred.return result )
             in
@@ -724,7 +759,7 @@ module Make (Inputs : Inputs_intf) = struct
               ; time_controller= config.time_controller
               ; external_transitions_writer=
                   Strict_pipe.Writer.to_linear_pipe external_transitions_writer
-              ; strongest_ledgers= valid_transitions_for_api
+              ; verified_transitions= valid_transitions_for_api
               ; logger= config.logger
               ; seen_jobs= Work_selector.State.init
               ; staged_ledger_transition_backup_capacity=

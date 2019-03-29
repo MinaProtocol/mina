@@ -91,8 +91,10 @@ module Constants = struct
 end
 
 module Proposal_data = struct
+  (* TODO : version *)
   type t =
-    {stake_proof: Coda_base.Stake_proof.t; vrf_result: Random_oracle.Digest.t}
+    { stake_proof: Coda_base.Stake_proof.t
+    ; vrf_result: Random_oracle.Digest.Stable.V1.t }
   [@@deriving bin_io]
 
   let prover_state {stake_proof; _} = stake_proof
@@ -293,7 +295,7 @@ module Epoch_ledger = struct
   [@@deriving sexp, bin_io, eq, compare, hash, to_yojson]
 
   (* TODO : version *)
-  type value = (Coda_base.Frozen_ledger_hash.Stable.V1.t, Amount.t) t
+  type value = (Coda_base.Frozen_ledger_hash.Stable.V1.t, Amount.Stable.V1.t) t
   [@@deriving sexp, bin_io, eq, compare, hash, to_yojson]
 
   type var = (Coda_base.Frozen_ledger_hash.var, Amount.var) t
@@ -440,7 +442,8 @@ module Vrf = struct
   end
 
   module Output = struct
-    type t = Random_oracle.Digest.t
+    (* TODO : version *)
+    type t = Random_oracle.Digest.Stable.V1.t
     [@@deriving sexp, bin_io, eq, compare, hash, yojson]
 
     type var = Random_oracle.Digest.Checked.t
@@ -613,14 +616,33 @@ module Vrf = struct
       let dummy_sparse_ledger =
         Coda_base.Sparse_ledger.of_ledger_subset_exn Genesis_ledger.t [pk]
       in
+      let empty_pending_coinbase =
+        Coda_base.Pending_coinbase.create () |> Or_error.ok_exn
+      in
       let ledger_handler =
         unstage (Coda_base.Sparse_ledger.handler dummy_sparse_ledger)
       in
-      fun (With {request; respond} as t) ->
+      let pending_coinbase_handler =
+        unstage
+          (Coda_base.Pending_coinbase.handler empty_pending_coinbase
+             ~is_new_stack:false)
+      in
+      let handlers =
+        Snarky.Request.Handler.(
+          push
+            (push fail (create_single pending_coinbase_handler))
+            (create_single ledger_handler))
+      in
+      fun (With {request; respond}) ->
         match request with
         | Winner_address -> respond (Provide 0)
         | Private_key -> respond (Provide sk)
-        | _ -> ledger_handler t
+        | _ ->
+            respond
+              (Provide
+                 (Snarky.Request.Handler.run handlers
+                    ["Ledger Handler"; "Pending Coinbase Handler"]
+                    request))
 
     let vrf_output =
       let _, sk = Coda_base.Sample_keypairs.keypairs.(0) in
@@ -678,7 +700,7 @@ module Epoch_data = struct
     ( Epoch_ledger.value
     , Epoch_seed.Stable.V1.t
     , Coda_base.State_hash.Stable.V1.t
-    , Length.t )
+    , Length.Stable.V1.t )
     t
   [@@deriving sexp, bin_io, eq, compare, hash, to_yojson]
 
@@ -805,7 +827,8 @@ module Consensus_transition_data = struct
   type ('epoch, 'slot) t = {epoch: 'epoch; slot: 'slot}
   [@@deriving sexp, bin_io, compare]
 
-  type value = (Epoch.t, Epoch.Slot.t) t [@@deriving sexp, bin_io, compare]
+  type value = (Epoch.Stable.V1.t, Epoch.Slot.Stable.V1.t) t
+  [@@deriving sexp, bin_io, compare]
 
   type var = (Epoch.Unpacked.var, Epoch.Slot.Unpacked.var) t
 
@@ -1020,12 +1043,13 @@ module Consensus_state = struct
         module T = struct
           let version = 1
 
+          (* TODO : version components *)
           type t =
-            ( Length.t
+            ( Length.Stable.V1.t
             , Vrf.Output.t
-            , Amount.t
-            , Epoch.t
-            , Epoch.Slot.t
+            , Amount.Stable.V1.t
+            , Epoch.Stable.V1.t
+            , Epoch.Slot.Stable.V1.t
             , Epoch_data.value
             , bool
             , Checkpoints.t )
@@ -1474,13 +1498,30 @@ module Prover_state = struct
 
   let precomputed_handler = Vrf.Precomputed.handler
 
-  let handler {delegator; ledger; private_key} : Snark_params.Tick.Handler.t =
+  let handler {delegator; ledger; private_key}
+      ~pending_coinbase:{ Coda_base.Pending_coinbase_witness.pending_coinbases
+                        ; is_new_stack } : Snark_params.Tick.Handler.t =
     let ledger_handler = unstage (Coda_base.Sparse_ledger.handler ledger) in
-    fun (With {request; respond} as t) ->
+    let pending_coinbase_handler =
+      unstage
+        (Coda_base.Pending_coinbase.handler pending_coinbases ~is_new_stack)
+    in
+    let handlers =
+      Snarky.Request.Handler.(
+        push
+          (push fail (create_single pending_coinbase_handler))
+          (create_single ledger_handler))
+    in
+    fun (With {request; respond}) ->
       match request with
       | Vrf.Winner_address -> respond (Provide delegator)
       | Vrf.Private_key -> respond (Provide private_key)
-      | _ -> ledger_handler t
+      | _ ->
+          respond
+            (Provide
+               (Snarky.Request.Handler.run handlers
+                  ["Ledger Handler"; "Pending Coinbase Handler"]
+                  request))
 end
 
 module Snark_transition = Coda_base.Snark_transition.Make (struct
@@ -1811,7 +1852,8 @@ module For_tests = struct
       { Blockchain_state.genesis with
         staged_ledger_hash=
           Coda_base.Staged_ledger_hash.(
-            of_aux_and_ledger_hash Aux_hash.dummy root_ledger_hash)
+            of_aux_ledger_and_coinbase_hash Aux_hash.dummy root_ledger_hash
+              (Coda_base.Pending_coinbase.create () |> Or_error.ok_exn))
       ; snarked_ledger_hash=
           Coda_base.Frozen_ledger_hash.of_ledger_hash root_ledger_hash }
 
@@ -1945,6 +1987,7 @@ let%test_module "Proof of stake tests" =
       (* choose largest account as most likely to propose *)
       let ledger_data = Genesis_ledger.t in
       let ledger = Ledger.Any_ledger.cast (module Ledger) ledger_data in
+      let pending_coinbases = Pending_coinbase.create () |> Or_error.ok_exn in
       let maybe_sk, account = Genesis_ledger.largest_account_exn () in
       let private_key = Option.value_exn maybe_sk in
       let public_key = Account.public_key account in
@@ -1999,7 +2042,10 @@ let%test_module "Proof of stake tests" =
           Sparse_ledger.of_ledger_index_subset_exn ledger indices
         in
         let handler =
-          Prover_state.handler {delegator; ledger= sparse_ledger; private_key}
+          Prover_state.handler
+            {delegator; ledger= sparse_ledger; private_key}
+            ~pending_coinbase:
+              {Pending_coinbase_witness.pending_coinbases; is_new_stack= true}
         in
         let%map `Success _, var = Snark_params.Tick.handle result handler in
         As_prover.read typ var

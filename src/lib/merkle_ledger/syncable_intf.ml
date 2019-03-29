@@ -25,8 +25,8 @@ module type S = sig
 
   val set_batch_accounts : t -> (addr * account) list -> unit
 
-  (* Get all of the accounts that is in a subtree of the underlying merkle tree where it's root is `address`. 
-    The accounts are ordered from their address in the merkle tree *)
+  (** Get all of the accounts that are in a subtree of the underlying Merkle
+    tree rooted at `address`. The accounts are ordered by their addresses. *)
   val get_all_accounts_rooted_at_exn : t -> addr -> (addr * account) list
 
   val merkle_root : t -> root_hash

@@ -45,6 +45,8 @@ module type Test_intf = sig
 
   val with_instances : (Base.t -> Mask.t -> 'a) -> 'a
 
+  (** Here we provide a base ledger and two layers of attached masks
+          * one ontop another *)
   val with_chain :
        (   Base.t
         -> mask:Mask.Attached.t
@@ -52,8 +54,6 @@ module type Test_intf = sig
         -> mask2:Mask.Attached.t
         -> 'a)
     -> 'a
-  (** Here we provide a base ledger and two layers of attached masks
-          * one ontop another *)
 end
 
 module Make (Test : Test_intf) = struct

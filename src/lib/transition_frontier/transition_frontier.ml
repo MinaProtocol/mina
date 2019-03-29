@@ -84,7 +84,8 @@ struct
           in
           let%bind ( `Hash_after_applying staged_ledger_hash
                    , `Ledger_proof proof_opt
-                   , `Staged_ledger transitioned_staged_ledger ) =
+                   , `Staged_ledger transitioned_staged_ledger
+                   , `Pending_coinbase_data _ ) =
             let open Deferred.Let_syntax in
             match%map
               Inputs.Staged_ledger.apply ~logger staged_ledger
@@ -441,7 +442,8 @@ struct
     let rec find_path b =
       let elem = f b in
       let parent_hash = Breadcrumb.parent_hash b in
-      if State_hash.equal parent_hash t.root then [elem]
+      if State_hash.equal (Breadcrumb.state_hash b) t.root then []
+      else if State_hash.equal parent_hash t.root then [elem]
       else elem :: find_path (find_exn t parent_hash)
     in
     List.rev (find_path breadcrumb)
@@ -451,6 +453,8 @@ struct
   let iter t ~f = Hashtbl.iter t.table ~f:(fun n -> f n.breadcrumb)
 
   let root t = find_exn t t.root
+
+  let root_length t = (Hashtbl.find_exn t.table t.root).length
 
   let best_tip t = find_exn t t.best_tip
 
@@ -499,6 +503,14 @@ struct
     Out_channel.with_file filename ~f:(fun output_channel ->
         let graph = Visualizor.to_graph t in
         Visualizor.output_graph output_channel graph )
+
+  let visualize_to_string t =
+    let graph = Visualizor.to_graph t in
+    let buf = Buffer.create 0 in
+    let formatter = Format.formatter_of_buffer buf in
+    Visualizor.fprint_graph formatter graph ;
+    Format.pp_print_flush formatter () ;
+    Buffer.to_bytes buf |> Bytes.to_string
 
   let attach_node_to t ~(parent_node : Node.t) ~(node : Node.t) =
     let hash = Breadcrumb.state_hash (Node.breadcrumb node) in
@@ -592,33 +604,33 @@ struct
     t.root <- new_root_hash ;
     new_root_node
 
+  let common_ancestor t (bc1 : Breadcrumb.t) (bc2 : Breadcrumb.t) :
+      State_hash.t =
+    let rec go ancestors1 ancestors2 sh1 sh2 =
+      Hash_set.add ancestors1 sh1 ;
+      Hash_set.add ancestors2 sh2 ;
+      if Hash_set.mem ancestors1 sh2 then sh2
+      else if Hash_set.mem ancestors2 sh1 then sh1
+      else
+        let parent_unless_root sh =
+          if State_hash.equal sh t.root then sh
+          else find_exn t sh |> Breadcrumb.parent_hash
+        in
+        go ancestors1 ancestors2 (parent_unless_root sh1)
+          (parent_unless_root sh2)
+    in
+    go
+      (Hash_set.create (module State_hash) ())
+      (Hash_set.create (module State_hash) ())
+      (Breadcrumb.state_hash bc1)
+      (Breadcrumb.state_hash bc2)
+
   (* Get the breadcrumbs that are on bc1's path but not bc2's, and vice versa.
      Ordered oldest to newest.
   *)
   let get_path_diff t (bc1 : Breadcrumb.t) (bc2 : Breadcrumb.t) :
       Breadcrumb.t list * Breadcrumb.t list =
-    let common_ancestor =
-      if Breadcrumb.equal bc1 bc2 then Breadcrumb.state_hash bc1
-      else
-        let rec go ancestors1 ancestors2 sh1 sh2 =
-          if Hash_set.mem ancestors1 sh2 then sh2
-          else if Hash_set.mem ancestors2 sh1 then sh1
-          else
-            let parent_unless_root h =
-              if State_hash.equal h t.root then h
-              else find_exn t h |> Breadcrumb.parent_hash
-            in
-            Hash_set.add ancestors1 sh1 ;
-            Hash_set.add ancestors2 sh2 ;
-            go ancestors1 ancestors2 (parent_unless_root sh1)
-              (parent_unless_root sh2)
-        in
-        go
-          (Hash_set.create (module State_hash) ())
-          (Hash_set.create (module State_hash) ())
-          (Breadcrumb.state_hash bc1)
-          (Breadcrumb.state_hash bc2)
-    in
+    let ancestor = common_ancestor t bc1 bc2 in
     (* Find the breadcrumbs connecting bc1 and bc2, excluding bc1. Precondition:
        bc1 is an ancestor of bc2. *)
     let path_from_to bc1 bc2 =
@@ -630,9 +642,9 @@ struct
     in
     Logger.debug t.logger ~module_:__MODULE__ ~location:__LOC__
       !"Common ancestor: %{sexp: State_hash.t}"
-      common_ancestor ;
-    ( path_from_to (find_exn t common_ancestor) bc1
-    , path_from_to (find_exn t common_ancestor) bc2 )
+      ancestor ;
+    ( path_from_to (find_exn t ancestor) bc1
+    , path_from_to (find_exn t ancestor) bc2 )
 
   (* Adding a breadcrumb to the transition frontier is broken into the following steps:
    *   1) attach the breadcrumb to the transition frontier
@@ -657,22 +669,62 @@ struct
   *)
   let add_breadcrumb_exn t breadcrumb =
     O1trace.measure "add_breadcrumb" (fun () ->
+        let consensus_state_of_breadcrumb b =
+          Breadcrumb.transition_with_hash b
+          |> With_hash.data
+          |> Inputs.External_transition.Verified.protocol_state
+          |> Inputs.External_transition.Protocol_state.consensus_state
+        in
         let hash =
           With_hash.hash (Breadcrumb.transition_with_hash breadcrumb)
         in
         let root_node = Hashtbl.find_exn t.table t.root in
         (* 1 *)
         attach_breadcrumb_exn t breadcrumb ;
+        let parent_hash = Breadcrumb.parent_hash breadcrumb in
+        let parent_node =
+          Option.value_exn
+            (Hashtbl.find t.table parent_hash)
+            ~error:
+              (Error.of_exn
+                 (Parent_not_found (`Parent parent_hash, `Target hash)))
+        in
+        Debug_assert.debug_assert (fun () ->
+            (* if the proof verified, then this should always hold*)
+            assert (
+              Consensus.select
+                ~existing:
+                  (consensus_state_of_breadcrumb parent_node.breadcrumb)
+                ~candidate:(consensus_state_of_breadcrumb breadcrumb)
+                ~logger:
+                  (Logger.create ()
+                     ~metadata:
+                       [ ( "selection context"
+                         , `String
+                             "debug_assert that child is preferred over parent"
+                         ) ])
+              = `Take ) ) ;
         let node = Hashtbl.find_exn t.table hash in
         (* 2 *)
         let distance_to_parent = node.length - root_node.length in
         let best_tip_node = Hashtbl.find_exn t.table t.best_tip in
         (* 3 *)
+        let best_tip_change =
+          Consensus.select
+            ~existing:(consensus_state_of_breadcrumb best_tip_node.breadcrumb)
+            ~candidate:(consensus_state_of_breadcrumb node.breadcrumb)
+            ~logger:
+              (Logger.create ()
+                 ~metadata:
+                   [ ( "selection context"
+                     , `String "comparing new breadcrumb to best tip" ) ])
+        in
         let added_to_best_tip_path, removed_from_best_tip_path =
-          if node.length > best_tip_node.length then (
-            t.best_tip <- hash ;
-            get_path_diff t breadcrumb best_tip_node.breadcrumb )
-          else ([], [])
+          match best_tip_change with
+          | `Keep -> ([], [])
+          | `Take ->
+              t.best_tip <- hash ;
+              get_path_diff t breadcrumb best_tip_node.breadcrumb
         in
         Logger.debug t.logger ~module_:__MODULE__ ~location:__LOC__
           "added %d breadcrumbs and removed %d making path to new best tip"
@@ -718,7 +770,16 @@ struct
             (* 4.IV *)
             let new_root_node = move_root t heir_node in
             (* 4.V *)
-            let garbage = List.bind bad_hashes ~f:(successor_hashes_rec t) in
+            let garbage =
+              bad_hashes @ List.bind bad_hashes ~f:(successor_hashes_rec t)
+            in
+            Logger.trace t.logger ~module_:__MODULE__ ~location:__LOC__
+              ~metadata:
+                [ ("garbage", `List (List.map garbage ~f:State_hash.to_yojson))
+                ; ("length_of_garbage", `Int (List.length garbage))
+                ; ( "bad_hashes"
+                  , `List (List.map bad_hashes ~f:State_hash.to_yojson) ) ]
+              "collecting $length_of_garbage nodes rooted from $bad_hashes" ;
             let garbage_breadcrumbs =
               List.map garbage ~f:(fun g ->
                   (Hashtbl.find_exn t.table g).breadcrumb )
@@ -789,18 +850,19 @@ struct
         in
         (* 5 *)
         Extensions.handle_diff t.extensions t.extension_writers
-          ( if node.length > best_tip_node.length then
-            Transition_frontier_diff.New_best_tip
-              { old_root= root_node.breadcrumb
-              ; old_root_length= root_node.length
-              ; new_root= new_root_node.breadcrumb
-              ; added_to_best_tip_path=
-                  Non_empty_list.of_list_opt added_to_best_tip_path
-                  |> Option.value_exn
-              ; new_best_tip_length= node.length
-              ; removed_from_best_tip_path
-              ; garbage= garbage_breadcrumbs }
-          else Transition_frontier_diff.New_breadcrumb node.breadcrumb ) )
+          ( match best_tip_change with
+          | `Keep -> Transition_frontier_diff.New_breadcrumb node.breadcrumb
+          | `Take ->
+              Transition_frontier_diff.New_best_tip
+                { old_root= root_node.breadcrumb
+                ; old_root_length= root_node.length
+                ; new_root= new_root_node.breadcrumb
+                ; added_to_best_tip_path=
+                    Non_empty_list.of_list_opt added_to_best_tip_path
+                    |> Option.value_exn
+                ; new_best_tip_length= node.length
+                ; removed_from_best_tip_path
+                ; garbage= garbage_breadcrumbs } ) )
 
   let add_breadcrumb_if_present_exn t breadcrumb =
     let parent_hash = Breadcrumb.parent_hash breadcrumb in

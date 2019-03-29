@@ -1,13 +1,36 @@
 let component = ReasonReact.statelessComponent("SideText");
-let make = (~paragraphs, ~cta, _children) => {
+let make = (~className="", ~paragraphs, ~cta, _children) => {
   ...component,
   render: _self => {
     let ps =
-      Belt.Array.map(paragraphs, p =>
-        <p className=Style.Body.basic key=p> {ReasonReact.string(p)} </p>
+      Belt.Array.mapWithIndex(paragraphs, (i, p) =>
+        <p
+          className=Css.(
+            merge([
+              Style.Body.basic,
+              style(
+                if (i == 0) {
+                  [marginTop(`zero)];
+                } else {
+                  [];
+                },
+              ),
+            ])
+          )
+          key=p>
+          {ReasonReact.string(p)}
+        </p>
       );
 
-    <div className=Css.(style([width(`rem(21.0))]))>
+    <div
+      className=Css.(
+        merge([
+          className,
+          style([
+            media(Style.MediaQuery.notMobile, [width(`rem(20.625))]),
+          ]),
+        ])
+      )>
       {ReasonReact.array(ps)}
       <a
         href=Links.mailingList

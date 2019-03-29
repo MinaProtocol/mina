@@ -27,7 +27,7 @@ module Footer = {
           </a>
           {last
              ? ReasonReact.null
-             : <span className=footerStyle>
+             : <span className=footerStyle ariaHidden=true>
                  {ReasonReact.string({js| · |js})}
                </span>}
         </li>,
@@ -104,26 +104,20 @@ let make =
       ~name,
       ~extraHeaders=ReasonReact.null,
       ~footerColor=Style.Colors.white,
+      ~page,
       children,
     ) => {
   ...component,
   render: _ =>
-    <html>
+    <html
+      lang="en"
+      className=Css.(
+        style([
+          media(Style.MediaQuery.iphoneSEorSmaller, [fontSize(`px(13))]),
+        ])
+      )>
       <Head filename=name extra=extraHeaders />
       <body>
-        <Wrapped>
-          <div
-            className=Css.(
-              style([
-                marginTop(`rem(1.25)),
-                media(Style.MediaQuery.full, [marginTop(`rem(2.0))]),
-              ])
-            )>
-            <CodaNav />
-          </div>
-        </Wrapped>
-        <div> ...children </div>
-        <Footer bgcolor=footerColor />
         {if (Grid.enabled) {
            <div
              className=Css.(
@@ -151,6 +145,19 @@ let make =
          } else {
            <div />;
          }}
+        <Wrapped>
+          <div
+            className=Css.(
+              style([
+                marginTop(`rem(0.5)),
+                media(Style.MediaQuery.full, [marginTop(`rem(2.0))]),
+              ])
+            )>
+            <Nav page />
+          </div>
+        </Wrapped>
+        <main> ...children </main>
+        <Footer bgcolor=footerColor />
       </body>
     </html>,
 };
