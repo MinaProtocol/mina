@@ -6,9 +6,11 @@ module Colors = {
   let hyperlinkString = "hsl(201, 71%, 52%)";
   let hyperlinkAlpha = a => `hsla((201, 71, 52, a));
   let hyperlinkHover = `hsl((201, 71, 40));
+  let hyperlinkLight = `hsl((201, 71, 70));
 
   let metallicBlue = `rgb((70, 99, 131));
   let denimTwo = `rgb((61, 88, 120));
+  let greyBlueString = "rgb(118, 147, 190)";
   let darkGreyBlue = `rgb((61, 88, 120));
   let greyishBrown = `rgb((74, 74, 74));
 
