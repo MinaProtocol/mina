@@ -51,7 +51,7 @@ module type S = sig
     ; received_reader: content Envelope.Incoming.t Strict_pipe.Reader.t
     ; me: Peer.t
     ; peers: Peer.Hash_set.t
-    ; connections: (Unix.Inet_addr.t, Rpc.Connection.t) Hashtbl.t }
+    ; connections: (Unix.Inet_addr.t, Rpc.Connection.t list) Hashtbl.t }
 
   module Config : Config_intf
 
@@ -88,7 +88,7 @@ module Make (Message : Message_intf) :
     ; received_reader: Message.content Envelope.Incoming.t Strict_pipe.Reader.t
     ; me: Peer.t
     ; peers: Peer.Hash_set.t
-    ; connections: (Unix.Inet_addr.t, Rpc.Connection.t) Hashtbl.t }
+    ; connections: (Unix.Inet_addr.t, Rpc.Connection.t list) Hashtbl.t }
 
   module Config = struct
     type t =
@@ -149,7 +149,7 @@ module Make (Message : Message_intf) :
     broadcast_selected t selected_peers msg
 
   let create (config : Config.t)
-      (implementations : Host_and_port.t Rpc.Implementation.t list) =
+      (implementation_list : Host_and_port.t Rpc.Implementation.t list) =
     trace_task "gossip net" (fun () ->
         let%bind membership =
           match%map
@@ -186,11 +186,12 @@ module Make (Message : Message_intf) :
              ~f:(fun addr ->
                match Hashtbl.find_and_remove t.connections addr with
                | None -> Deferred.unit
-               | Some conn ->
+               | Some conn_list ->
                    Logger.debug t.logger ~module_:__MODULE__ ~location:__LOC__
                      !"Peer %{sexp: Unix.Inet_addr.t} banned, disconnecting."
                      addr ;
-                   Rpc.Connection.close conn )) ;
+                   Deferred.List.iter conn_list ~f:(fun conn ->
+                       Rpc.Connection.close conn ) )) ;
         trace_task "rebroadcasting messages" (fun () ->
             don't_wait_for
               (Linear_pipe.iter_unordered ~max_concurrency:64 broadcast_reader
@@ -209,7 +210,7 @@ module Make (Message : Message_intf) :
                     Strict_pipe.Writer.write received_writer
                       (Envelope.Incoming.wrap ~data:(Message.content msg)
                          ~sender:(Message.sender msg)) )
-              @ implementations )
+              @ implementation_list )
           in
           Rpc.Implementations.create_exn ~implementations
             ~on_unknown_rpc:`Close_connection
@@ -239,36 +240,41 @@ module Make (Message : Message_intf) :
                     "%s" (Exn.to_string_mach exn) ))
             (Tcp.Where_to_listen.of_port config.me.Peer.communication_port)
             (fun client reader writer ->
-              match
-                Hashtbl.find t.connections (Socket.Address.Inet.addr client)
-              with
-              | Some _ ->
-                  Logger.error t.logger ~module_:__MODULE__ ~location:__LOC__
-                    "Connection from %s already exists"
-                    (Socket.Address.Inet.to_string client) ;
-                  Deferred.unit
-              | None ->
-                  let%map _ =
-                    Rpc.Connection.server_with_close reader writer
-                      ~implementations
-                      ~connection_state:(fun conn ->
-                        (* connection state is the client's IP and ephemeral port
+              let conn_list =
+                Option.value_map ~default:[]
+                  (Hashtbl.find t.connections (Socket.Address.Inet.addr client))
+                  ~f:Fn.id
+              in
+              let connection_limit = List.length implementation_list + 1 in
+              if List.length conn_list = connection_limit then (
+                Logger.error t.logger ~module_:__MODULE__ ~location:__LOC__
+                  "Cannot open another connection. Number of existing \
+                   connections from %s equals the limit %d."
+                  (Socket.Address.Inet.to_string client)
+                  connection_limit ;
+                Deferred.unit )
+              else
+                let%map _ =
+                  Rpc.Connection.server_with_close reader writer
+                    ~implementations
+                    ~connection_state:(fun conn ->
+                      (* connection state is the client's IP and ephemeral port
                         when connecting to the server over TCP; the ephemeral
                         port is distinct from the client's discovery and
                         communication ports *)
-                        Hashtbl.add_exn t.connections
-                          ~key:(Socket.Address.Inet.addr client)
-                          ~data:conn ;
-                        Socket.Address.Inet.to_host_and_port client )
-                      ~on_handshake_error:
-                        (`Call
-                          (fun exn ->
-                            Logger.error t.logger ~module_:__MODULE__
-                              ~location:__LOC__ "%s" (Exn.to_string_mach exn) ;
-                            Deferred.unit ))
-                  in
-                  Hashtbl.remove t.connections
-                  @@ Socket.Address.Inet.addr client )
+                      Hashtbl.set t.connections
+                        ~key:(Socket.Address.Inet.addr client)
+                        ~data:(conn :: conn_list) ;
+                      Socket.Address.Inet.to_host_and_port client )
+                    ~on_handshake_error:
+                      (`Call
+                        (fun exn ->
+                          Logger.error t.logger ~module_:__MODULE__
+                            ~location:__LOC__ "%s" (Exn.to_string_mach exn) ;
+                          Deferred.unit ))
+                in
+                Hashtbl.remove t.connections @@ Socket.Address.Inet.addr client
+              )
         in
         t )
 
