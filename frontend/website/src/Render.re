@@ -103,12 +103,18 @@ module Router = {
 let jobOpenings = [|
   ("engineering-manager", "Engineering Manager (San Francisco)."),
   ("product-manager", "Product Manager (San Francisco)."),
+  ("community-manager", "Community Manager (San Francisco)."),
   ("senior-frontend-engineer", "Senior Frontend Engineer (San Francisco)."),
   (
     "protocol-reliability-engineer",
     "Protocol Reliability Engineer (San Francisco).",
   ),
   ("protocol-engineer", "Senior Protocol Engineer (San Francisco)."),
+  (
+    "director-of-business-development",
+    "Director of Business Development (San Francisco).",
+  ),
+  ("developer-advocate", "Developer Advocate (San Francisco)."),
 |];
 
 // GENERATE
