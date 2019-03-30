@@ -17,6 +17,7 @@ module Static = {
 module ThirdParty = {
   let coindeskTossesBlocks = "https://www.coindesk.com/blockchain-tosses-blocks-naval-metastable-back-twist-crypto-cash/";
   let tokenDailyQA = "https://www.tokendaily.co/p/q-as-with-o-1-on-coda-protocol";
+  let testnetStatus = "https://status.codaprotocol.com/";
 };
 
 module Talks = {

@@ -208,6 +208,9 @@ let make = _ => {
                {js|Earn Coda by helping to compress the blockchain\u00A0→|js},
              )}
           </a>
+          <a href=Links.ThirdParty.testnetStatus className=rightSideLink>
+            {ReasonReact.string({js|Check testnet uptime status\u00A0→|js})}
+          </a>
         </div>
       </div>
       <div
