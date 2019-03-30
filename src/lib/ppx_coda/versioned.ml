@@ -12,7 +12,6 @@
 
     [@@deriving version { wrapped }]
 
-
   If the "wrapped" option is omitted (the common case), the type must be named "t", 
   and its definition occurs in the module hierarchy "Stable.Vn.T", where n is a 
   positive integer.
@@ -81,6 +80,33 @@ let validate_type_decl inner3_modules wrapped type_decl =
       "Versioned type must not have type parameters" ;
   if wrapped then validate_wrapped_type_decl inner3_modules type_decl
   else validate_unwrapped_type_decl inner3_modules type_decl
+
+let module_name_from_unwrapped_path inner3_modules =
+  match inner3_modules with
+  | ["T"; module_version; "Stable"] -> module_version
+  | _ -> failwith "module_name_from_unwrapped_path: unexpected module path"
+
+let module_name_from_wrapped_path inner3_modules =
+  match inner3_modules with
+  | [module_version; "Stable"; "Wrapped"] -> module_version
+  | _ -> failwith "module_name_from_wrapped_path: unexpected module path"
+
+(* generate "let version = n", when version module is Vn *)
+let generate_version_number_decl inner3_modules loc wrapped =
+  (* invariant: we've checked module name already *)
+  let module E = Ppxlib.Ast_builder.Make (struct
+    let loc = loc
+  end) in
+  let open E in
+  let module_name =
+    if wrapped then module_name_from_wrapped_path inner3_modules
+    else module_name_from_unwrapped_path inner3_modules
+  in
+  let version =
+    String.sub module_name ~pos:1 ~len:(String.length module_name - 1)
+    |> int_of_string
+  in
+  [%stri let version = [%e eint version]]
 
 let ocaml_builtin_types = ["int"; "float"; "char"; "string"; "bool"; "unit"]
 
@@ -206,7 +232,8 @@ let generate_val_decls_for_type_decl ~options ~path type_decls =
   in
   let inner3_modules = List.take (List.rev path) 3 in
   validate_type_decl inner3_modules wrapped type_decl1 ;
-  generate_versioned_decls type_decl1 wrapped
+  generate_version_number_decl inner3_modules type_decl1.ptype_loc wrapped
+  :: generate_versioned_decls type_decl1 wrapped
 
 let () =
   Ppx_deriving.(
