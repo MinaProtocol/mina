@@ -28,6 +28,9 @@ positive-tests : unexpired.ml
 	@ echo -n "Versioned, wrapped type, should succeed..."
 	@ dune build versioned_good_wrapped.cma ${REDIRECT}
 	@ echo "OK"
+	@ echo -n "Versioned types with contained types, should succeed..."
+	@ dune build versioned_good_contained_types.cma ${REDIRECT}
+	@ echo "OK"
 
 negative-tests :
 # expiration
@@ -61,4 +64,7 @@ negative-tests :
 	@ echo "OK"
 	@ echo -n "Versioned type with bad version name, should fail..."
 	@ ! dune build versioned_bad_version_name.cma ${REDIRECT}
+	@ echo "OK"
+	@ echo -n "Versioned types with bad contained types, should fail..."
+	@ ! dune build versioned_bad_contained_types.cma ${REDIRECT}
 	@ echo "OK"

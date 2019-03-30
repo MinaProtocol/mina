@@ -82,9 +82,92 @@ let validate_type_decl inner3_modules wrapped type_decl =
   if wrapped then validate_wrapped_type_decl inner3_modules type_decl
   else validate_unwrapped_type_decl inner3_modules type_decl
 
-let generate_contained_type_decls _type_decl =
-  (* TODO *)
-  []
+let ocaml_builtin_types = ["int"; "float"; "char"; "string"; "bool"; "unit"]
+
+let is_ocaml_builtin_type txt =
+  match txt with
+  | Lident id -> List.mem ocaml_builtin_types id ~equal:String.equal
+  | _ -> false
+
+let rec generate_core_type_version_decls core_type =
+  match core_type.ptyp_desc with
+  | Ptyp_constr ({txt; _}, core_types) -> (
+    match (txt, core_types) with
+    | Lident id, [] ->
+        (* type t = id *)
+        if List.mem ocaml_builtin_types id ~equal:String.equal then
+          (* no versioning to worry about *)
+          []
+        else
+          (* a type not in a module (so not versioned) *)
+          Ppx_deriving.raise_errorf ~loc:core_type.ptyp_loc
+            "Type \"%s\" is not a versioned type" id
+    | Lident _id, _ :: _ ->
+        (* type t = (T1.t,T2.t) _id'
+             check that the parameters are versioned
+           *)
+        generate_version_decls_for_core_types core_types
+    | Ldot (prefix, "t"), [] ->
+        (* type t = A.B.t
+             generate: let _ = A.B.__versioned__
+           *)
+        let loc = core_type.ptyp_loc in
+        let pexp_loc = loc in
+        let versioned_ident =
+          { pexp_desc= Pexp_ident {txt= Ldot (prefix, "__versioned__"); loc}
+          ; pexp_loc
+          ; pexp_attributes= [] }
+        in
+        [%str let _ = [%e versioned_ident]]
+    | _ ->
+        Ppx_deriving.raise_errorf ~loc:core_type.ptyp_loc
+          "Unrecognized type constructor for versioned type" )
+  | Ptyp_tuple core_types ->
+      (* type t = t1 * t2 * t3 *)
+      generate_version_decls_for_core_types core_types
+  | Ptyp_variant _ -> (* type t = [ `A | `B ] *)
+                      []
+  | _ ->
+      Ppx_deriving.raise_errorf ~loc:core_type.ptyp_loc
+        "Can't determine versioning for contained type"
+
+and generate_version_decls_for_core_types core_types =
+  List.fold_right core_types ~init:[] ~f:(fun core_type accum ->
+      generate_core_type_version_decls core_type @ accum )
+
+let generate_version_decls_for_label_decls label_decls =
+  generate_version_decls_for_core_types
+    (List.map label_decls ~f:(fun lab_decl -> lab_decl.pld_type))
+
+let generate_constructor_decl_decls ctor_decl =
+  match (ctor_decl.pcd_res, ctor_decl.pcd_args) with
+  | None, Pcstr_tuple core_types ->
+      (* C of T1 * ... * Tn *)
+      generate_version_decls_for_core_types core_types
+  | None, Pcstr_record label_decls ->
+      (* C of { ... } *)
+      generate_version_decls_for_label_decls label_decls
+  | _ ->
+      Ppx_deriving.raise_errorf ~loc:ctor_decl.pcd_loc
+        "Can't determine versioning for constructor declaration"
+
+let generate_contained_type_decls type_decl =
+  match type_decl.ptype_kind with
+  | Ptype_abstract ->
+      if Option.is_none type_decl.ptype_manifest then
+        Ppx_deriving.raise_errorf ~loc:type_decl.ptype_loc
+          "Versioned type, not a label or variant, must have manifest \
+           (right-hand side)" ;
+      let manifest = Option.value_exn type_decl.ptype_manifest in
+      generate_core_type_version_decls manifest
+  | Ptype_variant ctor_decls ->
+      List.fold ctor_decls ~init:[] ~f:(fun accum ctor_decl ->
+          generate_constructor_decl_decls ctor_decl @ accum )
+  | Ptype_record label_decls ->
+      generate_version_decls_for_label_decls label_decls
+  | Ptype_open ->
+      Ppx_deriving.raise_errorf ~loc:type_decl.ptype_loc
+        "Versioned type must not be open"
 
 let generate_versioned_decls type_decl wrapped =
   let module E = Ppxlib.Ast_builder.Make (struct
