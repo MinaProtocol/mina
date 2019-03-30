@@ -172,10 +172,10 @@ module NavWrapper = {
         |> Array.mapi((idx, elem) =>
              if (idx == Array.length(children) - 1) {
                <li
-                 className={Css.style(
-                   Style.paddingX(`rem(0.75))
-                   @ [Css.listStyle(`none, `inside, `none)],
-                 )}>
+                 className={Css.style([
+                   Css.paddingLeft(`rem(0.75)), // we need to skip padding right here as it's on the edge
+                   Css.listStyle(`none, `inside, `none),
+                 ])}>
                  elem
                </li>;
              } else {
