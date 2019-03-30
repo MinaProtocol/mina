@@ -22,7 +22,7 @@ module Make (Inputs : Inputs_intf) :
               ( Inputs.External_transition.Stable.Latest.t
               , State_hash.Stable.Latest.t )
               With_hash.t
-              Inputs.Diff_mutant.e
+              Inputs.Diff_mutant.E.t
    and module Extensions.Work = Inputs.Transaction_snark_work.Statement =
 struct
   (* NOTE: is Consensus_mechanism.select preferable over distance? *)

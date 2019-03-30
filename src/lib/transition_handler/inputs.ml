@@ -26,7 +26,7 @@ module type S = sig
                 ( External_transition.Stable.Latest.t
                 , State_hash.Stable.Latest.t )
                 With_hash.t
-                Diff_mutant.e
+                Diff_mutant.E.t
 end
 
 module With_unprocessed_transition_cache = struct

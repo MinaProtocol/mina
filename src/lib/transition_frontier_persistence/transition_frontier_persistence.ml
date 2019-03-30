@@ -5,6 +5,7 @@ open Pipe_lib
 module Diff_mutant = Diff_mutant
 module Worker = Worker
 module Intf = Intf
+module Diff_hash = Diff_hash
 
 module Make (Inputs : Intf.Main_inputs) :
   Intf.S
@@ -49,14 +50,15 @@ module Make (Inputs : Intf.Main_inputs) :
       (diff :
         ( (External_transition.t, State_hash.t) With_hash.t
         , output )
-        Diff_mutant.t) : (State_hash.t, output) Diff_mutant.t =
+        Diff_mutant.t) : State_hash.t Diff_mutant.E.t =
     match diff with
     | Remove_transitions removed_transitions_with_hashes ->
-        Remove_transitions
-          (List.map ~f:With_hash.hash removed_transitions_with_hashes)
-    | New_frontier first_root -> New_frontier first_root
-    | Add_transition added_transition -> Add_transition added_transition
-    | Update_root new_root -> Update_root new_root
+        E
+          (Remove_transitions
+             (List.map ~f:With_hash.hash removed_transitions_with_hashes))
+    | New_frontier first_root -> E (New_frontier first_root)
+    | Add_transition added_transition -> E (Add_transition added_transition)
+    | Update_root new_root -> E (Update_root new_root)
 
   let write_diff_and_verify ~logger ~acc_hash worker frontier diff_mutant =
     ( Debug_assert.debug_assert

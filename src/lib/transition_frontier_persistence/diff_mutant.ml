@@ -40,33 +40,51 @@ end = struct
 
   type serialized = string [@@deriving to_yojson, bin_io]
 
-  type ('external_transition, _) t =
-    | New_frontier :
-        ( ( External_transition.Stable.Latest.t
-          , State_hash.Stable.Latest.t )
-          With_hash.t
-        * Scan_state.Stable.Latest.t )
-        -> ('external_transition, unit) t
-    | Add_transition :
+  module Key = struct
+    module New_frontier = struct
+      type t =
         ( External_transition.Stable.Latest.t
         , State_hash.Stable.Latest.t )
         With_hash.t
-        -> ( 'external_transition
-           , Consensus.Consensus_state.Value.Stable.V1.t )
-           t
-    | Remove_transitions :
-        'external_transition list
-        -> ( 'external_transition
-           , Consensus.Consensus_state.Value.Stable.V1.t list )
-           t
-    | Update_root :
-        (State_hash.Stable.Latest.t * Scan_state.Stable.Latest.t)
-        -> ( 'external_transition
-           , State_hash.Stable.Latest.t * Scan_state.Stable.Latest.t )
-           t
+        * Scan_state.Stable.Latest.t
+      [@@deriving bin_io]
+    end
 
-  type 'external_transition e =
-    | E : ('external_transition, 'ouput) t -> 'external_transition e
+    module Add_transition = struct
+      type t =
+        ( External_transition.Stable.Latest.t
+        , State_hash.Stable.Latest.t )
+        With_hash.t
+      [@@deriving bin_io]
+    end
+
+    module Update_root = struct
+      type t = State_hash.Stable.Latest.t * Scan_state.Stable.Latest.t
+      [@@deriving bin_io]
+    end
+  end
+
+  module T = struct
+    type ('external_transition, _) t =
+      | New_frontier : Key.New_frontier.t -> ('external_transition, unit) t
+      | Add_transition :
+          Key.Add_transition.t
+          -> ( 'external_transition
+             , Consensus.Consensus_state.Value.Stable.V1.t )
+             t
+      | Remove_transitions :
+          'external_transition list
+          -> ( 'external_transition
+             , Consensus.Consensus_state.Value.Stable.V1.t list )
+             t
+      | Update_root :
+          Key.Update_root.t
+          -> ( 'external_transition
+             , State_hash.Stable.Latest.t * Scan_state.Stable.Latest.t )
+             t
+  end
+
+  type ('external_transition, 'output) t = ('external_transition, 'output) T.t
 
   let serialize_consensus_state =
     Binable.to_string (module Consensus.Consensus_state.Value.Stable.V1)
@@ -151,4 +169,36 @@ end = struct
       (mutant : mutant) =
     let diff_contents_hash = hash_diff_contents ~f t acc_hash in
     hash_mutant t mutant diff_contents_hash
+
+  module E = struct
+    type 'external_transition t =
+      | E : ('external_transition, 'output) T.t -> 'external_transition t
+
+    (* HACK:  This makes the existential type easily binable *)
+    include Binable.Of_binable1 (struct
+                type 'external_transition t =
+                  [ `New_frontier of Key.New_frontier.t
+                  | `Add_transition of Key.Add_transition.t
+                  | `Remove_transitions of 'external_transition list
+                  | `Update_root of Key.Update_root.t ]
+                [@@deriving bin_io]
+              end)
+              (struct
+                type nonrec 'external_transition t = 'external_transition t
+
+                let of_binable = function
+                  | `New_frontier data -> E (New_frontier data)
+                  | `Add_transition data -> E (Add_transition data)
+                  | `Remove_transitions transitions ->
+                      E (Remove_transitions transitions)
+                  | `Update_root data -> E (Update_root data)
+
+                let to_binable = function
+                  | E (New_frontier data) -> `New_frontier data
+                  | E (Add_transition data) -> `Add_transition data
+                  | E (Remove_transitions transitions) ->
+                      `Remove_transitions transitions
+                  | E (Update_root data) -> `Update_root data
+              end)
+  end
 end

@@ -58,7 +58,7 @@ let%test_module "Transition Frontier Persistence" =
              ( External_transition.Stable.Latest.t
              , State_hash.Stable.Latest.t )
              With_hash.t
-             Diff_mutant.e
+             Diff_mutant.E.t
              list)
            ->
           Deferred.List.fold diffs ~init:acc_hash ~f:(fun acc_hash -> function
@@ -139,11 +139,13 @@ let%test_module "Transition Frontier Persistence" =
       let transition_storage = transition_storage worker in
       let open Transition_frontier.Breadcrumb in
       Worker.handle_diff worker Diff_hash.empty
-        (New_frontier
-           (get_transition root, staged_ledger root |> Staged_ledger.scan_state))
+        (E
+           (New_frontier
+              ( get_transition root
+              , staged_ledger root |> Staged_ledger.scan_state )))
       |> ignore ;
       Worker.handle_diff worker Diff_hash.empty
-        (Add_transition (get_transition next_breadcrumb))
+        (E (Add_transition (get_transition next_breadcrumb)))
       |> ignore ;
       List.iter [root; next_breadcrumb] ~f:(fun breadcrumb ->
           let queried_transitions, _ =

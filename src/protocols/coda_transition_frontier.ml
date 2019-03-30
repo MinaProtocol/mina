@@ -22,7 +22,7 @@ module Transition_frontier_diff = struct
 end
 
 module type Diff_hash = sig
-  type t
+  type t [@@deriving bin_io]
 
   val merge : t -> string -> t
 
@@ -40,19 +40,23 @@ module type Diff_mutant = sig
 
   type consensus_state
 
-  type ('external_transition, _) t =
-    | New_frontier :
-        ((external_transition, state_hash) With_hash.t * scan_state)
-        -> ('external_transition, unit) t
-    | Add_transition :
-        (external_transition, state_hash) With_hash.t
-        -> ('external_transition, consensus_state) t
-    | Remove_transitions :
-        'external_transition list
-        -> ('external_transition, consensus_state list) t
-    | Update_root :
-        (state_hash * scan_state)
-        -> ('external_transition, state_hash * scan_state) t
+  module T : sig
+    type ('external_transition, _) t =
+      | New_frontier :
+          ((external_transition, state_hash) With_hash.t * scan_state)
+          -> ('external_transition, unit) t
+      | Add_transition :
+          (external_transition, state_hash) With_hash.t
+          -> ('external_transition, consensus_state) t
+      | Remove_transitions :
+          'external_transition list
+          -> ('external_transition, consensus_state list) t
+      | Update_root :
+          (state_hash * scan_state)
+          -> ('external_transition, state_hash * scan_state) t
+  end
+
+  type ('a, 'b) t = ('a, 'b) T.t
 
   type hash
 
@@ -71,8 +75,13 @@ module type Diff_mutant = sig
     -> 'output
     -> hash
 
-  type 'external_transition e =
-    | E : ('external_transition, 'output) t -> 'external_transition e
+  module E : sig
+    type 'external_transition t =
+      | E : ('external_transition, 'output) T.t -> 'external_transition t
+
+    include
+      Binable.S1 with type 'external_transition t := 'external_transition t
+  end
 end
 
 (** An extension to the transition frontier that provides a view onto the data
@@ -100,7 +109,7 @@ module type Transition_frontier_extension_intf0 = sig
     -> transition_frontier_breadcrumb Transition_frontier_diff.t
     -> view Option.t
   (** Handle a transition frontier diff, and return the new version of the
-            computed view, if it's updated. *)
+              computed view, if it's updated. *)
 end
 
 (** The type of the view onto the changes to the current best tip. This type

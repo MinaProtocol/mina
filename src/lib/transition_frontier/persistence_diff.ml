@@ -24,7 +24,7 @@ module Make (Inputs : Inputs_intf) :
               ( Inputs.External_transition.Stable.Latest.t
               , State_hash.Stable.Latest.t )
               With_hash.t
-              Inputs.Diff_mutant.e
+              Inputs.Diff_mutant.E.t
               list = struct
   open Inputs
 
@@ -36,7 +36,7 @@ module Make (Inputs : Inputs_intf) :
     ( External_transition.Stable.Latest.t
     , State_hash.Stable.Latest.t )
     With_hash.t
-    Diff_mutant.e
+    Diff_mutant.E.t
     list
 
   let create () = ()
@@ -55,7 +55,7 @@ module Make (Inputs : Inputs_intf) :
   let handle_diff () (diff : Breadcrumb.t Transition_frontier_diff.t) :
       view option =
     let open Transition_frontier_diff in
-    let open Diff_mutant in
+    let open Diff_mutant.E in
     Option.return
     @@
     match diff with

@@ -274,27 +274,25 @@ module type Inputs_intf = sig
                 ( External_transition.Stable.Latest.t
                 , Coda_base.State_hash.Stable.Latest.t )
                 With_hash.t
-                Diff_mutant.e
+                Diff_mutant.E.t
 
   module Transition_frontier_persistence : sig
     module Worker : sig
-      include
-        Transition_frontier_persistence.Intf.Worker
-        with type external_transition := External_transition.Stable.Latest.t
-         and type scan_state := Staged_ledger.Scan_state.t
-         and type state_hash := Coda_base.State_hash.t
-         and type frontier := Transition_frontier.t
-         and type consensus_local_state := Consensus_mechanism.Local_state.t
-         and type root_snarked_ledger := Ledger_db.t
-         and type breadcrumb := Transition_frontier.Breadcrumb.t
-         and type hash := Diff_hash.t
-         and type 'output diff :=
-                    (Coda_base.State_hash.t, 'output) Diff_mutant.t
+      type t
+
+      val create : directory_name:string -> t Deferred.t
+
+      val deserialize :
+           directory_name:string
+        -> logger:Logger.t
+        -> root_snarked_ledger:Ledger_db.t
+        -> consensus_local_state:Consensus_mechanism.Local_state.t
+        -> Transition_frontier.t Deferred.t
 
       val handle_diff :
            t
         -> Diff_hash.t
-        -> (Coda_base.State_hash.t, 'output) Diff_mutant.t
+        -> Coda_base.State_hash.t Diff_mutant.E.t
         -> Diff_hash.t Deferred.Or_error.t
     end
 
@@ -658,10 +656,9 @@ module Make (Inputs : Inputs_intf) = struct
                     !"Persistence database does not exist yet. Creating it at \
                       %s"
                     config.transition_frontier_location ;
-                  let worker =
+                  let%bind worker =
                     Transition_frontier_persistence.Worker.create
-                      ~logger:config.logger
-                      ~directory_name:config.transition_frontier_location ()
+                      ~directory_name:config.transition_frontier_location
                   in
                   let%map transition_frontier =
                     Transition_frontier.create ~logger:config.logger
@@ -677,13 +674,14 @@ module Make (Inputs : Inputs_intf) = struct
                   (worker, transition_frontier)
               | `Yes ->
                   let directory_name = config.transition_frontier_location in
-                  let worker =
-                    Transition_frontier_persistence.Worker.create
-                      ~logger:config.logger ~directory_name ()
-                  in
-                  let%map frontier =
-                    Transition_frontier_persistence.Worker.deserialize worker
+                  let%bind frontier =
+                    Transition_frontier_persistence.Worker.deserialize
+                      ~directory_name ~logger:config.logger
                       ~root_snarked_ledger ~consensus_local_state
+                  in
+                  let%map worker =
+                    Transition_frontier_persistence.Worker.create
+                      ~directory_name
                   in
                   (worker, frontier)
             in

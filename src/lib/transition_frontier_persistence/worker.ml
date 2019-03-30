@@ -15,7 +15,7 @@ module Make (Inputs : Intf.Worker_inputs) : sig
      and type root_snarked_ledger := Ledger.Db.t
      and type breadcrumb := Transition_frontier.Breadcrumb.t
      and type hash := Diff_hash.t
-     and type 'output diff := (State_hash.t, 'output) Diff_mutant.t
+     and type diff := State_hash.t Diff_mutant.E.t
 end = struct
   open Inputs
 
@@ -69,8 +69,7 @@ end = struct
       "Added transition $hash and $parent_hash !" ;
     External_transition.consensus_state parent_transition
 
-  let handle_diff (type a) (t : t) acc_hash
-      (diff : (State_hash.t, a) Diff_mutant.t) =
+  let handle_diff (t : t) acc_hash (E diff : State_hash.t Diff_mutant.E.t) =
     let log ~location diff mutant =
       Debug_assert.debug_assert
       @@ fun () ->
@@ -164,6 +163,15 @@ end = struct
     Coda_base.Staged_ledger_hash.ledger_hash
       External_transition.Protocol_state.(
         Blockchain_state.staged_ledger_hash @@ blockchain_state protocol_state)
+
+  let with_worker ~directory_name ~logger ~f =
+    let transition_storage =
+      Transition_storage.create ~directory:directory_name
+    in
+    let worker = {transition_storage; logger} in
+    let result = f worker in
+    Transition_storage.close transition_storage ;
+    result
 
   let deserialize ({transition_storage= _; logger} as t) ~root_snarked_ledger
       ~consensus_local_state =

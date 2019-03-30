@@ -39,7 +39,7 @@ module type Inputs_intf = sig
                 ( External_transition.Stable.Latest.t
                 , Coda_base.State_hash.Stable.Latest.t )
                 With_hash.t
-                Diff_mutant.e
+                Diff_mutant.E.t
 
   module Transaction_pool :
     Coda_lib.Transaction_pool_read_intf

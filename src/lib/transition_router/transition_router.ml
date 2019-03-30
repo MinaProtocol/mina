@@ -25,7 +25,7 @@ module type Inputs_intf = sig
                 ( External_transition.Stable.Latest.t
                 , State_hash.Stable.Latest.t )
                 With_hash.t
-                Diff_mutant.e
+                Diff_mutant.E.t
 
   module Network :
     Network_intf

@@ -306,7 +306,7 @@ module type Main_intf = sig
                   ( External_transition.Stable.Latest.t
                   , State_hash.Stable.Latest.t )
                   With_hash.t
-                  Diff_mutant.e
+                  Diff_mutant.E.t
        and type Extensions.Work.t = Transaction_snark_work.Statement.t
   end
 
@@ -583,17 +583,7 @@ struct
 
   let max_length = Consensus.Constants.k
 
-  module Diff_hash = struct
-    open Digestif.SHA256
-
-    type t = ctx
-
-    let equal t1 t2 = eq (get t1) (get t2)
-
-    let empty = empty
-
-    let merge t1 string = feed_string t1 string
-  end
+  module Diff_hash = Transition_frontier_persistence.Diff_hash
 
   module Diff_mutant_inputs = struct
     module Diff_hash = Diff_hash
@@ -622,15 +612,10 @@ struct
     Transition_frontier.Make (Transition_frontier_inputs)
 
   module Transition_frontier_persistence = struct
-    module Worker = struct
-      include Transition_frontier_persistence.Worker.Make (struct
-        include Transition_frontier_inputs
-        module Transition_frontier = Transition_frontier
-      end)
-
-      let handle_diff t acc_hash diff_mutant =
-        Deferred.Or_error.return (handle_diff t acc_hash diff_mutant)
-    end
+    module Worker = Transition_frontier_persistence_rpc_worker.Make (struct
+      include Transition_frontier_inputs
+      module Transition_frontier = Transition_frontier
+    end)
 
     include Transition_frontier_persistence.Make (struct
       include Transition_frontier_inputs

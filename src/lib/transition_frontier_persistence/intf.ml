@@ -53,7 +53,7 @@ module type Worker_inputs = sig
                 ( External_transition.Stable.Latest.t
                 , State_hash.Stable.Latest.t )
                 With_hash.t
-                Diff_mutant.e
+                Diff_mutant.E.t
      and module Extensions.Work = Transaction_snark_work.Statement
 end
 
@@ -74,7 +74,7 @@ module type Worker = sig
 
   type breadcrumb
 
-  type 'output diff
+  type diff
 
   type t
 
@@ -86,7 +86,10 @@ module type Worker = sig
     -> consensus_local_state:consensus_local_state
     -> frontier Deferred.t
 
-  val handle_diff : t -> hash -> 'output diff -> hash
+  val handle_diff : t -> hash -> diff -> hash
+
+  val with_worker :
+    directory_name:string -> logger:Logger.t -> f:(t -> 'a) -> 'a
 
   module For_tests : sig
     module Transition_storage : sig
@@ -113,7 +116,7 @@ module type Main_inputs = sig
     val handle_diff :
          t
       -> Diff_hash.t
-      -> (State_hash.t, 'output) Diff_mutant.t
+      -> State_hash.t Diff_mutant.E.t
       -> Diff_hash.t Deferred.Or_error.t
   end
 end
@@ -133,6 +136,7 @@ module type S = sig
     -> worker
     -> unit Deferred.t
 
+  (* TODO: Lol this cannot be polymorphic. Don't actually get any wins if this was polymorphic *)
   module For_tests : sig
     val write_diff_and_verify :
          logger:Logger.t

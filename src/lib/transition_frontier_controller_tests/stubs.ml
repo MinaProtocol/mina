@@ -156,18 +156,7 @@ struct
 
   module Blockchain_state = External_transition.Protocol_state.Blockchain_state
   module Protocol_state = External_transition.Protocol_state
-
-  module Diff_hash = struct
-    open Digestif.SHA256
-
-    type t = ctx
-
-    let equal t1 t2 = eq (get t1) (get t2)
-
-    let empty = empty
-
-    let merge t1 string = feed_string t1 string
-  end
+  module Diff_hash = Transition_frontier_persistence.Diff_hash
 
   module Diff_mutant_inputs = struct
     module Staged_ledger_aux_hash = Staged_ledger_aux_hash
