@@ -51,13 +51,28 @@ let rec random_point () =
     if random_bool () then (x, a) else (x, b)
   else random_point ()
 
-let max_input_size = 20000
+let scalar_size_in_triples = Crypto_params_init.Tock0.Field.size_in_bits / 4
+
+let max_input_size_in_bits = 20000
+
+let base_params =
+  List.init
+    (max_input_size_in_bits / (3 * scalar_size_in_triples))
+    ~f:(fun i -> Group.of_affine_coordinates (random_point ()))
+
+let sixteen_times x =
+  x |> Group.double |> Group.double |> Group.double |> Group.double
 
 let params =
-  List.init (max_input_size / 4) ~f:(fun i ->
-      let t = Group.of_affine_coordinates (random_point ()) in
-      let tt = Group.double t in
-      (t, tt, Group.add t tt, Group.double tt) )
+  let powers g =
+    let gg = Group.double g in
+    (g, gg, Group.add g gg, Group.double gg)
+  in
+  let open Sequence in
+  concat_map (of_list base_params) ~f:(fun x ->
+      unfold ~init:x ~f:(fun g -> Some (powers g, sixteen_times g))
+      |> Fn.flip take scalar_size_in_triples )
+  |> to_list
 
 let params_array = Array.of_list params
 
