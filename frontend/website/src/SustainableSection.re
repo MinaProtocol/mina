@@ -129,7 +129,10 @@ let make = _children => {
             paragraphs=[|
               "With Coda's constant sized blockchain and energy efficient consensus, Coda will be sustainable even as it scales to thousands of transactions per second, millions of users, and years of transaction history.",
             |]
-            cta="Notify me about participating in consensus"
+            cta={
+              SideText.Cta.copy: "Notify me about participating in consensus",
+              link: Links.Forms.participateInConsensus,
+            }
           />
         </div>
       </div>

@@ -11,7 +11,7 @@ let make = (~overflowHidden=false, children) => {
             media(
               Style.MediaQuery.full,
               [
-                maxWidth(`rem(84.0)),
+                maxWidth(`rem(89.0)),
                 margin(`auto),
                 ...Style.paddingX(`rem(3.0)),
               ],

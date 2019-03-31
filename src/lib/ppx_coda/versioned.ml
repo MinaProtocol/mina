@@ -1,6 +1,6 @@
 (* versioned.ml -- static enforcement of versioned types via ppx
 
-   1) check that versioned type always in Stable.Vn.T module hierarchy
+   1) check that versioned type always in valid module hierarchy
    2) versioned types depend only on other versioned types or OCaml built-in types
 
   to use, add coda_ppx to the dune pps list, and annotate a type declaration with
@@ -11,7 +11,6 @@
   or
 
     [@@deriving version { wrapped }]
-
 
   If the "wrapped" option is omitted (the common case), the type must be named "t", 
   and its definition occurs in the module hierarchy "Stable.Vn.T", where n is a 
@@ -29,162 +28,214 @@ open Ppxlib
 
 type version_info = {versioned: bool; wrapped: bool}
 
-(* {wrapped} *)
-let is_wrapped_option args =
-  match args with
-  | [ ( Nolabel
-      , { pexp_desc=
-            Pexp_record
-              ( [ ( {txt= Lident "wrapped"; _}
-                  , {pexp_desc= Pexp_ident {txt= Lident "wrapped"; _}; _} ) ]
-              , None ); _ } ) ] ->
-      true
-  | _ -> false
+let deriver = "version"
 
-let item_versioned_info_opt item : version_info option =
-  let is_version_id id =
-    match id.txt with Lident s -> String.equal s "version" | _ -> false
-  in
-  match item with
-  | Pexp_ident id ->
-      if is_version_id id then Some {versioned= true; wrapped= false} else None
-  | Pexp_apply ({pexp_desc= Pexp_ident id; _}, args) ->
-      if is_version_id id then
-        if is_wrapped_option args then Some {versioned= true; wrapped= true}
-        else
-          (* build location from entire args list *)
-          let _, {pexp_loc= loc1; _} = List.hd_exn args in
-          let _, {pexp_loc= loc2; _} = List.hd_exn (List.rev args) in
-          let loc =
-            {loc_start= loc1.loc_start; loc_end= loc2.loc_end; loc_ghost= true}
-          in
-          Location.raise_errorf ~loc
-            "Invalid option(s) to \"version\", can only be \"wrapped\""
-      else None
-  | _ -> None
-
-let payload_version_info_opt payload : version_info option =
-  match payload with
-  | PStr structure ->
-      List.find_map structure ~f:(fun str ->
-          match str.pstr_desc with
-          | Pstr_eval (expr, _) -> (
-            (* "version" can appear as:
-                - an indvidual identifier
-                - an application, or
-                - in a tuple, as an identifier or application
-            *)
-            match expr.pexp_desc with
-            | Pexp_ident _ | Pexp_apply _ ->
-                item_versioned_info_opt expr.pexp_desc
-            | Pexp_tuple exprs ->
-                List.find_map exprs ~f:(fun expr ->
-                    item_versioned_info_opt expr.pexp_desc )
-            | _ -> None )
-          | _ -> None )
-  | _ -> None
-
-let attribute_version_info_opt ((name, payload) : attribute) :
-    version_info option =
-  if String.equal name.txt "deriving" then payload_version_info_opt payload
-  else None
-
-let get_attributes_version_info_opt (attrs : attribute list) :
-    version_info option =
-  List.find_map attrs ~f:attribute_version_info_opt
-
-let get_type_version_info_opt type_decl : version_info option =
-  get_attributes_version_info_opt type_decl.ptype_attributes
-
-let validate_module_version module_version =
-  let version_name = module_version.txt in
-  let version_name_loc = module_version.loc in
-  let len = String.length version_name in
-  if not (Char.equal version_name.[0] 'V' && len > 1) then
-    Location.raise_errorf ~loc:version_name_loc
+let validate_module_version module_version loc =
+  let len = String.length module_version in
+  if not (Char.equal module_version.[0] 'V' && len > 1) then
+    Location.raise_errorf ~loc
       "Versioning module containing versioned type must be named Vn, for some \
        number n"
   else
-    let numeric_part = String.sub version_name ~pos:1 ~len:(len - 1) in
+    let numeric_part = String.sub module_version ~pos:1 ~len:(len - 1) in
     String.iter numeric_part ~f:(fun c ->
         if not (Char.is_digit c) then
-          Location.raise_errorf ~loc:version_name_loc
+          Location.raise_errorf ~loc
             "Versioning module name must be Vn, for some number n, got: \"%s\""
-            version_name ) ;
+            module_version ) ;
     (* invariant: 0th char is digit *)
     if Int.equal (Char.get_digit_exn numeric_part.[0]) 0 then
-      Location.raise_errorf ~loc:version_name_loc
-        "Versioning module name must be Vn, for a number n, but n cannot \
+      Location.raise_errorf ~loc
+        "Versioning module name must be Vn, for a number n, which cannot \
          begin with 0, got: \"%s\""
-        version_name
+        module_version
 
 let validate_unwrapped_type_decl inner3_modules type_decl =
   match inner3_modules with
-  | [{txt= "T"; _}; module_version; {txt= "Stable"; _}] ->
-      validate_module_version module_version
+  | ["T"; module_version; "Stable"] ->
+      validate_module_version module_version type_decl.ptype_loc
   | _ ->
       Location.raise_errorf ~loc:type_decl.ptype_loc
-        "Versioned type must be contained in module structure Stable.Vn.T, \
-         for some number n"
+        "Versioned type must be contained in module path Stable.Vn.T, for \
+         some number n"
 
 let validate_wrapped_type_decl inner3_modules type_decl =
   match inner3_modules with
-  | [module_version; {txt= "Stable"; _}; {txt= "Wrapped"; _}] ->
-      validate_module_version module_version
+  | [module_version; "Stable"; "Wrapped"] ->
+      validate_module_version module_version type_decl.ptype_loc
   | _ ->
       Location.raise_errorf ~loc:type_decl.ptype_loc
-        "Wrapped versioned type must be contained in module structure \
+        "Wrapped versioned type must be contained in module path \
          Wrapped.Stable.Vn, for some number n"
 
 (* check that a versioned type occurs in valid module hierarchy and is named "t"
  *)
-let validate_type_decl inner3_modules type_decl =
-  match get_type_version_info_opt type_decl with
-  | None
-  (* should not happen *)
-   |Some {versioned= false; _} ->
-      ()
-  | Some {versioned= true; wrapped} ->
-      if not (String.equal type_decl.ptype_name.txt "t") then
-        Location.raise_errorf ~loc:type_decl.ptype_loc
-          "Versioned type must be named \"t\", got: \"%s\""
-          type_decl.ptype_name.txt ;
-      if not (List.is_empty type_decl.ptype_params) then
-        Location.raise_errorf ~loc:type_decl.ptype_loc
-          "Versioned type must not have type parameters" ;
-      if wrapped then validate_wrapped_type_decl inner3_modules type_decl
-      else validate_unwrapped_type_decl inner3_modules type_decl
+let validate_type_decl inner3_modules wrapped type_decl =
+  if not (String.equal type_decl.ptype_name.txt "t") then
+    Location.raise_errorf ~loc:type_decl.ptype_name.loc
+      "Versioned type must be named \"t\", got: \"%s\""
+      type_decl.ptype_name.txt ;
+  if not (List.is_empty type_decl.ptype_params) then
+    Location.raise_errorf ~loc:type_decl.ptype_loc
+      "Versioned type must not have type parameters" ;
+  if wrapped then validate_wrapped_type_decl inner3_modules type_decl
+  else validate_unwrapped_type_decl inner3_modules type_decl
 
-(* syntax check only *)
-let versioned_syntactic_check =
-  object (self)
-    inherit [string loc list] Ast_traverse.fold as super
+let module_name_from_unwrapped_path inner3_modules =
+  match inner3_modules with
+  | ["T"; module_version; "Stable"] -> module_version
+  | _ -> failwith "module_name_from_unwrapped_path: unexpected module path"
 
-    (* module_path is list of module names traversed, from innermost to outer *)
-    method! structure_item ({pstr_desc; _} as str) module_path =
-      match pstr_desc with
-      (* for modules, current name is cons'ed to acc *)
-      | Pstr_module {pmb_name; pmb_expr; _} -> (
-        match pmb_expr.pmod_desc with
-        | Pmod_structure structure ->
-            let new_module_path = pmb_name :: module_path in
-            List.iter structure ~f:(fun si ->
-                ignore (self#structure_item si new_module_path) ) ;
-            (* we've left the structure, so we're in the same module hierarchy we started with *)
-            module_path
-        | _ -> module_path )
-      | Pstr_type (_rec_decl, type_decls) ->
-          (* if versioned, check syntactic placement of type, add code *)
-          let inner3_modules = List.take module_path 3 in
-          List.iter type_decls ~f:(validate_type_decl inner3_modules) ;
-          module_path
-      | _ -> super#structure_item str module_path
-  end
+let module_name_from_wrapped_path inner3_modules =
+  match inner3_modules with
+  | [module_version; "Stable"; "Wrapped"] -> module_version
+  | _ -> failwith "module_name_from_wrapped_path: unexpected module path"
 
-let check_versioned_module structure =
-  ignore (versioned_syntactic_check#structure structure []) ;
-  structure
+(* generate "let version = n", when version module is Vn *)
+let generate_version_number_decl inner3_modules loc wrapped =
+  (* invariant: we've checked module name already *)
+  let module E = Ppxlib.Ast_builder.Make (struct
+    let loc = loc
+  end) in
+  let open E in
+  let module_name =
+    if wrapped then module_name_from_wrapped_path inner3_modules
+    else module_name_from_unwrapped_path inner3_modules
+  in
+  let version =
+    String.sub module_name ~pos:1 ~len:(String.length module_name - 1)
+    |> int_of_string
+  in
+  [%stri let version = [%e eint version]]
+
+let ocaml_builtin_types = ["int"; "float"; "char"; "string"; "bool"; "unit"]
+
+let is_ocaml_builtin_type txt =
+  match txt with
+  | Lident id -> List.mem ocaml_builtin_types id ~equal:String.equal
+  | _ -> false
+
+let rec generate_core_type_version_decls core_type =
+  match core_type.ptyp_desc with
+  | Ptyp_constr ({txt; _}, core_types) -> (
+    match (txt, core_types) with
+    | Lident id, [] ->
+        (* type t = id *)
+        if List.mem ocaml_builtin_types id ~equal:String.equal then
+          (* no versioning to worry about *)
+          []
+        else
+          (* a type not in a module (so not versioned) *)
+          Ppx_deriving.raise_errorf ~loc:core_type.ptyp_loc
+            "Type \"%s\" is not a versioned type" id
+    | Lident _id, _ :: _ ->
+        (* type t = (T1.t,T2.t) _id'
+             check that the parameters are versioned
+           *)
+        generate_version_decls_for_core_types core_types
+    | Ldot (prefix, "t"), [] ->
+        (* type t = A.B.t
+             generate: let _ = A.B.__versioned__
+           *)
+        let loc = core_type.ptyp_loc in
+        let pexp_loc = loc in
+        let versioned_ident =
+          { pexp_desc= Pexp_ident {txt= Ldot (prefix, "__versioned__"); loc}
+          ; pexp_loc
+          ; pexp_attributes= [] }
+        in
+        [%str let _ = [%e versioned_ident]]
+    | _ ->
+        Ppx_deriving.raise_errorf ~loc:core_type.ptyp_loc
+          "Unrecognized type constructor for versioned type" )
+  | Ptyp_tuple core_types ->
+      (* type t = t1 * t2 * t3 *)
+      generate_version_decls_for_core_types core_types
+  | Ptyp_variant _ -> (* type t = [ `A | `B ] *)
+                      []
+  | _ ->
+      Ppx_deriving.raise_errorf ~loc:core_type.ptyp_loc
+        "Can't determine versioning for contained type"
+
+and generate_version_decls_for_core_types core_types =
+  List.fold_right core_types ~init:[] ~f:(fun core_type accum ->
+      generate_core_type_version_decls core_type @ accum )
+
+let generate_version_decls_for_label_decls label_decls =
+  generate_version_decls_for_core_types
+    (List.map label_decls ~f:(fun lab_decl -> lab_decl.pld_type))
+
+let generate_constructor_decl_decls ctor_decl =
+  match (ctor_decl.pcd_res, ctor_decl.pcd_args) with
+  | None, Pcstr_tuple core_types ->
+      (* C of T1 * ... * Tn *)
+      generate_version_decls_for_core_types core_types
+  | None, Pcstr_record label_decls ->
+      (* C of { ... } *)
+      generate_version_decls_for_label_decls label_decls
+  | _ ->
+      Ppx_deriving.raise_errorf ~loc:ctor_decl.pcd_loc
+        "Can't determine versioning for constructor declaration"
+
+let generate_contained_type_decls type_decl =
+  match type_decl.ptype_kind with
+  | Ptype_abstract ->
+      if Option.is_none type_decl.ptype_manifest then
+        Ppx_deriving.raise_errorf ~loc:type_decl.ptype_loc
+          "Versioned type, not a label or variant, must have manifest \
+           (right-hand side)" ;
+      let manifest = Option.value_exn type_decl.ptype_manifest in
+      generate_core_type_version_decls manifest
+  | Ptype_variant ctor_decls ->
+      List.fold ctor_decls ~init:[] ~f:(fun accum ctor_decl ->
+          generate_constructor_decl_decls ctor_decl @ accum )
+  | Ptype_record label_decls ->
+      generate_version_decls_for_label_decls label_decls
+  | Ptype_open ->
+      Ppx_deriving.raise_errorf ~loc:type_decl.ptype_loc
+        "Versioned type must not be open"
+
+let generate_versioned_decls type_decl wrapped =
+  let module E = Ppxlib.Ast_builder.Make (struct
+    let loc = type_decl.ptype_loc
+  end) in
+  let open E in
+  let versioned_current = [%stri let __versioned__ = true] in
+  if wrapped then [versioned_current]
+  else versioned_current :: generate_contained_type_decls type_decl
+
+let generate_val_decls_for_type_decl ~options ~path type_decls =
+  let type_decl1 = List.hd_exn type_decls in
+  let type_decl2 = List.hd_exn (List.rev type_decls) in
+  ( if not (Int.equal (List.length type_decls) 1) then
+    let loc =
+      { loc_start= type_decl1.ptype_loc.loc_start
+      ; loc_end= type_decl2.ptype_loc.loc_end
+      ; loc_ghost= true }
+    in
+    Ppx_deriving.raise_errorf ~loc
+      "Versioned type must be just one type \"t\", not a sequence of types" ) ;
+  let wrapped =
+    match options with
+    | [] -> false
+    | [("wrapped", {pexp_desc= Pexp_ident {txt= Lident "wrapped"; _}; _})] ->
+        true
+    | _ ->
+        let exprs = List.map options ~f:snd in
+        let {pexp_loc= loc1; _} = List.hd_exn exprs in
+        let {pexp_loc= loc2; _} = List.hd_exn (List.rev exprs) in
+        let loc =
+          {loc_start= loc1.loc_start; loc_end= loc2.loc_end; loc_ghost= true}
+        in
+        Ppx_deriving.raise_errorf ~loc
+          "Invalid option(s) to \"version\", can only be \"wrapped\""
+  in
+  let inner3_modules = List.take (List.rev path) 3 in
+  validate_type_decl inner3_modules wrapped type_decl1 ;
+  generate_version_number_decl inner3_modules type_decl1.ptype_loc wrapped
+  :: generate_versioned_decls type_decl1 wrapped
 
 let () =
-  Driver.register_transformation "versioned_module"
-    ~impl:check_versioned_module
+  Ppx_deriving.(
+    register
+      (create deriver ~type_decl_str:generate_val_decls_for_type_decl ()))
