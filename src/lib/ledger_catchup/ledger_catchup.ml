@@ -293,6 +293,8 @@ module Make (Inputs : Inputs.S) :
               !"All peers either sent us bad data, didn't have the info, or \
                 our transition frontier moved too fast: %s"
               (Error.to_string_hum e) ;
+            let (Rose_tree.T (target_transition, _)) = subtree in
+            ignore (Cached.invalidate target_transition) ;
             Deferred.unit )
     |> don't_wait_for
 end
