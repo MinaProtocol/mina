@@ -13,3 +13,7 @@ module Foo = struct
     end
   end
 end
+
+module type Some_intf = sig
+  type t = Quux | Zzz [@@deriving bin_io, version]
+end
