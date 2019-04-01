@@ -462,7 +462,7 @@ end = struct
 
       let cswap_field (b : Boolean.var) (x, y) =
         (* (x + b(y - x), y + b(x - y)) *)
-        let open Field.Checked.Infix in
+        let open Field.Checked in
         let%map b_y_minus_x =
           Tick.Field.Checked.mul (b :> Field.Var.t) (y - x)
         in

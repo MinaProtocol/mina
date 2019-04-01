@@ -63,8 +63,6 @@ struct
     T :
       module type of T with module Var := T.Var and module Checked := T.Checked )
 
-  include Infix
-
   let of_bits = Other_impl.Field.project
 
   let length_in_bits = size_in_bits
@@ -121,10 +119,7 @@ struct
   module Scalar = Make_inner_curve_scalar (Impl) (Other_impl)
 
   let find_y x =
-    let y2 =
-      Field.Infix.(
-        (x * Field.square x) + (Coefficients.a * x) + Coefficients.b)
-    in
+    let y2 = Field.((x * square x) + (Coefficients.a * x) + Coefficients.b) in
     if Field.is_square y2 then Some (Field.sqrt y2) else None
 end
 
@@ -356,7 +351,7 @@ module Tick = struct
     include Hashable.Make (Tick0.Field)
     module Bits = Bits.Make_field (Tick0.Field) (Tick0.Bigint)
 
-    let size_in_triples = (size_in_bits + 2) / 3
+    let size_in_triples = Int.((size_in_bits + 2) / 3)
   end
 
   module Fq = Snarky_field_extensions.Field_extensions.F (Tick0)

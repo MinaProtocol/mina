@@ -177,7 +177,7 @@ module Time = struct
 
   let diff_checked x y =
     let pack = Tick.Field.Var.project in
-    Span.unpack_var Tick.Field.Checked.Infix.(pack x - pack y)
+    Span.unpack_var Tick.Field.Checked.(pack x - pack y)
 
   let modulus t span = UInt64.rem t span
 
