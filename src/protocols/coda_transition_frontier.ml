@@ -40,6 +40,35 @@ module type Diff_mutant = sig
 
   type consensus_state
 
+  (** Diff_mutant is a GADT that represents operations that affect the changes
+      on the transition_frontier. The left-hand side of the GADT represents
+      change that will occur to the transition_frontier. The right-hand side of
+      the GADT represents which components are are effected by these changes
+      and a certification that these components are handled appropriately.
+      There are comments for each GADT that will discuss the operations that
+      changes a `transition_frontier` and their corresponding side-effects.*)
+
+  (** New_frontier: When creating a new transition frontier, the
+      transition_frontier will begin with a single breadcrumb that can be
+      constructed mainly with a root external transition and a scan_state.
+      There are no components in the frontier that affects the frontier.
+      Therefore, the type of this diff is tagged as a unit. *)
+
+  (** Add_transition: Add_transition would simply add a transition to the
+      frontier and is therefore the parameter for Add_transition. After adding
+      the transition, we add the transition to its parent list of successors.
+      To certify that we added it to the right parent. The consensus_state of
+      the parent can accomplish this.  *)
+
+  (** Remove_transitions: Remove_transitions is an operation that removes a set
+      of transitions. We need to make sure that we are deleting the right
+      transition and we use their consensus_state to accomplish this. Therefore
+      the type of Remove_transitions is indexed by a list of consensus_state.  *)
+
+  (** Update_root: Update root is an indication that the root state_hash and
+      the root scan_state state. To verify that we update the right root, we
+      can indicate the old root is being updated. THerefore, the type of
+      Update_root is indexed by a state_hash and scan_state.  *)
   type _ t =
     | New_frontier :
         ((external_transition, state_hash) With_hash.t * scan_state)
@@ -54,9 +83,9 @@ module type Diff_mutant = sig
 
   type hash
 
-  val yojson_of_key : 'a t -> Yojson.Safe.json
+  val key_to_yojson : 'a t -> Yojson.Safe.json
 
-  val yojson_of_value : 'a t -> 'a -> Yojson.Safe.json
+  val value_to_yojson : 'a t -> 'a -> Yojson.Safe.json
 
   val hash : hash -> 'a t -> 'a -> hash
 
@@ -88,7 +117,7 @@ module type Transition_frontier_extension_intf0 = sig
     -> transition_frontier_breadcrumb Transition_frontier_diff.t
     -> view Option.t
   (** Handle a transition frontier diff, and return the new version of the
-            computed view, if it's updated. *)
+              computed view, if it's updated. *)
 end
 
 (** The type of the view onto the changes to the current best tip. This type

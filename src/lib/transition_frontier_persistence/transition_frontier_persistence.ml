@@ -44,22 +44,10 @@ module Make (Inputs : Intf.Main_inputs) = struct
           |> Staged_ledger.scan_state )
 
   let write_diff_and_verify ~logger ~acc_hash worker frontier diff_mutant =
-    ( Debug_assert.debug_assert
-    @@ fun () ->
-    Logger.info logger ~module_:__MODULE__ ~location:__LOC__
-      ~metadata:[("diff_request", Diff_mutant.yojson_of_key diff_mutant)]
-      "Applying mutant diff; $diff_request" ) ;
     let ground_truth_diff = apply_diff frontier diff_mutant in
     let ground_truth_hash =
       Diff_mutant.hash acc_hash diff_mutant ground_truth_diff
     in
-    ( Debug_assert.debug_assert
-    @@ fun () ->
-    Logger.trace ~module_:__MODULE__ ~location:__LOC__ logger
-      ~metadata:
-        [ ( "diff_response"
-          , Diff_mutant.yojson_of_value diff_mutant ground_truth_diff ) ]
-      "Ground truth diff mutant" ) ;
     match%map Worker.handle_diff worker acc_hash diff_mutant with
     | Error e ->
         Logger.error ~module_:__MODULE__ ~location:__LOC__ logger

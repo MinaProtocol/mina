@@ -407,8 +407,7 @@ struct
          (root_breadcrumb |> return |> Quickcheck.Generator.return)
          (gen_breadcrumb ~logger ~accounts_with_secret_keys)
 
-  let gen_flattened_tree ~logger ~size ~accounts_with_secret_keys
-      root_breadcrumb =
+  let gen_tree_list ~logger ~size ~accounts_with_secret_keys root_breadcrumb =
     Quickcheck.Generator.with_size ~size
     @@ Quickcheck_lib.gen_imperative_ktree
          (root_breadcrumb |> return |> Quickcheck.Generator.return)

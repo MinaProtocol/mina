@@ -69,13 +69,6 @@ end = struct
     External_transition.consensus_state parent_transition
 
   let handle_diff (type a) (t : t) acc_hash (diff : a Diff_mutant.t) =
-    let log ~location diff mutant =
-      Debug_assert.debug_assert
-      @@ fun () ->
-      Logger.trace ~module_:__MODULE__ ~location t.logger
-        ~metadata:[("diff_response", Diff_mutant.yojson_of_value diff mutant)]
-        "Worker processed diff_mutant and created mutant: $diff_response"
-    in
     match diff with
     | New_frontier
         ({With_hash.hash= first_root_hash; data= first_root}, scan_state) ->
@@ -85,7 +78,6 @@ end = struct
               ~data:(first_root_hash, scan_state) ;
             Transition_storage.Batch.set batch
               ~key:(Transition first_root_hash) ~data:(first_root, []) ;
-            log ~location:__LOC__ diff () ;
             Diff_mutant.hash acc_hash diff () )
     | Add_transition transition_with_hash ->
         Transition_storage.Batch.with_batch t.transition_storage
@@ -93,7 +85,6 @@ end = struct
             let mutant =
               apply_add_transition (t, batch) transition_with_hash
             in
-            log ~location:__LOC__ diff mutant ;
             Diff_mutant.hash acc_hash diff mutant )
     | Remove_transitions removed_transitions_with_hash ->
         let mutant =
@@ -106,7 +97,6 @@ end = struct
                     ~key:(Transition state_hash) ;
                   External_transition.consensus_state removed_transition ) )
         in
-        log ~location:__LOC__ diff mutant ;
         Diff_mutant.hash acc_hash diff mutant
     | Update_root new_root_data ->
         (* We can get the serialized root_data from the database and then hash it, rather than using `Transition_storage.get` to deserialize the data and then hash it again which is slower *)
@@ -125,7 +115,7 @@ end = struct
         in
         Transition_storage.set_raw t.transition_storage ~key:Root
           ~data:serialized_new_root_data ;
-        Logger.info t.logger ~module_:__MODULE__ ~location:__LOC__
+        Logger.trace t.logger ~module_:__MODULE__ ~location:__LOC__
           "Worker updated root" ;
         let diff_contents_hash =
           Diff_hash.merge acc_hash

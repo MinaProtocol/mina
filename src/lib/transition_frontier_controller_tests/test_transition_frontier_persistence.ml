@@ -24,6 +24,8 @@ end)
 
 let%test_module "Transition Frontier Persistence" =
   ( module struct
+    let logger = Logger.create ()
+
     let check_transitions worker written_breadcrumbs =
       List.iter written_breadcrumbs ~f:(fun breadcrumb ->
           let open Worker.For_tests in
@@ -36,11 +38,11 @@ let%test_module "Transition Frontier Persistence" =
               ~key:(Transition_storage.Schema.Transition hash)
             |> Option.value_exn
           in
-          assert (
-            External_transition.(
-              equal (of_verified expected_transition) queried_transition) ) )
+          [%test_eq: External_transition.t]
+            (External_transition.of_verified expected_transition)
+            queried_transition )
 
-    let store_transitions ~logger worker frontier breadcrumbs =
+    let store_transitions worker frontier breadcrumbs =
       let complete_ivar = Ivar.create () in
       let breadcrumb_jobs =
         State_hash.Hash_set.of_list
@@ -53,17 +55,17 @@ let%test_module "Transition Frontier Persistence" =
       Broadcast_pipe.Reader.fold
         (Transition_frontier.persistence_diff_pipe frontier)
         ~init:Diff_hash.empty ~f:(fun acc_hash (diffs : Diff_mutant.e list) ->
-          Deferred.List.fold diffs ~init:acc_hash ~f:(fun acc_hash -> function
-            | E mutant_diff ->
-                let%map new_hash =
-                  Transition_frontier_persistence.write_diff_and_verify ~logger
-                    ~acc_hash worker frontier mutant_diff
-                in
-                ( match mutant_diff with
-                | Add_transition {With_hash.hash; _} -> remove_job hash
-                | New_frontier ({With_hash.hash; _}, _) -> remove_job hash
-                | _ -> () ) ;
-                new_hash ) )
+          Deferred.List.fold diffs ~init:acc_hash
+            ~f:(fun acc_hash (E mutant_diff) ->
+              let%map new_hash =
+                Transition_frontier_persistence.write_diff_and_verify ~logger
+                  ~acc_hash worker frontier mutant_diff
+              in
+              ( match mutant_diff with
+              | Add_transition {With_hash.hash; _} -> remove_job hash
+              | New_frontier ({With_hash.hash; _}, _) -> remove_job hash
+              | _ -> () ) ;
+              new_hash ) )
       |> Deferred.ignore |> don't_wait_for ;
       let%bind () =
         Deferred.List.iter breadcrumbs
@@ -71,54 +73,52 @@ let%test_module "Transition Frontier Persistence" =
       in
       Ivar.read complete_ivar
 
-    let store_and_check_transitions ~logger worker frontier breadcrumbs =
-      let%map () = store_transitions ~logger worker frontier breadcrumbs in
+    let store_and_check_transitions worker frontier breadcrumbs =
+      let%map () = store_transitions worker frontier breadcrumbs in
       check_transitions worker breadcrumbs
 
-    let create_worker ~logger =
+    let create_worker () =
       let%map frontier =
         create_root_frontier ~logger Genesis_ledger.accounts
       in
       let worker : Worker.t = Worker.create ~logger () in
       (frontier, worker)
 
-    let generate_breadcrumbs ~logger ~gen_root_breadcrumb_builder frontier size
-        =
+    let generate_breadcrumbs ~gen_root_breadcrumb_builder frontier size =
       gen_root_breadcrumb_builder ~logger ~size
         ~accounts_with_secret_keys:Genesis_ledger.accounts
         (Transition_frontier.root frontier)
       |> Quickcheck.random_value |> Deferred.all
 
     let test_breadcrumbs ~gen_root_breadcrumb_builder num_breadcrumbs =
-      let logger = Logger.create () in
       Thread_safe.block_on_async_exn
       @@ fun () ->
-      let%bind frontier, worker = create_worker ~logger in
+      let%bind frontier, worker = create_worker () in
       let%bind breadcrumbs =
-        generate_breadcrumbs ~logger ~gen_root_breadcrumb_builder frontier
+        generate_breadcrumbs ~gen_root_breadcrumb_builder frontier
           num_breadcrumbs
       in
-      store_and_check_transitions ~logger worker frontier breadcrumbs
+      store_and_check_transitions worker frontier breadcrumbs
 
-    let test_linear_breacrumbs =
+    let test_linear_breadcrumbs =
       test_breadcrumbs ~gen_root_breadcrumb_builder:gen_linear_breadcrumbs
 
     let test_tree_breadcrumbs =
-      test_breadcrumbs ~gen_root_breadcrumb_builder:gen_flattened_tree
+      test_breadcrumbs ~gen_root_breadcrumb_builder:gen_tree_list
 
     let get_transition =
       Fn.compose
         (With_hash.map ~f:External_transition.of_verified)
         Transition_frontier.Breadcrumb.transition_with_hash
 
-    let%test_unit "For any key-value pair (k, v) among a set of homogenous \
-                   key-value pairs, set(k, v); get(k)==v" =
+    let%test_unit "Should be able to query transitions from \
+                   transition_storage after writing New_frontier and \
+                   Add_transition diffs into the storage" =
       Core.Backtrace.elide := false ;
       Async.Scheduler.set_record_backtraces true ;
-      let logger = Logger.create () in
       Thread_safe.block_on_async_exn
       @@ fun () ->
-      let%bind frontier, worker = create_worker ~logger in
+      let%bind frontier, worker = create_worker () in
       let create_breadcrumb =
         gen_breadcrumb ~logger
           ~accounts_with_secret_keys:Genesis_ledger.accounts
@@ -144,16 +144,15 @@ let%test_module "Transition Frontier Persistence" =
                    (Transition_frontier.Breadcrumb.state_hash breadcrumb))
             |> Option.value_exn
           in
-          assert (
-            External_transition.equal
-              (get_transition breadcrumb |> With_hash.data)
-              queried_transitions ) )
+          [%test_eq: External_transition.t]
+            (get_transition breadcrumb |> With_hash.data)
+            queried_transitions )
 
     let%test_unit "Dump external transitions to disk" =
-      test_linear_breacrumbs 3
+      test_linear_breadcrumbs (max_length - 1)
 
     let%test_unit "Root changes multiple times" =
-      test_linear_breacrumbs (2 * max_length)
+      test_linear_breadcrumbs (2 * max_length)
 
     let%test_unit "Randomly generate a tree" =
       test_tree_breadcrumbs (2 * max_length)
@@ -163,20 +162,18 @@ let%test_module "Transition Frontier Persistence" =
 
     let%test "Serializing a tree and then deserializing it should give us the \
               same transition_frontier" =
-      let logger = Logger.create () in
       let num_breadcrumbs = 2 * max_length in
       Thread_safe.block_on_async_exn
       @@ fun () ->
-      let%bind frontier, worker = create_worker ~logger in
+      let%bind frontier, worker = create_worker () in
       let%bind breadcrumbs =
-        generate_breadcrumbs ~logger
-          ~gen_root_breadcrumb_builder:gen_flattened_tree frontier
-          num_breadcrumbs
+        generate_breadcrumbs ~gen_root_breadcrumb_builder:gen_tree_list
+          frontier num_breadcrumbs
       in
       let root_snarked_ledger =
         Transition_frontier.For_tests.root_snarked_ledger frontier
       in
-      let%bind () = store_transitions ~logger worker frontier breadcrumbs in
+      let%bind () = store_transitions worker frontier breadcrumbs in
       let%map deserialized_frontier =
         Worker.deserialize worker ~root_snarked_ledger
           ~consensus_local_state:

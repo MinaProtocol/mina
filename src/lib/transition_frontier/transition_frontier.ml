@@ -126,6 +126,11 @@ struct
     let state_hash {transition_with_hash; _} =
       With_hash.hash transition_with_hash
 
+    let parent_hash {transition_with_hash; _} =
+      Consensus.Protocol_state.previous_state_hash
+        ( With_hash.data transition_with_hash
+        |> Inputs.External_transition.Verified.protocol_state )
+
     let equal breadcrumb1 breadcrumb2 =
       State_hash.equal (state_hash breadcrumb1) (state_hash breadcrumb2)
 
@@ -133,11 +138,6 @@ struct
       State_hash.compare (state_hash breadcrumb1) (state_hash breadcrumb2)
 
     let hash = Fn.compose State_hash.hash state_hash
-
-    let parent_hash {transition_with_hash; _} =
-      Consensus.Protocol_state.previous_state_hash
-        ( With_hash.data transition_with_hash
-        |> Inputs.External_transition.Verified.protocol_state )
 
     let consensus_state {transition_with_hash; _} =
       With_hash.data transition_with_hash
@@ -201,15 +201,15 @@ struct
       type t =
         { history: Breadcrumb.t Queue.t
         ; capacity: int
-        ; mutable last: Breadcrumb.t option }
+        ; mutable most_recent: Breadcrumb.t option }
 
       let create capacity =
         let history = Queue.create () in
-        {history; capacity; last= None}
+        {history; capacity; most_recent= None}
 
       let lookup {history; _} = Queue.lookup history
 
-      let most_recent {last; _} = last
+      let most_recent {most_recent; _} = most_recent
 
       let mem {history; _} = Queue.mem history
 
@@ -217,7 +217,7 @@ struct
         if Queue.length history >= capacity then
           Queue.dequeue_exn history |> ignore ;
         Queue.enqueue history state_hash breadcrumb |> ignore ;
-        t.last <- Some breadcrumb
+        t.most_recent <- Some breadcrumb
 
       let is_empty {history; _} = Queue.is_empty history
     end
@@ -861,28 +861,26 @@ struct
     Ledger.of_database root_snarked_ledger
 
   let equal t1 t2 =
-    let open Sequence in
-    unfold_step
-      ~init:[(root t1, root t2)]
-      ~f:(function
-        | [] -> Done
-        | (breadcrumb1, breadcrumb2) :: remaining_jobs ->
-            if not (Breadcrumb.equal breadcrumb1 breadcrumb2) then
-              Step.Yield (false, [])
-            else
-              let sort =
-                List.sort ~compare:(fun b1 b2 ->
-                    State_hash.compare (Breadcrumb.state_hash b1)
-                      (Breadcrumb.state_hash b2) )
-              in
-              List.zip
-                (sort (successors t1 breadcrumb1))
-                (sort (successors t2 breadcrumb2))
-              |> Option.value_map
-                   ~default:(Step.Yield (false, []))
-                   ~f:(fun new_jobs ->
-                     Step.Yield (true, new_jobs @ remaining_jobs) ))
-    |> for_all ~f:Fn.id
+    let sort_breadcrumbs = List.sort ~compare:Breadcrumb.compare in
+    let equal_breadcrumb breadcrumb1 breadcrumb2 =
+      let open Breadcrumb in
+      let open Option.Let_syntax in
+      let get_successor_nodes frontier breadcrumb =
+        let%map node = Hashtbl.find frontier.table @@ state_hash breadcrumb in
+        Node.successor_hashes node
+      in
+      equal breadcrumb1 breadcrumb2
+      && State_hash.equal (parent_hash breadcrumb1) (parent_hash breadcrumb2)
+      && (let%bind successors1 = get_successor_nodes t1 breadcrumb1 in
+          let%map successors2 = get_successor_nodes t2 breadcrumb2 in
+          List.equal ~equal:State_hash.equal
+            (successors1 |> List.sort ~compare:State_hash.compare)
+            (successors2 |> List.sort ~compare:State_hash.compare))
+         |> Option.value_map ~default:false ~f:Fn.id
+    in
+    List.equal ~equal:equal_breadcrumb
+      (all_breadcrumbs t1 |> sort_breadcrumbs)
+      (all_breadcrumbs t2 |> sort_breadcrumbs)
 
   module For_tests = struct
     let root_snarked_ledger {root_snarked_ledger; _} = root_snarked_ledger
