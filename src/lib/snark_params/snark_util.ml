@@ -158,8 +158,6 @@ module Make (Impl : Snarky.Snark_intf.S) = struct
           test ()
         done
 
-      let check x () = Or_error.is_ok (check x ())
-
       let%test_unit "boolean_assert_lte" =
         Or_error.ok_exn
           (check
