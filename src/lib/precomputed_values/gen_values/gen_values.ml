@@ -50,8 +50,7 @@ module Make_real (Keys : Keys_lib.Keys.S) = struct
     let module Wrap = Keys.Wrap in
     Tock.prove
       (Tock.Keypair.pk Wrap.keys)
-      Wrap.input {Wrap.Prover_state.proof}
-      (Lazy.force Wrap.reduced_main)
+      Wrap.input {Wrap.Prover_state.proof} Wrap.main
       (Wrap_input.of_tick_field hash)
 
   let base_proof_expr =
@@ -63,9 +62,7 @@ module Make_real (Keys : Keys_lib.Keys.S) = struct
       ; update= Consensus.Snark_transition.genesis }
     in
     let main x =
-      Tick.handle
-        (Lazy.force Keys.Step.reduced_main x)
-        Consensus.Prover_state.precomputed_handler
+      Tick.handle (Keys.Step.main x) Consensus.Prover_state.precomputed_handler
     in
     let tick =
       Tick.Groth16.prove

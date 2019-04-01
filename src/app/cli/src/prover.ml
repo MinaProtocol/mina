@@ -75,8 +75,7 @@ module Worker_state = struct
                  let module Wrap = Keys.Wrap in
                  Tock.prove
                    (Tock.Keypair.pk Wrap.keys)
-                   Wrap.input {Wrap.Prover_state.proof}
-                   (Lazy.force Wrap.reduced_main)
+                   Wrap.input {Wrap.Prover_state.proof} Wrap.main
                    (Wrap_input.of_tick_field hash)
 
                let extend_blockchain (chain : Blockchain.t)

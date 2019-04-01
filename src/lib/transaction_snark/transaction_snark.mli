@@ -173,8 +173,7 @@ val check_user_command :
   -> unit
 
 val generate_transaction_witness :
-     ?preeval:bool
-  -> sok_message:Sok_message.t
+     sok_message:Sok_message.t
   -> source:Frozen_ledger_hash.t
   -> target:Frozen_ledger_hash.t
   -> Pending_coinbase_stack_state.t
@@ -186,8 +185,7 @@ module type S = sig
   include Verification.S
 
   val of_transaction :
-       ?preeval:bool
-    -> sok_digest:Sok_message.Digest.t
+       sok_digest:Sok_message.Digest.t
     -> source:Frozen_ledger_hash.t
     -> target:Frozen_ledger_hash.t
     -> pending_coinbase_stack_state:Pending_coinbase_stack_state.t

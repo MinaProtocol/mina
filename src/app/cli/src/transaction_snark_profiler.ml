@@ -100,7 +100,7 @@ let rec pair_up = function
 (* This gives the "wall-clock time" to snarkify the given list of transactions, assuming
    unbounded parallelism. *)
 let profile (module T : Transaction_snark.S) sparse_ledger0
-    (transitions : Transaction.t list) preeval =
+    (transitions : Transaction.t list) =
   let (base_proof_time, _), base_proofs =
     List.fold_map transitions ~init:(Time.Span.zero, sparse_ledger0)
       ~f:(fun (max_span, sparse_ledger) t ->
@@ -114,7 +114,7 @@ let profile (module T : Transaction_snark.S) sparse_ledger0
         in
         let span, proof =
           time (fun () ->
-              T.of_transaction ?preeval ~sok_digest:Sok_message.Digest.default
+              T.of_transaction ~sok_digest:Sok_message.Digest.default
                 ~source:(Sparse_ledger.merkle_root sparse_ledger)
                 ~target:(Sparse_ledger.merkle_root sparse_ledger')
                 ~pending_coinbase_stack_state:
@@ -144,8 +144,7 @@ let profile (module T : Transaction_snark.S) sparse_ledger0
   let total_time = merge_all base_proof_time base_proofs in
   Printf.sprintf !"Total time was: %{Time.Span}" total_time
 
-let check_base_snarks sparse_ledger0 (transitions : Transaction.t list)
-    _preeval =
+let check_base_snarks sparse_ledger0 (transitions : Transaction.t list) =
   let _ =
     let sok_message =
       Sok_message.create ~fee:Currency.Fee.zero
@@ -176,7 +175,7 @@ let check_base_snarks sparse_ledger0 (transitions : Transaction.t list)
   "Base constraint system satisfied"
 
 let generate_base_snarks_witness sparse_ledger0
-    (transitions : Transaction.t list) preeval =
+    (transitions : Transaction.t list) =
   let _ =
     let sok_message =
       Sok_message.create ~fee:Currency.Fee.zero
@@ -193,7 +192,7 @@ let generate_base_snarks_witness sparse_ledger0
           | _ -> Pending_coinbase.Stack.empty
         in
         let () =
-          Transaction_snark.generate_transaction_witness ?preeval ~sok_message
+          Transaction_snark.generate_transaction_witness ~sok_message
             ~source:(Sparse_ledger.merkle_root sparse_ledger)
             ~target:(Sparse_ledger.merkle_root sparse_ledger')
             { Transaction_snark.Pending_coinbase_stack_state.source=
@@ -206,7 +205,7 @@ let generate_base_snarks_witness sparse_ledger0
   in
   "Base constraint system satisfied"
 
-let run profiler num_transactions repeats preeval =
+let run profiler num_transactions repeats =
   let ledger, transitions = create_ledger_and_transactions num_transactions in
   let sparse_ledger =
     Coda_base.Sparse_ledger.of_ledger_subset_exn ledger
@@ -221,27 +220,27 @@ let run profiler num_transactions repeats preeval =
                proposer :: Option.to_list (Option.map fee_transfer ~f:fst) ))
   in
   for i = 1 to repeats do
-    let message = profiler sparse_ledger transitions preeval in
+    let message = profiler sparse_ledger transitions in
     Core.printf !"[%i] %s\n%!" i message
   done ;
   exit 0
 
-let main num_transactions repeats preeval () =
+let main num_transactions repeats () =
   Snarky.Libsnark.set_no_profiling false ;
   Test_util.with_randomness 123456789 (fun () ->
       let keys = Transaction_snark.Keys.create () in
       let module T = Transaction_snark.Make (struct
         let keys = keys
       end) in
-      run (profile (module T)) num_transactions repeats preeval )
+      run (profile (module T)) num_transactions repeats )
 
-let dry num_transactions repeats preeval () =
+let dry num_transactions repeats () =
   Test_util.with_randomness 123456789 (fun () ->
-      run check_base_snarks num_transactions repeats preeval )
+      run check_base_snarks num_transactions repeats )
 
-let witness num_transactions repeats preeval () =
+let witness num_transactions repeats () =
   Test_util.with_randomness 123456789 (fun () ->
-      run generate_base_snarks_witness num_transactions repeats preeval )
+      run generate_base_snarks_witness num_transactions repeats )
 
 let command =
   let open Command.Let_syntax in
@@ -255,12 +254,6 @@ let command =
      and repeats =
        flag "repeat" ~doc:"count number of times to repeat the profile"
          (optional int)
-     and preeval =
-       flag "preeval"
-         ~doc:
-           "true/false whether to pre-evaluate the checked computation to \
-            cache interpreter and computation state"
-         (optional bool)
      and check_only =
        flag "check-only"
          ~doc:"Just check base snarks, don't keys or time anything" no_arg
@@ -273,6 +266,6 @@ let command =
        |> Option.value ~default:`Two_from_same
      in
      let repeats = Option.value repeats ~default:1 in
-     if witness_only then witness num_transactions repeats preeval
-     else if check_only then dry num_transactions repeats preeval
-     else main num_transactions repeats preeval)
+     if witness_only then witness num_transactions repeats
+     else if check_only then dry num_transactions repeats
+     else main num_transactions repeats)
