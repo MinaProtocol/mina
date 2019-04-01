@@ -132,7 +132,7 @@ let rec generate_core_type_version_decls core_type =
         (* type t = (T1.t,T2.t) _id'
              check that the parameters are versioned
            *)
-        generate_version_decls_for_core_types core_types
+        generate_version_lets_for_core_types core_types
     | Ldot (prefix, "t"), [] ->
         (* type t = A.B.t
              generate: let _ = A.B.__versioned__
@@ -150,29 +150,29 @@ let rec generate_core_type_version_decls core_type =
           "Unrecognized type constructor for versioned type" )
   | Ptyp_tuple core_types ->
       (* type t = t1 * t2 * t3 *)
-      generate_version_decls_for_core_types core_types
+      generate_version_lets_for_core_types core_types
   | Ptyp_variant _ -> (* type t = [ `A | `B ] *)
                       []
   | _ ->
       Ppx_deriving.raise_errorf ~loc:core_type.ptyp_loc
         "Can't determine versioning for contained type"
 
-and generate_version_decls_for_core_types core_types =
+and generate_version_lets_for_core_types core_types =
   List.fold_right core_types ~init:[] ~f:(fun core_type accum ->
       generate_core_type_version_decls core_type @ accum )
 
-let generate_version_decls_for_label_decls label_decls =
-  generate_version_decls_for_core_types
+let generate_version_lets_for_label_decls label_decls =
+  generate_version_lets_for_core_types
     (List.map label_decls ~f:(fun lab_decl -> lab_decl.pld_type))
 
 let generate_constructor_decl_decls ctor_decl =
   match (ctor_decl.pcd_res, ctor_decl.pcd_args) with
   | None, Pcstr_tuple core_types ->
       (* C of T1 * ... * Tn *)
-      generate_version_decls_for_core_types core_types
+      generate_version_lets_for_core_types core_types
   | None, Pcstr_record label_decls ->
       (* C of { ... } *)
-      generate_version_decls_for_label_decls label_decls
+      generate_version_lets_for_label_decls label_decls
   | _ ->
       Ppx_deriving.raise_errorf ~loc:ctor_decl.pcd_loc
         "Can't determine versioning for constructor declaration"
@@ -190,7 +190,7 @@ let generate_contained_type_decls type_decl =
       List.fold ctor_decls ~init:[] ~f:(fun accum ctor_decl ->
           generate_constructor_decl_decls ctor_decl @ accum )
   | Ptype_record label_decls ->
-      generate_version_decls_for_label_decls label_decls
+      generate_version_lets_for_label_decls label_decls
   | Ptype_open ->
       Ppx_deriving.raise_errorf ~loc:type_decl.ptype_loc
         "Versioned type must not be open"
@@ -204,7 +204,12 @@ let generate_versioned_decls type_decl wrapped =
   if wrapped then [versioned_current]
   else versioned_current :: generate_contained_type_decls type_decl
 
-let generate_val_decls_for_type_decl ~options ~path type_decls =
+let validate_type_name type_name =
+  if not (String.equal type_name.txt "t") then
+    Ppx_deriving.raise_errorf ~loc:type_name.loc
+      "Versioned type must be named \"t\""
+
+let get_type_decl_representative type_decls =
   let type_decl1 = List.hd_exn type_decls in
   let type_decl2 = List.hd_exn (List.rev type_decls) in
   ( if not (Int.equal (List.length type_decls) 1) then
@@ -215,6 +220,11 @@ let generate_val_decls_for_type_decl ~options ~path type_decls =
     in
     Ppx_deriving.raise_errorf ~loc
       "Versioned type must be just one type \"t\", not a sequence of types" ) ;
+  validate_type_name type_decl1.ptype_name ;
+  type_decl1
+
+let generate_let_bindings_for_type_decl_str ~options ~path type_decls =
+  let type_decl = get_type_decl_representative type_decls in
   let wrapped =
     match options with
     | [] -> false
@@ -231,11 +241,31 @@ let generate_val_decls_for_type_decl ~options ~path type_decls =
           "Invalid option(s) to \"version\", can only be \"wrapped\""
   in
   let inner3_modules = List.take (List.rev path) 3 in
-  validate_type_decl inner3_modules wrapped type_decl1 ;
-  generate_version_number_decl inner3_modules type_decl1.ptype_loc wrapped
-  :: generate_versioned_decls type_decl1 wrapped
+  validate_type_decl inner3_modules wrapped type_decl ;
+  generate_version_number_decl inner3_modules type_decl.ptype_loc wrapped
+  :: generate_versioned_decls type_decl wrapped
+
+let generate_val_decls_for_type_decl type_decl =
+  match type_decl.ptype_kind with
+  (* the structure of the type doesn't affect what we generate for signatures *)
+  | Ptype_abstract | Ptype_variant _ | Ptype_record _ ->
+      let loc = type_decl.ptype_loc in
+      [%sig:
+        val version : int
+
+        val __versioned__ : bool]
+  | Ptype_open ->
+      (* but the type can't be open, else it might vary over time *)
+      Ppx_deriving.raise_errorf ~loc:type_decl.ptype_loc
+        "Versioned type in a signature must not be open"
+
+let generate_val_decls_for_type_decl_sig ~options:_ ~path:_ type_decls =
+  (* in a signature, the module path may vary *)
+  let type_decl = get_type_decl_representative type_decls in
+  generate_val_decls_for_type_decl type_decl
 
 let () =
   Ppx_deriving.(
     register
-      (create deriver ~type_decl_str:generate_val_decls_for_type_decl ()))
+      (create deriver ~type_decl_str:generate_let_bindings_for_type_decl_str
+         ~type_decl_sig:generate_val_decls_for_type_decl_sig ()))
