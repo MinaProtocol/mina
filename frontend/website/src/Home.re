@@ -1,23 +1,23 @@
 let extraHeaders = <link rel="stylesheet" type_="text/css" href="index.css" />;
 
 let component = ReasonReact.statelessComponent("Home");
-let make = _ => {
+let make = (~posts, _children) => {
   ...component,
   render: _self =>
     // nudge this up one half unit on mobile
     <section
       className=Css.(
         style([
-          marginTop(`rem(-0.5)),
-          media(Style.MediaQuery.full, [marginTop(`zero)]),
+          marginTop(`rem(-0.8125)),
+          media(Style.MediaQuery.full, [marginTop(`rem(-0.25))]),
         ])
       )>
-      <Wrapped>
+      <Wrapped overflowHidden=true>
         <HeroSection />
         <CryptoAppsSection />
         <InclusiveSection />
         <SustainableSection />
-        <GetInvolvedSection />
+        <GetInvolvedSection posts />
       </Wrapped>
       <div
         className=Css.(

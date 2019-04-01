@@ -37,27 +37,47 @@ let writeStatic = (path, rootComponent) => {
     extractCritical(ReactDOMServerRe.renderToStaticMarkup(rootComponent));
   Node.Fs.writeFileAsUtf8Sync(
     path ++ ".html",
-    "<!doctype html><meta charset=\"utf-8\" />\n" ++ rendered##html,
+    "<!doctype html>\n" ++ rendered##html,
   );
   Node.Fs.writeFileAsUtf8Sync(path ++ ".css", rendered##css);
 };
 
-let posts =
-  Node.Fs.readdirSync("posts")
-  |> Array.to_list
-  |> List.filter(s => Js.String.endsWith(Markdown.suffix, s))
-  |> List.map(fileName => {
-       let length = String.length(fileName) - String.length(Markdown.suffix);
-       let name = String.sub(fileName, 0, length);
-       let path = "posts/" ++ fileName;
-       let (html, content) = Markdown.load(path);
-       let metadata = BlogPost.parseMetadata(content, path);
-       (name, html, metadata);
-     });
+let posts = {
+  let unsorted =
+    Node.Fs.readdirSync("posts")
+    |> Array.to_list
+    |> List.filter(s => Js.String.endsWith(Markdown.suffix, s))
+    |> List.map(fileName => {
+         let length =
+           String.length(fileName) - String.length(Markdown.suffix);
+         let name = String.sub(fileName, 0, length);
+         let path = "posts/" ++ fileName;
+         let (html, content) = Markdown.load(path);
+         let metadata = BlogPost.parseMetadata(content, path);
+         (name, html, metadata);
+       });
+
+  List.sort(
+    ((_, _, metadata1), (_, _, metadata2)) => {
+      let date1 = Js.Date.fromString(metadata1.BlogPost.date);
+      let date2 = Js.Date.fromString(metadata2.date);
+      let diff = Js.Date.getTime(date2) -. Js.Date.getTime(date1);
+      if (diff > 0.) {
+        1;
+      } else if (diff < 0.) {
+        (-1);
+      } else {
+        0;
+      };
+    },
+    unsorted,
+  );
+};
 
 module Router = {
   type t =
     | File(string, ReasonReact.reactElement)
+    | Css_file(string, string)
     | Dir(string, array(t));
 
   let generateStatic = {
@@ -65,6 +85,9 @@ module Router = {
       fun
       | File(name, elem) => {
           writeStatic(path ++ "/" ++ name, elem);
+        }
+      | Css_file(name, content) => {
+          Node.Fs.writeFileAsUtf8Sync(path ++ "/" ++ name ++ ".css", content);
         }
       | Dir(name, routes) => {
           let path_ = path ++ "/" ++ name;
@@ -91,15 +114,22 @@ let jobOpenings = [|
 // GENERATE
 
 Rimraf.sync("site");
+
+let blogPage =
+  <Page page=`Blog name="blog" extraHeaders=Blog.extraHeaders>
+    <Wrapped> <Blog posts /> </Wrapped>
+  </Page>;
+
 Router.(
   generateStatic(
     Dir(
       "site",
       [|
+        Css_file("fonts", Style.Typeface.Loader.load()),
         File(
           "index",
-          <Page name="index" footerColor=Style.Colors.gandalf>
-            <Home />
+          <Page page=`Home name="index" footerColor=Style.Colors.gandalf>
+            <Home posts />
           </Page>,
         ),
         Dir(
@@ -110,13 +140,15 @@ Router.(
                File(
                  name,
                  <Page
+                   page=`Blog
                    name
                    extraHeaders=Blog.extraHeaders
                    footerColor=Style.Colors.gandalf>
                    <Wrapped> <BlogPost name html metadata /> </Wrapped>
                  </Page>,
                )
-             ),
+             )
+          |> Array.append([|File("index", blogPage)|]),
         ),
         Dir(
           "jobs",
@@ -125,6 +157,7 @@ Router.(
                File(
                  name,
                  <Page
+                   page=`Jobs
                    name
                    footerColor=Style.Colors.gandalf
                    extraHeaders=Careers.extraHeaders>
@@ -137,35 +170,32 @@ Router.(
         ),
         File(
           "jobs",
-          <Page name="jobs" extraHeaders=Careers.extraHeaders>
+          <Page page=`Jobs name="jobs" extraHeaders=Careers.extraHeaders>
             <Wrapped> <Careers jobOpenings /> </Wrapped>
           </Page>,
         ),
         File(
           "code",
-          <Page name="code" extraHeaders=Code.extraHeaders>
+          <Page page=`Code name="code" extraHeaders=Code.extraHeaders>
             <Wrapped> <Code /> </Wrapped>
           </Page>,
         ),
         File(
           "testnet",
-          <Page name="testnet" extraHeaders=Testnet.extraHeaders>
+          <Page page=`Testnet name="testnet" extraHeaders=Testnet.extraHeaders>
             <Wrapped> <Testnet /> </Wrapped>
           </Page>,
         ),
+        File("blog", blogPage),
         File(
-          "blog",
-          <Page name="blog" extraHeaders=Blog.extraHeaders>
-            <Wrapped> <Blog posts /> </Wrapped>
+          "privacy",
+          <Page page=`Privacy name="privacy">
+            <RawHtml path="html/Privacy.html" />
           </Page>,
         ),
         File(
-          "privacy",
-          <Page name="privacy"> <RawHtml path="html/Privacy.html" /> </Page>,
-        ),
-        File(
           "tos",
-          <Page name="tos"> <RawHtml path="html/TOS.html" /> </Page>,
+          <Page page=`Tos name="tos"> <RawHtml path="html/TOS.html" /> </Page>,
         ),
       |],
     ),

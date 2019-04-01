@@ -2,13 +2,13 @@ open Core_kernel
 
 module Single : sig
   module Spec : sig
-    type ('statement, 'transition, 'sparse_ledger, 'ledger_proof) t =
-      | Transition of 'statement * 'transition * 'sparse_ledger
+    type ('statement, 'transition, 'witness, 'ledger_proof) t =
+      | Transition of 'statement * 'transition * 'witness
       | Merge of 'statement * 'ledger_proof * 'ledger_proof
     [@@deriving bin_io, sexp]
 
     val statement :
-      ('statement, 'transition, 'sparse_ledger, 'ledger_proof) t -> 'statement
+      ('statement, 'transition, 'witness, 'ledger_proof) t -> 'statement
   end
 end
 

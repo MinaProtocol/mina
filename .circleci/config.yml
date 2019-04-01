@@ -275,6 +275,18 @@ jobs:
                   command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run "test_postake_five_even_snarkless:coda-shared-prefix-multiproposer-test -num-proposers 5"'
             - store_artifacts:
                   path: test_logs
+    test--test_postake_five_even_txns:
+        resource_class: large
+        docker:
+            - image: codaprotocol/coda:toolchain-af1380e0f6c8726391d82b2adb6a2a3b20dd46a0
+        steps:
+            - checkout
+            - run: git submodule sync && git submodule update --init --recursive
+            - run:
+                  name: Running test -- test_postake_five_even_txns:coda-shared-prefix-multiproposer-test -num-proposers 5 -payments
+                  command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run "test_postake_five_even_txns:coda-shared-prefix-multiproposer-test -num-proposers 5 -payments"'
+            - store_artifacts:
+                  path: test_logs
     test--test_postake_snarkless:
         resource_class: large
         docker:
@@ -363,6 +375,7 @@ workflows:
             - test--test_postake_bootstrap
             - test--test_postake_catchup
             - test--test_postake_five_even_snarkless
+            - test--test_postake_five_even_txns
             - test--test_postake_snarkless
             - test--test_postake_split
             - test--test_postake_split_snarkless

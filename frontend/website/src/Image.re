@@ -1,5 +1,5 @@
 let component = ReasonReact.statelessComponent("CryptoAppsSection");
-let make = (~className, ~name, _children) => {
+let make = (~className, ~name, ~alt, _children) => {
   ...component,
   render: _self => {
     <img
@@ -8,6 +8,7 @@ let make = (~className, ~name, _children) => {
       srcSet={
         name ++ ".png 1x, " ++ name ++ "@2x.png 2x, " ++ name ++ "@3x.png 3x"
       }
+      alt
     />;
   },
 };

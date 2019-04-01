@@ -87,7 +87,8 @@ let%test_module "Bootstrap Controller" =
               input_transitions_verified
           in
           let transition_reader, transition_writer =
-            Pipe_lib.Strict_pipe.create Synchronous
+            Pipe_lib.Strict_pipe.create ~name:(__MODULE__ ^ __LOC__)
+              Synchronous
           in
           let () =
             List.iter
@@ -119,7 +120,7 @@ let%test_module "Bootstrap Controller" =
     let is_syncing = function `Ignored -> false | `Syncing _ -> true
 
     let make_transition_pipe () =
-      Pipe_lib.Strict_pipe.create
+      Pipe_lib.Strict_pipe.create ~name:(__MODULE__ ^ __LOC__)
         (Buffered (`Capacity 10, `Overflow Drop_head))
 
     let get_best_tip_hash (peer : Network_builder.peer) =
@@ -155,9 +156,13 @@ let%test_module "Bootstrap Controller" =
                 Transition_frontier.shallow_copy_root_snarked_ledger frontier
               in
               let scan_state = Staged_ledger.scan_state staged_ledger in
+              let pending_coinbases =
+                Staged_ledger.pending_coinbase_collection staged_ledger
+              in
               let%map actual_staged_ledger =
-                Staged_ledger.of_scan_state_and_snarked_ledger ~scan_state
-                  ~snarked_ledger ~expected_merkle_root
+                Staged_ledger
+                .of_scan_state_pending_coinbases_and_snarked_ledger ~scan_state
+                  ~snarked_ledger ~expected_merkle_root ~pending_coinbases
                 |> Deferred.Or_error.ok_exn
               in
               assert (
