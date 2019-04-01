@@ -59,7 +59,7 @@ module Item = {
                 display(`flex),
                 justifyContent(`spaceBetween),
                 alignItems(`center),
-                margin(`rem(0.0)),
+                margin(`zero),
                 flexWrap(`wrap),
                 height(`auto),
                 media(
@@ -96,7 +96,7 @@ module Item = {
                 style([
                   maxWidth(`rem(25.)),
                   display(`flex),
-                  margin(`rem(0.0)),
+                  margin(`zero),
                   order(5),
                   media(Style.MediaQuery.notMobile, [order(2)]),
                 ]),
