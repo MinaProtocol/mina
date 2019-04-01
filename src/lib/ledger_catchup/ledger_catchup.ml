@@ -235,7 +235,7 @@ module Make (Inputs : Inputs.S) :
                 @@ Or_error.errorf
                      !"Peer %{sexp:Network_peer.Peer.t} did not have transition"
                      peer
-            | Some queried_transitions ->
+            | Some queried_transitions -> (
                 let last, rest =
                   Non_empty_list.(uncons @@ rev queried_transitions)
                 in
@@ -277,8 +277,15 @@ module Make (Inputs : Inputs.S) :
                     ~f:(fun transition acc -> Rose_tree.T (transition, [acc])
                   )
                 in
-                materialize_breadcrumbs ~frontier ~logger ~peer full_subtree )
-    )
+                let open Deferred.Let_syntax in
+                match%bind
+                  materialize_breadcrumbs ~frontier ~logger ~peer full_subtree
+                with
+                | Ok result -> Deferred.Or_error.return result
+                | error ->
+                    List.iter verified_transitions
+                      ~f:(Fn.compose ignore Cached.invalidate) ;
+                    Deferred.return error ) ) )
 
   let run ~logger ~network ~frontier ~catchup_job_reader
       ~catchup_breadcrumbs_writer ~unprocessed_transition_cache =
