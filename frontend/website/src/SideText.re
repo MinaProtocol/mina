@@ -1,7 +1,14 @@
+module Cta = {
+  type t = {
+    copy: string,
+    link: string,
+  };
+};
 let component = ReasonReact.statelessComponent("SideText");
 let make = (~className="", ~paragraphs, ~cta, _children) => {
   ...component,
   render: _self => {
+    let {Cta.copy, link} = cta;
     let ps =
       Belt.Array.mapWithIndex(paragraphs, (i, p) =>
         <p
@@ -33,11 +40,11 @@ let make = (~className="", ~paragraphs, ~cta, _children) => {
       )>
       {ReasonReact.array(ps)}
       <a
-        href=Links.mailingList
+        href=link
         className=Css.(
           merge([Style.Link.basic, style([marginTop(`rem(1.5))])])
         )>
-        {ReasonReact.string(cta ++ {j|\u00A0→|j})}
+        {ReasonReact.string(copy ++ {j|\u00A0→|j})}
       </a>
     </div>;
   },

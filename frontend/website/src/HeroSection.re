@@ -168,6 +168,8 @@ module Graphic = {
           className={style([
             width(`percent(100.0)),
             maxWidth(`rem(20.0)),
+            marginRight(`rem(2.0)),
+            media(Style.MediaQuery.veryLarge, [marginRight(`rem(4.75))]),
           ])}>
           <div
             className={style([
@@ -217,7 +219,11 @@ let make = _ => {
           justifyContent(`spaceAround),
           flexWrap(`wrap),
           maxWidth(`rem(69.0)),
-          media(Style.MediaQuery.full, [flexWrap(`nowrap)]),
+          media(Style.MediaQuery.veryLarge, [margin(`auto)]),
+          media(
+            Style.MediaQuery.full,
+            [flexWrap(`nowrap), justifyContent(`spaceBetween)],
+          ),
         ])
       )>
       <Copy />
