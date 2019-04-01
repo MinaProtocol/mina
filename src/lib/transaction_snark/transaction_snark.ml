@@ -1039,7 +1039,7 @@ struct
     in
     with_label __LOC__ (Boolean.Assert.is_true result)
 
-  let reduced_main = lazy (reduce_to_prover wrap_input main)
+  let main = reduce_to_prover wrap_input main
 
   let create_keys () = generate_keypair ~exposing:wrap_input main
 
