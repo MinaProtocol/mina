@@ -17,6 +17,10 @@ module type Inputs_intf = sig
     type t
   end
 
+  module Transaction_witness : sig
+    type t
+  end
+
   module Ledger_proof : sig
     type t
   end
@@ -45,12 +49,12 @@ module type Inputs_intf = sig
          t
       -> ( ( Ledger_proof_statement.t
            , Transaction.t
-           , Sparse_ledger.t
+           , Transaction_witness.t
            , Ledger_proof.t )
            Snark_work_lib.Work.Single.Spec.t
          * ( Ledger_proof_statement.t
            , Transaction.t
-           , Sparse_ledger.t
+           , Transaction_witness.t
            , Ledger_proof.t )
            Snark_work_lib.Work.Single.Spec.t
            option )
@@ -59,6 +63,7 @@ module type Inputs_intf = sig
 end
 
 module Test_input = struct
+  module Transaction_witness = Int
   module Ledger_hash = Int
   module Ledger_proof_statement = Int
   module Sparse_ledger = Int

@@ -329,7 +329,7 @@ let run_test () : unit Deferred.t =
         assert (block_count coda > block_count')
       else
         let%bind _ =
-          test_multiple_payments other_accounts (pks other_accounts) 5.
+          test_multiple_payments other_accounts (pks other_accounts) 7.
         in
         test_duplicate_payments sender_keypair receiver_keypair )
 

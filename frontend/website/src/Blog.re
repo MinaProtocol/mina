@@ -48,53 +48,35 @@ let previousPost = (metadata: BlogPost.metadata) =>
   </>;
 
 let make = (~posts, _children) => {
-  let sortedPosts =
-    List.sort(
-      ((_, _, metadata1), (_, _, metadata2)) => {
-        let date1 = Js.Date.fromString(metadata1.BlogPost.date);
-        let date2 = Js.Date.fromString(metadata2.date);
-        let diff = Js.Date.getTime(date2) -. Js.Date.getTime(date1);
-        if (diff > 0.) {
-          1;
-        } else if (diff < 0.) {
-          (-1);
-        } else {
-          0;
-        };
-      },
-      posts,
-    );
-  {
-    ...component,
-    render: _self =>
-      switch (sortedPosts) {
-      | [] => failwith("No blog posts found")
-      | [(name, html, metadata)] => <BlogPost name html metadata />
-      | [(name, html, metadata), ...tl] =>
-        <div>
-          <BlogPost name html metadata showComments=false />
-          <h3
-            className="f4 f3-ns ddinexp mt0 mb0 fw4 mw65 center pt3 pt4-m pt5-l">
-            {ReasonReact.string("Previous Posts:")}
-          </h3>
-          <div className="mw65 center ph3 ph4-m ph5-l">
-            <ul className="list lh-copy">
-              ...{Array.of_list(
-                List.map(
-                  ((name, _, metadata)) =>
-                    <li>
-                      <a
-                        href={"/blog/" ++ name ++ ".html"}
-                        className="f5 dodgerblue fw5 no-underline hover-link">
-                        {previousPost(metadata)}
-                      </a>
-                    </li>,
-                  tl,
-                ),
-              )}
-            </ul>
-          </div>
+  ...component,
+  render: _self =>
+    switch (posts) {
+    | [] => failwith("No blog posts found")
+    | [(name, html, metadata)] => <BlogPost name html metadata />
+    | [(name, html, metadata), ...tl] =>
+      <div>
+        <BlogPost name html metadata showComments=false />
+        <h3
+          className="f4 f3-ns ddinexp mt0 mb0 fw4 mw65 center pt3 pt4-m pt5-l">
+          {ReasonReact.string("Previous Posts:")}
+        </h3>
+        <div className="mw65 center ph3 ph4-m ph5-l">
+          <ul className="list lh-copy">
+            ...{Array.of_list(
+              List.map(
+                ((name, _, metadata)) =>
+                  <li>
+                    <a
+                      href={"/blog/" ++ name ++ ".html"}
+                      className="f5 dodgerblue fw5 no-underline hover-link">
+                      {previousPost(metadata)}
+                    </a>
+                  </li>,
+                tl,
+              ),
+            )}
+          </ul>
         </div>
-      },
-  };
+      </div>
+    },
 };
