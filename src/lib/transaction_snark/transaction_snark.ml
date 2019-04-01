@@ -487,7 +487,7 @@ module Base = struct
     in
     ()
 
-  let main = reduce_to_prover (tick_input ()) main
+  let prove_main = reduce_to_prover (tick_input ()) main
 
   let create_keys () = Groth16.generate_keypair main ~exposing:(tick_input ())
 
@@ -497,15 +497,13 @@ module Base = struct
     let prover_state : Prover_state.t =
       {state1; state2; transaction; sok_digest; pending_coinbase_stack_state}
     in
-    let main top_hash = handle (main top_hash) handler in
     let top_hash =
       base_top_hash ~sok_digest ~state1 ~state2
         ~fee_excess:(Transaction_union.excess transaction)
         ~supply_increase:(Transaction_union.supply_increase transaction)
         ~pending_coinbase_stack_state
     in
-    ( top_hash
-    , Groth16.prove proving_key (tick_input ()) prover_state main top_hash )
+    (top_hash, prove_main proving_key ~handlers:[handler] prover_state top_hash)
 
   let cached =
     let load =
@@ -789,7 +787,7 @@ module Merge = struct
     in
     Boolean.Assert.all [verify_12; verify_23]
 
-  let main = Groth16.reduce_to_prover (tick_input ()) main
+  let prove_main = reduce_to_prover (input ()) main
 
   let create_keys () = Groth16.generate_keypair ~exposing:(input ()) main
 
@@ -1039,7 +1037,7 @@ struct
     in
     with_label __LOC__ (Boolean.Assert.is_true result)
 
-  let main = reduce_to_prover wrap_input main
+  let prove_main = reduce_to_prover wrap_input main
 
   let create_keys () = generate_keypair ~exposing:wrap_input main
 
@@ -1182,7 +1180,7 @@ struct
 
   let wrap proof_type proof input =
     let prover_state = {Wrap.Prover_state.proof; proof_type} in
-    Tock.prove keys.proving.wrap wrap_input prover_state Wrap.main
+    Wrap.prove_main keys.proving.wrap prover_state
       (Wrap_input.of_tick_field input)
 
   let merge_proof sok_digest ledger_hash1 ledger_hash2 ledger_hash3
@@ -1222,9 +1220,7 @@ struct
       ; transition23
       ; tock_vk= keys.verification.wrap }
     in
-    ( top_hash
-    , Tick.Groth16.prove keys.proving.merge (tick_input ()) prover_state
-        Merge.main top_hash )
+    (top_hash, Merge.prove_main keys.proving.merge prover_state top_hash)
 
   let of_transaction_union sok_digest source target
       ~pending_coinbase_stack_state transaction handler =
