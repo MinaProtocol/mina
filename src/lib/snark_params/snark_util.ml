@@ -158,26 +158,25 @@ module Make (Impl : Snarky.Snark_intf.S) = struct
           test ()
         done
 
-      let check x () = Or_error.is_ok (check x ())
-
       let%test_unit "boolean_assert_lte" =
+        Or_error.ok_exn
+          (check
+             (Checked.all_unit
+                [ boolean_assert_lte Boolean.false_ Boolean.false_
+                ; boolean_assert_lte Boolean.false_ Boolean.true_
+                ; boolean_assert_lte Boolean.true_ Boolean.true_ ])
+             ()) ;
         assert (
-          check
-            (Checked.all_unit
-               [ boolean_assert_lte Boolean.false_ Boolean.false_
-               ; boolean_assert_lte Boolean.false_ Boolean.true_
-               ; boolean_assert_lte Boolean.true_ Boolean.true_ ])
-            () ) ;
-        assert (
-          not (check (boolean_assert_lte Boolean.true_ Boolean.false_) ()) )
+          Or_error.is_error
+            (check (boolean_assert_lte Boolean.true_ Boolean.false_) ()) )
 
       let%test_unit "assert_decreasing" =
         let decreasing bs =
           check (assert_decreasing (List.map ~f:Boolean.var_of_value bs)) ()
         in
-        assert (decreasing [true; true; true; false]) ;
-        assert (decreasing [true; true; false; false]) ;
-        assert (not (decreasing [true; true; false; true]))
+        Or_error.ok_exn (decreasing [true; true; true; false]) ;
+        Or_error.ok_exn (decreasing [true; true; false; false]) ;
+        assert (Or_error.is_error (decreasing [true; true; false; true]))
 
       let%test_unit "n_ones" =
         let total_length = 6 in
@@ -194,8 +193,9 @@ module Make (Impl : Snarky.Snark_intf.S) = struct
             List.init total_length ~f:(fun i -> (k lsr i) land 1 = 1)
           in
           for i = 0 to Int.pow 2 total_length - 1 do
-            if i = correct then assert (check (handle_with (to_bits i)) ())
-            else assert (not (check (handle_with (to_bits i)) ()))
+            if i = correct then
+              Or_error.ok_exn (check (handle_with (to_bits i)) ())
+            else assert (Or_error.is_error (check (handle_with (to_bits i)) ()))
           done
         in
         for n = 0 to total_length do
