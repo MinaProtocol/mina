@@ -175,7 +175,7 @@ module Typeface = {
 };
 
 module MediaQuery = {
-  let veryLarge = "(min-width: 71rem)";
+  let veryLarge = "(min-width: 83.8125rem)";
   let full = "(min-width: 48rem)";
   let notMobile = "(min-width: 32rem)";
   let notSmallMobile = "(min-width: 25rem)";
