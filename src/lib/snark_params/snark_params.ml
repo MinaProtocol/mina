@@ -752,6 +752,15 @@ let set_chunked_hashing b = Tick.Pedersen.State.set_chunked_fold b
 [%%inject
 "ledger_depth", ledger_depth]
 
+[%%inject
+"scan_state_transaction_capacity_log_2", scan_state_transaction_capacity_log_2]
+
+[%%inject
+"scan_state_work_delay_factor", scan_state_work_delay_factor]
+
+let pending_coinbase_depth =
+  scan_state_transaction_capacity_log_2 + scan_state_work_delay_factor
+
 (* Let n = Tick.Field.size_in_bits.
    Let k = n - 3.
    The reason k = n - 3 is as follows. Inside [meets_target], we compare

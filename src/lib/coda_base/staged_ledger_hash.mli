@@ -7,7 +7,11 @@ type t [@@deriving sexp, eq, compare, hash, yojson]
 
 include Hashable with type t := t
 
+type value [@@deriving sexp, eq, compare, hash]
+
 type var
+
+val var_of_t : t -> var
 
 val typ : (var, t) Typ.t
 
@@ -16,6 +20,8 @@ val var_to_triples : var -> (Boolean.var Triple.t list, _) Checked.t
 val length_in_triples : int
 
 val fold : t -> bool Triple.t Fold.t
+
+val genesis : t
 
 module Stable : sig
   module V1 : sig
@@ -26,8 +32,6 @@ module Stable : sig
 
   module Latest : module type of V1
 end
-
-val dummy : t
 
 module Aux_hash : sig
   type t
@@ -51,6 +55,9 @@ val ledger_hash : t -> Ledger_hash.t
 
 val aux_hash : t -> Aux_hash.t
 
-val of_aux_and_ledger_hash : Aux_hash.t -> Ledger_hash.t -> t
+val pending_coinbase_hash : t -> Pending_coinbase.Hash.t
 
-val to_string : t -> string
+val pending_coinbase_hash_var : var -> Pending_coinbase.Hash.var
+
+val of_aux_ledger_and_coinbase_hash :
+  Aux_hash.t -> Ledger_hash.t -> Pending_coinbase.t -> t

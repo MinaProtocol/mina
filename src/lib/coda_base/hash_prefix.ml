@@ -32,4 +32,14 @@ let vrf_message = salt vrf_message
 
 let vrf_output = salt vrf_output
 
+let coinbase_merkle_tree =
+  Array.init Snark_params.pending_coinbase_depth ~f:(fun i ->
+      salt (coinbase_merkle_tree i) )
+
+let coinbase = salt coinbase
+
+let pending_coinbases = salt pending_coinbases
+
+let coinbase_stack = salt coinbase_stack
+
 let checkpoint_list = salt checkpoint_list

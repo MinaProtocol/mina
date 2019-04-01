@@ -84,7 +84,8 @@ struct
           in
           let%bind ( `Hash_after_applying staged_ledger_hash
                    , `Ledger_proof proof_opt
-                   , `Staged_ledger transitioned_staged_ledger ) =
+                   , `Staged_ledger transitioned_staged_ledger
+                   , `Pending_coinbase_data _ ) =
             let open Deferred.Let_syntax in
             match%map
               Inputs.Staged_ledger.apply ~logger staged_ledger
@@ -603,33 +604,33 @@ struct
     t.root <- new_root_hash ;
     new_root_node
 
+  let common_ancestor t (bc1 : Breadcrumb.t) (bc2 : Breadcrumb.t) :
+      State_hash.t =
+    let rec go ancestors1 ancestors2 sh1 sh2 =
+      Hash_set.add ancestors1 sh1 ;
+      Hash_set.add ancestors2 sh2 ;
+      if Hash_set.mem ancestors1 sh2 then sh2
+      else if Hash_set.mem ancestors2 sh1 then sh1
+      else
+        let parent_unless_root sh =
+          if State_hash.equal sh t.root then sh
+          else find_exn t sh |> Breadcrumb.parent_hash
+        in
+        go ancestors1 ancestors2 (parent_unless_root sh1)
+          (parent_unless_root sh2)
+    in
+    go
+      (Hash_set.create (module State_hash) ())
+      (Hash_set.create (module State_hash) ())
+      (Breadcrumb.state_hash bc1)
+      (Breadcrumb.state_hash bc2)
+
   (* Get the breadcrumbs that are on bc1's path but not bc2's, and vice versa.
      Ordered oldest to newest.
   *)
   let get_path_diff t (bc1 : Breadcrumb.t) (bc2 : Breadcrumb.t) :
       Breadcrumb.t list * Breadcrumb.t list =
-    let common_ancestor =
-      if Breadcrumb.equal bc1 bc2 then Breadcrumb.state_hash bc1
-      else
-        let rec go ancestors1 ancestors2 sh1 sh2 =
-          if Hash_set.mem ancestors1 sh2 then sh2
-          else if Hash_set.mem ancestors2 sh1 then sh1
-          else
-            let parent_unless_root h =
-              if State_hash.equal h t.root then h
-              else find_exn t h |> Breadcrumb.parent_hash
-            in
-            Hash_set.add ancestors1 sh1 ;
-            Hash_set.add ancestors2 sh2 ;
-            go ancestors1 ancestors2 (parent_unless_root sh1)
-              (parent_unless_root sh2)
-        in
-        go
-          (Hash_set.create (module State_hash) ())
-          (Hash_set.create (module State_hash) ())
-          (Breadcrumb.state_hash bc1)
-          (Breadcrumb.state_hash bc2)
-    in
+    let ancestor = common_ancestor t bc1 bc2 in
     (* Find the breadcrumbs connecting bc1 and bc2, excluding bc1. Precondition:
        bc1 is an ancestor of bc2. *)
     let path_from_to bc1 bc2 =
@@ -641,9 +642,9 @@ struct
     in
     Logger.debug t.logger ~module_:__MODULE__ ~location:__LOC__
       !"Common ancestor: %{sexp: State_hash.t}"
-      common_ancestor ;
-    ( path_from_to (find_exn t common_ancestor) bc1
-    , path_from_to (find_exn t common_ancestor) bc2 )
+      ancestor ;
+    ( path_from_to (find_exn t ancestor) bc1
+    , path_from_to (find_exn t ancestor) bc2 )
 
   (* Adding a breadcrumb to the transition frontier is broken into the following steps:
    *   1) attach the breadcrumb to the transition frontier
@@ -769,7 +770,16 @@ struct
             (* 4.IV *)
             let new_root_node = move_root t heir_node in
             (* 4.V *)
-            let garbage = List.bind bad_hashes ~f:(successor_hashes_rec t) in
+            let garbage =
+              bad_hashes @ List.bind bad_hashes ~f:(successor_hashes_rec t)
+            in
+            Logger.trace t.logger ~module_:__MODULE__ ~location:__LOC__
+              ~metadata:
+                [ ("garbage", `List (List.map garbage ~f:State_hash.to_yojson))
+                ; ("length_of_garbage", `Int (List.length garbage))
+                ; ( "bad_hashes"
+                  , `List (List.map bad_hashes ~f:State_hash.to_yojson) ) ]
+              "collecting $length_of_garbage nodes rooted from $bad_hashes" ;
             let garbage_breadcrumbs =
               List.map garbage ~f:(fun g ->
                   (Hashtbl.find_exn t.table g).breadcrumb )

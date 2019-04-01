@@ -1,21 +1,24 @@
 let component = ReasonReact.statelessComponent("Page.Wrapped");
-let make = children => {
+let make = (~overflowHidden=false, children) => {
   ...component,
   render: _ => {
     <div
       className=Css.(
-        style([
-          margin(`auto),
-          media(
-            Style.MediaQuery.full,
-            [
-              maxWidth(`rem(84.0)),
-              margin(`auto),
-              ...Style.paddingX(`rem(3.0)),
-            ],
-          ),
-          ...Style.paddingX(`rem(1.25)),
-        ])
+        style(
+          (overflowHidden ? [overflow(`hidden)] : [])
+          @ [
+            margin(`auto),
+            media(
+              Style.MediaQuery.full,
+              [
+                maxWidth(`rem(89.0)),
+                margin(`auto),
+                ...Style.paddingX(`rem(3.0)),
+              ],
+            ),
+            ...Style.paddingX(`rem(1.25)),
+          ],
+        )
       )>
       ...children
     </div>;
