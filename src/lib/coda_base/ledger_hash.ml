@@ -53,9 +53,7 @@ let merge ~height (h1 : t) (h2 : t) =
 (* TODO: @ihm cryptography review *)
 let empty_hash =
   let open Tick.Pedersen in
-  digest_fold
-    (State.create params ~get_chunk_table)
-    (Fold.string_triples "nothing up my sleeve")
+  digest_fold (State.create ()) (Fold.string_triples "nothing up my sleeve")
   |> of_hash
 
 let of_digest = Fn.compose Fn.id of_hash
