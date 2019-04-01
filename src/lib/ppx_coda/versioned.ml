@@ -75,9 +75,6 @@ let validate_type_decl inner3_modules wrapped type_decl =
     Location.raise_errorf ~loc:type_decl.ptype_name.loc
       "Versioned type must be named \"t\", got: \"%s\""
       type_decl.ptype_name.txt ;
-  if not (List.is_empty type_decl.ptype_params) then
-    Location.raise_errorf ~loc:type_decl.ptype_loc
-      "Versioned type must not have type parameters" ;
   if wrapped then validate_wrapped_type_decl inner3_modules type_decl
   else validate_unwrapped_type_decl inner3_modules type_decl
 
@@ -118,25 +115,22 @@ let is_ocaml_builtin_type txt =
 let rec generate_core_type_version_decls core_type =
   match core_type.ptyp_desc with
   | Ptyp_constr ({txt; _}, core_types) -> (
-    match (txt, core_types) with
-    | Lident id, [] ->
+    match txt with
+    | Lident id ->
         (* type t = id *)
-        if List.mem ocaml_builtin_types id ~equal:String.equal then
-          (* no versioning to worry about *)
+        if
+          List.is_empty core_types
+          && List.mem ocaml_builtin_types id ~equal:String.equal
+        then (* no versioning to worry about *)
           []
         else
           (* a type not in a module (so not versioned) *)
           Ppx_deriving.raise_errorf ~loc:core_type.ptyp_loc
             "Type \"%s\" is not a versioned type" id
-    | Lident _id, _ :: _ ->
-        (* type t = (T1.t,T2.t) _id'
-             check that the parameters are versioned
-           *)
-        generate_version_lets_for_core_types core_types
-    | Ldot (prefix, "t"), [] ->
+    | Ldot (prefix, "t") ->
         (* type t = A.B.t
-             generate: let _ = A.B.__versioned__
-           *)
+          generate: let _ = A.B.__versioned__
+        *)
         let loc = core_type.ptyp_loc in
         let pexp_loc = loc in
         let versioned_ident =
@@ -145,6 +139,7 @@ let rec generate_core_type_version_decls core_type =
           ; pexp_attributes= [] }
         in
         [%str let _ = [%e versioned_ident]]
+        @ generate_version_lets_for_core_types core_types
     | _ ->
         Ppx_deriving.raise_errorf ~loc:core_type.ptyp_loc
           "Unrecognized type constructor for versioned type" )
@@ -153,6 +148,8 @@ let rec generate_core_type_version_decls core_type =
       generate_version_lets_for_core_types core_types
   | Ptyp_variant _ -> (* type t = [ `A | `B ] *)
                       []
+  | Ptyp_var _ -> (* type variable *)
+                  []
   | _ ->
       Ppx_deriving.raise_errorf ~loc:core_type.ptyp_loc
         "Can't determine versioning for contained type"
@@ -204,11 +201,6 @@ let generate_versioned_decls type_decl wrapped =
   if wrapped then [versioned_current]
   else versioned_current :: generate_contained_type_decls type_decl
 
-let validate_type_name type_name =
-  if not (String.equal type_name.txt "t") then
-    Ppx_deriving.raise_errorf ~loc:type_name.loc
-      "Versioned type must be named \"t\""
-
 let get_type_decl_representative type_decls =
   let type_decl1 = List.hd_exn type_decls in
   let type_decl2 = List.hd_exn (List.rev type_decls) in
@@ -220,7 +212,6 @@ let get_type_decl_representative type_decls =
     in
     Ppx_deriving.raise_errorf ~loc
       "Versioned type must be just one type \"t\", not a sequence of types" ) ;
-  validate_type_name type_decl1.ptype_name ;
   type_decl1
 
 let generate_let_bindings_for_type_decl_str ~options ~path type_decls =
