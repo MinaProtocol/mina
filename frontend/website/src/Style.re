@@ -1,16 +1,23 @@
 module Colors = {
+  let string =
+    fun
+    | `rgb(r, g, b) => Printf.sprintf("rgb(%d,%d,%d)", r, g, b)
+    | `rgba(r, g, b, a) => Printf.sprintf("rgba(%d,%d,%d,%f)", r, g, b, a)
+    | `hsl(h, s, l) => Printf.sprintf("hsl(%d,%d%%,%d%%)", h, s, l)
+    | `hsla(h, s, l, a) =>
+      Printf.sprintf("hsla(%d,%d%%,%d%%,%f)", h, s, l, a);
+
   let fadedBlue = `rgb((111, 167, 197));
   let white = Css.white;
   let whiteAlpha = a => `rgba((255, 255, 255, a));
   let hyperlink = `hsl((201, 71, 52));
-  let hyperlinkString = "hsl(201, 71%, 52%)";
   let hyperlinkAlpha = a => `hsla((201, 71, 52, a));
   let hyperlinkHover = `hsl((201, 71, 40));
   let hyperlinkLight = `hsl((201, 71, 70));
 
   let metallicBlue = `rgb((70, 99, 131));
   let denimTwo = `rgb((61, 88, 120));
-  let greyBlueString = "rgb(118, 147, 190)";
+  let greyBlue = `rgb(118, 147, 190);
   let darkGreyBlue = `rgb((61, 88, 120));
   let greyishBrown = `rgb((74, 74, 74));
 
@@ -229,6 +236,19 @@ module H1 = {
           lineHeight(`rem(4.0)),
         ],
       ),
+    ]);
+};
+
+module H2 = {
+  open Css;
+
+  let basic =
+    style([
+      Typeface.ibmplexsans,
+      fontWeight(`normal),
+      fontSize(`rem(2.25)),
+      letterSpacing(`rem(-0.03125)),
+      lineHeight(`rem(3.0)),
     ]);
 };
 

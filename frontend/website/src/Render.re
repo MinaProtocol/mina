@@ -176,9 +176,7 @@ Router.(
         ),
         File(
           "code",
-          <Page page=`Code name="code" extraHeaders=Code.extraHeaders>
-            <Wrapped> <Code /> </Wrapped>
-          </Page>,
+          <Page page=`Code name="code"> <Wrapped> <Code /> </Wrapped> </Page>,
         ),
         File(
           "testnet",
