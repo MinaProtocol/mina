@@ -33,6 +33,12 @@
   (libraries core_kernel)
   (modules versioned_good_contained_types))
 
+(library
+  (name versioned_good_type_parameters)
+  (preprocess (pps ppx_jane ppx_deriving_yojson ppx_coda))
+  (libraries core_kernel)
+  (modules versioned_good_type_parameters))
+
 ;;; should fail
 
 ;; expiration
@@ -94,3 +100,8 @@
   (libraries core_kernel)
   (modules versioned_bad_contained_types))
 
+(library
+  (name versioned_bad_type_parameters)
+  (preprocess (pps ppx_jane ppx_deriving_yojson ppx_coda))
+  (libraries core_kernel)
+  (modules versioned_bad_type_parameters))
