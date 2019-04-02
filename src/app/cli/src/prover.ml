@@ -91,11 +91,6 @@ module Worker_state = struct
                    ; prev_state= chain.state
                    ; update= block }
                  in
-                 let main x =
-                   Tick.handle (Keys.Step.main x)
-                     (Consensus_mechanism.Prover_state.handler
-                        state_for_handler ~pending_coinbase)
-                 in
                  let prev_proof =
                    Keys.Step.prove_main
                      (Tick.Groth16.Keypair.pk Keys.Step.keys)
