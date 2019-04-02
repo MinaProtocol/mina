@@ -357,6 +357,11 @@ module Tick = struct
     module Bits = Bits.Make_field (Tick0.Field) (Tick0.Bigint)
 
     let size_in_triples = (size_in_bits + 2) / 3
+
+    (* for now, assert this type, derived from snarky, is versioned; can we 
+       prevent it changing?
+     *)
+    let __versioned__ = true
   end
 
   module Fq = Snarky_field_extensions.Field_extensions.F (Tick0)
