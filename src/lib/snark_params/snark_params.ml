@@ -739,8 +739,7 @@ module Bg = struct
                (List.init (Vector.length x) ~f:(fun i ->
                     Tick.Field.unpack (Vector.get x i) ))
 
-        let salt =
-          lazy Tick.Pedersen.(State.salt params ~get_chunk_table "TockBGHash")
+        let salt = lazy (Tick.Pedersen.State.salt "TockBGHash")
 
         let random_oracle x =
           (Blake2.digest_field x :> string)
