@@ -6,6 +6,7 @@
   (libraries
     core_kernel
     snarky
+    blake2
     snarky_blake2
     coda_digestif
     snark_params
