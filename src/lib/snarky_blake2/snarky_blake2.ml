@@ -228,7 +228,8 @@ let%test_module "blake2-equality test" =
       [%test_eq: a] checked_result (unchecked input)
 
     let blake2_unchecked s =
-      Blake2.string_to_bits (Blake2.digest_string (Blake2.bits_to_string s) :> string)
+      Blake2.string_to_bits
+        (Blake2.digest_string (Blake2.bits_to_string s) :> string)
 
     let to_bitstring bits =
       String.init (Array.length bits) ~f:(fun i ->
