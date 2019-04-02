@@ -168,28 +168,11 @@ let chunk_table_structure ~loc =
     open Core
     module Group = Crypto_params_init.Tick_backend.Inner_curve
 
-    let chunk_table_string_opt_ref = ref (Some [%e chunk_table_ast ~loc])
-
-    (** dummy empty table before deserialization *)
-    let chunk_table_ref : Chunk_table.t ref = ref (Chunk_table.create [||])
-
-    let deserialized = ref false
-
-    let deserialize () =
-      if not !deserialized then (
-        let chunk_table_string =
-          Option.value_exn !chunk_table_string_opt_ref
-        in
-        let result =
-          Binable.of_string (module Chunk_table) chunk_table_string
-        in
-        (* allow string to be GCed *)
-        chunk_table_string_opt_ref := None ;
-        chunk_table_ref := result ;
-        deserialized := true )
-
-    (** returns valid chunk table *)
-    let get_chunk_table () = deserialize () ; !chunk_table_ref.table_data]
+    let chunk_table =
+      lazy
+        (let s = [%e chunk_table_ast ~loc] in
+         let t = Binable.of_string (module Chunk_table) s in
+         t.table_data)]
 
 let generate_ml_file filename structure =
   let fmt = Format.formatter_of_out_channel (Out_channel.create filename) in
