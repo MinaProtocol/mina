@@ -152,7 +152,7 @@ let create () : (module S) Async.Deferred.t =
               As_prover.(map get_state ~f:there)
               (main x)
 
-          let prove_main = Tick.reduce_to_prover (input ()) main
+          let prove_main = Tick.Groth16.reduce_to_prover (input ()) main
         end
 
         module Wrap = struct
