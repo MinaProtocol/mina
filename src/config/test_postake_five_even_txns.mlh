@@ -4,9 +4,9 @@
 [%%import "config/consensus/postake_tiny.mlh"]
 [%%import "config/scan_state/small.mlh"]
 [%%import "config/debug_level/some.mlh"]
-[%%import "config/proof_level/none.mlh"]
+[%%import "config/proof_level/check.mlh"]
 
-[%%define time_offsets false]
+[%%define time_offsets true]
 [%%define fake_hash false]
 
 [%%define genesis_ledger "test_five_even_stakes"]
