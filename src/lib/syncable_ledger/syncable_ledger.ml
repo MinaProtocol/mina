@@ -85,7 +85,7 @@ module type Inputs_intf = sig
 end
 
 module type S = sig
-  type t [@@deriving sexp]
+  type 'a t [@@deriving sexp]
 
   type merkle_tree
 
@@ -115,38 +115,40 @@ module type S = sig
     val answer_query : t -> query -> answer option
   end
 
-  val create : merkle_tree -> logger:Logger.t -> t
+  val create : merkle_tree -> logger:Logger.t -> 'a t
 
   val answer_writer :
-    t -> (root_hash * query * answer Envelope.Incoming.t) Linear_pipe.Writer.t
+       'a t
+    -> (root_hash * query * answer Envelope.Incoming.t) Linear_pipe.Writer.t
 
-  val query_reader : t -> (root_hash * query) Linear_pipe.Reader.t
+  val query_reader : 'a t -> (root_hash * query) Linear_pipe.Reader.t
 
-  val destroy : t -> unit
+  val destroy : 'a t -> unit
 
-  val new_goal : t -> root_hash -> [`Repeat | `New]
+  val new_goal : 'a t -> root_hash -> data:'a -> [`Repeat | `New]
 
-  val peek_valid_tree : t -> merkle_tree option
+  val peek_valid_tree : 'a t -> merkle_tree option
 
-  val valid_tree : t -> merkle_tree Deferred.t
+  val valid_tree : 'a t -> (merkle_tree * 'a) Deferred.t
 
   val wait_until_valid :
-       t
+       'a t
     -> root_hash
     -> [`Ok of merkle_tree | `Target_changed of root_hash option * root_hash]
        Deferred.t
 
   val fetch :
-       t
+       'a t
     -> root_hash
+    -> data:'a
     -> [`Ok of merkle_tree | `Target_changed of root_hash option * root_hash]
        Deferred.t
 
-  val apply_or_queue_diff : t -> diff -> unit
+  val apply_or_queue_diff : 'a t -> diff -> unit
 
-  val merkle_path_at_addr : t -> addr -> merkle_path Or_error.t
+  val merkle_path_at_addr : 'a t -> addr -> merkle_path Or_error.t
 
-  val get_account_at_addr : t -> addr -> account Or_error.t
+  val get_account_at_addr : 'a t -> addr -> account Or_error.t
 end
 
 (*
@@ -290,8 +292,9 @@ end = struct
                (len, MT.get_inner_hash_at_addr_exn mt content_root_addr))
   end
 
-  type t =
+  type 'a t =
     { mutable desired_root: Root_hash.t option
+    ; mutable auxillary_data: 'a option
     ; tree: MT.t
     ; logger: Logger.t
     ; answers:
@@ -321,7 +324,7 @@ end = struct
 
   let query_reader t = t.query_reader
 
-  let expect_children : t -> Addr.t -> Hash.t -> unit =
+  let expect_children : 'a t -> Addr.t -> Hash.t -> unit =
    fun t parent_addr expected ->
     Logger.trace t.logger ~module_:__MODULE__ ~location:__LOC__
       ~metadata:
@@ -330,7 +333,7 @@ end = struct
       "Expecting children parent $parent_address, expected: $hash" ;
     Addr.Table.add_exn t.waiting_parents ~key:parent_addr ~data:expected
 
-  let expect_content : t -> Addr.t -> Hash.t -> unit =
+  let expect_content : 'a t -> Addr.t -> Hash.t -> unit =
    fun t addr expected ->
     Logger.trace t.logger ~module_:__MODULE__ ~location:__LOC__
       ~metadata:
@@ -342,7 +345,7 @@ end = struct
 
   (** Given an address and the accounts below that address, fill in the tree
       with them. *)
-  let add_content : t -> Addr.t -> Account.t list -> Hash.t Or_error.t =
+  let add_content : 'a t -> Addr.t -> Account.t list -> Hash.t Or_error.t =
    fun t addr content ->
     let expected = Addr.Table.find_exn t.waiting_content addr in
     (* TODO #444 should we batch all the updates and do them at the end? *)
@@ -355,7 +358,7 @@ end = struct
       children for retrieval if the values in the underlying ledger don't match
       the hashes we got from the network. *)
   let add_child_hashes_to :
-         t
+         'a t
       -> Addr.t
       -> Hash.t
       -> Hash.t
@@ -522,7 +525,7 @@ end = struct
     in
     Linear_pipe.iter t.answers ~f:(fun a -> handle_answer a ; Deferred.unit)
 
-  let new_goal t h =
+  let new_goal t h ~data =
     let should_skip =
       match t.desired_root with
       | None -> false
@@ -540,6 +543,7 @@ end = struct
         (`Target_changed (t.desired_root, h)) ;
       t.validity_listener <- Ivar.create () ;
       t.desired_root <- Some h ;
+      t.auxillary_data <- Some data ;
       Linear_pipe.write_without_pushback_if_open t.queries (h, Num_accounts) ;
       `New )
     else (
@@ -549,7 +553,7 @@ end = struct
 
   let rec valid_tree t =
     match%bind Ivar.read t.validity_listener with
-    | `Ok -> return t.tree
+    | `Ok -> return (t.tree, Option.value_exn t.auxillary_data)
     | `Target_changed _ -> valid_tree t
 
   let peek_valid_tree t =
@@ -565,8 +569,8 @@ end = struct
         | `Target_changed payload -> `Target_changed payload
         | `Ok -> `Ok t.tree )
 
-  let fetch t rh =
-    new_goal t rh |> ignore ;
+  let fetch t rh ~data =
+    new_goal t rh ~data |> ignore ;
     wait_until_valid t rh
 
   let create mt ~logger =
@@ -574,6 +578,7 @@ end = struct
     let ar, aw = Linear_pipe.create () in
     let t =
       { desired_root= None
+      ; auxillary_data= None
       ; tree= mt
       ; logger
       ; answers= ar
