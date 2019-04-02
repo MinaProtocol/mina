@@ -4,8 +4,6 @@ open Import
 module Stable = struct
   module V1 = struct
     module T = struct
-      let version = 1
-
       type t =
         { proposer: Public_key.Compressed.Stable.V1.t
         ; amount: Currency.Amount.Stable.V1.t
