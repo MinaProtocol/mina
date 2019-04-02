@@ -294,7 +294,7 @@ end = struct
 
   type 'a t =
     { mutable desired_root: Root_hash.t option
-    ; mutable auxillary_data: 'a option
+    ; mutable auxiliary_data: 'a option
     ; tree: MT.t
     ; logger: Logger.t
     ; answers:
@@ -543,7 +543,7 @@ end = struct
         (`Target_changed (t.desired_root, h)) ;
       t.validity_listener <- Ivar.create () ;
       t.desired_root <- Some h ;
-      t.auxillary_data <- Some data ;
+      t.auxiliary_data <- Some data ;
       Linear_pipe.write_without_pushback_if_open t.queries (h, Num_accounts) ;
       `New )
     else (
@@ -553,7 +553,7 @@ end = struct
 
   let rec valid_tree t =
     match%bind Ivar.read t.validity_listener with
-    | `Ok -> return (t.tree, Option.value_exn t.auxillary_data)
+    | `Ok -> return (t.tree, Option.value_exn t.auxiliary_data)
     | `Target_changed _ -> valid_tree t
 
   let peek_valid_tree t =
@@ -578,7 +578,7 @@ end = struct
     let ar, aw = Linear_pipe.create () in
     let t =
       { desired_root= None
-      ; auxillary_data= None
+      ; auxiliary_data= None
       ; tree= mt
       ; logger
       ; answers= ar
