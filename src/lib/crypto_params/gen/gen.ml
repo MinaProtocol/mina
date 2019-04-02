@@ -41,7 +41,6 @@ let rec random_point () =
   let x = random_field_element () in
   let y2 =
     let open Impl.Field in
-    let open Infix in
     (x * square x)
     + (Crypto_params_init.Tick_backend.Inner_curve.Coefficients.a * x)
     + Crypto_params_init.Tick_backend.Inner_curve.Coefficients.b

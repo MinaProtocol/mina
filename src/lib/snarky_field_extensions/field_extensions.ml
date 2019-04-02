@@ -222,10 +222,7 @@ struct
 
     let to_list x = [x]
 
-    module Unchecked = struct
-      include Field
-      include Field.Infix
-    end
+    module Unchecked = Field
 
     type t = Field.Var.t
 
@@ -243,9 +240,9 @@ struct
 
     let assert_r1cs a b c = assert_r1cs a b c
 
-    let ( + ) = Field.Checked.Infix.( + )
+    let ( + ) = Field.Checked.( + )
 
-    let ( - ) = Field.Checked.Infix.( - )
+    let ( - ) = Field.Checked.( - )
 
     let negate t = Field.Var.scale t Unchecked.(negate one)
 
@@ -333,7 +330,7 @@ end = struct
 
     let assert_square (a, b) (a2, b2) =
       let open F in
-      let ab = scale b2 Field.(Infix.(one / of_int 2)) in
+      let ab = scale b2 Field.(one / of_int 2) in
       let%map () = assert_r1cs a b ab
       and () =
         assert_r1cs (a + b)
@@ -827,5 +824,5 @@ struct
     let p2 = Params.frobenius_coeffs_c1.(Int.( * ) (power mod 2) 2) in
     let p4 = Params.frobenius_coeffs_c1.(power mod 4) in
     let ( * ) s x = Field.Var.scale x s in
-    ((c00, p2 * c01), (p4 * c10, Field.Infix.(p4 * p2) * c11))
+    ((c00, p2 * c01), (p4 * c10, Field.(p4 * p2) * c11))
 end
