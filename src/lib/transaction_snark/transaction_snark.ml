@@ -491,9 +491,9 @@ module Base = struct
 
   let create_keys () = Groth16.generate_keypair main ~exposing:(tick_input ())
 
-  let transaction_union_proof ~proving_key sok_digest state1
-      state2 pending_coinbase_stack_state (transaction : Transaction_union.t)
-      handler =
+  let transaction_union_proof ~proving_key sok_digest state1 state2
+      pending_coinbase_stack_state (transaction : Transaction_union.t) handler
+      =
     let prover_state : Prover_state.t =
       {state1; state2; transaction; sok_digest; pending_coinbase_stack_state}
     in
@@ -1136,8 +1136,8 @@ let check_user_command ~sok_message ~source ~target pending_coinbase_stack t
       ; target= pending_coinbase_stack }
     (User_command t) handler
 
-let generate_transaction_union_witness sok_message source
-    target transaction pending_coinbase_stack_state handler =
+let generate_transaction_union_witness sok_message source target transaction
+    pending_coinbase_stack_state handler =
   let sok_digest = Sok_message.digest sok_message in
   let prover_state : Base.Prover_state.t =
     { state1= source
@@ -1240,8 +1240,8 @@ struct
     ; supply_increase= Transaction_union.supply_increase transaction
     ; proof= wrap `Base proof top_hash }
 
-  let of_transaction ~sok_digest ~source ~target
-      ~pending_coinbase_stack_state transition handler =
+  let of_transaction ~sok_digest ~source ~target ~pending_coinbase_stack_state
+      transition handler =
     of_transaction_union ?preeval sok_digest source target
       ~pending_coinbase_stack_state
       (Transaction_union.of_transaction transition)
