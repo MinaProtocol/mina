@@ -13,7 +13,7 @@ module Account_binable = struct
   (* Account.t not bin_io *)
   include Account.Stable.V1
 
-  let hash = Fn.compose Ledger_hash.of_digest Account.digest
+  let data_hash = Fn.compose Ledger_hash.of_digest Account.digest
 end
 
 include Sparse_ledger_lib.Sparse_ledger.Make

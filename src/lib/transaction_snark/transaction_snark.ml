@@ -17,12 +17,13 @@ let wrap_input = Tock.Data_spec.[Wrap_input.typ]
 let exists' typ ~f = Tick.(exists typ ~compute:As_prover.(map get_state ~f))
 
 module Input = struct
+  (* TODO : version *)
   type t =
     { source: Frozen_ledger_hash.Stable.V1.t
     ; target: Frozen_ledger_hash.Stable.V1.t
     ; fee_excess: Currency.Amount.Signed.t
-    ; pending_coinbase_before: Pending_coinbase.Stack.t
-    ; pending_coinbase_after: Pending_coinbase.Stack.t }
+    ; pending_coinbase_before: Pending_coinbase.Stack.Stable.V1.t
+    ; pending_coinbase_after: Pending_coinbase.Stack.Stable.V1.t }
   [@@deriving bin_io]
 end
 
@@ -62,7 +63,8 @@ module Pending_coinbase_stack_state = struct
   (*State of the coinbase stack for the current transaction snark*)
   module T = struct
     type t =
-      {source: Pending_coinbase.Stack.t; target: Pending_coinbase.Stack.t}
+      { source: Pending_coinbase.Stack.Stable.V1.t
+      ; target: Pending_coinbase.Stack.Stable.V1.t }
     [@@deriving sexp, bin_io, hash, compare, eq, fields, yojson]
   end
 
