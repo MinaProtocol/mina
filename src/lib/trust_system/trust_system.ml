@@ -14,6 +14,7 @@ module Actions = struct
     | Requested_unknown_item
         (** Peer requested something we don't know. They might be ahead of us or
           they might be malicious. *)
+    | Fulfilled_request  (** Peer fulfilled a request we made. *)
   [@@deriving show]
 
   (** The action they took, paired with a message and associated JSON metadata
@@ -22,12 +23,14 @@ module Actions = struct
 
   let to_trust_response (action, _) =
     let open Peer_trust.Trust_response in
+    (* FIXME figure out a good value for this *)
+    let request_increment = Peer_trust.max_rate 10. in
     match action with
     | Sent_bad_hash -> Insta_ban
     | Violated_protocol -> Insta_ban
-    (* FIXME figure out a good value for this *)
-    | Made_request -> Trust_decrease (Peer_trust.max_rate 10.)
+    | Made_request -> Trust_decrease request_increment
     | Requested_unknown_item -> Trust_decrease (Peer_trust.max_rate 1.)
+    | Fulfilled_request -> (* trade 1:1 *) Trust_increase request_increment
 
   let to_log : t -> string * (string, Yojson.Safe.json) List.Assoc.t =
    fun (action, extra_opt) ->
