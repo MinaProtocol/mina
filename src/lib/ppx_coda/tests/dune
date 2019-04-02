@@ -22,10 +22,10 @@
   (modules versioned_good))
 
 (library
-  (name versioned_good_option)
+  (name versioned_good_type_constructors)
   (preprocess (pps ppx_jane ppx_deriving_yojson ppx_coda))
   (libraries core_kernel)
-  (modules versioned_good_option))
+  (modules versioned_good_type_constructors))
 
 (library
   (name versioned_good_wrapped)
