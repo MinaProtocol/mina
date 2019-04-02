@@ -1123,7 +1123,7 @@ let check_transaction_union sok_message source target
 
 let check_transaction ~sok_message ~source ~target
     ~pending_coinbase_stack_state (t : Transaction.t) handler =
-  check_transaction_union ?preeval sok_message source target
+  check_transaction_union sok_message source target
     pending_coinbase_stack_state
     (Transaction_union.of_transaction t)
     handler
@@ -1227,9 +1227,8 @@ struct
   let of_transaction_union sok_digest source target
       ~pending_coinbase_stack_state transaction handler =
     let top_hash, proof =
-      Base.transaction_union_proof ?preeval sok_digest
-        ~proving_key:keys.proving.base source target
-        pending_coinbase_stack_state transaction handler
+      Base.transaction_union_proof sok_digest ~proving_key:keys.proving.base
+        source target pending_coinbase_stack_state transaction handler
     in
     { source
     ; sok_digest
@@ -1242,8 +1241,7 @@ struct
 
   let of_transaction ~sok_digest ~source ~target ~pending_coinbase_stack_state
       transition handler =
-    of_transaction_union ?preeval sok_digest source target
-      ~pending_coinbase_stack_state
+    of_transaction_union sok_digest source target ~pending_coinbase_stack_state
       (Transaction_union.of_transaction transition)
       handler
 
