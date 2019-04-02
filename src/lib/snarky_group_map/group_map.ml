@@ -424,37 +424,9 @@ struct
     |> Option.value_exn
 end
 
-let%test_unit "foo" =
+let%test_unit "group map test" =
   let module S = Snarky.Snark.Make (Snarky.Backends.Mnt6.Default) in
-  let module C = struct
-    type t = S.Field.t
-
-    let ( + ) = S.Field.add
-
-    let ( * ) = S.Field.mul
-
-    let ( / ) = S.Field.Infix.( / )
-
-    let t_of_sexp = S.Field.t_of_sexp
-
-    let of_int = S.Field.of_int
-
-    let one = S.Field.one
-
-    let zero = S.Field.zero
-
-    let negate = S.Field.negate
-  end in
-  let module U = struct
-    include C
-
-    let equal = S.Field.equal
-
-    let sqrt = S.Field.sqrt
-
-    let is_square = S.Field.is_square
-
-    let sexp_of_t = S.Field.sexp_of_t
-  end in
-  let module M = Make_unchecked (U) (Snarky.Libsnark.Mnt4.G1.Coefficients) in
+  let module M =
+    Make_unchecked (S.Field) (Snarky.Libsnark.Mnt4.G1.Coefficients)
+  in
   ()
