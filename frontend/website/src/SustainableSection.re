@@ -67,6 +67,7 @@ let make = _children => {
           style([
             marginTop(`rem(2.375)),
             display(`flex),
+            maxWidth(`rem(81.5)),
             justifyContent(`spaceBetween),
             alignItems(`center),
             flexWrap(`wrapReverse),
@@ -79,11 +80,7 @@ let make = _children => {
         )>
         <div
           className=Css.(
-            style([
-              marginBottom(`rem(2.375)),
-              userSelect(`none),
-              marginRight(`rem(2.0)),
-            ])
+            style([marginBottom(`rem(2.375)), userSelect(`none)])
           )>
           <Svg
             className=Css.(
@@ -103,11 +100,7 @@ let make = _children => {
         </div>
         <div
           className=Css.(
-            style([
-              marginBottom(`rem(2.375)),
-              userSelect(`none),
-              marginRight(`rem(2.0)),
-            ])
+            style([marginBottom(`rem(2.375)), userSelect(`none)])
           )>
           <Svg
             className=Css.(

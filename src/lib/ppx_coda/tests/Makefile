@@ -25,11 +25,17 @@ positive-tests : unexpired.ml
 	@ echo -n "Versioned type, should succeed..."
 	@ dune build versioned_good.cma ${REDIRECT}
 	@ echo "OK"
+	@ echo -n "Versioned option type, should succeed..."
+	@ dune build versioned_good_option.cma ${REDIRECT}
+	@ echo "OK"
 	@ echo -n "Versioned, wrapped type, should succeed..."
 	@ dune build versioned_good_wrapped.cma ${REDIRECT}
 	@ echo "OK"
 	@ echo -n "Versioned types with contained types, should succeed..."
 	@ dune build versioned_good_contained_types.cma ${REDIRECT}
+	@ echo "OK"
+	@ echo -n "Versioned types with type parameters, should succeed..."
+	@ dune build versioned_good_type_parameters.cma ${REDIRECT}
 	@ echo "OK"
 
 negative-tests :
@@ -67,4 +73,7 @@ negative-tests :
 	@ echo "OK"
 	@ echo -n "Versioned types with bad contained types, should fail..."
 	@ ! dune build versioned_bad_contained_types.cma ${REDIRECT}
+	@ echo "OK"
+	@ echo -n "Versioned types with unversioned type with type parameters, should fail..."
+	@ ! dune build versioned_bad_type_parameters.cma ${REDIRECT}
 	@ echo "OK"

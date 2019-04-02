@@ -81,9 +81,9 @@ struct
       module T = struct
         let version = 1
 
-        (* TODO : will this type be versioned? *)
+        (* TODO : version Pedersen.Digest *)
         type t = Pedersen.Digest.t
-        [@@deriving bin_io, sexp, eq, compare, hash, yojson]
+        [@@deriving bin_io, sexp, eq, compare, hash, yojson, version]
       end
 
       include T

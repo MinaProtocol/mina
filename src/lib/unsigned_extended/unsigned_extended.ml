@@ -4,7 +4,7 @@ open Snark_params
 type uint64 = Unsigned.uint64
 
 module type S = sig
-  type t [@@deriving bin_io, sexp, hash, compare, eq, yojson]
+  type t [@@deriving bin_io, sexp, hash, compare, eq, yojson, version]
 
   val length_in_bits : int
 
@@ -107,6 +107,11 @@ module Extend
 
   include T
   include Hashable.Make (T)
+
+  (* TODO : actually version this type *)
+  let version = 1
+
+  let __versioned__ = true
 
   include Bin_prot.Utils.Make_binable (struct
     module Binable = Signed
