@@ -277,8 +277,8 @@ module T = struct
           let module Run = Run (Config) (Main) in
           let%bind trust_dir = Unix.mkdtemp (conf_dir ^/ "trust") in
           let receipt_chain_dir_name = conf_dir ^/ "receipt_chain" in
-          let%bind transition_frontier_location =
-            Unix.mkdtemp (conf_dir ^/ "transition_frontier")
+          let transition_frontier_location =
+            conf_dir ^/ "transition_frontier"
           in
           let%bind trust_dir = Unix.mkdtemp (conf_dir ^/ "trust") in
           let%bind () = File_system.create_dir receipt_chain_dir_name in

@@ -57,8 +57,8 @@ let run_test () : unit Deferred.t =
       let open Main in
       let%bind trust_dir = Async.Unix.mkdtemp (temp_conf_dir ^/ "trust_db") in
       let trust_system = Coda_base.Trust_system.create ~db_dir:trust_dir in
-      let%bind transition_frontier_location =
-        Unix.mkdtemp (temp_conf_dir ^/ "transition_frontier")
+      let transition_frontier_location =
+        temp_conf_dir ^/ "transition_frontier"
       in
       let%bind receipt_chain_dir_name =
         Async.Unix.mkdtemp (temp_conf_dir ^/ "receipt_chain")

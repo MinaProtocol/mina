@@ -656,6 +656,9 @@ module Make (Inputs : Inputs_intf) = struct
                     !"Persistence database does not exist yet. Creating it at \
                       %s"
                     config.transition_frontier_location ;
+                  let%bind () =
+                    Async.Unix.mkdir config.transition_frontier_location
+                  in
                   let%bind worker =
                     Transition_frontier_persistence.Worker.create
                       ~directory_name:config.transition_frontier_location

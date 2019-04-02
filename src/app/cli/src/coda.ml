@@ -294,7 +294,6 @@ let daemon logger =
        let () = Snark_params.set_chunked_hashing true in
        let%bind () = Async.Unix.mkdir ~p:() trust_dir in
        let transition_frontier_location = conf_dir ^/ "transition_frontier" in
-       let%bind () = Async.Unix.mkdir ~p:() transition_frontier_location in
        let trust_system = Coda_base.Trust_system.create ~db_dir:trust_dir in
        let time_controller =
          M.Inputs.Time.Controller.create M.Inputs.Time.Controller.basic
