@@ -2,10 +2,10 @@ let component = ReasonReact.statelessComponent("RawHtml");
 
 let make = (~path, _) => {
   let html = Node.Fs.readFileAsUtf8Sync(path);
-  Css.(global("strong", [fontWeight(`num(800)), color(black)]));
   {
     ...component,
-    render: _self =>
+    render: _self => {
+      Css.(global("strong", [fontWeight(`num(800)), color(black)]));
       <Wrapped>
         <div
           className=Css.(
@@ -21,6 +21,7 @@ let make = (~path, _) => {
           )
           dangerouslySetInnerHTML={"__html": html}
         />
-      </Wrapped>,
+      </Wrapped>;
+    },
   };
 };
