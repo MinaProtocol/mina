@@ -6,10 +6,8 @@ module Single = struct
   module Stable = struct
     module V1 = struct
       module T = struct
-        let version = 1
-
         type t = Public_key.Compressed.Stable.V1.t * Currency.Fee.Stable.V1.t
-        [@@deriving bin_io, sexp, compare, eq, yojson]
+        [@@deriving bin_io, sexp, compare, eq, yojson, version]
       end
 
       include T
@@ -35,12 +33,10 @@ end
 module Stable = struct
   module V1 = struct
     module T = struct
-      let version = 1
-
       type t =
         | One of Single.Stable.V1.t
         | Two of Single.Stable.V1.t * Single.Stable.V1.t
-      [@@deriving bin_io, sexp, compare, eq, yojson]
+      [@@deriving bin_io, sexp, compare, eq, yojson, version]
     end
 
     include T
