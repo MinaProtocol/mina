@@ -129,9 +129,9 @@ let rec generate_core_type_version_decls core_type =
                 "Type constructor \"%s\" expects one type argument, got %d" id
                 (List.length core_types)
         else
-          (* a type not in a module (so not versioned) *)
           Ppx_deriving.raise_errorf ~loc:core_type.ptyp_loc
-            "Type \"%s\" is not a versioned type" id
+            "\"%s\" is neither an OCaml type constructor nor a versioned type"
+            id
     | Ldot (prefix, "t") ->
         (* type t = A.B.t
           generate: let _ = A.B.__versioned__
