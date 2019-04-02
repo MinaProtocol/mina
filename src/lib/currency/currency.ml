@@ -23,7 +23,8 @@ module type Basic = sig
 
   module Stable : sig
     module V1 : sig
-      type nonrec t = t [@@deriving bin_io, sexp, compare, eq, hash, yojson]
+      type nonrec t = t
+      [@@deriving bin_io, sexp, compare, eq, hash, yojson, version]
     end
 
     module Latest = V1
@@ -215,9 +216,7 @@ end = struct
   module Stable = struct
     module V1 = struct
       module T = struct
-        let version = 1
-
-        type t = Unsigned.t [@@deriving bin_io, sexp, compare, hash]
+        type t = Unsigned.t [@@deriving bin_io, sexp, compare, hash, version]
 
         let of_int = Unsigned.of_int
 
