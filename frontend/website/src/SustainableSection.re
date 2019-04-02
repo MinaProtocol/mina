@@ -102,6 +102,7 @@ let make = _children => {
             style([marginBottom(`rem(2.375)), userSelect(`none)])
           )>
           <Svg
+            inline=true
             className=Css.(
               style([
                 width(`percent(100.)),
