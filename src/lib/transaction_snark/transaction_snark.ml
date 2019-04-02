@@ -1220,7 +1220,9 @@ struct
       ; transition23
       ; tock_vk= keys.verification.wrap }
     in
-    (top_hash, Merge.prove_main keys.proving.merge prover_state top_hash)
+    ( top_hash
+    , Tick.Groth16.prove keys.proving.merge (tick_input ()) prover_state
+        Merge.main top_hash )
 
   let of_transaction_union sok_digest source target
       ~pending_coinbase_stack_state transaction handler =
