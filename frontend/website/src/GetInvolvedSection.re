@@ -176,6 +176,14 @@ module KnowledgeBase = {
               // after the blog posts
               @ [
                 (
+                  "Snarkette: JavaScript Groth-Maller SNARK verifier",
+                  Links.Static.snarkette,
+                ),
+                (
+                  "Coda: A Blockchain the Size of a Few Tweets",
+                  Links.ThirdParty.codaTheSizeOfTweets,
+                ),
+                (
                   "Coindesk: This Blockchain Tosses Blocks",
                   Links.ThirdParty.coindeskTossesBlocks,
                 ),
@@ -190,8 +198,45 @@ module KnowledgeBase = {
           <SubSection
             title="Videos & Podcasts"
             content=[|
+              (
+                "SNARKonomicon: Effectively program SNARKs",
+                Links.Talks.notesFromSnarkomicon,
+              ),
+              (
+                "Crypto{graphy,currency} Meetup @ Coda HQ",
+                Links.Panel.cryptographyCurrency,
+              ),
+              (
+                "Decentralization's Trojan Horse: CODA Protocol",
+                Links.Podcasts.decentralizationTrojanHorse,
+              ),
+              (
+                "Snarky: Algebraic effects in Coda",
+                Links.Talks.snarkyAlgebraicEffects,
+              ),
+              (
+                "Using zk-SNARKs For A Constant Sized Blockchain",
+                Links.Talks.usingZkConstantSize,
+              ),
+              (
+                "Zero Knowledge Proofs: Mind Bending Tech",
+                Links.Panel.zkProofsMindBending,
+              ),
+              ("Fast Accumulation on Streams", Links.Talks.scanningForScans),
+              ("Scalar Capital Summit 2018", Links.Panel.scalarCapitalSummit),
+              (
+                "Digging into recursive zkSNARKs with Coda",
+                Links.Podcasts.digIntoRecursive,
+              ),
+              (
+                "High Throughput Slow SNARKs",
+                Links.Talks.highThroughputSlowSnarks,
+              ),
+              (
+                "Using zk-SNARKs to create a succinct blockchain",
+                Links.Talks.zkSnarksSuccinctBlockchain,
+              ),
               ("Hack Summit 2018: Coda Talk", Links.Talks.hackSummit2018),
-              ("Scanning for Scans", Links.Talks.scanningForScans),
               (
                 "Token Talks - Interview with Coda",
                 Links.Podcasts.tokenTalksInterview,
