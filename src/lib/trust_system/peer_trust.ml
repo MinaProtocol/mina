@@ -7,9 +7,11 @@ module Trust_response = struct
 end
 
 module type Action_intf = sig
-  type t [@@deriving sexp_of, yojson]
+  type t
 
   val to_trust_response : t -> Trust_response.t
+
+  val to_log : t -> string * (string, Yojson.Safe.json) List.Assoc.t
 end
 
 let max_rate secs =
@@ -107,30 +109,30 @@ struct
     in
     let simple_old = Record_inst.to_peer_status old_record in
     let simple_new = Record_inst.to_peer_status new_record in
+    let action_fmt, action_metadata = Action.to_log action in
     let%map () =
       match (simple_old.banned, simple_new.banned) with
       | Unbanned, Banned_until expiration ->
           Logger.faulty_peer_without_punishment logger ~module_:__MODULE__
             ~location:__LOC__
             ~metadata:
-              [ ("peer", Peer_id.to_yojson peer)
-              ; ( "expiration"
-                , `String (Time.to_string_abs expiration ~zone:Time.Zone.utc)
-                )
-              ; ("action", Action.to_yojson action) ]
-            "Banning peer $peer until $expiration due to action $action" ;
-          Strict_pipe.Writer.write bans_writer peer
+              ( [ ("peer", Peer_id.to_yojson peer)
+                ; ( "expiration"
+                  , `String (Time.to_string_abs expiration ~zone:Time.Zone.utc)
+                  ) ]
+              @ action_metadata )
+            "Banning peer $peer until $expiration because it %s" action_fmt ;
+          if Option.is_some db then Strict_pipe.Writer.write bans_writer peer
+          else Deferred.unit
       | _, _ ->
           let verb =
             if simple_new.trust >. simple_old.trust then "Increasing"
             else "Decreasing"
           in
           Logger.debug logger ~module_:__MODULE__ ~location:__LOC__
-            ~metadata:
-              [ ("peer", Peer_id.to_yojson peer)
-              ; ("action", Action.to_yojson action) ]
-            "%s trust for peer $peer due to action $action. New trust is %f."
-            verb simple_new.trust ;
+            ~metadata:([("peer", Peer_id.to_yojson peer)] @ action_metadata)
+            "%s trust for peer $peer due to action %s. New trust is %f." verb
+            action_fmt simple_new.trust ;
           Deferred.unit
     in
     Option.iter db ~f:(fun db' -> Db.set db' ~key:peer ~data:new_record)
@@ -164,6 +166,8 @@ let%test_module "peer_trust" =
         | Slow_punish -> Trust_response.Trust_decrease (max_rate 1.)
         | Slow_credit -> Trust_response.Trust_increase (max_rate 1.)
         | Big_credit -> Trust_response.Trust_increase 0.2
+
+      let to_log t = (string_of_sexp @@ sexp_of_t t, [])
     end
 
     module Peer_trust_test = Make0 (Peer_id) (Mock_now) (Db) (Action)

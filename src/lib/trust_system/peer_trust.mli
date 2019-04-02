@@ -8,6 +8,7 @@
     responsibility of the caller, which is coda_base. *)
 
 open Async
+open Core
 open Pipe_lib
 
 (** What we do in response to some trust-affecting action. *)
@@ -22,9 +23,13 @@ end
 module type Action_intf = sig
   (** The type of trust-affecting actions. For the log messages to be
       grammatical, the constructors should be past tense verbs. *)
-  type t [@@deriving sexp_of, yojson]
+  type t
 
   val to_trust_response : t -> Trust_response.t
+
+  (** Convert an action into a format string and a set of metadata for
+      logging *)
+  val to_log : t -> string * (string, Yojson.Safe.json) List.Assoc.t
 end
 
 (** Trust increment that sets a maximum rate of doing a bad thing (presuming the

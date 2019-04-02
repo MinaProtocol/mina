@@ -110,9 +110,15 @@ module type S = sig
   module Responder : sig
     type t
 
-    val create : merkle_tree -> (query -> unit) -> logger:Logger.t -> t
+    val create :
+         merkle_tree
+      -> (query -> unit)
+      -> logger:Logger.t
+      -> trust_system:Trust_system.t
+      -> t
 
-    val answer_query : t -> query -> answer option
+    val answer_query :
+      t -> query Envelope.Incoming.t -> answer option Deferred.t
   end
 
   val create :
@@ -216,81 +222,118 @@ end = struct
   type query = Addr.t Query.t
 
   module Responder = struct
-    type t = {mt: MT.t; f: query -> unit; logger: Logger.t}
+    type t =
+      { mt: MT.t
+      ; f: query -> unit
+      ; logger: Logger.t
+      ; trust_system: Trust_system.t }
 
-    let create : MT.t -> (query -> unit) -> logger:Logger.t -> t =
-     fun mt f ~logger -> {mt; f; logger}
+    let create :
+           MT.t
+        -> (query -> unit)
+        -> logger:Logger.t
+        -> trust_system:Trust_system.t
+        -> t =
+     fun mt f ~logger ~trust_system -> {mt; f; logger; trust_system}
 
-    let answer_query : t -> query -> answer option =
-     fun {mt; f; logger} q ->
-      f q ;
-      match q with
-      | What_child_hashes a -> (
-        match
-          let open Or_error.Let_syntax in
-          let%bind lchild = Addr.child a Direction.Left in
-          let%bind rchild = Addr.child a Direction.Right in
-          Or_error.try_with (fun () ->
-              Answer.Child_hashes_are
-                ( MT.get_inner_hash_at_addr_exn mt lchild
-                , MT.get_inner_hash_at_addr_exn mt rchild ) )
-        with
-        | Ok answer -> Some answer
-        | Error _ ->
-            (* TODO: punish *)
-            Logger.faulty_peer logger ~module_:__MODULE__ ~location:__LOC__
-              "Peer requested child hashes of invalid address $addr !"
-              ~metadata:[("addr", Addr.to_yojson a)] ;
-            None )
-      | What_contents a ->
-          let addresses_and_accounts =
-            List.sort ~compare:(fun (addr1, _) (addr2, _) ->
-                Addr.compare addr1 addr2 )
-            @@ MT.get_all_accounts_rooted_at_exn mt a
-            (* can't actually throw *)
-          in
-          let addresses, accounts = List.unzip addresses_and_accounts in
-          if not (List.is_empty addresses) then
-            let first_address, rest_address =
-              (List.hd_exn addresses, List.tl_exn addresses)
+    let answer_query :
+        t -> query Envelope.Incoming.t -> answer option Deferred.t =
+     fun {mt; f; logger; trust_system} query_envelope ->
+      let open Trust_system in
+      let sender = Envelope.Incoming.sender query_envelope in
+      let query = Envelope.Incoming.data query_envelope in
+      f query ;
+      let response_or_punish =
+        match query with
+        | What_child_hashes a -> (
+          match
+            let open Or_error.Let_syntax in
+            let%bind lchild = Addr.child a Direction.Left in
+            let%bind rchild = Addr.child a Direction.Right in
+            Or_error.try_with (fun () ->
+                Answer.Child_hashes_are
+                  ( MT.get_inner_hash_at_addr_exn mt lchild
+                  , MT.get_inner_hash_at_addr_exn mt rchild ) )
+          with
+          | Ok answer -> Either.First answer
+          | Error _ ->
+              Either.Second
+                ( Actions.Violated_protocol
+                , Some
+                    ( "invalid address $addr in What_child_hashes request"
+                    , [("addr", Addr.to_yojson a)] ) ) )
+        | What_contents a ->
+            if Addr.height a > account_subtree_height then
+              Either.Second
+                ( Actions.Violated_protocol
+                , Some
+                    ( "requested too big of a subtree at once: $addr"
+                    , [("addr", Addr.to_yojson a)] ) )
+            else
+              let addresses_and_accounts =
+                List.sort ~compare:(fun (addr1, _) (addr2, _) ->
+                    Addr.compare addr1 addr2 )
+                @@ MT.get_all_accounts_rooted_at_exn mt a
+                (* can't actually throw *)
+              in
+              let addresses, accounts = List.unzip addresses_and_accounts in
+              if List.is_empty addresses then
+                (* Peer should know what portions of the tree are full from the
+                   Num_accounts query. *)
+                Either.Second
+                  ( Actions.Violated_protocol
+                  , Some
+                      ( "Requested empty subtree: $addr"
+                      , [("addr", Addr.to_yojson a)] ) )
+              else
+                let first_address, rest_address =
+                  (List.hd_exn addresses, List.tl_exn addresses)
+                in
+                let missing_address, is_compact =
+                  List.fold rest_address
+                    ~init:(Addr.next first_address, true)
+                    ~f:(fun (expected_address, is_compact) actual_address ->
+                      if is_compact && expected_address = Some actual_address
+                      then (Addr.next actual_address, true)
+                      else (expected_address, false) )
+                in
+                if not is_compact then (
+                  (* indicates our ledger is invalid somehow. *)
+                  Logger.fatal logger ~module_:__MODULE__ ~location:__LOC__
+                    ~metadata:
+                      [ ( "missing_address"
+                        , Addr.to_yojson (Option.value_exn missing_address) )
+                      ; ( "addresses_and_accounts"
+                        , `List
+                            (List.map addresses_and_accounts
+                               ~f:(fun (addr, account) ->
+                                 `Tuple
+                                   [ Addr.to_yojson addr
+                                   ; Account.to_yojson account ] )) ) ]
+                    "Missing an account at address: $missing_address inside \
+                     the list: $addresses_and_accounts" ;
+                  assert false )
+                else Either.First (Answer.Contents_are accounts)
+        | Num_accounts ->
+            let len = MT.num_accounts mt in
+            let height = Int.ceil_log2 len in
+            (* FIXME: bug when height=0 https://github.com/o1-labs/nanobit/issues/365 *)
+            let content_root_addr =
+              funpow (MT.depth - height)
+                (fun a -> Addr.child_exn a Direction.Left)
+                (Addr.root ())
             in
-            let missing_address, is_compact =
-              List.fold rest_address
-                ~init:(Addr.next first_address, true)
-                ~f:(fun (expected_address, is_compact) actual_address ->
-                  if is_compact && expected_address = Some actual_address then
-                    (Addr.next actual_address, true)
-                  else (expected_address, false) )
-            in
-            if not is_compact then
-              Logger.error logger ~module_:__MODULE__ ~location:__LOC__
-                ~metadata:
-                  [ ( "missing_address"
-                    , Addr.to_yojson (Option.value_exn missing_address) )
-                  ; ( "addresses_and_accounts"
-                    , `List
-                        (List.map addresses_and_accounts
-                           ~f:(fun (addr, account) ->
-                             `Tuple
-                               [Addr.to_yojson addr; Account.to_yojson account]
-                         )) ) ]
-                "Missing an account at address: $missing_address inside the \
-                 list: $addresses_and_accounts"
-            else ()
-          else () ;
-          Some (Contents_are accounts)
-      | Num_accounts ->
-          let len = MT.num_accounts mt in
-          let height = Int.ceil_log2 len in
-          (* FIXME: bug when height=0 https://github.com/o1-labs/nanobit/issues/365 *)
-          let content_root_addr =
-            funpow (MT.depth - height)
-              (fun a -> Addr.child_exn a Direction.Left)
-              (Addr.root ())
+            Either.First
+              (Num_accounts
+                 (len, MT.get_inner_hash_at_addr_exn mt content_root_addr))
+      in
+      match response_or_punish with
+      | Either.First answer -> Deferred.return @@ Some answer
+      | Either.Second action ->
+          let%map _ =
+            record_envelope_sender trust_system logger sender action
           in
-          Some
-            (Num_accounts
-               (len, MT.get_inner_hash_at_addr_exn mt content_root_addr))
+          None
   end
 
   type 'a t =

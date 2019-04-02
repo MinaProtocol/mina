@@ -651,21 +651,22 @@ module Make (Inputs : Inputs_intf) = struct
                 ~get_staged_ledger_aux_at_hash:(fun _hash ->
                   failwith "shouldn't be necessary right now?" )
                 ~answer_sync_ledger_query:(fun query_env ->
-                  let open Or_error.Let_syntax in
-                  Deferred.return
-                  @@
-                  let ledger_hash, query = Envelope.Incoming.data query_env in
+                  let open Deferred.Or_error.Let_syntax in
+                  let ledger_hash, _ = Envelope.Incoming.data query_env in
                   let%bind frontier =
-                    peek_frontier frontier_broadcast_pipe_r
+                    Deferred.return @@ peek_frontier frontier_broadcast_pipe_r
                   in
-                  Sync_handler.answer_query ~frontier ledger_hash query
-                    ~logger:config.logger
-                  |> Result.of_option
-                       ~error:
-                         (Error.createf
-                            !"Could not answer query for ledger_hash: \
-                              %{sexp:Ledger_hash.t}"
-                            ledger_hash) )
+                  Sync_handler.answer_query ~frontier ledger_hash
+                    (Envelope.Incoming.map ~f:Tuple2.get2 query_env)
+                    ~logger:config.logger ~trust_system:config.trust_system
+                  |> Deferred.map
+                       ~f:
+                         (Result.of_option
+                            ~error:
+                              (Error.createf
+                                 !"Refused to answer query for ledger_hash: \
+                                   %{sexp:Ledger_hash.t}"
+                                 ledger_hash)) )
                 ~transition_catchup:(fun enveloped_hash ->
                   let open Deferred.Option.Let_syntax in
                   let hash = Envelope.Incoming.data enveloped_hash in

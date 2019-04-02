@@ -531,9 +531,10 @@ module type Sync_handler_intf = sig
   val answer_query :
        frontier:transition_frontier
     -> ledger_hash
-    -> syncable_ledger_query
+    -> syncable_ledger_query Envelope.Incoming.t
     -> logger:Logger.t
-    -> syncable_ledger_answer option
+    -> trust_system:Trust_system.t
+    -> syncable_ledger_answer option Deferred.t
 
   val transition_catchup :
        frontier:transition_frontier
