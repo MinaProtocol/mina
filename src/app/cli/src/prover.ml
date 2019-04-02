@@ -73,9 +73,9 @@ module Worker_state = struct
 
                let wrap hash proof =
                  let module Wrap = Keys.Wrap in
-                 Wrap.prove_main
+                 Tock.prove
                    (Tock.Keypair.pk Wrap.keys)
-                   {Wrap.Prover_state.proof}
+                   Wrap.input {Wrap.Prover_state.proof} Wrap.main
                    (Wrap_input.of_tick_field hash)
 
                let extend_blockchain (chain : Blockchain.t)

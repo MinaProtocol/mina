@@ -48,9 +48,9 @@ module Make_real (Keys : Keys_lib.Keys.S) = struct
   let wrap hash proof =
     let open Snark_params in
     let module Wrap = Keys.Wrap in
-    Wrap.prove_main
+    Tock.prove
       (Tock.Keypair.pk Wrap.keys)
-      {Wrap.Prover_state.proof}
+      Wrap.input {Wrap.Prover_state.proof} Wrap.main
       (Wrap_input.of_tick_field hash)
 
   let base_proof_expr =

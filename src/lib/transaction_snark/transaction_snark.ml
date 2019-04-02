@@ -1180,7 +1180,7 @@ struct
 
   let wrap proof_type proof input =
     let prover_state = {Wrap.Prover_state.proof; proof_type} in
-    Wrap.prove_main keys.proving.wrap prover_state
+    Tock.prove keys.proving.wrap wrap_input prover_state Wrap.main
       (Wrap_input.of_tick_field input)
 
   let merge_proof sok_digest ledger_hash1 ledger_hash2 ledger_hash3
