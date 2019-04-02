@@ -280,7 +280,7 @@ module Make (Message : Message_intf) :
                    from %s equals the limit %d."
                   (Socket.Address.Inet.to_string client)
                   (Option.value_exn t.max_concurrent_connections) ;
-                Deferred.unit )
+                Reader.close reader >>= fun _ -> Writer.close writer )
               else
                 let conn_id = Uuid.create () in
                 let%map _ =
