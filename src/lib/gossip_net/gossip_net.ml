@@ -347,23 +347,6 @@ module Make (Message : Message_intf) :
     let peer = Peer.to_communications_host_and_port peer in
     try_call_rpc t peer rpc query
 
-  let query_available_peer t ~max_peers rpc query =
-    let open Deferred.Let_syntax in
-    let rec try_peers error_acc peers =
-      match peers with
-      | [] ->
-          return
-            (Or_error.error_string
-               (error_acc ^ "Tried " ^ Int.to_string max_peers ^ " peers.\n"))
-      | p :: ps -> (
-          let peer = Peer.to_communications_host_and_port p in
-          match%bind try_call_rpc t peer rpc query with
-          | Error e -> try_peers (error_acc ^ Error.to_string_hum e ^ ".\n") ps
-          | x -> return x )
-    in
-    let peers = random_peers t max_peers in
-    try_peers "" peers
-
   let query_random_peers t n rpc query =
     let peers = random_sublist (Hash_set.to_list t.peers) n in
     Logger.trace t.logger ~module_:__MODULE__ ~location:__LOC__
