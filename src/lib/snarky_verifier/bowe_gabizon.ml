@@ -107,16 +107,13 @@ module Make (Inputs : Inputs_intf) = struct
           , G2_precomputation.create_constant G2.Unchecked.one )
         ; (Neg, G1_precomputation.create c, delta_prime_pc)
         ; (Pos, G1_precomputation.create a, b) ]
-      >>= final_exponentiation
-      >>= Fqk.equal vk.alpha_beta
-    in
-    let%bind test2 =
-      let%bind ys = hash a b c delta_prime in
+      >>= final_exponentiation >>= Fqk.equal vk.alpha_beta
+    and test2 =
+      let%bind ys = hash ~a ~b ~c ~delta_prime in
       batch_miller_loop
         [ (Pos, G1_precomputation.create ys, delta_prime_pc)
         ; (Neg, G1_precomputation.create z, vk_precomp.delta) ]
-      >>= final_exponentiation
-      >>= Fqk.equal Fqk.one
+      >>= final_exponentiation >>= Fqk.equal Fqk.one
     in
     Boolean.(test1 && test2)
 end
