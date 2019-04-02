@@ -2,14 +2,6 @@ open Core_kernel
 open Snark_params
 open Module_version
 
-let digest_size_in_bits = 256
-
-let digest_size_in_bytes = 256 / 8
-
-module Blake2 = Digestif.Make_BLAKE2S (struct
-  let digest_size = digest_size_in_bytes
-end)
-
 module Digest = struct
   open Fold_lib
 
@@ -60,7 +52,7 @@ module Digest = struct
     module Registered_V1 = Registrar.Register (V1)
   end
 
-  let to_bits = Snarky_blake2.string_to_bits
+  let to_bits = Blake2.string_to_bits
 
   let length_in_bytes = 32
 
@@ -74,7 +66,7 @@ module Digest = struct
     Quickcheck.test gen ~f:(fun t ->
         assert (Array.of_list (Fold.to_list (fold_bits t)) = to_bits t) )
 
-  let of_bits = Snarky_blake2.bits_to_string
+  let of_bits = Blake2.bits_to_string
 
   let%test_unit "of_bits . to_bits = id" =
     Quickcheck.test gen ~f:(fun t ->
@@ -108,12 +100,12 @@ module Digest = struct
   end
 
   let to_bits (t : t) =
-    Array.to_list (Snarky_blake2.string_to_bits (t :> string))
+    Array.to_list (Blake2.string_to_bits (t :> string))
 
   let typ : (Checked.t, t) Typ.t =
-    Typ.transport (Typ.array ~length:digest_size_in_bits Boolean.typ)
-      ~there:Snarky_blake2.string_to_bits ~back:(fun bs ->
-        of_string (Snarky_blake2.bits_to_string bs) )
+    Typ.transport (Typ.array ~length:Blake2.digest_size_in_bits Boolean.typ)
+      ~there:Blake2.string_to_bits ~back:(fun bs ->
+        of_string (Blake2.bits_to_string bs) )
 end
 
 let digest_string s = (Blake2.digest_string s :> string)
@@ -125,7 +117,7 @@ let digest_field =
     Array.init Field.size_in_bits ~f:(Bigint.test_bit n)
   in
   fun x ->
-    (digest_string (Snarky_blake2.bits_to_string (field_to_bits x)) :> string)
+    (digest_string (Blake2.bits_to_string (field_to_bits x)) :> string)
 
 module Checked = struct
   include Snarky_blake2.Make (Tick)
@@ -145,7 +137,7 @@ let%test_unit "checked-unchecked equality" =
         (Tick.Typ.list ~length:(List.length bits) Tick.Boolean.typ)
         Digest.typ Checked.digest_bits
         (fun bs ->
-          digest_string (Snarky_blake2.bits_to_string (Array.of_list bs)) )
+          digest_string (Blake2.bits_to_string (Array.of_list bs)) )
         bits )
 
 let%test_unit "checked-unchecked field" =

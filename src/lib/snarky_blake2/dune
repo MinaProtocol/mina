@@ -5,5 +5,6 @@
   (inline_tests)
   (libraries
     snarky
+    blake2
     coda_digestif
     core_kernel ))
