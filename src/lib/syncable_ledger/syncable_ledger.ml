@@ -441,11 +441,10 @@ end = struct
       `Good subtrees_to_fetch )
     else `Hash_mismatch
 
-  let all_done t res =
+  let all_done t =
     if not (Root_hash.equal (MT.merkle_root t.tree) (desired_root_exn t)) then
       failwith "We finished syncing, but made a mistake somewhere :("
-    else Ivar.fill t.validity_listener `Ok ;
-    res
+    else Ivar.fill t.validity_listener `Ok
 
   (** Compute the hash of an empty tree of the specified height. *)
   let empty_hash_at_height h =
@@ -497,7 +496,15 @@ end = struct
     handle_node t (Addr.root ()) rh
 
   let main_loop t =
-    let handle_answer (root_hash, query, env) =
+    let handle_answer :
+           Root_hash.t
+           * Addr.t Query.t
+           * (Hash.t, Account.t) Answer.t Envelope.Incoming.t
+        -> unit Deferred.t =
+     fun (root_hash, query, env) ->
+      (* NOTE: think about synchronization here. This is deferred now, so
+          the t and the underlying ledger can change while processing is
+          happening. *)
       let already_done =
         match Ivar.peek t.validity_listener with
         | Some `Ok -> true
@@ -513,51 +520,49 @@ end = struct
             [ ("desired_hash", Root_hash.to_yojson (desired_root_exn t))
             ; ("ignored_hash", Root_hash.to_yojson root_hash) ]
           "My desired root was $desired_hash, so I'm ignoring $ignored_hash" ;
-        () )
-      else if already_done then
+        Deferred.unit )
+      else if already_done then (
         (* This can happen if we asked for hashes that turn out to be equal in
            underlying ledger and the target. *)
         Logger.debug t.logger ~module_:__MODULE__ ~location:__LOC__
-          "Got sync response when we're already finished syncing"
-      else
-        let res =
-          match (query, answer) with
-          | Query.What_child_hashes addr, Answer.Child_hashes_are (lh, rh) -> (
-            match add_child_hashes_to t addr lh rh with
-            (* TODO #435: Stick this in a log, punish the sender *)
-            | `Hash_mismatch ->
-                Logger.faulty_peer t.logger ~module_:__MODULE__
-                  ~location:__LOC__
-                  ~metadata:
-                    [ ("left_child_hash", Hash.to_yojson lh)
-                    ; ("right_child_hash", Hash.to_yojson rh)
-                    ; ( "sender"
-                      , Envelope.Sender.to_yojson
-                          (Envelope.Incoming.sender env) ) ]
-                  "Peer lied when trying to add child hashes $left_child_hash \
-                   and $right_child_hash. Sender was: $sender"
-            | `Good children_to_verify ->
-                (* TODO #312: Make sure we don't write too much *)
-                List.iter children_to_verify ~f:(fun (addr, hash) ->
-                    handle_node t addr hash ) )
-          | Query.What_contents addr, Answer.Contents_are leaves ->
-              (* FIXME untrusted _exn *)
-              add_content t addr leaves |> Or_error.ok_exn |> ignore
-          | Query.Num_accounts, Answer.Num_accounts (count, content_root) ->
-              handle_num_accounts t count content_root
-          | query, answer ->
+          "Got sync response when we're already finished syncing" ;
+        Deferred.unit )
+      else (
+        ( match (query, answer) with
+        | Query.What_child_hashes addr, Answer.Child_hashes_are (lh, rh) -> (
+          match add_child_hashes_to t addr lh rh with
+          (* TODO #435: Stick this in a log, punish the sender *)
+          | `Hash_mismatch ->
               Logger.faulty_peer t.logger ~module_:__MODULE__ ~location:__LOC__
                 ~metadata:
-                  [ ( "peer"
-                    , Envelope.Sender.to_yojson @@ Envelope.Incoming.sender env
-                    )
-                  ; ("query", Query.to_yojson Addr.to_yojson query)
-                  ; ( "answer"
-                    , Answer.to_yojson Hash.to_yojson Account.to_yojson answer
+                  [ ("left_child_hash", Hash.to_yojson lh)
+                  ; ("right_child_hash", Hash.to_yojson rh)
+                  ; ( "sender"
+                    , Envelope.Sender.to_yojson (Envelope.Incoming.sender env)
                     ) ]
-                "Peer $peer answered question we didn't ask! Query was $query \
-                 answer was $answer"
-        in
+                "Peer lied when trying to add child hashes $left_child_hash \
+                 and $right_child_hash. Sender was: $sender"
+          | `Good children_to_verify ->
+              (* TODO #312: Make sure we don't write too much *)
+              List.iter children_to_verify ~f:(fun (addr, hash) ->
+                  handle_node t addr hash ) )
+        | Query.What_contents addr, Answer.Contents_are leaves ->
+            (* FIXME untrusted _exn *)
+            add_content t addr leaves |> Or_error.ok_exn |> ignore
+        | Query.Num_accounts, Answer.Num_accounts (count, content_root) ->
+            handle_num_accounts t count content_root
+        | query, answer ->
+            Logger.faulty_peer t.logger ~module_:__MODULE__ ~location:__LOC__
+              ~metadata:
+                [ ( "peer"
+                  , Envelope.Sender.to_yojson @@ Envelope.Incoming.sender env
+                  )
+                ; ("query", Query.to_yojson Addr.to_yojson query)
+                ; ( "answer"
+                  , Answer.to_yojson Hash.to_yojson Account.to_yojson answer )
+                ]
+              "Peer $peer answered question we didn't ask! Query was $query \
+               answer was $answer" ) ;
         if
           Root_hash.equal
             (Option.value_exn t.desired_root)
@@ -565,10 +570,10 @@ end = struct
         then (
           Logger.trace t.logger ~module_:__MODULE__ ~location:__LOC__
             "Snarked database sync'd. All done" ;
-          all_done t res )
-        else res
+          all_done t ) ;
+        Deferred.unit )
     in
-    Linear_pipe.iter t.answers ~f:(fun a -> handle_answer a ; Deferred.unit)
+    Linear_pipe.iter t.answers ~f:handle_answer
 
   let new_goal t h ~data =
     let should_skip =
