@@ -20,8 +20,8 @@ module Stable : sig
   end
 end
 
-val encrypt : password:Bytes.t -> plaintext:Bytes.t -> t
 (** Password-protect some plaintext. *)
+val encrypt : password:Bytes.t -> plaintext:Bytes.t -> t
 
-val decrypt : password:Bytes.t -> t -> Bytes.t Core.Or_error.t
 (** Decrypt some bytes with a password *)
+val decrypt : password:Bytes.t -> t -> Bytes.t Core.Or_error.t

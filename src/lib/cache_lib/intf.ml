@@ -27,47 +27,47 @@ module Cached = struct
   module type S = sig
     type ('t, 'cache_t) t
 
-    val pure : 't -> ('t, _) t
     (** [pure v] returns a pure cached object with
      *  the value of [v]. Pure cached objects are used
-     *  for unifying values with the [Cached.t] type for 
+     *  for unifying values with the [Cached.t] type for
      *  convenience. Pure cached objects are not stored
      *  in a cache and cannot be consumed.
      *)
+    val pure : 't -> ('t, _) t
 
-    val peek : ('t, _) t -> 't
     (** [peek c] inspects the value of [c] without consuming
      *  [c].
      *)
+    val peek : ('t, _) t -> 't
 
-    val invalidate : ('t, _) t -> 't Or_error.t
     (** [invalidate c] removes the underlying cached value
      *  of [c] from its cache. [invalidate] will return an
      *  [Error] if the underlying cached value was not
      *  present in the cache.
      *)
+    val invalidate : ('t, _) t -> 't Or_error.t
 
     val was_consumed : (_, _) t -> bool
 
-    val transform : ('t0, 'cache_t) t -> f:('t0 -> 't1) -> ('t1, 'cache_t) t
     (** [transform c ~f ~logger] maps the value of [c] over
      *  [f], consuming [c]. *)
+    val transform : ('t0, 'cache_t) t -> f:('t0 -> 't1) -> ('t1, 'cache_t) t
 
-    val sequence_deferred :
-      ('t Deferred.t, 'cache_t) t -> ('t, 'cache_t) t Deferred.t
     (** [sequence_deferred c] lifts a deferred value from
      *  [c], returning a non deferred cached object in a
      *  deferred context. [c] is consumed.
      *)
+    val sequence_deferred :
+      ('t Deferred.t, 'cache_t) t -> ('t, 'cache_t) t Deferred.t
 
-    val sequence_result :
-      (('t, 'e) Result.t, 'cache_t) t -> (('t, 'cache_t) t, 'e) Result.t
     (** [sequence_result] lifts a result value from
      *  [c], returning a result containing the raw
      *  cached value if the value of [c] was [Ok].
      *  Otherwise, an [Error] is returned and [c]
      *  is invalidated from the cache
      *)
+    val sequence_result :
+      (('t, 'e) Result.t, 'cache_t) t -> (('t, 'cache_t) t, 'e) Result.t
   end
 end
 
@@ -89,12 +89,12 @@ module Cache = struct
       -> (module Hash_set.Elt_plain with type t = 'elt)
       -> 'elt t
 
-    val register : 'elt t -> 'elt -> ('elt, 'elt) Cached.t Or_error.t
     (** [register cache elt] add [elt] to [cache]. If [elt]
      *  already existed in [cache], an [Error] is returned.
      *  Otherwise, [Ok] is returned with a [Cached]
      *  representation of [elt].
      *)
+    val register : 'elt t -> 'elt -> ('elt, 'elt) Cached.t Or_error.t
 
     val mem : 'elt t -> 'elt -> bool
 

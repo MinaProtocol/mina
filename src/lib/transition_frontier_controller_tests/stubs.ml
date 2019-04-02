@@ -18,10 +18,22 @@ struct
   end
 
   module Ledger_proof_statement = Transaction_snark.Statement
+  module Pending_coinbase_stack_state =
+    Transaction_snark.Pending_coinbase_stack_state
 
   module Ledger_proof = struct
-    type t = Ledger_proof_statement.t * Sok_message.Digest.Stable.V1.t
-    [@@deriving sexp, bin_io]
+    module Stable = struct
+      module V1 = struct
+        type t =
+          Ledger_proof_statement.Stable.V1.t * Sok_message.Digest.Stable.V1.t
+        [@@deriving sexp, bin_io, yojson]
+      end
+
+      module Latest = V1
+    end
+
+    (* TODO: remove bin_io, after fixing functors to accept this *)
+    type t = Stable.V1.t [@@deriving sexp, bin_io, yojson]
 
     let underlying_proof (_ : t) = Proof.dummy
 
@@ -50,44 +62,37 @@ struct
     let to_bytes = Staged_ledger_hash.Aux_hash.to_bytes
   end
 
+  module Transaction_witness = Coda_base.Transaction_witness
+  module Pending_coinbase = Coda_base.Pending_coinbase
+  module Pending_coinbase_hash = Coda_base.Pending_coinbase.Hash
   module Transaction_snark_work =
-    Staged_ledger.Make_completed_work (Public_key.Compressed) (Ledger_proof)
-      (Ledger_proof_statement)
+    Staged_ledger.Make_completed_work (Ledger_proof) (Ledger_proof_statement)
 
-  module User_command = struct
-    include (
-      User_command :
-        module type of User_command
-        with module With_valid_signature := User_command.With_valid_signature )
+  module Staged_ledger_hash_binable = struct
+    include Staged_ledger_hash.Stable.V1
 
-    let fee (t : t) = Payload.fee t.payload
-
-    let sender (t : t) = Signature_lib.Public_key.compress t.sender
-
-    let seed = Secure_random.string ()
-
-    module With_valid_signature = struct
-      module T = struct
-        include User_command.With_valid_signature
-
-        let compare t1 t2 =
-          User_command.With_valid_signature.compare ~seed t1 t2
-      end
-
-      include T
-      include Comparable.Make (T)
-    end
+    let ( of_aux_ledger_and_coinbase_hash
+        , aux_hash
+        , ledger_hash
+        , pending_coinbase_hash ) =
+      Staged_ledger_hash.
+        ( of_aux_ledger_and_coinbase_hash
+        , aux_hash
+        , ledger_hash
+        , pending_coinbase_hash )
   end
 
   module Staged_ledger_diff = Staged_ledger.Make_diff (struct
     module Fee_transfer = Fee_transfer
     module Ledger_proof = Ledger_proof
     module Ledger_hash = Ledger_hash
-    module Staged_ledger_hash = Staged_ledger_hash
+    module Staged_ledger_hash = Staged_ledger_hash_binable
     module Staged_ledger_aux_hash = Staged_ledger_aux_hash
     module Compressed_public_key = Public_key.Compressed
     module User_command = User_command
     module Transaction_snark_work = Transaction_snark_work
+    module Pending_coinbase = Pending_coinbase
+    module Pending_coinbase_hash = Pending_coinbase_hash
   end)
 
   module External_transition =
@@ -125,13 +130,17 @@ struct
     module Ledger_proof = Ledger_proof
     module Ledger_proof_verifier = Ledger_proof_verifier
     module Staged_ledger_aux_hash = Staged_ledger_aux_hash
-    module Staged_ledger_hash = Coda_base.Staged_ledger_hash
+    module Staged_ledger_hash = Staged_ledger_hash_binable
     module Transaction_snark_work = Transaction_snark_work
     module Transaction_validator = Transaction_validator
     module Staged_ledger_diff = Staged_ledger_diff
     module Account = Coda_base.Account
     module Ledger = Coda_base.Ledger
     module Sparse_ledger = Coda_base.Sparse_ledger
+    module Pending_coinbase = Pending_coinbase
+    module Pending_coinbase_hash = Pending_coinbase_hash
+    module Pending_coinbase_stack_state = Pending_coinbase_stack_state
+    module Transaction_witness = Transaction_witness
   end)
 
   (* Generate valid payments for each blockchain state by having
@@ -172,7 +181,11 @@ struct
     module Transaction_snark_work = Transaction_snark_work
     module Staged_ledger_diff = Staged_ledger_diff
     module External_transition = External_transition
+    module Transaction_witness = Transaction_witness
     module Staged_ledger = Staged_ledger
+    module Pending_coinbase_stack_state = Pending_coinbase_stack_state
+    module Pending_coinbase_hash = Pending_coinbase_hash
+    module Pending_coinbase = Pending_coinbase
 
     let max_length = Inputs.max_length
   end
@@ -206,10 +219,12 @@ struct
         let {Keypair.public_key; _} = Keypair.create () in
         let prover = Public_key.compress public_key in
         Some
-          { Transaction_snark_work.Checked.fee= Fee.Unsigned.of_int 1
-          ; proofs=
-              List.map stmts ~f:(fun stmt -> (stmt, Sok_message.Digest.default))
-          ; prover }
+          Transaction_snark_work.Checked.
+            { fee= Fee.Unsigned.of_int 1
+            ; proofs=
+                List.map stmts ~f:(fun stmt ->
+                    (stmt, Sok_message.Digest.default) )
+            ; prover }
       in
       let staged_ledger_diff =
         Staged_ledger.create_diff parent_staged_ledger ~logger
@@ -218,7 +233,8 @@ struct
       in
       let%bind ( `Hash_after_applying next_staged_ledger_hash
                , `Ledger_proof ledger_proof_opt
-               , `Staged_ledger _ ) =
+               , `Staged_ledger _
+               , `Pending_coinbase_data _ ) =
         Staged_ledger.apply_diff_unchecked parent_staged_ledger
           staged_ledger_diff
         |> Deferred.Or_error.ok_exn
@@ -241,7 +257,8 @@ struct
           ~default:previous_ledger_hash
       in
       let next_blockchain_state =
-        Blockchain_state.create_value ~timestamp:(Block_time.now ())
+        Blockchain_state.create_value
+          ~timestamp:(Block_time.now Time.Controller.basic)
           ~snarked_ledger_hash:next_ledger_hash
           ~staged_ledger_hash:next_staged_ledger_hash
       in
@@ -279,10 +296,13 @@ struct
           ~transition_with_hash:next_verified_external_transition_with_hash
       with
       | Ok new_breadcrumb ->
-          Logger.info logger
-            !"Producing a breadcrumb with hash : %{sexp:State_hash.t}"
-            ( Transition_frontier.Breadcrumb.transition_with_hash new_breadcrumb
-            |> With_hash.hash ) ;
+          Logger.info logger ~module_:__MODULE__ ~location:__LOC__
+            ~metadata:
+              [ ( "state_hash"
+                , Transition_frontier.Breadcrumb.transition_with_hash
+                    new_breadcrumb
+                  |> With_hash.hash |> State_hash.to_yojson ) ]
+            "Producing a breadcrumb with hash: $state_hash" ;
           new_breadcrumb
       | Error (`Fatal_error exn) -> raise exn
       | Error (`Validation_error e) ->
@@ -303,6 +323,9 @@ struct
     let root_transaction_snark_scan_state =
       Staged_ledger.Scan_state.empty ()
     in
+    let root_pending_coinbases =
+      Pending_coinbase.create () |> Or_error.ok_exn
+    in
     let genesis_protocol_state_with_hash =
       Consensus.For_tests.create_genesis_protocol_state
         (Ledger.of_database root_snarked_ledger)
@@ -318,9 +341,9 @@ struct
       |> Blockchain_state.snarked_ledger_hash
       |> Frozen_ledger_hash.to_ledger_hash
     in
-    Logger.info logger
-      !"Snarked_ledger_hash is %{sexp:Ledger_hash.t}"
-      root_ledger_hash ;
+    Logger.info logger ~module_:__MODULE__ ~location:__LOC__
+      ~metadata:[("root_ledger_hash", Ledger_hash.to_yojson root_ledger_hash)]
+      "Snarked_ledger_hash is $root_ledger_hash" ;
     let dummy_staged_ledger_diff =
       let creator =
         Quickcheck.random_value Signature_lib.Public_key.Compressed.gen
@@ -330,7 +353,7 @@ struct
             ; user_commands= []
             ; coinbase= Staged_ledger_diff.At_most_two.Zero }
           , None )
-      ; prev_hash= Coda_base.Staged_ledger_hash.dummy
+      ; prev_hash= Coda_base.Staged_ledger_hash.genesis
       ; creator }
     in
     (* the genesis transition is assumed to be valid *)
@@ -345,14 +368,14 @@ struct
     in
     let open Deferred.Let_syntax in
     let expected_merkle_root = Ledger.Db.merkle_root root_snarked_ledger in
-    match%map
-      Staged_ledger.of_scan_state_and_snarked_ledger
+    match%bind
+      Staged_ledger.of_scan_state_pending_coinbases_and_snarked_ledger
         ~scan_state:root_transaction_snark_scan_state
         ~snarked_ledger:(Ledger.of_database root_snarked_ledger)
-        ~expected_merkle_root
+        ~expected_merkle_root ~pending_coinbases:root_pending_coinbases
     with
     | Ok root_staged_ledger ->
-        let frontier =
+        let%map frontier =
           Transition_frontier.create ~logger
             ~root_transition:root_transition_with_data ~root_snarked_ledger
             ~root_staged_ledger
@@ -380,6 +403,25 @@ struct
     @@ Quickcheck_lib.gen_imperative_list
          (root_breadcrumb |> return |> Quickcheck.Generator.return)
          (gen_breadcrumb ~logger ~accounts_with_secret_keys)
+
+  let add_linear_breadcrumbs ~logger ~size ~accounts_with_secret_keys ~frontier
+      ~parent =
+    let new_breadcrumbs =
+      gen_linear_breadcrumbs ~logger ~size ~accounts_with_secret_keys parent
+      |> Quickcheck.random_value
+    in
+    Deferred.List.iter new_breadcrumbs ~f:(fun breadcrumb ->
+        let%bind breadcrumb = breadcrumb in
+        Transition_frontier.add_breadcrumb_exn frontier breadcrumb )
+
+  let add_child ~logger ~accounts_with_secret_keys ~frontier ~parent =
+    let%bind new_node =
+      ( gen_breadcrumb ~logger ~accounts_with_secret_keys
+      |> Quickcheck.random_value )
+      @@ Deferred.return parent
+    in
+    let%map () = Transition_frontier.add_breadcrumb_exn frontier new_node in
+    new_node
 
   let gen_tree ~logger ~size ~accounts_with_secret_keys root_breadcrumb =
     Quickcheck.Generator.with_size ~size
@@ -483,16 +525,21 @@ struct
            let merkle_root =
              Ledger.merkle_root (Staged_ledger.ledger staged_ledger)
            in
-           (peer_root_with_proof, scan_state, merkle_root))
+           let pending_coinbases =
+             Staged_ledger.pending_coinbase_collection staged_ledger
+           in
+           (peer_root_with_proof, scan_state, merkle_root, pending_coinbases))
 
     let glue_sync_ledger {table; logger; _} query_reader response_writer : unit
         =
       Pipe_lib.Linear_pipe.iter_unordered ~max_concurrency:8 query_reader
         ~f:(fun (ledger_hash, sync_ledger_query) ->
-          Logger.info logger
-            !"Processing ledger query : %{sexp:(Ledger.Addr.t \
-              Syncable_ledger.query)}"
-            sync_ledger_query ;
+          Logger.info logger ~module_:__MODULE__ ~location:__LOC__
+            ~metadata:
+              [ ( "sync_ledger_query"
+                , Syncable_ledger.Query.to_yojson Ledger.Addr.to_yojson
+                    sync_ledger_query ) ]
+            !"Processing ledger query: $sync_ledger_query" ;
           let answer =
             Hashtbl.to_alist table
             |> List.find_map ~f:(fun (peer, frontier) ->
@@ -501,21 +548,27 @@ struct
                      Sync_handler.answer_query ~frontier ledger_hash
                        sync_ledger_query ~logger
                    in
-                   Envelope.Incoming.wrap ~data:answer ~sender:peer )
+                   Envelope.Incoming.wrap ~data:answer
+                     ~sender:(Envelope.Sender.Remote peer) )
           in
           match answer with
           | None ->
-              Logger.info logger
-                !"Could not find an answer for : %{sexp:(Ledger.Addr.t \
-                  Syncable_ledger.query)}"
-                sync_ledger_query ;
+              Logger.info logger ~module_:__MODULE__ ~location:__LOC__
+                ~metadata:
+                  [ ( "sync_ledger_query"
+                    , Syncable_ledger.Query.to_yojson Ledger.Addr.to_yojson
+                        sync_ledger_query ) ]
+                "Could not find an answer for: $sync_ledger_query" ;
               Deferred.unit
           | Some answer ->
-              Logger.info logger
-                !"Found an answer for : %{sexp:(Ledger.Addr.t \
-                  Syncable_ledger.query)}"
-                sync_ledger_query ;
-              Pipe_lib.Linear_pipe.write response_writer answer )
+              Logger.info logger ~module_:__MODULE__ ~location:__LOC__
+                ~metadata:
+                  [ ( "sync_ledger_query"
+                    , Syncable_ledger.Query.to_yojson Ledger.Addr.to_yojson
+                        sync_ledger_query ) ]
+                "Found an answer for: $sync_ledger_query" ;
+              Pipe_lib.Linear_pipe.write response_writer
+                (ledger_hash, sync_ledger_query, answer) )
       |> don't_wait_for
   end
 
@@ -575,17 +628,20 @@ struct
           find_exn frontier state_hash
           |> Breadcrumb.transition_with_hash |> With_hash.data)
       in
-      Logger.info logger
-        !"Peer %{sexp:Network_peer.Peer.t} sending %{sexp:State_hash.t}"
-        address state_hash ;
+      Logger.info logger ~module_:__MODULE__ ~location:__LOC__
+        ~metadata:
+          [ ("peer", Network_peer.Peer.to_yojson address)
+          ; ("state_hash", State_hash.to_yojson state_hash) ]
+        "Peer $peer sending $state_hash" ;
       let enveloped_transition =
-        Envelope.Incoming.wrap ~data:transition ~sender:address
+        Envelope.Incoming.wrap ~data:transition
+          ~sender:(Envelope.Sender.Remote address)
       in
       Pipe_lib.Strict_pipe.Writer.write transition_writer
         (`Transition enveloped_transition, `Time_received Constants.time)
 
     let make_transition_pipe () =
-      Pipe_lib.Strict_pipe.create
-        (Buffered (`Capacity 10, `Overflow Drop_head))
+      Pipe_lib.Strict_pipe.create ~name:(__MODULE__ ^ __LOC__)
+        (Buffered (`Capacity 30, `Overflow Drop_head))
   end
 end

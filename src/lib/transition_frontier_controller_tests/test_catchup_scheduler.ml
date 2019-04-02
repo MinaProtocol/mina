@@ -24,7 +24,7 @@ let%test_module "Transition_handler.Catchup_scheduler tests" =
   ( module struct
     let logger = Logger.null ()
 
-    let time_controller = Time.Controller.create ()
+    let time_controller = Time.Controller.basic
 
     let timeout_duration = Time.Span.of_ms 200L
 
@@ -62,10 +62,10 @@ let%test_module "Transition_handler.Catchup_scheduler tests" =
       Core.Backtrace.elide := false ;
       Async.Scheduler.set_record_backtraces true ;
       let catchup_job_reader, catchup_job_writer =
-        Strict_pipe.create Synchronous
+        Strict_pipe.create ~name:(__MODULE__ ^ __LOC__) Synchronous
       in
       let _catchup_breadcrumbs_reader, catchup_breadcrumbs_writer =
-        Strict_pipe.create Synchronous
+        Strict_pipe.create ~name:(__MODULE__ ^ __LOC__) Synchronous
       in
       Thread_safe.block_on_async_exn (fun () ->
           let open Deferred.Let_syntax in
@@ -117,12 +117,12 @@ let%test_module "Transition_handler.Catchup_scheduler tests" =
 
     let%test_unit "if a linear sequence of transitions in reverse order, \
                    catchup scheduler should not create duplicate jobs" =
-      let logger = Logger.create () in
+      let logger = Logger.null () in
       let _catchup_job_reader, catchup_job_writer =
-        Strict_pipe.create Synchronous
+        Strict_pipe.create ~name:(__MODULE__ ^ __LOC__) Synchronous
       in
       let catchup_breadcrumbs_reader, catchup_breadcrumbs_writer =
-        Strict_pipe.create Synchronous
+        Strict_pipe.create ~name:(__MODULE__ ^ __LOC__) Synchronous
       in
       let unprocessed_transition_cache =
         Unprocessed_transition_cache.create ~logger
@@ -199,10 +199,10 @@ let%test_module "Transition_handler.Catchup_scheduler tests" =
                    the missing node is received before the timeout expires, \
                    the timeout would be canceled" =
       let _catchup_job_reader, catchup_job_writer =
-        Strict_pipe.create Synchronous
+        Strict_pipe.create ~name:(__MODULE__ ^ __LOC__) Synchronous
       in
       let catchup_breadcrumbs_reader, catchup_breadcrumbs_writer =
-        Strict_pipe.create Synchronous
+        Strict_pipe.create ~name:(__MODULE__ ^ __LOC__) Synchronous
       in
       let unprocessed_transition_cache =
         Unprocessed_transition_cache.create ~logger

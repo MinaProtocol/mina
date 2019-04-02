@@ -7,7 +7,7 @@ open Tuple_lib
 type uint64 = Unsigned.uint64
 
 module type Basic = sig
-  type t [@@deriving bin_io, sexp, compare, hash, yojson]
+  type t [@@deriving sexp, compare, hash, yojson]
 
   val max_int : t
 
@@ -19,7 +19,8 @@ module type Basic = sig
 
   module Stable : sig
     module V1 : sig
-      type nonrec t = t [@@deriving bin_io, sexp, compare, eq, hash, yojson]
+      type nonrec t = t
+      [@@deriving bin_io, sexp, compare, eq, hash, yojson, version]
     end
 
     module Latest = V1
@@ -56,6 +57,8 @@ module type Basic = sig
   val var_to_number : var -> Number.t
 
   val var_to_triples : var -> Boolean.var Triple.t list
+
+  val equal_var : var -> var -> (Boolean.var, _) Checked.t
 end
 
 module type Arithmetic_intf = sig
@@ -106,7 +109,7 @@ module type Signed_intf = sig
   type ('magnitude, 'sgn) t_
 
   type t = (magnitude, Sgn.t) t_
-  [@@deriving sexp, hash, bin_io, compare, eq, to_yojson]
+  [@@deriving sexp, hash, bin_io, compare, eq, yojson]
 
   val gen : t Quickcheck.Generator.t
 
@@ -114,7 +117,7 @@ module type Signed_intf = sig
     module V1 : sig
       type nonrec ('magnitude, 'sgn) t_ = ('magnitude, 'sgn) t_
 
-      type nonrec t = t [@@deriving bin_io, sexp, hash, compare, eq, to_yojson]
+      type nonrec t = t [@@deriving bin_io, sexp, hash, compare, eq, yojson]
     end
 
     module Latest = V1

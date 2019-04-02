@@ -4,10 +4,11 @@
   "description": "",
   "main": "index.js",
   "dependencies": {
+    "bs-css": "^8.0.2",
     "bs-electron": "github:Schmavery/bs-electron",
+    "graphql_ppx": "^0.2.8",
     "reason-apollo": "^0.15.2",
-    "reason-react": "^0.5.3",
-    "graphql_ppx": "^0.2.8"
+    "reason-react": "^0.5.3"
   },
   "devDependencies": {
     "bs-platform": "^4.0.18",

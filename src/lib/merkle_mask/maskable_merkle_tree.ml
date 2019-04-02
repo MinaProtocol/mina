@@ -26,8 +26,13 @@ module Make (Inputs : Inputs_intf) = struct
   module Node = struct
     type t = Mask.Attached.t
 
-    type display =
+    type attached =
       {hash: string; uuid: string; total_currency: int; num_accounts: int}
+    [@@deriving yojson]
+
+    type dangling = {uuid: string} [@@deriving yojson]
+
+    type display = [`Attached of attached | `Dangling_parent of dangling]
     [@@deriving yojson]
 
     let format_uuid mask =
@@ -36,7 +41,7 @@ module Make (Inputs : Inputs_intf) = struct
 
     let name mask = sprintf !"\"%s \"" (format_uuid mask)
 
-    let display mask =
+    let display_attached_mask mask =
       let root_hash = Mask.Attached.merkle_root mask in
       let num_accounts = Mask.Attached.num_accounts mask in
       let total_currency =
@@ -49,18 +54,18 @@ module Make (Inputs : Inputs_intf) = struct
       ; total_currency
       ; uuid }
 
+    let display mask =
+      try `Attached (display_attached_mask mask)
+      with Mask.Attached.Dangling_parent_reference _ ->
+        `Dangling_parent {uuid= format_uuid mask}
+
     let equal mask1 mask2 =
       let open Mask.Attached in
       Uuid.equal (get_uuid mask1) (get_uuid mask2)
-      && Hash.equal
-           (Mask.Attached.merkle_root mask1)
-           (Mask.Attached.merkle_root mask2)
 
     let compare mask1 mask2 =
       let open Mask.Attached in
-      match Uuid.compare (get_uuid mask1) (get_uuid mask2) with
-      | 0 -> Hash.compare (merkle_root mask1) (merkle_root mask2)
-      | x -> x
+      Uuid.compare (get_uuid mask1) (get_uuid mask2)
 
     let hash mask = Uuid.hash @@ Mask.Attached.get_uuid mask
   end

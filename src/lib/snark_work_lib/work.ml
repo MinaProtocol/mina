@@ -2,8 +2,8 @@ open Core_kernel
 
 module Single = struct
   module Spec = struct
-    type ('statement, 'transition, 'sparse_ledger, 'ledger_proof) t =
-      | Transition of 'statement * 'transition * 'sparse_ledger sexp_opaque
+    type ('statement, 'transition, 'witness, 'ledger_proof) t =
+      | Transition of 'statement * 'transition * 'witness sexp_opaque
       | Merge of
           'statement * 'ledger_proof sexp_opaque * 'ledger_proof sexp_opaque
     [@@deriving bin_io, sexp]
@@ -18,11 +18,12 @@ module Spec = struct
 end
 
 module Result = struct
+  (* TODO : version *)
   type ('spec, 'single) t =
     { proofs: 'single list
     ; metrics: (Time.Span.t * [`Transition | `Merge]) list
     ; spec: 'spec
-    ; prover: Signature_lib.Public_key.Compressed.t }
+    ; prover: Signature_lib.Public_key.Compressed.Stable.V1.t }
   [@@deriving bin_io, fields]
 end
 

@@ -1,7 +1,15 @@
 open Core
 
 module type Key = sig
-  type t [@@deriving sexp, bin_io]
+  type t [@@deriving sexp]
+
+  module Stable :
+    sig
+      module V1 : sig
+        type t [@@deriving sexp, bin_io]
+      end
+    end
+    with type V1.t = t
 
   val empty : t
 
@@ -35,7 +43,7 @@ module type Account = sig
 end
 
 module type Hash = sig
-  type t [@@deriving bin_io, sexp, eq, compare]
+  type t [@@deriving bin_io, sexp, eq, compare, yojson]
 
   include Hashable.S_binable with type t := t
 

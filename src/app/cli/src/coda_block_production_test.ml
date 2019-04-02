@@ -6,15 +6,15 @@ open Coda_main
 let name = "coda-block-production-test"
 
 let main () =
-  let log = Logger.create () in
-  let log = Logger.child log name in
+  let logger = Logger.create () in
   let n = 1 in
   let snark_work_public_keys i = None in
   let%bind testnet =
-    Coda_worker_testnet.test log n Option.some snark_work_public_keys
+    Coda_worker_testnet.test logger n Option.some snark_work_public_keys
       Protocols.Coda_pow.Work_selection.Seq
   in
-  after (Time.Span.of_sec 30.)
+  let%bind () = after (Time.Span.of_sec 30.) in
+  Coda_worker_testnet.Api.teardown testnet
 
 let command =
   Command.async ~summary:"Test that blocks get produced"

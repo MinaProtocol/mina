@@ -5,6 +5,7 @@
   (inline_tests)
   (library_flags (-linkall))
   (libraries
+    snarky_taylor
     core_kernel
     lite_compat
     coda_base
@@ -15,6 +16,7 @@
     unix_timestamp
     global_signer_private_key
     non_zero_curve_point
+    module_version
     yojson)
    (preprocessor_deps "../../config.mlh")
    (preprocess (pps ppx_base ppx_let ppx_deriving.std ppx_deriving_yojson ppx_sexp_conv ppx_bin_prot ppx_custom_printf ppx_inline_test ppx_optcomp ppx_snarky ppx_deriving_yojson bisect_ppx -conditional))

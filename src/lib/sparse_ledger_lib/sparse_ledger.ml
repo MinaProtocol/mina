@@ -63,6 +63,7 @@ struct
 
   type t_tmp = (Hash.t, Key.t, Account.t) t [@@deriving bin_io, sexp]
 
+  (* TODO : version *)
   type t = t_tmp [@@deriving bin_io, sexp]
 
   let of_hash = of_hash

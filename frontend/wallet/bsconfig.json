@@ -8,7 +8,8 @@
   "bs-dependencies": [
     "bs-electron",
     "reason-react",
-    "reason-apollo"
+    "reason-apollo",
+    "bs-css"
   ],
   "ppx-flags": [
     "graphql_ppx/ppx"

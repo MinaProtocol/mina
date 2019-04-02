@@ -7,7 +7,7 @@ module type S = sig
 
   type data
 
-  val create : filename:string -> log:Logger.t -> t Deferred.t
+  val create : filename:string -> logger:Logger.t -> t Deferred.t
 
   val store : t -> data -> unit Deferred.t
 end
@@ -34,7 +34,7 @@ end)
     let%bind () = Store.store filename data in
     Request.put request filename
 
-  let create ~filename ~log =
+  let create ~filename ~logger =
     let reader, writer = Linear_pipe.create () in
     let t = {filename; reader; writer} in
     let%map () =
@@ -45,13 +45,11 @@ end)
                  match%map write_to_storage t request data with
                  | Ok () -> ()
                  | Error e ->
-                     Logger.error log
-                       !"Writing data IO_error: %s"
-                       (Error.to_string_hum e) ))
+                     Logger.error logger ~module_:__MODULE__ ~location:__LOC__
+                       "Writing data IO_error: %s" (Error.to_string_hum e) ))
       | Error e ->
-          Logger.error log
-            !"Unable to create request: %s"
-            (Error.to_string_hum e)
+          Logger.error logger ~module_:__MODULE__ ~location:__LOC__
+            "Unable to create request: %s" (Error.to_string_hum e)
     in
     t
 

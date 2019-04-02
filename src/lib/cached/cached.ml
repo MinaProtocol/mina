@@ -5,10 +5,11 @@ type 'a value = {path: string; value: 'a; checksum: Md5.t}
 
 let try_load bin path =
   let logger = Logger.create () in
-  let controller = Storage.Disk.Controller.create ~parent_log:logger bin in
+  let controller = Storage.Disk.Controller.create ~logger bin in
   match%map Storage.Disk.load_with_checksum controller path with
   | Ok {Storage.Checked_data.data; checksum} ->
-      Logger.info logger "Loaded value successfully from %s" path ;
+      Logger.info logger ~module_:__MODULE__ ~location:__LOC__
+        "Loaded value successfully from %s" path ;
       Ok {path; value= data; checksum}
   | Error `Checksum_no_match -> Or_error.error_string "Checksum failure"
   | Error ((`IO_error _ | `No_exist) as err) -> (
@@ -34,7 +35,7 @@ module Component = struct
   let store (Load {label; f; bin}) ~base_path ~env =
     let path = base_path ^ "_" ^ label in
     let logger = Logger.create () in
-    let controller = Storage.Disk.Controller.create ~parent_log:logger bin in
+    let controller = Storage.Disk.Controller.create ~logger bin in
     let value = f env in
     let%map checksum =
       Storage.Disk.store_with_checksum controller path value

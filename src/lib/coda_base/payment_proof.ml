@@ -2,7 +2,9 @@ open Core_kernel
 open Receipt_chain_database_lib
 
 module T = struct
-  type t = (Receipt.Chain_hash.t, User_command.t) Payment_proof.t
+  (* TODO : version *)
+  type t =
+    (Receipt.Chain_hash.Stable.V1.t, User_command.Stable.V1.t) Payment_proof.t
   [@@deriving eq, sexp, bin_io, yojson]
 end
 

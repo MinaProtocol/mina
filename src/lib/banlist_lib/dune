@@ -1,8 +1,0 @@
-(library
- (name banlist_lib)
-  (public_name banlist_lib)
-  (library_flags (-linkall))
-  (libraries core async time_simulator key_value_database)
-  (inline_tests)
-  (preprocess (pps ppx_jane ppx_deriving.eq bisect_ppx -conditional))
-  (synopsis "Track banned and suspicious peers"))

@@ -1,6 +1,7 @@
 open Core_kernel
 
-type ('a, 'h) t = {data: 'a; hash: 'h} [@@deriving sexp, bin_io, compare]
+type ('a, 'h) t = {data: 'a; hash: 'h}
+[@@deriving sexp, bin_io, compare, to_yojson]
 
 let data {data; _} = data
 

@@ -1,5 +1,6 @@
 (library
   (name ledger_catchup)
   (public_name ledger_catchup)
+  (flags :standard -warn-error -3)
   (preprocess (pps ppx_jane) )
   (libraries async_kernel non_empty_list transition_frontier transition_handler consensus core_kernel protocols pipe_lib syncable_ledger merkle_address coda_base kademlia))

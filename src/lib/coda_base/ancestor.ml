@@ -7,7 +7,7 @@ module Input = struct
       module T = struct
         let version = 1
 
-        type t = {descendant: State_hash.t; generations: int}
+        type t = {descendant: State_hash.Stable.V1.t; generations: int}
         [@@deriving sexp, bin_io]
       end
 
@@ -162,7 +162,7 @@ let%test_unit "completeness" =
           let input = {Input.generations= i + 1; descendant= h} in
           let a, proof =
             Prover.prove prover {generations= i + 1; descendant= h}
-            |> Option.value_exn
+            |> Option.value_exn ?here:None ?error:None ?message:None
           in
           [%test_eq: State_hash.t] a ancestor ;
           assert (verify input a proof) ) )

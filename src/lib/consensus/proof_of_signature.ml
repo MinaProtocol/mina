@@ -11,6 +11,7 @@ open Coda_numbers
 open Coda_base
 open Fold_lib
 open Signature_lib
+open Module_version
 module Time = Block_time
 
 module Global_public_key = struct
@@ -46,9 +47,17 @@ end
 module Prover_state = struct
   include Unit
 
-  let precomputed_handler _ = Snarky.Request.unhandled
+  let precomputed_handler =
+    unstage
+      (Coda_base.Pending_coinbase.handler
+         (Pending_coinbase.create () |> Or_error.ok_exn)
+         ~is_new_stack:false)
 
-  let handler _ _ = Snarky.Request.unhandled
+  let handler ()
+      ~pending_coinbase:{ Coda_base.Pending_coinbase_witness.pending_coinbases
+                        ; is_new_stack } =
+    unstage
+      (Coda_base.Pending_coinbase.handler pending_coinbases ~is_new_stack)
 end
 
 module Proposal_data = struct
@@ -91,16 +100,43 @@ end
 module Consensus_state = struct
   type ('length, 'public_key) t_ =
     {length: 'length; signer_public_key: 'public_key}
-  [@@deriving eq, bin_io, sexp, hash, compare]
+  [@@deriving eq, bin_io, sexp, hash, compare, to_yojson]
 
   type display = {length: string} [@@deriving yojson]
 
-  type value = (Length.t, Public_key.Compressed.t) t_
-  [@@deriving bin_io, sexp, hash, compare]
+  module Value = struct
+    module Stable = struct
+      module V1 = struct
+        module T = struct
+          let version = 1
+
+          type t = (Length.Stable.V1.t, Public_key.Compressed.Stable.V1.t) t_
+          [@@deriving bin_io, sexp, hash, compare, to_yojson]
+        end
+
+        include T
+        include Registration.Make_latest_version (T)
+
+        let equal = equal_t_ Length.equal Public_key.Compressed.equal
+      end
+
+      module Latest = V1
+
+      module Module_decl = struct
+        let name = "consensus_proof_of_signature"
+
+        type latest = Latest.t
+      end
+
+      module Registrar = Registration.Make (Module_decl)
+      module Registered_V1 = Registrar.Register (V1)
+    end
+
+    type t = Stable.Latest.t (* bin_io omitted intentionally *)
+    [@@deriving sexp, hash, compare, eq, to_yojson]
+  end
 
   type var = (Length.Unpacked.var, Public_key.Compressed.var) t_
-
-  let equal_value = equal_t_ Length.equal Public_key.Compressed.equal
 
   let length_in_triples =
     Length.length_in_triples + Public_key.Compressed.length_in_triples
@@ -119,7 +155,7 @@ module Consensus_state = struct
     let open Snark_params.Tick.Data_spec in
     [Length.Unpacked.typ; Public_key.Compressed.typ]
 
-  let typ : (var, value) Snark_params.Tick.Typ.t =
+  let typ : (var, Value.t) Snark_params.Tick.Typ.t =
     Snark_params.Tick.Typ.of_hlistable data_spec ~var_to_hlist:to_hlist
       ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist ~value_of_hlist:of_hlist
 
@@ -133,11 +169,11 @@ module Consensus_state = struct
   let fold {length; signer_public_key} =
     Fold.(Length.fold length +> Public_key.Compressed.fold signer_public_key)
 
-  let update (state : value) =
+  let update (state : Value.t) =
     { length= Length.succ state.length
     ; signer_public_key= Global_public_key.compressed }
 
-  let length (t : value) = t.length
+  let length (t : Value.t) = t.length
 
   let time_hum _ = "<posig has no notion of time>"
 
@@ -147,7 +183,7 @@ module Consensus_state = struct
         { Lite_base.Consensus_state.length= Lite_compat.length length
         ; signer_public_key= Lite_compat.public_key signer_public_key } )
 
-  let display (t : value) : display = {length= Length.to_string t.length}
+  let display (t : Value.t) : display = {length= Length.to_string t.length}
 end
 
 module Protocol_state =
@@ -168,7 +204,7 @@ end)
 let generate_transition ~previous_protocol_state ~blockchain_state ~time:_
     ~proposal_data ~transactions:_ ~snarked_ledger_hash:_ ~supply_increase:_
     ~logger:_ =
-  let previous_consensus_state : Consensus_state.value =
+  let previous_consensus_state : Consensus_state.Value.t =
     Protocol_state.consensus_state previous_protocol_state
   in
   (* TODO: sign protocol_state instead of blockchain_state *)
@@ -263,7 +299,7 @@ module For_tests = struct
     let open Consensus_state in
     Quickcheck.Generator.return
     @@ fun ~previous_protocol_state ~snarked_ledger_hash:_ ->
-    let prev : Consensus_state.value =
+    let prev : Consensus_state.Value.t =
       Protocol_state.consensus_state (With_hash.data previous_protocol_state)
     in
     {length= Length.succ prev.length; signer_public_key= prev.signer_public_key}
@@ -275,7 +311,8 @@ module For_tests = struct
         { Blockchain_state.genesis with
           staged_ledger_hash=
             Staged_ledger_hash.(
-              of_aux_and_ledger_hash Aux_hash.dummy root_ledger_hash)
+              of_aux_ledger_and_coinbase_hash Aux_hash.dummy root_ledger_hash
+                (Pending_coinbase.create () |> Or_error.ok_exn))
         ; snarked_ledger_hash=
             Frozen_ledger_hash.of_ledger_hash root_ledger_hash }
 end

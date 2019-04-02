@@ -186,11 +186,11 @@ A staged ledger can be regarded as a "Pending accounts database" that has transa
 A staged ledger consists of the accounts state (what we currently call ledger) and a data structure called [parallel_scan.ml](../src/lib/parallel_scan/parallel_scan.ml). It keeps track of all the transactions that need to be snarked (grep for `Available_job.t`) to produce a single transaction snark that certifies a set of transactions. This is exposed as Aux in the staged ledger.
 Parallel scan is a tree like structure that stores statements needed to be proved. A statement can be of applying a single transaction `Base` or of composing other statements `Merge`. Snarking of these statements is delegated to snark-workers. The snark workers submit snarks for the corresponding statements which are used by the proposer to update the parallel scan state.
 
-When the propser wins a block, the payments read from the transaction pool are sent to the staged ledger to create a diff `Staged_ledger_diff`. 
-A diff consists of 
+When the propser wins a block, the payments read from the transaction pool are sent to the staged ledger to create a diff `Staged_ledger_diff`.
+A diff consists of
 1. Payments included in the block
 2. A list of proofs that prove some of the transactions (payments, coinbase, and proof-fees) from previous blocks
-3. Coinbase 
+3. Coinbase
 
 There are two primary operations in staged ledger.
 1. Creating a diff :

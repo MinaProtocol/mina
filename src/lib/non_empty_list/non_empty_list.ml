@@ -1,7 +1,17 @@
 open Core_kernel
 
 (* A non-empty list is a tuple of the head and the rest (as a list) *)
-type 'a t = 'a * 'a list [@@deriving sexp, compare, eq, hash, bin_io]
+module Stable = struct
+  (* underlying type has a parameter, so don't register versions *)
+  module V1 = struct
+    type 'a t = 'a * 'a list [@@deriving sexp, compare, eq, hash, bin_io]
+  end
+
+  module Latest = V1
+end
+
+(* bin_io omitted intentionally *)
+type 'a t = 'a Stable.Latest.t [@@deriving sexp, compare, eq, hash]
 
 let init x xs = (x, xs)
 

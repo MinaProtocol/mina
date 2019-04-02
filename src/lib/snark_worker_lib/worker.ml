@@ -4,7 +4,7 @@ open Async
 module Make (Inputs : Intf.Inputs_intf) :
   Intf.S
   with type transition := Inputs.Transaction.t
-   and type sparse_ledger := Inputs.Sparse_ledger.t
+   and type transaction_witness := Inputs.Transaction_witness.t
    and type statement := Inputs.Statement.t
    and type proof := Inputs.Proof.t = struct
   open Inputs
@@ -17,7 +17,7 @@ module Make (Inputs : Intf.Inputs_intf) :
         type t =
           ( Statement.t
           , Transaction.t
-          , Sparse_ledger.t
+          , Transaction_witness.t
           , Proof.t )
           Work.Single.Spec.t
         [@@deriving sexp]
@@ -72,18 +72,29 @@ module Make (Inputs : Intf.Inputs_intf) :
         else Or_error.of_exn exn
     | Ok res -> res
 
+  let emit_proof_metrics metrics logger =
+    List.iter metrics ~f:(fun (total, tag) ->
+        match tag with
+        | `Merge ->
+            Logger.info logger ~module_:__MODULE__ ~location:__LOC__
+              !"Merge Proof Completed - %s%!"
+              (Time.Span.to_string total)
+        | `Transition ->
+            Logger.info logger ~module_:__MODULE__ ~location:__LOC__
+              !"Base Proof Completed - %s%!"
+              (Time.Span.to_string total) )
+
   let main daemon_address public_key shutdown_on_disconnect =
-    let log =
-      Logger.create ()
-      |> Fn.flip Logger.child "snark-worker"
-      |> Fn.flip Logger.child __MODULE__
-    in
+    let logger = Logger.create () in
     let%bind state = Worker_state.create () in
     let wait ?(sec = 0.5) () = after (Time.Span.of_sec sec) in
     let rec go () =
       let log_and_retry label error =
-        Logger.error log !"Error %s:\n%{sexp:Error.t}" label error ;
-        let%bind () = wait () in
+        Logger.error logger ~module_:__MODULE__ ~location:__LOC__
+          !"Error %s: %{sexp:Error.t}"
+          label error ;
+        let%bind () = wait ~sec:30.0 () in
+        (* FIXME: Use a backoff algo here *)
         go ()
       in
       match%bind
@@ -93,17 +104,28 @@ module Make (Inputs : Intf.Inputs_intf) :
       | Ok None ->
           let random_delay =
             Worker_state.worker_wait_time
-            +. (0.2 *. Random.float Worker_state.worker_wait_time)
+            +. (0.5 *. Random.float Worker_state.worker_wait_time)
           in
-          Logger.trace log "No work; waiting %.3fs" random_delay ;
+          Logger.trace logger ~module_:__MODULE__ ~location:__LOC__
+            "No work received from %s - sleeping %.4fs"
+            (Host_and_port.to_string daemon_address)
+            random_delay ;
           let%bind () = wait ~sec:random_delay () in
           go ()
       | Ok (Some work) -> (
-          Logger.info log !"Received work." ;
+          Logger.info logger ~module_:__MODULE__ ~location:__LOC__
+            !"Received work from %s%!"
+            (Host_and_port.to_string daemon_address) ;
+          let%bind () = wait () in
+          (* Pause to wait for stdout to flush *)
           match perform state public_key work with
           | Error e -> log_and_retry "performing work" e
           | Ok result -> (
               match%bind
+                emit_proof_metrics result.metrics logger ;
+                Logger.info logger ~module_:__MODULE__ ~location:__LOC__
+                  "Submitted work to %s%!"
+                  (Host_and_port.to_string daemon_address) ;
                 dispatch Rpcs.Submit_work.rpc shutdown_on_disconnect result
                   daemon_address
               with

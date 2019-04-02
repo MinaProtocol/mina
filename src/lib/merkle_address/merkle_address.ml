@@ -17,6 +17,8 @@ module type S = sig
 
   include Hashable.S_binable with type t := t
 
+  val to_yojson : t -> Yojson.Safe.json
+
   val of_byte_string : string -> t
 
   val of_directions : Direction.t list -> t
@@ -117,6 +119,8 @@ end) : S = struct
     let length = depth path in
     if length mod 8 = 0 then path
     else concat [path; zeroes_bitstring (8 - (length mod 8))]
+
+  let to_yojson t = `String (to_string t)
 
   module Stable = struct
     module V1 = struct

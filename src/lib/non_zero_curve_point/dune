@@ -5,4 +5,4 @@
  (library_flags -linkall)
  (libraries core_kernel snark_params fold_lib base64 codable module_version)
  (preprocess
-  (pps ppx_snarky ppx_jane ppx_deriving.eq)))
+  (pps ppx_snarky ppx_coda ppx_jane ppx_deriving.eq)))

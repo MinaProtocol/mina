@@ -12,9 +12,19 @@ module type Transition_frontier_intf = sig
 
   module Extensions : sig
     module Work : sig
-      type t [@@deriving sexp, bin_io]
+      type t [@@deriving sexp]
 
-      include Hashable.S_binable with type t := t
+      module Stable :
+        sig
+          module V1 : sig
+            type t [@@deriving sexp, bin_io]
+
+            include Hashable.S_binable with type t := t
+          end
+        end
+        with type V1.t = t
+
+      include Hashable.S with type t := t
     end
   end
 
@@ -34,7 +44,7 @@ module type S = sig
   type t [@@deriving bin_io]
 
   val create :
-       parent_log:Logger.t
+       logger:Logger.t
     -> frontier_broadcast_pipe:transition_frontier Option.t
                                Broadcast_pipe.Reader.t
     -> t
@@ -59,9 +69,19 @@ end) (Fee : sig
 
   include Comparable.S with type t := t
 end) (Work : sig
-  type t [@@deriving sexp, bin_io]
+  type t [@@deriving sexp]
 
-  include Hashable.S_binable with type t := t
+  module Stable :
+    sig
+      module V1 : sig
+        type t [@@deriving sexp, bin_io]
+
+        include Hashable.S_binable with type t := t
+      end
+    end
+    with type V1.t = t
+
+  include Hashable.S with type t := t
 end)
 (Transition_frontier : Transition_frontier_intf
                        with module Extensions.Work = Work) :
@@ -87,9 +107,10 @@ end)
     let fee (t : t) = t.fee
   end
 
+  (* TODO : Version this type *)
   type t =
-    { snark_table: Priced_proof.t Work.Table.t
-    ; mutable ref_table: int Work.Table.t option }
+    { snark_table: Priced_proof.t Work.Stable.V1.Table.t
+    ; mutable ref_table: int Work.Stable.V1.Table.t option }
   [@@deriving sexp, bin_io]
 
   (* shadow generated bin_io code so that ref table is always None when written *)
@@ -136,7 +157,7 @@ end)
     in
     Deferred.don't_wait_for tf_deferred
 
-  let create ~parent_log:_ ~frontier_broadcast_pipe =
+  let create ~logger:_ ~frontier_broadcast_pipe =
     let t = {snark_table= Work.Table.create (); ref_table= None} in
     listen_to_frontier_broadcast_pipe frontier_broadcast_pipe t ;
     t
@@ -182,13 +203,29 @@ let%test_module "random set test" =
       let gen = Int.gen
     end
 
+    module Mock_work = struct
+      (* no bin_io except in Stable versions *)
+      module T = struct
+        type t = Int.t [@@deriving sexp, hash, compare]
+
+        let gen = Int.gen
+      end
+
+      include T
+      include Hashable.Make (T)
+
+      module Stable = struct
+        module V1 = Int
+      end
+    end
+
     module Mock_transition_frontier = struct
       type t = string
 
       let create () : t = ""
 
       module Extensions = struct
-        module Work = Int
+        module Work = Mock_work
       end
 
       let snark_pool_refcount_pipe _ =
@@ -198,7 +235,6 @@ let%test_module "random set test" =
         reader
     end
 
-    module Mock_work = Int
     module Mock_fee = Int
 
     module Mock_Priced_proof = struct
@@ -224,7 +260,7 @@ let%test_module "random set test" =
         Broadcast_pipe.create (Some (Mock_transition_frontier.create ()))
       in
       let pool =
-        Mock_snark_pool.create ~parent_log:(Logger.create ())
+        Mock_snark_pool.create ~logger:(Logger.null ())
           ~frontier_broadcast_pipe:frontier_broadcast_pipe_r
       in
       List.iter sample_solved_work ~f:(fun (work, proof, fee) ->

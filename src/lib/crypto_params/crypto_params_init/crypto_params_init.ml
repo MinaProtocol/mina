@@ -1,15 +1,38 @@
+[%%import
+"../../../config.mlh"]
+
+[%%if
+curve_size = 298]
+
+module Cycle = Snarky.Libsnark.Mnt298
+
+[%%elif
+curve_size = 753]
+
+module Cycle = Snarky.Libsnark.Mnt753
+
+[%%else]
+
+[%%show
+curve_size]
+
+[%%error
+"invalid value for \"curve_size\""]
+
+[%%endif]
+
 module Tick_backend = struct
-  module Full = Snarky.Backends.Mnt4
+  module Full = Cycle.Mnt4
   include Full.GM
-  module Inner_curve = Snarky.Libsnark.Mnt6.G1
-  module Inner_twisted_curve = Snarky.Libsnark.Mnt6.G2
+  module Inner_curve = Cycle.Mnt6.G1
+  module Inner_twisted_curve = Cycle.Mnt6.G2
 end
 
 module Tock_backend = struct
-  module Full = Snarky.Backends.Mnt6
+  module Full = Cycle.Mnt6
   include Full.GM
-  module Inner_curve = Snarky.Libsnark.Mnt4.G1
-  module Inner_twisted_curve = Snarky.Libsnark.Mnt4.G2
+  module Inner_curve = Cycle.Mnt4.G1
+  module Inner_twisted_curve = Cycle.Mnt4.G2
 end
 
 module Tick0 = Snarky.Snark.Make (Tick_backend)

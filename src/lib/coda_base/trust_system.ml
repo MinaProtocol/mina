@@ -2,7 +2,7 @@
 
 module Actions = struct
   (* Stub actions. Will fill in later. *)
-  type t = Sent_bad_hash | Etc [@@deriving sexp_of]
+  type t = Sent_bad_hash | Etc [@@deriving sexp_of, yojson]
 
   let to_trust_response t =
     let open Peer_trust.Trust_response in
