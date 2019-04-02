@@ -18,6 +18,7 @@ let main n () =
   let%bind testnet =
     Coda_worker_testnet.test logger n Option.some snark_work_public_keys
       Protocols.Coda_pow.Work_selection.Seq
+      ~max_concurrent_connections:(Some 10)
   in
   (* SEND TXNS *)
   let keypairs =

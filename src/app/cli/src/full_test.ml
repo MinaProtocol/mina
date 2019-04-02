@@ -79,7 +79,8 @@ let run_test () : unit Deferred.t =
             ; me=
                 Network_peer.Peer.create Unix.Inet_addr.localhost
                   ~discovery_port:8001 ~communication_port:8000
-            ; trust_system } }
+            ; trust_system
+            ; max_concurrent_connections= Some 10 } }
       in
       Core.Backtrace.elide := false ;
       Async.Scheduler.set_record_backtraces true ;

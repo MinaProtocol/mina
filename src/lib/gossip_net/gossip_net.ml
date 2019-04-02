@@ -34,7 +34,8 @@ module type Config_intf = sig
     ; me: Peer.t
     ; conf_dir: string
     ; logger: Logger.t
-    ; trust_system: Coda_base.Trust_system.t }
+    ; trust_system: Coda_base.Trust_system.t
+    ; max_concurrent_connections: int option }
   [@@deriving make]
 end
 
@@ -51,7 +52,9 @@ module type S = sig
     ; received_reader: content Envelope.Incoming.t Strict_pipe.Reader.t
     ; me: Peer.t
     ; peers: Peer.Hash_set.t
-    ; connections: (Unix.Inet_addr.t, Rpc.Connection.t list) Hashtbl.t }
+    ; connections:
+        (Unix.Inet_addr.t, (Uuid.t, Rpc.Connection.t) Hashtbl.t) Hashtbl.t
+    ; max_concurrent_connections: int option }
 
   module Config : Config_intf
 
@@ -88,7 +91,9 @@ module Make (Message : Message_intf) :
     ; received_reader: Message.content Envelope.Incoming.t Strict_pipe.Reader.t
     ; me: Peer.t
     ; peers: Peer.Hash_set.t
-    ; connections: (Unix.Inet_addr.t, Rpc.Connection.t list) Hashtbl.t }
+    ; connections:
+        (Unix.Inet_addr.t, (Uuid.t, Rpc.Connection.t) Hashtbl.t) Hashtbl.t
+    ; max_concurrent_connections: int option }
 
   module Config = struct
     type t =
@@ -98,7 +103,8 @@ module Make (Message : Message_intf) :
       ; me: Peer.t
       ; conf_dir: string
       ; logger: Logger.t
-      ; trust_system: Coda_base.Trust_system.t }
+      ; trust_system: Coda_base.Trust_system.t
+      ; max_concurrent_connections: int option }
     [@@deriving make]
   end
 
@@ -111,15 +117,32 @@ module Make (Message : Message_intf) :
     | Ok conn -> Versioned_rpc.Connection_with_menu.create conn
 
   let try_call_rpc t peer dispatch query =
-    try_with (fun () ->
-        Tcp.with_connection (Tcp.Where_to_connect.of_host_and_port peer)
-          ~timeout:t.timeout (fun _ r w ->
-            create_connection_with_menu peer r w
-            >>=? fun conn -> dispatch conn query ) )
-    >>| function
-    | Ok (Ok result) -> Ok result
-    | Ok (Error exn) -> Error exn
-    | Error exn -> Or_error.of_exn exn
+    let call () =
+      try_with (fun () ->
+          Tcp.with_connection (Tcp.Where_to_connect.of_host_and_port peer)
+            ~timeout:t.timeout (fun _ r w ->
+              create_connection_with_menu peer r w
+              >>=? fun conn -> dispatch conn query ) )
+      >>| function
+      | Ok (Ok result) -> Ok result
+      | Ok (Error exn) -> Error exn
+      | Error exn -> Or_error.of_exn exn
+    in
+    match Hashtbl.find t.connections (Unix.Inet_addr.of_string peer.host) with
+    | None -> call ()
+    | Some conn_map ->
+        if
+          Option.is_some t.max_concurrent_connections
+          && Hashtbl.length conn_map
+             = Option.value_exn t.max_concurrent_connections
+        then
+          Deferred.return
+            (Or_error.errorf
+               !"Not connecting to peer %s. Number of open connections to the \
+                 peer equals the limit %d.\n"
+               peer.host
+               (Option.value_exn t.max_concurrent_connections))
+        else call ()
 
   let broadcast_selected t peers msg =
     let peers =
@@ -178,7 +201,8 @@ module Make (Message : Message_intf) :
           ; received_reader
           ; me= config.me
           ; peers= Peer.Hash_set.create ()
-          ; connections= Hashtbl.create (module Unix.Inet_addr) }
+          ; connections= Hashtbl.create (module Unix.Inet_addr)
+          ; max_concurrent_connections= config.max_concurrent_connections }
         in
         don't_wait_for
           (Strict_pipe.Reader.iter
@@ -190,8 +214,8 @@ module Make (Message : Message_intf) :
                    Logger.debug t.logger ~module_:__MODULE__ ~location:__LOC__
                      !"Peer %{sexp: Unix.Inet_addr.t} banned, disconnecting."
                      addr ;
-                   Deferred.List.iter conn_list ~f:(fun conn ->
-                       Rpc.Connection.close conn ) )) ;
+                   Deferred.List.iter (Hashtbl.to_alist conn_list)
+                     ~f:(fun (_, conn) -> Rpc.Connection.close conn ) )) ;
         trace_task "rebroadcasting messages" (fun () ->
             don't_wait_for
               (Linear_pipe.iter_unordered ~max_concurrency:64 broadcast_reader
@@ -240,20 +264,25 @@ module Make (Message : Message_intf) :
                     "%s" (Exn.to_string_mach exn) ))
             (Tcp.Where_to_listen.of_port config.me.Peer.communication_port)
             (fun client reader writer ->
-              let conn_list =
-                Option.value_map ~default:[]
+              let conn_map =
+                Option.value_map
+                  ~default:(Hashtbl.create (module Uuid))
                   (Hashtbl.find t.connections (Socket.Address.Inet.addr client))
                   ~f:Fn.id
               in
-              let connection_limit = List.length implementation_list + 1 in
-              if List.length conn_list = connection_limit then (
+              if
+                Option.is_some t.max_concurrent_connections
+                && Hashtbl.length conn_map
+                   = Option.value_exn t.max_concurrent_connections
+              then (
                 Logger.error t.logger ~module_:__MODULE__ ~location:__LOC__
-                  "Cannot open another connection. Number of existing \
-                   connections from %s equals the limit %d."
+                  "Cannot open another connection. Number of open connections \
+                   from %s equals the limit %d."
                   (Socket.Address.Inet.to_string client)
-                  connection_limit ;
+                  (Option.value_exn t.max_concurrent_connections) ;
                 Deferred.unit )
               else
+                let conn_id = Uuid.create () in
                 let%map _ =
                   Rpc.Connection.server_with_close reader writer
                     ~implementations
@@ -262,9 +291,12 @@ module Make (Message : Message_intf) :
                         when connecting to the server over TCP; the ephemeral
                         port is distinct from the client's discovery and
                         communication ports *)
+                      let () =
+                        Hashtbl.add_exn conn_map ~key:conn_id ~data:conn
+                      in
                       Hashtbl.set t.connections
                         ~key:(Socket.Address.Inet.addr client)
-                        ~data:(conn :: conn_list) ;
+                        ~data:conn_map ;
                       Socket.Address.Inet.to_host_and_port client )
                     ~on_handshake_error:
                       (`Call
@@ -273,8 +305,18 @@ module Make (Message : Message_intf) :
                             ~location:__LOC__ "%s" (Exn.to_string_mach exn) ;
                           Deferred.unit ))
                 in
-                Hashtbl.remove t.connections @@ Socket.Address.Inet.addr client
-              )
+                let conn_map =
+                  Hashtbl.find_exn t.connections
+                    (Socket.Address.Inet.addr client)
+                in
+                let () = Hashtbl.remove conn_map conn_id in
+                if Hashtbl.is_empty conn_map then
+                  Hashtbl.remove t.connections
+                  @@ Socket.Address.Inet.addr client
+                else
+                  Hashtbl.set t.connections
+                    ~key:(Socket.Address.Inet.addr client)
+                    ~data:conn_map )
         in
         t )
 
@@ -304,6 +346,23 @@ module Make (Message : Message_intf) :
       peer ;
     let peer = Peer.to_communications_host_and_port peer in
     try_call_rpc t peer rpc query
+
+  let query_available_peer t ~max_peers rpc query =
+    let open Deferred.Let_syntax in
+    let rec try_peers error_acc peers =
+      match peers with
+      | [] ->
+          return
+            (Or_error.error_string
+               (error_acc ^ "Tried " ^ Int.to_string max_peers ^ " peers.\n"))
+      | p :: ps -> (
+          let peer = Peer.to_communications_host_and_port p in
+          match%bind try_call_rpc t peer rpc query with
+          | Error e -> try_peers (error_acc ^ Error.to_string_hum e ^ ".\n") ps
+          | x -> return x )
+    in
+    let peers = random_peers t max_peers in
+    try_peers "" peers
 
   let query_random_peers t n rpc query =
     let peers = random_sublist (Hash_set.to_list t.peers) n in

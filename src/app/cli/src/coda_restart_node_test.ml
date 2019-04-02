@@ -22,6 +22,7 @@ let main () =
   let%bind testnet =
     Coda_worker_testnet.test logger n proposers snark_work_public_keys
       Protocols.Coda_pow.Work_selection.Seq
+      ~max_concurrent_connections:(Some 10)
   in
   let%bind () =
     Coda_worker_testnet.Restarts.trigger_catchup testnet ~logger ~node:1

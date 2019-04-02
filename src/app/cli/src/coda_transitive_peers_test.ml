@@ -19,10 +19,12 @@ let main () =
   let work_selection = Protocols.Coda_pow.Work_selection.Seq in
   Coda_processes.init () ;
   let trace_dir = Unix.getenv "CODA_TRACING" in
+  let max_concurrent_connections = Some 10 in
   let configs =
     Coda_processes.local_configs n ~program_dir ~proposal_interval
       ~acceptable_delay ~snark_worker_public_keys:None
       ~proposers:(Fn.const None) ~work_selection ~trace_dir
+      ~max_concurrent_connections
   in
   let%bind workers = Coda_processes.spawn_local_processes_exn configs in
   let discovery_ports, external_ports, peers =
@@ -39,6 +41,7 @@ let main () =
     Coda_process.local_config ~peers ~external_port ~discovery_port
       ~acceptable_delay ~snark_worker_config:None ~proposer:None ~program_dir
       ~work_selection ~trace_dir ~offset:Time.Span.zero ()
+      ~max_concurrent_connections
   in
   let%bind worker = Coda_process.spawn_exn config in
   let%bind _ = after (Time.Span.of_sec 10.) in

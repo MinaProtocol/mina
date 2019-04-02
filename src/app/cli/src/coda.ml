@@ -96,6 +96,10 @@ let daemon logger =
          ~doc:"Use S-expressions in log output, instead of JSON"
      and enable_tracing =
        flag "tracing" no_arg ~doc:"Trace into $config-directory/$pid.trace"
+     and limit_connections =
+       flag "limit-concurrent-connections"
+         ~doc:"y|n Limit number of concurrent connections per IP (default:y)"
+         (optional bool)
      in
      fun () ->
        let open Deferred.Let_syntax in
@@ -167,6 +171,13 @@ let daemon logger =
          in
          or_from_config json_to_currency_fee_option "snark-worker-fee"
            ~default:Cli_lib.Fee.default_snark_worker snark_work_fee
+       in
+       let max_concurrent_connections =
+         if
+           or_from_config YJ.Util.to_bool_option "max-concurrent-connections"
+             ~default:true limit_connections
+         then Some 10
+         else None
        in
        let rest_server_port =
          maybe_from_config YJ.Util.to_int_option "rest-port" rest_server_port
@@ -271,6 +282,8 @@ let daemon logger =
          let commit_id = commit_id
 
          let work_selection = work_selection
+
+         let max_concurrent_connections = max_concurrent_connections
        end in
        let%bind (module Init) =
          make_init
@@ -307,7 +320,8 @@ let daemon logger =
              ; conf_dir
              ; initial_peers
              ; me
-             ; trust_system } }
+             ; trust_system
+             ; max_concurrent_connections } }
        in
        let receipt_chain_dir_name = conf_dir ^/ "receipt_chain" in
        let%bind () = Async.Unix.mkdir ~p:() receipt_chain_dir_name in
