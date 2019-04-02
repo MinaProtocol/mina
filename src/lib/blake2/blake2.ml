@@ -42,9 +42,6 @@ let digest_field =
   let field_to_bits x =
     let open Crypto_params.Tick0 in
     let n = Bigint.of_field x in
-    Array.init Field.size_in_bits
-      ~f:(Bigint.test_bit n)
+    Array.init Field.size_in_bits ~f:(Bigint.test_bit n)
   in
-  fun x ->
-    digest_string (bits_to_string (field_to_bits x))
-
+  fun x -> digest_string (bits_to_string (field_to_bits x))
