@@ -25,8 +25,8 @@ positive-tests : unexpired.ml
 	@ echo -n "Versioned type, should succeed..."
 	@ dune build versioned_good.cma ${REDIRECT}
 	@ echo "OK"
-	@ echo -n "Versioned option type, should succeed..."
-	@ dune build versioned_good_option.cma ${REDIRECT}
+	@ echo -n "Versioned type_constructors type, should succeed..."
+	@ dune build versioned_good_type_constructors.cma ${REDIRECT}
 	@ echo "OK"
 	@ echo -n "Versioned, wrapped type, should succeed..."
 	@ dune build versioned_good_wrapped.cma ${REDIRECT}
