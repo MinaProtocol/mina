@@ -6,6 +6,7 @@
  (inline_tests)
  (libraries fold_lib o1trace coda_digestif tuple_lib bitstring_lib
    core_kernel snarky snarky_verifier snarky_field_extensions snarky_curves
+   snarky_blake2 snarky_group_map
    snarky_pairing snark_bits dummy_values crypto_params chunked_triples)
  (preprocess
   (pps ppx_base ppx_let ppx_deriving.std ppx_deriving_yojson ppx_sexp_conv ppx_bin_prot

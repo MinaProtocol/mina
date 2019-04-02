@@ -711,6 +711,55 @@ module Tick = struct
   module Groth_verifier = Snarky_verifier.Groth.Make (Pairing)
 end
 
+module Bg = struct
+  module M =
+    Snarky.Libsnark.Make_bowe_gabizon
+      (Tock_backend.Full)
+      (struct
+        open Tock_backend.Full
+
+        let g1_to_bits t =
+          let x, y = G1.to_affine_coordinates t in
+          Tick.Bigint.(test_bit (of_field y) 0) :: Tick.Field.unpack x
+
+        let g2_to_bits t =
+          let x, y = G2.to_affine_coordinates t in
+          let open Tick.Field in
+          let y0 = Vector.get y 0 in
+          assert (not Tick.Field.(equal y0 zero)) ;
+          Tick.Bigint.(test_bit (of_field y0) 0)
+          :: List.concat
+               (List.init (Vector.length x) ~f:(fun i ->
+                    Tick.Field.unpack (Vector.get x i) ))
+
+        let salt =
+          lazy Tick.Pedersen.(State.salt params ~get_chunk_table "TockBGHash")
+
+        let random_oracle x =
+          (Blake2.digest_field x :> string)
+          |> Blake2.string_to_bits |> Array.to_list
+
+        module Group_map =
+          Snarky_group_map.Group_map.Make_unchecked (struct
+              include Tick.Field
+              include Infix
+            end)
+            (Tick.Inner_curve.Coefficients)
+
+        let hash ?message ~a ~b ~c ~delta_prime =
+          Tick.Pedersen.digest_fold (Lazy.force salt)
+            Fold_lib.Fold.(
+              group3 ~default:false
+                ( of_list (g1_to_bits a)
+                +> of_list (g2_to_bits b)
+                +> of_list (g1_to_bits c)
+                +> of_list (g2_to_bits delta_prime)
+                +> of_array (Option.value ~default:[||] message) ))
+          |> random_oracle |> Tick.Field.project |> Group_map.to_group
+          |> Tick.Inner_curve.of_affine_coordinates
+      end)
+end
+
 let tock_vk_to_bool_list vk =
   let vk = Tick.Groth_maller_verifier.vk_of_backend_vk vk in
   let g1 = Tick.Inner_curve.to_affine_coordinates in
