@@ -276,32 +276,13 @@ module type Inputs_intf = sig
                 With_hash.t
                 Diff_mutant.E.t
 
-  module Transition_frontier_persistence : sig
-    module Worker : sig
-      type t
-
-      val create : directory_name:string -> t Deferred.t
-
-      val deserialize :
-           directory_name:string
-        -> logger:Logger.t
-        -> root_snarked_ledger:Ledger_db.t
-        -> consensus_local_state:Consensus_mechanism.Local_state.t
-        -> Transition_frontier.t Deferred.t
-
-      val handle_diff :
-           t
-        -> Diff_hash.t
-        -> Coda_base.State_hash.t Diff_mutant.E.t
-        -> Diff_hash.t Deferred.Or_error.t
-    end
-
-    val listen_to_frontier_broadcast_pipe :
-         logger:Logger.t
-      -> Transition_frontier.t sexp_option Broadcast_pipe.Reader.t
-      -> Worker.t
-      -> unit Deferred.t
-  end
+  module Transition_frontier_persistence :
+    Transition_frontier_persistence.Intf.S
+    with type frontier := Transition_frontier.t
+     and type 'output diff := 'output Diff_mutant.E.t
+     and type diff_hash := Diff_hash.t
+     and type root_snarked_ledger := Ledger_db.t
+     and type consensus_local_state := Consensus_mechanism.Local_state.t
 
   module Transaction_pool :
     Transaction_pool_intf
@@ -646,7 +627,7 @@ module Make (Inputs : Inputs_intf) = struct
               | Ok staged_ledger -> staged_ledger
               | Error err -> Error.raise err
             in
-            let%bind worker, transition_frontier =
+            let%bind persistence, transition_frontier =
               match%bind
                 Async.Sys.file_exists config.transition_frontier_location
               with
@@ -659,9 +640,10 @@ module Make (Inputs : Inputs_intf) = struct
                   let%bind () =
                     Async.Unix.mkdir config.transition_frontier_location
                   in
-                  let%bind worker =
-                    Transition_frontier_persistence.Worker.create
+                  let persistence =
+                    Transition_frontier_persistence.create
                       ~directory_name:config.transition_frontier_location
+                      ~logger:config.logger ()
                   in
                   let%map transition_frontier =
                     Transition_frontier.create ~logger:config.logger
@@ -674,17 +656,17 @@ module Make (Inputs : Inputs_intf) = struct
                       ~root_staged_ledger ~root_snarked_ledger
                       ~consensus_local_state
                   in
-                  (worker, transition_frontier)
+                  (persistence, transition_frontier)
               | `Yes ->
                   let directory_name = config.transition_frontier_location in
-                  let%bind frontier =
-                    Transition_frontier_persistence.Worker.deserialize
-                      ~directory_name ~logger:config.logger
-                      ~root_snarked_ledger ~consensus_local_state
+                  let%map frontier =
+                    Transition_frontier_persistence.deserialize ~directory_name
+                      ~logger:config.logger ~root_snarked_ledger
+                      ~consensus_local_state
                   in
-                  let%map worker =
-                    Transition_frontier_persistence.Worker.create
-                      ~directory_name
+                  let worker =
+                    Transition_frontier_persistence.create ~directory_name
+                      ~logger:config.logger ()
                   in
                   (worker, frontier)
             in
@@ -692,7 +674,7 @@ module Make (Inputs : Inputs_intf) = struct
               Broadcast_pipe.create (Some transition_frontier)
             in
             Transition_frontier_persistence.listen_to_frontier_broadcast_pipe
-              ~logger:config.logger frontier_broadcast_pipe_r worker
+              ~logger:config.logger frontier_broadcast_pipe_r persistence
             |> don't_wait_for ;
             let%bind net =
               Net.create config.net_config

@@ -100,10 +100,4 @@ struct
   let handle_diff {connection; _} hash diff =
     Rpc_worker.Connection.run connection ~f:Rpc_worker.functions.handle_diff
       ~arg:(hash, diff)
-
-  let deserialize ~directory_name ~logger ~root_snarked_ledger
-      ~consensus_local_state =
-    Worker.with_worker ~directory_name ~logger ~f:(fun worker ->
-        Worker.deserialize worker ~root_snarked_ledger ~consensus_local_state
-    )
 end

@@ -38,6 +38,19 @@ end
 module type Worker_inputs = sig
   include Transition_frontier.Inputs_intf
 
+  module Make_transition_storage (Inputs : Transition_frontier.Inputs_intf) : sig
+    module Schema :
+      Transition_database_schema
+      with type external_transition :=
+                  Inputs.External_transition.Stable.Latest.t
+       and type state_hash := State_hash.Stable.Latest.t
+       and type scan_state := Inputs.Staged_ledger.Scan_state.Stable.Latest.t
+
+    include Rocksdb.Serializable.GADT.S with type 'a g := 'a Schema.t
+
+    val get : t -> logger:Logger.t -> ?location:string -> 'a Schema.t -> 'a
+  end
+
   module Transition_frontier :
     Transition_frontier_intf
     with type state_hash := State_hash.t
@@ -58,21 +71,7 @@ module type Worker_inputs = sig
 end
 
 module type Worker = sig
-  type external_transition
-
-  type scan_state
-
-  type state_hash
-
-  type consensus_local_state
-
-  type frontier
-
-  type root_snarked_ledger
-
   type hash
-
-  type breadcrumb
 
   type diff
 
@@ -80,70 +79,54 @@ module type Worker = sig
 
   val create : ?directory_name:string -> logger:Logger.t -> unit -> t
 
-  val deserialize :
-       t
-    -> root_snarked_ledger:root_snarked_ledger
-    -> consensus_local_state:consensus_local_state
-    -> frontier Deferred.t
+  val close : t -> unit
 
   val handle_diff : t -> hash -> diff -> hash
-
-  val with_worker :
-    directory_name:string -> logger:Logger.t -> f:(t -> 'a) -> 'a
-
-  module For_tests : sig
-    module Transition_storage : sig
-      module Schema :
-        Transition_database_schema
-        with type external_transition := external_transition
-         and type state_hash := state_hash
-         and type scan_state := scan_state
-
-      include Rocksdb.Serializable.GADT.S with type 'a g := 'a Schema.t
-    end
-
-    val transition_storage : t -> Transition_storage.t
-  end
 end
 
 (* TODO: Make an RPC_parallel version of Worker.ml *)
 module type Main_inputs = sig
   include Worker_inputs
 
-  module Worker : sig
-    type t
+  module Make_worker (Inputs : Worker_inputs) : sig
+    include
+      Worker
+      with type hash := Inputs.Diff_hash.t
+       and type diff := State_hash.t Inputs.Diff_mutant.E.t
 
     val handle_diff :
          t
-      -> Diff_hash.t
-      -> State_hash.t Diff_mutant.E.t
-      -> Diff_hash.t Deferred.Or_error.t
+      -> Inputs.Diff_hash.t
+      -> State_hash.t Inputs.Diff_mutant.E.t
+      -> Inputs.Diff_hash.t Deferred.Or_error.t
   end
 end
 
 module type S = sig
   type frontier
 
-  type worker
+  type t
 
   type 'output diff
 
   type diff_hash
 
+  type root_snarked_ledger
+
+  type consensus_local_state
+
+  val create : ?directory_name:string -> logger:Logger.t -> unit -> t
+
   val listen_to_frontier_broadcast_pipe :
        logger:Logger.t
     -> frontier option Broadcast_pipe.Reader.t
-    -> worker
+    -> t
     -> unit Deferred.t
 
-  (* TODO: Lol this cannot be polymorphic. Don't actually get any wins if this was polymorphic *)
-  module For_tests : sig
-    val write_diff_and_verify :
-         logger:Logger.t
-      -> acc_hash:diff_hash
-      -> worker
-      -> frontier
-      -> 'output diff
-      -> diff_hash Deferred.t
-  end
+  val deserialize :
+       directory_name:string
+    -> logger:Logger.t
+    -> root_snarked_ledger:root_snarked_ledger
+    -> consensus_local_state:consensus_local_state
+    -> frontier Deferred.t
 end

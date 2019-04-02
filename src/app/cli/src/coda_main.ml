@@ -611,18 +611,14 @@ struct
   module Transition_frontier =
     Transition_frontier.Make (Transition_frontier_inputs)
 
-  module Transition_frontier_persistence = struct
-    module Worker = Transition_frontier_persistence_rpc_worker.Make (struct
-      include Transition_frontier_inputs
-      module Transition_frontier = Transition_frontier
-    end)
-
-    include Transition_frontier_persistence.Make (struct
-      include Transition_frontier_inputs
-      module Transition_frontier = Transition_frontier
-      module Worker = Worker
-    end)
-  end
+  module Transition_frontier_persistence =
+  Transition_frontier_persistence.Make (struct
+    include Transition_frontier_inputs
+    module Transition_frontier = Transition_frontier
+    module Make_worker = Transition_frontier_persistence.Worker.Make_async
+    module Make_transition_storage =
+      Transition_frontier_persistence.Transition_storage.Make
+  end)
 
   module Transaction_pool = struct
     module Pool = Transaction_pool.Make (Staged_ledger) (Transition_frontier)

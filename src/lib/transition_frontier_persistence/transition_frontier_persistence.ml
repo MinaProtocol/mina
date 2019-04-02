@@ -6,17 +6,16 @@ module Diff_mutant = Diff_mutant
 module Worker = Worker
 module Intf = Intf
 module Diff_hash = Diff_hash
+module Transition_storage = Transition_storage
 
-module Make (Inputs : Intf.Main_inputs) :
-  Intf.S
-  with type frontier := Inputs.Transition_frontier.t
-   and type worker := Inputs.Worker.t
-   and type diff_hash := Inputs.Diff_hash.t
-   and type 'output diff :=
-              ( (Inputs.External_transition.t, State_hash.t) With_hash.t
-              , 'output )
-              Inputs.Diff_mutant.t = struct
+module Make (Inputs : Intf.Main_inputs) = struct
   open Inputs
+  module Worker = Inputs.Make_worker (Inputs)
+  module Transition_storage = Inputs.Make_transition_storage (Inputs)
+
+  type t = Worker.t
+
+  let create = Worker.create
 
   let apply_diff (type mutant) frontier
       (diff :
@@ -114,6 +113,107 @@ module Make (Inputs : Intf.Main_inputs) :
               Deferred.return Diff_hash.empty )
     in
     Deferred.unit
+
+  let directly_add_breadcrumb ~logger transition_frontier transition_with_hash
+      parent =
+    let log_error () =
+      Logger.fatal logger ~module_:__MODULE__ ~location:__LOC__
+        ~metadata:
+          [("hash", State_hash.to_yojson (With_hash.hash transition_with_hash))]
+        "Failed to add breadcrumb into $hash"
+    in
+    let%bind child_breadcrumb =
+      match%map
+        Transition_frontier.Breadcrumb.build ~logger ~parent
+          ~transition_with_hash
+      with
+      | Ok child_breadcrumb -> child_breadcrumb
+      | Error (`Fatal_error exn) -> log_error () ; raise exn
+      | Error (`Validation_error error) -> log_error () ; Error.raise error
+    in
+    let%map () =
+      Transition_frontier.add_breadcrumb_exn transition_frontier
+        child_breadcrumb
+    in
+    child_breadcrumb
+
+  let staged_ledger_hash transition =
+    let open External_transition.Verified in
+    let protocol_state = protocol_state transition in
+    Coda_base.Staged_ledger_hash.ledger_hash
+      External_transition.Protocol_state.(
+        Blockchain_state.staged_ledger_hash @@ blockchain_state protocol_state)
+
+  let with_database ~directory_name ~f =
+    let transition_storage =
+      Transition_storage.create ~directory:directory_name
+    in
+    let result = f transition_storage in
+    Transition_storage.close transition_storage ;
+    result
+
+  let deserialize ~directory_name ~logger ~root_snarked_ledger
+      ~consensus_local_state =
+    let open Transition_storage.Schema in
+    with_database ~directory_name ~f:(fun transition_storage ->
+        let state_hash, scan_state =
+          Transition_storage.get transition_storage ~logger Root
+        in
+        let get_verified_transition state_hash =
+          let transition, root_successor_hashes =
+            Transition_storage.get transition_storage ~logger
+              (Transition state_hash)
+          in
+          (* We read a transition that was already verified before it was written to disk *)
+          let (`I_swear_this_is_safe_see_my_comment verified_transition) =
+            External_transition.to_verified transition
+          in
+          (verified_transition, root_successor_hashes)
+        in
+        let root_transition, root_successor_hashes =
+          let verified_transition, children_hashes =
+            get_verified_transition state_hash
+          in
+          ( {With_hash.data= verified_transition; hash= state_hash}
+          , children_hashes )
+        in
+        let%bind root_staged_ledger =
+          Staged_ledger.of_scan_state_and_snarked_ledger ~scan_state
+            ~snarked_ledger:(Ledger.of_database root_snarked_ledger)
+            ~expected_merkle_root:
+              (staged_ledger_hash @@ With_hash.data root_transition)
+          |> Deferred.Or_error.ok_exn
+        in
+        let%bind transition_frontier =
+          Transition_frontier.create ~logger ~consensus_local_state
+            ~root_transition ~root_snarked_ledger ~root_staged_ledger
+        in
+        let create_job breadcrumb child_hashes =
+          List.map child_hashes ~f:(fun child_hash -> (child_hash, breadcrumb))
+        in
+        let rec dfs = function
+          | [] -> Deferred.unit
+          | (state_hash, parent_breadcrumb) :: remaining_jobs ->
+              let verified_transition, child_hashes =
+                get_verified_transition state_hash
+              in
+              let%bind new_breadcrumb =
+                directly_add_breadcrumb ~logger transition_frontier
+                  With_hash.{data= verified_transition; hash= state_hash}
+                  parent_breadcrumb
+              in
+              dfs
+                ( List.map child_hashes ~f:(fun child_hash ->
+                      (child_hash, new_breadcrumb) )
+                @ remaining_jobs )
+        in
+        let%map () =
+          dfs
+            (create_job
+               (Transition_frontier.root transition_frontier)
+               root_successor_hashes)
+        in
+        transition_frontier )
 
   module For_tests = struct
     let write_diff_and_verify = write_diff_and_verify
