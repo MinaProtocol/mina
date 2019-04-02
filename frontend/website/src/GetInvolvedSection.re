@@ -4,6 +4,7 @@ module Link = {
     ...component,
     render: _ => {
       <a
+        target="_blank"
         href=link
         className=Css.(merge([Style.Link.basic, style([cursor(`pointer)])]))>
         {ReasonReact.string(message ++ {js|\u00A0→|js})}
@@ -20,7 +21,7 @@ module KnowledgeBase = {
       ...component,
       render: _ => {
         let items =
-          Belt.Array.map(content, ((copy, link)) =>
+          Belt.Array.map(content, ({Links.Named.name: copy, link}) =>
             <li
               className=Css.(
                 style([
@@ -165,43 +166,11 @@ module KnowledgeBase = {
           )>
           <SubSection
             title="Articles"
-            content={
-              // before the blog posts
-              [("Read the Coda Whitepaper", Links.Static.whitepaper)]
-              @ List.map(
-                  ((name, _, metadata)) =>
-                    (metadata.BlogPost.title, "/blog/" ++ name ++ ".html"),
-                  posts,
-                )
-              // after the blog posts
-              @ [
-                (
-                  "Coindesk: This Blockchain Tosses Blocks",
-                  Links.ThirdParty.coindeskTossesBlocks,
-                ),
-                (
-                  "TokenDaily: Deep Dive with O(1) on Coda Protocol",
-                  Links.ThirdParty.tokenDailyQA,
-                ),
-              ]
-              |> Array.of_list
-            }
+            content={Array.of_list(Links.Lists.articles(posts))}
           />
           <SubSection
             title="Videos & Podcasts"
-            content=[|
-              ("Hack Summit 2018: Coda Talk", Links.Talks.hackSummit2018),
-              ("Scanning for Scans", Links.Talks.scanningForScans),
-              (
-                "Token Talks - Interview with Coda",
-                Links.Podcasts.tokenTalksInterview,
-              ),
-              (
-                "A High-Level Language for Verifiable Computation",
-                Links.Talks.highLevelLanguage,
-              ),
-              ("Snarky, a DSL for Writing SNARKs", Links.Talks.snarkyDsl),
-            |]
+            content={Array.of_list(Links.Lists.richMedia)}
           />
         </div>
       </fieldset>;

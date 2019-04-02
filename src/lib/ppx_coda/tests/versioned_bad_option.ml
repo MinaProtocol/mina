@@ -5,7 +5,8 @@ module Foo = struct
     module Stable = struct
       module V1 = struct
         module T = struct
-          type t = int [@@deriving yojson, bin_io, version {unwrapped}]
+          (* "option" misspelled *)
+          type t = int optin [@@deriving yojson, bin_io, version]
         end
 
         include T

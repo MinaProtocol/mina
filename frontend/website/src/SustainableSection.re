@@ -28,13 +28,12 @@ let make = _children => {
             merge([
               Style.H1.hero,
               style([
-                color(Style.Colors.denimTwo),
+                color(Style.Colors.clover),
                 position(`relative),
                 display(`inlineBlock),
                 marginTop(`zero),
                 marginBottom(`zero),
                 media(Style.MediaQuery.notSmallMobile, [margin(`auto)]),
-                media(Style.MediaQuery.full, [color(Style.Colors.clover)]),
               ]),
             ])
           )>
