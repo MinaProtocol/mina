@@ -222,7 +222,8 @@ end = struct
                 in
                 Root_sync_ledger.new_goal root_sync_ledger
                   (Frozen_ledger_hash.to_ledger_hash snarked_ledger_hash)
-                  ~data:(t.current_root |> With_hash.hash) ;
+                  ~data:(t.current_root |> With_hash.hash)
+                |> ignore ;
                 `Syncing
                   { snarked_ledger_hash
                   ; staged_ledger_merkle_root
