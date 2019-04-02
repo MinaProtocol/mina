@@ -497,13 +497,15 @@ module Base = struct
     let prover_state : Prover_state.t =
       {state1; state2; transaction; sok_digest; pending_coinbase_stack_state}
     in
+    let main top_hash = handle (main top_hash) handler in
     let top_hash =
       base_top_hash ~sok_digest ~state1 ~state2
         ~fee_excess:(Transaction_union.excess transaction)
         ~supply_increase:(Transaction_union.supply_increase transaction)
         ~pending_coinbase_stack_state
     in
-    (top_hash, prove_main proving_key ~handlers:[handler] prover_state top_hash)
+    ( top_hash
+    , Groth16.prove proving_key (tick_input ()) prover_state main top_hash )
 
   let cached =
     let load =
