@@ -6,5 +6,5 @@
  (libraries snarky base64 snark_params core non_zero_curve_point yojson)
  (preprocessor_deps ../../config.mlh)
  (preprocess
-  (pps ppx_snarky ppx_jane ppx_deriving.eq ppx_deriving_yojson))
+  (pps ppx_snarky ppx_coda ppx_jane ppx_deriving.eq ppx_deriving_yojson))
  (synopsis "Schnorr signatures using the tick and tock curves"))
