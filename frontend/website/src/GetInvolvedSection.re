@@ -20,7 +20,7 @@ module KnowledgeBase = {
       ...component,
       render: _ => {
         let items =
-          Belt.Array.map(content, ((copy, link)) =>
+          Belt.Array.map(content, ({Links.Named.name: copy, link}) =>
             <li
               className=Css.(
                 style([
@@ -167,30 +167,21 @@ module KnowledgeBase = {
             title="Articles"
             content={
               // before the blog posts
-              [("Read the Coda Whitepaper", Links.Static.whitepaper)]
+              [Links.Static.whitepaper]
               @ List.map(
                   ((name, _, metadata)) =>
-                    (metadata.BlogPost.title, "/blog/" ++ name ++ ".html"),
+                    {
+                      Links.Named.name: metadata.BlogPost.title,
+                      link: "/blog/" ++ name ++ ".html",
+                    },
                   posts,
                 )
               // after the blog posts
               @ [
-                (
-                  "Snarkette: JavaScript Groth-Maller SNARK verifier",
-                  Links.Static.snarkette,
-                ),
-                (
-                  "Coda: A Blockchain the Size of a Few Tweets",
-                  Links.ThirdParty.codaTheSizeOfTweets,
-                ),
-                (
-                  "Coindesk: This Blockchain Tosses Blocks",
-                  Links.ThirdParty.coindeskTossesBlocks,
-                ),
-                (
-                  "TokenDaily: Deep Dive with O(1) on Coda Protocol",
-                  Links.ThirdParty.tokenDailyQA,
-                ),
+                Links.Static.snarkette,
+                Links.ThirdParty.codaTheSizeOfTweets,
+                Links.ThirdParty.coindeskTossesBlocks,
+                Links.ThirdParty.tokenDailyQA,
               ]
               |> Array.of_list
             }
@@ -198,54 +189,21 @@ module KnowledgeBase = {
           <SubSection
             title="Videos & Podcasts"
             content=[|
-              (
-                "SNARKonomicon: Effectively program SNARKs",
-                Links.Talks.notesFromSnarkomicon,
-              ),
-              (
-                "Crypto{graphy,currency} Meetup @ Coda HQ",
-                Links.Panel.cryptographyCurrency,
-              ),
-              (
-                "Decentralization's Trojan Horse: CODA Protocol",
-                Links.Podcasts.decentralizationTrojanHorse,
-              ),
-              (
-                "Snarky: Algebraic effects in Coda",
-                Links.Talks.snarkyAlgebraicEffects,
-              ),
-              (
-                "Using zk-SNARKs For A Constant Sized Blockchain",
-                Links.Talks.usingZkConstantSize,
-              ),
-              (
-                "Zero Knowledge Proofs: Mind Bending Tech",
-                Links.Panel.zkProofsMindBending,
-              ),
-              ("Fast Accumulation on Streams", Links.Talks.scanningForScans),
-              ("Scalar Capital Summit 2018", Links.Panel.scalarCapitalSummit),
-              (
-                "Digging into recursive zkSNARKs with Coda",
-                Links.Podcasts.digIntoRecursive,
-              ),
-              (
-                "High Throughput Slow SNARKs",
-                Links.Talks.highThroughputSlowSnarks,
-              ),
-              (
-                "Using zk-SNARKs to create a succinct blockchain",
-                Links.Talks.zkSnarksSuccinctBlockchain,
-              ),
-              ("Hack Summit 2018: Coda Talk", Links.Talks.hackSummit2018),
-              (
-                "Token Talks - Interview with Coda",
-                Links.Podcasts.tokenTalksInterview,
-              ),
-              (
-                "A High-Level Language for Verifiable Computation",
-                Links.Talks.highLevelLanguage,
-              ),
-              ("Snarky, a DSL for Writing SNARKs", Links.Talks.snarkyDsl),
+              Links.Talks.notesFromSnarkomicon,
+              Links.Panel.cryptographyCurrency,
+              Links.Podcasts.decentralizationTrojanHorse,
+              Links.Talks.snarkyAlgebraicEffects,
+              Links.Talks.usingZkConstantSize,
+              Links.Panel.zkProofsMindBending,
+              Links.Talks.scanningForScans,
+              Links.Panel.scalarCapitalSummit,
+              Links.Podcasts.digIntoRecursive,
+              Links.Talks.highThroughputSlowSnarks,
+              Links.Talks.zkSnarksSuccinctBlockchain,
+              Links.Talks.hackSummit2018,
+              Links.Podcasts.tokenTalksInterview,
+              Links.Talks.highLevelLanguage,
+              Links.Talks.snarkyDsl,
             |]
           />
         </div>
