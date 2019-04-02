@@ -385,7 +385,7 @@ module SignupButton = {
         <span
           className=Css.(
             style([
-              marginLeft(`rem(0.25)),
+              marginLeft(`rem(0.1875)),
               marginRight(`rem(0.0625)),
               // HACK: vertically centering leaves it 1px too high
               paddingTop(`rem(0.0625)),

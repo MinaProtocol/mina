@@ -25,10 +25,8 @@ end
 module Stable = struct
   module V1 = struct
     module T = struct
-      let version = 1
-
       type t = Tick.Field.t * Tick.Field.t
-      [@@deriving bin_io, sexp, eq, compare, hash]
+      [@@deriving bin_io, sexp, eq, compare, hash, version]
     end
 
     include T
@@ -90,16 +88,26 @@ let parity y = Tick.Bigint.(test_bit (of_field y) 0)
 module Compressed = struct
   open Tick
 
-  type ('field, 'boolean) t_ = {x: 'field; is_odd: 'boolean}
-  [@@deriving bin_io, sexp, compare, eq, hash]
+  module Poly = struct
+    module Stable = struct
+      module V1 = struct
+        module T = struct
+          type ('field, 'boolean) t = {x: 'field; is_odd: 'boolean}
+          [@@deriving bin_io, sexp, compare, eq, hash, version]
+        end
+
+        include T
+      end
+
+      module Latest = V1
+    end
+  end
 
   module Stable = struct
     module V1 = struct
       module T = struct
-        let version = 1
-
-        type t = (Field.t, bool) t_
-        [@@deriving bin_io, sexp, eq, compare, hash]
+        type t = (Field.t, bool) Poly.Stable.V1.t
+        [@@deriving bin_io, sexp, eq, compare, hash, version]
       end
 
       include T
@@ -130,22 +138,24 @@ module Compressed = struct
 
   let to_string = to_base64
 
-  let empty = {x= Field.zero; is_odd= false}
+  let empty = Poly.Stable.Latest.{x= Field.zero; is_odd= false}
 
   let gen =
     let open Quickcheck.Generator.Let_syntax in
     let%map x = Field.gen and is_odd = Bool.gen in
-    {x; is_odd}
+    Poly.Stable.Latest.{x; is_odd}
 
   let bit_length_to_triple_length n = (n + 2) / 3
 
   let length_in_triples = bit_length_to_triple_length (1 + Field.size_in_bits)
 
-  type var = (Field.Var.t, Boolean.var) t_
+  type var = (Field.Var.t, Boolean.var) Poly.Stable.Latest.t
 
-  let to_hlist {x; is_odd} = Snarky.H_list.[x; is_odd]
+  let to_hlist Poly.Stable.Latest.({x; is_odd}) = Snarky.H_list.[x; is_odd]
 
-  let of_hlist : (unit, 'a -> 'b -> unit) Snarky.H_list.t -> ('a, 'b) t_ =
+  let of_hlist :
+      (unit, 'a -> 'b -> unit) Snarky.H_list.t -> ('a, 'b) Poly.Stable.Latest.t
+      =
     Snarky.H_list.(fun [x; is_odd] -> {x; is_odd})
 
   let typ : (var, t) Typ.t =
@@ -162,7 +172,7 @@ module Compressed = struct
     and () = Boolean.Assert.(t1.is_odd = t2.is_odd) in
     ()
 
-  let fold_bits {is_odd; x} =
+  let fold_bits Poly.Stable.Latest.({is_odd; x}) =
     {Fold.fold= (fun ~init ~f -> f ((Field.Bits.fold x).fold ~init ~f) is_odd)}
 
   let fold t = Fold.group3 ~default:false (fold_bits t)
@@ -179,18 +189,24 @@ module Compressed = struct
 
   module Checked = struct
     let equal t1 t2 =
-      let%bind x_eq = Field.Checked.equal t1.x t2.x in
+      let%bind x_eq =
+        Field.Checked.equal t1.Poly.Stable.Latest.x t2.Poly.Stable.Latest.x
+      in
       let%bind odd_eq = Boolean.equal t1.is_odd t2.is_odd in
       Boolean.(x_eq && odd_eq)
 
     let if_ cond ~then_:t1 ~else_:t2 =
-      let%map x = Field.Checked.if_ cond ~then_:t1.x ~else_:t2.x
+      let%map x =
+        Field.Checked.if_ cond ~then_:t1.Poly.Stable.Latest.x
+          ~else_:t2.Poly.Stable.Latest.x
       and is_odd = Boolean.if_ cond ~then_:t1.is_odd ~else_:t2.is_odd in
-      {x; is_odd}
+      Poly.Stable.Latest.{x; is_odd}
 
     module Assert = struct
       let equal t1 t2 =
-        let%map () = Field.Checked.Assert.equal t1.x t2.x
+        let%map () =
+          Field.Checked.Assert.equal t1.Poly.Stable.Latest.x
+            t2.Poly.Stable.Latest.x
         and () = Boolean.Assert.(t1.is_odd = t2.is_odd) in
         ()
     end
@@ -227,7 +243,7 @@ let compress : t -> Compressed.t = Compressed.compress
 
 let%snarkydef compress_var ((x, y) : var) : (Compressed.var, _) Checked.t =
   let%map is_odd = parity_var y in
-  {Compressed.x; is_odd}
+  {Compressed.Poly.Stable.Latest.x; is_odd}
 
 let of_bigstring, to_bigstring = Stable.Latest.(of_bigstring, to_bigstring)
 
