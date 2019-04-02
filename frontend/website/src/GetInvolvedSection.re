@@ -1,9 +1,10 @@
 module Link = {
   let component = ReasonReact.statelessComponent("GetInvolved.Link");
-  let make = (~message, _) => {
+  let make = (~link, ~message, _) => {
     ...component,
     render: _ => {
       <a
+        href=link
         className=Css.(merge([Style.Link.basic, style([cursor(`pointer)])]))>
         {ReasonReact.string(message ++ {js|\u00A0→|js})}
       </a>;
@@ -41,9 +42,9 @@ module KnowledgeBase = {
                 href=link
                 className=Css.(
                   merge([Style.Link.basic, style([cursor(`pointer)])])
-                )>
-                {ReasonReact.string(copy)}
-              </a>
+                )
+                dangerouslySetInnerHTML={"__html": copy}
+              />
             </li>
           );
 
@@ -87,7 +88,7 @@ module KnowledgeBase = {
   };
 
   let component = ReasonReact.statelessComponent("GetInvolved.KnowledgeBase");
-  let make = _ => {
+  let make = (~posts, _children) => {
     ...component,
     render: _ => {
       <fieldset
@@ -164,20 +165,42 @@ module KnowledgeBase = {
           )>
           <SubSection
             title="Articles"
-            content=[|
-              ("Read the Coda Whitepaper", "#"),
-              ("Fast Accumulation on Streams", "#"),
-              ("Coindesk: This Blockchain Tosses Blocks", "#"),
-              ("TokenDaily: Deep Dive with O(1) on Coda Protocol", "#"),
-            |]
+            content={
+              // before the blog posts
+              [("Read the Coda Whitepaper", Links.Static.whitepaper)]
+              @ List.map(
+                  ((name, _, metadata)) =>
+                    (metadata.BlogPost.title, "/blog/" ++ name ++ ".html"),
+                  posts,
+                )
+              // after the blog posts
+              @ [
+                (
+                  "Coindesk: This Blockchain Tosses Blocks",
+                  Links.ThirdParty.coindeskTossesBlocks,
+                ),
+                (
+                  "TokenDaily: Deep Dive with O(1) on Coda Protocol",
+                  Links.ThirdParty.tokenDailyQA,
+                ),
+              ]
+              |> Array.of_list
+            }
           />
           <SubSection
             title="Videos & Podcasts"
             content=[|
-              ("Hack Summit 2018: Coda Talk", "#"),
-              ("Token Talks - Interview with Coda", "#"),
-              ("A High-Level Language for Verifiable Computation", "#"),
-              ("Snarky, a DSL for Writing SNARKs", "#"),
+              ("Hack Summit 2018: Coda Talk", Links.Talks.hackSummit2018),
+              ("Scanning for Scans", Links.Talks.scanningForScans),
+              (
+                "Token Talks - Interview with Coda",
+                Links.Podcasts.tokenTalksInterview,
+              ),
+              (
+                "A High-Level Language for Verifiable Computation",
+                Links.Talks.highLevelLanguage,
+              ),
+              ("Snarky, a DSL for Writing SNARKs", Links.Talks.snarkyDsl),
             |]
           />
         </div>
@@ -327,7 +350,7 @@ module SocialLink = {
 let marginBelow = Css.(style([marginBottom(`rem(0.5))]));
 
 let component = ReasonReact.statelessComponent("GetInvolved");
-let make = _ => {
+let make = (~posts, _children) => {
   ...component,
   render: _self =>
     <div className=Css.(style([marginBottom(`rem(13.0))]))>
@@ -374,16 +397,28 @@ let make = _ => {
             ])
           )>
           <li className=marginBelow>
-            <Link message="Stay updated about developing with Coda" />
+            <Link
+              link=Links.Forms.developingWithCoda
+              message="Stay updated about developing with Coda"
+            />
           </li>
           <li className=marginBelow>
-            <Link message="Notify me about participating in consensus" />
+            <Link
+              link=Links.Forms.participateInConsensus
+              message="Notify me about participating in consensus"
+            />
           </li>
           <li className=marginBelow>
-            <Link message="Earn Coda by helping to compress the blockchain" />
+            <Link
+              link=Links.Forms.compressTheBlockchain
+              message="Earn Coda by helping to compress the blockchain"
+            />
           </li>
           <li className=marginBelow>
-            <Link message="Join our mailing list for updates" />
+            <Link
+              link=Links.Forms.mailingList
+              message="Join our mailing list for updates"
+            />
           </li>
         </ul>
       </div>
@@ -420,6 +455,6 @@ let make = _ => {
           svg=SocialLink.Svg.telegram
         />
       </div>
-      <KnowledgeBase />
+      <KnowledgeBase posts />
     </div>,
 };

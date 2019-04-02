@@ -1,4 +1,4 @@
-let middleElementWidthRems = 13.75;
+let middleElementWidthRems = 21.5;
 
 let topMarginUnderHeading = `rem(2.5);
 // nudge so it looks like the center of the coda icon hits bar
@@ -40,7 +40,7 @@ module Code = {
                   display(`block),
                   position(`absolute),
                   top(`percent(50.0)),
-                  left(`percent(10.0)), // determined experimentally
+                  left(`percent(13.5)), // determined experimentally
                   width(`percent(100.0)),
                   height(`rem(0.125)),
                   backgroundColor(Style.Colors.blueBlue),
@@ -270,7 +270,10 @@ let make = _ => {
               "Empower your users with a direct secure connection to the Coda network.",
               "Coda will be able to be embedded into any webpage or app with just a script tag and a couple lines of JavaScript.",
             |]
-            cta="Stay updated about developing with Coda"
+            cta={
+              SideText.Cta.copy: "Stay updated about developing with Coda",
+              link: Links.Forms.developingWithCoda,
+            }
           />
         </div>
         <ImageCollage

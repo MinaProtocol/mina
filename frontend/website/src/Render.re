@@ -42,18 +42,37 @@ let writeStatic = (path, rootComponent) => {
   Node.Fs.writeFileAsUtf8Sync(path ++ ".css", rendered##css);
 };
 
-let posts =
-  Node.Fs.readdirSync("posts")
-  |> Array.to_list
-  |> List.filter(s => Js.String.endsWith(Markdown.suffix, s))
-  |> List.map(fileName => {
-       let length = String.length(fileName) - String.length(Markdown.suffix);
-       let name = String.sub(fileName, 0, length);
-       let path = "posts/" ++ fileName;
-       let (html, content) = Markdown.load(path);
-       let metadata = BlogPost.parseMetadata(content, path);
-       (name, html, metadata);
-     });
+let posts = {
+  let unsorted =
+    Node.Fs.readdirSync("posts")
+    |> Array.to_list
+    |> List.filter(s => Js.String.endsWith(Markdown.suffix, s))
+    |> List.map(fileName => {
+         let length =
+           String.length(fileName) - String.length(Markdown.suffix);
+         let name = String.sub(fileName, 0, length);
+         let path = "posts/" ++ fileName;
+         let (html, content) = Markdown.load(path);
+         let metadata = BlogPost.parseMetadata(content, path);
+         (name, html, metadata);
+       });
+
+  List.sort(
+    ((_, _, metadata1), (_, _, metadata2)) => {
+      let date1 = Js.Date.fromString(metadata1.BlogPost.date);
+      let date2 = Js.Date.fromString(metadata2.date);
+      let diff = Js.Date.getTime(date2) -. Js.Date.getTime(date1);
+      if (diff > 0.) {
+        1;
+      } else if (diff < 0.) {
+        (-1);
+      } else {
+        0;
+      };
+    },
+    unsorted,
+  );
+};
 
 module Router = {
   type t =
@@ -96,6 +115,11 @@ let jobOpenings = [|
 
 Rimraf.sync("site");
 
+let blogPage =
+  <Page page=`Blog name="blog" extraHeaders=Blog.extraHeaders>
+    <Wrapped> <Blog posts /> </Wrapped>
+  </Page>;
+
 Router.(
   generateStatic(
     Dir(
@@ -105,7 +129,7 @@ Router.(
         File(
           "index",
           <Page page=`Home name="index" footerColor=Style.Colors.gandalf>
-            <Home />
+            <Home posts />
           </Page>,
         ),
         Dir(
@@ -123,7 +147,8 @@ Router.(
                    <Wrapped> <BlogPost name html metadata /> </Wrapped>
                  </Page>,
                )
-             ),
+             )
+          |> Array.append([|File("index", blogPage)|]),
         ),
         Dir(
           "jobs",
@@ -161,12 +186,7 @@ Router.(
             <Wrapped> <Testnet /> </Wrapped>
           </Page>,
         ),
-        File(
-          "blog",
-          <Page page=`Blog name="blog" extraHeaders=Blog.extraHeaders>
-            <Wrapped> <Blog posts /> </Wrapped>
-          </Page>,
-        ),
+        File("blog", blogPage),
         File(
           "privacy",
           <Page page=`Privacy name="privacy">
