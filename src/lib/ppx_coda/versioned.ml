@@ -107,7 +107,7 @@ let generate_version_number_decl inner3_modules loc wrapped =
 
 let ocaml_builtin_types = ["int"; "float"; "char"; "string"; "bool"; "unit"]
 
-let ocaml_builtin_type_constructors = ["list"; "option"]
+let ocaml_builtin_type_constructors = ["list"; "option"; "ref"]
 
 let rec generate_core_type_version_decls core_type =
   match core_type.ptyp_desc with
