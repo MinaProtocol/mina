@@ -4,7 +4,8 @@ open Network_peer
 module Sender : sig
   module Stable : sig
     module V1 : sig
-      type t = Local | Remote of Peer.t [@@deriving sexp, bin_io, yojson]
+      type t = Local | Remote of Peer.t
+      [@@deriving sexp, bin_io, yojson, version]
     end
 
     module Latest = V1
@@ -18,7 +19,7 @@ module Incoming : sig
   module Stable : sig
     module V1 : sig
       type 'a t = {data: 'a; sender: Sender.Stable.V1.t}
-      [@@deriving sexp, bin_io, yojson]
+      [@@deriving sexp, bin_io, yojson, version]
     end
 
     module Latest = V1
