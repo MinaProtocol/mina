@@ -99,8 +99,7 @@ module Digest = struct
       Array.map (to_bits s) ~f:Boolean.var_of_value
   end
 
-  let to_bits (t : t) =
-    Array.to_list (Blake2.string_to_bits (t :> string))
+  let to_bits (t : t) = Array.to_list (Blake2.string_to_bits (t :> string))
 
   let typ : (Checked.t, t) Typ.t =
     Typ.transport (Typ.array ~length:Blake2.digest_size_in_bits Boolean.typ)
@@ -116,8 +115,7 @@ let digest_field =
     let n = Bigint.of_field x in
     Array.init Field.size_in_bits ~f:(Bigint.test_bit n)
   in
-  fun x ->
-    (digest_string (Blake2.bits_to_string (field_to_bits x)) :> string)
+  fun x -> (digest_string (Blake2.bits_to_string (field_to_bits x)) :> string)
 
 module Checked = struct
   include Snarky_blake2.Make (Tick)
@@ -136,8 +134,7 @@ let%test_unit "checked-unchecked equality" =
       Tick.Test.test_equal ~sexp_of_t:Digest.sexp_of_t
         (Tick.Typ.list ~length:(List.length bits) Tick.Boolean.typ)
         Digest.typ Checked.digest_bits
-        (fun bs ->
-          digest_string (Blake2.bits_to_string (Array.of_list bs)) )
+        (fun bs -> digest_string (Blake2.bits_to_string (Array.of_list bs)))
         bits )
 
 let%test_unit "checked-unchecked field" =
