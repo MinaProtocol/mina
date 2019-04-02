@@ -165,46 +165,11 @@ module KnowledgeBase = {
           )>
           <SubSection
             title="Articles"
-            content={
-              // before the blog posts
-              [Links.Static.whitepaper]
-              @ List.map(
-                  ((name, _, metadata)) =>
-                    {
-                      Links.Named.name: metadata.BlogPost.title,
-                      link: "/blog/" ++ name ++ ".html",
-                    },
-                  posts,
-                )
-              // after the blog posts
-              @ [
-                Links.Static.snarkette,
-                Links.ThirdParty.codaTheSizeOfTweets,
-                Links.ThirdParty.coindeskTossesBlocks,
-                Links.ThirdParty.tokenDailyQA,
-              ]
-              |> Array.of_list
-            }
+            content={Array.of_list(Links.Lists.articles(posts))}
           />
           <SubSection
             title="Videos & Podcasts"
-            content=[|
-              Links.Talks.notesFromSnarkomicon,
-              Links.Panel.cryptographyCurrency,
-              Links.Podcasts.decentralizationTrojanHorse,
-              Links.Talks.snarkyAlgebraicEffects,
-              Links.Talks.usingZkConstantSize,
-              Links.Panel.zkProofsMindBending,
-              Links.Talks.scanningForScans,
-              Links.Panel.scalarCapitalSummit,
-              Links.Podcasts.digIntoRecursive,
-              Links.Talks.highThroughputSlowSnarks,
-              Links.Talks.zkSnarksSuccinctBlockchain,
-              Links.Talks.hackSummit2018,
-              Links.Podcasts.tokenTalksInterview,
-              Links.Talks.highLevelLanguage,
-              Links.Talks.snarkyDsl,
-            |]
+            content={Array.of_list(Links.Lists.richMedia)}
           />
         </div>
       </fieldset>;

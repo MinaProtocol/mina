@@ -136,3 +136,39 @@ module Panel = {
     link: "https://www.youtube.com/watch?v=PgurOsSZ8OQ",
   };
 };
+
+module Lists = {
+  let articles = posts =>
+    // before the blog posts
+    [Static.whitepaper]
+    @ List.map(
+        ((name, _, metadata)) =>
+          {name: metadata.BlogPost.title, link: "/blog/" ++ name ++ ".html"},
+        posts,
+      )
+    // after the blog posts
+    @ [
+      Static.snarkette,
+      ThirdParty.codaTheSizeOfTweets,
+      ThirdParty.coindeskTossesBlocks,
+      ThirdParty.tokenDailyQA,
+    ];
+
+  let richMedia = [
+    Talks.notesFromSnarkomicon,
+    Panel.cryptographyCurrency,
+    Podcasts.decentralizationTrojanHorse,
+    Talks.snarkyAlgebraicEffects,
+    Talks.usingZkConstantSize,
+    Panel.zkProofsMindBending,
+    Talks.scanningForScans,
+    Panel.scalarCapitalSummit,
+    Podcasts.digIntoRecursive,
+    Talks.highThroughputSlowSnarks,
+    Talks.zkSnarksSuccinctBlockchain,
+    Talks.hackSummit2018,
+    Podcasts.tokenTalksInterview,
+    Talks.highLevelLanguage,
+    Talks.snarkyDsl,
+  ];
+};
