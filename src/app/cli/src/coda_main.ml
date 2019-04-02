@@ -712,7 +712,7 @@ struct
           let%map x = Bignum_bigint.(gen_incl zero (Field.size - one))
           and is_odd = Bool.gen in
           let x = Bigint.(to_field (of_bignum_bigint x)) in
-          {Public_key.Compressed.x; is_odd}
+          {Public_key.Compressed.Poly.Stable.Latest.x; is_odd}
         in
         Quickcheck.Generator.map2 Fee.Unsigned.gen pk ~f:(fun fee prover ->
             {fee; prover} )

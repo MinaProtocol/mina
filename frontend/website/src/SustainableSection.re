@@ -28,13 +28,12 @@ let make = _children => {
             merge([
               Style.H1.hero,
               style([
-                color(Style.Colors.denimTwo),
+                color(Style.Colors.clover),
                 position(`relative),
                 display(`inlineBlock),
                 marginTop(`zero),
                 marginBottom(`zero),
                 media(Style.MediaQuery.notSmallMobile, [margin(`auto)]),
-                media(Style.MediaQuery.full, [color(Style.Colors.clover)]),
               ]),
             ])
           )>
@@ -67,6 +66,7 @@ let make = _children => {
           style([
             marginTop(`rem(2.375)),
             display(`flex),
+            maxWidth(`rem(81.5)),
             justifyContent(`spaceBetween),
             alignItems(`center),
             flexWrap(`wrapReverse),
@@ -79,11 +79,7 @@ let make = _children => {
         )>
         <div
           className=Css.(
-            style([
-              marginBottom(`rem(2.375)),
-              userSelect(`none),
-              marginRight(`rem(2.0)),
-            ])
+            style([marginBottom(`rem(2.375)), userSelect(`none)])
           )>
           <Svg
             className=Css.(
@@ -103,11 +99,7 @@ let make = _children => {
         </div>
         <div
           className=Css.(
-            style([
-              marginBottom(`rem(2.375)),
-              userSelect(`none),
-              marginRight(`rem(2.0)),
-            ])
+            style([marginBottom(`rem(2.375)), userSelect(`none)])
           )>
           <Svg
             className=Css.(

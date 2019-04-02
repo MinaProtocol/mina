@@ -357,6 +357,11 @@ module Tick = struct
     module Bits = Bits.Make_field (Tick0.Field) (Tick0.Bigint)
 
     let size_in_triples = (size_in_bits + 2) / 3
+
+    (* for now, assert this type, derived from snarky, is versioned; can we 
+       prevent it changing?
+     *)
+    let __versioned__ = true
   end
 
   module Fq = Snarky_field_extensions.Field_extensions.F (Tick0)
@@ -409,11 +414,19 @@ module Tick = struct
   module Pedersen = struct
     include Crypto_params.Pedersen_params
     include Crypto_params.Pedersen_chunk_table
-    include Pedersen.Make (Field) (Bigint) (Inner_curve)
+
+    include Pedersen.Make (struct
+      module Field = Field
+      module Bigint = Bigint
+      module Curve = Inner_curve
+
+      let params = params
+
+      let chunk_table = chunk_table
+    end)
 
     let zero_hash =
-      digest_fold
-        (State.create params ~get_chunk_table)
+      digest_fold (State.create ())
         (Fold_lib.Fold.of_list [(false, false, false)])
 
     module Checked = struct
@@ -444,9 +457,8 @@ module Tick = struct
       let equal_states s1 s2 =
         equal_curves s1.State.acc s2.State.acc
         && Int.equal s1.triples_consumed s2.triples_consumed
-        (* params, chunk_tables should never be modified *)
-        && phys_equal s1.params s2.params
-        && phys_equal (s1.get_chunk_table ()) (s2.get_chunk_table ())
+
+      (* params, chunk_tables should never be modified *)
 
       let gen_fold n =
         let gen_triple =
@@ -467,13 +479,13 @@ module Tick = struct
         in
         Fold.of_list (gen_triples n)
 
-      let initial_state = State.create params ~get_chunk_table
+      let initial_state = State.create ()
 
       let run_updates fold =
         (* make sure chunk table deserialized before running test;
            actual deserialization happens just once
          *)
-        ignore (Crypto_params.Pedersen_chunk_table.deserialize ()) ;
+        ignore (Lazy.force chunk_table) ;
         let result = State.update_fold_chunked initial_state fold in
         let unchunked_result =
           State.update_fold_unchunked initial_state fold

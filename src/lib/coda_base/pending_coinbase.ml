@@ -151,9 +151,7 @@ module Coinbase_stack = struct
       |> of_hash
 
     let empty =
-      of_hash
-        ( Pedersen.(State.salt params ~get_chunk_table "CoinbaseStack")
-        |> Pedersen.State.digest )
+      of_hash (Pedersen.(State.salt "CoinbaseStack") |> Pedersen.State.digest)
 
     module Checked = struct
       type t = var
@@ -206,8 +204,7 @@ module Hash = struct
 
   let empty_hash =
     let open Tick.Pedersen in
-    digest_fold
-      (State.create params ~get_chunk_table)
+    digest_fold (State.create ())
       (Fold.string_triples "Pending coinbases merkle tree")
     |> of_hash
 

@@ -198,15 +198,24 @@ let make = _ => {
           <p className=rightSideText>
             {ReasonReact.string("We'll soon be releasing the public testnet")}
           </p>
-          <a href=Links.Forms.participateInConsensus className=rightSideLink>
+          <a
+            target="_blank"
+            href=Links.Forms.participateInConsensus
+            className=rightSideLink>
             {ReasonReact.string(
                {js|Notify me about participating in consensus\u00A0→|js},
              )}
           </a>
-          <a href=Links.Forms.compressTheBlockchain className=rightSideLink>
+          <a
+            target="_blank"
+            href=Links.Forms.compressTheBlockchain
+            className=rightSideLink>
             {ReasonReact.string(
                {js|Earn Coda by helping to compress the blockchain\u00A0→|js},
              )}
+          </a>
+          <a href=Links.ThirdParty.testnetStatus className=rightSideLink>
+            {ReasonReact.string({js|Check testnet uptime status\u00A0→|js})}
           </a>
         </div>
       </div>

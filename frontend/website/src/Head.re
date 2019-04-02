@@ -27,7 +27,7 @@ let make = (~extra, ~filename, _children) => {
       <meta name="viewport" content="width=device-width, initial-scale=1" />
       <meta
         property="og:image"
-        content="https://codaprotocol.com/static/img/coda_facebook_OG.jpg"
+        content="https://coda-staging-84430.firebaseapp.com/static/img/coda_facebook_OG.jpg"
       />
       <meta property="og:updated_time" content="1526001445" />
       <meta property="og:type" content="website" />

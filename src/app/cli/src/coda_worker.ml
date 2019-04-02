@@ -441,7 +441,7 @@ module T = struct
                    let state_hash = With_hash.hash t in
                    let prev_state_hash = State_hash.to_bits prev_state_hash in
                    let state_hash = State_hash.to_bits state_hash in
-                   Linear_pipe.write w (prev_state_hash, state_hash) )) ;
+                   Linear_pipe.write_if_open w (prev_state_hash, state_hash) )) ;
             return r.pipe
           in
           let coda_root_diff () =

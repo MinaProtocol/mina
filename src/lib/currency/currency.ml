@@ -23,7 +23,8 @@ module type Basic = sig
 
   module Stable : sig
     module V1 : sig
-      type nonrec t = t [@@deriving bin_io, sexp, compare, eq, hash, yojson]
+      type nonrec t = t
+      [@@deriving bin_io, sexp, compare, eq, hash, yojson, version]
     end
 
     module Latest = V1
@@ -215,9 +216,7 @@ end = struct
   module Stable = struct
     module V1 = struct
       module T = struct
-        let version = 1
-
-        type t = Unsigned.t [@@deriving bin_io, sexp, compare, hash]
+        type t = Unsigned.t [@@deriving bin_io, sexp, compare, hash, version]
 
         let of_int = Unsigned.of_int
 
@@ -549,11 +548,13 @@ end = struct
 
     let%test_module "currency_test" =
       ( module struct
-        let check c () = Or_error.is_ok (check c ())
+        let expect_failure err c =
+          if Or_error.is_ok (check c ()) then failwith err
 
-        let expect_failure err c = if check c () then failwith err
-
-        let expect_success err c = if not (check c ()) then failwith err
+        let expect_success err c =
+          match check c () with
+          | Ok () -> ()
+          | Error e -> Error.(raise (tag ~tag:err e))
 
         let to_bigint x = Bignum_bigint.of_string (Unsigned.to_string x)
 

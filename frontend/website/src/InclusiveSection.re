@@ -140,7 +140,8 @@ module Figure = {
             flexDirection(`column),
             alignItems(`center),
             justifyContent(`center),
-            width(`rem(20.625)),
+            width(`rem(19.5)),
+            media(Style.MediaQuery.notMobile, [width(`rem(20.625))]),
           ])
         )>
         <Svg dims link alt />

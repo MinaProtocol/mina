@@ -1,4 +1,4 @@
-let middleElementWidthRems = 13.75;
+let middleElementWidthRems = 21.5;
 
 let topMarginUnderHeading = `rem(2.5);
 // nudge so it looks like the center of the coda icon hits bar
@@ -40,7 +40,7 @@ module Code = {
                   display(`block),
                   position(`absolute),
                   top(`percent(50.0)),
-                  left(`percent(10.0)), // determined experimentally
+                  left(`percent(13.5)), // determined experimentally
                   width(`percent(100.0)),
                   height(`rem(0.125)),
                   backgroundColor(Style.Colors.blueBlue),
