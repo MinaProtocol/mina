@@ -235,6 +235,18 @@ module Local_state = struct
       ; delegators: Currency.Balance.t Coda_base.Account.Index.Table.t }
     [@@deriving sexp]
 
+    let to_yojson {ledger; delegators} =
+      `Assoc
+        [ ( "ledger_hash"
+          , Coda_base.(
+              Sparse_ledger.merkle_root ledger |> Ledger_hash.to_yojson) )
+        ; ( "delegators"
+          , `Assoc
+              ( Hashtbl.to_alist delegators
+              |> List.map ~f:(fun (account, balance) ->
+                     ( Int.to_string account
+                     , `Int (Currency.Balance.to_int balance) ) ) ) ) ]
+
     let create_empty () =
       { ledger= Coda_base.Sparse_ledger.of_root Coda_base.Ledger_hash.empty_hash
       ; delegators= Coda_base.Account.Index.Table.create () }
@@ -246,7 +258,7 @@ module Local_state = struct
     ; mutable last_checked_slot_and_epoch: Epoch.t * Epoch.Slot.t
     ; genesis_epoch_snapshot: Snapshot.t
     ; proposer_public_key: Public_key.Compressed.t option }
-  [@@deriving sexp]
+  [@@deriving sexp, to_yojson]
 
   let create proposer_public_key =
     (* TODO: remove duplicated genesis ledger *)
@@ -279,6 +291,7 @@ module Local_state = struct
     ; proposer_public_key }
 
   type snapshot_identifier = Last_epoch_snapshot | Curr_epoch_snapshot
+  [@@deriving to_yojson]
 
   let get_snapshot t id =
     match id with
@@ -551,7 +564,6 @@ module Vrf = struct
       (* This version can't be used right now because the field is too small. *)
       let _is_satisfied ~my_stake ~total_stake vrf_output =
         let open Snark_params.Tick in
-        let open Let_syntax in
         let open Number in
         let%bind lhs = of_bits vrf_output * Amount.var_to_number total_stake in
         let%bind rhs =
@@ -582,7 +594,6 @@ module Vrf = struct
   let%snarkydef get_vrf_evaluation shifted ~ledger ~message =
     let open Coda_base in
     let open Snark_params.Tick in
-    let open Let_syntax in
     let%bind private_key =
       request_witness Scalar.typ (As_prover.return Private_key)
     in
@@ -604,7 +615,6 @@ module Vrf = struct
     let%snarkydef check shifted ~(epoch_ledger : Epoch_ledger.var) ~epoch ~slot
         ~seed =
       let open Snark_params.Tick in
-      let open Let_syntax in
       let%bind winner_addr =
         request_witness Coda_base.Account.Index.Unpacked.typ
           (As_prover.return Winner_address)
@@ -1658,6 +1668,11 @@ let select_epoch_data ~(consensus_state : Consensus_state.Value.t) ~epoch =
   else if in_next_epoch then Ok consensus_state.curr_epoch_data
   else Error ()
 
+let epoch_snapshot_name = function
+  | `Genesis -> "genesis"
+  | `Curr -> "curr"
+  | `Last -> "last"
+
 (* Select the correct epoch snapshot to use from local state for an epoch.
  * The rule for selecting the correct epoch snapshot is predicated off of
  * whether or not the first transition in the epoch in question has been
@@ -1687,45 +1702,55 @@ let select_epoch_snapshot ~(consensus_state : Consensus_state.Value.t)
     consensus_state.curr_epoch_data.length > Length.of_int Constants.k
   in
   if is_genesis_snapshot then
-    ("genesis", Some local_state.genesis_epoch_snapshot)
+    (`Genesis, Some local_state.genesis_epoch_snapshot)
   else if in_next_epoch || not epoch_is_finalized then
-    ("curr", local_state.curr_epoch_snapshot)
-  else ("last", local_state.last_epoch_snapshot)
+    (`Curr, local_state.curr_epoch_snapshot)
+  else (`Last, local_state.last_epoch_snapshot)
 
 type local_state_sync =
   { snapshot_id: Local_state.snapshot_identifier
   ; expected_root: Coda_base.Frozen_ledger_hash.t }
+[@@deriving to_yojson]
 
 let required_local_state_sync ~(consensus_state : Consensus_state.Value.t)
     ~local_state =
   let open Coda_base in
   let open Consensus_state in
-  (*
   let epoch = consensus_state.curr_epoch in
   let epoch_data =
     (* This should not fail since we are getting epoch data for the
      * same epoch that the consensus state is in. *)
     select_epoch_data ~consensus_state ~epoch
-    |> Result.map_error ~f:(Fn.const "unexpected failure while selecting epoch data from consensus state")
+    |> Result.map_error
+         ~f:
+           (Fn.const
+              "unexpected failure while selecting epoch data from consensus \
+               state")
     |> Result.ok_or_failwith
   in
-  *)
+  let source, _snapshot =
+    select_epoch_snapshot ~consensus_state ~local_state ~epoch ~epoch_data
+  in
   let required_snapshot_sync snapshot_id expected_root =
     match Local_state.get_snapshot local_state snapshot_id with
     | None -> Some {snapshot_id; expected_root}
     | Some s ->
-        if
-          Ledger_hash.equal
-            (Frozen_ledger_hash.to_ledger_hash expected_root)
-            (Sparse_ledger.merkle_root s.ledger)
-        then None
-        else Some {snapshot_id; expected_root}
+        Option.some_if
+          (not
+             (Ledger_hash.equal
+                (Frozen_ledger_hash.to_ledger_hash expected_root)
+                (Sparse_ledger.merkle_root s.ledger)))
+          {snapshot_id; expected_root}
   in
-  if consensus_state.curr_epoch_data.length <= Length.of_int Constants.k then
-    Option.map
-      (required_snapshot_sync Curr_epoch_snapshot
-         consensus_state.last_epoch_data.ledger.hash) ~f:(fun x -> [x] )
-  else
+  match source with
+  | `Genesis -> None
+  (* We never need to do work to have the genesis snapshot*)
+  | `Curr ->
+      Option.map
+        (required_snapshot_sync Curr_epoch_snapshot
+           consensus_state.last_epoch_data.ledger.hash)
+        ~f:Non_empty_list.singleton
+  | `Last -> (
     match
       Core.List.filter_map
         [ required_snapshot_sync Curr_epoch_snapshot
@@ -1735,18 +1760,26 @@ let required_local_state_sync ~(consensus_state : Consensus_state.Value.t)
         ~f:Fn.id
     with
     | [] -> None
-    | ls -> Some ls
+    | ls -> Non_empty_list.of_list_opt ls )
 
-let sync_local_state ~logger ~local_state ~random_peers ~query_peer
-    requested_syncs =
+let sync_local_state ~logger ~local_state ~random_peers
+    ~(query_peer : Network_peer.query_peer) requested_syncs =
   let open Local_state in
   let open Snapshot in
   let open Deferred.Let_syntax in
+  let requested_syncs = Non_empty_list.to_list requested_syncs in
+  Logger.info logger "syncing local state, %d jobs"
+    (List.length requested_syncs)
+    ~location:__LOC__ ~module_:__MODULE__
+    ~metadata:
+      [ ( "requested_syncs"
+        , `List (List.map requested_syncs ~f:local_state_sync_to_yojson) )
+      ; ("local_state", Local_state.to_yojson local_state) ] ;
   let sync {snapshot_id; expected_root= target_ledger_hash} =
     Deferred.List.exists (random_peers 3) ~f:(fun peer ->
         match%map
-          query_peer peer Rpcs.Get_epoch_ledger.dispatch_multi
-            target_ledger_hash
+          query_peer.query peer Rpcs.Get_epoch_ledger.dispatch_multi
+            (Coda_base.Frozen_ledger_hash.to_ledger_hash target_ledger_hash)
         with
         | Ok (Ok snapshot_ledger) ->
             let delegators =
@@ -1814,7 +1847,12 @@ let received_within_window (epoch, slot) ~time_received =
   in
   let window_start = Epoch.slot_start_time epoch slot in
   let window_end = add window_start Constants.delta_duration in
-  window_start < time_received && time_received < window_end
+  if window_start < time_received && time_received < window_end then Ok ()
+  else
+    Error
+      [ ("window_start", to_yojson window_start)
+      ; ("window_end", to_yojson window_end)
+      ; ("time_received", to_yojson time_received) ]
 
 let received_at_valid_time (consensus_state : Consensus_state.Value.t)
     ~time_received =
@@ -1956,7 +1994,6 @@ let next_proposal now (state : Consensus_state.Value.t) ~local_state ~keypair
     (Int64.to_int now) (Epoch.to_int epoch) (Epoch.Slot.to_int slot)
     ( Int64.to_int @@ Time.Span.to_ms @@ Time.to_span_since_epoch
     @@ Epoch.start_time epoch ) ;
-  let epoch_transitioning = Epoch.equal epoch (Epoch.succ state.curr_epoch) in
   let next_slot =
     Logger.info logger ~module_:__MODULE__ ~location:__LOC__
       !"Selecting correct epoch data from state -- epoch by time: %d, state \
@@ -1984,11 +2021,11 @@ let next_proposal now (state : Consensus_state.Value.t) ~local_state ~keypair
           Logger.info logger ~module_:__MODULE__ ~location:__LOC__
             "Unable to check vrf evaluation: %s_epoch_ledger does not exist \
              in local state"
-            source
+            (epoch_snapshot_name source)
       | Some snapshot ->
           Logger.info logger ~module_:__MODULE__ ~location:__LOC__
             !"using %s_epoch_snapshot root hash %{sexp:Coda_base.Ledger_hash.t}"
-            source
+            (epoch_snapshot_name source)
             (Coda_base.Sparse_ledger.merkle_root snapshot.ledger) ) ;
       snapshot
     in
@@ -2166,6 +2203,7 @@ let%test "Receive a valid consensus_state with a bit of delay" =
   let time_received = Epoch.slot_start_time curr_epoch new_slot in
   received_at_valid_time Consensus_state.genesis
     ~time_received:(to_unix_timestamp time_received)
+  |> Result.is_ok
 
 let%test "Receive an invalid consensus_state" =
   let epoch = Epoch.of_int 5 in
@@ -2181,8 +2219,9 @@ let%test "Receive an invalid consensus_state" =
   let times = [too_late; too_early] in
   List.for_all times ~f:(fun time ->
       not
-        (received_at_valid_time consensus_state
-           ~time_received:(to_unix_timestamp time)) )
+        ( received_at_valid_time consensus_state
+            ~time_received:(to_unix_timestamp time)
+        |> Result.is_ok ) )
 
 let%test_module "Proof of stake tests" =
   ( module struct
@@ -2209,7 +2248,6 @@ let%test_module "Proof of stake tests" =
       in
       let supply_increase = Currency.Amount.of_int 42 in
       (* setup ledger, needed to compute proposer_vrf_result here and handler below *)
-      let open Signature_lib in
       let open Coda_base in
       (* choose largest account as most likely to propose *)
       let ledger_data = Genesis_ledger.t in
@@ -2235,7 +2273,6 @@ let%test_module "Proof of stake tests" =
       (* build pieces needed to apply "update_var" *)
       let checked_computation =
         let open Snark_params.Tick in
-        let open Let_syntax in
         (* work in Checked monad *)
         let%bind previous_state =
           exists typ ~compute:(As_prover.return previous_consensus_state)

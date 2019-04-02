@@ -721,6 +721,13 @@ struct
           With_hash.hash (Breadcrumb.transition_with_hash breadcrumb)
         in
         let root_node = Hashtbl.find_exn t.table t.root in
+        let old_best_tip = best_tip t in
+        let local_state_was_synced_at_start =
+          Consensus.required_local_state_sync
+            ~consensus_state:(consensus_state_of_breadcrumb old_best_tip)
+            ~local_state:t.consensus_local_state
+          |> Option.is_none
+        in
         (* 1 *)
         attach_breadcrumb_exn t breadcrumb ;
         let parent_hash = Breadcrumb.parent_hash breadcrumb in
@@ -840,6 +847,35 @@ struct
                 (Coda_base.Ledger.Any_ledger.cast
                    (module Coda_base.Ledger.Db)
                    t.root_snarked_ledger) ;
+            Debug_assert.debug_assert (fun () ->
+                (* After the lock transition, if the local_state was previously synced, it should continue to be synced *)
+                match
+                  Consensus.required_local_state_sync
+                    ~consensus_state:
+                      (consensus_state_of_breadcrumb best_tip_node.breadcrumb)
+                    ~local_state:t.consensus_local_state
+                with
+                | Some jobs ->
+                    (* But if there wasn't sync work to do when we started, then there shouldn't be now. *)
+                    if local_state_was_synced_at_start then (
+                      Logger.fatal t.logger
+                        "after lock transition, the best tip consensus state \
+                         is out of sync with the local state -- bug in either \
+                         required_local_state_sync or lock_transition."
+                        ~module_:__MODULE__ ~location:__LOC__
+                        ~metadata:
+                          [ ( "sync_jobs"
+                            , `List
+                                ( Non_empty_list.to_list jobs
+                                |> List.map
+                                     ~f:Consensus.local_state_sync_to_yojson )
+                            )
+                          ; ( "local_state"
+                            , Consensus.Local_state.to_yojson
+                                t.consensus_local_state )
+                          ; ("tf_viz", `String (visualize_to_string t)) ] ;
+                      assert false )
+                | None -> () ) ;
             (* 4.VIII *)
             ( match
                 ( Inputs.Staged_ledger.proof_txns new_root_staged_ledger

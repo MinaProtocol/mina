@@ -86,7 +86,7 @@ struct
         [@@deriving bin_io]
 
         (* , version {rpc} *)
-        
+
         (* TODO : remove after uncommenting version{rpc} *)
         let version = 1
 
@@ -142,7 +142,7 @@ struct
         [@@deriving bin_io, sexp]
 
         (* , version {rpc} *)
-        
+
         (* TODO : remove this after uncommenting version{rpc} *)
         let version = 1
 
@@ -601,6 +601,15 @@ module Make (Inputs : Inputs_intf) = struct
     Gossip_net.query_peer t.gossip_net peer
       Rpcs.Transition_catchup.dispatch_multi
       (envelope_from_me t state_hash)
+
+  let query_peer :
+         t
+      -> Network_peer.Peer.t
+      -> (Versioned_rpc.Connection_with_menu.t -> 'q -> 'r Deferred.Or_error.t)
+      -> 'q
+      -> 'r Deferred.Or_error.t =
+   fun t peer rpc rpc_input ->
+    Gossip_net.query_peer t.gossip_net peer rpc rpc_input
 
   let try_non_preferred_peers t input peers ~rpc =
     let max_current_peers = 8 in

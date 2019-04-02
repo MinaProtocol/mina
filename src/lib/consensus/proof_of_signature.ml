@@ -39,7 +39,7 @@ module Global_public_key = struct
 end
 
 module Local_state = struct
-  type t = unit [@@deriving sexp]
+  type t = unit [@@deriving sexp, to_yojson]
 
   let create _ = ()
 end
@@ -227,7 +227,7 @@ let generate_transition ~previous_protocol_state ~blockchain_state ~time:_
   in
   (protocol_state, consensus_transition_data)
 
-let received_at_valid_time _ ~time_received:_ = true
+let received_at_valid_time _ ~time_received:_ = Ok ()
 
 let is_transition_valid_checked (transition : Snark_transition.var) =
   let Consensus_transition_data.({signature}) =
@@ -322,11 +322,13 @@ end
 
 let should_bootstrap ~existing:_ ~candidate:_ = false
 
-let local_state_out_of_sync ~consensus_state:_ ~local_state:_ = false
-
-let sync_local_state ~consensus_state:_ ~local_state:_ =
-  failwith "cannot call sync_local_state on Consensus.Proof_of_signature"
-
 let time_hum now = Core_kernel.Time.to_string now
+
+type local_state_sync = unit [@@deriving to_yojson]
+
+let required_local_state_sync ~consensus_state:_ ~local_state:_ = None
+
+let sync_local_state ~logger:_ ~local_state:_ ~random_peers:_ ~query_peer:_ _ =
+  failwith "cannot call sync_local_state on Consensus.Proof_of_signature"
 
 [%%endif]

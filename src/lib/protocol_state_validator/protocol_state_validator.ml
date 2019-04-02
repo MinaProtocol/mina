@@ -51,25 +51,25 @@ module Make (Inputs : Inputs_intf) :
       Fn.compose External_transition.Protocol_state.consensus_state
         External_transition.protocol_state
     in
-    if
+    match
       Consensus.received_at_valid_time
         (consensus_state transition)
         ~time_received
-    then
-      let open Deferred.Or_error.Let_syntax in
-      let%map _ : External_transition.Proof_verified.t =
-        validate_proof transition
-      in
-      (* Verified both protocol_state proof and consensus_state *)
-      let (`I_swear_this_is_safe_see_my_comment verified_transition) =
-        External_transition.to_verified transition
-      in
-      verified_transition
-    else
-      Deferred.return
-      @@ transition_error
-           (sprintf
-              !"not received_at_valid_time (received at \
-                %{sexp:Unix_timestamp.t}"
-              time_received)
+    with
+    | Ok () ->
+        let open Deferred.Or_error.Let_syntax in
+        let%map _ : External_transition.Proof_verified.t =
+          validate_proof transition
+        in
+        (* Verified both protocol_state proof and consensus_state *)
+        let (`I_swear_this_is_safe_see_my_comment verified_transition) =
+          External_transition.to_verified transition
+        in
+        verified_transition
+    | Error e ->
+        Deferred.return
+        @@ transition_error
+             (sprintf
+                !"not received_at_valid_time: %s"
+                (Yojson.Safe.to_string (`Assoc e)))
 end

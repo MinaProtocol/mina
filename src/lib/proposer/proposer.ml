@@ -294,7 +294,8 @@ module Make (Inputs : Inputs_intf) :
             Some (protocol_state, internal_transition, witness) ) )
 
   let run ~logger ~get_completed_work ~transaction_pool ~time_controller
-      ~keypair ~consensus_local_state ~frontier_reader ~transition_writer =
+      ~keypair ~consensus_local_state ~frontier_reader ~transition_writer
+      ~random_peers ~query_peer =
     trace_task "proposer" (fun () ->
         let log_bootstrap_mode () =
           Logger.info logger ~module_:__MODULE__ ~location:__LOC__
@@ -436,19 +437,28 @@ module Make (Inputs : Inputs_intf) :
                   let consensus_state =
                     Protocol_state.consensus_state protocol_state
                   in
-                  if
-                    Consensus_mechanism.local_state_out_of_sync
+                  match
+                    Consensus_mechanism.required_local_state_sync
                       ~consensus_state ~local_state:consensus_local_state
-                  then (
-                    Logger.info logger ~module_:__MODULE__ ~location:__LOC__
-                      "Synchronizing consensus local state" ;
-                    don't_wait_for
-                      (let%map () =
-                         Consensus_mechanism.sync_local_state ~consensus_state
-                           ~local_state:consensus_local_state
-                       in
-                       check_for_proposal ()) )
-                  else
+                  with
+                  | Some sync_jobs ->
+                      Logger.info logger ~module_:__MODULE__ ~location:__LOC__
+                        "Synchronizing consensus local state" ;
+                      don't_wait_for
+                        (let%map res =
+                           Consensus_mechanism.sync_local_state
+                             ~local_state:consensus_local_state ~logger
+                             ~random_peers ~query_peer sync_jobs
+                         in
+                         ( match res with
+                         | Ok () -> ()
+                         | Error e ->
+                             Logger.error logger ~module_:__MODULE__
+                               ~location:__LOC__
+                               "error syncing local state: %s"
+                               (Error.to_string_hum e) ) ;
+                         check_for_proposal ())
+                  | None -> (
                     match
                       measure "asking conensus what to do" (fun () ->
                           Consensus_mechanism.next_proposal
@@ -472,7 +482,7 @@ module Make (Inputs : Inputs_intf) :
                               (Interruptible.finally
                                  (Singleton_supervisor.dispatch
                                     proposal_supervisor data)
-                                 ~f:check_for_proposal) ) ) )
+                                 ~f:check_for_proposal) ) ) ) )
         in
         check_for_proposal () )
 end
