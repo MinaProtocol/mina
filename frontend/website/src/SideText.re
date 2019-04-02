@@ -40,6 +40,7 @@ let make = (~className="", ~paragraphs, ~cta, _children) => {
       )>
       {ReasonReact.array(ps)}
       <a
+        target="_blank"
         href=link
         className=Css.(
           merge([Style.Link.basic, style([marginTop(`rem(1.5))])])
