@@ -22,6 +22,12 @@
   (modules versioned_good))
 
 (library
+  (name versioned_good_option)
+  (preprocess (pps ppx_jane ppx_deriving_yojson ppx_coda))
+  (libraries core_kernel)
+  (modules versioned_good_option))
+
+(library
   (name versioned_good_wrapped)
   (preprocess (pps ppx_jane ppx_deriving_yojson ppx_coda))
   (libraries core_kernel)
