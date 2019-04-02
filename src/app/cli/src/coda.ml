@@ -98,7 +98,9 @@ let daemon logger =
        flag "tracing" no_arg ~doc:"Trace into $config-directory/$pid.trace"
      and limit_connections =
        flag "limit-concurrent-connections"
-         ~doc:"y|n Limit number of concurrent connections per IP (default:y)"
+         ~doc:
+           "y|n Limit the number of concurrent connections per IP address \
+            (default:y)"
          (optional bool)
      in
      fun () ->
