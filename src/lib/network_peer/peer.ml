@@ -18,6 +18,11 @@ module Stable = struct
         (* TCP *) }
       [@@deriving bin_io, compare, hash, sexp]
 
+      (* TODO : the port int's don't need versioning; the host type should be wrapped
+         for now, we assert the type is versioned
+       *)
+      let __versioned__ = true
+
       let to_yojson {host; discovery_port; communication_port} =
         `Assoc
           [ ("host", `String (Unix.Inet_addr.to_string host))
