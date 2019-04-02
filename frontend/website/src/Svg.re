@@ -19,7 +19,11 @@ let make = (~link, ~dims, ~inline=false, ~className=?, ~alt, _children) => {
         Node.Fs.readFileAsUtf8Sync(
           String.sub(link, 1, String.length(link) - 1),
         );
-      <div dangerouslySetInnerHTML={"__html": content} alt />;
+      <div
+        className={Belt.Option.getWithDefault(className, "")}
+        dangerouslySetInnerHTML={"__html": content}
+        alt
+      />;
     } else {
       <object
         data=link

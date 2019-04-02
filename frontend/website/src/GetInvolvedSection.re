@@ -329,8 +329,8 @@ let make = (~posts, _children) => {
             Style.H1.hero,
             style([
               color(Style.Colors.denimTwo),
-              textAlign(`center),
               marginTop(`rem(6.)),
+              media(Style.MediaQuery.notMobile, [textAlign(`center)]),
             ]),
           ])
         )>
