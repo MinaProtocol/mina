@@ -19,6 +19,9 @@ module type S = sig
   module Digest : sig
     type t [@@deriving bin_io, sexp, eq, hash, compare, yojson]
 
+    (* TODO : really version *)
+    val __versioned__ : bool
+
     val size_in_bits : int
 
     val fold : t -> bool Triple.t Fold.t
@@ -79,6 +82,9 @@ struct
 
   module Digest = struct
     type t = Field.t [@@deriving sexp, bin_io, compare, hash, eq]
+
+    (* TODO : really version *)
+    let __versioned__ = true
 
     let size_in_bits = Field.size_in_bits
 

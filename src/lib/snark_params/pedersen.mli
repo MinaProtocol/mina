@@ -17,6 +17,9 @@ module type S = sig
   module Digest : sig
     type t [@@deriving bin_io, sexp, eq, hash, compare, yojson]
 
+    (* TODO: assert versioned, for now *)
+    val __versioned__ : bool
+
     val size_in_bits : int
 
     val fold : t -> bool Triple.t Fold.t

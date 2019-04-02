@@ -9,7 +9,7 @@ module Single = struct
         let version = 1
 
         type t = Public_key.Compressed.Stable.V1.t * Currency.Fee.Stable.V1.t
-        [@@deriving bin_io, sexp, compare, eq, yojson]
+        [@@deriving bin_io, sexp, compare, eq, yojson, version]
       end
 
       include T
