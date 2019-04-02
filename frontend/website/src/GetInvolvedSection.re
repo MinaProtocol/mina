@@ -4,6 +4,7 @@ module Link = {
     ...component,
     render: _ => {
       <a
+        target="_blank"
         href=link
         className=Css.(merge([Style.Link.basic, style([cursor(`pointer)])]))>
         {ReasonReact.string(message ++ {js|\u00A0→|js})}
