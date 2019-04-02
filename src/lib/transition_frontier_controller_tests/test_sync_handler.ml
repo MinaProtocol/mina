@@ -41,7 +41,9 @@ let%test_module "Sync_handler" =
                     (Network_peer.Peer.Table.of_alist_exn [(peer, frontier)])
               in
               Network.glue_sync_ledger network query_reader answer_writer ;
-              match%map Sync_ledger.Mask.fetch sync_ledger desired_root with
+              match%map
+                Sync_ledger.Mask.fetch sync_ledger desired_root ~data:()
+              with
               | `Ok synced_ledger ->
                   Ledger_hash.equal
                     (Ledger.merkle_root dest_ledger)
