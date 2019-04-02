@@ -9,9 +9,9 @@ module Make (Inputs : Intf.Worker_inputs) : sig
     Intf.Worker
     with type hash := Diff_hash.t
      and type diff := State_hash.t Diff_mutant.E.t
+     and type transition_storage := Transition_storage.t
 end = struct
   open Inputs
-  module Transition_storage = Make_transition_storage (Inputs)
 
   type t = {transition_storage: Transition_storage.t; logger: Logger.t}
 
@@ -113,6 +113,10 @@ end = struct
         in
         Diff_hash.merge diff_contents_hash
           (old_root_data |> Bigstring.to_string)
+
+  module For_tests = struct
+    let transition_storage {transition_storage; _} = transition_storage
+  end
 end
 
 module Make_async (Inputs : Intf.Worker_inputs) = struct

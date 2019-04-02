@@ -38,13 +38,12 @@ end
 module type Worker_inputs = sig
   include Transition_frontier.Inputs_intf
 
-  module Make_transition_storage (Inputs : Transition_frontier.Inputs_intf) : sig
+  module Transition_storage : sig
     module Schema :
       Transition_database_schema
-      with type external_transition :=
-                  Inputs.External_transition.Stable.Latest.t
+      with type external_transition := External_transition.Stable.Latest.t
        and type state_hash := State_hash.Stable.Latest.t
-       and type scan_state := Inputs.Staged_ledger.Scan_state.Stable.Latest.t
+       and type scan_state := Staged_ledger.Scan_state.Stable.Latest.t
 
     include Rocksdb.Serializable.GADT.S with type 'a g := 'a Schema.t
 
@@ -75,6 +74,8 @@ module type Worker = sig
 
   type diff
 
+  type transition_storage
+
   type t
 
   val create : ?directory_name:string -> logger:Logger.t -> unit -> t
@@ -82,6 +83,10 @@ module type Worker = sig
   val close : t -> unit
 
   val handle_diff : t -> hash -> diff -> hash
+
+  module For_tests : sig
+    val transition_storage : t -> transition_storage
+  end
 end
 
 (* TODO: Make an RPC_parallel version of Worker.ml *)
@@ -93,6 +98,7 @@ module type Main_inputs = sig
       Worker
       with type hash := Inputs.Diff_hash.t
        and type diff := State_hash.t Inputs.Diff_mutant.E.t
+       and type transition_storage := Inputs.Transition_storage.t
 
     val handle_diff :
          t

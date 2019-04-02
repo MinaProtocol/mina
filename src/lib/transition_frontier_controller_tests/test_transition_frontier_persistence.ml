@@ -8,20 +8,20 @@ module Stubs = Stubs.Make (struct
 end)
 
 open Stubs
+module Transition_storage =
+  Transition_frontier_persistence.Transition_storage.Make (Stubs)
 
 module Transition_frontier_persistence =
 Transition_frontier_persistence.Make (struct
   include Stubs
   module Make_worker = Transition_frontier_persistence.Worker.Make_async
-  module Make_transition_storage =
-    Transition_frontier_persistence.Transition_storage.Make
+  module Transition_storage = Transition_storage
 end)
 
 let%test_module "Transition Frontier Persistence" =
   ( module struct
     let check_transitions ~logger transition_storage written_breadcrumbs =
       List.iter written_breadcrumbs ~f:(fun breadcrumb ->
-          let open Transition_frontier_persistence in
           let {With_hash.hash; data= expected_transition} =
             Transition_frontier.Breadcrumb.transition_with_hash breadcrumb
           in
@@ -85,12 +85,9 @@ let%test_module "Transition Frontier Persistence" =
       result
 
     let with_database ~directory_name ~f =
-      let database =
-        Transition_frontier_persistence.Transition_storage.create
-          ~directory:directory_name
-      in
+      let database = Transition_storage.create ~directory:directory_name in
       let result = f database in
-      Transition_frontier_persistence.Transition_storage.close database ;
+      Transition_storage.close database ;
       result
 
     let generate_breadcrumbs ~logger ~gen_root_breadcrumb_builder frontier size
@@ -200,12 +197,15 @@ let%test_module "Transition Frontier Persistence" =
         Transition_frontier.For_tests.root_snarked_ledger frontier
       in
       let%bind () = store_transitions ~logger worker frontier breadcrumbs in
-      Transition_frontier_persistence.Worker.close worker ;
+      let transition_storage =
+        Transition_frontier_persistence.Worker.For_tests.transition_storage
+          worker
+      in
       let%map deserialized_frontier =
-        Transition_frontier_persistence.deserialize ~directory_name ~logger
-          ~root_snarked_ledger
+        Transition_frontier_persistence.read ~logger ~root_snarked_ledger
           ~consensus_local_state:
             (Transition_frontier.consensus_local_state frontier)
+          transition_storage
       in
       Transition_frontier.equal frontier deserialized_frontier
 

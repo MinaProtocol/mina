@@ -610,14 +610,16 @@ struct
 
   module Transition_frontier =
     Transition_frontier.Make (Transition_frontier_inputs)
+  module Transition_storage =
+    Transition_frontier_persistence.Transition_storage.Make
+      (Transition_frontier_inputs)
 
   module Transition_frontier_persistence =
   Transition_frontier_persistence.Make (struct
     include Transition_frontier_inputs
     module Transition_frontier = Transition_frontier
     module Make_worker = Transition_frontier_persistence.Worker.Make_async
-    module Make_transition_storage =
-      Transition_frontier_persistence.Transition_storage.Make
+    module Transition_storage = Transition_storage
   end)
 
   module Transaction_pool = struct
