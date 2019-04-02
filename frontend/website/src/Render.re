@@ -42,6 +42,14 @@ let writeStatic = (path, rootComponent) => {
   Node.Fs.writeFileAsUtf8Sync(path ++ ".css", rendered##css);
 };
 
+Array.length(Sys.argv) > 2 && Sys.argv[2] == "prod"
+  ? {
+    Links.Cdn.prefix := "https://cdn.codaprotocol.com/";
+  }
+  : ();
+
+let asset_regex = [%re {|/\/static\/blog\/.*{png,jpg,svg}/|}];
+
 let posts = {
   let unsorted =
     Node.Fs.readdirSync("posts")
@@ -129,7 +137,13 @@ Router.(
         File(
           "index",
           <Page page=`Home name="index" footerColor=Style.Colors.gandalf>
-            <Home posts />
+            <Home
+              posts={List.map(
+                ((name, html, metadata)) =>
+                  (name, html, metadata.BlogPost.title),
+                posts,
+              )}
+            />
           </Page>,
         ),
         Dir(

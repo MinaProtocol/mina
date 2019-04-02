@@ -10,10 +10,12 @@ module Investor = {
       | `Jpg => "jpg"
       };
     let imageSrc =
-      "/static/img/investors/"
-      ++ String.lowercase(firstName)
-      ++ "."
-      ++ suffixStr;
+      Links.Cdn.url(
+        "/static/img/investors/"
+        ++ String.lowercase(firstName)
+        ++ "."
+        ++ suffixStr,
+      );
     {
       ...component,
       render: _self =>
