@@ -42,6 +42,14 @@ let writeStatic = (path, rootComponent) => {
   Node.Fs.writeFileAsUtf8Sync(path ++ ".css", rendered##css);
 };
 
+Array.length(Sys.argv) > 2 && Sys.argv[2] == "prod"
+  ? {
+    Links.Cdn.prefix := "https://cdn.codaprotocol.com";
+  }
+  : ();
+
+let asset_regex = [%re {|/\/static\/blog\/.*{png,jpg,svg}/|}];
+
 let posts = {
   let unsorted =
     Node.Fs.readdirSync("posts")
@@ -103,12 +111,18 @@ module Router = {
 let jobOpenings = [|
   ("engineering-manager", "Engineering Manager (San Francisco)."),
   ("product-manager", "Product Manager (San Francisco)."),
+  ("community-manager", "Community Manager (San Francisco)."),
   ("senior-frontend-engineer", "Senior Frontend Engineer (San Francisco)."),
   (
     "protocol-reliability-engineer",
     "Protocol Reliability Engineer (San Francisco).",
   ),
   ("protocol-engineer", "Senior Protocol Engineer (San Francisco)."),
+  (
+    "director-of-business-development",
+    "Director of Business Development (San Francisco).",
+  ),
+  ("developer-advocate", "Developer Advocate (San Francisco)."),
 |];
 
 // GENERATE
@@ -129,7 +143,13 @@ Router.(
         File(
           "index",
           <Page page=`Home name="index" footerColor=Style.Colors.gandalf>
-            <Home posts />
+            <Home
+              posts={List.map(
+                ((name, html, metadata)) =>
+                  (name, html, metadata.BlogPost.title),
+                posts,
+              )}
+            />
           </Page>,
         ),
         Dir(
