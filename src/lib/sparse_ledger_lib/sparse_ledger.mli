@@ -50,7 +50,7 @@ end) (Key : sig
 end) (Account : sig
   type t [@@deriving bin_io, eq, sexp]
 
-  val hash : t -> Hash.t
+  val data_hash : t -> Hash.t
 end) :
   S
   with type hash := Hash.t

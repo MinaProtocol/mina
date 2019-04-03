@@ -56,7 +56,7 @@ module Copy = {
             )>
             <span>
               {ReasonReact.string(
-                 "This makes it dramatically easier to develop modern usable crypto apps that work directly from the browser and enables more inclusive, sustainable consensus.",
+                 "Coda's portable blockchain makes it dramatically easier to develop modern usable crypto apps that work directly from the browser and enables more inclusive, sustainable consensus.",
                )}
             </span>
             <br />

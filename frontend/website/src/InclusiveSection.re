@@ -223,18 +223,18 @@ let make = _ => {
               paragraphs=[|
                 `styled([
                   `emph(
-                    "Simple, fair consensus designed so you can run a node",
+                    "Simple, fair consensus designed so you can participate",
                   ),
                   `str(
                     ". Participation is proportional to how much stake you have in the protocol with no lockups, no forced delegation, and low bandwidth requirements.",
                   ),
                 ]),
                 `str(
-                  "With just a small stake you'll be able to participate directly in consensus and earn Coda.",
+                  "With just a small stake you'll be able to participate directly in consensus.",
                 ),
               |]
               cta={
-                SideText.Cta.copy: "Stay updated about participating in consensus",
+                SideText.Cta.copy: {j|Sign up to learn more about about staking with\u00A0Coda|j},
                 link: Links.Forms.participateInConsensus,
               }
             />
