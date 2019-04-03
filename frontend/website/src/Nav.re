@@ -68,14 +68,13 @@ module NavStyle = {
               `rgba((0, 0, 0, 0.12)),
             ),
             borderRadius(`px(10)),
-            marginTop(`rem(2.25)),
+            marginTop(`zero),
             marginRight(`rem(-0.6)),
             display(`flex),
             maxWidth(`rem(10.)),
             flexDirection(`column),
             alignItems(`flexStart),
-            unsafe("padding-inline-start", "0"),
-            unsafe("-webkit-padding-start", "0"),
+            position(`absolute),
             before(
               triangle(expandedMenuBorderColor, 1)
               @ [
@@ -86,10 +85,10 @@ module NavStyle = {
                   ~spread=`zero,
                   `rgba((0, 0, 0, 0.12)),
                 ),
-                zIndex(-10),
+                zIndex(-1),
               ],
             ),
-            after(triangle(white, 0) @ []),
+            after(triangle(white, 0) @ [zIndex(1)]),
           ],
         ),
       ]),
@@ -128,9 +127,11 @@ module DropdownMenu = {
           id="nav-menu-btn">
           {ReasonReact.string("Menu")}
         </button>
-        <ul id="nav-menu" className=NavStyle.collapsedMenuItems>
-          ...children
-        </ul>
+        <div className=Css.(style([zIndex(1), position(`relative)]))>
+          <ul id="nav-menu" className=NavStyle.collapsedMenuItems>
+            ...children
+          </ul>
+        </div>
         <RunScript>
           {Printf.sprintf(
              {|
