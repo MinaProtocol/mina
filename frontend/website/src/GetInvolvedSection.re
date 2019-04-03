@@ -31,11 +31,12 @@ module KnowledgeBase = {
                   marginLeft(`rem(1.5)),
                   marginRight(`rem(1.)),
                   before([
-                    unsafe("content", {js|"*"|js}),
+                    contentRule({js|*|js}),
                     color(Style.Colors.hyperlink),
                     display(`inlineBlock),
                     marginLeft(`rem(-1.)),
                     marginRight(`rem(0.6)),
+                    verticalAlign(`bottom),
                   ]),
                 ])
               )>
@@ -77,8 +78,6 @@ module KnowledgeBase = {
                 paddingLeft(`zero),
                 paddingRight(`zero),
                 marginBottom(`zero),
-                unsafe("-webkit-padding-before", "0"),
-                unsafe("-webkit-margin-before", "0"),
                 media(Style.MediaQuery.notMobile, [width(`rem(25.))]),
               ])
             )>
@@ -105,12 +104,6 @@ module KnowledgeBase = {
             marginLeft(`auto),
             marginRight(`auto),
             unsafe("min-width", "min-content"),
-            unsafe("padding-inline-start", "0"),
-            unsafe("padding-block-start", "0"),
-            unsafe("-webkit-padding-before", "0"),
-            unsafe("-webkit-padding-start", "0"),
-            unsafe("-webkit-padding-end", "0"),
-            unsafe("-webkit-padding-after", "0"),
             media(Style.MediaQuery.notMobile, [paddingBottom(`rem(2.))]),
           ])
         )>
@@ -142,10 +135,6 @@ module KnowledgeBase = {
                    textTransform(`uppercase),
                    fontWeight(`medium),
                    color(Style.Colors.midnight),
-                   unsafe("margin-block-start", "0"),
-                   unsafe("margin-block-end", "0"),
-                   unsafe("-webkit-margin-before", "0"),
-                   unsafe("-webkit-margin-after", "0"),
                  ])
                )>
                {ReasonReact.string("Knowledge base")}
@@ -323,7 +312,7 @@ let component = ReasonReact.statelessComponent("GetInvolved");
 let make = (~posts, _children) => {
   ...component,
   render: _self =>
-    <div className=Css.(style([marginBottom(`rem(13.0))]))>
+    <div>
       <h1
         className=Css.(
           merge([
@@ -331,6 +320,7 @@ let make = (~posts, _children) => {
             style([
               color(Style.Colors.denimTwo),
               marginTop(`rem(6.)),
+              marginBottom(`rem(2.5)),
               media(Style.MediaQuery.notMobile, [textAlign(`center)]),
             ]),
           ])
@@ -377,18 +367,13 @@ let make = (~posts, _children) => {
           <span> {ReasonReact.string(".")} </span>
         </p>
         <div>
-          <p className=Style.Body.basic>
+          <p
+            className=Css.(
+              merge([Style.Body.basic, style([marginBottom(`rem(0.75))])])
+            )>
             {ReasonReact.string("Stay updated about:")}
           </p>
-          <ul
-            className=Css.(
-              style([
-                listStyle(`none, `inside, `none),
-                unsafe("-webkit-padding-before", "0"),
-                unsafe("-webkit-margin-before", "0"),
-                unsafe("padding-inline-start", "0"),
-              ])
-            )>
+          <ul className=Css.(style([listStyle(`none, `inside, `none)]))>
             <li className=marginBelow>
               <Link
                 link=Links.Forms.developingWithCoda

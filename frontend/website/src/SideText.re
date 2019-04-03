@@ -11,9 +11,9 @@ let make = (~className="", ~paragraphs, ~cta, _children) => {
   render: _self => {
     let {Cta.copy, link} = cta;
     let ps =
-      Belt.Array.mapWithIndex(
+      Belt.Array.map(
         paragraphs,
-        (i, entry) => {
+        entry => {
           let content =
             switch (entry) {
             | `str(s) => [|ReasonReact.string(s)|]
@@ -34,16 +34,7 @@ let make = (~className="", ~paragraphs, ~cta, _children) => {
 
           <p
             className=Css.(
-              merge([
-                Style.Body.basic,
-                style(
-                  if (i == 0) {
-                    [marginTop(`zero)];
-                  } else {
-                    [];
-                  },
-                ),
-              ])
+              merge([Style.Body.basic, style([marginBottom(`rem(1.5))])])
             )>
             // should be fine to use i here since this is all static content
              ...content </p>;

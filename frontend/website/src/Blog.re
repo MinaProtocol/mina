@@ -98,7 +98,7 @@ let createPostFadedContents = html =>
       className=Css.(
         style([
           after([
-            unsafe("content", "\"\""),
+            contentRule(""),
             position(`absolute),
             zIndex(1),
             // Needed to prevent the bottom of the text peeking through for some reason.
@@ -160,7 +160,6 @@ let createPostSummary = ((name, html, metadata)) => {
         style([
           position(`relative),
           pointerEvents(`none),
-          zIndex(1),
           display(`flex),
           alignItems(`flexStart),
           flexDirection(`column),
@@ -194,14 +193,13 @@ let make = (~posts, _children) => {
     <div
       className=Css.(
         style([
-          marginTop(`rem(2.0)),
           display(`flex),
           flexDirection(`column),
           alignItems(`stretch),
           maxWidth(`rem(43.)),
           marginLeft(`auto),
           marginRight(`auto),
-          media(Style.MediaQuery.notMobile, [marginTop(`rem(4.0))]),
+          media(Style.MediaQuery.full, [marginTop(`rem(2.0))]),
         ])
       )>
       <div> ...{Array.of_list(List.map(createPostSummary, posts))} </div>

@@ -21,7 +21,7 @@ let make = (~posts, _children) => {
         className=Css.(
           style([
             backgroundColor(Style.Colors.gandalf),
-            marginTop(`rem(10.)),
+            marginTop(`rem(13.)),
           ])
         )>
         <Wrapped> <TeamSection /> <InvestorsSection /> </Wrapped>
