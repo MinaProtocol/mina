@@ -79,6 +79,7 @@ module KnowledgeBase = {
                 marginBottom(`zero),
                 unsafe("-webkit-padding-before", "0"),
                 unsafe("-webkit-margin-before", "0"),
+                media(Style.MediaQuery.notMobile, [width(`rem(25.))]),
               ])
             )>
             ...items
@@ -329,8 +330,8 @@ let make = (~posts, _children) => {
             Style.H1.hero,
             style([
               color(Style.Colors.denimTwo),
-              textAlign(`center),
               marginTop(`rem(6.)),
+              media(Style.MediaQuery.notMobile, [textAlign(`center)]),
             ]),
           ])
         )>
