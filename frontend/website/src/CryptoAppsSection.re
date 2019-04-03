@@ -267,8 +267,12 @@ let make = _ => {
               ])
             )
             paragraphs=[|
-              "Empower your users with a direct secure connection to the Coda network.",
-              "Coda will be able to be embedded into any webpage or app with just a script tag and a couple lines of JavaScript.",
+              `str(
+                "Build games and other applications that take advantage of the new capabilities enabled by cryptocurrency with just a script tag and a few lines of javascript.",
+              ),
+              `str(
+                "Your users will have a seamless, secure experience without having to download any extensions or trust additional 3rd parties.",
+              ),
             |]
             cta={
               SideText.Cta.copy: "Stay updated about developing with Coda",

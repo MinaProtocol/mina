@@ -31,11 +31,12 @@ module KnowledgeBase = {
                   marginLeft(`rem(1.5)),
                   marginRight(`rem(1.)),
                   before([
-                    unsafe("content", {js|"*"|js}),
+                    contentRule({js|*|js}),
                     color(Style.Colors.hyperlink),
                     display(`inlineBlock),
                     marginLeft(`rem(-1.)),
                     marginRight(`rem(0.6)),
+                    verticalAlign(`bottom),
                   ]),
                 ])
               )>
@@ -77,8 +78,7 @@ module KnowledgeBase = {
                 paddingLeft(`zero),
                 paddingRight(`zero),
                 marginBottom(`zero),
-                unsafe("-webkit-padding-before", "0"),
-                unsafe("-webkit-margin-before", "0"),
+                maxWidth(`rem(24.5)),
               ])
             )>
             ...items
@@ -104,12 +104,6 @@ module KnowledgeBase = {
             marginLeft(`auto),
             marginRight(`auto),
             unsafe("min-width", "min-content"),
-            unsafe("padding-inline-start", "0"),
-            unsafe("padding-block-start", "0"),
-            unsafe("-webkit-padding-before", "0"),
-            unsafe("-webkit-padding-start", "0"),
-            unsafe("-webkit-padding-end", "0"),
-            unsafe("-webkit-padding-after", "0"),
             media(Style.MediaQuery.notMobile, [paddingBottom(`rem(2.))]),
           ])
         )>
@@ -141,19 +135,30 @@ module KnowledgeBase = {
                    textTransform(`uppercase),
                    fontWeight(`medium),
                    color(Style.Colors.midnight),
-                   unsafe("margin-block-start", "0"),
-                   unsafe("margin-block-end", "0"),
-                   unsafe("-webkit-margin-before", "0"),
-                   unsafe("-webkit-margin-after", "0"),
                  ])
                )>
                {ReasonReact.string("Knowledge base")}
              </h4>,
            |],
          )}
+        <input
+          id="expand-knowledge-base"
+          type_="checkbox"
+          className=Css.(
+            style([
+              display(`none),
+              selector(
+                ":checked + div",
+                [height(`auto), after([display(`none)])],
+              ),
+              selector(":checked ~ label", [display(`none)]),
+            ])
+          )
+        />
         <div
           className=Css.(
             style([
+              position(`relative),
               display(`flex),
               justifyContent(`spaceAround),
               flexWrap(`wrap),
@@ -162,6 +167,26 @@ module KnowledgeBase = {
               paddingRight(`rem(1.0)),
               paddingTop(`rem(1.5)),
               paddingBottom(`rem(1.5)),
+              height(`rem(15.)),
+              overflow(`hidden),
+              after([
+                contentRule(""),
+                position(`absolute),
+                bottom(`zero),
+                left(`zero),
+                height(`rem(2.)),
+                width(`percent(100.)),
+                pointerEvents(`none),
+                backgroundImage(
+                  `linearGradient((
+                    `deg(0),
+                    [
+                      (0, Style.Colors.white),
+                      (100, Style.Colors.whiteAlpha(0.0)),
+                    ],
+                  )),
+                ),
+              ]),
             ])
           )>
           <SubSection
@@ -173,6 +198,16 @@ module KnowledgeBase = {
             content={Array.of_list(Links.Lists.richMedia)}
           />
         </div>
+        <label
+          className=Css.(
+            merge([Style.Link.basic, style([marginTop(`rem(1.0))])])
+          )
+          htmlFor="expand-knowledge-base">
+          {ReasonReact.string({js|View all ↓|js})}
+        </label>
+        <RunScript>
+          {|document.getElementById("expand-knowledge-base").checked = false;|}
+        </RunScript>
       </fieldset>;
     },
   };
@@ -322,15 +357,16 @@ let component = ReasonReact.statelessComponent("GetInvolved");
 let make = (~posts, _children) => {
   ...component,
   render: _self =>
-    <div className=Css.(style([marginBottom(`rem(13.0))]))>
+    <div>
       <h1
         className=Css.(
           merge([
             Style.H1.hero,
             style([
               color(Style.Colors.denimTwo),
-              textAlign(`center),
               marginTop(`rem(6.)),
+              marginBottom(`rem(2.5)),
+              media(Style.MediaQuery.notMobile, [textAlign(`center)]),
             ]),
           ])
         )>
@@ -353,6 +389,8 @@ let make = (~posts, _children) => {
               style([
                 maxWidth(`rem(22.5)),
                 marginTop(`zero),
+                marginBottom(`rem(0.5)),
+                width(`rem(22.)),
                 media(
                   Style.MediaQuery.full,
                   [marginRight(`rem(3.75)), marginLeft(`rem(3.75))],
@@ -360,44 +398,55 @@ let make = (~posts, _children) => {
               ]),
             ])
           )>
-          {ReasonReact.string(
-             "Help us build a more accessible, sustainable cryptocurrency. Join our community on discord, and follow our progress on twitter.",
-           )}
+          <span>
+            {ReasonReact.string(
+               "Help us build a more accessible, inclusive cryptocurrency. Join our community on ",
+             )}
+          </span>
+          <a className=Style.Link.basic href="https://discord.gg/wz7zQyc">
+            {ReasonReact.string("Discord")}
+          </a>
+          <span> {ReasonReact.string(", and follow our progress on ")} </span>
+          <a
+            className=Style.Link.basic href="https://twitter.com/codaprotocol">
+            {ReasonReact.string("Twitter")}
+          </a>
+          <span> {ReasonReact.string(".")} </span>
         </p>
-        <ul
-          className=Css.(
-            style([
-              listStyle(`none, `inside, `none),
-              unsafe("-webkit-padding-before", "0"),
-              unsafe("-webkit-margin-before", "0"),
-              unsafe("padding-inline-start", "0"),
-            ])
-          )>
-          <li className=marginBelow>
-            <Link
-              link=Links.Forms.developingWithCoda
-              message="Stay updated about developing with Coda"
-            />
-          </li>
-          <li className=marginBelow>
-            <Link
-              link=Links.Forms.participateInConsensus
-              message="Notify me about participating in consensus"
-            />
-          </li>
-          <li className=marginBelow>
-            <Link
-              link=Links.Forms.compressTheBlockchain
-              message="Earn Coda by helping to compress the blockchain"
-            />
-          </li>
-          <li className=marginBelow>
-            <Link
-              link=Links.Forms.mailingList
-              message="Join our mailing list for updates"
-            />
-          </li>
-        </ul>
+        <div>
+          <p
+            className=Css.(
+              merge([Style.Body.basic, style([marginBottom(`rem(0.75))])])
+            )>
+            {ReasonReact.string("Stay updated about:")}
+          </p>
+          <ul className=Css.(style([listStyle(`none, `inside, `none)]))>
+            <li className=marginBelow>
+              <Link
+                link=Links.Forms.developingWithCoda
+                message="Developing with Coda"
+              />
+            </li>
+            <li className=marginBelow>
+              <Link
+                link=Links.Forms.participateInConsensus
+                message="Participating in consensus"
+              />
+            </li>
+            <li className=marginBelow>
+              <Link
+                link=Links.Forms.compressTheBlockchain
+                message="Helping to compress the blockchain"
+              />
+            </li>
+            <li className=marginBelow>
+              <Link
+                link=Links.Forms.mailingList
+                message="Join our mailing list for updates and distribution"
+              />
+            </li>
+          </ul>
+        </div>
       </div>
       <div
         className=Css.(
