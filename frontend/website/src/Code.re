@@ -132,7 +132,12 @@ let make = _ => {
           marginRight(`auto),
         ])
       )>
-      <h3 className=Style.H3.wings> {ReasonReact.string("Run Coda")} </h3>
+      <h3
+        className=Css.(
+          merge([Style.H3.wings, style([marginTop(`rem(1.25))])])
+        )>
+        {ReasonReact.string("Run Coda")}
+      </h3>
       <code
         className=Css.(
           style([

@@ -312,7 +312,7 @@ let component = ReasonReact.statelessComponent("GetInvolved");
 let make = (~posts, _children) => {
   ...component,
   render: _self =>
-    <div className=Css.(style([marginBottom(`rem(13.0))]))>
+    <div>
       <h1
         className=Css.(
           merge([

@@ -193,14 +193,13 @@ let make = (~posts, _children) => {
     <div
       className=Css.(
         style([
-          marginTop(`rem(2.0)),
           display(`flex),
           flexDirection(`column),
           alignItems(`stretch),
           maxWidth(`rem(43.)),
           marginLeft(`auto),
           marginRight(`auto),
-          media(Style.MediaQuery.notMobile, [marginTop(`rem(4.0))]),
+          media(Style.MediaQuery.full, [marginTop(`rem(2.0))]),
         ])
       )>
       <div> ...{Array.of_list(List.map(createPostSummary, posts))} </div>
