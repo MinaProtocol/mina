@@ -79,6 +79,7 @@ module KnowledgeBase = {
                 marginBottom(`zero),
                 unsafe("-webkit-padding-before", "0"),
                 unsafe("-webkit-margin-before", "0"),
+                media(Style.MediaQuery.notMobile, [width(`rem(25.))]),
               ])
             )>
             ...items
