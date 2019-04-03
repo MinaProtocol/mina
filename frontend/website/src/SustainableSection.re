@@ -88,6 +88,7 @@ let make = _children => {
             ])
           )>
           <Svg
+            inline=true
             className=Css.(
               style([
                 width(`rem(18.75)),
