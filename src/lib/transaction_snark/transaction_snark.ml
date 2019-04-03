@@ -487,7 +487,7 @@ module Base = struct
     in
     ()
 
-  let prove_main = reduce_to_prover (tick_input ()) main
+  let prove_main = Groth16.reduce_to_prover (tick_input ()) main
 
   let create_keys () = Groth16.generate_keypair main ~exposing:(tick_input ())
 
