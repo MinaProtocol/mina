@@ -104,6 +104,7 @@ module KnowledgeBase = {
             marginLeft(`auto),
             marginRight(`auto),
             unsafe("min-width", "min-content"),
+            paddingBottom(`rem(1.)),
             media(Style.MediaQuery.notMobile, [paddingBottom(`rem(2.))]),
           ])
         )>
@@ -200,7 +201,19 @@ module KnowledgeBase = {
         </div>
         <label
           className=Css.(
-            merge([Style.Link.basic, style([marginTop(`rem(1.0))])])
+            merge([
+              Style.Link.basic,
+              style([
+                color(Style.Colors.hyperlink),
+                marginTop(`rem(1.0)),
+                marginLeft(`auto),
+                marginRight(`auto),
+                marginBottom(`rem(-1.0)),
+                width(`rem(10.)),
+                height(`rem(2.5)),
+                display(`block),
+              ]),
+            ])
           )
           htmlFor="expand-knowledge-base">
           {ReasonReact.string({js|View all ↓|js})}

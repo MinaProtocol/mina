@@ -1,5 +1,5 @@
 module Member = {
-  let component = ReasonReact.statelessComponent("Team.Member");
+  let component = ReasonReact.statelessComponent("TeamSection.Member");
   let make = (~name, ~title, ~description, _children) => {
     let lastName = Js.String.split(" ", name)[1];
     let imageSrc =
@@ -125,6 +125,97 @@ module Member = {
   };
 };
 
+module Section = {
+  let component = ReasonReact.statelessComponent("TeamSection.Section");
+  let make = (~name, children) => {
+    ...component,
+    render: _self => {
+      let checkboxName = name ++ "-checkbox";
+      let labelName = name ++ "-label";
+      <>
+        <h3 className=Style.H3.Technical.boxed>
+          {ReasonReact.string(name)}
+        </h3>
+        <input
+          type_="checkbox"
+          id=checkboxName
+          className=Css.(
+            style([
+              display(`none),
+              selector(
+                ":checked + div",
+                [height(`auto), after([display(`none)])],
+              ),
+              selector(":checked ~ #" ++ labelName, [display(`none)]),
+            ])
+          )
+        />
+        <div
+          className=Css.(
+            style([
+              position(`relative),
+              height(`rem(45.)),
+              overflow(`hidden),
+              display(`flex),
+              flexWrap(`wrap),
+              marginLeft(`auto),
+              marginRight(`auto),
+              justifyContent(`center),
+              after([
+                contentRule(""),
+                position(`absolute),
+                bottom(`zero),
+                left(`zero),
+                height(`rem(8.)),
+                width(`percent(100.)),
+                pointerEvents(`none),
+                backgroundImage(
+                  `linearGradient((
+                    `deg(0),
+                    [
+                      (0, Style.Colors.navyBlue),
+                      (100, Style.Colors.navyBlueAlpha(0.0)),
+                    ],
+                  )),
+                ),
+              ]),
+            ])
+          )>
+          ...children
+        </div>
+        <label
+          id=labelName
+          className=Css.(
+            merge([
+              Style.Link.basic,
+              style([
+                Style.Typeface.pragmataPro,
+                fontWeight(`bold),
+                display(`block),
+                height(`rem(4.)),
+                width(`rem(20.)),
+                marginLeft(`auto),
+                marginRight(`auto),
+                marginTop(`rem(1.0)),
+                marginBottom(`rem(3.0)),
+                textAlign(`center),
+              ]),
+            ])
+          )
+          htmlFor=checkboxName>
+          {ReasonReact.string({js|View all ↓|js})}
+        </label>
+        <RunScript>
+          {Printf.sprintf(
+             {|document.getElementById("%s").checked = false;|},
+             checkboxName,
+           )}
+        </RunScript>
+      </>;
+    },
+  };
+};
+
 let advisor = "Advisor";
 let headerHeight = `rem(6.125);
 let component = ReasonReact.statelessComponent("TeamSection");
@@ -177,19 +268,7 @@ let make = _children => {
           {ReasonReact.string(" O(1) Labs")}
         </span>
       </div>
-      <h3 className=Style.H3.Technical.boxed>
-        {ReasonReact.string("Team")}
-      </h3>
-      <div
-        className=Css.(
-          style([
-            display(`flex),
-            flexWrap(`wrap),
-            marginLeft(`auto),
-            marginRight(`auto),
-            justifyContent(`center),
-          ])
-        )>
+      <Section name="Team">
         <Member
           name="Evan Shapiro"
           title="CEO"
@@ -378,20 +457,8 @@ let make = _children => {
        experience design. Regardless of the medium, the end goal is for the \
        well-being of the user."
         />
-      </div>
-      <h3 className=Style.H3.Technical.boxed>
-        {ReasonReact.string("Advisors")}
-      </h3>
-      <div
-        className=Css.(
-          style([
-            display(`flex),
-            flexWrap(`wrap),
-            marginLeft(`auto),
-            marginRight(`auto),
-            justifyContent(`center),
-          ])
-        )>
+      </Section>
+      <Section name="Advisors">
         <Member
           name="Jill Carlson"
           title=advisor
@@ -448,6 +515,6 @@ let make = _children => {
           title=advisor
           description="Amit Sahai is a Professor of Computer Science at UCLA, Fellow of the ACM, and Fellow of the IACR. His research interests are in security, cryptography, and theoretical computer science. He is the co-inventor of Attribute-Based Encryption, Functional Encryption, Indistinguishability Obfuscation, author of over 100 technical research papers, and invited speaker at institutions such as MIT, Stanford, and Berkeley. He has also received honors from the Alfred P. Sloan Foundation, Okawa Foundation, Xerox Foundation, Google Research, the BSF, and the ACM. He earned his PhD in Computer Science from MIT and served on the faculty at Princeton before joining UCLA in 2004."
         />
-      </div>
+      </Section>
     </>,
 };
