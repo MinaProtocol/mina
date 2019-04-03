@@ -29,7 +29,7 @@ let load = path => {
   let filter = Links.Cdn.prefix^ == "" ? "" : "--filter src/filter.js ";
   let html =
     Node.Child_process.execSync(
-      "pandoc " ++ filter ++ path ++ " --katex",
+      "pandoc " ++ filter ++ path ++ " --mathjax",
       Node.Child_process.option(),
     );
   let content = Node.Fs.readFileAsUtf8Sync(path);
