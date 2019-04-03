@@ -441,6 +441,10 @@ module T = struct
                    let state_hash = With_hash.hash t in
                    let prev_state_hash = State_hash.to_bits prev_state_hash in
                    let state_hash = State_hash.to_bits state_hash in
+                   if Pipe.is_closed w then
+                     Logger.error logger ~module_:__MODULE__ ~location:__LOC__
+                       "why is this w pipe closed? did someone close the \
+                        reader end? dropping this write..." ;
                    Linear_pipe.write_if_open w (prev_state_hash, state_hash) )) ;
             return r.pipe
           in
