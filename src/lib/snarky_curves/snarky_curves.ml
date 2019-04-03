@@ -315,7 +315,7 @@ module Make_weierstrass_checked
     let choose a1 a2 =
       let open Field.Checked in
       F.map2_ a1 a2 ~f:(fun a1 a2 ->
-          Infix.((a1 * cond) + (a2 * (Field.Var.constant Field.one - cond))) )
+          (a1 * cond) + (a2 * (Field.Var.constant Field.one - cond)) )
     in
     (choose x1 x2, choose y1 y2)
 

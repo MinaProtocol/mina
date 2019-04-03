@@ -28,13 +28,12 @@ let make = _children => {
             merge([
               Style.H1.hero,
               style([
-                color(Style.Colors.denimTwo),
+                color(Style.Colors.clover),
                 position(`relative),
                 display(`inlineBlock),
                 marginTop(`zero),
                 marginBottom(`zero),
                 media(Style.MediaQuery.notSmallMobile, [margin(`auto)]),
-                media(Style.MediaQuery.full, [color(Style.Colors.clover)]),
               ]),
             ])
           )>
@@ -80,13 +79,18 @@ let make = _children => {
         )>
         <div
           className=Css.(
-            style([marginBottom(`rem(2.375)), userSelect(`none)])
+            style([
+              userSelect(`none),
+              media(
+                Style.MediaQuery.notMobile,
+                [marginBottom(`rem(2.375))],
+              ),
+            ])
           )>
           <Svg
             className=Css.(
               style([
-                height(`rem(16.8125)),
-                width(`percent(100.)),
+                width(`rem(18.75)),
                 media(Style.MediaQuery.notMobile, [width(`rem(23.9375))]),
               ])
             )
@@ -100,13 +104,19 @@ let make = _children => {
         </div>
         <div
           className=Css.(
-            style([marginBottom(`rem(2.375)), userSelect(`none)])
+            style([
+              userSelect(`none),
+              media(
+                Style.MediaQuery.notMobile,
+                [marginBottom(`rem(2.375))],
+              ),
+            ])
           )>
           <Svg
+            inline=true
             className=Css.(
               style([
-                width(`percent(100.)),
-                height(`rem(16.8125)),
+                width(`rem(18.75)),
                 media(Style.MediaQuery.notMobile, [width(`rem(23.9375))]),
               ])
             )

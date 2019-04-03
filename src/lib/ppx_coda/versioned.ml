@@ -107,7 +107,9 @@ let generate_version_number_decl inner3_modules loc wrapped =
 
 let ocaml_builtin_types = ["int"; "float"; "char"; "string"; "bool"; "unit"]
 
-let ocaml_builtin_type_constructors = ["list"; "option"]
+let ocaml_builtin_type_constructors = ["list"; "option"; "ref"]
+
+let jane_street_type_constructors = ["sexp_opaque"]
 
 let rec generate_core_type_version_decls core_type =
   match core_type.ptyp_desc with
@@ -120,7 +122,9 @@ let rec generate_core_type_version_decls core_type =
           && List.mem ocaml_builtin_types id ~equal:String.equal
         then (* no versioning to worry about *)
           []
-        else if List.mem ocaml_builtin_type_constructors id ~equal:String.equal
+        else if
+          List.mem ocaml_builtin_type_constructors id ~equal:String.equal
+          || List.mem jane_street_type_constructors id ~equal:String.equal
         then
           match core_types with
           | [_] -> generate_version_lets_for_core_types core_types
@@ -129,9 +133,9 @@ let rec generate_core_type_version_decls core_type =
                 "Type constructor \"%s\" expects one type argument, got %d" id
                 (List.length core_types)
         else
-          (* a type not in a module (so not versioned) *)
           Ppx_deriving.raise_errorf ~loc:core_type.ptyp_loc
-            "Type \"%s\" is not a versioned type" id
+            "\"%s\" is neither an OCaml type constructor nor a versioned type"
+            id
     | Ldot (prefix, "t") ->
         (* type t = A.B.t
           generate: let _ = A.B.__versioned__
