@@ -141,11 +141,11 @@ let make = _children => {
                 `str("."),
               ]),
               `str(
-                "Help compress Coda by participating in snarking. Just like mining, with snarking anyone can contribute their compute to the network to help compress the blockchain and earn Coda.",
+                "Help compress Coda by participating in snarking. Just like mining, with snarking anyone can contribute their compute to the network to help compress the blockchain.",
               ),
             |]
             cta={
-              SideText.Cta.copy: "Earn Coda by helping to compress the blockchain",
+              SideText.Cta.copy: {j|Learn more about helping compress Coda's\u00A0blockchain|j},
               link: Links.Forms.compressTheBlockchain,
             }
           />
