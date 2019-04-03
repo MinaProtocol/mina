@@ -71,7 +71,7 @@ module State = struct
       ; other_trees_data
       ; stateful_work_order= _
       ; curr_job_seq_no= _ } =
-    List.(append (rev (concat other_trees_data)) (rev recent_tree_data))
+    List.(rev (concat (recent_tree_data :: other_trees_data)))
 
   let next_leaf_pos p cur_pos =
     if cur_pos = (2 * p) - 2 then p - 1 else cur_pos + 1
