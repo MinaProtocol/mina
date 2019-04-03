@@ -1,4 +1,5 @@
 open Core_kernel
+open Async
 open Protocols.Coda_transition_frontier
 open Coda_base
 
@@ -16,6 +17,7 @@ module type Inputs_intf = sig
      and type staged_ledger_diff := Staged_ledger_diff.t
      and type consensus_local_state := Consensus.Local_state.t
      and type user_command := User_command.t
+     and type diff_mutant := Diff_mutant.e
 
   module Time : Protocols.Coda_pow.Time_intf
 
@@ -58,11 +60,40 @@ module Make (Inputs : Inputs_intf) :
     |> Sequence.find ~f:(fun ledger ->
            Ledger_hash.equal (Ledger.merkle_root ledger) ledger_hash )
 
-  let answer_query ~frontier hash query ~logger =
-    let open Option.Let_syntax in
-    let%bind ledger = get_ledger_by_hash ~frontier hash in
-    let responder = Sync_ledger.Mask.Responder.create ledger ignore ~logger in
-    Sync_ledger.Mask.Responder.answer_query responder query
+  let answer_query :
+         frontier:Inputs.Transition_frontier.t
+      -> Ledger_hash.t
+      -> Sync_ledger.Query.t Envelope.Incoming.t
+      -> logger:Logger.t
+      -> trust_system:Trust_system.t
+      -> Sync_ledger.Answer.t Option.t Deferred.t =
+   fun ~frontier hash query ~logger ~trust_system ->
+    let open Trust_system in
+    let sender = Envelope.Incoming.sender query in
+    let%bind _ =
+      record_envelope_sender trust_system logger sender
+        ( Actions.Made_request
+        , Some
+            ( "syncable ledger query: $query"
+            , [ ( "query"
+                , Sync_ledger.Query.to_yojson (Envelope.Incoming.data query) )
+              ] ) )
+    in
+    match get_ledger_by_hash ~frontier hash with
+    | None ->
+        let%map _ =
+          record_envelope_sender trust_system logger sender
+            ( Actions.Requested_unknown_item
+            , Some
+                ( "tried to sync ledger with hash: $hash"
+                , [("hash", Ledger_hash.to_yojson hash)] ) )
+        in
+        None
+    | Some ledger ->
+        let responder =
+          Sync_ledger.Mask.Responder.create ledger ignore ~logger ~trust_system
+        in
+        Sync_ledger.Mask.Responder.answer_query responder query
 
   let transition_catchup ~frontier state_hash =
     let open Option.Let_syntax in

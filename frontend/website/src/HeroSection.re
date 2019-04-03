@@ -36,7 +36,7 @@ module Copy = {
               ])
             )>
             {ReasonReact.string(
-               "A cryptocurrency with a tiny, portable blockchain.",
+               {j|A cryptocurrency with a tiny portable blockchain.|j},
              )}
           </h1>
           <p
@@ -45,7 +45,7 @@ module Copy = {
                 Style.Body.big,
                 style([
                   marginTop(`rem(2.0)),
-                  maxWidth(`rem(28.0)),
+                  maxWidth(`rem(30.0)),
                   // align with the grid
                   media(
                     Style.MediaQuery.full,
@@ -56,15 +56,14 @@ module Copy = {
             )>
             <span>
               {ReasonReact.string(
-                 "Coda is the first cryptocurrency with a succinct blockchain. Our lightweight blockchain means ",
+                 "This makes it dramatically easier to develop modern usable crypto apps that work directly from the browser and enables more inclusive, sustainable consensus.",
                )}
             </span>
-            <span className=Style.Body.big_semibold>
-              {ReasonReact.string("anyone can use Coda directly")}
-            </span>
+            <br />
+            <br />
             <span>
               {ReasonReact.string(
-                 " from any device, in less data than a few tweets.",
+                 "Coda achieves this by substituting the traditional blockchain for a tiny zero knowledge proof, enabling the protocol state to be instantly verified by any device.",
                )}
             </span>
           </p>

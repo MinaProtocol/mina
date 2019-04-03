@@ -4,9 +4,14 @@ let make = (~className, ~name, ~alt, _children) => {
   render: _self => {
     <img
       className
-      src={name ++ ".png"}
+      src={Links.Cdn.url(name ++ ".png")}
       srcSet={
-        name ++ ".png 1x, " ++ name ++ "@2x.png 2x, " ++ name ++ "@3x.png 3x"
+        Links.Cdn.url(name ++ ".png")
+        ++ " 1x, "
+        ++ Links.Cdn.url(name ++ "@2x.png")
+        ++ " 2x, "
+        ++ Links.Cdn.url(name ++ "@3x.png")
+        ++ " 3x"
       }
       alt
     />;

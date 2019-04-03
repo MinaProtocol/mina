@@ -252,6 +252,17 @@ module type Inputs_intf = sig
 
   module Ledger_db : Coda_pow.Ledger_creatable_intf
 
+  module Diff_hash : Protocols.Coda_transition_frontier.Diff_hash
+
+  module Diff_mutant :
+    Protocols.Coda_transition_frontier.Diff_mutant
+    with type external_transition := External_transition.Stable.Latest.t
+     and type state_hash := Coda_base.State_hash.t
+     and type scan_state := Staged_ledger.Scan_state.t
+     and type hash := Diff_hash.t
+     and type consensus_state := Consensus.Consensus_state.Value.Stable.V1.t
+     and type pending_coinbases := Pending_coinbase.t
+
   module Transition_frontier :
     Protocols.Coda_transition_frontier.Transition_frontier_intf
     with type state_hash := Protocol_state_hash.t
@@ -263,6 +274,7 @@ module type Inputs_intf = sig
      and type transaction_snark_scan_state := Staged_ledger.Scan_state.t
      and type consensus_local_state := Consensus_mechanism.Local_state.t
      and type user_command := User_command.t
+     and type diff_mutant := Diff_mutant.e
 
   module Transaction_pool :
     Transaction_pool_intf
@@ -540,6 +552,7 @@ module Make (Inputs : Inputs_intf) = struct
     (** If ledger_db_location is None, will auto-generate a db based on a UUID *)
     type t =
       { logger: Logger.t
+      ; trust_system: Trust_system.t
       ; propose_keypair: Keypair.t option
       ; run_snark_worker: bool
       ; net_config: Net.Config.t
@@ -548,7 +561,7 @@ module Make (Inputs : Inputs_intf) = struct
       ; snark_pool_disk_location: string
       ; ledger_db_location: string option
       ; staged_ledger_transition_backup_capacity: int [@default 10]
-      ; time_controller: Time.Controller.t (* FIXME trust system goes here? *)
+      ; time_controller: Time.Controller.t
       ; receipt_chain_database: Coda_base.Receipt_chain_database.t
       ; snark_work_fee: Currency.Fee.t
       ; monitor: Monitor.t option
@@ -650,21 +663,22 @@ module Make (Inputs : Inputs_intf) = struct
                 ~get_staged_ledger_aux_at_hash:(fun _hash ->
                   failwith "shouldn't be necessary right now?" )
                 ~answer_sync_ledger_query:(fun query_env ->
-                  let open Or_error.Let_syntax in
-                  Deferred.return
-                  @@
-                  let ledger_hash, query = Envelope.Incoming.data query_env in
+                  let open Deferred.Or_error.Let_syntax in
+                  let ledger_hash, _ = Envelope.Incoming.data query_env in
                   let%bind frontier =
-                    peek_frontier frontier_broadcast_pipe_r
+                    Deferred.return @@ peek_frontier frontier_broadcast_pipe_r
                   in
-                  Sync_handler.answer_query ~frontier ledger_hash query
-                    ~logger:config.logger
-                  |> Result.of_option
-                       ~error:
-                         (Error.createf
-                            !"Could not answer query for ledger_hash: \
-                              %{sexp:Ledger_hash.t}"
-                            ledger_hash) )
+                  Sync_handler.answer_query ~frontier ledger_hash
+                    (Envelope.Incoming.map ~f:Tuple2.get2 query_env)
+                    ~logger:config.logger ~trust_system:config.trust_system
+                  |> Deferred.map
+                       ~f:
+                         (Result.of_option
+                            ~error:
+                              (Error.createf
+                                 !"Refused to answer query for ledger_hash: \
+                                   %{sexp:Ledger_hash.t}"
+                                 ledger_hash)) )
                 ~transition_catchup:(fun enveloped_hash ->
                   let open Deferred.Option.Let_syntax in
                   let hash = Envelope.Incoming.data enveloped_hash in
@@ -704,7 +718,8 @@ module Make (Inputs : Inputs_intf) = struct
                   Deferred.return result )
             in
             let valid_transitions =
-              Transition_router.run ~logger:config.logger ~network:net
+              Transition_router.run ~logger:config.logger
+                ~trust_system:config.trust_system ~network:net
                 ~time_controller:config.time_controller
                 ~frontier_broadcast_pipe:
                   (frontier_broadcast_pipe_r, frontier_broadcast_pipe_w)
