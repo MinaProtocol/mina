@@ -134,7 +134,7 @@ module type Ledger_hash_intf = sig
 end
 
 module type Pending_coinbase_hash_intf = sig
-  type t [@@deriving bin_io, eq, sexp, compare, hash]
+  type t [@@deriving eq, sexp, compare, hash]
 
   val to_bytes : t -> string
 
@@ -157,7 +157,7 @@ module type Pending_coinbase_intf = sig
   end
 
   module Stack : sig
-    type t [@@deriving sexp, bin_io, eq]
+    type t [@@deriving sexp, eq]
 
     val push : t -> coinbase -> t
 
