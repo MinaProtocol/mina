@@ -331,6 +331,7 @@ let make = (~posts, _children) => {
             style([
               color(Style.Colors.denimTwo),
               marginTop(`rem(6.)),
+              marginBottom(`rem(2.5)),
               media(Style.MediaQuery.notMobile, [textAlign(`center)]),
             ]),
           ])
@@ -377,7 +378,10 @@ let make = (~posts, _children) => {
           <span> {ReasonReact.string(".")} </span>
         </p>
         <div>
-          <p className=Style.Body.basic>
+          <p
+            className=Css.(
+              merge([Style.Body.basic, style([marginBottom(`rem(0.75))])])
+            )>
             {ReasonReact.string("Stay updated about:")}
           </p>
           <ul
