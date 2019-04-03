@@ -65,7 +65,7 @@ module Talks = {
   };
   let snarkyAlgebraicEffects = {
     name: "Snarky: Algebraic effects in Coda",
-    link: "https://www.youtube.com/watch?v=Na2i8MbXbI",
+    link: "https://www.youtube.com/watch?v=-Na2i8MbXbI",
   };
 
   let usingZkConstantSize = {
