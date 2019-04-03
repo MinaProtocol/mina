@@ -22,12 +22,12 @@ jobs:
                   name: Lint wallet
                   command: cd frontend/wallet && npm run reformat && git diff --exit-code src
             - run:
-                  name: Decrypt PragmataPro font
-                  command: cd frontend/wallet && npm run decrypt-ci
-            - run:
                   name: Build wallet
                   command: cd frontend/wallet && npm run build
             - run: cd frontend/website && npm install
+            - run:
+                  name: Decrypt PragmataPro font
+                  command: cd frontend/wallet && npm run decrypt-ci
             - run:
                   name: Lint website
                   command: cd frontend/website && npm run reformat && git diff --exit-code src
