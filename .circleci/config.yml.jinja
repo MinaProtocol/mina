@@ -27,7 +27,7 @@ jobs:
             - run: cd frontend/website && npm install
             - run:
                   name: Decrypt PragmataPro font
-                  command: cd frontend/wallet && npm run decrypt-ci
+                  command: cd frontend/website && npm run decrypt-ci
             - run:
                   name: Lint website
                   command: cd frontend/website && npm run reformat && git diff --exit-code src
