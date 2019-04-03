@@ -18,6 +18,7 @@ module type Inputs_intf = sig
      and type staged_ledger := Staged_ledger.t
      and type consensus_local_state := Consensus.Local_state.t
      and type user_command := User_command.t
+     and type diff_mutant := Diff_mutant.e
 
   module Root_sync_ledger :
     Syncable_ledger.S
@@ -99,7 +100,7 @@ module Make (Inputs : Inputs_intf) : sig
     val on_transition :
          t
       -> sender:Network_peer.Peer.t
-      -> root_sync_ledger:Root_sync_ledger.t
+      -> root_sync_ledger:State_hash.t Root_sync_ledger.t
       -> External_transition.Proof_verified.t
       -> [> `Syncing of syncing_data | `Ignored] Deferred.t
 
@@ -113,7 +114,7 @@ module Make (Inputs : Inputs_intf) : sig
 
     val sync_ledger :
          t
-      -> root_sync_ledger:Inputs.Root_sync_ledger.t
+      -> root_sync_ledger:State_hash.t Inputs.Root_sync_ledger.t
       -> transition_graph:Transition_cache.t
       -> transition_reader:( [< `Transition of Inputs.External_transition
                                                .Verified
@@ -214,7 +215,7 @@ end = struct
               if
                 Staged_ledger_hash.equal expected_staged_ledger_hash
                   received_staged_ledger_hash
-              then
+              then (
                 let snarked_ledger_hash =
                   blockchain_state
                   |> External_transition.Protocol_state.Blockchain_state
@@ -222,12 +223,13 @@ end = struct
                 in
                 Root_sync_ledger.new_goal root_sync_ledger
                   (Frozen_ledger_hash.to_ledger_hash snarked_ledger_hash)
-                |> Fn.const
-                   @@ `Syncing
-                        { snarked_ledger_hash
-                        ; staged_ledger_merkle_root
-                        ; scan_state
-                        ; pending_coinbases }
+                  ~data:(t.current_root |> With_hash.hash)
+                |> ignore ;
+                `Syncing
+                  { snarked_ledger_hash
+                  ; staged_ledger_merkle_root
+                  ; scan_state
+                  ; pending_coinbases } )
               else (
                 (* TODO: punish! *)
                 Logger.faulty_peer t.logger ~module_:__MODULE__
@@ -286,7 +288,8 @@ end = struct
           | `Ignored -> ()
         else Deferred.unit )
 
-  let run ~logger ~network ~frontier ~ledger_db ~transition_reader =
+  let run ~logger ~trust_system ~network ~frontier ~ledger_db
+      ~transition_reader =
     let initial_breadcrumb = Transition_frontier.root frontier in
     let initial_root_verified_transition =
       initial_breadcrumb |> Transition_frontier.Breadcrumb.transition_with_hash
@@ -305,12 +308,12 @@ end = struct
     let result = Mvar.create () in
     let%bind synced_db =
       let root_sync_ledger =
-        Root_sync_ledger.create ledger_db ~logger:t.logger
+        Root_sync_ledger.create ledger_db ~logger:t.logger ~trust_system
       in
       sync_ledger t ~root_sync_ledger ~transition_graph ~transition_reader
         ~result
       |> don't_wait_for ;
-      let%map synced_db = Root_sync_ledger.valid_tree root_sync_ledger in
+      let%map synced_db, _ = Root_sync_ledger.valid_tree root_sync_ledger in
       Root_sync_ledger.destroy root_sync_ledger ;
       synced_db
     in

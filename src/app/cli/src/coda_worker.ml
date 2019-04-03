@@ -320,7 +320,7 @@ module T = struct
             Coda_base.Receipt_chain_database.create
               ~directory:receipt_chain_dir_name
           in
-          let trust_system = Coda_base.Trust_system.create ~db_dir:trust_dir in
+          let trust_system = Trust_system.create ~db_dir:trust_dir in
           let time_controller =
             Run.Inputs.Time.Controller.create Run.Inputs.Time.Controller.basic
           in
@@ -345,7 +345,7 @@ module T = struct
           in
           let%bind coda =
             Main.create
-              (Main.Config.make ~logger ~net_config
+              (Main.Config.make ~logger ~trust_system ~net_config
                  ~run_snark_worker:(Option.is_some snark_worker_config)
                  ~staged_ledger_persistant_location:
                    (conf_dir ^/ "staged_ledger")

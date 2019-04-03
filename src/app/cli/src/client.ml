@@ -160,7 +160,8 @@ let verify_payment =
            dispatch Verify_proof.rpc (pk, payment, proof) port
          in
          match%map dispatch_result with
-         | Ok (Ok ()) -> printf "Payment is valid on the existing blockchain!"
+         | Ok (Ok ()) ->
+             printf "Payment is valid on the existing blockchain!\n"
          | Error e | Ok (Error e) -> eprintf "%s" (Error.to_string_hum e) ))
 
 let get_nonce addr port =
@@ -520,6 +521,7 @@ let command =
     [ ("get-balance", get_balance)
     ; ("get-public-keys", get_public_keys)
     ; ("prove-payment", prove_payment)
+    ; ("verify-payment", verify_payment)
     ; ("get-nonce", get_nonce_cmd)
     ; ("send-payment", send_payment)
     ; ("stop-daemon", stop_daemon)
