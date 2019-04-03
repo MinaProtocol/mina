@@ -78,7 +78,7 @@ module KnowledgeBase = {
                 paddingLeft(`zero),
                 paddingRight(`zero),
                 marginBottom(`zero),
-                media(Style.MediaQuery.notMobile, [width(`rem(25.))]),
+                maxWidth(`rem(24.5)),
               ])
             )>
             ...items
@@ -141,9 +141,24 @@ module KnowledgeBase = {
              </h4>,
            |],
          )}
+        <input
+          id="expand-knowledge-base"
+          type_="checkbox"
+          className=Css.(
+            style([
+              display(`none),
+              selector(
+                ":checked + div",
+                [height(`auto), after([display(`none)])],
+              ),
+              selector(":checked ~ label", [display(`none)]),
+            ])
+          )
+        />
         <div
           className=Css.(
             style([
+              position(`relative),
               display(`flex),
               justifyContent(`spaceAround),
               flexWrap(`wrap),
@@ -152,6 +167,26 @@ module KnowledgeBase = {
               paddingRight(`rem(1.0)),
               paddingTop(`rem(1.5)),
               paddingBottom(`rem(1.5)),
+              height(`rem(15.)),
+              overflow(`hidden),
+              after([
+                contentRule(""),
+                position(`absolute),
+                bottom(`zero),
+                left(`zero),
+                height(`rem(2.)),
+                width(`percent(100.)),
+                pointerEvents(`none),
+                backgroundImage(
+                  `linearGradient((
+                    `deg(0),
+                    [
+                      (0, Style.Colors.white),
+                      (100, Style.Colors.whiteAlpha(0.0)),
+                    ],
+                  )),
+                ),
+              ]),
             ])
           )>
           <SubSection
@@ -163,6 +198,16 @@ module KnowledgeBase = {
             content={Array.of_list(Links.Lists.richMedia)}
           />
         </div>
+        <label
+          className=Css.(
+            merge([Style.Link.basic, style([marginTop(`rem(1.0))])])
+          )
+          htmlFor="expand-knowledge-base">
+          {ReasonReact.string({js|View all ↓|js})}
+        </label>
+        <RunScript>
+          {|document.getElementById("expand-knowledge-base").checked = false;|}
+        </RunScript>
       </fieldset>;
     },
   };
@@ -344,6 +389,8 @@ let make = (~posts, _children) => {
               style([
                 maxWidth(`rem(22.5)),
                 marginTop(`zero),
+                marginBottom(`rem(0.5)),
+                width(`rem(22.)),
                 media(
                   Style.MediaQuery.full,
                   [marginRight(`rem(3.75)), marginLeft(`rem(3.75))],
