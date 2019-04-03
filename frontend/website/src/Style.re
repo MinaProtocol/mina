@@ -373,3 +373,24 @@ Css.global(
   "a,article,aside,blockquote,body,code,dd,div,dl,dt,fieldset,figcaption,figure,footer,form,h1,h2,h3,h4,h5,h6,header,html,input[type=email],input[type=number],input[type=password],input[type=tel],input[type=text],input[type=url],legend,li,main,nav,ol,p,pre,section,table,td,textarea,th,tr,ul",
   [Css.boxSizing(`borderBox)],
 );
+
+// Reset padding that appears only on some browsers
+Css.global(
+  "h1,h2,h3,h4,h5,fieldset,ul,li,p",
+  Css.[
+    unsafe("padding-inline-start", "0"),
+    unsafe("padding-inline-end", "0"),
+    unsafe("padding-block-start", "0"),
+    unsafe("padding-block-end", "0"),
+    unsafe("margin-inline-start", "0"),
+    unsafe("margin-inline-end", "0"),
+    unsafe("margin-block-start", "0"),
+    unsafe("margin-block-end", "0"),
+    unsafe("-webkit-padding-before", "0"),
+    unsafe("-webkit-padding-start", "0"),
+    unsafe("-webkit-padding-end", "0"),
+    unsafe("-webkit-padding-after", "0"),
+    unsafe("-webkit-margin-before", "0"),
+    unsafe("-webkit-margin-after", "0"),
+  ],
+);
