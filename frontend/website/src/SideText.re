@@ -4,29 +4,50 @@ module Cta = {
     link: string,
   };
 };
+
 let component = ReasonReact.statelessComponent("SideText");
 let make = (~className="", ~paragraphs, ~cta, _children) => {
   ...component,
   render: _self => {
     let {Cta.copy, link} = cta;
     let ps =
-      Belt.Array.mapWithIndex(paragraphs, (i, p) =>
-        <p
-          className=Css.(
-            merge([
-              Style.Body.basic,
-              style(
-                if (i == 0) {
-                  [marginTop(`zero)];
-                } else {
-                  [];
-                },
-              ),
-            ])
-          )
-          key=p>
-          {ReasonReact.string(p)}
-        </p>
+      Belt.Array.mapWithIndex(
+        paragraphs,
+        (i, entry) => {
+          let content =
+            switch (entry) {
+            | `str(s) => [|ReasonReact.string(s)|]
+            | `styled(xs) =>
+              List.map(
+                x =>
+                  switch (x) {
+                  | `emph(s) =>
+                    <span className=Style.Body.basic_semibold>
+                      {ReasonReact.string(s)}
+                    </span>
+                  | `str(s) => <span> {ReasonReact.string(s)} </span>
+                  },
+                xs,
+              )
+              |> Array.of_list
+            };
+
+          <p
+            className=Css.(
+              merge([
+                Style.Body.basic,
+                style(
+                  if (i == 0) {
+                    [marginTop(`zero)];
+                  } else {
+                    [];
+                  },
+                ),
+              ])
+            )>
+            // should be fine to use i here since this is all static content
+             ...content </p>;
+        },
       );
 
     <div
@@ -38,15 +59,19 @@ let make = (~className="", ~paragraphs, ~cta, _children) => {
           ]),
         ])
       )>
-      {ReasonReact.array(ps)}
-      <a
-        target="_blank"
-        href=link
-        className=Css.(
-          merge([Style.Link.basic, style([marginTop(`rem(1.5))])])
-        )>
-        {ReasonReact.string(copy ++ {j|\u00A0→|j})}
-      </a>
+      ...{Array.append(
+        ps,
+        [|
+          <a
+            target="_blank"
+            href=link
+            className=Css.(
+              merge([Style.Link.basic, style([marginTop(`rem(1.5))])])
+            )>
+            {ReasonReact.string(copy ++ {j|\u00A0→|j})}
+          </a>,
+        |],
+      )}
     </div>;
   },
 };

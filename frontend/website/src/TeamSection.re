@@ -19,7 +19,8 @@ module Member = {
   let component = ReasonReact.statelessComponent("Team.Member");
   let make = (~name, ~title, ~description, _children) => {
     let lastName = Js.String.split(" ", name)[1];
-    let imageSrc = "/static/img/" ++ String.lowercase(lastName) ++ ".jpg";
+    let imageSrc =
+      Links.Cdn.url("/static/img/" ++ String.lowercase(lastName) ++ ".jpg");
     {
       ...component,
       render: _self =>

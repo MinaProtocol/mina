@@ -88,6 +88,7 @@ let make = _children => {
             ])
           )>
           <Svg
+            inline=true
             className=Css.(
               style([
                 width(`rem(18.75)),
@@ -130,11 +131,22 @@ let make = _children => {
         <div className=Css.(style([marginBottom(`rem(2.375))]))>
           <SideText
             paragraphs=[|
-              "With Coda's constant sized blockchain and energy efficient consensus, Coda will be sustainable even as it scales to thousands of transactions per second, millions of users, and years of transaction history.",
+              `styled([
+                `str(
+                  "With Coda's constant sized blockchain and energy efficient consensus, Coda will be",
+                ),
+                `emph(
+                  " sustainable even as it scales to thousands of transactions per second, millions of users, and years of transactions history",
+                ),
+                `str("."),
+              ]),
+              `str(
+                "Help compress Coda by participating in snarking. Just like mining, with snarking anyone can contribute their compute to the network to help compress the blockchain and earn Coda.",
+              ),
             |]
             cta={
-              SideText.Cta.copy: "Notify me about participating in consensus",
-              link: Links.Forms.participateInConsensus,
+              SideText.Cta.copy: "Earn Coda by helping to compress the blockchain",
+              link: Links.Forms.compressTheBlockchain,
             }
           />
         </div>

@@ -361,44 +361,60 @@ let make = (~posts, _children) => {
               ]),
             ])
           )>
-          {ReasonReact.string(
-             "Help us build a more accessible, sustainable cryptocurrency. Join our community on discord, and follow our progress on twitter.",
-           )}
+          <span>
+            {ReasonReact.string(
+               "Help us build a more accessible, inclusive cryptocurrency. Join our community on ",
+             )}
+          </span>
+          <a className=Style.Link.basic href="https://discord.gg/wz7zQyc">
+            {ReasonReact.string("Discord")}
+          </a>
+          <span> {ReasonReact.string(", and follow our progress on ")} </span>
+          <a
+            className=Style.Link.basic href="https://twitter.com/codaprotocol">
+            {ReasonReact.string("Twitter")}
+          </a>
+          <span> {ReasonReact.string(".")} </span>
         </p>
-        <ul
-          className=Css.(
-            style([
-              listStyle(`none, `inside, `none),
-              unsafe("-webkit-padding-before", "0"),
-              unsafe("-webkit-margin-before", "0"),
-              unsafe("padding-inline-start", "0"),
-            ])
-          )>
-          <li className=marginBelow>
-            <Link
-              link=Links.Forms.developingWithCoda
-              message="Stay updated about developing with Coda"
-            />
-          </li>
-          <li className=marginBelow>
-            <Link
-              link=Links.Forms.participateInConsensus
-              message="Notify me about participating in consensus"
-            />
-          </li>
-          <li className=marginBelow>
-            <Link
-              link=Links.Forms.compressTheBlockchain
-              message="Earn Coda by helping to compress the blockchain"
-            />
-          </li>
-          <li className=marginBelow>
-            <Link
-              link=Links.Forms.mailingList
-              message="Join our mailing list for updates"
-            />
-          </li>
-        </ul>
+        <div>
+          <p className=Style.Body.basic>
+            {ReasonReact.string("Stay updated about:")}
+          </p>
+          <ul
+            className=Css.(
+              style([
+                listStyle(`none, `inside, `none),
+                unsafe("-webkit-padding-before", "0"),
+                unsafe("-webkit-margin-before", "0"),
+                unsafe("padding-inline-start", "0"),
+              ])
+            )>
+            <li className=marginBelow>
+              <Link
+                link=Links.Forms.developingWithCoda
+                message="Developing with Coda"
+              />
+            </li>
+            <li className=marginBelow>
+              <Link
+                link=Links.Forms.participateInConsensus
+                message="Participating in consensus"
+              />
+            </li>
+            <li className=marginBelow>
+              <Link
+                link=Links.Forms.compressTheBlockchain
+                message="Helping to compress the blockchain"
+              />
+            </li>
+            <li className=marginBelow>
+              <Link
+                link=Links.Forms.mailingList
+                message="Join our mailing list for updates and distribution"
+              />
+            </li>
+          </ul>
+        </div>
       </div>
       <div
         className=Css.(
