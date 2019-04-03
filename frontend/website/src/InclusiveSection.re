@@ -128,6 +128,7 @@ module Figure = {
   let make = (~captionColor, ~link, ~dims, ~caption, ~alt, _children) => {
     ...component,
     render: _self => {
+      let (w, h) = dims;
       <figure
         className=Css.(
           style([
@@ -144,7 +145,18 @@ module Figure = {
             media(Style.MediaQuery.notMobile, [width(`rem(20.625))]),
           ])
         )>
-        <Svg dims link alt />
+        <Svg
+          className=Css.(
+            style([
+              // on mobile we want to square our figures with the height size
+              width(`rem(h)),
+              media(Style.MediaQuery.notMobile, [width(`rem(w))]),
+            ])
+          )
+          dims
+          link
+          alt
+        />
         <figcaption
           className=Css.(
             merge([
