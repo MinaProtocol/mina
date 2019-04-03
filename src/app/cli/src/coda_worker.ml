@@ -275,7 +275,6 @@ module T = struct
           in
           let module Main = Coda_main.Make_coda (Init) in
           let module Run = Run (Config) (Main) in
-          let%bind trust_dir = Unix.mkdtemp (conf_dir ^/ "trust") in
           let receipt_chain_dir_name = conf_dir ^/ "receipt_chain" in
           let%bind trust_dir = Unix.mkdtemp (conf_dir ^/ "trust") in
           let%bind () = File_system.create_dir receipt_chain_dir_name in
