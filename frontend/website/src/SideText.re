@@ -10,23 +10,44 @@ let make = (~className="", ~paragraphs, ~cta, _children) => {
   render: _self => {
     let {Cta.copy, link} = cta;
     let ps =
-      Belt.Array.mapWithIndex(paragraphs, (i, p) =>
-        <p
-          className=Css.(
-            merge([
-              Style.Body.basic,
-              style(
-                if (i == 0) {
-                  [marginTop(`zero)];
-                } else {
-                  [];
-                },
-              ),
-            ])
-          )
-          key=p>
-          {ReasonReact.string(p)}
-        </p>
+      Belt.Array.mapWithIndex(
+        paragraphs,
+        (i, entry) => {
+          let content =
+            switch (entry) {
+            | `str(s) => [|ReasonReact.string(s)|]
+            | `styled(xs) =>
+              List.map(
+                x =>
+                  switch (x) {
+                  | `emph(s) =>
+                    <span className=Style.Body.basic_semibold>
+                      {ReasonReact.string(s)}
+                    </span>
+                  | `str(s) => <span> {ReasonReact.string(s)} </span>
+                  },
+                xs,
+              )
+              |> Array.of_list
+            };
+
+          <p
+            className=Css.(
+              merge([
+                Style.Body.basic,
+                style(
+                  if (i == 0) {
+                    [marginTop(`zero)];
+                  } else {
+                    [];
+                  },
+                ),
+              ])
+            )
+            key={Js.Int.toString(i)}>
+            // should be fine to use i here since this is all static content
+             ...content </p>;
+        },
       );
 
     <div
