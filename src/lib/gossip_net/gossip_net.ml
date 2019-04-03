@@ -93,6 +93,8 @@ module Make (Message : Message_intf) :
     ; peers: Peer.Hash_set.t
     ; connections:
         (Unix.Inet_addr.t, (Uuid.t, Rpc.Connection.t) Hashtbl.t) Hashtbl.t
+          (**mapping a Uuid to a connection to be able to remove it from the hash 
+         *table since Rpc.Connection.t doesn't have the socket information*)
     ; max_concurrent_connections: int option
     (* maximum number of concurrent connections from an ip (infinite if None)*)
     }
