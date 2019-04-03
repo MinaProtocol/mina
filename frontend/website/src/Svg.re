@@ -26,7 +26,7 @@ let make = (~link, ~dims, ~inline=false, ~className=?, ~alt, _children) => {
       />;
     } else {
       <object
-        data=link
+        data={Links.Cdn.url(link)}
         type_="image/svg+xml"
         width={Js.Int.toString(Size.pixelsX(dims))}
         height={Js.Int.toString(Size.pixelsY(dims))}

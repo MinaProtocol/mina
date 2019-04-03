@@ -1,3 +1,9 @@
+module Cdn = {
+  let prefix = ref("");
+
+  let url = s => prefix^ ++ s;
+};
+
 module Named = {
   type t = {
     link: string,
@@ -19,9 +25,9 @@ module Forms = {
 };
 
 module Static = {
-  let whitepaper = {
+  let whitepaper = () => {
     name: "Read the Coda Whitepaper",
-    link: "/static/coda-whitepaper-05-10-2018-0.pdf",
+    link: Cdn.url("/static/coda-whitepaper-05-10-2018-0.pdf"),
   };
 
   let snarkette = {
@@ -140,10 +146,10 @@ module Panel = {
 module Lists = {
   let articles = posts =>
     // before the blog posts
-    [Static.whitepaper]
+    [Static.whitepaper()]
     @ List.map(
-        ((name, _, metadata)) =>
-          {name: metadata.BlogPost.title, link: "/blog/" ++ name ++ ".html"},
+        ((name, _, title)) =>
+          {name: title, link: "/blog/" ++ name ++ ".html"},
         posts,
       )
     // after the blog posts

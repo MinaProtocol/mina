@@ -173,7 +173,11 @@ let dot = {
 
 let extraHeaders =
   <>
-    <link rel="stylesheet" type_="text/css" href="/static/css/careers.css" />
+    <link
+      rel="stylesheet"
+      type_="text/css"
+      href={Links.Cdn.url("/static/css/careers.css")}
+    />
     Head.legacyStylesheets
   </>;
 
@@ -187,28 +191,36 @@ let make = (~jobOpenings, _) => {
         jobOpenings,
       );
 
+    let f = Links.Cdn.url;
+
     <div>
-      <div className="mw960 pv3 center ph3 ibmplex oceanblack">
+      <div className="mw960 center ph3 ibmplex oceanblack">
         <h1
-          className="fadedblue aktivgroteskex careers-double-line-header ttu f5 fw5 tracked-more mb4 nowrap">
+          className={
+            "fadedblue aktivgroteskex careers-double-line-header ttu f5 fw5 tracked-more mb4 nowrap "
+            ++ Css.(style([marginTop(`rem(1.25))]))
+          }>
           {ReasonReact.string("Work with us!")}
         </h1>
         <div>
           <div className="dn db-ns">
             <div>
               <div className="careers-gallery-row1">
-                <img src="/static/img/careers/group-outside.jpg" />
-                <img src="/static/img/careers/group-in-house.jpg" />
+                <img src={f("/static/img/careers/group-outside.jpg")} />
+                <img src={f("/static/img/careers/group-in-house.jpg")} />
               </div>
               <div className="careers-gallery-row2">
-                <img src="/static/img/careers/nacera-outside.jpg" />
-                <img src="/static/img/careers/john-cooking.jpg" />
-                <img src="/static/img/careers/vanishree-talking.jpg" />
+                <img src={f("/static/img/careers/nacera-outside.jpg")} />
+                <img src={f("/static/img/careers/john-cooking.jpg")} />
+                <img src={f("/static/img/careers/vanishree-talking.jpg")} />
               </div>
             </div>
           </div>
           <div className="db dn-ns">
-            <img className="" src="/static/img/careers/group-outside.jpg" />
+            <img
+              className=""
+              src={f("/static/img/careers/group-outside.jpg")}
+            />
           </div>
         </div>
         <div className="mw800 center">

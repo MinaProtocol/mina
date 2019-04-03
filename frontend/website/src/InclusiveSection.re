@@ -209,8 +209,17 @@ let make = _ => {
             className=Css.(style([display(`flex), justifyContent(`center)]))>
             <SideText
               paragraphs=[|
-                "Simple, fair consensus. Participation is proportional to how much stake you have in the protocol with no lockups, no forced delegation, and low bandwidth requirements.",
-                "With just a small stake, you'll be able to participate directly in consensus and earn Coda.",
+                `styled([
+                  `emph(
+                    "Simple, fair consensus designed so you can run a node",
+                  ),
+                  `str(
+                    ". Participation is proportional to how much stake you have in the protocol with no lockups, no forced delegation, and low bandwidth requirements.",
+                  ),
+                ]),
+                `str(
+                  "With just a small stake you'll be able to participate directly in consensus and earn Coda.",
+                ),
               |]
               cta={
                 SideText.Cta.copy: "Stay updated about participating in consensus",
