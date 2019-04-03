@@ -274,7 +274,6 @@ module H2 = {
 
 module Technical = {
   open Css;
-  // TODO: Replace with equals signs
   let border = f => style([f(`px(3), `dashed, Colors.greyishAlpha(0.5))]);
 
   let basic =
