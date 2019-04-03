@@ -36,7 +36,7 @@ module Copy = {
               ])
             )>
             {ReasonReact.string(
-               "A cryptocurreny anyone can verify and participate in.",
+               {j|A cryptocurrency anyone can verify and participate\u00A0in.|j},
              )}
           </h1>
           <p
