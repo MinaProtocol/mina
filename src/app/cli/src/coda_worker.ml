@@ -28,7 +28,8 @@ module Input = struct
     ; external_port: int
     ; discovery_port: int
     ; acceptable_delay: Time.Span.t
-    ; peers: Host_and_port.t list }
+    ; peers: Host_and_port.t list
+    ; max_concurrent_connections: int option }
   [@@deriving bin_io]
 end
 
@@ -271,7 +272,8 @@ module T = struct
         ; program_dir
         ; external_port
         ; peers
-        ; discovery_port } =
+        ; discovery_port
+        ; max_concurrent_connections } =
       let logger =
         Logger.create
           ~metadata:[("host", `String host); ("port", `Int external_port)]
@@ -306,6 +308,8 @@ module T = struct
         let commit_id = None
 
         let work_selection = work_selection
+
+        let max_concurrent_connections = max_concurrent_connections
       end in
       O1trace.trace_task "worker_main" (fun () ->
           let%bind (module Init) =
@@ -337,7 +341,8 @@ module T = struct
                       (Unix.Inet_addr.of_string host)
                       ~discovery_port ~communication_port:external_port
                 ; logger
-                ; trust_system } }
+                ; trust_system
+                ; max_concurrent_connections } }
           in
           let monitor = Async.Monitor.create ~name:"coda" () in
           let with_monitor f input =
