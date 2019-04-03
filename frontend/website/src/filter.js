@@ -1,7 +1,5 @@
 #!/usr/bin/env node
 
-// Pandoc filter to convert all text to uppercase
-
 var process = require('process');
 var pandoc = require('pandoc-filter');
 var Image = pandoc.Image;

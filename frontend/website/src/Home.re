@@ -1,10 +1,3 @@
-let extraHeaders =
-  <link
-    rel="stylesheet"
-    type_="text/css"
-    href={Links.Cdn.url("/index.css")}
-  />;
-
 let component = ReasonReact.statelessComponent("Home");
 let make = (~posts, _children) => {
   ...component,
