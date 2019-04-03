@@ -9,9 +9,11 @@ module type Transition_database_schema = sig
 
   type scan_state
 
+  type pending_coinbases
+
   type _ t =
     | Transition : state_hash -> (external_transition * state_hash list) t
-    | Root : (state_hash * scan_state) t
+    | Root : (state_hash * scan_state * pending_coinbases) t
 
   include Rocksdb.Serializable.GADT.Key_intf with type 'a t := 'a t
 end
@@ -67,6 +69,8 @@ module type Worker = sig
 
   type breadcrumb
 
+  type pending_coinbases
+
   type 'a diff
 
   type t
@@ -88,6 +92,7 @@ module type Worker = sig
         with type external_transition := external_transition
          and type state_hash := state_hash
          and type scan_state := scan_state
+         and type pending_coinbases := pending_coinbases
 
       include Rocksdb.Serializable.GADT.S with type 'a g := 'a Schema.t
     end

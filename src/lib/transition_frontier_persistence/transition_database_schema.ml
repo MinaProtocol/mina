@@ -5,7 +5,8 @@ module Make (Inputs : Transition_frontier.Inputs_intf) :
   Intf.Transition_database_schema
   with type external_transition := Inputs.External_transition.Stable.Latest.t
    and type scan_state := Inputs.Staged_ledger.Scan_state.t
-   and type state_hash := State_hash.t = struct
+   and type state_hash := State_hash.t
+   and type pending_coinbases := Pending_coinbase.t = struct
   open Inputs
 
   module Transition = struct
@@ -19,7 +20,9 @@ module Make (Inputs : Transition_frontier.Inputs_intf) :
   module Root_data = struct
     module Data = struct
       type t =
-        State_hash.Stable.Latest.t * Staged_ledger.Scan_state.Stable.Latest.t
+        State_hash.Stable.Latest.t
+        * Staged_ledger.Scan_state.Stable.Latest.t
+        * Pending_coinbase.t
       [@@deriving bin_io]
     end
   end

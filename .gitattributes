@@ -6,4 +6,4 @@ src/lib/snarky/src/camlsnark_c/libsnark-caml/* linguist-vendored
 *.svg filter=lfs diff=lfs merge=lfs -text
 *.woff filter=lfs diff=lfs merge=lfs -text
 *.woff2 filter=lfs diff=lfs merge=lfs -text
-
+frontend/website/static/*.bc.js filter=lfs diff=lfs merge=lfs -text

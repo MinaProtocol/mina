@@ -10,14 +10,25 @@ module Make (Inputs : sig
     type t [@@deriving sexp, bin_io]
   end
 
+  module Compressed_public_key : Compressed_public_key_intf
+
   module Staged_ledger_aux_hash : Staged_ledger_aux_hash_intf
+
+  module Fee_transfer :
+    Fee_transfer_intf with type public_key := Compressed_public_key.t
+
+  module Pending_coinbase : sig
+    type t [@@deriving sexp, bin_io]
+  end
+
+  module Pending_coinbase_hash : Pending_coinbase_hash_intf
 
   module Staged_ledger_hash :
     Staged_ledger_hash_intf
     with type staged_ledger_aux_hash := Staged_ledger_aux_hash.t
      and type ledger_hash := Ledger_hash.t
-
-  module Compressed_public_key : Compressed_public_key_intf
+     and type pending_coinbase := Pending_coinbase.t
+     and type pending_coinbase_hash := Pending_coinbase_hash.t
 
   module User_command :
     User_command_intf with type public_key := Compressed_public_key.t
@@ -27,9 +38,6 @@ module Make (Inputs : sig
     with type public_key := Compressed_public_key.t
      and type statement := Transaction_snark.Statement.t
      and type proof := Ledger_proof.t
-
-  module Fee_transfer :
-    Fee_transfer_intf with type public_key := Compressed_public_key.t
 end) :
   Coda_pow.Staged_ledger_diff_intf
   with type user_command := Inputs.User_command.t
@@ -39,7 +47,7 @@ end) :
    and type public_key := Inputs.Compressed_public_key.t
    and type completed_work := Inputs.Transaction_snark_work.t
    and type completed_work_checked := Inputs.Transaction_snark_work.Checked.t
-   and type fee_transfer_single := Inputs.Fee_transfer.single = struct
+   and type fee_transfer_single := Inputs.Fee_transfer.Single.t = struct
   open Inputs
 
   module At_most_two = struct
@@ -66,7 +74,9 @@ end) :
       | _ -> Or_error.error_string "Error incrementing coinbase parts"
   end
 
-  type ft = Inputs.Fee_transfer.single [@@deriving sexp, bin_io]
+  (* TODO: version *)
+
+  type ft = Inputs.Fee_transfer.Single.Stable.V1.t [@@deriving sexp, bin_io]
 
   (* TODO: version *)
 

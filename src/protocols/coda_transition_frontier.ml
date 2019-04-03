@@ -38,6 +38,8 @@ module type Diff_mutant = sig
 
   type scan_state
 
+  type pending_coinbases
+
   type consensus_state
 
   (** Diff_mutant is a GADT that represents operations that affect the changes
@@ -49,7 +51,9 @@ module type Diff_mutant = sig
       changes a `transition_frontier` and their corresponding side-effects.*)
   type _ t =
     | New_frontier :
-        ((external_transition, state_hash) With_hash.t * scan_state)
+        ( (external_transition, state_hash) With_hash.t
+        * scan_state
+        * pending_coinbases )
         -> unit t
         (** New_frontier: When creating a new transition frontier, the
             transition_frontier will begin with a single breadcrumb that can be
@@ -72,7 +76,9 @@ module type Diff_mutant = sig
             right transition and we use their consensus_state to accomplish
             this. Therefore the type of Remove_transitions is indexed by a list
             of consensus_state. *)
-    | Update_root : (state_hash * scan_state) -> (state_hash * scan_state) t
+    | Update_root :
+        (state_hash * scan_state * pending_coinbases)
+        -> (state_hash * scan_state * pending_coinbases) t
         (** Update_root: Update root is an indication that the root state_hash
             and the root scan_state state. To verify that we update the right
             root, we can indicate the old root is being updated. Therefore, the
@@ -106,15 +112,15 @@ module type Transition_frontier_extension_intf0 = sig
 
   val create : input -> t
 
-  val initial_view : unit -> view
   (** The first view that is ever available. *)
+  val initial_view : unit -> view
 
+  (** Handle a transition frontier diff, and return the new version of the
+        computed view, if it's updated. *)
   val handle_diff :
        t
     -> transition_frontier_breadcrumb Transition_frontier_diff.t
     -> view Option.t
-  (** Handle a transition frontier diff, and return the new version of the
-              computed view, if it's updated. *)
 end
 
 (** The type of the view onto the changes to the current best tip. This type
@@ -136,6 +142,8 @@ module type Network_intf = sig
   type state_hash
 
   type ledger_hash
+
+  type pending_coinbases
 
   type consensus_state
 
@@ -165,7 +173,8 @@ module type Network_intf = sig
          , state_body_hash list * external_transition )
          Proof_carrying_data.t
        * parallel_scan_state
-       * ledger_hash )
+       * ledger_hash
+       * pending_coinbases )
        Deferred.Or_error.t
 
   (* TODO: Change this to strict_pipe *)
@@ -197,8 +206,8 @@ module type Transition_frontier_Breadcrumb_intf = sig
     -> staged_ledger
     -> t
 
-  val copy : t -> t
   (** The copied breadcrumb delegates to [Staged_ledger.copy], the other fields are already immutable *)
+  val copy : t -> t
 
   val build :
        logger:Logger.t
@@ -265,8 +274,8 @@ module type Transition_frontier_base_intf = sig
     -> consensus_local_state:consensus_local_state
     -> t Deferred.t
 
-  val close : t -> unit
   (** Clean up internal state. *)
+  val close : t -> unit
 
   val find_exn : t -> state_hash -> Breadcrumb.t
 
@@ -291,6 +300,8 @@ module type Transition_frontier_intf = sig
 
   val previous_root : t -> Breadcrumb.t option
 
+  val root_length : t -> int
+
   val best_tip : t -> Breadcrumb.t
 
   val path_map : t -> Breadcrumb.t -> f:(Breadcrumb.t -> 'a) -> 'a list
@@ -310,16 +321,18 @@ module type Transition_frontier_intf = sig
 
   val successors_rec : t -> Breadcrumb.t -> Breadcrumb.t list
 
+  val common_ancestor : t -> Breadcrumb.t -> Breadcrumb.t -> state_hash
+
   val iter : t -> f:(Breadcrumb.t -> unit) -> unit
 
-  val add_breadcrumb_exn : t -> Breadcrumb.t -> unit Deferred.t
   (** Adds a breadcrumb to the transition frontier or throws. It possibly
    * triggers a root move and it triggers any extensions that are listening to
    * events on the frontier. *)
+  val add_breadcrumb_exn : t -> Breadcrumb.t -> unit Deferred.t
 
-  val add_breadcrumb_if_present_exn : t -> Breadcrumb.t -> unit Deferred.t
   (** Like add_breadcrumb_exn except it doesn't throw if the parent hash is
    * missing from the transition frontier *)
+  val add_breadcrumb_if_present_exn : t -> Breadcrumb.t -> unit Deferred.t
 
   val best_tip_path_length_exn : t -> int
 
@@ -381,6 +394,8 @@ module type Transition_frontier_intf = sig
 
   val persistence_diff_pipe :
     t -> Extensions.Persistence_diff.view Broadcast_pipe.Reader.t
+
+  val visualize_to_string : t -> string
 
   val visualize : filename:string -> t -> unit
 

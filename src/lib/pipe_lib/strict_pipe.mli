@@ -24,10 +24,10 @@ type (_, _) type_ =
 
 module Reader : sig
   type 't t
-
   (* Using [`Eof | `Ok of 't] to mirror interface of Jane Street's Pipe read *)
-  val read : 't t -> [`Eof | `Ok of 't] Deferred.t
+
   (** Read a single value from the pipe or fail if the pipe is closed *)
+  val read : 't t -> [`Eof | `Ok of 't] Deferred.t
 
   val to_linear_pipe : 't t -> 't Linear_pipe.Reader.t
 
@@ -37,32 +37,32 @@ module Reader : sig
 
   val filter_map : 'a t -> f:('a -> 'b option) -> 'b t
 
-  val fold : 'a t -> init:'b -> f:('b -> 'a -> 'b Deferred.t) -> 'b Deferred.t
   (** This is equivalent to CSP style communication pattern. This does not
    * delegate to [Pipe.iter] under the hood because that emulates a
    * "single-threadedness" with its pushback mechanism. We want more of a CSP
    * model. *)
+  val fold : 'a t -> init:'b -> f:('b -> 'a -> 'b Deferred.t) -> 'b Deferred.t
 
+  (** This has similar semantics to [fold reader ~init ~f], but f isn't
+   * deferred. This function delegates to [Pipe.fold_without_pushback] *)
   val fold_without_pushback :
        ?consumer:Pipe.Consumer.t
     -> 'a t
     -> init:'b
     -> f:('b -> 'a -> 'b)
     -> 'b Deferred.t
-  (** This has similar semantics to [fold reader ~init ~f], but f isn't
-   * deferred. This function delegates to [Pipe.fold_without_pushback] *)
 
-  val iter : 'a t -> f:('a -> unit Deferred.t) -> unit Deferred.t
   (** This is a specialization of a fold for the common case of accumulating
    * unit. See [fold reader ~init ~f] *)
+  val iter : 'a t -> f:('a -> unit Deferred.t) -> unit Deferred.t
 
+  (** See [fold_without_pushback reader ~init ~f] *)
   val iter_without_pushback :
        ?consumer:Pipe.Consumer.t
     -> ?continue_on_error:bool
     -> 'a t
     -> f:('a -> unit)
     -> unit Deferred.t
-  (** See [fold_without_pushback reader ~init ~f] *)
 
   val clear : _ t -> unit
 
@@ -81,13 +81,13 @@ module Reader : sig
     val two : 'a t -> 'a t * 'a t
   end
 
+  (** This function would take a pipe and split the reader side into 3 ends. The
+   * `read`s to the new pipe have to be in the same order as the `write`s or else
+   * there will be a deadlock. *)
   val partition_map3 :
        'a t
     -> f:('a -> [`Fst of 'b | `Snd of 'c | `Trd of 'd])
     -> 'b t * 'c t * 'd t
-  (** This function would take a pipe and split the reader side into 3 ends. The
-   * `read`s to the new pipe have to be in the same order as the `write`s or else
-   * there will be a deadlock. *)
 end
 
 module Writer : sig

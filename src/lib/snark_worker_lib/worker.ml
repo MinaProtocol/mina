@@ -4,7 +4,7 @@ open Async
 module Make (Inputs : Intf.Inputs_intf) :
   Intf.S
   with type transition := Inputs.Transaction.t
-   and type sparse_ledger := Inputs.Sparse_ledger.t
+   and type transaction_witness := Inputs.Transaction_witness.t
    and type statement := Inputs.Statement.t
    and type proof := Inputs.Proof.t = struct
   open Inputs
@@ -17,7 +17,7 @@ module Make (Inputs : Intf.Inputs_intf) :
         type t =
           ( Statement.t
           , Transaction.t
-          , Sparse_ledger.t
+          , Transaction_witness.t
           , Proof.t )
           Work.Single.Spec.t
         [@@deriving sexp]

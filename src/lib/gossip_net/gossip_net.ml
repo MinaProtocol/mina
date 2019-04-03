@@ -12,7 +12,7 @@ type ('q, 'r) dispatch =
 module type Message_intf = sig
   type content
 
-  type msg
+  type msg [@@deriving to_yojson]
 
   include
     Versioned_rpc.Both_convert.One_way.S
@@ -20,6 +20,8 @@ module type Message_intf = sig
      and type caller_msg := msg
 
   val content : msg -> content
+
+  val summary : msg -> string
 
   val sender : msg -> Envelope.Sender.t
 end
@@ -121,7 +123,8 @@ module Make (Message : Message_intf) :
 
   let broadcast_selected t peers msg =
     let peers =
-      List.map peers ~f:(fun peer -> Peer.to_communications_host_and_port peer)
+      List.map peers ~f:(fun peer ->
+          (peer, Peer.to_communications_host_and_port peer) )
     in
     let send peer =
       try_call_rpc t peer
@@ -130,10 +133,15 @@ module Make (Message : Message_intf) :
     in
     trace_event "broadcasting message" ;
     Deferred.List.iter ~how:`Parallel peers ~f:(fun p ->
-        match%map send p with
+        match%map send (snd p) with
         | Ok () -> ()
         | Error e ->
-            Logger.error t.logger ~module_:__MODULE__ ~location:__LOC__ "%s"
+            Logger.error t.logger ~module_:__MODULE__ ~location:__LOC__
+              "broadcasting $short_msg to $peer failed: %s"
+              ~metadata:
+                [ ("short_msg", `String (Message.summary msg))
+                ; ("msg", Message.msg_to_yojson msg)
+                ; ("peer", Peer.to_yojson (fst p)) ]
               (Error.to_string_hum e) )
 
   let broadcast_random t n msg =

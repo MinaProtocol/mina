@@ -35,6 +35,7 @@ module Make (Inputs : Inputs) : sig
      and type scan_state := Scan_state.Stable.Latest.t
      and type hash := Diff_hash.t
      and type consensus_state := Consensus.Consensus_state.Value.Stable.V1.t
+     and type pending_coinbases := Pending_coinbase.t
 end = struct
   open Inputs
 
@@ -43,7 +44,8 @@ end = struct
         ( ( External_transition.Stable.Latest.t
           , State_hash.Stable.Latest.t )
           With_hash.t
-        * Scan_state.Stable.Latest.t )
+        * Scan_state.Stable.Latest.t
+        * Pending_coinbase.t )
         -> unit t
     | Add_transition :
         ( External_transition.Stable.Latest.t
@@ -57,8 +59,13 @@ end = struct
         list
         -> Consensus.Consensus_state.Value.Stable.V1.t list t
     | Update_root :
-        (State_hash.Stable.Latest.t * Scan_state.Stable.Latest.t)
-        -> (State_hash.Stable.Latest.t * Scan_state.Stable.Latest.t) t
+        ( State_hash.Stable.Latest.t
+        * Scan_state.Stable.Latest.t
+        * Pending_coinbase.t )
+        -> ( State_hash.Stable.Latest.t
+           * Scan_state.Stable.Latest.t
+           * Pending_coinbase.t )
+           t
 
   type e = E : 'a t -> e
 
@@ -83,7 +90,7 @@ end = struct
           json_consensus_state parent_consensus_state
       | Remove_transitions _, removed_consensus_state ->
           `List (List.map removed_consensus_state ~f:json_consensus_state)
-      | Update_root _, (old_state_hash, _) ->
+      | Update_root _, (old_state_hash, _, _) ->
           State_hash.to_yojson old_state_hash
     in
     `List [`String (name key); json_value]
@@ -91,39 +98,42 @@ end = struct
   let key_to_yojson (type a) (key : a t) =
     let json_key =
       match key with
-      | New_frontier (With_hash.({hash; _}), _) -> State_hash.to_yojson hash
+      | New_frontier (With_hash.({hash; _}), _, _) -> State_hash.to_yojson hash
       | Add_transition With_hash.({hash; _}) -> State_hash.to_yojson hash
       | Remove_transitions removed_transitions ->
           `List
             (List.map removed_transitions
                ~f:(Fn.compose State_hash.to_yojson With_hash.hash))
-      | Update_root (state_hash, _) -> State_hash.to_yojson state_hash
+      | Update_root (state_hash, _, _) -> State_hash.to_yojson state_hash
     in
     `List [`String (name key); json_key]
 
   let merge = Fn.flip Diff_hash.merge
 
-  let hash_root_data (hash, scan_state) acc =
+  let hash_root_data (hash, scan_state, pending_coinbase) acc =
     merge
       ( Bin_prot.Utils.bin_dump
           [%bin_type_class:
-            State_hash.Stable.Latest.t * Scan_state.Stable.Latest.t]
-            .writer (hash, scan_state)
+            State_hash.Stable.Latest.t
+            * Scan_state.Stable.Latest.t
+            * Pending_coinbase.t]
+            .writer
+          (hash, scan_state, pending_coinbase)
       |> Bigstring.to_string )
       acc
 
   let hash_diff_contents (type mutant) (t : mutant t) acc =
     match t with
-    | New_frontier ({With_hash.hash; _}, scan_state) ->
-        hash_root_data (hash, scan_state) acc
+    | New_frontier ({With_hash.hash; _}, scan_state, pending_coinbase) ->
+        hash_root_data (hash, scan_state, pending_coinbase) acc
     | Add_transition {With_hash.hash; _} ->
         Diff_hash.merge acc (State_hash.to_bytes hash)
     | Remove_transitions removed_transitions ->
         List.fold removed_transitions ~init:acc
           ~f:(fun acc_hash {With_hash.hash; _} ->
             Diff_hash.merge acc_hash (State_hash.to_bytes hash) )
-    | Update_root (new_hash, new_scan_state) ->
-        hash_root_data (new_hash, new_scan_state) acc
+    | Update_root (new_hash, new_scan_state, pending_coinbase) ->
+        hash_root_data (new_hash, new_scan_state, pending_coinbase) acc
 
   let hash_mutant (type mutant) (t : mutant t) (mutant : mutant) acc =
     match (t, mutant) with
@@ -134,8 +144,8 @@ end = struct
         List.fold removed_transitions ~init:acc
           ~f:(fun acc_hash removed_transition ->
             merge (serialize_consensus_state removed_transition) acc_hash )
-    | Update_root _, (old_root, old_scan_state) ->
-        hash_root_data (old_root, old_scan_state) acc
+    | Update_root _, (old_root, old_scan_state, old_pending_coinbase) ->
+        hash_root_data (old_root, old_scan_state, old_pending_coinbase) acc
 
   let hash (type mutant) acc_hash (t : mutant t) (mutant : mutant) =
     let diff_contents_hash = hash_diff_contents t acc_hash in

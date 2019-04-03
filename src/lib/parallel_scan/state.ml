@@ -66,7 +66,7 @@ module Stable = struct
       { jobs: ('a, 'd) Job.t Ring_buffer.t
       ; level_pointer: int Array.t
       ; capacity: int
-      ; mutable acc: int * ('a * 'd list) option
+      ; mutable acc: int * ('a * 'd list) option sexp_opaque
       ; mutable current_data_length: int
       ; mutable base_none_pos: int option
       ; mutable recent_tree_data: 'd list sexp_opaque

@@ -11,7 +11,7 @@ Here's the summary if you want to contribute code:
 
 1. Learn some OCaml. The [Real World OCaml](https://dev.realworldocaml.org/toc.html) book is good. Jane Street also has [some exercises](https://github.com/janestreet/learn-ocaml-workshop).
 2. Learn how we use OCaml. We have [a style guide](https://github.com/CodaProtocol/coda/blob/master/docs/style_guide.md) that goes over the important things.
-3. Fork and clone the repo, then set up your development environment. See the [developer README](README-dev.md) for details. 
+3. Fork and clone the repo, then set up your development environment. See the [developer README](README-dev.md) for details.
 4. Find a good first issue. The best issues to start with are those tagged [`category-mentored`](https://github.com/CodaProtocol/coda/issues?q=is%3Aissue+is%3Aopen+sort%3Aupdated-desc+label%3Acategory-mentored). These have a detailed description on how to approach the issue and someone appointed to help people solve it. Once you're famliar with the codebase, [`category-quick-fix`](https://github.com/CodaProtocol/coda/issues?utf8=%E2%9C%93&q=is%3Aissue+is%3Aopen+sort%3Aupdated-desc++label%3Acategory-quick-fix+) is a good source of reasonably well-defined tasks.
 5. Create a branch in your local clone and implement the solution.
 6. Push the branch to your GitHub fork and create a pull request.
@@ -83,10 +83,10 @@ that we agree to implement.
 This process isn't final, but in general:
 
 1. RFCs will be open for at least a week for discussion.
-2. Once discussion has slowed down or there is consensus, the core eng team 
+2. Once discussion has slowed down or there is consensus, the core eng team
    will initiate a "Final Comment Period". This will include the core eng's
    "merge disposition" (merge/don't merge). The FCP comment should be based
-   on information and arguments already present in the RFC thread. At the 
+   on information and arguments already present in the RFC thread. At the
    end of the FCP, the core eng team decides to do another FCP, leave the FCP
    state for continued discussion, or resolve the RFC by merging/closing
    (whichever the announced disposition was).

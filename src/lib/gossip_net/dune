@@ -6,5 +6,5 @@
  (inline_tests)
  (libraries core pipe_lib logger kademlia async async_extra o1trace)
  (preprocess
-  (pps ppx_jane ppx_deriving.make bisect_ppx -- -conditional))
+  (pps ppx_jane ppx_deriving.make ppx_deriving_yojson bisect_ppx -- -conditional))
  (synopsis "Gossip Network"))

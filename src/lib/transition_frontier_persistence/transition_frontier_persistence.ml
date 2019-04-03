@@ -20,6 +20,14 @@ module Make (Inputs : Intf.Main_inputs) = struct
     in
     Bin_prot.Utils.bin_dump bin_type.writer (new_root, new_scan_state)
 
+  let scan_state t =
+    t |> Transition_frontier.Breadcrumb.staged_ledger
+    |> Inputs.Staged_ledger.scan_state
+
+  let pending_coinbase t =
+    t |> Transition_frontier.Breadcrumb.staged_ledger
+    |> Staged_ledger.pending_coinbase_collection
+
   let apply_diff (type mutant) frontier (diff : mutant Diff_mutant.t) : mutant
       =
     match diff with
@@ -39,9 +47,12 @@ module Make (Inputs : Intf.Main_inputs) = struct
         let state_hash =
           Transition_frontier.Breadcrumb.state_hash previous_root
         in
+        let staged_ledger =
+          previous_root |> Transition_frontier.Breadcrumb.staged_ledger
+        in
         ( state_hash
-        , Transition_frontier.Breadcrumb.staged_ledger previous_root
-          |> Staged_ledger.scan_state )
+        , Staged_ledger.scan_state staged_ledger
+        , Staged_ledger.pending_coinbase_collection staged_ledger )
 
   let write_diff_and_verify ~logger ~acc_hash worker frontier diff_mutant =
     let ground_truth_diff = apply_diff frontier diff_mutant in

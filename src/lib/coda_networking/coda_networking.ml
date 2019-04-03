@@ -208,7 +208,8 @@ struct
             , State_body_hash.t list * External_transition.t )
             Proof_carrying_data.Stable.V1.t
           * Staged_ledger_aux.Stable.V1.t
-          * Ledger_hash.Stable.V1.t )
+          * Ledger_hash.Stable.V1.t
+          * Pending_coinbase.t )
           option
       end
 
@@ -238,7 +239,8 @@ struct
               * External_transition.Stable.V1.t )
             Proof_carrying_data.Stable.V1.t
           * Staged_ledger_aux.Stable.V1.t
-          * Ledger_hash.Stable.V1.t )
+          * Ledger_hash.Stable.V1.t
+          * Pending_coinbase.t )
           option
         [@@deriving bin_io]
 
@@ -453,7 +455,8 @@ module Make (Inputs : Inputs_intf) = struct
               , State_body_hash.t list * External_transition.t )
               Proof_carrying_data.t
             * Staged_ledger_aux.t
-            * Ledger_hash.t )
+            * Ledger_hash.t
+            * Pending_coinbase.t )
             Deferred.Option.t) =
     (* TODO: for following functions, could check that IP in _conn matches
        the sender IP in envelope, punish if mismatch due to IP forgery

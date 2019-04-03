@@ -1,3 +1,5 @@
+let twoColumnMedia = "(min-width: 34rem)";
+
 module Investor = {
   let component = ReasonReact.statelessComponent("Investors.Investor");
   let make = (~name, ~suffix, _) => {
@@ -8,10 +10,12 @@ module Investor = {
       | `Jpg => "jpg"
       };
     let imageSrc =
-      "/static/img/investors/"
-      ++ String.lowercase(firstName)
-      ++ "."
-      ++ suffixStr;
+      Links.Cdn.url(
+        "/static/img/investors/"
+        ++ String.lowercase(firstName)
+        ++ "."
+        ++ suffixStr,
+      );
     {
       ...component,
       render: _self =>
@@ -21,16 +25,27 @@ module Investor = {
               display(`flex),
               flexDirection(`row),
               alignItems(`center),
+              media(twoColumnMedia, [marginLeft(`rem(3.))]),
             ])
           )>
-          <img src=imageSrc className=TeamSection.iconStyle />
-          <h4
-            className=Css.(
-              merge([Style.Body.basic, style([color(Style.Colors.slate)])])
-            )>
-            {ReasonReact.string(name)}
-          </h4>
-        </div>,
+          // Note: change this alt text if we ever hide the investor name
+
+            <img
+              src=imageSrc
+              className=TeamSection.iconStyle
+              alt=""
+              ariaHidden=true
+            />
+            <h4
+              className=Css.(
+                merge([
+                  Style.Body.basic,
+                  style([color(Style.Colors.slate)]),
+                ])
+              )>
+              {ReasonReact.string(name)}
+            </h4>
+          </div>,
     };
   };
 };
@@ -53,7 +68,7 @@ let make = _children => {
             justifyContent(`center),
             gridTemplateColumns([`fr(1.), `fr(1.)]),
             media(
-              Style.MediaQuery.notMobile,
+              twoColumnMedia,
               [
                 // bs-css doesn't allow fr in minmax: https://github.com/SentiaAnalytics/bs-css/pull/124
                 unsafe(

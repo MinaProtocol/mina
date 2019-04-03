@@ -63,7 +63,7 @@ let%test_module "Transition Frontier Persistence" =
               in
               ( match mutant_diff with
               | Add_transition {With_hash.hash; _} -> remove_job hash
-              | New_frontier ({With_hash.hash; _}, _) -> remove_job hash
+              | New_frontier ({With_hash.hash; _}, _, _) -> remove_job hash
               | _ -> () ) ;
               new_hash ) )
       |> Deferred.ignore |> don't_wait_for ;
@@ -129,9 +129,12 @@ let%test_module "Transition Frontier Persistence" =
       let open Worker.For_tests in
       let transition_storage = transition_storage worker in
       let open Transition_frontier.Breadcrumb in
+      let staged_ledger = staged_ledger root in
       Worker.handle_diff worker Diff_hash.empty
         (New_frontier
-           (get_transition root, staged_ledger root |> Staged_ledger.scan_state))
+           ( get_transition root
+           , Staged_ledger.scan_state staged_ledger
+           , Staged_ledger.pending_coinbase_collection staged_ledger ))
       |> ignore ;
       Worker.handle_diff worker Diff_hash.empty
         (Add_transition (get_transition next_breadcrumb))

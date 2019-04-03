@@ -2,4 +2,4 @@
   (name envelope)
   (public_name envelope)
   (libraries core_kernel network_peer)
-  (preprocess (pps ppx_jane ppx_deriving_yojson)))
+  (preprocess (pps ppx_jane ppx_coda ppx_deriving_yojson)))

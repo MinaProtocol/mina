@@ -5,7 +5,7 @@ date: 2019-03-13
 
 O(1) Labs is aiming to develop the first cryptocurrency protocol that can deliver on the promise of supporting real-world applications and widespread use. Our team is based in San Francisco, and we are funded by top investors (including Polychain, Metastable, Max Levchin, and Naval Ravikant).
 
-Currency is as valuable as the economic activity it enables. We’re seeking an individual capable of orchestrating strategic deals, partnerships, and creative go-to-market strategies to engage with a wide variety of potential partners to help build liquidity and utility into the ecosystem. 
+Currency is as valuable as the economic activity it enables. We’re seeking an individual capable of orchestrating strategic deals, partnerships, and creative go-to-market strategies to engage with a wide variety of potential partners to help build liquidity and utility into the ecosystem.
 
 Our director of business development will have the following responsibilities:
 
@@ -18,7 +18,7 @@ The ideal candidate:
 
 * Has deep experience in the cryptocurrency space and relationships with exchanges, custody providers, protocol developers, and other strategic players in the ecosystem
 * Thoroughly understands blockchain and cryptocurrency technology
-* Has proven ability to negotiate complex deals with a variety of senior stakeholders 
+* Has proven ability to negotiate complex deals with a variety of senior stakeholders
 * Is an excellent writer and persuasive speaker
 
 There are no hard requirements and we're more interested in learning about your individual background.

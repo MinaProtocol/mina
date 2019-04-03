@@ -36,20 +36,20 @@ module Checked = struct
   let is_pos (v : var) =
     Boolean.Unsafe.of_cvar
       (let open Field.Checked in
-      Infix.(one_half * (v + Field.Var.constant Field.one)))
+      one_half * (v + Field.Var.constant Field.one))
 
   let is_neg (v : var) =
     Boolean.Unsafe.of_cvar
       (let open Field.Checked in
-      Infix.(neg_one_half * (v - Field.Var.constant Field.one)))
+      neg_one_half * (v - Field.Var.constant Field.one))
 
   let pos_if_true (b : Boolean.var) =
     let open Field.Checked in
-    Infix.((two * (b :> Field.Var.t)) - Field.Var.constant Field.one)
+    (two * (b :> Field.Var.t)) - Field.Var.constant Field.one
 
   let neg_if_true (b : Boolean.var) =
     let open Field.Checked in
-    Infix.((neg_two * (b :> Field.Var.t)) + Field.Var.constant Field.one)
+    (neg_two * (b :> Field.Var.t)) + Field.Var.constant Field.one
 
   let negate t = Field.Var.scale t neg_one
 

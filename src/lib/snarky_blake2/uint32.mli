@@ -8,8 +8,8 @@ module type S = sig
 
   module Unchecked = Unsigned.UInt32
 
-  val length_in_bits : int
   (** This is 32 *)
+  val length_in_bits : int
 
   val constant : Unsigned.UInt32.t -> t
 
@@ -19,8 +19,8 @@ module type S = sig
 
   val sum : t list -> (t, _) Checked.t
 
-  val rotr : t -> int -> t
   (** Rotate to the "right" (i.e., move higher bits down) *)
+  val rotr : t -> int -> t
 
   val typ : (t, Unchecked.t) Typ.t
 end

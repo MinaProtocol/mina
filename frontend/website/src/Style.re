@@ -1,17 +1,27 @@
 module Colors = {
+  let string =
+    fun
+    | `rgb(r, g, b) => Printf.sprintf("rgb(%d,%d,%d)", r, g, b)
+    | `rgba(r, g, b, a) => Printf.sprintf("rgba(%d,%d,%d,%f)", r, g, b, a)
+    | `hsl(h, s, l) => Printf.sprintf("hsl(%d,%d%%,%d%%)", h, s, l)
+    | `hsla(h, s, l, a) =>
+      Printf.sprintf("hsla(%d,%d%%,%d%%,%f)", h, s, l, a);
+
   let fadedBlue = `rgb((111, 167, 197));
   let white = Css.white;
+  let whiteAlpha = a => `rgba((255, 255, 255, a));
   let hyperlink = `hsl((201, 71, 52));
   let hyperlinkAlpha = a => `hsla((201, 71, 52, a));
-  let hyperlinkHover = `hsl((201, 71, 70));
+  let hyperlinkHover = `hsl((201, 71, 40));
+  let hyperlinkLight = `hsl((201, 71, 70));
 
   let metallicBlue = `rgb((70, 99, 131));
   let denimTwo = `rgb((61, 88, 120));
+  let greyBlue = `rgb((118, 147, 190));
   let darkGreyBlue = `rgb((61, 88, 120));
   let greyishBrown = `rgb((74, 74, 74));
 
   let bluishGreen = `rgb((22, 168, 85));
-  let purpleBrown = `rgb((100, 46, 48));
   let offWhite = `rgb((243, 243, 243));
   let grey = `rgb((129, 146, 168));
 
@@ -31,10 +41,135 @@ module Colors = {
   let lightClover = `rgba((118, 205, 135, 0.12));
 
   let teal = `rgb((71, 130, 160));
+  let tealAlpha = a => `rgba((71, 130, 160, a));
+
+  let rosebud = `rgb((163, 83, 111));
+
+  let blueBlue = `rgb((42, 81, 224));
+  let midnight = `rgb((31, 45, 61));
 };
 
 module Typeface = {
   open Css;
+  // To prevent "flash of unstyled text" on some browsers (firefox), we need
+  // to do insane things to mitigate it. Even though the CSS working group
+  // created `font-display: block` for this purpose, Firefox chooses to not
+  // follow the standard "wait for 3seconds before showing fallback fonts."
+  //
+  // Instead we can base64 the woff and woff2 fonts and include those directly
+  // in our stylesheets. Now those browsers have no choice but to show us the
+  // font correctly.
+  //
+  // Scafolding code adapted from Bs-css Css.re.
+  module Loader = {
+    let string_of_fontWeight = x =>
+      switch (x) {
+      | `thin => "100"
+      | `extraLight => "200"
+      | `light => "300"
+      | `normal => "400"
+      | `medium => "500"
+      | `semiBold => "600"
+      | `bold => "700"
+      | `extraBold => "800"
+      };
+
+    let genFontFace = (~fontFamily, ~src, ~fontWeight=?, ()) => {
+      let src =
+        src
+        |> List.map(s => {
+             let ext = {
+               let arr = Js.String.split(".", s);
+               arr[Array.length(arr) - 1];
+             };
+             let b64 = Node.Fs.readFileSync("./" ++ s, `base64);
+             "url(\"data:font/"
+             ++ ext
+             ++ ";base64,"
+             ++ b64
+             ++ "\") format(\""
+             ++ ext
+             ++ "\")";
+           })
+        |> String.concat(", ");
+
+      let fontWeight =
+        Belt.Option.mapWithDefault(fontWeight, "", w =>
+          "font-weight: " ++ string_of_fontWeight(w)
+        );
+      let asString = {j|@font-face {
+      font-family: $fontFamily;
+      src: $src;
+      font-display: block;
+      font-style: normal;
+      $(fontWeight);
+  }|j};
+
+      asString;
+    };
+
+    let load = () => {
+      let weights = [
+        // The weights are intentionally shifted thinner one unit
+        (`thin, "Thin"),
+        (`extraLight, "Thin"),
+        (`light, "ExtraLight"),
+        (`normal, "Light"),
+        (`medium, "Regular"),
+        (`semiBold, "Medium"),
+        (`bold, "SemiBold"),
+        (`extraBold, "Bold"),
+      ];
+
+      String.concat(
+        "\n",
+        [
+          genFontFace(
+            ~fontFamily="IBM Plex Serif",
+            ~src=[
+              "/static/font/IBMPlexSerif-Medium-Latin1.woff2",
+              "/static/font/IBMPlexSerif-Medium-Latin1.woff",
+            ],
+            ~fontWeight=`medium,
+            (),
+          ),
+          genFontFace(
+            ~fontFamily="IBM Plex Mono",
+            ~src=[
+              "/static/font/IBMPlexMono-SemiBold-Latin1.woff2",
+              "/static/font/IBMPlexMono-SemiBold-Latin1.woff",
+            ],
+            ~fontWeight=`bold,
+            (),
+          ),
+          genFontFace(
+            ~fontFamily="IBM Plex Mono",
+            ~src=[
+              "/static/font/IBMPlexMono-Medium-Latin1.woff2",
+              "/static/font/IBMPlexMono-Medium-Latin1.woff",
+            ],
+            ~fontWeight=`semiBold,
+            (),
+          ),
+          ...List.map(
+               ((weight, name)) =>
+                 genFontFace(
+                   ~fontFamily="IBM Plex Sans",
+                   ~src=[
+                     "/static/font/IBMPlexSans-" ++ name ++ "-Latin1.woff2",
+                     "/static/font/IBMPlexSans-" ++ name ++ "-Latin1.woff",
+                   ],
+                   ~fontWeight=weight,
+                   (),
+                 ),
+               weights,
+             ),
+        ],
+      );
+    };
+  };
+
+  let ibmplexserif = fontFamily("IBM Plex Serif, serif");
 
   let ibmplexsans =
     fontFamily("IBM Plex Sans, Helvetica Neue, Arial, sans-serif");
@@ -47,8 +182,16 @@ module Typeface = {
 };
 
 module MediaQuery = {
+  let veryLarge = "(min-width: 83.8125rem)";
   let full = "(min-width: 48rem)";
   let notMobile = "(min-width: 32rem)";
+  let notSmallMobile = "(min-width: 25rem)";
+  let statusLiftAlways = "(min-width: 38rem)";
+  let statusLift = keepAnnouncementBar =>
+    keepAnnouncementBar ? statusLiftAlways : "(min-width: 0rem)";
+
+  // to adjust root font size (therefore pixels)
+  let iphoneSEorSmaller = "(max-width: 374px)";
 };
 
 /** sets both paddingLeft and paddingRight, as one should */
@@ -89,7 +232,6 @@ module H1 = {
       fontSize(`rem(2.25)),
       letterSpacing(`rem(-0.02375)),
       lineHeight(`rem(3.0)),
-      color(Colors.denimTwo),
       media(
         MediaQuery.full,
         [
@@ -98,6 +240,19 @@ module H1 = {
           lineHeight(`rem(4.0)),
         ],
       ),
+    ]);
+};
+
+module H2 = {
+  open Css;
+
+  let basic =
+    style([
+      Typeface.ibmplexsans,
+      fontWeight(`normal),
+      fontSize(`rem(2.25)),
+      letterSpacing(`rem(-0.03125)),
+      lineHeight(`rem(3.0)),
     ]);
 };
 
@@ -112,11 +267,10 @@ module H3 = {
       lineHeight(`rem(1.5)),
     ]);
 
-  let wide =
+  let wideNoColor =
     style([
       whiteSpace(`nowrap),
       fontSize(`rem(1.0)),
-      color(Colors.fadedBlue),
       letterSpacing(`em(0.25)),
       Typeface.aktivgrotesk,
       fontWeight(`medium),
@@ -124,6 +278,8 @@ module H3 = {
       textAlign(`center),
       textTransform(`uppercase),
     ]);
+
+  let wide = merge([wideNoColor, style([color(Colors.fadedBlue)])]);
 
   let wings = {
     let wing = [
@@ -161,21 +317,36 @@ module H4 = {
       fontWeight(`normal),
       color(Colors.greyishBrown),
     ]);
+
+  let wide =
+    style([
+      whiteSpace(`nowrap),
+      fontSize(`rem(0.75)),
+      letterSpacing(`rem(0.125)),
+      Typeface.aktivgrotesk,
+      fontWeight(`medium),
+      fontStyle(`normal),
+      textAlign(`center),
+      textTransform(`uppercase),
+    ]);
 };
 
 module H5 = {
   open Css;
 
-  let basic =
+  let init =
     style([
       Typeface.ibmplexsans,
       fontSize(`rem(0.9345)),
-      lineHeight(`rem(1.5)),
       letterSpacing(`rem(0.125)),
       fontWeight(`normal),
       color(Colors.slateAlpha(0.5)),
       textTransform(`uppercase),
     ]);
+
+  let basic = merge([init, style([lineHeight(`rem(1.5))])]);
+
+  let tight = merge([init, style([lineHeight(`rem(1.25))])]);
 };
 
 module Body = {
@@ -189,6 +360,8 @@ module Body = {
       lineHeight(`rem(1.5)),
       fontWeight(`normal),
     ]);
+
+  let basic_semibold = merge([basic, style([fontWeight(`semiBold)])]);
 
   let big =
     style([
@@ -205,4 +378,25 @@ module Body = {
 Css.global(
   "a,article,aside,blockquote,body,code,dd,div,dl,dt,fieldset,figcaption,figure,footer,form,h1,h2,h3,h4,h5,h6,header,html,input[type=email],input[type=number],input[type=password],input[type=tel],input[type=text],input[type=url],legend,li,main,nav,ol,p,pre,section,table,td,textarea,th,tr,ul",
   [Css.boxSizing(`borderBox)],
+);
+
+// Reset padding that appears only on some browsers
+Css.global(
+  "h1,h2,h3,h4,h5,fieldset,ul,li,p",
+  Css.[
+    unsafe("padding-inline-start", "0"),
+    unsafe("padding-inline-end", "0"),
+    unsafe("padding-block-start", "0"),
+    unsafe("padding-block-end", "0"),
+    unsafe("margin-inline-start", "0"),
+    unsafe("margin-inline-end", "0"),
+    unsafe("margin-block-start", "0"),
+    unsafe("margin-block-end", "0"),
+    unsafe("-webkit-padding-before", "0"),
+    unsafe("-webkit-padding-start", "0"),
+    unsafe("-webkit-padding-end", "0"),
+    unsafe("-webkit-padding-after", "0"),
+    unsafe("-webkit-margin-before", "0"),
+    unsafe("-webkit-margin-after", "0"),
+  ],
 );

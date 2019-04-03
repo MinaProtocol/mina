@@ -42,7 +42,10 @@ module Digest = struct
       module T = struct
         let version = 1
 
-        include Random_oracle.Digest
+        include Random_oracle.Digest.Stable.V1
+
+        let fold, typ, length_in_triples =
+          Random_oracle.Digest.(fold, typ, length_in_triples)
       end
 
       include T
@@ -64,7 +67,7 @@ module Digest = struct
   (* bin_io omitted intentionally *)
   type t = Stable.Latest.t [@@deriving sexp, eq, yojson]
 
-  module Checked = Stable.Latest.Checked
+  module Checked = Random_oracle.Digest.Checked
 
   let fold, typ, length_in_triples =
     Stable.Latest.(fold, typ, length_in_triples)
