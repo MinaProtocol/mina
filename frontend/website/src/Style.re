@@ -357,6 +357,8 @@ module Body = {
       fontWeight(`normal),
     ]);
 
+  let basic_semibold = merge([basic, style([fontWeight(`semiBold)])]);
+
   let big =
     style([
       Typeface.ibmplexsans,
