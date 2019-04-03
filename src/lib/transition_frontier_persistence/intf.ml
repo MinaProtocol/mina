@@ -89,7 +89,6 @@ module type Worker = sig
   end
 end
 
-(* TODO: Make an RPC_parallel version of Worker.ml *)
 module type Main_inputs = sig
   include Worker_inputs
 
