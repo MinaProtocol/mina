@@ -20,7 +20,7 @@ let make = (~posts, _children) => {
       <div
         className=Css.(
           style([
-            backgroundColor(Style.Colors.gandalf),
+            backgroundColor(Style.Colors.navyBlue),
             marginTop(`rem(13.)),
           ])
         )>
