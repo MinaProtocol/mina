@@ -46,7 +46,11 @@ module Footer = {
                 maxWidth(`rem(96.0)),
                 marginLeft(`auto),
                 marginRight(`auto),
-                ...Style.paddingY(`rem(2.)),
+                // Not using Style.paddingY here because we need the background
+                // color the same (so can't use margin), but we also need some
+                // top spacing.
+                paddingTop(`rem(4.75)),
+                paddingBottom(`rem(2.)),
               ]
               @ Style.paddingX(`rem(4.0)),
             )

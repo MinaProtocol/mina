@@ -194,9 +194,12 @@ let make = (~jobOpenings, _) => {
     let f = Links.Cdn.url;
 
     <div>
-      <div className="mw960 pv3 center ph3 ibmplex oceanblack">
+      <div className="mw960 center ph3 ibmplex oceanblack">
         <h1
-          className="fadedblue aktivgroteskex careers-double-line-header ttu f5 fw5 tracked-more mb4 nowrap">
+          className={
+            "fadedblue aktivgroteskex careers-double-line-header ttu f5 fw5 tracked-more mb4 nowrap "
+            ++ Css.(style([marginTop(`rem(1.25))]))
+          }>
           {ReasonReact.string("Work with us!")}
         </h1>
         <div>
