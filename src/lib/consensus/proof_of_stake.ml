@@ -1781,14 +1781,15 @@ let lock_transition (prev : Consensus_state.Value.t)
     local_state.last_epoch_snapshot <- local_state.curr_epoch_snapshot ;
     local_state.curr_epoch_snapshot <- epoch_snapshot )
 
-let create_genesis_protocol_state consensus_transition_data blockchain_state =
+let create_genesis_protocol_state ~blockchain_state =
   let consensus_state =
     Or_error.ok_exn
       (Consensus_state.update ~proposer_vrf_result:Vrf.Precomputed.vrf_output
          ~previous_consensus_state:
            Protocol_state.(consensus_state negative_one)
          ~previous_protocol_state_hash:Protocol_state.(hash negative_one)
-         ~consensus_transition_data ~supply_increase:Currency.Amount.zero
+         ~consensus_transition_data:Snark_transition.(consensus_data genesis)
+         ~supply_increase:Currency.Amount.zero
          ~snarked_ledger_hash:genesis_ledger_hash)
   in
   let state =
@@ -1799,15 +1800,12 @@ let create_genesis_protocol_state consensus_transition_data blockchain_state =
   With_hash.of_data ~hash_data:Protocol_state.hash state
 
 let genesis_protocol_state =
-  create_genesis_protocol_state
-    Snark_transition.(consensus_data genesis)
-    Snark_transition.(blockchain_state genesis)
+  create_genesis_protocol_state Snark_transition.(blockchain_state genesis)
 
 module For_tests = struct
   let create_genesis_protocol_state ledger =
-    let consensus_data = Snark_transition.(consensus_data genesis) in
     let root_ledger_hash = Coda_base.Ledger.merkle_root ledger in
-    create_genesis_protocol_state consensus_data
+    create_genesis_protocol_state
       { Blockchain_state.genesis with
         staged_ledger_hash=
           Coda_base.Staged_ledger_hash.(

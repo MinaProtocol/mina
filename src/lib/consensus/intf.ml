@@ -101,6 +101,10 @@ module type S = sig
     val prover_state : t -> Prover_state.t
   end
 
+  val create_genesis_protocol_state :
+       blockchain_state:Protocol_state.Blockchain_state.Value.t
+    -> (Protocol_state.value, Coda_base.State_hash.t) With_hash.t
+
   module For_tests : sig
     val gen_consensus_state :
          gen_slot_advancement:int Quickcheck.Generator.t

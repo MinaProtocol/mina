@@ -1058,6 +1058,8 @@ module type Blockchain_state_intf = sig
 
   type var
 
+  val genesis : Value.t
+
   val create_value :
        staged_ledger_hash:staged_ledger_hash
     -> snarked_ledger_hash:frozen_ledger_hash
@@ -1408,6 +1410,10 @@ module type Consensus_mechanism_intf = sig
     -> candidate:Consensus_state.Value.t
     -> logger:Logger.t
     -> [`Keep | `Take]
+
+  val create_genesis_protocol_state :
+       blockchain_state:Blockchain_state.Value.t
+    -> (Protocol_state.Value.t, protocol_state_hash) With_hash.t
 
   val genesis_protocol_state :
     (Protocol_state.Value.t, protocol_state_hash) With_hash.t

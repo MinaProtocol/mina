@@ -173,6 +173,14 @@ module Make (Inputs : Intf.Main_inputs) = struct
       in
       ({With_hash.data= verified_transition; hash= state_hash}, children_hashes)
     in
+    let%bind () =
+      Async.Writer.with_file "persistence.log" ~f:(fun writer ->
+          Async.Writer.write writer
+            (Core.sprintf
+               !"Snarked ledger merkle hash: %{sexp:Coda_base.Ledger_hash.t}"
+               (Coda_base.Ledger.Db.merkle_root root_snarked_ledger)) ;
+          Deferred.unit )
+    in
     let%bind root_staged_ledger =
       Staged_ledger.of_scan_state_and_snarked_ledger ~scan_state
         ~snarked_ledger:(Ledger.of_database root_snarked_ledger)

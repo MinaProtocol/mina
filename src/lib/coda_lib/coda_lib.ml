@@ -579,8 +579,31 @@ module Make (Inputs : Inputs_intf) = struct
       ; creator= Account.public_key (snd (List.hd_exn Genesis_ledger.accounts))
       }
     in
+    let root_ledger_hash = Ledger.merkle_root Genesis.ledger in
+    let%bind () =
+      Async.Writer.with_file "genesis_snarked_ledger.log" ~f:(fun writer ->
+          Async.Writer.write writer
+            (Core.sprintf
+               !"Snarked ledger merkle hash: %{sexp:Ledger_hash.t}"
+               (Ledger.merkle_root Genesis.ledger)) ;
+          Deferred.unit )
+    in
+    let empty_scan_state = Staged_ledger.Scan_state.empty () in
+    let genesis_blockchain_state =
+      Consensus_mechanism.Blockchain_state.create_value
+        ~staged_ledger_hash:
+          Staged_ledger_hash.(
+            of_aux_and_ledger_hash
+              (Staged_ledger.Scan_state.hash empty_scan_state)
+              root_ledger_hash)
+        ~snarked_ledger_hash:
+          (Frozen_ledger_hash.of_ledger_hash root_ledger_hash)
+        ~timestamp:Consensus_mechanism.Blockchain_state.(timestamp genesis)
+    in
     let genesis_protocol_state =
-      With_hash.data Consensus_mechanism.genesis_protocol_state
+      With_hash.data
+        (Consensus_mechanism.create_genesis_protocol_state
+           ~blockchain_state:genesis_blockchain_state)
     in
     (* the genesis transition is assumed to be valid *)
     let (`I_swear_this_is_safe_see_my_comment first_transition) =
