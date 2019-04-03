@@ -147,7 +147,7 @@ let make = _ => {
         className=Css.(
           merge([
             Style.H3.wings,
-            style([marginTop(`rem(3.0)), marginBottom(`rem(3.0))]),
+            style([marginTop(`rem(1.25)), marginBottom(`rem(3.0))]),
           ])
         )>
         {ReasonReact.string("Testnet")}

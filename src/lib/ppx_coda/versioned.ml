@@ -109,6 +109,8 @@ let ocaml_builtin_types = ["int"; "float"; "char"; "string"; "bool"; "unit"]
 
 let ocaml_builtin_type_constructors = ["list"; "option"; "ref"]
 
+let jane_street_type_constructors = ["sexp_opaque"]
+
 let rec generate_core_type_version_decls core_type =
   match core_type.ptyp_desc with
   | Ptyp_constr ({txt; _}, core_types) -> (
@@ -120,7 +122,9 @@ let rec generate_core_type_version_decls core_type =
           && List.mem ocaml_builtin_types id ~equal:String.equal
         then (* no versioning to worry about *)
           []
-        else if List.mem ocaml_builtin_type_constructors id ~equal:String.equal
+        else if
+          List.mem ocaml_builtin_type_constructors id ~equal:String.equal
+          || List.mem jane_street_type_constructors id ~equal:String.equal
         then
           match core_types with
           | [_] -> generate_version_lets_for_core_types core_types

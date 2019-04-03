@@ -1,5 +1,3 @@
-let extraHeaders = <link rel="stylesheet" type_="text/css" href="index.css" />;
-
 let component = ReasonReact.statelessComponent("Home");
 let make = (~posts, _children) => {
   ...component,
@@ -22,8 +20,8 @@ let make = (~posts, _children) => {
       <div
         className=Css.(
           style([
-            backgroundColor(Style.Colors.gandalf),
-            marginTop(`rem(10.)),
+            backgroundColor(Style.Colors.navyBlue),
+            marginTop(`rem(13.)),
           ])
         )>
         <Wrapped> <TeamSection /> <InvestorsSection /> </Wrapped>
