@@ -98,7 +98,7 @@ let createPostFadedContents = html =>
       className=Css.(
         style([
           after([
-            unsafe("content", "\"\""),
+            contentRule(""),
             position(`absolute),
             zIndex(1),
             // Needed to prevent the bottom of the text peeking through for some reason.
@@ -160,7 +160,6 @@ let createPostSummary = ((name, html, metadata)) => {
         style([
           position(`relative),
           pointerEvents(`none),
-          zIndex(1),
           display(`flex),
           alignItems(`flexStart),
           flexDirection(`column),

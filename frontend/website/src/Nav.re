@@ -7,8 +7,6 @@ module NavStyle = {
   module MediaQuery = {
     let menu = "(min-width: 62rem)";
     let menuMax = "(max-width: 61.9375rem)";
-    let statusLift = keepAnnouncementBar =>
-      keepAnnouncementBar ? "(min-width: 38rem)" : "(min-width: 0rem)";
   };
   let bottomNudge = Css.marginBottom(`rem(2.0));
   let bottomNudgeOffset = offset => Css.marginBottom(`rem(2.0 -. offset));
@@ -70,14 +68,13 @@ module NavStyle = {
               `rgba((0, 0, 0, 0.12)),
             ),
             borderRadius(`px(10)),
-            marginTop(`rem(2.25)),
+            marginTop(`zero),
             marginRight(`rem(-0.6)),
             display(`flex),
             maxWidth(`rem(10.)),
             flexDirection(`column),
             alignItems(`flexStart),
-            unsafe("padding-inline-start", "0"),
-            unsafe("-webkit-padding-start", "0"),
+            position(`absolute),
             before(
               triangle(expandedMenuBorderColor, 1)
               @ [
@@ -88,10 +85,10 @@ module NavStyle = {
                   ~spread=`zero,
                   `rgba((0, 0, 0, 0.12)),
                 ),
-                zIndex(-10),
+                zIndex(-1),
               ],
             ),
-            after(triangle(white, 0) @ []),
+            after(triangle(white, 0) @ [zIndex(1)]),
           ],
         ),
       ]),
@@ -130,9 +127,11 @@ module DropdownMenu = {
           id="nav-menu-btn">
           {ReasonReact.string("Menu")}
         </button>
-        <ul id="nav-menu" className=NavStyle.collapsedMenuItems>
-          ...children
-        </ul>
+        <div className=Css.(style([zIndex(1), position(`relative)]))>
+          <ul id="nav-menu" className=NavStyle.collapsedMenuItems>
+            ...children
+          </ul>
+        </div>
         <RunScript>
           {Printf.sprintf(
              {|
@@ -219,7 +218,7 @@ module NavWrapper = {
             alignItems(`flexEnd),
             flexWrap(`wrap),
             media(
-              NavStyle.MediaQuery.statusLift(keepAnnouncementBar),
+              Style.MediaQuery.statusLift(keepAnnouncementBar),
               [flexWrap(`nowrap), alignItems(`center)],
             ),
           ])
@@ -233,7 +232,7 @@ module NavWrapper = {
               width(`percent(50.0)),
               marginTop(`zero),
               media(
-                NavStyle.MediaQuery.statusLift(keepAnnouncementBar),
+                Style.MediaQuery.statusLift(keepAnnouncementBar),
                 [
                   width(`auto),
                   marginRight(`rem(0.75)),
@@ -253,7 +252,7 @@ module NavWrapper = {
               width(`percent(100.0)),
               NavStyle.bottomNudge,
               media(
-                NavStyle.MediaQuery.statusLift(keepAnnouncementBar),
+                Style.MediaQuery.statusLift(keepAnnouncementBar),
                 [order(2), width(`auto), marginLeft(`zero)],
               ),
               media(NavStyle.MediaQuery.menu, [width(`percent(40.0))]),
@@ -265,7 +264,7 @@ module NavWrapper = {
               style([
                 width(`rem(21.25)),
                 media(
-                  NavStyle.MediaQuery.statusLift(keepAnnouncementBar),
+                  Style.MediaQuery.statusLift(keepAnnouncementBar),
                   [width(`rem(21.25)), margin(`auto)],
                 ),
               ])
@@ -281,7 +280,7 @@ module NavWrapper = {
               order(2),
               NavStyle.bottomNudgeOffset(0.5),
               media(
-                NavStyle.MediaQuery.statusLift(keepAnnouncementBar),
+                Style.MediaQuery.statusLift(keepAnnouncementBar),
                 [order(3), width(`auto), NavStyle.bottomNudge],
               ),
               media(NavStyle.MediaQuery.menu, [width(`percent(50.0))]),

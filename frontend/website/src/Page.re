@@ -150,7 +150,10 @@ let make =
             className=Css.(
               style([
                 marginTop(`rem(0.5)),
-                media(Style.MediaQuery.full, [marginTop(`rem(2.0))]),
+                media(
+                  Style.MediaQuery.statusLiftAlways,
+                  [marginTop(`rem(2.0))],
+                ),
               ])
             )>
             <Nav page />
