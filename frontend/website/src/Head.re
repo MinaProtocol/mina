@@ -11,7 +11,11 @@ let legacyStylesheets =
       integrity="sha384-G0fIWCsCzJIMAVNQPfjH08cyYaUtMwjJwqiRKxxE/rx96Uroj1BtIQ6MLJuheaO9"
       crossOrigin="anonymous"
     />
-    <link rel="stylesheet" type_="text/css" href="/static/css/common.css" />
+    <link
+      rel="stylesheet"
+      type_="text/css"
+      href={Links.Cdn.url("/static/css/common.css")}
+    />
   </>;
 
 let component = ReasonReact.statelessComponent("Header");
@@ -43,7 +47,11 @@ let make = (~extra, ~filename, _children) => {
       />
       extra
       <title> {ReasonReact.string("Coda Cryptocurrency Protocol")} </title>
-      <link rel="stylesheet" type_="text/css" href="/fonts.css" />
+      <link
+        rel="stylesheet"
+        type_="text/css"
+        href={Links.Cdn.url("/fonts.css")}
+      />
       <link
         rel="stylesheet"
         type_="text/css"
@@ -57,19 +65,19 @@ let make = (~extra, ~filename, _children) => {
       <link
         rel="stylesheet"
         type_="text/css"
-        href="/static/css/normalize.css"
+        href={Links.Cdn.url("/static/css/normalize.css")}
       />
       <link rel="stylesheet" type_="text/css" href={filename ++ ".css"} />
       <link
         rel="icon"
         type_="image/png"
-        href="/static/favicon-32x32.png"
+        href={Links.Cdn.url("/static/favicon-32x32.png")}
         sizes="32x32"
       />
       <link
         rel="icon"
         type_="image/png"
-        href="/static/favicon-16x16.png"
+        href={Links.Cdn.url("/static/favicon-16x16.png")}
         sizes="16x16"
       />
       <script

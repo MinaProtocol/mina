@@ -8,7 +8,7 @@ module Metadata = {
         {|^---(?:.|\n)*^|} ++ key ++ {|:(.*)\n(?:.|\n)*^---|},
         ~flags="m",
       );
-    switch (Js.Re.exec(content, re)) {
+    switch (Js.Re.exec_(re, content)) {
     | None => None
     | Some(result) =>
       let captures = Js.Re.captures(result);
@@ -25,9 +25,11 @@ module Metadata = {
 };
 
 let load = path => {
+  // I've tried and tried and I couldn't get the env vars here to appear in the src/filter.js program
+  let filter = Links.Cdn.prefix^ == "" ? "" : "--filter src/filter.js ";
   let html =
     Node.Child_process.execSync(
-      "pandoc " ++ path ++ " --mathjax",
+      "pandoc " ++ filter ++ path ++ " --katex",
       Node.Child_process.option(),
     );
   let content = Node.Fs.readFileAsUtf8Sync(path);

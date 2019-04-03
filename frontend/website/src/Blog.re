@@ -18,7 +18,7 @@ let extraHeaders =
       integrity="sha384-kmZOZB5ObwgQnS/DuDg6TScgOiWWBiVt0plIRkZCmE6rDZGrEOQeHM5PcHi+nyqe"
       crossOrigin="anonymous"
     />
-    <link rel="stylesheet" href="/static/css/blog.css" />
+    <link rel="stylesheet" href={Links.Cdn.url("/static/css/blog.css")} />
     Head.legacyStylesheets
   </>;
 
