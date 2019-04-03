@@ -7,8 +7,6 @@ module NavStyle = {
   module MediaQuery = {
     let menu = "(min-width: 62rem)";
     let menuMax = "(max-width: 61.9375rem)";
-    let statusLift = keepAnnouncementBar =>
-      keepAnnouncementBar ? "(min-width: 38rem)" : "(min-width: 0rem)";
   };
   let bottomNudge = Css.marginBottom(`rem(2.0));
   let bottomNudgeOffset = offset => Css.marginBottom(`rem(2.0 -. offset));
@@ -219,7 +217,7 @@ module NavWrapper = {
             alignItems(`flexEnd),
             flexWrap(`wrap),
             media(
-              NavStyle.MediaQuery.statusLift(keepAnnouncementBar),
+              Style.MediaQuery.statusLift(keepAnnouncementBar),
               [flexWrap(`nowrap), alignItems(`center)],
             ),
           ])
@@ -233,7 +231,7 @@ module NavWrapper = {
               width(`percent(50.0)),
               marginTop(`zero),
               media(
-                NavStyle.MediaQuery.statusLift(keepAnnouncementBar),
+                Style.MediaQuery.statusLift(keepAnnouncementBar),
                 [
                   width(`auto),
                   marginRight(`rem(0.75)),
@@ -253,7 +251,7 @@ module NavWrapper = {
               width(`percent(100.0)),
               NavStyle.bottomNudge,
               media(
-                NavStyle.MediaQuery.statusLift(keepAnnouncementBar),
+                Style.MediaQuery.statusLift(keepAnnouncementBar),
                 [order(2), width(`auto), marginLeft(`zero)],
               ),
               media(NavStyle.MediaQuery.menu, [width(`percent(40.0))]),
@@ -265,7 +263,7 @@ module NavWrapper = {
               style([
                 width(`rem(21.25)),
                 media(
-                  NavStyle.MediaQuery.statusLift(keepAnnouncementBar),
+                  Style.MediaQuery.statusLift(keepAnnouncementBar),
                   [width(`rem(21.25)), margin(`auto)],
                 ),
               ])
@@ -281,7 +279,7 @@ module NavWrapper = {
               order(2),
               NavStyle.bottomNudgeOffset(0.5),
               media(
-                NavStyle.MediaQuery.statusLift(keepAnnouncementBar),
+                Style.MediaQuery.statusLift(keepAnnouncementBar),
                 [order(3), width(`auto), NavStyle.bottomNudge],
               ),
               media(NavStyle.MediaQuery.menu, [width(`percent(50.0))]),
