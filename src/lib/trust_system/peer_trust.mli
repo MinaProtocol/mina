@@ -7,8 +7,8 @@
     or actually do anything when a peer should be banned. That's the
     responsibility of the caller, which is coda_base. *)
 
-open Core
 open Async
+open Core
 open Pipe_lib
 
 (** What we do in response to some trust-affecting action. *)
@@ -19,17 +19,17 @@ module Trust_response : sig
     | Trust_decrease of float  (** Decrease trust by the specified amount. *)
 end
 
-module Banned_status : module type of Banned_status
-
-module Peer_status : module type of Peer_status
-
 (** Interface for trust-affecting actions. *)
 module type Action_intf = sig
   (** The type of trust-affecting actions. For the log messages to be
       grammatical, the constructors should be past tense verbs. *)
-  type t [@@deriving sexp_of, yojson]
+  type t
 
   val to_trust_response : t -> Trust_response.t
+
+  (** Convert an action into a format string and a set of metadata for
+      logging *)
+  val to_log : t -> string * (string, Yojson.Safe.json) List.Assoc.t
 end
 
 (** Trust increment that sets a maximum rate of doing a bad thing (presuming the
@@ -51,6 +51,9 @@ module type S = sig
   (** Set up the trust system. Pass the directory to store the trust database
       in. *)
   val create : db_dir:string -> t
+
+  (** Get a fake trust system, for tests. *)
+  val null : unit -> t
 
   (** Get the pipe of ban events. The purpose of this is to allow us to
       proactively disconnect from peers when they're banned. You *must* consume

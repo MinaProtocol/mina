@@ -32,7 +32,7 @@
     coda_numbers
     debug_assert
     merkle_mask
-    peer_trust
+    trust_system
     receipt_chain_database_lib
     storage
     yojson
