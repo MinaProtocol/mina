@@ -293,7 +293,7 @@ let daemon logger =
        let trust_dir = conf_dir ^/ "trust" in
        let () = Snark_params.set_chunked_hashing true in
        let%bind () = Async.Unix.mkdir ~p:() trust_dir in
-       let trust_system = Coda_base.Trust_system.create ~db_dir:trust_dir in
+       let trust_system = Trust_system.create ~db_dir:trust_dir in
        let time_controller =
          M.Inputs.Time.Controller.create M.Inputs.Time.Controller.basic
        in
@@ -318,7 +318,7 @@ let daemon logger =
        let monitor = Async.Monitor.create ~name:"coda" () in
        let%bind coda =
          Run.create
-           (Run.Config.make ~logger ~net_config
+           (Run.Config.make ~logger ~trust_system ~net_config
               ~run_snark_worker:(Option.is_some run_snark_worker_flag)
               ~staged_ledger_persistant_location:(conf_dir ^/ "staged_ledger")
               ~transaction_pool_disk_location:(conf_dir ^/ "transaction_pool")

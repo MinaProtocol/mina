@@ -576,13 +576,15 @@ struct
                 , Syncable_ledger.Query.to_yojson Ledger.Addr.to_yojson
                     sync_ledger_query ) ]
             !"Processing ledger query: $sync_ledger_query" ;
-          let answer =
+          let trust_system = Trust_system.null () in
+          let envelope_query = Envelope.Incoming.local sync_ledger_query in
+          let%bind answer =
             Hashtbl.to_alist table
-            |> List.find_map ~f:(fun (peer, frontier) ->
-                   let open Option.Let_syntax in
+            |> Deferred.List.find_map ~f:(fun (peer, frontier) ->
+                   let open Deferred.Option.Let_syntax in
                    let%map answer =
                      Sync_handler.answer_query ~frontier ledger_hash
-                       sync_ledger_query ~logger
+                       envelope_query ~logger ~trust_system
                    in
                    Envelope.Incoming.wrap ~data:answer
                      ~sender:(Envelope.Sender.Remote peer) )

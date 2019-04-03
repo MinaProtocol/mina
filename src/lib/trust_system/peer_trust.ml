@@ -6,13 +6,12 @@ module Trust_response = struct
   type t = Insta_ban | Trust_increase of float | Trust_decrease of float
 end
 
-module Banned_status = Banned_status
-module Peer_status = Peer_status
-
 module type Action_intf = sig
-  type t [@@deriving sexp_of, yojson]
+  type t
 
   val to_trust_response : t -> Trust_response.t
+
+  val to_log : t -> string * (string, Yojson.Safe.json) List.Assoc.t
 end
 
 let max_rate secs =
@@ -29,6 +28,8 @@ module type S = sig
   type action
 
   val create : db_dir:string -> t
+
+  val null : unit -> t
 
   val ban_pipe : t -> peer Strict_pipe.Reader.t
 
@@ -50,7 +51,11 @@ end)
 (Action : Action_intf) =
 struct
   type t =
-    { db: Db.t
+    { db:
+        Db.t option
+        (* This is an option to allow using a fake trust system in tests. This is
+       ugly, but the alternative is functoring half of Coda over the trust
+       system. *)
     ; bans_reader: Peer_id.t Strict_pipe.Reader.t
     ; bans_writer:
         ( Peer_id.t
@@ -62,22 +67,33 @@ struct
 
   let create ~db_dir =
     let reader, writer = Strict_pipe.create Strict_pipe.Synchronous in
-    {db= Db.create ~directory:db_dir; bans_reader= reader; bans_writer= writer}
+    { db= Some (Db.create ~directory:db_dir)
+    ; bans_reader= reader
+    ; bans_writer= writer }
+
+  let null : unit -> t =
+   fun () ->
+    let bans_reader, bans_writer =
+      Strict_pipe.create Strict_pipe.Synchronous
+    in
+    {db= None; bans_reader; bans_writer}
 
   let ban_pipe {bans_reader} = bans_reader
 
-  let lookup {db} peer =
-    match Db.get db peer with
+  let get_db {db} peer = Option.bind db (fun db' -> Db.get db' peer)
+
+  let lookup t peer =
+    match get_db t peer with
     | Some record -> Record_inst.to_peer_status record
     | None -> Record_inst.to_peer_status @@ Record_inst.init ()
 
   let close {db; bans_writer} =
-    Db.close db ;
+    Option.iter db ~f:Db.close ;
     Strict_pipe.Writer.close bans_writer
 
-  let record {db; bans_writer} logger peer action =
+  let record ({db; bans_writer} as t) logger peer action =
     let old_record =
-      match Db.get db peer with
+      match get_db t peer with
       | None -> Record_inst.init ()
       | Some trust_record -> trust_record
     in
@@ -93,33 +109,33 @@ struct
     in
     let simple_old = Record_inst.to_peer_status old_record in
     let simple_new = Record_inst.to_peer_status new_record in
+    let action_fmt, action_metadata = Action.to_log action in
     let%map () =
       match (simple_old.banned, simple_new.banned) with
       | Unbanned, Banned_until expiration ->
           Logger.faulty_peer_without_punishment logger ~module_:__MODULE__
             ~location:__LOC__
             ~metadata:
-              [ ("peer", Peer_id.to_yojson peer)
-              ; ( "expiration"
-                , `String (Time.to_string_abs expiration ~zone:Time.Zone.utc)
-                )
-              ; ("action", Action.to_yojson action) ]
-            "Banning peer $peer until $expiration due to action $action" ;
-          Strict_pipe.Writer.write bans_writer peer
+              ( [ ("peer", Peer_id.to_yojson peer)
+                ; ( "expiration"
+                  , `String (Time.to_string_abs expiration ~zone:Time.Zone.utc)
+                  ) ]
+              @ action_metadata )
+            "Banning peer $peer until $expiration because it %s" action_fmt ;
+          if Option.is_some db then Strict_pipe.Writer.write bans_writer peer
+          else Deferred.unit
       | _, _ ->
           let verb =
             if simple_new.trust >. simple_old.trust then "Increasing"
             else "Decreasing"
           in
           Logger.debug logger ~module_:__MODULE__ ~location:__LOC__
-            ~metadata:
-              [ ("peer", Peer_id.to_yojson peer)
-              ; ("action", Action.to_yojson action) ]
-            "%s trust for peer $peer due to action $action. New trust is %f."
-            verb simple_new.trust ;
+            ~metadata:([("peer", Peer_id.to_yojson peer)] @ action_metadata)
+            "%s trust for peer $peer due to action %s. New trust is %f." verb
+            action_fmt simple_new.trust ;
           Deferred.unit
     in
-    Db.set db ~key:peer ~data:new_record
+    Option.iter db ~f:(fun db' -> Db.set db' ~key:peer ~data:new_record)
 end
 
 let%test_module "peer_trust" =
@@ -150,6 +166,8 @@ let%test_module "peer_trust" =
         | Slow_punish -> Trust_response.Trust_decrease (max_rate 1.)
         | Slow_credit -> Trust_response.Trust_increase (max_rate 1.)
         | Big_credit -> Trust_response.Trust_increase 0.2
+
+      let to_log t = (string_of_sexp @@ sexp_of_t t, [])
     end
 
     module Peer_trust_test = Make0 (Peer_id) (Mock_now) (Db) (Action)
