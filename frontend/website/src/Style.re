@@ -34,10 +34,9 @@ module Colors = {
 
   let navy = `rgb((0, 49, 90));
   let navyBlue = `rgb((0, 23, 74));
-  let greyish = `rgb((170, 170, 170));
+  let navyBlueAlpha = a => `rgba((0, 23, 74, a));
+  let greyishAlpha = a => `rgba((170, 170, 170, a));
   let saville = `hsl((212, 33, 35));
-  // For use with box-shadow so we can't use opacity
-  let greenShadow = `rgba((136, 191, 163, 0.64));
 
   let clover = `rgb((22, 168, 85));
   let lightClover = `rgba((118, 205, 135, 0.12));
@@ -275,8 +274,7 @@ module H2 = {
 
 module Technical = {
   open Css;
-  // TODO: Replace with equals signs
-  let border = f => style([f(`px(6), `solid, Colors.greyish)]);
+  let border = f => style([f(`px(3), `dashed, Colors.greyishAlpha(0.5))]);
 
   let basic =
     style([
