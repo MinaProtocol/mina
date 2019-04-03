@@ -109,7 +109,10 @@ let createPostFadedContents = html =>
             backgroundImage(
               `linearGradient((
                 `deg(0),
-                [(0, white), (100, transparent)],
+                [
+                  (0, Style.Colors.white),
+                  (100, Style.Colors.whiteAlpha(0.)),
+                ],
               )),
             ),
           ]),

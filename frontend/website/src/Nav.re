@@ -57,7 +57,7 @@ module NavStyle = {
         media(
           // Make expanded menu not show up on a wide screen
           MediaQuery.menuMax,
-          Style.paddingY(`rem(0.25))
+          Style.paddingY(`rem(0.3))
           @ [
             border(`px(1), `solid, expandedMenuBorderColor),
             boxShadow(
@@ -174,6 +174,10 @@ module NavWrapper = {
                  className={Css.style([
                    Css.paddingLeft(`rem(0.75)), // we need to skip padding right here as it's on the edge
                    Css.listStyle(`none, `inside, `none),
+                   Css.media(
+                     NavStyle.MediaQuery.menuMax,
+                     [Css.width(`percent(100.)), Css.padding(`zero)],
+                   ),
                  ])}>
                  elem
                </li>;
@@ -183,7 +187,13 @@ module NavWrapper = {
                    className={Css.style(
                      Style.paddingX(`rem(0.75))
                      @ Style.paddingY(`rem(0.5))
-                     @ [Css.listStyle(`none, `inside, `none)],
+                     @ [
+                       Css.listStyle(`none, `inside, `none),
+                       Css.media(
+                         NavStyle.MediaQuery.menuMax,
+                         [Css.width(`percent(100.)), Css.padding(`zero)],
+                       ),
+                     ],
                    )}>
                    elem
                  </li>
@@ -294,8 +304,8 @@ module NavWrapper = {
 };
 
 let menuStyle =
-  Style.paddingX(`rem(1.75))
-  @ Style.paddingY(`rem(0.75))
+  Style.paddingX(`rem(1.8))
+  @ Style.paddingY(`rem(0.5))
   @ Css.[
       height(`auto),
       margin(`zero),
@@ -307,6 +317,8 @@ let menuStyle =
       fontWeight(`medium),
       letterSpacing(`rem(0.)),
       fontStyle(`normal),
+      display(`block),
+      width(`percent(100.)),
       textTransform(`none),
       outline(`zero, `none, `transparent),
       focus([color(Style.Colors.hyperlink)]),

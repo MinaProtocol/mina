@@ -34,7 +34,7 @@ module type Config_intf = sig
     ; me: Peer.t
     ; conf_dir: string
     ; logger: Logger.t
-    ; trust_system: Coda_base.Trust_system.t
+    ; trust_system: Trust_system.t
     ; max_concurrent_connections: int option }
   [@@deriving make]
 end
@@ -107,7 +107,7 @@ module Make (Message : Message_intf) :
       ; me: Peer.t
       ; conf_dir: string
       ; logger: Logger.t
-      ; trust_system: Coda_base.Trust_system.t
+      ; trust_system: Trust_system.t
       ; max_concurrent_connections: int option }
     [@@deriving make]
   end
@@ -209,8 +209,7 @@ module Make (Message : Message_intf) :
           ; max_concurrent_connections= config.max_concurrent_connections }
         in
         don't_wait_for
-          (Strict_pipe.Reader.iter
-             (Coda_base.Trust_system.ban_pipe config.trust_system)
+          (Strict_pipe.Reader.iter (Trust_system.ban_pipe config.trust_system)
              ~f:(fun addr ->
                match Hashtbl.find_and_remove t.connections addr with
                | None -> Deferred.unit
