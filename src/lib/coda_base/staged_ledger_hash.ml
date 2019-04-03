@@ -59,8 +59,16 @@ module Pending_coinbase_aux = struct
   module Stable = struct
     module V1 = struct
       module T = struct
-        type t = string
-        [@@deriving bin_io, sexp, eq, compare, hash, yojson, version]
+        type t = string [@@deriving bin_io, sexp, eq, compare, hash, version]
+
+        let to_yojson s = `String (Base64.encode_string s)
+
+        let of_yojson = function
+          | `String s -> (
+            match Base64.decode s with
+            | Ok s -> Ok s
+            | Error (`Msg e) -> Error (sprintf "bad base64: %s" e) )
+          | _ -> Error "expected `String"
       end
 
       include T
@@ -194,8 +202,8 @@ module Stable = struct
     module T = struct
       (** Staged ledger hash has two parts
       1) merkle root of the pending coinbases
-      2) ledger hash, aux hash, and the FIFO order of the coinbase stacks(Non snark). 
-      Only part 1 is required for blockchain snark computation and therefore the remaining fields of the staged ledger are grouped together as "Non_snark" 
+      2) ledger hash, aux hash, and the FIFO order of the coinbase stacks(Non snark).
+      Only part 1 is required for blockchain snark computation and therefore the remaining fields of the staged ledger are grouped together as "Non_snark"
       *)
       type t =
         ( Non_snark.Stable.V1.t

@@ -142,7 +142,7 @@ Router.(
         Css_file("fonts", Style.Typeface.Loader.load()),
         File(
           "index",
-          <Page page=`Home name="index" footerColor=Style.Colors.gandalf>
+          <Page page=`Home name="index" footerColor=Style.Colors.navyBlue>
             <Home
               posts={List.map(
                 ((name, html, metadata)) =>

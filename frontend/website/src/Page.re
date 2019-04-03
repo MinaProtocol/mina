@@ -97,6 +97,15 @@ module Footer = {
               </Link>
             </ul>
           </div>
+          <p
+            className=Css.(
+              merge([
+                Style.Body.small,
+                style([textAlign(`center), color(Style.Colors.saville)]),
+              ])
+            )>
+            {ReasonReact.string({j|© 2019 O(1) Labs Corporation|j})}
+          </p>
         </section>
       </footer>,
   };
@@ -153,7 +162,7 @@ let make =
           <div
             className=Css.(
               style([
-                marginTop(`rem(0.5)),
+                marginTop(`rem(1.0)),
                 media(
                   Style.MediaQuery.statusLiftAlways,
                   [marginTop(`rem(2.0))],

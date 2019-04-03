@@ -9,6 +9,8 @@ module Make (Inputs : sig
 end) =
 struct
   (** [Stubs] is a set of modules used for testing different components of tfc  *)
+  let max_length = Inputs.max_length
+
   module Time = Coda_base.Block_time
 
   module State_proof = struct
@@ -174,7 +176,19 @@ struct
   module Blockchain_state = External_transition.Protocol_state.Blockchain_state
   module Protocol_state = External_transition.Protocol_state
 
-  module Transition_frontier_inputs = struct
+  module Diff_hash = struct
+    open Digestif.SHA256
+
+    type t = ctx
+
+    let equal t1 t2 = eq (get t1) (get t2)
+
+    let empty = empty
+
+    let merge t1 string = feed_string t1 string
+  end
+
+  module Diff_mutant_inputs = struct
     module Staged_ledger_aux_hash = Staged_ledger_aux_hash
     module Ledger_proof_statement = Ledger_proof_statement
     module Ledger_proof = Ledger_proof
@@ -183,9 +197,19 @@ struct
     module External_transition = External_transition
     module Transaction_witness = Transaction_witness
     module Staged_ledger = Staged_ledger
+    module Diff_hash = Diff_hash
+    module Scan_state = Staged_ledger.Scan_state
     module Pending_coinbase_stack_state = Pending_coinbase_stack_state
     module Pending_coinbase_hash = Pending_coinbase_hash
     module Pending_coinbase = Pending_coinbase
+  end
+
+  module Diff_mutant =
+    Transition_frontier_persistence.Diff_mutant.Make (Diff_mutant_inputs)
+
+  module Transition_frontier_inputs = struct
+    include Diff_mutant_inputs
+    module Diff_mutant = Diff_mutant
 
     let max_length = Inputs.max_length
   end
@@ -308,8 +332,7 @@ struct
       | Error (`Validation_error e) ->
           failwithf !"Validation Error : %{sexp:Error.t}" e ()
 
-  let create_root_frontier ~logger accounts_with_secret_keys :
-      Transition_frontier.t Deferred.t =
+  let create_snarked_ledger accounts_with_secret_keys =
     let accounts = List.map ~f:snd accounts_with_secret_keys in
     let proposer_account = List.hd_exn accounts in
     let root_snarked_ledger = Coda_base.Ledger.Db.create () in
@@ -320,6 +343,13 @@ struct
             account
         in
         assert (status = `Added) ) ;
+    (root_snarked_ledger, proposer_account)
+
+  let create_root_frontier ~logger accounts_with_secret_keys :
+      Transition_frontier.t Deferred.t =
+    let root_snarked_ledger, proposer_account =
+      create_snarked_ledger accounts_with_secret_keys
+    in
     let root_transaction_snark_scan_state =
       Staged_ledger.Scan_state.empty ()
     in
@@ -426,6 +456,12 @@ struct
   let gen_tree ~logger ~size ~accounts_with_secret_keys root_breadcrumb =
     Quickcheck.Generator.with_size ~size
     @@ Quickcheck_lib.gen_imperative_rose_tree
+         (root_breadcrumb |> return |> Quickcheck.Generator.return)
+         (gen_breadcrumb ~logger ~accounts_with_secret_keys)
+
+  let gen_tree_list ~logger ~size ~accounts_with_secret_keys root_breadcrumb =
+    Quickcheck.Generator.with_size ~size
+    @@ Quickcheck_lib.gen_imperative_ktree
          (root_breadcrumb |> return |> Quickcheck.Generator.return)
          (gen_breadcrumb ~logger ~accounts_with_secret_keys)
 
@@ -540,13 +576,15 @@ struct
                 , Syncable_ledger.Query.to_yojson Ledger.Addr.to_yojson
                     sync_ledger_query ) ]
             !"Processing ledger query: $sync_ledger_query" ;
-          let answer =
+          let trust_system = Trust_system.null () in
+          let envelope_query = Envelope.Incoming.local sync_ledger_query in
+          let%bind answer =
             Hashtbl.to_alist table
-            |> List.find_map ~f:(fun (peer, frontier) ->
-                   let open Option.Let_syntax in
+            |> Deferred.List.find_map ~f:(fun (peer, frontier) ->
+                   let open Deferred.Option.Let_syntax in
                    let%map answer =
                      Sync_handler.answer_query ~frontier ledger_hash
-                       sync_ledger_query ~logger
+                       envelope_query ~logger ~trust_system
                    in
                    Envelope.Incoming.wrap ~data:answer
                      ~sender:(Envelope.Sender.Remote peer) )
