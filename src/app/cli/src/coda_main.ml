@@ -320,7 +320,7 @@ module type Main_intf = sig
       ; transaction_pool_disk_location: string
       ; snark_pool_disk_location: string
       ; ledger_db_location: string option
-      ; transition_frontier_location: string
+      ; transition_frontier_location: string option
       ; staged_ledger_transition_backup_capacity: int [@default 10]
       ; time_controller:
           Inputs.Time.Controller.t (* FIXME trust system goes here? *)

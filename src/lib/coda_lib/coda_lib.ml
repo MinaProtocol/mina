@@ -545,7 +545,7 @@ module Make (Inputs : Inputs_intf) = struct
       ; transaction_pool_disk_location: string
       ; snark_pool_disk_location: string
       ; ledger_db_location: string option
-      ; transition_frontier_location: string
+      ; transition_frontier_location: string option
       ; staged_ledger_transition_backup_capacity: int [@default 10]
       ; time_controller: Time.Controller.t (* FIXME trust system goes here? *)
       ; receipt_chain_database: Coda_base.Receipt_chain_database.t
@@ -635,50 +635,62 @@ module Make (Inputs : Inputs_intf) = struct
             in
             let net_ivar = Ivar.create () in
             let%bind persistence, ledger_db, transition_frontier =
-              match%bind
-                Async.Sys.file_exists config.transition_frontier_location
-              with
-              | `No | `Unknown ->
-                  Logger.info config.logger ~module_:__MODULE__
-                    ~location:__LOC__
-                    !"Persistence database does not exist yet. Creating it at \
-                      %s"
-                    config.transition_frontier_location ;
-                  let%bind () =
-                    Async.Unix.mkdir config.transition_frontier_location
-                  in
-                  let persistence =
-                    Transition_frontier_persistence.create
-                      ~directory_name:config.transition_frontier_location
-                      ~logger:config.logger ()
-                  in
-                  let%map root_snarked_ledger, frontier =
+              match config.transition_frontier_location with
+              | None ->
+                  let%map ledger_db, frontier =
                     create_genesis_frontier config ~consensus_local_state
                   in
-                  (persistence, root_snarked_ledger, frontier)
-              | `Yes ->
-                  let directory_name = config.transition_frontier_location in
-                  let root_snarked_ledger =
-                    Ledger_db.create ?directory_name:config.ledger_db_location
-                      ()
-                  in
-                  let%map frontier =
-                    Transition_frontier_persistence.deserialize ~directory_name
-                      ~logger:config.logger ~root_snarked_ledger
-                      ~consensus_local_state
-                  in
-                  let worker =
-                    Transition_frontier_persistence.create ~directory_name
-                      ~logger:config.logger ()
-                  in
-                  (worker, root_snarked_ledger, frontier)
+                  ( None
+                  , Ledger_transfer.transfer_accounts ~src:Genesis.ledger
+                      ~dest:ledger_db
+                  , frontier )
+              | Some transition_frontier_location -> (
+                  match%bind
+                    Async.Sys.file_exists transition_frontier_location
+                  with
+                  | `No | `Unknown ->
+                      Logger.info config.logger ~module_:__MODULE__
+                        ~location:__LOC__
+                        !"Persistence database does not exist yet. Creating \
+                          it at %s"
+                        transition_frontier_location ;
+                      let%bind () =
+                        Async.Unix.mkdir transition_frontier_location
+                      in
+                      let persistence =
+                        Transition_frontier_persistence.create
+                          ~directory_name:transition_frontier_location
+                          ~logger:config.logger ()
+                      in
+                      let%map root_snarked_ledger, frontier =
+                        create_genesis_frontier config ~consensus_local_state
+                      in
+                      (Some persistence, root_snarked_ledger, frontier)
+                  | `Yes ->
+                      let directory_name = transition_frontier_location in
+                      let root_snarked_ledger =
+                        Ledger_db.create
+                          ?directory_name:config.ledger_db_location ()
+                      in
+                      let%map frontier =
+                        Transition_frontier_persistence.deserialize
+                          ~directory_name ~logger:config.logger
+                          ~root_snarked_ledger ~consensus_local_state
+                      in
+                      let persistence =
+                        Transition_frontier_persistence.create ~directory_name
+                          ~logger:config.logger ()
+                      in
+                      (Some persistence, root_snarked_ledger, frontier) )
             in
             let frontier_broadcast_pipe_r, frontier_broadcast_pipe_w =
               Broadcast_pipe.create (Some transition_frontier)
             in
-            Transition_frontier_persistence.listen_to_frontier_broadcast_pipe
-              ~logger:config.logger frontier_broadcast_pipe_r persistence
-            |> don't_wait_for ;
+            Option.iter persistence ~f:(fun persistence ->
+                Transition_frontier_persistence
+                .listen_to_frontier_broadcast_pipe ~logger:config.logger
+                  frontier_broadcast_pipe_r persistence
+                |> don't_wait_for ) ;
             let%bind net =
               Net.create config.net_config
                 ~get_staged_ledger_aux_at_hash:(fun _hash ->
