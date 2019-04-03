@@ -15,6 +15,10 @@ let extraHeaders = <> Head.legacyStylesheets </>;
       fontSize(`px(16)),
     ],
   );
+  global(
+    "#block-explorer .bg-lemoncurry",
+    [Style.Typeface.ibmplexsans, fontWeight(`medium), fontSize(`px(16))],
+  );
 
   // Remove fade in of explanations
   global(".animate-opacity", [opacity(1.)]);
