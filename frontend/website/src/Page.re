@@ -162,7 +162,7 @@ let make =
           <div
             className=Css.(
               style([
-                marginTop(`rem(0.5)),
+                marginTop(`rem(1.0)),
                 media(
                   Style.MediaQuery.statusLiftAlways,
                   [marginTop(`rem(2.0))],

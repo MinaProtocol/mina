@@ -7,8 +7,13 @@ module ApplyItem = {
         <a
           href={"/jobs/" ++ filename ++ ".html"}
           className={
-            "f5 dodgerblue fw5 no-underline "
-            ++ Css.(style([hover([color(Style.Colors.hyperlinkHover)])]))
+            "f5 fw5 no-underline "
+            ++ Css.(
+                 style([
+                   color(Style.Colors.hyperlink),
+                   hover([color(Style.Colors.hyperlinkHover)]),
+                 ])
+               )
           }>
           {ReasonReact.string(name)}
         </a>
@@ -202,7 +207,7 @@ let make = (~jobOpenings, _) => {
           }>
           {ReasonReact.string("Work with us!")}
         </h1>
-        <div>
+        <div className=Css.(style([marginBottom(`rem(1.5))]))>
           <div className="dn db-ns">
             <div>
               <div className="careers-gallery-row1">
@@ -239,9 +244,10 @@ let make = (~jobOpenings, _) => {
                 <a
                   href="/code.html"
                   className={
-                    "dodgerblue fw5 no-underline nowrap "
+                    "fw5 no-underline nowrap "
                     ++ Css.(
                          style([
+                           color(Style.Colors.hyperlink),
                            hover([color(Style.Colors.hyperlinkHover)]),
                          ])
                        )
