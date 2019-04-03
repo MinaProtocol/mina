@@ -135,7 +135,7 @@ module Typeface = {
           ),
           genFontFace(
             ~fontFamily="PragmataPro",
-            ~src=["/static/font/Essential-PragmataPro-Bold.woff2"],
+            ~src=["/static/font/PragmataPro-Bold.woff2"],
             ~fontWeight=`bold,
             (),
           ),
