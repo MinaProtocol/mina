@@ -789,7 +789,7 @@ module Merge = struct
     in
     Boolean.Assert.all [verify_12; verify_23]
 
-  let prove_main = reduce_to_prover (input ()) main
+  let prove_main = Groth16.reduce_to_prover (input ()) main
 
   let create_keys () = Groth16.generate_keypair ~exposing:(input ()) main
 
