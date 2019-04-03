@@ -56,7 +56,7 @@ let run_test () : unit Deferred.t =
       let module Run = Run (Config) (Main) in
       let open Main in
       let%bind trust_dir = Async.Unix.mkdtemp (temp_conf_dir ^/ "trust_db") in
-      let trust_system = Coda_base.Trust_system.create ~db_dir:trust_dir in
+      let trust_system = Trust_system.create ~db_dir:trust_dir in
       let%bind receipt_chain_dir_name =
         Async.Unix.mkdtemp (temp_conf_dir ^/ "receipt_chain")
       in
@@ -85,8 +85,8 @@ let run_test () : unit Deferred.t =
       Async.Scheduler.set_record_backtraces true ;
       let%bind coda =
         Main.create
-          (Main.Config.make ~logger ~net_config ~propose_keypair:keypair
-             ~run_snark_worker:true
+          (Main.Config.make ~logger ~trust_system ~net_config
+             ~propose_keypair:keypair ~run_snark_worker:true
              ~staged_ledger_persistant_location:
                (temp_conf_dir ^/ "staged_ledger")
              ~transaction_pool_disk_location:

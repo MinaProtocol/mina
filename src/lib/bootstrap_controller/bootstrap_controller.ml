@@ -288,7 +288,8 @@ end = struct
           | `Ignored -> ()
         else Deferred.unit )
 
-  let run ~logger ~network ~frontier ~ledger_db ~transition_reader =
+  let run ~logger ~trust_system ~network ~frontier ~ledger_db
+      ~transition_reader =
     let initial_breadcrumb = Transition_frontier.root frontier in
     let initial_root_verified_transition =
       initial_breadcrumb |> Transition_frontier.Breadcrumb.transition_with_hash
@@ -307,7 +308,7 @@ end = struct
     let result = Mvar.create () in
     let%bind synced_db =
       let root_sync_ledger =
-        Root_sync_ledger.create ledger_db ~logger:t.logger
+        Root_sync_ledger.create ledger_db ~logger:t.logger ~trust_system
       in
       sync_ledger t ~root_sync_ledger ~transition_graph ~transition_reader
         ~result
