@@ -47,39 +47,36 @@ module type Diff_mutant = sig
       and a certification that these components are handled appropriately.
       There are comments for each GADT that will discuss the operations that
       changes a `transition_frontier` and their corresponding side-effects.*)
-
-  (** New_frontier: When creating a new transition frontier, the
-      transition_frontier will begin with a single breadcrumb that can be
-      constructed mainly with a root external transition and a scan_state.
-      There are no components in the frontier that affects the frontier.
-      Therefore, the type of this diff is tagged as a unit. *)
-
-  (** Add_transition: Add_transition would simply add a transition to the
-      frontier and is therefore the parameter for Add_transition. After adding
-      the transition, we add the transition to its parent list of successors.
-      To certify that we added it to the right parent. The consensus_state of
-      the parent can accomplish this.  *)
-
-  (** Remove_transitions: Remove_transitions is an operation that removes a set
-      of transitions. We need to make sure that we are deleting the right
-      transition and we use their consensus_state to accomplish this. Therefore
-      the type of Remove_transitions is indexed by a list of consensus_state.  *)
-
-  (** Update_root: Update root is an indication that the root state_hash and
-      the root scan_state state. To verify that we update the right root, we
-      can indicate the old root is being updated. THerefore, the type of
-      Update_root is indexed by a state_hash and scan_state.  *)
   type _ t =
     | New_frontier :
         ((external_transition, state_hash) With_hash.t * scan_state)
         -> unit t
+        (** New_frontier: When creating a new transition frontier, the
+            transition_frontier will begin with a single breadcrumb that can be
+            constructed mainly with a root external transition and a
+            scan_state. There are no components in the frontier that affects
+            the frontier. Therefore, the type of this diff is tagged as a unit. *)
     | Add_transition :
         (external_transition, state_hash) With_hash.t
         -> consensus_state t
+        (** Add_transition: Add_transition would simply add a transition to the
+            frontier and is therefore the parameter for Add_transition. After
+            adding the transition, we add the transition to its parent list of
+            successors. To certify that we added it to the right parent. The
+            consensus_state of the parent can accomplish this. *)
     | Remove_transitions :
         (external_transition, state_hash) With_hash.t list
         -> consensus_state list t
+        (** Remove_transitions: Remove_transitions is an operation that removes
+            a set of transitions. We need to make sure that we are deleting the
+            right transition and we use their consensus_state to accomplish
+            this. Therefore the type of Remove_transitions is indexed by a list
+            of consensus_state. *)
     | Update_root : (state_hash * scan_state) -> (state_hash * scan_state) t
+        (** Update_root: Update root is an indication that the root state_hash
+            and the root scan_state state. To verify that we update the right
+            root, we can indicate the old root is being updated. Therefore, the
+            type of Update_root is indexed by a state_hash and scan_state. *)
 
   type hash
 
