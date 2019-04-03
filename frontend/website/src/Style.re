@@ -186,6 +186,10 @@ module MediaQuery = {
   let full = "(min-width: 48rem)";
   let notMobile = "(min-width: 32rem)";
   let notSmallMobile = "(min-width: 25rem)";
+  let statusLiftAlways = "(min-width: 38rem)";
+  let statusLift = keepAnnouncementBar =>
+    keepAnnouncementBar ? statusLiftAlways : "(min-width: 0rem)";
+
   // to adjust root font size (therefore pixels)
   let iphoneSEorSmaller = "(max-width: 374px)";
 };
@@ -356,6 +360,8 @@ module Body = {
       lineHeight(`rem(1.5)),
       fontWeight(`normal),
     ]);
+
+  let basic_semibold = merge([basic, style([fontWeight(`semiBold)])]);
 
   let big =
     style([
