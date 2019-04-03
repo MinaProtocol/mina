@@ -43,8 +43,7 @@ let make = (~className="", ~paragraphs, ~cta, _children) => {
                   },
                 ),
               ])
-            )
-            key={Js.Int.toString(i)}>
+            )>
             // should be fine to use i here since this is all static content
              ...content </p>;
         },
@@ -59,7 +58,7 @@ let make = (~className="", ~paragraphs, ~cta, _children) => {
           ]),
         ])
       )>
-      {ReasonReact.array(ps)}
+      ...{ps}
       <a
         target="_blank"
         href=link
