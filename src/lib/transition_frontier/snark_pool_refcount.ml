@@ -70,7 +70,7 @@ struct
   let handle_diff t diff =
     let removed, added =
       match (diff : Inputs.Breadcrumb.t Transition_frontier_diff.t) with
-      | New_breadcrumb breadcrumb ->
+      | New_breadcrumb breadcrumb | New_frontier breadcrumb ->
           (0, add_breadcrumb_to_ref_table t breadcrumb)
       | New_best_tip {old_root; new_root; added_to_best_tip_path; garbage; _}
         ->

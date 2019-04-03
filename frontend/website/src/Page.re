@@ -97,6 +97,15 @@ module Footer = {
               </Link>
             </ul>
           </div>
+          <p
+            className=Css.(
+              merge([
+                Style.Body.small,
+                style([textAlign(`center), color(Style.Colors.saville)]),
+              ])
+            )>
+            {ReasonReact.string({j|© 2019 O(1) Labs Corporation|j})}
+          </p>
         </section>
       </footer>,
   };

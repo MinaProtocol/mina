@@ -128,7 +128,7 @@ module Make (Inputs : Inputs_intf) :
       (loc, buf)
     in
     let locs_bufs = List.map locations_vs ~f:create_buf in
-    set_raw_batch mdb locs_bufs
+    set_raw_batch ~remove_keys:[] mdb locs_bufs
 
   let get_inner_hash_at_addr_exn mdb address =
     assert (Addr.depth address <= Depth.depth) ;
@@ -256,7 +256,7 @@ module Make (Inputs : Inputs_intf) :
       let last_location_key_value =
         (Account_location.last_location_key (), last_location)
       in
-      Account_location.set_batch mdb
+      Account_location.set_batch ~remove_keys:[] mdb
         ( Non_empty_list.cons last_location_key_value
             (Non_empty_list.map key_to_location_list ~f:(fun (key, location) ->
                  (Account_location.build_location key, location) ))
