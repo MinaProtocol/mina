@@ -4,6 +4,7 @@ module Cta = {
     link: string,
   };
 };
+
 let component = ReasonReact.statelessComponent("SideText");
 let make = (~className="", ~paragraphs, ~cta, _children) => {
   ...component,
@@ -58,15 +59,19 @@ let make = (~className="", ~paragraphs, ~cta, _children) => {
           ]),
         ])
       )>
-      ...{ps}
-      <a
-        target="_blank"
-        href=link
-        className=Css.(
-          merge([Style.Link.basic, style([marginTop(`rem(1.5))])])
-        )>
-        {ReasonReact.string(copy ++ {j|\u00A0→|j})}
-      </a>
+      ...{Array.append(
+        ps,
+        [|
+          <a
+            target="_blank"
+            href=link
+            className=Css.(
+              merge([Style.Link.basic, style([marginTop(`rem(1.5))])])
+            )>
+            {ReasonReact.string(copy ++ {j|\u00A0→|j})}
+          </a>,
+        |],
+      )}
     </div>;
   },
 };
