@@ -267,15 +267,17 @@ let make = _ => {
               ])
             )
             paragraphs=[|
-              `str(
-                "Build games and other applications that take advantage of the new capabilities enabled by cryptocurrency with just a script tag and a few lines of javascript.",
-              ),
+              `styled([
+                `emph(
+                  "Build games and other applications that take advantage of the new capabilities enabled by cryptocurrency with just a script tag and a few lines of javascript.",
+                ),
+              ]),
               `str(
                 "Your users will have a seamless, secure experience without having to download any extensions or trust additional 3rd parties.",
               ),
             |]
             cta={
-              SideText.Cta.copy: "Stay updated about developing with Coda",
+              SideText.Cta.copy: {j|Stay informed about early access to developing with\u00A0Coda|j},
               link: Links.Forms.developingWithCoda,
             }
           />
