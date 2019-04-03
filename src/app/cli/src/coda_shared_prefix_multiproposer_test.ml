@@ -17,8 +17,7 @@ let main n enable_payments () =
   in
   let%bind testnet =
     Coda_worker_testnet.test logger n Option.some snark_work_public_keys
-      Protocols.Coda_pow.Work_selection.Seq
-      ~max_concurrent_connections:(Some 10)
+      Protocols.Coda_pow.Work_selection.Seq ~max_concurrent_connections:None
   in
   let%bind () =
     if enable_payments then

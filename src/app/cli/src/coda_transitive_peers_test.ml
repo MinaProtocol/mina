@@ -19,7 +19,7 @@ let main () =
   let work_selection = Protocols.Coda_pow.Work_selection.Seq in
   Coda_processes.init () ;
   let trace_dir = Unix.getenv "CODA_TRACING" in
-  let max_concurrent_connections = Some 10 in
+  let max_concurrent_connections = None in
   let configs =
     Coda_processes.local_configs n ~program_dir ~proposal_interval
       ~acceptable_delay ~snark_worker_public_keys:None

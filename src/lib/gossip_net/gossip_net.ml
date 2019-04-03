@@ -93,7 +93,9 @@ module Make (Message : Message_intf) :
     ; peers: Peer.Hash_set.t
     ; connections:
         (Unix.Inet_addr.t, (Uuid.t, Rpc.Connection.t) Hashtbl.t) Hashtbl.t
-    ; max_concurrent_connections: int option }
+    ; max_concurrent_connections: int option
+    (* maximum number of concurrent connections from an ip (infinite if None)*)
+    }
 
   module Config = struct
     type t =
@@ -134,7 +136,7 @@ module Make (Message : Message_intf) :
         if
           Option.is_some t.max_concurrent_connections
           && Hashtbl.length conn_map
-             = Option.value_exn t.max_concurrent_connections
+             >= Option.value_exn t.max_concurrent_connections
         then
           Deferred.return
             (Or_error.errorf
@@ -273,7 +275,7 @@ module Make (Message : Message_intf) :
               if
                 Option.is_some t.max_concurrent_connections
                 && Hashtbl.length conn_map
-                   = Option.value_exn t.max_concurrent_connections
+                   >= Option.value_exn t.max_concurrent_connections
               then (
                 Logger.error t.logger ~module_:__MODULE__ ~location:__LOC__
                   "Cannot open another connection. Number of open connections \
@@ -291,9 +293,7 @@ module Make (Message : Message_intf) :
                         when connecting to the server over TCP; the ephemeral
                         port is distinct from the client's discovery and
                         communication ports *)
-                      let () =
-                        Hashtbl.add_exn conn_map ~key:conn_id ~data:conn
-                      in
+                      Hashtbl.add_exn conn_map ~key:conn_id ~data:conn ;
                       Hashtbl.set t.connections
                         ~key:(Socket.Address.Inet.addr client)
                         ~data:conn_map ;
@@ -309,7 +309,7 @@ module Make (Message : Message_intf) :
                   Hashtbl.find_exn t.connections
                     (Socket.Address.Inet.addr client)
                 in
-                let () = Hashtbl.remove conn_map conn_id in
+                Hashtbl.remove conn_map conn_id ;
                 if Hashtbl.is_empty conn_map then
                   Hashtbl.remove t.connections
                   @@ Socket.Address.Inet.addr client
