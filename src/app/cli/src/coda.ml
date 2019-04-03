@@ -100,7 +100,7 @@ let daemon logger =
        flag "limit-concurrent-connections"
          ~doc:
            "true|false Limit the number of concurrent connections per IP \
-            address (default:false)"
+            address (default:true)"
          (optional bool)
      in
      fun () ->
