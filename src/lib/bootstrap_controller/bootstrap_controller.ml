@@ -35,6 +35,7 @@ module type Inputs_intf = sig
     Network_intf
     with type peer := Network_peer.Peer.t
      and type state_hash := State_hash.t
+     and type protocol_state_hash := State_hash.t
      and type external_transition := External_transition.t
      and type consensus_state := Consensus.Consensus_state.Value.t
      and type state_body_hash := State_body_hash.t
@@ -95,14 +96,15 @@ module Make (Inputs : Inputs_intf) : sig
       -> network:Inputs.Network.t
       -> t
 
-    type syncing_data
-
     val on_transition :
          t
       -> sender:Network_peer.Peer.t
-      -> root_sync_ledger:State_hash.t Root_sync_ledger.t
+      -> root_sync_ledger:( State_hash.t
+                          * Network_peer.Peer.t
+                          * Staged_ledger_hash.t )
+                          Root_sync_ledger.t
       -> External_transition.Proof_verified.t
-      -> [> `Syncing of syncing_data | `Ignored] Deferred.t
+      -> [> `Syncing | `Ignored] Deferred.t
 
     module Transition_cache : sig
       include
@@ -114,7 +116,10 @@ module Make (Inputs : Inputs_intf) : sig
 
     val sync_ledger :
          t
-      -> root_sync_ledger:State_hash.t Inputs.Root_sync_ledger.t
+      -> root_sync_ledger:( State_hash.t
+                          * Network_peer.Peer.t
+                          * Staged_ledger_hash.t )
+                          Inputs.Root_sync_ledger.t
       -> transition_graph:Transition_cache.t
       -> transition_reader:( [< `Transition of Inputs.External_transition
                                                .Verified
@@ -122,11 +127,6 @@ module Make (Inputs : Inputs_intf) : sig
                                                Envelope.Incoming.t ]
                            * [< `Time_received of 'a] )
                            Pipe_lib.Strict_pipe.Reader.t
-      -> result:( Frozen_ledger_hash.t
-                * Ledger_hash.t
-                * Staged_ledger.Scan_state.t
-                * Pending_coinbase.t )
-                Mvar.Read_write.t
       -> unit Deferred.t
   end
 end = struct
@@ -139,12 +139,6 @@ end = struct
     ; mutable current_root:
         (External_transition.Proof_verified.t, State_hash.t) With_hash.t
     ; network: Network.t }
-
-  type syncing_data =
-    { snarked_ledger_hash: Frozen_ledger_hash.t
-    ; staged_ledger_merkle_root: Ledger_hash.t
-    ; scan_state: Staged_ledger.Scan_state.t
-    ; pending_coinbases: Pending_coinbase.t }
 
   module Transition_cache = Transition_cache.Make (Inputs)
 
@@ -182,11 +176,7 @@ end = struct
           @@ Logger.error t.logger
                !"Could not get the proof of root from the network: %s"
                (Error.to_string_hum e)
-      | Ok
-          ( peer_root_with_proof
-          , scan_state
-          , staged_ledger_merkle_root
-          , pending_coinbases ) -> (
+      | Ok peer_root_with_proof -> (
           match%map
             Root_prover.verify ~logger:t.logger ~observed_state:candidate_state
               ~peer_root:peer_root_with_proof
@@ -205,41 +195,22 @@ end = struct
                 |> External_transition.Protocol_state.Blockchain_state
                    .staged_ledger_hash
               in
-              let received_staged_ledger_hash =
-                Staged_ledger_hash.of_aux_ledger_and_coinbase_hash
-                  (Staged_ledger_hash.Aux_hash.of_bytes
-                     (Staged_ledger_aux_hash.to_bytes
-                        (Staged_ledger.Scan_state.hash scan_state)))
-                  staged_ledger_merkle_root pending_coinbases
+              let snarked_ledger_hash =
+                blockchain_state
+                |> External_transition.Protocol_state.Blockchain_state
+                   .snarked_ledger_hash
               in
-              if
-                Staged_ledger_hash.equal expected_staged_ledger_hash
-                  received_staged_ledger_hash
-              then (
-                let snarked_ledger_hash =
-                  blockchain_state
-                  |> External_transition.Protocol_state.Blockchain_state
-                     .snarked_ledger_hash
-                in
-                Root_sync_ledger.new_goal root_sync_ledger
-                  (Frozen_ledger_hash.to_ledger_hash snarked_ledger_hash)
-                  ~data:(t.current_root |> With_hash.hash)
-                |> ignore ;
-                `Syncing
-                  { snarked_ledger_hash
-                  ; staged_ledger_merkle_root
-                  ; scan_state
-                  ; pending_coinbases } )
-              else (
-                (* TODO: punish! *)
-                Logger.faulty_peer t.logger ~module_:__MODULE__
-                  ~location:__LOC__
-                  "Received wrong staged_ledger_aux from the network" ;
-                `Ignored )
+              Root_sync_ledger.new_goal root_sync_ledger
+                (Frozen_ledger_hash.to_ledger_hash snarked_ledger_hash)
+                ~data:
+                  ( With_hash.hash t.current_root
+                  , sender
+                  , expected_staged_ledger_hash )
+              |> ignore ;
+              `Syncing
           | Error e -> received_bad_proof t e |> Fn.const `Ignored )
 
-  let sync_ledger t ~root_sync_ledger ~transition_graph ~transition_reader
-      ~result =
+  let sync_ledger t ~root_sync_ledger ~transition_graph ~transition_reader =
     let query_reader = Root_sync_ledger.query_reader root_sync_ledger in
     let response_writer = Root_sync_ledger.answer_writer root_sync_ledger in
     Network.glue_sync_ledger t.network query_reader response_writer ;
@@ -269,23 +240,10 @@ end = struct
           worth_getting_root t
             (Consensus.Protocol_state.consensus_state protocol_state)
         then
-          let open Deferred.Let_syntax in
-          match%map
-            on_transition t ~sender ~root_sync_ledger
-              (External_transition.forget_consensus_state_verification
-                 transition)
-          with
-          | `Syncing
-              { snarked_ledger_hash
-              ; staged_ledger_merkle_root
-              ; scan_state
-              ; pending_coinbases } ->
-              Mvar.set result
-                ( snarked_ledger_hash
-                , staged_ledger_merkle_root
-                , scan_state
-                , pending_coinbases )
-          | `Ignored -> ()
+          Deferred.ignore
+          @@ on_transition t ~sender ~root_sync_ledger
+               (External_transition.forget_consensus_state_verification
+                  transition)
         else Deferred.unit )
 
   let run ~logger ~trust_system ~network ~frontier ~ledger_db
@@ -305,65 +263,78 @@ end = struct
       ; current_root= initial_root_transition }
     in
     let transition_graph = Transition_cache.create () in
-    let result = Mvar.create () in
-    let%bind synced_db =
+    let%bind synced_db, (hash, sender, expected_staged_ledger_hash) =
       let root_sync_ledger =
         Root_sync_ledger.create ledger_db ~logger:t.logger ~trust_system
       in
       sync_ledger t ~root_sync_ledger ~transition_graph ~transition_reader
-        ~result
       |> don't_wait_for ;
-      let%map synced_db, _ = Root_sync_ledger.valid_tree root_sync_ledger in
+      let%map synced_db, data = Root_sync_ledger.valid_tree root_sync_ledger in
       Root_sync_ledger.destroy root_sync_ledger ;
-      synced_db
-    in
-    let%bind ( snarked_ledger_hash
-             , expected_merkle_root
-             , scan_state
-             , pending_coinbases ) =
-      Mvar.take result
-    in
-    assert (
-      Ledger.Db.(
-        Ledger_hash.equal (merkle_root ledger_db) (merkle_root synced_db)
-        && Ledger_hash.equal (merkle_root ledger_db)
-             (Frozen_ledger_hash.to_ledger_hash snarked_ledger_hash)) ) ;
-    let new_root =
-      With_hash.map t.current_root ~f:(fun root ->
-          (* Need to coerce new_root from a proof_verified transition to a
-             fully verified transition because it will be added into transition
-             frontier*)
-          let (`I_swear_this_is_safe_see_my_comment verified_root) =
-            External_transition.(root |> of_proof_verified |> to_verified)
-          in
-          verified_root )
+      (synced_db, data)
     in
     match%bind
-      Staged_ledger.of_scan_state_pending_coinbases_and_snarked_ledger
-        ~scan_state
-        ~snarked_ledger:(Ledger.of_database synced_db)
-        ~expected_merkle_root ~pending_coinbases
+      Network.get_staged_ledger_aux_and_pending_coinbases_at_hash t.network
+        sender hash
     with
-    | Ok root_staged_ledger ->
-        let%map new_frontier =
-          Transition_frontier.create ~logger ~root_transition:new_root
-            ~root_snarked_ledger:synced_db ~root_staged_ledger
-            ~consensus_local_state:
-              (Transition_frontier.consensus_local_state frontier)
+    | Error _ -> failwith "..."
+    | Ok (scan_state, expected_merkle_root, pending_coinbases) ->
+        assert (
+          Ledger.Db.(
+            Ledger_hash.equal (merkle_root ledger_db) (merkle_root synced_db)
+            (*&& Ledger_hash.equal (merkle_root ledger_db)
+             (Frozen_ledger_hash.to_ledger_hash snarked_ledger_hash) *))
+        ) ;
+        let new_root =
+          With_hash.map t.current_root ~f:(fun root ->
+              (* Need to coerce new_root from a proof_verified transition to a
+             fully verified transition because it will be added into transition
+             frontier*)
+              let (`I_swear_this_is_safe_see_my_comment verified_root) =
+                External_transition.(root |> of_proof_verified |> to_verified)
+              in
+              verified_root )
         in
-        Logger.info logger ~module_:__MODULE__ ~location:__LOC__
-          "Bootstrap state: complete." ;
-        (new_frontier, Transition_cache.data transition_graph)
-    | Error err ->
-        (* TODO: punish *)
-        Logger.faulty_peer logger ~module_:__MODULE__ ~location:__LOC__
-          "received faulty scan state from the peer." ;
-        Error.raise err
+        let received_staged_ledger_hash =
+          Staged_ledger_hash.of_aux_ledger_and_coinbase_hash
+            (Staged_ledger_hash.Aux_hash.of_bytes
+               (Staged_ledger_aux_hash.to_bytes
+                  (Staged_ledger.Scan_state.hash scan_state)))
+            expected_merkle_root pending_coinbases
+        in
+        if
+          Staged_ledger_hash.equal expected_staged_ledger_hash
+            received_staged_ledger_hash
+        then (
+          match%bind
+            Staged_ledger.of_scan_state_pending_coinbases_and_snarked_ledger
+              ~scan_state
+              ~snarked_ledger:(Ledger.of_database synced_db)
+              ~expected_merkle_root ~pending_coinbases
+          with
+          | Ok root_staged_ledger ->
+              let%map new_frontier =
+                Transition_frontier.create ~logger ~root_transition:new_root
+                  ~root_snarked_ledger:synced_db ~root_staged_ledger
+                  ~consensus_local_state:
+                    (Transition_frontier.consensus_local_state frontier)
+              in
+              Logger.info logger ~module_:__MODULE__ ~location:__LOC__
+                "Bootstrap state: complete." ;
+              (new_frontier, Transition_cache.data transition_graph)
+          | Error err ->
+              (* TODO: punish *)
+              Logger.faulty_peer logger ~module_:__MODULE__ ~location:__LOC__
+                "received faulty scan state from the peer." ;
+              Error.raise err )
+        else (
+          (* TODO: punish! *)
+          Logger.faulty_peer t.logger ~module_:__MODULE__ ~location:__LOC__
+            "Received wrong staged_ledger_aux from the network" ;
+          exit 1 )
 
   module For_tests = struct
     type nonrec t = t
-
-    type nonrec syncing_data = syncing_data
 
     let hash_data =
       Fn.compose Consensus.Protocol_state.hash

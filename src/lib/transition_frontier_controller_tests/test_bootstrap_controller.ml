@@ -109,8 +109,7 @@ let%test_module "Bootstrap Controller" =
               ~root_sync_ledger ~transition_graph ~transition_reader
           in
           let () = Pipe_lib.Strict_pipe.Writer.close transition_writer in
-          let result = Mvar.create () in
-          let%map () = run_sync ~result in
+          let%map () = run_sync in
           let saved_transitions_verified =
             Bootstrap_controller.For_tests.Transition_cache.data
               transition_graph
@@ -120,7 +119,7 @@ let%test_module "Bootstrap Controller" =
               (of_list input_transitions_verified)
               (of_list saved_transitions_verified)) )
 
-    let is_syncing = function `Ignored -> false | `Syncing _ -> true
+    let is_syncing = function `Ignored -> false | `Syncing -> true
 
     let make_transition_pipe () =
       Pipe_lib.Strict_pipe.create ~name:(__MODULE__ ^ __LOC__)
