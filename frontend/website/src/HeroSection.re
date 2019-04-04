@@ -2,7 +2,23 @@ module Copy = {
   let component = ReasonReact.statelessComponent("HeroSection.Copy");
   let make = _ => {
     ...component,
-    render: _self =>
+    render: _self => {
+      let largeLinkStyle =
+        Css.(
+          style([
+            Style.Typeface.ibmplexsans,
+            color(Style.Colors.hyperlink),
+            textDecoration(`none),
+            fontWeight(`medium),
+            fontSize(`rem(1.125)),
+            lineHeight(`rem(1.875)),
+            letterSpacing(`rem(-0.0125)),
+            hover([color(Style.Colors.hyperlinkHover)]),
+          ])
+        );
+
+      let heroSvgVar = "--svg-color-hero";
+
       <div
         className=Css.(
           style([
@@ -57,25 +73,57 @@ module Copy = {
             )>
             <span>
               {ReasonReact.string(
-                 "Coda's portable blockchain makes it dramatically easier to develop modern usable crypto apps that work directly from the browser and enables more inclusive, sustainable consensus.",
-               )}
-            </span>
-            <br />
-            <br />
-            <span>
-              {ReasonReact.string(
-                 "Coda achieves this by substituting the traditional blockchain for a tiny zero knowledge proof, ",
+                 "Coda swaps the traditional blockchain for a tiny cryptographic proof, enabling a cryptocurrency as accessible as any other app or website. This makes it ",
                )}
             </span>
             <span className=Style.Body.big_semibold>
               {ReasonReact.string(
-                 "enabling the protocol state to be instantly verified by any device",
+                 "dramatically easier to develop user friendly crypto apps",
                )}
             </span>
-            <span> {ReasonReact.string(".")} </span>
+            <span>
+              {ReasonReact.string(
+                 {j| that run natively in the browser, and enables more inclusive, sustainable\u00A0consensus.|j},
+               )}
+            </span>
+            <br />
+            <br />
+            <a href=Links.Forms.mailingList className=largeLinkStyle>
+              {ReasonReact.string({j|Join our mailing list\u00A0→|j})}
+            </a>
+            <br />
+            <a
+              href="https://twitter.com/codaprotocol"
+              className=Css.(
+                merge([
+                  largeLinkStyle,
+                  style([
+                    marginTop(`rem(0.5)),
+                    display(`flex),
+                    alignItems(`center),
+                    // Original color of svg
+                    unsafe(heroSvgVar, Style.Colors.(string(hyperlink))),
+                    hover([
+                      unsafe(
+                        heroSvgVar,
+                        Style.Colors.(string(hyperlinkHover)),
+                      ),
+                    ]),
+                  ]),
+                ])
+              )>
+              <span className=Css.(style([marginRight(`rem(0.375))]))>
+                {ReasonReact.string({j|Follow us on Twitter|j})}
+              </span>
+              {GetInvolvedSection.SocialLink.Svg.twitter(
+                 ~dims=(16, 16),
+                 heroSvgVar,
+               )}
+            </a>
           </p>
         </div>
-      </div>,
+      </div>;
+    },
   };
 };
 
