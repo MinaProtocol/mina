@@ -3,21 +3,19 @@ open Bitstring
 open Module_version
 
 module type S = sig
-  type t [@@deriving sexp, bin_io, hash, eq, compare]
+  type t [@@deriving sexp, bin_io, hash, eq, compare, to_yojson]
 
   module Stable : sig
     module V1 : sig
       val version : int
 
-      type nonrec t = t [@@deriving sexp, bin_io, hash, eq, compare]
+      type nonrec t = t [@@deriving sexp, bin_io, hash, eq, compare, to_yojson]
     end
 
     module Latest : module type of V1
   end
 
   include Hashable.S_binable with type t := t
-
-  val to_yojson : t -> Yojson.Safe.json
 
   val of_byte_string : string -> t
 
@@ -166,6 +164,8 @@ end) : S = struct
         let compare = compare
 
         let equal = equals
+
+        let to_yojson = to_yojson
       end
 
       include T

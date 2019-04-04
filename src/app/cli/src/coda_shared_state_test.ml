@@ -8,7 +8,6 @@ open Signature_lib
 let name = "coda-shared-state-test"
 
 let main () =
-  let open Keypair in
   let logger = Logger.create () in
   let n = 2 in
   let keypairs =
@@ -20,7 +19,7 @@ let main () =
   in
   let%bind testnet =
     Coda_worker_testnet.test logger n Option.some snark_work_public_keys
-      Protocols.Coda_pow.Work_selection.Seq
+      Protocols.Coda_pow.Work_selection.Seq ~max_concurrent_connections:None
   in
   let%bind () =
     Coda_worker_testnet.Payments.send_several_payments testnet ~node:0

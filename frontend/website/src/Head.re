@@ -11,7 +11,11 @@ let legacyStylesheets =
       integrity="sha384-G0fIWCsCzJIMAVNQPfjH08cyYaUtMwjJwqiRKxxE/rx96Uroj1BtIQ6MLJuheaO9"
       crossOrigin="anonymous"
     />
-    <link rel="stylesheet" type_="text/css" href="/static/css/common.css" />
+    <link
+      rel="stylesheet"
+      type_="text/css"
+      href={Links.Cdn.url("/static/css/common.css")}
+    />
   </>;
 
 let component = ReasonReact.statelessComponent("Header");
@@ -19,10 +23,15 @@ let make = (~extra, ~filename, _children) => {
   ...component,
   render: _self =>
     <head>
+      {ReactDOMRe.createElement(
+         "meta",
+         ~props=ReactDOMRe.objToDOMProps({"charSet": "utf-8"}),
+         [||],
+       )}
       <meta name="viewport" content="width=device-width, initial-scale=1" />
       <meta
         property="og:image"
-        content="https://codaprotocol.com/static/img/compare-outlined-png.png"
+        content="https://cdn.codaprotocol.com/static/img/coda_facebook_OG.jpg"
       />
       <meta property="og:updated_time" content="1526001445" />
       <meta property="og:type" content="website" />
@@ -30,14 +39,19 @@ let make = (~extra, ~filename, _children) => {
       <meta property="og:title" content="Coda Cryptocurrency Protocol" />
       <meta
         property="og:description"
-        content="That means that no matter how many transactions are performed, verifying the blockchain remains inexpensive and accessible to everyone."
+        content="Coda is the first cryptocurrency with a succinct blockchain. Our lightweight blockchain means anyone can use Coda directly from any device, in less data than a few tweets."
       />
       <meta
         name="description"
-        content="That means that no matter how many transactions are performed, verifying the blockchain remains inexpensive and accessible to everyone."
+        content="Coda is the first cryptocurrency with a succinct blockchain. Our lightweight blockchain means anyone can use Coda directly from any device, in less data than a few tweets."
       />
       extra
       <title> {ReasonReact.string("Coda Cryptocurrency Protocol")} </title>
+      <link
+        rel="stylesheet"
+        type_="text/css"
+        href={Links.Cdn.url("/fonts.css")}
+      />
       <link
         rel="stylesheet"
         type_="text/css"
@@ -51,24 +65,35 @@ let make = (~extra, ~filename, _children) => {
       <link
         rel="stylesheet"
         type_="text/css"
-        href="/static/css/normalize.css"
+        href={Links.Cdn.url("/static/css/normalize.css")}
       />
       <link rel="stylesheet" type_="text/css" href={filename ++ ".css"} />
       <link
         rel="icon"
         type_="image/png"
-        href="/static/favicon-32x32.png"
+        href={Links.Cdn.url("/static/favicon-32x32.png")}
         sizes="32x32"
       />
       <link
         rel="icon"
         type_="image/png"
-        href="/static/favicon-16x16.png"
+        href={Links.Cdn.url("/static/favicon-16x16.png")}
         sizes="16x16"
       />
       <script
         src="https://www.googletagmanager.com/gtag/js?id=UA-115553548-2"
       />
+      // On recent versions of firefox, the browser will do a "flash of
+      // unstyled content" for images by displaying the alt text(!) before the
+      // image loads. Of course, we must disable this.
+      <style>
+        {ReasonReact.string(
+           {|
+      img:-moz-loading {
+        visibility: hidden;
+      }|},
+         )}
+      </style>
       <RunScript>
         {|
   window.dataLayer = window.dataLayer || [];

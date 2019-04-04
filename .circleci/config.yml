@@ -26,6 +26,9 @@ jobs:
                   command: cd frontend/wallet && npm run build
             - run: cd frontend/website && npm install
             - run:
+                  name: Decrypt PragmataPro font
+                  command: cd frontend/website && npm run decrypt-ci
+            - run:
                   name: Lint website
                   command: cd frontend/website && npm run reformat && git diff --exit-code src
             - run:
@@ -116,6 +119,42 @@ jobs:
             - image: codaprotocol/coda:toolchain-af1380e0f6c8726391d82b2adb6a2a3b20dd46a0
         environment:
             DUNE_PROFILE: testnet_postake
+        steps:
+            - checkout
+            - run: mkdir -p /tmp/artifacts
+            - run: git submodule sync && git submodule update --init --recursive
+            - run:
+                  name: Download Stable Proving Keys
+                  command: ./scripts/skip_if_only_frontend.sh scripts/getkeys.sh
+            - run:
+                  name: Build OCaml
+                  command: ./scripts/skip_if_only_frontend.sh bash -c 'eval `opam config env` && make build 2>&1 | tee /tmp/artifacts/buildocaml.log'
+            - run:
+                  name: Build deb Package with keys
+                  command: ./scripts/skip_if_only_frontend.sh make deb
+            - run:
+                  name: Store Generated Proving and Verifying Keys
+                  command: ./scripts/skip_if_only_frontend.sh make provingkeys
+            - run:
+                  name: Store Genesis Public/Private Keypairs
+                  command: ./scripts/skip_if_only_frontend.sh make genesiskeys
+            - run:
+                  name: Upload deb to repo
+                  command: ./scripts/skip_if_only_frontend.sh make publish_deb
+            - run:
+                  name: Record Constraint System Digests
+                  command: ./scripts/skip_if_only_frontend.sh bash -c 'src/_build/default/app/cli/src/coda.exe client constraint-system-digests | tee /tmp/artifacts/constraint-system-digests.log'
+            - store_artifacts:
+                  path: /tmp/artifacts
+            - run:
+                  name: Copy artifacts to Google Cloud
+                  command: ./scripts/skip_if_only_frontend.sh scripts/artifacts.sh
+    build-artifacts--testnet_postake_many_proposers:
+        resource_class: large
+        docker:
+            - image: codaprotocol/coda:toolchain-af1380e0f6c8726391d82b2adb6a2a3b20dd46a0
+        environment:
+            DUNE_PROFILE: testnet_postake_many_proposers
         steps:
             - checkout
             - run: mkdir -p /tmp/artifacts
@@ -275,6 +314,18 @@ jobs:
                   command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run "test_postake_five_even_snarkless:coda-shared-prefix-multiproposer-test -num-proposers 5"'
             - store_artifacts:
                   path: test_logs
+    test--test_postake_five_even_txns:
+        resource_class: large
+        docker:
+            - image: codaprotocol/coda:toolchain-af1380e0f6c8726391d82b2adb6a2a3b20dd46a0
+        steps:
+            - checkout
+            - run: git submodule sync && git submodule update --init --recursive
+            - run:
+                  name: Running test -- test_postake_five_even_txns:coda-shared-prefix-multiproposer-test -num-proposers 5 -payments
+                  command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run "test_postake_five_even_txns:coda-shared-prefix-multiproposer-test -num-proposers 5 -payments"'
+            - store_artifacts:
+                  path: test_logs
     test--test_postake_snarkless:
         resource_class: large
         docker:
@@ -354,6 +405,7 @@ workflows:
             - tracetool
             - build-wallet
             - build-artifacts--testnet_postake
+            - build-artifacts--testnet_postake_many_proposers
             - build-artifacts--testnet_postake_snarkless_fake_hash
             - test-unit--test_posig_snarkless
             - test-unit--test_postake_snarkless
@@ -363,6 +415,7 @@ workflows:
             - test--test_postake_bootstrap
             - test--test_postake_catchup
             - test--test_postake_five_even_snarkless
+            - test--test_postake_five_even_txns
             - test--test_postake_snarkless
             - test--test_postake_split
             - test--test_postake_split_snarkless

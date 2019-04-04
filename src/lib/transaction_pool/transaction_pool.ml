@@ -524,7 +524,7 @@ let%test_module _ =
           List.iter ~f:(Test.add pool) txs ;
           let%bind () =
             Broadcast_pipe.Writer.write best_tip_diff_w
-              {new_user_commands= [0; 3; 4]; removed_user_commands= [4; 5; 6]}
+              {new_user_commands= [0; 3; 7]; removed_user_commands= [5; 6; 7]}
           in
           assert_pool_txs [1; 2; 4; 5; 6] ;
           Deferred.return true )

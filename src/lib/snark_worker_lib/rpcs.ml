@@ -11,7 +11,7 @@ module Make (Inputs : Intf.Inputs_intf) = struct
     type response =
       ( Statement.Stable.V1.t
       , Transaction.t
-      , Sparse_ledger.t
+      , Transaction_witness.t
       , Proof.t )
       Work.Single.Spec.t
       Work.Spec.t
@@ -26,7 +26,7 @@ module Make (Inputs : Intf.Inputs_intf) = struct
     type query =
       ( ( Statement.Stable.V1.t
         , Transaction.t
-        , Sparse_ledger.t
+        , Transaction_witness.t
         , Proof.t )
         Work.Single.Spec.t
         Work.Spec.t

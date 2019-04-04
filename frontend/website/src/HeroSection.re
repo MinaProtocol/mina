@@ -2,7 +2,23 @@ module Copy = {
   let component = ReasonReact.statelessComponent("HeroSection.Copy");
   let make = _ => {
     ...component,
-    render: _self =>
+    render: _self => {
+      let largeLinkStyle =
+        Css.(
+          style([
+            Style.Typeface.ibmplexsans,
+            color(Style.Colors.hyperlink),
+            textDecoration(`none),
+            fontWeight(`medium),
+            fontSize(`rem(1.125)),
+            lineHeight(`rem(1.875)),
+            letterSpacing(`rem(-0.0125)),
+            hover([color(Style.Colors.hyperlinkHover)]),
+          ])
+        );
+
+      let heroSvgVar = "--svg-color-hero";
+
       <div
         className=Css.(
           style([
@@ -12,11 +28,12 @@ module Copy = {
             width(`percent(100.0)),
             maxWidth(`rem(37.0)),
             minWidth(`rem(17.5)),
+            media("(min-width: 30rem)", [minWidth(`rem(24.0))]),
             media(
               Style.MediaQuery.full,
-              [width(`percent(50.0)), minWidth(`rem(24.0))],
+              [width(`percent(60.0)), minWidth(`rem(24.0))],
             ),
-            media("(min-width: 30rem)", [minWidth(`rem(24.0))]),
+            media(Style.MediaQuery.somewhatLarge, [minWidth(`rem(32.))]),
           ])
         )>
         <div
@@ -29,14 +46,14 @@ module Copy = {
                 Style.H1.hero,
                 style([
                   color(Style.Colors.denimTwo),
-                  marginTop(`rem(1.0)),
+                  marginTop(`zero),
                   marginBottom(`zero),
                   media(Style.MediaQuery.full, [marginTop(`rem(1.5))]),
                 ]),
               ])
             )>
             {ReasonReact.string(
-               "A cryptocurrency with a tiny, portable blockchain.",
+               {j|A cryptocurrency with a tiny portable blockchain.|j},
              )}
           </h1>
           <p
@@ -45,31 +62,68 @@ module Copy = {
                 Style.Body.big,
                 style([
                   marginTop(`rem(2.0)),
-                  maxWidth(`rem(28.0)),
+                  maxWidth(`rem(30.0)),
                   // align with the grid
                   media(
                     Style.MediaQuery.full,
-                    [marginTop(`rem(1.75)), marginBottom(`rem(11.875))],
+                    [marginTop(`rem(1.75)), marginBottom(`rem(4.0))],
                   ),
                 ]),
               ])
             )>
             <span>
               {ReasonReact.string(
-                 "Coda is the first cryptocurrency with a succinct blockchain. Our lightweight blockchain means ",
+                 "Coda swaps the traditional blockchain for a tiny cryptographic proof, enabling a cryptocurrency as accessible as any other app or website. This makes it ",
                )}
             </span>
             <span className=Style.Body.big_semibold>
-              {ReasonReact.string("anyone can use Coda directly")}
+              {ReasonReact.string(
+                 "dramatically easier to develop user friendly crypto apps",
+               )}
             </span>
             <span>
               {ReasonReact.string(
-                 " from any device, in less data than a few tweets.",
+                 {j| that run natively in the browser, and enables more inclusive, sustainable\u00A0consensus.|j},
                )}
             </span>
+            <br />
+            <br />
+            <a href=Links.Forms.mailingList className=largeLinkStyle>
+              {ReasonReact.string({j|Join our mailing list\u00A0→|j})}
+            </a>
+            <br />
+            <a
+              href="https://twitter.com/codaprotocol"
+              className=Css.(
+                merge([
+                  largeLinkStyle,
+                  style([
+                    marginTop(`rem(0.5)),
+                    display(`flex),
+                    alignItems(`center),
+                    // Original color of svg
+                    unsafe(heroSvgVar, Style.Colors.(string(hyperlink))),
+                    hover([
+                      unsafe(
+                        heroSvgVar,
+                        Style.Colors.(string(hyperlinkHover)),
+                      ),
+                    ]),
+                  ]),
+                ])
+              )>
+              <span className=Css.(style([marginRight(`rem(0.375))]))>
+                {ReasonReact.string({j|Follow us on Twitter|j})}
+              </span>
+              {GetInvolvedSection.SocialLink.Svg.twitter(
+                 ~dims=(16, 16),
+                 heroSvgVar,
+               )}
+            </a>
           </p>
         </div>
-      </div>,
+      </div>;
+    },
   };
 };
 
@@ -79,28 +133,37 @@ module Graphic = {
       <Svg
         className=Css.(style([marginTop(`rem(-0.625))]))
         link="/static/img/hero-illustration.svg"
-        dims=(13.9375, 33.375)
+        dims=(9.5625, 33.375)
+        alt="Huge tower of blocks representing the data required by other blockchains."
       />;
-  };
-
-  module Small = {
-    let svg = <Svg link="/static/img/icon.svg" dims=(0.625, 0.625) />;
   };
 
   module Info = {
     let component =
       ReasonReact.statelessComponent("HeroSection.Graphic.Info");
 
-    let make = (~sizeEmphasis, ~name, ~size, ~label, ~textColor, children) => {
+    let make =
+        (
+          ~className="",
+          ~sizeEmphasis,
+          ~name,
+          ~size,
+          ~label,
+          ~textColor,
+          children,
+        ) => {
       ...component,
       render: _ =>
         <div
           className=Css.(
-            style([
-              display(`flex),
-              flexDirection(`column),
-              justifyContent(`flexEnd),
-              alignItems(`center),
+            merge([
+              className,
+              style([
+                display(`flex),
+                flexDirection(`column),
+                justifyContent(`flexEnd),
+                alignItems(`center),
+              ]),
             ])
           )>
           {children[0]}
@@ -158,7 +221,12 @@ module Graphic = {
         <div
           className={style([
             width(`percent(100.0)),
-            media(Style.MediaQuery.full, [maxWidth(`rem(22.625))]),
+            maxWidth(`rem(20.0)),
+            marginRight(`rem(2.0)),
+            media(
+              Style.MediaQuery.veryVeryLarge,
+              [marginRight(`rem(4.75))],
+            ),
           ])}>
           <div
             className={style([
@@ -176,9 +244,14 @@ module Graphic = {
               <Image
                 className={style([width(`rem(0.625))])}
                 name="/static/img/coda-icon"
+                alt="Small Coda logo representing its small, fixed blockchain size."
               />
             </Info>
             <Info
+              className={style([
+                marginRight(`rem(-1.5)),
+                media(Style.MediaQuery.full, [marginRight(`zero)]),
+              ])}
               sizeEmphasis=true
               name="Other blockchains"
               size="2TB+"
@@ -200,12 +273,16 @@ let make = _ => {
       className=Css.(
         style([
           display(`flex),
-          marginTop(`rem(0.25)),
           justifyContent(`spaceAround),
           flexWrap(`wrap),
+          maxWidth(`rem(73.0)),
+          media(
+            Style.MediaQuery.somewhatLarge,
+            [marginLeft(`px(80)), marginRight(`px(80))],
+          ),
           media(
             Style.MediaQuery.full,
-            [marginTop(`rem(2.5)), flexWrap(`nowrap)],
+            [flexWrap(`nowrap), justifyContent(`spaceBetween)],
           ),
         ])
       )>

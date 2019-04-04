@@ -27,6 +27,7 @@ module type S = sig
     -> Consensus.Protocol_state.Value.t
     -> Consensus.Snark_transition.value
     -> Consensus.Prover_state.t
+    -> Pending_coinbase_witness.t
     -> Blockchain.t Deferred.Or_error.t
 end
 
@@ -42,6 +43,7 @@ module Worker_state = struct
       -> Consensus_mechanism.Protocol_state.Value.t
       -> Consensus_mechanism.Snark_transition.value
       -> Consensus_mechanism.Prover_state.t
+      -> Pending_coinbase_witness.t
       -> Blockchain.t
 
     val verify : Consensus_mechanism.Protocol_state.Value.t -> Proof.t -> bool
@@ -79,7 +81,7 @@ module Worker_state = struct
                let extend_blockchain (chain : Blockchain.t)
                    (next_state : Consensus.Protocol_state.Value.t)
                    (block : Consensus.Snark_transition.value) state_for_handler
-                   =
+                   pending_coinbase =
                  let next_state_top_hash =
                    Keys.Step.instance_hash next_state
                  in
@@ -92,7 +94,7 @@ module Worker_state = struct
                  let main x =
                    Tick.handle (Keys.Step.main x)
                      (Consensus_mechanism.Prover_state.handler
-                        state_for_handler)
+                        state_for_handler ~pending_coinbase)
                  in
                  let prev_proof =
                    Tick.Groth16.prove
@@ -121,7 +123,7 @@ module Worker_state = struct
                let extend_blockchain (chain : Blockchain.t)
                    (next_state : Consensus.Protocol_state.Value.t)
                    (block : Consensus.Snark_transition.value) state_for_handler
-                   =
+                   pending_coinbase =
                  let next_state_top_hash =
                    Keys.Step.instance_hash next_state
                  in
@@ -134,15 +136,17 @@ module Worker_state = struct
                  let main x =
                    Tick.handle (Keys.Step.main x)
                      (Consensus_mechanism.Prover_state.handler
-                        state_for_handler)
+                        state_for_handler ~pending_coinbase)
                  in
-                 let _ =
+                 match
                    Tick.Groth16.check
                      (main @@ Tick.Field.Var.constant next_state_top_hash)
                      prover_state
-                 in
-                 { Blockchain.state= next_state
-                 ; proof= Precomputed_values.base_proof }
+                 with
+                 | Ok () ->
+                     { Blockchain.state= next_state
+                     ; proof= Precomputed_values.base_proof }
+                 | Error e -> Error.raise e
 
                let verify state proof = true
              end
@@ -151,7 +155,8 @@ module Worker_state = struct
              ( module struct
                module Transaction_snark = Transaction_snark
 
-               let extend_blockchain chain next_state block state_for_handler =
+               let extend_blockchain chain next_state block state_for_handler
+                   pending_coinbase =
                  { Blockchain.proof= Precomputed_values.base_proof
                  ; state= next_state }
 
@@ -186,15 +191,18 @@ module Functions = struct
         Blockchain.t
         * Consensus_mechanism.Protocol_state.Value.Stable.V1.t
         * Consensus_mechanism.Snark_transition.value
-        * Consensus_mechanism.Prover_state.t] Blockchain.bin_t
+        * Consensus_mechanism.Prover_state.t
+        * Pending_coinbase_witness.t] Blockchain.bin_t
       (fun w
       ( ({Blockchain.state= prev_state; proof= prev_proof} as chain)
       , next_state
       , transition
-      , prover_state )
+      , prover_state
+      , pending_coinbase )
       ->
         let%map (module W) = Worker_state.get w in
-        W.extend_blockchain chain next_state transition prover_state )
+        W.extend_blockchain chain next_state transition prover_state
+          pending_coinbase )
 
   let verify_blockchain =
     create Blockchain.bin_t bin_bool (fun w {Blockchain.state; proof} ->
@@ -214,6 +222,7 @@ module Worker = struct
             * Consensus_mechanism.Protocol_state.Value.t
             * Consensus_mechanism.Snark_transition.value
             * Consensus_mechanism.Prover_state.t
+            * Pending_coinbase_witness.t
           , Blockchain.t )
           F.t
       ; verify_blockchain: ('w, Blockchain.t, bool) F.t }
@@ -267,9 +276,10 @@ let create ~conf_dir =
 let initialized {connection; _} =
   Worker.Connection.run connection ~f:Worker.functions.initialized ~arg:()
 
-let extend_blockchain {connection; _} chain next_state block prover_state =
+let extend_blockchain {connection; _} chain next_state block prover_state
+    pending_coinbase =
   Worker.Connection.run connection ~f:Worker.functions.extend_blockchain
-    ~arg:(chain, next_state, block, prover_state)
+    ~arg:(chain, next_state, block, prover_state, pending_coinbase)
 
 let verify_blockchain {connection; _} chain =
   Worker.Connection.run connection ~f:Worker.functions.verify_blockchain

@@ -81,7 +81,8 @@ let%test_unit "to_bits" =
   with_randomness 123456789 (fun () ->
       let input =
         { receiver=
-            {Public_key.Compressed.x= Field.random (); is_odd= Random.bool ()}
+            { Public_key.Compressed.Poly.Stable.Latest.x= Field.random ()
+            ; is_odd= Random.bool () }
         ; amount= Amount.of_int (Random.int Int.max_value) }
       in
       Test_util.test_to_triples typ fold var_to_triples input )

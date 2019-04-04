@@ -14,11 +14,17 @@ module Proof_type : sig
   type t = Stable.Latest.t [@@deriving sexp, yojson]
 end
 
+module Pending_coinbase_stack_state : sig
+  type t = {source: Pending_coinbase.Stack.t; target: Pending_coinbase.Stack.t}
+  [@@deriving sexp, bin_io, hash, compare, eq, fields]
+end
+
 module Statement : sig
   type t =
     { source: Coda_base.Frozen_ledger_hash.Stable.V1.t
     ; target: Coda_base.Frozen_ledger_hash.Stable.V1.t
     ; supply_increase: Currency.Amount.Stable.V1.t
+    ; pending_coinbase_stack_state: Pending_coinbase_stack_state.t
     ; fee_excess: Currency.Fee.Signed.Stable.V1.t
     ; proof_type: Proof_type.Stable.V1.t }
   [@@deriving sexp, hash, compare, yojson]
@@ -30,6 +36,7 @@ module Statement : sig
           { source: Coda_base.Frozen_ledger_hash.Stable.V1.t
           ; target: Coda_base.Frozen_ledger_hash.Stable.V1.t
           ; supply_increase: Currency.Amount.Stable.V1.t
+          ; pending_coinbase_stack_state: Pending_coinbase_stack_state.t
           ; fee_excess: Currency.Fee.Signed.Stable.V1.t
           ; proof_type: Proof_type.Stable.V1.t }
         [@@deriving sexp, bin_io, hash, compare, yojson]
@@ -65,6 +72,7 @@ val create :
   -> target:Frozen_ledger_hash.t
   -> proof_type:Proof_type.t
   -> supply_increase:Currency.Amount.t
+  -> pending_coinbase_stack_state:Pending_coinbase_stack_state.t
   -> fee_excess:Currency.Amount.Signed.t
   -> sok_digest:Sok_message.Digest.t
   -> proof:Tock.Proof.t
@@ -134,6 +142,8 @@ module Verification : sig
          Sok_message.Digest.Checked.t
       -> Frozen_ledger_hash.var
       -> Frozen_ledger_hash.var
+      -> Pending_coinbase.Stack.var
+      -> Pending_coinbase.Stack.var
       -> Currency.Amount.var
       -> (Tock.Proof.t, 's) Tick.As_prover.t
       -> (Tick.Boolean.var, 's) Tick.Checked.t
@@ -149,6 +159,7 @@ val check_transaction :
   -> sok_message:Sok_message.t
   -> source:Frozen_ledger_hash.t
   -> target:Frozen_ledger_hash.t
+  -> pending_coinbase_stack_state:Pending_coinbase_stack_state.t
   -> Transaction.t
   -> Tick.Handler.t
   -> unit
@@ -157,6 +168,7 @@ val check_user_command :
      sok_message:Sok_message.t
   -> source:Frozen_ledger_hash.t
   -> target:Frozen_ledger_hash.t
+  -> Pending_coinbase.Stack.t
   -> User_command.With_valid_signature.t
   -> Tick.Handler.t
   -> unit
@@ -166,6 +178,7 @@ val generate_transaction_witness :
   -> sok_message:Sok_message.t
   -> source:Frozen_ledger_hash.t
   -> target:Frozen_ledger_hash.t
+  -> Pending_coinbase_stack_state.t
   -> Transaction.t
   -> Tick.Handler.t
   -> unit
@@ -178,6 +191,7 @@ module type S = sig
     -> sok_digest:Sok_message.Digest.t
     -> source:Frozen_ledger_hash.t
     -> target:Frozen_ledger_hash.t
+    -> pending_coinbase_stack_state:Pending_coinbase_stack_state.t
     -> Transaction.t
     -> Tick.Handler.t
     -> t
@@ -186,6 +200,7 @@ module type S = sig
        sok_digest:Sok_message.Digest.t
     -> source:Frozen_ledger_hash.t
     -> target:Frozen_ledger_hash.t
+    -> pending_coinbase_stack:Pending_coinbase.Stack.t
     -> User_command.With_valid_signature.t
     -> Tick.Handler.t
     -> t
@@ -194,6 +209,7 @@ module type S = sig
        sok_digest:Sok_message.Digest.t
     -> source:Frozen_ledger_hash.t
     -> target:Frozen_ledger_hash.t
+    -> pending_coinbase_stack:Pending_coinbase.Stack.t
     -> Fee_transfer.t
     -> Tick.Handler.t
     -> t

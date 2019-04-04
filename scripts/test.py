@@ -11,6 +11,7 @@ from itertools import chain
 
 build_artifact_profiles = [
     'testnet_postake',
+    'testnet_postake_many_proposers',
     'testnet_postake_snarkless_fake_hash',
 ]
 
@@ -48,6 +49,7 @@ test_permutations = {
     'test_postake_bootstrap' : ['coda-bootstrap-test'],
     'test_postake_txns': ['coda-shared-state-test'],
     'test_postake_five_even_snarkless': ['coda-shared-prefix-multiproposer-test -num-proposers 5'],
+    'test_postake_five_even_txns': ['coda-shared-prefix-multiproposer-test -num-proposers 5 -payments'],
 }
 
 ci_blacklist = [

@@ -18,6 +18,11 @@ module Make (Inputs : Inputs_intf) :
    and type transaction_snark_scan_state := Inputs.Staged_ledger.Scan_state.t
    and type consensus_local_state := Consensus.Local_state.t
    and type user_command := User_command.t
+   and type diff_mutant :=
+              ( Inputs.External_transition.Stable.Latest.t
+              , State_hash.Stable.Latest.t )
+              With_hash.t
+              Inputs.Diff_mutant.E.t
    and module Extensions.Work = Inputs.Transaction_snark_work.Statement =
 struct
   (* NOTE: is Consensus_mechanism.select preferable over distance? *)
@@ -84,7 +89,8 @@ struct
           in
           let%bind ( `Hash_after_applying staged_ledger_hash
                    , `Ledger_proof proof_opt
-                   , `Staged_ledger transitioned_staged_ledger ) =
+                   , `Staged_ledger transitioned_staged_ledger
+                   , `Pending_coinbase_data _ ) =
             let open Deferred.Let_syntax in
             match%map
               Inputs.Staged_ledger.apply ~logger staged_ledger
@@ -119,8 +125,16 @@ struct
           ; staged_ledger= transitioned_staged_ledger
           ; just_emitted_a_proof } )
 
+    let external_transition {transition_with_hash; _} =
+      With_hash.data transition_with_hash
+
     let state_hash {transition_with_hash; _} =
       With_hash.hash transition_with_hash
+
+    let parent_hash {transition_with_hash; _} =
+      Consensus.Protocol_state.previous_state_hash
+        ( With_hash.data transition_with_hash
+        |> Inputs.External_transition.Verified.protocol_state )
 
     let equal breadcrumb1 breadcrumb2 =
       State_hash.equal (state_hash breadcrumb1) (state_hash breadcrumb2)
@@ -129,11 +143,6 @@ struct
       State_hash.compare (state_hash breadcrumb1) (state_hash breadcrumb2)
 
     let hash = Fn.compose State_hash.hash state_hash
-
-    let parent_hash {transition_with_hash; _} =
-      Consensus.Protocol_state.previous_state_hash
-        ( With_hash.data transition_with_hash
-        |> Inputs.External_transition.Verified.protocol_state )
 
     let consensus_state {transition_with_hash; _} =
       With_hash.data transition_with_hash
@@ -194,20 +203,26 @@ struct
     module Root_history = struct
       module Queue = Hash_queue.Make (State_hash)
 
-      type t = {history: Breadcrumb.t Queue.t; capacity: int}
+      type t =
+        { history: Breadcrumb.t Queue.t
+        ; capacity: int
+        ; mutable most_recent: Breadcrumb.t option }
 
       let create capacity =
         let history = Queue.create () in
-        {history; capacity}
+        {history; capacity; most_recent= None}
 
       let lookup {history; _} = Queue.lookup history
 
+      let most_recent {most_recent; _} = most_recent
+
       let mem {history; _} = Queue.mem history
 
-      let enqueue {history; capacity} state_hash breadcrumb =
+      let enqueue ({history; capacity; _} as t) state_hash breadcrumb =
         if Queue.length history >= capacity then
           Queue.dequeue_exn history |> ignore ;
-        Queue.enqueue history state_hash breadcrumb |> ignore
+        Queue.enqueue history state_hash breadcrumb |> ignore ;
+        t.most_recent <- Some breadcrumb
 
       let is_empty {history; _} = Queue.is_empty history
     end
@@ -215,28 +230,37 @@ struct
     module Best_tip_diff = Best_tip_diff.Make (Breadcrumb)
     module Root_diff = Root_diff.Make (Breadcrumb)
 
+    module Persistence_diff = Persistence_diff.Make (struct
+      include Inputs
+      module Breadcrumb = Breadcrumb
+    end)
+
     type t =
       { root_history: Root_history.t
       ; snark_pool_refcount: Snark_pool_refcount.t
       ; best_tip_diff: Best_tip_diff.t
-      ; root_diff: Root_diff.t }
+      ; root_diff: Root_diff.t
+      ; persistence_diff: Persistence_diff.t }
     [@@deriving fields]
 
     let create () =
       { snark_pool_refcount= Snark_pool_refcount.create ()
       ; best_tip_diff= Best_tip_diff.create ()
       ; root_history= Root_history.create (2 * Inputs.max_length)
-      ; root_diff= Root_diff.create () }
+      ; root_diff= Root_diff.create ()
+      ; persistence_diff= Persistence_diff.create () }
 
     type writers =
       { snark_pool: Snark_pool_refcount.view Broadcast_pipe.Writer.t
       ; best_tip_diff: Best_tip_diff.view Broadcast_pipe.Writer.t
-      ; root_diff: Root_diff.view Broadcast_pipe.Writer.t }
+      ; root_diff: Root_diff.view Broadcast_pipe.Writer.t
+      ; persistence_diff: Persistence_diff.view Broadcast_pipe.Writer.t }
 
     type readers =
       { snark_pool: Snark_pool_refcount.view Broadcast_pipe.Reader.t
       ; best_tip_diff: Best_tip_diff.view Broadcast_pipe.Reader.t
-      ; root_diff: Root_diff.view Broadcast_pipe.Reader.t }
+      ; root_diff: Root_diff.view Broadcast_pipe.Reader.t
+      ; persistence_diff: Persistence_diff.view Broadcast_pipe.Reader.t }
     [@@deriving fields]
 
     let make_pipes () : readers * writers =
@@ -246,18 +270,24 @@ struct
         Broadcast_pipe.create (Best_tip_diff.initial_view ())
       and root_diff_reader, root_diff_writer =
         Broadcast_pipe.create (Root_diff.initial_view ())
+      and persistence_diff_reader, persistence_diff_writer =
+        Broadcast_pipe.create (Persistence_diff.initial_view ())
       in
       ( { snark_pool= snark_reader
         ; best_tip_diff= best_tip_reader
-        ; root_diff= root_diff_reader }
+        ; root_diff= root_diff_reader
+        ; persistence_diff= persistence_diff_reader }
       , { snark_pool= snark_writer
         ; best_tip_diff= best_tip_writer
-        ; root_diff= root_diff_writer } )
+        ; root_diff= root_diff_writer
+        ; persistence_diff= persistence_diff_writer } )
 
-    let close_pipes ({snark_pool; best_tip_diff; root_diff} : writers) =
+    let close_pipes
+        ({snark_pool; best_tip_diff; root_diff; persistence_diff} : writers) =
       Broadcast_pipe.Writer.close snark_pool ;
       Broadcast_pipe.Writer.close best_tip_diff ;
-      Broadcast_pipe.Writer.close root_diff
+      Broadcast_pipe.Writer.close root_diff ;
+      Broadcast_pipe.Writer.close persistence_diff
 
     let mb_write_to_pipe diff ext_t handle pipe =
       Option.value ~default:Deferred.unit
@@ -270,7 +300,9 @@ struct
         mb_write_to_pipe diff (Field.get field t) handler pipe
       in
       ( match diff with
-      | Transition_frontier_diff.New_breadcrumb _ -> ()
+      | Transition_frontier_diff.New_breadcrumb _
+       |Transition_frontier_diff.New_frontier _ ->
+          ()
       | Transition_frontier_diff.New_best_tip
           {old_root; old_root_length; new_best_tip_length; _} ->
           if new_best_tip_length - old_root_length > max_length then
@@ -282,6 +314,8 @@ struct
           (use Snark_pool_refcount.handle_diff pipes.snark_pool)
         ~best_tip_diff:(use Best_tip_diff.handle_diff pipes.best_tip_diff)
         ~root_diff:(use Root_diff.handle_diff pipes.root_diff)
+        ~persistence_diff:
+          (use Persistence_diff.handle_diff pipes.persistence_diff)
   end
 
   module Node = struct
@@ -340,6 +374,9 @@ struct
 
   let root_diff_pipe {extension_readers; _} = extension_readers.root_diff
 
+  let persistence_diff_pipe {extension_readers; _} =
+    extension_readers.persistence_diff
+
   (* TODO: load from and write to disk *)
   let create ~logger
       ~(root_transition :
@@ -385,7 +422,7 @@ struct
     in
     let%map () =
       Extensions.handle_diff t.extensions t.extension_writers
-        (Transition_frontier_diff.New_breadcrumb root_breadcrumb)
+        (Transition_frontier_diff.New_frontier root_breadcrumb)
     in
     t
 
@@ -415,6 +452,9 @@ struct
       | None -> Non_empty_list.singleton elem
     in
     Option.map ~f:Non_empty_list.rev (go state_hash)
+
+  let previous_root t =
+    Extensions.Root_history.most_recent t.extensions.root_history
 
   let get_path_inclusively_in_root_history t state_hash ~f =
     path_search t state_hash
@@ -603,33 +643,33 @@ struct
     t.root <- new_root_hash ;
     new_root_node
 
+  let common_ancestor t (bc1 : Breadcrumb.t) (bc2 : Breadcrumb.t) :
+      State_hash.t =
+    let rec go ancestors1 ancestors2 sh1 sh2 =
+      Hash_set.add ancestors1 sh1 ;
+      Hash_set.add ancestors2 sh2 ;
+      if Hash_set.mem ancestors1 sh2 then sh2
+      else if Hash_set.mem ancestors2 sh1 then sh1
+      else
+        let parent_unless_root sh =
+          if State_hash.equal sh t.root then sh
+          else find_exn t sh |> Breadcrumb.parent_hash
+        in
+        go ancestors1 ancestors2 (parent_unless_root sh1)
+          (parent_unless_root sh2)
+    in
+    go
+      (Hash_set.create (module State_hash) ())
+      (Hash_set.create (module State_hash) ())
+      (Breadcrumb.state_hash bc1)
+      (Breadcrumb.state_hash bc2)
+
   (* Get the breadcrumbs that are on bc1's path but not bc2's, and vice versa.
      Ordered oldest to newest.
   *)
   let get_path_diff t (bc1 : Breadcrumb.t) (bc2 : Breadcrumb.t) :
       Breadcrumb.t list * Breadcrumb.t list =
-    let common_ancestor =
-      if Breadcrumb.equal bc1 bc2 then Breadcrumb.state_hash bc1
-      else
-        let rec go ancestors1 ancestors2 sh1 sh2 =
-          if Hash_set.mem ancestors1 sh2 then sh2
-          else if Hash_set.mem ancestors2 sh1 then sh1
-          else
-            let parent_unless_root h =
-              if State_hash.equal h t.root then h
-              else find_exn t h |> Breadcrumb.parent_hash
-            in
-            Hash_set.add ancestors1 sh1 ;
-            Hash_set.add ancestors2 sh2 ;
-            go ancestors1 ancestors2 (parent_unless_root sh1)
-              (parent_unless_root sh2)
-        in
-        go
-          (Hash_set.create (module State_hash) ())
-          (Hash_set.create (module State_hash) ())
-          (Breadcrumb.state_hash bc1)
-          (Breadcrumb.state_hash bc2)
-    in
+    let ancestor = common_ancestor t bc1 bc2 in
     (* Find the breadcrumbs connecting bc1 and bc2, excluding bc1. Precondition:
        bc1 is an ancestor of bc2. *)
     let path_from_to bc1 bc2 =
@@ -641,9 +681,9 @@ struct
     in
     Logger.debug t.logger ~module_:__MODULE__ ~location:__LOC__
       !"Common ancestor: %{sexp: State_hash.t}"
-      common_ancestor ;
-    ( path_from_to (find_exn t common_ancestor) bc1
-    , path_from_to (find_exn t common_ancestor) bc2 )
+      ancestor ;
+    ( path_from_to (find_exn t ancestor) bc1
+    , path_from_to (find_exn t ancestor) bc2 )
 
   (* Adding a breadcrumb to the transition frontier is broken into the following steps:
    *   1) attach the breadcrumb to the transition frontier
@@ -769,7 +809,16 @@ struct
             (* 4.IV *)
             let new_root_node = move_root t heir_node in
             (* 4.V *)
-            let garbage = List.bind bad_hashes ~f:(successor_hashes_rec t) in
+            let garbage =
+              bad_hashes @ List.bind bad_hashes ~f:(successor_hashes_rec t)
+            in
+            Logger.trace t.logger ~module_:__MODULE__ ~location:__LOC__
+              ~metadata:
+                [ ("garbage", `List (List.map garbage ~f:State_hash.to_yojson))
+                ; ("length_of_garbage", `Int (List.length garbage))
+                ; ( "bad_hashes"
+                  , `List (List.map bad_hashes ~f:State_hash.to_yojson) ) ]
+              "collecting $length_of_garbage nodes rooted from $bad_hashes" ;
             let garbage_breadcrumbs =
               List.map garbage ~f:(fun g ->
                   (Hashtbl.find_exn t.table g).breadcrumb )
@@ -876,6 +925,28 @@ struct
 
   let shallow_copy_root_snarked_ledger {root_snarked_ledger; _} =
     Ledger.of_database root_snarked_ledger
+
+  let equal t1 t2 =
+    let sort_breadcrumbs = List.sort ~compare:Breadcrumb.compare in
+    let equal_breadcrumb breadcrumb1 breadcrumb2 =
+      let open Breadcrumb in
+      let open Option.Let_syntax in
+      let get_successor_nodes frontier breadcrumb =
+        let%map node = Hashtbl.find frontier.table @@ state_hash breadcrumb in
+        Node.successor_hashes node
+      in
+      equal breadcrumb1 breadcrumb2
+      && State_hash.equal (parent_hash breadcrumb1) (parent_hash breadcrumb2)
+      && (let%bind successors1 = get_successor_nodes t1 breadcrumb1 in
+          let%map successors2 = get_successor_nodes t2 breadcrumb2 in
+          List.equal ~equal:State_hash.equal
+            (successors1 |> List.sort ~compare:State_hash.compare)
+            (successors2 |> List.sort ~compare:State_hash.compare))
+         |> Option.value_map ~default:false ~f:Fn.id
+    in
+    List.equal ~equal:equal_breadcrumb
+      (all_breadcrumbs t1 |> sort_breadcrumbs)
+      (all_breadcrumbs t2 |> sort_breadcrumbs)
 
   module For_tests = struct
     let root_snarked_ledger {root_snarked_ledger; _} = root_snarked_ledger

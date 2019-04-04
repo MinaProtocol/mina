@@ -28,19 +28,21 @@ module Input = struct
     ; external_port: int
     ; discovery_port: int
     ; acceptable_delay: Time.Span.t
-    ; peers: Host_and_port.t list }
+    ; peers: Host_and_port.t list
+    ; max_concurrent_connections: int option }
   [@@deriving bin_io]
 end
 
 open Input
 
 module Send_payment_input = struct
+  (* TODO : version *)
   type t =
     Private_key.t
     * Public_key.Compressed.Stable.V1.t
     * Currency.Amount.Stable.V1.t
     * Currency.Fee.Stable.V1.t
-    * User_command_memo.t
+    * User_command_memo.Stable.V1.t
   [@@deriving bin_io]
 end
 
@@ -270,7 +272,8 @@ module T = struct
         ; program_dir
         ; external_port
         ; peers
-        ; discovery_port } =
+        ; discovery_port
+        ; max_concurrent_connections } =
       let logger =
         Logger.create
           ~metadata:[("host", `String host); ("port", `Int external_port)]
@@ -305,6 +308,8 @@ module T = struct
         let commit_id = None
 
         let work_selection = work_selection
+
+        let max_concurrent_connections = max_concurrent_connections
       end in
       O1trace.trace_task "worker_main" (fun () ->
           let%bind (module Init) =
@@ -312,14 +317,14 @@ module T = struct
           in
           let module Main = Coda_main.Make_coda (Init) in
           let module Run = Run (Config) (Main) in
-          let%bind trust_dir = Unix.mkdtemp (conf_dir ^/ "trust") in
           let receipt_chain_dir_name = conf_dir ^/ "receipt_chain" in
+          let%bind trust_dir = Unix.mkdtemp (conf_dir ^/ "trust") in
           let%bind () = File_system.create_dir receipt_chain_dir_name in
           let receipt_chain_database =
             Coda_base.Receipt_chain_database.create
               ~directory:receipt_chain_dir_name
           in
-          let trust_system = Coda_base.Trust_system.create ~db_dir:trust_dir in
+          let trust_system = Trust_system.create ~db_dir:trust_dir in
           let time_controller =
             Run.Inputs.Time.Controller.create Run.Inputs.Time.Controller.basic
           in
@@ -336,7 +341,8 @@ module T = struct
                       (Unix.Inet_addr.of_string host)
                       ~discovery_port ~communication_port:external_port
                 ; logger
-                ; trust_system } }
+                ; trust_system
+                ; max_concurrent_connections } }
           in
           let monitor = Async.Monitor.create ~name:"coda" () in
           let with_monitor f input =
@@ -344,10 +350,8 @@ module T = struct
           in
           let%bind coda =
             Main.create
-              (Main.Config.make ~logger ~net_config
+              (Main.Config.make ~logger ~trust_system ~net_config
                  ~run_snark_worker:(Option.is_some snark_worker_config)
-                 ~staged_ledger_persistant_location:
-                   (conf_dir ^/ "staged_ledger")
                  ~transaction_pool_disk_location:
                    (conf_dir ^/ "transaction_pool")
                  ~snark_pool_disk_location:(conf_dir ^/ "snark_pool")
@@ -440,7 +444,11 @@ module T = struct
                    let state_hash = With_hash.hash t in
                    let prev_state_hash = State_hash.to_bits prev_state_hash in
                    let state_hash = State_hash.to_bits state_hash in
-                   Linear_pipe.write w (prev_state_hash, state_hash) )) ;
+                   if Pipe.is_closed w then
+                     Logger.error logger ~module_:__MODULE__ ~location:__LOC__
+                       "why is this w pipe closed? did someone close the \
+                        reader end? dropping this write..." ;
+                   Linear_pipe.write_if_open w (prev_state_hash, state_hash) )) ;
             return r.pipe
           in
           let coda_root_diff () =

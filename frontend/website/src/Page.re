@@ -27,7 +27,7 @@ module Footer = {
           </a>
           {last
              ? ReasonReact.null
-             : <span className=footerStyle>
+             : <span className=footerStyle ariaHidden=true>
                  {ReasonReact.string({js| · |js})}
                </span>}
         </li>,
@@ -46,7 +46,11 @@ module Footer = {
                 maxWidth(`rem(96.0)),
                 marginLeft(`auto),
                 marginRight(`auto),
-                ...Style.paddingY(`rem(2.)),
+                // Not using Style.paddingY here because we need the background
+                // color the same (so can't use margin), but we also need some
+                // top spacing.
+                paddingTop(`rem(4.75)),
+                paddingBottom(`rem(2.)),
               ]
               @ Style.paddingX(`rem(4.0)),
             )
@@ -88,11 +92,23 @@ module Footer = {
               <Link link="/privacy.html" name="privacy">
                 {ReasonReact.string("Privacy Policy")}
               </Link>
-              <Link link="/jobs.html" name="hiring" last=true>
+              <Link link="/jobs.html" name="hiring">
                 {ReasonReact.string("We're Hiring")}
+              </Link>
+              <Link link="/static/presskit.zip" name="presskit" last=true>
+                {ReasonReact.string("Press Kit")}
               </Link>
             </ul>
           </div>
+          <p
+            className=Css.(
+              merge([
+                Style.Body.small,
+                style([textAlign(`center), color(Style.Colors.saville)]),
+              ])
+            )>
+            {ReasonReact.string({j|© 2019 O(1) Labs|j})}
+          </p>
         </section>
       </footer>,
   };
@@ -104,11 +120,13 @@ let make =
       ~name,
       ~extraHeaders=ReasonReact.null,
       ~footerColor=Style.Colors.white,
+      ~page,
       children,
     ) => {
   ...component,
   render: _ =>
     <html
+      lang="en"
       className=Css.(
         style([
           media(Style.MediaQuery.iphoneSEorSmaller, [fontSize(`px(13))]),
@@ -148,13 +166,16 @@ let make =
             className=Css.(
               style([
                 marginTop(`rem(1.0)),
-                media(Style.MediaQuery.full, [marginTop(`rem(2.0))]),
+                media(
+                  Style.MediaQuery.statusLiftAlways,
+                  [marginTop(`rem(2.0))],
+                ),
               ])
             )>
-            <CodaNav />
+            <Nav page />
           </div>
         </Wrapped>
-        <div> ...children </div>
+        <main> ...children </main>
         <Footer bgcolor=footerColor />
       </body>
     </html>,

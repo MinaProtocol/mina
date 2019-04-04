@@ -11,11 +11,15 @@
     "reformat": "bsrefmt --in-place src/*.re",
     "link-static": "ln -s $(pwd)/../../src/app/website/static site/static",
     "test": "echo \"Error: no test specified\" && exit 1",
-    "deploy-ci": "firebase deploy --project coda-staging-84430 --token \"$FIREBASE_TOKEN\""
+    "deploy-ci": "firebase deploy --project coda-staging-84430 --token \"$FIREBASE_TOKEN\"",
+    "deploy-cdn": "npm run build && node lib/js/src/Render.js prod && aws s3 sync . s3://website-codaprotocol/",
+    "decrypt": "cd static/font && unzip PragmataPro.zip",
+    "decrypt-ci": "cd static/font && unzip -P \"$PRAGMATA_ZIP_PASSWORD\" PragmataPro.zip"
   },
   "dependencies": {
     "bs-css": "8.0.2",
     "emotion-server": "<10.0",
+    "pandoc-filter": "^1.0.0",
     "reason-react": "0.6.0",
     "rimraf": "^2.6.3"
   },

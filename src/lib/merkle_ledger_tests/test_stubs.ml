@@ -161,8 +161,10 @@ module In_memory_kvdb : Intf.Key_value_database = struct
 
   let set t ~key ~data = Bigstring_frozen.Table.set t.table ~key ~data
 
-  let set_batch tbl ~key_data_pairs =
-    List.iter key_data_pairs ~f:(fun (key, data) -> set tbl ~key ~data)
+  let set_batch t ?(remove_keys = []) ~key_data_pairs =
+    List.iter key_data_pairs ~f:(fun (key, data) -> set t ~key ~data) ;
+    List.iter remove_keys ~f:(fun key ->
+        Bigstring_frozen.Table.remove t.table key )
 
   let remove t ~key = Bigstring_frozen.Table.remove t.table key
 end
