@@ -290,6 +290,17 @@ module type Main_intf = sig
       with module Protocol_state = Consensus.Protocol_state
        and module Staged_ledger_diff := Staged_ledger_diff
 
+    module Diff_hash : Protocols.Coda_transition_frontier.Diff_hash
+
+    module Diff_mutant :
+      Protocols.Coda_transition_frontier.Diff_mutant
+      with type external_transition := External_transition.Stable.Latest.t
+       and type state_hash := State_hash.t
+       and type scan_state := Staged_ledger.Scan_state.t
+       and type hash := Diff_hash.t
+       and type consensus_state := Consensus.Consensus_state.Value.Stable.V1.t
+       and type pending_coinbases := Pending_coinbase.t
+
     module Transition_frontier :
       Protocols.Coda_pow.Transition_frontier_intf
       with type state_hash := State_hash.t
@@ -301,6 +312,11 @@ module type Main_intf = sig
        and type transaction_snark_scan_state := Staged_ledger.Scan_state.t
        and type consensus_local_state := Consensus.Local_state.t
        and type user_command := User_command.t
+       and type diff_mutant :=
+                  ( External_transition.Stable.Latest.t
+                  , State_hash.Stable.Latest.t )
+                  With_hash.t
+                  Diff_mutant.E.t
        and type Extensions.Work.t = Transaction_snark_work.Statement.t
   end
 
@@ -308,16 +324,16 @@ module type Main_intf = sig
     (** If ledger_db_location is None, will auto-generate a db based on a UUID *)
     type t =
       { logger: Logger.t
+      ; trust_system: Trust_system.t
       ; propose_keypair: Keypair.t option
       ; run_snark_worker: bool
       ; net_config: Inputs.Net.Config.t
-      ; staged_ledger_persistant_location: string
       ; transaction_pool_disk_location: string
       ; snark_pool_disk_location: string
       ; ledger_db_location: string option
+      ; transition_frontier_location: string option
       ; staged_ledger_transition_backup_capacity: int [@default 10]
-      ; time_controller:
-          Inputs.Time.Controller.t (* FIXME trust system goes here? *)
+      ; time_controller: Inputs.Time.Controller.t
       ; receipt_chain_database: Receipt_chain_database.t
       ; snark_work_fee: Currency.Fee.t
       ; monitor: Async.Monitor.t option }
@@ -592,7 +608,18 @@ struct
 
   let max_length = Consensus.Constants.k
 
-  module Transition_frontier = Transition_frontier.Make (struct
+  module Diff_hash = Transition_frontier_persistence.Diff_hash
+
+  module Diff_mutant_inputs = struct
+    module Diff_hash = Diff_hash
+    module Scan_state = Staged_ledger.Scan_state
+    module External_transition = External_transition
+  end
+
+  module Diff_mutant =
+    Transition_frontier_persistence.Diff_mutant.Make (Diff_mutant_inputs)
+
+  module Transition_frontier_inputs = struct
     module Pending_coinbase_hash = Pending_coinbase_hash
     module Transaction_witness = Transaction_witness
     module Staged_ledger_aux_hash = Staged_ledger_aux_hash
@@ -602,10 +629,26 @@ struct
     module Staged_ledger_diff = Staged_ledger_diff
     module External_transition = External_transition
     module Staged_ledger = Staged_ledger
+    module Diff_hash = Diff_hash
+    module Diff_mutant = Diff_mutant
     module Pending_coinbase_stack_state = Pending_coinbase_stack_state
     module Pending_coinbase = Pending_coinbase
 
     let max_length = max_length
+  end
+
+  module Transition_frontier =
+    Transition_frontier.Make (Transition_frontier_inputs)
+  module Transition_storage =
+    Transition_frontier_persistence.Transition_storage.Make
+      (Transition_frontier_inputs)
+
+  module Transition_frontier_persistence =
+  Transition_frontier_persistence.Make (struct
+    include Transition_frontier_inputs
+    module Transition_frontier = Transition_frontier
+    module Make_worker = Transition_frontier_persistence.Worker.Make_async
+    module Transition_storage = Transition_storage
   end)
 
   module Transaction_pool = struct

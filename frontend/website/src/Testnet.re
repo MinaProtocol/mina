@@ -15,6 +15,13 @@ let extraHeaders = <> Head.legacyStylesheets </>;
       fontSize(`px(16)),
     ],
   );
+  global(
+    "#block-explorer .bg-lemoncurry",
+    [Style.Typeface.ibmplexsans, fontWeight(`medium), fontSize(`px(16))],
+  );
+
+  // Remove the "status down" lemon curry popup as it's inaccurate
+  global(".darksnow.tc.bg-lemoncurry", [display(`none)]);
 
   // Remove fade in of explanations
   global(".animate-opacity", [opacity(1.)]);
@@ -147,7 +154,7 @@ let make = _ => {
         className=Css.(
           merge([
             Style.H3.wings,
-            style([marginTop(`rem(3.0)), marginBottom(`rem(3.0))]),
+            style([marginTop(`rem(1.25)), marginBottom(`rem(3.0))]),
           ])
         )>
         {ReasonReact.string("Testnet")}

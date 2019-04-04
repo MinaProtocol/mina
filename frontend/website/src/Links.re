@@ -1,3 +1,9 @@
+module Cdn = {
+  let prefix = ref("");
+
+  let url = s => prefix^ ++ s;
+};
+
 module Named = {
   type t = {
     link: string,
@@ -13,15 +19,15 @@ module Forms = {
 
   let participateInConsensus = "https://docs.google.com/forms/d/e/1FAIpQLSdChigoRhyZqg1RbaA6ODiqJ4q42cPpNbSH-koxXHjLwDeqDw/viewform?usp=pp_url&entry.2026041782=I+want+to+help+run+the+Coda+network+by+participating+in+consensus";
 
-  let compressTheBlockchain = "https://docs.google.com/forms/d/e/1FAIpQLSdChigoRhyZqg1RbaA6ODiqJ4q42cPpNbSH-koxXHjLwDeqDw/viewform?usp=pp_url&entry.2026041782=I+want+to+earn+Coda+by+helping+compress+the+blockchain";
+  let compressTheBlockchain = "https://docs.google.com/forms/d/e/1FAIpQLSdChigoRhyZqg1RbaA6ODiqJ4q42cPpNbSH-koxXHjLwDeqDw/viewform?usp=pp_url&entry.2026041782=I+want+help+run+the+Coda+network+by+compressing+the+blockchain";
 
   let improveSnarkTech = "https://docs.google.com/forms/d/e/1FAIpQLSdChigoRhyZqg1RbaA6ODiqJ4q42cPpNbSH-koxXHjLwDeqDw/viewform?usp=pp_url&entry.2026041782=I%27m+interested+in+improving+the+SNARK+tech+underlying+Coda";
 };
 
 module Static = {
-  let whitepaper = {
+  let whitepaper = () => {
     name: "Read the Coda Whitepaper",
-    link: "/static/coda-whitepaper-05-10-2018-0.pdf",
+    link: Cdn.url("/static/coda-whitepaper-05-10-2018-0.pdf"),
   };
 
   let snarkette = {
@@ -59,7 +65,7 @@ module Talks = {
   };
   let snarkyAlgebraicEffects = {
     name: "Snarky: Algebraic effects in Coda",
-    link: "https://www.youtube.com/watch?v=Na2i8MbXbI",
+    link: "https://www.youtube.com/watch?v=-Na2i8MbXbI",
   };
 
   let usingZkConstantSize = {
@@ -138,37 +144,45 @@ module Panel = {
 };
 
 module Lists = {
-  let articles = posts =>
-    // before the blog posts
-    [Static.whitepaper]
+  let articles = posts => {
+    let render_post = (name, title) => {
+      name: title,
+      link: "/blog/" ++ name ++ ".html",
+    };
+    let ((name, _, title), ps) = (List.hd(posts), List.tl(posts));
+    [
+      render_post(name, title),
+      Static.whitepaper(),
+      ThirdParty.coindeskTossesBlocks,
+      ThirdParty.codaMediumPost,
+      ThirdParty.tokenDailyQA,
+    ]
+    // top 5 above, rest below the fold
     @ List.map(
-        ((name, _, metadata)) =>
-          {name: metadata.BlogPost.title, link: "/blog/" ++ name ++ ".html"},
-        posts,
+        ((name, _, title)) =>
+          {name: title, link: "/blog/" ++ name ++ ".html"},
+        ps,
       )
     // after the blog posts
-    @ [
-      Static.snarkette,
-      ThirdParty.codaTheSizeOfTweets,
-      ThirdParty.coindeskTossesBlocks,
-      ThirdParty.tokenDailyQA,
-    ];
+    @ [Static.snarkette, ThirdParty.codaTheSizeOfTweets];
+  };
 
   let richMedia = [
+    Talks.hackSummit2018,
+    Podcasts.tokenTalksInterview,
+    Talks.highLevelLanguage,
+    Podcasts.digIntoRecursive,
+    Podcasts.decentralizationTrojanHorse,
+    // top 5 above, rest below the fold
     Talks.notesFromSnarkomicon,
     Panel.cryptographyCurrency,
-    Podcasts.decentralizationTrojanHorse,
     Talks.snarkyAlgebraicEffects,
     Talks.usingZkConstantSize,
     Panel.zkProofsMindBending,
     Talks.scanningForScans,
     Panel.scalarCapitalSummit,
-    Podcasts.digIntoRecursive,
     Talks.highThroughputSlowSnarks,
     Talks.zkSnarksSuccinctBlockchain,
-    Talks.hackSummit2018,
-    Podcasts.tokenTalksInterview,
-    Talks.highLevelLanguage,
     Talks.snarkyDsl,
   ];
 };

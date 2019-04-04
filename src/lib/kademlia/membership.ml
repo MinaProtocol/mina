@@ -1,6 +1,5 @@
 open Async_kernel
 open Core
-open Coda_base
 open Pipe_lib
 open Network_peer
 
@@ -252,7 +251,7 @@ module Make
         (* TODO punish peers from kad? *)
         (* val record : t -> Logger.t -> Unix.Inet_addr.Blocking_sexp.t -> Trust_system.Actions.t -> unit Deferred.t *)
         val lookup :
-          t -> Unix.Inet_addr.Blocking_sexp.t -> Peer_trust.Peer_status.t
+          t -> Unix.Inet_addr.Blocking_sexp.t -> Trust_system.Peer_status.t
     end) : sig
   include S with type trust_system := Trust_system.t
 
@@ -403,7 +402,7 @@ let%test_module "Tests" =
       type t = unit
 
       let lookup (_ : t) (_ : Unix.Inet_addr.t) =
-        Peer_trust.Peer_status.{trust= 0.0; banned= Unbanned}
+        Trust_system.Peer_status.{trust= 0.0; banned= Unbanned}
     end
 
     module type S_test = sig

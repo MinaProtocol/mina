@@ -7,8 +7,6 @@ module NavStyle = {
   module MediaQuery = {
     let menu = "(min-width: 62rem)";
     let menuMax = "(max-width: 61.9375rem)";
-    let statusLift = keepAnnouncementBar =>
-      keepAnnouncementBar ? "(min-width: 38rem)" : "(min-width: 0rem)";
   };
   let bottomNudge = Css.marginBottom(`rem(2.0));
   let bottomNudgeOffset = offset => Css.marginBottom(`rem(2.0 -. offset));
@@ -59,7 +57,7 @@ module NavStyle = {
         media(
           // Make expanded menu not show up on a wide screen
           MediaQuery.menuMax,
-          Style.paddingY(`rem(0.25))
+          Style.paddingY(`rem(0.3))
           @ [
             border(`px(1), `solid, expandedMenuBorderColor),
             boxShadow(
@@ -70,14 +68,13 @@ module NavStyle = {
               `rgba((0, 0, 0, 0.12)),
             ),
             borderRadius(`px(10)),
-            marginTop(`rem(2.25)),
+            marginTop(`zero),
             marginRight(`rem(-0.6)),
             display(`flex),
             maxWidth(`rem(10.)),
             flexDirection(`column),
             alignItems(`flexStart),
-            unsafe("padding-inline-start", "0"),
-            unsafe("-webkit-padding-start", "0"),
+            position(`absolute),
             before(
               triangle(expandedMenuBorderColor, 1)
               @ [
@@ -88,10 +85,10 @@ module NavStyle = {
                   ~spread=`zero,
                   `rgba((0, 0, 0, 0.12)),
                 ),
-                zIndex(-10),
+                zIndex(-1),
               ],
             ),
-            after(triangle(white, 0) @ []),
+            after(triangle(white, 0) @ [zIndex(1)]),
           ],
         ),
       ]),
@@ -130,9 +127,11 @@ module DropdownMenu = {
           id="nav-menu-btn">
           {ReasonReact.string("Menu")}
         </button>
-        <ul id="nav-menu" className=NavStyle.collapsedMenuItems>
-          ...children
-        </ul>
+        <div className=Css.(style([zIndex(1), position(`relative)]))>
+          <ul id="nav-menu" className=NavStyle.collapsedMenuItems>
+            ...children
+          </ul>
+        </div>
         <RunScript>
           {Printf.sprintf(
              {|
@@ -175,6 +174,10 @@ module NavWrapper = {
                  className={Css.style([
                    Css.paddingLeft(`rem(0.75)), // we need to skip padding right here as it's on the edge
                    Css.listStyle(`none, `inside, `none),
+                   Css.media(
+                     NavStyle.MediaQuery.menuMax,
+                     [Css.width(`percent(100.)), Css.padding(`zero)],
+                   ),
                  ])}>
                  elem
                </li>;
@@ -184,7 +187,13 @@ module NavWrapper = {
                    className={Css.style(
                      Style.paddingX(`rem(0.75))
                      @ Style.paddingY(`rem(0.5))
-                     @ [Css.listStyle(`none, `inside, `none)],
+                     @ [
+                       Css.listStyle(`none, `inside, `none),
+                       Css.media(
+                         NavStyle.MediaQuery.menuMax,
+                         [Css.width(`percent(100.)), Css.padding(`zero)],
+                       ),
+                     ],
                    )}>
                    elem
                  </li>
@@ -219,7 +228,7 @@ module NavWrapper = {
             alignItems(`flexEnd),
             flexWrap(`wrap),
             media(
-              NavStyle.MediaQuery.statusLift(keepAnnouncementBar),
+              Style.MediaQuery.statusLift(keepAnnouncementBar),
               [flexWrap(`nowrap), alignItems(`center)],
             ),
           ])
@@ -233,7 +242,7 @@ module NavWrapper = {
               width(`percent(50.0)),
               marginTop(`zero),
               media(
-                NavStyle.MediaQuery.statusLift(keepAnnouncementBar),
+                Style.MediaQuery.statusLift(keepAnnouncementBar),
                 [
                   width(`auto),
                   marginRight(`rem(0.75)),
@@ -252,12 +261,18 @@ module NavWrapper = {
               order(3),
               width(`percent(100.0)),
               NavStyle.bottomNudge,
+              display(`none), // just hide when status lift happens
               media(
-                NavStyle.MediaQuery.statusLift(keepAnnouncementBar),
-                [order(2), width(`auto), marginLeft(`zero)],
+                Style.MediaQuery.statusLift(keepAnnouncementBar),
+                [
+                  order(2),
+                  width(`auto),
+                  marginLeft(`zero),
+                  ...keepAnnouncementBar
+                       ? [display(`block)] : [display(`none)],
+                ],
               ),
               media(NavStyle.MediaQuery.menu, [width(`percent(40.0))]),
-              ...keepAnnouncementBar ? [] : [display(`none)],
             ])
           )>
           <div
@@ -265,7 +280,7 @@ module NavWrapper = {
               style([
                 width(`rem(21.25)),
                 media(
-                  NavStyle.MediaQuery.statusLift(keepAnnouncementBar),
+                  Style.MediaQuery.statusLift(keepAnnouncementBar),
                   [width(`rem(21.25)), margin(`auto)],
                 ),
               ])
@@ -281,7 +296,7 @@ module NavWrapper = {
               order(2),
               NavStyle.bottomNudgeOffset(0.5),
               media(
-                NavStyle.MediaQuery.statusLift(keepAnnouncementBar),
+                Style.MediaQuery.statusLift(keepAnnouncementBar),
                 [order(3), width(`auto), NavStyle.bottomNudge],
               ),
               media(NavStyle.MediaQuery.menu, [width(`percent(50.0))]),
@@ -295,8 +310,8 @@ module NavWrapper = {
 };
 
 let menuStyle =
-  Style.paddingX(`rem(1.75))
-  @ Style.paddingY(`rem(0.75))
+  Style.paddingX(`rem(1.8))
+  @ Style.paddingY(`rem(0.5))
   @ Css.[
       height(`auto),
       margin(`zero),
@@ -308,6 +323,8 @@ let menuStyle =
       fontWeight(`medium),
       letterSpacing(`rem(0.)),
       fontStyle(`normal),
+      display(`block),
+      width(`percent(100.)),
       textTransform(`none),
       outline(`zero, `none, `transparent),
       focus([color(Style.Colors.hyperlink)]),

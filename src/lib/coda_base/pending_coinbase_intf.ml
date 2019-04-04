@@ -39,7 +39,16 @@ module type S = sig
   end
 
   module type Data_hash_binable_intf = sig
-    type t [@@deriving bin_io, sexp, hash, compare, eq, yojson]
+    type t [@@deriving sexp, compare, eq, yojson, hash]
+
+    module Stable : sig
+      module V1 : sig
+        type nonrec t = t
+        [@@deriving bin_io, sexp, compare, eq, yojson, version, hash]
+      end
+
+      module Latest = V1
+    end
 
     type var
 
@@ -75,6 +84,8 @@ module type S = sig
   and Stack : sig
     include Data_hash_binable_intf
 
+    val data_hash : t -> Hash.t
+
     val push : t -> Coinbase.t -> t
 
     val empty : t
@@ -88,8 +99,6 @@ module type S = sig
 
       val empty : t
     end
-
-    val hash : t -> Hash.t
   end
 
   val create : unit -> t Or_error.t

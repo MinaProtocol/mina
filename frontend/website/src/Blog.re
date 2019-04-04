@@ -18,65 +18,200 @@ let extraHeaders =
       integrity="sha384-kmZOZB5ObwgQnS/DuDg6TScgOiWWBiVt0plIRkZCmE6rDZGrEOQeHM5PcHi+nyqe"
       crossOrigin="anonymous"
     />
-    <link rel="stylesheet" href="/static/css/blog.css" />
+    <link rel="stylesheet" href={Links.Cdn.url("/static/css/blog.css")} />
     Head.legacyStylesheets
   </>;
 
+let titleColor = c => Css.unsafe("--title-color", Style.Colors.string(c));
+let readMoreColor = c =>
+  Css.unsafe("--read-more-color", Style.Colors.string(c));
+
 let component = ReasonReact.statelessComponent("Blog");
 
-let previousPost = (metadata: BlogPost.metadata) =>
-  <>
-    <h2
-      className="f3 ddinexp tracked-tightish pt2 pt3-m pt4-l mt1 mb1"
-      dangerouslySetInnerHTML={"__html": metadata.title}
+// Need to dangerouslySetInnerHTML to handle html entities in the markdown
+let createPostHeader = metadata =>
+  <div className={Css.style([Css.width(`percent(100.))])}>
+    <h1
+      className=Css.(
+        style([
+          margin(`zero),
+          fontSize(`rem(2.25)),
+          Style.Typeface.ibmplexsans,
+          fontWeight(`semiBold),
+          letterSpacing(`rem(-0.0625)),
+          width(`percent(100.)),
+          unsafe("color", "var(--title-color)"),
+          media(Style.MediaQuery.notMobile, [fontSize(`rem(3.))]),
+        ])
+      )
+      dangerouslySetInnerHTML={"__html": metadata.BlogPost.title}
     />
     {switch (metadata.subtitle) {
      | None => ReasonReact.null
      | Some(subtitle) =>
-       <h3
-         className="f5 f4-ns ddinexp mt0 mb1 fw4"
+       <h2
+         className=Css.(
+           merge([
+             Style.Body.big,
+             style([margin(`zero), fontWeight(`normal)]),
+           ])
+         )
          dangerouslySetInnerHTML={"__html": subtitle}
        />
      }}
-    <h5
-      className="f8 f7-ns nowrap fw4 tracked-supermega ttu metropolis mt0 mb4 mb1-ns">
-      <span className="mr2">
-        {ReasonReact.string("by " ++ metadata.author ++ " ")}
-      </span>
-      <span className="fr"> {ReasonReact.string(metadata.date)} </span>
-    </h5>
-  </>;
+    <h3
+      className=Css.(
+        style([
+          Style.Typeface.ibmplexsans,
+          fontSize(`rem(0.75)),
+          letterSpacing(`rem(0.0875)),
+          fontWeight(`normal),
+          color(Style.Colors.slate),
+          marginTop(`rem(1.5)),
+          textTransform(`uppercase),
+        ])
+      )>
+      {ReasonReact.string("by " ++ metadata.author ++ " ")}
+    </h3>
+    <h3
+      className=Css.(
+        style([
+          Style.Typeface.ibmplexsans,
+          fontSize(`rem(0.75)),
+          letterSpacing(`rem(0.0875)),
+          fontWeight(`normal),
+          color(Style.Colors.slateAlpha(0.5)),
+        ])
+      )>
+      {ReasonReact.string(metadata.date)}
+    </h3>
+  </div>;
+
+let createPostFadedContents = html =>
+  <div
+    className=Css.(
+      style([
+        height(`rem(10.5)),
+        width(`percent(100.)),
+        position(`relative),
+        overflow(`hidden),
+        marginTop(`rem(1.)),
+      ])
+    )>
+    <div
+      className=Css.(
+        style([
+          after([
+            contentRule(""),
+            position(`absolute),
+            zIndex(1),
+            // Needed to prevent the bottom of the text peeking through for some reason.
+            bottom(`px(-1)),
+            left(`zero),
+            height(`rem(4.75)),
+            width(`percent(100.)),
+            backgroundImage(
+              `linearGradient((
+                `deg(0),
+                [
+                  (0, Style.Colors.white),
+                  (100, Style.Colors.whiteAlpha(0.)),
+                ],
+              )),
+            ),
+          ]),
+        ])
+      )>
+      <div
+        className={
+          "blog-content "
+          ++ Css.(
+               style([
+                 Style.Typeface.ibmplexsans,
+                 lineHeight(`rem(1.5)),
+                 color(Style.Colors.saville),
+                 boxSizing(`contentBox),
+               ])
+             )
+        }
+        dangerouslySetInnerHTML={"__html": html}
+      />
+    </div>
+  </div>;
+
+// Uses an overlay link to avoid nesting anchor tags
+let createPostSummary = ((name, html, metadata)) => {
+  <div className=Css.(style([position(`relative)]))>
+    <a
+      href={"/blog/" ++ name ++ ".html"}
+      className=Css.(
+        style([
+          position(`absolute),
+          left(`zero),
+          right(`zero),
+          top(`zero),
+          bottom(`zero),
+          // display(`block),
+          selector(
+            ":hover + div",
+            [
+              color(Style.Colors.hyperlink),
+              titleColor(Style.Colors.hyperlink),
+              readMoreColor(Style.Colors.hyperlinkHover),
+            ],
+          ),
+        ])
+      )
+    />
+    <div
+      className=Css.(
+        style([
+          position(`relative),
+          pointerEvents(`none),
+          display(`flex),
+          alignItems(`flexStart),
+          flexDirection(`column),
+          marginBottom(`rem(4.)),
+          color(Style.Colors.saville),
+          titleColor(Style.Colors.saville),
+          readMoreColor(Style.Colors.hyperlink),
+        ])
+      )>
+      {createPostHeader(metadata)}
+      {createPostFadedContents(html)}
+      <div
+        className=Css.(
+          style([
+            marginTop(`rem(1.)),
+            Style.Typeface.ibmplexsans,
+            fontWeight(`medium),
+            fontSize(`rem(1.)),
+            letterSpacing(`rem(-0.0125)),
+            unsafe("color", "var(--read-more-color)"),
+          ])
+        )>
+        {ReasonReact.string({js|Read more →|js})}
+      </div>
+    </div>
+  </div>;
+};
 
 let make = (~posts, _children) => {
   ...component,
   render: _self =>
-    switch (posts) {
-    | [] => failwith("No blog posts found")
-    | [(name, html, metadata)] => <BlogPost name html metadata />
-    | [(name, html, metadata), ...tl] =>
-      <div>
-        <BlogPost name html metadata showComments=false />
-        <h3
-          className="f4 f3-ns ddinexp mt0 mb0 fw4 mw65 center pt3 pt4-m pt5-l">
-          {ReasonReact.string("Previous Posts:")}
-        </h3>
-        <div className="mw65 center ph3 ph4-m ph5-l">
-          <ul className="list lh-copy">
-            ...{Array.of_list(
-              List.map(
-                ((name, _, metadata)) =>
-                  <li>
-                    <a
-                      href={"/blog/" ++ name ++ ".html"}
-                      className="f5 dodgerblue fw5 no-underline hover-link">
-                      {previousPost(metadata)}
-                    </a>
-                  </li>,
-                tl,
-              ),
-            )}
-          </ul>
-        </div>
-      </div>
-    },
+    <div
+      className=Css.(
+        style([
+          display(`flex),
+          flexDirection(`column),
+          alignItems(`stretch),
+          maxWidth(`rem(43.)),
+          marginLeft(`auto),
+          marginRight(`auto),
+          media(Style.MediaQuery.full, [marginTop(`rem(2.0))]),
+        ])
+      )>
+      <div> ...{Array.of_list(List.map(createPostSummary, posts))} </div>
+      BlogPost.renderKatex
+    </div>,
 };

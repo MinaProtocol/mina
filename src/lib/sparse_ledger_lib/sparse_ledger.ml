@@ -54,7 +54,7 @@ end) (Key : sig
 end) (Account : sig
   type t [@@deriving bin_io, eq, sexp]
 
-  val hash : t -> Hash.t
+  val data_hash : t -> Hash.t
 end) =
 struct
   type tree_tmp = (Hash.t, Account.t) tree [@@deriving eq]
@@ -69,7 +69,7 @@ struct
   let of_hash = of_hash
 
   let hash = function
-    | Account a -> Account.hash a
+    | Account a -> Account.data_hash a
     | Hash h -> h
     | Node (h, _, _) -> h
 
@@ -210,7 +210,7 @@ let%test_module "sparse-ledger-test" =
 
       let key {name; _} = name
 
-      let hash t = Md5.digest_string (Binable.to_string (module T) t)
+      let data_hash t = Md5.digest_string (Binable.to_string (module T) t)
     end
 
     include Make (Hash) (String) (Account)
