@@ -128,13 +128,19 @@ module Typeface = {
         [
           genFontFace(
             ~fontFamily="PragmataPro",
-            ~src=["/static/font/Essential-PragmataPro-Regular.woff2"],
+            ~src=[
+              "/static/font/Essential-PragmataPro-Regular.woff2",
+              "/static/font/Essential-PragmataPro-Regular.woff",
+            ],
             ~fontWeight=`normal,
             (),
           ),
           genFontFace(
             ~fontFamily="PragmataPro",
-            ~src=["/static/font/PragmataPro-Bold.woff2"],
+            ~src=[
+              "/static/font/PragmataPro-Bold.woff2",
+              "/static/font/PragmataPro-Bold.woff",
+            ],
             ~fontWeight=`bold,
             (),
           ),
@@ -198,7 +204,9 @@ module Typeface = {
 };
 
 module MediaQuery = {
-  let veryLarge = "(min-width: 83.8125rem)";
+  let veryVeryLarge = "(min-width: 77rem)";
+  let veryLarge = "(min-width: 70.8125rem)";
+  let somewhatLarge = "(min-width: 65.5rem)";
   let full = "(min-width: 48rem)";
   let notMobile = "(min-width: 32rem)";
   let notSmallMobile = "(min-width: 25rem)";
@@ -478,3 +486,5 @@ Css.global(
     unsafe("-webkit-margin-after", "0"),
   ],
 );
+
+Css.global("p", Css.[marginTop(`rem(1.)), marginBottom(`rem(1.))]);

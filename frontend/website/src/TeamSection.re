@@ -28,6 +28,7 @@ module Member = {
                     minHeight(`rem(27.5)),
                     marginLeft(`rem(1.5625)),
                     marginRight(`rem(1.5625)),
+                    width(`percent(100.)),
                   ],
                 ),
               ]),
@@ -85,6 +86,16 @@ module Member = {
                       Style.H3.Technical.title,
                       style([
                         marginTop(`rem(0.0625)),
+                        // hack to remove top margin for IE11
+                        media(
+                          "all and (-ms-high-contrast: none), (-ms-high-contrast: active)",
+                          [margin(`auto)],
+                        ),
+                        // hack to remove top margin for Edge
+                        selector(
+                          "@supports (-ms-ime-align:auto)",
+                          [margin(`auto)],
+                        ),
                         ...Style.paddingX(`rem(0.1875)),
                       ]),
                     ])
@@ -164,7 +175,7 @@ module Section = {
               after([
                 contentRule(""),
                 position(`absolute),
-                bottom(`zero),
+                bottom(`px(-1)),
                 left(`zero),
                 height(`rem(8.)),
                 width(`percent(100.)),
@@ -199,6 +210,7 @@ module Section = {
                 marginTop(`rem(1.0)),
                 marginBottom(`rem(3.0)),
                 textAlign(`center),
+                cursor(`pointer),
               ]),
             ])
           )
