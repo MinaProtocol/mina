@@ -113,8 +113,6 @@ module Make_fp
 
   let of_int = N.of_int
 
-  let to_string = N.to_string
-
   let of_string = N.of_string
 
   let to_string = N.to_string
