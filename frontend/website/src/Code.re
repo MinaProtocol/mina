@@ -185,7 +185,6 @@ let make = _ => {
                   flexShrink(1),
                   flexGrow(1.0),
                   marginRight(`rem(0.5)),
-                  width(`rem(15.)),
                   marginTop(`rem(2.)),
                   marginRight(`rem(1.0)),
                 ]),

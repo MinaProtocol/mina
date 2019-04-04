@@ -63,9 +63,15 @@ module Copy = {
             <br />
             <span>
               {ReasonReact.string(
-                 "Coda achieves this by substituting the traditional blockchain for a tiny zero knowledge proof, enabling the protocol state to be instantly verified by any device.",
+                 "Coda achieves this by substituting the traditional blockchain for a tiny zero knowledge proof, ",
                )}
             </span>
+            <span className=Style.Body.big_semibold>
+              {ReasonReact.string(
+                 "enabling the protocol state to be instantly verified by any device",
+               )}
+            </span>
+            <span> {ReasonReact.string(".")} </span>
           </p>
         </div>
       </div>,

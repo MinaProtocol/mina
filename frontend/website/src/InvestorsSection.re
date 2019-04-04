@@ -20,10 +20,7 @@ module Investor = {
           className=Css.(
             merge([
               Style.H3.Technical.title,
-              style([
-                marginTop(`rem(0.0625)),
-                ...Style.paddingX(`rem(0.1875)),
-              ]),
+              style(Style.paddingX(`rem(0.1875))),
             ])
           )>
           {ReasonReact.string(name)}
