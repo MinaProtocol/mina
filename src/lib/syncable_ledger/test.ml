@@ -88,7 +88,8 @@ struct
        )) ;
     match
       Async.Thread_safe.block_on_async_exn (fun () ->
-          Sync_ledger.fetch lsync desired_root ~data:() )
+          Sync_ledger.fetch lsync desired_root ~data:() ~equal:(fun () () ->
+              true ) )
     with
     | `Ok mt ->
         total_queries := Some (List.length !seen_queries) ;
@@ -122,7 +123,9 @@ struct
                      (fun q -> seen_queries := q :: !seen_queries)
                      ~logger ~trust_system ;
                  desired_root := Ledger.merkle_root l3 ;
-                 Sync_ledger.new_goal lsync !desired_root ~data:() |> ignore ;
+                 Sync_ledger.new_goal lsync !desired_root ~data:()
+                   ~equal:(fun () () -> true )
+                 |> ignore ;
                  Deferred.unit )
                else
                  let%bind answ_opt =
@@ -139,7 +142,8 @@ struct
              res )) ;
     match
       Async.Thread_safe.block_on_async_exn (fun () ->
-          Sync_ledger.fetch lsync !desired_root ~data:() )
+          Sync_ledger.fetch lsync !desired_root ~data:() ~equal:(fun () () ->
+              true ) )
     with
     | `Ok _ -> failwith "shouldn't happen"
     | `Target_changed _ -> (
