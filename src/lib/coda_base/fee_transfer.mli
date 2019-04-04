@@ -19,7 +19,7 @@ module Stable : sig
     type t =
       | One of Single.Stable.V1.t
       | Two of Single.Stable.V1.t * Single.Stable.V1.t
-    [@@deriving bin_io, sexp, compare, eq, yojson]
+    [@@deriving bin_io, sexp, compare, eq, yojson, version]
   end
 
   module Latest = V1

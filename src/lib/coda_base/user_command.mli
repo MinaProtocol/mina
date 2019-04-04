@@ -2,26 +2,32 @@ open Core
 open Import
 module Payload = User_command_payload
 
-type ('payload, 'pk, 'signature) t_ =
-  {payload: 'payload; sender: 'pk; signature: 'signature}
-[@@deriving bin_io, eq, sexp, hash, yojson]
+module Poly : sig
+  module Stable : sig
+    module V1 : sig
+      type ('payload, 'pk, 'signature) t =
+        {payload: 'payload; sender: 'pk; signature: 'signature}
+      [@@deriving bin_io, eq, sexp, hash, yojson]
+    end
 
-type t = (Payload.t, Public_key.t, Signature.t) t_
-[@@deriving bin_io, eq, sexp, hash, yojson]
+    module Latest = V1
+  end
+end
 
 module Stable : sig
   module V1 : sig
-    type nonrec ('payload, 'pk, 'signature) t_ =
-                                                ('payload, 'pk, 'signature) t_ =
-      {payload: 'payload; sender: 'pk; signature: 'signature}
-    [@@deriving bin_io, eq, sexp, hash, yojson]
-
-    type t = (Payload.Stable.V1.t, Public_key.t, Signature.t) t_
-    [@@deriving bin_io, eq, sexp, hash, yojson]
+    type t =
+      ( Payload.Stable.V1.t
+      , Public_key.Stable.V1.t
+      , Signature.Stable.V1.t )
+      Poly.Stable.V1.t
+    [@@deriving bin_io, eq, sexp, hash, yojson, version]
   end
 
   module Latest : module type of V1
 end
+
+type t = Stable.Latest.t [@@deriving sexp, yojson, hash]
 
 include Comparable.S with type t := t
 
