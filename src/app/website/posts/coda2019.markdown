@@ -24,6 +24,8 @@ This is no coincidence. The fundamental technology underlying cryptocurrencies i
 
 Coda solves this problem. [Leveraging zero knowledge proofs](https://youtu.be/eWVGATxEB6M?t=90), it substitutes the traditional blockchain for a tiny, portable cryptographic proof, about the size of a few tweets. This means that anyone can get the same level of security as a standard blockchain with a tiny fraction of the requirements. Participating in consensus or fully verifying the chain are both highly accessible from any device. And even better, as the proof is constant sized, using Coda stays inclusive and decentralized even at millions of users, thousands of transactions per second, and with decades of history.
 
+<img src='/static/blog/coda2019/comparison.png' style='width:50%; display: block; margin-left: auto; margin-right: auto'></img>
+
 Coda takes this a step farther, as well. By reducing the size of the chain to be so small, Coda can be used from websites without requiring an extension and from mobile phones with intermittent connectivity, enabling an experience where anyone has the option to fully use cryptocurrency applications without intermediaries.
 
 Developers will be able to reach users simply by dropping in a `<script>` tag into their frontend and writing a few lines of code, without requiring users to download extensions or trust any third parties. By taking advantage of this, developers will be able to build new websites and applications impossible in today’s world. A social network can prove it’s treating your data and privacy with respect. New kinds of games can be built leveraging the capabilities of a cryptocurrency. Communities can organize and make decisions with fully verifiable elections.
