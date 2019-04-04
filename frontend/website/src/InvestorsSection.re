@@ -10,27 +10,22 @@ module Investor = {
           style([
             display(`flex),
             alignItems(`center),
-            backgroundColor(Style.Colors.greyish),
+            backgroundColor(Style.Colors.greyishAlpha(1.0)),
             height(`rem(1.75)),
             marginRight(`rem(0.75)),
             marginBottom(`rem(0.625)),
           ])
         )>
-        // Note: change this alt text if we ever hide the investor name
-
-          <h4
-            className=Css.(
-              merge([
-                Style.H3.Technical.title,
-                style([
-                  marginTop(`rem(0.0625)),
-                  ...Style.paddingX(`rem(0.1875)),
-                ]),
-              ])
-            )>
-            {ReasonReact.string(name)}
-          </h4>
-        </div>,
+        <h4
+          className=Css.(
+            merge([
+              Style.H3.Technical.title,
+              style(Style.paddingX(`rem(0.1875))),
+            ])
+          )>
+          {ReasonReact.string(name)}
+        </h4>
+      </div>,
   };
 };
 

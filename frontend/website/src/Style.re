@@ -34,10 +34,9 @@ module Colors = {
 
   let navy = `rgb((0, 49, 90));
   let navyBlue = `rgb((0, 23, 74));
-  let greyish = `rgb((170, 170, 170));
+  let navyBlueAlpha = a => `rgba((0, 23, 74, a));
+  let greyishAlpha = a => `rgba((170, 170, 170, a));
   let saville = `hsl((212, 33, 35));
-  // For use with box-shadow so we can't use opacity
-  let greenShadow = `rgba((136, 191, 163, 0.64));
 
   let clover = `rgb((22, 168, 85));
   let lightClover = `rgba((118, 205, 135, 0.12));
@@ -129,13 +128,19 @@ module Typeface = {
         [
           genFontFace(
             ~fontFamily="PragmataPro",
-            ~src=["/static/font/Essential-PragmataPro-Regular.woff2"],
+            ~src=[
+              "/static/font/Essential-PragmataPro-Regular.woff2",
+              "/static/font/Essential-PragmataPro-Regular.woff",
+            ],
             ~fontWeight=`normal,
             (),
           ),
           genFontFace(
             ~fontFamily="PragmataPro",
-            ~src=["/static/font/Essential-PragmataPro-Bold.woff2"],
+            ~src=[
+              "/static/font/PragmataPro-Bold.woff2",
+              "/static/font/PragmataPro-Bold.woff",
+            ],
             ~fontWeight=`bold,
             (),
           ),
@@ -199,7 +204,9 @@ module Typeface = {
 };
 
 module MediaQuery = {
-  let veryLarge = "(min-width: 83.8125rem)";
+  let veryVeryLarge = "(min-width: 77rem)";
+  let veryLarge = "(min-width: 70.8125rem)";
+  let somewhatLarge = "(min-width: 65.5rem)";
   let full = "(min-width: 48rem)";
   let notMobile = "(min-width: 32rem)";
   let notSmallMobile = "(min-width: 25rem)";
@@ -275,8 +282,7 @@ module H2 = {
 
 module Technical = {
   open Css;
-  // TODO: Replace with equals signs
-  let border = f => style([f(`px(6), `solid, Colors.greyish)]);
+  let border = f => style([f(`px(3), `dashed, Colors.greyishAlpha(0.5))]);
 
   let basic =
     style([
@@ -480,3 +486,5 @@ Css.global(
     unsafe("-webkit-margin-after", "0"),
   ],
 );
+
+Css.global("p", Css.[marginTop(`rem(1.)), marginBottom(`rem(1.))]);

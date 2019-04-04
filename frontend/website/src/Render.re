@@ -107,7 +107,6 @@ module Router = {
   };
 };
 
-// TODO: Render job pages
 let jobOpenings = [|
   ("engineering-manager", "Engineering Manager (San Francisco)."),
   ("product-manager", "Product Manager (San Francisco)."),

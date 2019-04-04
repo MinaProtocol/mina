@@ -317,8 +317,8 @@ module T = struct
           in
           let module Main = Coda_main.Make_coda (Init) in
           let module Run = Run (Config) (Main) in
-          let%bind trust_dir = Unix.mkdtemp (conf_dir ^/ "trust") in
           let receipt_chain_dir_name = conf_dir ^/ "receipt_chain" in
+          let%bind trust_dir = Unix.mkdtemp (conf_dir ^/ "trust") in
           let%bind () = File_system.create_dir receipt_chain_dir_name in
           let receipt_chain_database =
             Coda_base.Receipt_chain_database.create
@@ -352,8 +352,6 @@ module T = struct
             Main.create
               (Main.Config.make ~logger ~trust_system ~net_config
                  ~run_snark_worker:(Option.is_some snark_worker_config)
-                 ~staged_ledger_persistant_location:
-                   (conf_dir ^/ "staged_ledger")
                  ~transaction_pool_disk_location:
                    (conf_dir ^/ "transaction_pool")
                  ~snark_pool_disk_location:(conf_dir ^/ "snark_pool")

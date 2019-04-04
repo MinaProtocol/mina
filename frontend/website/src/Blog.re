@@ -30,15 +30,16 @@ let component = ReasonReact.statelessComponent("Blog");
 
 // Need to dangerouslySetInnerHTML to handle html entities in the markdown
 let createPostHeader = metadata =>
-  <div>
+  <div className={Css.style([Css.width(`percent(100.))])}>
     <h1
       className=Css.(
         style([
+          margin(`zero),
           fontSize(`rem(2.25)),
           Style.Typeface.ibmplexsans,
           fontWeight(`semiBold),
           letterSpacing(`rem(-0.0625)),
-          color(Style.Colors.saville),
+          width(`percent(100.)),
           unsafe("color", "var(--title-color)"),
           media(Style.MediaQuery.notMobile, [fontSize(`rem(3.))]),
         ])
@@ -50,7 +51,10 @@ let createPostHeader = metadata =>
      | Some(subtitle) =>
        <h2
          className=Css.(
-           merge([Style.Body.big, style([fontWeight(`normal)])])
+           merge([
+             Style.Body.big,
+             style([margin(`zero), fontWeight(`normal)]),
+           ])
          )
          dangerouslySetInnerHTML={"__html": subtitle}
        />
@@ -104,7 +108,7 @@ let createPostFadedContents = html =>
             // Needed to prevent the bottom of the text peeking through for some reason.
             bottom(`px(-1)),
             left(`zero),
-            height(`rem(9.5)),
+            height(`rem(4.75)),
             width(`percent(100.)),
             backgroundImage(
               `linearGradient((
@@ -151,6 +155,7 @@ let createPostSummary = ((name, html, metadata)) => {
           selector(
             ":hover + div",
             [
+              color(Style.Colors.hyperlink),
               titleColor(Style.Colors.hyperlink),
               readMoreColor(Style.Colors.hyperlinkHover),
             ],
@@ -167,6 +172,7 @@ let createPostSummary = ((name, html, metadata)) => {
           alignItems(`flexStart),
           flexDirection(`column),
           marginBottom(`rem(4.)),
+          color(Style.Colors.saville),
           titleColor(Style.Colors.saville),
           readMoreColor(Style.Colors.hyperlink),
         ])
