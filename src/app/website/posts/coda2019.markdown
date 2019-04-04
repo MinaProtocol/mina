@@ -1,14 +1,12 @@
 ---
-title: O(1) Labs and Coda in 2019
+title: New O(1) Labs Funding and Coda in 2019
 subtitle: Announcing a fundraise in O(1) Labs and new ways community members will be able to contribute to Coda
 date: 2019-04-02
 author: Evan Shapiro
 author_website: https://twitter.com/evanashapiro
 ---
 
-**Tldr; we raised a new round of funding and over the next few months will be inviting users to become more deeply involved with Coda, a more accessible cryptocurrency. Scroll to the bottom to learn how you can participate.**
-
-<br>
+*Tldr: We raised a new round of funding and over the next few months will be inviting users to become more deeply involved with Coda, a more accessible cryptocurrency. Scroll to the bottom to learn how you can participate.*
 
 We’re excited to announce that last fall, we finished a new round of funding for O(1) Labs! We raised $15M from a group of fantastic investors including Accomplice, Coinbase Ventures, Paradigm, and General Catalyst. These excellent funds, along with a few other high value-add investors are joined by additional support from our amazing seed investors including MetaStable, PolyChain, Electric Capital, and others.
 

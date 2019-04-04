@@ -55,7 +55,7 @@ let make = _ => {
     <A
       name="announcementbar"
       id="announcementbar--anchor"
-      href="/testnet.html"
+      href="/blog/coda2019.html"
       className=Css.(
         style(
           Style.paddingX(`rem(1.25))
