@@ -312,7 +312,11 @@ module type Main_intf = sig
        and type transaction_snark_scan_state := Staged_ledger.Scan_state.t
        and type consensus_local_state := Consensus.Local_state.t
        and type user_command := User_command.t
-       and type diff_mutant := Diff_mutant.e
+       and type diff_mutant :=
+                  ( External_transition.Stable.Latest.t
+                  , State_hash.Stable.Latest.t )
+                  With_hash.t
+                  Diff_mutant.E.t
        and type Extensions.Work.t = Transaction_snark_work.Statement.t
   end
 
@@ -324,10 +328,10 @@ module type Main_intf = sig
       ; propose_keypair: Keypair.t option
       ; run_snark_worker: bool
       ; net_config: Inputs.Net.Config.t
-      ; staged_ledger_persistant_location: string
       ; transaction_pool_disk_location: string
       ; snark_pool_disk_location: string
       ; ledger_db_location: string option
+      ; transition_frontier_location: string option
       ; staged_ledger_transition_backup_capacity: int [@default 10]
       ; time_controller: Inputs.Time.Controller.t
       ; receipt_chain_database: Receipt_chain_database.t
@@ -604,17 +608,7 @@ struct
 
   let max_length = Consensus.Constants.k
 
-  module Diff_hash = struct
-    open Digestif.SHA256
-
-    type t = ctx
-
-    let equal t1 t2 = eq (get t1) (get t2)
-
-    let empty = empty
-
-    let merge t1 string = feed_string t1 string
-  end
+  module Diff_hash = Transition_frontier_persistence.Diff_hash
 
   module Diff_mutant_inputs = struct
     module Diff_hash = Diff_hash
@@ -625,7 +619,7 @@ struct
   module Diff_mutant =
     Transition_frontier_persistence.Diff_mutant.Make (Diff_mutant_inputs)
 
-  module Transition_frontier = Transition_frontier.Make (struct
+  module Transition_frontier_inputs = struct
     module Pending_coinbase_hash = Pending_coinbase_hash
     module Transaction_witness = Transaction_witness
     module Staged_ledger_aux_hash = Staged_ledger_aux_hash
@@ -641,6 +635,20 @@ struct
     module Pending_coinbase = Pending_coinbase
 
     let max_length = max_length
+  end
+
+  module Transition_frontier =
+    Transition_frontier.Make (Transition_frontier_inputs)
+  module Transition_storage =
+    Transition_frontier_persistence.Transition_storage.Make
+      (Transition_frontier_inputs)
+
+  module Transition_frontier_persistence =
+  Transition_frontier_persistence.Make (struct
+    include Transition_frontier_inputs
+    module Transition_frontier = Transition_frontier
+    module Make_worker = Transition_frontier_persistence.Worker.Make_async
+    module Transition_storage = Transition_storage
   end)
 
   module Transaction_pool = struct
