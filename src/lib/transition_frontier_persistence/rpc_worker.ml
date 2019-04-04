@@ -2,8 +2,7 @@ open Core
 open Async
 open Coda_base
 
-module Make (Inputs : Transition_frontier_persistence.Intf.Worker_inputs) =
-struct
+module Make (Inputs : Intf.Worker_inputs) = struct
   open Inputs
 
   module type S = sig
@@ -11,7 +10,7 @@ struct
       Diff_hash.t -> State_hash.t Diff_mutant.E.t -> Diff_hash.t
   end
 
-  module Worker = Transition_frontier_persistence.Worker.Make (Inputs)
+  module Worker = Worker.Make (Inputs)
 
   module Worker_state = struct
     type t = (module S)
@@ -70,7 +69,7 @@ struct
         let functions =
           let f (i, o, f) =
             C.create_rpc
-              ~f:(fun ~worker_state ~conn_state i -> f worker_state i)
+              ~f:(fun ~worker_state ~conn_state:_ i -> f worker_state i)
               ~bin_input:i ~bin_output:o ()
           in
           let open Functions in

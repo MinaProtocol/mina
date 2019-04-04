@@ -317,11 +317,7 @@ module T = struct
           in
           let module Main = Coda_main.Make_coda (Init) in
           let module Run = Run (Config) (Main) in
-          let%bind trust_dir = Unix.mkdtemp (conf_dir ^/ "trust") in
           let receipt_chain_dir_name = conf_dir ^/ "receipt_chain" in
-          let%bind transition_frontier_location =
-            Unix.mkdtemp (conf_dir ^/ "transition_frontier")
-          in
           let%bind trust_dir = Unix.mkdtemp (conf_dir ^/ "trust") in
           let%bind () = File_system.create_dir receipt_chain_dir_name in
           let receipt_chain_database =
@@ -361,7 +357,6 @@ module T = struct
                  ~snark_pool_disk_location:(conf_dir ^/ "snark_pool")
                  ~time_controller ~receipt_chain_database
                  ~snark_work_fee:(Currency.Fee.of_int 0)
-                 ~transition_frontier_location
                  ?propose_keypair:Config.propose_keypair () ~monitor)
           in
           Run.handle_shutdown ~monitor ~conf_dir ~logger coda ;

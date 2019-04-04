@@ -331,7 +331,7 @@ module type Main_intf = sig
       ; transaction_pool_disk_location: string
       ; snark_pool_disk_location: string
       ; ledger_db_location: string option
-      ; transition_frontier_location: string
+      ; transition_frontier_location: string option
       ; staged_ledger_transition_backup_capacity: int [@default 10]
       ; time_controller: Inputs.Time.Controller.t
       ; receipt_chain_database: Receipt_chain_database.t
@@ -639,19 +639,17 @@ struct
 
   module Transition_frontier =
     Transition_frontier.Make (Transition_frontier_inputs)
+  module Transition_storage =
+    Transition_frontier_persistence.Transition_storage.Make
+      (Transition_frontier_inputs)
 
-  module Transition_frontier_persistence = struct
-    module Worker = Transition_frontier_persistence_rpc_worker.Make (struct
-      include Transition_frontier_inputs
-      module Transition_frontier = Transition_frontier
-    end)
-
-    include Transition_frontier_persistence.Make (struct
-      include Transition_frontier_inputs
-      module Transition_frontier = Transition_frontier
-      module Worker = Worker
-    end)
-  end
+  module Transition_frontier_persistence =
+  Transition_frontier_persistence.Make (struct
+    include Transition_frontier_inputs
+    module Transition_frontier = Transition_frontier
+    module Make_worker = Transition_frontier_persistence.Worker.Make_async
+    module Transition_storage = Transition_storage
+  end)
 
   module Transaction_pool = struct
     module Pool = Transaction_pool.Make (Staged_ledger) (Transition_frontier)
