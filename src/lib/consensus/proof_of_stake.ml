@@ -1043,6 +1043,8 @@ module Consensus_state = struct
         module T = struct
           let version = 1
 
+          let __versioned__ = true
+
           (* TODO : version components *)
           type t =
             ( Length.Stable.V1.t
