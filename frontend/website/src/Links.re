@@ -144,37 +144,45 @@ module Panel = {
 };
 
 module Lists = {
-  let articles = posts =>
-    // before the blog posts
-    [Static.whitepaper()]
+  let articles = posts => {
+    let render_post = (name, title) => {
+      name: title,
+      link: "/blog/" ++ name ++ ".html",
+    };
+    let ((name, _, title), ps) = (List.hd(posts), List.tl(posts));
+    [
+      render_post(name, title),
+      Static.whitepaper(),
+      ThirdParty.coindeskTossesBlocks,
+      ThirdParty.codaMediumPost,
+      ThirdParty.tokenDailyQA,
+    ]
+    // top 5 above, rest below the fold
     @ List.map(
         ((name, _, title)) =>
           {name: title, link: "/blog/" ++ name ++ ".html"},
-        posts,
+        ps,
       )
     // after the blog posts
-    @ [
-      Static.snarkette,
-      ThirdParty.codaTheSizeOfTweets,
-      ThirdParty.coindeskTossesBlocks,
-      ThirdParty.tokenDailyQA,
-    ];
+    @ [Static.snarkette, ThirdParty.codaTheSizeOfTweets];
+  };
 
   let richMedia = [
+    Talks.hackSummit2018,
+    Podcasts.tokenTalksInterview,
+    Talks.highLevelLanguage,
+    Podcasts.digIntoRecursive,
+    Podcasts.decentralizationTrojanHorse,
+    // top 5 above, rest below the fold
     Talks.notesFromSnarkomicon,
     Panel.cryptographyCurrency,
-    Podcasts.decentralizationTrojanHorse,
     Talks.snarkyAlgebraicEffects,
     Talks.usingZkConstantSize,
     Panel.zkProofsMindBending,
     Talks.scanningForScans,
     Panel.scalarCapitalSummit,
-    Podcasts.digIntoRecursive,
     Talks.highThroughputSlowSnarks,
     Talks.zkSnarksSuccinctBlockchain,
-    Talks.hackSummit2018,
-    Podcasts.tokenTalksInterview,
-    Talks.highLevelLanguage,
     Talks.snarkyDsl,
   ];
 };

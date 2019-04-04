@@ -392,7 +392,11 @@ let make = (~posts, _children) => {
             justifyContent(`spaceBetween),
             flexWrap(`wrap),
             alignItems(`flexStart),
-            media(Style.MediaQuery.notMobile, [justifyContent(`center)]),
+            maxWidth(`rem(46.0)),
+            media(
+              Style.MediaQuery.notMobile,
+              [justifyContent(`spaceBetween), margin(`auto)],
+            ),
           ])
         )>
         <p
@@ -404,10 +408,7 @@ let make = (~posts, _children) => {
                 marginTop(`zero),
                 marginBottom(`rem(0.5)),
                 width(`rem(22.)),
-                media(
-                  Style.MediaQuery.full,
-                  [marginRight(`rem(3.75)), marginLeft(`rem(3.75))],
-                ),
+                media(Style.MediaQuery.full, []),
               ]),
             ])
           )>
@@ -426,7 +427,7 @@ let make = (~posts, _children) => {
           </a>
           <span> {ReasonReact.string(".")} </span>
         </p>
-        <div>
+        <div className=Css.(style([marginRight(`rem(1.))]))>
           <p
             className=Css.(
               merge([Style.Body.basic, style([marginBottom(`rem(0.75))])])
@@ -449,13 +450,13 @@ let make = (~posts, _children) => {
             <li className=marginBelow>
               <Link
                 link=Links.Forms.compressTheBlockchain
-                message="Helping to compress the blockchain"
+                message="Compressing the blockchain"
               />
             </li>
             <li className=marginBelow>
               <Link
                 link=Links.Forms.mailingList
-                message="Join our mailing list for updates and distribution"
+                message="Join our mailing list"
               />
             </li>
           </ul>

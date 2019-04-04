@@ -12,11 +12,12 @@ module Copy = {
             width(`percent(100.0)),
             maxWidth(`rem(37.0)),
             minWidth(`rem(17.5)),
+            media("(min-width: 30rem)", [minWidth(`rem(24.0))]),
             media(
               Style.MediaQuery.full,
               [width(`percent(60.0)), minWidth(`rem(24.0))],
             ),
-            media("(min-width: 30rem)", [minWidth(`rem(24.0))]),
+            media(Style.MediaQuery.somewhatLarge, [minWidth(`rem(32.))]),
           ])
         )>
         <div
@@ -174,7 +175,10 @@ module Graphic = {
             width(`percent(100.0)),
             maxWidth(`rem(20.0)),
             marginRight(`rem(2.0)),
-            media(Style.MediaQuery.veryLarge, [marginRight(`rem(4.75))]),
+            media(
+              Style.MediaQuery.veryVeryLarge,
+              [marginRight(`rem(4.75))],
+            ),
           ])}>
           <div
             className={style([
@@ -223,8 +227,11 @@ let make = _ => {
           display(`flex),
           justifyContent(`spaceAround),
           flexWrap(`wrap),
-          maxWidth(`rem(69.0)),
-          media(Style.MediaQuery.veryLarge, [margin(`auto)]),
+          maxWidth(`rem(73.0)),
+          media(
+            Style.MediaQuery.somewhatLarge,
+            [marginLeft(`px(80)), marginRight(`px(80))],
+          ),
           media(
             Style.MediaQuery.full,
             [flexWrap(`nowrap), justifyContent(`spaceBetween)],
