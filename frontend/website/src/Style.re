@@ -128,13 +128,19 @@ module Typeface = {
         [
           genFontFace(
             ~fontFamily="PragmataPro",
-            ~src=["/static/font/Essential-PragmataPro-Regular.woff2"],
+            ~src=[
+              "/static/font/Essential-PragmataPro-Regular.woff2",
+              "/static/font/Essential-PragmataPro-Regular.woff",
+            ],
             ~fontWeight=`normal,
             (),
           ),
           genFontFace(
             ~fontFamily="PragmataPro",
-            ~src=["/static/font/PragmataPro-Bold.woff2"],
+            ~src=[
+              "/static/font/PragmataPro-Bold.woff2",
+              "/static/font/PragmataPro-Bold.woff",
+            ],
             ~fontWeight=`bold,
             (),
           ),
@@ -478,3 +484,5 @@ Css.global(
     unsafe("-webkit-margin-after", "0"),
   ],
 );
+
+Css.global("p", Css.[marginTop(`rem(1.)), marginBottom(`rem(1.))]);
