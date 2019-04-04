@@ -269,7 +269,7 @@ let make = _ => {
             paragraphs=[|
               `styled([
                 `emph(
-                  "Build games and other applications that take advantage of the new capabilities enabled by cryptocurrency with just a script tag and a few lines of javascript.",
+                  "Build apps and games that take advantage of the new capabilities enabled by cryptocurrency with just a script tag and a few lines of javascript.",
                 ),
               ]),
               `str(
