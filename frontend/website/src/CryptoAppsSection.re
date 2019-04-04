@@ -40,12 +40,20 @@ module Code = {
                   display(`block),
                   position(`absolute),
                   top(`percent(50.0)),
-                  left(`percent(13.5)), // determined experimentally
                   width(`percent(100.0)),
                   height(`rem(0.125)),
                   backgroundColor(Style.Colors.blueBlue),
                 ],
               ),
+              // super hacky, but the it's the final hour
+              // determined experimentally
+              media("(min-width: 1100px)", [right(`rem(-5.25))]),
+              media("(min-width: 1140px)", [right(`rem(-5.5))]),
+              media("(min-width: 1180px)", [right(`rem(-5.25))]),
+              media("(min-width: 1220px)", [right(`rem(-5.0))]),
+              media("(min-width: 1260px)", [right(`rem(-4.75))]),
+              media("(min-width: 1298px)", [right(`rem(-4.5))]),
+              media("(min-width: 1324px)", [right(`rem(-4.25))]),
             ]),
           ])
         )>
@@ -216,6 +224,7 @@ let make = _ => {
               media(
                 Style.MediaQuery.veryLarge,
                 [
+                  flexWrap(`nowrap),
                   position(`absolute),
                   top(`percent(50.0)),
                   left(`percent(50.0)),
