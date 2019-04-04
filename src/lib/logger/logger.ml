@@ -101,7 +101,11 @@ let log t ~level ~module_ ~location ?(metadata = []) fmt =
         ; metadata= Metadata.extend t.metadata metadata }
       in
       if Message.check_invariants message then
-        Message.to_yojson message |> Yojson.Safe.to_string |> print_endline
+        Message.to_yojson message |> Yojson.Safe.to_string
+        |> Core.print_endline
+        (* Core.print_endline flushes (which may block) and Async.print_endline
+           doesn't. We use the Core version here to ensure complete log messages
+           are delivered in a timely fashion. *)
       else (* TODO: handle gracefully *)
         failwith "invalid log call"
   in

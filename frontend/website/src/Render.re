@@ -42,18 +42,45 @@ let writeStatic = (path, rootComponent) => {
   Node.Fs.writeFileAsUtf8Sync(path ++ ".css", rendered##css);
 };
 
-let posts =
-  Node.Fs.readdirSync("posts")
-  |> Array.to_list
-  |> List.filter(s => Js.String.endsWith(Markdown.suffix, s))
-  |> List.map(fileName => {
-       let length = String.length(fileName) - String.length(Markdown.suffix);
-       let name = String.sub(fileName, 0, length);
-       let path = "posts/" ++ fileName;
-       let (html, content) = Markdown.load(path);
-       let metadata = BlogPost.parseMetadata(content, path);
-       (name, html, metadata);
-     });
+Array.length(Sys.argv) > 2 && Sys.argv[2] == "prod"
+  ? {
+    Links.Cdn.prefix := "https://cdn.codaprotocol.com";
+  }
+  : ();
+
+let asset_regex = [%re {|/\/static\/blog\/.*{png,jpg,svg}/|}];
+
+let posts = {
+  let unsorted =
+    Node.Fs.readdirSync("posts")
+    |> Array.to_list
+    |> List.filter(s => Js.String.endsWith(Markdown.suffix, s))
+    |> List.map(fileName => {
+         let length =
+           String.length(fileName) - String.length(Markdown.suffix);
+         let name = String.sub(fileName, 0, length);
+         let path = "posts/" ++ fileName;
+         let (html, content) = Markdown.load(path);
+         let metadata = BlogPost.parseMetadata(content, path);
+         (name, html, metadata);
+       });
+
+  List.sort(
+    ((_, _, metadata1), (_, _, metadata2)) => {
+      let date1 = Js.Date.fromString(metadata1.BlogPost.date);
+      let date2 = Js.Date.fromString(metadata2.date);
+      let diff = Js.Date.getTime(date2) -. Js.Date.getTime(date1);
+      if (diff > 0.) {
+        1;
+      } else if (diff < 0.) {
+        (-1);
+      } else {
+        0;
+      };
+    },
+    unsorted,
+  );
+};
 
 module Router = {
   type t =
@@ -80,21 +107,31 @@ module Router = {
   };
 };
 
-// TODO: Render job pages
 let jobOpenings = [|
   ("engineering-manager", "Engineering Manager (San Francisco)."),
   ("product-manager", "Product Manager (San Francisco)."),
+  ("community-manager", "Community Manager (San Francisco)."),
   ("senior-frontend-engineer", "Senior Frontend Engineer (San Francisco)."),
   (
     "protocol-reliability-engineer",
     "Protocol Reliability Engineer (San Francisco).",
   ),
   ("protocol-engineer", "Senior Protocol Engineer (San Francisco)."),
+  (
+    "director-of-business-development",
+    "Director of Business Development (San Francisco).",
+  ),
+  ("developer-advocate", "Developer Advocate (San Francisco)."),
 |];
 
 // GENERATE
 
 Rimraf.sync("site");
+
+let blogPage =
+  <Page page=`Blog name="blog" extraHeaders=Blog.extraHeaders>
+    <Wrapped> <Blog posts /> </Wrapped>
+  </Page>;
 
 Router.(
   generateStatic(
@@ -104,8 +141,14 @@ Router.(
         Css_file("fonts", Style.Typeface.Loader.load()),
         File(
           "index",
-          <Page page=`Home name="index" footerColor=Style.Colors.gandalf>
-            <Home />
+          <Page page=`Home name="index" footerColor=Style.Colors.navyBlue>
+            <Home
+              posts={List.map(
+                ((name, html, metadata)) =>
+                  (name, html, metadata.BlogPost.title),
+                posts,
+              )}
+            />
           </Page>,
         ),
         Dir(
@@ -123,7 +166,8 @@ Router.(
                    <Wrapped> <BlogPost name html metadata /> </Wrapped>
                  </Page>,
                )
-             ),
+             )
+          |> Array.append([|File("index", blogPage)|]),
         ),
         Dir(
           "jobs",
@@ -151,9 +195,7 @@ Router.(
         ),
         File(
           "code",
-          <Page page=`Code name="code" extraHeaders=Code.extraHeaders>
-            <Wrapped> <Code /> </Wrapped>
-          </Page>,
+          <Page page=`Code name="code"> <Wrapped> <Code /> </Wrapped> </Page>,
         ),
         File(
           "testnet",
@@ -161,12 +203,7 @@ Router.(
             <Wrapped> <Testnet /> </Wrapped>
           </Page>,
         ),
-        File(
-          "blog",
-          <Page page=`Blog name="blog" extraHeaders=Blog.extraHeaders>
-            <Wrapped> <Blog posts /> </Wrapped>
-          </Page>,
-        ),
+        File("blog", blogPage),
         File(
           "privacy",
           <Page page=`Privacy name="privacy">

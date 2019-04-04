@@ -44,7 +44,7 @@ let overlay = {
   let fullInfo = bg(~row=0.5, ~col=6.0, ~gutter=1.0, ~offset=0.5);
   let fullWidth = fullInfo.backgroundWidth;
   Css.[
-    unsafe("content", ""),
+    contentRule(""),
     position(`absolute),
     height(`percent(100.0)),
     top(`px(0)),

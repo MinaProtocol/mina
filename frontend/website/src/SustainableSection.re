@@ -28,13 +28,12 @@ let make = _children => {
             merge([
               Style.H1.hero,
               style([
-                color(Style.Colors.denimTwo),
+                color(Style.Colors.clover),
                 position(`relative),
                 display(`inlineBlock),
                 marginTop(`zero),
                 marginBottom(`zero),
                 media(Style.MediaQuery.notSmallMobile, [margin(`auto)]),
-                media(Style.MediaQuery.full, [color(Style.Colors.clover)]),
               ]),
             ])
           )>
@@ -67,6 +66,7 @@ let make = _children => {
           style([
             marginTop(`rem(2.375)),
             display(`flex),
+            maxWidth(`rem(81.5)),
             justifyContent(`spaceBetween),
             alignItems(`center),
             flexWrap(`wrapReverse),
@@ -80,16 +80,18 @@ let make = _children => {
         <div
           className=Css.(
             style([
-              marginBottom(`rem(2.375)),
               userSelect(`none),
-              marginRight(`rem(2.0)),
+              media(
+                Style.MediaQuery.notMobile,
+                [marginBottom(`rem(2.375))],
+              ),
             ])
           )>
           <Svg
+            inline=true
             className=Css.(
               style([
-                height(`rem(16.8125)),
-                width(`percent(100.)),
+                width(`rem(18.75)),
                 media(Style.MediaQuery.notMobile, [width(`rem(23.9375))]),
               ])
             )
@@ -104,16 +106,18 @@ let make = _children => {
         <div
           className=Css.(
             style([
-              marginBottom(`rem(2.375)),
               userSelect(`none),
-              marginRight(`rem(2.0)),
+              media(
+                Style.MediaQuery.notMobile,
+                [marginBottom(`rem(2.375))],
+              ),
             ])
           )>
           <Svg
+            inline=true
             className=Css.(
               style([
-                width(`percent(100.)),
-                height(`rem(16.8125)),
+                width(`rem(18.75)),
                 media(Style.MediaQuery.notMobile, [width(`rem(23.9375))]),
               ])
             )
@@ -127,9 +131,23 @@ let make = _children => {
         <div className=Css.(style([marginBottom(`rem(2.375))]))>
           <SideText
             paragraphs=[|
-              "With Coda's constant sized blockchain and energy efficient consensus, Coda will be sustainable even as it scales to thousands of transactions per second, millions of users, and years of transaction history.",
+              `styled([
+                `str(
+                  "With Coda's constant sized blockchain and energy efficient consensus, Coda will be",
+                ),
+                `emph(
+                  " sustainable even as it scales to thousands of transactions per second, millions of users, and years of transactions history",
+                ),
+                `str("."),
+              ]),
+              `str(
+                "Help compress Coda by participating in snarking. Just like mining, with snarking anyone can contribute their compute to the network to help compress the blockchain.",
+              ),
             |]
-            cta="Notify me about participating in consensus"
+            cta={
+              SideText.Cta.copy: {j|Learn more about helping compress Coda's\u00A0blockchain|j},
+              link: Links.Forms.compressTheBlockchain,
+            }
           />
         </div>
       </div>

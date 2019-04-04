@@ -46,7 +46,11 @@ module Footer = {
                 maxWidth(`rem(96.0)),
                 marginLeft(`auto),
                 marginRight(`auto),
-                ...Style.paddingY(`rem(2.)),
+                // Not using Style.paddingY here because we need the background
+                // color the same (so can't use margin), but we also need some
+                // top spacing.
+                paddingTop(`rem(4.75)),
+                paddingBottom(`rem(2.)),
               ]
               @ Style.paddingX(`rem(4.0)),
             )
@@ -88,11 +92,23 @@ module Footer = {
               <Link link="/privacy.html" name="privacy">
                 {ReasonReact.string("Privacy Policy")}
               </Link>
-              <Link link="/jobs.html" name="hiring" last=true>
+              <Link link="/jobs.html" name="hiring">
                 {ReasonReact.string("We're Hiring")}
+              </Link>
+              <Link link="/static/presskit.zip" name="presskit" last=true>
+                {ReasonReact.string("Press Kit")}
               </Link>
             </ul>
           </div>
+          <p
+            className=Css.(
+              merge([
+                Style.Body.small,
+                style([textAlign(`center), color(Style.Colors.saville)]),
+              ])
+            )>
+            {ReasonReact.string({j|© 2019 O(1) Labs|j})}
+          </p>
         </section>
       </footer>,
   };
@@ -149,8 +165,11 @@ let make =
           <div
             className=Css.(
               style([
-                marginTop(`rem(0.5)),
-                media(Style.MediaQuery.full, [marginTop(`rem(2.0))]),
+                marginTop(`rem(1.0)),
+                media(
+                  Style.MediaQuery.statusLiftAlways,
+                  [marginTop(`rem(2.0))],
+                ),
               ])
             )>
             <Nav page />

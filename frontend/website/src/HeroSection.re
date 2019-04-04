@@ -36,7 +36,7 @@ module Copy = {
               ])
             )>
             {ReasonReact.string(
-               "A cryptocurrency with a tiny, portable blockchain.",
+               {j|A cryptocurrency with a tiny portable blockchain.|j},
              )}
           </h1>
           <p
@@ -45,7 +45,7 @@ module Copy = {
                 Style.Body.big,
                 style([
                   marginTop(`rem(2.0)),
-                  maxWidth(`rem(28.0)),
+                  maxWidth(`rem(30.0)),
                   // align with the grid
                   media(
                     Style.MediaQuery.full,
@@ -56,17 +56,22 @@ module Copy = {
             )>
             <span>
               {ReasonReact.string(
-                 "Coda is the first cryptocurrency with a succinct blockchain. Our lightweight blockchain means ",
+                 "Coda's portable blockchain makes it dramatically easier to develop modern usable crypto apps that work directly from the browser and enables more inclusive, sustainable consensus.",
+               )}
+            </span>
+            <br />
+            <br />
+            <span>
+              {ReasonReact.string(
+                 "Coda achieves this by substituting the traditional blockchain for a tiny zero knowledge proof, ",
                )}
             </span>
             <span className=Style.Body.big_semibold>
-              {ReasonReact.string("anyone can use Coda directly")}
-            </span>
-            <span>
               {ReasonReact.string(
-                 " from any device, in less data than a few tweets.",
+                 "enabling the protocol state to be instantly verified by any device",
                )}
             </span>
+            <span> {ReasonReact.string(".")} </span>
           </p>
         </div>
       </div>,
@@ -168,6 +173,8 @@ module Graphic = {
           className={style([
             width(`percent(100.0)),
             maxWidth(`rem(20.0)),
+            marginRight(`rem(2.0)),
+            media(Style.MediaQuery.veryLarge, [marginRight(`rem(4.75))]),
           ])}>
           <div
             className={style([
@@ -217,7 +224,11 @@ let make = _ => {
           justifyContent(`spaceAround),
           flexWrap(`wrap),
           maxWidth(`rem(69.0)),
-          media(Style.MediaQuery.full, [flexWrap(`nowrap)]),
+          media(Style.MediaQuery.veryLarge, [margin(`auto)]),
+          media(
+            Style.MediaQuery.full,
+            [flexWrap(`nowrap), justifyContent(`spaceBetween)],
+          ),
         ])
       )>
       <Copy />

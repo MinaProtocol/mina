@@ -128,6 +128,7 @@ module Figure = {
   let make = (~captionColor, ~link, ~dims, ~caption, ~alt, _children) => {
     ...component,
     render: _self => {
+      let (w, h) = dims;
       <figure
         className=Css.(
           style([
@@ -140,10 +141,22 @@ module Figure = {
             flexDirection(`column),
             alignItems(`center),
             justifyContent(`center),
-            width(`rem(20.625)),
+            width(`rem(19.5)),
+            media(Style.MediaQuery.notMobile, [width(`rem(20.625))]),
           ])
         )>
-        <Svg dims link alt />
+        <Svg
+          className=Css.(
+            style([
+              // on mobile we want to square our figures with the height size
+              width(`rem(h)),
+              media(Style.MediaQuery.notMobile, [width(`rem(w))]),
+            ])
+          )
+          dims
+          link
+          alt
+        />
         <figcaption
           className=Css.(
             merge([
@@ -208,10 +221,22 @@ let make = _ => {
             className=Css.(style([display(`flex), justifyContent(`center)]))>
             <SideText
               paragraphs=[|
-                "Simple, fair consensus. Participation is proportional to how much stake you have in the protocol with no lockups, no forced delegation, and low bandwidth requirements.",
-                "With just a small stake, you'll be able to participate directly in consensus and earn Coda.",
+                `styled([
+                  `emph(
+                    "Simple, fair consensus designed so you can participate",
+                  ),
+                  `str(
+                    ". Participation is proportional to how much stake you have in the protocol with no lockups, no forced delegation, and low bandwidth requirements.",
+                  ),
+                ]),
+                `str(
+                  "With just a small stake you'll be able to participate directly in consensus.",
+                ),
               |]
-              cta="Stay updated about participating in consensus"
+              cta={
+                SideText.Cta.copy: {j|Sign up to learn more about about staking with\u00A0Coda|j},
+                link: Links.Forms.participateInConsensus,
+              }
             />
           </div>
           <Legend
