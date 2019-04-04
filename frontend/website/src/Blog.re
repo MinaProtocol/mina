@@ -104,7 +104,7 @@ let createPostFadedContents = html =>
             // Needed to prevent the bottom of the text peeking through for some reason.
             bottom(`px(-1)),
             left(`zero),
-            height(`rem(9.5)),
+            height(`rem(4.75)),
             width(`percent(100.)),
             backgroundImage(
               `linearGradient((
