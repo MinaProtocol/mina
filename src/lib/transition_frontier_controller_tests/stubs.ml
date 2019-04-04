@@ -520,8 +520,6 @@ struct
     type t =
       {logger: Logger.t; table: Transition_frontier.t Network_peer.Peer.Table.t}
 
-    type protocol_state_hash = State_hash.t
-
     let create ~logger ~peers = {logger; table= peers}
 
     let random_peers {table; _} num_peers =
@@ -547,22 +545,8 @@ struct
                  pending_coinbase at hash")
            (let open Option.Let_syntax in
            let%bind frontier = Hashtbl.find table peer in
-           let%map breadcrumb =
-             mplus
-               (Transition_frontier.find frontier hash)
-               (Transition_frontier.find_in_root_history frontier hash)
-           in
-           let staged_ledger =
-             Transition_frontier.Breadcrumb.staged_ledger breadcrumb
-           in
-           let scan_state = Staged_ledger.scan_state staged_ledger in
-           let merkle_root =
-             Staged_ledger.ledger staged_ledger |> Ledger.merkle_root
-           in
-           let pending_coinbases =
-             Staged_ledger.pending_coinbase_collection staged_ledger
-           in
-           (scan_state, merkle_root, pending_coinbases))
+           Sync_handler.get_staged_ledger_aux_and_pending_coinbases_at_hash
+             ~frontier hash)
 
     let get_ancestry {table; logger} peer consensus_state =
       Deferred.return

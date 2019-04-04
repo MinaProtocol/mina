@@ -15,6 +15,8 @@ module type Inputs_intf = sig
      and type transition_frontier := Transition_frontier.t
      and type syncable_ledger_query := Sync_ledger.Query.t
      and type syncable_ledger_answer := Sync_ledger.Answer.t
+     and type pending_coinbases := Pending_coinbase.t
+     and type parallel_scan_state := Staged_ledger.Scan_state.t
 
   module Transition_handler :
     Transition_handler_intf
@@ -31,7 +33,6 @@ module type Inputs_intf = sig
     Network_intf
     with type peer := Network_peer.Peer.t
      and type state_hash := State_hash.t
-     and type protocol_state_hash := State_hash.t
      and type external_transition := External_transition.t
      and type consensus_state := Consensus.Consensus_state.Value.t
      and type state_body_hash := State_body_hash.t

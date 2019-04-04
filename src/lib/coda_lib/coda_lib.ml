@@ -36,8 +36,6 @@ module type Network_intf = sig
 
   type state_hash
 
-  type protocol_state_hash
-
   type state_body_hash
 
   val states :
@@ -80,7 +78,7 @@ module type Network_intf = sig
 
   val create :
        Config.t
-    -> get_staged_ledger_aux_and_pending_coinbases_at_hash:(   protocol_state_hash
+    -> get_staged_ledger_aux_and_pending_coinbases_at_hash:(   state_hash
                                                                Envelope
                                                                .Incoming
                                                                .t
@@ -336,7 +334,6 @@ module type Inputs_intf = sig
      and type sync_ledger_answer := Coda_base.Sync_ledger.Answer.t
      and type time := Time.t
      and type state_hash := Coda_base.State_hash.t
-     and type protocol_state_hash := Protocol_state_hash.t
      and type state_body_hash := State_body_hash.t
      and type consensus_state := Consensus_mechanism.Consensus_state.Value.t
      and type pending_coinbases := Pending_coinbase.t
@@ -405,6 +402,8 @@ module type Inputs_intf = sig
      and type transition_frontier := Transition_frontier.t
      and type syncable_ledger_query := Coda_base.Sync_ledger.Query.t
      and type syncable_ledger_answer := Coda_base.Sync_ledger.Answer.t
+     and type pending_coinbases := Pending_coinbase.t
+     and type parallel_scan_state := Staged_ledger.Scan_state.t
 end
 
 module Make (Inputs : Inputs_intf) = struct
@@ -726,7 +725,6 @@ module Make (Inputs : Inputs_intf) = struct
                 .listen_to_frontier_broadcast_pipe ~logger:config.logger
                   frontier_broadcast_pipe_r persistence
                 |> don't_wait_for ) ;
-            let mplus ma mb = if Option.is_some ma then ma else mb in              
             let%bind net =
               Net.create config.net_config
                 ~get_staged_ledger_aux_and_pending_coinbases_at_hash:
@@ -738,22 +736,9 @@ module Make (Inputs : Inputs_intf) = struct
                   let%bind frontier =
                     Broadcast_pipe.Reader.peek frontier_broadcast_pipe_r
                   in
-                  let%map breadcrumb =
-                    mplus
-                      (Transition_frontier.find frontier hash)
-                      (Transition_frontier.find_in_root_history frontier hash)
-                  in
-                  let staged_ledger =
-                    Transition_frontier.Breadcrumb.staged_ledger breadcrumb
-                  in
-                  let scan_state = Staged_ledger.scan_state staged_ledger in
-                  let merkle_root =
-                    Ledger.merkle_root (Staged_ledger.ledger staged_ledger)
-                  in
-                  let pending_coinbase =
-                    Staged_ledger.pending_coinbase_collection staged_ledger
-                  in
-                  (scan_state, merkle_root, pending_coinbase) )
+                  Sync_handler
+                  .get_staged_ledger_aux_and_pending_coinbases_at_hash
+                    ~frontier hash )
                 ~answer_sync_ledger_query:(fun query_env ->
                   let open Deferred.Or_error.Let_syntax in
                   let ledger_hash, _ = Envelope.Incoming.data query_env in

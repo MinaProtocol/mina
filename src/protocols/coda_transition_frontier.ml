@@ -162,8 +162,6 @@ module type Network_intf = sig
 
   type state_hash
 
-  type protocol_state_hash
-
   type ledger_hash
 
   type pending_coinbases
@@ -191,7 +189,7 @@ module type Network_intf = sig
   val get_staged_ledger_aux_and_pending_coinbases_at_hash :
        t
     -> peer
-    -> protocol_state_hash
+    -> state_hash
     -> (parallel_scan_state * ledger_hash * pending_coinbases)
        Deferred.Or_error.t
 
@@ -646,6 +644,10 @@ module type Sync_handler_intf = sig
 
   type syncable_ledger_answer
 
+  type parallel_scan_state
+
+  type pending_coinbases
+
   val answer_query :
        frontier:transition_frontier
     -> ledger_hash
@@ -658,6 +660,11 @@ module type Sync_handler_intf = sig
        frontier:transition_frontier
     -> state_hash
     -> external_transition Non_empty_list.t option
+
+  val get_staged_ledger_aux_and_pending_coinbases_at_hash :
+       frontier:transition_frontier
+    -> state_hash
+    -> (parallel_scan_state * ledger_hash * pending_coinbases) Option.t
 end
 
 module type Root_prover_intf = sig
