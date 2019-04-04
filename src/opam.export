@@ -30,6 +30,7 @@ roots: [
   "ppx_deriving_yojson.3.3"
   "re2.v0.11.0"
   "rpc_parallel.v0.11.0"
+  "core_extended.v0.11.0"
   "utop.2.2.0"
   "virtual_dom.v0.11.0"
   "yojson.1.5.0"
