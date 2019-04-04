@@ -17,9 +17,15 @@ module Rpcs (Inputs : sig
     Protocols.Coda_pow.Staged_ledger_aux_hash_intf
 
   module Staged_ledger_aux : sig
-    module Stable : sig
-      module V1 : Binable.S
-    end
+    type t
+
+    module Stable :
+      sig
+        module V1 : sig
+          type t [@@deriving bin_io, version]
+        end
+      end
+      with type V1.t = t
   end
 
   module Ledger_hash : Protocols.Coda_pow.Ledger_hash_intf
@@ -361,7 +367,7 @@ module type Inputs_intf = sig
     module Stable :
       sig
         module V1 : sig
-          type t [@@deriving bin_io]
+          type t [@@deriving bin_io, version]
         end
       end
       with type V1.t = t

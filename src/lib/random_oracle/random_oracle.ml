@@ -28,9 +28,7 @@ module Digest = struct
   module Stable = struct
     module V1 = struct
       module T = struct
-        let version = 1
-
-        type t = string [@@deriving sexp, bin_io, compare, hash]
+        type t = string [@@deriving sexp, bin_io, compare, hash, version]
       end
 
       include T

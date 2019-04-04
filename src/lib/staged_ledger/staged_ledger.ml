@@ -746,7 +746,7 @@ end = struct
     in
     match second with
     | None ->
-        (*Single partition: 
+        (*Single partition:
          1.Check if a new stack is required by going through the latest transactions. If any coinbases in it, then get the latest stack otheriwse create a new stack [working_stack]
          2.create data for enqueuing into the scan state *)
         let current_base_jobs =
@@ -775,7 +775,7 @@ end = struct
         (is_new_stack, data, updated_stack)
     | Some _ ->
         (*Two partition:
-        Assumption: Only one of the partition will have coinbase transaction(s)in it. 
+        Assumption: Only one of the partition will have coinbase transaction(s)in it.
          1. Get the latest stack for coinbase in the first set of transactions
          2. get the first set of scan_state data using the above stack
          3. get a new stack for the second parition because the second set of transactions would start from the begining of the scan_state
@@ -1638,6 +1638,11 @@ let%test_module "test" =
         module Stable = struct
           module V1 = struct
             type t = unit [@@deriving bin_io, sexp, yojson]
+
+            (* test code, don't need actual versioning *)
+            let version = 1
+
+            let __versioned__ = true
           end
 
           module Latest = V1
@@ -1661,15 +1666,20 @@ let%test_module "test" =
 
         type txn_fee = int [@@deriving sexp, bin_io, compare, eq, yojson]
 
-        module T = struct
-          type t = txn_amt * txn_fee
-          [@@deriving sexp, bin_io, compare, eq, yojson]
+        module Stable = struct
+          module V1 = struct
+            type t = txn_amt * txn_fee
+            [@@deriving sexp, bin_io, compare, eq, yojson]
+          end
+
+          module Latest = V1
         end
 
-        include T
+        type t = Stable.Latest.t [@@deriving sexp, compare, eq, yojson]
 
         module With_valid_signature = struct
-          type t = T.t [@@deriving sexp, bin_io, compare, eq, yojson]
+          type t = Stable.Latest.t
+          [@@deriving sexp, bin_io, compare, eq, yojson]
         end
 
         let check : t -> With_valid_signature.t option = fun i -> Some i
@@ -1941,6 +1951,11 @@ let%test_module "test" =
               ; proof_type: [`Base | `Merge] }
             [@@deriving sexp, bin_io, compare, hash, yojson, eq]
 
+            (* test code, don't need to assure this type is actually versioned *)
+            let version = 1
+
+            let __versioned__ = true
+
             let merge s1 s2 =
               let open Or_error.Let_syntax in
               let%bind _ =
@@ -2041,6 +2056,11 @@ let%test_module "test" =
           module Stable = struct
             module V1 = struct
               type t = transaction [@@deriving sexp, bin_io]
+
+              (* test code, don't need to assure this type is actually versioned *)
+              let version = 1
+
+              let __versioned__ = true
             end
 
             module Latest = V1
@@ -2242,16 +2262,14 @@ let%test_module "test" =
       end
 
       module Staged_ledger_diff = struct
-        (* TODO : version *)
         type completed_work = Transaction_snark_work.Stable.V1.t
         [@@deriving sexp, bin_io, compare, yojson]
 
-        (* TODO : version *)
         type completed_work_checked =
           Transaction_snark_work.Checked.Stable.V1.t
         [@@deriving sexp, bin_io, compare, yojson]
 
-        type user_command = User_command.t
+        type user_command = User_command.Stable.V1.t
         [@@deriving sexp, bin_io, compare, yojson]
 
         type fee_transfer_single = Fee_transfer.Single.Stable.V1.t
@@ -2388,7 +2406,20 @@ let%test_module "test" =
       end
 
       module Transaction_witness = struct
-        type t = {ledger: Sparse_ledger.t} [@@deriving bin_io, sexp]
+        module Stable = struct
+          module V1 = struct
+            type t = {ledger: Sparse_ledger.t} [@@deriving bin_io, sexp]
+
+            (* test code, don't need to assure this type is actually versioned *)
+            let version = 1
+
+            let __versioned__ = true
+          end
+
+          module Latest = V1
+        end
+
+        type t = Stable.Latest.t = {ledger: Sparse_ledger.t} [@@deriving sexp]
       end
     end
 

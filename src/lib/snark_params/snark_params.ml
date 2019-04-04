@@ -297,6 +297,9 @@ module Tock = struct
   module Proof = struct
     include Tock0.Proof
 
+    (* TODO : follow this include all the way and really version it *)
+    let __versioned__ = true
+
     let dummy = Dummy_values.Tock.GrothMaller17.proof
   end
 
@@ -353,7 +356,7 @@ module Tick = struct
 
     let size_in_triples = Int.((size_in_bits + 2) / 3)
 
-    (* for now, assert this type, derived from snarky, is versioned; can we 
+    (* for now, assert this type, derived from snarky, is versioned; can we
        prevent it changing?
      *)
     let __versioned__ = true
