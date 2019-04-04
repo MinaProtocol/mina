@@ -177,14 +177,14 @@ let dot = {
   str({js|·|js});
 };
 
-let extraHeaders =
+let extraHeaders = () =>
   <>
     <link
       rel="stylesheet"
       type_="text/css"
       href={Links.Cdn.url("/static/css/careers.css")}
     />
-    Head.legacyStylesheets
+    {Head.legacyStylesheets()}
   </>;
 
 let component = ReasonReact.statelessComponent("Career");

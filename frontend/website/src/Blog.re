@@ -1,4 +1,4 @@
-let extraHeaders =
+let extraHeaders = () =>
   <>
     <link
       rel="stylesheet"
@@ -19,7 +19,7 @@ let extraHeaders =
       crossOrigin="anonymous"
     />
     <link rel="stylesheet" href={Links.Cdn.url("/static/css/blog.css")} />
-    Head.legacyStylesheets
+    {Head.legacyStylesheets()}
   </>;
 
 let titleColor = c => Css.unsafe("--title-color", Style.Colors.string(c));

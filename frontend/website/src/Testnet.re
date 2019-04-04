@@ -1,4 +1,4 @@
-let extraHeaders = <> Head.legacyStylesheets </>;
+let extraHeaders = () => <> {Head.legacyStylesheets()} </>;
 
 {
   open Css;
