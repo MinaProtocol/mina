@@ -5,8 +5,6 @@ open Module_version
 module Stable = struct
   module V1 = struct
     module T = struct
-      let version = 1
-
       type t =
         { fee: Currency.Fee.Stable.V1.t
         ; prover: Public_key.Compressed.Stable.V1.t }

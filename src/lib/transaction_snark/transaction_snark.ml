@@ -97,8 +97,6 @@ module Statement = struct
   module Stable = struct
     module V1 = struct
       module T = struct
-        let version = 1
-
         type t =
           { source: Coda_base.Frozen_ledger_hash.Stable.V1.t
           ; target: Coda_base.Frozen_ledger_hash.Stable.V1.t
@@ -181,8 +179,6 @@ end
 module Stable = struct
   module V1 = struct
     module T = struct
-      let version = 1
-
       type t =
         { source: Frozen_ledger_hash.Stable.V1.t
         ; target: Frozen_ledger_hash.Stable.V1.t

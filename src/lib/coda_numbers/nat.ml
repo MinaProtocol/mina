@@ -70,7 +70,7 @@ module type F = functor
   -> S with type t := N.t and module Bits := Bits
 
 module Make (N : sig
-  type t [@@deriving bin_io, sexp, compare, hash]
+  type t [@@deriving bin_io, sexp, compare, hash, version {unnumbered}]
 
   include Unsigned_extended.S with type t := t
 

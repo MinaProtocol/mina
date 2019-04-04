@@ -26,9 +26,7 @@ module type Versioned_module_intf = sig
 end
 
 module type Version_intf = sig
-  type t [@@deriving bin_io]
-
-  val version : int
+  type t [@@deriving bin_io, version]
 end
 
 (* functor to create a registrar that can
@@ -86,7 +84,7 @@ module Make (Module_decl : Module_decl_intf) = struct
       registered := (module Versioned_module) :: !registered
 
     module With_version = struct
-      type nonrec t = {version: int; t: Versioned_module.t} [@@deriving bin_io]
+      type t = {version: int; t: Versioned_module.t} [@@deriving bin_io]
 
       let create t = {version; t}
     end
@@ -96,7 +94,7 @@ end
 (* functor to generate With_version and bin_io boilerplate *)
 module Make_version (Version : Version_intf) = struct
   module With_version = struct
-    type nonrec t = {version: int; t: Version.t} [@@deriving bin_io]
+    type t = {version: int; t: Version.t} [@@deriving bin_io]
 
     let create t = {version= Version.version; t}
   end
@@ -155,10 +153,8 @@ let%test_module "Test versioned modules" =
 
       module V2 = struct
         module T = struct
-          let version = 2
-
           (* string, int swapped in tuple from V1's t *)
-          type t = string * int [@@deriving bin_io]
+          type t = string * int [@@deriving bin_io, version]
         end
 
         include T
@@ -169,9 +165,7 @@ let%test_module "Test versioned modules" =
 
       module V1 = struct
         module T = struct
-          let version = 1
-
-          type t = int * string [@@deriving bin_io]
+          type t = int * string [@@deriving bin_io, version]
         end
 
         include T

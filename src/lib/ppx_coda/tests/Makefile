@@ -25,6 +25,9 @@ positive-tests : unexpired.ml
 	@ echo -n "Versioned type, should succeed..."
 	@ dune build versioned_good.cma ${REDIRECT}
 	@ echo "OK"
+	@ echo -n "Versioned type with unnumbered, should succeed..."
+	@ dune build versioned_good_unnumbered.cma ${REDIRECT}
+	@ echo "OK"
 	@ echo -n "Versioned type_constructors type, should succeed..."
 	@ dune build versioned_good_type_constructors.cma ${REDIRECT}
 	@ echo "OK"
@@ -61,6 +64,9 @@ negative-tests :
 	@ echo "OK"
 	@ echo -n "Versioned type, bad module structure, should fail..."
 	@ ! dune build versioned_bad_module_structure.cma ${REDIRECT}
+	@ echo "OK"
+	@ echo -n "Versioned type, unnumbered, invalid use of 'version', should fail..."
+	@ ! dune build versioned_bad_unnumbered.cma ${REDIRECT}
 	@ echo "OK"
 	@ echo -n "Versioned type, bad wrapped module structure, should fail..."
 	@ ! dune build versioned_bad_wrapped_module_structure.cma ${REDIRECT}

@@ -277,8 +277,6 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
       module Stable = struct
         module V1 = struct
           module T = struct
-            let version = 1
-
             type t = {common: Common.Stable.V1.t; body: Body.Stable.V1.t}
             [@@deriving sexp, bin_io, version]
           end
@@ -342,8 +340,6 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
       module Stable = struct
         module V1 = struct
           module T = struct
-            let version = 1
-
             type t =
               { coinbase: Coinbase.Stable.V1.t
               ; previous_empty_accounts: Public_key.Compressed.Stable.V1.t list
@@ -378,8 +374,6 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
       module Stable = struct
         module V1 = struct
           module T = struct
-            let version = 1
-
             type t =
               | User_command of User_command_undo.Stable.V1.t
               | Fee_transfer of Fee_transfer_undo.Stable.V1.t
@@ -414,8 +408,6 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
     module Stable = struct
       module V1 = struct
         module T = struct
-          let version = 1
-
           type t =
             { previous_hash: Ledger_hash.Stable.V1.t
             ; varying: Varying.Stable.V1.t }

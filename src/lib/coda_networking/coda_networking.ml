@@ -22,7 +22,7 @@ module Rpcs (Inputs : sig
     module Stable :
       sig
         module V1 : sig
-          type t [@@deriving bin_io, version]
+          type t [@@deriving bin_io, version {unnumbered}]
         end
       end
       with type V1.t = t
