@@ -26,9 +26,13 @@ struct
   module Ledger_proof = struct
     module Stable = struct
       module V1 = struct
-        type t =
-          Ledger_proof_statement.Stable.V1.t * Sok_message.Digest.Stable.V1.t
-        [@@deriving sexp, bin_io, yojson]
+        module T = struct
+          type t =
+            Ledger_proof_statement.Stable.V1.t * Sok_message.Digest.Stable.V1.t
+          [@@deriving sexp, bin_io, yojson, version]
+        end
+
+        include T
       end
 
       module Latest = V1

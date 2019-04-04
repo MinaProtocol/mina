@@ -6,7 +6,8 @@ module Digest : sig
 
   module Stable : sig
     module V1 : sig
-      type nonrec t = t [@@deriving bin_io, sexp, compare, hash, yojson]
+      type nonrec t = t
+      [@@deriving bin_io, sexp, compare, hash, yojson, version]
 
       include Comparable.S with type t := t
     end

@@ -4,7 +4,7 @@ module Payment = User_command
 
 module Tree_node = struct
   (* TODO : version *)
-  type t = (Receipt.Chain_hash.Stable.V1.t, Payment.t) Tree_node.t
+  type t = (Receipt.Chain_hash.Stable.V1.t, Payment.Stable.V1.t) Tree_node.t
   [@@deriving bin_io]
 end
 
