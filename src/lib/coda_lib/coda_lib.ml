@@ -78,10 +78,16 @@ module type Network_intf = sig
 
   val create :
        Config.t
-    -> get_staged_ledger_aux_at_hash:(   staged_ledger_hash Envelope.Incoming.t
-                                      -> (parallel_scan_state * ledger_hash)
-                                         option
-                                         Deferred.t)
+    -> get_staged_ledger_aux_and_pending_coinbases_at_hash:(   state_hash
+                                                               Envelope
+                                                               .Incoming
+                                                               .t
+                                                            -> ( parallel_scan_state
+                                                               * ledger_hash
+                                                               * pending_coinbases
+                                                               )
+                                                               Deferred.Option
+                                                               .t)
     -> answer_sync_ledger_query:(   (ledger_hash * sync_ledger_query)
                                     Envelope.Incoming.t
                                  -> sync_ledger_answer Deferred.Or_error.t)
@@ -89,12 +95,9 @@ module type Network_intf = sig
                            -> state_with_witness Non_empty_list.t
                               Deferred.Option.t)
     -> get_ancestry:(   consensus_state Envelope.Incoming.t
-                     -> ( ( state_with_witness
-                          , state_body_hash list * state_with_witness )
-                          Proof_carrying_data.t
-                        * parallel_scan_state
-                        * ledger_hash
-                        * pending_coinbases )
+                     -> ( state_with_witness
+                        , state_body_hash list * state_with_witness )
+                        Proof_carrying_data.t
                         Deferred.Option.t)
     -> t Deferred.t
 end
@@ -399,6 +402,8 @@ module type Inputs_intf = sig
      and type transition_frontier := Transition_frontier.t
      and type syncable_ledger_query := Coda_base.Sync_ledger.Query.t
      and type syncable_ledger_answer := Coda_base.Sync_ledger.Answer.t
+     and type pending_coinbases := Pending_coinbase.t
+     and type parallel_scan_state := Staged_ledger.Scan_state.t
 end
 
 module Make (Inputs : Inputs_intf) = struct
@@ -722,8 +727,18 @@ module Make (Inputs : Inputs_intf) = struct
                 |> don't_wait_for ) ;
             let%bind net =
               Net.create config.net_config
-                ~get_staged_ledger_aux_at_hash:(fun _hash ->
-                  failwith "shouldn't be necessary right now?" )
+                ~get_staged_ledger_aux_and_pending_coinbases_at_hash:
+                  (fun enveloped_hash ->
+                  let hash = Envelope.Incoming.data enveloped_hash in
+                  Deferred.return
+                  @@
+                  let open Option.Let_syntax in
+                  let%bind frontier =
+                    Broadcast_pipe.Reader.peek frontier_broadcast_pipe_r
+                  in
+                  Sync_handler
+                  .get_staged_ledger_aux_and_pending_coinbases_at_hash
+                    ~frontier hash )
                 ~answer_sync_ledger_query:(fun query_env ->
                   let open Deferred.Or_error.Let_syntax in
                   let ledger_hash, _ = Envelope.Incoming.data query_env in
@@ -752,32 +767,14 @@ module Make (Inputs : Inputs_intf) = struct
                   @@ Sync_handler.transition_catchup ~frontier hash )
                 ~get_ancestry:(fun query_env ->
                   let consensus_state = Envelope.Incoming.data query_env in
-                  let result =
-                    let open Option.Let_syntax in
-                    let%bind frontier =
-                      Broadcast_pipe.Reader.peek frontier_broadcast_pipe_r
-                    in
-                    let%map peer_root_with_proof =
-                      Root_prover.prove ~logger:config.logger ~frontier
-                        consensus_state
-                    in
-                    let staged_ledger =
-                      Transition_frontier.Breadcrumb.staged_ledger
-                        (Transition_frontier.root frontier)
-                    in
-                    let scan_state = Staged_ledger.scan_state staged_ledger in
-                    let pending_coinbase_collection =
-                      Staged_ledger.pending_coinbase_collection staged_ledger
-                    in
-                    let merkle_root =
-                      Ledger.merkle_root (Staged_ledger.ledger staged_ledger)
-                    in
-                    ( peer_root_with_proof
-                    , scan_state
-                    , merkle_root
-                    , pending_coinbase_collection )
+                  Deferred.return
+                  @@
+                  let open Option.Let_syntax in
+                  let%bind frontier =
+                    Broadcast_pipe.Reader.peek frontier_broadcast_pipe_r
                   in
-                  Deferred.return result )
+                  Root_prover.prove ~logger:config.logger ~frontier
+                    consensus_state )
             in
             let valid_transitions =
               Transition_router.run ~logger:config.logger

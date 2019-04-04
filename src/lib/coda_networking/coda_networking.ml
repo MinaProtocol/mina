@@ -17,9 +17,15 @@ module Rpcs (Inputs : sig
     Protocols.Coda_pow.Staged_ledger_aux_hash_intf
 
   module Staged_ledger_aux : sig
-    module Stable : sig
-      module V1 : Binable.S
-    end
+    type t
+
+    module Stable :
+      sig
+        module V1 : sig
+          type t [@@deriving bin_io, version]
+        end
+      end
+      with type V1.t = t
   end
 
   module Ledger_hash : Protocols.Coda_pow.Ledger_hash_intf
@@ -39,17 +45,19 @@ struct
 
   *)
 
-  module Get_staged_ledger_aux_at_hash = struct
+  module Get_staged_ledger_aux_and_pending_coinbases_at_hash = struct
     module T = struct
-      let name = "get_staged_ledger_aux_at_hash"
+      let name = "get_staged_ledger_aux_and_pending_coinbases_at_hash"
 
       module T = struct
         (* "master" types, do not change *)
-        type query =
-          Staged_ledger_hash.Stable.V1.t Envelope.Incoming.Stable.V1.t
+        type query = State_hash.Stable.V1.t Envelope.Incoming.Stable.V1.t
 
         type response =
-          (Staged_ledger_aux.Stable.V1.t * Ledger_hash.Stable.V1.t) option
+          ( Staged_ledger_aux.Stable.V1.t
+          * Ledger_hash.Stable.V1.t
+          * Pending_coinbase.t )
+          option
       end
 
       module Caller = T
@@ -67,12 +75,14 @@ struct
 
     module V1 = struct
       module T = struct
-        type query =
-          Staged_ledger_hash.Stable.V1.t Envelope.Incoming.Stable.V1.t
+        type query = State_hash.Stable.V1.t Envelope.Incoming.Stable.V1.t
         [@@deriving bin_io]
 
         type response =
-          (Staged_ledger_aux.Stable.V1.t * Ledger_hash.Stable.V1.t) option
+          ( Staged_ledger_aux.Stable.V1.t
+          * Ledger_hash.Stable.V1.t
+          * Pending_coinbase.t )
+          option
         [@@deriving bin_io]
 
         let version = 1
@@ -204,12 +214,9 @@ struct
         [@@deriving sexp]
 
         type response =
-          ( ( External_transition.Stable.V1.t
-            , State_body_hash.t list * External_transition.t )
-            Proof_carrying_data.Stable.V1.t
-          * Staged_ledger_aux.Stable.V1.t
-          * Ledger_hash.Stable.V1.t
-          * Pending_coinbase.t )
+          ( External_transition.Stable.V1.t
+          , State_body_hash.t list * External_transition.t )
+          Proof_carrying_data.Stable.V1.t
           option
       end
 
@@ -234,13 +241,10 @@ struct
         [@@deriving bin_io, sexp]
 
         type response =
-          ( ( External_transition.Stable.V1.t
-            , State_body_hash.Stable.V1.t list
-              * External_transition.Stable.V1.t )
-            Proof_carrying_data.Stable.V1.t
-          * Staged_ledger_aux.Stable.V1.t
-          * Ledger_hash.Stable.V1.t
-          * Pending_coinbase.t )
+          ( External_transition.Stable.V1.t
+          , State_body_hash.Stable.V1.t list * External_transition.Stable.V1.t
+          )
+          Proof_carrying_data.Stable.V1.t
           option
         [@@deriving bin_io]
 
@@ -361,7 +365,7 @@ module type Inputs_intf = sig
     module Stable :
       sig
         module V1 : sig
-          type t [@@deriving bin_io]
+          type t [@@deriving bin_io, version]
         end
       end
       with type V1.t = t
@@ -439,9 +443,11 @@ module Make (Inputs : Inputs_intf) = struct
   [@@deriving fields]
 
   let create (config : Config.t)
-      ~(get_staged_ledger_aux_at_hash :
-            Staged_ledger_hash.t Envelope.Incoming.t
-         -> (Staged_ledger_aux.Stable.V1.t * Ledger_hash.t) option Deferred.t)
+      ~(get_staged_ledger_aux_and_pending_coinbases_at_hash :
+            State_hash.t Envelope.Incoming.t
+         -> (Staged_ledger_aux.Stable.V1.t * Ledger_hash.t * Pending_coinbase.t)
+            option
+            Deferred.t)
       ~(answer_sync_ledger_query :
             (Ledger_hash.t * Ledger.Location.Addr.t Syncable_ledger.Query.t)
             Envelope.Incoming.t
@@ -451,18 +457,16 @@ module Make (Inputs : Inputs_intf) = struct
          -> External_transition.t Non_empty_list.t option Deferred.t)
       ~(get_ancestry :
             Consensus.Consensus_state.Value.t Envelope.Incoming.t
-         -> ( ( External_transition.t
-              , State_body_hash.t list * External_transition.t )
-              Proof_carrying_data.t
-            * Staged_ledger_aux.t
-            * Ledger_hash.t
-            * Pending_coinbase.t )
+         -> ( External_transition.t
+            , State_body_hash.t list * External_transition.t )
+            Proof_carrying_data.t
             Deferred.Option.t) =
     (* TODO: for following functions, could check that IP in _conn matches
        the sender IP in envelope, punish if mismatch due to IP forgery
     *)
-    let get_staged_ledger_aux_at_hash_rpc _conn ~version:_ hash_in_envelope =
-      get_staged_ledger_aux_at_hash hash_in_envelope
+    let get_staged_ledger_aux_and_pending_coinbases_at_hash_rpc _conn
+        ~version:_ hash_in_envelope =
+      get_staged_ledger_aux_and_pending_coinbases_at_hash hash_in_envelope
     in
     let answer_sync_ledger_query_rpc _conn ~version:_ query_in_envelope =
       answer_sync_ledger_query query_in_envelope
@@ -481,8 +485,9 @@ module Make (Inputs : Inputs_intf) = struct
     in
     let implementations =
       List.concat
-        [ Rpcs.Get_staged_ledger_aux_at_hash.implement_multi
-            get_staged_ledger_aux_at_hash_rpc
+        [ Rpcs.Get_staged_ledger_aux_and_pending_coinbases_at_hash
+          .implement_multi
+            get_staged_ledger_aux_and_pending_coinbases_at_hash_rpc
         ; Rpcs.Answer_sync_ledger_query.implement_multi
             answer_sync_ledger_query_rpc
         ; Rpcs.Transition_catchup.implement_multi transition_catchup_rpc
@@ -584,71 +589,56 @@ module Make (Inputs : Inputs_intf) = struct
       Rpcs.Transition_catchup.dispatch_multi
       (envelope_from_me t state_hash)
 
-  let get_ancestry_non_preferred_peers t input peers =
+  let try_non_preferred_peers t input peers ~rpc =
     let max_current_peers = 8 in
     let rec loop peers num_peers =
       if num_peers > max_current_peers then
         return
-          (Or_error.errorf
-             !"None of randomly-chosen peers has a more preferred consensus \
-               state than %{sexp:Rpcs.Get_ancestry.query}"
-             input)
+          (Or_error.error_string
+             "None of randomly-chosen peers can handle the request")
       else
         let current_peers, remaining_peers = List.split_n peers num_peers in
         find_map' current_peers ~f:(fun peer ->
-            let%bind ancestors_or_error =
-              Gossip_net.query_peer t.gossip_net peer
-                Rpcs.Get_ancestry.dispatch_multi input
+            let%bind response_or_error =
+              Gossip_net.query_peer t.gossip_net peer rpc input
             in
-            match ancestors_or_error with
-            | Ok (Some ancestors) -> return (Ok ancestors)
-            | Ok None ->
-                Logger.info t.logger ~module_:__MODULE__ ~location:__LOC__
-                  !"get_ancestry returned no root for non-preferred peer \
-                    %{sexp: Peer.t} on consensus_state %{sexp: \
-                    Rpcs.Get_ancestry.query}"
-                  peer input ;
-                loop remaining_peers (2 * num_peers)
-            | Error e ->
-                Logger.warn t.logger ~module_:__MODULE__ ~location:__LOC__
-                  !"get_ancestry generated error for non-preferred peer \
-                    %{sexp: Peer.t}: %{sexp: Error.t}"
-                  peer e ;
-                loop remaining_peers (2 * num_peers) )
+            match response_or_error with
+            | Ok (Some response) -> return (Ok response)
+            | Ok None -> loop remaining_peers (2 * num_peers)
+            | Error e -> loop remaining_peers (2 * num_peers) )
     in
     loop peers 1
 
-  let get_ancestry t preferred_peer input =
-    O1trace.trace_recurring_task "get_ancestry" (fun () ->
-        let input_in_envelope = envelope_from_me t input in
-        (* try preferred_peer first *)
-        let%bind ancestors_or_error =
-          Gossip_net.query_peer t.gossip_net preferred_peer
-            Rpcs.Get_ancestry.dispatch_multi input_in_envelope
-        in
-        let get_random_peers () =
-          let max_peers = 15 in
-          (* 1 + 2 + 4 + 8 *)
-          let except = Peer.Hash_set.of_list [preferred_peer] in
-          random_peers_except t max_peers ~except
-        in
-        match ancestors_or_error with
-        | Ok (Some ancestors) -> return (Ok ancestors)
-        | Ok None ->
-            (* #TODO: punish *)
-            Logger.faulty_peer t.logger ~module_:__MODULE__ ~location:__LOC__
-              !"get_ancestry returned no ancestors for the transition sender \
-                %{sexp: Peer.t}, trying non-preferred peers"
-              preferred_peer ;
-            let peers = get_random_peers () in
-            get_ancestry_non_preferred_peers t input_in_envelope peers
-        | Error e ->
-            Logger.warn t.logger ~module_:__MODULE__ ~location:__LOC__
-              !"get_ancestry generated error for the transition sender \
-                %{sexp: Peer.t}: %{sexp: Error.t}; trying non-preferred peers"
-              preferred_peer e ;
-            let peers = get_random_peers () in
-            get_ancestry_non_preferred_peers t input_in_envelope peers )
+  let try_preferred_peer t peer input ~rpc =
+    let envelope = envelope_from_me t input in
+    let%bind response = Gossip_net.query_peer t.gossip_net peer rpc envelope in
+    let get_random_peers () =
+      let max_peers = 15 in
+      let except = Peer.Hash_set.of_list [peer] in
+      random_peers_except t max_peers ~except
+    in
+    match response with
+    | Ok (Some data) -> return (Ok data)
+    | Ok None ->
+        Logger.faulty_peer t.logger ~module_:__MODULE__ ~location:__LOC__
+          !"get no response from %{sexp: Peer.t}"
+          peer ;
+        let peers = get_random_peers () in
+        try_non_preferred_peers t envelope peers ~rpc
+    | Error e ->
+        Logger.faulty_peer t.logger ~module_:__MODULE__ ~location:__LOC__
+          !"get error from %{sexp: Peer.t}"
+          peer ;
+        let peers = get_random_peers () in
+        try_non_preferred_peers t envelope peers ~rpc
+
+  let get_staged_ledger_aux_and_pending_coinbases_at_hash t peer input =
+    try_preferred_peer t peer input
+      ~rpc:
+        Rpcs.Get_staged_ledger_aux_and_pending_coinbases_at_hash.dispatch_multi
+
+  let get_ancestry t peer input =
+    try_preferred_peer t peer input ~rpc:Rpcs.Get_ancestry.dispatch_multi
 
   let glue_sync_ledger t query_reader response_writer =
     (* We attempt to query 3 random peers, retry_max times. We keep track of the

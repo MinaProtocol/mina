@@ -465,9 +465,7 @@ struct
 
       include (
         Currency.Amount.Signed.Stable.Latest :
-          module type of Currency.Amount.Signed.Stable.Latest
-          with type t := t
-           and type ('a, 'b) t_ := ('a, 'b) t_ )
+          module type of Currency.Amount.Signed.Stable.Latest with type t := t )
     end
   end
 

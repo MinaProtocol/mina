@@ -93,7 +93,7 @@ module Make (Inputs : Inputs_intf) :
     ; consensus_data: 'consensus_data
     ; sok_digest: 'sok_digest
     ; supply_increase: 'amount
-    ; ledger_proof: Proof.t option
+    ; ledger_proof: Proof.Stable.V1.t option
     ; proposer: 'proposer_pk
     ; coinbase: 'amount }
   [@@deriving bin_io, sexp, fields]

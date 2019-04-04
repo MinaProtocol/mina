@@ -4,10 +4,13 @@ open Module_version
 module Stable = struct
   module V1 = struct
     module T = struct
-      let version = 1
-
       type t = Snark_params.Tock.Field.t * Snark_params.Tock.Field.t
       [@@deriving sexp, eq, compare, hash, bin_io]
+
+      (* TODO : version Field in snarky *)
+      let version = 1
+
+      let __versioned__ = true
     end
 
     let to_base64 t = Binable.to_string (module T) t |> Base64.encode_string

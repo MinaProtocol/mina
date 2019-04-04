@@ -106,32 +106,39 @@ module type Signed_intf = sig
 
   type magnitude_var
 
-  type ('magnitude, 'sgn) t_
+  module Poly : sig
+    module Stable : sig
+      module V1 : sig
+        type ('magnitude, 'sgn) t [@@deriving version]
+      end
 
-  type t = (magnitude, Sgn.t) t_
-  [@@deriving sexp, hash, bin_io, compare, eq, yojson]
-
-  val gen : t Quickcheck.Generator.t
+      module Latest = V1
+    end
+  end
 
   module Stable : sig
     module V1 : sig
-      type nonrec ('magnitude, 'sgn) t_ = ('magnitude, 'sgn) t_
-
-      type nonrec t = t [@@deriving bin_io, sexp, hash, compare, eq, yojson]
+      type t = (magnitude, Sgn.Stable.V1.t) Poly.Stable.V1.t
+      [@@deriving bin_io, sexp, hash, compare, eq, yojson, version]
     end
 
     module Latest = V1
   end
 
+  type t = Stable.Latest.t [@@deriving sexp, hash, compare, eq, yojson]
+
+  val gen : t Quickcheck.Generator.t
+
   val length_in_triples : int
 
-  val create : magnitude:'magnitude -> sgn:'sgn -> ('magnitude, 'sgn) t_
+  val create :
+    magnitude:'magnitude -> sgn:'sgn -> ('magnitude, 'sgn) Poly.Stable.Latest.t
 
   val sgn : t -> Sgn.t
 
   val magnitude : t -> magnitude
 
-  type nonrec var = (magnitude_var, Sgn.var) t_
+  type var = (magnitude_var, Sgn.var) Poly.Stable.Latest.t
 
   val typ : (var, t) Typ.t
 
@@ -166,7 +173,8 @@ module type Signed_intf = sig
 
     val cswap :
          Boolean.var
-      -> (magnitude_var, Sgn.t) t_ * (magnitude_var, Sgn.t) t_
+      -> (magnitude_var, Sgn.t) Poly.Stable.Latest.t
+         * (magnitude_var, Sgn.t) Poly.Stable.Latest.t
       -> (var * var, _) Checked.t
   end
 end
