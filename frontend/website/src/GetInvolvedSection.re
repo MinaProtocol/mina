@@ -212,6 +212,7 @@ module KnowledgeBase = {
                 width(`rem(10.)),
                 height(`rem(2.5)),
                 display(`block),
+                cursor(`pointer),
               ]),
             ])
           )
