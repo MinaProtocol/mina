@@ -4,7 +4,8 @@ module ApplyItem = {
     ...component,
     render: _self =>
       <li className="list lh-copy">
-        <a
+        <A
+          name={"job-" ++ filename}
           href={"/jobs/" ++ filename ++ ".html"}
           className={
             "f5 fw5 no-underline "
@@ -16,7 +17,7 @@ module ApplyItem = {
                )
           }>
           {ReasonReact.string(name)}
-        </a>
+        </A>
       </li>,
   };
 };
@@ -241,7 +242,8 @@ let make = (~jobOpenings, _) => {
                 {ReasonReact.string(
                    {js|We passionately believe in the open-source philosophy, and make our software free for the entire world to\u00A0use. |js},
                  )}
-                <a
+                <A
+                  name="careers-code"
                   href="/code.html"
                   className={
                     "fw5 no-underline nowrap "
@@ -253,7 +255,7 @@ let make = (~jobOpenings, _) => {
                        )
                   }>
                   {ReasonReact.string({js|Take a look →|js})}
-                </a>
+                </A>
               </HeadingItem>
               <HeadingItem title="Collaboration">
                 {ReasonReact.string(

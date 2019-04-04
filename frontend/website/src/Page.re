@@ -18,13 +18,13 @@ module Footer = {
       ...component,
       render: _self =>
         <li className=Css.(style([display(`inline)]))>
-          <a
+          <A
             href=link
             className=footerStyle
             name={"footer-" ++ name}
             target="_blank">
             ...children
-          </a>
+          </A>
           {last
              ? ReasonReact.null
              : <span className=footerStyle ariaHidden=true>

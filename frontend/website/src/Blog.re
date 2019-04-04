@@ -142,7 +142,8 @@ let createPostFadedContents = html =>
 // Uses an overlay link to avoid nesting anchor tags
 let createPostSummary = ((name, html, metadata)) => {
   <div className=Css.(style([position(`relative)]))>
-    <a
+    <A
+      name={"blog-" ++ name}
       href={"/blog/" ++ name ++ ".html"}
       className=Css.(
         style([

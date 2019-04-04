@@ -13,15 +13,30 @@ module Named = {
 open Named;
 
 module Forms = {
-  let mailingList = "https://docs.google.com/forms/d/e/1FAIpQLSdChigoRhyZqg1RbaA6ODiqJ4q42cPpNbSH-koxXHjLwDeqDw/viewform?usp=pp_url&entry.2026041782=I+just+want+to+learn+more!";
+  let mailingList = {
+    link: "https://docs.google.com/forms/d/e/1FAIpQLSdChigoRhyZqg1RbaA6ODiqJ4q42cPpNbSH-koxXHjLwDeqDw/viewform?usp=pp_url&entry.2026041782=I+just+want+to+learn+more!",
+    name: "mailinglist-none",
+  };
 
-  let developingWithCoda = "https://docs.google.com/forms/d/e/1FAIpQLSdChigoRhyZqg1RbaA6ODiqJ4q42cPpNbSH-koxXHjLwDeqDw/viewform?usp=pp_url&entry.2026041782=I+want+to+develop+cryptocurrency+applications+with+Coda";
+  let developingWithCoda = {
+    link: "https://docs.google.com/forms/d/e/1FAIpQLSdChigoRhyZqg1RbaA6ODiqJ4q42cPpNbSH-koxXHjLwDeqDw/viewform?usp=pp_url&entry.2026041782=I+want+to+develop+cryptocurrency+applications+with+Coda",
+    name: "mailinglist-developingwithcoda",
+  };
 
-  let participateInConsensus = "https://docs.google.com/forms/d/e/1FAIpQLSdChigoRhyZqg1RbaA6ODiqJ4q42cPpNbSH-koxXHjLwDeqDw/viewform?usp=pp_url&entry.2026041782=I+want+to+help+run+the+Coda+network+by+participating+in+consensus";
+  let participateInConsensus = {
+    link: "https://docs.google.com/forms/d/e/1FAIpQLSdChigoRhyZqg1RbaA6ODiqJ4q42cPpNbSH-koxXHjLwDeqDw/viewform?usp=pp_url&entry.2026041782=I+want+to+help+run+the+Coda+network+by+participating+in+consensus",
+    name: "mailinglist-participateinconsensus",
+  };
 
-  let compressTheBlockchain = "https://docs.google.com/forms/d/e/1FAIpQLSdChigoRhyZqg1RbaA6ODiqJ4q42cPpNbSH-koxXHjLwDeqDw/viewform?usp=pp_url&entry.2026041782=I+want+help+run+the+Coda+network+by+compressing+the+blockchain";
+  let compressTheBlockchain = {
+    link: "https://docs.google.com/forms/d/e/1FAIpQLSdChigoRhyZqg1RbaA6ODiqJ4q42cPpNbSH-koxXHjLwDeqDw/viewform?usp=pp_url&entry.2026041782=I+want+help+run+the+Coda+network+by+compressing+the+blockchain",
+    name: "mailinglist-compresstheblockchain",
+  };
 
-  let improveSnarkTech = "https://docs.google.com/forms/d/e/1FAIpQLSdChigoRhyZqg1RbaA6ODiqJ4q42cPpNbSH-koxXHjLwDeqDw/viewform?usp=pp_url&entry.2026041782=I%27m+interested+in+improving+the+SNARK+tech+underlying+Coda";
+  let improveSnarkTech = {
+    link: "https://docs.google.com/forms/d/e/1FAIpQLSdChigoRhyZqg1RbaA6ODiqJ4q42cPpNbSH-koxXHjLwDeqDw/viewform?usp=pp_url&entry.2026041782=I%27m+interested+in+improving+the+SNARK+tech+underlying+Coda",
+    name: "mailinglist-improvesnarktech",
+  };
 };
 
 module Static = {

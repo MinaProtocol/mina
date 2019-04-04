@@ -3,12 +3,13 @@ module Link = {
   let make = (~link, ~message, _) => {
     ...component,
     render: _ => {
-      <a
+      <A
+        name={link.Links.Named.name}
         target="_blank"
-        href=link
+        href={link.Links.Named.link}
         className=Css.(merge([Style.Link.basic, style([cursor(`pointer)])]))>
         {ReasonReact.string(message ++ {js|\u00A0→|js})}
-      </a>;
+      </A>;
     },
   };
 };
@@ -339,7 +340,8 @@ module SocialLink = {
   let make = (~link, ~name, ~svg, _children) => {
     ...component,
     render: _ => {
-      <a
+      <A
+        name={"getinvolved-" ++ name}
         href=link
         className=Css.(
           style([
@@ -360,7 +362,7 @@ module SocialLink = {
         )>
         <div className=Css.(style([marginRight(`rem(1.))]))> svg </div>
         <h3 className=Style.H3.wideNoColor> {ReasonReact.string(name)} </h3>
-      </a>;
+      </A>;
     },
   };
 };
@@ -418,14 +420,19 @@ let make = (~posts, _children) => {
                "Help us build a more accessible, inclusive cryptocurrency. Join our community on ",
              )}
           </span>
-          <a className=Style.Link.basic href="https://discord.gg/wz7zQyc">
+          <A
+            name="copy-discord"
+            className=Style.Link.basic
+            href="https://discord.gg/wz7zQyc">
             {ReasonReact.string("Discord")}
-          </a>
+          </A>
           <span> {ReasonReact.string(", and follow our progress on ")} </span>
-          <a
-            className=Style.Link.basic href="https://twitter.com/codaprotocol">
+          <A
+            name="copy-twitter"
+            className=Style.Link.basic
+            href="https://twitter.com/codaprotocol">
             {ReasonReact.string("Twitter")}
-          </a>
+          </A>
           <span> {ReasonReact.string(".")} </span>
         </p>
         <div className=Css.(style([marginRight(`rem(1.))]))>
