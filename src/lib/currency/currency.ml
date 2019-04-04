@@ -11,7 +11,7 @@ open Module_version
 type uint64 = Unsigned.uint64
 
 module type Basic = sig
-  type t [@@deriving bin_io, sexp, compare, hash, yojson]
+  type t [@@deriving sexp, compare, hash, yojson]
 
   val max_int : t
 
@@ -23,7 +23,8 @@ module type Basic = sig
 
   module Stable : sig
     module V1 : sig
-      type nonrec t = t [@@deriving bin_io, sexp, compare, eq, hash, yojson]
+      type nonrec t = t
+      [@@deriving bin_io, sexp, compare, eq, hash, yojson, version]
     end
 
     module Latest = V1
@@ -60,6 +61,8 @@ module type Basic = sig
   val var_to_number : var -> Number.t
 
   val var_to_triples : var -> Boolean.var Triple.t list
+
+  val equal_var : var -> var -> (Boolean.var, _) Checked.t
 end
 
 module type Arithmetic_intf = sig
@@ -82,7 +85,7 @@ module type Signed_intf = sig
   type ('magnitude, 'sgn) t_
 
   type t = (magnitude, Sgn.t) t_
-  [@@deriving sexp, hash, bin_io, compare, eq, to_yojson]
+  [@@deriving sexp, hash, bin_io, compare, eq, yojson]
 
   val gen : t Quickcheck.Generator.t
 
@@ -90,7 +93,7 @@ module type Signed_intf = sig
     module V1 : sig
       type nonrec ('magnitude, 'sgn) t_ = ('magnitude, 'sgn) t_
 
-      type nonrec t = t [@@deriving bin_io, sexp, hash, compare, eq, to_yojson]
+      type nonrec t = t [@@deriving bin_io, sexp, hash, compare, eq, yojson]
     end
 
     module Latest = V1
@@ -213,9 +216,7 @@ end = struct
   module Stable = struct
     module V1 = struct
       module T = struct
-        let version = 1
-
-        type t = Unsigned.t [@@deriving bin_io, sexp, compare, hash]
+        type t = Unsigned.t [@@deriving bin_io, sexp, compare, hash, version]
 
         let of_int = Unsigned.of_int
 
@@ -316,7 +317,7 @@ end = struct
   let var_of_t t =
     List.init M.length ~f:(fun i -> Boolean.var_of_value (Vector.get t i))
 
-  type magnitude = t [@@deriving sexp, bin_io, hash, compare, eq, to_yojson]
+  type magnitude = t [@@deriving sexp, bin_io, hash, compare, eq, yojson]
 
   let fold_bits = fold
 
@@ -333,12 +334,12 @@ end = struct
           let version = 1
 
           type ('magnitude, 'sgn) t_ = {magnitude: 'magnitude; sgn: 'sgn}
-          [@@deriving bin_io, sexp, hash, compare, fields, eq, to_yojson]
+          [@@deriving bin_io, sexp, hash, compare, fields, eq, yojson]
 
           let create ~magnitude ~sgn = {magnitude; sgn}
 
           type t = (magnitude, Sgn.t) t_
-          [@@deriving bin_io, sexp, hash, compare, eq, to_yojson]
+          [@@deriving bin_io, sexp, hash, compare, eq, yojson]
         end
 
         include T
@@ -460,7 +461,7 @@ end = struct
 
       let cswap_field (b : Boolean.var) (x, y) =
         (* (x + b(y - x), y + b(x - y)) *)
-        let open Field.Checked.Infix in
+        let open Field.Checked in
         let%map b_y_minus_x =
           Tick.Field.Checked.mul (b :> Field.Var.t) (y - x)
         in
@@ -547,9 +548,13 @@ end = struct
 
     let%test_module "currency_test" =
       ( module struct
-        let expect_failure err c = if check c () then failwith err
+        let expect_failure err c =
+          if Or_error.is_ok (check c ()) then failwith err
 
-        let expect_success err c = if not (check c ()) then failwith err
+        let expect_success err c =
+          match check c () with
+          | Ok () -> ()
+          | Error e -> Error.(raise (tag ~tag:err e))
 
         let to_bigint x = Bignum_bigint.of_string (Unsigned.to_string x)
 

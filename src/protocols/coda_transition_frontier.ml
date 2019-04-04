@@ -7,16 +7,92 @@ module Transition_frontier_diff = struct
   type 'a t =
     | New_breadcrumb of 'a
         (** Triggered when a new breadcrumb is added without changing the root or best_tip *)
+    | New_frontier of 'a
+        (** First breadcrumb to become the root of the frontier  *)
     | New_best_tip of
         { old_root: 'a
         ; old_root_length: int
         ; new_root: 'a  (** Same as old root if the root doesn't change *)
-        ; new_best_tip: 'a
+        ; added_to_best_tip_path: 'a Non_empty_list.t (* oldest first *)
         ; new_best_tip_length: int
-        ; old_best_tip: 'a
+        ; removed_from_best_tip_path: 'a list (* also oldest first *)
         ; garbage: 'a list }
         (** Triggered when a new breadcrumb is added, causing a new best_tip *)
   [@@deriving sexp]
+end
+
+module type Diff_hash = sig
+  type t
+
+  val merge : t -> string -> t
+
+  val empty : t
+
+  val equal : t -> t -> bool
+end
+
+module type Diff_mutant = sig
+  type external_transition
+
+  type state_hash
+
+  type scan_state
+
+  type pending_coinbases
+
+  type consensus_state
+
+  (** Diff_mutant is a GADT that represents operations that affect the changes
+      on the transition_frontier. The left-hand side of the GADT represents
+      change that will occur to the transition_frontier. The right-hand side of
+      the GADT represents which components are are effected by these changes
+      and a certification that these components are handled appropriately.
+      There are comments for each GADT that will discuss the operations that
+      changes a `transition_frontier` and their corresponding side-effects.*)
+  type _ t =
+    | New_frontier :
+        ( (external_transition, state_hash) With_hash.t
+        * scan_state
+        * pending_coinbases )
+        -> unit t
+        (** New_frontier: When creating a new transition frontier, the
+            transition_frontier will begin with a single breadcrumb that can be
+            constructed mainly with a root external transition and a
+            scan_state. There are no components in the frontier that affects
+            the frontier. Therefore, the type of this diff is tagged as a unit. *)
+    | Add_transition :
+        (external_transition, state_hash) With_hash.t
+        -> consensus_state t
+        (** Add_transition: Add_transition would simply add a transition to the
+            frontier and is therefore the parameter for Add_transition. After
+            adding the transition, we add the transition to its parent list of
+            successors. To certify that we added it to the right parent. The
+            consensus_state of the parent can accomplish this. *)
+    | Remove_transitions :
+        (external_transition, state_hash) With_hash.t list
+        -> consensus_state list t
+        (** Remove_transitions: Remove_transitions is an operation that removes
+            a set of transitions. We need to make sure that we are deleting the
+            right transition and we use their consensus_state to accomplish
+            this. Therefore the type of Remove_transitions is indexed by a list
+            of consensus_state. *)
+    | Update_root :
+        (state_hash * scan_state * pending_coinbases)
+        -> (state_hash * scan_state * pending_coinbases) t
+        (** Update_root: Update root is an indication that the root state_hash
+            and the root scan_state state. To verify that we update the right
+            root, we can indicate the old root is being updated. Therefore, the
+            type of Update_root is indexed by a state_hash and scan_state. *)
+
+  type hash
+
+  val key_to_yojson : 'a t -> Yojson.Safe.json
+
+  val value_to_yojson : 'a t -> 'a -> Yojson.Safe.json
+
+  val hash : hash -> 'a t -> 'a -> hash
+
+  type e = E : 'a t -> e
 end
 
 (** An extension to the transition frontier that provides a view onto the data
@@ -36,21 +112,26 @@ module type Transition_frontier_extension_intf0 = sig
 
   val create : input -> t
 
-  val initial_view : view
   (** The first view that is ever available. *)
+  val initial_view : unit -> view
 
+  (** Handle a transition frontier diff, and return the new version of the
+        computed view, if it's updated. *)
   val handle_diff :
        t
     -> transition_frontier_breadcrumb Transition_frontier_diff.t
     -> view Option.t
-  (** Handle a transition frontier diff, and return the new version of the
-        computed view, if it's updated. *)
 end
 
 (** The type of the view onto the changes to the current best tip. This type
     needs to be here to avoid dependency cycles. *)
 module Best_tip_diff_view = struct
-  type 'b t = {new_best_tip: 'b; old_best_tip: 'b}
+  type 'b t = {new_user_commands: 'b list; removed_user_commands: 'b list}
+end
+
+module Root_diff_view = struct
+  type 'b t = {user_commands: 'b list; root_length: int option}
+  [@@deriving bin_io]
 end
 
 module type Network_intf = sig
@@ -62,6 +143,8 @@ module type Network_intf = sig
 
   type ledger_hash
 
+  type pending_coinbases
+
   type consensus_state
 
   type sync_ledger_query
@@ -71,6 +154,8 @@ module type Network_intf = sig
   type external_transition
 
   type state_body_hash
+
+  type parallel_scan_state
 
   val random_peers : t -> int -> peer list
 
@@ -84,22 +169,27 @@ module type Network_intf = sig
        t
     -> peer
     -> consensus_state
-    -> ( external_transition
-       , state_body_hash list * external_transition )
-       Proof_carrying_data.t
+    -> ( ( external_transition
+         , state_body_hash list * external_transition )
+         Proof_carrying_data.t
+       * parallel_scan_state
+       * ledger_hash
+       * pending_coinbases )
        Deferred.Or_error.t
 
   (* TODO: Change this to strict_pipe *)
   val glue_sync_ledger :
        t
     -> (ledger_hash * sync_ledger_query) Pipe_lib.Linear_pipe.Reader.t
-    -> (ledger_hash * sync_ledger_answer) Envelope.Incoming.t
+    -> ( ledger_hash
+       * sync_ledger_query
+       * sync_ledger_answer Envelope.Incoming.t )
        Pipe_lib.Linear_pipe.Writer.t
     -> unit
 end
 
 module type Transition_frontier_Breadcrumb_intf = sig
-  type t [@@deriving sexp, eq, compare]
+  type t [@@deriving sexp, eq, compare, to_yojson]
 
   type display [@@deriving yojson]
 
@@ -116,6 +206,9 @@ module type Transition_frontier_Breadcrumb_intf = sig
     -> staged_ledger
     -> t
 
+  (** The copied breadcrumb delegates to [Staged_ledger.copy], the other fields are already immutable *)
+  val copy : t -> t
+
   val build :
        logger:Logger.t
     -> parent:t
@@ -131,6 +224,10 @@ module type Transition_frontier_Breadcrumb_intf = sig
   val staged_ledger : t -> staged_ledger
 
   val hash : t -> int
+
+  val external_transition : t -> external_transition_verified
+
+  val state_hash : t -> state_hash
 
   val display : t -> display
 
@@ -158,7 +255,9 @@ module type Transition_frontier_base_intf = sig
 
   type staged_ledger_diff
 
-  type t
+  type diff_mutant
+
+  type t [@@deriving eq]
 
   module Breadcrumb :
     Transition_frontier_Breadcrumb_intf
@@ -171,13 +270,12 @@ module type Transition_frontier_base_intf = sig
        logger:Logger.t
     -> root_transition:(external_transition_verified, state_hash) With_hash.t
     -> root_snarked_ledger:ledger_database
-    -> root_transaction_snark_scan_state:transaction_snark_scan_state
-    -> root_staged_ledger_diff:staged_ledger_diff option
+    -> root_staged_ledger:staged_ledger
     -> consensus_local_state:consensus_local_state
     -> t Deferred.t
 
-  val close : t -> unit
   (** Clean up internal state. *)
+  val close : t -> unit
 
   val find_exn : t -> state_hash -> Breadcrumb.t
 
@@ -200,6 +298,10 @@ module type Transition_frontier_intf = sig
 
   val root : t -> Breadcrumb.t
 
+  val previous_root : t -> Breadcrumb.t option
+
+  val root_length : t -> int
+
   val best_tip : t -> Breadcrumb.t
 
   val path_map : t -> Breadcrumb.t -> f:(Breadcrumb.t -> 'a) -> 'a list
@@ -219,9 +321,18 @@ module type Transition_frontier_intf = sig
 
   val successors_rec : t -> Breadcrumb.t -> Breadcrumb.t list
 
+  val common_ancestor : t -> Breadcrumb.t -> Breadcrumb.t -> state_hash
+
   val iter : t -> f:(Breadcrumb.t -> unit) -> unit
 
+  (** Adds a breadcrumb to the transition frontier or throws. It possibly
+   * triggers a root move and it triggers any extensions that are listening to
+   * events on the frontier. *)
   val add_breadcrumb_exn : t -> Breadcrumb.t -> unit Deferred.t
+
+  (** Like add_breadcrumb_exn except it doesn't throw if the parent hash is
+   * missing from the transition frontier *)
+  val add_breadcrumb_if_present_exn : t -> Breadcrumb.t -> unit Deferred.t
 
   val best_tip_path_length_exn : t -> int
 
@@ -233,9 +344,19 @@ module type Transition_frontier_intf = sig
 
   module Extensions : sig
     module Work : sig
-      type t [@@deriving sexp, bin_io]
+      type t [@@deriving sexp]
 
-      include Hashable.S_binable with type t := t
+      module Stable :
+        sig
+          module V1 : sig
+            type t [@@deriving sexp, bin_io]
+
+            include Hashable.S_binable with type t := t
+          end
+        end
+        with type V1.t = t
+
+      include Hashable.S with type t := t
     end
 
     module Snark_pool_refcount : sig
@@ -246,11 +367,20 @@ module type Transition_frontier_intf = sig
 
     module Best_tip_diff :
       Transition_frontier_extension_intf
-      with type view = Breadcrumb.t Best_tip_diff_view.t Option.t
+      with type view = user_command Best_tip_diff_view.t
+
+    module Root_diff :
+      Transition_frontier_extension_intf
+      with type view = user_command Root_diff_view.t
+
+    module Persistence_diff :
+      Transition_frontier_extension_intf with type view = diff_mutant list
 
     type readers =
       { snark_pool: Snark_pool_refcount.view Broadcast_pipe.Reader.t
-      ; best_tip_diff: Best_tip_diff.view Broadcast_pipe.Reader.t }
+      ; best_tip_diff: Best_tip_diff.view Broadcast_pipe.Reader.t
+      ; root_diff: Root_diff.view Broadcast_pipe.Reader.t
+      ; persistence_diff: Persistence_diff.view Broadcast_pipe.Reader.t }
     [@@deriving fields]
   end
 
@@ -259,6 +389,13 @@ module type Transition_frontier_intf = sig
 
   val best_tip_diff_pipe :
     t -> Extensions.Best_tip_diff.view Broadcast_pipe.Reader.t
+
+  val root_diff_pipe : t -> Extensions.Root_diff.view Broadcast_pipe.Reader.t
+
+  val persistence_diff_pipe :
+    t -> Extensions.Persistence_diff.view Broadcast_pipe.Reader.t
+
+  val visualize_to_string : t -> string
 
   val visualize : filename:string -> t -> unit
 
@@ -332,7 +469,7 @@ module type Transition_handler_validator_intf = sig
                                    With_hash.t
                                  , state_hash )
                                  Cached.t
-                               , Strict_pipe.drop_head Strict_pipe.buffered
+                               , Strict_pipe.crash Strict_pipe.buffered
                                , unit )
                                Strict_pipe.Writer.t
     -> unprocessed_transition_cache:unprocessed_transition_cache
@@ -403,7 +540,7 @@ module type Transition_handler_processor_intf = sig
     -> processed_transition_writer:( ( external_transition_verified
                                      , state_hash )
                                      With_hash.t
-                                   , Strict_pipe.drop_head Strict_pipe.buffered
+                                   , Strict_pipe.crash Strict_pipe.buffered
                                    , unit )
                                    Strict_pipe.Writer.t
     -> unprocessed_transition_cache:unprocessed_transition_cache
@@ -483,9 +620,10 @@ module type Sync_handler_intf = sig
   val answer_query :
        frontier:transition_frontier
     -> ledger_hash
-    -> syncable_ledger_query
+    -> syncable_ledger_query Envelope.Incoming.t
     -> logger:Logger.t
-    -> (ledger_hash * syncable_ledger_answer) option
+    -> trust_system:Trust_system.t
+    -> syncable_ledger_answer option Deferred.t
 
   val transition_catchup :
        frontier:transition_frontier
@@ -536,7 +674,8 @@ module type Bootstrap_controller_intf = sig
   type ledger_db
 
   val run :
-       parent_log:Logger.t
+       logger:Logger.t
+    -> trust_system:Trust_system.t
     -> network:network
     -> frontier:transition_frontier
     -> ledger_db:ledger_db
@@ -621,7 +760,7 @@ module type Initial_validator_intf = sig
     -> valid_transition_writer:( [ `Transition of external_transition_verified
                                                   Envelope.Incoming.t ]
                                  * [`Time_received of time]
-                               , Strict_pipe.drop_head Strict_pipe.buffered
+                               , Strict_pipe.crash Strict_pipe.buffered
                                , unit )
                                Strict_pipe.Writer.t
     -> unit
@@ -646,6 +785,7 @@ module type Transition_router_intf = sig
 
   val run :
        logger:Logger.t
+    -> trust_system:Trust_system.t
     -> network:network
     -> time_controller:time_controller
     -> frontier_broadcast_pipe:transition_frontier option

@@ -4,7 +4,13 @@ open Tick
 open Fold_lib
 open Tuple_lib
 
-type t [@@deriving sexp, bin_io, eq, compare, hash, yojson]
+type t [@@deriving sexp, eq, compare, hash, yojson]
+
+module Stable : sig
+  module V1 : sig
+    type nonrec t = t [@@deriving sexp, bin_io, eq, compare, hash, yojson]
+  end
+end
 
 module Checked : sig
   type unchecked = t

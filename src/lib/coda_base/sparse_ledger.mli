@@ -2,12 +2,15 @@ open Core
 open Import
 open Snark_params.Tick
 
-type t [@@deriving bin_io, sexp]
+(* TODO : version *)
+type t [@@deriving sexp, bin_io]
 
 val merkle_root : t -> Ledger_hash.t
 
 val path_exn :
   t -> int -> [`Left of Ledger_hash.t | `Right of Ledger_hash.t] list
+
+val find_index_exn : t -> Account.key -> int
 
 val of_root : Ledger_hash.t -> t
 

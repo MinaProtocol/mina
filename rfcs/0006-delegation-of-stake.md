@@ -102,7 +102,7 @@ The main thing this design has going for it is you only need to do one VRF evalu
   - `delegated_to_me : Currency.Amount.t`
   - `delegated_by_me : Currency.Amount.t`
 
-  The invariants we maintain are 
+  The invariants we maintain are
   - For any account corresponding to public key `p`, `delegated_stake` is the sum
     `\sum_{a : Account.t, a.delegated_by_me = p} a.delegated_to_me`.
   - For any account `a`, `a.delegated_by_me <= a.balance`.

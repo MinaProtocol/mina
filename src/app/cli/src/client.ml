@@ -160,7 +160,8 @@ let verify_payment =
            dispatch Verify_proof.rpc (pk, payment, proof) port
          in
          match%map dispatch_result with
-         | Ok (Ok ()) -> printf "Payment is valid on the existing blockchain!"
+         | Ok (Ok ()) ->
+             printf "Payment is valid on the existing blockchain!\n"
          | Error e | Ok (Error e) -> eprintf "%s" (Error.to_string_hum e) ))
 
 let get_nonce addr port =
@@ -473,25 +474,54 @@ let stop_tracing =
          | Ok () -> printf "Daemon stopped printing!"
          | Error e -> eprintf !"Error: %{sexp:Error.t}\n" e ))
 
-let visualize_frontier =
-  let open Deferred.Let_syntax in
-  let open Daemon_rpcs in
-  let open Command.Param in
-  Command.async ~summary:"Produce a dot file of the transition_frontier"
-    (Cli_lib.Background_daemon.init
-       Command.Param.(anon @@ ("output-filepath" %: string))
-       ~f:(fun port filename ->
-         match%map dispatch Visualize_frontier.rpc filename port with
-         | Ok () ->
-             printf !"Successfully wrote the visual at location %s." filename
-         | Error e ->
-             printf "Could not save file: %s\n" (Error.to_string_hum e) ))
+module Visualization = struct
+  let create_command (type rpc_response) ~name ~f
+      (rpc : (string, rpc_response) Rpc.Rpc.t) =
+    let open Deferred.Let_syntax in
+    let open Command.Param in
+    Command.async
+      ~summary:(sprintf !"Produce a visualization of the %s" name)
+      (Cli_lib.Background_daemon.init
+         Command.Param.(anon @@ ("output-filepath" %: string))
+         ~f:(fun port filename ->
+           let%map message =
+             match%map dispatch rpc filename port with
+             | Ok response -> f filename response
+             | Error e ->
+                 sprintf "Could not save file: %s\n" (Error.to_string_hum e)
+           in
+           print_string message ))
+
+  module Frontier = struct
+    let name = "transition-frontier"
+
+    let command =
+      create_command ~name Daemon_rpcs.Visualization.Frontier.rpc
+        ~f:(fun filename -> function
+        | `Active () -> Visualization_message.success name filename
+        | `Bootstrapping -> Visualization_message.bootstrap name )
+  end
+
+  module Registered_masks = struct
+    let name = "registered-masks"
+
+    let command =
+      create_command ~name Daemon_rpcs.Visualization.Registered_masks.rpc
+        ~f:(fun filename () -> Visualization_message.success name filename )
+  end
+
+  let command_group =
+    Command.group ~summary:"Visualize data structures special to Coda"
+      [ (Frontier.name, Frontier.command)
+      ; (Registered_masks.name, Registered_masks.command) ]
+end
 
 let command =
   Command.group ~summary:"Lightweight client commands"
     [ ("get-balance", get_balance)
     ; ("get-public-keys", get_public_keys)
     ; ("prove-payment", prove_payment)
+    ; ("verify-payment", verify_payment)
     ; ("get-nonce", get_nonce_cmd)
     ; ("send-payment", send_payment)
     ; ("stop-daemon", stop_daemon)
@@ -506,4 +536,4 @@ let command =
     ; ("start-tracing", start_tracing)
     ; ("stop-tracing", stop_tracing)
     ; ("snark-job-list", snark_job_list)
-    ; ("visualize-frontier", visualize_frontier) ]
+    ; ("visualization", Visualization.command_group) ]

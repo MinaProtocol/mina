@@ -86,8 +86,7 @@ module Make (Impl : Snarky.Snark_intf.S) : S with module Impl := Impl = struct
       Array.fold t
         ~init:(Field.one, Field.Var.constant Field.zero)
         ~f:(fun (x, acc) b ->
-          ( Field.Infix.(x + x)
-          , Field.Checked.Infix.(acc + (x * (b :> Field.Var.t))) ) )
+          (Field.(x + x), Field.Checked.(acc + (x * (b :> Field.Var.t)))) )
     in
     acc
 

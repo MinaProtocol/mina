@@ -3,13 +3,13 @@ open Bitstring
 open Module_version
 
 module type S = sig
-  type t [@@deriving sexp, bin_io, hash, eq, compare]
+  type t [@@deriving sexp, bin_io, hash, eq, compare, to_yojson]
 
   module Stable : sig
     module V1 : sig
       val version : int
 
-      type nonrec t = t [@@deriving sexp, bin_io, hash, eq, compare]
+      type nonrec t = t [@@deriving sexp, bin_io, hash, eq, compare, to_yojson]
     end
 
     module Latest : module type of V1
@@ -118,6 +118,8 @@ end) : S = struct
     if length mod 8 = 0 then path
     else concat [path; zeroes_bitstring (8 - (length mod 8))]
 
+  let to_yojson t = `String (to_string t)
+
   module Stable = struct
     module V1 = struct
       let to_tuple path =
@@ -162,6 +164,8 @@ end) : S = struct
         let compare = compare
 
         let equal = equals
+
+        let to_yojson = to_yojson
       end
 
       include T

@@ -1,24 +1,26 @@
 open Core_kernel
 
-module Make
-    (Key : Intf.Key)
-    (Account : Intf.Account with type key := Key.t)
-    (Hash : Intf.Hash with type account := Account.t)
-    (Location : Location_intf.S) (Depth : sig
-        val depth : int
-    end) : sig
+module type Inputs_intf = sig
+  include Base_inputs_intf.S
+
+  module Location : Location_intf.S
+end
+
+module Make (Inputs : Inputs_intf) : sig
   include
     Base_ledger_intf.S
-    with module Addr = Location.Addr
-    with module Location = Location
-    with type key := Key.t
-     and type key_set := Key.Set.t
-     and type hash := Hash.t
-     and type root_hash := Hash.t
-     and type account := Account.t
+    with module Addr = Inputs.Location.Addr
+    with module Location = Inputs.Location
+    with type key := Inputs.Key.t
+     and type key_set := Inputs.Key.Set.t
+     and type hash := Inputs.Hash.t
+     and type root_hash := Inputs.Hash.t
+     and type account := Inputs.Account.t
 
   val create : unit -> t
 end = struct
+  open Inputs
+
   type t = Core.Uuid.t [@@deriving sexp_of]
 
   let t_of_sexp _ = failwith "t_of_sexp unimplemented"

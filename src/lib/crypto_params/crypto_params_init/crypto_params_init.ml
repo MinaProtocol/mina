@@ -1,25 +1,38 @@
+[%%import
+"../../../config.mlh"]
+
+[%%if
+curve_size = 298]
+
+module Cycle = Snarky.Libsnark.Mnt298
+
+[%%elif
+curve_size = 753]
+
+module Cycle = Snarky.Libsnark.Mnt753
+
+[%%else]
+
+[%%show
+curve_size]
+
+[%%error
+"invalid value for \"curve_size\""]
+
+[%%endif]
+
 module Tick_backend = struct
-  module Full = Snarky.Backends.Mnt4
+  module Full = Cycle.Mnt4
   include Full.GM
-
-  module Inner_curve = struct
-    include Snarky.Libsnark.Mnt6.Group
-    include Snarky.Libsnark.Curves.Mnt6.G1
-  end
-
-  module Inner_twisted_curve = Snarky.Libsnark.Mnt6.G2
+  module Inner_curve = Cycle.Mnt6.G1
+  module Inner_twisted_curve = Cycle.Mnt6.G2
 end
 
 module Tock_backend = struct
-  module Full = Snarky.Backends.Mnt6
+  module Full = Cycle.Mnt6
   include Full.GM
-
-  module Inner_curve = struct
-    include Snarky.Libsnark.Mnt4.Group
-    include Snarky.Libsnark.Curves.Mnt4.G1
-  end
-
-  module Inner_twisted_curve = Snarky.Libsnark.Mnt4.G2
+  module Inner_curve = Cycle.Mnt4.G1
+  module Inner_twisted_curve = Cycle.Mnt4.G2
 end
 
 module Tick0 = Snarky.Snark.Make (Tick_backend)
@@ -130,7 +143,6 @@ module Wrap_input = struct
         ; Bitstring.Lsb_first.of_list [high_bit] ]
 
       let to_scalar {low_bits; high_bit} =
-        let open Tock0.Let_syntax in
         let%map low_bits =
           Field.Checked.unpack ~length:(Tick0.Field.size_in_bits - 1) low_bits
         in

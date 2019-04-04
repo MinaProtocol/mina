@@ -4,7 +4,7 @@ open Snark_params
 type uint64 = Unsigned.uint64
 
 module type S = sig
-  type t [@@deriving bin_io, sexp, hash, compare, eq]
+  type t [@@deriving bin_io, sexp, hash, compare, eq, yojson, version]
 
   val length_in_bits : int
 
@@ -108,6 +108,11 @@ module Extend
   include T
   include Hashable.Make (T)
 
+  (* TODO : actually version this type *)
+  let version = 1
+
+  let __versioned__ = true
+
   include Bin_prot.Utils.Make_binable (struct
     module Binable = Signed
 
@@ -119,6 +124,13 @@ module Extend
   end)
 
   include (Unsigned : Unsigned_intf with type t := t)
+
+  (* serializes to and from json as strings since bit lengths > 32 cannot be represented in json *)
+  let to_yojson n = `String (to_string n)
+
+  let of_yojson = function
+    | `String s -> Ok (of_string s)
+    | _ -> Error "expected string"
 
   let to_uint64 = M.to_uint64
 

@@ -1,0 +1,21 @@
+{
+  "name": "electron-test",
+  "reason" : {"react-jsx" : 2},
+  "sources": {
+      "dir": "src",
+      "subdirs": true
+  },
+  "bs-dependencies": [
+    "bs-electron",
+    "reason-react",
+    "reason-apollo",
+    "bs-css"
+  ],
+  "ppx-flags": [
+    "graphql_ppx/ppx"
+  ],
+  "warnings": {
+    "error": "+101"
+  },
+  "refmt": 3
+}

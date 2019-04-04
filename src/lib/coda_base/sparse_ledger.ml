@@ -2,14 +2,24 @@ open Core
 open Import
 open Snark_params.Tick
 
-include Sparse_ledger_lib.Sparse_ledger.Make
-          (Ledger_hash)
-          (Public_key.Compressed.Stable.V1)
-          (struct
-            include Account.Stable.Latest
+module Ledger_hash_binable = struct
+  (* Ledger_hash.t not bin_io *)
+  include Ledger_hash.Stable.V1
 
-            let hash = Fn.compose Ledger_hash.of_digest Account.digest
-          end)
+  let merge = Ledger_hash.merge
+end
+
+module Account_binable = struct
+  (* Account.t not bin_io *)
+  include Account.Stable.V1
+
+  let data_hash = Fn.compose Ledger_hash.of_digest Account.digest
+end
+
+include Sparse_ledger_lib.Sparse_ledger.Make
+          (Ledger_hash_binable)
+          (Public_key.Compressed.Stable.V1)
+          (Account_binable)
 
 let of_root (h : Ledger_hash.t) =
   of_hash ~depth:Ledger.depth (Ledger_hash.of_digest (h :> Pedersen.Digest.t))
@@ -27,7 +37,8 @@ let of_ledger_subset_exn (oledger : Ledger.t) keys =
             , add_path sl
                 (Ledger.merkle_path ledger loc)
                 key
-                (Ledger.get ledger loc |> Option.value_exn) )
+                ( Ledger.get ledger loc
+                |> Option.value_exn ?here:None ?error:None ?message:None ) )
         | None ->
             let path, acct = Ledger.create_empty ledger key in
             (key :: new_keys, add_path sl path key acct) )
@@ -84,7 +95,7 @@ let apply_user_command_exn t ({sender; payload; signature= _} : User_command.t)
         Receipt.Chain_hash.cons payload sender_account.receipt_chain_hash
     ; balance=
         Balance.sub_amount sender_account.balance (Amount.of_fee fee)
-        |> Option.value_exn }
+        |> Option.value_exn ?here:None ?error:None ?message:None }
   in
   match User_command.Payload.body payload with
   | Stake_delegation (Set_delegate {new_delegate}) ->
@@ -95,7 +106,7 @@ let apply_user_command_exn t ({sender; payload; signature= _} : User_command.t)
           { sender_account with
             balance=
               Balance.sub_amount sender_account.balance amount
-              |> Option.value_exn }
+              |> Option.value_exn ?here:None ?error:None ?message:None }
       in
       let receiver_idx = find_index_exn t receiver in
       let receiver_account = get_or_initialize_exn receiver t receiver_idx in
@@ -106,7 +117,7 @@ let apply_user_command_exn t ({sender; payload; signature= _} : User_command.t)
               (Balance.add_amount receiver_account.balance amount) }
 
 let apply_fee_transfer_exn =
-  let apply_single t ((pk, fee) : Fee_transfer.single) =
+  let apply_single t ((pk, fee) : Fee_transfer.Single.t) =
     let index = find_index_exn t pk in
     let account = get_or_initialize_exn pk t index in
     let open Currency in
@@ -133,7 +144,10 @@ let apply_coinbase_exn t
     | None -> (coinbase_amount, t)
     | Some (receiver, fee) ->
         let fee = Amount.of_fee fee in
-        let reward = Amount.sub coinbase_amount fee |> Option.value_exn in
+        let reward =
+          Amount.sub coinbase_amount fee
+          |> Option.value_exn ?here:None ?message:None ?error:None
+        in
         (reward, add_to_balance t receiver fee)
   in
   add_to_balance t proposer proposer_reward

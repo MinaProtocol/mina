@@ -52,17 +52,6 @@ let of_bigint n =
   assert (Bigint.compare x max_bigint <= 0) ;
   Bigint.to_field x
 
-let assert_mem x xs =
-  let open Tick in
-  let open Let_syntax in
-  let rec go acc = function
-    | [] -> Boolean.Assert.any acc
-    | y :: ys ->
-        let%bind e = Field.Checked.equal x y in
-        go (e :: acc) ys
-  in
-  go [] xs
-
 (* TODO: Use a "dual" variable to ensure the bit_length constraint is actually always
    enforced. *)
 include Bits.Snarkable.Small

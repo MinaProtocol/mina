@@ -150,7 +150,6 @@ module Make_weierstrass_checked
   type t = F.t * F.t
 
   let assert_on_curve (x, y) =
-    let open Let_syntax in
     let open F in
     let%bind x2 = square x in
     let%bind x3 = x2 * x in
@@ -172,7 +171,6 @@ module Make_weierstrass_checked
     F.(constant x, constant y)
 
   let assert_equal (x1, y1) (x2, y2) =
-    let open Let_syntax in
     let%map () = F.assert_equal x1 x2 and () = F.assert_equal y1 y2 in
     ()
 
@@ -317,7 +315,7 @@ module Make_weierstrass_checked
     let choose a1 a2 =
       let open Field.Checked in
       F.map2_ a1 a2 ~f:(fun a1 a2 ->
-          Infix.((a1 * cond) + (a2 * (Field.Var.constant Field.one - cond))) )
+          (a1 * cond) + (a2 * (Field.Var.constant Field.one - cond)) )
     in
     (choose x1 x2, choose y1 y2)
 

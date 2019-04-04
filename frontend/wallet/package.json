@@ -1,0 +1,29 @@
+{
+  "name": "coda-wallet",
+  "version": "0.1.0",
+  "description": "",
+  "main": "index.js",
+  "dependencies": {
+    "bs-css": "^8.0.2",
+    "bs-electron": "github:Schmavery/bs-electron",
+    "graphql_ppx": "^0.2.8",
+    "reason-apollo": "^0.15.2",
+    "reason-react": "^0.5.3"
+  },
+  "devDependencies": {
+    "bs-platform": "^4.0.18",
+    "concurrently": "^4.1.0",
+    "fastpack": "^0.8.4"
+  },
+  "scripts": {
+    "start": "electron ./lib/js/src/App.js",
+    "build": "bsb -make-world",
+    "clean": "bsb -clean-world",
+    "pack": "fpack --development ./lib/js/src/Index.js",
+    "query": "send-introspection-query http://localhost:8080/graphql",
+    "reformat": "bsrefmt --in-place src/*.re",
+    "dev": "concurrently 'bsb -make-world -w' 'fpack watch --development ./lib/js/src/Index.js' 'electron ./lib/js/src/App.js'"
+  },
+  "author": "",
+  "license": "ISC"
+}

@@ -63,8 +63,6 @@ struct
     T :
       module type of T with module Var := T.Var and module Checked := T.Checked )
 
-  include Infix
-
   let of_bits = Other_impl.Field.project
 
   let length_in_bits = size_in_bits
@@ -121,10 +119,7 @@ struct
   module Scalar = Make_inner_curve_scalar (Impl) (Other_impl)
 
   let find_y x =
-    let y2 =
-      Field.Infix.(
-        (x * Field.square x) + (Coefficients.a * x) + Coefficients.b)
-    in
+    let y2 = Field.((x * square x) + (Coefficients.a * x) + Coefficients.b) in
     if Field.is_square y2 then Some (Field.sqrt y2) else None
 end
 
@@ -300,7 +295,7 @@ module Tock = struct
     let conv_fqe v = Field.Vector.(get v 0, get v 1)
 
     let conv_g2 p =
-      let x, y = Tock_backend.Inner_twisted_curve.to_coords p in
+      let x, y = Tock_backend.Inner_twisted_curve.to_affine_coordinates p in
       Pairing.G2.Unchecked.of_affine_coordinates (conv_fqe x, conv_fqe y)
 
     let conv_fqk p =
@@ -343,7 +338,12 @@ module Tick = struct
     include Hashable.Make (Tick0.Field)
     module Bits = Bits.Make_field (Tick0.Field) (Tick0.Bigint)
 
-    let size_in_triples = (size_in_bits + 2) / 3
+    let size_in_triples = Int.((size_in_bits + 2) / 3)
+
+    (* for now, assert this type, derived from snarky, is versioned; can we 
+       prevent it changing?
+     *)
+    let __versioned__ = true
   end
 
   module Fq = Snarky_field_extensions.Field_extensions.F (Tick0)
@@ -396,11 +396,19 @@ module Tick = struct
   module Pedersen = struct
     include Crypto_params.Pedersen_params
     include Crypto_params.Pedersen_chunk_table
-    include Pedersen.Make (Field) (Bigint) (Inner_curve)
+
+    include Pedersen.Make (struct
+      module Field = Field
+      module Bigint = Bigint
+      module Curve = Inner_curve
+
+      let params = params
+
+      let chunk_table = chunk_table
+    end)
 
     let zero_hash =
-      digest_fold
-        (State.create params ~get_chunk_table)
+      digest_fold (State.create ())
         (Fold_lib.Fold.of_list [(false, false, false)])
 
     module Checked = struct
@@ -431,9 +439,8 @@ module Tick = struct
       let equal_states s1 s2 =
         equal_curves s1.State.acc s2.State.acc
         && Int.equal s1.triples_consumed s2.triples_consumed
-        (* params, chunk_tables should never be modified *)
-        && phys_equal s1.params s2.params
-        && phys_equal (s1.get_chunk_table ()) (s2.get_chunk_table ())
+
+      (* params, chunk_tables should never be modified *)
 
       let gen_fold n =
         let gen_triple =
@@ -454,13 +461,13 @@ module Tick = struct
         in
         Fold.of_list (gen_triples n)
 
-      let initial_state = State.create params ~get_chunk_table
+      let initial_state = State.create ()
 
       let run_updates fold =
         (* make sure chunk table deserialized before running test;
            actual deserialization happens just once
          *)
-        ignore (Crypto_params.Pedersen_chunk_table.deserialize ()) ;
+        ignore (Lazy.force chunk_table) ;
         let result = State.update_fold_chunked initial_state fold in
         let unchunked_result =
           State.update_fold_unchunked initial_state fold
@@ -629,7 +636,7 @@ module Tick = struct
     let conv_fqe v = Field.Vector.(get v 0, get v 1, get v 2)
 
     let conv_g2 p =
-      let x, y = Tick_backend.Inner_twisted_curve.to_coords p in
+      let x, y = Tick_backend.Inner_twisted_curve.to_affine_coordinates p in
       Pairing.G2.Unchecked.of_affine_coordinates (conv_fqe x, conv_fqe y)
 
     let conv_fqk (p : Tock_backend.Full.Fqk.t) =
@@ -707,6 +714,15 @@ let set_chunked_hashing b = Tick.Pedersen.State.set_chunked_fold b
 
 [%%inject
 "ledger_depth", ledger_depth]
+
+[%%inject
+"scan_state_transaction_capacity_log_2", scan_state_transaction_capacity_log_2]
+
+[%%inject
+"scan_state_work_delay_factor", scan_state_work_delay_factor]
+
+let pending_coinbase_depth =
+  scan_state_transaction_capacity_log_2 + scan_state_work_delay_factor
 
 (* Let n = Tick.Field.size_in_bits.
    Let k = n - 3.

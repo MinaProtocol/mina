@@ -11,11 +11,11 @@ module type Inputs_intf = sig
 
   module State_proof :
     Proof_intf
-    with type input := Consensus.Protocol_state.value
+    with type input := Consensus.Protocol_state.Value.t
      and type t := Proof.t
 end
 
-let transition_error msg = Or_error.errorf !"transition rejected :%s" msg
+let transition_error msg = Or_error.errorf "transition rejected: %s" msg
 
 module Make (Inputs : Inputs_intf) :
   Protocol_state_validator_intf
@@ -65,5 +65,11 @@ module Make (Inputs : Inputs_intf) :
         External_transition.to_verified transition
       in
       verified_transition
-    else Deferred.return @@ transition_error "failed consensus validation"
+    else
+      Deferred.return
+      @@ transition_error
+           (sprintf
+              !"not received_at_valid_time (received at \
+                %{sexp:Unix_timestamp.t}"
+              time_received)
 end

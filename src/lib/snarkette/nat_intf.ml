@@ -9,8 +9,6 @@ module type S = sig
 
   val to_int_exn : t -> int
 
-  val of_string : string -> t
-
   val ( < ) : t -> t -> bool
 
   val ( + ) : t -> t -> t

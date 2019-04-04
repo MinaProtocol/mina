@@ -20,7 +20,7 @@ let spawn_exn (config : Coda_worker.Input.t) =
 
 let local_config ?proposal_interval ~peers ~discovery_port ~external_port
     ~acceptable_delay ~program_dir ~proposer ~snark_worker_config
-    ~work_selection () =
+    ~work_selection ~offset ~trace_dir ~max_concurrent_connections () =
   let host = "127.0.0.1" in
   let conf_dir =
     Filename.temp_dir_name
@@ -29,28 +29,35 @@ let local_config ?proposal_interval ~peers ~discovery_port ~external_port
   let config =
     { Coda_worker.Input.host
     ; env=
-        Core.Unix.environment () |> Array.to_list
-        |> List.filter_map
-             ~f:
-               (Fn.compose
-                  (function [a; b] -> Some (a, b) | _ -> None)
-                  (String.split ~on:'='))
+        ( "CODA_TIME_OFFSET"
+        , Time.Span.to_int63_seconds_round_down_exn offset
+          |> Int63.to_int
+          |> Option.value_exn ?here:None ?message:None ?error:None
+          |> Int.to_string )
+        :: ( Core.Unix.environment () |> Array.to_list
+           |> List.filter_map
+                ~f:
+                  (Fn.compose
+                     (function [a; b] -> Some (a, b) | _ -> None)
+                     (String.split ~on:'=')) )
     ; proposer
     ; external_port
     ; snark_worker_config
     ; work_selection
     ; peers
     ; conf_dir
+    ; trace_dir
     ; program_dir
     ; acceptable_delay
-    ; discovery_port }
+    ; discovery_port
+    ; max_concurrent_connections }
   in
   config
 
 let disconnect (conn, proc, _) =
   let%bind () = Coda_worker.Connection.close conn in
-  let%bind _ : Unix.Exit_or_signal.t = Process.wait proc in
-  return ()
+  let%map _ : Unix.Exit_or_signal.t = Process.wait proc in
+  ()
 
 let peers_exn (conn, proc, _) =
   Coda_worker.Connection.run_exn conn ~f:Coda_worker.functions.peers ~arg:()
@@ -59,20 +66,46 @@ let get_balance_exn (conn, proc, _) pk =
   Coda_worker.Connection.run_exn conn ~f:Coda_worker.functions.get_balance
     ~arg:pk
 
+let get_nonce_exn (conn, proc, _) pk =
+  Coda_worker.Connection.run_exn conn ~f:Coda_worker.functions.get_nonce
+    ~arg:pk
+
+let root_length_exn (conn, proc, _) =
+  Coda_worker.Connection.run_exn conn ~f:Coda_worker.functions.root_length
+    ~arg:()
+
 let send_payment_exn (conn, proc, _) sk pk amount fee memo =
   Coda_worker.Connection.run_exn conn ~f:Coda_worker.functions.send_payment
     ~arg:(sk, pk, amount, fee, memo)
+
+let process_payment_exn (conn, proc, _) cmd =
+  Coda_worker.Connection.run_exn conn ~f:Coda_worker.functions.process_payment
+    ~arg:cmd
 
 let prove_receipt_exn (conn, proc, _) proving_receipt resulting_receipt =
   Coda_worker.Connection.run_exn conn ~f:Coda_worker.functions.prove_receipt
     ~arg:(proving_receipt, resulting_receipt)
 
-let strongest_ledgers_exn (conn, proc, _) =
+let verified_transitions_exn (conn, proc, _) =
   let%map r =
     Coda_worker.Connection.run_exn conn
-      ~f:Coda_worker.functions.strongest_ledgers ~arg:()
+      ~f:Coda_worker.functions.verified_transitions ~arg:()
+  in
+  Linear_pipe.wrap_reader r
+
+let root_diff_exn (conn, proc, _) =
+  let%map r =
+    Coda_worker.Connection.run_exn conn ~f:Coda_worker.functions.root_diff
+      ~arg:()
   in
   Linear_pipe.wrap_reader r
 
 let start_exn (conn, proc, _) =
   Coda_worker.Connection.run_exn conn ~f:Coda_worker.functions.start ~arg:()
+
+let dump_tf (conn, proc, _) =
+  Coda_worker.Connection.run_exn conn ~f:Coda_worker.functions.dump_tf ~arg:()
+
+let best_path (conn, proc, _) =
+  Coda_worker.Connection.run_exn conn ~f:Coda_worker.functions.best_path
+    ~arg:()

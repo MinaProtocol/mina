@@ -4,13 +4,11 @@ open Import
 module Stable = struct
   module V1 = struct
     module T = struct
-      let version = 1
-
       type t =
-        { proposer: Public_key.Compressed.t
-        ; amount: Currency.Amount.t
-        ; fee_transfer: Fee_transfer.single option }
-      [@@deriving sexp, bin_io, compare, eq]
+        { proposer: Public_key.Compressed.Stable.V1.t
+        ; amount: Currency.Amount.Stable.V1.t
+        ; fee_transfer: Fee_transfer.Single.Stable.V1.t option }
+      [@@deriving sexp, bin_io, compare, eq, version]
     end
 
     include T
@@ -53,16 +51,25 @@ end
 
 (* DO NOT add bin_io to the deriving list *)
 type t = Stable.Latest.t =
-  { proposer: Public_key.Compressed.t
-  ; amount: Currency.Amount.t
-  ; fee_transfer: Fee_transfer.single option }
+  { proposer: Public_key.Compressed.Stable.V1.t
+  ; amount: Currency.Amount.Stable.V1.t
+  ; fee_transfer: Fee_transfer.Single.Stable.V1.t option }
 [@@deriving sexp, compare, eq]
 
 let is_valid = Stable.Latest.is_valid
 
 let create ~amount ~proposer ~fee_transfer =
   let t = {proposer; amount; fee_transfer} in
-  if is_valid t then Ok t
+  if is_valid t then
+    let adjusted_fee_transfer =
+      if
+        Public_key.Compressed.equal
+          (Option.value_map fee_transfer ~default:proposer ~f:fst)
+          proposer
+      then None
+      else fee_transfer
+    in
+    Ok {t with fee_transfer= adjusted_fee_transfer}
   else Or_error.error_string "Coinbase.create: fee transfer was too high"
 
 let supply_increase {proposer= _; amount; fee_transfer} =
@@ -77,3 +84,16 @@ let supply_increase {proposer= _; amount; fee_transfer} =
 let fee_excess t =
   Or_error.map (supply_increase t) ~f:(fun _increase ->
       Currency.Fee.Signed.zero )
+
+let gen =
+  let open Quickcheck.Let_syntax in
+  let%bind proposer = Public_key.Compressed.gen in
+  let%bind amount =
+    Currency.Amount.(gen_incl zero Protocols.Coda_praos.coinbase_amount)
+  in
+  let fee =
+    Currency.Fee.gen_incl Currency.Fee.zero (Currency.Amount.to_fee amount)
+  in
+  let prover = Public_key.Compressed.gen in
+  let%map fee_transfer = Option.gen (Quickcheck.Generator.tuple2 prover fee) in
+  {proposer; amount; fee_transfer}

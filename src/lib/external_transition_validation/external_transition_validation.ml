@@ -9,7 +9,7 @@ module type Inputs_intf = sig
 
   module State_proof :
     Proof_intf
-    with type input := Consensus.Protocol_state.value
+    with type input := Consensus.Protocol_state.Value.t
      and type t := Proof.t
 
   module Transition_frontier :
@@ -233,7 +233,8 @@ module Make (Inputs : Inputs_intf) :
     in
     let%bind ( `Hash_after_applying staged_ledger_hash
              , `Ledger_proof proof_opt
-             , `Staged_ledger transitioned_staged_ledger ) =
+             , `Staged_ledger transitioned_staged_ledger
+             , `Pending_coinbase_data _ ) =
       Staged_ledger.apply ~logger parent_staged_ledger staged_ledger_diff
       |> Deferred.Result.map_error ~f:(fun e ->
              `Staged_ledger_application_failed e )

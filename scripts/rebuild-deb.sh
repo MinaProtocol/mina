@@ -37,7 +37,7 @@ cat ${BUILDDIR}/DEBIAN/control
 
 mkdir -p ${BUILDDIR}/usr/local/bin
 cp ./default/app/cli/src/coda.exe ${BUILDDIR}/usr/local/bin/coda
-cp ./default/app/logproc/src/logproc.exe ${BUILDDIR}/usr/local/bin/logproc
+cp ./default/app/logproc/logproc.exe ${BUILDDIR}/usr/local/bin/logproc
 
 
 # Include proving/verifying

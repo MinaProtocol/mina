@@ -34,13 +34,13 @@ module type Coda_intf = sig
     (t -> Signature_lib.Public_key.Compressed.t list -> Lite_base.Lite_chain.t)
     option
 
-  val strongest_ledgers :
+  val verified_transitions :
        t
     -> (Inputs.External_transition.Verified.t, State_hash.t) With_hash.t
        Strict_pipe.Reader.t
 end
 
-let to_base64 m x = B64.encode (Binable.to_string m x)
+let to_base64 m x = Base64.encode_string (Binable.to_string m x)
 
 module Storage (Bin : Binable.S) = struct
   let store location data =
@@ -54,7 +54,7 @@ struct
   let get_proposer_chain coda =
     let open Base in
     let open Keypair in
-    let get_lite_chain_exn = Program.get_lite_chain |> Option.value_exn in
+    let get_lite_chain_exn = Option.value_exn Program.get_lite_chain in
     (* HACK: we are just passing in the proposer path for this demo *)
     let keypair = Genesis_ledger.largest_account_keypair_exn () in
     let keys = [Public_key.compress keypair.public_key] in
@@ -66,9 +66,9 @@ struct
       (Storage (Lite_base.Lite_chain))
       (Put_request)
 
-  let run ~filename ~log coda =
-    let%bind web_client_pipe = Web_pipe.create ~filename ~log in
-    Strict_pipe.Reader.iter (Program.strongest_ledgers coda) ~f:(fun _ ->
+  let run ~filename ~logger coda =
+    let%bind web_client_pipe = Web_pipe.create ~filename ~logger in
+    Strict_pipe.Reader.iter (Program.verified_transitions coda) ~f:(fun _ ->
         let chain = get_proposer_chain coda in
         Web_pipe.store web_client_pipe chain )
 end
@@ -94,26 +94,29 @@ let verification_key_location () =
             !"IO ERROR: Verification key does not exist\n\
              \        You should probably turn off snarks" )
 
-let send_file_to_s3 log filename =
+let send_file_to_s3 logger filename =
   let open Deferred.Or_error.Let_syntax in
-  Logger.trace log "Copying %s to s3 client" filename ;
+  Logger.trace logger ~module_:__MODULE__ ~location:__LOC__
+    "Copying %s to s3 client" filename ;
   let%bind request = Web_request.S3_put_request.create () in
   Web_request.S3_put_request.put request filename
 
-let store_file ~send ~log filename object_name =
+let store_file ~send ~logger filename object_name =
   let open Deferred.Let_syntax in
-  match%map send log filename with
-  | Ok () -> Logger.trace log !"Successfully sent %s" object_name
+  match%map send logger filename with
+  | Ok () ->
+      Logger.trace logger ~module_:__MODULE__ ~location:__LOC__
+        "Successfully sent %s" object_name
   | Error e ->
-      Logger.error log !"Could not send %s: %s" object_name
-        (Error.to_string_hum e)
+      Logger.error logger ~module_:__MODULE__ ~location:__LOC__
+        "Could not send %s: %s" object_name (Error.to_string_hum e)
 
-let store_verification_keys ~send ~log =
+let store_verification_keys ~send ~logger =
   match%bind verification_key_location () with
   | Ok verification_key_location ->
-      store_file ~send ~log verification_key_location "verification keys"
+      store_file ~send ~logger verification_key_location "verification keys"
   | Error e ->
-      Logger.error log
+      Logger.error logger ~module_:__MODULE__ ~location:__LOC__
         !"Verification key Lookup Error: %s"
         (Error.to_string_hum e) ;
       Deferred.unit
@@ -124,34 +127,38 @@ let copy ~src ~dst =
 let project_directory = "CODA_PROJECT_DIR"
 
 let run_service (type t) (module Program : Coda_intf with type t = t) coda
-    ~conf_dir ~log =
+    ~conf_dir ~logger =
   O1trace.trace_task "web pipe" (fun () -> function
     | `None ->
-        Logger.info log "Not running a web client pipe" ;
+        Logger.info logger ~module_:__MODULE__ ~location:__LOC__
+          "Not running a web client pipe" ;
         don't_wait_for
           (Strict_pipe.Reader.iter_without_pushback
-             (Program.strongest_ledgers coda)
+             (Program.verified_transitions coda)
              ~f:ignore)
     | `Local path ->
         let open Keypair in
-        Logger.trace log "Saving chain locally at path %s" path ;
-        store_verification_keys ~log ~send:(fun _log vk_location ->
+        Logger.trace logger ~module_:__MODULE__ ~location:__LOC__
+          "Saving chain locally at path %s" path ;
+        store_verification_keys ~logger ~send:(fun _log vk_location ->
             copy ~src:vk_location ~dst:(path ^/ verification_key_basename)
             >>| Or_error.return )
         |> don't_wait_for ;
         let get_lite_chain = Option.value_exn Program.get_lite_chain in
         let keypair = Genesis_ledger.largest_account_keypair_exn () in
-        Strict_pipe.Reader.iter (Program.strongest_ledgers coda) ~f:(fun _ ->
+        Strict_pipe.Reader.iter (Program.verified_transitions coda)
+          ~f:(fun _ ->
             Writer.save (path ^/ "chain")
               ~contents:
-                (B64.encode
+                (Base64.encode_string
                    (Binable.to_string
                       (module Lite_base.Lite_chain)
                       (get_lite_chain coda
                          [Public_key.compress keypair.public_key]))) )
         |> don't_wait_for
     | `S3 ->
-        Logger.info log "Running S3 web client pipe" ;
+        Logger.info logger ~module_:__MODULE__ ~location:__LOC__
+          "Running S3 web client pipe" ;
         let module Broadcaster =
           Make_broadcaster
             (Program)
@@ -164,7 +171,7 @@ let run_service (type t) (module Program : Coda_intf with type t = t) coda
         don't_wait_for
           (let location = conf_dir ^/ "snarkette-data" in
            let%bind () = Unix.mkdir location ~p:() in
-           Broadcaster.run ~log ~filename:(location ^/ "chain") coda) ;
+           Broadcaster.run ~logger ~filename:(location ^/ "chain") coda) ;
         let js_file_storage_work =
           Unix.getenv project_directory
           |> Option.value_map ~default:Deferred.unit ~f:(fun file_dir ->
@@ -173,18 +180,18 @@ let run_service (type t) (module Program : Coda_intf with type t = t) coda
                      Deferred.all_unit
                        [ store_file
                            (file_dir ^/ "verifier_main.bc.js")
-                           "Verifier Main" ~log ~send:send_file_to_s3
-                       ; store_file (file_dir ^/ "main.bc.js") "Main" ~log
+                           "Verifier Main" ~logger ~send:send_file_to_s3
+                       ; store_file (file_dir ^/ "main.bc.js") "Main" ~logger
                            ~send:send_file_to_s3 ]
                  | `No | `Unknown ->
-                     Logger.error log
+                     Logger.error logger ~module_:__MODULE__ ~location:__LOC__
                        !"Js file directory %s does not exists"
                        file_dir ;
                      Deferred.unit )
         in
         let work =
           Deferred.all_unit
-            [ store_verification_keys ~send:send_file_to_s3 ~log
+            [ store_verification_keys ~send:send_file_to_s3 ~logger
             ; js_file_storage_work ]
         in
         don't_wait_for work )

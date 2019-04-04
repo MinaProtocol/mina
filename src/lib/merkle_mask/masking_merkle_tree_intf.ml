@@ -21,8 +21,8 @@ module type S = sig
 
   module Addr = Location.Addr
 
-  val create : unit -> t
   (** create a mask with no parent *)
+  val create : unit -> t
 
   val get_uuid : t -> Core.Uuid.t
 
@@ -37,20 +37,22 @@ module type S = sig
        and type key := key
        and type key_set := key_set
 
-    val get_hash : t -> Addr.t -> hash option
+    exception Dangling_parent_reference of Core.Uuid.t
+
     (** get hash from mask, if present, else from its parent *)
+    val get_hash : t -> Addr.t -> hash option
 
-    val commit : t -> unit
     (** commit all state to the parent, flush state locally *)
+    val commit : t -> unit
 
-    val unset_parent : t -> unattached
     (** remove parent *)
+    val unset_parent : t -> unattached
 
-    val get_parent : t -> parent
     (** get mask parent *)
+    val get_parent : t -> parent
 
-    val parent_set_notify : t -> account -> unit
     (** called when parent sets an account; update local state *)
+    val parent_set_notify : t -> account -> unit
 
     val copy : t -> t
     (* makes new mask instance with copied tables, re-use parent *)
@@ -65,6 +67,6 @@ module type S = sig
     end
   end
 
-  val set_parent : unattached -> parent -> Attached.t
   (** tell mask about parent *)
+  val set_parent : unattached -> parent -> Attached.t
 end

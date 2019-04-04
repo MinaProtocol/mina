@@ -42,6 +42,7 @@ module Make (Inputs : Inputs.S) : sig
      and type staged_ledger_aux_hash := Inputs.Staged_ledger_aux_hash.t
      and type transaction_snark_work_statement :=
                 Inputs.Transaction_snark_work.Statement.t
+     and type transaction_witness := Inputs.Transaction_witness.t
 end = struct
   open Inputs
 
@@ -52,10 +53,11 @@ end = struct
           let version = 1
 
           (* TODO: The statement is redundant here - it can be computed from the witness and the transaction *)
+          (* TODO : version all fields *)
           type t =
-            { transaction_with_info: Ledger.Undo.t
-            ; statement: Ledger_proof_statement.t
-            ; witness: Inputs.Sparse_ledger.t }
+            { transaction_with_info: Ledger.Undo.Stable.V1.t
+            ; statement: Ledger_proof_statement.Stable.V1.t
+            ; witness: Transaction_witness.t sexp_opaque }
           [@@deriving sexp, bin_io]
         end
 
@@ -75,7 +77,11 @@ end = struct
       module Registered_V1 = Registrar.Register (V1)
     end
 
-    include Stable.Latest
+    type t = Stable.Latest.t =
+      { transaction_with_info: Ledger.Undo.t
+      ; statement: Ledger_proof_statement.t
+      ; witness: Inputs.Transaction_witness.t }
+    [@@deriving sexp]
   end
 
   module Ledger_proof_with_sok_message = struct
@@ -84,7 +90,8 @@ end = struct
         module T = struct
           let version = 1
 
-          type t = Ledger_proof.t * Sok_message.t [@@deriving sexp, bin_io]
+          type t = Ledger_proof.Stable.V1.t * Sok_message.Stable.V1.t
+          [@@deriving sexp, bin_io]
         end
 
         include T
@@ -103,7 +110,7 @@ end = struct
       module Registered_V1 = Registrar.Register (V1)
     end
 
-    include Stable.Latest
+    type t = Ledger_proof.t * Sok_message.t [@@deriving sexp]
   end
 
   module Available_job = struct
@@ -143,8 +150,21 @@ end = struct
   type job = Available_job.t [@@deriving sexp]
 
   type parallel_scan_completed_job =
-    Ledger_proof_with_sok_message.t Parallel_scan.State.Completed_job.t
+    Ledger_proof_with_sok_message.Stable.V1.t
+    Parallel_scan.State.Completed_job.t
   [@@deriving sexp, bin_io]
+
+  (*Work capacity represents max number of work(currently in the tree and the ones that would arise in the future when current jobs are done) in the tree. *)
+  let work_capacity () =
+    let open Constants in
+    (*+1 because of <, +1 to give enough time to adjust the counter after proof is emitted, +1 to due to delay in proof emitting*)
+    (*For Evan: Having C= 2x(txns/block * total-no-of-trees) essentially means all the trees can have full leaves without having to do any work. This doesn't work with the succinct representation and FIFO work order during when this specific edge case occurs*)
+    (*Edge case:When there is a single slot at the end of the tree before continuing at the begining of the tree (referring to the last level), the jobs on the right side of the tree are done along with the jobs on the left (because it wasn't added until then). The root node has to wait until the right sub-tree has completed before the next round begins. By the time the right sub-tree is completed, the left tree is also ready with the proof but has to wait until the root is emitted. This won't work with our succint datastructure impl and FIFO work order.*)
+    let work_delay_factor = max 2 work_delay_factor in
+    let nearest_log_2_txn = Int.ceil_log2 transaction_capacity_log_2 in
+    let nearest_log_2_incr = Int.ceil_log2 work_delay_factor in
+    3 + nearest_log_2_incr + nearest_log_2_txn
+    + Int.pow 2 (transaction_capacity_log_2 + work_delay_factor)
 
   module Stable = struct
     module V1 = struct
@@ -154,15 +174,43 @@ end = struct
         type t =
           { (*Job_count: Keeping track of the number of jobs added to the tree. Every transaction added amounts to two jobs*)
             tree:
-              ( Ledger_proof_with_sok_message.t
-              , Transaction_with_witness.t )
-              Parallel_scan.State.t
+              ( Ledger_proof_with_sok_message.Stable.V1.t
+              , Transaction_with_witness.Stable.V1.t )
+              Parallel_scan.State.Stable.V1.t
           ; mutable job_count: int }
         [@@deriving sexp, bin_io]
       end
 
       include T
       include Registration.Make_latest_version (T)
+
+      let hash t =
+        let state_hash =
+          Parallel_scan.State.hash t.tree
+            (Binable.to_string (module Ledger_proof_with_sok_message.Stable.V1))
+            (Binable.to_string (module Transaction_with_witness.Stable.V1))
+        in
+        Staged_ledger_aux_hash.of_bytes
+          ((state_hash :> string) ^ Int.to_string t.job_count)
+
+      let is_valid t =
+        let k = max Constants.work_delay_factor 2 in
+        Parallel_scan.parallelism ~state:t.tree
+        = Int.pow 2 (Constants.transaction_capacity_log_2 + k)
+        && t.job_count < work_capacity ()
+        && Parallel_scan.is_valid t.tree
+
+      include Binable.Of_binable
+                (T)
+                (struct
+                  type nonrec t = t
+
+                  let to_binable = Fn.id
+
+                  let of_binable t =
+                    (* assert (is_valid t) ; *)
+                    t
+                end)
     end
 
     module Latest = V1
@@ -177,63 +225,40 @@ end = struct
     module Registered_V1 = Registrar.Register (V1)
   end
 
-  include Stable.Latest
+  type t = Stable.Latest.t =
+    { tree:
+        ( Ledger_proof_with_sok_message.Stable.V1.t
+        , Transaction_with_witness.Stable.V1.t )
+        Parallel_scan.State.Stable.V1.t
+    ; mutable job_count: int }
+  [@@deriving sexp]
 
-  (*Work capacity represents max number of work(currently in the tree and the ones that would arise in the future when current jobs are done) in the tree. *)
-  let work_capacity () =
-    let open Constants in
-    (*+1 because of <, +1 to give enough time to adjust the counter after proof is emitted, +1 to due to delay in proof emitting*)
-    (*For Evan: Having C= 2x(txns/block * total-no-of-trees) essentially means all the trees can have full leaves without having to do any work. This doesn't work with the succinct representation and FIFO work order during when this specific edge case occurs*)
-    (*Edge case:When there is a single slot at the end of the tree before continuing at the begining of the tree (referring to the last level), the jobs on the right side of the tree are done along with the jobs on the left (because it wasn't added until then). The root node has to wait until the right sub-tree has completed before the next round begins. By the time the right sub-tree is completed, the left tree is also ready with the proof but has to wait until the root is emitted. This won't work with our succint datastructure impl and FIFO work order.*)
-    let work_delay_factor = max 2 work_delay_factor in
-    let nearest_log_2_txn = Int.ceil_log2 transaction_capacity_log_2 in
-    let nearest_log_2_incr = Int.ceil_log2 work_delay_factor in
-    3 + nearest_log_2_incr + nearest_log_2_txn
-    + Int.pow 2 (transaction_capacity_log_2 + work_delay_factor)
-
-  let hash t =
-    let state_hash =
-      Parallel_scan.State.hash t.tree
-        (Binable.to_string (module Ledger_proof_with_sok_message))
-        (Binable.to_string (module Transaction_with_witness))
-    in
-    Staged_ledger_aux_hash.of_bytes
-      ((state_hash :> string) ^ Int.to_string t.job_count)
-
-  let is_valid t =
-    let k = max Constants.work_delay_factor 2 in
-    Parallel_scan.parallelism ~state:t.tree
-    = Int.pow 2 (Constants.transaction_capacity_log_2 + k)
-    && t.job_count < work_capacity ()
-    && Parallel_scan.is_valid t.tree
-
-  include Binable.Of_binable
-            (T)
-            (struct
-              type nonrec t = t
-
-              let to_binable = Fn.id
-
-              let of_binable t =
-                assert (is_valid t) ;
-                t
-            end)
+  let hash, is_valid = Stable.Latest.(hash, is_valid)
 
   (**********Helpers*************)
 
   let create_expected_statement
-      {Transaction_with_witness.transaction_with_info; witness; _} =
+      {Transaction_with_witness.transaction_with_info; witness; statement; _} =
     let open Or_error.Let_syntax in
     let source =
-      Frozen_ledger_hash.of_ledger_hash @@ Sparse_ledger.merkle_root witness
+      Frozen_ledger_hash.of_ledger_hash
+      @@ Sparse_ledger.merkle_root witness.ledger
     in
     let%bind transaction = Ledger.Undo.transaction transaction_with_info in
     let%bind after =
       Or_error.try_with (fun () ->
-          Sparse_ledger.apply_transaction_exn witness transaction )
+          Sparse_ledger.apply_transaction_exn witness.ledger transaction )
     in
     let target =
       Frozen_ledger_hash.of_ledger_hash @@ Sparse_ledger.merkle_root after
+    in
+    let pending_coinbase_before =
+      statement.pending_coinbase_stack_state.source
+    in
+    let pending_coinbase_after =
+      match transaction with
+      | Coinbase c -> Pending_coinbase.Stack.push pending_coinbase_before c
+      | _ -> pending_coinbase_before
     in
     let%bind fee_excess = Transaction.fee_excess transaction in
     let%map supply_increase = Transaction.supply_increase transaction in
@@ -241,6 +266,9 @@ end = struct
     ; target
     ; fee_excess
     ; supply_increase
+    ; pending_coinbase_stack_state=
+        { Pending_coinbase_stack_state.source= pending_coinbase_before
+        ; target= pending_coinbase_after }
     ; proof_type= `Base }
 
   let completed_work_to_scanable_work (job : job) (fee, current_proof, prover)
@@ -265,6 +293,9 @@ end = struct
           { Ledger_proof_statement.source= s.source
           ; target= s'.target
           ; supply_increase
+          ; pending_coinbase_stack_state=
+              { source= s.pending_coinbase_stack_state.source
+              ; target= s'.pending_coinbase_stack_state.target }
           ; fee_excess
           ; proof_type= `Merge }
         in
@@ -288,6 +319,7 @@ end = struct
   struct
     module Fold = Parallel_scan.State.Make_foldable (M)
 
+    (*TODO: fold over the pending_coinbase tree and validate the statements?*)
     let scan_statement {tree; _} :
         (Ledger_proof_statement.t, [`Error of Error.t | `Empty]) Result.t M.t =
       let write_error description =
@@ -377,7 +409,8 @@ end = struct
       | Ok (Some res) -> Ok res
       | Error e -> Error (`Error e)
 
-    let check_invariants t ~error_prefix ledger snarked_ledger_hash =
+    let check_invariants t ~error_prefix ~ledger_hash_end:current_ledger_hash
+        ~ledger_hash_begin:snarked_ledger_hash =
       let clarify_error cond err =
         if not cond then Or_error.errorf "%s : %s" error_prefix err else Ok ()
       in
@@ -385,14 +418,18 @@ end = struct
       match%map scan_statement t with
       | Error (`Error e) -> Error e
       | Error `Empty ->
-          let current_ledger_hash =
-            Ledger.merkle_root ledger |> Frozen_ledger_hash.of_ledger_hash
-          in
+          let current_ledger_hash = current_ledger_hash in
           Option.value_map ~default:(Ok ()) snarked_ledger_hash ~f:(fun hash ->
               clarify_error
                 (Frozen_ledger_hash.equal hash current_ledger_hash)
                 "did not connect with snarked ledger hash" )
-      | Ok {fee_excess; source; target; supply_increase= _; proof_type= _} ->
+      | Ok
+          { fee_excess
+          ; source
+          ; target
+          ; supply_increase= _
+          ; pending_coinbase_stack_state= _ (*TODO: check pending coinbases?*)
+          ; proof_type= _ } ->
           let open Or_error.Let_syntax in
           let%map () =
             Option.value_map ~default:(Ok ()) snarked_ledger_hash
@@ -402,10 +439,7 @@ end = struct
                   "did not connect with snarked ledger hash" )
           and () =
             clarify_error
-              (Frozen_ledger_hash.equal
-                 ( Ledger.merkle_root ledger
-                 |> Frozen_ledger_hash.of_ledger_hash )
-                 target)
+              (Frozen_ledger_hash.equal current_ledger_hash target)
               "incorrect statement target hash"
           and () =
             clarify_error
@@ -434,6 +468,9 @@ end = struct
         { Ledger_proof_statement.source= stmt1.source
         ; target= stmt2.target
         ; supply_increase
+        ; pending_coinbase_stack_state=
+            { source= stmt1.pending_coinbase_stack_state.source
+            ; target= stmt2.pending_coinbase_stack_state.target }
         ; fee_excess
         ; proof_type= `Merge }
 
@@ -527,9 +564,18 @@ end = struct
 
   let next_jobs_sequence t = Parallel_scan.next_jobs_sequence ~state:t.tree
 
+  let base_jobs_on_latest_tree t =
+    Parallel_scan.base_jobs_on_latest_tree t.tree
+
   let staged_transactions t =
     List.map (Parallel_scan.current_data t.tree)
       ~f:(fun (t : Transaction_with_witness.t) -> t.transaction_with_info )
+
+  let all_transactions t =
+    List.map ~f:(fun (t : Transaction_with_witness.t) ->
+        t.transaction_with_info |> Ledger.Undo.transaction )
+    @@ Parallel_scan.State.transactions t.tree
+    |> Or_error.all
 
   let copy {tree; job_count} = {tree= Parallel_scan.State.copy tree; job_count}
 

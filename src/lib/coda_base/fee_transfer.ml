@@ -1,11 +1,65 @@
 open Core
 open Import
+open Module_version
 
-type single = Public_key.Compressed.t * Currency.Fee.Stable.V1.t
-[@@deriving bin_io, sexp, compare, eq]
+module Single = struct
+  module Stable = struct
+    module V1 = struct
+      module T = struct
+        type t = Public_key.Compressed.Stable.V1.t * Currency.Fee.Stable.V1.t
+        [@@deriving bin_io, sexp, compare, eq, yojson, version]
+      end
 
-type t = One of single | Two of single * single
-[@@deriving bin_io, sexp, compare, eq]
+      include T
+      include Registration.Make_latest_version (T)
+    end
+
+    module Latest = V1
+
+    module Module_decl = struct
+      let name = "fee_transfer_single"
+
+      type latest = Latest.t
+    end
+
+    module Registrar = Registration.Make (Module_decl)
+    module Registered_V1 = Registrar.Register (V1)
+  end
+
+  (* bin_io omitted *)
+  type t = Stable.Latest.t [@@deriving sexp, compare, eq, yojson]
+end
+
+module Stable = struct
+  module V1 = struct
+    module T = struct
+      type t =
+        | One of Single.Stable.V1.t
+        | Two of Single.Stable.V1.t * Single.Stable.V1.t
+      [@@deriving bin_io, sexp, compare, eq, yojson, version]
+    end
+
+    include T
+    include Registration.Make_latest_version (T)
+  end
+
+  module Latest = V1
+
+  module Module_decl = struct
+    let name = "fee_transfer"
+
+    type latest = Latest.t
+  end
+
+  module Registrar = Registration.Make (Module_decl)
+  module Registered_V1 = Registrar.Register (V1)
+end
+
+(* bin_io omitted *)
+type t = Stable.Latest.t =
+  | One of Single.Stable.V1.t
+  | Two of Single.Stable.V1.t * Single.Stable.V1.t
+[@@deriving sexp, compare, eq, yojson]
 
 let to_list = function One x -> [x] | Two (x, y) -> [x; y]
 

@@ -33,6 +33,8 @@ module type Fp_intf = sig
 
   type nat
 
+  include Stringable.S with type t := t
+
   val of_int : int -> t
 
   val of_bits : bool list -> t option
@@ -110,6 +112,8 @@ module Make_fp
   open N
 
   let of_int = N.of_int
+
+  let to_string = N.to_string
 
   let of_string = N.of_string
 

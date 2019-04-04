@@ -16,26 +16,15 @@ module type Inputs_intf = sig
   val hash : hash -> proof_elem -> hash
 end
 
-module type S = sig
-  type value
+module Make_intf (Input : Inputs_intf) = struct
+  module type S = sig
+    val prove : context:Input.context -> Input.value -> Input.proof_elem list
 
-  type context
-
-  type proof_elem
-
-  type hash
-
-  val prove : context:context -> value -> proof_elem list
-
-  val verify : init:hash -> proof_elem list -> hash -> bool
+    val verify : init:Input.hash -> Input.proof_elem list -> Input.hash -> bool
+  end
 end
 
-module Make (Input : Inputs_intf) :
-  S
-  with type value := Input.value
-   and type context := Input.context
-   and type hash := Input.hash
-   and type proof_elem := Input.proof_elem = struct
+module Make (Input : Inputs_intf) : Make_intf(Input).S = struct
   open Input
 
   let prove ~context last =

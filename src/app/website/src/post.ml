@@ -13,6 +13,7 @@ type t =
   ; basename: string }
 
 let load path =
+  print_endline path ;
   let%map markdown = Reader.file_contents path and html = Markdown.load path in
   match extract_kv_str markdown with
   | None ->

@@ -2,4 +2,4 @@
   (name network_peer)
   (public_name network_peer)
   (libraries core module_version)
-  (preprocess (pps ppx_jane)))
+  (preprocess (pps ppx_jane ppx_deriving_yojson)))

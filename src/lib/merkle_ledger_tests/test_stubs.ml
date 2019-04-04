@@ -5,7 +5,7 @@ module Balance = Currency.Balance
 module Account = struct
   (* want bin_io, not available with Account.t *)
   type t = Coda_base.Account.Stable.V1.t
-  [@@deriving bin_io, sexp, eq, compare, hash]
+  [@@deriving bin_io, sexp, eq, compare, hash, yojson]
 
   type key = Coda_base.Account.Stable.V1.key
   [@@deriving bin_io, sexp, eq, compare, hash]
@@ -29,7 +29,7 @@ end
 (* below are alternative modules that use strings as public keys and UInt64 as balances for
    in accounts
 
-   using these modules instead of Account and Balance above speeds up the 
+   using these modules instead of Account and Balance above speeds up the
    ledger tests
 
    we don't use the alternatives for testing currently, because Account
@@ -56,7 +56,7 @@ module Account_not_used = struct
 
   type t =
     { public_key: key
-    ; balance: Balance.t
+    ; balance: Balance.Stable.V1.t
            [@printer
              fun fmt balance ->
                Format.pp_print_string fmt (Balance.to_string balance)] }
@@ -93,6 +93,12 @@ module Receipt = Coda_base.Receipt
 module Hash = struct
   module T = struct
     type t = Md5.t [@@deriving sexp, hash, compare, bin_io, eq]
+
+    let to_yojson t = `String (Md5.to_hex t)
+
+    let of_yojson = function
+      | `String s -> Ok (Md5.of_hex_exn s)
+      | _ -> Error "expected string"
   end
 
   include T
@@ -155,8 +161,10 @@ module In_memory_kvdb : Intf.Key_value_database = struct
 
   let set t ~key ~data = Bigstring_frozen.Table.set t.table ~key ~data
 
-  let set_batch tbl ~key_data_pairs =
-    List.iter key_data_pairs ~f:(fun (key, data) -> set tbl ~key ~data)
+  let set_batch t ?(remove_keys = []) ~key_data_pairs =
+    List.iter key_data_pairs ~f:(fun (key, data) -> set t ~key ~data) ;
+    List.iter remove_keys ~f:(fun key ->
+        Bigstring_frozen.Table.remove t.table key )
 
   let remove t ~key = Bigstring_frozen.Table.remove t.table key
 end
@@ -167,9 +175,15 @@ module Storage_locations : Intf.Storage_locations = struct
 end
 
 module Key = struct
-  module T = struct
-    type t = Account.key [@@deriving sexp, bin_io, eq, compare, hash]
+  module Stable = struct
+    module V1 = struct
+      type t = Account.key [@@deriving sexp, bin_io, eq, compare, hash]
+    end
+
+    module Latest = V1
   end
+
+  type t = Stable.Latest.t [@@deriving sexp, compare, hash]
 
   let to_string = Signature_lib.Public_key.Compressed.to_base64
 
@@ -188,12 +202,18 @@ module Key = struct
         (Quickcheck.Generator.list_with_length num_to_gen gen)
     in
     let unique_keys =
-      List.dedup_and_sort ~compare:T.compare more_than_enough_keys
+      List.dedup_and_sort ~compare:Stable.Latest.compare more_than_enough_keys
     in
     assert (List.length unique_keys >= num_keys) ;
     List.take unique_keys num_keys
 
-  include T
-  include Hashable.Make_binable (T)
-  include Comparable.Make (T)
+  include Hashable.Make_binable (Stable.Latest)
+  include Comparable.Make (Stable.Latest)
+end
+
+module Base_inputs = struct
+  module Key = Key
+  module Balance = Balance
+  module Account = Account
+  module Hash = Hash
 end

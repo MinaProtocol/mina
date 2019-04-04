@@ -1,7 +1,17 @@
 open Core_kernel
 
 (* A non-empty list is a tuple of the head and the rest (as a list) *)
-type 'a t = 'a * 'a list [@@deriving sexp, compare, eq, hash, bin_io]
+module Stable = struct
+  (* underlying type has a parameter, so don't register versions *)
+  module V1 = struct
+    type 'a t = 'a * 'a list [@@deriving sexp, compare, eq, hash, bin_io]
+  end
+
+  module Latest = V1
+end
+
+(* bin_io omitted intentionally *)
+type 'a t = 'a Stable.Latest.t [@@deriving sexp, compare, eq, hash]
 
 let init x xs = (x, xs)
 
@@ -14,6 +24,8 @@ let cons x' (x, xs) = (x', x :: xs)
 let head (x, _) = x
 
 let tail (_, xs) = xs
+
+let last (x, xs) = if List.is_empty xs then x else List.last_exn xs
 
 let of_list_opt = function [] -> None | x :: xs -> Some (x, xs)
 
@@ -51,3 +63,11 @@ let take (x, xs) = function
   | 0 -> None
   | 1 -> Some (x, [])
   | n -> Some (x, List.take xs (n - 1))
+
+let min_elt ~compare (x, xs) =
+  Option.value_map ~default:x (List.min_elt ~compare xs) ~f:(fun mininum ->
+      if compare x mininum < 0 then x else mininum )
+
+let max_elt ~compare (x, xs) =
+  Option.value_map ~default:x (List.max_elt ~compare xs) ~f:(fun maximum ->
+      if compare x maximum > 0 then x else maximum )

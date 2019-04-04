@@ -1,3 +1,5 @@
+open Core
+
 module Context = struct
   type ('message, 'pk) t = {message: 'message; public_key: 'pk}
   [@@deriving sexp]
@@ -226,7 +228,7 @@ end = struct
             (module Group.Checked.Shifted.S with type t = shifted))
           ({scaled_message_hash; discrete_log_equality= {c; s}} : var)
           ({message; public_key} : Context.var) =
-        let open Impl.Let_syntax in
+        let open Impl.Checked in
         let%bind () =
           let%bind a =
             (* s * g - c * public_key *)
@@ -370,56 +372,22 @@ let%test_module "vrf-test" =
       end
     end
 
-    (*
-    module Scalar =
-      Bigint_scalar (Impl)
-        (struct
-          let modulus =
-            Bigint.of_string
-              "4252498232415687930110553454452223399041429939925660931491171303058234989338533"
-
-          let random () = Bigint.random modulus
-        end)
-
-    module Curve =
-      Snarky.Curves.Edwards.Make (Impl) (Scalar)
-        (struct
-          let d = Impl.Field.of_int 20
-
-          let cofactor =
-            Bigint.(of_int 8 * of_int 5 * of_int 7 * of_int 399699743)
-
-          let order = Scalar.modulus
-
-          let generator =
-            let conv =
-              Fn.compose
-                Impl.Bigint.(Fn.compose to_field of_bignum_bigint)
-                Bigint.of_string
-            in
-            ( conv
-                "327139552581206216694048482879340715614392408122535065054918285794885302348678908604813232"
-            , conv
-                "269570906944652130755537879906638127626718348459103982395416666003851617088183934285066554"
-            )
-        end) *)
-
     module Curve = struct
       open Impl
 
       type var = Field.Var.t * Field.Var.t
 
-      include Snarky.Libsnark.Mnt6.Group
+      include Snarky.Libsnark.Mnt6.G1
 
       module Checked = struct
         include Snarky_curves.Make_weierstrass_checked
                   (Snarky_field_extensions.Field_extensions.F (Impl)) (Scalar)
                   (struct
-                    include Snarky.Libsnark.Mnt6.Group
+                    include Snarky.Libsnark.Mnt6.G1
 
                     let scale = scale_field
                   end)
-                  (Snarky.Libsnark.Curves.Mnt6.G1.Coefficients)
+                  (Snarky.Libsnark.Mnt6.G1.Coefficients)
 
         let add_known_unsafe t x = add_unsafe t (constant x)
       end
@@ -495,7 +463,6 @@ let%test_module "vrf-test" =
         include Curve.Checked
 
         let to_bits ((x, y) : var) =
-          let open Let_syntax in
           let%map x =
             Field.Checked.choose_preimage_var ~length:Field.size_in_bits x
           and y =
@@ -559,7 +526,7 @@ let%test_module "vrf-test" =
       |> Curve.to_affine_coordinates |> fst
 
     let hash_bits_checked bits =
-      let open Impl.Let_syntax in
+      let open Impl.Checked in
       Pedersen.hash
         ~init:(0, `Value Curve.zero)
         (bits_to_triples bits ~default:Impl.Boolean.false_)
@@ -574,7 +541,7 @@ let%test_module "vrf-test" =
 
       module Checked = struct
         let hash message pt =
-          let open Impl.Let_syntax in
+          let open Impl in
           let%bind message = Group.Checked.to_bits message
           and pt = Group.Checked.to_bits pt in
           hash_bits_checked (message @ pt)
@@ -583,7 +550,6 @@ let%test_module "vrf-test" =
 
     module Hash = struct
       open Impl
-      open Let_syntax
 
       let hash_for_proof m g1 g2 g3 =
         let x = hash_bits (List.concat_map ~f:Group.to_bits [m; g1; g2; g3]) in
@@ -592,11 +558,13 @@ let%test_module "vrf-test" =
       module Checked = struct
         let hash_for_proof m g1 g2 g3 =
           let%bind bs =
-            Checked.List.map ~f:Group.Checked.to_bits [m; g1; g2; g3]
-            >>| List.concat
+            Checked.map
+              (Checked.List.map ~f:Group.Checked.to_bits [m; g1; g2; g3])
+              ~f:List.concat
           in
-          hash_bits_checked bs >>= Pedersen.Digest.choose_preimage
-          >>| fun xs ->
+          let%map xs =
+            Checked.(hash_bits_checked bs >>= Pedersen.Digest.choose_preimage)
+          in
           List.take (xs :> Boolean.var list) Scalar.length_in_bits
       end
     end

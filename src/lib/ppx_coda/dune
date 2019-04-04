@@ -1,7 +1,7 @@
 (library
     (name ppx_coda)
     (public_name ppx_coda)
-    (kind ppx_rewriter)
-    (libraries ppxlib core_kernel)
-    (preprocess (pps ppxlib.metaquot))
-)
+    (kind ppx_deriver)
+    (libraries compiler-libs.common ppxlib ppx_deriving.api core_kernel)
+    (preprocess (pps ppxlib.metaquot)))
+

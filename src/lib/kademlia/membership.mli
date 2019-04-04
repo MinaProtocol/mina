@@ -11,9 +11,9 @@ module Haskell : sig
   val connect :
        initial_peers:Host_and_port.t list
     -> me:Peer.t
-    -> parent_log:Logger.t
+    -> logger:Logger.t
     -> conf_dir:string
-    -> trust_system:Coda_base.Trust_system.t
+    -> trust_system:Trust_system.t
     -> t Deferred.Or_error.t
 
   val peers : t -> Peer.t list

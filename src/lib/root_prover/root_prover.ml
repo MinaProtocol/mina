@@ -18,6 +18,7 @@ module type Inputs_intf = sig
      and type staged_ledger_diff := Staged_ledger_diff.t
      and type consensus_local_state := Consensus.Local_state.t
      and type user_command := User_command.t
+     and type diff_mutant := Diff_mutant.e
 
   module Time : Protocols.Coda_pow.Time_intf
 
@@ -38,7 +39,7 @@ module Make (Inputs : Inputs_intf) :
    and type external_transition := Inputs.External_transition.t
    and type proof_verified_external_transition :=
               Inputs.External_transition.Proof_verified.t
-   and type consensus_state := Consensus.Consensus_state.value
+   and type consensus_state := Consensus.Consensus_state.Value.t
    and type state_hash := State_hash.t = struct
   open Inputs
 
@@ -107,9 +108,11 @@ module Make (Inputs : Inputs_intf) :
       |> Transition_frontier.Breadcrumb.transition_with_hash |> With_hash.data
     in
     let merkle_list = Merkle_list.prove ~context:frontier best_verified_tip in
-    Logger.info logger
-      !"Produced a merkle list of %{sexp:State_body_hash.t list}"
-      merkle_list ;
+    Logger.info logger ~module_:__MODULE__ ~location:__LOC__
+      ~metadata:
+        [ ( "merkle_list"
+          , `List (List.map ~f:State_body_hash.to_yojson merkle_list) ) ]
+      "Produced a merkle list of $merkle_list" ;
     Some
       Proof_carrying_data.
         { data= root |> External_transition.of_verified
