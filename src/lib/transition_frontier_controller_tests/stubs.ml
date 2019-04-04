@@ -537,27 +537,28 @@ struct
       let%bind frontier = Hashtbl.find table peer in
       Sync_handler.transition_catchup ~frontier state_hash
 
+    let mplus ma mb = if Option.is_some ma then ma else mb
+
+    let get_staged_ledger_aux_and_pending_coinbases_at_hash {table; _} peer
+        hash =
+      Deferred.return
+      @@ Result.of_option
+           ~error:
+             (Error.of_string
+                "Peer could not find the staged_ledger_aux and \
+                 pending_coinbase at hash")
+           (let open Option.Let_syntax in
+           let%bind frontier = Hashtbl.find table peer in
+           Sync_handler.get_staged_ledger_aux_and_pending_coinbases_at_hash
+             ~frontier hash)
+
     let get_ancestry {table; logger} peer consensus_state =
       Deferred.return
       @@ Result.of_option
            ~error:(Error.of_string "Peer could not produce an ancestor")
            (let open Option.Let_syntax in
            let%bind frontier = Hashtbl.find table peer in
-           let%map peer_root_with_proof =
-             Root_prover.prove ~logger ~frontier consensus_state
-           in
-           let staged_ledger =
-             Transition_frontier.Breadcrumb.staged_ledger
-               (Transition_frontier.root frontier)
-           in
-           let scan_state = Staged_ledger.scan_state staged_ledger in
-           let merkle_root =
-             Ledger.merkle_root (Staged_ledger.ledger staged_ledger)
-           in
-           let pending_coinbases =
-             Staged_ledger.pending_coinbase_collection staged_ledger
-           in
-           (peer_root_with_proof, scan_state, merkle_root, pending_coinbases))
+           Root_prover.prove ~logger ~frontier consensus_state)
 
     let glue_sync_ledger {table; logger; _} query_reader response_writer : unit
         =
