@@ -1,6 +1,7 @@
 open Protocols.Coda_transition_frontier
 open Coda_base
 open Async_kernel
+open Pipe_lib
 
 module type Transition_database_schema = sig
   type external_transition
@@ -39,6 +40,19 @@ end
 module type Worker_inputs = sig
   include Transition_frontier.Inputs_intf
 
+  module Transition_storage : sig
+    module Schema :
+      Transition_database_schema
+      with type external_transition := External_transition.Stable.Latest.t
+       and type state_hash := State_hash.Stable.Latest.t
+       and type scan_state := Staged_ledger.Scan_state.Stable.Latest.t
+       and type pending_coinbases := Pending_coinbase.t
+
+    include Rocksdb.Serializable.GADT.S with type 'a g := 'a Schema.t
+
+    val get : t -> logger:Logger.t -> ?location:string -> 'a Schema.t -> 'a
+  end
+
   module Transition_frontier :
     Transition_frontier_intf
     with type state_hash := State_hash.t
@@ -50,65 +64,77 @@ module type Worker_inputs = sig
      and type transaction_snark_scan_state := Staged_ledger.Scan_state.t
      and type consensus_local_state := Consensus.Local_state.t
      and type user_command := User_command.t
-     and type diff_mutant := Diff_mutant.e
+     and type diff_mutant :=
+                ( External_transition.Stable.Latest.t
+                , State_hash.Stable.Latest.t )
+                With_hash.t
+                Diff_mutant.E.t
      and module Extensions.Work = Transaction_snark_work.Statement
 end
 
 module type Worker = sig
-  type external_transition
-
-  type scan_state
-
-  type state_hash
-
-  type frontier
-
-  type root_snarked_ledger
-
   type hash
 
-  type breadcrumb
+  type diff
 
-  type pending_coinbases
-
-  type 'a diff
+  type transition_storage
 
   type t
 
   val create : ?directory_name:string -> logger:Logger.t -> unit -> t
 
-  val deserialize :
-       t
-    -> root_snarked_ledger:root_snarked_ledger
-    -> consensus_local_state:Consensus.Local_state.t
-    -> frontier Deferred.t
+  val close : t -> unit
 
-  val handle_diff : t -> hash -> 'a diff -> hash
+  val handle_diff : t -> hash -> diff -> hash
 
   module For_tests : sig
-    module Transition_storage : sig
-      module Schema :
-        Transition_database_schema
-        with type external_transition := external_transition
-         and type state_hash := state_hash
-         and type scan_state := scan_state
-         and type pending_coinbases := pending_coinbases
-
-      include Rocksdb.Serializable.GADT.S with type 'a g := 'a Schema.t
-    end
-
-    val transition_storage : t -> Transition_storage.t
+    val transition_storage : t -> transition_storage
   end
 end
 
-(* TODO: Make an RPC_parallel version of Worker.ml *)
 module type Main_inputs = sig
   include Worker_inputs
 
-  module Worker : sig
-    type t
+  module Make_worker (Inputs : Worker_inputs) : sig
+    include
+      Worker
+      with type hash := Inputs.Diff_hash.t
+       and type diff := State_hash.t Inputs.Diff_mutant.E.t
+       and type transition_storage := Inputs.Transition_storage.t
 
     val handle_diff :
-      t -> Diff_hash.t -> 'a Diff_mutant.t -> Diff_hash.t Deferred.Or_error.t
+         t
+      -> Inputs.Diff_hash.t
+      -> State_hash.t Inputs.Diff_mutant.E.t
+      -> Inputs.Diff_hash.t Deferred.Or_error.t
   end
+end
+
+module type S = sig
+  type frontier
+
+  type t
+
+  type 'output diff
+
+  type diff_hash
+
+  type root_snarked_ledger
+
+  type consensus_local_state
+
+  val create : ?directory_name:string -> logger:Logger.t -> unit -> t
+
+  val listen_to_frontier_broadcast_pipe :
+       logger:Logger.t
+    -> frontier option Broadcast_pipe.Reader.t
+    -> t
+    -> unit Deferred.t
+
+  val deserialize :
+       directory_name:string
+    -> logger:Logger.t
+    -> root_snarked_ledger:root_snarked_ledger
+    -> consensus_local_state:consensus_local_state
+    -> frontier Deferred.t
 end

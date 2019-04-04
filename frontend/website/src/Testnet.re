@@ -20,6 +20,9 @@ let extraHeaders = <> Head.legacyStylesheets </>;
     [Style.Typeface.ibmplexsans, fontWeight(`medium), fontSize(`px(16))],
   );
 
+  // Remove the "status down" lemon curry popup as it's inaccurate
+  global(".darksnow.tc.bg-lemoncurry", [display(`none)]);
+
   // Remove fade in of explanations
   global(".animate-opacity", [opacity(1.)]);
 
