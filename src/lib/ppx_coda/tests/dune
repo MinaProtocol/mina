@@ -9,47 +9,12 @@
   (preprocess (pps ppx_jane ppx_deriving_yojson ppx_coda))
   (modules unexpired))
 
-(library
-  (name unexpired_in_module)
-  (preprocess (pps ppx_coda))
-  (modules unexpired_in_module))
-
 ;; versioning
 (library
   (name versioned_good)
   (preprocess (pps ppx_jane ppx_deriving_yojson ppx_coda))
   (libraries core_kernel)
   (modules versioned_good))
-
-(library
-  (name versioned_good_unnumbered)
-  (preprocess (pps ppx_jane ppx_deriving_yojson ppx_coda))
-  (libraries core_kernel)
-  (modules versioned_good_unnumbered))
-
-(library
-  (name versioned_good_type_constructors)
-  (preprocess (pps ppx_jane ppx_deriving_yojson ppx_coda))
-  (libraries core_kernel)
-  (modules versioned_good_type_constructors))
-
-(library
-  (name versioned_good_wrapped)
-  (preprocess (pps ppx_jane ppx_deriving_yojson ppx_coda))
-  (libraries core_kernel)
-  (modules versioned_good_wrapped))
-
-(library
-  (name versioned_good_contained_types)
-  (preprocess (pps ppx_jane ppx_deriving_yojson ppx_coda))
-  (libraries core_kernel)
-  (modules versioned_good_contained_types))
-
-(library
-  (name versioned_good_type_parameters)
-  (preprocess (pps ppx_jane ppx_deriving_yojson ppx_coda))
-  (libraries core_kernel)
-  (modules versioned_good_type_parameters))
 
 ;;; should fail
 

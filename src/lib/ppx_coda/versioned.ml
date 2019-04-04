@@ -128,7 +128,8 @@ let rec generate_core_type_version_decls core_type =
     match txt with
     | Lident id ->
         (* type t = id *)
-        if
+        if String.equal id "t" (* recursion *) then []
+        else if
           List.is_empty core_types
           && List.mem ocaml_builtin_types id ~equal:String.equal
         then (* no versioning to worry about *)
@@ -149,7 +150,7 @@ let rec generate_core_type_version_decls core_type =
             id
     | Ldot (prefix, "t") ->
         (* type t = A.B.t
-          generate: let _ = A.B.__versioned__
+           generate: let _ = A.B.__versioned__
         *)
         let loc = core_type.ptyp_loc in
         let pexp_loc = loc in
@@ -259,8 +260,8 @@ let validate_options valid options =
       (String.concat ~sep:"," valid)
 
 let generate_let_bindings_for_type_decl_str ~options ~path type_decls =
-  let type_decl = get_type_decl_representative type_decls in
   ignore (validate_options ["wrapped"; "unnumbered"] options) ;
+  let type_decl = get_type_decl_representative type_decls in
   let wrapped = check_for_option "wrapped" options in
   let unnumbered = check_for_option "unnumbered" options in
   let inner3_modules = List.take (List.rev path) 3 in
@@ -286,8 +287,8 @@ let generate_val_decls_for_type_decl type_decl ~unnumbered =
 
 let generate_val_decls_for_type_decl_sig ~options ~path:_ type_decls =
   (* in a signature, the module path may vary *)
-  let type_decl = get_type_decl_representative type_decls in
   ignore (validate_options ["unnumbered"] options) ;
+  let type_decl = get_type_decl_representative type_decls in
   let unnumbered = check_for_option "unnumbered" options in
   generate_val_decls_for_type_decl type_decl ~unnumbered
 
