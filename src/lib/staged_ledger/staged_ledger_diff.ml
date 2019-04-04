@@ -102,11 +102,14 @@ end) :
   module Stable = struct
     module V1 = struct
       module T = struct
+        (* TODO : use version ppx *)
         let version = 1
+
+        let __versioned__ = true
 
         type t =
           { diff: diff
-          ; prev_hash: Staged_ledger_hash.t (* TODO : version *)
+          ; prev_hash: Staged_ledger_hash.t
           ; creator: Compressed_public_key.Stable.V1.t }
         [@@deriving sexp, bin_io]
       end

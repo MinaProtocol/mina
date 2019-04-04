@@ -21,6 +21,17 @@
   integer. TODO: Anything to say about registration, translation to a latest
   version for wrapped types?
 
+  For types in structures, we can also write:
+
+    [@@deriving version { unnumbered }]
+
+  The "unnumbered" option prevents the generation of the value
+   
+    let version = n
+
+  to prevent warnings or errors about an unused value. That's 
+  useful for versioned types in modules that aren't registered.
+
 *)
 
 open Core_kernel
@@ -201,7 +212,7 @@ let generate_contained_type_decls type_decl =
       Ppx_deriving.raise_errorf ~loc:type_decl.ptype_loc
         "Versioned type must not be open"
 
-let generate_versioned_decls type_decl wrapped =
+let generate_versioned_decls type_decl ~wrapped =
   let module E = Ppxlib.Ast_builder.Make (struct
     let loc = type_decl.ptype_loc
   end) in
@@ -223,46 +234,62 @@ let get_type_decl_representative type_decls =
       "Versioned type must be just one type \"t\", not a sequence of types" ) ;
   type_decl1
 
+let check_for_option s options =
+  let is_s_opt opt =
+    match opt with
+    | str1, {pexp_desc= Pexp_ident {txt= Lident str2; _}; _} ->
+        String.equal s str1 && String.equal s str2
+    | _ -> false
+  in
+  List.find options ~f:is_s_opt |> Option.is_some
+
+let validate_options valid options =
+  let get_option_name (str, _) = str in
+  let is_valid opt =
+    get_option_name opt |> List.mem valid ~equal:String.equal
+  in
+  if not (List.for_all options ~f:is_valid) then
+    let exprs = List.map options ~f:snd in
+    let {pexp_loc= loc1; _} = List.hd_exn exprs in
+    let {pexp_loc= loc2; _} = List.hd_exn (List.rev exprs) in
+    let loc =
+      {loc_start= loc1.loc_start; loc_end= loc2.loc_end; loc_ghost= true}
+    in
+    Ppx_deriving.raise_errorf ~loc "Valid options to \"version\" are: %s"
+      (String.concat ~sep:"," valid)
+
 let generate_let_bindings_for_type_decl_str ~options ~path type_decls =
   let type_decl = get_type_decl_representative type_decls in
-  let wrapped =
-    match options with
-    | [] -> false
-    | [("wrapped", {pexp_desc= Pexp_ident {txt= Lident "wrapped"; _}; _})] ->
-        true
-    | _ ->
-        let exprs = List.map options ~f:snd in
-        let {pexp_loc= loc1; _} = List.hd_exn exprs in
-        let {pexp_loc= loc2; _} = List.hd_exn (List.rev exprs) in
-        let loc =
-          {loc_start= loc1.loc_start; loc_end= loc2.loc_end; loc_ghost= true}
-        in
-        Ppx_deriving.raise_errorf ~loc
-          "Invalid option(s) to \"version\", can only be \"wrapped\""
-  in
+  ignore (validate_options ["wrapped"; "unnumbered"] options) ;
+  let wrapped = check_for_option "wrapped" options in
+  let unnumbered = check_for_option "unnumbered" options in
   let inner3_modules = List.take (List.rev path) 3 in
   validate_type_decl inner3_modules wrapped type_decl ;
-  generate_version_number_decl inner3_modules type_decl.ptype_loc wrapped
-  :: generate_versioned_decls type_decl wrapped
+  let versioned_decls = generate_versioned_decls type_decl ~wrapped in
+  if unnumbered then versioned_decls
+  else
+    generate_version_number_decl inner3_modules type_decl.ptype_loc wrapped
+    :: versioned_decls
 
-let generate_val_decls_for_type_decl type_decl =
+let generate_val_decls_for_type_decl type_decl ~unnumbered =
   match type_decl.ptype_kind with
   (* the structure of the type doesn't affect what we generate for signatures *)
   | Ptype_abstract | Ptype_variant _ | Ptype_record _ ->
       let loc = type_decl.ptype_loc in
-      [%sig:
-        val version : int
-
-        val __versioned__ : bool]
+      let versioned = [%sigi: val __versioned__ : bool] in
+      if unnumbered then [versioned]
+      else [[%sigi: val version : int]; versioned]
   | Ptype_open ->
       (* but the type can't be open, else it might vary over time *)
       Ppx_deriving.raise_errorf ~loc:type_decl.ptype_loc
         "Versioned type in a signature must not be open"
 
-let generate_val_decls_for_type_decl_sig ~options:_ ~path:_ type_decls =
+let generate_val_decls_for_type_decl_sig ~options ~path:_ type_decls =
   (* in a signature, the module path may vary *)
   let type_decl = get_type_decl_representative type_decls in
-  generate_val_decls_for_type_decl type_decl
+  ignore (validate_options ["unnumbered"] options) ;
+  let unnumbered = check_for_option "unnumbered" options in
+  generate_val_decls_for_type_decl type_decl ~unnumbered
 
 let () =
   Ppx_deriving.(
