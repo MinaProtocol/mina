@@ -44,7 +44,7 @@ let writeStatic = (path, rootComponent) => {
 
 Array.length(Sys.argv) > 2 && Sys.argv[2] == "prod"
   ? {
-    Links.Cdn.prefix := "https://cdn.codaprotocol.com";
+    Links.Cdn.prefix := "https://cdn.codaprotocol.com/v1";
   }
   : ();
 
