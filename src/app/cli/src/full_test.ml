@@ -56,10 +56,7 @@ let run_test () : unit Deferred.t =
       let module Run = Run (Config) (Main) in
       let open Main in
       let%bind trust_dir = Async.Unix.mkdtemp (temp_conf_dir ^/ "trust_db") in
-      let trust_system = Coda_base.Trust_system.create ~db_dir:trust_dir in
-      let%bind transition_frontier_location =
-        Unix.mkdtemp (temp_conf_dir ^/ "transition_frontier")
-      in
+      let trust_system = Trust_system.create ~db_dir:trust_dir in
       let%bind receipt_chain_dir_name =
         Async.Unix.mkdtemp (temp_conf_dir ^/ "receipt_chain")
       in
@@ -74,7 +71,7 @@ let run_test () : unit Deferred.t =
         { Inputs.Net.Config.logger
         ; time_controller
         ; gossip_net_params=
-            { Inputs.Net.Gossip_net.Config.timeout= Time.Span.of_sec 1.
+            { Inputs.Net.Gossip_net.Config.timeout= Time.Span.of_sec 3.
             ; logger
             ; target_peer_count= 8
             ; initial_peers= []
@@ -82,7 +79,8 @@ let run_test () : unit Deferred.t =
             ; me=
                 Network_peer.Peer.create Unix.Inet_addr.localhost
                   ~discovery_port:8001 ~communication_port:8000
-            ; trust_system } }
+            ; trust_system
+            ; max_concurrent_connections= Some 10 } }
       in
       Core.Backtrace.elide := false ;
       Async.Scheduler.set_record_backtraces true ;
@@ -93,13 +91,13 @@ let run_test () : unit Deferred.t =
              ~transaction_pool_disk_location:
                (temp_conf_dir ^/ "transaction_pool")
              ~snark_pool_disk_location:(temp_conf_dir ^/ "snark_pool")
-             ~transition_frontier_location ~time_controller
-             ~receipt_chain_database () ~snark_work_fee:(Currency.Fee.of_int 0))
+             ~time_controller ~receipt_chain_database ()
+             ~snark_work_fee:(Currency.Fee.of_int 0))
       in
       Main.start coda ;
       don't_wait_for
         (Strict_pipe.Reader.iter_without_pushback
-           (Main.strongest_ledgers coda)
+           (Main.verified_transitions coda)
            ~f:ignore) ;
       let wait_until_cond ~(f : t -> bool) ~(timeout : Float.t) =
         let rec go () =
@@ -330,7 +328,7 @@ let run_test () : unit Deferred.t =
         assert (block_count coda > block_count')
       else
         let%bind _ =
-          test_multiple_payments other_accounts (pks other_accounts) 5.
+          test_multiple_payments other_accounts (pks other_accounts) 7.
         in
         test_duplicate_payments sender_keypair receiver_keypair )
 

@@ -52,6 +52,10 @@ module Make (Inputs : Inputs_intf) :
   let scan_state breadcrumb =
     breadcrumb |> Breadcrumb.staged_ledger |> Staged_ledger.scan_state
 
+  let pending_coinbase breadcrumb =
+    breadcrumb |> Breadcrumb.staged_ledger
+    |> Staged_ledger.pending_coinbase_collection
+
   let handle_diff () (diff : Breadcrumb.t Transition_frontier_diff.t) :
       view option =
     let open Transition_frontier_diff in
@@ -60,7 +64,11 @@ module Make (Inputs : Inputs_intf) :
     @@
     match diff with
     | New_frontier breadcrumb ->
-        [E (New_frontier (get_transition breadcrumb, scan_state breadcrumb))]
+        [ E
+            (New_frontier
+               ( get_transition breadcrumb
+               , scan_state breadcrumb
+               , pending_coinbase breadcrumb )) ]
     | New_breadcrumb breadcrumb ->
         [E (Add_transition (get_transition breadcrumb))]
     | New_best_tip {garbage; added_to_best_tip_path; new_root; old_root; _} ->
@@ -80,6 +88,9 @@ module Make (Inputs : Inputs_intf) :
         else
           [ added_transition
           ; E
-              (Update_root (Breadcrumb.state_hash new_root, scan_state new_root))
+              (Update_root
+                 ( Breadcrumb.state_hash new_root
+                 , scan_state new_root
+                 , pending_coinbase new_root ))
           ; remove_transition ]
 end

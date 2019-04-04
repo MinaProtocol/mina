@@ -7,7 +7,8 @@ module Worker = Worker
 module Intf = Intf
 module Diff_hash = Diff_hash
 
-module Make (Inputs : Intf.Main_inputs) :
+module Make (Inputs : Intf.Main_inputs) =
+(* :
   Intf.S
   with type frontier := Inputs.Transition_frontier.t
    and type worker := Inputs.Worker.t
@@ -15,8 +16,17 @@ module Make (Inputs : Intf.Main_inputs) :
    and type 'output diff :=
               ( (Inputs.External_transition.t, State_hash.t) With_hash.t
               , 'output )
-              Inputs.Diff_mutant.t = struct
+              Inputs.Diff_mutant.t  *)
+struct
   open Inputs
+
+  let scan_state t =
+    t |> Transition_frontier.Breadcrumb.staged_ledger
+    |> Inputs.Staged_ledger.scan_state
+
+  let pending_coinbase t =
+    t |> Transition_frontier.Breadcrumb.staged_ledger
+    |> Staged_ledger.pending_coinbase_collection
 
   let apply_diff (type mutant) frontier
       (diff :
@@ -42,9 +52,7 @@ module Make (Inputs : Intf.Main_inputs) :
         let state_hash =
           Transition_frontier.Breadcrumb.state_hash previous_root
         in
-        ( state_hash
-        , Transition_frontier.Breadcrumb.staged_ledger previous_root
-          |> Staged_ledger.scan_state )
+        (state_hash, scan_state previous_root, pending_coinbase previous_root)
 
   let to_state_hash_diff (type output)
       (diff :
@@ -61,26 +69,11 @@ module Make (Inputs : Intf.Main_inputs) :
     | Update_root new_root -> E (Update_root new_root)
 
   let write_diff_and_verify ~logger ~acc_hash worker frontier diff_mutant =
-    ( Debug_assert.debug_assert
-    @@ fun () ->
-    Logger.info logger ~module_:__MODULE__ ~location:__LOC__
-      ~metadata:
-        [ ( "diff_request"
-          , Diff_mutant.yojson_of_key diff_mutant
-              ~f:(Fn.compose State_hash.to_yojson With_hash.hash) ) ]
-      "Applying mutant diff; $diff_request" ) ;
     let ground_truth_diff = apply_diff frontier diff_mutant in
     let ground_truth_hash =
       Diff_mutant.hash acc_hash diff_mutant ground_truth_diff
         ~f:(Fn.compose State_hash.to_bytes With_hash.hash)
     in
-    ( Debug_assert.debug_assert
-    @@ fun () ->
-    Logger.trace ~module_:__MODULE__ ~location:__LOC__ logger
-      ~metadata:
-        [ ( "diff_response"
-          , Diff_mutant.yojson_of_value diff_mutant ground_truth_diff ) ]
-      "Ground truth diff mutant" ) ;
     match%map
       Worker.handle_diff worker acc_hash (to_state_hash_diff diff_mutant)
     with

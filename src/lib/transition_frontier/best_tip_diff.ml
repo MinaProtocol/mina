@@ -29,9 +29,9 @@ end) :
     let open Transition_frontier_diff in
     match diff with
     | New_breadcrumb _ -> None (* We only care about the best tip *)
-    | New_frontier breadrcumb ->
+    | New_frontier breadcrumb ->
         Some
-          { new_user_commands= Breadcrumb.to_user_commands breadrcumb
+          { new_user_commands= Breadcrumb.to_user_commands breadcrumb
           ; removed_user_commands= [] }
     | New_best_tip {added_to_best_tip_path; removed_from_best_tip_path; _} ->
         Some

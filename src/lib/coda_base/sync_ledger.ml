@@ -79,7 +79,7 @@ module Query = struct
 
         type t =
           Ledger.Location.Addr.Stable.V1.t Syncable_ledger.Query.Stable.V1.t
-        [@@deriving bin_io, sexp]
+        [@@deriving bin_io, sexp, to_yojson]
       end
 
       include T
@@ -99,5 +99,5 @@ module Query = struct
   end
 
   (* bin_io omitted from deriving list *)
-  type t = Stable.Latest.t [@@deriving sexp]
+  type t = Stable.Latest.t [@@deriving sexp, to_yojson]
 end

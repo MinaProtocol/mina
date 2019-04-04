@@ -236,7 +236,7 @@ Transaction throughput here refers to the rate at which transactions can be proc
 
 <div class="side-footnote-container">
 <div class="side-footnote">
-<sup>7</sup> 
+<sup>7</sup>
 The more we sacrifice latency the longer proposer nodes have to keep around full copies of the state before just relying on the small SNARK itself.
 </div>
 </div>
@@ -257,7 +257,7 @@ We’ll start with some assumptions:
 
 <div class="side-footnote-container">
 <div class="side-footnote">
-<sup>8</sup> 
+<sup>8</sup>
 This is possible because of a cryptographic notion known as “Signature of Knowledge” which lets us embed information about the creator and a fee into the proof in a way that is unforgeable. We will talk more about how we use this information in another blog&nbsp;post.
 </div>
 
@@ -304,7 +304,7 @@ $$M_{ij} := \; \; \sigma_i \Longrightarrow \sigma_j$$
 
 Accumulated value:
 
-$$A_k := \; \; \sigma_0 \Longrightarrow \sigma_k$$ 
+$$A_k := \; \; \sigma_0 \Longrightarrow \sigma_k$$
 
 Let’s say that data effectively enqueues a “Base job” that can be completed to become “Base work”. Similarly, two “Base work”s (or two “Merge works”s) can be combined in a “Merge job” to create “Merge work”.
 
@@ -410,7 +410,7 @@ Now we have $$\frac{R}{2}$$ pieces of merge work to complete and we use $$\frac{
 ![](https://d2mxuefqeaa7sj.cloudfront.net/s_1F9E16749B17DC54549D96B5A3247F680EDDCCCB3DD78CFE222A02DA9883D4EE_1544566092163_naive-all.png)
 
 
-We repeat until we reach the top of the tree. The completed Merge work at the top can be consumed by the rest of the&nbsp;system. 
+We repeat until we reach the top of the tree. The completed Merge work at the top can be consumed by the rest of the&nbsp;system.
 
 ## Analysis
 
@@ -517,21 +517,21 @@ Throughput of work completion matches our stream of data! It’s perfect, we’v
 
 - Latency: $$O(log(R))$$
 
- 
+
 
 
 <div class="side-footnote-container">
 <div class="side-footnote">
-<sup>9</sup> 
+<sup>9</sup>
 Here’s a short informal proof: Note that any sort of reduction operation on $$N$$ pieces of data can’t be done faster than $$O(log(N))$$ span. If we assume we could handle our $$R$$ units that we enqueue at a time in fewer than $$O(log(N))$$ steps then since we’re doing a reduction operation we would be doing it faster than $$O(log(N))$$ which is a contradiction.
 </div>
 </div>
 Latency is still logarithmic, though now it’s $$log(R)+1$$ steps as our trees have $$R$$ leaves and we an extra layer on the bottom for base jobs. In fact, this is actually the lower bound.^[Here’s a short informal proof: Note that any sort of reduction operation on $$N$$ pieces of data can’t be done faster than $$O(log(N))$$ span. If we assume we could handle our $$R$$ units that we enqueue at a time in fewer than $$O(log(N))$$ steps then since we’re doing a reduction operation we would be doing it faster than $$O(log(N))$$ which is a&nbsp;contradiction.]
- 
 
-- Space: $$O(R*log(R))$$ 
 
- 
+- Space: $$O(R*log(R))$$
+
+
 We have multiple trees now. Interestingly, we have exactly $$log(R)$$ trees pending at a time. Again our longer trees take up an extra layer than traditional binary trees, so in this case $$3R-1$$ nodes since we have $$R$$ leaves, and we have $$log(R)$$ of these trees.^[In order to prevent latency and space from growing over time, we need to make sure we complete work as fast as we add it.]
 
 Now that we have thoroughly optimized our throughput and latency, let’s optimize for&nbsp;space.
@@ -540,7 +540,7 @@ Now that we have thoroughly optimized our throughput and latency, let’s optimi
 
 <div class="side-footnote-container">
 <div class="side-footnote">
-<sup>10</sup> 
+<sup>10</sup>
 In order to prevent latency and space from growing over time, we need to make sure we complete work as fast as we add it.
 </div>
 </div>
@@ -565,13 +565,13 @@ Throughput is the same as before.
 
 - Latency: $$O(log(R))$$
 
- 
+
 Latency is the same as above.
- 
 
-- Space: $$O(R)$$ 
 
- 
+- Space: $$O(R)$$
+
+
 We’ve reduced our space back down to a single tree with leaves $$3R-1$$.
 
 ## Space Optimization
@@ -583,16 +583,16 @@ Do we really need that extra layer? If we change how we think about the problem,
 
 Now we’re down to $$2R-1$$ nodes—a standard binary tree with $$R$$ leaves.
 
-How do we store the tree? Since we know the size a priori (a complete binary tree with $$R$$ leaves), we can use a *succinct* representation. 
+How do we store the tree? Since we know the size a priori (a complete binary tree with $$R$$ leaves), we can use a *succinct* representation.
 
 
 <div class="side-footnote-container">
 <div class="side-footnote">
-<sup>11</sup> 
+<sup>11</sup>
 This is a very interesting area of computer science research, and I very much recommend the curious to read more: See [Zhou, et. al 2013](https://www.cs.cmu.edu/~dga/papers/zhou-sea2013.pdf) and [wavelet trees](https://en.wikipedia.org/wiki/Wavelet_Tree).
 <br>
 <br>
-<sup>12</sup> 
+<sup>12</sup>
 In our case, just the&nbsp;cursor.
 </div>
 </div>
@@ -613,13 +613,13 @@ Throughput keeps up with production rate $$R$$, so we couldn’t do better.
 
 - Latency: $$O(log(R))$$
 
- 
+
 Latency is proportional to $$log(R)$$ steps, as we described earlier, so we don’t get hurt too badly&nbsp;there.
- 
 
-- Space: $$2R-1 + O(1)$$  
 
- 
+- Space: $$2R-1 + O(1)$$
+
+
 We have an implicit data structure representation for our complete binary tree with $$2R$$ leaves as described above.
 
 ### Fully Optimized Scan

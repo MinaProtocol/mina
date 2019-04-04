@@ -18,6 +18,7 @@ let%test_module "Sync_handler" =
       Backtrace.elide := false ;
       Printexc.record_backtrace true ;
       let logger = Logger.null () in
+      let trust_system = Trust_system.null () in
       Ledger.with_ephemeral_ledger ~f:(fun dest_ledger ->
           Thread_safe.block_on_async_exn (fun () ->
               let%bind frontier =
@@ -28,7 +29,9 @@ let%test_module "Sync_handler" =
                 |> Ledger.of_database
               in
               let desired_root = Ledger.merkle_root source_ledger in
-              let sync_ledger = Sync_ledger.Mask.create dest_ledger ~logger in
+              let sync_ledger =
+                Sync_ledger.Mask.create dest_ledger ~logger ~trust_system
+              in
               let query_reader = Sync_ledger.Mask.query_reader sync_ledger in
               let answer_writer = Sync_ledger.Mask.answer_writer sync_ledger in
               let peer =
@@ -41,7 +44,9 @@ let%test_module "Sync_handler" =
                     (Network_peer.Peer.Table.of_alist_exn [(peer, frontier)])
               in
               Network.glue_sync_ledger network query_reader answer_writer ;
-              match%map Sync_ledger.Mask.fetch sync_ledger desired_root with
+              match%map
+                Sync_ledger.Mask.fetch sync_ledger desired_root ~data:()
+              with
               | `Ok synced_ledger ->
                   Ledger_hash.equal
                     (Ledger.merkle_root dest_ledger)

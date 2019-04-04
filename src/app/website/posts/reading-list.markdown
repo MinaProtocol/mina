@@ -52,7 +52,7 @@ Some books we like are
 For our purposes, some basic knowledge of abstract algebra is useful. Good things to understand
 are the definitions of groups and fields. Basic (discrete) probability theory is useful as well.
 
-Programming for SNARKs can also be quite mathematical, and we think the skills provided by a 
+Programming for SNARKs can also be quite mathematical, and we think the skills provided by a
 background in mathematics are somewhat transferable to SNARK programming.
 
 ## Cryptography
@@ -76,7 +76,7 @@ We of course don't expect anyone to be an expert in all of these areas, but expe
 - Systems Programming
 - Distributed Systems
 
-Again, we stress that a candidate need not have background in any of the above specialized areas, 
+Again, we stress that a candidate need not have background in any of the above specialized areas,
 but these are the fields that will be useful
 to us as we build out our protocol, so if this stuff seems interesting to you,
 and you'd be willing to start learning a chunk of it, we'd be interested in talking.

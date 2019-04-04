@@ -10,20 +10,42 @@ module Size = {
 };
 
 let component = ReasonReact.statelessComponent("Svg");
-let make = (~link, ~dims, _children) => {
+let make = (~link, ~dims, ~inline=false, ~className=?, ~alt, _children) => {
   ...component,
   render: _self =>
-    <svg
-      className=Css.(
-        style([
-          width(`rem(Size.remX(dims))),
-          height(`rem(Size.remY(dims))),
-        ])
-      )>
-      <image
-        xlinkHref=link
+    if (inline) {
+      // Load the CSS inline so that we can get the fonts from the main page.
+      let content =
+        Node.Fs.readFileAsUtf8Sync(
+          String.sub(link, 1, String.length(link) - 1),
+        );
+      <div
+        className={Belt.Option.getWithDefault(className, "")}
+        dangerouslySetInnerHTML={"__html": content}
+        alt
+      />;
+    } else {
+      <object
+        data={Links.Cdn.url(link)}
+        type_="image/svg+xml"
         width={Js.Int.toString(Size.pixelsX(dims))}
         height={Js.Int.toString(Size.pixelsY(dims))}
-      />
-    </svg>,
+        role={String.length(alt) == 0 ? "presentation" : "img"}
+        ariaHidden={String.length(alt) == 0}
+        alt
+        ariaLabel=alt
+        className={
+          switch (className) {
+          | None =>
+            Css.(
+              style([
+                width(`rem(Size.remX(dims))),
+                height(`rem(Size.remY(dims))),
+              ])
+            )
+          | Some(className) => className
+          }
+        }
+      />;
+    },
 };

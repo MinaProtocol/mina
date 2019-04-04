@@ -1,5 +1,6 @@
 open Core_kernel
 open Snark_params
+open Module_version
 
 let digest_size_in_bits = 256
 
@@ -24,8 +25,39 @@ module Digest = struct
           in
           go init 0 ) }
 
-  module T = struct
-    type t = string [@@deriving sexp, bin_io, compare, hash, yojson]
+  module Stable = struct
+    module V1 = struct
+      module T = struct
+        let version = 1
+
+        type t = string [@@deriving sexp, bin_io, compare, hash]
+      end
+
+      include T
+
+      let to_yojson s = `String (Base64.encode_string s)
+
+      let of_yojson = function
+        | `String s -> (
+          match Base64.decode s with
+          | Ok s -> Ok s
+          | Error (`Msg e) -> Error (sprintf "bad base64: %s" e) )
+        | _ -> Error "expected `String"
+
+      include Comparable.Make (T)
+      include Registration.Make_latest_version (T)
+    end
+
+    module Latest = V1
+
+    module Module_decl = struct
+      let name = "random_oracle_digest"
+
+      type latest = Latest.t
+    end
+
+    module Registrar = Registration.Make (Module_decl)
+    module Registered_V1 = Registrar.Register (V1)
   end
 
   let to_bits = Snarky_blake2.string_to_bits
@@ -52,8 +84,9 @@ module Digest = struct
     Quickcheck.test (List.gen_with_length length_in_bits Bool.gen) ~f:(fun t ->
         assert (Array.to_list (to_bits (of_bits (List.to_array t))) = t) )
 
-  include T
-  include Comparable.Make (T)
+  type t = Stable.Latest.t [@@deriving sexp, compare, hash, yojson]
+
+  include Comparable.Make (Stable.Latest)
 
   let fold t = Fold_lib.Fold.group3 ~default:false (fold_bits t)
 

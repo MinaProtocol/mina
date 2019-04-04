@@ -6,7 +6,15 @@ module ApplyItem = {
       <li className="list lh-copy">
         <a
           href={"/jobs/" ++ filename ++ ".html"}
-          className="f5 dodgerblue fw5 no-underline hover-link">
+          className={
+            "f5 fw5 no-underline "
+            ++ Css.(
+                 style([
+                   color(Style.Colors.hyperlink),
+                   hover([color(Style.Colors.hyperlinkHover)]),
+                 ])
+               )
+          }>
           {ReasonReact.string(name)}
         </a>
       </li>,
@@ -170,11 +178,10 @@ let dot = {
 
 let extraHeaders =
   <>
-    <link rel="stylesheet" type_="text/css" href="/static/css/careers.css" />
     <link
       rel="stylesheet"
       type_="text/css"
-      href="https://use.typekit.net/mta7mwm.css"
+      href={Links.Cdn.url("/static/css/careers.css")}
     />
     Head.legacyStylesheets
   </>;
@@ -189,28 +196,36 @@ let make = (~jobOpenings, _) => {
         jobOpenings,
       );
 
+    let f = Links.Cdn.url;
+
     <div>
-      <div className="mw960 pv3 center ph3 ibmplex oceanblack">
+      <div className="mw960 center ph3 ibmplex oceanblack">
         <h1
-          className="fadedblue aktivgroteskex careers-double-line-header ttu f5 fw5 tracked-more mb4">
+          className={
+            "fadedblue aktivgroteskex careers-double-line-header ttu f5 fw5 tracked-more mb4 nowrap "
+            ++ Css.(style([marginTop(`rem(1.25))]))
+          }>
           {ReasonReact.string("Work with us!")}
         </h1>
-        <div>
+        <div className=Css.(style([marginBottom(`rem(1.5))]))>
           <div className="dn db-ns">
             <div>
               <div className="careers-gallery-row1">
-                <img src="/static/img/careers/group-outside.jpg" />
-                <img src="/static/img/careers/group-in-house.jpg" />
+                <img src={f("/static/img/careers/group-outside.jpg")} />
+                <img src={f("/static/img/careers/group-in-house.jpg")} />
               </div>
               <div className="careers-gallery-row2">
-                <img src="/static/img/careers/nacera-outside.jpg" />
-                <img src="/static/img/careers/john-cooking.jpg" />
-                <img src="/static/img/careers/vanishree-talking.jpg" />
+                <img src={f("/static/img/careers/nacera-outside.jpg")} />
+                <img src={f("/static/img/careers/john-cooking.jpg")} />
+                <img src={f("/static/img/careers/vanishree-talking.jpg")} />
               </div>
             </div>
           </div>
           <div className="db dn-ns">
-            <img className="" src="/static/img/careers/group-outside.jpg" />
+            <img
+              className=""
+              src={f("/static/img/careers/group-outside.jpg")}
+            />
           </div>
         </div>
         <div className="mw800 center">
@@ -224,11 +239,19 @@ let make = (~jobOpenings, _) => {
             <div className="mt45">
               <HeadingItem title="Open Source">
                 {ReasonReact.string(
-                   {js|We passionately believe in the open-source philosophy, and make our software free for the entire world to\u00A0use.|js},
+                   {js|We passionately believe in the open-source philosophy, and make our software free for the entire world to\u00A0use. |js},
                  )}
                 <a
-                  href="/static/code.html"
-                  className="dodgerblue fw5 no-underline hover-link nowrap">
+                  href="/code.html"
+                  className={
+                    "fw5 no-underline nowrap "
+                    ++ Css.(
+                         style([
+                           color(Style.Colors.hyperlink),
+                           hover([color(Style.Colors.hyperlinkHover)]),
+                         ])
+                       )
+                  }>
                   {ReasonReact.string({js|Take a look →|js})}
                 </a>
               </HeadingItem>

@@ -1,10 +1,12 @@
 open Core
 
-type fee_transfer = Fee_transfer.t [@@deriving bin_io, sexp]
+(* TODO : version *)
+type fee_transfer = Fee_transfer.Stable.V1.t [@@deriving bin_io, sexp]
 
+(* TODO : version *)
 type t =
   | User_command of User_command.With_valid_signature.t
-  | Fee_transfer of Fee_transfer.t
+  | Fee_transfer of Fee_transfer.Stable.V1.t
   | Coinbase of Coinbase.Stable.V1.t
 [@@deriving bin_io, sexp]
 

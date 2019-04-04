@@ -42,6 +42,7 @@ module Make (Inputs : Inputs.S) : sig
      and type staged_ledger_aux_hash := Inputs.Staged_ledger_aux_hash.t
      and type transaction_snark_work_statement :=
                 Inputs.Transaction_snark_work.Statement.t
+     and type transaction_witness := Inputs.Transaction_witness.t
 end = struct
   open Inputs
 
@@ -52,10 +53,11 @@ end = struct
           let version = 1
 
           (* TODO: The statement is redundant here - it can be computed from the witness and the transaction *)
+          (* TODO : version all fields *)
           type t =
-            { transaction_with_info: Ledger.Undo.t
-            ; statement: Ledger_proof_statement.t
-            ; witness: Inputs.Sparse_ledger.t }
+            { transaction_with_info: Ledger.Undo.Stable.V1.t
+            ; statement: Ledger_proof_statement.Stable.V1.t
+            ; witness: Transaction_witness.t sexp_opaque }
           [@@deriving sexp, bin_io]
         end
 
@@ -78,7 +80,7 @@ end = struct
     type t = Stable.Latest.t =
       { transaction_with_info: Ledger.Undo.t
       ; statement: Ledger_proof_statement.t
-      ; witness: Inputs.Sparse_ledger.t }
+      ; witness: Inputs.Transaction_witness.t }
     [@@deriving sexp]
   end
 
@@ -236,18 +238,27 @@ end = struct
   (**********Helpers*************)
 
   let create_expected_statement
-      {Transaction_with_witness.transaction_with_info; witness; _} =
+      {Transaction_with_witness.transaction_with_info; witness; statement; _} =
     let open Or_error.Let_syntax in
     let source =
-      Frozen_ledger_hash.of_ledger_hash @@ Sparse_ledger.merkle_root witness
+      Frozen_ledger_hash.of_ledger_hash
+      @@ Sparse_ledger.merkle_root witness.ledger
     in
     let%bind transaction = Ledger.Undo.transaction transaction_with_info in
     let%bind after =
       Or_error.try_with (fun () ->
-          Sparse_ledger.apply_transaction_exn witness transaction )
+          Sparse_ledger.apply_transaction_exn witness.ledger transaction )
     in
     let target =
       Frozen_ledger_hash.of_ledger_hash @@ Sparse_ledger.merkle_root after
+    in
+    let pending_coinbase_before =
+      statement.pending_coinbase_stack_state.source
+    in
+    let pending_coinbase_after =
+      match transaction with
+      | Coinbase c -> Pending_coinbase.Stack.push pending_coinbase_before c
+      | _ -> pending_coinbase_before
     in
     let%bind fee_excess = Transaction.fee_excess transaction in
     let%map supply_increase = Transaction.supply_increase transaction in
@@ -255,6 +266,9 @@ end = struct
     ; target
     ; fee_excess
     ; supply_increase
+    ; pending_coinbase_stack_state=
+        { Pending_coinbase_stack_state.source= pending_coinbase_before
+        ; target= pending_coinbase_after }
     ; proof_type= `Base }
 
   let completed_work_to_scanable_work (job : job) (fee, current_proof, prover)
@@ -279,6 +293,9 @@ end = struct
           { Ledger_proof_statement.source= s.source
           ; target= s'.target
           ; supply_increase
+          ; pending_coinbase_stack_state=
+              { source= s.pending_coinbase_stack_state.source
+              ; target= s'.pending_coinbase_stack_state.target }
           ; fee_excess
           ; proof_type= `Merge }
         in
@@ -302,6 +319,7 @@ end = struct
   struct
     module Fold = Parallel_scan.State.Make_foldable (M)
 
+    (*TODO: fold over the pending_coinbase tree and validate the statements?*)
     let scan_statement {tree; _} :
         (Ledger_proof_statement.t, [`Error of Error.t | `Empty]) Result.t M.t =
       let write_error description =
@@ -405,7 +423,13 @@ end = struct
               clarify_error
                 (Frozen_ledger_hash.equal hash current_ledger_hash)
                 "did not connect with snarked ledger hash" )
-      | Ok {fee_excess; source; target; supply_increase= _; proof_type= _} ->
+      | Ok
+          { fee_excess
+          ; source
+          ; target
+          ; supply_increase= _
+          ; pending_coinbase_stack_state= _ (*TODO: check pending coinbases?*)
+          ; proof_type= _ } ->
           let open Or_error.Let_syntax in
           let%map () =
             Option.value_map ~default:(Ok ()) snarked_ledger_hash
@@ -444,6 +468,9 @@ end = struct
         { Ledger_proof_statement.source= stmt1.source
         ; target= stmt2.target
         ; supply_increase
+        ; pending_coinbase_stack_state=
+            { source= stmt1.pending_coinbase_stack_state.source
+            ; target= stmt2.pending_coinbase_stack_state.target }
         ; fee_excess
         ; proof_type= `Merge }
 
@@ -536,6 +563,9 @@ end = struct
   let next_jobs t = Parallel_scan.next_jobs ~state:t.tree
 
   let next_jobs_sequence t = Parallel_scan.next_jobs_sequence ~state:t.tree
+
+  let base_jobs_on_latest_tree t =
+    Parallel_scan.base_jobs_on_latest_tree t.tree
 
   let staged_transactions t =
     List.map (Parallel_scan.current_data t.tree)

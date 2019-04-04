@@ -35,7 +35,7 @@ module Body = struct
         | Stake_delegation -> (Amount.zero, max_amount_without_overflow)
         | Fee_transfer -> (Amount.zero, max_amount_without_overflow)
         | Coinbase ->
-            (* In this case, 
+            (* In this case,
              amount - fee should be defined. In other words,
              amount >= fee *)
             (Amount.of_fee fee, Amount.max_int)

@@ -20,7 +20,7 @@ let spawn_exn (config : Coda_worker.Input.t) =
 
 let local_config ?proposal_interval ~peers ~discovery_port ~external_port
     ~acceptable_delay ~program_dir ~proposer ~snark_worker_config
-    ~work_selection ~offset ~trace_dir () =
+    ~work_selection ~offset ~trace_dir ~max_concurrent_connections () =
   let host = "127.0.0.1" in
   let conf_dir =
     Filename.temp_dir_name
@@ -49,7 +49,8 @@ let local_config ?proposal_interval ~peers ~discovery_port ~external_port
     ; trace_dir
     ; program_dir
     ; acceptable_delay
-    ; discovery_port }
+    ; discovery_port
+    ; max_concurrent_connections }
   in
   config
 
@@ -69,6 +70,10 @@ let get_nonce_exn (conn, proc, _) pk =
   Coda_worker.Connection.run_exn conn ~f:Coda_worker.functions.get_nonce
     ~arg:pk
 
+let root_length_exn (conn, proc, _) =
+  Coda_worker.Connection.run_exn conn ~f:Coda_worker.functions.root_length
+    ~arg:()
+
 let send_payment_exn (conn, proc, _) sk pk amount fee memo =
   Coda_worker.Connection.run_exn conn ~f:Coda_worker.functions.send_payment
     ~arg:(sk, pk, amount, fee, memo)
@@ -81,10 +86,10 @@ let prove_receipt_exn (conn, proc, _) proving_receipt resulting_receipt =
   Coda_worker.Connection.run_exn conn ~f:Coda_worker.functions.prove_receipt
     ~arg:(proving_receipt, resulting_receipt)
 
-let strongest_ledgers_exn (conn, proc, _) =
+let verified_transitions_exn (conn, proc, _) =
   let%map r =
     Coda_worker.Connection.run_exn conn
-      ~f:Coda_worker.functions.strongest_ledgers ~arg:()
+      ~f:Coda_worker.functions.verified_transitions ~arg:()
   in
   Linear_pipe.wrap_reader r
 
@@ -97,3 +102,10 @@ let root_diff_exn (conn, proc, _) =
 
 let start_exn (conn, proc, _) =
   Coda_worker.Connection.run_exn conn ~f:Coda_worker.functions.start ~arg:()
+
+let dump_tf (conn, proc, _) =
+  Coda_worker.Connection.run_exn conn ~f:Coda_worker.functions.dump_tf ~arg:()
+
+let best_path (conn, proc, _) =
+  Coda_worker.Connection.run_exn conn ~f:Coda_worker.functions.best_path
+    ~arg:()

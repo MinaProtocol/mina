@@ -11,8 +11,10 @@ module Inputs = struct
   end
 
   module Proof = struct
+    (* TODO : version *)
     type t =
-      Transaction_snark.Statement.t * Coda_base.Sok_message.Digest.Stable.V1.t
+      Transaction_snark.Statement.Stable.V1.t
+      * Coda_base.Sok_message.Digest.Stable.V1.t
     [@@deriving bin_io, sexp]
   end
 
@@ -26,6 +28,8 @@ module Inputs = struct
 
   module Transaction = Coda_base.Transaction
   module Sparse_ledger = Coda_base.Sparse_ledger
+  module Pending_coinbase = Coda_base.Pending_coinbase
+  module Transaction_witness = Coda_base.Transaction_witness
 
   let perform_single () ~message s =
     Ok

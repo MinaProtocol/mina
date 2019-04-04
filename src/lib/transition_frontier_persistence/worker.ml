@@ -16,6 +16,7 @@ module Make (Inputs : Intf.Worker_inputs) : sig
      and type breadcrumb := Transition_frontier.Breadcrumb.t
      and type hash := Diff_hash.t
      and type diff := State_hash.t Diff_mutant.E.t
+     and type pending_coinbases := Pending_coinbase.t
 end = struct
   open Inputs
 
@@ -70,23 +71,17 @@ end = struct
     External_transition.consensus_state parent_transition
 
   let handle_diff (t : t) acc_hash (E diff : State_hash.t Diff_mutant.E.t) =
-    let log ~location diff mutant =
-      Debug_assert.debug_assert
-      @@ fun () ->
-      Logger.trace ~module_:__MODULE__ ~location t.logger
-        ~metadata:[("diff_response", Diff_mutant.yojson_of_value diff mutant)]
-        "Worker processed diff_mutant and created mutant: $diff_response"
-    in
     match diff with
     | New_frontier
-        ({With_hash.hash= first_root_hash; data= first_root}, scan_state) ->
+        ( {With_hash.hash= first_root_hash; data= first_root}
+        , scan_state
+        , pending_coinbase ) ->
         Transition_storage.Batch.with_batch t.transition_storage
           ~f:(fun batch ->
             Transition_storage.Batch.set batch ~key:Root
-              ~data:(first_root_hash, scan_state) ;
+              ~data:(first_root_hash, scan_state, pending_coinbase) ;
             Transition_storage.Batch.set batch
               ~key:(Transition first_root_hash) ~data:(first_root, []) ;
-            log ~location:__LOC__ diff () ;
             Diff_mutant.hash ~f:State_hash.to_bytes acc_hash diff () )
     | Add_transition transition_with_hash ->
         Transition_storage.Batch.with_batch t.transition_storage
@@ -94,7 +89,6 @@ end = struct
             let mutant =
               apply_add_transition (t, batch) transition_with_hash
             in
-            log ~location:__LOC__ diff mutant ;
             Diff_mutant.hash ~f:State_hash.to_bytes acc_hash diff mutant )
     | Remove_transitions removed_transitions ->
         let mutant =
@@ -106,7 +100,6 @@ end = struct
                     ~key:(Transition state_hash) ;
                   External_transition.consensus_state removed_transition ) )
         in
-        log ~location:__LOC__ diff mutant ;
         Diff_mutant.hash ~f:State_hash.to_bytes acc_hash diff mutant
     | Update_root new_root_data ->
         (* We can get the serialized root_data from the database and then hash it, rather than using `Transition_storage.get` to deserialize the data and then hash it again which is slower *)
@@ -118,7 +111,8 @@ end = struct
         let bin =
           [%bin_type_class:
             State_hash.Stable.Latest.t
-            * Staged_ledger.Scan_state.Stable.Latest.t]
+            * Staged_ledger.Scan_state.Stable.Latest.t
+            * Pending_coinbase.t]
         in
         let serialized_new_root_data =
           Bin_prot.Utils.bin_dump bin.writer new_root_data
@@ -176,7 +170,7 @@ end = struct
   let deserialize ({transition_storage= _; logger} as t) ~root_snarked_ledger
       ~consensus_local_state =
     let open Transition_storage.Schema in
-    let state_hash, scan_state = get t Root in
+    let state_hash, scan_state, pending_coinbases = get t Root in
     let get_verified_transition state_hash =
       let transition, root_successor_hashes = get t (Transition state_hash) in
       (* We read a transition that was already verified before it was written to disk *)
@@ -192,10 +186,12 @@ end = struct
       ({With_hash.data= verified_transition; hash= state_hash}, children_hashes)
     in
     let%bind root_staged_ledger =
-      Staged_ledger.of_scan_state_and_snarked_ledger ~scan_state
+      Staged_ledger.of_scan_state_pending_coinbases_and_snarked_ledger
+        ~scan_state
         ~snarked_ledger:(Ledger.of_database root_snarked_ledger)
         ~expected_merkle_root:
           (staged_ledger_hash @@ With_hash.data root_transition)
+        ~pending_coinbases
       |> Deferred.Or_error.ok_exn
     in
     let%bind transition_frontier =

@@ -4,7 +4,7 @@ open Fold_lib
 open Tuple_lib
 
 module type S = sig
-  type t [@@deriving bin_io, sexp, compare, hash, yojson]
+  type t [@@deriving sexp, compare, hash, yojson]
 
   include Comparable.S with type t := t
 
