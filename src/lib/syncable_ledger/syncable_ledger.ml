@@ -132,7 +132,12 @@ module type S = sig
 
   val destroy : 'a t -> unit
 
-  val new_goal : 'a t -> root_hash -> data:'a -> [`Repeat | `New]
+  val new_goal :
+       'a t
+    -> root_hash
+    -> data:'a
+    -> equal:('a -> 'a -> bool)
+    -> [`Repeat | `New | `Update_data]
 
   val peek_valid_tree : 'a t -> merkle_tree option
 
@@ -148,6 +153,7 @@ module type S = sig
        'a t
     -> root_hash
     -> data:'a
+    -> equal:('a -> 'a -> bool)
     -> [`Ok of merkle_tree | `Target_changed of root_hash option * root_hash]
        Deferred.t
 
@@ -640,7 +646,7 @@ end = struct
     in
     Linear_pipe.iter t.answers ~f:handle_answer
 
-  let new_goal t h ~data =
+  let new_goal t h ~data ~equal =
     let should_skip =
       match t.desired_root with
       | None -> false
@@ -661,10 +667,16 @@ end = struct
       t.auxiliary_data <- Some data ;
       Linear_pipe.write_without_pushback_if_open t.queries (h, Num_accounts) ;
       `New )
-    else (
+    else if
+      Option.fold t.auxiliary_data ~init:false ~f:(fun _ saved_data ->
+          equal data saved_data )
+    then (
       Logger.info t.logger ~module_:__MODULE__ ~location:__LOC__
         "new_goal to same hash, not doing anything" ;
       `Repeat )
+    else (
+      t.auxiliary_data <- Some data ;
+      `Update_data )
 
   let rec valid_tree t =
     match%bind Ivar.read t.validity_listener with
@@ -684,8 +696,8 @@ end = struct
         | `Target_changed payload -> `Target_changed payload
         | `Ok -> `Ok t.tree )
 
-  let fetch t rh ~data =
-    new_goal t rh ~data |> ignore ;
+  let fetch t rh ~data ~equal =
+    new_goal t rh ~data ~equal |> ignore ;
     wait_until_valid t rh
 
   let create mt ~logger ~trust_system =
