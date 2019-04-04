@@ -22,7 +22,8 @@ module KnowledgeBase = {
       ...component,
       render: _ => {
         let items =
-          Belt.Array.map(content, ({Links.Named.name: copy, link}) =>
+          Belt.Array.map(
+            content, ({Links.Named.name: (copy, machineName), link}) =>
             <li
               className=Css.(
                 style([
@@ -41,12 +42,13 @@ module KnowledgeBase = {
                   ]),
                 ])
               )>
-              <a
+              <A
+                name=machineName
                 href=link
                 className=Css.(
                   merge([Style.Link.basic, style([cursor(`pointer)])])
                 )
-                dangerouslySetInnerHTML={"__html": copy}
+                innerHtml=copy
               />
             </li>
           );

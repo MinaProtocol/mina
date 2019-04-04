@@ -1,7 +1,7 @@
 module Cta = {
   type t = {
     copy: string,
-    link: Links.Named.t,
+    link: Links.Named.t(string),
   };
 };
 

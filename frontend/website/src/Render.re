@@ -145,7 +145,7 @@ Router.(
             <Home
               posts={List.map(
                 ((name, html, metadata)) =>
-                  (name, html, metadata.BlogPost.title),
+                  (name, html, (metadata.BlogPost.title, "blog-" ++ name)),
                 posts,
               )}
             />
