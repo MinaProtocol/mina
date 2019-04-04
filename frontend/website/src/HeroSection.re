@@ -88,11 +88,15 @@ module Copy = {
             </span>
             <br />
             <br />
-            <a href=Links.Forms.mailingList className=largeLinkStyle>
+            <a
+              target="_blank"
+              href=Links.Forms.mailingList
+              className=largeLinkStyle>
               {ReasonReact.string({j|Join our mailing list\u00A0→|j})}
             </a>
             <br />
             <a
+              target="_blank"
               href="https://twitter.com/codaprotocol"
               className=Css.(
                 merge([

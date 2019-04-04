@@ -218,7 +218,7 @@ let make = _ => {
             href=Links.Forms.compressTheBlockchain
             className=rightSideLink>
             {ReasonReact.string(
-               {js|Earn Coda by helping to compress the blockchain\u00A0→|js},
+               {js|Help to compress the Coda blockchain\u00A0→|js},
              )}
           </a>
           <a href=Links.ThirdParty.testnetStatus className=rightSideLink>

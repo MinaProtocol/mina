@@ -431,7 +431,10 @@ let make = (~posts, _children) => {
         <div className=Css.(style([marginRight(`rem(1.))]))>
           <p
             className=Css.(
-              merge([Style.Body.basic, style([marginBottom(`rem(0.75))])])
+              merge([
+                Style.Body.basic,
+                style([marginTop(`zero), marginBottom(`rem(0.75))]),
+              ])
             )>
             {ReasonReact.string("Stay updated about:")}
           </p>
@@ -451,7 +454,7 @@ let make = (~posts, _children) => {
             <li className=marginBelow>
               <Link
                 link=Links.Forms.participateInConsensus
-                message="Participating in consensus"
+                message="Participating in staking"
               />
             </li>
             <li className=marginBelow>
