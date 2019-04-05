@@ -24,7 +24,7 @@
   integer. TODO: Anything to say about registration, translation to a latest
   version for wrapped types?
 
-  If "rpc" is true, again, the type must be named "query", "response", or "message",
+  If "rpc" is true, again, the type must be named "query", "response", or "msg",
   and the type definition occurs in the hierarchy "Vn.T".
 
   For types in structures, we can also write:
@@ -95,7 +95,7 @@ let validate_wrapped_type_decl inner3_modules type_decl =
          Wrapped.Stable.Vn, for some number n"
 
 (* check that a versioned type occurs in valid module hierarchy and is named "t"
-   (for RPC types, the name can be "query", "response", or "message")
+   (for RPC types, the name can be "query", "response", or "msg")
  *)
 let validate_type_decl inner3_modules generation_kind type_decl =
   let name = type_decl.ptype_name.txt in
@@ -109,7 +109,7 @@ let validate_type_decl inner3_modules generation_kind type_decl =
           name ;
       validate_wrapped_type_decl inner3_modules type_decl
   | Rpc ->
-      let rpc_valid_names = ["query"; "response"; "message"] in
+      let rpc_valid_names = ["query"; "response"; "msg"] in
       if
         List.find rpc_valid_names ~f:(fun ty -> String.equal ty name)
         |> Option.is_none
