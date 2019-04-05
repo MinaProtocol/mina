@@ -614,7 +614,7 @@ module Make (Inputs : Inputs_intf) = struct
             match response_or_error with
             | Ok (Some response) -> return (Ok response)
             | Ok None -> loop remaining_peers (2 * num_peers)
-            | Error _e -> loop remaining_peers (2 * num_peers) )
+            | Error _ -> loop remaining_peers (2 * num_peers) )
     in
     loop peers 1
 
@@ -634,7 +634,7 @@ module Make (Inputs : Inputs_intf) = struct
           peer ;
         let peers = get_random_peers () in
         try_non_preferred_peers t envelope peers ~rpc
-    | Error e ->
+    | Error _ ->
         Logger.faulty_peer t.logger ~module_:__MODULE__ ~location:__LOC__
           !"get error from %{sexp: Peer.t}"
           peer ;
