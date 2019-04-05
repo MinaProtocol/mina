@@ -14,7 +14,9 @@ module Make (Inputs : Inputs.With_unprocessed_transition_cache.S) :
    and type unprocessed_transition_cache :=
               Inputs.Unprocessed_transition_cache.t
    and type transition_frontier := Inputs.Transition_frontier.t
-   and type staged_ledger := Inputs.Staged_ledger.t = struct
+   and type staged_ledger := Inputs.Staged_ledger.t
+   and type transition_frontier_breadcrumb :=
+              Inputs.Transition_frontier.Breadcrumb.t = struct
   open Inputs
   open Consensus
 
@@ -33,16 +35,14 @@ module Make (Inputs : Inputs.With_unprocessed_transition_cache.S) :
       |> External_transition.Verified.protocol_state
     in
     let%bind () =
-      Result.ok_if_true
-        (Transition_frontier.find frontier hash |> Option.is_none)
-        ~error:`Duplicate
+      Option.fold (Transition_frontier.find frontier hash) ~init:Result.ok_unit
+        ~f:(fun _ breadcrumb -> Result.Error (`Duplicate breadcrumb) )
     in
     let%bind () =
-      Result.ok_if_true
-        (not
-           (Unprocessed_transition_cache.mem unprocessed_transition_cache
-              transition_with_hash))
-        ~error:`Under_processing
+      Option.fold
+        (Unprocessed_transition_cache.final_result unprocessed_transition_cache
+           transition_with_hash) ~init:Result.ok_unit ~f:(fun _ final_result ->
+          Result.Error (`Under_processing final_result) )
     in
     let%map () =
       Result.ok_if_true
@@ -110,7 +110,7 @@ module Make (Inputs : Inputs.With_unprocessed_transition_cache.S) :
                    (Core_kernel.Time.diff (Core_kernel.Time.now ())
                       transition_time) ;
                  Writer.write valid_transition_writer cached_transition
-             | Error `Duplicate | Error `Under_processing ->
+             | Error (`Duplicate _) | Error (`Under_processing _) ->
                  if Lru.find already_reported_duplicates hash |> Option.is_none
                  then (
                    Logger.info logger ~module_:__MODULE__ ~location:__LOC__

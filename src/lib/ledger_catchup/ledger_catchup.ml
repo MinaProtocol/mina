@@ -184,21 +184,30 @@ module Make (Inputs : Inputs.S) :
            ~unprocessed_transition_cache verified_transition_with_hash
     in
     let open Deferred.Let_syntax in
-    match%map cached_verified_transition with
-    | Ok x -> Ok (Some x)
-    | Error `Duplicate ->
+    match%bind cached_verified_transition with
+    | Ok x -> Deferred.return @@ Ok (Either.Second x)
+    | Error (`Duplicate breadcrumb) ->
         Logger.trace logger ~module_:__MODULE__ ~location:__LOC__
           "transition queried during ledger catchup has already been seen" ;
-        Ok None
-    | Error `Under_processing ->
+        Deferred.return @@ Ok (Either.First breadcrumb)
+    | Error (`Under_processing final_result) -> (
         Logger.trace logger ~module_:__MODULE__ ~location:__LOC__
           "transition queried during ledger catchup is still under procession" ;
-        Ok None
+        match%map Ivar.read final_result with
+        | `Failed ->
+            failwith
+              "todo cancel the waiting job in both ledger_catch and \
+               catchup_scheduler"
+        | `Applied hash ->
+            Ok
+              (Either.First
+                 (Transition_frontier.find frontier hash |> Option.value_exn))
+        )
     | Error (`Invalid reason) ->
         Logger.faulty_peer logger ~module_:__MODULE__ ~location:__LOC__
           "transition queried during ledger catchup was not valid because %s"
           reason ;
-        Error (Error.of_string reason)
+        Deferred.return @@ Error (Error.of_string reason)
 
   let take_while_map_result_rev ~f list =
     let open Deferred.Or_error.Let_syntax in
@@ -210,8 +219,9 @@ module Make (Inputs : Inputs.S) :
           else
             match%bind f elem with
             | Error e -> Deferred.return (Error e)
-            | Ok None -> Deferred.Or_error.return (acc, false)
-            | Ok (Some y) -> Deferred.Or_error.return (y :: acc, true) )
+            | Ok (Either.First _) -> Deferred.Or_error.return (acc, false)
+            | Ok (Either.Second y) -> Deferred.Or_error.return (y :: acc, true)
+      )
     in
     result
 

@@ -15,7 +15,9 @@ module Make (Inputs : Inputs_intf) : Intf.Main.S = struct
     val remove : 'elt t -> 'elt -> unit
   end = struct
     type 'a t =
-      {name: string; set: ('a, Intf.final_result) Hashtbl.t; logger: Logger.t}
+      { name: string
+      ; set: ('a, 'a Intf.final_result) Hashtbl.t
+      ; logger: Logger.t }
 
     let name {name; _} = name
 
@@ -44,21 +46,22 @@ module Make (Inputs : Inputs_intf) : Intf.Main.S = struct
   and Cached : sig
     include Intf.Cached.S
 
-    val create : 'elt Cache.t -> 'elt -> Intf.final_result -> ('elt, 'elt) t
+    val create :
+      'elt Cache.t -> 'elt -> 'elt Intf.final_result -> ('elt, 'elt) t
   end = struct
     type (_, _) t =
       | Base :
           { data: 'a
           ; cache: 'a Cache.t
           ; mutable consumed: bool
-          ; final_result: Intf.final_result }
+          ; final_result: 'a Intf.final_result }
           -> ('a, 'a) t
       | Derivative :
           { original: 'a
           ; mutant: 'b
           ; cache: 'a Cache.t
           ; mutable consumed: bool
-          ; final_result: Intf.final_result }
+          ; final_result: 'a Intf.final_result }
           -> ('b, 'a) t
       | Pure : 'a -> ('a, _) t
 
@@ -79,7 +82,7 @@ module Make (Inputs : Inputs_intf) : Intf.Main.S = struct
       | Derivative x -> x.original
       | Pure _ -> failwith "cannot access original of pure Cached.t"
 
-    let final_result : type a b. (a, b) t -> Intf.final_result = function
+    let final_result : type a b. (a, b) t -> b Intf.final_result = function
       | Base x -> x.final_result
       | Derivative x -> x.final_result
       | Pure _ -> failwith "cannot access final result of pure Cached.t"
@@ -100,8 +103,8 @@ module Make (Inputs : Inputs_intf) : Intf.Main.S = struct
       | Pure _ -> failwith "cannot set final result of pure Cached.t"
 
     let mark_applied : type a b. (a, b) t -> unit = function
-      | Base x -> Ivar.fill x.final_result `Applied
-      | Derivative x -> Ivar.fill x.final_result `Applied
+      | Base x -> Ivar.fill x.final_result (`Applied x.data)
+      | Derivative x -> Ivar.fill x.final_result (`Applied x.original)
       | Pure _ -> failwith "cannot set final result of pure Cached.t"
 
     let attach_finalizer t =

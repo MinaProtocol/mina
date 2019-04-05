@@ -482,6 +482,8 @@ module type Transition_handler_validator_intf = sig
 
   type transition_frontier
 
+  type transition_frontier_breadcrumb
+
   type staged_ledger
 
   val run :
@@ -510,7 +512,9 @@ module type Transition_handler_validator_intf = sig
     -> ( ( (external_transition_verified, state_hash) With_hash.t
          , state_hash )
          Cached.t
-       , [`Duplicate | `Invalid of string | `Under_processing] )
+       , [ `Duplicate of transition_frontier_breadcrumb
+         | `Invalid of string
+         | `Under_processing of state_hash Cache_lib.Intf.final_result ] )
        Result.t
 end
 
@@ -619,6 +623,7 @@ module type Transition_handler_intf = sig
      and type unprocessed_transition_cache := Unprocessed_transition_cache.t
      and type transition_frontier := transition_frontier
      and type staged_ledger := staged_ledger
+     and type transition_frontier_breadcrumb := transition_frontier_breadcrumb
 
   module Processor :
     Transition_handler_processor_intf
