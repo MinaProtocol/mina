@@ -5,7 +5,7 @@ module Stable = struct
   module V1 = struct
     (* TODO: This should be stable. *)
     module T = struct
-      type t = Tock.Proof.t
+      type t = Tock.Proof.t [@@deriving version]
 
       let to_string = Tock_backend.Proof.to_string
 
@@ -33,8 +33,14 @@ module Stable = struct
     let {Bin_prot.Type_class.write= bin_write_t; size= bin_size_t} =
       bin_writer_t
   end
+
+  module Latest = V1
 end
+
+type t = Stable.Latest.t
 
 let dummy = Tock.Proof.dummy
 
-include Stable.V1
+include Sexpable.Of_stringable (Stable.Latest)
+
+let to_yojson, of_yojson = Stable.Latest.(to_yojson, of_yojson)

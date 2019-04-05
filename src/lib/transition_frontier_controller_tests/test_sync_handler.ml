@@ -46,6 +46,7 @@ let%test_module "Sync_handler" =
               Network.glue_sync_ledger network query_reader answer_writer ;
               match%map
                 Sync_ledger.Mask.fetch sync_ledger desired_root ~data:()
+                  ~equal:(fun () () -> true )
               with
               | `Ok synced_ledger ->
                   Ledger_hash.equal

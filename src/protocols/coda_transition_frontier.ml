@@ -186,16 +186,20 @@ module type Network_intf = sig
     -> state_hash
     -> external_transition Non_empty_list.t option Deferred.Or_error.t
 
+  val get_staged_ledger_aux_and_pending_coinbases_at_hash :
+       t
+    -> peer
+    -> state_hash
+    -> (parallel_scan_state * ledger_hash * pending_coinbases)
+       Deferred.Or_error.t
+
   val get_ancestry :
        t
     -> peer
     -> consensus_state
-    -> ( ( external_transition
-         , state_body_hash list * external_transition )
-         Proof_carrying_data.t
-       * parallel_scan_state
-       * ledger_hash
-       * pending_coinbases )
+    -> ( external_transition
+       , state_body_hash list * external_transition )
+       Proof_carrying_data.t
        Deferred.Or_error.t
 
   (* TODO: Change this to strict_pipe *)
@@ -330,6 +334,8 @@ module type Transition_frontier_intf = sig
   val hash_path : t -> Breadcrumb.t -> state_hash list
 
   val find : t -> state_hash -> Breadcrumb.t option
+
+  val find_in_root_history : t -> state_hash -> Breadcrumb.t option
 
   val root_history_path_map :
     t -> state_hash -> f:(Breadcrumb.t -> 'a) -> 'a Non_empty_list.t option
@@ -638,6 +644,10 @@ module type Sync_handler_intf = sig
 
   type syncable_ledger_answer
 
+  type parallel_scan_state
+
+  type pending_coinbases
+
   val answer_query :
        frontier:transition_frontier
     -> ledger_hash
@@ -650,6 +660,11 @@ module type Sync_handler_intf = sig
        frontier:transition_frontier
     -> state_hash
     -> external_transition Non_empty_list.t option
+
+  val get_staged_ledger_aux_and_pending_coinbases_at_hash :
+       frontier:transition_frontier
+    -> state_hash
+    -> (parallel_scan_state * ledger_hash * pending_coinbases) Option.t
 end
 
 module type Root_prover_intf = sig

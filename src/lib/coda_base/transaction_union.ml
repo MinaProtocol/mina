@@ -38,7 +38,7 @@ let typ : (var, t) Typ.t =
 *)
 let of_transaction : Transaction.t -> t = function
   | User_command cmd ->
-      let {User_command.sender; payload; signature} =
+      let User_command.Poly.Stable.Latest.({sender; payload; signature}) =
         (cmd :> User_command.t)
       in
       { payload= Transaction_union_payload.of_user_command_payload payload
