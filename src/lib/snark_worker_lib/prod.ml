@@ -49,7 +49,7 @@ module Inputs = struct
   module Transaction = Coda_base.Transaction
   module Sparse_ledger = Coda_base.Sparse_ledger
   module Pending_coinbase = Coda_base.Pending_coinbase
-  module Transaction_witness = Coda_base.Transaction_witness
+  module Transaction_witness = Coda_base.Transaction_witness.Stable.V1
 
   (* TODO: Use public_key once SoK is implemented *)
   let perform_single ({m= (module M); cache} : Worker_state.t) ~message =

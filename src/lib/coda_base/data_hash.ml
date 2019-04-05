@@ -80,8 +80,6 @@ struct
   module Stable = struct
     module V1 = struct
       module T = struct
-        let version = 1
-
         (* TODO : version Pedersen.Digest *)
         type t = Pedersen.Digest.t
         [@@deriving bin_io, sexp, eq, compare, hash, yojson, version]

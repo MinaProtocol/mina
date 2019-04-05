@@ -82,7 +82,7 @@ end) :
 
   type pre_diff_with_at_most_two_coinbase =
     { completed_works: Transaction_snark_work.Stable.V1.t list
-    ; user_commands: User_command.t list
+    ; user_commands: User_command.Stable.V1.t list
     ; coinbase: ft At_most_two.t }
   [@@deriving sexp, bin_io]
 
@@ -90,7 +90,7 @@ end) :
 
   type pre_diff_with_at_most_one_coinbase =
     { completed_works: Transaction_snark_work.Stable.V1.t list
-    ; user_commands: User_command.t list
+    ; user_commands: User_command.Stable.V1.t list
     ; coinbase: ft At_most_one.t }
   [@@deriving sexp, bin_io]
 
@@ -102,11 +102,14 @@ end) :
   module Stable = struct
     module V1 = struct
       module T = struct
+        (* TODO : use version ppx *)
         let version = 1
+
+        let __versioned__ = true
 
         type t =
           { diff: diff
-          ; prev_hash: Staged_ledger_hash.t (* TODO : version *)
+          ; prev_hash: Staged_ledger_hash.t
           ; creator: Compressed_public_key.Stable.V1.t }
         [@@deriving sexp, bin_io]
       end

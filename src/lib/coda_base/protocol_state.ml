@@ -171,7 +171,10 @@ module Make
       module Stable = struct
         module V1 = struct
           module T = struct
+            (* TODO : use version ppx *)
             let version = 1
+
+            let __versioned__ = true
 
             type tt =
               ( Blockchain_state.Value.Stable.V1.t
@@ -248,7 +251,10 @@ module Make
     module Stable = struct
       module V1 = struct
         module T = struct
+          (* TODO : use version ppx *)
           let version = 1
+
+          let __versioned__ = true
 
           type t_ = (State_hash.Stable.V1.t, Body.Value.Stable.V1.t) t
           [@@deriving bin_io, sexp, hash, compare, eq, to_yojson]
