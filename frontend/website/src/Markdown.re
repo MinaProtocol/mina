@@ -39,7 +39,6 @@ module Child_process = {
 };
 
 let load = path => {
-  // I've tried and tried and I couldn't get the env vars here to appear in the src/filter.js program
   let filter = Links.Cdn.prefix^ == "" ? "" : "--filter src/filter.js ";
 
   let html =
