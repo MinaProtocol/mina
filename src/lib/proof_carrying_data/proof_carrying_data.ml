@@ -3,7 +3,12 @@
 module Stable = struct
   (* don't register versions, because of type parameters *)
   module V1 = struct
-    type ('a, 'b) t = {data: 'a; proof: 'b} [@@deriving sexp, fields, bin_io]
+    module T = struct
+      type ('a, 'b) t = {data: 'a; proof: 'b}
+      [@@deriving sexp, fields, bin_io, version]
+    end
+
+    include T
   end
 
   module Latest = V1

@@ -251,12 +251,7 @@ struct
           )
           Proof_carrying_data.Stable.V1.t
           option
-        [@@deriving bin_io]
-
-        (* , version {rpc} *)
-        
-        (* TODO : remove after uncommenting version{rpc} *)
-        let version = 1
+        [@@deriving bin_io, version {rpc}]
 
         let query_of_caller_model = Fn.id
 
