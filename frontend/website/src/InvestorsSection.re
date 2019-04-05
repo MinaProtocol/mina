@@ -50,21 +50,33 @@ let make = _children => {
           ])
         )>
         <Investor name="Metastable" />
-        <Investor name="Polychain Capital" />
-        <Investor name="ScifiVC" />
-        <Investor name="Dekrypt Capital" />
+        <Investor name="Accomplice" />
         <Investor name="Electric Capital" />
-        <Investor name="Curious Endeavors" />
-        <Investor name="Kindred Ventures" />
-        <Investor name="Caffeinated Capital" />
-        <Investor name="Naval Ravikant" />
-        <Investor name="Elad Gil" />
-        <Investor name="Linda Xie" />
-        <Investor name="Fred Ehrsam" />
-        <Investor name="Jack Herrick" />
-        <Investor name="Nima Capital" />
-        <Investor name="Charlie Noyes" />
-        <Investor name="O Group" />
+        <Investor name="Polychain Capital" />
+        <Investor name="Paradigm" />
+        <Investor name="Coinbase Ventures" />
+        <Investor name="Dragonfly" />
+        <Investor name="Dekrypt Capital" />
+        <Investor name="Scifi vc" />
+        <Investor name="libertus" />
+        <Investor name="general catalyst" />
+        <Investor name="multicoin capital" />
+        <Investor name="collaborative fund" />
+        <Investor name="kilowatt capital" />
+        <Investor name="naval ravikant" />
+        <Investor name="elad gil" />
+        <Investor name="linda xie" />
+        <Investor name="fred ehrsam" />
+        <Investor name="jack herrick" />
+        <Investor name="charlie noyes" />
+        <Investor name="ed roman" />
+        <Investor name="andrew keys" />
+        <Investor name="kindred ventures" />
+        <Investor name="curious endeavors" />
+        <Investor name="blockchange" />
+        <Investor name="ogroup" />
+        <Investor name="nima capital" />
+        <Investor name="evolve vc" />
       </div>
     </div>,
 };

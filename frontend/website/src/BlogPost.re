@@ -81,13 +81,17 @@ let shareItems =
     <span className="f7 ttu fw4 tracked-mega blueshare">
       {ReasonReact.string("share:")}
     </span>
-    <a href="https://twitter.com/codaprotocol">
+    <A name="share-blog-twitter" href="https://twitter.com/codaprotocol">
       {ReasonReact.string("Twitter")}
-    </a>
+    </A>
     dot
-    <a href="https://discord.gg/UyqY37F"> {ReasonReact.string("Discord")} </a>
+    <A name="share-blog-discord" href="https://discord.gg/UyqY37F">
+      {ReasonReact.string("Discord")}
+    </A>
     dot
-    <a href="https://t.me/codaprotocol"> {ReasonReact.string("Telegram")} </a>
+    <A name="share-blog-telegram" href="https://t.me/codaprotocol">
+      {ReasonReact.string("Telegram")}
+    </A>
   </>;
 
 let component = ReasonReact.statelessComponent("BlogPost");
@@ -120,7 +124,11 @@ let make = (~name, ~html, ~metadata, ~showComments=true, _) => {
                        {ReasonReact.string("by " ++ metadata.author ++ " ")}
                      </span>
                    | Some(website) =>
-                     <a
+                     <A
+                       name={
+                         "authors-twitter-"
+                         ++ Js.String.replace(" ", "-", metadata.author)
+                       }
                        href=website
                        className="blueblack no-underline"
                        target="_blank">
@@ -130,7 +138,7 @@ let make = (~name, ~html, ~metadata, ~showComments=true, _) => {
                        <i
                          className="ml-1 ml-2-ns fab f7 fa-twitter mr3 mr2-m mr3-l"
                        />
-                     </a>
+                     </A>
                    }}
                 </h4>
                 <h4
@@ -169,7 +177,11 @@ let make = (~name, ~html, ~metadata, ~showComments=true, _) => {
                          {ReasonReact.string("by " ++ metadata.author ++ " ")}
                        </span>
                      | Some(website) =>
-                       <a
+                       <A
+                         name={
+                           "authors-twitter-"
+                           ++ Js.String.replace(" ", "-", metadata.author)
+                         }
                          href=website
                          className="blueblack no-underline"
                          target="_blank">
@@ -181,7 +193,7 @@ let make = (~name, ~html, ~metadata, ~showComments=true, _) => {
                          <i
                            className="ml-1 ml-2-ns fab f7 fa-twitter mr3 mr2-m mr3-l"
                          />
-                       </a>
+                       </A>
                      }}
                   </h4>
                   <h4

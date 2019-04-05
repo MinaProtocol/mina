@@ -373,3 +373,8 @@
   font-family:'IBM Plex Italic', italic;
   font-style: italic;
 }
+
+.blog-content em {
+  font-style: italic;
+}
+
