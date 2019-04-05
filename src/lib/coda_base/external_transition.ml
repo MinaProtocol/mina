@@ -37,7 +37,7 @@ module type S = sig
     module Stable :
       sig
         module V1 : sig
-          type t [@@deriving bin_io, sexp]
+          type t [@@deriving bin_io, sexp, version]
         end
       end
       with type V1.t = t
@@ -103,7 +103,7 @@ module Make (Staged_ledger_diff : sig
   module Stable :
     sig
       module V1 : sig
-        type t [@@deriving bin_io, sexp]
+        type t [@@deriving bin_io, sexp, version]
       end
     end
     with type V1.t = t

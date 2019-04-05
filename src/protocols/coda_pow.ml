@@ -714,7 +714,7 @@ module type Staged_ledger_diff_intf = sig
       module V1 : sig
         type t =
           {diff: diff; prev_hash: staged_ledger_hash; creator: public_key}
-        [@@deriving sexp, bin_io]
+        [@@deriving sexp, bin_io, version]
       end
 
       module Latest = V1

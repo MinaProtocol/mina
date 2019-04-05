@@ -2335,6 +2335,11 @@ let%test_module "test" =
             type t =
               {diff: diff; prev_hash: staged_ledger_hash; creator: public_key}
             [@@deriving sexp, bin_io]
+
+            (* fake versioning *)
+            let version = 1
+
+            let __versioned__ = true
           end
 
           module Latest = V1
