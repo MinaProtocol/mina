@@ -43,11 +43,9 @@
 open Core_kernel
 open Ppxlib
 
-type version_info = {versioned: bool; wrapped: bool}
+let deriver = "version"
 
 type generation_kind = Plain | Wrapped | Rpc
-
-let deriver = "version"
 
 let validate_module_version module_version loc =
   let len = String.length module_version in
