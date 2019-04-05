@@ -55,7 +55,8 @@ module type S = sig
       module Stable :
         sig
           module V1 : sig
-            type t [@@deriving hash, eq, compare, bin_io, sexp, to_yojson]
+            type t
+            [@@deriving hash, eq, compare, bin_io, sexp, to_yojson, version]
           end
         end
         with type V1.t = t

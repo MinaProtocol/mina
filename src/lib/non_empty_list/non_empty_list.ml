@@ -4,7 +4,12 @@ open Core_kernel
 module Stable = struct
   (* underlying type has a parameter, so don't register versions *)
   module V1 = struct
-    type 'a t = 'a * 'a list [@@deriving sexp, compare, eq, hash, bin_io]
+    module T = struct
+      type 'a t = 'a * 'a list
+      [@@deriving sexp, compare, eq, hash, bin_io, version]
+    end
+
+    include T
   end
 
   module Latest = V1

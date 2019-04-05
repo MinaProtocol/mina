@@ -54,7 +54,7 @@ module type S = sig
   module Stable :
     sig
       module V1 : sig
-        type t [@@deriving sexp, bin_io, to_yojson]
+        type t [@@deriving sexp, bin_io, to_yojson, version]
       end
 
       module Latest = V1

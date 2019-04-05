@@ -85,6 +85,9 @@ struct
           option
         [@@deriving bin_io]
 
+        (* , version{rpc} *)
+        
+        (* TODO : remove after uncommenting version{rpc} *)
         let version = 1
 
         let query_of_caller_model = Fn.id
@@ -132,11 +135,15 @@ struct
         type query =
           (Ledger_hash.Stable.V1.t * Sync_ledger.Query.Stable.V1.t)
           Envelope.Incoming.Stable.V1.t
-        [@@deriving bin_io, sexp]
+        [@@deriving bin_io, sexp, version {rpc}]
 
+        (* TODO : wrap Or_error *)
         type response = Sync_ledger.Answer.Stable.V1.t Or_error.t
         [@@deriving bin_io, sexp]
 
+        (* , version {rpc} *)
+        
+        (* TODO : remove this after uncommenting version{rpc} *)
         let version = 1
 
         let query_of_caller_model = Fn.id
@@ -181,13 +188,11 @@ struct
     module V1 = struct
       module T = struct
         type query = State_hash.Stable.V1.t Envelope.Incoming.Stable.V1.t
-        [@@deriving bin_io, sexp]
+        [@@deriving bin_io, sexp, version {rpc}]
 
         type response =
           External_transition.Stable.V1.t Non_empty_list.Stable.V1.t option
-        [@@deriving bin_io, sexp]
-
-        let version = 1
+        [@@deriving bin_io, sexp, version {rpc}]
 
         let query_of_caller_model = Fn.id
 
@@ -238,7 +243,7 @@ struct
         type query =
           Consensus.Consensus_state.Value.Stable.V1.t
           Envelope.Incoming.Stable.V1.t
-        [@@deriving bin_io, sexp]
+        [@@deriving bin_io, sexp, version {rpc}]
 
         type response =
           ( External_transition.Stable.V1.t
@@ -248,6 +253,9 @@ struct
           option
         [@@deriving bin_io]
 
+        (* , version {rpc} *)
+        
+        (* TODO : remove after uncommenting version{rpc} *)
         let version = 1
 
         let query_of_caller_model = Fn.id
@@ -322,14 +330,20 @@ struct
 
   include Versioned_rpc.Both_convert.One_way.Make (T)
 
+  module Content = struct
+    module Wrapped = struct
+      module Stable = struct
+        module V1 = struct
+          type t = T.T.content [@@deriving bin_io, sexp, version {wrapped}]
+        end
+      end
+    end
+  end
+
   module V1 = struct
     module T = struct
-      type content = T.T.content [@@deriving bin_io, sexp]
-
-      type msg = content Envelope.Incoming.Stable.V1.t
-      [@@deriving bin_io, sexp]
-
-      let version = 1
+      type msg = Content.Wrapped.Stable.V1.t Envelope.Incoming.Stable.V1.t
+      [@@deriving bin_io, sexp, version {rpc}]
 
       let callee_model_of_msg = Fn.id
 
@@ -605,7 +619,7 @@ module Make (Inputs : Inputs_intf) = struct
             match response_or_error with
             | Ok (Some response) -> return (Ok response)
             | Ok None -> loop remaining_peers (2 * num_peers)
-            | Error e -> loop remaining_peers (2 * num_peers) )
+            | Error _e -> loop remaining_peers (2 * num_peers) )
     in
     loop peers 1
 
