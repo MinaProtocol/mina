@@ -121,7 +121,7 @@ module type Ledger_hash_intf = sig
   module Stable :
     sig
       module V1 : sig
-        type t [@@deriving eq, sexp, compare, bin_io]
+        type t [@@deriving eq, sexp, compare, bin_io, version]
       end
 
       module Latest = V1
