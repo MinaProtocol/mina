@@ -41,7 +41,7 @@ module type Sok_message_intf = sig
 
   module Stable : sig
     module V1 : sig
-      type t [@@deriving sexp, bin_io]
+      type t [@@deriving sexp, bin_io, version]
     end
 
     module Latest = V1
@@ -192,7 +192,13 @@ end
 module type Transaction_witness_intf = sig
   type sparse_ledger
 
-  type t = {ledger: sparse_ledger} [@@deriving bin_io, sexp]
+  type t = {ledger: sparse_ledger} [@@deriving sexp]
+
+  module Stable : sig
+    module V1 : sig
+      type nonrec t = t [@@deriving bin_io, sexp, version]
+    end
+  end
 end
 
 module type Protocol_state_hash_intf = sig
@@ -309,7 +315,7 @@ module type Ledger_intf = sig
     module Stable :
       sig
         module V1 : sig
-          type t [@@deriving sexp, bin_io]
+          type t [@@deriving sexp, bin_io, version]
         end
 
         module Latest = V1
@@ -357,9 +363,7 @@ module Fee = struct
 
     include (
       Currency.Fee.Signed.Stable.V1 :
-        module type of Currency.Fee.Signed.Stable.Latest
-        with type t := t
-         and type ('a, 'b) t_ := ('a, 'b) t_ )
+        module type of Currency.Fee.Signed.Stable.Latest with type t := t )
   end
 end
 
@@ -372,7 +376,13 @@ module type Snark_pool_proof_intf = sig
 end
 
 module type User_command_intf = sig
-  type t [@@deriving sexp, eq, bin_io, yojson]
+  type t [@@deriving sexp, eq, yojson]
+
+  module Stable : sig
+    module V1 : sig
+      type nonrec t = t [@@deriving bin_io, sexp, eq, yojson]
+    end
+  end
 
   type public_key
 
@@ -501,7 +511,7 @@ module type Pending_coinbase_stack_state_intf = sig
   type pending_coinbase_stack
 
   type t = {source: pending_coinbase_stack; target: pending_coinbase_stack}
-  [@@deriving sexp, bin_io, compare]
+  [@@deriving sexp, compare]
 end
 
 module type Ledger_proof_statement_intf = sig
@@ -528,7 +538,7 @@ module type Ledger_proof_statement_intf = sig
           ; pending_coinbase_stack_state: pending_coinbase_stack_state
           ; fee_excess: Fee.Signed.t
           ; proof_type: [`Base | `Merge] }
-        [@@deriving sexp, bin_io, compare]
+        [@@deriving sexp, bin_io, compare, version]
       end
     end
     with type V1.t = t
@@ -553,7 +563,7 @@ module type Ledger_proof_intf = sig
   module Stable :
     sig
       module V1 : sig
-        type t [@@deriving sexp, bin_io, yojson]
+        type t [@@deriving sexp, bin_io, yojson, version]
       end
 
       module Latest = V1
@@ -704,7 +714,7 @@ module type Staged_ledger_diff_intf = sig
       module V1 : sig
         type t =
           {diff: diff; prev_hash: staged_ledger_hash; creator: public_key}
-        [@@deriving sexp, bin_io]
+        [@@deriving sexp, bin_io, version]
       end
 
       module Latest = V1
@@ -786,7 +796,7 @@ module type Transaction_snark_scan_state_intf = sig
   module Stable :
     sig
       module V1 : sig
-        type t [@@deriving sexp, bin_io]
+        type t [@@deriving sexp, bin_io, version]
 
         val hash : t -> staged_ledger_aux_hash
       end
@@ -945,7 +955,7 @@ module type Staged_ledger_base_intf = sig
     module Stable :
       sig
         module V1 : sig
-          type t [@@deriving sexp, bin_io]
+          type t [@@deriving sexp, bin_io, version]
 
           val hash : t -> staged_ledger_aux_hash
         end

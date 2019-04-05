@@ -465,9 +465,7 @@ struct
 
       include (
         Currency.Amount.Signed.Stable.Latest :
-          module type of Currency.Amount.Signed.Stable.Latest
-          with type t := t
-           and type ('a, 'b) t_ := ('a, 'b) t_ )
+          module type of Currency.Amount.Signed.Stable.Latest with type t := t )
     end
   end
 
@@ -528,7 +526,16 @@ struct
   module Sparse_ledger = Coda_base.Sparse_ledger
 
   module Transaction_snark_work_proof = struct
-    type t = Ledger_proof.Stable.V1.t list [@@deriving sexp, bin_io, yojson]
+    module Stable = struct
+      module V1 = struct
+        module T = struct
+          type t = Ledger_proof.Stable.V1.t list
+          [@@deriving sexp, bin_io, yojson, version]
+        end
+
+        include T
+      end
+    end
   end
 
   module Pending_coinbase_hash = Pending_coinbase.Hash
@@ -728,42 +735,47 @@ struct
 
   module Snark_pool = struct
     module Work = Transaction_snark_work.Statement
-    module Proof = Transaction_snark_work_proof
+    module Proof = Transaction_snark_work_proof.Stable.V1
 
     module Fee = struct
-      (* TODO : version Fee *)
-      module T = struct
-        type t =
-          {fee: Fee.Unsigned.t; prover: Public_key.Compressed.Stable.V1.t}
-        [@@deriving bin_io, sexp, yojson]
+      module Stable = struct
+        module V1 = struct
+          module T = struct
+            type t =
+              {fee: Fee.Unsigned.t; prover: Public_key.Compressed.Stable.V1.t}
+            [@@deriving bin_io, sexp, yojson, version]
 
-        (* TODO: Compare in a better way than with public key, like in transaction pool *)
-        let compare t1 t2 =
-          let r = compare t1.fee t2.fee in
-          if Int.( <> ) r 0 then r
-          else Public_key.Compressed.compare t1.prover t2.prover
+            (* TODO: Compare in a better way than with public key, like in transaction pool *)
+            let compare t1 t2 =
+              let r = compare t1.fee t2.fee in
+              if Int.( <> ) r 0 then r
+              else Public_key.Compressed.compare t1.prover t2.prover
+
+            let gen =
+              (* This isn't really a valid public key, but good enough for testing *)
+              let pk =
+                let open Snark_params.Tick in
+                let open Quickcheck.Generator.Let_syntax in
+                let%map x = Bignum_bigint.(gen_incl zero (Field.size - one))
+                and is_odd = Bool.gen in
+                let x = Bigint.(to_field (of_bignum_bigint x)) in
+                {Public_key.Compressed.Poly.Stable.Latest.x; is_odd}
+              in
+              Quickcheck.Generator.map2 Fee.Unsigned.gen pk
+                ~f:(fun fee prover -> {fee; prover} )
+          end
+
+          include T
+          include Comparable.Make (T)
+        end
       end
-
-      include T
-      include Comparable.Make (T)
-
-      let gen =
-        (* This isn't really a valid public key, but good enough for testing *)
-        let pk =
-          let open Snark_params.Tick in
-          let open Quickcheck.Generator.Let_syntax in
-          let%map x = Bignum_bigint.(gen_incl zero (Field.size - one))
-          and is_odd = Bool.gen in
-          let x = Bigint.(to_field (of_bignum_bigint x)) in
-          {Public_key.Compressed.Poly.Stable.Latest.x; is_odd}
-        in
-        Quickcheck.Generator.map2 Fee.Unsigned.gen pk ~f:(fun fee prover ->
-            {fee; prover} )
     end
 
-    module Pool = Snark_pool.Make (Proof) (Fee) (Work) (Transition_frontier)
+    (* TODO : we're choosing versioned inputs, so the result should be versioned *)
+    module Pool =
+      Snark_pool.Make (Proof) (Fee.Stable.V1) (Work) (Transition_frontier)
     module Diff =
-      Network_pool.Snark_pool_diff.Make (Proof) (Fee) (Work)
+      Network_pool.Snark_pool_diff.Make (Proof) (Fee.Stable.V1) (Work)
         (Transition_frontier)
         (Pool)
 

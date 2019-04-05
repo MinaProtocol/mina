@@ -97,7 +97,7 @@ module Undo : sig
       module Stable :
         sig
           module V1 : sig
-            type t [@@deriving bin_io, sexp]
+            type t [@@deriving bin_io, sexp, version]
           end
 
           module Latest = V1
@@ -193,7 +193,7 @@ module Undo : sig
   module Stable :
     sig
       module V1 : sig
-        type t [@@deriving bin_io, sexp]
+        type t [@@deriving bin_io, sexp, version]
       end
 
       module Latest = V1

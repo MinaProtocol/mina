@@ -131,7 +131,10 @@ end) : S = struct
         slice (bitstring_of_string string) 0 length
 
       module T = struct
+        (* TODO : use version ppx *)
         let version = 1
+
+        let __versioned__ = true
 
         type nonrec t = t
 

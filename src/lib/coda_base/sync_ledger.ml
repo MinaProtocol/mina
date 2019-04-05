@@ -42,7 +42,10 @@ module Answer = struct
   module Stable = struct
     module V1 = struct
       module T = struct
+        (* TODO : use version ppx *)
         let version = 1
+
+        let __versioned__ = true
 
         type t =
           ( Ledger_hash.Stable.V1.t
@@ -75,7 +78,10 @@ module Query = struct
   module Stable = struct
     module V1 = struct
       module T = struct
+        (* TODO : use version ppx *)
         let version = 1
+
+        let __versioned__ = true
 
         type t =
           Ledger.Location.Addr.Stable.V1.t Syncable_ledger.Query.Stable.V1.t

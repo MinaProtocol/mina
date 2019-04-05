@@ -70,7 +70,10 @@ end) :
   module Stable = struct
     module V1 = struct
       module T = struct
+        (* TODO : use version ppx *)
         let version = 1
+
+        let __versioned__ = true
 
         type t =
           { snark_transition: Snark_transition.value
