@@ -20,6 +20,8 @@ module Segment_id = Nat.Make32 ()
 
 module Typ = Crypto_params.Tick0.Typ
 
+let with_label = Snark_params.Tick.with_label
+
 module Epoch_seed = struct
   include Coda_base.Data_hash.Make_full_size ()
 
@@ -567,10 +569,9 @@ module Vrf = struct
     | Winner_address : Coda_base.Account.Index.t Snarky.Request.t
     | Private_key : Scalar.value Snarky.Request.t
 
-  open Snark_params.Tick
-
   let%snarkydef_ get_vrf_evaluation shifted ~ledger ~message =
     let open Coda_base in
+    let open Snark_params.Tick in
     let open Let_syntax in
     let%bind private_key =
       request_witness Scalar.typ (As_prover.return Private_key)
@@ -592,6 +593,7 @@ module Vrf = struct
   module Checked = struct
     let%snarkydef_ check shifted ~(epoch_ledger : Epoch_ledger.var) ~epoch
         ~slot ~seed =
+      let open Snark_params.Tick in
       let open Let_syntax in
       let%bind winner_addr =
         request_witness Coda_base.Account.Index.Unpacked.typ
