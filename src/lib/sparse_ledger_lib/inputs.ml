@@ -6,9 +6,7 @@ module type S = sig
       type nonrec t = t [@@deriving bin_io, eq, sexp]
     end
 
-    module Latest : sig
-      type nonrec t = t [@@deriving bin_io, eq, sexp]
-    end
+    module Latest : module type of V1
   end
 end
 

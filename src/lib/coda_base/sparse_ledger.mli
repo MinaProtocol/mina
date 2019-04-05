@@ -2,7 +2,6 @@ open Core
 open Import
 open Snark_params.Tick
 
-(* TODO : version *)
 type t =
   ( Ledger_hash.t
   , Account.key

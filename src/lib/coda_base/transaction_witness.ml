@@ -1,3 +1,5 @@
+open Module_version
+
 module Stable = struct
   module V1 = struct
     module T = struct
@@ -6,6 +8,7 @@ module Stable = struct
     end
 
     include T
+    include Registration.Make_latest_version (T)
   end
 
   module Latest = V1

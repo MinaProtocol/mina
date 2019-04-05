@@ -60,7 +60,7 @@ end
 module Stack_id : sig
   module Stable : sig
     module V1 : sig
-      type t [@@deriving bin_io, sexp, compare, eq]
+      type t [@@deriving bin_io, sexp, compare, eq, version]
     end
 
     module Latest = V1
@@ -366,9 +366,9 @@ module T = struct
   (* the arguments to Sparse_ledger.Make are all versioned; a particular choice of those
      versions yields a version of the result
    *)
-  module Merkle_tree = struct
-    include Sparse_ledger_lib.Sparse_ledger.Make (Hash) (Stack_id) (Stack)
-  end
+  module Merkle_tree =
+    Sparse_ledger_lib.Sparse_ledger.Make (Hash.Stable.V1) (Stack_id.Stable.V1)
+      (Stack.Stable.V1)
 
   module Checked = struct
     open Coinbase_stack

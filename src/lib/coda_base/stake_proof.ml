@@ -1,5 +1,6 @@
 open Core
 
+(* TODO: version *)
 type t =
   { delegator: Account.Index.t
   ; ledger: Sparse_ledger.Stable.V1.t

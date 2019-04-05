@@ -1,7 +1,5 @@
 open Core_kernel
 
-type index = int [@@deriving bin_io, sexp]
-
 module Poly = struct
   module Tree = struct
     module Stable = struct
@@ -11,7 +9,7 @@ module Poly = struct
             | Account of 'account
             | Hash of 'hash
             | Node of 'hash * ('hash, 'account) t * ('hash, 'account) t
-          [@@deriving bin_io, eq, sexp, version]
+          [@@deriving bin_io, version, eq, sexp, version]
         end
 
         include T
@@ -31,10 +29,10 @@ module Poly = struct
     module V1 = struct
       module T = struct
         type ('hash, 'key, 'account) t =
-          { indexes: ('key, index) List.Assoc.t
+          { indexes: ('key * int) list
           ; depth: int
           ; tree: ('hash, 'account) Tree.Stable.V1.t }
-        [@@deriving bin_io, sexp]
+        [@@deriving bin_io, sexp, version]
       end
 
       include T
@@ -45,19 +43,15 @@ module Poly = struct
 end
 
 module type S = sig
-  module Hash : Inputs.Hash
+  type hash
 
-  module Key : Inputs.Key
+  type key
 
-  module Account : Inputs.Account with type hash := Hash.t
+  type account
 
   module Stable : sig
     module V1 : sig
-      type t =
-        ( Hash.Stable.V1.t
-        , Key.Stable.V1.t
-        , Account.Stable.V1.t )
-        Poly.Stable.V1.t
+      type t = (hash, key, account) Poly.Stable.V1.t
       [@@deriving bin_io, sexp, version]
     end
 
@@ -66,53 +60,52 @@ module type S = sig
 
   type t = Stable.Latest.t [@@deriving sexp]
 
-  val of_hash : depth:int -> Hash.t -> t
+  val of_hash : depth:int -> hash -> t
 
-  val get_exn : t -> index -> Account.t
+  val get_exn : t -> int -> account
 
-  val path_exn : t -> index -> [`Left of Hash.t | `Right of Hash.t] list
+  val path_exn : t -> int -> [`Left of hash | `Right of hash] list
 
-  val set_exn : t -> index -> Account.t -> t
+  val set_exn : t -> int -> account -> t
 
-  val find_index_exn : t -> Key.t -> index
+  val find_index_exn : t -> key -> int
 
   val add_path :
-    t -> [`Left of Hash.t | `Right of Hash.t] list -> Key.t -> Account.t -> t
+    t -> [`Left of hash | `Right of hash] list -> key -> account -> t
 
-  val iteri : t -> f:(index -> Account.t -> unit) -> unit
+  val iteri : t -> f:(int -> account -> unit) -> unit
 
-  val merkle_root : t -> Hash.t
+  val merkle_root : t -> hash
 end
 
 let tree {Poly.Stable.Latest.tree; _} = tree
 
 let of_hash ~depth h = {Poly.Stable.Latest.indexes= []; depth; tree= Hash h}
 
-module Make
-    (Hash : Inputs.Hash)
-    (Key : Inputs.Key)
-    (Account : Inputs.Account with type hash := Hash.t) : sig
+module Make (Hash : sig
+  type t [@@deriving bin_io, eq, sexp, compare, version]
+
+  val merge : height:int -> t -> t -> t
+end) (Key : sig
+  type t [@@deriving bin_io, eq, sexp, version]
+end) (Account : sig
+  type t [@@deriving bin_io, eq, sexp, version]
+
+  val data_hash : t -> Hash.t
+end) : sig
   include
     S
-    with module Hash := Hash
-     and module Key := Key
-     and module Account := Account
+    with type hash := Hash.t
+     and type key := Key.t
+     and type account := Account.t
 
-  val hash : (Hash.Stable.V1.t, Account.Stable.V1.t) Poly.Tree.t -> Hash.t
+  val hash : (Hash.t, Account.t) Poly.Tree.t -> Hash.t
 end = struct
   module Stable = struct
     module V1 = struct
       module T = struct
-        let __versioned__ = true
-
-        let version = 1
-
-        type t =
-          ( Hash.Stable.V1.t
-          , Key.Stable.V1.t
-          , Account.Stable.V1.t )
-          Poly.Stable.V1.t
-        [@@deriving bin_io, sexp]
+        type t = (Hash.t, Key.t, Account.t) Poly.Stable.V1.t
+        [@@deriving bin_io, sexp, version]
       end
 
       include T
@@ -123,7 +116,7 @@ end = struct
 
   type t = Stable.Latest.t [@@deriving sexp]
 
-  let of_hash ~depth (hash : Hash.Stable.V1.t) = of_hash ~depth hash
+  let of_hash ~depth (hash : Hash.t) = of_hash ~depth hash
 
   let hash : (Hash.t, Account.t) Poly.Tree.t -> Hash.t = function
     | Account a -> Account.data_hash a
@@ -247,6 +240,10 @@ let%test_module "sparse-ledger-test" =
       module Stable = struct
         module V1 = struct
           module T = struct
+            let __versioned__ = true
+
+            let version = 1
+
             type t = Md5.t [@@deriving bin_io, eq, sexp]
           end
 
@@ -273,7 +270,7 @@ let%test_module "sparse-ledger-test" =
         module V1 = struct
           module T = struct
             type t = {name: string; favorite_number: int}
-            [@@deriving bin_io, eq, sexp]
+            [@@deriving bin_io, eq, sexp, version]
           end
 
           include T
@@ -298,7 +295,7 @@ let%test_module "sparse-ledger-test" =
       module Stable = struct
         module V1 = struct
           module T = struct
-            type t = String.t [@@deriving bin_io, eq, sexp]
+            type t = string [@@deriving bin_io, eq, sexp, version]
           end
 
           include T

@@ -2,17 +2,14 @@ open Core
 open Import
 open Snark_params.Tick
 
-module Ledger_hash_binable = struct
-  include Ledger_hash
+include Sparse_ledger_lib.Sparse_ledger.Make (struct
+            include Ledger_hash.Stable.V1
 
-  let merge = Ledger_hash.merge
-end
-
-include Sparse_ledger_lib.Sparse_ledger.Make
-          (Ledger_hash_binable)
-          (Public_key.Compressed)
+            let merge = Ledger_hash.merge
+          end)
+          (Public_key.Compressed.Stable.V1)
           (struct
-            include Account
+            include Account.Stable.V1
 
             let data_hash = Fn.compose Ledger_hash.of_digest Account.digest
           end)

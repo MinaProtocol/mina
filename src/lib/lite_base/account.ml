@@ -7,6 +7,11 @@ module Nonce = Nat.Make32 ()
 module Stable = struct
   module V1 = struct
     module T = struct
+      (* TODO: version *)
+      let version = 1
+
+      let __versioned__ = true
+
       type t =
         { public_key: Public_key.Compressed.Stable.V1.t
         ; balance: Balance.t

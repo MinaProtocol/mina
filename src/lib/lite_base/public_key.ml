@@ -9,6 +9,11 @@ module Compressed = struct
   module Stable = struct
     module V1 = struct
       module T = struct
+        (* TODO: version *)
+        let __versioned__ = true
+
+        let version = 1
+
         type t = {x: Field.t; is_odd: bool} [@@deriving bin_io, eq, sexp]
       end
 
