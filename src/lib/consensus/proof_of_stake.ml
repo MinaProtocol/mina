@@ -1370,9 +1370,13 @@ module Consensus_state = struct
         ~then_:previous_state.checkpoints ~else_:consed
     in
     let%bind has_ancestor_in_same_checkpoint_window =
-      same_checkpoint_window
-        ~prev:(Global_slot.Checked.create ~epoch:prev_epoch ~slot:prev_slot)
-        ~next:(Global_slot.Checked.create ~epoch:next_epoch ~slot:next_slot)
+      with_state As_prover.(return ())
+      @@ Runner.run
+           (same_checkpoint_window
+              ~prev:
+                (Global_slot.Checked.create ~epoch:prev_epoch ~slot:prev_slot)
+              ~next:
+                (Global_slot.Checked.create ~epoch:next_epoch ~slot:next_slot))
     in
     let%bind curr_data =
       let%map seed =
