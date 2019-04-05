@@ -117,7 +117,15 @@ module type S = sig
      and type ledger_hash := Ledger_hash.t
 
   module Sparse_ledger : sig
-    type t [@@deriving sexp, bin_io]
+    module Stable : sig
+      module V1 : sig
+        type t [@@deriving sexp, bin_io]
+      end
+
+      module Latest = V1
+    end
+
+    type t = Stable.V1.t
 
     val of_ledger_subset_exn : Ledger.t -> Compressed_public_key.t list -> t
 
@@ -127,6 +135,6 @@ module type S = sig
   end
 
   module Transaction_witness :
-    Coda_pow.Transaction_witness_intf
-    with type sparse_ledger := Sparse_ledger.t
+    Transaction_witness_intf
+    with type sparse_ledger := Sparse_ledger.Stable.V1.t
 end

@@ -2152,7 +2152,15 @@ let%test_module "test" =
       end
 
       module Sparse_ledger = struct
-        type t = int [@@deriving sexp, bin_io]
+        module Stable = struct
+          module V1 = struct
+            type t = int [@@deriving sexp, bin_io]
+          end
+
+          module Latest = V1
+        end
+
+        include Stable.V1
 
         let of_ledger_subset_exn :
             Ledger.t -> Compressed_public_key.t list -> t =

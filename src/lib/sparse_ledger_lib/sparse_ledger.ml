@@ -1,88 +1,146 @@
 open Core_kernel
 
-type ('hash, 'account) tree =
-  | Account of 'account
-  | Hash of 'hash
-  | Node of 'hash * ('hash, 'account) tree * ('hash, 'account) tree
-[@@deriving bin_io, eq, sexp]
-
 type index = int [@@deriving bin_io, sexp]
 
-type ('hash, 'key, 'account) t =
-  { indexes: ('key, index) List.Assoc.t
-  ; depth: int
-  ; tree: ('hash, 'account) tree }
-[@@deriving bin_io, sexp]
+module Poly = struct
+  module Tree = struct
+    module Stable = struct
+      module V1 = struct
+        module T = struct
+          type ('hash, 'account) t =
+            | Account of 'account
+            | Hash of 'hash
+            | Node of 'hash * ('hash, 'account) t * ('hash, 'account) t
+          [@@deriving bin_io, eq, sexp, version]
+        end
 
-let tree {tree; _} = tree
+        include T
+      end
 
-module type S = sig
-  type hash
+      module Latest = V1
+    end
 
-  type key
+    type ('hash, 'account) t = ('hash, 'account) Stable.Latest.t =
+      | Account of 'account
+      | Hash of 'hash
+      | Node of 'hash * ('hash, 'account) t * ('hash, 'account) t
+    [@@deriving eq, sexp]
+  end
 
-  type account
+  module Stable = struct
+    module V1 = struct
+      module T = struct
+        type ('hash, 'key, 'account) t =
+          { indexes: ('key, index) List.Assoc.t
+          ; depth: int
+          ; tree: ('hash, 'account) Tree.Stable.V1.t }
+        [@@deriving bin_io, sexp]
+      end
 
-  type nonrec t = (hash, key, account) t [@@deriving bin_io, sexp]
+      include T
+    end
 
-  val of_hash : depth:int -> hash -> t
-
-  val get_exn : t -> index -> account
-
-  val path_exn : t -> index -> [`Left of hash | `Right of hash] list
-
-  val set_exn : t -> index -> account -> t
-
-  val find_index_exn : t -> key -> index
-
-  val add_path :
-    t -> [`Left of hash | `Right of hash] list -> key -> account -> t
-
-  val iteri : t -> f:(index -> account -> unit) -> unit
-
-  val merkle_root : t -> hash
+    module Latest = V1
+  end
 end
 
-let of_hash ~depth h = {indexes= []; depth; tree= Hash h}
+module type S = sig
+  module Hash : Inputs.Hash
 
-module Make (Hash : sig
-  type t [@@deriving bin_io, eq, sexp, compare]
+  module Key : Inputs.Key
 
-  val merge : height:int -> t -> t -> t
-end) (Key : sig
-  type t [@@deriving bin_io, eq, sexp]
-end) (Account : sig
-  type t [@@deriving bin_io, eq, sexp]
+  module Account : Inputs.Account with type hash := Hash.t
 
-  val data_hash : t -> Hash.t
-end) =
-struct
-  type tree_tmp = (Hash.t, Account.t) tree [@@deriving eq]
+  module Stable : sig
+    module V1 : sig
+      type t =
+        ( Hash.Stable.V1.t
+        , Key.Stable.V1.t
+        , Account.Stable.V1.t )
+        Poly.Stable.V1.t
+      [@@deriving bin_io, sexp, version]
+    end
 
-  type tree = tree_tmp [@@deriving eq]
+    module Latest = V1
+  end
 
-  type t_tmp = (Hash.t, Key.t, Account.t) t [@@deriving bin_io, sexp]
+  type t = Stable.Latest.t [@@deriving sexp]
 
-  (* TODO : version *)
-  type t = t_tmp [@@deriving bin_io, sexp]
+  val of_hash : depth:int -> Hash.t -> t
 
-  let of_hash = of_hash
+  val get_exn : t -> index -> Account.t
 
-  let hash = function
+  val path_exn : t -> index -> [`Left of Hash.t | `Right of Hash.t] list
+
+  val set_exn : t -> index -> Account.t -> t
+
+  val find_index_exn : t -> Key.t -> index
+
+  val add_path :
+    t -> [`Left of Hash.t | `Right of Hash.t] list -> Key.t -> Account.t -> t
+
+  val iteri : t -> f:(index -> Account.t -> unit) -> unit
+
+  val merkle_root : t -> Hash.t
+end
+
+let tree {Poly.Stable.Latest.tree; _} = tree
+
+let of_hash ~depth h = {Poly.Stable.Latest.indexes= []; depth; tree= Hash h}
+
+module Make
+    (Hash : Inputs.Hash)
+    (Key : Inputs.Key)
+    (Account : Inputs.Account with type hash := Hash.t) : sig
+  include
+    S
+    with module Hash := Hash
+     and module Key := Key
+     and module Account := Account
+
+  val hash : (Hash.Stable.V1.t, Account.Stable.V1.t) Poly.Tree.t -> Hash.t
+end = struct
+  module Stable = struct
+    module V1 = struct
+      module T = struct
+        let __versioned__ = true
+
+        let version = 1
+
+        type t =
+          ( Hash.Stable.V1.t
+          , Key.Stable.V1.t
+          , Account.Stable.V1.t )
+          Poly.Stable.V1.t
+        [@@deriving bin_io, sexp]
+      end
+
+      include T
+    end
+
+    module Latest = V1
+  end
+
+  type t = Stable.Latest.t [@@deriving sexp]
+
+  let of_hash ~depth (hash : Hash.Stable.V1.t) = of_hash ~depth hash
+
+  let hash : (Hash.t, Account.t) Poly.Tree.t -> Hash.t = function
     | Account a -> Account.data_hash a
     | Hash h -> h
     | Node (h, _, _) -> h
 
   type index = int [@@deriving bin_io, sexp]
 
-  let merkle_root {tree; _} = hash tree
+  let merkle_root {Poly.Stable.Latest.tree; _} = hash tree
 
   let add_path depth0 tree0 path0 account =
+    (* let open Poly.Tree.V1 in *)
     let rec build_tree height p =
       match p with
       | `Left h_r :: path ->
           let l = build_tree (height - 1) path in
-          Node (Hash.merge ~height (hash l) h_r, l, Hash h_r)
+          Poly.Tree.Node (Hash.merge ~height (hash l) h_r, l, Hash h_r)
       | `Right h_l :: path ->
           let r = build_tree (height - 1) path in
           Node (Hash.merge ~height h_l (hash r), Hash h_l, r)
@@ -92,7 +150,7 @@ struct
     in
     let rec union height tree path =
       match (tree, path) with
-      | Hash h, path ->
+      | Poly.Tree.Hash h, path ->
           let t = build_tree height path in
           [%test_result: Hash.t]
             ~message:
@@ -116,7 +174,7 @@ struct
     in
     union (depth0 - 1) tree0 (List.rev path0)
 
-  let add_path t path key account =
+  let add_path (t : t) path key account =
     let index =
       List.foldi path ~init:0 ~f:(fun i acc x ->
           match x with `Right _ -> acc + (1 lsl i) | `Left _ -> acc )
@@ -125,10 +183,10 @@ struct
       tree= add_path t.depth t.tree path account
     ; indexes= (key, index) :: t.indexes }
 
-  let iteri t ~f =
+  let iteri (t : t) ~f =
     let rec go acc i tree ~f =
       match tree with
-      | Account a -> f acc a
+      | Poly.Tree.Account a -> f acc a
       | Hash _ -> ()
       | Node (_, l, r) ->
           go acc (i - 1) l ~f ;
@@ -138,12 +196,13 @@ struct
 
   let ith_bit idx i = (idx lsr i) land 1 = 1
 
-  let find_index_exn t pk = List.Assoc.find_exn t.indexes ~equal:Key.equal pk
+  let find_index_exn (t : t) pk =
+    List.Assoc.find_exn t.indexes ~equal:Key.equal pk
 
-  let get_exn {tree; depth; _} idx =
+  let get_exn {Poly.Stable.Latest.tree; depth; _} idx =
     let rec go i tree =
       match (i < 0, tree) with
-      | true, Account acct -> acct
+      | true, Poly.Tree.Account acct -> acct
       | false, Node (_, l, r) ->
           let go_right = ith_bit idx i in
           if go_right then go (i - 1) r else go (i - 1) l
@@ -151,10 +210,10 @@ struct
     in
     go (depth - 1) tree
 
-  let set_exn t idx acct =
+  let set_exn (t : t) idx acct =
     let rec go i tree =
       match (i < 0, tree) with
-      | true, Account _ -> Account acct
+      | true, Poly.Tree.Account _ -> Poly.Tree.Account acct
       | false, Node (_, l, r) ->
           let l, r =
             let go_right = ith_bit idx i in
@@ -165,12 +224,12 @@ struct
     in
     {t with tree= go (t.depth - 1) t.tree}
 
-  let path_exn {tree; depth; _} idx =
+  let path_exn {Poly.Stable.Latest.tree; depth; _} idx =
     let rec go acc i tree =
       if i < 0 then acc
       else
         match tree with
-        | Account _ -> failwith "Sparse_ledger.path: Bad depth"
+        | Poly.Tree.Account _ -> failwith "Sparse_ledger.path: Bad depth"
         | Hash _ -> failwith "Sparse_ledger.path: Dead end"
         | Node (_, l, r) ->
             let go_right = ith_bit idx i in
@@ -180,10 +239,24 @@ struct
     go [] (depth - 1) tree
 end
 
+type ('hash, 'key, 'account) t = ('hash, 'key, 'account) Poly.Stable.Latest.t
+
 let%test_module "sparse-ledger-test" =
   ( module struct
     module Hash = struct
-      include Md5
+      module Stable = struct
+        module V1 = struct
+          module T = struct
+            type t = Md5.t [@@deriving bin_io, eq, sexp]
+          end
+
+          include T
+        end
+
+        module Latest = V1
+      end
+
+      include Stable.V1
 
       let compare a b = String.compare (Md5.to_hex a) (Md5.to_hex b)
 
@@ -192,16 +265,24 @@ let%test_module "sparse-ledger-test" =
         digest_string
           (sprintf "sparse-ledger_%03d" height ^ to_binary x ^ to_binary y)
 
-      let gen = Quickcheck.Generator.map String.gen ~f:digest_string
+      let gen = Quickcheck.Generator.map String.gen ~f:Md5.digest_string
     end
 
     module Account = struct
-      module T = struct
-        type t = {name: string; favorite_number: int}
-        [@@deriving bin_io, eq, sexp]
+      module Stable = struct
+        module V1 = struct
+          module T = struct
+            type t = {name: string; favorite_number: int}
+            [@@deriving bin_io, eq, sexp]
+          end
+
+          include T
+        end
+
+        module Latest = V1
       end
 
-      include T
+      include Stable.V1
 
       let gen =
         let open Quickcheck.Generator.Let_syntax in
@@ -213,14 +294,30 @@ let%test_module "sparse-ledger-test" =
       let data_hash t = Md5.digest_string (Binable.to_string (module T) t)
     end
 
-    include Make (Hash) (String) (Account)
+    module Key = struct
+      module Stable = struct
+        module V1 = struct
+          module T = struct
+            type t = String.t [@@deriving bin_io, eq, sexp]
+          end
+
+          include T
+        end
+
+        module Latest = V1
+      end
+
+      include Stable.V1
+    end
+
+    include Make (Hash) (Key) (Account)
 
     let gen =
       let open Quickcheck.Generator in
       let open Let_syntax in
       let indexes max_depth t =
         let rec go addr d = function
-          | Account a -> [(Account.key a, addr)]
+          | Poly.Tree.Account a -> [(Account.key a, addr)]
           | Hash _ -> []
           | Node (_, l, r) ->
               go addr (d - 1) l @ go (addr lor (1 lsl d)) (d - 1) r
@@ -228,7 +325,7 @@ let%test_module "sparse-ledger-test" =
         go 0 (max_depth - 1) t
       in
       let rec prune_hash_branches = function
-        | Hash h -> Hash h
+        | Poly.Tree.Hash h -> Poly.Tree.Hash h
         | Account a -> Account a
         | Node (h, l, r) -> (
           match (prune_hash_branches l, prune_hash_branches r) with
@@ -236,19 +333,20 @@ let%test_module "sparse-ledger-test" =
           | l, r -> Node (h, l, r) )
       in
       let rec gen depth =
-        if depth = 0 then Account.gen >>| fun a -> Account a
+        if depth = 0 then Account.gen >>| fun a -> Poly.Tree.Account a
         else
           let t =
             let sub = gen (depth - 1) in
             let%map l = sub and r = sub in
-            Node (Hash.merge ~height:(depth - 1) (hash l) (hash r), l, r)
+            Poly.Tree.Node
+              (Hash.merge ~height:(depth - 1) (hash l) (hash r), l, r)
           in
           weighted_union
-            [(1. /. 3., Hash.gen >>| fun h -> Hash h); (2. /. 3., t)]
+            [(1. /. 3., Hash.gen >>| fun h -> Poly.Tree.Hash h); (2. /. 3., t)]
       in
       let%bind depth = Int.gen_incl 0 16 in
       let%map tree = gen depth >>| prune_hash_branches in
-      {tree; depth; indexes= indexes depth tree}
+      {Poly.Stable.Latest.tree; depth; indexes= indexes depth tree}
 
     let%test_unit "path_test" =
       Quickcheck.test gen ~f:(fun t ->
@@ -259,5 +357,5 @@ let%test_module "sparse-ledger-test" =
                 add_path acc (path_exn t index) (Account.key account) account
             )
           in
-          assert (equal_tree t'.tree t.tree) )
+          assert (Poly.Tree.equal Hash.equal Account.equal t'.tree t.tree) )
   end )

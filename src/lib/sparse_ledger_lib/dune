@@ -6,5 +6,5 @@
  (inline_tests)
  (libraries core_kernel)
  (preprocess
-  (pps ppx_jane ppx_deriving.eq bisect_ppx -- -conditional))
+  (pps ppx_jane ppx_deriving.eq bisect_ppx ppx_coda -- -conditional))
  (synopsis "sparse Ledger implementation"))

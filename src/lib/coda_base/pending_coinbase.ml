@@ -367,14 +367,7 @@ module T = struct
      versions yields a version of the result
    *)
   module Merkle_tree = struct
-    module Stable = struct
-      module V1 =
-        Sparse_ledger_lib.Sparse_ledger.Make
-          (Hash.Stable.V1)
-          (Stack_id.Stable.V1)
-          (Stack.Stable.V1)
-      module Latest = V1
-    end
+    include Sparse_ledger_lib.Sparse_ledger.Make (Hash) (Stack_id) (Stack)
   end
 
   module Checked = struct
@@ -558,13 +551,12 @@ module T = struct
           create_path (coinbase_tree_depth - 1) [] (Stack_id.to_int key)
         in
         go
-          (Merkle_tree.Stable.Latest.add_path t path key Stack.empty)
+          (Merkle_tree.add_path t path key Stack.empty)
           (Or_error.ok_exn (Stack_id.incr_by_one key))
     in
     { tree=
         go
-          (Merkle_tree.Stable.Latest.of_hash ~depth:coinbase_tree_depth
-             root_hash)
+          (Merkle_tree.of_hash ~depth:coinbase_tree_depth root_hash)
           Stack_id.zero
     ; pos_list= []
     ; new_pos= Stack_id.zero }
@@ -573,20 +565,17 @@ module T = struct
 
   let try_with = Or_error.try_with
 
-  let merkle_root t = Merkle_tree.Stable.Latest.merkle_root t.tree
+  let merkle_root t = Merkle_tree.merkle_root t.tree
 
-  let get_stack t index =
-    try_with (fun () -> Merkle_tree.Stable.Latest.get_exn t.tree index)
+  let get_stack t index = try_with (fun () -> Merkle_tree.get_exn t.tree index)
 
-  let path t index =
-    try_with (fun () -> Merkle_tree.Stable.Latest.path_exn t.tree index)
+  let path t index = try_with (fun () -> Merkle_tree.path_exn t.tree index)
 
   let set_stack t index stack =
-    try_with (fun () ->
-        {t with tree= Merkle_tree.Stable.Latest.set_exn t.tree index stack} )
+    try_with (fun () -> {t with tree= Merkle_tree.set_exn t.tree index stack})
 
   let find_index t key =
-    try_with (fun () -> Merkle_tree.Stable.Latest.find_index_exn t.tree key)
+    try_with (fun () -> Merkle_tree.find_index_exn t.tree key)
 
   let with_next_index t ~is_new_stack =
     let open Or_error.Let_syntax in
@@ -610,8 +599,8 @@ module T = struct
     let open Or_error.Let_syntax in
     let%bind key = latest_stack_id t ~is_new_stack in
     Or_error.try_with (fun () ->
-        let index = Merkle_tree.Stable.Latest.find_index_exn t.tree key in
-        Merkle_tree.Stable.Latest.get_exn t.tree index )
+        let index = Merkle_tree.find_index_exn t.tree key in
+        Merkle_tree.get_exn t.tree index )
 
   let oldest_stack_id t = List.last t.pos_list
 
