@@ -219,7 +219,7 @@ let rec generate_core_type_version_decls type_name core_type =
       Ppx_deriving.raise_errorf ~loc:core_type.ptyp_loc
         "Can't determine versioning for contained type"
 
-and generate_version_lets_for_core_types (type_name : string) core_types =
+and generate_version_lets_for_core_types type_name core_types =
   List.fold_right core_types ~init:[] ~f:(fun core_type accum ->
       generate_core_type_version_decls type_name core_type @ accum )
 
@@ -227,7 +227,7 @@ let generate_version_lets_for_label_decls type_name label_decls =
   generate_version_lets_for_core_types type_name
     (List.map label_decls ~f:(fun lab_decl -> lab_decl.pld_type))
 
-let generate_constructor_decl_decls (type_name : string) ctor_decl =
+let generate_constructor_decl_decls type_name ctor_decl =
   match (ctor_decl.pcd_res, ctor_decl.pcd_args) with
   | None, Pcstr_tuple core_types ->
       (* C of T1 * ... * Tn *)
