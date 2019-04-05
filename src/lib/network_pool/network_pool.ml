@@ -112,6 +112,9 @@ let%test_module "network pool test" =
     module Mock_proof = struct
       type input = Int.t
 
+      (* fake versioning *)
+      let __versioned__ = true
+
       type t = Int.t [@@deriving sexp, bin_io, yojson]
 
       let verify _ _ = return true
@@ -151,7 +154,13 @@ let%test_module "network pool test" =
         reader
     end
 
-    module Mock_fee = Int
+    module Mock_fee = struct
+      include Int
+
+      (* fake versioning *)
+      let __versioned__ = true
+    end
+
     module Mock_snark_pool =
       Snark_pool.Make (Mock_proof) (Mock_fee) (Mock_work)
         (Mock_transition_frontier)

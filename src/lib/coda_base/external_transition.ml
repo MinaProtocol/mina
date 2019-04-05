@@ -37,7 +37,7 @@ module type S = sig
     module Stable :
       sig
         module V1 : sig
-          type t [@@deriving bin_io, sexp]
+          type t [@@deriving bin_io, sexp, version]
         end
       end
       with type V1.t = t
@@ -103,7 +103,7 @@ module Make (Staged_ledger_diff : sig
   module Stable :
     sig
       module V1 : sig
-        type t [@@deriving bin_io, sexp]
+        type t [@@deriving bin_io, sexp, version]
       end
     end
     with type V1.t = t
@@ -119,7 +119,10 @@ end)
   module Stable = struct
     module V1 = struct
       module T = struct
+        (* TODO : use version ppx *)
         let version = 1
+
+        let __versioned__ = true
 
         type t =
           { protocol_state: Protocol_state.Value.Stable.V1.t

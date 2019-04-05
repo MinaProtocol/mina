@@ -60,7 +60,7 @@ end
 module Stack_id : sig
   module Stable : sig
     module V1 : sig
-      type t [@@deriving bin_io, sexp, compare, eq, version]
+      type t [@@deriving bin_io, sexp, compare, eq]
     end
 
     module Latest = V1
