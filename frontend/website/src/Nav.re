@@ -261,12 +261,18 @@ module NavWrapper = {
               order(3),
               width(`percent(100.0)),
               NavStyle.bottomNudge,
+              display(`none), // just hide when status lift happens
               media(
                 Style.MediaQuery.statusLift(keepAnnouncementBar),
-                [order(2), width(`auto), marginLeft(`zero)],
+                [
+                  order(2),
+                  width(`auto),
+                  marginLeft(`zero),
+                  ...keepAnnouncementBar
+                       ? [display(`block)] : [display(`none)],
+                ],
               ),
               media(NavStyle.MediaQuery.menu, [width(`percent(40.0))]),
-              ...keepAnnouncementBar ? [] : [display(`none)],
             ])
           )>
           <div

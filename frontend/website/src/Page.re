@@ -92,8 +92,11 @@ module Footer = {
               <Link link="/privacy.html" name="privacy">
                 {ReasonReact.string("Privacy Policy")}
               </Link>
-              <Link link="/jobs.html" name="hiring" last=true>
+              <Link link="/jobs.html" name="hiring">
                 {ReasonReact.string("We're Hiring")}
+              </Link>
+              <Link link="/static/presskit.zip" name="presskit" last=true>
+                {ReasonReact.string("Press Kit")}
               </Link>
             </ul>
           </div>
@@ -104,7 +107,7 @@ module Footer = {
                 style([textAlign(`center), color(Style.Colors.saville)]),
               ])
             )>
-            {ReasonReact.string({j|© 2019 O(1) Labs Corporation|j})}
+            {ReasonReact.string({j|© 2019 O(1) Labs|j})}
           </p>
         </section>
       </footer>,

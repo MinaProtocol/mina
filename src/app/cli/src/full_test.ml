@@ -79,7 +79,8 @@ let run_test () : unit Deferred.t =
             ; me=
                 Network_peer.Peer.create Unix.Inet_addr.localhost
                   ~discovery_port:8001 ~communication_port:8000
-            ; trust_system } }
+            ; trust_system
+            ; max_concurrent_connections= Some 10 } }
       in
       Core.Backtrace.elide := false ;
       Async.Scheduler.set_record_backtraces true ;
@@ -87,8 +88,6 @@ let run_test () : unit Deferred.t =
         Main.create
           (Main.Config.make ~logger ~trust_system ~net_config
              ~propose_keypair:keypair ~run_snark_worker:true
-             ~staged_ledger_persistant_location:
-               (temp_conf_dir ^/ "staged_ledger")
              ~transaction_pool_disk_location:
                (temp_conf_dir ^/ "transaction_pool")
              ~snark_pool_disk_location:(temp_conf_dir ^/ "snark_pool")

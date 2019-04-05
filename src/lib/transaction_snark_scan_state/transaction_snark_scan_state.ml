@@ -50,15 +50,12 @@ end = struct
     module Stable = struct
       module V1 = struct
         module T = struct
-          let version = 1
-
           (* TODO: The statement is redundant here - it can be computed from the witness and the transaction *)
-          (* TODO : version all fields *)
           type t =
             { transaction_with_info: Ledger.Undo.Stable.V1.t
             ; statement: Ledger_proof_statement.Stable.V1.t
-            ; witness: Transaction_witness.t sexp_opaque }
-          [@@deriving sexp, bin_io]
+            ; witness: Transaction_witness.Stable.V1.t sexp_opaque }
+          [@@deriving sexp, bin_io, version]
         end
 
         include T
@@ -88,10 +85,8 @@ end = struct
     module Stable = struct
       module V1 = struct
         module T = struct
-          let version = 1
-
           type t = Ledger_proof.Stable.V1.t * Sok_message.Stable.V1.t
-          [@@deriving sexp, bin_io]
+          [@@deriving sexp, bin_io, version]
         end
 
         include T
@@ -171,8 +166,6 @@ end = struct
   module Stable = struct
     module V1 = struct
       module T = struct
-        let version = 1
-
         type t =
           { (*Job_count: Keeping track of the number of jobs added to the tree. Every transaction added amounts to two jobs*)
             tree:
@@ -180,7 +173,7 @@ end = struct
               , Transaction_with_witness.Stable.V1.t )
               Parallel_scan.State.Stable.V1.t
           ; mutable job_count: int }
-        [@@deriving sexp, bin_io]
+        [@@deriving sexp, bin_io, version]
       end
 
       include T

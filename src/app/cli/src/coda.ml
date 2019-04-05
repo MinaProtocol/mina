@@ -96,6 +96,12 @@ let daemon logger =
          ~doc:"Use S-expressions in log output, instead of JSON"
      and enable_tracing =
        flag "tracing" no_arg ~doc:"Trace into $config-directory/$pid.trace"
+     and limit_connections =
+       flag "limit-concurrent-connections"
+         ~doc:
+           "true|false Limit the number of concurrent connections per IP \
+            address (default:true)"
+         (optional bool)
      in
      fun () ->
        let open Deferred.Let_syntax in
@@ -167,6 +173,13 @@ let daemon logger =
          in
          or_from_config json_to_currency_fee_option "snark-worker-fee"
            ~default:Cli_lib.Fee.default_snark_worker snark_work_fee
+       in
+       let max_concurrent_connections =
+         if
+           or_from_config YJ.Util.to_bool_option "max-concurrent-connections"
+             ~default:true limit_connections
+         then Some 10
+         else None
        in
        let rest_server_port =
          maybe_from_config YJ.Util.to_int_option "rest-port" rest_server_port
@@ -271,6 +284,8 @@ let daemon logger =
          let commit_id = commit_id
 
          let work_selection = work_selection
+
+         let max_concurrent_connections = max_concurrent_connections
        end in
        let%bind (module Init) =
          make_init
@@ -293,6 +308,7 @@ let daemon logger =
        let trust_dir = conf_dir ^/ "trust" in
        let () = Snark_params.set_chunked_hashing true in
        let%bind () = Async.Unix.mkdir ~p:() trust_dir in
+       let transition_frontier_location = conf_dir ^/ "transition_frontier" in
        let trust_system = Trust_system.create ~db_dir:trust_dir in
        let time_controller =
          M.Inputs.Time.Controller.create M.Inputs.Time.Controller.basic
@@ -307,7 +323,8 @@ let daemon logger =
              ; conf_dir
              ; initial_peers
              ; me
-             ; trust_system } }
+             ; trust_system
+             ; max_concurrent_connections } }
        in
        let receipt_chain_dir_name = conf_dir ^/ "receipt_chain" in
        let%bind () = Async.Unix.mkdir ~p:() receipt_chain_dir_name in
@@ -320,13 +337,12 @@ let daemon logger =
          Run.create
            (Run.Config.make ~logger ~trust_system ~net_config
               ~run_snark_worker:(Option.is_some run_snark_worker_flag)
-              ~staged_ledger_persistant_location:(conf_dir ^/ "staged_ledger")
               ~transaction_pool_disk_location:(conf_dir ^/ "transaction_pool")
               ~snark_pool_disk_location:(conf_dir ^/ "snark_pool")
               ~ledger_db_location:(conf_dir ^/ "ledger_db")
               ~snark_work_fee:snark_work_fee_flag ~receipt_chain_database
-              ~time_controller ?propose_keypair:Config0.propose_keypair ()
-              ~monitor)
+              ~transition_frontier_location ~time_controller
+              ?propose_keypair:Config0.propose_keypair () ~monitor)
        in
        Run.handle_shutdown ~monitor ~conf_dir ~logger coda ;
        Async.Scheduler.within' ~monitor

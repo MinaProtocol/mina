@@ -18,7 +18,11 @@ module Make (Inputs : Inputs_intf) :
    and type transaction_snark_scan_state := Inputs.Staged_ledger.Scan_state.t
    and type consensus_local_state := Consensus.Local_state.t
    and type user_command := User_command.t
-   and type diff_mutant := Inputs.Diff_mutant.e
+   and type diff_mutant :=
+              ( Inputs.External_transition.Stable.Latest.t
+              , State_hash.Stable.Latest.t )
+              With_hash.t
+              Inputs.Diff_mutant.E.t
    and module Extensions.Work = Inputs.Transaction_snark_work.Statement =
 struct
   (* NOTE: is Consensus_mechanism.select preferable over distance? *)
@@ -437,6 +441,9 @@ struct
   let find_exn t hash =
     let node = Hashtbl.find_exn t.table hash in
     node.breadcrumb
+
+  let find_in_root_history t hash =
+    Extensions.Root_history.lookup t.extensions.root_history hash
 
   let path_search t state_hash ~find ~f =
     let open Option.Let_syntax in

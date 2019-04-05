@@ -119,7 +119,10 @@ end)
   module Stable = struct
     module V1 = struct
       module T = struct
+        (* TODO : use version ppx *)
         let version = 1
+
+        let __versioned__ = true
 
         type t =
           { protocol_state: Protocol_state.Value.Stable.V1.t

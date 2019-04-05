@@ -4,19 +4,50 @@ open Coda_digestif
 module Job = struct
   module Stable = struct
     module V1 = struct
-      type sequence_no = int [@@deriving sexp, bin_io]
+      module Sequence_no = struct
+        module Stable = struct
+          module V1 = struct
+            module T = struct
+              type t = int [@@deriving sexp, bin_io, version]
+            end
+
+            include T
+          end
+
+          module Latest = V1
+        end
+
+        type t = Stable.Latest.t [@@deriving sexp]
+      end
 
       (*A merge can have zero components, one component (either the left or the right), or two components in which case there is an integer (sequence_no) representing a set of (completed)jobs in a sequence of (completed)jobs created*)
-      type 'a merge =
-        | Empty
-        | Lcomp of 'a
-        | Rcomp of 'a
-        | Bcomp of ('a * 'a * sequence_no)
-      [@@deriving sexp, bin_io]
+      module Merge = struct
+        module Stable = struct
+          module V1 = struct
+            module T = struct
+              type 'a t =
+                | Empty
+                | Lcomp of 'a
+                | Rcomp of 'a
+                | Bcomp of ('a * 'a * Sequence_no.Stable.V1.t)
+              [@@deriving sexp, bin_io, version]
+            end
 
-      (* don't use version number and module registration here, because of type parameters *)
-      type ('a, 'd) t = Merge of 'a merge | Base of ('d * sequence_no) option
-      [@@deriving sexp, bin_io]
+            include T
+          end
+
+          module Latest = V1
+        end
+      end
+
+      module T = struct
+        type ('a, 'd) t =
+          | Merge of 'a Merge.Stable.V1.t
+          | Base of ('d * Sequence_no.Stable.V1.t) option
+        [@@deriving sexp, bin_io, version]
+      end
+
+      include T
     end
 
     module Latest = V1
@@ -61,20 +92,29 @@ end
 
 module Stable = struct
   module V1 = struct
-    (* don't use version number and module registration here, because of type parameters *)
-    type ('a, 'd) t =
-      { jobs: ('a, 'd) Job.t Ring_buffer.t
-      ; level_pointer: int Array.t
-      ; capacity: int
-      ; mutable acc: int * ('a * 'd list) option sexp_opaque
-      ; mutable current_data_length: int
-      ; mutable base_none_pos: int option
-      ; mutable recent_tree_data: 'd list sexp_opaque
-      ; mutable other_trees_data: 'd list list sexp_opaque
-      ; stateful_work_order: int Queue.t
-      ; mutable curr_job_seq_no: int
-      ; root_level: int }
-    [@@deriving sexp, bin_io]
+    (* don't use module registration here, because of type parameters *)
+    module T = struct
+      type ('a, 'd) t =
+        { jobs: ('a, 'd) Job.t Ring_buffer.Stable.V1.t
+        ; level_pointer: int Array.t
+        ; capacity: int
+        ; mutable acc: int * ('a * 'd list) option sexp_opaque
+        ; mutable current_data_length: int
+        ; mutable base_none_pos: int option
+        ; mutable recent_tree_data: 'd list sexp_opaque
+        ; mutable other_trees_data: 'd list list sexp_opaque
+        ; stateful_work_order: int Queue.t
+        ; mutable curr_job_seq_no: int
+        ; root_level: int }
+      [@@deriving sexp, bin_io]
+
+      (* TODO : wrap Array and Queue, all other types here don't need versioning *)
+      let version = 1
+
+      let __versioned__ = true
+    end
+
+    include T
   end
 
   module Latest = V1

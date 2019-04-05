@@ -22,7 +22,7 @@ module Transition_frontier_diff = struct
 end
 
 module type Diff_hash = sig
-  type t
+  type t [@@deriving bin_io]
 
   val merge : t -> string -> t
 
@@ -49,50 +49,71 @@ module type Diff_mutant = sig
       and a certification that these components are handled appropriately.
       There are comments for each GADT that will discuss the operations that
       changes a `transition_frontier` and their corresponding side-effects.*)
-  type _ t =
-    | New_frontier :
-        ( (external_transition, state_hash) With_hash.t
-        * scan_state
-        * pending_coinbases )
-        -> unit t
-        (** New_frontier: When creating a new transition frontier, the
+  module T : sig
+    type ('external_transition, _) t =
+      | New_frontier :
+          ( (external_transition, state_hash) With_hash.t
+          * scan_state
+          * pending_coinbases )
+          -> ('external_transition, unit) t
+          (** New_frontier: When creating a new transition frontier, the
             transition_frontier will begin with a single breadcrumb that can be
             constructed mainly with a root external transition and a
             scan_state. There are no components in the frontier that affects
             the frontier. Therefore, the type of this diff is tagged as a unit. *)
-    | Add_transition :
-        (external_transition, state_hash) With_hash.t
-        -> consensus_state t
-        (** Add_transition: Add_transition would simply add a transition to the
+      | Add_transition :
+          (external_transition, state_hash) With_hash.t
+          -> ('external_transition, consensus_state) t
+          (** Add_transition: Add_transition would simply add a transition to the
             frontier and is therefore the parameter for Add_transition. After
             adding the transition, we add the transition to its parent list of
             successors. To certify that we added it to the right parent. The
             consensus_state of the parent can accomplish this. *)
-    | Remove_transitions :
-        (external_transition, state_hash) With_hash.t list
-        -> consensus_state list t
-        (** Remove_transitions: Remove_transitions is an operation that removes
+      | Remove_transitions :
+          'external_transition list
+          -> ('external_transition, consensus_state list) t
+          (** Remove_transitions: Remove_transitions is an operation that removes
             a set of transitions. We need to make sure that we are deleting the
             right transition and we use their consensus_state to accomplish
             this. Therefore the type of Remove_transitions is indexed by a list
             of consensus_state. *)
-    | Update_root :
-        (state_hash * scan_state * pending_coinbases)
-        -> (state_hash * scan_state * pending_coinbases) t
-        (** Update_root: Update root is an indication that the root state_hash
+      | Update_root :
+          (state_hash * scan_state * pending_coinbases)
+          -> ( 'external_transition
+             , state_hash * scan_state * pending_coinbases )
+             t
+          (** Update_root: Update root is an indication that the root state_hash
             and the root scan_state state. To verify that we update the right
             root, we can indicate the old root is being updated. Therefore, the
             type of Update_root is indexed by a state_hash and scan_state. *)
+  end
+
+  type ('a, 'b) t = ('a, 'b) T.t
 
   type hash
 
-  val key_to_yojson : 'a t -> Yojson.Safe.json
+  val key_to_yojson :
+       ('external_transition, 'output) T.t
+    -> f:('external_transition -> Yojson.Safe.json)
+    -> Yojson.Safe.json
 
-  val value_to_yojson : 'a t -> 'a -> Yojson.Safe.json
+  val value_to_yojson :
+    ('external_transition, 'output) T.t -> 'output -> Yojson.Safe.json
 
-  val hash : hash -> 'a t -> 'a -> hash
+  val hash :
+       hash
+    -> ('external_transition, 'output) T.t
+    -> f:('external_transition -> string)
+    -> 'output
+    -> hash
 
-  type e = E : 'a t -> e
+  module E : sig
+    type 'external_transition t =
+      | E : ('external_transition, 'output) T.t -> 'external_transition t
+
+    include
+      Binable.S1 with type 'external_transition t := 'external_transition t
+  end
 end
 
 (** An extension to the transition frontier that provides a view onto the data
@@ -165,16 +186,20 @@ module type Network_intf = sig
     -> state_hash
     -> external_transition Non_empty_list.t option Deferred.Or_error.t
 
+  val get_staged_ledger_aux_and_pending_coinbases_at_hash :
+       t
+    -> peer
+    -> state_hash
+    -> (parallel_scan_state * ledger_hash * pending_coinbases)
+       Deferred.Or_error.t
+
   val get_ancestry :
        t
     -> peer
     -> consensus_state
-    -> ( ( external_transition
-         , state_body_hash list * external_transition )
-         Proof_carrying_data.t
-       * parallel_scan_state
-       * ledger_hash
-       * pending_coinbases )
+    -> ( external_transition
+       , state_body_hash list * external_transition )
+       Proof_carrying_data.t
        Deferred.Or_error.t
 
   (* TODO: Change this to strict_pipe *)
@@ -309,6 +334,8 @@ module type Transition_frontier_intf = sig
   val hash_path : t -> Breadcrumb.t -> state_hash list
 
   val find : t -> state_hash -> Breadcrumb.t option
+
+  val find_in_root_history : t -> state_hash -> Breadcrumb.t option
 
   val root_history_path_map :
     t -> state_hash -> f:(Breadcrumb.t -> 'a) -> 'a Non_empty_list.t option
@@ -617,6 +644,10 @@ module type Sync_handler_intf = sig
 
   type syncable_ledger_answer
 
+  type parallel_scan_state
+
+  type pending_coinbases
+
   val answer_query :
        frontier:transition_frontier
     -> ledger_hash
@@ -629,6 +660,11 @@ module type Sync_handler_intf = sig
        frontier:transition_frontier
     -> state_hash
     -> external_transition Non_empty_list.t option
+
+  val get_staged_ledger_aux_and_pending_coinbases_at_hash :
+       frontier:transition_frontier
+    -> state_hash
+    -> (parallel_scan_state * ledger_hash * pending_coinbases) Option.t
 end
 
 module type Root_prover_intf = sig

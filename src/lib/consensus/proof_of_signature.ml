@@ -108,7 +108,10 @@ module Consensus_state = struct
     module Stable = struct
       module V1 = struct
         module T = struct
+          (* TODO : use version ppx *)
           let version = 1
+
+          let __versioned__ = true
 
           type t = (Length.Stable.V1.t, Public_key.Compressed.Stable.V1.t) t_
           [@@deriving bin_io, sexp, hash, compare, to_yojson]

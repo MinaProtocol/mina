@@ -81,12 +81,18 @@ module Body = struct
   end
 end
 
-type t = (User_command_payload.Common.t, Body.t) User_command_payload.t_
+type t =
+  ( User_command_payload.Common.t
+  , Body.t )
+  User_command_payload.Poly.Stable.Latest.t
 [@@deriving sexp]
 
 type payload = t [@@deriving sexp]
 
-type var = (User_command_payload.Common.var, Body.var) User_command_payload.t_
+type var =
+  ( User_command_payload.Common.var
+  , Body.var )
+  User_command_payload.Poly.Stable.Latest.t
 
 type payload_var = var
 
@@ -94,13 +100,15 @@ let gen =
   let open Quickcheck.Generator.Let_syntax in
   let%bind common = User_command_payload.Common.gen in
   let%map body = Body.gen ~fee:common.fee in
-  {User_command_payload.common; body}
+  User_command_payload.Poly.Stable.Latest.{common; body}
 
-let to_hlist ({common; body} : (_, _) User_command_payload.t_) =
+let to_hlist
+    ({common; body} : (_, _) User_command_payload.Poly.Stable.Latest.t) =
   H_list.[common; body]
 
 let of_hlist : type c v.
-    (unit, c -> v -> unit) H_list.t -> (c, v) User_command_payload.t_ =
+       (unit, c -> v -> unit) H_list.t
+    -> (c, v) User_command_payload.Poly.Stable.Latest.t =
  fun H_list.([common; body]) -> {common; body}
 
 let typ : (var, t) Typ.t =

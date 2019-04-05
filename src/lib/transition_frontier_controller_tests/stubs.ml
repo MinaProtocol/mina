@@ -26,9 +26,13 @@ struct
   module Ledger_proof = struct
     module Stable = struct
       module V1 = struct
-        type t =
-          Ledger_proof_statement.Stable.V1.t * Sok_message.Digest.Stable.V1.t
-        [@@deriving sexp, bin_io, yojson]
+        module T = struct
+          type t =
+            Ledger_proof_statement.Stable.V1.t * Sok_message.Digest.Stable.V1.t
+          [@@deriving sexp, bin_io, yojson, version]
+        end
+
+        include T
       end
 
       module Latest = V1
@@ -175,18 +179,7 @@ struct
 
   module Blockchain_state = External_transition.Protocol_state.Blockchain_state
   module Protocol_state = External_transition.Protocol_state
-
-  module Diff_hash = struct
-    open Digestif.SHA256
-
-    type t = ctx
-
-    let equal t1 t2 = eq (get t1) (get t2)
-
-    let empty = empty
-
-    let merge t1 string = feed_string t1 string
-  end
+  module Diff_hash = Transition_frontier_persistence.Diff_hash
 
   module Diff_mutant_inputs = struct
     module Staged_ledger_aux_hash = Staged_ledger_aux_hash
@@ -544,27 +537,28 @@ struct
       let%bind frontier = Hashtbl.find table peer in
       Sync_handler.transition_catchup ~frontier state_hash
 
+    let mplus ma mb = if Option.is_some ma then ma else mb
+
+    let get_staged_ledger_aux_and_pending_coinbases_at_hash {table; _} peer
+        hash =
+      Deferred.return
+      @@ Result.of_option
+           ~error:
+             (Error.of_string
+                "Peer could not find the staged_ledger_aux and \
+                 pending_coinbase at hash")
+           (let open Option.Let_syntax in
+           let%bind frontier = Hashtbl.find table peer in
+           Sync_handler.get_staged_ledger_aux_and_pending_coinbases_at_hash
+             ~frontier hash)
+
     let get_ancestry {table; logger} peer consensus_state =
       Deferred.return
       @@ Result.of_option
            ~error:(Error.of_string "Peer could not produce an ancestor")
            (let open Option.Let_syntax in
            let%bind frontier = Hashtbl.find table peer in
-           let%map peer_root_with_proof =
-             Root_prover.prove ~logger ~frontier consensus_state
-           in
-           let staged_ledger =
-             Transition_frontier.Breadcrumb.staged_ledger
-               (Transition_frontier.root frontier)
-           in
-           let scan_state = Staged_ledger.scan_state staged_ledger in
-           let merkle_root =
-             Ledger.merkle_root (Staged_ledger.ledger staged_ledger)
-           in
-           let pending_coinbases =
-             Staged_ledger.pending_coinbase_collection staged_ledger
-           in
-           (peer_root_with_proof, scan_state, merkle_root, pending_coinbases))
+           Root_prover.prove ~logger ~frontier consensus_state)
 
     let glue_sync_ledger {table; logger; _} query_reader response_writer : unit
         =

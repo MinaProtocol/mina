@@ -8,5 +8,5 @@ include Sparse_ledger_lib.Sparse_ledger.Make (struct
           (struct
             include Account
 
-            let hash = Account.digest
+            let data_hash = Account.digest
           end)
