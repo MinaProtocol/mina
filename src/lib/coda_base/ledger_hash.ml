@@ -87,7 +87,7 @@ let get t addr =
    - returns a root [t'] of a tree of depth [depth]
    which is [t] but with the account [f account] at path [addr].
 *)
-let%snarkydef modify_account t pk ~(filter : Account.var -> ('a, _) Checked.t)
+let%snarkydef_ modify_account t pk ~(filter : Account.var -> ('a, _) Checked.t)
     ~f =
   let%bind addr =
     request_witness Account.Index.Unpacked.typ

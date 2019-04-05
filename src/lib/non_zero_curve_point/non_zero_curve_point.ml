@@ -241,7 +241,7 @@ let decompress_var ({x; is_odd} as c : Compressed.var) =
 
 let compress : t -> Compressed.t = Compressed.compress
 
-let%snarkydef compress_var ((x, y) : var) : (Compressed.var, _) Checked.t =
+let%snarkydef_ compress_var ((x, y) : var) : (Compressed.var, _) Checked.t =
   let%map is_odd = parity_var y in
   {Compressed.Poly.Stable.Latest.x; is_odd}
 

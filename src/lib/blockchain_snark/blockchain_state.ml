@@ -51,7 +51,7 @@ module Make (Consensus_mechanism : Consensus.S) :
         | "full" -> T.verify_complete_merge
         | _ -> fun _ _ _ _ _ _ _ -> Checked.return Boolean.true_
 
-      let%snarkydef update
+      let%snarkydef_ update
           ((previous_state_hash, previous_state) :
             State_hash.var * Protocol_state.var)
           (transition : Snark_transition.var) :
@@ -144,13 +144,13 @@ module Make (Consensus_mechanism : Consensus.S) :
   end
 
   module Checked = struct
-    let%snarkydef is_base_hash h =
+    let%snarkydef_ is_base_hash h =
       Field.Checked.equal
         (Field.Var.constant
            (Consensus_mechanism.genesis_protocol_state.hash :> Field.t))
         (State_hash.var_to_hash_packed h)
 
-    let%snarkydef hash (t : Protocol_state.var) =
+    let%snarkydef_ hash (t : Protocol_state.var) =
       Protocol_state.var_to_triples t
       >>= Pedersen.Checked.digest_triples ~init:Hash_prefix.protocol_state
       >>| State_hash.var_of_hash_packed

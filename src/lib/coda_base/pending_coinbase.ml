@@ -450,7 +450,7 @@ module T = struct
         (Merkle_tree.get_req ~depth (Hash.var_to_hash_packed t) addr)
         reraise_merkle_requests
 
-    let%snarkydef add_coinbase t (pk, amount) =
+    let%snarkydef_ add_coinbase t (pk, amount) =
       let%bind addr =
         request_witness Address.typ
           As_prover.(map (return ()) ~f:(fun _ -> Find_index_of_newest_stack))
@@ -486,7 +486,7 @@ module T = struct
         reraise_merkle_requests
       >>| Hash.var_of_hash_packed
 
-    let%snarkydef pop_coinbases t ~proof_emitted =
+    let%snarkydef_ pop_coinbases t ~proof_emitted =
       let%bind addr =
         request_witness Address.typ
           As_prover.(map (return ()) ~f:(fun _ -> Find_index_of_oldest_stack))

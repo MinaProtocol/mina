@@ -27,7 +27,7 @@ module Message = struct
 
   let () = assert Insecure.signature_hash_function
 
-  let%snarkydef hash_checked t ~nonce =
+  let%snarkydef_ hash_checked t ~nonce =
     let init =
       Pedersen.Checked.Section.create ~acc:(`Value Hash_prefix.signature.acc)
         ~support:

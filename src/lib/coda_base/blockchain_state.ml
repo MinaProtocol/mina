@@ -212,7 +212,7 @@ end) : S = struct
 
     let () = assert Insecure.signature_hash_function
 
-    let%snarkydef hash_checked t ~nonce =
+    let%snarkydef_ hash_checked t ~nonce =
       let%bind trips = var_to_triples t in
       let%bind hash =
         Pedersen.Checked.digest_triples ~init:Hash_prefix.signature

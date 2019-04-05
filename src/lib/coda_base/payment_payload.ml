@@ -80,7 +80,7 @@ let fold Poly.Stable.Latest.({receiver; amount}) =
 (* TODO: This could be a bit more efficient by packing across triples,
    but I think the added confusion-possibility
    is not worth it. *)
-let%snarkydef var_to_triples Poly.Stable.Latest.({receiver; amount}) =
+let%snarkydef_ var_to_triples Poly.Stable.Latest.({receiver; amount}) =
   let%map receiver = Public_key.Compressed.var_to_triples receiver in
   let amount = Amount.var_to_triples amount in
   receiver @ amount

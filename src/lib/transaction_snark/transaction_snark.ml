@@ -311,7 +311,7 @@ module Base = struct
   open Tick
   open Let_syntax
 
-  let%snarkydef check_signature shifted ~payload_section ~is_user_command
+  let%snarkydef_ check_signature shifted ~payload_section ~is_user_command
       ~sender ~signature =
     let%bind verifies =
       Schnorr.Checked.verifies shifted signature sender payload_section
@@ -340,7 +340,7 @@ module Base = struct
 
   *)
   (* Nonce should only be incremented if it is a "Normal" transaction. *)
-  let%snarkydef apply_tagged_transaction (type shifted)
+  let%snarkydef_ apply_tagged_transaction (type shifted)
       (shifted : (module Inner_curve.Checked.Shifted.S with type t = shifted))
       root pending_coinbase_stack_before
       ({sender; signature; payload} : Transaction_union.var) =
@@ -467,7 +467,7 @@ module Base = struct
    such that
    H(l1, l2, pending_coinbase_stack_state.source, pending_coinbase_stack_state.target, fee_excess, supply_increase) = top_hash,
    applying [t] to ledger with merkle hash [l1] results in ledger with merkle hash [l2]. *)
-  let%snarkydef main top_hash =
+  let%snarkydef_ main top_hash =
     let%bind (module Shifted) = Tick.Inner_curve.Checked.Shifted.create () in
     let%bind root_before =
       exists' Frozen_ledger_hash.typ ~f:Prover_state.state1
@@ -703,7 +703,7 @@ module Merge = struct
      verify_transition tock_vk _ s1 s2 pending_coinbase_stack12.source, pending_coinbase_stack12.target is true
      verify_transition tock_vk _ s2 s3 pending_coinbase_stack23.source, pending_coinbase_stack23.target is true
   *)
-  let%snarkydef main (top_hash : Pedersen.Checked.Digest.var) =
+  let%snarkydef_ main (top_hash : Pedersen.Checked.Digest.var) =
     let%bind tock_vk =
       exists' (Verifier.Verification_key.typ ~input_size:wrap_input_size)
         ~f:(fun {Prover_state.tock_vk; _} -> Verifier.vk_of_backend_vk tock_vk
@@ -1026,7 +1026,7 @@ struct
    constraints pass iff
    (b1, b2, .., bn) = unpack input,
    there is a proof making one of [ base_vk; merge_vk ] accept (b1, b2, .., bn) *)
-  let%snarkydef main (input : Wrap_input.var) =
+  let%snarkydef_ main (input : Wrap_input.var) =
     let%bind input = with_label __LOC__ (Wrap_input.Checked.to_scalar input) in
     let%bind is_base =
       exists' Boolean.typ ~f:(fun {Prover_state.proof_type; _} ->
