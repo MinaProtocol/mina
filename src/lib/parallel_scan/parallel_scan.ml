@@ -33,8 +33,8 @@ module State = struct
   (* Creates state that placeholders-out all the right jobs in the right spot
    * also we need to seed the buffer with exactly one piece of work
   *)
-  let create : type a d. parallelism_log_2:int -> (a, d) t =
-   fun ~parallelism_log_2 ->
+  let create : type a d. parallelism_log_2:int -> root_level:int -> (a, d) t =
+   fun ~parallelism_log_2 ~root_level ->
     let open Job in
     let parallelism = Int.pow 2 parallelism_log_2 in
     let jobs =
@@ -58,7 +58,8 @@ module State = struct
     ; recent_tree_data= []
     ; other_trees_data= []
     ; stateful_work_order= Queue.create ()
-    ; curr_job_seq_no= 0 }
+    ; curr_job_seq_no= 0
+    ; root_level }
 
   let transactions
       { jobs= _
@@ -76,6 +77,25 @@ module State = struct
   let next_leaf_pos p cur_pos =
     if cur_pos = (2 * p) - 2 then p - 1 else cur_pos + 1
 
+  let is_at_root ~root_level pos =
+    let root_starts = Int.pow 2 root_level - 1 in
+    let root_ends = Int.pow 2 (root_level + 1) - 2 in
+    root_starts <= pos && pos <= root_ends
+
+  let slots_per_block state = parallelism state / Int.pow 2 state.root_level
+
+  let block_of state pos =
+    let parallelism = State.parallelism state in
+    let slots_per_block = slots_per_block state in
+    let rec go curr_block_start_pos =
+      if pos >= curr_block_start_pos || curr_block_start_pos = parallelism - 1
+      then curr_block_start_pos
+      else go (curr_block_start_pos - slots_per_block)
+    in
+    go ((2 * parallelism) - slots_per_block - 1)
+
+  (*start from last block*)
+  
   (*Assuming that Base Somes are picked in the same order*)
   let next_base_pos state cur_pos =
     let p = parallelism state in
@@ -86,7 +106,7 @@ module State = struct
 
   let%test_unit "parallelism derived from jobs" =
     let of_parallelism_log_2 x =
-      let s = create ~parallelism_log_2:x in
+      let s = create ~parallelism_log_2:x ~root_level:2 in
       assert (parallelism s = Int.pow 2 x)
     in
     of_parallelism_log_2 1 ;
@@ -285,7 +305,11 @@ module State = struct
     List.rev lst
 
   let base_jobs_on_latest_tree (state : ('a, 'd) t) : 'd list =
-    let leaves_start_at = parallelism state - 1 in
+    let parallelism = parallelism state in
+    let leaves_start_at =
+      Option.value_map ~default:(parallelism - 1) state.base_none_pos
+        ~f:(block_of state)
+    in
     let rec go pos jobs =
       (*Get jobs from leaf-0 to the leaf at current enqueue position. The ones that are after base_pos are pending jobs from previous tree *)
       if
@@ -334,7 +358,8 @@ module State = struct
     match (parent_empty old_jobs cur_pos, cur_job, completed_job) with
     | true, Merge (Bcomp _), Merged z ->
         let%bind () =
-          if cur_pos = 0 then (
+          if is_at_root ~root_level:t.root_level cur_pos then (
+            Core.printf !"emitting from root at pos %d\n%!" cur_pos ;
             match List.rev t.other_trees_data with
             | [] ->
                 failwith
@@ -378,6 +403,7 @@ module State = struct
       -> unit Or_error.t =
    fun t completed_jobs jobs_copy ->
     let open Or_error.Let_syntax in
+    Core.printf !"started consuming work \n %!" ;
     match completed_jobs with
     | [] -> Ok ()
     | j :: js -> (
@@ -396,7 +422,10 @@ module State = struct
           Or_error.error_string "Invalid job encountered while enqueuing data"
     in
     let%map () = Ring_buffer.direct_update (State.jobs state) base_pos ~f in
-    let last_leaf_pos = Ring_buffer.length state.jobs - 1 in
+    let last_leaf_pos =
+      block_of state base_pos + slots_per_block state - 1
+      (*Ring_buffer.length state.jobs - 1*)
+    in
     if base_pos = last_leaf_pos then (
       state.other_trees_data
       <- (value :: state.recent_tree_data) :: state.other_trees_data ;
@@ -493,7 +522,8 @@ let view_jobs_with_position (t : ('a, 'd) State.t) fa fd =
       (i, job') :: jobs )
   |> List.rev
 
-let start : type a d. parallelism_log_2:int -> (a, d) State.t = State.create
+let start : type a d. parallelism_log_2:int -> (a, d) State.t =
+  State.create ~root_level:2
 
 let next_jobs :
     state:('a, 'd) State.t -> ('a, 'd) Available_job.t list Or_error.t =
@@ -657,17 +687,17 @@ let current_job_sequence_number : ('a, 'd) State.t -> int =
 
 let partition_if_overflowing ~max_slots state =
   let n = min (free_space ~state) max_slots in
-  let parallelism = State.parallelism state in
-  let offset = parallelism - 1 in
   match State.base_none_pos state with
   | None -> {Space_partition.first= 0; second= None}
   | Some start ->
-      let start_0 = start - offset in
-      if n <= parallelism - start_0 then
+      let block_start = State.block_of state start in
+      let start_0 = start - block_start in
+      let slots_in_current_block = State.slots_per_block state - start_0 in
+      if n <= slots_in_current_block then
         {Space_partition.first= n; second= None}
       else
-        { Space_partition.first= parallelism - start_0
-        ; second= Some (n - (parallelism - start_0)) }
+        { Space_partition.first= slots_in_current_block
+        ; second= Some (n - slots_in_current_block) }
 
 let gen :
        gen_data:'d Quickcheck.Generator.t
@@ -679,7 +709,7 @@ let gen :
  fun ~gen_data ~f_job_done ~f_acc ->
   let open Quickcheck.Generator.Let_syntax in
   let%bind parallelism_log_2 = Int.gen_incl 2 7 in
-  let s = State.create ~parallelism_log_2 in
+  let s = State.create ~parallelism_log_2 ~root_level:2 in
   let parallelism = State.parallelism s in
   let%bind data_chunk_size =
     Int.gen_incl ((parallelism / 2) - 1) (parallelism / 2)
@@ -797,7 +827,7 @@ let%test_module "scans" =
           let offset = leaves - 1 in
           let last_index = (2 * leaves) - 2 in
           let g = Int.gen_incl 1 max_slots in
-          let state = State.create ~parallelism_log_2:p in
+          let state = State.create ~parallelism_log_2:p ~root_level:2 in
           Quickcheck.test g ~trials:1000 ~f:(fun i ->
               let data = List.init i ~f:Int64.of_int in
               let partition = partition_if_overflowing ~max_slots:i state in
@@ -826,7 +856,7 @@ let%test_module "scans" =
           let cur_value = ref 0 in
           let parallelism_log_2 = 4 in
           let one = Int64.of_int 1 in
-          let state = State.create ~parallelism_log_2 in
+          let state = State.create ~parallelism_log_2 ~root_level:2 in
           (*List.fold
             (List.init 20 ~f:(fun _ -> ()))
             ~init:()
@@ -946,7 +976,7 @@ let%test_module "scans" =
             in
             assert (sum_of_all_seq_numbers = sum_of_n)
           in
-          let state = State.create ~parallelism_log_2:p in
+          let state = State.create ~parallelism_log_2:p ~root_level:2 in
           Quickcheck.test g ~trials:50 ~f:(fun _ ->
               if free_space ~state < Int.pow 2 p then
                 (*Work until all the leaves are empty*)
@@ -1084,7 +1114,7 @@ let%test_module "scans" =
       let create_job (s : ('a, 'd) State.t) pos job =
         Ring_buffer.direct_update s.jobs pos ~f:(fun _ -> Ok job) |> ok
       in
-      let empty_tree = State.create ~parallelism_log_2:exp in
+      let empty_tree = State.create ~parallelism_log_2:exp ~root_level:2 in
       let p = State.parallelism empty_tree in
       assert (not_valid empty_tree) ;
       let level_i = Int.pow 2 (exp - 1) in

@@ -827,12 +827,17 @@ end = struct
         let%map () =
           if Pending_coinbase.Stack.equal oldest_stack ledger_proof_stack then
             Ok ()
-          else
+          else (
+            Core.printf
+              !"expected %{sexp: Pending_coinbase.Stack.t} got %{sexp: \
+                Pending_coinbase.Stack.t} \n\
+               \ %!"
+              oldest_stack ledger_proof_stack ;
             Error
               (Staged_ledger_error.Unexpected
                  (Error.of_string
                     "Pending coinbase stack of the ledger proof did not match \
-                     the oldest stack in the pending coinbase tree"))
+                     the oldest stack in the pending coinbase tree.")) )
         in
         pending_coinbase_collection_updated1
       else Ok pending_coinbase_collection
