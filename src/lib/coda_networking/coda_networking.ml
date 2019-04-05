@@ -243,9 +243,7 @@ struct
         type query =
           Consensus.Consensus_state.Value.Stable.V1.t
           Envelope.Incoming.Stable.V1.t
-        [@@deriving bin_io, sexp]
-
-        (* , version {rpc} *)
+        [@@deriving bin_io, sexp, version {rpc}]
 
         type response =
           ( External_transition.Stable.V1.t
