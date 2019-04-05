@@ -1827,7 +1827,12 @@ let%test_module "test" =
       module Ledger_hash = struct
         module Stable = struct
           module V1 = struct
-            type t = int [@@deriving sexp, bin_io, compare, hash, eq, yojson]
+            module T = struct
+              type t = int
+              [@@deriving sexp, bin_io, compare, hash, eq, yojson, version]
+            end
+
+            include T
           end
 
           module Latest = V1
