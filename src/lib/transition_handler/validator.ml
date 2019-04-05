@@ -42,7 +42,7 @@ module Make (Inputs : Inputs.With_unprocessed_transition_cache.S) :
         (not
            (Unprocessed_transition_cache.mem unprocessed_transition_cache
               transition_with_hash))
-        ~error:`Duplicate
+        ~error:`Under_processing
     in
     let%map () =
       Result.ok_if_true
@@ -58,7 +58,6 @@ module Make (Inputs : Inputs.With_unprocessed_transition_cache.S) :
     (* we expect this to be Ok since we just checked the cache *)
     Unprocessed_transition_cache.register unprocessed_transition_cache
       transition_with_hash
-    |> Or_error.ok_exn
 
   let run ~logger ~frontier ~transition_reader
       ~(valid_transition_writer :
@@ -111,7 +110,7 @@ module Make (Inputs : Inputs.With_unprocessed_transition_cache.S) :
                    (Core_kernel.Time.diff (Core_kernel.Time.now ())
                       transition_time) ;
                  Writer.write valid_transition_writer cached_transition
-             | Error `Duplicate ->
+             | Error `Duplicate | Error `Under_processing ->
                  if Lru.find already_reported_duplicates hash |> Option.is_none
                  then (
                    Logger.info logger ~module_:__MODULE__ ~location:__LOC__

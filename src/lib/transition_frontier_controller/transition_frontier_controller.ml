@@ -111,7 +111,6 @@ module Make (Inputs : Inputs_intf) :
          * are no duplicates in the list *)
         Transition_handler.Unprocessed_transition_cache.register
           unprocessed_transition_cache t
-        |> Or_error.ok_exn
         |> Strict_pipe.Writer.write primary_transition_writer ) ;
     Strict_pipe.Reader.iter_without_pushback valid_transition_reader
       ~f:(Strict_pipe.Writer.write primary_transition_writer)

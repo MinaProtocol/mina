@@ -1,6 +1,5 @@
 open Async_kernel
 open Core_kernel
-open Or_error.Let_syntax
 
 module type Inputs_intf = sig
   val handle_unconsumed_cache_item :
@@ -13,49 +12,53 @@ module Make (Inputs : Inputs_intf) : Intf.Main.S = struct
 
     val logger : _ t -> Logger.t
 
-    val remove : 'elt t -> 'elt -> unit Or_error.t
+    val remove : 'elt t -> 'elt -> unit
   end = struct
-    type 'a t = {name: string; set: 'a Hash_set.t; logger: Logger.t}
+    type 'a t =
+      {name: string; set: ('a, Intf.final_result) Hashtbl.t; logger: Logger.t}
 
     let name {name; _} = name
 
     let logger {logger; _} = logger
 
     let create (type elt) ~name ~logger
-        (module Elt : Hash_set.Elt_plain with type t = elt) : elt t =
-      let set =
-        Hash_set.create ~growth_allowed:true ?size:None (module Elt) ()
-      in
+        (module Elt : Hashtbl.Key_plain with type t = elt) : elt t =
+      let set = Hashtbl.create ~growth_allowed:true ?size:None (module Elt) in
       let logger = Logger.extend logger [("cache", `String name)] in
       {name; set; logger}
 
+    let final_result t x = Hashtbl.find t.set x
+
     let register t x =
-      let%map () = Hash_set.strict_add t.set x in
-      Cached.create t x
+      let final_result = Ivar.create () in
+      Hashtbl.add_exn t.set ~key:x ~data:final_result ;
+      Cached.create t x final_result
 
-    let mem t x = Hash_set.mem t.set x
+    let mem t x = Hashtbl.mem t.set x
 
-    let remove t x = Hash_set.strict_remove t.set x
+    let remove t x = Hashtbl.remove t.set x
 
-    let to_list t = Hash_set.to_list t.set
+    let to_list t = Hashtbl.keys t.set
   end
   
   and Cached : sig
     include Intf.Cached.S
 
-    val create : 'elt Cache.t -> 'elt -> ('elt, 'elt) t
+    val create : 'elt Cache.t -> 'elt -> Intf.final_result -> ('elt, 'elt) t
   end = struct
     type (_, _) t =
       | Base :
           { data: 'a
           ; cache: 'a Cache.t
-          ; mutable consumed: bool }
+          ; mutable consumed: bool
+          ; final_result: Intf.final_result }
           -> ('a, 'a) t
       | Derivative :
           { original: 'a
           ; mutant: 'b
           ; cache: 'a Cache.t
-          ; mutable consumed: bool }
+          ; mutable consumed: bool
+          ; final_result: Intf.final_result }
           -> ('b, 'a) t
       | Pure : 'a -> ('a, _) t
 
@@ -76,6 +79,11 @@ module Make (Inputs : Inputs_intf) : Intf.Main.S = struct
       | Derivative x -> x.original
       | Pure _ -> failwith "cannot access original of pure Cached.t"
 
+    let final_result : type a b. (a, b) t -> Intf.final_result = function
+      | Base x -> x.final_result
+      | Derivative x -> x.final_result
+      | Pure _ -> failwith "cannot access final result of pure Cached.t"
+
     let was_consumed : type a b. (a, b) t -> bool = function
       | Base x -> x.consumed
       | Derivative x -> x.consumed
@@ -86,6 +94,16 @@ module Make (Inputs : Inputs_intf) : Intf.Main.S = struct
       | Derivative x -> x.consumed <- true
       | Pure _ -> failwith "cannot set consumption of pure Cached.t"
 
+    let mark_failed : type a b. (a, b) t -> unit = function
+      | Base x -> Ivar.fill x.final_result `Failed
+      | Derivative x -> Ivar.fill x.final_result `Failed
+      | Pure _ -> failwith "cannot set final result of pure Cached.t"
+
+    let mark_applied : type a b. (a, b) t -> unit = function
+      | Base x -> Ivar.fill x.final_result `Applied
+      | Derivative x -> Ivar.fill x.final_result `Applied
+      | Pure _ -> failwith "cannot set final result of pure Cached.t"
+
     let attach_finalizer t =
       Gc.Expert.add_finalizer (Heap_block.create_exn t) (fun block ->
           let t = Heap_block.value block in
@@ -95,8 +113,8 @@ module Make (Inputs : Inputs_intf) : Intf.Main.S = struct
               ~cache_name:(Cache.name cache) ) ;
       t
 
-    let create cache data =
-      attach_finalizer (Base {data; cache; consumed= false})
+    let create cache data final_result =
+      attach_finalizer (Base {data; cache; consumed= false; final_result})
 
     let assert_not_consumed t msg =
       let open Error in
@@ -117,11 +135,19 @@ module Make (Inputs : Inputs_intf) : Intf.Main.S = struct
            { original= original t
            ; mutant= f (value t)
            ; cache= cache t
-           ; consumed= false })
+           ; consumed= false
+           ; final_result= final_result t })
 
-    let invalidate (type a b) (t : (a, b) t) : a Or_error.t =
+    let invalidate (type a b) (t : (a, b) t) : a =
       consume t ;
-      let%map () = Cache.remove (cache t) (original t) in
+      mark_failed t ;
+      Cache.remove (cache t) (original t) ;
+      value t
+
+    let free (type a b) (t : (a, b) t) : a =
+      consume t ;
+      mark_applied t ;
+      Cache.remove (cache t) (original t) ;
       value t
 
     let sequence_deferred (type a b) (t : (a Deferred.t, b) t) :
@@ -164,8 +190,10 @@ module Make (Inputs : Inputs_intf) : Intf.Main.S = struct
         Cache.create ~logger ~name:Name.t (module Transmuter.Target)
 
       let register t x =
-        let%map target = Cache.register t (Transmuter.transmute x) in
+        let target = Cache.register t (Transmuter.transmute x) in
         Cached.transform target ~f:(Fn.const x)
+
+      let final_result t x = Cache.final_result t (Transmuter.transmute x)
 
       let mem t x = Cache.mem t (Transmuter.transmute x)
     end
@@ -197,7 +225,7 @@ let%test_module "cache_lib test instance" =
       let logger = Logger.null () in
       with_cache ~logger ~f:(fun cache ->
           with_item ~f:(fun data ->
-              let x = Or_error.ok_exn (Cache.register cache data) in
+              let x = Cache.register cache data in
               ignore (Cached.invalidate x) ) ;
           Gc.full_major () ;
           assert (!dropped_cache_items = 0) )
@@ -207,8 +235,7 @@ let%test_module "cache_lib test instance" =
       setup () ;
       let logger = Logger.null () in
       with_cache ~logger ~f:(fun cache ->
-          with_item ~f:(fun data ->
-              ignore (Or_error.ok_exn (Cache.register cache data)) ) ;
+          with_item ~f:(fun data -> ignore (Cache.register cache data)) ;
           Gc.full_major () ;
           assert (!dropped_cache_items = 1) )
 
@@ -218,7 +245,7 @@ let%test_module "cache_lib test instance" =
       let logger = Logger.null () in
       with_item ~f:(fun data ->
           with_cache ~logger ~f:(fun cache ->
-              ignore (Or_error.ok_exn (Cache.register cache data)) ) ;
+              ignore (Cache.register cache data) ) ;
           Gc.full_major () ;
           assert (!dropped_cache_items = 1) )
 
@@ -227,7 +254,7 @@ let%test_module "cache_lib test instance" =
       let logger = Logger.null () in
       with_cache ~logger ~f:(fun cache ->
           with_item ~f:(fun data ->
-              let cached = Or_error.ok_exn (Cache.register cache data) in
+              let cached = Cache.register cache data in
               Gc.full_major () ;
               assert (!dropped_cache_items = 0) ;
               ignore (Cached.invalidate cached) ) ) ;
@@ -240,7 +267,7 @@ let%test_module "cache_lib test instance" =
       let logger = Logger.null () in
       with_cache ~logger ~f:(fun cache ->
           with_item ~f:(fun data ->
-              Cache.register cache data |> Or_error.ok_exn
+              Cache.register cache data
               |> Cached.transform ~f:(Fn.const 5)
               |> Cached.transform ~f:(Fn.const ())
               |> ignore ) ;
@@ -253,7 +280,7 @@ let%test_module "cache_lib test instance" =
       let logger = Logger.null () in
       with_cache ~logger ~f:(fun cache ->
           with_item ~f:(fun data ->
-              Cache.register cache data |> Or_error.ok_exn
+              Cache.register cache data
               |> Cached.transform ~f:(Fn.const 5)
               |> Cached.transform ~f:(Fn.const ())
               |> Cached.invalidate |> ignore ) ;
@@ -266,7 +293,7 @@ let%test_module "cache_lib test instance" =
       let logger = Logger.null () in
       with_cache ~logger ~f:(fun cache ->
           with_item ~f:(fun data ->
-              let src = Or_error.ok_exn (Cache.register cache data) in
+              let src = Cache.register cache data in
               let derivation = Cached.transform src ~f:(Fn.const 5) in
               assert (
                 try
@@ -276,4 +303,15 @@ let%test_module "cache_lib test instance" =
               ignore (Cached.invalidate derivation) ) ;
           Gc.full_major () ;
           assert (!dropped_cache_items = 0) )
+
+    let%test_unit "deriving a cached object inhabits its parent's final result"
+        =
+      setup () ;
+      with_cache ~logger:(Logger.null ()) ~f:(fun cache ->
+          with_item ~f:(fun data ->
+              let src = Cache.register cache data in
+              let der = Cached.transform src ~f:(Fn.const 5) in
+              let src_final_result = Cached.final_result src in
+              let der_final_result = Cached.final_result der in
+              assert (Ivar.equal src_final_result der_final_result) ) )
   end )

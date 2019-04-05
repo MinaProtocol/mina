@@ -1,6 +1,8 @@
 open Async_kernel
 open Core_kernel
 
+type final_result = [`Failed | `Applied] Ivar.t
+
 (** [Constant.S] is a helper signature for passing constant values
  *  to functors.
  *)
@@ -40,12 +42,16 @@ module Cached = struct
      *)
     val peek : ('t, _) t -> 't
 
+    val final_result : ('t, _) t -> final_result
+
     (** [invalidate c] removes the underlying cached value
      *  of [c] from its cache. [invalidate] will return an
      *  [Error] if the underlying cached value was not
      *  present in the cache.
      *)
-    val invalidate : ('t, _) t -> 't Or_error.t
+    val invalidate : ('t, _) t -> 't
+
+    val free : ('t, _) t -> 't
 
     val was_consumed : (_, _) t -> bool
 
@@ -72,7 +78,7 @@ module Cached = struct
 end
 
 (**
- *  A ['a Cache.t] is a [Hash_set.t] baked cache abstraction which
+ *  A ['a Cache.t] is a [Hashtbl.t] baked cache abstraction which
  *  registers [('a, 'a) Cached.t] values.
  *)
 module Cache = struct
@@ -86,7 +92,7 @@ module Cache = struct
     val create :
          name:string
       -> logger:Logger.t
-      -> (module Hash_set.Elt_plain with type t = 'elt)
+      -> (module Hashtbl.Key_plain with type t = 'elt)
       -> 'elt t
 
     (** [register cache elt] add [elt] to [cache]. If [elt]
@@ -94,9 +100,11 @@ module Cache = struct
      *  Otherwise, [Ok] is returned with a [Cached]
      *  representation of [elt].
      *)
-    val register : 'elt t -> 'elt -> ('elt, 'elt) Cached.t Or_error.t
+    val register : 'elt t -> 'elt -> ('elt, 'elt) Cached.t
 
     val mem : 'elt t -> 'elt -> bool
+
+    val final_result : 'elt t -> 'elt -> final_result Option.t
 
     val to_list : 'elt t -> 'elt list
   end
@@ -137,7 +145,9 @@ module Transmuter_cache = struct
 
     val create : logger:Logger.t -> t
 
-    val register : t -> source -> (source, target) Cached.t Or_error.t
+    val register : t -> source -> (source, target) Cached.t
+
+    val final_result : t -> source -> final_result Option.t
 
     val mem : t -> source -> bool
   end

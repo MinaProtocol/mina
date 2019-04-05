@@ -187,8 +187,12 @@ module Make (Inputs : Inputs.S) :
     match%map cached_verified_transition with
     | Ok x -> Ok (Some x)
     | Error `Duplicate ->
-        Logger.info logger ~module_:__MODULE__ ~location:__LOC__
+        Logger.trace logger ~module_:__MODULE__ ~location:__LOC__
           "transition queried during ledger catchup has already been seen" ;
+        Ok None
+    | Error `Under_processing ->
+        Logger.trace logger ~module_:__MODULE__ ~location:__LOC__
+          "transition queried during ledger catchup is still under procession" ;
         Ok None
     | Error (`Invalid reason) ->
         Logger.faulty_peer logger ~module_:__MODULE__ ~location:__LOC__

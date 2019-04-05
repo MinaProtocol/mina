@@ -155,9 +155,8 @@ let%test_module "Transition_handler.Catchup_scheduler tests" =
           let cached_dangling_transitions =
             List.map dangling_transitions
               ~f:
-                (Fn.compose Or_error.ok_exn
-                   (Unprocessed_transition_cache.register
-                      unprocessed_transition_cache))
+                (Unprocessed_transition_cache.register
+                   unprocessed_transition_cache)
           in
           List.(
             iter (rev cached_dangling_transitions) ~f:(fun cached_transition ->
@@ -180,12 +179,10 @@ let%test_module "Transition_handler.Catchup_scheduler tests" =
                     unprocessed_transition_cache
                     (Transition_frontier.Breadcrumb.transition_with_hash
                        missing_breadcrumb)
-                |> Or_error.ok_exn
                 |> Cached.transform ~f:(Fn.const missing_breadcrumb) )
           in
           let received_rose_tree =
-            Rose_tree.map cached_received_rose_tree
-              ~f:(Fn.compose Or_error.ok_exn Cached.invalidate)
+            Rose_tree.map cached_received_rose_tree ~f:Cached.invalidate
           in
           assert (
             List.equal
@@ -235,9 +232,8 @@ let%test_module "Transition_handler.Catchup_scheduler tests" =
           let cached_dangling_transitions =
             List.map dangling_transitions
               ~f:
-                (Fn.compose Or_error.ok_exn
-                   (Unprocessed_transition_cache.register
-                      unprocessed_transition_cache))
+                (Unprocessed_transition_cache.register
+                   unprocessed_transition_cache)
           in
           List.iter (List.permute cached_dangling_transitions)
             ~f:(fun cached_transition ->
@@ -258,12 +254,10 @@ let%test_module "Transition_handler.Catchup_scheduler tests" =
                     unprocessed_transition_cache
                     (Transition_frontier.Breadcrumb.transition_with_hash
                        missing_breadcrumb)
-                |> Or_error.ok_exn
                 |> Cached.transform ~f:(Fn.const missing_breadcrumb) )
           in
           let received_rose_tree =
-            Rose_tree.map cached_received_rose_tree
-              ~f:(Fn.compose Or_error.ok_exn Cached.invalidate)
+            Rose_tree.map cached_received_rose_tree ~f:Cached.invalidate
           in
           assert (
             Rose_tree.equiv received_rose_tree upcoming_rose_tree

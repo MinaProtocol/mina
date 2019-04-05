@@ -46,7 +46,6 @@ let%test_module "Ledger catchup" =
       let cached_transition =
         Transition_handler.Unprocessed_transition_cache.register
           unprocessed_transition_cache transition
-        |> Or_error.ok_exn
       in
       Strict_pipe.Writer.write catchup_job_writer
         (Rose_tree.T (cached_transition, [])) ;
@@ -62,8 +61,7 @@ let%test_module "Ledger catchup" =
         Ivar.read result_ivar >>| List.hd_exn
       in
       let catchup_breadcrumbs =
-        Rose_tree.map cached_catchup_breadcrumbs
-          ~f:(Fn.compose Or_error.ok_exn Cache_lib.Cached.invalidate)
+        Rose_tree.map cached_catchup_breadcrumbs ~f:Cache_lib.Cached.invalidate
       in
       Rose_tree.equal expected_breadcrumbs catchup_breadcrumbs
         ~f:(fun breadcrumb_tree1 breadcrumb_tree2 ->
