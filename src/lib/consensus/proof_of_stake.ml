@@ -567,9 +567,10 @@ module Vrf = struct
     | Winner_address : Coda_base.Account.Index.t Snarky.Request.t
     | Private_key : Scalar.value Snarky.Request.t
 
-  let%snarkydef get_vrf_evaluation shifted ~ledger ~message =
+  open Snark_params.Tick
+
+  let%snarkydef_ get_vrf_evaluation shifted ~ledger ~message =
     let open Coda_base in
-    let open Snark_params.Tick in
     let open Let_syntax in
     let%bind private_key =
       request_witness Scalar.typ (As_prover.return Private_key)
@@ -589,9 +590,8 @@ module Vrf = struct
     (evaluation, account.balance)
 
   module Checked = struct
-    let%snarkydef check shifted ~(epoch_ledger : Epoch_ledger.var) ~epoch ~slot
-        ~seed =
-      let open Snark_params.Tick in
+    let%snarkydef_ check shifted ~(epoch_ledger : Epoch_ledger.var) ~epoch
+        ~slot ~seed =
       let open Let_syntax in
       let%bind winner_addr =
         request_witness Coda_base.Account.Index.Unpacked.typ
@@ -1323,7 +1323,7 @@ module Consensus_state = struct
         (Epoch.pack_var epoch :> Var.t) + (Epoch.Slot.pack_var slot :> Var.t))
       (Var.constant zero)
 
-  let%snarkydef update_var (previous_state : var)
+  let%snarkydef_ update_var (previous_state : var)
       (transition_data : Consensus_transition_data.var)
       (previous_protocol_state_hash : Coda_base.State_hash.var)
       ~(supply_increase : Currency.Amount.var)
@@ -1577,7 +1577,7 @@ let received_at_valid_time (consensus_state : Consensus_state.Value.t)
     ~time_received
 
 include struct
-  let%snarkydef next_state_checked ~(prev_state : Protocol_state.var)
+  let%snarkydef_ next_state_checked ~(prev_state : Protocol_state.var)
       ~(prev_state_hash : Coda_base.State_hash.var) transition supply_increase
       =
     Consensus_state.update_var
