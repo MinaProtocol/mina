@@ -194,8 +194,6 @@ struct
           External_transition.Stable.V1.t Non_empty_list.Stable.V1.t option
         [@@deriving bin_io, sexp, version {rpc}]
 
-        let version = 1
-
         let query_of_caller_model = Fn.id
 
         let callee_model_of_query = Fn.id
