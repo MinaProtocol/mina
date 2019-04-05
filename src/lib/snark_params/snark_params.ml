@@ -126,7 +126,7 @@ end
 module Tock = struct
   include (Tock0 : module type of Tock0 with module Proof := Tock0.Proof)
 
-  module Groth16 = Snarky.Snark.Make (Tock_backend.Full.Default)
+  module Groth16 = Snarky.Snark.Make_noast (Tock_backend.Full.Default)
   module Fq = Snarky_field_extensions.Field_extensions.F (Tock0)
 
   module Inner_curve = struct
@@ -347,7 +347,7 @@ end
 module Tick = struct
   include (Tick0 : module type of Tick0 with module Field := Tick0.Field)
 
-  module Groth16 = Snarky.Snark.Make (Tick_backend.Full.Default)
+  module Groth16 = Snarky.Snark.Make_noast (Tick_backend.Full.Default)
 
   module Field = struct
     include Tick0.Field

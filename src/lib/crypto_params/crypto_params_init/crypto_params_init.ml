@@ -35,8 +35,8 @@ module Tock_backend = struct
   module Inner_twisted_curve = Cycle.Mnt4.G2
 end
 
-module Tick0 = Snarky.Snark.Make (Tick_backend)
-module Tock0 = Snarky.Snark.Make (Tock_backend)
+module Tick0 = Snarky.Snark.Make_noast (Tick_backend)
+module Tock0 = Snarky.Snark.Make_noast (Tock_backend)
 
 module Wrap_input = struct
   (*

@@ -425,7 +425,7 @@ struct
 end
 
 let%test_unit "group map test" =
-  let module S = Snarky.Snark.Make (Snarky.Backends.Mnt6.Default) in
+  let module S = Snarky.Snark.Make_noast (Snarky.Backends.Mnt6.Default) in
   let module M =
     Make_unchecked (S.Field) (Snarky.Libsnark.Mnt4.G1.Coefficients)
   in

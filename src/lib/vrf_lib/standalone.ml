@@ -334,8 +334,8 @@ end
 let%test_module "vrf-test" =
   ( module struct
     (* Nothing in here is secure, it's just for the test *)
-    module Impl = Snarky.Snark.Make (Snarky.Backends.Mnt4.GM)
-    module Other_impl = Snarky.Snark.Make (Snarky.Backends.Mnt6.GM)
+    module Impl = Snarky.Snark.Make_noast (Snarky.Backends.Mnt4.GM)
+    module Other_impl = Snarky.Snark.Make_noast (Snarky.Backends.Mnt6.GM)
     module B = Bigint
 
     module Scalar = struct
