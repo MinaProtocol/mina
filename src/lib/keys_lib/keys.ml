@@ -135,7 +135,7 @@ let create () : (module S) Async.Deferred.t =
             let open Tick in
             with_state
               ~and_then:(fun s -> As_prover.set_state (back s))
-              As_prover.(map get_state ~f:there)
+              As_prover.(map (get_state ()) ~f:there)
               (main x)
         end
 
@@ -152,7 +152,7 @@ let create () : (module S) Async.Deferred.t =
             let open Tock in
             with_state
               ~and_then:(fun s -> As_prover.set_state (back s))
-              As_prover.(map get_state ~f:there)
+              As_prover.(map (get_state ()) ~f:there)
               (main x)
         end
       end in

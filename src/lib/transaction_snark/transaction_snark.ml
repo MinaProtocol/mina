@@ -14,7 +14,8 @@ let tick_input () =
 
 let wrap_input = Tock.Data_spec.[Wrap_input.typ]
 
-let exists' typ ~f = Tick.(exists typ ~compute:As_prover.(map get_state ~f))
+let exists' typ ~f =
+  Tick.(exists typ ~compute:As_prover.(map (get_state ()) ~f))
 
 module Input = struct
   (* TODO : version *)
@@ -507,7 +508,7 @@ module Base = struct
     in
     ()
 
-  let reduced_main = lazy (Groth16.reduce_to_prover (tick_input ()) main)
+  let reduced_main = lazy main
 
   let create_keys () = Groth16.generate_keypair main ~exposing:(tick_input ())
 
@@ -680,7 +681,7 @@ module Merge = struct
       exists Verifier.Proof.typ
         ~compute:
           As_prover.(
-            map get_state ~f:(fun s ->
+            map (get_state ()) ~f:(fun s ->
                 get_transition_data s |> Transition_data.proof |> snd
                 |> Verifier.proof_of_backend_proof ))
     in
@@ -1019,7 +1020,7 @@ struct
     [@@deriving fields]
   end
 
-  let exists' typ ~f = exists typ ~compute:As_prover.(map get_state ~f)
+  let exists' typ ~f = exists typ ~compute:As_prover.(map (get_state ()) ~f)
 
   (* spec for [main input]:
    constraints pass iff
@@ -1047,7 +1048,7 @@ struct
         exists Verifier.Proof.typ
           ~compute:
             As_prover.(
-              map get_state
+              map (get_state ())
                 ~f:
                   (Fn.compose Verifier.proof_of_backend_proof
                      Prover_state.proof))

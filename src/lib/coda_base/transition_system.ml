@@ -110,7 +110,7 @@ struct
       >>| Tick.Pedersen.Checked.Section.to_initial_segment_digest
       >>| Or_error.ok_exn >>| fst
 
-    let%snarkydef prev_state_valid wrap_vk_section wrap_vk prev_state_hash =
+    let%snarkydef_ prev_state_valid wrap_vk_section wrap_vk prev_state_hash =
       match Coda_compile_config.proof_level with
       | "full" ->
           (* TODO: Should build compositionally on the prev_state hash (instead of converting to bits) *)
@@ -128,7 +128,7 @@ struct
             exists Verifier.Proof.typ
               ~compute:
                 As_prover.(
-                  map get_state
+                  map (get_state ())
                     ~f:
                       (Fn.compose Verifier.proof_of_backend_proof
                          Prover_state.prev_proof))
@@ -138,9 +138,9 @@ struct
       | "check" | "none" -> return Boolean.true_
       | _ -> failwith "unknown proof_level"
 
-    let exists' typ ~f = exists typ ~compute:As_prover.(map get_state ~f)
+    let exists' typ ~f = exists typ ~compute:As_prover.(map (get_state ()) ~f)
 
-    let%snarkydef main (top_hash : Digest.Tick.Packed.var) =
+    let%snarkydef_ main (top_hash : Digest.Tick.Packed.var) =
       let%bind prev_state = exists' State.typ ~f:Prover_state.prev_state
       and update = exists' Update.typ ~f:Prover_state.update in
       let%bind prev_state_hash = State.Checked.hash prev_state in
@@ -208,7 +208,7 @@ struct
       ; alpha_beta= Pairing.Fqk.constant alpha_beta }
 
     (* TODO: Use an online verifier here *)
-    let%snarkydef main (input : Wrap_input.var) =
+    let%snarkydef_ main (input : Wrap_input.var) =
       let%bind result =
         (* The use of choose_preimage here is justified since we feed it to the verifier, which doesn't
              depend on which unpacking is provided. *)
@@ -217,7 +217,7 @@ struct
           exists Verifier.Proof.typ
             ~compute:
               As_prover.(
-                map get_state
+                map (get_state ())
                   ~f:
                     (Fn.compose Verifier.proof_of_backend_proof
                        Prover_state.proof))
