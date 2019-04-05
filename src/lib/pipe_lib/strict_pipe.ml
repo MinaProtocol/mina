@@ -23,7 +23,7 @@ type (_, _) type_ =
       [`Capacity of int] * [`Overflow of 'b overflow_behavior]
       -> ('b buffered, unit) type_
 
-let value_or_empty = Option.value ~default:""
+let value_or_empty = Option.value ~default:"<unnamed>"
 
 module Reader0 = struct
   type 't t =
