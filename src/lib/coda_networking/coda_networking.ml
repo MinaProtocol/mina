@@ -76,7 +76,7 @@ struct
     module V1 = struct
       module T = struct
         type query = State_hash.Stable.V1.t Envelope.Incoming.Stable.V1.t
-        [@@deriving bin_io]
+        [@@deriving bin_io, version {rpc}]
 
         type response =
           ( Staged_ledger_aux.Stable.V1.t
