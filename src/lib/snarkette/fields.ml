@@ -29,6 +29,8 @@ end
 module type Fp_intf = sig
   include Intf
 
+  include Stringable.S with type t := t
+
   type nat
 
   include Stringable.S with type t := t
@@ -111,9 +113,9 @@ module Make_fp
 
   let of_int = N.of_int
 
-  let to_string = N.to_string
-
   let of_string = N.of_string
+
+  let to_string = N.to_string
 
   let rec extended_euclidean a b =
     if equal b zero then (a, one, zero)
