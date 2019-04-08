@@ -37,7 +37,7 @@ module Inputs = struct
     let arg_type = Cli_lib.Arg_type.public_key_compressed
   end
 
-  module Transaction = Coda_base.Transaction.Stable.V1
+  module Transaction = Coda_base.Transaction.Stable.Latest
   module Sparse_ledger = Coda_base.Sparse_ledger.Stable.V1
   module Pending_coinbase = Coda_base.Pending_coinbase.Stable.V1
   module Transaction_witness = Coda_base.Transaction_witness.Stable.V1

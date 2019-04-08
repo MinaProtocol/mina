@@ -46,7 +46,7 @@ module Inputs = struct
     let arg_type = Cli_lib.Arg_type.public_key_compressed
   end
 
-  module Transaction = Coda_base.Transaction.Stable.V1
+  module Transaction = Coda_base.Transaction.Stable.Latest
   module Sparse_ledger = Coda_base.Sparse_ledger.Stable.V1
   module Pending_coinbase = Coda_base.Pending_coinbase.Stable.V1
   module Transaction_witness = Coda_base.Transaction_witness.Stable.V1
@@ -71,7 +71,7 @@ module Inputs = struct
             let start = Time.now () in
             let res =
               M.of_transaction ~sok_digest ~source:input.Statement.source
-                ~target:input.target (Transaction.to_latest t)
+                ~target:input.target t
                 ~pending_coinbase_stack_state:
                   input.Statement.pending_coinbase_stack_state
                 (unstage (Coda_base.Sparse_ledger.handler w.ledger))

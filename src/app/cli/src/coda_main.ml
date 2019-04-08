@@ -517,23 +517,10 @@ struct
   module Account = Account
 
   module Transaction = struct
-    module T = struct
-      type t = Coda_base.Transaction.t =
-        | User_command of User_command.With_valid_signature.t
-        | Fee_transfer of Fee_transfer.t
-        | Coinbase of Coinbase.t
-      [@@deriving compare, eq]
-    end
+    open Coda_base.Transaction
+    include Stable.Latest
 
-    let fee_excess = Transaction.fee_excess
-
-    let supply_increase = Transaction.supply_increase
-
-    include T
-
-    include (
-      Coda_base.Transaction :
-        module type of Coda_base.Transaction with type t := t )
+    let fee_excess, supply_increase = (fee_excess, supply_increase)
   end
 
   module Ledger = Ledger
