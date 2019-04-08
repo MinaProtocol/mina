@@ -15,10 +15,17 @@ module type S = sig
   type curve
 
   module Digest : sig
-    type t [@@deriving bin_io, sexp, eq, hash, compare, yojson]
+    type t [@@deriving sexp, eq, hash, compare, yojson]
 
-    (* TODO: assert versioned, for now *)
-    val __versioned__ : bool
+    module Stable :
+      sig
+        module V1 : sig
+          type t [@@deriving sexp, bin_io, compare, hash, eq, version, yojson]
+        end
+
+        module Latest = V1
+      end
+      with type V1.t = t
 
     val size_in_bits : int
 
