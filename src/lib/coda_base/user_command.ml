@@ -10,17 +10,31 @@ open Module_version
 module Fee = Currency.Fee
 module Payload = User_command_payload
 
+module Poly = struct
+  module Stable = struct
+    module V1 = struct
+      module T = struct
+        type ('payload, 'pk, 'signature) t =
+          {payload: 'payload; sender: 'pk; signature: 'signature}
+        [@@deriving bin_io, eq, sexp, hash, yojson, version {unnumbered}]
+      end
+
+      include T
+    end
+
+    module Latest = V1
+  end
+end
+
 module Stable = struct
   module V1 = struct
     module T = struct
-      let version = 1
-
-      type ('payload, 'pk, 'signature) t_ =
-        {payload: 'payload; sender: 'pk; signature: 'signature}
-      [@@deriving bin_io, eq, sexp, hash, yojson]
-
-      type t = (Payload.Stable.V1.t, Public_key.Stable.V1.t, Signature.t) t_
-      [@@deriving bin_io, eq, sexp, hash, yojson]
+      type t =
+        ( Payload.Stable.V1.t
+        , Public_key.Stable.V1.t
+        , Signature.Stable.V1.t )
+        Poly.Stable.V1.t
+      [@@deriving bin_io, eq, sexp, hash, yojson, version]
 
       type with_seed = string * t [@@deriving hash]
 
@@ -60,15 +74,17 @@ module Stable = struct
   module Registered_V1 = Registrar.Register (V1)
 end
 
-include Stable.Latest
+type t = Stable.Latest.t [@@deriving sexp, yojson, hash]
+
+include Comparable.Make (Stable.Latest)
 
 type value = t
 
-let payload {payload; _} = payload
+let payload Poly.Stable.Latest.({payload; _}) = payload
 
 let fee = Fn.compose Payload.fee payload
 
-let sender t = Public_key.compress t.sender
+let sender t = Public_key.compress Poly.Stable.Latest.(t.sender)
 
 let accounts_accessed ({payload; sender; _} : value) =
   Public_key.compress sender :: Payload.accounts_accessed payload
@@ -101,9 +117,7 @@ module With_valid_signature = struct
   module Stable = struct
     module V1 = struct
       module T = struct
-        let version = 1
-
-        type t = Stable.V1.t [@@deriving sexp, eq, bin_io, yojson]
+        type t = Stable.V1.t [@@deriving sexp, eq, bin_io, yojson, version]
       end
 
       include T

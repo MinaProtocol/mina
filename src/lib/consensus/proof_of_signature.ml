@@ -47,9 +47,17 @@ end
 module Prover_state = struct
   include Unit
 
-  let precomputed_handler _ = Snarky.Request.unhandled
+  let precomputed_handler =
+    unstage
+      (Coda_base.Pending_coinbase.handler
+         (Pending_coinbase.create () |> Or_error.ok_exn)
+         ~is_new_stack:false)
 
-  let handler _ _ = Snarky.Request.unhandled
+  let handler ()
+      ~pending_coinbase:{ Coda_base.Pending_coinbase_witness.pending_coinbases
+                        ; is_new_stack } =
+    unstage
+      (Coda_base.Pending_coinbase.handler pending_coinbases ~is_new_stack)
 end
 
 module Proposal_data = struct
@@ -100,7 +108,10 @@ module Consensus_state = struct
     module Stable = struct
       module V1 = struct
         module T = struct
+          (* TODO : use version ppx *)
           let version = 1
+
+          let __versioned__ = true
 
           type t = (Length.Stable.V1.t, Public_key.Compressed.Stable.V1.t) t_
           [@@deriving bin_io, sexp, hash, compare, to_yojson]
@@ -303,7 +314,8 @@ module For_tests = struct
         { Blockchain_state.genesis with
           staged_ledger_hash=
             Staged_ledger_hash.(
-              of_aux_and_ledger_hash Aux_hash.dummy root_ledger_hash)
+              of_aux_ledger_and_coinbase_hash Aux_hash.dummy root_ledger_hash
+                (Pending_coinbase.create () |> Or_error.ok_exn))
         ; snarked_ledger_hash=
             Frozen_ledger_hash.of_ledger_hash root_ledger_hash }
 end

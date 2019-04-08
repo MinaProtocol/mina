@@ -6,7 +6,7 @@ module Make (Inputs : Inputs.Inputs_intf) :
    and type work :=
               ( Inputs.Ledger_proof_statement.t
               , Inputs.Transaction.t
-              , Inputs.Sparse_ledger.t
+              , Inputs.Transaction_witness.t
               , Inputs.Ledger_proof.t )
               Snark_work_lib.Work.Single.Spec.t
    and type snark_pool := Inputs.Snark_pool.t

@@ -16,6 +16,11 @@ module type S = sig
      and type staged_ledger := Staged_ledger.t
      and type consensus_local_state := Consensus.Local_state.t
      and type user_command := User_command.t
+     and type diff_mutant :=
+                ( External_transition.Stable.Latest.t
+                , State_hash.Stable.Latest.t )
+                With_hash.t
+                Diff_mutant.E.t
 
   module Unprocessed_transition_cache :
     Unprocessed_transition_cache_intf
@@ -43,6 +48,7 @@ module type S = sig
                 Ledger.Location.Addr.t Syncable_ledger.Query.t
      and type sync_ledger_answer := Sync_ledger.Answer.t
      and type parallel_scan_state := Staged_ledger.Scan_state.t
+     and type pending_coinbases := Pending_coinbase.t
 
   module Time : Time_intf
 

@@ -21,6 +21,11 @@ module type Inputs_intf = sig
      and type masked_ledger := Coda_base.Ledger.t
      and type consensus_local_state := Consensus.Local_state.t
      and type user_command := User_command.t
+     and type diff_mutant :=
+                ( External_transition.Stable.Latest.t
+                , State_hash.Stable.Latest.t )
+                With_hash.t
+                Diff_mutant.E.t
 
   module Network :
     Network_intf
@@ -33,6 +38,7 @@ module type Inputs_intf = sig
      and type sync_ledger_query := Sync_ledger.Query.t
      and type sync_ledger_answer := Sync_ledger.Answer.t
      and type parallel_scan_state := Staged_ledger.Scan_state.t
+     and type pending_coinbases := Pending_coinbase.t
 
   module Transition_frontier_controller :
     Transition_frontier_controller_intf
@@ -133,7 +139,7 @@ module Make (Inputs : Inputs_intf) :
 
   let peek_exn p = Broadcast_pipe.Reader.peek p |> Option.value_exn
 
-  let run ~logger ~network ~time_controller
+  let run ~logger ~trust_system ~network ~time_controller
       ~frontier_broadcast_pipe:(frontier_r, frontier_w) ~ledger_db
       ~network_transition_reader ~proposer_transition_reader =
     let clean_transition_frontier_controller_and_start_bootstrap
@@ -156,7 +162,7 @@ module Make (Inputs : Inputs_intf) :
         ( `Transition _incoming_transition
         , `Time_received (to_unix_timestamp _tm) ) ;
       let%map new_frontier, collected_transitions =
-        Bootstrap_controller.run ~logger ~network ~ledger_db
+        Bootstrap_controller.run ~logger ~trust_system ~network ~ledger_db
           ~frontier:old_frontier ~transition_reader:bootstrap_controller_reader
       in
       kill bootstrap_controller_reader bootstrap_controller_writer ;

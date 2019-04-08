@@ -5,10 +5,8 @@ module Input = struct
   module Stable = struct
     module V1 = struct
       module T = struct
-        let version = 1
-
         type t = {descendant: State_hash.Stable.V1.t; generations: int}
-        [@@deriving sexp, bin_io]
+        [@@deriving sexp, bin_io, version]
       end
 
       include T
@@ -36,9 +34,7 @@ module Proof = struct
   module Stable = struct
     module V1 = struct
       module T = struct
-        let version = 1
-
-        type t = State_body_hash.Stable.V1.t list [@@deriving bin_io]
+        type t = State_body_hash.Stable.V1.t list [@@deriving bin_io, version]
       end
 
       include T

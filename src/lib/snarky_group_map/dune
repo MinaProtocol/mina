@@ -1,0 +1,9 @@
+(library
+  (name snarky_group_map)
+  (public_name snarky_group_map)
+  (preprocess (pps ppx_jane ppx_deriving.eq))
+  (inline_tests)
+  (libraries
+    snarky
+    snarkette
+    core_kernel ))

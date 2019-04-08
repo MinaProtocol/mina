@@ -7,7 +7,7 @@ module Stable : sig
       { proposer: Public_key.Compressed.Stable.V1.t
       ; amount: Currency.Amount.Stable.V1.t
       ; fee_transfer: Fee_transfer.Single.Stable.V1.t option }
-    [@@deriving sexp, bin_io, compare, eq]
+    [@@deriving sexp, bin_io, compare, eq, version]
   end
 
   module Latest = V1
@@ -29,3 +29,5 @@ val create :
 val supply_increase : t -> Currency.Amount.t Or_error.t
 
 val fee_excess : t -> Currency.Fee.Signed.t Or_error.t
+
+val gen : t Quickcheck.Generator.t

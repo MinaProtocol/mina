@@ -26,6 +26,9 @@ jobs:
                   command: cd frontend/wallet && npm run build
             - run: cd frontend/website && npm install
             - run:
+                  name: Decrypt PragmataPro font
+                  command: cd frontend/website && npm run decrypt-ci
+            - run:
                   name: Lint website
                   command: cd frontend/website && npm run reformat && git diff --exit-code src
             - run:
@@ -37,7 +40,7 @@ jobs:
 
     lint:
         docker:
-            - image: codaprotocol/coda:toolchain-af1380e0f6c8726391d82b2adb6a2a3b20dd46a0
+            - image: codaprotocol/coda:toolchain-e815174112752dd87cae95a6818b9cdfc26eba77
         steps:
             - checkout
             - run: git submodule sync && git submodule update --init --recursive
@@ -115,7 +118,7 @@ jobs:
     build-artifacts--{{profile}}:
         resource_class: large
         docker:
-            - image: codaprotocol/coda:toolchain-af1380e0f6c8726391d82b2adb6a2a3b20dd46a0
+            - image: codaprotocol/coda:toolchain-e815174112752dd87cae95a6818b9cdfc26eba77
         environment:
             DUNE_PROFILE: {{profile}}
         steps:
@@ -154,7 +157,7 @@ jobs:
     test-unit--{{profile}}:
         resource_class: large
         docker:
-            - image: codaprotocol/coda:toolchain-af1380e0f6c8726391d82b2adb6a2a3b20dd46a0
+            - image: codaprotocol/coda:toolchain-e815174112752dd87cae95a6818b9cdfc26eba77
         steps:
             - checkout
             - run: git submodule sync && git submodule update --init --recursive
@@ -167,7 +170,7 @@ jobs:
     test--{{profile}}:
         resource_class: large
         docker:
-            - image: codaprotocol/coda:toolchain-af1380e0f6c8726391d82b2adb6a2a3b20dd46a0
+            - image: codaprotocol/coda:toolchain-e815174112752dd87cae95a6818b9cdfc26eba77
         steps:
             - checkout
             - run: git submodule sync && git submodule update --init --recursive

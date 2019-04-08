@@ -1,4 +1,4 @@
-let middleElementWidthRems = 13.75;
+let middleElementWidthRems = 21.5;
 
 let topMarginUnderHeading = `rem(2.5);
 // nudge so it looks like the center of the coda icon hits bar
@@ -40,12 +40,20 @@ module Code = {
                   display(`block),
                   position(`absolute),
                   top(`percent(50.0)),
-                  left(`percent(10.5)), // determined experimentally
                   width(`percent(100.0)),
                   height(`rem(0.125)),
                   backgroundColor(Style.Colors.blueBlue),
                 ],
               ),
+              // super hacky, but the it's the final hour
+              // determined experimentally
+              media("(min-width: 1100px)", [right(`rem(-5.25))]),
+              media("(min-width: 1140px)", [right(`rem(-5.5))]),
+              media("(min-width: 1180px)", [right(`rem(-5.25))]),
+              media("(min-width: 1220px)", [right(`rem(-5.0))]),
+              media("(min-width: 1260px)", [right(`rem(-4.75))]),
+              media("(min-width: 1298px)", [right(`rem(-4.5))]),
+              media("(min-width: 1324px)", [right(`rem(-4.25))]),
             ]),
           ])
         )>
@@ -63,8 +71,9 @@ module Code = {
                 fontWeight(`medium),
                 fontSize(`rem(0.8125)),
                 borderRadius(`px(12)),
-                lineHeight(`rem(1.25)),
-                maxWidth(`rem(21.4375)),
+                lineHeight(`rem(1.0)),
+                letterSpacing(`zero),
+                maxWidth(`rem(23.0)),
                 // the width demands it stick out a bit
                 marginLeft(`rem(-0.25)),
                 media(
@@ -180,7 +189,12 @@ let make = _ => {
       />
       <div
         className=Css.(
-          style([position(`relative), left(`zero), top(`zero)])
+          style([
+            position(`relative),
+            left(`zero),
+            top(`zero),
+            minHeight(`rem(38.)),
+          ])
         )>
         <ImageCollage
           className=Css.(
@@ -210,6 +224,7 @@ let make = _ => {
               media(
                 Style.MediaQuery.veryLarge,
                 [
+                  flexWrap(`nowrap),
                   position(`absolute),
                   top(`percent(50.0)),
                   left(`percent(50.0)),
@@ -226,9 +241,9 @@ let make = _ => {
             src={|<script src="coda_api.js"></script>
 <script>
   onClick(button)
-     .then(() => Coda.requestWallet())
-     .then((wallet) =>
-       Coda.sendTransaction(wallet, ...))
+    .then(() => Coda.requestWallet())
+    .then((wallet) =>
+        wallet.sendTransaction(...))
 </script>|}
           />
           // This keeps the right hand text aligned with the inclusive app section.
@@ -261,10 +276,19 @@ let make = _ => {
               ])
             )
             paragraphs=[|
-              "Empower your users with a direct secure connection to the Coda network.",
-              "Coda will be able to be embedded into any webpage or app with just a script tag and a couple lines of JavaScript.",
+              `styled([
+                `emph(
+                  "Build apps and games that take advantage of the new capabilities enabled by cryptocurrency with just a script tag and a few lines of javascript.",
+                ),
+              ]),
+              `str(
+                "Your users will have a seamless, secure experience without having to download any extensions or trust additional 3rd parties.",
+              ),
             |]
-            cta="Stay updated about developing with Coda"
+            cta={
+              SideText.Cta.copy: {j|Stay informed about early access to developing with\u00A0Coda|j},
+              link: Links.Forms.developingWithCoda,
+            }
           />
         </div>
         <ImageCollage

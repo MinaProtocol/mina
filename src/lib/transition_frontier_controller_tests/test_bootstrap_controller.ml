@@ -39,6 +39,7 @@ let%test_module "Bootstrap Controller" =
       in
       let num_breadcrumbs = (Transition_frontier.max_length * 2) + 2 in
       let logger = Logger.null () in
+      let trust_system = Trust_system.null () in
       let network =
         Network.create ~logger ~peers:(Network_peer.Peer.Table.of_alist_exn [])
       in
@@ -59,7 +60,9 @@ let%test_module "Bootstrap Controller" =
           let ledger_db =
             Transition_frontier.For_tests.root_snarked_ledger frontier
           in
-          let root_sync_ledger = Root_sync_ledger.create ledger_db ~logger in
+          let root_sync_ledger =
+            Root_sync_ledger.create ledger_db ~logger ~trust_system
+          in
           let parent_breadcrumb = Transition_frontier.best_tip frontier in
           let breadcrumbs_gen =
             gen_linear_breadcrumbs ~logger ~size:num_breadcrumbs
@@ -87,7 +90,8 @@ let%test_module "Bootstrap Controller" =
               input_transitions_verified
           in
           let transition_reader, transition_writer =
-            Pipe_lib.Strict_pipe.create Synchronous
+            Pipe_lib.Strict_pipe.create ~name:(__MODULE__ ^ __LOC__)
+              Synchronous
           in
           let () =
             List.iter
@@ -105,8 +109,7 @@ let%test_module "Bootstrap Controller" =
               ~root_sync_ledger ~transition_graph ~transition_reader
           in
           let () = Pipe_lib.Strict_pipe.Writer.close transition_writer in
-          let result = Mvar.create () in
-          let%map () = run_sync ~result in
+          let%map () = run_sync in
           let saved_transitions_verified =
             Bootstrap_controller.For_tests.Transition_cache.data
               transition_graph
@@ -116,10 +119,13 @@ let%test_module "Bootstrap Controller" =
               (of_list input_transitions_verified)
               (of_list saved_transitions_verified)) )
 
-    let is_syncing = function `Ignored -> false | `Syncing _ -> true
+    let is_syncing = function
+      | `Ignored -> false
+      | `Syncing_new_snarked_ledger -> true
+      | `Updating_root_transition -> false
 
     let make_transition_pipe () =
-      Pipe_lib.Strict_pipe.create
+      Pipe_lib.Strict_pipe.create ~name:(__MODULE__ ^ __LOC__)
         (Buffered (`Capacity 10, `Overflow Drop_head))
 
     let get_best_tip_hash (peer : Network_builder.peer) =
@@ -155,9 +161,13 @@ let%test_module "Bootstrap Controller" =
                 Transition_frontier.shallow_copy_root_snarked_ledger frontier
               in
               let scan_state = Staged_ledger.scan_state staged_ledger in
+              let pending_coinbases =
+                Staged_ledger.pending_coinbase_collection staged_ledger
+              in
               let%map actual_staged_ledger =
-                Staged_ledger.of_scan_state_and_snarked_ledger ~scan_state
-                  ~snarked_ledger ~expected_merkle_root
+                Staged_ledger
+                .of_scan_state_pending_coinbases_and_snarked_ledger ~scan_state
+                  ~snarked_ledger ~expected_merkle_root ~pending_coinbases
                 |> Deferred.Or_error.ok_exn
               in
               assert (
@@ -169,6 +179,7 @@ let%test_module "Bootstrap Controller" =
       Backtrace.elide := false ;
       Printexc.record_backtrace true ;
       let logger = Logger.null () in
+      let trust_system = Trust_system.null () in
       let num_breadcrumbs = 10 in
       Thread_safe.block_on_async_exn (fun () ->
           let%bind syncing_frontier, peer, network =
@@ -184,7 +195,7 @@ let%test_module "Bootstrap Controller" =
             Transition_frontier.For_tests.root_snarked_ledger syncing_frontier
           in
           let%map new_frontier, (_ : External_transition.Verified.t list) =
-            Bootstrap_controller.run ~logger ~network
+            Bootstrap_controller.run ~logger ~trust_system ~network
               ~frontier:syncing_frontier ~ledger_db ~transition_reader
           in
           Ledger_hash.equal (root_hash new_frontier) (root_hash peer.frontier)
@@ -195,6 +206,7 @@ let%test_module "Bootstrap Controller" =
       Backtrace.elide := false ;
       Printexc.record_backtrace true ;
       let logger = Logger.null () in
+      let trust_system = Trust_system.null () in
       let small_peer_num_breadcrumbs = 6 in
       let large_peer_num_breadcrumbs = small_peer_num_breadcrumbs * 2 in
       let source_accounts = [List.hd_exn Genesis_ledger.accounts] in
@@ -230,14 +242,15 @@ let%test_module "Bootstrap Controller" =
               (get_best_tip_hash large_peer)
           in
           let%map new_frontier, (_ : External_transition.Verified.t list) =
-            Bootstrap_controller.run ~logger ~network ~frontier:me ~ledger_db
-              ~transition_reader
+            Bootstrap_controller.run ~logger ~trust_system ~network
+              ~frontier:me ~ledger_db ~transition_reader
           in
           Ledger_hash.equal (root_hash new_frontier)
             (root_hash large_peer.frontier) )
 
     let%test "`on_transition` should deny outdated transitions" =
       let logger = Logger.null () in
+      let trust_system = Trust_system.null () in
       let num_breadcrumbs = 10 in
       Thread_safe.block_on_async_exn (fun () ->
           let%bind syncing_frontier, peer, network =
@@ -249,7 +262,7 @@ let%test_module "Bootstrap Controller" =
             Root_sync_ledger.create
               (Transition_frontier.For_tests.root_snarked_ledger
                  syncing_frontier)
-              ~logger
+              ~logger ~trust_system
           in
           let query_reader = Root_sync_ledger.query_reader root_sync_ledger in
           let response_writer =

@@ -3,7 +3,7 @@ open Core_kernel
 type uint64 = Unsigned.uint64
 
 module type S = sig
-  type t [@@deriving bin_io, sexp, hash, compare, eq, yojson]
+  type t [@@deriving bin_io, sexp, hash, compare, eq, yojson, version]
 
   val length_in_bits : int
 

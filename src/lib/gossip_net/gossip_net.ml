@@ -34,7 +34,8 @@ module type Config_intf = sig
     ; me: Peer.t
     ; conf_dir: string
     ; logger: Logger.t
-    ; trust_system: Coda_base.Trust_system.t }
+    ; trust_system: Trust_system.t
+    ; max_concurrent_connections: int option }
   [@@deriving make]
 end
 
@@ -51,7 +52,9 @@ module type S = sig
     ; received_reader: content Envelope.Incoming.t Strict_pipe.Reader.t
     ; me: Peer.t
     ; peers: Peer.Hash_set.t
-    ; connections: (Unix.Inet_addr.t, Rpc.Connection.t) Hashtbl.t }
+    ; connections:
+        (Unix.Inet_addr.t, (Uuid.t, Rpc.Connection.t) Hashtbl.t) Hashtbl.t
+    ; max_concurrent_connections: int option }
 
   module Config : Config_intf
 
@@ -88,7 +91,13 @@ module Make (Message : Message_intf) :
     ; received_reader: Message.content Envelope.Incoming.t Strict_pipe.Reader.t
     ; me: Peer.t
     ; peers: Peer.Hash_set.t
-    ; connections: (Unix.Inet_addr.t, Rpc.Connection.t) Hashtbl.t }
+    ; connections:
+        (Unix.Inet_addr.t, (Uuid.t, Rpc.Connection.t) Hashtbl.t) Hashtbl.t
+          (**mapping a Uuid to a connection to be able to remove it from the hash 
+         *table since Rpc.Connection.t doesn't have the socket information*)
+    ; max_concurrent_connections: int option
+    (* maximum number of concurrent connections from an ip (infinite if None)*)
+    }
 
   module Config = struct
     type t =
@@ -98,7 +107,8 @@ module Make (Message : Message_intf) :
       ; me: Peer.t
       ; conf_dir: string
       ; logger: Logger.t
-      ; trust_system: Coda_base.Trust_system.t }
+      ; trust_system: Trust_system.t
+      ; max_concurrent_connections: int option }
     [@@deriving make]
   end
 
@@ -111,15 +121,32 @@ module Make (Message : Message_intf) :
     | Ok conn -> Versioned_rpc.Connection_with_menu.create conn
 
   let try_call_rpc t peer dispatch query =
-    try_with (fun () ->
-        Tcp.with_connection (Tcp.Where_to_connect.of_host_and_port peer)
-          ~timeout:t.timeout (fun _ r w ->
-            create_connection_with_menu peer r w
-            >>=? fun conn -> dispatch conn query ) )
-    >>| function
-    | Ok (Ok result) -> Ok result
-    | Ok (Error exn) -> Error exn
-    | Error exn -> Or_error.of_exn exn
+    let call () =
+      try_with (fun () ->
+          Tcp.with_connection (Tcp.Where_to_connect.of_host_and_port peer)
+            ~timeout:t.timeout (fun _ r w ->
+              create_connection_with_menu peer r w
+              >>=? fun conn -> dispatch conn query ) )
+      >>| function
+      | Ok (Ok result) -> Ok result
+      | Ok (Error exn) -> Error exn
+      | Error exn -> Or_error.of_exn exn
+    in
+    match Hashtbl.find t.connections (Unix.Inet_addr.of_string peer.host) with
+    | None -> call ()
+    | Some conn_map ->
+        if
+          Option.is_some t.max_concurrent_connections
+          && Hashtbl.length conn_map
+             >= Option.value_exn t.max_concurrent_connections
+        then
+          Deferred.return
+            (Or_error.errorf
+               !"Not connecting to peer %s. Number of open connections to the \
+                 peer equals the limit %d.\n"
+               peer.host
+               (Option.value_exn t.max_concurrent_connections))
+        else call ()
 
   let broadcast_selected t peers msg =
     let peers =
@@ -149,7 +176,7 @@ module Make (Message : Message_intf) :
     broadcast_selected t selected_peers msg
 
   let create (config : Config.t)
-      (implementations : Host_and_port.t Rpc.Implementation.t list) =
+      (implementation_list : Host_and_port.t Rpc.Implementation.t list) =
     trace_task "gossip net" (fun () ->
         let%bind membership =
           match%map
@@ -178,19 +205,20 @@ module Make (Message : Message_intf) :
           ; received_reader
           ; me= config.me
           ; peers= Peer.Hash_set.create ()
-          ; connections= Hashtbl.create (module Unix.Inet_addr) }
+          ; connections= Hashtbl.create (module Unix.Inet_addr)
+          ; max_concurrent_connections= config.max_concurrent_connections }
         in
         don't_wait_for
-          (Strict_pipe.Reader.iter
-             (Coda_base.Trust_system.ban_pipe config.trust_system)
+          (Strict_pipe.Reader.iter (Trust_system.ban_pipe config.trust_system)
              ~f:(fun addr ->
                match Hashtbl.find_and_remove t.connections addr with
                | None -> Deferred.unit
-               | Some conn ->
+               | Some conn_list ->
                    Logger.debug t.logger ~module_:__MODULE__ ~location:__LOC__
                      !"Peer %{sexp: Unix.Inet_addr.t} banned, disconnecting."
                      addr ;
-                   Rpc.Connection.close conn )) ;
+                   Deferred.List.iter (Hashtbl.to_alist conn_list)
+                     ~f:(fun (_, conn) -> Rpc.Connection.close conn ) )) ;
         trace_task "rebroadcasting messages" (fun () ->
             don't_wait_for
               (Linear_pipe.iter_unordered ~max_concurrency:64 broadcast_reader
@@ -209,7 +237,7 @@ module Make (Message : Message_intf) :
                     Strict_pipe.Writer.write received_writer
                       (Envelope.Incoming.wrap ~data:(Message.content msg)
                          ~sender:(Message.sender msg)) )
-              @ implementations )
+              @ implementation_list )
           in
           Rpc.Implementations.create_exn ~implementations
             ~on_unknown_rpc:`Close_connection
@@ -239,26 +267,57 @@ module Make (Message : Message_intf) :
                     "%s" (Exn.to_string_mach exn) ))
             (Tcp.Where_to_listen.of_port config.me.Peer.communication_port)
             (fun client reader writer ->
-              let%map _ =
-                Rpc.Connection.server_with_close reader writer ~implementations
-                  ~connection_state:(fun conn ->
-                    (* connection state is the client's IP and ephemeral port
+              let conn_map =
+                Option.value_map
+                  ~default:(Hashtbl.create (module Uuid))
+                  (Hashtbl.find t.connections (Socket.Address.Inet.addr client))
+                  ~f:Fn.id
+              in
+              if
+                Option.is_some t.max_concurrent_connections
+                && Hashtbl.length conn_map
+                   >= Option.value_exn t.max_concurrent_connections
+              then (
+                Logger.error t.logger ~module_:__MODULE__ ~location:__LOC__
+                  "Cannot open another connection. Number of open connections \
+                   from %s equals the limit %d."
+                  (Socket.Address.Inet.to_string client)
+                  (Option.value_exn t.max_concurrent_connections) ;
+                Reader.close reader >>= fun _ -> Writer.close writer )
+              else
+                let conn_id = Uuid.create () in
+                let%map _ =
+                  Rpc.Connection.server_with_close reader writer
+                    ~implementations
+                    ~connection_state:(fun conn ->
+                      (* connection state is the client's IP and ephemeral port
                         when connecting to the server over TCP; the ephemeral
                         port is distinct from the client's discovery and
                         communication ports *)
-                    Hashtbl.set t.connections
-                      ~key:(Socket.Address.Inet.addr client)
-                      ~data:conn ;
-                    Socket.Address.Inet.to_host_and_port client )
-                  ~on_handshake_error:
-                    (`Call
-                      (fun exn ->
-                        Logger.error t.logger ~module_:__MODULE__
-                          ~location:__LOC__ "%s" (Exn.to_string_mach exn) ;
-                        Deferred.unit ))
-              in
-              Hashtbl.remove t.connections @@ Socket.Address.Inet.addr client
-              )
+                      Hashtbl.add_exn conn_map ~key:conn_id ~data:conn ;
+                      Hashtbl.set t.connections
+                        ~key:(Socket.Address.Inet.addr client)
+                        ~data:conn_map ;
+                      Socket.Address.Inet.to_host_and_port client )
+                    ~on_handshake_error:
+                      (`Call
+                        (fun exn ->
+                          Logger.error t.logger ~module_:__MODULE__
+                            ~location:__LOC__ "%s" (Exn.to_string_mach exn) ;
+                          Deferred.unit ))
+                in
+                let conn_map =
+                  Hashtbl.find_exn t.connections
+                    (Socket.Address.Inet.addr client)
+                in
+                Hashtbl.remove conn_map conn_id ;
+                if Hashtbl.is_empty conn_map then
+                  Hashtbl.remove t.connections
+                  @@ Socket.Address.Inet.addr client
+                else
+                  Hashtbl.set t.connections
+                    ~key:(Socket.Address.Inet.addr client)
+                    ~data:conn_map )
         in
         t )
 

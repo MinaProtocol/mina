@@ -6,9 +6,14 @@ open Coda_numbers
 module type Prover_state_intf = sig
   type t [@@deriving bin_io, sexp]
 
+  type pending_coinbase_witness
+
   val precomputed_handler : Snark_params.Tick.Handler.t
 
-  val handler : t -> Snark_params.Tick.Handler.t
+  val handler :
+       t
+    -> pending_coinbase:pending_coinbase_witness
+    -> Snark_params.Tick.Handler.t
 end
 
 (** Constants are defined with a single letter (latin or greek) based on
@@ -50,7 +55,8 @@ module type S = sig
       module Stable :
         sig
           module V1 : sig
-            type t [@@deriving hash, eq, compare, bin_io, sexp, to_yojson]
+            type t
+            [@@deriving hash, eq, compare, bin_io, sexp, to_yojson, version]
           end
         end
         with type V1.t = t
@@ -83,7 +89,9 @@ module type S = sig
 
   module Blockchain_state : Coda_base.Blockchain_state.S
 
-  module Prover_state : Prover_state_intf
+  module Prover_state :
+    Prover_state_intf
+    with type pending_coinbase_witness := Coda_base.Pending_coinbase_witness.t
 
   module Protocol_state :
     Coda_base.Protocol_state.S

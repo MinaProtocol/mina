@@ -68,6 +68,10 @@ module Make (Inputs : Inputs.With_unprocessed_transition_cache.S) :
          , crash buffered
          , unit )
          Writer.t) ~unprocessed_transition_cache =
+    let module Lru = Core_extended.Cache.Lru in
+    let already_reported_duplicates =
+      Lru.create ~destruct:None Consensus.Constants.(k * c)
+    in
     don't_wait_for
       (Reader.iter transition_reader
          ~f:(fun (`Transition transition_env, `Time_received _) ->
@@ -108,12 +112,16 @@ module Make (Inputs : Inputs.With_unprocessed_transition_cache.S) :
                       transition_time) ;
                  Writer.write valid_transition_writer cached_transition
              | Error `Duplicate ->
-                 Logger.info logger ~module_:__MODULE__ ~location:__LOC__
-                   "ignoring transition we've already seen $state_hash"
-                   ~metadata:
-                     [ ("state_hash", State_hash.to_yojson hash)
-                     ; ( "transition"
-                       , External_transition.Verified.to_yojson transition ) ]
+                 if Lru.find already_reported_duplicates hash |> Option.is_none
+                 then (
+                   Logger.info logger ~module_:__MODULE__ ~location:__LOC__
+                     "ignoring transition we've already seen $state_hash"
+                     ~metadata:
+                       [ ("state_hash", State_hash.to_yojson hash)
+                       ; ( "transition"
+                         , External_transition.Verified.to_yojson transition )
+                       ] ;
+                   Lru.add already_reported_duplicates ~key:hash ~data:() )
              | Error (`Invalid reason) ->
                  Logger.warn logger ~module_:__MODULE__ ~location:__LOC__
                    !"rejecting transition because \"$reason\" -- received \

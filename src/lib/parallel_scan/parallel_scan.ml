@@ -71,8 +71,7 @@ module State = struct
       ; other_trees_data
       ; stateful_work_order= _
       ; curr_job_seq_no= _ } =
-    List.(
-      append (rev (other_trees_data |> bind ~f:rev)) (rev recent_tree_data))
+    List.(rev (concat (recent_tree_data :: other_trees_data)))
 
   let next_leaf_pos p cur_pos =
     if cur_pos = (2 * p) - 2 then p - 1 else cur_pos + 1
@@ -284,6 +283,24 @@ module State = struct
           if parent_empty state.jobs index then elt :: lst else lst )
     in
     List.rev lst
+
+  let base_jobs_on_latest_tree (state : ('a, 'd) t) : 'd list =
+    let leaves_start_at = parallelism state - 1 in
+    let rec go pos jobs =
+      (*Get jobs from leaf-0 to the leaf at current enqueue position. The ones that are after base_pos are pending jobs from previous tree *)
+      if
+        Option.is_none state.base_none_pos
+        || pos >= Option.value_exn state.base_none_pos
+      then jobs
+      else
+        let jobs =
+          match Ring_buffer.read_i state.jobs pos with
+          | Job.Base (Some (j, _)) -> j :: jobs
+          | _ -> jobs
+        in
+        go (pos + 1) jobs
+    in
+    go leaves_start_at []
 
   let update_new_job t z dir pos =
     let new_job (cur_job : ('a, 'd) Job.t) : ('a, 'd) Job.t Or_error.t =
@@ -516,6 +533,8 @@ let enqueue_data : state:('a, 'd) State.t -> data:'d list -> unit Or_error.t =
   else (
     state.current_data_length <- state.current_data_length + List.length data ;
     State.include_many_data state data )
+
+let base_jobs_on_latest_tree = State.base_jobs_on_latest_tree
 
 let is_valid t =
   let p = State.parallelism t in

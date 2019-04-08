@@ -1,58 +1,63 @@
-let iconStyle =
-  Css.(
-    style([
-      width(`rem(2.5)),
-      height(`rem(2.5)),
-      borderRadius(`percent(100.)),
-      marginRight(`rem(1.)),
-      boxShadow(
-        ~x=`zero,
-        ~y=`zero,
-        ~blur=`px(4),
-        ~spread=`zero,
-        Style.Colors.greenShadow,
-      ),
-    ])
-  );
-
 module Member = {
-  let component = ReasonReact.statelessComponent("Team.Member");
+  let component = ReasonReact.statelessComponent("TeamSection.Member");
   let make = (~name, ~title, ~description, _children) => {
     let lastName = Js.String.split(" ", name)[1];
-    let imageSrc = "/static/img/" ++ String.lowercase(lastName) ++ ".jpg";
+    let imageSrc =
+      Links.Cdn.url("/static/img/" ++ String.lowercase(lastName) ++ ".jpg");
     {
       ...component,
       render: _self =>
         <div
           className=Css.(
-            style([
-              display(`flex),
-              flexDirection(`column),
-              width(`rem(20.5)),
-              minWidth(`rem(20.5)),
-              flexGrow(1.),
-              maxWidth(`rem(23.75)),
-              backgroundColor(Style.Colors.veryLightGrey),
-              borderRadius(`px(10)),
-              border(`px(1), `solid, Style.Colors.hyperlinkAlpha(0.2)),
-              padding(`rem(1.5)),
-              marginTop(`rem(1.5625)),
-              marginBottom(`rem(1.5625)),
-              marginLeft(`zero),
-              marginRight(`zero),
-              media(
-                Style.MediaQuery.notMobile,
-                [
-                  minHeight(`rem(27.5)),
-                  marginLeft(`rem(1.5625)),
-                  marginRight(`rem(1.5625)),
-                ],
-              ),
+            merge([
+              Style.Technical.border(Css.border),
+              style([
+                display(`flex),
+                flexDirection(`column),
+                width(`rem(20.5)),
+                minWidth(`rem(20.5)),
+                flexGrow(1.),
+                maxWidth(`rem(23.75)),
+                marginTop(`rem(1.5625)),
+                marginBottom(`rem(1.5625)),
+                marginLeft(`zero),
+                marginRight(`zero),
+                media(
+                  Style.MediaQuery.notMobile,
+                  [
+                    minHeight(`rem(27.5)),
+                    marginLeft(`rem(1.5625)),
+                    marginRight(`rem(1.5625)),
+                    width(`percent(100.)),
+                  ],
+                ),
+              ]),
             ])
           )>
-          <div className=Css.(style([display(`flex), flexDirection(`row)]))>
+          <div
+            className=Css.(
+              merge([
+                Style.Technical.border(Css.borderBottom),
+                style([
+                  display(`flex),
+                  flexDirection(`row),
+                  alignItems(`center),
+                ]),
+              ])
+            )>
             <img
-              className=iconStyle
+              className=Css.(
+                style([
+                  width(`rem(5.5)),
+                  height(`rem(5.5)),
+                  unsafe("-webkit-filter", "grayscale(1)"),
+                  unsafe("filter", "grayscale(1)"),
+                  marginLeft(`rem(0.875)),
+                  marginTop(`rem(0.625)),
+                  marginBottom(`rem(0.625)),
+                  ...Style.paddingX(`rem(1.)),
+                ])
+              )
               src=imageSrc
               alt={j|Portrait photo of $name.|j}
             />
@@ -67,35 +72,159 @@ module Member = {
               )>
               <div
                 className=Css.(
-                  merge([Style.H3.wide, style([letterSpacing(`em(0.2))])])
+                  style([
+                    display(`flex),
+                    justifyContent(`center),
+                    alignItems(`center),
+                    backgroundColor(Style.Colors.tealBlue),
+                    height(`rem(1.75)),
+                  ])
                 )>
-                {ReasonReact.string(name)}
+                <h3
+                  className=Css.(
+                    merge([
+                      Style.H3.Technical.title,
+                      style([
+                        marginTop(`rem(0.0625)),
+                        // hack to remove top margin for IE11
+                        media(
+                          "all and (-ms-high-contrast: none), (-ms-high-contrast: active)",
+                          [margin(`auto)],
+                        ),
+                        // hack to remove top margin for Edge
+                        selector(
+                          "@supports (-ms-ime-align:auto)",
+                          [margin(`auto)],
+                        ),
+                        ...Style.paddingX(`rem(0.1875)),
+                      ]),
+                    ])
+                  )>
+                  {ReasonReact.string(name)}
+                </h3>
               </div>
-              <div
+              <h5
                 className=Css.(
                   merge([
-                    Style.H5.basic,
-                    style([textAlign(`left), whiteSpace(`nowrap)]),
+                    Style.Technical.basic,
+                    style([
+                      textAlign(`left),
+                      whiteSpace(`nowrap),
+                      marginTop(`rem(0.125)),
+                    ]),
                   ])
                 )>
                 {ReasonReact.string(title)}
-              </div>
+              </h5>
             </div>
           </div>
-          <div
+          <p
             className=Css.(
               merge([
                 style([
-                  color(Style.Colors.saville),
-                  marginTop(`rem(1.875)),
+                  marginLeft(`rem(1.875)),
+                  marginRight(`rem(2.)),
+                  ...Style.paddingY(`rem(0.5)),
                 ]),
-                Style.Body.basic,
+                Style.Body.Technical.basic,
               ])
             )>
             {ReasonReact.string(description)}
-          </div>
+          </p>
         </div>,
     };
+  };
+};
+
+module Section = {
+  let component = ReasonReact.statelessComponent("TeamSection.Section");
+  let make = (~name, children) => {
+    ...component,
+    render: _self => {
+      let checkboxName = name ++ "-checkbox";
+      let labelName = name ++ "-label";
+      <>
+        <h3 className=Style.H3.Technical.boxed>
+          {ReasonReact.string(name)}
+        </h3>
+        <input
+          type_="checkbox"
+          id=checkboxName
+          className=Css.(
+            style([
+              display(`none),
+              selector(
+                ":checked + div",
+                [height(`auto), after([display(`none)])],
+              ),
+              selector(":checked ~ #" ++ labelName, [display(`none)]),
+            ])
+          )
+        />
+        <div
+          className=Css.(
+            style([
+              position(`relative),
+              height(`rem(45.)),
+              overflow(`hidden),
+              display(`flex),
+              flexWrap(`wrap),
+              marginLeft(`auto),
+              marginRight(`auto),
+              justifyContent(`center),
+              after([
+                contentRule(""),
+                position(`absolute),
+                bottom(`px(-1)),
+                left(`zero),
+                height(`rem(8.)),
+                width(`percent(100.)),
+                pointerEvents(`none),
+                backgroundImage(
+                  `linearGradient((
+                    `deg(0),
+                    [
+                      (0, Style.Colors.navyBlue),
+                      (100, Style.Colors.navyBlueAlpha(0.0)),
+                    ],
+                  )),
+                ),
+              ]),
+            ])
+          )>
+          ...children
+        </div>
+        <label
+          id=labelName
+          className=Css.(
+            merge([
+              Style.Link.basic,
+              style([
+                Style.Typeface.pragmataPro,
+                fontWeight(`bold),
+                display(`block),
+                height(`rem(4.)),
+                width(`rem(20.)),
+                marginLeft(`auto),
+                marginRight(`auto),
+                marginTop(`rem(1.0)),
+                marginBottom(`rem(3.0)),
+                textAlign(`center),
+                cursor(`pointer),
+              ]),
+            ])
+          )
+          htmlFor=checkboxName>
+          {ReasonReact.string({js|View all ↓|js})}
+        </label>
+        <RunScript>
+          {Printf.sprintf(
+             {|document.getElementById("%s").checked = false;|},
+             checkboxName,
+           )}
+        </RunScript>
+      </>;
+    },
   };
 };
 
@@ -127,7 +256,12 @@ let make = _children => {
             marginRight(`auto),
             marginBottom(`rem(3.0)),
             maxWidth(`rem(27.125)),
-            backgroundColor(Style.Colors.navy),
+            backgroundColor(Style.Colors.navyBlue),
+            // TODO: How do you use the boxShadow in bs-css
+            unsafe(
+              "box-shadow",
+              "0 2px 50px 0 rgba(0, 0, 0, 0.2), 0 7px 8px 0 rgba(0, 0, 0, 0.5)",
+            ),
             textAlign(`center),
             whiteSpace(`nowrap),
           ])
@@ -146,17 +280,7 @@ let make = _children => {
           {ReasonReact.string(" O(1) Labs")}
         </span>
       </div>
-      <h3 className=Style.H3.wings> {ReasonReact.string("Team")} </h3>
-      <div
-        className=Css.(
-          style([
-            display(`flex),
-            flexWrap(`wrap),
-            marginLeft(`auto),
-            marginRight(`auto),
-            justifyContent(`center),
-          ])
-        )>
+      <Section name="Team">
         <Member
           name="Evan Shapiro"
           title="CEO"
@@ -345,18 +469,27 @@ let make = _children => {
        experience design. Regardless of the medium, the end goal is for the \
        well-being of the user."
         />
-      </div>
-      <h3 className=Style.H3.wings> {ReasonReact.string("Advisors")} </h3>
-      <div
-        className=Css.(
-          style([
-            display(`flex),
-            flexWrap(`wrap),
-            marginLeft(`auto),
-            marginRight(`auto),
-            justifyContent(`center),
-          ])
-        )>
+      </Section>
+      <Section name="Advisors">
+        <Member
+          name="Jill Carlson"
+          title=advisor
+          description="Jill has worked with the IMF and is an advisor to cryptocurrency and blockchain-based ventures. \
+        Previously, Jill ran strategy at blockchain start up Chain, where she managed \
+        initiatives with Nasdaq and State Street. Jill has conducted academic research \
+        on cryptocurrency at the University of Oxford, where she focused on the economic \
+        and political implications of bitcoin. Jill began her career as a credit trader at Goldman Sachs. \
+        She holds a MSc from Magdalen College, Oxford, and an AB from Harvard, where she studied Classics."
+        />
+        <Member
+          name="Paul Davison"
+          title=advisor
+          description="Paul Davison is the CEO of CoinList - the leading platform for high \
+       quality, compliant token sales and airdrops. Prior to CoinList, Paul \
+       was the Founder/CEO of Highlight (acquired by Pinterest), an EIR at \
+       Benchmark Capital, and a VP at Metaweb (acquired by Google). He holds \
+       a BS from Stanford University and an MBA from Stanford Business School."
+        />
         <Member
           name="Joseph Bonneau"
           title=advisor
@@ -390,24 +523,10 @@ let make = _children => {
        light clients, confidential smart contracts and proofs of solvency."
         />
         <Member
-          name="Jill Carlson"
+          name="Amit Sahai"
           title=advisor
-          description="Jill has worked with the IMF and is an advisor to cryptocurrency and blockchain-based ventures. \
-        Previously, Jill ran strategy at blockchain start up Chain, where she managed \
-        initiatives with Nasdaq and State Street. Jill has conducted academic research \
-        on cryptocurrency at the University of Oxford, where she focused on the economic \
-        and political implications of bitcoin. Jill began her career as a credit trader at Goldman Sachs. \
-        She holds a MSc from Magdalen College, Oxford, and an AB from Harvard, where she studied Classics."
+          description="Amit Sahai is a Professor of Computer Science at UCLA, Fellow of the ACM, and Fellow of the IACR. His research interests are in security, cryptography, and theoretical computer science. He is the co-inventor of Attribute-Based Encryption, Functional Encryption, Indistinguishability Obfuscation, author of over 100 technical research papers, and invited speaker at institutions such as MIT, Stanford, and Berkeley. He has also received honors from the Alfred P. Sloan Foundation, Okawa Foundation, Xerox Foundation, Google Research, the BSF, and the ACM. He earned his PhD in Computer Science from MIT and served on the faculty at Princeton before joining UCLA in 2004."
         />
-        <Member
-          name="Paul Davison"
-          title=advisor
-          description="Paul Davison is the CEO of CoinList - the leading platform for high \
-       quality, compliant token sales and airdrops. Prior to CoinList, Paul \
-       was the Founder/CEO of Highlight (acquired by Pinterest), an EIR at \
-       Benchmark Capital, and a VP at Metaweb (acquired by Google). He holds \
-       a BS from Stanford University and an MBA from Stanford Business School."
-        />
-      </div>
+      </Section>
     </>,
 };

@@ -1,13 +1,23 @@
 module Colors = {
+  let string =
+    fun
+    | `rgb(r, g, b) => Printf.sprintf("rgb(%d,%d,%d)", r, g, b)
+    | `rgba(r, g, b, a) => Printf.sprintf("rgba(%d,%d,%d,%f)", r, g, b, a)
+    | `hsl(h, s, l) => Printf.sprintf("hsl(%d,%d%%,%d%%)", h, s, l)
+    | `hsla(h, s, l, a) =>
+      Printf.sprintf("hsla(%d,%d%%,%d%%,%f)", h, s, l, a);
+
   let fadedBlue = `rgb((111, 167, 197));
   let white = Css.white;
   let whiteAlpha = a => `rgba((255, 255, 255, a));
   let hyperlink = `hsl((201, 71, 52));
   let hyperlinkAlpha = a => `hsla((201, 71, 52, a));
-  let hyperlinkHover = `hsl((201, 71, 70));
+  let hyperlinkHover = `hsl((201, 71, 40));
+  let hyperlinkLight = `hsl((201, 71, 70));
 
   let metallicBlue = `rgb((70, 99, 131));
   let denimTwo = `rgb((61, 88, 120));
+  let greyBlue = `rgb((118, 147, 190));
   let darkGreyBlue = `rgb((61, 88, 120));
   let greyishBrown = `rgb((74, 74, 74));
 
@@ -23,14 +33,16 @@ module Colors = {
   let slateAlpha = a => `hsla((209, 20, 40, a));
 
   let navy = `rgb((0, 49, 90));
+  let navyBlue = `rgb((0, 23, 74));
+  let navyBlueAlpha = a => `rgba((0, 23, 74, a));
+  let greyishAlpha = a => `rgba((170, 170, 170, a));
   let saville = `hsl((212, 33, 35));
-  // For use with box-shadow so we can't use opacity
-  let greenShadow = `rgba((136, 191, 163, 0.64));
 
   let clover = `rgb((22, 168, 85));
   let lightClover = `rgba((118, 205, 135, 0.12));
 
   let teal = `rgb((71, 130, 160));
+  let tealBlue = `rgb((0, 170, 170));
   let tealAlpha = a => `rgba((71, 130, 160, a));
 
   let rosebud = `rgb((163, 83, 111));
@@ -41,72 +53,143 @@ module Colors = {
 
 module Typeface = {
   open Css;
-  let weights = [
-    // The weights are intentionally shifted thinner one unit
-    (`thin, "Thin"),
-    (`extraLight, "Thin"),
-    (`light, "ExtraLight"),
-    (`normal, "Light"),
-    (`medium, "Regular"),
-    (`semiBold, "Medium"),
-    (`bold, "SemiBold"),
-    (`extraBold, "Bold"),
-  ];
+  // To prevent "flash of unstyled text" on some browsers (firefox), we need
+  // to do insane things to mitigate it. Even though the CSS working group
+  // created `font-display: block` for this purpose, Firefox chooses to not
+  // follow the standard "wait for 3seconds before showing fallback fonts."
+  //
+  // Instead we can base64 the woff and woff2 fonts and include those directly
+  // in our stylesheets. Now those browsers have no choice but to show us the
+  // font correctly.
+  //
+  // Scafolding code adapted from Bs-css Css.re.
+  module Loader = {
+    let string_of_fontWeight = x =>
+      switch (x) {
+      | `thin => "100"
+      | `extraLight => "200"
+      | `light => "300"
+      | `normal => "400"
+      | `medium => "500"
+      | `semiBold => "600"
+      | `bold => "700"
+      | `extraBold => "800"
+      };
 
-  // TODO: add format("woff") and unicode ranges
-  let () =
-    List.iter(
-      ((weight, name)) =>
-        ignore @@
-        fontFace(
-          ~fontFamily="IBM Plex Sans",
-          ~src=[
-            url("/static/font/IBMPlexSans-" ++ name ++ "-Latin1.woff2"),
-            url("/static/font/IBMPlexSans-" ++ name ++ "-Latin1.woff"),
-          ],
-          ~fontStyle=`normal,
-          ~fontWeight=weight,
-          (),
-        ),
-      weights,
-    );
+    let genFontFace = (~fontFamily, ~src, ~fontWeight=?, ()) => {
+      let src =
+        src
+        |> List.map(s => {
+             let ext = {
+               let arr = Js.String.split(".", s);
+               arr[Array.length(arr) - 1];
+             };
+             let b64 = Node.Fs.readFileSync("./" ++ s, `base64);
+             "url(\"data:font/"
+             ++ ext
+             ++ ";base64,"
+             ++ b64
+             ++ "\") format(\""
+             ++ ext
+             ++ "\")";
+           })
+        |> String.concat(", ");
 
-  let _ =
-    fontFace(
-      ~fontFamily="IBM Plex Mono",
-      ~src=[
-        url("/static/font/IBMPlexMono-Medium-Latin1.woff2"),
-        url("/static/font/IBMPlexMono-Medium-Latin1.woff"),
-      ],
-      ~fontStyle=`normal,
-      ~fontWeight=`semiBold,
-      (),
-    );
-  let _ =
-    fontFace(
-      ~fontFamily="IBM Plex Mono",
-      ~src=[
-        url("/static/font/IBMPlexMono-SemiBold-Latin1.woff2"),
-        url("/static/font/IBMPlexMono-SemiBold-Latin1.woff"),
-      ],
-      ~fontStyle=`normal,
-      ~fontWeight=`bold,
-      (),
-    );
+      let fontWeight =
+        Belt.Option.mapWithDefault(fontWeight, "", w =>
+          "font-weight: " ++ string_of_fontWeight(w)
+        );
+      let asString = {j|@font-face {
+      font-family: $fontFamily;
+      src: $src;
+      font-display: block;
+      font-style: normal;
+      $(fontWeight);
+  }|j};
 
-  let ibmplexserif =
-    fontFamily(
-      fontFace(
-        ~fontFamily="IBM Plex Serif",
-        ~src=[
-          url("/static/font/IBMPlexSerif-Medium-Latin1.woff2"),
-          url("/static/font/IBMPlexSerif-Medium-Latin1.woff"),
+      asString;
+    };
+
+    let load = () => {
+      let weights = [
+        // The weights are intentionally shifted thinner one unit
+        (`thin, "Thin"),
+        (`extraLight, "Thin"),
+        (`light, "ExtraLight"),
+        (`normal, "Light"),
+        (`medium, "Regular"),
+        (`semiBold, "Medium"),
+        (`bold, "SemiBold"),
+        (`extraBold, "Bold"),
+      ];
+
+      String.concat(
+        "\n",
+        [
+          genFontFace(
+            ~fontFamily="PragmataPro",
+            ~src=[
+              "/static/font/Essential-PragmataPro-Regular.woff2",
+              "/static/font/Essential-PragmataPro-Regular.woff",
+            ],
+            ~fontWeight=`normal,
+            (),
+          ),
+          genFontFace(
+            ~fontFamily="PragmataPro",
+            ~src=[
+              "/static/font/PragmataPro-Bold.woff2",
+              "/static/font/PragmataPro-Bold.woff",
+            ],
+            ~fontWeight=`bold,
+            (),
+          ),
+          genFontFace(
+            ~fontFamily="IBM Plex Serif",
+            ~src=[
+              "/static/font/IBMPlexSerif-Medium-Latin1.woff2",
+              "/static/font/IBMPlexSerif-Medium-Latin1.woff",
+            ],
+            ~fontWeight=`medium,
+            (),
+          ),
+          genFontFace(
+            ~fontFamily="IBM Plex Mono",
+            ~src=[
+              "/static/font/IBMPlexMono-SemiBold-Latin1.woff2",
+              "/static/font/IBMPlexMono-SemiBold-Latin1.woff",
+            ],
+            ~fontWeight=`bold,
+            (),
+          ),
+          genFontFace(
+            ~fontFamily="IBM Plex Mono",
+            ~src=[
+              "/static/font/IBMPlexMono-Medium-Latin1.woff2",
+              "/static/font/IBMPlexMono-Medium-Latin1.woff",
+            ],
+            ~fontWeight=`semiBold,
+            (),
+          ),
+          ...List.map(
+               ((weight, name)) =>
+                 genFontFace(
+                   ~fontFamily="IBM Plex Sans",
+                   ~src=[
+                     "/static/font/IBMPlexSans-" ++ name ++ "-Latin1.woff2",
+                     "/static/font/IBMPlexSans-" ++ name ++ "-Latin1.woff",
+                   ],
+                   ~fontWeight=weight,
+                   (),
+                 ),
+               weights,
+             ),
         ],
-        ~fontStyle=`normal,
-        ~fontWeight=`medium,
-        (),
-      ),
-    );
+      );
+    };
+  };
+
+  let ibmplexserif = fontFamily("IBM Plex Serif, serif");
 
   let ibmplexsans =
     fontFamily("IBM Plex Sans, Helvetica Neue, Arial, sans-serif");
@@ -116,13 +199,21 @@ module Typeface = {
   let aktivgrotesk = fontFamily("aktiv-grotesk-extended, sans-serif");
 
   let rubik = fontFamily("Rubik, sans-serif");
+
+  let pragmataPro = fontFamily("PragmataPro, monospace");
 };
 
 module MediaQuery = {
-  let veryLarge = "(min-width: 71rem)";
+  let veryVeryLarge = "(min-width: 77rem)";
+  let veryLarge = "(min-width: 70.8125rem)";
+  let somewhatLarge = "(min-width: 65.5rem)";
   let full = "(min-width: 48rem)";
   let notMobile = "(min-width: 32rem)";
   let notSmallMobile = "(min-width: 25rem)";
+  let statusLiftAlways = "(min-width: 38rem)";
+  let statusLift = keepAnnouncementBar =>
+    keepAnnouncementBar ? statusLiftAlways : "(min-width: 0rem)";
+
   // to adjust root font size (therefore pixels)
   let iphoneSEorSmaller = "(max-width: 374px)";
 };
@@ -176,6 +267,33 @@ module H1 = {
     ]);
 };
 
+module H2 = {
+  open Css;
+
+  let basic =
+    style([
+      Typeface.ibmplexsans,
+      fontWeight(`normal),
+      fontSize(`rem(2.25)),
+      letterSpacing(`rem(-0.03125)),
+      lineHeight(`rem(3.0)),
+    ]);
+};
+
+module Technical = {
+  open Css;
+  let border = f => style([f(`px(3), `dashed, Colors.greyishAlpha(0.5))]);
+
+  let basic =
+    style([
+      Typeface.pragmataPro,
+      fontWeight(`normal),
+      color(Css.white),
+      fontSize(`rem(0.9375)),
+      textTransform(`uppercase),
+    ]);
+};
+
 module H3 = {
   open Css;
 
@@ -187,11 +305,10 @@ module H3 = {
       lineHeight(`rem(1.5)),
     ]);
 
-  let wide =
+  let wideNoColor =
     style([
       whiteSpace(`nowrap),
       fontSize(`rem(1.0)),
-      color(Colors.fadedBlue),
       letterSpacing(`em(0.25)),
       Typeface.aktivgrotesk,
       fontWeight(`medium),
@@ -199,6 +316,8 @@ module H3 = {
       textAlign(`center),
       textTransform(`uppercase),
     ]);
+
+  let wide = merge([wideNoColor, style([color(Colors.fadedBlue)])]);
 
   let wings = {
     let wing = [
@@ -218,6 +337,35 @@ module H3 = {
         after([marginLeft(`rem(2.0)), ...wing]),
       ]),
     ]);
+  };
+
+  module Technical = {
+    let basic =
+      style([
+        Typeface.pragmataPro,
+        fontSize(`rem(0.9375)),
+        fontWeight(`bold),
+        letterSpacing(`px(1)),
+        textTransform(`uppercase),
+      ]);
+
+    let title = merge([basic, style([color(Css.black)])]);
+
+    let boxed =
+      merge([
+        basic,
+        Technical.border(Css.border),
+        style([
+          color(Colors.white),
+          lineHeight(`rem(1.5)),
+          display(`flex),
+          justifyContent(`center),
+          alignItems(`center),
+          width(`rem(9.0625)),
+          height(`rem(3.)),
+          margin(`auto),
+        ]),
+      ]);
   };
 };
 
@@ -271,6 +419,17 @@ module H5 = {
 module Body = {
   open Css;
 
+  module Technical = {
+    let basic =
+      style([
+        Typeface.pragmataPro,
+        color(Css.white),
+        fontSize(`rem(1.)),
+        lineHeight(`rem(1.25)),
+        letterSpacing(`rem(0.00625)),
+      ]);
+  };
+
   let basic =
     style([
       Typeface.ibmplexsans,
@@ -279,6 +438,8 @@ module Body = {
       lineHeight(`rem(1.5)),
       fontWeight(`normal),
     ]);
+
+  let basic_semibold = merge([basic, style([fontWeight(`semiBold)])]);
 
   let big =
     style([
@@ -289,6 +450,14 @@ module Body = {
     ]);
 
   let big_semibold = merge([big, style([fontWeight(`semiBold)])]);
+
+  let small =
+    style([
+      Typeface.ibmplexsans,
+      fontSize(`rem(0.8125)),
+      opacity(0.5),
+      lineHeight(`rem(1.25)),
+    ]);
 };
 
 // Match Tachyons setting pretty much everything to border-box
@@ -296,3 +465,26 @@ Css.global(
   "a,article,aside,blockquote,body,code,dd,div,dl,dt,fieldset,figcaption,figure,footer,form,h1,h2,h3,h4,h5,h6,header,html,input[type=email],input[type=number],input[type=password],input[type=tel],input[type=text],input[type=url],legend,li,main,nav,ol,p,pre,section,table,td,textarea,th,tr,ul",
   [Css.boxSizing(`borderBox)],
 );
+
+// Reset padding that appears only on some browsers
+Css.global(
+  "h1,h2,h3,h4,h5,fieldset,ul,li,p",
+  Css.[
+    unsafe("padding-inline-start", "0"),
+    unsafe("padding-inline-end", "0"),
+    unsafe("padding-block-start", "0"),
+    unsafe("padding-block-end", "0"),
+    unsafe("margin-inline-start", "0"),
+    unsafe("margin-inline-end", "0"),
+    unsafe("margin-block-start", "0"),
+    unsafe("margin-block-end", "0"),
+    unsafe("-webkit-padding-before", "0"),
+    unsafe("-webkit-padding-start", "0"),
+    unsafe("-webkit-padding-end", "0"),
+    unsafe("-webkit-padding-after", "0"),
+    unsafe("-webkit-margin-before", "0"),
+    unsafe("-webkit-margin-after", "0"),
+  ],
+);
+
+Css.global("p", Css.[marginTop(`rem(1.)), marginBottom(`rem(1.))]);

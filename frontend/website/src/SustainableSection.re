@@ -28,17 +28,16 @@ let make = _children => {
             merge([
               Style.H1.hero,
               style([
-                color(Style.Colors.denimTwo),
+                color(Style.Colors.clover),
                 position(`relative),
                 display(`inlineBlock),
                 marginTop(`zero),
                 marginBottom(`zero),
                 media(Style.MediaQuery.notSmallMobile, [margin(`auto)]),
-                media(Style.MediaQuery.full, [color(Style.Colors.clover)]),
               ]),
             ])
           )>
-          {ReasonReact.string("Sustainable Scalability")}
+          {ReasonReact.string("Sustainable scalability")}
           <div
             className=Css.(
               style([
@@ -67,6 +66,7 @@ let make = _children => {
           style([
             marginTop(`rem(2.375)),
             display(`flex),
+            maxWidth(`rem(81.5)),
             justifyContent(`spaceBetween),
             alignItems(`center),
             flexWrap(`wrapReverse),
@@ -80,15 +80,23 @@ let make = _children => {
         <div
           className=Css.(
             style([
-              marginBottom(`rem(2.375)),
               userSelect(`none),
-              marginRight(`rem(2.0)),
-              maxWidth(`rem(23.875)),
+              media(
+                Style.MediaQuery.notMobile,
+                [marginBottom(`rem(2.375))],
+              ),
             ])
           )>
           <Svg
+            inline=true
+            className=Css.(
+              style([
+                width(`rem(18.75)),
+                media(Style.MediaQuery.notMobile, [width(`rem(23.9375))]),
+              ])
+            )
             link="/static/img/chart-blockchain-size.svg"
-            dims=(23.125, 17.3125)
+            dims=(23.125, 16.8125)
             alt="Line graph comparing the size requirements of Coda to other blockchains. \
             Other blockchain's size requirements increase significantly over time, on the order \
             of 2TB+, whereas Coda staking nodes and user nodes remain constant, at around 1GB \
@@ -98,26 +106,48 @@ let make = _children => {
         <div
           className=Css.(
             style([
-              marginBottom(`rem(2.375)),
               userSelect(`none),
-              marginRight(`rem(2.0)),
-              maxWidth(`rem(23.125)),
+              media(
+                Style.MediaQuery.notMobile,
+                [marginBottom(`rem(2.375))],
+              ),
             ])
           )>
           <Svg
+            inline=true
+            className=Css.(
+              style([
+                width(`rem(18.75)),
+                media(Style.MediaQuery.notMobile, [width(`rem(23.9375))]),
+              ])
+            )
             link="/static/img/chart-blockchain-energy.svg"
-            dims=(23.9375, 18.1875)
+            dims=(23.125, 16.8125)
             alt="Line graph comparing the energy usage of Coda to other blockchains. \
-            Over time, the energy requirements for other blockchains to process a single \
-            transaction will go up, whereas the Coda network will remain constant."
+            Over time, the energy requirements for proof of work blockchains to process \
+            a single transaction will go up, whereas the Coda network will remain constant."
           />
         </div>
         <div className=Css.(style([marginBottom(`rem(2.375))]))>
           <SideText
             paragraphs=[|
-              "With Coda's constant sized blockchain and energy efficient consensus, Coda will be sustainable even as it scales to thousands of transactions per second, millions of users, and years of transaction history.",
+              `styled([
+                `str(
+                  "With Coda's constant sized blockchain and energy efficient consensus, Coda will be",
+                ),
+                `emph(
+                  " sustainable even as it scales to thousands of transactions per second, millions of users, and years of transactions history",
+                ),
+                `str("."),
+              ]),
+              `str(
+                "Help compress Coda by participating in snarking. Just like mining, with snarking anyone can contribute their compute to the network to help compress the blockchain.",
+              ),
             |]
-            cta="Notify me about participating in consensus"
+            cta={
+              SideText.Cta.copy: {j|Learn more about helping compress Coda's\u00A0blockchain|j},
+              link: Links.Forms.compressTheBlockchain,
+            }
           />
         </div>
       </div>

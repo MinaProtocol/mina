@@ -90,7 +90,7 @@ module Legend = {
               display(`flex),
               marginTop(`zero),
               marginBottom(`zero),
-              marginRight(`rem(0.25)),
+              marginRight(`rem(1.0)),
               media(Style.MediaQuery.notMobile, [marginRight(`rem(2.25))]),
             ])
           )>
@@ -98,7 +98,7 @@ module Legend = {
             className=Css.(style([marginRight(`rem(0.75))]))
             borderColor={Some(Style.Colors.clover)}
             fillColor=Style.Colors.lightClover
-            dims=(`rem(2.25), `rem(2.25))
+            dims=(`rem(2.5), `rem(2.5))
           />
           <h5
             className=Css.(
@@ -128,6 +128,7 @@ module Figure = {
   let make = (~captionColor, ~link, ~dims, ~caption, ~alt, _children) => {
     ...component,
     render: _self => {
+      let (w, h) = dims;
       <figure
         className=Css.(
           style([
@@ -140,10 +141,22 @@ module Figure = {
             flexDirection(`column),
             alignItems(`center),
             justifyContent(`center),
-            width(`rem(20.625)),
+            width(`rem(19.5)),
+            media(Style.MediaQuery.notMobile, [width(`rem(20.625))]),
           ])
         )>
-        <Svg dims link alt />
+        <Svg
+          className=Css.(
+            style([
+              // on mobile we want to square our figures with the height size
+              width(`rem(h)),
+              media(Style.MediaQuery.notMobile, [width(`rem(w))]),
+            ])
+          )
+          dims
+          link
+          alt
+        />
         <figcaption
           className=Css.(
             merge([
@@ -163,7 +176,7 @@ module Figure = {
   };
 };
 
-let legendQuery = "(min-width: 66.8125rem)";
+let legendQuery = "(min-width: 68.8125rem)";
 
 let component = ReasonReact.statelessComponent("InclusiveSection");
 let make = _ => {
@@ -193,7 +206,7 @@ let make = _ => {
           link="/static/img/coda-figure.svg"
           dims=(15.125, 15.125)
           caption="Coda"
-          alt="Figure showing everyone participating in consensus, including all individual users of Coda."
+          alt="Figure showing everyone participating in consensus, including individual users of Coda."
           captionColor=Style.Colors.clover
         />
         <Figure
@@ -208,10 +221,22 @@ let make = _ => {
             className=Css.(style([display(`flex), justifyContent(`center)]))>
             <SideText
               paragraphs=[|
-                "Simple, fair consensus. Participation is proportional to how much stake you have in the protocol with no lockups, no forced delegation, and low bandwidth requirements.",
-                "With just a small stake, you'll be able to participate directly in consensus and earn Coda.",
+                `styled([
+                  `emph(
+                    "Simple, fair consensus designed so you can participate",
+                  ),
+                  `str(
+                    ". Participation is proportional to how much stake you have in the protocol with no lockups, no forced delegation, and low bandwidth requirements.",
+                  ),
+                ]),
+                `str(
+                  "With just a small stake you'll be able to participate directly in consensus.",
+                ),
               |]
-              cta="Stay updated about participating in consensus"
+              cta={
+                SideText.Cta.copy: {j|Sign up to learn more about about staking with\u00A0Coda|j},
+                link: Links.Forms.participateInConsensus,
+              }
             />
           </div>
           <Legend

@@ -4,14 +4,11 @@ open Import
 module Stable = struct
   module V1 = struct
     module T = struct
-      let version = 1
-
-      (* TODO : use version for Fee_transfer *)
       type t =
         { proposer: Public_key.Compressed.Stable.V1.t
         ; amount: Currency.Amount.Stable.V1.t
         ; fee_transfer: Fee_transfer.Single.Stable.V1.t option }
-      [@@deriving sexp, bin_io, compare, eq]
+      [@@deriving sexp, bin_io, compare, eq, version]
     end
 
     include T
@@ -87,3 +84,16 @@ let supply_increase {proposer= _; amount; fee_transfer} =
 let fee_excess t =
   Or_error.map (supply_increase t) ~f:(fun _increase ->
       Currency.Fee.Signed.zero )
+
+let gen =
+  let open Quickcheck.Let_syntax in
+  let%bind proposer = Public_key.Compressed.gen in
+  let%bind amount =
+    Currency.Amount.(gen_incl zero Protocols.Coda_praos.coinbase_amount)
+  in
+  let fee =
+    Currency.Fee.gen_incl Currency.Fee.zero (Currency.Amount.to_fee amount)
+  in
+  let prover = Public_key.Compressed.gen in
+  let%map fee_transfer = Option.gen (Quickcheck.Generator.tuple2 prover fee) in
+  {proposer; amount; fee_transfer}

@@ -15,9 +15,8 @@ module Time = struct
   module Stable = struct
     module V1 = struct
       module T = struct
-        let version = 1
-
-        type t = UInt64.t [@@deriving bin_io, sexp, compare, eq, hash, yojson]
+        type t = UInt64.t
+        [@@deriving bin_io, sexp, compare, eq, hash, yojson, version]
       end
 
       include T
@@ -80,9 +79,7 @@ module Time = struct
     module Stable = struct
       module V1 = struct
         module T = struct
-          let version = 1
-
-          type t = UInt64.t [@@deriving bin_io, sexp, compare]
+          type t = UInt64.t [@@deriving bin_io, sexp, compare, version]
         end
 
         include T
@@ -177,7 +174,7 @@ module Time = struct
 
   let diff_checked x y =
     let pack = Tick.Field.Var.project in
-    Span.unpack_var Tick.Field.Checked.Infix.(pack x - pack y)
+    Span.unpack_var Tick.Field.Checked.(pack x - pack y)
 
   let modulus t span = UInt64.rem t span
 

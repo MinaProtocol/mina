@@ -35,9 +35,27 @@ module Icon = {
 let component = ReasonReact.statelessComponent("AnnouncementBar");
 let make = _ => {
   ...component,
-  render: _self =>
-    <a
-      href="/testnet.html"
+  render: _self => {
+    // HACK: On firefox (and only firefox) the text seems to not be centered in the announcementbar
+    //  This way we can write CSS that only targets firefox
+    Css.(
+      global(
+        "@-moz-document url-prefix()",
+        [
+          unsafe(
+            "#announcementbar--viewdemo, #announcementbar--testnetlive { margin-bottom",
+            "-0.125rem; }",
+          ),
+          unsafe("#announcementbar--anchor { padding-top", "0.5625rem; }"),
+          unsafe("#announcementbar--anchor { padding-bottom", "0.5625rem; }"),
+        ],
+      )
+    );
+
+    <A
+      name="announcementbar"
+      id="announcementbar--anchor"
+      href="/blog/coda2019.html"
       className=Css.(
         style(
           Style.paddingX(`rem(1.25))
@@ -58,31 +76,34 @@ let make = _ => {
       <div className=Css.(style([display(`flex), alignItems(`center)]))>
         Icon.svg
         <p
+          id="announcementbar--testnetlive"
           className=Css.(
             merge([
               Style.Body.basic,
               style([
                 marginLeft(`rem(1.25)),
+                marginBottom(`zero),
                 marginTop(`px(0)),
-                marginBottom(`px(0)),
               ]),
             ])
           )>
-          {ReasonReact.string("Testnet is live!")}
+          {ReasonReact.string("New Fundraising!")}
         </p>
       </div>
       <p
+        id="announcementbar--viewdemo"
         className=Css.(
           merge([
             Style.Link.No_hover.basic,
             style([
               marginTop(`px(0)),
-              marginBottom(`px(0)),
+              marginBottom(`zero),
               marginLeft(`rem(1.5)),
             ]),
           ])
         )>
-        {ReasonReact.string({j|View the demo\u00A0→|j})}
+        {ReasonReact.string({j|Read Here\u00A0→|j})}
       </p>
-    </a>,
+    </A>;
+  },
 };

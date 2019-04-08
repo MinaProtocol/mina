@@ -4,8 +4,8 @@ open Import
 module Single : sig
   module Stable : sig
     module V1 : sig
-      type t = Public_key.Compressed.t * Currency.Fee.t
-      [@@deriving bin_io, sexp, compare, eq, yojson]
+      type t = Public_key.Compressed.Stable.V1.t * Currency.Fee.Stable.V1.t
+      [@@deriving bin_io, sexp, compare, eq, yojson, version]
     end
 
     module Latest = V1
@@ -19,7 +19,7 @@ module Stable : sig
     type t =
       | One of Single.Stable.V1.t
       | Two of Single.Stable.V1.t * Single.Stable.V1.t
-    [@@deriving bin_io, sexp, compare, eq, yojson]
+    [@@deriving bin_io, sexp, compare, eq, yojson, version]
   end
 
   module Latest = V1

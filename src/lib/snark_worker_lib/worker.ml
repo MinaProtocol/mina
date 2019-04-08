@@ -4,7 +4,7 @@ open Async
 module Make (Inputs : Intf.Inputs_intf) :
   Intf.S
   with type transition := Inputs.Transaction.t
-   and type sparse_ledger := Inputs.Sparse_ledger.t
+   and type transaction_witness := Inputs.Transaction_witness.t
    and type statement := Inputs.Statement.t
    and type proof := Inputs.Proof.t = struct
   open Inputs
@@ -17,7 +17,7 @@ module Make (Inputs : Intf.Inputs_intf) :
         type t =
           ( Statement.t
           , Transaction.t
-          , Sparse_ledger.t
+          , Transaction_witness.t
           , Proof.t )
           Work.Single.Spec.t
         [@@deriving sexp]
@@ -98,7 +98,8 @@ module Make (Inputs : Intf.Inputs_intf) :
         go ()
       in
       match%bind
-        dispatch Rpcs.Get_work.rpc shutdown_on_disconnect () daemon_address
+        dispatch Rpcs.Get_work.Latest.rpc shutdown_on_disconnect ()
+          daemon_address
       with
       | Error e -> log_and_retry "getting work" e
       | Ok None ->
@@ -126,8 +127,8 @@ module Make (Inputs : Intf.Inputs_intf) :
                 Logger.info logger ~module_:__MODULE__ ~location:__LOC__
                   "Submitted work to %s%!"
                   (Host_and_port.to_string daemon_address) ;
-                dispatch Rpcs.Submit_work.rpc shutdown_on_disconnect result
-                  daemon_address
+                dispatch Rpcs.Submit_work.Latest.rpc shutdown_on_disconnect
+                  result daemon_address
               with
               | Error e -> log_and_retry "submitting work" e
               | Ok () -> go () ) )

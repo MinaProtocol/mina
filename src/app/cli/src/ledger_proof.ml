@@ -19,10 +19,8 @@ module Prod :
   module Stable = struct
     module V1 = struct
       module T = struct
-        let version = 1
-
         type t = Transaction_snark.Stable.V1.t
-        [@@deriving bin_io, sexp, yojson]
+        [@@deriving bin_io, sexp, yojson, version]
       end
 
       include T
@@ -58,8 +56,10 @@ module Prod :
                  ; target
                  ; supply_increase
                  ; fee_excess
+                 ; pending_coinbase_stack_state
                  ; proof_type } ~sok_digest ~proof =
-    Transaction_snark.create ~source ~target ~supply_increase
+    Transaction_snark.create ~source ~target ~pending_coinbase_stack_state
+      ~supply_increase
       ~fee_excess:(to_signed_amount fee_excess)
       ~sok_digest ~proof ~proof_type
 end
@@ -79,7 +79,7 @@ module Debug :
         type t =
           Transaction_snark.Statement.Stable.V1.t
           * Sok_message.Digest.Stable.V1.t
-        [@@deriving sexp, bin_io, yojson]
+        [@@deriving sexp, bin_io, yojson, version]
       end
 
       include T

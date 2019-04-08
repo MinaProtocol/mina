@@ -79,7 +79,7 @@ reformat: git_hooks
 	cd src; $(WRAPSRC) dune exec --profile=$(DUNE_PROFILE) app/reformat/reformat.exe -- -path .
 
 reformat-diff:
-	ocamlformat --doc-comments=before --inplace $(shell git diff --name-only HEAD | grep '.mli\?$$' | while IFS= read -r f; do stat "$$f" >/dev/null 2>&1 && echo "$$f"; done) || true
+	ocamlformat --doc-comments=before --inplace $(shell git status -s | cut -c 4- | grep '.mli\?$$' | while IFS= read -r f; do stat "$$f" >/dev/null 2>&1 && echo "$$f"; done) || true
 
 check-format:
 	cd src; $(WRAPSRC) dune exec --profile=$(DUNE_PROFILE) app/reformat/reformat.exe -- -path . -check
@@ -181,11 +181,14 @@ publish_kademlia_deb:
 
 publish_deb:
 	@if [ $(AWS_ACCESS_KEY_ID) ] ; then \
-		if [ "$(CIRCLE_BRANCH)" = "master" ] && [ "$(CIRCLE_JOB)" = "build-artifacts--testnet_postake" ] ; then \
-            echo "Publishing to stable" ; \
-			$(DEBS3) --codename stable   --component main src/_build/coda-*.deb ; \
-		else \
-            echo "Publishing to unstable" ; \
+		if $(and [ "$(CIRCLE_BRANCH)" = "master" ], \
+			$(or [ "$(CIRCLE_JOB)" = "build-artifacts--testnet_postake" ], \
+				 [ "$(CIRCLE_JOB)" = "build-artifacts--testnet_postake_many_proposers"] ) \
+			); then \
+				echo "Publishing to stable" ; \
+    			$(DEBS3) --codename stable   --component main src/_build/coda-*.deb ; \
+			else \
+				echo "Publishing to unstable" ; \
 			$(DEBS3) --codename unstable --component main src/_build/coda-*.deb ; \
 		fi ; \
 	else  \
