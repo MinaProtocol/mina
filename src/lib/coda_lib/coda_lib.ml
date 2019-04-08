@@ -610,7 +610,8 @@ module Make (Inputs : Inputs_intf) = struct
           ~query_peer:
             {Network_peer.query= (fun a b c -> Net.query_peer t.net a b c)} )
 
-  let create_genesis_frontier (config : Config.t) ~consensus_local_state =
+  let create_genesis_frontier (config : Config.t) =
+    let consensus_local_state = config.consensus_local_state in
     let pending_coinbases = Pending_coinbase.create () |> Or_error.ok_exn in
     let empty_diff =
       { Staged_ledger_diff.diff=
@@ -680,7 +681,7 @@ module Make (Inputs : Inputs_intf) = struct
               match config.transition_frontier_location with
               | None ->
                   let%map ledger_db, frontier =
-                    create_genesis_frontier config ~consensus_local_state
+                    create_genesis_frontier config
                   in
                   ( None
                   , Ledger_transfer.transfer_accounts ~src:Genesis.ledger
@@ -705,7 +706,7 @@ module Make (Inputs : Inputs_intf) = struct
                           ~logger:config.logger ()
                       in
                       let%map root_snarked_ledger, frontier =
-                        create_genesis_frontier config ~consensus_local_state
+                        create_genesis_frontier config
                       in
                       (Some persistence, root_snarked_ledger, frontier)
                   | `Yes ->
@@ -717,7 +718,8 @@ module Make (Inputs : Inputs_intf) = struct
                       let%map frontier =
                         Transition_frontier_persistence.deserialize
                           ~directory_name ~logger:config.logger
-                          ~root_snarked_ledger ~consensus_local_state
+                          ~root_snarked_ledger
+                          ~consensus_local_state:config.consensus_local_state
                       in
                       let persistence =
                         Transition_frontier_persistence.create ~directory_name

@@ -350,7 +350,8 @@ let daemon logger =
               ~ledger_db_location:(conf_dir ^/ "ledger_db")
               ~snark_work_fee:snark_work_fee_flag ~receipt_chain_database
               ~transition_frontier_location ~time_controller
-              ?propose_keypair:Config0.propose_keypair ~monitor ~consensus_local_state ())
+              ?propose_keypair:Config0.propose_keypair ~monitor
+              ~consensus_local_state ())
        in
        Run.handle_shutdown ~monitor ~conf_dir ~logger coda ;
        Async.Scheduler.within' ~monitor

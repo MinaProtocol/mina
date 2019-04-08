@@ -86,7 +86,7 @@ struct
         [@@deriving bin_io]
 
         (* , version {rpc} *)
-
+        
         (* TODO : remove after uncommenting version{rpc} *)
         let version = 1
 
@@ -142,7 +142,7 @@ struct
         [@@deriving bin_io, sexp]
 
         (* , version {rpc} *)
-
+        
         (* TODO : remove this after uncommenting version{rpc} *)
         let version = 1
 
