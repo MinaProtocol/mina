@@ -1,5 +1,5 @@
 cd ./react_ppx_3/
-opam switch create 4.02.3+buckle-master
+opam switch 4.02.3+buckle-master
 eval $(opam env)
 make
 cd ..
