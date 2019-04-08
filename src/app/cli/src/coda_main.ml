@@ -1655,13 +1655,28 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
           ~client_port
         |> ignore
 
+  let once : ('a -> unit) -> 'a -> unit =
+   fun f ->
+    let already_done = ref false in
+    fun x ->
+      if not !already_done then (
+        already_done := true ;
+        f x )
+
   let handle_shutdown ~monitor ~conf_dir ~logger t =
+    let log_shutdown : t -> unit = once (log_shutdown ~conf_dir ~logger) in
     Monitor.detach_and_iter_errors monitor ~f:(fun exn ->
-        log_shutdown ~conf_dir ~logger t ;
-        raise exn ) ;
+        log_shutdown t ;
+        Logger.fatal logger "Unhandled exception handled by Coda_main."
+          ~location:__LOC__ ~module_:__MODULE__
+          ~metadata:
+            [ ( "exception_sexp"
+              , `String (Sexplib.Conv.sexp_of_exn exn |> Sexp.to_string_mach)
+              ) ] ;
+        Async.(exit 1 |> don't_wait_for) ) ;
     Async_unix.Signal.(
       handle terminating ~f:(fun signal ->
-          log_shutdown ~conf_dir ~logger t ;
+          log_shutdown t ;
           Logger.info logger ~module_:__MODULE__ ~location:__LOC__
             !"Coda process got interrupted by signal %{sexp:t}"
             signal ))
