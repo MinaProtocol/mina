@@ -84,12 +84,10 @@ end = struct
   module Stable = struct
     module V1 = struct
       module T = struct
-        type t = Int.t [@@deriving sexp, compare, eq, bin_io]
+        type t = Int.t
+        [@@deriving sexp, compare, eq, bin_io, version {asserted}]
 
         (* TODO : wrap Int *)
-        let version = 1
-
-        let __versioned__ = true
       end
 
       include T
