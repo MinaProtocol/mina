@@ -37,13 +37,13 @@ end) =
 struct
   open Inputs
 
-  (* see
+  (* for versioning of the types here, see
 
      RFC 0012, and
 
      https://ocaml.janestreet.com/ocaml-core/latest/doc/async_rpc_kernel/Async_rpc_kernel/Versioned_rpc/
 
-  *)
+   *)
 
   module Get_staged_ledger_aux_and_pending_coinbases_at_hash = struct
     module T = struct
@@ -85,7 +85,7 @@ struct
           option
         [@@deriving bin_io]
 
-        (* , version{rpc} *)
+        (* , version {rpc} *)
         
         (* TODO : remove after uncommenting version{rpc} *)
         let version = 1
