@@ -11,6 +11,7 @@ module Make (Inputs : Transition_frontier.Inputs_intf) :
 
   module Transition = struct
     module Data = struct
+      (* TODO: version *)
       type t =
         External_transition.Stable.Latest.t * State_hash.Stable.Latest.t list
       [@@deriving bin_io]
@@ -19,10 +20,11 @@ module Make (Inputs : Transition_frontier.Inputs_intf) :
 
   module Root_data = struct
     module Data = struct
+      (* TODO: version *)
       type t =
         State_hash.Stable.Latest.t
         * Staged_ledger.Scan_state.Stable.Latest.t
-        * Pending_coinbase.t
+        * Pending_coinbase.Stable.Latest.t
       [@@deriving bin_io]
     end
   end

@@ -56,7 +56,7 @@ struct
         type response =
           ( Staged_ledger_aux.Stable.V1.t
           * Ledger_hash.Stable.V1.t
-          * Pending_coinbase.t )
+          * Pending_coinbase.Stable.V1.t )
           option
       end
 
@@ -81,7 +81,7 @@ struct
         type response =
           ( Staged_ledger_aux.Stable.V1.t
           * Ledger_hash.Stable.V1.t
-          * Pending_coinbase.t )
+          * Pending_coinbase.Stable.V1.t )
           option
         [@@deriving bin_io]
 
@@ -605,7 +605,7 @@ module Make (Inputs : Inputs_intf) = struct
             match response_or_error with
             | Ok (Some response) -> return (Ok response)
             | Ok None -> loop remaining_peers (2 * num_peers)
-            | Error e -> loop remaining_peers (2 * num_peers) )
+            | Error _e -> loop remaining_peers (2 * num_peers) )
     in
     loop peers 1
 
@@ -625,7 +625,7 @@ module Make (Inputs : Inputs_intf) = struct
           peer ;
         let peers = get_random_peers () in
         try_non_preferred_peers t envelope peers ~rpc
-    | Error e ->
+    | Error _e ->
         Logger.faulty_peer t.logger ~module_:__MODULE__ ~location:__LOC__
           !"get error from %{sexp: Peer.t}"
           peer ;

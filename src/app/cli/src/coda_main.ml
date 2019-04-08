@@ -388,6 +388,30 @@ module type Main_intf = sig
   val receipt_chain_database : t -> Receipt_chain_database.t
 end
 
+module Pending_coinbase = struct
+  open Coda_base.Pending_coinbase
+  include Stable.Latest
+
+  let ( hash_extra
+      , oldest_stack
+      , latest_stack
+      , create
+      , remove_coinbase_stack
+      , update_coinbase_stack
+      , merkle_root ) =
+    ( hash_extra
+    , oldest_stack
+    , latest_stack
+    , create
+    , remove_coinbase_stack
+    , update_coinbase_stack
+    , merkle_root )
+
+  module Stack = Stack
+  module Coinbase_data = Coinbase_data
+  module Hash = Hash
+end
+
 module Fee_transfer = Coda_base.Fee_transfer
 module Ledger_proof_statement = Transaction_snark.Statement
 module Pending_coinbase_stack_state =

@@ -41,16 +41,18 @@ end = struct
 
   module Key = struct
     module New_frontier = struct
+      (* TODO: version *)
       type t =
         ( External_transition.Stable.Latest.t
         , State_hash.Stable.Latest.t )
         With_hash.t
         * Scan_state.Stable.Latest.t
-        * Pending_coinbase.t
+        * Pending_coinbase.Stable.Latest.t
       [@@deriving bin_io]
     end
 
     module Add_transition = struct
+      (* TODO: version *)
       type t =
         ( External_transition.Stable.Latest.t
         , State_hash.Stable.Latest.t )
@@ -59,10 +61,11 @@ end = struct
     end
 
     module Update_root = struct
+      (* TODO: version *)
       type t =
         State_hash.Stable.Latest.t
         * Scan_state.Stable.Latest.t
-        * Pending_coinbase.t
+        * Pending_coinbase.Stable.Latest.t
       [@@deriving bin_io]
     end
   end
@@ -137,7 +140,7 @@ end = struct
           [%bin_type_class:
             State_hash.Stable.Latest.t
             * Scan_state.Stable.Latest.t
-            * Pending_coinbase.t]
+            * Pending_coinbase.Stable.Latest.t]
             .writer
           (hash, scan_state, pending_coinbase)
       |> Bigstring.to_string )
