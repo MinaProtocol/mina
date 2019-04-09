@@ -82,7 +82,7 @@ module type S = sig
     module Stable : sig
       module V1 : sig
         type nonrec t = (State_hash.Stable.V1.t, Body.Value.Stable.V1.t) t
-        [@@deriving sexp, bin_io, compare, eq, to_yojson]
+        [@@deriving sexp, bin_io, compare, eq, to_yojson, version]
       end
 
       module Latest : module type of V1
