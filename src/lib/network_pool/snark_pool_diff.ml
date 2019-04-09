@@ -6,9 +6,9 @@ type ('work, 'priced_proof) diff = Add_solved_work of 'work * 'priced_proof
 [@@deriving bin_io, sexp, yojson]
 
 module Make (Proof : sig
-  type t [@@deriving bin_io, yojson]
+  type t [@@deriving bin_io, yojson, version {unnumbered}]
 end) (Fee : sig
-  type t [@@deriving bin_io, sexp, yojson]
+  type t [@@deriving bin_io, sexp, yojson, version {unnumbered}]
 end) (Work : sig
   type t [@@deriving sexp, yojson]
 
@@ -31,11 +31,8 @@ struct
     module Stable = struct
       module V1 = struct
         module T = struct
-          let version = 1
-
-          (* TODO : version Proof and Fee *)
           type t = {proof: Proof.t sexp_opaque; fee: Fee.t}
-          [@@deriving bin_io, sexp]
+          [@@deriving bin_io, sexp, version]
 
           let to_yojson {proof; fee} =
             `Assoc
@@ -90,10 +87,8 @@ struct
   module Stable = struct
     module V1 = struct
       module T = struct
-        let version = 1
-
         type t = (Work.Stable.V1.t, Priced_proof.Stable.V1.t) diff
-        [@@deriving bin_io, sexp, yojson]
+        [@@deriving bin_io, sexp, yojson, version {asserted}]
       end
 
       include T

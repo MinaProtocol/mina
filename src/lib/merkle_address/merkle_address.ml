@@ -131,9 +131,7 @@ end) : S = struct
         slice (bitstring_of_string string) 0 length
 
       module T = struct
-        let version = 1
-
-        type nonrec t = t
+        type t = Bitstring.t [@@deriving version {asserted}]
 
         include Binable.Of_binable (struct
                     type t = int * string [@@deriving bin_io]

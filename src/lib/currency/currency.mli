@@ -109,7 +109,7 @@ module type Signed_intf = sig
   module Poly : sig
     module Stable : sig
       module V1 : sig
-        type ('magnitude, 'sgn) t [@@deriving version]
+        type ('magnitude, 'sgn) t [@@deriving version {unnumbered}]
       end
 
       module Latest = V1

@@ -102,13 +102,11 @@ end) :
   module Stable = struct
     module V1 = struct
       module T = struct
-        let version = 1
-
         type t =
           { diff: diff
-          ; prev_hash: Staged_ledger_hash.t (* TODO : version *)
+          ; prev_hash: Staged_ledger_hash.t
           ; creator: Compressed_public_key.Stable.V1.t }
-        [@@deriving sexp, bin_io]
+        [@@deriving sexp, bin_io, version {asserted}]
       end
 
       include T

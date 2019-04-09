@@ -105,12 +105,9 @@ module Stable = struct
         ; mutable other_trees_data: 'd list list sexp_opaque
         ; stateful_work_order: int Queue.t
         ; mutable curr_job_seq_no: int }
-      [@@deriving sexp, bin_io]
+      [@@deriving sexp, bin_io, version {asserted}]
 
-      (* TODO : wrap Array and Queue, all other types here don't need versioning *)
-      let version = 1
-
-      let __versioned__ = true
+      (* TODO : wrap Array and Queue *)
     end
 
     include T

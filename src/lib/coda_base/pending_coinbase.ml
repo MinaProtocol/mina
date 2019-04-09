@@ -60,7 +60,7 @@ end
 module Stack_id : sig
   module Stable : sig
     module V1 : sig
-      type t [@@deriving bin_io, sexp, compare, eq, version]
+      type t [@@deriving bin_io, sexp, compare, eq]
     end
 
     module Latest = V1
@@ -84,12 +84,10 @@ end = struct
   module Stable = struct
     module V1 = struct
       module T = struct
-        type t = Int.t [@@deriving sexp, compare, eq, bin_io]
+        type t = Int.t
+        [@@deriving sexp, compare, eq, bin_io, version {asserted}]
 
         (* TODO : wrap Int *)
-        let version = 1
-
-        let __versioned__ = true
       end
 
       include T

@@ -289,10 +289,8 @@ struct
     module Stable = struct
       module V1 = struct
         module T = struct
-          let version = 1
-
           type t = User_command.Stable.V1.t list
-          [@@deriving bin_io, sexp, yojson]
+          [@@deriving bin_io, sexp, yojson, version {asserted}]
         end
 
         include T
