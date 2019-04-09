@@ -74,3 +74,7 @@ App.on(
     createWindow();
   },
 );
+
+App.on(`WindowAllClosed, () =>
+  print_endline("Closing window, menu staying open")
+);
