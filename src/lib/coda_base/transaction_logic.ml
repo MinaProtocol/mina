@@ -472,7 +472,7 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
           { Undo.User_command_undo.common
           ; body= Stake_delegation {previous_delegate= sender_account.delegate}
           }
-    | Payment Payment_payload.Poly.Stable.Latest.({amount; receiver}) ->
+    | Payment Payment_payload.Poly.({amount; receiver}) ->
         let%bind sender_balance' = sub_amount sender_account.balance amount in
         let undo emptys : Undo.User_command_undo.t =
           {common; body= Payment {previous_empty_accounts= emptys}}

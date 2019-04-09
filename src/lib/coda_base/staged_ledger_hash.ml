@@ -197,6 +197,13 @@ module Stable = struct
 
       module Latest = V1
     end
+
+    type ('non_snark, 'pending_coinbase_hash) t =
+                                                 ( 'non_snark
+                                                 , 'pending_coinbase_hash )
+                                                 Stable.Latest.t =
+      {non_snark: 'non_snark; pending_coinbase_hash: 'pending_coinbase_hash}
+    [@@deriving sexp, eq, compare, hash, yojson]
   end
 
   module V1 = struct
@@ -233,7 +240,7 @@ end
 (* bin_io, version omitted *)
 type t = Stable.Latest.t [@@deriving sexp, eq, compare, hash, yojson]
 
-type ('a, 'b) t_ = ('a, 'b) Stable.Poly.Stable.Latest.t
+type ('a, 'b) t_ = ('a, 'b) Stable.Poly.t
 
 type value = t [@@deriving sexp, eq, compare, hash]
 

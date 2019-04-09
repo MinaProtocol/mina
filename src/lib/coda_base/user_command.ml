@@ -24,6 +24,14 @@ module Poly = struct
 
     module Latest = V1
   end
+
+  type ('payload, 'pk, 'signature) t =
+                                      ( 'payload
+                                      , 'pk
+                                      , 'signature )
+                                      Stable.Latest.t =
+    {payload: 'payload; sender: 'pk; signature: 'signature}
+  [@@deriving eq, sexp, hash, yojson]
 end
 
 module Stable = struct
@@ -80,11 +88,11 @@ include Comparable.Make (Stable.Latest)
 
 type value = t
 
-let payload Poly.Stable.Latest.({payload; _}) = payload
+let payload Poly.({payload; _}) = payload
 
 let fee = Fn.compose Payload.fee payload
 
-let sender t = Public_key.compress Poly.Stable.Latest.(t.sender)
+let sender t = Public_key.compress Poly.(t.sender)
 
 let accounts_accessed ({payload; sender; _} : value) =
   Public_key.compress sender :: Payload.accounts_accessed payload
