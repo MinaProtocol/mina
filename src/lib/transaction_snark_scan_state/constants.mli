@@ -3,3 +3,5 @@ val transaction_capacity_log_2 : int
 
 (** Log of number of block-times snark workers take to produce at least two proofs. Needs to be at least 2, increase this as needed to support slower SNARK workers *)
 val work_delay_factor : int
+
+val latency_factor : int

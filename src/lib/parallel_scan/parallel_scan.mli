@@ -178,7 +178,7 @@ module Job_view : sig
 end
 
 (** The initial state of the parallel scan at some parallelism *)
-val start : parallelism_log_2:int -> ('a, 'd) State.t
+val start : parallelism_log_2:int -> root_at_depth:int -> ('a, 'd) State.t
 
 (** Get the next k available jobs *)
 val next_k_jobs :
@@ -249,3 +249,5 @@ val view_jobs_with_position :
  * i.e., does not include base jobs that are part of previous trees not 
  * promoted to the merge jobs yet*)
 val base_jobs_on_latest_tree : ('a, 'd) State.t -> 'd list
+
+val next_on_new_tree : ('a, 'd) State.t -> bool Or_error.t

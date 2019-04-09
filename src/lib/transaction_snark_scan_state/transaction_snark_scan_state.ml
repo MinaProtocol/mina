@@ -161,7 +161,7 @@ end = struct
     3 + nearest_log_2_incr + nearest_log_2_txn
     + Int.pow 2 (transaction_capacity_log_2 + work_delay_factor)*)
     Int.pow 2 (transaction_capacity_log_2 + 1)
-    * (Int.pow 2 work_delay_factor - 1)
+    * (Int.pow 2 (work_delay_factor - Int.max (latency_factor - 1) 0) - 1)
 
   module Stable = struct
     module V1 = struct
@@ -192,7 +192,7 @@ end = struct
         let k = max Constants.work_delay_factor 2 in
         Parallel_scan.parallelism ~state:t.tree
         = Int.pow 2 (Constants.transaction_capacity_log_2 + k)
-        && t.job_count < work_capacity ()
+        && t.job_count <= work_capacity ()
         && Parallel_scan.is_valid t.tree
 
       include Binable.Of_binable
@@ -471,16 +471,16 @@ end = struct
 
   let capacity t = Parallel_scan.parallelism ~state:t.tree
 
-  let create ~transaction_capacity_log_2 =
-    (* Transaction capacity log_2 is 1/2^work_delay_factor the capacity for work parallelism *)
-    let k = max Constants.work_delay_factor 2 in
-    { tree=
-        Parallel_scan.start ~parallelism_log_2:(transaction_capacity_log_2 + k)
-    ; job_count= 0 }
-
   let empty () =
+    (* Transaction capacity log_2 is 1/2^work_delay_factor the capacity for work parallelism *)
     let open Constants in
-    create ~transaction_capacity_log_2
+    let k = max work_delay_factor 2 in
+    assert (work_delay_factor - latency_factor >= 2) ;
+    { tree=
+        Parallel_scan.start
+          ~parallelism_log_2:(transaction_capacity_log_2 + k)
+          ~root_at_depth:latency_factor
+    ; job_count= 0 }
 
   let extract_txns txns_with_witnesses =
     (* TODO: This type checks, but are we actually pulling the inverse txn here? *)
@@ -523,6 +523,7 @@ end = struct
         work
         ~f:(fun (w : Transaction_snark_work.t) -> List.length w.proofs)
     in
+    let old_proof = Parallel_scan.last_emitted_value t.tree in
     let%bind () = Parallel_scan.update_curr_job_seq_no t.tree in
     let%bind proof_opt = fill_in_transaction_snark_work t.tree work in
     let%bind () = enqueue_transactions t.tree transactions in
@@ -535,7 +536,22 @@ end = struct
       + (List.length transactions * 2)
       - work_count - adjust_job_count
     in
-    if new_count < work_capacity () then (
+    let%bind () =
+      Option.value_map ~default:(Ok ()) proof_opt ~f:(fun (proof, _) ->
+          let curr_source = (Ledger_proof.statement proof).source in
+          (*TODO: get genesis ledger hash if the old_proof is none*)
+          let prev_target =
+            Option.value_map ~default:curr_source old_proof
+              ~f:(fun ((p', _), _) -> (Ledger_proof.statement p').target )
+          in
+          if Frozen_ledger_hash.equal curr_source prev_target then Ok ()
+          else Or_error.error_string "Unexpected ledger proof emitted" )
+    in
+    Core.printf !"scan state: %s\n%!"
+      (Parallel_scan.State.visualize t.tree
+         ~draw_a:(fun _ -> "M")
+         ~draw_d:(fun _ -> "B")) ;
+    if new_count <= work_capacity () then (
       t.job_count <- new_count ;
       Ok proof_opt )
     else
@@ -558,6 +574,8 @@ end = struct
   let next_jobs t = Parallel_scan.next_jobs ~state:t.tree
 
   let next_jobs_sequence t = Parallel_scan.next_jobs_sequence ~state:t.tree
+
+  let next_on_new_tree t = Parallel_scan.next_on_new_tree t.tree
 
   let base_jobs_on_latest_tree t =
     Parallel_scan.base_jobs_on_latest_tree t.tree
