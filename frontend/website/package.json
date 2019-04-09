@@ -13,7 +13,7 @@
     "test": "echo \"Error: no test specified\" && exit 1",
     "deploy-ci": "FIREBASE_TOKEN=\"$FIREBASE_TOKEN\" ./deploy-website.sh ci",
     "decrypt": "cd static/font && unzip PragmataPro.zip",
-    "decrypt-ci": "[ -z \"$PRAGMATA_ZIP_PASSWORD\" ] || (cd static/font && unzip -P \"$PRAGMATA_ZIP_PASSWORD\" PragmataPro.zip)"
+    "decrypt-ci": "([ -z \"$PRAGMATA_ZIP_PASSWORD\" ] && cp static/font/IBMPlexMono-Medium-Latin1.woff static/font/Essential-PragmataPro-Regular.woff && cp static/font/IBMPlexMono-Medium-Latin1.woff2 static/font/Essential-PragmataPro-Regular.woff2 && cp static/font/IBMPlexMono-Medium-Latin1.woff static/font/PragmataPro-Bold.woff && cp static/font/IBMPlexMono-Medium-Latin1.woff2 static/font/PragmataPro-Bold.woff2  ) || (cd static/font && unzip -P \"$PRAGMATA_ZIP_PASSWORD\" PragmataPro.zip)"
   },
   "dependencies": {
     "bs-css": "8.0.2",

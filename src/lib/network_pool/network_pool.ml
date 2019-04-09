@@ -110,16 +110,22 @@ let%test_module "network pool test" =
     end
 
     module Mock_proof = struct
-      type input = Int.t
+      module Stable = struct
+        module V1 = struct
+          module T = struct
+            type t = Int.t
+            [@@deriving sexp, bin_io, yojson, version {asserted}]
+          end
 
-      (* fake versioning *)
-      let __versioned__ = true
+          include T
 
-      type t = Int.t [@@deriving sexp, bin_io, yojson]
+          type input = Int.t
 
-      let verify _ _ = return true
+          let verify _ _ = return true
 
-      let gen = Int.gen
+          let gen = Int.gen
+        end
+      end
     end
 
     module Mock_work = struct
@@ -155,17 +161,26 @@ let%test_module "network pool test" =
     end
 
     module Mock_fee = struct
-      include Int
+      module Stable = struct
+        module V1 = struct
+          module T = struct
+            type t = Int.t
+            [@@deriving bin_io, yojson, sexp, version {asserted}]
+          end
 
-      (* fake versioning *)
-      let __versioned__ = true
+          include T
+          include Comparable.Make (Int)
+        end
+      end
     end
 
     module Mock_snark_pool =
-      Snark_pool.Make (Mock_proof) (Mock_fee) (Mock_work)
+      Snark_pool.Make (Mock_proof.Stable.V1) (Mock_fee.Stable.V1) (Mock_work)
         (Mock_transition_frontier)
     module Mock_snark_pool_diff =
-      Snark_pool_diff.Make (Mock_proof) (Mock_fee) (Mock_work) (Int)
+      Snark_pool_diff.Make (Mock_proof.Stable.V1) (Mock_fee.Stable.V1)
+        (Mock_work)
+        (Int)
         (Mock_snark_pool)
     module Mock_network_pool =
       Make (Mock_transition_frontier) (Mock_snark_pool) (Mock_snark_pool_diff)

@@ -5,15 +5,12 @@ module Stable = struct
   module V1 = struct
     module T = struct
       type 'a t = {data: 'a Array.t; mutable position: int}
-      [@@deriving sexp, bin_io]
+      [@@deriving sexp, bin_io, version {asserted}]
     end
 
     include T
 
-    (* TODO : int doesn't need versioning; wrap Array *)
-    let version = 1
-
-    let __versioned__ = true
+    (* TODO : wrap Array *)
   end
 
   module Latest = V1

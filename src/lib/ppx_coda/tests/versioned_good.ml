@@ -193,3 +193,16 @@ module M10 = struct
     end
   end
 end
+
+(* assert versionedness *)
+module M11 = struct
+  module Stable = struct
+    module V1 = struct
+      module T = struct
+        type t = Int.t List.t [@@deriving bin_io, version {asserted}]
+      end
+
+      include T
+    end
+  end
+end

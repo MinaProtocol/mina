@@ -6,8 +6,6 @@ open Module_version
 module Stable = struct
   module V1 = struct
     module T = struct
-      let version = 1
-
       (* we using Blocking_sexp to be able to derive hash, sexp
          the base Inet_addr and Stable.V1 modules don't give that to you
        *)
@@ -16,13 +14,11 @@ module Stable = struct
         ; discovery_port: int (* UDP *)
         ; communication_port: int
         (* TCP *) }
-      [@@deriving bin_io, compare, hash, sexp]
+      [@@deriving bin_io, compare, hash, sexp, version {asserted}]
 
       (* TODO : the port int's don't need versioning; the host type should be wrapped
          for now, we assert the type is versioned
        *)
-      let __versioned__ = true
-
       let to_yojson {host; discovery_port; communication_port} =
         `Assoc
           [ ("host", `String (Unix.Inet_addr.to_string host))
