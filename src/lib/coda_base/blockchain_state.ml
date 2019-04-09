@@ -93,17 +93,13 @@ end) : S = struct
     module Stable = struct
       module V1 = struct
         module T = struct
-          (* TODO : use version ppx *)
-          let version = 1
-
-          let __versioned__ = true
-
           type t =
             ( Staged_ledger_hash.Stable.V1.t
             , Frozen_ledger_hash.Stable.V1.t
             , Block_time.Stable.V1.t )
             t_
-          [@@deriving bin_io, sexp, eq, compare, hash, yojson]
+          [@@deriving
+            bin_io, sexp, eq, compare, hash, yojson, version {asserted}]
         end
 
         include T

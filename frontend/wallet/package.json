@@ -8,7 +8,7 @@
     "bs-electron": "github:Schmavery/bs-electron",
     "graphql_ppx": "^0.2.8",
     "reason-apollo": "^0.15.2",
-    "reason-react": "^0.5.3"
+    "reason-react": "github:reasonml/reason-react#6a854ec"
   },
   "devDependencies": {
     "bs-platform": "^4.0.18",
@@ -22,7 +22,8 @@
     "pack": "fpack --development ./lib/js/src/Index.js",
     "query": "send-introspection-query http://localhost:8080/graphql",
     "reformat": "bsrefmt --in-place src/*.re",
-    "dev": "concurrently 'bsb -make-world -w' 'fpack watch --development ./lib/js/src/Index.js' 'electron ./lib/js/src/App.js'"
+    "dev": "concurrently 'bsb -make-world -w' 'fpack watch --development ./lib/js/src/Index.js' 'electron ./lib/js/src/App.js'",
+    "postinstall": "./postinstall.sh"
   },
   "author": "",
   "license": "ISC"

@@ -49,11 +49,6 @@ type ('pk, 'amount, 'nonce, 'receipt_chain_hash, 'bool) t_ =
 module Stable = struct
   module V1 = struct
     module T = struct
-      (* TODO : use version ppx *)
-      let version = 1
-
-      let __versioned__ = true
-
       type key = Public_key.Compressed.Stable.V1.t
       [@@deriving sexp, bin_io, eq, hash, compare, yojson]
 
@@ -64,7 +59,7 @@ module Stable = struct
         , Receipt.Chain_hash.Stable.V1.t
         , bool )
         t_
-      [@@deriving sexp, bin_io, eq, hash, compare, yojson]
+      [@@deriving sexp, bin_io, eq, hash, compare, yojson, version {asserted}]
     end
 
     include T

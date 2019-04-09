@@ -1041,11 +1041,6 @@ module Consensus_state = struct
     module Stable = struct
       module V1 = struct
         module T = struct
-          let version = 1
-
-          let __versioned__ = true
-
-          (* TODO : version components *)
           type t =
             ( Length.Stable.V1.t
             , Vrf.Output.t
@@ -1056,7 +1051,8 @@ module Consensus_state = struct
             , bool
             , Checkpoints.t )
             t_
-          [@@deriving sexp, bin_io, eq, compare, hash, to_yojson]
+          [@@deriving
+            sexp, bin_io, eq, compare, hash, to_yojson, version {asserted}]
         end
 
         include T

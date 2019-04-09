@@ -70,16 +70,11 @@ end) :
   module Stable = struct
     module V1 = struct
       module T = struct
-        (* TODO : use version ppx *)
-        let version = 1
-
-        let __versioned__ = true
-
         type t =
           { snark_transition: Snark_transition.value
           ; prover_state: Prover_state.t
           ; staged_ledger_diff: Staged_ledger_diff.Stable.V1.t }
-        [@@deriving sexp, fields, bin_io]
+        [@@deriving sexp, fields, bin_io, version {asserted}]
       end
 
       include T

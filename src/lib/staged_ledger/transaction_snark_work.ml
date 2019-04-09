@@ -30,13 +30,8 @@ end) :
     module Stable = struct
       module V1 = struct
         module T = struct
-          (* TODO : use version ppx *)
-          let version = 1
-
-          let __versioned__ = true
-
           type t = Ledger_proof_statement.Stable.V1.t list
-          [@@deriving bin_io, sexp, hash, compare, yojson]
+          [@@deriving bin_io, sexp, hash, compare, yojson, version {asserted}]
         end
 
         include T
@@ -70,16 +65,11 @@ end) :
     module Stable = struct
       module V1 = struct
         module T = struct
-          (* TODO : use version ppx *)
-          let version = 1
-
-          let __versioned__ = true
-
           type t =
             { fee: Fee.Unsigned.t
             ; proofs: Ledger_proof.t list
             ; prover: Public_key.Compressed.Stable.V1.t }
-          [@@deriving sexp, bin_io]
+          [@@deriving sexp, bin_io, version {asserted}]
         end
 
         include T
