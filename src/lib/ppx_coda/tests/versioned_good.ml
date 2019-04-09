@@ -121,6 +121,15 @@ module M6 = struct
 
       include T
     end
+
+    module V5 = struct
+      module T = struct
+        type t = Stable.V1.t array array sexp_opaque
+        [@@deriving sexp, bin_io, version]
+      end
+
+      include T
+    end
   end
 end
 
