@@ -388,6 +388,32 @@ module type Main_intf = sig
   val receipt_chain_database : t -> Receipt_chain_database.t
 end
 
+module Pending_coinbase = struct
+  module V1 = struct
+    include Coda_base.Pending_coinbase.Stable.V1
+
+    let ( hash_extra
+        , oldest_stack
+        , latest_stack
+        , create
+        , remove_coinbase_stack
+        , update_coinbase_stack
+        , merkle_root ) =
+      Coda_base.Pending_coinbase.
+        ( hash_extra
+        , oldest_stack
+        , latest_stack
+        , create
+        , remove_coinbase_stack
+        , update_coinbase_stack
+        , merkle_root )
+
+    module Stack = Coda_base.Pending_coinbase.Stack
+    module Coinbase_data = Coda_base.Pending_coinbase.Coinbase_data
+    module Hash = Coda_base.Pending_coinbase.Hash
+  end
+end
+
 module Fee_transfer = Coda_base.Fee_transfer
 module Ledger_proof_statement = Transaction_snark.Statement
 module Pending_coinbase_stack_state =
@@ -406,8 +432,8 @@ module Staged_ledger_diff = Staged_ledger.Make_diff (struct
   module User_command = User_command
   module Transaction_snark_work = Transaction_snark_work
   module Fee_transfer = Fee_transfer
-  module Pending_coinbase_hash = Pending_coinbase.Hash
-  module Pending_coinbase = Pending_coinbase
+  module Pending_coinbase_hash = Pending_coinbase.V1.Hash
+  module Pending_coinbase = Pending_coinbase.V1
 end)
 
 let make_init ~should_propose (module Config : Config_intf) :
@@ -493,23 +519,10 @@ struct
   module Account = Account
 
   module Transaction = struct
-    module T = struct
-      type t = Coda_base.Transaction.t =
-        | User_command of User_command.With_valid_signature.t
-        | Fee_transfer of Fee_transfer.t
-        | Coinbase of Coinbase.t
-      [@@deriving compare, eq]
-    end
+    include Coda_base.Transaction.Stable.V1
 
-    let fee_excess = Transaction.fee_excess
-
-    let supply_increase = Transaction.supply_increase
-
-    include T
-
-    include (
-      Coda_base.Transaction :
-        module type of Coda_base.Transaction with type t := t )
+    let fee_excess, supply_increase =
+      Coda_base.Transaction.(fee_excess, supply_increase)
   end
 
   module Ledger = Ledger
@@ -538,8 +551,8 @@ struct
     end
   end
 
-  module Pending_coinbase_hash = Pending_coinbase.Hash
-  module Pending_coinbase = Pending_coinbase
+  module Pending_coinbase_hash = Pending_coinbase.V1.Hash
+  module Pending_coinbase = Pending_coinbase.V1
   module Pending_coinbase_stack_state = Pending_coinbase_stack_state
   module Transaction_witness = Coda_base.Transaction_witness
 
@@ -567,8 +580,8 @@ struct
       module Staged_ledger_aux_hash = Staged_ledger_aux_hash
       module Transaction_validator = Transaction_validator
       module Config = Init
-      module Pending_coinbase = Pending_coinbase
       module Pending_coinbase_hash = Pending_coinbase_hash
+      module Pending_coinbase = Pending_coinbase
       module Pending_coinbase_stack_state = Pending_coinbase_stack_state
       module Transaction_witness = Transaction_witness
 

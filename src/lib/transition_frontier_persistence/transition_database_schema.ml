@@ -9,31 +9,30 @@ module Make (Inputs : Transition_frontier.Inputs_intf) :
    and type pending_coinbases := Pending_coinbase.t = struct
   open Inputs
 
-  module Transition = struct
-    module Data = struct
+  module Data = struct
+    module Transition = struct
+      (* TODO: version *)
       type t =
         External_transition.Stable.Latest.t * State_hash.Stable.Latest.t list
       [@@deriving bin_io]
     end
-  end
 
-  module Root_data = struct
-    module Data = struct
+    module Root_data = struct
       type t =
         State_hash.Stable.Latest.t
         * Staged_ledger.Scan_state.Stable.Latest.t
-        * Pending_coinbase.t
+        * Pending_coinbase.Stable.Latest.t
       [@@deriving bin_io]
     end
   end
 
   type _ t =
-    | Transition : State_hash.Stable.Latest.t -> Transition.Data.t t
-    | Root : Root_data.Data.t t
+    | Transition : State_hash.Stable.Latest.t -> Data.Transition.t t
+    | Root : Data.Root_data.t t
 
   let binable_data_type (type a) : a t -> a Bin_prot.Type_class.t = function
-    | Transition _ -> [%bin_type_class: Transition.Data.t]
-    | Root -> [%bin_type_class: Root_data.Data.t]
+    | Transition _ -> [%bin_type_class: Data.Transition.t]
+    | Root -> [%bin_type_class: Data.Root_data.t]
 
   (* HACK: a simple way to derive Bin_prot.Type_class.t for each case of a GADT *)
   let gadt_input_type_class (type data a) :

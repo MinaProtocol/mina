@@ -1,4 +1,6 @@
 open Core_kernel
 
-type t = {pending_coinbases: Pending_coinbase.t; is_new_stack: bool}
+(* TODO: version *)
+type t =
+  {pending_coinbases: Pending_coinbase.Stable.Latest.t; is_new_stack: bool}
 [@@deriving bin_io, sexp]

@@ -91,7 +91,7 @@ end = struct
           [%bin_type_class:
             State_hash.Stable.Latest.t
             * Staged_ledger.Scan_state.Stable.Latest.t
-            * Pending_coinbase.t]
+            * Pending_coinbase.Stable.Latest.t]
         in
         let serialized_new_root_data =
           Bin_prot.Utils.bin_dump bin.writer new_root_data

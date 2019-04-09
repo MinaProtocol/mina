@@ -23,7 +23,7 @@ module Make (Inputs : Intf.Inputs_intf) = struct
         type query = unit
 
         type response =
-          ( Statement.Stable.V1.t
+          ( Statement.t
           , Transaction.t
           , Transaction_witness.t
           , Proof.t )
@@ -45,7 +45,7 @@ module Make (Inputs : Intf.Inputs_intf) = struct
         type query = unit [@@deriving bin_io, version {rpc}]
 
         type response =
-          ( Statement.Stable.V1.t
+          ( Statement.t
           , Transaction.t
           , Transaction_witness.t
           , Proof.t )
@@ -82,7 +82,7 @@ module Make (Inputs : Intf.Inputs_intf) = struct
       module T = struct
         (* "master" types, do not change *)
         type query =
-          ( ( Statement.Stable.V1.t
+          ( ( Statement.t
             , Transaction.t
             , Transaction_witness.t
             , Proof.t )
@@ -104,7 +104,7 @@ module Make (Inputs : Intf.Inputs_intf) = struct
     module V1 = struct
       module T = struct
         type query =
-          ( ( Statement.Stable.V1.t
+          ( ( Statement.t
             , Transaction.t
             , Transaction_witness.t
             , Proof.t )
