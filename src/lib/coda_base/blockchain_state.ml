@@ -171,10 +171,12 @@ end) : S = struct
   let set_timestamp t timestamp = {t with timestamp}
 
   let genesis =
-    { staged_ledger_hash= Staged_ledger_hash.genesis
-    ; snarked_ledger_hash=
-        Frozen_ledger_hash.of_ledger_hash
-        @@ Ledger.merkle_root Genesis_ledger.t
+    let ledger_hash = Ledger.merkle_root Genesis_ledger.t in
+    { staged_ledger_hash=
+        Staged_ledger_hash.of_aux_ledger_and_coinbase_hash
+          Staged_ledger_hash.Aux_hash.dummy ledger_hash
+          (Pending_coinbase.create () |> Or_error.ok_exn)
+    ; snarked_ledger_hash= Frozen_ledger_hash.of_ledger_hash ledger_hash
     ; timestamp= Genesis_state_timestamp.value |> Block_time.of_time }
 
   type display = (string, string, string) t_ [@@deriving yojson]

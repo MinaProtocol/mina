@@ -237,4 +237,51 @@ let%test_module "Root_history and Transition_frontier" =
           in
           List.equal ~equal:Transition_frontier.Breadcrumb.equal
             expected_breadcrumb_trail result )
+
+    (* let%test_unit "Genesis blockchain merkle root should equal to the genesis ledger merkle root" =
+      let root_ledger_hash = Ledger.merkle_root Genesis_ledger.t in
+      let empty_scan_state = Staged_ledger.Scan_state.empty () in
+      let pending_coinbases =
+        Pending_coinbase.create () |> Or_error.ok_exn
+      in
+      let genesis_blockchain_state =
+      Consensus.Blockchain_state.create_value
+        ~staged_ledger_hash:
+          Staged_ledger_hash.(
+            of_aux_ledger_and_coinbase_hash
+              (Staged_ledger.Scan_state.hash empty_scan_state)
+              root_ledger_hash
+              pending_coinbases
+              )
+
+        ~snarked_ledger_hash:
+          (Frozen_ledger_hash.of_ledger_hash root_ledger_hash)
+        ~timestamp:Consensus.Blockchain_state.(timestamp genesis)
+    in
+    let genesis_protocol_state =
+      With_hash.data
+        (Consensus.create_genesis_protocol_state
+           ~blockchain_state:genesis_blockchain_state) in
+    let empty_diff =
+      { Staged_ledger_diff.diff=
+          ( { completed_works= []
+            ; user_commands= []
+            ; coinbase= Staged_ledger_diff.At_most_two.Zero }
+          , None )
+      ; prev_hash=
+          Staged_ledger_hash.of_aux_ledger_and_coinbase_hash
+            (Staged_ledger_aux_hash.of_bytes "")
+            (Ledger.merkle_root Genesis_ledger.t)
+            pending_coinbases
+      ; creator= Account.public_key (snd (List.hd_exn Genesis_ledger.accounts))
+      }
+    in
+    let (`I_swear_this_is_safe_see_my_comment root_transition) =
+      External_transition.to_verified
+        (External_transition.create
+            ~protocol_state:genesis_protocol_state
+            ~protocol_state_proof:Genesis_ledger.proof
+            ~staged_ledger_diff:empty_diff)
+    in
+    () *)
   end )

@@ -726,6 +726,7 @@ struct
   module Keypair = Keypair
 
   module Genesis = struct
+    (* TODO: this seems wrong *)
     let state = Consensus.genesis_protocol_state
 
     let ledger = Genesis_ledger.t

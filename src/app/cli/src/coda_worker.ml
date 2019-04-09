@@ -287,6 +287,7 @@ module T = struct
             Coda_tracing.start d )
           ~default:Deferred.unit
       in
+      printf !"Location of conf_dir: %s" conf_dir ;
       let%bind () = File_system.create_dir conf_dir in
       let module Config = struct
         let logger = logger
@@ -320,6 +321,9 @@ module T = struct
           let module Run = Run (Config) (Main) in
           let receipt_chain_dir_name = conf_dir ^/ "receipt_chain" in
           let%bind trust_dir = Unix.mkdtemp (conf_dir ^/ "trust") in
+          let%bind transition_frontier_location =
+            Unix.mkdtemp (conf_dir ^/ "transition_frontier")
+          in
           let%bind () = File_system.create_dir receipt_chain_dir_name in
           let receipt_chain_database =
             Coda_base.Receipt_chain_database.create
@@ -351,7 +355,8 @@ module T = struct
           in
           let%bind coda =
             Main.create
-              (Main.Config.make ~logger ~trust_system ~net_config
+              (Main.Config.make ~logger ~trust_system
+                 ~transition_frontier_location ~net_config
                  ~run_snark_worker:(Option.is_some snark_worker_config)
                  ~transaction_pool_disk_location:
                    (conf_dir ^/ "transaction_pool")

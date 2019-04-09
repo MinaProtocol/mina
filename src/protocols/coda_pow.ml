@@ -1555,6 +1555,10 @@ module type Consensus_mechanism_intf = sig
     -> logger:Logger.t
     -> [`Keep | `Take]
 
+  val create_genesis_protocol_state :
+       blockchain_state:Blockchain_state.Value.t
+    -> (Protocol_state.Value.t, protocol_state_hash) With_hash.t
+
   val genesis_protocol_state :
     (Protocol_state.Value.t, protocol_state_hash) With_hash.t
 end
