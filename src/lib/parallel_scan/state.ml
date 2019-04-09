@@ -100,7 +100,7 @@ module Stable = struct
     module T = struct
       type ('a, 'd) t =
         { jobs: ('a, 'd) Job.Stable.V1.t Ring_buffer.Stable.V1.t
-        ; level_pointer: int Array.t
+        ; level_pointer: int array
         ; capacity: int
         ; mutable acc: int * ('a * 'd list) option sexp_opaque
         ; mutable current_data_length: int
@@ -111,7 +111,7 @@ module Stable = struct
         ; mutable curr_job_seq_no: int }
       [@@deriving sexp, bin_io, version {asserted}]
 
-      (* TODO : wrap Array and Queue *)
+      (* TODO : wrap Queue *)
     end
 
     include T
@@ -123,7 +123,7 @@ end
 (* bin_io omitted from deriving list intentionally *)
 type ('a, 'd) t = ('a, 'd) Stable.Latest.t =
   { jobs: ('a, 'd) Job.t Ring_buffer.t
-  ; level_pointer: int Array.t
+  ; level_pointer: int array
   ; capacity: int
   ; mutable acc: int * ('a * 'd list) option
   ; mutable current_data_length: int
