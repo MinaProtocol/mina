@@ -21,9 +21,9 @@ module Account = struct
 
   let create = Coda_base.Account.create
 
-  let balance = Coda_base.Account.balance
+  let balance Coda_base.Account.Poly.({balance; _}) = balance
 
-  let update_balance t bal = {t with Coda_base.Account.balance= bal}
+  let update_balance t bal = {t with Coda_base.Account.Poly.balance= bal}
 end
 
 (* below are alternative modules that use strings as public keys and UInt64 as balances for

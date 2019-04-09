@@ -409,7 +409,7 @@ module Base = struct
              let%map balance =
                Balance.Checked.add_signed_amount account.balance sender_delta
              in
-             { Account.balance
+             { Account.Poly.balance
              ; public_key= sender_compressed
              ; nonce= next_nonce
              ; receipt_chain_hash
