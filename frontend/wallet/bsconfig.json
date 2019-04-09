@@ -1,6 +1,7 @@
 {
   "name": "electron-test",
-  "reason" : {"react-jsx" : 2},
+  // replace ppx-flags entry with this when we update bs-platform
+  // "reason" : {"react-jsx" : 3},
   "sources": {
       "dir": "src",
       "subdirs": true
@@ -12,7 +13,8 @@
     "bs-css"
   ],
   "ppx-flags": [
-    "graphql_ppx/ppx"
+    "graphql_ppx/ppx",
+    "react_ppx_3/reactjs_jsx_ppx_3"
   ],
   "warnings": {
     "error": "+101"

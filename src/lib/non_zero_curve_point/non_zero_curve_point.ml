@@ -26,7 +26,7 @@ module Stable = struct
   module V1 = struct
     module T = struct
       type t = Tick.Field.t * Tick.Field.t
-      [@@deriving bin_io, sexp, eq, compare, hash, version]
+      [@@deriving bin_io, sexp, eq, compare, hash, version {asserted}]
     end
 
     include T
@@ -107,7 +107,7 @@ module Compressed = struct
     module V1 = struct
       module T = struct
         type t = (Field.t, bool) Poly.Stable.V1.t
-        [@@deriving bin_io, sexp, eq, compare, hash, version]
+        [@@deriving bin_io, sexp, eq, compare, hash, version {asserted}]
       end
 
       include T
@@ -128,7 +128,8 @@ module Compressed = struct
   end
 
   (* bin_io omitted *)
-  type t = Stable.Latest.t [@@deriving sexp, compare, hash]
+  type t = (Field.t, bool) Poly.Stable.Latest.t
+  [@@deriving sexp, compare, hash]
 
   include Comparable.Make_binable (Stable.Latest)
   include Hashable.Make_binable (Stable.Latest)

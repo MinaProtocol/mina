@@ -87,13 +87,8 @@ struct
   module Stable = struct
     module V1 = struct
       module T = struct
-        (* TODO : use version ppx *)
-        let version = 1
-
-        let __versioned__ = true
-
         type t = (Work.Stable.V1.t, Priced_proof.Stable.V1.t) diff
-        [@@deriving bin_io, sexp, yojson]
+        [@@deriving bin_io, sexp, yojson, version {asserted}]
       end
 
       include T

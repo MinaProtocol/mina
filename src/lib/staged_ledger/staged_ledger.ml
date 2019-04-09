@@ -1637,12 +1637,11 @@ let%test_module "test" =
       module Sok_message = struct
         module Stable = struct
           module V1 = struct
-            type t = unit [@@deriving bin_io, sexp, yojson]
+            module T = struct
+              type t = unit [@@deriving bin_io, sexp, yojson, version]
+            end
 
-            (* test code, don't need actual versioning *)
-            let version = 1
-
-            let __versioned__ = true
+            include T
           end
 
           module Latest = V1
@@ -1947,19 +1946,19 @@ let%test_module "test" =
       module Ledger_proof_statement = struct
         module Stable = struct
           module V1 = struct
-            type t =
-              { source: Ledger_hash.Stable.V1.t
-              ; target: Ledger_hash.Stable.V1.t
-              ; supply_increase: Currency.Amount.Stable.V1.t
-              ; pending_coinbase_stack_state: Pending_coinbase_stack_state.t
-              ; fee_excess: Fee.Signed.t
-              ; proof_type: [`Base | `Merge] }
-            [@@deriving sexp, bin_io, compare, hash, yojson, eq]
+            module T = struct
+              type t =
+                { source: Ledger_hash.Stable.V1.t
+                ; target: Ledger_hash.Stable.V1.t
+                ; supply_increase: Currency.Amount.Stable.V1.t
+                ; pending_coinbase_stack_state: Pending_coinbase_stack_state.t
+                ; fee_excess: Fee.Signed.t
+                ; proof_type: [`Base | `Merge] }
+              [@@deriving
+                sexp, bin_io, compare, hash, yojson, eq, version {asserted}]
+            end
 
-            (* test code, don't need to assure this type is actually versioned *)
-            let version = 1
-
-            let __versioned__ = true
+            include T
 
             let merge s1 s2 =
               let open Or_error.Let_syntax in
@@ -2060,12 +2059,12 @@ let%test_module "test" =
 
           module Stable = struct
             module V1 = struct
-              type t = transaction [@@deriving sexp, bin_io]
+              module T = struct
+                type t = transaction
+                [@@deriving sexp, bin_io, version {asserted}]
+              end
 
-              (* test code, don't need to assure this type is actually versioned *)
-              let version = 1
-
-              let __versioned__ = true
+              include T
             end
 
             module Latest = V1
@@ -2337,14 +2336,13 @@ let%test_module "test" =
 
         module Stable = struct
           module V1 = struct
-            type t =
-              {diff: diff; prev_hash: staged_ledger_hash; creator: public_key}
-            [@@deriving sexp, bin_io]
+            module T = struct
+              type t =
+                {diff: diff; prev_hash: staged_ledger_hash; creator: public_key}
+              [@@deriving sexp, bin_io, version {asserted}]
+            end
 
-            (* fake versioning *)
-            let version = 1
-
-            let __versioned__ = true
+            include T
           end
 
           module Latest = V1
@@ -2418,12 +2416,12 @@ let%test_module "test" =
       module Transaction_witness = struct
         module Stable = struct
           module V1 = struct
-            type t = {ledger: Sparse_ledger.t} [@@deriving bin_io, sexp]
+            module T = struct
+              type t = {ledger: Sparse_ledger.t}
+              [@@deriving bin_io, sexp, version {asserted}]
+            end
 
-            (* test code, don't need to assure this type is actually versioned *)
-            let version = 1
-
-            let __versioned__ = true
+            include T
           end
 
           module Latest = V1

@@ -1527,14 +1527,14 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
             return (Coda_base.Ledger.Debug.visualize ~filename) ) ]
     in
     let snark_worker_impls =
-      [ implement Snark_worker.Rpcs.Get_work.rpc (fun () () ->
+      [ implement Snark_worker.Rpcs.Get_work.Latest.rpc (fun () () ->
             let r = request_work coda in
             Option.iter r ~f:(fun r ->
                 Logger.trace logger ~module_:__MODULE__ ~location:__LOC__
                   !"Get_work: %{sexp:Snark_worker.Work.Spec.t}"
                   r ) ;
             return r )
-      ; implement Snark_worker.Rpcs.Submit_work.rpc
+      ; implement Snark_worker.Rpcs.Submit_work.Latest.rpc
           (fun () (work : Snark_worker.Work.Result.t) ->
             Logger.trace logger ~module_:__MODULE__ ~location:__LOC__
               !"Submit_work: %{sexp:Snark_worker.Work.Spec.t}"
