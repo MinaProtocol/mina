@@ -164,7 +164,7 @@ let generate_version_number_decl inner3_modules loc generation_kind =
 
 let ocaml_builtin_types = ["int"; "float"; "char"; "string"; "bool"; "unit"]
 
-let ocaml_builtin_type_constructors = ["list"; "option"; "ref"]
+let ocaml_builtin_type_constructors = ["list"; "array"; "option"; "ref"]
 
 let jane_street_type_constructors = ["sexp_opaque"]
 
