@@ -256,7 +256,7 @@ let run_test () : unit Deferred.t =
             (List.map accounts
                ~f:(fun ((keypair : Signature_lib.Keypair.t), account) ->
                  ( Public_key.compress keypair.public_key
-                 , Account.balance account ) ))
+                 , account.Account.Poly.Stable.Latest.balance ) ))
         in
         let%bind updated_balance_sheet =
           send_payments accounts pks balance_sheet (fun i ->
