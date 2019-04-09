@@ -166,12 +166,12 @@ struct
         let%bind receiver_pk = List.random_element public_keys in
         let send_amount = Currency.Amount.of_int 1 in
         let sender_account_amount =
-          Account.balance sender_account |> Currency.Balance.to_amount
+          sender_account.Account.Poly.balance |> Currency.Balance.to_amount
         in
         let%map _ = Currency.Amount.sub sender_account_amount send_amount in
         let payload : User_command.Payload.t =
           User_command.Payload.create ~fee:Fee.Unsigned.zero
-            ~nonce:(Account.nonce sender_account)
+            ~nonce:sender_account.Account.Poly.nonce
             ~memo:User_command_memo.dummy
             ~body:(Payment {receiver= receiver_pk; amount= send_amount})
         in
@@ -404,7 +404,7 @@ struct
             ~root_staged_ledger
             ~consensus_local_state:
               (Consensus.Local_state.create
-                 (Some proposer_account.Account.public_key))
+                 (Some (Account.public_key proposer_account)))
         in
         frontier
     | Error err -> Error.raise err
