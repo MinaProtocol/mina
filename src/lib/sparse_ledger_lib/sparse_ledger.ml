@@ -245,6 +245,14 @@ let%test_module "sparse-ledger-test" =
             let version = 1
 
             type t = Md5.t [@@deriving bin_io, eq, sexp]
+
+            let compare a b = String.compare (Md5.to_hex a) (Md5.to_hex b)
+
+            let merge ~height x y =
+              let open Md5 in
+              digest_string
+                ( sprintf "sparse-ledger_%03d" height
+                ^ to_binary x ^ to_binary y )
           end
 
           include T
@@ -253,14 +261,9 @@ let%test_module "sparse-ledger-test" =
         module Latest = V1
       end
 
-      include Stable.V1
+      type t = Stable.Latest.t [@@deriving eq, sexp, compare]
 
-      let compare a b = String.compare (Md5.to_hex a) (Md5.to_hex b)
-
-      let merge ~height x y =
-        let open Md5 in
-        digest_string
-          (sprintf "sparse-ledger_%03d" height ^ to_binary x ^ to_binary y)
+      let merge = Stable.Latest.merge
 
       let gen = Quickcheck.Generator.map String.gen ~f:Md5.digest_string
     end
@@ -274,21 +277,24 @@ let%test_module "sparse-ledger-test" =
           end
 
           include T
+
+          let gen =
+            let open Quickcheck.Generator.Let_syntax in
+            let%map name = String.gen and favorite_number = Int.gen in
+            {name; favorite_number}
+
+          let key {name; _} = name
+
+          let data_hash t = Md5.digest_string (Binable.to_string (module T) t)
         end
 
         module Latest = V1
       end
 
-      include Stable.V1
+      type t = Stable.Latest.t = {name: string; favorite_number: int}
+      [@@deriving sexp, eq]
 
-      let gen =
-        let open Quickcheck.Generator.Let_syntax in
-        let%map name = String.gen and favorite_number = Int.gen in
-        {name; favorite_number}
-
-      let key {name; _} = name
-
-      let data_hash t = Md5.digest_string (Binable.to_string (module T) t)
+      let key, gen, data_hash = Stable.Latest.(key, gen, data_hash)
     end
 
     module Key = struct
@@ -304,10 +310,11 @@ let%test_module "sparse-ledger-test" =
         module Latest = V1
       end
 
-      include Stable.V1
+      type t = Stable.Latest.t [@@deriving eq, sexp]
     end
 
-    include Make (Hash) (Key) (Account)
+    include Make (Hash.Stable.Latest) (Key.Stable.Latest)
+              (Account.Stable.Latest)
 
     let gen =
       let open Quickcheck.Generator in

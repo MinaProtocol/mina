@@ -2,17 +2,52 @@ open Core
 open Import
 open Snark_params.Tick
 
-include Sparse_ledger_lib.Sparse_ledger.Make (struct
-            include Ledger_hash.Stable.V1
+module V1_make =
+  Sparse_ledger_lib.Sparse_ledger.Make (struct
+      include Ledger_hash.Stable.V1
 
-            let merge = Ledger_hash.merge
-          end)
-          (Public_key.Compressed.Stable.V1)
-          (struct
-            include Account.Stable.V1
+      let merge = Ledger_hash.merge
+    end)
+    (Public_key.Compressed.Stable.V1)
+    (struct
+      include Account.Stable.V1
 
-            let data_hash = Fn.compose Ledger_hash.of_digest Account.digest
-          end)
+      let data_hash = Fn.compose Ledger_hash.of_digest Account.digest
+    end)
+
+module Stable = struct
+  module V1 = struct
+    module T = struct
+      type t = V1_make.Stable.V1.t [@@deriving bin_io, sexp, version]
+    end
+
+    include T
+  end
+
+  module Latest = V1
+end
+
+type t = Stable.Latest.t [@@deriving sexp]
+
+module Latest_make = V1_make
+
+let ( of_hash
+    , get_exn
+    , path_exn
+    , set_exn
+    , find_index_exn
+    , add_path
+    , merkle_root
+    , iteri ) =
+  Latest_make.
+    ( of_hash
+    , get_exn
+    , path_exn
+    , set_exn
+    , find_index_exn
+    , add_path
+    , merkle_root
+    , iteri )
 
 let of_root (h : Ledger_hash.t) =
   of_hash ~depth:Ledger.depth (Ledger_hash.of_digest (h :> Pedersen.Digest.t))

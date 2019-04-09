@@ -23,11 +23,42 @@ module Hash = struct
   let merge = Stable.Latest.merge
 end
 
-include Sparse_ledger_lib.Sparse_ledger.Make
-          (Hash.Stable.V1)
-          (Lite_base.Public_key.Compressed.Stable.V1)
-          (struct
-            include Account.Stable.V1
+module V1_make =
+  Sparse_ledger_lib.Sparse_ledger.Make
+    (Hash.Stable.V1)
+    (Lite_base.Public_key.Compressed.Stable.V1)
+    (struct
+      include Account.Stable.V1
 
-            let data_hash = Account.digest
-          end)
+      let data_hash = Account.digest
+    end)
+
+module Stable = struct
+  module V1 = struct
+    module T = struct
+      type t = V1_make.Stable.V1.t [@@deriving bin_io, sexp, version]
+    end
+  end
+
+  module Latest = V1
+end
+
+module Latest_make = V1_make
+
+let ( of_hash
+    , get_exn
+    , path_exn
+    , set_exn
+    , find_index_exn
+    , add_path
+    , merkle_root
+    , iteri ) =
+  Latest_make.
+    ( of_hash
+    , get_exn
+    , path_exn
+    , set_exn
+    , find_index_exn
+    , add_path
+    , merkle_root
+    , iteri )

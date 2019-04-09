@@ -5,7 +5,7 @@ open Snark_params.Tick
 type t =
   ( Ledger_hash.t
   , Account.key
-  , Account.Stable.V1.t )
+  , Account.t )
   Sparse_ledger_lib.Sparse_ledger.Poly.Stable.V1.t
 [@@deriving sexp]
 

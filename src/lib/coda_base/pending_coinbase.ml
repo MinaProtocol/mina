@@ -366,9 +366,44 @@ module T = struct
   (* the arguments to Sparse_ledger.Make are all versioned; a particular choice of those
      versions yields a version of the result
    *)
-  module Merkle_tree =
+
+  module V1_make =
     Sparse_ledger_lib.Sparse_ledger.Make (Hash.Stable.V1) (Stack_id.Stable.V1)
       (Stack.Stable.V1)
+
+  module Merkle_tree = struct
+    module Stable = struct
+      module V1 = struct
+        module T = struct
+          type t = V1_make.Stable.V1.t [@@deriving bin_io, sexp, version]
+        end
+
+        include T
+      end
+
+      module Latest = V1
+    end
+
+    module Latest_make = V1_make
+
+    let ( of_hash
+        , get_exn
+        , path_exn
+        , set_exn
+        , find_index_exn
+        , add_path
+        , merkle_root
+        , iteri ) =
+      Latest_make.
+        ( of_hash
+        , get_exn
+        , path_exn
+        , set_exn
+        , find_index_exn
+        , add_path
+        , merkle_root
+        , iteri )
+  end
 
   module Checked = struct
     open Coinbase_stack

@@ -93,7 +93,7 @@ module type S = sig
       module Latest = V1
     end
 
-    type t = Stable.V1.t
+    type t = Stable.Latest.t
 
     val of_ledger_subset_exn : Ledger.t -> Compressed_public_key.t list -> t
 
@@ -103,6 +103,5 @@ module type S = sig
   end
 
   module Transaction_witness :
-    Transaction_witness_intf
-    with type sparse_ledger := Sparse_ledger.Stable.V1.t
+    Transaction_witness_intf with type sparse_ledger := Sparse_ledger.t
 end
