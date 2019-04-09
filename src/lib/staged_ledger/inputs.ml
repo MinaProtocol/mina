@@ -117,15 +117,7 @@ module type S = sig
      and type ledger_hash := Ledger_hash.t
 
   module Sparse_ledger : sig
-    module Stable : sig
-      module V1 : sig
-        type t [@@deriving sexp, bin_io]
-      end
-
-      module Latest = V1
-    end
-
-    type t = Stable.V1.t
+    type t
 
     val of_ledger_subset_exn : Ledger.t -> Compressed_public_key.t list -> t
 
@@ -135,6 +127,5 @@ module type S = sig
   end
 
   module Transaction_witness :
-    Transaction_witness_intf
-    with type sparse_ledger := Sparse_ledger.Stable.V1.t
+    Transaction_witness_intf with type sparse_ledger := Sparse_ledger.t
 end

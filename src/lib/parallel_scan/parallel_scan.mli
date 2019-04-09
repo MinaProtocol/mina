@@ -79,10 +79,21 @@ module State : sig
       end
     end
 
-    type ('a, 'd) t =
+    module Stable : sig
+      module V1 : sig
+        type ('a, 'd) t =
+          | Merge of 'a Merge.Stable.V1.t
+          | Base of ('d * Sequence_no.Stable.V1.t) option
+        [@@deriving bin_io, sexp, version]
+      end
+
+      module Latest = V1
+    end
+
+    type ('a, 'd) t = ('a, 'd) Stable.Latest.t =
       | Merge of 'a Merge.Stable.V1.t
       | Base of ('d * Sequence_no.Stable.V1.t) option
-    [@@deriving sexp, bin_io, version]
+    [@@deriving sexp]
   end
 
   module Completed_job : sig

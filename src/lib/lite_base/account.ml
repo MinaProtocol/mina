@@ -7,11 +7,6 @@ module Nonce = Nat.Make32 ()
 module Stable = struct
   module V1 = struct
     module T = struct
-      (* TODO: version *)
-      let version = 1
-
-      let __versioned__ = true
-
       type t =
         { public_key: Public_key.Compressed.Stable.V1.t
         ; balance: Balance.t
@@ -19,7 +14,7 @@ module Stable = struct
         ; receipt_chain_hash: Receipt.Chain_hash.t
         ; delegate: Public_key.Compressed.Stable.V1.t
         ; participated: bool }
-      [@@deriving bin_io, sexp, eq]
+      [@@deriving bin_io, sexp, eq, version {asserted}]
     end
 
     include T

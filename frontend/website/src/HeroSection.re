@@ -88,11 +88,17 @@ module Copy = {
             </span>
             <br />
             <br />
-            <a href=Links.Forms.mailingList className=largeLinkStyle>
+            <A
+              name={"hero-" ++ Links.Forms.mailingList.name}
+              target="_blank"
+              href={Links.Forms.mailingList.link}
+              className=largeLinkStyle>
               {ReasonReact.string({j|Join our mailing list\u00A0→|j})}
-            </a>
+            </A>
             <br />
-            <a
+            <A
+              name="hero-twitter"
+              target="_blank"
               href="https://twitter.com/codaprotocol"
               className=Css.(
                 merge([
@@ -119,7 +125,7 @@ module Copy = {
                  ~dims=(16, 16),
                  heroSvgVar,
                )}
-            </a>
+            </A>
           </p>
         </div>
       </div>;

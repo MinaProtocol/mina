@@ -85,15 +85,7 @@ module type S = sig
      and type account := Account.t
 
   module Sparse_ledger : sig
-    module Stable : sig
-      module V1 : sig
-        type t [@@deriving sexp, bin_io]
-      end
-
-      module Latest = V1
-    end
-
-    type t = Stable.Latest.t
+    type t
 
     val of_ledger_subset_exn : Ledger.t -> Compressed_public_key.t list -> t
 

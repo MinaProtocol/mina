@@ -54,7 +54,7 @@ module type S = sig
   module Stable :
     sig
       module V1 : sig
-        type t [@@deriving sexp, bin_io, to_yojson]
+        type t [@@deriving sexp, bin_io, to_yojson, version]
       end
 
       module Latest = V1
@@ -119,16 +119,11 @@ end)
   module Stable = struct
     module V1 = struct
       module T = struct
-        (* TODO : use version ppx *)
-        let version = 1
-
-        let __versioned__ = true
-
         type t =
           { protocol_state: Protocol_state.Value.Stable.V1.t
           ; protocol_state_proof: Proof.Stable.V1.t sexp_opaque
           ; staged_ledger_diff: Staged_ledger_diff.Stable.V1.t }
-        [@@deriving sexp, fields, bin_io]
+        [@@deriving sexp, fields, bin_io, version {asserted}]
 
         let to_yojson
             {protocol_state; protocol_state_proof= _; staged_ledger_diff= _} =

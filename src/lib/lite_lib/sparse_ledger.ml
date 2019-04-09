@@ -2,12 +2,8 @@ module Hash = struct
   module Stable = struct
     module V1 = struct
       module T = struct
-        let version = 1
-
-        let __versioned__ = true
-
         type t = Lite_base.Pedersen.Digest.t
-        [@@deriving sexp, bin_io, eq, compare]
+        [@@deriving sexp, bin_io, eq, compare, version {asserted}]
       end
 
       include T
@@ -38,6 +34,8 @@ module Stable = struct
     module T = struct
       type t = V1_make.Stable.V1.t [@@deriving bin_io, sexp, version]
     end
+
+    include T
   end
 
   module Latest = V1
