@@ -56,6 +56,21 @@ module Poly = struct
 
     module Latest = V1
   end
+
+  type ('pk, 'amount, 'nonce, 'receipt_chain_hash, 'bool) t =
+                                                             ( 'pk
+                                                             , 'amount
+                                                             , 'nonce
+                                                             , 'receipt_chain_hash
+                                                             , 'bool )
+                                                             Stable.Latest.t =
+    { public_key: 'pk
+    ; balance: 'amount
+    ; nonce: 'nonce
+    ; receipt_chain_hash: 'receipt_chain_hash
+    ; delegate: 'pk
+    ; participated: 'bool }
+  [@@deriving sexp, eq, compare, hash, yojson]
 end
 
 module Stable = struct
@@ -107,7 +122,7 @@ type var =
   , Nonce.Unpacked.var
   , Receipt.Chain_hash.var
   , Boolean.var )
-  Poly.Stable.Latest.t
+  Poly.t
 
 type value =
   ( Public_key.Compressed.t
@@ -115,7 +130,7 @@ type value =
   , Nonce.t
   , Receipt.Chain_hash.t
   , bool )
-  Poly.Stable.Latest.t
+  Poly.t
 [@@deriving sexp]
 
 let key_gen = Public_key.Compressed.gen
@@ -141,20 +156,19 @@ let typ : (var, value) Typ.t =
   let of_hlist
         : 'a 'b 'c 'd 'e.    ( unit
                              , 'a -> 'b -> 'c -> 'd -> 'a -> 'e -> unit )
-                             H_list.t
-          -> ('a, 'b, 'c, 'd, 'e) Poly.Stable.Latest.t =
+                             H_list.t -> ('a, 'b, 'c, 'd, 'e) Poly.t =
     let open H_list in
     fun [public_key; balance; nonce; receipt_chain_hash; delegate; participated]
         ->
       {public_key; balance; nonce; receipt_chain_hash; delegate; participated}
   in
   let to_hlist
-      Poly.Stable.Latest.({ public_key
-                          ; balance
-                          ; nonce
-                          ; receipt_chain_hash
-                          ; delegate
-                          ; participated }) =
+      Poly.({ public_key
+            ; balance
+            ; nonce
+            ; receipt_chain_hash
+            ; delegate
+            ; participated }) =
     H_list.
       [public_key; balance; nonce; receipt_chain_hash; delegate; participated]
   in
@@ -164,7 +178,7 @@ let typ : (var, value) Typ.t =
 let var_of_t
     ({public_key; balance; nonce; receipt_chain_hash; delegate; participated} :
       value) =
-  { Poly.Stable.Latest.public_key= Public_key.Compressed.var_of_t public_key
+  { Poly.public_key= Public_key.Compressed.var_of_t public_key
   ; balance= Balance.var_of_t balance
   ; nonce= Nonce.Unpacked.var_of_value nonce
   ; receipt_chain_hash= Receipt.Chain_hash.var_of_t receipt_chain_hash
@@ -172,12 +186,12 @@ let var_of_t
   ; participated= Boolean.var_of_value participated }
 
 let var_to_triples
-    Poly.Stable.Latest.({ public_key
-                        ; balance
-                        ; nonce
-                        ; receipt_chain_hash
-                        ; delegate
-                        ; participated }) =
+    Poly.({ public_key
+          ; balance
+          ; nonce
+          ; receipt_chain_hash
+          ; delegate
+          ; participated }) =
   let%map public_key = Public_key.Compressed.var_to_triples public_key
   and receipt_chain_hash = Receipt.Chain_hash.var_to_triples receipt_chain_hash
   and delegate = Public_key.Compressed.var_to_triples delegate in
@@ -201,7 +215,7 @@ let crypto_hash_prefix = Hash_prefix.account
 let crypto_hash t = Pedersen.hash_fold crypto_hash_prefix (fold t)
 
 let empty =
-  Poly.Stable.Latest.
+  Poly.
     { public_key= Public_key.Compressed.empty
     ; balance= Balance.zero
     ; nonce= Nonce.zero
@@ -212,7 +226,7 @@ let empty =
 let digest t = Pedersen.State.digest (crypto_hash t)
 
 let create public_key balance =
-  Poly.Stable.Latest.
+  Poly.
     { public_key
     ; balance
     ; nonce= Nonce.zero

@@ -1099,7 +1099,7 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
   let get_balance t (addr : Public_key.Compressed.t) =
     let open Participating_state.Option.Let_syntax in
     let%map account = get_account t addr in
-    account.Account.Poly.Stable.Latest.balance
+    account.Account.Poly.balance
 
   let get_accounts t =
     let open Participating_state.Let_syntax in
@@ -1119,8 +1119,7 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
     let%map accounts = get_accounts t in
     List.map accounts ~f:(fun account ->
         ( string_of_public_key account
-        , account.Account.Poly.Stable.Latest.balance |> Currency.Balance.to_int
-        ) )
+        , account.Account.Poly.balance |> Currency.Balance.to_int ) )
 
   let is_valid_payment t (txn : User_command.t) account_opt =
     let remainder =
@@ -1133,8 +1132,7 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
             Some (Currency.Amount.of_fee fee)
         | Payment {amount; _} -> Currency.Amount.add_fee amount fee
       in
-      Currency.Balance.sub_amount account.Account.Poly.Stable.Latest.balance
-        cost
+      Currency.Balance.sub_amount account.Account.Poly.balance cost
     in
     Option.is_some remainder
 
@@ -1142,7 +1140,7 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
   let txn_count = ref 0
 
   let record_payment ~logger t (txn : User_command.t) account =
-    let previous = account.Account.Poly.Stable.Latest.receipt_chain_hash in
+    let previous = account.Account.Poly.receipt_chain_hash in
     let receipt_chain_database = receipt_chain_database t in
     match Receipt_chain_database.add receipt_chain_database ~previous txn with
     | `Ok hash ->
@@ -1189,9 +1187,7 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
     let open Participating_state.Let_syntax in
     let%map account = get_account t addr in
     let account = Option.value_exn account in
-    let resulting_receipt =
-      account.Account.Poly.Stable.Latest.receipt_chain_hash
-    in
+    let resulting_receipt = account.Account.Poly.receipt_chain_hash in
     let open Or_error.Let_syntax in
     let%bind () = Payment_verifier.verify ~resulting_receipt proof in
     if
@@ -1258,7 +1254,7 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
     let open Option.Let_syntax in
     let%bind location = Ledger.location_of_key ledger addr in
     let%map account = Ledger.get ledger location in
-    account.Account.Poly.Stable.Latest.nonce
+    account.Account.Poly.nonce
 
   let start_time = Time_ns.now ()
 
@@ -1500,8 +1496,7 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
               |> Deferred.return
             in
             prove_receipt coda ~proving_receipt
-              ~resulting_receipt:
-                account.Account.Poly.Stable.Latest.receipt_chain_hash )
+              ~resulting_receipt:account.Account.Poly.receipt_chain_hash )
       ; implement Daemon_rpcs.Get_public_keys_with_balances.rpc (fun () () ->
             return
               (get_keys_with_balances coda |> Participating_state.active_exn)
