@@ -512,9 +512,9 @@ module type Transition_handler_validator_intf = sig
     -> ( ( (external_transition_verified, state_hash) With_hash.t
          , state_hash )
          Cached.t
-       , [ `Duplicate of transition_frontier_breadcrumb
+       , [ `In_frontier of transition_frontier_breadcrumb
          | `Invalid of string
-         | `Under_processing of state_hash Cache_lib.Intf.final_result ] )
+         | `Under_processing of state_hash Cache_lib.Intf.consumed_state ] )
        Result.t
 end
 

@@ -186,23 +186,22 @@ module Make (Inputs : Inputs.S) :
     let open Deferred.Let_syntax in
     match%bind cached_verified_transition with
     | Ok x -> Deferred.return @@ Ok (Either.Second x)
-    | Error (`Duplicate breadcrumb) ->
+    | Error (`In_frontier breadcrumb) ->
         Logger.trace logger ~module_:__MODULE__ ~location:__LOC__
           "transition queried during ledger catchup has already been seen" ;
         Deferred.return @@ Ok (Either.First breadcrumb)
-    | Error (`Under_processing final_result) -> (
+    | Error (`Under_processing consumed_state) -> (
         Logger.trace logger ~module_:__MODULE__ ~location:__LOC__
           "transition queried during ledger catchup is still under procession" ;
-        match%map Ivar.read final_result with
+        match%map Ivar.read consumed_state with
         | `Failed ->
+            (* TODO cancel the waiting job in both ledger_catch and \
+               catchup_scheduler *)
             failwith
               "todo cancel the waiting job in both ledger_catch and \
                catchup_scheduler"
-        | `Applied hash ->
-            Ok
-              (Either.First
-                 (Transition_frontier.find frontier hash |> Option.value_exn))
-        )
+        | `Success hash ->
+            Ok (Either.First (Transition_frontier.find_exn frontier hash)) )
     | Error (`Invalid reason) ->
         Logger.faulty_peer logger ~module_:__MODULE__ ~location:__LOC__
           "transition queried during ledger catchup was not valid because %s"

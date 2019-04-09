@@ -16,7 +16,7 @@ module Make (Inputs : Inputs_intf) : Intf.Main.S = struct
   end = struct
     type 'a t =
       { name: string
-      ; set: ('a, 'a Intf.final_result) Hashtbl.t
+      ; set: ('a, 'a Intf.consumed_state) Hashtbl.t
       ; logger: Logger.t }
 
     let name {name; _} = name
@@ -29,12 +29,12 @@ module Make (Inputs : Inputs_intf) : Intf.Main.S = struct
       let logger = Logger.extend logger [("cache", `String name)] in
       {name; set; logger}
 
-    let final_result t x = Hashtbl.find t.set x
+    let consumed_state t x = Hashtbl.find t.set x
 
     let register t x =
-      let final_result = Ivar.create () in
-      Hashtbl.add_exn t.set ~key:x ~data:final_result ;
-      Cached.create t x final_result
+      let consumed_state = Ivar.create () in
+      Hashtbl.add_exn t.set ~key:x ~data:consumed_state ;
+      Cached.create t x consumed_state
 
     let mem t x = Hashtbl.mem t.set x
 
@@ -47,21 +47,19 @@ module Make (Inputs : Inputs_intf) : Intf.Main.S = struct
     include Intf.Cached.S
 
     val create :
-      'elt Cache.t -> 'elt -> 'elt Intf.final_result -> ('elt, 'elt) t
+      'elt Cache.t -> 'elt -> 'elt Intf.consumed_state -> ('elt, 'elt) t
   end = struct
     type (_, _) t =
       | Base :
           { data: 'a
           ; cache: 'a Cache.t
-          ; mutable consumed: bool
-          ; final_result: 'a Intf.final_result }
+          ; consumed_state: 'a Intf.consumed_state }
           -> ('a, 'a) t
       | Derivative :
           { original: 'a
           ; mutant: 'b
           ; cache: 'a Cache.t
-          ; mutable consumed: bool
-          ; final_result: 'a Intf.final_result }
+          ; consumed_state: 'a Intf.consumed_state }
           -> ('b, 'a) t
       | Pure : 'a -> ('a, _) t
 
@@ -82,30 +80,25 @@ module Make (Inputs : Inputs_intf) : Intf.Main.S = struct
       | Derivative x -> x.original
       | Pure _ -> failwith "cannot access original of pure Cached.t"
 
-    let final_result : type a b. (a, b) t -> b Intf.final_result = function
-      | Base x -> x.final_result
-      | Derivative x -> x.final_result
-      | Pure _ -> failwith "cannot access final result of pure Cached.t"
+    let consumed_state : type a b. (a, b) t -> b Intf.consumed_state = function
+      | Base x -> x.consumed_state
+      | Derivative x -> x.consumed_state
+      | Pure _ -> failwith "cannot access consumed state of pure Cached.t"
 
     let was_consumed : type a b. (a, b) t -> bool = function
-      | Base x -> x.consumed
-      | Derivative x -> x.consumed
+      | Base x -> Ivar.is_full x.consumed_state
+      | Derivative x -> Ivar.is_full x.consumed_state
       | Pure _ -> false
 
-    let mark_consumed : type a b. (a, b) t -> unit = function
-      | Base x -> x.consumed <- true
-      | Derivative x -> x.consumed <- true
-      | Pure _ -> failwith "cannot set consumption of pure Cached.t"
-
     let mark_failed : type a b. (a, b) t -> unit = function
-      | Base x -> Ivar.fill x.final_result `Failed
-      | Derivative x -> Ivar.fill x.final_result `Failed
-      | Pure _ -> failwith "cannot set final result of pure Cached.t"
+      | Base x -> Ivar.fill x.consumed_state `Failed
+      | Derivative x -> Ivar.fill x.consumed_state `Failed
+      | Pure _ -> failwith "cannot set consumed state of pure Cached.t"
 
-    let mark_applied : type a b. (a, b) t -> unit = function
-      | Base x -> Ivar.fill x.final_result (`Applied x.data)
-      | Derivative x -> Ivar.fill x.final_result (`Applied x.original)
-      | Pure _ -> failwith "cannot set final result of pure Cached.t"
+    let mark_success : type a b. (a, b) t -> unit = function
+      | Base x -> Ivar.fill x.consumed_state (`Success x.data)
+      | Derivative x -> Ivar.fill x.consumed_state (`Success x.original)
+      | Pure _ -> failwith "cannot set consumed state of pure Cached.t"
 
     let attach_finalizer t =
       Gc.Expert.add_finalizer (Heap_block.create_exn t) (fun block ->
@@ -116,8 +109,8 @@ module Make (Inputs : Inputs_intf) : Intf.Main.S = struct
               ~cache_name:(Cache.name cache) ) ;
       t
 
-    let create cache data final_result =
-      attach_finalizer (Base {data; cache; consumed= false; final_result})
+    let create cache data consumed_state =
+      attach_finalizer (Base {data; cache; consumed_state})
 
     let assert_not_consumed t msg =
       let open Error in
@@ -127,29 +120,21 @@ module Make (Inputs : Inputs_intf) : Intf.Main.S = struct
       assert_not_consumed t "cannot peek at consumed Cached.t" ;
       value t
 
-    let consume (type a b) (t : (a, b) t) : unit =
-      assert_not_consumed t "cannot consume Cached.t twice" ;
-      mark_consumed t
-
     let transform (type a b) (t : (a, b) t) ~(f : a -> 'c) : ('c, b) t =
-      consume t ;
       attach_finalizer
         (Derivative
            { original= original t
            ; mutant= f (value t)
            ; cache= cache t
-           ; consumed= false
-           ; final_result= final_result t })
+           ; consumed_state= consumed_state t })
 
     let invalidate (type a b) (t : (a, b) t) : a =
-      consume t ;
       mark_failed t ;
       Cache.remove (cache t) (original t) ;
       value t
 
     let free (type a b) (t : (a, b) t) : a =
-      consume t ;
-      mark_applied t ;
+      mark_success t ;
       Cache.remove (cache t) (original t) ;
       value t
 
@@ -196,7 +181,7 @@ module Make (Inputs : Inputs_intf) : Intf.Main.S = struct
         let target = Cache.register t (Transmuter.transmute x) in
         Cached.transform target ~f:(Fn.const x)
 
-      let final_result t x = Cache.final_result t (Transmuter.transmute x)
+      let consumed_state t x = Cache.consumed_state t (Transmuter.transmute x)
 
       let mem t x = Cache.mem t (Transmuter.transmute x)
     end
@@ -307,14 +292,14 @@ let%test_module "cache_lib test instance" =
           Gc.full_major () ;
           assert (!dropped_cache_items = 0) )
 
-    let%test_unit "deriving a cached object inhabits its parent's final result"
-        =
+    let%test_unit "deriving a cached object inhabits its parent's \
+                   consumed_state" =
       setup () ;
       with_cache ~logger:(Logger.null ()) ~f:(fun cache ->
           with_item ~f:(fun data ->
               let src = Cache.register cache data in
               let der = Cached.transform src ~f:(Fn.const 5) in
-              let src_final_result = Cached.final_result src in
-              let der_final_result = Cached.final_result der in
-              assert (Ivar.equal src_final_result der_final_result) ) )
+              let src_consumed_state = Cached.consumed_state src in
+              let der_consumed_state = Cached.consumed_state der in
+              assert (Ivar.equal src_consumed_state der_consumed_state) ) )
   end )

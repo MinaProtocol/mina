@@ -36,13 +36,14 @@ module Make (Inputs : Inputs.With_unprocessed_transition_cache.S) :
     in
     let%bind () =
       Option.fold (Transition_frontier.find frontier hash) ~init:Result.ok_unit
-        ~f:(fun _ breadcrumb -> Result.Error (`Duplicate breadcrumb) )
+        ~f:(fun _ breadcrumb -> Result.Error (`In_frontier breadcrumb) )
     in
     let%bind () =
       Option.fold
-        (Unprocessed_transition_cache.final_result unprocessed_transition_cache
-           transition_with_hash) ~init:Result.ok_unit ~f:(fun _ final_result ->
-          Result.Error (`Under_processing final_result) )
+        (Unprocessed_transition_cache.consumed_state
+           unprocessed_transition_cache transition_with_hash)
+        ~init:Result.ok_unit ~f:(fun _ consumed_state ->
+          Result.Error (`Under_processing consumed_state) )
     in
     let%map () =
       Result.ok_if_true
@@ -110,7 +111,7 @@ module Make (Inputs : Inputs.With_unprocessed_transition_cache.S) :
                    (Core_kernel.Time.diff (Core_kernel.Time.now ())
                       transition_time) ;
                  Writer.write valid_transition_writer cached_transition
-             | Error (`Duplicate _) | Error (`Under_processing _) ->
+             | Error (`In_frontier _) | Error (`Under_processing _) ->
                  if Lru.find already_reported_duplicates hash |> Option.is_none
                  then (
                    Logger.info logger ~module_:__MODULE__ ~location:__LOC__
