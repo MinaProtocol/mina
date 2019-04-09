@@ -70,6 +70,7 @@ module Make_fp
     end) : Fp_intf with type nat := N.t = struct
   include Info
 
+  (* TODO version *)
   type t = N.t [@@deriving eq, bin_io, sexp, compare]
 
   let to_bigint = Fn.id

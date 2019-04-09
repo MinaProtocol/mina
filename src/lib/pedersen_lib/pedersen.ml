@@ -6,6 +6,7 @@ module type S = sig
   type curve
 
   module Digest : sig
+    (* TODO: version *)
     type t [@@deriving bin_io, sexp, eq, compare, yojson]
 
     val fold_bits : t -> bool Fold.t
