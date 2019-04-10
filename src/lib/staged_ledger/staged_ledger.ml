@@ -17,7 +17,14 @@ let option lab =
 module Make_completed_work = Transaction_snark_work.Make
 module Make_diff = Staged_ledger_diff.Make
 
-module Make (Inputs : Inputs.S) : sig
+module Make_with_constants (Constants : sig
+  val transaction_capacity_log_2 : int
+
+  val work_delay_factor : int
+
+  val latency_factor : int
+end)
+(Inputs : Inputs.S) : sig
   include
     Coda_pow.Staged_ledger_intf
     with type diff := Inputs.Staged_ledger_diff.t
@@ -43,7 +50,7 @@ module Make (Inputs : Inputs.S) : sig
      and type pending_coinbase_collection := Inputs.Pending_coinbase.t
 end = struct
   open Inputs
-  module Scan_state = Transaction_snark_scan_state.Make (Inputs)
+  module Scan_state = Transaction_snark_scan_state.Make (Constants) (Inputs)
 
   module Staged_ledger_error = struct
     type t =
@@ -280,10 +287,6 @@ end = struct
                 different from the one being requested ((%{sexp: \
                 Frozen_ledger_hash.t}))"
               target expected_target
-
-  module For_tests = struct
-    let snarked_ledger = snarked_ledger
-  end
 
   let statement_exn t =
     match Statement_scanner.scan_statement t.scan_state with
@@ -841,17 +844,12 @@ end = struct
           let%map () =
             if Pending_coinbase.Stack.equal oldest_stack ledger_proof_stack
             then Ok ()
-            else (
-              Core.printf
-                !"expected %{sexp: Pending_coinbase.Stack.t} got %{sexp: \
-                  Pending_coinbase.Stack.t} \n\
-                 \ %!"
-                oldest_stack ledger_proof_stack ;
+            else
               Error
                 (Staged_ledger_error.Unexpected
                    (Error.of_string
                       "Pending coinbase stack of the ledger proof did not \
-                       match the oldest stack in the pending coinbase tree.")) )
+                       match the oldest stack in the pending coinbase tree."))
           in
           pending_coinbase_collection_updated1
       | None -> Ok pending_coinbase_collection
@@ -964,9 +962,7 @@ end = struct
       in
       Or_error.iter_error r ~f:(fun e ->
           (* TODO: Pass a logger here *)
-          eprintf
-            !"Unexpected error: %s %{sexp:Error.t} \n\n              %!"
-            __LOC__ e data ) ;
+          eprintf !"Unexpected error: %s %{sexp:Error.t} \n%!" __LOC__ e ) ;
       Deferred.return (to_staged_ledger_or_error r)
     in
     let%bind updated_pending_coinbase_collection' =
@@ -1171,7 +1167,7 @@ end = struct
       let cw_unchecked =
         Sequence.map cw_seq ~f:Transaction_snark_work.forget
       in
-      let work_capacity = Scan_state.work_capacity () in
+      let work_capacity = Scan_state.work_capacity in
       let coinbase, rem_cw =
         match (add_coinbase, Sequence.next cw_unchecked) with
         | true, Some (cw, rem_cw) ->
@@ -1280,9 +1276,6 @@ end = struct
 
     let within_capacity t =
       let new_count = new_work_count t in
-      Core.printf
-        !" current capacity %d new capacity %d \n %!"
-        t.work_capacity new_count ;
       new_count <= t.work_capacity
 
     let incr_coinbase_part_by t count =
@@ -1634,7 +1627,23 @@ end = struct
     { Staged_ledger_diff.With_valid_signatures_and_proofs.diff
     ; creator= self
     ; prev_hash= curr_hash }
+
+  module For_tests = struct
+    let snarked_ledger = snarked_ledger
+
+    let create_exn ~ledger ~scan_state_latency_factor ~scan_state_work_delay
+        ~transaction_capacity_log_2 =
+      { scan_state=
+          Scan_state.For_tests.empty ~latency_factor:scan_state_latency_factor
+            ~work_delay_factor:scan_state_work_delay
+            ~transaction_capacity_log_2
+      ; ledger
+      ; pending_coinbase_collection=
+          Pending_coinbase.create () |> Or_error.ok_exn }
+  end
 end
+
+module Make = Make_with_constants (Transaction_snark_scan_state.Constants)
 
 let%test_module "test" =
   ( module struct
@@ -2936,4 +2945,130 @@ let%test_module "test" =
               if j > 2 then assert (x > 0) ;
               let expected_value = expected_ledger x all_ts old_ledger in
               if cb > 0 then assert (!(Sl.ledger !sl) = expected_value) ) )
+
+    let%test_module "staged ledgers with different latency factors" =
+      ( module struct
+        module Inputs = Test_input1
+
+        module type Staged_ledger_intf =
+          Coda_pow.Staged_ledger_intf
+          with type diff := Inputs.Staged_ledger_diff.t
+           and type valid_diff :=
+                      Inputs.Staged_ledger_diff
+                      .With_valid_signatures_and_proofs
+                      .t
+           and type ledger_hash := Inputs.Ledger_hash.t
+           and type frozen_ledger_hash := Inputs.Frozen_ledger_hash.t
+           and type staged_ledger_hash := Inputs.Staged_ledger_hash.t
+           and type public_key := Inputs.Compressed_public_key.t
+           and type ledger := Inputs.Ledger.t
+           and type user_command_with_valid_signature :=
+                      Inputs.User_command.With_valid_signature.t
+           and type statement := Inputs.Transaction_snark_work.Statement.t
+           and type completed_work_checked :=
+                      Inputs.Transaction_snark_work.Checked.t
+           and type ledger_proof := Inputs.Ledger_proof.t
+           and type staged_ledger_aux_hash := Inputs.Staged_ledger_aux_hash.t
+           and type sparse_ledger := Inputs.Sparse_ledger.t
+           and type ledger_proof_statement := Inputs.Ledger_proof_statement.t
+           and type ledger_proof_statement_set :=
+                      Inputs.Ledger_proof_statement.Set.t
+           and type transaction := Inputs.Transaction.t
+           and type user_command := Inputs.User_command.t
+           and type transaction_witness := Inputs.Transaction_witness.t
+           and type pending_coinbase_collection := Inputs.Pending_coinbase.t
+
+        let transaction_capacity_log_2 = 2
+
+        let sl_modules =
+          List.init 4 ~f:(fun i ->
+              let module Constants = struct
+                let transaction_capacity_log_2 = transaction_capacity_log_2
+
+                let work_delay_factor = 5
+
+                let latency_factor = i
+              end in
+              (module Make_with_constants (Constants) (Inputs)
+              : Staged_ledger_intf ) )
+
+        let%test_unit "max throughput at any latency: random number of \
+                       proofs-one prover" =
+          Backtrace.elide := false ;
+          let get_work work_list (stmts : Transaction_snark_work.Statement.t) :
+              Transaction_snark_work.Checked.t option =
+            if
+              Option.is_some
+                (List.find work_list ~f:(fun s ->
+                     Transaction_snark_work.Statement.equal s stmts ))
+            then
+              Some
+                { Transaction_snark_work.Checked.fee= Fee.Unsigned.of_int 0
+                ; proofs= stmts
+                ; prover= "P" }
+            else None
+          in
+          let logger = Logger.null () in
+          let p = Int.pow 2 transaction_capacity_log_2 in
+          let g = Int.gen_incl 0 p in
+          List.iter sl_modules ~f:(fun (module Sl) ->
+              let initial_ledger = ref 0 in
+              let staged_ledger = ref (Sl.create_exn ~ledger:initial_ledger) in
+              let create_and_apply sl logger txns stmt_to_work =
+                let open Deferred.Let_syntax in
+                let diff =
+                  Sl.create_diff !sl ~self:self_pk ~logger
+                    ~transactions_by_fee:txns ~get_completed_work:stmt_to_work
+                in
+                let diff' = Staged_ledger_diff.forget diff in
+                let%map ( `Hash_after_applying _
+                        , `Ledger_proof _
+                        , `Staged_ledger sl'
+                        , `Pending_coinbase_data _ ) =
+                  match%map Sl.apply !sl diff' ~logger with
+                  | Ok x -> x
+                  | Error e -> Error.raise (Sl.Staged_ledger_error.to_error e)
+                in
+                sl := sl' ;
+                diff'
+              in
+              Quickcheck.test g ~trials:100 ~f:(fun _ ->
+                  Async.Thread_safe.block_on_async_exn (fun () ->
+                      let all_ts =
+                        txns p (fun x -> (x + 1) * 100) (fun _ -> 0)
+                      in
+                      let work_list : Transaction_snark_work.Statement.t list =
+                        let capacity_reached =
+                          Sl.Scan_state.work_capacity
+                          >= Sl.Scan_state.current_job_count
+                               (Sl.scan_state !staged_ledger)
+                        in
+                        let spec_list =
+                          if capacity_reached then
+                            Sl.all_work_pairs_exn !staged_ledger
+                          else []
+                        in
+                        List.map spec_list ~f:(fun (s1, s2_opt) ->
+                            let stmt1 =
+                              Snark_work_lib.Work.Single.Spec.statement s1
+                            in
+                            let stmt2 =
+                              Option.value_map s2_opt ~default:[] ~f:(fun s ->
+                                  [Snark_work_lib.Work.Single.Spec.statement s]
+                              )
+                            in
+                            stmt1 :: stmt2 )
+                      in
+                      let%map diff =
+                        create_and_apply staged_ledger logger
+                          (Sequence.of_list all_ts) (get_work work_list)
+                      in
+                      let cb = coinbase_added diff in
+                      assert (cb > 0 && cb < 3) ;
+                      let x =
+                        List.length (Staged_ledger_diff.user_commands diff)
+                      in
+                      (*max throughput*)
+                      assert (x + cb = p) ) ) )
+      end )
   end )

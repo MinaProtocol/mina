@@ -351,7 +351,6 @@ module State = struct
     | true, Merge (Bcomp _), Merged z ->
         let%bind () =
           if is_at_root ~root_at_depth:t.root_at_depth cur_pos then (
-            Core.printf !"emitting from root at pos %d\n%!" cur_pos ;
             match List.rev t.other_trees_data with
             | [] ->
                 failwith
@@ -395,7 +394,6 @@ module State = struct
       -> unit Or_error.t =
    fun t completed_jobs jobs_copy ->
     let open Or_error.Let_syntax in
-    Core.printf !"started consuming work \n %!" ;
     match completed_jobs with
     | [] -> Ok ()
     | j :: js -> (
@@ -744,6 +742,51 @@ let gen :
 
 let default_seq_no = 0
 
+let%test_module "scan latency" =
+  ( module struct
+    let job_done (job : (Int64.t, Int64.t) Available_job.t) :
+        Int64.t State.Completed_job.t =
+      match job with
+      | Base (x, _) -> Lifted x
+      | Merge (x, y, _) -> Merged (Int64.( + ) x y)
+
+    let step state data =
+      let jobs = Or_error.ok_exn (next_jobs ~state) in
+      let jobs_done = List.map jobs ~f:job_done in
+      let res_opt =
+        Or_error.ok_exn
+        @@ fill_in_completed_jobs ~state ~completed_jobs:jobs_done
+      in
+      let () = Or_error.ok_exn @@ enqueue_data ~state ~data in
+      Option.value_map ~default:0 res_opt ~f:(fun _ -> 1)
+
+    let max_parallelism = 6
+
+    let max_data = 2
+
+    let%test_unit "test latency on multiple trees with different root_at_depth"
+        =
+      let depths = List.init 6 ~f:Fn.id in
+      let states =
+        List.map depths ~f:(fun i ->
+            State.create ~parallelism_log_2:max_parallelism ~root_at_depth:i )
+      in
+      let results_emitted = ref (List.init 6 ~f:(fun _ -> 0)) in
+      let data_length = Int.gen_incl 0 max_data in
+      let () =
+        Quickcheck.test data_length ~trials:1000 ~f:(fun i ->
+            let data = List.init i ~f:Int64.of_int in
+            let result_emitted = List.map states ~f:(fun s -> step s data) in
+            results_emitted :=
+              List.map2_exn result_emitted !results_emitted
+                ~f:(fun cur total -> cur + total ) )
+      in
+      let of_depth_0 = List.hd_exn !results_emitted in
+      List.iteri (List.drop !results_emitted 1) ~f:(fun i depth_i_plus_one ->
+          (*Scan results when root_at_depth=i should be twice the number of results when root_at_depth= i-1*)
+          assert (depth_i_plus_one >= Int.pow 2 (i + 1) * of_depth_0) )
+  end )
+
 let%test_module "scans" =
   ( module struct
     module Queue = Queue
@@ -821,17 +864,20 @@ let%test_module "scans" =
           | Merge (x, y, _) -> Merged (Int64.( + ) x y)
 
         let%test_unit "Split only if enqueuing onto the next queue" =
-          let p = 3 in
-          let max_slots = Int.pow 2 (p - 1) in
-          let leaves = max_slots * 2 in
-          let offset = leaves - 1 in
-          let last_index = (2 * leaves) - 2 in
+          let p = 4 in
+          let max_slots = Int.pow 2 (p - 2) in
           let g = Int.gen_incl 1 max_slots in
           let state = State.create ~parallelism_log_2:p ~root_at_depth:1 in
           Quickcheck.test g ~trials:1000 ~f:(fun i ->
               let data = List.init i ~f:Int64.of_int in
               let partition = partition_if_overflowing ~max_slots:i state in
               let curr_head = Option.value_exn state.base_none_pos in
+              let curr_block_start =
+                State.block_of state (Option.value_exn state.base_none_pos)
+              in
+              let curr_block_end =
+                curr_block_start + State.slots_per_block state - 1
+              in
               let jobs = Or_error.ok_exn (next_jobs ~state) in
               let jobs_done = List.map jobs ~f:job_done in
               let _ =
@@ -839,32 +885,39 @@ let%test_module "scans" =
                 @@ fill_in_completed_jobs ~state ~completed_jobs:jobs_done
               in
               let () = Or_error.ok_exn @@ enqueue_data ~state ~data in
+              (*Check base position after enqueuing*)
               match partition.second with
               | None ->
+                  let new_block_start =
+                    State.block_of state (Option.value_exn state.base_none_pos)
+                  in
                   let expected_base_pos =
-                    if curr_head + partition.first = last_index + 1 then offset
+                    if curr_head + partition.first = curr_block_end + 1 then
+                      new_block_start
                     else curr_head + partition.first
                   in
                   assert (
                     Option.value_exn state.base_none_pos = expected_base_pos )
               | Some y ->
+                  let new_block_start =
+                    State.block_of state (Option.value_exn state.base_none_pos)
+                  in
                   assert (partition.first + y = i) ;
-                  assert (Option.value_exn state.base_none_pos = y + offset) )
+                  assert (
+                    Option.value_exn state.base_none_pos = y + new_block_start
+                  ) )
 
         let%test_unit "non-emitted data tracking" =
           (* After a random number of steps, check if acc = current_state - data list*)
           let cur_value = ref 0 in
           let parallelism_log_2 = 4 in
           let one = Int64.of_int 1 in
-          let state = State.create ~parallelism_log_2 ~root_at_depth:1 in
-          (*List.fold
-            (List.init 20 ~f:(fun _ -> ()))
-            ~init:()
-            ~f:( *)
+          let root_at_depth = 1 in
+          let state = State.create ~parallelism_log_2 ~root_at_depth in
           let g = Int.gen_incl 1 (Int.pow 2 parallelism_log_2 / 2) in
+          let leaf_blocks = Int.pow 2 root_at_depth in
           Quickcheck.test g ~trials:1000 ~f:(fun i ->
               Async.Thread_safe.block_on_async_exn (fun () ->
-                  (*let i = free_space ~state - 1 in*)
                   let data = List.init i ~f:(fun _ -> one) in
                   let jobs = Or_error.ok_exn (next_jobs ~state) in
                   let jobs_done = List.map jobs ~f:job_done in
@@ -895,7 +948,8 @@ let%test_module "scans" =
                   let expected = !cur_value - Int64.to_int_exn acc_data in
                   assert (fst acc = expected) ;
                   assert (
-                    List.length state.other_trees_data < parallelism_log_2 ) ;
+                    List.length state.other_trees_data
+                    < (parallelism_log_2 - root_at_depth) * leaf_blocks ) ;
                   return () ) )
 
         let%test_unit "scan can be initialized from intermediate state" =
@@ -955,7 +1009,7 @@ let%test_module "scans" =
           )
 
         let%test_unit "sequence number reset" =
-          (*create jobs with unique sequence numbers starting from 1. At any point, after reset, the jobs should be labelled starting from 1. Therefore,  sum of those sequence numbers should be equal to sum of first n (number of jobs) natutal numbers*)
+          (*create jobs with unique sequence numbers starting from 1. At any point, after reset, the jobs should be labelled starting from 1. Therefore,  sum of those sequence numbers should be equal to sum of first n (number of jobs) natural numbers*)
           Backtrace.elide := false ;
           let p = 3 in
           let g = Int.gen_incl 0 (Int.pow 2 p) in
@@ -976,7 +1030,7 @@ let%test_module "scans" =
             in
             assert (sum_of_all_seq_numbers = sum_of_n)
           in
-          let state = State.create ~parallelism_log_2:p ~root_at_depth:1 in
+          let state = State.create ~parallelism_log_2:p ~root_at_depth:0 in
           Quickcheck.test g ~trials:50 ~f:(fun _ ->
               if free_space ~state < Int.pow 2 p then
                 (*Work until all the leaves are empty*)

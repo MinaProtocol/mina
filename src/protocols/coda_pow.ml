@@ -913,9 +913,17 @@ module type Transaction_snark_scan_state_intf = sig
 
   val current_job_count : t -> int
 
-  val work_capacity : unit -> int
+  val work_capacity : int
 
   val next_on_new_tree : t -> bool Or_error.t
+
+  module For_tests : sig
+    val empty :
+         latency_factor:int
+      -> work_delay_factor:int
+      -> transaction_capacity_log_2:int
+      -> t
+  end
 end
 
 module type Staged_ledger_base_intf = sig
@@ -988,6 +996,10 @@ module type Staged_ledger_base_intf = sig
     val all_work_to_do : t -> statement Sequence.t Or_error.t
 
     val all_transactions : t -> transaction list Or_error.t
+
+    val work_capacity : int
+
+    val current_job_count : t -> int
   end
 
   module Staged_ledger_error : sig
@@ -1057,6 +1069,13 @@ module type Staged_ledger_base_intf = sig
   module For_tests : sig
     val snarked_ledger :
       t -> snarked_ledger_hash:frozen_ledger_hash -> ledger Or_error.t
+
+    val create_exn :
+         ledger:ledger
+      -> scan_state_latency_factor:int
+      -> scan_state_work_delay:int
+      -> transaction_capacity_log_2:int
+      -> t
   end
 end
 

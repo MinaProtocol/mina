@@ -27,7 +27,14 @@ module type Monad_with_Or_error_intf = sig
   end
 end
 
-module Make (Inputs : Inputs.S) : sig
+module Make (Constants : sig
+  val transaction_capacity_log_2 : int
+
+  val work_delay_factor : int
+
+  val latency_factor : int
+end)
+(Inputs : Inputs.S) : sig
   include
     Coda_pow.Transaction_snark_scan_state_intf
     with type ledger := Inputs.Ledger.t
@@ -150,7 +157,7 @@ end = struct
   [@@deriving sexp, bin_io]
 
   (*Work capacity represents max number of work(currently in the tree and the ones that would arise in the future when current jobs are done) in the tree. *)
-  let work_capacity () =
+  let work_capacity =
     let open Constants in
     (*+1 because of <, +1 to give enough time to adjust the counter after proof is emitted, +1 to due to delay in proof emitting*)
     (*For Evan: Having C= 2x(txns/block * total-no-of-trees) essentially means all the trees can have full leaves without having to do any work. This doesn't work with the succinct representation and FIFO work order during when this specific edge case occurs*)
@@ -192,7 +199,7 @@ end = struct
         let k = max Constants.work_delay_factor 2 in
         Parallel_scan.parallelism ~state:t.tree
         = Int.pow 2 (Constants.transaction_capacity_log_2 + k)
-        && t.job_count <= work_capacity ()
+        && t.job_count <= work_capacity
         && Parallel_scan.is_valid t.tree
 
       include Binable.Of_binable
@@ -471,16 +478,19 @@ end = struct
 
   let capacity t = Parallel_scan.parallelism ~state:t.tree
 
-  let empty () =
+  let create ~latency_factor ~work_delay_factor ~transaction_capacity_log_2 =
     (* Transaction capacity log_2 is 1/2^work_delay_factor the capacity for work parallelism *)
-    let open Constants in
     let k = max work_delay_factor 2 in
-    assert (work_delay_factor - latency_factor >= 2) ;
+    assert (work_delay_factor - latency_factor >= 1) ;
     { tree=
         Parallel_scan.start
           ~parallelism_log_2:(transaction_capacity_log_2 + k)
           ~root_at_depth:latency_factor
     ; job_count= 0 }
+
+  let empty () =
+    let open Constants in
+    create ~latency_factor ~work_delay_factor ~transaction_capacity_log_2
 
   let extract_txns txns_with_witnesses =
     (* TODO: This type checks, but are we actually pulling the inverse txn here? *)
@@ -547,11 +557,7 @@ end = struct
           if Frozen_ledger_hash.equal curr_source prev_target then Ok ()
           else Or_error.error_string "Unexpected ledger proof emitted" )
     in
-    Core.printf !"scan state: %s\n%!"
-      (Parallel_scan.State.visualize t.tree
-         ~draw_a:(fun _ -> "M")
-         ~draw_d:(fun _ -> "B")) ;
-    if new_count <= work_capacity () then (
+    if new_count <= work_capacity then (
       t.job_count <- new_count ;
       Ok proof_opt )
     else
@@ -625,6 +631,11 @@ end = struct
            | None -> assert false
            | Some stmt -> stmt ))
       Transaction_snark_work.proofs_length
+
+  module For_tests = struct
+    let empty ~latency_factor ~work_delay_factor ~transaction_capacity_log_2 =
+      create ~latency_factor ~work_delay_factor ~transaction_capacity_log_2
+  end
 end
 
 module Constants = Constants
