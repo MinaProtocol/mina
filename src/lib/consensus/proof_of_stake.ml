@@ -93,7 +93,7 @@ end
 module Proposal_data = struct
   (* TODO : version *)
   type t =
-    { stake_proof: Coda_base.Stake_proof.t
+    { stake_proof: Coda_base.Stake_proof.Stable.V1.t
     ; vrf_result: Random_oracle.Digest.Stable.V1.t }
   [@@deriving bin_io]
 
