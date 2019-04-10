@@ -81,16 +81,11 @@ module State = struct
   it. No of blocks = 2^root_at_depth. This function returns the starting 
   position of the block containing pos *)
   let block_of state pos =
-    let parallelism = State.parallelism state in
+    let total_leaves = State.parallelism state in
     let slots_per_block = slots_per_block state in
-    let rec go curr_block_start_pos =
-      if pos >= curr_block_start_pos || curr_block_start_pos = parallelism - 1
-      then curr_block_start_pos
-      else go (curr_block_start_pos - slots_per_block)
-    in
-    go ((2 * parallelism) - slots_per_block - 1)
-
-  (*start from last block*)
+    let offset = total_leaves - 1 in
+    let block_number = (pos - offset) / slots_per_block in
+    offset + (block_number * slots_per_block)
 
   let%test_unit "multiple blocks" =
     let parallelism_log_2 = 5 in
@@ -99,11 +94,11 @@ module State = struct
       let slots_per_block = slots_per_block state in
       let total_leaves = parallelism state in
       let offset = total_leaves - 1 in
-      let all_leaf_positions =
+      let all_leaves_positions =
         List.init total_leaves ~f:(fun x -> x + offset)
       in
       let total_blocks =
-        List.fold ~init:0 all_leaf_positions ~f:(fun block_no pos ->
+        List.fold ~init:0 all_leaves_positions ~f:(fun block_no pos ->
             let block_start = block_of state pos in
             let cur_block_no = (block_start - offset) / slots_per_block in
             if block_no = cur_block_no then block_no
