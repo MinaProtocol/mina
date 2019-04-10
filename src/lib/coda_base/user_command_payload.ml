@@ -19,6 +19,10 @@ module Common = struct
 
       module Latest = V1
     end
+
+    type ('fee, 'nonce, 'memo) t = ('fee, 'nonce, 'memo) Stable.Latest.t =
+      {fee: 'fee; nonce: 'nonce; memo: 'memo}
+    [@@deriving eq, sexp, hash, yojson]
   end
 
   module Stable = struct
@@ -66,20 +70,16 @@ module Common = struct
       String.gen_with_length Memo.max_size_in_bytes Char.gen
       >>| Memo.create_exn
     in
-    Poly.Stable.Latest.{fee; nonce; memo}
+    Poly.{fee; nonce; memo}
 
   type var =
-    ( Currency.Fee.var
-    , Account_nonce.Unpacked.var
-    , Memo.Checked.t )
-    Poly.Stable.Latest.t
+    (Currency.Fee.var, Account_nonce.Unpacked.var, Memo.Checked.t) Poly.t
 
-  let to_hlist Poly.Stable.Latest.({fee; nonce; memo}) =
-    H_list.[fee; nonce; memo]
+  let to_hlist Poly.({fee; nonce; memo}) = H_list.[fee; nonce; memo]
 
   let of_hlist : type fee nonce memo.
          (unit, fee -> nonce -> memo -> unit) H_list.t
-      -> (fee, nonce, memo) Poly.Stable.Latest.t =
+      -> (fee, nonce, memo) Poly.t =
    fun H_list.([fee; nonce; memo]) -> {fee; nonce; memo}
 
   let typ =
@@ -173,6 +173,10 @@ module Poly = struct
 
     module Latest = V1
   end
+
+  type ('common, 'body) t = ('common, 'body) Stable.Latest.t =
+    {common: 'common; body: 'body}
+  [@@deriving eq, sexp, hash, yojson, compare]
 end
 
 module Stable = struct
@@ -233,4 +237,4 @@ let gen =
     |> Option.value_exn ?here:None ?error:None ?message:None
   in
   let%map body = Body.gen ~max_amount in
-  Poly.Stable.Latest.{common; body}
+  Poly.{common; body}

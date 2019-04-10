@@ -21,14 +21,19 @@ end
 
 module Common : sig
   module Poly : sig
-    module Stable : sig
-      module V1 : sig
-        type ('fee, 'nonce, 'memo) t = {fee: 'fee; nonce: 'nonce; memo: 'memo}
-        [@@deriving bin_io, eq, sexp, hash, yojson, version]
-      end
+    type ('fee, 'nonce, 'memo) t = {fee: 'fee; nonce: 'nonce; memo: 'memo}
+    [@@deriving eq, sexp, hash, yojson]
 
-      module Latest = V1
-    end
+    module Stable :
+      sig
+        module V1 : sig
+          type ('fee, 'nonce, 'memo) t
+          [@@deriving bin_io, eq, sexp, hash, yojson, version]
+        end
+
+        module Latest = V1
+      end
+      with type ('fee, 'nonce, 'memo) V1.t = ('fee, 'nonce, 'memo) t
   end
 
   module Stable : sig
@@ -52,7 +57,7 @@ module Common : sig
     ( Currency.Fee.var
     , Coda_numbers.Account_nonce.Unpacked.var
     , User_command_memo.Checked.t )
-    Poly.Stable.Latest.t
+    Poly.t
 
   val typ : (var, t) Typ.t
 
@@ -66,14 +71,19 @@ module Common : sig
 end
 
 module Poly : sig
-  module Stable : sig
-    module V1 : sig
-      type ('common, 'body) t = {common: 'common; body: 'body}
-      [@@deriving bin_io, eq, sexp, hash, yojson, compare, version]
-    end
+  type ('common, 'body) t = {common: 'common; body: 'body}
+  [@@deriving eq, sexp, hash, yojson, compare]
 
-    module Latest = V1
-  end
+  module Stable :
+    sig
+      module V1 : sig
+        type ('common, 'body) t
+        [@@deriving bin_io, eq, sexp, hash, yojson, compare, version]
+      end
+
+      module Latest = V1
+    end
+    with type ('common, 'body) V1.t = ('common, 'body) t
 end
 
 module Stable : sig
