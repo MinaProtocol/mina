@@ -53,7 +53,9 @@ module type S = sig
     ; me: Peer.t
     ; peers: Peer.Hash_set.t
     ; connections:
-        (Unix.Inet_addr.t, (Uuid.t, Rpc.Connection.t) Hashtbl.t) Hashtbl.t
+        ( Unix.Inet_addr.t
+        , (Uuid.t, Rpc.Connection.t Ivar.t) Hashtbl.t )
+        Hashtbl.t
     ; max_concurrent_connections: int option }
 
   module Config : Config_intf
@@ -92,7 +94,9 @@ module Make (Message : Message_intf) :
     ; me: Peer.t
     ; peers: Peer.Hash_set.t
     ; connections:
-        (Unix.Inet_addr.t, (Uuid.t, Rpc.Connection.t) Hashtbl.t) Hashtbl.t
+        ( Unix.Inet_addr.t
+        , (Uuid.t, Rpc.Connection.t Ivar.t) Hashtbl.t )
+        Hashtbl.t
           (**mapping a Uuid to a connection to be able to remove it from the hash 
          *table since Rpc.Connection.t doesn't have the socket information*)
     ; max_concurrent_connections: int option
@@ -218,7 +222,9 @@ module Make (Message : Message_intf) :
                      !"Peer %{sexp: Unix.Inet_addr.t} banned, disconnecting."
                      addr ;
                    Deferred.List.iter (Hashtbl.to_alist conn_list)
-                     ~f:(fun (_, conn) -> Rpc.Connection.close conn ) )) ;
+                     ~f:(fun (_, conn_ivar) ->
+                       let%bind conn = Ivar.read conn_ivar in
+                       Rpc.Connection.close conn ) )) ;
         trace_task "rebroadcasting messages" (fun () ->
             don't_wait_for
               (Linear_pipe.iter_unordered ~max_concurrency:64 broadcast_reader
@@ -264,7 +270,8 @@ module Make (Message : Message_intf) :
               (`Call
                 (fun _ exn ->
                   Logger.error t.logger ~module_:__MODULE__ ~location:__LOC__
-                    "%s" (Exn.to_string_mach exn) ))
+                    "%s" (Exn.to_string_mach exn) ;
+                  raise exn ))
             (Tcp.Where_to_listen.of_port config.me.Peer.communication_port)
             (fun client reader writer ->
               let conn_map =
@@ -286,6 +293,10 @@ module Make (Message : Message_intf) :
                 Reader.close reader >>= fun _ -> Writer.close writer )
               else
                 let conn_id = Uuid.create () in
+                Hashtbl.add_exn conn_map ~key:conn_id ~data:(Ivar.create ()) ;
+                Hashtbl.set t.connections
+                  ~key:(Socket.Address.Inet.addr client)
+                  ~data:conn_map ;
                 let%map _ =
                   Rpc.Connection.server_with_close reader writer
                     ~implementations
@@ -294,7 +305,8 @@ module Make (Message : Message_intf) :
                         when connecting to the server over TCP; the ephemeral
                         port is distinct from the client's discovery and
                         communication ports *)
-                      Hashtbl.add_exn conn_map ~key:conn_id ~data:conn ;
+                      let ivar = Hashtbl.find_exn conn_map conn_id in
+                      Ivar.fill ivar conn ;
                       Hashtbl.set t.connections
                         ~key:(Socket.Address.Inet.addr client)
                         ~data:conn_map ;
