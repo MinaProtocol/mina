@@ -192,7 +192,7 @@ end)
     {protocol_state; protocol_state_proof; staged_ledger_diff}
 
   let timestamp {protocol_state; _} =
-    Protocol_state.blockchain_state (Obj.magic protocol_state)
+    Protocol_state.blockchain_state protocol_state
     |> Blockchain_state.timestamp
 
   let consensus_state = Stable.Latest.consensus_state
