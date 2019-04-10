@@ -6,3 +6,6 @@
 
 [%%inject
 "work_delay_factor", scan_state_work_delay_factor]
+
+[%%inject
+"latency_factor", scan_state_latency_factor]
