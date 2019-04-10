@@ -257,9 +257,12 @@ module Make (Inputs : Inputs.S) :
                         ~location:__LOC__ "%s" error ;
                       Error (Error.of_string error) )
                 in
-                let rest, [target_transition] =
+                let rest, target_transition_singleton =
                   List.split_n verified_transitions
                     (List.length verified_transitions - 1)
+                in
+                let target_transition =
+                  List.hd_exn target_transition_singleton
                 in
                 let full_subtree =
                   List.fold_right rest
