@@ -261,5 +261,6 @@ val view_jobs_with_position :
  * promoted to the merge jobs yet*)
 val base_jobs_on_latest_tree : ('a, 'd) State.t -> 'd list
 
+(*returns true only if the position of the next 'd that could be enqueued is  
+of the leftmost leaf of the tree*)
 val next_on_new_tree : ('a, 'd) State.t -> bool Or_error.t
-(*returns true only if the position of the next 'd that could be enqueued is  of the leftmost leaf of the tree*)

@@ -750,20 +750,8 @@ end = struct
     match second with
     | None ->
         (*Single partition:
-         1.Check if a new stack is required by going through the latest transactions. If any coinbases in it, then get the latest stack otheriwse create a new stack [working_stack]
+         1.Check if a new stack is required and get a working stack [working_stack]
          2.create data for enqueuing into the scan state *)
-        (*let current_base_jobs =
-          Scan_state.base_jobs_on_latest_tree scan_state
-        in
-        let%bind coinbase_exists_on_new_tree =
-          coinbase_exists
-            ~get_transaction:
-              (fun { Scan_state.Transaction_with_witness.transaction_with_info; _
-                   } ->
-              to_staged_ledger_or_error
-              @@ Ledger.Undo.transaction transaction_with_info )
-            current_base_jobs
-        in*)
         let%bind is_new_tree =
           Scan_state.next_on_new_tree scan_state
           |> to_staged_ledger_or_error |> Deferred.return
@@ -782,10 +770,9 @@ end = struct
         (*Two partition:
         Assumption: Only one of the partition will have coinbase transaction(s)in it.
          1. Get the latest stack for coinbase in the first set of transactions
-         2. get the first set of scan_state data using the above stack
+         2. get the first set of scan_state data[data1]
          3. get a new stack for the second parition because the second set of transactions would start from the begining of the scan_state
-         4. get the second set of scan_state data using the new stack
-         5. return either of the stacks because only one of them would be updated as long as the assumption is true*)
+         4. get the second set of scan_state data[data2]*)
         let%bind working_stack1 =
           working_stack pending_coinbase_collection ~is_new_stack:false
           |> Deferred.return
@@ -809,20 +796,13 @@ end = struct
         in
         let second_has_data = List.length (List.drop transactions first) > 0 in
         let new_stack_in_snark, stack_update =
-          (*match first_has_coinbase, second_has_data with
-          | true, true -> (false, `Update_two (updated_stack1, updated_stack2)) 
+          match (first_has_coinbase, second_has_data) with
+          | true, true -> (false, `Update_two (updated_stack1, updated_stack2))
           (*updated_stack2 will not have any coinbase and therefore we don't want to create a new stack in snark. updated_stack2 is only used to update the pending_coinbase_aux because there's going to be data(second has data) on a "new tree"*)
           | true, false -> (false, `Update_one updated_stack1)
           | false, true -> (true, `Update_one updated_stack2)
           (*updated stack2 has coinbase and it will be on a "new tree"*)
-          | false, false -> (false, `Update_none)*)
-          if first_has_coinbase then
-            if second_has_data then
-              (false, `Update_two (updated_stack1, updated_stack2))
-            else (false, `Update_one updated_stack1)
-          else if second_has_data then
-            (true, `Update_two (updated_stack1, updated_stack2))
-          else (false, `Update_one updated_stack1)
+          | false, false -> (false, `Update_none)
         in
         (new_stack_in_snark, data1 @ data2, stack_update)
 
@@ -1630,16 +1610,6 @@ end = struct
 
   module For_tests = struct
     let snarked_ledger = snarked_ledger
-
-    let create_exn ~ledger ~scan_state_latency_factor ~scan_state_work_delay
-        ~transaction_capacity_log_2 =
-      { scan_state=
-          Scan_state.For_tests.empty ~latency_factor:scan_state_latency_factor
-            ~work_delay_factor:scan_state_work_delay
-            ~transaction_capacity_log_2
-      ; ledger
-      ; pending_coinbase_collection=
-          Pending_coinbase.create () |> Or_error.ok_exn }
   end
 end
 

@@ -75,6 +75,10 @@ module State = struct
 
   let slots_per_block state = parallelism state / Int.pow 2 state.root_at_depth
 
+  (*A block is a set of leaves that correspond to a ledger proof. If 
+  root_at_depth = 0 then there would be just one block with all the leaves in 
+  it. No of blocks = 2^root_at_depth. This function returns the starting 
+  position of the block containing pos *)
   let block_of state pos =
     let parallelism = State.parallelism state in
     let slots_per_block = slots_per_block state in
@@ -412,10 +416,7 @@ module State = struct
           Or_error.error_string "Invalid job encountered while enqueuing data"
     in
     let%map () = Ring_buffer.direct_update (State.jobs state) base_pos ~f in
-    let last_leaf_pos =
-      block_of state base_pos + slots_per_block state - 1
-      (*Ring_buffer.length state.jobs - 1*)
-    in
+    let last_leaf_pos = block_of state base_pos + slots_per_block state - 1 in
     if base_pos = last_leaf_pos then (
       state.other_trees_data
       <- (value :: state.recent_tree_data) :: state.other_trees_data ;
@@ -1009,7 +1010,10 @@ let%test_module "scans" =
           )
 
         let%test_unit "sequence number reset" =
-          (*create jobs with unique sequence numbers starting from 1. At any point, after reset, the jobs should be labelled starting from 1. Therefore,  sum of those sequence numbers should be equal to sum of first n (number of jobs) natural numbers*)
+          (*create jobs with unique sequence numbers starting from 1. At any 
+          point, after reset, the jobs should be labelled starting from 1. 
+          Therefore,  sum of those sequence numbers should be equal to sum of 
+          first n (number of jobs) natural numbers*)
           Backtrace.elide := false ;
           let p = 3 in
           let g = Int.gen_incl 0 (Int.pow 2 p) in

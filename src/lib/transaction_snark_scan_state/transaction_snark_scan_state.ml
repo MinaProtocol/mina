@@ -156,17 +156,9 @@ end = struct
     Parallel_scan.State.Completed_job.t
   [@@deriving sexp, bin_io]
 
-  (*Work capacity represents max number of work(currently in the tree and the ones that would arise in the future when current jobs are done) in the tree. *)
+  (*Work capacity represents max number of work in the tree. this includes the jobs that are currently in the tree and the ones that would arise in the future when current jobs are done*)
   let work_capacity =
     let open Constants in
-    (*+1 because of <, +1 to give enough time to adjust the counter after proof is emitted, +1 to due to delay in proof emitting*)
-    (*For Evan: Having C= 2x(txns/block * total-no-of-trees) essentially means all the trees can have full leaves without having to do any work. This doesn't work with the succinct representation and FIFO work order during when this specific edge case occurs*)
-    (*Edge case:When there is a single slot at the end of the tree before continuing at the begining of the tree (referring to the last level), the jobs on the right side of the tree are done along with the jobs on the left (because it wasn't added until then). The root node has to wait until the right sub-tree has completed before the next round begins. By the time the right sub-tree is completed, the left tree is also ready with the proof but has to wait until the root is emitted. This won't work with our succint datastructure impl and FIFO work order.*)
-    (*let work_delay_factor = max 2 work_delay_factor in
-    let nearest_log_2_txn = Int.ceil_log2 transaction_capacity_log_2 in
-    let nearest_log_2_incr = Int.ceil_log2 work_delay_factor in
-    3 + nearest_log_2_incr + nearest_log_2_txn
-    + Int.pow 2 (transaction_capacity_log_2 + work_delay_factor)*)
     Int.pow 2 (transaction_capacity_log_2 + 1)
     * (Int.pow 2 (work_delay_factor - Int.max (latency_factor - 1) 0) - 1)
 
@@ -631,11 +623,6 @@ end = struct
            | None -> assert false
            | Some stmt -> stmt ))
       Transaction_snark_work.proofs_length
-
-  module For_tests = struct
-    let empty ~latency_factor ~work_delay_factor ~transaction_capacity_log_2 =
-      create ~latency_factor ~work_delay_factor ~transaction_capacity_log_2
-  end
 end
 
 module Constants = Constants
