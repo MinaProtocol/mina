@@ -33,12 +33,12 @@ module type S = sig
     with type V1.t = t
 
   val create :
-       snark_transition:Snark_transition.value
+       snark_transition:Snark_transition.Value.t
     -> prover_state:Prover_state.t
     -> staged_ledger_diff:Staged_ledger_diff.t
     -> t
 
-  val snark_transition : t -> Snark_transition.value
+  val snark_transition : t -> Snark_transition.Value.t
 
   val prover_state : t -> Prover_state.t
 
@@ -71,7 +71,7 @@ end) :
     module V1 = struct
       module T = struct
         type t =
-          { snark_transition: Snark_transition.value
+          { snark_transition: Snark_transition.Value.Stable.V1.t
           ; prover_state: Prover_state.t
           ; staged_ledger_diff: Staged_ledger_diff.Stable.V1.t }
         [@@deriving sexp, fields, bin_io, version {asserted}]
@@ -93,13 +93,13 @@ end) :
     module Registered_V1 = Registrar.Register (V1)
   end
 
-  (* bin_io intentionally omitted *)
+  (* bin_io, version omitted *)
   type t = Stable.Latest.t =
-    { snark_transition: Snark_transition.value
+    { snark_transition: Snark_transition.Value.Stable.V1.t
     ; prover_state: Prover_state.t
-    ; staged_ledger_diff: Staged_ledger_diff.t }
+    ; staged_ledger_diff: Staged_ledger_diff.Stable.V1.t }
   [@@deriving sexp, fields]
 
   let create ~snark_transition ~prover_state ~staged_ledger_diff =
-    {snark_transition; staged_ledger_diff; prover_state}
+    {Stable.Latest.snark_transition; staged_ledger_diff; prover_state}
 end
