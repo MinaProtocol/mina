@@ -59,5 +59,5 @@ Task.Result.Infix.(
      // the inner Result is the exceptions we may have accumulated from bad i/o
      let x = Result.ok_exn(Result.ok_exn(res));
      assert(x == hello_world);
-     print_endline("I did it");
+     print_endline("Successfully read the data!");
    });

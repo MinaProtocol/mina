@@ -23,11 +23,19 @@ let ok = t =>
   | Ok(x) => Some(x)
   | Error(_) => None
   };
-let ok_exn = (t: t('a, Js.Exn.t)) =>
+let ok_exn = (t: t('a, Js.Exn.t)) => {
+  let string_of_str_option = s =>
+    switch (s) {
+    | None => "None"
+    | Some(s) => s
+    };
+
   switch (t) {
   | Ok(x) => x
-  | Error(e) => raise(Obj.magic(e))
+  | Error(e) =>
+    Js.Exn.raiseError(string_of_str_option(Js.Exn.stack(Obj.magic(e))))
   };
+};
 let err = t =>
   switch (t) {
   | Ok(_) => None

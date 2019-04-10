@@ -48,8 +48,11 @@ let fork = (t, ~f) => {
          | None => Js.Promise.resolve()
          | Some(a) => Js.Promise.resolve(cb(Result.return(a)))
          }
-       );
-
+       )
+    |> Js.Promise.catch(err => {
+         Js.log2("Uncaught exception in Task: ", err);
+         exit(1);
+       });
   ();
 };
 
