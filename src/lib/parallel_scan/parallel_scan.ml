@@ -49,6 +49,7 @@ module State = struct
     let level_pointer =
       Array.init (parallelism_log_2 + 1) ~f:(fun i -> Int.pow 2 i - 1)
     in
+    assert (root_at_depth >= 0 && root_at_depth <= parallelism_log_2) ;
     jobs.position <- 0 ;
     { jobs
     ; level_pointer
@@ -90,7 +91,38 @@ module State = struct
     go ((2 * parallelism) - slots_per_block - 1)
 
   (*start from last block*)
-  
+
+  let%test_unit "multiple blocks" =
+    let parallelism_log_2 = 5 in
+    let of_root_at_depth x =
+      let state = create ~parallelism_log_2 ~root_at_depth:x in
+      let slots_per_block = slots_per_block state in
+      let total_leaves = parallelism state in
+      let offset = total_leaves - 1 in
+      let all_leaf_positions =
+        List.init total_leaves ~f:(fun x -> x + offset)
+      in
+      let total_blocks =
+        List.fold ~init:0 all_leaf_positions ~f:(fun block_no pos ->
+            let block_start = block_of state pos in
+            let cur_block_no = (block_start - offset) / slots_per_block in
+            if block_no = cur_block_no then block_no
+            else
+              let block_end =
+                offset + ((block_no + 1) * slots_per_block) - 1
+              in
+              assert (pos - 1 = block_end) ;
+              cur_block_no )
+      in
+      assert (total_blocks + 1 = Int.pow 2 x)
+    in
+    of_root_at_depth 0 ;
+    of_root_at_depth 1 ;
+    of_root_at_depth 2 ;
+    of_root_at_depth 3 ;
+    of_root_at_depth 4 ;
+    of_root_at_depth 5
+
   (*Assuming that Base Somes are picked in the same order*)
   let next_base_pos state cur_pos =
     let p = parallelism state in
