@@ -1502,7 +1502,17 @@ module type Consensus_mechanism_intf = sig
      and type consensus_state := Consensus_state.Value.t
 
   module Prover_state : sig
-    type t [@@deriving bin_io]
+    type t
+
+    module Stable :
+      sig
+        module V1 : sig
+          type t [@@deriving bin_io]
+        end
+
+        module Latest : module type of V1
+      end
+      with type V1.t = t
   end
 
   module Proposal_data : sig
