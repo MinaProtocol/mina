@@ -360,6 +360,8 @@ module type Main_intf = sig
   val best_tip :
     t -> Inputs.Transition_frontier.Breadcrumb.t Participating_state.t
 
+  val is_active : t -> bool
+
   val visualize_frontier : filename:string -> t -> unit Participating_state.t
 
   val peers : t -> Network_peer.Peer.t list
@@ -1085,6 +1087,39 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
   include Program
   open Inputs
 
+  module Coda_graphql = struct
+    open Graphql_async
+    open Schema
+    open Async
+
+    module Types = struct
+      type sync_status = Error | Bootstrap | Synced
+
+      let sync_status =
+        non_null
+          (enum "sync_status" ~doc:"Sync status as daemon node"
+             ~values:
+               [ enum_value "ERROR" ~value:Error
+               ; enum_value "BOOTSTRAP" ~value:Bootstrap
+               ; enum_value "SYNCED" ~value:Synced ])
+    end
+
+    module Queries = struct
+      open Types
+
+      let sync_state =
+        io_field "sync_status" ~typ:sync_status
+          ~args:Arg.[]
+          ~resolve:(fun {ctx= coda; _} () ->
+            Deferred.Result.return
+              (if is_active coda then Synced else Bootstrap) )
+
+      let commands = [sync_state]
+    end
+
+    let schema = Graphql_async.Schema.(schema Queries.commands)
+  end
+
   module For_tests = struct
     let ledger_proof t = staged_ledger_ledger_proof t
   end
@@ -1551,17 +1586,10 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
     in
     Option.iter rest_server_port ~f:(fun rest_server_port ->
         trace_task "REST server" (fun () ->
-            let graphql_schema =
-              Graphql_async.Schema.(
-                schema
-                  [ field "greeting" ~typ:(non_null string)
-                      ~args:Arg.[]
-                      ~resolve:(fun _ () -> "hello coda") ])
-            in
             let graphql_callback =
               Graphql_cohttp_async.make_callback
-                (fun _req -> ())
-                graphql_schema
+                (fun _req -> coda)
+                Coda_graphql.schema
             in
             Cohttp_async.(
               Server.create

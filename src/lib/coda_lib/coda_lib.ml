@@ -483,6 +483,9 @@ module Make (Inputs : Inputs_intf) = struct
 
   let root_length = compose_of_option root_length_opt
 
+  let is_active t =
+    Option.is_some (Broadcast_pipe.Reader.peek t.transition_frontier)
+
   let visualize_frontier ~filename =
     compose_of_option
     @@ fun t ->
