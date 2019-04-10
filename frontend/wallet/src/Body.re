@@ -1,48 +1,59 @@
-let component = ReasonReact.statelessComponent("Body");
+module Test = [%graphql {| query { version } |}];
+module TestQuery = ApolloShim.CreateQuery(Test);
 
-module Test = [%graphql {| query { greeting } |}];
-module TestQuery = ReasonApollo.CreateQuery(Test);
+module HooksTest = {
+  [@react.component]
+  let make = (~name) => {
+    let (count, setCount) = React.useState(() => 0);
 
-let make = (~message as _, _children) => {
-  ...component,
-  render: _self => {
+    <div>
+      <p>
+        {React.string(
+           name ++ " clicked " ++ string_of_int(count) ++ " times",
+         )}
+      </p>
+      <button onClick={_ => setCount(count => count + 1)}>
+        {React.string("Click me")}
+      </button>
+    </div>;
+  };
+};
+
+[@react.component]
+let make = (~message as _) =>
+  <div
+    style={ReactDOMRe.Style.make(
+      ~color="white",
+      ~background="#121f2b11",
+      ~fontFamily="Sans-Serif",
+      ~display="flex",
+      ~overflow="hidden",
+      (),
+    )}>
     <div
       style={ReactDOMRe.Style.make(
-        ~color="white",
-        ~background="#121f2b11",
-        ~fontFamily="Sans-Serif",
         ~display="flex",
-        ~overflow="hidden",
+        ~flexDirection="column",
+        ~justifyContent="flex-start",
+        ~width="20%",
+        ~height="auto",
+        ~overflowY="auto",
         (),
       )}>
-
-        <div
-          style={ReactDOMRe.Style.make(
-            ~display="flex",
-            ~flexDirection="column",
-            ~justifyContent="flex-start",
-            ~width="20%",
-            ~height="auto",
-            ~overflowY="auto",
-            (),
-          )}>
-          <WalletItem name="Hot Wallet" balance=100.0 />
-          <WalletItem name="Vault" balance=234122.123 />
-        </div>
-        <div style={ReactDOMRe.Style.make(~margin="10px", ())}>
-          <TestQuery>
-            ...{({result}) =>
-              ReasonReact.string(
-                switch (result) {
-                | Loading => ""
-                | Error(error) => error##message
-                | Data(response) => response##greeting
-                },
-              )
-            }
-          </TestQuery>
-        </div>
-      </div>;
-      // </div>
-  },
-};
+      <WalletItem name="Hot Wallet2" balance=100.0 />
+      <WalletItem name="Vault" balance=234122.123 />
+    </div>
+    <div style={ReactDOMRe.Style.make(~margin="10px", ())}>
+      <TestQuery>
+        {result =>
+           ReasonReact.string(
+             switch (result) {
+             | Loading => ""
+             | Error(error) => error##message
+             | Data(response) => response##version
+             },
+           )}
+      </TestQuery>
+      <HooksTest name="test-hooks" />
+    </div>
+  </div>;

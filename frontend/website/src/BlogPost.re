@@ -101,7 +101,7 @@ let make = (~name, ~html, ~metadata, ~showComments=true, _) => {
     ...component,
     render: _self =>
       <div>
-        <div className="ph3 ph4-m ph5-l">
+        <div className="ph2-m ph3-l">
           <div>
             <div className="db dn-l">
               <div className="mw65-ns ibmplex f5 center blueblack">

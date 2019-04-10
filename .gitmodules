@@ -1,12 +1,12 @@
 [submodule "src/lib/snarky"]
 	path = src/lib/snarky
-	url = ../../o1-labs/snarky
+	url = git@github.com:o1-labs/snarky
 [submodule "src/external/ppx_optcomp"]
 	path = src/external/ppx_optcomp
-	url = ../ppx_optcomp
+	url = git@github.com:CodaProtocol/ppx_optcomp
 [submodule "src/external/async_kernel"]
 	path = src/external/async_kernel
-	url = ../async_kernel
+	url = git@github.com:CodaProtocol/async_kernel
 [submodule "src/external/ocaml-extlib"]
 	path = src/external/ocaml-extlib
 	url = git@github.com:CodaProtocol/ocaml-extlib.git

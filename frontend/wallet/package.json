@@ -8,21 +8,27 @@
     "bs-electron": "github:Schmavery/bs-electron",
     "graphql_ppx": "^0.2.8",
     "reason-apollo": "^0.15.2",
-    "reason-react": "^0.5.3"
+    "reason-react": "github:reasonml/reason-react#6a854ec"
   },
   "devDependencies": {
     "bs-platform": "^4.0.18",
     "concurrently": "^4.1.0",
-    "fastpack": "^0.8.4"
+    "fastpack": "^0.8.4",
+    "graphql-faker": "^1.9.0"
   },
   "scripts": {
     "start": "electron ./lib/js/src/App.js",
+    "fake": "graphql-faker --port 8080 -- schema.graphql",
+    "fake-inspector": "graphql-faker --open -- schema.graphql",
     "build": "bsb -make-world",
+    "build-ci": "npm run query-fake && npm run build",
     "clean": "bsb -clean-world",
     "pack": "fpack --development ./lib/js/src/Index.js",
     "query": "send-introspection-query http://localhost:8080/graphql",
+    "query-fake": "concurrently --kill-others 'npm run fake' 'sleep 5 && npm run query'",
     "reformat": "bsrefmt --in-place src/*.re",
-    "dev": "concurrently 'bsb -make-world -w' 'fpack watch --development ./lib/js/src/Index.js' 'electron ./lib/js/src/App.js'"
+    "dev": "concurrently --kill-others 'npm run fake' 'bsb -make-world -w' 'fpack watch --development ./lib/js/src/Index.js' 'sleep 2 && electron ./lib/js/src/App.js'",
+    "postinstall": "./postinstall.sh"
   },
   "author": "",
   "license": "ISC"
