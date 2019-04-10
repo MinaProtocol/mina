@@ -6,7 +6,20 @@ module Field = Crypto_params.Tock.Fq
 type t = Crypto_params.Tock.G1.t
 
 module Compressed = struct
-  type t = {x: Field.t; is_odd: bool} [@@deriving bin_io, eq, sexp]
+  module Stable = struct
+    module V1 = struct
+      module T = struct
+        type t = {x: Field.t; is_odd: bool}
+        [@@deriving bin_io, eq, sexp, version {asserted}]
+      end
+
+      include T
+    end
+
+    module Latest = V1
+  end
+
+  type t = Stable.Latest.t = {x: Field.t; is_odd: bool} [@@deriving eq, sexp]
 
   let fold_bits {is_odd; x} =
     {Fold.fold= (fun ~init ~f -> f ((Field.fold_bits x).fold ~init ~f) is_odd)}

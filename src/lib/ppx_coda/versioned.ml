@@ -10,36 +10,44 @@
 
   or
 
-    [@@deriving version { wrapped }]
+    [@@deriving version { option }]
 
-  If the "wrapped" option is omitted (the common case), the type must be named "t", 
-  and its definition occurs in the module hierarchy "Stable.Vn.T", where n is a 
-  positive integer.
+  where option is one of "wrapped", "unnumbered", "rpc", or "asserted".
+
+  Without options (the common case), the type must be named "t", and its definition 
+  occurs in the module hierarchy "Stable.Vn.T", where n is a positive integer.
   
   If "wrapped" is true, again, the type must be named "t", but the type
   definition occurs in the hierarchy "Wrapped.Stable.Vn", where n is a positive
   integer. TODO: Anything to say about registration, translation to a latest
   version for wrapped types?
 
-  For types in structures, we can also write:
-
-    [@@deriving version { unnumbered }]
-
   The "unnumbered" option prevents the generation of the value
    
     let version = n
 
-  to prevent warnings or errors about an unused value. That's 
-  useful for versioned types in modules that aren't registered.
+  to prevent warnings or errors about an unused value. That's useful for versioned types in 
+  modules that aren't registered.
 
+  The "asserted" option asserts that the type is versioned, to allow compilation
+  to proceed. The types referred to in the type are not checked for versioning
+  with this option. The type must be contained in the module hierarchy "Stable.Vn.T". 
+  Eventually, all uses of this option should be removed, except in test code.
+
+  If "rpc" is true, again, the type must be named "query", "response", or "msg",
+  and the type definition occurs in the hierarchy "Vn.T".
+
+  All these options are available for types within structures. Within signatures,
+  only the "unnumbered" option is available.
+ 
 *)
 
 open Core_kernel
 open Ppxlib
 
-type version_info = {versioned: bool; wrapped: bool}
-
 let deriver = "version"
+
+type generation_kind = Plain | Wrapped | Rpc
 
 let validate_module_version module_version loc =
   let len = String.length module_version in
@@ -61,7 +69,16 @@ let validate_module_version module_version loc =
          begin with 0, got: \"%s\""
         module_version
 
-let validate_unwrapped_type_decl inner3_modules type_decl =
+let validate_rpc_type_decl inner3_modules type_decl =
+  match List.take inner3_modules 2 with
+  | ["T"; module_version] ->
+      validate_module_version module_version type_decl.ptype_loc
+  | _ ->
+      Location.raise_errorf ~loc:type_decl.ptype_loc
+        "Versioned RPC type must be contained in module path Vn.T, for some \
+         number n"
+
+let validate_plain_type_decl inner3_modules type_decl =
   match inner3_modules with
   | ["T"; module_version; "Stable"] ->
       validate_module_version module_version type_decl.ptype_loc
@@ -80,35 +97,64 @@ let validate_wrapped_type_decl inner3_modules type_decl =
          Wrapped.Stable.Vn, for some number n"
 
 (* check that a versioned type occurs in valid module hierarchy and is named "t"
+   (for RPC types, the name can be "query", "response", or "msg")
  *)
-let validate_type_decl inner3_modules wrapped type_decl =
-  if not (String.equal type_decl.ptype_name.txt "t") then
-    Location.raise_errorf ~loc:type_decl.ptype_name.loc
-      "Versioned type must be named \"t\", got: \"%s\""
-      type_decl.ptype_name.txt ;
-  if wrapped then validate_wrapped_type_decl inner3_modules type_decl
-  else validate_unwrapped_type_decl inner3_modules type_decl
+let validate_type_decl inner3_modules generation_kind type_decl =
+  let name = type_decl.ptype_name.txt in
+  let loc = type_decl.ptype_name.loc in
+  match generation_kind with
+  | Wrapped ->
+      let valid_name = "t" in
+      if not (String.equal name valid_name) then
+        Location.raise_errorf ~loc
+          "Wrapped versioned type must be named \"%s\", got: \"%s\"" valid_name
+          name ;
+      validate_wrapped_type_decl inner3_modules type_decl
+  | Rpc ->
+      let rpc_valid_names = ["query"; "response"; "msg"] in
+      if
+        List.find rpc_valid_names ~f:(fun ty -> String.equal ty name)
+        |> Option.is_none
+      then
+        Location.raise_errorf ~loc
+          "RPC versioned type must be named one of \"%s\", got: \"%s\""
+          (String.concat ~sep:"," rpc_valid_names)
+          name ;
+      validate_rpc_type_decl inner3_modules type_decl
+  | Plain ->
+      let valid_name = "t" in
+      if not (String.equal name valid_name) then
+        Location.raise_errorf ~loc
+          "Versioned type must be named \"%s\", got: \"%s\"" valid_name name ;
+      validate_plain_type_decl inner3_modules type_decl
 
-let module_name_from_unwrapped_path inner3_modules =
+let module_name_from_plain_path inner3_modules =
   match inner3_modules with
   | ["T"; module_version; "Stable"] -> module_version
-  | _ -> failwith "module_name_from_unwrapped_path: unexpected module path"
+  | _ -> failwith "module_name_from_plain_path: unexpected module path"
 
 let module_name_from_wrapped_path inner3_modules =
   match inner3_modules with
   | [module_version; "Stable"; "Wrapped"] -> module_version
   | _ -> failwith "module_name_from_wrapped_path: unexpected module path"
 
+let module_name_from_rpc_path inner3_modules =
+  match List.take inner3_modules 2 with
+  | ["T"; module_version] -> module_version
+  | _ -> failwith "module_name_from_rpc_path: unexpected module path"
+
 (* generate "let version = n", when version module is Vn *)
-let generate_version_number_decl inner3_modules loc wrapped =
+let generate_version_number_decl inner3_modules loc generation_kind =
   (* invariant: we've checked module name already *)
   let module E = Ppxlib.Ast_builder.Make (struct
     let loc = loc
   end) in
   let open E in
   let module_name =
-    if wrapped then module_name_from_wrapped_path inner3_modules
-    else module_name_from_unwrapped_path inner3_modules
+    match generation_kind with
+    | Plain -> module_name_from_plain_path inner3_modules
+    | Wrapped -> module_name_from_wrapped_path inner3_modules
+    | Rpc -> module_name_from_rpc_path inner3_modules
   in
   let version =
     String.sub module_name ~pos:1 ~len:(String.length module_name - 1)
@@ -118,17 +164,17 @@ let generate_version_number_decl inner3_modules loc wrapped =
 
 let ocaml_builtin_types = ["int"; "float"; "char"; "string"; "bool"; "unit"]
 
-let ocaml_builtin_type_constructors = ["list"; "option"; "ref"]
+let ocaml_builtin_type_constructors = ["list"; "array"; "option"; "ref"]
 
 let jane_street_type_constructors = ["sexp_opaque"]
 
-let rec generate_core_type_version_decls core_type =
+let rec generate_core_type_version_decls type_name core_type =
   match core_type.ptyp_desc with
   | Ptyp_constr ({txt; _}, core_types) -> (
     match txt with
     | Lident id ->
         (* type t = id *)
-        if String.equal id "t" (* recursion *) then []
+        if String.equal id type_name (* recursion *) then []
         else if
           List.is_empty core_types
           && List.mem ocaml_builtin_types id ~equal:String.equal
@@ -139,7 +185,7 @@ let rec generate_core_type_version_decls core_type =
           || List.mem jane_street_type_constructors id ~equal:String.equal
         then
           match core_types with
-          | [_] -> generate_version_lets_for_core_types core_types
+          | [_] -> generate_version_lets_for_core_types type_name core_types
           | _ ->
               Ppx_deriving.raise_errorf ~loc:core_type.ptyp_loc
                 "Type constructor \"%s\" expects one type argument, got %d" id
@@ -160,13 +206,13 @@ let rec generate_core_type_version_decls core_type =
           ; pexp_attributes= [] }
         in
         [%str let _ = [%e versioned_ident]]
-        @ generate_version_lets_for_core_types core_types
+        @ generate_version_lets_for_core_types type_name core_types
     | _ ->
         Ppx_deriving.raise_errorf ~loc:core_type.ptyp_loc
           "Unrecognized type constructor for versioned type" )
   | Ptyp_tuple core_types ->
       (* type t = t1 * t2 * t3 *)
-      generate_version_lets_for_core_types core_types
+      generate_version_lets_for_core_types type_name core_types
   | Ptyp_variant _ -> (* type t = [ `A | `B ] *)
                       []
   | Ptyp_var _ -> (* type variable *)
@@ -175,27 +221,28 @@ let rec generate_core_type_version_decls core_type =
       Ppx_deriving.raise_errorf ~loc:core_type.ptyp_loc
         "Can't determine versioning for contained type"
 
-and generate_version_lets_for_core_types core_types =
+and generate_version_lets_for_core_types type_name core_types =
   List.fold_right core_types ~init:[] ~f:(fun core_type accum ->
-      generate_core_type_version_decls core_type @ accum )
+      generate_core_type_version_decls type_name core_type @ accum )
 
-let generate_version_lets_for_label_decls label_decls =
-  generate_version_lets_for_core_types
+let generate_version_lets_for_label_decls type_name label_decls =
+  generate_version_lets_for_core_types type_name
     (List.map label_decls ~f:(fun lab_decl -> lab_decl.pld_type))
 
-let generate_constructor_decl_decls ctor_decl =
+let generate_constructor_decl_decls type_name ctor_decl =
   match (ctor_decl.pcd_res, ctor_decl.pcd_args) with
   | None, Pcstr_tuple core_types ->
       (* C of T1 * ... * Tn *)
-      generate_version_lets_for_core_types core_types
+      generate_version_lets_for_core_types type_name core_types
   | None, Pcstr_record label_decls ->
       (* C of { ... } *)
-      generate_version_lets_for_label_decls label_decls
+      generate_version_lets_for_label_decls type_name label_decls
   | _ ->
       Ppx_deriving.raise_errorf ~loc:ctor_decl.pcd_loc
         "Can't determine versioning for constructor declaration"
 
 let generate_contained_type_decls type_decl =
+  let type_name = type_decl.ptype_name.txt in
   match type_decl.ptype_kind with
   | Ptype_abstract ->
       if Option.is_none type_decl.ptype_manifest then
@@ -203,24 +250,35 @@ let generate_contained_type_decls type_decl =
           "Versioned type, not a label or variant, must have manifest \
            (right-hand side)" ;
       let manifest = Option.value_exn type_decl.ptype_manifest in
-      generate_core_type_version_decls manifest
+      generate_core_type_version_decls type_name manifest
   | Ptype_variant ctor_decls ->
       List.fold ctor_decls ~init:[] ~f:(fun accum ctor_decl ->
-          generate_constructor_decl_decls ctor_decl @ accum )
+          generate_constructor_decl_decls type_name ctor_decl @ accum )
   | Ptype_record label_decls ->
-      generate_version_lets_for_label_decls label_decls
+      generate_version_lets_for_label_decls type_name label_decls
   | Ptype_open ->
       Ppx_deriving.raise_errorf ~loc:type_decl.ptype_loc
-        "Versioned type must not be open"
+        "Versioned type may not be open"
 
-let generate_versioned_decls type_decl ~wrapped =
+let generate_versioned_decls ~asserted generation_kind type_decl =
   let module E = Ppxlib.Ast_builder.Make (struct
     let loc = type_decl.ptype_loc
   end) in
   let open E in
   let versioned_current = [%stri let __versioned__ = true] in
-  if wrapped then [versioned_current]
-  else versioned_current :: generate_contained_type_decls type_decl
+  if asserted then [versioned_current]
+  else
+    match generation_kind with
+    | Wrapped ->
+        (* don't check whether contained types are versioned *)
+        [versioned_current]
+    | Rpc ->
+        (* check whether contained types are versioned,
+        but don't assert versioned-ness of this type *)
+        generate_contained_type_decls type_decl
+    | Plain ->
+        (* check contained types, assert this type is versioned *)
+        versioned_current :: generate_contained_type_decls type_decl
 
 let get_type_decl_representative type_decls =
   let type_decl1 = List.hd_exn type_decls in
@@ -260,16 +318,40 @@ let validate_options valid options =
       (String.concat ~sep:"," valid)
 
 let generate_let_bindings_for_type_decl_str ~options ~path type_decls =
-  ignore (validate_options ["wrapped"; "unnumbered"] options) ;
+  ignore
+    (validate_options ["wrapped"; "unnumbered"; "rpc"; "asserted"] options) ;
   let type_decl = get_type_decl_representative type_decls in
   let wrapped = check_for_option "wrapped" options in
   let unnumbered = check_for_option "unnumbered" options in
+  let asserted = check_for_option "asserted" options in
+  let rpc = check_for_option "rpc" options in
+  if asserted && (wrapped || rpc) then
+    Ppx_deriving.raise_errorf ~loc:type_decl.ptype_loc
+      "Option \"asserted\" cannot be combined with \"wrapped\" or \"rpc\" \
+       options" ;
+  let generation_kind =
+    match (rpc, wrapped) with
+    | true, false -> Rpc
+    | false, true -> Wrapped
+    | false, false -> Plain
+    | true, true ->
+        Ppx_deriving.raise_errorf ~loc:type_decl.ptype_loc
+          "RPC versioned type cannot also be wrapped"
+  in
   let inner3_modules = List.take (List.rev path) 3 in
-  validate_type_decl inner3_modules wrapped type_decl ;
-  let versioned_decls = generate_versioned_decls type_decl ~wrapped in
-  if unnumbered then versioned_decls
+  validate_type_decl inner3_modules generation_kind type_decl ;
+  let versioned_decls =
+    generate_versioned_decls ~asserted generation_kind type_decl
+  in
+  let type_name = type_decl.ptype_name.txt in
+  (* generate version number for Rpc response, but not for query, so we
+     don't get an unused value
+   *)
+  if unnumbered || (generation_kind = Rpc && String.equal type_name "query")
+  then versioned_decls
   else
-    generate_version_number_decl inner3_modules type_decl.ptype_loc wrapped
+    generate_version_number_decl inner3_modules type_decl.ptype_loc
+      generation_kind
     :: versioned_decls
 
 let generate_val_decls_for_type_decl type_decl ~unnumbered =

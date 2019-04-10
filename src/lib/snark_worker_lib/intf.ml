@@ -6,7 +6,11 @@ let command_name = "snark-worker"
 
 module type Inputs_intf = sig
   module Sparse_ledger : sig
-    type t [@@deriving bin_io, sexp]
+    module Stable : sig
+      module V1 : sig
+        type t [@@deriving bin_io, sexp]
+      end
+    end
   end
 
   module Transaction_witness : sig
@@ -93,19 +97,27 @@ module type S = sig
 
   module Rpcs : sig
     module Get_work : sig
-      type query = unit
+      module V1 : sig
+        type query = unit
 
-      type response = Work.Spec.t option
+        type response = Work.Spec.t option
 
-      val rpc : (query, response) Rpc.Rpc.t
+        val rpc : (query, response) Rpc.Rpc.t
+      end
+
+      module Latest = V1
     end
 
     module Submit_work : sig
-      type query = Work.Result.t
+      module V1 : sig
+        type query = Work.Result.t
 
-      type response = unit
+        type response = unit
 
-      val rpc : (query, response) Rpc.Rpc.t
+        val rpc : (query, response) Rpc.Rpc.t
+      end
+
+      module Latest = V1
     end
   end
 

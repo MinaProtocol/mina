@@ -16,7 +16,8 @@ module type Consensus_state_intf = sig
     module Stable :
       sig
         module V1 : sig
-          type t [@@deriving hash, compare, bin_io, sexp, eq, to_yojson]
+          type t
+          [@@deriving hash, compare, bin_io, sexp, eq, to_yojson, version]
         end
       end
       with type V1.t = t
@@ -56,12 +57,11 @@ module type S = sig
     module Value : sig
       module Stable : sig
         module V1 : sig
-          (* TODO : version these pieces *)
           type nonrec t =
             ( Blockchain_state.Value.Stable.V1.t
             , Consensus_state.Value.Stable.V1.t )
             t
-          [@@deriving bin_io, sexp, to_yojson]
+          [@@deriving bin_io, sexp, to_yojson, version]
         end
 
         module Latest : module type of V1
@@ -82,7 +82,7 @@ module type S = sig
     module Stable : sig
       module V1 : sig
         type nonrec t = (State_hash.Stable.V1.t, Body.Value.Stable.V1.t) t
-        [@@deriving sexp, bin_io, compare, eq, to_yojson]
+        [@@deriving sexp, bin_io, compare, eq, to_yojson, version]
       end
 
       module Latest : module type of V1
@@ -171,18 +171,15 @@ module Make
       module Stable = struct
         module V1 = struct
           module T = struct
-            (* TODO : use version ppx *)
-            let version = 1
-
-            let __versioned__ = true
-
             type tt =
               ( Blockchain_state.Value.Stable.V1.t
               , Consensus_state.Value.Stable.V1.t )
               t
             [@@deriving eq, ord, bin_io, hash, sexp, to_yojson]
 
-            type t = tt [@@deriving eq, ord, bin_io, hash, sexp, to_yojson]
+            type t = tt
+            [@@deriving
+              eq, ord, bin_io, hash, sexp, to_yojson, version {asserted}]
           end
 
           include T
@@ -251,15 +248,12 @@ module Make
     module Stable = struct
       module V1 = struct
         module T = struct
-          (* TODO : use version ppx *)
-          let version = 1
-
-          let __versioned__ = true
-
           type t_ = (State_hash.Stable.V1.t, Body.Value.Stable.V1.t) t
           [@@deriving bin_io, sexp, hash, compare, eq, to_yojson]
 
-          type t = t_ [@@deriving bin_io, sexp, hash, compare, eq, to_yojson]
+          type t = t_
+          [@@deriving
+            bin_io, sexp, hash, compare, eq, to_yojson, version {asserted}]
         end
 
         include T

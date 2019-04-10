@@ -1,6 +1,8 @@
 open Fold_lib
 
-type t = {length: Length.t; signer_public_key: Public_key.Compressed.t}
+(* TODO: version *)
+type t =
+  {length: Length.t; signer_public_key: Public_key.Compressed.Stable.V1.t}
 [@@deriving eq, bin_io, sexp]
 
 let length_in_triples =

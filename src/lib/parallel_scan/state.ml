@@ -2,43 +2,44 @@ open Core_kernel
 open Coda_digestif
 
 module Job = struct
+  module Sequence_no = struct
+    module Stable = struct
+      module V1 = struct
+        module T = struct
+          type t = int [@@deriving sexp, bin_io, version]
+        end
+
+        include T
+      end
+
+      module Latest = V1
+    end
+
+    type t = Stable.Latest.t [@@deriving sexp]
+  end
+
+  module Merge = struct
+    module Stable = struct
+      module V1 = struct
+        module T = struct
+          type 'a t =
+            | Empty
+            | Lcomp of 'a
+            | Rcomp of 'a
+            | Bcomp of ('a * 'a * Sequence_no.Stable.V1.t)
+          [@@deriving sexp, bin_io, version]
+        end
+
+        include T
+      end
+
+      module Latest = V1
+    end
+  end
+
   module Stable = struct
     module V1 = struct
-      module Sequence_no = struct
-        module Stable = struct
-          module V1 = struct
-            module T = struct
-              type t = int [@@deriving sexp, bin_io, version]
-            end
-
-            include T
-          end
-
-          module Latest = V1
-        end
-
-        type t = Stable.Latest.t [@@deriving sexp]
-      end
-
       (*A merge can have zero components, one component (either the left or the right), or two components in which case there is an integer (sequence_no) representing a set of (completed)jobs in a sequence of (completed)jobs created*)
-      module Merge = struct
-        module Stable = struct
-          module V1 = struct
-            module T = struct
-              type 'a t =
-                | Empty
-                | Lcomp of 'a
-                | Rcomp of 'a
-                | Bcomp of ('a * 'a * Sequence_no.Stable.V1.t)
-              [@@deriving sexp, bin_io, version]
-            end
-
-            include T
-          end
-
-          module Latest = V1
-        end
-      end
 
       module T = struct
         type ('a, 'd) t =
@@ -53,7 +54,10 @@ module Job = struct
     module Latest = V1
   end
 
-  include Stable.Latest
+  type ('a, 'd) t = ('a, 'd) Stable.Latest.t =
+    | Merge of 'a Merge.Stable.V1.t
+    | Base of ('d * Sequence_no.Stable.V1.t) option
+  [@@deriving sexp]
 
   let gen a_gen d_gen =
     let open Quickcheck.Generator in
@@ -95,8 +99,8 @@ module Stable = struct
     (* don't use module registration here, because of type parameters *)
     module T = struct
       type ('a, 'd) t =
-        { jobs: ('a, 'd) Job.t Ring_buffer.Stable.V1.t
-        ; level_pointer: int Array.t
+        { jobs: ('a, 'd) Job.Stable.V1.t Ring_buffer.Stable.V1.t
+        ; level_pointer: int array
         ; capacity: int
         ; mutable acc: int * ('a * 'd list) option sexp_opaque
         ; mutable current_data_length: int
@@ -106,12 +110,9 @@ module Stable = struct
         ; stateful_work_order: int Queue.t
         ; mutable curr_job_seq_no: int
         ; root_at_depth: int }
-      [@@deriving sexp, bin_io]
+      [@@deriving sexp, bin_io, version {asserted}]
 
-      (* TODO : wrap Array and Queue, all other types here don't need versioning *)
-      let version = 1
-
-      let __versioned__ = true
+      (* TODO : wrap Queue *)
     end
 
     include T
@@ -123,7 +124,7 @@ end
 (* bin_io omitted from deriving list intentionally *)
 type ('a, 'd) t = ('a, 'd) Stable.Latest.t =
   { jobs: ('a, 'd) Job.t Ring_buffer.t
-  ; level_pointer: int Array.t
+  ; level_pointer: int array
   ; capacity: int
   ; mutable acc: int * ('a * 'd list) option
   ; mutable current_data_length: int

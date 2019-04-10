@@ -10,6 +10,12 @@ if [[ ! "$CIRCLE_BUILD_NUM" ]]; then
     exit 0
 fi
 
+# No creds
+if [[ -z "$JSON_GCLOUD_CREDENTIALS" || "$JSON_GCLOUD_CREDENTIALS" == "" ]]; then
+    echo "Skipping artifact upload as creds are missing"
+    exit 0
+fi
+
 do_copy () {
     # GC credentials
     echo $JSON_GCLOUD_CREDENTIALS > google_creds.json
