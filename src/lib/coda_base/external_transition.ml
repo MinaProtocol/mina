@@ -123,7 +123,7 @@ end)
           { protocol_state: Protocol_state.Value.Stable.V1.t
           ; protocol_state_proof: Proof.Stable.V1.t sexp_opaque
           ; staged_ledger_diff: Staged_ledger_diff.Stable.V1.t }
-        [@@deriving sexp, fields, bin_io, version {asserted}]
+        [@@deriving sexp, fields, bin_io, version]
 
         let to_yojson
             {protocol_state; protocol_state_proof= _; staged_ledger_diff= _} =
