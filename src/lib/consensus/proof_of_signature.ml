@@ -45,7 +45,19 @@ module Local_state = struct
 end
 
 module Prover_state = struct
-  include Unit
+  module Stable = struct
+    module V1 = struct
+      module T = struct
+        type t = unit [@@deriving bin_io, sexp, version]
+      end
+
+      include T
+    end
+
+    module Latest = V1
+  end
+
+  type t = Stable.Latest.t [@@deriving sexp]
 
   let precomputed_handler =
     unstage

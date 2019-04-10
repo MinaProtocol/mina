@@ -4,7 +4,17 @@ open Fold_lib
 open Coda_numbers
 
 module type Prover_state_intf = sig
-  type t [@@deriving bin_io, sexp]
+  type t [@@deriving sexp]
+
+  module Stable :
+    sig
+      module V1 : sig
+        type t [@@deriving bin_io, sexp, version]
+      end
+
+      module Latest : module type of V1
+    end
+    with type V1.t = t
 
   type pending_coinbase_witness
 

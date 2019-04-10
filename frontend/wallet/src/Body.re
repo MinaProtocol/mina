@@ -1,4 +1,4 @@
-module Test = [%graphql {| query { greeting } |}];
+module Test = [%graphql {| query { version } |}];
 module TestQuery = ApolloShim.CreateQuery(Test);
 
 module HooksTest = {
@@ -50,7 +50,7 @@ let make = (~message as _) =>
              switch (result) {
              | Loading => ""
              | Error(error) => error##message
-             | Data(response) => response##greeting
+             | Data(response) => response##version
              },
            )}
       </TestQuery>
