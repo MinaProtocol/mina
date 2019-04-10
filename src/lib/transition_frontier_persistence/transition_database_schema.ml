@@ -3,7 +3,7 @@ open Coda_base
 
 module Make (Inputs : Transition_frontier.Inputs_intf) :
   Intf.Transition_database_schema
-  with type external_transition := Inputs.External_transition.Stable.Latest.t
+  with type external_transition := Inputs.External_transition.t
    and type scan_state := Inputs.Staged_ledger.Scan_state.t
    and type state_hash := State_hash.t
    and type pending_coinbases := Pending_coinbase.t = struct
@@ -12,22 +12,21 @@ module Make (Inputs : Transition_frontier.Inputs_intf) :
   module Data = struct
     module Transition = struct
       (* TODO: version *)
-      type t =
-        External_transition.Stable.Latest.t * State_hash.Stable.Latest.t list
+      type t = External_transition.Stable.V1.t * State_hash.Stable.V1.t list
       [@@deriving bin_io]
     end
 
     module Root_data = struct
       type t =
-        State_hash.Stable.Latest.t
-        * Staged_ledger.Scan_state.Stable.Latest.t
-        * Pending_coinbase.Stable.Latest.t
+        State_hash.Stable.V1.t
+        * Staged_ledger.Scan_state.Stable.V1.t
+        * Pending_coinbase.Stable.V1.t
       [@@deriving bin_io]
     end
   end
 
   type _ t =
-    | Transition : State_hash.Stable.Latest.t -> Data.Transition.t t
+    | Transition : State_hash.Stable.V1.t -> Data.Transition.t t
     | Root : Data.Root_data.t t
 
   let binable_data_type (type a) : a t -> a Bin_prot.Type_class.t = function
@@ -62,7 +61,7 @@ module Make (Inputs : Transition_frontier.Inputs_intf) :
       a t -> a t Bin_prot.Type_class.t = function
     | Transition _ ->
         gadt_input_type_class
-          (module State_hash.Stable.Latest)
+          (module State_hash.Stable.V1)
           ~to_gadt:(fun transition -> Transition transition)
           ~of_gadt:(fun (Transition transition) -> transition)
     | Root ->

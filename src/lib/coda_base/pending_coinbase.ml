@@ -558,6 +558,9 @@ module T = struct
 
       module Latest = V1
     end
+
+    type ('tree, 'stack_id) t = ('tree, 'stack_id) Stable.Latest.t =
+      {tree: 'tree; pos_list: 'stack_id list; new_pos: 'stack_id}
   end
 
   module Stable = struct
@@ -610,7 +613,7 @@ module T = struct
           (Merkle_tree.add_path t path key Stack.empty)
           (Or_error.ok_exn (Stack_id.incr_by_one key))
     in
-    { Poly.Stable.Latest.tree=
+    { Poly.tree=
         go
           (Merkle_tree.of_hash ~depth:coinbase_tree_depth root_hash)
           Stack_id.zero

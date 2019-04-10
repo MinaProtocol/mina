@@ -4,22 +4,25 @@ open Protocols.Coda_transition_frontier
 
 module type Inputs = sig
   module Scan_state : sig
+    type t
+
     module Stable : sig
-      module Latest : sig
-        type t [@@deriving bin_io]
+      module V1 : sig
+        type nonrec t = t [@@deriving bin_io]
       end
     end
   end
 
   module External_transition : sig
+    type t
+
     module Stable : sig
-      module Latest : sig
-        type t [@@deriving bin_io]
+      module V1 : sig
+        type nonrec t = t [@@deriving bin_io]
       end
     end
 
-    val consensus_state :
-      Stable.Latest.t -> Consensus.Consensus_state.Value.Stable.V1.t
+    val consensus_state : t -> Consensus.Consensus_state.Value.Stable.V1.t
   end
 
   module Diff_hash : Diff_hash
@@ -30,9 +33,9 @@ module Make (Inputs : Inputs) : sig
 
   include
     Diff_mutant
-    with type external_transition := External_transition.Stable.Latest.t
+    with type external_transition := External_transition.t
      and type state_hash := State_hash.t
-     and type scan_state := Scan_state.Stable.Latest.t
+     and type scan_state := Scan_state.t
      and type hash := Diff_hash.t
      and type consensus_state := Consensus.Consensus_state.Value.Stable.V1.t
      and type pending_coinbases := Pending_coinbase.t
@@ -43,29 +46,25 @@ end = struct
     module New_frontier = struct
       (* TODO: version *)
       type t =
-        ( External_transition.Stable.Latest.t
-        , State_hash.Stable.Latest.t )
-        With_hash.t
-        * Scan_state.Stable.Latest.t
-        * Pending_coinbase.Stable.Latest.t
+        (External_transition.Stable.V1.t, State_hash.Stable.V1.t) With_hash.t
+        * Scan_state.Stable.V1.t
+        * Pending_coinbase.Stable.V1.t
       [@@deriving bin_io]
     end
 
     module Add_transition = struct
       (* TODO: version *)
       type t =
-        ( External_transition.Stable.Latest.t
-        , State_hash.Stable.Latest.t )
-        With_hash.t
+        (External_transition.Stable.V1.t, State_hash.Stable.V1.t) With_hash.t
       [@@deriving bin_io]
     end
 
     module Update_root = struct
       (* TODO: version *)
       type t =
-        State_hash.Stable.Latest.t
-        * Scan_state.Stable.Latest.t
-        * Pending_coinbase.Stable.Latest.t
+        State_hash.Stable.V1.t
+        * Scan_state.Stable.V1.t
+        * Pending_coinbase.Stable.V1.t
       [@@deriving bin_io]
     end
   end
@@ -86,8 +85,8 @@ end = struct
       | Update_root :
           Key.Update_root.t
           -> ( 'external_transition
-             , State_hash.Stable.Latest.t
-               * Scan_state.Stable.Latest.t
+             , State_hash.Stable.V1.t
+               * Scan_state.Stable.V1.t
                * Pending_coinbase.t )
              t
   end
@@ -138,9 +137,9 @@ end = struct
     merge
       ( Bin_prot.Utils.bin_dump
           [%bin_type_class:
-            State_hash.Stable.Latest.t
-            * Scan_state.Stable.Latest.t
-            * Pending_coinbase.Stable.Latest.t]
+            State_hash.Stable.V1.t
+            * Scan_state.Stable.V1.t
+            * Pending_coinbase.Stable.V1.t]
             .writer
           (hash, scan_state, pending_coinbase)
       |> Bigstring.to_string )

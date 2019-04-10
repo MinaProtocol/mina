@@ -130,10 +130,10 @@ struct
       (Consensus.Protocol_state)
 
   module Transaction = struct
-    open Coda_base.Transaction
-    include Stable.Latest
+    include Coda_base.Transaction.Stable.Latest
 
-    let fee_excess, supply_increase = (fee_excess, supply_increase)
+    let fee_excess, supply_increase =
+      Coda_base.Transaction.(fee_excess, supply_increase)
   end
 
   module Staged_ledger = Staged_ledger.Make (struct
