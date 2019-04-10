@@ -54,7 +54,7 @@ module type S = sig
     ; peers: Peer.Hash_set.t
     ; connections:
         ( Unix.Inet_addr.t
-        , (Uuid.t, Rpc.Connection.t option) Hashtbl.t )
+        , (Uuid.t, Rpc.Connection.t Ivar.t) Hashtbl.t )
         Hashtbl.t
     ; max_concurrent_connections: int option }
 
@@ -95,7 +95,7 @@ module Make (Message : Message_intf) :
     ; peers: Peer.Hash_set.t
     ; connections:
         ( Unix.Inet_addr.t
-        , (Uuid.t, Rpc.Connection.t option) Hashtbl.t )
+        , (Uuid.t, Rpc.Connection.t Ivar.t) Hashtbl.t )
         Hashtbl.t
           (**mapping a Uuid to a connection to be able to remove it from the hash 
          *table since Rpc.Connection.t doesn't have the socket information*)
@@ -222,10 +222,9 @@ module Make (Message : Message_intf) :
                      !"Peer %{sexp: Unix.Inet_addr.t} banned, disconnecting."
                      addr ;
                    Deferred.List.iter (Hashtbl.to_alist conn_list)
-                     ~f:(fun (_, conn_opt) ->
-                       match conn_opt with
-                       | None -> return ()
-                       | Some conn -> Rpc.Connection.close conn ) )) ;
+                     ~f:(fun (_, conn_ivar) ->
+                       let%bind conn = Ivar.read conn_ivar in
+                       Rpc.Connection.close conn ) )) ;
         trace_task "rebroadcasting messages" (fun () ->
             don't_wait_for
               (Linear_pipe.iter_unordered ~max_concurrency:64 broadcast_reader
@@ -294,7 +293,7 @@ module Make (Message : Message_intf) :
                 Reader.close reader >>= fun _ -> Writer.close writer )
               else
                 let conn_id = Uuid.create () in
-                Hashtbl.add_exn conn_map ~key:conn_id ~data:None ;
+                Hashtbl.add_exn conn_map ~key:conn_id ~data:(Ivar.create ()) ;
                 Hashtbl.set t.connections
                   ~key:(Socket.Address.Inet.addr client)
                   ~data:conn_map ;
@@ -306,7 +305,8 @@ module Make (Message : Message_intf) :
                         when connecting to the server over TCP; the ephemeral
                         port is distinct from the client's discovery and
                         communication ports *)
-                      Hashtbl.set conn_map ~key:conn_id ~data:(Some conn) ;
+                      let ivar = Hashtbl.find_exn conn_map conn_id in
+                      Ivar.fill ivar conn ;
                       Hashtbl.set t.connections
                         ~key:(Socket.Address.Inet.addr client)
                         ~data:conn_map ;
