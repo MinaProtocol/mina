@@ -452,12 +452,14 @@ module type Catchup_intf = sig
        logger:Logger.t
     -> network:network
     -> frontier:transition_frontier
-    -> catchup_job_reader:( ( external_transition_verified
+    -> catchup_job_reader:( state_hash
+                          * ( ( external_transition_verified
+                              , state_hash )
+                              With_hash.t
                             , state_hash )
-                            With_hash.t
-                          , state_hash )
-                          Cached.t
-                          Rose_tree.t
+                            Cached.t
+                            Rose_tree.t
+                            list )
                           Strict_pipe.Reader.t
     -> catchup_breadcrumbs_writer:( ( transition_frontier_breadcrumb
                                     , state_hash )
@@ -512,7 +514,7 @@ module type Transition_handler_validator_intf = sig
     -> ( ( (external_transition_verified, state_hash) With_hash.t
          , state_hash )
          Cached.t
-       , [ `In_frontier of transition_frontier_breadcrumb
+       , [ `In_frontier of state_hash
          | `Invalid of string
          | `Under_processing of state_hash Cache_lib.Intf.consumed_state ] )
        Result.t
@@ -545,12 +547,14 @@ module type Transition_handler_processor_intf = sig
                                   , state_hash )
                                   With_hash.t
                                   Strict_pipe.Reader.t
-    -> catchup_job_writer:( ( ( external_transition_verified
+    -> catchup_job_writer:( state_hash
+                            * ( ( external_transition_verified
+                                , state_hash )
+                                With_hash.t
                               , state_hash )
-                              With_hash.t
-                            , state_hash )
-                            Cached.t
-                            Rose_tree.t
+                              Cached.t
+                              Rose_tree.t
+                              list
                           , Strict_pipe.synchronous
                           , unit Deferred.t )
                           Strict_pipe.Writer.t

@@ -47,8 +47,11 @@ let%test_module "Ledger catchup" =
         Transition_handler.Unprocessed_transition_cache.register
           unprocessed_transition_cache transition
       in
+      let parent_hash =
+        External_transition.Verified.parent_hash (With_hash.data transition)
+      in
       Strict_pipe.Writer.write catchup_job_writer
-        (Rose_tree.T (cached_transition, [])) ;
+        (parent_hash, [Rose_tree.T (cached_transition, [])]) ;
       Ledger_catchup.run ~logger ~network ~frontier:me
         ~catchup_breadcrumbs_writer ~catchup_job_reader
         ~unprocessed_transition_cache ;
@@ -61,7 +64,7 @@ let%test_module "Ledger catchup" =
         Ivar.read result_ivar >>| List.hd_exn
       in
       let catchup_breadcrumbs =
-        Rose_tree.map cached_catchup_breadcrumbs ~f:Cache_lib.Cached.invalidate
+        Rose_tree.map cached_catchup_breadcrumbs ~f:Cache_lib.Cached.free
       in
       Rose_tree.equal expected_breadcrumbs catchup_breadcrumbs
         ~f:(fun breadcrumb_tree1 breadcrumb_tree2 ->

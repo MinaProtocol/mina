@@ -45,10 +45,12 @@ module Make (Inputs : Inputs.With_unprocessed_transition_cache.S) :
       ~(proposer_transition_reader :
          (External_transition.Verified.t, State_hash.t) With_hash.t Reader.t)
       ~(catchup_job_writer :
-         ( ( (External_transition.Verified.t, State_hash.t) With_hash.t
-           , State_hash.t )
-           Cached.t
-           Rose_tree.t
+         ( State_hash.t
+           * ( (External_transition.Verified.t, State_hash.t) With_hash.t
+             , State_hash.t )
+             Cached.t
+             Rose_tree.t
+             list
          , synchronous
          , unit Deferred.t )
          Writer.t)

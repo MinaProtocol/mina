@@ -24,10 +24,12 @@ module Make (Inputs : Inputs.S) = struct
     { logger: Logger.t
     ; time_controller: Time.Controller.t
     ; catchup_job_writer:
-        ( ( (External_transition.Verified.t, State_hash.t) With_hash.t
-          , State_hash.t )
-          Cached.t
-          Rose_tree.t
+        ( State_hash.t
+          * ( (External_transition.Verified.t, State_hash.t) With_hash.t
+            , State_hash.t )
+            Cached.t
+            Rose_tree.t
+            list
         , synchronous
         , unit Deferred.t )
         Writer.t
@@ -135,6 +137,12 @@ module Make (Inputs : Inputs.S) = struct
     in
     Rose_tree.T (cached_transition, List.map successors ~f:(extract_subtree t))
 
+  let extract_forest t hash =
+    let successors =
+      Option.value ~default:[] (Hashtbl.find t.collected_transitions hash)
+    in
+    (hash, List.map successors ~f:(extract_subtree t))
+
   let rec remove_tree t parent_hash =
     let children =
       Option.value ~default:[]
@@ -153,7 +161,8 @@ module Make (Inputs : Inputs.S) = struct
     in
     let make_timeout duration =
       Time.Timeout.create t.time_controller duration ~f:(fun _ ->
-          let subtree = extract_subtree t cached_transition in
+          let forest = extract_forest t parent_hash in
+          Hashtbl.remove t.parent_root_timeouts parent_hash ;
           remove_tree t parent_hash ;
           Logger.info t.logger ~module_:__MODULE__ ~location:__LOC__
             ~metadata:
@@ -168,7 +177,7 @@ module Make (Inputs : Inputs.S) = struct
             "timed out waiting for the parent of $cached_transition after \
              $duration ms, signalling a catchup job" ;
           (* it's ok to create a new thread here because the thread essentially does no work *)
-          don't_wait_for (Writer.write t.catchup_job_writer subtree) )
+          don't_wait_for (Writer.write t.catchup_job_writer forest) )
     in
     match Hashtbl.find t.collected_transitions parent_hash with
     | None ->

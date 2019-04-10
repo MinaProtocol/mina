@@ -36,7 +36,7 @@ module Make (Inputs : Inputs.With_unprocessed_transition_cache.S) :
     in
     let%bind () =
       Option.fold (Transition_frontier.find frontier hash) ~init:Result.ok_unit
-        ~f:(fun _ breadcrumb -> Result.Error (`In_frontier breadcrumb) )
+        ~f:(fun _ _ -> Result.Error (`In_frontier hash) )
     in
     let%bind () =
       Option.fold

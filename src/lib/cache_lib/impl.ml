@@ -129,12 +129,12 @@ module Make (Inputs : Inputs_intf) : Intf.Main.S = struct
            ; consumed_state= consumed_state t })
 
     let invalidate (type a b) (t : (a, b) t) : a =
-      mark_failed t ;
+      assert_not_consumed t "cannot invalidate consumed items" mark_failed t ;
       Cache.remove (cache t) (original t) ;
       value t
 
     let free (type a b) (t : (a, b) t) : a =
-      mark_success t ;
+      assert_not_consumed t "cannot free consumed items" mark_success t ;
       Cache.remove (cache t) (original t) ;
       value t
 
@@ -207,14 +207,14 @@ let%test_module "cache_lib test instance" =
     let with_cache ~logger ~f =
       Cache.create ~name:"test" ~logger (module String) |> f
 
-    let%test_unit "cached objects do not trigger unconsumption hook when \
-                   invalidated" =
+    let%test_unit "cached objects do not trigger unconsumption hook when freed"
+        =
       setup () ;
       let logger = Logger.null () in
       with_cache ~logger ~f:(fun cache ->
           with_item ~f:(fun data ->
               let x = Cache.register cache data in
-              ignore (Cached.invalidate x) ) ;
+              ignore (Cached.free x) ) ;
           Gc.full_major () ;
           assert (!dropped_cache_items = 0) )
 
@@ -245,7 +245,7 @@ let%test_module "cache_lib test instance" =
               let cached = Cache.register cache data in
               Gc.full_major () ;
               assert (!dropped_cache_items = 0) ;
-              ignore (Cached.invalidate cached) ) ) ;
+              ignore (Cached.free cached) ) ) ;
       Gc.full_major () ;
       assert (!dropped_cache_items = 0)
 
@@ -262,8 +262,8 @@ let%test_module "cache_lib test instance" =
           Gc.full_major () ;
           assert (!dropped_cache_items = 1) )
 
-    let%test_unit "properly invalidated derived cached objects do not trigger \
-                   any unconsumption handler calls" =
+    let%test_unit "properly freed derived cached objects do not trigger any \
+                   unconsumption handler calls" =
       setup () ;
       let logger = Logger.null () in
       with_cache ~logger ~f:(fun cache ->
@@ -271,7 +271,7 @@ let%test_module "cache_lib test instance" =
               Cache.register cache data
               |> Cached.transform ~f:(Fn.const 5)
               |> Cached.transform ~f:(Fn.const ())
-              |> Cached.invalidate |> ignore ) ;
+              |> Cached.free |> ignore ) ;
           Gc.full_major () ;
           assert (!dropped_cache_items = 0) )
 
@@ -285,10 +285,10 @@ let%test_module "cache_lib test instance" =
               let derivation = Cached.transform src ~f:(Fn.const 5) in
               assert (
                 try
-                  ignore (Cached.invalidate src) ;
+                  ignore (Cached.free src) ;
                   false
                 with _ -> true ) ;
-              ignore (Cached.invalidate derivation) ) ;
+              ignore (Cached.free derivation) ) ;
           Gc.full_major () ;
           assert (!dropped_cache_items = 0) )
 

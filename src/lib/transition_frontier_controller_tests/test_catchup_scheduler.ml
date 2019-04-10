@@ -101,15 +101,8 @@ let%test_module "Transition_handler.Catchup_scheduler tests" =
           Strict_pipe.Reader.iter_without_pushback catchup_job_reader
             ~f:(Ivar.fill result_ivar)
           |> don't_wait_for ;
-          let%map cached_catchup_transition =
-            match%map Ivar.read result_ivar with
-            | Rose_tree.T (t, []) -> t
-            | _ -> failwith "unexpected rose tree result"
-          in
-          let catchup_parent_hash =
-            Cached.peek cached_catchup_transition
-            |> With_hash.data |> External_transition.Verified.protocol_state
-            |> Protocol_state.previous_state_hash
+          let%map catchup_parent_hash =
+            match%map Ivar.read result_ivar with hash, _ -> hash
           in
           assert (Coda_base.State_hash.equal missing_hash catchup_parent_hash) ;
           Strict_pipe.Writer.close catchup_breadcrumbs_writer ;
@@ -182,7 +175,7 @@ let%test_module "Transition_handler.Catchup_scheduler tests" =
                 |> Cached.transform ~f:(Fn.const missing_breadcrumb) )
           in
           let received_rose_tree =
-            Rose_tree.map cached_received_rose_tree ~f:Cached.invalidate
+            Rose_tree.map cached_received_rose_tree ~f:Cached.free
           in
           assert (
             List.equal
@@ -257,7 +250,7 @@ let%test_module "Transition_handler.Catchup_scheduler tests" =
                 |> Cached.transform ~f:(Fn.const missing_breadcrumb) )
           in
           let received_rose_tree =
-            Rose_tree.map cached_received_rose_tree ~f:Cached.invalidate
+            Rose_tree.map cached_received_rose_tree ~f:Cached.free
           in
           assert (
             Rose_tree.equiv received_rose_tree upcoming_rose_tree

@@ -24,25 +24,23 @@ let main n () =
       ~f:Genesis_ledger.keypair_of_account_record_exn
   in
   Coda_worker_testnet.Payments.send_several_payments testnet ~node:0 ~keypairs
-    ~n:10
+    ~n:30
   |> don't_wait_for ;
   (* RESTART NODES *)
   (* catchup *)
-  let idx = Quickcheck.random_value (Int.gen_incl 1 (n - 1)) in
   let%bind () =
-    Coda_worker_testnet.Restarts.trigger_catchup testnet ~logger ~node:idx
+    Coda_worker_testnet.Restarts.trigger_catchup testnet ~logger ~node:2
   in
-  let%bind () = after (Time.Span.of_min 5.) in
+  let%bind () = after (Time.Span.of_min 1.) in
   (* bootstrap *)
-  let idx = Quickcheck.random_value (Int.gen_incl 1 (n - 1)) in
   let%bind () =
-    Coda_worker_testnet.Restarts.trigger_bootstrap testnet ~logger ~node:idx
+    Coda_worker_testnet.Restarts.trigger_bootstrap testnet ~logger ~node:1
   in
   (* TODO: We should add the random restart again once the Genesis Ledger is
      implemented. *)
   (* settle for a few more min *)
   (* TODO: Make sure to check that catchup actually worked *)
-  let%bind () = after (Time.Span.of_min 5.) in
+  let%bind () = after (Time.Span.of_min 2.) in
   Coda_worker_testnet.Api.teardown testnet
 
 let command =
