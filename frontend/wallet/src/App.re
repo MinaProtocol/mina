@@ -48,3 +48,16 @@ App.on(
 App.on(`WindowAllClosed, () =>
   print_endline("Closing window, menu staying open")
 );
+
+// Proof of concept on "database"
+let hello_world: Js.Json.t = Js.Json.string("hello world");
+Task.Result.Infix.(
+  FlatFileDb.store(hello_world) >>= (() => FlatFileDb.load())
+)
+|> Task.fork(~f=res => {
+     // the outer Result is to handle random Js exceptions that happened
+     // the inner Result is the exceptions we may have accumulated from bad i/o
+     let x = Result.ok_exn(Result.ok_exn(res));
+     assert(x == hello_world);
+     print_endline("I did it");
+   });
