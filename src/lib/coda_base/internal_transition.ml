@@ -15,7 +15,17 @@ module type S = sig
   end
 
   module Prover_state : sig
-    type t [@@deriving sexp, bin_io]
+    type t [@@deriving sexp]
+
+    module Stable :
+      sig
+        module V1 : sig
+          type t [@@deriving sexp, bin_io, version]
+        end
+
+        module Latest : module type of V1
+      end
+      with type V1.t = t
   end
 
   module Snark_transition : Snark_transition.S
@@ -51,13 +61,23 @@ module Make (Staged_ledger_diff : sig
   module Stable :
     sig
       module V1 : sig
-        type t [@@deriving bin_io, sexp]
+        type t [@@deriving bin_io, sexp, version]
       end
     end
     with type V1.t = t
 end)
 (Snark_transition : Snark_transition.S) (Prover_state : sig
-    type t [@@deriving sexp, bin_io]
+    type t [@@deriving sexp]
+
+    module Stable :
+      sig
+        module V1 : sig
+          type t [@@deriving sexp, bin_io, version]
+        end
+
+        module Latest : module type of V1
+      end
+      with type V1.t = t
 end) :
   S
   with module Staged_ledger_diff = Staged_ledger_diff
@@ -72,9 +92,9 @@ end) :
       module T = struct
         type t =
           { snark_transition: Snark_transition.Value.Stable.V1.t
-          ; prover_state: Prover_state.t
+          ; prover_state: Prover_state.Stable.V1.t
           ; staged_ledger_diff: Staged_ledger_diff.Stable.V1.t }
-        [@@deriving sexp, fields, bin_io, version {asserted}]
+        [@@deriving sexp, fields, bin_io, version]
       end
 
       include T
@@ -96,7 +116,7 @@ end) :
   (* bin_io, version omitted *)
   type t = Stable.Latest.t =
     { snark_transition: Snark_transition.Value.Stable.V1.t
-    ; prover_state: Prover_state.t
+    ; prover_state: Prover_state.Stable.V1.t
     ; staged_ledger_diff: Staged_ledger_diff.Stable.V1.t }
   [@@deriving sexp, fields]
 
