@@ -194,6 +194,7 @@ workflows:
                     only: master
             - tracetool
             - build-wallet
+            - build-macos
             {%- for profile in build_artifact_profiles %}
             - build-artifacts--{{profile}}
             {%- endfor %}

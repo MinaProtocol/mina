@@ -404,6 +404,7 @@ workflows:
                     only: master
             - tracetool
             - build-wallet
+            - build-macos
             - build-artifacts--testnet_postake
             - build-artifacts--testnet_postake_many_proposers
             - build-artifacts--testnet_postake_snarkless_fake_hash
