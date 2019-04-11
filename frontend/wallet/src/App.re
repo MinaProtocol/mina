@@ -1,4 +1,5 @@
 open BsElectron;
+open Tc;
 
 let dev = true;
 
@@ -31,7 +32,7 @@ let createTray = () => {
     ];
 
   let menu = Menu.make();
-  List.iter(Menu.append(menu), items);
+  List.iter(~f=Menu.append(menu), items);
 
   Tray.setContextMenu(t, menu);
 };
@@ -51,13 +52,14 @@ App.on(`WindowAllClosed, () =>
 
 // Proof of concept on "database"
 let hello_world: Js.Json.t = Js.Json.string("hello world");
-Task.Result.Infix.(
-  FlatFileDb.store(hello_world) >>= (() => FlatFileDb.load())
-)
-|> Task.fork(~f=res => {
-     // the outer Result is to handle random Js exceptions that happened
-     // the inner Result is the exceptions we may have accumulated from bad i/o
-     let x = Result.ok_exn(Result.ok_exn(res));
-     assert(x == hello_world);
-     print_endline("Successfully read the data!");
-   });
+let task =
+  FlatFileDb.store(hello_world) |> Task.andThen(~f=() => FlatFileDb.load());
+
+Task.attempt(
+  task,
+  ~f=res => {
+    let x = Result.ok_exn(res);
+    assert(x == hello_world);
+    print_endline("Successfully read the data!");
+  },
+);
