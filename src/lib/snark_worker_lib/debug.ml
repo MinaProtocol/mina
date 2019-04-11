@@ -29,7 +29,7 @@ module Inputs = struct
     let worker_wait_time = 0.1
   end
 
-  module Statement = Transaction_snark.Statement.Stable.V1
+  module Statement = Transaction_snark.Statement
 
   module Public_key = struct
     include Signature_lib.Public_key.Compressed
