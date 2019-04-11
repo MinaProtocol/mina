@@ -67,12 +67,11 @@ extra_required_status_checks = [
     "ci/circleci: lint",
     "ci/circleci: tracetool",
     "ci/circleci: build-wallet",
+    "ci/circleci: build-macos",
 ]
 
 # these are full status check names. they will not be required to succeed.
-not_required_status_checks = [
-    "ci/circleci: build-macos",
-]
+not_required_status_checks = []
 
 
 def fail(msg):
