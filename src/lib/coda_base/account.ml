@@ -10,7 +10,19 @@ open Fold_lib
 open Module_version
 
 module Index = struct
-  include Int
+  module Stable = struct
+    module V1 = struct
+      module T = struct
+        type t = int [@@deriving bin_io, sexp, version]
+      end
+
+      include T
+    end
+
+    module Latest = V1
+  end
+
+  type t = Stable.Latest.t [@@deriving sexp]
 
   let gen = Int.gen_incl 0 ((1 lsl Snark_params.ledger_depth) - 1)
 
