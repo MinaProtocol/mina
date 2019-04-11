@@ -455,25 +455,8 @@ module Make (Inputs : Inputs_intf) = struct
     ; online_status: [`Offline | `Online] Broadcast_pipe.Reader.t }
   [@@deriving fields]
 
-  [%%if
-  consensus_mechanism = "proof_of_stake"]
-
-  [%%inject
-  "block_window_duration_ms", block_window_duration]
-
-  [%%inject
-  "delta", delta]
-
   let offline_time =
-    Time.Span.of_ms @@ Int64.of_int (block_window_duration_ms * delta)
-
-  [%%else]
-
-  let offline_time =
-    let seconds = 15 in
-    Time.Span.of_ms @@ Int64.of_int (seconds * 1000)
-
-  [%%endif]
+    Time.Span.of_ms @@ Int64.of_int Consensus.Constants.inactivity_secs
 
   let setup_timer time_controller sync_state_broadcaster =
     Time.Timeout.create time_controller offline_time ~f:(fun _ ->
@@ -488,11 +471,7 @@ module Make (Inputs : Inputs_intf) = struct
         ~f:ignore
     in
     Strict_pipe.Reader.fold received_messages ~init ~f:(fun old_timeout _ ->
-        let%map () =
-          match Broadcast_pipe.Reader.peek online_reader with
-          | `Offline -> Broadcast_pipe.Writer.write online_writer `Online
-          | `Online -> Deferred.unit
-        in
+        let%map () = Broadcast_pipe.Writer.write online_writer `Online in
         Time.Timeout.cancel time_controller old_timeout () ;
         setup_timer time_controller online_writer )
     |> Deferred.ignore |> don't_wait_for ;
