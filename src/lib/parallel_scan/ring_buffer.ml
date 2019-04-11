@@ -4,13 +4,11 @@ open Async_kernel
 module Stable = struct
   module V1 = struct
     module T = struct
-      type 'a t = {data: 'a Array.t; mutable position: int}
-      [@@deriving sexp, bin_io, version {asserted}]
+      type 'a t = {data: 'a array; mutable position: int}
+      [@@deriving sexp, bin_io, version]
     end
 
     include T
-
-    (* TODO : wrap Array *)
   end
 
   module Latest = V1
