@@ -39,7 +39,7 @@ module Staged_ledger_aux_hash = struct
 end
 
 module Staged_ledger_hash = struct
-  include Staged_ledger_hash.Stable.Latest
+  include Staged_ledger_hash
 
   let ledger_hash = Staged_ledger_hash.ledger_hash
 
