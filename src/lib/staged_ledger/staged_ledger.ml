@@ -17,7 +17,14 @@ let option lab =
 module Make_completed_work = Transaction_snark_work.Make
 module Make_diff = Staged_ledger_diff.Make
 
-module Make (Inputs : Inputs.S) : sig
+module Make_with_constants (Constants : sig
+  val transaction_capacity_log_2 : int
+
+  val work_delay_factor : int
+
+  val latency_factor : int
+end)
+(Inputs : Inputs.S) : sig
   include
     Coda_pow.Staged_ledger_intf
     with type diff := Inputs.Staged_ledger_diff.t
@@ -43,7 +50,7 @@ module Make (Inputs : Inputs.S) : sig
      and type pending_coinbase_collection := Inputs.Pending_coinbase.t
 end = struct
   open Inputs
-  module Scan_state = Transaction_snark_scan_state.Make (Inputs)
+  module Scan_state = Transaction_snark_scan_state.Make (Constants) (Inputs)
 
   module Staged_ledger_error = struct
     type t =
@@ -280,10 +287,6 @@ end = struct
                 different from the one being requested ((%{sexp: \
                 Frozen_ledger_hash.t}))"
               target expected_target
-
-  module For_tests = struct
-    let snarked_ledger = snarked_ledger
-  end
 
   let statement_exn t =
     match Statement_scanner.scan_statement t.scan_state with
@@ -747,24 +750,14 @@ end = struct
     match second with
     | None ->
         (*Single partition:
-         1.Check if a new stack is required by going through the latest transactions. If any coinbases in it, then get the latest stack otheriwse create a new stack [working_stack]
+         1.Check if a new stack is required and get a working stack [working_stack]
          2.create data for enqueuing into the scan state *)
-        let current_base_jobs =
-          Scan_state.base_jobs_on_latest_tree scan_state
-        in
-        let%bind coinbase_exists_on_new_tree =
-          coinbase_exists
-            ~get_transaction:
-              (fun { Scan_state.Transaction_with_witness.transaction_with_info; _
-                   } ->
-              to_staged_ledger_or_error
-              @@ Ledger.Undo.transaction transaction_with_info )
-            current_base_jobs
+        let%bind is_new_tree =
+          Scan_state.next_on_new_tree scan_state
+          |> to_staged_ledger_or_error |> Deferred.return
         in
         let have_data_to_enqueue = List.length transactions > 0 in
-        let is_new_stack =
-          (not coinbase_exists_on_new_tree) && have_data_to_enqueue
-        in
+        let is_new_stack = is_new_tree && have_data_to_enqueue in
         let%bind working_stack =
           working_stack pending_coinbase_collection ~is_new_stack
           |> Deferred.return
@@ -772,15 +765,14 @@ end = struct
         let%map data, updated_stack =
           update_ledger_and_get_statements ledger working_stack transactions
         in
-        (is_new_stack, data, updated_stack)
+        (is_new_stack, data, `Update_one updated_stack)
     | Some _ ->
         (*Two partition:
         Assumption: Only one of the partition will have coinbase transaction(s)in it.
          1. Get the latest stack for coinbase in the first set of transactions
-         2. get the first set of scan_state data using the above stack
+         2. get the first set of scan_state data[data1]
          3. get a new stack for the second parition because the second set of transactions would start from the begining of the scan_state
-         4. get the second set of scan_state data using the new stack
-         5. return either of the stacks because only one of them would be updated as long as the assumption is true*)
+         4. get the second set of scan_state data[data2]*)
         let%bind working_stack1 =
           working_stack pending_coinbase_collection ~is_new_stack:false
           |> Deferred.return
@@ -803,45 +795,63 @@ end = struct
             (List.take transactions first)
         in
         let second_has_data = List.length (List.drop transactions first) > 0 in
-        let is_new_stack, updated_stack =
-          if first_has_coinbase then (false, updated_stack1)
-          else if second_has_data then (true, updated_stack2)
-          else (false, updated_stack1)
+        let new_stack_in_snark, stack_update =
+          match (first_has_coinbase, second_has_data) with
+          | true, true -> (false, `Update_two (updated_stack1, updated_stack2))
+          (*updated_stack2 will not have any coinbase and therefore we don't want to create a new stack in snark. updated_stack2 is only used to update the pending_coinbase_aux because there's going to be data(second has data) on a "new tree"*)
+          | true, false -> (false, `Update_one updated_stack1)
+          | false, true -> (true, `Update_one updated_stack2)
+          (*updated stack2 has coinbase and it will be on a "new tree"*)
+          | false, false -> (false, `Update_none)
         in
-        (is_new_stack, data1 @ data2, updated_stack)
+        (new_stack_in_snark, data1 @ data2, stack_update)
 
   (*update the pending_coinbase tree with the updated/new stack and delete the oldest stack if a proof was emitted*)
   let update_pending_coinbase_collection pending_coinbase_collection
-      updated_coinbase_stack ~is_new_stack ~ledger_proof =
+      stack_update ~is_new_stack ~ledger_proof =
     let open Result.Let_syntax in
+    (*Deleting oldest stack if proof emitted*)
     let%bind pending_coinbase_collection_updated1 =
-      if Option.is_some ledger_proof then
-        let%bind oldest_stack, pending_coinbase_collection_updated1 =
-          Pending_coinbase.remove_coinbase_stack pending_coinbase_collection
-          |> to_staged_ledger_or_error
-        in
-        let ledger_proof_stack =
-          let proof, _ = Option.value_exn ledger_proof in
-          (Ledger_proof.statement proof).pending_coinbase_stack_state.target
-        in
-        let%map () =
-          if Pending_coinbase.Stack.equal oldest_stack ledger_proof_stack then
-            Ok ()
-          else
-            Error
-              (Staged_ledger_error.Unexpected
-                 (Error.of_string
-                    "Pending coinbase stack of the ledger proof did not match \
-                     the oldest stack in the pending coinbase tree"))
-        in
-        pending_coinbase_collection_updated1
-      else Ok pending_coinbase_collection
+      match ledger_proof with
+      | Some (proof, _) ->
+          let%bind oldest_stack, pending_coinbase_collection_updated1 =
+            Pending_coinbase.remove_coinbase_stack pending_coinbase_collection
+            |> to_staged_ledger_or_error
+          in
+          let ledger_proof_stack =
+            (Ledger_proof.statement proof).pending_coinbase_stack_state.target
+          in
+          let%map () =
+            if Pending_coinbase.Stack.equal oldest_stack ledger_proof_stack
+            then Ok ()
+            else
+              Error
+                (Staged_ledger_error.Unexpected
+                   (Error.of_string
+                      "Pending coinbase stack of the ledger proof did not \
+                       match the oldest stack in the pending coinbase tree."))
+          in
+          pending_coinbase_collection_updated1
+      | None -> Ok pending_coinbase_collection
     in
+    (*updating the latest stack and/or adding a new one*)
     let%map pending_coinbase_collection_updated2 =
-      Pending_coinbase.update_coinbase_stack
-        pending_coinbase_collection_updated1 updated_coinbase_stack
-        ~is_new_stack
-      |> to_staged_ledger_or_error
+      match stack_update with
+      | `Update_none -> Ok pending_coinbase_collection_updated1
+      | `Update_one stack1 ->
+          Pending_coinbase.update_coinbase_stack
+            pending_coinbase_collection_updated1 stack1 ~is_new_stack
+          |> to_staged_ledger_or_error
+      | `Update_two (stack1, stack2) ->
+          (*The case when part of the transactions go in to the old tree and remaining on to the new tree*)
+          let%bind update1 =
+            Pending_coinbase.update_coinbase_stack
+              pending_coinbase_collection_updated1 stack1 ~is_new_stack:false
+            |> to_staged_ledger_or_error
+          in
+          Pending_coinbase.update_coinbase_stack update1 stack2
+            ~is_new_stack:true
+          |> to_staged_ledger_or_error
     in
     pending_coinbase_collection_updated2
 
@@ -919,7 +929,7 @@ end = struct
       , p1.user_commands_count + p2.user_commands_count
       , p1.coinbases @ p2.coinbases )
     in
-    let%bind is_new_stack, data, updated_coinbase_stack =
+    let%bind is_new_stack, data, stack_update =
       update_coinbase_stack_and_get_data scan_state' new_ledger
         t.pending_coinbase_collection transactions
     in
@@ -932,12 +942,12 @@ end = struct
       in
       Or_error.iter_error r ~f:(fun e ->
           (* TODO: Pass a logger here *)
-          eprintf !"Unexpected error: %s %{sexp:Error.t}\n%!" __LOC__ e ) ;
+          eprintf !"Unexpected error: %s %{sexp:Error.t} \n%!" __LOC__ e ) ;
       Deferred.return (to_staged_ledger_or_error r)
     in
     let%bind updated_pending_coinbase_collection' =
       update_pending_coinbase_collection t.pending_coinbase_collection
-        updated_coinbase_stack ~is_new_stack ~ledger_proof:res_opt
+        stack_update ~is_new_stack ~ledger_proof:res_opt
       |> Deferred.return
     in
     let%bind coinbase_amount =
@@ -1137,15 +1147,15 @@ end = struct
       let cw_unchecked =
         Sequence.map cw_seq ~f:Transaction_snark_work.forget
       in
-      let work_capacity = Scan_state.work_capacity () in
+      let work_capacity = Scan_state.work_capacity in
       let coinbase, rem_cw =
         match (add_coinbase, Sequence.next cw_unchecked) with
         | true, Some (cw, rem_cw) ->
             (Staged_ledger_diff.At_most_two.One (coinbase_ft cw), rem_cw)
         | true, None ->
-            (*new count after a coinbase is added should be less that capacity*)
+            (*new count after a coinbase is added should be less than the capacity*)
             let new_count = cur_work_count + 2 in
-            if max_job_count = 0 || new_count < work_capacity then
+            if max_job_count = 0 || new_count <= work_capacity then
               (One None, cw_unchecked)
             else (Zero, cw_unchecked)
         | _ -> (Zero, cw_unchecked)
@@ -1246,7 +1256,7 @@ end = struct
 
     let within_capacity t =
       let new_count = new_work_count t in
-      new_count < t.work_capacity
+      new_count <= t.work_capacity
 
     let incr_coinbase_part_by t count =
       let open Or_error.Let_syntax in
@@ -1597,7 +1607,13 @@ end = struct
     { Staged_ledger_diff.With_valid_signatures_and_proofs.diff
     ; creator= self
     ; prev_hash= curr_hash }
+
+  module For_tests = struct
+    let snarked_ledger = snarked_ledger
+  end
 end
+
+module Make = Make_with_constants (Transaction_snark_scan_state.Constants)
 
 let%test_module "test" =
   ( module struct
@@ -1955,7 +1971,7 @@ let%test_module "test" =
                 ; fee_excess: Fee.Signed.t
                 ; proof_type: [`Base | `Merge] }
               [@@deriving
-                sexp, bin_io, compare, hash, yojson, eq, version {asserted}]
+                sexp, bin_io, compare, hash, yojson, eq, version {for_test}]
             end
 
             include T
@@ -2061,7 +2077,7 @@ let%test_module "test" =
             module V1 = struct
               module T = struct
                 type t = transaction
-                [@@deriving sexp, bin_io, version {asserted}]
+                [@@deriving sexp, bin_io, version {for_test}]
               end
 
               include T
@@ -2339,7 +2355,7 @@ let%test_module "test" =
             module T = struct
               type t =
                 {diff: diff; prev_hash: staged_ledger_hash; creator: public_key}
-              [@@deriving sexp, bin_io, version {asserted}]
+              [@@deriving sexp, bin_io, version {for_test}]
             end
 
             include T
@@ -2418,7 +2434,7 @@ let%test_module "test" =
           module V1 = struct
             module T = struct
               type t = {ledger: Sparse_ledger.t}
-              [@@deriving bin_io, sexp, version {asserted}]
+              [@@deriving bin_io, sexp, version {for_test}]
             end
 
             include T
@@ -2907,4 +2923,130 @@ let%test_module "test" =
               if j > 2 then assert (x > 0) ;
               let expected_value = expected_ledger x all_ts old_ledger in
               if cb > 0 then assert (!(Sl.ledger !sl) = expected_value) ) )
+
+    let%test_module "staged ledgers with different latency factors" =
+      ( module struct
+        module Inputs = Test_input1
+
+        module type Staged_ledger_intf =
+          Coda_pow.Staged_ledger_intf
+          with type diff := Inputs.Staged_ledger_diff.t
+           and type valid_diff :=
+                      Inputs.Staged_ledger_diff
+                      .With_valid_signatures_and_proofs
+                      .t
+           and type ledger_hash := Inputs.Ledger_hash.t
+           and type frozen_ledger_hash := Inputs.Frozen_ledger_hash.t
+           and type staged_ledger_hash := Inputs.Staged_ledger_hash.t
+           and type public_key := Inputs.Compressed_public_key.t
+           and type ledger := Inputs.Ledger.t
+           and type user_command_with_valid_signature :=
+                      Inputs.User_command.With_valid_signature.t
+           and type statement := Inputs.Transaction_snark_work.Statement.t
+           and type completed_work_checked :=
+                      Inputs.Transaction_snark_work.Checked.t
+           and type ledger_proof := Inputs.Ledger_proof.t
+           and type staged_ledger_aux_hash := Inputs.Staged_ledger_aux_hash.t
+           and type sparse_ledger := Inputs.Sparse_ledger.t
+           and type ledger_proof_statement := Inputs.Ledger_proof_statement.t
+           and type ledger_proof_statement_set :=
+                      Inputs.Ledger_proof_statement.Set.t
+           and type transaction := Inputs.Transaction.t
+           and type user_command := Inputs.User_command.t
+           and type transaction_witness := Inputs.Transaction_witness.t
+           and type pending_coinbase_collection := Inputs.Pending_coinbase.t
+
+        let transaction_capacity_log_2 = 2
+
+        let sl_modules =
+          List.init 4 ~f:(fun i ->
+              let module Constants = struct
+                let transaction_capacity_log_2 = transaction_capacity_log_2
+
+                let work_delay_factor = 5
+
+                let latency_factor = i
+              end in
+              (module Make_with_constants (Constants) (Inputs)
+              : Staged_ledger_intf ) )
+
+        let%test_unit "max throughput at any latency: random number of \
+                       proofs-one prover" =
+          Backtrace.elide := false ;
+          let get_work work_list (stmts : Transaction_snark_work.Statement.t) :
+              Transaction_snark_work.Checked.t option =
+            if
+              Option.is_some
+                (List.find work_list ~f:(fun s ->
+                     Transaction_snark_work.Statement.equal s stmts ))
+            then
+              Some
+                { Transaction_snark_work.Checked.fee= Fee.Unsigned.of_int 0
+                ; proofs= stmts
+                ; prover= "P" }
+            else None
+          in
+          let logger = Logger.null () in
+          let p = Int.pow 2 transaction_capacity_log_2 in
+          let g = Int.gen_incl 0 p in
+          List.iter sl_modules ~f:(fun (module Sl) ->
+              let initial_ledger = ref 0 in
+              let staged_ledger = ref (Sl.create_exn ~ledger:initial_ledger) in
+              let create_and_apply sl logger txns stmt_to_work =
+                let open Deferred.Let_syntax in
+                let diff =
+                  Sl.create_diff !sl ~self:self_pk ~logger
+                    ~transactions_by_fee:txns ~get_completed_work:stmt_to_work
+                in
+                let diff' = Staged_ledger_diff.forget diff in
+                let%map ( `Hash_after_applying _
+                        , `Ledger_proof _
+                        , `Staged_ledger sl'
+                        , `Pending_coinbase_data _ ) =
+                  match%map Sl.apply !sl diff' ~logger with
+                  | Ok x -> x
+                  | Error e -> Error.raise (Sl.Staged_ledger_error.to_error e)
+                in
+                sl := sl' ;
+                diff'
+              in
+              Quickcheck.test g ~trials:100 ~f:(fun _ ->
+                  Async.Thread_safe.block_on_async_exn (fun () ->
+                      let all_ts =
+                        txns p (fun x -> (x + 1) * 100) (fun _ -> 0)
+                      in
+                      let work_list : Transaction_snark_work.Statement.t list =
+                        let capacity_reached =
+                          Sl.Scan_state.work_capacity
+                          >= Sl.Scan_state.current_job_count
+                               (Sl.scan_state !staged_ledger)
+                        in
+                        let spec_list =
+                          if capacity_reached then
+                            Sl.all_work_pairs_exn !staged_ledger
+                          else []
+                        in
+                        List.map spec_list ~f:(fun (s1, s2_opt) ->
+                            let stmt1 =
+                              Snark_work_lib.Work.Single.Spec.statement s1
+                            in
+                            let stmt2 =
+                              Option.value_map s2_opt ~default:[] ~f:(fun s ->
+                                  [Snark_work_lib.Work.Single.Spec.statement s]
+                              )
+                            in
+                            stmt1 :: stmt2 )
+                      in
+                      let%map diff =
+                        create_and_apply staged_ledger logger
+                          (Sequence.of_list all_ts) (get_work work_list)
+                      in
+                      let cb = coinbase_added diff in
+                      assert (cb > 0 && cb < 3) ;
+                      let x =
+                        List.length (Staged_ledger_diff.user_commands diff)
+                      in
+                      (*max throughput*)
+                      assert (x + cb = p) ) ) )
+      end )
   end )
