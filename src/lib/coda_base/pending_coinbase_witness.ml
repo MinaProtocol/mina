@@ -27,3 +27,4 @@ end
 
 type t = Stable.Latest.t =
   {pending_coinbases: Pending_coinbase.Stable.V1.t; is_new_stack: bool}
+[@@deriving sexp]
