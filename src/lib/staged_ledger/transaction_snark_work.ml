@@ -13,8 +13,8 @@ end) (Ledger_proof_statement : sig
   module Stable :
     sig
       module V1 : sig
-        type t [@@deriving sexp, bin_io, hash, compare, yojson]
-      end
+        type t [@@deriving sexp, bin_io, hash, compare, yojson, version]
+      end [@warning "-32"]
     end
     with type V1.t = t
 
@@ -31,7 +31,7 @@ end) :
       module V1 = struct
         module T = struct
           type t = Ledger_proof_statement.Stable.V1.t list
-          [@@deriving bin_io, sexp, hash, compare, yojson, version {asserted}]
+          [@@deriving bin_io, sexp, hash, compare, yojson, version]
         end
 
         include T
