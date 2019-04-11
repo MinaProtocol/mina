@@ -1,7 +1,7 @@
 open Async_kernel
 open Core_kernel
 
-type 'a consumed_state = [`Failed | `Success of 'a] Ivar.t
+type 'a final_state = [`Failed | `Success of 'a] Ivar.t
 
 (** [Constant.S] is a helper signature for passing constant values
  *  to functors.
@@ -42,7 +42,7 @@ module Cached = struct
      *)
     val peek : ('t, _) t -> 't
 
-    val consumed_state : ('t1, 't2) t -> 't2 consumed_state
+    val final_state : ('t1, 't2) t -> 't2 final_state
 
     (** [invalidate c] removes the underlying cached value
      *  of [c] from its cache. [invalidate] will return an
@@ -104,7 +104,7 @@ module Cache = struct
 
     val mem : 'elt t -> 'elt -> bool
 
-    val consumed_state : 'elt t -> 'elt -> 'elt consumed_state Option.t
+    val final_state : 'elt t -> 'elt -> 'elt final_state Option.t
 
     val to_list : 'elt t -> 'elt list
   end
@@ -147,7 +147,7 @@ module Transmuter_cache = struct
 
     val register : t -> source -> (source, target) Cached.t
 
-    val consumed_state : t -> source -> target consumed_state Option.t
+    val final_state : t -> source -> target final_state Option.t
 
     val mem : t -> source -> bool
   end

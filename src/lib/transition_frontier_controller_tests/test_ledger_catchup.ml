@@ -40,6 +40,8 @@ let%test_module "Ledger catchup" =
       let catchup_breadcrumbs_reader, catchup_breadcrumbs_writer =
         Strict_pipe.create ~name:(__MODULE__ ^ __LOC__) Synchronous
       in
+      Logger.trace logger ~module_:__MODULE__ ~location:__LOC__
+        "cache is created" ;
       let unprocessed_transition_cache =
         Transition_handler.Unprocessed_transition_cache.create ~logger
       in
@@ -52,9 +54,12 @@ let%test_module "Ledger catchup" =
       in
       Strict_pipe.Writer.write catchup_job_writer
         (parent_hash, [Rose_tree.T (cached_transition, [])]) ;
+      Logger.trace logger ~module_:__MODULE__ ~location:__LOC__ "catchup start" ;
       Ledger_catchup.run ~logger ~network ~frontier:me
         ~catchup_breadcrumbs_writer ~catchup_job_reader
         ~unprocessed_transition_cache ;
+      Logger.trace logger ~module_:__MODULE__ ~location:__LOC__
+        "catchup finishes" ;
       let result_ivar = Ivar.create () in
       (* TODO: expose Strict_pipe.read *)
       Strict_pipe.Reader.iter catchup_breadcrumbs_reader ~f:(fun rose_tree ->
@@ -63,8 +68,13 @@ let%test_module "Ledger catchup" =
       let%map cached_catchup_breadcrumbs =
         Ivar.read result_ivar >>| List.hd_exn
       in
+      Logger.trace logger ~module_:__MODULE__ ~location:__LOC__
+        "\n\n XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX \n\n" ;
       let catchup_breadcrumbs =
-        Rose_tree.map cached_catchup_breadcrumbs ~f:Cache_lib.Cached.free
+        Rose_tree.map cached_catchup_breadcrumbs ~f:(fun x ->
+            Logger.trace logger ~module_:__MODULE__ ~location:__LOC__
+              "\n\n !!!!!!!!!!!!!!!!!!!!! \n\n" ;
+            Cache_lib.Cached.free x )
       in
       Rose_tree.equal expected_breadcrumbs catchup_breadcrumbs
         ~f:(fun breadcrumb_tree1 breadcrumb_tree2 ->
@@ -79,7 +89,7 @@ let%test_module "Ledger catchup" =
     let%test "catchup to a peer" =
       Core.Backtrace.elide := false ;
       Async.Scheduler.set_record_backtraces true ;
-      let logger = Logger.null () in
+      let logger = Logger.create () in
       Thread_safe.block_on_async_exn (fun () ->
           let%bind me, peer, network =
             Network_builder.setup_me_and_a_peer
@@ -96,8 +106,8 @@ let%test_module "Ledger catchup" =
                 ~f:Fn.id
             |> Rose_tree.of_list_exn ) )
 
-    let%test_unit "peers can provide transitions with length between \
-                   max_length to 2 * max_length" =
+    let%test "peers can provide transitions with length between max_length to \
+              2 * max_length" =
       let logger = Logger.null () in
       Thread_safe.block_on_async_exn (fun () ->
           let num_breadcrumbs =
@@ -123,9 +133,6 @@ let%test_module "Ledger catchup" =
               ~f:Fn.id
             |> Option.value_exn
           in
-          let%map result =
-            test_catchup ~logger ~network me best_transition
-              (Rose_tree.of_list_exn @@ Non_empty_list.tail history)
-          in
-          assert result )
+          test_catchup ~logger ~network me best_transition
+            (Rose_tree.of_list_exn @@ Non_empty_list.tail history) )
   end )

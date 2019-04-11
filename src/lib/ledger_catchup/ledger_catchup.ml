@@ -287,7 +287,10 @@ module Make (Inputs : Inputs.S) :
           get_transitions_and_compute_breadcrumbs ~logger ~network ~frontier
             ~num_peers:8 ~unprocessed_transition_cache ~target_forest:forest
         with
-        | Ok tree -> Strict_pipe.Writer.write catchup_breadcrumbs_writer [tree]
+        | Ok tree ->
+            Logger.trace logger ~module_:__MODULE__ ~location:__LOC__
+              "about to write to the catchup breadcrumbs pipe" ;
+            Strict_pipe.Writer.write catchup_breadcrumbs_writer [tree]
         | Error e ->
             Logger.info logger ~module_:__MODULE__ ~location:__LOC__
               !"All peers either sent us bad data, didn't have the info, or \

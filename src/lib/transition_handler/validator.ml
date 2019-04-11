@@ -40,10 +40,9 @@ module Make (Inputs : Inputs.With_unprocessed_transition_cache.S) :
     in
     let%bind () =
       Option.fold
-        (Unprocessed_transition_cache.consumed_state
-           unprocessed_transition_cache transition_with_hash)
-        ~init:Result.ok_unit ~f:(fun _ consumed_state ->
-          Result.Error (`Under_processing consumed_state) )
+        (Unprocessed_transition_cache.final_state unprocessed_transition_cache
+           transition_with_hash) ~init:Result.ok_unit ~f:(fun _ final_state ->
+          Result.Error (`Under_processing final_state) )
     in
     let%map () =
       Result.ok_if_true
