@@ -35,8 +35,6 @@ module type S = sig
      and type transition_frontier := Transition_frontier.t
      and type staged_ledger := Staged_ledger.t
      and type time := Block_time.t0
-     and type transition_frontier_breadcrumb :=
-                Transition_frontier.Breadcrumb.t
 
   module Network :
     Network_intf

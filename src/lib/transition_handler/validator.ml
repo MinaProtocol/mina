@@ -14,9 +14,7 @@ module Make (Inputs : Inputs.With_unprocessed_transition_cache.S) :
    and type unprocessed_transition_cache :=
               Inputs.Unprocessed_transition_cache.t
    and type transition_frontier := Inputs.Transition_frontier.t
-   and type staged_ledger := Inputs.Staged_ledger.t
-   and type transition_frontier_breadcrumb :=
-              Inputs.Transition_frontier.Breadcrumb.t = struct
+   and type staged_ledger := Inputs.Staged_ledger.t = struct
   open Inputs
   open Consensus
 

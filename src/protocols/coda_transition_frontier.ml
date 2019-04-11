@@ -484,8 +484,6 @@ module type Transition_handler_validator_intf = sig
 
   type transition_frontier
 
-  type transition_frontier_breadcrumb
-
   type staged_ledger
 
   val run :
@@ -627,7 +625,6 @@ module type Transition_handler_intf = sig
      and type unprocessed_transition_cache := Unprocessed_transition_cache.t
      and type transition_frontier := transition_frontier
      and type staged_ledger := staged_ledger
-     and type transition_frontier_breadcrumb := transition_frontier_breadcrumb
 
   module Processor :
     Transition_handler_processor_intf
