@@ -56,7 +56,7 @@ struct
         type response =
           ( Staged_ledger_aux.Stable.V1.t
           * Ledger_hash.Stable.V1.t
-          * Pending_coinbase.t )
+          * Pending_coinbase.Stable.V1.t )
           option
       end
 
@@ -81,12 +81,10 @@ struct
         type response =
           ( Staged_ledger_aux.Stable.V1.t
           * Ledger_hash.Stable.V1.t
-          * Pending_coinbase.t )
+          * Pending_coinbase.Stable.V1.t )
           option
-        [@@deriving bin_io]
+        [@@deriving bin_io, version {rpc}]
 
-        (* , version {rpc} *)
-        
         (* TODO : remove after uncommenting version{rpc} *)
         let version = 1
 
