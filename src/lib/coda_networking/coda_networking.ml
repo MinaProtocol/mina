@@ -88,9 +88,6 @@ struct
           option
         [@@deriving bin_io, version {rpc}]
 
-        (* TODO : remove after uncommenting version{rpc} *)
-        let version = 1
-
         let query_of_caller_model = Fn.id
 
         let callee_model_of_query = Fn.id

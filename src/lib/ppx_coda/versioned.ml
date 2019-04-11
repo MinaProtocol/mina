@@ -164,7 +164,8 @@ let generate_version_number_decl inner3_modules loc generation_kind =
   in
   [%stri let version = [%e eint version]]
 
-let ocaml_builtin_types = ["int"; "float"; "char"; "string"; "bool"; "unit"]
+let ocaml_builtin_types =
+  ["int"; "int32"; "int64"; "float"; "char"; "string"; "bool"; "unit"]
 
 let ocaml_builtin_type_constructors = ["list"; "array"; "option"; "ref"]
 
