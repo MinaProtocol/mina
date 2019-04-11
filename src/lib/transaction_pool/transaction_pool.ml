@@ -41,7 +41,7 @@ module type User_command_intf = sig
   module Stable :
     sig
       module V1 : sig
-        type t [@@deriving sexp, bin_io, yojson]
+        type t [@@deriving sexp, bin_io, yojson, version]
       end
     end
     with type V1.t = t
@@ -290,7 +290,7 @@ struct
       module V1 = struct
         module T = struct
           type t = User_command.Stable.V1.t list
-          [@@deriving bin_io, sexp, yojson, version {asserted}]
+          [@@deriving bin_io, sexp, yojson, version]
         end
 
         include T
@@ -442,7 +442,13 @@ let%test_module _ =
     module Test =
       Make0 (struct
           module Stable = struct
-            module V1 = Int
+            module V1 = struct
+              module T = struct
+                type t = int [@@deriving bin_io, version, sexp, yojson]
+              end
+
+              include T
+            end
           end
 
           include (Int : module type of Int with module Stable := Int.Stable)
