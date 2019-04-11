@@ -1971,7 +1971,7 @@ let%test_module "test" =
                 ; fee_excess: Fee.Signed.t
                 ; proof_type: [`Base | `Merge] }
               [@@deriving
-                sexp, bin_io, compare, hash, yojson, eq, version {asserted}]
+                sexp, bin_io, compare, hash, yojson, eq, version {for_test}]
             end
 
             include T
@@ -2077,7 +2077,7 @@ let%test_module "test" =
             module V1 = struct
               module T = struct
                 type t = transaction
-                [@@deriving sexp, bin_io, version {asserted}]
+                [@@deriving sexp, bin_io, version {for_test}]
               end
 
               include T
@@ -2355,7 +2355,7 @@ let%test_module "test" =
             module T = struct
               type t =
                 {diff: diff; prev_hash: staged_ledger_hash; creator: public_key}
-              [@@deriving sexp, bin_io, version {asserted}]
+              [@@deriving sexp, bin_io, version {for_test}]
             end
 
             include T
@@ -2434,7 +2434,7 @@ let%test_module "test" =
           module V1 = struct
             module T = struct
               type t = {ledger: Sparse_ledger.t}
-              [@@deriving bin_io, sexp, version {asserted}]
+              [@@deriving bin_io, sexp, version {for_test}]
             end
 
             include T
