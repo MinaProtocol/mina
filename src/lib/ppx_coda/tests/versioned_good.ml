@@ -215,3 +215,29 @@ module M11 = struct
     end
   end
 end
+
+(* int32 *)
+module M12 = struct
+  module Stable = struct
+    module V1 = struct
+      module T = struct
+        type t = int32 [@@deriving bin_io, version]
+      end
+
+      include T
+    end
+  end
+end
+
+(* int64 *)
+module M13 = struct
+  module Stable = struct
+    module V1 = struct
+      module T = struct
+        type t = int64 [@@deriving bin_io, version]
+      end
+
+      include T
+    end
+  end
+end
