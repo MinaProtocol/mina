@@ -13,8 +13,9 @@ end) (Ledger_proof_statement : sig
   module Stable :
     sig
       module V1 : sig
-        type t [@@deriving sexp, bin_io, hash, compare, yojson, version]
-      end [@warning "-32"]
+        type t
+        [@@deriving sexp, bin_io, hash, compare, yojson, version {unnumbered}]
+      end
     end
     with type V1.t = t
 
