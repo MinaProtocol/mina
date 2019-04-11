@@ -6,11 +6,7 @@ let command_name = "snark-worker"
 
 module type Inputs_intf = sig
   module Sparse_ledger : sig
-    module Stable : sig
-      module V1 : sig
-        type t [@@deriving bin_io, sexp]
-      end
-    end
+    type t [@@deriving bin_io, sexp]
   end
 
   module Transaction_witness : sig

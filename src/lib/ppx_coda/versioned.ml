@@ -32,7 +32,9 @@
   The "asserted" option asserts that the type is versioned, to allow compilation
   to proceed. The types referred to in the type are not checked for versioning
   with this option. The type must be contained in the module hierarchy "Stable.Vn.T". 
-  Eventually, all uses of this option should be removed, except in test code.
+  Eventually, all uses of this option should be removed.
+
+  The "for_test" option is a synonym of "asserted" that can be used in test code.
 
   If "rpc" is true, again, the type must be named "query", "response", or "msg",
   and the type definition occurs in the hierarchy "Vn.T".
@@ -162,7 +164,8 @@ let generate_version_number_decl inner3_modules loc generation_kind =
   in
   [%stri let version = [%e eint version]]
 
-let ocaml_builtin_types = ["int"; "float"; "char"; "string"; "bool"; "unit"]
+let ocaml_builtin_types =
+  ["int"; "int32"; "int64"; "float"; "char"; "string"; "bool"; "unit"]
 
 let ocaml_builtin_type_constructors = ["list"; "array"; "option"; "ref"]
 
@@ -319,16 +322,20 @@ let validate_options valid options =
 
 let generate_let_bindings_for_type_decl_str ~options ~path type_decls =
   ignore
-    (validate_options ["wrapped"; "unnumbered"; "rpc"; "asserted"] options) ;
+    (validate_options
+       ["wrapped"; "unnumbered"; "rpc"; "asserted"; "for_test"]
+       options) ;
   let type_decl = get_type_decl_representative type_decls in
   let wrapped = check_for_option "wrapped" options in
   let unnumbered = check_for_option "unnumbered" options in
-  let asserted = check_for_option "asserted" options in
+  let asserted =
+    check_for_option "asserted" options || check_for_option "for_test" options
+  in
   let rpc = check_for_option "rpc" options in
   if asserted && (wrapped || rpc) then
     Ppx_deriving.raise_errorf ~loc:type_decl.ptype_loc
-      "Option \"asserted\" cannot be combined with \"wrapped\" or \"rpc\" \
-       options" ;
+      "Options \"asserted\" or \"for_test\" cannot be combined with \
+       \"wrapped\" or \"rpc\" options" ;
   let generation_kind =
     match (rpc, wrapped) with
     | true, false -> Rpc

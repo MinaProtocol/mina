@@ -180,9 +180,9 @@ let apply_coinbase_exn t
   in
   add_to_balance t proposer proposer_reward
 
-let apply_transaction_exn t transition =
+let apply_transaction_exn t (transition : Transaction.t) =
   match transition with
-  | Transaction.Fee_transfer tr -> apply_fee_transfer_exn t tr
+  | Fee_transfer tr -> apply_fee_transfer_exn t tr
   | User_command cmd -> apply_user_command_exn t (cmd :> User_command.t)
   | Coinbase c -> apply_coinbase_exn t c
 
