@@ -1,4 +1,7 @@
-// Remove this module when reason-apollo updates to support hooks
+// TODO: Remove this module when reason-apollo updates to support hooks
+
+// Note: Many of these types redundantly define the option to work around a jsx3
+// bug https://github.com/reasonml/reason-react/issues/369
 
 module CreateQueryBinding = (Config: ReasonApolloTypes.Config) => {
   open ReasonApolloTypes;
@@ -15,19 +18,19 @@ module CreateQueryBinding = (Config: ReasonApolloTypes.Config) => {
   external make:
     (
       ~query: queryString,
-      ~variables: Js.Json.t=?,
-      ~pollInterval: int=?,
-      ~notifyOnNetworkStatusChange: bool=?,
-      ~fetchPolicy: string=?,
-      ~errorPolicy: string=?,
-      ~ssr: bool=?,
-      ~displayName: string=?,
-      ~skip: bool=?,
-      ~onCompleted: Js.Nullable.t(Js.Json.t) => unit=?,
-      ~onError: apolloError => unit=?,
-      ~partialRefetch: bool=?,
-      ~delay: bool=?,
-      ~context: Js.Json.t=?,
+      ~variables: option(Js.Json.t)=?,
+      ~pollInterval: option(int)=?,
+      ~notifyOnNetworkStatusChange: option(bool)=?,
+      ~fetchPolicy: option(string)=?,
+      ~errorPolicy: option(string)=?,
+      ~ssr: option(bool)=?,
+      ~displayName: option(string)=?,
+      ~skip: option(bool)=?,
+      ~onCompleted: option(Js.Nullable.t(Js.Json.t) => unit)=?,
+      ~onError: option(apolloError => unit)=?,
+      ~partialRefetch: option(bool)=?,
+      ~delay: option(bool)=?,
+      ~context: option(Js.Json.t)=?,
       ~children: renderPropObjJS => ReasonReact.reactElement
     ) =>
     React.element =
@@ -63,12 +66,10 @@ module CreateQuery = (Config: ReasonApolloTypes.Config) => {
       ) =>
       unit,
   };
-
   type queryResponse('a) =
     | Loading
     | Error(apolloError)
     | Data('a);
-
   // TODO map over the rest of the object if we need it
   let apolloDataToVariant = (apolloData: CreateQueryBinding.renderPropObjJS) =>
     CreateQueryBinding.(
@@ -90,25 +91,24 @@ module CreateQuery = (Config: ReasonApolloTypes.Config) => {
     );
   [@bs.module] external gql: ReasonApolloTypes.gql = "graphql-tag";
   let queryString = gql(. Config.query);
-
   // This component isn't really necessary but it's a helper that makes the
   // interface more similar to the old one.
   [@react.component]
   let make =
       (
-        ~variables: Js.Json.t=?,
-        ~pollInterval: int=?,
-        ~notifyOnNetworkStatusChange: bool=?,
-        ~fetchPolicy: string=?,
-        ~errorPolicy: string=?,
-        ~ssr: bool=?,
-        ~displayName: string=?,
-        ~skip: bool=?,
-        ~onCompleted: Js.Nullable.t(Js.Json.t) => unit=?,
-        ~onError: apolloError => unit=?,
-        ~partialRefetch: bool=?,
-        ~delay: bool=?,
-        ~context: Js.Json.t=?,
+        ~variables: option(Js.Json.t)=?,
+        ~pollInterval: option(int)=?,
+        ~notifyOnNetworkStatusChange: option(bool)=?,
+        ~fetchPolicy: option(string)=?,
+        ~errorPolicy: option(string)=?,
+        ~ssr: option(bool)=?,
+        ~displayName: option(string)=?,
+        ~skip: option(bool)=?,
+        ~onCompleted: option(Js.Nullable.t(Js.Json.t) => unit)=?,
+        ~onError: option(apolloError => unit)=?,
+        ~partialRefetch: option(bool)=?,
+        ~delay: option(bool)=?,
+        ~context: option(Js.Json.t)=?,
         ~children: queryResponse(Config.t) => React.element,
       ) => {
     let wrappedChildren = (objJs): React.element =>

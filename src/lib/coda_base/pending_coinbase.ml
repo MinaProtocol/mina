@@ -544,11 +544,40 @@ module T = struct
       (Hash.var_of_hash_packed new_root, prev)
   end
 
-  type t =
-    { tree: Merkle_tree.Stable.Latest.t
-    ; pos_list: Stack_id.Stable.Latest.t list
-    ; new_pos: Stack_id.Stable.Latest.t }
-  [@@deriving sexp, bin_io]
+  module Poly = struct
+    module Stable = struct
+      module V1 = struct
+        module T = struct
+          type ('tree, 'stack_id) t =
+            {tree: 'tree; pos_list: 'stack_id list; new_pos: 'stack_id}
+          [@@deriving bin_io, sexp, version]
+        end
+
+        include T
+      end
+
+      module Latest = V1
+    end
+
+    type ('tree, 'stack_id) t = ('tree, 'stack_id) Stable.Latest.t =
+      {tree: 'tree; pos_list: 'stack_id list; new_pos: 'stack_id}
+  end
+
+  module Stable = struct
+    module V1 = struct
+      module T = struct
+        type t =
+          (Merkle_tree.Stable.V1.t, Stack_id.Stable.V1.t) Poly.Stable.V1.t
+        [@@deriving bin_io, sexp, version]
+      end
+
+      include T
+    end
+
+    module Latest = V1
+  end
+
+  type t = Stable.Latest.t [@@deriving sexp]
 
   let create_exn' () =
     let init_hash = Stack.data_hash Stack.empty in
@@ -584,7 +613,7 @@ module T = struct
           (Merkle_tree.add_path t path key Stack.empty)
           (Or_error.ok_exn (Stack_id.incr_by_one key))
     in
-    { tree=
+    { Poly.tree=
         go
           (Merkle_tree.of_hash ~depth:coinbase_tree_depth root_hash)
           Stack_id.zero
@@ -595,19 +624,21 @@ module T = struct
 
   let try_with = Or_error.try_with
 
-  let merkle_root t = Merkle_tree.merkle_root t.tree
+  let merkle_root (t : t) = Merkle_tree.merkle_root t.tree
 
-  let get_stack t index = try_with (fun () -> Merkle_tree.get_exn t.tree index)
+  let get_stack (t : t) index =
+    try_with (fun () -> Merkle_tree.get_exn t.tree index)
 
-  let path t index = try_with (fun () -> Merkle_tree.path_exn t.tree index)
+  let path (t : t) index =
+    try_with (fun () -> Merkle_tree.path_exn t.tree index)
 
-  let set_stack t index stack =
+  let set_stack (t : t) index stack =
     try_with (fun () -> {t with tree= Merkle_tree.set_exn t.tree index stack})
 
-  let find_index t key =
+  let find_index (t : t) key =
     try_with (fun () -> Merkle_tree.find_index_exn t.tree key)
 
-  let with_next_index t ~is_new_stack =
+  let with_next_index (t : t) ~is_new_stack =
     let open Or_error.Let_syntax in
     if is_new_stack then
       let%map new_pos =
@@ -618,21 +649,21 @@ module T = struct
       {t with pos_list= t.new_pos :: t.pos_list; new_pos}
     else Ok t
 
-  let latest_stack_id t ~is_new_stack =
+  let latest_stack_id (t : t) ~is_new_stack =
     if is_new_stack then Ok t.new_pos
     else
       match List.hd t.pos_list with
       | Some x -> Ok x
       | None -> Or_error.error_string "No Stack_id for the latest stack"
 
-  let latest_stack t ~is_new_stack =
+  let latest_stack (t : t) ~is_new_stack =
     let open Or_error.Let_syntax in
     let%bind key = latest_stack_id t ~is_new_stack in
     Or_error.try_with (fun () ->
         let index = Merkle_tree.find_index_exn t.tree key in
         Merkle_tree.get_exn t.tree index )
 
-  let oldest_stack_id t = List.last t.pos_list
+  let oldest_stack_id (t : t) = List.last t.pos_list
 
   let remove_oldest_stack_id t =
     match List.rev t with
@@ -661,7 +692,7 @@ module T = struct
     let%bind t' = with_next_index t ~is_new_stack in
     set_stack t' stack_index stack
 
-  let remove_coinbase_stack t =
+  let remove_coinbase_stack (t : t) =
     let open Or_error.Let_syntax in
     let%bind oldest_stack, remaining = remove_oldest_stack_id t.pos_list in
     let%bind stack_index = find_index t oldest_stack in
@@ -669,7 +700,7 @@ module T = struct
     let%map t' = set_stack t stack_index Stack.empty in
     (stack, {t' with pos_list= remaining})
 
-  let hash_extra {pos_list; new_pos; _} =
+  let hash_extra ({pos_list; new_pos; _} : t) =
     let h = Digestif.SHA256.init () in
     let h =
       Digestif.SHA256.feed_string h
