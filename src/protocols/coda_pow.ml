@@ -823,6 +823,7 @@ module type Transaction_snark_scan_state_intf = sig
       { transaction_with_info: transaction_with_info
       ; statement: ledger_proof_statement
       ; witness: transaction_witness }
+    [@@deriving sexp]
   end
 
   module Ledger_proof_with_sok_message : sig
@@ -912,7 +913,9 @@ module type Transaction_snark_scan_state_intf = sig
 
   val current_job_count : t -> int
 
-  val work_capacity : unit -> int
+  val work_capacity : int
+
+  val next_on_new_tree : t -> bool Or_error.t
 end
 
 module type Staged_ledger_base_intf = sig
@@ -985,6 +988,10 @@ module type Staged_ledger_base_intf = sig
     val all_work_to_do : t -> statement Sequence.t Or_error.t
 
     val all_transactions : t -> transaction list Or_error.t
+
+    val work_capacity : int
+
+    val current_job_count : t -> int
   end
 
   module Staged_ledger_error : sig
@@ -1495,7 +1502,17 @@ module type Consensus_mechanism_intf = sig
      and type consensus_state := Consensus_state.Value.t
 
   module Prover_state : sig
-    type t [@@deriving bin_io]
+    type t
+
+    module Stable :
+      sig
+        module V1 : sig
+          type t [@@deriving bin_io]
+        end
+
+        module Latest : module type of V1
+      end
+      with type V1.t = t
   end
 
   module Proposal_data : sig

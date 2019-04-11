@@ -157,8 +157,7 @@ module Make (Impl : Snarky.Snark_intf.S) : S with module Impl := Impl = struct
          personalization = personalization *)
       Array.map
         ~f:(Fn.compose UInt32.constant UInt32.Unchecked.of_int)
-        [| 0x6A09E667 lxor 0x01010000 (* depth = 1, fanout = 1 *)
-           lxor 32
+        [| 0x6A09E667 lxor 0x01010000 (* depth = 1, fanout = 1 *) lxor 32
            (* digest_length = 32 *)
          ; 0xBB67AE85
          ; 0x3C6EF372

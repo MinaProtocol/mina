@@ -40,6 +40,12 @@ module Poly = struct
 
     module Latest = V1
   end
+
+  type ('hash, 'key, 'account) t = ('hash, 'key, 'account) Stable.Latest.t =
+    { indexes: ('key * int) list
+    ; depth: int
+    ; tree: ('hash, 'account) Tree.Stable.V1.t }
+  [@@deriving sexp]
 end
 
 module type S = sig
@@ -78,9 +84,9 @@ module type S = sig
   val merkle_root : t -> hash
 end
 
-let tree {Poly.Stable.Latest.tree; _} = tree
+let tree {Poly.tree; _} = tree
 
-let of_hash ~depth h = {Poly.Stable.Latest.indexes= []; depth; tree= Hash h}
+let of_hash ~depth h = {Poly.indexes= []; depth; tree= Hash h}
 
 module Make (Hash : sig
   type t [@@deriving bin_io, eq, sexp, compare, version]
@@ -125,7 +131,7 @@ end = struct
 
   type index = int [@@deriving bin_io, sexp]
 
-  let merkle_root {Poly.Stable.Latest.tree; _} = hash tree
+  let merkle_root {Poly.tree; _} = hash tree
 
   let add_path depth0 tree0 path0 account =
     (* let open Poly.Tree.V1 in *)
@@ -192,7 +198,7 @@ end = struct
   let find_index_exn (t : t) pk =
     List.Assoc.find_exn t.indexes ~equal:Key.equal pk
 
-  let get_exn {Poly.Stable.Latest.tree; depth; _} idx =
+  let get_exn {Poly.tree; depth; _} idx =
     let rec go i tree =
       match (i < 0, tree) with
       | true, Poly.Tree.Account acct -> acct
@@ -217,7 +223,7 @@ end = struct
     in
     {t with tree= go (t.depth - 1) t.tree}
 
-  let path_exn {Poly.Stable.Latest.tree; depth; _} idx =
+  let path_exn {Poly.tree; depth; _} idx =
     let rec go acc i tree =
       if i < 0 then acc
       else
@@ -232,7 +238,7 @@ end = struct
     go [] (depth - 1) tree
 end
 
-type ('hash, 'key, 'account) t = ('hash, 'key, 'account) Poly.Stable.Latest.t
+type ('hash, 'key, 'account) t = ('hash, 'key, 'account) Poly.t
 
 let%test_module "sparse-ledger-test" =
   ( module struct
@@ -350,7 +356,7 @@ let%test_module "sparse-ledger-test" =
       in
       let%bind depth = Int.gen_incl 0 16 in
       let%map tree = gen depth >>| prune_hash_branches in
-      {Poly.Stable.Latest.tree; depth; indexes= indexes depth tree}
+      {Poly.tree; depth; indexes= indexes depth tree}
 
     let%test_unit "path_test" =
       Quickcheck.test gen ~f:(fun t ->

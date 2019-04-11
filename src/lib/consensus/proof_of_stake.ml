@@ -93,7 +93,7 @@ end
 module Proposal_data = struct
   (* TODO : version *)
   type t =
-    { stake_proof: Coda_base.Stake_proof.t
+    { stake_proof: Coda_base.Stake_proof.Stable.V1.t
     ; vrf_result: Random_oracle.Digest.Stable.V1.t }
   [@@deriving bin_io]
 
@@ -104,7 +104,7 @@ let genesis_ledger_total_currency =
   Coda_base.Ledger.to_list Genesis_ledger.t
   |> List.fold_left ~init:Balance.zero ~f:(fun sum account ->
          Balance.add_amount sum
-           (Balance.to_amount @@ Coda_base.Account.balance account)
+           (Balance.to_amount @@ account.Coda_base.Account.Poly.balance)
          |> Option.value_exn ?here:None ?error:None
               ~message:"failed to calculate total currency in genesis ledger"
      )
