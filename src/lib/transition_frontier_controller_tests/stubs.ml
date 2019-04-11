@@ -98,7 +98,7 @@ struct
     Staged_ledger.Make_completed_work (Ledger_proof) (Ledger_proof_statement)
 
   module Staged_ledger_hash_binable = struct
-    include Staged_ledger_hash.Stable.V1
+    include Staged_ledger_hash
 
     let ( of_aux_ledger_and_coinbase_hash
         , aux_hash
