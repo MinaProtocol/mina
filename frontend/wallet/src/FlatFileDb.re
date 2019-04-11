@@ -1,3 +1,5 @@
+open Tc;
+
 module Fs = {
   [@bs.val] [@bs.module "fs"]
   external readFile:
