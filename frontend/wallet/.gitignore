@@ -4,6 +4,7 @@
 graphql_schema.json
 npm-debug.log
 node_modules
+db.json
 /lib
 /bundle
 *.exe

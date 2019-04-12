@@ -1,15 +1,18 @@
 {
   "name": "electron-test",
-  "reason" : {"react-jsx" : 3},
+  "reason": {
+    "react-jsx": 3
+  },
   "sources": {
-      "dir": "src",
-      "subdirs": true
+    "dir": "src",
+    "subdirs": true
   },
   "bs-dependencies": [
     "bs-electron",
     "reason-react",
     "reason-apollo",
-    "bs-css"
+    "bs-css",
+    "tablecloth-bucklescript"
   ],
   "ppx-flags": [
     "graphql_ppx/ppx"
