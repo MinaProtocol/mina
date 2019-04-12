@@ -511,7 +511,7 @@ module Base = struct
 
   let create_keys () = Groth16.generate_keypair main ~exposing:(tick_input ())
 
-  let transaction_union_proof ?(preeval = true) ~proving_key sok_digest state1
+  let transaction_union_proof ?(preeval = false) ~proving_key sok_digest state1
       state2 pending_coinbase_stack_state (transaction : Transaction_union.t)
       handler =
     let prover_state : Prover_state.t =
