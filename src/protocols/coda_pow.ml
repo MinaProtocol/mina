@@ -620,7 +620,7 @@ module type Transaction_snark_work_intf = sig
     module Stable :
       sig
         module V1 : sig
-          type t [@@deriving yojson]
+          type t [@@deriving yojson, version]
 
           include Sexpable.S with type t := t
 
