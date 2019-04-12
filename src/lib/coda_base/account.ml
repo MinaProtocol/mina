@@ -17,7 +17,6 @@ module Index = struct
       end
 
       include T
-      module Table = Int.Table
     end
 
     module Latest = V1
@@ -26,6 +25,8 @@ module Index = struct
   type t = Stable.Latest.t [@@deriving sexp]
 
   let gen = Int.gen_incl 0 ((1 lsl Snark_params.ledger_depth) - 1)
+
+  module Table = Int.Table
 
   module Vector = struct
     include Int
