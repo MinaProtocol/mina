@@ -43,6 +43,8 @@ module type Network_intf = sig
 
   val peers : t -> Network_peer.Peer.t list
 
+  val online_status : t -> [`Online | `Offline] Broadcast_pipe.Reader.t
+
   val random_peers : t -> int -> Network_peer.Peer.t list
 
   val catchup_transition :
@@ -483,8 +485,14 @@ module Make (Inputs : Inputs_intf) = struct
 
   let root_length = compose_of_option root_length_opt
 
-  let is_active t =
-    Option.is_some (Broadcast_pipe.Reader.peek t.transition_frontier)
+  let sync_status t =
+    match Broadcast_pipe.Reader.peek @@ Net.online_status t.net with
+    | `Offline -> `Offline
+    | `Online ->
+        Option.value_map
+          (Broadcast_pipe.Reader.peek t.transition_frontier)
+          ~default:`Bootstrap
+          ~f:(Fn.const `Synced)
 
   let visualize_frontier ~filename =
     compose_of_option
