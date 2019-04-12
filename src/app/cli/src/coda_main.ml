@@ -39,7 +39,7 @@ module Staged_ledger_aux_hash = struct
 end
 
 module Staged_ledger_hash = struct
-  include Staged_ledger_hash.Stable.Latest
+  include Staged_ledger_hash
 
   let ledger_hash = Staged_ledger_hash.ledger_hash
 
@@ -360,7 +360,7 @@ module type Main_intf = sig
   val best_tip :
     t -> Inputs.Transition_frontier.Breadcrumb.t Participating_state.t
 
-  val is_active : t -> bool
+  val sync_status : t -> [`Offline | `Synced | `Bootstrap]
 
   val visualize_frontier : filename:string -> t -> unit Participating_state.t
 
@@ -390,6 +390,32 @@ module type Main_intf = sig
   val receipt_chain_database : t -> Receipt_chain_database.t
 end
 
+module Pending_coinbase = struct
+  module V1 = struct
+    include Coda_base.Pending_coinbase.Stable.V1
+
+    let ( hash_extra
+        , oldest_stack
+        , latest_stack
+        , create
+        , remove_coinbase_stack
+        , update_coinbase_stack
+        , merkle_root ) =
+      Coda_base.Pending_coinbase.
+        ( hash_extra
+        , oldest_stack
+        , latest_stack
+        , create
+        , remove_coinbase_stack
+        , update_coinbase_stack
+        , merkle_root )
+
+    module Stack = Coda_base.Pending_coinbase.Stack
+    module Coinbase_data = Coda_base.Pending_coinbase.Coinbase_data
+    module Hash = Coda_base.Pending_coinbase.Hash
+  end
+end
+
 module Fee_transfer = Coda_base.Fee_transfer
 module Ledger_proof_statement = Transaction_snark.Statement
 module Pending_coinbase_stack_state =
@@ -408,8 +434,8 @@ module Staged_ledger_diff = Staged_ledger.Make_diff (struct
   module User_command = User_command
   module Transaction_snark_work = Transaction_snark_work
   module Fee_transfer = Fee_transfer
-  module Pending_coinbase_hash = Pending_coinbase.Hash
-  module Pending_coinbase = Pending_coinbase
+  module Pending_coinbase_hash = Pending_coinbase.V1.Hash
+  module Pending_coinbase = Pending_coinbase.V1
 end)
 
 let make_init ~should_propose (module Config : Config_intf) :
@@ -495,23 +521,10 @@ struct
   module Account = Account
 
   module Transaction = struct
-    module T = struct
-      type t = Coda_base.Transaction.t =
-        | User_command of User_command.With_valid_signature.t
-        | Fee_transfer of Fee_transfer.t
-        | Coinbase of Coinbase.t
-      [@@deriving compare, eq]
-    end
+    include Coda_base.Transaction.Stable.V1
 
-    let fee_excess = Transaction.fee_excess
-
-    let supply_increase = Transaction.supply_increase
-
-    include T
-
-    include (
-      Coda_base.Transaction :
-        module type of Coda_base.Transaction with type t := t )
+    let fee_excess, supply_increase =
+      Coda_base.Transaction.(fee_excess, supply_increase)
   end
 
   module Ledger = Ledger
@@ -540,8 +553,8 @@ struct
     end
   end
 
-  module Pending_coinbase_hash = Pending_coinbase.Hash
-  module Pending_coinbase = Pending_coinbase
+  module Pending_coinbase_hash = Pending_coinbase.V1.Hash
+  module Pending_coinbase = Pending_coinbase.V1
   module Pending_coinbase_stack_state = Pending_coinbase_stack_state
   module Transaction_witness = Coda_base.Transaction_witness
 
@@ -569,8 +582,8 @@ struct
       module Staged_ledger_aux_hash = Staged_ledger_aux_hash
       module Transaction_validator = Transaction_validator
       module Config = Init
-      module Pending_coinbase = Pending_coinbase
       module Pending_coinbase_hash = Pending_coinbase_hash
+      module Pending_coinbase = Pending_coinbase
       module Pending_coinbase_stack_state = Pending_coinbase_stack_state
       module Transaction_witness = Transaction_witness
 
@@ -776,14 +789,14 @@ struct
     (* TODO : we're choosing versioned inputs, so the result should be versioned *)
     module Pool =
       Snark_pool.Make (Proof) (Fee.Stable.V1) (Work) (Transition_frontier)
-    module Diff =
+    module Snark_pool_diff =
       Network_pool.Snark_pool_diff.Make (Proof) (Fee.Stable.V1) (Work)
         (Transition_frontier)
         (Pool)
 
-    type pool_diff = Diff.t
+    type pool_diff = Snark_pool_diff.t
 
-    include Network_pool.Make (Transition_frontier) (Pool) (Diff)
+    include Network_pool.Make (Transition_frontier) (Pool) (Snark_pool_diff)
 
     let get_completed_work t statement =
       Option.map
@@ -809,11 +822,10 @@ struct
       apply_and_broadcast t
         (Envelope.Incoming.wrap
            ~data:
-             (Add_solved_work
+             (Diff.Add_solved_work
                 ( List.map res.spec.instances ~f:Single.Spec.statement
-                , Diff.Priced_proof.
-                    { proof= res.proofs
-                    ; fee= {fee= res.spec.fee; prover= res.prover} } ))
+                , { Snark_pool_diff.Priced_proof.proof= res.proofs
+                  ; fee= {fee= res.spec.fee; prover= res.prover} } ))
            ~sender:Envelope.Sender.Local)
   end
 
@@ -822,7 +834,7 @@ struct
   module Net = Coda_networking.Make (struct
     include Inputs0
     module Snark_pool = Snark_pool
-    module Snark_pool_diff = Snark_pool.Diff
+    module Snark_pool_diff = Snark_pool.Snark_pool_diff
     module Sync_ledger = Sync_ledger
     module Staged_ledger_hash = Staged_ledger_hash
     module Ledger_hash = Ledger_hash
@@ -1087,21 +1099,19 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
   include Program
   open Inputs
 
-  module Coda_graphql = struct
+  module Graphql = struct
     open Graphql_async
     open Schema
     open Async
 
     module Types = struct
-      type sync_status = Error | Bootstrap | Synced
-
-      let sync_status =
+      let sync_status : ('context, [`Offline | `Synced | `Bootstrap]) typ =
         non_null
           (enum "sync_status" ~doc:"Sync status as daemon node"
              ~values:
-               [ enum_value "ERROR" ~value:Error
-               ; enum_value "BOOTSTRAP" ~value:Bootstrap
-               ; enum_value "SYNCED" ~value:Synced ])
+               [ enum_value "BOOTSTRAP" ~value:`Bootstrap
+               ; enum_value "SYNCED" ~value:`Synced
+               ; enum_value "OFFLINE" ~value:`Offline ])
     end
 
     module Queries = struct
@@ -1111,8 +1121,7 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
         io_field "sync_status" ~typ:sync_status
           ~args:Arg.[]
           ~resolve:(fun {ctx= coda; _} () ->
-            Deferred.Result.return
-              (if is_active coda then Synced else Bootstrap) )
+            Deferred.Result.return (Program.sync_status coda) )
 
       let commands = [sync_state]
     end
@@ -1589,7 +1598,7 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
             let graphql_callback =
               Graphql_cohttp_async.make_callback
                 (fun _req -> coda)
-                Coda_graphql.schema
+                Graphql.schema
             in
             Cohttp_async.(
               Server.create

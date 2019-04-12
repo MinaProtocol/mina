@@ -881,7 +881,7 @@ end = struct
       , List.length jobs )
     in
     let apply_pre_diff_with_at_most_two
-        (pre_diff1 : Staged_ledger_diff.pre_diff_with_at_most_two_coinbase) =
+        (pre_diff1 : Staged_ledger_diff.Pre_diff_with_at_most_two_coinbase.t) =
       let coinbase_parts =
         match pre_diff1.coinbase with
         | Zero -> `Zero
@@ -892,7 +892,7 @@ end = struct
         pre_diff1.completed_works
     in
     let apply_pre_diff_with_at_most_one
-        (pre_diff2 : Staged_ledger_diff.pre_diff_with_at_most_one_coinbase) =
+        (pre_diff2 : Staged_ledger_diff.Pre_diff_with_at_most_one_coinbase.t) =
       let coinbase_added =
         match pre_diff2.coinbase with Zero -> `Zero | One x -> `One x
       in
@@ -1638,8 +1638,12 @@ let%test_module "test" =
 
         module Stable = struct
           module V1 = struct
-            type t = string
-            [@@deriving sexp, bin_io, compare, eq, yojson, hash]
+            module T = struct
+              type t = string
+              [@@deriving sexp, bin_io, compare, eq, yojson, hash, version]
+            end
+
+            include T
           end
         end
 
@@ -1683,8 +1687,13 @@ let%test_module "test" =
 
         module Stable = struct
           module V1 = struct
-            type t = txn_amt * txn_fee
-            [@@deriving sexp, bin_io, compare, eq, yojson]
+            module T = struct
+              type t = txn_amt * txn_fee
+              [@@deriving
+                sexp, bin_io, compare, eq, yojson, version {for_test}]
+            end
+
+            include T
           end
 
           module Latest = V1
@@ -1717,8 +1726,13 @@ let%test_module "test" =
         module Single = struct
           module Stable = struct
             module V1 = struct
-              type t = public_key * fee
-              [@@deriving bin_io, sexp, compare, eq, yojson, hash]
+              module T = struct
+                type t = public_key * fee
+                [@@deriving
+                  bin_io, sexp, compare, eq, yojson, hash, version {for_test}]
+              end
+
+              include T
             end
 
             module Latest = V1
@@ -1729,10 +1743,20 @@ let%test_module "test" =
 
         module Stable = struct
           module V1 = struct
-            type t =
-              | One of Single.Stable.V1.t
-              | Two of Single.Stable.V1.t * Single.Stable.V1.t
-            [@@deriving bin_io, sexp, compare, eq, yojson]
+            module T = struct
+              type t =
+                | One of Single.Stable.V1.t
+                | Two of Single.Stable.V1.t * Single.Stable.V1.t
+              [@@deriving
+                bin_io
+                , sexp
+                , compare
+                , eq
+                , yojson
+                , version {for_test; unnumbered}]
+            end
+
+            include T
           end
 
           module Latest = V1
@@ -1971,7 +1995,7 @@ let%test_module "test" =
                 ; fee_excess: Fee.Signed.t
                 ; proof_type: [`Base | `Merge] }
               [@@deriving
-                sexp, bin_io, compare, hash, yojson, eq, version {asserted}]
+                sexp, bin_io, compare, hash, yojson, eq, version {for_test}]
             end
 
             include T
@@ -2077,7 +2101,7 @@ let%test_module "test" =
             module V1 = struct
               module T = struct
                 type t = transaction
-                [@@deriving sexp, bin_io, version {asserted}]
+                [@@deriving sexp, bin_io, version {for_test}]
               end
 
               include T
@@ -2195,7 +2219,21 @@ let%test_module "test" =
       end
 
       module Staged_ledger_hash = struct
-        include String
+        module Stable = struct
+          module V1 = struct
+            module T = struct
+              type t = string
+              [@@deriving bin_io, sexp, hash, compare, eq, yojson, version]
+            end
+
+            include T
+            include Hashable.Make_binable (T)
+          end
+
+          module Latest = V1
+        end
+
+        type t = string [@@deriving sexp, eq, compare]
 
         type ledger_hash = Ledger_hash.t
 
@@ -2229,8 +2267,12 @@ let%test_module "test" =
 
         module Stable = struct
           module V1 = struct
-            type t = {fee: fee; proofs: proof list; prover: public_key}
-            [@@deriving sexp, bin_io, compare, yojson]
+            module T = struct
+              type t = {fee: fee; proofs: proof list; prover: public_key}
+              [@@deriving sexp, bin_io, compare, yojson, version {for_test}]
+            end
+
+            include T
           end
 
           module Latest = V1
@@ -2245,7 +2287,8 @@ let%test_module "test" =
             module V1 = struct
               module T = struct
                 type t = statement list
-                [@@deriving sexp, bin_io, compare, hash, eq, yojson]
+                [@@deriving
+                  sexp, bin_io, compare, hash, eq, yojson, version {for_test}]
               end
 
               include T
@@ -2302,15 +2345,31 @@ let%test_module "test" =
         type public_key = Compressed_public_key.Stable.V1.t
         [@@deriving sexp, bin_io, compare, yojson]
 
-        type staged_ledger_hash = Staged_ledger_hash.t
+        type staged_ledger_hash = Staged_ledger_hash.Stable.V1.t
         [@@deriving sexp, bin_io, compare, yojson]
 
         module At_most_two = struct
-          type 'a t =
+          module Stable = struct
+            module V1 = struct
+              module T = struct
+                type 'a t =
+                  | Zero
+                  | One of 'a option
+                  | Two of ('a * 'a option) option
+                [@@deriving sexp, bin_io, yojson, version]
+              end
+
+              include T
+            end
+
+            module Latest = V1
+          end
+
+          type 'a t = 'a Stable.Latest.t =
             | Zero
             | One of 'a option
             | Two of ('a * 'a option) option
-          [@@deriving sexp, bin_io, yojson]
+          [@@deriving sexp, yojson]
 
           let increase t ws =
             match (t, ws) with
@@ -2323,8 +2382,21 @@ let%test_module "test" =
         end
 
         module At_most_one = struct
-          type 'a t = Zero | One of 'a option
-          [@@deriving sexp, bin_io, yojson]
+          module Stable = struct
+            module V1 = struct
+              module T = struct
+                type 'a t = Zero | One of 'a option
+                [@@deriving sexp, bin_io, yojson, version]
+              end
+
+              include T
+            end
+
+            module Latest = V1
+          end
+
+          type 'a t = 'a Stable.Latest.t = Zero | One of 'a option
+          [@@deriving sexp, yojson]
 
           let increase t ws =
             match (t, ws) with
@@ -2333,29 +2405,84 @@ let%test_module "test" =
             | _ -> Or_error.error_string "Error incrementing coinbase parts"
         end
 
-        type pre_diff_with_at_most_two_coinbase =
-          { completed_works: completed_work list
-          ; user_commands: user_command list
-          ; coinbase: fee_transfer_single At_most_two.t }
-        [@@deriving sexp, bin_io, yojson]
+        module Pre_diff_with_at_most_two_coinbase = struct
+          module Stable = struct
+            module V1 = struct
+              module T = struct
+                type t =
+                  { completed_works: completed_work list
+                  ; user_commands: user_command list
+                  ; coinbase: fee_transfer_single At_most_two.Stable.Latest.t
+                  }
+                [@@deriving
+                  sexp, bin_io, yojson, version {for_test; unnumbered}]
+              end
 
-        type pre_diff_with_at_most_one_coinbase =
-          { completed_works: completed_work list
-          ; user_commands: user_command list
-          ; coinbase: fee_transfer_single At_most_one.t }
-        [@@deriving sexp, bin_io, yojson]
+              include T
+            end
 
-        type diff =
-          pre_diff_with_at_most_two_coinbase
-          * pre_diff_with_at_most_one_coinbase option
-        [@@deriving sexp, bin_io, yojson]
+            module Latest = V1
+          end
+
+          type t = Stable.Latest.t =
+            { completed_works: completed_work list
+            ; user_commands: user_command list
+            ; coinbase: fee_transfer_single At_most_two.t }
+          [@@deriving sexp, yojson]
+        end
+
+        module Pre_diff_with_at_most_one_coinbase = struct
+          module Stable = struct
+            module V1 = struct
+              module T = struct
+                type t =
+                  { completed_works: completed_work list
+                  ; user_commands: user_command list
+                  ; coinbase: fee_transfer_single At_most_one.Stable.Latest.t
+                  }
+                [@@deriving sexp, bin_io, yojson, version {for_test}]
+              end
+
+              include T
+            end
+
+            module Latest = V1
+          end
+
+          type t = Stable.Latest.t =
+            { completed_works: completed_work list
+            ; user_commands: user_command list
+            ; coinbase: fee_transfer_single At_most_one.t }
+          [@@deriving sexp, yojson]
+        end
+
+        module Diff = struct
+          module Stable = struct
+            module V1 = struct
+              module T = struct
+                type t =
+                  Pre_diff_with_at_most_two_coinbase.Stable.V1.t
+                  * Pre_diff_with_at_most_one_coinbase.Stable.V1.t option
+                [@@deriving sexp, bin_io, yojson, version]
+              end
+
+              include T
+            end
+
+            module Latest = V1
+          end
+
+          type t = Stable.Latest.t [@@deriving sexp, yojson]
+        end
 
         module Stable = struct
           module V1 = struct
             module T = struct
               type t =
-                {diff: diff; prev_hash: staged_ledger_hash; creator: public_key}
-              [@@deriving sexp, bin_io, version {asserted}]
+                { diff: Diff.Stable.V1.t
+                ; prev_hash: staged_ledger_hash
+                ; creator: public_key }
+              [@@deriving sexp, bin_io, version {for_test}]
             end
 
             include T
@@ -2365,7 +2492,9 @@ let%test_module "test" =
         end
 
         type t = Stable.Latest.t =
-          {diff: diff; prev_hash: staged_ledger_hash; creator: public_key}
+          { diff: Diff.Stable.V1.t
+          ; prev_hash: staged_ledger_hash
+          ; creator: public_key }
         [@@deriving sexp, yojson]
 
         module With_valid_signatures_and_proofs = struct
@@ -2403,7 +2532,7 @@ let%test_module "test" =
             (pre_diff :
               With_valid_signatures_and_proofs
               .pre_diff_with_at_most_two_coinbase) :
-            pre_diff_with_at_most_two_coinbase =
+            Pre_diff_with_at_most_two_coinbase.t =
           { completed_works= forget_cw pre_diff.completed_works
           ; user_commands= (pre_diff.user_commands :> User_command.t list)
           ; coinbase= pre_diff.coinbase }
@@ -2411,7 +2540,8 @@ let%test_module "test" =
         let forget_pre_diff_with_at_most_one
             (pre_diff :
               With_valid_signatures_and_proofs
-              .pre_diff_with_at_most_one_coinbase) =
+              .pre_diff_with_at_most_one_coinbase) :
+            Pre_diff_with_at_most_one_coinbase.t =
           { completed_works= forget_cw pre_diff.completed_works
           ; user_commands= (pre_diff.user_commands :> User_command.t list)
           ; coinbase= pre_diff.coinbase }
@@ -2434,7 +2564,7 @@ let%test_module "test" =
           module V1 = struct
             module T = struct
               type t = {ledger: Sparse_ledger.t}
-              [@@deriving bin_io, sexp, version {asserted}]
+              [@@deriving bin_io, sexp, version {for_test}]
             end
 
             include T
@@ -2685,7 +2815,7 @@ let%test_module "test" =
             ; prev_hash
             ; creator= "C" }
         | Some _ ->
-            let diff : Staged_ledger_diff.diff =
+            let diff : Staged_ledger_diff.Diff.t =
               ( { completed_works
                 ; user_commands= List.take txns partition.first
                 ; coinbase= Zero }

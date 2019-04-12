@@ -215,3 +215,55 @@ module M11 = struct
     end
   end
 end
+
+(* int32 *)
+module M12 = struct
+  module Stable = struct
+    module V1 = struct
+      module T = struct
+        type t = int32 [@@deriving bin_io, version]
+      end
+
+      include T
+    end
+  end
+end
+
+(* int64 *)
+module M13 = struct
+  module Stable = struct
+    module V1 = struct
+      module T = struct
+        type t = int64 [@@deriving bin_io, version]
+      end
+
+      include T
+    end
+  end
+end
+
+(* bytes *)
+module M14 = struct
+  module Stable = struct
+    module V1 = struct
+      module T = struct
+        type t = bytes [@@deriving bin_io, version]
+      end
+
+      include T
+    end
+  end
+end
+
+(* Jane Street whitelisting *)
+module M15 = struct
+  module Stable = struct
+    module V1 = struct
+      module T = struct
+        type t = int Core_kernel.Queue.Stable.V1.t [@@deriving bin_io, version]
+      end
+
+      include T
+    end
+  end
+end
