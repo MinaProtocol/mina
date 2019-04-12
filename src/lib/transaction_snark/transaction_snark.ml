@@ -507,7 +507,7 @@ module Base = struct
     in
     ()
 
-  let reduced_main = lazy (Groth16.reduce_to_prover (tick_input ()) main)
+  let reduced_main = lazy main
 
   let create_keys () = Groth16.generate_keypair main ~exposing:(tick_input ())
 
