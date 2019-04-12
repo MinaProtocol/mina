@@ -76,9 +76,9 @@ module State = struct
 
   let slots_per_block state = parallelism state / Int.pow 2 state.root_at_depth
 
-  (*A block is a set of leaves that correspond to a ledger proof. If 
-  root_at_depth = 0 then there would be just one block with all the leaves in 
-  it. No of blocks = 2^root_at_depth. This function returns the starting 
+  (*A block is a set of leaves that correspond to a ledger proof. If
+  root_at_depth = 0 then there would be just one block with all the leaves in
+  it. No of blocks = 2^root_at_depth. This function returns the starting
   position of the block containing pos *)
   let block_of state pos =
     let total_leaves = State.parallelism state in
@@ -985,7 +985,7 @@ let%test_module "scans" =
           let g =
             gen
               ~gen_data:
-                Quickcheck.Generator.Let_syntax.(Int.gen >>| Int64.of_int)
+                Quickcheck.Generator.Let_syntax.(Int.quickcheck_generator >>| Int64.of_int)
               ~f_job_done:job_done ~f_acc:f_merge_up
           in
           Quickcheck.test g ~sexp_of:[%sexp_of: (int64, int64) State.t]
@@ -1037,9 +1037,9 @@ let%test_module "scans" =
           )
 
         let%test_unit "sequence number reset" =
-          (*create jobs with unique sequence numbers starting from 1. At any 
-          point, after reset, the jobs should be labelled starting from 1. 
-          Therefore,  sum of those sequence numbers should be equal to sum of 
+          (*create jobs with unique sequence numbers starting from 1. At any
+          point, after reset, the jobs should be labelled starting from 1.
+          Therefore,  sum of those sequence numbers should be equal to sum of
           first n (number of jobs) natural numbers*)
           Backtrace.elide := false ;
           let p = 3 in

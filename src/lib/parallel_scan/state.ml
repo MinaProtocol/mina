@@ -64,8 +64,8 @@ module Job = struct
     let open Quickcheck.Generator.Let_syntax in
     match%map
       variant2
-        (variant4 Bool.gen a_gen a_gen (tuple3 a_gen a_gen Int.gen))
-        (Option.gen (tuple2 d_gen Int.gen))
+        (variant4 Bool.quickcheck_generator a_gen a_gen (tuple3 a_gen a_gen Int.quickcheck_generator))
+        (Option.quickcheck_generator (tuple2 d_gen Int.quickcheck_generator))
     with
     | `A (`A _) -> Merge Empty
     | `A (`B a) -> Merge (Lcomp a)
@@ -76,7 +76,7 @@ module Job = struct
   let gen_full a_gen d_gen =
     let open Quickcheck.Generator in
     let open Quickcheck.Generator.Let_syntax in
-    match%map variant2 (tuple3 a_gen a_gen Int.gen) (tuple2 d_gen Int.gen) with
+    match%map variant2 (tuple3 a_gen a_gen Int.quickcheck_generator) (tuple2 d_gen Int.quickcheck_generator) with
     | `A (a1, a2, o) -> Merge (Bcomp (a1, a2, o))
     | `B (d, o) -> Base (Some (d, o))
 end

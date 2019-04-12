@@ -28,7 +28,7 @@ end
 [%%endif]
 
 module Graphql_cohttp_async =
-  Graphql_cohttp.Make (Graphql_async.Schema) (Cohttp_async.Body)
+  Graphql_cohttp.Make (Graphql_async.Schema) (Cohttp_async.Io) (Cohttp_async.Body)
 
 module Staged_ledger_aux_hash = struct
   include Staged_ledger_hash.Aux_hash.Stable.Latest
@@ -590,8 +590,8 @@ struct
       let check (Transaction_snark_work.({fee; prover; proofs}) as t) stmts =
         let message = Sok_message.create ~fee ~prover in
         match List.zip proofs stmts with
-        | None -> return None
-        | Some ps ->
+        | Unequal_lengths -> return None
+        | Ok ps ->
             let%map good =
               Deferred.List.for_all ps ~f:(fun (proof, stmt) ->
                   Transaction_snark.verify ~message proof stmt )
@@ -772,7 +772,7 @@ struct
                 let open Snark_params.Tick in
                 let open Quickcheck.Generator.Let_syntax in
                 let%map x = Bignum_bigint.(gen_incl zero (Field.size - one))
-                and is_odd = Bool.gen in
+                and is_odd = Bool.quickcheck_generator in
                 let x = Bigint.(to_field (of_bignum_bigint x)) in
                 {Public_key.Compressed.Poly.x; is_odd}
               in
@@ -1605,7 +1605,7 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
                 Coda_graphql.schema
             in
             Cohttp_async.(
-              Server.create
+              Server.create_expert
                 ~on_handler_error:
                   (`Call
                     (fun net exn ->
@@ -1621,13 +1621,14 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
                       |> Daemon_rpcs.Types.Status.to_yojson
                       |> Yojson.Safe.pretty_to_string )
                   in
+                  let lift x = `Response x in
                   match Uri.path uri with
                   | "/graphql" -> graphql_callback () req body
-                  | "/status" -> status `None
-                  | "/status/performance" -> status `Performance
+                  | "/status" -> status `None >>| lift
+                  | "/status/performance" -> status `Performance >>| lift
                   | _ ->
                       Server.respond_string ~status:`Not_found
-                        "Route not found" )) )
+                        "Route not found" >>| lift)) )
         |> ignore ) ;
     let where_to_listen =
       Tcp.Where_to_listen.bind_to All_addresses (On_port client_port)

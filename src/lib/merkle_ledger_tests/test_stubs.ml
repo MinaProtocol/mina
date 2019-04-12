@@ -48,7 +48,7 @@ module Balance_not_used = struct
 
   let equal x y = UInt64.compare x y = 0
 
-  let gen = Quickcheck.Generator.map ~f:UInt64.of_int64 Int64.gen
+  let gen = Quickcheck.Generator.map ~f:UInt64.of_int64 Int64.quickcheck_generator
 end
 
 module Account_not_used = struct
@@ -70,8 +70,8 @@ module Account_not_used = struct
     let balance = Balance.of_string string_balance in
     {public_key; balance}
 
-  (* vanilla String.gen yields the empty string about half the time *)
-  let key_gen = String.gen_with_length 10 Char.gen
+  (* vanilla String.quickcheck_generator yields the empty string about half the time *)
+  let key_gen = String.gen_with_length 10 Char.quickcheck_generator
 
   let set_balance {public_key; _} balance = {public_key; balance}
 
@@ -81,8 +81,8 @@ module Account_not_used = struct
 
   let gen =
     let open Quickcheck.Let_syntax in
-    let%bind public_key = String.gen in
-    let%map int_balance = Int.gen in
+    let%bind public_key = String.quickcheck_generator in
+    let%map int_balance = Int.quickcheck_generator in
     let nat_balance = abs int_balance in
     let balance = Balance.of_int nat_balance in
     {public_key; balance}
@@ -133,6 +133,15 @@ module In_memory_kvdb : Intf.Key_value_database = struct
       let hash = hash_t_frozen
 
       let hash_fold_t = hash_fold_t_frozen
+
+      let bin_t = Bin_prot.Std.bin_bigstring
+      let bin_read_t = Bin_prot.Std.bin_read_bigstring
+      let __bin_read_t__ = Bin_prot.Std.__bin_read_bigstring__
+      let bin_write_t = Bin_prot.Std.bin_write_bigstring
+      let bin_shape_t = Bin_prot.Std.bin_shape_bigstring
+      let bin_size_t = Bin_prot.Std.bin_size_bigstring
+      let bin_reader_t = Bin_prot.Std.bin_reader_bigstring
+      let bin_writer_t = Bin_prot.Std.bin_writer_bigstring
     end
 
     include T
@@ -153,7 +162,7 @@ module In_memory_kvdb : Intf.Key_value_database = struct
   let get_uuid t = t.uuid
 
   let create ~directory:_ =
-    {uuid= Uuid.create (); table= Bigstring_frozen.Table.create ()}
+    {uuid= Uuid_unix.create (); table= Bigstring_frozen.Table.create ()}
 
   let close _ = ()
 

@@ -352,7 +352,7 @@ module Make (Test : Test_intf) = struct
                  (Mask.Addr.root ())
           in
           assert (List.length accounts = List.length retrieved_accounts) ;
-          assert (List.equal ~equal:Account.equal accounts retrieved_accounts)
+          assert (List.equal Account.equal accounts retrieved_accounts)
       )
 
   let%test_unit "get_all_accounts should preserve the ordering of accounts by \
@@ -411,7 +411,7 @@ module Make (Test : Test_intf) = struct
               (List.length base_accounts)
               (List.length retrieved_accounts) ) ;
           assert (
-            List.equal ~equal:Account.equal expected_accounts
+            List.equal Account.equal expected_accounts
               retrieved_accounts ) )
 
   let%test_unit "removing accounts from mask restores Merkle root" =

@@ -125,7 +125,7 @@ let%test_unit "buffer wraps around" =
   assert (b.data = [|4; 2; 3|])
 
 let%test_unit "b = let s = read_all b; back1;add_many s;forwards1" =
-  Quickcheck.test ~sexp_of:[%sexp_of: int t] (gen Int.gen) ~f:(fun b ->
+  Quickcheck.test ~sexp_of:[%sexp_of: int t] (gen Int.quickcheck_generator) ~f:(fun b ->
       let old = copy b in
       let stuff = read_all b in
       back ~n:1 b ;

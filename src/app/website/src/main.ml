@@ -567,7 +567,7 @@ let () =
   Command.async ~summary:"build site"
     (let open Command.Param in
     let open Command.Let_syntax in
-    let%map dst = anon ("BUILD-DIR" %: file)
+    let%map dst = anon ("BUILD-DIR" %: string)
     and working_directory =
       flag "working-directory"
         ~doc:"Working directory relative to executing filesystem commands"

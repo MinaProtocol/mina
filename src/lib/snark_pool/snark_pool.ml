@@ -200,7 +200,7 @@ let%test_module "random set test" =
 
       let verify _ _ = return true
 
-      let gen = Int.gen
+      let gen = Int.quickcheck_generator
     end
 
     module Mock_work = struct
@@ -208,7 +208,7 @@ let%test_module "random set test" =
       module T = struct
         type t = Int.t [@@deriving sexp, hash, compare]
 
-        let gen = Int.gen
+        let gen = Int.quickcheck_generator
       end
 
       include T
@@ -253,7 +253,7 @@ let%test_module "random set test" =
     let gen =
       let open Quickcheck.Generator.Let_syntax in
       let gen_entry () =
-        Quickcheck.Generator.tuple3 Mock_work.gen Mock_work.gen Mock_fee.gen
+        Quickcheck.Generator.tuple3 Mock_work.gen Mock_work.gen Mock_fee.quickcheck_generator
       in
       let%map sample_solved_work = Quickcheck.Generator.list (gen_entry ()) in
       let frontier_broadcast_pipe_r, _ =
@@ -271,7 +271,7 @@ let%test_module "random set test" =
                    the snark pool, the fee of the work is at most the minimum \
                    of those fees" =
       let gen_entry () =
-        Quickcheck.Generator.tuple2 Mock_proof.gen Mock_fee.gen
+        Quickcheck.Generator.tuple2 Mock_proof.gen Mock_fee.quickcheck_generator
       in
       Quickcheck.test
         ~sexp_of:
@@ -303,8 +303,8 @@ let%test_module "random set test" =
             * Mock_fee.t
             * Mock_proof.t
             * Mock_proof.t]
-        (Quickcheck.Generator.tuple6 gen Mock_work.gen Mock_fee.gen
-           Mock_fee.gen Mock_proof.gen Mock_proof.gen)
+        (Quickcheck.Generator.tuple6 gen Mock_work.gen Mock_fee.quickcheck_generator
+           Mock_fee.quickcheck_generator Mock_proof.gen Mock_proof.gen)
         ~f:(fun (t, work, fee_1, fee_2, cheap_proof, expensive_proof) ->
           Mock_snark_pool.remove_solved_work t work ;
           let expensive_fee = max fee_1 fee_2

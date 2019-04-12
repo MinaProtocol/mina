@@ -26,7 +26,7 @@ let of_bits = function
 
 let%test_unit "to_bool of_bool inv" =
   let open Quickcheck in
-  test (Generator.tuple2 Bool.gen Bool.gen) ~f:(fun b ->
+  test (Generator.tuple2 Bool.quickcheck_generator Bool.quickcheck_generator) ~f:(fun b ->
       assert (b = to_bits (of_bits b)) )
 
 let typ =

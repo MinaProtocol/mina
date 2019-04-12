@@ -25,12 +25,12 @@ module type Work_selector_with_tests_intf = sig
 end
 
 module type Work_selector_F = functor (Inputs : Inputs.Inputs_intf) -> Work_selector_with_tests_intf
-                                                                       with type 
+                                                                       with type
                                                                        staged_ledger :=
                                                                          Inputs
                                                                          .Staged_ledger
                                                                          .t
-                                                                        and type 
+                                                                        and type
                                                                        work :=
                                                                          ( Inputs
                                                                            .Ledger_proof_statement
@@ -50,12 +50,12 @@ module type Work_selector_F = functor (Inputs : Inputs.Inputs_intf) -> Work_sele
                                                                          .Single
                                                                          .Spec
                                                                          .t
-                                                                        and type 
+                                                                        and type
                                                                        snark_pool :=
                                                                          Inputs
                                                                          .Snark_pool
                                                                          .t
-                                                                        and type 
+                                                                        and type
                                                                        fee :=
                                                                          Inputs
                                                                          .Fee
@@ -90,7 +90,7 @@ module Make_test (Make_selector : Work_selector_F) = struct
     let snark_pool = T.Snark_pool.create () in
     let gen_add_work work =
       let open Quickcheck.Generator.Let_syntax in
-      let%bind should_add_work = Bool.gen in
+      let%bind should_add_work = Bool.quickcheck_generator in
       if should_add_work then
         let%map fee =
           Quickcheck.Generator.of_list [cheap_work_fee; expensive_work_fee]

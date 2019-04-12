@@ -188,9 +188,9 @@ let%test_module "Transition_handler.Catchup_scheduler tests" =
               ~f:(Fn.compose Or_error.ok_exn Cached.invalidate)
           in
           assert (
-            List.equal
+            List.equal Transition_frontier.Breadcrumb.equal
               (Rose_tree.flatten received_rose_tree)
-              upcoming_breadcrumbs ~equal:Transition_frontier.Breadcrumb.equal
+              upcoming_breadcrumbs
           ) ;
           Strict_pipe.Writer.close catchup_breadcrumbs_writer ;
           Strict_pipe.Writer.close catchup_job_writer )

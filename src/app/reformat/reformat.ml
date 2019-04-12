@@ -66,7 +66,7 @@ let main dry_run check path =
 let cli =
   let open Command.Let_syntax in
   Command.async ~summary:"Format all ml and mli files"
-    (let%map_open path = flag "path" ~doc:"Path to traverse" (required file)
+    (let%map_open path = flag "path" ~doc:"Path to traverse" (required string)
      and dry_run = flag "dry-run" no_arg ~doc:"Dry run"
      and check =
        flag "check" no_arg

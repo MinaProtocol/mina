@@ -57,7 +57,7 @@ module Make (Inputs : Inputs_intf.S) = struct
   type unattached = t [@@deriving sexp]
 
   let create () =
-    { uuid= Uuid.create ()
+    { uuid= Uuid_unix.create ()
     ; parent= None
     ; account_tbl= Location.Table.create ()
     ; hash_tbl= Addr.Table.create ()
@@ -338,7 +338,7 @@ module Make (Inputs : Inputs_intf.S) = struct
 
     (* copy tables in t; use same parent *)
     let copy t =
-      { uuid= Uuid.create ()
+      { uuid= Uuid_unix.create ()
       ; parent= Some (get_parent t)
       ; account_tbl= Location.Table.copy t.account_tbl
       ; location_tbl= Key.Table.copy t.location_tbl

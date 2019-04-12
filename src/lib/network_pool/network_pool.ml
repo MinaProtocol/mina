@@ -123,7 +123,7 @@ let%test_module "network pool test" =
 
           let verify _ _ = return true
 
-          let gen = Int.gen
+          let gen = Int.quickcheck_generator
         end
       end
     end
@@ -133,7 +133,7 @@ let%test_module "network pool test" =
       module T = struct
         type t = Int.t [@@deriving sexp, hash, compare, yojson]
 
-        let gen = Int.gen
+        let gen = Int.quickcheck_generator
       end
 
       include T

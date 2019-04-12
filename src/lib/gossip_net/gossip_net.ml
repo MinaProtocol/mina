@@ -97,7 +97,7 @@ module Make (Message : Message_intf) :
         ( Unix.Inet_addr.t
         , (Uuid.t, Rpc.Connection.t Ivar.t) Hashtbl.t )
         Hashtbl.t
-          (**mapping a Uuid to a connection to be able to remove it from the hash 
+          (**mapping a Uuid to a connection to be able to remove it from the hash
          *table since Rpc.Connection.t doesn't have the socket information*)
     ; max_concurrent_connections: int option
     (* maximum number of concurrent connections from an ip (infinite if None)*)
@@ -292,7 +292,7 @@ module Make (Message : Message_intf) :
                   (Option.value_exn t.max_concurrent_connections) ;
                 Reader.close reader >>= fun _ -> Writer.close writer )
               else
-                let conn_id = Uuid.create () in
+                let conn_id = Uuid_unix.create () in
                 Hashtbl.add_exn conn_map ~key:conn_id ~data:(Ivar.create ()) ;
                 Hashtbl.set t.connections
                   ~key:(Socket.Address.Inet.addr client)

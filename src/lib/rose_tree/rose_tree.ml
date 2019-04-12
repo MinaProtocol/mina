@@ -24,7 +24,7 @@ let rec of_list_exn = function
   | h :: t -> T (h, [of_list_exn t])
 
 let rec equal ~f (T (value1, children1)) (T (value2, children2)) =
-  f value1 value2 && List.equal ~equal:(equal ~f) children1 children2
+  f value1 value2 && List.equal (equal ~f) children1 children2
 
 let subset ~f xs ys = List.for_all xs ~f:(fun x -> List.mem ys x ~equal:f)
 

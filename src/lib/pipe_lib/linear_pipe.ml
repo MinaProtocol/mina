@@ -58,8 +58,8 @@ let set_has_reader (reader : 'a Reader.t) =
   if reader.has_reader then multiple_reads_error ()
   else reader.has_reader <- true
 
-let iter ?consumer ?continue_on_error reader ~f =
-  bracket reader (Pipe.iter reader.Reader.pipe ?consumer ?continue_on_error ~f)
+let iter ?flushed ?continue_on_error reader ~f =
+  bracket reader (Pipe.iter reader.Reader.pipe ?flushed ?continue_on_error ~f)
 
 let iter_unordered ?consumer ~max_concurrency reader ~f =
   bracket reader

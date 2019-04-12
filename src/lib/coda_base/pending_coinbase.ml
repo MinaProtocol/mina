@@ -707,7 +707,7 @@ module T = struct
         (List.fold pos_list ~init:"" ~f:(fun s a -> s ^ Stack_id.to_string a))
     in
     let h = Digestif.SHA256.feed_string h (Stack_id.to_string new_pos) in
-    (Digestif.SHA256.get h :> string)
+    Digestif.SHA256.(get h |> to_raw_string)
 
   let handler (t : t) ~is_new_stack =
     let pending_coinbase = ref t in

@@ -25,7 +25,7 @@ let%test_module "Root_history and Transition_frontier" =
               root)
 
     let breadcrumb_trail_equals =
-      List.equal ~equal:Transition_frontier.Breadcrumb.equal
+      List.equal Transition_frontier.Breadcrumb.equal
 
     let logger = Logger.null ()
 
@@ -147,7 +147,7 @@ let%test_module "Root_history and Transition_frontier" =
           assert (
             Transition_frontier.For_tests.root_history_mem frontier query_hash
           ) ;
-          List.equal ~equal:Transition_frontier.Breadcrumb.equal
+          List.equal Transition_frontier.Breadcrumb.equal
             expected_breadcrumbs
             ( breadcrumbs_path frontier query_hash
             |> Option.value_exn |> Non_empty_list.to_list ) )
@@ -235,6 +235,6 @@ let%test_module "Root_history and Transition_frontier" =
             breadcrumbs_path frontier random_breadcrumb_hash
             |> Option.value_exn |> Non_empty_list.to_list
           in
-          List.equal ~equal:Transition_frontier.Breadcrumb.equal
+          List.equal Transition_frontier.Breadcrumb.equal
             expected_breadcrumb_trail result )
   end )

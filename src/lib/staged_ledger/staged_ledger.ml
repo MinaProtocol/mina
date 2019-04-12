@@ -1651,7 +1651,7 @@ let%test_module "test" =
 
         include Comparable.Make_binable (String)
 
-        let empty, gen = String.(empty, gen)
+        let empty, gen = String.(empty, quickcheck_generator)
       end
 
       module Sok_message = struct
@@ -1884,7 +1884,7 @@ let%test_module "test" =
         let to_bytes : t -> string =
          fun _ -> failwith "to_bytes in ledger hash"
 
-        let gen = Int.gen
+        let gen = Int.quickcheck_generator
       end
 
       module Frozen_ledger_hash = struct

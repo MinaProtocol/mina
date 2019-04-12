@@ -35,13 +35,13 @@ let daemon logger =
   Command.async ~summary:"Coda daemon"
     (let%map_open conf_dir =
        flag "config-directory" ~doc:"DIR Configuration directory"
-         (optional file)
+         (optional string)
      and propose_key =
        flag "propose-key"
          ~doc:
            "KEYFILE Private key file for the proposing transitions \
             (default:don't propose)"
-         (optional file)
+         (optional string)
      and peers =
        flag "peer"
          ~doc:
@@ -296,7 +296,7 @@ let daemon logger =
        let module Run = Run (Config0) (M) in
        Stream.iter
          (Async.Scheduler.long_cycles
-            ~at_least:(sec 0.5 |> Time_ns.Span.of_span))
+            ~at_least:(sec 0.5 |> Time_ns.Span.of_span_float_round_nearest))
          ~f:(fun span ->
            Logger.warn logger ~module_:__MODULE__ ~location:__LOC__
              "long async cycle %s"

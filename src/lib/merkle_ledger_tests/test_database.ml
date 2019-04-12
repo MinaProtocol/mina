@@ -227,7 +227,7 @@ let%test_module "test functor on in memory databases" =
                   if
                     not
                     @@ List.equal
-                         ~equal:(fun (addr1, account1) (addr2, account2) ->
+                         (fun (addr1, account1) (addr2, account2) ->
                            MT.Addr.equal addr1 addr2
                            && Account.equal account1 account2 )
                          old_addresses_and_accounts new_addresses_and_accounts
@@ -310,7 +310,7 @@ let%test_module "test functor on in memory databases" =
                   List.map ~f:snd
                   @@ MT.get_all_accounts_rooted_at_exn mdb address
                 in
-                assert (List.equal ~equal:Account.equal accounts result) ) )
+                assert (List.equal Account.equal accounts result) ) )
 
       let%test_unit "create_empty doesn't modify the hash" =
         Test.with_instance (fun ledger ->
@@ -406,7 +406,7 @@ let%test_module "test functor on in memory databases" =
               in
               assert (List.length accounts = List.length retrieved_accounts) ;
               assert (
-                List.equal ~equal:Account.equal accounts retrieved_accounts )
+                List.equal Account.equal accounts retrieved_accounts )
           )
 
       let%test_unit "removing accounts restores Merkle root" =

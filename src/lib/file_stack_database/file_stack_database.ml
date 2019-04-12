@@ -53,7 +53,7 @@ let%test_module "file stack database" =
 
     let string_gen =
       let open Quickcheck.Let_syntax in
-      String.gen_with_length size Char.gen >>| Bigstring.of_string
+      String.gen_with_length size Char.quickcheck_generator >>| Bigstring.of_string
 
     let with_test f =
       (fun () ->

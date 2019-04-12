@@ -123,7 +123,7 @@ let%test_module "receipt_database" =
       Quickcheck.test
         ~sexp_of:[%sexp_of: Receipt_chain_hash.t * Payment.t list]
         Quickcheck.Generator.(
-          tuple2 Receipt_chain_hash.gen (list_non_empty Payment.gen))
+          tuple2 Receipt_chain_hash.quickcheck_generator (list_non_empty Payment.quickcheck_generator))
         ~f:(fun (initial_receipt_chain, payments) ->
           let db = Receipt_db.create ~directory:"" in
           let resulting_receipt, expected_merkle_path =
@@ -156,8 +156,8 @@ let%test_module "receipt_database" =
       Quickcheck.test
         ~sexp_of:[%sexp_of: Receipt_chain_hash.t * Payment.t * Payment.t list]
         Quickcheck.Generator.(
-          tuple3 Receipt_chain_hash.gen Payment.gen
-            (list_non_empty Payment.gen))
+          tuple3 Receipt_chain_hash.quickcheck_generator Payment.quickcheck_generator
+            (list_non_empty Payment.quickcheck_generator))
         ~f:(fun (prev_receipt_chain, initial_payment, payments) ->
           let db = Receipt_db.create ~directory:"" in
           let initial_receipt_chain =
@@ -195,8 +195,8 @@ let%test_module "receipt_database" =
       Quickcheck.test
         ~sexp_of:[%sexp_of: Receipt_chain_hash.t * Payment.t * Payment.t list]
         Quickcheck.Generator.(
-          tuple3 Receipt_chain_hash.gen Payment.gen
-            (list_non_empty Payment.gen))
+          tuple3 Receipt_chain_hash.quickcheck_generator Payment.quickcheck_generator
+            (list_non_empty Payment.quickcheck_generator))
         ~f:(fun (initial_receipt_chain, unrecorded_payment, payments) ->
           let db = Receipt_db.create ~directory:"" in
           populate_random_path ~db payments initial_receipt_chain ;

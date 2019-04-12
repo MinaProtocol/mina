@@ -220,8 +220,8 @@ struct
 
       let enqueue ({history; capacity; _} as t) state_hash breadcrumb =
         if Queue.length history >= capacity then
-          Queue.dequeue_exn history |> ignore ;
-        Queue.enqueue history state_hash breadcrumb |> ignore ;
+          Queue.dequeue_front_exn history |> ignore ;
+        Queue.enqueue_back history state_hash breadcrumb |> ignore ;
         t.most_recent <- Some breadcrumb
 
       let is_empty {history; _} = Queue.is_empty history
@@ -552,7 +552,7 @@ struct
     let formatter = Format.formatter_of_buffer buf in
     Visualizor.fprint_graph formatter graph ;
     Format.pp_print_flush formatter () ;
-    Buffer.to_bytes buf |> Bytes.to_string
+    Buffer.contents buf
 
   let attach_node_to t ~(parent_node : Node.t) ~(node : Node.t) =
     let hash = Breadcrumb.state_hash (Node.breadcrumb node) in
@@ -864,7 +864,7 @@ struct
                     TL.apply_transaction t.root_snarked_ledger txn
                     |> Or_error.ok_exn |> ignore ) ;
                 (* TODO: See issue #1606 to make this faster *)
-                
+
                 (*Ledger.commit db_mask ;*)
                 ignore
                   (Ledger.Maskable.unregister_mask_exn
@@ -942,12 +942,12 @@ struct
       && State_hash.equal (parent_hash breadcrumb1) (parent_hash breadcrumb2)
       && (let%bind successors1 = get_successor_nodes t1 breadcrumb1 in
           let%map successors2 = get_successor_nodes t2 breadcrumb2 in
-          List.equal ~equal:State_hash.equal
+          List.equal State_hash.equal
             (successors1 |> List.sort ~compare:State_hash.compare)
             (successors2 |> List.sort ~compare:State_hash.compare))
          |> Option.value_map ~default:false ~f:Fn.id
     in
-    List.equal ~equal:equal_breadcrumb
+    List.equal equal_breadcrumb
       (all_breadcrumbs t1 |> sort_breadcrumbs)
       (all_breadcrumbs t2 |> sort_breadcrumbs)
 

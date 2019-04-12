@@ -68,7 +68,7 @@ module Make (Inputs : Inputs.With_unprocessed_transition_cache.S) :
          , crash buffered
          , unit )
          Writer.t) ~unprocessed_transition_cache =
-    let module Lru = Core_extended.Cache.Lru in
+    let module Lru = Core_extended_cache.Lru in
     let already_reported_duplicates =
       Lru.create ~destruct:None Consensus.Constants.(k * c)
     in

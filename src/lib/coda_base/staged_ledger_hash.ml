@@ -145,7 +145,7 @@ module Non_snark = struct
     let h = Digestif.SHA256.feed_string h (Ledger_hash.to_bytes ledger_hash) in
     let h = Digestif.SHA256.feed_string h aux_hash in
     let h = Digestif.SHA256.feed_string h pending_coinbase_aux in
-    (Digestif.SHA256.get h :> string)
+    Digestif.SHA256.(get h |> to_raw_string)
 
   let fold t = Fold.string_triples (digest t)
 

@@ -166,7 +166,7 @@ module Statement = struct
     and supply_increase = Currency.Amount.gen
     and pending_coinbase_before = Pending_coinbase.Stack.gen
     and pending_coinbase_after = Pending_coinbase.Stack.gen
-    and proof_type = Bool.gen >>| fun b -> if b then `Merge else `Base in
+    and proof_type = Bool.quickcheck_generator >>| fun b -> if b then `Merge else `Base in
     { source
     ; target
     ; fee_excess

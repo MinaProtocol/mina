@@ -48,7 +48,7 @@ module Make (Inputs : Inputs_intf) :
   let get_uuid t = t.uuid
 
   let create ?directory_name () =
-    let uuid = Uuid.create () in
+    let uuid = Uuid_unix.create () in
     let directory =
       match directory_name with
       | None -> Uuid.to_string uuid
@@ -365,6 +365,9 @@ module Make (Inputs : Inputs_intf) :
       foldi t ~init ~f:f'
 
     let iter = `Define_using_fold
+
+    (* Use num_accounts instead? *)
+    let length = `Define_using_fold
   end)
 
   let fold_until = C.fold_until

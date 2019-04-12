@@ -13,7 +13,7 @@ include T
 let create ~directory =
   let opts = Rocks.Options.create () in
   Rocks.Options.set_create_if_missing opts true ;
-  {uuid= Uuid.create (); db= Rocks.open_db ~opts directory}
+  {uuid= Uuid_unix.create (); db= Rocks.open_db ~opts directory}
 
 let get_uuid t = t.uuid
 
@@ -77,7 +77,7 @@ let to_alist t : (Bigstring.t * Bigstring.t) list =
 
 let%test_unit "to_alist (of_alist l) = l" =
   Quickcheck.test
-    Quickcheck.Generator.(tuple2 String.gen String.gen |> list)
+    Quickcheck.Generator.(tuple2 String.quickcheck_generator String.quickcheck_generator |> list)
     ~f:(fun kvs ->
       File_system.with_temp_dir "/tmp/coda-test" ~f:(fun directory ->
           let s = Bigstring.of_string in

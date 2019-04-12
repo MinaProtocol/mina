@@ -185,7 +185,7 @@ end = struct
             (Binable.to_string (module Transaction_with_witness.Stable.V1))
         in
         Staged_ledger_aux_hash.of_bytes
-          ((state_hash :> string) ^ Int.to_string t.job_count)
+          ((state_hash |> Digestif.SHA256.to_raw_string) ^ Int.to_string t.job_count)
 
       let is_valid t =
         let k = max Constants.work_delay_factor 2 in

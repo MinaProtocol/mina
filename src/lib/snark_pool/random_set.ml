@@ -23,7 +23,7 @@ end
 module Make (Key : sig
   type t [@@deriving sexp, bin_io]
 
-  val gen : t Quickcheck.Generator.t
+  val quickcheck_generator : t Quickcheck.Generator.t
 
   include Hashable.S_binable with type t := t
 end) : S with type key := Key.t = struct
@@ -57,20 +57,20 @@ end) : S with type key := Key.t = struct
 
   let gen =
     let open Quickcheck.Generator.Let_syntax in
-    let%map sample_list = Quickcheck.Generator.list Key.gen in
+    let%map sample_list = Quickcheck.Generator.list Key.quickcheck_generator in
     let t = create () in
     List.iter sample_list ~f:(add t) ;
     t
 
   let%test_unit "for all s, x : add s x -> mem s x" =
     Quickcheck.test ~sexp_of:[%sexp_of: t * Key.t]
-      (Quickcheck.Generator.tuple2 gen Key.gen) ~f:(fun (s, x) ->
+      (Quickcheck.Generator.tuple2 gen Key.quickcheck_generator) ~f:(fun (s, x) ->
         add s x ;
         assert (mem s x) )
 
   let%test_unit "for all s, x: add s x & remove s x -> !mem s x" =
     Quickcheck.test ~sexp_of:[%sexp_of: t * Key.t]
-      (Quickcheck.Generator.tuple2 gen Key.gen) ~f:(fun (s, x) ->
+      (Quickcheck.Generator.tuple2 gen Key.quickcheck_generator) ~f:(fun (s, x) ->
         add s x ;
         remove s x ;
         assert (not (mem s x)) )

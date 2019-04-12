@@ -271,7 +271,7 @@ let%test_module "sparse-ledger-test" =
 
       let merge = Stable.Latest.merge
 
-      let gen = Quickcheck.Generator.map String.gen ~f:Md5.digest_string
+      let gen = Quickcheck.Generator.map String.quickcheck_generator ~f:Md5.digest_string
     end
 
     module Account = struct
@@ -286,7 +286,7 @@ let%test_module "sparse-ledger-test" =
 
           let gen =
             let open Quickcheck.Generator.Let_syntax in
-            let%map name = String.gen and favorite_number = Int.gen in
+            let%map name = String.quickcheck_generator and favorite_number = Int.quickcheck_generator in
             {name; favorite_number}
 
           let key {name; _} = name

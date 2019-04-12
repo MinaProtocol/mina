@@ -146,7 +146,7 @@ module Compressed = struct
 
   let gen =
     let open Quickcheck.Generator.Let_syntax in
-    let%map x = Field.gen and is_odd = Bool.gen in
+    let%map x = Field.gen and is_odd = Bool.quickcheck_generator in
     Poly.{x; is_odd}
 
   let bit_length_to_triple_length n = (n + 2) / 3

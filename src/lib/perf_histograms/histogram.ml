@@ -58,7 +58,7 @@ struct
 
   let add ({params; _} as t) e =
     match Elem.bucket ~params e with
-    | `Index i -> Array.replace t.buckets i ~f:Int.succ
+    | `Index i ->  t.buckets.(i) <- Int.succ t.buckets.(i)
     | `Overflow -> t.overflow <- t.overflow + 1
     | `Underflow -> t.underflow <- t.underflow + 1
 end

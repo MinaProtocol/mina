@@ -99,7 +99,7 @@ let decrypt ~(password : Bytes.t)
 
 let%test_unit "successful roundtrip" =
   (* 4 trials because password hashing is slow *)
-  let bgen = Bytes.gen_with_length 16 Char.gen in
+  let bgen = Bytes.gen_with_length 16 Char.quickcheck_generator in
   Quickcheck.test
     Quickcheck.Generator.(tuple2 bgen bgen)
     ~trials:4

@@ -118,7 +118,13 @@ module Make_version (Version : Version_intf) = struct
     assert (Int.equal read_version Version.version) ;
     t
 
-  let __bin_read_t__ = With_version.__bin_read_t__
+  let __bin_read_t__ buf ~pos_ref i =
+    let With_version.({version= read_version; t}) =
+      With_version.__bin_read_t__ buf ~pos_ref i
+    in
+    (* sanity check *)
+    assert (Int.equal read_version Version.version) ;
+    t
 
   let bin_reader_t =
     Bin_prot.Type_class.{read= bin_read_t; vtag_read= __bin_read_t__}

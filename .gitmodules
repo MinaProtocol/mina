@@ -10,3 +10,9 @@
 [submodule "src/external/ocaml-extlib"]
 	path = src/external/ocaml-extlib
 	url = git@github.com:CodaProtocol/ocaml-extlib.git
+[submodule "src/external/rpc_parallel"]
+	path = src/external/rpc_parallel
+	url = git@github.com:CodaProtocol/rpc_parallel.git
+[submodule "src/external/digestif"]
+	path = src/external/digestif
+	url = git@github.com:CodaProtocol/digestif.git

@@ -95,5 +95,5 @@ let gen =
     Currency.Fee.gen_incl Currency.Fee.zero (Currency.Amount.to_fee amount)
   in
   let prover = Public_key.Compressed.gen in
-  let%map fee_transfer = Option.gen (Quickcheck.Generator.tuple2 prover fee) in
+  let%map fee_transfer = Option.quickcheck_generator (Quickcheck.Generator.tuple2 prover fee) in
   {proposer; amount; fee_transfer}

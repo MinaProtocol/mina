@@ -84,7 +84,7 @@ module Make_fp
   let gen =
     let length_in_int32s = (length_in_bits + 31) / 32 in
     Quickcheck.Generator.(
-      map (list_with_length length_in_int32s Int32.gen) ~f:(fun xs ->
+      map (list_with_length length_in_int32s Int32.quickcheck_generator) ~f:(fun xs ->
           List.foldi xs ~init:zero ~f:(fun i acc x ->
               N.log_or acc
                 (N.shift_left (N.of_int (Int32.to_int_exn x)) (32 * i)) ) ))

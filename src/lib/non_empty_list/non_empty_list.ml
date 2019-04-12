@@ -48,6 +48,8 @@ module C = Container.Make (struct
   let fold (x, xs) ~init ~f = List.fold xs ~init:(f init x) ~f
 
   let iter = `Custom (fun (x, xs) ~f -> f x ; List.iter xs ~f)
+
+  let length = `Define_using_fold
 end)
 
 let find = C.find

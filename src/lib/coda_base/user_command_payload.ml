@@ -67,7 +67,7 @@ module Common = struct
     let%map fee = Currency.Fee.gen
     and nonce = Account_nonce.gen
     and memo =
-      String.gen_with_length Memo.max_size_in_bytes Char.gen
+      String.gen_with_length Memo.max_size_in_bytes Char.quickcheck_generator
       >>| Memo.create_exn
     in
     Poly.{fee; nonce; memo}

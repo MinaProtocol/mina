@@ -14,8 +14,7 @@ let buf = Bigstring.create 128
 let emit_event = Output.Binary.emit_event ~buf
 
 let timestamp () =
-  Time_stamp_counter.now () |> Time_stamp_counter.to_time_ns
-  |> Core.Time_ns.to_int63_ns_since_epoch |> Int63.to_int_exn
+  Time_stamp_counter.now () |> Time_stamp_counter.to_int63 |> Int63.to_int_exn
 
 let current_wr = ref None
 

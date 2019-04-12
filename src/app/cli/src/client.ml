@@ -130,12 +130,12 @@ let verify_payment =
   let proof_path_flag =
     flag "proof-path"
       ~doc:"PROOFFILE File to read json version of payment proof"
-      (required file)
+      (required string)
   in
   let payment_path_flag =
     flag "payment-path"
       ~doc:"PAYMENTPATH File to read json version of verifying payment"
-      (required file)
+      (required string)
   in
   let address_flag =
     flag "address" ~doc:"PUBLICKEY Public-key address of sender"
@@ -427,7 +427,7 @@ let constraint_system_digests =
                ()
          in
          let all =
-           List.sort (fun (k1, _) (k2, _) -> String.compare k1 k2) all
+           List.sort ~compare:(fun (k1, _) (k2, _) -> String.compare k1 k2) all
          in
          List.iter all ~f:(fun (k, v) -> printf "%s\t%s\n" k (Md5.to_hex v)) ;
          Deferred.unit ))
