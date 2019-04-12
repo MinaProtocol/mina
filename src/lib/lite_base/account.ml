@@ -2,17 +2,14 @@ open Core_kernel
 open Module_version
 
 module Balance = struct
-  module V1_make = Nat.V1_64_make ()
+  module V1_make_0 = Nat.Make64 ()
+
+  module V1_make = V1_make_0.Stable.V1
 
   module Stable = struct
     module V1 = struct
-      module T = struct
-        type t = V1_make.Stable.V1.t
-        [@@deriving bin_io, sexp, eq, compare, version]
-      end
-
-      include T
-      include Registration.Make_latest_version (T)
+      include V1_make.Stable.V1
+      include Registration.Make_latest_version (V1_make.Stable.V1)
     end
 
     module Latest = V1
@@ -27,21 +24,18 @@ module Balance = struct
     module Registered_V1 = Registrar.Register (V1)
   end
 
-  include V1_make.Importable
+  include V1_make.Impl
 end
 
 module Nonce = struct
-  module V1_make = Nat.V1_32_make ()
+  module V1_make_0 = Nat.Make32 ()
+
+  module V1_make = V1_make_0.Stable.V1
 
   module Stable = struct
     module V1 = struct
-      module T = struct
-        type t = V1_make.Stable.V1.t
-        [@@deriving bin_io, sexp, eq, compare, version]
-      end
-
-      include T
-      include Registration.Make_latest_version (T)
+      include V1_make.Stable.V1
+      include Registration.Make_latest_version (V1_make.Stable.V1)
     end
 
     module Latest = V1
@@ -56,7 +50,7 @@ module Nonce = struct
     module Registered_V1 = Registrar.Register (V1)
   end
 
-  include V1_make.Importable
+  include V1_make.Impl
 end
 
 module Stable = struct
