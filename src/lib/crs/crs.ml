@@ -12,7 +12,8 @@ module State = struct
   let update ~seed ({digest; i; j} as state) =
     if j = digest_length_in_bits then
       let digest =
-        Digestif.SHA256.(digest_string (seed ^ string_of_int i) |> to_raw_string)
+        Digestif.SHA256.(
+          digest_string (seed ^ string_of_int i) |> to_raw_string)
       in
       let b = ith_bit digest 0 in
       (b, {digest; i= i + 1; j= 1})

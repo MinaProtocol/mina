@@ -37,7 +37,7 @@ let%test_module "Transition_handler.Catchup_scheduler tests" =
       let%bind frontier =
         create_root_frontier ~logger accounts_with_secret_keys
       in
-      let%map _ : unit =
+      let%map (_ : unit) =
         build_frontier_randomly
           ~gen_root_breadcrumb_builder:(fun root_breadcrumb ->
             Quickcheck.Generator.with_size ~size:num_breadcrumbs
@@ -103,8 +103,10 @@ let%test_module "Transition_handler.Catchup_scheduler tests" =
           |> don't_wait_for ;
           let%map cached_catchup_transition =
             match%map Ivar.read result_ivar with
-            | Rose_tree.T (t, []) -> t
-            | _ -> failwith "unexpected rose tree result"
+            | Rose_tree.T (t, []) ->
+                t
+            | _ ->
+                failwith "unexpected rose tree result"
           in
           let catchup_parent_hash =
             Cached.peek cached_catchup_transition
@@ -166,7 +168,7 @@ let%test_module "Transition_handler.Catchup_scheduler tests" =
                 assert (
                   Catchup_scheduler.has_timeout scheduler
                     (Cached.peek cached_transition) ) )) ;
-          let%bind _ : unit =
+          let%bind (_ : unit) =
             Transition_frontier.add_breadcrumb_exn frontier missing_breadcrumb
           in
           Catchup_scheduler.notify scheduler
@@ -190,8 +192,7 @@ let%test_module "Transition_handler.Catchup_scheduler tests" =
           assert (
             List.equal Transition_frontier.Breadcrumb.equal
               (Rose_tree.flatten received_rose_tree)
-              upcoming_breadcrumbs
-          ) ;
+              upcoming_breadcrumbs ) ;
           Strict_pipe.Writer.close catchup_breadcrumbs_writer ;
           Strict_pipe.Writer.close catchup_job_writer )
 
@@ -244,7 +245,7 @@ let%test_module "Transition_handler.Catchup_scheduler tests" =
               Catchup_scheduler.watch scheduler ~timeout_duration
                 ~cached_transition ) ;
           assert (not @@ Catchup_scheduler.is_empty scheduler) ;
-          let%bind _ : unit =
+          let%bind (_ : unit) =
             Transition_frontier.add_breadcrumb_exn frontier missing_breadcrumb
           in
           Catchup_scheduler.notify scheduler

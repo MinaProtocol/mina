@@ -104,9 +104,12 @@ module Test_input = struct
       let pairs = chunks_of ls ~n:2 in
       List.map pairs ~f:(fun js ->
           match js with
-          | [j] -> (work j, None)
-          | [j1; j2] -> (work j1, Some (work j2))
-          | _ -> failwith "error pairing jobs" )
+          | [j] ->
+              (work j, None)
+          | [j1; j2] ->
+              (work j1, Some (work j2))
+          | _ ->
+              failwith "error pairing jobs" )
 
     let all_work_pairs_exn (t : t) = paired t
   end

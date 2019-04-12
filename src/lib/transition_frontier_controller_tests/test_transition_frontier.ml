@@ -147,8 +147,7 @@ let%test_module "Root_history and Transition_frontier" =
           assert (
             Transition_frontier.For_tests.root_history_mem frontier query_hash
           ) ;
-          List.equal Transition_frontier.Breadcrumb.equal
-            expected_breadcrumbs
+          List.equal Transition_frontier.Breadcrumb.equal expected_breadcrumbs
             ( breadcrumbs_path frontier query_hash
             |> Option.value_exn |> Non_empty_list.to_list ) )
 

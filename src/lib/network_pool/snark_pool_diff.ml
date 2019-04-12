@@ -56,7 +56,8 @@ struct
                 let%bind proof_val = Proof.of_yojson proof_json in
                 let%map fee_val = Fee.of_yojson fee_json in
                 {proof= proof_val; fee= fee_val}
-            | _ -> Error "expected `Assoc"
+            | _ ->
+                Error "expected `Assoc"
         end
 
         include T
@@ -111,7 +112,7 @@ struct
   type t = Stable.Latest.t [@@deriving sexp, yojson]
 
   let summary = function
-    | Add_solved_work (_, Priced_proof.({proof= _; fee})) ->
+    | Add_solved_work (_, Priced_proof.{proof= _; fee}) ->
         Printf.sprintf !"Snark_pool_diff add with fee %{sexp: Fee.t}" fee
 
   let apply (pool : Pool.t) (t : t Envelope.Incoming.t) :
@@ -120,9 +121,11 @@ struct
     let to_or_error = function
       | `Don't_rebroadcast ->
           Or_error.error_string "Worse fee or already in pool"
-      | `Rebroadcast -> Ok t
+      | `Rebroadcast ->
+          Ok t
     in
-    ( match t with Add_solved_work (work, {proof; fee}) ->
+    ( match t with
+    | Add_solved_work (work, {proof; fee}) ->
         Pool.add_snark pool ~work ~proof ~fee )
     |> to_or_error |> Deferred.return
 end

@@ -55,6 +55,7 @@ module type S = sig
     val parent_set_notify : t -> account -> unit
 
     val copy : t -> t
+
     (* makes new mask instance with copied tables, re-use parent *)
 
     (** already have module For_testing from include above *)

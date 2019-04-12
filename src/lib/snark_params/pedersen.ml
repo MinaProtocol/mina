@@ -101,9 +101,10 @@ struct
 
         let of_yojson = function
           | `String s -> (
-            try Ok (Field.of_string s) with exn ->
-              Error Error.(to_string_hum (of_exn exn)) )
-          | _ -> Error "expected string"
+            try Ok (Field.of_string s)
+            with exn -> Error Error.(to_string_hum (of_exn exn)) )
+          | _ ->
+              Error "expected string"
       end
 
       module Latest = V1
@@ -181,8 +182,7 @@ struct
       ; synched: bool (* have we reached a chunk boundary *)
       ; chunk_rev: bool Triple.t list (* reversed chunk, or part of one *)
       ; chunk_rev_len: int (* length of chunk_rev *)
-      ; chunk_ndx: int
-      (* index into the chunk table to use *) }
+      ; chunk_ndx: int (* index into the chunk table to use *) }
 
     let update_fold_chunked (t : t) (fold : bool Triple.t Fold.t) =
       O1trace.measure "pedersen fold" (fun () ->

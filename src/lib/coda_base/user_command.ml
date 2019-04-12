@@ -26,10 +26,7 @@ module Poly = struct
   end
 
   type ('payload, 'pk, 'signature) t =
-                                      ( 'payload
-                                      , 'pk
-                                      , 'signature )
-                                      Stable.Latest.t =
+        ('payload, 'pk, 'signature) Stable.Latest.t =
     {payload: 'payload; sender: 'pk; signature: 'signature}
   [@@deriving eq, sexp, hash, yojson]
 end
@@ -88,7 +85,7 @@ include Comparable.Make (Stable.Latest)
 
 type value = t
 
-let payload Poly.({payload; _}) = payload
+let payload Poly.{payload; _} = payload
 
 let fee = Fn.compose Payload.fee payload
 

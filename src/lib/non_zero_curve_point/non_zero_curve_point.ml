@@ -155,7 +155,7 @@ module Compressed = struct
 
   type var = (Field.Var.t, Boolean.var) Poly.t
 
-  let to_hlist Poly.Stable.Latest.({x; is_odd}) = Snarky.H_list.[x; is_odd]
+  let to_hlist Poly.Stable.Latest.{x; is_odd} = Snarky.H_list.[x; is_odd]
 
   let of_hlist : (unit, 'a -> 'b -> unit) Snarky.H_list.t -> ('a, 'b) Poly.t =
     Snarky.H_list.(fun [x; is_odd] -> {x; is_odd})
@@ -174,7 +174,7 @@ module Compressed = struct
     and () = Boolean.Assert.(t1.is_odd = t2.is_odd) in
     ()
 
-  let fold_bits Poly.({is_odd; x}) =
+  let fold_bits Poly.{is_odd; x} =
     {Fold.fold= (fun ~init ~f -> f ((Field.Bits.fold x).fold ~init ~f) is_odd)}
 
   let fold t = Fold.group3 ~default:false (fold_bits t)

@@ -28,7 +28,8 @@ module type S = sig
          , 'consensus_data
          , 'sok_digest
          , 'amount
-         , 'proposer_pk ) t =
+         , 'proposer_pk )
+         t =
       { blockchain_state: 'blockchain_state
       ; consensus_data: 'consensus_data
       ; sok_digest: 'sok_digest
@@ -45,7 +46,8 @@ module type S = sig
                , 'consensus_data
                , 'sok_digest
                , 'amount
-               , 'proposer_pk ) t
+               , 'proposer_pk )
+               t
           [@@deriving bin_io, sexp, version]
         end
 
@@ -55,7 +57,8 @@ module type S = sig
                 , 'consensus_data
                 , 'sok_digest
                 , 'amount
-                , 'proposer_pk ) V1.t =
+                , 'proposer_pk )
+                V1.t =
                   ( 'blockchain_state
                   , 'consensus_data
                   , 'sok_digest
@@ -140,7 +143,8 @@ module Make (Inputs : Inputs_intf) :
                , 'consensus_data
                , 'sok_digest
                , 'amount
-               , 'proposer_pk ) t =
+               , 'proposer_pk )
+               t =
             { blockchain_state: 'blockchain_state
             ; consensus_data: 'consensus_data
             ; sok_digest: 'sok_digest
@@ -161,13 +165,14 @@ module Make (Inputs : Inputs_intf) :
          , 'consensus_data
          , 'sok_digest
          , 'amount
-         , 'proposer_pk ) t =
-                             ( 'blockchain_state
-                             , 'consensus_data
-                             , 'sok_digest
-                             , 'amount
-                             , 'proposer_pk )
-                             Stable.Latest.t =
+         , 'proposer_pk )
+         t =
+          ( 'blockchain_state
+          , 'consensus_data
+          , 'sok_digest
+          , 'amount
+          , 'proposer_pk )
+          Stable.Latest.t =
       { blockchain_state: 'blockchain_state
       ; consensus_data: 'consensus_data
       ; sok_digest: 'sok_digest

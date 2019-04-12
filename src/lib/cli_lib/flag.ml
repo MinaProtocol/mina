@@ -19,7 +19,8 @@ let privkey_write_path =
 
 let privkey_read_path =
   let open Command.Param in
-  flag "privkey-path" ~doc:"FILE File to read private key from" (required string)
+  flag "privkey-path" ~doc:"FILE File to read private key from"
+    (required string)
 
 let port =
   Command.Param.flag "daemon-port"

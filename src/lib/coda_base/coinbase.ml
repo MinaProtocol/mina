@@ -16,8 +16,10 @@ module Stable = struct
 
     let is_valid {proposer= _; amount; fee_transfer} =
       match fee_transfer with
-      | None -> true
-      | Some (_, fee) -> Currency.Amount.(of_fee fee <= amount)
+      | None ->
+          true
+      | Some (_, fee) ->
+          Currency.Amount.(of_fee fee <= amount)
 
     (* check validity when deserializing *)
     include Binable.Of_binable
@@ -74,7 +76,8 @@ let create ~amount ~proposer ~fee_transfer =
 
 let supply_increase {proposer= _; amount; fee_transfer} =
   match fee_transfer with
-  | None -> Ok amount
+  | None ->
+      Ok amount
   | Some (_, fee) ->
       Currency.Amount.sub amount (Currency.Amount.of_fee fee)
       |> Option.value_map
@@ -95,5 +98,7 @@ let gen =
     Currency.Fee.gen_incl Currency.Fee.zero (Currency.Amount.to_fee amount)
   in
   let prover = Public_key.Compressed.gen in
-  let%map fee_transfer = Option.quickcheck_generator (Quickcheck.Generator.tuple2 prover fee) in
+  let%map fee_transfer =
+    Option.quickcheck_generator (Quickcheck.Generator.tuple2 prover fee)
+  in
   {proposer; amount; fee_transfer}

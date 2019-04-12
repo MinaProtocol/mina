@@ -9,7 +9,8 @@ type 'a t =
 let remove_old_data newest t =
   let rec go () =
     match Doubly_linked.first t.queue with
-    | None -> ()
+    | None ->
+        ()
     | Some (l, _) ->
         if Length.to_int newest - Length.to_int l > t.max_size then (
           Doubly_linked.remove_first t.queue |> ignore ;
@@ -27,8 +28,10 @@ let push_exn t ~length ~data =
 
 let push t ~length ~data =
   match push_exn t ~length ~data with
-  | exception _ -> `Length_did_not_increase
-  | () -> `Ok
+  | exception _ ->
+      `Length_did_not_increase
+  | () ->
+      `Ok
 
 let interval t =
   let open Option.Let_syntax in
@@ -38,19 +41,25 @@ let interval t =
 
 let find t length =
   match interval t with
-  | None -> `Unknown
+  | None ->
+      `Unknown
   | Some (oldest, newest) ->
       if Length.(oldest <= length && length <= newest) then
         match Hashtbl.find t.by_length length with
-        | Some x -> `Known (snd (Doubly_linked.Elt.value x))
-        | None -> `Unknown
+        | Some x ->
+            `Known (snd (Doubly_linked.Elt.value x))
+        | None ->
+            `Unknown
       else `Out_of_bounds
 
 let find_exn t length =
   match find t length with
-  | `Known x -> x
-  | `Out_of_bounds -> failwith "Root_history.find_exn: out of bounds"
-  | `Unknown -> failwith "Root_history.find_exn: unknown"
+  | `Known x ->
+      x
+  | `Out_of_bounds ->
+      failwith "Root_history.find_exn: out of bounds"
+  | `Unknown ->
+      failwith "Root_history.find_exn: unknown"
 
 let create ~max_size =
   {max_size; queue= Doubly_linked.create (); by_length= Length.Table.create ()}
@@ -76,6 +85,7 @@ let%test_unit "max_size invariant" =
       let t = create ~max_size in
       List.iter ps ~f:(fun length -> push_exn t ~length ~data:()) ;
       match interval t with
-      | None -> ()
+      | None ->
+          ()
       | Some (oldest, newest) ->
           assert (Length.to_int newest - Length.to_int oldest <= max_size) )

@@ -38,9 +38,13 @@ module Make (Depth : Intf.Depth) = struct
     include Hashable.Make (T)
 
     let bin_read_t = Bin_prot.Std.bin_read_bigstring
+
     let __bin_read_t__ = Bin_prot.Std.__bin_read_bigstring__
+
     let bin_write_t = Bin_prot.Std.bin_write_bigstring
+
     let bin_shape_t = Bin_prot.Std.bin_shape_bigstring
+
     let bin_size_t = Bin_prot.Std.bin_size_bigstring
   end
 
@@ -67,8 +71,10 @@ module Make (Depth : Intf.Depth) = struct
   let height : t -> int = function
     | Generic _ ->
         raise (Invalid_argument "height: generic location has no height")
-    | Account _ -> 0
-    | Hash path -> Addr.height path
+    | Account _ ->
+        0
+    | Hash path ->
+        Addr.height path
 
   let root_hash : t = Hash (Addr.root ())
 
@@ -98,12 +104,14 @@ module Make (Depth : Intf.Depth) = struct
     dst
 
   let to_path_exn = function
-    | Account path | Hash path -> path
+    | Account path | Hash path ->
+        path
     | Generic _ ->
         raise (Invalid_argument "to_path_exn: generic does not have a path")
 
   let serialize = function
-    | Generic data -> prefix_bigstring Prefix.generic data
+    | Generic data ->
+        prefix_bigstring Prefix.generic data
     | Account path ->
         assert (Addr.depth path = Depth.depth) ;
         prefix_bigstring Prefix.account (Addr.serialize path)
@@ -124,24 +132,32 @@ module Make (Depth : Intf.Depth) = struct
     | Generic _ ->
         raise
           (Invalid_argument "next: generic locations have no next location")
-    | Account path -> Addr.next path |> Option.map ~f:(fun next -> Account next)
-    | Hash path -> Addr.next path |> Option.map ~f:(fun next -> Hash next)
+    | Account path ->
+        Addr.next path |> Option.map ~f:(fun next -> Account next)
+    | Hash path ->
+        Addr.next path |> Option.map ~f:(fun next -> Hash next)
 
   let prev : t -> t Option.t = function
     | Generic _ ->
         raise
           (Invalid_argument "prev: generic locations have no prev location")
-    | Account path -> Addr.prev path |> Option.map ~f:(fun prev -> Account prev)
-    | Hash path -> Addr.prev path |> Option.map ~f:(fun prev -> Hash prev)
+    | Account path ->
+        Addr.prev path |> Option.map ~f:(fun prev -> Account prev)
+    | Hash path ->
+        Addr.prev path |> Option.map ~f:(fun prev -> Hash prev)
 
   let sibling : t -> t = function
     | Generic _ ->
         raise (Invalid_argument "sibling: generic locations have no sibling")
-    | Account path -> Account (Addr.sibling path)
-    | Hash path -> Hash (Addr.sibling path)
+    | Account path ->
+        Account (Addr.sibling path)
+    | Hash path ->
+        Hash (Addr.sibling path)
 
   let order_siblings (location : t) (base : 'a) (sibling : 'a) : 'a * 'a =
     match last_direction (to_path_exn location) with
-    | Left -> (base, sibling)
-    | Right -> (sibling, base)
+    | Left ->
+        (base, sibling)
+    | Right ->
+        (sibling, base)
 end

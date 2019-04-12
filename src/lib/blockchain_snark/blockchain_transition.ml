@@ -42,7 +42,8 @@ module Keys = struct
       let open Async in
       let load c p =
         match%map load_with_checksum c p with
-        | Ok x -> x
+        | Ok x ->
+            x
         | Error _e ->
             failwithf
               !"Blockchain_snark: load failed on %{sexp:Storage.location}"
@@ -81,7 +82,8 @@ module Keys = struct
       let open Async in
       let load c p =
         match%map load_with_checksum c p with
-        | Ok x -> x
+        | Ok x ->
+            x
         | Error _e ->
             failwithf
               !"Blockchain_snark: load failed on %{sexp:Storage.location}"

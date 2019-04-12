@@ -117,7 +117,8 @@ module Make (Inputs : Inputs.With_unprocessed_transition_cache.S) :
                              * we're catching up *)
                            ~f:(add_and_finalize ~only_if_present:true) )
                    with
-                   | Ok () -> ()
+                   | Ok () ->
+                       ()
                    | Error err ->
                        Logger.error logger ~module_:__MODULE__
                          ~location:__LOC__
@@ -148,7 +149,8 @@ module Make (Inputs : Inputs.With_unprocessed_transition_cache.S) :
                          match
                            Transition_frontier.find frontier parent_hash
                          with
-                         | Some parent -> return parent
+                         | Some parent ->
+                             return parent
                          | None ->
                              Deferred.Or_error.error_string "parent not found"
                        in
@@ -164,12 +166,15 @@ module Make (Inputs : Inputs.With_unprocessed_transition_cache.S) :
                          match Cached.sequence_result cached_breadcrumb with
                          | Error (`Validation_error e) ->
                              (* TODO: Punish *) Error e
-                         | Error (`Fatal_error e) -> raise e
-                         | Ok b -> Ok b
+                         | Error (`Fatal_error e) ->
+                             raise e
+                         | Ok b ->
+                             Ok b
                        in
                        add_and_finalize ~only_if_present:false breadcrumb
                      with
-                     | Ok () -> ()
+                     | Ok () ->
+                         ()
                      | Error err ->
                          Logger.error logger ~module_:__MODULE__
                            ~location:__LOC__

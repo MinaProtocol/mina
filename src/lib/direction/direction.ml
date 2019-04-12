@@ -30,5 +30,7 @@ let gen_list depth = Quickcheck.Generator.list_with_length depth gen
 let shrinker =
   Quickcheck.Shrinker.create (fun dir ->
       Sequence.unfold ~init:dir ~f:(function
-        | Left -> None
-        | Right -> Some (Left, Left) ) )
+        | Left ->
+            None
+        | Right ->
+            Some (Left, Left) ) )

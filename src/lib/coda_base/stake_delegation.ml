@@ -36,6 +36,7 @@ let gen =
       Set_delegate {new_delegate= k} )
 
 let fold = function
-  | Set_delegate {new_delegate} -> Public_key.Compressed.fold new_delegate
+  | Set_delegate {new_delegate} ->
+      Public_key.Compressed.fold new_delegate
 
 let length_in_triples = Public_key.Compressed.length_in_triples

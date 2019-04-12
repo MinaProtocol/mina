@@ -30,9 +30,12 @@ module Digest = struct
       let of_yojson = function
         | `String s -> (
           match Base64.decode s with
-          | Ok s -> Ok s
-          | Error (`Msg e) -> Error (sprintf "bad base64: %s" e) )
-        | _ -> Error "expected `String"
+          | Ok s ->
+              Ok s
+          | Error (`Msg e) ->
+              Error (sprintf "bad base64: %s" e) )
+        | _ ->
+            Error "expected `String"
 
       include Comparable.Make (T)
       include Registration.Make_latest_version (T)
@@ -71,7 +74,9 @@ module Digest = struct
         assert (String.equal (of_bits (to_bits t)) t) )
 
   let%test_unit "to_bits . of_bits = id" =
-    Quickcheck.test (List.gen_with_length length_in_bits Bool.quickcheck_generator) ~f:(fun t ->
+    Quickcheck.test
+      (List.gen_with_length length_in_bits Bool.quickcheck_generator)
+      ~f:(fun t ->
         assert (Array.to_list (to_bits (of_bits (List.to_array t))) = t) )
 
   type t = Stable.Latest.t [@@deriving sexp, compare, hash, yojson]
@@ -127,8 +132,8 @@ module Checked = struct
 end
 
 let%test_unit "checked-unchecked equality" =
-  Quickcheck.test ~trials:10 (Quickcheck.Generator.list Bool.quickcheck_generator)
-    ~f:(fun bits ->
+  Quickcheck.test ~trials:10
+    (Quickcheck.Generator.list Bool.quickcheck_generator) ~f:(fun bits ->
       Tick.Test.test_equal ~sexp_of_t:Digest.sexp_of_t
         (Tick.Typ.list ~length:(List.length bits) Tick.Boolean.typ)
         Digest.typ Checked.digest_bits

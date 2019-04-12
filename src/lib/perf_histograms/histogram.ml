@@ -58,9 +58,12 @@ struct
 
   let add ({params; _} as t) e =
     match Elem.bucket ~params e with
-    | `Index i ->  t.buckets.(i) <- Int.succ t.buckets.(i)
-    | `Overflow -> t.overflow <- t.overflow + 1
-    | `Underflow -> t.underflow <- t.underflow + 1
+    | `Index i ->
+        t.buckets.(i) <- Int.succ t.buckets.(i)
+    | `Overflow ->
+        t.overflow <- t.overflow + 1
+    | `Underflow ->
+        t.underflow <- t.underflow + 1
 end
 
 module Exp_time_spans = Make (struct
@@ -72,8 +75,10 @@ module Exp_time_spans = Make (struct
   let of_yojson t =
     let open Ppx_deriving_yojson_runtime in
     match t with
-    | `Float ms -> Result.Ok (Time.Span.of_ms ms)
-    | _ -> Result.Error "Not a floating point milliseconds value"
+    | `Float ms ->
+        Result.Ok (Time.Span.of_ms ms)
+    | _ ->
+        Result.Error "Not a floating point milliseconds value"
 
   module Params = struct
     type t0 = t

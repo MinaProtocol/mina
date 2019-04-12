@@ -45,7 +45,7 @@ module Types = struct
       List.fold msgs
         ~init:
           (Printf.sprintf "Total: %d (overflow:%d) (underflow:%d)\n\t" total
-             overflow underflow) ~f:(fun acc x -> acc ^ "\n\t" ^ x )
+             overflow underflow) ~f:(fun acc x -> acc ^ "\n\t" ^ x)
       ^ "\n\t..."
 
     module Rpc_timings = struct
@@ -110,33 +110,38 @@ module Types = struct
               ("RPC Timings", Rpc_timings.to_text (f x)) :: acc )
             ~external_transition_latency:(fun acc x ->
               match f x with
-              | None -> acc
+              | None ->
+                  acc
               | Some report ->
                   ("Block Latencies (hist.)", summarize_report report) :: acc
               )
             ~accepted_transition_local_latency:(fun acc x ->
               match f x with
-              | None -> acc
+              | None ->
+                  acc
               | Some report ->
                   ( "Accepted local block Latencies (hist.)"
                   , summarize_report report )
                   :: acc )
             ~accepted_transition_remote_latency:(fun acc x ->
               match f x with
-              | None -> acc
+              | None ->
+                  acc
               | Some report ->
                   ( "Accepted remote block Latencies (hist.)"
                   , summarize_report report )
                   :: acc )
             ~snark_worker_transition_time:(fun acc x ->
               match f x with
-              | None -> acc
+              | None ->
+                  acc
               | Some report ->
                   ("Snark Worker a->b (hist.)", summarize_report report) :: acc
               )
             ~snark_worker_merge_time:(fun acc x ->
               match f x with
-              | None -> acc
+              | None ->
+                  acc
               | Some report ->
                   ("Snark Worker Merge (hist.)", summarize_report report)
                   :: acc )
@@ -219,7 +224,8 @@ module Types = struct
               List.fold_left ls ~init:"" ~f:(fun acc (k, v) ->
                   acc ^ sprintf "\n    %s = %s" k (Yojson.Safe.to_string v) )
               ^ "\n"
-          | _ -> failwith "unexpected consensus configuration json format"
+          | _ ->
+              failwith "unexpected consensus configuration json format"
         in
         map_entry "Consensus Configuration" ~f:render
     end

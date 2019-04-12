@@ -7,8 +7,10 @@ module BytesWr = struct
   let to_yojson t = `String (Bytes.to_string t |> Base64.encode_string)
 
   let of_yojson = function
-    | `String s -> Ok (Base64.decode_exn s |> Bytes.of_string)
-    | _ -> Error "Bytes.of_yojson needs a string"
+    | `String s ->
+        Ok (Base64.decode_exn s |> Bytes.of_string)
+    | _ ->
+        Error "Bytes.of_yojson needs a string"
 end
 
 module Stable = struct

@@ -55,7 +55,7 @@ module Make (Inputs : Intf.Inputs_intf) = struct
         [@@deriving bin_io]
 
         (* , version {rpc} *)
-        
+
         (* remove when version {rpc} uncommented *)
         let version = 1
 

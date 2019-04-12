@@ -64,21 +64,33 @@ module Job = struct
     let open Quickcheck.Generator.Let_syntax in
     match%map
       variant2
-        (variant4 Bool.quickcheck_generator a_gen a_gen (tuple3 a_gen a_gen Int.quickcheck_generator))
+        (variant4 Bool.quickcheck_generator a_gen a_gen
+           (tuple3 a_gen a_gen Int.quickcheck_generator))
         (Option.quickcheck_generator (tuple2 d_gen Int.quickcheck_generator))
     with
-    | `A (`A _) -> Merge Empty
-    | `A (`B a) -> Merge (Lcomp a)
-    | `A (`C a) -> Merge (Rcomp a)
-    | `A (`D a) -> Merge (Bcomp a)
-    | `B d -> Base d
+    | `A (`A _) ->
+        Merge Empty
+    | `A (`B a) ->
+        Merge (Lcomp a)
+    | `A (`C a) ->
+        Merge (Rcomp a)
+    | `A (`D a) ->
+        Merge (Bcomp a)
+    | `B d ->
+        Base d
 
   let gen_full a_gen d_gen =
     let open Quickcheck.Generator in
     let open Quickcheck.Generator.Let_syntax in
-    match%map variant2 (tuple3 a_gen a_gen Int.quickcheck_generator) (tuple2 d_gen Int.quickcheck_generator) with
-    | `A (a1, a2, o) -> Merge (Bcomp (a1, a2, o))
-    | `B (d, o) -> Base (Some (d, o))
+    match%map
+      variant2
+        (tuple3 a_gen a_gen Int.quickcheck_generator)
+        (tuple2 d_gen Int.quickcheck_generator)
+    with
+    | `A (a1, a2, o) ->
+        Merge (Bcomp (a1, a2, o))
+    | `B (d, o) ->
+        Base (Some (d, o))
 end
 
 module Completed_job = struct
@@ -149,16 +161,21 @@ let hash
     ; capacity
     ; level_pointer
     ; curr_job_seq_no
-    ; root_at_depth; _ } a_to_string d_to_string =
+    ; root_at_depth
+    ; _ } a_to_string d_to_string =
   let h = ref (Digestif.SHA256.init ()) in
   let add_string s = h := Digestif.SHA256.feed_string !h s in
   Ring_buffer.iter jobs ~f:(function
-    | Base None -> add_string "Base None"
+    | Base None ->
+        add_string "Base None"
     | Base (Some (x, o)) ->
         add_string ("Base Some " ^ d_to_string x ^ " " ^ Int.to_string o)
-    | Merge Empty -> add_string "Merge Empty"
-    | Merge (Rcomp a) -> add_string ("Merge Rcomp " ^ a_to_string a)
-    | Merge (Lcomp a) -> add_string ("Merge Lcomp " ^ a_to_string a)
+    | Merge Empty ->
+        add_string "Merge Empty"
+    | Merge (Rcomp a) ->
+        add_string ("Merge Rcomp " ^ a_to_string a)
+    | Merge (Lcomp a) ->
+        add_string ("Merge Lcomp " ^ a_to_string a)
     | Merge (Bcomp (a1, a2, o)) ->
         add_string
           ( "Merge Bcomp " ^ a_to_string a1 ^ " " ^ a_to_string a2 ^ " "
@@ -170,12 +187,16 @@ let hash
   add_string
     (Array.fold level_pointer ~init:"" ~f:(fun s a -> s ^ Int.to_string a)) ;
   ( match a with
-  | None -> add_string "None"
-  | Some (a, _) -> add_string (a_to_string a) ) ;
+  | None ->
+      add_string "None"
+  | Some (a, _) ->
+      add_string (a_to_string a) ) ;
   add_string (Int.to_string current_data_length) ;
   ( match x with
-  | None -> add_string "None"
-  | Some a -> add_string (Int.to_string a) ) ;
+  | None ->
+      add_string "None"
+  | Some a ->
+      add_string (Int.to_string a) ) ;
   add_string (Int.to_string curr_job_seq_no) ;
   add_string (Int.to_string root_at_depth) ;
   Digestif.SHA256.get !h

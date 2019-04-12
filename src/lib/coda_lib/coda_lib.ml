@@ -412,8 +412,8 @@ module Make (Inputs : Inputs_intf) = struct
   type t =
     { propose_keypair: Keypair.t option
     ; run_snark_worker: bool
-    ; net:
-        Net.t (* TODO: Is this the best spot for the transaction_pool ref? *)
+    ; net: Net.t
+          (* TODO: Is this the best spot for the transaction_pool ref? *)
     ; transaction_pool: Transaction_pool.t
     ; snark_pool: Snark_pool.t
     ; transition_frontier: Transition_frontier.t option Broadcast_pipe.Reader.t
@@ -514,7 +514,8 @@ module Make (Inputs : Inputs_intf) = struct
           then Some (Ledger.to_list (Staged_ledger.ledger staged_ledger))
           else None )
     with
-    | Some x -> Deferred.return (Ok x)
+    | Some x ->
+        Deferred.return (Ok x)
     | None ->
         Deferred.Or_error.error_string
           "staged ledger hash not found in transition frontier"
@@ -546,7 +547,8 @@ module Make (Inputs : Inputs_intf) = struct
     in
     don't_wait_for
       (Broadcast_pipe.Reader.iter t.transition_frontier ~f:(function
-        | None -> Deferred.unit
+        | None ->
+            Deferred.unit
         | Some frontier ->
             Broadcast_pipe.Reader.iter
               (Transition_frontier.root_diff_pipe frontier)
@@ -585,7 +587,7 @@ module Make (Inputs : Inputs_intf) = struct
       ; receipt_chain_database: Coda_base.Receipt_chain_database.t
       ; snark_work_fee: Currency.Fee.t
       ; monitor: Monitor.t option
-      (* TODO: Pass banlist to modules discussed in Ban Reasons issue: https://github.com/CodaProtocol/coda/issues/852 *)
+            (* TODO: Pass banlist to modules discussed in Ban Reasons issue: https://github.com/CodaProtocol/coda/issues/852 *)
       }
     [@@deriving make]
   end
@@ -640,8 +642,10 @@ module Make (Inputs : Inputs_intf) = struct
           ~scan_state:(Staged_ledger.Scan_state.empty ())
           ~pending_coinbase_collection:pending_coinbases
       with
-      | Ok staged_ledger -> staged_ledger
-      | Error err -> Error.raise err
+      | Ok staged_ledger ->
+          staged_ledger
+      | Error err ->
+          Error.raise err
     in
     let%map frontier =
       Transition_frontier.create ~logger:config.logger
@@ -788,7 +792,7 @@ module Make (Inputs : Inputs_intf) = struct
                 ~ledger_db
                 ~network_transition_reader:
                   (Strict_pipe.Reader.map external_transitions_reader
-                     ~f:(fun (tn, tm) -> (`Transition tn, `Time_received tm) ))
+                     ~f:(fun (tn, tm) -> (`Transition tn, `Time_received tm)))
                 ~proposer_transition_reader
             in
             let valid_transitions_for_network, valid_transitions_for_api =

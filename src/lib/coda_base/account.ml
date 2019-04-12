@@ -58,12 +58,7 @@ module Poly = struct
   end
 
   type ('pk, 'amount, 'nonce, 'receipt_chain_hash, 'bool) t =
-                                                             ( 'pk
-                                                             , 'amount
-                                                             , 'nonce
-                                                             , 'receipt_chain_hash
-                                                             , 'bool )
-                                                             Stable.Latest.t =
+        ('pk, 'amount, 'nonce, 'receipt_chain_hash, 'bool) Stable.Latest.t =
     { public_key: 'pk
     ; balance: 'amount
     ; nonce: 'nonce
@@ -163,12 +158,9 @@ let typ : (var, value) Typ.t =
       {public_key; balance; nonce; receipt_chain_hash; delegate; participated}
   in
   let to_hlist
-      Poly.({ public_key
-            ; balance
-            ; nonce
-            ; receipt_chain_hash
-            ; delegate
-            ; participated }) =
+      Poly.
+        {public_key; balance; nonce; receipt_chain_hash; delegate; participated}
+      =
     H_list.
       [public_key; balance; nonce; receipt_chain_hash; delegate; participated]
   in
@@ -186,12 +178,9 @@ let var_of_t
   ; participated= Boolean.var_of_value participated }
 
 let var_to_triples
-    Poly.({ public_key
-          ; balance
-          ; nonce
-          ; receipt_chain_hash
-          ; delegate
-          ; participated }) =
+    Poly.
+      {public_key; balance; nonce; receipt_chain_hash; delegate; participated}
+    =
   let%map public_key = Public_key.Compressed.var_to_triples public_key
   and receipt_chain_hash = Receipt.Chain_hash.var_to_triples receipt_chain_hash
   and delegate = Public_key.Compressed.var_to_triples delegate in

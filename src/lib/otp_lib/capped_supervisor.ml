@@ -25,7 +25,8 @@ let create ?(buffer_capacity = 30) ~job_capacity f =
     if n <= 0 then ()
     else
       match !pending_jobs with
-      | [] -> ()
+      | [] ->
+          ()
       | h :: t ->
           pending_jobs := t ;
           run_job h ;

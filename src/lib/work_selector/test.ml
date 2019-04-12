@@ -25,12 +25,12 @@ module type Work_selector_with_tests_intf = sig
 end
 
 module type Work_selector_F = functor (Inputs : Inputs.Inputs_intf) -> Work_selector_with_tests_intf
-                                                                       with type
+                                                                       with type 
                                                                        staged_ledger :=
                                                                          Inputs
                                                                          .Staged_ledger
                                                                          .t
-                                                                        and type
+                                                                        and type 
                                                                        work :=
                                                                          ( Inputs
                                                                            .Ledger_proof_statement
@@ -50,12 +50,12 @@ module type Work_selector_F = functor (Inputs : Inputs.Inputs_intf) -> Work_sele
                                                                          .Single
                                                                          .Spec
                                                                          .t
-                                                                        and type
+                                                                        and type 
                                                                        snark_pool :=
                                                                          Inputs
                                                                          .Snark_pool
                                                                          .t
-                                                                        and type
+                                                                        and type 
                                                                        fee :=
                                                                          Inputs
                                                                          .Fee
@@ -119,7 +119,8 @@ module Make_test (Make_selector : Work_selector_F) = struct
                 (i <= p) ;
               let work, seen = Selector.work ~snark_pool ~fee:my_fee sl seen in
               match work with
-              | [] -> return ()
+              | [] ->
+                  return ()
               | job ->
                   [%test_result: Bool.t]
                     ~message:"Should not get any cheap jobs" ~expect:true

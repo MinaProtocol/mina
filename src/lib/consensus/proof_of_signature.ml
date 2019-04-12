@@ -91,7 +91,7 @@ module Consensus_transition_data = struct
   let to_hlist {signature} = H_list.[signature]
 
   let of_hlist : (unit, 'signature -> unit) H_list.t -> 'signature t_ =
-   fun H_list.([signature]) -> {signature}
+   fun H_list.[signature] -> {signature}
 
   let data_spec =
     Snark_params.Tick.Data_spec.[Blockchain_state.Signature.Signature.typ]
@@ -160,7 +160,7 @@ module Consensus_state = struct
   let of_hlist :
          (unit, 'length -> 'public_key -> unit) H_list.t
       -> ('length, 'public_key) t_ =
-   fun H_list.([length; signer_public_key]) -> {length; signer_public_key}
+   fun H_list.[length; signer_public_key] -> {length; signer_public_key}
 
   let data_spec =
     let open Snark_params.Tick.Data_spec in
@@ -238,7 +238,7 @@ let generate_transition ~previous_protocol_state ~blockchain_state ~time:_
 let received_at_valid_time _ ~time_received:_ = true
 
 let is_transition_valid_checked (transition : Snark_transition.var) =
-  let Consensus_transition_data.({signature}) =
+  let Consensus_transition_data.{signature} =
     Snark_transition.consensus_data transition
   in
   let open Snark_params.Tick.Checked.Let_syntax in
@@ -266,8 +266,8 @@ let next_state_checked ~(prev_state : Protocol_state.var) ~prev_state_hash:_
   and success = is_transition_valid_checked block in
   (`Success success, {length; signer_public_key})
 
-let select ~existing:Consensus_state.({length= l1; signer_public_key= _})
-    ~candidate:Consensus_state.({length= l2; signer_public_key= _}) ~logger:_ =
+let select ~existing:Consensus_state.{length= l1; signer_public_key= _}
+    ~candidate:Consensus_state.{length= l2; signer_public_key= _} ~logger:_ =
   if Length.compare l1 l2 >= 0 then `Keep else `Take
 
 let next_proposal now _state ~local_state:_ ~keypair ~logger:_ =

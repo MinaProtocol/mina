@@ -13,14 +13,16 @@ open! Core
 
     @param destruct function called on every value we remove from the cache
 *)
-val memoize : ?destruct : ('b -> unit)
-  -> ?expire:[ `Lru of int | `Keep_all | `Keep_one ]
+val memoize :
+     ?destruct:('b -> unit)
+  -> ?expire:[`Lru of int | `Keep_all | `Keep_one]
   -> ('a -> 'b)
-  -> ('a -> 'b)
+  -> 'a
+  -> 'b
 
 (** Returns memoized version of any function with argument unit. In effect this
     builds a lazy value.*)
-val unit : (unit -> 'a) -> (unit -> 'a)
+val unit : (unit -> 'a) -> unit -> 'a
 
 (** {1 Exposed cache }
 
@@ -30,46 +32,47 @@ val unit : (unit -> 'a) -> (unit -> 'a)
 
 (** Least recently used caching *)
 module Lru : sig
-  type ('k,'v) t
-  type ('a,'b) memo = ('a, ('b, exn) Result.t) t
+  type ('k, 'v) t
+
+  type ('a, 'b) memo = ('a, ('b, exn) Result.t) t
 
   val find : ('k, 'v) t -> 'k -> 'v option
+
   val add : ('k, 'v) t -> key:'k -> data:'v -> unit
-  val remove : ('k,_) t -> 'k -> unit
-  val clear : (_,_) t -> unit
 
-  val create : destruct:('v -> unit) option -> int -> ('k,'v) t
+  val remove : ('k, _) t -> 'k -> unit
 
-  val call_with_cache : cache:('a,'b) memo -> ('a -> 'b) -> 'a -> 'b
+  val clear : (_, _) t -> unit
+
+  val create : destruct:('v -> unit) option -> int -> ('k, 'v) t
+
+  val call_with_cache : cache:('a, 'b) memo -> ('a -> 'b) -> 'a -> 'b
 
   val memoize :
-    ?destruct:('b -> unit)
-    -> ('a -> 'b)
-    -> int
-    -> ('a,'b) memo * ('a -> 'b)
+    ?destruct:('b -> unit) -> ('a -> 'b) -> int -> ('a, 'b) memo * ('a -> 'b)
 end
 
 (** Full caching (never flushes out values automatically ) *)
 module Keep_all : sig
-  type ('k,'v) t
-  type ('a,'b) memo = ('a, ('b, exn) Result.t) t
+  type ('k, 'v) t
+
+  type ('a, 'b) memo = ('a, ('b, exn) Result.t) t
 
   val find : ('k, 'v) t -> 'k -> 'v option
+
   val add : ('k, 'v) t -> key:'k -> data:'v -> unit
-  val remove : ('k,_) t -> 'k -> unit
-  val clear : (_,_) t -> unit
 
-  val create : destruct:('v -> unit) option -> ('k,'v) t
+  val remove : ('k, _) t -> 'k -> unit
 
-  val call_with_cache : cache:('a,'b) memo -> ('a -> 'b) -> 'a -> 'b
+  val clear : (_, _) t -> unit
+
+  val create : destruct:('v -> unit) option -> ('k, 'v) t
+
+  val call_with_cache : cache:('a, 'b) memo -> ('a -> 'b) -> 'a -> 'b
 
   val memoize :
-    ?destruct:('b -> unit)
-    -> ('a -> 'b)
-    -> ('a,'b) memo * ('a -> 'b)
-
+    ?destruct:('b -> unit) -> ('a -> 'b) -> ('a, 'b) memo * ('a -> 'b)
 end
-
 
 (** {1  Generic caching}
 
@@ -83,8 +86,7 @@ end
 
     This dictates when elements will droped from the cache.
 *)
-module type Strategy =
-sig
+module type Strategy = sig
   type 'a t
 
   (** This type is used to specify the signature of [cps_create]. For instance
@@ -98,7 +100,6 @@ sig
   (** [cps_create ~f ] is given in CPS form to enable chaining. (i.e. instead of
       directly returning a value it applies f to this value). *)
   val cps_create : f:(_ t -> 'b) -> 'b with_init_args
-
 
   (** Marks an element as "fresh". Returns a list of elements to be dropped from
       the store. *)
@@ -116,9 +117,7 @@ end
     A [Store] is the backend used to store the values in a cache. A store is
     a key/value associative table.
 *)
-module type Store =
-sig
-
+module type Store = sig
   (** A key value store. *)
   type ('k, 'v) t
 
@@ -128,7 +127,7 @@ sig
 
       see {!Cache.Strategy.cps_create} for more information.
   *)
-  val cps_create : f:((_,_) t -> 'b) -> 'b with_init_args
+  val cps_create : f:((_, _) t -> 'b) -> 'b with_init_args
 
   (** Remove all the values from the store. *)
   val clear : ('k, 'v) t -> unit
@@ -141,7 +140,7 @@ sig
   val find : ('k, 'v) t -> 'k -> 'v option
 
   (** [data store] returns all values in [store]. *)
-  val data : (_,'v) t -> 'v list
+  val data : (_, 'v) t -> 'v list
 
   (** [remove store key] removes the binding for [key] in [store]. *)
   val remove : ('k, 'v) t -> 'k -> unit
@@ -149,9 +148,8 @@ end
 
 (** The output signature of the functor {!Cache.Make} *)
 module type S = sig
-
   (** A key value cache*)
-  type ('k,'v) t
+  type ('k, 'v) t
 
   (** Used to specify the type of the {!create} and {!memoize} function. This
       describes the arguments required to initialise the caching strategy and
@@ -165,21 +163,24 @@ module type S = sig
   *)
   type 'a with_init_args
 
-  type ('a,'b) memo = ('a, ('b, exn) Result.t) t
+  type ('a, 'b) memo = ('a, ('b, exn) Result.t) t
 
   val find : ('k, 'v) t -> 'k -> 'v option
+
   val add : ('k, 'v) t -> key:'k -> data:'v -> unit
-  val remove : ('k,_) t -> 'k -> unit
-  val clear : (_,_) t -> unit
 
-  val create : destruct:('v -> unit) option -> ('k,'v) t with_init_args
+  val remove : ('k, _) t -> 'k -> unit
 
-  val call_with_cache : cache:('a,'b) memo -> ('a -> 'b) -> 'a -> 'b
+  val clear : (_, _) t -> unit
+
+  val create : destruct:('v -> unit) option -> ('k, 'v) t with_init_args
+
+  val call_with_cache : cache:('a, 'b) memo -> ('a -> 'b) -> 'a -> 'b
 
   val memoize :
-    ?destruct:('b -> unit)
+       ?destruct:('b -> unit)
     -> ('a -> 'b)
-    -> (('a,'b) memo * ('a -> 'b)) with_init_args
+    -> (('a, 'b) memo * ('a -> 'b)) with_init_args
 end
 
 (** Predefined strategies *)
@@ -196,5 +197,5 @@ module Store : sig
   module Table : Store with type 'a with_init_args = 'a
 end
 
-module Make (Strat : Strategy) (Store : Store) : S
-  with type 'a with_init_args = ('a Store.with_init_args Strat.with_init_args)
+module Make (Strat : Strategy) (Store : Store) :
+  S with type 'a with_init_args = 'a Store.with_init_args Strat.with_init_args

@@ -30,7 +30,7 @@ module Make (Input : Inputs_intf) : Make_intf(Input).S = struct
   let prove ~context last =
     let rec find_path value =
       Option.value_map (get_previous ~context value) ~default:[]
-        ~f:(fun parent -> to_proof_elem value :: find_path parent )
+        ~f:(fun parent -> to_proof_elem value :: find_path parent)
     in
     List.rev (find_path last)
 

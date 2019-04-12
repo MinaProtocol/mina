@@ -41,8 +41,10 @@ struct
         match
           get_or_create_account_exn ledger key (Account.initialize key)
         with
-        | `Existed, loc -> ([], loc)
-        | `Added, loc -> ([key], loc)
+        | `Existed, loc ->
+            ([], loc)
+        | `Added, loc ->
+            ([key], loc)
       in
       (key, get ledger loc |> Option.value_exn, loc)
   end
@@ -97,7 +99,8 @@ struct
                 (Inputs.External_transition.Verified.staged_ledger_diff
                    transition)
             with
-            | Ok x -> Ok x
+            | Ok x ->
+                Ok x
             | Error (Inputs.Staged_ledger.Staged_ledger_error.Unexpected e) ->
                 Error (`Fatal_error (Error.to_exn e))
             | Error e ->
@@ -301,7 +304,7 @@ struct
       in
       ( match diff with
       | Transition_frontier_diff.New_breadcrumb _
-       |Transition_frontier_diff.New_frontier _ ->
+      | Transition_frontier_diff.New_frontier _ ->
           ()
       | Transition_frontier_diff.New_best_tip
           {old_root; old_root_length; new_best_tip_length; _} ->
@@ -451,8 +454,10 @@ struct
       let%map breadcrumb = find t state_hash in
       let elem = f breadcrumb in
       match go (Breadcrumb.parent_hash breadcrumb) with
-      | Some subresult -> Non_empty_list.cons elem subresult
-      | None -> Non_empty_list.singleton elem
+      | Some subresult ->
+          Non_empty_list.cons elem subresult
+      | None ->
+          Non_empty_list.singleton elem
     in
     Option.map ~f:Non_empty_list.rev (go state_hash)
 
@@ -467,7 +472,8 @@ struct
   let root_history_path_map t state_hash ~f =
     let open Option.Let_syntax in
     match path_search t ~find ~f state_hash with
-    | None -> get_path_inclusively_in_root_history t state_hash ~f
+    | None ->
+        get_path_inclusively_in_root_history t state_hash ~f
     | Some frontier_path ->
         let root_history_path =
           let%bind root_breadcrumb = find t t.root in
@@ -530,7 +536,8 @@ struct
           List.fold node.successor_hashes ~init:graph_with_node
             ~f:(fun acc_graph successor_state_hash ->
               match State_hash.Table.find t.table successor_state_hash with
-              | Some child_node -> add_edge acc_graph node child_node
+              | Some child_node ->
+                  add_edge acc_graph node child_node
               | None ->
                   Logger.info t.logger ~module_:__MODULE__ ~location:__LOC__
                     ~metadata:
@@ -763,7 +770,8 @@ struct
         in
         let added_to_best_tip_path, removed_from_best_tip_path =
           match best_tip_change with
-          | `Keep -> ([], [])
+          | `Keep ->
+              ([], [])
           | `Take ->
               t.best_tip <- hash ;
               get_path_diff t breadcrumb best_tip_node.breadcrumb
@@ -872,7 +880,8 @@ struct
                         (module Ledger.Db)
                         t.root_snarked_ledger)
                      db_mask)
-            | _, false | None, _ -> () ) ;
+            | _, false | None, _ ->
+                () ) ;
             [%test_result: Frozen_ledger_hash.t]
               ~message:
                 "Root snarked ledger hash diverged from blockchain state \
@@ -893,7 +902,8 @@ struct
         (* 5 *)
         Extensions.handle_diff t.extensions t.extension_writers
           ( match best_tip_change with
-          | `Keep -> Transition_frontier_diff.New_breadcrumb node.breadcrumb
+          | `Keep ->
+              Transition_frontier_diff.New_breadcrumb node.breadcrumb
           | `Take ->
               Transition_frontier_diff.New_best_tip
                 { old_root= root_node.breadcrumb
@@ -909,7 +919,8 @@ struct
   let add_breadcrumb_if_present_exn t breadcrumb =
     let parent_hash = Breadcrumb.parent_hash breadcrumb in
     match Hashtbl.find t.table parent_hash with
-    | Some _ -> add_breadcrumb_exn t breadcrumb
+    | Some _ ->
+        add_breadcrumb_exn t breadcrumb
     | None ->
         Logger.warn t.logger ~module_:__MODULE__ ~location:__LOC__
           !"When trying to add breadcrumb, its parent had been removed from \

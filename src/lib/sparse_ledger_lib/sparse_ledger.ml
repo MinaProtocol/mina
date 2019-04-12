@@ -125,9 +125,12 @@ end = struct
   let of_hash ~depth (hash : Hash.t) = of_hash ~depth hash
 
   let hash : (Hash.t, Account.t) Poly.Tree.t -> Hash.t = function
-    | Account a -> Account.data_hash a
-    | Hash h -> h
-    | Node (h, _, _) -> h
+    | Account a ->
+        Account.data_hash a
+    | Hash h ->
+        h
+    | Node (h, _, _) ->
+        h
 
   type index = int [@@deriving bin_io, sexp]
 
@@ -165,8 +168,10 @@ end = struct
           assert (Hash.equal h_l (hash l)) ;
           let r = union (height - 1) r path in
           Node (h, l, r)
-      | Node _, [] -> failwith "Path too short"
-      | Account _, _ :: _ -> failwith "Path too long"
+      | Node _, [] ->
+          failwith "Path too short"
+      | Account _, _ :: _ ->
+          failwith "Path too long"
       | Account a, [] ->
           assert (Account.equal a account) ;
           tree
@@ -185,8 +190,10 @@ end = struct
   let iteri (t : t) ~f =
     let rec go acc i tree ~f =
       match tree with
-      | Poly.Tree.Account a -> f acc a
-      | Hash _ -> ()
+      | Poly.Tree.Account a ->
+          f acc a
+      | Hash _ ->
+          ()
       | Node (_, l, r) ->
           go acc (i - 1) l ~f ;
           go (acc + (1 lsl i)) (i - 1) r ~f
@@ -201,25 +208,29 @@ end = struct
   let get_exn {Poly.tree; depth; _} idx =
     let rec go i tree =
       match (i < 0, tree) with
-      | true, Poly.Tree.Account acct -> acct
+      | true, Poly.Tree.Account acct ->
+          acct
       | false, Node (_, l, r) ->
           let go_right = ith_bit idx i in
           if go_right then go (i - 1) r else go (i - 1) l
-      | _ -> failwith "Sparse_ledger.get: Bad index"
+      | _ ->
+          failwith "Sparse_ledger.get: Bad index"
     in
     go (depth - 1) tree
 
   let set_exn (t : t) idx acct =
     let rec go i tree =
       match (i < 0, tree) with
-      | true, Poly.Tree.Account _ -> Poly.Tree.Account acct
+      | true, Poly.Tree.Account _ ->
+          Poly.Tree.Account acct
       | false, Node (_, l, r) ->
           let l, r =
             let go_right = ith_bit idx i in
             if go_right then (l, go (i - 1) r) else (go (i - 1) l, r)
           in
           Node (Hash.merge ~height:i (hash l) (hash r), l, r)
-      | _ -> failwith "Sparse_ledger.get: Bad index"
+      | _ ->
+          failwith "Sparse_ledger.get: Bad index"
     in
     {t with tree= go (t.depth - 1) t.tree}
 
@@ -228,8 +239,10 @@ end = struct
       if i < 0 then acc
       else
         match tree with
-        | Poly.Tree.Account _ -> failwith "Sparse_ledger.path: Bad depth"
-        | Hash _ -> failwith "Sparse_ledger.path: Dead end"
+        | Poly.Tree.Account _ ->
+            failwith "Sparse_ledger.path: Bad depth"
+        | Hash _ ->
+            failwith "Sparse_ledger.path: Dead end"
         | Node (_, l, r) ->
             let go_right = ith_bit idx i in
             if go_right then go (`Right (hash l) :: acc) (i - 1) r
@@ -271,7 +284,9 @@ let%test_module "sparse-ledger-test" =
 
       let merge = Stable.Latest.merge
 
-      let gen = Quickcheck.Generator.map String.quickcheck_generator ~f:Md5.digest_string
+      let gen =
+        Quickcheck.Generator.map String.quickcheck_generator
+          ~f:Md5.digest_string
     end
 
     module Account = struct
@@ -286,7 +301,8 @@ let%test_module "sparse-ledger-test" =
 
           let gen =
             let open Quickcheck.Generator.Let_syntax in
-            let%map name = String.quickcheck_generator and favorite_number = Int.quickcheck_generator in
+            let%map name = String.quickcheck_generator
+            and favorite_number = Int.quickcheck_generator in
             {name; favorite_number}
 
           let key {name; _} = name
@@ -327,20 +343,26 @@ let%test_module "sparse-ledger-test" =
       let open Let_syntax in
       let indexes max_depth t =
         let rec go addr d = function
-          | Poly.Tree.Account a -> [(Account.key a, addr)]
-          | Hash _ -> []
+          | Poly.Tree.Account a ->
+              [(Account.key a, addr)]
+          | Hash _ ->
+              []
           | Node (_, l, r) ->
               go addr (d - 1) l @ go (addr lor (1 lsl d)) (d - 1) r
         in
         go 0 (max_depth - 1) t
       in
       let rec prune_hash_branches = function
-        | Poly.Tree.Hash h -> Poly.Tree.Hash h
-        | Account a -> Account a
+        | Poly.Tree.Hash h ->
+            Poly.Tree.Hash h
+        | Account a ->
+            Account a
         | Node (h, l, r) -> (
           match (prune_hash_branches l, prune_hash_branches r) with
-          | Hash _, Hash _ -> Hash h
-          | l, r -> Node (h, l, r) )
+          | Hash _, Hash _ ->
+              Hash h
+          | l, r ->
+              Node (h, l, r) )
       in
       let rec gen depth =
         if depth = 0 then Account.gen >>| fun a -> Poly.Tree.Account a

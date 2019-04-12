@@ -18,8 +18,10 @@ end = struct
   let create ?directory_name ~logger () =
     let directory =
       match directory_name with
-      | None -> Uuid.to_string (Uuid_unix.create ())
-      | Some name -> name
+      | None ->
+          Uuid.to_string (Uuid_unix.create ())
+      | Some name ->
+          name
     in
     let transition_storage = Transition_storage.create ~directory in
     {transition_storage; logger}
@@ -28,7 +30,7 @@ end = struct
     Transition_storage.close transition_storage
 
   let apply_add_transition ({transition_storage; logger}, batch)
-      With_hash.({hash; data= external_transition}) =
+      With_hash.{hash; data= external_transition} =
     let open Transition_storage.Schema in
     let parent_hash = External_transition.parent_hash external_transition in
     let parent_transition, children_hashes =

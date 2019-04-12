@@ -166,11 +166,14 @@ end)
     when the refcount for the given work is 0 *)
   let work_is_referenced t work =
     match t.ref_table with
-    | None -> true
+    | None ->
+        true
     | Some ref_table -> (
       match Work.Table.find ref_table work with
-      | None -> false
-      | Some _ -> true )
+      | None ->
+          false
+      | Some _ ->
+          true )
 
   let add_snark t ~work ~proof ~fee =
     if work_is_referenced t work then
@@ -180,7 +183,8 @@ end)
         `Rebroadcast
       in
       match Work.Table.find t.snark_table work with
-      | None -> update_and_rebroadcast ()
+      | None ->
+          update_and_rebroadcast ()
       | Some prev ->
           if Fee.( < ) fee prev.fee then update_and_rebroadcast ()
           else `Don't_rebroadcast
@@ -253,7 +257,8 @@ let%test_module "random set test" =
     let gen =
       let open Quickcheck.Generator.Let_syntax in
       let gen_entry () =
-        Quickcheck.Generator.tuple3 Mock_work.gen Mock_work.gen Mock_fee.quickcheck_generator
+        Quickcheck.Generator.tuple3 Mock_work.gen Mock_work.gen
+          Mock_fee.quickcheck_generator
       in
       let%map sample_solved_work = Quickcheck.Generator.list (gen_entry ()) in
       let frontier_broadcast_pipe_r, _ =
@@ -271,7 +276,8 @@ let%test_module "random set test" =
                    the snark pool, the fee of the work is at most the minimum \
                    of those fees" =
       let gen_entry () =
-        Quickcheck.Generator.tuple2 Mock_proof.gen Mock_fee.quickcheck_generator
+        Quickcheck.Generator.tuple2 Mock_proof.gen
+          Mock_fee.quickcheck_generator
       in
       Quickcheck.test
         ~sexp_of:
@@ -303,8 +309,9 @@ let%test_module "random set test" =
             * Mock_fee.t
             * Mock_proof.t
             * Mock_proof.t]
-        (Quickcheck.Generator.tuple6 gen Mock_work.gen Mock_fee.quickcheck_generator
-           Mock_fee.quickcheck_generator Mock_proof.gen Mock_proof.gen)
+        (Quickcheck.Generator.tuple6 gen Mock_work.gen
+           Mock_fee.quickcheck_generator Mock_fee.quickcheck_generator
+           Mock_proof.gen Mock_proof.gen)
         ~f:(fun (t, work, fee_1, fee_2, cheap_proof, expensive_proof) ->
           Mock_snark_pool.remove_solved_work t work ;
           let expensive_fee = max fee_1 fee_2

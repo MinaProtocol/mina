@@ -21,7 +21,7 @@ module Account = struct
 
   let create = Coda_base.Account.create
 
-  let balance Coda_base.Account.Poly.({balance; _}) = balance
+  let balance Coda_base.Account.Poly.{balance; _} = balance
 
   let update_balance t bal = {t with Coda_base.Account.Poly.balance= bal}
 end
@@ -48,7 +48,8 @@ module Balance_not_used = struct
 
   let equal x y = UInt64.compare x y = 0
 
-  let gen = Quickcheck.Generator.map ~f:UInt64.of_int64 Int64.quickcheck_generator
+  let gen =
+    Quickcheck.Generator.map ~f:UInt64.of_int64 Int64.quickcheck_generator
 end
 
 module Account_not_used = struct
@@ -57,9 +58,9 @@ module Account_not_used = struct
   type t =
     { public_key: key
     ; balance: Balance.Stable.V1.t
-           [@printer
-             fun fmt balance ->
-               Format.pp_print_string fmt (Balance.to_string balance)] }
+          [@printer
+            fun fmt balance ->
+              Format.pp_print_string fmt (Balance.to_string balance)] }
   [@@deriving bin_io, eq, show, fields]
 
   let sexp_of_t {public_key; balance} =
@@ -97,8 +98,10 @@ module Hash = struct
     let to_yojson t = `String (Md5.to_hex t)
 
     let of_yojson = function
-      | `String s -> Ok (Md5.of_hex_exn s)
-      | _ -> Error "expected string"
+      | `String s ->
+          Ok (Md5.of_hex_exn s)
+      | _ ->
+          Error "expected string"
   end
 
   include T
@@ -135,12 +138,19 @@ module In_memory_kvdb : Intf.Key_value_database = struct
       let hash_fold_t = hash_fold_t_frozen
 
       let bin_t = Bin_prot.Std.bin_bigstring
+
       let bin_read_t = Bin_prot.Std.bin_read_bigstring
+
       let __bin_read_t__ = Bin_prot.Std.__bin_read_bigstring__
+
       let bin_write_t = Bin_prot.Std.bin_write_bigstring
+
       let bin_shape_t = Bin_prot.Std.bin_shape_bigstring
+
       let bin_size_t = Bin_prot.Std.bin_size_bigstring
+
       let bin_reader_t = Bin_prot.Std.bin_reader_bigstring
+
       let bin_writer_t = Bin_prot.Std.bin_writer_bigstring
     end
 

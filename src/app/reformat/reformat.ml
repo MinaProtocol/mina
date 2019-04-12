@@ -20,9 +20,12 @@ let rec fold_over_files ~path ~process_path ~init ~f =
       match%bind Sys.is_directory (path ^/ x) with
       | `Yes when process_path `Dir (path ^/ x) ->
           fold_over_files ~path:(path ^/ x) ~process_path ~init:acc ~f
-      | `Yes -> return acc
-      | _ when process_path `File (path ^/ x) -> f acc (path ^/ x)
-      | _ -> return acc )
+      | `Yes ->
+          return acc
+      | _ when process_path `File (path ^/ x) ->
+          f acc (path ^/ x)
+      | _ ->
+          return acc )
 
 let main dry_run check path =
   let%bind all =

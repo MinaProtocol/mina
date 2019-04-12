@@ -120,9 +120,12 @@ let%test_module "Bootstrap Controller" =
               (of_list saved_transitions_verified)) )
 
     let is_syncing = function
-      | `Ignored -> false
-      | `Syncing_new_snarked_ledger -> true
-      | `Updating_root_transition -> false
+      | `Ignored ->
+          false
+      | `Syncing_new_snarked_ledger ->
+          true
+      | `Updating_root_transition ->
+          false
 
     let make_transition_pipe () =
       Pipe_lib.Strict_pipe.create ~name:(__MODULE__ ^ __LOC__)

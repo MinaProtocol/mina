@@ -77,7 +77,8 @@ let to_alist t : (Bigstring.t * Bigstring.t) list =
 
 let%test_unit "to_alist (of_alist l) = l" =
   Quickcheck.test
-    Quickcheck.Generator.(tuple2 String.quickcheck_generator String.quickcheck_generator |> list)
+    Quickcheck.Generator.(
+      tuple2 String.quickcheck_generator String.quickcheck_generator |> list)
     ~f:(fun kvs ->
       File_system.with_temp_dir "/tmp/coda-test" ~f:(fun directory ->
           let s = Bigstring.of_string in

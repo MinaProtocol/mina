@@ -20,7 +20,8 @@ let accumulate ~init ~parent_log ~prover ~updates ~strongest_chain =
                   (Error.to_string_hum
                      (Error.tag e ~tag:"prover verify failed")) ;
                 return chain
-            | Ok false -> return chain
+            | Ok false ->
+                return chain
             | Ok true ->
                 if
                   let open Strength in

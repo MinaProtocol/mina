@@ -67,9 +67,12 @@ let to_list (x, xs) = x :: xs
 let append (x, xs) ys = (x, xs @ to_list ys)
 
 let take (x, xs) = function
-  | 0 -> None
-  | 1 -> Some (x, [])
-  | n -> Some (x, List.take xs (n - 1))
+  | 0 ->
+      None
+  | 1 ->
+      Some (x, [])
+  | n ->
+      Some (x, List.take xs (n - 1))
 
 let min_elt ~compare (x, xs) =
   Option.value_map ~default:x (List.min_elt ~compare xs) ~f:(fun mininum ->
