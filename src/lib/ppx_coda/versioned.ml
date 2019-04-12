@@ -165,11 +165,41 @@ let generate_version_number_decl inner3_modules loc generation_kind =
   [%stri let version = [%e eint version]]
 
 let ocaml_builtin_types =
-  ["int"; "int32"; "int64"; "float"; "char"; "string"; "bool"; "unit"]
+  ["bytes"; "int"; "int32"; "int64"; "float"; "char"; "string"; "bool"; "unit"]
 
 let ocaml_builtin_type_constructors = ["list"; "array"; "option"; "ref"]
 
 let jane_street_type_constructors = ["sexp_opaque"]
+
+(* for module path A.B.C represented by a longident, produce [A;B;C] *)
+let rec list_of_longident longident ~loc =
+  match longident with
+  | Lident id -> [id]
+  | Ldot (longident2, s) -> list_of_longident longident2 ~loc @ [s]
+  | Lapply _ ->
+      Ppx_deriving.raise_errorf ~loc
+        "Type name contains unexpected application"
+
+(* true iff module_path is of form M. ... .Stable.Vn, where M is Core or Core_kernel, and n is integer *)
+let is_jane_street_stable_module module_path =
+  let hd_elt = List.hd_exn module_path in
+  let jane_street_libs = ["Core_kernel"; "Core"] in
+  List.mem jane_street_libs hd_elt ~equal:String.equal
+  &&
+  match List.rev module_path with
+  | vn :: "Stable" :: _ ->
+      let len = String.length vn in
+      len > 1
+      && Char.equal vn.[0] 'V'
+      &&
+      let numeric_part = String.sub vn ~pos:1 ~len:(len - 1) in
+      String.for_all numeric_part ~f:Char.is_digit
+      && not (Int.equal (Char.get_digit_exn numeric_part.[0]) 0)
+  | _ -> false
+
+let whitelisted_prefix prefix ~loc =
+  let module_path = list_of_longident prefix ~loc in
+  is_jane_street_stable_module module_path
 
 let rec generate_core_type_version_decls type_name core_type =
   match core_type.ptyp_desc with
@@ -199,17 +229,22 @@ let rec generate_core_type_version_decls type_name core_type =
             id
     | Ldot (prefix, "t") ->
         (* type t = A.B.t
-           generate: let _ = A.B.__versioned__
+           if prefix not whitelisted, generate: let _ = A.B.__versioned__
         *)
-        let loc = core_type.ptyp_loc in
-        let pexp_loc = loc in
-        let versioned_ident =
-          { pexp_desc= Pexp_ident {txt= Ldot (prefix, "__versioned__"); loc}
-          ; pexp_loc
-          ; pexp_attributes= [] }
+        let core_type_decls =
+          generate_version_lets_for_core_types type_name core_types
         in
-        [%str let _ = [%e versioned_ident]]
-        @ generate_version_lets_for_core_types type_name core_types
+        if whitelisted_prefix prefix ~loc:core_type.ptyp_loc then
+          core_type_decls
+        else
+          let loc = core_type.ptyp_loc in
+          let pexp_loc = loc in
+          let versioned_ident =
+            { pexp_desc= Pexp_ident {txt= Ldot (prefix, "__versioned__"); loc}
+            ; pexp_loc
+            ; pexp_attributes= [] }
+          in
+          [%str let _ = [%e versioned_ident]] @ core_type_decls
     | _ ->
         Ppx_deriving.raise_errorf ~loc:core_type.ptyp_loc
           "Unrecognized type constructor for versioned type" )

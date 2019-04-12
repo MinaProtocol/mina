@@ -2287,7 +2287,8 @@ let%test_module "test" =
             module V1 = struct
               module T = struct
                 type t = statement list
-                [@@deriving sexp, bin_io, compare, hash, eq, yojson]
+                [@@deriving
+                  sexp, bin_io, compare, hash, eq, yojson, version {for_test}]
               end
 
               include T
