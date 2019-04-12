@@ -113,7 +113,8 @@ let%test_module "network pool test" =
       module Stable = struct
         module V1 = struct
           module T = struct
-            type t = int [@@deriving sexp, bin_io, yojson, version]
+            type t = int
+            [@@deriving sexp, bin_io, yojson, version {unnumbered}]
           end
 
           include T
@@ -174,7 +175,8 @@ let%test_module "network pool test" =
       module Stable = struct
         module V1 = struct
           module T = struct
-            type t = int [@@deriving bin_io, yojson, sexp, version]
+            type t = int
+            [@@deriving bin_io, yojson, sexp, version {unnumbered}]
           end
 
           include T
