@@ -21,7 +21,7 @@ With this feature, clients will be able to join the network from any device at a
 
 This version of the implementation is correct given that [50% + epsilon] of stake has always been participating and honest. 
 
-* Add a new field to protocol_state called `min_window`, initally set to 1
+* Add a new field to protocol_state called `min_window`, initally set to `8k`
 * Add a new field to protocol_state called `current_window`, initially set to 0
 * If `FLOOR(previous_protocol_state.slot_number/(8k)) == FLOOR(current_protocol_state.slot_number/(8k))`
   * set `current_protocol_state.current_window` to `previous_protocol_state.current_window + 1`
