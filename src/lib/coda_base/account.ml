@@ -17,6 +17,7 @@ module Index = struct
       end
 
       include T
+      module Table = Int.Table
     end
 
     module Latest = V1
