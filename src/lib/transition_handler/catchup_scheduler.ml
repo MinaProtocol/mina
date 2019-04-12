@@ -130,7 +130,8 @@ module Make (Inputs : Inputs.S) = struct
 
   let has_timeout t transition =
     Hashtbl.mem t.parent_root_timeouts
-      ( With_hash.data transition |> External_transition.Verified.protocol_state
+      ( With_hash.data transition |> Envelope.Incoming.data
+      |> External_transition.Verified.protocol_state
       |> Protocol_state.previous_state_hash )
 
   let is_empty t =
