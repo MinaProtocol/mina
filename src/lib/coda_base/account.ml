@@ -24,6 +24,8 @@ module Index = struct
 
   type t = Stable.Latest.t [@@deriving sexp]
 
+  let to_int = Int.to_int
+
   let gen = Int.gen_incl 0 ((1 lsl Snark_params.ledger_depth) - 1)
 
   module Table = Int.Table
