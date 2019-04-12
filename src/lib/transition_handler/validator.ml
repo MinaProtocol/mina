@@ -23,7 +23,8 @@ module Make (Inputs : Inputs.With_unprocessed_transition_cache.S) :
     let open With_hash in
     let open Protocol_state in
     let open Result.Let_syntax in
-    let {hash; data= transition} = transition_with_hash in
+    let {hash; data= transition_enveloped} = transition_with_hash in
+    let transition = Envelope.Incoming.data transition_enveloped in
     let protocol_state =
       External_transition.Verified.protocol_state transition
     in
@@ -62,7 +63,9 @@ module Make (Inputs : Inputs.With_unprocessed_transition_cache.S) :
 
   let run ~logger ~frontier ~transition_reader
       ~(valid_transition_writer :
-         ( ( (External_transition.Verified.t, State_hash.t) With_hash.t
+         ( ( ( External_transition.Verified.t Envelope.Incoming.t
+             , State_hash.t )
+             With_hash.t
            , State_hash.t )
            Cached.t
          , crash buffered
@@ -82,7 +85,7 @@ module Make (Inputs : Inputs.With_unprocessed_transition_cache.S) :
              Protocol_state.hash
                (External_transition.Verified.protocol_state transition)
            in
-           let transition_with_hash = {With_hash.hash; data= transition} in
+           let transition_with_hash = {With_hash.hash; data= transition_env} in
            Deferred.return
              ( match
                  validate_transition ~logger ~frontier
@@ -110,6 +113,7 @@ module Make (Inputs : Inputs.With_unprocessed_transition_cache.S) :
                  Perf_histograms.add_span ~name:hist_name
                    (Core_kernel.Time.diff (Core_kernel.Time.now ())
                       transition_time) ;
+                 (*Deepthi: This needs to be in an envelope*)
                  Writer.write valid_transition_writer cached_transition
              | Error `Duplicate ->
                  if Lru.find already_reported_duplicates hash |> Option.is_none
@@ -123,6 +127,7 @@ module Make (Inputs : Inputs.With_unprocessed_transition_cache.S) :
                        ] ;
                    Lru.add already_reported_duplicates ~key:hash ~data:() )
              | Error (`Invalid reason) ->
+                 (*Deepthi: record*)
                  Logger.warn logger ~module_:__MODULE__ ~location:__LOC__
                    !"rejecting transition because \"$reason\" -- received \
                      from $sender"

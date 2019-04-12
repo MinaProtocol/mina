@@ -27,6 +27,8 @@ module Incoming : sig
 
   type 'a t = 'a Stable.Latest.t [@@deriving sexp, yojson]
 
+  val equal : equal_data:('a -> 'a -> bool) -> 'a t -> 'a t -> bool
+
   val sender : 'a t -> Sender.t
 
   val data : 'a t -> 'a

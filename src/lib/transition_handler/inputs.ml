@@ -38,7 +38,9 @@ module With_unprocessed_transition_cache = struct
       with module Cached := Cache_lib.Cached
        and module Cache := Cache_lib.Cache
        and type source =
-                  (External_transition.Verified.t, State_hash.t) With_hash.t
+                  ( External_transition.Verified.t Envelope.Incoming.t
+                  , State_hash.t )
+                  With_hash.t
        and type target = State_hash.t
   end
 end

@@ -11,6 +11,13 @@ module Sender = struct
       end
 
       include T
+
+      let equal t t' =
+        match (t, t') with
+        | Local, Local -> true
+        | Remote p, Remote p' -> Peer.Stable.V1.compare p p' = 0
+        | _ -> false
+
       include Registration.Make_latest_version (T)
     end
 
@@ -40,6 +47,9 @@ module Incoming = struct
       end
 
       include T
+
+      let equal ~equal_data t t' =
+        Sender.Stable.V1.equal t.sender t'.sender && equal_data t.data t'.data
     end
 
     module Latest = V1
@@ -47,6 +57,8 @@ module Incoming = struct
 
   (* bin_io intentionally omitted *)
   type 'a t = 'a Stable.Latest.t [@@deriving sexp, yojson]
+
+  let equal = Stable.Latest.equal
 
   let sender t = t.Stable.Latest.sender
 

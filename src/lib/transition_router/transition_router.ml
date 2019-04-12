@@ -172,7 +172,8 @@ module Make (Inputs : Inputs_intf) :
             (With_hash.of_data
                ~hash_data:
                  (Fn.compose Consensus.Protocol_state.hash
-                    External_transition.Verified.protocol_state)) )
+                    (Fn.compose External_transition.Verified.protocol_state
+                       Envelope.Incoming.data))) )
     in
     let start_transition_frontier_controller ~verified_transition_writer
         ~clear_reader ~collected_transitions frontier =

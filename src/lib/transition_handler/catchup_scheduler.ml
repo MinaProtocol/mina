@@ -24,7 +24,9 @@ module Make (Inputs : Inputs.S) = struct
     { logger: Logger.t
     ; time_controller: Time.Controller.t
     ; catchup_job_writer:
-        ( ( (External_transition.Verified.t, State_hash.t) With_hash.t
+        ( ( ( External_transition.Verified.t Envelope.Incoming.t
+            , State_hash.t )
+            With_hash.t
           , State_hash.t )
           Cached.t
           Rose_tree.t
@@ -38,7 +40,9 @@ module Make (Inputs : Inputs.S) = struct
               its corresponding value in the hash table would just be an empty
               list. *)
     ; collected_transitions:
-        ( (External_transition.Verified.t, State_hash.t) With_hash.t
+        ( ( External_transition.Verified.t Envelope.Incoming.t
+          , State_hash.t )
+          With_hash.t
         , State_hash.t )
         Cached.t
         list
@@ -48,7 +52,9 @@ module Make (Inputs : Inputs.S) = struct
               timeouts. *)
     ; parent_root_timeouts: unit Time.Timeout.t State_hash.Table.t
     ; breadcrumb_builder_supervisor:
-        ( (External_transition.Verified.t, State_hash.t) With_hash.t
+        ( ( External_transition.Verified.t Envelope.Incoming.t
+          , State_hash.t )
+          With_hash.t
         , State_hash.t )
         Cached.t
         Rose_tree.t
@@ -59,7 +65,7 @@ module Make (Inputs : Inputs.S) = struct
     Deferred.List.map transition_subtrees
       ~f:(fun (Rose_tree.T (subtree_root, _) as subtree) ->
         let subtree_root_parent_hash =
-          With_hash.data (Cached.peek subtree_root)
+          Envelope.Incoming.data (With_hash.data (Cached.peek subtree_root))
           |> External_transition.Verified.protocol_state
           |> Protocol_state.previous_state_hash
         in
@@ -70,7 +76,13 @@ module Make (Inputs : Inputs.S) = struct
           ~f:(fun parent cached_transition_with_hash ->
             let%map cached_breadcrumb_result =
               Cached.transform cached_transition_with_hash
-                ~f:(fun transition_with_hash ->
+                ~f:(fun transition_with_hash_enveloped ->
+                  let transition_with_hash =
+                    { transition_with_hash_enveloped with
+                      data=
+                        Envelope.Incoming.data
+                        @@ With_hash.data transition_with_hash_enveloped }
+                  in
                   Transition_frontier.Breadcrumb.build ~logger
                     ~parent:(Cached.peek parent) ~transition_with_hash )
               |> Cached.sequence_deferred
@@ -91,7 +103,16 @@ module Make (Inputs : Inputs.S) = struct
     let collected_transitions = State_hash.Table.create () in
     let parent_root_timeouts = State_hash.Table.create () in
     let breadcrumb_builder_supervisor =
-      Capped_supervisor.create ~job_capacity:5 (fun transition_branches ->
+      Capped_supervisor.create ~job_capacity:5
+        (fun (transition_branches :
+               ( ( Inputs.External_transition.Verified.t Envelope.Incoming.t
+                 , State_hash.t )
+                 With_hash.t
+               , 'a )
+               Cached.t
+               Rose_tree.t
+               list)
+        ->
           build_breadcrumbs ~logger ~frontier transition_branches
           >>= Writer.write catchup_breadcrumbs_writer )
     in
@@ -147,7 +168,7 @@ module Make (Inputs : Inputs.S) = struct
   let watch t ~timeout_duration ~cached_transition =
     let hash = With_hash.hash (Cached.peek cached_transition) in
     let parent_hash =
-      With_hash.data (Cached.peek cached_transition)
+      Envelope.Incoming.data (With_hash.data (Cached.peek cached_transition))
       |> External_transition.Verified.protocol_state
       |> Protocol_state.previous_state_hash
     in
@@ -164,7 +185,8 @@ module Make (Inputs : Inputs.S) = struct
               ; ( "cached_transition"
                 , Cached.peek cached_transition
                   |> With_hash.data
-                  |> Inputs.External_transition.Verified.to_yojson ) ]
+                  |> Envelope.Incoming.to_yojson
+                       Inputs.External_transition.Verified.to_yojson ) ]
             "timed out waiting for the parent of $cached_transition after \
              $duration ms, signalling a catchup job" ;
           (* it's ok to create a new thread here because the thread essentially does no work *)

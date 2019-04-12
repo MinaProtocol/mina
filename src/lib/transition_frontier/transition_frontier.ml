@@ -73,6 +73,17 @@ struct
     let copy t =
       {t with staged_ledger= Inputs.Staged_ledger.copy t.staged_ledger}
 
+    (*let build_with_enveloped_transition ~logger ~parent ~transition_with_hash =
+      O1trace.measure "Breadcrumb.build" (fun () ->
+      let open Deferred.Result.Let_syntax in
+      let staged_ledger = parent.staged_ledger in
+      let transition_with_hash = {With_hash.data=Envelope.Incoming.data @@ With_hash.data transition_with_hash; hash=With_hash.hash transition_with_hash} in
+      match%map
+        build ~logger ~parent ~transition_with_hash
+      with
+      | Error (`Validation_error error) -> (*Punish*) 
+      | x -> x*)
+
     let build ~logger ~parent ~transition_with_hash =
       O1trace.measure "Breadcrumb.build" (fun () ->
           let open Deferred.Result.Let_syntax in
@@ -121,6 +132,8 @@ struct
                         applying the diff does not match blockchain state's \
                         ledger hash and staged ledger hash resp.\n")) )
           in
+          (*          let transition_with_hash = {With_hash.hash=With_hash.hash transition_with_hash; data= Envelope.Incoming.data @@ With_hash.data transition_with_hash}
+          in*)
           { transition_with_hash
           ; staged_ledger= transitioned_staged_ledger
           ; just_emitted_a_proof } )

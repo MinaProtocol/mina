@@ -31,6 +31,7 @@ module type Diff_hash = sig
   val equal : t -> t -> bool
 end
 
+(*Deepthi: add envelopes here as well*)
 module type Diff_mutant = sig
   type external_transition
 
@@ -452,7 +453,7 @@ module type Catchup_intf = sig
        logger:Logger.t
     -> network:network
     -> frontier:transition_frontier
-    -> catchup_job_reader:( ( external_transition_verified
+    -> catchup_job_reader:( ( external_transition_verified Envelope.Incoming.t
                             , state_hash )
                             With_hash.t
                           , state_hash )
@@ -492,6 +493,7 @@ module type Transition_handler_validator_intf = sig
                          * [`Time_received of time] )
                          Strict_pipe.Reader.t
     -> valid_transition_writer:( ( ( external_transition_verified
+                                     Envelope.Incoming.t
                                    , state_hash )
                                    With_hash.t
                                  , state_hash )
@@ -506,8 +508,12 @@ module type Transition_handler_validator_intf = sig
        logger:Logger.t
     -> frontier:transition_frontier
     -> unprocessed_transition_cache:unprocessed_transition_cache
-    -> (external_transition_verified, state_hash) With_hash.t
-    -> ( ( (external_transition_verified, state_hash) With_hash.t
+    -> ( external_transition_verified Envelope.Incoming.t
+       , state_hash )
+       With_hash.t
+    -> ( ( ( external_transition_verified Envelope.Incoming.t
+           , state_hash )
+           With_hash.t
          , state_hash )
          Cached.t
        , [`Duplicate | `Invalid of string] )
@@ -532,6 +538,7 @@ module type Transition_handler_processor_intf = sig
     -> time_controller:time_controller
     -> frontier:transition_frontier
     -> primary_transition_reader:( ( external_transition_verified
+                                     Envelope.Incoming.t
                                    , state_hash )
                                    With_hash.t
                                  , state_hash )
@@ -541,7 +548,7 @@ module type Transition_handler_processor_intf = sig
                                   , state_hash )
                                   With_hash.t
                                   Strict_pipe.Reader.t
-    -> catchup_job_writer:( ( ( external_transition_verified
+    -> catchup_job_writer:( ( ( external_transition_verified Envelope.Incoming.t
                               , state_hash )
                               With_hash.t
                             , state_hash )
@@ -585,8 +592,12 @@ module type Unprocessed_transition_cache_intf = sig
 
   val register :
        t
-    -> (external_transition_verified, state_hash) With_hash.t
-    -> ( (external_transition_verified, state_hash) With_hash.t
+    -> ( external_transition_verified Envelope.Incoming.t
+       , state_hash )
+       With_hash.t
+    -> ( ( external_transition_verified Envelope.Incoming.t
+         , state_hash )
+         With_hash.t
        , state_hash )
        Cached.t
        Or_error.t
@@ -719,7 +730,9 @@ module type Bootstrap_controller_intf = sig
                                              Envelope.Incoming.t ]
                          * [< `Time_received of int64] )
                          Strict_pipe.Reader.t
-    -> (transition_frontier * external_transition_verified list) Deferred.t
+    -> ( transition_frontier
+       * external_transition_verified Envelope.Incoming.t list )
+       Deferred.t
 end
 
 module type Transition_frontier_controller_intf = sig
@@ -739,7 +752,7 @@ module type Transition_frontier_controller_intf = sig
        logger:Logger.t
     -> network:network
     -> time_controller:time_controller
-    -> collected_transitions:( external_transition_verified
+    -> collected_transitions:( external_transition_verified Envelope.Incoming.t
                              , state_hash )
                              With_hash.t
                              list

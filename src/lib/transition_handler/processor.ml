@@ -38,14 +38,18 @@ module Make (Inputs : Inputs.With_unprocessed_transition_cache.S) :
 
   let run ~logger ~time_controller ~frontier
       ~(primary_transition_reader :
-         ( (External_transition.Verified.t, State_hash.t) With_hash.t
+         ( ( External_transition.Verified.t Envelope.Incoming.t
+           , State_hash.t )
+           With_hash.t
          , State_hash.t )
          Cached.t
          Reader.t)
       ~(proposer_transition_reader :
          (External_transition.Verified.t, State_hash.t) With_hash.t Reader.t)
       ~(catchup_job_writer :
-         ( ( (External_transition.Verified.t, State_hash.t) With_hash.t
+         ( ( ( External_transition.Verified.t Envelope.Incoming.t
+             , State_hash.t )
+             With_hash.t
            , State_hash.t )
            Cached.t
            Rose_tree.t
@@ -94,9 +98,15 @@ module Make (Inputs : Inputs.With_unprocessed_transition_cache.S) :
                (* The proposer transitions are registered into the cache in order to prevent
                 * duplicate internal proposals. Otherwise, this could just be wrapped with a
                 * phantom Cached.t *)
+               let enveloped_transition =
+                 { With_hash.data=
+                     Envelope.Incoming.wrap ~data:vt.data
+                       ~sender:Envelope.Sender.Local
+                 ; hash= vt.hash }
+               in
                `Valid_transition
                  ( Unprocessed_transition_cache.register
-                     unprocessed_transition_cache vt
+                     unprocessed_transition_cache enveloped_transition
                  |> Or_error.ok_exn ) )
          ; Reader.map catchup_breadcrumbs_reader ~f:(fun cb ->
                `Catchup_breadcrumbs cb )
@@ -128,7 +138,8 @@ module Make (Inputs : Inputs.With_unprocessed_transition_cache.S) :
                  match
                    Transition_frontier.find frontier
                      (transition_parent_hash
-                        (With_hash.data (Cached.peek cached_transition)))
+                        ( Envelope.Incoming.data
+                        @@ With_hash.data (Cached.peek cached_transition) ))
                  with
                  | None ->
                      return
@@ -140,7 +151,7 @@ module Make (Inputs : Inputs.With_unprocessed_transition_cache.S) :
                        let open Deferred.Result.Let_syntax in
                        let parent_hash =
                          Cached.peek cached_transition
-                         |> With_hash.data
+                         |> With_hash.data |> Envelope.Incoming.data
                          |> External_transition.Verified.protocol_state
                          |> Protocol_state.previous_state_hash
                        in
@@ -156,7 +167,14 @@ module Make (Inputs : Inputs.With_unprocessed_transition_cache.S) :
                          let open Deferred.Let_syntax in
                          let%map cached_breadcrumb =
                            Cached.transform cached_transition
-                             ~f:(fun transition_with_hash ->
+                             ~f:(fun transition_with_hash_enveloped ->
+                               let transition_with_hash =
+                                 { transition_with_hash_enveloped with
+                                   data=
+                                     Envelope.Incoming.data
+                                     @@ With_hash.data
+                                          transition_with_hash_enveloped }
+                               in
                                Transition_frontier.Breadcrumb.build ~logger
                                  ~parent ~transition_with_hash )
                            |> Cached.sequence_deferred
