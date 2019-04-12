@@ -31,7 +31,6 @@ module type Diff_hash = sig
   val equal : t -> t -> bool
 end
 
-(*Deepthi: add envelopes here as well*)
 module type Diff_mutant = sig
   type external_transition
 

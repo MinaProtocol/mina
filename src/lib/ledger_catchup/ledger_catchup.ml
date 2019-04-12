@@ -50,14 +50,7 @@ module Make (Inputs : Inputs.S) :
   (* We would like the async scheduler to context switch between each iteration
      of external transitions when trying to build breadcrumb_path. Therefore,
      this function needs to return a Deferred *)
-  let construct_breadcrumb_path ~logger frontier initial_state_hash
-      (tree :
-        ( ( External_transition.Verified.t Envelope.Incoming.t
-          , State_hash.t )
-          With_hash.t
-        , State_hash.t )
-        Cached.t
-        Rose_tree.t) =
+  let construct_breadcrumb_path ~logger frontier initial_state_hash tree =
     (* If the breadcrumb we are targetting is removed from the transition
      * frontier while we're catching up, it means this path is not on the
      * critical path that has been chosen in the frontier. As such, we should
@@ -84,7 +77,11 @@ module Make (Inputs : Inputs.S) :
           let open Deferred.Let_syntax in
           let%map cached_result =
             Cached.transform cached_transition_with_hash
-              ~f:(fun transition_with_hash_enveloped ->
+              ~f:(fun (transition_with_hash_enveloped :
+                        ( External_transition.Verified.t Envelope.Incoming.t
+                        , State_hash.t )
+                        With_hash.t)
+                 ->
                 let open Deferred.Or_error.Let_syntax in
                 let transition_with_hash =
                   { transition_with_hash_enveloped with
@@ -194,7 +191,6 @@ module Make (Inputs : Inputs.S) :
             (Fn.compose Consensus.Protocol_state.hash
                External_transition.Verified.protocol_state)
       in
-      (*TODO: Should we also request transitions in envelopes to punish the sender of the transition instead of the peer?*)
       let verified_transition_with_hash_enveloped =
         { verified_transition_with_hash with
           data=
@@ -314,15 +310,7 @@ module Make (Inputs : Inputs.S) :
 
   let run ~logger ~network ~frontier ~catchup_job_reader
       ~catchup_breadcrumbs_writer ~unprocessed_transition_cache =
-    Strict_pipe.Reader.iter catchup_job_reader
-      ~f:(fun (subtree :
-                ( ( External_transition.Verified.t Envelope.Incoming.t
-                  , State_hash.t )
-                  With_hash.t
-                , State_hash.t )
-                Cached.t
-                Rose_tree.t)
-         ->
+    Strict_pipe.Reader.iter catchup_job_reader ~f:(fun subtree ->
         match%bind
           get_transitions_and_compute_breadcrumbs ~logger ~network ~frontier
             ~num_peers:8 ~unprocessed_transition_cache ~target_subtree:subtree

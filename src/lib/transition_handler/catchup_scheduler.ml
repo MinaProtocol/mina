@@ -103,16 +103,7 @@ module Make (Inputs : Inputs.S) = struct
     let collected_transitions = State_hash.Table.create () in
     let parent_root_timeouts = State_hash.Table.create () in
     let breadcrumb_builder_supervisor =
-      Capped_supervisor.create ~job_capacity:5
-        (fun (transition_branches :
-               ( ( Inputs.External_transition.Verified.t Envelope.Incoming.t
-                 , State_hash.t )
-                 With_hash.t
-               , 'a )
-               Cached.t
-               Rose_tree.t
-               list)
-        ->
+      Capped_supervisor.create ~job_capacity:5 (fun transition_branches ->
           build_breadcrumbs ~logger ~frontier transition_branches
           >>= Writer.write catchup_breadcrumbs_writer )
     in
