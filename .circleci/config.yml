@@ -4,7 +4,7 @@ version: 3
 jobs:
     tracetool:
         docker:
-            - image: codaprotocol/coda:toolchain-rust-b2e9fa0d25f2f9b7c7f01d6f8727e2c6c7690712
+            - image: codaprotocol/coda:toolchain-rust-c4b2cc7c53ef51136350323d52609de5aa83f3a5
         steps:
             - checkout
             - run: git submodule sync && git submodule update --init --recursive
@@ -41,7 +41,7 @@ jobs:
 
     lint:
         docker:
-            - image: codaprotocol/coda:toolchain-e815174112752dd87cae95a6818b9cdfc26eba77
+            - image: codaprotocol/coda:toolchain-c4b2cc7c53ef51136350323d52609de5aa83f3a5
         steps:
             - checkout
             - run: git submodule sync && git submodule update --init --recursive
@@ -117,7 +117,7 @@ jobs:
     build-artifacts--testnet_postake:
         resource_class: large
         docker:
-            - image: codaprotocol/coda:toolchain-e815174112752dd87cae95a6818b9cdfc26eba77
+            - image: codaprotocol/coda:toolchain-c4b2cc7c53ef51136350323d52609de5aa83f3a5
         environment:
             DUNE_PROFILE: testnet_postake
         steps:
@@ -153,7 +153,7 @@ jobs:
     build-artifacts--testnet_postake_many_proposers:
         resource_class: large
         docker:
-            - image: codaprotocol/coda:toolchain-e815174112752dd87cae95a6818b9cdfc26eba77
+            - image: codaprotocol/coda:toolchain-c4b2cc7c53ef51136350323d52609de5aa83f3a5
         environment:
             DUNE_PROFILE: testnet_postake_many_proposers
         steps:
@@ -189,7 +189,7 @@ jobs:
     build-artifacts--testnet_postake_snarkless_fake_hash:
         resource_class: large
         docker:
-            - image: codaprotocol/coda:toolchain-e815174112752dd87cae95a6818b9cdfc26eba77
+            - image: codaprotocol/coda:toolchain-c4b2cc7c53ef51136350323d52609de5aa83f3a5
         environment:
             DUNE_PROFILE: testnet_postake_snarkless_fake_hash
         steps:
@@ -225,7 +225,7 @@ jobs:
     test-unit--test_posig_snarkless:
         resource_class: large
         docker:
-            - image: codaprotocol/coda:toolchain-e815174112752dd87cae95a6818b9cdfc26eba77
+            - image: codaprotocol/coda:toolchain-c4b2cc7c53ef51136350323d52609de5aa83f3a5
         steps:
             - checkout
             - run: git submodule sync && git submodule update --init --recursive
@@ -235,7 +235,7 @@ jobs:
     test-unit--test_postake_snarkless:
         resource_class: large
         docker:
-            - image: codaprotocol/coda:toolchain-e815174112752dd87cae95a6818b9cdfc26eba77
+            - image: codaprotocol/coda:toolchain-c4b2cc7c53ef51136350323d52609de5aa83f3a5
         steps:
             - checkout
             - run: git submodule sync && git submodule update --init --recursive
@@ -245,7 +245,7 @@ jobs:
     test-unit--dev:
         resource_class: large
         docker:
-            - image: codaprotocol/coda:toolchain-e815174112752dd87cae95a6818b9cdfc26eba77
+            - image: codaprotocol/coda:toolchain-c4b2cc7c53ef51136350323d52609de5aa83f3a5
         steps:
             - checkout
             - run: git submodule sync && git submodule update --init --recursive
@@ -255,7 +255,7 @@ jobs:
     test--fake_hash:
         resource_class: large
         docker:
-            - image: codaprotocol/coda:toolchain-e815174112752dd87cae95a6818b9cdfc26eba77
+            - image: codaprotocol/coda:toolchain-c4b2cc7c53ef51136350323d52609de5aa83f3a5
         steps:
             - checkout
             - run: git submodule sync && git submodule update --init --recursive
@@ -267,7 +267,7 @@ jobs:
     test--test_postake:
         resource_class: large
         docker:
-            - image: codaprotocol/coda:toolchain-e815174112752dd87cae95a6818b9cdfc26eba77
+            - image: codaprotocol/coda:toolchain-c4b2cc7c53ef51136350323d52609de5aa83f3a5
         steps:
             - checkout
             - run: git submodule sync && git submodule update --init --recursive
@@ -282,7 +282,7 @@ jobs:
     test--test_postake_bootstrap:
         resource_class: large
         docker:
-            - image: codaprotocol/coda:toolchain-e815174112752dd87cae95a6818b9cdfc26eba77
+            - image: codaprotocol/coda:toolchain-c4b2cc7c53ef51136350323d52609de5aa83f3a5
         steps:
             - checkout
             - run: git submodule sync && git submodule update --init --recursive
@@ -294,7 +294,7 @@ jobs:
     test--test_postake_catchup:
         resource_class: large
         docker:
-            - image: codaprotocol/coda:toolchain-e815174112752dd87cae95a6818b9cdfc26eba77
+            - image: codaprotocol/coda:toolchain-c4b2cc7c53ef51136350323d52609de5aa83f3a5
         steps:
             - checkout
             - run: git submodule sync && git submodule update --init --recursive
@@ -306,7 +306,7 @@ jobs:
     test--test_postake_five_even_snarkless:
         resource_class: large
         docker:
-            - image: codaprotocol/coda:toolchain-e815174112752dd87cae95a6818b9cdfc26eba77
+            - image: codaprotocol/coda:toolchain-c4b2cc7c53ef51136350323d52609de5aa83f3a5
         steps:
             - checkout
             - run: git submodule sync && git submodule update --init --recursive
@@ -318,7 +318,7 @@ jobs:
     test--test_postake_five_even_txns:
         resource_class: large
         docker:
-            - image: codaprotocol/coda:toolchain-e815174112752dd87cae95a6818b9cdfc26eba77
+            - image: codaprotocol/coda:toolchain-c4b2cc7c53ef51136350323d52609de5aa83f3a5
         steps:
             - checkout
             - run: git submodule sync && git submodule update --init --recursive
@@ -330,7 +330,7 @@ jobs:
     test--test_postake_snarkless:
         resource_class: large
         docker:
-            - image: codaprotocol/coda:toolchain-e815174112752dd87cae95a6818b9cdfc26eba77
+            - image: codaprotocol/coda:toolchain-c4b2cc7c53ef51136350323d52609de5aa83f3a5
         steps:
             - checkout
             - run: git submodule sync && git submodule update --init --recursive
@@ -345,7 +345,7 @@ jobs:
     test--test_postake_split:
         resource_class: large
         docker:
-            - image: codaprotocol/coda:toolchain-e815174112752dd87cae95a6818b9cdfc26eba77
+            - image: codaprotocol/coda:toolchain-c4b2cc7c53ef51136350323d52609de5aa83f3a5
         steps:
             - checkout
             - run: git submodule sync && git submodule update --init --recursive
@@ -357,7 +357,7 @@ jobs:
     test--test_postake_split_snarkless:
         resource_class: large
         docker:
-            - image: codaprotocol/coda:toolchain-e815174112752dd87cae95a6818b9cdfc26eba77
+            - image: codaprotocol/coda:toolchain-c4b2cc7c53ef51136350323d52609de5aa83f3a5
         steps:
             - checkout
             - run: git submodule sync && git submodule update --init --recursive
@@ -384,7 +384,7 @@ jobs:
     test--test_postake_txns:
         resource_class: large
         docker:
-            - image: codaprotocol/coda:toolchain-e815174112752dd87cae95a6818b9cdfc26eba77
+            - image: codaprotocol/coda:toolchain-c4b2cc7c53ef51136350323d52609de5aa83f3a5
         steps:
             - checkout
             - run: git submodule sync && git submodule update --init --recursive
