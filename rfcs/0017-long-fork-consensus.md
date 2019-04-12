@@ -52,13 +52,17 @@ If the assumption that [50% + epsilon] of the stake has always been participatin
 * define a constant, `min_window_period`
 * define a constant, `inflation`
 * add a new field to each account called `vote_hash`, initially set to `0`
-* add a ring buffer to protocol state called `min_windows`
-* add a new field to `protocol_state` called `tail_min_window`
-* add a new field to `protocol_state` called `min_window`
-* add a new field to `protocol_state` called `current_window`
-* add a new field to the staged ledger called `vote_stake`
+* add a ring buffer to protocol state called `min_windows` initially set to `[1]*min_windows_length`
+* add a new field to `protocol_state` called `tail_min_window` initially set to `1`
+* add a new field to `protocol_state` called `min_window` initially set to `1`
+* add a new field to `protocol_state` called `current_window` initially set to `0`
+* add a new field to the staged ledger called `vote_stake` initially set to `0`
+* add a new field to the staged ledger called `vote_hash` initially set to `0`
 
-* TODO transaction changes
+Add to transaction application logic:
+* TODO
+
+Add to the protocol state update logic:
 
 * `let window_diff = FLOOR(current_protocol_state.slot_number/(8k)) - FLOOR(previous_protocol_state.slot_number/(8k))`
 * if `window_diff == 0`
@@ -76,13 +80,15 @@ If the assumption that [50% + epsilon] of the stake has always been participatin
 * else
   * TODO
 
-* if the `snarked_ledger` is being updated to `staged_ledger`
-  * set intermediate variable `voted_stake` to `staged_ledger.voted_stake`
+* if the `snarked_ledger` is being updated
+  * set `current_protocol_state.min_window` to `MAX(current_protocol_state.min_window, new_snarked_ledger.voted_stake/staged_ledger.total_stake)`
 * else
-  * set intermediate variable `voted_stake` to `0`
+  * do nothing
 
-* TODO vote triggering
-* Incentives discussion
+Add to the transaction accepting logic:
+
+TODO vote triggering
+Incentives discussion
 
 ## Drawbacks
 [drawbacks]: #drawbacks
