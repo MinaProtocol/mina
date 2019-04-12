@@ -789,14 +789,14 @@ struct
     (* TODO : we're choosing versioned inputs, so the result should be versioned *)
     module Pool =
       Snark_pool.Make (Proof) (Fee.Stable.V1) (Work) (Transition_frontier)
-    module Diff =
+    module Snark_pool_diff =
       Network_pool.Snark_pool_diff.Make (Proof) (Fee.Stable.V1) (Work)
         (Transition_frontier)
         (Pool)
 
-    type pool_diff = Diff.t
+    type pool_diff = Snark_pool_diff.t
 
-    include Network_pool.Make (Transition_frontier) (Pool) (Diff)
+    include Network_pool.Make (Transition_frontier) (Pool) (Snark_pool_diff)
 
     let get_completed_work t statement =
       Option.map
@@ -822,11 +822,10 @@ struct
       apply_and_broadcast t
         (Envelope.Incoming.wrap
            ~data:
-             (Add_solved_work
+             (Diff.Add_solved_work
                 ( List.map res.spec.instances ~f:Single.Spec.statement
-                , Diff.Priced_proof.
-                    { proof= res.proofs
-                    ; fee= {fee= res.spec.fee; prover= res.prover} } ))
+                , { Snark_pool_diff.Priced_proof.proof= res.proofs
+                  ; fee= {fee= res.spec.fee; prover= res.prover} } ))
            ~sender:Envelope.Sender.Local)
   end
 
@@ -835,7 +834,7 @@ struct
   module Net = Coda_networking.Make (struct
     include Inputs0
     module Snark_pool = Snark_pool
-    module Snark_pool_diff = Snark_pool.Diff
+    module Snark_pool_diff = Snark_pool.Snark_pool_diff
     module Sync_ledger = Sync_ledger
     module Staged_ledger_hash = Staged_ledger_hash
     module Ledger_hash = Ledger_hash
