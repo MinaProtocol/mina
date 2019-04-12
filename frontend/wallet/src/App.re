@@ -1,4 +1,5 @@
 open BsElectron;
+open Tc;
 
 let dev = true;
 
@@ -31,7 +32,7 @@ let createTray = () => {
     ];
 
   let menu = Menu.make();
-  List.iter(Menu.append(menu), items);
+  List.iter(~f=Menu.append(menu), items);
 
   Tray.setContextMenu(t, menu);
 };
@@ -47,4 +48,18 @@ App.on(
 
 App.on(`WindowAllClosed, () =>
   print_endline("Closing window, menu staying open")
+);
+
+// Proof of concept on "database"
+let hello_world: Js.Json.t = Js.Json.string("hello world");
+let task =
+  FlatFileDb.store(hello_world) |> Task.andThen(~f=() => FlatFileDb.load());
+
+Task.attempt(
+  task,
+  ~f=res => {
+    let x = Result.ok_exn(res);
+    assert(x == hello_world);
+    print_endline("Successfully read the data!");
+  },
 );

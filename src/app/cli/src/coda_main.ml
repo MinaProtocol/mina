@@ -360,7 +360,7 @@ module type Main_intf = sig
   val best_tip :
     t -> Inputs.Transition_frontier.Breadcrumb.t Participating_state.t
 
-  val is_active : t -> bool
+  val sync_status : t -> [`Offline | `Synced | `Bootstrap]
 
   val visualize_frontier : filename:string -> t -> unit Participating_state.t
 
@@ -1099,21 +1099,19 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
   include Program
   open Inputs
 
-  module Coda_graphql = struct
+  module Graphql = struct
     open Graphql_async
     open Schema
     open Async
 
     module Types = struct
-      type sync_status = Error | Bootstrap | Synced
-
-      let sync_status =
+      let sync_status : ('context, [`Offline | `Synced | `Bootstrap]) typ =
         non_null
           (enum "sync_status" ~doc:"Sync status as daemon node"
              ~values:
-               [ enum_value "ERROR" ~value:Error
-               ; enum_value "BOOTSTRAP" ~value:Bootstrap
-               ; enum_value "SYNCED" ~value:Synced ])
+               [ enum_value "BOOTSTRAP" ~value:`Bootstrap
+               ; enum_value "SYNCED" ~value:`Synced
+               ; enum_value "OFFLINE" ~value:`Offline ])
     end
 
     module Queries = struct
@@ -1123,8 +1121,7 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
         io_field "sync_status" ~typ:sync_status
           ~args:Arg.[]
           ~resolve:(fun {ctx= coda; _} () ->
-            Deferred.Result.return
-              (if is_active coda then Synced else Bootstrap) )
+            Deferred.Result.return (Program.sync_status coda) )
 
       let commands = [sync_state]
     end
@@ -1601,7 +1598,7 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
             let graphql_callback =
               Graphql_cohttp_async.make_callback
                 (fun _req -> coda)
-                Coda_graphql.schema
+                Graphql.schema
             in
             Cohttp_async.(
               Server.create
