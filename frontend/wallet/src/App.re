@@ -3,10 +3,6 @@ open Tc;
 
 let dev = true;
 
-let sendMoney = () => {
-  print_endline("Sending!");
-};
-
 let createTray = () => {
   let t = AppTray.get();
   let items =
@@ -21,7 +17,12 @@ let createTray = () => {
       make(Radio({js|    Wallet_1  □ 100|js}), ()),
       make(Radio({js|    Vault  □ 100,000|js}), ()),
       make(Separator, ()),
-      make(Label("Send"), ~accelerator="CmdOrCtrl+S", ~click=sendMoney, ()),
+      make(
+        Label("Send"),
+        ~accelerator="CmdOrCtrl+S",
+        ~click=() => AppWindow.deepLink(Route.Send),
+        (),
+      ),
       make(Separator, ()),
       make(Label("Request"), ~accelerator="CmdOrCtrl+R", ()),
       make(Separator, ()),
@@ -41,14 +42,13 @@ App.on(
   `Ready,
   () => {
     createTray();
-    let _ = AppWindow.get();
-    ();
+    AppWindow.deepLink(Route.Home);
   },
 );
 
-App.on(`WindowAllClosed, () =>
-  print_endline("Closing window, menu staying open")
-);
+// We need this handler here to prevent the application from exiting on all
+// windows closed. Keep in mind, we have the tray.
+App.on(`WindowAllClosed, () => ());
 
 // Proof of concept on "database"
 let hello_world: Js.Json.t = Js.Json.string("hello world");

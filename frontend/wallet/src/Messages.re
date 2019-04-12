@@ -1,4 +1,4 @@
 let message = __MODULE__;
-type mainToRendererMessages = [ | `Hello_world];
+type mainToRendererMessages = [ | `Deep_link(Route.t)];
 
 type rendererToMainMessages = [ | `HelloBack];
