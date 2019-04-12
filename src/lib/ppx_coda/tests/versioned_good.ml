@@ -241,3 +241,16 @@ module M13 = struct
     end
   end
 end
+
+(* bytes *)
+module M14 = struct
+  module Stable = struct
+    module V1 = struct
+      module T = struct
+        type t = bytes [@@deriving bin_io, version]
+      end
+
+      include T
+    end
+  end
+end
