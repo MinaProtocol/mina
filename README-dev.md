@@ -144,6 +144,8 @@ you need, you run `opam switch import src/opam.export`.
 Some of our dependencies aren't taken from `opam`, and aren't integrated
 with `dune`, so you need to add them manually:
 
+* `opam pin add src/external/digestif`
+* `opam pin add src/external/async_kernel`
 * `opam pin add src/external/ocaml-sodium`
 * `opam pin add src/external/rpc_parallel`
 * `opam pin add src/external/ocaml-extlib`
