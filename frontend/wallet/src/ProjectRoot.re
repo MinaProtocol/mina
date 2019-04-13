@@ -1,2 +1,3 @@
-let path =
-  Node_path.join2(Belt.Option.getExn([%bs.node __dirname]), "../../../");
+open Tc;
+
+let path = Node_path.join2(Option.getExn([%bs.node __dirname]), "../../../");
