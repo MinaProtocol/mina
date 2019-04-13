@@ -171,15 +171,6 @@ let ocaml_builtin_type_constructors = ["list"; "array"; "option"; "ref"]
 
 let jane_street_type_constructors = ["sexp_opaque"]
 
-(* for module path A.B.C represented by a longident, produce [A;B;C] *)
-let rec list_of_longident longident ~loc =
-  match longident with
-  | Lident id -> [id]
-  | Ldot (longident2, s) -> list_of_longident longident2 ~loc @ [s]
-  | Lapply _ ->
-      Ppx_deriving.raise_errorf ~loc
-        "Type name contains unexpected application"
-
 (* true iff module_path is of form M. ... .Stable.Vn, where M is Core or Core_kernel, and n is integer *)
 let is_jane_street_stable_module module_path =
   let hd_elt = List.hd_exn module_path in
@@ -201,7 +192,7 @@ let whitelisted_prefix prefix ~loc =
   match prefix with
   | Lident id -> String.equal id "Bitstring"
   | Ldot _ ->
-      let module_path = list_of_longident prefix ~loc in
+      let module_path = Longident.flatten_exn prefix in
       is_jane_street_stable_module module_path
   | Lapply _ ->
       Ppx_deriving.raise_errorf ~loc
