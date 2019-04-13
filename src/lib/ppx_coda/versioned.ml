@@ -198,8 +198,14 @@ let is_jane_street_stable_module module_path =
   | _ -> false
 
 let whitelisted_prefix prefix ~loc =
-  let module_path = list_of_longident prefix ~loc in
-  is_jane_street_stable_module module_path
+  match prefix with
+  | Lident id -> String.equal id "Bitstring"
+  | Ldot _ ->
+      let module_path = list_of_longident prefix ~loc in
+      is_jane_street_stable_module module_path
+  | Lapply _ ->
+      Ppx_deriving.raise_errorf ~loc
+        "Type name contains unexpected application"
 
 let rec generate_core_type_version_decls type_name core_type =
   match core_type.ptyp_desc with
