@@ -24,28 +24,21 @@ module Make (Depth : Intf.Depth) = struct
   (* add functions to library module Bigstring so we can derive hash for the type t below *)
   module Bigstring = struct
     module T = struct
-      include Bigstring
+      include Bigstring.Stable.V1
 
-      type tt = Bigstring.t [@@deriving sexp, compare]
+      let get, length, equal, create, to_string, set, blit, sub =
+        Bigstring.(get, length, equal, create, to_string, set, blit, sub)
 
-      let hash t = to_string t |> String.hash
+      type tt = Bigstring.Stable.V1.t [@@deriving sexp, compare]
+
+      let hash t = Bigstring.to_string t |> String.hash
 
       let hash_fold_t hash_state t =
-        String.hash_fold_t hash_state (to_string t)
+        String.hash_fold_t hash_state (Bigstring.to_string t)
     end
 
     include T
     include Hashable.Make (T)
-
-    let bin_read_t = Bin_prot.Std.bin_read_bigstring
-
-    let __bin_read_t__ = Bin_prot.Std.__bin_read_bigstring__
-
-    let bin_write_t = Bin_prot.Std.bin_write_bigstring
-
-    let bin_shape_t = Bin_prot.Std.bin_shape_bigstring
-
-    let bin_size_t = Bin_prot.Std.bin_size_bigstring
   end
 
   module T = struct

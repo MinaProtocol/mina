@@ -128,7 +128,7 @@ module Intf = Merkle_ledger.Intf
 module In_memory_kvdb : Intf.Key_value_database = struct
   module Bigstring_frozen = struct
     module T = struct
-      include Bigstring
+      include Bigstring.Stable.V1
 
       (* we're not mutating Bigstrings, which would invalidate hashes
        OK to use these hash functions
@@ -136,22 +136,6 @@ module In_memory_kvdb : Intf.Key_value_database = struct
       let hash = hash_t_frozen
 
       let hash_fold_t = hash_fold_t_frozen
-
-      let bin_t = Bin_prot.Std.bin_bigstring
-
-      let bin_read_t = Bin_prot.Std.bin_read_bigstring
-
-      let __bin_read_t__ = Bin_prot.Std.__bin_read_bigstring__
-
-      let bin_write_t = Bin_prot.Std.bin_write_bigstring
-
-      let bin_shape_t = Bin_prot.Std.bin_shape_bigstring
-
-      let bin_size_t = Bin_prot.Std.bin_size_bigstring
-
-      let bin_reader_t = Bin_prot.Std.bin_reader_bigstring
-
-      let bin_writer_t = Bin_prot.Std.bin_writer_bigstring
     end
 
     include T
