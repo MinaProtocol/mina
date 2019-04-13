@@ -104,6 +104,7 @@ let%test_module "Transition_handler.Catchup_scheduler tests" =
           let%map catchup_parent_hash =
             match%map Ivar.read result_ivar with hash, _ -> hash
           in
+          assert (Catchup_scheduler.is_empty scheduler) ;
           assert (Coda_base.State_hash.equal missing_hash catchup_parent_hash) ;
           Strict_pipe.Writer.close catchup_breadcrumbs_writer ;
           Strict_pipe.Writer.close catchup_job_writer )

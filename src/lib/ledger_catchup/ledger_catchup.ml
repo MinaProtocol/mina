@@ -43,6 +43,7 @@ module Make (Inputs : Inputs.S) :
    and type network := Inputs.Network.t = struct
   open Inputs
 
+  (*
   let get_previous_state_hash transition =
     transition |> With_hash.data |> External_transition.Verified.protocol_state
     |> External_transition.Protocol_state.previous_state_hash
@@ -134,6 +135,7 @@ module Make (Inputs : Inputs.S) :
         Cached.transform c ~f:(function
           | `Initial -> failwith "impossible"
           | `Constructed breadcrumb -> breadcrumb ) )
+*)
 
   let verify_transition ~logger ~frontier ~unprocessed_transition_cache
       transition =
@@ -245,34 +247,26 @@ module Make (Inputs : Inputs.S) :
                       (verify_transition ~logger ~frontier
                          ~unprocessed_transition_cache)
                 in
-                let%bind () =
-                  Deferred.return
-                    ( if List.length verified_transitions > 0 then Ok ()
-                    else
-                      let error =
-                        "Peer should have given us some new transitions that \
-                         are not in our transition frontier"
-                      in
-                      Logger.faulty_peer logger ~module_:__MODULE__
-                        ~location:__LOC__ "%s" error ;
-                      Error (Error.of_string error) )
-                in
-                let rest, target_transition_singleton =
-                  List.split_n verified_transitions
-                    (List.length verified_transitions - 1)
-                in
-                let target_transition =
-                  List.hd_exn target_transition_singleton
-                in
-                let full_subtree =
-                  List.fold_right rest
-                    ~init:(Rose_tree.T (target_transition, subtrees))
-                    ~f:(fun transition acc -> Rose_tree.T (transition, [acc]))
+                let subtrees_of_transitions =
+                  if List.length verified_transitions > 0 then
+                    let rest, target_transition_singleton =
+                      List.split_n verified_transitions
+                        (List.length verified_transitions - 1)
+                    in
+                    let target_transition =
+                      List.hd_exn target_transition_singleton
+                    in
+                    [ List.fold_right rest
+                        ~init:(Rose_tree.T (target_transition, subtrees))
+                        ~f:(fun transition acc ->
+                          Rose_tree.T (transition, [acc]) ) ]
+                  else subtrees
                 in
                 let open Deferred.Let_syntax in
                 match%bind
-                  construct_breadcrumb_path ~logger frontier initial_state_hash
-                    full_subtree
+                  Breadcrumb_builder.build_subtrees_of_breadcrumbs ~logger
+                    ~frontier ~initial_hash:initial_state_hash
+                    subtrees_of_transitions
                 with
                 | Ok result -> Deferred.Or_error.return result
                 | error ->
@@ -283,14 +277,14 @@ module Make (Inputs : Inputs.S) :
   let run ~logger ~network ~frontier ~catchup_job_reader
       ~catchup_breadcrumbs_writer ~unprocessed_transition_cache =
     Strict_pipe.Reader.iter catchup_job_reader ~f:(fun forest ->
-        match%bind
-          get_transitions_and_compute_breadcrumbs ~logger ~network ~frontier
-            ~num_peers:8 ~unprocessed_transition_cache ~target_forest:forest
-        with
-        | Ok tree ->
+        ( match%bind
+            get_transitions_and_compute_breadcrumbs ~logger ~network ~frontier
+              ~num_peers:8 ~unprocessed_transition_cache ~target_forest:forest
+          with
+        | Ok trees ->
             Logger.trace logger ~module_:__MODULE__ ~location:__LOC__
               "about to write to the catchup breadcrumbs pipe" ;
-            Strict_pipe.Writer.write catchup_breadcrumbs_writer [tree]
+            Strict_pipe.Writer.write catchup_breadcrumbs_writer trees
         | Error e ->
             Logger.info logger ~module_:__MODULE__ ~location:__LOC__
               !"All peers either sent us bad data, didn't have the info, or \
@@ -300,5 +294,7 @@ module Make (Inputs : Inputs.S) :
                 Rose_tree.iter subtree ~f:(fun cached_transition ->
                     Cached.invalidate cached_transition |> ignore ) ) ;
             Deferred.unit )
+        |> don't_wait_for ;
+        Deferred.unit )
     |> don't_wait_for
 end

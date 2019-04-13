@@ -518,6 +518,28 @@ module type Transition_handler_validator_intf = sig
        Result.t
 end
 
+module type Breadcrumb_builder_intf = sig
+  type state_hash
+
+  type transition_frontier
+
+  type transition_frontier_breadcrumb
+
+  type external_transition_verified
+
+  val build_subtrees_of_breadcrumbs :
+       logger:Logger.t
+    -> frontier:transition_frontier
+    -> initial_hash:state_hash
+    -> ( (external_transition_verified, state_hash) With_hash.t
+       , state_hash )
+       Cached.t
+       Rose_tree.t
+       List.t
+    -> (transition_frontier_breadcrumb, state_hash) Cached.t Rose_tree.t List.t
+       Deferred.Or_error.t
+end
+
 module type Transition_handler_processor_intf = sig
   type state_hash
 
@@ -616,6 +638,13 @@ module type Transition_handler_intf = sig
     Unprocessed_transition_cache_intf
     with type state_hash := state_hash
      and type external_transition_verified := external_transition_verified
+
+  module Breadcrumb_builder :
+    Breadcrumb_builder_intf
+    with type state_hash := state_hash
+    with type external_transition_verified := external_transition_verified
+    with type transition_frontier := transition_frontier
+    with type transition_frontier_breadcrumb := transition_frontier_breadcrumb
 
   module Validator :
     Transition_handler_validator_intf

@@ -94,6 +94,8 @@ module Make (Inputs : Inputs.S) = struct
     let parent_root_timeouts = State_hash.Table.create () in
     let breadcrumb_builder_supervisor =
       Capped_supervisor.create ~job_capacity:5 (fun transition_branches ->
+          (* TODO: refact this to use Transition_handler.Breadcrumb_builder.build_subtrees_of_breadcrumbs
+             and do garbage collection on caches if it fails *)
           build_breadcrumbs ~logger ~frontier transition_branches
           >>= Writer.write catchup_breadcrumbs_writer )
     in

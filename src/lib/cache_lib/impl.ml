@@ -294,7 +294,7 @@ let%test_module "cache_lib test instance" =
           Gc.full_major () ;
           assert (!dropped_cache_items = 0) )
 
-    let%test_unit "freed original cached object would also free the derived \
+    let%test_unit "free original cached object would also free the derived \
                    cached object" =
       setup () ;
       let logger = Logger.null () in
