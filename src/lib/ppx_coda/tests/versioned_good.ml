@@ -121,6 +121,15 @@ module M6 = struct
 
       include T
     end
+
+    module V5 = struct
+      module T = struct
+        type t = Stable.V1.t array array sexp_opaque
+        [@@deriving sexp, bin_io, version]
+      end
+
+      include T
+    end
   end
 end
 
@@ -190,6 +199,71 @@ module M10 = struct
       module V1 = struct
         type t = string [@@deriving version {wrapped}]
       end
+    end
+  end
+end
+
+(* assert versionedness *)
+module M11 = struct
+  module Stable = struct
+    module V1 = struct
+      module T = struct
+        type t = Int.t List.t [@@deriving bin_io, version {asserted}]
+      end
+
+      include T
+    end
+  end
+end
+
+(* int32 *)
+module M12 = struct
+  module Stable = struct
+    module V1 = struct
+      module T = struct
+        type t = int32 [@@deriving bin_io, version]
+      end
+
+      include T
+    end
+  end
+end
+
+(* int64 *)
+module M13 = struct
+  module Stable = struct
+    module V1 = struct
+      module T = struct
+        type t = int64 [@@deriving bin_io, version]
+      end
+
+      include T
+    end
+  end
+end
+
+(* bytes *)
+module M14 = struct
+  module Stable = struct
+    module V1 = struct
+      module T = struct
+        type t = bytes [@@deriving bin_io, version]
+      end
+
+      include T
+    end
+  end
+end
+
+(* Jane Street whitelisting *)
+module M15 = struct
+  module Stable = struct
+    module V1 = struct
+      module T = struct
+        type t = int Core_kernel.Queue.Stable.V1.t [@@deriving bin_io, version]
+      end
+
+      include T
     end
   end
 end

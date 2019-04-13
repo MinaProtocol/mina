@@ -79,10 +79,21 @@ module State : sig
       end
     end
 
-    type ('a, 'd) t =
+    module Stable : sig
+      module V1 : sig
+        type ('a, 'd) t =
+          | Merge of 'a Merge.Stable.V1.t
+          | Base of ('d * Sequence_no.Stable.V1.t) option
+        [@@deriving bin_io, sexp, version]
+      end
+
+      module Latest = V1
+    end
+
+    type ('a, 'd) t = ('a, 'd) Stable.Latest.t =
       | Merge of 'a Merge.Stable.V1.t
       | Base of ('d * Sequence_no.Stable.V1.t) option
-    [@@deriving sexp, bin_io, version]
+    [@@deriving sexp]
   end
 
   module Completed_job : sig
@@ -178,7 +189,7 @@ module Job_view : sig
 end
 
 (** The initial state of the parallel scan at some parallelism *)
-val start : parallelism_log_2:int -> ('a, 'd) State.t
+val start : parallelism_log_2:int -> root_at_depth:int -> ('a, 'd) State.t
 
 (** Get the next k available jobs *)
 val next_k_jobs :
@@ -249,3 +260,7 @@ val view_jobs_with_position :
  * i.e., does not include base jobs that are part of previous trees not 
  * promoted to the merge jobs yet*)
 val base_jobs_on_latest_tree : ('a, 'd) State.t -> 'd list
+
+(*returns true only if the position of the next 'd that could be enqueued is  
+of the leftmost leaf of the tree*)
+val next_on_new_tree : ('a, 'd) State.t -> bool Or_error.t

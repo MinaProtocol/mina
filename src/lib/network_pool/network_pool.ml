@@ -110,20 +110,25 @@ let%test_module "network pool test" =
     end
 
     module Mock_proof = struct
-      type input = Int.t
+      module Stable = struct
+        module V1 = struct
+          module T = struct
+            type t = int
+            [@@deriving sexp, bin_io, yojson, version {unnumbered}]
+          end
 
-      (* fake versioning *)
-      let __versioned__ = true
+          include T
 
-      type t = Int.t [@@deriving sexp, bin_io, yojson]
+          type input = Int.t
 
-      let verify _ _ = return true
+          let verify _ _ = return true
 
-      let gen = Int.gen
+          let gen = Int.gen
+        end
+      end
     end
 
     module Mock_work = struct
-      (* no bin_io except in Stable versions *)
       module T = struct
         type t = Int.t [@@deriving sexp, hash, compare, yojson]
 
@@ -134,7 +139,19 @@ let%test_module "network pool test" =
       include Hashable.Make (T)
 
       module Stable = struct
-        module V1 = Int
+        module V1 = struct
+          module T = struct
+            type t = int
+            [@@deriving bin_io, sexp, yojson, hash, compare, version]
+          end
+
+          include T
+          module Table = Int.Table
+          module Hash_queue = Int.Hash_queue
+          module Hash_set = Int.Hash_set
+
+          let hashable = Int.hashable
+        end
       end
     end
 
@@ -155,17 +172,26 @@ let%test_module "network pool test" =
     end
 
     module Mock_fee = struct
-      include Int
+      module Stable = struct
+        module V1 = struct
+          module T = struct
+            type t = int
+            [@@deriving bin_io, yojson, sexp, version {unnumbered}]
+          end
 
-      (* fake versioning *)
-      let __versioned__ = true
+          include T
+          include Comparable.Make (Int)
+        end
+      end
     end
 
     module Mock_snark_pool =
-      Snark_pool.Make (Mock_proof) (Mock_fee) (Mock_work)
+      Snark_pool.Make (Mock_proof.Stable.V1) (Mock_fee.Stable.V1) (Mock_work)
         (Mock_transition_frontier)
     module Mock_snark_pool_diff =
-      Snark_pool_diff.Make (Mock_proof) (Mock_fee) (Mock_work) (Int)
+      Snark_pool_diff.Make (Mock_proof.Stable.V1) (Mock_fee.Stable.V1)
+        (Mock_work)
+        (Int)
         (Mock_snark_pool)
     module Mock_network_pool =
       Make (Mock_transition_frontier) (Mock_snark_pool) (Mock_snark_pool_diff)
@@ -185,7 +211,9 @@ let%test_module "network pool test" =
       let priced_proof =
         {Mock_snark_pool_diff.Priced_proof.proof= 0; fee= 0}
       in
-      let command = Snark_pool_diff.Add_solved_work (work, priced_proof) in
+      let command =
+        Snark_pool_diff.Diff.Add_solved_work (work, priced_proof)
+      in
       (fun () ->
         don't_wait_for
         @@ Linear_pipe.iter (Mock_network_pool.broadcasts network_pool)
@@ -206,7 +234,7 @@ let%test_module "network pool test" =
         let work_diffs =
           List.map works ~f:(fun work ->
               Envelope.Incoming.local
-                (Snark_pool_diff.Add_solved_work
+                (Snark_pool_diff.Diff.Add_solved_work
                    (work, Mock_snark_pool_diff.Priced_proof.{proof= 0; fee= 0}))
           )
           |> Linear_pipe.of_list
@@ -224,7 +252,7 @@ let%test_module "network pool test" =
              ~f:(fun work_command ->
                let work =
                  match work_command
-                 with Snark_pool_diff.Add_solved_work (work, _) -> work
+                 with Snark_pool_diff.Diff.Add_solved_work (work, _) -> work
                in
                assert (List.mem works work ~equal:( = )) ;
                Deferred.unit ) ;

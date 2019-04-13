@@ -10,34 +10,38 @@
 
   or
 
-    [@@deriving version { wrapped }]
+    [@@deriving version { option }]
 
-  or one of
+  where option is one of "wrapped", "unnumbered", "rpc", or "asserted".
 
-    [@@deriving version { rpc }]
-
-  Without options (the common case), the type must be named "t", and its definition occurs
-  in the module hierarchy "Stable.Vn.T", where n is a positive integer.
+  Without options (the common case), the type must be named "t", and its definition 
+  occurs in the module hierarchy "Stable.Vn.T", where n is a positive integer.
   
   If "wrapped" is true, again, the type must be named "t", but the type
   definition occurs in the hierarchy "Wrapped.Stable.Vn", where n is a positive
   integer. TODO: Anything to say about registration, translation to a latest
   version for wrapped types?
 
-  If "rpc" is true, again, the type must be named "query", "response", or "msg",
-  and the type definition occurs in the hierarchy "Vn.T".
-
-  For types in structures, we can also write:
-
-    [@@deriving version { unnumbered }]
-
   The "unnumbered" option prevents the generation of the value
    
     let version = n
 
-  to prevent warnings or errors about an unused value. That's 
-  useful for versioned types in modules that aren't registered.
+  to prevent warnings or errors about an unused value. That's useful for versioned types in 
+  modules that aren't registered.
 
+  The "asserted" option asserts that the type is versioned, to allow compilation
+  to proceed. The types referred to in the type are not checked for versioning
+  with this option. The type must be contained in the module hierarchy "Stable.Vn.T". 
+  Eventually, all uses of this option should be removed.
+
+  The "for_test" option is a synonym of "asserted" that can be used in test code.
+
+  If "rpc" is true, again, the type must be named "query", "response", or "msg",
+  and the type definition occurs in the hierarchy "Vn.T".
+
+  All these options are available for types within structures. Within signatures,
+  only the "unnumbered" option is available.
+ 
 *)
 
 open Core_kernel
@@ -160,11 +164,39 @@ let generate_version_number_decl inner3_modules loc generation_kind =
   in
   [%stri let version = [%e eint version]]
 
-let ocaml_builtin_types = ["int"; "float"; "char"; "string"; "bool"; "unit"]
+let ocaml_builtin_types =
+  ["bytes"; "int"; "int32"; "int64"; "float"; "char"; "string"; "bool"; "unit"]
 
-let ocaml_builtin_type_constructors = ["list"; "option"; "ref"]
+let ocaml_builtin_type_constructors = ["list"; "array"; "option"; "ref"]
 
 let jane_street_type_constructors = ["sexp_opaque"]
+
+(* true iff module_path is of form M. ... .Stable.Vn, where M is Core or Core_kernel, and n is integer *)
+let is_jane_street_stable_module module_path =
+  let hd_elt = List.hd_exn module_path in
+  let jane_street_libs = ["Core_kernel"; "Core"] in
+  List.mem jane_street_libs hd_elt ~equal:String.equal
+  &&
+  match List.rev module_path with
+  | vn :: "Stable" :: _ ->
+      let len = String.length vn in
+      len > 1
+      && Char.equal vn.[0] 'V'
+      &&
+      let numeric_part = String.sub vn ~pos:1 ~len:(len - 1) in
+      String.for_all numeric_part ~f:Char.is_digit
+      && not (Int.equal (Char.get_digit_exn numeric_part.[0]) 0)
+  | _ -> false
+
+let whitelisted_prefix prefix ~loc =
+  match prefix with
+  | Lident id -> String.equal id "Bitstring"
+  | Ldot _ ->
+      let module_path = Longident.flatten_exn prefix in
+      is_jane_street_stable_module module_path
+  | Lapply _ ->
+      Ppx_deriving.raise_errorf ~loc
+        "Type name contains unexpected application"
 
 let rec generate_core_type_version_decls type_name core_type =
   match core_type.ptyp_desc with
@@ -194,17 +226,22 @@ let rec generate_core_type_version_decls type_name core_type =
             id
     | Ldot (prefix, "t") ->
         (* type t = A.B.t
-           generate: let _ = A.B.__versioned__
+           if prefix not whitelisted, generate: let _ = A.B.__versioned__
         *)
-        let loc = core_type.ptyp_loc in
-        let pexp_loc = loc in
-        let versioned_ident =
-          { pexp_desc= Pexp_ident {txt= Ldot (prefix, "__versioned__"); loc}
-          ; pexp_loc
-          ; pexp_attributes= [] }
+        let core_type_decls =
+          generate_version_lets_for_core_types type_name core_types
         in
-        [%str let _ = [%e versioned_ident]]
-        @ generate_version_lets_for_core_types type_name core_types
+        if whitelisted_prefix prefix ~loc:core_type.ptyp_loc then
+          core_type_decls
+        else
+          let loc = core_type.ptyp_loc in
+          let pexp_loc = loc in
+          let versioned_ident =
+            { pexp_desc= Pexp_ident {txt= Ldot (prefix, "__versioned__"); loc}
+            ; pexp_loc
+            ; pexp_attributes= [] }
+          in
+          [%str let _ = [%e versioned_ident]] @ core_type_decls
     | _ ->
         Ppx_deriving.raise_errorf ~loc:core_type.ptyp_loc
           "Unrecognized type constructor for versioned type" )
@@ -258,23 +295,25 @@ let generate_contained_type_decls type_decl =
       Ppx_deriving.raise_errorf ~loc:type_decl.ptype_loc
         "Versioned type may not be open"
 
-let generate_versioned_decls generation_kind type_decl =
+let generate_versioned_decls ~asserted generation_kind type_decl =
   let module E = Ppxlib.Ast_builder.Make (struct
     let loc = type_decl.ptype_loc
   end) in
   let open E in
   let versioned_current = [%stri let __versioned__ = true] in
-  match generation_kind with
-  | Wrapped ->
-      (* don't check whether contained types are versioned *)
-      [versioned_current]
-  | Rpc ->
-      (* check whether contained types are versioned,
+  if asserted then [versioned_current]
+  else
+    match generation_kind with
+    | Wrapped ->
+        (* don't check whether contained types are versioned *)
+        [versioned_current]
+    | Rpc ->
+        (* check whether contained types are versioned,
         but don't assert versioned-ness of this type *)
-      generate_contained_type_decls type_decl
-  | Plain ->
-      (* check contained types, assert this type is versioned *)
-      versioned_current :: generate_contained_type_decls type_decl
+        generate_contained_type_decls type_decl
+    | Plain ->
+        (* check contained types, assert this type is versioned *)
+        versioned_current :: generate_contained_type_decls type_decl
 
 let get_type_decl_representative type_decls =
   let type_decl1 = List.hd_exn type_decls in
@@ -314,11 +353,21 @@ let validate_options valid options =
       (String.concat ~sep:"," valid)
 
 let generate_let_bindings_for_type_decl_str ~options ~path type_decls =
-  ignore (validate_options ["wrapped"; "unnumbered"; "rpc"] options) ;
+  ignore
+    (validate_options
+       ["wrapped"; "unnumbered"; "rpc"; "asserted"; "for_test"]
+       options) ;
   let type_decl = get_type_decl_representative type_decls in
   let wrapped = check_for_option "wrapped" options in
   let unnumbered = check_for_option "unnumbered" options in
+  let asserted =
+    check_for_option "asserted" options || check_for_option "for_test" options
+  in
   let rpc = check_for_option "rpc" options in
+  if asserted && (wrapped || rpc) then
+    Ppx_deriving.raise_errorf ~loc:type_decl.ptype_loc
+      "Options \"asserted\" or \"for_test\" cannot be combined with \
+       \"wrapped\" or \"rpc\" options" ;
   let generation_kind =
     match (rpc, wrapped) with
     | true, false -> Rpc
@@ -330,7 +379,9 @@ let generate_let_bindings_for_type_decl_str ~options ~path type_decls =
   in
   let inner3_modules = List.take (List.rev path) 3 in
   validate_type_decl inner3_modules generation_kind type_decl ;
-  let versioned_decls = generate_versioned_decls generation_kind type_decl in
+  let versioned_decls =
+    generate_versioned_decls ~asserted generation_kind type_decl
+  in
   let type_name = type_decl.ptype_name.txt in
   (* generate version number for Rpc response, but not for query, so we
      don't get an unused value
