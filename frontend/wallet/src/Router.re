@@ -1,8 +1,3 @@
-let navigate = route => ReasonReact.Router.push("#" ++ Route.print(route));
+open Tc;
 
-let listenToMain = () =>
-  MainCommunication.on((. _event, message) =>
-    switch (message) {
-    | `Deep_link(route) => navigate(route)
-    }
-  );
+let navigate = route => ReasonReact.Router.push("#" ++ Route.print(route));

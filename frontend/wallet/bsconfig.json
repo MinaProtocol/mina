@@ -12,7 +12,8 @@
     "reason-react",
     "reason-apollo",
     "bs-css",
-    "tablecloth-bucklescript"
+    "tablecloth-bucklescript",
+    "@glennsl/bs-json"
   ],
   "ppx-flags": [
     "graphql_ppx/ppx"

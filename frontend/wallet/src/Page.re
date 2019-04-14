@@ -1,3 +1,5 @@
+open Tc;
+
 let component = ReasonReact.statelessComponent("Page");
 
 let inMemoryCache = ApolloInMemoryCache.createInMemoryCache();
@@ -6,21 +8,59 @@ let httpLink =
 let instance =
   ReasonApollo.createApolloClient(~link=httpLink, ~cache=inMemoryCache, ());
 
-Router.listenToMain();
+MainCommunication.listen();
 
 [@react.component]
 let make = (~message) => {
   let url = ReasonReact.Router.useUrl();
 
-  let modalView =
+  let (modalView, settingsOrError) =
     switch (Route.parse(url.hash)) {
-    | Some(Route.Send) => Some(<Send />)
-    | Some(DeleteWallet) => Some(<Delete />)
-    | Some(Home) => None
     | None =>
       Js.log2("Failed to parse route: ", url.hash);
-      None;
+      (None, `Error(`Json_parse_error));
+    | Some({Route.path, settingsOrError}) =>
+      Js.log3("Got path, settingsOrError: ", path, settingsOrError);
+      (
+        switch (path) {
+        | Route.Path.Send => Some(<Send />)
+        | DeleteWallet => Some(<Delete />)
+        | Home => None
+        },
+        settingsOrError,
+      );
     };
+
+  let randomNum = Js.Math.random_int(0, 1000);
+
+  let handleChangeName = () =>
+    switch (settingsOrError) {
+    | `Settings(settings) =>
+      let task =
+        SettingsRenderer.add(
+          settings,
+          ~key=PublicKey.ofStringExn(randomNum |> Js.Int.toString),
+          ~name="Test Wallet",
+        );
+      Js.log("Add started");
+      Task.attempt(task, ~f=res => Js.log2("Add complete", res));
+    | _ => Js.log("There's an error")
+    };
+
+  let settingsInfo = {
+    let question = " (did you create a settings.json file with {\"state\": {}} ?)";
+    switch (settingsOrError) {
+    | `Settings(_) => "Settings loaded successfully"
+    | `Error(`Json_parse_error) =>
+      "Settings failed to load with a json parse error" ++ question
+    | `Error(`Decode_error(s)) =>
+      "Settings failed to decode with " ++ s ++ question
+    | `Error(`Error_reading_file(e)) =>
+      "Settings failed to load with a js exception"
+      ++ question
+      ++ (Js.Exn.stack(e) |> Option.withDefault(~default=""))
+    };
+  };
 
   <ApolloShim.Provider client=instance>
     <div
@@ -35,15 +75,22 @@ let make = (~message) => {
       )}>
       <div className=Css.(style([display(`flex), flexDirection(`column)]))>
         <Header />
-        <Body message />
+        <Body message={message ++ ";; " ++ settingsInfo} />
       </div>
-      <button onClick={_e => Router.(navigate(Send))}>
+      <button
+        onClick={_e => Router.(navigate({path: Send, settingsOrError}))}>
         {ReasonReact.string("Send")}
       </button>
-      <button onClick={_e => Router.(navigate(DeleteWallet))}>
+      <button
+        onClick={_e =>
+          Router.(navigate({path: DeleteWallet, settingsOrError}))
+        }>
         {ReasonReact.string("Delete wallet")}
       </button>
-      <Modal view=modalView />
+      <button onClick={_e => handleChangeName()}>
+        {ReasonReact.string("Change name: " ++ Js.Int.toString(randomNum))}
+      </button>
+      <Modal settingsOrError view=modalView />
     </div>
   </ApolloShim.Provider>;
 };

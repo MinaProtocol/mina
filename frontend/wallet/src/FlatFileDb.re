@@ -22,12 +22,21 @@ module Fs = {
     Task.uncallbackify0(writeFile(path, data, "utf-8"));
 };
 
+exception Json_parse_error;
+
 type t = Js.Json.t;
 
-let load = () => {
-  Fs.readFileAsync(ProjectRoot.path ++ "/db.json")
-  |> Task.map(~f=contents => Js.Json.parseExn(contents));
+let load = path => {
+  Fs.readFileAsync(ProjectRoot.path ++ "/" ++ path)
+  |> Task.mapError(~f=e => `Error_reading_file(e))
+  |> Task.andThen(~f=contents =>
+       switch (Json.parse(contents)) {
+       | Some(json) => Task.succeed(json)
+       | None => Task.fail(`Json_parse_error)
+       }
+     );
 };
 
-let store = t =>
-  Fs.writeFileAsync(ProjectRoot.path ++ "/db.json", Js.Json.stringify(t));
+let store = (path, t) =>
+  Fs.writeFileAsync(ProjectRoot.path ++ "/" ++ path, Js.Json.stringify(t))
+  |> Task.mapError(~f=e => `Js_exn(e));

@@ -4,6 +4,7 @@
   "description": "",
   "main": "index.js",
   "dependencies": {
+    "@glennsl/bs-json": "^3.0.0",
     "bs-css": "^8.0.2",
     "bs-electron": "github:Schmavery/bs-electron",
     "graphql_ppx": "^0.2.8",
