@@ -18,15 +18,7 @@ module type Inputs_intf = sig
   end
 
   module Statement : sig
-    type t [@@deriving sexp]
-
-    module Stable :
-      sig
-        module V1 : sig
-          type t [@@deriving bin_io, sexp, version]
-        end
-      end
-      with type V1.t = t
+    type t [@@deriving bin_io, sexp, version]
   end
 
   open Snark_work_lib

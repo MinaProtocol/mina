@@ -38,7 +38,7 @@ module Inputs = struct
   end
 
   module Proof = Transaction_snark.Stable.V1
-  module Statement = Transaction_snark.Statement
+  module Statement = Transaction_snark.Statement.Stable.V1
 
   module Public_key = struct
     include Public_key.Compressed
