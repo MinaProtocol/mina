@@ -21,12 +21,7 @@ module Single = struct
     end
 
     type ('statement, 'transition, 'witness, 'ledger_proof) t =
-                                                               ( 'statement
-                                                               , 'transition
-                                                               , 'witness
-                                                               , 'ledger_proof
-                                                               )
-                                                               Stable.Latest.t =
+          ('statement, 'transition, 'witness, 'ledger_proof) Stable.Latest.t =
       | Transition of 'statement * 'transition * 'witness sexp_opaque
       | Merge of
           'statement * 'ledger_proof sexp_opaque * 'ledger_proof sexp_opaque

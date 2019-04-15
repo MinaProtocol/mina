@@ -520,7 +520,9 @@ module Base = struct
     let prover_state : Prover_state.t =
       {state1; state2; transaction; sok_digest; pending_coinbase_stack_state}
     in
-    let main = if preeval then failwith "preeval currently disabled" else main in
+    let main =
+      if preeval then failwith "preeval currently disabled" else main
+    in
     let main top_hash = handle (main top_hash) handler in
     let top_hash =
       base_top_hash ~sok_digest ~state1 ~state2
@@ -1134,7 +1136,9 @@ let check_transaction_union ?(preeval = false) sok_message source target
       ~supply_increase:(Transaction_union.supply_increase transaction)
   in
   let open Tick in
-  let main = if preeval then failwith "preeval currently disabled" else Base.main in
+  let main =
+    if preeval then failwith "preeval currently disabled" else Base.main
+  in
   let main =
     handle
       (Checked.map (main (Field.Var.constant top_hash)) ~f:As_prover.return)
@@ -1174,7 +1178,9 @@ let generate_transaction_union_witness ?(preeval = false) sok_message source
       ~pending_coinbase_stack_state
   in
   let open Tick.Groth16 in
-  let main = if preeval then failwith "preeval currently disabled" else Base.main in
+  let main =
+    if preeval then failwith "preeval currently disabled" else Base.main
+  in
   let main x = handle (main x) handler in
   generate_auxiliary_input (tick_input ()) prover_state main top_hash
 

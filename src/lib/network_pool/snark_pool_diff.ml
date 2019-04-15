@@ -129,7 +129,7 @@ struct
   type t = Stable.Latest.t [@@deriving sexp, yojson]
 
   let summary = function
-    | Diff.Add_solved_work (_, Priced_proof.({proof= _; fee})) ->
+    | Diff.Add_solved_work (_, Priced_proof.{proof= _; fee}) ->
         Printf.sprintf !"Snark_pool_diff add with fee %{sexp: Fee.t}" fee
 
   let apply (pool : Pool.t) (t : t Envelope.Incoming.t) :

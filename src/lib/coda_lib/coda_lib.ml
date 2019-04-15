@@ -487,7 +487,8 @@ module Make (Inputs : Inputs_intf) = struct
 
   let sync_status t =
     match Broadcast_pipe.Reader.peek @@ Net.online_status t.net with
-    | `Offline -> `Offline
+    | `Offline ->
+        `Offline
     | `Online ->
         Option.value_map
           (Broadcast_pipe.Reader.peek t.transition_frontier)

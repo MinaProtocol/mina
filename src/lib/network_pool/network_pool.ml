@@ -253,8 +253,9 @@ let%test_module "network pool test" =
         @@ Linear_pipe.iter (Mock_network_pool.broadcasts network_pool)
              ~f:(fun work_command ->
                let work =
-                 match work_command
-                 with Snark_pool_diff.Diff.Add_solved_work (work, _) -> work
+                 match work_command with
+                 | Snark_pool_diff.Diff.Add_solved_work (work, _) ->
+                     work
                in
                assert (List.mem works work ~equal:( = )) ;
                Deferred.unit ) ;

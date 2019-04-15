@@ -196,15 +196,18 @@ let is_jane_street_stable_module module_path =
   List.mem jane_street_libs hd_elt ~equal:String.equal
   &&
   match List.rev module_path with
-  | vn :: "Stable" :: _ -> is_version_module vn
+  | vn :: "Stable" :: _ ->
+      is_version_module vn
   | vn :: "Span" :: "Stable" :: "Time" :: _ ->
       (* special case, maybe improper module structure *)
       is_version_module vn
-  | _ -> false
+  | _ ->
+      false
 
 let whitelisted_prefix prefix ~loc =
   match prefix with
-  | Lident id -> String.equal id "Bitstring"
+  | Lident id ->
+      String.equal id "Bitstring"
   | Ldot _ ->
       let module_path = Longident.flatten_exn prefix in
       is_jane_street_stable_module module_path

@@ -352,7 +352,7 @@ module Epoch_ledger = struct
   let of_hlist :
          (unit, 'ledger_hash -> 'total_currency -> unit) Coda_base.H_list.t
       -> ('ledger_hash, 'total_currency) Poly.t =
-   fun Coda_base.H_list.([hash; total_currency]) -> {hash; total_currency}
+   fun Coda_base.H_list.[hash; total_currency] -> {hash; total_currency}
 
   let data_spec =
     Snark_params.Tick.Data_spec.[Coda_base.Frozen_ledger_hash.typ; Amount.typ]
@@ -779,14 +779,11 @@ module Epoch_data = struct
     end
 
     type ('epoch_ledger, 'epoch_seed, 'protocol_state_hash, 'length) t =
-                                                                        ( 'epoch_ledger
-                                                                        , 'epoch_seed
-                                                                        , 'protocol_state_hash
-                                                                        , 'length
-                                                                        )
-                                                                        Stable
-                                                                        .Latest
-                                                                        .t =
+          ( 'epoch_ledger
+          , 'epoch_seed
+          , 'protocol_state_hash
+          , 'length )
+          Stable.Latest.t =
       { ledger: 'epoch_ledger
       ; seed: 'epoch_seed
       ; start_checkpoint: 'protocol_state_hash
@@ -853,11 +850,8 @@ module Epoch_data = struct
            -> unit )
          Coda_base.H_list.t
       -> ('ledger, 'seed, 'protocol_state_hash, 'length) Poly.t =
-   fun Coda_base.H_list.([ ledger
-                         ; seed
-                         ; start_checkpoint
-                         ; lock_checkpoint
-                         ; length ]) ->
+   fun Coda_base.H_list.
+         [ledger; seed; start_checkpoint; lock_checkpoint; length] ->
     {ledger; seed; start_checkpoint; lock_checkpoint; length}
 
   let data_spec =
@@ -1027,7 +1021,7 @@ module Consensus_transition_data = struct
   let of_hlist :
          (unit, 'epoch -> 'slot -> unit) Coda_base.H_list.t
       -> ('epoch, 'slot) Poly.t =
-   fun Coda_base.H_list.([epoch; slot]) -> {Poly.epoch; slot}
+   fun Coda_base.H_list.[epoch; slot] -> {Poly.epoch; slot}
 
   let data_spec =
     let open Snark_params.Tick.Data_spec in
@@ -1104,8 +1098,10 @@ module Checkpoints = struct
           let digest ({prefix; tail} : t) =
             let rec go acc p =
               match Fqueue.dequeue p with
-              | None -> acc
-              | Some (h, p) -> go (merge h acc) p
+              | None ->
+                  acc
+              | Some (h, p) ->
+                  go (merge h acc) p
             in
             go tail prefix
         end
@@ -1253,7 +1249,8 @@ module Consensus_state = struct
                , 'slot
                , 'epoch_data
                , 'bool
-               , 'checkpoints ) t =
+               , 'checkpoints )
+               t =
             { length: 'length
             ; epoch_length: 'length
             ; last_vrf_output: 'vrf_output
@@ -1280,16 +1277,17 @@ module Consensus_state = struct
          , 'slot
          , 'epoch_data
          , 'bool
-         , 'checkpoints ) t =
-                             ( 'length
-                             , 'vrf_output
-                             , 'amount
-                             , 'epoch
-                             , 'slot
-                             , 'epoch_data
-                             , 'bool
-                             , 'checkpoints )
-                             Stable.Latest.t =
+         , 'checkpoints )
+         t =
+          ( 'length
+          , 'vrf_output
+          , 'amount
+          , 'epoch
+          , 'slot
+          , 'epoch_data
+          , 'bool
+          , 'checkpoints )
+          Stable.Latest.t =
       { length: 'length
       ; epoch_length: 'length
       ; last_vrf_output: 'vrf_output
@@ -1399,16 +1397,17 @@ module Consensus_state = struct
          , 'bool
          , 'checkpoints )
          Poly.t =
-   fun Coda_base.H_list.([ length
-                         ; epoch_length
-                         ; last_vrf_output
-                         ; total_currency
-                         ; curr_epoch
-                         ; curr_slot
-                         ; last_epoch_data
-                         ; curr_epoch_data
-                         ; has_ancestor_in_same_checkpoint_window
-                         ; checkpoints ]) ->
+   fun Coda_base.H_list.
+         [ length
+         ; epoch_length
+         ; last_vrf_output
+         ; total_currency
+         ; curr_epoch
+         ; curr_slot
+         ; last_epoch_data
+         ; curr_epoch_data
+         ; has_ancestor_in_same_checkpoint_window
+         ; checkpoints ] ->
     { length
     ; epoch_length
     ; last_vrf_output
@@ -1445,7 +1444,8 @@ module Consensus_state = struct
       ; curr_epoch
       ; curr_slot
       ; last_epoch_data
-      ; curr_epoch_data; _ } =
+      ; curr_epoch_data
+      ; _ } =
     let open Snark_params.Tick.Checked.Let_syntax in
     let%map last_epoch_data_triples = Epoch_data.var_to_triples last_epoch_data
     and curr_epoch_data_triples = Epoch_data.var_to_triples curr_epoch_data in
@@ -1465,7 +1465,8 @@ module Consensus_state = struct
       ; curr_slot
       ; total_currency
       ; last_epoch_data
-      ; curr_epoch_data; _ } =
+      ; curr_epoch_data
+      ; _ } =
     let open Fold in
     Length.fold length +> Length.fold epoch_length
     +> Vrf.Output.fold last_vrf_output

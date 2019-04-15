@@ -9,8 +9,7 @@ module Stable = struct
       type t =
         { host: Core.Unix.Inet_addr.Stable.V1.t (* IPv4 or IPv6 address *)
         ; discovery_port: int (* UDP *)
-        ; communication_port: int
-        (* TCP *) }
+        ; communication_port: int (* TCP *) }
       [@@deriving bin_io, compare, sexp, version]
 
       (* these hash functions come from the implementation of Inet_addr,
