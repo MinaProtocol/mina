@@ -23,7 +23,7 @@ module Make (Inputs : Intf.Inputs_intf) = struct
         type query = unit
 
         type response =
-          ( Statement.Stable.V1.t
+          ( Statement.t
           , Transaction.t
           , Transaction_witness.t
           , Proof.t )
@@ -45,19 +45,14 @@ module Make (Inputs : Intf.Inputs_intf) = struct
         type query = unit [@@deriving bin_io, version {rpc}]
 
         type response =
-          ( Statement.Stable.V1.t
+          ( Statement.t
           , Transaction.t
           , Transaction_witness.t
           , Proof.t )
-          Work.Single.Spec.t
-          Work.Spec.t
+          Work.Single.Spec.Stable.V1.t
+          Work.Spec.Stable.V1.t
           option
-        [@@deriving bin_io]
-
-        (* , version {rpc} *)
-        
-        (* remove when version {rpc} uncommented *)
-        let version = 1
+        [@@deriving bin_io, version {rpc}]
 
         let query_of_caller_model = Fn.id
 
@@ -82,7 +77,7 @@ module Make (Inputs : Intf.Inputs_intf) = struct
       module T = struct
         (* "master" types, do not change *)
         type query =
-          ( ( Statement.Stable.V1.t
+          ( ( Statement.t
             , Transaction.t
             , Transaction_witness.t
             , Proof.t )
@@ -104,17 +99,15 @@ module Make (Inputs : Intf.Inputs_intf) = struct
     module V1 = struct
       module T = struct
         type query =
-          ( ( Statement.Stable.V1.t
+          ( ( Statement.t
             , Transaction.t
             , Transaction_witness.t
             , Proof.t )
-            Work.Single.Spec.t
-            Work.Spec.t
+            Work.Single.Spec.Stable.V1.t
+            Work.Spec.Stable.V1.t
           , Proof.t )
-          Work.Result.t
-        [@@deriving bin_io]
-
-        (* , version {rpc} *)
+          Work.Result.Stable.V1.t
+        [@@deriving bin_io, version {rpc}]
 
         type response = unit [@@deriving bin_io, version {rpc}]
 

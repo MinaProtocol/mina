@@ -6,19 +6,19 @@ open Module_version
 module Stable = struct
   module V1 = struct
     module T = struct
-      (* we using Blocking_sexp to be able to derive hash, sexp
-         the base Inet_addr and Stable.V1 modules don't give that to you
-       *)
       type t =
-        { host: Unix.Inet_addr.Blocking_sexp.t (* IPv4 or IPv6 address *)
+        { host: Core.Unix.Inet_addr.Stable.V1.t (* IPv4 or IPv6 address *)
         ; discovery_port: int (* UDP *)
         ; communication_port: int
         (* TCP *) }
-      [@@deriving bin_io, compare, hash, sexp, version {asserted}]
+      [@@deriving bin_io, compare, sexp, version]
 
-      (* TODO : the port int's don't need versioning; the host type should be wrapped
-         for now, we assert the type is versioned
-       *)
+      (* these hash functions come from the implementation of Inet_addr, 
+         though they're not exposed *)
+      let hash_fold_t hash t = hash_fold_int hash (Hashtbl.hash t)
+
+      let hash : t -> int = Ppx_hash_lib.Std.Hash.of_fold hash_fold_t
+
       let to_yojson {host; discovery_port; communication_port} =
         `Assoc
           [ ("host", `String (Unix.Inet_addr.to_string host))
@@ -66,10 +66,10 @@ end
 
 (* bin_io omitted *)
 type t = Stable.Latest.t =
-  { host: Unix.Inet_addr.Blocking_sexp.t
+  { host: Core.Unix.Inet_addr.Stable.V1.t
   ; discovery_port: int
   ; communication_port: int }
-[@@deriving compare, hash, sexp]
+[@@deriving compare, sexp]
 
 let of_yojson, to_yojson = Stable.Latest.(of_yojson, to_yojson)
 

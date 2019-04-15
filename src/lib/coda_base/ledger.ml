@@ -45,11 +45,9 @@ module Ledger_inner = struct
 
     let public_key = Account.public_key
 
-    let balance = Account.balance
+    let balance Account.Poly.({balance; _}) = balance
 
     let initialize = Account.initialize
-
-    let balance = Account.balance
   end
 
   module Inputs = struct

@@ -4,7 +4,17 @@ open Fold_lib
 open Coda_numbers
 
 module type Prover_state_intf = sig
-  type t [@@deriving bin_io, sexp]
+  type t [@@deriving sexp]
+
+  module Stable :
+    sig
+      module V1 : sig
+        type t [@@deriving bin_io, sexp, version]
+      end
+
+      module Latest : module type of V1
+    end
+    with type V1.t = t
 
   type pending_coinbase_witness
 
@@ -40,11 +50,21 @@ module type S = sig
   end
 
   module Consensus_transition_data : sig
-    type value [@@deriving bin_io, sexp]
+    module Value : sig
+      type t [@@deriving sexp]
 
-    include Snark_params.Tick.Snarkable.S with type value := value
+      module Stable :
+        sig
+          module V1 : sig
+            type t [@@deriving sexp, bin_io, version]
+          end
+        end
+        with type V1.t = t
+    end
 
-    val genesis : value
+    include Snark_params.Tick.Snarkable.S with type value := Value.t
+
+    val genesis : Value.t
   end
 
   module Consensus_state : sig
@@ -148,7 +168,7 @@ module type S = sig
     -> snarked_ledger_hash:Coda_base.Frozen_ledger_hash.t
     -> supply_increase:Currency.Amount.t
     -> logger:Logger.t
-    -> Protocol_state.Value.t * Consensus_transition_data.value
+    -> Protocol_state.Value.t * Consensus_transition_data.Value.t
 
   (**
    * Check that a consensus state was received at a valid time.

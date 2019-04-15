@@ -7,6 +7,6 @@ nix:
   packages: [gmp]
 extra-deps:
 - git: https://github.com/CodaProtocol/kademlia.git
-  commit: cfd2a5da7294bd305eb56a385e0a2e7287da45dd
+  commit: ea9ff68b03e66541e4be77f8e2561352360cafcd
 flags: {}
 extra-package-dbs: []
