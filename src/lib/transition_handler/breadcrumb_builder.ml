@@ -4,7 +4,7 @@ open Core
 open Async
 open Cache_lib
 
-module Make (Inputs : Inputs.With_unprocessed_transition_cache.S) :
+module Make (Inputs : Inputs.S) :
   Breadcrumb_builder_intf
   with type state_hash := State_hash.t
   with type external_transition_verified :=
@@ -16,6 +16,10 @@ module Make (Inputs : Inputs.With_unprocessed_transition_cache.S) :
 
   let build_subtrees_of_breadcrumbs ~logger ~frontier ~initial_hash
       subtrees_of_transitions =
+    (* If the breadcrumb we are targetting is removed from the transition
+     * frontier while we're catching up, it means this path is not on the
+     * critical path that has been chosen in the frontier. As such, we should
+     * drop it on the floor. *)
     let breadcrumb_if_present () =
       match Transition_frontier.find frontier initial_hash with
       | None ->

@@ -19,6 +19,7 @@ open Coda_base
 module Make (Inputs : Inputs.S) = struct
   open Inputs
   open Consensus
+  module Breadcrumb_builder = Breadcrumb_builder.Make (Inputs)
 
   type t =
     { logger: Logger.t
@@ -50,54 +51,37 @@ module Make (Inputs : Inputs.S) = struct
               timeouts. *)
     ; parent_root_timeouts: unit Time.Timeout.t State_hash.Table.t
     ; breadcrumb_builder_supervisor:
-        ( (External_transition.Verified.t, State_hash.t) With_hash.t
-        , State_hash.t )
-        Cached.t
-        Rose_tree.t
-        list
+        ( State_hash.t
+        * ( (External_transition.Verified.t, State_hash.t) With_hash.t
+          , State_hash.t )
+          Cached.t
+          Rose_tree.t
+          list )
         Capped_supervisor.t }
-
-  let build_breadcrumbs ~logger ~frontier transition_subtrees =
-    Deferred.List.map transition_subtrees
-      ~f:(fun (Rose_tree.T (subtree_root, _) as subtree) ->
-        let subtree_root_parent_hash =
-          With_hash.data (Cached.peek subtree_root)
-          |> External_transition.Verified.protocol_state
-          |> Protocol_state.previous_state_hash
-        in
-        let branch_parent =
-          Transition_frontier.find_exn frontier subtree_root_parent_hash
-        in
-        Rose_tree.Deferred.fold_map subtree ~init:(Cached.pure branch_parent)
-          ~f:(fun parent cached_transition_with_hash ->
-            let%map cached_breadcrumb_result =
-              Cached.transform cached_transition_with_hash
-                ~f:(fun transition_with_hash ->
-                  Transition_frontier.Breadcrumb.build ~logger
-                    ~parent:(Cached.peek parent) ~transition_with_hash )
-              |> Cached.sequence_deferred
-            in
-            match Cached.sequence_result cached_breadcrumb_result with
-            | Error (`Validation_error e) ->
-                (* TODO: Punish *)
-                Logger.faulty_peer logger ~module_:__MODULE__ ~location:__LOC__
-                  "invalid transition in catchup scheduler breadcrumb \
-                   builder: %s"
-                  (Error.to_string_hum e) ;
-                raise (Error.to_exn e)
-            | Error (`Fatal_error e) -> raise e
-            | Ok breadcrumb -> breadcrumb ) )
 
   let create ~logger ~frontier ~time_controller ~catchup_job_writer
       ~catchup_breadcrumbs_writer =
     let collected_transitions = State_hash.Table.create () in
     let parent_root_timeouts = State_hash.Table.create () in
     let breadcrumb_builder_supervisor =
-      Capped_supervisor.create ~job_capacity:5 (fun transition_branches ->
+      Capped_supervisor.create ~job_capacity:5
+        (fun (initial_hash, transition_branches) ->
           (* TODO: refact this to use Transition_handler.Breadcrumb_builder.build_subtrees_of_breadcrumbs
              and do garbage collection on caches if it fails *)
-          build_breadcrumbs ~logger ~frontier transition_branches
-          >>= Writer.write catchup_breadcrumbs_writer )
+          match%map
+            Breadcrumb_builder.build_subtrees_of_breadcrumbs ~logger ~frontier
+              ~initial_hash transition_branches
+          with
+          | Ok trees_of_breadcrumbs ->
+              Writer.write catchup_breadcrumbs_writer trees_of_breadcrumbs
+              |> don't_wait_for
+          | Error err ->
+              Logger.trace logger ~module_:__MODULE__ ~location:__LOC__
+                !"Error during buildup breadcrumbs inside catchup_scheduler: %s"
+                (Error.to_string_hum err) ;
+              List.iter transition_branches ~f:(fun subtree ->
+                  Rose_tree.iter subtree ~f:(fun cached_transition ->
+                      Cached.invalidate cached_transition |> ignore ) ) )
     in
     { logger
     ; collected_transitions
@@ -228,7 +212,7 @@ module Make (Inputs : Inputs.S) = struct
             List.map collected_transitions ~f:(extract_subtree t)
           in
           Capped_supervisor.dispatch t.breadcrumb_builder_supervisor
-            transition_subtrees ) ;
+            (hash, transition_subtrees) ) ;
       remove_tree t hash ;
       Or_error.return ()
 end
