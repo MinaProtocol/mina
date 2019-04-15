@@ -65,7 +65,7 @@ module Result = struct
           ; metrics: (Core.Time.Stable.Span.V1.t * [`Transition | `Merge]) list
           ; spec: 'spec
           ; prover: Signature_lib.Public_key.Compressed.Stable.V1.t }
-        [@@deriving bin_io, fields, version {asserted}]
+        [@@deriving bin_io, fields, version]
       end
 
       include T
