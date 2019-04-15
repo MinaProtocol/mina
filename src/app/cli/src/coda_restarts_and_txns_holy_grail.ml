@@ -40,7 +40,7 @@ let main n () =
      implemented. *)
   (* settle for a few more min *)
   (* TODO: Make sure to check that catchup actually worked *)
-  let%bind () = after (Time.Span.of_min 2.) in
+  let%bind () = after (Time.Span.of_min 4.) in
   Coda_worker_testnet.Api.teardown testnet
 
 let command =

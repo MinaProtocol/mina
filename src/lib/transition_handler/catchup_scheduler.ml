@@ -66,8 +66,6 @@ module Make (Inputs : Inputs.S) = struct
     let breadcrumb_builder_supervisor =
       Capped_supervisor.create ~job_capacity:5
         (fun (initial_hash, transition_branches) ->
-          (* TODO: refact this to use Transition_handler.Breadcrumb_builder.build_subtrees_of_breadcrumbs
-             and do garbage collection on caches if it fails *)
           match%map
             Breadcrumb_builder.build_subtrees_of_breadcrumbs ~logger ~frontier
               ~initial_hash transition_branches

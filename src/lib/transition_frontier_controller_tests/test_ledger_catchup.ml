@@ -32,100 +32,6 @@ end)
 
 let%test_module "Ledger catchup" =
   ( module struct
-    let%test_unit "catchup won't be blocked by transitions that are still \
-                   under processing" =
-      let logger = Logger.create () in
-      let catchup_job_reader, catchup_job_writer =
-        Strict_pipe.create (Buffered (`Capacity 10, `Overflow Drop_head))
-      in
-      let catchup_breadcrumbs_reader, catchup_breadcrumbs_writer =
-        Strict_pipe.create Synchronous
-      in
-      let unprocessed_transition_cache =
-        Transition_handler.Unprocessed_transition_cache.create ~logger
-      in
-      Thread_safe.block_on_async_exn (fun () ->
-          let open Deferred.Let_syntax in
-          let%bind me, peer, network =
-            Network_builder.setup_me_and_a_peer
-              ~source_accounts:Genesis_ledger.accounts ~logger
-              ~target_accounts:Genesis_ledger.accounts
-              ~num_breadcrumbs:max_length
-          in
-          let best_breadcrumb = Transition_frontier.best_tip peer.frontier in
-          let best_transition =
-            Transition_frontier.Breadcrumb.transition_with_hash best_breadcrumb
-          in
-          let history =
-            Transition_frontier.root_history_path_map peer.frontier
-              (With_hash.hash best_transition)
-              ~f:Fn.id
-            |> Option.value_exn
-          in
-          let missing_breadcrumbs = Non_empty_list.tail history in
-          let missing_transitions =
-            List.map missing_breadcrumbs
-              ~f:Transition_frontier.Breadcrumb.transition_with_hash
-            |> List.rev
-          in
-          let last_breadcrumb = List.last_exn missing_breadcrumbs in
-          let parent_hashes =
-            List.map missing_transitions
-              ~f:
-                (Fn.compose External_transition.Verified.parent_hash
-                   With_hash.data)
-          in
-          let cached_transitions =
-            List.map missing_transitions
-              ~f:
-                (Transition_handler.Unprocessed_transition_cache.register
-                   unprocessed_transition_cache)
-          in
-          let forests =
-            List.map2_exn parent_hashes cached_transitions
-              ~f:(fun parent_hash cached_transition ->
-                (parent_hash, [Rose_tree.T (cached_transition, [])]) )
-          in
-          List.iter forests ~f:(fun forest ->
-              Deferred.upon
-                (after (Core.Time.Span.of_ms 500.))
-                (fun () -> Strict_pipe.Writer.write catchup_job_writer forest)
-          ) ;
-          Ledger_catchup.run ~logger ~network ~frontier:me
-            ~catchup_breadcrumbs_writer ~catchup_job_reader
-            ~unprocessed_transition_cache ;
-          let q =
-            List.map missing_breadcrumbs ~f:(fun breadcrumb ->
-                Rose_tree.T (breadcrumb, []) )
-            |> Queue.of_list
-          in
-          let finished = Ivar.create () in
-          Strict_pipe.Reader.iter catchup_breadcrumbs_reader
-            ~f:(fun rose_trees ->
-              let catchup_breadcrumb_tree =
-                Rose_tree.map (List.hd_exn rose_trees) ~f:Cache_lib.Cached.free
-              in
-              assert (
-                List.length (Rose_tree.flatten catchup_breadcrumb_tree) = 1 ) ;
-              let catchup_breadcrumb =
-                List.hd_exn (Rose_tree.flatten catchup_breadcrumb_tree)
-              in
-              let expected_breadcrumb =
-                List.hd_exn @@ Rose_tree.flatten @@ Queue.dequeue_exn q
-              in
-              assert (
-                Transition_frontier.Breadcrumb.equal expected_breadcrumb
-                  catchup_breadcrumb ) ;
-              Transition_frontier.add_breadcrumb_exn me expected_breadcrumb
-              |> ignore ;
-              if
-                Transition_frontier.Breadcrumb.equal expected_breadcrumb
-                  last_breadcrumb
-              then Ivar.fill finished () ;
-              Deferred.unit )
-          |> don't_wait_for ;
-          Ivar.read finished )
-
     let test_catchup ~logger ~network (me : Transition_frontier.t) transition
         expected_breadcrumbs =
       let catchup_job_reader, catchup_job_writer =
@@ -236,4 +142,98 @@ let%test_module "Ledger catchup" =
           in
           test_catchup ~logger ~network me best_transition
             (Rose_tree.of_list_exn [best_breadcrumb]) )
+
+    let%test_unit "catchup won't be blocked by transitions that are still \
+                   under processing" =
+      let logger = Logger.create () in
+      let catchup_job_reader, catchup_job_writer =
+        Strict_pipe.create (Buffered (`Capacity 10, `Overflow Drop_head))
+      in
+      let catchup_breadcrumbs_reader, catchup_breadcrumbs_writer =
+        Strict_pipe.create Synchronous
+      in
+      let unprocessed_transition_cache =
+        Transition_handler.Unprocessed_transition_cache.create ~logger
+      in
+      Thread_safe.block_on_async_exn (fun () ->
+          let open Deferred.Let_syntax in
+          let%bind me, peer, network =
+            Network_builder.setup_me_and_a_peer
+              ~source_accounts:Genesis_ledger.accounts ~logger
+              ~target_accounts:Genesis_ledger.accounts
+              ~num_breadcrumbs:max_length
+          in
+          let best_breadcrumb = Transition_frontier.best_tip peer.frontier in
+          let best_transition =
+            Transition_frontier.Breadcrumb.transition_with_hash best_breadcrumb
+          in
+          let history =
+            Transition_frontier.root_history_path_map peer.frontier
+              (With_hash.hash best_transition)
+              ~f:Fn.id
+            |> Option.value_exn
+          in
+          let missing_breadcrumbs = Non_empty_list.tail history in
+          let missing_transitions =
+            List.map missing_breadcrumbs
+              ~f:Transition_frontier.Breadcrumb.transition_with_hash
+            |> List.rev
+          in
+          let last_breadcrumb = List.last_exn missing_breadcrumbs in
+          let parent_hashes =
+            List.map missing_transitions
+              ~f:
+                (Fn.compose External_transition.Verified.parent_hash
+                   With_hash.data)
+          in
+          let cached_transitions =
+            List.map missing_transitions
+              ~f:
+                (Transition_handler.Unprocessed_transition_cache.register
+                   unprocessed_transition_cache)
+          in
+          let forests =
+            List.map2_exn parent_hashes cached_transitions
+              ~f:(fun parent_hash cached_transition ->
+                (parent_hash, [Rose_tree.T (cached_transition, [])]) )
+          in
+          List.iter forests ~f:(fun forest ->
+              Deferred.upon
+                (after (Core.Time.Span.of_ms 500.))
+                (fun () -> Strict_pipe.Writer.write catchup_job_writer forest)
+          ) ;
+          Ledger_catchup.run ~logger ~network ~frontier:me
+            ~catchup_breadcrumbs_writer ~catchup_job_reader
+            ~unprocessed_transition_cache ;
+          let q =
+            List.map missing_breadcrumbs ~f:(fun breadcrumb ->
+                Rose_tree.T (breadcrumb, []) )
+            |> Queue.of_list
+          in
+          let finished = Ivar.create () in
+          Strict_pipe.Reader.iter catchup_breadcrumbs_reader
+            ~f:(fun rose_trees ->
+              let catchup_breadcrumb_tree =
+                Rose_tree.map (List.hd_exn rose_trees) ~f:Cache_lib.Cached.free
+              in
+              assert (
+                List.length (Rose_tree.flatten catchup_breadcrumb_tree) = 1 ) ;
+              let catchup_breadcrumb =
+                List.hd_exn (Rose_tree.flatten catchup_breadcrumb_tree)
+              in
+              let expected_breadcrumb =
+                List.hd_exn @@ Rose_tree.flatten @@ Queue.dequeue_exn q
+              in
+              assert (
+                Transition_frontier.Breadcrumb.equal expected_breadcrumb
+                  catchup_breadcrumb ) ;
+              Transition_frontier.add_breadcrumb_exn me expected_breadcrumb
+              |> ignore ;
+              if
+                Transition_frontier.Breadcrumb.equal expected_breadcrumb
+                  last_breadcrumb
+              then Ivar.fill finished () ;
+              Deferred.unit )
+          |> don't_wait_for ;
+          Ivar.read finished )
   end )
