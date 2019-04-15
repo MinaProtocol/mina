@@ -267,3 +267,16 @@ module M15 = struct
     end
   end
 end
+
+(* Jane Street special case *)
+module M16 = struct
+  module Stable = struct
+    module V1 = struct
+      module T = struct
+        type t = Core_kernel.Time.Stable.Span.V1.t [@@deriving bin_io, version]
+      end
+
+      include T
+    end
+  end
+end
