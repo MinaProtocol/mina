@@ -620,7 +620,7 @@ module type Transaction_snark_work_intf = sig
     module Stable :
       sig
         module V1 : sig
-          type t [@@deriving yojson]
+          type t [@@deriving yojson, version]
 
           include Sexpable.S with type t := t
 
@@ -1540,7 +1540,9 @@ module type Consensus_mechanism_intf = sig
   end
 
   module Consensus_transition_data : sig
-    type value [@@deriving sexp]
+    module Value : sig
+      type t [@@deriving sexp]
+    end
 
     type var
   end
@@ -1589,7 +1591,7 @@ module type Consensus_mechanism_intf = sig
       -> ?ledger_proof:proof
       -> supply_increase:Currency.Amount.t
       -> blockchain_state:Blockchain_state.Value.t
-      -> consensus_data:Consensus_transition_data.value
+      -> consensus_data:Consensus_transition_data.Value.t
       -> proposer:compressed_public_key
       -> coinbase:Currency.Amount.t
       -> unit
@@ -1597,7 +1599,7 @@ module type Consensus_mechanism_intf = sig
 
     val blockchain_state : value -> Blockchain_state.Value.t
 
-    val consensus_data : value -> Consensus_transition_data.value
+    val consensus_data : value -> Consensus_transition_data.Value.t
   end
 
   val generate_transition :
@@ -1609,7 +1611,7 @@ module type Consensus_mechanism_intf = sig
     -> snarked_ledger_hash:frozen_ledger_hash
     -> supply_increase:Currency.Amount.t
     -> logger:Logger.t
-    -> Protocol_state.Value.t * Consensus_transition_data.value
+    -> Protocol_state.Value.t * Consensus_transition_data.Value.t
 
   val received_at_valid_time :
     Consensus_state.Value.t -> time_received:Unix_timestamp.t -> bool

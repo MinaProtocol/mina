@@ -1,11 +1,21 @@
 open Core_kernel
 
 module type Consensus_data_intf = sig
-  type value [@@deriving bin_io, sexp]
+  module Value : sig
+    type t [@@deriving sexp]
 
-  include Snark_params.Tick.Snarkable.S with type value := value
+    module Stable :
+      sig
+        module V1 : sig
+          type t [@@deriving sexp, bin_io, version]
+        end
+      end
+      with type V1.t = t
+  end
 
-  val genesis : value
+  include Snark_params.Tick.Snarkable.S with type value := Value.t
+
+  val genesis : Value.t
 end
 
 module type Inputs_intf = sig
@@ -71,11 +81,11 @@ module type S = sig
     module Stable : sig
       module V1 : sig
         type t =
-          ( Blockchain_state.Value.t
-          , Consensus_data.value
-          , Sok_message.Digest.t
-          , Currency.Amount.t
-          , Signature_lib.Public_key.Compressed.t )
+          ( Blockchain_state.Value.Stable.V1.t
+          , Consensus_data.Value.Stable.V1.t
+          , Sok_message.Digest.Stable.V1.t
+          , Currency.Amount.Stable.V1.t
+          , Signature_lib.Public_key.Compressed.Stable.V1.t )
           Poly.Stable.V1.t
         [@@deriving bin_io, sexp, version]
       end
@@ -106,7 +116,7 @@ module type S = sig
     -> ?ledger_proof:Proof.t
     -> supply_increase:Currency.Amount.t
     -> blockchain_state:Blockchain_state.Value.t
-    -> consensus_data:Consensus_data.value
+    -> consensus_data:Consensus_data.Value.Stable.V1.t
     -> proposer:Signature_lib.Public_key.Compressed.t
     -> coinbase:Currency.Amount.t
     -> unit
@@ -189,12 +199,12 @@ module Make (Inputs : Inputs_intf) :
         module T = struct
           type t =
             ( Blockchain_state.Value.Stable.V1.t
-            , Consensus_data.value
+            , Consensus_data.Value.Stable.V1.t
             , Sok_message.Digest.Stable.V1.t
             , Currency.Amount.Stable.V1.t
             , Signature_lib.Public_key.Compressed.Stable.V1.t )
             Poly.Stable.V1.t
-          [@@deriving bin_io, sexp, version {asserted}]
+          [@@deriving bin_io, sexp, version]
         end
 
         include T

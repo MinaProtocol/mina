@@ -119,12 +119,10 @@ module Stable = struct
         ; mutable base_none_pos: int option
         ; mutable recent_tree_data: 'd list sexp_opaque
         ; mutable other_trees_data: 'd list list sexp_opaque
-        ; stateful_work_order: int Queue.t
+        ; stateful_work_order: int Core.Queue.Stable.V1.t
         ; mutable curr_job_seq_no: int
         ; root_at_depth: int }
-      [@@deriving sexp, bin_io, version {asserted}]
-
-      (* TODO : wrap Queue *)
+      [@@deriving sexp, bin_io, version]
     end
 
     include T

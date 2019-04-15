@@ -360,7 +360,7 @@ module type Main_intf = sig
   val best_tip :
     t -> Inputs.Transition_frontier.Breadcrumb.t Participating_state.t
 
-  val is_active : t -> bool
+  val sync_status : t -> [`Offline | `Synced | `Bootstrap]
 
   val visualize_frontier : filename:string -> t -> unit Participating_state.t
 
@@ -793,14 +793,14 @@ struct
     (* TODO : we're choosing versioned inputs, so the result should be versioned *)
     module Pool =
       Snark_pool.Make (Proof) (Fee.Stable.V1) (Work) (Transition_frontier)
-    module Diff =
+    module Snark_pool_diff =
       Network_pool.Snark_pool_diff.Make (Proof) (Fee.Stable.V1) (Work)
         (Transition_frontier)
         (Pool)
 
-    type pool_diff = Diff.t
+    type pool_diff = Snark_pool_diff.t
 
-    include Network_pool.Make (Transition_frontier) (Pool) (Diff)
+    include Network_pool.Make (Transition_frontier) (Pool) (Snark_pool_diff)
 
     let get_completed_work t statement =
       Option.map
@@ -827,11 +827,10 @@ struct
       apply_and_broadcast t
         (Envelope.Incoming.wrap
            ~data:
-             (Add_solved_work
+             (Diff.Add_solved_work
                 ( List.map res.spec.instances ~f:Single.Spec.statement
-                , Diff.Priced_proof.
-                    { proof= res.proofs
-                    ; fee= {fee= res.spec.fee; prover= res.prover} } ))
+                , { Snark_pool_diff.Priced_proof.proof= res.proofs
+                  ; fee= {fee= res.spec.fee; prover= res.prover} } ))
            ~sender:Envelope.Sender.Local)
   end
 
@@ -840,7 +839,7 @@ struct
   module Net = Coda_networking.Make (struct
     include Inputs0
     module Snark_pool = Snark_pool
-    module Snark_pool_diff = Snark_pool.Diff
+    module Snark_pool_diff = Snark_pool.Snark_pool_diff
     module Sync_ledger = Sync_ledger
     module Staged_ledger_hash = Staged_ledger_hash
     module Ledger_hash = Ledger_hash
@@ -1108,21 +1107,19 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
   include Program
   open Inputs
 
-  module Coda_graphql = struct
+  module Graphql = struct
     open Graphql_async
     open Schema
     open Async
 
     module Types = struct
-      type sync_status = Error | Bootstrap | Synced
-
-      let sync_status =
+      let sync_status : ('context, [`Offline | `Synced | `Bootstrap]) typ =
         non_null
           (enum "sync_status" ~doc:"Sync status as daemon node"
              ~values:
-               [ enum_value "ERROR" ~value:Error
-               ; enum_value "BOOTSTRAP" ~value:Bootstrap
-               ; enum_value "SYNCED" ~value:Synced ])
+               [ enum_value "BOOTSTRAP" ~value:`Bootstrap
+               ; enum_value "SYNCED" ~value:`Synced
+               ; enum_value "OFFLINE" ~value:`Offline ])
     end
 
     module Queries = struct
@@ -1132,8 +1129,7 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
         io_field "sync_status" ~typ:sync_status
           ~args:Arg.[]
           ~resolve:(fun {ctx= coda; _} () ->
-            Deferred.Result.return
-              (if is_active coda then Synced else Bootstrap) )
+            Deferred.Result.return (Program.sync_status coda) )
 
       let commands = [sync_state]
     end
@@ -1614,7 +1610,7 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
             let graphql_callback =
               Graphql_cohttp_async.make_callback
                 (fun _req -> coda)
-                Coda_graphql.schema
+                Graphql.schema
             in
             Cohttp_async.(
               Server.create_expert

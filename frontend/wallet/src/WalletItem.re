@@ -84,7 +84,7 @@ let make = (~name, ~balance) => {
        <div className=Styles.walletName> {ReasonReact.string(name)} </div>;
      }}
     <div className=Styles.balance>
-      {ReasonReact.string({js|■ |js} ++ string_of_float(balance))}
+      {ReasonReact.string({js|■ |js} ++ Js.Float.toString(balance))}
     </div>
     {if (expanded) {
        <>

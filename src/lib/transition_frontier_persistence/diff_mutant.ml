@@ -46,7 +46,9 @@ end = struct
     module New_frontier = struct
       (* TODO: version *)
       type t =
-        (External_transition.Stable.V1.t, State_hash.Stable.V1.t) With_hash.t
+        ( External_transition.Stable.V1.t
+        , State_hash.Stable.V1.t )
+        With_hash.Stable.V1.t
         * Scan_state.Stable.V1.t
         * Pending_coinbase.Stable.V1.t
       [@@deriving bin_io]
@@ -55,7 +57,9 @@ end = struct
     module Add_transition = struct
       (* TODO: version *)
       type t =
-        (External_transition.Stable.V1.t, State_hash.Stable.V1.t) With_hash.t
+        ( External_transition.Stable.V1.t
+        , State_hash.Stable.V1.t )
+        With_hash.Stable.V1.t
       [@@deriving bin_io]
     end
 

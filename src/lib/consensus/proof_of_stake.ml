@@ -81,7 +81,7 @@ module Constants = struct
       slots_per_year / per_year
 
     (* Number of bits required to represent a number
-   < size_in_slots *)
+       < size_in_slots *)
     let per_window_index_size_in_bits = Core.Int.ceil_log2 size_in_slots
   end
 
@@ -91,11 +91,9 @@ module Constants = struct
 end
 
 module Proposal_data = struct
-  (* TODO : version *)
   type t =
     { stake_proof: Coda_base.Stake_proof.Stable.V1.t
     ; vrf_result: Random_oracle.Digest.Stable.V1.t }
-  [@@deriving bin_io]
 
   let prover_state {stake_proof; _} = stake_proof
 end
@@ -296,42 +294,87 @@ module Local_state = struct
 end
 
 module Epoch_ledger = struct
-  type ('ledger_hash, 'amount) t = {hash: 'ledger_hash; total_currency: 'amount}
-  [@@deriving sexp, bin_io, eq, compare, hash, to_yojson]
+  module Poly = struct
+    module Stable = struct
+      module V1 = struct
+        module T = struct
+          type ('ledger_hash, 'amount) t =
+            {hash: 'ledger_hash; total_currency: 'amount}
+          [@@deriving sexp, bin_io, eq, compare, hash, to_yojson, version]
+        end
 
-  (* TODO : version *)
-  type value = (Coda_base.Frozen_ledger_hash.Stable.V1.t, Amount.Stable.V1.t) t
-  [@@deriving sexp, bin_io, eq, compare, hash, to_yojson]
+        include T
+      end
 
-  type var = (Coda_base.Frozen_ledger_hash.var, Amount.var) t
+      module Latest = V1
+    end
 
-  let to_hlist {hash; total_currency} = Coda_base.H_list.[hash; total_currency]
+    type ('ledger_hash, 'amount) t = ('ledger_hash, 'amount) Stable.Latest.t =
+      {hash: 'ledger_hash; total_currency: 'amount}
+    [@@deriving sexp, eq, compare, hash, to_yojson]
+  end
+
+  module Value = struct
+    module Stable = struct
+      module V1 = struct
+        module T = struct
+          type t =
+            ( Coda_base.Frozen_ledger_hash.Stable.V1.t
+            , Amount.Stable.V1.t )
+            Poly.Stable.V1.t
+          [@@deriving sexp, bin_io, eq, compare, hash, to_yojson, version]
+        end
+
+        include T
+        include Module_version.Registration.Make_latest_version (T)
+      end
+
+      module Latest = V1
+
+      module Module_decl = struct
+        let name = "epoch_ledger_data_proof_of_stake"
+
+        type latest = Latest.t
+      end
+
+      module Registrar = Module_version.Registration.Make (Module_decl)
+      module Registered_V1 = Registrar.Register (V1)
+    end
+
+    type t = Stable.Latest.t [@@deriving sexp, eq, compare, hash, to_yojson]
+  end
+
+  type var = (Coda_base.Frozen_ledger_hash.var, Amount.var) Poly.t
+
+  let to_hlist {Poly.hash; total_currency} =
+    Coda_base.H_list.[hash; total_currency]
 
   let of_hlist :
          (unit, 'ledger_hash -> 'total_currency -> unit) Coda_base.H_list.t
-      -> ('ledger_hash, 'total_currency) t =
-   fun Coda_base.H_list.[hash; total_currency] -> {hash; total_currency}
+      -> ('ledger_hash, 'total_currency) Poly.t =
+   fun Coda_base.H_list.([hash; total_currency]) -> {hash; total_currency}
 
   let data_spec =
     Snark_params.Tick.Data_spec.[Coda_base.Frozen_ledger_hash.typ; Amount.typ]
 
-  let typ : (var, value) Typ.t =
+  let typ : (var, Value.t) Typ.t =
     Snark_params.Tick.Typ.of_hlistable data_spec ~var_to_hlist:to_hlist
       ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist ~value_of_hlist:of_hlist
 
-  let var_to_triples {hash; total_currency} =
+  let var_to_triples {Poly.hash; total_currency} =
     let open Snark_params.Tick.Checked.Let_syntax in
     let%map hash_triples = Coda_base.Frozen_ledger_hash.var_to_triples hash in
     hash_triples @ Amount.var_to_triples total_currency
 
-  let fold {hash; total_currency} =
+  let fold {Poly.hash; total_currency} =
     let open Fold in
     Coda_base.Frozen_ledger_hash.fold hash +> Amount.fold total_currency
 
   let length_in_triples =
     Coda_base.Frozen_ledger_hash.length_in_triples + Amount.length_in_triples
 
-  let if_ cond ~then_ ~else_ =
+  let if_ cond ~(then_ : (Coda_base.Frozen_ledger_hash.var, Amount.var) Poly.t)
+      ~(else_ : (Coda_base.Frozen_ledger_hash.var, Amount.var) Poly.t) =
     let open Snark_params.Tick.Checked.Let_syntax in
     let%map hash =
       Coda_base.Frozen_ledger_hash.if_ cond ~then_:then_.hash ~else_:else_.hash
@@ -339,10 +382,11 @@ module Epoch_ledger = struct
       Amount.Checked.if_ cond ~then_:then_.total_currency
         ~else_:else_.total_currency
     in
-    {hash; total_currency}
+    {Poly.hash; total_currency}
 
   let genesis =
-    {hash= genesis_ledger_hash; total_currency= genesis_ledger_total_currency}
+    { Poly.hash= genesis_ledger_hash
+    ; total_currency= genesis_ledger_total_currency }
 end
 
 module Vrf = struct
@@ -447,9 +491,30 @@ module Vrf = struct
   end
 
   module Output = struct
-    (* TODO : version *)
-    type t = Random_oracle.Digest.Stable.V1.t
-    [@@deriving sexp, bin_io, eq, compare, hash, yojson]
+    module Stable = struct
+      module V1 = struct
+        module T = struct
+          type t = Random_oracle.Digest.Stable.V1.t
+          [@@deriving sexp, bin_io, eq, compare, hash, yojson, version]
+        end
+
+        include T
+        include Registration.Make_latest_version (T)
+      end
+
+      module Latest = V1
+
+      module Module_decl = struct
+        let name = "random_oracle_digest"
+
+        type latest = Latest.t
+      end
+
+      module Registrar = Registration.Make (Module_decl)
+      module Registered_V1 = Registrar.Register (V1)
+    end
+
+    type t = Stable.Latest.t [@@deriving sexp, eq, compare, hash, yojson]
 
     type var = Random_oracle.Digest.Checked.t
 
@@ -694,31 +759,88 @@ module Vrf = struct
 end
 
 module Epoch_data = struct
-  type ('epoch_ledger, 'epoch_seed, 'protocol_state_hash, 'length) t =
-    { ledger: 'epoch_ledger
-    ; seed: 'epoch_seed
-    ; start_checkpoint: 'protocol_state_hash
-    ; lock_checkpoint: 'protocol_state_hash
-    ; length: 'length }
-  [@@deriving sexp, bin_io, eq, compare, hash, to_yojson]
+  module Poly = struct
+    module Stable = struct
+      module V1 = struct
+        module T = struct
+          type ('epoch_ledger, 'epoch_seed, 'protocol_state_hash, 'length) t =
+            { ledger: 'epoch_ledger
+            ; seed: 'epoch_seed
+            ; start_checkpoint: 'protocol_state_hash
+            ; lock_checkpoint: 'protocol_state_hash
+            ; length: 'length }
+          [@@deriving sexp, bin_io, eq, compare, hash, to_yojson, version]
+        end
 
-  (* TODO : version *)
-  type value =
-    ( Epoch_ledger.value
-    , Epoch_seed.Stable.V1.t
-    , Coda_base.State_hash.Stable.V1.t
-    , Length.Stable.V1.t )
-    t
-  [@@deriving sexp, bin_io, eq, compare, hash, to_yojson]
+        include T
+      end
+
+      module Latest = V1
+    end
+
+    type ('epoch_ledger, 'epoch_seed, 'protocol_state_hash, 'length) t =
+                                                                        ( 'epoch_ledger
+                                                                        , 'epoch_seed
+                                                                        , 'protocol_state_hash
+                                                                        , 'length
+                                                                        )
+                                                                        Stable
+                                                                        .Latest
+                                                                        .t =
+      { ledger: 'epoch_ledger
+      ; seed: 'epoch_seed
+      ; start_checkpoint: 'protocol_state_hash
+      ; lock_checkpoint: 'protocol_state_hash
+      ; length: 'length }
+    [@@deriving sexp, eq, compare, hash, to_yojson]
+  end
+
+  module Value = struct
+    module Stable = struct
+      module V1 = struct
+        module T = struct
+          type t =
+            ( Epoch_ledger.Value.Stable.V1.t
+            , Epoch_seed.Stable.V1.t
+            , Coda_base.State_hash.Stable.V1.t
+            , Length.Stable.V1.t )
+            Poly.Stable.V1.t
+          [@@deriving sexp, bin_io, eq, compare, hash, to_yojson, version]
+        end
+
+        include T
+        include Module_version.Registration.Make_latest_version (T)
+      end
+
+      module Latest = V1
+
+      module Module_decl = struct
+        let name = "epoch_data_proof_of_stake"
+
+        type latest = Latest.t
+      end
+
+      module Registrar = Module_version.Registration.Make (Module_decl)
+      module Registered_V1 = Registrar.Register (V1)
+    end
+
+    type t =
+      ( Epoch_ledger.Value.Stable.Latest.t
+      , Epoch_seed.Stable.Latest.t
+      , Coda_base.State_hash.Stable.Latest.t
+      , Length.Stable.Latest.t )
+      Poly.t
+    [@@deriving sexp, eq, compare, hash, to_yojson]
+  end
 
   type var =
     ( Epoch_ledger.var
     , Epoch_seed.var
     , Coda_base.State_hash.var
     , Length.Unpacked.var )
-    t
+    Poly.t
 
-  let to_hlist {ledger; seed; start_checkpoint; lock_checkpoint; length} =
+  let to_hlist {Poly.ledger; seed; start_checkpoint; lock_checkpoint; length} =
     Coda_base.H_list.[ledger; seed; start_checkpoint; lock_checkpoint; length]
 
   let of_hlist :
@@ -730,9 +852,12 @@ module Epoch_data = struct
            -> 'length
            -> unit )
          Coda_base.H_list.t
-      -> ('ledger, 'seed, 'protocol_state_hash, 'length) t =
-   fun Coda_base.H_list.
-         [ledger; seed; start_checkpoint; lock_checkpoint; length] ->
+      -> ('ledger, 'seed, 'protocol_state_hash, 'length) Poly.t =
+   fun Coda_base.H_list.([ ledger
+                         ; seed
+                         ; start_checkpoint
+                         ; lock_checkpoint
+                         ; length ]) ->
     {ledger; seed; start_checkpoint; lock_checkpoint; length}
 
   let data_spec =
@@ -743,12 +868,12 @@ module Epoch_data = struct
     ; Coda_base.State_hash.typ
     ; Length.Unpacked.typ ]
 
-  let typ : (var, value) Typ.t =
+  let typ : (var, Value.t) Typ.t =
     Snark_params.Tick.Typ.of_hlistable data_spec ~var_to_hlist:to_hlist
       ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist ~value_of_hlist:of_hlist
 
-  let var_to_triples {ledger; seed; start_checkpoint; lock_checkpoint; length}
-      =
+  let var_to_triples
+      {Poly.ledger; seed; start_checkpoint; lock_checkpoint; length} =
     let open Snark_params.Tick.Checked.Let_syntax in
     let%map ledger_triples = Epoch_ledger.var_to_triples ledger
     and seed_triples = Epoch_seed.var_to_triples seed
@@ -761,7 +886,7 @@ module Epoch_data = struct
     @ lock_checkpoint_triples
     @ Length.Unpacked.var_to_triples length
 
-  let fold {ledger; seed; start_checkpoint; lock_checkpoint; length} =
+  let fold {Poly.ledger; seed; start_checkpoint; lock_checkpoint; length} =
     let open Fold in
     Epoch_ledger.fold ledger +> Epoch_seed.fold seed
     +> Coda_base.State_hash.fold start_checkpoint
@@ -773,7 +898,19 @@ module Epoch_data = struct
     + Coda_base.State_hash.length_in_triples
     + Coda_base.State_hash.length_in_triples + Length.length_in_triples
 
-  let if_ cond ~then_ ~else_ =
+  let if_ cond
+      ~(then_ :
+         ( Epoch_ledger.var
+         , Epoch_seed.var
+         , Coda_base.State_hash.var
+         , Length.Unpacked.var )
+         Poly.t)
+      ~(else_ :
+         ( Epoch_ledger.var
+         , Epoch_seed.var
+         , Coda_base.State_hash.var
+         , Length.Unpacked.var )
+         Poly.t) =
     let open Snark_params.Tick.Checked.Let_syntax in
     let%map ledger =
       Epoch_ledger.if_ cond ~then_:then_.ledger ~else_:else_.ledger
@@ -785,10 +922,10 @@ module Epoch_data = struct
       Coda_base.State_hash.if_ cond ~then_:then_.lock_checkpoint
         ~else_:else_.lock_checkpoint
     and length = Length.if_ cond ~then_:then_.length ~else_:else_.length in
-    {ledger; seed; start_checkpoint; lock_checkpoint; length}
+    {Poly.ledger; seed; start_checkpoint; lock_checkpoint; length}
 
   let genesis =
-    { ledger=
+    { Poly.ledger=
         Epoch_ledger.genesis
         (* TODO: epoch_seed needs to be non-determinable by o1-labs before mainnet launch *)
     ; seed= Epoch_seed.initial
@@ -799,12 +936,12 @@ module Epoch_data = struct
   let update_pair (last_data, curr_data) epoch_length ~prev_epoch ~next_epoch
       ~prev_slot ~prev_protocol_state_hash ~proposer_vrf_result
       ~snarked_ledger_hash ~total_currency =
-    let open Epoch_ledger in
     let last_data, curr_data, epoch_length =
       if next_epoch > prev_epoch then
         ( curr_data
-        , { seed= Epoch_seed.initial
-          ; ledger= {hash= snarked_ledger_hash; total_currency}
+        , { Poly.seed= Epoch_seed.initial
+          ; ledger=
+              {Epoch_ledger.Poly.hash= snarked_ledger_hash; total_currency}
           ; start_checkpoint= prev_protocol_state_hash
           ; lock_checkpoint= Coda_base.State_hash.(of_hash zero)
           ; length= Length.of_int 1 }
@@ -812,7 +949,7 @@ module Epoch_data = struct
       else (
         assert (Epoch.equal next_epoch prev_epoch) ;
         ( last_data
-        , {curr_data with length= Length.succ curr_data.length}
+        , Poly.{curr_data with length= Length.succ curr_data.length}
         , epoch_length ) )
     in
     let curr_seed, curr_lock_checkpoint =
@@ -822,39 +959,81 @@ module Epoch_data = struct
       else (curr_data.seed, curr_data.lock_checkpoint)
     in
     let curr_data =
-      {curr_data with seed= curr_seed; lock_checkpoint= curr_lock_checkpoint}
+      Poly.
+        {curr_data with seed= curr_seed; lock_checkpoint= curr_lock_checkpoint}
     in
     (last_data, curr_data, epoch_length)
 end
 
 module Consensus_transition_data = struct
-  type ('epoch, 'slot) t = {epoch: 'epoch; slot: 'slot}
-  [@@deriving sexp, bin_io, compare]
+  module Poly = struct
+    module Stable = struct
+      module V1 = struct
+        module T = struct
+          type ('epoch, 'slot) t = {epoch: 'epoch; slot: 'slot}
+          [@@deriving sexp, bin_io, compare, version]
+        end
 
-  type value = (Epoch.Stable.V1.t, Epoch.Slot.Stable.V1.t) t
-  [@@deriving sexp, bin_io, compare]
+        include T
+      end
 
-  type var = (Epoch.Unpacked.var, Epoch.Slot.Unpacked.var) t
+      module Latest = V1
+    end
 
-  let var_of_value ({epoch; slot} : value) : var =
+    type ('epoch, 'slot) t = ('epoch, 'slot) Stable.Latest.t =
+      {epoch: 'epoch; slot: 'slot}
+    [@@deriving sexp, compare]
+  end
+
+  module Value = struct
+    module Stable = struct
+      module V1 = struct
+        module T = struct
+          type t = (Epoch.Stable.V1.t, Epoch.Slot.Stable.V1.t) Poly.Stable.V1.t
+          [@@deriving sexp, bin_io, compare, version]
+        end
+
+        include T
+        include Module_version.Registration.Make_latest_version (T)
+      end
+
+      module Latest = V1
+
+      module Module_decl = struct
+        let name = "consensus_transition_data_proof_of_stake"
+
+        type latest = Latest.t
+      end
+
+      module Registrar = Module_version.Registration.Make (Module_decl)
+      module Registered_V1 = Registrar.Register (V1)
+    end
+
+    type t = Stable.Latest.t [@@deriving sexp, compare]
+  end
+
+  type var = (Epoch.Unpacked.var, Epoch.Slot.Unpacked.var) Poly.t
+
+  let var_of_value {Poly.epoch; slot} : var =
     (* reuse variable names because field names the same *)
     let epoch = Epoch.(unpack_value epoch |> Unpacked.var_of_value) in
     let slot = Epoch.Slot.(unpack_value slot |> Unpacked.var_of_value) in
     {epoch; slot}
 
-  let genesis = {epoch= Epoch.zero; slot= Epoch.Slot.zero}
+  let genesis = {Poly.epoch= Epoch.zero; slot= Epoch.Slot.zero}
 
-  let to_hlist {epoch; slot} = Coda_base.H_list.[epoch; slot]
+  let to_hlist {Poly.epoch; slot} = Coda_base.H_list.[epoch; slot]
 
   let of_hlist :
-      (unit, 'epoch -> 'slot -> unit) Coda_base.H_list.t -> ('epoch, 'slot) t =
-   fun Coda_base.H_list.[epoch; slot] -> {epoch; slot}
+         (unit, 'epoch -> 'slot -> unit) Coda_base.H_list.t
+      -> ('epoch, 'slot) Poly.t =
+   fun Coda_base.H_list.([epoch; slot]) -> {Poly.epoch; slot}
 
   let data_spec =
     let open Snark_params.Tick.Data_spec in
     [Epoch.Unpacked.typ; Epoch.Slot.Unpacked.typ]
 
-  let typ : (var, value) Typ.t =
+  let typ : (var, Value.t) Typ.t =
     Snark_params.Tick.Typ.of_hlistable data_spec ~var_to_hlist:to_hlist
       ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist ~value_of_hlist:of_hlist
 end
@@ -912,62 +1091,102 @@ module Checkpoints = struct
   let length = Constants.Checkpoint_window.per_year
 
   module Repr = struct
-    module Q = struct
-      module List = struct
-        type 'a t = 'a list [@@deriving to_yojson]
+    module Stable = struct
+      module V1 = struct
+        module T = struct
+          type t =
+            { (* TODO: Make a nice way to force this to have bounded (or fixed) size for
+                 bin_io reasons *)
+              prefix: Coda_base.State_hash.Stable.V1.t Core.Fqueue.Stable.V1.t
+            ; tail: Hash.Stable.V1.t }
+          [@@deriving sexp, bin_io, compare, version]
+
+          let digest ({prefix; tail} : t) =
+            let rec go acc p =
+              match Fqueue.dequeue p with
+              | None -> acc
+              | Some (h, p) -> go (merge h acc) p
+            in
+            go tail prefix
+        end
+
+        include T
+
+        module Yojson = struct
+          type t =
+            { prefix: Coda_base.State_hash.Stable.V1.t list
+            ; tail: Hash.Stable.V1.t }
+          [@@deriving to_yojson]
+        end
+
+        let to_yojson ({prefix; tail} : t) =
+          Yojson.to_yojson {prefix= Fqueue.to_list prefix; tail}
       end
 
-      include Fqueue
-
-      let to_yojson f t = List.to_yojson f (to_list t)
+      module Latest = V1
     end
 
-    (* TODO : version *)
-    type t =
-      { (* TODO: Make a nice way to force this to have bounded (or fixed) size for
-         bin_io reasons *)
-        prefix: Coda_base.State_hash.Stable.V1.t Q.t
-      ; tail: Hash.Stable.V1.t }
-    [@@deriving sexp, bin_io, compare, hash, to_yojson]
+    type t = Stable.Latest.t =
+      {prefix: Coda_base.State_hash.t Fqueue.t; tail: Hash.t}
+    [@@deriving sexp, hash, compare]
+
+    let to_yojson = Stable.V1.to_yojson
 
     let equal t1 t2 = compare t1 t2 = 0
 
-    let digest {prefix; tail} =
-      let rec go acc p =
-        match Fqueue.dequeue p with
-        | None ->
-            acc
-        | Some (h, p) ->
-            go (merge h acc) p
-      in
-      go tail prefix
+    let digest = Stable.V1.digest
   end
 
-  type t = (Repr.t, Hash.t) With_hash.t [@@deriving sexp]
+  module Stable = struct
+    module V1 = struct
+      module T = struct
+        type t = (Repr.Stable.V1.t, Hash.Stable.V1.t) With_hash.Stable.V1.t
+        [@@deriving sexp, version, to_yojson]
 
-  let to_repr (t : t) = t.data
+        let compare (t1 : t) (t2 : t) = Hash.compare t1.hash t2.hash
 
-  let of_repr r = {With_hash.data= r; hash= Repr.digest r}
+        let equal (t1 : t) (t2 : t) = Hash.equal t1.hash t2.hash
 
-  let compare (t1 : t) (t2 : t) = Hash.compare t1.hash t2.hash
+        let hash (t : t) = Hash.hash t.hash
 
-  let equal (t1 : t) (t2 : t) = Hash.equal t1.hash t2.hash
+        let hash_fold_t s (t : t) = Hash.hash_fold_t s t.hash
 
-  let hash t = Repr.hash (to_repr t)
+        let to_repr (t : t) = t.data
 
-  let hash_fold_t s t = Repr.hash_fold_t s (to_repr t)
+        let of_repr r =
+          {With_hash.Stable.V1.data= r; hash= Repr.Stable.V1.digest r}
 
-  let to_yojson = Fn.compose Repr.to_yojson to_repr
+        include Binable.Of_binable
+                  (Repr.Stable.V1)
+                  (struct
+                    type nonrec t = t
 
-  include Binable.Of_binable
-            (Repr)
-            (struct
-              type nonrec t = t
+                    let to_binable = to_repr
 
-              let to_binable = to_repr
+                    let of_binable = of_repr
+                  end)
+      end
 
-              let of_binable = of_repr
-            end)
+      include T
+      include Registration.Make_latest_version (T)
+    end
+
+    module Latest = V1
+
+    module Module_decl = struct
+      let name = "checkpoints_proof_of_stake"
+
+      type latest = Latest.t
+    end
+
+    module Registrar = Registration.Make (Module_decl)
+    module Registered_V1 = Registrar.Register (V1)
+  end
+
+  type t = (Repr.t, Hash.t) With_hash.t [@@deriving sexp, to_yojson]
+
+  let compare, equal, hash, hash_fold_t =
+    Stable.Latest.(compare, equal, hash, hash_fold_t)
 
   let empty : t =
     let dummy = Hash.of_hash Snark_params.Tick.Field.zero in
@@ -1023,26 +1242,66 @@ end
    which is in the same checkpoint window as the given state.
 *)
 module Consensus_state = struct
-  type ( 'length
-       , 'vrf_output
-       , 'amount
-       , 'epoch
-       , 'slot
-       , 'epoch_data
-       , 'bool
-       , 'checkpoints )
-       t_ =
-    { length: 'length
-    ; epoch_length: 'length
-    ; last_vrf_output: 'vrf_output
-    ; total_currency: 'amount
-    ; curr_epoch: 'epoch
-    ; curr_slot: 'slot
-    ; last_epoch_data: 'epoch_data
-    ; curr_epoch_data: 'epoch_data
-    ; has_ancestor_in_same_checkpoint_window: 'bool
-    ; checkpoints: 'checkpoints }
-  [@@deriving sexp, bin_io, eq, compare, hash, to_yojson]
+  module Poly = struct
+    module Stable = struct
+      module V1 = struct
+        module T = struct
+          type ( 'length
+               , 'vrf_output
+               , 'amount
+               , 'epoch
+               , 'slot
+               , 'epoch_data
+               , 'bool
+               , 'checkpoints ) t =
+            { length: 'length
+            ; epoch_length: 'length
+            ; last_vrf_output: 'vrf_output
+            ; total_currency: 'amount
+            ; curr_epoch: 'epoch
+            ; curr_slot: 'slot
+            ; last_epoch_data: 'epoch_data
+            ; curr_epoch_data: 'epoch_data
+            ; has_ancestor_in_same_checkpoint_window: 'bool
+            ; checkpoints: 'checkpoints }
+          [@@deriving sexp, bin_io, eq, compare, hash, to_yojson, version]
+        end
+
+        include T
+      end
+
+      module Latest = V1
+    end
+
+    type ( 'length
+         , 'vrf_output
+         , 'amount
+         , 'epoch
+         , 'slot
+         , 'epoch_data
+         , 'bool
+         , 'checkpoints ) t =
+                             ( 'length
+                             , 'vrf_output
+                             , 'amount
+                             , 'epoch
+                             , 'slot
+                             , 'epoch_data
+                             , 'bool
+                             , 'checkpoints )
+                             Stable.Latest.t =
+      { length: 'length
+      ; epoch_length: 'length
+      ; last_vrf_output: 'vrf_output
+      ; total_currency: 'amount
+      ; curr_epoch: 'epoch
+      ; curr_slot: 'slot
+      ; last_epoch_data: 'epoch_data
+      ; curr_epoch_data: 'epoch_data
+      ; has_ancestor_in_same_checkpoint_window: 'bool
+      ; checkpoints: 'checkpoints }
+    [@@deriving sexp, eq, compare, hash, to_yojson]
+  end
 
   module Value = struct
     module Stable = struct
@@ -1050,16 +1309,15 @@ module Consensus_state = struct
         module T = struct
           type t =
             ( Length.Stable.V1.t
-            , Vrf.Output.t
+            , Vrf.Output.Stable.V1.t
             , Amount.Stable.V1.t
             , Epoch.Stable.V1.t
             , Epoch.Slot.Stable.V1.t
-            , Epoch_data.value
+            , Epoch_data.Value.Stable.V1.t
             , bool
-            , Checkpoints.t )
-            t_
-          [@@deriving
-            sexp, bin_io, eq, compare, hash, to_yojson, version {asserted}]
+            , Checkpoints.Stable.V1.t )
+            Poly.Stable.V1.t
+          [@@deriving sexp, bin_io, eq, compare, hash, version, to_yojson]
         end
 
         include T
@@ -1069,7 +1327,7 @@ module Consensus_state = struct
       module Latest = V1
 
       module Module_decl = struct
-        let name = "consensus_proof_of_stake"
+        let name = "consensus_state_proof_of_stake"
 
         type latest = Latest.t
       end
@@ -1093,10 +1351,10 @@ module Consensus_state = struct
     , Epoch_data.var
     , Boolean.var
     , Checkpoints.var )
-    t_
+    Poly.t
 
   let to_hlist
-      { length
+      { Poly.length
       ; epoch_length
       ; last_vrf_output
       ; total_currency
@@ -1140,18 +1398,17 @@ module Consensus_state = struct
          , 'epoch_data
          , 'bool
          , 'checkpoints )
-         t_ =
-   fun Coda_base.H_list.
-         [ length
-         ; epoch_length
-         ; last_vrf_output
-         ; total_currency
-         ; curr_epoch
-         ; curr_slot
-         ; last_epoch_data
-         ; curr_epoch_data
-         ; has_ancestor_in_same_checkpoint_window
-         ; checkpoints ] ->
+         Poly.t =
+   fun Coda_base.H_list.([ length
+                         ; epoch_length
+                         ; last_vrf_output
+                         ; total_currency
+                         ; curr_epoch
+                         ; curr_slot
+                         ; last_epoch_data
+                         ; curr_epoch_data
+                         ; has_ancestor_in_same_checkpoint_window
+                         ; checkpoints ]) ->
     { length
     ; epoch_length
     ; last_vrf_output
@@ -1181,14 +1438,14 @@ module Consensus_state = struct
       ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist ~value_of_hlist:of_hlist
 
   let var_to_triples
-      { length
+      { Poly.length
       ; epoch_length
       ; last_vrf_output
       ; total_currency
       ; curr_epoch
       ; curr_slot
       ; last_epoch_data
-      ; curr_epoch_data } =
+      ; curr_epoch_data; _ } =
     let open Snark_params.Tick.Checked.Let_syntax in
     let%map last_epoch_data_triples = Epoch_data.var_to_triples last_epoch_data
     and curr_epoch_data_triples = Epoch_data.var_to_triples curr_epoch_data in
@@ -1201,14 +1458,14 @@ module Consensus_state = struct
     @ last_epoch_data_triples @ curr_epoch_data_triples
 
   let fold
-      { length
+      { Poly.length
       ; epoch_length
       ; last_vrf_output
       ; curr_epoch
       ; curr_slot
       ; total_currency
       ; last_epoch_data
-      ; curr_epoch_data } =
+      ; curr_epoch_data; _ } =
     let open Fold in
     Length.fold length +> Length.fold epoch_length
     +> Vrf.Output.fold last_vrf_output
@@ -1224,7 +1481,7 @@ module Consensus_state = struct
     + Epoch_data.length_in_triples + Epoch_data.length_in_triples
 
   let genesis : Value.t =
-    { length= Length.zero
+    { Poly.length= Length.zero
     ; epoch_length= Length.zero
     ; last_vrf_output= Vrf.Output.dummy
     ; total_currency= genesis_ledger_total_currency
@@ -1242,13 +1499,12 @@ module Consensus_state = struct
     Core.Int.(checkpoint_window slot1 = checkpoint_window slot2)
 
   let update ~(previous_consensus_state : Value.t)
-      ~(consensus_transition_data : Consensus_transition_data.value)
+      ~(consensus_transition_data : Consensus_transition_data.Value.t)
       ~(previous_protocol_state_hash : Coda_base.State_hash.t)
       ~(supply_increase : Currency.Amount.t)
       ~(snarked_ledger_hash : Coda_base.Frozen_ledger_hash.t)
       ~(proposer_vrf_result : Random_oracle.Digest.t) : Value.t Or_error.t =
     let open Or_error.Let_syntax in
-    let open Consensus_transition_data in
     let%map total_currency =
       Amount.add previous_consensus_state.total_currency supply_increase
       |> Option.map ~f:Or_error.return
@@ -1273,7 +1529,7 @@ module Consensus_state = struct
         Checkpoints.cons previous_protocol_state_hash
           previous_consensus_state.checkpoints
     in
-    { length= Length.succ previous_consensus_state.length
+    { Poly.length= Length.succ previous_consensus_state.length
     ; epoch_length
     ; last_vrf_output= proposer_vrf_result
     ; total_currency
@@ -1333,10 +1589,13 @@ module Consensus_state = struct
       ~(supply_increase : Currency.Amount.var)
       ~(previous_blockchain_state_ledger_hash :
          Coda_base.Frozen_ledger_hash.var) =
-    let open Consensus_transition_data in
     let open Snark_params.Tick in
-    let {curr_epoch= prev_epoch; curr_slot= prev_slot; _} = previous_state in
-    let {epoch= next_epoch; slot= next_slot} = transition_data in
+    let {Poly.curr_epoch= prev_epoch; curr_slot= prev_slot; _} =
+      previous_state
+    in
+    let {Consensus_transition_data.Poly.epoch= next_epoch; slot= next_slot} =
+      transition_data
+    in
     let%bind epoch_increased =
       let%bind c = Epoch.compare_var prev_epoch next_epoch in
       let%map () = Boolean.Assert.is_true c.less_or_equal in
@@ -1424,7 +1683,7 @@ module Consensus_state = struct
         Coda_base.State_hash.if_ in_seed_update_range
           ~then_:previous_protocol_state_hash ~else_:base
       in
-      {Epoch_data.seed; length; ledger; start_checkpoint; lock_checkpoint}
+      {Epoch_data.Poly.seed; length; ledger; start_checkpoint; lock_checkpoint}
     and length = Length.increment_var previous_state.length
     (* TODO: keep track of total_currency in transaction snark. The current_slot
      * implementation would allow an adversary to make then total_currency incorrect by
@@ -1436,7 +1695,7 @@ module Consensus_state = struct
     in
     Checked.return
       ( `Success threshold_satisfied
-      , { length
+      , { Poly.length
         ; epoch_length
         ; last_vrf_output= vrf_result
         ; curr_epoch= transition_data.epoch
@@ -1549,7 +1808,9 @@ let generate_transition ~(previous_protocol_state : Protocol_state.Value.t)
     let time = Time.of_span_since_epoch (Time.Span.of_ms time) in
     Epoch.epoch_and_slot_of_time_exn time
   in
-  let consensus_transition_data = Consensus_transition_data.{epoch; slot} in
+  let consensus_transition_data =
+    Consensus_transition_data.Poly.{epoch; slot}
+  in
   let consensus_state =
     Or_error.ok_exn
       (Consensus_state.update ~previous_consensus_state
@@ -1911,7 +2172,7 @@ module For_tests = struct
         if prev.has_ancestor_in_same_checkpoint_window then prev.checkpoints
         else Checkpoints.cons previous_protocol_state.hash prev.checkpoints
       in
-      { length
+      { Poly.length
       ; epoch_length
       ; last_vrf_output= proposer_vrf_result
       ; total_currency
@@ -1988,8 +2249,8 @@ let%test_module "Proof of stake tests" =
         Epoch.epoch_and_slot_of_time_exn
           (Time.of_time (Core_kernel.Time.now ()))
       in
-      let consensus_transition_data : Consensus_transition_data.value =
-        {epoch; slot}
+      let consensus_transition_data : Consensus_transition_data.Value.t =
+        {Consensus_transition_data.Poly.epoch; slot}
       in
       let previous_protocol_state_hash =
         With_hash.hash previous_protocol_state

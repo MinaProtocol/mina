@@ -41,14 +41,15 @@ module Make (Depth : Intf.Depth) = struct
     include Hashable.Make (T)
   end
 
+  (* TODO : version *)
   module T = struct
     type t =
       | Generic of Bigstring.t
           [@printer
             fun fmt bstr ->
               Format.pp_print_string fmt (Bigstring.to_string bstr)]
-      | Account of Addr.t
-      | Hash of Addr.t
+      | Account of Addr.Stable.V1.t
+      | Hash of Addr.Stable.V1.t
     [@@deriving hash, sexp, compare, eq, bin_io]
   end
 

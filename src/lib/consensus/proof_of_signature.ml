@@ -82,16 +82,57 @@ module Blockchain_state = Coda_base.Blockchain_state.Make (Genesis_ledger)
 module Lite_compat = Lite_compat.Make (Blockchain_state)
 
 module Consensus_transition_data = struct
-  type 'signature t_ = {signature: 'signature} [@@deriving bin_io, sexp]
+  module Poly = struct
+    module Stable = struct
+      module V1 = struct
+        module T = struct
+          type 'signature t = {signature: 'signature}
+          [@@deriving bin_io, sexp, version]
+        end
 
-  type value = Signature.Stable.V1.t t_ [@@deriving bin_io, sexp]
+        include T
+      end
 
-  type var = Signature.var t_
+      module Latest = V1
+    end
 
-  let to_hlist {signature} = H_list.[signature]
+    type 'signature t = 'signature Stable.Latest.t = {signature: 'signature}
+    [@@deriving sexp]
+  end
 
-  let of_hlist : (unit, 'signature -> unit) H_list.t -> 'signature t_ =
-   fun H_list.[signature] -> {signature}
+  module Value = struct
+    module Stable = struct
+      module V1 = struct
+        module T = struct
+          type t = Signature.Stable.V1.t Poly.Stable.V1.t
+          [@@deriving bin_io, sexp, version]
+        end
+
+        include T
+        include Module_version.Registration.Make_latest_version (T)
+      end
+
+      module Latest = V1
+
+      module Module_decl = struct
+        let name = "consensus_transition_data_proof_of_stake"
+
+        type latest = Latest.t
+      end
+
+      module Registrar = Module_version.Registration.Make (Module_decl)
+      module Registered_V1 = Registrar.Register (V1)
+    end
+
+    type t = Stable.Latest.t [@@deriving sexp]
+  end
+
+  type var = Signature.var Poly.t
+
+  let to_hlist {Poly.signature} = H_list.[signature]
+
+  let of_hlist : (unit, 'signature -> unit) H_list.t -> 'signature Poly.t =
+   fun H_list.([signature]) -> {Poly.signature}
 
   let data_spec =
     Snark_params.Tick.Data_spec.[Blockchain_state.Signature.Signature.typ]
@@ -101,18 +142,34 @@ module Consensus_transition_data = struct
       ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist ~value_of_hlist:of_hlist
 
   let create_value ~private_key blockchain_state =
-    {signature= Blockchain_state.Signature.sign private_key blockchain_state}
+    { Poly.signature=
+        Blockchain_state.Signature.sign private_key blockchain_state }
 
   let genesis =
-    { signature=
+    { Poly.signature=
         Blockchain_state.Signature.sign Global_public_key.genesis_private_key
           Blockchain_state.genesis }
 end
 
 module Consensus_state = struct
-  type ('length, 'public_key) t_ =
-    {length: 'length; signer_public_key: 'public_key}
-  [@@deriving eq, bin_io, sexp, hash, compare, to_yojson]
+  module Poly = struct
+    module Stable = struct
+      module V1 = struct
+        module T = struct
+          type ('length, 'public_key) t =
+            {length: 'length; signer_public_key: 'public_key}
+          [@@deriving eq, bin_io, sexp, hash, compare, to_yojson, version]
+        end
+
+        include T
+      end
+
+      module Latest = V1
+    end
+
+    type ('length, 'public_key) t = ('length, 'public_key) Stable.Latest.t =
+      {length: 'length; signer_public_key: 'public_key}
+  end
 
   type display = {length: string} [@@deriving yojson]
 
@@ -120,21 +177,21 @@ module Consensus_state = struct
     module Stable = struct
       module V1 = struct
         module T = struct
-          type t = (Length.Stable.V1.t, Public_key.Compressed.Stable.V1.t) t_
-          [@@deriving
-            bin_io, sexp, hash, compare, to_yojson, version {asserted}]
+          type t =
+            ( Length.Stable.V1.t
+            , Public_key.Compressed.Stable.V1.t )
+            Poly.Stable.V1.t
+          [@@deriving eq, bin_io, sexp, hash, compare, to_yojson, version]
         end
 
         include T
         include Registration.Make_latest_version (T)
-
-        let equal = equal_t_ Length.equal Public_key.Compressed.equal
       end
 
       module Latest = V1
 
       module Module_decl = struct
-        let name = "consensus_proof_of_signature"
+        let name = "consensus_state_proof_of_signature"
 
         type latest = Latest.t
       end
@@ -147,20 +204,21 @@ module Consensus_state = struct
     [@@deriving sexp, hash, compare, eq, to_yojson]
   end
 
-  type var = (Length.Unpacked.var, Public_key.Compressed.var) t_
+  type var = (Length.Unpacked.var, Public_key.Compressed.var) Poly.t
 
   let length_in_triples =
     Length.length_in_triples + Public_key.Compressed.length_in_triples
 
   let genesis =
-    {length= Length.zero; signer_public_key= Global_public_key.compressed}
+    {Poly.length= Length.zero; signer_public_key= Global_public_key.compressed}
 
-  let to_hlist {length; signer_public_key} = H_list.[length; signer_public_key]
+  let to_hlist {Poly.length; signer_public_key} =
+    H_list.[length; signer_public_key]
 
   let of_hlist :
          (unit, 'length -> 'public_key -> unit) H_list.t
-      -> ('length, 'public_key) t_ =
-   fun H_list.[length; signer_public_key] -> {length; signer_public_key}
+      -> ('length, 'public_key) Poly.t =
+   fun H_list.([length; signer_public_key]) -> {Poly.length; signer_public_key}
 
   let data_spec =
     let open Snark_params.Tick.Data_spec in
@@ -170,18 +228,18 @@ module Consensus_state = struct
     Snark_params.Tick.Typ.of_hlistable data_spec ~var_to_hlist:to_hlist
       ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist ~value_of_hlist:of_hlist
 
-  let var_to_triples {length; signer_public_key} =
+  let var_to_triples {Poly.length; signer_public_key} =
     let open Snark_params.Tick.Checked.Let_syntax in
     let%map public_key_triples =
       Public_key.Compressed.var_to_triples signer_public_key
     in
     Length.Unpacked.var_to_triples length @ public_key_triples
 
-  let fold {length; signer_public_key} =
+  let fold {Poly.length; signer_public_key} =
     Fold.(Length.fold length +> Public_key.Compressed.fold signer_public_key)
 
   let update (state : Value.t) =
-    { length= Length.succ state.length
+    { Poly.length= Length.succ state.length
     ; signer_public_key= Global_public_key.compressed }
 
   let length (t : Value.t) = t.length
@@ -190,7 +248,7 @@ module Consensus_state = struct
 
   let to_lite =
     Some
-      (fun {length; signer_public_key} ->
+      (fun {Poly.length; signer_public_key} ->
         { Lite_base.Consensus_state.length= Lite_compat.length length
         ; signer_public_key= Lite_compat.public_key signer_public_key } )
 
@@ -225,7 +283,7 @@ let generate_transition ~previous_protocol_state ~blockchain_state ~time:_
   in
   let consensus_state =
     let open Consensus_state in
-    { length= Length.succ previous_consensus_state.length
+    { Poly.length= Length.succ previous_consensus_state.length
     ; signer_public_key= Global_public_key.compressed }
   in
   let protocol_state =
@@ -238,7 +296,7 @@ let generate_transition ~previous_protocol_state ~blockchain_state ~time:_
 let received_at_valid_time _ ~time_received:_ = true
 
 let is_transition_valid_checked (transition : Snark_transition.var) =
-  let Consensus_transition_data.{signature} =
+  let {Consensus_transition_data.Poly.signature} =
     Snark_transition.consensus_data transition
   in
   let open Snark_params.Tick.Checked.Let_syntax in
@@ -264,10 +322,11 @@ let next_state_checked ~(prev_state : Protocol_state.var) ~prev_state_hash:_
     Public_key.Compressed.Checked.Assert.equal prev_state.signer_public_key
       signer_public_key
   and success = is_transition_valid_checked block in
-  (`Success success, {length; signer_public_key})
+  (`Success success, {Poly.length; signer_public_key})
 
-let select ~existing:Consensus_state.{length= l1; signer_public_key= _}
-    ~candidate:Consensus_state.{length= l2; signer_public_key= _} ~logger:_ =
+let select ~existing:{Consensus_state.Poly.length= l1; signer_public_key= _}
+    ~candidate:{Consensus_state.Poly.length= l2; signer_public_key= _}
+    ~logger:_ =
   if Length.compare l1 l2 >= 0 then `Keep else `Take
 
 let next_proposal now _state ~local_state:_ ~keypair ~logger:_ =
@@ -313,7 +372,8 @@ module For_tests = struct
     let prev : Consensus_state.Value.t =
       Protocol_state.consensus_state (With_hash.data previous_protocol_state)
     in
-    {length= Length.succ prev.length; signer_public_key= prev.signer_public_key}
+    { Poly.length= Length.succ prev.length
+    ; signer_public_key= prev.signer_public_key }
 
   let create_genesis_protocol_state ledger =
     let root_ledger_hash = Ledger.merkle_root ledger in

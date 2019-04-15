@@ -16,3 +16,6 @@
 [submodule "src/external/digestif"]
 	path = src/external/digestif
 	url = git@github.com:CodaProtocol/digestif.git
+[submodule "frontend/wallet/tablecloth"]
+	path = frontend/wallet/tablecloth
+	url = https://github.com/bkase/tablecloth
