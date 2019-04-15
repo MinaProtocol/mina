@@ -51,10 +51,8 @@ let%test_module "Transition_handler.Catchup_scheduler tests" =
     let transition_with_hash_enveloped
         (transition_with_hash :
           (External_transition.Verified.t, 'a) With_hash.t) =
-      { transition_with_hash with
-        data=
-          Envelope.Incoming.wrap ~data:transition_with_hash.data
-            ~sender:Envelope.Sender.Local }
+      Envelope.Incoming.wrap ~data:transition_with_hash
+        ~sender:Envelope.Sender.Local
 
     let extract_children_from ~reader ~root =
       let open Deferred.Let_syntax in
@@ -103,10 +101,8 @@ let%test_module "Transition_handler.Catchup_scheduler tests" =
               Transition_frontier.Breadcrumb.transition_with_hash
                 dangling_breadcrumb
             in
-            { transition_with_hash with
-              data=
-                Envelope.Incoming.wrap ~data:transition_with_hash.data
-                  ~sender:Envelope.Sender.Local }
+            Envelope.Incoming.wrap ~data:transition_with_hash
+              ~sender:Envelope.Sender.Local
             |> Cached.pure
           in
           Catchup_scheduler.watch scheduler ~timeout_duration
@@ -122,9 +118,8 @@ let%test_module "Transition_handler.Catchup_scheduler tests" =
           in
           let catchup_parent_hash =
             Cached.peek cached_catchup_transition
-            |> With_hash.data |> Envelope.Incoming.data
-            |> External_transition.Verified.protocol_state
-            |> Protocol_state.previous_state_hash
+            |> Envelope.Incoming.data |> With_hash.data
+            |> External_transition.Verified.parent_hash
           in
           assert (Coda_base.State_hash.equal missing_hash catchup_parent_hash) ;
           Strict_pipe.Writer.close catchup_breadcrumbs_writer ;

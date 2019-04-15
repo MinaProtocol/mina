@@ -167,13 +167,15 @@ module Make (Inputs : Inputs_intf) :
       in
       kill bootstrap_controller_reader bootstrap_controller_writer ;
       ( new_frontier
-      , List.map collected_transitions
-          ~f:
-            (With_hash.of_data
-               ~hash_data:
-                 (Fn.compose Consensus.Protocol_state.hash
-                    (Fn.compose External_transition.Verified.protocol_state
-                       Envelope.Incoming.data))) )
+      , List.map collected_transitions ~f:(fun transition ->
+            Envelope.Incoming.wrap
+              ~sender:(Envelope.Incoming.sender transition)
+              ~data:
+                ( Envelope.Incoming.data transition
+                |> With_hash.of_data
+                     ~hash_data:
+                       (Fn.compose Consensus.Protocol_state.hash
+                          External_transition.Verified.protocol_state) ) ) )
     in
     let start_transition_frontier_controller ~verified_transition_writer
         ~clear_reader ~collected_transitions frontier =

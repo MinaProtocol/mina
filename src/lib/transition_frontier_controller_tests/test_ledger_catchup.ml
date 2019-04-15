@@ -34,10 +34,8 @@ let%test_module "Ledger catchup" =
     let transition_with_hash_enveloped
         (transition_with_hash :
           (External_transition.Verified.t, 'a) With_hash.t) =
-      { transition_with_hash with
-        data=
-          Envelope.Incoming.wrap ~data:transition_with_hash.data
-            ~sender:Envelope.Sender.Local }
+      Envelope.Incoming.wrap ~data:transition_with_hash
+        ~sender:Envelope.Sender.Local
 
     let test_catchup ~logger ~network (me : Transition_frontier.t) transition
         expected_breadcrumbs =
@@ -119,7 +117,9 @@ let%test_module "Ledger catchup" =
           let best_breadcrumb = Transition_frontier.best_tip peer.frontier in
           let best_transition =
             Transition_frontier.Breadcrumb.transition_with_hash best_breadcrumb
-            |> transition_with_hash_enveloped
+          in
+          let best_transition_enveloped =
+            transition_with_hash_enveloped best_transition
           in
           Logger.info logger ~module_:__MODULE__ ~location:__LOC__
             ~metadata:
@@ -133,7 +133,7 @@ let%test_module "Ledger catchup" =
             |> Option.value_exn
           in
           let%map result =
-            test_catchup ~logger ~network me best_transition
+            test_catchup ~logger ~network me best_transition_enveloped
               (Rose_tree.of_list_exn @@ Non_empty_list.tail history)
           in
           assert result )

@@ -42,7 +42,7 @@ module Make (Inputs : Inputs_intf) :
             List.mem children new_child
               ~equal:
                 (Envelope.Incoming.equal
-                   ~equal_data:Inputs.External_transition.Verified.equal)
+                   Inputs.External_transition.Verified.equal)
           then children
           else new_child :: children )
 

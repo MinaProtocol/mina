@@ -7,17 +7,10 @@ module Sender = struct
     module V1 = struct
       module T = struct
         type t = Local | Remote of Peer.Stable.V1.t
-        [@@deriving sexp, bin_io, yojson, version]
+        [@@deriving eq, sexp, bin_io, yojson, version]
       end
 
       include T
-
-      let equal t t' =
-        match (t, t') with
-        | Local, Local -> true
-        | Remote p, Remote p' -> Peer.Stable.V1.compare p p' = 0
-        | _ -> false
-
       include Registration.Make_latest_version (T)
     end
 
@@ -43,22 +36,17 @@ module Incoming = struct
     module V1 = struct
       module T = struct
         type 'a t = {data: 'a; sender: Sender.Stable.V1.t}
-        [@@deriving sexp, bin_io, yojson, version]
+        [@@deriving eq, sexp, bin_io, yojson, version]
       end
 
       include T
-
-      let equal ~equal_data t t' =
-        Sender.Stable.V1.equal t.sender t'.sender && equal_data t.data t'.data
     end
 
     module Latest = V1
   end
 
   (* bin_io intentionally omitted *)
-  type 'a t = 'a Stable.Latest.t [@@deriving sexp, yojson]
-
-  let equal = Stable.Latest.equal
+  type 'a t = 'a Stable.Latest.t [@@deriving eq, sexp, yojson]
 
   let sender t = t.Stable.Latest.sender
 

@@ -14,20 +14,20 @@ module Transmuter = struct
   module Make (Inputs : Inputs.S) :
     Cache_lib.Intf.Transmuter.S
     with type Source.t =
-                ( Inputs.External_transition.Verified.t Envelope.Incoming.t
+                ( Inputs.External_transition.Verified.t
                 , State_hash.t )
                 With_hash.t
+                Envelope.Incoming.t
      and type Target.t = State_hash.t = struct
     module Source = struct
       type t =
-        ( Inputs.External_transition.Verified.t Envelope.Incoming.t
-        , State_hash.t )
-        With_hash.t
+        (Inputs.External_transition.Verified.t, State_hash.t) With_hash.t
+        Envelope.Incoming.t
     end
 
     module Target = State_hash
 
-    let transmute = With_hash.hash
+    let transmute = Fn.compose With_hash.hash Envelope.Incoming.data
   end
 end
 
@@ -36,8 +36,7 @@ module Make (Inputs : Inputs.S) :
   with module Cached := Cache_lib.Cached
    and module Cache := Cache_lib.Cache
    and type source =
-              ( Inputs.External_transition.Verified.t Envelope.Incoming.t
-              , State_hash.t )
-              With_hash.t
+              (Inputs.External_transition.Verified.t, State_hash.t) With_hash.t
+              Envelope.Incoming.t
    and type target = State_hash.t =
   Cache_lib.Transmuter_cache.Make (Transmuter.Make (Inputs)) (Name)

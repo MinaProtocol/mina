@@ -44,8 +44,7 @@ module Make (Inputs : Inputs.S) :
   open Inputs
 
   let get_previous_state_hash transition =
-    transition |> With_hash.data |> External_transition.Verified.protocol_state
-    |> External_transition.Protocol_state.previous_state_hash
+    transition |> With_hash.data |> External_transition.Verified.parent_hash
 
   (* We would like the async scheduler to context switch between each iteration
      of external transitions when trying to build breadcrumb_path. Therefore,
@@ -78,16 +77,14 @@ module Make (Inputs : Inputs.S) :
           let%map cached_result =
             Cached.transform cached_transition_with_hash
               ~f:(fun (transition_with_hash_enveloped :
-                        ( External_transition.Verified.t Envelope.Incoming.t
+                        ( External_transition.Verified.t
                         , State_hash.t )
-                        With_hash.t)
+                        With_hash.t
+                        Envelope.Incoming.t)
                  ->
                 let open Deferred.Or_error.Let_syntax in
                 let transition_with_hash =
-                  { transition_with_hash_enveloped with
-                    data=
-                      Envelope.Incoming.data
-                      @@ With_hash.data transition_with_hash_enveloped }
+                  Envelope.Incoming.data transition_with_hash_enveloped
                 in
                 let parent_or_initial =
                   Cached.peek cached_parent_breadcrumb_or_initial
@@ -149,8 +146,8 @@ module Make (Inputs : Inputs.S) :
   let materialize_breadcrumbs ~frontier ~logger ~peer
       (Rose_tree.T (foreign_transition_head, _) as tree) =
     let initial_state_hash =
-      With_hash.data (Cached.peek foreign_transition_head)
-      |> Envelope.Incoming.data |> External_transition.Verified.protocol_state
+      Envelope.Incoming.data (Cached.peek foreign_transition_head)
+      |> With_hash.data |> External_transition.Verified.protocol_state
       |> External_transition.Protocol_state.previous_state_hash
     in
     match Transition_frontier.find frontier initial_state_hash with
@@ -192,10 +189,8 @@ module Make (Inputs : Inputs.S) :
                External_transition.Verified.protocol_state)
       in
       let verified_transition_with_hash_enveloped =
-        { verified_transition_with_hash with
-          data=
-            Envelope.Incoming.wrap ~data:verified_transition_with_hash.data
-              ~sender:(Envelope.Incoming.sender transition_enveloped) }
+        Envelope.Incoming.wrap ~data:verified_transition_with_hash
+          ~sender:(Envelope.Incoming.sender transition_enveloped)
       in
       Deferred.return
       @@ Transition_handler_validator.validate_transition ~logger ~frontier
@@ -234,7 +229,9 @@ module Make (Inputs : Inputs.S) :
       ~num_peers ~unprocessed_transition_cache ~target_subtree =
     let peers = Network.random_peers network num_peers in
     let (Rose_tree.T (target_transition, _)) = target_subtree in
-    let target_hash = With_hash.hash (Cached.peek target_transition) in
+    let target_hash =
+      With_hash.hash @@ Envelope.Incoming.data (Cached.peek target_transition)
+    in
     let open Deferred.Or_error.Let_syntax in
     Logger.trace logger "doing a catchup job with target $target_hash"
       ~module_:__MODULE__ ~location:__LOC__
@@ -243,9 +240,8 @@ module Make (Inputs : Inputs.S) :
         ; ( "target_subtree"
           , Rose_tree.to_yojson
               (fun elem ->
-                Cached.peek elem |> With_hash.data
-                |> Envelope.Incoming.to_yojson
-                     Inputs.External_transition.Verified.to_yojson )
+                Cached.peek elem |> Envelope.Incoming.data |> With_hash.data
+                |> Inputs.External_transition.Verified.to_yojson )
               target_subtree ) ] ;
     Deferred.Or_error.find_map_ok peers ~f:(fun peer ->
         O1trace.trace_recurring_task "ledger catchup" (fun () ->

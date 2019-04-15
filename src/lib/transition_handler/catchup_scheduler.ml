@@ -18,15 +18,13 @@ open Coda_base
 
 module Make (Inputs : Inputs.S) = struct
   open Inputs
-  open Consensus
 
   type t =
     { logger: Logger.t
     ; time_controller: Time.Controller.t
     ; catchup_job_writer:
-        ( ( ( External_transition.Verified.t Envelope.Incoming.t
-            , State_hash.t )
-            With_hash.t
+        ( ( (External_transition.Verified.t, State_hash.t) With_hash.t
+            Envelope.Incoming.t
           , State_hash.t )
           Cached.t
           Rose_tree.t
@@ -40,9 +38,8 @@ module Make (Inputs : Inputs.S) = struct
               its corresponding value in the hash table would just be an empty
               list. *)
     ; collected_transitions:
-        ( ( External_transition.Verified.t Envelope.Incoming.t
-          , State_hash.t )
-          With_hash.t
+        ( (External_transition.Verified.t, State_hash.t) With_hash.t
+          Envelope.Incoming.t
         , State_hash.t )
         Cached.t
         list
@@ -52,9 +49,8 @@ module Make (Inputs : Inputs.S) = struct
               timeouts. *)
     ; parent_root_timeouts: unit Time.Timeout.t State_hash.Table.t
     ; breadcrumb_builder_supervisor:
-        ( ( External_transition.Verified.t Envelope.Incoming.t
-          , State_hash.t )
-          With_hash.t
+        ( (External_transition.Verified.t, State_hash.t) With_hash.t
+          Envelope.Incoming.t
         , State_hash.t )
         Cached.t
         Rose_tree.t
@@ -65,9 +61,8 @@ module Make (Inputs : Inputs.S) = struct
     Deferred.List.map transition_subtrees
       ~f:(fun (Rose_tree.T (subtree_root, _) as subtree) ->
         let subtree_root_parent_hash =
-          Envelope.Incoming.data (With_hash.data (Cached.peek subtree_root))
-          |> External_transition.Verified.protocol_state
-          |> Protocol_state.previous_state_hash
+          With_hash.data @@ Envelope.Incoming.data (Cached.peek subtree_root)
+          |> External_transition.Verified.parent_hash
         in
         let branch_parent =
           Transition_frontier.find_exn frontier subtree_root_parent_hash
@@ -78,10 +73,7 @@ module Make (Inputs : Inputs.S) = struct
               Cached.transform cached_transition_with_hash
                 ~f:(fun transition_with_hash_enveloped ->
                   let transition_with_hash =
-                    { transition_with_hash_enveloped with
-                      data=
-                        Envelope.Incoming.data
-                        @@ With_hash.data transition_with_hash_enveloped }
+                    Envelope.Incoming.data transition_with_hash_enveloped
                   in
                   Transition_frontier.Breadcrumb.build ~logger
                     ~parent:(Cached.peek parent) ~transition_with_hash )
@@ -116,14 +108,12 @@ module Make (Inputs : Inputs.S) = struct
 
   let mem t transition =
     Hashtbl.mem t.collected_transitions
-      ( With_hash.data transition |> External_transition.Verified.protocol_state
-      |> Protocol_state.previous_state_hash )
+      (With_hash.data transition |> External_transition.Verified.parent_hash)
 
   let has_timeout t transition =
     Hashtbl.mem t.parent_root_timeouts
-      ( With_hash.data transition |> Envelope.Incoming.data
-      |> External_transition.Verified.protocol_state
-      |> Protocol_state.previous_state_hash )
+      ( With_hash.data @@ Envelope.Incoming.data transition
+      |> External_transition.Verified.parent_hash )
 
   let is_empty t =
     Hashtbl.is_empty t.collected_transitions
@@ -144,7 +134,8 @@ module Make (Inputs : Inputs.S) = struct
     let successors =
       Option.value ~default:[]
         (Hashtbl.find t.collected_transitions
-           (With_hash.hash (Cached.peek cached_transition)))
+           ( With_hash.hash
+           @@ Envelope.Incoming.data (Cached.peek cached_transition) ))
     in
     Rose_tree.T (cached_transition, List.map successors ~f:(extract_subtree t))
 
@@ -155,14 +146,17 @@ module Make (Inputs : Inputs.S) = struct
     in
     Hashtbl.remove t.collected_transitions parent_hash ;
     List.iter children ~f:(fun child ->
-        remove_tree t (With_hash.hash (Cached.peek child)) )
+        remove_tree t
+          (With_hash.hash @@ Envelope.Incoming.data (Cached.peek child)) )
 
   let watch t ~timeout_duration ~cached_transition =
-    let hash = With_hash.hash (Cached.peek cached_transition) in
+    let transition_with_hash =
+      Envelope.Incoming.data (Cached.peek cached_transition)
+    in
+    let hash = With_hash.hash transition_with_hash in
     let parent_hash =
-      Envelope.Incoming.data (With_hash.data (Cached.peek cached_transition))
-      |> External_transition.Verified.protocol_state
-      |> Protocol_state.previous_state_hash
+      With_hash.data transition_with_hash
+      |> External_transition.Verified.parent_hash
     in
     let make_timeout duration =
       Time.Timeout.create t.time_controller duration ~f:(fun _ ->
@@ -176,9 +170,8 @@ module Make (Inputs : Inputs.S) = struct
                 )
               ; ( "cached_transition"
                 , Cached.peek cached_transition
-                  |> With_hash.data
-                  |> Envelope.Incoming.to_yojson
-                       Inputs.External_transition.Verified.to_yojson ) ]
+                  |> Envelope.Incoming.data |> With_hash.data
+                  |> Inputs.External_transition.Verified.to_yojson ) ]
             "timed out waiting for the parent of $cached_transition after \
              $duration ms, signalling a catchup job" ;
           (* it's ok to create a new thread here because the thread essentially does no work *)
@@ -201,7 +194,9 @@ module Make (Inputs : Inputs.S) = struct
           List.exists cached_sibling_transitions
             ~f:(fun cached_sibling_transition ->
               State_hash.equal hash
-                (With_hash.hash (Cached.peek cached_sibling_transition)) )
+                ( With_hash.hash
+                @@ Envelope.Incoming.data
+                     (Cached.peek cached_sibling_transition) ) )
         then
           Logger.info t.logger ~module_:__MODULE__ ~location:__LOC__
             ~metadata:[("state_hash", State_hash.to_yojson hash)]
