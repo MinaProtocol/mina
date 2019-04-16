@@ -73,24 +73,49 @@ let make = (~message) => {
         ~left="0",
         (),
       )}>
-      <div className=Css.(style([display(`flex), flexDirection(`column)]))>
-        <Header />
-        <Body message={message ++ ";; " ++ settingsInfo} />
+      <div
+        className=Css.(
+          style([
+            display(`flex),
+            flexDirection(`column),
+            justifyContent(`spaceBetween),
+            height(`percent(100.)),
+          ])
+        )>
+        <div>
+          <div
+            className=Css.(style([display(`flex), flexDirection(`column)]))>
+            <Header />
+            <Body message={message ++ ";; " ++ settingsInfo} />
+          </div>
+          <button
+            onClick={_e => Router.(navigate({path: Send, settingsOrError}))}>
+            {ReasonReact.string("Send")}
+          </button>
+          <button
+            onClick={_e =>
+              Router.(navigate({path: DeleteWallet, settingsOrError}))
+            }>
+            {ReasonReact.string("Delete wallet")}
+          </button>
+          <button onClick={_e => handleChangeName()}>
+            {ReasonReact.string(
+               "Change name: " ++ Js.Int.toString(randomNum),
+             )}
+          </button>
+        </div>
+        <div>
+          {switch (settingsOrError) {
+           | `Settings(settings) =>
+             <Footer
+               stakingKey={PublicKey.ofStringExn("131243123")}
+               settings
+             />
+           | `Error(_) => <span />
+           }}
+          <Modal settingsOrError view=modalView />
+        </div>
       </div>
-      <button
-        onClick={_e => Router.(navigate({path: Send, settingsOrError}))}>
-        {ReasonReact.string("Send")}
-      </button>
-      <button
-        onClick={_e =>
-          Router.(navigate({path: DeleteWallet, settingsOrError}))
-        }>
-        {ReasonReact.string("Delete wallet")}
-      </button>
-      <button onClick={_e => handleChangeName()}>
-        {ReasonReact.string("Change name: " ++ Js.Int.toString(randomNum))}
-      </button>
-      <Modal settingsOrError view=modalView />
     </div>
   </ApolloShim.Provider>;
 };
