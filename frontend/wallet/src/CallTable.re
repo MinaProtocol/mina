@@ -1,14 +1,16 @@
 open Tc;
 
 module Ident = {
-  type t = int;
+  type t = (int, string);
+
+  let toString = ((i, s)) => Js.Int.toString(i) ++ s;
 };
 
 // TODO: GADT this to support responses tthat aren't just unit
 // call number -> Task completer
 type t = {
   table: Js.Dict.t(unit => unit),
-  ident: ref(Ident.t),
+  id: ref(int),
 };
 
 module Pending = {
@@ -18,23 +20,23 @@ module Pending = {
   };
 };
 
-let make = () => {table: Js.Dict.empty(), ident: ref(0)};
+let make = () => {table: Js.Dict.empty(), id: ref(0)};
 
-let nextPending = t => {
-  let ident = t.ident^;
+let nextPending = (t, ~loc) => {
+  let id = t.id^;
   let task =
     Task.create(cb => {
-      incr(t.ident);
-      Js.Dict.set(t.table, Js.Int.toString(ident), () =>
+      incr(t.id);
+      Js.Dict.set(t.table, Ident.toString((id, loc)), () =>
         cb(Belt.Result.Ok())
       );
     });
-  {Pending.ident, task};
+  {Pending.ident: (id, loc), task};
 };
 
 // assuming responses are one-shot for now
 let resolve = (t, ident) => {
-  switch (Js.Dict.get(t.table, Js.Int.toString(ident))) {
+  switch (Js.Dict.get(t.table, Ident.toString(ident))) {
   | None =>
     Js.log2("Unexpected missing identifier from call table, ignoring ", ident)
   | Some(f) => f()

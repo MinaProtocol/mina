@@ -12,5 +12,5 @@ module Pending: {
 type t;
 
 let make: unit => t;
-let nextPending: t => Pending.t('x);
+let nextPending: (t, ~loc: string) => Pending.t('x);
 let resolve: (t, Ident.t) => unit;

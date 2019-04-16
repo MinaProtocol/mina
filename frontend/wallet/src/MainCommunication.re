@@ -6,7 +6,7 @@ include IpcRenderer.MakeIpcRenderer(Messages);
 let callTable = CallTable.make();
 
 let setName = (key, name) => {
-  let pending = CallTable.nextPending(callTable);
+  let pending = CallTable.nextPending(callTable, ~loc=__LOC__);
   send(`Set_name((key, name, pending.ident)));
   pending.task;
 };
