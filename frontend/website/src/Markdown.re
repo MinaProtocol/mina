@@ -24,13 +24,33 @@ module Metadata = {
     };
 };
 
+module Child_process = {
+  type env = {
+    .
+    "CODA_CDN_URL": string,
+    "PATH": string,
+  };
+  type option;
+
+  [@bs.obj] external option: (~env: env=?, unit) => option = "";
+
+  [@bs.module "child_process"]
+  external execSync: (string, option) => string = "";
+};
+
 let load = path => {
-  // I've tried and tried and I couldn't get the env vars here to appear in the src/filter.js program
   let filter = Links.Cdn.prefix^ == "" ? "" : "--filter src/filter.js ";
+
   let html =
-    Node.Child_process.execSync(
+    Child_process.execSync(
       "pandoc " ++ filter ++ path ++ " --mathjax",
-      Node.Child_process.option(),
+      Child_process.option(
+        ~env={
+          "CODA_CDN_URL": Links.Cdn.prefix^,
+          "PATH": Js_dict.unsafeGet(Node.Process.process##env, "PATH"),
+        },
+        (),
+      ),
     );
   let content = Node.Fs.readFileAsUtf8Sync(path);
   (html, content);

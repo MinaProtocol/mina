@@ -16,7 +16,8 @@ module type Consensus_state_intf = sig
     module Stable :
       sig
         module V1 : sig
-          type t [@@deriving hash, compare, bin_io, sexp, eq, to_yojson]
+          type t
+          [@@deriving hash, compare, bin_io, sexp, eq, to_yojson, version]
         end
       end
       with type V1.t = t
@@ -45,23 +46,54 @@ module type Consensus_state_intf = sig
   val display : Value.t -> display
 end
 
+module Poly = struct
+  module Stable = struct
+    module V1 = struct
+      module T = struct
+        type ('state_hash, 'body) t =
+          {previous_state_hash: 'state_hash; body: 'body}
+        [@@deriving eq, ord, bin_io, hash, sexp, to_yojson, version]
+      end
+
+      include T
+    end
+
+    module Latest = V1
+  end
+
+  type ('state_hash, 'body) t = ('state_hash, 'body) Stable.Latest.t =
+    {previous_state_hash: 'state_hash; body: 'body}
+  [@@deriving sexp]
+end
+
 module type S = sig
   module Blockchain_state : Blockchain_state.S
 
   module Consensus_state : Consensus_state_intf
 
   module Body : sig
-    type ('a, 'b) t [@@deriving bin_io, sexp]
+    module Poly : sig
+      type ('a, 'b) t [@@deriving sexp]
+
+      module Stable :
+        sig
+          module V1 : sig
+            type ('a, 'b) t [@@deriving bin_io, sexp, version]
+          end
+
+          module Latest : module type of V1
+        end
+        with type ('a, 'b) V1.t = ('a, 'b) t
+    end
 
     module Value : sig
       module Stable : sig
         module V1 : sig
-          (* TODO : version these pieces *)
-          type nonrec t =
+          type t =
             ( Blockchain_state.Value.Stable.V1.t
             , Consensus_state.Value.Stable.V1.t )
-            t
-          [@@deriving bin_io, sexp, to_yojson]
+            Poly.Stable.V1.t
+          [@@deriving bin_io, sexp, to_yojson, version]
         end
 
         module Latest : module type of V1
@@ -71,18 +103,19 @@ module type S = sig
       type t = Stable.Latest.t [@@deriving sexp, to_yojson]
     end
 
-    type var = (Blockchain_state.var, Consensus_state.var) t
+    type var = (Blockchain_state.var, Consensus_state.var) Poly.t
+
+    type ('a, 'b) t = ('a, 'b) Poly.t
 
     val hash : Value.t -> State_body_hash.t
   end
 
-  type ('a, 'body) t [@@deriving bin_io, sexp, to_yojson]
-
   module Value : sig
     module Stable : sig
       module V1 : sig
-        type nonrec t = (State_hash.Stable.V1.t, Body.Value.Stable.V1.t) t
-        [@@deriving sexp, bin_io, compare, eq, to_yojson]
+        type t =
+          (State_hash.Stable.V1.t, Body.Value.Stable.V1.t) Poly.Stable.V1.t
+        [@@deriving sexp, bin_io, compare, eq, to_yojson, version]
       end
 
       module Latest : module type of V1
@@ -96,11 +129,11 @@ module type S = sig
 
   type value = Value.t [@@deriving sexp, to_yojson]
 
-  type var = (State_hash.var, Body.var) t
+  type var = (State_hash.var, Body.var) Poly.t
 
   include Snarkable.S with type value := Value.t and type var := var
 
-  val create : previous_state_hash:'a -> body:'b -> ('a, 'b) t
+  val create : previous_state_hash:'a -> body:'b -> ('a, 'b) Poly.t
 
   val create_value :
        previous_state_hash:State_hash.t
@@ -114,13 +147,13 @@ module type S = sig
     -> consensus_state:Consensus_state.var
     -> var
 
-  val previous_state_hash : ('a, _) t -> 'a
+  val previous_state_hash : ('a, _) Poly.t -> 'a
 
-  val body : (_, 'a) t -> 'a
+  val body : (_, 'a) Poly.t -> 'a
 
-  val blockchain_state : (_, ('a, _) Body.t) t -> 'a
+  val blockchain_state : (_, ('a, _) Body.t) Poly.t -> 'a
 
-  val consensus_state : (_, (_, 'a) Body.t) t -> 'a
+  val consensus_state : (_, (_, 'a) Body.t) Poly.t -> 'a
 
   val negative_one : Value.t
 
@@ -129,14 +162,7 @@ module type S = sig
   val hash : Value.t -> State_hash.t
 end
 
-module T = struct
-  type ('state_hash, 'body) t = {previous_state_hash: 'state_hash; body: 'body}
-  [@@deriving eq, ord, bin_io, hash, sexp, to_yojson]
-end
-
-include T
-
-let fold ~fold_body {previous_state_hash; body} =
+let fold ~fold_body {Poly.previous_state_hash; body} =
   let open Fold in
   State_hash.fold previous_state_hash +> fold_body body
 
@@ -147,42 +173,49 @@ let hash ~hash_body t =
 
 let crypto_hash = hash
 
-module Body = struct
-  type ('blockchain_state, 'consensus_state) t =
-    {blockchain_state: 'blockchain_state; consensus_state: 'consensus_state}
-  [@@deriving eq, ord, bin_io, hash, sexp, to_yojson]
-end
-
 module Make
     (Blockchain_state : Blockchain_state.S)
     (Consensus_state : Consensus_state_intf) :
   S
   with module Blockchain_state = Blockchain_state
-   and module Consensus_state = Consensus_state
-   and type ('a, 'b) t = ('a, 'b) t
-   and type ('a, 'b) Body.t = ('a, 'b) Body.t = struct
+   and module Consensus_state = Consensus_state = struct
   module Blockchain_state = Blockchain_state
   module Consensus_state = Consensus_state
 
   module Body = struct
-    include Body
+    module Poly = struct
+      module Stable = struct
+        module V1 = struct
+          module T = struct
+            type ('blockchain_state, 'consensus_state) t =
+              { blockchain_state: 'blockchain_state
+              ; consensus_state: 'consensus_state }
+            [@@deriving bin_io, sexp, eq, compare, to_yojson, hash, version]
+          end
+
+          include T
+        end
+
+        module Latest = V1
+      end
+
+      type ('blockchain_state, 'consensus_state) t =
+                                                    ( 'blockchain_state
+                                                    , 'consensus_state )
+                                                    Stable.Latest.t =
+        {blockchain_state: 'blockchain_state; consensus_state: 'consensus_state}
+      [@@deriving sexp]
+    end
 
     module Value = struct
       module Stable = struct
         module V1 = struct
           module T = struct
-            (* TODO : use version ppx *)
-            let version = 1
-
-            let __versioned__ = true
-
-            type tt =
+            type t =
               ( Blockchain_state.Value.Stable.V1.t
               , Consensus_state.Value.Stable.V1.t )
-              t
-            [@@deriving eq, ord, bin_io, hash, sexp, to_yojson]
-
-            type t = tt [@@deriving eq, ord, bin_io, hash, sexp, to_yojson]
+              Poly.Stable.V1.t
+            [@@deriving eq, ord, bin_io, hash, sexp, to_yojson, version]
           end
 
           include T
@@ -204,14 +237,17 @@ module Make
       type t = Stable.Latest.t [@@deriving sexp, to_yojson]
     end
 
-    type value = Value.t [@@deriving sexp]
+    type ('blockchain_state, 'consensus_state) t =
+      ('blockchain_state, 'consensus_state) Poly.t
 
-    type var = (Blockchain_state.var, Consensus_state.var) t
+    type value = Value.t [@@deriving sexp, to_yojson]
 
-    let to_hlist {blockchain_state; consensus_state} =
+    type var = (Blockchain_state.var, Consensus_state.var) Poly.t
+
+    let to_hlist {Poly.blockchain_state; consensus_state} =
       H_list.[blockchain_state; consensus_state]
 
-    let of_hlist : (unit, 'bs -> 'cs -> unit) H_list.t -> ('bs, 'cs) t =
+    let of_hlist : (unit, 'bs -> 'cs -> unit) H_list.t -> ('bs, 'cs) Poly.t =
      fun H_list.([blockchain_state; consensus_state]) ->
       {blockchain_state; consensus_state}
 
@@ -221,7 +257,7 @@ module Make
       Typ.of_hlistable data_spec ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist
         ~value_to_hlist:to_hlist ~value_of_hlist:of_hlist
 
-    let fold {blockchain_state; consensus_state} =
+    let fold {Poly.blockchain_state; consensus_state} =
       let open Fold in
       Blockchain_state.fold blockchain_state
       +> Consensus_state.fold consensus_state
@@ -231,7 +267,7 @@ module Make
         (fold s)
       |> State_body_hash.of_hash
 
-    let var_to_triples {blockchain_state; consensus_state} =
+    let var_to_triples {Poly.blockchain_state; consensus_state} =
       let%map blockchain_state =
         Blockchain_state.var_to_triples blockchain_state
       and consensus_state = Consensus_state.var_to_triples consensus_state in
@@ -245,21 +281,13 @@ module Make
       >>| State_body_hash.var_of_hash_packed
   end
 
-  include T
-
   module Value = struct
     module Stable = struct
       module V1 = struct
         module T = struct
-          (* TODO : use version ppx *)
-          let version = 1
-
-          let __versioned__ = true
-
-          type t_ = (State_hash.Stable.V1.t, Body.Value.Stable.V1.t) t
-          [@@deriving bin_io, sexp, hash, compare, eq, to_yojson]
-
-          type t = t_ [@@deriving bin_io, sexp, hash, compare, eq, to_yojson]
+          type t =
+            (State_hash.Stable.V1.t, Body.Value.Stable.V1.t) Poly.Stable.V1.t
+          [@@deriving bin_io, sexp, hash, compare, eq, to_yojson, version]
         end
 
         include T
@@ -286,31 +314,36 @@ module Make
 
   type value = Value.t [@@deriving sexp, to_yojson]
 
-  type var = (State_hash.var, Body.var) t
+  type var = (State_hash.var, Body.var) Poly.t
 
   module Proof = Proof
   module Hash = State_hash
 
-  let create ~previous_state_hash ~body = {previous_state_hash; body}
+  let create ~previous_state_hash ~body = {Poly.previous_state_hash; body}
 
   let create' ~previous_state_hash ~blockchain_state ~consensus_state =
-    {previous_state_hash; body= {Body.blockchain_state; consensus_state}}
+    { Poly.previous_state_hash
+    ; body= {Body.Poly.blockchain_state; consensus_state} }
 
   let create_value = create'
 
   let create_var = create'
 
-  let body {body; _} = body
+  let body {Poly.body; _} = body
 
-  let previous_state_hash {previous_state_hash; _} = previous_state_hash
+  let previous_state_hash {Poly.previous_state_hash; _} = previous_state_hash
 
-  let blockchain_state {body= {Body.blockchain_state; _}; _} = blockchain_state
+  let blockchain_state {Poly.body= {Body.Poly.blockchain_state; _}; _} =
+    blockchain_state
 
-  let consensus_state {body= {Body.consensus_state; _}; _} = consensus_state
+  let consensus_state {Poly.body= {Body.Poly.consensus_state; _}; _} =
+    consensus_state
 
-  let to_hlist {previous_state_hash; body} = H_list.[previous_state_hash; body]
+  let to_hlist {Poly.previous_state_hash; body} =
+    H_list.[previous_state_hash; body]
 
-  let of_hlist : (unit, 'psh -> 'body -> unit) H_list.t -> ('psh, 'body) t =
+  let of_hlist : (unit, 'psh -> 'body -> unit) H_list.t -> ('psh, 'body) Poly.t
+      =
    fun H_list.([previous_state_hash; body]) -> {previous_state_hash; body}
 
   let data_spec = Data_spec.[State_hash.typ; Body.typ]
@@ -319,15 +352,13 @@ module Make
     Typ.of_hlistable data_spec ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist
       ~value_to_hlist:to_hlist ~value_of_hlist:of_hlist
 
-  let var_to_triples {previous_state_hash; body} =
+  let var_to_triples {Poly.previous_state_hash; body} =
     let open Let_syntax in
     let%map previous_state_hash = State_hash.var_to_triples previous_state_hash
     and body_hash =
       Body.hash_checked body >>= State_body_hash.var_to_triples
     in
     previous_state_hash @ body_hash
-
-  let fold t = fold ~fold_body:(Fn.compose State_body_hash.fold Body.hash) t
 
   let hash = crypto_hash ~hash_body:Body.hash
 
@@ -341,9 +372,9 @@ module Make
   [%%endif]
 
   let negative_one =
-    { previous_state_hash=
+    { Poly.previous_state_hash=
         State_hash.of_hash Snark_params.Tick.Pedersen.zero_hash
     ; body=
-        { Body.blockchain_state= Blockchain_state.genesis
+        { Body.Poly.blockchain_state= Blockchain_state.genesis
         ; consensus_state= Consensus_state.genesis } }
 end

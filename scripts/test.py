@@ -202,7 +202,7 @@ def run(args):
             print('Running: %s' % (cmd))
             run_cmd(cmd, lambda: fail('Test "%s:%s" failed' % (profile, test)))
 
-    print('Testing successfull')
+    print('Testing successful')
 
 
 def get_required_status():

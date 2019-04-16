@@ -15,7 +15,17 @@ module type S = sig
   end
 
   module Prover_state : sig
-    type t [@@deriving sexp, bin_io]
+    type t [@@deriving sexp]
+
+    module Stable :
+      sig
+        module V1 : sig
+          type t [@@deriving sexp, bin_io, version]
+        end
+
+        module Latest : module type of V1
+      end
+      with type V1.t = t
   end
 
   module Snark_transition : Snark_transition.S
@@ -33,12 +43,12 @@ module type S = sig
     with type V1.t = t
 
   val create :
-       snark_transition:Snark_transition.value
+       snark_transition:Snark_transition.Value.t
     -> prover_state:Prover_state.t
     -> staged_ledger_diff:Staged_ledger_diff.t
     -> t
 
-  val snark_transition : t -> Snark_transition.value
+  val snark_transition : t -> Snark_transition.Value.t
 
   val prover_state : t -> Prover_state.t
 
@@ -51,13 +61,23 @@ module Make (Staged_ledger_diff : sig
   module Stable :
     sig
       module V1 : sig
-        type t [@@deriving bin_io, sexp]
+        type t [@@deriving bin_io, sexp, version]
       end
     end
     with type V1.t = t
 end)
 (Snark_transition : Snark_transition.S) (Prover_state : sig
-    type t [@@deriving sexp, bin_io]
+    type t [@@deriving sexp]
+
+    module Stable :
+      sig
+        module V1 : sig
+          type t [@@deriving sexp, bin_io, version]
+        end
+
+        module Latest : module type of V1
+      end
+      with type V1.t = t
 end) :
   S
   with module Staged_ledger_diff = Staged_ledger_diff
@@ -70,16 +90,11 @@ end) :
   module Stable = struct
     module V1 = struct
       module T = struct
-        (* TODO : use version ppx *)
-        let version = 1
-
-        let __versioned__ = true
-
         type t =
-          { snark_transition: Snark_transition.value
-          ; prover_state: Prover_state.t
+          { snark_transition: Snark_transition.Value.Stable.V1.t
+          ; prover_state: Prover_state.Stable.V1.t
           ; staged_ledger_diff: Staged_ledger_diff.Stable.V1.t }
-        [@@deriving sexp, fields, bin_io]
+        [@@deriving sexp, fields, bin_io, version]
       end
 
       include T
@@ -98,13 +113,13 @@ end) :
     module Registered_V1 = Registrar.Register (V1)
   end
 
-  (* bin_io intentionally omitted *)
+  (* bin_io, version omitted *)
   type t = Stable.Latest.t =
-    { snark_transition: Snark_transition.value
-    ; prover_state: Prover_state.t
-    ; staged_ledger_diff: Staged_ledger_diff.t }
+    { snark_transition: Snark_transition.Value.Stable.V1.t
+    ; prover_state: Prover_state.Stable.V1.t
+    ; staged_ledger_diff: Staged_ledger_diff.Stable.V1.t }
   [@@deriving sexp, fields]
 
   let create ~snark_transition ~prover_state ~staged_ledger_diff =
-    {snark_transition; staged_ledger_diff; prover_state}
+    {Stable.Latest.snark_transition; staged_ledger_diff; prover_state}
 end

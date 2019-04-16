@@ -80,8 +80,7 @@ struct
   module Stable = struct
     module V1 = struct
       module T = struct
-        (* TODO : version Pedersen.Digest *)
-        type t = Pedersen.Digest.t
+        type t = Pedersen.Digest.Stable.V1.t
         [@@deriving bin_io, sexp, eq, compare, hash, yojson, version]
       end
 
