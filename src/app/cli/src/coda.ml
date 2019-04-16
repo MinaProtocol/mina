@@ -476,7 +476,6 @@ let () =
   don't_wait_for (ensure_testnet_id_still_good logger) ;
   (* Turn on snark debugging in prod for now *)
   Snarky.Snark.set_eval_constraints true ;
-  Command.run (Command.group ~summary:"Coda" (coda_commands logger)) ;
   Async.Monitor.detach_and_iter_errors
     ~f:(fun exn ->
       Logger.fatal logger "toplevel unhandled exception, dying now."
@@ -487,4 +486,5 @@ let () =
           ] ;
       Async.(exit 1 |> don't_wait_for) )
     Async.Monitor.main ;
-  Core.exit 0
+  Command.run (Command.group ~summary:"Coda" (coda_commands logger)) ;
+  failwith "Command.run shouldn't have returned!"
