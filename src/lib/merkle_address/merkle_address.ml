@@ -186,8 +186,8 @@ end) : S = struct
 
   type t = Stable.Latest.t
 
-  let t_of_sexp, sexp_of_t, to_yojson, compare, equal =
-    Stable.Latest.(t_of_sexp, sexp_of_t, to_yojson, compare, equal)
+  [%%define_locally
+  Stable.Latest.(t_of_sexp, sexp_of_t, to_yojson, compare, equal)]
 
   include Hashable.Make_binable (Stable.Latest)
 

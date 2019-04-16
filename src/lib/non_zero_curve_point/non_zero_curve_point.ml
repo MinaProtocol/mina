@@ -241,7 +241,8 @@ let%snarkydef compress_var ((x, y) : var) : (Compressed.var, _) Checked.t =
   let%map is_odd = parity_var y in
   {Compressed.Poly.x; is_odd}
 
-let of_bigstring, to_bigstring = Stable.Latest.(of_bigstring, to_bigstring)
+[%%define_locally
+Stable.Latest.(of_bigstring, to_bigstring)]
 
 let%test_unit "point-compression: decompress . compress = id" =
   Quickcheck.test gen ~f:(fun pk ->
