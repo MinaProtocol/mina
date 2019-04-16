@@ -1,4 +1,3 @@
-open Tc;
 include Settings.S;
 
 let load:
