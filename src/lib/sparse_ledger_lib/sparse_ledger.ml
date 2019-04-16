@@ -300,7 +300,8 @@ let%test_module "sparse-ledger-test" =
       type t = Stable.Latest.t = {name: string; favorite_number: int}
       [@@deriving sexp, eq]
 
-      let key, gen, data_hash = Stable.Latest.(key, gen, data_hash)
+      [%%define_locally
+      Stable.Latest.(key, gen, data_hash)]
     end
 
     module Key = struct
