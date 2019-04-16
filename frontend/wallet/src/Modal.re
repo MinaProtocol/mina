@@ -1,5 +1,5 @@
 [@react.component]
-let make = (~view) => {
+let make = (~view, ~settingsOrError) => {
   switch (view) {
   | None => <span />
   | Some(view) =>
@@ -17,7 +17,7 @@ let make = (~view) => {
           backgroundColor(StyleGuide.Colors.savilleAlpha(0.95)),
         ])
       )
-      onClick={_ => Router.navigate(Home)}>
+      onClick={_ => Router.navigate({path: Home, settingsOrError})}>
       view
     </div>
   };

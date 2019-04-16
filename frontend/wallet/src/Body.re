@@ -20,7 +20,7 @@ module HooksTest = {
 };
 
 [@react.component]
-let make = (~message as _) =>
+let make = (~message) =>
   <div
     style={ReactDOMRe.Style.make(
       ~color="white",
@@ -55,5 +55,6 @@ let make = (~message as _) =>
            )}
       </TestQuery>
       <HooksTest name="test-hooks" />
+      <p> {ReasonReact.string(message)} </p>
     </div>
   </div>;
