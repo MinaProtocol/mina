@@ -190,9 +190,9 @@ module Functions = struct
       [%bin_type_class:
         Blockchain.t
         * Consensus_mechanism.Protocol_state.Value.Stable.V1.t
-        * Consensus_mechanism.Snark_transition.value
-        * Consensus_mechanism.Prover_state.t
-        * Pending_coinbase_witness.t] Blockchain.bin_t
+        * Consensus_mechanism.Snark_transition.Value.Stable.V1.t
+        * Consensus_mechanism.Prover_state.Stable.V1.t
+        * Pending_coinbase_witness.Stable.V1.t] Blockchain.bin_t
       (fun w
       ( ({Blockchain.state= prev_state; proof= prev_proof} as chain)
       , next_state

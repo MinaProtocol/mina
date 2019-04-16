@@ -38,7 +38,7 @@ module Inputs = struct
   end
 
   module Proof = Transaction_snark.Stable.V1
-  module Statement = Transaction_snark.Statement
+  module Statement = Transaction_snark.Statement.Stable.V1
 
   module Public_key = struct
     include Public_key.Compressed
@@ -46,16 +46,21 @@ module Inputs = struct
     let arg_type = Cli_lib.Arg_type.public_key_compressed
   end
 
-  module Transaction = Coda_base.Transaction
-  module Sparse_ledger = Coda_base.Sparse_ledger
-  module Pending_coinbase = Coda_base.Pending_coinbase
+  module Transaction = Coda_base.Transaction.Stable.V1
+  module Sparse_ledger = Coda_base.Sparse_ledger.Stable.V1
+  module Pending_coinbase = Coda_base.Pending_coinbase.Stable.V1
   module Transaction_witness = Coda_base.Transaction_witness.Stable.V1
 
   (* TODO: Use public_key once SoK is implemented *)
   let perform_single ({m= (module M); cache} : Worker_state.t) ~message =
     let open Snark_work_lib in
     let sok_digest = Coda_base.Sok_message.digest message in
-    fun single ->
+    fun (single :
+          ( Statement.t
+          , Transaction.t
+          , Transaction_witness.t
+          , Transaction_snark.t )
+          Work.Single.Spec.t) ->
       let statement = Work.Single.Spec.statement single in
       match Cache.find cache statement with
       | Some proof -> Or_error.return (proof, Time.Span.zero)

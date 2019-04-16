@@ -33,10 +33,14 @@ consensus_mechanism = "proof_of_stake"]
 [%%inject
 "delta", delta]
 
+let inactivity_secs = block_window_duration_ms * delta
+
 [%%else]
 
 let delta = 1
 
 let c = 1
+
+let inactivity_secs = 15000
 
 [%%endif]

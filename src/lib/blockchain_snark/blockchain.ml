@@ -16,14 +16,9 @@ module Protocol_state = Consensus.Protocol_state
 module Stable = struct
   module V1 = struct
     module T = struct
-      (* TODO : use version ppx *)
-      let version = 1
-
-      let __versioned__ = true
-
       type t =
         {state: Protocol_state.Value.Stable.V1.t; proof: Proof.Stable.V1.t}
-      [@@deriving bin_io, fields]
+      [@@deriving bin_io, fields, version]
     end
 
     include T
