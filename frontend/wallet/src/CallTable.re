@@ -27,8 +27,14 @@ let nextPending = (t, ~loc) => {
   let task =
     Task.create(cb => {
       incr(t.id);
-      Js.Dict.set(t.table, Ident.toString((id, loc)), () =>
-        cb(Belt.Result.Ok())
+      let key = Ident.toString((id, loc));
+      Js.Dict.set(
+        t.table,
+        key,
+        () => {
+          Js.Dict.set(t.table, key, Obj.magic(Js.Nullable.undefined));
+          cb(Belt.Result.Ok());
+        },
       );
     });
   {Pending.ident: (id, loc), task};
