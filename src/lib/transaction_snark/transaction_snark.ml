@@ -24,7 +24,7 @@ module Input = struct
     ; fee_excess: Currency.Amount.Signed.Stable.V1.t
     ; pending_coinbase_before: Pending_coinbase.Stack.Stable.V1.t
     ; pending_coinbase_after: Pending_coinbase.Stack.Stable.V1.t }
-  [@@deriving bin_io]
+  [@@deriving bin_io, sexp, compare]
 end
 
 module Proof_type = struct
@@ -363,7 +363,7 @@ module Base = struct
     let proposer = payload.body.public_key in
     let%bind is_coinbase = Transaction_union.Tag.Checked.is_coinbase tag in
     let%bind pending_coinbase_stack_after =
-      let coinbase = (proposer, receiver_increase) in
+      let coinbase = (proposer, payload.body.amount) in
       let%bind stack' =
         Pending_coinbase.Stack.Checked.push pending_coinbase_stack_before
           coinbase
@@ -372,10 +372,13 @@ module Base = struct
         ~else_:pending_coinbase_stack_before
     in
     let%bind root =
-      let%bind is_fee_transfer =
-        Transaction_union.Tag.Checked.is_fee_transfer tag
+      let%bind is_writeable =
+        let%bind is_fee_transfer =
+          Transaction_union.Tag.Checked.is_fee_transfer tag
+        in
+        Boolean.any [is_fee_transfer; is_coinbase]
       in
-      Frozen_ledger_hash.modify_account_send root ~is_fee_transfer
+      Frozen_ledger_hash.modify_account_send root ~is_writeable
         sender_compressed ~f:(fun ~is_empty_and_writeable account ->
           with_label __LOC__
             (let%bind next_nonce =
