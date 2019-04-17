@@ -40,7 +40,6 @@ let main n () =
   (* TODO: We should add the random restart again once the Genesis Ledger is
      implemented. *)
   (* settle for a few more min *)
-  (* TODO: Make sure to check that catchup actually worked *)
   let%bind () = after (Time.Span.of_min 1.) in
   Coda_worker_testnet.Api.teardown testnet
 
