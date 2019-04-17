@@ -40,7 +40,7 @@ module Make (Inputs : Inputs.With_unprocessed_transition_cache.S) :
       Option.fold
         (Unprocessed_transition_cache.final_state unprocessed_transition_cache
            transition_with_hash) ~init:Result.ok_unit ~f:(fun _ final_state ->
-          Result.Error (`Under_processing final_state) )
+          Result.Error (`In_process final_state) )
     in
     let%map () =
       Result.ok_if_true
@@ -108,7 +108,7 @@ module Make (Inputs : Inputs.With_unprocessed_transition_cache.S) :
                    (Core_kernel.Time.diff (Core_kernel.Time.now ())
                       transition_time) ;
                  Writer.write valid_transition_writer cached_transition
-             | Error (`In_frontier _) | Error (`Under_processing _) ->
+             | Error (`In_frontier _) | Error (`In_process _) ->
                  if Lru.find already_reported_duplicates hash |> Option.is_none
                  then (
                    Logger.info logger ~module_:__MODULE__ ~location:__LOC__

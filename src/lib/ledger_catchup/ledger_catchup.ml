@@ -77,9 +77,10 @@ module Make (Inputs : Inputs.S) :
         Logger.trace logger ~module_:__MODULE__ ~location:__LOC__
           "transition queried during ledger catchup has already been seen" ;
         Deferred.return @@ Ok (Either.First hash)
-    | Error (`Under_processing consumed_state) -> (
+    | Error (`In_process consumed_state) -> (
         Logger.trace logger ~module_:__MODULE__ ~location:__LOC__
-          "transition queried during ledger catchup is still under procession" ;
+          "transition queried during ledger catchup is still in process in \
+           one of the components in transition_frontier" ;
         match%map Ivar.read consumed_state with
         | `Failed ->
             Logger.trace logger ~module_:__MODULE__ ~location:__LOC__
@@ -153,14 +154,15 @@ module Make (Inputs : Inputs.S) :
                       (verify_transition ~logger ~frontier
                          ~unprocessed_transition_cache)
                 in
+                let split_last xs =
+                  let init = List.take xs (List.length xs - 1) in
+                  let last = List.last_exn xs in
+                  (init, last)
+                in
                 let subtrees_of_transitions =
                   if List.length verified_transitions > 0 then
-                    let rest, target_transition_singleton =
-                      List.split_n verified_transitions
-                        (List.length verified_transitions - 1)
-                    in
-                    let target_transition =
-                      List.hd_exn target_transition_singleton
+                    let rest, target_transition =
+                      split_last verified_transitions
                     in
                     [ List.fold_right rest
                         ~init:(Rose_tree.T (target_transition, subtrees))
@@ -182,10 +184,11 @@ module Make (Inputs : Inputs.S) :
 
   let run ~logger ~network ~frontier ~catchup_job_reader
       ~catchup_breadcrumbs_writer ~unprocessed_transition_cache =
-    Strict_pipe.Reader.iter catchup_job_reader ~f:(fun forest ->
+    Strict_pipe.Reader.iter catchup_job_reader ~f:(fun (hash, subtrees) ->
         ( match%bind
             get_transitions_and_compute_breadcrumbs ~logger ~network ~frontier
-              ~num_peers:8 ~unprocessed_transition_cache ~target_forest:forest
+              ~num_peers:8 ~unprocessed_transition_cache
+              ~target_forest:(hash, subtrees)
           with
         | Ok trees ->
             Logger.trace logger ~module_:__MODULE__ ~location:__LOC__
@@ -196,7 +199,7 @@ module Make (Inputs : Inputs.S) :
               !"All peers either sent us bad data, didn't have the info, or \
                 our transition frontier moved too fast: %s"
               (Error.to_string_hum e) ;
-            List.iter (snd forest) ~f:(fun subtree ->
+            List.iter subtrees ~f:(fun subtree ->
                 Rose_tree.iter subtree ~f:(fun cached_transition ->
                     Cached.invalidate cached_transition |> ignore ) ) ;
             Deferred.unit )

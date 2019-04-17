@@ -205,7 +205,7 @@ let%test_module "Ledger catchup" =
           Ledger_catchup.run ~logger ~network ~frontier:me
             ~catchup_breadcrumbs_writer ~catchup_job_reader
             ~unprocessed_transition_cache ;
-          let q =
+          let missing_breadcrumbs_queue =
             List.map missing_breadcrumbs ~f:(fun breadcrumb ->
                 Rose_tree.T (breadcrumb, []) )
             |> Queue.of_list
@@ -222,7 +222,8 @@ let%test_module "Ledger catchup" =
                 List.hd_exn (Rose_tree.flatten catchup_breadcrumb_tree)
               in
               let expected_breadcrumb =
-                List.hd_exn @@ Rose_tree.flatten @@ Queue.dequeue_exn q
+                List.hd_exn @@ Rose_tree.flatten
+                @@ Queue.dequeue_exn missing_breadcrumbs_queue
               in
               assert (
                 Transition_frontier.Breadcrumb.equal expected_breadcrumb

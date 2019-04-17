@@ -514,7 +514,7 @@ module type Transition_handler_validator_intf = sig
          Cached.t
        , [ `In_frontier of state_hash
          | `Invalid of string
-         | `Under_processing of state_hash Cache_lib.Intf.final_state ] )
+         | `In_process of state_hash Cache_lib.Intf.final_state ] )
        Result.t
 end
 
