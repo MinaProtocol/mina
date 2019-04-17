@@ -1520,7 +1520,8 @@ module Consensus_state = struct
            ~default:(Or_error.error_string "failed to add total_currency")
     and () =
       if
-        Epoch.(prev_epoch < next_epoch)
+        (Epoch.(equal next_epoch zero) && Epoch.Slot.(equal next_slot zero))
+        || Epoch.(prev_epoch < next_epoch)
         || Epoch.(prev_epoch = next_epoch)
            && Epoch.Slot.(prev_slot < next_slot)
       then Ok ()
@@ -1990,7 +1991,9 @@ let select ~existing ~candidate ~logger =
   | Some choice -> choice
   | None ->
       log_result `Keep "no predicates were matched" ;
-      `Keep
+      if Length.(candidate.min_length_of_epoch > existing.min_length_of_epoch)
+      then `Take
+      else `Keep
 
 let time_hum (now : Core_kernel.Time.t) =
   let epoch, slot = Epoch.epoch_and_slot_of_time_exn (Time.of_time now) in
