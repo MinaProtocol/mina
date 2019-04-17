@@ -327,10 +327,16 @@ struct
             (Breadcrumb.state_hash breadcrumb)
       | Transition_frontier_diff.New_frontier _ -> ()
       | Transition_frontier_diff.New_best_tip
-          {old_root; old_root_length; new_best_tip_length; _} ->
-          if new_best_tip_length - old_root_length > max_length then
+          { old_root
+          ; old_root_length
+          ; new_best_tip_length
+          ; added_to_best_tip_path; _ } ->
+          if new_best_tip_length - old_root_length > max_length then (
             let root_state_hash = Breadcrumb.state_hash old_root in
-            Root_history.enqueue t.root_history root_state_hash old_root ) ;
+            Root_history.enqueue t.root_history root_state_hash old_root ;
+            Transition_registry.notify t.transition_registry
+              (Breadcrumb.state_hash
+                 (Non_empty_list.last added_to_best_tip_path)) ) ) ;
       Fields.fold ~init:diff
         ~root_history:(fun _ _ -> Deferred.unit)
         ~snark_pool_refcount:
