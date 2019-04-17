@@ -8,6 +8,7 @@ db.json
 settings.json
 /lib
 /bundle
+/dist
 *.exe
 *.cmi
 *.cmx
