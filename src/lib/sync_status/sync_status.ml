@@ -3,7 +3,7 @@ let to_string = function
   | `Bootstrap -> "Bootstrap"
   | `Synced -> "Synced"
 
-  let to_yojson status = `String (to_string status)  
+let to_yojson status = `String (to_string status)
 
 module Stable = struct
   module V1 = struct
