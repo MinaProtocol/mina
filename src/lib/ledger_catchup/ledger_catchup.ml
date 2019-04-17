@@ -7,9 +7,9 @@ open Coda_base
 
 (** [Ledger_catchup] is a procedure that connects a foreign external transition
     into a transition frontier by requesting a path of external_transitions
-    from its peer. It receives the external_transition to catchup from
-    [Catchup_monitor]. With that external_transition, it will ask its peers for
-    a path of external_transitions from their root to the transition it is
+    from its peer. It receives the state_hash to catchup from
+    [Catchup_scheduler]. With that state_hash, it will ask its peers for
+    a path of external_transitions from their root to the state_hash it is
     asking for. It will then perform the following validations on each
     external_transition:
 
@@ -20,13 +20,17 @@ open Coda_base
     2. Each transition is checked through [Transition_processor.Validator] and
     [Protocol_state_validator]
 
-    If any of the external_transitions is invalid, the sender is punished.
+    If any of the external_transitions is invalid, 
+    1) the sender is punished;
+    2) those external_transitions that already passed validation would be
+       invalidated.
     Otherwise, [Ledger_catchup] will build a corresponding breadcrumb path from
     the path of external_transitions. A breadcrumb from the path is built using
     its corresponding external_transition staged_ledger_diff and applying it to
     its preceding breadcrumb staged_ledger to obtain its corresponding
     staged_ledger. If there was an error in building the breadcrumbs, then
-    catchup will punish the sender for sending a faulty staged_ledger_diff.
+    1) catchup will punish the sender for sending a faulty staged_ledger_diff;
+    2) catchup would invalidate the cached transitions.
     After building the breadcrumb path, [Ledger_catchup] will then send it to
     the [Processor] via writing them to catchup_breadcrumbs_writer. *)
 

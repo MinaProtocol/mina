@@ -196,8 +196,10 @@ let%test_module "Ledger catchup" =
             ~unprocessed_transition_cache ;
           let%bind () = after (Core.Time.Span.of_sec 1.) in
           Cache_lib.Cached.invalidate cached_failing_transition |> ignore ;
-          let%bind () = after (Core.Time.Span.of_sec 1.) in
-          Deferred.return true )
+          let%map result =
+            Ivar.read (Cache_lib.Cached.final_state cached_best_transition)
+          in
+          result = `Failed )
 
     let%test_unit "catchup won't be blocked by transitions that are still \
                    under processing" =
