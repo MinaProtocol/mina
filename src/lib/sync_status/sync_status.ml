@@ -3,11 +3,15 @@ let to_string = function
   | `Bootstrap -> "Bootstrap"
   | `Synced -> "Synced"
 
+  let to_yojson status = `String (to_string status)  
+
 module Stable = struct
   module V1 = struct
     module T = struct
       type t = [`Offline | `Bootstrap | `Synced]
-      [@@deriving bin_io, version, sexp, to_yojson]
+      [@@deriving bin_io, version, sexp]
+
+      let to_yojson = to_yojson
     end
 
     include T
@@ -16,4 +20,4 @@ module Stable = struct
   module Latest = V1
 end
 
-type t = [`Offline | `Bootstrap | `Synced] [@@deriving sexp, to_yojson]
+type t = [`Offline | `Bootstrap | `Synced] [@@deriving sexp]
