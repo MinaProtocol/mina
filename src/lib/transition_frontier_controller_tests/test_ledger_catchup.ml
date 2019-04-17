@@ -143,6 +143,62 @@ let%test_module "Ledger catchup" =
           test_catchup ~logger ~network me best_transition
             (Rose_tree.of_list_exn [best_breadcrumb]) )
 
+    let%test "catchup would fail if one of the parent transition fails" =
+      let logger = Logger.create () in
+      let catchup_job_reader, catchup_job_writer =
+        Strict_pipe.create (Buffered (`Capacity 10, `Overflow Drop_head))
+      in
+      let catchup_breadcrumbs_reader, catchup_breadcrumbs_writer =
+        Strict_pipe.create Synchronous
+      in
+      let unprocessed_transition_cache =
+        Transition_handler.Unprocessed_transition_cache.create ~logger
+      in
+      Thread_safe.block_on_async_exn (fun () ->
+          let%bind me, peer, network =
+            Network_builder.setup_me_and_a_peer ~logger
+              ~source_accounts:Genesis_ledger.accounts
+              ~target_accounts:Genesis_ledger.accounts
+              ~num_breadcrumbs:max_length
+          in
+          let best_breadcrumb = Transition_frontier.best_tip peer.frontier in
+          let best_transition =
+            Transition_frontier.Breadcrumb.transition_with_hash best_breadcrumb
+          in
+          let history =
+            Transition_frontier.root_history_path_map peer.frontier
+              (With_hash.hash best_transition)
+              ~f:Fn.id
+            |> Option.value_exn
+          in
+          let missing_breadcrumbs = Non_empty_list.tail history in
+          let missing_transitions =
+            List.map missing_breadcrumbs
+              ~f:Transition_frontier.Breadcrumb.transition_with_hash
+          in
+          let cached_best_transition =
+            Transition_handler.Unprocessed_transition_cache.register
+              unprocessed_transition_cache best_transition
+          in
+          let parent_hash =
+            External_transition.Verified.parent_hash
+              (With_hash.data best_transition)
+          in
+          Strict_pipe.Writer.write catchup_job_writer
+            (parent_hash, [Rose_tree.T (cached_best_transition, [])]) ;
+          let failing_transition = List.nth_exn missing_transitions 1 in
+          let cached_failing_transition =
+            Transition_handler.Unprocessed_transition_cache.register
+              unprocessed_transition_cache failing_transition
+          in
+          Strict_pipe.Writer.write catchup_job_writer
+            (parent_hash, [Rose_tree.T (cached_best_transition, [])]) ;
+          Ledger_catchup.run ~logger ~network ~frontier:me
+            ~catchup_breadcrumbs_writer ~catchup_job_reader
+            ~unprocessed_transition_cache ;
+          Cache_lib.Cached.invalidate cached_failing_transition
+          |> Fn.const (Deferred.return true) )
+
     let%test_unit "catchup won't be blocked by transitions that are still \
                    under processing" =
       let logger = Logger.create () in
