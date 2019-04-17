@@ -227,6 +227,26 @@ struct
       let is_empty {history; _} = Queue.is_empty history
     end
 
+    (* TODO: guard against waiting for transitions that already exist in the frontier *)
+    module Transition_registry = struct
+      type t = unit Ivar.t list State_hash.Table.t
+
+      let create () = State_hash.Table.create ()
+
+      let notify =
+        State_hash.Table.change ~f:(function
+          | Some ls ->
+              List.iter ls ~f:(Fn.flip Ivar.fill ()) ;
+              None
+          | None -> None )
+
+      let register t state_hash =
+        Deferred.create (fun ivar ->
+            State_hash.Table.update t state_hash ~f:(function
+              | Some ls -> ivar :: ls
+              | None -> [ivar] ) )
+    end
+
     module Best_tip_diff = Best_tip_diff.Make (Breadcrumb)
     module Root_diff = Root_diff.Make (Breadcrumb)
 
@@ -238,15 +258,17 @@ struct
     type t =
       { root_history: Root_history.t
       ; snark_pool_refcount: Snark_pool_refcount.t
+      ; transition_registry: Transition_registry.t
       ; best_tip_diff: Best_tip_diff.t
       ; root_diff: Root_diff.t
       ; persistence_diff: Persistence_diff.t }
     [@@deriving fields]
 
     let create () =
-      { snark_pool_refcount= Snark_pool_refcount.create ()
+      { root_history= Root_history.create (2 * Inputs.max_length)
+      ; snark_pool_refcount= Snark_pool_refcount.create ()
+      ; transition_registry= Transition_registry.create ()
       ; best_tip_diff= Best_tip_diff.create ()
-      ; root_history= Root_history.create (2 * Inputs.max_length)
       ; root_diff= Root_diff.create ()
       ; persistence_diff= Persistence_diff.create () }
 
@@ -300,9 +322,10 @@ struct
         mb_write_to_pipe diff (Field.get field t) handler pipe
       in
       ( match diff with
-      | Transition_frontier_diff.New_breadcrumb _
-       |Transition_frontier_diff.New_frontier _ ->
-          ()
+      | Transition_frontier_diff.New_breadcrumb breadcrumb ->
+          Transition_registry.notify t.transition_registry
+            (Breadcrumb.state_hash breadcrumb)
+      | Transition_frontier_diff.New_frontier _ -> ()
       | Transition_frontier_diff.New_best_tip
           {old_root; old_root_length; new_best_tip_length; _} ->
           if new_best_tip_length - old_root_length > max_length then
@@ -312,6 +335,7 @@ struct
         ~root_history:(fun _ _ -> Deferred.unit)
         ~snark_pool_refcount:
           (use Snark_pool_refcount.handle_diff pipes.snark_pool)
+        ~transition_registry:(fun acc _ -> acc)
         ~best_tip_diff:(use Best_tip_diff.handle_diff pipes.best_tip_diff)
         ~root_diff:(use Root_diff.handle_diff pipes.root_diff)
         ~persistence_diff:
@@ -964,6 +988,12 @@ struct
 
   let shallow_copy_root_snarked_ledger {root_snarked_ledger; _} =
     Ledger.of_database root_snarked_ledger
+
+  let wait_for_transition t target_hash =
+    if Hashtbl.mem t.table target_hash then Deferred.unit
+    else
+      let transition_registry = Extensions.transition_registry t.extensions in
+      Extensions.Transition_registry.register transition_registry target_hash
 
   let equal t1 t2 =
     let sort_breadcrumbs = List.sort ~compare:Breadcrumb.compare in

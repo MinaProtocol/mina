@@ -408,8 +408,12 @@ module Make (Inputs : Inputs_intf) :
                           { With_hash.hash= Protocol_state.hash protocol_state
                           ; data= external_transition }
                         in
-                        Strict_pipe.Writer.write transition_writer
-                          external_transition_with_hash) )
+                        let%bind () =
+                          Strict_pipe.Writer.write transition_writer
+                            external_transition_with_hash
+                        in
+                        Transition_frontier.wait_for_transition frontier
+                          (With_hash.hash external_transition_with_hash)) )
         in
         let proposal_supervisor = Singleton_supervisor.create ~task:propose in
         let scheduler = Singleton_scheduler.create time_controller in

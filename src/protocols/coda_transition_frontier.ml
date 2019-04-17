@@ -365,6 +365,8 @@ module type Transition_frontier_intf = sig
 
   val shallow_copy_root_snarked_ledger : t -> masked_ledger
 
+  val wait_for_transition : t -> state_hash -> unit Deferred.t
+
   module type Transition_frontier_extension_intf =
     Transition_frontier_extension_intf0
     with type transition_frontier_breadcrumb := Breadcrumb.t
