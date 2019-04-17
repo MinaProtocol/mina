@@ -24,9 +24,9 @@ let make = () => {table: Js.Dict.empty(), id: ref(0)};
 
 let nextPending = (t, ~loc) => {
   let id = t.id^;
+  incr(t.id);
   let task =
     Task.create(cb => {
-      incr(t.id);
       let key = Ident.toString((id, loc));
       Js.Dict.set(
         t.table,

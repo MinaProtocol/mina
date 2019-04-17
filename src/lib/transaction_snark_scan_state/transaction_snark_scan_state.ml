@@ -227,7 +227,8 @@ end = struct
     ; mutable job_count: int }
   [@@deriving sexp]
 
-  let hash, is_valid = Stable.Latest.(hash, is_valid)
+  [%%define_locally
+  Stable.Latest.(hash, is_valid)]
 
   (**********Helpers*************)
 
