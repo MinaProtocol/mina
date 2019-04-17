@@ -6,9 +6,7 @@ module Navigator = {
     external writeText: string => Js.Promise.t(unit) = "";
 
     let writeTextTask: string => Task.t('x, unit) =
-      (str, ()) =>
-        writeText(str)
-        |> Js.Promise.then_(() => Js.Promise.resolve(Belt.Result.Ok()));
+      str => Task.liftPromise(() => writeText(str));
   };
 };
 
@@ -53,6 +51,10 @@ module RightButtons = {
     [@react.component]
     let make = (~pubKeySelected) => {
       let str = ReasonReact.string("Copy public key");
+      // The switch is over the <button> rather than within the onClick because
+      // if there exists an onClick the button is no longer disabled (despite
+      // disabled being true), and there is no way to give JSX an `option` for
+      // the click handler.
       switch (pubKeySelected) {
       | Some(pubKey) =>
         <button
