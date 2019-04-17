@@ -1090,13 +1090,14 @@ module Checkpoints = struct
           type t =
             { (* TODO: Make a nice way to force this to have bounded (or fixed) size for
                  bin_io reasons *)
-              prefix: Coda_base.State_hash.Stable.V1.t Core.Fqueue.Stable.V1.t
+              (* Front is oldest. Back is newest *)
+              prefix: Coda_base.State_hash.Stable.V1.t Core.Fdeque.Stable.V1.t
             ; tail: Hash.Stable.V1.t }
           [@@deriving sexp, bin_io, compare, version]
 
           let digest ({prefix; tail} : t) =
             let rec go acc p =
-              match Fqueue.dequeue p with
+              match Fdeque.dequeue_front p with
               | None -> acc
               | Some (h, p) -> go (merge h acc) p
             in
@@ -1113,14 +1114,14 @@ module Checkpoints = struct
         end
 
         let to_yojson ({prefix; tail} : t) =
-          Yojson.to_yojson {prefix= Fqueue.to_list prefix; tail}
+          Yojson.to_yojson {prefix= Fdeque.to_list prefix; tail}
       end
 
       module Latest = V1
     end
 
     type t = Stable.Latest.t =
-      {prefix: Coda_base.State_hash.t Fqueue.t; tail: Hash.t}
+      {prefix: Coda_base.State_hash.t Fdeque.t; tail: Hash.t}
     [@@deriving sexp, hash, compare]
 
     let to_yojson = Stable.V1.to_yojson
@@ -1183,17 +1184,33 @@ module Checkpoints = struct
 
   let empty : t =
     let dummy = Hash.of_hash Snark_params.Tick.Field.zero in
-    {hash= dummy; data= {prefix= Fqueue.empty; tail= dummy}}
+    {hash= dummy; data= {prefix= Fdeque.empty; tail= dummy}}
 
   let cons sh (t : t) : t =
     (* This kind of defeats the purpose of having a queue, but oh well. *)
-    let n = Fqueue.length t.data.prefix in
+    let n = Fdeque.length t.data.prefix in
     let hash = merge sh t.hash in
     let {Repr.prefix; tail} = t.data in
-    if n < length then {hash; data= {prefix= Fqueue.enqueue prefix sh; tail}}
+    if n < length then
+      {hash; data= {prefix= Fdeque.enqueue_back prefix sh; tail}}
     else
-      let sh0, prefix = Fqueue.dequeue_exn prefix in
-      {hash; data= {prefix= Fqueue.enqueue prefix sh; tail= merge sh0 tail}}
+      let sh0, prefix = Fdeque.dequeue_front_exn prefix in
+      { hash
+      ; data= {prefix= Fdeque.enqueue_back prefix sh; tail= merge sh0 tail} }
+
+  let overlap (t1 : t) (t2 : t) =
+    let exists t ~f =
+      (* From newest to oldest *)
+      Fdeque.Back_to_front.fold_until t ~init:0
+        ~f:(fun n x ->
+          if n >= length then Stop false
+          else if f x then Stop true
+          else Continue (n + 1) )
+        ~finish:(fun _ -> false)
+    in
+    exists t1.data.prefix ~f:(fun h1 ->
+        exists t2.data.prefix ~f:(fun h2 -> Coda_base.State_hash.equal h1 h2)
+    )
 
   let fold (t : t) = Hash.fold t.hash
 
@@ -1204,7 +1221,7 @@ module Checkpoints = struct
   let typ =
     Typ.transport Hash.typ
       ~there:(fun (t : t) -> t.hash)
-      ~back:(fun hash -> {hash; data= {prefix= Fqueue.empty; tail= hash}})
+      ~back:(fun hash -> {hash; data= {prefix= Fdeque.empty; tail= hash}})
 
   module Checked = struct
     let if_ = Hash.if_
