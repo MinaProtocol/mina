@@ -112,7 +112,8 @@ struct
     (* omit bin_io, version *)
     type t = Stable.Latest.t [@@deriving sexp, eq, hash, compare]
 
-    let of_yojson, to_yojson = Stable.Latest.(of_yojson, to_yojson)
+    [%%define_locally
+    Stable.Latest.(of_yojson, to_yojson)]
 
     let size_in_bits = Field.size_in_bits
 
