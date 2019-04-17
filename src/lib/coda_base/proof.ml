@@ -44,4 +44,5 @@ let dummy = Tock.Proof.dummy
 
 include Sexpable.Of_stringable (Stable.Latest)
 
-let to_yojson, of_yojson = Stable.Latest.(to_yojson, of_yojson)
+[%%define_locally
+Stable.Latest.(to_yojson, of_yojson)]

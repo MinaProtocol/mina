@@ -3,7 +3,7 @@ open Tc;
 
 let dev = true;
 
-let createTray = () => {
+let createTray = settingsOrError => {
   let t = AppTray.get();
   let items =
     Menu.Item.[
@@ -20,7 +20,8 @@ let createTray = () => {
       make(
         Label("Send"),
         ~accelerator="CmdOrCtrl+S",
-        ~click=() => AppWindow.deepLink(Route.Send),
+        ~click=
+          () => AppWindow.deepLink({path: Route.Path.Send, settingsOrError}),
         (),
       ),
       make(Separator, ()),
@@ -38,28 +39,24 @@ let createTray = () => {
   Tray.setContextMenu(t, menu);
 };
 
-App.on(
-  `Ready,
-  () => {
-    createTray();
-    AppWindow.deepLink(Route.Home);
-  },
-);
-
 // We need this handler here to prevent the application from exiting on all
 // windows closed. Keep in mind, we have the tray.
 App.on(`WindowAllClosed, () => ());
 
-// Proof of concept on "database"
-let hello_world: Js.Json.t = Js.Json.string("hello world");
 let task =
-  FlatFileDb.store(hello_world) |> Task.andThen(~f=() => FlatFileDb.load());
+  Task.map2(
+    Task.uncallbackifyValue(App.on(`Ready)),
+    SettingsMain.load(),
+    ~f=((), settings) =>
+    `Settings(settings)
+  )
+  |> Task.onError(~f=e => Task.succeed(`Error(e)));
 
-Task.attempt(
+Task.perform(
   task,
-  ~f=res => {
-    let x = Result.ok_exn(res);
-    assert(x == hello_world);
-    print_endline("Successfully read the data!");
+  ~f=settingsOrError => {
+    // TODO: Send whatever settings are relevant to the relevant pieces
+    createTray(settingsOrError);
+    AppWindow.deepLink({path: Route.Path.Home, settingsOrError});
   },
 );

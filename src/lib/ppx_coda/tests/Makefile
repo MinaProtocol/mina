@@ -22,6 +22,10 @@ positive-tests : unexpired.ml
 	@ echo -n "Versioned types, should succeed..."
 	@ dune build versioned_good.cma ${REDIRECT}
 	@ echo "OK"
+# define locally
+	@ echo -n "Define locally, should succeed..."
+	@ dune build define_locally_good.cma ${REDIRECT}
+	@ echo "OK"
 
 negative-tests :
 # expiration
