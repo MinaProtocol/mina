@@ -148,7 +148,7 @@ let%test_module "Ledger catchup" =
       let catchup_job_reader, catchup_job_writer =
         Strict_pipe.create (Buffered (`Capacity 10, `Overflow Drop_head))
       in
-      let catchup_breadcrumbs_reader, catchup_breadcrumbs_writer =
+      let _catchup_breadcrumbs_reader, catchup_breadcrumbs_writer =
         Strict_pipe.create Synchronous
       in
       let unprocessed_transition_cache =
