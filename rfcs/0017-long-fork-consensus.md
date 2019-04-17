@@ -11,7 +11,7 @@ This mechanism also does not require checkpointing at any time horizon, compared
 
 [motivation]: #motivation
 
-Its not realistic for clients to have always been online, and it is a poor trust model to require clients to find a trusted third party (high friction and not always feasible).
+It's not realistic for clients to have always been online, and it is a poor trust model to require clients to find a trusted third party (high friction and not always feasible).
 
 With this feature, clients will be able to join the network from any device at any time.
 
@@ -23,9 +23,9 @@ With this feature, clients will be able to join the network from any device at a
 
 This version of the implementation is correct given that [50% + epsilon] of stake has always been participating and honest. 
 
-* Add a new field to `protocol_state` called `min_window`, initally set to `8k`
+* Add a new field to `protocol_state` called `min_window`, initally set to `24k`
 * Add a new field to `protocol_state` called `current_window`, initially set to 0
-* `let window_diff = FLOOR(current_protocol_state.slot_number/(8k)) - FLOOR(previous_protocol_state.slot_number/(8k))`
+* `let window_diff = FLOOR(current_protocol_state.global_slot_number/(24k)) - FLOOR(previous_protocol_state.global_slot_number/(24k))`
 * if `window_diff == 0`
   * set `current_protocol_state.current_window` to `previous_protocol_state.current_window + 1`
 * else if `window_diff == 1`
@@ -37,7 +37,7 @@ This version of the implementation is correct given that [50% + epsilon] of stak
 
 Add to the chain select(A,B) function:
 
-* If no checkpoints match between current and proposed, choose the chain with the greater `min_window`. If its a tie choose the already held chain.
+* If the previous-epoch checkpoint does not match between current and proposed, choose the chain with the greater `min_window`. If its a tie choose the already held chain.
 
 The intuition is each `current_window` is a sample from a distribution parameterized by the chain's participation. `min-window` then will asymptote over time to a low percentile of the distruibution, which will always be large enough to differentiate between the honest chain and an adversary's. 
 
@@ -64,21 +64,25 @@ Add to transaction application logic:
 
 Add to the protocol state update logic:
 
-* `let window_diff = FLOOR(current_protocol_state.slot_number/(8k)) - FLOOR(previous_protocol_state.slot_number/(8k))`
+* `let window_diff = FLOOR(current_protocol_state.global_slot_number/(24k)) - FLOOR(previous_protocol_state.global_slot_number/(24k))`
 * if `window_diff == 0`
-  * TODO
+  * set `current_protocol_state.current_window` to `previous_protocol_state.current_window + 1`
 * if `window_diff == 1`
-  * TODO
+  * set `current_protocol_state.min_window` to `MIN(current_protocol_state.current_window, previous_protocol_state.min_window)`
+  * set `current_protocol_state.current_window` to `1`
 * else
-  * TODO
+  * set `current_protocol_state.min_window` to `0`
+  * set `current_protocol_state.current_window` to `1`
 
-* `let min_window_period_diff = FLOOR(current_protocol_state.slot_number/min_window_period) - FLOOR(previous_protocol_state.slot_number/min_window_period)`
+* `let min_window_period_diff = FLOOR(current_protocol_state.global_slot_number/min_window_period) - FLOOR(previous_protocol_state.global_slot_number/min_window_period)`
 * if `min_window_period_diff == 0`
-  * TODO
+  * set most recent `current_protocol_state.min_windows` to `MIN(most recent current_protocol_state.min_windows, current_protocol_state.min_window)`
 * else if `min_window_period_diff == 1`
-  * TODO
+  * push `current_protocol_state.min_window` to `current_protocol_state.min_windows`
+  * set `current_protocol_state.tail_min_windows` to `MIN(pop current_protocol_state.min_windows, current_protocol_state.tail_min_windows)`
 * else
-  * TODO
+  * push `0` to `current_protocol_state.min_windows`
+  * set `current_protocol_state.tail_min_windows` to `MIN(pop current_protocol_state.min_windows, current_protocol_state.tail_min_windows)`
 
 * if the `snarked_ledger` is being updated
   * set `current_protocol_state.min_window` to `MAX(current_protocol_state.min_window, new_snarked_ledger.voted_stake/staged_ledger.total_stake)`
@@ -86,6 +90,7 @@ Add to the protocol state update logic:
   * do nothing
 
 Add to the transaction accepting logic:
+* TODO
 
 TODO vote triggering
 Incentives discussion
