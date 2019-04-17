@@ -1,6 +1,4 @@
-#!/bin/bash
 
-set -euo pipefail
 
 SCRIPTPATH="$( cd "$(dirname "$0")" ; pwd -P )"
 cd $SCRIPTPATH/../src/_build
@@ -39,23 +37,19 @@ mkdir -p ${BUILDDIR}/usr/local/bin
 cp ./default/app/cli/src/coda.exe ${BUILDDIR}/usr/local/bin/coda
 cp ./default/app/logproc/logproc.exe ${BUILDDIR}/usr/local/bin/logproc
 
-
-# Include proving/verifying
-
-# Look in tmp first (compile time generated keys)
-tmp_keys=$(shopt -s nullglob dotglob; echo /tmp/coda_cache_dir/*)
-if (( ${#tmp_keys} ))
-then
-    mkdir -p ${BUILDDIR}/var/lib/coda
-    cp /tmp/coda_cache_dir/* ${BUILDDIR}/var/lib/coda
-else
-    # Look instead for packaged keys (downloaded before build time)
-    var_keys=$(shopt -s nullglob dotglob; echo /var/lib/coda/*)
-    if (( ${#var_keys} ))
-    then
+# Look for static and generated proving/verifying keys
+var_keys=$(shopt -s nullglob dotglob; echo /var/lib/coda/*)
+if (( ${#var_keys} )) ; then
+    echo "Found PV keys in /var/lib/coda - stock keys"
 	mkdir -p ${BUILDDIR}/var/lib/coda
 	cp /var/lib/coda/* ${BUILDDIR}/var/lib/coda
-    fi
+fi
+
+tmp_keys=$(shopt -s nullglob dotglob; echo /tmp/coda_cache_dir/*)
+if (( ${#tmp_keys} )) ; then
+    echo "Found PV keys in /tmp/coda_cache_dir - snark may have changed"
+    mkdir -p ${BUILDDIR}/var/lib/coda
+    cp /tmp/coda_cache_dir/* ${BUILDDIR}/var/lib/coda
 fi
 
 # Bash autocompletion
