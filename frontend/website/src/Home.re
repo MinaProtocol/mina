@@ -6,7 +6,7 @@ let make = (~posts, _children) => {
     <section
       className=Css.(
         style([
-          marginTop(`rem(-0.8125)),
+          marginTop(`rem(-0.3125)),
           media(Style.MediaQuery.full, [marginTop(`rem(-0.25))]),
         ])
       )>
@@ -20,7 +20,7 @@ let make = (~posts, _children) => {
       <div
         className=Css.(
           style([
-            backgroundColor(Style.Colors.gandalf),
+            backgroundColor(Style.Colors.navyBlue),
             marginTop(`rem(13.)),
           ])
         )>

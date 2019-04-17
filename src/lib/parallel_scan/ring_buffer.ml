@@ -1,7 +1,22 @@
 open Core_kernel
 open Async_kernel
 
-type 'a t = {data: 'a Array.t; mutable position: int} [@@deriving sexp, bin_io]
+module Stable = struct
+  module V1 = struct
+    module T = struct
+      type 'a t = {data: 'a array; mutable position: int}
+      [@@deriving sexp, bin_io, version]
+    end
+
+    include T
+  end
+
+  module Latest = V1
+end
+
+(* omit bin_io, version *)
+type 'a t = 'a Stable.Latest.t = {data: 'a Array.t; mutable position: int}
+[@@deriving sexp]
 
 let filter_map t = Array.filter_map t.data
 

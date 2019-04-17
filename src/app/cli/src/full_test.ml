@@ -56,7 +56,7 @@ let run_test () : unit Deferred.t =
       let module Run = Run (Config) (Main) in
       let open Main in
       let%bind trust_dir = Async.Unix.mkdtemp (temp_conf_dir ^/ "trust_db") in
-      let trust_system = Coda_base.Trust_system.create ~db_dir:trust_dir in
+      let trust_system = Trust_system.create ~db_dir:trust_dir in
       let%bind receipt_chain_dir_name =
         Async.Unix.mkdtemp (temp_conf_dir ^/ "receipt_chain")
       in
@@ -79,16 +79,15 @@ let run_test () : unit Deferred.t =
             ; me=
                 Network_peer.Peer.create Unix.Inet_addr.localhost
                   ~discovery_port:8001 ~communication_port:8000
-            ; trust_system } }
+            ; trust_system
+            ; max_concurrent_connections= Some 10 } }
       in
       Core.Backtrace.elide := false ;
       Async.Scheduler.set_record_backtraces true ;
       let%bind coda =
         Main.create
-          (Main.Config.make ~logger ~net_config ~propose_keypair:keypair
-             ~run_snark_worker:true
-             ~staged_ledger_persistant_location:
-               (temp_conf_dir ^/ "staged_ledger")
+          (Main.Config.make ~logger ~trust_system ~net_config
+             ~propose_keypair:keypair ~run_snark_worker:true
              ~transaction_pool_disk_location:
                (temp_conf_dir ^/ "transaction_pool")
              ~snark_pool_disk_location:(temp_conf_dir ^/ "snark_pool")
@@ -257,7 +256,7 @@ let run_test () : unit Deferred.t =
             (List.map accounts
                ~f:(fun ((keypair : Signature_lib.Keypair.t), account) ->
                  ( Public_key.compress keypair.public_key
-                 , Account.balance account ) ))
+                 , account.Account.Poly.balance ) ))
         in
         let%bind updated_balance_sheet =
           send_payments accounts pks balance_sheet (fun i ->

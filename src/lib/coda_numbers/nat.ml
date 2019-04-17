@@ -13,7 +13,8 @@ module type S = sig
 
   module Stable : sig
     module V1 : sig
-      type nonrec t = t [@@deriving bin_io, sexp, eq, compare, hash, yojson]
+      type nonrec t = t
+      [@@deriving bin_io, sexp, eq, compare, hash, yojson, version]
     end
 
     module Latest = V1
@@ -69,7 +70,7 @@ module type F = functor
   -> S with type t := N.t and module Bits := Bits
 
 module Make (N : sig
-  type t [@@deriving bin_io, sexp, compare, hash]
+  type t [@@deriving bin_io, sexp, compare, hash, version {unnumbered}]
 
   include Unsigned_extended.S with type t := t
 
@@ -83,9 +84,8 @@ struct
   module Stable = struct
     module V1 = struct
       module T = struct
-        let version = 1
-
-        type t = N.t [@@deriving bin_io, sexp, eq, compare, hash, yojson]
+        type t = N.t
+        [@@deriving bin_io, sexp, eq, compare, hash, yojson, version]
       end
 
       include T

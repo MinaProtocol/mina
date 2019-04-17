@@ -20,23 +20,36 @@ module Body : sig
 end
 
 module Common : sig
-  type ('fee, 'nonce, 'memo) t_ = {fee: 'fee; nonce: 'nonce; memo: 'memo}
-  [@@deriving bin_io, eq, sexp, hash]
+  module Poly : sig
+    type ('fee, 'nonce, 'memo) t = {fee: 'fee; nonce: 'nonce; memo: 'memo}
+    [@@deriving eq, sexp, hash, yojson]
 
-  type t =
-    ( Currency.Fee.Stable.V1.t
-    , Coda_numbers.Account_nonce.Stable.V1.t
-    , User_command_memo.t )
-    t_
-  [@@deriving eq, sexp, hash]
+    module Stable :
+      sig
+        module V1 : sig
+          type ('fee, 'nonce, 'memo) t
+          [@@deriving bin_io, eq, sexp, hash, yojson, version]
+        end
+
+        module Latest = V1
+      end
+      with type ('fee, 'nonce, 'memo) V1.t = ('fee, 'nonce, 'memo) t
+  end
 
   module Stable : sig
     module V1 : sig
-      type nonrec t = t [@@deriving bin_io, eq, sexp, hash]
+      type t =
+        ( Currency.Fee.Stable.V1.t
+        , Coda_numbers.Account_nonce.Stable.V1.t
+        , User_command_memo.t )
+        Poly.Stable.V1.t
+      [@@deriving bin_io, eq, sexp, hash]
     end
 
     module Latest = V1
   end
+
+  type t = Stable.Latest.t [@@deriving eq, sexp, hash]
 
   val gen : t Quickcheck.Generator.t
 
@@ -44,7 +57,7 @@ module Common : sig
     ( Currency.Fee.var
     , Coda_numbers.Account_nonce.Unpacked.var
     , User_command_memo.Checked.t )
-    t_
+    Poly.t
 
   val typ : (var, t) Typ.t
 
@@ -57,10 +70,32 @@ module Common : sig
   end
 end
 
-type ('common, 'body) t_ = {common: 'common; body: 'body}
-[@@deriving bin_io, eq, sexp, hash]
+module Poly : sig
+  type ('common, 'body) t = {common: 'common; body: 'body}
+  [@@deriving eq, sexp, hash, yojson, compare]
 
-type t = (Common.t, Body.t) t_ [@@deriving eq, sexp, hash]
+  module Stable :
+    sig
+      module V1 : sig
+        type ('common, 'body) t
+        [@@deriving bin_io, eq, sexp, hash, yojson, compare, version]
+      end
+
+      module Latest = V1
+    end
+    with type ('common, 'body) V1.t = ('common, 'body) t
+end
+
+module Stable : sig
+  module V1 : sig
+    type t = (Common.Stable.V1.t, Body.Stable.V1.t) Poly.Stable.V1.t
+    [@@deriving bin_io, eq, sexp, hash, yojson, version]
+  end
+
+  module Latest = V1
+end
+
+type t = Stable.Latest.t [@@deriving eq, sexp, hash]
 
 val create :
      fee:Currency.Fee.t
@@ -72,14 +107,6 @@ val create :
 val length_in_triples : int
 
 val dummy : t
-
-module Stable : sig
-  module V1 : sig
-    type nonrec t = t [@@deriving bin_io, eq, sexp, hash, yojson]
-  end
-
-  module Latest = V1
-end
 
 val fold : t -> bool Triple.t Fold.t
 

@@ -33,14 +33,16 @@ module Colors = {
   let slateAlpha = a => `hsla((209, 20, 40, a));
 
   let navy = `rgb((0, 49, 90));
+  let navyBlue = `rgb((0, 23, 74));
+  let navyBlueAlpha = a => `rgba((0, 23, 74, a));
+  let greyishAlpha = a => `rgba((170, 170, 170, a));
   let saville = `hsl((212, 33, 35));
-  // For use with box-shadow so we can't use opacity
-  let greenShadow = `rgba((136, 191, 163, 0.64));
 
   let clover = `rgb((22, 168, 85));
   let lightClover = `rgba((118, 205, 135, 0.12));
 
   let teal = `rgb((71, 130, 160));
+  let tealBlue = `rgb((0, 170, 170));
   let tealAlpha = a => `rgba((71, 130, 160, a));
 
   let rosebud = `rgb((163, 83, 111));
@@ -125,6 +127,24 @@ module Typeface = {
         "\n",
         [
           genFontFace(
+            ~fontFamily="PragmataPro",
+            ~src=[
+              "/static/font/Essential-PragmataPro-Regular.woff2",
+              "/static/font/Essential-PragmataPro-Regular.woff",
+            ],
+            ~fontWeight=`normal,
+            (),
+          ),
+          genFontFace(
+            ~fontFamily="PragmataPro",
+            ~src=[
+              "/static/font/PragmataPro-Bold.woff2",
+              "/static/font/PragmataPro-Bold.woff",
+            ],
+            ~fontWeight=`bold,
+            (),
+          ),
+          genFontFace(
             ~fontFamily="IBM Plex Serif",
             ~src=[
               "/static/font/IBMPlexSerif-Medium-Latin1.woff2",
@@ -179,10 +199,14 @@ module Typeface = {
   let aktivgrotesk = fontFamily("aktiv-grotesk-extended, sans-serif");
 
   let rubik = fontFamily("Rubik, sans-serif");
+
+  let pragmataPro = fontFamily("PragmataPro, monospace");
 };
 
 module MediaQuery = {
-  let veryLarge = "(min-width: 83.8125rem)";
+  let veryVeryLarge = "(min-width: 77rem)";
+  let veryLarge = "(min-width: 70.8125rem)";
+  let somewhatLarge = "(min-width: 65.5rem)";
   let full = "(min-width: 48rem)";
   let notMobile = "(min-width: 32rem)";
   let notSmallMobile = "(min-width: 25rem)";
@@ -256,6 +280,20 @@ module H2 = {
     ]);
 };
 
+module Technical = {
+  open Css;
+  let border = f => style([f(`px(3), `dashed, Colors.greyishAlpha(0.5))]);
+
+  let basic =
+    style([
+      Typeface.pragmataPro,
+      fontWeight(`normal),
+      color(Css.white),
+      fontSize(`rem(0.9375)),
+      textTransform(`uppercase),
+    ]);
+};
+
 module H3 = {
   open Css;
 
@@ -299,6 +337,35 @@ module H3 = {
         after([marginLeft(`rem(2.0)), ...wing]),
       ]),
     ]);
+  };
+
+  module Technical = {
+    let basic =
+      style([
+        Typeface.pragmataPro,
+        fontSize(`rem(0.9375)),
+        fontWeight(`bold),
+        letterSpacing(`px(1)),
+        textTransform(`uppercase),
+      ]);
+
+    let title = merge([basic, style([color(Css.black)])]);
+
+    let boxed =
+      merge([
+        basic,
+        Technical.border(Css.border),
+        style([
+          color(Colors.white),
+          lineHeight(`rem(1.5)),
+          display(`flex),
+          justifyContent(`center),
+          alignItems(`center),
+          width(`rem(9.0625)),
+          height(`rem(3.)),
+          margin(`auto),
+        ]),
+      ]);
   };
 };
 
@@ -352,6 +419,17 @@ module H5 = {
 module Body = {
   open Css;
 
+  module Technical = {
+    let basic =
+      style([
+        Typeface.pragmataPro,
+        color(Css.white),
+        fontSize(`rem(1.)),
+        lineHeight(`rem(1.25)),
+        letterSpacing(`rem(0.00625)),
+      ]);
+  };
+
   let basic =
     style([
       Typeface.ibmplexsans,
@@ -372,6 +450,14 @@ module Body = {
     ]);
 
   let big_semibold = merge([big, style([fontWeight(`semiBold)])]);
+
+  let small =
+    style([
+      Typeface.ibmplexsans,
+      fontSize(`rem(0.8125)),
+      opacity(0.5),
+      lineHeight(`rem(1.25)),
+    ]);
 };
 
 // Match Tachyons setting pretty much everything to border-box
@@ -400,3 +486,5 @@ Css.global(
     unsafe("-webkit-margin-after", "0"),
   ],
 );
+
+Css.global("p", Css.[marginTop(`rem(1.)), marginBottom(`rem(1.))]);

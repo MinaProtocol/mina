@@ -316,7 +316,9 @@ end
 
 module Verify_proof = struct
   type query =
-    Public_key.Compressed.Stable.Latest.t * User_command.t * Payment_proof.t
+    Public_key.Compressed.Stable.Latest.t
+    * User_command.Stable.V1.t
+    * Payment_proof.t
   [@@deriving bin_io]
 
   type response = unit Or_error.t [@@deriving bin_io]

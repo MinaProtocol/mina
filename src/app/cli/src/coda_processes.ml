@@ -34,7 +34,7 @@ let offset =
 
 let local_configs ?proposal_interval ?(proposers = Fn.const None) n
     ~acceptable_delay ~program_dir ~snark_worker_public_keys ~work_selection
-    ~trace_dir =
+    ~trace_dir ~max_concurrent_connections =
   let discovery_ports, external_ports, peers = net_configs n in
   let peers = [] :: List.drop peers 1 in
   let args =
@@ -57,7 +57,7 @@ let local_configs ?proposal_interval ?(proposers = Fn.const None) n
         Coda_process.local_config ?proposal_interval ~peers ~discovery_port
           ~external_port ~snark_worker_config ~program_dir ~acceptable_delay
           ~proposer:(proposers i) ~work_selection ~trace_dir
-          ~offset:(Lazy.force offset) () )
+          ~offset:(Lazy.force offset) ~max_concurrent_connections () )
   in
   configs
 
