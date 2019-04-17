@@ -135,14 +135,9 @@ struct
           Envelope.Incoming.Stable.V1.t
         [@@deriving bin_io, sexp, version {rpc}]
 
-        (* TODO : wrap Or_error *)
-        type response = Sync_ledger.Answer.Stable.V1.t Or_error.t
-        [@@deriving bin_io, sexp]
-
-        (* , version {rpc} *)
-        
-        (* TODO : remove this after uncommenting version{rpc} *)
-        let version = 1
+        type response =
+          Sync_ledger.Answer.Stable.V1.t Core.Or_error.Stable.V1.t
+        [@@deriving bin_io, sexp, version {rpc}]
 
         let query_of_caller_model = Fn.id
 

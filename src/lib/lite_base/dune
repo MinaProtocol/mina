@@ -10,4 +10,5 @@
     fold_lib
     sparse_ledger_lib
     snarkette
-    bin_prot))
+    bin_prot
+    module_version))
