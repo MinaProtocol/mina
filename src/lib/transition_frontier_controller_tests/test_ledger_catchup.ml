@@ -191,13 +191,12 @@ let%test_module "Ledger catchup" =
             Transition_handler.Unprocessed_transition_cache.register
               unprocessed_transition_cache failing_transition
           in
-          Strict_pipe.Writer.write catchup_job_writer
-            (parent_hash, [Rose_tree.T (cached_best_transition, [])]) ;
           Ledger_catchup.run ~logger ~network ~frontier:me
             ~catchup_breadcrumbs_writer ~catchup_job_reader
             ~unprocessed_transition_cache ;
-          Cache_lib.Cached.invalidate cached_failing_transition
-          |> Fn.const (Deferred.return true) )
+          let%bind _ = after (Core.Time.Span.of_ms 500.) in
+          Cache_lib.Cached.invalidate cached_failing_transition |> ignore ;
+          Deferred.return true )
 
     let%test_unit "catchup won't be blocked by transitions that are still \
                    under processing" =
