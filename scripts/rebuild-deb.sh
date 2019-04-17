@@ -8,7 +8,8 @@ DATE=$(date +%Y-%m-%d)
 GITHASH=$(git rev-parse --short=8 HEAD)
 
 # Identify CI builds by build number
-if [[ -v CIRCLE_BUILD_NUM ]]; then
+set +u
+if [[ -z "$CIRCLE_BUILD_NUM: ]]; then
     VERSION="0.1.${CIRCLE_BUILD_NUM}-CI"
 else
     VERSION="0.1.${DATE}-${GITHASH}"
