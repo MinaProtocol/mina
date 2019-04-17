@@ -1,15 +1,5 @@
 open Tc;
 
-module Navigator = {
-  module Clipboard = {
-    [@bs.val] [@bs.scope ("navigator", "clipboard")]
-    external writeText: string => Js.Promise.t(unit) = "";
-
-    let writeTextTask: string => Task.t('x, unit) =
-      str => Task.liftPromise(() => writeText(str));
-  };
-};
-
 module StakingSwitch = {
   [@react.component]
   let make = (~pubKey, ~settings) => {
@@ -60,7 +50,9 @@ module RightButtons = {
         <button
           onClick={_e => {
             let task =
-              Navigator.Clipboard.writeTextTask(PublicKey.toString(pubKey));
+              Bindings.Navigator.Clipboard.writeTextTask(
+                PublicKey.toString(pubKey),
+              );
             Task.perform(task, ~f=()
               // TODO: Should we toast when this happens? Do we need to handle errors?
               => Js.log("Copied to clipboard"));
