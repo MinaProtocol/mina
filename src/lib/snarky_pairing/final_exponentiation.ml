@@ -43,7 +43,6 @@ module Make (Inputs : Inputs_intf) = struct
         let%bind acc =
           if naf.(i) > 0 then Fqk.(acc * elt)
           else if naf.(i) < 0 then Fqk.(acc * elt_inv)
-            (* TODO: Confirm that this is ok. Alternatively can just compute the inverse (or the unitary inverse) once at the top. *)
           else return acc
         in
         go (i - 1) (found_nonzero || naf.(i) <> 0) acc
