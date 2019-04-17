@@ -103,7 +103,9 @@ module Make (Inputs : Inputs.S) :
             Deferred.Or_error.return (acc, initial_state_hash)
           else
             match%bind f elem with
-            | Error e -> Deferred.return (Error e)
+            | Error e ->
+                List.iter acc ~f:(Fn.compose ignore Cached.invalidate) ;
+                Deferred.return (Error e)
             | Ok (Either.First hash) ->
                 Deferred.Or_error.return (acc, Some hash)
             | Ok (Either.Second transition) ->
@@ -202,6 +204,8 @@ module Make (Inputs : Inputs.S) :
             List.iter subtrees ~f:(fun subtree ->
                 Rose_tree.iter subtree ~f:(fun cached_transition ->
                     Cached.invalidate cached_transition |> ignore ) ) ;
+            Logger.trace logger ~module_:__MODULE__ ~location:__LOC__
+              "garbage collected failed cached transitions" ;
             Deferred.unit )
         |> don't_wait_for ;
         Deferred.unit )

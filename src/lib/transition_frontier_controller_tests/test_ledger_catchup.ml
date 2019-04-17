@@ -194,8 +194,9 @@ let%test_module "Ledger catchup" =
           Ledger_catchup.run ~logger ~network ~frontier:me
             ~catchup_breadcrumbs_writer ~catchup_job_reader
             ~unprocessed_transition_cache ;
-          let%bind _ = after (Core.Time.Span.of_ms 500.) in
+          let%bind () = after (Core.Time.Span.of_sec 1.) in
           Cache_lib.Cached.invalidate cached_failing_transition |> ignore ;
+          let%bind () = after (Core.Time.Span.of_sec 1.) in
           Deferred.return true )
 
     let%test_unit "catchup won't be blocked by transitions that are still \
