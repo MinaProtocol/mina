@@ -19,6 +19,10 @@ include (
 module Task = {
   include Tablecloth.Task;
 
+  /// Take a `unit => Promise.t('a)` into a `Task.t('x, 'a)`
+  let liftPromise = (f, ()) =>
+    f() |> Js.Promise.then_(a => Js.Promise.resolve(Belt.Result.Ok(a)));
+
   let uncallbackifyValue = f => {
     create(cb => f(a => cb(Belt.Result.Ok(a))));
   };
