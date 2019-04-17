@@ -128,7 +128,7 @@ struct
 
   type var =
     { digest: Pedersen.Checked.Digest.var
-    ; bits: Boolean.var Bitstring.Lsb_first.t option }
+    ; mutable bits: Boolean.var Bitstring.Lsb_first.t option }
 
   let var_of_t t =
     let n = Bigint.of_field t in
@@ -159,7 +159,9 @@ struct
     match t.bits with
     | Some bits -> return (bits :> Boolean.var list)
     | None ->
-        unpack t.digest
+        let%map bits = unpack t.digest in
+        t.bits <- Some (Bitstring.Lsb_first.of_list bits) ;
+        bits
 
   let var_to_triples t =
     var_to_bits t >>| Bitstring.pad_to_triple_list ~default:Boolean.false_
