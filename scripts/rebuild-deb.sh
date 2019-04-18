@@ -34,8 +34,11 @@ Description: Coda Client and Daemon
  Built from ${GITHASH}
 EOF
 
+echo "------------------------------------------------------------"
+echo "Control File:"
 cat ${BUILDDIR}/DEBIAN/control
 
+echo "------------------------------------------------------------"
 mkdir -p ${BUILDDIR}/usr/local/bin
 cp ./default/app/cli/src/coda.exe ${BUILDDIR}/usr/local/bin/coda
 cp ./default/app/logproc/logproc.exe ${BUILDDIR}/usr/local/bin/logproc
@@ -44,6 +47,7 @@ cp ./default/app/logproc/logproc.exe ${BUILDDIR}/usr/local/bin/logproc
 var_keys=$(shopt -s nullglob dotglob; echo /var/lib/coda/*)
 if (( ${#var_keys} )) ; then
     echo "Found PV keys in /var/lib/coda - stock keys"
+    ls /var/lib/coda/*
 	mkdir -p ${BUILDDIR}/var/lib/coda
 	cp /var/lib/coda/* ${BUILDDIR}/var/lib/coda
 fi
@@ -51,6 +55,7 @@ fi
 tmp_keys=$(shopt -s nullglob dotglob; echo /tmp/coda_cache_dir/*)
 if (( ${#tmp_keys} )) ; then
     echo "Found PV keys in /tmp/coda_cache_dir - snark may have changed"
+    ls /tmp/coda_cache_dir/*
     mkdir -p ${BUILDDIR}/var/lib/coda
     cp /tmp/coda_cache_dir/* ${BUILDDIR}/var/lib/coda
 fi
@@ -64,8 +69,11 @@ export PATH=${cwd}/${BUILDDIR}/usr/local/bin/:${PATH}
 env COMMAND_OUTPUT_INSTALLATION_BASH=1 coda  > ${BUILDDIR}/etc/bash_completion.d/coda
 
 # echo contents of deb
+echo "------------------------------------------------------------"
+echo "Deb Contents:"
 find ${BUILDDIR}
 
 # Build the package
+echo "------------------------------------------------------------"
 dpkg-deb --build ${BUILDDIR}
 ln -s -f ${BUILDDIR}.deb coda.deb

@@ -13,8 +13,9 @@ DEBS3='deb-s3 upload \
 
 # check for AWS Creds
 if [ -z "$AWS_ACCESS_KEY_ID" ]; then
+
     # master is 'stable'
-    if [[ "$CIRCLE_BRANCH" == "master" ]]
+    if [[ "$CIRCLE_BRANCH" == "master" ]]; then
         CODENAME='stable'
     else
         CODENAME='unstable'
