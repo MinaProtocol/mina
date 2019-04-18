@@ -441,16 +441,20 @@ end)
 let make_init ~should_propose (module Config : Config_intf) :
     (module Init_intf) Deferred.t =
   let open Config in
+  Stdlib.Printf.eprintf "1\n%!" ;
   let%bind proposer_prover =
     if should_propose then Prover.create ~conf_dir >>| fun p -> `Proposer p
     else return `Non_proposer
   in
+  Stdlib.Printf.eprintf "2\n%!" ;
   let%map verifier = Verifier.create ~conf_dir in
+  Stdlib.Printf.eprintf "3\n%!" ;
   let (module Make_work_selector : Work_selector_F) =
     match work_selection with
     | Seq -> (module Work_selector.Sequence.Make : Work_selector_F)
     | Random -> (module Work_selector.Random.Make : Work_selector_F)
   in
+  Stdlib.Printf.eprintf "4\n%!" ;
   let module Init = struct
     module Ledger_proof_statement = Ledger_proof_statement
     module Transaction_snark_work = Transaction_snark_work
@@ -462,6 +466,7 @@ let make_init ~should_propose (module Config : Config_intf) :
 
     let verifier = verifier
   end in
+  Stdlib.Printf.eprintf "5\n%!" ;
   (module Init : Init_intf)
 
 module Make_inputs0
@@ -847,8 +852,6 @@ struct
 
     module Foo = struct
       open Get_staged_ledger_aux_and_pending_coinbases_at_hash
-
-      let%test "foo" = false
 
       let%test "Get_staged_ledger_aux_and_pending_coinbases_at_hash \
                 deserialize query" =
@@ -1726,3 +1729,40 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
             !"Coda process got interrupted by signal %{sexp:t}"
             signal ))
 end
+
+let%test_module "coda_main_tests" =
+  ( module struct
+    let%test "RPC deserializations" =
+      let open Deferred.Let_syntax in
+      Stdlib.Printf.eprintf "INIT\n%!" ;
+      Parallel.init_master () ;
+      Stdlib.Printf.eprintf "DONE WITH INIT\n%!" ;
+      Thread_safe.block_on_async_exn (fun () ->
+          Stdlib.Printf.eprintf "INSIDE THUNK\n%!" ;
+          let module Config0 = struct
+            let logger = Logger.null ()
+
+            let conf_dir = ""
+
+            let lbc_tree_max_depth = `Finite 50
+
+            let propose_keypair = None
+
+            let genesis_proof = Precomputed_values.base_proof
+
+            let commit_id = None
+
+            let work_selection = Protocols.Coda_pow.Work_selection.Seq
+
+            let max_concurrent_connections = Some 10
+          end in
+          Stdlib.Printf.eprintf "MADE CONFIG\n%!" ;
+          let%bind (module Init) =
+            make_init ~should_propose:false (module Config0)
+          in
+          Stdlib.Printf.eprintf "MADE INIT\n%!" ;
+          (*           let module Coda = Make_coda (Init) in *)
+          Stdlib.Printf.eprintf "MADE CODA\n%!" ;
+          assert (3 = 4) ;
+          Deferred.return true )
+  end )
