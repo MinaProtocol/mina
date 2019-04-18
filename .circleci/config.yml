@@ -228,7 +228,7 @@ jobs:
     build-artifacts--testnet_postake_medium_curves:
         resource_class: large
         docker:
-            - image: codaprotocol/coda:toolchain-e815174112752dd87cae95a6818b9cdfc26eba77
+            - image: codaprotocol/coda:toolchain-c4b2cc7c53ef51136350323d52609de5aa83f3a5
         environment:
             DUNE_PROFILE: testnet_postake_medium_curves
         steps:
