@@ -31,8 +31,6 @@ module Make (Inputs : Inputs.With_unprocessed_transition_cache.S) :
   (* TODO: calculate a sensible value from postake consensus arguments *)
   let catchup_timeout_duration = Time.Span.of_ms 6000L
 
-  let transition_parent_hash = External_transition.Verified.parent_hash
-
   let run ~logger ~time_controller ~frontier
       ~(primary_transition_reader :
          ( (External_transition.Verified.t, State_hash.t) With_hash.t
@@ -129,7 +127,7 @@ module Make (Inputs : Inputs.With_unprocessed_transition_cache.S) :
                | `Valid_transition cached_transition -> (
                  match
                    Transition_frontier.find frontier
-                     (transition_parent_hash
+                     (External_transition.Verified.parent_hash
                         ( With_hash.data
                         @@ Envelope.Incoming.data
                              (Cached.peek cached_transition) ))

@@ -147,8 +147,7 @@ module Make (Inputs : Inputs.S) :
       (Rose_tree.T (foreign_transition_head, _) as tree) =
     let initial_state_hash =
       Envelope.Incoming.data (Cached.peek foreign_transition_head)
-      |> With_hash.data |> External_transition.Verified.protocol_state
-      |> External_transition.Protocol_state.previous_state_hash
+      |> get_previous_state_hash
     in
     match Transition_frontier.find frontier initial_state_hash with
     | None ->
@@ -174,23 +173,20 @@ module Make (Inputs : Inputs.S) :
         |> Deferred.Result.map_error ~f:(fun error ->
                `Invalid (Error.to_string_hum error) )
       in
-      (* We need to coerce the transition from a proof_verified
+      let verified_transition_with_hash_enveloped =
+        Envelope.Incoming.map transition_enveloped ~f:(fun transition ->
+            (* We need to coerce the transition from a proof_verified
          transition to a fully verified in
          order to add the transition to be added to the
          transition frontier and to be fed through the
          transition_handler_validator. *)
-      let (`I_swear_this_is_safe_see_my_comment verified_transition) =
-        External_transition.to_verified transition
-      in
-      let verified_transition_with_hash =
-        With_hash.of_data verified_transition
-          ~hash_data:
-            (Fn.compose Consensus.Protocol_state.hash
-               External_transition.Verified.protocol_state)
-      in
-      let verified_transition_with_hash_enveloped =
-        Envelope.Incoming.wrap ~data:verified_transition_with_hash
-          ~sender:(Envelope.Incoming.sender transition_enveloped)
+            let (`I_swear_this_is_safe_see_my_comment verified_transition) =
+              External_transition.to_verified transition
+            in
+            With_hash.of_data verified_transition
+              ~hash_data:
+                (Fn.compose Consensus.Protocol_state.hash
+                   External_transition.Verified.protocol_state) )
       in
       Deferred.return
       @@ Transition_handler_validator.validate_transition ~logger ~frontier
