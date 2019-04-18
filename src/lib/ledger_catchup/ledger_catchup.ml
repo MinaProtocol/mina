@@ -133,8 +133,10 @@ module Make (Inputs : Inputs.S) :
                       breadcrumb_if_present ()
                     in
                     `Constructed new_breadcrumb
-                | Error (`Fatal_error exn) -> Or_error.of_exn exn
-                | Error (`Validation_error error) -> Error error )
+                | Error (`Fatal_error exn) ->
+                    Or_error.of_exn exn
+                | Error (`Validation_error error) ->
+                    Error error )
             (*TODO: punish*)
             |> Cached.sequence_deferred
           in
@@ -172,7 +174,7 @@ module Make (Inputs : Inputs.S) :
     let cached_verified_transition =
       let open Deferred.Result.Let_syntax in
       let transition = Envelope.Incoming.data transition_enveloped in
-      let%bind _ : External_transition.Proof_verified.t =
+      let%bind (_ : External_transition.Proof_verified.t) =
         Protocol_state_validator.validate_proof transition
         |> Deferred.Result.map_error ~f:(fun error ->
                `Invalid (Error.to_string_hum error) )
