@@ -118,6 +118,7 @@ struct
 
   module Scalar = Make_inner_curve_scalar (Impl) (Other_impl)
 
+  (*TODO: Dedup*)
   let find_y x =
     let y2 = Field.((x * square x) + (Coefficients.a * x) + Coefficients.b) in
     if Field.is_square y2 then Some (Field.sqrt y2) else None
@@ -364,15 +365,6 @@ module Tick = struct
 
     let scale = scale_field
 
-    let point_near_x x =
-      let rec go x = function
-        | Some y -> of_affine_coordinates (x, y)
-        | None ->
-            let x' = Field.(add one x) in
-            go x' (find_y x')
-      in
-      go x (find_y x)
-
     module Checked = struct
       include Snarky_curves.Make_weierstrass_checked (Fq) (Scalar)
                 (struct
@@ -391,16 +383,7 @@ module Tick = struct
   module Pedersen = struct
     include Crypto_params.Pedersen_params
     include Crypto_params.Pedersen_chunk_table
-
-    include Pedersen.Make (struct
-      module Field = Field
-      module Bigint = Bigint
-      module Curve = Inner_curve
-
-      let params = params
-
-      let chunk_table = chunk_table
-    end)
+    include Crypto_params.Tick_pedersen
 
     let zero_hash =
       digest_fold (State.create ())
@@ -674,54 +657,6 @@ module Tick = struct
   end
 
   module Groth_verifier = Snarky_verifier.Groth.Make (Pairing)
-end
-
-module Bg = struct
-  module M =
-    Snarky.Libsnark.Make_bowe_gabizon
-      (Tock_backend.Full)
-      (struct
-        open Tock_backend.Full
-
-        let g1_to_bits t =
-          let x, y = G1.to_affine_coordinates t in
-          Tick.Bigint.(test_bit (of_field y) 0) :: Tick.Field.unpack x
-
-        let g2_to_bits t =
-          let x, y = G2.to_affine_coordinates t in
-          let open Tick.Field in
-          let y0 = Vector.get y 0 in
-          assert (not Tick.Field.(equal y0 zero)) ;
-          Tick.Bigint.(test_bit (of_field y0) 0)
-          :: List.concat
-               (List.init (Vector.length x) ~f:(fun i ->
-                    Tick.Field.unpack (Vector.get x i) ))
-
-        let salt = lazy (Tick.Pedersen.State.salt "TockBGHash")
-
-        let random_oracle x =
-          (Blake2.digest_field x :> string)
-          |> Blake2.string_to_bits |> Array.to_list
-
-        module Group_map =
-          Snarky_group_map.Group_map.Make_unchecked (struct
-              include Tick.Field
-              include Infix
-            end)
-            (Tick.Inner_curve.Coefficients)
-
-        let hash ?message ~a ~b ~c ~delta_prime =
-          Tick.Pedersen.digest_fold (Lazy.force salt)
-            Fold_lib.Fold.(
-              group3 ~default:false
-                ( of_list (g1_to_bits a)
-                +> of_list (g2_to_bits b)
-                +> of_list (g1_to_bits c)
-                +> of_list (g2_to_bits delta_prime)
-                +> of_array (Option.value ~default:[||] message) ))
-          |> random_oracle |> Tick.Field.project |> Group_map.to_group
-          |> Tick.Inner_curve.of_affine_coordinates
-      end)
 end
 
 let tock_vk_to_bool_list vk =

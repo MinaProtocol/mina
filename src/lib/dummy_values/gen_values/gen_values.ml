@@ -41,7 +41,7 @@ struct
       let keypair = generate_keypair main ~exposing in
       prove (Keypair.pk keypair) exposing () main Field.one
     in
-    B.Proof.to_string proof
+    Binable.to_string (module B.Proof) proof
 
   let vk_string, pk_string =
     let open Impl in
@@ -91,7 +91,13 @@ struct
           [%e estring str]]
     in
     let proof_stri =
-      [%stri let proof = [%e of_string_expr "Proof" proof_string]]
+      [%stri let proof =
+               Core_kernel.Binable.of_string
+                 [%e 
+                   pexp_pack
+                     (pmod_ident (ident (curve_module_name ^. "Proof"))) ]
+                 [%e estring proof_string]
+      ]
     in
     let vk_stri =
       [%stri
