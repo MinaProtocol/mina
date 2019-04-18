@@ -25,7 +25,7 @@ module type S = sig
   val modify_account_send :
        var
     -> Public_key.Compressed.var
-    -> is_fee_transfer:Boolean.var
+    -> is_writeable:Boolean.var
     -> f:(   is_empty_and_writeable:Boolean.var
           -> Account.var
           -> (Account.var, 's) Checked.t)
