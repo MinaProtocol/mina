@@ -73,7 +73,8 @@ type t = Stable.Latest.t =
   ; communication_port: int }
 [@@deriving compare, sexp]
 
-let of_yojson, to_yojson = Stable.Latest.(of_yojson, to_yojson)
+[%%define_locally
+Stable.Latest.(of_yojson, to_yojson)]
 
 include Hashable.Make (Stable.Latest)
 include Comparable.Make_binable (Stable.Latest)

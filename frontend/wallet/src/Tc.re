@@ -19,6 +19,14 @@ include (
 module Task = {
   include Tablecloth.Task;
 
+  /// Take a `unit => Promise.t('a)` into a `Task.t('x, 'a)`
+  let liftPromise = (f, ()) =>
+    f() |> Js.Promise.then_(a => Js.Promise.resolve(Belt.Result.Ok(a)));
+
+  let uncallbackifyValue = f => {
+    create(cb => f(a => cb(Belt.Result.Ok(a))));
+  };
+
   /// Take a Node.js style ((nullable err) => unit) => unit function and make it
   /// return a task instead
   let uncallbackify0 = f => {
@@ -69,4 +77,11 @@ module Option = {
   include Tablecloth.Option;
 
   let getExn = x => Belt.Option.getExn(x);
+
+  let map2 = (t1, t2, ~f) => {
+    switch (t1, t2) {
+    | (Some(a), Some(b)) => Some(f(a, b))
+    | _ => None
+    };
+  };
 };

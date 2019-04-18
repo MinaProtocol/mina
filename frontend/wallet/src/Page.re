@@ -1,3 +1,5 @@
+open Tc;
+
 let component = ReasonReact.statelessComponent("Page");
 
 let inMemoryCache = ApolloInMemoryCache.createInMemoryCache();
@@ -6,21 +8,49 @@ let httpLink =
 let instance =
   ReasonApollo.createApolloClient(~link=httpLink, ~cache=inMemoryCache, ());
 
-Router.listenToMain();
+MainCommunication.listen();
 
 [@react.component]
 let make = (~message) => {
   let url = ReasonReact.Router.useUrl();
 
-  let modalView =
+  let (modalView, settingsOrError) =
     switch (Route.parse(url.hash)) {
-    | Some(Route.Send) => Some(<Send />)
-    | Some(DeleteWallet) => Some(<Delete />)
-    | Some(Home) => None
     | None =>
       Js.log2("Failed to parse route: ", url.hash);
-      None;
+      (None, `Error(`Json_parse_error));
+    | Some({Route.path, settingsOrError}) =>
+      Js.log3("Got path, settingsOrError: ", path, settingsOrError);
+      (
+        switch (path) {
+        | Route.Path.Send => Some(<Send />)
+        | DeleteWallet => Some(<Delete />)
+        | Home => None
+        },
+        settingsOrError,
+      );
     };
+
+  let randomNum = Js.Math.random_int(0, 1000);
+
+  let settingsInfo = {
+    let question = " (did you create a settings.json file with {\"state\": {}} ?)";
+    switch (settingsOrError) {
+    | `Settings(_) => "Settings loaded successfully"
+    | `Error(`Json_parse_error) =>
+      "Settings failed to load with a json parse error" ++ question
+    | `Error(`Decode_error(s)) =>
+      "Settings failed to decode with " ++ s ++ question
+    | `Error(`Error_reading_file(e)) =>
+      "Settings failed to load with a js exception"
+      ++ question
+      ++ (Js.Exn.stack(e) |> Option.withDefault(~default=""))
+    };
+  };
+
+  let testButton = (str, ~f) => {
+    <button onClick={_e => f()}> {ReasonReact.string(str)} </button>;
+  };
 
   <ApolloShim.Provider client=instance>
     <div
@@ -33,17 +63,54 @@ let make = (~message) => {
         ~left="0",
         (),
       )}>
-      <div className=Css.(style([display(`flex), flexDirection(`column)]))>
-        <Header />
-        <Body message />
+      <div
+        className=Css.(
+          style([
+            display(`flex),
+            flexDirection(`column),
+            justifyContent(`spaceBetween),
+            height(`percent(100.)),
+          ])
+        )>
+        <div>
+          <div
+            className=Css.(style([display(`flex), flexDirection(`column)]))>
+            <Header />
+            <Body message={message ++ ";; " ++ settingsInfo} />
+          </div>
+          {testButton("Send", ~f=() =>
+             Router.(navigate({path: Send, settingsOrError}))
+           )}
+          {testButton("Delete wallet", ~f=() =>
+             Router.(navigate({path: DeleteWallet, settingsOrError}))
+           )}
+          {testButton("Change name: " ++ Js.Int.toString(randomNum), ~f=() =>
+             switch (settingsOrError) {
+             | `Settings(settings) =>
+               let task =
+                 SettingsRenderer.add(
+                   settings,
+                   ~key=PublicKey.ofStringExn(randomNum |> Js.Int.toString),
+                   ~name="Test Wallet",
+                 );
+               Js.log("Add started");
+               Task.attempt(task, ~f=res => Js.log2("Add complete", res));
+             | _ => Js.log("There's an error")
+             }
+           )}
+        </div>
+        <div>
+          {switch (settingsOrError) {
+           | `Settings(settings) =>
+             <Footer
+               stakingKey={PublicKey.ofStringExn("131243123")}
+               settings
+             />
+           | `Error(_) => <span />
+           }}
+          <Modal settingsOrError view=modalView />
+        </div>
       </div>
-      <button onClick={_e => Router.(navigate(Send))}>
-        {ReasonReact.string("Send")}
-      </button>
-      <button onClick={_e => Router.(navigate(DeleteWallet))}>
-        {ReasonReact.string("Delete wallet")}
-      </button>
-      <Modal view=modalView />
     </div>
   </ApolloShim.Provider>;
 };

@@ -171,35 +171,37 @@ let ocaml_builtin_type_constructors = ["list"; "array"; "option"; "ref"]
 
 let jane_street_type_constructors = ["sexp_opaque"]
 
-(* for module path A.B.C represented by a longident, produce [A;B;C] *)
-let rec list_of_longident longident ~loc =
-  match longident with
-  | Lident id -> [id]
-  | Ldot (longident2, s) -> list_of_longident longident2 ~loc @ [s]
-  | Lapply _ ->
-      Ppx_deriving.raise_errorf ~loc
-        "Type name contains unexpected application"
-
 (* true iff module_path is of form M. ... .Stable.Vn, where M is Core or Core_kernel, and n is integer *)
 let is_jane_street_stable_module module_path =
   let hd_elt = List.hd_exn module_path in
   let jane_street_libs = ["Core_kernel"; "Core"] in
+  let is_version_module vn =
+    let len = String.length vn in
+    len > 1
+    && Char.equal vn.[0] 'V'
+    &&
+    let numeric_part = String.sub vn ~pos:1 ~len:(len - 1) in
+    String.for_all numeric_part ~f:Char.is_digit
+    && not (Int.equal (Char.get_digit_exn numeric_part.[0]) 0)
+  in
   List.mem jane_street_libs hd_elt ~equal:String.equal
   &&
   match List.rev module_path with
-  | vn :: "Stable" :: _ ->
-      let len = String.length vn in
-      len > 1
-      && Char.equal vn.[0] 'V'
-      &&
-      let numeric_part = String.sub vn ~pos:1 ~len:(len - 1) in
-      String.for_all numeric_part ~f:Char.is_digit
-      && not (Int.equal (Char.get_digit_exn numeric_part.[0]) 0)
+  | vn :: "Stable" :: _ -> is_version_module vn
+  | vn :: "Span" :: "Stable" :: "Time" :: _ ->
+      (* special case, maybe improper module structure *)
+      is_version_module vn
   | _ -> false
 
 let whitelisted_prefix prefix ~loc =
-  let module_path = list_of_longident prefix ~loc in
-  is_jane_street_stable_module module_path
+  match prefix with
+  | Lident id -> String.equal id "Bitstring"
+  | Ldot _ ->
+      let module_path = Longident.flatten_exn prefix in
+      is_jane_street_stable_module module_path
+  | Lapply _ ->
+      Ppx_deriving.raise_errorf ~loc
+        "Type name contains unexpected application"
 
 let rec generate_core_type_version_decls type_name core_type =
   match core_type.ptyp_desc with
