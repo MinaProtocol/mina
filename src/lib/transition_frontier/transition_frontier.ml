@@ -132,9 +132,8 @@ struct
       With_hash.hash transition_with_hash
 
     let parent_hash {transition_with_hash; _} =
-      Consensus.Protocol_state.previous_state_hash
-        ( With_hash.data transition_with_hash
-        |> Inputs.External_transition.Verified.protocol_state )
+      With_hash.data transition_with_hash
+      |> Inputs.External_transition.Verified.parent_hash
 
     let equal breadcrumb1 breadcrumb2 =
       State_hash.equal (state_hash breadcrumb1) (state_hash breadcrumb2)

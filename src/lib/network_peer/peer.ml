@@ -13,6 +13,8 @@ module Stable = struct
         (* TCP *) }
       [@@deriving bin_io, compare, sexp, version]
 
+      let equal t t' = compare t t' = 0
+
       (* these hash functions come from the implementation of Inet_addr, 
          though they're not exposed *)
       let hash_fold_t hash t = hash_fold_int hash (Hashtbl.hash t)
