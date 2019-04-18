@@ -200,7 +200,7 @@ module Types = struct
 
       let run_snark_worker = bool_entry "Snark Worker Running"
 
-      let is_bootstrapping = bool_entry "Is Bootstrapping"
+      let sync_status = map_entry "Sync Status" ~f:Sync_status.to_string
 
       let propose_pubkey =
         map_entry "Proposer Running"
@@ -242,7 +242,7 @@ module Types = struct
       ; peers: string list
       ; user_commands_sent: int
       ; run_snark_worker: bool
-      ; is_bootstrapping: bool
+      ; sync_status: Sync_status.Stable.V1.t
       ; propose_pubkey: Public_key.Stable.Latest.t option
       ; histograms: Histograms.t option
       ; consensus_time_best_tip: string option
@@ -258,7 +258,7 @@ module Types = struct
         let get field = Field.get field s
       end) in
       let open M in
-      Fields.to_list ~is_bootstrapping ~num_accounts ~block_count ~uptime_secs
+      Fields.to_list ~sync_status ~num_accounts ~block_count ~uptime_secs
         ~ledger_merkle_root ~staged_ledger_hash ~state_hash ~commit_id
         ~conf_dir ~peers ~user_commands_sent ~run_snark_worker ~propose_pubkey
         ~histograms ~consensus_time_best_tip ~consensus_time_now

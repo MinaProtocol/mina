@@ -1,3 +1,6 @@
+[%%import
+"../../config.mlh"]
+
 open Core
 open Signature_lib
 open Coda_base
@@ -24,7 +27,7 @@ module Input = struct
     ; fee_excess: Currency.Amount.Signed.Stable.V1.t
     ; pending_coinbase_before: Pending_coinbase.Stack.Stable.V1.t
     ; pending_coinbase_after: Pending_coinbase.Stack.Stable.V1.t }
-  [@@deriving bin_io]
+  [@@deriving bin_io, sexp, compare]
 end
 
 module Proof_type = struct
@@ -366,7 +369,7 @@ module Base = struct
     let proposer = payload.body.public_key in
     let%bind is_coinbase = Transaction_union.Tag.Checked.is_coinbase tag in
     let%bind pending_coinbase_stack_after =
-      let coinbase = (proposer, receiver_increase) in
+      let coinbase = (proposer, payload.body.amount) in
       let%bind stack' =
         Pending_coinbase.Stack.Checked.push pending_coinbase_stack_before
           coinbase
@@ -375,10 +378,13 @@ module Base = struct
         ~else_:pending_coinbase_stack_before
     in
     let%bind root =
-      let%bind is_fee_transfer =
-        Transaction_union.Tag.Checked.is_fee_transfer tag
+      let%bind is_writeable =
+        let%bind is_fee_transfer =
+          Transaction_union.Tag.Checked.is_fee_transfer tag
+        in
+        Boolean.any [is_fee_transfer; is_coinbase]
       in
-      Frozen_ledger_hash.modify_account_send root ~is_fee_transfer
+      Frozen_ledger_hash.modify_account_send root ~is_writeable
         sender_compressed ~f:(fun ~is_empty_and_writeable account ->
           with_label __LOC__
             (let%bind next_nonce =
@@ -1570,7 +1576,57 @@ let%test_module "transaction_snark" =
       of_user_command ~sok_digest ~source ~target ~pending_coinbase_stack
         user_command handler
 
-    (*TODO: tests*)
+    (*
+                ~proposer:
+                  { x=
+                      Snark_params.Tick.Field.of_string
+                        "39876046544032071884326965137489542106804584544160987424424979200505499184903744868114140"
+                  ; is_odd= true }
+                ~fee_transfer:
+                  (Some
+                     ( { x=
+                           Snark_params.Tick.Field.of_string
+                             "221715137372156378645114069225806158618712943627692160064142985953895666487801880947288786"
+                       ; is_odd= true }
+       *)
+    let%test_unit "coinbase" =
+      Test_util.with_randomness 123456789 (fun () ->
+          let mk_pubkey () =
+            Public_key.(compress (of_private_key_exn (Private_key.create ())))
+          in
+          let proposer = mk_pubkey () in
+          let other = mk_pubkey () in
+          let pending_coinbase_init = Pending_coinbase.Stack.empty in
+          let cb =
+            Coinbase.create
+              ~amount:(Currency.Amount.of_int 10)
+              ~proposer
+              ~fee_transfer:(Some (other, Currency.Fee.of_int 1))
+            |> Or_error.ok_exn
+          in
+          let transaction = Transaction.Coinbase cb in
+          Ledger.with_ledger ~f:(fun ledger ->
+              Ledger.create_new_account_exn ledger proposer
+                (Account.create proposer Balance.zero) ;
+              let sparse_ledger =
+                Sparse_ledger.of_ledger_subset_exn ledger [proposer; other]
+              in
+              check_transaction transaction
+                (unstage (Sparse_ledger.handler sparse_ledger))
+                ~sok_message:
+                  (Coda_base.Sok_message.create ~fee:Currency.Fee.zero
+                     ~prover:Public_key.Compressed.empty)
+                ~source:(Sparse_ledger.merkle_root sparse_ledger)
+                ~target:
+                  Sparse_ledger.(
+                    merkle_root
+                      (apply_transaction_exn sparse_ledger transaction))
+                ~pending_coinbase_stack_state:
+                  { source= pending_coinbase_init
+                  ; target=
+                      Pending_coinbase.Stack.push pending_coinbase_init cb } )
+      )
+
     let%test_unit "new_account" =
       Test_util.with_randomness 123456789 (fun () ->
           let wallets = random_wallets () in

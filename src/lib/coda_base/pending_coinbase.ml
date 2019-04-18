@@ -264,31 +264,20 @@ module T = struct
 
     let data_hash = Stable.Latest.data_hash
 
-    let ( to_bits
-        , to_bytes
-        , fold
-        , equal_var
-        , length_in_triples
-        , var_to_triples
-        , hash_fold_t
-        , empty
-        , push
-        , gen
-        , var_of_t
-        , typ ) =
-      Stack_builder.
-        ( to_bits
-        , to_bytes
-        , fold
-        , equal_var
-        , length_in_triples
-        , var_to_triples
-        , hash_fold_t
-        , empty
-        , push
-        , gen
-        , var_of_t
-        , typ )
+    [%%define_locally
+    Stack_builder.
+      ( to_bits
+      , to_bytes
+      , fold
+      , equal_var
+      , length_in_triples
+      , var_to_triples
+      , hash_fold_t
+      , empty
+      , push
+      , gen
+      , var_of_t
+      , typ )]
 
     module Checked = Stack_builder.Checked
   end
@@ -326,36 +315,24 @@ module T = struct
 
     type var = Stable.Latest.var
 
-    let merge = Stable.Latest.(merge)
+    [%%define_locally
+    Stable.Latest.(merge)]
 
-    (* we should have a ppx for this *)
-    let ( of_digest
-        , empty_hash
-        , gen
-        , to_bits
-        , to_bytes
-        , fold
-        , equal_var
-        , length_in_triples
-        , var_to_triples
-        , var_of_t
-        , var_of_hash_packed
-        , var_to_hash_packed
-        , typ ) =
-      Hash_builder.
-        ( of_digest
-        , empty_hash
-        , gen
-        , to_bits
-        , to_bytes
-        , fold
-        , equal_var
-        , length_in_triples
-        , var_to_triples
-        , var_of_t
-        , var_of_hash_packed
-        , var_to_hash_packed
-        , typ )
+    [%%define_locally
+    Hash_builder.
+      ( of_digest
+      , empty_hash
+      , gen
+      , to_bits
+      , to_bytes
+      , fold
+      , equal_var
+      , length_in_triples
+      , var_to_triples
+      , var_of_t
+      , var_of_hash_packed
+      , var_to_hash_packed
+      , typ )]
   end
 
   (* the arguments to Sparse_ledger.Make are all versioned; a particular choice of those
@@ -381,23 +358,16 @@ module T = struct
 
     module Latest_make = V1_make
 
-    let ( of_hash
-        , get_exn
-        , path_exn
-        , set_exn
-        , find_index_exn
-        , add_path
-        , merkle_root
-        , iteri ) =
-      Latest_make.
-        ( of_hash
-        , get_exn
-        , path_exn
-        , set_exn
-        , find_index_exn
-        , add_path
-        , merkle_root
-        , iteri )
+    [%%define_locally
+    Latest_make.
+      ( of_hash
+      , get_exn
+      , path_exn
+      , set_exn
+      , find_index_exn
+      , add_path
+      , merkle_root
+      , iteri )]
   end
 
   module Checked = struct

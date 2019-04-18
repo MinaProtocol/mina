@@ -1399,6 +1399,12 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
       let block_count =
         Length.to_int @@ Consensus.Consensus_state.length consensus_state
       in
+      let%bind sync_status =
+        match sync_status t with
+        | `Bootstrap -> `Bootstrapping
+        | `Offline -> `Active `Offline
+        | `Synced -> `Active `Synced
+      in
       let%map staged_ledger = best_staged_ledger t in
       let staged_ledger_hash =
         staged_ledger |> Staged_ledger.hash |> Staged_ledger_hash.sexp_of_t
@@ -1407,14 +1413,15 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
       let consensus_time_best_tip =
         Consensus.Consensus_state.time_hum consensus_state
       in
-      { num_accounts= Some num_accounts
-      ; block_count= Some block_count
-      ; ledger_merkle_root= Some ledger_merkle_root
-      ; staged_ledger_hash= Some staged_ledger_hash
-      ; state_hash= Some state_hash
-      ; consensus_time_best_tip= Some consensus_time_best_tip }
+      ( sync_status
+      , { num_accounts= Some num_accounts
+        ; block_count= Some block_count
+        ; ledger_merkle_root= Some ledger_merkle_root
+        ; staged_ledger_hash= Some staged_ledger_hash
+        ; state_hash= Some state_hash
+        ; consensus_time_best_tip= Some consensus_time_best_tip } )
     in
-    let ( is_bootstrapping
+    let ( sync_status
         , { num_accounts
           ; block_count
           ; ledger_merkle_root
@@ -1422,10 +1429,9 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
           ; state_hash
           ; consensus_time_best_tip } ) =
       match active_status () with
-      | `Active result ->
-          (false, result)
+      | `Active result -> result
       | `Bootstrapping ->
-          ( true
+          ( `Bootstrap
           , { num_accounts= None
             ; block_count= None
             ; ledger_merkle_root= None
@@ -1434,7 +1440,7 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
             ; consensus_time_best_tip= None } )
     in
     { Daemon_rpcs.Types.Status.num_accounts
-    ; is_bootstrapping
+    ; sync_status
     ; block_count
     ; uptime_secs
     ; ledger_merkle_root

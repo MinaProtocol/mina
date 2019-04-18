@@ -165,37 +165,10 @@ deb:
 	@mkdir -p /tmp/artifacts
 	@cp src/_build/coda.deb /tmp/artifacts/.
 
-# deb-s3 https://github.com/krobertson/deb-s3
-DEBS3 = deb-s3 upload --s3-region=us-west-2 --bucket packages.o1test.net --preserve-versions --cache-control=max-age=120
-
-publish_kademlia_deb:
-	@if [ $(AWS_ACCESS_KEY_ID) ] ; then \
-		if [ "$(CIRCLE_BRANCH)" = "master" ] ; then \
-			$(DEBS3) --codename stable   --component main src/_build/coda-kademlia.deb ; \
-		else \
-			$(DEBS3) --codename unstable --component main src/_build/coda-kademlia.deb ; \
-		fi ; \
-	else \
-		echo "WARNING: AWS_ACCESS_KEY_ID not set, deb-s3 not run" ; \
-	fi
-
 publish_deb:
-	@if [ $(AWS_ACCESS_KEY_ID) ] ; then \
-		if $(and [ "$(CIRCLE_BRANCH)" = "master" ], \
-			$(or [ "$(CIRCLE_JOB)" = "build-artifacts--testnet_postake" ], \
-				 [ "$(CIRCLE_JOB)" = "build-artifacts--testnet_postake_many_proposers"] ) \
-			); then \
-				echo "Publishing to stable" ; \
-    			$(DEBS3) --codename stable   --component main src/_build/coda-*.deb ; \
-			else \
-				echo "Publishing to unstable" ; \
-			$(DEBS3) --codename unstable --component main src/_build/coda-*.deb ; \
-		fi ; \
-	else  \
-		echo "WARNING: AWS_ACCESS_KEY_ID not set, deb-s3 commands not run" ; \
-	fi
+	@./scripts/publish-deb.sh
 
-publish_debs: publish_deb publish_kademlia_deb
+publish_debs: publish_deb
 
 provingkeys:
 	$(WRAP) tar -cvjf src/_build/coda_cache_dir_$(GITHASH)_$(CODA_CONSENSUS).tar.bz2  /tmp/coda_cache_dir ; \

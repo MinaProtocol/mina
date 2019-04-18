@@ -123,7 +123,8 @@ end
 (* bin_io, version omitted *)
 type t = Stable.Latest.t [@@deriving sexp, eq, hash, compare]
 
-let public_key = Stable.Latest.(public_key)
+[%%define_locally
+Stable.Latest.(public_key)]
 
 type key = Stable.Latest.key
 

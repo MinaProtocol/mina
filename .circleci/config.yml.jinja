@@ -25,6 +25,9 @@ jobs:
             - run:
                   name: Build wallet
                   command: cd frontend/wallet && npm run build-ci
+            - run:
+                  name: Test wallet
+                  command: cd frontend/wallet && npm test
             - run: cd frontend/website && npm install
             - run:
                   name: Decrypt PragmataPro font

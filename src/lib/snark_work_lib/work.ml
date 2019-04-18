@@ -6,11 +6,8 @@ module Single = struct
       module V1 = struct
         module T = struct
           type ('statement, 'transition, 'witness, 'ledger_proof) t =
-            | Transition of 'statement * 'transition * 'witness sexp_opaque
-            | Merge of
-                'statement
-                * 'ledger_proof sexp_opaque
-                * 'ledger_proof sexp_opaque
+            | Transition of 'statement * 'transition * 'witness
+            | Merge of 'statement * 'ledger_proof * 'ledger_proof
           [@@deriving bin_io, sexp, version]
         end
 
@@ -21,8 +18,13 @@ module Single = struct
     end
 
     type ('statement, 'transition, 'witness, 'ledger_proof) t =
-          ('statement, 'transition, 'witness, 'ledger_proof) Stable.Latest.t =
-      | Transition of 'statement * 'transition * 'witness sexp_opaque
+                                                               ( 'statement
+                                                               , 'transition
+                                                               , 'witness
+                                                               , 'ledger_proof
+                                                               )
+                                                               Stable.Latest.t =
+      | Transition of 'statement * 'transition * 'witness
       | Merge of
           'statement * 'ledger_proof sexp_opaque * 'ledger_proof sexp_opaque
     [@@deriving sexp]
