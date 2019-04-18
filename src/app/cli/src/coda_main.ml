@@ -394,21 +394,15 @@ module Pending_coinbase = struct
   module V1 = struct
     include Coda_base.Pending_coinbase.Stable.V1
 
-    let ( hash_extra
-        , oldest_stack
-        , latest_stack
-        , create
-        , remove_coinbase_stack
-        , update_coinbase_stack
-        , merkle_root ) =
-      Coda_base.Pending_coinbase.
-        ( hash_extra
-        , oldest_stack
-        , latest_stack
-        , create
-        , remove_coinbase_stack
-        , update_coinbase_stack
-        , merkle_root )
+    [%%define_locally
+    Coda_base.Pending_coinbase.
+      ( hash_extra
+      , oldest_stack
+      , latest_stack
+      , create
+      , remove_coinbase_stack
+      , update_coinbase_stack
+      , merkle_root )]
 
     module Stack = Coda_base.Pending_coinbase.Stack
     module Coinbase_data = Coda_base.Pending_coinbase.Coinbase_data
