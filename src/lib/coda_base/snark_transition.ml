@@ -1,11 +1,21 @@
 open Core_kernel
 
 module type Consensus_data_intf = sig
-  type value [@@deriving bin_io, sexp]
+  module Value : sig
+    type t [@@deriving sexp]
 
-  include Snark_params.Tick.Snarkable.S with type value := value
+    module Stable :
+      sig
+        module V1 : sig
+          type t [@@deriving sexp, bin_io, version]
+        end
+      end
+      with type V1.t = t
+  end
 
-  val genesis : value
+  include Snark_params.Tick.Snarkable.S with type value := Value.t
+
+  val genesis : Value.t
 end
 
 module type Inputs_intf = sig
@@ -23,21 +33,67 @@ module type S = sig
 
   module Consensus_data : Consensus_data_intf
 
-  type ( 'blockchain_state
-       , 'consensus_data
-       , 'sok_digest
-       , 'amount
-       , 'proposer_pk ) t
-  [@@deriving sexp]
+  module Poly : sig
+    type ( 'blockchain_state
+         , 'consensus_data
+         , 'sok_digest
+         , 'amount
+         , 'proposer_pk ) t =
+      { blockchain_state: 'blockchain_state
+      ; consensus_data: 'consensus_data
+      ; sok_digest: 'sok_digest
+      ; supply_increase: 'amount
+      ; ledger_proof: Proof.Stable.V1.t option
+      ; proposer: 'proposer_pk
+      ; coinbase: 'amount }
+    [@@deriving sexp, fields]
 
-  type value =
-    ( Blockchain_state.Value.t
-    , Consensus_data.value
-    , Sok_message.Digest.t
-    , Currency.Amount.t
-    , Signature_lib.Public_key.Compressed.t )
-    t
-  [@@deriving bin_io, sexp]
+    module Stable :
+      sig
+        module V1 : sig
+          type ( 'blockchain_state
+               , 'consensus_data
+               , 'sok_digest
+               , 'amount
+               , 'proposer_pk ) t
+          [@@deriving bin_io, sexp, version]
+        end
+
+        module Latest : module type of V1
+      end
+      with type ( 'blockchain_state
+                , 'consensus_data
+                , 'sok_digest
+                , 'amount
+                , 'proposer_pk ) V1.t =
+                  ( 'blockchain_state
+                  , 'consensus_data
+                  , 'sok_digest
+                  , 'amount
+                  , 'proposer_pk )
+                  t
+  end
+
+  module Value : sig
+    module Stable : sig
+      module V1 : sig
+        type t =
+          ( Blockchain_state.Value.Stable.V1.t
+          , Consensus_data.Value.Stable.V1.t
+          , Sok_message.Digest.Stable.V1.t
+          , Currency.Amount.Stable.V1.t
+          , Signature_lib.Public_key.Compressed.Stable.V1.t )
+          Poly.Stable.V1.t
+        [@@deriving bin_io, sexp, version]
+      end
+
+      module Latest : module type of V1
+    end
+
+    type t = Stable.Latest.t [@@deriving sexp]
+  end
+
+  type value = Value.t
 
   type var =
     ( Blockchain_state.var
@@ -45,37 +101,39 @@ module type S = sig
     , Sok_message.Digest.Checked.t
     , Currency.Amount.var
     , Signature_lib.Public_key.Compressed.var )
-    t
+    Poly.t
 
   include
-    Snark_params.Tick.Snarkable.S with type value := value and type var := var
+    Snark_params.Tick.Snarkable.S
+    with type value := Value.t
+     and type var := var
 
   val create_value :
        ?sok_digest:Sok_message.Digest.t
     -> ?ledger_proof:Proof.t
     -> supply_increase:Currency.Amount.t
     -> blockchain_state:Blockchain_state.Value.t
-    -> consensus_data:Consensus_data.value
+    -> consensus_data:Consensus_data.Value.Stable.V1.t
     -> proposer:Signature_lib.Public_key.Compressed.t
     -> coinbase:Currency.Amount.t
     -> unit
-    -> value
+    -> Value.t
 
-  val blockchain_state : ('a, _, _, _, _) t -> 'a
+  val blockchain_state : ('a, _, _, _, _) Poly.t -> 'a
 
-  val consensus_data : (_, 'a, _, _, _) t -> 'a
+  val consensus_data : (_, 'a, _, _, _) Poly.t -> 'a
 
-  val sok_digest : (_, _, 'a, _, _) t -> 'a
+  val sok_digest : (_, _, 'a, _, _) Poly.t -> 'a
 
-  val supply_increase : (_, _, _, 'a, _) t -> 'a
+  val supply_increase : (_, _, _, 'a, _) Poly.t -> 'a
 
-  val coinbase : (_, _, _, 'a, _) t -> 'a
+  val coinbase : (_, _, _, 'a, _) Poly.t -> 'a
 
-  val ledger_proof : _ t -> Proof.t option
+  val ledger_proof : _ Poly.t -> Proof.t option
 
-  val proposer : (_, _, _, _, 'a) t -> 'a
+  val proposer : (_, _, _, _, 'a) Poly.t -> 'a
 
-  val genesis : value
+  val genesis : Value.t
 end
 
 module Make (Inputs : Inputs_intf) :
@@ -84,28 +142,92 @@ module Make (Inputs : Inputs_intf) :
    and module Consensus_data = Inputs.Consensus_data = struct
   include Inputs
 
-  type ( 'blockchain_state
-       , 'consensus_data
-       , 'sok_digest
-       , 'amount
-       , 'proposer_pk ) t =
-    { blockchain_state: 'blockchain_state
-    ; consensus_data: 'consensus_data
-    ; sok_digest: 'sok_digest
-    ; supply_increase: 'amount
-    ; ledger_proof: Proof.t option
-    ; proposer: 'proposer_pk
-    ; coinbase: 'amount }
-  [@@deriving bin_io, sexp, fields]
+  module Poly = struct
+    module Stable = struct
+      module V1 = struct
+        module T = struct
+          type ( 'blockchain_state
+               , 'consensus_data
+               , 'sok_digest
+               , 'amount
+               , 'proposer_pk ) t =
+            { blockchain_state: 'blockchain_state
+            ; consensus_data: 'consensus_data
+            ; sok_digest: 'sok_digest
+            ; supply_increase: 'amount
+            ; ledger_proof: Proof.Stable.V1.t option
+            ; proposer: 'proposer_pk
+            ; coinbase: 'amount }
+          [@@deriving bin_io, sexp, fields, version]
+        end
 
-  type value =
-    ( Blockchain_state.Value.Stable.V1.t
-    , Consensus_data.value
-    , Sok_message.Digest.Stable.V1.t
-    , Currency.Amount.Stable.V1.t
-    , Signature_lib.Public_key.Compressed.Stable.V1.t )
-    t
-  [@@deriving bin_io, sexp]
+        include T
+      end
+
+      module Latest = V1
+    end
+
+    type ( 'blockchain_state
+         , 'consensus_data
+         , 'sok_digest
+         , 'amount
+         , 'proposer_pk ) t =
+                             ( 'blockchain_state
+                             , 'consensus_data
+                             , 'sok_digest
+                             , 'amount
+                             , 'proposer_pk )
+                             Stable.Latest.t =
+      { blockchain_state: 'blockchain_state
+      ; consensus_data: 'consensus_data
+      ; sok_digest: 'sok_digest
+      ; supply_increase: 'amount
+      ; ledger_proof: Proof.Stable.V1.t option
+      ; proposer: 'proposer_pk
+      ; coinbase: 'amount }
+    [@@deriving sexp, fields]
+  end
+
+  module Value = struct
+    module Stable = struct
+      module V1 = struct
+        module T = struct
+          type t =
+            ( Blockchain_state.Value.Stable.V1.t
+            , Consensus_data.Value.Stable.V1.t
+            , Sok_message.Digest.Stable.V1.t
+            , Currency.Amount.Stable.V1.t
+            , Signature_lib.Public_key.Compressed.Stable.V1.t )
+            Poly.Stable.V1.t
+          [@@deriving bin_io, sexp, version]
+        end
+
+        include T
+      end
+
+      module Latest = V1
+    end
+
+    type t = Stable.Latest.t [@@deriving sexp]
+  end
+
+  let ( blockchain_state
+      , consensus_data
+      , ledger_proof
+      , sok_digest
+      , supply_increase
+      , proposer
+      , coinbase ) =
+    Poly.
+      ( blockchain_state
+      , consensus_data
+      , ledger_proof
+      , sok_digest
+      , supply_increase
+      , proposer
+      , coinbase )
+
+  type value = Value.t
 
   type var =
     ( Blockchain_state.var
@@ -113,11 +235,11 @@ module Make (Inputs : Inputs_intf) :
     , Sok_message.Digest.Checked.t
     , Currency.Amount.var
     , Signature_lib.Public_key.Compressed.var )
-    t
+    Poly.t
 
   let create_value ?(sok_digest = Sok_message.Digest.default) ?ledger_proof
       ~supply_increase ~blockchain_state ~consensus_data ~proposer ~coinbase ()
-      =
+      : Value.t =
     { blockchain_state
     ; consensus_data
     ; ledger_proof
@@ -129,7 +251,7 @@ module Make (Inputs : Inputs_intf) :
   let typ =
     let open Snark_params.Tick.Typ in
     let store
-        { blockchain_state
+        { Poly.blockchain_state
         ; consensus_data
         ; sok_digest
         ; supply_increase
@@ -143,7 +265,7 @@ module Make (Inputs : Inputs_intf) :
       and supply_increase = Currency.Amount.typ.store supply_increase
       and proposer = Signature_lib.Public_key.Compressed.typ.store proposer
       and coinbase = Currency.Amount.typ.store coinbase in
-      { blockchain_state
+      { Poly.blockchain_state
       ; consensus_data
       ; sok_digest
       ; supply_increase
@@ -152,7 +274,7 @@ module Make (Inputs : Inputs_intf) :
       ; coinbase }
     in
     let read
-        { blockchain_state
+        { Poly.blockchain_state
         ; consensus_data
         ; sok_digest
         ; supply_increase
@@ -166,7 +288,7 @@ module Make (Inputs : Inputs_intf) :
       and supply_increase = Currency.Amount.typ.read supply_increase
       and proposer = Signature_lib.Public_key.Compressed.typ.read proposer
       and coinbase = Currency.Amount.typ.read coinbase in
-      { blockchain_state
+      { Poly.blockchain_state
       ; consensus_data
       ; sok_digest
       ; supply_increase
@@ -175,7 +297,7 @@ module Make (Inputs : Inputs_intf) :
       ; coinbase }
     in
     let check
-        { blockchain_state
+        { Poly.blockchain_state
         ; consensus_data
         ; sok_digest
         ; supply_increase
@@ -198,7 +320,7 @@ module Make (Inputs : Inputs_intf) :
       and supply_increase = Currency.Amount.typ.alloc
       and proposer = Signature_lib.Public_key.Compressed.typ.alloc
       and coinbase = Currency.Amount.typ.alloc in
-      { blockchain_state
+      { Poly.blockchain_state
       ; consensus_data
       ; sok_digest
       ; supply_increase
@@ -209,7 +331,7 @@ module Make (Inputs : Inputs_intf) :
     {Snarky.Types.Typ.store; read; check; alloc}
 
   let genesis =
-    { blockchain_state= Blockchain_state.genesis
+    { Poly.blockchain_state= Blockchain_state.genesis
     ; consensus_data= Consensus_data.genesis
     ; supply_increase= Currency.Amount.zero
     ; sok_digest=

@@ -27,7 +27,14 @@ module type Monad_with_Or_error_intf = sig
   end
 end
 
-module Make (Inputs : Inputs.S) : sig
+module Make (Constants : sig
+  val transaction_capacity_log_2 : int
+
+  val work_delay_factor : int
+
+  val latency_factor : int
+end)
+(Inputs : Inputs.S) : sig
   include
     Coda_pow.Transaction_snark_scan_state_intf
     with type ledger := Inputs.Ledger.t
@@ -50,15 +57,12 @@ end = struct
     module Stable = struct
       module V1 = struct
         module T = struct
-          let version = 1
-
           (* TODO: The statement is redundant here - it can be computed from the witness and the transaction *)
-          (* TODO : version all fields *)
           type t =
             { transaction_with_info: Ledger.Undo.Stable.V1.t
             ; statement: Ledger_proof_statement.Stable.V1.t
-            ; witness: Transaction_witness.t sexp_opaque }
-          [@@deriving sexp, bin_io]
+            ; witness: Transaction_witness.Stable.V1.t sexp_opaque }
+          [@@deriving sexp, bin_io, version]
         end
 
         include T
@@ -88,10 +92,8 @@ end = struct
     module Stable = struct
       module V1 = struct
         module T = struct
-          let version = 1
-
           type t = Ledger_proof.Stable.V1.t * Sok_message.Stable.V1.t
-          [@@deriving sexp, bin_io]
+          [@@deriving sexp, bin_io, version]
         end
 
         include T
@@ -154,23 +156,15 @@ end = struct
     Parallel_scan.State.Completed_job.t
   [@@deriving sexp, bin_io]
 
-  (*Work capacity represents max number of work(currently in the tree and the ones that would arise in the future when current jobs are done) in the tree. *)
-  let work_capacity () =
+  (*Work capacity represents max number of work in the tree. this includes the jobs that are currently in the tree and the ones that would arise in the future when current jobs are done*)
+  let work_capacity =
     let open Constants in
-    (*+1 because of <, +1 to give enough time to adjust the counter after proof is emitted, +1 to due to delay in proof emitting*)
-    (*For Evan: Having C= 2x(txns/block * total-no-of-trees) essentially means all the trees can have full leaves without having to do any work. This doesn't work with the succinct representation and FIFO work order during when this specific edge case occurs*)
-    (*Edge case:When there is a single slot at the end of the tree before continuing at the begining of the tree (referring to the last level), the jobs on the right side of the tree are done along with the jobs on the left (because it wasn't added until then). The root node has to wait until the right sub-tree has completed before the next round begins. By the time the right sub-tree is completed, the left tree is also ready with the proof but has to wait until the root is emitted. This won't work with our succint datastructure impl and FIFO work order.*)
-    let work_delay_factor = max 2 work_delay_factor in
-    let nearest_log_2_txn = Int.ceil_log2 transaction_capacity_log_2 in
-    let nearest_log_2_incr = Int.ceil_log2 work_delay_factor in
-    3 + nearest_log_2_incr + nearest_log_2_txn
-    + Int.pow 2 (transaction_capacity_log_2 + work_delay_factor)
+    Int.pow 2 (transaction_capacity_log_2 + 1)
+    * (Int.pow 2 (work_delay_factor - Int.max (latency_factor - 1) 0) - 1)
 
   module Stable = struct
     module V1 = struct
       module T = struct
-        let version = 1
-
         type t =
           { (*Job_count: Keeping track of the number of jobs added to the tree. Every transaction added amounts to two jobs*)
             tree:
@@ -178,7 +172,7 @@ end = struct
               , Transaction_with_witness.Stable.V1.t )
               Parallel_scan.State.Stable.V1.t
           ; mutable job_count: int }
-        [@@deriving sexp, bin_io]
+        [@@deriving sexp, bin_io, version]
       end
 
       include T
@@ -197,7 +191,7 @@ end = struct
         let k = max Constants.work_delay_factor 2 in
         Parallel_scan.parallelism ~state:t.tree
         = Int.pow 2 (Constants.transaction_capacity_log_2 + k)
-        && t.job_count < work_capacity ()
+        && t.job_count <= work_capacity
         && Parallel_scan.is_valid t.tree
 
       include Binable.Of_binable
@@ -208,7 +202,7 @@ end = struct
                   let to_binable = Fn.id
 
                   let of_binable t =
-                    assert (is_valid t) ;
+                    (* assert (is_valid t) ; *)
                     t
                 end)
     end
@@ -233,7 +227,8 @@ end = struct
     ; mutable job_count: int }
   [@@deriving sexp]
 
-  let hash, is_valid = Stable.Latest.(hash, is_valid)
+  [%%define_locally
+  Stable.Latest.(hash, is_valid)]
 
   (**********Helpers*************)
 
@@ -476,16 +471,19 @@ end = struct
 
   let capacity t = Parallel_scan.parallelism ~state:t.tree
 
-  let create ~transaction_capacity_log_2 =
+  let create ~latency_factor ~work_delay_factor ~transaction_capacity_log_2 =
     (* Transaction capacity log_2 is 1/2^work_delay_factor the capacity for work parallelism *)
-    let k = max Constants.work_delay_factor 2 in
+    let k = max work_delay_factor 2 in
+    assert (work_delay_factor - latency_factor >= 1) ;
     { tree=
-        Parallel_scan.start ~parallelism_log_2:(transaction_capacity_log_2 + k)
+        Parallel_scan.start
+          ~parallelism_log_2:(transaction_capacity_log_2 + k)
+          ~root_at_depth:latency_factor
     ; job_count= 0 }
 
   let empty () =
     let open Constants in
-    create ~transaction_capacity_log_2
+    create ~latency_factor ~work_delay_factor ~transaction_capacity_log_2
 
   let extract_txns txns_with_witnesses =
     (* TODO: This type checks, but are we actually pulling the inverse txn here? *)
@@ -528,6 +526,7 @@ end = struct
         work
         ~f:(fun (w : Transaction_snark_work.t) -> List.length w.proofs)
     in
+    let old_proof = Parallel_scan.last_emitted_value t.tree in
     let%bind () = Parallel_scan.update_curr_job_seq_no t.tree in
     let%bind proof_opt = fill_in_transaction_snark_work t.tree work in
     let%bind () = enqueue_transactions t.tree transactions in
@@ -540,7 +539,18 @@ end = struct
       + (List.length transactions * 2)
       - work_count - adjust_job_count
     in
-    if new_count < work_capacity () then (
+    let%bind () =
+      Option.value_map ~default:(Ok ()) proof_opt ~f:(fun (proof, _) ->
+          let curr_source = (Ledger_proof.statement proof).source in
+          (*TODO: get genesis ledger hash if the old_proof is none*)
+          let prev_target =
+            Option.value_map ~default:curr_source old_proof
+              ~f:(fun ((p', _), _) -> (Ledger_proof.statement p').target )
+          in
+          if Frozen_ledger_hash.equal curr_source prev_target then Ok ()
+          else Or_error.error_string "Unexpected ledger proof emitted" )
+    in
+    if new_count <= work_capacity then (
       t.job_count <- new_count ;
       Ok proof_opt )
     else
@@ -563,6 +573,8 @@ end = struct
   let next_jobs t = Parallel_scan.next_jobs ~state:t.tree
 
   let next_jobs_sequence t = Parallel_scan.next_jobs_sequence ~state:t.tree
+
+  let next_on_new_tree t = Parallel_scan.next_on_new_tree t.tree
 
   let base_jobs_on_latest_tree t =
     Parallel_scan.base_jobs_on_latest_tree t.tree

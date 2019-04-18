@@ -39,7 +39,7 @@ module Staged_ledger_aux_hash = struct
 end
 
 module Staged_ledger_hash = struct
-  include Staged_ledger_hash.Stable.Latest
+  include Staged_ledger_hash
 
   let ledger_hash = Staged_ledger_hash.ledger_hash
 
@@ -290,6 +290,17 @@ module type Main_intf = sig
       with module Protocol_state = Consensus.Protocol_state
        and module Staged_ledger_diff := Staged_ledger_diff
 
+    module Diff_hash : Protocols.Coda_transition_frontier.Diff_hash
+
+    module Diff_mutant :
+      Protocols.Coda_transition_frontier.Diff_mutant
+      with type external_transition := External_transition.Stable.Latest.t
+       and type state_hash := State_hash.t
+       and type scan_state := Staged_ledger.Scan_state.t
+       and type hash := Diff_hash.t
+       and type consensus_state := Consensus.Consensus_state.Value.Stable.V1.t
+       and type pending_coinbases := Pending_coinbase.t
+
     module Transition_frontier :
       Protocols.Coda_pow.Transition_frontier_intf
       with type state_hash := State_hash.t
@@ -301,6 +312,11 @@ module type Main_intf = sig
        and type transaction_snark_scan_state := Staged_ledger.Scan_state.t
        and type consensus_local_state := Consensus.Local_state.t
        and type user_command := User_command.t
+       and type diff_mutant :=
+                  ( External_transition.Stable.Latest.t
+                  , State_hash.Stable.Latest.t )
+                  With_hash.t
+                  Diff_mutant.E.t
        and type Extensions.Work.t = Transaction_snark_work.Statement.t
   end
 
@@ -308,16 +324,16 @@ module type Main_intf = sig
     (** If ledger_db_location is None, will auto-generate a db based on a UUID *)
     type t =
       { logger: Logger.t
+      ; trust_system: Trust_system.t
       ; propose_keypair: Keypair.t option
       ; run_snark_worker: bool
       ; net_config: Inputs.Net.Config.t
-      ; staged_ledger_persistant_location: string
       ; transaction_pool_disk_location: string
       ; snark_pool_disk_location: string
       ; ledger_db_location: string option
+      ; transition_frontier_location: string option
       ; staged_ledger_transition_backup_capacity: int [@default 10]
-      ; time_controller:
-          Inputs.Time.Controller.t (* FIXME trust system goes here? *)
+      ; time_controller: Inputs.Time.Controller.t
       ; receipt_chain_database: Receipt_chain_database.t
       ; snark_work_fee: Currency.Fee.t
       ; monitor: Async.Monitor.t option }
@@ -343,6 +359,8 @@ module type Main_intf = sig
 
   val best_tip :
     t -> Inputs.Transition_frontier.Breadcrumb.t Participating_state.t
+
+  val sync_status : t -> [`Offline | `Synced | `Bootstrap]
 
   val visualize_frontier : filename:string -> t -> unit Participating_state.t
 
@@ -372,6 +390,32 @@ module type Main_intf = sig
   val receipt_chain_database : t -> Receipt_chain_database.t
 end
 
+module Pending_coinbase = struct
+  module V1 = struct
+    include Coda_base.Pending_coinbase.Stable.V1
+
+    let ( hash_extra
+        , oldest_stack
+        , latest_stack
+        , create
+        , remove_coinbase_stack
+        , update_coinbase_stack
+        , merkle_root ) =
+      Coda_base.Pending_coinbase.
+        ( hash_extra
+        , oldest_stack
+        , latest_stack
+        , create
+        , remove_coinbase_stack
+        , update_coinbase_stack
+        , merkle_root )
+
+    module Stack = Coda_base.Pending_coinbase.Stack
+    module Coinbase_data = Coda_base.Pending_coinbase.Coinbase_data
+    module Hash = Coda_base.Pending_coinbase.Hash
+  end
+end
+
 module Fee_transfer = Coda_base.Fee_transfer
 module Ledger_proof_statement = Transaction_snark.Statement
 module Pending_coinbase_stack_state =
@@ -390,8 +434,8 @@ module Staged_ledger_diff = Staged_ledger.Make_diff (struct
   module User_command = User_command
   module Transaction_snark_work = Transaction_snark_work
   module Fee_transfer = Fee_transfer
-  module Pending_coinbase_hash = Pending_coinbase.Hash
-  module Pending_coinbase = Pending_coinbase
+  module Pending_coinbase_hash = Pending_coinbase.V1.Hash
+  module Pending_coinbase = Pending_coinbase.V1
 end)
 
 let make_init ~should_propose (module Config : Config_intf) :
@@ -449,9 +493,7 @@ struct
 
       include (
         Currency.Amount.Signed.Stable.Latest :
-          module type of Currency.Amount.Signed.Stable.Latest
-          with type t := t
-           and type ('a, 'b) t_ := ('a, 'b) t_ )
+          module type of Currency.Amount.Signed.Stable.Latest with type t := t )
     end
   end
 
@@ -479,23 +521,10 @@ struct
   module Account = Account
 
   module Transaction = struct
-    module T = struct
-      type t = Coda_base.Transaction.t =
-        | User_command of User_command.With_valid_signature.t
-        | Fee_transfer of Fee_transfer.t
-        | Coinbase of Coinbase.t
-      [@@deriving compare, eq]
-    end
+    include Coda_base.Transaction.Stable.V1
 
-    let fee_excess = Transaction.fee_excess
-
-    let supply_increase = Transaction.supply_increase
-
-    include T
-
-    include (
-      Coda_base.Transaction :
-        module type of Coda_base.Transaction with type t := t )
+    let fee_excess, supply_increase =
+      Coda_base.Transaction.(fee_excess, supply_increase)
   end
 
   module Ledger = Ledger
@@ -512,11 +541,20 @@ struct
   module Sparse_ledger = Coda_base.Sparse_ledger
 
   module Transaction_snark_work_proof = struct
-    type t = Ledger_proof.Stable.V1.t list [@@deriving sexp, bin_io, yojson]
+    module Stable = struct
+      module V1 = struct
+        module T = struct
+          type t = Ledger_proof.Stable.V1.t list
+          [@@deriving sexp, bin_io, yojson, version]
+        end
+
+        include T
+      end
+    end
   end
 
-  module Pending_coinbase_hash = Pending_coinbase.Hash
-  module Pending_coinbase = Pending_coinbase
+  module Pending_coinbase_hash = Pending_coinbase.V1.Hash
+  module Pending_coinbase = Pending_coinbase.V1
   module Pending_coinbase_stack_state = Pending_coinbase_stack_state
   module Transaction_witness = Coda_base.Transaction_witness
 
@@ -544,8 +582,8 @@ struct
       module Staged_ledger_aux_hash = Staged_ledger_aux_hash
       module Transaction_validator = Transaction_validator
       module Config = Init
-      module Pending_coinbase = Pending_coinbase
       module Pending_coinbase_hash = Pending_coinbase_hash
+      module Pending_coinbase = Pending_coinbase
       module Pending_coinbase_stack_state = Pending_coinbase_stack_state
       module Transaction_witness = Transaction_witness
 
@@ -592,7 +630,18 @@ struct
 
   let max_length = Consensus.Constants.k
 
-  module Transition_frontier = Transition_frontier.Make (struct
+  module Diff_hash = Transition_frontier_persistence.Diff_hash
+
+  module Diff_mutant_inputs = struct
+    module Diff_hash = Diff_hash
+    module Scan_state = Staged_ledger.Scan_state
+    module External_transition = External_transition
+  end
+
+  module Diff_mutant =
+    Transition_frontier_persistence.Diff_mutant.Make (Diff_mutant_inputs)
+
+  module Transition_frontier_inputs = struct
     module Pending_coinbase_hash = Pending_coinbase_hash
     module Transaction_witness = Transaction_witness
     module Staged_ledger_aux_hash = Staged_ledger_aux_hash
@@ -602,10 +651,26 @@ struct
     module Staged_ledger_diff = Staged_ledger_diff
     module External_transition = External_transition
     module Staged_ledger = Staged_ledger
+    module Diff_hash = Diff_hash
+    module Diff_mutant = Diff_mutant
     module Pending_coinbase_stack_state = Pending_coinbase_stack_state
     module Pending_coinbase = Pending_coinbase
 
     let max_length = max_length
+  end
+
+  module Transition_frontier =
+    Transition_frontier.Make (Transition_frontier_inputs)
+  module Transition_storage =
+    Transition_frontier_persistence.Transition_storage.Make
+      (Transition_frontier_inputs)
+
+  module Transition_frontier_persistence =
+  Transition_frontier_persistence.Make (struct
+    include Transition_frontier_inputs
+    module Transition_frontier = Transition_frontier
+    module Make_worker = Transition_frontier_persistence.Worker.Make_async
+    module Transition_storage = Transition_storage
   end)
 
   module Transaction_pool = struct
@@ -685,48 +750,53 @@ struct
 
   module Snark_pool = struct
     module Work = Transaction_snark_work.Statement
-    module Proof = Transaction_snark_work_proof
+    module Proof = Transaction_snark_work_proof.Stable.V1
 
     module Fee = struct
-      (* TODO : version Fee *)
-      module T = struct
-        type t =
-          {fee: Fee.Unsigned.t; prover: Public_key.Compressed.Stable.V1.t}
-        [@@deriving bin_io, sexp, yojson]
+      module Stable = struct
+        module V1 = struct
+          module T = struct
+            type t =
+              {fee: Fee.Unsigned.t; prover: Public_key.Compressed.Stable.V1.t}
+            [@@deriving bin_io, sexp, yojson, version]
 
-        (* TODO: Compare in a better way than with public key, like in transaction pool *)
-        let compare t1 t2 =
-          let r = compare t1.fee t2.fee in
-          if Int.( <> ) r 0 then r
-          else Public_key.Compressed.compare t1.prover t2.prover
+            (* TODO: Compare in a better way than with public key, like in transaction pool *)
+            let compare t1 t2 =
+              let r = compare t1.fee t2.fee in
+              if Int.( <> ) r 0 then r
+              else Public_key.Compressed.compare t1.prover t2.prover
+
+            let gen =
+              (* This isn't really a valid public key, but good enough for testing *)
+              let pk =
+                let open Snark_params.Tick in
+                let open Quickcheck.Generator.Let_syntax in
+                let%map x = Bignum_bigint.(gen_incl zero (Field.size - one))
+                and is_odd = Bool.gen in
+                let x = Bigint.(to_field (of_bignum_bigint x)) in
+                {Public_key.Compressed.Poly.x; is_odd}
+              in
+              Quickcheck.Generator.map2 Fee.Unsigned.gen pk
+                ~f:(fun fee prover -> {fee; prover} )
+          end
+
+          include T
+          include Comparable.Make (T)
+        end
       end
-
-      include T
-      include Comparable.Make (T)
-
-      let gen =
-        (* This isn't really a valid public key, but good enough for testing *)
-        let pk =
-          let open Snark_params.Tick in
-          let open Quickcheck.Generator.Let_syntax in
-          let%map x = Bignum_bigint.(gen_incl zero (Field.size - one))
-          and is_odd = Bool.gen in
-          let x = Bigint.(to_field (of_bignum_bigint x)) in
-          {Public_key.Compressed.Poly.Stable.Latest.x; is_odd}
-        in
-        Quickcheck.Generator.map2 Fee.Unsigned.gen pk ~f:(fun fee prover ->
-            {fee; prover} )
     end
 
-    module Pool = Snark_pool.Make (Proof) (Fee) (Work) (Transition_frontier)
-    module Diff =
-      Network_pool.Snark_pool_diff.Make (Proof) (Fee) (Work)
+    (* TODO : we're choosing versioned inputs, so the result should be versioned *)
+    module Pool =
+      Snark_pool.Make (Proof) (Fee.Stable.V1) (Work) (Transition_frontier)
+    module Snark_pool_diff =
+      Network_pool.Snark_pool_diff.Make (Proof) (Fee.Stable.V1) (Work)
         (Transition_frontier)
         (Pool)
 
-    type pool_diff = Diff.t
+    type pool_diff = Snark_pool_diff.t
 
-    include Network_pool.Make (Transition_frontier) (Pool) (Diff)
+    include Network_pool.Make (Transition_frontier) (Pool) (Snark_pool_diff)
 
     let get_completed_work t statement =
       Option.map
@@ -752,11 +822,10 @@ struct
       apply_and_broadcast t
         (Envelope.Incoming.wrap
            ~data:
-             (Add_solved_work
+             (Diff.Add_solved_work
                 ( List.map res.spec.instances ~f:Single.Spec.statement
-                , Diff.Priced_proof.
-                    { proof= res.proofs
-                    ; fee= {fee= res.spec.fee; prover= res.prover} } ))
+                , { Snark_pool_diff.Priced_proof.proof= res.proofs
+                  ; fee= {fee= res.spec.fee; prover= res.prover} } ))
            ~sender:Envelope.Sender.Local)
   end
 
@@ -765,7 +834,7 @@ struct
   module Net = Coda_networking.Make (struct
     include Inputs0
     module Snark_pool = Snark_pool
-    module Snark_pool_diff = Snark_pool.Diff
+    module Snark_pool_diff = Snark_pool.Snark_pool_diff
     module Sync_ledger = Sync_ledger
     module Staged_ledger_hash = Staged_ledger_hash
     module Ledger_hash = Ledger_hash
@@ -1030,6 +1099,36 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
   include Program
   open Inputs
 
+  module Graphql = struct
+    open Graphql_async
+    open Schema
+    open Async
+
+    module Types = struct
+      let sync_status : ('context, [`Offline | `Synced | `Bootstrap]) typ =
+        non_null
+          (enum "sync_status" ~doc:"Sync status as daemon node"
+             ~values:
+               [ enum_value "BOOTSTRAP" ~value:`Bootstrap
+               ; enum_value "SYNCED" ~value:`Synced
+               ; enum_value "OFFLINE" ~value:`Offline ])
+    end
+
+    module Queries = struct
+      open Types
+
+      let sync_state =
+        io_field "sync_status" ~typ:sync_status
+          ~args:Arg.[]
+          ~resolve:(fun {ctx= coda; _} () ->
+            Deferred.Result.return (Program.sync_status coda) )
+
+      let commands = [sync_state]
+    end
+
+    let schema = Graphql_async.Schema.(schema Queries.commands)
+  end
+
   module For_tests = struct
     let ledger_proof t = staged_ledger_ledger_proof t
   end
@@ -1044,7 +1143,7 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
   let get_balance t (addr : Public_key.Compressed.t) =
     let open Participating_state.Option.Let_syntax in
     let%map account = get_account t addr in
-    account.Account.balance
+    account.Account.Poly.balance
 
   let get_accounts t =
     let open Participating_state.Let_syntax in
@@ -1064,7 +1163,7 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
     let%map accounts = get_accounts t in
     List.map accounts ~f:(fun account ->
         ( string_of_public_key account
-        , Account.balance account |> Currency.Balance.to_int ) )
+        , account.Account.Poly.balance |> Currency.Balance.to_int ) )
 
   let is_valid_payment t (txn : User_command.t) account_opt =
     let remainder =
@@ -1077,7 +1176,7 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
             Some (Currency.Amount.of_fee fee)
         | Payment {amount; _} -> Currency.Amount.add_fee amount fee
       in
-      Currency.Balance.sub_amount account.Account.balance cost
+      Currency.Balance.sub_amount account.Account.Poly.balance cost
     in
     Option.is_some remainder
 
@@ -1085,7 +1184,7 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
   let txn_count = ref 0
 
   let record_payment ~logger t (txn : User_command.t) account =
-    let previous = Account.receipt_chain_hash account in
+    let previous = account.Account.Poly.receipt_chain_hash in
     let receipt_chain_database = receipt_chain_database t in
     match Receipt_chain_database.add receipt_chain_database ~previous txn with
     | `Ok hash ->
@@ -1132,7 +1231,7 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
     let open Participating_state.Let_syntax in
     let%map account = get_account t addr in
     let account = Option.value_exn account in
-    let resulting_receipt = Account.receipt_chain_hash account in
+    let resulting_receipt = account.Account.Poly.receipt_chain_hash in
     let open Or_error.Let_syntax in
     let%bind () = Payment_verifier.verify ~resulting_receipt proof in
     if
@@ -1199,7 +1298,7 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
     let open Option.Let_syntax in
     let%bind location = Ledger.location_of_key ledger addr in
     let%map account = Ledger.get ledger location in
-    account.Account.nonce
+    account.Account.Poly.nonce
 
   let start_time = Time_ns.now ()
 
@@ -1441,7 +1540,7 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
               |> Deferred.return
             in
             prove_receipt coda ~proving_receipt
-              ~resulting_receipt:(Account.receipt_chain_hash account) )
+              ~resulting_receipt:account.Account.Poly.receipt_chain_hash )
       ; implement Daemon_rpcs.Get_public_keys_with_balances.rpc (fun () () ->
             return
               (get_keys_with_balances coda |> Participating_state.active_exn)
@@ -1472,14 +1571,14 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
             return (Coda_base.Ledger.Debug.visualize ~filename) ) ]
     in
     let snark_worker_impls =
-      [ implement Snark_worker.Rpcs.Get_work.rpc (fun () () ->
+      [ implement Snark_worker.Rpcs.Get_work.Latest.rpc (fun () () ->
             let r = request_work coda in
             Option.iter r ~f:(fun r ->
                 Logger.trace logger ~module_:__MODULE__ ~location:__LOC__
                   !"Get_work: %{sexp:Snark_worker.Work.Spec.t}"
                   r ) ;
             return r )
-      ; implement Snark_worker.Rpcs.Submit_work.rpc
+      ; implement Snark_worker.Rpcs.Submit_work.Latest.rpc
           (fun () (work : Snark_worker.Work.Result.t) ->
             Logger.trace logger ~module_:__MODULE__ ~location:__LOC__
               !"Submit_work: %{sexp:Snark_worker.Work.Spec.t}"
@@ -1496,17 +1595,10 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
     in
     Option.iter rest_server_port ~f:(fun rest_server_port ->
         trace_task "REST server" (fun () ->
-            let graphql_schema =
-              Graphql_async.Schema.(
-                schema
-                  [ field "greeting" ~typ:(non_null string)
-                      ~args:Arg.[]
-                      ~resolve:(fun _ () -> "hello coda") ])
-            in
             let graphql_callback =
               Graphql_cohttp_async.make_callback
-                (fun _req -> ())
-                graphql_schema
+                (fun _req -> coda)
+                Graphql.schema
             in
             Cohttp_async.(
               Server.create

@@ -66,55 +66,45 @@ module Styles = {
     ]);
 };
 
-let component = ReasonReact.reducerComponent("WalletItem");
-
-let make = (~name, ~balance, _children) => {
-  ...component,
-  initialState: () => false,
-  reducer: (action, state) =>
-    switch (action) {
-    | Toggle => ReasonReact.Update(!state)
-    },
-  render: self => {
-    <div
-      className={
-        self.state ? Styles.activeWalletItem : Styles.inactiveWalletItem
-      }
-      onClick={_event => self.send(Toggle)}>
-      {if (self.state) {
-         <input
-           type_="text"
-           className=Styles.walletNameTextField
-           value=name
-           readOnly=true
-           onClick={e => ReactEvent.Synthetic.stopPropagation(e)}
-         />;
-       } else {
-         <div className=Styles.walletName> {ReasonReact.string(name)} </div>;
-       }}
-      <div className=Styles.balance>
-        {ReasonReact.string({js|■ |js} ++ string_of_float(balance))}
-      </div>
-      {if (self.state) {
-         <>
-           <hr className=Styles.separator />
-           <div className=Styles.settingLabel>
-             {ReasonReact.string("Staking")}
-           </div>
-           <hr className=Styles.separator />
-           <div className=Styles.settingLabel>
-             {ReasonReact.string("Private key")}
-           </div>
-           <hr className=Styles.separator />
-           <button
-             className=Styles.deleteButton
-             onClick={_event => self.send(Toggle)}>
-             {ReasonReact.string("Delete wallet")}
-           </button>
-         </>;
-       } else {
-         ReasonReact.null;
-       }}
-    </div>;
-  },
+[@react.component]
+let make = (~name, ~balance) => {
+  let (expanded, setExpanded) = React.useState(() => false);
+  <div
+    className={expanded ? Styles.activeWalletItem : Styles.inactiveWalletItem}
+    onClick={_event => setExpanded(expanded => !expanded)}>
+    {if (expanded) {
+       <input
+         type_="text"
+         className=Styles.walletNameTextField
+         value=name
+         readOnly=true
+         onClick={e => ReactEvent.Synthetic.stopPropagation(e)}
+       />;
+     } else {
+       <div className=Styles.walletName> {ReasonReact.string(name)} </div>;
+     }}
+    <div className=Styles.balance>
+      {ReasonReact.string({js|■ |js} ++ Js.Float.toString(balance))}
+    </div>
+    {if (expanded) {
+       <>
+         <hr className=Styles.separator />
+         <div className=Styles.settingLabel>
+           {ReasonReact.string("Staking")}
+         </div>
+         <hr className=Styles.separator />
+         <div className=Styles.settingLabel>
+           {ReasonReact.string("Private key")}
+         </div>
+         <hr className=Styles.separator />
+         <button
+           className=Styles.deleteButton
+           onClick={_event => setExpanded(e => !e)}>
+           {ReasonReact.string("Delete wallet")}
+         </button>
+       </>;
+     } else {
+       ReasonReact.null;
+     }}
+  </div>;
 };

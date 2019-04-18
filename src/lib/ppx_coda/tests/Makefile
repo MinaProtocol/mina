@@ -18,24 +18,13 @@ positive-tests : unexpired.ml
 	@ echo -n "Unexpired, should succeed..."
 	@ dune build unexpired.cma ${REDIRECT}
 	@ echo "OK"
-	@ echo -n "Unexpired in module, should succeed..."
-	@ dune build unexpired_in_module.cma ${REDIRECT}
-	@ echo "OK"
 # versioning
-	@ echo -n "Versioned type, should succeed..."
+	@ echo -n "Versioned types, should succeed..."
 	@ dune build versioned_good.cma ${REDIRECT}
 	@ echo "OK"
-	@ echo -n "Versioned type_constructors type, should succeed..."
-	@ dune build versioned_good_type_constructors.cma ${REDIRECT}
-	@ echo "OK"
-	@ echo -n "Versioned, wrapped type, should succeed..."
-	@ dune build versioned_good_wrapped.cma ${REDIRECT}
-	@ echo "OK"
-	@ echo -n "Versioned types with contained types, should succeed..."
-	@ dune build versioned_good_contained_types.cma ${REDIRECT}
-	@ echo "OK"
-	@ echo -n "Versioned types with type parameters, should succeed..."
-	@ dune build versioned_good_type_parameters.cma ${REDIRECT}
+# define locally
+	@ echo -n "Define locally, should succeed..."
+	@ dune build define_locally_good.cma ${REDIRECT}
 	@ echo "OK"
 
 negative-tests :
@@ -61,6 +50,9 @@ negative-tests :
 	@ echo "OK"
 	@ echo -n "Versioned type, bad module structure, should fail..."
 	@ ! dune build versioned_bad_module_structure.cma ${REDIRECT}
+	@ echo "OK"
+	@ echo -n "Versioned type, unnumbered, invalid use of 'version', should fail..."
+	@ ! dune build versioned_bad_unnumbered.cma ${REDIRECT}
 	@ echo "OK"
 	@ echo -n "Versioned type, bad wrapped module structure, should fail..."
 	@ ! dune build versioned_bad_wrapped_module_structure.cma ${REDIRECT}

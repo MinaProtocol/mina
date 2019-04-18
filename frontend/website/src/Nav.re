@@ -57,7 +57,7 @@ module NavStyle = {
         media(
           // Make expanded menu not show up on a wide screen
           MediaQuery.menuMax,
-          Style.paddingY(`rem(0.25))
+          Style.paddingY(`rem(0.3))
           @ [
             border(`px(1), `solid, expandedMenuBorderColor),
             boxShadow(
@@ -174,6 +174,10 @@ module NavWrapper = {
                  className={Css.style([
                    Css.paddingLeft(`rem(0.75)), // we need to skip padding right here as it's on the edge
                    Css.listStyle(`none, `inside, `none),
+                   Css.media(
+                     NavStyle.MediaQuery.menuMax,
+                     [Css.width(`percent(100.)), Css.padding(`zero)],
+                   ),
                  ])}>
                  elem
                </li>;
@@ -183,7 +187,13 @@ module NavWrapper = {
                    className={Css.style(
                      Style.paddingX(`rem(0.75))
                      @ Style.paddingY(`rem(0.5))
-                     @ [Css.listStyle(`none, `inside, `none)],
+                     @ [
+                       Css.listStyle(`none, `inside, `none),
+                       Css.media(
+                         NavStyle.MediaQuery.menuMax,
+                         [Css.width(`percent(100.)), Css.padding(`zero)],
+                       ),
+                     ],
                    )}>
                    elem
                  </li>
@@ -223,7 +233,8 @@ module NavWrapper = {
             ),
           ])
         )>
-        <a
+        <A
+          name="nav-home"
           href="/"
           className=Css.(
             style([
@@ -244,19 +255,25 @@ module NavWrapper = {
             ])
           )>
           <Image className="" name="/static/img/coda-logo" alt="Coda Home" />
-        </a>
+        </A>
         <div
           className=Css.(
             style([
               order(3),
               width(`percent(100.0)),
               NavStyle.bottomNudge,
+              display(`none), // just hide when status lift happens
               media(
                 Style.MediaQuery.statusLift(keepAnnouncementBar),
-                [order(2), width(`auto), marginLeft(`zero)],
+                [
+                  order(2),
+                  width(`auto),
+                  marginLeft(`zero),
+                  ...keepAnnouncementBar
+                       ? [display(`block)] : [display(`none)],
+                ],
               ),
               media(NavStyle.MediaQuery.menu, [width(`percent(40.0))]),
-              ...keepAnnouncementBar ? [] : [display(`none)],
             ])
           )>
           <div
@@ -294,8 +311,8 @@ module NavWrapper = {
 };
 
 let menuStyle =
-  Style.paddingX(`rem(1.75))
-  @ Style.paddingY(`rem(0.75))
+  Style.paddingX(`rem(1.8))
+  @ Style.paddingY(`rem(0.5))
   @ Css.[
       height(`auto),
       margin(`zero),
@@ -307,6 +324,8 @@ let menuStyle =
       fontWeight(`medium),
       letterSpacing(`rem(0.)),
       fontStyle(`normal),
+      display(`block),
+      width(`percent(100.)),
       textTransform(`none),
       outline(`zero, `none, `transparent),
       focus([color(Style.Colors.hyperlink)]),
@@ -320,7 +339,8 @@ module SimpleButton = {
   let make = (~name, ~activePage=false, ~link, _children) => {
     ...component,
     render: _self => {
-      <a
+      <A
+        name={"nav-" ++ name}
         href=link
         className=Css.(
           merge([
@@ -341,7 +361,7 @@ module SimpleButton = {
           ])
         )>
         {ReasonReact.string(name)}
-      </a>;
+      </A>;
     },
   };
 };
@@ -353,8 +373,9 @@ module SignupButton = {
   let make = (~name, ~link, _children) => {
     ...component,
     render: _self => {
-      <a
-        href=link
+      <A
+        name={"nav-" ++ link.Links.Named.name}
+        href={link.Links.Named.link}
         className=Css.(
           merge([
             H4.wide,
@@ -396,7 +417,7 @@ module SignupButton = {
           )>
           {ReasonReact.string(name)}
         </span>
-      </a>;
+      </A>;
     },
   };
 };

@@ -1,8 +1,8 @@
 open Async_kernel
 
-exception Overflow of string option
+exception Overflow of string
 
-exception Multiple_reads_attempted of string option
+exception Multiple_reads_attempted of string
 
 type crash = Overflow_behavior_crash
 

@@ -21,9 +21,9 @@ module Account = struct
 
   let create = Coda_base.Account.create
 
-  let balance = Coda_base.Account.balance
+  let balance Coda_base.Account.Poly.({balance; _}) = balance
 
-  let update_balance t bal = {t with Coda_base.Account.balance= bal}
+  let update_balance t bal = {t with Coda_base.Account.Poly.balance= bal}
 end
 
 (* below are alternative modules that use strings as public keys and UInt64 as balances for
@@ -161,8 +161,10 @@ module In_memory_kvdb : Intf.Key_value_database = struct
 
   let set t ~key ~data = Bigstring_frozen.Table.set t.table ~key ~data
 
-  let set_batch tbl ~key_data_pairs =
-    List.iter key_data_pairs ~f:(fun (key, data) -> set tbl ~key ~data)
+  let set_batch t ?(remove_keys = []) ~key_data_pairs =
+    List.iter key_data_pairs ~f:(fun (key, data) -> set t ~key ~data) ;
+    List.iter remove_keys ~f:(fun key ->
+        Bigstring_frozen.Table.remove t.table key )
 
   let remove t ~key = Bigstring_frozen.Table.remove t.table key
 end
