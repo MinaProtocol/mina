@@ -75,7 +75,7 @@ module Inputs = struct
                 [ ( "spec"
                   , `String (Sexp.to_string (sexp_of_single_spec single)) ) ]
               "Worker failed: %s" (Error.to_string_hum e) ;
-            Error e
+            Error.raise e
         | Ok res ->
             Cache.add cache ~statement ~proof:res ;
             let total = Time.abs_diff (Time.now ()) start in
