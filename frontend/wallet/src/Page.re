@@ -33,20 +33,6 @@ let make = (~message) => {
 
   let randomNum = Js.Math.random_int(0, 1000);
 
-  let handleChangeName = () =>
-    switch (settingsOrError) {
-    | `Settings(settings) =>
-      let task =
-        SettingsRenderer.add(
-          settings,
-          ~key=PublicKey.ofStringExn(randomNum |> Js.Int.toString),
-          ~name="Test Wallet",
-        );
-      Js.log("Add started");
-      Task.attempt(task, ~f=res => Js.log2("Add complete", res));
-    | _ => Js.log("There's an error")
-    };
-
   let settingsInfo = {
     let question = " (did you create a settings.json file with {\"state\": {}} ?)";
     switch (settingsOrError) {
@@ -62,6 +48,10 @@ let make = (~message) => {
     };
   };
 
+  let testButton = (str, ~f) => {
+    <button onClick={_e => f()}> {ReasonReact.string(str)} </button>;
+  };
+
   <ApolloShim.Provider client=instance>
     <div
       style={ReactDOMRe.Style.make(
@@ -73,24 +63,54 @@ let make = (~message) => {
         ~left="0",
         (),
       )}>
-      <div className=Css.(style([display(`flex), flexDirection(`column)]))>
-        <Header />
-        <Body message={message ++ ";; " ++ settingsInfo} />
+      <div
+        className=Css.(
+          style([
+            display(`flex),
+            flexDirection(`column),
+            justifyContent(`spaceBetween),
+            height(`percent(100.)),
+          ])
+        )>
+        <div>
+          <div
+            className=Css.(style([display(`flex), flexDirection(`column)]))>
+            <Header />
+            <Body message={message ++ ";; " ++ settingsInfo} />
+          </div>
+          {testButton("Send", ~f=() =>
+             Router.(navigate({path: Send, settingsOrError}))
+           )}
+          {testButton("Delete wallet", ~f=() =>
+             Router.(navigate({path: DeleteWallet, settingsOrError}))
+           )}
+          {testButton("Change name: " ++ Js.Int.toString(randomNum), ~f=() =>
+             switch (settingsOrError) {
+             | `Settings(settings) =>
+               let task =
+                 SettingsRenderer.add(
+                   settings,
+                   ~key=PublicKey.ofStringExn(randomNum |> Js.Int.toString),
+                   ~name="Test Wallet",
+                 );
+               Js.log("Add started");
+               Task.attempt(task, ~f=res => Js.log2("Add complete", res));
+             | _ => Js.log("There's an error")
+             }
+           )}
+        </div>
+        <div>
+          {switch (settingsOrError) {
+           | `Settings(settings) =>
+             <Footer
+               stakingKey={PublicKey.ofStringExn("131243123")}
+               settings
+             />
+           | `Error(_) => <span />
+           }}
+          <Modal settingsOrError view=modalView />
+        </div>
       </div>
-      <button
-        onClick={_e => Router.(navigate({path: Send, settingsOrError}))}>
-        {ReasonReact.string("Send")}
-      </button>
-      <button
-        onClick={_e =>
-          Router.(navigate({path: DeleteWallet, settingsOrError}))
-        }>
-        {ReasonReact.string("Delete wallet")}
-      </button>
-      <button onClick={_e => handleChangeName()}>
-        {ReasonReact.string("Change name: " ++ Js.Int.toString(randomNum))}
-      </button>
-      <Modal settingsOrError view=modalView />
     </div>
   </ApolloShim.Provider>;
 };

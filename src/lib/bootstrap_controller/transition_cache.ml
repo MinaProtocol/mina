@@ -12,9 +12,13 @@ module type S = sig
 
   val create : unit -> t
 
-  val add : t -> parent:state_hash -> external_transition_verified -> unit
+  val add :
+       t
+    -> parent:state_hash
+    -> external_transition_verified Envelope.Incoming.t
+    -> unit
 
-  val data : t -> external_transition_verified list
+  val data : t -> external_transition_verified Envelope.Incoming.t list
 end
 
 module type Inputs_intf = Transition_frontier.Inputs_intf
@@ -24,7 +28,9 @@ module Make (Inputs : Inputs_intf) :
   with type external_transition_verified :=
               Inputs.External_transition.Verified.t
    and type state_hash := State_hash.t = struct
-  type t = Inputs.External_transition.Verified.t list State_hash.Table.t
+  type t =
+    Inputs.External_transition.Verified.t Envelope.Incoming.t list
+    State_hash.Table.t
 
   let create () = State_hash.Table.create ()
 
@@ -34,7 +40,9 @@ module Make (Inputs : Inputs_intf) :
       | Some children ->
           if
             List.mem children new_child
-              ~equal:Inputs.External_transition.Verified.equal
+              ~equal:
+                (Envelope.Incoming.equal
+                   Inputs.External_transition.Verified.equal)
           then children
           else new_child :: children )
 

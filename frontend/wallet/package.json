@@ -2,7 +2,7 @@
   "name": "coda-wallet",
   "version": "0.1.0",
   "description": "",
-  "main": "index.js",
+  "main": "bundle/index.js",
   "dependencies": {
     "@glennsl/bs-jest": "^0.4.8",
     "@glennsl/bs-json": "^3.0.0",
@@ -16,6 +16,7 @@
   "devDependencies": {
     "bs-platform": "^5.0.1",
     "concurrently": "^4.1.0",
+    "electron-builder": "^20.39.0",
     "fastpack": "^0.8.4",
     "graphql-faker": "^1.9.0"
   },
@@ -31,7 +32,34 @@
     "query-fake": "concurrently --kill-others 'npm run fake' 'sleep 5 && npm run query'",
     "reformat": "bsrefmt --in-place src/*.re",
     "test": "jest",
+    "dist": "build",
     "dev": "concurrently --kill-others 'npm run fake' 'bsb -make-world -w' 'fpack watch --development ./lib/js/src/Index.js' 'sleep 2 && electron ./lib/js/src/App.js'"
+  },
+  "build": {
+    "appId": "FOO.org.codaprotocol.prowallet",
+    "dmg": {
+      "contents": [
+        {
+          "x": 110,
+          "y": 150
+        },
+        {
+          "x": 240,
+          "y": 150,
+          "type": "link",
+          "path": "/Applications"
+        }
+      ]
+    },
+    "linux": {
+      "target": [
+        "AppImage",
+        "deb"
+      ]
+    },
+    "win": {
+      "target": "NSIS"
+    }
   },
   "author": "",
   "license": "ISC"
