@@ -26,19 +26,15 @@ module Make (Inputs : Inputs.With_unprocessed_transition_cache.S) :
    and type transition_frontier_breadcrumb :=
               Inputs.Transition_frontier.Breadcrumb.t = struct
   open Inputs
-  open Consensus
   module Catchup_scheduler = Catchup_scheduler.Make (Inputs)
 
   (* TODO: calculate a sensible value from postake consensus arguments *)
   let catchup_timeout_duration = Time.Span.of_ms 6000L
 
-  let transition_parent_hash t =
-    External_transition.Verified.protocol_state t
-    |> Protocol_state.previous_state_hash
-
   let run ~logger ~time_controller ~frontier
       ~(primary_transition_reader :
          ( (External_transition.Verified.t, State_hash.t) With_hash.t
+           Envelope.Incoming.t
          , State_hash.t )
          Cached.t
          Reader.t)
@@ -46,6 +42,7 @@ module Make (Inputs : Inputs.With_unprocessed_transition_cache.S) :
          (External_transition.Verified.t, State_hash.t) With_hash.t Reader.t)
       ~(catchup_job_writer :
          ( ( (External_transition.Verified.t, State_hash.t) With_hash.t
+             Envelope.Incoming.t
            , State_hash.t )
            Cached.t
            Rose_tree.t
@@ -94,9 +91,12 @@ module Make (Inputs : Inputs.With_unprocessed_transition_cache.S) :
                (* The proposer transitions are registered into the cache in order to prevent
                 * duplicate internal proposals. Otherwise, this could just be wrapped with a
                 * phantom Cached.t *)
+               let enveloped_transition =
+                 Envelope.Incoming.wrap ~data:vt ~sender:Envelope.Sender.Local
+               in
                `Valid_transition
                  ( Unprocessed_transition_cache.register
-                     unprocessed_transition_cache vt
+                     unprocessed_transition_cache enveloped_transition
                  |> Or_error.ok_exn ) )
          ; Reader.map catchup_breadcrumbs_reader ~f:(fun cb ->
                `Catchup_breadcrumbs cb )
@@ -127,8 +127,10 @@ module Make (Inputs : Inputs.With_unprocessed_transition_cache.S) :
                | `Valid_transition cached_transition -> (
                  match
                    Transition_frontier.find frontier
-                     (transition_parent_hash
-                        (With_hash.data (Cached.peek cached_transition)))
+                     (External_transition.Verified.parent_hash
+                        ( With_hash.data
+                        @@ Envelope.Incoming.data
+                             (Cached.peek cached_transition) ))
                  with
                  | None ->
                      return
@@ -140,9 +142,8 @@ module Make (Inputs : Inputs.With_unprocessed_transition_cache.S) :
                        let open Deferred.Result.Let_syntax in
                        let parent_hash =
                          Cached.peek cached_transition
-                         |> With_hash.data
-                         |> External_transition.Verified.protocol_state
-                         |> Protocol_state.previous_state_hash
+                         |> Envelope.Incoming.data |> With_hash.data
+                         |> External_transition.Verified.parent_hash
                        in
                        let%bind parent =
                          match
@@ -156,7 +157,11 @@ module Make (Inputs : Inputs.With_unprocessed_transition_cache.S) :
                          let open Deferred.Let_syntax in
                          let%map cached_breadcrumb =
                            Cached.transform cached_transition
-                             ~f:(fun transition_with_hash ->
+                             ~f:(fun transition_with_hash_enveloped ->
+                               let transition_with_hash =
+                                 Envelope.Incoming.data
+                                   transition_with_hash_enveloped
+                               in
                                Transition_frontier.Breadcrumb.build ~logger
                                  ~parent ~transition_with_hash )
                            |> Cached.sequence_deferred

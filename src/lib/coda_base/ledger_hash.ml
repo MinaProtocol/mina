@@ -109,7 +109,7 @@ let%snarkydef modify_account t pk ~(filter : Account.var -> ('a, _) Checked.t)
    - returns a root [t'] of a tree of depth [depth]
    which is [t] but with the account [f account] at path [addr].
 *)
-let modify_account_send t pk ~is_fee_transfer ~f =
+let%snarkydef modify_account_send t pk ~is_writeable ~f =
   modify_account t pk
     ~filter:(fun account ->
       let%bind account_already_there =
@@ -119,9 +119,13 @@ let modify_account_send t pk ~is_fee_transfer ~f =
         Public_key.Compressed.Checked.equal account.public_key
           Public_key.Compressed.(var_of_t empty)
       in
-      let%bind fee_transfer = Boolean.(account_not_there && is_fee_transfer) in
-      let%bind () = Boolean.Assert.any [account_already_there; fee_transfer] in
-      return fee_transfer )
+      let%bind not_there_but_writeable =
+        Boolean.(account_not_there && is_writeable)
+      in
+      let%bind () =
+        Boolean.Assert.any [account_already_there; not_there_but_writeable]
+      in
+      return not_there_but_writeable )
     ~f:(fun is_empty_and_writeable x -> f ~is_empty_and_writeable x)
 
 (*
@@ -131,7 +135,7 @@ let modify_account_send t pk ~is_fee_transfer ~f =
    - returns a root [t'] of a tree of depth [depth]
    which is [t] but with the account [f account] at path [addr].
 *)
-let modify_account_recv t pk ~f =
+let%snarkydef modify_account_recv t pk ~f =
   modify_account t pk
     ~filter:(fun account ->
       let%bind account_already_there =
