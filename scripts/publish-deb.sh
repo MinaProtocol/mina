@@ -4,6 +4,8 @@ set -euo pipefail
 # Needed to check variables
 set +u
 
+set -x
+
 # utility for publishing deb repo with commons options
 DEBS3='deb-s3 upload \
         --s3-region=us-west-2 \
@@ -28,8 +30,8 @@ else
           "$CIRCLE_JOB" == "build-artifacts--testnet_postake_medium_curves" || \
           "$CIRCLE_JOB" == "build-artifacts--testnet_postake_many_proposers" ]]; then
           pwd
-          ls src/_build/*.deb
-          ${DEBS3} --codename ${CODENAME} --component main src/_build/coda-*.deb
+          cd src/_build
+          ${DEBS3} --codename ${CODENAME} --component main coda-*.deb
     else
         echo "WARNING: Circle job: ${CIRCLE_JOB} not in publish list"
     fi
