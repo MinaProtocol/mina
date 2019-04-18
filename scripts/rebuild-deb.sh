@@ -1,8 +1,6 @@
 #!/bin/bash
 set -euo pipefail
 
-set -x
-
 SCRIPTPATH="$( cd "$(dirname "$0")" ; pwd -P )"
 cd $SCRIPTPATH/../src/_build
 
