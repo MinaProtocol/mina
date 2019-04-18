@@ -96,7 +96,6 @@ module Inputs = struct
                       (unstage (Coda_base.Sparse_ledger.handler w.ledger)) ) )
         | Merge (_, proof1, proof2) ->
             process (fun () -> M.merge ~sok_digest proof1 proof2) )
-
 end
 
 module Worker = Worker.Make (Inputs)
