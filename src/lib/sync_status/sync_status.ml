@@ -1,7 +1,10 @@
 let to_string = function
-  | `Offline -> "Offline"
-  | `Bootstrap -> "Bootstrap"
-  | `Synced -> "Synced"
+  | `Offline ->
+      "Offline"
+  | `Bootstrap ->
+      "Bootstrap"
+  | `Synced ->
+      "Synced"
 
 let to_yojson status = `String (to_string status)
 

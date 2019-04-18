@@ -1401,9 +1401,12 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
       in
       let%bind sync_status =
         match sync_status t with
-        | `Bootstrap -> `Bootstrapping
-        | `Offline -> `Active `Offline
-        | `Synced -> `Active `Synced
+        | `Bootstrap ->
+            `Bootstrapping
+        | `Offline ->
+            `Active `Offline
+        | `Synced ->
+            `Active `Synced
       in
       let%map staged_ledger = best_staged_ledger t in
       let staged_ledger_hash =
@@ -1429,7 +1432,8 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
           ; state_hash
           ; consensus_time_best_tip } ) =
       match active_status () with
-      | `Active result -> result
+      | `Active result ->
+          result
       | `Bootstrapping ->
           ( `Bootstrap
           , { num_accounts= None

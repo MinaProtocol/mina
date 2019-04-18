@@ -1402,17 +1402,18 @@ module Consensus_state = struct
          , 'bool
          , 'checkpoints )
          Poly.t =
-   fun Coda_base.H_list.([ length
-                         ; epoch_length
-                         ; min_length_of_epoch
-                         ; last_vrf_output
-                         ; total_currency
-                         ; curr_epoch
-                         ; curr_slot
-                         ; last_epoch_data
-                         ; curr_epoch_data
-                         ; has_ancestor_in_same_checkpoint_window
-                         ; checkpoints ]) ->
+   fun Coda_base.H_list.
+         [ length
+         ; epoch_length
+         ; min_length_of_epoch
+         ; last_vrf_output
+         ; total_currency
+         ; curr_epoch
+         ; curr_slot
+         ; last_epoch_data
+         ; curr_epoch_data
+         ; has_ancestor_in_same_checkpoint_window
+         ; checkpoints ] ->
     { length
     ; epoch_length
     ; min_length_of_epoch
