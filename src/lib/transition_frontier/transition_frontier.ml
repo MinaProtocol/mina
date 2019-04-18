@@ -233,8 +233,8 @@ struct
 
       let create () = State_hash.Table.create ()
 
-      let notify =
-        State_hash.Table.change ~f:(function
+      let notify t state_hash =
+        State_hash.Table.change t state_hash ~f:(function
           | Some ls ->
               List.iter ls ~f:(Fn.flip Ivar.fill ()) ;
               None
@@ -331,12 +331,12 @@ struct
           ; old_root_length
           ; new_best_tip_length
           ; added_to_best_tip_path; _ } ->
-          if new_best_tip_length - old_root_length > max_length then (
+          ( if new_best_tip_length - old_root_length > max_length then
             let root_state_hash = Breadcrumb.state_hash old_root in
-            Root_history.enqueue t.root_history root_state_hash old_root ;
-            Transition_registry.notify t.transition_registry
-              (Breadcrumb.state_hash
-                 (Non_empty_list.last added_to_best_tip_path)) ) ) ;
+            Root_history.enqueue t.root_history root_state_hash old_root ) ;
+          Transition_registry.notify t.transition_registry
+            (Breadcrumb.state_hash (Non_empty_list.last added_to_best_tip_path))
+      ) ;
       Fields.fold ~init:diff
         ~root_history:(fun _ _ -> Deferred.unit)
         ~snark_pool_refcount:

@@ -408,10 +408,17 @@ module Make (Inputs : Inputs_intf) :
                           { With_hash.hash= Protocol_state.hash protocol_state
                           ; data= external_transition }
                         in
+                        Logger.info logger ~module_:__MODULE__
+                          ~location:__LOC__
+                          !"Submitting transition to the transition frontier \
+                            controller" ;
                         let%bind () =
                           Strict_pipe.Writer.write transition_writer
                             external_transition_with_hash
                         in
+                        Logger.info logger ~module_:__MODULE__
+                          ~location:__LOC__
+                          !"Waiting for transition to be inserted into frontier" ;
                         Transition_frontier.wait_for_transition frontier
                           (With_hash.hash external_transition_with_hash)) )
         in
