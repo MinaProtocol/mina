@@ -44,8 +44,8 @@ module Types = struct
       let total = List.sum (module Int) values ~f:Fn.id in
       List.fold msgs
         ~init:
-          (Printf.sprintf "Total: %d (overflow:%d) (underflow:%d)\n\t" total
-             overflow underflow) ~f:(fun acc x -> acc ^ "\n\t" ^ x )
+          (Printf.sprintf "\n\tTotal: %d (overflow:%d) (underflow:%d)\n\t"
+             total overflow underflow) ~f:(fun acc x -> acc ^ "\n\t" ^ x )
       ^ "\n\t..."
 
     module Rpc_timings = struct
