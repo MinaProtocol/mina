@@ -6,11 +6,25 @@ open Bitstring_lib
 open Tuple_lib
 
 module type S = sig
-  type ('staged_ledger_hash, 'snarked_ledger_hash, 'time) t_ =
-    { staged_ledger_hash: 'staged_ledger_hash
-    ; snarked_ledger_hash: 'snarked_ledger_hash
-    ; timestamp: 'time }
-  [@@deriving sexp, eq, compare, fields, yojson]
+  module Poly : sig
+    type ('staged_ledger_hash, 'snarked_ledger_hash, 'time) t =
+      { staged_ledger_hash: 'staged_ledger_hash
+      ; snarked_ledger_hash: 'snarked_ledger_hash
+      ; timestamp: 'time }
+    [@@deriving sexp, eq, compare, fields, yojson]
+
+    module Stable :
+      sig
+        module V1 : sig
+          type ('staged_ledger_hash, 'snarked_ledger_hash, 'time) t
+          [@@deriving bin_io, sexp, eq, compare, yojson, version]
+        end
+
+        module Latest : module type of V1
+      end
+      with type ('staged_ledger_hash, 'snarked_ledger_hash, 'time) V1.t =
+                  ('staged_ledger_hash, 'snarked_ledger_hash, 'time) t
+  end
 
   module Value : sig
     module Stable : sig
@@ -19,8 +33,8 @@ module type S = sig
           ( Staged_ledger_hash.Stable.V1.t
           , Frozen_ledger_hash.Stable.V1.t
           , Block_time.Stable.V1.t )
-          t_
-        [@@deriving bin_io, sexp, eq, compare, hash, yojson]
+          Poly.Stable.V1.t
+        [@@deriving bin_io, sexp, eq, compare, hash, yojson, version]
       end
 
       module Latest : module type of V1
@@ -35,8 +49,16 @@ module type S = sig
                 ( Staged_ledger_hash.var
                 , Frozen_ledger_hash.var
                 , Block_time.Unpacked.var )
-                t_
+                Poly.t
      and type value := Value.t
+
+  val staged_ledger_hash :
+    ('staged_ledger_hash, _, _) Poly.t -> 'staged_ledger_hash
+
+  val snarked_ledger_hash :
+    (_, 'snarked_ledger_hash, _) Poly.t -> 'snarked_ledger_hash
+
+  val timestamp : (_, _, 'time) Poly.t -> 'time
 
   val create_value :
        staged_ledger_hash:Staged_ledger_hash.t
@@ -48,13 +70,13 @@ module type S = sig
 
   val genesis : Value.t
 
-  val set_timestamp : ('a, 'b, 'c) t_ -> 'c -> ('a, 'b, 'c) t_
+  val set_timestamp : ('a, 'b, 'c) Poly.t -> 'c -> ('a, 'b, 'c) Poly.t
 
   val fold : Value.t -> bool Triple.t Fold.t
 
   val var_to_triples : var -> (Boolean.var Triple.t list, _) Checked.t
 
-  type display = (string, string, string) t_ [@@deriving yojson]
+  type display = (string, string, string) Poly.t [@@deriving yojson]
 
   val display : Value.t -> display
 
@@ -83,24 +105,47 @@ end
 module Make (Genesis_ledger : sig
   val t : Ledger.t
 end) : S = struct
-  type ('staged_ledger_hash, 'snarked_ledger_hash, 'time) t_ =
-    { staged_ledger_hash: 'staged_ledger_hash
-    ; snarked_ledger_hash: 'snarked_ledger_hash
-    ; timestamp: 'time }
-  [@@deriving bin_io, sexp, fields, eq, compare, hash, yojson]
+  module Poly = struct
+    module Stable = struct
+      module V1 = struct
+        module T = struct
+          type ('staged_ledger_hash, 'snarked_ledger_hash, 'time) t =
+            { staged_ledger_hash: 'staged_ledger_hash
+            ; snarked_ledger_hash: 'snarked_ledger_hash
+            ; timestamp: 'time }
+          [@@deriving bin_io, sexp, fields, eq, compare, hash, yojson, version]
+        end
+
+        include T
+      end
+
+      module Latest = V1
+    end
+
+    type ('staged_ledger_hash, 'snarked_ledger_hash, 'time) t =
+                                                               ( 'staged_ledger_hash
+                                                               , 'snarked_ledger_hash
+                                                               , 'time )
+                                                               Stable.Latest.t =
+      { staged_ledger_hash: 'staged_ledger_hash
+      ; snarked_ledger_hash: 'snarked_ledger_hash
+      ; timestamp: 'time }
+    [@@deriving sexp, fields, eq, compare, hash, yojson]
+  end
+
+  let staged_ledger_hash, snarked_ledger_hash, timestamp =
+    Poly.(staged_ledger_hash, snarked_ledger_hash, timestamp)
 
   module Value = struct
     module Stable = struct
       module V1 = struct
         module T = struct
-          let version = 1
-
           type t =
             ( Staged_ledger_hash.Stable.V1.t
             , Frozen_ledger_hash.Stable.V1.t
             , Block_time.Stable.V1.t )
-            t_
-          [@@deriving bin_io, sexp, eq, compare, hash, yojson]
+            Poly.Stable.V1.t
+          [@@deriving bin_io, sexp, eq, compare, hash, yojson, version]
         end
 
         include T
@@ -127,16 +172,16 @@ end) : S = struct
     ( Staged_ledger_hash.var
     , Frozen_ledger_hash.var
     , Block_time.Unpacked.var )
-    t_
+    Poly.t
 
   let create_value ~staged_ledger_hash ~snarked_ledger_hash ~timestamp =
-    {staged_ledger_hash; snarked_ledger_hash; timestamp}
+    {Poly.staged_ledger_hash; snarked_ledger_hash; timestamp}
 
-  let to_hlist {staged_ledger_hash; snarked_ledger_hash; timestamp} =
+  let to_hlist Poly.({staged_ledger_hash; snarked_ledger_hash; timestamp}) =
     H_list.[staged_ledger_hash; snarked_ledger_hash; timestamp]
 
   let of_hlist :
-      (unit, 'lbh -> 'lh -> 'ti -> unit) H_list.t -> ('lbh, 'lh, 'ti) t_ =
+      (unit, 'lbh -> 'lh -> 'ti -> unit) H_list.t -> ('lbh, 'lh, 'ti) Poly.t =
     H_list.(
       fun [staged_ledger_hash; snarked_ledger_hash; timestamp] ->
         {staged_ledger_hash; snarked_ledger_hash; timestamp})
@@ -169,19 +214,20 @@ end) : S = struct
     Staged_ledger_hash.length_in_triples + Frozen_ledger_hash.length_in_triples
     + Block_time.length_in_triples
 
-  let set_timestamp t timestamp = {t with timestamp}
+  let set_timestamp t timestamp = {t with Poly.timestamp}
 
   let genesis =
-    { staged_ledger_hash= Staged_ledger_hash.genesis
-    ; snarked_ledger_hash=
-        Frozen_ledger_hash.of_ledger_hash
-        @@ Ledger.merkle_root Genesis_ledger.t
-    ; timestamp= Genesis_state_timestamp.value |> Block_time.of_time }
+    Poly.
+      { staged_ledger_hash= Staged_ledger_hash.genesis
+      ; snarked_ledger_hash=
+          Frozen_ledger_hash.of_ledger_hash
+          @@ Ledger.merkle_root Genesis_ledger.t
+      ; timestamp= Genesis_state_timestamp.value |> Block_time.of_time }
 
-  type display = (string, string, string) t_ [@@deriving yojson]
+  type display = (string, string, string) Poly.t [@@deriving yojson]
 
-  let display {staged_ledger_hash; snarked_ledger_hash; timestamp} =
-    { staged_ledger_hash=
+  let display Poly.({staged_ledger_hash; snarked_ledger_hash; timestamp}) =
+    { Poly.staged_ledger_hash=
         Visualization.display_short_sexp (module Ledger_hash)
         @@ Staged_ledger_hash.ledger_hash staged_ledger_hash
     ; snarked_ledger_hash=

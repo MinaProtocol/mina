@@ -35,7 +35,8 @@ module Item = {
   let make = (~name, ~link, ~description, _children) => {
     ...component,
     render: _self =>
-      <a
+      <A
+        name={Js.String.replace(" ", "-", name)}
         href=link
         className=Css.(
           style([
@@ -116,7 +117,7 @@ module Item = {
             {chevron(Style.Colors.tealAlpha(0.1))}
           </div>
         </div>
-      </a>,
+      </A>,
   };
 };
 
@@ -132,7 +133,12 @@ let make = _ => {
           marginRight(`auto),
         ])
       )>
-      <h3 className=Style.H3.wings> {ReasonReact.string("Run Coda")} </h3>
+      <h3
+        className=Css.(
+          merge([Style.H3.wings, style([marginTop(`rem(1.25))])])
+        )>
+        {ReasonReact.string("Run Coda")}
+      </h3>
       <code
         className=Css.(
           style([
@@ -180,7 +186,6 @@ let make = _ => {
                   flexShrink(1),
                   flexGrow(1.0),
                   marginRight(`rem(0.5)),
-                  width(`rem(15.)),
                   marginTop(`rem(2.)),
                   marginRight(`rem(1.0)),
                 ]),
@@ -192,7 +197,8 @@ let make = _ => {
              smartphones, will be able to instantly validate the state of the ledger.",
              )}
           </p>
-          <a
+          <A
+            name="code-github"
             href="https://github.com/CodaProtocol/coda"
             className=Css.(
               merge([
@@ -240,7 +246,7 @@ let make = _ => {
                 {chevron(Style.Colors.tealAlpha(0.1))}
               </div>
             </div>
-          </a>
+          </A>
         </div>
         <Item
           name="Get Started"

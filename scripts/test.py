@@ -11,6 +11,7 @@ from itertools import chain
 
 build_artifact_profiles = [
     'testnet_postake',
+    'testnet_postake_many_proposers',
     'testnet_postake_snarkless_fake_hash',
 ]
 
@@ -201,7 +202,7 @@ def run(args):
             print('Running: %s' % (cmd))
             run_cmd(cmd, lambda: fail('Test "%s:%s" failed' % (profile, test)))
 
-    print('Testing successfull')
+    print('Testing successful')
 
 
 def get_required_status():

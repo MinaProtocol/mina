@@ -33,7 +33,8 @@ module Time : sig
 
   module Stable : sig
     module V1 : sig
-      type nonrec t = t [@@deriving sexp, bin_io, compare, eq, hash, yojson]
+      type nonrec t = t
+      [@@deriving sexp, bin_io, compare, eq, hash, yojson, version]
     end
   end
 

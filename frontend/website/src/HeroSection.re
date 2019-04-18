@@ -2,7 +2,23 @@ module Copy = {
   let component = ReasonReact.statelessComponent("HeroSection.Copy");
   let make = _ => {
     ...component,
-    render: _self =>
+    render: _self => {
+      let largeLinkStyle =
+        Css.(
+          style([
+            Style.Typeface.ibmplexsans,
+            color(Style.Colors.hyperlink),
+            textDecoration(`none),
+            fontWeight(`medium),
+            fontSize(`rem(1.125)),
+            lineHeight(`rem(1.875)),
+            letterSpacing(`rem(-0.0125)),
+            hover([color(Style.Colors.hyperlinkHover)]),
+          ])
+        );
+
+      let heroSvgVar = "--svg-color-hero";
+
       <div
         className=Css.(
           style([
@@ -12,11 +28,12 @@ module Copy = {
             width(`percent(100.0)),
             maxWidth(`rem(37.0)),
             minWidth(`rem(17.5)),
+            media("(min-width: 30rem)", [minWidth(`rem(24.0))]),
             media(
               Style.MediaQuery.full,
               [width(`percent(60.0)), minWidth(`rem(24.0))],
             ),
-            media("(min-width: 30rem)", [minWidth(`rem(24.0))]),
+            media(Style.MediaQuery.somewhatLarge, [minWidth(`rem(32.))]),
           ])
         )>
         <div
@@ -36,7 +53,7 @@ module Copy = {
               ])
             )>
             {ReasonReact.string(
-               "A cryptocurrency with a tiny, portable blockchain.",
+               {j|A cryptocurrency with a tiny portable blockchain.|j},
              )}
           </h1>
           <p
@@ -45,7 +62,7 @@ module Copy = {
                 Style.Body.big,
                 style([
                   marginTop(`rem(2.0)),
-                  maxWidth(`rem(28.0)),
+                  maxWidth(`rem(30.0)),
                   // align with the grid
                   media(
                     Style.MediaQuery.full,
@@ -56,20 +73,63 @@ module Copy = {
             )>
             <span>
               {ReasonReact.string(
-                 "Coda is the first cryptocurrency with a succinct blockchain. Our lightweight blockchain means ",
+                 "Coda swaps the traditional blockchain for a tiny cryptographic proof, enabling a cryptocurrency as accessible as any other app or website. This makes it ",
                )}
             </span>
             <span className=Style.Body.big_semibold>
-              {ReasonReact.string("anyone can use Coda directly")}
+              {ReasonReact.string(
+                 "dramatically easier to develop user friendly crypto apps",
+               )}
             </span>
             <span>
               {ReasonReact.string(
-                 " from any device, in less data than a few tweets.",
+                 {j| that run natively in the browser, and enables more inclusive, sustainable\u00A0consensus.|j},
                )}
             </span>
+            <br />
+            <br />
+            <A
+              name={"hero-" ++ Links.Forms.mailingList.name}
+              target="_blank"
+              href={Links.Forms.mailingList.link}
+              className=largeLinkStyle>
+              {ReasonReact.string({j|Join our mailing list\u00A0→|j})}
+            </A>
+            <br />
+            <A
+              name="hero-twitter"
+              target="_blank"
+              href="https://twitter.com/codaprotocol"
+              className=Css.(
+                merge([
+                  largeLinkStyle,
+                  style([
+                    marginTop(`rem(0.5)),
+                    display(`flex),
+                    alignItems(`center),
+                    // Original color of svg
+                    unsafe(heroSvgVar, Style.Colors.(string(hyperlink))),
+                    hover([
+                      unsafe(
+                        heroSvgVar,
+                        Style.Colors.(string(hyperlinkHover)),
+                      ),
+                    ]),
+                  ]),
+                ])
+              )>
+              <span className=Css.(style([marginRight(`rem(0.375))]))>
+                {ReasonReact.string({j|Follow us on Twitter|j})}
+              </span>
+              {GetInvolvedSection.SocialLink.Svg.twitter(
+                 ~dims=(16, 16),
+                 heroSvgVar,
+               )}
+            </A>
           </p>
         </div>
-      </div>,
+      </div>;
+    },
   };
 };
 
@@ -169,7 +229,10 @@ module Graphic = {
             width(`percent(100.0)),
             maxWidth(`rem(20.0)),
             marginRight(`rem(2.0)),
-            media(Style.MediaQuery.veryLarge, [marginRight(`rem(4.75))]),
+            media(
+              Style.MediaQuery.veryVeryLarge,
+              [marginRight(`rem(4.75))],
+            ),
           ])}>
           <div
             className={style([
@@ -218,8 +281,11 @@ let make = _ => {
           display(`flex),
           justifyContent(`spaceAround),
           flexWrap(`wrap),
-          maxWidth(`rem(69.0)),
-          media(Style.MediaQuery.veryLarge, [margin(`auto)]),
+          maxWidth(`rem(73.0)),
+          media(
+            Style.MediaQuery.somewhatLarge,
+            [marginLeft(`px(80)), marginRight(`px(80))],
+          ),
           media(
             Style.MediaQuery.full,
             [flexWrap(`nowrap), justifyContent(`spaceBetween)],

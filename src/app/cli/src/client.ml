@@ -85,7 +85,7 @@ let get_public_keys =
   in
   Command.async ~summary:"Get public keys"
     (Cli_lib.Background_daemon.init
-       (return (fun a b -> (a, b)) <*> with_balances_flag <*> Cli_lib.Flag.json)
+       (Args.zip2 with_balances_flag Cli_lib.Flag.json)
        ~f:(fun port (is_balance_included, json) ->
          if is_balance_included then
            dispatch_pretty_message ~json
@@ -160,7 +160,8 @@ let verify_payment =
            dispatch Verify_proof.rpc (pk, payment, proof) port
          in
          match%map dispatch_result with
-         | Ok (Ok ()) -> printf "Payment is valid on the existing blockchain!"
+         | Ok (Ok ()) ->
+             printf "Payment is valid on the existing blockchain!\n"
          | Error e | Ok (Error e) -> eprintf "%s" (Error.to_string_hum e) ))
 
 let get_nonce addr port =
@@ -192,11 +193,7 @@ let status =
   let open Deferred.Let_syntax in
   let open Daemon_rpcs in
   let open Command.Param in
-  let flag =
-    let open Command.Param in
-    return (fun a b -> (a, b))
-    <*> Cli_lib.Flag.json <*> Cli_lib.Flag.performance
-  in
+  let flag = Args.zip2 Cli_lib.Flag.json Cli_lib.Flag.performance in
   Command.async ~summary:"Get running daemon status"
     (Cli_lib.Background_daemon.init flag ~f:(fun port (json, performance) ->
          dispatch_pretty_message ~json
@@ -208,11 +205,7 @@ let status =
 let status_clear_hist =
   let open Deferred.Let_syntax in
   let open Daemon_rpcs in
-  let flag =
-    let open Command.Param in
-    return (fun a b -> (a, b))
-    <*> Cli_lib.Flag.json <*> Cli_lib.Flag.performance
-  in
+  let flag = Args.zip2 Cli_lib.Flag.json Cli_lib.Flag.performance in
   Command.async ~summary:"Clear histograms reported in status"
     (Cli_lib.Background_daemon.init flag ~f:(fun port (json, performance) ->
          dispatch_pretty_message ~json
@@ -308,11 +301,7 @@ let user_command (body_args : User_command_payload.Body.t Command.Param.t)
            (Currency.Fee.to_int Cli_lib.Fee.default_transaction))
       (optional txn_fee)
   in
-  let flag =
-    let open Command.Param in
-    return (fun a b c -> (a, b, c))
-    <*> body_args <*> Cli_lib.Flag.privkey_read_path <*> amount_flag
-  in
+  let flag = Args.zip3 body_args Cli_lib.Flag.privkey_read_path amount_flag in
   Command.async ~summary
     (Cli_lib.Background_daemon.init flag
        ~f:(fun port (body, from_account, fee) ->
@@ -520,6 +509,7 @@ let command =
     [ ("get-balance", get_balance)
     ; ("get-public-keys", get_public_keys)
     ; ("prove-payment", prove_payment)
+    ; ("verify-payment", verify_payment)
     ; ("get-nonce", get_nonce_cmd)
     ; ("send-payment", send_payment)
     ; ("stop-daemon", stop_daemon)

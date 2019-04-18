@@ -7,6 +7,6 @@
  (libraries sgn_type snark_params core_kernel ppx_deriving_yojson.runtime
    yojson)
  (preprocess
-  (pps ppx_jane ppx_deriving.eq bisect_ppx ppx_deriving_yojson --
+  (pps ppx_jane ppx_coda ppx_deriving.eq bisect_ppx ppx_deriving_yojson --
     -conditional))
  (synopsis "sgn library"))

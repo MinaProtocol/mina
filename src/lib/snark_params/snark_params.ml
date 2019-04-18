@@ -128,6 +128,7 @@ module Tock = struct
 
   module Groth16 = Snarky.Snark.Make (Tock_backend.Full.Default)
   module Fq = Snarky_field_extensions.Field_extensions.F (Tock0)
+  module Snarkette_tock = Snarkette.Mnt4_80
 
   module Inner_curve = struct
     include Tock_backend.Inner_curve
@@ -167,11 +168,14 @@ module Tock = struct
 
   module Pairing = struct
     module T = struct
+      let conv_field =
+        Fn.compose Tock0.Field.of_string Snarkette_tock.Fq.to_string
+
       module Impl = Tock0
       open Snarky_field_extensions.Field_extensions
       module Fq = Fq
 
-      let non_residue = Tock0.Field.of_int 17
+      let non_residue = conv_field Snarkette_tock.non_residue
 
       module Fqe = struct
         module Params = struct
@@ -181,6 +185,8 @@ module Tock = struct
         end
 
         include E2 (Fq) (Params)
+
+        let conv = A.map ~f:conv_field
 
         let real_part (x, _) = x
       end
@@ -210,20 +216,8 @@ module Tock = struct
                     (Coefficients)
 
           let one =
-            let open Field in
-            { x=
-                ( of_string
-                    "438374926219350099854919100077809681842783509163790991847867546339851681564223481322252708"
-                , of_string
-                    "37620953615500480110935514360923278605464476459712393277679280819942849043649216370485641"
-                )
-            ; y=
-                ( of_string
-                    "37437409008528968268352521034936931842973546441370663118543015118291998305624025037512482"
-                , of_string
-                    "424621479598893882672393190337420680597584695892317197646113820787463109735345923009077489"
-                )
-            ; z= Fqe.Unchecked.one }
+            let x, y = Snarkette_tock.G2.(to_affine_coordinates one) in
+            {x= Fqe.conv x; y= Fqe.conv y; z= Fqe.Unchecked.one}
         end
 
         include Snarky_curves.Make_weierstrass_checked
@@ -246,14 +240,8 @@ module Tock = struct
           let mul_by_non_residue = Fqe.mul_by_primitive_element
 
           let frobenius_coeffs_c1 =
-            [| Tock0.Field.of_string "1"
-             ; Tock0.Field.of_string
-                 "7684163245453501615621351552473337069301082060976805004625011694147890954040864167002308"
-             ; Tock0.Field.of_string
-                 "475922286169261325753349249653048451545124879242694725395555128576210262817955800483758080"
-             ; Tock0.Field.of_string
-                 "468238122923807824137727898100575114475823797181717920390930116882062371863914936316755773"
-            |]
+            Array.map ~f:conv_field
+              Snarkette_tock.Fq4.Params.frobenius_coeffs_c1
         end
 
         include F4 (Fqe) (Params)
@@ -268,10 +256,9 @@ module Tock = struct
       module N = Snarkette.Mnt6_80.N
 
       module Params = struct
-        include Snarkette.Mnt4_80.Pairing_info
+        include Snarkette_tock.Pairing_info
 
-        let loop_count_is_neg =
-          Snarkette.Mnt4_80.Pairing_info.is_loop_count_neg
+        let loop_count_is_neg = Snarkette_tock.Pairing_info.is_loop_count_neg
       end
 
       module G2_precomputation = struct
@@ -352,11 +339,6 @@ module Tick = struct
     module Bits = Bits.Make_field (Tick0.Field) (Tick0.Bigint)
 
     let size_in_triples = Int.((size_in_bits + 2) / 3)
-
-    (* for now, assert this type, derived from snarky, is versioned; can we 
-       prevent it changing?
-     *)
-    let __versioned__ = true
   end
 
   module Fq = Snarky_field_extensions.Field_extensions.F (Tick0)
@@ -509,6 +491,7 @@ module Tick = struct
   end
 
   module Util = Snark_util.Make (Tick0)
+  module Snarkette_tick = Snarkette.Mnt6_80
 
   module Pairing = struct
     module T = struct
@@ -516,7 +499,10 @@ module Tick = struct
       open Snarky_field_extensions.Field_extensions
       module Fq = Fq
 
-      let non_residue = Tick0.Field.of_int 5
+      let conv_field =
+        Fn.compose Tick0.Field.of_string Snarkette_tick.Fq.to_string
+
+      let non_residue = conv_field Snarkette_tick.non_residue
 
       module Fqe = struct
         module Params = struct
@@ -525,23 +511,17 @@ module Tick = struct
           let mul_by_non_residue x = Fq.scale x non_residue
 
           let frobenius_coeffs_c1 =
-            [| Tick0.Field.of_string "1"
-             ; Tick0.Field.of_string
-                 "471738898967521029133040851318449165997304108729558973770077319830005517129946578866686956"
-             ; Tick0.Field.of_string
-                 "4183387201740296620308398334599285547820769823264541783190415909159130177461911693276180"
-            |]
+            Array.map ~f:conv_field
+              Snarkette_tick.Fq3.Params.frobenius_coeffs_c1
 
           let frobenius_coeffs_c2 =
-            [| Tick0.Field.of_string "1"
-             ; Tick0.Field.of_string
-                 "4183387201740296620308398334599285547820769823264541783190415909159130177461911693276180"
-             ; Tick0.Field.of_string
-                 "471738898967521029133040851318449165997304108729558973770077319830005517129946578866686956"
-            |]
+            Array.map ~f:conv_field
+              Snarkette_tick.Fq3.Params.frobenius_coeffs_c2
         end
 
         include F3 (Fq) (Params)
+
+        let conv = A.map ~f:conv_field
 
         let real_part (x, _, _) = x
       end
@@ -574,24 +554,8 @@ module Tick = struct
                     end)
 
           let one =
-            let open Field in
-            { z= Fqe.Unchecked.one
-            ; x=
-                ( of_string
-                    "421456435772811846256826561593908322288509115489119907560382401870203318738334702321297427"
-                , of_string
-                    "103072927438548502463527009961344915021167584706439945404959058962657261178393635706405114"
-                , of_string
-                    "143029172143731852627002926324735183809768363301149009204849580478324784395590388826052558"
-                )
-            ; y=
-                ( of_string
-                    "464673596668689463130099227575639512541218133445388869383893594087634649237515554342751377"
-                , of_string
-                    "100642907501977375184575075967118071807821117960152743335603284583254620685343989304941678"
-                , of_string
-                    "123019855502969896026940545715841181300275180157288044663051565390506010149881373807142903"
-                ) }
+            let x, y = Snarkette_tick.G2.(to_affine_coordinates one) in
+            {z= Fqe.Unchecked.one; x= Fqe.conv x; y= Fqe.conv y}
         end
 
         include Snarky_curves.Make_weierstrass_checked
@@ -610,14 +574,8 @@ module Tick = struct
       module Fqk = struct
         module Params = struct
           let frobenius_coeffs_c1 =
-            Array.map ~f:Tick0.Field.of_string
-              [| "1"
-               ; "471738898967521029133040851318449165997304108729558973770077319830005517129946578866686957"
-               ; "471738898967521029133040851318449165997304108729558973770077319830005517129946578866686956"
-               ; "475922286169261325753349249653048451545124878552823515553267735739164647307408490559963136"
-               ; "4183387201740296620308398334599285547820769823264541783190415909159130177461911693276180"
-               ; "4183387201740296620308398334599285547820769823264541783190415909159130177461911693276181"
-              |]
+            Array.map ~f:conv_field
+              Snarkette_tick.Fq6.Params.frobenius_coeffs_c1
         end
 
         module Fq2 =
@@ -638,13 +596,12 @@ module Tick = struct
             let twist = Fq.Unchecked.(zero, one, zero)
           end)
 
-      module N = Snarkette.Mnt6_80.N
+      module N = Snarkette_tick.N
 
       module Params = struct
-        include Snarkette.Mnt6_80.Pairing_info
+        include Snarkette_tick.Pairing_info
 
-        let loop_count_is_neg =
-          Snarkette.Mnt6_80.Pairing_info.is_loop_count_neg
+        let loop_count_is_neg = Snarkette_tick.Pairing_info.is_loop_count_neg
       end
 
       module G2_precomputation = struct
@@ -652,7 +609,8 @@ module Tick = struct
                   (struct
                     include Params
 
-                    let coeff_a = Tick0.Field.(zero, zero, of_int 11)
+                    let coeff_a =
+                      Tick0.Field.(zero, zero, G1.Unchecked.Coefficients.a)
                   end)
 
         let create_constant =

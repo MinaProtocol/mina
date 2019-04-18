@@ -19,13 +19,13 @@ module Incoming : sig
   module Stable : sig
     module V1 : sig
       type 'a t = {data: 'a; sender: Sender.Stable.V1.t}
-      [@@deriving sexp, bin_io, yojson, version]
+      [@@deriving eq, sexp, bin_io, yojson, version]
     end
 
     module Latest = V1
   end
 
-  type 'a t = 'a Stable.Latest.t [@@deriving sexp, yojson]
+  type 'a t = 'a Stable.Latest.t [@@deriving eq, sexp, yojson]
 
   val sender : 'a t -> Sender.t
 
