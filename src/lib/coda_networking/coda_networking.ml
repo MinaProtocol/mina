@@ -191,7 +191,11 @@ struct
 
         let callee_model_of_query = Fn.id
 
-        let response_of_callee_model = Fn.id
+        let response_of_callee_model (r : response) =
+          let buff = Bin_prot.Common.create_buf 4096 in
+          let len = bin_write_response buff ~pos:0 r in
+          Stdlib.Printf.eprintf "LEN: %d\n%!" len ;
+          r
 
         let caller_model_of_response = Fn.id
       end
