@@ -3215,12 +3215,14 @@ let%test_module "test" =
 
         let transaction_capacity_log_2 = 2
 
+        let work_delay = 5
+
         let sl_modules =
-          List.init 4 ~f:(fun i ->
+          List.init work_delay ~f:(fun i ->
               let module Constants = struct
                 let transaction_capacity_log_2 = transaction_capacity_log_2
 
-                let work_delay_factor = 5
+                let work_delay_factor = work_delay
 
                 let latency_factor = i
               end in
@@ -3269,21 +3271,23 @@ let%test_module "test" =
                 sl := sl' ;
                 diff'
               in
-              Quickcheck.test g ~trials:100 ~f:(fun _ ->
+              Quickcheck.test g ~trials:1000 ~f:(fun _ ->
                   Async.Thread_safe.block_on_async_exn (fun () ->
                       let all_ts =
                         txns p (fun x -> (x + 1) * 100) (fun _ -> 0)
                       in
                       let work_list : Transaction_snark_work.Statement.t list =
-                        let capacity_reached =
-                          Sl.Scan_state.work_capacity
-                          >= Sl.Scan_state.current_job_count
-                               (Sl.scan_state !staged_ledger)
+                        let proofs_required =
+                          max
+                            ( Sl.Scan_state.current_job_count
+                                (Sl.scan_state !staged_ledger)
+                            + (2 * p) - Sl.Scan_state.work_capacity )
+                            0
                         in
                         let spec_list =
-                          if capacity_reached then
-                            Sl.all_work_pairs_exn !staged_ledger
-                          else []
+                          List.take
+                            (Sl.all_work_pairs_exn !staged_ledger)
+                            ((proofs_required + 1) / 2)
                         in
                         List.map spec_list ~f:(fun (s1, s2_opt) ->
                             let stmt1 =

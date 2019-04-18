@@ -163,8 +163,20 @@ end = struct
   (*Work capacity represents max number of work in the tree. this includes the jobs that are currently in the tree and the ones that would arise in the future when current jobs are done*)
   let work_capacity =
     let open Constants in
-    Int.pow 2 (transaction_capacity_log_2 + 1)
+    let extra_jobs =
+      let rec go i count =
+        if i = work_delay_factor - 1 then count
+        else go (i + 1) (count + Int.pow 2 (i - 1))
+      in
+      go (max latency_factor 1) 0
+    in
+    (Int.pow 2 (transaction_capacity_log_2 + 1) - 1)
+    (*Transaction_capacity_tree size (c-tree) *)
     * (Int.pow 2 (work_delay_factor - Int.max (latency_factor - 1) 0) - 1)
+    (*all but one c-tree that are in the tree formed at root_depth = latency_factor+1 *)
+    + extra_jobs
+
+  (*half the number of jobs on each level above work_delay_factor depth and below latency_factor depth*)
 
   module Stable = struct
     module V1 = struct
@@ -547,7 +559,9 @@ end = struct
     let%bind () = Parallel_scan.update_curr_job_seq_no t.tree in
     let%bind proof_opt = fill_in_transaction_snark_work t.tree work in
     let%bind () = enqueue_transactions t.tree transactions in
-    (*important: Everytime a proof is emitted, reduce the job count by 1 because you only had to do (2^x - 1 extra jobs). This is important because otherwise the job count would never become zero*)
+    (*important: Everytime a proof is emitted, reduce the job count by 1 
+    because you only had to do (2^x - 2^latency_factor extra jobs). This is important because 
+    otherwise the job count would never become zero*)
     let adjust_job_count =
       Option.value_map ~default:0 ~f:(fun _ -> 1) proof_opt
     in
@@ -572,7 +586,9 @@ end = struct
       Ok proof_opt )
     else
       Or_error.error_string
-        "Job count exceeded work_capacity. Cannot enqueue the transactions"
+        ( "Job count(" ^ Int.to_string new_count ^ ") exceeded work_capacity("
+        ^ Int.to_string work_capacity
+        ^ "). Cannot enqueue the transactions" )
 
   let latest_ledger_proof t =
     let open Option.Let_syntax in
