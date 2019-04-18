@@ -6,6 +6,7 @@ open Async
 open Coda_base
 open Blockchain_snark
 open Cli_lib
+open Cli_inputs
 open Coda_main
 module YJ = Yojson.Safe
 module Git_sha = Daemon_rpcs.Types.Git_sha
