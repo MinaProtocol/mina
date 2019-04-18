@@ -44,10 +44,15 @@ module type S = sig
 
   module Bits : Bits_intf.S with type t := t
 
+  open Snark_params.Tick
+
   include
-    Snark_params.Tick.Snarkable.Bits.Small
-    with type Unpacked.value = t
-     and type Packed.value = t
+    Snarkable.Bits.Small with type Unpacked.value = t and type Packed.value = t
+
+  val is_succ_var :
+    pred:Unpacked.var -> succ:Unpacked.var -> (Boolean.var, _) Checked.t
+
+  val min_var : Unpacked.var -> Unpacked.var -> (Unpacked.var, _) Checked.t
 
   val fold : t -> bool Triple.t Fold.t
 end
