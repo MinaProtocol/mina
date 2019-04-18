@@ -343,9 +343,12 @@ struct
 
   let summary msg =
     match Envelope.Incoming.data msg with
-    | New_state _ -> "new state"
-    | Snark_pool_diff _ -> "snark pool diff"
-    | Transaction_pool_diff _ -> "transaction pool diff"
+    | New_state _ ->
+        "new state"
+    | Snark_pool_diff _ ->
+        "snark pool diff"
+    | Transaction_pool_diff _ ->
+        "transaction pool diff"
 end
 
 module type Inputs_intf = sig
@@ -542,7 +545,8 @@ module Make (Inputs : Inputs_intf) = struct
               `Fst
                 ( Envelope.Incoming.map x ~f:(fun _ -> s)
                 , Time.now config.time_controller )
-          | Snark_pool_diff d -> `Snd (Envelope.Incoming.map x ~f:(fun _ -> d))
+          | Snark_pool_diff d ->
+              `Snd (Envelope.Incoming.map x ~f:(fun _ -> d))
           | Transaction_pool_diff d ->
               `Trd (Envelope.Incoming.map x ~f:(fun _ -> d)) )
     in
@@ -636,9 +640,12 @@ module Make (Inputs : Inputs_intf) = struct
               Gossip_net.query_peer t.gossip_net peer rpc input
             in
             match response_or_error with
-            | Ok (Some response) -> return (Ok response)
-            | Ok None -> loop remaining_peers (2 * num_peers)
-            | Error _ -> loop remaining_peers (2 * num_peers) )
+            | Ok (Some response) ->
+                return (Ok response)
+            | Ok None ->
+                loop remaining_peers (2 * num_peers)
+            | Error _ ->
+                loop remaining_peers (2 * num_peers) )
     in
     loop peers 1
 
@@ -651,7 +658,8 @@ module Make (Inputs : Inputs_intf) = struct
       random_peers_except t max_peers ~except
     in
     match response with
-    | Ok (Some data) -> return (Ok data)
+    | Ok (Some data) ->
+        return (Ok data)
     | Ok None ->
         Logger.faulty_peer t.logger ~module_:__MODULE__ ~location:__LOC__
           !"get no response from %{sexp: Peer.t}"

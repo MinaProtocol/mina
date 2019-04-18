@@ -52,8 +52,10 @@ module Make (Blockchain_state : Coda_base.Blockchain_state.S) = struct
          list =
     let f (e : Coda_base.Ledger.Path.elem) =
       match e with
-      | `Left h -> `Left (digest (h :> Tick.Pedersen.Digest.t))
-      | `Right h -> `Right (digest (h :> Tick.Pedersen.Digest.t))
+      | `Left h ->
+          `Left (digest (h :> Tick.Pedersen.Digest.t))
+      | `Right h ->
+          `Right (digest (h :> Tick.Pedersen.Digest.t))
     in
     List.map ~f
 

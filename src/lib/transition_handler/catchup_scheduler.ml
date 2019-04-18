@@ -87,8 +87,10 @@ module Make (Inputs : Inputs.S) = struct
                    builder: %s"
                   (Error.to_string_hum e) ;
                 raise (Error.to_exn e)
-            | Error (`Fatal_error e) -> raise e
-            | Ok breadcrumb -> breadcrumb ) )
+            | Error (`Fatal_error e) ->
+                raise e
+            | Ok breadcrumb ->
+                breadcrumb ) )
 
   let create ~logger ~frontier ~time_controller ~catchup_job_writer
       ~catchup_breadcrumbs_writer =
@@ -203,7 +205,7 @@ module Make (Inputs : Inputs.S) = struct
             "Received request to watch transition for catchup that already \
              was being watched: $state_hash"
         else
-          let _ : Time.Span.t option = cancel_timeout t hash in
+          let (_ : Time.Span.t option) = cancel_timeout t hash in
           Hashtbl.set t.collected_transitions ~key:parent_hash
             ~data:(cached_transition :: cached_sibling_transitions) ;
           Hashtbl.update t.collected_transitions hash
@@ -219,7 +221,7 @@ module Make (Inputs : Inputs.S) = struct
           non-parent_root_transition: %{sexp: State_hash.t}"
         hash
     else
-      let _ : Time.Span.t option = cancel_timeout t hash in
+      let (_ : Time.Span.t option) = cancel_timeout t hash in
       Option.iter (Hashtbl.find t.collected_transitions hash)
         ~f:(fun collected_transitions ->
           let transition_subtrees =

@@ -512,10 +512,14 @@ let%test_module "vrf-test" =
     end
 
     let rec bits_to_triples ~default = function
-      | b0 :: b1 :: b2 :: bs -> (b0, b1, b2) :: bits_to_triples ~default bs
-      | [] -> []
-      | [b] -> [(b, default, default)]
-      | [b1; b2] -> [(b1, b2, default)]
+      | b0 :: b1 :: b2 :: bs ->
+          (b0, b1, b2) :: bits_to_triples ~default bs
+      | [] ->
+          []
+      | [b] ->
+          [(b, default, default)]
+      | [b1; b2] ->
+          [(b1, b2, default)]
 
     let hash_bits bits =
       List.foldi ~init:Curve.zero (bits_to_triples ~default:false bits)

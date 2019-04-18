@@ -19,8 +19,10 @@ module Stable = struct
     let to_yojson t = `String (to_string t)
 
     let of_yojson = function
-      | `String x -> Ok (of_string x)
-      | _ -> Error "expected `String"
+      | `String x ->
+          Ok (of_string x)
+      | _ ->
+          Error "expected `String"
 
     (* TODO: Figure out what the right thing to do is for conversion failures *)
     let ( { Bin_prot.Type_class.reader= bin_reader_t

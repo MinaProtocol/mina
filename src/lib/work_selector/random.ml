@@ -22,7 +22,8 @@ module Make (Inputs : Inputs.Inputs_intf) :
       (state : State.t) =
     let unseen_jobs = Helper.all_works staged_ledger state in
     match Helper.get_expensive_work ~snark_pool ~fee unseen_jobs with
-    | [] -> ([], state)
+    | [] ->
+        ([], state)
     | _ ->
         let i = Random.int (List.length unseen_jobs) in
         let x = List.nth_exn unseen_jobs i in

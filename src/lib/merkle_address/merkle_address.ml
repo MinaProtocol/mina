@@ -99,7 +99,8 @@ end) : S = struct
   let of_directions dirs =
     let path = create_bitstring (List.length dirs) in
     let rec loop i = function
-      | [] -> ()
+      | [] ->
+          ()
       | h :: t ->
           if Direction.to_bool h then set path i ;
           loop (i + 1) t
@@ -323,8 +324,10 @@ end) : S = struct
     let fold ?(stop = `Inclusive) (first, last) ~init ~f =
       assert (depth first = depth last) ;
       match stop with
-      | `Inclusive -> fold_incl (first, last) ~init ~f
-      | `Exclusive -> fold_exl (first, last) ~init ~f
+      | `Inclusive ->
+          fold_incl (first, last) ~init ~f
+      | `Exclusive ->
+          fold_exl (first, last) ~init ~f
 
     let subtree_range address =
       let first_node = concat [address; zeroes_bitstring @@ height address] in
@@ -336,13 +339,14 @@ end) : S = struct
       Sequence.unfold
         ~init:(first_node, `Don't_stop)
         ~f:(function
-          | _, `Stop -> None
+          | _, `Stop ->
+              None
           | current_node, `Don't_stop ->
               if compare current_node last_node = 0 then
                 Some (current_node, (current_node, `Stop))
               else
                 Option.map (next current_node) ~f:(fun next_node ->
-                    (current_node, (next_node, `Don't_stop)) ))
+                    (current_node, (next_node, `Don't_stop)) ) )
   end
 
   let%test "Bitstring bin_io serialization does not change" =
@@ -398,7 +402,8 @@ end) : S = struct
       (Direction.gen_list Input.depth) ~f:(fun directions ->
         let address = of_directions directions in
         match next address with
-        | None -> ()
+        | None ->
+            ()
         | Some addr' ->
             [%test_result: t option] ~expect:(Some address) (prev addr') )
 end

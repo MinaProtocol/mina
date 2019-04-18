@@ -65,7 +65,8 @@ module Make (Inputs : Inputs.S) :
           in
           Logger.error logger ~module_:__MODULE__ ~location:__LOC__ !"%s" msg ;
           Or_error.error_string msg
-      | Some crumb -> Or_error.return crumb
+      | Some crumb ->
+          Or_error.return crumb
     in
     let open Deferred.Or_error.Let_syntax in
     let%map tree =
@@ -96,7 +97,8 @@ module Make (Inputs : Inputs.S) :
                         breadcrumb_if_present () |> Deferred.return
                       in
                       crumb
-                  | `Constructed parent -> Deferred.Or_error.return parent
+                  | `Constructed parent ->
+                      Deferred.Or_error.return parent
                 in
                 let parent_state_hash =
                   Transition_frontier.Breadcrumb.transition_with_hash
@@ -127,12 +129,14 @@ module Make (Inputs : Inputs.S) :
                     let open Result.Let_syntax in
                     (* After we do a bunch of async work on what used to be our initial breacrumb
                         * make sure it's still there, otherwise drop it on the floor *)
-                    let%map _ : Transition_frontier.Breadcrumb.t =
+                    let%map (_ : Transition_frontier.Breadcrumb.t) =
                       breadcrumb_if_present ()
                     in
                     `Constructed new_breadcrumb
-                | Error (`Fatal_error exn) -> Or_error.of_exn exn
-                | Error (`Validation_error error) -> Error error )
+                | Error (`Fatal_error exn) ->
+                    Or_error.of_exn exn
+                | Error (`Validation_error error) ->
+                    Error error )
             (*TODO: punish*)
             |> Cached.sequence_deferred
           in
@@ -140,8 +144,10 @@ module Make (Inputs : Inputs.S) :
     in
     Rose_tree.map tree ~f:(fun c ->
         Cached.transform c ~f:(function
-          | `Initial -> failwith "impossible"
-          | `Constructed breadcrumb -> breadcrumb ) )
+          | `Initial ->
+              failwith "impossible"
+          | `Constructed breadcrumb ->
+              breadcrumb ) )
 
   let materialize_breadcrumbs ~frontier ~logger ~peer
       (Rose_tree.T (foreign_transition_head, _) as tree) =
@@ -168,7 +174,7 @@ module Make (Inputs : Inputs.S) :
     let cached_verified_transition =
       let open Deferred.Result.Let_syntax in
       let transition = Envelope.Incoming.data transition_enveloped in
-      let%bind _ : External_transition.Proof_verified.t =
+      let%bind (_ : External_transition.Proof_verified.t) =
         Protocol_state_validator.validate_proof transition
         |> Deferred.Result.map_error ~f:(fun error ->
                `Invalid (Error.to_string_hum error) )
@@ -195,7 +201,8 @@ module Make (Inputs : Inputs.S) :
     in
     let open Deferred.Let_syntax in
     match%map cached_verified_transition with
-    | Ok x -> Ok (Some x)
+    | Ok x ->
+        Ok (Some x)
     | Error `Duplicate ->
         Logger.info logger ~module_:__MODULE__ ~location:__LOC__
           "transition queried during ledger catchup has already been seen" ;
@@ -215,9 +222,12 @@ module Make (Inputs : Inputs.S) :
           if not should_continue then Deferred.Or_error.return (acc, false)
           else
             match%bind f elem with
-            | Error e -> Deferred.return (Error e)
-            | Ok None -> Deferred.Or_error.return (acc, false)
-            | Ok (Some y) -> Deferred.Or_error.return (y :: acc, true) )
+            | Error e ->
+                Deferred.return (Error e)
+            | Ok None ->
+                Deferred.Or_error.return (acc, false)
+            | Ok (Some y) ->
+                Deferred.Or_error.return (y :: acc, true) )
     in
     result
 
@@ -294,7 +304,8 @@ module Make (Inputs : Inputs.S) :
                 match%bind
                   materialize_breadcrumbs ~frontier ~logger ~peer full_subtree
                 with
-                | Ok result -> Deferred.Or_error.return result
+                | Ok result ->
+                    Deferred.Or_error.return result
                 | error ->
                     List.iter verified_transitions
                       ~f:(Fn.compose ignore Cached.invalidate) ;
@@ -307,7 +318,8 @@ module Make (Inputs : Inputs.S) :
           get_transitions_and_compute_breadcrumbs ~logger ~network ~frontier
             ~num_peers:8 ~unprocessed_transition_cache ~target_subtree:subtree
         with
-        | Ok tree -> Strict_pipe.Writer.write catchup_breadcrumbs_writer [tree]
+        | Ok tree ->
+            Strict_pipe.Writer.write catchup_breadcrumbs_writer [tree]
         | Error e ->
             Logger.info logger ~module_:__MODULE__ ~location:__LOC__
               !"All peers either sent us bad data, didn't have the info, or \

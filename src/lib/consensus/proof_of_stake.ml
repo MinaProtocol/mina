@@ -117,8 +117,10 @@ let compute_delegators self_pk ~iter_accounts =
   let t = Account.Index.Table.create () in
   let matches_pubkey pubkey =
     match self_pk with
-    | `Include_self, pk -> Public_key.Compressed.equal pk pubkey
-    | `Don't_include_self, _ -> false
+    | `Include_self, pk ->
+        Public_key.Compressed.equal pk pubkey
+    | `Don't_include_self, _ ->
+        false
   in
   iter_accounts (fun i (acct : Account.t) ->
       (* TODO: The second disjunct is a hack and should be removed once the delegation
@@ -249,7 +251,8 @@ module Local_state = struct
     (* TODO: remove duplicated genesis ledger *)
     let genesis_epoch_snapshot =
       match proposer_public_key with
-      | None -> Snapshot.create_empty ()
+      | None ->
+          Snapshot.create_empty ()
       | Some key ->
           let open Snapshot in
           let delegators =
@@ -281,11 +284,13 @@ module Local_state = struct
       Tuple2.compare ~cmp1:Epoch.compare ~cmp2:Epoch.Slot.compare
         t.last_checked_slot_and_epoch (epoch, slot)
     with
-    | i when i >= 0 -> `Seen
+    | i when i >= 0 ->
+        `Seen
     | i when i < 0 ->
         t.last_checked_slot_and_epoch <- (epoch, slot) ;
         `Unseen
-    | _ -> failwith "forall x : int. x >= 0 || x < 0 is impossibly false"
+    | _ ->
+        failwith "forall x : int. x >= 0 || x < 0 is impossibly false"
 end
 
 module Epoch_ledger = struct
@@ -347,7 +352,7 @@ module Epoch_ledger = struct
   let of_hlist :
          (unit, 'ledger_hash -> 'total_currency -> unit) Coda_base.H_list.t
       -> ('ledger_hash, 'total_currency) Poly.t =
-   fun Coda_base.H_list.([hash; total_currency]) -> {hash; total_currency}
+   fun Coda_base.H_list.[hash; total_currency] -> {hash; total_currency}
 
   let data_spec =
     Snark_params.Tick.Data_spec.[Coda_base.Frozen_ledger_hash.typ; Amount.typ]
@@ -432,7 +437,7 @@ module Vrf = struct
            , 'epoch -> 'slot -> 'epoch_seed -> 'del -> unit )
            Coda_base.H_list.t
         -> ('epoch, 'slot, 'epoch_seed, 'del) t =
-     fun Coda_base.H_list.([epoch; slot; seed; delegator]) ->
+     fun Coda_base.H_list.[epoch; slot; seed; delegator] ->
       {epoch; slot; seed; delegator}
 
     let data_spec =
@@ -700,8 +705,10 @@ module Vrf = struct
       in
       fun (With {request; respond}) ->
         match request with
-        | Winner_address -> respond (Provide 0)
-        | Private_key -> respond (Provide sk)
+        | Winner_address ->
+            respond (Provide 0)
+        | Private_key ->
+            respond (Provide sk)
         | _ ->
             respond
               (Provide
@@ -772,14 +779,11 @@ module Epoch_data = struct
     end
 
     type ('epoch_ledger, 'epoch_seed, 'protocol_state_hash, 'length) t =
-                                                                        ( 'epoch_ledger
-                                                                        , 'epoch_seed
-                                                                        , 'protocol_state_hash
-                                                                        , 'length
-                                                                        )
-                                                                        Stable
-                                                                        .Latest
-                                                                        .t =
+          ( 'epoch_ledger
+          , 'epoch_seed
+          , 'protocol_state_hash
+          , 'length )
+          Stable.Latest.t =
       { ledger: 'epoch_ledger
       ; seed: 'epoch_seed
       ; start_checkpoint: 'protocol_state_hash
@@ -846,11 +850,8 @@ module Epoch_data = struct
            -> unit )
          Coda_base.H_list.t
       -> ('ledger, 'seed, 'protocol_state_hash, 'length) Poly.t =
-   fun Coda_base.H_list.([ ledger
-                         ; seed
-                         ; start_checkpoint
-                         ; lock_checkpoint
-                         ; length ]) ->
+   fun Coda_base.H_list.
+         [ledger; seed; start_checkpoint; lock_checkpoint; length] ->
     {ledger; seed; start_checkpoint; lock_checkpoint; length}
 
   let data_spec =
@@ -1020,7 +1021,7 @@ module Consensus_transition_data = struct
   let of_hlist :
          (unit, 'epoch -> 'slot -> unit) Coda_base.H_list.t
       -> ('epoch, 'slot) Poly.t =
-   fun Coda_base.H_list.([epoch; slot]) -> {Poly.epoch; slot}
+   fun Coda_base.H_list.[epoch; slot] -> {Poly.epoch; slot}
 
   let data_spec =
     let open Snark_params.Tick.Data_spec in
@@ -1097,8 +1098,10 @@ module Checkpoints = struct
           let digest ({prefix; tail} : t) =
             let rec go acc p =
               match Fqueue.dequeue p with
-              | None -> acc
-              | Some (h, p) -> go (merge h acc) p
+              | None ->
+                  acc
+              | Some (h, p) ->
+                  go (merge h acc) p
             in
             go tail prefix
         end
@@ -1246,7 +1249,8 @@ module Consensus_state = struct
                , 'slot
                , 'epoch_data
                , 'bool
-               , 'checkpoints ) t =
+               , 'checkpoints )
+               t =
             { length: 'length
             ; epoch_length: 'length
             ; min_length_of_epoch: 'length
@@ -1274,16 +1278,17 @@ module Consensus_state = struct
          , 'slot
          , 'epoch_data
          , 'bool
-         , 'checkpoints ) t =
-                             ( 'length
-                             , 'vrf_output
-                             , 'amount
-                             , 'epoch
-                             , 'slot
-                             , 'epoch_data
-                             , 'bool
-                             , 'checkpoints )
-                             Stable.Latest.t =
+         , 'checkpoints )
+         t =
+          ( 'length
+          , 'vrf_output
+          , 'amount
+          , 'epoch
+          , 'slot
+          , 'epoch_data
+          , 'bool
+          , 'checkpoints )
+          Stable.Latest.t =
       { length: 'length
       ; epoch_length: 'length
       ; min_length_of_epoch: 'length
@@ -1397,17 +1402,18 @@ module Consensus_state = struct
          , 'bool
          , 'checkpoints )
          Poly.t =
-   fun Coda_base.H_list.([ length
-                         ; epoch_length
-                         ; min_length_of_epoch
-                         ; last_vrf_output
-                         ; total_currency
-                         ; curr_epoch
-                         ; curr_slot
-                         ; last_epoch_data
-                         ; curr_epoch_data
-                         ; has_ancestor_in_same_checkpoint_window
-                         ; checkpoints ]) ->
+   fun Coda_base.H_list.
+         [ length
+         ; epoch_length
+         ; min_length_of_epoch
+         ; last_vrf_output
+         ; total_currency
+         ; curr_epoch
+         ; curr_slot
+         ; last_epoch_data
+         ; curr_epoch_data
+         ; has_ancestor_in_same_checkpoint_window
+         ; checkpoints ] ->
     { length
     ; epoch_length
     ; min_length_of_epoch
@@ -1446,7 +1452,8 @@ module Consensus_state = struct
       ; curr_epoch
       ; curr_slot
       ; last_epoch_data
-      ; curr_epoch_data; _ } =
+      ; curr_epoch_data
+      ; _ } =
     let open Snark_params.Tick.Checked.Let_syntax in
     let%map last_epoch_data_triples = Epoch_data.var_to_triples last_epoch_data
     and curr_epoch_data_triples = Epoch_data.var_to_triples curr_epoch_data in
@@ -1466,7 +1473,8 @@ module Consensus_state = struct
       ; curr_slot
       ; total_currency
       ; last_epoch_data
-      ; curr_epoch_data; _ } =
+      ; curr_epoch_data
+      ; _ } =
     let open Fold in
     Length.fold length +> Length.fold epoch_length
     +> Vrf.Output.fold last_vrf_output
@@ -1818,8 +1826,10 @@ module Prover_state = struct
     in
     fun (With {request; respond}) ->
       match request with
-      | Vrf.Winner_address -> respond (Provide delegator)
-      | Vrf.Private_key -> respond (Provide private_key)
+      | Vrf.Winner_address ->
+          respond (Provide delegator)
+      | Vrf.Private_key ->
+          respond (Provide private_key)
       | _ ->
           respond
             (Provide
@@ -1904,8 +1914,10 @@ let select ~existing ~candidate ~logger =
   let log_choice ~precondition_msg ~choice_msg choice =
     let choice_msg =
       match choice with
-      | `Take -> choice_msg
-      | `Keep -> Printf.sprintf "not (%s)" choice_msg
+      | `Take ->
+          choice_msg
+      | `Keep ->
+          Printf.sprintf "not (%s)" choice_msg
     in
     let msg = Printf.sprintf "(%s) && (%s)" precondition_msg choice_msg in
     log_result choice msg
@@ -1988,7 +2000,8 @@ let select ~existing ~candidate ~logger =
           Some choice )
         else None )
   with
-  | Some choice -> choice
+  | Some choice ->
+      choice
   | None ->
       log_result `Keep "no predicates were matched" ;
       if Length.(candidate.min_length_of_epoch > existing.min_length_of_epoch)
@@ -2079,11 +2092,14 @@ let next_proposal now (state : Consensus_state.Value.t) ~local_state ~keypair
         None
       else
         match Local_state.seen_slot local_state epoch slot with
-        | `Seen -> find_winning_slot (Epoch.Slot.succ slot)
+        | `Seen ->
+            find_winning_slot (Epoch.Slot.succ slot)
         | `Unseen -> (
           match proposal_data slot with
-          | None -> find_winning_slot (Epoch.Slot.succ slot)
-          | Some data -> Some (slot, data) )
+          | None ->
+              find_winning_slot (Epoch.Slot.succ slot)
+          | Some data ->
+              Some (slot, data) )
     in
     find_winning_slot slot
   in
