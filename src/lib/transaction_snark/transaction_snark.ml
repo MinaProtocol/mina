@@ -513,7 +513,7 @@ module Base = struct
     in
     ()
 
-  let prove_main = Groth16.reduce_to_prover (tick_input ()) main
+  let prove_main = Core_kernel.Staged.unstage @@ Groth16.reduce_to_prover (tick_input ()) main
 
   let create_keys () = Groth16.generate_keypair main ~exposing:(tick_input ())
 
@@ -815,7 +815,7 @@ module Merge = struct
     in
     Boolean.Assert.all [verify_12; verify_23]
 
-  let prove_main = Groth16.reduce_to_prover (input ()) main
+  let prove_main = Core_kernel.Staged.unstage @@ Groth16.reduce_to_prover (input ()) main
 
   let create_keys () = Groth16.generate_keypair ~exposing:(input ()) main
 
@@ -1065,7 +1065,7 @@ struct
     in
     with_label __LOC__ (Boolean.Assert.is_true result)
 
-  let prove_main = reduce_to_prover wrap_input main
+  let prove_main = Core_kernel.Staged.unstage @@ reduce_to_prover wrap_input main
 
   let create_keys () = generate_keypair ~exposing:wrap_input main
 
