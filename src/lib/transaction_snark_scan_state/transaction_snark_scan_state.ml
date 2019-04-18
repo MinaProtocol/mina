@@ -586,9 +586,10 @@ end = struct
       Ok proof_opt )
     else
       Or_error.error_string
-        ( "Job count(" ^ Int.to_string new_count ^ ") exceeded work_capacity("
-        ^ Int.to_string work_capacity
-        ^ "). Cannot enqueue the transactions" )
+        (sprintf
+           "Job count (%d) exceeded work_capacity(%d). Cannot enqueue the \
+            transactions"
+           new_count work_capacity)
 
   let latest_ledger_proof t =
     let open Option.Let_syntax in
