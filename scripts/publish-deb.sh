@@ -23,7 +23,6 @@ else
     if [[ "$CIRCLE_JOB" == "build-artifacts--testnet_postake" || \
           "$CIRCLE_JOB" == "build-artifacts--testnet_postake_medium_curves" || \
           "$CIRCLE_JOB" == "build-artifacts--testnet_postake_many_proposers" ]]; then
-          pwd
           cd src/_build
           ${DEBS3} --codename ${CODENAME} --component main coda-*.deb
     else
