@@ -4,18 +4,12 @@ set -euo pipefail
 # Needed to check variables
 set +u
 
-set -x
-
 # utility for publishing deb repo with commons options
-DEBS3='deb-s3 upload \
-        --s3-region=us-west-2 \
-        --bucket packages.o1test.net \
-        --preserve-versions \
-        --cache-control=max-age=120'
+DEBS3='deb-s3 upload --s3-region=us-west-2 --bucket packages.o1test.net --preserve-versions --cache-control=max-age=120'
 
 # check for AWS Creds
 if [ -z "$AWS_ACCESS_KEY_ID" ]; then
-    echo "WARNING: AWS_ACCESS_KEY_ID not set, publish commands not run" 
+    echo "WARNING: AWS_ACCESS_KEY_ID not set, publish commands not run"
     exit 0
 else
     # master is 'stable'
