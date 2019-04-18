@@ -249,7 +249,7 @@ end = struct
           External_transition.Protocol_state.previous_state_hash protocol_state
         in
         Transition_cache.add transition_graph ~parent:previous_state_hash
-          transition ;
+          incoming_transition ;
         (* TODO: Efficiently limiting the number of green threads in #1337 *)
         if
           worth_getting_root t
