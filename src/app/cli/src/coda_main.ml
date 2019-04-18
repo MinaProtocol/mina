@@ -1735,9 +1735,9 @@ let%test_module "coda_main_tests" =
     let%test "RPC deserializations" =
       let open Deferred.Let_syntax in
       Stdlib.Printf.eprintf "INIT\n%!" ;
-      Parallel.init_master () ;
       Stdlib.Printf.eprintf "DONE WITH INIT\n%!" ;
       Thread_safe.block_on_async_exn (fun () ->
+          Parallel.init_master () ;
           Stdlib.Printf.eprintf "INSIDE THUNK\n%!" ;
           let module Config0 = struct
             let logger = Logger.null ()
@@ -1761,8 +1761,9 @@ let%test_module "coda_main_tests" =
             make_init ~should_propose:false (module Config0)
           in
           Stdlib.Printf.eprintf "MADE INIT\n%!" ;
-          (*           let module Coda = Make_coda (Init) in *)
+          let module Coda = Make_coda (Init) in
           Stdlib.Printf.eprintf "MADE CODA\n%!" ;
+          let module Rpcs = Coda.Inputs.Net.Rpcs in
           assert (3 = 4) ;
           Deferred.return true )
   end )
