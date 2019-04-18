@@ -13,7 +13,9 @@ DEBS3='deb-s3 upload \
 
 # check for AWS Creds
 if [ -z "$AWS_ACCESS_KEY_ID" ]; then
-
+    echo "WARNING: AWS_ACCESS_KEY_ID not set, publish commands not run" 
+    exit 0
+else
     # master is 'stable'
     if [[ "$CIRCLE_BRANCH" == "master" ]]; then
         CODENAME='stable'
@@ -23,6 +25,7 @@ if [ -z "$AWS_ACCESS_KEY_ID" ]; then
 
     # only publish some jobs
     if [[ "$CIRCLE_JOB" == "build-artifacts--testnet_postake" || \
+          "$CIRCLE_JOB" == "build-artifacts--testnet_postake_medium_curves" || \
           "$CIRCLE_JOB" == "build-artifacts--testnet_postake_many_proposers" ]]; then
           pwd
           ls src/_build/*.deb
@@ -30,6 +33,4 @@ if [ -z "$AWS_ACCESS_KEY_ID" ]; then
     else
         echo "WARNING: Circle job: ${CIRCLE_JOB} not in publish list"
     fi
-else
-    echo "WARNING: AWS_ACCESS_KEY_ID not set, publish commands not run" ; \
 fi
