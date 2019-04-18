@@ -5,6 +5,8 @@ set -euo pipefail
 set +u
 
 # utility for publishing deb repo with commons options
+# deb-s3 https://github.com/krobertson/deb-s3
+
 DEBS3='deb-s3 upload --s3-region=us-west-2 --bucket packages.o1test.net --preserve-versions --cache-control=max-age=120'
 
 # check for AWS Creds
