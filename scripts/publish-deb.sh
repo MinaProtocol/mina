@@ -5,11 +5,11 @@ set -euo pipefail
 set +u
 
 # utility for publishing deb repo with commons options
-DEBS3=`deb-s3 upload \
+DEBS3='deb-s3 upload \
         --s3-region=us-west-2 \
         --bucket packages.o1test.net \
         --preserve-versions \
-        --cache-control=max-age=120`
+        --cache-control=max-age=120'
 
 # check for AWS Creds
 if [ -z "$AWS_ACCESS_KEY_ID" ]; then
