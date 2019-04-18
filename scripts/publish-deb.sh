@@ -23,7 +23,7 @@ if [ -z "$AWS_ACCESS_KEY_ID" ]; then
     # only publish some jobs
     if [[ "$CIRCLE_JOB" == "build-artifacts--testnet_postake" || \
           "$CIRCLE_JOB" == "build-artifacts--testnet_postake_many_proposers" ]]; then
-        ${DEBS3} --codename ${CODENAME} --component main src/_build/coda-*.deb
+        ${DEBS3} --codename ${CODENAME} --component main coda-*.deb
     else
         echo "WARNING: Circle job: ${CIRCLE_JOB} not in publish list"
     fi
