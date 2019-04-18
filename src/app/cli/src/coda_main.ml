@@ -842,6 +842,29 @@ struct
     module Blockchain_state = Consensus.Blockchain_state
   end)
 
+  module For_test_rpc = struct
+    open Net.Rpcs
+
+    module Foo = struct
+      open Get_staged_ledger_aux_and_pending_coinbases_at_hash
+
+      let%test "foo" = false
+
+      let%test "Get_staged_ledger_aux_and_pending_coinbases_at_hash \
+                deserialize query" =
+        (* serialization should fail if the query type has changed *)
+        let known_good_serialization =
+          "\x01\x28\x61\x68\xB6\x65\x95\x11\x82\x15\xAC\x9D\x8B\x24\x6F\x5D\x85\xE0\x3B\xE6\x5A\x27\x3C\x2930\x04\x6E\xE9\xBE\xE4\x04\xFA\xFB\x44\xF6\x00\x00\x00\x00\x00\x00\x00\x00\x01\x01\x01\x09\x31\x32\x37\x2E\x30\x2E\x30\x2E\x31\xFE\xDB\x59\xFE\xDA\x59"
+        in
+        let len = String.length known_good_serialization in
+        let buff = Bin_prot.Common.create_buf 128 in
+        Bin_prot.Common.blit_string_buf known_good_serialization buff ~len ;
+        let pos_ref = ref 0 in
+        let _ : query = V1.bin_read_query buff ~pos_ref in
+        true
+    end
+  end
+
   module Protocol_state_validator = Protocol_state_validator.Make (struct
     include Inputs0
     module State_proof = Protocol_state_proof
