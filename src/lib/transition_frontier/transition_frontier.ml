@@ -882,7 +882,8 @@ struct
                 match
                   Consensus.required_local_state_sync
                     ~consensus_state:
-                      (consensus_state_of_breadcrumb best_tip_node.breadcrumb)
+                      (consensus_state_of_breadcrumb
+                         (Hashtbl.find_exn t.table t.best_tip).breadcrumb)
                     ~local_state:t.consensus_local_state
                 with
                 | Some jobs ->

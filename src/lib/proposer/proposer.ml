@@ -2,6 +2,7 @@ open Core
 open Async
 open Pipe_lib
 open O1trace
+module Time = Coda_base.Block_time
 
 module type Inputs_intf = sig
   include Protocols.Coda_pow.Inputs_intf
@@ -384,7 +385,7 @@ module Make (Inputs : Inputs_intf) :
                           "failed to prove generated protocol state: %s"
                           (Error.to_string_hum err) ;
                         return ()
-                    | Ok protocol_state_proof ->
+                    | Ok protocol_state_proof -> (
                         let span = Time.diff (Time.now time_controller) t0 in
                         Logger.info logger ~module_:__MODULE__
                           ~location:__LOC__
@@ -418,9 +419,31 @@ module Make (Inputs : Inputs_intf) :
                         in
                         Logger.info logger ~module_:__MODULE__
                           ~location:__LOC__
-                          !"Waiting for transition to be inserted into frontier" ;
-                        Transition_frontier.wait_for_transition frontier
-                          (With_hash.hash external_transition_with_hash)) )
+                          "Waiting for transition to be inserted into frontier" ;
+                        Deferred.choose
+                          [ Deferred.choice
+                              (Transition_frontier.wait_for_transition frontier
+                                 (With_hash.hash external_transition_with_hash))
+                              (Fn.const `Transition_accepted)
+                          ; Deferred.choice
+                              ( Time.Timeout.create time_controller
+                                  (Time.Span.of_ms 15000L) ~f:(Fn.const ())
+                              |> Time.Timeout.to_deferred )
+                              (Fn.const `Timed_out) ]
+                        >>| function
+                        | `Transition_accepted ->
+                            Logger.info logger ~module_:__MODULE__
+                              ~location:__LOC__
+                              "Generated transition was accepted into \
+                               transition frontier"
+                        | `Timed_out ->
+                            let str =
+                              "Generated transition was never accepted into \
+                               transition frontier"
+                            in
+                            Logger.fatal logger ~module_:__MODULE__
+                              ~location:__LOC__ "%s" str ;
+                            Error.raise (Error.of_string str) )) )
         in
         let proposal_supervisor = Singleton_supervisor.create ~task:propose in
         let scheduler = Singleton_scheduler.create time_controller in
