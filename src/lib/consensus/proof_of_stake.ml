@@ -2331,7 +2331,7 @@ let next_proposal now (state : Consensus_state.Value.t) ~local_state ~keypair
     in
     if
       Epoch.equal curr_epoch state.curr_epoch
-      && Epoch.Slot.equal curr_slot state.curr_slot th
+      && Epoch.Slot.equal curr_slot state.curr_slot
     then (
       Logger.fatal logger "why did this happen?" ~module_:__MODULE__
         ~location:__LOC__ ;
