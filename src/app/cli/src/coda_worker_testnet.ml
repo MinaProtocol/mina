@@ -11,6 +11,8 @@ module Api = struct
 
   type user_cmds_under_inspection = (User_command.t, user_cmd_status) Hashtbl.t
 
+  type restart_type = [`Catchup | `Bootstrap]
+
   type t =
     { workers: Coda_process.t Array.t
     ; configs: Coda_worker.Input.t list
@@ -24,7 +26,8 @@ module Api = struct
           (** The int counts the number of ongoing RPCs. when it is 0, it is safe to take the worker offline.
         [stop] below will set the status to `Off, and we only try doing an RPC if the status is `On,
         so eventually the counter _must_ become 0, ensuring progress. *)
-    }
+    ; root_lengths: int Array.t
+    ; restart_signals: (restart_type * unit Ivar.t) Option.t Array.t }
 
   let create configs workers start_writer =
     let status =
@@ -37,7 +40,15 @@ module Api = struct
     let locks =
       Array.init (Array.length workers) (fun _ -> (ref 0, Condition.create ()))
     in
-    {workers; configs; start_writer; status; locks}
+    let root_lengths = Array.init (Array.length workers) (fun _ -> 0) in
+    let restart_signals = Array.init (Array.length workers) (fun _ -> None) in
+    { workers
+    ; configs
+    ; start_writer
+    ; status
+    ; locks
+    ; root_lengths
+    ; restart_signals }
 
   let online t i = match t.status.(i) with `On _ -> true | `Off -> false
 
@@ -154,6 +165,16 @@ module Api = struct
 
   let teardown t =
     Deferred.Array.iteri ~how:`Parallel t.workers ~f:(fun i _ -> stop t i)
+
+  let setup_bootstrap_signal t i =
+    let signal = Ivar.create () in
+    t.restart_signals.(i) <- Some (`Bootstrap, signal) ;
+    signal
+
+  let setup_catchup_signal t i =
+    let signal = Ivar.create () in
+    t.restart_signals.(i) <- Some (`Catchup, signal) ;
+    signal
 end
 
 (** the prefix check keeps track of the "best path" for each worker. the
@@ -272,6 +293,28 @@ let start_payment_check logger root_pipe workers (testnet : Api.t) =
       Option.fold root_length ~init:Deferred.unit ~f:(fun _ length ->
           match testnet.status.(worker_id) with
           | `On (`Synced user_cmds_under_inspection) ->
+              testnet.root_lengths.(worker_id) <- length ;
+              Array.iteri testnet.restart_signals ~f:(fun i -> function
+                | None ->
+                    ()
+                | Some (`Bootstrap, signal) ->
+                    if
+                      testnet.root_lengths.(i)
+                      + (2 * Consensus.Constants.k)
+                      + Consensus.Constants.delta
+                      < length - 2
+                    then (
+                      Ivar.fill signal () ;
+                      testnet.restart_signals.(i) <- None )
+                    else ()
+                | Some (`Catchup, signal) ->
+                    if
+                      testnet.root_lengths.(i) + (Consensus.Constants.k / 2)
+                      < length - 1
+                    then (
+                      Ivar.fill signal () ;
+                      testnet.restart_signals.(i) <- None )
+                    else () ) ;
               let earliest_user_cmd =
                 List.min_elt (Hashtbl.to_alist user_cmds_under_inspection)
                   ~compare:(fun (user_cmd1, status1) (user_cmd2, status2) ->
@@ -420,17 +463,6 @@ module Restarts : sig
   val trigger_bootstrap :
     Api.t -> logger:Logger.t -> node:int -> unit Deferred.t
 end = struct
-  let catchup_wait_duration =
-    Time.Span.of_ms
-    @@ ( (Consensus.Constants.c + Consensus.Constants.delta)
-         * Consensus.Constants.block_window_duration_ms
-       |> Float.of_int )
-
-  let bootstrap_wait_duration =
-    Time.Span.of_ms
-    @@ ( Consensus.Constants.(c * ((2 * k) + delta) * block_window_duration_ms)
-       |> Float.of_int )
-
   let restart_node testnet ~logger ~node ~duration =
     let%bind () = after (Time.Span.of_sec 5.) in
     Logger.info logger ~module_:__MODULE__ ~location:__LOC__ "Stopping %d" node ;
@@ -440,12 +472,22 @@ end = struct
     Api.start testnet node
 
   let trigger_catchup testnet ~logger ~node =
+    let%bind () = after (Time.Span.of_sec 5.) in
+    Logger.info logger ~module_:__MODULE__ ~location:__LOC__ "Stopping %d" node ;
+    let%bind () = Api.stop testnet node in
+    let signal = Api.setup_catchup_signal testnet node in
+    let%bind () = Ivar.read signal in
     Logger.info logger ~module_:__MODULE__ ~location:__LOC__
       "Triggering catchup on %d" node ;
-    restart_node testnet ~logger ~node ~duration:catchup_wait_duration
+    Api.start testnet node
 
   let trigger_bootstrap testnet ~logger ~node =
+    let%bind () = after (Time.Span.of_sec 5.) in
+    Logger.info logger ~module_:__MODULE__ ~location:__LOC__ "Stopping %d" node ;
+    let%bind () = Api.stop testnet node in
+    let signal = Api.setup_bootstrap_signal testnet node in
+    let%bind () = Ivar.read signal in
     Logger.info logger ~module_:__MODULE__ ~location:__LOC__
       "Triggering bootstrap on %d" node ;
-    restart_node testnet ~node ~logger ~duration:bootstrap_wait_duration
+    Api.start testnet node
 end
