@@ -787,7 +787,7 @@ struct
                   (consensus_state_of_breadcrumb parent_node.breadcrumb)
                 ~candidate:(consensus_state_of_breadcrumb breadcrumb)
                 ~logger:
-                  (Logger.extend logger
+                  (Logger.extend t.logger
                      [ ( "selection_context"
                        , `String
                            "debug_assert that child is preferred over parent"
@@ -803,7 +803,7 @@ struct
             ~existing:(consensus_state_of_breadcrumb best_tip_node.breadcrumb)
             ~candidate:(consensus_state_of_breadcrumb node.breadcrumb)
             ~logger:
-              (Logger.extend logger
+              (Logger.extend t.logger
                  [ ( "selection_context"
                    , `String "comparing new breadcrumb to best tip" ) ])
         in
