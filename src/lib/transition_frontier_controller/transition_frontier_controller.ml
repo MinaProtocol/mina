@@ -131,7 +131,7 @@ module Make (Inputs : Inputs_intf) :
         kill catchup_job_reader catchup_job_writer ;
         kill catchup_breadcrumbs_reader catchup_breadcrumbs_writer ;
         kill proposer_transition_reader_copy proposer_transition_writer_copy ;
-        Ivar.fill_if_empty clean_up_catchup_scheduler () )
+        Ivar.fill clean_up_catchup_scheduler () )
     |> don't_wait_for ;
     processed_transition_reader
 end
