@@ -18,7 +18,6 @@ open Coda_base
 
 module Make (Inputs : Inputs.S) = struct
   open Inputs
-  open Consensus
   module Breadcrumb_builder = Breadcrumb_builder.Make (Inputs)
 
   type t =
@@ -61,41 +60,6 @@ module Make (Inputs : Inputs.S) = struct
           Rose_tree.t
           list )
         Capped_supervisor.t }
-
-  let build_breadcrumbs ~logger ~frontier transition_subtrees =
-    Deferred.List.map transition_subtrees
-      ~f:(fun (Rose_tree.T (subtree_root, _) as subtree) ->
-        let subtree_root_parent_hash =
-          With_hash.data @@ Envelope.Incoming.data (Cached.peek subtree_root)
-          |> External_transition.Verified.parent_hash
-        in
-        let branch_parent =
-          Transition_frontier.find_exn frontier subtree_root_parent_hash
-        in
-        Rose_tree.Deferred.fold_map subtree ~init:(Cached.pure branch_parent)
-          ~f:(fun parent cached_transition_with_hash ->
-            let%map cached_breadcrumb_result =
-              Cached.transform cached_transition_with_hash
-                ~f:(fun transition_with_hash_enveloped ->
-                  let transition_with_hash =
-                    Envelope.Incoming.data transition_with_hash_enveloped
-                  in
-                  Transition_frontier.Breadcrumb.build ~logger
-                    ~parent:(Cached.peek parent) ~transition_with_hash )
-              |> Cached.sequence_deferred
-            in
-            match Cached.sequence_result cached_breadcrumb_result with
-            | Error (`Validation_error e) ->
-                (* TODO: Punish *)
-                Logger.faulty_peer logger ~module_:__MODULE__ ~location:__LOC__
-                  "invalid transition in catchup scheduler breadcrumb \
-                   builder: %s"
-                  (Error.to_string_hum e) ;
-                raise (Error.to_exn e)
-            | Error (`Fatal_error e) ->
-                raise e
-            | Ok breadcrumb ->
-                breadcrumb ) )
 
   let create ~logger ~frontier ~time_controller ~catchup_job_writer
       ~catchup_breadcrumbs_writer =

@@ -79,7 +79,8 @@ module Make (Inputs : Inputs.S) :
     in
     let open Deferred.Let_syntax in
     match%bind cached_verified_transition with
-    | Ok x -> Deferred.return @@ Ok (Either.Second x)
+    | Ok x ->
+        Deferred.return @@ Ok (Either.Second x)
     | Error (`In_frontier hash) ->
         Logger.trace logger ~module_:__MODULE__ ~location:__LOC__
           "transition queried during ledger catchup has already been seen" ;
@@ -93,7 +94,8 @@ module Make (Inputs : Inputs.S) :
             Logger.trace logger ~module_:__MODULE__ ~location:__LOC__
               "transition queried during ledger catchup failed" ;
             Error (Error.of_string "Previous transition failed")
-        | `Success hash -> Ok (Either.First hash) )
+        | `Success hash ->
+            Ok (Either.First hash) )
     | Error (`Invalid reason) ->
         Logger.faulty_peer logger ~module_:__MODULE__ ~location:__LOC__
           "transition queried during ledger catchup was not valid because %s"
@@ -160,9 +162,11 @@ module Make (Inputs : Inputs.S) :
                 let%bind verified_transitions, initial_state_hash =
                   take_while_map_result_rev
                     Non_empty_list.(to_list rev_queried_transitions)
-                    ~f:
-                      (verify_transition ~logger ~frontier
-                         ~unprocessed_transition_cache)
+                    ~f:(fun transition ->
+                      verify_transition ~logger ~frontier
+                        ~unprocessed_transition_cache
+                        (Envelope.Incoming.wrap ~data:transition
+                           ~sender:(Envelope.Sender.Remote peer)) )
                 in
                 let split_last xs =
                   let init = List.take xs (List.length xs - 1) in

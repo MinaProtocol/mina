@@ -456,6 +456,7 @@ module type Catchup_intf = sig
                           * ( ( external_transition_verified
                               , state_hash )
                               With_hash.t
+                              Envelope.Incoming.t
                             , state_hash )
                             Cached.t
                             Rose_tree.t
@@ -536,6 +537,7 @@ module type Breadcrumb_builder_intf = sig
     -> frontier:transition_frontier
     -> initial_hash:state_hash
     -> ( (external_transition_verified, state_hash) With_hash.t
+         Envelope.Incoming.t
        , state_hash )
        Cached.t
        Rose_tree.t
@@ -576,6 +578,7 @@ module type Transition_handler_processor_intf = sig
                             * ( ( external_transition_verified
                                 , state_hash )
                                 With_hash.t
+                                Envelope.Incoming.t
                               , state_hash )
                               Cached.t
                               Rose_tree.t

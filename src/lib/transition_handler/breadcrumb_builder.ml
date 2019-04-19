@@ -31,7 +31,8 @@ module Make (Inputs : Inputs.S) :
           in
           Logger.error logger ~module_:__MODULE__ ~location:__LOC__ !"%s" msg ;
           Or_error.error_string msg
-      | Some breadcrumb -> Or_error.return breadcrumb
+      | Some breadcrumb ->
+          Or_error.return breadcrumb
     in
     Deferred.Or_error.List.map subtrees_of_transitions
       ~f:(fun subtree_of_transitions ->
@@ -41,11 +42,15 @@ module Make (Inputs : Inputs.S) :
         in
         Rose_tree.Deferred.Or_error.fold_map subtree_of_transitions
           ~init:(Cached.pure init_breadcrumb)
-          ~f:(fun cached_parent cached_transition ->
+          ~f:(fun cached_parent cached_enveloped_transition ->
             let open Deferred.Let_syntax in
             let%map cached_result =
-              Cached.transform cached_transition ~f:(fun transition ->
+              Cached.transform cached_enveloped_transition
+                ~f:(fun enveloped_transition ->
                   let open Deferred.Or_error.Let_syntax in
+                  let transition =
+                    Envelope.Incoming.data enveloped_transition
+                  in
                   let parent = Cached.peek cached_parent in
                   let expected_parent_hash =
                     Transition_frontier.Breadcrumb.transition_with_hash parent
@@ -74,12 +79,14 @@ module Make (Inputs : Inputs.S) :
                   with
                   | Ok new_breadcrumb ->
                       let open Result.Let_syntax in
-                      let%map _ : Transition_frontier.Breadcrumb.t =
+                      let%map (_ : Transition_frontier.Breadcrumb.t) =
                         breadcrumb_if_present ()
                       in
                       new_breadcrumb
-                  | Error (`Fatal_error exn) -> Or_error.of_exn exn
-                  | Error (`Validation_error error) -> Error error )
+                  | Error (`Fatal_error exn) ->
+                      Or_error.of_exn exn
+                  | Error (`Validation_error error) ->
+                      Error error )
               |> Cached.sequence_deferred
             in
             Cached.sequence_result cached_result ) )

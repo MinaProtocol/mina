@@ -159,8 +159,10 @@ let%test_module "Transition_handler.Catchup_scheduler tests" =
           let cached_dangling_transitions =
             List.map dangling_transitions
               ~f:
-                (Unprocessed_transition_cache.register_exn
-                   unprocessed_transition_cache)
+                (Fn.compose
+                   (Unprocessed_transition_cache.register_exn
+                      unprocessed_transition_cache)
+                   transition_with_hash_enveloped)
           in
           List.(
             iter (rev cached_dangling_transitions) ~f:(fun cached_transition ->
@@ -181,8 +183,9 @@ let%test_module "Transition_handler.Catchup_scheduler tests" =
               ~root:
                 ( Unprocessed_transition_cache.register_exn
                     unprocessed_transition_cache
-                    (Transition_frontier.Breadcrumb.transition_with_hash
-                       missing_breadcrumb)
+                    ( Transition_frontier.Breadcrumb.transition_with_hash
+                        missing_breadcrumb
+                    |> transition_with_hash_enveloped )
                 |> Cached.transform ~f:(Fn.const missing_breadcrumb) )
           in
           let received_rose_tree =
@@ -236,8 +239,10 @@ let%test_module "Transition_handler.Catchup_scheduler tests" =
           let cached_dangling_transitions =
             List.map dangling_transitions
               ~f:
-                (Unprocessed_transition_cache.register_exn
-                   unprocessed_transition_cache)
+                (Fn.compose
+                   (Unprocessed_transition_cache.register_exn
+                      unprocessed_transition_cache)
+                   transition_with_hash_enveloped)
           in
           List.iter (List.permute cached_dangling_transitions)
             ~f:(fun cached_transition ->
@@ -256,8 +261,9 @@ let%test_module "Transition_handler.Catchup_scheduler tests" =
               ~root:
                 ( Unprocessed_transition_cache.register_exn
                     unprocessed_transition_cache
-                    (Transition_frontier.Breadcrumb.transition_with_hash
-                       missing_breadcrumb)
+                    ( Transition_frontier.Breadcrumb.transition_with_hash
+                        missing_breadcrumb
+                    |> transition_with_hash_enveloped )
                 |> Cached.transform ~f:(Fn.const missing_breadcrumb) )
           in
           let received_rose_tree =

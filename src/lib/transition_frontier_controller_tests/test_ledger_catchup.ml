@@ -55,7 +55,8 @@ let%test_module "Ledger catchup" =
           unprocessed_transition_cache transition
       in
       let parent_hash =
-        External_transition.Verified.parent_hash (With_hash.data transition)
+        External_transition.Verified.parent_hash
+          (With_hash.data (Envelope.Incoming.data transition))
       in
       Strict_pipe.Writer.write catchup_job_writer
         (parent_hash, [Rose_tree.T (cached_transition, [])]) ;
@@ -135,7 +136,7 @@ let%test_module "Ledger catchup" =
               ~f:Fn.id
             |> Option.value_exn
           in
-          test_catchup ~logger ~network me best_transition
+          test_catchup ~logger ~network me best_transition_enveloped
             (Rose_tree.of_list_exn @@ Non_empty_list.tail history) )
 
     let%test "catchup would be successful even if the parent transition is \
@@ -151,7 +152,8 @@ let%test_module "Ledger catchup" =
           let best_transition =
             Transition_frontier.Breadcrumb.transition_with_hash best_breadcrumb
           in
-          test_catchup ~logger ~network me best_transition
+          test_catchup ~logger ~network me
+            (transition_with_hash_enveloped best_transition)
             (Rose_tree.of_list_exn [best_breadcrumb]) )
 
     let%test "catchup would fail if one of the parent transition fails" =
@@ -189,7 +191,8 @@ let%test_module "Ledger catchup" =
           in
           let cached_best_transition =
             Transition_handler.Unprocessed_transition_cache.register_exn
-              unprocessed_transition_cache best_transition
+              unprocessed_transition_cache
+              (transition_with_hash_enveloped best_transition)
           in
           let parent_hash =
             External_transition.Verified.parent_hash
@@ -200,7 +203,8 @@ let%test_module "Ledger catchup" =
           let failing_transition = List.nth_exn missing_transitions 1 in
           let cached_failing_transition =
             Transition_handler.Unprocessed_transition_cache.register_exn
-              unprocessed_transition_cache failing_transition
+              unprocessed_transition_cache
+              (transition_with_hash_enveloped failing_transition)
           in
           Ledger_catchup.run ~logger ~network ~frontier:me
             ~catchup_breadcrumbs_writer ~catchup_job_reader
@@ -259,8 +263,10 @@ let%test_module "Ledger catchup" =
           let cached_transitions =
             List.map missing_transitions
               ~f:
-                (Transition_handler.Unprocessed_transition_cache.register_exn
-                   unprocessed_transition_cache)
+                (Fn.compose
+                   (Transition_handler.Unprocessed_transition_cache
+                    .register_exn unprocessed_transition_cache)
+                   transition_with_hash_enveloped)
           in
           let forests =
             List.map2_exn parent_hashes cached_transitions

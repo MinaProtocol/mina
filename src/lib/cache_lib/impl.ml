@@ -90,29 +90,44 @@ module Make (Inputs : Inputs_intf) : Intf.Main.S = struct
           failwith "cannot access original of pure Cached.t"
 
     let final_state : type a b. (a, b) t -> b Intf.final_state = function
-      | Base x -> x.final_state
-      | Derivative x -> x.final_state
-      | Pure _ -> failwith "cannot access consumed state of pure Cached.t"
+      | Base x ->
+          x.final_state
+      | Derivative x ->
+          x.final_state
+      | Pure _ ->
+          failwith "cannot access consumed state of pure Cached.t"
 
     let was_consumed : type a b. (a, b) t -> bool = function
-      | Base x -> Ivar.is_full x.final_state || x.transformed
-      | Derivative x -> Ivar.is_full x.final_state || x.transformed
-      | Pure _ -> false
+      | Base x ->
+          Ivar.is_full x.final_state || x.transformed
+      | Derivative x ->
+          Ivar.is_full x.final_state || x.transformed
+      | Pure _ ->
+          false
 
     let was_finalized : type a b. (a, b) t -> bool = function
-      | Base x -> Ivar.is_full x.final_state
-      | Derivative x -> Ivar.is_full x.final_state
-      | Pure _ -> false
+      | Base x ->
+          Ivar.is_full x.final_state
+      | Derivative x ->
+          Ivar.is_full x.final_state
+      | Pure _ ->
+          false
 
     let mark_failed : type a b. (a, b) t -> unit = function
-      | Base x -> Ivar.fill x.final_state `Failed
-      | Derivative x -> Ivar.fill x.final_state `Failed
-      | Pure _ -> failwith "cannot set consumed state of pure Cached.t"
+      | Base x ->
+          Ivar.fill x.final_state `Failed
+      | Derivative x ->
+          Ivar.fill x.final_state `Failed
+      | Pure _ ->
+          failwith "cannot set consumed state of pure Cached.t"
 
     let mark_success : type a b. (a, b) t -> unit = function
-      | Base x -> Ivar.fill x.final_state (`Success x.data)
-      | Derivative x -> Ivar.fill x.final_state (`Success x.original)
-      | Pure _ -> failwith "cannot set consumed state of pure Cached.t"
+      | Base x ->
+          Ivar.fill x.final_state (`Success x.data)
+      | Derivative x ->
+          Ivar.fill x.final_state (`Success x.original)
+      | Pure _ ->
+          failwith "cannot set consumed state of pure Cached.t"
 
     let attach_finalizer t =
       Gc.Expert.add_finalizer (Heap_block.create_exn t) (fun block ->
@@ -139,9 +154,12 @@ module Make (Inputs : Inputs_intf) : Intf.Main.S = struct
       value t
 
     let mark_transformed : type a b. (a, b) t -> unit = function
-      | Base x -> x.transformed <- true
-      | Derivative x -> x.transformed <- true
-      | Pure _ -> failwith "cannot set transformed status for pure Cached.t"
+      | Base x ->
+          x.transformed <- true
+      | Derivative x ->
+          x.transformed <- true
+      | Pure _ ->
+          failwith "cannot set transformed status for pure Cached.t"
 
     let transform (type a b) (t : (a, b) t) ~(f : a -> 'c) : ('c, b) t =
       assert_not_consumed t "cannot consume Cached.t twice" ;

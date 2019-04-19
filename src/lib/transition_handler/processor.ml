@@ -99,7 +99,7 @@ module Make (Inputs : Inputs.With_unprocessed_transition_cache.S) :
                in
                `Valid_transition
                  (Unprocessed_transition_cache.register_exn
-                    unprocessed_transition_cache vt) )
+                    unprocessed_transition_cache enveloped_transition) )
          ; Reader.map catchup_breadcrumbs_reader ~f:(fun cb ->
                `Catchup_breadcrumbs cb )
          ; Reader.map primary_transition_reader ~f:(fun vt ->
