@@ -1,5 +1,4 @@
-type action =
-  | Toggle;
+open Tc;
 
 module Styles = {
   open Css;
@@ -66,27 +65,148 @@ module Styles = {
     ]);
 };
 
+module Action = {
+  type t =
+    | SaveName
+    | ChangeName(string)
+    | LoadingDone
+    | ResetDebounce
+    | ToggleExpand;
+
+  let print =
+    fun
+    | SaveName => "saveName"
+    | ChangeName(_) => "changeName"
+    | LoadingDone => "loadingDone"
+    | ResetDebounce => "resetDebounce"
+    | ToggleExpand => "toggleExpand";
+};
+
+module State = {
+  module Visibility = {
+    type t =
+      | Shrunk
+      | Loading
+      | Expanded;
+  };
+
+  type t = {
+    currentName: string,
+    visibility: Visibility.t,
+    // onBlur triggers before onClick of the parent div
+    // and the settings reload is fast enough that the reload
+    // finishes and then the click triggers an expansion again!
+    //
+    // This debounce (when enabled) ensures we ignore actions that
+    // the user triggers
+    debounce: bool,
+  };
+};
+
+let useReducerWithDispatch = (reduceWithDispatch, initialState) => {
+  let dispatchSelf = ref(None);
+  let (state, dispatch) =
+    React.useReducer(
+      (state, action) =>
+        reduceWithDispatch(
+          action =>
+            switch (dispatchSelf^) {
+            | None => failwith("Don't call inner dispatch synchronously!")
+            | Some(dispatch) => dispatch(action)
+            },
+          state,
+          action,
+        ),
+      initialState,
+    );
+  dispatchSelf := Some(dispatch);
+  (state, dispatch);
+};
+
 [@react.component]
-let make = (~name, ~balance) => {
-  let (expanded, setExpanded) = React.useState(() => false);
+let make = (~wallet: Wallet.t, ~settings, ~setSettingsOrError) => {
+  let (state: State.t, dispatch) =
+    useReducerWithDispatch(
+      (dispatch, state: State.t, action) => {
+        Js.log4(
+          "Getting action",
+          Action.print(action),
+          state,
+          state.debounce,
+        );
+        switch (action) {
+        | Action.ChangeName(newName) => {...state, currentName: newName}
+        | ToggleExpand =>
+          switch (state.visibility, state.debounce) {
+          | (Shrunk, false) => {...state, visibility: Expanded}
+          | (Expanded, false) => {...state, visibility: Shrunk}
+          // ignore these ones
+          | (Shrunk, true)
+          | (Expanded, true)
+          | (Loading, _) => state
+          }
+        | LoadingDone => {...state, visibility: Shrunk}
+        | ResetDebounce => {...state, debounce: false}
+        | SaveName =>
+          let _ = Js.Global.setTimeout(() => dispatch(ResetDebounce), 100);
+          Task.perform(
+            SettingsRenderer.add(
+              settings,
+              ~key=wallet.key,
+              ~name=state.currentName,
+            ),
+            ~f=settingsOrError => {
+              setSettingsOrError(settingsOrError);
+              // TODO: Loading needs to be on the whole wallet-item pane since
+              // Settings updates are not commutative
+              dispatch(LoadingDone);
+            },
+          );
+          {...state, State.visibility: Loading, debounce: true};
+        };
+      },
+      {
+        State.currentName:
+          SettingsRenderer.lookupWithFallback(settings, wallet.key),
+        visibility: Shrunk,
+        debounce: false,
+      },
+    );
+
   <div
-    className={expanded ? Styles.activeWalletItem : Styles.inactiveWalletItem}
-    onClick={_event => setExpanded(expanded => !expanded)}>
-    {if (expanded) {
+    className={
+      switch (state.visibility) {
+      | Shrunk => Styles.inactiveWalletItem
+      | Expanded => Styles.activeWalletItem
+      | Loading => Css.(style([backgroundColor(`rgb((255, 0, 0)))]))
+      }
+    }
+    onClick={_event => dispatch(ToggleExpand)}>
+    {switch (state.visibility) {
+     | Shrunk =>
+       <div className=Styles.walletName>
+         {ReasonReact.string(state.currentName)}
+       </div>
+     | Expanded =>
        <input
          type_="text"
          className=Styles.walletNameTextField
-         value=name
-         readOnly=true
+         value={state.currentName}
+         onBlur={_ => dispatch(SaveName)}
+         onChange={e =>
+           dispatch(ChangeName(ReactEvent.Synthetic.target(e)##value))
+         }
          onClick={e => ReactEvent.Synthetic.stopPropagation(e)}
-       />;
-     } else {
-       <div className=Styles.walletName> {ReasonReact.string(name)} </div>;
+       />
+     | Loading => <div> {ReasonReact.string("LOADING")} </div>
      }}
     <div className=Styles.balance>
-      {ReasonReact.string({js|■ |js} ++ Js.Float.toString(balance))}
+      {ReasonReact.string({js|■ |js} ++ Js.Int.toString(wallet.balance))}
     </div>
-    {if (expanded) {
+    {switch (state.visibility) {
+     | Shrunk
+     | Loading => ReasonReact.null
+     | Expanded =>
        <>
          <hr className=Styles.separator />
          <div className=Styles.settingLabel>
@@ -99,12 +219,10 @@ let make = (~name, ~balance) => {
          <hr className=Styles.separator />
          <button
            className=Styles.deleteButton
-           onClick={_event => setExpanded(e => !e)}>
+           onClick={_event => dispatch(ToggleExpand)}>
            {ReasonReact.string("Delete wallet")}
          </button>
-       </>;
-     } else {
-       ReasonReact.null;
+       </>
      }}
   </div>;
 };
