@@ -271,6 +271,9 @@ module InfoSection = {
   };
 };
 
+// TODO: As suggested in https://github.com/CodaProtocol/coda/pull/2260 , we
+// should probably switch to CSS Grid
+//
 // We can represent one of these cells as a row in an HTML table in the
 // following manner:
 //
