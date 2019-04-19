@@ -22,6 +22,7 @@ module HooksTest = {
 [@react.component]
 let make = (~message) =>
   <div
+    className=Css.(style([width(`percent(100.))]))
     style={ReactDOMRe.Style.make(
       ~color="white",
       ~background="#121f2b11",
@@ -43,7 +44,9 @@ let make = (~message) =>
       <WalletItem name="Hot Wallet2" balance=100.0 />
       <WalletItem name="Vault" balance=234122.123 />
     </div>
-    <div style={ReactDOMRe.Style.make(~margin="10px", ())}>
+    <div
+      className=Css.(style([width(`percent(100.))]))
+      style={ReactDOMRe.Style.make(~margin="10px", ())}>
       <TestQuery>
         {result =>
            ReasonReact.string(
@@ -56,5 +59,6 @@ let make = (~message) =>
       </TestQuery>
       <HooksTest name="test-hooks" />
       <p> {ReasonReact.string(message)} </p>
+      <TransactionsView />
     </div>
   </div>;

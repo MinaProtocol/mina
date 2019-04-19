@@ -35,16 +35,14 @@ module Make (Inputs : Inputs.With_unprocessed_transition_cache.S) :
       |> External_transition.Verified.protocol_state
     in
     let%bind () =
-      Result.ok_if_true
-        (Transition_frontier.find frontier hash |> Option.is_none)
-        ~error:`Duplicate
+      Option.fold (Transition_frontier.find frontier hash) ~init:Result.ok_unit
+        ~f:(fun _ _ -> Result.Error (`In_frontier hash))
     in
     let%bind () =
-      Result.ok_if_true
-        (not
-           (Unprocessed_transition_cache.mem unprocessed_transition_cache
-              transition_with_hash))
-        ~error:`Duplicate
+      Option.fold
+        (Unprocessed_transition_cache.final_state unprocessed_transition_cache
+           transition_with_hash) ~init:Result.ok_unit ~f:(fun _ final_state ->
+          Result.Error (`In_process final_state) )
     in
     let%map () =
       Result.ok_if_true
@@ -58,9 +56,8 @@ module Make (Inputs : Inputs.With_unprocessed_transition_cache.S) :
              consensus state")
     in
     (* we expect this to be Ok since we just checked the cache *)
-    Unprocessed_transition_cache.register unprocessed_transition_cache
+    Unprocessed_transition_cache.register_exn unprocessed_transition_cache
       transition_with_hash
-    |> Or_error.ok_exn
 
   let run ~logger ~frontier ~transition_reader
       ~(valid_transition_writer :
@@ -118,7 +115,7 @@ module Make (Inputs : Inputs.With_unprocessed_transition_cache.S) :
                    (Core_kernel.Time.diff (Core_kernel.Time.now ())
                       transition_time) ;
                  Writer.write valid_transition_writer cached_transition
-             | Error `Duplicate ->
+             | Error (`In_frontier _) | Error (`In_process _) ->
                  if Lru.find already_reported_duplicates hash |> Option.is_none
                  then (
                    Logger.info logger ~module_:__MODULE__ ~location:__LOC__
