@@ -72,7 +72,8 @@ module Make (Inputs : Inputs.With_unprocessed_transition_cache.S) :
     let add_and_finalize ~only_if_present cached_breadcrumb =
       let open Deferred.Or_error.Let_syntax in
       let%bind breadcrumb =
-        Deferred.Or_error.return (Cached.free cached_breadcrumb)
+        Deferred.Or_error.return
+          (Cached.invalidate_with_success cached_breadcrumb)
       in
       let transition =
         Transition_frontier.Breadcrumb.transition_with_hash breadcrumb
@@ -97,7 +98,7 @@ module Make (Inputs : Inputs.With_unprocessed_transition_cache.S) :
                 * duplicate internal proposals. Otherwise, this could just be wrapped with a
                 * phantom Cached.t *)
                `Valid_transition
-                 (Unprocessed_transition_cache.register
+                 (Unprocessed_transition_cache.register_exn
                     unprocessed_transition_cache vt) )
          ; Reader.map catchup_breadcrumbs_reader ~f:(fun cb ->
                `Catchup_breadcrumbs cb )

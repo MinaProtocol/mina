@@ -149,7 +149,7 @@ let%test_module "Transition_handler.Catchup_scheduler tests" =
           let cached_dangling_transitions =
             List.map dangling_transitions
               ~f:
-                (Unprocessed_transition_cache.register
+                (Unprocessed_transition_cache.register_exn
                    unprocessed_transition_cache)
           in
           List.(
@@ -169,14 +169,15 @@ let%test_module "Transition_handler.Catchup_scheduler tests" =
           let%map cached_received_rose_tree =
             extract_children_from ~reader:catchup_breadcrumbs_reader
               ~root:
-                ( Unprocessed_transition_cache.register
+                ( Unprocessed_transition_cache.register_exn
                     unprocessed_transition_cache
                     (Transition_frontier.Breadcrumb.transition_with_hash
                        missing_breadcrumb)
                 |> Cached.transform ~f:(Fn.const missing_breadcrumb) )
           in
           let received_rose_tree =
-            Rose_tree.map cached_received_rose_tree ~f:Cached.free
+            Rose_tree.map cached_received_rose_tree
+              ~f:Cached.invalidate_with_success
           in
           assert (
             List.equal
@@ -226,7 +227,7 @@ let%test_module "Transition_handler.Catchup_scheduler tests" =
           let cached_dangling_transitions =
             List.map dangling_transitions
               ~f:
-                (Unprocessed_transition_cache.register
+                (Unprocessed_transition_cache.register_exn
                    unprocessed_transition_cache)
           in
           List.iter (List.permute cached_dangling_transitions)
@@ -244,14 +245,15 @@ let%test_module "Transition_handler.Catchup_scheduler tests" =
           let%map cached_received_rose_tree =
             extract_children_from ~reader:catchup_breadcrumbs_reader
               ~root:
-                ( Unprocessed_transition_cache.register
+                ( Unprocessed_transition_cache.register_exn
                     unprocessed_transition_cache
                     (Transition_frontier.Breadcrumb.transition_with_hash
                        missing_breadcrumb)
                 |> Cached.transform ~f:(Fn.const missing_breadcrumb) )
           in
           let received_rose_tree =
-            Rose_tree.map cached_received_rose_tree ~f:Cached.free
+            Rose_tree.map cached_received_rose_tree
+              ~f:Cached.invalidate_with_success
           in
           assert (
             Rose_tree.equiv received_rose_tree upcoming_rose_tree

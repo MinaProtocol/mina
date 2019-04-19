@@ -54,7 +54,7 @@ module Make (Inputs : Inputs.With_unprocessed_transition_cache.S) :
              consensus state")
     in
     (* we expect this to be Ok since we just checked the cache *)
-    Unprocessed_transition_cache.register unprocessed_transition_cache
+    Unprocessed_transition_cache.register_exn unprocessed_transition_cache
       transition_with_hash
 
   let run ~logger ~frontier ~transition_reader

@@ -611,7 +611,7 @@ module type Unprocessed_transition_cache_intf = sig
 
   val create : logger:Logger.t -> t
 
-  val register :
+  val register_exn :
        t
     -> (external_transition_verified, state_hash) With_hash.t
     -> ( (external_transition_verified, state_hash) With_hash.t

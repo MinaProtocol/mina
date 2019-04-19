@@ -79,7 +79,8 @@ module Make (Inputs : Inputs.S) = struct
                 (Error.to_string_hum err) ;
               List.iter transition_branches ~f:(fun subtree ->
                   Rose_tree.iter subtree ~f:(fun cached_transition ->
-                      Cached.invalidate cached_transition |> ignore ) ) )
+                      Cached.invalidate_with_failure cached_transition
+                      |> ignore ) ) )
     in
     { logger
     ; collected_transitions

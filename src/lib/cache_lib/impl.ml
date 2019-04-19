@@ -29,7 +29,7 @@ module Make (Inputs : Inputs_intf) : Intf.Main.S = struct
 
     let final_state t x = Hashtbl.find t.set x
 
-    let register t x =
+    let register_exn t x =
       let final_state = Ivar.create () in
       Hashtbl.add_exn t.set ~key:x ~data:final_state ;
       Cached.create t x final_state
@@ -145,13 +145,13 @@ module Make (Inputs : Inputs_intf) : Intf.Main.S = struct
            ; transformed= false
            ; final_state= final_state t })
 
-    let invalidate (type a b) (t : (a, b) t) : a =
+    let invalidate_with_failure (type a b) (t : (a, b) t) : a =
       assert_not_finalized t "Cached item has already been finalized" ;
       mark_failed t ;
       Cache.remove (cache t) (original t) ;
       value t
 
-    let free (type a b) (t : (a, b) t) : a =
+    let invalidate_with_success (type a b) (t : (a, b) t) : a =
       assert_not_finalized t "Cached item has already been finalized" ;
       mark_success t ;
       Cache.remove (cache t) (original t) ;
@@ -171,7 +171,7 @@ module Make (Inputs : Inputs_intf) : Intf.Main.S = struct
           Logger.error ~module_:__MODULE__ ~location:__LOC__
             (Cache.logger (cache t))
             "Cached.sequence_result called on an already consumed Cached.t" ;
-          ignore (invalidate t) ;
+          ignore (invalidate_with_failure t) ;
           Error err
   end
 
@@ -196,8 +196,8 @@ module Make (Inputs : Inputs_intf) : Intf.Main.S = struct
       let create ~logger =
         Cache.create ~logger ~name:Name.t (module Transmuter.Target)
 
-      let register t x =
-        let target = Cache.register t (Transmuter.transmute x) in
+      let register_exn t x =
+        let target = Cache.register_exn t (Transmuter.transmute x) in
         Cached.transform target ~f:(Fn.const x)
 
       let final_state t x = Cache.final_state t (Transmuter.transmute x)
@@ -226,14 +226,14 @@ let%test_module "cache_lib test instance" =
     let with_cache ~logger ~f =
       Cache.create ~name:"test" ~logger (module String) |> f
 
-    let%test_unit "cached objects do not trigger unconsumption hook when freed"
-        =
+    let%test_unit "cached objects do not trigger unconsumption hook when \
+                   invalidated" =
       setup () ;
       let logger = Logger.null () in
       with_cache ~logger ~f:(fun cache ->
           with_item ~f:(fun data ->
-              let x = Cache.register cache data in
-              ignore (Cached.free x) ) ;
+              let x = Cache.register_exn cache data in
+              ignore (Cached.invalidate_with_success x) ) ;
           Gc.full_major () ;
           assert (!dropped_cache_items = 0) )
 
@@ -242,7 +242,7 @@ let%test_module "cache_lib test instance" =
       setup () ;
       let logger = Logger.null () in
       with_cache ~logger ~f:(fun cache ->
-          with_item ~f:(fun data -> ignore (Cache.register cache data)) ;
+          with_item ~f:(fun data -> ignore (Cache.register_exn cache data)) ;
           Gc.full_major () ;
           assert (!dropped_cache_items = 1) )
 
@@ -252,7 +252,7 @@ let%test_module "cache_lib test instance" =
       let logger = Logger.null () in
       with_item ~f:(fun data ->
           with_cache ~logger ~f:(fun cache ->
-              ignore (Cache.register cache data) ) ;
+              ignore (Cache.register_exn cache data) ) ;
           Gc.full_major () ;
           assert (!dropped_cache_items = 1) )
 
@@ -261,10 +261,10 @@ let%test_module "cache_lib test instance" =
       let logger = Logger.null () in
       with_cache ~logger ~f:(fun cache ->
           with_item ~f:(fun data ->
-              let cached = Cache.register cache data in
+              let cached = Cache.register_exn cache data in
               Gc.full_major () ;
               assert (!dropped_cache_items = 0) ;
-              ignore (Cached.free cached) ) ) ;
+              ignore (Cached.invalidate_with_success cached) ) ) ;
       Gc.full_major () ;
       assert (!dropped_cache_items = 0)
 
@@ -274,39 +274,39 @@ let%test_module "cache_lib test instance" =
       let logger = Logger.null () in
       with_cache ~logger ~f:(fun cache ->
           with_item ~f:(fun data ->
-              Cache.register cache data
+              Cache.register_exn cache data
               |> Cached.transform ~f:(Fn.const 5)
               |> Cached.transform ~f:(Fn.const ())
               |> ignore ) ;
           Gc.full_major () ;
           assert (!dropped_cache_items = 1) )
 
-    let%test_unit "properly freed derived cached objects do not trigger any \
-                   unconsumption handler calls" =
+    let%test_unit "properly invalidated derived cached objects do not trigger \
+                   any unconsumption handler calls" =
       setup () ;
       let logger = Logger.null () in
       with_cache ~logger ~f:(fun cache ->
           with_item ~f:(fun data ->
-              Cache.register cache data
+              Cache.register_exn cache data
               |> Cached.transform ~f:(Fn.const 5)
               |> Cached.transform ~f:(Fn.const ())
-              |> Cached.free |> ignore ) ;
+              |> Cached.invalidate_with_success |> ignore ) ;
           Gc.full_major () ;
           assert (!dropped_cache_items = 0) )
 
-    let%test_unit "free original cached object would also free the derived \
-                   cached object" =
+    let%test_unit "invalidate original cached object would also remove the \
+                   derived cached object" =
       setup () ;
       let logger = Logger.null () in
       with_cache ~logger ~f:(fun cache ->
           with_item ~f:(fun data ->
-              let src = Cache.register cache data in
+              let src = Cache.register_exn cache data in
               let _der =
                 src
                 |> Cached.transform ~f:(Fn.const 5)
                 |> Cached.transform ~f:(Fn.const ())
               in
-              Cached.free src |> ignore ) ;
+              Cached.invalidate_with_success src |> ignore ) ;
           Gc.full_major () ;
           assert (!dropped_cache_items = 0) )
 
@@ -315,7 +315,7 @@ let%test_module "cache_lib test instance" =
       setup () ;
       with_cache ~logger:(Logger.null ()) ~f:(fun cache ->
           with_item ~f:(fun data ->
-              let src = Cache.register cache data in
+              let src = Cache.register_exn cache data in
               let der = Cached.transform src ~f:(Fn.const 5) in
               let src_final_state = Cached.final_state src in
               let der_final_state = Cached.final_state der in

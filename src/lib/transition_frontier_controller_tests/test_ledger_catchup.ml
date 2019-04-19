@@ -45,7 +45,7 @@ let%test_module "Ledger catchup" =
         Transition_handler.Unprocessed_transition_cache.create ~logger
       in
       let cached_transition =
-        Transition_handler.Unprocessed_transition_cache.register
+        Transition_handler.Unprocessed_transition_cache.register_exn
           unprocessed_transition_cache transition
       in
       let parent_hash =
@@ -65,7 +65,8 @@ let%test_module "Ledger catchup" =
         Ivar.read result_ivar >>| List.hd_exn
       in
       let catchup_breadcrumbs =
-        Rose_tree.map cached_catchup_breadcrumbs ~f:Cache_lib.Cached.free
+        Rose_tree.map cached_catchup_breadcrumbs
+          ~f:Cache_lib.Cached.invalidate_with_success
       in
       Rose_tree.equal expected_breadcrumbs catchup_breadcrumbs
         ~f:(fun breadcrumb_tree1 breadcrumb_tree2 ->
@@ -177,7 +178,7 @@ let%test_module "Ledger catchup" =
               ~f:Transition_frontier.Breadcrumb.transition_with_hash
           in
           let cached_best_transition =
-            Transition_handler.Unprocessed_transition_cache.register
+            Transition_handler.Unprocessed_transition_cache.register_exn
               unprocessed_transition_cache best_transition
           in
           let parent_hash =
@@ -188,14 +189,15 @@ let%test_module "Ledger catchup" =
             (parent_hash, [Rose_tree.T (cached_best_transition, [])]) ;
           let failing_transition = List.nth_exn missing_transitions 1 in
           let cached_failing_transition =
-            Transition_handler.Unprocessed_transition_cache.register
+            Transition_handler.Unprocessed_transition_cache.register_exn
               unprocessed_transition_cache failing_transition
           in
           Ledger_catchup.run ~logger ~network ~frontier:me
             ~catchup_breadcrumbs_writer ~catchup_job_reader
             ~unprocessed_transition_cache ;
           let%bind () = after (Core.Time.Span.of_sec 1.) in
-          Cache_lib.Cached.invalidate cached_failing_transition |> ignore ;
+          Cache_lib.Cached.invalidate_with_failure cached_failing_transition
+          |> ignore ;
           let%map result =
             Ivar.read (Cache_lib.Cached.final_state cached_best_transition)
           in
@@ -247,7 +249,7 @@ let%test_module "Ledger catchup" =
           let cached_transitions =
             List.map missing_transitions
               ~f:
-                (Transition_handler.Unprocessed_transition_cache.register
+                (Transition_handler.Unprocessed_transition_cache.register_exn
                    unprocessed_transition_cache)
           in
           let forests =
@@ -272,7 +274,8 @@ let%test_module "Ledger catchup" =
           Strict_pipe.Reader.iter catchup_breadcrumbs_reader
             ~f:(fun rose_trees ->
               let catchup_breadcrumb_tree =
-                Rose_tree.map (List.hd_exn rose_trees) ~f:Cache_lib.Cached.free
+                Rose_tree.map (List.hd_exn rose_trees)
+                  ~f:Cache_lib.Cached.invalidate_with_success
               in
               assert (
                 List.length (Rose_tree.flatten catchup_breadcrumb_tree) = 1 ) ;

@@ -108,7 +108,8 @@ module Make (Inputs : Inputs.S) :
           else
             match%bind f elem with
             | Error e ->
-                List.iter acc ~f:(Fn.compose ignore Cached.invalidate) ;
+                List.iter acc
+                  ~f:(Fn.compose ignore Cached.invalidate_with_failure) ;
                 Deferred.return (Error e)
             | Ok (Either.First hash) ->
                 Deferred.Or_error.return (acc, Some hash)
@@ -185,7 +186,7 @@ module Make (Inputs : Inputs.S) :
                 | Ok result -> Deferred.Or_error.return result
                 | error ->
                     List.iter verified_transitions
-                      ~f:(Fn.compose ignore Cached.invalidate) ;
+                      ~f:(Fn.compose ignore Cached.invalidate_with_failure) ;
                     Deferred.return error ) ) )
 
   let run ~logger ~network ~frontier ~catchup_job_reader
@@ -207,7 +208,8 @@ module Make (Inputs : Inputs.S) :
               (Error.to_string_hum e) ;
             List.iter subtrees ~f:(fun subtree ->
                 Rose_tree.iter subtree ~f:(fun cached_transition ->
-                    Cached.invalidate cached_transition |> ignore ) ) ;
+                    Cached.invalidate_with_failure cached_transition |> ignore
+                ) ) ;
             Logger.trace logger ~module_:__MODULE__ ~location:__LOC__
               "garbage collected failed cached transitions" ;
             Deferred.unit )

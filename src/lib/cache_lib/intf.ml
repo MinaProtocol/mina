@@ -49,9 +49,9 @@ module Cached = struct
      *  [Error] if the underlying cached value was not
      *  present in the cache.
      *)
-    val invalidate : ('t, _) t -> 't
+    val invalidate_with_failure : ('t, _) t -> 't
 
-    val free : ('t, _) t -> 't
+    val invalidate_with_success : ('t, _) t -> 't
 
     val was_consumed : (_, _) t -> bool
 
@@ -100,7 +100,7 @@ module Cache = struct
      *  Otherwise, [Ok] is returned with a [Cached]
      *  representation of [elt].
      *)
-    val register : 'elt t -> 'elt -> ('elt, 'elt) Cached.t
+    val register_exn : 'elt t -> 'elt -> ('elt, 'elt) Cached.t
 
     val mem : 'elt t -> 'elt -> bool
 
@@ -145,7 +145,7 @@ module Transmuter_cache = struct
 
     val create : logger:Logger.t -> t
 
-    val register : t -> source -> (source, target) Cached.t
+    val register_exn : t -> source -> (source, target) Cached.t
 
     val final_state : t -> source -> target final_state Option.t
 
