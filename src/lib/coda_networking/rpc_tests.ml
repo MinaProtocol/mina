@@ -28,6 +28,15 @@ let%test_module "RPC deserialization tests" =
 
     (* Answer_sync_ledger_query *)
 
+    (* let%test "Answer_sync_ledger_query V1 deserialize query" =
+       let known_good_serialization = "\x01\x28\x3F\xA0\x11\xB1\xAF\x94\x42\x1E\x3F\x15\xDA\x35\x72\x2B\x55\xA2\x3C\xC7\xD5\x4C\xA5\xB7\x2E\x95\xD3\x45\xCA\xAE\x11\x14\x12\xD6\x00\x00\x00\x00\x00\x00\x00\x00\x01\x02\x01\x01\x01\x09\x31\x32\x37\x2E\x30\x2E\x30\x2E\x31\xFE\xDB\x59\xFE\xDA\x59"
+       in     
+       let buff = serialization_in_buffer known_good_serialization in
+       let pos_ref = ref 0 in
+       let _ : query = V1.bin_read_query buff ~pos_ref in
+       true
+     *)
+
     (*
   let%test "Answer_sync_ledger_query V1 deserialize response" =
   (* serialization should fail if the response type has changed *)
