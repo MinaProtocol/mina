@@ -47,6 +47,17 @@ let%test_module "RPC deserialization tests" =
   true
     *)
 
+    (* Transition_catchup *)
+
+    (* let%test "Transition_catchup V1 deserialize query" =
+       let known_good_serialization = "\x01\x28\xD8\x4A\x82\xE6\x9D\x62\x31\xE5\x8A\xE9\x9B\x73\x77\x7F\x36\x9E\xA9\x1F\xB4\x14\x78\x05\x71\x7D\x09\x6E\xF4\xDB\x48\x3C\xAB\x2A\x00\x00\x00\x00\x00\x00\x00\x00\x01\x01\x01\x09\x31\x32\x37\x2E\x30\x2E\x30\x2E\x31\xFE\xDB\x59\xFE\xDA\x59"
+       in     
+       let buff = serialization_in_buffer known_good_serialization in
+       let pos_ref = ref 0 in
+       let _ : query = V1.bin_read_query buff ~pos_ref in
+       true
+     *)
+
     (* Get_ancestry *)
 
     (* let%test "Get_ancestry V1 deserialize query" =
