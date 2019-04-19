@@ -15,6 +15,10 @@ open Network_peer
    inside the Rpcs functor, rather than at the locus of application
 *)
 
+(* TODO : uncomment unit tests below when Coda_networking, Rpcs are defunctored so we can
+   run unit tests here
+*)
+
 module Rpcs (Inputs : sig
   module Staged_ledger_aux_hash :
     Protocols.Coda_pow.Staged_ledger_aux_hash_intf
@@ -100,11 +104,7 @@ struct
       include T
       include Register (T)
 
-      (* TODO : uncomment when Coda_networking, Rpcs are defunctored so we can
-         run unit tests here
-       *)
-
-      (* let%test "Get_staged_ledger_aux_and_pending_coinbases_at_hash \
+      (* let%test "Get_staged_ledger_aux_and_pending_coinbases_at_hash V1 \
                 deserialize query" =
         (* serialization should fail if the query type has changed *)
         let known_good_serialization =
@@ -168,6 +168,18 @@ struct
 
       include T
       include Register (T)
+
+      (*
+       let%test "Answer_sync_ledger_query V1 deserialize response" =
+        (* serialization should fail if the response type has changed *)
+       let known_good_serialization = "\x00\x01\x02\x12\x01\x28\xC7\xBC\x6A\x07\xC9\x22\x93\xFD\xA4\x57\x7D\xE2\xF0\x3E\xDC\xB4\x56\x6A\xCB\xF8\x6E\x94\xCD\xC2\x61\x72\x9A\xA5\x8E\xAD\x5D\xFD\x00\x00\x00\x00\x00\x00\x00\x00" in
+       let len = String.length known_good_serialization in
+       let buff = Bin_prot.Common.create_buf 128 in
+       Bin_prot.Common.blit_string_buf known_good_serialization buff ~len ;
+       let pos_ref = ref 0 in
+       let _ : response = V1.bin_read_response buff ~pos_ref in
+       true
+     *)
     end
   end
 
