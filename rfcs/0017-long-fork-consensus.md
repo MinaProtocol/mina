@@ -19,43 +19,43 @@ With this feature, clients will be able to join the network from any device at a
 
 [detailed-design]: #detailed-design
 
-### Part 1: min-window
+### Part 1: min-epoch
 
 This version of the implementation is correct given that [50% + epsilon] of stake has always been participating and honest. 
 
-* Add a new field to `protocol_state` called `min_window`, initally set to `24k`
-* Add a new field to `protocol_state` called `current_window`, initially set to 0
-* `let window_diff = FLOOR(current_protocol_state.global_slot_number/(24k)) - FLOOR(previous_protocol_state.global_slot_number/(24k))`
-* if `window_diff == 0`
-  * set `current_protocol_state.current_window` to `previous_protocol_state.current_window + 1`
-* else if `window_diff == 1`
-  * set `current_protocol_state.min_window` to `MIN(current_protocol_state.current_window, previous_protocol_state.min_window)`
-  * set `current_protocol_state.current_window` to `1`
+* Add a new field to `protocol_state` called `min_epoch`, initally set to `24k`
+* Add a new field to `protocol_state` called `current_epoch`, initially set to 0
+* `let epoch_diff = FLOOR(current_protocol_state.global_slot_number/(24k)) - FLOOR(previous_protocol_state.global_slot_number/(24k))`
+* if `epoch_diff == 0`
+  * set `current_protocol_state.current_epoch` to `previous_protocol_state.current_epoch + 1`
+* else if `epoch_diff == 1`
+  * set `current_protocol_state.min_epoch` to `MIN(current_protocol_state.current_epoch, previous_protocol_state.min_epoch)`
+  * set `current_protocol_state.current_epoch` to `1`
 * else
-  * set `current_protocol_state.min_window` to `0`
-  * set `current_protocol_state.current_window` to `1`
+  * set `current_protocol_state.min_epoch` to `0`
+  * set `current_protocol_state.current_epoch` to `1`
 
 Add to the chain select(A,B) function:
 
-* If the previous-epoch checkpoint does not match between current and proposed, choose the chain with the greater `min_window`. If its a tie choose the already held chain.
+* If the previous-epoch checkpoint does not match between current and proposed, choose the chain with the greater `min_epoch`. If its a tie choose the already held chain.
 
-The intuition is each `current_window` is a sample from a distribution parameterized by the chain's participation. `min-window` then will asymptote over time to a low percentile of the distruibution, which will always be large enough to differentiate between the honest chain and an adversary's. 
+The intuition is each `current_epoch` is a sample from a distribution parameterized by the chain's participation. `min-epoch` then will asymptote over time to a low percentile of the distruibution, which will always be large enough to differentiate between the honest chain and an adversary's. 
 
-Consider this proof sketch, relying on Ouroboros Genesis. Consider an attacker trying to create a distant fork. Assume they were able to create a long fork with no low participation windows. If true the same attack would be possible in Ouroboros Genesis. However Ouroboros Genesis showed trying to make a distant fork would create a low participation region immediately after the fork was attempted. Therefore its not possible to create such a fork without a participation window significantly lower than the honest chain, and this method of chain selection is secure for distant forks.
+Consider this proof sketch, relying on Ouroboros Genesis. Consider an attacker trying to create a distant fork. Assume they were able to create a long fork with no low participation epochs. If true the same attack would be possible in Ouroboros Genesis. However Ouroboros Genesis showed trying to make a distant fork would create a low participation region immediately after the fork was attempted. Therefore its not possible to create such a fork without a participation epoch significantly lower than the honest chain, and this method of chain selection is secure for distant forks.
 
 
-### Part 2: min-window with voting
+### Part 2: min-epoch with voting
 
 If the assumption that [50% + epsilon] of the stake has always been participating and honest is violated, at the point this happens safety will be compromised. We can add another feature to consensus to ensure that this temporary compromising will not become permanent.
 
-* define a constant, `min_windows_length`
-* define a constant, `min_window_period`
+* define a constant, `min_epochs_length`
+* define a constant, `min_epoch_period`
 * define a constant, `inflation`
 * add a new field to each account called `vote_hash`, initially set to `0`
-* add a ring buffer to protocol state called `min_windows` initially set to `[1]*min_windows_length`
-* add a new field to `protocol_state` called `tail_min_window` initially set to `1`
-* add a new field to `protocol_state` called `min_window` initially set to `1`
-* add a new field to `protocol_state` called `current_window` initially set to `0`
+* add a ring buffer to protocol state called `min_epochs` initially set to `[1]*min_epochs_length`
+* add a new field to `protocol_state` called `tail_min_epoch` initially set to `1`
+* add a new field to `protocol_state` called `min_epoch` initially set to `1`
+* add a new field to `protocol_state` called `current_epoch` initially set to `0`
 * add a new field to the staged ledger called `vote_stake` initially set to `0`
 * add a new field to the staged ledger called `vote_hash` initially set to `0`
 
@@ -64,28 +64,28 @@ Add to transaction application logic:
 
 Add to the protocol state update logic:
 
-* `let window_diff = FLOOR(current_protocol_state.global_slot_number/(24k)) - FLOOR(previous_protocol_state.global_slot_number/(24k))`
-* if `window_diff == 0`
-  * set `current_protocol_state.current_window` to `previous_protocol_state.current_window + 1`
-* if `window_diff == 1`
-  * set `current_protocol_state.min_window` to `MIN(current_protocol_state.current_window, previous_protocol_state.min_window)`
-  * set `current_protocol_state.current_window` to `1`
+* `let epoch_diff = FLOOR(current_protocol_state.global_slot_number/(24k)) - FLOOR(previous_protocol_state.global_slot_number/(24k))`
+* if `epoch_diff == 0`
+  * set `current_protocol_state.current_epoch` to `previous_protocol_state.current_epoch + 1`
+* if `epoch_diff == 1`
+  * set `current_protocol_state.min_epoch` to `MIN(current_protocol_state.current_epoch, previous_protocol_state.min_epoch)`
+  * set `current_protocol_state.current_epoch` to `1`
 * else
-  * set `current_protocol_state.min_window` to `0`
-  * set `current_protocol_state.current_window` to `1`
+  * set `current_protocol_state.min_epoch` to `0`
+  * set `current_protocol_state.current_epoch` to `1`
 
-* `let min_window_period_diff = FLOOR(current_protocol_state.global_slot_number/min_window_period) - FLOOR(previous_protocol_state.global_slot_number/min_window_period)`
-* if `min_window_period_diff == 0`
-  * set most recent `current_protocol_state.min_windows` to `MIN(most recent current_protocol_state.min_windows, current_protocol_state.min_window)`
-* else if `min_window_period_diff == 1`
-  * push `current_protocol_state.min_window` to `current_protocol_state.min_windows`
-  * set `current_protocol_state.tail_min_windows` to `MIN(pop current_protocol_state.min_windows, current_protocol_state.tail_min_windows)`
+* `let min_epoch_period_diff = FLOOR(current_protocol_state.global_slot_number/min_epoch_period) - FLOOR(previous_protocol_state.global_slot_number/min_epoch_period)`
+* if `min_epoch_period_diff == 0`
+  * set most recent `current_protocol_state.min_epochs` to `MIN(most recent current_protocol_state.min_epochs, current_protocol_state.min_epoch)`
+* else if `min_epoch_period_diff == 1`
+  * push `current_protocol_state.min_epoch` to `current_protocol_state.min_epochs`
+  * set `current_protocol_state.tail_min_epochs` to `MIN(pop current_protocol_state.min_epochs, current_protocol_state.tail_min_epochs)`
 * else
-  * push `0` to `current_protocol_state.min_windows`
-  * set `current_protocol_state.tail_min_windows` to `MIN(pop current_protocol_state.min_windows, current_protocol_state.tail_min_windows)`
+  * push `0` to `current_protocol_state.min_epochs`
+  * set `current_protocol_state.tail_min_epochs` to `MIN(pop current_protocol_state.min_epochs, current_protocol_state.tail_min_epochs)`
 
 * if the `snarked_ledger` is being updated
-  * set `current_protocol_state.min_window` to `MAX(current_protocol_state.min_window, new_snarked_ledger.voted_stake/staged_ledger.total_stake)`
+  * set `current_protocol_state.min_epoch` to `MAX(current_protocol_state.min_epoch, new_snarked_ledger.voted_stake/staged_ledger.total_stake)`
 * else
   * do nothing
 
@@ -109,7 +109,7 @@ This will
 Other designs considered were:
 
 * Track unique stake participation each epoch, use recent unique stake participation as the long distance fork strength. This has the upside that its relatively simple, but the downside that it relies on assuming the number of staking parties is significantly less than the number of slots in an epoch. It also relies on annual checkpoints, which this verison does not require.
-* min-window (Stage 1) with a "reset" mechanism that would generate new checkpoints. Has the upside again that its simple, but the downside that it would require consensus outside the protocol to agree on a checkpoint which would create a point for centralization.
+* min-epoch (Stage 1) with a "reset" mechanism that would generate new checkpoints. Has the upside again that its simple, but the downside that it would require consensus outside the protocol to agree on a checkpoint which would create a point for centralization.
 
 ## Prior art
 [prior-art]: #prior-art
@@ -123,6 +123,6 @@ Prior art:
 ## Unresolved questions
 [unresolved-questions]: #unresolved-questions
 
-* security proof of min-window
-* proof adding voting does not break min-window
+* security proof of min-epoch
+* proof adding voting does not break min-epoch
 * careful analysis of different scenarior where the 51% honesty assumption could be violated, what could play out, and operationally what different parties should plan to do
