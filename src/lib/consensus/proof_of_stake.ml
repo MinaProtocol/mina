@@ -2332,7 +2332,10 @@ let next_proposal now (state : Consensus_state.Value.t) ~local_state ~keypair
     if
       Epoch.equal curr_epoch state.curr_epoch
       && Epoch.Slot.equal curr_slot state.curr_slot th
-    then (Logger.fatal logger "why did this happen?" ~module_:__MODULE__ ~location:__LOC__; Epoch.incr (curr_epoch, curr_slot))
+    then (
+      Logger.fatal logger "why did this happen?" ~module_:__MODULE__
+        ~location:__LOC__ ;
+      Epoch.incr (curr_epoch, curr_slot) )
     else (curr_epoch, curr_slot)
   in
   Logger.info logger ~module_:__MODULE__ ~location:__LOC__
