@@ -333,7 +333,7 @@ jobs:
     test--test_postake_holy_grail:
         resource_class: large
         docker:
-            - image: codaprotocol/coda:toolchain-c4b2cc7c53ef51136350323d52609de5aa83f3a5
+            - image: codaprotocol/coda:toolchain-f8dc1642d4ed1d38a7c726f0f2677f53654e4bfc
         steps:
             - checkout
             - run: git submodule sync && git submodule update --init --recursive
