@@ -103,7 +103,7 @@ struct
       (* TODO : uncomment when Coda_networking, Rpcs are defunctored so we can
          run unit tests here
        *)
-      
+
       (* let%test "Get_staged_ledger_aux_and_pending_coinbases_at_hash \
                 deserialize query" =
         (* serialization should fail if the query type has changed *)
