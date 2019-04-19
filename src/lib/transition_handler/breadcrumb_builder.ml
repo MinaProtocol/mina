@@ -15,7 +15,7 @@ module Make (Inputs : Inputs.S) :
   open Inputs
 
   let build_subtrees_of_breadcrumbs ~logger ~frontier ~initial_hash
-      subtrees_of_transitions =
+      subtrees_of_enveloped_transitions =
     (* If the breadcrumb we are targetting is removed from the transition
      * frontier while we're catching up, it means this path is not on the
      * critical path that has been chosen in the frontier. As such, we should
@@ -34,13 +34,13 @@ module Make (Inputs : Inputs.S) :
       | Some breadcrumb ->
           Or_error.return breadcrumb
     in
-    Deferred.Or_error.List.map subtrees_of_transitions
-      ~f:(fun subtree_of_transitions ->
+    Deferred.Or_error.List.map subtrees_of_enveloped_transitions
+      ~f:(fun subtree_of_enveloped_transitions ->
         let open Deferred.Or_error.Let_syntax in
         let%bind init_breadcrumb =
           breadcrumb_if_present () |> Deferred.return
         in
-        Rose_tree.Deferred.Or_error.fold_map subtree_of_transitions
+        Rose_tree.Deferred.Or_error.fold_map subtree_of_enveloped_transitions
           ~init:(Cached.pure init_breadcrumb)
           ~f:(fun cached_parent cached_enveloped_transition ->
             let open Deferred.Let_syntax in
