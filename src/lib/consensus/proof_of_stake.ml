@@ -1900,7 +1900,7 @@ module Rpcs = struct
       module T = struct
         type query = Coda_base.Ledger_hash.Stable.V1.t [@@deriving bin_io]
 
-        type response = (Coda_base.Sparse_ledger.t, string) Result.t
+        type response = (Coda_base.Sparse_ledger.Stable.V1.t, string) Result.t
         [@@deriving bin_io]
 
         let version = 1
@@ -2009,8 +2009,8 @@ let select_epoch_snapshot ~(consensus_state : Consensus_state.Value.t)
     ~local_state ~epoch ~epoch_data =
   let open Consensus_state in
   let open Local_state in
-  let open Epoch_data in
-  let open Epoch_ledger in
+  let open Epoch_data.Poly in
+  let open Epoch_ledger.Poly in
   (* is the snapshot we need the genesis snapshot? *)
   let is_genesis_snapshot =
     Coda_base.Frozen_ledger_hash.equal epoch_data.ledger.hash
