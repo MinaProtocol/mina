@@ -6,7 +6,7 @@ set -exo pipefail
 if [ -z "$JSON_GCLOUD_CREDENTIALS" ]; then
     echo "WARNING: JSON_GCLOUD_CREDENTIALS not set, static PV keys not used"
     exit 0
-else
+fi
 
 # GC credentials
 echo $JSON_GCLOUD_CREDENTIALS > google_creds.json
