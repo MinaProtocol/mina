@@ -65,7 +65,8 @@ let make = (~message) => {
           }
         />,
       )
-    | DeleteWallet => Some(<Delete closeModal walletName="Hot Wallet" />)
+    | Some(DeleteWallet) =>
+      Some(<Delete closeModal walletName="Hot Wallet" />)
     | Some(Home) => None
     };
 
