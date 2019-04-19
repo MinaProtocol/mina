@@ -789,7 +789,7 @@ struct
                 ~logger:
                   (Logger.create ()
                      ~metadata:
-                       [ ( "selection context"
+                       [ ( "selection_context"
                          , `String
                              "debug_assert that child is preferred over parent"
                          ) ])
@@ -806,7 +806,7 @@ struct
             ~logger:
               (Logger.create ()
                  ~metadata:
-                   [ ( "selection context"
+                   [ ( "selection_context"
                      , `String "comparing new breadcrumb to best tip" ) ])
         in
         let added_to_best_tip_path, removed_from_best_tip_path =

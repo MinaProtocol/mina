@@ -102,8 +102,10 @@ module Make (Inputs : Inputs_intf) :
     in
     let best_tip = External_transition.of_verified best_verified_tip in
     let is_tip_better =
-      Consensus.select ~logger ~existing:(consensus_state best_tip)
-        ~candidate:seen_consensus_state
+      Consensus.select
+        ~logger:
+          (Logger.extend logger [("selection_context", "Root_prover.prove")])
+        ~existing:(consensus_state best_tip) ~candidate:seen_consensus_state
       = `Keep
     in
     let%bind () = Option.some_if is_tip_better () in
@@ -149,7 +151,10 @@ module Make (Inputs : Inputs_intf) :
     let best_tip_hash = With_hash.hash best_tip_with_hash in
     (* This statement might not see a peer's best_tip as the best_tip *)
     let is_before_best_tip candidate =
-      Consensus.select ~logger ~existing:(consensus_state best_tip) ~candidate
+      Consensus.select
+        ~logger:
+          (Logger.extend logger [("selection_context", "Root_prover.verify")])
+        ~existing:(consensus_state best_tip) ~candidate
       = `Keep
     in
     let%bind () =

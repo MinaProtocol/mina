@@ -149,7 +149,10 @@ end = struct
 
   let worth_getting_root t candidate =
     `Take
-    = Consensus.select ~logger:t.logger
+    = Consensus.select
+        ~logger:
+          (Logger.extend t.logger
+             [("selection_context", "Bootstrap_controller.worth_getting_root")])
         ~existing:
           ( t.best_seen_transition |> With_hash.data
           |> External_transition.Proof_verified.protocol_state
