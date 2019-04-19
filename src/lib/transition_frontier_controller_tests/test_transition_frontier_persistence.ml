@@ -63,9 +63,12 @@ let%test_module "Transition Frontier Persistence" =
                   ~acc_hash worker frontier mutant_diff
               in
               ( match mutant_diff with
-              | Add_transition {With_hash.hash; _} -> remove_job hash
-              | New_frontier ({With_hash.hash; _}, _, _) -> remove_job hash
-              | _ -> () ) ;
+              | Add_transition {With_hash.hash; _} ->
+                  remove_job hash
+              | New_frontier ({With_hash.hash; _}, _, _) ->
+                  remove_job hash
+              | _ ->
+                  () ) ;
               new_hash ) )
       |> Deferred.ignore |> don't_wait_for ;
       let%bind () =
@@ -100,7 +103,7 @@ let%test_module "Transition Frontier Persistence" =
     let test_breadcrumbs ~gen_root_breadcrumb_builder num_breadcrumbs =
       Thread_safe.block_on_async_exn
       @@ fun () ->
-      let directory_name = Uuid.to_string (Uuid.create ()) in
+      let directory_name = Uuid.to_string (Uuid_unix.create ()) in
       let%map breadcrumbs =
         with_persistence ~logger ~directory_name ~f:(fun (frontier, t) ->
             let%bind breadcrumbs =
@@ -131,7 +134,7 @@ let%test_module "Transition Frontier Persistence" =
       Async.Scheduler.set_record_backtraces true ;
       Thread_safe.block_on_async_exn
       @@ fun () ->
-      let directory_name = Uuid.to_string (Uuid.create ()) in
+      let directory_name = Uuid.to_string (Uuid_unix.create ()) in
       let%map root, next_breadcrumb =
         with_persistence ~logger ~directory_name ~f:(fun (frontier, t) ->
             let create_breadcrumb =
@@ -183,7 +186,7 @@ let%test_module "Transition Frontier Persistence" =
       let num_breadcrumbs = max_length in
       Thread_safe.block_on_async_exn
       @@ fun () ->
-      let directory_name = Uuid.to_string (Uuid.create ()) in
+      let directory_name = Uuid.to_string (Uuid_unix.create ()) in
       let%bind frontier =
         create_root_frontier ~logger Genesis_ledger.accounts
       in

@@ -123,10 +123,7 @@ end) : S = struct
     end
 
     type ('staged_ledger_hash, 'snarked_ledger_hash, 'time) t =
-                                                               ( 'staged_ledger_hash
-                                                               , 'snarked_ledger_hash
-                                                               , 'time )
-                                                               Stable.Latest.t =
+          ('staged_ledger_hash, 'snarked_ledger_hash, 'time) Stable.Latest.t =
       { staged_ledger_hash: 'staged_ledger_hash
       ; snarked_ledger_hash: 'snarked_ledger_hash
       ; timestamp: 'time }
@@ -177,7 +174,7 @@ end) : S = struct
   let create_value ~staged_ledger_hash ~snarked_ledger_hash ~timestamp =
     {Poly.staged_ledger_hash; snarked_ledger_hash; timestamp}
 
-  let to_hlist Poly.({staged_ledger_hash; snarked_ledger_hash; timestamp}) =
+  let to_hlist Poly.{staged_ledger_hash; snarked_ledger_hash; timestamp} =
     H_list.[staged_ledger_hash; snarked_ledger_hash; timestamp]
 
   let of_hlist :
@@ -226,7 +223,7 @@ end) : S = struct
 
   type display = (string, string, string) Poly.t [@@deriving yojson]
 
-  let display Poly.({staged_ledger_hash; snarked_ledger_hash; timestamp}) =
+  let display Poly.{staged_ledger_hash; snarked_ledger_hash; timestamp} =
     { Poly.staged_ledger_hash=
         Visualization.display_short_sexp (module Ledger_hash)
         @@ Staged_ledger_hash.ledger_hash staged_ledger_hash

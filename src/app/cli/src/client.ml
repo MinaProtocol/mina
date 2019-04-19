@@ -10,8 +10,10 @@ let dispatch rpc query port =
     (fun _ r w ->
       let open Deferred.Let_syntax in
       match%bind Rpc.Connection.create r w ~connection_state:(fun _ -> ()) with
-      | Error exn -> return (Or_error.of_exn exn)
-      | Ok conn -> Rpc.Rpc.dispatch rpc conn query )
+      | Error exn ->
+          return (Or_error.of_exn exn)
+      | Ok conn ->
+          Rpc.Rpc.dispatch rpc conn query )
 
 (** Call an RPC, passing handlers for a successful call and a failing one. Note
    that a successful *call* may have failed on the server side and returned a
@@ -22,9 +24,12 @@ let dispatch_with_message rpc query port ~success ~error =
   match%bind dispatch rpc query port with
   | Ok x -> (
     match success x with
-    | Ok res -> printf "%s\n" res ; Deferred.unit
-    | Error e -> fail (Error.to_string_hum e) )
-  | Error e -> fail (error e)
+    | Ok res ->
+        printf "%s\n" res ; Deferred.unit
+    | Error e ->
+        fail (Error.to_string_hum e) )
+  | Error e ->
+      fail (error e)
 
 let dispatch_pretty_message (type t)
     (module Print : Cli_lib.Render.Printable_intf with type t = t)
@@ -49,7 +54,8 @@ let stop_daemon =
   Command.async ~summary:"Stop the daemon"
     (Cli_lib.Background_daemon.init (return ()) ~f:(fun port () ->
          match%map dispatch Stop_daemon.rpc () port with
-         | Ok () -> printf "Daemon stopping\n"
+         | Ok () ->
+             printf "Daemon stopping\n"
          | Error e ->
              printf "Daemon likely stopped: %s\n" (Error.to_string_hum e) ))
 
@@ -69,7 +75,8 @@ let get_balance =
              (Public_key.compress address)
              port
          with
-         | Ok (Some b) -> printf "%s\n" (Currency.Balance.to_string b)
+         | Ok (Some b) ->
+             printf "%s\n" (Currency.Balance.to_string b)
          | Ok None ->
              printf "No account found at that public_key (zero balance)\n"
          | Error e ->
@@ -130,12 +137,12 @@ let verify_payment =
   let proof_path_flag =
     flag "proof-path"
       ~doc:"PROOFFILE File to read json version of payment proof"
-      (required file)
+      (required string)
   in
   let payment_path_flag =
     flag "payment-path"
       ~doc:"PAYMENTPATH File to read json version of verifying payment"
-      (required file)
+      (required string)
   in
   let address_flag =
     flag "address" ~doc:"PUBLICKEY Public-key address of sender"
@@ -162,16 +169,20 @@ let verify_payment =
          match%map dispatch_result with
          | Ok (Ok ()) ->
              printf "Payment is valid on the existing blockchain!\n"
-         | Error e | Ok (Error e) -> eprintf "%s" (Error.to_string_hum e) ))
+         | Error e | Ok (Error e) ->
+             eprintf "%s" (Error.to_string_hum e) ))
 
 let get_nonce addr port =
   let open Deferred.Let_syntax in
   match%map
     dispatch Daemon_rpcs.Get_nonce.rpc (Public_key.compress addr) port
   with
-  | Ok (Some n) -> Ok n
-  | Ok None -> Error "No account found at that public_key"
-  | Error e -> Error (Error.to_string_hum e)
+  | Ok (Some n) ->
+      Ok n
+  | Ok None ->
+      Error "No account found at that public_key"
+  | Error e ->
+      Error (Error.to_string_hum e)
 
 let get_nonce_cmd =
   let open Command.Param in
@@ -219,12 +230,14 @@ let get_nonce_exn public_key port =
   | Error e ->
       eprintf "Failed to get nonce %s\n" e ;
       exit 1
-  | Ok nonce -> return nonce
+  | Ok nonce ->
+      return nonce
 
 let handle_exception_nicely (type a) (f : unit -> a Deferred.t) () :
     a Deferred.t =
   match%bind Deferred.Or_error.try_with ~extract_exn:true f with
-  | Ok e -> return e
+  | Ok e ->
+      return e
   | Error e ->
       eprintf "Error: %s" (Error.to_string_hum e) ;
       exit 1
@@ -241,7 +254,8 @@ let batch_send_payments =
     match%bind
       Reader.load_sexp payments_path [%of_sexp: Payment_info.t list]
     with
-    | Ok x -> return x
+    | Ok x ->
+        return x
     | Error e ->
         let sample_info () : Payment_info.t =
           let keypair = Keypair.create () in
@@ -414,9 +428,12 @@ let dump_ledger =
     (Cli_lib.Background_daemon.init sl_hash ~f:(fun port sl_hash ->
          dispatch Daemon_rpcs.Get_ledger.rpc sl_hash port
          >>| function
-         | Error e -> eprintf !"Error: %{sexp:Error.t}\n" e
-         | Ok (Error e) -> printf !"Ledger not found: %{sexp:Error.t}\n" e
-         | Ok (Ok accounts) -> printf !"%{sexp:Account.t list}\n" accounts ))
+         | Error e ->
+             eprintf !"Error: %{sexp:Error.t}\n" e
+         | Ok (Error e) ->
+             printf !"Ledger not found: %{sexp:Error.t}\n" e
+         | Ok (Ok accounts) ->
+             printf !"%{sexp:Account.t list}\n" accounts ))
 
 let constraint_system_digests =
   Command.async ~summary:"Print MD5 digest of each SNARK constraint"
@@ -427,7 +444,7 @@ let constraint_system_digests =
                ()
          in
          let all =
-           List.sort (fun (k1, _) (k2, _) -> String.compare k1 k2) all
+           List.sort ~compare:(fun (k1, _) (k2, _) -> String.compare k1 k2) all
          in
          List.iter all ~f:(fun (k, v) -> printf "%s\t%s\n" k (Md5.to_hex v)) ;
          Deferred.unit ))
@@ -439,8 +456,10 @@ let snark_job_list =
   Command.async ~summary:"List of snark jobs in JSON format"
     (Cli_lib.Background_daemon.init (return ()) ~f:(fun port () ->
          match%map dispatch Daemon_rpcs.Snark_job_list.rpc () port with
-         | Ok str -> printf "%s" str
-         | Error e -> eprintf !"Error: %{sexp:Error.t}\n" e ))
+         | Ok str ->
+             printf "%s" str
+         | Error e ->
+             eprintf !"Error: %{sexp:Error.t}\n" e ))
 
 let start_tracing =
   let open Deferred.Let_syntax in
@@ -449,8 +468,10 @@ let start_tracing =
   Command.async ~summary:"Start async tracing to $config-directory/$pid.trace"
     (Cli_lib.Background_daemon.init (return ()) ~f:(fun port () ->
          match%map dispatch Daemon_rpcs.Start_tracing.rpc () port with
-         | Ok () -> printf "Daemon started tracing!"
-         | Error e -> eprintf !"Error: %{sexp:Error.t}\n" e ))
+         | Ok () ->
+             printf "Daemon started tracing!"
+         | Error e ->
+             eprintf !"Error: %{sexp:Error.t}\n" e ))
 
 let stop_tracing =
   let open Deferred.Let_syntax in
@@ -459,8 +480,10 @@ let stop_tracing =
   Command.async ~summary:"Stop async tracing"
     (Cli_lib.Background_daemon.init (return ()) ~f:(fun port () ->
          match%map dispatch Daemon_rpcs.Stop_tracing.rpc () port with
-         | Ok () -> printf "Daemon stopped printing!"
-         | Error e -> eprintf !"Error: %{sexp:Error.t}\n" e ))
+         | Ok () ->
+             printf "Daemon stopped printing!"
+         | Error e ->
+             eprintf !"Error: %{sexp:Error.t}\n" e ))
 
 module Visualization = struct
   let create_command (type rpc_response) ~name ~f
@@ -474,7 +497,8 @@ module Visualization = struct
          ~f:(fun port filename ->
            let%map message =
              match%map dispatch rpc filename port with
-             | Ok response -> f filename response
+             | Ok response ->
+                 f filename response
              | Error e ->
                  sprintf "Could not save file: %s\n" (Error.to_string_hum e)
            in
@@ -486,8 +510,10 @@ module Visualization = struct
     let command =
       create_command ~name Daemon_rpcs.Visualization.Frontier.rpc
         ~f:(fun filename -> function
-        | `Active () -> Visualization_message.success name filename
-        | `Bootstrapping -> Visualization_message.bootstrap name )
+        | `Active () ->
+            Visualization_message.success name filename
+        | `Bootstrapping ->
+            Visualization_message.bootstrap name )
   end
 
   module Registered_masks = struct
@@ -495,7 +521,7 @@ module Visualization = struct
 
     let command =
       create_command ~name Daemon_rpcs.Visualization.Registered_masks.rpc
-        ~f:(fun filename () -> Visualization_message.success name filename )
+        ~f:(fun filename () -> Visualization_message.success name filename)
   end
 
   let command_group =

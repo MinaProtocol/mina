@@ -75,12 +75,18 @@ end) :
 
     let increase t ws =
       match (t, ws) with
-      | Zero, [] -> Ok (One None)
-      | Zero, [a] -> Ok (One (Some a))
-      | One _, [] -> Ok (Two None)
-      | One _, [a] -> Ok (Two (Some (a, None)))
-      | One _, [a; a'] -> Ok (Two (Some (a', Some a)))
-      | _ -> Or_error.error_string "Error incrementing coinbase parts"
+      | Zero, [] ->
+          Ok (One None)
+      | Zero, [a] ->
+          Ok (One (Some a))
+      | One _, [] ->
+          Ok (Two None)
+      | One _, [a] ->
+          Ok (Two (Some (a, None)))
+      | One _, [a; a'] ->
+          Ok (Two (Some (a', Some a)))
+      | _ ->
+          Or_error.error_string "Error incrementing coinbase parts"
   end
 
   module At_most_one = struct
@@ -102,9 +108,12 @@ end) :
 
     let increase t ws =
       match (t, ws) with
-      | Zero, [] -> Ok (One None)
-      | Zero, [a] -> Ok (One (Some a))
-      | _ -> Or_error.error_string "Error incrementing coinbase parts"
+      | Zero, [] ->
+          Ok (One None)
+      | Zero, [a] ->
+          Ok (One (Some a))
+      | _ ->
+          Or_error.error_string "Error incrementing coinbase parts"
   end
 
   module Ft = struct

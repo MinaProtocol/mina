@@ -8,7 +8,8 @@ let extract_kv_str markdown =
 
 let split_kv s =
   match String.index s ':' with
-  | None -> None
+  | None ->
+      None
   | Some i ->
       let n = String.length s in
       Some

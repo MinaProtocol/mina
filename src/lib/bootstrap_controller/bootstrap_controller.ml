@@ -127,10 +127,9 @@ module Make (Inputs : Inputs_intf) : sig
                           * Staged_ledger_hash.t )
                           Inputs.Root_sync_ledger.t
       -> transition_graph:Transition_cache.t
-      -> transition_reader:( [< `Transition of Inputs.External_transition
-                                               .Verified
-                                               .t
-                                               Envelope.Incoming.t ]
+      -> transition_reader:( [< `Transition of
+                                Inputs.External_transition.Verified.t
+                                Envelope.Incoming.t ]
                            * [< `Time_received of 'a] )
                            Pipe_lib.Strict_pipe.Reader.t
       -> unit Deferred.t
@@ -216,10 +215,14 @@ end = struct
                   ~equal:(fun (hash1, _, _) (hash2, _, _) ->
                     State_hash.equal hash1 hash2 )
               with
-              | `New -> `Syncing_new_snarked_ledger
-              | `Update_data -> `Updating_root_transition
-              | `Repeat -> `Ignored )
-          | Error e -> received_bad_proof t e |> Fn.const `Ignored )
+              | `New ->
+                  `Syncing_new_snarked_ledger
+              | `Update_data ->
+                  `Updating_root_transition
+              | `Repeat ->
+                  `Ignored )
+          | Error e ->
+              received_bad_proof t e |> Fn.const `Ignored )
 
   let sync_ledger t ~root_sync_ledger ~transition_graph ~transition_reader =
     let query_reader = Root_sync_ledger.query_reader root_sync_ledger in
@@ -236,7 +239,8 @@ end = struct
               failwith
                 "Unexpected, we should be syncing only to remote nodes in \
                  sync ledger"
-          | Envelope.Sender.Remote peer -> peer
+          | Envelope.Sender.Remote peer ->
+              peer
         in
         let protocol_state =
           External_transition.Verified.protocol_state transition
@@ -245,7 +249,7 @@ end = struct
           External_transition.Protocol_state.previous_state_hash protocol_state
         in
         Transition_cache.add transition_graph ~parent:previous_state_hash
-          transition ;
+          incoming_transition ;
         (* TODO: Efficiently limiting the number of green threads in #1337 *)
         if
           worth_getting_root t

@@ -169,7 +169,8 @@ let apply_coinbase_exn t
   in
   let proposer_reward, t =
     match fee_transfer with
-    | None -> (coinbase_amount, t)
+    | None ->
+        (coinbase_amount, t)
     | Some (receiver, fee) ->
         let fee = Amount.of_fee fee in
         let reward =
@@ -182,9 +183,12 @@ let apply_coinbase_exn t
 
 let apply_transaction_exn t (transition : Transaction.t) =
   match transition with
-  | Fee_transfer tr -> apply_fee_transfer_exn t tr
-  | User_command cmd -> apply_user_command_exn t (cmd :> User_command.t)
-  | Coinbase c -> apply_coinbase_exn t c
+  | Fee_transfer tr ->
+      apply_fee_transfer_exn t tr
+  | User_command cmd ->
+      apply_user_command_exn t (cmd :> User_command.t)
+  | Coinbase c ->
+      apply_coinbase_exn t c
 
 let merkle_root t = Ledger_hash.of_hash (merkle_root t :> Pedersen.Digest.t)
 
@@ -208,4 +212,5 @@ let handler t =
       | Ledger_hash.Find_index pk ->
           let index = find_index_exn !ledger pk in
           respond (Provide index)
-      | _ -> unhandled )
+      | _ ->
+          unhandled )

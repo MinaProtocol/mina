@@ -117,9 +117,8 @@ struct
   type t =
     { mutable pool: pool
     ; logger: Logger.t
-    ; mutable diff_reader:
-        unit Deferred.t Option.t
-        (* TODO we want to validate against the best tip + any relevant commands
+    ; mutable diff_reader: unit Deferred.t Option.t
+          (* TODO we want to validate against the best tip + any relevant commands
        already in the pool, to support queuing. *)
     ; mutable best_tip_ledger: Base_ledger.t option }
 
@@ -203,7 +202,8 @@ struct
         match
           Transaction_validator.apply_user_command validation_ledger tx
         with
-        | Ok () -> add t tx
+        | Ok () ->
+            add t tx
         | Error err ->
             Logger.trace t.logger ~module_:__MODULE__ ~location:__LOC__
               !"Transaction %{sexp: User_command.With_valid_signature.t} \
@@ -235,7 +235,8 @@ struct
                (* Sanity check: the view pipe should have been closed before the
                     frontier was destroyed. *)
                match t.diff_reader with
-               | None -> Deferred.unit
+               | None ->
+                   Deferred.unit
                | Some hdl ->
                    let is_finished = ref false in
                    t.best_tip_ledger <- None ;
@@ -374,8 +375,10 @@ struct
       in
       t.pool <- pool' ;
       match res with
-      | [] -> Deferred.Or_error.error_string "No new transactions"
-      | xs -> Deferred.Or_error.return xs
+      | [] ->
+          Deferred.Or_error.error_string "No new transactions"
+      | xs ->
+          Deferred.Or_error.return xs
   end
 
   (* TODO: Actually back this by the file-system *)
