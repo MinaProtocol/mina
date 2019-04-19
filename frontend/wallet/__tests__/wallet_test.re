@@ -2,25 +2,69 @@ open Jest;
 open Expect;
 open Tc;
 
-describe("CallTable", () =>
+module Typ = {
+  type t('a) =
+    | Int: t(int)
+    | Str: t(string);
+
+  let if_eq =
+      (
+        type a,
+        type b,
+        ta: t(a),
+        tb: t(b),
+        v: b,
+        ~is_equal: a => unit,
+        ~not_equal: b => unit,
+      ) => {
+    switch (ta, tb) {
+    | (Int, Int) => is_equal(v)
+    | (Str, Str) => is_equal(v)
+    | (_, _) => not_equal(v)
+    };
+  };
+};
+module CallTable = CallTable.Make(Typ);
+
+describe("CallTable", () => {
   testAsync(
-    "pending tasks complete",
+    "pending int task completes",
     ~timeout=10,
     cb => {
       let table = CallTable.make();
-      let pending: CallTable.Pending.t('x) =
-        CallTable.nextPending(table, ~loc=__LOC__);
-      Task.perform(pending.task, ~f=() => cb(expect(true) |> toBe(true)));
+
+      let pendingInt: CallTable.Pending.t('x, int) =
+        CallTable.nextPending(table, Typ.Int, ~loc=__LOC__);
+      Task.perform(pendingInt.task, ~f=i => cb(expect(i) |> toBe(1)));
 
       let _ =
         Js.Global.setTimeout(
-          () => CallTable.resolve(table, pending.ident),
+          () => CallTable.resolve(table, pendingInt.ident, 1),
           1,
         );
       ();
     },
-  )
-);
+  );
+
+  testAsync(
+    "pending str task completes",
+    ~timeout=10,
+    cb => {
+      let table = CallTable.make();
+
+      let pendingStr: CallTable.Pending.t('x, string) =
+        CallTable.nextPending(table, Typ.Str, ~loc=__LOC__);
+      Task.perform(pendingStr.task, ~f=s => cb(expect(s) |> toBe("hello")));
+
+      let _ =
+        Js.Global.setTimeout(
+          () => CallTable.resolve(table, pendingStr.ident, "hello"),
+          1,
+        );
+      ();
+    },
+  );
+});
 
 describe("Settings", () =>
   describe("serialization", () =>
