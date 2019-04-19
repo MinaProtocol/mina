@@ -4,7 +4,7 @@ version: 3
 jobs:
     tracetool:
         docker:
-            - image: codaprotocol/coda:toolchain-rust-b2e9fa0d25f2f9b7c7f01d6f8727e2c6c7690712
+            - image: codaprotocol/coda:toolchain-rust-c4b2cc7c53ef51136350323d52609de5aa83f3a5
         steps:
             - checkout
             - run: git submodule sync && git submodule update --init --recursive
@@ -17,13 +17,17 @@ jobs:
             xcode: "10.1.0"
         steps:
             - checkout
+            - run: git submodule sync && git submodule update --init --recursive
             - run: cd frontend/wallet && npm install
             - run:
                   name: Lint wallet
                   command: cd frontend/wallet && npm run reformat && git diff --exit-code src
             - run:
                   name: Build wallet
-                  command: cd frontend/wallet && npm run build
+                  command: cd frontend/wallet && npm run build-ci
+            - run:
+                  name: Test wallet
+                  command: cd frontend/wallet && npm test
             - run: cd frontend/website && npm install
             - run:
                   name: Decrypt PragmataPro font
@@ -40,7 +44,7 @@ jobs:
 
     lint:
         docker:
-            - image: codaprotocol/coda:toolchain-e815174112752dd87cae95a6818b9cdfc26eba77
+            - image: codaprotocol/coda:toolchain-f8dc1642d4ed1d38a7c726f0f2677f53654e4bfc
         steps:
             - checkout
             - run: git submodule sync && git submodule update --init --recursive
@@ -118,7 +122,7 @@ jobs:
     build-artifacts--{{profile}}:
         resource_class: large
         docker:
-            - image: codaprotocol/coda:toolchain-e815174112752dd87cae95a6818b9cdfc26eba77
+            - image: codaprotocol/coda:toolchain-f8dc1642d4ed1d38a7c726f0f2677f53654e4bfc
         environment:
             DUNE_PROFILE: {{profile}}
         steps:
@@ -157,7 +161,7 @@ jobs:
     test-unit--{{profile}}:
         resource_class: large
         docker:
-            - image: codaprotocol/coda:toolchain-e815174112752dd87cae95a6818b9cdfc26eba77
+            - image: codaprotocol/coda:toolchain-f8dc1642d4ed1d38a7c726f0f2677f53654e4bfc
         steps:
             - checkout
             - run: git submodule sync && git submodule update --init --recursive
@@ -170,7 +174,7 @@ jobs:
     test--{{profile}}:
         resource_class: large
         docker:
-            - image: codaprotocol/coda:toolchain-e815174112752dd87cae95a6818b9cdfc26eba77
+            - image: codaprotocol/coda:toolchain-f8dc1642d4ed1d38a7c726f0f2677f53654e4bfc
         steps:
             - checkout
             - run: git submodule sync && git submodule update --init --recursive

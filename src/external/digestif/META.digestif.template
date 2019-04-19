@@ -1,4 +1,0 @@
-# JBUILDER_GEN
-
-xen_linkopts = "-l:xen/librakia_xen_stubs.a"
-freestanding_linkopts = "-l:freestanding/librakia_freestanding_stubs.a"

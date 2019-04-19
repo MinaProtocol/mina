@@ -7,8 +7,10 @@ module Make (Impl : Snarky.Snark_intf.S) = struct
   let pack_int bs =
     assert (List.length bs < 62) ;
     let rec go pt acc = function
-      | [] -> acc
-      | b :: bs -> if b then go (2 * pt) (pt + acc) bs else go (2 * pt) acc bs
+      | [] ->
+          acc
+      | b :: bs ->
+          if b then go (2 * pt) (pt + acc) bs else go (2 * pt) acc bs
     in
     go 1 0 bs
 
@@ -26,7 +28,8 @@ module Make (Impl : Snarky.Snark_intf.S) = struct
   let assert_decreasing : Boolean.var list -> (unit, _) Checked.t =
     let rec go prev (bs0 : Boolean.var list) =
       match bs0 with
-      | [] -> return ()
+      | [] ->
+          return ()
       | b :: bs ->
           let%bind () = boolean_assert_lte b prev in
           go b bs
@@ -47,7 +50,8 @@ module Make (Impl : Snarky.Snark_intf.S) = struct
             (Field.Var.add acc (Field.Var.scale b two_to_the_i))
             (Field.add two_to_the_i two_to_the_i)
             bs
-      | [] -> acc
+      | [] ->
+          acc
     in
     go (Field.Var.constant Field.zero) Field.one (bs0 :> Field.Var.t list)
 
@@ -97,8 +101,10 @@ module Make (Impl : Snarky.Snark_intf.S) = struct
           (List.rev (Field.unpack x))
           ~f:(fun i x -> if x then Some i else None)
       with
-      | Some leading_zeroes -> Field.size_in_bits - leading_zeroes
-      | None -> 0
+      | Some leading_zeroes ->
+          Field.size_in_bits - leading_zeroes
+      | None ->
+          0
     in
     num_bits
 
@@ -185,8 +191,10 @@ module Make (Impl : Snarky.Snark_intf.S) = struct
           let handle_with (resp : bool list) =
             handle t (fun (With {request; respond}) ->
                 match request with
-                | N_ones -> respond (Provide resp)
-                | _ -> unhandled )
+                | N_ones ->
+                    respond (Provide resp)
+                | _ ->
+                    unhandled )
           in
           let correct = Int.pow 2 n - 1 in
           let to_bits k =

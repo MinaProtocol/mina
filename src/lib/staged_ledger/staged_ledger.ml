@@ -8,8 +8,10 @@ open Coda_pow
 open O1trace
 
 let val_or_exn label = function
-  | Error e -> failwithf "%s: %s" label (Error.to_string_hum e) ()
-  | Ok x -> x
+  | Error e ->
+      failwithf "%s: %s" label (Error.to_string_hum e) ()
+  | Ok x ->
+      x
 
 let option lab =
   Option.value_map ~default:(Or_error.error_string lab) ~f:(fun x -> Ok x)
@@ -17,7 +19,14 @@ let option lab =
 module Make_completed_work = Transaction_snark_work.Make
 module Make_diff = Staged_ledger_diff.Make
 
-module Make (Inputs : Inputs.S) : sig
+module Make_with_constants (Constants : sig
+  val transaction_capacity_log_2 : int
+
+  val work_delay_factor : int
+
+  val latency_factor : int
+end)
+(Inputs : Inputs.S) : sig
   include
     Coda_pow.Staged_ledger_intf
     with type diff := Inputs.Staged_ledger_diff.t
@@ -43,7 +52,7 @@ module Make (Inputs : Inputs.S) : sig
      and type pending_coinbase_collection := Inputs.Pending_coinbase.t
 end = struct
   open Inputs
-  module Scan_state = Transaction_snark_scan_state.Make (Inputs)
+  module Scan_state = Transaction_snark_scan_state.Make (Constants) (Inputs)
 
   module Staged_ledger_error = struct
     type t =
@@ -63,7 +72,8 @@ end = struct
           Format.asprintf
             !"Bad signature of the user command: %{sexp: User_command.t} \n"
             t
-      | Coinbase_error err -> Format.asprintf !"Coinbase error: %s \n" err
+      | Coinbase_error err ->
+          Format.asprintf !"Coinbase error: %s \n" err
       | Bad_prev_hash (h1, h2) ->
           Format.asprintf
             !"bad prev_hash: Expected %{sexp: Staged_ledger_hash.t}, got \
@@ -86,18 +96,23 @@ end = struct
               Statement: %{sexp: Ledger_proof_statement.t} Prover: \
               %{sexp:Compressed_public_key.t}\n"
             p s prover
-      | Unexpected e -> Error.to_string_hum e
+      | Unexpected e ->
+          Error.to_string_hum e
 
     let to_error = Fn.compose Error.of_string to_string
 
     let to_or_error = function
-      | Ok s -> Ok s
-      | Error e -> Or_error.error_string (to_string e)
+      | Ok s ->
+          Ok s
+      | Error e ->
+          Or_error.error_string (to_string e)
   end
 
   let to_staged_ledger_or_error = function
-    | Ok a -> Ok a
-    | Error e -> Error (Staged_ledger_error.Unexpected e)
+    | Ok a ->
+        Ok a
+    | Error e ->
+        Error (Staged_ledger_error.Unexpected e)
 
   type job = Scan_state.Available_job.t [@@deriving sexp]
 
@@ -113,7 +128,8 @@ end = struct
           |> to_staged_ledger_or_error )
     | Some statement -> (
         match%map verify_proof proof statement ~message with
-        | true -> Ok ()
+        | true ->
+            Ok ()
         | _ ->
             Error
               (Staged_ledger_error.Invalid_proof (proof, statement, prover)) )
@@ -146,9 +162,8 @@ end = struct
   [@@deriving sexp, bin_io]
 
   type t =
-    { scan_state:
-        Scan_state.t
-        (* Invariant: this is the ledger after having applied all the transactions in
+    { scan_state: Scan_state.t
+          (* Invariant: this is the ledger after having applied all the transactions in
        *the above state. *)
     ; ledger: Ledger.attached_mask sexp_opaque
     ; pending_coinbase_collection: Pending_coinbase.t }
@@ -206,13 +221,18 @@ end = struct
       let pairs = chunks_of all_jobs ~n:2 in
       List.map pairs ~f:(fun js ->
           match js with
-          | [j] -> (j, None)
-          | [j1; j2] -> (j1, Some j2)
-          | _ -> failwith "error pairing jobs" )
+          | [j] ->
+              (j, None)
+          | [j1; j2] ->
+              (j1, Some j2)
+          | _ ->
+              failwith "error pairing jobs" )
     in
     let job_pair_to_work_spec_pair = function
-      | j, Some j' -> (single_spec j, Some (single_spec j'))
-      | j, None -> (single_spec j, None)
+      | j, Some j' ->
+          (single_spec j, Some (single_spec j'))
+      | j, None ->
+          (single_spec j, None)
     in
     List.map all_jobs_paired ~f:job_pair_to_work_spec_pair
 
@@ -269,7 +289,8 @@ end = struct
         expected_target
     else
       match Scan_state.latest_ledger_proof scan_state with
-      | None -> return snarked_ledger
+      | None ->
+          return snarked_ledger
       | Some proof ->
           let target = get_target proof in
           if Frozen_ledger_hash.equal snarked_ledger_hash target then
@@ -281,22 +302,22 @@ end = struct
                 Frozen_ledger_hash.t}))"
               target expected_target
 
-  module For_tests = struct
-    let snarked_ledger = snarked_ledger
-  end
-
   let statement_exn t =
     match Statement_scanner.scan_statement t.scan_state with
-    | Ok s -> `Non_empty s
-    | Error `Empty -> `Empty
-    | Error (`Error e) -> failwithf !"statement_exn: %{sexp:Error.t}" e ()
+    | Ok s ->
+        `Non_empty s
+    | Error `Empty ->
+        `Empty
+    | Error (`Error e) ->
+        failwithf !"statement_exn: %{sexp:Error.t}" e ()
 
   let of_scan_state_and_ledger ~snarked_ledger_hash ~ledger ~scan_state
       ~pending_coinbase_collection =
     let open Deferred.Or_error.Let_syntax in
     let verify_snarked_ledger t snarked_ledger_hash =
       match snarked_ledger t ~snarked_ledger_hash with
-      | Ok _ -> Ok ()
+      | Ok _ ->
+          Ok ()
       | Error e ->
           Or_error.error_string
             ( "Error verifying snarked ledger hash from the ledger.\n"
@@ -395,8 +416,10 @@ end = struct
         Ok
           (List.fold ~init:Fee.Unsigned.zero xs ~f:(fun acc x ->
                match Fee.Unsigned.add acc (f x) with
-               | None -> return (Or_error.error_string "Fee overflow")
-               | Some res -> res )) )
+               | None ->
+                   return (Or_error.error_string "Fee overflow")
+               | Some res ->
+                   res )) )
 
   let working_stack pending_coinbase_collection ~is_new_stack =
     to_staged_ledger_or_error
@@ -404,8 +427,10 @@ end = struct
 
   let push_coinbase_and_get_new_collection current_stack (t : Transaction.t) =
     match t with
-    | Coinbase c -> Pending_coinbase.Stack.push current_stack c
-    | _ -> current_stack
+    | Coinbase c ->
+        Pending_coinbase.Stack.push current_stack c
+    | _ ->
+        current_stack
 
   let apply_transaction_and_get_statement ledger current_stack s =
     let open Result.Let_syntax in
@@ -435,7 +460,8 @@ end = struct
   let apply_transaction_and_get_witness ledger current_stack s =
     let open Deferred.Let_syntax in
     let public_keys = function
-      | Transaction.Fee_transfer t -> Fee_transfer.receivers t
+      | Transaction.Fee_transfer t ->
+          Fee_transfer.receivers t
       | User_command t ->
           let t = (t :> User_command.t) in
           User_command.accounts_accessed t
@@ -466,14 +492,16 @@ end = struct
   let update_ledger_and_get_statements ledger current_stack ts =
     let open Deferred.Let_syntax in
     let rec go coinbase_stack acc = function
-      | [] -> return (Ok (List.rev acc, coinbase_stack))
+      | [] ->
+          return (Ok (List.rev acc, coinbase_stack))
       | t :: ts -> (
           match%bind
             apply_transaction_and_get_witness ledger coinbase_stack t
           with
           | Ok (res, updated_coinbase_stack) ->
               go updated_coinbase_stack (res :: acc) ts
-          | Error e -> return (Error e) )
+          | Error e ->
+              return (Error e) )
     in
     go current_stack [] ts
 
@@ -494,8 +522,10 @@ end = struct
       let open Deferred.Let_syntax in
       Deferred.List.find_map job_proofs ~f:(fun (job, proof) ->
           match%map verify ~message job proof prover with
-          | Ok () -> None
-          | Error e -> Some e )
+          | Ok () ->
+              None
+          | Error e ->
+              Some e )
     in
     let open Deferred.Let_syntax in
     let%map result =
@@ -525,14 +555,15 @@ end = struct
     Or_error.try_with (fun () ->
         List.fold coinbase_fts ~init:singles_map ~f:(fun accum single ->
             match Compressed_public_key.Map.find accum (fst single) with
-            | None -> accum
+            | None ->
+                accum
             | Some fee ->
                 let new_fee =
                   Option.value_exn (Currency.Fee.sub fee (snd single))
                 in
                 if new_fee > Currency.Fee.zero then
                   Compressed_public_key.Map.update accum (fst single)
-                    ~f:(fun _ -> new_fee )
+                    ~f:(fun _ -> new_fee)
                 else Compressed_public_key.Map.remove accum (fst single) )
         (* TODO: This creates a weird incentive to have a small public_key *)
         |> Map.to_alist ~key_order:`Increasing
@@ -562,7 +593,8 @@ end = struct
     let open Result.Let_syntax in
     let coinbase = Protocols.Coda_praos.coinbase_amount in
     let coinbase_or_error = function
-      | Ok x -> Ok x
+      | Ok x ->
+          Ok x
       | Error e ->
           Error (Staged_ledger_error.Coinbase_error (Error.to_string_hum e))
     in
@@ -597,14 +629,16 @@ end = struct
       [cb1; cb2]
     in
     match coinbase_parts with
-    | `Zero -> return []
+    | `Zero ->
+        return []
     | `One x ->
         let%map cb =
           Coinbase.create ~amount:coinbase ~proposer ~fee_transfer:x
           |> coinbase_or_error
         in
         [cb]
-    | `Two None -> two_parts (Currency.Amount.of_int 1) None None
+    | `Two None ->
+        two_parts (Currency.Amount.of_int 1) None None
     | `Two (Some (ft1, ft2)) ->
         two_parts (Currency.Amount.of_fee (snd ft1)) (Some ft1) ft2
 
@@ -648,7 +682,8 @@ end = struct
             List.fold_until user_commands ~init:[]
               ~f:(fun acc t ->
                 match User_command.check t with
-                | Some t -> Continue (t :: acc)
+                | Some t ->
+                    Continue (t :: acc)
                 | None ->
                     (* TODO: punish *)
                     Stop (Error (Staged_ledger_error.Bad_signature t)) )
@@ -658,11 +693,16 @@ end = struct
         in
         let coinbase_fts =
           match coinbase_parts with
-          | `Zero -> []
-          | `One (Some ft) -> [ft]
-          | `Two (Some (ft, None)) -> [ft]
-          | `Two (Some (ft1, Some ft2)) -> [ft1; ft2]
-          | _ -> []
+          | `Zero ->
+              []
+          | `One (Some ft) ->
+              [ft]
+          | `Two (Some (ft, None)) ->
+              [ft]
+          | `Two (Some (ft1, Some ft2)) ->
+              [ft1; ft2]
+          | _ ->
+              []
         in
         let%bind coinbase_work_fees =
           sum_fees coinbase_fts ~f:snd |> to_staged_ledger_or_error
@@ -735,9 +775,12 @@ end = struct
       List.fold_until ~init:(Ok false) txns
         ~f:(fun acc t ->
           match get_transaction t with
-          | Ok (Transaction.Coinbase _) -> Stop (Ok true)
-          | Error e -> Stop (Error e)
-          | _ -> Continue acc )
+          | Ok (Transaction.Coinbase _) ->
+              Stop (Ok true)
+          | Error e ->
+              Stop (Error e)
+          | _ ->
+              Continue acc )
         ~finish:Fn.id
       |> Deferred.return
     in
@@ -747,24 +790,14 @@ end = struct
     match second with
     | None ->
         (*Single partition:
-         1.Check if a new stack is required by going through the latest transactions. If any coinbases in it, then get the latest stack otheriwse create a new stack [working_stack]
+         1.Check if a new stack is required and get a working stack [working_stack]
          2.create data for enqueuing into the scan state *)
-        let current_base_jobs =
-          Scan_state.base_jobs_on_latest_tree scan_state
-        in
-        let%bind coinbase_exists_on_new_tree =
-          coinbase_exists
-            ~get_transaction:
-              (fun { Scan_state.Transaction_with_witness.transaction_with_info; _
-                   } ->
-              to_staged_ledger_or_error
-              @@ Ledger.Undo.transaction transaction_with_info )
-            current_base_jobs
+        let%bind is_new_tree =
+          Scan_state.next_on_new_tree scan_state
+          |> to_staged_ledger_or_error |> Deferred.return
         in
         let have_data_to_enqueue = List.length transactions > 0 in
-        let is_new_stack =
-          (not coinbase_exists_on_new_tree) && have_data_to_enqueue
-        in
+        let is_new_stack = is_new_tree && have_data_to_enqueue in
         let%bind working_stack =
           working_stack pending_coinbase_collection ~is_new_stack
           |> Deferred.return
@@ -772,15 +805,14 @@ end = struct
         let%map data, updated_stack =
           update_ledger_and_get_statements ledger working_stack transactions
         in
-        (is_new_stack, data, updated_stack)
+        (is_new_stack, data, `Update_one updated_stack)
     | Some _ ->
         (*Two partition:
         Assumption: Only one of the partition will have coinbase transaction(s)in it.
          1. Get the latest stack for coinbase in the first set of transactions
-         2. get the first set of scan_state data using the above stack
+         2. get the first set of scan_state data[data1]
          3. get a new stack for the second parition because the second set of transactions would start from the begining of the scan_state
-         4. get the second set of scan_state data using the new stack
-         5. return either of the stacks because only one of them would be updated as long as the assumption is true*)
+         4. get the second set of scan_state data[data2]*)
         let%bind working_stack1 =
           working_stack pending_coinbase_collection ~is_new_stack:false
           |> Deferred.return
@@ -803,53 +835,80 @@ end = struct
             (List.take transactions first)
         in
         let second_has_data = List.length (List.drop transactions first) > 0 in
-        let is_new_stack, updated_stack =
-          if first_has_coinbase then (false, updated_stack1)
-          else if second_has_data then (true, updated_stack2)
-          else (false, updated_stack1)
+        let new_stack_in_snark, stack_update =
+          match (first_has_coinbase, second_has_data) with
+          | true, true ->
+              (false, `Update_two (updated_stack1, updated_stack2))
+          (*updated_stack2 will not have any coinbase and therefore we don't want to create a new stack in snark. updated_stack2 is only used to update the pending_coinbase_aux because there's going to be data(second has data) on a "new tree"*)
+          | true, false ->
+              (false, `Update_one updated_stack1)
+          | false, true ->
+              (true, `Update_one updated_stack2)
+          (*updated stack2 has coinbase and it will be on a "new tree"*)
+          | false, false ->
+              (false, `Update_none)
         in
-        (is_new_stack, data1 @ data2, updated_stack)
+        (new_stack_in_snark, data1 @ data2, stack_update)
 
   (*update the pending_coinbase tree with the updated/new stack and delete the oldest stack if a proof was emitted*)
   let update_pending_coinbase_collection pending_coinbase_collection
-      updated_coinbase_stack ~is_new_stack ~ledger_proof =
+      stack_update ~is_new_stack ~ledger_proof =
     let open Result.Let_syntax in
+    (*Deleting oldest stack if proof emitted*)
     let%bind pending_coinbase_collection_updated1 =
-      if Option.is_some ledger_proof then
-        let%bind oldest_stack, pending_coinbase_collection_updated1 =
-          Pending_coinbase.remove_coinbase_stack pending_coinbase_collection
-          |> to_staged_ledger_or_error
-        in
-        let ledger_proof_stack =
-          let proof, _ = Option.value_exn ledger_proof in
-          (Ledger_proof.statement proof).pending_coinbase_stack_state.target
-        in
-        let%map () =
-          if Pending_coinbase.Stack.equal oldest_stack ledger_proof_stack then
-            Ok ()
-          else
-            Error
-              (Staged_ledger_error.Unexpected
-                 (Error.of_string
-                    "Pending coinbase stack of the ledger proof did not match \
-                     the oldest stack in the pending coinbase tree"))
-        in
-        pending_coinbase_collection_updated1
-      else Ok pending_coinbase_collection
+      match ledger_proof with
+      | Some (proof, _) ->
+          let%bind oldest_stack, pending_coinbase_collection_updated1 =
+            Pending_coinbase.remove_coinbase_stack pending_coinbase_collection
+            |> to_staged_ledger_or_error
+          in
+          let ledger_proof_stack =
+            (Ledger_proof.statement proof).pending_coinbase_stack_state.target
+          in
+          let%map () =
+            if Pending_coinbase.Stack.equal oldest_stack ledger_proof_stack
+            then Ok ()
+            else
+              Error
+                (Staged_ledger_error.Unexpected
+                   (Error.of_string
+                      "Pending coinbase stack of the ledger proof did not \
+                       match the oldest stack in the pending coinbase tree."))
+          in
+          pending_coinbase_collection_updated1
+      | None ->
+          Ok pending_coinbase_collection
     in
+    (*updating the latest stack and/or adding a new one*)
     let%map pending_coinbase_collection_updated2 =
-      Pending_coinbase.update_coinbase_stack
-        pending_coinbase_collection_updated1 updated_coinbase_stack
-        ~is_new_stack
-      |> to_staged_ledger_or_error
+      match stack_update with
+      | `Update_none ->
+          Ok pending_coinbase_collection_updated1
+      | `Update_one stack1 ->
+          Pending_coinbase.update_coinbase_stack
+            pending_coinbase_collection_updated1 stack1 ~is_new_stack
+          |> to_staged_ledger_or_error
+      | `Update_two (stack1, stack2) ->
+          (*The case when part of the transactions go in to the old tree and remaining on to the new tree*)
+          let%bind update1 =
+            Pending_coinbase.update_coinbase_stack
+              pending_coinbase_collection_updated1 stack1 ~is_new_stack:false
+            |> to_staged_ledger_or_error
+          in
+          Pending_coinbase.update_coinbase_stack update1 stack2
+            ~is_new_stack:true
+          |> to_staged_ledger_or_error
     in
     pending_coinbase_collection_updated2
 
   let coinbase_for_blockchain_snark (coinbases : Coinbase.t list) =
     match coinbases with
-    | [] -> Ok Currency.Amount.zero
-    | [x] -> Ok x.amount
-    | [x; _] -> Ok x.amount
+    | [] ->
+        Ok Currency.Amount.zero
+    | [x] ->
+        Ok x.amount
+    | [x; _] ->
+        Ok x.amount
     | _ ->
         Error
           (Staged_ledger_error.Coinbase_error "More than two coinbase parts")
@@ -871,18 +930,21 @@ end = struct
       , List.length jobs )
     in
     let apply_pre_diff_with_at_most_two
-        (pre_diff1 : Staged_ledger_diff.pre_diff_with_at_most_two_coinbase) =
+        (pre_diff1 : Staged_ledger_diff.Pre_diff_with_at_most_two_coinbase.t) =
       let coinbase_parts =
         match pre_diff1.coinbase with
-        | Zero -> `Zero
-        | One x -> `One x
-        | Two x -> `Two x
+        | Zero ->
+            `Zero
+        | One x ->
+            `One x
+        | Two x ->
+            `Two x
       in
       apply_pre_diff coinbase_parts sl_diff.creator pre_diff1.user_commands
         pre_diff1.completed_works
     in
     let apply_pre_diff_with_at_most_one
-        (pre_diff2 : Staged_ledger_diff.pre_diff_with_at_most_one_coinbase) =
+        (pre_diff2 : Staged_ledger_diff.Pre_diff_with_at_most_one_coinbase.t) =
       let coinbase_added =
         match pre_diff2.coinbase with Zero -> `Zero | One x -> `One x
       in
@@ -919,7 +981,7 @@ end = struct
       , p1.user_commands_count + p2.user_commands_count
       , p1.coinbases @ p2.coinbases )
     in
-    let%bind is_new_stack, data, updated_coinbase_stack =
+    let%bind is_new_stack, data, stack_update =
       update_coinbase_stack_and_get_data scan_state' new_ledger
         t.pending_coinbase_collection transactions
     in
@@ -932,12 +994,12 @@ end = struct
       in
       Or_error.iter_error r ~f:(fun e ->
           (* TODO: Pass a logger here *)
-          eprintf !"Unexpected error: %s %{sexp:Error.t}\n%!" __LOC__ e ) ;
+          eprintf !"Unexpected error: %s %{sexp:Error.t} \n%!" __LOC__ e ) ;
       Deferred.return (to_staged_ledger_or_error r)
     in
     let%bind updated_pending_coinbase_collection' =
       update_pending_coinbase_collection t.pending_coinbase_collection
-        updated_coinbase_stack ~is_new_stack ~ledger_proof:res_opt
+        stack_update ~is_new_stack ~ledger_proof:res_opt
       |> Deferred.return
     in
     let%bind coinbase_amount =
@@ -975,8 +1037,10 @@ end = struct
 
   let ok_exn' (t : ('a, Staged_ledger_error.t) Result.t) =
     match t with
-    | Ok x -> x
-    | Error e -> Error.raise (Staged_ledger_error.to_error e)
+    | Ok x ->
+        x
+    | Error e ->
+        Error.raise (Staged_ledger_error.to_error e)
 
   let apply_pre_diff_unchecked coinbase_parts proposer user_commands
       completed_works =
@@ -985,10 +1049,14 @@ end = struct
     in
     let coinbase_fts =
       match coinbase_parts with
-      | `One (Some ft) -> [ft]
-      | `Two (Some (ft, None)) -> [ft]
-      | `Two (Some (ft1, Some ft2)) -> [ft1; ft2]
-      | _ -> []
+      | `One (Some ft) ->
+          [ft]
+      | `Two (Some (ft, None)) ->
+          [ft]
+      | `Two (Some (ft1, Some ft2)) ->
+          [ft1; ft2]
+      | _ ->
+          []
     in
     let coinbase_work_fees = sum_fees coinbase_fts ~f:snd |> Or_error.ok_exn in
     let coinbase_parts =
@@ -1017,9 +1085,12 @@ end = struct
           .pre_diff_with_at_most_two_coinbase) =
       let coinbase_parts =
         match pre_diff1.coinbase with
-        | Zero -> `Zero
-        | One x -> `One x
-        | Two x -> `Two x
+        | Zero ->
+            `Zero
+        | One x ->
+            `One x
+        | Two x ->
+            `Two x
       in
       apply_pre_diff_unchecked coinbase_parts sl_diff.creator
         pre_diff1.user_commands pre_diff1.completed_works
@@ -1105,9 +1176,8 @@ end = struct
       { max_space: int (*max space available currently*)
       ; max_jobs: int (*Max amount of work that can be purchased*)
       ; cur_work_count: int (*Current work capacity of the scan state *)
-      ; work_capacity:
-          int
-          (*max number of pending jobs (currently in the tree and the ones that would arise in the future when current jobs are done) allowed on the tree*)
+      ; work_capacity: int
+            (*max number of pending jobs (currently in the tree and the ones that would arise in the future when current jobs are done) allowed on the tree*)
       ; user_commands_rev: User_command.With_valid_signature.t Sequence.t
       ; completed_work_rev: Transaction_snark_work.Checked.t Sequence.t
       ; fee_transfers: Currency.Fee.t Compressed_public_key.Map.t
@@ -1130,25 +1200,27 @@ end = struct
           match Sequence.next seq with
           | Some (w, rem_seq) ->
               go rem_seq (Sequence.append (Sequence.singleton w) rev_seq)
-          | None -> rev_seq
+          | None ->
+              rev_seq
         in
         go seq Sequence.empty
       in
       let cw_unchecked =
         Sequence.map cw_seq ~f:Transaction_snark_work.forget
       in
-      let work_capacity = Scan_state.work_capacity () in
+      let work_capacity = Scan_state.work_capacity in
       let coinbase, rem_cw =
         match (add_coinbase, Sequence.next cw_unchecked) with
         | true, Some (cw, rem_cw) ->
             (Staged_ledger_diff.At_most_two.One (coinbase_ft cw), rem_cw)
         | true, None ->
-            (*new count after a coinbase is added should be less that capacity*)
+            (*new count after a coinbase is added should be less than the capacity*)
             let new_count = cur_work_count + 2 in
-            if max_job_count = 0 || new_count < work_capacity then
+            if max_job_count = 0 || new_count <= work_capacity then
               (One None, cw_unchecked)
             else (Zero, cw_unchecked)
-        | _ -> (Zero, cw_unchecked)
+        | _ ->
+            (Zero, cw_unchecked)
       in
       let singles =
         Sequence.filter_map rem_cw
@@ -1205,9 +1277,12 @@ end = struct
 
     let coinbase_added t =
       match t.coinbase with
-      | Staged_ledger_diff.At_most_two.Zero -> 0
-      | One _ -> 1
-      | Two _ -> 2
+      | Staged_ledger_diff.At_most_two.Zero ->
+          0
+      | One _ ->
+          1
+      | Two _ ->
+          2
 
     let max_work_done t =
       let no_of_proof_bundles = Sequence.length t.completed_work_rev in
@@ -1216,8 +1291,10 @@ end = struct
     let slots_occupied t =
       let fee_for_self =
         match t.budget with
-        | Error _ -> 0
-        | Ok b -> if b > Currency.Fee.zero then 1 else 0
+        | Error _ ->
+            0
+        | Ok b ->
+            if b > Currency.Fee.zero then 1 else 0
       in
       let total_fee_transfer_pks =
         Compressed_public_key.Map.length t.fee_transfers + fee_for_self
@@ -1246,16 +1323,19 @@ end = struct
 
     let within_capacity t =
       let new_count = new_work_count t in
-      new_count < t.work_capacity
+      new_count <= t.work_capacity
 
     let incr_coinbase_part_by t count =
       let open Or_error.Let_syntax in
       let incr = function
         | Staged_ledger_diff.At_most_two.Zero, ft_opt ->
             Ok (Staged_ledger_diff.At_most_two.One ft_opt)
-        | One None, None -> Ok (Two None)
-        | One (Some ft), ft_opt -> Ok (Two (Some (ft, ft_opt)))
-        | _ -> Or_error.error_string "Coinbase count cannot be more than two"
+        | One None, None ->
+            Ok (Two None)
+        | One (Some ft), ft_opt ->
+            Ok (Two (Some (ft, ft_opt)))
+        | _ ->
+            Or_error.error_string "Coinbase count cannot be more than two"
       in
       let by_one res =
         let res' =
@@ -1273,10 +1353,12 @@ end = struct
           | None, true ->
               let%map coinbase = incr (res.coinbase, None) in
               {res with coinbase}
-          | _ -> Ok res
+          | _ ->
+              Ok res
         in
         match res' with
-        | Ok res'' -> if within_capacity res'' then res'' else res
+        | Ok res'' ->
+            if within_capacity res'' then res'' else res
         | Error e ->
             Logger.error t.logger ~module_:__MODULE__ ~location:__LOC__ "%s"
               (Error.to_string_hum e) ;
@@ -1297,10 +1379,14 @@ end = struct
       let len = Sequence.length t.completed_work_rev in
       let cb_work =
         match t.coinbase with
-        | Staged_ledger_diff.At_most_two.One (Some _) -> 1
-        | Two (Some (_, None)) -> 1
-        | Two (Some (_, Some _)) -> 2
-        | _ -> 0
+        | Staged_ledger_diff.At_most_two.One (Some _) ->
+            1
+        | Two (Some (_, None)) ->
+            1
+        | Two (Some (_, Some _)) ->
+            2
+        | _ ->
+            0
       in
       len - cb_work
 
@@ -1308,7 +1394,8 @@ end = struct
       (*Coinbase work is paid by the coinbase, so don't delete that unless the coinbase itself is deleted*)
       if non_coinbase_work t > 0 then
         match Sequence.next t.completed_work_rev with
-        | None -> t
+        | None ->
+            t
         | Some (w, rem_seq) ->
             let to_be_discarded = Transaction_snark_work.forget w in
             let current_fee =
@@ -1325,7 +1412,7 @@ end = struct
               | Some fee ->
                   if fee > Currency.Fee.zero then
                     Compressed_public_key.Map.update t.fee_transfers
-                      to_be_discarded.prover ~f:(fun _ -> fee )
+                      to_be_discarded.prover ~f:(fun _ -> fee)
                   else
                     Compressed_public_key.Map.remove t.fee_transfers
                       to_be_discarded.prover
@@ -1342,7 +1429,8 @@ end = struct
               | Ok b ->
                   option "Currency overflow"
                     (Currency.Fee.add b to_be_discarded.fee)
-              | _ -> re_budget new_t
+              | _ ->
+                  re_budget new_t
             in
             {new_t with budget}
       else t
@@ -1353,7 +1441,7 @@ end = struct
         let update_fee_transfers t ft coinbase =
           let updated_fee_transfers =
             Compressed_public_key.Map.update t.fee_transfers (fst ft)
-              ~f:(fun _ -> snd ft )
+              ~f:(fun _ -> snd ft)
           in
           let new_t =
             {t with coinbase; fee_transfers= updated_fee_transfers}
@@ -1362,11 +1450,16 @@ end = struct
           {new_t with budget= updated_budget}
         in
         match t.coinbase with
-        | Staged_ledger_diff.At_most_two.Zero -> t
-        | One None -> {t with coinbase= Staged_ledger_diff.At_most_two.Zero}
-        | Two None -> {t with coinbase= One None}
-        | Two (Some (ft, None)) -> {t with coinbase= One (Some ft)}
-        | One (Some ft) -> update_fee_transfers t ft Zero
+        | Staged_ledger_diff.At_most_two.Zero ->
+            t
+        | One None ->
+            {t with coinbase= Staged_ledger_diff.At_most_two.Zero}
+        | Two None ->
+            {t with coinbase= One None}
+        | Two (Some (ft, None)) ->
+            {t with coinbase= One (Some ft)}
+        | One (Some ft) ->
+            update_fee_transfers t ft Zero
         | Two (Some (ft1, Some ft2)) ->
             update_fee_transfers t ft2 (One (Some ft1))
       in
@@ -1382,7 +1475,8 @@ end = struct
             | Ok b ->
                 option "Fee insufficient"
                   (Currency.Fee.sub b (User_command.fee (uc :> User_command.t)))
-            | _ -> re_budget new_t
+            | _ ->
+                re_budget new_t
           in
           {new_t with budget}
   end
@@ -1436,7 +1530,8 @@ end = struct
           let to_at_most_one = function
             | Staged_ledger_diff.At_most_two.Zero ->
                 Staged_ledger_diff.At_most_one.Zero
-            | One x -> One x
+            | One x ->
+                One x
             | _ ->
                 Logger.error logger ~module_:__MODULE__ ~location:__LOC__
                   "Error creating diff: Should have at most one coinbase in \
@@ -1561,7 +1656,8 @@ end = struct
               Continue
                 ( Sequence.append seq (Sequence.singleton cw_checked)
                 , List.length cw_checked.proofs + count )
-          | None -> Stop (seq, count) )
+          | None ->
+              Stop (seq, count) )
         ~finish:Fn.id
     in
     (* max number of jobs that can be done *)
@@ -1584,7 +1680,8 @@ end = struct
                   $user_command"
                 (Error.to_string_hum e) ;
               seq
-          | Ok _ -> Sequence.append (Sequence.singleton t) seq )
+          | Ok _ ->
+              Sequence.append (Sequence.singleton t) seq )
     in
     let diff =
       O1trace.measure "generate diff" (fun () ->
@@ -1597,7 +1694,13 @@ end = struct
     { Staged_ledger_diff.With_valid_signatures_and_proofs.diff
     ; creator= self
     ; prev_hash= curr_hash }
+
+  module For_tests = struct
+    let snarked_ledger = snarked_ledger
+  end
 end
+
+module Make = Make_with_constants (Transaction_snark_scan_state.Constants)
 
 let%test_module "test" =
   ( module struct
@@ -1610,8 +1713,10 @@ let%test_module "test" =
         let to_yojson s = `String s
 
         let of_yojson = function
-          | `String s -> Ok s
-          | _ -> Error "expected string"
+          | `String s ->
+              Ok s
+          | _ ->
+              Error "expected string"
 
         let empty = ""
       end
@@ -1622,8 +1727,12 @@ let%test_module "test" =
 
         module Stable = struct
           module V1 = struct
-            type t = string
-            [@@deriving sexp, bin_io, compare, eq, yojson, hash]
+            module T = struct
+              type t = string
+              [@@deriving sexp, bin_io, compare, eq, yojson, hash, version]
+            end
+
+            include T
           end
         end
 
@@ -1631,7 +1740,7 @@ let%test_module "test" =
 
         include Comparable.Make_binable (String)
 
-        let empty, gen = String.(empty, gen)
+        let empty, gen = String.(empty, quickcheck_generator)
       end
 
       module Sok_message = struct
@@ -1667,8 +1776,13 @@ let%test_module "test" =
 
         module Stable = struct
           module V1 = struct
-            type t = txn_amt * txn_fee
-            [@@deriving sexp, bin_io, compare, eq, yojson]
+            module T = struct
+              type t = txn_amt * txn_fee
+              [@@deriving
+                sexp, bin_io, compare, eq, yojson, version {for_test}]
+            end
+
+            include T
           end
 
           module Latest = V1
@@ -1701,8 +1815,13 @@ let%test_module "test" =
         module Single = struct
           module Stable = struct
             module V1 = struct
-              type t = public_key * fee
-              [@@deriving bin_io, sexp, compare, eq, yojson, hash]
+              module T = struct
+                type t = public_key * fee
+                [@@deriving
+                  bin_io, sexp, compare, eq, yojson, hash, version {for_test}]
+              end
+
+              include T
             end
 
             module Latest = V1
@@ -1713,10 +1832,20 @@ let%test_module "test" =
 
         module Stable = struct
           module V1 = struct
-            type t =
-              | One of Single.Stable.V1.t
-              | Two of Single.Stable.V1.t * Single.Stable.V1.t
-            [@@deriving bin_io, sexp, compare, eq, yojson]
+            module T = struct
+              type t =
+                | One of Single.Stable.V1.t
+                | Two of Single.Stable.V1.t * Single.Stable.V1.t
+              [@@deriving
+                bin_io
+                , sexp
+                , compare
+                , eq
+                , yojson
+                , version {for_test; unnumbered}]
+            end
+
+            include T
           end
 
           module Latest = V1
@@ -1733,19 +1862,25 @@ let%test_module "test" =
 
         let of_single_list xs =
           let rec go acc = function
-            | x1 :: x2 :: xs -> go (Two (x1, x2) :: acc) xs
-            | [] -> acc
-            | [x] -> One x :: acc
+            | x1 :: x2 :: xs ->
+                go (Two (x1, x2) :: acc) xs
+            | [] ->
+                acc
+            | [x] ->
+                One x :: acc
           in
           go [] xs
 
         let fee_excess t : fee Or_error.t =
           match t with
-          | One (_, fee) -> Ok fee
+          | One (_, fee) ->
+              Ok fee
           | Two ((_, fee1), (_, fee2)) -> (
             match Fee.Unsigned.add fee1 fee2 with
-            | None -> Or_error.error_string "Fee_transfer.fee_excess: overflow"
-            | Some res -> Ok res )
+            | None ->
+                Or_error.error_string "Fee_transfer.fee_excess: overflow"
+            | Some res ->
+                Ok res )
 
         let fee_excess_int t =
           Fee.Unsigned.to_int (Or_error.ok_exn @@ fee_excess t)
@@ -1768,7 +1903,8 @@ let%test_module "test" =
 
         let supply_increase {proposer= _; amount; fee_transfer} =
           match fee_transfer with
-          | None -> Ok amount
+          | None ->
+              Ok amount
           | Some (_, fee) ->
               Currency.Amount.sub amount (Currency.Amount.of_fee fee)
               |> Option.value_map ~f:Or_error.return
@@ -1780,8 +1916,10 @@ let%test_module "test" =
 
         let is_valid {proposer= _; amount; fee_transfer} =
           match fee_transfer with
-          | None -> true
-          | Some (_, fee) -> Currency.Amount.(of_fee fee <= amount)
+          | None ->
+              true
+          | Some (_, fee) ->
+              Currency.Amount.(of_fee fee <= amount)
 
         let create ~amount ~proposer ~fee_transfer =
           let t = {proposer; amount; fee_transfer} in
@@ -1816,11 +1954,14 @@ let%test_module "test" =
           | Fee_transfer f ->
               let%map fee = Fee_transfer.fee_excess f in
               Currency.Fee.Signed.negate (Currency.Fee.Signed.of_unsigned fee)
-          | Coinbase t -> Coinbase.fee_excess t
+          | Coinbase t ->
+              Coinbase.fee_excess t
 
         let supply_increase = function
-          | User_command _ | Fee_transfer _ -> Ok Currency.Amount.zero
-          | Coinbase t -> Coinbase.supply_increase t
+          | User_command _ | Fee_transfer _ ->
+              Ok Currency.Amount.zero
+          | Coinbase t ->
+              Coinbase.supply_increase t
       end
 
       module Ledger_hash = struct
@@ -1844,7 +1985,7 @@ let%test_module "test" =
         let to_bytes : t -> string =
          fun _ -> failwith "to_bytes in ledger hash"
 
-        let gen = Int.gen
+        let gen = Int.quickcheck_generator
       end
 
       module Frozen_ledger_hash = struct
@@ -1914,8 +2055,10 @@ let%test_module "test" =
           if is_new_stack then Ok []
           else
             match List.hd t with
-            | Some s -> Ok s
-            | None -> Or_error.error_string "no stack found"
+            | Some s ->
+                Ok s
+            | None ->
+                Or_error.error_string "no stack found"
 
         let oldest_stack t =
           match List.rev t with [] -> Ok [] | x :: _ -> Ok x
@@ -1927,14 +2070,17 @@ let%test_module "test" =
           | [] ->
               Or_error.error_string
                 "tried to remove stack from an empty collection"
-          | x :: xs -> Ok (x, List.rev xs)
+          | x :: xs ->
+              Ok (x, List.rev xs)
 
         let update_coinbase_stack (t : t) (stack : Stack.t) ~is_new_stack =
           if is_new_stack then Ok (stack :: t)
           else
             match t with
-            | [] -> Or_error.error_string "tried to update empty tree"
-            | _ :: xs -> Ok (stack :: xs)
+            | [] ->
+                Or_error.error_string "tried to update empty tree"
+            | _ :: xs ->
+                Ok (stack :: xs)
       end
 
       module Pending_coinbase_stack_state = struct
@@ -1955,7 +2101,7 @@ let%test_module "test" =
                 ; fee_excess: Fee.Signed.t
                 ; proof_type: [`Base | `Merge] }
               [@@deriving
-                sexp, bin_io, compare, hash, yojson, eq, version {asserted}]
+                sexp, bin_io, compare, hash, yojson, eq, version {for_test}]
             end
 
             include T
@@ -2061,7 +2207,7 @@ let%test_module "test" =
             module V1 = struct
               module T = struct
                 type t = transaction
-                [@@deriving sexp, bin_io, version {asserted}]
+                [@@deriving sexp, bin_io, version {for_test}]
               end
 
               include T
@@ -2132,9 +2278,12 @@ let%test_module "test" =
          fun t s ->
           let v =
             match s with
-            | User_command t' -> fst t'
-            | Fee_transfer f -> Fee_transfer.fee_excess_int f
-            | Coinbase c -> Currency.Amount.to_int c.amount
+            | User_command t' ->
+                fst t'
+            | Fee_transfer f ->
+                Fee_transfer.fee_excess_int f
+            | Coinbase c ->
+                Currency.Amount.to_int c.amount
           in
           t := !t - v ;
           Or_error.return ()
@@ -2179,7 +2328,21 @@ let%test_module "test" =
       end
 
       module Staged_ledger_hash = struct
-        include String
+        module Stable = struct
+          module V1 = struct
+            module T = struct
+              type t = string
+              [@@deriving bin_io, sexp, hash, compare, eq, yojson, version]
+            end
+
+            include T
+            include Hashable.Make_binable (T)
+          end
+
+          module Latest = V1
+        end
+
+        type t = string [@@deriving sexp, eq, compare]
 
         type ledger_hash = Ledger_hash.t
 
@@ -2213,8 +2376,12 @@ let%test_module "test" =
 
         module Stable = struct
           module V1 = struct
-            type t = {fee: fee; proofs: proof list; prover: public_key}
-            [@@deriving sexp, bin_io, compare, yojson]
+            module T = struct
+              type t = {fee: fee; proofs: proof list; prover: public_key}
+              [@@deriving sexp, bin_io, compare, yojson, version {for_test}]
+            end
+
+            include T
           end
 
           module Latest = V1
@@ -2229,7 +2396,8 @@ let%test_module "test" =
             module V1 = struct
               module T = struct
                 type t = statement list
-                [@@deriving sexp, bin_io, compare, hash, eq, yojson]
+                [@@deriving
+                  sexp, bin_io, compare, hash, eq, yojson, version {for_test}]
               end
 
               include T
@@ -2286,60 +2454,153 @@ let%test_module "test" =
         type public_key = Compressed_public_key.Stable.V1.t
         [@@deriving sexp, bin_io, compare, yojson]
 
-        type staged_ledger_hash = Staged_ledger_hash.t
+        type staged_ledger_hash = Staged_ledger_hash.Stable.V1.t
         [@@deriving sexp, bin_io, compare, yojson]
 
         module At_most_two = struct
-          type 'a t =
+          module Stable = struct
+            module V1 = struct
+              module T = struct
+                type 'a t =
+                  | Zero
+                  | One of 'a option
+                  | Two of ('a * 'a option) option
+                [@@deriving sexp, bin_io, yojson, version]
+              end
+
+              include T
+            end
+
+            module Latest = V1
+          end
+
+          type 'a t = 'a Stable.Latest.t =
             | Zero
             | One of 'a option
             | Two of ('a * 'a option) option
-          [@@deriving sexp, bin_io, yojson]
+          [@@deriving sexp, yojson]
 
           let increase t ws =
             match (t, ws) with
-            | Zero, [] -> Ok (One None)
-            | Zero, [a] -> Ok (One (Some a))
-            | One _, [] -> Ok (Two None)
-            | One _, [a] -> Ok (Two (Some (a, None)))
-            | One _, [a; a'] -> Ok (Two (Some (a', Some a)))
-            | _ -> Or_error.error_string "Error incrementing coinbase parts"
+            | Zero, [] ->
+                Ok (One None)
+            | Zero, [a] ->
+                Ok (One (Some a))
+            | One _, [] ->
+                Ok (Two None)
+            | One _, [a] ->
+                Ok (Two (Some (a, None)))
+            | One _, [a; a'] ->
+                Ok (Two (Some (a', Some a)))
+            | _ ->
+                Or_error.error_string "Error incrementing coinbase parts"
         end
 
         module At_most_one = struct
-          type 'a t = Zero | One of 'a option
-          [@@deriving sexp, bin_io, yojson]
+          module Stable = struct
+            module V1 = struct
+              module T = struct
+                type 'a t = Zero | One of 'a option
+                [@@deriving sexp, bin_io, yojson, version]
+              end
+
+              include T
+            end
+
+            module Latest = V1
+          end
+
+          type 'a t = 'a Stable.Latest.t = Zero | One of 'a option
+          [@@deriving sexp, yojson]
 
           let increase t ws =
             match (t, ws) with
-            | Zero, [] -> Ok (One None)
-            | Zero, [a] -> Ok (One (Some a))
-            | _ -> Or_error.error_string "Error incrementing coinbase parts"
+            | Zero, [] ->
+                Ok (One None)
+            | Zero, [a] ->
+                Ok (One (Some a))
+            | _ ->
+                Or_error.error_string "Error incrementing coinbase parts"
         end
 
-        type pre_diff_with_at_most_two_coinbase =
-          { completed_works: completed_work list
-          ; user_commands: user_command list
-          ; coinbase: fee_transfer_single At_most_two.t }
-        [@@deriving sexp, bin_io, yojson]
+        module Pre_diff_with_at_most_two_coinbase = struct
+          module Stable = struct
+            module V1 = struct
+              module T = struct
+                type t =
+                  { completed_works: completed_work list
+                  ; user_commands: user_command list
+                  ; coinbase: fee_transfer_single At_most_two.Stable.Latest.t
+                  }
+                [@@deriving
+                  sexp, bin_io, yojson, version {for_test; unnumbered}]
+              end
 
-        type pre_diff_with_at_most_one_coinbase =
-          { completed_works: completed_work list
-          ; user_commands: user_command list
-          ; coinbase: fee_transfer_single At_most_one.t }
-        [@@deriving sexp, bin_io, yojson]
+              include T
+            end
 
-        type diff =
-          pre_diff_with_at_most_two_coinbase
-          * pre_diff_with_at_most_one_coinbase option
-        [@@deriving sexp, bin_io, yojson]
+            module Latest = V1
+          end
+
+          type t = Stable.Latest.t =
+            { completed_works: completed_work list
+            ; user_commands: user_command list
+            ; coinbase: fee_transfer_single At_most_two.t }
+          [@@deriving sexp, yojson]
+        end
+
+        module Pre_diff_with_at_most_one_coinbase = struct
+          module Stable = struct
+            module V1 = struct
+              module T = struct
+                type t =
+                  { completed_works: completed_work list
+                  ; user_commands: user_command list
+                  ; coinbase: fee_transfer_single At_most_one.Stable.Latest.t
+                  }
+                [@@deriving sexp, bin_io, yojson, version {for_test}]
+              end
+
+              include T
+            end
+
+            module Latest = V1
+          end
+
+          type t = Stable.Latest.t =
+            { completed_works: completed_work list
+            ; user_commands: user_command list
+            ; coinbase: fee_transfer_single At_most_one.t }
+          [@@deriving sexp, yojson]
+        end
+
+        module Diff = struct
+          module Stable = struct
+            module V1 = struct
+              module T = struct
+                type t =
+                  Pre_diff_with_at_most_two_coinbase.Stable.V1.t
+                  * Pre_diff_with_at_most_one_coinbase.Stable.V1.t option
+                [@@deriving sexp, bin_io, yojson, version]
+              end
+
+              include T
+            end
+
+            module Latest = V1
+          end
+
+          type t = Stable.Latest.t [@@deriving sexp, yojson]
+        end
 
         module Stable = struct
           module V1 = struct
             module T = struct
               type t =
-                {diff: diff; prev_hash: staged_ledger_hash; creator: public_key}
-              [@@deriving sexp, bin_io, version {asserted}]
+                { diff: Diff.Stable.V1.t
+                ; prev_hash: staged_ledger_hash
+                ; creator: public_key }
+              [@@deriving sexp, bin_io, version {for_test}]
             end
 
             include T
@@ -2349,7 +2610,9 @@ let%test_module "test" =
         end
 
         type t = Stable.Latest.t =
-          {diff: diff; prev_hash: staged_ledger_hash; creator: public_key}
+          { diff: Diff.Stable.V1.t
+          ; prev_hash: staged_ledger_hash
+          ; creator: public_key }
         [@@deriving sexp, yojson]
 
         module With_valid_signatures_and_proofs = struct
@@ -2387,7 +2650,7 @@ let%test_module "test" =
             (pre_diff :
               With_valid_signatures_and_proofs
               .pre_diff_with_at_most_two_coinbase) :
-            pre_diff_with_at_most_two_coinbase =
+            Pre_diff_with_at_most_two_coinbase.t =
           { completed_works= forget_cw pre_diff.completed_works
           ; user_commands= (pre_diff.user_commands :> User_command.t list)
           ; coinbase= pre_diff.coinbase }
@@ -2395,7 +2658,8 @@ let%test_module "test" =
         let forget_pre_diff_with_at_most_one
             (pre_diff :
               With_valid_signatures_and_proofs
-              .pre_diff_with_at_most_one_coinbase) =
+              .pre_diff_with_at_most_one_coinbase) :
+            Pre_diff_with_at_most_one_coinbase.t =
           { completed_works= forget_cw pre_diff.completed_works
           ; user_commands= (pre_diff.user_commands :> User_command.t list)
           ; coinbase= pre_diff.coinbase }
@@ -2418,7 +2682,7 @@ let%test_module "test" =
           module V1 = struct
             module T = struct
               type t = {ledger: Sparse_ledger.t}
-              [@@deriving bin_io, sexp, version {asserted}]
+              [@@deriving bin_io, sexp, version {for_test}]
             end
 
             include T
@@ -2477,8 +2741,10 @@ let%test_module "test" =
               , `Staged_ledger sl'
               , `Pending_coinbase_data _ ) =
         match%map Sl.apply !sl diff' ~logger with
-        | Ok x -> x
-        | Error e -> Error.raise (Sl.Staged_ledger_error.to_error e)
+        | Ok x ->
+            x
+        | Error e ->
+            Error.raise (Sl.Staged_ledger_error.to_error e)
       in
       assert (Staged_ledger_hash.equal hash (Sl.hash sl')) ;
       sl := sl' ;
@@ -2487,13 +2753,18 @@ let%test_module "test" =
     let txns n f g = List.zip_exn (List.init n ~f) (List.init n ~f:g)
 
     let coinbase_added_first_prediff = function
-      | Staged_ledger_diff.At_most_two.Zero -> 0
-      | One _ -> 1
-      | _ -> 2
+      | Staged_ledger_diff.At_most_two.Zero ->
+          0
+      | One _ ->
+          1
+      | _ ->
+          2
 
     let coinbase_added_second_prediff = function
-      | Staged_ledger_diff.At_most_one.Zero -> 0
-      | _ -> 1
+      | Staged_ledger_diff.At_most_one.Zero ->
+          0
+      | _ ->
+          1
 
     let coinbase_added (sl_diff : Staged_ledger_diff.t) =
       coinbase_added_first_prediff (fst sl_diff.diff).coinbase
@@ -2669,7 +2940,7 @@ let%test_module "test" =
             ; prev_hash
             ; creator= "C" }
         | Some _ ->
-            let diff : Staged_ledger_diff.diff =
+            let diff : Staged_ledger_diff.Diff.t =
               ( { completed_works
                 ; user_commands= List.take txns partition.first
                 ; coinbase= Zero }
@@ -2708,8 +2979,10 @@ let%test_module "test" =
                   partitions
               in
               match%map Sl.apply !sl diff ~logger with
-              | Error (Sl.Staged_ledger_error.Non_zero_fee_excess _) -> ()
-              | Error _ -> assert false
+              | Error (Sl.Staged_ledger_error.Non_zero_fee_excess _) ->
+                  ()
+              | Error _ ->
+                  assert false
               | Ok
                   ( `Hash_after_applying _hash
                   , `Ledger_proof _ledger_proof
@@ -2907,4 +3180,136 @@ let%test_module "test" =
               if j > 2 then assert (x > 0) ;
               let expected_value = expected_ledger x all_ts old_ledger in
               if cb > 0 then assert (!(Sl.ledger !sl) = expected_value) ) )
+
+    let%test_module "staged ledgers with different latency factors" =
+      ( module struct
+        module Inputs = Test_input1
+
+        module type Staged_ledger_intf =
+          Coda_pow.Staged_ledger_intf
+          with type diff := Inputs.Staged_ledger_diff.t
+           and type valid_diff :=
+                      Inputs.Staged_ledger_diff
+                      .With_valid_signatures_and_proofs
+                      .t
+           and type ledger_hash := Inputs.Ledger_hash.t
+           and type frozen_ledger_hash := Inputs.Frozen_ledger_hash.t
+           and type staged_ledger_hash := Inputs.Staged_ledger_hash.t
+           and type public_key := Inputs.Compressed_public_key.t
+           and type ledger := Inputs.Ledger.t
+           and type user_command_with_valid_signature :=
+                      Inputs.User_command.With_valid_signature.t
+           and type statement := Inputs.Transaction_snark_work.Statement.t
+           and type completed_work_checked :=
+                      Inputs.Transaction_snark_work.Checked.t
+           and type ledger_proof := Inputs.Ledger_proof.t
+           and type staged_ledger_aux_hash := Inputs.Staged_ledger_aux_hash.t
+           and type sparse_ledger := Inputs.Sparse_ledger.t
+           and type ledger_proof_statement := Inputs.Ledger_proof_statement.t
+           and type ledger_proof_statement_set :=
+                      Inputs.Ledger_proof_statement.Set.t
+           and type transaction := Inputs.Transaction.t
+           and type user_command := Inputs.User_command.t
+           and type transaction_witness := Inputs.Transaction_witness.t
+           and type pending_coinbase_collection := Inputs.Pending_coinbase.t
+
+        let transaction_capacity_log_2 = 2
+
+        let work_delay = 5
+
+        let sl_modules =
+          List.init work_delay ~f:(fun i ->
+              let module Constants = struct
+                let transaction_capacity_log_2 = transaction_capacity_log_2
+
+                let work_delay_factor = work_delay
+
+                let latency_factor = i
+              end in
+              (module Make_with_constants (Constants) (Inputs)
+              : Staged_ledger_intf ) )
+
+        let%test_unit "max throughput at any latency: random number of \
+                       proofs-one prover" =
+          Backtrace.elide := false ;
+          let get_work work_list (stmts : Transaction_snark_work.Statement.t) :
+              Transaction_snark_work.Checked.t option =
+            if
+              Option.is_some
+                (List.find work_list ~f:(fun s ->
+                     Transaction_snark_work.Statement.equal s stmts ))
+            then
+              Some
+                { Transaction_snark_work.Checked.fee= Fee.Unsigned.of_int 0
+                ; proofs= stmts
+                ; prover= "P" }
+            else None
+          in
+          let logger = Logger.null () in
+          let p = Int.pow 2 transaction_capacity_log_2 in
+          let g = Int.gen_incl 0 p in
+          List.iter sl_modules ~f:(fun (module Sl) ->
+              let initial_ledger = ref 0 in
+              let staged_ledger = ref (Sl.create_exn ~ledger:initial_ledger) in
+              let create_and_apply sl logger txns stmt_to_work =
+                let open Deferred.Let_syntax in
+                let diff =
+                  Sl.create_diff !sl ~self:self_pk ~logger
+                    ~transactions_by_fee:txns ~get_completed_work:stmt_to_work
+                in
+                let diff' = Staged_ledger_diff.forget diff in
+                let%map ( `Hash_after_applying _
+                        , `Ledger_proof _
+                        , `Staged_ledger sl'
+                        , `Pending_coinbase_data _ ) =
+                  match%map Sl.apply !sl diff' ~logger with
+                  | Ok x ->
+                      x
+                  | Error e ->
+                      Error.raise (Sl.Staged_ledger_error.to_error e)
+                in
+                sl := sl' ;
+                diff'
+              in
+              Quickcheck.test g ~trials:1000 ~f:(fun _ ->
+                  Async.Thread_safe.block_on_async_exn (fun () ->
+                      let all_ts =
+                        txns p (fun x -> (x + 1) * 100) (fun _ -> 0)
+                      in
+                      let work_list : Transaction_snark_work.Statement.t list =
+                        let proofs_required =
+                          max
+                            ( Sl.Scan_state.current_job_count
+                                (Sl.scan_state !staged_ledger)
+                            + (2 * p) - Sl.Scan_state.work_capacity )
+                            0
+                        in
+                        let spec_list =
+                          List.take
+                            (Sl.all_work_pairs_exn !staged_ledger)
+                            ((proofs_required + 1) / 2)
+                        in
+                        List.map spec_list ~f:(fun (s1, s2_opt) ->
+                            let stmt1 =
+                              Snark_work_lib.Work.Single.Spec.statement s1
+                            in
+                            let stmt2 =
+                              Option.value_map s2_opt ~default:[] ~f:(fun s ->
+                                  [Snark_work_lib.Work.Single.Spec.statement s]
+                              )
+                            in
+                            stmt1 :: stmt2 )
+                      in
+                      let%map diff =
+                        create_and_apply staged_ledger logger
+                          (Sequence.of_list all_ts) (get_work work_list)
+                      in
+                      let cb = coinbase_added diff in
+                      assert (cb > 0 && cb < 3) ;
+                      let x =
+                        List.length (Staged_ledger_diff.user_commands diff)
+                      in
+                      (*max throughput*)
+                      assert (x + cb = p) ) ) )
+      end )
   end )

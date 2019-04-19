@@ -58,7 +58,7 @@ module Make (Inputs : Inputs_intf) :
     with
     | Ok () ->
         let open Deferred.Or_error.Let_syntax in
-        let%map _ : External_transition.Proof_verified.t =
+        let%map (_ : External_transition.Proof_verified.t) =
           validate_proof transition
         in
         (* Verified both protocol_state proof and consensus_state *)

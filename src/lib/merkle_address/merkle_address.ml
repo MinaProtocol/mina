@@ -3,13 +3,15 @@ open Bitstring
 open Module_version
 
 module type S = sig
-  type t [@@deriving sexp, bin_io, hash, eq, compare, to_yojson]
+  type t [@@deriving sexp, hash, eq, compare, to_yojson]
 
   module Stable : sig
     module V1 : sig
       val version : int
 
-      type nonrec t = t [@@deriving sexp, bin_io, hash, eq, compare, to_yojson]
+      type nonrec t = t
+      [@@deriving
+        sexp, bin_io, hash, eq, compare, to_yojson, version {unnumbered}]
     end
 
     module Latest : module type of V1
@@ -97,7 +99,8 @@ end) : S = struct
   let of_directions dirs =
     let path = create_bitstring (List.length dirs) in
     let rec loop i = function
-      | [] -> ()
+      | [] ->
+          ()
       | h :: t ->
           if Direction.to_bool h then set path i ;
           loop (i + 1) t
@@ -131,7 +134,7 @@ end) : S = struct
         slice (bitstring_of_string string) 0 length
 
       module T = struct
-        type t = Bitstring.t [@@deriving version {asserted}]
+        type t = Bitstring.t [@@deriving version]
 
         include Binable.Of_binable (struct
                     type t = int * string [@@deriving bin_io]
@@ -168,7 +171,6 @@ end) : S = struct
 
       include T
       include Registration.Make_latest_version (T)
-      include Hashable.Make_binable (T)
     end
 
     module Latest = V1
@@ -183,7 +185,12 @@ end) : S = struct
     module Registered_V1 = Registrar.Register (V1)
   end
 
-  include Stable.Latest
+  type t = Stable.Latest.t
+
+  [%%define_locally
+  Stable.Latest.(t_of_sexp, sexp_of_t, to_yojson, compare, equal)]
+
+  include Hashable.Make_binable (Stable.Latest)
 
   let of_byte_string = bitstring_of_string
 
@@ -317,8 +324,10 @@ end) : S = struct
     let fold ?(stop = `Inclusive) (first, last) ~init ~f =
       assert (depth first = depth last) ;
       match stop with
-      | `Inclusive -> fold_incl (first, last) ~init ~f
-      | `Exclusive -> fold_exl (first, last) ~init ~f
+      | `Inclusive ->
+          fold_incl (first, last) ~init ~f
+      | `Exclusive ->
+          fold_exl (first, last) ~init ~f
 
     let subtree_range address =
       let first_node = concat [address; zeroes_bitstring @@ height address] in
@@ -330,14 +339,32 @@ end) : S = struct
       Sequence.unfold
         ~init:(first_node, `Don't_stop)
         ~f:(function
-          | _, `Stop -> None
+          | _, `Stop ->
+              None
           | current_node, `Don't_stop ->
               if compare current_node last_node = 0 then
                 Some (current_node, (current_node, `Stop))
               else
                 Option.map (next current_node) ~f:(fun next_node ->
-                    (current_node, (next_node, `Don't_stop)) ))
+                    (current_node, (next_node, `Don't_stop)) ) )
   end
+
+  let%test "Bitstring bin_io serialization does not change" =
+    (* Bitstring.t is whitelisted as a versioned type. This test assures that serializations of that type haven't changed *)
+    let buff = Bin_prot.Common.create_buf 256 in
+    let text =
+      "Contrary to popular belief, Lorem Ipsum is not simply random text. It \
+       has roots in a piece of classical Latin literature."
+    in
+    let known_good_serialization =
+      Bytes.of_string
+        "\x01\xFE\xC8\x03\x79\x43\x6F\x6E\x74\x72\x61\x72\x79\x20\x74\x6F\x20\x70\x6F\x70\x75\x6C\x61\x72\x20\x62\x65\x6C\x69\x65\x66\x2C\x20\x4C\x6F\x72\x65\x6D\x20\x49\x70\x73\x75\x6D\x20\x69\x73\x20\x6E\x6F\x74\x20\x73\x69\x6D\x70\x6C\x79\x20\x72\x61\x6E\x64\x6F\x6D\x20\x74\x65\x78\x74\x2E\x20\x49\x74\x20\x68\x61\x73\x20\x72\x6F\x6F\x74\x73\x20\x69\x6E\x20\x61\x20\x70\x69\x65\x63\x65\x20\x6F\x66\x20\x63\x6C\x61\x73\x73\x69\x63\x61\x6C\x20\x4C\x61\x74\x69\x6E\x20\x6C\x69\x74\x65\x72\x61\x74\x75\x72\x65\x2E"
+    in
+    let bs = Bitstring.bitstring_of_string text in
+    let len = Stable.Latest.bin_write_t buff ~pos:0 bs in
+    let bytes = Bytes.create len in
+    Bin_prot.Common.blit_buf_bytes buff bytes ~len ;
+    Bytes.equal bytes known_good_serialization
 
   let%test "the merkle root should have no path" =
     dirs_from_root (root ()) = []
@@ -375,7 +402,8 @@ end) : S = struct
       (Direction.gen_list Input.depth) ~f:(fun directions ->
         let address = of_directions directions in
         match next address with
-        | None -> ()
+        | None ->
+            ()
         | Some addr' ->
             [%test_result: t option] ~expect:(Some address) (prev addr') )
 end

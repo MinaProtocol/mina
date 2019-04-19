@@ -6,8 +6,8 @@ module Level = struct
   [@@deriving sexp, compare, show {with_path= false}]
 
   let of_string str =
-    try Ok (t_of_sexp (Sexp.Atom str)) with Sexp.Of_sexp_error (err, _) ->
-      Error (Exn.to_string err)
+    try Ok (t_of_sexp (Sexp.Atom str))
+    with Sexp.Of_sexp_error (err, _) -> Error (Exn.to_string err)
 
   let to_yojson t = `String (show t)
 
@@ -39,8 +39,10 @@ module Metadata = struct
   let to_yojson t = `Assoc (String.Map.to_alist t)
 
   let of_yojson = function
-    | `Assoc alist -> Ok (String.Map.of_alist_exn alist)
-    | _ -> Error "expected object"
+    | `Assoc alist ->
+        Ok (String.Map.of_alist_exn alist)
+    | _ ->
+        Error "expected object"
 
   let mem = String.Map.mem
 
@@ -69,8 +71,10 @@ module Message = struct
 
   let metadata_references str =
     match Re2.find_all ~sub:(`Index 1) metadata_interpolation_regex str with
-    | Ok ls -> ls
-    | Error _ -> []
+    | Ok ls ->
+        ls
+    | Error _ ->
+        []
 
   let check_invariants t =
     let refs = metadata_references t.message in

@@ -31,9 +31,12 @@ module Body = struct
           |> Option.value_exn ?here:None ?message:None ?error:None
         in
         match tag with
-        | Payment -> (Amount.zero, max_amount_without_overflow)
-        | Stake_delegation -> (Amount.zero, max_amount_without_overflow)
-        | Fee_transfer -> (Amount.zero, max_amount_without_overflow)
+        | Payment ->
+            (Amount.zero, max_amount_without_overflow)
+        | Stake_delegation ->
+            (Amount.zero, max_amount_without_overflow)
+        | Fee_transfer ->
+            (Amount.zero, max_amount_without_overflow)
         | Coinbase ->
             (* In this case,
              amount - fee should be defined. In other words,
@@ -55,9 +58,9 @@ module Body = struct
 
   let typ =
     Typ.of_hlistable spec ~var_to_hlist:to_hlist ~value_to_hlist:to_hlist
-      ~var_of_hlist:(fun H_list.([tag; public_key; amount]) ->
+      ~var_of_hlist:(fun H_list.[tag; public_key; amount] ->
         {tag; public_key; amount} )
-      ~value_of_hlist:(fun H_list.([tag; public_key; amount]) ->
+      ~value_of_hlist:(fun H_list.[tag; public_key; amount] ->
         {tag; public_key; amount} )
 
   let of_user_command_payload_body = function
@@ -81,18 +84,13 @@ module Body = struct
   end
 end
 
-type t =
-  ( User_command_payload.Common.t
-  , Body.t )
-  User_command_payload.Poly.Stable.Latest.t
+type t = (User_command_payload.Common.t, Body.t) User_command_payload.Poly.t
 [@@deriving sexp]
 
 type payload = t [@@deriving sexp]
 
 type var =
-  ( User_command_payload.Common.var
-  , Body.var )
-  User_command_payload.Poly.Stable.Latest.t
+  (User_command_payload.Common.var, Body.var) User_command_payload.Poly.t
 
 type payload_var = var
 
@@ -100,16 +98,14 @@ let gen =
   let open Quickcheck.Generator.Let_syntax in
   let%bind common = User_command_payload.Common.gen in
   let%map body = Body.gen ~fee:common.fee in
-  User_command_payload.Poly.Stable.Latest.{common; body}
+  User_command_payload.Poly.{common; body}
 
-let to_hlist
-    ({common; body} : (_, _) User_command_payload.Poly.Stable.Latest.t) =
+let to_hlist ({common; body} : (_, _) User_command_payload.Poly.t) =
   H_list.[common; body]
 
 let of_hlist : type c v.
-       (unit, c -> v -> unit) H_list.t
-    -> (c, v) User_command_payload.Poly.Stable.Latest.t =
- fun H_list.([common; body]) -> {common; body}
+    (unit, c -> v -> unit) H_list.t -> (c, v) User_command_payload.Poly.t =
+ fun H_list.[common; body] -> {common; body}
 
 let typ : (var, t) Typ.t =
   Typ.of_hlistable
@@ -156,11 +152,11 @@ module Changes = struct
       [Amount.Signed.typ; Amount.typ; Amount.Signed.typ; Amount.typ]
       ~var_to_hlist:to_hlist ~value_to_hlist:to_hlist
       ~var_of_hlist:
-        (fun H_list.([sender_delta; receiver_increase; excess; supply_increase])
-             -> {sender_delta; receiver_increase; excess; supply_increase} )
+        (fun H_list.[sender_delta; receiver_increase; excess; supply_increase] ->
+        {sender_delta; receiver_increase; excess; supply_increase} )
       ~value_of_hlist:
-        (fun H_list.([sender_delta; receiver_increase; excess; supply_increase])
-             -> {sender_delta; receiver_increase; excess; supply_increase} )
+        (fun H_list.[sender_delta; receiver_increase; excess; supply_increase] ->
+        {sender_delta; receiver_increase; excess; supply_increase} )
 
   let of_payload (payload : payload) : t =
     let tag = payload.body.tag in
@@ -307,18 +303,23 @@ let excess (payload : t) : Amount.Signed.t =
   let fee = payload.common.fee in
   let amount = payload.body.amount in
   match tag with
-  | Payment -> Amount.Signed.of_unsigned (Amount.of_fee fee)
-  | Stake_delegation -> Amount.Signed.of_unsigned (Amount.of_fee fee)
+  | Payment ->
+      Amount.Signed.of_unsigned (Amount.of_fee fee)
+  | Stake_delegation ->
+      Amount.Signed.of_unsigned (Amount.of_fee fee)
   | Fee_transfer ->
       Option.value_exn (Amount.add_fee amount fee)
       |> Amount.Signed.of_unsigned |> Amount.Signed.negate
-  | Coinbase -> Amount.Signed.zero
+  | Coinbase ->
+      Amount.Signed.zero
 
 let supply_increase (payload : payload) =
   let tag = payload.body.tag in
   match tag with
-  | Coinbase -> payload.body.amount
-  | Payment | Stake_delegation | Fee_transfer -> Amount.zero
+  | Coinbase ->
+      payload.body.amount
+  | Payment | Stake_delegation | Fee_transfer ->
+      Amount.zero
 
 let%test_unit "fold_compatibility" =
   Quickcheck.test User_command_payload.gen ~f:(fun t ->

@@ -29,16 +29,20 @@ val of_private_key_exn : Private_key.t -> t
 
 module Compressed : sig
   module Poly : sig
-    module Stable : sig
-      module V1 : sig
-        type ('field, 'boolean) t = {x: 'field; is_odd: 'boolean}
-      end
+    type ('field, 'boolean) t = {x: 'field; is_odd: 'boolean}
 
-      module Latest = V1
-    end
+    module Stable :
+      sig
+        module V1 : sig
+          type ('field, 'boolean) t
+        end
+
+        module Latest = V1
+      end
+      with type ('field, 'boolean) V1.t = ('field, 'boolean) t
   end
 
-  type t = (Field.t, bool) Poly.Stable.Latest.t [@@deriving sexp, hash]
+  type t = (Field.t, bool) Poly.t [@@deriving sexp, hash]
 
   include Codable.S with type t := t
 
@@ -58,7 +62,7 @@ module Compressed : sig
 
   val length_in_triples : int
 
-  type var = (Field.Var.t, Boolean.var) Poly.Stable.Latest.t
+  type var = (Field.Var.t, Boolean.var) Poly.t
 
   val typ : (var, t) Typ.t
 

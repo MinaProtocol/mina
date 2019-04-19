@@ -433,8 +433,10 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
           Option.value_map ~default:(Or_error.error_string "Bad signature")
             (UC.check tr.common.user_command) ~f:(fun x ->
               Ok (Transaction.User_command x) )
-      | Fee_transfer f -> Ok (Fee_transfer f.fee_transfer)
-      | Coinbase c -> Ok (Coinbase c.coinbase)
+      | Fee_transfer f ->
+          Ok (Fee_transfer f.fee_transfer)
+      | Coinbase c ->
+          Ok (Coinbase c.coinbase)
   end
 
   (* someday: It would probably be better if we didn't modify the receipt chain hash
@@ -472,7 +474,7 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
           { Undo.User_command_undo.common
           ; body= Stake_delegation {previous_delegate= sender_account.delegate}
           }
-    | Payment Payment_payload.Poly.Stable.Latest.({amount; receiver}) ->
+    | Payment Payment_payload.Poly.{amount; receiver} ->
         let%bind sender_balance' = sub_amount sender_account.balance amount in
         let undo emptys : Undo.User_command_undo.t =
           {common; body= Payment {previous_empty_accounts= emptys}}
@@ -543,13 +545,16 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
     let get_or_initialize pk =
       let initial_account = Account.initialize pk in
       match get_or_create_account_exn t pk (Account.initialize pk) with
-      | `Added, location -> (location, initial_account, [pk])
-      | `Existed, location -> (location, Option.value_exn (get t location), [])
+      | `Added, location ->
+          (location, initial_account, [pk])
+      | `Existed, location ->
+          (location, Option.value_exn (get t location), [])
     in
     let open Or_error.Let_syntax in
     let%bind proposer_reward, emptys1, receiver_update =
       match fee_transfer with
-      | None -> return (coinbase_amount, [], None)
+      | None ->
+          return (coinbase_amount, [], None)
       | Some (receiver, fee) ->
           assert (not @@ Public_key.Compressed.equal receiver proposer) ;
           let fee = Amount.of_fee fee in
@@ -577,12 +582,13 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
   (* Don't have to be atomic here because these should never fail. In fact, none of
   the undo functions should ever return an error. This should be fixed in the types. *)
   let undo_coinbase t
-      Undo.Coinbase_undo.({ coinbase=
-                              {proposer; fee_transfer; amount= coinbase_amount}
-                          ; previous_empty_accounts }) =
+      Undo.Coinbase_undo.
+        { coinbase= {proposer; fee_transfer; amount= coinbase_amount}
+        ; previous_empty_accounts } =
     let proposer_reward =
       match fee_transfer with
-      | None -> coinbase_amount
+      | None ->
+          coinbase_amount
       | Some (receiver, fee) ->
           let fee = Amount.of_fee fee in
           let receiver_location =
@@ -629,7 +635,9 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
       let%bind () = validate_nonces (Account.Nonce.succ nonce) account.nonce in
       return
         { account with
-          balance; nonce; receipt_chain_hash= previous_receipt_chain_hash }
+          balance
+        ; nonce
+        ; receipt_chain_hash= previous_receipt_chain_hash }
     in
     match (User_command.Payload.body payload, body) with
     | Stake_delegation (Set_delegate _), Stake_delegation {previous_delegate}
@@ -657,16 +665,20 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
           set ledger receiver_location
             {receiver_account with balance= receiver_balance'} ;
           remove_accounts_exn ledger previous_empty_accounts
-    | _, _ -> failwith "Undo/command mismatch"
+    | _, _ ->
+        failwith "Undo/command mismatch"
 
   let undo : t -> Undo.t -> unit Or_error.t =
    fun ledger undo ->
     let open Or_error.Let_syntax in
     let%map res =
       match undo.varying with
-      | Fee_transfer u -> undo_fee_transfer ledger u
-      | User_command u -> undo_user_command ledger u
-      | Coinbase c -> undo_coinbase ledger c ; Ok ()
+      | Fee_transfer u ->
+          undo_fee_transfer ledger u
+      | User_command u ->
+          undo_user_command ledger u
+      | Coinbase c ->
+          undo_coinbase ledger c ; Ok ()
     in
     Debug_assert.debug_assert (fun () ->
         [%test_eq: Ledger_hash.t] undo.previous_hash (merkle_root ledger) ) ;

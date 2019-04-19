@@ -88,8 +88,10 @@ end = struct
 
   let rec with_value ~f t =
     match t.value with
-    | Some x -> f x
-    | None -> don't_wait_for (Ivar.read t.signal >>| fun () -> with_value ~f t)
+    | Some x ->
+        f x
+    | None ->
+        don't_wait_for (Ivar.read t.signal >>| fun () -> with_value ~f t)
 end
 
 module Singleton_supervisor : sig
@@ -113,7 +115,8 @@ end = struct
     | Some (ivar, _) ->
         Ivar.fill ivar () ;
         t.task <- None
-    | None -> ()
+    | None ->
+        ()
 
   let dispatch t data =
     cancel t ;
@@ -178,7 +181,8 @@ module Make (Inputs : Inputs_intf) :
       | Some timeout ->
           Time.Timeout.cancel t.time_controller timeout () ;
           t.timeout <- None
-      | None -> ()
+      | None ->
+          ()
 
     let schedule t time ~f =
       cancel t ;
@@ -307,7 +311,8 @@ module Make (Inputs : Inputs_intf) :
         let propose ivar proposal_data =
           let open Interruptible.Let_syntax in
           match Broadcast_pipe.Reader.peek frontier_reader with
-          | None -> log_bootstrap_mode () ; Interruptible.return ()
+          | None ->
+              log_bootstrap_mode () ; Interruptible.return ()
           | Some frontier -> (
               let crumb = Transition_frontier.best_tip frontier in
               Logger.trace logger ~module_:__MODULE__ ~location:__LOC__
@@ -335,7 +340,8 @@ module Make (Inputs : Inputs_intf) :
               in
               trace_event "next state generated" ;
               match next_state_opt with
-              | None -> Interruptible.return ()
+              | None ->
+                  Interruptible.return ()
               | Some
                   ( protocol_state
                   , internal_transition
@@ -485,7 +491,8 @@ module Make (Inputs : Inputs_intf) :
                              ~random_peers ~query_peer sync_jobs
                          in
                          ( match res with
-                         | Ok () -> ()
+                         | Ok () ->
+                             ()
                          | Error e ->
                              Logger.error logger ~module_:__MODULE__
                                ~location:__LOC__

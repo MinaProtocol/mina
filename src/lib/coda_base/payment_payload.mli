@@ -5,14 +5,19 @@ open Snark_params.Tick
 open Import
 
 module Poly : sig
-  module Stable : sig
-    module V1 : sig
-      type nonrec ('pk, 'amount) t = {receiver: 'pk; amount: 'amount}
-      [@@deriving bin_io, eq, sexp, hash, yojson, version]
-    end
+  type ('pk, 'amount) t = {receiver: 'pk; amount: 'amount}
+  [@@deriving eq, sexp, hash, yojson]
 
-    module Latest = V1
-  end
+  module Stable :
+    sig
+      module V1 : sig
+        type nonrec ('pk, 'amount) t
+        [@@deriving bin_io, eq, sexp, hash, yojson, version]
+      end
+
+      module Latest = V1
+    end
+    with type ('pk, 'amount) V1.t = ('pk, 'amount) t
 end
 
 module Stable : sig
@@ -33,8 +38,7 @@ val dummy : t
 
 val gen : max_amount:Currency.Amount.t -> t Quickcheck.Generator.t
 
-type var =
-  (Public_key.Compressed.var, Currency.Amount.var) Poly.Stable.Latest.t
+type var = (Public_key.Compressed.var, Currency.Amount.var) Poly.t
 
 val length_in_triples : int
 

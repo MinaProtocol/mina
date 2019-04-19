@@ -21,7 +21,8 @@ module Member = struct
           [text name]
       and affiliation =
         match affiliation with
-        | None -> span [] []
+        | None ->
+            span [] []
         | Some affiliation ->
             h4
               [Style.(render (Styles.heading_style + ["silver f5"]))]

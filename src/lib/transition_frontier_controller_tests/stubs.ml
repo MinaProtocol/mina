@@ -69,13 +69,36 @@ struct
   end
 
   module Transaction_witness = Coda_base.Transaction_witness
-  module Pending_coinbase = Coda_base.Pending_coinbase
+
+  module Pending_coinbase = struct
+    include Coda_base.Pending_coinbase.Stable.V1
+
+    let ( hash_extra
+        , oldest_stack
+        , latest_stack
+        , create
+        , remove_coinbase_stack
+        , update_coinbase_stack
+        , merkle_root ) =
+      Coda_base.Pending_coinbase.
+        ( hash_extra
+        , oldest_stack
+        , latest_stack
+        , create
+        , remove_coinbase_stack
+        , update_coinbase_stack
+        , merkle_root )
+
+    module Stack = Coda_base.Pending_coinbase.Stack
+    module Coinbase_data = Coda_base.Pending_coinbase.Coinbase_data
+  end
+
   module Pending_coinbase_hash = Coda_base.Pending_coinbase.Hash
   module Transaction_snark_work =
     Staged_ledger.Make_completed_work (Ledger_proof) (Ledger_proof_statement)
 
   module Staged_ledger_hash_binable = struct
-    include Staged_ledger_hash.Stable.V1
+    include Staged_ledger_hash
 
     let ( of_aux_ledger_and_coinbase_hash
         , aux_hash
@@ -107,19 +130,10 @@ struct
       (Consensus.Protocol_state)
 
   module Transaction = struct
-    module T = struct
-      type t = Coda_base.Transaction.t =
-        | User_command of User_command.With_valid_signature.t
-        | Fee_transfer of Fee_transfer.t
-        | Coinbase of Coinbase.t
-      [@@deriving compare, eq]
-    end
+    include Coda_base.Transaction.Stable.Latest
 
-    include T
-
-    include (
-      Coda_base.Transaction :
-        module type of Coda_base.Transaction with type t := t )
+    let fee_excess, supply_increase =
+      Coda_base.Transaction.(fee_excess, supply_increase)
   end
 
   module Staged_ledger = Staged_ledger.Make (struct
@@ -166,12 +180,12 @@ struct
         let%bind receiver_pk = List.random_element public_keys in
         let send_amount = Currency.Amount.of_int 1 in
         let sender_account_amount =
-          Account.balance sender_account |> Currency.Balance.to_amount
+          sender_account.Account.Poly.balance |> Currency.Balance.to_amount
         in
         let%map _ = Currency.Amount.sub sender_account_amount send_amount in
         let payload : User_command.Payload.t =
           User_command.Payload.create ~fee:Fee.Unsigned.zero
-            ~nonce:(Account.nonce sender_account)
+            ~nonce:sender_account.Account.Poly.nonce
             ~memo:User_command_memo.dummy
             ~body:(Payment {receiver= receiver_pk; amount= send_amount})
         in
@@ -228,7 +242,7 @@ struct
       let transactions = gen_payments accounts_with_secret_keys in
       let _, largest_account =
         List.max_elt accounts_with_secret_keys
-          ~compare:(fun (_, acc1) (_, acc2) -> Account.compare acc1 acc2 )
+          ~compare:(fun (_, acc1) (_, acc2) -> Account.compare acc1 acc2)
         |> Option.value_exn
       in
       let largest_account_public_key = Account.public_key largest_account in
@@ -321,7 +335,8 @@ struct
                   |> With_hash.hash |> State_hash.to_yojson ) ]
             "Producing a breadcrumb with hash: $state_hash" ;
           new_breadcrumb
-      | Error (`Fatal_error exn) -> raise exn
+      | Error (`Fatal_error exn) ->
+          raise exn
       | Error (`Validation_error e) ->
           failwithf !"Validation Error : %{sexp:Error.t}" e ()
 
@@ -404,10 +419,11 @@ struct
             ~root_staged_ledger
             ~consensus_local_state:
               (Consensus.Local_state.create
-                 (Some proposer_account.Account.public_key))
+                 (Some (Account.public_key proposer_account)))
         in
         frontier
-    | Error err -> Error.raise err
+    | Error err ->
+        Error.raise err
 
   let build_frontier_randomly ~gen_root_breadcrumb_builder frontier :
       unit Deferred.t =

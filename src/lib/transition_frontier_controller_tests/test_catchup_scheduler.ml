@@ -37,7 +37,7 @@ let%test_module "Transition_handler.Catchup_scheduler tests" =
       let%bind frontier =
         create_root_frontier ~logger accounts_with_secret_keys
       in
-      let%map _ : unit =
+      let%map (_ : unit) =
         build_frontier_randomly
           ~gen_root_breadcrumb_builder:(fun root_breadcrumb ->
             Quickcheck.Generator.with_size ~size:num_breadcrumbs
@@ -47,6 +47,12 @@ let%test_module "Transition_handler.Catchup_scheduler tests" =
           frontier
       in
       frontier
+
+    let transition_with_hash_enveloped
+        (transition_with_hash :
+          (External_transition.Verified.t, 'a) With_hash.t) =
+      Envelope.Incoming.wrap ~data:transition_with_hash
+        ~sender:Envelope.Sender.Local
 
     let extract_children_from ~reader ~root =
       let open Deferred.Let_syntax in
@@ -91,8 +97,12 @@ let%test_module "Transition_handler.Catchup_scheduler tests" =
           in
           let dangling_breadcrumb = List.nth_exn upcoming_breadcrumbs 1 in
           let dangling_transition =
-            Transition_frontier.Breadcrumb.transition_with_hash
-              dangling_breadcrumb
+            let transition_with_hash =
+              Transition_frontier.Breadcrumb.transition_with_hash
+                dangling_breadcrumb
+            in
+            Envelope.Incoming.wrap ~data:transition_with_hash
+              ~sender:Envelope.Sender.Local
             |> Cached.pure
           in
           Catchup_scheduler.watch scheduler ~timeout_duration
@@ -103,13 +113,15 @@ let%test_module "Transition_handler.Catchup_scheduler tests" =
           |> don't_wait_for ;
           let%map cached_catchup_transition =
             match%map Ivar.read result_ivar with
-            | Rose_tree.T (t, []) -> t
-            | _ -> failwith "unexpected rose tree result"
+            | Rose_tree.T (t, []) ->
+                t
+            | _ ->
+                failwith "unexpected rose tree result"
           in
           let catchup_parent_hash =
             Cached.peek cached_catchup_transition
-            |> With_hash.data |> External_transition.Verified.protocol_state
-            |> Protocol_state.previous_state_hash
+            |> Envelope.Incoming.data |> With_hash.data
+            |> External_transition.Verified.parent_hash
           in
           assert (Coda_base.State_hash.equal missing_hash catchup_parent_hash) ;
           Strict_pipe.Writer.close catchup_breadcrumbs_writer ;
@@ -156,8 +168,10 @@ let%test_module "Transition_handler.Catchup_scheduler tests" =
             List.map dangling_transitions
               ~f:
                 (Fn.compose Or_error.ok_exn
-                   (Unprocessed_transition_cache.register
-                      unprocessed_transition_cache))
+                   (Fn.compose
+                      (Unprocessed_transition_cache.register
+                         unprocessed_transition_cache)
+                      transition_with_hash_enveloped))
           in
           List.(
             iter (rev cached_dangling_transitions) ~f:(fun cached_transition ->
@@ -166,7 +180,7 @@ let%test_module "Transition_handler.Catchup_scheduler tests" =
                 assert (
                   Catchup_scheduler.has_timeout scheduler
                     (Cached.peek cached_transition) ) )) ;
-          let%bind _ : unit =
+          let%bind (_ : unit) =
             Transition_frontier.add_breadcrumb_exn frontier missing_breadcrumb
           in
           Catchup_scheduler.notify scheduler
@@ -178,8 +192,9 @@ let%test_module "Transition_handler.Catchup_scheduler tests" =
               ~root:
                 ( Unprocessed_transition_cache.register
                     unprocessed_transition_cache
-                    (Transition_frontier.Breadcrumb.transition_with_hash
-                       missing_breadcrumb)
+                    ( Transition_frontier.Breadcrumb.transition_with_hash
+                        missing_breadcrumb
+                    |> transition_with_hash_enveloped )
                 |> Or_error.ok_exn
                 |> Cached.transform ~f:(Fn.const missing_breadcrumb) )
           in
@@ -188,10 +203,9 @@ let%test_module "Transition_handler.Catchup_scheduler tests" =
               ~f:(Fn.compose Or_error.ok_exn Cached.invalidate)
           in
           assert (
-            List.equal
+            List.equal Transition_frontier.Breadcrumb.equal
               (Rose_tree.flatten received_rose_tree)
-              upcoming_breadcrumbs ~equal:Transition_frontier.Breadcrumb.equal
-          ) ;
+              upcoming_breadcrumbs ) ;
           Strict_pipe.Writer.close catchup_breadcrumbs_writer ;
           Strict_pipe.Writer.close catchup_job_writer )
 
@@ -236,15 +250,17 @@ let%test_module "Transition_handler.Catchup_scheduler tests" =
             List.map dangling_transitions
               ~f:
                 (Fn.compose Or_error.ok_exn
-                   (Unprocessed_transition_cache.register
-                      unprocessed_transition_cache))
+                   (Fn.compose
+                      (Unprocessed_transition_cache.register
+                         unprocessed_transition_cache)
+                      transition_with_hash_enveloped))
           in
           List.iter (List.permute cached_dangling_transitions)
             ~f:(fun cached_transition ->
               Catchup_scheduler.watch scheduler ~timeout_duration
                 ~cached_transition ) ;
           assert (not @@ Catchup_scheduler.is_empty scheduler) ;
-          let%bind _ : unit =
+          let%bind (_ : unit) =
             Transition_frontier.add_breadcrumb_exn frontier missing_breadcrumb
           in
           Catchup_scheduler.notify scheduler
@@ -256,8 +272,9 @@ let%test_module "Transition_handler.Catchup_scheduler tests" =
               ~root:
                 ( Unprocessed_transition_cache.register
                     unprocessed_transition_cache
-                    (Transition_frontier.Breadcrumb.transition_with_hash
-                       missing_breadcrumb)
+                    ( Transition_frontier.Breadcrumb.transition_with_hash
+                        missing_breadcrumb
+                    |> transition_with_hash_enveloped )
                 |> Or_error.ok_exn
                 |> Cached.transform ~f:(Fn.const missing_breadcrumb) )
           in

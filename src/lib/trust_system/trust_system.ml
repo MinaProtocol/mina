@@ -26,16 +26,22 @@ module Actions = struct
     (* FIXME figure out a good value for this *)
     let request_increment = Peer_trust.max_rate 10. in
     match action with
-    | Sent_bad_hash -> Insta_ban
-    | Violated_protocol -> Insta_ban
-    | Made_request -> Trust_decrease request_increment
-    | Requested_unknown_item -> Trust_decrease (Peer_trust.max_rate 1.)
-    | Fulfilled_request -> (* trade 1:1 *) Trust_increase request_increment
+    | Sent_bad_hash ->
+        Insta_ban
+    | Violated_protocol ->
+        Insta_ban
+    | Made_request ->
+        Trust_decrease request_increment
+    | Requested_unknown_item ->
+        Trust_decrease (Peer_trust.max_rate 1.)
+    | Fulfilled_request ->
+        (* trade 1:1 *) Trust_increase request_increment
 
   let to_log : t -> string * (string, Yojson.Safe.json) List.Assoc.t =
    fun (action, extra_opt) ->
     match extra_opt with
-    | None -> (show_action action, [])
+    | None ->
+        (show_action action, [])
     | Some (fmt, metadata) ->
         (sprintf !"%s (%s)" (show_action action) fmt, metadata)
 end
@@ -55,4 +61,5 @@ let record_envelope_sender :
         ~metadata:action_metadata
         "Attempted to record trust action of ourselves: %s" action_fmt ;
       Deferred.unit
-  | Remote {host; _} -> record t logger host action
+  | Remote {host; _} ->
+      record t logger host action

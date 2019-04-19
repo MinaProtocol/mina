@@ -157,8 +157,7 @@ module Make (Impl : Snarky.Snark_intf.S) : S with module Impl := Impl = struct
          personalization = personalization *)
       Array.map
         ~f:(Fn.compose UInt32.constant UInt32.Unchecked.of_int)
-        [| 0x6A09E667 lxor 0x01010000 (* depth = 1, fanout = 1 *)
-           lxor 32
+        [| 0x6A09E667 lxor 0x01010000 (* depth = 1, fanout = 1 *) lxor 32
            (* digest_length = 32 *)
          ; 0xBB67AE85
          ; 0x3C6EF372
@@ -229,7 +228,7 @@ let%test_module "blake2-equality test" =
 
     let blake2_unchecked s =
       Blake2.string_to_bits
-        (Blake2.digest_string (Blake2.bits_to_string s) :> string)
+        Blake2.(digest_string (Blake2.bits_to_string s) |> to_raw_string)
 
     let to_bitstring bits =
       String.init (Array.length bits) ~f:(fun i ->
@@ -251,7 +250,7 @@ let%test_module "blake2-equality test" =
       let input =
         let open Quickcheck.Let_syntax in
         let%bind n = Int.gen_incl 0 (1024 / 8) in
-        let%map x = String.gen_with_length n Char.gen in
+        let%map x = String.gen_with_length n Char.quickcheck_generator in
         (n, Blake2.string_to_bits x)
       in
       let output_typ =

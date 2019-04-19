@@ -51,7 +51,11 @@ module Make (Inputs : Inputs_intf) :
 
   type fully_valid = Truth.true_t all
 
-  type ('time_received, 'proof, 'frontier_dependencies, 'staged_ledger_diff) with_transition =
+  type ( 'time_received
+       , 'proof
+       , 'frontier_dependencies
+       , 'staged_ledger_diff )
+       with_transition =
     (External_transition.t, State_hash.t) With_hash.t
     * ('time_received, 'proof, 'frontier_dependencies, 'staged_ledger_diff) t
 
@@ -85,7 +89,8 @@ module Make (Inputs : Inputs_intf) :
           , proof
           , frontier_dependencies
           , staged_ledger_diff )
-      | _ -> failwith "why can't this be refuted?"
+      | _ ->
+          failwith "why can't this be refuted?"
 
     let set_valid_proof :
            ( 'time_received
@@ -106,7 +111,8 @@ module Make (Inputs : Inputs_intf) :
           , (`Proof, Truth.True)
           , frontier_dependencies
           , staged_ledger_diff )
-      | _ -> failwith "why can't this be refuted?"
+      | _ ->
+          failwith "why can't this be refuted?"
 
     let set_valid_frontier_dependencies :
            ( 'time_received
@@ -127,7 +133,8 @@ module Make (Inputs : Inputs_intf) :
           , proof
           , (`Frontier_dependencies, Truth.True)
           , staged_ledger_diff )
-      | _ -> failwith "why can't this be refuted?"
+      | _ ->
+          failwith "why can't this be refuted?"
 
     let set_valid_staged_ledger_diff :
            ( 'time_received
@@ -148,7 +155,8 @@ module Make (Inputs : Inputs_intf) :
           , proof
           , frontier_dependencies
           , (`Staged_ledger_diff, Truth.True) )
-      | _ -> failwith "why can't this be refuted?"
+      | _ ->
+          failwith "why can't this be refuted?"
   end
 
   let validate_time_received (t, validation) ~time_received =
@@ -157,8 +165,10 @@ module Make (Inputs : Inputs_intf) :
       |> Protocol_state.consensus_state
     in
     match Consensus.received_at_valid_time consensus_state ~time_received with
-    | Ok () -> Ok (t, Unsafe.set_valid_time_received validation)
-    | Error _ -> Error `Invalid_time_received
+    | Ok () ->
+        Ok (t, Unsafe.set_valid_time_received validation)
+    | Error _ ->
+        Error `Invalid_time_received
 
   let validate_proof (t, validation) =
     let open External_transition in
@@ -217,9 +227,8 @@ module Make (Inputs : Inputs_intf) :
            with_transition
            * Staged_ledger.t
          , [ `Invalid_ledger_hash_after_staged_ledger_application
-           | `Staged_ledger_application_failed of Staged_ledger
-                                                  .Staged_ledger_error
-                                                  .t ] )
+           | `Staged_ledger_application_failed of
+             Staged_ledger.Staged_ledger_error.t ] )
          Deferred.Result.t =
    fun (t, validation) ~logger ~parent_staged_ledger ->
     let open Deferred.Result.Let_syntax in
@@ -249,7 +258,8 @@ module Make (Inputs : Inputs_intf) :
             ~default:
               (Frozen_ledger_hash.of_ledger_hash
                  (Ledger.merkle_root Genesis_ledger.t))
-      | Some (proof, _) -> target_hash_of_ledger_proof proof
+      | Some (proof, _) ->
+          target_hash_of_ledger_proof proof
     in
     Deferred.return
       ( if

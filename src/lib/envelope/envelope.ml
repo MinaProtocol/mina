@@ -7,7 +7,7 @@ module Sender = struct
     module V1 = struct
       module T = struct
         type t = Local | Remote of Peer.Stable.V1.t
-        [@@deriving sexp, bin_io, yojson, version]
+        [@@deriving eq, sexp, bin_io, yojson, version]
       end
 
       include T
@@ -36,7 +36,7 @@ module Incoming = struct
     module V1 = struct
       module T = struct
         type 'a t = {data: 'a; sender: Sender.Stable.V1.t}
-        [@@deriving sexp, bin_io, yojson, version]
+        [@@deriving eq, sexp, bin_io, yojson, version]
       end
 
       include T
@@ -46,7 +46,7 @@ module Incoming = struct
   end
 
   (* bin_io intentionally omitted *)
-  type 'a t = 'a Stable.Latest.t [@@deriving sexp, yojson]
+  type 'a t = 'a Stable.Latest.t [@@deriving eq, sexp, yojson]
 
   let sender t = t.Stable.Latest.sender
 

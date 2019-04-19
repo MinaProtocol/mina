@@ -93,9 +93,12 @@ let time thunk =
   (Time.diff stop start, x)
 
 let rec pair_up = function
-  | [] -> []
-  | x :: y :: xs -> (x, y) :: pair_up xs
-  | _ -> failwith "Expected even length list"
+  | [] ->
+      []
+  | x :: y :: xs ->
+      (x, y) :: pair_up xs
+  | _ ->
+      failwith "Expected even length list"
 
 (* This gives the "wall-clock time" to snarkify the given list of transactions, assuming
    unbounded parallelism. *)
@@ -109,8 +112,10 @@ let profile (module T : Transaction_snark.S) sparse_ledger0
         in
         let coinbase_stack_target =
           match t with
-          | Coinbase c -> Pending_coinbase.(Stack.push Stack.empty c)
-          | _ -> Pending_coinbase.Stack.empty
+          | Coinbase c ->
+              Pending_coinbase.(Stack.push Stack.empty c)
+          | _ ->
+              Pending_coinbase.Stack.empty
         in
         let span, proof =
           time (fun () ->
@@ -127,7 +132,8 @@ let profile (module T : Transaction_snark.S) sparse_ledger0
   in
   let rec merge_all serial_time proofs =
     match proofs with
-    | [x] -> serial_time
+    | [x] ->
+        serial_time
     | _ ->
         let layer_time, new_proofs =
           List.fold_map (pair_up proofs) ~init:Time.Span.zero
@@ -158,8 +164,10 @@ let check_base_snarks sparse_ledger0 (transitions : Transaction.t list) preeval
         in
         let coinbase_stack_target =
           match t with
-          | Coinbase c -> Pending_coinbase.(Stack.push Stack.empty c)
-          | _ -> Pending_coinbase.Stack.empty
+          | Coinbase c ->
+              Pending_coinbase.(Stack.push Stack.empty c)
+          | _ ->
+              Pending_coinbase.Stack.empty
         in
         let () =
           Transaction_snark.check_transaction ?preeval ~sok_message
@@ -189,8 +197,10 @@ let generate_base_snarks_witness sparse_ledger0
         in
         let coinbase_stack_target =
           match t with
-          | Coinbase c -> Pending_coinbase.(Stack.push Stack.empty c)
-          | _ -> Pending_coinbase.Stack.empty
+          | Coinbase c ->
+              Pending_coinbase.(Stack.push Stack.empty c)
+          | _ ->
+              Pending_coinbase.Stack.empty
         in
         let () =
           Transaction_snark.generate_transaction_witness ?preeval ~sok_message

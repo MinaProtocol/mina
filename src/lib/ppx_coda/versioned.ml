@@ -32,7 +32,9 @@
   The "asserted" option asserts that the type is versioned, to allow compilation
   to proceed. The types referred to in the type are not checked for versioning
   with this option. The type must be contained in the module hierarchy "Stable.Vn.T". 
-  Eventually, all uses of this option should be removed, except in test code.
+  Eventually, all uses of this option should be removed.
+
+  The "for_test" option is a synonym of "asserted" that can be used in test code.
 
   If "rpc" is true, again, the type must be named "query", "response", or "msg",
   and the type definition occurs in the hierarchy "Vn.T".
@@ -130,18 +132,24 @@ let validate_type_decl inner3_modules generation_kind type_decl =
 
 let module_name_from_plain_path inner3_modules =
   match inner3_modules with
-  | ["T"; module_version; "Stable"] -> module_version
-  | _ -> failwith "module_name_from_plain_path: unexpected module path"
+  | ["T"; module_version; "Stable"] ->
+      module_version
+  | _ ->
+      failwith "module_name_from_plain_path: unexpected module path"
 
 let module_name_from_wrapped_path inner3_modules =
   match inner3_modules with
-  | [module_version; "Stable"; "Wrapped"] -> module_version
-  | _ -> failwith "module_name_from_wrapped_path: unexpected module path"
+  | [module_version; "Stable"; "Wrapped"] ->
+      module_version
+  | _ ->
+      failwith "module_name_from_wrapped_path: unexpected module path"
 
 let module_name_from_rpc_path inner3_modules =
   match List.take inner3_modules 2 with
-  | ["T"; module_version] -> module_version
-  | _ -> failwith "module_name_from_rpc_path: unexpected module path"
+  | ["T"; module_version] ->
+      module_version
+  | _ ->
+      failwith "module_name_from_rpc_path: unexpected module path"
 
 (* generate "let version = n", when version module is Vn *)
 let generate_version_number_decl inner3_modules loc generation_kind =
@@ -152,9 +160,12 @@ let generate_version_number_decl inner3_modules loc generation_kind =
   let open E in
   let module_name =
     match generation_kind with
-    | Plain -> module_name_from_plain_path inner3_modules
-    | Wrapped -> module_name_from_wrapped_path inner3_modules
-    | Rpc -> module_name_from_rpc_path inner3_modules
+    | Plain ->
+        module_name_from_plain_path inner3_modules
+    | Wrapped ->
+        module_name_from_wrapped_path inner3_modules
+    | Rpc ->
+        module_name_from_rpc_path inner3_modules
   in
   let version =
     String.sub module_name ~pos:1 ~len:(String.length module_name - 1)
@@ -162,11 +173,47 @@ let generate_version_number_decl inner3_modules loc generation_kind =
   in
   [%stri let version = [%e eint version]]
 
-let ocaml_builtin_types = ["int"; "float"; "char"; "string"; "bool"; "unit"]
+let ocaml_builtin_types =
+  ["bytes"; "int"; "int32"; "int64"; "float"; "char"; "string"; "bool"; "unit"]
 
-let ocaml_builtin_type_constructors = ["list"; "option"; "ref"]
+let ocaml_builtin_type_constructors = ["list"; "array"; "option"; "ref"]
 
 let jane_street_type_constructors = ["sexp_opaque"]
+
+(* true iff module_path is of form M. ... .Stable.Vn, where M is Core or Core_kernel, and n is integer *)
+let is_jane_street_stable_module module_path =
+  let hd_elt = List.hd_exn module_path in
+  let jane_street_libs = ["Core_kernel"; "Core"] in
+  let is_version_module vn =
+    let len = String.length vn in
+    len > 1
+    && Char.equal vn.[0] 'V'
+    &&
+    let numeric_part = String.sub vn ~pos:1 ~len:(len - 1) in
+    String.for_all numeric_part ~f:Char.is_digit
+    && not (Int.equal (Char.get_digit_exn numeric_part.[0]) 0)
+  in
+  List.mem jane_street_libs hd_elt ~equal:String.equal
+  &&
+  match List.rev module_path with
+  | vn :: "Stable" :: _ ->
+      is_version_module vn
+  | vn :: "Span" :: "Stable" :: "Time" :: _ ->
+      (* special case, maybe improper module structure *)
+      is_version_module vn
+  | _ ->
+      false
+
+let whitelisted_prefix prefix ~loc =
+  match prefix with
+  | Lident id ->
+      String.equal id "Bitstring"
+  | Ldot _ ->
+      let module_path = Longident.flatten_exn prefix in
+      is_jane_street_stable_module module_path
+  | Lapply _ ->
+      Ppx_deriving.raise_errorf ~loc
+        "Type name contains unexpected application"
 
 let rec generate_core_type_version_decls type_name core_type =
   match core_type.ptyp_desc with
@@ -185,7 +232,8 @@ let rec generate_core_type_version_decls type_name core_type =
           || List.mem jane_street_type_constructors id ~equal:String.equal
         then
           match core_types with
-          | [_] -> generate_version_lets_for_core_types type_name core_types
+          | [_] ->
+              generate_version_lets_for_core_types type_name core_types
           | _ ->
               Ppx_deriving.raise_errorf ~loc:core_type.ptyp_loc
                 "Type constructor \"%s\" expects one type argument, got %d" id
@@ -196,27 +244,34 @@ let rec generate_core_type_version_decls type_name core_type =
             id
     | Ldot (prefix, "t") ->
         (* type t = A.B.t
-           generate: let _ = A.B.__versioned__
+           if prefix not whitelisted, generate: let _ = A.B.__versioned__
         *)
-        let loc = core_type.ptyp_loc in
-        let pexp_loc = loc in
-        let versioned_ident =
-          { pexp_desc= Pexp_ident {txt= Ldot (prefix, "__versioned__"); loc}
-          ; pexp_loc
-          ; pexp_attributes= [] }
+        let core_type_decls =
+          generate_version_lets_for_core_types type_name core_types
         in
-        [%str let _ = [%e versioned_ident]]
-        @ generate_version_lets_for_core_types type_name core_types
+        if whitelisted_prefix prefix ~loc:core_type.ptyp_loc then
+          core_type_decls
+        else
+          let loc = core_type.ptyp_loc in
+          let pexp_loc = loc in
+          let versioned_ident =
+            { pexp_desc= Pexp_ident {txt= Ldot (prefix, "__versioned__"); loc}
+            ; pexp_loc
+            ; pexp_attributes= [] }
+          in
+          [%str let _ = [%e versioned_ident]] @ core_type_decls
     | _ ->
         Ppx_deriving.raise_errorf ~loc:core_type.ptyp_loc
           "Unrecognized type constructor for versioned type" )
   | Ptyp_tuple core_types ->
       (* type t = t1 * t2 * t3 *)
       generate_version_lets_for_core_types type_name core_types
-  | Ptyp_variant _ -> (* type t = [ `A | `B ] *)
-                      []
-  | Ptyp_var _ -> (* type variable *)
-                  []
+  | Ptyp_variant _ ->
+      (* type t = [ `A | `B ] *)
+      []
+  | Ptyp_var _ ->
+      (* type variable *)
+      []
   | _ ->
       Ppx_deriving.raise_errorf ~loc:core_type.ptyp_loc
         "Can't determine versioning for contained type"
@@ -298,7 +353,8 @@ let check_for_option s options =
     match opt with
     | str1, {pexp_desc= Pexp_ident {txt= Lident str2; _}; _} ->
         String.equal s str1 && String.equal s str2
-    | _ -> false
+    | _ ->
+        false
   in
   List.find options ~f:is_s_opt |> Option.is_some
 
@@ -319,21 +375,28 @@ let validate_options valid options =
 
 let generate_let_bindings_for_type_decl_str ~options ~path type_decls =
   ignore
-    (validate_options ["wrapped"; "unnumbered"; "rpc"; "asserted"] options) ;
+    (validate_options
+       ["wrapped"; "unnumbered"; "rpc"; "asserted"; "for_test"]
+       options) ;
   let type_decl = get_type_decl_representative type_decls in
   let wrapped = check_for_option "wrapped" options in
   let unnumbered = check_for_option "unnumbered" options in
-  let asserted = check_for_option "asserted" options in
+  let asserted =
+    check_for_option "asserted" options || check_for_option "for_test" options
+  in
   let rpc = check_for_option "rpc" options in
   if asserted && (wrapped || rpc) then
     Ppx_deriving.raise_errorf ~loc:type_decl.ptype_loc
-      "Option \"asserted\" cannot be combined with \"wrapped\" or \"rpc\" \
-       options" ;
+      "Options \"asserted\" or \"for_test\" cannot be combined with \
+       \"wrapped\" or \"rpc\" options" ;
   let generation_kind =
     match (rpc, wrapped) with
-    | true, false -> Rpc
-    | false, true -> Wrapped
-    | false, false -> Plain
+    | true, false ->
+        Rpc
+    | false, true ->
+        Wrapped
+    | false, false ->
+        Plain
     | true, true ->
         Ppx_deriving.raise_errorf ~loc:type_decl.ptype_loc
           "RPC versioned type cannot also be wrapped"

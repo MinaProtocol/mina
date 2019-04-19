@@ -1,3 +1,6 @@
+[%%import
+"../../config.mlh"]
+
 open Core_kernel
 open Async
 open Kademlia
@@ -56,7 +59,7 @@ struct
         type response =
           ( Staged_ledger_aux.Stable.V1.t
           * Ledger_hash.Stable.V1.t
-          * Pending_coinbase.t )
+          * Pending_coinbase.Stable.V1.t )
           option
       end
 
@@ -81,14 +84,9 @@ struct
         type response =
           ( Staged_ledger_aux.Stable.V1.t
           * Ledger_hash.Stable.V1.t
-          * Pending_coinbase.t )
+          * Pending_coinbase.Stable.V1.t )
           option
-        [@@deriving bin_io]
-
-        (* , version {rpc} *)
-        
-        (* TODO : remove after uncommenting version{rpc} *)
-        let version = 1
+        [@@deriving bin_io, version {rpc}]
 
         let query_of_caller_model = Fn.id
 
@@ -137,14 +135,9 @@ struct
           Envelope.Incoming.Stable.V1.t
         [@@deriving bin_io, sexp, version {rpc}]
 
-        (* TODO : wrap Or_error *)
-        type response = Sync_ledger.Answer.Stable.V1.t Or_error.t
-        [@@deriving bin_io, sexp]
-
-        (* , version {rpc} *)
-        
-        (* TODO : remove this after uncommenting version{rpc} *)
-        let version = 1
+        type response =
+          Sync_ledger.Answer.Stable.V1.t Core.Or_error.Stable.V1.t
+        [@@deriving bin_io, sexp, version {rpc}]
 
         let query_of_caller_model = Fn.id
 
@@ -350,9 +343,12 @@ struct
 
   let summary msg =
     match Envelope.Incoming.data msg with
-    | New_state _ -> "new state"
-    | Snark_pool_diff _ -> "snark pool diff"
-    | Transaction_pool_diff _ -> "transaction pool diff"
+    | New_state _ ->
+        "new state"
+    | Snark_pool_diff _ ->
+        "snark pool diff"
+    | Transaction_pool_diff _ ->
+        "transaction pool diff"
 end
 
 module type Inputs_intf = sig
@@ -450,8 +446,31 @@ module Make (Inputs : Inputs_intf) = struct
     ; transaction_pool_diffs:
         Transaction_pool_diff.t Envelope.Incoming.t Linear_pipe.Reader.t
     ; snark_pool_diffs:
-        Snark_pool_diff.t Envelope.Incoming.t Linear_pipe.Reader.t }
+        Snark_pool_diff.t Envelope.Incoming.t Linear_pipe.Reader.t
+    ; online_status: [`Offline | `Online] Broadcast_pipe.Reader.t }
   [@@deriving fields]
+
+  let offline_time =
+    Time.Span.of_ms @@ Int64.of_int Consensus.Constants.inactivity_secs
+
+  let setup_timer time_controller sync_state_broadcaster =
+    Time.Timeout.create time_controller offline_time ~f:(fun _ ->
+        Broadcast_pipe.Writer.write sync_state_broadcaster `Offline
+        |> don't_wait_for )
+
+  let online_broadcaster time_controller received_messages =
+    let online_reader, online_writer = Broadcast_pipe.create `Offline in
+    let init =
+      Time.Timeout.create time_controller
+        (Time.Span.of_ms Int64.zero)
+        ~f:ignore
+    in
+    Strict_pipe.Reader.fold received_messages ~init ~f:(fun old_timeout _ ->
+        let%map () = Broadcast_pipe.Writer.write online_writer `Online in
+        Time.Timeout.cancel time_controller old_timeout () ;
+        setup_timer time_controller online_writer )
+    |> Deferred.ignore |> don't_wait_for ;
+    online_reader
 
   let create (config : Config.t)
       ~(get_staged_ledger_aux_and_pending_coinbases_at_hash :
@@ -514,9 +533,14 @@ module Make (Inputs : Inputs_intf) = struct
        For example, some things you really want to not drop (like your outgoing
        block announcment).
     *)
+    let received_gossips, online_notifier =
+      Strict_pipe.Reader.Fork.two (Gossip_net.received gossip_net)
+    in
+    let online_status =
+      online_broadcaster config.time_controller online_notifier
+    in
     let states, snark_pool_diffs, transaction_pool_diffs =
-      Strict_pipe.Reader.partition_map3 (Gossip_net.received gossip_net)
-        ~f:(fun x ->
+      Strict_pipe.Reader.partition_map3 received_gossips ~f:(fun x ->
           match Envelope.Incoming.data x with
           | New_state s ->
               Perf_histograms.add_span ~name:"external_transition_latency"
@@ -525,7 +549,8 @@ module Make (Inputs : Inputs_intf) = struct
               `Fst
                 ( Envelope.Incoming.map x ~f:(fun _ -> s)
                 , Time.now config.time_controller )
-          | Snark_pool_diff d -> `Snd (Envelope.Incoming.map x ~f:(fun _ -> d))
+          | Snark_pool_diff d ->
+              `Snd (Envelope.Incoming.map x ~f:(fun _ -> d))
           | Transaction_pool_diff d ->
               `Trd (Envelope.Incoming.map x ~f:(fun _ -> d)) )
     in
@@ -534,7 +559,8 @@ module Make (Inputs : Inputs_intf) = struct
     ; states
     ; snark_pool_diffs= Strict_pipe.Reader.to_linear_pipe snark_pool_diffs
     ; transaction_pool_diffs=
-        Strict_pipe.Reader.to_linear_pipe transaction_pool_diffs }
+        Strict_pipe.Reader.to_linear_pipe transaction_pool_diffs
+    ; online_status }
 
   (* wrap data in envelope, with "me" in the gossip net as the sender *)
   let envelope_from_me t data =
@@ -592,6 +618,8 @@ module Make (Inputs : Inputs_intf) = struct
 
   let peers t = Gossip_net.peers t.gossip_net
 
+  let online_status t = t.online_status
+
   let random_peers {gossip_net; _} = Gossip_net.random_peers gossip_net
 
   let random_peers_except {gossip_net; _} n ~(except : Peer.Hash_set.t) =
@@ -625,9 +653,12 @@ module Make (Inputs : Inputs_intf) = struct
               Gossip_net.query_peer t.gossip_net peer rpc input
             in
             match response_or_error with
-            | Ok (Some response) -> return (Ok response)
-            | Ok None -> loop remaining_peers (2 * num_peers)
-            | Error _ -> loop remaining_peers (2 * num_peers) )
+            | Ok (Some response) ->
+                return (Ok response)
+            | Ok None ->
+                loop remaining_peers (2 * num_peers)
+            | Error _ ->
+                loop remaining_peers (2 * num_peers) )
     in
     loop peers 1
 
@@ -640,7 +671,8 @@ module Make (Inputs : Inputs_intf) = struct
       random_peers_except t max_peers ~except
     in
     match response with
-    | Ok (Some data) -> return (Ok data)
+    | Ok (Some data) ->
+        return (Ok data)
     | Ok None ->
         Logger.faulty_peer t.logger ~module_:__MODULE__ ~location:__LOC__
           !"get no response from %{sexp: Peer.t}"

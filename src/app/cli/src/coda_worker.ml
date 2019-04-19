@@ -38,7 +38,7 @@ open Input
 module Send_payment_input = struct
   (* TODO : version *)
   type t =
-    Private_key.t
+    Private_key.Stable.V1.t
     * Public_key.Compressed.Stable.V1.t
     * Currency.Amount.Stable.V1.t
     * Currency.Fee.Stable.V1.t

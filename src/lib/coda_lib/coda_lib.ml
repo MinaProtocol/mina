@@ -44,6 +44,8 @@ module type Network_intf = sig
 
   val peers : t -> Network_peer.Peer.t list
 
+  val online_status : t -> [`Online | `Offline] Broadcast_pipe.Reader.t
+
   val random_peers : t -> int -> Network_peer.Peer.t list
 
   val catchup_transition :
@@ -422,8 +424,8 @@ module Make (Inputs : Inputs_intf) = struct
   type t =
     { propose_keypair: Keypair.t option
     ; run_snark_worker: bool
-    ; net:
-        Net.t (* TODO: Is this the best spot for the transaction_pool ref? *)
+    ; net: Net.t
+          (* TODO: Is this the best spot for the transaction_pool ref? *)
     ; transaction_pool: Transaction_pool.t
     ; snark_pool: Snark_pool.t
     ; transition_frontier: Transition_frontier.t option Broadcast_pipe.Reader.t
@@ -493,6 +495,16 @@ module Make (Inputs : Inputs_intf) = struct
 
   let root_length = compose_of_option root_length_opt
 
+  let sync_status t =
+    match Broadcast_pipe.Reader.peek @@ Net.online_status t.net with
+    | `Offline ->
+        `Offline
+    | `Online ->
+        Option.value_map
+          (Broadcast_pipe.Reader.peek t.transition_frontier)
+          ~default:`Bootstrap
+          ~f:(Fn.const `Synced)
+
   let visualize_frontier ~filename =
     compose_of_option
     @@ fun t ->
@@ -521,7 +533,8 @@ module Make (Inputs : Inputs_intf) = struct
           then Some (Ledger.to_list (Staged_ledger.ledger staged_ledger))
           else None )
     with
-    | Some x -> Deferred.return (Ok x)
+    | Some x ->
+        Deferred.return (Ok x)
     | None ->
         Deferred.Or_error.error_string
           "staged ledger hash not found in transition frontier"
@@ -553,7 +566,8 @@ module Make (Inputs : Inputs_intf) = struct
     in
     don't_wait_for
       (Broadcast_pipe.Reader.iter t.transition_frontier ~f:(function
-        | None -> Deferred.unit
+        | None ->
+            Deferred.unit
         | Some frontier ->
             Broadcast_pipe.Reader.iter
               (Transition_frontier.root_diff_pipe frontier)
@@ -593,7 +607,7 @@ module Make (Inputs : Inputs_intf) = struct
       ; snark_work_fee: Currency.Fee.t
       ; monitor: Monitor.t option
       ; consensus_local_state: Consensus_mechanism.Local_state.t
-      (* TODO: Pass banlist to modules discussed in Ban Reasons issue: https://github.com/CodaProtocol/coda/issues/852 *)
+            (* TODO: Pass banlist to modules discussed in Ban Reasons issue: https://github.com/CodaProtocol/coda/issues/852 *)
       }
     [@@deriving make]
   end
@@ -652,8 +666,10 @@ module Make (Inputs : Inputs_intf) = struct
           ~scan_state:(Staged_ledger.Scan_state.empty ())
           ~pending_coinbase_collection:pending_coinbases
       with
-      | Ok staged_ledger -> staged_ledger
-      | Error err -> Error.raise err
+      | Ok staged_ledger ->
+          staged_ledger
+      | Error err ->
+          Error.raise err
     in
     let%map frontier =
       Transition_frontier.create ~logger:config.logger
@@ -795,7 +811,7 @@ module Make (Inputs : Inputs_intf) = struct
                 ~ledger_db
                 ~network_transition_reader:
                   (Strict_pipe.Reader.map external_transitions_reader
-                     ~f:(fun (tn, tm) -> (`Transition tn, `Time_received tm) ))
+                     ~f:(fun (tn, tm) -> (`Transition tn, `Time_received tm)))
                 ~proposer_transition_reader
             in
             let valid_transitions_for_network, valid_transitions_for_api =

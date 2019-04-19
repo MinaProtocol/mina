@@ -20,7 +20,7 @@ let create a =
         `Ok )
   in
   don't_wait_for
-    (Pipe.iter ~consumer root_r ~f:(fun v ->
+    (Pipe.iter ~flushed:(Consumer consumer) root_r ~f:(fun v ->
          t.cache <- v ;
          downstream_flushed_v := Ivar.create () ;
          let inner_pipes = Int.Table.data t.pipes in
@@ -80,14 +80,15 @@ module Reader = struct
   let iter t ~f =
     prepare_pipe t ~f:(fun r ->
         let consumer = add_trivial_consumer r in
-        Pipe.iter ~consumer r ~f:(fun v ->
+        Pipe.iter ~flushed:(Consumer consumer) r ~f:(fun v ->
             let%map () = f v in
             Pipe.Consumer.values_sent_downstream consumer ) )
 
   let iter_until t ~f =
     let rec loop ~consumer reader =
       match%bind Pipe.read ~consumer reader with
-      | `Eof -> return ()
+      | `Eof ->
+          return ()
       | `Ok v ->
           if%bind f v then return ()
           else (

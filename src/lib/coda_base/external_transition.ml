@@ -123,7 +123,7 @@ end)
           { protocol_state: Protocol_state.Value.Stable.V1.t
           ; protocol_state_proof: Proof.Stable.V1.t sexp_opaque
           ; staged_ledger_diff: Staged_ledger_diff.Stable.V1.t }
-        [@@deriving sexp, fields, bin_io, version {asserted}]
+        [@@deriving sexp, fields, bin_io, version]
 
         let to_yojson
             {protocol_state; protocol_state_proof= _; staged_ledger_diff= _} =
@@ -192,7 +192,7 @@ end)
     {protocol_state; protocol_state_proof; staged_ledger_diff}
 
   let timestamp {protocol_state; _} =
-    Protocol_state.blockchain_state (Obj.magic protocol_state)
+    Protocol_state.blockchain_state protocol_state
     |> Blockchain_state.timestamp
 
   let consensus_state = Stable.Latest.consensus_state

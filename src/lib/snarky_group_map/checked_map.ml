@@ -17,27 +17,43 @@ struct
 
   open M
 
+  let non_residue : Field.Constant.t Lazy.t =
+    let open Field.Constant in
+    let rec go i = if not (is_square i) then i else go (i + one) in
+    lazy (go (of_int 2))
+
+  let sqrt_exn x =
+    let y =
+      exists Field.typ ~compute:(fun () ->
+          Field.Constant.sqrt (As_prover.read_var x) )
+    in
+    assert_square y x ; y
+
   (* let sqrt_flagged : Field.t -> Field.t * Boolean.var = *)
   let sqrt_flagged x =
-    (* z = sqrt of x (if one exists) *)
-    let z =
-      exists Field.typ ~compute:(fun () ->
-          let x = As_prover.read_var x in
-          if M.Field.Constant.is_square x then M.Field.Constant.sqrt x
-          else M.Field.Constant.one )
+    (*
+       imeckler: I learned this trick from Dan Boneh
+
+       m a known non residue
+
+       exists is_square : bool, y.
+       if is_square then assert y*y = x else assert y*y = m * x
+
+       <=>
+
+       assert (y*y = if is_square then x else m * x)
+    *)
+    let is_square =
+      exists Boolean.typ ~compute:(fun () ->
+          Field.Constant.is_square (As_prover.read_var x) )
     in
-    let z2 = Field.(z * z) in
-    let b = Field.equal z2 x in
-    (z, b)
+    let m = Lazy.force non_residue in
+    ( sqrt_exn (Field.if_ is_square ~then_:x ~else_:(Field.scale x m))
+    , is_square )
 
   (* with (x1, b1), (x2, b2), (x3, b3), we need to take only 
    * the first square. this means we can do
    * x1 * f1 + (x2 * f2 * not f1) + (x3 * f3 * not f1 * not f2)
-   * NOTE : in case all three of f x1, f x2, f x3 are square
-   * and a malicious prover submits the wrong z to sqrt_flagged, 
-   * meaning it returns 0 instead of 1, the adversary gets 3 chances 
-   * rather than one. This is solved by ensuring external verifiers
-   * only accept proofs that use the *first* square in f x1, f x2, f x3
    *)
 
   let to_group x =

@@ -65,8 +65,8 @@ module Digest = struct
 
   module Checked = Random_oracle.Digest.Checked
 
-  let fold, typ, length_in_triples =
-    Stable.Latest.(fold, typ, length_in_triples)
+  [%%define_locally
+  Stable.Latest.(fold, typ, length_in_triples)]
 
   let default =
     let open Random_oracle.Digest in

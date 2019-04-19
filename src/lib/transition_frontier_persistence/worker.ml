@@ -18,8 +18,10 @@ end = struct
   let create ?directory_name ~logger () =
     let directory =
       match directory_name with
-      | None -> Uuid.to_string (Uuid.create ())
-      | Some name -> name
+      | None ->
+          Uuid.to_string (Uuid_unix.create ())
+      | Some name ->
+          name
     in
     let transition_storage = Transition_storage.create ~directory in
     {transition_storage; logger}
@@ -28,7 +30,7 @@ end = struct
     Transition_storage.close transition_storage
 
   let apply_add_transition ({transition_storage; logger}, batch)
-      With_hash.({hash; data= external_transition}) =
+      With_hash.{hash; data= external_transition} =
     let open Transition_storage.Schema in
     let parent_hash = External_transition.parent_hash external_transition in
     let parent_transition, children_hashes =
@@ -91,7 +93,7 @@ end = struct
           [%bin_type_class:
             State_hash.Stable.Latest.t
             * Staged_ledger.Scan_state.Stable.Latest.t
-            * Pending_coinbase.t]
+            * Pending_coinbase.Stable.Latest.t]
         in
         let serialized_new_root_data =
           Bin_prot.Utils.bin_dump bin.writer new_root_data

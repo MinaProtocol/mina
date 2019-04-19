@@ -35,6 +35,7 @@ end
 (** Trust increment that sets a maximum rate of doing a bad thing (presuming the
     peer does no good things) in actions/second. *)
 val max_rate : float -> float
+
 (* TODO consider deduplicating somehow, maybe with an intf.ml, or by getting rid
    of this definition entirely. *)
 
@@ -71,6 +72,7 @@ module type S = sig
   (** Shut down. *)
   val close : t -> unit
 end
+
 (* FIXME The parameter docs don't render :( *)
 
 (** Instantiate the module.
