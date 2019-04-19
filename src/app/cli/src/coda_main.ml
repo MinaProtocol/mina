@@ -1141,9 +1141,9 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
         let reader, writer = Async.Pipe.create () in
         Incr_status.Observer.on_update_exn observer ~f:(function
           | Initialized value ->
-              Async.Pipe.write_without_pushback writer value
+              Async.Pipe.write_or_drop_head writer value
           | Changed (_, value) ->
-              Async.Pipe.write_without_pushback writer value
+              Async.Pipe.write_or_drop_head writer value
           | Invalidated ->
               () ) ;
         reader
