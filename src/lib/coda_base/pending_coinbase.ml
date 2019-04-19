@@ -878,7 +878,6 @@ let%test_unit "push and pop multiple stacks" =
   in
   (*remove the oldest stack and check if that's the expected one *)
   let check t expected_stack =
-    Core.printf !"tree %{sexp:t}\n%!" t ;
     let popped_stack, updated_pending_coinbases =
       remove_coinbase_stack t |> Or_error.ok_exn
     in
