@@ -35,13 +35,13 @@ let daemon logger =
   Command.async ~summary:"Coda daemon"
     (let%map_open conf_dir =
        flag "config-directory" ~doc:"DIR Configuration directory"
-         (optional file)
+         (optional string)
      and propose_key =
        flag "propose-key"
          ~doc:
            "KEYFILE Private key file for the proposing transitions \
             (default:don't propose)"
-         (optional file)
+         (optional string)
      and peers =
        flag "peer"
          ~doc:
@@ -132,7 +132,8 @@ let daemon logger =
                in
                YJ.from_string ~fname:"daemon.json" contents )
          with
-         | Ok c -> Some c
+         | Ok c ->
+             Some c
          | Error e ->
              Logger.trace logger ~module_:__MODULE__ ~location:__LOC__
                "error reading daemon.json: %s" (Error.to_string_mach e) ;
@@ -145,7 +146,8 @@ let daemon logger =
          let open Option.Let_syntax in
          let open YJ.Util in
          match actual_value with
-         | Some v -> Some v
+         | Some v ->
+             Some v
          | None ->
              let%bind config = config in
              let%bind json_val = to_option Fn.id (member keyname config) in
@@ -153,7 +155,8 @@ let daemon logger =
        in
        let or_from_config map keyname actual_value ~default =
          match maybe_from_config map keyname actual_value with
-         | Some x -> x
+         | Some x ->
+             x
          | None ->
              Logger.info logger ~module_:__MODULE__ ~location:__LOC__
                "didn't find %s in the config file, using default" keyname ;
@@ -205,13 +208,15 @@ let daemon logger =
        if enable_tracing then Coda_tracing.start conf_dir |> don't_wait_for ;
        let%bind initial_peers_raw =
          match peers with
-         | _ :: _ -> return peers
+         | _ :: _ ->
+             return peers
          | [] -> (
              let peers_path = conf_dir ^/ "peers" in
              match%bind
                Reader.load_sexp peers_path [%of_sexp: Host_and_port.t list]
              with
-             | Ok ls -> return ls
+             | Ok ls ->
+                 return ls
              | Error e ->
                  let default_initial_peers = [] in
                  let%map () =
@@ -257,8 +262,10 @@ let daemon logger =
        in
        let sequence maybe_def =
          match maybe_def with
-         | Some def -> Deferred.map def ~f:Option.return
-         | None -> Deferred.return None
+         | Some def ->
+             Deferred.map def ~f:Option.return
+         | None ->
+             Deferred.return None
        in
        let%bind propose_keypair =
          Option.map ~f:Cli_lib.Keypair.Terminal_stdin.read_exn propose_key
@@ -296,14 +303,14 @@ let daemon logger =
        let module Run = Run (Config0) (M) in
        Stream.iter
          (Async.Scheduler.long_cycles
-            ~at_least:(sec 0.5 |> Time_ns.Span.of_span))
+            ~at_least:(sec 0.5 |> Time_ns.Span.of_span_float_round_nearest))
          ~f:(fun span ->
            Logger.warn logger ~module_:__MODULE__ ~location:__LOC__
              "long async cycle %s"
              (Time_ns.Span.to_string span) ) ;
        let run_snark_worker_action =
          Option.value_map run_snark_worker_flag ~default:`Don't_run
-           ~f:(fun k -> `With_public_key k )
+           ~f:(fun k -> `With_public_key k)
        in
        let trust_dir = conf_dir ^/ "trust" in
        let () = Snark_params.set_chunked_hashing true in
@@ -408,7 +415,8 @@ let rec ensure_testnet_id_still_good logger =
           exit 1
         in
         match commit_id with
-        | None -> finish None body_string
+        | None ->
+            finish None body_string
         | Some sha ->
             if
               List.exists valid_ids ~f:(fun remote_id ->

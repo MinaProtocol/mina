@@ -97,10 +97,10 @@ module Make (Message : Message_intf) :
         ( Unix.Inet_addr.t
         , (Uuid.t, Rpc.Connection.t Ivar.t) Hashtbl.t )
         Hashtbl.t
-          (**mapping a Uuid to a connection to be able to remove it from the hash 
+          (**mapping a Uuid to a connection to be able to remove it from the hash
          *table since Rpc.Connection.t doesn't have the socket information*)
     ; max_concurrent_connections: int option
-    (* maximum number of concurrent connections from an ip (infinite if None)*)
+          (* maximum number of concurrent connections from an ip (infinite if None)*)
     }
 
   module Config = struct
@@ -121,8 +121,10 @@ module Make (Message : Message_intf) :
 
   let create_connection_with_menu peer r w =
     match%bind Rpc.Connection.create r w ~connection_state:(fun _ -> peer) with
-    | Error exn -> return (Or_error.of_exn exn)
-    | Ok conn -> Versioned_rpc.Connection_with_menu.create conn
+    | Error exn ->
+        return (Or_error.of_exn exn)
+    | Ok conn ->
+        Versioned_rpc.Connection_with_menu.create conn
 
   let try_call_rpc t peer dispatch query =
     let call () =
@@ -132,12 +134,16 @@ module Make (Message : Message_intf) :
               create_connection_with_menu peer r w
               >>=? fun conn -> dispatch conn query ) )
       >>| function
-      | Ok (Ok result) -> Ok result
-      | Ok (Error exn) -> Error exn
-      | Error exn -> Or_error.of_exn exn
+      | Ok (Ok result) ->
+          Ok result
+      | Ok (Error exn) ->
+          Error exn
+      | Error exn ->
+          Or_error.of_exn exn
     in
     match Hashtbl.find t.connections (Unix.Inet_addr.of_string peer.host) with
-    | None -> call ()
+    | None ->
+        call ()
     | Some conn_map ->
         if
           Option.is_some t.max_concurrent_connections
@@ -165,7 +171,8 @@ module Make (Message : Message_intf) :
     trace_event "broadcasting message" ;
     Deferred.List.iter ~how:`Parallel peers ~f:(fun p ->
         match%map send (snd p) with
-        | Ok () -> ()
+        | Ok () ->
+            ()
         | Error e ->
             Logger.error t.logger ~module_:__MODULE__ ~location:__LOC__
               "broadcasting $short_msg to $peer failed: %s"
@@ -189,7 +196,8 @@ module Make (Message : Message_intf) :
                   ~me:config.me ~conf_dir:config.conf_dir ~logger:config.logger
                   ~trust_system:config.trust_system )
           with
-          | Ok membership -> membership
+          | Ok membership ->
+              membership
           | Error e ->
               failwith
                 (Printf.sprintf "Failed to connect to kademlia process: %s\n"
@@ -216,7 +224,8 @@ module Make (Message : Message_intf) :
           (Strict_pipe.Reader.iter (Trust_system.ban_pipe config.trust_system)
              ~f:(fun addr ->
                match Hashtbl.find_and_remove t.connections addr with
-               | None -> Deferred.unit
+               | None ->
+                   Deferred.unit
                | Some conn_list ->
                    Logger.debug t.logger ~module_:__MODULE__ ~location:__LOC__
                      !"Peer %{sexp: Unix.Inet_addr.t} banned, disconnecting."
@@ -292,7 +301,7 @@ module Make (Message : Message_intf) :
                   (Option.value_exn t.max_concurrent_connections) ;
                 Reader.close reader >>= fun _ -> Writer.close writer )
               else
-                let conn_id = Uuid.create () in
+                let conn_id = Uuid_unix.create () in
                 Hashtbl.add_exn conn_map ~key:conn_id ~data:(Ivar.create ()) ;
                 Hashtbl.set t.connections
                   ~key:(Socket.Address.Inet.addr client)

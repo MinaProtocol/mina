@@ -4,3 +4,5 @@ type t = string;
 let ofStringExn = s => s;
 
 let toString = s => s;
+
+let equal = (a, b) => a === b;

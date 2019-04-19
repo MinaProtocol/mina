@@ -13,21 +13,29 @@ let gen =
 type var = Boolean.var * Boolean.var
 
 let to_bits = function
-  | Payment -> (false, false)
-  | Stake_delegation -> (true, false)
-  | Fee_transfer -> (false, true)
-  | Coinbase -> (true, true)
+  | Payment ->
+      (false, false)
+  | Stake_delegation ->
+      (true, false)
+  | Fee_transfer ->
+      (false, true)
+  | Coinbase ->
+      (true, true)
 
 let of_bits = function
-  | false, false -> Payment
-  | true, false -> Stake_delegation
-  | false, true -> Fee_transfer
-  | true, true -> Coinbase
+  | false, false ->
+      Payment
+  | true, false ->
+      Stake_delegation
+  | false, true ->
+      Fee_transfer
+  | true, true ->
+      Coinbase
 
 let%test_unit "to_bool of_bool inv" =
   let open Quickcheck in
-  test (Generator.tuple2 Bool.gen Bool.gen) ~f:(fun b ->
-      assert (b = to_bits (of_bits b)) )
+  test (Generator.tuple2 Bool.quickcheck_generator Bool.quickcheck_generator)
+    ~f:(fun b -> assert (b = to_bits (of_bits b)))
 
 let typ =
   Typ.transport Typ.(Boolean.typ * Boolean.typ) ~there:to_bits ~back:of_bits

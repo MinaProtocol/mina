@@ -169,7 +169,9 @@ module Statement = struct
     and supply_increase = Currency.Amount.gen
     and pending_coinbase_before = Pending_coinbase.Stack.gen
     and pending_coinbase_after = Pending_coinbase.Stack.gen
-    and proof_type = Bool.gen >>| fun b -> if b then `Merge else `Base in
+    and proof_type =
+      Bool.quickcheck_generator >>| fun b -> if b then `Merge else `Base
+    in
     { source
     ; target
     ; fee_excess
@@ -258,7 +260,8 @@ let construct_input ~proof_type ~sok_digest ~state1 ~state2 ~supply_increase
     +> Amount.Signed.fold fee_excess
   in
   match proof_type with
-  | `Base -> Tick.Pedersen.digest_fold Hash_prefix.base_snark fold
+  | `Base ->
+      Tick.Pedersen.digest_fold Hash_prefix.base_snark fold
   | `Merge wrap_vk_bits ->
       Tick.Pedersen.digest_fold Hash_prefix.merge_snark
         Fold.(fold +> group3 ~default:false (of_list wrap_vk_bits))
@@ -523,7 +526,9 @@ module Base = struct
     let prover_state : Prover_state.t =
       {state1; state2; transaction; sok_digest; pending_coinbase_stack_state}
     in
-    let main = if preeval then Lazy.force reduced_main else main in
+    let main =
+      if preeval then failwith "preeval currently disabled" else main
+    in
     let main top_hash = handle (main top_hash) handler in
     let top_hash =
       base_top_hash ~sok_digest ~state1 ~state2
@@ -593,7 +598,8 @@ module Merge = struct
   (* TODO: When we switch to the weierstrass curve use the shifted
    add-many function *)
   let disjoint_union_sections = function
-    | [] -> failwith "empty list"
+    | [] ->
+        failwith "empty list"
     | s :: ss ->
         Checked.List.fold
           ~f:(fun acc x -> Pedersen.Checked.Section.disjoint_union_exn acc x)
@@ -1136,7 +1142,9 @@ let check_transaction_union ?(preeval = false) sok_message source target
       ~supply_increase:(Transaction_union.supply_increase transaction)
   in
   let open Tick in
-  let main = if preeval then Lazy.force Base.reduced_main else Base.main in
+  let main =
+    if preeval then failwith "preeval currently disabled" else Base.main
+  in
   let main =
     handle
       (Checked.map (main (Field.Var.constant top_hash)) ~f:As_prover.return)
@@ -1176,7 +1184,9 @@ let generate_transaction_union_witness ?(preeval = false) sok_message source
       ~pending_coinbase_stack_state
   in
   let open Tick.Groth16 in
-  let main = if preeval then Lazy.force Base.reduced_main else Base.main in
+  let main =
+    if preeval then failwith "preeval currently disabled" else Base.main
+  in
   let main x = handle (main x) handler in
   generate_auxiliary_input (tick_input ()) prover_state main top_hash
 
@@ -1373,7 +1383,8 @@ module Keys = struct
       let open Async in
       let load c p =
         match%map load_with_checksum c p with
-        | Ok x -> x
+        | Ok x ->
+            x
         | Error _e ->
             failwithf
               !"Transaction_snark: load failed on %{sexp:Storage.location}"
@@ -1407,7 +1418,8 @@ module Keys = struct
       let open Async in
       let load c p =
         match%map load_with_checksum c p with
-        | Ok x -> x
+        | Ok x ->
+            x
         | Error _e ->
             failwithf
               !"Transaction_snark: load failed on %{sexp:Storage.location}"

@@ -452,13 +452,15 @@ module type Catchup_intf = sig
        logger:Logger.t
     -> network:network
     -> frontier:transition_frontier
-    -> catchup_job_reader:( ( external_transition_verified
+    -> catchup_job_reader:( state_hash
+                          * ( ( external_transition_verified
+                              , state_hash )
+                              With_hash.t
+                              Envelope.Incoming.t
                             , state_hash )
-                            With_hash.t
-                            Envelope.Incoming.t
-                          , state_hash )
-                          Cached.t
-                          Rose_tree.t
+                            Cached.t
+                            Rose_tree.t
+                            list )
                           Strict_pipe.Reader.t
     -> catchup_breadcrumbs_writer:( ( transition_frontier_breadcrumb
                                     , state_hash )
@@ -488,8 +490,9 @@ module type Transition_handler_validator_intf = sig
   val run :
        logger:Logger.t
     -> frontier:transition_frontier
-    -> transition_reader:( [ `Transition of external_transition_verified
-                                            Envelope.Incoming.t ]
+    -> transition_reader:( [ `Transition of
+                             external_transition_verified Envelope.Incoming.t
+                           ]
                          * [`Time_received of time] )
                          Strict_pipe.Reader.t
     -> valid_transition_writer:( ( ( external_transition_verified
@@ -514,8 +517,33 @@ module type Transition_handler_validator_intf = sig
            Envelope.Incoming.t
          , state_hash )
          Cached.t
-       , [`Duplicate | `Invalid of string] )
+       , [ `In_frontier of state_hash
+         | `Invalid of string
+         | `In_process of state_hash Cache_lib.Intf.final_state ] )
        Result.t
+end
+
+module type Breadcrumb_builder_intf = sig
+  type state_hash
+
+  type transition_frontier
+
+  type transition_frontier_breadcrumb
+
+  type external_transition_verified
+
+  val build_subtrees_of_breadcrumbs :
+       logger:Logger.t
+    -> frontier:transition_frontier
+    -> initial_hash:state_hash
+    -> ( (external_transition_verified, state_hash) With_hash.t
+         Envelope.Incoming.t
+       , state_hash )
+       Cached.t
+       Rose_tree.t
+       List.t
+    -> (transition_frontier_breadcrumb, state_hash) Cached.t Rose_tree.t List.t
+       Deferred.Or_error.t
 end
 
 module type Transition_handler_processor_intf = sig
@@ -546,13 +574,15 @@ module type Transition_handler_processor_intf = sig
                                   , state_hash )
                                   With_hash.t
                                   Strict_pipe.Reader.t
-    -> catchup_job_writer:( ( ( external_transition_verified
+    -> catchup_job_writer:( state_hash
+                            * ( ( external_transition_verified
+                                , state_hash )
+                                With_hash.t
+                                Envelope.Incoming.t
                               , state_hash )
-                              With_hash.t
-                              Envelope.Incoming.t
-                            , state_hash )
-                            Cached.t
-                            Rose_tree.t
+                              Cached.t
+                              Rose_tree.t
+                              list
                           , Strict_pipe.synchronous
                           , unit Deferred.t )
                           Strict_pipe.Writer.t
@@ -589,7 +619,7 @@ module type Unprocessed_transition_cache_intf = sig
 
   val create : logger:Logger.t -> t
 
-  val register :
+  val register_exn :
        t
     -> (external_transition_verified, state_hash) With_hash.t
        Envelope.Incoming.t
@@ -597,7 +627,6 @@ module type Unprocessed_transition_cache_intf = sig
          Envelope.Incoming.t
        , state_hash )
        Cached.t
-       Or_error.t
 end
 
 module type Transition_handler_intf = sig
@@ -619,6 +648,13 @@ module type Transition_handler_intf = sig
     Unprocessed_transition_cache_intf
     with type state_hash := state_hash
      and type external_transition_verified := external_transition_verified
+
+  module Breadcrumb_builder :
+    Breadcrumb_builder_intf
+    with type state_hash := state_hash
+    with type external_transition_verified := external_transition_verified
+    with type transition_frontier := transition_frontier
+    with type transition_frontier_breadcrumb := transition_frontier_breadcrumb
 
   module Validator :
     Transition_handler_validator_intf
@@ -723,8 +759,9 @@ module type Bootstrap_controller_intf = sig
     -> network:network
     -> frontier:transition_frontier
     -> ledger_db:ledger_db
-    -> transition_reader:( [< `Transition of external_transition_verified
-                                             Envelope.Incoming.t ]
+    -> transition_reader:( [< `Transition of
+                              external_transition_verified Envelope.Incoming.t
+                           ]
                          * [< `Time_received of int64] )
                          Strict_pipe.Reader.t
     -> ( transition_frontier
@@ -755,8 +792,9 @@ module type Transition_frontier_controller_intf = sig
                              Envelope.Incoming.t
                              list
     -> frontier:transition_frontier
-    -> network_transition_reader:( [ `Transition of external_transition_verified
-                                                    Envelope.Incoming.t ]
+    -> network_transition_reader:( [ `Transition of
+                                     external_transition_verified
+                                     Envelope.Incoming.t ]
                                  * [`Time_received of time] )
                                  Strict_pipe.Reader.t
     -> proposer_transition_reader:( external_transition_verified
@@ -800,12 +838,13 @@ module type Initial_validator_intf = sig
 
   val run :
        logger:Logger.t
-    -> transition_reader:( [ `Transition of external_transition
-                                            Envelope.Incoming.t ]
+    -> transition_reader:( [ `Transition of
+                             external_transition Envelope.Incoming.t ]
                          * [`Time_received of time] )
                          Strict_pipe.Reader.t
-    -> valid_transition_writer:( [ `Transition of external_transition_verified
-                                                  Envelope.Incoming.t ]
+    -> valid_transition_writer:( [ `Transition of
+                                   external_transition_verified
+                                   Envelope.Incoming.t ]
                                  * [`Time_received of time]
                                , Strict_pipe.crash Strict_pipe.buffered
                                , unit )
@@ -840,8 +879,8 @@ module type Transition_router_intf = sig
                                * transition_frontier option
                                  Pipe_lib.Broadcast_pipe.Writer.t
     -> ledger_db:ledger_db
-    -> network_transition_reader:( [ `Transition of external_transition
-                                                    Envelope.Incoming.t ]
+    -> network_transition_reader:( [ `Transition of
+                                     external_transition Envelope.Incoming.t ]
                                  * [`Time_received of time] )
                                  Strict_pipe.Reader.t
     -> proposer_transition_reader:( external_transition_verified

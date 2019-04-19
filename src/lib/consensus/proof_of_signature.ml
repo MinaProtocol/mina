@@ -132,7 +132,7 @@ module Consensus_transition_data = struct
   let to_hlist {Poly.signature} = H_list.[signature]
 
   let of_hlist : (unit, 'signature -> unit) H_list.t -> 'signature Poly.t =
-   fun H_list.([signature]) -> {Poly.signature}
+   fun H_list.[signature] -> {Poly.signature}
 
   let data_spec =
     Snark_params.Tick.Data_spec.[Blockchain_state.Signature.Signature.typ]
@@ -218,7 +218,7 @@ module Consensus_state = struct
   let of_hlist :
          (unit, 'length -> 'public_key -> unit) H_list.t
       -> ('length, 'public_key) Poly.t =
-   fun H_list.([length; signer_public_key]) -> {Poly.length; signer_public_key}
+   fun H_list.[length; signer_public_key] -> {Poly.length; signer_public_key}
 
   let data_spec =
     let open Snark_params.Tick.Data_spec in

@@ -18,12 +18,15 @@ let handle_open ~mkdir ~(f : string -> 'a Deferred.Or_error.t) path :
               "%s exists and it not a directory, can't store files there" dn
           else Deferred.Or_error.return true )
     with
-    | Ok x -> return x
-    | Error (Unix.Unix_error (ENOENT, _, _)) -> Deferred.Or_error.return false
+    | Ok x ->
+        return x
+    | Error (Unix.Unix_error (ENOENT, _, _)) ->
+        Deferred.Or_error.return false
     | Error (Unix.Unix_error (e, _, _)) ->
         Deferred.Or_error.errorf "could not stat %s: %s, not making keys\n" dn
           (message e)
-    | Error e -> Deferred.Or_error.of_exn e
+    | Error e ->
+        Deferred.Or_error.of_exn e
   in
   let%bind () =
     let open Deferred.Let_syntax in
@@ -38,21 +41,25 @@ let handle_open ~mkdir ~(f : string -> 'a Deferred.Or_error.t) path :
               "%s does not exist\nHint: mkdir -p %s; chmod 700 %s\n" dn dn dn
           else Deferred.Or_error.ok_unit )
     with
-    | Ok x -> return x
+    | Ok x ->
+        return x
     | Error (Unix.Unix_error ((EACCES as e), _, _)) ->
         Deferred.Or_error.errorf "could not mkdir -p %s: %s\n" dn (message e)
-    | Error e -> raise e
+    | Error e ->
+        raise e
   in
   match%bind
     Deferred.Or_error.try_with ~extract_exn:true (fun () -> f path)
   with
-  | Ok x -> Deferred.Or_error.return x
+  | Ok x ->
+      Deferred.Or_error.return x
   | Error e -> (
     (* (Unix.Unix_error (e, _, _)) -> *)
     match Error.to_exn e with
     | Unix.Unix_error (e, _, _) ->
         Deferred.Or_error.errorf "could not open %s: %s\n" path (message e)
-    | e -> Deferred.Or_error.of_exn e )
+    | e ->
+        Deferred.Or_error.of_exn e )
 
 let lift (t : 'a Deferred.t) : 'a Deferred.Or_error.t = t >>| fun x -> Ok x
 
@@ -105,21 +112,26 @@ let read ~path ~(password : Bytes.t Deferred.Or_error.t Lazy.t) =
   in
   let%bind () =
     match (file_error, dir_error) with
-    | Some e1, Some e2 -> Deferred.Or_error.error_string (e1 ^ e2)
-    | Some e1, None | None, Some e1 -> Deferred.Or_error.error_string e1
-    | None, None -> Deferred.Or_error.ok_unit
+    | Some e1, Some e2 ->
+        Deferred.Or_error.error_string (e1 ^ e2)
+    | Some e1, None | None, Some e1 ->
+        Deferred.Or_error.error_string e1
+    | None, None ->
+        Deferred.Or_error.ok_unit
   in
   let%bind file_contents = read_all privkey_file in
   let%bind sb =
     match Secret_box.of_yojson (Yojson.Safe.from_string file_contents) with
-    | Ok sb -> return sb
+    | Ok sb ->
+        return sb
     | Error e ->
         Deferred.Or_error.errorf
           "couldn't parse %s, is the secret file corrupt?: %s\n" path e
   in
   let%bind password = Lazy.force password in
   match Secret_box.decrypt ~password sb with
-  | Ok pk_bytes -> return pk_bytes
+  | Ok pk_bytes ->
+      return pk_bytes
   | Error e ->
       Deferred.Or_error.errorf "while decrypting %s: %s\n" path
         (Error.to_string_hum e)
