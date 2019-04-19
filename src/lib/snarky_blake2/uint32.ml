@@ -95,11 +95,14 @@ module Make (Impl : Snarky.Snark_intf.S) : S with module Impl := Impl = struct
     let c, vars =
       List.fold xs ~init:(0, []) ~f:(fun (c, vs) t ->
           match to_constant t with
-          | Some x -> (Unchecked.to_int x + c, vs)
-          | None -> (c, t :: vs) )
+          | Some x ->
+              (Unchecked.to_int x + c, vs)
+          | None ->
+              (c, t :: vs) )
     in
     match vars with
-    | [] -> return (constant (Unchecked.of_int (c mod (1 lsl 32))))
+    | [] ->
+        return (constant (Unchecked.of_int (c mod (1 lsl 32))))
     | _ ->
         let max_length =
           Int.(

@@ -344,9 +344,12 @@ struct
     else return false
 
   let step (t : t) = function
-    | Event.Found transition -> step' t transition
+    | Event.Found transition ->
+        step' t transition
     | Event.New_state pcd -> (
         match%map check_state t.state pcd with
-        | true -> {state= pcd}
-        | false -> t )
+        | true ->
+            {state= pcd}
+        | false ->
+            t )
 end

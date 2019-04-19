@@ -1,8 +1,8 @@
 open Async_kernel
 
-exception Overflow of string option
+exception Overflow of string
 
-exception Multiple_reads_attempted of string option
+exception Multiple_reads_attempted of string
 
 type crash = Overflow_behavior_crash
 
@@ -24,6 +24,7 @@ type (_, _) type_ =
 
 module Reader : sig
   type 't t
+
   (* Using [`Eof | `Ok of 't] to mirror interface of Jane Street's Pipe read *)
 
   (** Read a single value from the pipe or fail if the pipe is closed *)

@@ -1,4 +1,4 @@
-let extraHeaders = <> Head.legacyStylesheets </>;
+let extraHeaders = () => <> {Head.legacyStylesheets()} </>;
 
 {
   open Css;
@@ -205,25 +205,30 @@ let make = _ => {
           <p className=rightSideText>
             {ReasonReact.string("We'll soon be releasing the public testnet")}
           </p>
-          <a
+          <A
+            name={"testnet-" ++ Links.Forms.participateInConsensus.name}
             target="_blank"
-            href=Links.Forms.participateInConsensus
+            href={Links.Forms.participateInConsensus.link}
             className=rightSideLink>
             {ReasonReact.string(
                {js|Notify me about participating in consensus\u00A0→|js},
              )}
-          </a>
-          <a
+          </A>
+          <A
+            name={"testnet-" ++ Links.Forms.compressTheBlockchain.name}
             target="_blank"
-            href=Links.Forms.compressTheBlockchain
+            href={Links.Forms.compressTheBlockchain.link}
             className=rightSideLink>
             {ReasonReact.string(
-               {js|Earn Coda by helping to compress the blockchain\u00A0→|js},
+               {js|Help to compress the Coda blockchain\u00A0→|js},
              )}
-          </a>
-          <a href=Links.ThirdParty.testnetStatus className=rightSideLink>
+          </A>
+          <A
+            name="testnet-status"
+            href=Links.ThirdParty.testnetStatus
+            className=rightSideLink>
             {ReasonReact.string({js|Check testnet uptime status\u00A0→|js})}
-          </a>
+          </A>
         </div>
       </div>
       <div

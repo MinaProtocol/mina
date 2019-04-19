@@ -233,7 +233,8 @@ module NavWrapper = {
             ),
           ])
         )>
-        <a
+        <A
+          name="nav-home"
           href="/"
           className=Css.(
             style([
@@ -254,19 +255,25 @@ module NavWrapper = {
             ])
           )>
           <Image className="" name="/static/img/coda-logo" alt="Coda Home" />
-        </a>
+        </A>
         <div
           className=Css.(
             style([
               order(3),
               width(`percent(100.0)),
               NavStyle.bottomNudge,
+              display(`none), // just hide when status lift happens
               media(
                 Style.MediaQuery.statusLift(keepAnnouncementBar),
-                [order(2), width(`auto), marginLeft(`zero)],
+                [
+                  order(2),
+                  width(`auto),
+                  marginLeft(`zero),
+                  ...keepAnnouncementBar
+                       ? [display(`block)] : [display(`none)],
+                ],
               ),
               media(NavStyle.MediaQuery.menu, [width(`percent(40.0))]),
-              ...keepAnnouncementBar ? [] : [display(`none)],
             ])
           )>
           <div
@@ -332,7 +339,8 @@ module SimpleButton = {
   let make = (~name, ~activePage=false, ~link, _children) => {
     ...component,
     render: _self => {
-      <a
+      <A
+        name={"nav-" ++ name}
         href=link
         className=Css.(
           merge([
@@ -353,7 +361,7 @@ module SimpleButton = {
           ])
         )>
         {ReasonReact.string(name)}
-      </a>;
+      </A>;
     },
   };
 };
@@ -365,8 +373,9 @@ module SignupButton = {
   let make = (~name, ~link, _children) => {
     ...component,
     render: _self => {
-      <a
-        href=link
+      <A
+        name={"nav-" ++ link.Links.Named.name}
+        href={link.Links.Named.link}
         className=Css.(
           merge([
             H4.wide,
@@ -408,7 +417,7 @@ module SignupButton = {
           )>
           {ReasonReact.string(name)}
         </span>
-      </a>;
+      </A>;
     },
   };
 };

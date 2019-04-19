@@ -50,7 +50,8 @@ let run_test () : unit Deferred.t =
         | Some trace_dir ->
             let%bind () = Async.Unix.mkdir ~p:() trace_dir in
             Coda_tracing.start trace_dir
-        | None -> Deferred.unit
+        | None ->
+            Deferred.unit
       in
       let module Main = Coda_main.Make_coda (Init) in
       let module Run = Run (Config) (Main) in
@@ -116,7 +117,8 @@ let run_test () : unit Deferred.t =
           | Some b when not (Currency.Balance.equal b initial_receiver_balance)
             ->
               true
-          | _ -> false
+          | _ ->
+              false
         in
         wait_until_cond ~f:cond ~timeout:3.
       in
@@ -256,7 +258,7 @@ let run_test () : unit Deferred.t =
             (List.map accounts
                ~f:(fun ((keypair : Signature_lib.Keypair.t), account) ->
                  ( Public_key.compress keypair.public_key
-                 , Account.balance account ) ))
+                 , account.Account.Poly.balance ) ))
         in
         let%bind updated_balance_sheet =
           send_payments accounts pks balance_sheet (fun i ->

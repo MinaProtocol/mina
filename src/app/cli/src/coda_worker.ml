@@ -38,7 +38,7 @@ open Input
 module Send_payment_input = struct
   (* TODO : version *)
   type t =
-    Private_key.t
+    Private_key.Stable.V1.t
     * Public_key.Compressed.Stable.V1.t
     * Currency.Amount.Stable.V1.t
     * Currency.Fee.Stable.V1.t
@@ -225,7 +225,8 @@ module T = struct
           [%bin_type_class: Receipt.Chain_hash.Stable.V1.t Or_error.t] ()
 
     let process_payment =
-      C.create_rpc ~f:process_payment_impl ~bin_input:User_command.bin_t
+      C.create_rpc ~f:process_payment_impl
+        ~bin_input:User_command.Stable.Latest.bin_t
         ~bin_output:
           [%bin_type_class: Receipt.Chain_hash.Stable.V1.t Or_error.t] ()
 
@@ -237,8 +238,8 @@ module T = struct
       C.create_pipe ~f:root_diff_impl ~bin_input:Unit.bin_t
         ~bin_output:
           [%bin_type_class:
-            User_command.t Protocols.Coda_transition_frontier.Root_diff_view.t]
-        ()
+            User_command.Stable.Latest.t
+            Protocols.Coda_transition_frontier.Root_diff_view.t] ()
 
     let dump_tf =
       C.create_rpc ~f:dump_tf_impl ~bin_input:Unit.bin_t

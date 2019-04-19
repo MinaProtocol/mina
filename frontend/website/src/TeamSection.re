@@ -210,6 +210,7 @@ module Section = {
                 marginTop(`rem(1.0)),
                 marginBottom(`rem(3.0)),
                 textAlign(`center),
+                cursor(`pointer),
               ]),
             ])
           )

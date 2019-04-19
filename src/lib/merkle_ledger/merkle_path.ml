@@ -29,8 +29,10 @@ end) : S with type hash := Hash.t = struct
     List.fold t ~init:(leaf_hash, 0) ~f:(fun (acc, height) elem ->
         let acc =
           match elem with
-          | `Left h -> Hash.merge ~height acc h
-          | `Right h -> Hash.merge ~height h acc
+          | `Left h ->
+              Hash.merge ~height acc h
+          | `Right h ->
+              Hash.merge ~height h acc
         in
         (acc, height + 1) )
     |> fst

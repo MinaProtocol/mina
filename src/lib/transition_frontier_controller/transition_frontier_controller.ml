@@ -15,6 +15,8 @@ module type Inputs_intf = sig
      and type transition_frontier := Transition_frontier.t
      and type syncable_ledger_query := Sync_ledger.Query.t
      and type syncable_ledger_answer := Sync_ledger.Answer.t
+     and type pending_coinbases := Pending_coinbase.t
+     and type parallel_scan_state := Staged_ledger.Scan_state.t
 
   module Transition_handler :
     Transition_handler_intf
@@ -107,9 +109,8 @@ module Make (Inputs : Inputs_intf) :
         (* since the cache was just built, it's safe to assume
          * registering these will not fail, so long as there
          * are no duplicates in the list *)
-        Transition_handler.Unprocessed_transition_cache.register
+        Transition_handler.Unprocessed_transition_cache.register_exn
           unprocessed_transition_cache t
-        |> Or_error.ok_exn
         |> Strict_pipe.Writer.write primary_transition_writer ) ;
     Strict_pipe.Reader.iter_without_pushback valid_transition_reader
       ~f:(Strict_pipe.Writer.write primary_transition_writer)

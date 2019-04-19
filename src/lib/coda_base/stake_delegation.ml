@@ -5,11 +5,9 @@ open Module_version
 module Stable = struct
   module V1 = struct
     module T = struct
-      let version = 1
-
       type t =
         | Set_delegate of {new_delegate: Public_key.Compressed.Stable.V1.t}
-      [@@deriving bin_io, eq, sexp, hash, yojson]
+      [@@deriving bin_io, eq, sexp, hash, yojson, version]
     end
 
     include T
@@ -38,6 +36,7 @@ let gen =
       Set_delegate {new_delegate= k} )
 
 let fold = function
-  | Set_delegate {new_delegate} -> Public_key.Compressed.fold new_delegate
+  | Set_delegate {new_delegate} ->
+      Public_key.Compressed.fold new_delegate
 
 let length_in_triples = Public_key.Compressed.length_in_triples

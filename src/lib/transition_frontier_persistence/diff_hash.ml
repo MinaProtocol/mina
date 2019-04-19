@@ -11,7 +11,7 @@ include Binable.Of_stringable (struct
   let to_string = to_hex
 end)
 
-let equal t1 t2 = eq t1 t2
+let equal t1 t2 = equal t1 t2
 
 let empty = digest_string ""
 

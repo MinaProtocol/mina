@@ -25,8 +25,10 @@ let load_with_checksum (type a) (c : a Controller.t) location =
           if valid t then
             Ok {checksum= t.checksum; data= Binable.of_string c.tc t.data}
           else Error `Checksum_no_match
-      | Error e -> Error (`IO_error e) )
-  | `No | `Unknown -> return (Error `No_exist)
+      | Error e ->
+          Error (`IO_error e) )
+  | `No | `Unknown ->
+      return (Error `No_exist)
 
 let load c location =
   Deferred.Result.map (load_with_checksum c location) ~f:(fun t -> t.data)

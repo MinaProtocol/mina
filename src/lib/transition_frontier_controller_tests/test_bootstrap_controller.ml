@@ -109,18 +109,24 @@ let%test_module "Bootstrap Controller" =
               ~root_sync_ledger ~transition_graph ~transition_reader
           in
           let () = Pipe_lib.Strict_pipe.Writer.close transition_writer in
-          let result = Mvar.create () in
-          let%map () = run_sync ~result in
+          let%map () = run_sync in
           let saved_transitions_verified =
             Bootstrap_controller.For_tests.Transition_cache.data
               transition_graph
+            |> List.map ~f:Envelope.Incoming.data
           in
           External_transition.Verified.Set.(
             equal
               (of_list input_transitions_verified)
               (of_list saved_transitions_verified)) )
 
-    let is_syncing = function `Ignored -> false | `Syncing _ -> true
+    let is_syncing = function
+      | `Ignored ->
+          false
+      | `Syncing_new_snarked_ledger ->
+          true
+      | `Updating_root_transition ->
+          false
 
     let make_transition_pipe () =
       Pipe_lib.Strict_pipe.create ~name:(__MODULE__ ^ __LOC__)
@@ -192,7 +198,10 @@ let%test_module "Bootstrap Controller" =
           let ledger_db =
             Transition_frontier.For_tests.root_snarked_ledger syncing_frontier
           in
-          let%map new_frontier, (_ : External_transition.Verified.t list) =
+          let%map ( new_frontier
+                  , (_ :
+                      External_transition.Verified.t Envelope.Incoming.t list)
+                  ) =
             Bootstrap_controller.run ~logger ~trust_system ~network
               ~frontier:syncing_frontier ~ledger_db ~transition_reader
           in
@@ -239,7 +248,10 @@ let%test_module "Bootstrap Controller" =
               ~peer:large_peer
               (get_best_tip_hash large_peer)
           in
-          let%map new_frontier, (_ : External_transition.Verified.t list) =
+          let%map ( new_frontier
+                  , (_ :
+                      External_transition.Verified.t Envelope.Incoming.t list)
+                  ) =
             Bootstrap_controller.run ~logger ~trust_system ~network
               ~frontier:me ~ledger_db ~transition_reader
           in

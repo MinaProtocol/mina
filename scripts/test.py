@@ -46,7 +46,8 @@ test_permutations = {
     'test_posig': simple_tests,
     'test_postake': simple_tests,
     'test_postake_catchup': ['coda-restart-node-test'],
-    'test_postake_bootstrap' : ['coda-bootstrap-test'],
+    'test_postake_bootstrap': ['coda-bootstrap-test'],
+    'test_postake_holy_grail': ['coda-restarts-and-txns-holy-grail -num-proposers 5'],
     'test_postake_txns': ['coda-shared-state-test'],
     'test_postake_five_even_snarkless': ['coda-shared-prefix-multiproposer-test -num-proposers 5'],
     'test_postake_five_even_txns': ['coda-shared-prefix-multiproposer-test -num-proposers 5 -payments'],
@@ -202,7 +203,7 @@ def run(args):
             print('Running: %s' % (cmd))
             run_cmd(cmd, lambda: fail('Test "%s:%s" failed' % (profile, test)))
 
-    print('Testing successfull')
+    print('Testing successful')
 
 
 def get_required_status():

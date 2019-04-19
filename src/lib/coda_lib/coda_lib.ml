@@ -43,6 +43,8 @@ module type Network_intf = sig
 
   val peers : t -> Network_peer.Peer.t list
 
+  val online_status : t -> [`Online | `Offline] Broadcast_pipe.Reader.t
+
   val random_peers : t -> int -> Network_peer.Peer.t list
 
   val catchup_transition :
@@ -78,10 +80,16 @@ module type Network_intf = sig
 
   val create :
        Config.t
-    -> get_staged_ledger_aux_at_hash:(   staged_ledger_hash Envelope.Incoming.t
-                                      -> (parallel_scan_state * ledger_hash)
-                                         option
-                                         Deferred.t)
+    -> get_staged_ledger_aux_and_pending_coinbases_at_hash:(   state_hash
+                                                               Envelope
+                                                               .Incoming
+                                                               .t
+                                                            -> ( parallel_scan_state
+                                                               * ledger_hash
+                                                               * pending_coinbases
+                                                               )
+                                                               Deferred.Option
+                                                               .t)
     -> answer_sync_ledger_query:(   (ledger_hash * sync_ledger_query)
                                     Envelope.Incoming.t
                                  -> sync_ledger_answer Deferred.Or_error.t)
@@ -89,12 +97,9 @@ module type Network_intf = sig
                            -> state_with_witness Non_empty_list.t
                               Deferred.Option.t)
     -> get_ancestry:(   consensus_state Envelope.Incoming.t
-                     -> ( ( state_with_witness
-                          , state_body_hash list * state_with_witness )
-                          Proof_carrying_data.t
-                        * parallel_scan_state
-                        * ledger_hash
-                        * pending_coinbases )
+                     -> ( state_with_witness
+                        , state_body_hash list * state_with_witness )
+                        Proof_carrying_data.t
                         Deferred.Option.t)
     -> t Deferred.t
 end
@@ -399,6 +404,8 @@ module type Inputs_intf = sig
      and type transition_frontier := Transition_frontier.t
      and type syncable_ledger_query := Coda_base.Sync_ledger.Query.t
      and type syncable_ledger_answer := Coda_base.Sync_ledger.Answer.t
+     and type pending_coinbases := Pending_coinbase.t
+     and type parallel_scan_state := Staged_ledger.Scan_state.t
 end
 
 module Make (Inputs : Inputs_intf) = struct
@@ -407,8 +414,8 @@ module Make (Inputs : Inputs_intf) = struct
   type t =
     { propose_keypair: Keypair.t option
     ; run_snark_worker: bool
-    ; net:
-        Net.t (* TODO: Is this the best spot for the transaction_pool ref? *)
+    ; net: Net.t
+          (* TODO: Is this the best spot for the transaction_pool ref? *)
     ; transaction_pool: Transaction_pool.t
     ; snark_pool: Snark_pool.t
     ; transition_frontier: Transition_frontier.t option Broadcast_pipe.Reader.t
@@ -478,6 +485,16 @@ module Make (Inputs : Inputs_intf) = struct
 
   let root_length = compose_of_option root_length_opt
 
+  let sync_status t =
+    match Broadcast_pipe.Reader.peek @@ Net.online_status t.net with
+    | `Offline ->
+        `Offline
+    | `Online ->
+        Option.value_map
+          (Broadcast_pipe.Reader.peek t.transition_frontier)
+          ~default:`Bootstrap
+          ~f:(Fn.const `Synced)
+
   let visualize_frontier ~filename =
     compose_of_option
     @@ fun t ->
@@ -506,7 +523,8 @@ module Make (Inputs : Inputs_intf) = struct
           then Some (Ledger.to_list (Staged_ledger.ledger staged_ledger))
           else None )
     with
-    | Some x -> Deferred.return (Ok x)
+    | Some x ->
+        Deferred.return (Ok x)
     | None ->
         Deferred.Or_error.error_string
           "staged ledger hash not found in transition frontier"
@@ -538,7 +556,8 @@ module Make (Inputs : Inputs_intf) = struct
     in
     don't_wait_for
       (Broadcast_pipe.Reader.iter t.transition_frontier ~f:(function
-        | None -> Deferred.unit
+        | None ->
+            Deferred.unit
         | Some frontier ->
             Broadcast_pipe.Reader.iter
               (Transition_frontier.root_diff_pipe frontier)
@@ -577,7 +596,7 @@ module Make (Inputs : Inputs_intf) = struct
       ; receipt_chain_database: Coda_base.Receipt_chain_database.t
       ; snark_work_fee: Currency.Fee.t
       ; monitor: Monitor.t option
-      (* TODO: Pass banlist to modules discussed in Ban Reasons issue: https://github.com/CodaProtocol/coda/issues/852 *)
+            (* TODO: Pass banlist to modules discussed in Ban Reasons issue: https://github.com/CodaProtocol/coda/issues/852 *)
       }
     [@@deriving make]
   end
@@ -632,8 +651,10 @@ module Make (Inputs : Inputs_intf) = struct
           ~scan_state:(Staged_ledger.Scan_state.empty ())
           ~pending_coinbase_collection:pending_coinbases
       with
-      | Ok staged_ledger -> staged_ledger
-      | Error err -> Error.raise err
+      | Ok staged_ledger ->
+          staged_ledger
+      | Error err ->
+          Error.raise err
     in
     let%map frontier =
       Transition_frontier.create ~logger:config.logger
@@ -722,8 +743,18 @@ module Make (Inputs : Inputs_intf) = struct
                 |> don't_wait_for ) ;
             let%bind net =
               Net.create config.net_config
-                ~get_staged_ledger_aux_at_hash:(fun _hash ->
-                  failwith "shouldn't be necessary right now?" )
+                ~get_staged_ledger_aux_and_pending_coinbases_at_hash:
+                  (fun enveloped_hash ->
+                  let hash = Envelope.Incoming.data enveloped_hash in
+                  Deferred.return
+                  @@
+                  let open Option.Let_syntax in
+                  let%bind frontier =
+                    Broadcast_pipe.Reader.peek frontier_broadcast_pipe_r
+                  in
+                  Sync_handler
+                  .get_staged_ledger_aux_and_pending_coinbases_at_hash
+                    ~frontier hash )
                 ~answer_sync_ledger_query:(fun query_env ->
                   let open Deferred.Or_error.Let_syntax in
                   let ledger_hash, _ = Envelope.Incoming.data query_env in
@@ -752,32 +783,14 @@ module Make (Inputs : Inputs_intf) = struct
                   @@ Sync_handler.transition_catchup ~frontier hash )
                 ~get_ancestry:(fun query_env ->
                   let consensus_state = Envelope.Incoming.data query_env in
-                  let result =
-                    let open Option.Let_syntax in
-                    let%bind frontier =
-                      Broadcast_pipe.Reader.peek frontier_broadcast_pipe_r
-                    in
-                    let%map peer_root_with_proof =
-                      Root_prover.prove ~logger:config.logger ~frontier
-                        consensus_state
-                    in
-                    let staged_ledger =
-                      Transition_frontier.Breadcrumb.staged_ledger
-                        (Transition_frontier.root frontier)
-                    in
-                    let scan_state = Staged_ledger.scan_state staged_ledger in
-                    let pending_coinbase_collection =
-                      Staged_ledger.pending_coinbase_collection staged_ledger
-                    in
-                    let merkle_root =
-                      Ledger.merkle_root (Staged_ledger.ledger staged_ledger)
-                    in
-                    ( peer_root_with_proof
-                    , scan_state
-                    , merkle_root
-                    , pending_coinbase_collection )
+                  Deferred.return
+                  @@
+                  let open Option.Let_syntax in
+                  let%bind frontier =
+                    Broadcast_pipe.Reader.peek frontier_broadcast_pipe_r
                   in
-                  Deferred.return result )
+                  Root_prover.prove ~logger:config.logger ~frontier
+                    consensus_state )
             in
             let valid_transitions =
               Transition_router.run ~logger:config.logger
@@ -788,7 +801,7 @@ module Make (Inputs : Inputs_intf) = struct
                 ~ledger_db
                 ~network_transition_reader:
                   (Strict_pipe.Reader.map external_transitions_reader
-                     ~f:(fun (tn, tm) -> (`Transition tn, `Time_received tm) ))
+                     ~f:(fun (tn, tm) -> (`Transition tn, `Time_received tm)))
                 ~proposer_transition_reader
             in
             let valid_transitions_for_network, valid_transitions_for_api =

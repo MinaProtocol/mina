@@ -47,14 +47,15 @@ end) : S = struct
             if Time.is_later banned_until ~than:(Now.now ()) then
               Some banned_until
             else None
-        | None -> None ) }
+        | None ->
+            None ) }
 
   (** Set the record to banned, updating trust. *)
   let ban t =
     let new_record = update t in
     { new_record with
-      trust= -1.0; banned_until_opt= Some (Time.add (Now.now ()) Time.Span.day)
-    }
+      trust= -1.0
+    ; banned_until_opt= Some (Time.add (Now.now ()) Time.Span.day) }
 
   (** Add some trust, subtract by passing a negative number. *)
   let add_trust t increment =

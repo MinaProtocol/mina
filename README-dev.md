@@ -15,7 +15,7 @@ Coda, this is the right file!
 Building Coda can be slightly involved. There are many C library dependencies that need
 to be present in the system, as well as some OCaml-specific setup.
 
-Currently, Coda only builds/runs on Linux. Building on macOS [is tracked in this issue](https://github.com/CodaProtocol/coda/issues/962).
+Currently, Coda builds/runs on Linux & macOS. MacOS may have some issues that you can track [here](https://github.com/CodaProtocol/coda/issues/962).
 
 The short version:
 
@@ -55,7 +55,7 @@ copy of the repo.
 
 * Pull down developer container image  (~2GB download, go stretch your legs)
 
-`docker pull codaprotocol/coda:toolchain-af1380e0f6c8726391d82b2adb6a2a3b20dd46a0`
+`docker pull codaprotocol/coda:toolchain-f8dc1642d4ed1d38a7c726f0f2677f53654e4bfc`
 
 * Create local builder image
 
@@ -144,6 +144,8 @@ you need, you run `opam switch import src/opam.export`.
 Some of our dependencies aren't taken from `opam`, and aren't integrated
 with `dune`, so you need to add them manually:
 
+* `opam pin add src/external/digestif`
+* `opam pin add src/external/async_kernel`
 * `opam pin add src/external/ocaml-sodium`
 * `opam pin add src/external/rpc_parallel`
 * `opam pin add src/external/ocaml-extlib`

@@ -32,6 +32,12 @@ module Rimraf = {
   [@bs.val] [@bs.module "rimraf"] external sync: string => unit = "";
 };
 
+Array.length(Sys.argv) > 2 && Sys.argv[2] == "prod"
+  ? {
+    Links.Cdn.prefix := "https://cdn.codaprotocol.com/v2";
+  }
+  : ();
+
 let writeStatic = (path, rootComponent) => {
   let rendered =
     extractCritical(ReactDOMServerRe.renderToStaticMarkup(rootComponent));
@@ -41,12 +47,6 @@ let writeStatic = (path, rootComponent) => {
   );
   Node.Fs.writeFileAsUtf8Sync(path ++ ".css", rendered##css);
 };
-
-Array.length(Sys.argv) > 2 && Sys.argv[2] == "prod"
-  ? {
-    Links.Cdn.prefix := "https://cdn.codaprotocol.com";
-  }
-  : ();
 
 let asset_regex = [%re {|/\/static\/blog\/.*{png,jpg,svg}/|}];
 
@@ -110,7 +110,6 @@ module Router = {
 let jobOpenings = [|
   ("engineering-manager", "Engineering Manager (San Francisco)."),
   ("product-manager", "Product Manager (San Francisco)."),
-  ("community-manager", "Community Manager (San Francisco)."),
   ("senior-frontend-engineer", "Senior Frontend Engineer (San Francisco)."),
   (
     "protocol-reliability-engineer",
@@ -129,7 +128,7 @@ let jobOpenings = [|
 Rimraf.sync("site");
 
 let blogPage =
-  <Page page=`Blog name="blog" extraHeaders=Blog.extraHeaders>
+  <Page page=`Blog name="blog" extraHeaders={Blog.extraHeaders()}>
     <Wrapped> <Blog posts /> </Wrapped>
   </Page>;
 
@@ -145,7 +144,7 @@ Router.(
             <Home
               posts={List.map(
                 ((name, html, metadata)) =>
-                  (name, html, metadata.BlogPost.title),
+                  (name, html, (metadata.BlogPost.title, "blog-" ++ name)),
                 posts,
               )}
             />
@@ -161,7 +160,7 @@ Router.(
                  <Page
                    page=`Blog
                    name
-                   extraHeaders=Blog.extraHeaders
+                   extraHeaders={Blog.extraHeaders()}
                    footerColor=Style.Colors.gandalf>
                    <Wrapped> <BlogPost name html metadata /> </Wrapped>
                  </Page>,
@@ -179,7 +178,7 @@ Router.(
                    page=`Jobs
                    name
                    footerColor=Style.Colors.gandalf
-                   extraHeaders=Careers.extraHeaders>
+                   extraHeaders={Careers.extraHeaders()}>
                    <Wrapped>
                      <CareerPost path={"jobs/" ++ name ++ ".markdown"} />
                    </Wrapped>
@@ -189,7 +188,7 @@ Router.(
         ),
         File(
           "jobs",
-          <Page page=`Jobs name="jobs" extraHeaders=Careers.extraHeaders>
+          <Page page=`Jobs name="jobs" extraHeaders={Careers.extraHeaders()}>
             <Wrapped> <Careers jobOpenings /> </Wrapped>
           </Page>,
         ),
@@ -199,7 +198,8 @@ Router.(
         ),
         File(
           "testnet",
-          <Page page=`Testnet name="testnet" extraHeaders=Testnet.extraHeaders>
+          <Page
+            page=`Testnet name="testnet" extraHeaders={Testnet.extraHeaders()}>
             <Wrapped> <Testnet /> </Wrapped>
           </Page>,
         ),

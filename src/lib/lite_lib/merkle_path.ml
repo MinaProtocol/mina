@@ -20,8 +20,10 @@ let implied_root (t : t) leaf_hash =
   List.fold t ~init:(leaf_hash, 0) ~f:(fun (acc, height) elem ->
       let acc =
         match elem with
-        | `Left h -> merge ~height acc h
-        | `Right h -> merge ~height h acc
+        | `Left h ->
+            merge ~height acc h
+        | `Right h ->
+            merge ~height h acc
       in
       (acc, height + 1) )
   |> fst

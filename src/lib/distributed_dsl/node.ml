@@ -221,8 +221,10 @@ struct
     let to_cancel, to_put_back =
       List.partition_map l ~f:(fun tok' ->
           match tok with
-          | None -> `Fst tok'
-          | Some tok -> if tok = tok' then `Fst tok' else `Snd tok' )
+          | None ->
+              `Fst tok'
+          | Some tok ->
+              if tok = tok' then `Fst tok' else `Snd tok' )
     in
     List.iter to_cancel ~f:(fun tok' -> Timer.cancel t.timer tok') ;
     add_back_timers t ~key:label ~data:to_put_back
@@ -237,7 +239,8 @@ struct
     let () = Timer_label.Table.add_multi t.timers ~key:label ~data:tok in
     don't_wait_for
       ( match%map waited with
-      | `Cancelled -> remove_tok tok
+      | `Cancelled ->
+          remove_tok tok
       | `Finished ->
           remove_tok tok ;
           Linear_pipe.write_or_exn ~capacity:1024 t.triggered_timers_w
@@ -276,7 +279,8 @@ struct
             failwithf "You specified the same condition twice! %s"
               (Condition_label.sexp_of_label l |> Sexp.to_string_hum)
               ()
-        | `Ok -> () ) ;
+        | `Ok ->
+            () ) ;
     let message_handlers = Message_label.Table.create () in
     List.iter message_conditions ~f:(fun (l, c, h) ->
         match Message_label.Table.add message_handlers ~key:l ~data:(c, h) with
@@ -284,7 +288,8 @@ struct
             failwithf "You specified the same message handler twice! %s"
               (Message_label.sexp_of_label l |> Sexp.to_string_hum)
               ()
-        | `Ok -> () ) ;
+        | `Ok ->
+            () ) ;
     let timers = Timer_label.Table.create () in
     let triggered_timers_r, triggered_timers_w = Linear_pipe.create () in
     let t =
@@ -317,7 +322,8 @@ struct
           List.filter checks ~f:(fun (_, (cond, _)) -> cond t.state)
         in
         match matches with
-        | [] -> return (with_new_state t t.state)
+        | [] ->
+            return (with_new_state t t.state)
         | [(label, (_, transition))] ->
             let%map t' = transition t t.state >>| with_new_state t in
             Logger.debug t.logger ~module_:__MODULE__ ~location:__LOC__
@@ -352,7 +358,8 @@ struct
           List.filter checks ~f:(fun (_, (cond, _)) -> cond msg t.state)
         in
         match matches with
-        | [] -> return (with_new_state t t.state)
+        | [] ->
+            return (with_new_state t t.state)
         | [(label, (_, transition))] ->
             let%map t' = transition t msg t.state >>| with_new_state t in
             Logger.debug t.logger ~module_:__MODULE__ ~location:__LOC__
@@ -367,7 +374,8 @@ struct
               |> List.sexp_of_t Message_label.sexp_of_label
               |> Sexp.to_string_hum )
               () )
-    | false, None, None -> return (with_new_state t t.state)
+    | false, None, None ->
+        return (with_new_state t t.state)
 
   let ident {ident} = ident
 
@@ -377,8 +385,10 @@ struct
 
   let send_exn t ~recipient msg =
     match%map send t ~recipient msg with
-    | Ok () -> ()
-    | Error e -> failwithf "Send failed %s" (Error.to_string_hum e) ()
+    | Ok () ->
+        ()
+    | Error e ->
+        failwithf "Send failed %s" (Error.to_string_hum e) ()
 
   let send_multi t ~recipients msg =
     Deferred.List.all

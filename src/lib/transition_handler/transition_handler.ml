@@ -24,6 +24,7 @@ module Make (Inputs : Inputs.S) :
     module Unprocessed_transition_cache = Unprocessed_transition_cache
   end
 
+  module Breadcrumb_builder = Breadcrumb_builder.Make (Full_inputs)
   module Processor = Processor.Make (Full_inputs)
   module Validator = Validator.Make (Full_inputs)
 end

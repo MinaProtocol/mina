@@ -26,9 +26,13 @@ struct
   module Ledger_proof = struct
     module Stable = struct
       module V1 = struct
-        type t =
-          Ledger_proof_statement.Stable.V1.t * Sok_message.Digest.Stable.V1.t
-        [@@deriving sexp, bin_io, yojson]
+        module T = struct
+          type t =
+            Ledger_proof_statement.Stable.V1.t * Sok_message.Digest.Stable.V1.t
+          [@@deriving sexp, bin_io, yojson, version]
+        end
+
+        include T
       end
 
       module Latest = V1
@@ -65,13 +69,36 @@ struct
   end
 
   module Transaction_witness = Coda_base.Transaction_witness
-  module Pending_coinbase = Coda_base.Pending_coinbase
+
+  module Pending_coinbase = struct
+    include Coda_base.Pending_coinbase.Stable.V1
+
+    let ( hash_extra
+        , oldest_stack
+        , latest_stack
+        , create
+        , remove_coinbase_stack
+        , update_coinbase_stack
+        , merkle_root ) =
+      Coda_base.Pending_coinbase.
+        ( hash_extra
+        , oldest_stack
+        , latest_stack
+        , create
+        , remove_coinbase_stack
+        , update_coinbase_stack
+        , merkle_root )
+
+    module Stack = Coda_base.Pending_coinbase.Stack
+    module Coinbase_data = Coda_base.Pending_coinbase.Coinbase_data
+  end
+
   module Pending_coinbase_hash = Coda_base.Pending_coinbase.Hash
   module Transaction_snark_work =
     Staged_ledger.Make_completed_work (Ledger_proof) (Ledger_proof_statement)
 
   module Staged_ledger_hash_binable = struct
-    include Staged_ledger_hash.Stable.V1
+    include Staged_ledger_hash
 
     let ( of_aux_ledger_and_coinbase_hash
         , aux_hash
@@ -103,19 +130,10 @@ struct
       (Consensus.Protocol_state)
 
   module Transaction = struct
-    module T = struct
-      type t = Coda_base.Transaction.t =
-        | User_command of User_command.With_valid_signature.t
-        | Fee_transfer of Fee_transfer.t
-        | Coinbase of Coinbase.t
-      [@@deriving compare, eq]
-    end
+    include Coda_base.Transaction.Stable.Latest
 
-    include T
-
-    include (
-      Coda_base.Transaction :
-        module type of Coda_base.Transaction with type t := t )
+    let fee_excess, supply_increase =
+      Coda_base.Transaction.(fee_excess, supply_increase)
   end
 
   module Staged_ledger = Staged_ledger.Make (struct
@@ -162,12 +180,12 @@ struct
         let%bind receiver_pk = List.random_element public_keys in
         let send_amount = Currency.Amount.of_int 1 in
         let sender_account_amount =
-          Account.balance sender_account |> Currency.Balance.to_amount
+          sender_account.Account.Poly.balance |> Currency.Balance.to_amount
         in
         let%map _ = Currency.Amount.sub sender_account_amount send_amount in
         let payload : User_command.Payload.t =
           User_command.Payload.create ~fee:Fee.Unsigned.zero
-            ~nonce:(Account.nonce sender_account)
+            ~nonce:sender_account.Account.Poly.nonce
             ~memo:User_command_memo.dummy
             ~body:(Payment {receiver= receiver_pk; amount= send_amount})
         in
@@ -224,7 +242,7 @@ struct
       let transactions = gen_payments accounts_with_secret_keys in
       let _, largest_account =
         List.max_elt accounts_with_secret_keys
-          ~compare:(fun (_, acc1) (_, acc2) -> Account.compare acc1 acc2 )
+          ~compare:(fun (_, acc1) (_, acc2) -> Account.compare acc1 acc2)
         |> Option.value_exn
       in
       let largest_account_public_key = Account.public_key largest_account in
@@ -317,7 +335,8 @@ struct
                   |> With_hash.hash |> State_hash.to_yojson ) ]
             "Producing a breadcrumb with hash: $state_hash" ;
           new_breadcrumb
-      | Error (`Fatal_error exn) -> raise exn
+      | Error (`Fatal_error exn) ->
+          raise exn
       | Error (`Validation_error e) ->
           failwithf !"Validation Error : %{sexp:Error.t}" e ()
 
@@ -400,10 +419,11 @@ struct
             ~root_staged_ledger
             ~consensus_local_state:
               (Consensus.Local_state.create
-                 (Some proposer_account.Account.public_key))
+                 (Some (Account.public_key proposer_account)))
         in
         frontier
-    | Error err -> Error.raise err
+    | Error err ->
+        Error.raise err
 
   let build_frontier_randomly ~gen_root_breadcrumb_builder frontier :
       unit Deferred.t =
@@ -533,27 +553,28 @@ struct
       let%bind frontier = Hashtbl.find table peer in
       Sync_handler.transition_catchup ~frontier state_hash
 
+    let mplus ma mb = if Option.is_some ma then ma else mb
+
+    let get_staged_ledger_aux_and_pending_coinbases_at_hash {table; _} peer
+        hash =
+      Deferred.return
+      @@ Result.of_option
+           ~error:
+             (Error.of_string
+                "Peer could not find the staged_ledger_aux and \
+                 pending_coinbase at hash")
+           (let open Option.Let_syntax in
+           let%bind frontier = Hashtbl.find table peer in
+           Sync_handler.get_staged_ledger_aux_and_pending_coinbases_at_hash
+             ~frontier hash)
+
     let get_ancestry {table; logger} peer consensus_state =
       Deferred.return
       @@ Result.of_option
            ~error:(Error.of_string "Peer could not produce an ancestor")
            (let open Option.Let_syntax in
            let%bind frontier = Hashtbl.find table peer in
-           let%map peer_root_with_proof =
-             Root_prover.prove ~logger ~frontier consensus_state
-           in
-           let staged_ledger =
-             Transition_frontier.Breadcrumb.staged_ledger
-               (Transition_frontier.root frontier)
-           in
-           let scan_state = Staged_ledger.scan_state staged_ledger in
-           let merkle_root =
-             Ledger.merkle_root (Staged_ledger.ledger staged_ledger)
-           in
-           let pending_coinbases =
-             Staged_ledger.pending_coinbase_collection staged_ledger
-           in
-           (peer_root_with_proof, scan_state, merkle_root, pending_coinbases))
+           Root_prover.prove ~logger ~frontier consensus_state)
 
     let glue_sync_ledger {table; logger; _} query_reader response_writer : unit
         =

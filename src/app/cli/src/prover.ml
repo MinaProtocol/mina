@@ -146,7 +146,8 @@ module Worker_state = struct
                  | Ok () ->
                      { Blockchain.state= next_state
                      ; proof= Precomputed_values.base_proof }
-                 | Error e -> Error.raise e
+                 | Error e ->
+                     Error.raise e
 
                let verify state proof = true
              end
@@ -163,7 +164,8 @@ module Worker_state = struct
                let verify _ _ = true
              end
              : S )
-         | _ -> failwith "unknown proof_level set in compile config"
+         | _ ->
+             failwith "unknown proof_level set in compile config"
        in
        m)
 
@@ -190,9 +192,9 @@ module Functions = struct
       [%bin_type_class:
         Blockchain.t
         * Consensus_mechanism.Protocol_state.Value.Stable.V1.t
-        * Consensus_mechanism.Snark_transition.value
-        * Consensus_mechanism.Prover_state.t
-        * Pending_coinbase_witness.t] Blockchain.bin_t
+        * Consensus_mechanism.Snark_transition.Value.Stable.V1.t
+        * Consensus_mechanism.Prover_state.Stable.V1.t
+        * Pending_coinbase_witness.Stable.V1.t] Blockchain.bin_t
       (fun w
       ( ({Blockchain.state= prev_state; proof= prev_proof} as chain)
       , next_state
