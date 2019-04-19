@@ -886,6 +886,7 @@ struct
     module Staged_ledger_aux_hash = Staged_ledger_aux_hash
     module Protocol_state_validator = Protocol_state_validator
     module Network = Net
+    module Breadcrumb_builder = Transition_handler.Breadcrumb_builder
   end)
 
   module Root_prover = Root_prover.Make (struct

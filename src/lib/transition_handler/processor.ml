@@ -41,11 +41,13 @@ module Make (Inputs : Inputs.With_unprocessed_transition_cache.S) :
       ~(proposer_transition_reader :
          (External_transition.Verified.t, State_hash.t) With_hash.t Reader.t)
       ~(catchup_job_writer :
-         ( ( (External_transition.Verified.t, State_hash.t) With_hash.t
-             Envelope.Incoming.t
-           , State_hash.t )
-           Cached.t
-           Rose_tree.t
+         ( State_hash.t
+           * ( (External_transition.Verified.t, State_hash.t) With_hash.t
+               Envelope.Incoming.t
+             , State_hash.t )
+             Cached.t
+             Rose_tree.t
+             list
          , synchronous
          , unit Deferred.t )
          Writer.t)
@@ -67,7 +69,8 @@ module Make (Inputs : Inputs.With_unprocessed_transition_cache.S) :
     let add_and_finalize ~only_if_present cached_breadcrumb =
       let open Deferred.Or_error.Let_syntax in
       let%bind breadcrumb =
-        Deferred.return (Cached.invalidate cached_breadcrumb)
+        Deferred.Or_error.return
+          (Cached.invalidate_with_success cached_breadcrumb)
       in
       let transition =
         Transition_frontier.Breadcrumb.transition_with_hash breadcrumb
@@ -95,9 +98,8 @@ module Make (Inputs : Inputs.With_unprocessed_transition_cache.S) :
                  Envelope.Incoming.wrap ~data:vt ~sender:Envelope.Sender.Local
                in
                `Valid_transition
-                 ( Unprocessed_transition_cache.register
-                     unprocessed_transition_cache enveloped_transition
-                 |> Or_error.ok_exn ) )
+                 (Unprocessed_transition_cache.register_exn
+                    unprocessed_transition_cache enveloped_transition) )
          ; Reader.map catchup_breadcrumbs_reader ~f:(fun cb ->
                `Catchup_breadcrumbs cb )
          ; Reader.map primary_transition_reader ~f:(fun vt ->
