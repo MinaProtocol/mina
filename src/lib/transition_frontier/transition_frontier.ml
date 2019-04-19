@@ -787,12 +787,11 @@ struct
                   (consensus_state_of_breadcrumb parent_node.breadcrumb)
                 ~candidate:(consensus_state_of_breadcrumb breadcrumb)
                 ~logger:
-                  (Logger.create ()
-                     ~metadata:
-                       [ ( "selection_context"
-                         , `String
-                             "debug_assert that child is preferred over parent"
-                         ) ])
+                  (Logger.extend logger
+                     [ ( "selection_context"
+                       , `String
+                           "debug_assert that child is preferred over parent"
+                       ) ])
               = `Take ) ) ;
         let node = Hashtbl.find_exn t.table hash in
         (* 2 *)
@@ -804,10 +803,9 @@ struct
             ~existing:(consensus_state_of_breadcrumb best_tip_node.breadcrumb)
             ~candidate:(consensus_state_of_breadcrumb node.breadcrumb)
             ~logger:
-              (Logger.create ()
-                 ~metadata:
-                   [ ( "selection_context"
-                     , `String "comparing new breadcrumb to best tip" ) ])
+              (Logger.extend logger
+                 [ ( "selection_context"
+                   , `String "comparing new breadcrumb to best tip" ) ])
         in
         let added_to_best_tip_path, removed_from_best_tip_path =
           match best_tip_change with
