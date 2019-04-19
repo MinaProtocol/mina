@@ -2324,11 +2324,11 @@ let next_proposal now (state : Consensus_state.Value.t) ~local_state ~keypair
   let open Keypair in
   Logger.info logger ~module_:__MODULE__ ~location:__LOC__
     "Checking for next proposal..." ;
+  let curr_epoch, curr_slot =
+    Epoch.epoch_and_slot_of_time_exn
+      (Time.of_span_since_epoch (Time.Span.of_ms now))
+  in
   let epoch, slot =
-    let curr_epoch, curr_slot =
-      Epoch.epoch_and_slot_of_time_exn
-        (Time.of_span_since_epoch (Time.Span.of_ms now))
-    in
     if
       Epoch.equal curr_epoch state.curr_epoch
       && Epoch.Slot.equal curr_slot state.curr_slot
@@ -2405,7 +2405,7 @@ let next_proposal now (state : Consensus_state.Value.t) ~local_state ~keypair
       Logger.info logger ~module_:__MODULE__ ~location:__LOC__
         "Proposing in %d slots"
         (Epoch.Slot.to_int next_slot - Epoch.Slot.to_int slot) ;
-      if Epoch.Slot.equal slot next_slot then `Propose_now data
+      if Epoch.Slot.equal curr_slot next_slot then `Propose_now data
       else
         `Propose
           ( Epoch.slot_start_time epoch next_slot
