@@ -21,6 +21,16 @@ module Reader : sig
 
   (** Peek at the latest value in the pipe. *)
   val peek : 'a t -> 'a
+
+  val map : 'a t -> f:('a -> 'b) -> 'b t
+
+  val filter : 'a t -> f:('a -> bool) -> 'a t Ivar.t
+
+  (** Converts a reader to a Jane street pipe reader *)
+  val to_jane_street_pipe : 'a t -> 'a Pipe.Reader.t
+
+  (** Receives values from different reader pipes and combines them into one pipe. Its inital cached value is set to the cached value of the first pipe in the list *)
+  val merge : 'a t Non_empty_list.t -> 'a t
 end
 
 module Writer : sig
