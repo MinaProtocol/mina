@@ -56,9 +56,11 @@ module Make =
   let nextPending = (type a, t, typ: Typ.t(a), ~loc) => {
     let id = t.id^;
     incr(t.id);
+    // immediately create a task
     let task =
       Task.create(cb => {
         let key = Ident.toString({id, loc, typ});
+        // but don't resolve it until the callback inside the dictionary is invoked
         Js.Dict.set(t.table, key, (Any.T(v, typ2)) =>
           Typ.if_eq(
             typ,
@@ -66,7 +68,9 @@ module Make =
             v,
             ~is_equal=
               a => {
+                // if the two type witnesses are the same, we can free the memory in the dictionary
                 Js.Dict.set(t.table, key, Obj.magic(Js.Nullable.undefined));
+                // and complete the task
                 cb(Belt.Result.Ok(a));
               },
             ~not_equal=
@@ -90,6 +94,7 @@ module Make =
 
   // assuming responses are one-shot for now
   let resolve = (type a, t, ident: Ident.t(a), v: a) => {
+    // reolve a task by calling the callback in the dictionary
     switch (Js.Dict.get(t.table, Ident.toString(ident))) {
     | None =>
       Js.log2(
