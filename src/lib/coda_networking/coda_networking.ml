@@ -92,7 +92,11 @@ struct
 
         let callee_model_of_query = Fn.id
 
-        let response_of_callee_model = Fn.id
+        let response_of_callee_model (r : response) =
+          let buff = Bin_prot.Common.create_buf 4096 in
+          let len = bin_write_response buff ~pos:0 r in
+          Stdlib.Printf.eprintf "LEN1: %d\n%!" len ;
+          r
 
         let caller_model_of_response = Fn.id
       end
@@ -143,7 +147,19 @@ struct
 
         let callee_model_of_query = Fn.id
 
-        let response_of_callee_model = Fn.id
+        let response_of_callee_model (r : response) =
+          let buff = Bin_prot.Common.create_buf 4096 in
+          let len = bin_write_response buff ~pos:0 r in
+          let s = Bytes.create len in
+          Bin_prot.Common.blit_buf_bytes buff s ~len ;
+          let oc = Stdlib.open_out "/home/steck/answer_sync_ledger.ml" in
+          Stdlib.Printf.fprintf oc "let _ = \"" ;
+          String.iter (Bytes.to_string s) ~f:(fun c ->
+              Stdlib.Printf.fprintf oc "\\x%0X" (Char.to_int c) ) ;
+          Stdlib.Printf.fprintf oc "\"\n%!" ;
+          Stdlib.close_out oc ;
+          let _ = Stdlib.exit 0 in
+          r
 
         let caller_model_of_response = Fn.id
       end
@@ -254,7 +270,11 @@ struct
 
         let callee_model_of_query = Fn.id
 
-        let response_of_callee_model = Fn.id
+        let response_of_callee_model (r : response) =
+          let buff = Bin_prot.Common.create_buf 4096 in
+          let len = bin_write_response buff ~pos:0 r in
+          Stdlib.Printf.eprintf "LEN3: %d\n%!" len ;
+          r
 
         let caller_model_of_response = Fn.id
       end
