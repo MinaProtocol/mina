@@ -27,6 +27,7 @@ module Make (Inputs : Inputs.S) = struct
     ; catchup_job_writer:
         ( State_hash.t
           * ( (External_transition.Verified.t, State_hash.t) With_hash.t
+              Envelope.Incoming.t
             , State_hash.t )
             Cached.t
             Rose_tree.t
@@ -42,6 +43,7 @@ module Make (Inputs : Inputs.S) = struct
               list. *)
     ; collected_transitions:
         ( (External_transition.Verified.t, State_hash.t) With_hash.t
+          Envelope.Incoming.t
         , State_hash.t )
         Cached.t
         list
@@ -53,11 +55,47 @@ module Make (Inputs : Inputs.S) = struct
     ; breadcrumb_builder_supervisor:
         ( State_hash.t
         * ( (External_transition.Verified.t, State_hash.t) With_hash.t
+            Envelope.Incoming.t
           , State_hash.t )
           Cached.t
           Rose_tree.t
           list )
         Capped_supervisor.t }
+
+  let build_breadcrumbs ~logger ~frontier transition_subtrees =
+    Deferred.List.map transition_subtrees
+      ~f:(fun (Rose_tree.T (subtree_root, _) as subtree) ->
+        let subtree_root_parent_hash =
+          With_hash.data @@ Envelope.Incoming.data (Cached.peek subtree_root)
+          |> External_transition.Verified.parent_hash
+        in
+        let branch_parent =
+          Transition_frontier.find_exn frontier subtree_root_parent_hash
+        in
+        Rose_tree.Deferred.fold_map subtree ~init:(Cached.pure branch_parent)
+          ~f:(fun parent cached_transition_with_hash ->
+            let%map cached_breadcrumb_result =
+              Cached.transform cached_transition_with_hash
+                ~f:(fun transition_with_hash_enveloped ->
+                  let transition_with_hash =
+                    Envelope.Incoming.data transition_with_hash_enveloped
+                  in
+                  Transition_frontier.Breadcrumb.build ~logger
+                    ~parent:(Cached.peek parent) ~transition_with_hash )
+              |> Cached.sequence_deferred
+            in
+            match Cached.sequence_result cached_breadcrumb_result with
+            | Error (`Validation_error e) ->
+                (* TODO: Punish *)
+                Logger.faulty_peer logger ~module_:__MODULE__ ~location:__LOC__
+                  "invalid transition in catchup scheduler breadcrumb \
+                   builder: %s"
+                  (Error.to_string_hum e) ;
+                raise (Error.to_exn e)
+            | Error (`Fatal_error e) ->
+                raise e
+            | Ok breadcrumb ->
+                breadcrumb ) )
 
   let create ~logger ~frontier ~time_controller ~catchup_job_writer
       ~catchup_breadcrumbs_writer =
@@ -91,13 +129,12 @@ module Make (Inputs : Inputs.S) = struct
 
   let mem t transition =
     Hashtbl.mem t.collected_transitions
-      ( With_hash.data transition |> External_transition.Verified.protocol_state
-      |> Protocol_state.previous_state_hash )
+      (With_hash.data transition |> External_transition.Verified.parent_hash)
 
   let has_timeout t transition =
     Hashtbl.mem t.parent_root_timeouts
-      ( With_hash.data transition |> External_transition.Verified.protocol_state
-      |> Protocol_state.previous_state_hash )
+      ( With_hash.data @@ Envelope.Incoming.data transition
+      |> External_transition.Verified.parent_hash )
 
   let is_empty t =
     Hashtbl.is_empty t.collected_transitions
@@ -118,7 +155,8 @@ module Make (Inputs : Inputs.S) = struct
     let successors =
       Option.value ~default:[]
         (Hashtbl.find t.collected_transitions
-           (With_hash.hash (Cached.peek cached_transition)))
+           ( With_hash.hash
+           @@ Envelope.Incoming.data (Cached.peek cached_transition) ))
     in
     Rose_tree.T (cached_transition, List.map successors ~f:(extract_subtree t))
 
@@ -135,14 +173,17 @@ module Make (Inputs : Inputs.S) = struct
     in
     Hashtbl.remove t.collected_transitions parent_hash ;
     List.iter children ~f:(fun child ->
-        remove_tree t (With_hash.hash (Cached.peek child)) )
+        remove_tree t
+          (With_hash.hash @@ Envelope.Incoming.data (Cached.peek child)) )
 
   let watch t ~timeout_duration ~cached_transition =
-    let hash = With_hash.hash (Cached.peek cached_transition) in
+    let transition_with_hash =
+      Envelope.Incoming.data (Cached.peek cached_transition)
+    in
+    let hash = With_hash.hash transition_with_hash in
     let parent_hash =
-      With_hash.data (Cached.peek cached_transition)
-      |> External_transition.Verified.protocol_state
-      |> Protocol_state.previous_state_hash
+      With_hash.data transition_with_hash
+      |> External_transition.Verified.parent_hash
     in
     let make_timeout duration =
       Time.Timeout.create t.time_controller duration ~f:(fun _ ->
@@ -157,7 +198,7 @@ module Make (Inputs : Inputs.S) = struct
                 )
               ; ( "cached_transition"
                 , Cached.peek cached_transition
-                  |> With_hash.data
+                  |> Envelope.Incoming.data |> With_hash.data
                   |> Inputs.External_transition.Verified.to_yojson ) ]
             "timed out waiting for the parent of $cached_transition after \
              $duration ms, signalling a catchup job" ;
@@ -181,14 +222,16 @@ module Make (Inputs : Inputs.S) = struct
           List.exists cached_sibling_transitions
             ~f:(fun cached_sibling_transition ->
               State_hash.equal hash
-                (With_hash.hash (Cached.peek cached_sibling_transition)) )
+                ( With_hash.hash
+                @@ Envelope.Incoming.data
+                     (Cached.peek cached_sibling_transition) ) )
         then
           Logger.info t.logger ~module_:__MODULE__ ~location:__LOC__
             ~metadata:[("state_hash", State_hash.to_yojson hash)]
             "Received request to watch transition for catchup that already \
              was being watched: $state_hash"
         else
-          let _ : Time.Span.t option = cancel_timeout t hash in
+          let (_ : Time.Span.t option) = cancel_timeout t hash in
           Hashtbl.set t.collected_transitions ~key:parent_hash
             ~data:(cached_transition :: cached_sibling_transitions) ;
           Hashtbl.update t.collected_transitions hash
@@ -204,7 +247,7 @@ module Make (Inputs : Inputs.S) = struct
           non-parent_root_transition: %{sexp: State_hash.t}"
         hash
     else
-      let _ : Time.Span.t option = cancel_timeout t hash in
+      let (_ : Time.Span.t option) = cancel_timeout t hash in
       Option.iter (Hashtbl.find t.collected_transitions hash)
         ~f:(fun collected_transitions ->
           let transition_subtrees =

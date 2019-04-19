@@ -48,31 +48,34 @@ module Make (Inputs : Inputs.S) :
   open Inputs
 
   let verify_transition ~logger ~frontier ~unprocessed_transition_cache
-      transition =
+      transition_enveloped =
     let cached_verified_transition =
       let open Deferred.Result.Let_syntax in
-      let%bind _ : External_transition.Proof_verified.t =
+      let transition = Envelope.Incoming.data transition_enveloped in
+      let%bind (_ : External_transition.Proof_verified.t) =
         Protocol_state_validator.validate_proof transition
         |> Deferred.Result.map_error ~f:(fun error ->
                `Invalid (Error.to_string_hum error) )
       in
-      (* We need to coerce the transition from a proof_verified
+      let verified_transition_with_hash_enveloped =
+        Envelope.Incoming.map transition_enveloped ~f:(fun transition ->
+            (* We need to coerce the transition from a proof_verified
          transition to a fully verified in
          order to add the transition to be added to the
          transition frontier and to be fed through the
          transition_handler_validator. *)
-      let (`I_swear_this_is_safe_see_my_comment verified_transition) =
-        External_transition.to_verified transition
-      in
-      let verified_transition_with_hash =
-        With_hash.of_data verified_transition
-          ~hash_data:
-            (Fn.compose Consensus.Protocol_state.hash
-               External_transition.Verified.protocol_state)
+            let (`I_swear_this_is_safe_see_my_comment verified_transition) =
+              External_transition.to_verified transition
+            in
+            With_hash.of_data verified_transition
+              ~hash_data:
+                (Fn.compose Consensus.Protocol_state.hash
+                   External_transition.Verified.protocol_state) )
       in
       Deferred.return
       @@ Transition_handler_validator.validate_transition ~logger ~frontier
-           ~unprocessed_transition_cache verified_transition_with_hash
+           ~unprocessed_transition_cache
+           verified_transition_with_hash_enveloped
     in
     let open Deferred.Let_syntax in
     match%bind cached_verified_transition with
@@ -183,7 +186,8 @@ module Make (Inputs : Inputs.S) :
                     ~frontier ~initial_hash:initial_state_hash
                     subtrees_of_transitions
                 with
-                | Ok result -> Deferred.Or_error.return result
+                | Ok result ->
+                    Deferred.Or_error.return result
                 | error ->
                     List.iter verified_transitions
                       ~f:(Fn.compose ignore Cached.invalidate_with_failure) ;

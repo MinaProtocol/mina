@@ -7,8 +7,10 @@ module BytesWr = struct
   let to_yojson t = `String (Bytes.to_string t |> Base64.encode_string)
 
   let of_yojson = function
-    | `String s -> Ok (Base64.decode_exn s |> Bytes.of_string)
-    | _ -> Error "Bytes.of_yojson needs a string"
+    | `String s ->
+        Ok (Base64.decode_exn s |> Bytes.of_string)
+    | _ ->
+        Error "Bytes.of_yojson needs a string"
 end
 
 module Stable = struct
@@ -99,7 +101,7 @@ let decrypt ~(password : Bytes.t)
 
 let%test_unit "successful roundtrip" =
   (* 4 trials because password hashing is slow *)
-  let bgen = Bytes.gen_with_length 16 Char.gen in
+  let bgen = Bytes.gen_with_length 16 Char.quickcheck_generator in
   Quickcheck.test
     Quickcheck.Generator.(tuple2 bgen bgen)
     ~trials:4

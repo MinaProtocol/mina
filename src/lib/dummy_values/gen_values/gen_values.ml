@@ -15,8 +15,10 @@ module Proof_system_name = struct
   type t = Groth16 | GrothMaller17
 
   let to_string = function
-    | Groth16 -> "Groth16"
-    | GrothMaller17 -> "GrothMaller17"
+    | Groth16 ->
+        "Groth16"
+    | GrothMaller17 ->
+        "GrothMaller17"
 end
 
 module Make
@@ -65,7 +67,8 @@ struct
               generate_keypair
                 Data_spec.[Boolean.typ; Boolean.typ]
                 (fun b1 b2 -> Boolean.Assert.is_true b1)
-          | _ -> assert false )
+          | _ ->
+              assert false )
     in
     ( Verification_key.to_string (Keypair.vk kp)
     , Proving_key.to_string (Keypair.pk kp) )
@@ -80,8 +83,10 @@ struct
     let curve_name = Curve_name.to_string curve in
     let curve_module_name =
       match proof_system with
-      | GrothMaller17 -> sprintf "Crypto_params.%s_backend" curve_name
-      | Groth16 -> sprintf "Crypto_params.%s_backend.Full.Default" curve_name
+      | GrothMaller17 ->
+          sprintf "Crypto_params.%s_backend" curve_name
+      | Groth16 ->
+          sprintf "Crypto_params.%s_backend.Full.Default" curve_name
     in
     let of_string_expr submodule_name str =
       [%expr
@@ -148,7 +153,7 @@ let main () =
              ~expr:
                (pmod_structure
                   (List.map [Proof_system_name.Groth16; GrothMaller17]
-                     ~f:(fun sys -> structure_item_of_spec (curve, sys) )))) )
+                     ~f:(fun sys -> structure_item_of_spec (curve, sys))))) )
   in
   Pprintast.top_phrase fmt (Ptop_def structure) ;
   exit 0

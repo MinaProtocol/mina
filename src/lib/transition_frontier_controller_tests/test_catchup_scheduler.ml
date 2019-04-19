@@ -37,7 +37,7 @@ let%test_module "Transition_handler.Catchup_scheduler tests" =
       let%bind frontier =
         create_root_frontier ~logger accounts_with_secret_keys
       in
-      let%map _ : unit =
+      let%map (_ : unit) =
         build_frontier_randomly
           ~gen_root_breadcrumb_builder:(fun root_breadcrumb ->
             Quickcheck.Generator.with_size ~size:num_breadcrumbs
@@ -47,6 +47,12 @@ let%test_module "Transition_handler.Catchup_scheduler tests" =
           frontier
       in
       frontier
+
+    let transition_with_hash_enveloped
+        (transition_with_hash :
+          (External_transition.Verified.t, 'a) With_hash.t) =
+      Envelope.Incoming.wrap ~data:transition_with_hash
+        ~sender:Envelope.Sender.Local
 
     let extract_children_from ~reader ~root =
       let open Deferred.Let_syntax in
@@ -91,8 +97,12 @@ let%test_module "Transition_handler.Catchup_scheduler tests" =
           in
           let dangling_breadcrumb = List.nth_exn upcoming_breadcrumbs 1 in
           let dangling_transition =
-            Transition_frontier.Breadcrumb.transition_with_hash
-              dangling_breadcrumb
+            let transition_with_hash =
+              Transition_frontier.Breadcrumb.transition_with_hash
+                dangling_breadcrumb
+            in
+            Envelope.Incoming.wrap ~data:transition_with_hash
+              ~sender:Envelope.Sender.Local
             |> Cached.pure
           in
           Catchup_scheduler.watch scheduler ~timeout_duration
@@ -159,7 +169,7 @@ let%test_module "Transition_handler.Catchup_scheduler tests" =
                 assert (
                   Catchup_scheduler.has_timeout scheduler
                     (Cached.peek cached_transition) ) )) ;
-          let%bind _ : unit =
+          let%bind (_ : unit) =
             Transition_frontier.add_breadcrumb_exn frontier missing_breadcrumb
           in
           Catchup_scheduler.notify scheduler
@@ -180,10 +190,9 @@ let%test_module "Transition_handler.Catchup_scheduler tests" =
               ~f:Cached.invalidate_with_success
           in
           assert (
-            List.equal
+            List.equal Transition_frontier.Breadcrumb.equal
               (Rose_tree.flatten received_rose_tree)
-              upcoming_breadcrumbs ~equal:Transition_frontier.Breadcrumb.equal
-          ) ;
+              upcoming_breadcrumbs ) ;
           Strict_pipe.Writer.close catchup_breadcrumbs_writer ;
           Strict_pipe.Writer.close catchup_job_writer )
 
@@ -235,7 +244,7 @@ let%test_module "Transition_handler.Catchup_scheduler tests" =
               Catchup_scheduler.watch scheduler ~timeout_duration
                 ~cached_transition ) ;
           assert (not @@ Catchup_scheduler.is_empty scheduler) ;
-          let%bind _ : unit =
+          let%bind (_ : unit) =
             Transition_frontier.add_breadcrumb_exn frontier missing_breadcrumb
           in
           Catchup_scheduler.notify scheduler

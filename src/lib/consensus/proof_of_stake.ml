@@ -117,8 +117,10 @@ let compute_delegators self_pk ~iter_accounts =
   let t = Account.Index.Table.create () in
   let matches_pubkey pubkey =
     match self_pk with
-    | `Include_self, pk -> Public_key.Compressed.equal pk pubkey
-    | `Don't_include_self, _ -> false
+    | `Include_self, pk ->
+        Public_key.Compressed.equal pk pubkey
+    | `Don't_include_self, _ ->
+        false
   in
   iter_accounts (fun i (acct : Account.t) ->
       (* TODO: The second disjunct is a hack and should be removed once the delegation
@@ -249,7 +251,8 @@ module Local_state = struct
     (* TODO: remove duplicated genesis ledger *)
     let genesis_epoch_snapshot =
       match proposer_public_key with
-      | None -> Snapshot.create_empty ()
+      | None ->
+          Snapshot.create_empty ()
       | Some key ->
           let open Snapshot in
           let delegators =
@@ -281,11 +284,13 @@ module Local_state = struct
       Tuple2.compare ~cmp1:Epoch.compare ~cmp2:Epoch.Slot.compare
         t.last_checked_slot_and_epoch (epoch, slot)
     with
-    | i when i >= 0 -> `Seen
+    | i when i >= 0 ->
+        `Seen
     | i when i < 0 ->
         t.last_checked_slot_and_epoch <- (epoch, slot) ;
         `Unseen
-    | _ -> failwith "forall x : int. x >= 0 || x < 0 is impossibly false"
+    | _ ->
+        failwith "forall x : int. x >= 0 || x < 0 is impossibly false"
 end
 
 module Epoch_ledger = struct
@@ -347,7 +352,7 @@ module Epoch_ledger = struct
   let of_hlist :
          (unit, 'ledger_hash -> 'total_currency -> unit) Coda_base.H_list.t
       -> ('ledger_hash, 'total_currency) Poly.t =
-   fun Coda_base.H_list.([hash; total_currency]) -> {hash; total_currency}
+   fun Coda_base.H_list.[hash; total_currency] -> {hash; total_currency}
 
   let data_spec =
     Snark_params.Tick.Data_spec.[Coda_base.Frozen_ledger_hash.typ; Amount.typ]
@@ -432,7 +437,7 @@ module Vrf = struct
            , 'epoch -> 'slot -> 'epoch_seed -> 'del -> unit )
            Coda_base.H_list.t
         -> ('epoch, 'slot, 'epoch_seed, 'del) t =
-     fun Coda_base.H_list.([epoch; slot; seed; delegator]) ->
+     fun Coda_base.H_list.[epoch; slot; seed; delegator] ->
       {epoch; slot; seed; delegator}
 
     let data_spec =
@@ -700,8 +705,10 @@ module Vrf = struct
       in
       fun (With {request; respond}) ->
         match request with
-        | Winner_address -> respond (Provide 0)
-        | Private_key -> respond (Provide sk)
+        | Winner_address ->
+            respond (Provide 0)
+        | Private_key ->
+            respond (Provide sk)
         | _ ->
             respond
               (Provide
@@ -772,14 +779,11 @@ module Epoch_data = struct
     end
 
     type ('epoch_ledger, 'epoch_seed, 'protocol_state_hash, 'length) t =
-                                                                        ( 'epoch_ledger
-                                                                        , 'epoch_seed
-                                                                        , 'protocol_state_hash
-                                                                        , 'length
-                                                                        )
-                                                                        Stable
-                                                                        .Latest
-                                                                        .t =
+          ( 'epoch_ledger
+          , 'epoch_seed
+          , 'protocol_state_hash
+          , 'length )
+          Stable.Latest.t =
       { ledger: 'epoch_ledger
       ; seed: 'epoch_seed
       ; start_checkpoint: 'protocol_state_hash
@@ -846,11 +850,8 @@ module Epoch_data = struct
            -> unit )
          Coda_base.H_list.t
       -> ('ledger, 'seed, 'protocol_state_hash, 'length) Poly.t =
-   fun Coda_base.H_list.([ ledger
-                         ; seed
-                         ; start_checkpoint
-                         ; lock_checkpoint
-                         ; length ]) ->
+   fun Coda_base.H_list.
+         [ledger; seed; start_checkpoint; lock_checkpoint; length] ->
     {ledger; seed; start_checkpoint; lock_checkpoint; length}
 
   let data_spec =
@@ -1020,7 +1021,7 @@ module Consensus_transition_data = struct
   let of_hlist :
          (unit, 'epoch -> 'slot -> unit) Coda_base.H_list.t
       -> ('epoch, 'slot) Poly.t =
-   fun Coda_base.H_list.([epoch; slot]) -> {Poly.epoch; slot}
+   fun Coda_base.H_list.[epoch; slot] -> {Poly.epoch; slot}
 
   let data_spec =
     let open Snark_params.Tick.Data_spec in
@@ -1097,8 +1098,10 @@ module Checkpoints = struct
           let digest ({prefix; tail} : t) =
             let rec go acc p =
               match Fqueue.dequeue p with
-              | None -> acc
-              | Some (h, p) -> go (merge h acc) p
+              | None ->
+                  acc
+              | Some (h, p) ->
+                  go (merge h acc) p
             in
             go tail prefix
         end
@@ -1246,9 +1249,11 @@ module Consensus_state = struct
                , 'slot
                , 'epoch_data
                , 'bool
-               , 'checkpoints ) t =
+               , 'checkpoints )
+               t =
             { length: 'length
             ; epoch_length: 'length
+            ; min_length_of_epoch: 'length
             ; last_vrf_output: 'vrf_output
             ; total_currency: 'amount
             ; curr_epoch: 'epoch
@@ -1273,18 +1278,20 @@ module Consensus_state = struct
          , 'slot
          , 'epoch_data
          , 'bool
-         , 'checkpoints ) t =
-                             ( 'length
-                             , 'vrf_output
-                             , 'amount
-                             , 'epoch
-                             , 'slot
-                             , 'epoch_data
-                             , 'bool
-                             , 'checkpoints )
-                             Stable.Latest.t =
+         , 'checkpoints )
+         t =
+          ( 'length
+          , 'vrf_output
+          , 'amount
+          , 'epoch
+          , 'slot
+          , 'epoch_data
+          , 'bool
+          , 'checkpoints )
+          Stable.Latest.t =
       { length: 'length
       ; epoch_length: 'length
+      ; min_length_of_epoch: 'length
       ; last_vrf_output: 'vrf_output
       ; total_currency: 'amount
       ; curr_epoch: 'epoch
@@ -1349,6 +1356,7 @@ module Consensus_state = struct
   let to_hlist
       { Poly.length
       ; epoch_length
+      ; min_length_of_epoch
       ; last_vrf_output
       ; total_currency
       ; curr_epoch
@@ -1360,6 +1368,7 @@ module Consensus_state = struct
     let open Coda_base.H_list in
     [ length
     ; epoch_length
+    ; min_length_of_epoch
     ; last_vrf_output
     ; total_currency
     ; curr_epoch
@@ -1372,6 +1381,7 @@ module Consensus_state = struct
   let of_hlist :
          ( unit
          ,    'length
+           -> 'length
            -> 'length
            -> 'vrf_output
            -> 'amount
@@ -1392,18 +1402,21 @@ module Consensus_state = struct
          , 'bool
          , 'checkpoints )
          Poly.t =
-   fun Coda_base.H_list.([ length
-                         ; epoch_length
-                         ; last_vrf_output
-                         ; total_currency
-                         ; curr_epoch
-                         ; curr_slot
-                         ; last_epoch_data
-                         ; curr_epoch_data
-                         ; has_ancestor_in_same_checkpoint_window
-                         ; checkpoints ]) ->
+   fun Coda_base.H_list.
+         [ length
+         ; epoch_length
+         ; min_length_of_epoch
+         ; last_vrf_output
+         ; total_currency
+         ; curr_epoch
+         ; curr_slot
+         ; last_epoch_data
+         ; curr_epoch_data
+         ; has_ancestor_in_same_checkpoint_window
+         ; checkpoints ] ->
     { length
     ; epoch_length
+    ; min_length_of_epoch
     ; last_vrf_output
     ; total_currency
     ; curr_epoch
@@ -1416,6 +1429,7 @@ module Consensus_state = struct
   let data_spec =
     let open Snark_params.Tick.Data_spec in
     [ Length.Unpacked.typ
+    ; Length.Unpacked.typ
     ; Length.Unpacked.typ
     ; Vrf.Output.typ
     ; Amount.typ
@@ -1438,7 +1452,8 @@ module Consensus_state = struct
       ; curr_epoch
       ; curr_slot
       ; last_epoch_data
-      ; curr_epoch_data; _ } =
+      ; curr_epoch_data
+      ; _ } =
     let open Snark_params.Tick.Checked.Let_syntax in
     let%map last_epoch_data_triples = Epoch_data.var_to_triples last_epoch_data
     and curr_epoch_data_triples = Epoch_data.var_to_triples curr_epoch_data in
@@ -1458,7 +1473,8 @@ module Consensus_state = struct
       ; curr_slot
       ; total_currency
       ; last_epoch_data
-      ; curr_epoch_data; _ } =
+      ; curr_epoch_data
+      ; _ } =
     let open Fold in
     Length.fold length +> Length.fold epoch_length
     +> Vrf.Output.fold last_vrf_output
@@ -1476,6 +1492,7 @@ module Consensus_state = struct
   let genesis : Value.t =
     { Poly.length= Length.zero
     ; epoch_length= Length.zero
+    ; min_length_of_epoch= Length.of_int (UInt32.to_int Constants.Epoch.size)
     ; last_vrf_output= Vrf.Output.dummy
     ; total_currency= genesis_ledger_total_currency
     ; curr_epoch= Epoch.zero
@@ -1498,21 +1515,36 @@ module Consensus_state = struct
       ~(snarked_ledger_hash : Coda_base.Frozen_ledger_hash.t)
       ~(proposer_vrf_result : Random_oracle.Digest.t) : Value.t Or_error.t =
     let open Or_error.Let_syntax in
+    let prev_epoch, prev_slot =
+      (previous_consensus_state.curr_epoch, previous_consensus_state.curr_slot)
+    in
+    let next_epoch, next_slot =
+      (consensus_transition_data.epoch, consensus_transition_data.slot)
+    in
     let%map total_currency =
       Amount.add previous_consensus_state.total_currency supply_increase
       |> Option.map ~f:Or_error.return
       |> Option.value
            ~default:(Or_error.error_string "failed to add total_currency")
+    and () =
+      if
+        (Epoch.(equal next_epoch zero) && Epoch.Slot.(equal next_slot zero))
+        || Epoch.(prev_epoch < next_epoch)
+        || Epoch.(prev_epoch = next_epoch)
+           && Epoch.Slot.(prev_slot < next_slot)
+      then Ok ()
+      else
+        Or_error.errorf
+          !"(epoch, slot) did not increase. prev=%{sexp:Epoch.t * \
+            Epoch.Slot.t}, next=%{sexp:Epoch.t * Epoch.Slot.t}"
+          (prev_epoch, prev_slot) (next_epoch, next_slot)
     in
     let last_epoch_data, curr_epoch_data, epoch_length =
       Epoch_data.update_pair
         ( previous_consensus_state.last_epoch_data
         , previous_consensus_state.curr_epoch_data )
-        previous_consensus_state.epoch_length
-        ~prev_epoch:previous_consensus_state.curr_epoch
-        ~next_epoch:consensus_transition_data.epoch
-        ~prev_slot:previous_consensus_state.curr_slot
-        ~prev_protocol_state_hash:previous_protocol_state_hash
+        previous_consensus_state.epoch_length ~prev_epoch ~next_epoch
+        ~prev_slot ~prev_protocol_state_hash:previous_protocol_state_hash
         ~proposer_vrf_result ~snarked_ledger_hash ~total_currency
     in
     let checkpoints =
@@ -1524,18 +1556,23 @@ module Consensus_state = struct
     in
     { Poly.length= Length.succ previous_consensus_state.length
     ; epoch_length
+    ; min_length_of_epoch=
+        ( if Epoch.equal prev_epoch next_epoch then
+          previous_consensus_state.min_length_of_epoch
+        else if Epoch.(equal next_epoch (succ prev_epoch)) then
+          Length.min previous_consensus_state.min_length_of_epoch
+            previous_consensus_state.curr_epoch_data.length
+        else Length.zero )
     ; last_vrf_output= proposer_vrf_result
     ; total_currency
     ; curr_epoch= consensus_transition_data.epoch
-    ; curr_slot= consensus_transition_data.slot
+    ; curr_slot= next_slot
     ; last_epoch_data
     ; curr_epoch_data
     ; has_ancestor_in_same_checkpoint_window=
         same_checkpoint_window_unchecked
-          (Global_slot.create ~epoch:previous_consensus_state.curr_epoch
-             ~slot:previous_consensus_state.curr_slot)
-          (Global_slot.create ~epoch:consensus_transition_data.epoch
-             ~slot:consensus_transition_data.slot)
+          (Global_slot.create ~epoch:prev_epoch ~slot:prev_slot)
+          (Global_slot.create ~epoch:next_epoch ~slot:next_slot)
     ; checkpoints }
 
   module M = Snarky.Snark.Run.Make (Crypto_params_init.Tick_backend)
@@ -1685,11 +1722,28 @@ module Consensus_state = struct
       Amount.Checked.add previous_state.total_currency supply_increase
     and epoch_length =
       Length.increment_if_var previous_state.epoch_length epoch_increased
+    and min_length_of_epoch =
+      let if_ b ~then_ ~else_ =
+        let%bind b = b and then_ = then_ and else_ = else_ in
+        Length.if_ b ~then_ ~else_
+      in
+      let return = Checked.return in
+      if_
+        (return Boolean.(not epoch_increased))
+        ~then_:(return previous_state.min_length_of_epoch)
+        ~else_:
+          (if_
+             (Epoch.is_succ_var ~pred:prev_epoch ~succ:next_epoch)
+             ~then_:
+               (Length.min_var previous_state.min_length_of_epoch
+                  previous_state.curr_epoch_data.length)
+             ~else_:(return (Length.Unpacked.var_of_value Length.zero)))
     in
     Checked.return
       ( `Success threshold_satisfied
       , { Poly.length
         ; epoch_length
+        ; min_length_of_epoch
         ; last_vrf_output= vrf_result
         ; curr_epoch= transition_data.epoch
         ; curr_slot= transition_data.slot
@@ -1772,8 +1826,10 @@ module Prover_state = struct
     in
     fun (With {request; respond}) ->
       match request with
-      | Vrf.Winner_address -> respond (Provide delegator)
-      | Vrf.Private_key -> respond (Provide private_key)
+      | Vrf.Winner_address ->
+          respond (Provide delegator)
+      | Vrf.Private_key ->
+          respond (Provide private_key)
       | _ ->
           respond
             (Provide
@@ -1858,8 +1914,10 @@ let select ~existing ~candidate ~logger =
   let log_choice ~precondition_msg ~choice_msg choice =
     let choice_msg =
       match choice with
-      | `Take -> choice_msg
-      | `Keep -> Printf.sprintf "not (%s)" choice_msg
+      | `Take ->
+          choice_msg
+      | `Keep ->
+          Printf.sprintf "not (%s)" choice_msg
     in
     let msg = Printf.sprintf "(%s) && (%s)" precondition_msg choice_msg in
     log_result choice msg
@@ -1942,10 +2000,13 @@ let select ~existing ~candidate ~logger =
           Some choice )
         else None )
   with
-  | Some choice -> choice
+  | Some choice ->
+      choice
   | None ->
       log_result `Keep "no predicates were matched" ;
-      `Keep
+      if Length.(candidate.min_length_of_epoch > existing.min_length_of_epoch)
+      then `Take
+      else `Keep
 
 let time_hum (now : Core_kernel.Time.t) =
   let epoch, slot = Epoch.epoch_and_slot_of_time_exn (Time.of_time now) in
@@ -2031,11 +2092,14 @@ let next_proposal now (state : Consensus_state.Value.t) ~local_state ~keypair
         None
       else
         match Local_state.seen_slot local_state epoch slot with
-        | `Seen -> find_winning_slot (Epoch.Slot.succ slot)
+        | `Seen ->
+            find_winning_slot (Epoch.Slot.succ slot)
         | `Unseen -> (
           match proposal_data slot with
-          | None -> find_winning_slot (Epoch.Slot.succ slot)
-          | Some data -> Some (slot, data) )
+          | None ->
+              find_winning_slot (Epoch.Slot.succ slot)
+          | Some data ->
+              Some (slot, data) )
     in
     find_winning_slot slot
   in
@@ -2159,6 +2223,12 @@ module For_tests = struct
       in
       { Poly.length
       ; epoch_length
+      ; min_length_of_epoch=
+          ( if Epoch.equal prev.curr_epoch curr_epoch then
+            prev.min_length_of_epoch
+          else if Epoch.(equal curr_epoch (succ prev.curr_epoch)) then
+            Length.min prev.min_length_of_epoch prev.curr_epoch_data.length
+          else Length.zero )
       ; last_vrf_output= proposer_vrf_result
       ; total_currency
       ; curr_epoch

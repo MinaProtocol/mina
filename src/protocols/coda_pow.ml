@@ -1432,7 +1432,11 @@ module type External_transition_validation_intf = sig
 
   type fully_valid = Truth.true_t all
 
-  type ('time_received, 'proof, 'frontier_dependencies, 'staged_ledger_diff) with_transition =
+  type ( 'time_received
+       , 'proof
+       , 'frontier_dependencies
+       , 'staged_ledger_diff )
+       with_transition =
     (external_transition, state_hash) With_hash.t
     * ('time_received, 'proof, 'frontier_dependencies, 'staged_ledger_diff) t
 

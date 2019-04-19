@@ -113,6 +113,7 @@ let%test_module "Bootstrap Controller" =
           let saved_transitions_verified =
             Bootstrap_controller.For_tests.Transition_cache.data
               transition_graph
+            |> List.map ~f:Envelope.Incoming.data
           in
           External_transition.Verified.Set.(
             equal
@@ -120,9 +121,12 @@ let%test_module "Bootstrap Controller" =
               (of_list saved_transitions_verified)) )
 
     let is_syncing = function
-      | `Ignored -> false
-      | `Syncing_new_snarked_ledger -> true
-      | `Updating_root_transition -> false
+      | `Ignored ->
+          false
+      | `Syncing_new_snarked_ledger ->
+          true
+      | `Updating_root_transition ->
+          false
 
     let make_transition_pipe () =
       Pipe_lib.Strict_pipe.create ~name:(__MODULE__ ^ __LOC__)
@@ -194,7 +198,10 @@ let%test_module "Bootstrap Controller" =
           let ledger_db =
             Transition_frontier.For_tests.root_snarked_ledger syncing_frontier
           in
-          let%map new_frontier, (_ : External_transition.Verified.t list) =
+          let%map ( new_frontier
+                  , (_ :
+                      External_transition.Verified.t Envelope.Incoming.t list)
+                  ) =
             Bootstrap_controller.run ~logger ~trust_system ~network
               ~frontier:syncing_frontier ~ledger_db ~transition_reader
           in
@@ -241,7 +248,10 @@ let%test_module "Bootstrap Controller" =
               ~peer:large_peer
               (get_best_tip_hash large_peer)
           in
-          let%map new_frontier, (_ : External_transition.Verified.t list) =
+          let%map ( new_frontier
+                  , (_ :
+                      External_transition.Verified.t Envelope.Incoming.t list)
+                  ) =
             Bootstrap_controller.run ~logger ~trust_system ~network
               ~frontier:me ~ledger_db ~transition_reader
           in

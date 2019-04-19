@@ -13,7 +13,8 @@ let main () =
     | 0 ->
         Some
           (List.nth_exn Genesis_ledger.accounts 5 |> snd |> Account.public_key)
-    | _ -> None
+    | _ ->
+        None
   in
   let%bind testnet =
     Coda_worker_testnet.test logger n Option.some snark_work_public_keys

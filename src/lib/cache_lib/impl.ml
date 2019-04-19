@@ -40,7 +40,7 @@ module Make (Inputs : Inputs_intf) : Intf.Main.S = struct
 
     let to_list t = Hashtbl.keys t.set
   end
-  
+
   and Cached : sig
     include Intf.Cached.S
 
@@ -66,19 +66,28 @@ module Make (Inputs : Inputs_intf) : Intf.Main.S = struct
     let pure x = Pure x
 
     let cache : type a b. (a, b) t -> b Cache.t = function
-      | Base x -> x.cache
-      | Derivative x -> x.cache
-      | Pure _ -> failwith "cannot access cache of pure Cached.t"
+      | Base x ->
+          x.cache
+      | Derivative x ->
+          x.cache
+      | Pure _ ->
+          failwith "cannot access cache of pure Cached.t"
 
     let value : type a b. (a, b) t -> a = function
-      | Base x -> x.data
-      | Derivative x -> x.mutant
-      | Pure x -> x
+      | Base x ->
+          x.data
+      | Derivative x ->
+          x.mutant
+      | Pure x ->
+          x
 
     let original : type a b. (a, b) t -> b = function
-      | Base x -> x.data
-      | Derivative x -> x.original
-      | Pure _ -> failwith "cannot access original of pure Cached.t"
+      | Base x ->
+          x.data
+      | Derivative x ->
+          x.original
+      | Pure _ ->
+          failwith "cannot access original of pure Cached.t"
 
     let final_state : type a b. (a, b) t -> b Intf.final_state = function
       | Base x -> x.final_state
@@ -166,7 +175,8 @@ module Make (Inputs : Inputs_intf) : Intf.Main.S = struct
     let sequence_result (type a b) (t : ((a, 'e) Result.t, b) t) :
         ((a, b) t, 'e) Result.t =
       match peek t with
-      | Ok x -> Ok (transform t ~f:(Fn.const x))
+      | Ok x ->
+          Ok (transform t ~f:(Fn.const x))
       | Error err ->
           Logger.error ~module_:__MODULE__ ~location:__LOC__
             (Cache.logger (cache t))

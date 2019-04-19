@@ -105,8 +105,10 @@ module Make (Inputs : Inputs_intf) :
       ~candidate:(External_transition.Protocol_state.consensus_state new_state)
 
   let is_bootstrapping = function
-    | `Bootstrap_controller (_, _) -> true
-    | `Transition_frontier_controller (_, _, _) -> false
+    | `Bootstrap_controller (_, _) ->
+        true
+    | `Transition_frontier_controller (_, _, _) ->
+        false
 
   let get_root_state frontier =
     Transition_frontier.root frontier
@@ -167,12 +169,15 @@ module Make (Inputs : Inputs_intf) :
       in
       kill bootstrap_controller_reader bootstrap_controller_writer ;
       ( new_frontier
-      , List.map collected_transitions
-          ~f:
-            (With_hash.of_data
-               ~hash_data:
-                 (Fn.compose Consensus.Protocol_state.hash
-                    External_transition.Verified.protocol_state)) )
+      , List.map collected_transitions ~f:(fun transition ->
+            Envelope.Incoming.wrap
+              ~sender:(Envelope.Incoming.sender transition)
+              ~data:
+                ( Envelope.Incoming.data transition
+                |> With_hash.of_data
+                     ~hash_data:
+                       (Fn.compose Consensus.Protocol_state.hash
+                          External_transition.Verified.protocol_state) ) ) )
     in
     let start_transition_frontier_controller ~verified_transition_writer
         ~clear_reader ~collected_transitions frontier =
@@ -218,7 +223,7 @@ module Make (Inputs : Inputs_intf) :
                 (Broadcast_pipe.Writer.write frontier_w (Some frontier))
           | `Bootstrap_controller (_, _) ->
               Transition_frontier.close (peek_exn frontier_r) ;
-              don't_wait_for (Broadcast_pipe.Writer.write frontier_w None))
+              don't_wait_for (Broadcast_pipe.Writer.write frontier_w None) )
     in
     let ( valid_protocol_state_transition_reader
         , valid_protocol_state_transition_writer ) =

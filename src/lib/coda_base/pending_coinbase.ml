@@ -436,7 +436,8 @@ module T = struct
           respond (Delegate (Set_coinbase_stack (addr, stack)))
       | Merkle_tree.Get_element addr ->
           respond (Delegate (Get_coinbase_stack addr))
-      | _ -> unhandled
+      | _ ->
+          unhandled
 
     let get t addr =
       handle
@@ -623,8 +624,10 @@ module T = struct
     if is_new_stack then Ok t.new_pos
     else
       match List.hd t.pos_list with
-      | Some x -> Ok x
-      | None -> Or_error.error_string "No Stack_id for the latest stack"
+      | Some x ->
+          Ok x
+      | None ->
+          Or_error.error_string "No Stack_id for the latest stack"
 
   let latest_stack (t : t) ~is_new_stack =
     let open Or_error.Let_syntax in
@@ -637,8 +640,10 @@ module T = struct
 
   let remove_oldest_stack_id t =
     match List.rev t with
-    | [] -> Or_error.error_string "No coinbase stack to pop"
-    | x :: xs -> Ok (x, List.rev xs)
+    | [] ->
+        Or_error.error_string "No coinbase stack to pop"
+    | x :: xs ->
+        Ok (x, List.rev xs)
 
   let oldest_stack t =
     let open Or_error.Let_syntax in
@@ -677,7 +682,7 @@ module T = struct
         (List.fold pos_list ~init:"" ~f:(fun s a -> s ^ Stack_id.to_string a))
     in
     let h = Digestif.SHA256.feed_string h (Stack_id.to_string new_pos) in
-    (Digestif.SHA256.get h :> string)
+    Digestif.SHA256.(get h |> to_raw_string)
 
   let handler (t : t) ~is_new_stack =
     let pending_coinbase = ref t in
@@ -705,8 +710,10 @@ module T = struct
         | Checked.Find_index_of_newest_stack ->
             let stack_id =
               match latest_stack_id !pending_coinbase ~is_new_stack with
-              | Ok id -> id
-              | _ -> Stack_id.zero
+              | Ok id ->
+                  id
+              | _ ->
+                  Stack_id.zero
             in
             let index =
               find_index !pending_coinbase stack_id |> Or_error.ok_exn
@@ -722,7 +729,8 @@ module T = struct
             pending_coinbase :=
               set_stack !pending_coinbase idx stack |> Or_error.ok_exn ;
             respond (Provide ())
-        | _ -> unhandled )
+        | _ ->
+            unhandled )
 end
 
 include T

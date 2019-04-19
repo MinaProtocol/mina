@@ -22,8 +22,10 @@ let least ~such_that =
 let greatest ~such_that =
   let rec go best i =
     match such_that i with
-    | Some acc -> go (Some acc) (i + 1)
-    | None -> Option.value_exn best
+    | Some acc ->
+        go (Some acc) (i + 1)
+    | None ->
+        Option.value_exn best
   in
   go None 0
 
@@ -64,7 +66,8 @@ let terms_needed ~derivative_magnitude_upper_bound ~bits_of_precision:k =
       let d = derivative_magnitude_upper_bound Int.(n + 1) in
       Bignum.(of_bigint (factorial nn) / d > lower_bound) )
 
-let ceil_log2 n = least ~such_that:(fun i -> B.(pow (of_int 2) (of_int i) >= n))
+let ceil_log2 n =
+  least ~such_that:(fun i -> B.(pow (of_int 2) (of_int i) >= n))
 
 let binary_expansion x =
   assert (Bignum.(x < one)) ;
@@ -172,7 +175,8 @@ module Exp = struct
         | None ->
             assert (sgn = `Pos) ;
             Some term
-        | Some s -> Some (Floating_point.add_signed ~m s (sgn, term)) )
+        | Some s ->
+            Some (Floating_point.add_signed ~m s (sgn, term)) )
     |> Option.value_exn
 
   let one_minus_exp ~m

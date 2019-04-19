@@ -32,7 +32,8 @@ module Make (Inputs : Intf.Main_inputs) = struct
         , mutant )
         Diff_mutant.t) : mutant =
     match diff with
-    | New_frontier _ -> ()
+    | New_frontier _ ->
+        ()
     | Add_transition {data= transition; _} ->
         let parent_hash = External_transition.parent_hash transition in
         Transition_frontier.find_exn frontier parent_hash
@@ -60,9 +61,12 @@ module Make (Inputs : Intf.Main_inputs) = struct
         E
           (Remove_transitions
              (List.map ~f:With_hash.hash removed_transitions_with_hashes))
-    | New_frontier first_root -> E (New_frontier first_root)
-    | Add_transition added_transition -> E (Add_transition added_transition)
-    | Update_root new_root -> E (Update_root new_root)
+    | New_frontier first_root ->
+        E (New_frontier first_root)
+    | Add_transition added_transition ->
+        E (Add_transition added_transition)
+    | Update_root new_root ->
+        E (Update_root new_root)
 
   let write_diff_and_verify ~logger ~acc_hash worker frontier diff_mutant =
     let ground_truth_diff = apply_diff frontier diff_mutant in
@@ -86,7 +90,7 @@ module Make (Inputs : Intf.Main_inputs) = struct
   let listen_to_frontier_broadcast_pipe ~logger
       (frontier_broadcast_pipe :
         Transition_frontier.t option Broadcast_pipe.Reader.t) worker =
-    let%bind _ : Diff_hash.t =
+    let%bind (_ : Diff_hash.t) =
       Broadcast_pipe.Reader.fold frontier_broadcast_pipe ~init:Diff_hash.empty
         ~f:(fun acc_hash frontier_opt ->
           match frontier_opt with
@@ -117,9 +121,12 @@ module Make (Inputs : Intf.Main_inputs) = struct
         Transition_frontier.Breadcrumb.build ~logger ~parent
           ~transition_with_hash
       with
-      | Ok child_breadcrumb -> child_breadcrumb
-      | Error (`Fatal_error exn) -> log_error () ; raise exn
-      | Error (`Validation_error error) -> log_error () ; Error.raise error
+      | Ok child_breadcrumb ->
+          child_breadcrumb
+      | Error (`Fatal_error exn) ->
+          log_error () ; raise exn
+      | Error (`Validation_error error) ->
+          log_error () ; Error.raise error
     in
     let%map () =
       Transition_frontier.add_breadcrumb_exn transition_frontier
@@ -189,7 +196,8 @@ module Make (Inputs : Intf.Main_inputs) = struct
       List.map child_hashes ~f:(fun child_hash -> (child_hash, breadcrumb))
     in
     let rec dfs = function
-      | [] -> Deferred.unit
+      | [] ->
+          Deferred.unit
       | (state_hash, parent_breadcrumb) :: remaining_jobs ->
           let verified_transition, child_hashes =
             get_verified_transition state_hash
