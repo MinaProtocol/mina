@@ -486,6 +486,49 @@ module Make (Inputs : Inputs_intf) = struct
   let root_length = compose_of_option root_length_opt
 
   let sync_status t =
+    let initial_online_status =
+      ( Broadcast_pipe.Reader.peek @@ Net.online_status t.net
+        :> [`Offline | `Online | `Synced | `Bootstrap] )
+    in
+    let current_status : [`Offline | `Online | `Synced | `Bootstrap] ref =
+      ref initial_online_status
+    in
+    let filter_online_status : [`Offline | `Online] -> bool =
+     fun new_status ->
+      let new_status =
+        (new_status :> [`Offline | `Online | `Synced | `Bootstrap])
+      in
+      let old_status = !current_status in
+      current_status := new_status ;
+      old_status = new_status
+    in
+    let online_status_reader =
+      Broadcast_pipe.Reader.filter (Net.online_status t.net)
+        ~f:filter_online_status
+    in
+    let to_active_status :
+        _ option -> [> `Offline | `Online | `Synced | `Bootstrap] =
+      Option.value_map ~default:`Bootstrap ~f:(Fn.const `Synced)
+    in
+    let active_reader :
+        [`Offline | `Online | `Synced | `Bootstrap] Broadcast_pipe.Reader.t =
+      Broadcast_pipe.Reader.map t.transition_frontier ~f:to_active_status
+    in
+    let merged_reader =
+      Broadcast_pipe.Reader.merge
+        (Non_empty_list.init active_reader [filter_online_status])
+    in
+    Broadcast_pipe.Reader.iter online_status_reader ~f:(fun value ->
+        Broadcast_pipe.Writer.write merged_writer
+          (value :> [`Offline | `Online | `Synced | `Bootstrap]) )
+    |> don't_wait_for ;
+    Broadcast_pipe.Reader.iter active_reader
+      ~f:(Broadcast_pipe.Writer.write merged_writer)
+    |> don't_wait_for ;
+    (* let merged_reader, merged_writer = create init in
+  List.iter readers ~f:(fun reader ->
+      Reader.iter reader ~f:(Writer.write merged_writer) |> don't_wait_for ) ;
+  merged_reader *)
     match Broadcast_pipe.Reader.peek @@ Net.online_status t.net with
     | `Offline -> `Offline
     | `Online ->
