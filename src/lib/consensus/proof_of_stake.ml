@@ -1991,22 +1991,35 @@ let select ~existing ~candidate ~logger =
             << candidate.curr_epoch_data.length )
         , "candidate current epoch is longer than existing last epoch" ) ) ]
   in
-  match
+  let precondition_msg, choice_msg, should_take =
     List.find_map branches
       ~f:(fun ((precondition, precondition_msg), (choice, choice_msg)) ->
-        if Lazy.force precondition then (
-          let choice = if Lazy.force choice then `Take else `Keep in
-          log_choice ~precondition_msg ~choice_msg choice ;
-          Some choice )
-        else None )
-  with
-  | Some choice ->
-      choice
-  | None ->
-      log_result `Keep "no predicates were matched" ;
-      if Length.(candidate.min_length_of_epoch > existing.min_length_of_epoch)
-      then `Take
-      else `Keep
+        Option.some_if (Lazy.force precondition)
+          (precondition_msg, choice_msg, choice) )
+    |> Option.value
+         ~default:
+           ( "default case"
+           , "candidate virtual min-length is longer than existing virtual \
+              min-length"
+           , lazy
+               (let newest_epoch =
+                  Epoch.max existing.curr_epoch candidate.curr_epoch
+                in
+                let virtual_min_length (s : Consensus_state.Value.t) =
+                  if Epoch.(succ s.curr_epoch < newest_epoch) then Length.zero
+                    (* There is a gap of an entire epoch *)
+                  else if Epoch.(succ s.curr_epoch = newest_epoch) then
+                    Length.(min s.min_length_of_epoch s.curr_epoch_data.length)
+                    (* Imagine the latest epoch was padded out with zeroes to reach the newest_epoch *)
+                  else s.min_length_of_epoch
+                in
+                Length.(
+                  virtual_min_length existing < virtual_min_length candidate))
+           )
+  in
+  let choice = if Lazy.force should_take then `Take else `Keep in
+  log_choice ~precondition_msg ~choice_msg choice ;
+  choice
 
 let time_hum (now : Core_kernel.Time.t) =
   let epoch, slot = Epoch.epoch_and_slot_of_time_exn (Time.of_time now) in
