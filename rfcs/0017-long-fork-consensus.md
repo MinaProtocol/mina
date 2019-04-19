@@ -24,22 +24,22 @@ With this feature, clients will be able to join the network from any device at a
 This version of the implementation is correct given that [50% + epsilon] of stake has always been participating and honest. 
 
 * Add a new field to `protocol_state` called `min_epoch`, initally set to `24k`
-* Add a new field to `protocol_state` called `current_epoch`, initially set to 0
+* Add a new field to `protocol_state` called `current_epoch_length`, initially set to 0
 * `let epoch_diff = FLOOR(current_protocol_state.global_slot_number/(24k)) - FLOOR(previous_protocol_state.global_slot_number/(24k))`
 * if `epoch_diff == 0`
-  * set `current_protocol_state.current_epoch` to `previous_protocol_state.current_epoch + 1`
+  * set `current_protocol_state.current_epoch_length` to `previous_protocol_state.current_epoch_length + 1`
 * else if `epoch_diff == 1`
-  * set `current_protocol_state.min_epoch` to `MIN(current_protocol_state.current_epoch, previous_protocol_state.min_epoch)`
-  * set `current_protocol_state.current_epoch` to `1`
+  * set `current_protocol_state.min_epoch` to `MIN(current_protocol_state.current_epoch_length, previous_protocol_state.min_epoch)`
+  * set `current_protocol_state.current_epoch_length` to `1`
 * else
   * set `current_protocol_state.min_epoch` to `0`
-  * set `current_protocol_state.current_epoch` to `1`
+  * set `current_protocol_state.current_epoch_length` to `1`
 
 Add to the chain select(A,B) function:
 
 * If the previous-epoch checkpoint does not match between current and proposed, choose the chain with the greater `min_epoch`. If its a tie choose the already held chain.
 
-The intuition is each `current_epoch` is a sample from a distribution parameterized by the chain's participation. `min-epoch` then will asymptote over time to a low percentile of the distruibution, which will always be large enough to differentiate between the honest chain and an adversary's. 
+The intuition is each `current_epoch_length` is a sample from a distribution parameterized by the chain's participation. `min-epoch` then will asymptote over time to a low percentile of the distruibution, which will always be large enough to differentiate between the honest chain and an adversary's. 
 
 Consider this proof sketch, relying on Ouroboros Genesis. Consider an attacker trying to create a distant fork. Assume they were able to create a long fork with no low participation epochs. If true the same attack would be possible in Ouroboros Genesis. However Ouroboros Genesis showed trying to make a distant fork would create a low participation region immediately after the fork was attempted. Therefore its not possible to create such a fork without a participation epoch significantly lower than the honest chain, and this method of chain selection is secure for distant forks.
 
@@ -50,15 +50,17 @@ If the assumption that [50% + epsilon] of the stake has always been participatin
 
 * define a constant, `min_epochs_length`
 * define a constant, `min_epoch_period`
+* define a constant, `recent_epochs_length` (where `recent_epochs_length*epoch_length = min_epoch_period`)
 * define a constant, `inflation`
 * add the following fields:
   * to each account
     * `vote_hash` initially set to `0`
   * to protocol state
     * `min_epochs`, a ring buffer initially set to `[1]*min_epochs_length`
+    * `recent_epochs`, a ring buffer initially set to `[1]*recent_epochs_length`
     * `tail_min_epoch` initially set to `1`
     * `min_epoch` initially set to `1`
-    * `current_epoch` initially set to `0`
+    * `current_epoch_length` initially set to `0`
   * to ledger state
     * `vote_stake` initially set to `0`
     * `vote_hash` initially set to `0`
@@ -78,22 +80,24 @@ Add to the protocol state update logic:
 
 * `let epoch_diff = FLOOR(current_protocol_state.global_slot_number/(24k)) - FLOOR(previous_protocol_state.global_slot_number/(24k))`
 * if `epoch_diff == 0`
-  * set `current_protocol_state.current_epoch` to `previous_protocol_state.current_epoch + 1`
+  * set `current_protocol_state.current_epoch_length` to `previous_protocol_state.current_epoch_length + 1`
 * if `epoch_diff == 1`
-  * set `current_protocol_state.min_epoch` to `MIN(current_protocol_state.current_epoch, previous_protocol_state.min_epoch)`
-  * set `current_protocol_state.current_epoch` to `1`
+  * set `current_protocol_state.min_epoch` to `MIN(current_protocol_state.current_epoch_length, previous_protocol_state.min_epoch)`
+  * set `current_protocol_state.current_epoch_length` to `1`
+  * push `current_protocol_state.min_epoch` to `current_protocol_state.recent_epochs`
 * else
   * set `current_protocol_state.min_epoch` to `0`
-  * set `current_protocol_state.current_epoch` to `1`
+  * set `current_protocol_state.current_epoch_length` to `1`
+  * push `0, epoch_start_hash` to `current_protocol_state.recent_epochs`
 
 * `let min_epoch_period_diff = FLOOR(current_protocol_state.global_slot_number/min_epoch_period) - FLOOR(previous_protocol_state.global_slot_number/min_epoch_period)`
 * if `min_epoch_period_diff == 0`
   * set most recent `current_protocol_state.min_epochs` to `MIN(most recent current_protocol_state.min_epochs, current_protocol_state.min_epoch)`
 * else if `min_epoch_period_diff == 1`
-  * push `current_protocol_state.min_epoch` to `current_protocol_state.min_epochs`
+  * push `current_protocol_state.min_epoch, epoch_start_hash` to `current_protocol_state.min_epochs`
   * set `current_protocol_state.tail_min_epochs` to `MIN(pop current_protocol_state.min_epochs, current_protocol_state.tail_min_epochs)`
 * else
-  * push `0` to `current_protocol_state.min_epochs`
+  * push `0` to `current_protocol_state.min_epochs, epoch_start_hash`
   * set `current_protocol_state.tail_min_epochs` to `MIN(pop current_protocol_state.min_epochs, current_protocol_state.tail_min_epochs)`
 
 * if the `snarked_ledger` is being updated
@@ -106,14 +110,22 @@ Add to the transaction accepting logic:
 * if in the first 2/3 of an epoch
   * only accept a transaction to the staged ledger if its `transaction.vote_hash` matches the previous epoch locked hash
 
+Add to the transaction submission logic:
+* honest nodes never submit transactions with different `lock_hashes` within an epoch. For each epoch, they do not submit blocks to multiple chains with different `locked_hash`s
+
 Add to the protocol state accepting logic
   * for updates in the first 2/3 slots of the epoch, only accept a new protocol state if all transactions included follow the above transaction accepting logic
 
+Add to the chain selection function:
+* if checkpoints do not match:
+  * find most recent matching hash between `recent_epoch_lengths` and `min_epochs`, take chain with higher participation immediately after that matching hash
+  * if no such matching hash, compare `tail_min_epochs`
+
 Vote triggering
-  * TODO
+  * if an epoch is observed with lower participation than [50% + epsilon], or the most recent `epoch_length` was better than the `min_epoch_length` by some constant (on the order of say, 5%), vote in the next epoch.
 
 Incentives discussion
-  * TODO
+  * By sending transactions / accepting them, Coda holders increase the expected value of their holdings, so are motivated to submit transactions and accept them if a vote was to be triggered
 
 ## Drawbacks
 [drawbacks]: #drawbacks
