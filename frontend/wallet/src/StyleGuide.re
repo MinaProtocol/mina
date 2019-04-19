@@ -10,9 +10,17 @@ module Colors = {
 
   let serpentine = `hex("479056");
 
+  let roseBud = `hex("a3536f");
+
+  let sage = `hex("65906e");
+
   let headerBgColor = `hex("06111bBB");
   let headerGreyText = `hex("516679");
   let textColor = white;
+};
+
+module Typeface = {
+  let lucidaGrande = fontFamily("LucidaGrande");
 };
 
 module CssElectron = {
