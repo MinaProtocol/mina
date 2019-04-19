@@ -205,7 +205,8 @@ module Make (Inputs : Inputs_intf) :
             ~logger:
               (Logger.extend logger
                  [ ( "selection_context"
-                   , "External_transition_validation.validate_frontier" ) ])
+                   , `String "External_transition_validation.validate_frontier"
+                   ) ])
             ~existing:(Protocol_state.consensus_state root_protocol_state)
             ~candidate:(Protocol_state.consensus_state protocol_state) )
         ~error:`Not_selected_over_frontier_root

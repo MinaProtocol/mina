@@ -104,7 +104,8 @@ module Make (Inputs : Inputs_intf) :
     let is_tip_better =
       Consensus.select
         ~logger:
-          (Logger.extend logger [("selection_context", "Root_prover.prove")])
+          (Logger.extend logger
+             [("selection_context", `String "Root_prover.prove")])
         ~existing:(consensus_state best_tip) ~candidate:seen_consensus_state
       = `Keep
     in
@@ -153,7 +154,8 @@ module Make (Inputs : Inputs_intf) :
     let is_before_best_tip candidate =
       Consensus.select
         ~logger:
-          (Logger.extend logger [("selection_context", "Root_prover.verify")])
+          (Logger.extend logger
+             [("selection_context", `String "Root_prover.verify")])
         ~existing:(consensus_state best_tip) ~candidate
       = `Keep
     in

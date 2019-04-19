@@ -152,7 +152,8 @@ end = struct
     = Consensus.select
         ~logger:
           (Logger.extend t.logger
-             [("selection_context", "Bootstrap_controller.worth_getting_root")])
+             [ ( "selection_context"
+               , `String "Bootstrap_controller.worth_getting_root" ) ])
         ~existing:
           ( t.best_seen_transition |> With_hash.data
           |> External_transition.Proof_verified.protocol_state
