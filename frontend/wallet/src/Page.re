@@ -45,11 +45,28 @@ let useRoute = () => {
 let make = (~message) => {
   let (path, settingsOrError, setSettingsOrError) = useRoute();
 
+  let closeModal = () => Router.navigate({path: Home, settingsOrError});
   let modalView =
     switch (path) {
     | None => None
-    | Some(Route.Path.Send) => Some(<Send />)
-    | Some(DeleteWallet) => Some(<Delete />)
+    | Some(Route.Path.Send) =>
+      Some(
+        <Send
+          closeModal
+          myWallets=[
+            {Wallet.key: PublicKey.ofStringExn("BK123123123"), balance: 100},
+            {Wallet.key: PublicKey.ofStringExn("BK8888888"), balance: 783},
+          ]
+          settings={
+            switch (settingsOrError) {
+            | `Settings(settings) => settings
+            | _ => failwith("Bad; we need settings")
+            }
+          }
+        />,
+      )
+    | Some(DeleteWallet) =>
+      Some(<Delete closeModal walletName="Hot Wallet" />)
     | Some(Home) => None
     };
 
@@ -107,9 +124,6 @@ let make = (~message) => {
             <Header />
             <Body message={message ++ ";; " ++ settingsInfo} />
           </div>
-          {testButton("Send", ~f=() =>
-             Router.(navigate({path: Send, settingsOrError}))
-           )}
           {testButton("Delete wallet", ~f=() =>
              Router.(navigate({path: DeleteWallet, settingsOrError}))
            )}
