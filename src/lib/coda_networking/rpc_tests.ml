@@ -4,15 +4,17 @@
    run unit tests here
 *)
 
-let serialization_in_buffer serialization =
-  let len = String.length serialization in
-  let buff = Bin_prot.Common.create_buf len in
-  Bin_prot.Common.blit_string_buf serialization buff ~len ;
-  buff
+let%test_module "RPC deserialization tests" =
+  ( module struct
+    let serialization_in_buffer serialization =
+      let len = String.length serialization in
+      let buff = Bin_prot.Common.create_buf len in
+      Bin_prot.Common.blit_string_buf serialization buff ~len ;
+      buff
 
-(* Get_staged_ledger_aux_and_pending_coinbases_at_hash *)
+    (* Get_staged_ledger_aux_and_pending_coinbases_at_hash *)
 
-(* let%test "Get_staged_ledger_aux_and_pending_coinbases_at_hash V1 \
+    (* let%test "Get_staged_ledger_aux_and_pending_coinbases_at_hash V1 \
                 deserialize query" =
         (* serialization should fail if the query type has changed *)
         let known_good_serialization =
@@ -22,11 +24,11 @@ let serialization_in_buffer serialization =
         let pos_ref = ref 0 in
         let _ : query = V1.bin_read_query buff ~pos_ref in
         true
-*)
+    *)
 
-(* Answer_sync_ledger_query *)
+    (* Answer_sync_ledger_query *)
 
-(*
+    (*
   let%test "Answer_sync_ledger_query V1 deserialize response" =
   (* serialization should fail if the response type has changed *)
   let known_good_serialization = "\x00\x01\x02\x12\x01\x28\xC7\xBC\x6A\x07\xC9\x22\x93\xFD\xA4\x57\x7D\xE2\xF0\x3E\xDC\xB4\x56\x6A\xCB\xF8\x6E\x94\xCD\xC2\x61\x72\x9A\xA5\x8E\xAD\x5D\xFD\x00\x00\x00\x00\x00\x00\x00\x00" in
@@ -34,8 +36,9 @@ let serialization_in_buffer serialization =
   let pos_ref = ref 0 in
   let _ : response = V1.bin_read_response buff ~pos_ref in
   true
- *)
+    *)
 
-(* Get_ancestry *)
+    (* Get_ancestry *)
 
-(* Message *)
+    (* Message *)
+  end )
