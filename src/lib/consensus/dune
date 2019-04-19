@@ -21,5 +21,5 @@
     module_version
     yojson)
    (preprocessor_deps "../../config.mlh")
-   (preprocess (pps ppx_base ppx_coda ppx_let ppx_assert ppx_deriving.std ppx_deriving_yojson ppx_sexp_conv ppx_bin_prot ppx_custom_printf ppx_inline_test ppx_optcomp ppx_snarky ppx_deriving_yojson bppx_fields_conv isect_ppx -conditional))
+   (preprocess (pps ppx_base ppx_coda ppx_let ppx_assert ppx_deriving.std ppx_deriving_yojson ppx_sexp_conv ppx_bin_prot ppx_custom_printf ppx_inline_test ppx_optcomp ppx_snarky ppx_deriving_yojson ppx_fields_conv bisect_ppx -conditional))
    (synopsis "Consensus mechanisms"))
