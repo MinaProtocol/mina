@@ -51,16 +51,28 @@ If the assumption that [50% + epsilon] of the stake has always been participatin
 * define a constant, `min_epochs_length`
 * define a constant, `min_epoch_period`
 * define a constant, `inflation`
-* add a new field to each account called `vote_hash`, initially set to `0`
-* add a ring buffer to protocol state called `min_epochs` initially set to `[1]*min_epochs_length`
-* add a new field to `protocol_state` called `tail_min_epoch` initially set to `1`
-* add a new field to `protocol_state` called `min_epoch` initially set to `1`
-* add a new field to `protocol_state` called `current_epoch` initially set to `0`
-* add a new field to the staged ledger called `vote_stake` initially set to `0`
-* add a new field to the staged ledger called `vote_hash` initially set to `0`
+* add the following fields:
+  * to each account
+    * `vote_hash` initially set to `0`
+  * to protocol state
+    * `min_epochs`, a ring buffer initially set to `[1]*min_epochs_length`
+    * `tail_min_epoch` initially set to `1`
+    * `min_epoch` initially set to `1`
+    * `current_epoch` initially set to `0`
+  * to ledger state
+    * `vote_stake` initially set to `0`
+    * `vote_hash` initially set to `0`
+  * to transactions
+    * `vote_hash`
 
 Add to transaction application logic:
-* TODO
+```
+if transaction.vote_hash == staged_ledger.vote_hash
+  staged_leger_.vote_stake += get_ledger_of_hash(staged_ledger.vote_hash).stake_of(transaction.public_key)
+else
+  staged_leger_.vote_stake = 0
+  staged_ledger.vote_hash = transaction.vote_hash
+```
 
 Add to the protocol state update logic:
 
@@ -85,15 +97,23 @@ Add to the protocol state update logic:
   * set `current_protocol_state.tail_min_epochs` to `MIN(pop current_protocol_state.min_epochs, current_protocol_state.tail_min_epochs)`
 
 * if the `snarked_ledger` is being updated
-  * set `current_protocol_state.min_epoch` to `MAX(current_protocol_state.min_epoch, new_snarked_ledger.voted_stake/staged_ledger.total_stake)`
+  * `if new_snarked_ledger.vote_hash == new_protocol_state.last_epoch_locked_checkpoint`
+    * set `current_protocol_state.min_epoch` to `MAX(current_protocol_state.min_epoch, new_snarked_ledger.voted_stake/staged_ledger.total_stake)`
 * else
   * do nothing
 
 Add to the transaction accepting logic:
-* TODO
+* if in the first 2/3 of an epoch
+  * only accept a transaction to the staged ledger if its `transaction.vote_hash` matches the previous epoch locked hash
 
-TODO vote triggering
+Add to the protocol state accepting logic
+  * for updates in the first 2/3 slots of the epoch, only accept a new protocol state if all transactions included follow the above transaction accepting logic
+
+Vote triggering
+  * TODO
+
 Incentives discussion
+  * TODO
 
 ## Drawbacks
 [drawbacks]: #drawbacks
