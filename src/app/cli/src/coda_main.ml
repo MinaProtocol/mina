@@ -66,6 +66,8 @@ module Frozen_ledger_hash = struct
   let of_ledger_hash = Frozen_ledger_hash.of_ledger_hash
 end
 
+module Incr_status = Incremental.Make ()
+
 module type Ledger_proof_verifier_intf = sig
   val verify :
        Ledger_proof.t
@@ -187,6 +189,8 @@ module type Main_intf = sig
         with type gossip_config := Gossip_net.Config.t
          and type time_controller := Time.Controller.t
     end
+
+    module Incr_status : Incremental.S
 
     module Sparse_ledger : sig
       type t
@@ -360,7 +364,8 @@ module type Main_intf = sig
   val best_tip :
     t -> Inputs.Transition_frontier.Breadcrumb.t Participating_state.t
 
-  val sync_status : t -> [`Offline | `Synced | `Bootstrap]
+  val sync_status :
+    t -> [`Offline | `Synced | `Bootstrap] Inputs.Incr_status.Observer.t
 
   val visualize_frontier : filename:string -> t -> unit Participating_state.t
 
@@ -829,6 +834,7 @@ struct
   end
 
   module Root_sync_ledger = Sync_ledger.Db
+  module Incr_status = Incr_status
 
   module Net = Coda_networking.Make (struct
     include Inputs0
@@ -1123,12 +1129,39 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
         io_field "sync_status" ~typ:sync_status
           ~args:Arg.[]
           ~resolve:(fun {ctx= coda; _} () ->
-            Deferred.Result.return (Program.sync_status coda) )
+            Deferred.return
+              (Inputs.Incr_status.Observer.value @@ Program.sync_status coda)
+            >>| Result.map_error ~f:Error.to_string_hum )
 
       let commands = [sync_state]
     end
 
-    let schema = Graphql_async.Schema.(schema Queries.commands)
+    module Subscriptions = struct
+      let to_pipe observer =
+        let reader, writer = Async.Pipe.create () in
+        Incr_status.Observer.on_update_exn observer ~f:(function
+          | Initialized value ->
+              Async.Pipe.write_without_pushback writer value
+          | Changed (_, value) ->
+              Async.Pipe.write_without_pushback writer value
+          | Invalidated ->
+              () ) ;
+        reader
+
+      let new_sync_update =
+        subscription_field "new_sync_update"
+          ~doc:"Subscripts on sync update from Coda" ~deprecated:NotDeprecated
+          ~typ:Types.sync_status
+          ~args:Arg.[]
+          ~resolve:(fun {ctx= coda; _} ->
+            Program.sync_status coda |> to_pipe |> Deferred.Result.return )
+
+      let commands = [new_sync_update]
+    end
+
+    let schema =
+      Graphql_async.Schema.(
+        schema Queries.commands ~subscriptions:Subscriptions.commands)
   end
 
   module For_tests = struct
@@ -1394,7 +1427,8 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
         Length.to_int @@ Consensus.Consensus_state.length consensus_state
       in
       let%bind sync_status =
-        match sync_status t with
+        Incr_status.stabilize () ;
+        match Incr_status.Observer.value_exn @@ sync_status t with
         | `Bootstrap ->
             `Bootstrapping
         | `Offline ->
