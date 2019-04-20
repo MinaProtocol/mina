@@ -24,7 +24,7 @@ let main n () =
       ~f:Genesis_ledger.keypair_of_account_record_exn
   in
   Coda_worker_testnet.Payments.send_several_payments testnet ~node:0 ~keypairs
-    ~n:25
+    ~n:10
   |> don't_wait_for ;
   (* RESTART NODES *)
   (* catchup *)
