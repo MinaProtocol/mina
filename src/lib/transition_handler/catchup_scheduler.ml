@@ -167,7 +167,9 @@ module Make (Inputs : Inputs.S) = struct
             "timed out waiting for the parent of $cached_transition after \
              $duration ms, signalling a catchup job" ;
           (* it's ok to create a new thread here because the thread essentially does no work *)
-          don't_wait_for (Writer.write t.catchup_job_writer forest) )
+          don't_wait_for
+            ( if Writer.is_closed t.catchup_job_writer then Deferred.unit
+            else Writer.write t.catchup_job_writer forest ) )
     in
     match Hashtbl.find t.collected_transitions parent_hash with
     | None ->
