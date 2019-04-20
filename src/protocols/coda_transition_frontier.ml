@@ -574,6 +574,7 @@ module type Transition_handler_processor_intf = sig
                                   , state_hash )
                                   With_hash.t
                                   Strict_pipe.Reader.t
+    -> clean_up_catchup_scheduler:unit Ivar.t
     -> catchup_job_writer:( state_hash
                             * ( ( external_transition_verified
                                 , state_hash )
