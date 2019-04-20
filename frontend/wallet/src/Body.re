@@ -68,16 +68,16 @@ let make = (~message, ~settingsOrError, ~setSettingsOrError) =>
       <div
         className=Css.(style([width(`percent(100.)), margin(`rem(1.25))]))>
         <TestQuery>
-          {(
-             result =>
-               ReasonReact.string(
-                 switch (result) {
-                 | Loading => ""
-                 | Error(error) => error##message
-                 | Data(response) => response##version
-                 },
-               )
-           )}
+          (
+            result =>
+              ReasonReact.string(
+                switch (result) {
+                | Loading => ""
+                | Error(error) => error##message
+                | Data(response) => response##version
+                },
+              )
+          )
         </TestQuery>
         <HooksTest name="test-hooks" />
         <p> {ReasonReact.string(message)} </p>
