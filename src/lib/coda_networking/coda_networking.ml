@@ -438,6 +438,7 @@ module Make (Inputs : Inputs_intf) = struct
   type t =
     { gossip_net: Gossip_net.t
     ; logger: Logger.t
+    ; trust_system: Trust_system.t
     ; states:
         (External_transition.t Envelope.Incoming.t * Time.t)
         Strict_pipe.Reader.t
@@ -552,6 +553,7 @@ module Make (Inputs : Inputs_intf) = struct
     in
     { gossip_net
     ; logger= config.logger
+    ; trust_system= config.gossip_net_params.trust_system
     ; states
     ; snark_pool_diffs= Strict_pipe.Reader.to_linear_pipe snark_pool_diffs
     ; transaction_pool_diffs=
@@ -661,13 +663,19 @@ module Make (Inputs : Inputs_intf) = struct
     | Ok (Some data) ->
         return (Ok data)
     | Ok None ->
-        Logger.faulty_peer t.logger ~module_:__MODULE__ ~location:__LOC__
-          !"get no response from %{sexp: Peer.t}"
-          peer ;
+        let%bind () =
+          Trust_system.(
+            record t.trust_system t.logger peer.host
+              Actions.
+                ( Violated_protocol
+                , Some
+                    ( "When querying preferred peer $peer, got no response"
+                    , [("peer", Peer.to_yojson peer)] ) ))
+        in
         let peers = get_random_peers () in
         try_non_preferred_peers t envelope peers ~rpc
     | Error _ ->
-        Logger.faulty_peer t.logger ~module_:__MODULE__ ~location:__LOC__
+        Logger.error t.logger ~module_:__MODULE__ ~location:__LOC__
           !"get error from %{sexp: Peer.t}"
           peer ;
         let peers = get_random_peers () in
