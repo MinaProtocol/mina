@@ -36,6 +36,14 @@ module type S = sig
      and type staged_ledger := Staged_ledger.t
      and type time := Block_time.t0
 
+  module Breadcrumb_builder :
+    Breadcrumb_builder_intf
+    with type state_hash := State_hash.t
+     and type external_transition_verified := External_transition.Verified.t
+     and type transition_frontier := Transition_frontier.t
+     and type transition_frontier_breadcrumb :=
+                Transition_frontier.Breadcrumb.t
+
   module Network :
     Network_intf
     with type peer := Network_peer.Peer.t

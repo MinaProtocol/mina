@@ -79,6 +79,7 @@ let%test_module "Transition_handler.Catchup_scheduler tests" =
           let scheduler =
             Catchup_scheduler.create ~logger ~frontier ~time_controller
               ~catchup_job_writer ~catchup_breadcrumbs_writer
+              ~clean_up_signal:(Ivar.create ())
           in
           let randomly_chosen_breadcrumb =
             Transition_frontier.all_breadcrumbs frontier
@@ -111,18 +112,10 @@ let%test_module "Transition_handler.Catchup_scheduler tests" =
           Strict_pipe.Reader.iter_without_pushback catchup_job_reader
             ~f:(Ivar.fill result_ivar)
           |> don't_wait_for ;
-          let%map cached_catchup_transition =
-            match%map Ivar.read result_ivar with
-            | Rose_tree.T (t, []) ->
-                t
-            | _ ->
-                failwith "unexpected rose tree result"
+          let%map catchup_parent_hash =
+            match%map Ivar.read result_ivar with hash, _ -> hash
           in
-          let catchup_parent_hash =
-            Cached.peek cached_catchup_transition
-            |> Envelope.Incoming.data |> With_hash.data
-            |> External_transition.Verified.parent_hash
-          in
+          assert (Catchup_scheduler.is_empty scheduler) ;
           assert (Coda_base.State_hash.equal missing_hash catchup_parent_hash) ;
           Strict_pipe.Writer.close catchup_breadcrumbs_writer ;
           Strict_pipe.Writer.close catchup_job_writer )
@@ -145,6 +138,7 @@ let%test_module "Transition_handler.Catchup_scheduler tests" =
           let scheduler =
             Catchup_scheduler.create ~logger ~frontier ~time_controller
               ~catchup_job_writer ~catchup_breadcrumbs_writer
+              ~clean_up_signal:(Ivar.create ())
           in
           let randomly_chosen_breadcrumb =
             Transition_frontier.all_breadcrumbs frontier
@@ -167,11 +161,10 @@ let%test_module "Transition_handler.Catchup_scheduler tests" =
           let cached_dangling_transitions =
             List.map dangling_transitions
               ~f:
-                (Fn.compose Or_error.ok_exn
-                   (Fn.compose
-                      (Unprocessed_transition_cache.register
-                         unprocessed_transition_cache)
-                      transition_with_hash_enveloped))
+                (Fn.compose
+                   (Unprocessed_transition_cache.register_exn
+                      unprocessed_transition_cache)
+                   transition_with_hash_enveloped)
           in
           List.(
             iter (rev cached_dangling_transitions) ~f:(fun cached_transition ->
@@ -190,17 +183,16 @@ let%test_module "Transition_handler.Catchup_scheduler tests" =
           let%map cached_received_rose_tree =
             extract_children_from ~reader:catchup_breadcrumbs_reader
               ~root:
-                ( Unprocessed_transition_cache.register
+                ( Unprocessed_transition_cache.register_exn
                     unprocessed_transition_cache
                     ( Transition_frontier.Breadcrumb.transition_with_hash
                         missing_breadcrumb
                     |> transition_with_hash_enveloped )
-                |> Or_error.ok_exn
                 |> Cached.transform ~f:(Fn.const missing_breadcrumb) )
           in
           let received_rose_tree =
             Rose_tree.map cached_received_rose_tree
-              ~f:(Fn.compose Or_error.ok_exn Cached.invalidate)
+              ~f:Cached.invalidate_with_success
           in
           assert (
             List.equal Transition_frontier.Breadcrumb.equal
@@ -227,6 +219,7 @@ let%test_module "Transition_handler.Catchup_scheduler tests" =
           let scheduler =
             Catchup_scheduler.create ~logger ~frontier ~time_controller
               ~catchup_job_writer ~catchup_breadcrumbs_writer
+              ~clean_up_signal:(Ivar.create ())
           in
           let randomly_chosen_breadcrumb =
             Transition_frontier.all_breadcrumbs frontier
@@ -249,11 +242,10 @@ let%test_module "Transition_handler.Catchup_scheduler tests" =
           let cached_dangling_transitions =
             List.map dangling_transitions
               ~f:
-                (Fn.compose Or_error.ok_exn
-                   (Fn.compose
-                      (Unprocessed_transition_cache.register
-                         unprocessed_transition_cache)
-                      transition_with_hash_enveloped))
+                (Fn.compose
+                   (Unprocessed_transition_cache.register_exn
+                      unprocessed_transition_cache)
+                   transition_with_hash_enveloped)
           in
           List.iter (List.permute cached_dangling_transitions)
             ~f:(fun cached_transition ->
@@ -270,17 +262,16 @@ let%test_module "Transition_handler.Catchup_scheduler tests" =
           let%map cached_received_rose_tree =
             extract_children_from ~reader:catchup_breadcrumbs_reader
               ~root:
-                ( Unprocessed_transition_cache.register
+                ( Unprocessed_transition_cache.register_exn
                     unprocessed_transition_cache
                     ( Transition_frontier.Breadcrumb.transition_with_hash
                         missing_breadcrumb
                     |> transition_with_hash_enveloped )
-                |> Or_error.ok_exn
                 |> Cached.transform ~f:(Fn.const missing_breadcrumb) )
           in
           let received_rose_tree =
             Rose_tree.map cached_received_rose_tree
-              ~f:(Fn.compose Or_error.ok_exn Cached.invalidate)
+              ~f:Cached.invalidate_with_success
           in
           assert (
             Rose_tree.equiv received_rose_tree upcoming_rose_tree

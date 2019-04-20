@@ -15,14 +15,25 @@ include Single.Make({
           switch (settingsOrError) {
           | `Settings(settings) =>
             let task = SettingsMain.add(settings, ~key, ~name);
-            Task.attempt(
-              task,
-              ~f=_res => {
-                Js.log2("Settings updated", settings);
-                send(t, `Respond(pendingIdent));
-              },
+            Task.attempt(task, ~f=_res =>
+              send(
+                t,
+                `Respond_new_settings((
+                  pendingIdent,
+                  Js.Json.stringify(
+                    Route.SettingsOrError.Encode.t(`Settings(settings)),
+                  ),
+                )),
+              )
             );
-          | _ => send(t, `Respond(pendingIdent))
+          | e =>
+            send(
+              t,
+              `Respond_new_settings((
+                pendingIdent,
+                Js.Json.stringify(Route.SettingsOrError.Encode.t(e)),
+              )),
+            )
           }
         };
     RendererCommunication.on(cb);
