@@ -202,7 +202,7 @@ module type Transaction_witness_intf = sig
 end
 
 module type Protocol_state_hash_intf = sig
-  type t [@@deriving bin_io, sexp, eq]
+  type t [@@deriving bin_io, sexp, eq, to_yojson]
 
   include Hashable.S_binable with type t := t
 end

@@ -415,10 +415,16 @@ module Make (Inputs : Inputs_intf) :
                           { With_hash.hash= Protocol_state.hash protocol_state
                           ; data= external_transition }
                         in
+                        let metadata =
+                          [ ( "state_hash"
+                            , Protocol_state_hash.to_yojson
+                                external_transition_with_hash.hash ) ]
+                        in
                         Logger.info logger ~module_:__MODULE__
                           ~location:__LOC__
                           !"Submitting transition to the transition frontier \
-                            controller" ;
+                            controller"
+                          ~metadata ;
                         let%bind () =
                           Strict_pipe.Writer.write transition_writer
                             external_transition_with_hash
@@ -433,13 +439,17 @@ module Make (Inputs : Inputs_intf) :
                               (Fn.const `Transition_accepted)
                           ; Deferred.choice
                               ( Time.Timeout.create time_controller
-                                  (Time.Span.of_ms 15000L) ~f:(Fn.const ())
+                                  (* We allow up to 15 seconds for the transition to make its way from the transition_writer to the frontier.
+                                     This value is chosen to be reasonably generous. In theory, this should not take terribly long. But long
+                                     cycles do happen in our system, and with medium curves those long cycles can be substantial. *)
+                                  (Time.Span.of_ms 15000L)
+                                  ~f:(Fn.const ())
                               |> Time.Timeout.to_deferred )
                               (Fn.const `Timed_out) ]
                         >>| function
                         | `Transition_accepted ->
                             Logger.info logger ~module_:__MODULE__
-                              ~location:__LOC__
+                              ~location:__LOC__ ~metadata
                               "Generated transition was accepted into \
                                transition frontier"
                         | `Timed_out ->
@@ -448,7 +458,7 @@ module Make (Inputs : Inputs_intf) :
                                transition frontier"
                             in
                             Logger.fatal logger ~module_:__MODULE__
-                              ~location:__LOC__ "%s" str ;
+                              ~location:__LOC__ ~metadata "%s" str ;
                             Error.raise (Error.of_string str) )) )
         in
         let proposal_supervisor = Singleton_supervisor.create ~task:propose in

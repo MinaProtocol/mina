@@ -50,7 +50,7 @@ module Make (Inputs : Inputs.With_unprocessed_transition_cache.S) :
         = Consensus.select
             ~logger:
               (Logger.extend logger
-                 [("selection context", `String "Transition_handler.Validator")])
+                 [("selection_context", `String "Transition_handler.Validator")])
             ~existing:(consensus_state root_protocol_state)
             ~candidate:(consensus_state protocol_state) )
         ~error:
