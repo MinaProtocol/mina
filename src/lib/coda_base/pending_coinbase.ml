@@ -881,7 +881,7 @@ let%test_unit "push and pop multiple stacks" =
     let popped_stack, updated_pending_coinbases =
       remove_coinbase_stack t |> Or_error.ok_exn
     in
-    assert (popped_stack = expected_stack) ;
+    assert (Stack.equal popped_stack expected_stack) ;
     updated_pending_coinbases
   in
   let add_remove_check trials =
