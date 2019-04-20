@@ -668,13 +668,12 @@ module Make (Inputs : Inputs_intf) = struct
             record t.trust_system t.logger peer.host
               Actions.
                 ( Violated_protocol
-                , Some
-                    ( "When querying preferred peer $peer, got no response"
-                    , [("peer", Peer.to_yojson peer)] ) ))
+                , Some ("When querying preferred peer, got no response", []) ))
         in
         let peers = get_random_peers () in
         try_non_preferred_peers t envelope peers ~rpc
     | Error _ ->
+        (* TODO: determine what punishments apply here *)
         Logger.error t.logger ~module_:__MODULE__ ~location:__LOC__
           !"get error from %{sexp: Peer.t}"
           peer ;
