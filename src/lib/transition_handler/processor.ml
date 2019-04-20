@@ -29,7 +29,9 @@ module Make (Inputs : Inputs.With_unprocessed_transition_cache.S) :
   module Catchup_scheduler = Catchup_scheduler.Make (Inputs)
 
   (* TODO: calculate a sensible value from postake consensus arguments *)
-  let catchup_timeout_duration = Time.Span.of_ms 6000L
+  let catchup_timeout_duration =
+    Time.Span.of_ms
+      (Consensus.Constants.block_window_duration_ms * 2 |> Int64.of_int)
 
   let run ~logger ~time_controller ~frontier
       ~(primary_transition_reader :
@@ -40,6 +42,7 @@ module Make (Inputs : Inputs.With_unprocessed_transition_cache.S) :
          Reader.t)
       ~(proposer_transition_reader :
          (External_transition.Verified.t, State_hash.t) With_hash.t Reader.t)
+      ~(clean_up_catchup_scheduler : unit Ivar.t)
       ~(catchup_job_writer :
          ( State_hash.t
            * ( (External_transition.Verified.t, State_hash.t) With_hash.t
@@ -64,6 +67,7 @@ module Make (Inputs : Inputs.With_unprocessed_transition_cache.S) :
     let catchup_scheduler =
       Catchup_scheduler.create ~logger ~frontier ~time_controller
         ~catchup_job_writer ~catchup_breadcrumbs_writer
+        ~clean_up_signal:clean_up_catchup_scheduler
     in
     (* add a breadcrumb and perform post processing *)
     let add_and_finalize ~only_if_present cached_breadcrumb =
