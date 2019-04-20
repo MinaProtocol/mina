@@ -867,9 +867,9 @@ let%test_unit "push and pop multiple stacks" =
         in
         (new_stack, updated)
   in
-  (*fill upto n stacks*)
-  let fill trials =
-    iter ~trials coinbases_gen ~f:(fun coinbases ->
+  (*fill up to n stacks*)
+  let fill n =
+    iter ~trials:n coinbases_gen ~f:(fun coinbases ->
         let new_stack, updated_pending_coinbases =
           add_new_stack !pending_coinbases coinbases
         in
