@@ -104,22 +104,14 @@ module State = {
 };
 
 let useReducerWithDispatch = (reduceWithDispatch, initialState) => {
-  let dispatchSelf = ref(None);
+  let dispatchSelf = ref(ignore);
   let (state, dispatch) =
     React.useReducer(
       (state, action) =>
-        reduceWithDispatch(
-          action =>
-            switch (dispatchSelf^) {
-            | None => failwith("Don't call inner dispatch synchronously!")
-            | Some(dispatch) => dispatch(action)
-            },
-          state,
-          action,
-        ),
+        reduceWithDispatch(action => dispatchSelf^(action), state, action),
       initialState,
     );
-  dispatchSelf := Some(dispatch);
+  dispatchSelf := dispatch;
   (state, dispatch);
 };
 
