@@ -115,12 +115,13 @@ module Make (Inputs : Inputs_intf) :
     Strict_pipe.Reader.iter_without_pushback valid_transition_reader
       ~f:(Strict_pipe.Writer.write primary_transition_writer)
     |> don't_wait_for ;
+    let clean_up_catchup_scheduler = Ivar.create () in
     Transition_handler.Processor.run ~logger ~time_controller ~frontier
       ~primary_transition_reader
       ~proposer_transition_reader:proposer_transition_reader_copy
-      ~catchup_job_writer ~catchup_breadcrumbs_reader
-      ~catchup_breadcrumbs_writer ~processed_transition_writer
-      ~unprocessed_transition_cache ;
+      ~clean_up_catchup_scheduler ~catchup_job_writer
+      ~catchup_breadcrumbs_reader ~catchup_breadcrumbs_writer
+      ~processed_transition_writer ~unprocessed_transition_cache ;
     Catchup.run ~logger ~network ~frontier ~catchup_job_reader
       ~catchup_breadcrumbs_writer ~unprocessed_transition_cache ;
     Strict_pipe.Reader.iter_without_pushback clear_reader ~f:(fun _ ->
@@ -129,7 +130,8 @@ module Make (Inputs : Inputs_intf) :
         kill processed_transition_reader processed_transition_writer ;
         kill catchup_job_reader catchup_job_writer ;
         kill catchup_breadcrumbs_reader catchup_breadcrumbs_writer ;
-        kill proposer_transition_reader_copy proposer_transition_writer_copy )
+        kill proposer_transition_reader_copy proposer_transition_writer_copy ;
+        Ivar.fill clean_up_catchup_scheduler () )
     |> don't_wait_for ;
     processed_transition_reader
 end

@@ -15,7 +15,7 @@ Coda, this is the right file!
 Building Coda can be slightly involved. There are many C library dependencies that need
 to be present in the system, as well as some OCaml-specific setup.
 
-Currently, Coda only builds/runs on Linux. Building on macOS [is tracked in this issue](https://github.com/CodaProtocol/coda/issues/962).
+Currently, Coda builds/runs on Linux & macOS. MacOS may have some issues that you can track [here](https://github.com/CodaProtocol/coda/issues/962).
 
 The short version:
 
