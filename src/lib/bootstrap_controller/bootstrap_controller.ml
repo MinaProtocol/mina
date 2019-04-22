@@ -97,6 +97,7 @@ module Make (Inputs : Inputs_intf) : sig
 
     val make_bootstrap :
          logger:Logger.t
+      -> trust_system:Trust_system.t
       -> genesis_root:Inputs.External_transition.Proof_verified.t
       -> network:Inputs.Network.t
       -> t
@@ -139,6 +140,7 @@ end = struct
 
   type t =
     { logger: Logger.t
+    ; trust_system: Trust_system.t
     ; mutable best_seen_transition:
         (External_transition.Proof_verified.t, State_hash.t) With_hash.t
     ; mutable current_root:
@@ -160,9 +162,14 @@ end = struct
           |> Consensus.Protocol_state.consensus_state )
         ~candidate
 
-  let received_bad_proof t e =
-    (* TODO: Punish *)
-    Logger.faulty_peer t.logger !"Bad ancestor proof: %{sexp:Error.t}" e
+  let received_bad_proof t sender_host e =
+    Trust_system.(
+      record t.trust_system t.logger sender_host
+        Actions.
+          ( Violated_protocol
+          , Some
+              ( "Bad ancestor proof: $error"
+              , [("error", `String (Error.to_string_hum e))] ) ))
 
   let done_syncing_root root_sync_ledger =
     Option.is_some (Root_sync_ledger.peek_valid_tree root_sync_ledger)
@@ -186,11 +193,19 @@ end = struct
                !"Could not get the proof of root from the network: %s"
                (Error.to_string_hum e)
       | Ok peer_root_with_proof -> (
-          match%map
+          match%bind
             Root_prover.verify ~logger:t.logger ~observed_state:candidate_state
               ~peer_root:peer_root_with_proof
           with
           | Ok (peer_root, peer_best_tip) -> (
+              let%bind () =
+                Trust_system.(
+                  record t.trust_system t.logger sender.host
+                    Actions.
+                      ( Fulfilled_request
+                      , Some ("Received verified peer root and best tip", [])
+                      ))
+              in
               t.best_seen_transition <- peer_best_tip ;
               t.current_root <- peer_root ;
               let blockchain_state =
@@ -209,6 +224,8 @@ end = struct
                 |> External_transition.Protocol_state.Blockchain_state
                    .snarked_ledger_hash
               in
+              return
+              @@
               match
                 Root_sync_ledger.new_goal root_sync_ledger
                   (Frozen_ledger_hash.to_ledger_hash snarked_ledger_hash)
@@ -226,7 +243,8 @@ end = struct
               | `Repeat ->
                   `Ignored )
           | Error e ->
-              received_bad_proof t e |> Fn.const `Ignored )
+              return (received_bad_proof t sender.host e |> Fn.const `Ignored)
+          )
 
   let sync_ledger t ~root_sync_ledger ~transition_graph ~transition_reader =
     let query_reader = Root_sync_ledger.query_reader root_sync_ledger in
@@ -278,6 +296,7 @@ end = struct
     let t =
       { network
       ; logger
+      ; trust_system
       ; best_seen_transition= initial_root_transition
       ; current_root= initial_root_transition }
     in
@@ -323,11 +342,25 @@ end = struct
         ~expected_merkle_root ~pending_coinbases
     with
     | Error err ->
-        Logger.faulty_peer logger ~module_:__MODULE__ ~location:__LOC__
-          "can't find scan state from the peer or received faulty scan state \
-           from the peer." ;
+        let%bind () =
+          Trust_system.(
+            record t.trust_system t.logger sender.host
+              Actions.
+                ( Violated_protocol
+                , Some
+                    ( "Can't find scan state from the peer or received faulty \
+                       scan state from the peer."
+                    , [] ) ))
+        in
         Error.raise err
     | Ok root_staged_ledger ->
+        let%bind () =
+          Trust_system.(
+            record t.trust_system t.logger sender.host
+              Actions.
+                ( Fulfilled_request
+                , Some ("Received valid scan state from peer", []) ))
+        in
         let new_root =
           With_hash.map t.current_root ~f:(fun root ->
               (* Need to coerce new_root from a proof_verified transition to a
@@ -355,9 +388,10 @@ end = struct
       Fn.compose Consensus.Protocol_state.hash
         External_transition.Proof_verified.protocol_state
 
-    let make_bootstrap ~logger ~genesis_root ~network =
+    let make_bootstrap ~logger ~trust_system ~genesis_root ~network =
       let transition = With_hash.of_data genesis_root ~hash_data in
       { logger
+      ; trust_system
       ; best_seen_transition= transition
       ; current_root= transition
       ; network }
