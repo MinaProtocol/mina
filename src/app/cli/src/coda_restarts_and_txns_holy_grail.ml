@@ -23,6 +23,7 @@ let main n () =
     List.map Genesis_ledger.accounts
       ~f:Genesis_ledger.keypair_of_account_record_exn
   in
+  let random_node () = Random.int (n - 1) + 1 in
   Coda_worker_testnet.Payments.send_several_payments testnet ~node:0 ~keypairs
     ~n:10
   |> don't_wait_for ;
@@ -31,19 +32,19 @@ let main n () =
   let%bind () = after (Time.Span.of_min 1.) in
   let%bind () =
     Coda_worker_testnet.Restarts.trigger_catchup testnet ~logger
-      ~node:(Random.int 4 + 1)
+      ~node:(random_node ())
   in
   let%bind () = after (Time.Span.of_min 1.) in
   (* bootstrap *)
   let%bind () =
     Coda_worker_testnet.Restarts.trigger_bootstrap testnet ~logger
-      ~node:(Random.int 4 + 1)
+      ~node:(random_node ())
   in
   (* random restart *)
   let%bind () = after (Time.Span.of_min 1.) in
   let%bind () =
     Coda_worker_testnet.Restarts.restart_node testnet ~logger
-      ~node:(Random.int 4 + 1)
+      ~node:(random_node ())
       ~duration:(Time.Span.of_min (Random.float 5.))
   in
   (* settle for a few more min *)

@@ -208,8 +208,11 @@ module Make (Inputs : Inputs.S) :
         | Ok trees ->
             Logger.trace logger ~module_:__MODULE__ ~location:__LOC__
               "about to write to the catchup breadcrumbs pipe" ;
-            if Strict_pipe.Writer.is_closed catchup_breadcrumbs_writer then
-              Deferred.unit
+            if Strict_pipe.Writer.is_closed catchup_breadcrumbs_writer then (
+              Logger.trace logger ~module_:__MODULE__ ~location:__LOC__
+                "catchup breadcrumbs pipe was closed; attempt to write to \
+                 closed pipe" ;
+              Deferred.unit )
             else Strict_pipe.Writer.write catchup_breadcrumbs_writer trees
         | Error e ->
             Logger.info logger ~module_:__MODULE__ ~location:__LOC__

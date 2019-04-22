@@ -174,7 +174,10 @@ module Make (Inputs : Inputs.S) = struct
              $duration ms, signalling a catchup job" ;
           (* it's ok to create a new thread here because the thread essentially does no work *)
           don't_wait_for
-            ( if Writer.is_closed t.catchup_job_writer then Deferred.unit
+            ( if Writer.is_closed t.catchup_job_writer then (
+              Logger.trace t.logger ~module_:__MODULE__ ~location:__LOC__
+                "catchup job pipe was closed; attempt to write to closed pipe" ;
+              Deferred.unit )
             else Writer.write t.catchup_job_writer forest ) )
     in
     match Hashtbl.find t.collected_transitions parent_hash with
