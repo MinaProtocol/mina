@@ -5,11 +5,9 @@ open Signature_lib
 open Coda_numbers
 open Coda_base
 open O1trace
-
 module Graphql_cohttp_async =
   Graphql_cohttp.Make (Graphql_async.Schema) (Cohttp_async.Io)
     (Cohttp_async.Body)
-
 
 module Make (Config_in : Coda_main.Config_intf) (Program : Coda_main.Main_intf) =
 struct
