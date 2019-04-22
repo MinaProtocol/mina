@@ -194,6 +194,13 @@ end = struct
               ~peer_root:peer_root_with_proof
           with
           | Ok (peer_root, peer_best_tip) -> (
+              ignore
+                Trust_system.(
+                  record t.trust_system t.logger sender.host
+                    Actions.
+                      ( Fulfilled_request
+                      , Some ("Received verified peer root and best tip", [])
+                      )) ;
               t.best_seen_transition <- peer_best_tip ;
               t.current_root <- peer_root ;
               let blockchain_state =
