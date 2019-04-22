@@ -47,7 +47,10 @@ module Make (Inputs : Inputs.With_unprocessed_transition_cache.S) :
     let%map () =
       Result.ok_if_true
         ( `Take
-        = Consensus.select ~logger
+        = Consensus.select
+            ~logger:
+              (Logger.extend logger
+                 [("selection_context", `String "Transition_handler.Validator")])
             ~existing:(consensus_state root_protocol_state)
             ~candidate:(consensus_state protocol_state) )
         ~error:
