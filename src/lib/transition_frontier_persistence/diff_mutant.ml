@@ -122,7 +122,7 @@ end = struct
         , `Int
             ( String.hash
             @@ Binable.to_string (module Scan_state.Stable.V1) scan_state ) )
-      ; ( "Pending coinbase"
+      ; ( "pending_coinbase"
         , `Int
             ( String.hash
             @@ Binable.to_string
