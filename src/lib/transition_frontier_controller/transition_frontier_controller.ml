@@ -69,8 +69,9 @@ module Make (Inputs : Inputs_intf) :
     Strict_pipe.Reader.clear reader ;
     Strict_pipe.Writer.close writer
 
-  let run ~logger ~network ~time_controller ~collected_transitions ~frontier
-      ~network_transition_reader ~proposer_transition_reader ~clear_reader =
+  let run ~logger ~trust_system ~network ~time_controller
+      ~collected_transitions ~frontier ~network_transition_reader
+      ~proposer_transition_reader ~clear_reader =
     let valid_transition_pipe_capacity = 30 in
     let valid_transition_reader, valid_transition_writer =
       Strict_pipe.create ~name:"valid transitions"
@@ -122,7 +123,7 @@ module Make (Inputs : Inputs_intf) :
       ~clean_up_catchup_scheduler ~catchup_job_writer
       ~catchup_breadcrumbs_reader ~catchup_breadcrumbs_writer
       ~processed_transition_writer ~unprocessed_transition_cache ;
-    Catchup.run ~logger ~network ~frontier ~catchup_job_reader
+    Catchup.run ~logger ~trust_system ~network ~frontier ~catchup_job_reader
       ~catchup_breadcrumbs_writer ~unprocessed_transition_cache ;
     Strict_pipe.Reader.iter_without_pushback clear_reader ~f:(fun _ ->
         kill valid_transition_reader valid_transition_writer ;
