@@ -470,6 +470,7 @@ let coda_commands logger =
     ; ( Coda_restarts_and_txns_holy_grail.name
       , Coda_restarts_and_txns_holy_grail.command )
     ; (Coda_bootstrap_test.name, Coda_bootstrap_test.command)
+    ; (Coda_long_fork.name, Coda_long_fork.command)
     ; ("full-test", Full_test.command)
     ; ("transaction-snark-profiler", Transaction_snark_profiler.command) ]
   in
