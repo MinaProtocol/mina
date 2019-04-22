@@ -300,7 +300,7 @@ let daemon logger =
            (module Config0)
        in
        let module M = Coda_main.Make_coda (Init) in
-       let module Run = Run (Config0) (M) in
+       let module Run = Coda_run.Make (Config0) (M) in
        Stream.iter
          (Async.Scheduler.long_cycles
             ~at_least:(sec 0.5 |> Time_ns.Span.of_span_float_round_nearest))
