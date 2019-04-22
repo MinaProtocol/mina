@@ -588,7 +588,7 @@ module Make (Inputs : Inputs_intf) = struct
   let root_diff t =
     let root_diff_reader, root_diff_writer =
       Strict_pipe.create ~name:"root diff"
-        (Buffered (`Capacity 10, `Overflow Crash))
+        (Buffered (`Capacity 30, `Overflow Crash))
     in
     don't_wait_for
       (Broadcast_pipe.Reader.iter t.transition_frontier ~f:(function

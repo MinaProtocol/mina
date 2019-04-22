@@ -45,7 +45,7 @@ let main n () =
   let%bind () =
     Coda_worker_testnet.Restarts.restart_node testnet ~logger
       ~node:(random_node ())
-      ~duration:(Time.Span.of_min (Random.float 5.))
+      ~duration:(Time.Span.of_min (Random.float 3.))
   in
   (* settle for a few more min *)
   let%bind () = after (Time.Span.of_min 1.) in
