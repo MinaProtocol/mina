@@ -1,5 +1,6 @@
 open Core_kernel
 open Async_kernel
+open Async_rpc_kernel
 open Protocols
 open Pipe_lib
 open Strict_pipe
@@ -73,6 +74,13 @@ module type Network_intf = sig
        * sync_ledger_answer Envelope.Incoming.t )
        Linear_pipe.Writer.t
     -> unit
+
+  val query_peer :
+       t
+    -> Network_peer.Peer.t
+    -> (Versioned_rpc.Connection_with_menu.t -> 'q -> 'r Deferred.Or_error.t)
+    -> 'q
+    -> 'r Deferred.Or_error.t
 
   module Config : sig
     type t
@@ -207,6 +215,8 @@ module type Proposer_intf = sig
                          , synchronous
                          , unit Deferred.t )
                          Strict_pipe.Writer.t
+    -> random_peers:(int -> Network_peer.Peer.t list)
+    -> query_peer:Network_peer.query_peer
     -> unit
 end
 
@@ -406,6 +416,8 @@ module type Inputs_intf = sig
      and type syncable_ledger_answer := Coda_base.Sync_ledger.Answer.t
      and type pending_coinbases := Pending_coinbase.t
      and type parallel_scan_state := Staged_ledger.Scan_state.t
+
+  module Incr_status : Incremental.S
 end
 
 module Make (Inputs : Inputs_intf) = struct
@@ -485,15 +497,38 @@ module Make (Inputs : Inputs_intf) = struct
 
   let root_length = compose_of_option root_length_opt
 
+  module Incr = struct
+    open Incr_status
+
+    let of_broadcast_pipe pipe =
+      let init = Broadcast_pipe.Reader.peek pipe in
+      let var = Var.create init in
+      Broadcast_pipe.Reader.iter pipe ~f:(fun value ->
+          Var.set var value ; stabilize () ; Deferred.unit )
+      |> don't_wait_for ;
+      var
+
+    let online_status t = of_broadcast_pipe @@ Net.online_status t.net
+
+    let transition_frontier t = of_broadcast_pipe @@ t.transition_frontier
+  end
+
   let sync_status t =
-    match Broadcast_pipe.Reader.peek @@ Net.online_status t.net with
-    | `Offline ->
-        `Offline
-    | `Online ->
-        Option.value_map
-          (Broadcast_pipe.Reader.peek t.transition_frontier)
-          ~default:`Bootstrap
-          ~f:(Fn.const `Synced)
+    let open Incr_status in
+    let incremental_status =
+      Incr_status.map2
+        (Var.watch @@ Incr.online_status t)
+        (Var.watch @@ Incr.transition_frontier t)
+        ~f:(fun online_status active_status ->
+          match online_status with
+          | `Offline ->
+              `Offline
+          | `Online ->
+              Option.value_map active_status ~default:`Bootstrap
+                ~f:(Fn.const `Synced) )
+    in
+    let observer = observe incremental_status in
+    stabilize () ; observer
 
   let visualize_frontier ~filename =
     compose_of_option
@@ -596,6 +631,7 @@ module Make (Inputs : Inputs_intf) = struct
       ; receipt_chain_database: Coda_base.Receipt_chain_database.t
       ; snark_work_fee: Currency.Fee.t
       ; monitor: Monitor.t option
+      ; consensus_local_state: Consensus_mechanism.Local_state.t
             (* TODO: Pass banlist to modules discussed in Ban Reasons issue: https://github.com/CodaProtocol/coda/issues/852 *)
       }
     [@@deriving make]
@@ -608,9 +644,13 @@ module Make (Inputs : Inputs_intf) = struct
           ~time_controller:t.time_controller ~keypair
           ~consensus_local_state:t.consensus_local_state
           ~frontier_reader:t.transition_frontier
-          ~transition_writer:t.proposer_transition_writer )
+          ~transition_writer:t.proposer_transition_writer
+          ~random_peers:(Net.random_peers t.net)
+          ~query_peer:
+            {Network_peer.query= (fun a b c -> Net.query_peer t.net a b c)} )
 
-  let create_genesis_frontier (config : Config.t) ~consensus_local_state =
+  let create_genesis_frontier (config : Config.t) =
+    let consensus_local_state = config.consensus_local_state in
     let pending_coinbases = Pending_coinbase.create () |> Or_error.ok_exn in
     let empty_diff =
       { Staged_ledger_diff.diff=
@@ -671,12 +711,6 @@ module Make (Inputs : Inputs_intf) = struct
     let monitor = Option.value ~default:(Monitor.create ()) config.monitor in
     Async.Scheduler.within' ~monitor (fun () ->
         trace_task "coda" (fun () ->
-            let consensus_local_state =
-              Consensus_mechanism.Local_state.create
-                (Option.map config.propose_keypair ~f:(fun keypair ->
-                     let open Keypair in
-                     Public_key.compress keypair.public_key ))
-            in
             let external_transitions_reader, external_transitions_writer =
               Strict_pipe.create Synchronous
             in
@@ -688,7 +722,7 @@ module Make (Inputs : Inputs_intf) = struct
               match config.transition_frontier_location with
               | None ->
                   let%map ledger_db, frontier =
-                    create_genesis_frontier config ~consensus_local_state
+                    create_genesis_frontier config
                   in
                   ( None
                   , Ledger_transfer.transfer_accounts ~src:Genesis.ledger
@@ -713,7 +747,7 @@ module Make (Inputs : Inputs_intf) = struct
                           ~logger:config.logger ()
                       in
                       let%map root_snarked_ledger, frontier =
-                        create_genesis_frontier config ~consensus_local_state
+                        create_genesis_frontier config
                       in
                       (Some persistence, root_snarked_ledger, frontier)
                   | `Yes ->
@@ -725,7 +759,8 @@ module Make (Inputs : Inputs_intf) = struct
                       let%map frontier =
                         Transition_frontier_persistence.deserialize
                           ~directory_name ~logger:config.logger
-                          ~root_snarked_ledger ~consensus_local_state
+                          ~root_snarked_ledger
+                          ~consensus_local_state:config.consensus_local_state
                       in
                       let persistence =
                         Transition_frontier_persistence.create ~directory_name
@@ -857,5 +892,5 @@ module Make (Inputs : Inputs_intf) = struct
               ; receipt_chain_database= config.receipt_chain_database
               ; snark_work_fee= config.snark_work_fee
               ; proposer_transition_writer
-              ; consensus_local_state } ) )
+              ; consensus_local_state= config.consensus_local_state } ) )
 end

@@ -229,6 +229,29 @@ struct
       let is_empty {history; _} = Queue.is_empty history
     end
 
+    (* TODO: guard against waiting for transitions that already exist in the frontier *)
+    module Transition_registry = struct
+      type t = unit Ivar.t list State_hash.Table.t
+
+      let create () = State_hash.Table.create ()
+
+      let notify t state_hash =
+        State_hash.Table.change t state_hash ~f:(function
+          | Some ls ->
+              List.iter ls ~f:(Fn.flip Ivar.fill ()) ;
+              None
+          | None ->
+              None )
+
+      let register t state_hash =
+        Deferred.create (fun ivar ->
+            State_hash.Table.update t state_hash ~f:(function
+              | Some ls ->
+                  ivar :: ls
+              | None ->
+                  [ivar] ) )
+    end
+
     module Best_tip_diff = Best_tip_diff.Make (Breadcrumb)
     module Root_diff = Root_diff.Make (Breadcrumb)
 
@@ -240,15 +263,17 @@ struct
     type t =
       { root_history: Root_history.t
       ; snark_pool_refcount: Snark_pool_refcount.t
+      ; transition_registry: Transition_registry.t
       ; best_tip_diff: Best_tip_diff.t
       ; root_diff: Root_diff.t
       ; persistence_diff: Persistence_diff.t }
     [@@deriving fields]
 
     let create () =
-      { snark_pool_refcount= Snark_pool_refcount.create ()
+      { root_history= Root_history.create (2 * Inputs.max_length)
+      ; snark_pool_refcount= Snark_pool_refcount.create ()
+      ; transition_registry= Transition_registry.create ()
       ; best_tip_diff= Best_tip_diff.create ()
-      ; root_history= Root_history.create (2 * Inputs.max_length)
       ; root_diff= Root_diff.create ()
       ; persistence_diff= Persistence_diff.create () }
 
@@ -302,18 +327,28 @@ struct
         mb_write_to_pipe diff (Field.get field t) handler pipe
       in
       ( match diff with
-      | Transition_frontier_diff.New_breadcrumb _
+      | Transition_frontier_diff.New_breadcrumb breadcrumb ->
+          Transition_registry.notify t.transition_registry
+            (Breadcrumb.state_hash breadcrumb)
       | Transition_frontier_diff.New_frontier _ ->
           ()
       | Transition_frontier_diff.New_best_tip
-          {old_root; old_root_length; new_best_tip_length; _} ->
-          if new_best_tip_length - old_root_length > max_length then
+          { old_root
+          ; old_root_length
+          ; new_best_tip_length
+          ; added_to_best_tip_path
+          ; _ } ->
+          ( if new_best_tip_length - old_root_length > max_length then
             let root_state_hash = Breadcrumb.state_hash old_root in
             Root_history.enqueue t.root_history root_state_hash old_root ) ;
+          Transition_registry.notify t.transition_registry
+            (Breadcrumb.state_hash (Non_empty_list.last added_to_best_tip_path))
+      ) ;
       Fields.fold ~init:diff
         ~root_history:(fun _ _ -> Deferred.unit)
         ~snark_pool_refcount:
           (use Snark_pool_refcount.handle_diff pipes.snark_pool)
+        ~transition_registry:(fun acc _ -> acc)
         ~best_tip_diff:(use Best_tip_diff.handle_diff pipes.best_tip_diff)
         ~root_diff:(use Root_diff.handle_diff pipes.root_diff)
         ~persistence_diff:
@@ -727,6 +762,13 @@ struct
           With_hash.hash (Breadcrumb.transition_with_hash breadcrumb)
         in
         let root_node = Hashtbl.find_exn t.table t.root in
+        let old_best_tip = best_tip t in
+        let local_state_was_synced_at_start =
+          Consensus.required_local_state_sync
+            ~consensus_state:(consensus_state_of_breadcrumb old_best_tip)
+            ~local_state:t.consensus_local_state
+          |> Option.is_none
+        in
         (* 1 *)
         attach_breadcrumb_exn t breadcrumb ;
         let parent_hash = Breadcrumb.parent_hash breadcrumb in
@@ -745,12 +787,11 @@ struct
                   (consensus_state_of_breadcrumb parent_node.breadcrumb)
                 ~candidate:(consensus_state_of_breadcrumb breadcrumb)
                 ~logger:
-                  (Logger.create ()
-                     ~metadata:
-                       [ ( "selection context"
-                         , `String
-                             "debug_assert that child is preferred over parent"
-                         ) ])
+                  (Logger.extend t.logger
+                     [ ( "selection_context"
+                       , `String
+                           "debug_assert that child is preferred over parent"
+                       ) ])
               = `Take ) ) ;
         let node = Hashtbl.find_exn t.table hash in
         (* 2 *)
@@ -762,10 +803,9 @@ struct
             ~existing:(consensus_state_of_breadcrumb best_tip_node.breadcrumb)
             ~candidate:(consensus_state_of_breadcrumb node.breadcrumb)
             ~logger:
-              (Logger.create ()
-                 ~metadata:
-                   [ ( "selection context"
-                     , `String "comparing new breadcrumb to best tip" ) ])
+              (Logger.extend t.logger
+                 [ ( "selection_context"
+                   , `String "comparing new breadcrumb to best tip" ) ])
         in
         let added_to_best_tip_path, removed_from_best_tip_path =
           match best_tip_change with
@@ -847,6 +887,37 @@ struct
                 (Coda_base.Ledger.Any_ledger.cast
                    (module Coda_base.Ledger.Db)
                    t.root_snarked_ledger) ;
+            Debug_assert.debug_assert (fun () ->
+                (* After the lock transition, if the local_state was previously synced, it should continue to be synced *)
+                match
+                  Consensus.required_local_state_sync
+                    ~consensus_state:
+                      (consensus_state_of_breadcrumb
+                         (Hashtbl.find_exn t.table t.best_tip).breadcrumb)
+                    ~local_state:t.consensus_local_state
+                with
+                | Some jobs ->
+                    (* But if there wasn't sync work to do when we started, then there shouldn't be now. *)
+                    if local_state_was_synced_at_start then (
+                      Logger.fatal t.logger
+                        "after lock transition, the best tip consensus state \
+                         is out of sync with the local state -- bug in either \
+                         required_local_state_sync or lock_transition."
+                        ~module_:__MODULE__ ~location:__LOC__
+                        ~metadata:
+                          [ ( "sync_jobs"
+                            , `List
+                                ( Non_empty_list.to_list jobs
+                                |> List.map
+                                     ~f:Consensus.local_state_sync_to_yojson )
+                            )
+                          ; ( "local_state"
+                            , Consensus.Local_state.to_yojson
+                                t.consensus_local_state )
+                          ; ("tf_viz", `String (visualize_to_string t)) ] ;
+                      assert false )
+                | None ->
+                    () ) ;
             (* 4.VIII *)
             ( match
                 ( Inputs.Staged_ledger.proof_txns new_root_staged_ledger
@@ -938,6 +1009,12 @@ struct
 
   let shallow_copy_root_snarked_ledger {root_snarked_ledger; _} =
     Ledger.of_database root_snarked_ledger
+
+  let wait_for_transition t target_hash =
+    if Hashtbl.mem t.table target_hash then Deferred.unit
+    else
+      let transition_registry = Extensions.transition_registry t.extensions in
+      Extensions.Transition_registry.register transition_registry target_hash
 
   let equal t1 t2 =
     let sort_breadcrumbs = List.sort ~compare:Breadcrumb.compare in
