@@ -38,8 +38,8 @@ let%test_module "Ledger catchup" =
       Envelope.Incoming.wrap ~data:transition_with_hash
         ~sender:Envelope.Sender.Local
 
-    let test_catchup ~logger ~network (me : Transition_frontier.t) transition
-        expected_breadcrumbs =
+    let test_catchup ~logger ~trust_system ~network
+        (me : Transition_frontier.t) transition expected_breadcrumbs =
       let catchup_job_reader, catchup_job_writer =
         Strict_pipe.create ~name:(__MODULE__ ^ __LOC__)
           (Buffered (`Capacity 10, `Overflow Drop_head))
@@ -60,7 +60,7 @@ let%test_module "Ledger catchup" =
       in
       Strict_pipe.Writer.write catchup_job_writer
         (parent_hash, [Rose_tree.T (cached_transition, [])]) ;
-      Ledger_catchup.run ~logger ~network ~frontier:me
+      Ledger_catchup.run ~logger ~trust_system ~network ~frontier:me
         ~catchup_breadcrumbs_writer ~catchup_job_reader
         ~unprocessed_transition_cache ;
       let result_ivar = Ivar.create () in
@@ -89,6 +89,7 @@ let%test_module "Ledger catchup" =
       Core.Backtrace.elide := false ;
       Async.Scheduler.set_record_backtraces true ;
       let logger = Logger.create () in
+      let trust_system = Trust_system.null () in
       Thread_safe.block_on_async_exn (fun () ->
           let%bind me, peer, network =
             Network_builder.setup_me_and_a_peer
@@ -101,7 +102,7 @@ let%test_module "Ledger catchup" =
             Transition_frontier.Breadcrumb.transition_with_hash best_breadcrumb
             |> transition_with_hash_enveloped
           in
-          test_catchup ~logger ~network me best_transition
+          test_catchup ~logger ~trust_system ~network me best_transition
             ( Transition_frontier.path_map peer.frontier best_breadcrumb
                 ~f:Fn.id
             |> Rose_tree.of_list_exn ) )
@@ -109,6 +110,7 @@ let%test_module "Ledger catchup" =
     let%test "peers can provide transitions with length between max_length to \
               2 * max_length" =
       let logger = Logger.null () in
+      let trust_system = Trust_system.null () in
       Thread_safe.block_on_async_exn (fun () ->
           let num_breadcrumbs =
             Int.gen_incl max_length (2 * max_length) |> Quickcheck.random_value
@@ -136,12 +138,14 @@ let%test_module "Ledger catchup" =
               ~f:Fn.id
             |> Option.value_exn
           in
-          test_catchup ~logger ~network me best_transition_enveloped
+          test_catchup ~logger ~trust_system ~network me
+            best_transition_enveloped
             (Rose_tree.of_list_exn @@ Non_empty_list.tail history) )
 
     let%test "catchup would be successful even if the parent transition is \
               already in the frontier" =
       let logger = Logger.create () in
+      let trust_system = Trust_system.null () in
       Thread_safe.block_on_async_exn (fun () ->
           let%bind me, peer, network =
             Network_builder.setup_me_and_a_peer ~logger
@@ -152,12 +156,13 @@ let%test_module "Ledger catchup" =
           let best_transition =
             Transition_frontier.Breadcrumb.transition_with_hash best_breadcrumb
           in
-          test_catchup ~logger ~network me
+          test_catchup ~logger ~trust_system ~network me
             (transition_with_hash_enveloped best_transition)
             (Rose_tree.of_list_exn [best_breadcrumb]) )
 
     let%test "catchup would fail if one of the parent transition fails" =
       let logger = Logger.create () in
+      let trust_system = Trust_system.null () in
       let catchup_job_reader, catchup_job_writer =
         Strict_pipe.create (Buffered (`Capacity 10, `Overflow Drop_head))
       in
@@ -206,7 +211,7 @@ let%test_module "Ledger catchup" =
               unprocessed_transition_cache
               (transition_with_hash_enveloped failing_transition)
           in
-          Ledger_catchup.run ~logger ~network ~frontier:me
+          Ledger_catchup.run ~logger ~trust_system ~network ~frontier:me
             ~catchup_breadcrumbs_writer ~catchup_job_reader
             ~unprocessed_transition_cache ;
           let%bind () = after (Core.Time.Span.of_sec 1.) in
@@ -220,6 +225,7 @@ let%test_module "Ledger catchup" =
     let%test_unit "catchup won't be blocked by transitions that are still \
                    under processing" =
       let logger = Logger.create () in
+      let trust_system = Trust_system.null () in
       let catchup_job_reader, catchup_job_writer =
         Strict_pipe.create (Buffered (`Capacity 10, `Overflow Drop_head))
       in
@@ -278,7 +284,7 @@ let%test_module "Ledger catchup" =
                 (after (Core.Time.Span.of_ms 500.))
                 (fun () -> Strict_pipe.Writer.write catchup_job_writer forest)
           ) ;
-          Ledger_catchup.run ~logger ~network ~frontier:me
+          Ledger_catchup.run ~logger ~trust_system ~network ~frontier:me
             ~catchup_breadcrumbs_writer ~catchup_job_reader
             ~unprocessed_transition_cache ;
           let missing_breadcrumbs_queue =
