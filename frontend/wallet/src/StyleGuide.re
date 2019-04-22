@@ -4,7 +4,9 @@ open Css;
 module Colors = {
   let hexToString = (`hex(s)) => s;
 
+  let bgWithAlpha = `hex("121F2B11");
   let bgColor = `hex("121F2B");
+
   let savilleAlpha = a => `rgba((31, 45, 61, a));
   let saville = savilleAlpha(1.);
 

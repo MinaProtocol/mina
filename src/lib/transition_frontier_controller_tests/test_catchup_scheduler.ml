@@ -79,6 +79,7 @@ let%test_module "Transition_handler.Catchup_scheduler tests" =
           let scheduler =
             Catchup_scheduler.create ~logger ~frontier ~time_controller
               ~catchup_job_writer ~catchup_breadcrumbs_writer
+              ~clean_up_signal:(Ivar.create ())
           in
           let randomly_chosen_breadcrumb =
             Transition_frontier.all_breadcrumbs frontier
@@ -137,6 +138,7 @@ let%test_module "Transition_handler.Catchup_scheduler tests" =
           let scheduler =
             Catchup_scheduler.create ~logger ~frontier ~time_controller
               ~catchup_job_writer ~catchup_breadcrumbs_writer
+              ~clean_up_signal:(Ivar.create ())
           in
           let randomly_chosen_breadcrumb =
             Transition_frontier.all_breadcrumbs frontier
@@ -217,6 +219,7 @@ let%test_module "Transition_handler.Catchup_scheduler tests" =
           let scheduler =
             Catchup_scheduler.create ~logger ~frontier ~time_controller
               ~catchup_job_writer ~catchup_breadcrumbs_writer
+              ~clean_up_signal:(Ivar.create ())
           in
           let randomly_chosen_breadcrumb =
             Transition_frontier.all_breadcrumbs frontier

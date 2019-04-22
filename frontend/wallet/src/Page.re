@@ -38,7 +38,7 @@ let useRoute = () => {
     Some(() => MainCommunication.stopListening(token));
   });
 
-  (path, settingsOrError, setSettingsOrError);
+  (path, settingsOrError, s => setSettingsOrError(_ => s));
 };
 
 [@react.component]
@@ -75,14 +75,7 @@ let make = (~message) => {
   let settingsInfo = {
     let question = " (did you create a settings.json file with {\"state\": {}} ?)";
     switch (settingsOrError) {
-    | `Settings(settings) =>
-      "Settings loaded successfully"
-      ++ (
-        Js.Dict.entries(settings.state)
-        |> Array.map(~f=((k, v)) => "(" ++ k ++ "," ++ v ++ ")")
-        |> Array.to_list
-        |> String.concat
-      )
+    | `Settings(_) => "Settings loaded successfully"
     | `Error(`Json_parse_error) =>
       "Settings failed to load with a json parse error" ++ question
     | `Error(`Decode_error(s)) =>
@@ -122,7 +115,11 @@ let make = (~message) => {
           <div
             className=Css.(style([display(`flex), flexDirection(`column)]))>
             <Header />
-            <Body message={message ++ ";; " ++ settingsInfo} />
+            <Body
+              message={message ++ ";; " ++ settingsInfo}
+              settingsOrError
+              setSettingsOrError
+            />
           </div>
           {testButton("Delete wallet", ~f=() =>
              Router.(navigate({path: DeleteWallet, settingsOrError}))
@@ -134,14 +131,14 @@ let make = (~message) => {
                  SettingsRenderer.add(
                    settings,
                    ~key=PublicKey.ofStringExn(randomNum |> Js.Int.toString),
-                   ~name="Test Wallet",
+                   ~name="Wallet " ++ Js.Int.toString(randomNum),
                  );
                Js.log("Add started");
                Task.perform(
                  task,
                  ~f=settingsOrError => {
                    Js.log2("Add complete", settingsOrError);
-                   setSettingsOrError(_ => settingsOrError);
+                   setSettingsOrError(settingsOrError);
                  },
                );
              | _ => Js.log("There's an error")
