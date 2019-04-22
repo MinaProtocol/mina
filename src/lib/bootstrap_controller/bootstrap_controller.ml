@@ -189,18 +189,19 @@ end = struct
                !"Could not get the proof of root from the network: %s"
                (Error.to_string_hum e)
       | Ok peer_root_with_proof -> (
-          match%map
+          match%bind
             Root_prover.verify ~logger:t.logger ~observed_state:candidate_state
               ~peer_root:peer_root_with_proof
           with
           | Ok (peer_root, peer_best_tip) -> (
-              ignore
+              let%bind () =
                 Trust_system.(
                   record t.trust_system t.logger sender.host
                     Actions.
                       ( Fulfilled_request
                       , Some ("Received verified peer root and best tip", [])
-                      )) ;
+                      ))
+              in
               t.best_seen_transition <- peer_best_tip ;
               t.current_root <- peer_root ;
               let blockchain_state =
@@ -219,6 +220,8 @@ end = struct
                 |> External_transition.Protocol_state.Blockchain_state
                    .snarked_ledger_hash
               in
+              return
+              @@
               match
                 Root_sync_ledger.new_goal root_sync_ledger
                   (Frozen_ledger_hash.to_ledger_hash snarked_ledger_hash)
@@ -236,7 +239,8 @@ end = struct
               | `Repeat ->
                   `Ignored )
           | Error e ->
-              received_bad_proof t sender.host e |> Fn.const `Ignored )
+              return (received_bad_proof t sender.host e |> Fn.const `Ignored)
+          )
 
   let sync_ledger t ~root_sync_ledger ~transition_graph ~transition_reader =
     let query_reader = Root_sync_ledger.query_reader root_sync_ledger in
@@ -334,7 +338,7 @@ end = struct
         ~expected_merkle_root ~pending_coinbases
     with
     | Error err ->
-        ignore
+        let%bind () =
           Trust_system.(
             record t.trust_system t.logger sender.host
               Actions.
@@ -342,9 +346,17 @@ end = struct
                 , Some
                     ( "Can't find scan state from the peer or received faulty \
                        scan state from the peer."
-                    , [] ) )) ;
+                    , [] ) ))
+        in
         Error.raise err
     | Ok root_staged_ledger ->
+        let%bind () =
+          Trust_system.(
+            record t.trust_system t.logger sender.host
+              Actions.
+                ( Fulfilled_request
+                , Some ("Received valid scan state from peer", []) ))
+        in
         let new_root =
           With_hash.map t.current_root ~f:(fun root ->
               (* Need to coerce new_root from a proof_verified transition to a
