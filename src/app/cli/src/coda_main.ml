@@ -28,8 +28,7 @@ end
 [%%endif]
 
 module Graphql_cohttp_async =
-  Graphql_cohttp.Make (Graphql_async.Schema) (Cohttp_async.Io)
-    (Cohttp_async.Body)
+  Graphql_cohttp.Make (Graphql_async.Schema) (Cohttp_async.Body)
 
 module Staged_ledger_aux_hash = struct
   include Staged_ledger_hash.Aux_hash.Stable.Latest
@@ -1139,15 +1138,17 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
 
     module Subscriptions = struct
       let to_pipe observer =
-        let reader, writer = Async.Pipe.create () in
+        let reader, writer =
+          Strict_pipe.(create (Buffered (`Capacity 1, `Overflow Drop_head)))
+        in
         Incr_status.Observer.on_update_exn observer ~f:(function
           | Initialized value ->
-              Async.Pipe.write_or_drop_head writer value
+              Strict_pipe.Writer.write writer value
           | Changed (_, value) ->
-              Async.Pipe.write_or_drop_head writer value
+              Strict_pipe.Writer.write writer value
           | Invalidated ->
               () ) ;
-        reader
+        (Strict_pipe.Reader.to_linear_pipe reader).Linear_pipe.Reader.pipe
 
       let new_sync_update =
         subscription_field "new_sync_update"
@@ -1646,7 +1647,7 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
     in
     Option.iter rest_server_port ~f:(fun rest_server_port ->
         trace_task "REST server" (fun () ->
-            let graphql_callback =
+            let _graphql_callback =
               Graphql_cohttp_async.make_callback
                 (fun _req -> coda)
                 Graphql.schema
@@ -1671,7 +1672,7 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
                   let lift x = `Response x in
                   match Uri.path uri with
                   | "/graphql" ->
-                      graphql_callback () req body
+                      status `None >>| lift (* graphql_callback () req body *)
                   | "/status" ->
                       status `None >>| lift
                   | "/status/performance" ->
