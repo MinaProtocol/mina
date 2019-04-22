@@ -4,7 +4,7 @@
 open Core
 open Async
 open Coda_worker
-open Coda_main
+open Coda_inputs
 
 let init () = Parallel.init_master ()
 

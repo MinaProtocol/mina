@@ -9,7 +9,7 @@ module Graphql_cohttp_async =
   Graphql_cohttp.Make (Graphql_async.Schema) (Cohttp_async.Io)
     (Cohttp_async.Body)
 
-module Make (Config_in : Coda_main.Config_intf) (Program : Coda_main.Main_intf) =
+module Make (Config_in : Coda_inputs.Config_intf) (Program : Coda_inputs.Main_intf) =
 struct
   include Program
   open Inputs
