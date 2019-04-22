@@ -1,3 +1,5 @@
+open Core_kernel
+
 let to_string = function
   | `Offline ->
       "Offline"
@@ -6,21 +8,35 @@ let to_string = function
   | `Synced ->
       "Synced"
 
+let of_string string =
+  match String.lowercase string with
+  | "offline" ->
+      Ok `Offline
+  | "bootstrap" ->
+      Ok `Bootstrap
+  | "synced" ->
+      Ok `Synced
+  | status ->
+      Error (Error.createf !"%s is not a valid status" status)
+
 let to_yojson status = `String (to_string status)
 
 module Stable = struct
   module V1 = struct
     module T = struct
       type t = [`Offline | `Bootstrap | `Synced]
-      [@@deriving bin_io, version, sexp]
+      [@@deriving bin_io, version, sexp, hash, compare]
 
       let to_yojson = to_yojson
     end
 
     include T
+    include Hashable.Make (T)
   end
 
   module Latest = V1
 end
 
-type t = [`Offline | `Bootstrap | `Synced] [@@deriving sexp]
+type t = [`Offline | `Bootstrap | `Synced] [@@deriving sexp, hash]
+
+include Hashable.Make (Stable.Latest.T)
