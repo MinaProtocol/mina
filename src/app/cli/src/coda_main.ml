@@ -28,7 +28,8 @@ end
 [%%endif]
 
 module Graphql_cohttp_async =
-  Graphql_cohttp.Make (Graphql_async.Schema) (Cohttp_async.Body)
+  Graphql_cohttp.Make (Graphql_async.Schema) (Cohttp_async.Io)
+    (Cohttp_async.Body)
 
 module Staged_ledger_aux_hash = struct
   include Staged_ledger_hash.Aux_hash.Stable.Latest
@@ -1647,7 +1648,7 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
     in
     Option.iter rest_server_port ~f:(fun rest_server_port ->
         trace_task "REST server" (fun () ->
-            let _graphql_callback =
+            let graphql_callback =
               Graphql_cohttp_async.make_callback
                 (fun _req -> coda)
                 Graphql.schema
@@ -1672,7 +1673,7 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
                   let lift x = `Response x in
                   match Uri.path uri with
                   | "/graphql" ->
-                      status `None >>| lift (* graphql_callback () req body *)
+                      graphql_callback () req body
                   | "/status" ->
                       status `None >>| lift
                   | "/status/performance" ->
