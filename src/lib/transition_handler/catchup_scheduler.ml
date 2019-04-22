@@ -62,9 +62,15 @@ module Make (Inputs : Inputs.S) = struct
         Capped_supervisor.t }
 
   let create ~logger ~frontier ~time_controller ~catchup_job_writer
-      ~catchup_breadcrumbs_writer =
+      ~catchup_breadcrumbs_writer ~clean_up_signal =
     let collected_transitions = State_hash.Table.create () in
     let parent_root_timeouts = State_hash.Table.create () in
+    upon (Ivar.read clean_up_signal) (fun () ->
+        Hashtbl.iter collected_transitions ~f:(fun cached_transitions ->
+            List.iter cached_transitions
+              ~f:(Fn.compose ignore Cached.invalidate_with_failure) ) ;
+        Hashtbl.iter parent_root_timeouts ~f:(fun timeout ->
+            Time.Timeout.cancel time_controller timeout () ) ) ;
     let breadcrumb_builder_supervisor =
       Capped_supervisor.create ~job_capacity:5
         (fun (initial_hash, transition_branches) ->

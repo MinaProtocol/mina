@@ -54,8 +54,8 @@ let%test_module "Bootstrap Controller" =
             |> External_transition.forget_consensus_state_verification
           in
           let bootstrap =
-            Bootstrap_controller.For_tests.make_bootstrap ~logger ~genesis_root
-              ~network
+            Bootstrap_controller.For_tests.make_bootstrap ~logger ~trust_system
+              ~genesis_root ~network
           in
           let ledger_db =
             Transition_frontier.For_tests.root_snarked_ledger frontier
@@ -286,7 +286,9 @@ let%test_module "Bootstrap Controller" =
             |> External_transition.forget_consensus_state_verification
           in
           let open Bootstrap_controller.For_tests in
-          let bootstrap = make_bootstrap ~logger ~genesis_root ~network in
+          let bootstrap =
+            make_bootstrap ~logger ~trust_system ~genesis_root ~network
+          in
           let best_transition =
             Transition_frontier.best_tip peer.frontier
             |> Transition_frontier.Breadcrumb.transition_with_hash
