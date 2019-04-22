@@ -6,7 +6,7 @@ open Async
 open Coda_base
 open Blockchain_snark
 open Cli_lib
-open Coda_main
+open Coda_inputs
 open Signature_lib
 module YJ = Yojson.Safe
 module Git_sha = Daemon_rpcs.Types.Git_sha
@@ -300,8 +300,8 @@ let daemon logger =
            ~should_propose:(Option.is_some propose_keypair)
            (module Config0)
        in
-       let module M = Coda_main.Make_coda (Init) in
-       let module Run = Run (Config0) (M) in
+       let module M = Coda_inputs.Make_coda (Init) in
+       let module Run = Coda_run.Make (Config0) (M) in
        Stream.iter
          (Async.Scheduler.long_cycles
             ~at_least:(sec 0.5 |> Time_ns.Span.of_span_float_round_nearest))
