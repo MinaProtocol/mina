@@ -97,6 +97,7 @@ module Make (Inputs : Inputs_intf) : sig
 
     val make_bootstrap :
          logger:Logger.t
+      -> trust_system:Trust_system.t
       -> genesis_root:Inputs.External_transition.Proof_verified.t
       -> network:Inputs.Network.t
       -> t
@@ -139,6 +140,7 @@ end = struct
 
   type t =
     { logger: Logger.t
+    ; trust_system: Trust_system.t
     ; mutable best_seen_transition:
         (External_transition.Proof_verified.t, State_hash.t) With_hash.t
     ; mutable current_root:
@@ -156,9 +158,14 @@ end = struct
           |> Consensus.Protocol_state.consensus_state )
         ~candidate
 
-  let received_bad_proof t e =
-    (* TODO: Punish *)
-    Logger.faulty_peer t.logger !"Bad ancestor proof: %{sexp:Error.t}" e
+  let received_bad_proof t sender_host e =
+    Trust_system.(
+      record t.trust_system t.logger sender_host
+        Actions.
+          ( Violated_protocol
+          , Some
+              ( "Bad ancestor proof: $error"
+              , [("error", `String (Error.to_string_hum e))] ) ))
 
   let done_syncing_root root_sync_ledger =
     Option.is_some (Root_sync_ledger.peek_valid_tree root_sync_ledger)
@@ -222,7 +229,7 @@ end = struct
               | `Repeat ->
                   `Ignored )
           | Error e ->
-              received_bad_proof t e |> Fn.const `Ignored )
+              received_bad_proof t sender.host e |> Fn.const `Ignored )
 
   let sync_ledger t ~root_sync_ledger ~transition_graph ~transition_reader =
     let query_reader = Root_sync_ledger.query_reader root_sync_ledger in
@@ -274,6 +281,7 @@ end = struct
     let t =
       { network
       ; logger
+      ; trust_system
       ; best_seen_transition= initial_root_transition
       ; current_root= initial_root_transition }
     in
@@ -319,9 +327,15 @@ end = struct
         ~expected_merkle_root ~pending_coinbases
     with
     | Error err ->
-        Logger.faulty_peer logger ~module_:__MODULE__ ~location:__LOC__
-          "can't find scan state from the peer or received faulty scan state \
-           from the peer." ;
+        ignore
+          Trust_system.(
+            record t.trust_system t.logger sender.host
+              Actions.
+                ( Violated_protocol
+                , Some
+                    ( "Can't find scan state from the peer or received faulty \
+                       scan state from the peer."
+                    , [] ) )) ;
         Error.raise err
     | Ok root_staged_ledger ->
         let new_root =
@@ -351,9 +365,10 @@ end = struct
       Fn.compose Consensus.Protocol_state.hash
         External_transition.Proof_verified.protocol_state
 
-    let make_bootstrap ~logger ~genesis_root ~network =
+    let make_bootstrap ~logger ~trust_system ~genesis_root ~network =
       let transition = With_hash.of_data genesis_root ~hash_data in
       { logger
+      ; trust_system
       ; best_seen_transition= transition
       ; current_root= transition
       ; network }
