@@ -54,6 +54,19 @@ let of_root (h : Ledger_hash.t) =
 
 let of_ledger_root ledger = of_root (Ledger.merkle_root ledger)
 
+let of_any_ledger (ledger : Ledger.Any_ledger.witness) =
+  Ledger.Any_ledger.M.foldi ledger
+    ~init:(of_root (Ledger.Any_ledger.M.merkle_root ledger))
+    ~f:(fun _addr sparse_ledger account ->
+      let loc =
+        Option.value_exn
+          (Ledger.Any_ledger.M.location_of_key ledger account.public_key)
+      in
+      add_path sparse_ledger
+        (Ledger.Any_ledger.M.merkle_path ledger loc)
+        account.public_key
+        (Option.value_exn (Ledger.Any_ledger.M.get ledger loc)) )
+
 let of_ledger_subset_exn (oledger : Ledger.t) keys =
   let ledger = Ledger.copy oledger in
   let new_keys, sparse =
