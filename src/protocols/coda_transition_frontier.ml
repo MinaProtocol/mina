@@ -450,6 +450,7 @@ module type Catchup_intf = sig
 
   val run :
        logger:Logger.t
+    -> trust_system:Trust_system.t
     -> network:network
     -> frontier:transition_frontier
     -> catchup_job_reader:( state_hash
@@ -785,6 +786,7 @@ module type Transition_frontier_controller_intf = sig
 
   val run :
        logger:Logger.t
+    -> trust_system:Trust_system.t
     -> network:network
     -> time_controller:time_controller
     -> collected_transitions:( external_transition_verified
