@@ -187,8 +187,8 @@ module Make (Inputs : Inputs_intf) :
       Logger.info logger ~module_:__MODULE__ ~location:__LOC__
         "Starting Transition Frontier Controller phase" ;
       let new_verified_transition_reader =
-        Transition_frontier_controller.run ~logger ~network ~time_controller
-          ~collected_transitions ~frontier
+        Transition_frontier_controller.run ~logger ~trust_system ~network
+          ~time_controller ~collected_transitions ~frontier
           ~network_transition_reader:transition_reader
           ~proposer_transition_reader ~clear_reader
       in
