@@ -27,8 +27,10 @@ module Repr = struct
         let digest ({prefix; tail} : t) =
           let rec go acc p =
             match Fdeque.dequeue_front p with
-            | None -> acc
-            | Some (h, p) -> go (merge h acc) p
+            | None ->
+                acc
+            | Some (h, p) ->
+                go (merge h acc) p
           in
           go tail prefix
       end
