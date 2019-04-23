@@ -656,6 +656,14 @@ module Make (Inputs : Inputs_intf) = struct
             in
             match response_or_error with
             | Ok (Some response) ->
+                let%bind () =
+                  Trust_system.(
+                    record t.trust_system t.logger peer.host
+                      Actions.
+                        ( Fulfilled_request
+                        , Some ("Nonpreferred peer returned valid response", [])
+                        ))
+                in
                 return (Ok response)
             | Ok None ->
                 loop remaining_peers (2 * num_peers)
@@ -674,6 +682,13 @@ module Make (Inputs : Inputs_intf) = struct
     in
     match response with
     | Ok (Some data) ->
+        let%bind () =
+          Trust_system.(
+            record t.trust_system t.logger peer.host
+              Actions.
+                ( Fulfilled_request
+                , Some ("Preferred peer returned valid response", []) ))
+        in
         return (Ok data)
     | Ok None ->
         let%bind () =
