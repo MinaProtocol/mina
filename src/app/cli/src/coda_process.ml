@@ -2,7 +2,7 @@ open Core
 open Async
 open Coda_worker
 open Coda_base
-open Coda_main
+open Coda_inputs
 open Pipe_lib
 
 type t = Coda_worker.Connection.t * Process.t * Coda_worker.Input.t
