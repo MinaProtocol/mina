@@ -540,10 +540,7 @@ module Base = struct
       if preeval then
         (Lazy.force reduced_main) proving_key ~handlers:[handler] prover_state
           top_hash
-      else
-        Groth16.prove proving_key (tick_input ()) prover_state
-          main
-          top_hash
+      else Groth16.prove proving_key (tick_input ()) prover_state main top_hash
     in
     (top_hash, proof)
 
