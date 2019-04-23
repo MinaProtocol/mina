@@ -123,7 +123,7 @@ let%test_module "network pool test" =
 
           let verify _ _ = return true
 
-          let gen = Int.gen
+          let gen = Int.quickcheck_generator
         end
       end
     end
@@ -132,7 +132,7 @@ let%test_module "network pool test" =
       module T = struct
         type t = Int.t [@@deriving sexp, hash, compare, yojson]
 
-        let gen = Int.gen
+        let gen = Int.quickcheck_generator
       end
 
       include T
@@ -220,8 +220,10 @@ let%test_module "network pool test" =
              ~f:(fun _ ->
                let pool = Mock_network_pool.pool network_pool in
                ( match Mock_snark_pool.request_proof pool 1 with
-               | Some {proof; fee= _} -> assert (proof = priced_proof.proof)
-               | None -> failwith "There should have been a proof here" ) ;
+               | Some {proof; fee= _} ->
+                   assert (proof = priced_proof.proof)
+               | None ->
+                   failwith "There should have been a proof here" ) ;
                Deferred.unit ) ;
         Mock_network_pool.apply_and_broadcast network_pool
           (Envelope.Incoming.local command) )
@@ -251,8 +253,9 @@ let%test_module "network pool test" =
         @@ Linear_pipe.iter (Mock_network_pool.broadcasts network_pool)
              ~f:(fun work_command ->
                let work =
-                 match work_command
-                 with Snark_pool_diff.Diff.Add_solved_work (work, _) -> work
+                 match work_command with
+                 | Snark_pool_diff.Diff.Add_solved_work (work, _) ->
+                     work
                in
                assert (List.mem works work ~equal:( = )) ;
                Deferred.unit ) ;

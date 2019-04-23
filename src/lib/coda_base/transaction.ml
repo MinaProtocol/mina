@@ -27,9 +27,13 @@ let fee_excess = function
       Ok
         (Currency.Fee.Signed.of_unsigned
            (User_command_payload.fee (t :> User_command.t).payload))
-  | Fee_transfer t -> Fee_transfer.fee_excess t
-  | Coinbase t -> Coinbase.fee_excess t
+  | Fee_transfer t ->
+      Fee_transfer.fee_excess t
+  | Coinbase t ->
+      Coinbase.fee_excess t
 
 let supply_increase = function
-  | User_command _ | Fee_transfer _ -> Ok Currency.Amount.zero
-  | Coinbase t -> Coinbase.supply_increase t
+  | User_command _ | Fee_transfer _ ->
+      Ok Currency.Amount.zero
+  | Coinbase t ->
+      Coinbase.supply_increase t

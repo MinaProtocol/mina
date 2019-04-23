@@ -28,7 +28,8 @@ module Image = struct
           let xStr = Int.to_string x in
           let yStr = Int.to_string y in
           Printf.sprintf "max-width:%spx;max-height:%spx" xStr yStr
-      | `Free -> ""
+      | `Free ->
+          ""
     in
     ksprintf Html.literal
       {literal|<img style='%s' class="%s" src='%s'>|literal} inline_style
@@ -156,8 +157,10 @@ module Input_button = struct
     let open Html_concise in
     let button_node =
       match button_hint with
-      | `Text button_hint -> text button_hint
-      | `Node n -> n
+      | `Text button_hint ->
+          text button_hint
+      | `Node n ->
+          n
     in
     node "a"
       ( [ href url
@@ -176,8 +179,10 @@ module Input_button = struct
     let open Html_concise in
     let button_node =
       match button_hint with
-      | `Text button_hint -> text button_hint
-      | `Node n -> n
+      | `Text button_hint ->
+          text button_hint
+      | `Node n ->
+          n
     in
     node "a"
       ( [ href url
@@ -316,8 +321,10 @@ module Compound_chunk = struct
     | Some image ->
         let left, right =
           match image_positioning with
-          | Image_positioning.Left -> (image, important_text)
-          | Right -> (important_text, image)
+          | Image_positioning.Left ->
+              (image, important_text)
+          | Right ->
+              (important_text, image)
         in
         Mobile_switch.create
           ~not_small:
@@ -332,7 +339,8 @@ module Compound_chunk = struct
                | `With_image ->
                    [ div [class_ "flex justify-center mb3"] [image]
                    ; important_text ]
-               | `No_image_on_small -> [important_text] ))
+               | `No_image_on_small ->
+                   [important_text] ))
 end
 
 module Section = struct
@@ -341,9 +349,12 @@ module Section = struct
     let open Html_concise in
     let color, bg_color =
       match scheme with
-      | `Light -> ("black", "bg-white")
-      | `Dark -> ("silver", "bg-snow")
-      | `None -> ("black", "")
+      | `Light ->
+          ("black", "bg-white")
+      | `Dark ->
+          ("silver", "bg-snow")
+      | `None ->
+          ("black", "")
     in
     let heading_font =
       match heading_size with `Normal -> "f5" | `Large -> "f3"
@@ -360,7 +371,8 @@ module Section = struct
             String.split ~on:' ' (String.lowercase heading) |> List.hd_exn
           in
           [id section_id]
-      | None -> []
+      | None ->
+          []
     in
     let heading =
       Option.map heading ~f:(fun heading ->
@@ -376,8 +388,10 @@ module Section = struct
                   + Spacing.side_padding ~tight:false )) ]
           @ maybe_id )
           ( match heading with
-          | Some heading -> [heading; content]
-          | None -> [content] ) ]
+          | Some heading ->
+              [heading; content]
+          | None ->
+              [content] ) ]
 
   let carousel ?heading ~pages ~scheme () =
     let open Html_concise in
@@ -485,8 +499,10 @@ module Section = struct
       let top_style = Style.(Styles.copytext + of_class "mw6 tc center mb5") in
       let top =
         match content with
-        | Some content -> p [Style.render top_style] [text content]
-        | None -> div [class_ "dn"] []
+        | Some content ->
+            p [Style.render top_style] [text content]
+        | None ->
+            div [class_ "dn"] []
       in
       let examples =
         List.map examples ~f:(fun e -> li [class_ "mb5 mw8 center"] [e])

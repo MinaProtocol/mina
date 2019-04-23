@@ -25,7 +25,8 @@ let expand ~loc ~path:_ override (module_name : longident) defs =
       let names =
         List.map exps ~f:(fun {pexp_desc= item; pexp_loc= loc; _} ->
             match item with
-            | Pexp_ident {txt= Lident id; _} -> id
+            | Pexp_ident {txt= Lident id; _} ->
+                id
             | __ ->
                 raise_errorf ~loc "Item in opened module is not an identifier"
         )
@@ -41,7 +42,8 @@ let expand ~loc ~path:_ override (module_name : longident) defs =
         [ Vb.mk ~loc
             (Pat.var ~loc {txt= id; loc})
             (Exp.open_ ~loc override {txt= module_name; loc} defs) ]
-  | _ -> raise_errorf ~loc "Must provide an identifier or tuple of identifiers"
+  | _ ->
+      raise_errorf ~loc "Must provide an identifier or tuple of identifiers"
 
 let ext =
   (* TODO : separate entry point for defining from enclosing module *)

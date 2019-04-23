@@ -104,34 +104,60 @@ end = struct
     Consensus.Consensus_state.(display_to_yojson @@ display consensus_state)
 
   let name (type a) : (_, a) t -> string = function
-    | New_frontier _ -> "New_frontier"
-    | Add_transition _ -> "Add_transition"
-    | Remove_transitions _ -> "Remove_transitions"
-    | Update_root _ -> "Update_root"
+    | New_frontier _ ->
+        "New_frontier"
+    | Add_transition _ ->
+        "Add_transition"
+    | Remove_transitions _ ->
+        "Remove_transitions"
+    | Update_root _ ->
+        "Update_root"
+
+  let update_root_to_yojson (state_hash, scan_state, pending_coinbase) =
+    (* We need some representation of scan_state and pending_coinbase,
+      so the serialized version of these states would be fine *)
+    `Assoc
+      [ ("state_hash", State_hash.to_yojson state_hash)
+      ; ( "scan_state"
+        , `Int
+            ( String.hash
+            @@ Binable.to_string (module Scan_state.Stable.V1) scan_state ) )
+      ; ( "pending_coinbase"
+        , `Int
+            ( String.hash
+            @@ Binable.to_string
+                 (module Pending_coinbase.Stable.V1)
+                 pending_coinbase ) ) ]
 
   (* Yojson is not performant and should be turned off *)
   let value_to_yojson (type a) (key : ('external_transition, a) t) (value : a)
       =
     let json_value =
       match (key, value) with
-      | New_frontier _, () -> `Null
+      | New_frontier _, () ->
+          `Null
       | Add_transition _, parent_consensus_state ->
           json_consensus_state parent_consensus_state
       | Remove_transitions _, removed_consensus_state ->
           `List (List.map removed_consensus_state ~f:json_consensus_state)
-      | Update_root _, (old_state_hash, _, _) ->
-          State_hash.to_yojson old_state_hash
+      | Update_root _, (old_state_hash, old_scan_state, old_pending_coinbase)
+        ->
+          update_root_to_yojson
+            (old_state_hash, old_scan_state, old_pending_coinbase)
     in
     `List [`String (name key); json_value]
 
   let key_to_yojson (type a) (key : ('external_transition, a) t) ~f =
     let json_key =
       match key with
-      | New_frontier (With_hash.({hash; _}), _, _) -> State_hash.to_yojson hash
-      | Add_transition With_hash.({hash; _}) -> State_hash.to_yojson hash
+      | New_frontier (With_hash.{hash; _}, _, _) ->
+          State_hash.to_yojson hash
+      | Add_transition With_hash.{hash; _} ->
+          State_hash.to_yojson hash
       | Remove_transitions removed_transitions ->
           `List (List.map removed_transitions ~f)
-      | Update_root (state_hash, _, _) -> State_hash.to_yojson state_hash
+      | Update_root (state_hash, scan_state, pending_coinbase) ->
+          update_root_to_yojson (state_hash, scan_state, pending_coinbase)
     in
     `List [`String (name key); json_key]
 
@@ -165,7 +191,8 @@ end = struct
   let hash_mutant (type mutant) (t : ('external_transition, mutant) t)
       (mutant : mutant) acc =
     match (t, mutant) with
-    | New_frontier _, () -> acc
+    | New_frontier _, () ->
+        acc
     | Add_transition _, parent_external_transition ->
         merge (serialize_consensus_state parent_external_transition) acc
     | Remove_transitions _, removed_transitions ->
@@ -197,18 +224,24 @@ end = struct
                 type nonrec 'external_transition t = 'external_transition t
 
                 let of_binable = function
-                  | `New_frontier data -> E (New_frontier data)
-                  | `Add_transition data -> E (Add_transition data)
+                  | `New_frontier data ->
+                      E (New_frontier data)
+                  | `Add_transition data ->
+                      E (Add_transition data)
                   | `Remove_transitions transitions ->
                       E (Remove_transitions transitions)
-                  | `Update_root data -> E (Update_root data)
+                  | `Update_root data ->
+                      E (Update_root data)
 
                 let to_binable = function
-                  | E (New_frontier data) -> `New_frontier data
-                  | E (Add_transition data) -> `Add_transition data
+                  | E (New_frontier data) ->
+                      `New_frontier data
+                  | E (Add_transition data) ->
+                      `Add_transition data
                   | E (Remove_transitions transitions) ->
                       `Remove_transitions transitions
-                  | E (Update_root data) -> `Update_root data
+                  | E (Update_root data) ->
+                      `Update_root data
               end)
   end
 end

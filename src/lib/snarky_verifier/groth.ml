@@ -69,7 +69,8 @@ module Make (Inputs : Inputs.S) = struct
     let of_hlist :
         (unit, 'a -> 'b -> 'a -> unit) Snarky.H_list.t -> ('a, 'b) t_ =
       function
-      | [a; b; c] -> {a; b; c}
+      | [a; b; c] ->
+          {a; b; c}
 
     let typ =
       Typ.of_hlistable

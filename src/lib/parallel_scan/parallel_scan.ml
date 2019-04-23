@@ -76,9 +76,9 @@ module State = struct
 
   let slots_per_block state = parallelism state / Int.pow 2 state.root_at_depth
 
-  (*A block is a set of leaves that correspond to a ledger proof. If 
-  root_at_depth = 0 then there would be just one block with all the leaves in 
-  it. No of blocks = 2^root_at_depth. This function returns the starting 
+  (*A block is a set of leaves that correspond to a ledger proof. If
+  root_at_depth = 0 then there would be just one block with all the leaves in
+  it. No of blocks = 2^root_at_depth. This function returns the starting
   position of the block containing pos *)
   let block_of state pos =
     let total_leaves = State.parallelism state in
@@ -123,8 +123,10 @@ module State = struct
     let p = parallelism state in
     let next_pos = next_leaf_pos p cur_pos in
     match Ring_buffer.read_i state.jobs next_pos with
-    | Base None -> Some next_pos
-    | _ -> None
+    | Base None ->
+        Some next_pos
+    | _ ->
+        None
 
   let%test_unit "parallelism derived from jobs" =
     let of_parallelism_log_2 x =
@@ -142,19 +144,26 @@ module State = struct
     let none = "_" in
     let print s1 s2 = Printf.sprintf "(%s,%s)" s1 s2 in
     let draw_job = function
-      | Job.Merge Empty -> print none none
-      | Job.Merge (Lcomp x) -> print (draw_a x) none
-      | Job.Merge (Rcomp y) -> print none (draw_a y)
-      | Job.Merge (Bcomp (x, y, _place)) -> print (draw_a x) (draw_a y)
-      | Job.Base None -> print none ""
-      | Job.Base (Some (d, _place)) -> draw_d d
+      | Job.Merge Empty ->
+          print none none
+      | Job.Merge (Lcomp x) ->
+          print (draw_a x) none
+      | Job.Merge (Rcomp y) ->
+          print none (draw_a y)
+      | Job.Merge (Bcomp (x, y, _place)) ->
+          print (draw_a x) (draw_a y)
+      | Job.Base None ->
+          print none ""
+      | Job.Base (Some (d, _place)) ->
+          draw_d d
     in
     let jobs = jobs state in
     let layers_rev =
       Ring_buffer.fold jobs ~init:[[]] ~f:(fun layers job ->
           let len = Int.pow 2 (List.length layers - 1) in
           match layers with
-          | [] -> failwith "impossible"
+          | [] ->
+              failwith "impossible"
           | hd :: rest ->
               if List.length hd >= len then [job] :: layers
               else (job :: hd) :: rest )
@@ -244,15 +253,22 @@ module State = struct
 
   let rec parent_empty (t : ('a, 'b) Job.t Ring_buffer.t) pos =
     match pos with
-    | 0 -> true
+    | 0 ->
+        true
     | pos -> (
       match (dir pos, Ring_buffer.read_i t ((pos - 1) / 2)) with
-      | _, Merge Empty -> true
-      | `Left, Merge (Rcomp _) -> true
-      | `Right, Merge (Lcomp _) -> true
-      | _, Merge (Bcomp _) -> parent_empty t ((pos - 1) / 2)
-      | _, Base _ -> failwith "This shouldn't have occured"
-      | _ -> false )
+      | _, Merge Empty ->
+          true
+      | `Left, Merge (Rcomp _) ->
+          true
+      | `Right, Merge (Lcomp _) ->
+          true
+      | _, Merge (Bcomp _) ->
+          parent_empty t ((pos - 1) / 2)
+      | _, Base _ ->
+          failwith "This shouldn't have occured"
+      | _ ->
+          false )
 
   (*Level_pointer stores a start index for each level. These are, at first,
     the indices of the first node on each level and get incremented when a job is
@@ -276,8 +292,10 @@ module State = struct
 
   let next_position parallelism level_pointer cur_pos =
     match next_position_info parallelism level_pointer cur_pos with
-    | `Same_level pos -> pos
-    | `Next_level pos -> pos
+    | `Same_level pos ->
+        pos
+    | `Next_level pos ->
+        pos
 
   (*On each level, the jobs are completed starting from a specific index that
     is stored in levels_pointer. When a job at that index is completed, it points
@@ -297,16 +315,20 @@ module State = struct
     let module J = Job in
     let module A = Available_job in
     match job with
-    | J.Base (Some (d, o)) -> Some (A.Base (d, o))
-    | J.Merge (Bcomp (a, b, o)) -> Some (A.Merge (a, b, o))
-    | _ -> None
+    | J.Base (Some (d, o)) ->
+        Some (A.Base (d, o))
+    | J.Merge (Bcomp (a, b, o)) ->
+        Some (A.Merge (a, b, o))
+    | _ ->
+        None
 
   let job state index =
     match job_ready (Ring_buffer.read_i state.jobs index) with
     | None ->
         Or_error.errorf
           "Invalid state of the scan: Found an un-Available_job.t at %d " index
-    | Some e -> Ok e
+    | Some e ->
+        Ok e
 
   let jobs_ready_sequence state =
     let open Sequence in
@@ -342,8 +364,10 @@ module State = struct
       else
         let jobs =
           match Ring_buffer.read_i state.jobs pos with
-          | Job.Base (Some (j, _)) -> j :: jobs
-          | _ -> jobs
+          | Job.Base (Some (j, _)) ->
+              j :: jobs
+          | _ ->
+              jobs
         in
         go (pos + 1) jobs
     in
@@ -352,17 +376,22 @@ module State = struct
   let update_new_job t z dir pos =
     let new_job (cur_job : ('a, 'd) Job.t) : ('a, 'd) Job.t Or_error.t =
       match (dir, cur_job) with
-      | `Left, Merge Empty -> Ok (Merge (Lcomp z))
-      | `Right, Merge Empty -> Ok (Merge (Rcomp z))
-      | `Left, Merge (Rcomp a) -> Ok (Merge (Bcomp (z, a, t.curr_job_seq_no)))
-      | `Right, Merge (Lcomp a) -> Ok (Merge (Bcomp (a, z, t.curr_job_seq_no)))
+      | `Left, Merge Empty ->
+          Ok (Merge (Lcomp z))
+      | `Right, Merge Empty ->
+          Ok (Merge (Rcomp z))
+      | `Left, Merge (Rcomp a) ->
+          Ok (Merge (Bcomp (z, a, t.curr_job_seq_no)))
+      | `Right, Merge (Lcomp a) ->
+          Ok (Merge (Bcomp (a, z, t.curr_job_seq_no)))
       | `Left, Merge (Lcomp _) | `Right, Merge (Rcomp _) | _, Merge (Bcomp _)
         ->
           (*TODO: punish the sender*)
           Or_error.errorf
             !"Impossible: the side of merge we want is not empty (loc: %d)"
             pos
-      | _, Base _ -> Error (Error.of_string "impossible: we never fill base")
+      | _, Base _ ->
+          Error (Error.of_string "impossible: we never fill base")
     in
     Ring_buffer.direct_update t.jobs pos ~f:new_job
 
@@ -394,8 +423,10 @@ module State = struct
             let parent_pos = (cur_pos - 1) / 2 in
             let%map () = update_new_job t z (dir cur_pos) parent_pos in
             match Ring_buffer.read_i t.jobs parent_pos with
-            | Merge (Bcomp _) -> Queue.enqueue t.stateful_work_order parent_pos
-            | _ -> ()
+            | Merge (Bcomp _) ->
+                Queue.enqueue t.stateful_work_order parent_pos
+            | _ ->
+                ()
         in
         let () = incr_level_pointer t cur_pos in
         let%map () = update_cur_job t (Merge Empty) cur_pos in
@@ -409,11 +440,14 @@ module State = struct
         t.current_data_length <- t.current_data_length - 1 ;
         let () =
           match Ring_buffer.read_i t.jobs parent_pos with
-          | Merge (Bcomp _) -> Queue.enqueue t.stateful_work_order parent_pos
-          | _ -> ()
+          | Merge (Bcomp _) ->
+              Queue.enqueue t.stateful_work_order parent_pos
+          | _ ->
+              ()
         in
         Ok ()
-    | false, _, _ -> Or_error.errorf "Parent of Job at %d not empty" cur_pos
+    | false, _, _ ->
+        Or_error.errorf "Parent of Job at %d not empty" cur_pos
     | _ ->
         Or_error.errorf "Job-to-do and Job-done doesn't match (at pos %d)"
           cur_pos
@@ -426,10 +460,12 @@ module State = struct
    fun t completed_jobs jobs_copy ->
     let open Or_error.Let_syntax in
     match completed_jobs with
-    | [] -> Ok ()
+    | [] ->
+        Ok ()
     | j :: js -> (
       match Queue.dequeue t.stateful_work_order with
-      | None -> Or_error.error_string "Work order state out of sync"
+      | None ->
+          Or_error.error_string "Work order state out of sync"
       | Some pos ->
           let%bind () = work t j jobs_copy pos in
           consume t js jobs_copy )
@@ -438,7 +474,8 @@ module State = struct
     let open Or_error.Let_syntax in
     let f (job : ('a, 'd) State.Job.t) : ('a, 'd) State.Job.t Or_error.t =
       match job with
-      | Base None -> Ok (Base (Some (value, state.curr_job_seq_no)))
+      | Base None ->
+          Ok (Base (Some (value, state.curr_job_seq_no)))
       | _ ->
           Or_error.error_string "Invalid job encountered while enqueuing data"
     in
@@ -455,7 +492,8 @@ module State = struct
         let open Or_error.Let_syntax in
         let%bind () = acc in
         match State.base_none_pos state with
-        | None -> Or_error.error_string "No empty leaves"
+        | None ->
+            Or_error.error_string "No empty leaves"
         | Some pos ->
             let%map () = include_one_datum state a pos in
             let () = Queue.enqueue state.stateful_work_order pos in
@@ -474,11 +512,14 @@ module State = struct
           | Continue subresult ->
               go subresult (i + 1)
                 (next_position (parallelism t) t.level_pointer pos)
-          | Stop aborted_value -> M.return (Stop aborted_value)
+          | Stop aborted_value ->
+              M.return (Stop aborted_value)
       in
       match%bind go init 0 0 with
-      | Continue result -> finish result
-      | Stop e -> return e
+      | Continue result ->
+          finish result
+      | Stop e ->
+          return e
   end
 
   module Foldable_ident = Make_foldable (Monad.Ident)
@@ -496,22 +537,28 @@ module State = struct
     let open Or_error.Let_syntax in
     let seq_no_at x =
       match Ring_buffer.read_i t.jobs x with
-      | Job.Base (Some (_, s)) -> Ok s
-      | Merge (Bcomp (_, _, s)) -> Ok s
+      | Job.Base (Some (_, s)) ->
+          Ok s
+      | Merge (Bcomp (_, _, s)) ->
+          Ok s
       | _ ->
           Or_error.error_string (sprintf "Expecting a completed job at %d" x)
     in
     let job_with_new_seq x seq_no =
       match Ring_buffer.read_i t.jobs x with
-      | Job.Base (Some (d, _)) -> Ok (Job.Base (Some (d, seq_no)))
-      | Merge (Bcomp (a1, a2, _)) -> Ok (Merge (Bcomp (a1, a2, seq_no)))
+      | Job.Base (Some (d, _)) ->
+          Ok (Job.Base (Some (d, seq_no)))
+      | Merge (Bcomp (a1, a2, _)) ->
+          Ok (Merge (Bcomp (a1, a2, seq_no)))
       | _ ->
           Or_error.error_string (sprintf "Expecting a completed job at %d" x)
     in
     let first_seq_no =
       match Queue.peek t.stateful_work_order with
-      | None -> Ok 1
-      | Some x -> seq_no_at x
+      | None ->
+          Ok 1
+      | Some x ->
+          seq_no_at x
     in
     Queue.fold ~init:(Ok 0) t.stateful_work_order ~f:(fun cur_seq index ->
         let%bind seq_no =
@@ -521,7 +568,7 @@ module State = struct
         let new_seq_no = seq_no - offset + 1 in
         let%map () =
           Or_error.bind (job_with_new_seq index new_seq_no)
-            ~f:(fun updated_job -> update_cur_job t updated_job index )
+            ~f:(fun updated_job -> update_cur_job t updated_job index)
         in
         new_seq_no )
 end
@@ -532,10 +579,14 @@ let view_jobs_with_position (t : ('a, 'd) State.t) fa fd =
         match job with
         | State.Job.Base x ->
             Job_view.Base (Option.map ~f:(fun (d, _) -> fd d) x)
-        | Merge Empty -> Merge (None, None)
-        | Merge (Lcomp x) -> Merge (Some (fa x), None)
-        | Merge (Rcomp y) -> Merge (None, Some (fa y))
-        | Merge (Bcomp (x, y, _)) -> Merge (Some (fa x), Some (fa y))
+        | Merge Empty ->
+            Merge (None, None)
+        | Merge (Lcomp x) ->
+            Merge (Some (fa x), None)
+        | Merge (Rcomp y) ->
+            Merge (None, Some (fa y))
+        | Merge (Bcomp (x, y, _)) ->
+            Merge (Some (fa x), Some (fa y))
       in
       (i, job') :: jobs )
   |> List.rev
@@ -609,8 +660,10 @@ let is_valid t =
         ~f:(fun (continue, count) job ->
           if continue then
             match job with
-            | State.Job.Base None -> (continue, count + 1)
-            | _ -> (false, count)
+            | State.Job.Base None ->
+                (continue, count + 1)
+            | _ ->
+                (false, count)
           else (false, count) )
         ~init:(true, 0)
     in
@@ -623,16 +676,21 @@ let is_valid t =
         let job = Ring_buffer.read_i t.jobs pos in
         let acc' = f acc job in
         match State.next_position_info p t.level_pointer pos with
-        | `Same_level pos' -> go pos' acc'
-        | `Next_level _ -> acc'
+        | `Same_level pos' ->
+            go pos' acc'
+        | `Next_level _ ->
+            acc'
       in
       go level_start init
     in
     let if_start_empty_all_empty level_start =
       let is_empty = function
-        | State.Job.Base None -> true
-        | Merge Empty -> true
-        | _ -> false
+        | State.Job.Base None ->
+            true
+        | Merge Empty ->
+            true
+        | _ ->
+            false
       in
       let first_job = Ring_buffer.read_i t.jobs level_start in
       if is_empty first_job then
@@ -664,9 +722,12 @@ let is_valid t =
         acc
         ||
         match job with
-        | Base (Some _) -> true
-        | Merge (Lcomp _) | Merge (Bcomp _) -> true
-        | _ -> false )
+        | Base (Some _) ->
+            true
+        | Merge (Lcomp _) | Merge (Bcomp _) ->
+            true
+        | _ ->
+            false )
   in
   Option.is_some (State.base_none_pos t)
   && free_space ~state:t > 0
@@ -682,7 +743,7 @@ let fill_in_completed_jobs :
   let old_jobs = Ring_buffer.copy state.jobs in
   let last_acc = state.acc in
   let%map () = State.consume state completed_jobs old_jobs in
-  (state.jobs).position <- 0 ;
+  state.jobs.position <- 0 ;
   if not (fst last_acc = fst state.acc) then snd state.acc else None
 
 let last_emitted_value (state : ('a, 'd) State.t) = snd state.acc
@@ -695,7 +756,8 @@ let parallelism : state:('a, 'd) State.t -> int =
 
 let next_on_new_tree (state : ('a, 's) State.t) =
   match state.base_none_pos with
-  | None -> Or_error.error_string "Invalid position for the next base job"
+  | None ->
+      Or_error.error_string "Invalid position for the next base job"
   | Some pos ->
       let block_start = State.block_of state pos in
       if block_start = pos then Ok true else Ok false
@@ -714,7 +776,8 @@ let current_job_sequence_number : ('a, 'd) State.t -> int =
 let partition_if_overflowing ~max_slots state =
   let n = min (free_space ~state) max_slots in
   match State.base_none_pos state with
-  | None -> {Space_partition.first= 0; second= None}
+  | None ->
+      {Space_partition.first= 0; second= None}
   | Some start ->
       let block_start = State.block_of state start in
       let start_0 = start - block_start in
@@ -775,8 +838,10 @@ let%test_module "scan latency" =
     let job_done (job : (Int64.t, Int64.t) Available_job.t) :
         Int64.t State.Completed_job.t =
       match job with
-      | Base (x, _) -> Lifted x
-      | Merge (x, y, _) -> Merged (Int64.( + ) x y)
+      | Base (x, _) ->
+          Lifted x
+      | Merge (x, y, _) ->
+          Merged (Int64.( + ) x y)
 
     let step state data =
       let jobs = Or_error.ok_exn (next_jobs ~state) in
@@ -807,7 +872,7 @@ let%test_module "scan latency" =
             let result_emitted = List.map states ~f:(fun s -> step s data) in
             results_emitted :=
               List.map2_exn result_emitted !results_emitted
-                ~f:(fun cur total -> cur + total ) )
+                ~f:(fun cur total -> cur + total) )
       in
       let of_depth_0 = List.hd_exn !results_emitted in
       List.iteri (List.drop !results_emitted 1) ~f:(fun i depth_i_plus_one ->
@@ -860,7 +925,8 @@ let%test_module "scans" =
     let do_steps ~state ~data ~f ~f_acc w =
       let rec go () =
         match%bind Linear_pipe.read' data with
-        | `Eof -> return ()
+        | `Eof ->
+            return ()
         | `Ok q ->
             let ds = Queue.to_list q in
             let%bind () = step_on_free_space state w ds f f_acc in
@@ -888,8 +954,10 @@ let%test_module "scans" =
         let job_done (job : (Int64.t, Int64.t) Available_job.t) :
             Int64.t State.Completed_job.t =
           match job with
-          | Base (x, _) -> Lifted x
-          | Merge (x, y, _) -> Merged (Int64.( + ) x y)
+          | Base (x, _) ->
+              Lifted x
+          | Merge (x, y, _) ->
+              Merged (Int64.( + ) x y)
 
         let%test_unit "Split only if enqueuing onto the next queue" =
           let p = 4 in
@@ -971,7 +1039,7 @@ let%test_module "scans" =
                   in
                   let acc =
                     Option.value_map (snd state.acc) ~default:(0, [])
-                      ~f:(fun (x, xs) -> (Int64.to_int_exn x, xs) )
+                      ~f:(fun (x, xs) -> (Int64.to_int_exn x, xs))
                   in
                   let expected = !cur_value - Int64.to_int_exn acc_data in
                   assert (fst acc = expected) ;
@@ -985,7 +1053,8 @@ let%test_module "scans" =
           let g =
             gen
               ~gen_data:
-                Quickcheck.Generator.Let_syntax.(Int.gen >>| Int64.of_int)
+                Quickcheck.Generator.Let_syntax.(
+                  Int.quickcheck_generator >>| Int64.of_int)
               ~f_job_done:job_done ~f_acc:f_merge_up
           in
           Quickcheck.test g ~sexp_of:[%sexp_of: (int64, int64) State.t]
@@ -1018,9 +1087,12 @@ let%test_module "scans" =
                     List.init (parallelism * parallelism) ~f:(fun _ -> ())
                     |> Deferred.List.fold ~init:v ~f:(fun v _ ->
                            match%map Linear_pipe.read (pipe s) with
-                           | `Eof -> v
-                           | `Ok (Some (v', _)) -> v'
-                           | `Ok None -> v )
+                           | `Eof ->
+                               v
+                           | `Ok (Some (v', _)) ->
+                               v'
+                           | `Ok None ->
+                               v )
                   in
                   (* after we flush intermediate work *)
                   let old_acc =
@@ -1037,9 +1109,9 @@ let%test_module "scans" =
           )
 
         let%test_unit "sequence number reset" =
-          (*create jobs with unique sequence numbers starting from 1. At any 
-          point, after reset, the jobs should be labelled starting from 1. 
-          Therefore,  sum of those sequence numbers should be equal to sum of 
+          (*create jobs with unique sequence numbers starting from 1. At any
+          point, after reset, the jobs should be labelled starting from 1.
+          Therefore,  sum of those sequence numbers should be equal to sum of
           first n (number of jobs) natural numbers*)
           Backtrace.elide := false ;
           let p = 3 in
@@ -1055,8 +1127,10 @@ let%test_module "scans" =
                 (module Int)
                 ~f:(fun (job : (int64, int64) Available_job.t) ->
                   match job with
-                  | Merge (_, _, seq) -> seq
-                  | Base (_, seq) -> seq )
+                  | Merge (_, _, seq) ->
+                      seq
+                  | Base (_, seq) ->
+                      seq )
                 (jobs state_copy)
             in
             assert (sum_of_all_seq_numbers = sum_of_n)
@@ -1106,8 +1180,10 @@ let%test_module "scans" =
         let job_done (job : (Int64.t, string) Available_job.t) :
             Int64.t State.Completed_job.t =
           match job with
-          | Base (x, _) -> Lifted (Int64.of_string x)
-          | Merge (x, y, _) -> Merged (Int64.( + ) x y)
+          | Base (x, _) ->
+              Lifted (Int64.of_string x)
+          | Merge (x, y, _) ->
+              Merged (Int64.( + ) x y)
 
         let%test_unit "scan behaves like a fold long-term" =
           let a_bunch_of_ones_then_zeros x =
@@ -1131,9 +1207,12 @@ let%test_module "scans" =
                 List.init (3 * n) ~f:(fun _ -> ())
                 |> Deferred.List.fold ~init:Int64.zero ~f:(fun acc _ ->
                        match%map Linear_pipe.read result with
-                       | `Eof -> acc
-                       | `Ok (Some (v, _)) -> v
-                       | `Ok None -> acc )
+                       | `Eof ->
+                           acc
+                       | `Ok (Some (v, _)) ->
+                           v
+                       | `Ok None ->
+                           acc )
               in
               let expected =
                 List.fold
@@ -1153,8 +1232,10 @@ let%test_module "scans" =
         let job_done (job : (string, string) Available_job.t) :
             string State.Completed_job.t =
           match job with
-          | Base (x, _) -> Lifted x
-          | Merge (x, y, _) -> Merged (String.( ^ ) x y)
+          | Base (x, _) ->
+              Lifted x
+          | Merge (x, y, _) ->
+              Merged (String.( ^ ) x y)
 
         let%test_unit "scan performs operation in correct order with \
                        non-commutative semigroup" =
@@ -1180,9 +1261,12 @@ let%test_module "scans" =
                 List.init (42 * n) ~f:(fun _ -> ())
                 |> Deferred.List.fold ~init:"" ~f:(fun acc _ ->
                        match%map Linear_pipe.read result with
-                       | `Eof -> acc
-                       | `Ok (Some (v, _)) -> v
-                       | `Ok None -> acc )
+                       | `Eof ->
+                           acc
+                       | `Ok (Some (v, _)) ->
+                           v
+                       | `Ok None ->
+                           acc )
               in
               let expected =
                 List.fold

@@ -6,7 +6,8 @@ open Async
 open Coda_base
 open Blockchain_snark
 open Cli_lib
-open Coda_main
+open Coda_inputs
+open Signature_lib
 module YJ = Yojson.Safe
 module Git_sha = Daemon_rpcs.Types.Git_sha
 
@@ -35,13 +36,13 @@ let daemon logger =
   Command.async ~summary:"Coda daemon"
     (let%map_open conf_dir =
        flag "config-directory" ~doc:"DIR Configuration directory"
-         (optional file)
+         (optional string)
      and propose_key =
        flag "propose-key"
          ~doc:
            "KEYFILE Private key file for the proposing transitions \
             (default:don't propose)"
-         (optional file)
+         (optional string)
      and peers =
        flag "peer"
          ~doc:
@@ -132,7 +133,8 @@ let daemon logger =
                in
                YJ.from_string ~fname:"daemon.json" contents )
          with
-         | Ok c -> Some c
+         | Ok c ->
+             Some c
          | Error e ->
              Logger.trace logger ~module_:__MODULE__ ~location:__LOC__
                "error reading daemon.json: %s" (Error.to_string_mach e) ;
@@ -145,7 +147,8 @@ let daemon logger =
          let open Option.Let_syntax in
          let open YJ.Util in
          match actual_value with
-         | Some v -> Some v
+         | Some v ->
+             Some v
          | None ->
              let%bind config = config in
              let%bind json_val = to_option Fn.id (member keyname config) in
@@ -153,7 +156,8 @@ let daemon logger =
        in
        let or_from_config map keyname actual_value ~default =
          match maybe_from_config map keyname actual_value with
-         | Some x -> x
+         | Some x ->
+             x
          | None ->
              Logger.info logger ~module_:__MODULE__ ~location:__LOC__
                "didn't find %s in the config file, using default" keyname ;
@@ -205,13 +209,15 @@ let daemon logger =
        if enable_tracing then Coda_tracing.start conf_dir |> don't_wait_for ;
        let%bind initial_peers_raw =
          match peers with
-         | _ :: _ -> return peers
+         | _ :: _ ->
+             return peers
          | [] -> (
              let peers_path = conf_dir ^/ "peers" in
              match%bind
                Reader.load_sexp peers_path [%of_sexp: Host_and_port.t list]
              with
-             | Ok ls -> return ls
+             | Ok ls ->
+                 return ls
              | Error e ->
                  let default_initial_peers = [] in
                  let%map () =
@@ -257,8 +263,10 @@ let daemon logger =
        in
        let sequence maybe_def =
          match maybe_def with
-         | Some def -> Deferred.map def ~f:Option.return
-         | None -> Deferred.return None
+         | Some def ->
+             Deferred.map def ~f:Option.return
+         | None ->
+             Deferred.return None
        in
        let%bind propose_keypair =
          Option.map ~f:Cli_lib.Keypair.Terminal_stdin.read_exn propose_key
@@ -292,18 +300,18 @@ let daemon logger =
            ~should_propose:(Option.is_some propose_keypair)
            (module Config0)
        in
-       let module M = Coda_main.Make_coda (Init) in
-       let module Run = Run (Config0) (M) in
+       let module M = Coda_inputs.Make_coda (Init) in
+       let module Run = Coda_run.Make (Config0) (M) in
        Stream.iter
          (Async.Scheduler.long_cycles
-            ~at_least:(sec 0.5 |> Time_ns.Span.of_span))
+            ~at_least:(sec 0.5 |> Time_ns.Span.of_span_float_round_nearest))
          ~f:(fun span ->
            Logger.warn logger ~module_:__MODULE__ ~location:__LOC__
              "long async cycle %s"
              (Time_ns.Span.to_string span) ) ;
        let run_snark_worker_action =
          Option.value_map run_snark_worker_flag ~default:`Don't_run
-           ~f:(fun k -> `With_public_key k )
+           ~f:(fun k -> `With_public_key k)
        in
        let trust_dir = conf_dir ^/ "trust" in
        let () = Snark_params.set_chunked_hashing true in
@@ -313,9 +321,16 @@ let daemon logger =
        let time_controller =
          M.Inputs.Time.Controller.create M.Inputs.Time.Controller.basic
        in
+       let consensus_local_state =
+         Consensus.Local_state.create
+           (Option.map Config0.propose_keypair ~f:(fun keypair ->
+                let open Keypair in
+                Public_key.compress keypair.public_key ))
+       in
        let net_config =
          { M.Inputs.Net.Config.logger
          ; time_controller
+         ; consensus_local_state
          ; gossip_net_params=
              { timeout= Time.Span.of_sec 3.
              ; logger
@@ -342,7 +357,8 @@ let daemon logger =
               ~ledger_db_location:(conf_dir ^/ "ledger_db")
               ~snark_work_fee:snark_work_fee_flag ~receipt_chain_database
               ~transition_frontier_location ~time_controller
-              ?propose_keypair:Config0.propose_keypair () ~monitor)
+              ?propose_keypair:Config0.propose_keypair ~monitor
+              ~consensus_local_state ())
        in
        Run.handle_shutdown ~monitor ~conf_dir ~logger coda ;
        Async.Scheduler.within' ~monitor
@@ -408,7 +424,8 @@ let rec ensure_testnet_id_still_good logger =
           exit 1
         in
         match commit_id with
-        | None -> finish None body_string
+        | None ->
+            finish None body_string
         | Some sha ->
             if
               List.exists valid_ids ~f:(fun remote_id ->

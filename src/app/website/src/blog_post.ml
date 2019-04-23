@@ -53,7 +53,8 @@ let author s website =
             ; literal
                 {literal|<i class="ml-1 ml-2-ns fab f7 fa-twitter mr3 mr2-m mr3-l"></i>|literal}
             ] ]
-    | None -> [text ("by " ^ s)] )
+    | None ->
+        [text ("by " ^ s)] )
 
 let date d =
   let month_day = Date.format d "%B %d" in
@@ -101,7 +102,7 @@ let post ~standalone name (post : Post.t) =
           [Stationary.Attribute.class_ "blog-content lh-copy"]
           [ post.content
           ; hr []
-          (* HACK: to reuse styles from blog hr, we can just stick it in blog-content *)
+            (* HACK: to reuse styles from blog hr, we can just stick it in blog-content *)
            ]
       ; Share.content ]
   in

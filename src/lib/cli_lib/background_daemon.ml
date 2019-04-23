@@ -20,8 +20,10 @@ let run ~f port arg =
     | No_daemon ->
         Print.printf !"Error: daemon not running. See `coda daemon`\n" ;
         go Abort
-    | Run_client -> f port arg
-    | Abort -> exit 1
+    | Run_client ->
+        f port arg
+    | Abort ->
+        exit 1
   in
   go Start
 

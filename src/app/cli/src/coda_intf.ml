@@ -1,4 +1,4 @@
-open Coda_main
+open Coda_inputs
 
 module type S = sig
   type ledger_proof

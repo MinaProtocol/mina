@@ -54,6 +54,19 @@ let of_root (h : Ledger_hash.t) =
 
 let of_ledger_root ledger = of_root (Ledger.merkle_root ledger)
 
+let of_any_ledger (ledger : Ledger.Any_ledger.witness) =
+  Ledger.Any_ledger.M.foldi ledger
+    ~init:(of_root (Ledger.Any_ledger.M.merkle_root ledger))
+    ~f:(fun _addr sparse_ledger account ->
+      let loc =
+        Option.value_exn
+          (Ledger.Any_ledger.M.location_of_key ledger account.public_key)
+      in
+      add_path sparse_ledger
+        (Ledger.Any_ledger.M.merkle_path ledger loc)
+        account.public_key
+        (Option.value_exn (Ledger.Any_ledger.M.get ledger loc)) )
+
 let of_ledger_subset_exn (oledger : Ledger.t) keys =
   let ledger = Ledger.copy oledger in
   let new_keys, sparse =
@@ -169,7 +182,8 @@ let apply_coinbase_exn t
   in
   let proposer_reward, t =
     match fee_transfer with
-    | None -> (coinbase_amount, t)
+    | None ->
+        (coinbase_amount, t)
     | Some (receiver, fee) ->
         let fee = Amount.of_fee fee in
         let reward =
@@ -182,9 +196,12 @@ let apply_coinbase_exn t
 
 let apply_transaction_exn t (transition : Transaction.t) =
   match transition with
-  | Fee_transfer tr -> apply_fee_transfer_exn t tr
-  | User_command cmd -> apply_user_command_exn t (cmd :> User_command.t)
-  | Coinbase c -> apply_coinbase_exn t c
+  | Fee_transfer tr ->
+      apply_fee_transfer_exn t tr
+  | User_command cmd ->
+      apply_user_command_exn t (cmd :> User_command.t)
+  | Coinbase c ->
+      apply_coinbase_exn t c
 
 let merkle_root t = Ledger_hash.of_hash (merkle_root t :> Pedersen.Digest.t)
 
@@ -208,4 +225,5 @@ let handler t =
       | Ledger_hash.Find_index pk ->
           let index = find_index_exn !ledger pk in
           respond (Provide index)
-      | _ -> unhandled )
+      | _ ->
+          unhandled )

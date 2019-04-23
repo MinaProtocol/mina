@@ -4,7 +4,7 @@
 open Core
 open Async
 open Coda_base
-open Coda_main
+open Coda_inputs
 open Signature_lib
 open Pipe_lib
 open O1trace
@@ -50,10 +50,11 @@ let run_test () : unit Deferred.t =
         | Some trace_dir ->
             let%bind () = Async.Unix.mkdir ~p:() trace_dir in
             Coda_tracing.start trace_dir
-        | None -> Deferred.unit
+        | None ->
+            Deferred.unit
       in
-      let module Main = Coda_main.Make_coda (Init) in
-      let module Run = Run (Config) (Main) in
+      let module Main = Coda_inputs.Make_coda (Init) in
+      let module Run = Coda_run.Make (Config) (Main) in
       let open Main in
       let%bind trust_dir = Async.Unix.mkdtemp (temp_conf_dir ^/ "trust_db") in
       let trust_system = Trust_system.create ~db_dir:trust_dir in
@@ -67,9 +68,14 @@ let run_test () : unit Deferred.t =
       let time_controller =
         Inputs.Time.Controller.create Inputs.Time.Controller.basic
       in
+      let consensus_local_state =
+        Consensus.Local_state.create
+          (Some (Public_key.compress keypair.public_key))
+      in
       let net_config =
         { Inputs.Net.Config.logger
         ; time_controller
+        ; consensus_local_state
         ; gossip_net_params=
             { Inputs.Net.Gossip_net.Config.timeout= Time.Span.of_sec 3.
             ; logger
@@ -91,8 +97,8 @@ let run_test () : unit Deferred.t =
              ~transaction_pool_disk_location:
                (temp_conf_dir ^/ "transaction_pool")
              ~snark_pool_disk_location:(temp_conf_dir ^/ "snark_pool")
-             ~time_controller ~receipt_chain_database ()
-             ~snark_work_fee:(Currency.Fee.of_int 0))
+             ~time_controller ~receipt_chain_database
+             ~snark_work_fee:(Currency.Fee.of_int 0) ~consensus_local_state ())
       in
       Main.start coda ;
       don't_wait_for
@@ -116,7 +122,8 @@ let run_test () : unit Deferred.t =
           | Some b when not (Currency.Balance.equal b initial_receiver_balance)
             ->
               true
-          | _ -> false
+          | _ ->
+              false
         in
         wait_until_cond ~f:cond ~timeout:3.
       in
