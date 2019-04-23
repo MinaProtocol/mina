@@ -23,10 +23,27 @@ let main () =
     Coda_worker_testnet.test logger n proposers snark_work_public_keys
       Protocols.Coda_pow.Work_selection.Seq ~max_concurrent_connections:None
   in
+  let previous_status = Sync_status.Hash_set.create () in
+  let bootstrapping_node = 1 in
+  (let%bind sync_status_pipe_opt =
+     Coda_worker_testnet.Api.sync_status testnet bootstrapping_node
+   in
+   Pipe_lib.Linear_pipe.iter (Option.value_exn sync_status_pipe_opt)
+     ~f:(fun sync_status ->
+       Logger.trace logger ~module_:__MODULE__ ~location:__LOC__
+         !"Bootstrap node received status: %{sexp:Sync_status.t}"
+         sync_status ;
+       Hash_set.add previous_status sync_status ;
+       Deferred.unit ))
+  |> don't_wait_for ;
   let%bind () =
-    Coda_worker_testnet.Restarts.trigger_bootstrap testnet ~logger ~node:1
+    Coda_worker_testnet.Restarts.trigger_bootstrap testnet ~logger
+      ~node:bootstrapping_node
   in
   let%bind () = after (Time.Span.of_sec 180.) in
+  (* TODO: one of the previous_statuses should be `Bootstrap. The broadcast pip 
+    coda.transition_frontier never gets set to None *)
+  assert (Hash_set.mem previous_status `Synced) ;
   Coda_worker_testnet.Api.teardown testnet
 
 let command =
