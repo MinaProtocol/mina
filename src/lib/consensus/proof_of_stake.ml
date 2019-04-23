@@ -227,6 +227,15 @@ module Epoch = struct
     in
     (epoch, slot)
 
+  let diff_in_slots ((epoch, slot) : t * Slot.t) ((epoch', slot') : t * Slot.t)
+      : int64 =
+    let open UInt32 in
+    let open UInt32.Infix in
+    let epoch_size = to_int64 Constants.Epoch.size in
+    let epoch_diff = to_int64 (epoch - epoch') in
+    let slot_diff = to_int64 (slot - slot') in
+    Int64.Infix.((epoch_diff * epoch_size) + slot_diff)
+
   let incr ((epoch, slot) : t * Slot.t) =
     let open UInt32 in
     if Slot.equal slot (sub Constants.Epoch.size one) then (add epoch one, zero)
@@ -2176,17 +2185,25 @@ let generate_transition ~(previous_protocol_state : Protocol_state.Value.t)
 
 let received_within_window (epoch, slot) ~time_received =
   let open Time in
+  let open Result.Let_syntax in
+  let open Int64 in
+  let ( < ) x y = Pervasives.(0 < compare x y) in
+  let ( >= ) x y = Pervasives.(compare x y <= 0) in
   let time_received =
     of_span_since_epoch (Span.of_ms (Unix_timestamp.to_int64 time_received))
   in
-  let window_start = Epoch.slot_start_time epoch slot in
-  let window_end = add window_start Constants.delta_duration in
-  if window_start < time_received && time_received < window_end then Ok ()
-  else
-    Error
-      [ ("window_start", to_yojson window_start)
-      ; ("window_end", to_yojson window_end)
-      ; ("time_received", to_yojson time_received) ]
+  let%bind received_epoch, received_slot =
+    try Ok (Epoch.epoch_and_slot_of_time_exn time_received)
+    with Invalid_argument _ -> Error `Too_early
+  in
+  let slot_diff =
+    Epoch.diff_in_slots
+      (Epoch.epoch_and_slot_of_time_exn time_received)
+      (epoch, slot)
+  in
+  if slot_diff < 0L then Error `Too_early
+  else if slot_diff >= of_int Constants.delta then Error (`Too_late slot_diff)
+  else Ok ()
 
 let received_at_valid_time (consensus_state : Consensus_state.Value.t)
     ~time_received =
