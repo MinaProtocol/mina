@@ -330,7 +330,7 @@ let run_test () : unit Deferred.t =
         let%map () =
           wait_until_cond
             ~f:(fun t -> block_count t > block_count')
-            ~timeout:10.
+            ~timeout:5.
         in
         assert (block_count coda > block_count')
       else
