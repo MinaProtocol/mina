@@ -113,6 +113,22 @@ end = struct
     | Update_root _ ->
         "Update_root"
 
+  let update_root_to_yojson (state_hash, scan_state, pending_coinbase) =
+    (* We need some representation of scan_state and pending_coinbase,
+      so the serialized version of these states would be fine *)
+    `Assoc
+      [ ("state_hash", State_hash.to_yojson state_hash)
+      ; ( "scan_state"
+        , `Int
+            ( String.hash
+            @@ Binable.to_string (module Scan_state.Stable.V1) scan_state ) )
+      ; ( "pending_coinbase"
+        , `Int
+            ( String.hash
+            @@ Binable.to_string
+                 (module Pending_coinbase.Stable.V1)
+                 pending_coinbase ) ) ]
+
   (* Yojson is not performant and should be turned off *)
   let value_to_yojson (type a) (key : ('external_transition, a) t) (value : a)
       =
@@ -124,8 +140,10 @@ end = struct
           json_consensus_state parent_consensus_state
       | Remove_transitions _, removed_consensus_state ->
           `List (List.map removed_consensus_state ~f:json_consensus_state)
-      | Update_root _, (old_state_hash, _, _) ->
-          State_hash.to_yojson old_state_hash
+      | Update_root _, (old_state_hash, old_scan_state, old_pending_coinbase)
+        ->
+          update_root_to_yojson
+            (old_state_hash, old_scan_state, old_pending_coinbase)
     in
     `List [`String (name key); json_value]
 
@@ -138,8 +156,8 @@ end = struct
           State_hash.to_yojson hash
       | Remove_transitions removed_transitions ->
           `List (List.map removed_transitions ~f)
-      | Update_root (state_hash, _, _) ->
-          State_hash.to_yojson state_hash
+      | Update_root (state_hash, scan_state, pending_coinbase) ->
+          update_root_to_yojson (state_hash, scan_state, pending_coinbase)
     in
     `List [`String (name key); json_key]
 

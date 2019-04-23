@@ -87,6 +87,10 @@ module Api = struct
       ~f:(fun ~worker () -> Coda_process.best_path worker)
       t i
 
+  let sync_status =
+    run_online_worker ~arg:() ~f:(fun ~worker () ->
+        Coda_process.sync_status_exn worker )
+
   let start t i =
     Linear_pipe.write t.start_writer
       ( i
