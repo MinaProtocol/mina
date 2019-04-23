@@ -513,13 +513,19 @@ module Base = struct
     in
     ()
 
-  let prove_main = Core_kernel.Staged.unstage @@ Groth16.reduce_to_prover (tick_input ()) main
+  let use_reduce_to_prover = false
+
+  let prove_main =
+    if use_reduce_to_prover then
+      Staged.unstage @@ Groth16.reduce_to_prover (tick_input ()) main
+    else fun t0 k0 key ?handlers s ->
+      Groth16.prove key (input ()) ?handlers s main
 
   let create_keys () = Groth16.generate_keypair main ~exposing:(tick_input ())
 
-  let transaction_union_proof ~proving_key sok_digest state1
-      state2 pending_coinbase_stack_state (transaction : Transaction_union.t)
-      handler =
+  let transaction_union_proof ~proving_key sok_digest state1 state2
+      pending_coinbase_stack_state (transaction : Transaction_union.t) handler
+      =
     let prover_state : Prover_state.t =
       {state1; state2; transaction; sok_digest; pending_coinbase_stack_state}
     in
@@ -815,7 +821,13 @@ module Merge = struct
     in
     Boolean.Assert.all [verify_12; verify_23]
 
-  let prove_main = Core_kernel.Staged.unstage @@ Groth16.reduce_to_prover (input ()) main
+  let use_reduce_to_prover = false
+
+  let prove_main =
+    if use_reduce_to_prover then
+      Staged.unstage @@ Groth16.reduce_to_prover (input ()) main
+    else fun t0 k0 key ?handlers s ->
+      Groth16.prove key (input ()) ?handlers s main
 
   let create_keys () = Groth16.generate_keypair ~exposing:(input ()) main
 
@@ -1065,7 +1077,12 @@ struct
     in
     with_label __LOC__ (Boolean.Assert.is_true result)
 
-  let prove_main = Core_kernel.Staged.unstage @@ reduce_to_prover wrap_input main
+  let use_reduce_to_prover = false
+
+  let prove_main =
+    if use_reduce_to_prover then
+      Staged.unstage @@ Groth16.reduce_to_prover wrap_input main
+    else fun key ?handlers s -> Groth16.prove key (input ()) ?handlers s main
 
   let create_keys () = generate_keypair ~exposing:wrap_input main
 

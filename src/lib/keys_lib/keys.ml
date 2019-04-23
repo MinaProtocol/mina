@@ -152,7 +152,13 @@ let create () : (module S) Async.Deferred.t =
               As_prover.(map get_state ~f:there)
               (main x)
 
-          let prove_main = Staged.unstage @@ Tick.Groth16.reduce_to_prover (input ()) main
+          let use_reduce_to_prover = false
+
+          let prove_main =
+            if use_reduce_to_prover then
+              Staged.unstage @@ Tick.Groth16.reduce_to_prover (input ()) main
+            else fun t0 k0 key ?handlers s ->
+              Tick.Groth16.prove key (input ()) ?handlers s main
         end
 
         module Wrap = struct
@@ -171,7 +177,13 @@ let create () : (module S) Async.Deferred.t =
               As_prover.(map get_state ~f:there)
               (main x)
 
-          let prove_main = Staged.unstage @@ Tock.reduce_to_prover input main
+          let use_reduce_to_prover = false
+
+          let prove_main =
+            if use_reduce_to_prover then
+              Staged.unstage @@ Tock.reduce_to_prover input main
+            else fun t0 k0 key ?handlers s ->
+              Tock.prove key (input ()) ?handlers s main
         end
       end in
       (module M : S)
