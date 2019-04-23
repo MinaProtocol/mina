@@ -1076,7 +1076,7 @@ struct
     in
     with_label __LOC__ (Boolean.Assert.is_true result)
 
-  let use_reduce_to_prover = false
+  let use_reduce_to_prover = true
 
   let prove_main =
     if use_reduce_to_prover then
