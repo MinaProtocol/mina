@@ -466,7 +466,8 @@ struct
       else current
 
   let step (t : t) = function
-    | Event.Found transition -> step' t transition
+    | Event.Found transition ->
+        step' t transition
     | Event.Candidate_state pcd ->
         let%map state = select t.state pcd in
         {state}

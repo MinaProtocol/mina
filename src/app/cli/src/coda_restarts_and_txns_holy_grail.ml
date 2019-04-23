@@ -1,7 +1,7 @@
 open Core
 open Async
 open Coda_worker
-open Coda_main
+open Coda_inputs
 open Coda_base
 
 let name = "coda-restarts-and-txns-holy-grail"
@@ -28,21 +28,19 @@ let main n () =
   |> don't_wait_for ;
   (* RESTART NODES *)
   (* catchup *)
-  let idx = Quickcheck.random_value (Int.gen_incl 1 (n - 1)) in
+  let%bind () = after (Time.Span.of_min 1.) in
   let%bind () =
-    Coda_worker_testnet.Restarts.trigger_catchup testnet ~logger ~node:idx
+    Coda_worker_testnet.Restarts.trigger_catchup testnet ~logger ~node:2
   in
-  let%bind () = after (Time.Span.of_min 5.) in
+  let%bind () = after (Time.Span.of_min 1.) in
   (* bootstrap *)
-  let idx = Quickcheck.random_value (Int.gen_incl 1 (n - 1)) in
   let%bind () =
-    Coda_worker_testnet.Restarts.trigger_bootstrap testnet ~logger ~node:idx
+    Coda_worker_testnet.Restarts.trigger_bootstrap testnet ~logger ~node:1
   in
   (* TODO: We should add the random restart again once the Genesis Ledger is
      implemented. *)
   (* settle for a few more min *)
-  (* TODO: Make sure to check that catchup actually worked *)
-  let%bind () = after (Time.Span.of_min 5.) in
+  let%bind () = after (Time.Span.of_min 1.) in
   Coda_worker_testnet.Api.teardown testnet
 
 let command =

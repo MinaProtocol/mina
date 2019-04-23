@@ -132,18 +132,24 @@ let validate_type_decl inner3_modules generation_kind type_decl =
 
 let module_name_from_plain_path inner3_modules =
   match inner3_modules with
-  | ["T"; module_version; "Stable"] -> module_version
-  | _ -> failwith "module_name_from_plain_path: unexpected module path"
+  | ["T"; module_version; "Stable"] ->
+      module_version
+  | _ ->
+      failwith "module_name_from_plain_path: unexpected module path"
 
 let module_name_from_wrapped_path inner3_modules =
   match inner3_modules with
-  | [module_version; "Stable"; "Wrapped"] -> module_version
-  | _ -> failwith "module_name_from_wrapped_path: unexpected module path"
+  | [module_version; "Stable"; "Wrapped"] ->
+      module_version
+  | _ ->
+      failwith "module_name_from_wrapped_path: unexpected module path"
 
 let module_name_from_rpc_path inner3_modules =
   match List.take inner3_modules 2 with
-  | ["T"; module_version] -> module_version
-  | _ -> failwith "module_name_from_rpc_path: unexpected module path"
+  | ["T"; module_version] ->
+      module_version
+  | _ ->
+      failwith "module_name_from_rpc_path: unexpected module path"
 
 (* generate "let version = n", when version module is Vn *)
 let generate_version_number_decl inner3_modules loc generation_kind =
@@ -154,9 +160,12 @@ let generate_version_number_decl inner3_modules loc generation_kind =
   let open E in
   let module_name =
     match generation_kind with
-    | Plain -> module_name_from_plain_path inner3_modules
-    | Wrapped -> module_name_from_wrapped_path inner3_modules
-    | Rpc -> module_name_from_rpc_path inner3_modules
+    | Plain ->
+        module_name_from_plain_path inner3_modules
+    | Wrapped ->
+        module_name_from_wrapped_path inner3_modules
+    | Rpc ->
+        module_name_from_rpc_path inner3_modules
   in
   let version =
     String.sub module_name ~pos:1 ~len:(String.length module_name - 1)
@@ -187,15 +196,18 @@ let is_jane_street_stable_module module_path =
   List.mem jane_street_libs hd_elt ~equal:String.equal
   &&
   match List.rev module_path with
-  | vn :: "Stable" :: _ -> is_version_module vn
+  | vn :: "Stable" :: _ ->
+      is_version_module vn
   | vn :: "Span" :: "Stable" :: "Time" :: _ ->
       (* special case, maybe improper module structure *)
       is_version_module vn
-  | _ -> false
+  | _ ->
+      false
 
 let whitelisted_prefix prefix ~loc =
   match prefix with
-  | Lident id -> String.equal id "Bitstring"
+  | Lident id ->
+      String.equal id "Bitstring"
   | Ldot _ ->
       let module_path = Longident.flatten_exn prefix in
       is_jane_street_stable_module module_path
@@ -220,7 +232,8 @@ let rec generate_core_type_version_decls type_name core_type =
           || List.mem jane_street_type_constructors id ~equal:String.equal
         then
           match core_types with
-          | [_] -> generate_version_lets_for_core_types type_name core_types
+          | [_] ->
+              generate_version_lets_for_core_types type_name core_types
           | _ ->
               Ppx_deriving.raise_errorf ~loc:core_type.ptyp_loc
                 "Type constructor \"%s\" expects one type argument, got %d" id
@@ -253,10 +266,12 @@ let rec generate_core_type_version_decls type_name core_type =
   | Ptyp_tuple core_types ->
       (* type t = t1 * t2 * t3 *)
       generate_version_lets_for_core_types type_name core_types
-  | Ptyp_variant _ -> (* type t = [ `A | `B ] *)
-                      []
-  | Ptyp_var _ -> (* type variable *)
-                  []
+  | Ptyp_variant _ ->
+      (* type t = [ `A | `B ] *)
+      []
+  | Ptyp_var _ ->
+      (* type variable *)
+      []
   | _ ->
       Ppx_deriving.raise_errorf ~loc:core_type.ptyp_loc
         "Can't determine versioning for contained type"
@@ -338,7 +353,8 @@ let check_for_option s options =
     match opt with
     | str1, {pexp_desc= Pexp_ident {txt= Lident str2; _}; _} ->
         String.equal s str1 && String.equal s str2
-    | _ -> false
+    | _ ->
+        false
   in
   List.find options ~f:is_s_opt |> Option.is_some
 
@@ -375,9 +391,12 @@ let generate_let_bindings_for_type_decl_str ~options ~path type_decls =
        \"wrapped\" or \"rpc\" options" ;
   let generation_kind =
     match (rpc, wrapped) with
-    | true, false -> Rpc
-    | false, true -> Wrapped
-    | false, false -> Plain
+    | true, false ->
+        Rpc
+    | false, true ->
+        Wrapped
+    | false, false ->
+        Plain
     | true, true ->
         Ppx_deriving.raise_errorf ~loc:type_decl.ptype_loc
           "RPC versioned type cannot also be wrapped"

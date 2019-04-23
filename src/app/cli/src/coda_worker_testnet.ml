@@ -1,7 +1,7 @@
 open Core
 open Async
 open Coda_worker
-open Coda_main
+open Coda_inputs
 open Signature_lib
 open Coda_base
 open Pipe_lib
@@ -43,9 +43,12 @@ module Api = struct
 
   let synced t i =
     match t.status.(i) with
-    | `On (`Synced _) -> true
-    | `On `Catchup -> false
-    | `Off -> false
+    | `On (`Synced _) ->
+        true
+    | `On `Catchup ->
+        false
+    | `Off ->
+        false
 
   let run_online_worker ~f ~arg t i =
     let worker = t.workers.(i) in
@@ -73,6 +76,10 @@ module Api = struct
       ~f:(fun ~worker () -> Coda_process.best_path worker)
       t i
 
+  let sync_status =
+    run_online_worker ~arg:() ~f:(fun ~worker () ->
+        Coda_process.sync_status_exn worker )
+
   let start t i =
     Linear_pipe.write t.start_writer
       ( i
@@ -89,7 +96,8 @@ module Api = struct
     | `On (`Synced user_cmds_under_inspection) ->
         Hashtbl.iter user_cmds_under_inspection ~f:(fun {passed_root; _} ->
             Ivar.fill passed_root () )
-    | _ -> () ) ;
+    | _ ->
+        () ) ;
     t.status.(i) <- `Off ;
     let ongoing_rpcs, lock = t.locks.(i) in
     let rec wait_for_no_rpcs () =
@@ -130,7 +138,8 @@ module Api = struct
                 { expected_deadline= root_length + Consensus.Constants.k + delay
                 ; passed_root } ;
             Option.return passed_root
-        | _ -> return None )
+        | _ ->
+            return None )
       >>| Option.return
     in
     all_passed_root
@@ -183,8 +192,10 @@ let start_prefix_check logger workers events testnet ~acceptable_delay =
       Array.fold ~init:None
         ~f:(fun acc chain ->
           match acc with
-          | None -> Some chain
-          | Some acc -> Some (Hash_set.inter acc chain) )
+          | None ->
+              Some chain
+          | Some acc ->
+              Some (Hash_set.inter acc chain) )
         chain_sets
     with
     | Some hashes_in_common ->
@@ -259,9 +270,8 @@ let start_payment_check logger root_pipe workers (testnet : Api.t) =
   Linear_pipe.iter root_pipe ~f:(function
       | `Root
           ( worker_id
-          , Protocols.Coda_transition_frontier.Root_diff_view.({ user_commands
-                                                               ; root_length })
-          )
+          , Protocols.Coda_transition_frontier.Root_diff_view.
+              {user_commands; root_length} )
       ->
       Option.fold root_length ~init:Deferred.unit ~f:(fun _ length ->
           match testnet.status.(worker_id) with
@@ -296,9 +306,11 @@ let start_payment_check logger root_pipe workers (testnet : Api.t) =
                           "transaction $user_cmd finally gets into the root \
                            of node $worker_id, when root length is $length" ;
                         None
-                    | None -> None ) ) ;
+                    | None ->
+                        None ) ) ;
               Deferred.unit
-          | _ -> Deferred.unit ) )
+          | _ ->
+              Deferred.unit ) )
   |> don't_wait_for
 
 let events workers start_reader =
@@ -376,7 +388,7 @@ end = struct
   let send_several_payments testnet ~node ~keypairs ~n =
     let amount = Currency.Amount.of_int 10 in
     let fee = Currency.Fee.of_int 1 in
-    let%bind _ : unit option list =
+    let%bind (_ : unit option list) =
       Deferred.List.init n ~f:(fun _ ->
           let open Deferred.Option.Let_syntax in
           let%bind all_passed_root's =

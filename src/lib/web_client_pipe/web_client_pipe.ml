@@ -43,7 +43,8 @@ end)
           don't_wait_for
             (Linear_pipe.iter reader ~f:(fun data ->
                  match%map write_to_storage t request data with
-                 | Ok () -> ()
+                 | Ok () ->
+                     ()
                  | Error e ->
                      Logger.error logger ~module_:__MODULE__ ~location:__LOC__
                        "Writing data IO_error: %s" (Error.to_string_hum e) ))

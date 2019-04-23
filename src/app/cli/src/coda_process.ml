@@ -2,7 +2,7 @@ open Core
 open Async
 open Coda_worker
 open Coda_base
-open Coda_main
+open Coda_inputs
 open Pipe_lib
 
 type t = Coda_worker.Connection.t * Process.t * Coda_worker.Input.t
@@ -56,7 +56,7 @@ let local_config ?proposal_interval ~peers ~discovery_port ~external_port
 
 let disconnect (conn, proc, _) =
   let%bind () = Coda_worker.Connection.close conn in
-  let%map _ : Unix.Exit_or_signal.t = Process.wait proc in
+  let%map (_ : Unix.Exit_or_signal.t) = Process.wait proc in
   ()
 
 let peers_exn (conn, proc, _) =
@@ -85,6 +85,13 @@ let process_payment_exn (conn, proc, _) cmd =
 let prove_receipt_exn (conn, proc, _) proving_receipt resulting_receipt =
   Coda_worker.Connection.run_exn conn ~f:Coda_worker.functions.prove_receipt
     ~arg:(proving_receipt, resulting_receipt)
+
+let sync_status_exn (conn, proc, _) =
+  let%map r =
+    Coda_worker.Connection.run_exn conn ~f:Coda_worker.functions.sync_status
+      ~arg:()
+  in
+  Linear_pipe.wrap_reader r
 
 let verified_transitions_exn (conn, proc, _) =
   let%map r =

@@ -35,7 +35,7 @@ let string_to_bits s =
       (c lsr j) land 1 = 1 )
 
 let%test_unit "string to bits" =
-  Quickcheck.test ~trials:5 String.gen ~f:(fun s ->
+  Quickcheck.test ~trials:5 String.quickcheck_generator ~f:(fun s ->
       [%test_eq: string] s (bits_to_string (string_to_bits s)) )
 
 let digest_field =

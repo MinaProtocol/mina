@@ -202,7 +202,7 @@ module type Transaction_witness_intf = sig
 end
 
 module type Protocol_state_hash_intf = sig
-  type t [@@deriving bin_io, sexp, eq]
+  type t [@@deriving bin_io, sexp, eq, to_yojson]
 
   include Hashable.S_binable with type t := t
 end
@@ -1432,7 +1432,11 @@ module type External_transition_validation_intf = sig
 
   type fully_valid = Truth.true_t all
 
-  type ('time_received, 'proof, 'frontier_dependencies, 'staged_ledger_diff) with_transition =
+  type ( 'time_received
+       , 'proof
+       , 'frontier_dependencies
+       , 'staged_ledger_diff )
+       with_transition =
     (external_transition, state_hash) With_hash.t
     * ('time_received, 'proof, 'frontier_dependencies, 'staged_ledger_diff) t
 
@@ -1529,8 +1533,10 @@ module type Consensus_mechanism_intf = sig
 
   type time
 
+  type local_state_sync [@@deriving to_yojson]
+
   module Local_state : sig
-    type t [@@deriving sexp]
+    type t [@@deriving sexp, to_yojson]
 
     val create : compressed_public_key option -> t
   end
@@ -1610,7 +1616,9 @@ module type Consensus_mechanism_intf = sig
     -> Protocol_state.Value.t * Consensus_transition_data.Value.t
 
   val received_at_valid_time :
-    Consensus_state.Value.t -> time_received:Unix_timestamp.t -> bool
+       Consensus_state.Value.t
+    -> time_received:Unix_timestamp.t
+    -> (unit, (string * Yojson.Safe.json) list) result
 
   val next_proposal :
        Int64.t
@@ -1627,6 +1635,19 @@ module type Consensus_mechanism_intf = sig
     -> candidate:Consensus_state.Value.t
     -> logger:Logger.t
     -> [`Keep | `Take]
+
+  val required_local_state_sync :
+       consensus_state:Consensus_state.Value.t
+    -> local_state:Local_state.t
+    -> local_state_sync Non_empty_list.t option
+
+  val sync_local_state :
+       logger:Logger.t
+    -> local_state:Local_state.t
+    -> random_peers:(int -> Network_peer.Peer.t list)
+    -> query_peer:Network_peer.query_peer
+    -> local_state_sync Non_empty_list.t
+    -> unit Deferred.Or_error.t
 
   val genesis_protocol_state :
     (Protocol_state.Value.t, protocol_state_hash) With_hash.t

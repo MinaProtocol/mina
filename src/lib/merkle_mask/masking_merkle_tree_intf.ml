@@ -24,7 +24,7 @@ module type S = sig
   (** create a mask with no parent *)
   val create : unit -> t
 
-  val get_uuid : t -> Core.Uuid.t
+  val get_uuid : t -> Uuid.t
 
   module Attached : sig
     include
@@ -37,7 +37,7 @@ module type S = sig
        and type key := key
        and type key_set := key_set
 
-    exception Dangling_parent_reference of Core.Uuid.t
+    exception Dangling_parent_reference of Uuid.t
 
     (** get hash from mask, if present, else from its parent *)
     val get_hash : t -> Addr.t -> hash option
@@ -55,6 +55,7 @@ module type S = sig
     val parent_set_notify : t -> account -> unit
 
     val copy : t -> t
+
     (* makes new mask instance with copied tables, re-use parent *)
 
     (** already have module For_testing from include above *)
