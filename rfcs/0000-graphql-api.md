@@ -29,7 +29,10 @@ just to avoid needing to query it all every time.
 
 Note: There are several custom scalars defined at the top for readability. These will be `String`s in the final implementation due to the complications involved in the encoding of custom scalars not being expressed in the schema and needing to be implemented symmetrically on the client and server.
 
+Note: Public keys will all be the "compressed" public keys that are used elsewhere in the node.
+
 ```graphql
+# Note: this will all be strings in the actual api.
 scalar Date
 scalar PublicKey
 scalar PrivateKey
@@ -105,10 +108,14 @@ type BlockUpdate {
   consensus: ConsensusState!
 }
 
+type Balance {
+  total: UInt64!,
+  unknown: UInt64!,
+}
+
 type Wallet {
   publicKey: PublicKey!
-  privateKey: PrivateKey!
-  balance(consensus: ConsensusStatus): UInt64!
+  balance: Balance!
 }
 
 type NodeStatus {
@@ -213,13 +220,10 @@ type BlockConnection {
 }
 
 type Query {
-  # List of wallets currently tracked by the node
-  wallets: [Wallet!]!
+  # List of wallets for which the node knows the private key
+  ownedWallets: [Wallet!]!
   
-  # Gets balance of key at a certain consensus state
-  # Note: `consensus` is optional as we will likely decide one
-  # state to be the "real" balance
-  balance(publicKey: PublicKey!, consensus: ConsensusStatus): UInt64!
+  wallet(publicKey: PublicKey!): Wallet
   
   payments(
     filter: PaymentFilterInput,
@@ -419,9 +423,6 @@ simplify the interface and avoid any binary serialization that might rely on hav
 ## Unresolved questions
 [unresolved-questions]: #unresolved-questions
 
-- Should we be able to query the node for the amount of the balance that corresponds to unknown/missed transactions?
-  We could also calculate this client-side by summing up all the payments/fees/coinbases and comparing to the balance
-  queried from the node.
 - Several apis involve objects that get incrementally updated during consensus
   It's important that we have a reliable way to associate updates with their
   corresponding objects in memory. We don't have a concept of IDs for most of these
@@ -429,3 +430,4 @@ simplify the interface and avoid any binary serialization that might rely on hav
   objects, it might help with this and avoid accidents comparing fields in an insufficient way.
 - Authentication
 - Potentially out of scope: How will this evolve and be used in the future, when most wallets will just run a light node locally?
+- Future work: Create a utility to allow for hardware wallets to be used. This will involve calling the addWallet mutation without a private key and having the node talk to another process that interacts with the hardware wallet.
