@@ -1,7 +1,7 @@
 open Core
 open Async
 open Coda_worker
-open Coda_main
+open Coda_inputs
 open Signature_lib
 open Coda_base
 open Pipe_lib
@@ -75,6 +75,10 @@ module Api = struct
     run_online_worker ~arg:()
       ~f:(fun ~worker () -> Coda_process.best_path worker)
       t i
+
+  let sync_status =
+    run_online_worker ~arg:() ~f:(fun ~worker () ->
+        Coda_process.sync_status_exn worker )
 
   let start t i =
     Linear_pipe.write t.start_writer
