@@ -25,7 +25,7 @@ module Stable = struct
   module V1 = struct
     module T = struct
       type t = [`Offline | `Bootstrap | `Synced]
-      [@@deriving bin_io, version, sexp, hash, compare]
+      [@@deriving bin_io, version, sexp, hash, compare, equal]
 
       let to_yojson = to_yojson
     end
@@ -37,6 +37,11 @@ module Stable = struct
   module Latest = V1
 end
 
-type t = [`Offline | `Bootstrap | `Synced] [@@deriving sexp, hash]
+type t = [`Offline | `Bootstrap | `Synced] [@@deriving sexp, hash, equal]
 
 include Hashable.Make (Stable.Latest.T)
+
+let%test "of_string (to_string x) == x" =
+  List.for_all [`Offline; `Bootstrap; `Synced] ~f:(fun sync_status ->
+      equal sync_status (of_string (to_string sync_status) |> Or_error.ok_exn)
+  )

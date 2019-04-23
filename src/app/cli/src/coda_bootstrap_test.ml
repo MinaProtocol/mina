@@ -30,7 +30,7 @@ let main () =
    in
    Pipe_lib.Linear_pipe.iter (Option.value_exn sync_status_pipe_opt)
      ~f:(fun sync_status ->
-       Logger.info logger ~module_:__MODULE__ ~location:__LOC__
+       Logger.trace logger ~module_:__MODULE__ ~location:__LOC__
          !"Bootstrap node received status: %{sexp:Sync_status.t}"
          sync_status ;
        Hash_set.add previous_status sync_status ;
