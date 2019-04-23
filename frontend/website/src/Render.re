@@ -119,7 +119,7 @@ let jobOpenings = [|
   (
     "director-of-business-development",
     "Director of Business Development (San Francisco).",
-  )
+  ),
 |];
 
 // GENERATE
