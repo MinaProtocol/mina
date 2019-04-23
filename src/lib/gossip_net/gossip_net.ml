@@ -264,13 +264,41 @@ module Make (Message : Message_intf) :
           let implementations =
             Versioned_rpc.Menu.add
               ( Message.implement_multi
-                  (fun _client_host_and_port ~version:_ msg ->
-                    (* TODO: maybe check client host matches IP in msg, punish if
-                        mismatch due to forgery
-                     *)
-                    Strict_pipe.Writer.write received_writer
-                      (Envelope.Incoming.wrap ~data:(Message.content msg)
-                         ~sender:(Message.sender msg)) )
+                  (fun client_host_and_port ~version:_ msg ->
+                    let sender = Message.sender msg in
+                    let sender_host_and_port =
+                      let peer =
+                        match sender with
+                        | Local ->
+                            Peer.local
+                        | Remote peer ->
+                            peer
+                      in
+                      Peer.to_communications_host_and_port peer
+                    in
+                    let client_host =
+                      client_host_and_port.Host_and_port.host
+                    in
+                    let sender_host =
+                      sender_host_and_port.Host_and_port.host
+                    in
+                    if String.equal client_host sender_host then
+                      Strict_pipe.Writer.write received_writer
+                        (Envelope.Incoming.wrap ~data:(Message.content msg)
+                           ~sender)
+                    else
+                      (* punish the IP address associated with the connection, not the forged IP in the message *)
+                      Deferred.upon
+                        Trust_system.(
+                          record config.trust_system config.logger
+                            (Unix.Inet_addr.of_string client_host)
+                            Actions.
+                              ( Violated_protocol
+                              , Some
+                                  ( "Host and port in message doesn't match \
+                                     connection host and port"
+                                  , [] ) ))
+                        (fun () -> ()) )
               @ implementation_list )
           in
           Rpc.Implementations.create_exn ~implementations
