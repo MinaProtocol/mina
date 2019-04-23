@@ -119,8 +119,7 @@ let jobOpenings = [|
   (
     "director-of-business-development",
     "Director of Business Development (San Francisco).",
-  ),
-  ("developer-advocate", "Developer Advocate (San Francisco)."),
+  )
 |];
 
 // GENERATE
