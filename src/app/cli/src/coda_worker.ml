@@ -1,11 +1,8 @@
-[%%import
-"../../../config.mlh"]
-
 open Core
 open Async
 open Coda_base
 open Signature_lib
-open Coda_main
+open Coda_inputs
 open Signature_lib
 open Pipe_lib
 
@@ -99,6 +96,8 @@ module T = struct
         Rpc_parallel.Function.t
     ; verified_transitions:
         ('worker, unit, State_hashes.t Pipe.Reader.t) Rpc_parallel.Function.t
+    ; sync_status:
+        ('worker, unit, Sync_status.t Pipe.Reader.t) Rpc_parallel.Function.t
     ; root_diff:
         ( 'worker
         , unit
@@ -131,6 +130,8 @@ module T = struct
         User_command.t -> Receipt.Chain_hash.t Or_error.t Deferred.t
     ; coda_verified_transitions:
         unit -> State_hashes.t Pipe.Reader.t Deferred.t
+    ; coda_sync_status:
+        unit -> Sync_status.Stable.V1.t Pipe.Reader.t Deferred.t
     ; coda_root_diff:
            unit
         -> User_command.t Protocols.Coda_transition_frontier.Root_diff_view.t
@@ -162,6 +163,9 @@ module T = struct
 
     let verified_transitions_impl ~worker_state ~conn_state:() () =
       worker_state.coda_verified_transitions ()
+
+    let sync_status_impl ~worker_state ~conn_state:() () =
+      worker_state.coda_sync_status ()
 
     let root_diff_impl ~worker_state ~conn_state:() () =
       worker_state.coda_root_diff ()
@@ -241,6 +245,10 @@ module T = struct
             User_command.Stable.Latest.t
             Protocols.Coda_transition_frontier.Root_diff_view.t] ()
 
+    let sync_status =
+      C.create_pipe ~f:sync_status_impl ~bin_input:Unit.bin_t
+        ~bin_output:[%bin_type_class: Sync_status.Stable.V1.t] ()
+
     let dump_tf =
       C.create_rpc ~f:dump_tf_impl ~bin_input:Unit.bin_t
         ~bin_output:String.bin_t ()
@@ -261,7 +269,8 @@ module T = struct
       ; process_payment
       ; prove_receipt
       ; dump_tf
-      ; best_path }
+      ; best_path
+      ; sync_status }
 
     let init_worker_state
         { host
@@ -316,8 +325,8 @@ module T = struct
           let%bind (module Init) =
             make_init ~should_propose:(Option.is_some proposer) (module Config)
           in
-          let module Main = Coda_main.Make_coda (Init) in
-          let module Run = Run (Config) (Main) in
+          let module Main = Coda_inputs.Make_coda (Init) in
+          let module Run = Coda_run.Make (Config) (Main) in
           let receipt_chain_dir_name = conf_dir ^/ "receipt_chain" in
           let%bind trust_dir = Unix.mkdtemp (conf_dir ^/ "trust") in
           let%bind () = File_system.create_dir receipt_chain_dir_name in
@@ -476,6 +485,34 @@ module T = struct
             let path = Main.best_path coda in
             Deferred.return (Option.value ~default:[] path)
           in
+          let parse_sync_status_exn = function
+            | `Assoc [("data", `Assoc [("new_sync_update", `String status)])]
+              ->
+                Sync_status.of_string status |> Or_error.ok_exn
+            | unexpected_json ->
+                failwithf
+                  !"could not parse sync status from json. Got: %s"
+                  (Yojson.Basic.to_string unexpected_json)
+                  ()
+          in
+          let coda_sync_status () =
+            let schema = Run.Graphql.schema in
+            match Graphql_parser.parse "subscription { new_sync_update }" with
+            | Ok query -> (
+                match%map Graphql_async.Schema.execute schema coda query with
+                | Ok (`Stream pipe) ->
+                    Async.Pipe.map pipe ~f:(function
+                      | Ok json ->
+                          parse_sync_status_exn json
+                      | Error e ->
+                          failwith "Receiving sync status error: " )
+                | _ ->
+                    failwith "Expected to get a stream of sync updates" )
+            | Error e ->
+                failwithf
+                  !"unable to retrieve sync update subscription: %s"
+                  e ()
+          in
           { coda_peers= with_monitor coda_peers
           ; coda_verified_transitions= with_monitor coda_verified_transitions
           ; coda_root_diff= with_monitor coda_root_diff
@@ -487,7 +524,8 @@ module T = struct
           ; coda_prove_receipt= with_monitor coda_prove_receipt
           ; coda_start= with_monitor coda_start
           ; coda_dump_tf= with_monitor coda_dump_tf
-          ; coda_best_path= with_monitor coda_best_path } )
+          ; coda_best_path= with_monitor coda_best_path
+          ; coda_sync_status= with_monitor coda_sync_status } )
 
     let init_connection_state ~connection:_ ~worker_state:_ = return
   end
