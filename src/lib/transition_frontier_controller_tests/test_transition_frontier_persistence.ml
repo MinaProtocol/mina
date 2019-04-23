@@ -81,12 +81,21 @@ let%test_module "Transition Frontier Persistence" =
       let%bind frontier =
         create_root_frontier ~logger Genesis_ledger.accounts
       in
-      let worker =
-        Transition_frontier_persistence.create ~logger ?directory_name ()
-      in
-      let%map result = f (frontier, worker) in
-      Transition_frontier_persistence.Worker.close worker ;
-      result
+      Monitor.try_with_or_error (fun () ->
+          let worker =
+            Transition_frontier_persistence.create ~logger ?directory_name ()
+          in
+          let%map result = f (frontier, worker) in
+          Transition_frontier_persistence.Worker.close worker ;
+          result )
+      |> Deferred.map ~f:(function
+           | Ok value ->
+               value
+           | Error e ->
+               Logger.error ~module_:__MODULE__ ~location:__LOC__ logger
+                 "Encountered an error: Visualizing transition frontier" ;
+               Transition_frontier.visualize ~filename:"frontier.dot" frontier ;
+               Error.raise e )
 
     let with_database ~directory_name ~f =
       let database = Transition_storage.create ~directory:directory_name in
@@ -171,9 +180,6 @@ let%test_module "Transition Frontier Persistence" =
 
     let%test_unit "Root changes multiple times" =
       test_linear_breadcrumbs (2 * max_length)
-
-    let%test_unit "Randomly generate a tree" =
-      test_tree_breadcrumbs (2 * max_length)
 
     let%test_unit "Randomly generate a tree" =
       test_tree_breadcrumbs (2 * max_length)

@@ -515,10 +515,11 @@ module Make (Inputs : Inputs_intf) = struct
 
   let sync_status t =
     let open Incr_status in
+    let transition_frontier_incr = Var.watch @@ Incr.transition_frontier t in
     let incremental_status =
       Incr_status.map2
         (Var.watch @@ Incr.online_status t)
-        (Var.watch @@ Incr.transition_frontier t)
+        transition_frontier_incr
         ~f:(fun online_status active_status ->
           match online_status with
           | `Offline ->
@@ -587,7 +588,8 @@ module Make (Inputs : Inputs_intf) = struct
 
   let root_diff t =
     let root_diff_reader, root_diff_writer =
-      Strict_pipe.create (Buffered (`Capacity 10, `Overflow Crash))
+      Strict_pipe.create ~name:"root diff"
+        (Buffered (`Capacity 30, `Overflow Crash))
     in
     don't_wait_for
       (Broadcast_pipe.Reader.iter t.transition_frontier ~f:(function
