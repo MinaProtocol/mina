@@ -5,7 +5,7 @@ open Core
 open Async
 open Coda_base
 open Signature_lib
-open Coda_main
+open Coda_inputs
 open Signature_lib
 open Pipe_lib
 
@@ -316,8 +316,8 @@ module T = struct
           let%bind (module Init) =
             make_init ~should_propose:(Option.is_some proposer) (module Config)
           in
-          let module Main = Coda_main.Make_coda (Init) in
-          let module Run = Run (Config) (Main) in
+          let module Main = Coda_inputs.Make_coda (Init) in
+          let module Run = Coda_run.Make (Config) (Main) in
           let receipt_chain_dir_name = conf_dir ^/ "receipt_chain" in
           let%bind trust_dir = Unix.mkdtemp (conf_dir ^/ "trust") in
           let%bind () = File_system.create_dir receipt_chain_dir_name in
