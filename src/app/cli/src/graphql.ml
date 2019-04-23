@@ -26,16 +26,18 @@ module Make (Program : Coda_inputs.Main_intf) = struct
     (* TODO: include submitted_at (date) and included_at (date). These two fields are not exposed in the user_command *)
     let payment : (t, User_command.t option) typ =
       obj "payment" ~fields:(fun _ ->
-          [ field "nonce" ~typ:(non_null int)
+          [ field "nonce" ~typ:(non_null int) ~doc:"Nonce of the transaction"
               ~args:Arg.[]
               ~resolve:(fun _ payment ->
                 User_command_payload.nonce @@ User_command.payload payment
                 |> Account.Nonce.to_int )
           ; field "sender" ~typ:(non_null string)
+              ~doc:"Public key of the sender"
               ~args:Arg.[]
               ~resolve:(fun _ payment ->
                 User_command.sender payment |> Stringable.public_key )
           ; field "receiver" ~typ:(non_null string)
+              ~doc:"Public key of the receiver"
               ~args:Arg.[]
               ~resolve:(fun _ payment ->
                 match
@@ -47,6 +49,9 @@ module Make (Program : Coda_inputs.Main_intf) = struct
                     failwith "Payment should not consist of a stake delegation"
                 )
           ; field "amount" ~typ:(non_null string)
+              ~doc:
+                "Amount that sender send to receiver (amount is uint64 and is \
+                 coerced as a string)"
               ~args:Arg.[]
               ~resolve:(fun _ payment ->
                 match
@@ -58,11 +63,14 @@ module Make (Program : Coda_inputs.Main_intf) = struct
                     failwith "Payment should not consist of a stake delegation"
                 )
           ; field "fee" ~typ:(non_null string)
+              ~doc:
+                "Fee that sender is willing to pay for making the transaction \
+                 (fee is uint64 and is coerced as a string)"
               ~args:Arg.[]
               ~resolve:(fun _ payment ->
                 User_command.fee payment |> Currency.Fee.to_uint64
                 |> Stringable.uint64 )
-          ; field "memo" ~typ:(non_null string)
+          ; field "memo" ~typ:(non_null string) ~doc:"Note of the transaction"
               ~args:Arg.[]
               ~resolve:(fun _ payment ->
                 User_command_payload.memo @@ User_command.payload payment
