@@ -518,7 +518,8 @@ module Base = struct
   let prove_main =
     if use_reduce_to_prover then
       Staged.unstage @@ Groth16.reduce_to_prover (tick_input ()) main
-    else fun key ?handlers s -> Groth16.prove key (input ()) ?handlers s main
+    else fun key ?handlers s ->
+      Groth16.prove key (tick_input ()) ?handlers s main
 
   let create_keys () = Groth16.generate_keypair main ~exposing:(tick_input ())
 
@@ -1080,7 +1081,7 @@ struct
   let prove_main =
     if use_reduce_to_prover then
       Staged.unstage @@ reduce_to_prover wrap_input main
-    else fun key ?handlers s -> prove key (input ()) ?handlers s main
+    else fun key ?handlers s -> prove key wrap_input ?handlers s main
 
   let create_keys () = generate_keypair ~exposing:wrap_input main
 

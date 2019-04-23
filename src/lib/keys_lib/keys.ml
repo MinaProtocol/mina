@@ -182,8 +182,7 @@ let create () : (module S) Async.Deferred.t =
           let prove_main =
             if use_reduce_to_prover then
               Staged.unstage @@ Tock.reduce_to_prover input main
-            else fun key ?handlers s ->
-              Tock.prove key (input ()) ?handlers s main
+            else fun key ?handlers s -> Tock.prove key input ?handlers s main
         end
       end in
       (module M : S)
