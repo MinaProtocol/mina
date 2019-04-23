@@ -157,7 +157,7 @@ let create () : (module S) Async.Deferred.t =
           let prove_main =
             if use_reduce_to_prover then
               Staged.unstage @@ Tick.Groth16.reduce_to_prover (input ()) main
-            else fun t0 k0 key ?handlers s ->
+            else fun key ?handlers s ->
               Tick.Groth16.prove key (input ()) ?handlers s main
         end
 
@@ -182,7 +182,7 @@ let create () : (module S) Async.Deferred.t =
           let prove_main =
             if use_reduce_to_prover then
               Staged.unstage @@ Tock.reduce_to_prover input main
-            else fun t0 k0 key ?handlers s ->
+            else fun key ?handlers s ->
               Tock.prove key (input ()) ?handlers s main
         end
       end in
