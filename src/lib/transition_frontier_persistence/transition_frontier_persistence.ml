@@ -69,7 +69,17 @@ module Make (Inputs : Intf.Main_inputs) = struct
         E (Update_root new_root)
 
   let write_diff_and_verify ~logger ~acc_hash worker frontier diff_mutant =
+    Logger.trace logger "Handling mutant diff" ~module_:__MODULE__
+      ~location:__LOC__
+      ~metadata:
+        [ ( "diff_mutant"
+          , Diff_mutant.key_to_yojson diff_mutant
+              ~f:(Fn.compose State_hash.to_yojson With_hash.hash) ) ] ;
     let ground_truth_diff = apply_diff frontier diff_mutant in
+    Logger.trace logger ~module_:__MODULE__ ~location:__LOC__
+      ~metadata:
+        [("mutant", Diff_mutant.value_to_yojson diff_mutant ground_truth_diff)]
+      "Ground truth response" ;
     let ground_truth_hash =
       Diff_mutant.hash acc_hash diff_mutant ground_truth_diff
         ~f:(Fn.compose State_hash.to_bytes With_hash.hash)
@@ -84,8 +94,13 @@ module Make (Inputs : Intf.Main_inputs) = struct
     | Ok new_hash ->
         if Diff_hash.equal new_hash ground_truth_hash then ground_truth_hash
         else
-          failwith
-            "Unable to write mutant diff correctly as hashes are different"
+          failwithf
+            !"Unable to write mutant diff correctly as hashes are different:\n\
+             \ %s"
+            (Yojson.Safe.to_string
+               (Diff_mutant.key_to_yojson diff_mutant
+                  ~f:(Fn.compose State_hash.to_yojson With_hash.hash)))
+            ()
 
   let listen_to_frontier_broadcast_pipe ~logger
       (frontier_broadcast_pipe :

@@ -515,10 +515,11 @@ module Make (Inputs : Inputs_intf) = struct
 
   let sync_status t =
     let open Incr_status in
+    let transition_frontier_incr = Var.watch @@ Incr.transition_frontier t in
     let incremental_status =
       Incr_status.map2
         (Var.watch @@ Incr.online_status t)
-        (Var.watch @@ Incr.transition_frontier t)
+        transition_frontier_incr
         ~f:(fun online_status active_status ->
           match online_status with
           | `Offline ->
