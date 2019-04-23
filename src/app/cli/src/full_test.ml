@@ -237,8 +237,13 @@ let run_test () : unit Deferred.t =
         p_res |> Participating_state.active_exn |> assert_ok ;
         new_balance_sheet'
       in
-      let send_payments accounts pks balance_sheet f_amount =
-        Deferred.List.foldi accounts ~init:balance_sheet
+      let pks accounts =
+        List.map accounts ~f:(fun ((keypair : Signature_lib.Keypair.t), _) ->
+            Public_key.compress keypair.public_key )
+      in
+      let send_payments accounts ~txn_count balance_sheet f_amount =
+        let pks = pks accounts in
+        Deferred.List.foldi (List.take accounts txn_count) ~init:balance_sheet
           ~f:(fun i acc ((keypair : Signature_lib.Keypair.t), _) ->
             let sender_pk = Public_key.compress keypair.public_key in
             let receiver =
@@ -257,7 +262,7 @@ let run_test () : unit Deferred.t =
         let cond t = Option.is_some @@ Run.For_tests.ledger_proof t in
         wait_until_cond ~f:cond ~timeout
       in
-      let test_multiple_payments accounts pks timeout =
+      let test_multiple_payments accounts ~txn_count timeout =
         let balance_sheet =
           Public_key.Compressed.Map.of_alist_exn
             (List.map accounts
@@ -266,7 +271,7 @@ let run_test () : unit Deferred.t =
                  , account.Account.Poly.balance ) ))
         in
         let%bind updated_balance_sheet =
-          send_payments accounts pks balance_sheet (fun i ->
+          send_payments accounts ~txn_count balance_sheet (fun i ->
               Currency.Amount.of_int ((i + 1) * 10) )
         in
         (*After mining a few blocks and emitting a ledger_proof (by the parallel scan), check if the balances match *)
@@ -284,10 +289,6 @@ let run_test () : unit Deferred.t =
         in
         test_sending_payment sender_keypair.private_key
           (Public_key.compress receiver_keypair.public_key)
-      in
-      let pks accounts =
-        List.map accounts ~f:(fun ((keypair : Signature_lib.Keypair.t), _) ->
-            Public_key.compress keypair.public_key )
       in
       (*Need some accounts from the genesis ledger to test payment replays and
   sending multiple payments*)
@@ -324,7 +325,7 @@ let run_test () : unit Deferred.t =
       if with_snark then
         let accounts = List.take other_accounts 2 in
         let%bind block_count' =
-          test_multiple_payments accounts (pks accounts) 15.
+          test_multiple_payments accounts ~txn_count:1 15.
         in
         (*wait for a block after the ledger_proof is emitted*)
         let%map () =
@@ -335,7 +336,9 @@ let run_test () : unit Deferred.t =
         assert (block_count coda > block_count')
       else
         let%bind _ =
-          test_multiple_payments other_accounts (pks other_accounts) 7.
+          test_multiple_payments other_accounts
+            ~txn_count:(List.length other_accounts)
+            7.
         in
         test_duplicate_payments sender_keypair receiver_keypair )
 
