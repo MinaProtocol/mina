@@ -141,11 +141,6 @@ module Make (Message : Message_intf) :
       >>= function
       | Ok (Ok result) ->
           (* call succeeded, result is valid *)
-          let%bind () =
-            Trust_system.(
-              record t.trust_system t.logger peer.host
-                Actions.(Fulfilled_request, Some ("RPC call succeeded", [])))
-          in
           return (Ok result)
       | Ok (Error err) ->
           (* call succeeded, result is an error *)
