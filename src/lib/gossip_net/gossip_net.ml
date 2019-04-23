@@ -161,6 +161,11 @@ module Make (Message : Message_intf) :
           return (Error err)
       | Error exn ->
           (* call itself failed *)
+          (* TODO: learn what exceptions are raised here, punish peers for
+            handshake timeouts, possibly other exceptions
+          *)
+          Logger.error t.logger ~module_:__MODULE__ ~location:__LOC__
+            "RPC call raised an exception: %s" (Exn.to_string exn) ;
           return (Or_error.of_exn exn)
     in
     match Hashtbl.find t.connections peer.host with
