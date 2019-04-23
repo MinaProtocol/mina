@@ -323,15 +323,14 @@ let run_test () : unit Deferred.t =
       in
       if with_snark then
         let accounts = List.take other_accounts 2 in
-        let head_account = List.hd_exn accounts in
         let%bind block_count' =
-          test_multiple_payments [head_account] (pks accounts) 15.
+          test_multiple_payments accounts (pks accounts) 15.
         in
         (*wait for a block after the ledger_proof is emitted*)
         let%map () =
           wait_until_cond
             ~f:(fun t -> block_count t > block_count')
-            ~timeout:5.
+            ~timeout:10.
         in
         assert (block_count coda > block_count')
       else
