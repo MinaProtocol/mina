@@ -36,7 +36,8 @@ module Make (Inputs : Inputs_intf) :
 
   let add (t : t) ~parent new_child =
     State_hash.Table.update t parent ~f:(function
-      | None -> [new_child]
+      | None ->
+          [new_child]
       | Some children ->
           if
             List.mem children new_child

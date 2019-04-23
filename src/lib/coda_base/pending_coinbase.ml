@@ -436,7 +436,8 @@ module T = struct
           respond (Delegate (Set_coinbase_stack (addr, stack)))
       | Merkle_tree.Get_element addr ->
           respond (Delegate (Get_coinbase_stack addr))
-      | _ -> unhandled
+      | _ ->
+          unhandled
 
     let get t addr =
       handle
@@ -573,7 +574,9 @@ module T = struct
           (key / 2)
     in
     let rec go t key =
-      if Stack_id.( > ) key (Stack_id.of_int @@ Int.pow 2 coinbase_tree_depth)
+      if
+        Stack_id.( > ) key
+          (Stack_id.of_int @@ (Int.pow 2 coinbase_tree_depth - 1))
       then t
       else
         let path =
@@ -612,8 +615,8 @@ module T = struct
     let open Or_error.Let_syntax in
     if is_new_stack then
       let%map new_pos =
-        if Stack_id.equal t.new_pos (Stack_id.of_int coinbase_stacks) then
-          Ok Stack_id.zero
+        if Stack_id.equal t.new_pos (Stack_id.of_int (coinbase_stacks - 1))
+        then Ok Stack_id.zero
         else Stack_id.incr_by_one t.new_pos
       in
       {t with pos_list= t.new_pos :: t.pos_list; new_pos}
@@ -623,8 +626,10 @@ module T = struct
     if is_new_stack then Ok t.new_pos
     else
       match List.hd t.pos_list with
-      | Some x -> Ok x
-      | None -> Or_error.error_string "No Stack_id for the latest stack"
+      | Some x ->
+          Ok x
+      | None ->
+          Or_error.error_string "No Stack_id for the latest stack"
 
   let latest_stack (t : t) ~is_new_stack =
     let open Or_error.Let_syntax in
@@ -637,8 +642,10 @@ module T = struct
 
   let remove_oldest_stack_id t =
     match List.rev t with
-    | [] -> Or_error.error_string "No coinbase stack to pop"
-    | x :: xs -> Ok (x, List.rev xs)
+    | [] ->
+        Or_error.error_string "No coinbase stack to pop"
+    | x :: xs ->
+        Ok (x, List.rev xs)
 
   let oldest_stack t =
     let open Or_error.Let_syntax in
@@ -677,7 +684,7 @@ module T = struct
         (List.fold pos_list ~init:"" ~f:(fun s a -> s ^ Stack_id.to_string a))
     in
     let h = Digestif.SHA256.feed_string h (Stack_id.to_string new_pos) in
-    (Digestif.SHA256.get h :> string)
+    Digestif.SHA256.(get h |> to_raw_string)
 
   let handler (t : t) ~is_new_stack =
     let pending_coinbase = ref t in
@@ -705,8 +712,10 @@ module T = struct
         | Checked.Find_index_of_newest_stack ->
             let stack_id =
               match latest_stack_id !pending_coinbase ~is_new_stack with
-              | Ok id -> id
-              | _ -> Stack_id.zero
+              | Ok id ->
+                  id
+              | _ ->
+                  Stack_id.zero
             in
             let index =
               find_index !pending_coinbase stack_id |> Or_error.ok_exn
@@ -722,19 +731,16 @@ module T = struct
             pending_coinbase :=
               set_stack !pending_coinbase idx stack |> Or_error.ok_exn ;
             respond (Provide ())
-        | _ -> unhandled )
+        | _ ->
+            unhandled )
 end
 
 include T
 
 let%test_unit "add stack + remove stack = initial tree " =
   let pending_coinbases = ref (create () |> Or_error.ok_exn) in
-  let coinbases_gen =
-    Quickcheck.Generator.tuple2
-      (List.gen_with_length 20 Coinbase.gen)
-      (Int.gen_incl 1 coinbase_stacks)
-  in
-  Quickcheck.test coinbases_gen ~trials:10 ~f:(fun (cbs, _i) ->
+  let coinbases_gen = Quickcheck.Generator.list_non_empty Coinbase.gen in
+  Quickcheck.test coinbases_gen ~trials:50 ~f:(fun cbs ->
       Async.Thread_safe.block_on_async_exn (fun () ->
           let is_new = ref true in
           let init = merkle_root !pending_coinbases in
@@ -816,3 +822,73 @@ let%test_unit "Checked_tree = Unchecked_tree" =
         x
       in
       assert (Hash.equal (merkle_root unchecked) checked) )
+
+let%test_unit "push and pop multiple stacks" =
+  let open Quickcheck in
+  let pending_coinbases = ref (create () |> Or_error.ok_exn) in
+  let queue_of_stacks = Queue.create ~capacity:(coinbase_stacks + 1) () in
+  let max_coinbase_amount = Protocols.Coda_praos.coinbase_amount in
+  let coinbases_gen = Quickcheck.Generator.list Coinbase.gen in
+  let add_new_stack t = function
+    | [] ->
+        let t' = with_next_index t ~is_new_stack:true |> Or_error.ok_exn in
+        (Stack.empty, t')
+    | initial_coinbase :: coinbases ->
+        let t' =
+          add_coinbase t ~coinbase:initial_coinbase ~is_new_stack:true
+          |> Or_error.ok_exn
+        in
+        let updated =
+          List.fold coinbases ~init:t'
+            ~f:(fun pending_coinbases (coinbase : Coinbase.t) ->
+              let coinbase2 =
+                Coinbase.create
+                  ~amount:
+                    ( Amount.sub max_coinbase_amount coinbase.amount
+                    |> Option.value_exn ?here:None ?message:None ?error:None )
+                  ~proposer:coinbase.proposer ~fee_transfer:None
+                |> Or_error.ok_exn
+              in
+              if Amount.equal coinbase.amount Amount.zero then
+                pending_coinbases
+              else
+                let interim_tree =
+                  add_coinbase pending_coinbases ~coinbase ~is_new_stack:false
+                  |> Or_error.ok_exn
+                in
+                if Amount.equal coinbase2.amount Amount.zero then interim_tree
+                else
+                  add_coinbase interim_tree ~coinbase:coinbase2
+                    ~is_new_stack:false
+                  |> Or_error.ok_exn )
+        in
+        let new_stack =
+          Or_error.ok_exn @@ latest_stack updated ~is_new_stack:false
+        in
+        (new_stack, updated)
+  in
+  (*fill up to n stacks*)
+  let fill n =
+    iter ~trials:n coinbases_gen ~f:(fun coinbases ->
+        let new_stack, updated_pending_coinbases =
+          add_new_stack !pending_coinbases coinbases
+        in
+        pending_coinbases := updated_pending_coinbases ;
+        Queue.enqueue queue_of_stacks new_stack )
+  in
+  (*remove the oldest stack and check if that's the expected one *)
+  let check t expected_stack =
+    let popped_stack, updated_pending_coinbases =
+      remove_coinbase_stack t |> Or_error.ok_exn
+    in
+    assert (Stack.equal popped_stack expected_stack) ;
+    updated_pending_coinbases
+  in
+  let add_remove_check trials =
+    fill trials ;
+    Queue.iter queue_of_stacks ~f:(fun expected_stack ->
+        pending_coinbases := check !pending_coinbases expected_stack ) ;
+    Queue.clear queue_of_stacks
+  in
+  test ~trials:50 (Int.gen_incl 2 coinbase_stacks) ~f:(fun trials ->
+      add_remove_check trials )

@@ -157,7 +157,8 @@ struct
 
   let%snarkydef var_to_bits t =
     match t.bits with
-    | Some bits -> return (bits :> Boolean.var list)
+    | Some bits ->
+        return (bits :> Boolean.var list)
     | None ->
         let%map bits = unpack t.digest in
         t.bits <- Some (Bitstring.Lsb_first.of_list bits) ;

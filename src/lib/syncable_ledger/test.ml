@@ -94,7 +94,8 @@ struct
     | `Ok mt ->
         total_queries := Some (List.length !seen_queries) ;
         Root_hash.equal desired_root (Ledger.merkle_root mt)
-    | `Target_changed _ -> false
+    | `Target_changed _ ->
+        false
 
   let%test_unit "new_goal_soon" =
     let l1, _k1 = Ledger.load_ledger num_accts 1 in
@@ -124,7 +125,7 @@ struct
                      ~logger ~trust_system ;
                  desired_root := Ledger.merkle_root l3 ;
                  Sync_ledger.new_goal lsync !desired_root ~data:()
-                   ~equal:(fun () () -> true )
+                   ~equal:(fun () () -> true)
                  |> ignore ;
                  Deferred.unit )
                else
@@ -145,7 +146,8 @@ struct
           Sync_ledger.fetch lsync !desired_root ~data:() ~equal:(fun () () ->
               true ) )
     with
-    | `Ok _ -> failwith "shouldn't happen"
+    | `Ok _ ->
+        failwith "shouldn't happen"
     | `Target_changed _ -> (
       match
         Async.Thread_safe.block_on_async_exn (fun () ->
@@ -154,7 +156,8 @@ struct
       | `Ok mt ->
           [%test_result: Root_hash.t] ~expect:(Ledger.merkle_root l3)
             (Ledger.merkle_root mt)
-      | `Target_changed _ -> failwith "the target changed again" )
+      | `Target_changed _ ->
+          failwith "the target changed again" )
 end
 
 module Root_hash = struct
@@ -335,9 +338,10 @@ module Mask = struct
                     account
                 in
                 match action with
-                | `Existed -> Mask.Attached.set attached_mask location account
-                | `Added -> failwith "Expected to re-use an existing account"
-            ) ;
+                | `Existed ->
+                    Mask.Attached.set attached_mask location account
+                | `Added ->
+                    failwith "Expected to re-use an existing account" ) ;
             construct_layered_masks (iter - 1) (child_balance / 2)
               attached_mask
         in

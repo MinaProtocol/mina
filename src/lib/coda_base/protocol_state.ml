@@ -200,9 +200,7 @@ module Make
       end
 
       type ('blockchain_state, 'consensus_state) t =
-                                                    ( 'blockchain_state
-                                                    , 'consensus_state )
-                                                    Stable.Latest.t =
+            ('blockchain_state, 'consensus_state) Stable.Latest.t =
         {blockchain_state: 'blockchain_state; consensus_state: 'consensus_state}
       [@@deriving sexp]
     end
@@ -248,7 +246,7 @@ module Make
       H_list.[blockchain_state; consensus_state]
 
     let of_hlist : (unit, 'bs -> 'cs -> unit) H_list.t -> ('bs, 'cs) Poly.t =
-     fun H_list.([blockchain_state; consensus_state]) ->
+     fun H_list.[blockchain_state; consensus_state] ->
       {blockchain_state; consensus_state}
 
     let data_spec = Data_spec.[Blockchain_state.typ; Consensus_state.typ]
@@ -344,7 +342,7 @@ module Make
 
   let of_hlist : (unit, 'psh -> 'body -> unit) H_list.t -> ('psh, 'body) Poly.t
       =
-   fun H_list.([previous_state_hash; body]) -> {previous_state_hash; body}
+   fun H_list.[previous_state_hash; body] -> {previous_state_hash; body}
 
   let data_spec = Data_spec.[State_hash.typ; Body.typ]
 

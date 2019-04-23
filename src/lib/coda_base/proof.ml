@@ -21,9 +21,12 @@ module Stable = struct
     let of_yojson = function
       | `String s -> (
         match Base64.decode s with
-        | Ok s -> Ok (of_string s)
-        | Error (`Msg e) -> Error (sprintf "bad base64: %s" e) )
-      | _ -> Error "expected `String"
+        | Ok s ->
+            Ok (of_string s)
+        | Error (`Msg e) ->
+            Error (sprintf "bad base64: %s" e) )
+      | _ ->
+          Error "expected `String"
 
     (* TODO: Figure out what the right thing to do is for conversion failures *)
     let ( { Bin_prot.Type_class.reader= bin_reader_t

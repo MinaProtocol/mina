@@ -67,18 +67,18 @@ let typ : (var, t) Typ.t =
     let open H_list in
     fun [receiver; amount] -> {receiver; amount}
   in
-  let to_hlist Poly.({receiver; amount}) = H_list.[receiver; amount] in
+  let to_hlist Poly.{receiver; amount} = H_list.[receiver; amount] in
   Typ.of_hlistable spec ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist
     ~value_to_hlist:to_hlist ~value_of_hlist:of_hlist
 
-let fold Poly.({receiver; amount}) =
+let fold Poly.{receiver; amount} =
   let open Fold in
   Public_key.Compressed.fold receiver +> Amount.fold amount
 
 (* TODO: This could be a bit more efficient by packing across triples,
    but I think the added confusion-possibility
    is not worth it. *)
-let%snarkydef var_to_triples Poly.({receiver; amount}) =
+let%snarkydef var_to_triples Poly.{receiver; amount} =
   let%map receiver = Public_key.Compressed.var_to_triples receiver in
   let amount = Amount.var_to_triples amount in
   receiver @ amount

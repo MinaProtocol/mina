@@ -20,9 +20,12 @@ let rec fold_over_files ~path ~process_path ~init ~f =
       match%bind Sys.is_directory (path ^/ x) with
       | `Yes when process_path `Dir (path ^/ x) ->
           fold_over_files ~path:(path ^/ x) ~process_path ~init:acc ~f
-      | `Yes -> return acc
-      | _ when process_path `File (path ^/ x) -> f acc (path ^/ x)
-      | _ -> return acc )
+      | `Yes ->
+          return acc
+      | _ when process_path `File (path ^/ x) ->
+          f acc (path ^/ x)
+      | _ ->
+          return acc )
 
 let main dry_run check path =
   let%bind all =
@@ -66,7 +69,7 @@ let main dry_run check path =
 let cli =
   let open Command.Let_syntax in
   Command.async ~summary:"Format all ml and mli files"
-    (let%map_open path = flag "path" ~doc:"Path to traverse" (required file)
+    (let%map_open path = flag "path" ~doc:"Path to traverse" (required string)
      and dry_run = flag "dry-run" no_arg ~doc:"Dry run"
      and check =
        flag "check" no_arg

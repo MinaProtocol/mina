@@ -82,7 +82,8 @@ module Inputs = struct
             Ok (res, total)
       in
       match Cache.find cache statement with
-      | Some proof -> Or_error.return (proof, Time.Span.zero)
+      | Some proof ->
+          Or_error.return (proof, Time.Span.zero)
       | None -> (
         match single with
         | Work.Single.Spec.Transition (input, t, (w : Transaction_witness.t))

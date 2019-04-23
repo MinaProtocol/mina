@@ -34,7 +34,8 @@ let write_exn {Keypair.private_key; public_key} ~(privkey_path : string)
       let%bind pubkey_f = Writer.open_file (privkey_path ^ ".pub") in
       Writer.write_bytes pubkey_f pubkey_bytes ;
       Writer.close pubkey_f
-  | Error e -> raise (Error.to_exn e)
+  | Error e ->
+      raise (Error.to_exn e)
 
 (** Reads a private key from [privkey_path] using [Secret_file] *)
 let read_exn ~(privkey_path : string) ~(password : Secret_file.password) :
@@ -49,11 +50,13 @@ let read_exn ~(privkey_path : string) ~(password : Secret_file.password) :
              corrupt? %s"
             (Exn.to_string exn) ()
       in
-      try return (Keypair.of_private_key_exn pk) with exn ->
+      try return (Keypair.of_private_key_exn pk)
+      with exn ->
         failwithf
           "Error computing public key from private, is your keyfile corrupt? %s"
           (Exn.to_string exn) () )
-  | Error e -> raise (Error.to_exn e)
+  | Error e ->
+      raise (Error.to_exn e)
 
 let read_exn' path =
   read_exn ~privkey_path:path

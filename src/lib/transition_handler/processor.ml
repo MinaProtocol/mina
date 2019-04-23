@@ -29,7 +29,9 @@ module Make (Inputs : Inputs.With_unprocessed_transition_cache.S) :
   module Catchup_scheduler = Catchup_scheduler.Make (Inputs)
 
   (* TODO: calculate a sensible value from postake consensus arguments *)
-  let catchup_timeout_duration = Time.Span.of_ms 6000L
+  let catchup_timeout_duration =
+    Time.Span.of_ms
+      (Consensus.Constants.block_window_duration_ms * 2 |> Int64.of_int)
 
   let run ~logger ~time_controller ~frontier
       ~(primary_transition_reader :
@@ -40,12 +42,15 @@ module Make (Inputs : Inputs.With_unprocessed_transition_cache.S) :
          Reader.t)
       ~(proposer_transition_reader :
          (External_transition.Verified.t, State_hash.t) With_hash.t Reader.t)
+      ~(clean_up_catchup_scheduler : unit Ivar.t)
       ~(catchup_job_writer :
-         ( ( (External_transition.Verified.t, State_hash.t) With_hash.t
-             Envelope.Incoming.t
-           , State_hash.t )
-           Cached.t
-           Rose_tree.t
+         ( State_hash.t
+           * ( (External_transition.Verified.t, State_hash.t) With_hash.t
+               Envelope.Incoming.t
+             , State_hash.t )
+             Cached.t
+             Rose_tree.t
+             list
          , synchronous
          , unit Deferred.t )
          Writer.t)
@@ -62,12 +67,14 @@ module Make (Inputs : Inputs.With_unprocessed_transition_cache.S) :
     let catchup_scheduler =
       Catchup_scheduler.create ~logger ~frontier ~time_controller
         ~catchup_job_writer ~catchup_breadcrumbs_writer
+        ~clean_up_signal:clean_up_catchup_scheduler
     in
     (* add a breadcrumb and perform post processing *)
     let add_and_finalize ~only_if_present cached_breadcrumb =
       let open Deferred.Or_error.Let_syntax in
       let%bind breadcrumb =
-        Deferred.return (Cached.invalidate cached_breadcrumb)
+        Deferred.Or_error.return
+          (Cached.invalidate_with_success cached_breadcrumb)
       in
       let transition =
         Transition_frontier.Breadcrumb.transition_with_hash breadcrumb
@@ -95,9 +102,8 @@ module Make (Inputs : Inputs.With_unprocessed_transition_cache.S) :
                  Envelope.Incoming.wrap ~data:vt ~sender:Envelope.Sender.Local
                in
                `Valid_transition
-                 ( Unprocessed_transition_cache.register
-                     unprocessed_transition_cache enveloped_transition
-                 |> Or_error.ok_exn ) )
+                 (Unprocessed_transition_cache.register_exn
+                    unprocessed_transition_cache enveloped_transition) )
          ; Reader.map catchup_breadcrumbs_reader ~f:(fun cb ->
                `Catchup_breadcrumbs cb )
          ; Reader.map primary_transition_reader ~f:(fun vt ->
@@ -117,7 +123,8 @@ module Make (Inputs : Inputs.With_unprocessed_transition_cache.S) :
                              * we're catching up *)
                            ~f:(add_and_finalize ~only_if_present:true) )
                    with
-                   | Ok () -> ()
+                   | Ok () ->
+                       ()
                    | Error err ->
                        Logger.error logger ~module_:__MODULE__
                          ~location:__LOC__
@@ -149,7 +156,8 @@ module Make (Inputs : Inputs.With_unprocessed_transition_cache.S) :
                          match
                            Transition_frontier.find frontier parent_hash
                          with
-                         | Some parent -> return parent
+                         | Some parent ->
+                             return parent
                          | None ->
                              Deferred.Or_error.error_string "parent not found"
                        in
@@ -169,12 +177,15 @@ module Make (Inputs : Inputs.With_unprocessed_transition_cache.S) :
                          match Cached.sequence_result cached_breadcrumb with
                          | Error (`Validation_error e) ->
                              (* TODO: Punish *) Error e
-                         | Error (`Fatal_error e) -> raise e
-                         | Ok b -> Ok b
+                         | Error (`Fatal_error e) ->
+                             raise e
+                         | Ok b ->
+                             Ok b
                        in
                        add_and_finalize ~only_if_present:false breadcrumb
                      with
-                     | Ok () -> ()
+                     | Ok () ->
+                         ()
                      | Error err ->
                          Logger.error logger ~module_:__MODULE__
                            ~location:__LOC__

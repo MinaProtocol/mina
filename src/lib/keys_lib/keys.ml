@@ -61,7 +61,8 @@ let keys = Set_once.create ()
 
 let create () : (module S) Async.Deferred.t =
   match Set_once.get keys with
-  | Some x -> x
+  | Some x ->
+      x
   | None ->
       let open Async in
       let%map tx_vk = Lazy.force tx_vk

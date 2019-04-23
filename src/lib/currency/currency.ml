@@ -392,9 +392,9 @@ end = struct
 
     let create ~magnitude ~sgn = Poly.{magnitude; sgn}
 
-    let sgn Poly.({sgn; _}) = sgn
+    let sgn Poly.{sgn; _} = sgn
 
-    let magnitude Poly.({magnitude; _}) = magnitude
+    let magnitude Poly.{magnitude; _} = magnitude
 
     let zero = create ~magnitude:zero ~sgn:Sgn.Pos
 
@@ -412,7 +412,7 @@ end = struct
         =
       Snarky.H_list.(fun [magnitude; sgn] -> {magnitude; sgn})
 
-    let to_hlist Poly.({magnitude; sgn}) = Snarky.H_list.[magnitude; sgn]
+    let to_hlist Poly.{magnitude; sgn} = Snarky.H_list.[magnitude; sgn]
 
     let typ =
       Typ.of_hlistable
@@ -457,10 +457,10 @@ end = struct
     let ( + ) = add
 
     module Checked = struct
-      let to_bits Poly.({magnitude; sgn}) =
+      let to_bits Poly.{magnitude; sgn} =
         (var_to_bits magnitude :> Boolean.var list) @ [Sgn.Checked.is_pos sgn]
 
-      let constant Poly.({magnitude; sgn}) =
+      let constant Poly.{magnitude; sgn} =
         Poly.{magnitude= var_of_t magnitude; sgn= Sgn.Checked.constant sgn}
 
       let of_unsigned magnitude = Poly.{magnitude; sgn= Sgn.Checked.pos}
@@ -508,10 +508,14 @@ end = struct
       let cswap b (x, y) =
         let l_sgn, r_sgn =
           match Poly.(x.sgn, y.sgn) with
-          | Sgn.Pos, Sgn.Pos -> Sgn.Checked.(pos, pos)
-          | Neg, Neg -> Sgn.Checked.(neg, neg)
-          | Pos, Neg -> (Sgn.Checked.neg_if_true b, Sgn.Checked.pos_if_true b)
-          | Neg, Pos -> (Sgn.Checked.pos_if_true b, Sgn.Checked.neg_if_true b)
+          | Sgn.Pos, Sgn.Pos ->
+              Sgn.Checked.(pos, pos)
+          | Neg, Neg ->
+              Sgn.Checked.(neg, neg)
+          | Pos, Neg ->
+              (Sgn.Checked.neg_if_true b, Sgn.Checked.pos_if_true b)
+          | Neg, Pos ->
+              (Sgn.Checked.pos_if_true b, Sgn.Checked.neg_if_true b)
         in
         let%map l_mag, r_mag =
           let%bind l, r =
@@ -530,10 +534,14 @@ end = struct
     let if_value cond ~then_ ~else_ : var =
       List.init M.length ~f:(fun i ->
           match (Vector.get then_ i, Vector.get else_ i) with
-          | true, true -> Boolean.true_
-          | false, false -> Boolean.false_
-          | true, false -> cond
-          | false, true -> Boolean.not cond )
+          | true, true ->
+              Boolean.true_
+          | false, false ->
+              Boolean.false_
+          | true, false ->
+              cond
+          | false, true ->
+              Boolean.not cond )
 
     (* Unpacking protects against underflow *)
     let sub (x : Unpacked.var) (y : Unpacked.var) =
@@ -591,8 +599,10 @@ end = struct
 
         let expect_success err c =
           match check c () with
-          | Ok () -> ()
-          | Error e -> Error.(raise (tag ~tag:err e))
+          | Ok () ->
+              ()
+          | Error e ->
+              Error.(raise (tag ~tag:err e))
 
         let to_bigint x = Bignum_bigint.of_string (Unsigned.to_string x)
 

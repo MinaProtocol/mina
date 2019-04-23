@@ -21,8 +21,10 @@ let read_hidden_line prompt : Bytes.t Async.Deferred.t =
       (Option.value_exn old_termios)
       stdin ;
   match pwd with
-  | `Ok pwd -> Bytes.of_string pwd
-  | `Eof -> failwith "got EOF while reading password"
+  | `Ok pwd ->
+      Bytes.of_string pwd
+  | `Eof ->
+      failwith "got EOF while reading password"
 
 let lift (t : 'a Async.Deferred.t) : 'a Async.Deferred.Or_error.t =
   Async.Deferred.map t ~f:(fun x -> Ok x)
@@ -30,7 +32,9 @@ let lift (t : 'a Async.Deferred.t) : 'a Async.Deferred.Or_error.t =
 let hidden_line_or_env prompt ~env : Bytes.t Async.Deferred.Or_error.t =
   let open Async.Deferred.Or_error.Let_syntax in
   match Sys.getenv env with
-  | Some p -> return (Bytes.of_string p)
-  | _ -> lift (read_hidden_line prompt)
+  | Some p ->
+      return (Bytes.of_string p)
+  | _ ->
+      lift (read_hidden_line prompt)
 
 let read prompt = hidden_line_or_env prompt ~env:"CODA_PRIVKEY_PASS"
