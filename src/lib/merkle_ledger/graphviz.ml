@@ -90,7 +90,8 @@ struct
   let visualize t ~(initial_address : Ledger.Addr.t) =
     let rec bfs ~(edges : merkle_tree_edge list) ~accounts jobs =
       match Queue.dequeue jobs with
-      | None -> List.rev edges
+      | None ->
+          List.rev edges
       | Some address ->
           let parent_address = Addr.parent_exn address in
           let parent_hash =
@@ -177,7 +178,8 @@ struct
       let body =
         List.map edges ~f:(fun {source; target} ->
             match target with
-            | Pretty_hash hash -> [sprintf "\"%s\" -> \"%s\" " source hash]
+            | Pretty_hash hash ->
+                [sprintf "\"%s\" -> \"%s\" " source hash]
             | Pretty_account {public_key; balance} ->
                 [ sprintf "\"%s\" -> \"%s\" " source public_key
                 ; sprintf "\"%s\" [shape=record,label=\"{%s|%d}\"]" public_key

@@ -39,7 +39,7 @@ module Global_public_key = struct
 end
 
 module Local_state = struct
-  type t = unit [@@deriving sexp]
+  type t = unit [@@deriving sexp, to_yojson]
 
   let create _ = ()
 end
@@ -132,7 +132,7 @@ module Consensus_transition_data = struct
   let to_hlist {Poly.signature} = H_list.[signature]
 
   let of_hlist : (unit, 'signature -> unit) H_list.t -> 'signature Poly.t =
-   fun H_list.([signature]) -> {Poly.signature}
+   fun H_list.[signature] -> {Poly.signature}
 
   let data_spec =
     Snark_params.Tick.Data_spec.[Blockchain_state.Signature.Signature.typ]
@@ -218,7 +218,7 @@ module Consensus_state = struct
   let of_hlist :
          (unit, 'length -> 'public_key -> unit) H_list.t
       -> ('length, 'public_key) Poly.t =
-   fun H_list.([length; signer_public_key]) -> {Poly.length; signer_public_key}
+   fun H_list.[length; signer_public_key] -> {Poly.length; signer_public_key}
 
   let data_spec =
     let open Snark_params.Tick.Data_spec in
@@ -253,6 +253,10 @@ module Consensus_state = struct
         ; signer_public_key= Lite_compat.public_key signer_public_key } )
 
   let display (t : Value.t) : display = {length= Length.to_string t.length}
+end
+
+module Rpcs = struct
+  let implementations ~logger:_ ~local_state:_ = []
 end
 
 module Protocol_state =
@@ -293,7 +297,7 @@ let generate_transition ~previous_protocol_state ~blockchain_state ~time:_
   in
   (protocol_state, consensus_transition_data)
 
-let received_at_valid_time _ ~time_received:_ = true
+let received_at_valid_time _ ~time_received:_ = Ok ()
 
 let is_transition_valid_checked (transition : Snark_transition.var) =
   let {Consensus_transition_data.Poly.signature} =
@@ -391,5 +395,12 @@ end
 let should_bootstrap ~existing:_ ~candidate:_ = false
 
 let time_hum now = Core_kernel.Time.to_string now
+
+type local_state_sync = unit [@@deriving to_yojson]
+
+let required_local_state_sync ~consensus_state:_ ~local_state:_ = None
+
+let sync_local_state ~logger:_ ~local_state:_ ~random_peers:_ ~query_peer:_ _ =
+  failwith "cannot call sync_local_state on Consensus.Proof_of_signature"
 
 [%%endif]

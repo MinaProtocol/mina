@@ -51,9 +51,8 @@ end)
 (Action : Action_intf) =
 struct
   type t =
-    { db:
-        Db.t option
-        (* This is an option to allow using a fake trust system in tests. This is
+    { db: Db.t option
+          (* This is an option to allow using a fake trust system in tests. This is
        ugly, but the alternative is functoring half of Coda over the trust
        system. *)
     ; bans_reader: Peer_id.t Strict_pipe.Reader.t
@@ -84,8 +83,10 @@ struct
 
   let lookup t peer =
     match get_db t peer with
-    | Some record -> Record_inst.to_peer_status record
-    | None -> Record_inst.to_peer_status @@ Record_inst.init ()
+    | Some record ->
+        Record_inst.to_peer_status record
+    | None ->
+        Record_inst.to_peer_status @@ Record_inst.init ()
 
   let close {db; bans_writer} =
     Option.iter db ~f:Db.close ;
@@ -94,12 +95,15 @@ struct
   let record ({db; bans_writer} as t) logger peer action =
     let old_record =
       match get_db t peer with
-      | None -> Record_inst.init ()
-      | Some trust_record -> trust_record
+      | None ->
+          Record_inst.init ()
+      | Some trust_record ->
+          trust_record
     in
     let new_record =
       match Action.to_trust_response action with
-      | Insta_ban -> Record_inst.ban old_record
+      | Insta_ban ->
+          Record_inst.ban old_record
       | Trust_increase incr ->
           [%test_pred: Float.t] Float.is_positive incr ;
           Record_inst.add_trust old_record incr
@@ -162,10 +166,14 @@ let%test_module "peer_trust" =
 
       let to_trust_response t =
         match t with
-        | Insta_ban -> Trust_response.Insta_ban
-        | Slow_punish -> Trust_response.Trust_decrease (max_rate 1.)
-        | Slow_credit -> Trust_response.Trust_increase (max_rate 1.)
-        | Big_credit -> Trust_response.Trust_increase 0.2
+        | Insta_ban ->
+            Trust_response.Insta_ban
+        | Slow_punish ->
+            Trust_response.Trust_decrease (max_rate 1.)
+        | Slow_credit ->
+            Trust_response.Trust_increase (max_rate 1.)
+        | Big_credit ->
+            Trust_response.Trust_increase 0.2
 
       let to_log t = (string_of_sexp @@ sexp_of_t t, [])
     end
@@ -193,8 +201,10 @@ let%test_module "peer_trust" =
     let%test "Peers are unbanned and have 0 trust at initialization" =
       let db = setup_mock_db () in
       match Peer_trust_test.lookup db 0 with
-      | {trust= 0.0; banned= Unbanned} -> assert_ban_pipe [] ; true
-      | _ -> false
+      | {trust= 0.0; banned= Unbanned} ->
+          assert_ban_pipe [] ; true
+      | _ ->
+          false
 
     let%test "Insta-bans actually do so" =
       Thread_safe.block_on_async_exn (fun () ->
@@ -206,7 +216,8 @@ let%test_module "peer_trust" =
               @@ Time.add !Mock_now.current_time Time.Span.day ;
               assert_ban_pipe [0] ;
               true
-          | _ -> false )
+          | _ ->
+              false )
 
     let%test "trust decays by half in 24 hours" =
       Thread_safe.block_on_async_exn (fun () ->
@@ -221,8 +232,10 @@ let%test_module "peer_trust" =
                   (* N.b. the floating point equality operator has a built in
                  tolerance i.e. it's approximate equality. *)
                   decayed_trust =. start_trust /. 2.0
-              | _ -> false )
-          | _ -> false )
+              | _ ->
+                  false )
+          | _ ->
+              false )
 
     let do_constant_rate rate f =
       (* Simulate running the function at the specified rate, in actions/sec,
@@ -246,8 +259,10 @@ let%test_module "peer_trust" =
           let db = setup_mock_db () in
           let%map () = act_constant_rate db 1. Action.Slow_punish in
           match Peer_trust_test.lookup db 0 with
-          | {banned= Banned_until _} -> false
-          | {banned= Unbanned} -> assert_ban_pipe [] ; true )
+          | {banned= Banned_until _} ->
+              false
+          | {banned= Unbanned} ->
+              assert_ban_pipe [] ; true )
 
     let%test "peers do get banned for acting faster than the maximum rate" =
       Thread_safe.block_on_async_exn (fun () ->
@@ -257,7 +272,8 @@ let%test_module "peer_trust" =
           | {trust; banned= Banned_until _} ->
               assert_ban_pipe [0] ;
               true
-          | {trust; banned= Unbanned} -> false )
+          | {trust; banned= Unbanned} ->
+              false )
 
     let%test "good cancels bad" =
       Thread_safe.block_on_async_exn (fun () ->
@@ -270,8 +286,10 @@ let%test_module "peer_trust" =
                 Peer_trust_test.record db nolog 0 Action.Slow_credit )
           in
           match Peer_trust_test.lookup db 0 with
-          | {trust; banned= Banned_until _} -> false
-          | {trust; banned= Unbanned} -> assert_ban_pipe [] ; true )
+          | {trust; banned= Banned_until _} ->
+              false
+          | {trust; banned= Unbanned} ->
+              assert_ban_pipe [] ; true )
 
     let%test "insta-bans ignore positive trust" =
       Thread_safe.block_on_async_exn (fun () ->
@@ -288,8 +306,10 @@ let%test_module "peer_trust" =
           | {trust= -1.0; banned= Banned_until _} ->
               assert_ban_pipe [0] ;
               true
-          | {trust; banned= Banned_until _} -> failwith "Trust not set to -1"
-          | {trust; banned= Unbanned} -> failwith "Peer not banned" )
+          | {trust; banned= Banned_until _} ->
+              failwith "Trust not set to -1"
+          | {trust; banned= Unbanned} ->
+              failwith "Peer not banned" )
 
     let%test "multiple peers getting banned causes multiple ban events" =
       Thread_safe.block_on_async_exn (fun () ->
@@ -307,8 +327,10 @@ module Make =
       let to_yojson x = `String (Unix.Inet_addr.to_string x)
 
       let of_yojson = function
-        | `String str -> Ok (Unix.Inet_addr.of_string str)
-        | _ -> Error "expected string"
+        | `String str ->
+            Ok (Unix.Inet_addr.of_string str)
+        | _ ->
+            Error "expected string"
     end)
     (struct
       let now = Time.now

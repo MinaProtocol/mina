@@ -135,8 +135,10 @@ struct
           in
           (* true if not with_snark *)
           Verifier.verify wrap_vk precomp prev_top_hash proof
-      | "check" | "none" -> return Boolean.true_
-      | _ -> failwith "unknown proof_level"
+      | "check" | "none" ->
+          return Boolean.true_
+      | _ ->
+          failwith "unknown proof_level"
 
     let exists' typ ~f = exists typ ~compute:As_prover.(map get_state ~f)
 

@@ -41,8 +41,10 @@ module Time_queue = struct
 
   let actions_ready t =
     match (Heap.top t.pending_actions, t.on_new_action) with
-    | Some _, _ -> return ()
-    | None, Some ivar -> Ivar.read ivar
+    | Some _, _ ->
+        return ()
+    | None, Some ivar ->
+        Ivar.read ivar
     | None, None ->
         let ivar = Ivar.create () in
         t.on_new_action <- Some ivar ;
@@ -55,7 +57,8 @@ module Time_queue = struct
         f action
       in
       match Heap.top t.pending_actions with
-      | None -> return ()
+      | None ->
+          return ()
       | Some (_, at) ->
           let%bind () = do_next_action () in
           if Time.Span.(t.curr_time >= at) then go ()
@@ -63,11 +66,13 @@ module Time_queue = struct
             t.curr_time <- at ;
             let rec loop () =
               match Heap.top t.pending_actions with
-              | None -> return ()
+              | None ->
+                  return ()
               | Some (_, at) when t.curr_time >= at ->
                   let%bind () = do_next_action () in
                   loop ()
-              | Some _ -> return ()
+              | Some _ ->
+                  return ()
             in
             loop () )
     in
@@ -191,8 +196,10 @@ struct
 
   let cancel t tok =
     match Token.Table.find t.timer_stoppers tok with
-    | Some ivar -> Ivar.fill ivar `Cancelled
-    | None -> ()
+    | Some ivar ->
+        Ivar.fill ivar `Cancelled
+    | None ->
+        ()
 
   let send t ~recipient message : unit Deferred.Or_error.t =
     match Peer.Table.find t.network recipient with
@@ -337,20 +344,27 @@ struct
 
   let change t changes =
     List.iter changes ~f:(function
-      | Delete ident -> Identifier.Table.remove t.nodes ident
-      | Add n -> Identifier.Table.add_exn t.nodes ~key:(MyNode.ident n) ~data:n )
+      | Delete ident ->
+          Identifier.Table.remove t.nodes ident
+      | Add n ->
+          Identifier.Table.add_exn t.nodes ~key:(MyNode.ident n) ~data:n )
 
   let rec loop t ~stop ~max_iters =
     match max_iters with
-    | Some iters when iters <= 0 -> return ()
+    | Some iters when iters <= 0 ->
+        return ()
     | _ -> (
         let merge : 'a. 'a option -> 'a option -> 'a option =
          fun a b ->
           match (a, b) with
-          | None, None -> None
-          | None, Some b -> Some b
-          | Some a, None -> Some a
-          | Some a, Some b -> Some a
+          | None, None ->
+              None
+          | None, Some b ->
+              Some b
+          | Some a, None ->
+              Some a
+          | Some a, Some b ->
+              Some a
         in
         let choose3 (a : 'a Deferred.t) (a_imm : 'a option) (b : 'b Deferred.t)
             (b_imm : 'b option) (c : 'c Deferred.t) (c_imm : 'c option) :
@@ -384,9 +398,12 @@ struct
             List.fold (Identifier.Table.data t.nodes) ~init:None
               ~f:(fun acc x ->
                 match (acc, x) with
-                | Some _, _ -> acc
-                | None, x when MyNode.is_ready x -> Some x
-                | None, x -> acc )
+                | Some _, _ ->
+                    acc
+                | None, x when MyNode.is_ready x ->
+                    Some x
+                | None, x ->
+                    acc )
           in
           Option.value maybe_real ~default:n
         in
@@ -398,7 +415,8 @@ struct
           choose3 stop None node_ready node_ready_imm ticks_available None
         in
         match%bind chosen with
-        | Some (), _, _ -> return ()
+        | Some (), _, _ ->
+            return ()
         | None, Some n, _ ->
             (*printf "There's a transition at peer %d\n%!" (MyNode.ident n);*)
             let%bind n' = MyNode.step n in
@@ -410,7 +428,8 @@ struct
             (*printf "There's an event since no stuff for peers\n%!";*)
             let%bind () = Timer_transport.tick_forwards t.timer in
             loop t ~stop ~max_iters:(Option.map max_iters ~f:(fun i -> i - 1))
-        | None, None, None -> failwith "Something is ready" )
+        | None, None, None ->
+            failwith "Something is ready" )
 
   let create ~count ~initial_state cmds_per_node ~stop =
     let table = Identifier.Table.create () in
@@ -439,8 +458,10 @@ let%test_module "Distributed_dsl" =
     let expect f =
       Async.Thread_safe.block_on_async_exn (fun () ->
           match%map Deferred.create f with
-          | `Success -> ()
-          | `Failure s -> failwith s )
+          | `Success ->
+              ()
+          | `Failure s ->
+              failwith s )
 
     module State = struct
       type t = Start | Wait_msg | Sent_msg | Got_msg of int | Timeout
@@ -525,8 +546,8 @@ let%test_module "Distributed_dsl" =
             let open Machine.MyNode in
             ( [ msg Send_msg
                   (Fn.const (Fn.const true))
-                  ~f:(fun t (Msg i) -> function
-                    | Wait_msg -> return (Got_msg i) | m -> return m ) ]
+                  ~f:(fun t (Msg i) -> function Wait_msg -> return (Got_msg i)
+                    | m -> return m ) ]
             , [ on Init
                   (function Start -> true | _ -> false)
                   ~f:(fun _ _ -> return Wait_msg)
@@ -539,9 +560,12 @@ let%test_module "Distributed_dsl" =
                     return state )
               ; on Failure_case
                   (function
-                    | Timeout -> true
-                    | Got_msg i when i <= 5 -> true
-                    | _ -> false)
+                    | Timeout ->
+                        true
+                    | Got_msg i when i <= 5 ->
+                        true
+                    | _ ->
+                        false )
                   ~f:(fun _ _ ->
                     failwith
                       "All nodes should have received a message containing a \

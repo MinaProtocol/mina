@@ -76,8 +76,10 @@ end
 let get_service () =
   Unix.getenv request_service_name
   |> Option.value_map ~default:`None ~f:(function
-       | "S3" -> `S3
-       | path -> `Local path )
+       | "S3" ->
+           `S3
+       | path ->
+           `Local path )
 
 let verification_key_basename = "client_verification_key"
 
@@ -85,10 +87,12 @@ let verification_key_location () =
   let autogen = Cache_dir.autogen_path ^/ verification_key_basename in
   let manual = Cache_dir.manual_install_path ^/ verification_key_basename in
   match%bind Sys.file_exists manual with
-  | `Yes -> return (Ok manual)
+  | `Yes ->
+      return (Ok manual)
   | `No | `Unknown -> (
       match%map Sys.file_exists autogen with
-      | `Yes -> Ok autogen
+      | `Yes ->
+          Ok autogen
       | `No | `Unknown ->
           Or_error.errorf
             !"IO ERROR: Verification key does not exist\n\

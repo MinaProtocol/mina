@@ -46,8 +46,10 @@ module Make
   let get_payment t ~receipt =
     Key_value_db.get t ~key:receipt
     |> Option.bind ~f:(function
-         | Tree_node.Root -> None
-         | Child {value; _} -> Some value )
+         | Tree_node.Root ->
+             None
+         | Child {value; _} ->
+             Some value )
 
   let add t ~previous (payment : Payment.t) =
     let payload = Payment.payload payment in
@@ -67,7 +69,7 @@ module Make
                 (None, `Error_multiple_previous_receipts retrieved_parent)
               else
                 ( Some (Child {parent= previous; value= payment})
-                , `Duplicate receipt_chain_hash ))
+                , `Duplicate receipt_chain_hash ) )
     in
     Option.iter node ~f:(function node ->
         Key_value_db.set t ~key:receipt_chain_hash ~data:node ) ;
@@ -112,8 +114,10 @@ let%test_module "receipt_database" =
         ~f:(fun current_leaves payment ->
           let selected_forked_node = List.random_element_exn current_leaves in
           match Receipt_db.add db ~previous:selected_forked_node payment with
-          | `Ok checking_receipt -> checking_receipt :: current_leaves
-          | `Duplicate _ -> current_leaves
+          | `Ok checking_receipt ->
+              checking_receipt :: current_leaves
+          | `Duplicate _ ->
+              current_leaves
           | `Error_multiple_previous_receipts _ ->
               failwith "We should not have multiple previous receipts" )
       |> ignore
@@ -123,7 +127,8 @@ let%test_module "receipt_database" =
       Quickcheck.test
         ~sexp_of:[%sexp_of: Receipt_chain_hash.t * Payment.t list]
         Quickcheck.Generator.(
-          tuple2 Receipt_chain_hash.gen (list_non_empty Payment.gen))
+          tuple2 Receipt_chain_hash.quickcheck_generator
+            (list_non_empty Payment.quickcheck_generator))
         ~f:(fun (initial_receipt_chain, payments) ->
           let db = Receipt_db.create ~directory:"" in
           let resulting_receipt, expected_merkle_path =
@@ -132,7 +137,8 @@ let%test_module "receipt_database" =
                 match
                   Receipt_db.add db ~previous:prev_receipt_chain payment
                 with
-                | `Ok new_receipt_chain -> (new_receipt_chain, payment)
+                | `Ok new_receipt_chain ->
+                    (new_receipt_chain, payment)
                 | `Duplicate _ ->
                     failwith
                       "Each receipt chain in a sequence should be unique"
@@ -156,15 +162,17 @@ let%test_module "receipt_database" =
       Quickcheck.test
         ~sexp_of:[%sexp_of: Receipt_chain_hash.t * Payment.t * Payment.t list]
         Quickcheck.Generator.(
-          tuple3 Receipt_chain_hash.gen Payment.gen
-            (list_non_empty Payment.gen))
+          tuple3 Receipt_chain_hash.quickcheck_generator
+            Payment.quickcheck_generator
+            (list_non_empty Payment.quickcheck_generator))
         ~f:(fun (prev_receipt_chain, initial_payment, payments) ->
           let db = Receipt_db.create ~directory:"" in
           let initial_receipt_chain =
             match
               Receipt_db.add db ~previous:prev_receipt_chain initial_payment
             with
-            | `Ok receipt_chain -> receipt_chain
+            | `Ok receipt_chain ->
+                receipt_chain
             | `Duplicate _ ->
                 failwith
                   "There should be no duplicate inserts since the first \
@@ -195,8 +203,9 @@ let%test_module "receipt_database" =
       Quickcheck.test
         ~sexp_of:[%sexp_of: Receipt_chain_hash.t * Payment.t * Payment.t list]
         Quickcheck.Generator.(
-          tuple3 Receipt_chain_hash.gen Payment.gen
-            (list_non_empty Payment.gen))
+          tuple3 Receipt_chain_hash.quickcheck_generator
+            Payment.quickcheck_generator
+            (list_non_empty Payment.quickcheck_generator))
         ~f:(fun (initial_receipt_chain, unrecorded_payment, payments) ->
           let db = Receipt_db.create ~directory:"" in
           populate_random_path ~db payments initial_receipt_chain ;

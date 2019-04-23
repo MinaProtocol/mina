@@ -20,8 +20,10 @@ module Make (Inputs : Inputs.Inputs_intf) :
       (state : State.t) =
     let unseen_jobs = Helper.all_works staged_ledger state in
     match Helper.get_expensive_work ~snark_pool ~fee unseen_jobs with
-    | [] -> ([], state)
-    | x :: _ -> (Helper.pair_to_list x, State.set state x)
+    | [] ->
+        ([], state)
+    | x :: _ ->
+        (Helper.pair_to_list x, State.set state x)
 end
 
 let%test_module "test" =

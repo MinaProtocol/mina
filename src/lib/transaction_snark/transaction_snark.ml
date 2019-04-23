@@ -169,7 +169,9 @@ module Statement = struct
     and supply_increase = Currency.Amount.gen
     and pending_coinbase_before = Pending_coinbase.Stack.gen
     and pending_coinbase_after = Pending_coinbase.Stack.gen
-    and proof_type = Bool.gen >>| fun b -> if b then `Merge else `Base in
+    and proof_type =
+      Bool.quickcheck_generator >>| fun b -> if b then `Merge else `Base
+    in
     { source
     ; target
     ; fee_excess
@@ -258,7 +260,8 @@ let construct_input ~proof_type ~sok_digest ~state1 ~state2 ~supply_increase
     +> Amount.Signed.fold fee_excess
   in
   match proof_type with
-  | `Base -> Tick.Pedersen.digest_fold Hash_prefix.base_snark fold
+  | `Base ->
+      Tick.Pedersen.digest_fold Hash_prefix.base_snark fold
   | `Merge wrap_vk_bits ->
       Tick.Pedersen.digest_fold Hash_prefix.merge_snark
         Fold.(fold +> group3 ~default:false (of_list wrap_vk_bits))
@@ -537,7 +540,7 @@ module Base = struct
         ~pending_coinbase_stack_state
     in
     ( top_hash
-    , Groth16.prove proving_key (tick_input ()) prover_state main top_hash )
+    , prove_main proving_key ~handlers:[handler] prover_state top_hash )
 
   let cached =
     let load =
@@ -598,7 +601,8 @@ module Merge = struct
   (* TODO: When we switch to the weierstrass curve use the shifted
    add-many function *)
   let disjoint_union_sections = function
-    | [] -> failwith "empty list"
+    | [] ->
+        failwith "empty list"
     | s :: ss ->
         Checked.List.fold
           ~f:(fun acc x -> Pedersen.Checked.Section.disjoint_union_exn acc x)
@@ -1198,7 +1202,6 @@ let generate_transaction_union_witness sok_message source target transaction
       ~pending_coinbase_stack_state
   in
   let open Tick.Groth16 in
-  let main x = handle (Base.main x) handler in
   generate_auxiliary_input (tick_input ()) prover_state main top_hash
 
 let generate_transaction_witness ~sok_message ~source ~target
@@ -1390,7 +1393,8 @@ module Keys = struct
       let open Async in
       let load c p =
         match%map load_with_checksum c p with
-        | Ok x -> x
+        | Ok x ->
+            x
         | Error _e ->
             failwithf
               !"Transaction_snark: load failed on %{sexp:Storage.location}"
@@ -1424,7 +1428,8 @@ module Keys = struct
       let open Async in
       let load c p =
         match%map load_with_checksum c p with
-        | Ok x -> x
+        | Ok x ->
+            x
         | Error _e ->
             failwithf
               !"Transaction_snark: load failed on %{sexp:Storage.location}"

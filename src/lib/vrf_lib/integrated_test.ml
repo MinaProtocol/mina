@@ -35,7 +35,7 @@ module Message = struct
 
   let of_hlist :
       (unit, 'state_hash -> unit) Coda_base.H_list.t -> 'state_hash t =
-   fun Coda_base.H_list.([state_hash]) -> {state_hash}
+   fun Coda_base.H_list.[state_hash] -> {state_hash}
 
   let data_spec = Tick.Data_spec.[Coda_base.State_hash.typ]
 
