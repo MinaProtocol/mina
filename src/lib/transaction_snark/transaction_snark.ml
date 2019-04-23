@@ -1044,37 +1044,40 @@ struct
    (b1, b2, .., bn) = unpack input,
    there is a proof making one of [ base_vk; merge_vk ] accept (b1, b2, .., bn) *)
   let%snarkydef main (input : Wrap_input.var) =
-    let%bind input = with_label __LOC__ (Wrap_input.Checked.to_scalar input) in
-    let%bind is_base =
-      exists' Boolean.typ ~f:(fun {Prover_state.proof_type; _} ->
-          Proof_type.is_base proof_type )
-    in
-    let%bind verification_key_precomp =
-      with_label __LOC__
-        (Verifier.Verification_key.Precomputation.if_ is_base
-           ~then_:base_vk_precomp ~else_:merge_vk_precomp)
-    in
-    let%bind verification_key =
-      with_label __LOC__
-        (Verifier.Verification_key.if_ is_base
-           ~then_:(Verifier.constant_vk base_vk)
-           ~else_:(Verifier.constant_vk merge_vk))
-    in
-    let%bind result =
-      let%bind proof =
-        exists Verifier.Proof.typ
-          ~compute:
-            As_prover.(
-              map get_state
-                ~f:
-                  (Fn.compose Verifier.proof_of_backend_proof
-                     Prover_state.proof))
-      in
-      with_label __LOC__
-        (Verifier.verify verification_key verification_key_precomp [input]
-           proof)
-    in
-    with_label __LOC__ (Boolean.Assert.is_true result)
+    stop_reducing
+    @@ let%bind input =
+         with_label __LOC__ (Wrap_input.Checked.to_scalar input)
+       in
+       let%bind is_base =
+         exists' Boolean.typ ~f:(fun {Prover_state.proof_type; _} ->
+             Proof_type.is_base proof_type )
+       in
+       let%bind verification_key_precomp =
+         with_label __LOC__
+           (Verifier.Verification_key.Precomputation.if_ is_base
+              ~then_:base_vk_precomp ~else_:merge_vk_precomp)
+       in
+       let%bind verification_key =
+         with_label __LOC__
+           (Verifier.Verification_key.if_ is_base
+              ~then_:(Verifier.constant_vk base_vk)
+              ~else_:(Verifier.constant_vk merge_vk))
+       in
+       let%bind result =
+         let%bind proof =
+           exists Verifier.Proof.typ
+             ~compute:
+               As_prover.(
+                 map get_state
+                   ~f:
+                     (Fn.compose Verifier.proof_of_backend_proof
+                        Prover_state.proof))
+         in
+         with_label __LOC__
+           (Verifier.verify verification_key verification_key_precomp [input]
+              proof)
+       in
+       with_label __LOC__ (Boolean.Assert.is_true result)
 
   let use_reduce_to_prover = true
 
