@@ -493,5 +493,6 @@ let () =
   don't_wait_for (ensure_testnet_id_still_good logger) ;
   (* Turn on snark debugging in prod for now *)
   Snarky.Snark.set_eval_constraints true ;
+  Snarky.Snark.set_reduce_to_prover true ;
   Command.run (Command.group ~summary:"Coda" (coda_commands logger)) ;
   Core.exit 0
