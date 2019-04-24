@@ -824,7 +824,7 @@ module Merge = struct
     in
     Boolean.Assert.all [verify_12; verify_23]
 
-  let use_reduce_to_prover = false
+  let use_reduce_to_prover = true
 
   let prove_main =
     if use_reduce_to_prover then
