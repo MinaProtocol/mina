@@ -516,20 +516,17 @@ module Base = struct
     in
     ()
 
-  let reduced_main = lazy (Groth16.reduce_to_prover (tick_input ()) main)
+  let proof_system =
+    Groth16.Proof_system.create ~public_input:(tick_input ()) main
 
-  let create_keys () = Groth16.generate_keypair main ~exposing:(tick_input ())
+  let create_keys () = Groth16.Proof_system.generate_keypair proof_system
 
-  let transaction_union_proof ?(preeval = false) ~proving_key sok_digest state1
-      state2 pending_coinbase_stack_state (transaction : Transaction_union.t)
-      handler =
+  let transaction_union_proof ?preeval ~proving_key sok_digest state1 state2
+      pending_coinbase_stack_state (transaction : Transaction_union.t) handler
+      =
     let prover_state : Prover_state.t =
       {state1; state2; transaction; sok_digest; pending_coinbase_stack_state}
     in
-    let main =
-      if preeval then failwith "preeval currently disabled" else main
-    in
-    let main top_hash = handle (main top_hash) handler in
     let top_hash =
       base_top_hash ~sok_digest ~state1 ~state2
         ~fee_excess:(Transaction_union.excess transaction)
@@ -537,7 +534,8 @@ module Base = struct
         ~pending_coinbase_stack_state
     in
     ( top_hash
-    , Groth16.prove proving_key (tick_input ()) prover_state main top_hash )
+    , Groth16.Proof_system.prove ~proving_key ~handlers:[handler]
+        ~public_input:[top_hash] ?reduce:preeval proof_system prover_state )
 
   let cached =
     let load =
@@ -556,7 +554,7 @@ module Base = struct
       ~manual_install_path:Cache_dir.manual_install_path
       ~digest_input:(fun x ->
         Md5.to_hex (R1CS_constraint_system.digest (Lazy.force x)) )
-      ~input:(lazy (Groth16.constraint_system ~exposing:(tick_input ()) main))
+      ~input:(lazy (Groth16.Proof_system.constraint_system proof_system))
       ~create_env:(fun x -> Groth16.Keypair.generate (Lazy.force x))
 end
 
@@ -822,7 +820,9 @@ module Merge = struct
     in
     Boolean.Assert.all [verify_12; verify_23]
 
-  let create_keys () = Groth16.generate_keypair ~exposing:(input ()) main
+  let proof_system = Groth16.Proof_system.create ~public_input:(input ()) main
+
+  let create_keys () = Groth16.Proof_system.generate_keypair proof_system
 
   let cached =
     let load =
@@ -841,7 +841,7 @@ module Merge = struct
       ~manual_install_path:Cache_dir.manual_install_path
       ~digest_input:(fun x ->
         Md5.to_hex (R1CS_constraint_system.digest (Lazy.force x)) )
-      ~input:(lazy (Groth16.constraint_system ~exposing:(input ()) main))
+      ~input:(lazy (Groth16.Proof_system.constraint_system proof_system))
       ~create_env:(fun x -> Groth16.Keypair.generate (Lazy.force x))
 end
 
@@ -1070,7 +1070,9 @@ struct
     in
     with_label __LOC__ (Boolean.Assert.is_true result)
 
-  let create_keys () = generate_keypair ~exposing:wrap_input main
+  let proof_system = Proof_system.create ~public_input:wrap_input main
+
+  let create_keys () = Proof_system.generate_keypair proof_system
 
   let cached =
     let load =
@@ -1087,7 +1089,7 @@ struct
       ~autogen_path:Cache_dir.autogen_path
       ~manual_install_path:Cache_dir.manual_install_path
       ~digest_input:(Fn.compose Md5.to_hex R1CS_constraint_system.digest)
-      ~input:(constraint_system ~exposing:wrap_input main)
+      ~input:(Proof_system.constraint_system proof_system)
       ~create_env:Keypair.generate
 end
 
@@ -1125,7 +1127,7 @@ module type S = sig
   val merge : t -> t -> sok_digest:Sok_message.Digest.t -> t Or_error.t
 end
 
-let check_transaction_union ?(preeval = false) sok_message source target
+let check_transaction_union ?preeval sok_message source target
     pending_coinbase_stack_state transaction handler =
   let sok_digest = Sok_message.digest sok_message in
   let prover_state : Base.Prover_state.t =
@@ -1141,16 +1143,10 @@ let check_transaction_union ?(preeval = false) sok_message source target
       ~fee_excess:(Transaction_union.excess transaction)
       ~supply_increase:(Transaction_union.supply_increase transaction)
   in
-  let open Tick in
-  let main =
-    if preeval then failwith "preeval currently disabled" else Base.main
-  in
-  let main =
-    handle
-      (Checked.map (main (Field.Var.constant top_hash)) ~f:As_prover.return)
-      handler
-  in
-  Or_error.ok_exn (run_and_check main prover_state) |> ignore
+  let open Tick.Groth16 in
+  Or_error.ok_exn
+    (Proof_system.check ~handlers:[handler] ?reduce:preeval Base.proof_system
+       ~public_input:[top_hash] prover_state)
 
 let check_transaction ?preeval ~sok_message ~source ~target
     ~pending_coinbase_stack_state (t : Transaction.t) handler =
@@ -1167,8 +1163,8 @@ let check_user_command ~sok_message ~source ~target pending_coinbase_stack t
         {source= pending_coinbase_stack; target= pending_coinbase_stack}
     (User_command t) handler
 
-let generate_transaction_union_witness ?(preeval = false) sok_message source
-    target transaction pending_coinbase_stack_state handler =
+let generate_transaction_union_witness ?preeval sok_message source target
+    transaction pending_coinbase_stack_state handler =
   let sok_digest = Sok_message.digest sok_message in
   let prover_state : Base.Prover_state.t =
     { state1= source
@@ -1184,11 +1180,11 @@ let generate_transaction_union_witness ?(preeval = false) sok_message source
       ~pending_coinbase_stack_state
   in
   let open Tick.Groth16 in
-  let main =
-    if preeval then failwith "preeval currently disabled" else Base.main
-  in
-  let main x = handle (main x) handler in
-  generate_auxiliary_input (tick_input ()) prover_state main top_hash
+  ignore
+  @@ Proof_system.run_unchecked ~handlers:[handler] ?reduce:preeval
+       Base.proof_system ~public_input:[top_hash]
+       (fun a -> As_prover.(return a))
+       prover_state
 
 let generate_transaction_witness ?preeval ~sok_message ~source ~target
     pending_coinbase_stack_state (t : Transaction.t) handler =
@@ -1216,8 +1212,9 @@ struct
 
   let wrap proof_type proof input =
     let prover_state = {Wrap.Prover_state.proof; proof_type} in
-    Tock.prove keys.proving.wrap wrap_input prover_state Wrap.main
-      (Wrap_input.of_tick_field input)
+    Tock.Proof_system.prove Wrap.proof_system ~proving_key:keys.proving.wrap
+      ~public_input:[Wrap_input.of_tick_field input]
+      prover_state
 
   let merge_proof sok_digest ledger_hash1 ledger_hash2 ledger_hash3
       transition12 transition23 =
@@ -1257,8 +1254,9 @@ struct
       ; tock_vk= keys.verification.wrap }
     in
     ( top_hash
-    , Tick.Groth16.prove keys.proving.merge (tick_input ()) prover_state
-        Merge.main top_hash )
+    , Tick.Groth16.Proof_system.prove Merge.proof_system
+        ~proving_key:keys.proving.merge ~public_input:[top_hash] prover_state
+    )
 
   let of_transaction_union ?preeval sok_digest source target
       ~pending_coinbase_stack_state transaction handler =
@@ -1758,13 +1756,8 @@ let constraint_system_digests () =
 
     let base = Dummy_values.Tick.Groth16.verification_key
   end) in
-  let digest = Tick.R1CS_constraint_system.digest in
-  let digest' = Tock.R1CS_constraint_system.digest in
-  [ ( "transaction-merge"
-    , digest Merge.(Tick.Groth16.constraint_system ~exposing:(input ()) main)
-    )
-  ; ( "transaction-base"
-    , digest
-        Base.(Tick.Groth16.constraint_system ~exposing:(tick_input ()) main) )
-  ; ( "transaction-wrap"
-    , digest' W.(Tock.constraint_system ~exposing:wrap_input main) ) ]
+  let digest = Tick.Groth16.Proof_system.digest in
+  let digest' = Tock.Proof_system.digest in
+  [ ("transaction-merge", digest Merge.proof_system)
+  ; ("transaction-base", digest Base.proof_system)
+  ; ("transaction-wrap", digest' W.proof_system) ]
