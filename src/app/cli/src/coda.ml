@@ -269,7 +269,7 @@ let daemon logger =
              Deferred.return None
        in
        let%bind propose_keypair =
-         Option.map ~f:Cli_lib.Keypair.Terminal_stdin.read_exn propose_key
+         Option.map ~f:Secrets.Keypair.Terminal_stdin.read_exn propose_key
          |> sequence
        in
        let%bind client_whitelist =
@@ -354,6 +354,7 @@ let daemon logger =
               ~run_snark_worker:(Option.is_some run_snark_worker_flag)
               ~transaction_pool_disk_location:(conf_dir ^/ "transaction_pool")
               ~snark_pool_disk_location:(conf_dir ^/ "snark_pool")
+              ~wallets_disk_location:(conf_dir ^/ "wallets")
               ~ledger_db_location:(conf_dir ^/ "ledger_db")
               ~snark_work_fee:snark_work_fee_flag ~receipt_chain_database
               ~transition_frontier_location ~time_controller

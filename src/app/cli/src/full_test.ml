@@ -97,6 +97,7 @@ let run_test () : unit Deferred.t =
              ~transaction_pool_disk_location:
                (temp_conf_dir ^/ "transaction_pool")
              ~snark_pool_disk_location:(temp_conf_dir ^/ "snark_pool")
+             ~wallets_disk_location:(temp_conf_dir ^/ "wallets")
              ~time_controller ~receipt_chain_database
              ~snark_work_fee:(Currency.Fee.of_int 0) ~consensus_local_state ())
       in
