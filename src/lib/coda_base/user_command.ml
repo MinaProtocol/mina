@@ -3,7 +3,6 @@
 
 open Core
 open Import
-open Snark_params
 open Coda_numbers
 open Module_version
 module Fee = Currency.Fee
@@ -157,7 +156,7 @@ let check_signature _ = true
 
 let check_signature ({payload; sender; signature} : t) =
   Schnorr.verify signature
-    (Tick.Inner_curve.of_affine_coordinates sender)
+    (Snark_params.Tick.Inner_curve.of_affine_coordinates sender)
     payload
 
 [%%endif]
