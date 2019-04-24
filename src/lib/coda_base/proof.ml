@@ -14,13 +14,15 @@ module Stable = struct
     end
 
     include T
-    include Sexpable.Of_stringable(T)
+    include Sexpable.Of_stringable (T)
 
     let to_yojson t = `String (to_string t)
 
     let of_yojson = function
-      | `String x -> Ok (of_string x)
-      | _ -> Error "expected `String"
+      | `String x ->
+          Ok (of_string x)
+      | _ ->
+          Error "expected `String"
   end
 
   module Latest = V1

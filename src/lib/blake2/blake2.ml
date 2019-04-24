@@ -38,5 +38,4 @@ let%test_unit "string to bits" =
   Quickcheck.test ~trials:5 String.quickcheck_generator ~f:(fun s ->
       [%test_eq: string] s (bits_to_string (string_to_bits s)) )
 
-let digest_bits x =
-  digest_string (bits_to_string x)
+let digest_bits x = digest_string (bits_to_string x)

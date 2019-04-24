@@ -1,88 +1,86 @@
 open Core_kernel
-
 include Crypto_params_init
-
-
 module Pedersen_params = Pedersen_params
 module Pedersen_chunk_table = Pedersen_chunk_table
 
-module Tick_pedersen = 
-    Chunked_pedersen_lib.Pedersen.Make (struct
-      open Tick0
-      module Field = Field
-      module Bigint = Bigint
-      module Curve =
-        Tick_backend.Inner_curve
+module Tick_pedersen = Chunked_pedersen_lib.Pedersen.Make (struct
+  open Tick0
+  module Field = Field
+  module Bigint = Bigint
+  module Curve = Tick_backend.Inner_curve
 
+  let params = Pedersen_params.params
 
-      let params = Pedersen_params.params
-
-      let chunk_table = Pedersen_chunk_table.chunk_table
-    end)
+  let chunk_table = Pedersen_chunk_table.chunk_table
+end)
 
 module Tock_backend = struct
   module Full = Cycle.Mnt6
 
   module Bg = struct
-      include Snarky.Libsnark.Make_bowe_gabizon
-        (Full)
-        (struct
-          open Full
+    include Snarky.Libsnark.Make_bowe_gabizon
+              (Full)
+              (struct
+                open Full
 
-          let g1_to_bits t =
-            let x, y = G1.to_affine_coordinates t in
-            Tick0.Bigint.(test_bit (of_field y) 0) :: Tick0.Field.unpack x
+                let g1_to_bits t =
+                  let x, y = G1.to_affine_coordinates t in
+                  Tick0.Bigint.(test_bit (of_field y) 0)
+                  :: Tick0.Field.unpack x
 
-          let g2_to_bits t =
-            let x, y = G2.to_affine_coordinates t in
-            let open Tick0.Field in
-            let y0 = Vector.get y 0 in
-            assert (not Tick0.Field.(equal y0 zero)) ;
-            Tick0.Bigint.(test_bit (of_field y0) 0)
-            :: List.concat
-                (List.init (Vector.length x) ~f:(fun i ->
-                      Tick0.Field.unpack (Vector.get x i) ))
+                let g2_to_bits t =
+                  let x, y = G2.to_affine_coordinates t in
+                  let open Tick0.Field in
+                  let y0 = Vector.get y 0 in
+                  assert (not Tick0.Field.(equal y0 zero)) ;
+                  Tick0.Bigint.(test_bit (of_field y0) 0)
+                  :: List.concat
+                       (List.init (Vector.length x) ~f:(fun i ->
+                            Tick0.Field.unpack (Vector.get x i) ))
 
-          let salt = lazy (Tick_pedersen.State.salt "TockBGHash")
+                let salt = lazy (Tick_pedersen.State.salt "TockBGHash")
 
-          let random_oracle =
-            (* TODO: Dedup *)
-            let field_to_bits x =
-              let open Tick0 in
-              let n = Bigint.of_field x in
-              Array.init Field.size_in_bits ~f:(Bigint.test_bit n)
-            in
-            fun x ->
-            (Blake2.digest_bits (field_to_bits x) |> Blake2.to_raw_string)
-            |> Blake2.string_to_bits |> Array.to_list
+                let random_oracle =
+                  (* TODO: Dedup *)
+                  let field_to_bits x =
+                    let open Tick0 in
+                    let n = Bigint.of_field x in
+                    Array.init Field.size_in_bits ~f:(Bigint.test_bit n)
+                  in
+                  fun x ->
+                    Blake2.digest_bits (field_to_bits x)
+                    |> Blake2.to_raw_string |> Blake2.string_to_bits
+                    |> Array.to_list
 
-          module Group_map =
-            Snarky_group_map.Group_map.Make_unchecked (Tick0.Field)
-              (Tick_backend.Inner_curve.Coefficients)
+                module Group_map =
+                  Snarky_group_map.Group_map.Make_unchecked
+                    (Tick0.Field)
+                    (Tick_backend.Inner_curve.Coefficients)
 
-          let hash ?message ~a ~b ~c ~delta_prime =
-            Tick_pedersen.digest_fold (Lazy.force salt)
-              Fold_lib.Fold.(
-                group3 ~default:false
-                  ( of_list (g1_to_bits a)
-                  +> of_list (g2_to_bits b)
-                  +> of_list (g1_to_bits c)
-                  +> of_list (g2_to_bits delta_prime)
-                  +> of_array (Option.value ~default:[||] message) ))
-            |> random_oracle |> Tick0.Field.project |> Group_map.to_group
-            |> Tick_backend.Inner_curve.of_affine_coordinates
-        end)
+                let hash ?message ~a ~b ~c ~delta_prime =
+                  Tick_pedersen.digest_fold (Lazy.force salt)
+                    Fold_lib.Fold.(
+                      group3 ~default:false
+                        ( of_list (g1_to_bits a)
+                        +> of_list (g2_to_bits b)
+                        +> of_list (g1_to_bits c)
+                        +> of_list (g2_to_bits delta_prime)
+                        +> of_array (Option.value ~default:[||] message) ))
+                  |> random_oracle |> Tick0.Field.project |> Group_map.to_group
+                  |> Tick_backend.Inner_curve.of_affine_coordinates
+              end)
 
-      module Field = Full.Field
-      module Bigint = Full.Bigint
-      module Var = Full.Var
-      module R1CS_constraint = Full.R1CS_constraint
-      module R1CS_constraint_system = Full.R1CS_constraint_system
-      module Linear_combination = Full.Linear_combination
-      let field_size = Full.field_size
-    end
+    module Field = Full.Field
+    module Bigint = Full.Bigint
+    module Var = Full.Var
+    module R1CS_constraint = Full.R1CS_constraint
+    module R1CS_constraint_system = Full.R1CS_constraint_system
+    module Linear_combination = Full.Linear_combination
+
+    let field_size = Full.field_size
+  end
+
   include Bg
-
   module Inner_curve = Cycle.Mnt4.G1
   module Inner_twisted_curve = Cycle.Mnt4.G2
 end
@@ -164,8 +162,10 @@ module Wrap_input = struct
     let split_last_exn =
       let rec go acc x xs =
         match xs with
-        | [] -> (List.rev acc, x)
-        | x' :: xs -> go (x :: acc) x' xs
+        | [] ->
+            (List.rev acc, x)
+        | x' :: xs ->
+            go (x :: acc) x' xs
       in
       function
       | [] -> failwith "split_last: Empty list" | x :: xs -> go [] x xs
@@ -175,12 +175,12 @@ module Wrap_input = struct
     let typ : (var, t) Typ.t =
       Typ.of_hlistable spec
         ~var_to_hlist:(fun {low_bits; high_bit} -> [low_bits; high_bit])
-        ~var_of_hlist:(fun Snarky.H_list.([low_bits; high_bit]) ->
+        ~var_of_hlist:(fun Snarky.H_list.[low_bits; high_bit] ->
           {low_bits; high_bit} )
         ~value_to_hlist:(fun (x : Tick0.Field.t) ->
           let low_bits, high_bit = split_last_exn (Tick0.Field.unpack x) in
           [Tock0.Field.project low_bits; high_bit] )
-        ~value_of_hlist:(fun Snarky.H_list.([low_bits; high_bit]) ->
+        ~value_of_hlist:(fun Snarky.H_list.[low_bits; high_bit] ->
           Tick0.Field.project (Tock0.Field.unpack low_bits @ [high_bit]) )
 
     module Checked = struct

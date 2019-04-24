@@ -96,13 +96,11 @@ struct
           [%e estring str]]
     in
     let proof_stri =
-      [%stri let proof =
-               Core_kernel.Binable.of_string
-                 [%e 
-                   pexp_pack
-                     (pmod_ident (ident (curve_module_name ^. "Proof"))) ]
-                 [%e estring proof_string]
-      ]
+      [%stri
+        let proof =
+          Core_kernel.Binable.of_string
+            [%e pexp_pack (pmod_ident (ident (curve_module_name ^. "Proof")))]
+            [%e estring proof_string]]
     in
     let vk_stri =
       [%stri
