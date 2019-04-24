@@ -47,6 +47,7 @@ module type S = sig
   type t =
     { timeout: Time.Span.t
     ; logger: Logger.t
+    ; trust_system: Trust_system.t
     ; target_peer_count: int
     ; broadcast_writer: msg Linear_pipe.Writer.t
     ; received_reader: content Envelope.Incoming.t Strict_pipe.Reader.t
@@ -88,6 +89,7 @@ module Make (Message : Message_intf) :
   type t =
     { timeout: Time.Span.t
     ; logger: Logger.t
+    ; trust_system: Trust_system.t
     ; target_peer_count: int
     ; broadcast_writer: Message.msg Linear_pipe.Writer.t
     ; received_reader: Message.content Envelope.Incoming.t Strict_pipe.Reader.t
@@ -126,22 +128,42 @@ module Make (Message : Message_intf) :
     | Ok conn ->
         Versioned_rpc.Connection_with_menu.create conn
 
-  let try_call_rpc t peer dispatch query =
+  let try_call_rpc t (peer : Peer.t) dispatch query =
     let call () =
       try_with (fun () ->
-          Tcp.with_connection (Tcp.Where_to_connect.of_host_and_port peer)
-            ~timeout:t.timeout (fun _ r w ->
+          Tcp.with_connection
+            (Tcp.Where_to_connect.of_host_and_port
+               (Peer.to_communications_host_and_port peer))
+            ~timeout:t.timeout
+            (fun _ r w ->
               create_connection_with_menu peer r w
               >>=? fun conn -> dispatch conn query ) )
-      >>| function
+      >>= function
       | Ok (Ok result) ->
-          Ok result
-      | Ok (Error exn) ->
-          Error exn
+          (* call succeeded, result is valid *)
+          return (Ok result)
+      | Ok (Error err) ->
+          (* call succeeded, result is an error *)
+          let%bind () =
+            Trust_system.(
+              record t.trust_system t.logger peer.host
+                Actions.
+                  ( Violated_protocol
+                  , Some
+                      ( "RPC call failed, reason: $exn"
+                      , [("exn", `String (Error.to_string_hum err))] ) ))
+          in
+          return (Error err)
       | Error exn ->
-          Or_error.of_exn exn
+          (* call itself failed *)
+          (* TODO: learn what exceptions are raised here, punish peers for
+            handshake timeouts, possibly other exceptions
+          *)
+          Logger.error t.logger ~module_:__MODULE__ ~location:__LOC__
+            "RPC call raised an exception: %s" (Exn.to_string exn) ;
+          return (Or_error.of_exn exn)
     in
-    match Hashtbl.find t.connections (Unix.Inet_addr.of_string peer.host) with
+    match Hashtbl.find t.connections peer.host with
     | None ->
         call ()
     | Some conn_map ->
@@ -152,25 +174,21 @@ module Make (Message : Message_intf) :
         then
           Deferred.return
             (Or_error.errorf
-               !"Not connecting to peer %s. Number of open connections to the \
-                 peer equals the limit %d.\n"
-               peer.host
+               !"Not connecting to peer %{sexp:Peer.t}. Number of open \
+                 connections to the peer equals the limit %d.\n"
+               peer
                (Option.value_exn t.max_concurrent_connections))
         else call ()
 
   let broadcast_selected t peers msg =
-    let peers =
-      List.map peers ~f:(fun peer ->
-          (peer, Peer.to_communications_host_and_port peer) )
-    in
     let send peer =
       try_call_rpc t peer
         (fun conn m -> return (Message.dispatch_multi conn m))
         msg
     in
     trace_event "broadcasting message" ;
-    Deferred.List.iter ~how:`Parallel peers ~f:(fun p ->
-        match%map send (snd p) with
+    Deferred.List.iter ~how:`Parallel peers ~f:(fun peer ->
+        match%map send peer with
         | Ok () ->
             ()
         | Error e ->
@@ -179,7 +197,7 @@ module Make (Message : Message_intf) :
               ~metadata:
                 [ ("short_msg", `String (Message.summary msg))
                 ; ("msg", Message.msg_to_yojson msg)
-                ; ("peer", Peer.to_yojson (fst p)) ]
+                ; ("peer", Peer.to_yojson peer) ]
               (Error.to_string_hum e) )
 
   let broadcast_random t n msg =
@@ -212,6 +230,7 @@ module Make (Message : Message_intf) :
         let t =
           { timeout= config.timeout
           ; logger= config.logger
+          ; trust_system= config.trust_system
           ; target_peer_count= config.target_peer_count
           ; broadcast_writer
           ; received_reader
@@ -366,7 +385,6 @@ module Make (Message : Message_intf) :
     Logger.trace t.logger ~module_:__MODULE__ ~location:__LOC__
       !"Querying peer %{sexp: Peer.t}"
       peer ;
-    let peer = Peer.to_communications_host_and_port peer in
     try_call_rpc t peer rpc query
 
   let query_random_peers t n rpc query =
