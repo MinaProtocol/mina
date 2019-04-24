@@ -80,7 +80,7 @@ module Tock_backend = struct
     let field_size = Full.field_size
   end
 
-  include Bg
+  include Full.GM
   module Inner_curve = Cycle.Mnt4.G1
   module Inner_twisted_curve = Cycle.Mnt4.G2
 end
