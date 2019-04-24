@@ -31,6 +31,8 @@ module Digest : sig
 
   val of_string : string -> t
 
+  val to_string : t -> string
+
   val to_bits : t -> bool list
 
   module Checked : sig
