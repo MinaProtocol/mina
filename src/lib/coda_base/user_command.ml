@@ -5,7 +5,6 @@ open Core
 open Import
 open Snark_params
 open Coda_numbers
-open Tick
 open Module_version
 module Fee = Currency.Fee
 module Payload = User_command_payload
@@ -157,7 +156,9 @@ let check_signature _ = true
 [%%else]
 
 let check_signature ({payload; sender; signature} : t) =
-  Schnorr.verify signature (Inner_curve.of_affine_coordinates sender) payload
+  Schnorr.verify signature
+    (Tick.Inner_curve.of_affine_coordinates sender)
+    payload
 
 [%%endif]
 
