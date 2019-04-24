@@ -44,6 +44,10 @@ module type S = sig
 
   type msg
 
+  module Connection_with_state : sig
+    type t = Banned | Allowed of Rpc.Connection.t Ivar.t
+  end
+
   type t =
     { timeout: Time.Span.t
     ; logger: Logger.t
@@ -55,7 +59,7 @@ module type S = sig
     ; peers: Peer.Hash_set.t
     ; connections:
         ( Unix.Inet_addr.t
-        , (Uuid.t, Rpc.Connection.t Ivar.t) Hashtbl.t )
+        , (Uuid.t, Connection_with_state.t) Hashtbl.t )
         Hashtbl.t
     ; max_concurrent_connections: int option }
 
@@ -86,6 +90,13 @@ end
 
 module Make (Message : Message_intf) :
   S with type msg := Message.msg and type content := Message.content = struct
+  module Connection_with_state = struct
+    type t = Banned | Allowed of Rpc.Connection.t Ivar.t
+
+    let value_map ~when_allowed ~when_banned t =
+      match t with Allowed c -> when_allowed c | _ -> when_banned
+  end
+
   type t =
     { timeout: Time.Span.t
     ; logger: Logger.t
@@ -97,7 +108,7 @@ module Make (Message : Message_intf) :
     ; peers: Peer.Hash_set.t
     ; connections:
         ( Unix.Inet_addr.t
-        , (Uuid.t, Rpc.Connection.t Ivar.t) Hashtbl.t )
+        , (Uuid.t, Connection_with_state.t) Hashtbl.t )
         Hashtbl.t
           (**mapping a Uuid to a connection to be able to remove it from the hash
          *table since Rpc.Connection.t doesn't have the socket information*)
@@ -242,17 +253,26 @@ module Make (Message : Message_intf) :
         don't_wait_for
           (Strict_pipe.Reader.iter (Trust_system.ban_pipe config.trust_system)
              ~f:(fun addr ->
-               match Hashtbl.find_and_remove t.connections addr with
+               match Hashtbl.find t.connections addr with
                | None ->
                    Deferred.unit
-               | Some conn_list ->
+               | Some conn_tbl ->
                    Logger.debug t.logger ~module_:__MODULE__ ~location:__LOC__
                      !"Peer %{sexp: Unix.Inet_addr.t} banned, disconnecting."
                      addr ;
-                   Deferred.List.iter (Hashtbl.to_alist conn_list)
-                     ~f:(fun (_, conn_ivar) ->
-                       let%bind conn = Ivar.read conn_ivar in
-                       Rpc.Connection.close conn ) )) ;
+                   let%map () =
+                     Deferred.List.iter (Hashtbl.to_alist conn_tbl)
+                       ~f:(fun (_, conn_state) ->
+                         Connection_with_state.value_map conn_state
+                           ~when_allowed:(fun conn_ivar ->
+                             let%bind conn = Ivar.read conn_ivar in
+                             Rpc.Connection.close conn )
+                           ~when_banned:Deferred.unit )
+                   in
+                   Hashtbl.map_inplace conn_tbl ~f:(fun conn_state ->
+                       Connection_with_state.value_map conn_state
+                         ~when_allowed:(fun _ -> Connection_with_state.Banned)
+                         ~when_banned:Banned ) )) ;
         trace_task "rebroadcasting messages" (fun () ->
             don't_wait_for
               (Linear_pipe.iter_unordered ~max_concurrency:64 broadcast_reader
@@ -321,7 +341,8 @@ module Make (Message : Message_intf) :
                 Reader.close reader >>= fun _ -> Writer.close writer )
               else
                 let conn_id = Uuid_unix.create () in
-                Hashtbl.add_exn conn_map ~key:conn_id ~data:(Ivar.create ()) ;
+                Hashtbl.add_exn conn_map ~key:conn_id
+                  ~data:(Allowed (Ivar.create ())) ;
                 Hashtbl.set t.connections
                   ~key:(Socket.Address.Inet.addr client)
                   ~data:conn_map ;
@@ -333,8 +354,10 @@ module Make (Message : Message_intf) :
                         when connecting to the server over TCP; the ephemeral
                         port is distinct from the client's discovery and
                         communication ports *)
-                      let ivar = Hashtbl.find_exn conn_map conn_id in
-                      Ivar.fill ivar conn ;
+                      Connection_with_state.value_map
+                        (Hashtbl.find_exn conn_map conn_id)
+                        ~when_allowed:(fun ivar -> Ivar.fill ivar conn)
+                        ~when_banned:() ;
                       Hashtbl.set t.connections
                         ~key:(Socket.Address.Inet.addr client)
                         ~data:conn_map ;
