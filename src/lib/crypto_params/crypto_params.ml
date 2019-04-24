@@ -53,7 +53,7 @@ module Tock_backend = struct
               Array.init Field.size_in_bits ~f:(Bigint.test_bit n)
             in
             fun x ->
-            (Blake2.digest_bits (field_to_bits x) :> string)
+            (Blake2.digest_bits (field_to_bits x) |> Blake2.to_raw_string)
             |> Blake2.string_to_bits |> Array.to_list
 
           module Group_map =
