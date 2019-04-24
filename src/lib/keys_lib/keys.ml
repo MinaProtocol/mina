@@ -153,7 +153,7 @@ let create () : (module S) Async.Deferred.t =
               As_prover.(map get_state ~f:there)
               (main x)
 
-          let use_reduce_to_prover = true
+          let use_reduce_to_prover = false
 
           let prove_main =
             if use_reduce_to_prover then
@@ -178,7 +178,7 @@ let create () : (module S) Async.Deferred.t =
               As_prover.(map get_state ~f:there)
               (main x)
 
-          let use_reduce_to_prover = true
+          let use_reduce_to_prover = false
 
           let prove_main =
             if use_reduce_to_prover then
