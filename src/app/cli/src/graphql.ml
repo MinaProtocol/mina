@@ -6,7 +6,10 @@ open Pipe_lib
 open Coda_base
 open Signature_lib
 
-module Make (Program : Coda_inputs.Main_intf) = struct
+module Make
+    (Config_in : Coda_inputs.Config_intf)
+    (Program : Coda_inputs.Main_intf) =
+struct
   open Program
   open Inputs
 
@@ -96,7 +99,13 @@ module Make (Program : Coda_inputs.Main_intf) = struct
             (Inputs.Incr_status.Observer.value @@ Program.sync_status coda)
           >>| Result.map_error ~f:Error.to_string_hum )
 
-    let commands = [sync_state]
+    let version =
+      field "version" ~typ:string
+        ~args:Arg.[]
+        ~doc:"The version of the node (git commit hash)"
+        ~resolve:(fun _ _ -> Config_in.commit_id)
+
+    let commands = [sync_state; version]
   end
 
   module Subscriptions = struct
