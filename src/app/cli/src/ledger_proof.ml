@@ -74,8 +74,6 @@ module Debug :
   module Stable = struct
     module V1 = struct
       module T = struct
-        let version = 1
-
         type t =
           Transaction_snark.Statement.Stable.V1.t
           * Sok_message.Digest.Stable.V1.t
