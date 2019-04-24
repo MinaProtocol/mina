@@ -15,30 +15,22 @@ let load ~logger ~disk_location : t Deferred.t =
   in
   let path = disk_location ^/ "store" in
   let%bind () = File_system.create_dir path in
-  let%bind handle = Unix.opendir path in
-  let rec go () =
-    match%bind Unix.readdir_opt handle with
-    | None ->
-        return []
-    | Some next_file -> (
-        if
-          next_file = "." || next_file = ".."
-          || Filename.check_suffix next_file ".pub"
-        then go ()
+  let%bind files = Sys.readdir path >>| Array.to_list in
+  let%bind keypairs =
+    Deferred.List.filter_map files ~f:(fun file ->
+        if Filename.check_suffix file ".pub" then return None
         else
-          match%bind
-            Secret_keypair.read ~privkey_path:(path ^/ next_file) ~password
+          match%map
+            Secret_keypair.read ~privkey_path:(path ^/ file) ~password
           with
           | Ok keypair ->
-              let%bind xs = go () in
-              return (keypair :: xs)
+              Some keypair
           | Error e ->
               Logger.error logger ~module_:__MODULE__ ~location:__LOC__
                 "Failed to read %s: %s" path (Error.to_string_hum e) ;
-              go () )
+              None )
   in
-  let%bind () = Unix.chmod path ~perm:0o700 in
-  let%map keypairs = go () in
+  let%map () = Unix.chmod path ~perm:0o700 in
   {cache= keypairs; path}
 
 (** Effectfully generates a new private key file and a keypair *)
