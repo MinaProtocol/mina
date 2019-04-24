@@ -77,8 +77,8 @@ module Make (Program : Coda_inputs.Main_intf) = struct
                 |> User_command_memo.to_string ) ] )
 
     let snark_fee : (t, Transaction_snark_work.t option) typ =
-      obj "snark_fee" ~fields:(fun _ ->
-          [ field "snark_creator" ~typ:(non_null string)
+      obj "snarkFee" ~fields:(fun _ ->
+          [ field "snarkCreator" ~typ:(non_null string)
               ~doc:"public key of the snarker"
               ~args:Arg.[]
               ~resolve:(fun _ {Transaction_snark_work.prover; _} ->
@@ -103,7 +103,7 @@ module Make (Program : Coda_inputs.Main_intf) = struct
                 let staged_ledger_diff =
                   External_transition.staged_ledger_diff external_transition
                 in
-                staged_ledger_diff |> Staged_ledger_diff.total_coinbase
+                staged_ledger_diff |> Staged_ledger_diff.coinbase
                 |> Currency.Fee.to_uint64 |> Stringable.uint64 )
           ; field "creator" ~typ:(non_null string)
               ~doc:"Public key of the proposer creating the block"
@@ -124,7 +124,7 @@ module Make (Program : Coda_inputs.Main_intf) = struct
                   ~f:
                     (Fn.compose User_command_payload.is_payment
                        User_command.payload) )
-          ; field "snark_fees"
+          ; field "snarkFees"
               ~doc:"Fees that a proposer for constructing proofs"
               ~typ:(non_null (list @@ non_null snark_fee))
               ~args:Arg.[]
@@ -136,7 +136,7 @@ module Make (Program : Coda_inputs.Main_intf) = struct
 
     let sync_status : ('context, [`Offline | `Synced | `Bootstrap]) typ =
       non_null
-        (enum "sync_status" ~doc:"Sync status as daemon node"
+        (enum "syncStatus" ~doc:"Sync status as daemon node"
            ~values:
              [ enum_value "BOOTSTRAP" ~value:`Bootstrap
              ; enum_value "SYNCED" ~value:`Synced
@@ -147,7 +147,7 @@ module Make (Program : Coda_inputs.Main_intf) = struct
     open Types
 
     let sync_state =
-      io_field "sync_status" ~typ:sync_status
+      io_field "syncStatus" ~typ:sync_status
         ~args:Arg.[]
         ~resolve:(fun {ctx= coda; _} () ->
           Deferred.return
@@ -159,7 +159,7 @@ module Make (Program : Coda_inputs.Main_intf) = struct
 
   module Subscriptions = struct
     let new_sync_update =
-      subscription_field "new_sync_update"
+      subscription_field "newSyncUpdate"
         ~doc:"Subscribes on sync update from Coda" ~deprecated:NotDeprecated
         ~typ:Types.sync_status
         ~args:Arg.[]
@@ -168,12 +168,12 @@ module Make (Program : Coda_inputs.Main_intf) = struct
           |> Deferred.Result.return )
 
     let new_block =
-      subscription_field "new_block"
+      subscription_field "newBlock"
         ~doc:
           "Subscribes on a new block created by a proposer with a public key \
            KEY"
         ~typ:(non_null Types.block)
-        ~args:Arg.[arg "public_key" ~typ:(non_null string)]
+        ~args:Arg.[arg "publicKey" ~typ:(non_null string)]
         ~resolve:(fun {ctx= coda; _} public_key ->
           let public_key = Public_key.Compressed.of_base64_exn public_key in
           (* Pipes that will alert a subscriber of any new blocks throughout the entire time the daemon is on *)

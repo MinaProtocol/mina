@@ -2678,7 +2678,7 @@ let%test_module "test" =
 
         let completed_works = failwith "completed_work : Need to implement"
 
-        let total_coinbase = failwith "total_coinbase: Need to implement"
+        let coinbase = failwith "coinbase: Need to implement"
       end
 
       module Transaction_witness = struct

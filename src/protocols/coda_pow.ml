@@ -805,7 +805,7 @@ module type Staged_ledger_diff_intf = sig
 
   val completed_works : t -> completed_work list
 
-  val total_coinbase : t -> Fee.Unsigned.t
+  val coinbase : t -> Fee.Unsigned.t
 end
 
 module type Staged_ledger_transition_intf = sig
