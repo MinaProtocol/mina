@@ -44,7 +44,7 @@ let read ~(privkey_path : string) ~(password : Secret_file.password) :
   let%bind pk_bytes = Secret_file.read ~path:privkey_path ~password in
   let open Or_error.Let_syntax in
   Deferred.return
-  @@ let%bind pk =
+  @@ let%bind sk =
        try
          return (pk_bytes |> Bigstring.of_bytes |> Private_key.of_bigstring_exn)
        with exn ->
@@ -53,7 +53,7 @@ let read ~(privkey_path : string) ~(password : Secret_file.password) :
             corrupt? %s"
            (Exn.to_string exn)
      in
-     try return (Keypair.of_private_key_exn pk)
+     try return (Keypair.of_private_key_exn sk)
      with exn ->
        Or_error.errorf
          "Error computing public key from private, is your keyfile corrupt? %s"

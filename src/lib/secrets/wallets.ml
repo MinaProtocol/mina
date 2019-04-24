@@ -44,13 +44,12 @@ let load ~logger ~disk_location : t Deferred.t =
 (** Effectfully generates a new private key file and a keypair *)
 let generate_new t : Keypair.t Deferred.t =
   let keypair = Keypair.create () in
-  let privkey_path =
-    Filename.concat t.path
-      (* TODO: Do we need to version this? *)
-      ( Public_key.Compressed.to_base64
-          (keypair.public_key |> Public_key.compress)
-      |> String.tr ~target:'/' ~replacement:'x' )
+  let pubkey_str =
+    (* TODO: Do we need to version this? *)
+    Public_key.Compressed.to_base64 (keypair.public_key |> Public_key.compress)
+    |> String.tr ~target:'/' ~replacement:'x'
   in
+  let privkey_path = t.path ^/ pubkey_str in
   let%bind () = Secret_keypair.write_exn keypair ~privkey_path ~password in
   let%map () = Unix.chmod privkey_path ~perm:0o600 in
   t.cache <- keypair :: t.cache ;
