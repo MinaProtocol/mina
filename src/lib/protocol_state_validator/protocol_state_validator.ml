@@ -54,17 +54,16 @@ module Make (Inputs : Inputs_intf) :
     | `Invalid_proof ->
         Trust_system.record_envelope_sender trust_system logger sender
           ( Trust_system.Actions.Gossiped_invalid_transition
-          , Some ("received a transition with an invalid proof", []) )
+          , Some ("sent a transition with an invalid proof", []) )
     | `Too_early ->
         Trust_system.record_envelope_sender trust_system logger sender
           ( Trust_system.Actions.Gossiped_future_transition
-          , Some ("received a transition too early", []) )
+          , Some ("sent a transition too early", []) )
     | `Too_late slot_diff ->
         Trust_system.record_envelope_sender trust_system logger sender
           ( Trust_system.Actions.Gossiped_old_transition slot_diff
           , Some
-              ( "received a transition which was too old (off by $slot_diff \
-                 slots)"
+              ( "sent a transition which was too old (off by $slot_diff slots)"
               , [("slot_diff", `String (Int64.to_string slot_diff))] ) )
 
   let validate_consensus_state ~logger ~trust_system ~time_received ~sender

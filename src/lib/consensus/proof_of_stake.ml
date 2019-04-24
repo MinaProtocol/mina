@@ -2187,8 +2187,8 @@ let received_within_window (epoch, slot) ~time_received =
   let open Time in
   let open Result.Let_syntax in
   let open Int64 in
-  let ( < ) x y = Pervasives.(0 < compare x y) in
-  let ( >= ) x y = Pervasives.(compare x y <= 0) in
+  let ( < ) x y = Pervasives.(compare x y < 0) in
+  let ( >= ) x y = Pervasives.(compare x y >= 0) in
   let time_received =
     of_span_since_epoch (Span.of_ms (Unix_timestamp.to_int64 time_received))
   in
