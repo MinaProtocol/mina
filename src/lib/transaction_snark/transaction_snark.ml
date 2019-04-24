@@ -516,7 +516,7 @@ module Base = struct
     in
     ()
 
-  let use_reduce_to_prover = false
+  let use_reduce_to_prover = true
 
   let prove_main =
     if use_reduce_to_prover then
