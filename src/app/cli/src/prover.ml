@@ -97,8 +97,8 @@ module Worker_state = struct
                         state_for_handler ~pending_coinbase)
                  in
                  let prev_proof =
-                   Tick.Groth16.prove
-                     (Tick.Groth16.Keypair.pk Keys.Step.keys)
+                   Tick.prove
+                     (Tick.Keypair.pk Keys.Step.keys)
                      (Keys.Step.input ()) prover_state main next_state_top_hash
                  in
                  { Blockchain.state= next_state
@@ -139,7 +139,7 @@ module Worker_state = struct
                         state_for_handler ~pending_coinbase)
                  in
                  match
-                   Tick.Groth16.check
+                   Tick.check
                      (main @@ Tick.Field.Var.constant next_state_top_hash)
                      prover_state
                  with

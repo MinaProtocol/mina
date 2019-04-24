@@ -87,6 +87,8 @@ module Digest = struct
 
   let of_string = Fn.id
 
+  let to_string = Fn.id
+
   open Tick
 
   module Checked = struct
