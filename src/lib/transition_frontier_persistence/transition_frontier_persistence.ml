@@ -42,9 +42,23 @@ module Make (Inputs : Intf.Main_inputs) = struct
     | Remove_transitions external_transitions_with_hashes ->
         List.map external_transitions_with_hashes
           ~f:(Fn.compose External_transition.consensus_state With_hash.data)
-    | Update_root _ ->
+    | Update_root (new_root_hash, _, _) ->
         let previous_root =
-          Transition_frontier.previous_root frontier |> Option.value_exn
+          (let open Transition_frontier in
+          let open Option.Let_syntax in
+          let%bind root =
+            match find frontier new_root_hash with
+            | Some root ->
+                Some root
+            | None ->
+                find_in_root_history frontier new_root_hash
+          in
+          let previous_root_hash =
+            External_transition.Verified.parent_hash
+            @@ Breadcrumb.external_transition root
+          in
+          find_in_root_history frontier previous_root_hash)
+          |> Option.value_exn
         in
         let state_hash =
           Transition_frontier.Breadcrumb.state_hash previous_root
