@@ -15,7 +15,7 @@ module Make
 struct
   include Program
   open Inputs
-  module Graphql = Graphql.Make (Program)
+  module Graphql = Graphql.Make (Config_in) (Program)
 
   module For_tests = struct
     let ledger_proof t = staged_ledger_ledger_proof t
