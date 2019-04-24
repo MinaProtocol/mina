@@ -75,7 +75,7 @@ module Make (Inputs : Inputs.S) :
                                hash"))
                   in
                   let open Deferred.Let_syntax in
-                  (* TODO: <make issue> propagate bans through subtree *)
+                  (* TODO: propagate bans through subtree (#2299) *)
                   match%bind
                     Transition_frontier.Breadcrumb.build ~logger ~parent
                       ~transition_with_hash:transition
