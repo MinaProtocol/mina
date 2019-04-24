@@ -29,7 +29,7 @@ module Make (Program : Coda_inputs.Main_intf) = struct
 
     (* TODO: include submitted_at (date) and included_at (date). These two fields are not exposed in the user_command *)
     let payment : (t, User_command.t option) typ =
-      obj "payment" ~fields:(fun _ ->
+      obj "Payment" ~fields:(fun _ ->
           [ field "nonce" ~typ:(non_null int) ~doc:"Nonce of the transaction"
               ~args:Arg.[]
               ~resolve:(fun _ payment ->
@@ -77,7 +77,7 @@ module Make (Program : Coda_inputs.Main_intf) = struct
                 |> User_command_memo.to_string ) ] )
 
     let snark_fee : (t, Transaction_snark_work.t option) typ =
-      obj "snarkFee" ~fields:(fun _ ->
+      obj "SnarkFee" ~fields:(fun _ ->
           [ field "snarkCreator" ~typ:(non_null string)
               ~doc:"public key of the snarker"
               ~args:Arg.[]
@@ -96,7 +96,7 @@ module Make (Program : Coda_inputs.Main_intf) = struct
       staged_ledger_diff.creator
 
     let block : ('context, External_transition.t option) typ =
-      obj "block" ~fields:(fun _ ->
+      obj "Block" ~fields:(fun _ ->
           [ uint64_field "coinbase" ~doc:"Total coinbase awarded to proposer"
               ~args:Arg.[]
               ~resolve:(fun _ external_transition ->
@@ -136,7 +136,7 @@ module Make (Program : Coda_inputs.Main_intf) = struct
 
     let sync_status : ('context, [`Offline | `Synced | `Bootstrap]) typ =
       non_null
-        (enum "syncStatus" ~doc:"Sync status as daemon node"
+        (enum "SyncStatus" ~doc:"Sync status as daemon node"
            ~values:
              [ enum_value "BOOTSTRAP" ~value:`Bootstrap
              ; enum_value "SYNCED" ~value:`Synced
