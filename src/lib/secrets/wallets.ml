@@ -61,17 +61,21 @@ let%test_module "wallets" =
   ( module struct
     let logger = Logger.create ()
 
-    let pk x = x.Signature_lib.Keypair.public_key
+    module Kp_set = Set.Make (struct
+      type t = Keypair.t =
+        {public_key: Public_key.t; private_key: Private_key.t sexp_opaque}
+      [@@deriving sexp]
+
+      let compare a b = Public_key.compare a.public_key b.public_key
+    end)
 
     let%test_unit "get from scratch" =
       Async.Thread_safe.block_on_async_exn (fun () ->
           File_system.with_temp_dir "/tmp/coda-wallets-test" ~f:(fun path ->
               let%bind wallets = load ~logger ~disk_location:path in
               let%map kp = generate_new wallets in
-              let kps = get wallets in
-              assert (
-                List.exists kps ~f:(fun x -> Public_key.equal (pk x) (pk kp))
-              ) ) )
+              let kps = Kp_set.of_list (get wallets) in
+              assert (Kp_set.mem kps kp) ) )
 
     let%test_unit "get from existing file system not-scratch" =
       Backtrace.elide := false ;
@@ -80,16 +84,10 @@ let%test_module "wallets" =
               let%bind wallets = load ~logger ~disk_location:path in
               let%bind kp1 = generate_new wallets in
               let%bind kp2 = generate_new wallets in
-              let kps = get wallets in
-              assert (
-                List.exists kps ~f:(fun x ->
-                    Public_key.equal (pk x) (pk kp1)
-                    || Public_key.equal (pk x) (pk kp2) ) ) ;
+              let kps = Kp_set.of_list (get wallets) in
+              assert (Kp_set.mem kps kp1 && Kp_set.mem kps kp2) ;
               (* Get wallets again from scratch *)
               let%map wallets = load ~logger ~disk_location:path in
-              let kps = get wallets in
-              assert (
-                List.exists kps ~f:(fun x ->
-                    Public_key.equal (pk x) (pk kp1)
-                    || Public_key.equal (pk x) (pk kp2) ) ) ) )
+              let kps = Kp_set.of_list (get wallets) in
+              assert (Kp_set.mem kps kp1 && Kp_set.mem kps kp2) ) )
   end )
