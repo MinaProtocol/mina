@@ -536,8 +536,7 @@ module Base = struct
         ~supply_increase:(Transaction_union.supply_increase transaction)
         ~pending_coinbase_stack_state
     in
-    ( top_hash
-    , prove proving_key (tick_input ()) prover_state main top_hash )
+    (top_hash, prove proving_key (tick_input ()) prover_state main top_hash)
 
   let cached =
     let load =
@@ -546,8 +545,7 @@ module Base = struct
         Cached.component ~label:"verification" ~f:Keypair.vk
           (module Verification_key)
       and proving =
-        Cached.component ~label:"proving" ~f:Keypair.pk
-          (module Proving_key)
+        Cached.component ~label:"proving" ~f:Keypair.pk (module Proving_key)
       in
       (verification, {proving with value= ()})
     in
@@ -831,8 +829,7 @@ module Merge = struct
         Cached.component ~label:"verification" ~f:Keypair.vk
           (module Verification_key)
       and proving =
-        Cached.component ~label:"proving" ~f:Keypair.pk
-          (module Proving_key)
+        Cached.component ~label:"proving" ~f:Keypair.pk (module Proving_key)
       in
       (verification, {proving with value= ()})
     in
@@ -1257,8 +1254,8 @@ struct
       ; tock_vk= keys.verification.wrap }
     in
     ( top_hash
-    , Tick.prove keys.proving.merge (tick_input ()) prover_state
-        Merge.main top_hash )
+    , Tick.prove keys.proving.merge (tick_input ()) prover_state Merge.main
+        top_hash )
 
   let of_transaction_union ?preeval sok_digest source target
       ~pending_coinbase_stack_state transaction handler =
@@ -1761,10 +1758,8 @@ let constraint_system_digests () =
   let digest = Tick.R1CS_constraint_system.digest in
   let digest' = Tock.R1CS_constraint_system.digest in
   [ ( "transaction-merge"
-    , digest Merge.(Tick.constraint_system ~exposing:(input ()) main)
-    )
+    , digest Merge.(Tick.constraint_system ~exposing:(input ()) main) )
   ; ( "transaction-base"
-    , digest
-        Base.(Tick.constraint_system ~exposing:(tick_input ()) main) )
+    , digest Base.(Tick.constraint_system ~exposing:(tick_input ()) main) )
   ; ( "transaction-wrap"
     , digest' W.(Tock.constraint_system ~exposing:wrap_input main) ) ]

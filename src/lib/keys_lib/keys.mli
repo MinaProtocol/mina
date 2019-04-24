@@ -20,11 +20,7 @@ module type S = sig
 
     val input :
          unit
-      -> ( 'a
-         , 'b
-         , Tick.Field.Var.t -> 'a
-         , Tick.Field.t -> 'b )
-         Tick.Data_spec.t
+      -> ('a, 'b, Tick.Field.Var.t -> 'a, Tick.Field.t -> 'b) Tick.Data_spec.t
 
     module Verification_key : sig
       val to_bool_list : Tock.Verification_key.t -> bool list

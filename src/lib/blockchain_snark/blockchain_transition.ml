@@ -63,8 +63,7 @@ module Keys = struct
         ( "Blockchain_transition_verification" ^ Md5.to_hex step
         ^ Md5.to_hex wrap )
 
-    type t =
-      {step: Tick.Verification_key.t; wrap: Tock.Verification_key.t}
+    type t = {step: Tick.Verification_key.t; wrap: Tock.Verification_key.t}
 
     let dummy =
       { step= Dummy_values.Tick.Groth16.verification_key
@@ -220,8 +219,7 @@ struct
           (Fn.compose Md5.to_hex Tick.R1CS_constraint_system.digest)
         ~create_env:Tick.Keypair.generate
         ~input:
-          (Tick.constraint_system ~exposing:(Step_base.input ())
-             Step_base.main)
+          (Tick.constraint_system ~exposing:(Step_base.input ()) Step_base.main)
 
     let cached () =
       let paths = Fn.compose Cache_dir.possible_paths Filename.basename in
@@ -280,8 +278,6 @@ let constraint_system_digests () =
   let digest = Tick.R1CS_constraint_system.digest in
   let digest' = Tock.R1CS_constraint_system.digest in
   [ ( "blockchain-step"
-    , digest
-        M.Step_base.(Tick.constraint_system ~exposing:(input ()) main)
-    )
+    , digest M.Step_base.(Tick.constraint_system ~exposing:(input ()) main) )
   ; ("blockchain-wrap", digest' W.(Tock.constraint_system ~exposing:input main))
   ]
