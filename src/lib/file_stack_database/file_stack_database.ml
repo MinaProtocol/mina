@@ -53,7 +53,8 @@ let%test_module "file stack database" =
 
     let string_gen =
       let open Quickcheck.Let_syntax in
-      String.gen_with_length size Char.gen >>| Bigstring.of_string
+      String.gen_with_length size Char.quickcheck_generator
+      >>| Bigstring.of_string
 
     let with_test f =
       (fun () ->
@@ -83,7 +84,8 @@ let%test_module "file stack database" =
         Quickcheck.Generator.of_list [Push message; Pop]
       in
       let test_command t stack = function
-        | Push message -> Test.push t message ; message :: stack
+        | Push message ->
+            Test.push t message ; message :: stack
         | Pop -> (
             let elem = Test.pop t in
             match stack with

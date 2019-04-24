@@ -25,7 +25,7 @@ case $1 in
 esac
 
 if [[ $DOWNLOAD_THINGS == "YES" ]]; then
-  PACKAGES="gpatch opam cmake gmp pkg-config openssl libffi libsodium boost zlib"
+  PACKAGES="gpatch opam cmake gmp pkg-config openssl libffi libsodium boost zlib libomp"
 
   # removing already installed packages from the list
   for p in $(env HOMEBREW_NO_AUTO_UPDATE=1 brew list); do
@@ -33,8 +33,7 @@ if [[ $DOWNLOAD_THINGS == "YES" ]]; then
   done;
 
   # only run if there's work to do
-  if [[ $PACKAGES = *[![:space:]]* ]];
-   then
+  if [[ $PACKAGES = *[![:space:]]* ]]; then
     yes | env HOMEBREW_NO_AUTO_UPDATE=1 brew install $PACKAGES
   else
     echo 'All brew packages have already been installed.'
@@ -63,6 +62,7 @@ if [[ $COMPILE_THINGS == "YES" ]]; then
   env TERM=xterm opam pin -y add src/external/ocaml-sodium
   env TERM=xterm opam pin -y add src/external/rpc_parallel
   env TERM=xterm opam pin -y add src/external/ocaml-extlib
+  env TERM=xterm opam pin -y add src/external/digestif
   env TERM=xterm opam pin -y add src/external/async_kernel
   eval $(opam config env)
 

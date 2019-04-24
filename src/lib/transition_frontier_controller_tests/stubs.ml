@@ -242,7 +242,7 @@ struct
       let transactions = gen_payments accounts_with_secret_keys in
       let _, largest_account =
         List.max_elt accounts_with_secret_keys
-          ~compare:(fun (_, acc1) (_, acc2) -> Account.compare acc1 acc2 )
+          ~compare:(fun (_, acc1) (_, acc2) -> Account.compare acc1 acc2)
         |> Option.value_exn
       in
       let largest_account_public_key = Account.public_key largest_account in
@@ -335,7 +335,8 @@ struct
                   |> With_hash.hash |> State_hash.to_yojson ) ]
             "Producing a breadcrumb with hash: $state_hash" ;
           new_breadcrumb
-      | Error (`Fatal_error exn) -> raise exn
+      | Error (`Fatal_error exn) ->
+          raise exn
       | Error (`Validation_error e) ->
           failwithf !"Validation Error : %{sexp:Error.t}" e ()
 
@@ -421,7 +422,8 @@ struct
                  (Some (Account.public_key proposer_account)))
         in
         frontier
-    | Error err -> Error.raise err
+    | Error err ->
+        Error.raise err
 
   let build_frontier_randomly ~gen_root_breadcrumb_builder frontier :
       unit Deferred.t =

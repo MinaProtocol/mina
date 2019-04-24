@@ -423,15 +423,24 @@ module Tick = struct
       let gen_fold n =
         let gen_triple =
           Quickcheck.Generator.map (Int.gen_incl 0 7) ~f:(function
-            | 0 -> (false, false, false)
-            | 1 -> (false, false, true)
-            | 2 -> (false, true, false)
-            | 3 -> (false, true, true)
-            | 4 -> (true, false, false)
-            | 5 -> (true, false, true)
-            | 6 -> (true, true, false)
-            | 7 -> (true, true, true)
-            | _ -> failwith "gen_triple: got unexpected integer" )
+            | 0 ->
+                (false, false, false)
+            | 1 ->
+                (false, false, true)
+            | 2 ->
+                (false, true, false)
+            | 3 ->
+                (false, true, true)
+            | 4 ->
+                (true, false, false)
+            | 5 ->
+                (true, false, true)
+            | 6 ->
+                (true, true, false)
+            | 7 ->
+                (true, true, true)
+            | _ ->
+                failwith "gen_triple: got unexpected integer" )
         in
         let gen_triples n =
           Quickcheck.random_value

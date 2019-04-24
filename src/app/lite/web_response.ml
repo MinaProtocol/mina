@@ -11,8 +11,10 @@ let get url on_success on_error =
   req##.onload :=
     Dom.handler (fun _e ->
         ( match Js.Opt.to_option (File.CoerceTo.string req##.response) with
-        | None -> on_error (Error.of_string "get request failed")
-        | Some s -> on_success (Js.to_string s) ) ;
+        | None ->
+            on_error (Error.of_string "get request failed")
+        | Some s ->
+            on_success (Js.to_string s) ) ;
         Js._false ) ;
   req##_open (Js.string "GET") (Js.string url) Js._true ;
   req##send Js.Opt.empty

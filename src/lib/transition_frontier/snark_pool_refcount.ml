@@ -61,7 +61,8 @@ struct
         | Some v ->
             Work.Table.set table ~key:work ~data:(v - 1) ;
             acc
-        | None -> failwith "Removed a breadcrumb we didn't know about" )
+        | None ->
+            failwith "Removed a breadcrumb we didn't know about" )
 
   let create () = Work.Table.create ()
 

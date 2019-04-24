@@ -30,9 +30,12 @@ module Digest = struct
       let of_yojson = function
         | `String s -> (
           match Base64.decode s with
-          | Ok s -> Ok s
-          | Error (`Msg e) -> Error (sprintf "bad base64: %s" e) )
-        | _ -> Error "expected `String"
+          | Ok s ->
+              Ok s
+          | Error (`Msg e) ->
+              Error (sprintf "bad base64: %s" e) )
+        | _ ->
+            Error "expected `String"
 
       include Comparable.Make (T)
       include Registration.Make_latest_version (T)
@@ -58,7 +61,7 @@ module Digest = struct
 
   let length_in_triples = (length_in_bits + 2) / 3
 
-  let gen = String.gen_with_length length_in_bytes Char.gen
+  let gen = String.gen_with_length length_in_bytes Char.quickcheck_generator
 
   let%test_unit "to_bits compatible with fold" =
     Quickcheck.test gen ~f:(fun t ->
@@ -71,7 +74,9 @@ module Digest = struct
         assert (String.equal (of_bits (to_bits t)) t) )
 
   let%test_unit "to_bits . of_bits = id" =
-    Quickcheck.test (List.gen_with_length length_in_bits Bool.gen) ~f:(fun t ->
+    Quickcheck.test
+      (List.gen_with_length length_in_bits Bool.quickcheck_generator)
+      ~f:(fun t ->
         assert (Array.to_list (to_bits (of_bits (List.to_array t))) = t) )
 
   type t = Stable.Latest.t [@@deriving sexp, compare, hash, yojson]
@@ -81,6 +86,8 @@ module Digest = struct
   let fold t = Fold_lib.Fold.group3 ~default:false (fold_bits t)
 
   let of_string = Fn.id
+
+  let to_string = Fn.id
 
   open Tick
 
@@ -105,7 +112,7 @@ module Digest = struct
         of_string (Blake2.bits_to_string bs) )
 end
 
-let digest_string s = (Blake2.digest_string s :> string)
+let digest_string s = Blake2.(digest_string s |> to_raw_string)
 
 let digest_field =
   let field_to_bits x =
@@ -113,7 +120,7 @@ let digest_field =
     let n = Bigint.of_field x in
     Array.init Field.size_in_bits ~f:(Bigint.test_bit n)
   in
-  fun x -> (digest_string (Blake2.bits_to_string (field_to_bits x)) :> string)
+  fun x -> digest_string (Blake2.bits_to_string (field_to_bits x))
 
 module Checked = struct
   include Snarky_blake2.Make (Tick)
@@ -127,8 +134,8 @@ module Checked = struct
 end
 
 let%test_unit "checked-unchecked equality" =
-  Quickcheck.test ~trials:10 (Quickcheck.Generator.list Bool.gen)
-    ~f:(fun bits ->
+  Quickcheck.test ~trials:10
+    (Quickcheck.Generator.list Bool.quickcheck_generator) ~f:(fun bits ->
       Tick.Test.test_equal ~sexp_of_t:Digest.sexp_of_t
         (Tick.Typ.list ~length:(List.length bits) Tick.Boolean.typ)
         Digest.typ Checked.digest_bits

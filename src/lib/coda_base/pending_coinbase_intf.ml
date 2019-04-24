@@ -88,7 +88,7 @@ module type S = sig
 
     val of_digest : Pedersen.Digest.t -> t
   end
-  
+
   and Stack : sig
     include Data_hash_binable_intf
 

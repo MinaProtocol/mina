@@ -24,7 +24,8 @@ end) :
 
   let handle_diff () diff =
     match diff with
-    | Transition_frontier_diff.New_breadcrumb _ -> None
+    | Transition_frontier_diff.New_breadcrumb _ ->
+        None
     | Transition_frontier_diff.New_frontier root ->
         Some
           Root_diff_view.

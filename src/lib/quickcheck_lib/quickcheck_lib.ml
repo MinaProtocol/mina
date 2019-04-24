@@ -4,7 +4,8 @@ open Quickcheck.Let_syntax
 
 let rec map_gens ls ~f =
   match ls with
-  | [] -> return []
+  | [] ->
+      return []
   | h :: t ->
       let%bind h' = f h in
       let%map t' = map_gens t ~f in
@@ -32,7 +33,8 @@ let gen_imperative_rose_tree ?(p = 0.75) (root_gen : 'a t)
   let%bind root = root_gen in
   imperative_fixed_point root ~f:(fun self ->
       match%bind size with
-      | 0 -> failwith "there is no rose tree of size 0"
+      | 0 ->
+          failwith "there is no rose tree of size 0"
       | 1 ->
           let%map this = node_gen in
           fun parent -> Rose_tree.T (this parent, [])
@@ -55,7 +57,8 @@ let gen_imperative_ktree ?(p = 0.75) (root_gen : 'a t)
   let%bind root = root_gen in
   imperative_fixed_point root ~f:(fun self ->
       match%bind size with
-      | 0 -> return (fun _ -> [])
+      | 0 ->
+          return (fun _ -> [])
       (* this case is optional but more effecient *)
       | 1 ->
           let%map this = node_gen in
@@ -75,7 +78,8 @@ let gen_imperative_list (root_gen : 'a t) (node_gen : ('a -> 'a) t) =
   let%bind root = root_gen in
   imperative_fixed_point root ~f:(fun self ->
       match%bind size with
-      | 0 -> return (fun _ -> [])
+      | 0 ->
+          return (fun _ -> [])
       | n ->
           let%bind this = node_gen in
           let%map f = with_size ~size:(n - 1) self in
@@ -96,7 +100,8 @@ let%test_module "Quickcheck lib tests" =
       in
       Quickcheck.test gen ~f:(fun list ->
           match list with
-          | [] -> failwith "We assume that our list has at least one element"
+          | [] ->
+              failwith "We assume that our list has at least one element"
           | x :: xs ->
               let result =
                 List.fold_result xs ~init:x ~f:(fun elem next_elem ->

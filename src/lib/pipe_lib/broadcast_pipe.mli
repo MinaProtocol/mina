@@ -16,6 +16,10 @@ module Reader : sig
       will not be invoked until execution returns to the scheduler .*)
   val iter : 'a t -> f:('a -> unit Deferred.t) -> unit Deferred.t
 
+  (** Same as [iter], except that [f] will stop being called once it returns
+      [true], resolving the deferred return by [iter_until]. *)
+  val iter_until : 'a t -> f:('a -> bool Deferred.t) -> unit Deferred.t
+
   (** Fold over the items in the pipe. Same notes as iter. *)
   val fold : 'a t -> init:'b -> f:('b -> 'a -> 'b Deferred.t) -> 'b Deferred.t
 

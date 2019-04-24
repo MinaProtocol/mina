@@ -343,9 +343,12 @@ struct
 
   let summary msg =
     match Envelope.Incoming.data msg with
-    | New_state _ -> "new state"
-    | Snark_pool_diff _ -> "snark pool diff"
-    | Transaction_pool_diff _ -> "transaction pool diff"
+    | New_state _ ->
+        "new state"
+    | Snark_pool_diff _ ->
+        "snark pool diff"
+    | Transaction_pool_diff _ ->
+        "transaction pool diff"
 end
 
 module type Inputs_intf = sig
@@ -410,7 +413,8 @@ module type Config_intf = sig
   type t =
     { logger: Logger.t
     ; gossip_net_params: gossip_config
-    ; time_controller: time_controller }
+    ; time_controller: time_controller
+    ; consensus_local_state: Consensus.Local_state.t }
 end
 
 module Make (Inputs : Inputs_intf) = struct
@@ -426,7 +430,8 @@ module Make (Inputs : Inputs_intf) = struct
     type t =
       { logger: Logger.t
       ; gossip_net_params: Gossip_net.Config.t
-      ; time_controller: Time.Controller.t }
+      ; time_controller: Time.Controller.t
+      ; consensus_local_state: Consensus.Local_state.t }
   end
 
   module Rpcs = Rpcs (Inputs)
@@ -435,6 +440,7 @@ module Make (Inputs : Inputs_intf) = struct
   type t =
     { gossip_net: Gossip_net.t
     ; logger: Logger.t
+    ; trust_system: Trust_system.t
     ; states:
         (External_transition.t Envelope.Incoming.t * Time.t)
         Strict_pipe.Reader.t
@@ -516,7 +522,9 @@ module Make (Inputs : Inputs_intf) = struct
         ; Rpcs.Answer_sync_ledger_query.implement_multi
             answer_sync_ledger_query_rpc
         ; Rpcs.Transition_catchup.implement_multi transition_catchup_rpc
-        ; Rpcs.Get_ancestry.implement_multi get_ancestry_rpc ]
+        ; Rpcs.Get_ancestry.implement_multi get_ancestry_rpc
+        ; Consensus.Rpcs.implementations ~logger:config.logger
+            ~local_state:config.consensus_local_state ]
     in
     let%map gossip_net =
       Gossip_net.create config.gossip_net_params implementations
@@ -542,12 +550,14 @@ module Make (Inputs : Inputs_intf) = struct
               `Fst
                 ( Envelope.Incoming.map x ~f:(fun _ -> s)
                 , Time.now config.time_controller )
-          | Snark_pool_diff d -> `Snd (Envelope.Incoming.map x ~f:(fun _ -> d))
+          | Snark_pool_diff d ->
+              `Snd (Envelope.Incoming.map x ~f:(fun _ -> d))
           | Transaction_pool_diff d ->
               `Trd (Envelope.Incoming.map x ~f:(fun _ -> d)) )
     in
     { gossip_net
     ; logger= config.logger
+    ; trust_system= config.gossip_net_params.trust_system
     ; states
     ; snark_pool_diffs= Strict_pipe.Reader.to_linear_pipe snark_pool_diffs
     ; transaction_pool_diffs=
@@ -622,6 +632,15 @@ module Make (Inputs : Inputs_intf) = struct
       Rpcs.Transition_catchup.dispatch_multi
       (envelope_from_me t state_hash)
 
+  let query_peer :
+         t
+      -> Network_peer.Peer.t
+      -> (Versioned_rpc.Connection_with_menu.t -> 'q -> 'r Deferred.Or_error.t)
+      -> 'q
+      -> 'r Deferred.Or_error.t =
+   fun t peer rpc rpc_input ->
+    Gossip_net.query_peer t.gossip_net peer rpc rpc_input
+
   let try_non_preferred_peers t input peers ~rpc =
     let max_current_peers = 8 in
     let rec loop peers num_peers =
@@ -636,9 +655,20 @@ module Make (Inputs : Inputs_intf) = struct
               Gossip_net.query_peer t.gossip_net peer rpc input
             in
             match response_or_error with
-            | Ok (Some response) -> return (Ok response)
-            | Ok None -> loop remaining_peers (2 * num_peers)
-            | Error _ -> loop remaining_peers (2 * num_peers) )
+            | Ok (Some response) ->
+                let%bind () =
+                  Trust_system.(
+                    record t.trust_system t.logger peer.host
+                      Actions.
+                        ( Fulfilled_request
+                        , Some ("Nonpreferred peer returned valid response", [])
+                        ))
+                in
+                return (Ok response)
+            | Ok None ->
+                loop remaining_peers (2 * num_peers)
+            | Error _ ->
+                loop remaining_peers (2 * num_peers) )
     in
     loop peers 1
 
@@ -651,15 +681,28 @@ module Make (Inputs : Inputs_intf) = struct
       random_peers_except t max_peers ~except
     in
     match response with
-    | Ok (Some data) -> return (Ok data)
+    | Ok (Some data) ->
+        let%bind () =
+          Trust_system.(
+            record t.trust_system t.logger peer.host
+              Actions.
+                ( Fulfilled_request
+                , Some ("Preferred peer returned valid response", []) ))
+        in
+        return (Ok data)
     | Ok None ->
-        Logger.faulty_peer t.logger ~module_:__MODULE__ ~location:__LOC__
-          !"get no response from %{sexp: Peer.t}"
-          peer ;
+        let%bind () =
+          Trust_system.(
+            record t.trust_system t.logger peer.host
+              Actions.
+                ( Violated_protocol
+                , Some ("When querying preferred peer, got no response", []) ))
+        in
         let peers = get_random_peers () in
         try_non_preferred_peers t envelope peers ~rpc
     | Error _ ->
-        Logger.faulty_peer t.logger ~module_:__MODULE__ ~location:__LOC__
+        (* TODO: determine what punishments apply here *)
+        Logger.error t.logger ~module_:__MODULE__ ~location:__LOC__
           !"get error from %{sexp: Peer.t}"
           peer ;
         let peers = get_random_peers () in

@@ -2,7 +2,9 @@ open Core_kernel
 open Snark_params.Tick
 include Sgn_type.Sgn
 
-let gen = Quickcheck.Generator.map Bool.gen ~f:(fun b -> if b then Pos else Neg)
+let gen =
+  Quickcheck.Generator.map Bool.quickcheck_generator ~f:(fun b ->
+      if b then Pos else Neg )
 
 let negate = function Pos -> Neg | Neg -> Pos
 

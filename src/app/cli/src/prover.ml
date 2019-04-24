@@ -146,7 +146,8 @@ module Worker_state = struct
                  | Ok () ->
                      { Blockchain.state= next_state
                      ; proof= Precomputed_values.base_proof }
-                 | Error e -> Error.raise e
+                 | Error e ->
+                     Error.raise e
 
                let verify state proof = true
              end
@@ -163,7 +164,8 @@ module Worker_state = struct
                let verify _ _ = true
              end
              : S )
-         | _ -> failwith "unknown proof_level set in compile config"
+         | _ ->
+             failwith "unknown proof_level set in compile config"
        in
        m)
 

@@ -75,7 +75,8 @@ module Make (F : Intf.Basic) = struct
 
   let div_unsafe x y =
     match (to_constant x, to_constant y) with
-    | Some x, Some y -> return (constant Unchecked.(x / y))
+    | Some x, Some y ->
+        return (constant Unchecked.(x / y))
     | _, _ ->
         let%bind x_over_y =
           exists typ
@@ -87,16 +88,20 @@ module Make (F : Intf.Basic) = struct
 
   let assert_square =
     match assert_square with
-    | `Custom f -> f
-    | `Define -> fun a a2 -> assert_r1cs a a a2
+    | `Custom f ->
+        f
+    | `Define ->
+        fun a a2 -> assert_r1cs a a a2
 
   let ( * ) =
     match ( * ) with
-    | `Custom f -> f
+    | `Custom f ->
+        f
     | `Define -> (
         fun x y ->
           match (to_constant x, to_constant y) with
-          | Some x, Some y -> return (constant Unchecked.(x * y))
+          | Some x, Some y ->
+              return (constant Unchecked.(x * y))
           | _, _ ->
               let%bind res =
                 exists typ
@@ -113,11 +118,13 @@ module Make (F : Intf.Basic) = struct
 
   let square =
     match square with
-    | `Custom f -> f
+    | `Custom f ->
+        f
     | `Define -> (
         fun x ->
           match to_constant x with
-          | Some x -> return (constant (Unchecked.square x))
+          | Some x ->
+              return (constant (Unchecked.square x))
           | None ->
               let%bind res =
                 exists typ
@@ -132,11 +139,13 @@ module Make (F : Intf.Basic) = struct
 
   let inv_exn =
     match inv_exn with
-    | `Custom f -> f
+    | `Custom f ->
+        f
     | `Define -> (
         fun t ->
           match to_constant t with
-          | Some x -> return (constant (Unchecked.inv x))
+          | Some x ->
+              return (constant (Unchecked.inv x))
           | None ->
               let%bind res =
                 exists typ
@@ -163,8 +172,10 @@ struct
         Some
           (A.map t ~f:(fun x ->
                match F.to_constant x with
-               | Some x -> x
-               | None -> raise None_exn ))
+               | Some x ->
+                   x
+               | None ->
+                   raise None_exn ))
       with None_exn -> None
 
   let if_ b ~then_ ~else_ =
