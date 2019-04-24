@@ -1202,6 +1202,7 @@ let generate_transaction_union_witness sok_message source target transaction
       ~pending_coinbase_stack_state
   in
   let open Tick.Groth16 in
+  let main x = handle (Base.main x) handler in
   generate_auxiliary_input (tick_input ()) prover_state main top_hash
 
 let generate_transaction_witness ~sok_message ~source ~target
