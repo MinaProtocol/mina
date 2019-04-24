@@ -3,6 +3,7 @@ open Async_kernel
 open Protocols.Coda_transition_frontier
 open Coda_base
 open Pipe_lib
+open Coda_incremental
 
 module type Inputs_intf = Inputs.Inputs_intf
 
@@ -266,16 +267,24 @@ struct
       ; transition_registry: Transition_registry.t
       ; best_tip_diff: Best_tip_diff.t
       ; root_diff: Root_diff.t
-      ; persistence_diff: Persistence_diff.t }
+      ; persistence_diff: Persistence_diff.t
+      ; new_transition:
+          Inputs.External_transition.Verified.t New_transition.Var.t }
     [@@deriving fields]
 
-    let create () =
+    (* TODO: Each of these extensions should be created with the input of the breadcrumb *)
+    let create root_breadcrumb =
+      let new_transition =
+        New_transition.Var.create
+          (Breadcrumb.external_transition root_breadcrumb)
+      in
       { root_history= Root_history.create (2 * Inputs.max_length)
       ; snark_pool_refcount= Snark_pool_refcount.create ()
       ; transition_registry= Transition_registry.create ()
       ; best_tip_diff= Best_tip_diff.create ()
       ; root_diff= Root_diff.create ()
-      ; persistence_diff= Persistence_diff.create () }
+      ; persistence_diff= Persistence_diff.create ()
+      ; new_transition }
 
     type writers =
       { snark_pool: Snark_pool_refcount.view Broadcast_pipe.Writer.t
@@ -329,7 +338,10 @@ struct
       ( match diff with
       | Transition_frontier_diff.New_breadcrumb breadcrumb ->
           Transition_registry.notify t.transition_registry
-            (Breadcrumb.state_hash breadcrumb)
+            (Breadcrumb.state_hash breadcrumb) ;
+          New_transition.Var.set t.new_transition
+            (Breadcrumb.external_transition breadcrumb) ;
+          New_transition.stabilize ()
       | Transition_frontier_diff.New_frontier _ ->
           ()
       | Transition_frontier_diff.New_best_tip
@@ -341,9 +353,12 @@ struct
           ( if new_best_tip_length - old_root_length > max_length then
             let root_state_hash = Breadcrumb.state_hash old_root in
             Root_history.enqueue t.root_history root_state_hash old_root ) ;
+          let new_breadcrumb = Non_empty_list.last added_to_best_tip_path in
           Transition_registry.notify t.transition_registry
-            (Breadcrumb.state_hash (Non_empty_list.last added_to_best_tip_path))
-      ) ;
+            (Breadcrumb.state_hash new_breadcrumb) ;
+          New_transition.Var.set t.new_transition
+            (Breadcrumb.external_transition new_breadcrumb) ;
+          New_transition.stabilize () ) ;
       Fields.fold ~init:diff
         ~root_history:(fun _ _ -> Deferred.unit)
         ~snark_pool_refcount:
@@ -353,6 +368,7 @@ struct
         ~root_diff:(use Root_diff.handle_diff pipes.root_diff)
         ~persistence_diff:
           (use Persistence_diff.handle_diff pipes.persistence_diff)
+        ~new_transition:(fun acc _ -> acc)
   end
 
   module Node = struct
@@ -414,6 +430,14 @@ struct
   let persistence_diff_pipe {extension_readers; _} =
     extension_readers.persistence_diff
 
+  let new_transition {extensions; _} =
+    let new_transition_incr =
+      New_transition.Var.watch extensions.new_transition
+    in
+    let observer = New_transition.observe new_transition_incr in
+    New_transition.stabilize () ;
+    observer
+
   (* TODO: load from and write to disk *)
   let create ~logger
       ~(root_transition :
@@ -453,7 +477,7 @@ struct
       ; best_tip= root_hash
       ; table
       ; consensus_local_state
-      ; extensions= Extensions.create ()
+      ; extensions= Extensions.create root_breadcrumb
       ; extension_readers
       ; extension_writers }
     in

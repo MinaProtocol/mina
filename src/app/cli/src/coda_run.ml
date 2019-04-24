@@ -280,8 +280,8 @@ struct
         Length.to_int @@ Consensus.Consensus_state.length consensus_state
       in
       let%bind sync_status =
-        Incr_status.stabilize () ;
-        match Incr_status.Observer.value_exn @@ sync_status t with
+        Coda_incremental.Status.stabilize () ;
+        match Coda_incremental.Status.Observer.value_exn @@ sync_status t with
         | `Bootstrap ->
             `Bootstrapping
         | `Offline ->

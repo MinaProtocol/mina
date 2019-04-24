@@ -802,6 +802,10 @@ module type Staged_ledger_diff_intf = sig
   val forget : With_valid_signatures_and_proofs.t -> t
 
   val user_commands : t -> user_command list
+
+  val completed_works : t -> completed_work list
+
+  val total_coinbase : t -> Fee.Unsigned.t
 end
 
 module type Staged_ledger_transition_intf = sig

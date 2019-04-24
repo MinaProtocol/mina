@@ -62,8 +62,6 @@ module Frozen_ledger_hash = struct
   let of_ledger_hash = Frozen_ledger_hash.of_ledger_hash
 end
 
-module Incr_status = Incremental.Make ()
-
 module type Ledger_proof_verifier_intf = sig
   val verify :
        Ledger_proof.t
@@ -185,8 +183,6 @@ module type Main_intf = sig
         with type gossip_config := Gossip_net.Config.t
          and type time_controller := Time.Controller.t
     end
-
-    module Incr_status : Incremental.S
 
     module Sparse_ledger : sig
       type t
@@ -362,7 +358,7 @@ module type Main_intf = sig
     t -> Inputs.Transition_frontier.Breadcrumb.t Participating_state.t
 
   val sync_status :
-    t -> [`Offline | `Synced | `Bootstrap] Inputs.Incr_status.Observer.t
+    t -> [`Offline | `Synced | `Bootstrap] Coda_incremental.Status.Observer.t
 
   val visualize_frontier : filename:string -> t -> unit Participating_state.t
 
@@ -385,6 +381,9 @@ module type Main_intf = sig
   val create : Config.t -> t Deferred.t
 
   val staged_ledger_ledger_proof : t -> Inputs.Ledger_proof.t option
+
+  val transition_frontier :
+    t -> Inputs.Transition_frontier.t option Broadcast_pipe.Reader.t
 
   val get_ledger :
     t -> Staged_ledger_hash.t -> Account.t list Deferred.Or_error.t
@@ -831,7 +830,6 @@ struct
   end
 
   module Root_sync_ledger = Sync_ledger.Db
-  module Incr_status = Incr_status
 
   module Net = Coda_networking.Make (struct
     include Inputs0

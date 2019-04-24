@@ -73,6 +73,18 @@ end) :
       | Two of ('a * 'a option) option
     [@@deriving sexp]
 
+    let to_list (type a) : a t -> a list = function
+      | Zero ->
+          []
+      | One opt ->
+          Option.to_list opt
+      | Two opt ->
+          let open Option.Let_syntax in
+          Option.to_list
+            (let%map value, opt = opt in
+             value :: Option.to_list opt)
+          |> List.concat
+
     let increase t ws =
       match (t, ws) with
       | Zero, [] ->
@@ -105,6 +117,8 @@ end) :
 
     type 'a t = 'a Stable.Latest.t = Zero | One of 'a option
     [@@deriving sexp]
+
+    let to_list = function Zero -> [] | One opt -> Option.to_list opt
 
     let increase t ws =
       match (t, ws) with
@@ -289,4 +303,22 @@ end) :
   let user_commands (t : t) =
     (fst t.diff).user_commands
     @ Option.value_map (snd t.diff) ~default:[] ~f:(fun d -> d.user_commands)
+
+  let completed_works (t : t) =
+    (fst t.diff).completed_works
+    @ Option.value_map (snd t.diff) ~default:[] ~f:(fun d -> d.completed_works)
+
+  let add_coinbase (coinbases : Ft.t list) =
+    List.fold coinbases ~init:Currency.Fee.zero
+      ~f:(fun acc (_, fee_transfer) ->
+        Option.value_exn (Currency.Fee.add acc fee_transfer) )
+
+  let total_coinbase (t : t) =
+    let first_pre_diff, second_pre_diff_opt = t.diff in
+    let fee_transfers =
+      At_most_two.to_list first_pre_diff.coinbase
+      @ Option.value_map second_pre_diff_opt ~default:[]
+          ~f:(fun second_prediff -> At_most_one.to_list second_prediff.coinbase)
+    in
+    add_coinbase fee_transfers
 end

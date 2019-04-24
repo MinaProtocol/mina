@@ -23,6 +23,10 @@ module Make (Program : Coda_inputs.Main_intf) = struct
       let uint64 uint64 = Unsigned.UInt64.to_string uint64
     end
 
+    let uint64_field name ~doc =
+      field name ~typ:(non_null string)
+        ~doc:(sprintf !"%s (%s is uint64 and is coerced as a string" doc name)
+
     (* TODO: include submitted_at (date) and included_at (date). These two fields are not exposed in the user_command *)
     let payment : (t, User_command.t option) typ =
       obj "payment" ~fields:(fun _ ->
@@ -48,10 +52,7 @@ module Make (Program : Coda_inputs.Main_intf) = struct
                 | Stake_delegation _ ->
                     failwith "Payment should not consist of a stake delegation"
                 )
-          ; field "amount" ~typ:(non_null string)
-              ~doc:
-                "Amount that sender send to receiver (amount is uint64 and is \
-                 coerced as a string)"
+          ; uint64_field "amount" ~doc:"Amount that sender send to receiver"
               ~args:Arg.[]
               ~resolve:(fun _ payment ->
                 match
@@ -62,10 +63,9 @@ module Make (Program : Coda_inputs.Main_intf) = struct
                 | Stake_delegation _ ->
                     failwith "Payment should not consist of a stake delegation"
                 )
-          ; field "fee" ~typ:(non_null string)
+          ; uint64_field "fee"
               ~doc:
-                "Fee that sender is willing to pay for making the transaction \
-                 (fee is uint64 and is coerced as a string)"
+                "Fee that sender is willing to pay for making the transaction"
               ~args:Arg.[]
               ~resolve:(fun _ payment ->
                 User_command.fee payment |> Currency.Fee.to_uint64
@@ -75,6 +75,64 @@ module Make (Program : Coda_inputs.Main_intf) = struct
               ~resolve:(fun _ payment ->
                 User_command_payload.memo @@ User_command.payload payment
                 |> User_command_memo.to_string ) ] )
+
+    let snark_fee : (t, Transaction_snark_work.t option) typ =
+      obj "snark_fee" ~fields:(fun _ ->
+          [ field "snark_creator" ~typ:(non_null string)
+              ~doc:"public key of the snarker"
+              ~args:Arg.[]
+              ~resolve:(fun _ {Transaction_snark_work.prover; _} ->
+                Stringable.public_key prover )
+          ; field "fee" ~typ:(non_null string)
+              ~doc:"the cost of creating the proof"
+              ~args:Arg.[]
+              ~resolve:(fun _ {Transaction_snark_work.fee; _} ->
+                Currency.Fee.to_uint64 fee |> Unsigned.UInt64.to_string ) ] )
+
+    let block_proposer external_transition =
+      let staged_ledger_diff =
+        External_transition.staged_ledger_diff external_transition
+      in
+      staged_ledger_diff.creator
+
+    let block : ('context, External_transition.t option) typ =
+      obj "block" ~fields:(fun _ ->
+          [ uint64_field "coinbase" ~doc:"Total coinbase awarded to proposer"
+              ~args:Arg.[]
+              ~resolve:(fun _ external_transition ->
+                let staged_ledger_diff =
+                  External_transition.staged_ledger_diff external_transition
+                in
+                staged_ledger_diff |> Staged_ledger_diff.total_coinbase
+                |> Currency.Fee.to_uint64 |> Stringable.uint64 )
+          ; field "creator" ~typ:(non_null string)
+              ~doc:"Public key of the proposer creating the block"
+              ~args:Arg.[]
+              ~resolve:(fun _ external_transition ->
+                Stringable.public_key @@ block_proposer external_transition )
+          ; field "payments" ~doc:"List of payments in the block"
+              ~typ:(non_null (list @@ non_null payment))
+              ~args:Arg.[]
+              ~resolve:(fun _ external_transition ->
+                let staged_ledger_diff =
+                  External_transition.staged_ledger_diff external_transition
+                in
+                let user_commands =
+                  Staged_ledger_diff.user_commands staged_ledger_diff
+                in
+                List.filter user_commands
+                  ~f:
+                    (Fn.compose User_command_payload.is_payment
+                       User_command.payload) )
+          ; field "snark_fees"
+              ~doc:"Fees that a proposer for constructing proofs"
+              ~typ:(non_null (list @@ non_null snark_fee))
+              ~args:Arg.[]
+              ~resolve:(fun _ external_transition ->
+                let staged_ledger_diff =
+                  External_transition.staged_ledger_diff external_transition
+                in
+                Staged_ledger_diff.completed_works staged_ledger_diff ) ] )
 
     let sync_status : ('context, [`Offline | `Synced | `Bootstrap]) typ =
       non_null
@@ -93,33 +151,66 @@ module Make (Program : Coda_inputs.Main_intf) = struct
         ~args:Arg.[]
         ~resolve:(fun {ctx= coda; _} () ->
           Deferred.return
-            (Inputs.Incr_status.Observer.value @@ Program.sync_status coda)
+            (Coda_incremental.Status.Observer.value @@ Program.sync_status coda)
           >>| Result.map_error ~f:Error.to_string_hum )
 
     let commands = [sync_state]
   end
 
   module Subscriptions = struct
-    let to_pipe observer =
-      let reader, writer =
-        Strict_pipe.(create (Buffered (`Capacity 1, `Overflow Drop_head)))
-      in
-      Incr_status.Observer.on_update_exn observer ~f:(function
-        | Initialized value ->
-            Strict_pipe.Writer.write writer value
-        | Changed (_, value) ->
-            Strict_pipe.Writer.write writer value
-        | Invalidated ->
-            () ) ;
-      (Strict_pipe.Reader.to_linear_pipe reader).Linear_pipe.Reader.pipe
-
     let new_sync_update =
       subscription_field "new_sync_update"
-        ~doc:"Subscripts on sync update from Coda" ~deprecated:NotDeprecated
+        ~doc:"Subscribes on sync update from Coda" ~deprecated:NotDeprecated
         ~typ:Types.sync_status
         ~args:Arg.[]
         ~resolve:(fun {ctx= coda; _} ->
-          Program.sync_status coda |> to_pipe |> Deferred.Result.return )
+          Program.sync_status coda |> Coda_incremental.Status.to_pipe
+          |> Deferred.Result.return )
+
+    let new_block =
+      subscription_field "new_block"
+        ~doc:
+          "Subscribes on a new block created by a proposer with a public key \
+           KEY"
+        ~typ:(non_null Types.block)
+        ~args:Arg.[arg "public_key" ~typ:(non_null string)]
+        ~resolve:(fun {ctx= coda; _} public_key ->
+          let public_key = Public_key.Compressed.of_base64_exn public_key in
+          (* Pipes that will alert a subscriber of any new blocks throughout the entire time the daemon is on *)
+          let global_new_block_reader, global_new_block_writer =
+            Pipe.create ()
+          in
+          let init, _ = Pipe.create () in
+          Broadcast_pipe.Reader.fold (Program.transition_frontier coda) ~init
+            ~f:(fun acc_pipe -> function
+            | None ->
+                Deferred.return acc_pipe
+            | Some transition_frontier ->
+                Pipe.close_read acc_pipe ;
+                let new_block_observer =
+                  Transition_frontier.new_transition transition_frontier
+                in
+                let frontier_new_block_reader =
+                  Coda_incremental.New_transition.to_pipe new_block_observer
+                in
+                let filtered_new_block_reader =
+                  Pipe.filter_map frontier_new_block_reader
+                    ~f:(fun new_block ->
+                      let unverified_new_block =
+                        External_transition.of_verified new_block
+                      in
+                      Option.some_if
+                        (Public_key.Compressed.equal
+                           (Types.block_proposer unverified_new_block)
+                           public_key)
+                        unverified_new_block )
+                in
+                Pipe.transfer filtered_new_block_reader global_new_block_writer
+                  ~f:Fn.id
+                |> don't_wait_for ;
+                Deferred.return filtered_new_block_reader )
+          |> Deferred.ignore |> don't_wait_for ;
+          Deferred.Result.return global_new_block_reader )
 
     let commands = [new_sync_update]
   end
