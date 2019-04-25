@@ -106,3 +106,24 @@ describe("Settings", () =>
     )
   )
 );
+
+describe("Bindings", () =>
+  describe("spawn", () =>
+    testAsync(
+      "spawn echo and get stdout and exit code",
+      ~timeout=10,
+      cb => {
+        open Bindings.Child_process;
+        let echoProcess = spawn("echo", [|"hello"|]);
+        echoProcess
+        |> Spawn.stdoutGet
+        |> (
+          x =>
+            x.Event.on("data", data =>
+              cb(expect(Node.Buffer.toString(data)) |> toEqual("hello"))
+            )
+        );
+      },
+    )
+  )
+);
