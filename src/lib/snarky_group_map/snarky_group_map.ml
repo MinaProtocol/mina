@@ -28,8 +28,8 @@ let to_group (type t) (module F : Field_intf.S_unchecked with type t = t)
 module Checked = struct
   open Snarky
 
-  let to_group (type f constant)
-      (module M : Snark_intf.Run with type field = f) ~params t =
+  let to_group (type f) (module M : Snark_intf.Run with type field = f) ~params
+      t =
     let module G =
       Checked_map.Make
         (M)

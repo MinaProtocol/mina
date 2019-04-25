@@ -251,7 +251,7 @@ module Params = struct
   module Magic_numbers = struct
     type nonrec 'f t = 'f AB_pair.Table.t coefficients
 
-    let create ~negate ~of_string =
+    let create ~negate ~of_string : _ t =
       map t
         ~f:
           (Hashtbl.map ~f:(fun s ->

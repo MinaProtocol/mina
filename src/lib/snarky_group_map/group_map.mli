@@ -1,7 +1,6 @@
 (* Points on elliptic curves over finite fields by M. SKALBA
  * found at eg https://www.impan.pl/pl/wydawnictwa/czasopisma-i-serie-wydawnicze/acta-arithmetica/all/117/3/82159/points-on-elliptic-curves-over-finite-fields
  *)
-open Core
 
 module Intf (F : sig
   type t
