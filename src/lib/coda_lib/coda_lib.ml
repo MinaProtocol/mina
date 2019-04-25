@@ -425,9 +425,10 @@ module Make (Inputs : Inputs_intf) = struct
 
   type t =
     { propose_keypair: Keypair.t option
-    ; run_snark_worker: bool
+    ; snark_worker_key: Public_key.Compressed.Stable.V1.t option
     ; net: Net.t
           (* TODO: Is this the best spot for the transaction_pool ref? *)
+    ; wallets: Secrets.Wallets.t
     ; transaction_pool: Transaction_pool.t
     ; snark_pool: Snark_pool.t
     ; transition_frontier: Transition_frontier.t option Broadcast_pipe.Reader.t
@@ -458,7 +459,9 @@ module Make (Inputs : Inputs_intf) = struct
               "Cannot retrieve transition frontier now. Bootstrapping right \
                now.")
 
-  let run_snark_worker t = t.run_snark_worker
+  let wallets t = t.wallets
+
+  let snark_worker_key t = t.snark_worker_key
 
   let propose_keypair t = t.propose_keypair
 
@@ -622,10 +625,11 @@ module Make (Inputs : Inputs_intf) = struct
       { logger: Logger.t
       ; trust_system: Trust_system.t
       ; propose_keypair: Keypair.t option
-      ; run_snark_worker: bool
+      ; snark_worker_key: Public_key.Compressed.Stable.V1.t option
       ; net_config: Net.Config.t
       ; transaction_pool_disk_location: string
       ; snark_pool_disk_location: string
+      ; wallets_disk_location: string
       ; ledger_db_location: string option
       ; transition_frontier_location: string option
       ; staged_ledger_transition_backup_capacity: int [@default 10]
@@ -872,14 +876,19 @@ module Make (Inputs : Inputs_intf) = struct
                 ~incoming_diffs:(Net.snark_pool_diffs net)
                 ~frontier_broadcast_pipe:frontier_broadcast_pipe_r
             in
+            let%bind wallets =
+              Secrets.Wallets.load ~logger:config.logger
+                ~disk_location:config.wallets_disk_location
+            in
             don't_wait_for
               (Linear_pipe.iter (Snark_pool.broadcasts snark_pool) ~f:(fun x ->
                    Net.broadcast_snark_pool_diff net x ;
                    Deferred.unit )) ;
             return
               { propose_keypair= config.propose_keypair
-              ; run_snark_worker= config.run_snark_worker
+              ; snark_worker_key= config.snark_worker_key
               ; net
+              ; wallets
               ; transaction_pool
               ; snark_pool
               ; transition_frontier= frontier_broadcast_pipe_r
