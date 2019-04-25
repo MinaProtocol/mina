@@ -377,7 +377,7 @@ let daemon logger =
        let%bind coda =
          Run.create
            (Run.Config.make ~logger ~trust_system ~net_config
-              ~run_snark_worker:(Option.is_some run_snark_worker_flag)
+              ?snark_worker_key:run_snark_worker_flag
               ~transaction_pool_disk_location:(conf_dir ^/ "transaction_pool")
               ~snark_pool_disk_location:(conf_dir ^/ "snark_pool")
               ~wallets_disk_location:(conf_dir ^/ "wallets")
