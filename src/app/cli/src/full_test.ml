@@ -90,10 +90,19 @@ let run_test () : unit Deferred.t =
       in
       Core.Backtrace.elide := false ;
       Async.Scheduler.set_record_backtraces true ;
+      let largest_account_keypair =
+        Genesis_ledger.largest_account_keypair_exn ()
+      in
+      let run_snark_worker =
+        `With_public_key
+          (Public_key.compress largest_account_keypair.public_key)
+      in
       let%bind coda =
         Main.create
           (Main.Config.make ~logger ~trust_system ~net_config
-             ~propose_keypair:keypair ~run_snark_worker:true
+             ~propose_keypair:keypair
+             ~snark_worker_key:
+               (Public_key.compress largest_account_keypair.public_key)
              ~transaction_pool_disk_location:
                (temp_conf_dir ^/ "transaction_pool")
              ~snark_pool_disk_location:(temp_conf_dir ^/ "snark_pool")
@@ -142,13 +151,6 @@ let run_test () : unit Deferred.t =
               (sprintf !"Invalid Account: %{sexp: Public_key.Compressed.t}" pk)
       in
       let client_port = 8123 in
-      let largest_account_keypair =
-        Genesis_ledger.largest_account_keypair_exn ()
-      in
-      let run_snark_worker =
-        `With_public_key
-          (Public_key.compress largest_account_keypair.public_key)
-      in
       Run.setup_local_server ~client_port ~coda ~logger () ;
       Run.run_snark_worker ~logger ~client_port run_snark_worker ;
       (* Let the system settle *)
