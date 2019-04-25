@@ -38,6 +38,7 @@ module type Inputs_intf = sig
   module Network :
     Network_intf
     with type peer := Network_peer.Peer.t
+     and type inet_addr := Unix.Inet_addr.t
      and type state_hash := State_hash.t
      and type external_transition := External_transition.t
      and type consensus_state := Consensus.Consensus_state.Value.t
@@ -104,9 +105,9 @@ module Make (Inputs : Inputs_intf) : sig
 
     val on_transition :
          t
-      -> sender:Network_peer.Peer.t
+      -> sender:Unix.Inet_addr.t
       -> root_sync_ledger:( State_hash.t
-                          * Network_peer.Peer.t
+                          * Unix.Inet_addr.t
                           * Staged_ledger_hash.t )
                           Root_sync_ledger.t
       -> External_transition.Proof_verified.t
@@ -124,7 +125,7 @@ module Make (Inputs : Inputs_intf) : sig
     val sync_ledger :
          t
       -> root_sync_ledger:( State_hash.t
-                          * Network_peer.Peer.t
+                          * Unix.Inet_addr.t
                           * Staged_ledger_hash.t )
                           Inputs.Root_sync_ledger.t
       -> transition_graph:Transition_cache.t
@@ -200,7 +201,7 @@ end = struct
           | Ok (peer_root, peer_best_tip) -> (
               let%bind () =
                 Trust_system.(
-                  record t.trust_system t.logger sender.host
+                  record t.trust_system t.logger sender
                     Actions.
                       ( Fulfilled_request
                       , Some ("Received verified peer root and best tip", [])
@@ -243,8 +244,7 @@ end = struct
               | `Repeat ->
                   `Ignored )
           | Error e ->
-              return (received_bad_proof t sender.host e |> Fn.const `Ignored)
-          )
+              return (received_bad_proof t sender e |> Fn.const `Ignored) )
 
   let sync_ledger t ~root_sync_ledger ~transition_graph ~transition_reader =
     let query_reader = Root_sync_ledger.query_reader root_sync_ledger in
@@ -277,13 +277,8 @@ end = struct
           worth_getting_root t
             (Consensus.Protocol_state.consensus_state protocol_state)
         then
-          (* TODO : have on_transition take an IP *)
-          let fake_peer_for_now =
-            Network_peer.Peer.create sender ~communication_port:0
-              ~discovery_port:1
-          in
           Deferred.ignore
-          @@ on_transition t ~sender:fake_peer_for_now ~root_sync_ledger
+          @@ on_transition t ~sender ~root_sync_ledger
                (External_transition.forget_consensus_state_verification
                   transition)
         else Deferred.unit )
@@ -349,7 +344,7 @@ end = struct
     | Error err ->
         let%bind () =
           Trust_system.(
-            record t.trust_system t.logger sender.host
+            record t.trust_system t.logger sender
               Actions.
                 ( Violated_protocol
                 , Some
@@ -361,7 +356,7 @@ end = struct
     | Ok root_staged_ledger ->
         let%bind () =
           Trust_system.(
-            record t.trust_system t.logger sender.host
+            record t.trust_system t.logger sender
               Actions.
                 ( Fulfilled_request
                 , Some ("Received valid scan state from peer", []) ))

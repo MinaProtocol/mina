@@ -160,6 +160,8 @@ module type Network_intf = sig
 
   type peer
 
+  type inet_addr
+
   type state_hash
 
   type ledger_hash
@@ -188,14 +190,14 @@ module type Network_intf = sig
 
   val get_staged_ledger_aux_and_pending_coinbases_at_hash :
        t
-    -> peer
+    -> inet_addr
     -> state_hash
     -> (parallel_scan_state * ledger_hash * pending_coinbases)
        Deferred.Or_error.t
 
   val get_ancestry :
        t
-    -> peer
+    -> inet_addr
     -> consensus_state
     -> ( external_transition
        , state_body_hash list * external_transition )

@@ -658,49 +658,63 @@ module Make (Inputs : Inputs_intf) = struct
     in
     loop peers 1
 
-  let try_preferred_peer t peer input ~rpc =
+  let try_preferred_peer t inet_addr input ~rpc =
     let envelope = envelope_from_me t input in
-    let%bind response = Gossip_net.query_peer t.gossip_net peer rpc envelope in
-    let get_random_peers () =
-      let max_peers = 15 in
-      let except = Peer.Hash_set.of_list [peer] in
-      random_peers_except t max_peers ~except
+    let peers_at_addr =
+      Hashtbl.find_multi t.gossip_net.peers_by_ip inet_addr
     in
-    match response with
-    | Ok (Some data) ->
-        let%bind () =
-          Trust_system.(
-            record t.trust_system t.logger peer.host
-              Actions.
-                ( Fulfilled_request
-                , Some ("Preferred peer returned valid response", []) ))
+    (* if there's a single peer at inet_addr, call it the preferred peer *)
+    match peers_at_addr with
+    | [peer] -> (
+        let get_random_peers () =
+          let max_peers = 15 in
+          let except = Peer.Hash_set.of_list [peer] in
+          random_peers_except t max_peers ~except
         in
-        return (Ok data)
-    | Ok None ->
-        let%bind () =
-          Trust_system.(
-            record t.trust_system t.logger peer.host
-              Actions.
-                ( Violated_protocol
-                , Some ("When querying preferred peer, got no response", []) ))
+        let%bind response =
+          Gossip_net.query_peer t.gossip_net peer rpc envelope
         in
-        let peers = get_random_peers () in
-        try_non_preferred_peers t envelope peers ~rpc
-    | Error _ ->
-        (* TODO: determine what punishments apply here *)
-        Logger.error t.logger ~module_:__MODULE__ ~location:__LOC__
-          !"get error from %{sexp: Peer.t}"
-          peer ;
-        let peers = get_random_peers () in
+        match response with
+        | Ok (Some data) ->
+            let%bind () =
+              Trust_system.(
+                record t.trust_system t.logger peer.host
+                  Actions.
+                    ( Fulfilled_request
+                    , Some ("Preferred peer returned valid response", []) ))
+            in
+            return (Ok data)
+        | Ok None ->
+            let%bind () =
+              Trust_system.(
+                record t.trust_system t.logger peer.host
+                  Actions.
+                    ( Violated_protocol
+                    , Some ("When querying preferred peer, got no response", [])
+                    ))
+            in
+            let peers = get_random_peers () in
+            try_non_preferred_peers t envelope peers ~rpc
+        | Error _ ->
+            (* TODO: determine what punishments apply here *)
+            Logger.error t.logger ~module_:__MODULE__ ~location:__LOC__
+              !"get error from %{sexp: Peer.t}"
+              peer ;
+            let peers = get_random_peers () in
+            try_non_preferred_peers t envelope peers ~rpc )
+    | _ ->
+        (* no preferred peer *)
+        let max_peers = 16 in
+        let peers = random_peers t max_peers in
         try_non_preferred_peers t envelope peers ~rpc
 
-  let get_staged_ledger_aux_and_pending_coinbases_at_hash t peer input =
-    try_preferred_peer t peer input
+  let get_staged_ledger_aux_and_pending_coinbases_at_hash t inet_addr input =
+    try_preferred_peer t inet_addr input
       ~rpc:
         Rpcs.Get_staged_ledger_aux_and_pending_coinbases_at_hash.dispatch_multi
 
-  let get_ancestry t peer input =
-    try_preferred_peer t peer input ~rpc:Rpcs.Get_ancestry.dispatch_multi
+  let get_ancestry t inet_addr input =
+    try_preferred_peer t inet_addr input ~rpc:Rpcs.Get_ancestry.dispatch_multi
 
   let glue_sync_ledger t query_reader response_writer =
     (* We attempt to query 3 random peers, retry_max times. We keep track of the
