@@ -302,7 +302,7 @@ end) :
           ~f:(fun d -> d.coinbase) )
     with
     | At_most_two.Zero, At_most_one.Zero ->
-        Currency.Fee.zero
+        Currency.Amount.zero
     | _ ->
-        Coda_praos.coinbase_amount |> Currency.Amount.to_fee
+        Coda_praos.coinbase_amount
 end

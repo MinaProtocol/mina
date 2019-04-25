@@ -104,7 +104,7 @@ module Make (Program : Coda_inputs.Main_intf) = struct
                   External_transition.staged_ledger_diff external_transition
                 in
                 staged_ledger_diff |> Staged_ledger_diff.coinbase
-                |> Currency.Fee.to_uint64 |> Stringable.uint64 )
+                |> Currency.Amount.to_uint64 |> Stringable.uint64 )
           ; field "creator" ~typ:(non_null string)
               ~doc:"Public key of the proposer creating the block"
               ~args:Arg.[]
