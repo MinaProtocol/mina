@@ -49,7 +49,7 @@ let daemon logger =
          ~doc:
            "PUBLICKEY Public key for the associated private key that is being \
             tracked by this daemon. You cannot provide both `propose-key` and \
-            `propose-public-key`. (default:don't propose)"
+            `propose-public-key`. (default: don't propose)"
          (optional public_key_compressed)
      and peers =
        flag "peer"
