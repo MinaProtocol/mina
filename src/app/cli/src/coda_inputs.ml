@@ -322,7 +322,7 @@ module type Main_intf = sig
       { logger: Logger.t
       ; trust_system: Trust_system.t
       ; propose_keypair: Keypair.t option
-      ; run_snark_worker: bool
+      ; snark_worker_key: Public_key.Compressed.Stable.V1.t option
       ; net_config: Inputs.Net.Config.t
       ; transaction_pool_disk_location: string
       ; snark_pool_disk_location: string
@@ -342,7 +342,9 @@ module type Main_intf = sig
 
   val propose_keypair : t -> Keypair.t option
 
-  val run_snark_worker : t -> bool
+  val snark_worker_key : t -> Public_key.Compressed.Stable.V1.t option
+
+  val snark_work_fee : t -> Currency.Fee.t
 
   val request_work : t -> Inputs.Snark_worker.Work.Spec.t option
 
