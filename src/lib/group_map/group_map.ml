@@ -139,8 +139,8 @@ module Params = struct
           ; ((6, 5), "-5637798432")
           ; ((3, 7), "4402080")
           ; ((0, 9), "6435")
-          ; ((5, 0), "-3711755775062016")
-          ; ((2, 2), "-3365703371771136")
+          ; ((15, 0), "-3711755775062016")
+          ; ((12, 2), "-3365703371771136")
           ; ((9, 4), "1809225932544")
           ; ((6, 6), "2558454048")
           ; ((3, 8), "-7401888")
@@ -189,7 +189,7 @@ module Params = struct
           ; ((9, 10), "-61039617408")
           ; ((6, 12), "-31603264")
           ; ((3, 14), "-8712")
-          ; ((1, 16), "-1") ]
+          ; ((0, 16), "-1") ]
     ; d31=
         AB_pair.Table.of_alist_exn
           [ ((0, 0), "-1")
@@ -247,7 +247,11 @@ module Params = struct
     let {n1; d1; n2; d2; n3; d31; d32} = t in
     List.iter [n1; d1; n2; d2; n3; d31; d32] ~f:(fun t ->
         Hashtbl.iter_keys t ~f:(fun (a, b) ->
-            assert (((2 * a) + (3 * b)) mod 3 = 0) ) )
+            let three_j = (2 * a) + (3 * b) in
+            if three_j mod 3 <> 0 then
+              failwithf "2 * %d + 3 * %d = %d = %d mod 3" a b three_j
+                (three_j mod 3) ()
+            else () ) )
 
   module Magic_numbers = struct
     type nonrec 'f t = 'f AB_pair.Table.t coefficients
