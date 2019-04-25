@@ -553,8 +553,10 @@ module Make (Inputs : Inputs_intf) = struct
 
   (* wrap data in envelope, with "me" in the gossip net as the sender *)
   (* TODO : remove this when RPC queries aren't enveloped *)
-  let envelope_from_me _t data =
-    Envelope.Incoming.wrap ~data ~sender:Envelope.Sender.Local
+  let envelope_from_me t data =
+    let me = (gossip_net t).me in
+    (* this envelope is remote me, because we're sending it over the network *)
+    Envelope.Incoming.wrap ~data ~sender:(Envelope.Sender.Remote me.host)
 
   (* TODO: Have better pushback behavior *)
   let broadcast t msg =
