@@ -553,6 +553,7 @@ module Make (Inputs : Inputs_intf) = struct
 
   (* wrap data in envelope, with "me" in the gossip net as the sender *)
   (* TODO : remove this when RPC queries aren't enveloped *)
+
   let envelope_from_me t data =
     let me = (gossip_net t).me in
     (* this envelope is remote me, because we're sending it over the network *)

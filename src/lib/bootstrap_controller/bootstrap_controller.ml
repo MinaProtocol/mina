@@ -276,8 +276,13 @@ end = struct
           worth_getting_root t
             (Consensus.Protocol_state.consensus_state protocol_state)
         then
+          (* TODO : have on_transition take an IP *)
+          let fake_peer_for_now =
+            Network_peer.Peer.create sender ~communication_port:0
+              ~discovery_port:1
+          in
           Deferred.ignore
-          @@ on_transition t ~sender ~root_sync_ledger
+          @@ on_transition t ~sender:fake_peer_for_now ~root_sync_ledger
                (External_transition.forget_consensus_state_verification
                   transition)
         else Deferred.unit )
