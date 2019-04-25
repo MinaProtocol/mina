@@ -10,8 +10,6 @@ type ('q, 'r) dispatch =
   Versioned_rpc.Connection_with_menu.t -> 'q -> 'r Deferred.Or_error.t
 
 module type Message_intf = sig
-  type content
-
   type msg [@@deriving to_yojson]
 
   include
@@ -19,11 +17,7 @@ module type Message_intf = sig
     with type callee_msg := msg
      and type caller_msg := msg
 
-  val content : msg -> content
-
   val summary : msg -> string
-
-  val sender : msg -> Envelope.Sender.t
 end
 
 module type Config_intf = sig
@@ -40,8 +34,6 @@ module type Config_intf = sig
 end
 
 module type S = sig
-  type content
-
   type msg
 
   module Connection_with_state : sig
@@ -54,7 +46,7 @@ module type S = sig
     ; trust_system: Trust_system.t
     ; target_peer_count: int
     ; broadcast_writer: msg Linear_pipe.Writer.t
-    ; received_reader: content Envelope.Incoming.t Strict_pipe.Reader.t
+    ; received_reader: msg Envelope.Incoming.t Strict_pipe.Reader.t
     ; me: Peer.t
     ; peers: Peer.Hash_set.t
     ; connections:
@@ -68,7 +60,7 @@ module type S = sig
   val create :
     Config.t -> Host_and_port.t Rpc.Implementation.t list -> t Deferred.t
 
-  val received : t -> content Envelope.Incoming.t Strict_pipe.Reader.t
+  val received : t -> msg Envelope.Incoming.t Strict_pipe.Reader.t
 
   val broadcast : t -> msg Linear_pipe.Writer.t
 
@@ -88,8 +80,7 @@ module type S = sig
     t -> int -> ('q, 'r) dispatch -> 'q -> 'r Or_error.t Deferred.t List.t
 end
 
-module Make (Message : Message_intf) :
-  S with type msg := Message.msg and type content := Message.content = struct
+module Make (Message : Message_intf) : S with type msg := Message.msg = struct
   module Connection_with_state = struct
     type t = Banned | Allowed of Rpc.Connection.t Ivar.t
 
@@ -103,7 +94,7 @@ module Make (Message : Message_intf) :
     ; trust_system: Trust_system.t
     ; target_peer_count: int
     ; broadcast_writer: Message.msg Linear_pipe.Writer.t
-    ; received_reader: Message.content Envelope.Incoming.t Strict_pipe.Reader.t
+    ; received_reader: Message.msg Envelope.Incoming.t Strict_pipe.Reader.t
     ; me: Peer.t
     ; peers: Peer.Hash_set.t
     ; connections:
@@ -283,15 +274,17 @@ module Make (Message : Message_intf) :
         let implementations =
           let implementations =
             Versioned_rpc.Menu.add
-              ( Message.implement_multi
-                  (fun _client_host_and_port ~version:_ msg ->
-                    (* TODO: maybe check client host matches IP in msg, punish if
-                        mismatch due to forgery
-                     *)
-                    Strict_pipe.Writer.write received_writer
-                      (Envelope.Incoming.wrap ~data:(Message.content msg)
-                         ~sender:(Message.sender msg)) )
-              @ implementation_list )
+              (Message.implement_multi
+                 (fun client_host_and_port ~version:_ msg ->
+                   (* wrap received message in envelope *)
+                   let sender =
+                     Envelope.Sender.Remote
+                       (Unix.Inet_addr.of_string
+                          client_host_and_port.Host_and_port.host)
+                   in
+                   Strict_pipe.Writer.write received_writer
+                     (Envelope.Incoming.wrap ~data:msg ~sender) ))
+            @ implementation_list
           in
           Rpc.Implementations.create_exn ~implementations
             ~on_unknown_rpc:`Close_connection

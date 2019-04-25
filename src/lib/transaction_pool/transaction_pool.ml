@@ -536,10 +536,7 @@ let%test_module _ =
           assert_pool_txs [1; 2; 4; 5; 6] ;
           Deferred.return true )
 
-    let fake_peer : Network_peer.Peer.t =
-      { host= Unix.Inet_addr.of_string "1.1.1.1"
-      ; discovery_port= 2222
-      ; communication_port= 2223 }
+    let fake_inet_addr : Unix.Inet_addr.t = Unix.Inet_addr.of_string "1.1.1.1"
 
     let%test "Invalid transactions are not accepted" =
       Thread_safe.block_on_async_exn (fun () ->
@@ -555,7 +552,7 @@ let%test_module _ =
           let%bind apply_res =
             Test.Diff.apply pool
             @@ Envelope.Incoming.wrap ~data:[3; 5; 10]
-                 ~sender:(Remote fake_peer)
+                 ~sender:(Remote fake_inet_addr)
           in
           [%test_result: int list Or_error.t] ~expect:(Ok [10; 3]) apply_res ;
           Deferred.return true )

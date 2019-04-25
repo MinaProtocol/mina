@@ -268,7 +268,7 @@ module Message (Inputs : sig
     module Stable :
       sig
         module V1 : sig
-          type t [@@deriving bin_io, sexp, to_yojson]
+          type t [@@deriving bin_io, sexp, to_yojson, version]
         end
       end
       with type V1.t = t
@@ -280,7 +280,7 @@ module Message (Inputs : sig
     module Stable :
       sig
         module V1 : sig
-          type t [@@deriving bin_io, sexp, to_yojson]
+          type t [@@deriving bin_io, sexp, to_yojson, version]
         end
       end
       with type V1.t = t
@@ -294,14 +294,11 @@ struct
   module T = struct
     module T = struct
       (* "master" types, do not change *)
-      type content =
+      type msg =
         | New_state of External_transition.Stable.V1.t
         | Snark_pool_diff of Snark_pool_diff.Stable.V1.t
         | Transaction_pool_diff of Transaction_pool_diff.Stable.V1.t
       [@@deriving bin_io, sexp, to_yojson]
-
-      type msg = content Envelope.Incoming.Stable.V1.t
-      [@@deriving sexp, to_yojson]
     end
 
     let name = "message"
@@ -311,26 +308,14 @@ struct
   end
 
   include T.T
-
-  let content ({data; _} : msg) = data
-
-  let sender ({sender; _} : msg) = sender
-
   include Versioned_rpc.Both_convert.One_way.Make (T)
-
-  module Content = struct
-    module Wrapped = struct
-      module Stable = struct
-        module V1 = struct
-          type t = T.T.content [@@deriving bin_io, sexp, version {wrapped}]
-        end
-      end
-    end
-  end
 
   module V1 = struct
     module T = struct
-      type msg = Content.Wrapped.Stable.V1.t Envelope.Incoming.Stable.V1.t
+      type msg = T.T.msg =
+        | New_state of External_transition.Stable.V1.t
+        | Snark_pool_diff of Snark_pool_diff.Stable.V1.t
+        | Transaction_pool_diff of Transaction_pool_diff.Stable.V1.t
       [@@deriving bin_io, sexp, version {rpc}]
 
       let callee_model_of_msg = Fn.id
@@ -339,16 +324,18 @@ struct
     end
 
     include Register (T)
+
+    let summary = function
+      | T.New_state _ ->
+          "new state"
+      | Snark_pool_diff _ ->
+          "snark pool diff"
+      | Transaction_pool_diff _ ->
+          "transaction pool diff"
   end
 
-  let summary msg =
-    match Envelope.Incoming.data msg with
-    | New_state _ ->
-        "new state"
-    | Snark_pool_diff _ ->
-        "snark pool diff"
-    | Transaction_pool_diff _ ->
-        "transaction pool diff"
+  [%%define_locally
+  V1.(summary)]
 end
 
 module type Inputs_intf = sig
@@ -384,7 +371,7 @@ module type Inputs_intf = sig
     module Stable :
       sig
         module V1 : sig
-          type t [@@deriving sexp, bin_io, to_yojson]
+          type t [@@deriving sexp, bin_io, to_yojson, version]
         end
       end
       with type V1.t = t
@@ -396,7 +383,7 @@ module type Inputs_intf = sig
     module Stable :
       sig
         module V1 : sig
-          type t [@@deriving sexp, bin_io, to_yojson]
+          type t [@@deriving sexp, bin_io, to_yojson, version]
         end
       end
       with type V1.t = t
@@ -565,28 +552,25 @@ module Make (Inputs : Inputs_intf) = struct
     ; online_status }
 
   (* wrap data in envelope, with "me" in the gossip net as the sender *)
-  let envelope_from_me t data =
-    let me = (gossip_net t).me in
-    (* this envelope is remote me, because we're sending it over the network *)
-    Envelope.Incoming.wrap ~data ~sender:(Envelope.Sender.Remote me)
+  (* TODO : remove this when RPC queries aren't enveloped *)
+  let envelope_from_me _t data =
+    Envelope.Incoming.wrap ~data ~sender:Envelope.Sender.Local
 
   (* TODO: Have better pushback behavior *)
-  let broadcast t x =
+  let broadcast t msg =
     Logger.trace t.logger ~module_:__MODULE__ ~location:__LOC__
-      ~metadata:[("message", Message.msg_to_yojson x)]
+      ~metadata:[("message", Message.msg_to_yojson msg)]
       !"Broadcasting %s over gossip net"
-      (Message.summary x) ;
-    Linear_pipe.write_without_pushback (Gossip_net.broadcast t.gossip_net) x
+      (Message.summary msg) ;
+    Linear_pipe.write_without_pushback (Gossip_net.broadcast t.gossip_net) msg
 
-  let broadcast_from_me t content = broadcast t (envelope_from_me t content)
+  let broadcast_state t state = broadcast t (Message.New_state state)
 
-  let broadcast_state t x = broadcast_from_me t (Message.New_state x)
+  let broadcast_transaction_pool_diff t diff =
+    broadcast t (Message.Transaction_pool_diff diff)
 
-  let broadcast_transaction_pool_diff t x =
-    broadcast_from_me t (Message.Transaction_pool_diff x)
-
-  let broadcast_snark_pool_diff t x =
-    broadcast_from_me t (Message.Snark_pool_diff x)
+  let broadcast_snark_pool_diff t diff =
+    broadcast t (Message.Snark_pool_diff diff)
 
   (* TODO: This is kinda inefficient *)
   let find_map xs ~f =
@@ -746,9 +730,13 @@ module Make (Inputs : Inputs_intf) = struct
                   !"Received answer from peer %{sexp: Peer.t} on ledger_hash \
                     %{sexp: Ledger_hash.t}"
                   peer (fst query) ;
+                (* TODO : here is a place where an envelope could contain
+                   a Peer.t, and not just an IP address, if desired
+                *)
+                let inet_addr = peer.host in
                 Some
                   (Envelope.Incoming.wrap ~data:answer
-                     ~sender:(Envelope.Sender.Remote peer))
+                     ~sender:(Envelope.Sender.Remote inet_addr))
             | Ok (Error e) ->
                 Logger.info t.logger ~module_:__MODULE__ ~location:__LOC__
                   "Rpc error: %s" (Error.to_string_mach e) ;
