@@ -426,6 +426,7 @@ module Make (Inputs : Inputs_intf) = struct
     ; run_snark_worker: bool
     ; net: Net.t
           (* TODO: Is this the best spot for the transaction_pool ref? *)
+    ; wallets: Secrets.Wallets.t
     ; transaction_pool: Transaction_pool.t
     ; snark_pool: Snark_pool.t
     ; transition_frontier: Transition_frontier.t option Broadcast_pipe.Reader.t
@@ -455,6 +456,8 @@ module Make (Inputs : Inputs_intf) = struct
            (Error.of_string
               "Cannot retrieve transition frontier now. Bootstrapping right \
                now.")
+
+  let wallets t = t.wallets
 
   let run_snark_worker t = t.run_snark_worker
 
@@ -618,6 +621,7 @@ module Make (Inputs : Inputs_intf) = struct
       ; net_config: Net.Config.t
       ; transaction_pool_disk_location: string
       ; snark_pool_disk_location: string
+      ; wallets_disk_location: string
       ; ledger_db_location: string option
       ; transition_frontier_location: string option
       ; staged_ledger_transition_backup_capacity: int [@default 10]
@@ -864,6 +868,10 @@ module Make (Inputs : Inputs_intf) = struct
                 ~incoming_diffs:(Net.snark_pool_diffs net)
                 ~frontier_broadcast_pipe:frontier_broadcast_pipe_r
             in
+            let%bind wallets =
+              Secrets.Wallets.load ~logger:config.logger
+                ~disk_location:config.wallets_disk_location
+            in
             don't_wait_for
               (Linear_pipe.iter (Snark_pool.broadcasts snark_pool) ~f:(fun x ->
                    Net.broadcast_snark_pool_diff net x ;
@@ -872,6 +880,7 @@ module Make (Inputs : Inputs_intf) = struct
               { propose_keypair= config.propose_keypair
               ; run_snark_worker= config.run_snark_worker
               ; net
+              ; wallets
               ; transaction_pool
               ; snark_pool
               ; transition_frontier= frontier_broadcast_pipe_r

@@ -326,6 +326,7 @@ module type Main_intf = sig
       ; net_config: Inputs.Net.Config.t
       ; transaction_pool_disk_location: string
       ; snark_pool_disk_location: string
+      ; wallets_disk_location: string
       ; ledger_db_location: string option
       ; transition_frontier_location: string option
       ; staged_ledger_transition_backup_capacity: int [@default 10]
@@ -389,6 +390,8 @@ module type Main_intf = sig
     t -> Staged_ledger_hash.t -> Account.t list Deferred.Or_error.t
 
   val receipt_chain_database : t -> Receipt_chain_database.t
+
+  val wallets : t -> Secrets.Wallets.t
 end
 
 module Pending_coinbase = struct
