@@ -274,17 +274,17 @@ module Make (Message : Message_intf) : S with type msg := Message.msg = struct
         let implementations =
           let implementations =
             Versioned_rpc.Menu.add
-              (Message.implement_multi
-                 (fun client_host_and_port ~version:_ msg ->
-                   (* wrap received message in envelope *)
-                   let sender =
-                     Envelope.Sender.Remote
-                       (Unix.Inet_addr.of_string
-                          client_host_and_port.Host_and_port.host)
-                   in
-                   Strict_pipe.Writer.write received_writer
-                     (Envelope.Incoming.wrap ~data:msg ~sender) ))
-            @ implementation_list
+              ( Message.implement_multi
+                  (fun client_host_and_port ~version:_ msg ->
+                    (* wrap received message in envelope *)
+                    let sender =
+                      Envelope.Sender.Remote
+                        (Unix.Inet_addr.of_string
+                           client_host_and_port.Host_and_port.host)
+                    in
+                    Strict_pipe.Writer.write received_writer
+                      (Envelope.Incoming.wrap ~data:msg ~sender) )
+              @ implementation_list )
           in
           Rpc.Implementations.create_exn ~implementations
             ~on_unknown_rpc:`Close_connection

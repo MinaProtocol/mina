@@ -279,8 +279,8 @@ end = struct
         then
           (* TODO : have on_transition take an IP *)
           let fake_peer_for_now =
-            Network_peer.Peer.create sender ~communication_port:23002
-              ~discovery_port:23003
+            Network_peer.Peer.create sender ~communication_port:0
+              ~discovery_port:1
           in
           Deferred.ignore
           @@ on_transition t ~sender:fake_peer_for_now ~root_sync_ledger
