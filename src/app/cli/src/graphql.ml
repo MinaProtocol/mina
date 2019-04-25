@@ -196,7 +196,7 @@ struct
     open Schema
 
     let sync_state =
-      io_field "syncStatus" ~typ:sync_status
+      io_field "syncStatus" ~typ:Types.sync_status
         ~args:Arg.[]
         ~resolve:(fun {ctx= coda; _} () ->
           Deferred.return
