@@ -35,6 +35,16 @@ struct
       field name ~typ:(non_null string)
         ~doc:(sprintf !"%s (%s is uint64 and is coerced as a string" doc name)
 
+    let get_payments external_transition =
+      let staged_ledger_diff =
+        External_transition.staged_ledger_diff external_transition
+      in
+      let user_commands =
+        Staged_ledger_diff.user_commands staged_ledger_diff
+      in
+      List.filter user_commands
+        ~f:(Fn.compose User_command_payload.is_payment User_command.payload)
+
     (* TODO: include submitted_at (date) and included_at (date). These two fields are not exposed in the user_command *)
     let payment : (t, User_command.t option) typ =
       obj "Payment" ~fields:(fun _ ->
@@ -122,16 +132,7 @@ struct
               ~typ:(non_null (list @@ non_null payment))
               ~args:Arg.[]
               ~resolve:(fun _ external_transition ->
-                let staged_ledger_diff =
-                  External_transition.staged_ledger_diff external_transition
-                in
-                let user_commands =
-                  Staged_ledger_diff.user_commands staged_ledger_diff
-                in
-                List.filter user_commands
-                  ~f:
-                    (Fn.compose User_command_payload.is_payment
-                       User_command.payload) )
+                get_payments external_transition )
           ; field "snarkFees"
               ~doc:"Fees that a proposer for constructing proofs"
               ~typ:(non_null (list @@ non_null snark_fee))
@@ -266,6 +267,26 @@ struct
           Program.sync_status coda |> Coda_incremental.Status.to_pipe
           |> Deferred.Result.return )
 
+    (* Creates a global pipe to feed a subscription that will be available throughout the entire duration that a daemon is runnning  *)
+    let global_pipe coda ~to_pipe =
+      let global_reader, global_writer = Pipe.create () in
+      let init, _ = Pipe.create () in
+      Broadcast_pipe.Reader.fold (Program.transition_frontier coda) ~init
+        ~f:(fun acc_pipe -> function
+        | None ->
+            Deferred.return acc_pipe
+        | Some transition_frontier ->
+            Pipe.close_read acc_pipe ;
+            let new_block_incr =
+              Transition_frontier.new_transition transition_frontier
+            in
+            let frontier_pipe = to_pipe new_block_incr in
+            Pipe.transfer frontier_pipe global_writer ~f:Fn.id
+            |> don't_wait_for ;
+            Deferred.return frontier_pipe )
+      |> Deferred.ignore |> don't_wait_for ;
+      Deferred.Result.return global_reader
+
     let new_block =
       subscription_field "newBlock"
         ~doc:
@@ -276,42 +297,70 @@ struct
         ~resolve:(fun {ctx= coda; _} public_key ->
           let public_key = Public_key.Compressed.of_base64_exn public_key in
           (* Pipes that will alert a subscriber of any new blocks throughout the entire time the daemon is on *)
-          let global_new_block_reader, global_new_block_writer =
-            Pipe.create ()
-          in
-          let init, _ = Pipe.create () in
-          Broadcast_pipe.Reader.fold (Program.transition_frontier coda) ~init
-            ~f:(fun acc_pipe -> function
-            | None ->
-                Deferred.return acc_pipe
-            | Some transition_frontier ->
-                Pipe.close_read acc_pipe ;
-                let new_block_observer =
-                  Transition_frontier.new_transition transition_frontier
-                in
-                let frontier_new_block_reader =
-                  Coda_incremental.New_transition.to_pipe new_block_observer
-                in
-                let filtered_new_block_reader =
-                  Pipe.filter_map frontier_new_block_reader
-                    ~f:(fun new_block ->
-                      let unverified_new_block =
-                        External_transition.of_verified new_block
-                      in
-                      Option.some_if
-                        (Public_key.Compressed.equal
-                           (Types.block_proposer unverified_new_block)
-                           public_key)
-                        unverified_new_block )
-                in
-                Pipe.transfer filtered_new_block_reader global_new_block_writer
-                  ~f:Fn.id
-                |> don't_wait_for ;
-                Deferred.return filtered_new_block_reader )
-          |> Deferred.ignore |> don't_wait_for ;
-          Deferred.Result.return global_new_block_reader )
+          global_pipe coda ~to_pipe:(fun new_block_incr ->
+              let new_block_observer =
+                Coda_incremental.New_transition.observe new_block_incr
+              in
+              Coda_incremental.New_transition.stabilize () ;
+              let frontier_new_block_reader =
+                Coda_incremental.New_transition.to_pipe new_block_observer
+              in
+              Pipe.filter_map frontier_new_block_reader ~f:(fun new_block ->
+                  let unverified_new_block =
+                    External_transition.of_verified new_block
+                  in
+                  Option.some_if
+                    (Public_key.Compressed.equal
+                       (Types.block_proposer unverified_new_block)
+                       public_key)
+                    unverified_new_block ) ) )
 
-    let commands = [new_sync_update]
+    let new_payment_update =
+      subscription_field "newPaymentUpdate"
+        ~doc:
+          "Subscribes for payments with the sender's public key KEY whenever \
+           we receive a block"
+        ~typ:(non_null Types.payment)
+        ~args:Arg.[arg "publicKey" ~typ:(non_null string)]
+        ~resolve:(fun {ctx= coda; _} public_key ->
+          let public_key = Public_key.Compressed.of_base64_exn public_key in
+          global_pipe coda ~to_pipe:(fun new_block_incr ->
+              let payments_incr =
+                Coda_incremental.New_transition.map new_block_incr
+                  ~f:
+                    (Fn.compose Types.get_payments
+                       External_transition.of_verified)
+              in
+              let payments_observer =
+                Coda_incremental.New_transition.observe payments_incr
+              in
+              Coda_incremental.New_transition.stabilize () ;
+              let frontier_payment_reader, frontier_payment_writer =
+                (* TODO: should be the max amount of transactions in a block *)
+                Strict_pipe.(
+                  create (Buffered (`Capacity 20, `Overflow Drop_head)))
+              in
+              let write_payments payments =
+                List.filter payments ~f:(fun payment ->
+                    Public_key.Compressed.equal
+                      (User_command.sender payment)
+                      public_key )
+                |> List.iter ~f:(fun payment ->
+                       Strict_pipe.Writer.write frontier_payment_writer payment
+                   )
+              in
+              Coda_incremental.New_transition.Observer.on_update_exn
+                payments_observer ~f:(function
+                | Initialized payments ->
+                    write_payments payments
+                | Changed (_, payments) ->
+                    write_payments payments
+                | Invalidated ->
+                    () ) ;
+              (Strict_pipe.Reader.to_linear_pipe frontier_payment_reader)
+                .Linear_pipe.Reader.pipe ) )
+
+    let commands = [new_sync_update; new_block; new_payment_update]
   end
 
   module Mutations = struct
