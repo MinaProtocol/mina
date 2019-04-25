@@ -3,38 +3,6 @@
  *)
 open Core
 
-module type Field_intf = sig
-  type t
-
-  val ( + ) : t -> t -> t
-
-  val ( * ) : t -> t -> t
-
-  val ( / ) : t -> t -> t
-
-  val t_of_sexp : Sexp.t -> t
-
-  val of_int : int -> t
-
-  val one : t
-
-  val zero : t
-
-  val negate : t -> t
-end
-
-module type Unchecked_field_intf = sig
-  include Field_intf
-
-  val sqrt : t -> t
-
-  val equal : t -> t -> bool
-
-  val is_square : t -> bool
-
-  val sexp_of_t : t -> Sexp.t
-end
-
 module Intf (F : sig
   type t
 end) : sig
@@ -43,24 +11,23 @@ end) : sig
   end
 end
 
-module Make_group_map
-    (F : Field_intf) (Params : sig
-        val a : F.t
+module Params : sig
+  type 'f t
 
-        val b : F.t
-    end) : sig
-  val make_x1 : F.t -> F.t
+  val a : 'f t -> 'f
 
-  val make_x2 : F.t -> F.t
+  val b : 'f t -> 'f
 
-  val make_x3 : F.t -> F.t
+  val create : (module Field_intf.S with type t = 'f) -> a:'f -> b:'f -> 'f t
 end
 
-module Make_unchecked
-    (F : Unchecked_field_intf) (Params : sig
-        val a : F.t
+module Make_group_map
+    (Constant : Field_intf.S) (F : sig
+        include Field_intf.S
 
-        val b : F.t
+        val constant : Constant.t -> t
+    end) (Params : sig
+      val params : Constant.t Params.t
     end) : sig
-  val to_group : F.t -> F.t * F.t
+  val potential_xs : F.t -> F.t * F.t * F.t
 end
