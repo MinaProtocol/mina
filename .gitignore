@@ -6,6 +6,7 @@ result
 test.log
 build.log
 src/config.mlh
+src/config/config.mlh
 src/external/ocaml-rocksdb/rocksdb
 .stack-work/
 /wallet-keys/
