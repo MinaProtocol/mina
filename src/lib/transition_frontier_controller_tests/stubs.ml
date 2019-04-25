@@ -596,8 +596,9 @@ struct
                      Sync_handler.answer_query ~frontier ledger_hash
                        envelope_query ~logger ~trust_system
                    in
+                   let inet_addr = peer.host in
                    Envelope.Incoming.wrap ~data:answer
-                     ~sender:(Envelope.Sender.Remote peer) )
+                     ~sender:(Envelope.Sender.Remote inet_addr) )
           in
           match answer with
           | None ->
@@ -683,7 +684,7 @@ struct
         "Peer $peer sending $state_hash" ;
       let enveloped_transition =
         Envelope.Incoming.wrap ~data:transition
-          ~sender:(Envelope.Sender.Remote address)
+          ~sender:(Envelope.Sender.Remote address.host)
       in
       Pipe_lib.Strict_pipe.Writer.write transition_writer
         (`Transition enveloped_transition, `Time_received Constants.time)

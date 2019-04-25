@@ -86,7 +86,8 @@ let%test_module "Bootstrap Controller" =
              * these envelopes remote *)
               ~f:(fun x ->
                 Envelope.Incoming.wrap ~data:x
-                  ~sender:(Envelope.Sender.Remote Network_peer.Peer.local) )
+                  ~sender:(Envelope.Sender.Remote Network_peer.Peer.local.host)
+                )
               input_transitions_verified
           in
           let transition_reader, transition_writer =
