@@ -6,7 +6,7 @@
 [%%import "config/debug_level/some.mlh"]
 [%%import "config/proof_level/none.mlh"]
 
-[%%define time_offsets false]
+[%%define time_offsets true]
 [%%define fake_hash true]
 
 [%%define genesis_ledger "test"]
