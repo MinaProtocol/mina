@@ -427,8 +427,7 @@ module type Transition_frontier_intf = sig
     t -> Extensions.Persistence_diff.view Broadcast_pipe.Reader.t
 
   val new_transition :
-       t
-    -> external_transition_verified Coda_incremental.New_transition.Observer.t
+    t -> external_transition_verified Coda_incremental.New_transition.t
 
   val visualize_to_string : t -> string
 

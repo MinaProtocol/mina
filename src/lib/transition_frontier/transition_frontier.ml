@@ -434,9 +434,8 @@ struct
     let new_transition_incr =
       New_transition.Var.watch extensions.new_transition
     in
-    let observer = New_transition.observe new_transition_incr in
     New_transition.stabilize () ;
-    observer
+    new_transition_incr
 
   (* TODO: load from and write to disk *)
   let create ~logger
