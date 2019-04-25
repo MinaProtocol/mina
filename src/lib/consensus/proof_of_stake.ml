@@ -946,78 +946,26 @@ module Epoch_data = struct
          [ledger; seed; start_checkpoint; lock_checkpoint; length] ->
     {ledger; seed; start_checkpoint; lock_checkpoint; length}
 
-  module Last = struct
-    module Value = struct
-      module Stable = struct
-        module V1 = struct
-          module T = struct
-            type t =
-              ( Epoch_ledger.Value.Stable.V1.t
-              , Epoch_seed.Stable.V1.t
-              , Coda_base.State_hash.Stable.V1.t
-              , Coda_base.State_hash.Stable.V1.t
-              , Length.Stable.V1.t )
-              Poly.Stable.V1.t
-            [@@deriving sexp, bin_io, eq, compare, hash, to_yojson, version]
-          end
-
-          include T
-          include Module_version.Registration.Make_latest_version (T)
-        end
-
-        module Latest = V1
-
-        module Module_decl = struct
-          let name = "epoch_data_proof_of_stake"
-
-          type latest = Latest.t
-        end
-
-        module Registrar = Module_version.Registration.Make (Module_decl)
-        module Registered_V1 = Registrar.Register (V1)
+  module Make (Lock_checkpoint : sig
+    module Stable : sig
+      module V1 : sig
+        type t [@@deriving sexp, bin_io, eq, compare, hash, to_yojson, version]
       end
 
-      type t =
-        ( Epoch_ledger.Value.Stable.Latest.t
-        , Epoch_seed.Stable.Latest.t
-        , Coda_base.State_hash.Stable.Latest.t
-        , Coda_base.State_hash.Stable.Latest.t
-        , Length.Stable.Latest.t )
-        Poly.t
-      [@@deriving sexp, eq, compare, hash, to_yojson]
+      module Latest : sig
+        type t [@@deriving sexp, bin_io, eq, compare, hash, to_yojson, version]
+      end
     end
 
-    let data_spec =
-      let open Snark_params.Tick.Data_spec in
-      [ Epoch_ledger.typ
-      ; Epoch_seed.typ
-      ; Coda_base.State_hash.typ
-      ; Coda_base.State_hash.typ
-      ; Length.Unpacked.typ ]
+    type t = Stable.Latest.t
 
-    let typ : (var, Value.t) Typ.t =
-      Snark_params.Tick.Typ.of_hlistable data_spec ~var_to_hlist:to_hlist
-        ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist
-        ~value_of_hlist:of_hlist
+    val typ : (Coda_base.State_hash.var, t) Typ.t
 
-    let fold {Poly.ledger; seed; start_checkpoint; lock_checkpoint; length} =
-      let open Fold in
-      Epoch_ledger.fold ledger +> Epoch_seed.fold seed
-      +> Coda_base.State_hash.fold start_checkpoint
-      +> Coda_base.State_hash.fold lock_checkpoint
-      +> Length.fold length
+    val fold : t -> bool Tuple_lib.Triple.t Fold.t
 
-    let genesis =
-      { Poly.ledger=
-          Epoch_ledger.genesis
-          (* TODO: epoch_seed needs to be non-determinable by o1-labs before mainnet launch *)
-      ; seed= Epoch_seed.initial
-      ; start_checkpoint= Coda_base.State_hash.(of_hash zero)
-      ; lock_checkpoint= Coda_base.State_hash.(of_hash zero)
-      ; length= Length.of_int 1 }
-  end
-
-  module Curr = struct
+    val null : t
+  end) =
+  struct
     module Value = struct
       module Stable = struct
         module V1 = struct
@@ -1084,9 +1032,21 @@ module Epoch_data = struct
           (* TODO: epoch_seed needs to be non-determinable by o1-labs before mainnet launch *)
       ; seed= Epoch_seed.initial
       ; start_checkpoint= Coda_base.State_hash.(of_hash zero)
-      ; lock_checkpoint= None
+      ; lock_checkpoint= Lock_checkpoint.null
       ; length= Length.of_int 1 }
   end
+
+  module Last = Make (struct
+    include Coda_base.State_hash
+
+    let null = Coda_base.State_hash.(of_hash zero)
+  end)
+
+  module Curr = Make (struct
+    include Lock_checkpoint
+
+    let null = None
+  end)
 
   let curr_to_last curr =
     Poly.{curr with lock_checkpoint= Option.value_exn curr.lock_checkpoint}
