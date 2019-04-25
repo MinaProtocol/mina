@@ -598,6 +598,7 @@ struct
                      Sync_handler.answer_query ~frontier ledger_hash
                        envelope_query ~logger ~trust_system
                    in
+                   let inet_addr = peer.host in
                    Envelope.Incoming.wrap ~data:answer
                      ~sender:(Envelope.Sender.Remote inet_addr) )
           in
