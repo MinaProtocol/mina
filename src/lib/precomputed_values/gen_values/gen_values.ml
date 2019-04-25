@@ -65,8 +65,8 @@ module Make_real (Keys : Keys_lib.Keys.S) = struct
       Tick.handle (Keys.Step.main x) Consensus.Prover_state.precomputed_handler
     in
     let tick =
-      Tick.Groth16.prove
-        (Tick.Groth16.Keypair.pk Keys.Step.keys)
+      Tick.prove
+        (Tick.Keypair.pk Keys.Step.keys)
         (Keys.Step.input ()) prover_state main base_hash
     in
     let proof = wrap base_hash tick in

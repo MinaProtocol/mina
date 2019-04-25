@@ -18,14 +18,6 @@ let get_directory_contents ~blacklist_exts dirname =
   |> List.filter (fun name ->
       not (List.exists ((=) (file_extension name)) blacklist_exts))
 
-let rec find_all_files ~blacklist_exts dirname basename =
-  let fullname = Filename.concat dirname basename in
-  if Sys.is_directory fullname then
-    get_directory_contents ~blacklist_exts fullname
-    |> List.map (find_all_files ~blacklist_exts fullname)
-    |> List.concat
-  else [fullname]
-
 let () =
   let blacklist_exts = ["un~"] in
   let profiles =
@@ -33,16 +25,16 @@ let () =
     |> List.filter (fun name -> file_extension name = "mlh")
     |> List.map chop_file_extension
   in
-  let config_deps = find_all_files ~blacklist_exts "" "config" |> String.concat " " in
   let foreach ls ~f = List.map f ls |> String.concat "" in
   let env_entry profile = "  ("^profile^" (flags (:standard -w @a-4-29-40-41-42-44-45-48-58-59-60)))\n" in
+
+
   let dune_file = "\
-    (copy_files config/**.mlh)\n\
     (rule\n\
    \  (targets config.mlh)\n\
-   \  (mode fallback)\n\
-   \  (deps config/%{profile}.mlh "^config_deps^")\n\
-   \  (action (copy config/%{profile}.mlh config.mlh)))\n\
+   \  (mode promote)\n\
+   \  (deps config/config.mlh)\n\
+   \  (action (copy config/config.mlh config.mlh)))\n\
     (env\n"^foreach profiles ~f:env_entry^")"
   in
   (* uncomment for debugging

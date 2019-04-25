@@ -368,10 +368,12 @@ module T = struct
           let%bind coda =
             Main.create
               (Main.Config.make ~logger ~trust_system ~net_config
-                 ~run_snark_worker:(Option.is_some snark_worker_config)
+                 ?snark_worker_key:
+                   (Option.map snark_worker_config ~f:(fun c -> c.public_key))
                  ~transaction_pool_disk_location:
                    (conf_dir ^/ "transaction_pool")
                  ~snark_pool_disk_location:(conf_dir ^/ "snark_pool")
+                 ~wallets_disk_location:(conf_dir ^/ "wallets")
                  ~time_controller ~receipt_chain_database
                  ~snark_work_fee:(Currency.Fee.of_int 0)
                  ?propose_keypair:Config.propose_keypair ~monitor
