@@ -40,9 +40,17 @@ let daemon logger =
      and propose_key =
        flag "propose-key"
          ~doc:
-           "KEYFILE Private key file for the proposing transitions \
+           "KEYFILE Private key file for the proposing transitions. You \
+            cannot provide both `propose-key` and `propose-public-key`. \
             (default:don't propose)"
          (optional string)
+     and propose_public_key =
+       flag "propose-public-key"
+         ~doc:
+           "PUBLICKEY Public key for the associated private key that is being \
+            tracked by this daemon. You cannot provide both `propose-key` and \
+            `propose-public-key`. (default:don't propose)"
+         (optional public_key_compressed)
      and peers =
        flag "peer"
          ~doc:
@@ -261,16 +269,34 @@ let daemon logger =
            (Unix.Inet_addr.of_string ip)
            ~discovery_port ~communication_port:external_port
        in
-       let sequence maybe_def =
-         match maybe_def with
-         | Some def ->
-             Deferred.map def ~f:Option.return
-         | None ->
-             Deferred.return None
-       in
+       let wallets_disk_location = conf_dir ^/ "wallets" in
+       (* HACK: Until we can properly change propose keys at runtime we'll
+        * suffer by accepting a propose_public_key flag and reloading the wallet
+        * db here to find the keypair for the pubkey *)
        let%bind propose_keypair =
-         Option.map ~f:Secrets.Keypair.Terminal_stdin.read_exn propose_key
-         |> sequence
+         match (propose_key, propose_public_key) with
+         | Some _, Some _ ->
+             eprintf
+               "Error: You cannot provide both `propose-key` and \
+                `propose-public-key`" ;
+             exit 1
+         | Some sk_file, None ->
+             Secrets.Keypair.Terminal_stdin.read_exn sk_file >>| Option.some
+         | None, Some wallet_pk -> (
+             match%bind
+               Secrets.Wallets.load ~logger
+                 ~disk_location:wallets_disk_location
+               >>| Secrets.Wallets.find ~needle:wallet_pk
+             with
+             | Some keypair ->
+                 Deferred.Option.return keypair
+             | None ->
+                 eprintf
+                   "Error: This public key was not found in the local \
+                    daemon's wallet database" ;
+                 exit 1 )
+         | None, None ->
+             return None
        in
        let%bind client_whitelist =
          Reader.load_sexp
