@@ -1,18 +1,23 @@
 open Core
 open Async
 open Graphql_async
-open Schema
 open Pipe_lib
 open Coda_base
 open Signature_lib
+open Currency
 
-module Make (Program : Coda_inputs.Main_intf) = struct
+module Make
+    (Config_in : Coda_inputs.Config_intf)
+    (Program : Coda_inputs.Main_intf) =
+struct
   open Program
   open Inputs
 
   module Types = struct
+    open Schema
+
     module Stringable = struct
-      (** 64-bit respresentation of public key that is compressed to make snark computation efficent *)
+      (** base64 respresentation of public key that is compressed to make snark computation efficent *)
       let public_key = Public_key.Compressed.to_base64
 
       (** Unix form of time, which is the number of milliseconds that elapsed from January 1, 1970 *)
@@ -21,6 +26,9 @@ module Make (Program : Coda_inputs.Main_intf) = struct
 
       (** Javascript only has 53-bit integers so we need to make them into strings  *)
       let uint64 uint64 = Unsigned.UInt64.to_string uint64
+
+      (** Balance of Coda (a uint64 under the hood) *)
+      let balance b = Balance.to_uint64 b |> uint64
     end
 
     (* TODO: include submitted_at (date) and included_at (date). These two fields are not exposed in the user_command *)
@@ -83,23 +91,91 @@ module Make (Program : Coda_inputs.Main_intf) = struct
              [ enum_value "BOOTSTRAP" ~value:`Bootstrap
              ; enum_value "SYNCED" ~value:`Synced
              ; enum_value "OFFLINE" ~value:`Offline ])
+
+    module Wallet = struct
+      let pubkey_field ~resolve =
+        field "publicKey" ~typ:(non_null string)
+          ~doc:"The public identity of a wallet"
+          ~args:Arg.[]
+          ~resolve
+
+      let wallet =
+        obj "Wallet"
+          ~doc:
+            "An identity (public key) coupled with a balance"
+            (* TODO: Handle total/unknown struct *) ~fields:(fun _ ->
+            [ pubkey_field ~resolve:(fun _ (key, _) -> Stringable.public_key key)
+            ; field "balance" ~typ:string
+                ~doc:
+                  "The balance is null when we're bootstrapping or if it is \
+                   not found in the ledger"
+                ~args:Arg.[]
+                ~resolve:(fun _ (_, balance_opt) ->
+                  Option.map balance_opt ~f:Stringable.balance ) ] )
+
+      let add_wallet_payload =
+        obj "AddWalletPayload" ~fields:(fun _ ->
+            [pubkey_field ~resolve:(fun _ key -> Stringable.public_key key)] )
+    end
   end
 
   module Queries = struct
-    open Types
+    open Schema
 
     let sync_state =
-      io_field "sync_status" ~typ:sync_status
+      io_field "sync_status" ~typ:Types.sync_status
         ~args:Arg.[]
         ~resolve:(fun {ctx= coda; _} () ->
           Deferred.return
             (Inputs.Incr_status.Observer.value @@ Program.sync_status coda)
           >>| Result.map_error ~f:Error.to_string_hum )
 
-    let commands = [sync_state]
+    let version =
+      field "version" ~typ:string
+        ~args:Arg.[]
+        ~doc:"The version of the node (git commit hash)"
+        ~resolve:(fun _ _ -> Config_in.commit_id)
+
+    let balance_of_pk coda pk =
+      let account =
+        Program.best_ledger coda |> Participating_state.active
+        |> Option.bind ~f:(fun ledger ->
+               Ledger.location_of_key ledger pk
+               |> Option.bind ~f:(Ledger.get ledger) )
+      in
+      account |> Option.map ~f:(fun a -> a.Account.Poly.balance)
+
+    let owned_wallets =
+      field "ownedWallets"
+        ~doc:"Wallets for which the daemon knows the private key)"
+        ~typ:(non_null (list (non_null Types.Wallet.wallet)))
+        ~args:Arg.[]
+        ~resolve:(fun {ctx= coda; _} () ->
+          Program.wallets coda |> Secrets.Wallets.get
+          |> List.map ~f:(fun kp ->
+                 (* TODO: Is it a performance issue to recompress the PK every query? *)
+                 let pk = kp.Keypair.public_key |> Public_key.compress in
+                 (pk, balance_of_pk coda pk) ) )
+
+    let wallet =
+      field "wallet"
+        ~doc:
+          "Find any wallet via a public key. Balance is null if the key was \
+           not found or we're bootstrapping"
+        ~typ:
+          (non_null Types.Wallet.wallet)
+          (* TODO: Is there anyway to describe `public_key` arg in a more typesafe way on our ocaml-side *)
+        ~args:Arg.[arg "publicKey" ~typ:(non_null string)]
+        ~resolve:(fun {ctx= coda; _} () pk_string ->
+          let pk = Public_key.Compressed.of_base64_exn pk_string in
+          (pk, balance_of_pk coda pk) )
+
+    let commands = [sync_state; version; owned_wallets; wallet]
   end
 
   module Subscriptions = struct
+    open Schema
+
     let to_pipe observer =
       let reader, writer =
         Strict_pipe.(create (Buffered (`Capacity 1, `Overflow Drop_head)))
@@ -124,7 +200,25 @@ module Make (Program : Coda_inputs.Main_intf) = struct
     let commands = [new_sync_update]
   end
 
+  module Mutations = struct
+    open Schema
+
+    let add_wallet =
+      io_field "addWallet" ~doc:"Add a wallet"
+        ~typ:
+          (non_null Types.Wallet.add_wallet_payload)
+          (* TODO: For now, not including add wallet input *)
+        ~args:Arg.[]
+        ~resolve:(fun {ctx= coda; _} () ->
+          let open Deferred.Let_syntax in
+          let%map kp = Program.wallets coda |> Secrets.Wallets.generate_new in
+          Result.return (kp.Keypair.public_key |> Public_key.compress) )
+
+    let commands = [add_wallet]
+  end
+
   let schema =
     Graphql_async.Schema.(
-      schema Queries.commands ~subscriptions:Subscriptions.commands)
+      schema Queries.commands ~mutations:Mutations.commands
+        ~subscriptions:Subscriptions.commands)
 end
