@@ -117,6 +117,21 @@ struct
         obj "AddWalletPayload" ~fields:(fun _ ->
             [pubkey_field ~resolve:(fun _ key -> Stringable.public_key key)] )
     end
+
+    let snark_worker =
+      obj "SnarkWorker" ~fields:(fun _ ->
+          [ field "key" ~typ:(non_null string)
+              ~doc:"Public key of current snark worker."
+              ~args:Arg.[]
+              ~resolve:(fun {ctx= coda; _} (key, _) ->
+                Stringable.public_key key )
+          ; field "fee" ~typ:(non_null string)
+              ~doc:
+                "Fee that snark worker is charging to generate a snark proof \
+                 (fee is uint64 and is coerced as a string)"
+              ~args:Arg.[]
+              ~resolve:(fun {ctx= coda; _} (_, fee) ->
+                Stringable.uint64 (Currency.Fee.to_uint64 fee) ) ] )
   end
 
   module Queries = struct
@@ -170,7 +185,16 @@ struct
           let pk = Public_key.Compressed.of_base64_exn pk_string in
           (pk, balance_of_pk coda pk) )
 
-    let commands = [sync_state; version; owned_wallets; wallet]
+    let current_snark_worker =
+      field "currentSnarkWorker" ~typ:Types.snark_worker
+        ~args:Arg.[]
+        ~doc:"Get information about the current snark worker."
+        ~resolve:(fun {ctx= coda; _} _ ->
+          Option.map (Program.snark_worker_key coda) ~f:(fun k ->
+              (k, Program.snark_work_fee coda) ) )
+
+    let commands =
+      [sync_state; version; owned_wallets; wallet; current_snark_worker]
   end
 
   module Subscriptions = struct

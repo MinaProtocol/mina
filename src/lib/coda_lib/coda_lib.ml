@@ -425,7 +425,7 @@ module Make (Inputs : Inputs_intf) = struct
 
   type t =
     { propose_keypair: Keypair.t option
-    ; run_snark_worker: bool
+    ; snark_worker_key: Public_key.Compressed.Stable.V1.t option
     ; net: Net.t
           (* TODO: Is this the best spot for the transaction_pool ref? *)
     ; wallets: Secrets.Wallets.t
@@ -461,7 +461,7 @@ module Make (Inputs : Inputs_intf) = struct
 
   let wallets t = t.wallets
 
-  let run_snark_worker t = t.run_snark_worker
+  let snark_worker_key t = t.snark_worker_key
 
   let propose_keypair t = t.propose_keypair
 
@@ -625,7 +625,7 @@ module Make (Inputs : Inputs_intf) = struct
       { logger: Logger.t
       ; trust_system: Trust_system.t
       ; propose_keypair: Keypair.t option
-      ; run_snark_worker: bool
+      ; snark_worker_key: Public_key.Compressed.Stable.V1.t option
       ; net_config: Net.Config.t
       ; transaction_pool_disk_location: string
       ; snark_pool_disk_location: string
@@ -886,7 +886,7 @@ module Make (Inputs : Inputs_intf) = struct
                    Deferred.unit )) ;
             return
               { propose_keypair= config.propose_keypair
-              ; run_snark_worker= config.run_snark_worker
+              ; snark_worker_key= config.snark_worker_key
               ; net
               ; wallets
               ; transaction_pool

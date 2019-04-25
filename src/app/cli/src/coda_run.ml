@@ -218,7 +218,7 @@ struct
           |> Host_and_port.to_string )
     in
     let user_commands_sent = !txn_count in
-    let run_snark_worker = run_snark_worker t in
+    let run_snark_worker = Option.is_some (snark_worker_key t) in
     let propose_pubkey =
       Option.map ~f:(fun kp -> kp.public_key) (propose_keypair t)
     in
