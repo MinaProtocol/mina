@@ -4,7 +4,7 @@ module Secret_keypair = Keypair
 open Signature_lib
 
 (* A simple cache on top of the fs *)
-type t = {mutable cache: Keypair.t list; path: string}
+type t = {cache: Keypair.t Public_key.Compressed.Table.t; path: string}
 
 (* TODO: Don't just generate bad passwords *)
 let password = lazy (Deferred.Or_error.return (Bytes.of_string ""))
@@ -24,17 +24,24 @@ let load ~logger ~disk_location : t Deferred.t =
             Secret_keypair.read ~privkey_path:(path ^/ file) ~password
           with
           | Ok keypair ->
-              Some keypair
+              Some (keypair.public_key |> Public_key.compress, keypair)
           | Error e ->
               Logger.error logger ~module_:__MODULE__ ~location:__LOC__
                 "Failed to read %s: %s" path (Error.to_string_hum e) ;
               None )
   in
   let%map () = Unix.chmod path ~perm:0o700 in
-  {cache= keypairs; path}
+  let cache =
+    match Public_key.Compressed.Table.of_alist keypairs with
+    | `Ok m ->
+        m
+    | `Duplicate_key _ ->
+        failwith "impossible"
+  in
+  {cache; path}
 
 (** Effectfully generates a new private key file and a keypair *)
-let generate_new t : Keypair.t Deferred.t =
+let generate_new t : Public_key.Compressed.t Deferred.t =
   let keypair = Keypair.create () in
   let pubkey_str =
     (* TODO: Do we need to version this? *)
@@ -44,30 +51,29 @@ let generate_new t : Keypair.t Deferred.t =
   let privkey_path = t.path ^/ pubkey_str in
   let%bind () = Secret_keypair.write_exn keypair ~privkey_path ~password in
   let%map () = Unix.chmod privkey_path ~perm:0o600 in
-  t.cache <- keypair :: t.cache ;
-  keypair
+  let pk = Public_key.compress keypair.public_key in
+  Public_key.Compressed.Table.add_exn t.cache ~key:pk ~data:keypair ;
+  pk
 
-let get ({cache; _} : t) = cache
+let pks ({cache; _} : t) = Public_key.Compressed.Table.keys cache
+
+let find ({cache; _} : t) ~needle =
+  Public_key.Compressed.Table.find cache needle
 
 let%test_module "wallets" =
   ( module struct
     let logger = Logger.create ()
 
-    module Kp_set = Set.Make (struct
-      type t = Keypair.t =
-        {public_key: Public_key.t; private_key: Private_key.t sexp_opaque}
-      [@@deriving sexp]
-
-      let compare a b = Public_key.compare a.public_key b.public_key
-    end)
+    module Set = Public_key.Compressed.Set
 
     let%test_unit "get from scratch" =
       Async.Thread_safe.block_on_async_exn (fun () ->
           File_system.with_temp_dir "/tmp/coda-wallets-test" ~f:(fun path ->
               let%bind wallets = load ~logger ~disk_location:path in
-              let%map kp = generate_new wallets in
-              let kps = Kp_set.of_list (get wallets) in
-              assert (Kp_set.mem kps kp) ) )
+              let%map pk = generate_new wallets in
+              let keys = Set.of_list (pks wallets) in
+              assert (Set.mem keys pk) ;
+              assert (find wallets ~needle:pk |> Option.is_some) ) )
 
     let%test_unit "get from existing file system not-scratch" =
       Backtrace.elide := false ;
@@ -76,10 +82,10 @@ let%test_module "wallets" =
               let%bind wallets = load ~logger ~disk_location:path in
               let%bind kp1 = generate_new wallets in
               let%bind kp2 = generate_new wallets in
-              let kps = Kp_set.of_list (get wallets) in
-              assert (Kp_set.mem kps kp1 && Kp_set.mem kps kp2) ;
+              let keys = Set.of_list (pks wallets) in
+              assert (Set.mem keys kp1 && Set.mem keys kp2) ;
               (* Get wallets again from scratch *)
               let%map wallets = load ~logger ~disk_location:path in
-              let kps = Kp_set.of_list (get wallets) in
-              assert (Kp_set.mem kps kp1 && Kp_set.mem kps kp2) ) )
+              let keys = Set.of_list (pks wallets) in
+              assert (Set.mem keys kp1 && Set.mem keys kp2) ) )
   end )

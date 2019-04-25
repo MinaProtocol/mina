@@ -5,6 +5,8 @@ type t
 
 val load : logger:Logger.t -> disk_location:string -> t Deferred.t
 
-val generate_new : t -> Keypair.t Deferred.t
+val generate_new : t -> Public_key.Compressed.t Deferred.t
 
-val get : t -> Keypair.t list
+val pks : t -> Public_key.Compressed.t list
+
+val find : t -> needle:Public_key.Compressed.t -> Keypair.t option

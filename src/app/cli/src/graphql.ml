@@ -166,10 +166,9 @@ struct
         ~typ:(non_null (list (non_null Types.Wallet.wallet)))
         ~args:Arg.[]
         ~resolve:(fun {ctx= coda; _} () ->
-          Program.wallets coda |> Secrets.Wallets.get
-          |> List.map ~f:(fun kp ->
+          Program.wallets coda |> Secrets.Wallets.pks
+          |> List.map ~f:(fun pk ->
                  (* TODO: Is it a performance issue to recompress the PK every query? *)
-                 let pk = kp.Keypair.public_key |> Public_key.compress in
                  (pk, balance_of_pk coda pk) ) )
 
     let wallet =
@@ -235,8 +234,8 @@ struct
         ~args:Arg.[]
         ~resolve:(fun {ctx= coda; _} () ->
           let open Deferred.Let_syntax in
-          let%map kp = Program.wallets coda |> Secrets.Wallets.generate_new in
-          Result.return (kp.Keypair.public_key |> Public_key.compress) )
+          let%map pk = Program.wallets coda |> Secrets.Wallets.generate_new in
+          Result.return pk )
 
     let commands = [add_wallet]
   end
