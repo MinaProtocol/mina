@@ -23,6 +23,8 @@ let max_rate secs =
 module type S = sig
   type t
 
+  type host
+
   type peer
 
   type action
@@ -31,23 +33,24 @@ module type S = sig
 
   val null : unit -> t
 
-  val ban_pipe : t -> peer Strict_pipe.Reader.t
+  val ban_pipe : t -> host Strict_pipe.Reader.t
 
   val record : t -> Logger.t -> peer -> action -> unit Deferred.t
 
-  val lookup : t -> peer -> Peer_status.t
+  val lookup : t -> host -> Peer_status.t
 
   val close : t -> unit
 end
 
-module Make0 (Peer_id : sig
+module Make0 (Host : sig
   type t [@@deriving sexp, yojson]
+end) (Peer : sig
+  type t = {host: Host.t; discovery_port: int; communication_port: int}
+  [@@deriving sexp, yojson]
 end) (Now : sig
   val now : unit -> Time.t
 end)
-(Db : Key_value_database.S
-      with type key := Peer_id.t
-       and type value := Record.t)
+(Db : Key_value_database.S with type key := Host.t and type value := Record.t)
 (Action : Action_intf) =
 struct
   type t =
@@ -55,12 +58,10 @@ struct
           (* This is an option to allow using a fake trust system in tests. This is
        ugly, but the alternative is functoring half of Coda over the trust
        system. *)
-    ; bans_reader: Peer_id.t Strict_pipe.Reader.t
+    ; bans_reader: Host.t Strict_pipe.Reader.t
     ; bans_writer:
-        ( Peer_id.t
-        , Strict_pipe.synchronous
-        , unit Deferred.t )
-        Strict_pipe.Writer.t }
+        (Host.t, Strict_pipe.synchronous, unit Deferred.t) Strict_pipe.Writer.t
+    }
 
   module Record_inst = Record.Make (Now)
 
@@ -81,8 +82,8 @@ struct
 
   let get_db {db} peer = Option.bind db (fun db' -> Db.get db' peer)
 
-  let lookup t peer =
-    match get_db t peer with
+  let lookup t host =
+    match get_db t host with
     | Some record ->
         Record_inst.to_peer_status record
     | None ->
@@ -93,8 +94,9 @@ struct
     Strict_pipe.Writer.close bans_writer
 
   let record ({db; bans_writer} as t) logger peer action =
+    let open Peer in
     let old_record =
-      match get_db t peer with
+      match get_db t peer.host with
       | None ->
           Record_inst.init ()
       | Some trust_record ->
@@ -120,13 +122,14 @@ struct
           Logger.faulty_peer_without_punishment logger ~module_:__MODULE__
             ~location:__LOC__
             ~metadata:
-              ( [ ("peer", Peer_id.to_yojson peer)
+              ( [ ("peer", Peer.to_yojson peer)
                 ; ( "expiration"
                   , `String (Time.to_string_abs expiration ~zone:Time.Zone.utc)
                   ) ]
               @ action_metadata )
             "Banning peer $peer until $expiration because it %s" action_fmt ;
-          if Option.is_some db then Strict_pipe.Writer.write bans_writer peer
+          if Option.is_some db then
+            Strict_pipe.Writer.write bans_writer peer.host
           else Deferred.unit
       | _, _ ->
           let verb =
@@ -134,12 +137,12 @@ struct
             else "Decreasing"
           in
           Logger.debug logger ~module_:__MODULE__ ~location:__LOC__
-            ~metadata:([("peer", Peer_id.to_yojson peer)] @ action_metadata)
+            ~metadata:([("peer", Peer.to_yojson peer)] @ action_metadata)
             "%s trust for peer $peer due to action %s. New trust is %f." verb
             action_fmt simple_new.trust ;
           Deferred.unit
     in
-    Option.iter db ~f:(fun db' -> Db.set db' ~key:peer ~data:new_record)
+    Option.iter db ~f:(fun db' -> Db.set db' ~key:peer.host ~data:new_record)
 end
 
 let%test_module "peer_trust" =
@@ -153,11 +156,18 @@ let%test_module "peer_trust" =
       let advance span = current_time := Time.add !current_time span
     end
 
-    module Mock_record = Record.Make (Mock_now)
-    module Db = Key_value_database.Make_mock (Int) (Record)
-
-    module Peer_id = struct
+    module Host = struct
       type t = int [@@deriving sexp, yojson]
+
+      include (Int : module type of Int with type t := t)
+    end
+
+    module Mock_record = Record.Make (Mock_now)
+    module Db = Key_value_database.Make_mock (Host) (Record)
+
+    module Peer = struct
+      type t = {host: Host.t; discovery_port: int; communication_port: int}
+      [@@deriving sexp, yojson]
     end
 
     module Action = struct
@@ -178,7 +188,7 @@ let%test_module "peer_trust" =
       let to_log t = (string_of_sexp @@ sexp_of_t t, [])
     end
 
-    module Peer_trust_test = Make0 (Peer_id) (Mock_now) (Db) (Action)
+    module Peer_trust_test = Make0 (Host) (Peer) (Mock_now) (Db) (Action)
 
     (* We want to check the output of the pipe in these tests, but it's
        synchronous, so we need to read from it in a different "thread",
@@ -209,7 +219,11 @@ let%test_module "peer_trust" =
     let%test "Insta-bans actually do so" =
       Thread_safe.block_on_async_exn (fun () ->
           let db = setup_mock_db () in
-          let%map () = Peer_trust_test.record db nolog 0 Insta_ban in
+          let%map () =
+            Peer_trust_test.record db nolog
+              {host= 0; discovery_port= 0; communication_port= 0}
+              Insta_ban
+          in
           match Peer_trust_test.lookup db 0 with
           | {trust= -1.0; banned= Banned_until time} ->
               [%test_eq: Time.t] time
@@ -222,7 +236,11 @@ let%test_module "peer_trust" =
     let%test "trust decays by half in 24 hours" =
       Thread_safe.block_on_async_exn (fun () ->
           let db = setup_mock_db () in
-          let%map () = Peer_trust_test.record db nolog 0 Action.Big_credit in
+          let%map () =
+            Peer_trust_test.record db nolog
+              {host= 0; discovery_port= 0; communication_port= 0}
+              Action.Big_credit
+          in
           match Peer_trust_test.lookup db 0 with
           | {trust= start_trust; banned= Unbanned} -> (
               Mock_now.advance Time.Span.day ;
@@ -252,7 +270,10 @@ let%test_module "peer_trust" =
 
     let act_constant_rate db rate act =
       (* simulate performing an action at the specified rate for a week *)
-      do_constant_rate rate (fun () -> Peer_trust_test.record db nolog 0 act)
+      do_constant_rate rate (fun () ->
+          Peer_trust_test.record db nolog
+            {host= 0; discovery_port= 0; communication_port= 0}
+            act )
 
     let%test "peers don't get banned for acting at the maximum rate" =
       Thread_safe.block_on_async_exn (fun () ->
@@ -281,9 +302,13 @@ let%test_module "peer_trust" =
           let%map () =
             do_constant_rate 1.1 (fun () ->
                 let%bind () =
-                  Peer_trust_test.record db nolog 0 Action.Slow_punish
+                  Peer_trust_test.record db nolog
+                    {host= 0; discovery_port= 0; communication_port= 0}
+                    Action.Slow_punish
                 in
-                Peer_trust_test.record db nolog 0 Action.Slow_credit )
+                Peer_trust_test.record db nolog
+                  {host= 0; discovery_port= 0; communication_port= 0}
+                  Action.Slow_credit )
           in
           match Peer_trust_test.lookup db 0 with
           | {trust; banned= Banned_until _} ->
@@ -301,7 +326,11 @@ let%test_module "peer_trust" =
               assert_ban_pipe []
           | {trust; banned= Banned_until _} ->
               failwith "Peer is banned after credits" ) ;
-          let%map () = Peer_trust_test.record db nolog 0 Action.Insta_ban in
+          let%map () =
+            Peer_trust_test.record db nolog
+              {host= 0; discovery_port= 0; communication_port= 0}
+              Action.Insta_ban
+          in
           match Peer_trust_test.lookup db 0 with
           | {trust= -1.0; banned= Banned_until _} ->
               assert_ban_pipe [0] ;
@@ -314,8 +343,16 @@ let%test_module "peer_trust" =
     let%test "multiple peers getting banned causes multiple ban events" =
       Thread_safe.block_on_async_exn (fun () ->
           let db = setup_mock_db () in
-          let%bind () = Peer_trust_test.record db nolog 0 Action.Insta_ban in
-          let%map () = Peer_trust_test.record db nolog 1 Action.Insta_ban in
+          let%bind () =
+            Peer_trust_test.record db nolog
+              {host= 0; discovery_port= 0; communication_port= 0}
+              Action.Insta_ban
+          in
+          let%map () =
+            Peer_trust_test.record db nolog
+              {host= 1; discovery_port= 0; communication_port= 0}
+              Action.Insta_ban
+          in
           assert_ban_pipe [1; 0] (* Reverse order since it's a snoc list. *) ;
           true )
   end )
@@ -332,6 +369,7 @@ module Make =
         | _ ->
             Error "expected string"
     end)
+    (Network_peer.Peer)
     (struct
       let now = Time.now
     end)

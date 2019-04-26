@@ -157,7 +157,7 @@ module Make (Message : Message_intf) :
           (* call succeeded, result is an error *)
           let%bind () =
             Trust_system.(
-              record t.trust_system t.logger peer.host
+              record t.trust_system t.logger peer
                 Actions.
                   ( Violated_protocol
                   , Some

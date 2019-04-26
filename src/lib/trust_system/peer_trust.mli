@@ -43,6 +43,8 @@ val max_rate : float -> float
 module type S = sig
   type t
 
+  type host
+
   (** The data identifying a peer. *)
   type peer
 
@@ -60,14 +62,14 @@ module type S = sig
       proactively disconnect from peers when they're banned. You *must* consume
       this, otherwise the program will block indefinitely when a peer is
       banned. *)
-  val ban_pipe : t -> peer Strict_pipe.Reader.t
+  val ban_pipe : t -> host Strict_pipe.Reader.t
 
   (** Record an action a peer took. This may result in a ban event being
       emitted *)
   val record : t -> Logger.t -> peer -> action -> unit Deferred.t
 
   (** Look up the score of a peer and whether it's banned .*)
-  val lookup : t -> peer -> Peer_status.t
+  val lookup : t -> host -> Peer_status.t
 
   (** Shut down. *)
   val close : t -> unit
@@ -79,5 +81,6 @@ end
     @param Action Actions that affect trust *)
 module Make (Action : Action_intf) :
   S
-  with type peer := Unix.Inet_addr.Blocking_sexp.t
+  with type host := Core.Unix.Inet_addr.Stable.V1.t
+   and type peer := Network_peer.Peer.t
    and type action := Action.t

@@ -164,9 +164,9 @@ end = struct
           |> Consensus.Protocol_state.consensus_state )
         ~candidate
 
-  let received_bad_proof t sender_host e =
+  let received_bad_proof t sender e =
     Trust_system.(
-      record t.trust_system t.logger sender_host
+      record t.trust_system t.logger sender
         Actions.
           ( Violated_protocol
           , Some
@@ -202,7 +202,7 @@ end = struct
           | Ok (peer_root, peer_best_tip) -> (
               let%bind () =
                 Trust_system.(
-                  record t.trust_system t.logger sender.host
+                  record t.trust_system t.logger sender
                     Actions.
                       ( Fulfilled_request
                       , Some ("Received verified peer root and best tip", [])
@@ -245,8 +245,7 @@ end = struct
               | `Repeat ->
                   `Ignored )
           | Error e ->
-              return (received_bad_proof t sender.host e |> Fn.const `Ignored)
-          )
+              return (received_bad_proof t sender e |> Fn.const `Ignored) )
 
   let sync_ledger t ~root_sync_ledger ~transition_graph ~transition_reader =
     let query_reader = Root_sync_ledger.query_reader root_sync_ledger in
@@ -346,7 +345,7 @@ end = struct
     | Error err ->
         let%bind () =
           Trust_system.(
-            record t.trust_system t.logger sender.host
+            record t.trust_system t.logger sender
               Actions.
                 ( Violated_protocol
                 , Some
@@ -358,7 +357,7 @@ end = struct
     | Ok root_staged_ledger ->
         let%bind () =
           Trust_system.(
-            record t.trust_system t.logger sender.host
+            record t.trust_system t.logger sender
               Actions.
                 ( Fulfilled_request
                 , Some ("Received valid scan state from peer", []) ))

@@ -658,7 +658,7 @@ module Make (Inputs : Inputs_intf) = struct
             | Ok (Some response) ->
                 let%bind () =
                   Trust_system.(
-                    record t.trust_system t.logger peer.host
+                    record t.trust_system t.logger peer
                       Actions.
                         ( Fulfilled_request
                         , Some ("Nonpreferred peer returned valid response", [])
@@ -684,7 +684,7 @@ module Make (Inputs : Inputs_intf) = struct
     | Ok (Some data) ->
         let%bind () =
           Trust_system.(
-            record t.trust_system t.logger peer.host
+            record t.trust_system t.logger peer
               Actions.
                 ( Fulfilled_request
                 , Some ("Preferred peer returned valid response", []) ))
@@ -693,7 +693,7 @@ module Make (Inputs : Inputs_intf) = struct
     | Ok None ->
         let%bind () =
           Trust_system.(
-            record t.trust_system t.logger peer.host
+            record t.trust_system t.logger peer
               Actions.
                 ( Violated_protocol
                 , Some ("When querying preferred peer, got no response", []) ))
