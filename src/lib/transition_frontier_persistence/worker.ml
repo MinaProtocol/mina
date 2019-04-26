@@ -92,11 +92,18 @@ end = struct
         log_mutant t diff mutant ; hash acc_hash diff mutant
     | Update_root new_root_data ->
         let old_root_data =
+          Logger.trace t.logger !"Getting old root data" ~module_:__MODULE__
+            ~location:__LOC__ ;
           Transition_storage.get t.transition_storage ~logger:t.logger
             ~location:__LOC__ Transition_storage.Schema.Root
         in
+        Logger.trace t.logger !"Setting old root data" ~module_:__MODULE__
+          ~location:__LOC__ ;
         Transition_storage.set t.transition_storage ~key:Root
           ~data:new_root_data ;
+        Logger.trace t.logger
+          !"Finished setting old root data"
+          ~module_:__MODULE__ ~location:__LOC__ ;
         log_mutant t diff old_root_data ;
         hash acc_hash diff old_root_data
 

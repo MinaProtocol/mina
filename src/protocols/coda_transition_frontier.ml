@@ -29,6 +29,8 @@ module type Diff_hash = sig
   val empty : t
 
   val equal : t -> t -> bool
+
+  val to_string : t -> string
 end
 
 module type Diff_mutant = sig

@@ -110,10 +110,12 @@ module Make (Inputs : Intf.Main_inputs) = struct
         else
           failwithf
             !"Unable to write mutant diff correctly as hashes are different:\n\
-             \ %s"
+             \ %s. Hash of groundtruth %s Hash of actual %s"
             (Yojson.Safe.to_string
                (Diff_mutant.key_to_yojson diff_mutant
                   ~f:(Fn.compose State_hash.to_yojson With_hash.hash)))
+            (Diff_hash.to_string ground_truth_hash)
+            (Diff_hash.to_string new_hash)
             ()
 
   let listen_to_frontier_broadcast_pipe ~logger
