@@ -1049,7 +1049,14 @@ module Epoch_data = struct
   end)
 
   let curr_to_last curr =
-    Poly.{curr with lock_checkpoint= Option.value_exn curr.lock_checkpoint}
+    Poly.
+      { curr with
+        lock_checkpoint=
+          (* TODO: This is just a hack to make code compatible with old
+                   implementation. We should change it once Issue #2328
+                   is properly addressed. *)
+          Option.value curr.lock_checkpoint
+            ~default:Coda_base.State_hash.(of_hash zero) }
 
   let update_pair ((last_data, curr_data) : Last.Value.t * Curr.Value.t)
       epoch_length ~prev_epoch ~next_epoch ~prev_slot ~prev_protocol_state_hash
