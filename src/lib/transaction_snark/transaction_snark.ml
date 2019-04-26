@@ -1140,7 +1140,7 @@ let check_transaction_union ?preeval sok_message source target
       ~fee_excess:(Transaction_union.excess transaction)
       ~supply_increase:(Transaction_union.supply_increase transaction)
   in
-  let open Tick.Groth16 in
+  let open Tick in
   Or_error.ok_exn
     (Proof_system.check ~handlers:[handler] ?reduce:preeval Base.proof_system
        ~public_input:[top_hash] prover_state)
