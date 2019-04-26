@@ -99,19 +99,59 @@ struct
           ~args:Arg.[]
           ~resolve
 
+      module AnnotatedBalance = struct
+        type t = {total: Balance.t; unknown: Balance.t}
+
+        let obj =
+          obj "AnnotatedBalance"
+            ~doc:
+              "A total balance annotated with the amount that is currently \
+               unknown. Invariant: unknown <= total" ~fields:(fun _ ->
+              [ field "total" ~typ:(non_null string)
+                  ~doc:"A balance of Coda as a stringified uint64"
+                  ~args:Arg.[]
+                  ~resolve:(fun _ (b : t) -> Stringable.balance b.total)
+              ; field "unknown" ~typ:(non_null string)
+                  ~doc:"A balance of Coda as a stringified uint64"
+                  ~args:Arg.[]
+                  ~resolve:(fun _ (b : t) -> Stringable.balance b.unknown) ] )
+      end
+
       let wallet =
-        obj "Wallet"
-          ~doc:
-            "An identity (public key) coupled with a balance"
-            (* TODO: Handle total/unknown struct *) ~fields:(fun _ ->
-            [ pubkey_field ~resolve:(fun _ (key, _) -> Stringable.public_key key)
-            ; field "balance" ~typ:string
-                ~doc:
-                  "The balance is null when we're bootstrapping or if it is \
-                   not found in the ledger"
+        obj "Wallet" ~doc:"An account record according to the daemon"
+          ~fields:(fun _ ->
+            [ pubkey_field ~resolve:(fun _ account ->
+                  Stringable.public_key account.Account.Poly.public_key )
+            ; field "balance"
+                ~typ:(non_null AnnotatedBalance.obj)
+                ~doc:"A balance of Coda as a stringified uint64"
                 ~args:Arg.[]
-                ~resolve:(fun _ (_, balance_opt) ->
-                  Option.map balance_opt ~f:Stringable.balance ) ] )
+                ~resolve:(fun _ account -> account.Account.Poly.balance)
+            ; field "nonce" ~typ:(non_null string)
+                ~doc:
+                  "Nonces are natural numbers that increase each transaction. \
+                   Stringified uint32"
+                ~args:Arg.[]
+                ~resolve:(fun _ account ->
+                  Account.Nonce.to_string account.Account.Poly.nonce )
+            ; field "receiptChainHash" ~typ:(non_null string)
+                ~doc:"Top hash of the receipt chain merkle-list"
+                ~args:Arg.[]
+                ~resolve:(fun _ account ->
+                  Receipt.Chain_hash.to_string
+                    account.Account.Poly.receipt_chain_hash )
+            ; field "delegate" ~typ:(non_null string)
+                ~doc:
+                  "The public key to which you are delegating (including the \
+                   empty key!)"
+                ~args:Arg.[]
+                ~resolve:(fun _ account ->
+                  Stringable.public_key account.Account.Poly.delegate )
+            ; field "participated" ~typ:(non_null bool)
+                ~doc:"TODO, not sure what this is"
+                ~args:Arg.[]
+                ~resolve:(fun _ account -> account.Account.Poly.participated)
+            ] )
 
       let add_wallet_payload =
         obj "AddWalletPayload" ~fields:(fun _ ->
@@ -151,38 +191,53 @@ struct
         ~doc:"The version of the node (git commit hash)"
         ~resolve:(fun _ _ -> Config_in.commit_id)
 
-    let balance_of_pk coda pk =
+    let account_of_pk coda pk =
       let account =
         Program.best_ledger coda |> Participating_state.active
         |> Option.bind ~f:(fun ledger ->
                Ledger.location_of_key ledger pk
                |> Option.bind ~f:(Ledger.get ledger) )
       in
-      account |> Option.map ~f:(fun a -> a.Account.Poly.balance)
+      Option.map account
+        ~f:(fun { Account.Poly.public_key
+                ; nonce
+                ; balance
+                ; receipt_chain_hash
+                ; delegate
+                ; participated }
+           ->
+          { Account.Poly.public_key
+          ; nonce
+          ; delegate
+          ; balance=
+              {Types.Wallet.AnnotatedBalance.total= balance; unknown= balance}
+          ; receipt_chain_hash
+          ; participated } )
 
     let owned_wallets =
       field "ownedWallets"
-        ~doc:"Wallets for which the daemon knows the private key)"
+        ~doc:
+          "Wallets for which the daemon knows the private key that are found \
+           in our ledger"
         ~typ:(non_null (list (non_null Types.Wallet.wallet)))
         ~args:Arg.[]
         ~resolve:(fun {ctx= coda; _} () ->
           Program.wallets coda |> Secrets.Wallets.pks
-          |> List.map ~f:(fun pk ->
-                 (* TODO: Is it a performance issue to recompress the PK every query? *)
-                 (pk, balance_of_pk coda pk) ) )
+          |> List.filter_map ~f:(fun pk -> account_of_pk coda pk) )
 
     let wallet =
       field "wallet"
         ~doc:
-          "Find any wallet via a public key. Balance is null if the key was \
-           not found or we're bootstrapping"
+          "Find any wallet via a public key. Null if the key was not found \
+           for some reason (i.e. we're bootstrapping, or the account doesn't \
+           exist)"
         ~typ:
-          (non_null Types.Wallet.wallet)
+          Types.Wallet.wallet
           (* TODO: Is there anyway to describe `public_key` arg in a more typesafe way on our ocaml-side *)
         ~args:Arg.[arg "publicKey" ~typ:(non_null string)]
         ~resolve:(fun {ctx= coda; _} () pk_string ->
           let pk = Public_key.Compressed.of_base64_exn pk_string in
-          (pk, balance_of_pk coda pk) )
+          account_of_pk coda pk )
 
     let current_snark_worker =
       field "currentSnarkWorker" ~typ:Types.snark_worker
