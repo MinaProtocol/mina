@@ -229,12 +229,37 @@ module Epoch = struct
 
   let diff_in_slots ((epoch, slot) : t * Slot.t) ((epoch', slot') : t * Slot.t)
       : int64 =
-    let open UInt32 in
-    let open UInt32.Infix in
-    let epoch_size = to_int64 Constants.Epoch.size in
-    let epoch_diff = to_int64 (epoch - epoch') in
-    let slot_diff = to_int64 (slot - slot') in
-    Int64.Infix.((epoch_diff * epoch_size) + slot_diff)
+    let ( < ) x y = Pervasives.(Int64.compare x y < 0) in
+    let ( > ) x y = Pervasives.(Int64.compare x y > 0) in
+    let open Int64.Infix in
+    let of_uint32 = UInt32.to_int64 in
+    let epoch, slot = (of_uint32 epoch, of_uint32 slot) in
+    let epoch', slot' = (of_uint32 epoch', of_uint32 slot') in
+    let epoch_size = of_uint32 Constants.Epoch.size in
+    let epoch_diff = epoch - epoch' in
+    if epoch_diff > 0L then
+      ((epoch_diff - 1L) * epoch_size) + slot + (epoch_size - slot')
+    else if epoch_diff < 0L then
+      ((epoch_diff + 1L) * epoch_size) - (epoch_size - slot) - slot'
+    else slot - slot'
+
+  let%test_unit "test diff_in_slots" =
+    let open Int64.Infix in
+    let ( !^ ) = UInt32.of_int in
+    let ( !@ ) = Fn.compose ( !^ ) Int64.to_int in
+    let epoch_size = UInt32.to_int64 Constants.Epoch.size in
+    [%test_eq: int64] (diff_in_slots (!^0, !^5) (!^0, !^0)) 5L ;
+    [%test_eq: int64] (diff_in_slots (!^3, !^23) (!^3, !^20)) 3L ;
+    [%test_eq: int64] (diff_in_slots (!^4, !^4) (!^3, !^0)) (epoch_size + 4L) ;
+    [%test_eq: int64]
+      (diff_in_slots (!^6, !^42) (!^2, !^16))
+      ((epoch_size * 3L) + 42L + (epoch_size - 16L)) ;
+    [%test_eq: int64]
+      (diff_in_slots (!^2, !@(epoch_size - 1L)) (!^3, !^4))
+      (0L - 5L) ;
+    [%test_eq: int64]
+      (diff_in_slots (!^1, !^3) (!^7, !^27))
+      (0L - ((epoch_size * 5L) + (epoch_size - 3L) + 27L))
 
   let incr ((epoch, slot) : t * Slot.t) =
     let open UInt32 in
