@@ -1,7 +1,7 @@
 open Core
 open Async
 open Coda_worker
-open Coda_main
+open Coda_run
 open Coda_base
 
 let name = "coda-long-fork"
@@ -26,14 +26,14 @@ let main n () =
   in
   let%bind () =
     Coda_worker_testnet.Restarts.restart_node testnet ~logger ~node:1
-      ~duration:(Time.Span.of_ms (3 * epoche_duration |> Float.of_int))
+      ~duration:(Time.Span.of_ms (2 * epoche_duration |> Float.of_int))
   in
   let%bind () = after (Time.Span.of_min 2.) in
   Coda_worker_testnet.Api.teardown testnet
 
 let command =
   let open Command.Let_syntax in
-  Command.async ~summary:"Test that workers share prefixes"
+  Command.async ~summary:"Test that one worker goes offline for a long time"
     (let%map_open num_proposers =
        flag "num-proposers" ~doc:"NUM number of proposers to have"
          (required int)
