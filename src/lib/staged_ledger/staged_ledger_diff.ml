@@ -165,7 +165,7 @@ end) :
             { completed_works: Transaction_snark_work.Stable.V1.t list
             ; user_commands: User_command.Stable.V1.t list
             ; coinbase: Ft.Stable.V1.t At_most_one.Stable.V1.t }
-          [@@deriving sexp, bin_io, version]
+          [@@deriving sexp, bin_io, version {unnumbered}]
         end
 
         include T
@@ -188,7 +188,7 @@ end) :
           type t =
             Pre_diff_with_at_most_two_coinbase.Stable.V1.t
             * Pre_diff_with_at_most_one_coinbase.Stable.V1.t option
-          [@@deriving sexp, bin_io, version]
+          [@@deriving sexp, bin_io, version {unnumbered}]
         end
 
         include T

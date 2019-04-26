@@ -48,7 +48,7 @@ module Prover_state = struct
   module Stable = struct
     module V1 = struct
       module T = struct
-        type t = unit [@@deriving bin_io, sexp, version]
+        type t = unit [@@deriving bin_io, sexp, version {unnumbered}]
       end
 
       include T
