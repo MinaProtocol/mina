@@ -115,19 +115,13 @@ module Make (Inputs : Inputs.S) :
         let%map () =
           Trust_system.record_envelope_sender trust_system logger sender
             ( Trust_system.Actions.Gossiped_invalid_transition
-            , Some
-                ( "transition queried during ledger catchup had invalid proof"
-                , [("peer", Envelope.Sender.to_yojson sender)] ) )
+            , Some ("invalid proof", []) )
         in
         Error (Error.of_string "invalid proof")
     | Error `Disconnected ->
         let%map () =
           Trust_system.record_envelope_sender trust_system logger sender
-            ( Trust_system.Actions.Disconnected_chain
-            , Some
-                ( "transition queried during ledger catchup was not connected \
-                   to our chain"
-                , [("peer", Envelope.Sender.to_yojson sender)] ) )
+            (Trust_system.Actions.Disconnected_chain, None)
         in
         Error (Error.of_string "disconnected chain")
 

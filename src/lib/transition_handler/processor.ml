@@ -194,9 +194,7 @@ module Make (Inputs : Inputs.With_unprocessed_transition_cache.S) :
                                  , Some
                                      ( sprintf "invalid staged ledger: %s"
                                          (Error.to_string_hum error)
-                                     , [ ( "peer"
-                                         , Envelope.Sender.to_yojson sender )
-                                       ] ) )
+                                     , [] ) )
                              in
                              Error error
                          | Error (_sender, `Fatal_error error) ->

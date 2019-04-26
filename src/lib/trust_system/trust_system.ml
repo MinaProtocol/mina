@@ -53,11 +53,13 @@ module Actions = struct
     let request_increment = Peer_trust.max_rate 10. in
     match action with
     | Gossiped_old_transition slot_diff ->
-        (* We want to decrease the score exponentially based on how out of date the transition
+        (* NOTE: slot_diff here is [received_slot - (proposed_slot + Δ)]
+         *
+         * We want to decrease the score exponentially based on how out of date the transition
          * we received was. We would like the base score decrease to be some constant
          * [c], and we would like to instantly ban any peers who send us transitions
          * received more than [Δ] slots out of date. Therefore, we want some function
-         * [f] where [f(1) = c] and [f(Δ) >= 2]. We start by fitting an exponential function
+         * [f] where [f(1) = c] and [f(Δ) >= 2]. We start by fitting an geometric function
          * such that [f(Δ) = 2]. [(1/y)x^2] should be [2] when [x] is [Δ], so if we solve for
          * [(1/y)Δ^2 = 2], we get [y = Δ^2/2]. Therefore, we can define our function
          * [f(x) = (1/(Δ^2/2))x^2]. This does not satisfy [f(1) = c], but since we only constrain

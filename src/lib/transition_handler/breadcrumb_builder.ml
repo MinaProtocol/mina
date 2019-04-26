@@ -94,10 +94,7 @@ module Make (Inputs : Inputs.S) :
                         Trust_system.record_envelope_sender trust_system logger
                           sender
                           ( Trust_system.Actions.Gossiped_invalid_transition
-                          , Some
-                              ( "invalid staged ledger hash"
-                              , [("peer", Envelope.Sender.to_yojson sender)] )
-                          )
+                          , Some ("invalid staged ledger hash", []) )
                       in
                       Error error
                   | Error (`Invalid_staged_ledger_diff error) ->
@@ -105,10 +102,7 @@ module Make (Inputs : Inputs.S) :
                         Trust_system.record_envelope_sender trust_system logger
                           sender
                           ( Trust_system.Actions.Gossiped_invalid_transition
-                          , Some
-                              ( "invalid staged ledger diff"
-                              , [("peer", Envelope.Sender.to_yojson sender)] )
-                          )
+                          , Some ("invalid staged ledger diff", []) )
                       in
                       Error error )
               |> Cached.sequence_deferred
