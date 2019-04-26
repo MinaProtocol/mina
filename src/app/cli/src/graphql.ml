@@ -324,6 +324,7 @@ struct
         ~args:Arg.[arg "publicKey" ~typ:(non_null string)]
         ~resolve:(fun {ctx= coda; _} public_key ->
           let public_key = Public_key.Compressed.of_base64_exn public_key in
+          let transaction_database = transaction_database coda in
           global_pipe coda ~to_pipe:(fun new_block_incr ->
               let payments_incr =
                 Coda_incremental.New_transition.map new_block_incr
@@ -346,6 +347,12 @@ struct
                       (User_command.sender payment)
                       public_key )
                 |> List.iter ~f:(fun payment ->
+                       Option.iter (User_command.check payment)
+                         ~f:(fun checked_user_command ->
+                           Transaction_database.add transaction_database
+                             public_key
+                             (Coda_base.Transaction.User_command
+                                checked_user_command) ) ;
                        Strict_pipe.Writer.write frontier_payment_writer payment
                    )
               in
