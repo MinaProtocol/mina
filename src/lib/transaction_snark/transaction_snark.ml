@@ -12,7 +12,7 @@ open Module_version
 let state_hash_size_in_triples = Tick.Field.size_in_triples
 
 let tick_input () =
-  let open Tick.Groth16 in
+  let open Tick in
   Data_spec.[Field.typ]
 
 let wrap_input = Tock.Data_spec.[Wrap_input.typ]
@@ -273,9 +273,9 @@ let merge_top_hash wrap_vk_bits =
 
 module Verification_keys = struct
   type t =
-    { base: Tick.Groth16.Verification_key.t
+    { base: Tick.Verification_key.t
     ; wrap: Tock.Verification_key.t
-    ; merge: Tick.Groth16.Verification_key.t }
+    ; merge: Tick.Verification_key.t }
   [@@deriving bin_io]
 
   let dummy : t =
@@ -289,9 +289,9 @@ module Keys0 = struct
 
   module Proving = struct
     type t =
-      { base: Tick.Groth16.Proving_key.t
+      { base: Tick.Proving_key.t
       ; wrap: Tock.Proving_key.t
-      ; merge: Tick.Groth16.Proving_key.t }
+      ; merge: Tick.Proving_key.t }
     [@@deriving bin_io]
 
     let dummy =
@@ -516,10 +516,9 @@ module Base = struct
     in
     ()
 
-  let proof_system =
-    Groth16.Proof_system.create ~public_input:(tick_input ()) main
+  let proof_system = Proof_system.create ~public_input:(tick_input ()) main
 
-  let create_keys () = Groth16.Proof_system.generate_keypair proof_system
+  let create_keys () = Proof_system.generate_keypair proof_system
 
   let transaction_union_proof ?preeval ~proving_key sok_digest state1 state2
       pending_coinbase_stack_state (transaction : Transaction_union.t) handler
@@ -534,18 +533,17 @@ module Base = struct
         ~pending_coinbase_stack_state
     in
     ( top_hash
-    , Groth16.Proof_system.prove ~proving_key ~handlers:[handler]
+    , Proof_system.prove ~proving_key ~handlers:[handler]
         ~public_input:[top_hash] ?reduce:preeval proof_system prover_state )
 
   let cached =
     let load =
       let open Cached.Let_syntax in
       let%map verification =
-        Cached.component ~label:"verification" ~f:Groth16.Keypair.vk
-          (module Groth16.Verification_key)
+        Cached.component ~label:"verification" ~f:Keypair.vk
+          (module Verification_key)
       and proving =
-        Cached.component ~label:"proving" ~f:Groth16.Keypair.pk
-          (module Groth16.Proving_key)
+        Cached.component ~label:"proving" ~f:Keypair.pk (module Proving_key)
       in
       (verification, {proving with value= ()})
     in
@@ -554,8 +552,8 @@ module Base = struct
       ~manual_install_path:Cache_dir.manual_install_path
       ~digest_input:(fun x ->
         Md5.to_hex (R1CS_constraint_system.digest (Lazy.force x)) )
-      ~input:(lazy (Groth16.Proof_system.constraint_system proof_system))
-      ~create_env:(fun x -> Groth16.Keypair.generate (Lazy.force x))
+      ~input:(lazy (Proof_system.constraint_system proof_system))
+      ~create_env:(fun x -> Keypair.generate (Lazy.force x))
 end
 
 module Transition_data = struct
@@ -820,19 +818,18 @@ module Merge = struct
     in
     Boolean.Assert.all [verify_12; verify_23]
 
-  let proof_system = Groth16.Proof_system.create ~public_input:(input ()) main
+  let proof_system = Proof_system.create ~public_input:(input ()) main
 
-  let create_keys () = Groth16.Proof_system.generate_keypair proof_system
+  let create_keys () = Proof_system.generate_keypair proof_system
 
   let cached =
     let load =
       let open Cached.Let_syntax in
       let%map verification =
-        Cached.component ~label:"verification" ~f:Groth16.Keypair.vk
-          (module Groth16.Verification_key)
+        Cached.component ~label:"verification" ~f:Keypair.vk
+          (module Verification_key)
       and proving =
-        Cached.component ~label:"proving" ~f:Groth16.Keypair.pk
-          (module Groth16.Proving_key)
+        Cached.component ~label:"proving" ~f:Keypair.pk (module Proving_key)
       in
       (verification, {proving with value= ()})
     in
@@ -841,8 +838,8 @@ module Merge = struct
       ~manual_install_path:Cache_dir.manual_install_path
       ~digest_input:(fun x ->
         Md5.to_hex (R1CS_constraint_system.digest (Lazy.force x)) )
-      ~input:(lazy (Groth16.Proof_system.constraint_system proof_system))
-      ~create_env:(fun x -> Groth16.Keypair.generate (Lazy.force x))
+      ~input:(lazy (Proof_system.constraint_system proof_system))
+      ~create_env:(fun x -> Keypair.generate (Lazy.force x))
 end
 
 module Verification = struct
@@ -1008,9 +1005,9 @@ module Verification = struct
 end
 
 module Wrap (Vk : sig
-  val merge : Tick.Groth16.Verification_key.t
+  val merge : Tick.Verification_key.t
 
-  val base : Tick.Groth16.Verification_key.t
+  val base : Tick.Verification_key.t
 end) =
 struct
   open Tock
@@ -1027,7 +1024,7 @@ struct
     Verifier.Verification_key.Precomputation.create_constant base_vk
 
   module Prover_state = struct
-    type t = {proof_type: Proof_type.t; proof: Tick.Groth16.Proof.t}
+    type t = {proof_type: Proof_type.t; proof: Tick.Proof.t}
     [@@deriving fields]
   end
 
@@ -1179,7 +1176,7 @@ let generate_transaction_union_witness ?preeval sok_message source target
       ~supply_increase:(Transaction_union.supply_increase transaction)
       ~pending_coinbase_stack_state
   in
-  let open Tick.Groth16 in
+  let open Tick in
   ignore
   @@ Proof_system.run_unchecked ~handlers:[handler] ?reduce:preeval
        Base.proof_system ~public_input:[top_hash]
@@ -1254,7 +1251,7 @@ struct
       ; tock_vk= keys.verification.wrap }
     in
     ( top_hash
-    , Tick.Groth16.Proof_system.prove Merge.proof_system
+    , Tick.Proof_system.prove Merge.proof_system
         ~proving_key:keys.proving.merge ~public_input:[top_hash] prover_state
     )
 
@@ -1373,7 +1370,7 @@ module Keys = struct
       let open Storage in
       let logger = Logger.create () in
       let tick_controller =
-        Controller.create ~logger (module Tick.Groth16.Verification_key)
+        Controller.create ~logger (module Tick.Verification_key)
       in
       let tock_controller =
         Controller.create ~logger (module Tock.Verification_key)
@@ -1408,7 +1405,7 @@ module Keys = struct
       let open Storage in
       let logger = Logger.create () in
       let tick_controller =
-        Controller.create ~logger (module Tick.Groth16.Proving_key)
+        Controller.create ~logger (module Tick.Proving_key)
       in
       let tock_controller =
         Controller.create ~logger (module Tock.Proving_key)
@@ -1454,19 +1451,19 @@ module Keys = struct
     let merge = Merge.create_keys () in
     let wrap =
       let module Wrap = Wrap (struct
-        let base = Tick.Groth16.Keypair.vk base
+        let base = Tick.Keypair.vk base
 
-        let merge = Tick.Groth16.Keypair.vk merge
+        let merge = Tick.Keypair.vk merge
       end) in
       Wrap.create_keys ()
     in
     { proving=
-        { base= Tick.Groth16.Keypair.pk base
-        ; merge= Tick.Groth16.Keypair.pk merge
+        { base= Tick.Keypair.pk base
+        ; merge= Tick.Keypair.pk merge
         ; wrap= Tock.Keypair.pk wrap }
     ; verification=
-        { base= Tick.Groth16.Keypair.vk base
-        ; merge= Tick.Groth16.Keypair.vk merge
+        { base= Tick.Keypair.vk base
+        ; merge= Tick.Keypair.vk merge
         ; wrap= Tock.Keypair.vk wrap } }
 
   let cached () =
@@ -1756,7 +1753,7 @@ let constraint_system_digests () =
 
     let base = Dummy_values.Tick.Groth16.verification_key
   end) in
-  let digest = Tick.Groth16.Proof_system.digest in
+  let digest = Tick.Proof_system.digest in
   let digest' = Tock.Proof_system.digest in
   [ ("transaction-merge", digest Merge.proof_system)
   ; ("transaction-base", digest Base.proof_system)
