@@ -570,7 +570,7 @@ struct
            Sync_handler.get_staged_ledger_aux_and_pending_coinbases_at_hash
              ~frontier hash)
 
-    let get_ancestry {ip_table; logger} inet_addr consensus_state =
+    let get_ancestry {ip_table; logger; _} inet_addr consensus_state =
       Deferred.return
       @@ Result.of_option
            ~error:(Error.of_string "Peer could not produce an ancestor")
