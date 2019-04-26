@@ -236,12 +236,47 @@ let run profiler num_transactions repeats preeval =
   done ;
   exit 0
 
+let bin_io_id m x =
+  Binable.of_string m (Binable.to_string m x)
+
 let main num_transactions repeats preeval () =
   Snarky.Libsnark.set_no_profiling false ;
+  let keys = Transaction_snark.Keys.create () in
+  let merge_constraints0 =
+    !Transaction_snark.merge_constraints in
+  Core.printf "merge-constraints0 =%d\n" (List.length merge_constraints0);
+  Transaction_snark.expected_merge_constraints :=
+    merge_constraints0;
+  Core.printf "expected merge-constraints =%d\n" 
+    (List.length !Transaction_snark.expected_merge_constraints);
+  let keys' : Transaction_snark.Keys.t =
+    {proving =
+       { merge =
+           keys.proving.merge
+       |> bin_io_id (module Tick.Proving_key)
+       ; base =
+           keys.proving.base
+       |> bin_io_id (module Tick.Proving_key)
+       ; wrap =
+           keys.proving.wrap
+       |> bin_io_id (module Tock.Proving_key)
+       }
+    ; verification =
+       { merge =
+           keys.verification.merge
+       |> bin_io_id (module Tick.Verification_key)
+       ; base =
+           keys.verification.base
+       |> bin_io_id (module Tick.Verification_key)
+       ; wrap =
+           keys.verification.wrap
+       |> bin_io_id (module Tock.Verification_key)
+       }
+    }
+  in
   Test_util.with_randomness 123456789 (fun () ->
-      let keys = Transaction_snark.Keys.create () in
       let module T = Transaction_snark.Make (struct
-        let keys = keys
+        let keys = keys'
       end) in
       run (profile (module T)) num_transactions repeats preeval )
 

@@ -19,6 +19,9 @@ let wrap_input = Tock.Data_spec.[Wrap_input.typ]
 
 let exists' typ ~f = Tick.(exists typ ~compute:As_prover.(map get_state ~f))
 
+let merge_constraints = ref []
+let expected_merge_constraints = ref []
+
 module Input = struct
   (* TODO : version *)
   type t =
@@ -820,7 +823,15 @@ module Merge = struct
     in
     Boolean.Assert.all [verify_12; verify_23]
 
-  let create_keys () = generate_keypair ~exposing:(input ()) main
+  let create_keys () = 
+    printf "Clearing merge_constraints\n%!";
+    merge_constraints := [];
+    Tick.constraints := [];
+    let kp = generate_keypair ~exposing:(input ()) main in
+    printf "Tick.constraints = %d\n%!" (List.length !Tick.constraints);
+    merge_constraints := !Tick.constraints;
+    Tick.constraints := [];
+    kp
 
   let cached =
     let load =
@@ -1302,6 +1313,21 @@ struct
         !"Transaction_snark.merge: t1.target <> t2.source \
           (%{sexp:Frozen_ledger_hash.t} vs %{sexp:Frozen_ledger_hash.t})"
         t1.target t2.source () ;
+    printf "in merge, clearing constraints\n%!";
+
+    (let sys =
+      Tick_backend.Proving_key.r1cs_constraint_system keys.proving.merge
+    in
+    let count =
+      Tick_backend.R1CS_constraint_system.fold_constraints 
+        ~init:0
+        ~f:(fun acc _ -> acc + 1)
+      sys
+    in
+    printf "before prove num constraints = %d\n%!" count
+   );
+    Tick.constraints := [];
+    merge_constraints := [];
     let input, proof =
       merge_proof sok_digest t1.source t1.target t2.target
         { Transition_data.proof= (t1.proof_type, t1.proof)
@@ -1315,6 +1341,26 @@ struct
         ; sok_digest= t2.sok_digest
         ; pending_coinbase_stack_state= t2.pending_coinbase_stack_state }
     in
+    printf "in merge, setting constraints\n%!";
+    merge_constraints := !Tick.constraints;
+    List.iter2_exn !merge_constraints !expected_merge_constraints ~f:(fun actual expected ->
+      [%test_eq:  Tick.Field.Var.t Snarky.Constraint.t]
+        actual
+        expected);
+    printf "Made it thru %d, %d\n%!"
+      (List.length !merge_constraints)
+      (List.length !expected_merge_constraints);
+
+    (let sys =
+      Tick_backend.Proving_key.r1cs_constraint_system keys.proving.merge
+    in
+    let count =
+    Tick_backend.R1CS_constraint_system.fold_constraints ~init:0 ~f:(fun acc _ -> acc + 1)
+      sys
+    in
+    printf "after prove num constraints = %d\n%!" count
+   );
+
     let open Or_error.Let_syntax in
     let%map fee_excess =
       Amount.Signed.add t1.fee_excess t2.fee_excess

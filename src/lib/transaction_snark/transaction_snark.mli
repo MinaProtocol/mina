@@ -196,6 +196,9 @@ val generate_transaction_witness :
   -> Tick.Handler.t
   -> unit
 
+val merge_constraints : Tick.Constraint.t list ref
+val expected_merge_constraints : Tick.Constraint.t list ref
+
 module type S = sig
   include Verification.S
 
