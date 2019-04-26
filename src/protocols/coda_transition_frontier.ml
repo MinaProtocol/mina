@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 open Async_kernel
 open Pipe_lib
 open Cache_lib
@@ -160,8 +160,6 @@ module type Network_intf = sig
 
   type peer
 
-  type inet_addr
-
   type state_hash
 
   type ledger_hash
@@ -190,14 +188,14 @@ module type Network_intf = sig
 
   val get_staged_ledger_aux_and_pending_coinbases_at_hash :
        t
-    -> inet_addr
+    -> Unix.Inet_addr.t
     -> state_hash
     -> (parallel_scan_state * ledger_hash * pending_coinbases)
        Deferred.Or_error.t
 
   val get_ancestry :
        t
-    -> inet_addr
+    -> Unix.Inet_addr.t
     -> consensus_state
     -> ( external_transition
        , state_body_hash list * external_transition )
