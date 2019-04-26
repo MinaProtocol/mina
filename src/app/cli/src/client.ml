@@ -20,7 +20,7 @@ let dispatch rpc query port =
    failing result. To deal with that, the success handler returns an
    Or_error. *)
 let dispatch_with_message rpc query port ~success ~error =
-  let fail err = eprintf "%s\n" err ; exit 1 in
+  let fail err = eprintf "%s\n%1" err ; exit 14 in
   match%bind dispatch rpc query port with
   | Ok x -> (
     match success x with
