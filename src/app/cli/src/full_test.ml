@@ -4,7 +4,7 @@
 open Core
 open Async
 open Coda_base
-open Coda_main
+open Coda_inputs
 open Signature_lib
 open Pipe_lib
 open O1trace
@@ -53,8 +53,8 @@ let run_test () : unit Deferred.t =
         | None ->
             Deferred.unit
       in
-      let module Main = Coda_main.Make_coda (Init) in
-      let module Run = Run (Config) (Main) in
+      let module Main = Coda_inputs.Make_coda (Init) in
+      let module Run = Coda_run.Make (Config) (Main) in
       let open Main in
       let%bind trust_dir = Async.Unix.mkdtemp (temp_conf_dir ^/ "trust_db") in
       let trust_system = Trust_system.create ~db_dir:trust_dir in
@@ -68,9 +68,14 @@ let run_test () : unit Deferred.t =
       let time_controller =
         Inputs.Time.Controller.create Inputs.Time.Controller.basic
       in
+      let consensus_local_state =
+        Consensus.Local_state.create
+          (Some (Public_key.compress keypair.public_key))
+      in
       let net_config =
         { Inputs.Net.Config.logger
         ; time_controller
+        ; consensus_local_state
         ; gossip_net_params=
             { Inputs.Net.Gossip_net.Config.timeout= Time.Span.of_sec 3.
             ; logger
@@ -85,15 +90,25 @@ let run_test () : unit Deferred.t =
       in
       Core.Backtrace.elide := false ;
       Async.Scheduler.set_record_backtraces true ;
+      let largest_account_keypair =
+        Genesis_ledger.largest_account_keypair_exn ()
+      in
+      let run_snark_worker =
+        `With_public_key
+          (Public_key.compress largest_account_keypair.public_key)
+      in
       let%bind coda =
         Main.create
           (Main.Config.make ~logger ~trust_system ~net_config
-             ~propose_keypair:keypair ~run_snark_worker:true
+             ~propose_keypair:keypair
+             ~snark_worker_key:
+               (Public_key.compress largest_account_keypair.public_key)
              ~transaction_pool_disk_location:
                (temp_conf_dir ^/ "transaction_pool")
              ~snark_pool_disk_location:(temp_conf_dir ^/ "snark_pool")
-             ~time_controller ~receipt_chain_database ()
-             ~snark_work_fee:(Currency.Fee.of_int 0))
+             ~wallets_disk_location:(temp_conf_dir ^/ "wallets")
+             ~time_controller ~receipt_chain_database
+             ~snark_work_fee:(Currency.Fee.of_int 0) ~consensus_local_state ())
       in
       Main.start coda ;
       don't_wait_for
@@ -136,13 +151,6 @@ let run_test () : unit Deferred.t =
               (sprintf !"Invalid Account: %{sexp: Public_key.Compressed.t}" pk)
       in
       let client_port = 8123 in
-      let largest_account_keypair =
-        Genesis_ledger.largest_account_keypair_exn ()
-      in
-      let run_snark_worker =
-        `With_public_key
-          (Public_key.compress largest_account_keypair.public_key)
-      in
       Run.setup_local_server ~client_port ~coda ~logger () ;
       Run.run_snark_worker ~logger ~client_port run_snark_worker ;
       (* Let the system settle *)

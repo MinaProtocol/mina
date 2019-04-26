@@ -6,6 +6,7 @@ consensus_mechanism = "proof_of_stake"]
 
 let name = "proof_of_stake"
 
+open Async_kernel
 open Core_kernel
 open Signed
 open Unsigned
@@ -225,6 +226,11 @@ module Epoch = struct
            Time.Span.to_ms time_since_epoch / Constants.Slot.duration_ms)
     in
     (epoch, slot)
+
+  let incr ((epoch, slot) : t * Slot.t) =
+    let open UInt32 in
+    if Slot.equal slot (sub Constants.Epoch.size one) then (add epoch one, zero)
+    else (epoch, add slot one)
 end
 
 module Local_state = struct
@@ -233,6 +239,18 @@ module Local_state = struct
       { ledger: Coda_base.Sparse_ledger.t
       ; delegators: Currency.Balance.t Coda_base.Account.Index.Table.t }
     [@@deriving sexp]
+
+    let to_yojson {ledger; delegators} =
+      `Assoc
+        [ ( "ledger_hash"
+          , Coda_base.(
+              Sparse_ledger.merkle_root ledger |> Ledger_hash.to_yojson) )
+        ; ( "delegators"
+          , `Assoc
+              ( Hashtbl.to_alist delegators
+              |> List.map ~f:(fun (account, balance) ->
+                     ( Int.to_string account
+                     , `Int (Currency.Balance.to_int balance) ) ) ) ) ]
 
     let create_empty () =
       { ledger= Coda_base.Sparse_ledger.of_root Coda_base.Ledger_hash.empty_hash
@@ -245,7 +263,7 @@ module Local_state = struct
     ; mutable last_checked_slot_and_epoch: Epoch.t * Epoch.Slot.t
     ; genesis_epoch_snapshot: Snapshot.t
     ; proposer_public_key: Public_key.Compressed.t option }
-  [@@deriving sexp]
+  [@@deriving sexp, to_yojson]
 
   let create proposer_public_key =
     (* TODO: remove duplicated genesis ledger *)
@@ -265,11 +283,10 @@ module Local_state = struct
                     f (Ledger.Addr.to_int i) acct ) )
           in
           let ledger =
-            Coda_base.Sparse_ledger.of_ledger_index_subset_exn
+            Coda_base.Sparse_ledger.of_any_ledger
               (Coda_base.Ledger.Any_ledger.cast
                  (module Coda_base.Ledger)
                  Genesis_ledger.t)
-              (Coda_base.Account.Index.Table.keys delegators)
           in
           {delegators; ledger}
     in
@@ -278,6 +295,23 @@ module Local_state = struct
     ; genesis_epoch_snapshot
     ; last_checked_slot_and_epoch= (Epoch.zero, Epoch.Slot.zero)
     ; proposer_public_key }
+
+  type snapshot_identifier = Last_epoch_snapshot | Curr_epoch_snapshot
+  [@@deriving to_yojson]
+
+  let get_snapshot t id =
+    match id with
+    | Last_epoch_snapshot ->
+        t.last_epoch_snapshot
+    | Curr_epoch_snapshot ->
+        t.curr_epoch_snapshot
+
+  let set_snapshot t id v =
+    match id with
+    | Last_epoch_snapshot ->
+        t.last_epoch_snapshot <- v
+    | Curr_epoch_snapshot ->
+        t.curr_epoch_snapshot <- v
 
   let seen_slot t epoch slot =
     match
@@ -609,7 +643,6 @@ module Vrf = struct
       (* This version can't be used right now because the field is too small. *)
       let _is_satisfied ~my_stake ~total_stake vrf_output =
         let open Snark_params.Tick in
-        let open Let_syntax in
         let open Number in
         let%bind lhs = of_bits vrf_output * Amount.var_to_number total_stake in
         let%bind rhs =
@@ -640,7 +673,6 @@ module Vrf = struct
   let%snarkydef get_vrf_evaluation shifted ~ledger ~message =
     let open Coda_base in
     let open Snark_params.Tick in
-    let open Let_syntax in
     let%bind private_key =
       request_witness Scalar.typ (As_prover.return Private_key)
     in
@@ -662,7 +694,6 @@ module Vrf = struct
     let%snarkydef check shifted ~(epoch_ledger : Epoch_ledger.var) ~epoch ~slot
         ~seed =
       let open Snark_params.Tick in
-      let open Let_syntax in
       let%bind winner_addr =
         request_witness Coda_base.Account.Index.Unpacked.typ
           (As_prover.return Winner_address)
@@ -1844,6 +1875,275 @@ module Snark_transition = Coda_base.Snark_transition.Make (struct
   module Consensus_data = Consensus_transition_data
 end)
 
+module Rpcs = struct
+  open Async
+
+  module Get_epoch_ledger = struct
+    module T = struct
+      let name = "get_epoch_ledger"
+
+      module T = struct
+        type query = Coda_base.Ledger_hash.Stable.V1.t
+
+        type response = (Coda_base.Sparse_ledger.t, string) Result.t
+      end
+
+      module Caller = T
+      module Callee = T
+    end
+
+    include T.T
+    module M = Versioned_rpc.Both_convert.Plain.Make (T)
+    include M
+
+    include Perf_histograms.Rpc.Plain.Extend (struct
+      include M
+      include T
+    end)
+
+    module V1 = struct
+      module T = struct
+        type query = Coda_base.Ledger_hash.Stable.V1.t [@@deriving bin_io]
+
+        type response = (Coda_base.Sparse_ledger.Stable.V1.t, string) Result.t
+        [@@deriving bin_io]
+
+        let version = 1
+
+        let query_of_caller_model = Fn.id
+
+        let callee_model_of_query = Fn.id
+
+        let response_of_callee_model = Fn.id
+
+        let caller_model_of_response = Fn.id
+      end
+
+      include T
+      include Register (T)
+    end
+
+    let implementation ~logger ~local_state conn ~version:_ ledger_hash =
+      let open Coda_base in
+      let open Host_and_port in
+      let open Local_state in
+      let open Snapshot in
+      let open Option.Let_syntax in
+      Deferred.create (fun ivar ->
+          Logger.info logger ~module_:__MODULE__ ~location:__LOC__
+            ~metadata:
+              [ ("peer", `String (sprintf "%s:%d" conn.host conn.port))
+              ; ("ledger_hash", Coda_base.Ledger_hash.to_yojson ledger_hash) ]
+            "serving epoch ledger query with hash $ledger_hash from $peer" ;
+          let response =
+            if
+              Ledger_hash.equal ledger_hash
+                (Frozen_ledger_hash.to_ledger_hash genesis_ledger_hash)
+            then Error "refusing to serve genesis epoch ledger"
+            else
+              let candidate_snapshots =
+                [ local_state.last_epoch_snapshot
+                ; local_state.curr_epoch_snapshot ]
+              in
+              List.find_map candidate_snapshots ~f:(fun snapshot_opt ->
+                  let%map snapshot = snapshot_opt in
+                  if
+                    Ledger_hash.equal ledger_hash
+                      (Sparse_ledger.merkle_root snapshot.ledger)
+                  then Ok snapshot.ledger
+                  else Error "missing epoch ledger" )
+              |> Option.value ~default:(Error "epoch ledger not found")
+          in
+          Result.iter_error response ~f:(fun err ->
+              Logger.info logger ~module_:__MODULE__ ~location:__LOC__
+                ~metadata:
+                  [ ("peer", `String (sprintf "%s:%d" conn.host conn.port))
+                  ; ("error", `String err)
+                  ; ("ledger_hash", Coda_base.Ledger_hash.to_yojson ledger_hash)
+                  ]
+                "failed to serve epoch ledger query with hash $ledger_hash \
+                 from $peer: $error" ) ;
+          Ivar.fill ivar response )
+  end
+
+  let implementations ~logger ~local_state =
+    Get_epoch_ledger.(implement_multi (implementation ~logger ~local_state))
+end
+
+(* Select the correct epoch data to use from a consensus state for a given epoch.
+ * The rule for selecting the correct epoch data changes based on whether or not
+ * the consensus state we are selecting from is in the epoch we want to select.
+ * There is also a special case for when the consensus state we are selecting
+ * from is in the genesis epoch.
+ *)
+let select_epoch_data ~(consensus_state : Consensus_state.Value.t) ~epoch =
+  let open Consensus_state in
+  (* are we in the same epoch as the consensus state? *)
+  let in_same_epoch = Epoch.equal epoch consensus_state.curr_epoch in
+  (* are we in the next epoch after the consensus state? *)
+  let in_next_epoch =
+    Epoch.equal epoch (Epoch.succ consensus_state.curr_epoch)
+  in
+  (* is the consensus state from the genesis epoch? *)
+  let from_genesis_epoch =
+    Length.equal consensus_state.epoch_length Length.zero
+  in
+  if in_same_epoch || from_genesis_epoch then
+    Ok consensus_state.last_epoch_data
+  else if in_next_epoch then Ok consensus_state.curr_epoch_data
+  else Error ()
+
+let epoch_snapshot_name = function
+  | `Genesis ->
+      "genesis"
+  | `Curr ->
+      "curr"
+  | `Last ->
+      "last"
+
+(* Select the correct epoch snapshot to use from local state for an epoch.
+ * The rule for selecting the correct epoch snapshot is predicated off of
+ * whether or not the first transition in the epoch in question has been
+ * finalized yet, as the local state epoch snapshot pointers are not
+ * updated until the consensus state reaches the root of the transition frontier.
+ * This function does not guarantee that the selected epoch snapshot is valid
+ * (i.e. it does not check that the epoch snapshot's ledger hash is the same
+ * as the ledger hash specified by the epoch data).
+ *)
+let select_epoch_snapshot ~(consensus_state : Consensus_state.Value.t)
+    ~local_state ~epoch ~epoch_data =
+  let open Consensus_state in
+  let open Local_state in
+  let open Epoch_data.Poly in
+  let open Epoch_ledger.Poly in
+  (* is the snapshot we need the genesis snapshot? *)
+  let is_genesis_snapshot =
+    Coda_base.Frozen_ledger_hash.equal epoch_data.ledger.hash
+      genesis_ledger_hash
+  in
+  (* are we in the next epoch after the consensus state? *)
+  let in_next_epoch =
+    Epoch.equal epoch (Epoch.succ consensus_state.curr_epoch)
+  in
+  (* has the first transition in the epoch reached finalization? *)
+  let epoch_is_finalized =
+    consensus_state.curr_epoch_data.length > Length.of_int Constants.k
+  in
+  if is_genesis_snapshot then
+    (`Genesis, Some local_state.genesis_epoch_snapshot)
+  else if in_next_epoch || not epoch_is_finalized then
+    (`Curr, local_state.curr_epoch_snapshot)
+  else (`Last, local_state.last_epoch_snapshot)
+
+type local_state_sync =
+  { snapshot_id: Local_state.snapshot_identifier
+  ; expected_root: Coda_base.Frozen_ledger_hash.t }
+[@@deriving to_yojson]
+
+let required_local_state_sync ~(consensus_state : Consensus_state.Value.t)
+    ~local_state =
+  let open Coda_base in
+  let open Consensus_state in
+  let epoch = consensus_state.curr_epoch in
+  let epoch_data =
+    (* This should not fail since we are getting epoch data for the
+     * same epoch that the consensus state is in. *)
+    select_epoch_data ~consensus_state ~epoch
+    |> Result.map_error
+         ~f:
+           (Fn.const
+              "unexpected failure while selecting epoch data from consensus \
+               state")
+    |> Result.ok_or_failwith
+  in
+  let source, _snapshot =
+    select_epoch_snapshot ~consensus_state ~local_state ~epoch ~epoch_data
+  in
+  let required_snapshot_sync snapshot_id expected_root =
+    match Local_state.get_snapshot local_state snapshot_id with
+    | None ->
+        Some {snapshot_id; expected_root}
+    | Some s ->
+        Option.some_if
+          (not
+             (Ledger_hash.equal
+                (Frozen_ledger_hash.to_ledger_hash expected_root)
+                (Sparse_ledger.merkle_root s.ledger)))
+          {snapshot_id; expected_root}
+  in
+  match source with
+  | `Genesis ->
+      None
+  (* We never need to do work to have the genesis snapshot*)
+  | `Curr ->
+      Option.map
+        (required_snapshot_sync Curr_epoch_snapshot
+           consensus_state.last_epoch_data.ledger.hash)
+        ~f:Non_empty_list.singleton
+  | `Last -> (
+    match
+      Core.List.filter_map
+        [ required_snapshot_sync Curr_epoch_snapshot
+            consensus_state.curr_epoch_data.ledger.hash
+        ; required_snapshot_sync Last_epoch_snapshot
+            consensus_state.last_epoch_data.ledger.hash ]
+        ~f:Fn.id
+    with
+    | [] ->
+        None
+    | ls ->
+        Non_empty_list.of_list_opt ls )
+
+let sync_local_state ~logger ~local_state ~random_peers
+    ~(query_peer : Network_peer.query_peer) requested_syncs =
+  let open Local_state in
+  let open Snapshot in
+  let open Deferred.Let_syntax in
+  let requested_syncs = Non_empty_list.to_list requested_syncs in
+  Logger.info logger "syncing local state, %d jobs"
+    (List.length requested_syncs)
+    ~location:__LOC__ ~module_:__MODULE__
+    ~metadata:
+      [ ( "requested_syncs"
+        , `List (List.map requested_syncs ~f:local_state_sync_to_yojson) )
+      ; ("local_state", Local_state.to_yojson local_state) ] ;
+  let sync {snapshot_id; expected_root= target_ledger_hash} =
+    Deferred.List.exists (random_peers 3) ~f:(fun peer ->
+        match%map
+          query_peer.query peer Rpcs.Get_epoch_ledger.dispatch_multi
+            (Coda_base.Frozen_ledger_hash.to_ledger_hash target_ledger_hash)
+        with
+        | Ok (Ok snapshot_ledger) ->
+            let delegators =
+              Option.map local_state.proposer_public_key ~f:(fun pk ->
+                  compute_delegators
+                    (`Include_self, pk)
+                    ~iter_accounts:(fun f ->
+                      Coda_base.Sparse_ledger.iteri snapshot_ledger ~f ) )
+              |> Option.value
+                   ~default:(Coda_base.Account.Index.Table.create ())
+            in
+            set_snapshot local_state snapshot_id
+              (Some {ledger= snapshot_ledger; delegators}) ;
+            true
+        | Ok (Error err) ->
+            Logger.faulty_peer logger ~module_:__MODULE__ ~location:__LOC__
+              ~metadata:
+                [ ("peer", Network_peer.Peer.to_yojson peer)
+                ; ("error", `String err) ]
+              "peer $peer failed to serve requested epoch ledger: $error" ;
+            false
+        | Error err ->
+            Logger.faulty_peer logger ~module_:__MODULE__ ~location:__LOC__
+              ~metadata:
+                [ ("peer", Network_peer.Peer.to_yojson peer)
+                ; ("error", `String (Error.to_string_hum err)) ]
+              "error querying peer $peer: $error" ;
+            false )
+  in
+  if%map Deferred.List.for_all requested_syncs ~f:sync then Ok ()
+  else Error (Error.of_string "failed to synchronize epoch ledger")
+
 (* TODO: only track total currency from accounts > 1% of the currency using transactions *)
 let generate_transition ~(previous_protocol_state : Protocol_state.Value.t)
     ~blockchain_state ~time ~proposal_data ~transactions:_ ~snarked_ledger_hash
@@ -1881,7 +2181,12 @@ let received_within_window (epoch, slot) ~time_received =
   in
   let window_start = Epoch.slot_start_time epoch slot in
   let window_end = add window_start Constants.delta_duration in
-  window_start < time_received && time_received < window_end
+  if window_start < time_received && time_received < window_end then Ok ()
+  else
+    Error
+      [ ("window_start", to_yojson window_start)
+      ; ("window_end", to_yojson window_end)
+      ; ("time_received", to_yojson time_received) ]
 
 let received_at_valid_time (consensus_state : Consensus_state.Value.t)
     ~time_received =
@@ -1991,22 +2296,35 @@ let select ~existing ~candidate ~logger =
             << candidate.curr_epoch_data.length )
         , "candidate current epoch is longer than existing last epoch" ) ) ]
   in
-  match
+  let precondition_msg, choice_msg, should_take =
     List.find_map branches
       ~f:(fun ((precondition, precondition_msg), (choice, choice_msg)) ->
-        if Lazy.force precondition then (
-          let choice = if Lazy.force choice then `Take else `Keep in
-          log_choice ~precondition_msg ~choice_msg choice ;
-          Some choice )
-        else None )
-  with
-  | Some choice ->
-      choice
-  | None ->
-      log_result `Keep "no predicates were matched" ;
-      if Length.(candidate.min_length_of_epoch > existing.min_length_of_epoch)
-      then `Take
-      else `Keep
+        Option.some_if (Lazy.force precondition)
+          (precondition_msg, choice_msg, choice) )
+    |> Option.value
+         ~default:
+           ( "default case"
+           , "candidate virtual min-length is longer than existing virtual \
+              min-length"
+           , lazy
+               (let newest_epoch =
+                  Epoch.max existing.curr_epoch candidate.curr_epoch
+                in
+                let virtual_min_length (s : Consensus_state.Value.t) =
+                  if Epoch.(succ s.curr_epoch < newest_epoch) then Length.zero
+                    (* There is a gap of an entire epoch *)
+                  else if Epoch.(succ s.curr_epoch = newest_epoch) then
+                    Length.(min s.min_length_of_epoch s.curr_epoch_data.length)
+                    (* Imagine the latest epoch was padded out with zeroes to reach the newest_epoch *)
+                  else s.min_length_of_epoch
+                in
+                Length.(
+                  virtual_min_length existing < virtual_min_length candidate))
+           )
+  in
+  let choice = if Lazy.force should_take then `Take else `Keep in
+  log_choice ~precondition_msg ~choice_msg choice ;
+  choice
 
 let time_hum (now : Core_kernel.Time.t) =
   let epoch, slot = Epoch.epoch_and_slot_of_time_exn (Time.of_time now) in
@@ -2019,67 +2337,55 @@ let next_proposal now (state : Consensus_state.Value.t) ~local_state ~keypair
   let open Keypair in
   Logger.info logger ~module_:__MODULE__ ~location:__LOC__
     "Checking for next proposal..." ;
-  let epoch, slot =
+  let curr_epoch, curr_slot =
     Epoch.epoch_and_slot_of_time_exn
       (Time.of_span_since_epoch (Time.Span.of_ms now))
+  in
+  let epoch, slot =
+    if
+      Epoch.equal curr_epoch state.curr_epoch
+      && Epoch.Slot.equal curr_slot state.curr_slot
+    then Epoch.incr (curr_epoch, curr_slot)
+    else (curr_epoch, curr_slot)
   in
   Logger.info logger ~module_:__MODULE__ ~location:__LOC__
     "systime: %d, epoch-slot@systime: %08d-%04d, starttime@epoch@systime: %d"
     (Int64.to_int now) (Epoch.to_int epoch) (Epoch.Slot.to_int slot)
     ( Int64.to_int @@ Time.Span.to_ms @@ Time.to_span_since_epoch
     @@ Epoch.start_time epoch ) ;
-  let epoch_transitioning = Epoch.equal epoch (Epoch.succ state.curr_epoch) in
   let next_slot =
-    (* When we first enter an epoch, the protocol state may still be a previous
-     * epoch. If that is the case, we need to select the staged vrf inputs
-     * instead of the last vrf inputs, since if the protocol state were actually
-     * up to date with the epoch, those would be the last vrf inputs.
-    *)
+    Logger.info logger ~module_:__MODULE__ ~location:__LOC__
+      !"Selecting correct epoch data from state -- epoch by time: %d, state \
+        epoch: %d, state epoch length: %d"
+      (Epoch.to_int epoch)
+      (Epoch.to_int state.curr_epoch)
+      (Length.to_int state.epoch_length) ;
     let epoch_data =
-      Logger.info logger ~module_:__MODULE__ ~location:__LOC__
-        !"Selecting correct epoch data from state -- epoch by time: %d, state \
-          epoch: %d, state epoch length: %d"
-        (Epoch.to_int epoch)
-        (Epoch.to_int state.curr_epoch)
-        (Length.to_int state.epoch_length) ;
-      (* If we are in the current epoch or we are in the first epoch (before any
-       * transitions), use the last epoch data.
-      *)
-      if
-        Epoch.equal epoch state.curr_epoch
-        || Length.equal state.epoch_length Length.zero
-      then state.last_epoch_data
-        (* If we are in the next epoch, use the current epoch data. *)
-      else if epoch_transitioning then state.curr_epoch_data
-        (* If the epoch we are in is none of the above, something is wrong. *)
-      else (
-        Logger.error logger ~module_:__MODULE__ ~location:__LOC__
-          "system time is out of sync with protocol state time" ;
-        failwith "System time is out of sync. (hint: setup NTP if you haven't)" )
+      match select_epoch_data ~consensus_state:state ~epoch with
+      | Ok epoch_data ->
+          epoch_data
+      | Error () ->
+          Logger.error logger ~module_:__MODULE__ ~location:__LOC__
+            "system time is out of sync with protocol state time" ;
+          failwith
+            "System time is out of sync. (hint: setup NTP if you haven't)"
     in
     let total_stake = epoch_data.ledger.total_currency in
     let epoch_snapshot =
       let source, snapshot =
-        if
-          Coda_base.Frozen_ledger_hash.equal epoch_data.ledger.hash
-            genesis_ledger_hash
-        then ("genesis", Some local_state.Local_state.genesis_epoch_snapshot)
-        else if
-          epoch_transitioning
-          || state.curr_epoch_data.length <= Length.of_int Constants.k
-        then ("curr", local_state.curr_epoch_snapshot)
-        else ("last", local_state.Local_state.last_epoch_snapshot)
+        select_epoch_snapshot ~consensus_state:state ~local_state ~epoch
+          ~epoch_data
       in
       ( match snapshot with
       | None ->
           Logger.info logger ~module_:__MODULE__ ~location:__LOC__
             "Unable to check vrf evaluation: %s_epoch_ledger does not exist \
              in local state"
-            source
+            (epoch_snapshot_name source)
       | Some snapshot ->
           Logger.info logger ~module_:__MODULE__ ~location:__LOC__
             !"using %s_epoch_snapshot root hash %{sexp:Coda_base.Ledger_hash.t}"
-            source
+            (epoch_snapshot_name source)
             (Coda_base.Sparse_ledger.merkle_root snapshot.ledger) ) ;
       snapshot
     in
@@ -2109,7 +2415,7 @@ let next_proposal now (state : Consensus_state.Value.t) ~local_state ~keypair
       Logger.info logger ~module_:__MODULE__ ~location:__LOC__
         "Proposing in %d slots"
         (Epoch.Slot.to_int next_slot - Epoch.Slot.to_int slot) ;
-      if Epoch.Slot.equal slot next_slot then `Propose_now data
+      if Epoch.Slot.equal curr_slot next_slot then `Propose_now data
       else
         `Propose
           ( Epoch.slot_start_time epoch next_slot
@@ -2137,10 +2443,7 @@ let lock_transition (prev : Consensus_state.Value.t)
               ~iter_accounts:(fun f ->
                 Coda_base.Ledger.Any_ledger.M.iteri snarked_ledger ~f )
           in
-          let ledger =
-            Coda_base.Sparse_ledger.of_ledger_index_subset_exn snarked_ledger
-              (Coda_base.Account.Index.Table.keys delegators)
-          in
+          let ledger = Coda_base.Sparse_ledger.of_any_ledger snarked_ledger in
           {delegators; ledger} )
     in
     local_state.last_epoch_snapshot <- local_state.curr_epoch_snapshot ;
@@ -2269,6 +2572,7 @@ let%test "Receive a valid consensus_state with a bit of delay" =
   let time_received = Epoch.slot_start_time curr_epoch new_slot in
   received_at_valid_time Consensus_state.genesis
     ~time_received:(to_unix_timestamp time_received)
+  |> Result.is_ok
 
 let%test "Receive an invalid consensus_state" =
   let epoch = Epoch.of_int 5 in
@@ -2284,8 +2588,9 @@ let%test "Receive an invalid consensus_state" =
   let times = [too_late; too_early] in
   List.for_all times ~f:(fun time ->
       not
-        (received_at_valid_time consensus_state
-           ~time_received:(to_unix_timestamp time)) )
+        ( received_at_valid_time consensus_state
+            ~time_received:(to_unix_timestamp time)
+        |> Result.is_ok ) )
 
 let%test_module "Proof of stake tests" =
   ( module struct
@@ -2312,7 +2617,6 @@ let%test_module "Proof of stake tests" =
       in
       let supply_increase = Currency.Amount.of_int 42 in
       (* setup ledger, needed to compute proposer_vrf_result here and handler below *)
-      let open Signature_lib in
       let open Coda_base in
       (* choose largest account as most likely to propose *)
       let ledger_data = Genesis_ledger.t in
@@ -2338,7 +2642,6 @@ let%test_module "Proof of stake tests" =
       (* build pieces needed to apply "update_var" *)
       let checked_computation =
         let open Snark_params.Tick in
-        let open Let_syntax in
         (* work in Checked monad *)
         let%bind previous_state =
           exists typ ~compute:(As_prover.return previous_consensus_state)

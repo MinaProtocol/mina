@@ -47,8 +47,8 @@ module Make (Inputs : Inputs.S) :
    and type network := Inputs.Network.t = struct
   open Inputs
 
-  let verify_transition ~logger ~frontier ~unprocessed_transition_cache
-      transition_enveloped =
+  let verify_transition ~logger ~trust_system ~frontier
+      ~unprocessed_transition_cache transition_enveloped =
     let cached_verified_transition =
       let open Deferred.Result.Let_syntax in
       let transition = Envelope.Incoming.data transition_enveloped in
@@ -97,9 +97,17 @@ module Make (Inputs : Inputs.S) :
         | `Success hash ->
             Ok (Either.First hash) )
     | Error (`Invalid reason) ->
-        Logger.faulty_peer logger ~module_:__MODULE__ ~location:__LOC__
-          "transition queried during ledger catchup was not valid because %s"
-          reason ;
+        let%bind () =
+          Trust_system.(
+            record_envelope_sender trust_system logger
+              (Envelope.Incoming.sender transition_enveloped)
+              Actions.
+                ( Violated_protocol
+                , Some
+                    ( "Transition queried during ledger catchup was not valid \
+                       because $reason"
+                    , [("reason", `String reason)] ) ))
+        in
         Deferred.return @@ Error (Error.of_string reason)
 
   let take_while_map_result_rev ~f list =
@@ -123,8 +131,8 @@ module Make (Inputs : Inputs.S) :
     in
     (result, Option.value_exn initial_state_hash)
 
-  let get_transitions_and_compute_breadcrumbs ~logger ~network ~frontier
-      ~num_peers ~unprocessed_transition_cache ~target_forest =
+  let get_transitions_and_compute_breadcrumbs ~logger ~trust_system ~network
+      ~frontier ~num_peers ~unprocessed_transition_cache ~target_forest =
     let peers = Network.random_peers network num_peers in
     let target_hash, subtrees = target_forest in
     let open Deferred.Or_error.Let_syntax in
@@ -152,18 +160,22 @@ module Make (Inputs : Inputs.S) :
                       target_hash
                   then return ()
                   else (
-                    Logger.faulty_peer logger ~module_:__MODULE__
-                      ~location:__LOC__
-                      !"Peer %{sexp:Network_peer.Peer.t} returned an \
-                        different target transition than we requested"
-                      peer ;
+                    ignore
+                      Trust_system.(
+                        record trust_system logger peer.host
+                          Actions.
+                            ( Violated_protocol
+                            , Some
+                                ( "Peer returned a different target \
+                                   transition than requested"
+                                , [] ) )) ;
                     Deferred.return (Error (Error.of_string "")) )
                 in
                 let%bind verified_transitions, initial_state_hash =
                   take_while_map_result_rev
                     Non_empty_list.(to_list rev_queried_transitions)
                     ~f:(fun transition ->
-                      verify_transition ~logger ~frontier
+                      verify_transition ~logger ~trust_system ~frontier
                         ~unprocessed_transition_cache
                         (Envelope.Incoming.wrap ~data:transition
                            ~sender:(Envelope.Sender.Remote peer)) )
@@ -197,18 +209,23 @@ module Make (Inputs : Inputs.S) :
                       ~f:(Fn.compose ignore Cached.invalidate_with_failure) ;
                     Deferred.return error ) ) )
 
-  let run ~logger ~network ~frontier ~catchup_job_reader
+  let run ~logger ~trust_system ~network ~frontier ~catchup_job_reader
       ~catchup_breadcrumbs_writer ~unprocessed_transition_cache =
     Strict_pipe.Reader.iter catchup_job_reader ~f:(fun (hash, subtrees) ->
         ( match%bind
-            get_transitions_and_compute_breadcrumbs ~logger ~network ~frontier
-              ~num_peers:8 ~unprocessed_transition_cache
+            get_transitions_and_compute_breadcrumbs ~logger ~trust_system
+              ~network ~frontier ~num_peers:8 ~unprocessed_transition_cache
               ~target_forest:(hash, subtrees)
           with
         | Ok trees ->
             Logger.trace logger ~module_:__MODULE__ ~location:__LOC__
               "about to write to the catchup breadcrumbs pipe" ;
-            Strict_pipe.Writer.write catchup_breadcrumbs_writer trees
+            if Strict_pipe.Writer.is_closed catchup_breadcrumbs_writer then (
+              Logger.trace logger ~module_:__MODULE__ ~location:__LOC__
+                "catchup breadcrumbs pipe was closed; attempt to write to \
+                 closed pipe" ;
+              Deferred.unit )
+            else Strict_pipe.Writer.write catchup_breadcrumbs_writer trees
         | Error e ->
             Logger.info logger ~module_:__MODULE__ ~location:__LOC__
               !"All peers either sent us bad data, didn't have the info, or \

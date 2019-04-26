@@ -44,9 +44,14 @@ module type S = sig
 
   type msg
 
+  module Connection_with_state : sig
+    type t = Banned | Allowed of Rpc.Connection.t Ivar.t
+  end
+
   type t =
     { timeout: Time.Span.t
     ; logger: Logger.t
+    ; trust_system: Trust_system.t
     ; target_peer_count: int
     ; broadcast_writer: msg Linear_pipe.Writer.t
     ; received_reader: content Envelope.Incoming.t Strict_pipe.Reader.t
@@ -54,7 +59,7 @@ module type S = sig
     ; peers: Peer.Hash_set.t
     ; connections:
         ( Unix.Inet_addr.t
-        , (Uuid.t, Rpc.Connection.t Ivar.t) Hashtbl.t )
+        , (Uuid.t, Connection_with_state.t) Hashtbl.t )
         Hashtbl.t
     ; max_concurrent_connections: int option }
 
@@ -85,9 +90,17 @@ end
 
 module Make (Message : Message_intf) :
   S with type msg := Message.msg and type content := Message.content = struct
+  module Connection_with_state = struct
+    type t = Banned | Allowed of Rpc.Connection.t Ivar.t
+
+    let value_map ~when_allowed ~when_banned t =
+      match t with Allowed c -> when_allowed c | _ -> when_banned
+  end
+
   type t =
     { timeout: Time.Span.t
     ; logger: Logger.t
+    ; trust_system: Trust_system.t
     ; target_peer_count: int
     ; broadcast_writer: Message.msg Linear_pipe.Writer.t
     ; received_reader: Message.content Envelope.Incoming.t Strict_pipe.Reader.t
@@ -95,7 +108,7 @@ module Make (Message : Message_intf) :
     ; peers: Peer.Hash_set.t
     ; connections:
         ( Unix.Inet_addr.t
-        , (Uuid.t, Rpc.Connection.t Ivar.t) Hashtbl.t )
+        , (Uuid.t, Connection_with_state.t) Hashtbl.t )
         Hashtbl.t
           (**mapping a Uuid to a connection to be able to remove it from the hash
          *table since Rpc.Connection.t doesn't have the socket information*)
@@ -126,22 +139,42 @@ module Make (Message : Message_intf) :
     | Ok conn ->
         Versioned_rpc.Connection_with_menu.create conn
 
-  let try_call_rpc t peer dispatch query =
+  let try_call_rpc t (peer : Peer.t) dispatch query =
     let call () =
       try_with (fun () ->
-          Tcp.with_connection (Tcp.Where_to_connect.of_host_and_port peer)
-            ~timeout:t.timeout (fun _ r w ->
+          Tcp.with_connection
+            (Tcp.Where_to_connect.of_host_and_port
+               (Peer.to_communications_host_and_port peer))
+            ~timeout:t.timeout
+            (fun _ r w ->
               create_connection_with_menu peer r w
               >>=? fun conn -> dispatch conn query ) )
-      >>| function
+      >>= function
       | Ok (Ok result) ->
-          Ok result
-      | Ok (Error exn) ->
-          Error exn
+          (* call succeeded, result is valid *)
+          return (Ok result)
+      | Ok (Error err) ->
+          (* call succeeded, result is an error *)
+          let%bind () =
+            Trust_system.(
+              record t.trust_system t.logger peer.host
+                Actions.
+                  ( Violated_protocol
+                  , Some
+                      ( "RPC call failed, reason: $exn"
+                      , [("exn", `String (Error.to_string_hum err))] ) ))
+          in
+          return (Error err)
       | Error exn ->
-          Or_error.of_exn exn
+          (* call itself failed *)
+          (* TODO: learn what exceptions are raised here, punish peers for
+            handshake timeouts, possibly other exceptions
+          *)
+          Logger.error t.logger ~module_:__MODULE__ ~location:__LOC__
+            "RPC call raised an exception: %s" (Exn.to_string exn) ;
+          return (Or_error.of_exn exn)
     in
-    match Hashtbl.find t.connections (Unix.Inet_addr.of_string peer.host) with
+    match Hashtbl.find t.connections peer.host with
     | None ->
         call ()
     | Some conn_map ->
@@ -152,25 +185,21 @@ module Make (Message : Message_intf) :
         then
           Deferred.return
             (Or_error.errorf
-               !"Not connecting to peer %s. Number of open connections to the \
-                 peer equals the limit %d.\n"
-               peer.host
+               !"Not connecting to peer %{sexp:Peer.t}. Number of open \
+                 connections to the peer equals the limit %d.\n"
+               peer
                (Option.value_exn t.max_concurrent_connections))
         else call ()
 
   let broadcast_selected t peers msg =
-    let peers =
-      List.map peers ~f:(fun peer ->
-          (peer, Peer.to_communications_host_and_port peer) )
-    in
     let send peer =
       try_call_rpc t peer
         (fun conn m -> return (Message.dispatch_multi conn m))
         msg
     in
     trace_event "broadcasting message" ;
-    Deferred.List.iter ~how:`Parallel peers ~f:(fun p ->
-        match%map send (snd p) with
+    Deferred.List.iter ~how:`Parallel peers ~f:(fun peer ->
+        match%map send peer with
         | Ok () ->
             ()
         | Error e ->
@@ -179,7 +208,7 @@ module Make (Message : Message_intf) :
               ~metadata:
                 [ ("short_msg", `String (Message.summary msg))
                 ; ("msg", Message.msg_to_yojson msg)
-                ; ("peer", Peer.to_yojson (fst p)) ]
+                ; ("peer", Peer.to_yojson peer) ]
               (Error.to_string_hum e) )
 
   let broadcast_random t n msg =
@@ -212,6 +241,7 @@ module Make (Message : Message_intf) :
         let t =
           { timeout= config.timeout
           ; logger= config.logger
+          ; trust_system= config.trust_system
           ; target_peer_count= config.target_peer_count
           ; broadcast_writer
           ; received_reader
@@ -223,17 +253,26 @@ module Make (Message : Message_intf) :
         don't_wait_for
           (Strict_pipe.Reader.iter (Trust_system.ban_pipe config.trust_system)
              ~f:(fun addr ->
-               match Hashtbl.find_and_remove t.connections addr with
+               match Hashtbl.find t.connections addr with
                | None ->
                    Deferred.unit
-               | Some conn_list ->
+               | Some conn_tbl ->
                    Logger.debug t.logger ~module_:__MODULE__ ~location:__LOC__
                      !"Peer %{sexp: Unix.Inet_addr.t} banned, disconnecting."
                      addr ;
-                   Deferred.List.iter (Hashtbl.to_alist conn_list)
-                     ~f:(fun (_, conn_ivar) ->
-                       let%bind conn = Ivar.read conn_ivar in
-                       Rpc.Connection.close conn ) )) ;
+                   let%map () =
+                     Deferred.List.iter (Hashtbl.to_alist conn_tbl)
+                       ~f:(fun (_, conn_state) ->
+                         Connection_with_state.value_map conn_state
+                           ~when_allowed:(fun conn_ivar ->
+                             let%bind conn = Ivar.read conn_ivar in
+                             Rpc.Connection.close conn )
+                           ~when_banned:Deferred.unit )
+                   in
+                   Hashtbl.map_inplace conn_tbl ~f:(fun conn_state ->
+                       Connection_with_state.value_map conn_state
+                         ~when_allowed:(fun _ -> Connection_with_state.Banned)
+                         ~when_banned:Banned ) )) ;
         trace_task "rebroadcasting messages" (fun () ->
             don't_wait_for
               (Linear_pipe.iter_unordered ~max_concurrency:64 broadcast_reader
@@ -302,7 +341,8 @@ module Make (Message : Message_intf) :
                 Reader.close reader >>= fun _ -> Writer.close writer )
               else
                 let conn_id = Uuid_unix.create () in
-                Hashtbl.add_exn conn_map ~key:conn_id ~data:(Ivar.create ()) ;
+                Hashtbl.add_exn conn_map ~key:conn_id
+                  ~data:(Allowed (Ivar.create ())) ;
                 Hashtbl.set t.connections
                   ~key:(Socket.Address.Inet.addr client)
                   ~data:conn_map ;
@@ -314,8 +354,10 @@ module Make (Message : Message_intf) :
                         when connecting to the server over TCP; the ephemeral
                         port is distinct from the client's discovery and
                         communication ports *)
-                      let ivar = Hashtbl.find_exn conn_map conn_id in
-                      Ivar.fill ivar conn ;
+                      Connection_with_state.value_map
+                        (Hashtbl.find_exn conn_map conn_id)
+                        ~when_allowed:(fun ivar -> Ivar.fill ivar conn)
+                        ~when_banned:() ;
                       Hashtbl.set t.connections
                         ~key:(Socket.Address.Inet.addr client)
                         ~data:conn_map ;
@@ -366,7 +408,6 @@ module Make (Message : Message_intf) :
     Logger.trace t.logger ~module_:__MODULE__ ~location:__LOC__
       !"Querying peer %{sexp: Peer.t}"
       peer ;
-    let peer = Peer.to_communications_host_and_port peer in
     try_call_rpc t peer rpc query
 
   let query_random_peers t n rpc query =
