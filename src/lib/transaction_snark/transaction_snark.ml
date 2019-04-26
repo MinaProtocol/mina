@@ -1740,11 +1740,13 @@ let%test_module "transaction_snark" =
               let proof13 =
                 merge ~sok_digest proof12 proof23 |> Or_error.ok_exn
               in
-              Tock.verify proof13.proof keys.verification.wrap wrap_input
-                (Wrap_input.of_tick_field
-                   (merge_top_hash ~sok_digest ~state1 ~state2:state3
-                      ~supply_increase:Amount.zero ~fee_excess:total_fees
-                      ~pending_coinbase_stack_state wrap_vk_bits)) ) )
+              Tock.Proof_system.verify Wrap.proof_system proof13.proof
+                ~verification_key:keys.verification.wrap
+                ~public_input:
+                  [ Wrap_input.of_tick_field
+                      (merge_top_hash ~sok_digest ~state1 ~state2:state3
+                         ~supply_increase:Amount.zero ~fee_excess:total_fees
+                         ~pending_coinbase_stack_state wrap_vk_bits) ] ) )
   end )
 
 let constraint_system_digests () =
