@@ -61,5 +61,5 @@ let record_envelope_sender :
         ~metadata:action_metadata
         "Attempted to record trust action of ourselves: %s" action_fmt ;
       Deferred.unit
-  | Remote {host; _} ->
-      record t logger host action
+  | Remote inet_addr ->
+      record t logger inet_addr action
