@@ -141,7 +141,8 @@ struct
     (* Receipt.Chain_hash does not have bin_io *)
     include Receipt.Chain_hash.Stable.V1
 
-    let cons, empty = Receipt.Chain_hash.(cons, empty)
+    [%%define_locally
+    Receipt.Chain_hash.(cons, empty)]
   end
 
   module Payment_verifier =
