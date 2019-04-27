@@ -127,7 +127,8 @@ let run_test () : unit Deferred.t =
       let balance_change_or_timeout ~initial_receiver_balance receiver_pk =
         let cond t =
           match
-            Run.get_balance t receiver_pk |> Participating_state.active_exn
+            Run.Commands.get_balance t receiver_pk
+            |> Participating_state.active_exn
           with
           | Some b when not (Currency.Balance.equal b initial_receiver_balance)
             ->
@@ -138,7 +139,9 @@ let run_test () : unit Deferred.t =
         wait_until_cond ~f:cond ~timeout:3.
       in
       let assert_balance pk amount =
-        match Run.get_balance coda pk |> Participating_state.active_exn with
+        match
+          Run.Commands.get_balance coda pk |> Participating_state.active_exn
+        with
         | Some balance ->
             if not (Currency.Balance.equal balance amount) then
               failwithf
@@ -165,7 +168,7 @@ let run_test () : unit Deferred.t =
       let build_payment amount sender_sk receiver_pk fee =
         trace_recurring_task "build_payment" (fun () ->
             let nonce =
-              Run.get_nonce coda (pk_of_sk sender_sk)
+              Run.Commands.get_nonce coda (pk_of_sk sender_sk)
               |> Participating_state.active_exn
               |> Option.value_exn ?here:None ?error:None ?message:None
             in
@@ -183,17 +186,17 @@ let run_test () : unit Deferred.t =
             (Currency.Fee.of_int 0)
         in
         let prev_sender_balance =
-          Run.get_balance coda (pk_of_sk sender_sk)
+          Run.Commands.get_balance coda (pk_of_sk sender_sk)
           |> Participating_state.active_exn
           |> Option.value_exn ?here:None ?error:None ?message:None
         in
         let prev_receiver_balance =
-          Run.get_balance coda receiver_pk
+          Run.Commands.get_balance coda receiver_pk
           |> Participating_state.active_exn
           |> Option.value ~default:Currency.Balance.zero
         in
         let%bind p1_res =
-          Run.send_payment logger coda (payment :> User_command.t)
+          Run.Commands.send_payment logger coda (payment :> User_command.t)
         in
         assert_ok (p1_res |> Participating_state.active_exn) ;
         (* Send a similar payment twice on purpose; this second one will be rejected
@@ -203,7 +206,7 @@ let run_test () : unit Deferred.t =
             (Currency.Fee.of_int 0)
         in
         let%bind p2_res =
-          Run.send_payment logger coda (payment' :> User_command.t)
+          Run.Commands.send_payment logger coda (payment' :> User_command.t)
         in
         assert_ok (p2_res |> Participating_state.active_exn) ;
         (* The payment fails, but the rpc command doesn't indicate that because that
@@ -235,7 +238,7 @@ let run_test () : unit Deferred.t =
                 (Currency.Balance.add_amount (Option.value_exn v) amount) )
         in
         let%map p_res =
-          Run.send_payment logger coda (payment :> User_command.t)
+          Run.Commands.send_payment logger coda (payment :> User_command.t)
         in
         p_res |> Participating_state.active_exn |> assert_ok ;
         new_balance_sheet'
