@@ -322,11 +322,7 @@ module Make (Commands : Coda_commands.Intf) = struct
           let%map pk = Program.wallets coda |> Secrets.Wallets.generate_new in
           Result.return pk )
 
-    let result_of_failure f v ~error =
-      try Ok (f v) with Failure _ -> Error error
-
-    let result_of_invalid_arg f v ~error =
-      try Ok (f v) with Invalid_argument _ -> Error error
+    let result_of_exn f v ~error = try Ok (f v) with _ -> Error error
 
     let send_payment =
       io_field "sendPayment" ~doc:"Send a payment"
@@ -335,16 +331,16 @@ module Make (Commands : Coda_commands.Intf) = struct
         ~resolve:(fun {ctx= coda; _} () (from, to_, amount, fee, maybe_memo) ->
           let open Result.Monad_infix in
           let maybe_info =
-            result_of_failure Currency.Amount.of_string amount
+            result_of_exn Currency.Amount.of_string amount
               ~error:"Invalid payment `amount` provided."
             >>= fun amount ->
-            result_of_failure Currency.Fee.of_string fee
+            result_of_exn Currency.Fee.of_string fee
               ~error:"Invalid payment `fee` provided."
             >>= fun fee ->
-            result_of_invalid_arg Public_key.Compressed.of_base64_exn to_
+            result_of_exn Public_key.Compressed.of_base64_exn to_
               ~error:"`to` address is not a valid public key."
             >>= fun receiver ->
-            result_of_invalid_arg Public_key.Compressed.of_base64_exn from
+            result_of_exn Public_key.Compressed.of_base64_exn from
               ~error:"`from` address is not a valid public key."
             >>= fun sender ->
             Result.of_option
@@ -359,7 +355,7 @@ module Make (Commands : Coda_commands.Intf) = struct
             >>= fun sender_kp ->
             ( match maybe_memo with
             | Some m ->
-                result_of_failure User_command_memo.create_exn m
+                result_of_exn User_command_memo.create_exn m
                   ~error:"Invalid `memo` provided."
             | None ->
                 Ok User_command_memo.dummy )
