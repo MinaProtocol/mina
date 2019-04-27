@@ -453,11 +453,7 @@ module Make (Inputs : Inputs_intf) = struct
 
   let wrap_rpc_data_in_envelope conn data =
     let inet_addr = Unix.Inet_addr.of_string conn.Host_and_port.host in
-    let sender =
-      if Unix.Inet_addr.equal inet_addr Unix.Inet_addr.localhost then
-        Envelope.Sender.Local
-      else Envelope.Sender.Remote inet_addr
-    in
+    let sender = Envelope.Sender.Remote inet_addr in
     Envelope.Incoming.wrap ~data ~sender
 
   let create (config : Config.t)
@@ -749,7 +745,12 @@ module Make (Inputs : Inputs_intf) = struct
             let%bind () =
               Trust_system.(
                 record t.trust_system t.logger peer.host
-                  Actions.(Made_request, Some ("answer_sync_ledger_query", [])))
+                  Actions.
+                    ( Made_request
+                    , Some
+                        ( "answer_sync_ledger_query: $query"
+                        , [("query", Sync_ledger.Query.to_yojson (snd query))]
+                        ) ))
             in
             match%map
               Gossip_net.query_peer t.gossip_net peer
