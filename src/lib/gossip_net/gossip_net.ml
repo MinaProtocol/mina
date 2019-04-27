@@ -10,8 +10,6 @@ type ('q, 'r) dispatch =
   Versioned_rpc.Connection_with_menu.t -> 'q -> 'r Deferred.Or_error.t
 
 module type Message_intf = sig
-  type content
-
   type msg [@@deriving to_yojson]
 
   include
@@ -19,11 +17,7 @@ module type Message_intf = sig
     with type callee_msg := msg
      and type caller_msg := msg
 
-  val content : msg -> content
-
   val summary : msg -> string
-
-  val sender : msg -> Envelope.Sender.t
 end
 
 module type Config_intf = sig
@@ -40,8 +34,6 @@ module type Config_intf = sig
 end
 
 module type S = sig
-  type content
-
   type msg
 
   module Connection_with_state : sig
@@ -54,9 +46,10 @@ module type S = sig
     ; trust_system: Trust_system.t
     ; target_peer_count: int
     ; broadcast_writer: msg Linear_pipe.Writer.t
-    ; received_reader: content Envelope.Incoming.t Strict_pipe.Reader.t
+    ; received_reader: msg Envelope.Incoming.t Strict_pipe.Reader.t
     ; me: Peer.t
     ; peers: Peer.Hash_set.t
+    ; peers_by_ip: (Unix.Inet_addr.t, Peer.t list) Hashtbl.t
     ; connections:
         ( Unix.Inet_addr.t
         , (Uuid.t, Connection_with_state.t) Hashtbl.t )
@@ -68,7 +61,7 @@ module type S = sig
   val create :
     Config.t -> Host_and_port.t Rpc.Implementation.t list -> t Deferred.t
 
-  val received : t -> content Envelope.Incoming.t Strict_pipe.Reader.t
+  val received : t -> msg Envelope.Incoming.t Strict_pipe.Reader.t
 
   val broadcast : t -> msg Linear_pipe.Writer.t
 
@@ -88,8 +81,7 @@ module type S = sig
     t -> int -> ('q, 'r) dispatch -> 'q -> 'r Or_error.t Deferred.t List.t
 end
 
-module Make (Message : Message_intf) :
-  S with type msg := Message.msg and type content := Message.content = struct
+module Make (Message : Message_intf) : S with type msg := Message.msg = struct
   module Connection_with_state = struct
     type t = Banned | Allowed of Rpc.Connection.t Ivar.t
 
@@ -103,9 +95,10 @@ module Make (Message : Message_intf) :
     ; trust_system: Trust_system.t
     ; target_peer_count: int
     ; broadcast_writer: Message.msg Linear_pipe.Writer.t
-    ; received_reader: Message.content Envelope.Incoming.t Strict_pipe.Reader.t
+    ; received_reader: Message.msg Envelope.Incoming.t Strict_pipe.Reader.t
     ; me: Peer.t
     ; peers: Peer.Hash_set.t
+    ; peers_by_ip: (Unix.Inet_addr.t, Peer.t list) Hashtbl.t
     ; connections:
         ( Unix.Inet_addr.t
         , (Uuid.t, Connection_with_state.t) Hashtbl.t )
@@ -247,6 +240,7 @@ module Make (Message : Message_intf) :
           ; received_reader
           ; me= config.me
           ; peers= Peer.Hash_set.create ()
+          ; peers_by_ip= Hashtbl.create (module Unix.Inet_addr)
           ; connections= Hashtbl.create (module Unix.Inet_addr)
           ; max_concurrent_connections= config.max_concurrent_connections }
         in
@@ -284,13 +278,15 @@ module Make (Message : Message_intf) :
           let implementations =
             Versioned_rpc.Menu.add
               ( Message.implement_multi
-                  (fun _client_host_and_port ~version:_ msg ->
-                    (* TODO: maybe check client host matches IP in msg, punish if
-                        mismatch due to forgery
-                     *)
+                  (fun client_host_and_port ~version:_ msg ->
+                    (* wrap received message in envelope *)
+                    let sender =
+                      Envelope.Sender.Remote
+                        (Unix.Inet_addr.of_string
+                           client_host_and_port.Host_and_port.host)
+                    in
                     Strict_pipe.Writer.write received_writer
-                      (Envelope.Incoming.wrap ~data:(Message.content msg)
-                         ~sender:(Message.sender msg)) )
+                      (Envelope.Incoming.wrap ~data:msg ~sender) )
               @ implementation_list )
           in
           Rpc.Implementations.create_exn ~implementations
@@ -303,13 +299,25 @@ module Make (Message : Message_intf) :
                   Logger.info t.logger ~module_:__MODULE__ ~location:__LOC__
                     "Some peers connected %s"
                     (List.sexp_of_t Peer.sexp_of_t peers |> Sexp.to_string_hum) ;
-                  List.iter peers ~f:(fun peer -> Hash_set.add t.peers peer) ;
+                  List.iter peers ~f:(fun peer ->
+                      Hash_set.add t.peers peer ;
+                      Hashtbl.add_multi t.peers_by_ip ~key:peer.host ~data:peer
+                  ) ;
                   Deferred.unit
               | Disconnect peers ->
                   Logger.info t.logger ~module_:__MODULE__ ~location:__LOC__
                     "Some peers disconnected %s"
                     (List.sexp_of_t Peer.sexp_of_t peers |> Sexp.to_string_hum) ;
-                  List.iter peers ~f:(fun peer -> Hash_set.remove t.peers peer) ;
+                  List.iter peers ~f:(fun peer ->
+                      Hash_set.remove t.peers peer ;
+                      (* filter out this disconnected peer *)
+                      Hashtbl.update t.peers_by_ip peer.host ~f:(function
+                        | None ->
+                            failwith
+                              "Disconnected peer doesn't appear in peers_by_ip"
+                        | Some ip_peers ->
+                            List.filter ip_peers ~f:(fun ip_peer ->
+                                not (Peer.equal ip_peer peer) ) ) ) ;
                   Deferred.unit )
             |> ignore ) ;
         let%map _ =
