@@ -268,7 +268,7 @@ module Message (Inputs : sig
     module Stable :
       sig
         module V1 : sig
-          type t [@@deriving bin_io, sexp, to_yojson]
+          type t [@@deriving bin_io, sexp, to_yojson, version]
         end
       end
       with type V1.t = t
@@ -280,7 +280,7 @@ module Message (Inputs : sig
     module Stable :
       sig
         module V1 : sig
-          type t [@@deriving bin_io, sexp, to_yojson]
+          type t [@@deriving bin_io, sexp, to_yojson, version]
         end
       end
       with type V1.t = t
@@ -294,14 +294,11 @@ struct
   module T = struct
     module T = struct
       (* "master" types, do not change *)
-      type content =
+      type msg =
         | New_state of External_transition.Stable.V1.t
         | Snark_pool_diff of Snark_pool_diff.Stable.V1.t
         | Transaction_pool_diff of Transaction_pool_diff.Stable.V1.t
       [@@deriving bin_io, sexp, to_yojson]
-
-      type msg = content Envelope.Incoming.Stable.V1.t
-      [@@deriving sexp, to_yojson]
     end
 
     let name = "message"
@@ -311,26 +308,14 @@ struct
   end
 
   include T.T
-
-  let content ({data; _} : msg) = data
-
-  let sender ({sender; _} : msg) = sender
-
   include Versioned_rpc.Both_convert.One_way.Make (T)
-
-  module Content = struct
-    module Wrapped = struct
-      module Stable = struct
-        module V1 = struct
-          type t = T.T.content [@@deriving bin_io, sexp, version {wrapped}]
-        end
-      end
-    end
-  end
 
   module V1 = struct
     module T = struct
-      type msg = Content.Wrapped.Stable.V1.t Envelope.Incoming.Stable.V1.t
+      type msg = T.T.msg =
+        | New_state of External_transition.Stable.V1.t
+        | Snark_pool_diff of Snark_pool_diff.Stable.V1.t
+        | Transaction_pool_diff of Transaction_pool_diff.Stable.V1.t
       [@@deriving bin_io, sexp, version {rpc}]
 
       let callee_model_of_msg = Fn.id
@@ -339,16 +324,18 @@ struct
     end
 
     include Register (T)
+
+    let summary = function
+      | T.New_state _ ->
+          "new state"
+      | Snark_pool_diff _ ->
+          "snark pool diff"
+      | Transaction_pool_diff _ ->
+          "transaction pool diff"
   end
 
-  let summary msg =
-    match Envelope.Incoming.data msg with
-    | New_state _ ->
-        "new state"
-    | Snark_pool_diff _ ->
-        "snark pool diff"
-    | Transaction_pool_diff _ ->
-        "transaction pool diff"
+  [%%define_locally
+  V1.(summary)]
 end
 
 module type Inputs_intf = sig
@@ -384,7 +371,7 @@ module type Inputs_intf = sig
     module Stable :
       sig
         module V1 : sig
-          type t [@@deriving sexp, bin_io, to_yojson]
+          type t [@@deriving sexp, bin_io, to_yojson, version]
         end
       end
       with type V1.t = t
@@ -396,7 +383,7 @@ module type Inputs_intf = sig
     module Stable :
       sig
         module V1 : sig
-          type t [@@deriving sexp, bin_io, to_yojson]
+          type t [@@deriving sexp, bin_io, to_yojson, version]
         end
       end
       with type V1.t = t
@@ -565,28 +552,27 @@ module Make (Inputs : Inputs_intf) = struct
     ; online_status }
 
   (* wrap data in envelope, with "me" in the gossip net as the sender *)
+  (* TODO : remove this when RPC queries aren't enveloped *)
   let envelope_from_me t data =
     let me = (gossip_net t).me in
     (* this envelope is remote me, because we're sending it over the network *)
-    Envelope.Incoming.wrap ~data ~sender:(Envelope.Sender.Remote me)
+    Envelope.Incoming.wrap ~data ~sender:(Envelope.Sender.Remote me.host)
 
   (* TODO: Have better pushback behavior *)
-  let broadcast t x =
+  let broadcast t msg =
     Logger.trace t.logger ~module_:__MODULE__ ~location:__LOC__
-      ~metadata:[("message", Message.msg_to_yojson x)]
+      ~metadata:[("message", Message.msg_to_yojson msg)]
       !"Broadcasting %s over gossip net"
-      (Message.summary x) ;
-    Linear_pipe.write_without_pushback (Gossip_net.broadcast t.gossip_net) x
+      (Message.summary msg) ;
+    Linear_pipe.write_without_pushback (Gossip_net.broadcast t.gossip_net) msg
 
-  let broadcast_from_me t content = broadcast t (envelope_from_me t content)
+  let broadcast_state t state = broadcast t (Message.New_state state)
 
-  let broadcast_state t x = broadcast_from_me t (Message.New_state x)
+  let broadcast_transaction_pool_diff t diff =
+    broadcast t (Message.Transaction_pool_diff diff)
 
-  let broadcast_transaction_pool_diff t x =
-    broadcast_from_me t (Message.Transaction_pool_diff x)
-
-  let broadcast_snark_pool_diff t x =
-    broadcast_from_me t (Message.Snark_pool_diff x)
+  let broadcast_snark_pool_diff t diff =
+    broadcast t (Message.Snark_pool_diff diff)
 
   (* TODO: This is kinda inefficient *)
   let find_map xs ~f =
@@ -672,49 +658,63 @@ module Make (Inputs : Inputs_intf) = struct
     in
     loop peers 1
 
-  let try_preferred_peer t peer input ~rpc =
+  let try_preferred_peer t inet_addr input ~rpc =
     let envelope = envelope_from_me t input in
-    let%bind response = Gossip_net.query_peer t.gossip_net peer rpc envelope in
-    let get_random_peers () =
-      let max_peers = 15 in
-      let except = Peer.Hash_set.of_list [peer] in
-      random_peers_except t max_peers ~except
+    let peers_at_addr =
+      Hashtbl.find_multi t.gossip_net.peers_by_ip inet_addr
     in
-    match response with
-    | Ok (Some data) ->
-        let%bind () =
-          Trust_system.(
-            record t.trust_system t.logger peer.host
-              Actions.
-                ( Fulfilled_request
-                , Some ("Preferred peer returned valid response", []) ))
+    (* if there's a single peer at inet_addr, call it the preferred peer *)
+    match peers_at_addr with
+    | [peer] -> (
+        let get_random_peers () =
+          let max_peers = 15 in
+          let except = Peer.Hash_set.of_list [peer] in
+          random_peers_except t max_peers ~except
         in
-        return (Ok data)
-    | Ok None ->
-        let%bind () =
-          Trust_system.(
-            record t.trust_system t.logger peer.host
-              Actions.
-                ( Violated_protocol
-                , Some ("When querying preferred peer, got no response", []) ))
+        let%bind response =
+          Gossip_net.query_peer t.gossip_net peer rpc envelope
         in
-        let peers = get_random_peers () in
-        try_non_preferred_peers t envelope peers ~rpc
-    | Error _ ->
-        (* TODO: determine what punishments apply here *)
-        Logger.error t.logger ~module_:__MODULE__ ~location:__LOC__
-          !"get error from %{sexp: Peer.t}"
-          peer ;
-        let peers = get_random_peers () in
+        match response with
+        | Ok (Some data) ->
+            let%bind () =
+              Trust_system.(
+                record t.trust_system t.logger peer.host
+                  Actions.
+                    ( Fulfilled_request
+                    , Some ("Preferred peer returned valid response", []) ))
+            in
+            return (Ok data)
+        | Ok None ->
+            let%bind () =
+              Trust_system.(
+                record t.trust_system t.logger peer.host
+                  Actions.
+                    ( Violated_protocol
+                    , Some ("When querying preferred peer, got no response", [])
+                    ))
+            in
+            let peers = get_random_peers () in
+            try_non_preferred_peers t envelope peers ~rpc
+        | Error _ ->
+            (* TODO: determine what punishments apply here *)
+            Logger.error t.logger ~module_:__MODULE__ ~location:__LOC__
+              !"get error from %{sexp: Peer.t}"
+              peer ;
+            let peers = get_random_peers () in
+            try_non_preferred_peers t envelope peers ~rpc )
+    | _ ->
+        (* no preferred peer *)
+        let max_peers = 16 in
+        let peers = random_peers t max_peers in
         try_non_preferred_peers t envelope peers ~rpc
 
-  let get_staged_ledger_aux_and_pending_coinbases_at_hash t peer input =
-    try_preferred_peer t peer input
+  let get_staged_ledger_aux_and_pending_coinbases_at_hash t inet_addr input =
+    try_preferred_peer t inet_addr input
       ~rpc:
         Rpcs.Get_staged_ledger_aux_and_pending_coinbases_at_hash.dispatch_multi
 
-  let get_ancestry t peer input =
-    try_preferred_peer t peer input ~rpc:Rpcs.Get_ancestry.dispatch_multi
+  let get_ancestry t inet_addr input =
+    try_preferred_peer t inet_addr input ~rpc:Rpcs.Get_ancestry.dispatch_multi
 
   let glue_sync_ledger t query_reader response_writer =
     (* We attempt to query 3 random peers, retry_max times. We keep track of the
@@ -746,9 +746,13 @@ module Make (Inputs : Inputs_intf) = struct
                   !"Received answer from peer %{sexp: Peer.t} on ledger_hash \
                     %{sexp: Ledger_hash.t}"
                   peer (fst query) ;
+                (* TODO : here is a place where an envelope could contain
+                   a Peer.t, and not just an IP address, if desired
+                *)
+                let inet_addr = peer.host in
                 Some
                   (Envelope.Incoming.wrap ~data:answer
-                     ~sender:(Envelope.Sender.Remote peer))
+                     ~sender:(Envelope.Sender.Remote inet_addr))
             | Ok (Error e) ->
                 Logger.info t.logger ~module_:__MODULE__ ~location:__LOC__
                   "Rpc error: %s" (Error.to_string_mach e) ;
