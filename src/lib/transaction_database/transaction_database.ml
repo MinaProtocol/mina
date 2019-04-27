@@ -20,10 +20,11 @@ end
 
 module Database =
   Rocksdb.Serializable.Make
+    (Transaction.Stable.V1)
     (Public_key.Compressed.Stable.V1)
-    (Transaction_list.Stable.V1)
 
-type t = Database.t
+type t =
+  {database: Database.t; cache: Transaction.t Public_key.Compressed.Table.t}
 
 let create ?directory_name () =
   let directory =
@@ -33,7 +34,8 @@ let create ?directory_name () =
     | Some name ->
         name
   in
-  Database.create ~directory
+  { database= Database.create ~directory
+  ; cache= Public_key.Compressed.Table.create () }
 
 let close = Database.close
 
