@@ -160,8 +160,6 @@ module type Network_intf = sig
 
   type peer
 
-  type inet_addr
-
   type state_hash
 
   type ledger_hash

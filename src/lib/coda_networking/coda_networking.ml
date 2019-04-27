@@ -49,12 +49,12 @@ struct
    *)
 
   module Get_staged_ledger_aux_and_pending_coinbases_at_hash = struct
-    module T = struct
+    module Master = struct
       let name = "get_staged_ledger_aux_and_pending_coinbases_at_hash"
 
       module T = struct
         (* "master" types, do not change *)
-        type query = State_hash.Stable.V1.t Envelope.Incoming.Stable.V1.t
+        type query = State_hash.Stable.V1.t
 
         type response =
           ( Staged_ledger_aux.Stable.V1.t
@@ -67,19 +67,18 @@ struct
       module Callee = T
     end
 
-    include T.T
-    module M = Versioned_rpc.Both_convert.Plain.Make (T)
+    include Master.T
+    module M = Versioned_rpc.Both_convert.Plain.Make (Master)
     include M
 
     include Perf_histograms.Rpc.Plain.Extend (struct
       include M
-      include T
+      include Master
     end)
 
     module V1 = struct
       module T = struct
-        type query = State_hash.Stable.V1.t Envelope.Incoming.Stable.V1.t
-        [@@deriving bin_io, version {rpc}]
+        type query = State_hash.Stable.V1.t [@@deriving bin_io, version {rpc}]
 
         type response =
           ( Staged_ledger_aux.Stable.V1.t
@@ -103,14 +102,12 @@ struct
   end
 
   module Answer_sync_ledger_query = struct
-    module T = struct
+    module Master = struct
       let name = "answer_sync_ledger_query"
 
       module T = struct
         (* "master" types, do not change *)
-        type query =
-          (Ledger_hash.Stable.V1.t * Sync_ledger.Query.Stable.V1.t)
-          Envelope.Incoming.Stable.V1.t
+        type query = Ledger_hash.Stable.V1.t * Sync_ledger.Query.Stable.V1.t
 
         type response = Sync_ledger.Answer.Stable.V1.t Or_error.t
       end
@@ -119,20 +116,18 @@ struct
       module Callee = T
     end
 
-    include T.T
-    module M = Versioned_rpc.Both_convert.Plain.Make (T)
+    include Master.T
+    module M = Versioned_rpc.Both_convert.Plain.Make (Master)
     include M
 
     include Perf_histograms.Rpc.Plain.Extend (struct
       include M
-      include T
+      include Master
     end)
 
     module V1 = struct
       module T = struct
-        type query =
-          (Ledger_hash.Stable.V1.t * Sync_ledger.Query.Stable.V1.t)
-          Envelope.Incoming.Stable.V1.t
+        type query = Ledger_hash.Stable.V1.t * Sync_ledger.Query.Stable.V1.t
         [@@deriving bin_io, sexp, version {rpc}]
 
         type response =
@@ -154,12 +149,12 @@ struct
   end
 
   module Transition_catchup = struct
-    module T = struct
+    module Master = struct
       let name = "transition_catchup"
 
       module T = struct
         (* "master" types, do not change *)
-        type query = State_hash.Stable.V1.t Envelope.Incoming.Stable.V1.t
+        type query = State_hash.Stable.V1.t
 
         type response =
           External_transition.Stable.V1.t Non_empty_list.Stable.V1.t option
@@ -169,18 +164,18 @@ struct
       module Callee = T
     end
 
-    include T.T
-    module M = Versioned_rpc.Both_convert.Plain.Make (T)
+    include Master.T
+    module M = Versioned_rpc.Both_convert.Plain.Make (Master)
     include M
 
     include Perf_histograms.Rpc.Plain.Extend (struct
       include M
-      include T
+      include Master
     end)
 
     module V1 = struct
       module T = struct
-        type query = State_hash.Stable.V1.t Envelope.Incoming.Stable.V1.t
+        type query = State_hash.Stable.V1.t
         [@@deriving bin_io, sexp, version {rpc}]
 
         type response =
@@ -202,14 +197,12 @@ struct
   end
 
   module Get_ancestry = struct
-    module T = struct
+    module Master = struct
       let name = "get_ancestry"
 
       module T = struct
         (* "master" types, do not change *)
-        type query =
-          Consensus.Consensus_state.Value.t Envelope.Incoming.Stable.V1.t
-        [@@deriving sexp]
+        type query = Consensus.Consensus_state.Value.t [@@deriving sexp]
 
         type response =
           ( External_transition.Stable.V1.t
@@ -222,20 +215,18 @@ struct
       module Callee = T
     end
 
-    include T.T
-    module M = Versioned_rpc.Both_convert.Plain.Make (T)
+    include Master.T
+    module M = Versioned_rpc.Both_convert.Plain.Make (Master)
     include M
 
     include Perf_histograms.Rpc.Plain.Extend (struct
       include M
-      include T
+      include Master
     end)
 
     module V1 = struct
       module T = struct
-        type query =
-          Consensus.Consensus_state.Value.Stable.V1.t
-          Envelope.Incoming.Stable.V1.t
+        type query = Consensus.Consensus_state.Value.Stable.V1.t
         [@@deriving bin_io, sexp, version {rpc}]
 
         type response =
@@ -268,7 +259,7 @@ module Message (Inputs : sig
     module Stable :
       sig
         module V1 : sig
-          type t [@@deriving bin_io, sexp, to_yojson, version]
+          type t [@@deriving bin_io, sexp, to_yojson, version {unnumbered}]
         end
       end
       with type V1.t = t
@@ -280,7 +271,7 @@ module Message (Inputs : sig
     module Stable :
       sig
         module V1 : sig
-          type t [@@deriving bin_io, sexp, to_yojson, version]
+          type t [@@deriving bin_io, sexp, to_yojson, version {unnumbered}]
         end
       end
       with type V1.t = t
@@ -291,7 +282,7 @@ end) =
 struct
   open Inputs
 
-  module T = struct
+  module Master = struct
     module T = struct
       (* "master" types, do not change *)
       type msg =
@@ -307,12 +298,12 @@ struct
     module Callee = T
   end
 
-  include T.T
-  include Versioned_rpc.Both_convert.One_way.Make (T)
+  include Master.T
+  include Versioned_rpc.Both_convert.One_way.Make (Master)
 
   module V1 = struct
     module T = struct
-      type msg = T.T.msg =
+      type msg = Master.T.msg =
         | New_state of External_transition.Stable.V1.t
         | Snark_pool_diff of Snark_pool_diff.Stable.V1.t
         | Transaction_pool_diff of Transaction_pool_diff.Stable.V1.t
@@ -460,6 +451,15 @@ module Make (Inputs : Inputs_intf) = struct
     |> Deferred.ignore |> don't_wait_for ;
     online_reader
 
+  let wrap_rpc_data_in_envelope conn data =
+    let inet_addr = Unix.Inet_addr.of_string conn.Host_and_port.host in
+    let sender =
+      if Unix.Inet_addr.equal inet_addr Unix.Inet_addr.localhost then
+        Envelope.Sender.Local
+      else Envelope.Sender.Remote inet_addr
+    in
+    Envelope.Incoming.wrap ~data ~sender
+
   let create (config : Config.t)
       ~(get_staged_ledger_aux_and_pending_coinbases_at_hash :
             State_hash.t Envelope.Incoming.t
@@ -479,26 +479,27 @@ module Make (Inputs : Inputs_intf) = struct
             , State_body_hash.t list * External_transition.t )
             Proof_carrying_data.t
             Deferred.Option.t) =
-    (* TODO: for following functions, could check that IP in _conn matches
-       the sender IP in envelope, punish if mismatch due to IP forgery
-    *)
-    let get_staged_ledger_aux_and_pending_coinbases_at_hash_rpc _conn
-        ~version:_ hash_in_envelope =
+    (* each of the passed-in procedures expects an enveloped input, so
+       we wrap the data received via RPC *)
+    let get_staged_ledger_aux_and_pending_coinbases_at_hash_rpc conn ~version:_
+        hash =
+      let hash_in_envelope = wrap_rpc_data_in_envelope conn hash in
       get_staged_ledger_aux_and_pending_coinbases_at_hash hash_in_envelope
     in
-    let answer_sync_ledger_query_rpc _conn ~version:_ query_in_envelope =
+    let answer_sync_ledger_query_rpc conn ~version:_ query =
+      let query_in_envelope = wrap_rpc_data_in_envelope conn query in
       answer_sync_ledger_query query_in_envelope
     in
-    let transition_catchup_rpc _conn ~version:_ hash_in_envelope =
+    let transition_catchup_rpc conn ~version:_ hash =
       Logger.info config.logger ~module_:__MODULE__ ~location:__LOC__
-        !"Peer %{sexp:Envelope.Sender.t} sent transition_catchup"
-        (Envelope.Incoming.sender hash_in_envelope) ;
+        "Peer with IP %s sent transition_catchup" conn.Host_and_port.host ;
+      let hash_in_envelope = wrap_rpc_data_in_envelope conn hash in
       transition_catchup hash_in_envelope
     in
-    let get_ancestry_rpc _conn ~version:_ query_in_envelope =
+    let get_ancestry_rpc conn ~version:_ query =
       Logger.info config.logger ~module_:__MODULE__ ~location:__LOC__
-        !"Sending root proof to peer %{sexp:Envelope.Sender.t}"
-        (Envelope.Incoming.sender query_in_envelope) ;
+        "Sending root proof to peer with IP %s" conn.Host_and_port.host ;
+      let query_in_envelope = wrap_rpc_data_in_envelope conn query in
       get_ancestry query_in_envelope
     in
     let implementations =
@@ -528,19 +529,19 @@ module Make (Inputs : Inputs_intf) = struct
       online_broadcaster config.time_controller online_notifier
     in
     let states, snark_pool_diffs, transaction_pool_diffs =
-      Strict_pipe.Reader.partition_map3 received_gossips ~f:(fun x ->
-          match Envelope.Incoming.data x with
-          | New_state s ->
+      Strict_pipe.Reader.partition_map3 received_gossips ~f:(fun envelope ->
+          match Envelope.Incoming.data envelope with
+          | New_state state ->
               Perf_histograms.add_span ~name:"external_transition_latency"
                 (Core.Time.abs_diff (Core.Time.now ())
-                   (External_transition.timestamp s |> Block_time.to_time)) ;
+                   (External_transition.timestamp state |> Block_time.to_time)) ;
               `Fst
-                ( Envelope.Incoming.map x ~f:(fun _ -> s)
+                ( Envelope.Incoming.map envelope ~f:(fun _ -> state)
                 , Time.now config.time_controller )
-          | Snark_pool_diff d ->
-              `Snd (Envelope.Incoming.map x ~f:(fun _ -> d))
-          | Transaction_pool_diff d ->
-              `Trd (Envelope.Incoming.map x ~f:(fun _ -> d)) )
+          | Snark_pool_diff diff ->
+              `Snd (Envelope.Incoming.map envelope ~f:(fun _ -> diff))
+          | Transaction_pool_diff diff ->
+              `Trd (Envelope.Incoming.map envelope ~f:(fun _ -> diff)) )
     in
     { gossip_net
     ; logger= config.logger
@@ -550,13 +551,6 @@ module Make (Inputs : Inputs_intf) = struct
     ; transaction_pool_diffs=
         Strict_pipe.Reader.to_linear_pipe transaction_pool_diffs
     ; online_status }
-
-  (* wrap data in envelope, with "me" in the gossip net as the sender *)
-  (* TODO : remove this when RPC queries aren't enveloped *)
-  let envelope_from_me t data =
-    let me = (gossip_net t).me in
-    (* this envelope is remote me, because we're sending it over the network *)
-    Envelope.Incoming.wrap ~data ~sender:(Envelope.Sender.Remote me.host)
 
   (* TODO: Have better pushback behavior *)
   let broadcast t msg =
@@ -614,9 +608,13 @@ module Make (Inputs : Inputs_intf) = struct
     Gossip_net.random_peers_except gossip_net n ~except
 
   let catchup_transition t peer state_hash =
+    let%bind () =
+      Trust_system.(
+        record t.trust_system t.logger peer.Peer.host
+          Actions.(Made_request, Some ("transition_catchup", [])))
+    in
     Gossip_net.query_peer t.gossip_net peer
-      Rpcs.Transition_catchup.dispatch_multi
-      (envelope_from_me t state_hash)
+      Rpcs.Transition_catchup.dispatch_multi state_hash
 
   let query_peer :
          t
@@ -659,7 +657,6 @@ module Make (Inputs : Inputs_intf) = struct
     loop peers 1
 
   let try_preferred_peer t inet_addr input ~rpc =
-    let envelope = envelope_from_me t input in
     let peers_at_addr =
       Hashtbl.find_multi t.gossip_net.peers_by_ip inet_addr
     in
@@ -672,7 +669,7 @@ module Make (Inputs : Inputs_intf) = struct
           random_peers_except t max_peers ~except
         in
         let%bind response =
-          Gossip_net.query_peer t.gossip_net peer rpc envelope
+          Gossip_net.query_peer t.gossip_net peer rpc input
         in
         match response with
         | Ok (Some data) ->
@@ -694,26 +691,39 @@ module Make (Inputs : Inputs_intf) = struct
                     ))
             in
             let peers = get_random_peers () in
-            try_non_preferred_peers t envelope peers ~rpc
+            try_non_preferred_peers t input peers ~rpc
         | Error _ ->
             (* TODO: determine what punishments apply here *)
             Logger.error t.logger ~module_:__MODULE__ ~location:__LOC__
               !"get error from %{sexp: Peer.t}"
               peer ;
             let peers = get_random_peers () in
-            try_non_preferred_peers t envelope peers ~rpc )
+            try_non_preferred_peers t input peers ~rpc )
     | _ ->
         (* no preferred peer *)
         let max_peers = 16 in
         let peers = random_peers t max_peers in
-        try_non_preferred_peers t envelope peers ~rpc
+        try_non_preferred_peers t input peers ~rpc
 
   let get_staged_ledger_aux_and_pending_coinbases_at_hash t inet_addr input =
+    let%bind () =
+      Trust_system.(
+        record t.trust_system t.logger inet_addr
+          Actions.
+            ( Made_request
+            , Some ("get_staged_ledger_aux_and_pending_coinbases_at_hash", [])
+            ))
+    in
     try_preferred_peer t inet_addr input
       ~rpc:
         Rpcs.Get_staged_ledger_aux_and_pending_coinbases_at_hash.dispatch_multi
 
   let get_ancestry t inet_addr input =
+    let%bind () =
+      Trust_system.(
+        record t.trust_system t.logger inet_addr
+          Actions.(Made_request, Some ("get_ancestry", [])))
+    in
     try_preferred_peer t inet_addr input ~rpc:Rpcs.Get_ancestry.dispatch_multi
 
   let glue_sync_ledger t query_reader response_writer =
@@ -736,10 +746,14 @@ module Make (Inputs : Inputs_intf) = struct
               !"Asking %{sexp: Peer.t} query regarding ledger_hash %{sexp: \
                 Ledger_hash.t}"
               peer (fst query) ;
+            let%bind () =
+              Trust_system.(
+                record t.trust_system t.logger peer.host
+                  Actions.(Made_request, Some ("answer_sync_ledger_query", [])))
+            in
             match%map
               Gossip_net.query_peer t.gossip_net peer
-                Rpcs.Answer_sync_ledger_query.dispatch_multi
-                (envelope_from_me t query)
+                Rpcs.Answer_sync_ledger_query.dispatch_multi query
             with
             | Ok (Ok answer) ->
                 Logger.trace t.logger ~module_:__MODULE__ ~location:__LOC__
