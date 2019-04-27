@@ -195,7 +195,7 @@ let get_nonce_cmd =
          match%bind get_nonce address port with
          | Error e ->
              eprintf "Failed to get nonce: %s\n" e ;
-             exit 1
+             exit 2
          | Ok nonce ->
              printf "%s\n" (Account.Nonce.to_string nonce) ;
              exit 0 ))
@@ -229,7 +229,7 @@ let get_nonce_exn public_key port =
   match%bind get_nonce public_key port with
   | Error e ->
       eprintf "Failed to get nonce %s\n" e ;
-      exit 1
+      exit 3
   | Ok nonce ->
       return nonce
 
@@ -240,7 +240,7 @@ let handle_exception_nicely (type a) (f : unit -> a Deferred.t) () :
       return e
   | Error e ->
       eprintf "Error: %s" (Error.to_string_hum e) ;
-      exit 1
+      exit 4
 
 let batch_send_payments =
   let module Payment_info = struct
@@ -271,7 +271,7 @@ let batch_send_payments =
           (Sexp.to_string_hum
              ([%sexp_of: Payment_info.t list]
                 (List.init 3 ~f:(fun _ -> sample_info ())))) ;
-        exit 1
+        exit 5
   in
   let main port (privkey_path, payments_path) =
     let open Deferred.Let_syntax in

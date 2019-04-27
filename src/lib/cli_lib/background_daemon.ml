@@ -23,7 +23,7 @@ let run ~f port arg =
     | Run_client ->
         f port arg
     | Abort ->
-        exit 1
+        exit 14
   in
   go Start
 

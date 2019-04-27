@@ -101,7 +101,7 @@ struct
            ($parent_receipt_chain_hash, $previous_receipt_chain_hash). \
            Receipt.Chain_hash is supposed to be collision resistant. This \
            collision should not happen." ;
-        Core.exit 1
+        Core.exit 6
 
   module Receipt_chain_hash = struct
     (* Receipt.Chain_hash does not have bin_io *)
