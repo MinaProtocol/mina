@@ -20,10 +20,14 @@ end
 
 module Database =
   Rocksdb.Serializable.Make
+    (Transaction.Stable.V1)
     (Public_key.Compressed.Stable.V1)
-    (Transaction_list.Stable.V1)
 
-type t = Database.t
+type cache =
+  { user_transactions: Transaction.t list Public_key.Compressed.Table.t
+  ; all_transactions: Transaction.Hash_set.t }
+
+type t = {database: Database.t; cache: cache}
 
 let create ?directory_name () =
   let directory =
@@ -33,16 +37,24 @@ let create ?directory_name () =
     | Some name ->
         name
   in
-  Database.create ~directory
+  { database= Database.create ~directory
+  ; cache=
+      { user_transactions= Public_key.Compressed.Table.create ()
+      ; all_transactions= Transaction.Hash_set.create () } }
 
-let close = Database.close
+(* TODO: make load function #2333 *)
+
+let close {database; _} = Database.close database
 
 let add t (public_key : Public_key.Compressed.t) transaction =
-  match Database.get t ~key:public_key with
-  | Some stored_transactions ->
-      Database.set t ~key:public_key
-        ~data:(Non_empty_list.cons transaction stored_transactions)
-  | None ->
-      Database.set t ~key:public_key ~data:(Non_empty_list.init transaction [])
+  match Hash_set.strict_add t.cache.all_transactions transaction with
+  | Error _ ->
+      ()
+  | Ok () ->
+      Database.set t.database ~key:transaction ~data:public_key ;
+      Hashtbl.add_multi t.cache.user_transactions ~key:public_key
+        ~data:transaction
 
-let get_transactions t public_key = Database.get t ~key:public_key
+let get_transactions {cache= {user_transactions; _}; _} public_key =
+  let open Option.Monad_infix in
+  Hashtbl.find user_transactions public_key >>= Non_empty_list.of_list_opt

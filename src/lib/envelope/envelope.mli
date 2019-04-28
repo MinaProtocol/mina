@@ -1,18 +1,17 @@
 open Core
-open Network_peer
 
 module Sender : sig
   module Stable : sig
     module V1 : sig
-      type t = Local | Remote of Peer.t
-      [@@deriving sexp, bin_io, yojson, version]
+      type t = Local | Remote of Unix.Inet_addr.Stable.V1.t
+      [@@deriving sexp, bin_io, eq, yojson, version]
     end
 
     module Latest = V1
   end
 
-  type t = Stable.Latest.t = Local | Remote of Peer.t
-  [@@deriving sexp, yojson]
+  type t = Stable.Latest.t = Local | Remote of Unix.Inet_addr.Stable.V1.t
+  [@@deriving sexp, eq, yojson]
 end
 
 module Incoming : sig

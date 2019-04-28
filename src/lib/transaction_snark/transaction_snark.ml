@@ -292,7 +292,6 @@ module Keys0 = struct
       { base: Tick.Proving_key.t
       ; wrap: Tock.Proving_key.t
       ; merge: Tick.Proving_key.t }
-    [@@deriving bin_io]
 
     let dummy =
       { merge= Dummy_values.Tick.Groth16.proving_key
