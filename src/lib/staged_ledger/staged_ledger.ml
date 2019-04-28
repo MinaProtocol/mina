@@ -2676,9 +2676,9 @@ let%test_module "test" =
           @ Option.value_map (snd t.diff) ~default:[] ~f:(fun d ->
                 d.user_commands )
 
-        let completed_works = failwith "completed_work : Need to implement"
+        let completed_works _ = failwith "completed_work : Need to implement"
 
-        let coinbase = failwith "coinbase: Need to implement"
+        let coinbase _ = failwith "coinbase: Need to implement"
       end
 
       module Transaction_witness = struct

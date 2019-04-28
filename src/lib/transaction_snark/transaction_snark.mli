@@ -103,7 +103,6 @@ module Keys : sig
       { base: Tick.Proving_key.t
       ; wrap: Tock.Proving_key.t
       ; merge: Tick.Proving_key.t }
-    [@@deriving bin_io]
 
     val dummy : t
 
