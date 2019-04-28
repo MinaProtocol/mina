@@ -289,4 +289,20 @@ end) :
   let user_commands (t : t) =
     (fst t.diff).user_commands
     @ Option.value_map (snd t.diff) ~default:[] ~f:(fun d -> d.user_commands)
+
+  let completed_works (t : t) =
+    (fst t.diff).completed_works
+    @ Option.value_map (snd t.diff) ~default:[] ~f:(fun d -> d.completed_works)
+
+  let coinbase (t : t) =
+    let first_pre_diff, second_pre_diff_opt = t.diff in
+    match
+      ( first_pre_diff.coinbase
+      , Option.value_map second_pre_diff_opt ~default:At_most_one.Zero
+          ~f:(fun d -> d.coinbase) )
+    with
+    | At_most_two.Zero, At_most_one.Zero ->
+        Currency.Amount.zero
+    | _ ->
+        Coda_praos.coinbase_amount
 end

@@ -492,8 +492,7 @@ module T = struct
             Deferred.return (Option.value ~default:[] path)
           in
           let parse_sync_status_exn = function
-            | `Assoc [("data", `Assoc [("new_sync_update", `String status)])]
-              ->
+            | `Assoc [("data", `Assoc [("newSyncUpdate", `String status)])] ->
                 Sync_status.of_string status |> Or_error.ok_exn
             | unexpected_json ->
                 failwithf
@@ -503,7 +502,7 @@ module T = struct
           in
           let coda_sync_status () =
             let schema = Run.Graphql.schema in
-            match Graphql_parser.parse "subscription { new_sync_update }" with
+            match Graphql_parser.parse "subscription { newSyncUpdate }" with
             | Ok query -> (
                 match%map Graphql_async.Schema.execute schema coda query with
                 | Ok (`Stream pipe) ->
