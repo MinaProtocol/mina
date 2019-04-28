@@ -211,19 +211,6 @@ module Make (Commands : Coda_commands.Intf) = struct
             ] )
     end
 
-    module Inputs = struct
-      open Schema.Arg
-
-      let payment_filter_input =
-        non_null
-          (obj "PaymentFilterType"
-             ~coerce:(fun public_key -> public_key)
-             ~fields:
-               [ arg "toOrFrom"
-                   ~doc:"Public key of transactions you are looking for"
-                   ~typ:(non_null string) ])
-    end
-
     let snark_worker =
       obj "SnarkWorker" ~fields:(fun _ ->
           [ field "key" ~typ:(non_null string)
@@ -272,6 +259,15 @@ module Make (Commands : Coda_commands.Intf) = struct
                    a transaction fee"
                 ~typ:(non_null string)
             ; arg "memo" ~doc:"Public description of payment" ~typ:string ]
+
+      let payment_filter_input =
+        non_null
+          (obj "PaymentFilterType"
+             ~coerce:(fun public_key -> public_key)
+             ~fields:
+               [ arg "toOrFrom"
+                   ~doc:"Public key of transactions you are looking for"
+                   ~typ:(non_null string) ])
     end
   end
 
@@ -351,7 +347,7 @@ module Make (Commands : Coda_commands.Intf) = struct
     let payments =
       field "payments"
         ~doc:"Payments that a user with public key KEY sent or received"
-        ~args:Arg.[arg "publicKey" ~typ:Types.Inputs.payment_filter_input]
+        ~args:Arg.[arg "publicKey" ~typ:Types.Input.payment_filter_input]
         ~typ:(list @@ non_null Types.payment)
         ~resolve:(fun {ctx= coda; _} () public_key ->
           let public_key = Public_key.Compressed.of_base64_exn public_key in
