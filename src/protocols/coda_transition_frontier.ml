@@ -1,9 +1,11 @@
-open Core_kernel
+open Core
 open Async_kernel
 open Pipe_lib
 open Cache_lib
 
 module Transition_frontier_diff = struct
+  (* TODO: Remove New_frontier. 
+    Each transition frontier extension should be initialized by the input, the root breadcrumb *)
   type 'a t =
     | New_breadcrumb of 'a
         (** Triggered when a new breadcrumb is added without changing the root or best_tip *)
@@ -188,14 +190,14 @@ module type Network_intf = sig
 
   val get_staged_ledger_aux_and_pending_coinbases_at_hash :
        t
-    -> peer
+    -> Unix.Inet_addr.t
     -> state_hash
     -> (parallel_scan_state * ledger_hash * pending_coinbases)
        Deferred.Or_error.t
 
   val get_ancestry :
        t
-    -> peer
+    -> Unix.Inet_addr.t
     -> consensus_state
     -> ( external_transition
        , state_body_hash list * external_transition )
@@ -423,6 +425,9 @@ module type Transition_frontier_intf = sig
 
   val persistence_diff_pipe :
     t -> Extensions.Persistence_diff.view Broadcast_pipe.Reader.t
+
+  val new_transition :
+    t -> external_transition_verified Coda_incremental.New_transition.t
 
   val visualize_to_string : t -> string
 

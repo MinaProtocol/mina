@@ -142,7 +142,8 @@ let%test_module "network pool test" =
         module V1 = struct
           module T = struct
             type t = int
-            [@@deriving bin_io, sexp, yojson, hash, compare, version]
+            [@@deriving
+              bin_io, sexp, yojson, hash, compare, version {unnumbered}]
           end
 
           include T
