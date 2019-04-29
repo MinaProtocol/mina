@@ -54,7 +54,7 @@ module Constants = struct
   include Constants
 
   module Slot = struct
-    let duration = Constants.block_window_duration
+    (* let duration = Constants.block_window_duration *)
 
     let duration_ms = Int64.of_int block_window_duration_ms
   end
@@ -83,7 +83,7 @@ module Constants = struct
 
     (* Number of bits required to represent a number
        < size_in_slots *)
-    let per_window_index_size_in_bits = Core.Int.ceil_log2 size_in_slots
+    (* let per_window_index_size_in_bits = Core.Int.ceil_log2 size_in_slots *)
   end
 
   (** The duration of delta *)
@@ -162,10 +162,12 @@ module Epoch = struct
   module Slot = struct
     include Segment_id
 
+    (*
     let after_lock_checkpoint (slot : t) =
       let ck = Constants.(c * k |> UInt32.of_int) in
       let open UInt32.Infix in
       ck * UInt32.of_int 2 < slot
+    *)
 
     let in_seed_update_range (slot : t) =
       let ck = Constants.(c * k |> UInt32.of_int) in
@@ -214,8 +216,10 @@ module Epoch = struct
       (Time.Span.of_ms
          Int64.Infix.(int64_of_uint32 slot * Constants.Slot.duration_ms))
 
+  (*
   let slot_end_time (epoch : t) (slot : Slot.t) =
     Time.add (slot_start_time epoch slot) Constants.Slot.duration
+  *)
 
   let epoch_and_slot_of_time_exn tm : t * Slot.t =
     let epoch = of_time_exn tm in
@@ -334,7 +338,8 @@ module Epoch_ledger = struct
         module T = struct
           type ('ledger_hash, 'amount) t =
             {hash: 'ledger_hash; total_currency: 'amount}
-          [@@deriving sexp, bin_io, eq, compare, hash, to_yojson, version]
+          [@@deriving
+            sexp, bin_io, eq, compare, hash, to_yojson, version {unnumbered}]
         end
 
         include T
@@ -345,7 +350,7 @@ module Epoch_ledger = struct
 
     type ('ledger_hash, 'amount) t = ('ledger_hash, 'amount) Stable.Latest.t =
       {hash: 'ledger_hash; total_currency: 'amount}
-    [@@deriving sexp, eq, compare, hash, to_yojson]
+    [@@deriving sexp, compare, hash, to_yojson]
   end
 
   module Value = struct
@@ -375,7 +380,7 @@ module Epoch_ledger = struct
       module Registered_V1 = Registrar.Register (V1)
     end
 
-    type t = Stable.Latest.t [@@deriving sexp, eq, compare, hash, to_yojson]
+    type t = Stable.Latest.t [@@deriving sexp, compare, hash, to_yojson]
   end
 
   type var = (Coda_base.Frozen_ledger_hash.var, Amount.var) Poly.t
@@ -548,7 +553,7 @@ module Vrf = struct
       module Registered_V1 = Registrar.Register (V1)
     end
 
-    type t = Stable.Latest.t [@@deriving sexp, eq, compare, hash, yojson]
+    type t = Stable.Latest.t [@@deriving sexp, compare, hash, yojson]
 
     type var = Random_oracle.Digest.Checked.t
 
@@ -844,7 +849,8 @@ module Epoch_data = struct
             ; start_checkpoint: 'start_checkpoint
             ; lock_checkpoint: 'lock_checkpoint
             ; length: 'length }
-          [@@deriving sexp, bin_io, eq, compare, hash, to_yojson, version]
+          [@@deriving
+            sexp, bin_io, eq, compare, hash, to_yojson, version {unnumbered}]
         end
 
         include T
@@ -870,7 +876,7 @@ module Epoch_data = struct
       ; start_checkpoint: 'start_checkpoint
       ; lock_checkpoint: 'lock_checkpoint
       ; length: 'length }
-    [@@deriving sexp, eq, compare, hash, to_yojson]
+    [@@deriving sexp, compare, eq, hash, to_yojson]
   end
 
   type var =
@@ -1096,7 +1102,7 @@ module Consensus_transition_data = struct
       module V1 = struct
         module T = struct
           type ('epoch, 'slot) t = {epoch: 'epoch; slot: 'slot}
-          [@@deriving sexp, bin_io, compare, version]
+          [@@deriving sexp, bin_io, compare, version {unnumbered}]
         end
 
         include T
@@ -1138,12 +1144,6 @@ module Consensus_transition_data = struct
   end
 
   type var = (Epoch.Unpacked.var, Epoch.Slot.Unpacked.var) Poly.t
-
-  let var_of_value {Poly.epoch; slot} : var =
-    (* reuse variable names because field names the same *)
-    let epoch = Epoch.(unpack_value epoch |> Unpacked.var_of_value) in
-    let slot = Epoch.Slot.(unpack_value slot |> Unpacked.var_of_value) in
-    {epoch; slot}
 
   let genesis = {Poly.epoch= Epoch.zero; slot= Epoch.Slot.zero}
 
@@ -1224,7 +1224,7 @@ module Checkpoints = struct
                  bin_io reasons *)
               prefix: Coda_base.State_hash.Stable.V1.t Core.Fqueue.Stable.V1.t
             ; tail: Hash.Stable.V1.t }
-          [@@deriving sexp, bin_io, compare, version]
+          [@@deriving sexp, bin_io, compare, version {unnumbered}]
 
           let digest ({prefix; tail} : t) =
             let rec go acc p =
@@ -1258,10 +1258,6 @@ module Checkpoints = struct
     [@@deriving sexp, hash, compare]
 
     let to_yojson = Stable.V1.to_yojson
-
-    let equal t1 t2 = compare t1 t2 = 0
-
-    let digest = Stable.V1.digest
   end
 
   module Stable = struct
@@ -1273,8 +1269,6 @@ module Checkpoints = struct
         let compare (t1 : t) (t2 : t) = Hash.compare t1.hash t2.hash
 
         let equal (t1 : t) (t2 : t) = Hash.equal t1.hash t2.hash
-
-        let hash (t : t) = Hash.hash t.hash
 
         let hash_fold_t s (t : t) = Hash.hash_fold_t s t.hash
 
@@ -1312,9 +1306,6 @@ module Checkpoints = struct
 
   type t = (Repr.t, Hash.t) With_hash.t [@@deriving sexp, to_yojson]
 
-  let compare, equal, hash, hash_fold_t =
-    Stable.Latest.(compare, equal, hash, hash_fold_t)
-
   let empty : t =
     let dummy = Hash.of_hash Snark_params.Tick.Field.zero in
     {hash= dummy; data= {prefix= Fqueue.empty; tail= dummy}}
@@ -1328,10 +1319,6 @@ module Checkpoints = struct
     else
       let sh0, prefix = Fqueue.dequeue_exn prefix in
       {hash; data= {prefix= Fqueue.enqueue prefix sh; tail= merge sh0 tail}}
-
-  let fold (t : t) = Hash.fold t.hash
-
-  let length_in_triples = Hash.length_in_triples
 
   type var = Hash.var
 
@@ -1394,7 +1381,8 @@ module Consensus_state = struct
             ; curr_epoch_data: 'curr_epoch_data
             ; has_ancestor_in_same_checkpoint_window: 'bool
             ; checkpoints: 'checkpoints }
-          [@@deriving sexp, bin_io, eq, compare, hash, to_yojson, version]
+          [@@deriving
+            sexp, bin_io, eq, compare, hash, to_yojson, version {unnumbered}]
         end
 
         include T
@@ -1434,7 +1422,7 @@ module Consensus_state = struct
       ; curr_epoch_data: 'curr_epoch_data
       ; has_ancestor_in_same_checkpoint_window: 'bool
       ; checkpoints: 'checkpoints }
-    [@@deriving sexp, eq, compare, hash, to_yojson]
+    [@@deriving sexp, compare, hash, to_yojson]
   end
 
   module Value = struct
@@ -2083,7 +2071,6 @@ end
  * from is in the genesis epoch.
  *)
 let select_epoch_data ~(consensus_state : Consensus_state.Value.t) ~epoch =
-  let open Consensus_state in
   (* are we in the same epoch as the consensus state? *)
   let in_same_epoch = Epoch.equal epoch consensus_state.curr_epoch in
   (* are we in the next epoch after the consensus state? *)
@@ -2119,7 +2106,6 @@ let epoch_snapshot_name = function
  *)
 let select_epoch_snapshot ~(consensus_state : Consensus_state.Value.t)
     ~local_state ~epoch ~epoch_data =
-  let open Consensus_state in
   let open Local_state in
   let open Epoch_data.Poly in
   let open Epoch_ledger.Poly in
@@ -2150,7 +2136,6 @@ type local_state_sync =
 let required_local_state_sync ~(consensus_state : Consensus_state.Value.t)
     ~local_state =
   let open Coda_base in
-  let open Consensus_state in
   let epoch = consensus_state.curr_epoch in
   let epoch_data =
     (* This should not fail since we are getting epoch data for the
@@ -2234,14 +2219,17 @@ let sync_local_state ~logger ~local_state ~random_peers
               (Some {ledger= snapshot_ledger; delegators}) ;
             true
         | Ok (Error err) ->
-            Logger.faulty_peer logger ~module_:__MODULE__ ~location:__LOC__
+            (* TODO: punish *)
+            Logger.faulty_peer_without_punishment logger ~module_:__MODULE__
+              ~location:__LOC__
               ~metadata:
                 [ ("peer", Network_peer.Peer.to_yojson peer)
                 ; ("error", `String err) ]
               "peer $peer failed to serve requested epoch ledger: $error" ;
             false
         | Error err ->
-            Logger.faulty_peer logger ~module_:__MODULE__ ~location:__LOC__
+            Logger.faulty_peer_without_punishment logger ~module_:__MODULE__
+              ~location:__LOC__
               ~metadata:
                 [ ("peer", Network_peer.Peer.to_yojson peer)
                 ; ("error", `String (Error.to_string_hum err)) ]
@@ -2297,7 +2285,6 @@ let received_within_window (epoch, slot) ~time_received =
 
 let received_at_valid_time (consensus_state : Consensus_state.Value.t)
     ~time_received =
-  let open Consensus_state in
   received_within_window
     (consensus_state.curr_epoch, consensus_state.curr_slot)
     ~time_received
@@ -2316,8 +2303,6 @@ include struct
 end
 
 let select ~existing ~candidate ~logger =
-  let open Consensus_state in
-  let open Epoch_data in
   let string_of_choice = function `Take -> "Take" | `Keep -> "Keep" in
   let log_result choice msg =
     Logger.debug logger ~module_:__MODULE__ ~location:__LOC__
@@ -2443,8 +2428,6 @@ let time_hum (now : Core_kernel.Time.t) =
 
 let next_proposal now (state : Consensus_state.Value.t) ~local_state ~keypair
     ~logger =
-  let open Consensus_state in
-  let open Epoch_data in
   let open Keypair in
   Logger.info logger ~module_:__MODULE__ ~location:__LOC__
     "Checking for next proposal..." ;
@@ -2543,7 +2526,6 @@ let next_proposal now (state : Consensus_state.Value.t) ~local_state ~keypair
 let lock_transition (prev : Consensus_state.Value.t)
     (next : Consensus_state.Value.t) ~local_state ~snarked_ledger =
   let open Local_state in
-  let open Consensus_state in
   if not (Epoch.equal prev.curr_epoch next.curr_epoch) then (
     let epoch_snapshot =
       Option.map local_state.proposer_public_key ~f:(fun pk ->
