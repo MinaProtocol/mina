@@ -289,8 +289,26 @@ module Make (Message : Message_intf) : S with type msg := Message.msg = struct
                       (Envelope.Incoming.wrap ~data:msg ~sender) )
               @ implementation_list )
           in
+          let handle_unknown_rpc conn ~rpc_tag ~version =
+            Logger.debug t.logger ~module_:__MODULE__ ~location:__LOC__
+              !"Peer %{sexp: Host_and_port.t} made unknown RPC call \"%s\" \
+                with version: %d, disconnecting"
+              conn rpc_tag version ;
+            let inet_addr = Unix.Inet_addr.of_string conn.host in
+            Deferred.don't_wait_for
+              Trust_system.(
+                record t.trust_system t.logger inet_addr
+                  Actions.
+                    ( Violated_protocol
+                    , Some
+                        ( "Attempt to make unknown RPC call \"$rpc\" with \
+                           version $version"
+                        , [("rpc", `String rpc_tag); ("version", `Int version)]
+                        ) )) ;
+            `Close_connection
+          in
           Rpc.Implementations.create_exn ~implementations
-            ~on_unknown_rpc:`Close_connection
+            ~on_unknown_rpc:(`Call handle_unknown_rpc)
         in
         trace_task "peer events" (fun () ->
             Linear_pipe.iter_unordered ~max_concurrency:64 peer_events
@@ -354,7 +372,7 @@ module Make (Message : Message_intf) : S with type msg := Message.msg = struct
                 Hashtbl.set t.connections
                   ~key:(Socket.Address.Inet.addr client)
                   ~data:conn_map ;
-                let%map _ =
+                let%map () =
                   Rpc.Connection.server_with_close reader writer
                     ~implementations
                     ~connection_state:(fun conn ->
