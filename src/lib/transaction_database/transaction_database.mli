@@ -9,5 +9,4 @@ val close : t -> unit
 
 val add : t -> Public_key.Compressed.t -> Transaction.t -> unit
 
-val get_transactions :
-  t -> Public_key.Compressed.t -> [`Ok of Transaction.t list | `Not_found]
+val get_transactions : t -> Public_key.Compressed.t -> Transaction.t list

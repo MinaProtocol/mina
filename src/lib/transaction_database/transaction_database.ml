@@ -55,5 +55,4 @@ let add t (public_key : Public_key.Compressed.t) transaction =
         ~data:transaction
 
 let get_transactions {cache= {user_transactions; _}; _} public_key =
-  Option.value_map ~f:(fun txns -> `Ok txns) ~default:`Not_found
-  @@ Hashtbl.find user_transactions public_key
+  Option.value ~default:[] @@ Hashtbl.find user_transactions public_key
