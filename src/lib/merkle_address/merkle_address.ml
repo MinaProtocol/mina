@@ -10,8 +10,7 @@ module type S = sig
       val version : int
 
       type nonrec t = t
-      [@@deriving
-        sexp, bin_io, hash, eq, compare, to_yojson, version {unnumbered}]
+      [@@deriving sexp, bin_io, hash, eq, compare, to_yojson, version]
     end
 
     module Latest : module type of V1

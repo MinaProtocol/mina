@@ -118,6 +118,8 @@ val memo : t -> User_command_memo.t
 
 val body : t -> Body.t
 
+val is_payment : t -> bool
+
 val accounts_accessed : t -> Public_key.Compressed.t list
 
 val gen : t Quickcheck.Generator.t

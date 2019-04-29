@@ -419,7 +419,7 @@ module Make (Message : Message_intf) : S with type msg := Message.msg = struct
     try_call_rpc t peer rpc query
 
   let query_random_peers t n rpc query =
-    let peers = random_sublist (Hash_set.to_list t.peers) n in
+    let peers = random_peers t n in
     Logger.trace t.logger ~module_:__MODULE__ ~location:__LOC__
       !"Querying random peers: %{sexp: Peer.t list}"
       peers ;

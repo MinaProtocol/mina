@@ -4,6 +4,8 @@ open Pipe_lib
 open Cache_lib
 
 module Transition_frontier_diff = struct
+  (* TODO: Remove New_frontier. 
+    Each transition frontier extension should be initialized by the input, the root breadcrumb *)
   type 'a t =
     | New_breadcrumb of 'a
         (** Triggered when a new breadcrumb is added without changing the root or best_tip *)
@@ -423,6 +425,9 @@ module type Transition_frontier_intf = sig
 
   val persistence_diff_pipe :
     t -> Extensions.Persistence_diff.view Broadcast_pipe.Reader.t
+
+  val new_transition :
+    t -> external_transition_verified Coda_incremental.New_transition.t
 
   val visualize_to_string : t -> string
 

@@ -88,7 +88,7 @@ module type Signed_intf = sig
     module Stable :
       sig
         module V1 : sig
-          type ('magnitude, 'sgn) t [@@deriving version {unnumbered}]
+          type ('magnitude, 'sgn) t [@@deriving version]
         end
 
         module Latest = V1
@@ -345,8 +345,7 @@ end = struct
         module V1 = struct
           module T = struct
             type ('magnitude, 'sgn) t = {magnitude: 'magnitude; sgn: 'sgn}
-            [@@deriving
-              bin_io, sexp, hash, compare, eq, yojson, version {unnumbered}]
+            [@@deriving bin_io, sexp, hash, compare, eq, yojson, version]
           end
 
           include T

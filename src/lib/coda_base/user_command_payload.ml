@@ -222,6 +222,9 @@ let memo (t : t) = t.common.memo
 
 let body (t : t) = t.body
 
+let is_payment (t : t) =
+  match t.body with Payment _ -> true | Stake_delegation _ -> false
+
 let accounts_accessed (t : t) =
   match t.body with
   | Payment payload ->
