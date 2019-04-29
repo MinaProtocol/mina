@@ -24,7 +24,7 @@ module Make (Inputs : Intf.Main_inputs) = struct
     t |> Transition_frontier.Breadcrumb.staged_ledger
     |> Staged_ledger.pending_coinbase_collection
 
-  let apply_diff (type mutant) frontier
+  let apply_diff (type mutant) ~logger frontier
       (diff :
         ( ( External_transition.Stable.Latest.t
           , State_hash.Stable.Latest.t )
@@ -60,10 +60,18 @@ module Make (Inputs : Intf.Main_inputs) = struct
           find_in_root_history frontier previous_root_hash)
           |> Option.value_exn
         in
-        let state_hash =
+        let previous_state_hash =
           Transition_frontier.Breadcrumb.state_hash previous_root
         in
-        (state_hash, scan_state previous_root, pending_coinbase previous_root)
+        let mutant =
+          ( previous_state_hash
+          , scan_state previous_root
+          , pending_coinbase previous_root )
+        in
+        Logger.trace logger ~module_:__MODULE__ ~location:__LOC__
+          ~metadata:[("mutant", Diff_mutant.value_to_yojson diff mutant)]
+          "Ground truth root update" ;
+        mutant
 
   let to_state_hash_diff (type output)
       (diff :
@@ -89,11 +97,7 @@ module Make (Inputs : Intf.Main_inputs) = struct
         [ ( "diff_mutant"
           , Diff_mutant.key_to_yojson diff_mutant
               ~f:(Fn.compose State_hash.to_yojson With_hash.hash) ) ] ;
-    let ground_truth_diff = apply_diff frontier diff_mutant in
-    Logger.trace logger ~module_:__MODULE__ ~location:__LOC__
-      ~metadata:
-        [("mutant", Diff_mutant.value_to_yojson diff_mutant ground_truth_diff)]
-      "Ground truth response" ;
+    let ground_truth_diff = apply_diff ~logger frontier diff_mutant in
     let ground_truth_hash =
       Diff_mutant.hash acc_hash diff_mutant ground_truth_diff
         ~f:(Fn.compose State_hash.to_bytes With_hash.hash)

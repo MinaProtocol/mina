@@ -48,11 +48,6 @@ end = struct
       "Added transition $hash and $parent_hash !" ;
     External_transition.consensus_state parent_transition
 
-  let log_mutant (t : t) diff mutant =
-    Logger.trace t.logger ~module_:__MODULE__ ~location:__LOC__
-      ~metadata:[("mutant", Diff_mutant.value_to_yojson diff mutant)]
-      "Worker response diff: "
-
   let hash = Diff_mutant.hash ~f:State_hash.to_bytes
 
   let handle_diff (t : t) acc_hash (E diff : State_hash.t Diff_mutant.E.t) =
@@ -67,7 +62,6 @@ end = struct
               ~data:(first_root_hash, scan_state, pending_coinbase) ;
             Transition_storage.Batch.set batch
               ~key:(Transition first_root_hash) ~data:(first_root, []) ;
-            log_mutant t diff () ;
             hash acc_hash diff () )
     | Add_transition transition_with_hash ->
         Transition_storage.Batch.with_batch t.transition_storage
@@ -75,7 +69,7 @@ end = struct
             let mutant =
               apply_add_transition (t, batch) transition_with_hash
             in
-            log_mutant t diff mutant ; hash acc_hash diff mutant )
+            hash acc_hash diff mutant )
     | Remove_transitions removed_transitions ->
         let mutant =
           Transition_storage.Batch.with_batch t.transition_storage
@@ -89,7 +83,7 @@ end = struct
                     ~key:(Transition state_hash) ;
                   External_transition.consensus_state removed_transition ) )
         in
-        log_mutant t diff mutant ; hash acc_hash diff mutant
+        hash acc_hash diff mutant
     | Update_root new_root_data ->
         let old_root_data =
           Logger.trace t.logger !"Getting old root data" ~module_:__MODULE__
@@ -104,7 +98,9 @@ end = struct
         Logger.trace t.logger
           !"Finished setting old root data"
           ~module_:__MODULE__ ~location:__LOC__ ;
-        log_mutant t diff old_root_data ;
+        Logger.trace t.logger ~module_:__MODULE__ ~location:__LOC__
+          ~metadata:[("mutant", Diff_mutant.value_to_yojson diff old_root_data)]
+          "Worker root update mutant" ;
         hash acc_hash diff old_root_data
 
   module For_tests = struct
