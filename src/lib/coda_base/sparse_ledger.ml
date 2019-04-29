@@ -18,7 +18,8 @@ module V1_make =
 module Stable = struct
   module V1 = struct
     module T = struct
-      type t = V1_make.Stable.V1.t [@@deriving bin_io, sexp, version]
+      type t = V1_make.Stable.V1.t
+      [@@deriving bin_io, sexp, version {unnumbered}]
     end
 
     include T

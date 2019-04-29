@@ -447,7 +447,8 @@ let%test_module _ =
           module Stable = struct
             module V1 = struct
               module T = struct
-                type t = int [@@deriving bin_io, version, sexp, yojson]
+                type t = int
+                [@@deriving bin_io, version {unnumbered}, sexp, yojson]
               end
 
               include T

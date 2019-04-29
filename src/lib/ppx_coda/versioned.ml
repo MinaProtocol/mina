@@ -14,34 +14,45 @@
 
   where option is one of "wrapped", "unnumbered", "rpc", or "asserted".
 
-  Without options (the common case), the type must be named "t", and its definition 
+  Without options (the common case), the type must be named "t", and its definition
   occurs in the module hierarchy "Stable.Vn.T", where n is a positive integer.
-  
+
   If "wrapped" is true, again, the type must be named "t", but the type
   definition occurs in the hierarchy "Wrapped.Stable.Vn", where n is a positive
   integer. TODO: Anything to say about registration, translation to a latest
   version for wrapped types?
 
   The "unnumbered" option prevents the generation of the value
-   
+
     let version = n
 
-  to prevent warnings or errors about an unused value. That's useful for versioned types in 
-  modules that aren't registered.
+  to prevent warnings or errors about an unused value. That's useful for versioned types in
+  modules that aren't registered. For types with type parameters, the version number is
+  not generated, so the "unnumbered" option is not needed.
 
   The "asserted" option asserts that the type is versioned, to allow compilation
   to proceed. The types referred to in the type are not checked for versioning
-  with this option. The type must be contained in the module hierarchy "Stable.Vn.T". 
+  with this option. The type must be contained in the module hierarchy "Stable.Vn.T".
   Eventually, all uses of this option should be removed.
 
-  The "for_test" option is a synonym of "asserted" that can be used in test code.
+  The "for_test" option implies "asserted" and "unnumbered", for use in test code.
 
   If "rpc" is true, again, the type must be named "query", "response", or "msg",
   and the type definition occurs in the hierarchy "Vn.T".
 
-  All these options are available for types within structures. Within signatures,
-  only the "unnumbered" option is available.
- 
+  All these options are available for types within structures.
+
+  Within signatures, the declaration
+
+    val __versioned__ : bool
+
+  is generated. If the "numbered" option is given, then
+
+    val version : int
+
+  is also generated. This option should be needed only by the internal versioning
+  machinery, and not in ordinary code. No other options are available within signatures.
+
 *)
 
 open Core_kernel
@@ -380,7 +391,10 @@ let generate_let_bindings_for_type_decl_str ~options ~path type_decls =
        options) ;
   let type_decl = get_type_decl_representative type_decls in
   let wrapped = check_for_option "wrapped" options in
-  let unnumbered = check_for_option "unnumbered" options in
+  let unnumbered =
+    check_for_option "unnumbered" options
+    || check_for_option "for_test" options
+  in
   let asserted =
     check_for_option "asserted" options || check_for_option "for_test" options
   in
@@ -407,24 +421,26 @@ let generate_let_bindings_for_type_decl_str ~options ~path type_decls =
     generate_versioned_decls ~asserted generation_kind type_decl
   in
   let type_name = type_decl.ptype_name.txt in
+  let has_type_params = not (List.is_empty type_decl.ptype_params) in
   (* generate version number for Rpc response, but not for query, so we
      don't get an unused value
    *)
-  if unnumbered || (generation_kind = Rpc && String.equal type_name "query")
+  if
+    unnumbered || has_type_params
+    || (generation_kind = Rpc && String.equal type_name "query")
   then versioned_decls
   else
     generate_version_number_decl inner3_modules type_decl.ptype_loc
       generation_kind
     :: versioned_decls
 
-let generate_val_decls_for_type_decl type_decl ~unnumbered =
+let generate_val_decls_for_type_decl type_decl ~numbered =
   match type_decl.ptype_kind with
   (* the structure of the type doesn't affect what we generate for signatures *)
   | Ptype_abstract | Ptype_variant _ | Ptype_record _ ->
       let loc = type_decl.ptype_loc in
       let versioned = [%sigi: val __versioned__ : bool] in
-      if unnumbered then [versioned]
-      else [[%sigi: val version : int]; versioned]
+      if numbered then [[%sigi: val version : int]; versioned] else [versioned]
   | Ptype_open ->
       (* but the type can't be open, else it might vary over time *)
       Ppx_deriving.raise_errorf ~loc:type_decl.ptype_loc
@@ -432,10 +448,10 @@ let generate_val_decls_for_type_decl type_decl ~unnumbered =
 
 let generate_val_decls_for_type_decl_sig ~options ~path:_ type_decls =
   (* in a signature, the module path may vary *)
-  ignore (validate_options ["unnumbered"] options) ;
+  ignore (validate_options ["numbered"] options) ;
   let type_decl = get_type_decl_representative type_decls in
-  let unnumbered = check_for_option "unnumbered" options in
-  generate_val_decls_for_type_decl type_decl ~unnumbered
+  let numbered = check_for_option "numbered" options in
+  generate_val_decls_for_type_decl type_decl ~numbered
 
 let () =
   Ppx_deriving.(

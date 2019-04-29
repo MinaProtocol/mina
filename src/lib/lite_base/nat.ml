@@ -1,5 +1,5 @@
 module Make (Type : sig
-  type t [@@deriving bin_io, eq, sexp, compare, version {unnumbered}]
+  type t [@@deriving bin_io, eq, sexp, compare, version]
 end)
 (Impl : sig
           type t

@@ -92,7 +92,8 @@ struct
       module V1 = struct
         module T = struct
           type t = Field.t
-          [@@deriving sexp, bin_io, compare, hash, eq, version {asserted}]
+          [@@deriving
+            sexp, bin_io, compare, hash, eq, version {asserted; unnumbered}]
         end
 
         include T
