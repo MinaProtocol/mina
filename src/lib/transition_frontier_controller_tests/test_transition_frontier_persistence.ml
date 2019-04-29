@@ -179,6 +179,7 @@ let%test_module "Transition Frontier Persistence" =
       test_linear_breadcrumbs (max_length - 1)
 
     let%test_unit "Root changes multiple times" =
+      Printexc.record_backtrace true ;
       test_linear_breadcrumbs (2 * max_length)
 
     let%test_unit "Randomly generate a tree" =
