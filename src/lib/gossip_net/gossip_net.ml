@@ -290,7 +290,7 @@ module Make (Message : Message_intf) : S with type msg := Message.msg = struct
               @ implementation_list )
           in
           let handle_unknown_rpc conn ~rpc_tag ~version =
-            Logger.debug t.logger ~module_:__MODULE__ ~location:__LOC__
+            Logger.info t.logger ~module_:__MODULE__ ~location:__LOC__
               !"Peer %{sexp: Host_and_port.t} made unknown RPC call \"%s\" \
                 with version: %d, disconnecting"
               conn rpc_tag version ;
