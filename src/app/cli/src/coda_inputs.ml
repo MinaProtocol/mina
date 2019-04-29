@@ -379,6 +379,8 @@ module type Main_intf = sig
 
   val transaction_pool : t -> Inputs.Transaction_pool.t
 
+  val transaction_database : t -> Transaction_database.t
+
   val snark_pool : t -> Inputs.Snark_pool.t
 
   val create : Config.t -> t Deferred.t
