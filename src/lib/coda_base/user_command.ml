@@ -16,7 +16,7 @@ module Poly = struct
       module T = struct
         type ('payload, 'pk, 'signature) t =
           {payload: 'payload; sender: 'pk; signature: 'signature}
-        [@@deriving bin_io, eq, sexp, hash, yojson, version {unnumbered}]
+        [@@deriving bin_io, eq, sexp, hash, yojson, version]
       end
 
       include T
