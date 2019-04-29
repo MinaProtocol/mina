@@ -10,4 +10,4 @@ val close : t -> unit
 val add : t -> Public_key.Compressed.t -> Transaction.t -> unit
 
 val get_transactions :
-  t -> Public_key.Compressed.t -> Transaction.t Non_empty_list.t option
+  t -> Public_key.Compressed.t -> [`Ok of Transaction.t list | `Not_found]

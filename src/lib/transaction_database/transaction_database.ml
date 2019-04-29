@@ -2,12 +2,11 @@ open Coda_base
 open Core
 open Signature_lib
 
-(* TODO: This database should be optimized to query an individual transaction quickly. Also, it can technically take a long time to make a row update since we read a list of transactions from a user in the database and we just append the transaction into the list and then write that to the database *)
 module Transaction_list = struct
   module Stable = struct
     module V1 = struct
       module T = struct
-        type t = Transaction.Stable.V1.t Non_empty_list.Stable.V1.t
+        type t = Transaction.Stable.V1.t list
         [@@deriving bin_io, version {unnumbered}]
       end
 
@@ -56,5 +55,5 @@ let add t (public_key : Public_key.Compressed.t) transaction =
         ~data:transaction
 
 let get_transactions {cache= {user_transactions; _}; _} public_key =
-  let open Option.Monad_infix in
-  Hashtbl.find user_transactions public_key >>= Non_empty_list.of_list_opt
+  Option.value_map ~f:(fun txns -> `Ok txns) ~default:`Not_found
+  @@ Hashtbl.find user_transactions public_key
