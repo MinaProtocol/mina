@@ -26,7 +26,7 @@ module type Versioned_module_intf = sig
 end
 
 module type Version_intf = sig
-  type t [@@deriving bin_io, version]
+  type t [@@deriving bin_io, version {numbered}]
 end
 
 (* functor to create a registrar that can
