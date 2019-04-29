@@ -25,7 +25,7 @@ module Rpcs (Inputs : sig
     module Stable :
       sig
         module V1 : sig
-          type t [@@deriving bin_io, version {unnumbered}]
+          type t [@@deriving bin_io, version]
         end
       end
       with type V1.t = t
@@ -259,7 +259,7 @@ module Message (Inputs : sig
     module Stable :
       sig
         module V1 : sig
-          type t [@@deriving bin_io, sexp, to_yojson, version {unnumbered}]
+          type t [@@deriving bin_io, sexp, to_yojson, version]
         end
       end
       with type V1.t = t
@@ -271,7 +271,7 @@ module Message (Inputs : sig
     module Stable :
       sig
         module V1 : sig
-          type t [@@deriving bin_io, sexp, to_yojson, version {unnumbered}]
+          type t [@@deriving bin_io, sexp, to_yojson, version]
         end
       end
       with type V1.t = t
