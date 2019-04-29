@@ -90,8 +90,7 @@ let make = (~message) => {
   let testButton = (str, ~f) => {
     <button onClick={_e => f()}> {ReasonReact.string(str)} </button>;
   };
-
-  <ApolloShim.Provider client=instance>
+  <ReasonApollo.Provider client=instance>
     <div
       style={ReactDOMRe.Style.make(
         ~border="8px solid #11161b",
@@ -158,5 +157,5 @@ let make = (~message) => {
         </div>
       </div>
     </div>
-  </ApolloShim.Provider>;
+  </ReasonApollo.Provider>;
 };
