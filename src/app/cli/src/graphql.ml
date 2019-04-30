@@ -33,16 +33,6 @@ module Make (Commands : Coda_commands.Intf) = struct
       field name ~typ:(non_null string)
         ~doc:(sprintf !"%s (%s is uint64 and is coerced as a string" doc name)
 
-    let get_payments external_transition =
-      let staged_ledger_diff =
-        External_transition.staged_ledger_diff external_transition
-      in
-      let user_commands =
-        Staged_ledger_diff.user_commands staged_ledger_diff
-      in
-      List.filter user_commands
-        ~f:(Fn.compose User_command_payload.is_payment User_command.payload)
-
     (* TODO: include submitted_at (date) and included_at (date). These two fields are not exposed in the user_command *)
     let payment : (Program.t, User_command.t option) typ =
       obj "Payment" ~fields:(fun _ ->
@@ -105,12 +95,6 @@ module Make (Commands : Coda_commands.Intf) = struct
               ~resolve:(fun _ {Transaction_snark_work.fee; _} ->
                 Currency.Fee.to_uint64 fee |> Unsigned.UInt64.to_string ) ] )
 
-    let block_proposer external_transition =
-      let staged_ledger_diff =
-        External_transition.staged_ledger_diff external_transition
-      in
-      staged_ledger_diff.creator
-
     let block : ('context, External_transition.t option) typ =
       obj "Block" ~fields:(fun _ ->
           [ uint64_field "coinbase" ~doc:"Total coinbase awarded to proposer"
@@ -125,12 +109,13 @@ module Make (Commands : Coda_commands.Intf) = struct
               ~doc:"Public key of the proposer creating the block"
               ~args:Arg.[]
               ~resolve:(fun _ external_transition ->
-                Stringable.public_key @@ block_proposer external_transition )
+                Stringable.public_key
+                @@ External_transition.proposer external_transition )
           ; field "payments" ~doc:"List of payments in the block"
               ~typ:(non_null (list @@ non_null payment))
               ~args:Arg.[]
               ~resolve:(fun _ external_transition ->
-                get_payments external_transition )
+                External_transition.payments external_transition )
           ; field "snarkFees"
               ~doc:"Fees that a proposer for constructing proofs"
               ~typ:(non_null (list @@ non_null snark_fee))
@@ -351,22 +336,7 @@ module Make (Commands : Coda_commands.Intf) = struct
         ~typ:(non_null @@ list @@ non_null Types.payment)
         ~resolve:(fun {ctx= coda; _} () public_key ->
           let public_key = Public_key.Compressed.of_base64_exn public_key in
-          let transaction_database = Program.transaction_database coda in
-          let transactions =
-            Transaction_database.get_transactions transaction_database
-              public_key
-          in
-          List.filter_map transactions ~f:(function
-            | Coda_base.Transaction.User_command checked_user_command ->
-                let user_command =
-                  User_command.forget_check checked_user_command
-                in
-                Option.some_if
-                  ( User_command_payload.is_payment
-                  @@ User_command.payload user_command )
-                  user_command
-            | _ ->
-                None ) )
+          Commands.get_all_payments coda public_key )
 
     let commands =
       [ sync_state
@@ -389,26 +359,6 @@ module Make (Commands : Coda_commands.Intf) = struct
           Program.sync_status coda |> Coda_incremental.Status.to_pipe
           |> Deferred.Result.return )
 
-    (* Creates a global pipe to feed a subscription that will be available throughout the entire duration that a daemon is runnning  *)
-    let global_pipe coda ~to_pipe =
-      let global_reader, global_writer = Pipe.create () in
-      let init, _ = Pipe.create () in
-      Broadcast_pipe.Reader.fold (Program.transition_frontier coda) ~init
-        ~f:(fun acc_pipe -> function
-        | None ->
-            Deferred.return acc_pipe
-        | Some transition_frontier ->
-            Pipe.close_read acc_pipe ;
-            let new_block_incr =
-              Transition_frontier.new_transition transition_frontier
-            in
-            let frontier_pipe = to_pipe new_block_incr in
-            Pipe.transfer frontier_pipe global_writer ~f:Fn.id
-            |> don't_wait_for ;
-            Deferred.return frontier_pipe )
-      |> Deferred.ignore |> don't_wait_for ;
-      Deferred.Result.return global_reader
-
     let new_block =
       subscription_field "newBlock"
         ~doc:
@@ -419,23 +369,8 @@ module Make (Commands : Coda_commands.Intf) = struct
         ~resolve:(fun {ctx= coda; _} public_key ->
           let public_key = Public_key.Compressed.of_base64_exn public_key in
           (* Pipes that will alert a subscriber of any new blocks throughout the entire time the daemon is on *)
-          global_pipe coda ~to_pipe:(fun new_block_incr ->
-              let new_block_observer =
-                Coda_incremental.New_transition.observe new_block_incr
-              in
-              Coda_incremental.New_transition.stabilize () ;
-              let frontier_new_block_reader =
-                Coda_incremental.New_transition.to_pipe new_block_observer
-              in
-              Pipe.filter_map frontier_new_block_reader ~f:(fun new_block ->
-                  let unverified_new_block =
-                    External_transition.of_verified new_block
-                  in
-                  Option.some_if
-                    (Public_key.Compressed.equal
-                       (Types.block_proposer unverified_new_block)
-                       public_key)
-                    unverified_new_block ) ) )
+          Deferred.Result.return
+          @@ Commands.Subscriptions.new_block coda public_key )
 
     let new_payment_update =
       subscription_field "newPaymentUpdate"
@@ -446,48 +381,8 @@ module Make (Commands : Coda_commands.Intf) = struct
         ~args:Arg.[arg "publicKey" ~typ:(non_null string)]
         ~resolve:(fun {ctx= coda; _} public_key ->
           let public_key = Public_key.Compressed.of_base64_exn public_key in
-          let transaction_database = Program.transaction_database coda in
-          global_pipe coda ~to_pipe:(fun new_block_incr ->
-              let payments_incr =
-                Coda_incremental.New_transition.map new_block_incr
-                  ~f:
-                    (Fn.compose Types.get_payments
-                       External_transition.of_verified)
-              in
-              let payments_observer =
-                Coda_incremental.New_transition.observe payments_incr
-              in
-              Coda_incremental.New_transition.stabilize () ;
-              let frontier_payment_reader, frontier_payment_writer =
-                (* TODO: should be the max amount of transactions in a block *)
-                Strict_pipe.(
-                  create (Buffered (`Capacity 20, `Overflow Drop_head)))
-              in
-              let write_user_commands user_commands =
-                List.filter user_commands ~f:(fun user_command ->
-                    Public_key.Compressed.equal
-                      (User_command.sender user_command)
-                      public_key )
-                |> List.iter ~f:(fun user_command ->
-                       let checked_user_command =
-                         Option.value_exn (User_command.check user_command)
-                       in
-                       Transaction_database.add transaction_database public_key
-                         (Coda_base.Transaction.User_command
-                            checked_user_command) ;
-                       Strict_pipe.Writer.write frontier_payment_writer
-                         user_command )
-              in
-              Coda_incremental.New_transition.Observer.on_update_exn
-                payments_observer ~f:(function
-                | Initialized payments ->
-                    write_user_commands payments
-                | Changed (_, payments) ->
-                    write_user_commands payments
-                | Invalidated ->
-                    () ) ;
-              (Strict_pipe.Reader.to_linear_pipe frontier_payment_reader)
-                .Linear_pipe.Reader.pipe ) )
+          Deferred.Result.return
+          @@ Commands.Subscriptions.new_payment coda public_key )
 
     let commands = [new_sync_update; new_block; new_payment_update]
   end

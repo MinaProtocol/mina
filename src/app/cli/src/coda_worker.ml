@@ -44,34 +44,10 @@ module Send_payment_input = struct
 end
 
 module T = struct
-  module Peers = struct
-    (* TODO: version *)
-    type t = Network_peer.Peer.Stable.V1.t List.t [@@deriving bin_io]
-  end
-
-  module State_hashes = struct
-    type t = bool list * bool list [@@deriving bin_io]
-  end
-
-  module Maybe_currency = struct
-    (* TODO: version *)
-    type t = Currency.Balance.Stable.V1.t option [@@deriving bin_io]
-  end
-
-  module Prove_receipt = struct
-    (* TODO : version *)
-    module Input = struct
-      type t = Receipt.Chain_hash.Stable.V1.t * Receipt.Chain_hash.Stable.V1.t
-      [@@deriving bin_io]
-    end
-
-    module Output = struct
-      type t = Payment_proof.t [@@deriving bin_io]
-    end
-  end
+  type state_hashes = bool list * bool list
 
   type 'worker functions =
-    { peers: ('worker, unit, Peers.t) Rpc_parallel.Function.t
+    { peers: ('worker, unit, Network_peer.Peer.t list) Rpc_parallel.Function.t
     ; start: ('worker, unit, unit) Rpc_parallel.Function.t
     ; get_balance:
         ( 'worker
@@ -95,9 +71,19 @@ module T = struct
         , Receipt.Chain_hash.t Or_error.t )
         Rpc_parallel.Function.t
     ; verified_transitions:
-        ('worker, unit, State_hashes.t Pipe.Reader.t) Rpc_parallel.Function.t
+        ('worker, unit, state_hashes Pipe.Reader.t) Rpc_parallel.Function.t
     ; sync_status:
         ('worker, unit, Sync_status.t Pipe.Reader.t) Rpc_parallel.Function.t
+    ; get_all_payments:
+        ( 'worker
+        , Public_key.Compressed.t
+        , User_command.t list )
+        Rpc_parallel.Function.t
+    ; new_payment:
+        ( 'worker
+        , Public_key.Compressed.t
+        , User_command.t Pipe.Reader.t )
+        Rpc_parallel.Function.t
     ; root_diff:
         ( 'worker
         , unit
@@ -106,8 +92,8 @@ module T = struct
         Rpc_parallel.Function.t
     ; prove_receipt:
         ( 'worker
-        , Prove_receipt.Input.t
-        , Prove_receipt.Output.t )
+        , Receipt.Chain_hash.t * Receipt.Chain_hash.t
+        , Payment_proof.t )
         Rpc_parallel.Function.t
     ; dump_tf: ('worker, unit, string) Rpc_parallel.Function.t
     ; best_path:
@@ -117,9 +103,11 @@ module T = struct
         Rpc_parallel.Function.t }
 
   type coda_functions =
-    { coda_peers: unit -> Peers.t Deferred.t
+    { coda_peers: unit -> Network_peer.Peer.t list Deferred.t
     ; coda_start: unit -> unit Deferred.t
-    ; coda_get_balance: Public_key.Compressed.t -> Maybe_currency.t Deferred.t
+    ; coda_get_balance:
+           Public_key.Compressed.t
+        -> Currency.Balance.Stable.V1.t option Deferred.t
     ; coda_get_nonce:
            Public_key.Compressed.t
         -> Coda_numbers.Account_nonce.t option Deferred.t
@@ -128,17 +116,23 @@ module T = struct
         Send_payment_input.t -> Receipt.Chain_hash.t Or_error.t Deferred.t
     ; coda_process_payment:
         User_command.t -> Receipt.Chain_hash.t Or_error.t Deferred.t
-    ; coda_verified_transitions:
-        unit -> State_hashes.t Pipe.Reader.t Deferred.t
+    ; coda_verified_transitions: unit -> state_hashes Pipe.Reader.t Deferred.t
     ; coda_sync_status:
         unit -> Sync_status.Stable.V1.t Pipe.Reader.t Deferred.t
+    ; coda_new_payment:
+           Public_key.Compressed.Stable.V1.t
+        -> User_command.Stable.V1.t Pipe.Reader.t Deferred.t
+    ; coda_get_all_payments:
+           Public_key.Compressed.Stable.V1.t
+        -> User_command.Stable.V1.t list Deferred.t
     ; coda_root_diff:
            unit
         -> User_command.t Protocols.Coda_transition_frontier.Root_diff_view.t
            Pipe.Reader.t
            Deferred.t
     ; coda_prove_receipt:
-        Prove_receipt.Input.t -> Prove_receipt.Output.t Deferred.t
+           Receipt.Chain_hash.t * Receipt.Chain_hash.t
+        -> Payment_proof.t Deferred.t
     ; coda_dump_tf: unit -> string Deferred.t
     ; coda_best_path: unit -> State_hash.Stable.Latest.t list Deferred.t }
 
@@ -166,6 +160,12 @@ module T = struct
 
     let sync_status_impl ~worker_state ~conn_state:() () =
       worker_state.coda_sync_status ()
+
+    let new_payment_impl ~worker_state ~conn_state:() pk =
+      worker_state.coda_new_payment pk
+
+    let get_all_payments_impl ~worker_state ~conn_state:() pk =
+      worker_state.coda_get_all_payments pk
 
     let root_diff_impl ~worker_state ~conn_state:() () =
       worker_state.coda_root_diff ()
@@ -197,8 +197,8 @@ module T = struct
       worker_state.coda_best_path ()
 
     let peers =
-      C.create_rpc ~f:peers_impl ~bin_input:Unit.bin_t ~bin_output:Peers.bin_t
-        ()
+      C.create_rpc ~f:peers_impl ~bin_input:Unit.bin_t
+        ~bin_output:[%bin_type_class: Network_peer.Peer.Stable.V1.t list] ()
 
     let start =
       C.create_rpc ~f:start_impl ~bin_input:Unit.bin_t ~bin_output:Unit.bin_t
@@ -207,7 +207,7 @@ module T = struct
     let get_balance =
       C.create_rpc ~f:get_balance_impl
         ~bin_input:Public_key.Compressed.Stable.V1.bin_t
-        ~bin_output:Maybe_currency.bin_t ()
+        ~bin_output:[%bin_type_class: Currency.Balance.Stable.V1.t option] ()
 
     let get_nonce =
       C.create_rpc ~f:get_nonce_impl
@@ -220,8 +220,11 @@ module T = struct
         ~bin_output:Int.bin_t ()
 
     let prove_receipt =
-      C.create_rpc ~f:prove_receipt_impl ~bin_input:Prove_receipt.Input.bin_t
-        ~bin_output:Prove_receipt.Output.bin_t ()
+      C.create_rpc ~f:prove_receipt_impl
+        ~bin_input:
+          [%bin_type_class:
+            Receipt.Chain_hash.Stable.V1.t * Receipt.Chain_hash.Stable.V1.t]
+        ~bin_output:Payment_proof.bin_t ()
 
     let send_payment =
       C.create_rpc ~f:send_payment_impl ~bin_input:Send_payment_input.bin_t
@@ -236,7 +239,7 @@ module T = struct
 
     let verified_transitions =
       C.create_pipe ~f:verified_transitions_impl ~bin_input:Unit.bin_t
-        ~bin_output:State_hashes.bin_t ()
+        ~bin_output:[%bin_type_class: bool list * bool list] ()
 
     let root_diff =
       C.create_pipe ~f:root_diff_impl ~bin_input:Unit.bin_t
@@ -247,7 +250,17 @@ module T = struct
 
     let sync_status =
       C.create_pipe ~f:sync_status_impl ~bin_input:Unit.bin_t
-        ~bin_output:[%bin_type_class: Sync_status.Stable.V1.t] ()
+        ~bin_output:Sync_status.Stable.V1.bin_t ()
+
+    let new_payment =
+      C.create_pipe ~f:new_payment_impl
+        ~bin_input:Public_key.Compressed.Stable.V1.bin_t
+        ~bin_output:User_command.Stable.V1.bin_t ()
+
+    let get_all_payments =
+      C.create_rpc ~f:get_all_payments_impl
+        ~bin_input:Public_key.Compressed.Stable.V1.bin_t
+        ~bin_output:[%bin_type_class: User_command.Stable.V1.t list] ()
 
     let dump_tf =
       C.create_rpc ~f:dump_tf_impl ~bin_input:Unit.bin_t
@@ -270,7 +283,9 @@ module T = struct
       ; prove_receipt
       ; dump_tf
       ; best_path
-      ; sync_status }
+      ; sync_status
+      ; new_payment
+      ; get_all_payments }
 
     let init_worker_state
         { host
@@ -518,6 +533,13 @@ module T = struct
                   !"unable to retrieve sync update subscription: %s"
                   e ()
           in
+          let coda_new_payment =
+            Fn.compose Deferred.return
+            @@ Run.Commands.Subscriptions.new_payment coda
+          in
+          let coda_get_all_payments =
+            Fn.compose Deferred.return @@ Run.Commands.get_all_payments coda
+          in
           { coda_peers= with_monitor coda_peers
           ; coda_verified_transitions= with_monitor coda_verified_transitions
           ; coda_root_diff= with_monitor coda_root_diff
@@ -530,7 +552,9 @@ module T = struct
           ; coda_start= with_monitor coda_start
           ; coda_dump_tf= with_monitor coda_dump_tf
           ; coda_best_path= with_monitor coda_best_path
-          ; coda_sync_status= with_monitor coda_sync_status } )
+          ; coda_sync_status= with_monitor coda_sync_status
+          ; coda_new_payment= with_monitor coda_new_payment
+          ; coda_get_all_payments= with_monitor coda_get_all_payments } )
 
     let init_connection_state ~connection:_ ~worker_state:_ = return
   end
