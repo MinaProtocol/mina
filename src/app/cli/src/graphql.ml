@@ -284,7 +284,8 @@ module Make (Commands : Coda_commands.Intf) = struct
               ; balance
               ; receipt_chain_hash
               ; delegate
-              ; participated }
+              ; participated
+              ; voting_for }
          ->
         { Account.Poly.public_key
         ; nonce
@@ -292,7 +293,8 @@ module Make (Commands : Coda_commands.Intf) = struct
         ; balance=
             {Types.Wallet.AnnotatedBalance.total= balance; unknown= balance}
         ; receipt_chain_hash
-        ; participated } )
+        ; participated
+        ; voting_for } )
 
   module Queries = struct
     open Schema
