@@ -408,6 +408,7 @@ module Make (Commands : Coda_commands.Intf) = struct
         ~args:Arg.[arg "publicKey" ~typ:(non_null string)]
         ~resolve:(fun {ctx= coda; _} public_key ->
           let public_key = Public_key.Compressed.of_base64_exn public_key in
+          let transaction_database = Program.transaction_database coda in
           global_pipe coda ~to_pipe:(fun new_block_incr ->
               let payments_incr =
                 Coda_incremental.New_transition.map new_block_incr
@@ -424,21 +425,27 @@ module Make (Commands : Coda_commands.Intf) = struct
                 Strict_pipe.(
                   create (Buffered (`Capacity 20, `Overflow Drop_head)))
               in
-              let write_payments payments =
-                List.filter payments ~f:(fun payment ->
+              let write_user_commands user_commands =
+                List.filter user_commands ~f:(fun user_command ->
                     Public_key.Compressed.equal
-                      (User_command.sender payment)
+                      (User_command.sender user_command)
                       public_key )
-                |> List.iter ~f:(fun payment ->
-                       Strict_pipe.Writer.write frontier_payment_writer payment
-                   )
+                |> List.iter ~f:(fun user_command ->
+                       let checked_user_command =
+                         Option.value_exn (User_command.check user_command)
+                       in
+                       Transaction_database.add transaction_database public_key
+                         (Coda_base.Transaction.User_command
+                            checked_user_command) ;
+                       Strict_pipe.Writer.write frontier_payment_writer
+                         user_command )
               in
               Coda_incremental.New_transition.Observer.on_update_exn
                 payments_observer ~f:(function
                 | Initialized payments ->
-                    write_payments payments
+                    write_user_commands payments
                 | Changed (_, payments) ->
-                    write_payments payments
+                    write_user_commands payments
                 | Invalidated ->
                     () ) ;
               (Strict_pipe.Reader.to_linear_pipe frontier_payment_reader)

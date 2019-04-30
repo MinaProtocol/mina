@@ -5,13 +5,13 @@ module Single : sig
   module Stable : sig
     module V1 : sig
       type t = Public_key.Compressed.Stable.V1.t * Currency.Fee.Stable.V1.t
-      [@@deriving bin_io, sexp, compare, eq, yojson, version]
+      [@@deriving bin_io, sexp, compare, eq, yojson, version, hash]
     end
 
     module Latest = V1
   end
 
-  type t = Stable.Latest.t [@@deriving sexp, compare, eq, yojson]
+  type t = Stable.Latest.t [@@deriving sexp, compare, eq, yojson, hash]
 end
 
 module Stable : sig
@@ -19,7 +19,7 @@ module Stable : sig
     type t =
       | One of Single.Stable.V1.t
       | Two of Single.Stable.V1.t * Single.Stable.V1.t
-    [@@deriving bin_io, sexp, compare, eq, yojson, version]
+    [@@deriving bin_io, sexp, compare, eq, yojson, version, hash]
   end
 
   module Latest = V1
@@ -28,7 +28,7 @@ end
 type t = Stable.Latest.t =
   | One of Single.Stable.V1.t
   | Two of Single.Stable.V1.t * Single.Stable.V1.t
-[@@deriving sexp, compare, eq, yojson]
+[@@deriving sexp, compare, eq, yojson, hash]
 
 val to_list : t -> Single.t list
 
