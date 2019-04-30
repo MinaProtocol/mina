@@ -336,39 +336,43 @@ struct
         mb_write_to_pipe diff (Field.get field t) handler pipe
       in
       ( match diff with
-      | Transition_frontier_diff.New_breadcrumb breadcrumb ->
+      | Transition_frontier_diff.New_best_tip {old_root; new_root; _} ->
+          if not (Breadcrumb.equal old_root new_root) then
+            Root_history.enqueue t.root_history
+              (Breadcrumb.state_hash old_root)
+              old_root
+      | _ ->
+          () ) ;
+      let%map () =
+        Fields.fold ~init:diff
+          ~root_history:(fun _ _ -> Deferred.unit)
+          ~snark_pool_refcount:
+            (use Snark_pool_refcount.handle_diff pipes.snark_pool)
+          ~transition_registry:(fun acc _ -> acc)
+          ~best_tip_diff:(use Best_tip_diff.handle_diff pipes.best_tip_diff)
+          ~root_diff:(use Root_diff.handle_diff pipes.root_diff)
+          ~persistence_diff:
+            (use Persistence_diff.handle_diff pipes.persistence_diff)
+          ~new_transition:(fun acc _ -> acc)
+      in
+      let bc_opt =
+        match diff with
+        | New_breadcrumb bc ->
+            Some bc
+        | New_best_tip {added_to_best_tip_path; _} ->
+            Some (Non_empty_list.last added_to_best_tip_path)
+        | _ ->
+            None
+      in
+      Option.iter bc_opt ~f:(fun bc ->
+          (* Other components may be waiting on these, so it's important they're
+             updated after the views above so that those other components see
+             the views updated with the new breadcrumb. *)
           Transition_registry.notify t.transition_registry
-            (Breadcrumb.state_hash breadcrumb) ;
+            (Breadcrumb.state_hash bc) ;
           New_transition.Var.set t.new_transition
-            (Breadcrumb.external_transition breadcrumb) ;
-          New_transition.stabilize ()
-      | Transition_frontier_diff.New_frontier _ ->
-          ()
-      | Transition_frontier_diff.New_best_tip
-          { old_root
-          ; old_root_length
-          ; new_best_tip_length
-          ; added_to_best_tip_path
-          ; _ } ->
-          ( if new_best_tip_length - old_root_length > max_length then
-            let root_state_hash = Breadcrumb.state_hash old_root in
-            Root_history.enqueue t.root_history root_state_hash old_root ) ;
-          let new_breadcrumb = Non_empty_list.last added_to_best_tip_path in
-          Transition_registry.notify t.transition_registry
-            (Breadcrumb.state_hash new_breadcrumb) ;
-          New_transition.Var.set t.new_transition
-            (Breadcrumb.external_transition new_breadcrumb) ;
-          New_transition.stabilize () ) ;
-      Fields.fold ~init:diff
-        ~root_history:(fun _ _ -> Deferred.unit)
-        ~snark_pool_refcount:
-          (use Snark_pool_refcount.handle_diff pipes.snark_pool)
-        ~transition_registry:(fun acc _ -> acc)
-        ~best_tip_diff:(use Best_tip_diff.handle_diff pipes.best_tip_diff)
-        ~root_diff:(use Root_diff.handle_diff pipes.root_diff)
-        ~persistence_diff:
-          (use Persistence_diff.handle_diff pipes.persistence_diff)
-        ~new_transition:(fun acc _ -> acc)
+          @@ Breadcrumb.external_transition bc ;
+          New_transition.stabilize () )
   end
 
   module Node = struct
