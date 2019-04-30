@@ -165,7 +165,7 @@ module Make (Message : Message_intf) :
                 [ Sexp.Atom "src/connection.ml.Handshake_error.Handshake_error"
                 ; _ ] ) ->
               let%map () =
-                Trust_system.record t.trust_system t.logger peer
+                Trust_system.record t.trust_system t.logger peer.host
                   ( Trust_system.Actions.Outgoing_connection_error
                   , Some ("handshake error", []) )
               in
@@ -173,7 +173,7 @@ module Make (Message : Message_intf) :
               Error err
           | Async_rpc_kernel.Rpc_error.Rpc (Connection_closed, _), _ ->
               let%map () =
-                Trust_system.record t.trust_system t.logger peer
+                Trust_system.record t.trust_system t.logger peer.host
                   ( Trust_system.Actions.Outgoing_connection_error
                   , Some ("closed connection", []) )
               in
@@ -182,7 +182,7 @@ module Make (Message : Message_intf) :
               (* call succeeded, result is an error *)
               let%bind () =
                 Trust_system.(
-                  record t.trust_system t.logger peer
+                  record t.trust_system t.logger peer.host
                     Actions.
                       ( Violated_protocol
                       , Some

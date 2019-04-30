@@ -177,7 +177,7 @@ module Make (Inputs : Inputs.S) :
                   else (
                     ignore
                       Trust_system.(
-                        record trust_system logger peer
+                        record trust_system logger peer.host
                           Actions.
                             ( Violated_protocol
                             , Some
