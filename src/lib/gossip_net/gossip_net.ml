@@ -368,8 +368,8 @@ module Make (Message : Message_intf) : S with type msg := Message.msg = struct
                     false
               in
               if is_client_banned then (
-                Logger.error t.logger ~module_:__MODULE__ ~location:__LOC__
-                  "Disconnecting banned peer %s"
+                Logger.info t.logger ~module_:__MODULE__ ~location:__LOC__
+                  "Rejecting connection from banned peer %s"
                   (Socket.Address.Inet.to_string client) ;
                 Reader.close reader >>= fun _ -> Writer.close writer )
               else if
