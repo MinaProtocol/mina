@@ -367,8 +367,7 @@ module Epoch_ledger = struct
         module T = struct
           type ('ledger_hash, 'amount) t =
             {hash: 'ledger_hash; total_currency: 'amount}
-          [@@deriving
-            sexp, bin_io, eq, compare, hash, to_yojson, version {unnumbered}]
+          [@@deriving sexp, bin_io, eq, compare, hash, to_yojson, version]
         end
 
         include T
@@ -828,7 +827,8 @@ module Optional_state_hash = struct
     module V1 = struct
       module T = struct
         type t = Coda_base.State_hash.Stable.V1.t option
-        [@@deriving sexp, bin_io, eq, compare, hash, to_yojson, version]
+        [@@deriving
+          sexp, bin_io, eq, compare, hash, to_yojson, version {unnumbered}]
       end
 
       include T
@@ -2215,7 +2215,7 @@ let required_local_state_sync ~(consensus_state : Consensus_state.Value.t)
     | ls ->
         Non_empty_list.of_list_opt ls )
 
-let sync_local_state ~logger ~local_state ~random_peers
+let sync_local_state ~logger ~trust_system ~local_state ~random_peers
     ~(query_peer : Network_peer.query_peer) requested_syncs =
   let open Local_state in
   let open Snapshot in
@@ -2230,11 +2230,16 @@ let sync_local_state ~logger ~local_state ~random_peers
       ; ("local_state", Local_state.to_yojson local_state) ] ;
   let sync {snapshot_id; expected_root= target_ledger_hash} =
     Deferred.List.exists (random_peers 3) ~f:(fun peer ->
-        match%map
+        match%bind
           query_peer.query peer Rpcs.Get_epoch_ledger.dispatch_multi
             (Coda_base.Frozen_ledger_hash.to_ledger_hash target_ledger_hash)
         with
         | Ok (Ok snapshot_ledger) ->
+            let%bind () =
+              Trust_system.(
+                record trust_system logger peer.host
+                  Actions.(Epoch_ledger_provided, None))
+            in
             let delegators =
               Option.map local_state.proposer_public_key ~f:(fun pk ->
                   compute_delegators
@@ -2246,16 +2251,15 @@ let sync_local_state ~logger ~local_state ~random_peers
             in
             set_snapshot local_state snapshot_id
               (Some {ledger= snapshot_ledger; delegators}) ;
-            true
+            return true
         | Ok (Error err) ->
-            (* TODO: punish *)
             Logger.faulty_peer_without_punishment logger ~module_:__MODULE__
               ~location:__LOC__
               ~metadata:
                 [ ("peer", Network_peer.Peer.to_yojson peer)
                 ; ("error", `String err) ]
               "peer $peer failed to serve requested epoch ledger: $error" ;
-            false
+            return false
         | Error err ->
             Logger.faulty_peer_without_punishment logger ~module_:__MODULE__
               ~location:__LOC__
@@ -2263,7 +2267,7 @@ let sync_local_state ~logger ~local_state ~random_peers
                 [ ("peer", Network_peer.Peer.to_yojson peer)
                 ; ("error", `String (Error.to_string_hum err)) ]
               "error querying peer $peer: $error" ;
-            false )
+            return false )
   in
   if%map Deferred.List.for_all requested_syncs ~f:sync then Ok ()
   else Error (Error.of_string "failed to synchronize epoch ledger")

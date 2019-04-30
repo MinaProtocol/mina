@@ -47,6 +47,7 @@ module Actions = struct
         (** Peer requested something we don't know. They might be ahead of us or
           they might be malicious. *)
     | Fulfilled_request  (** Peer fulfilled a request we made. *)
+    | Epoch_ledger_provided  (** Special case of request fulfillment *)
   [@@deriving show]
 
   (** The action they took, paired with a message and associated JSON metadata
@@ -61,6 +62,7 @@ module Actions = struct
        the increase of a fulfilled request *)
     let request_increment = 0.90 *. fulfilled_increment in
     let connected_increment = 0.10 *. fulfilled_increment in
+    let epoch_ledger_provided_increment = 10. *. fulfilled_increment in
     match action with
     | Gossiped_old_transition slot_diff ->
         (* NOTE: slot_diff here is [received_slot - (proposed_slot + Δ)]
@@ -102,6 +104,8 @@ module Actions = struct
         Trust_decrease (Peer_trust.max_rate 1.)
     | Fulfilled_request ->
         Trust_increase fulfilled_increment
+    | Epoch_ledger_provided ->
+        Trust_increase epoch_ledger_provided_increment
 
   let to_log : t -> string * (string, Yojson.Safe.json) List.Assoc.t =
    fun (action, extra_opt) ->

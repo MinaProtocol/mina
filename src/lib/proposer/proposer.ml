@@ -298,9 +298,9 @@ module Make (Inputs : Inputs_intf) :
             in
             Some (protocol_state, internal_transition, witness) ) )
 
-  let run ~logger ~get_completed_work ~transaction_pool ~time_controller
-      ~keypair ~consensus_local_state ~frontier_reader ~transition_writer
-      ~random_peers ~query_peer =
+  let run ~logger ~trust_system ~get_completed_work ~transaction_pool
+      ~time_controller ~keypair ~consensus_local_state ~frontier_reader
+      ~transition_writer ~random_peers ~query_peer =
     trace_task "proposer" (fun () ->
         let log_bootstrap_mode () =
           Logger.info logger ~module_:__MODULE__ ~location:__LOC__
@@ -498,7 +498,7 @@ module Make (Inputs : Inputs_intf) :
                         (let%map res =
                            Consensus_mechanism.sync_local_state
                              ~local_state:consensus_local_state ~logger
-                             ~random_peers ~query_peer sync_jobs
+                             ~trust_system ~random_peers ~query_peer sync_jobs
                          in
                          ( match res with
                          | Ok () ->
