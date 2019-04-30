@@ -153,18 +153,43 @@ module Make (Message : Message_intf) :
       | Ok (Ok result) ->
           (* call succeeded, result is valid *)
           return (Ok result)
-      | Ok (Error err) ->
-          (* call succeeded, result is an error *)
-          let%bind () =
-            Trust_system.(
-              record t.trust_system t.logger peer
-                Actions.
-                  ( Violated_protocol
-                  , Some
-                      ( "RPC call failed, reason: $exn"
-                      , [("exn", `String (Error.to_string_hum err))] ) ))
-          in
-          return (Error err)
+      | Ok (Error err) -> (
+          Logger.error t.logger ~module_:__MODULE__ ~location:__LOC__
+            !"RPC call error: %s {{{%s}}} [[[%{sexp: Error.t}]]]"
+            (Exn.to_string (Error.to_exn err))
+            (Exn.to_string_mach (Error.to_exn err))
+            err ;
+          match (Error.to_exn err, Error.sexp_of_t err) with
+          | ( _
+            , Sexp.List
+                [ Sexp.Atom "src/connection.ml.Handshake_error.Handshake_error"
+                ; _ ] ) ->
+              let%map () =
+                Trust_system.record t.trust_system t.logger peer
+                  ( Trust_system.Actions.Outgoing_connection_error
+                  , Some ("handshake error", []) )
+              in
+              (* TODO: cleanup peer from peer table and maybe remove existing connections? *)
+              Error err
+          | Async_rpc_kernel.Rpc_error.Rpc (Connection_closed, _), _ ->
+              let%map () =
+                Trust_system.record t.trust_system t.logger peer
+                  ( Trust_system.Actions.Outgoing_connection_error
+                  , Some ("closed connection", []) )
+              in
+              Error err
+          | _ ->
+              (* call succeeded, result is an error *)
+              let%bind () =
+                Trust_system.(
+                  record t.trust_system t.logger peer
+                    Actions.
+                      ( Violated_protocol
+                      , Some
+                          ( "RPC call failed, reason: $exn"
+                          , [("exn", `String (Error.to_string_hum err))] ) ))
+              in
+              return (Error err) )
       | Error exn ->
           (* call itself failed *)
           (* TODO: learn what exceptions are raised here, punish peers for
