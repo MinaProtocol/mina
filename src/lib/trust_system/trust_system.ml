@@ -22,8 +22,6 @@ let delta = 1.0
 
 module Actions = struct
   type action =
-    | Incoming_connection_error
-        (** Encountered connection error while handling an incoming connection from a peer. *)
     | Outgoing_connection_error
         (** Encountered connection error while connecting to a peer. *)
     | Gossiped_old_transition of int64
@@ -88,8 +86,6 @@ module Actions = struct
         Insta_ban
     | Sent_bad_hash ->
         Insta_ban
-    | Incoming_connection_error ->
-        Trust_decrease 1.
     | Outgoing_connection_error ->
         Trust_decrease 0.4
     | Violated_protocol ->
