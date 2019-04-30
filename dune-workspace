@@ -1,0 +1,140 @@
+(lang dune 1.6)
+(context default)
+
+(context
+  (opam
+    (switch coda)
+    (name debug)
+    (profile debug)))
+
+(context
+  (opam
+    (switch coda)
+    (name dev)
+    (profile dev)))
+
+(context
+  (opam
+    (switch coda)
+    (name dev_snark)
+    (profile dev_snark)))
+
+(context
+  (opam
+    (switch coda)
+    (name fake_hash)
+    (profile fake_hash)))
+
+(context
+  (opam
+    (switch coda)
+    (name testnet_posig)
+    (profile testnet_posig)))
+
+(context
+  (opam
+    (switch coda)
+    (name testnet_postake_many_proposers)
+    (profile testnet_postake_many_proposers)))
+
+(context
+  (opam
+    (switch coda)
+    (name testnet_postake_medium_curves)
+    (profile testnet_postake_medium_curves)))
+
+(context
+  (opam
+    (switch coda)
+    (name testnet_postake)
+    (profile testnet_postake)))
+
+(context
+  (opam
+    (switch coda)
+    (name testnet_postake_snarkless_fake_hash)
+    (profile testnet_postake_snarkless_fake_hash)))
+
+(context
+  (opam
+    (switch coda)
+    (name testnet_postake_snarkless)
+    (profile testnet_postake_snarkless)))
+
+(context
+  (opam
+    (switch coda)
+    (name testnet_public)
+    (profile testnet_public)))
+
+(context
+  (opam
+    (switch coda)
+    (name test_posig)
+    (profile test_posig)))
+
+(context
+  (opam
+    (switch coda)
+    (name test_posig_snarkless)
+    (profile test_posig_snarkless)))
+
+(context
+  (opam
+    (switch coda)
+    (name test_postake_bootstrap)
+    (profile test_postake_bootstrap)))
+
+(context
+  (opam
+    (switch coda)
+    (name test_postake_catchup)
+    (profile test_postake_catchup)))
+
+(context
+  (opam
+    (switch coda)
+    (name test_postake_five_even_snarkless)
+    (profile test_postake_five_even_snarkless)))
+
+(context
+  (opam
+    (switch coda)
+    (name test_postake_five_even_txns)
+    (profile test_postake_five_even_txns)))
+
+(context
+  (opam
+    (switch coda)
+    (name test_postake_holy_grail)
+    (profile test_postake_holy_grail)))
+
+(context
+  (opam
+    (switch coda)
+    (name test_postake)
+    (profile test_postake)))
+
+(context
+  (opam
+    (switch coda)
+    (name test_postake_snarkless)
+    (profile test_postake_snarkless)))
+
+(context
+  (opam
+    (switch coda)
+    (name test_postake_split)
+    (profile test_postake_split)))
+
+(context
+  (opam
+    (switch coda)
+    (name test_postake_split_snarkless)
+    (profile test_postake_split_snarkless)))
+
+(context
+  (opam
+    (switch coda)
+    (name test_postake_txns)
+    (profile test_postake_txns)))
