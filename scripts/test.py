@@ -141,24 +141,22 @@ def run(args):
                 on_failure()
         wet('$ ' + cmd, do)
 
+    def dune_build(target, build_log):
+        run_cmd(
+            'dune build --display=progress %s 2> %s' % (target, build_log),
+            lambda: fail_with_log('building %s failed' % target, build_log)
+        )
 
+    def coda_build_dir(context):
+        return os.path.join('./_build', context)
+
+    timestamp = int(time.time())
+    log_dir = os.path.join('test_logs', str(timestamp))
     logproc_filter = '.level in ["Warn", "Error", "Fatal", "Faulty_peer"]'
-    coda_build_path = './_build/default'
-
     coda_app_path = 'app' if os.path.exists('dune-project') else 'src/app'
     coda_exe_path = os.path.join(coda_app_path, 'cli/src/coda.exe')
-    coda_exe = os.path.join(coda_build_path, coda_exe_path)
-
-    with open(os.devnull, 'w') as null:
-        if subprocess.call(['which', 'logproc'], stdout=null, stderr=null) == 0:
-            logproc_exe = 'logproc'
-            build_targets = coda_exe
-        else:
-            logproc_exe_path = os.path.join(coda_app_path, 'logproc/logproc.exe')
-            logproc_exe = os.path.join(coda_build_path, logproc_exe_path)
-            build_targets = '%s %s' % (coda_exe, logproc_exe)
-
     test_permutations = filter_test_permutations(args.whitelist_patterns, args.blacklist_patterns)
+
     if len(test_permutations) == 0:
         # TODO: support direct test dispatching
         if args.whitelist_patterns != ['*']:
@@ -172,41 +170,43 @@ def run(args):
         for test in tests:
             print('  - %s' % test)
 
-    timestamp = int(time.time())
     print('======================================')
     print('============= %d =============' % timestamp)
     print('======================================')
 
-    log_dir = os.path.join('test_logs', str(timestamp))
     def make_log_dir():
         if os.path.exists(log_dir):
             fail('test log directory already exists -- how???')
         os.makedirs(log_dir)
     wet('make new directory: ' + log_dir, make_log_dir)
 
-    for profile in test_permutations.keys():
-        profile_dir = os.path.join(log_dir, profile)
-        wet('make directory: ' + profile_dir, lambda: os.mkdir(profile_dir))
+    with open(os.devnull, 'w') as null:
+        if subprocess.call(['which', 'logproc'], stdout=null, stderr=null) == 0:
+            logproc_exe = 'logproc'
+        else:
+            logproc_exe_path = os.path.join(coda_app_path, 'logproc/logproc.exe')
+            logproc_exe = os.path.join(coda_build_dir('default'), logproc_exe_path)
+            build_log = os.path.join(log_dir, 'logproc_build.log')
+            dune_build(logproc_exe, build_log)
 
+    for profile in test_permutations.keys():
+        profile_log_dir = os.path.join(log_dir, profile)
+        build_log = os.path.join(profile_log_dir, 'build.log')
+        coda_exe = os.path.join(coda_build_dir(profile), coda_exe_path)
+
+        wet('make directory: ' + profile_log_dir, lambda: os.mkdir(profile_log_dir))
         print('- %s:' % profile)
-        build_log = os.path.join(profile_dir, 'build.log')
-        run_cmd(
-            'dune build --display=progress --profile=%s %s 2> %s'
-                % (profile, build_targets, build_log),
-            lambda: fail_with_log('building %s failed' % profile, build_log)
-        )
+        dune_build(coda_exe, build_log)
 
         for test in test_permutations[profile]:
             print('  - %s' % test)
-            log = os.path.join(profile_dir, '%s.log' % test)
+            test_log = os.path.join(profile_log_dir, '%s.log' % test)
             cmd = 'set -o pipefail && %s integration-test %s 2>&1 ' % (coda_exe, test)
             cmd += '| grep -v "* Elements of w " | grep -v "elements in proof:" '
-            cmd += '| tee \'%s\' | %s -f \'%s\' ' % (log, logproc_exe, logproc_filter)
-            print('Running: %s' % (cmd))
+            cmd += '| tee \'%s\' | %s -f \'%s\' ' % (test_log, logproc_exe, logproc_filter)
             run_cmd(cmd, lambda: fail('Test "%s:%s" failed' % (profile, test)))
 
     print('Testing successful')
-
 
 def get_required_status():
     test_permutations = filter_test_permutations(['*'], required_blacklist, permutations=filter_test_permutations(['*'], ci_blacklist))

@@ -234,7 +234,7 @@ jobs:
             - run: git submodule sync && git submodule update --init --recursive
             - run:
                   name: Run unit tests
-                  command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && dune build --profile=test_posig_snarkless -j8 && dune runtest --profile=test_posig_snarkless -j8'
+                  command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && dune build -j8 _build/test_posig_snarkless/src/app/cli/src/coda.exe && dune runtest -j8 _build/test_posig_snarkless'
     test-unit--test_postake_snarkless:
         resource_class: large
         docker:
@@ -244,7 +244,7 @@ jobs:
             - run: git submodule sync && git submodule update --init --recursive
             - run:
                   name: Run unit tests
-                  command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && dune build --profile=test_postake_snarkless -j8 && dune runtest --profile=test_postake_snarkless -j8'
+                  command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && dune build -j8 _build/test_postake_snarkless/src/app/cli/src/coda.exe && dune runtest -j8 _build/test_postake_snarkless'
     test-unit--dev:
         resource_class: large
         docker:
@@ -254,7 +254,7 @@ jobs:
             - run: git submodule sync && git submodule update --init --recursive
             - run:
                   name: Run unit tests
-                  command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && dune build --profile=dev -j8 && dune runtest --profile=dev -j8'
+                  command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && dune build -j8 _build/dev/src/app/cli/src/coda.exe && dune runtest -j8 _build/dev'
     test--fake_hash:
         resource_class: large
         docker:

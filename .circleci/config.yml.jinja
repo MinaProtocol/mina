@@ -167,7 +167,7 @@ jobs:
             - run: git submodule sync && git submodule update --init --recursive
             - run:
                   name: Run unit tests
-                  command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && dune build --profile={{profile}} -j8 && dune runtest --profile={{profile}} -j8'
+                  command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && dune build -j8 _build/{{profile}}/src/app/cli/src/coda.exe && dune runtest -j8 _build/{{profile}}'
     {%- endfor %}
 
     {%- for profile in test_permutations.keys() | sort %}
