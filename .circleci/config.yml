@@ -225,16 +225,6 @@ jobs:
             - run:
                   name: Copy artifacts to Google Cloud
                   command: ./scripts/skip_if_only_frontend.sh scripts/artifacts.sh
-    test-unit--test_posig_snarkless:
-        resource_class: large
-        docker:
-            - image: codaprotocol/coda:toolchain-2c6226fd8e3ae23d4a9d4671bba94414b2284fce
-        steps:
-            - checkout
-            - run: git submodule sync && git submodule update --init --recursive
-            - run:
-                  name: Run unit tests
-                  command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && dune build --profile=test_posig_snarkless -j8 && dune runtest --profile=test_posig_snarkless -j8'
     test-unit--test_postake_snarkless:
         resource_class: large
         docker:
@@ -426,7 +416,6 @@ workflows:
             - build-artifacts--testnet_postake
             - build-artifacts--testnet_postake_many_proposers
             - build-artifacts--testnet_postake_snarkless_fake_hash
-            - test-unit--test_posig_snarkless
             - test-unit--test_postake_snarkless
             - test-unit--dev
             - test--fake_hash
