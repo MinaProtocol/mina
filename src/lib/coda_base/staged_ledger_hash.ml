@@ -194,8 +194,7 @@ module Stable = struct
           type ('non_snark, 'pending_coinbase_hash) t =
             { non_snark: 'non_snark
             ; pending_coinbase_hash: 'pending_coinbase_hash }
-          [@@deriving
-            bin_io, sexp, eq, compare, hash, yojson, version {unnumbered}]
+          [@@deriving bin_io, sexp, eq, compare, hash, yojson, version]
         end
 
         include T

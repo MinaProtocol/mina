@@ -109,8 +109,6 @@ module Extend
   include Hashable.Make (T)
 
   (* TODO : actually version this type *)
-  let version = 1
-
   let __versioned__ = true
 
   include Bin_prot.Utils.Make_binable (struct

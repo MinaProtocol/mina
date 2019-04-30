@@ -20,7 +20,7 @@ open Coda_base
     2. Each transition is checked through [Transition_processor.Validator] and
     [Protocol_state_validator]
 
-    If any of the external_transitions is invalid, 
+    If any of the external_transitions is invalid,
     1) the sender is punished;
     2) those external_transitions that already passed validation would be
        invalidated.
@@ -178,7 +178,7 @@ module Make (Inputs : Inputs.S) :
                       verify_transition ~logger ~trust_system ~frontier
                         ~unprocessed_transition_cache
                         (Envelope.Incoming.wrap ~data:transition
-                           ~sender:(Envelope.Sender.Remote peer)) )
+                           ~sender:(Envelope.Sender.Remote peer.host)) )
                 in
                 let split_last xs =
                   let init = List.take xs (List.length xs - 1) in
@@ -220,7 +220,12 @@ module Make (Inputs : Inputs.S) :
         | Ok trees ->
             Logger.trace logger ~module_:__MODULE__ ~location:__LOC__
               "about to write to the catchup breadcrumbs pipe" ;
-            Strict_pipe.Writer.write catchup_breadcrumbs_writer trees
+            if Strict_pipe.Writer.is_closed catchup_breadcrumbs_writer then (
+              Logger.trace logger ~module_:__MODULE__ ~location:__LOC__
+                "catchup breadcrumbs pipe was closed; attempt to write to \
+                 closed pipe" ;
+              Deferred.unit )
+            else Strict_pipe.Writer.write catchup_breadcrumbs_writer trees
         | Error e ->
             Logger.info logger ~module_:__MODULE__ ~location:__LOC__
               !"All peers either sent us bad data, didn't have the info, or \

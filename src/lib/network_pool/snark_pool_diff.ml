@@ -23,9 +23,9 @@ module Diff = struct
 end
 
 module Make (Proof : sig
-  type t [@@deriving bin_io, yojson, version {unnumbered}]
+  type t [@@deriving bin_io, yojson, version]
 end) (Fee : sig
-  type t [@@deriving bin_io, sexp, yojson, version {unnumbered}]
+  type t [@@deriving bin_io, sexp, yojson, version]
 end) (Work : sig
   type t [@@deriving sexp, yojson]
 

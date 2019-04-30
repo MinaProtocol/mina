@@ -9,12 +9,12 @@
     "bs-css": "^8.0.2",
     "bs-electron": "github:Schmavery/bs-electron",
     "graphql_ppx": "^0.2.8",
-    "reason-apollo": "^0.15.2",
+    "reason-apollo": "^0.16.0",
     "reason-react": "^0.7.0",
     "tablecloth-bucklescript": "file:./tablecloth/bs"
   },
   "devDependencies": {
-    "bs-platform": "^5.0.1",
+    "bs-platform": "^5.0.3",
     "concurrently": "^4.1.0",
     "electron-builder": "^20.39.0",
     "fastpack": "^0.8.4",

@@ -128,7 +128,6 @@ end
 module Tock = struct
   include (Tock0 : module type of Tock0 with module Proof := Tock0.Proof)
 
-  module Groth16 = Snarky.Snark.Make (Tock_backend.Full.Default)
   module Fq = Snarky_field_extensions.Field_extensions.F (Tock0)
 
   module Inner_curve = struct
@@ -288,8 +287,6 @@ module Tock = struct
     let dummy = Dummy_values.Tock.GrothMaller17.proof
   end
 
-  module Groth_maller_verifier = Snarky_verifier.Groth_maller.Make (Pairing)
-
   module Groth_verifier = struct
     include Snarky_verifier.Groth.Make (Pairing)
 
@@ -331,8 +328,6 @@ end
 
 module Tick = struct
   include (Tick0 : module type of Tick0 with module Field := Tick0.Field)
-
-  module Groth16 = Snarky.Snark.Make (Tick_backend.Full.Default)
 
   module Field = struct
     include Tick0.Field
@@ -682,8 +677,6 @@ module Tick = struct
       ; h_gamma= Pairing.G2.constant vk.h_gamma
       ; g_alpha_h_beta= Pairing.Fqk.constant vk.g_alpha_h_beta }
   end
-
-  module Groth_verifier = Snarky_verifier.Groth.Make (Pairing)
 end
 
 let tock_vk_to_bool_list vk =

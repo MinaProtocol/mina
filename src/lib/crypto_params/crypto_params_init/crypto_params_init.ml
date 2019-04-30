@@ -27,7 +27,7 @@ curve_size]
 
 module Tick_backend = struct
   module Full = Cycle.Mnt4
-  include Full.GM
+  include Full.Default
   module Inner_curve = Cycle.Mnt6.G1
   module Inner_twisted_curve = Cycle.Mnt6.G2
 end

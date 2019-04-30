@@ -275,7 +275,7 @@ let batch_send_payments =
   in
   let main port (privkey_path, payments_path) =
     let open Deferred.Let_syntax in
-    let%bind keypair = Cli_lib.Keypair.Terminal_stdin.read_exn privkey_path
+    let%bind keypair = Secrets.Keypair.Terminal_stdin.read_exn privkey_path
     and infos = get_infos payments_path in
     let%bind nonce0 = get_nonce_exn keypair.public_key port in
     let _, ts =
@@ -321,7 +321,7 @@ let user_command (body_args : User_command_payload.Body.t Command.Param.t)
        ~f:(fun port (body, from_account, fee) ->
          let open Deferred.Let_syntax in
          let%bind sender_kp =
-           Cli_lib.Keypair.Terminal_stdin.read_exn from_account
+           Secrets.Keypair.Terminal_stdin.read_exn from_account
          in
          let%bind nonce = get_nonce_exn sender_kp.public_key port in
          let fee = Option.value ~default:(Currency.Fee.of_int 1) fee in
@@ -378,13 +378,13 @@ let wrap_key =
     @@ fun () ->
     let open Deferred.Let_syntax in
     let%bind privkey =
-      Cli_lib.Password.hidden_line_or_env "Private key: " ~env:"CODA_PRIVKEY"
+      Secrets.Password.hidden_line_or_env "Private key: " ~env:"CODA_PRIVKEY"
     in
     let pk =
       Private_key.of_base64_exn (privkey |> Or_error.ok_exn |> Bytes.to_string)
     in
     let kp = Keypair.of_private_key_exn pk in
-    Cli_lib.Keypair.Terminal_stdin.write_exn kp ~privkey_path)
+    Secrets.Keypair.Terminal_stdin.write_exn kp ~privkey_path)
 
 let dump_keypair =
   Command.async ~summary:"Print out a keypair from a private key file"
@@ -394,9 +394,9 @@ let dump_keypair =
     @@ fun () ->
     let open Deferred.Let_syntax in
     let%map kp =
-      Cli_lib.Keypair.read_exn ~privkey_path
+      Secrets.Keypair.read_exn ~privkey_path
         ~password:
-          (lazy (Cli_lib.Password.read "Password for private key file: "))
+          (lazy (Secrets.Password.read "Password for private key file: "))
     in
     printf "Public key: %s\nPrivate key: %s\n"
       (kp.public_key |> Public_key.compress |> Public_key.Compressed.to_base64)
@@ -410,7 +410,7 @@ let generate_keypair =
     @@ fun () ->
     let open Deferred.Let_syntax in
     let kp = Keypair.create () in
-    let%bind () = Cli_lib.Keypair.Terminal_stdin.write_exn kp ~privkey_path in
+    let%bind () = Secrets.Keypair.Terminal_stdin.write_exn kp ~privkey_path in
     printf "Public key: %s\n"
       (kp.public_key |> Public_key.compress |> Public_key.Compressed.to_base64) ;
     exit 0)
