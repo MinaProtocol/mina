@@ -1,9 +1,3 @@
-[%%import
-"../../config.mlh"]
-
-[%%if
-consensus_mechanism = "proof_of_stake"]
-
 let name = "proof_of_stake"
 
 open Async_kernel
@@ -2821,5 +2815,3 @@ let%test_module "Proof of stake tests" =
       assert (Value.equal checked_value next_consensus_state) ;
       ()
   end )
-
-[%%endif]
