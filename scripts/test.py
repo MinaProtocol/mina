@@ -16,9 +16,8 @@ build_artifact_profiles = [
 ]
 
 unit_test_profiles = [
-    'test_posig_snarkless',
     'test_postake_snarkless',
-    'dev',
+    'dev'
 ]
 
 simple_tests = [
@@ -39,11 +38,9 @@ all_tests = simple_tests + integration_tests
 
 test_permutations = {
     'fake_hash': ['full-test'],
-    'test_posig_snarkless': all_tests,
     'test_postake_snarkless': simple_tests,
     'test_postake_split_snarkless': integration_tests,
     'test_postake_split': ['coda-shared-prefix-multiproposer-test -num-proposers 2'],
-    'test_posig': simple_tests,
     # Temporarily not doing all `simple_tests` because it's failing
     # TODO: Deepthi will re-enable
     'test_postake': [ 'transaction-snark-profiler -check-only' ],
@@ -55,10 +52,7 @@ test_permutations = {
     'test_postake_five_even_txns': ['coda-shared-prefix-multiproposer-test -num-proposers 5 -payments'],
 }
 
-ci_blacklist = [
-    'test_posig:*',
-    'test_posig_snarkless:*',
-]
+ci_blacklist = []
 
 # of all the generated CI jobs, allow these specific ones to fail (extra blacklist on top of ci_blacklist)
 required_blacklist = [
