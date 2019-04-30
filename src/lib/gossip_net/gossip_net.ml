@@ -344,6 +344,12 @@ module Make (Message : Message_intf) : S with type msg := Message.msg = struct
                   raise exn ))
             (Tcp.Where_to_listen.of_port config.me.Peer.communication_port)
             (fun client reader writer ->
+              let inet_addr = Socket.Address.Inet.addr client in
+              let%bind () =
+                Trust_system.(
+                  record t.trust_system t.logger inet_addr
+                    Actions.(Connected, None))
+              in
               let conn_map =
                 Option.value_map
                   ~default:(Hashtbl.create (module Uuid))
