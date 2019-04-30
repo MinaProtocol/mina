@@ -290,19 +290,15 @@ module Make (Message : Message_intf) : S with type msg := Message.msg = struct
               @ implementation_list )
           in
           let handle_unknown_rpc conn ~rpc_tag ~version =
-            Logger.info t.logger ~module_:__MODULE__ ~location:__LOC__
-              !"Peer %{sexp: Host_and_port.t} made unknown RPC call \"%s\" \
-                with version: %d, disconnecting"
-              conn rpc_tag version ;
-            let inet_addr = Unix.Inet_addr.of_string conn.host in
+            let inet_addr = Unix.Inet_addr.of_string conn.Host_and_port.host in
             Deferred.don't_wait_for
               Trust_system.(
                 record t.trust_system t.logger inet_addr
                   Actions.
                     ( Violated_protocol
                     , Some
-                        ( "Attempt to make unknown RPC call \"$rpc\" with \
-                           version $version"
+                        ( "Attempt to make unknown (fixed-version) RPC call \
+                           \"$rpc\" with version $version"
                         , [("rpc", `String rpc_tag); ("version", `Int version)]
                         ) )) ;
             `Close_connection
