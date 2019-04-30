@@ -11,6 +11,8 @@ module Actions = struct
     | Made_request
         (** Peer made a valid request. This causes a small decrease to mitigate
             DoS. *)
+    | Connected
+        (** Peer connected to TCP server. Very small decrease to mitigate DoS *)
     | Requested_unknown_item
         (** Peer requested something we don't know. They might be ahead of us or
           they might be malicious. *)
@@ -24,7 +26,11 @@ module Actions = struct
   let to_trust_response (action, _) =
     let open Peer_trust.Trust_response in
     (* FIXME figure out a good value for this *)
-    let request_increment = Peer_trust.max_rate 10. in
+    let fulfilled_increment = Peer_trust.max_rate 10. in
+    (* the summed decreases of a connection and request equals
+       the increase of a fulfilled request *)
+    let request_increment = 0.90 *. fulfilled_increment in
+    let connected_increment = 0.10 *. fulfilled_increment in
     match action with
     | Sent_bad_hash ->
         Insta_ban
@@ -32,10 +38,12 @@ module Actions = struct
         Insta_ban
     | Made_request ->
         Trust_decrease request_increment
+    | Connected ->
+        Trust_decrease connected_increment
     | Requested_unknown_item ->
         Trust_decrease (Peer_trust.max_rate 1.)
     | Fulfilled_request ->
-        (* trade 1:1 *) Trust_increase request_increment
+        Trust_increase fulfilled_increment
 
   let to_log : t -> string * (string, Yojson.Safe.json) List.Assoc.t =
    fun (action, extra_opt) ->
