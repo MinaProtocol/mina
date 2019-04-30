@@ -68,7 +68,7 @@ module Actions = struct
          * [(1/y)Δ^2 = 2], we get [y = Δ^2/2]. Therefore, we can define our function
          * [f(x) = (1/(Δ^2/2))x^2]. This does not satisfy [f(1) = c], but since we only constrain
          * [f(Δ) >= 2], we can just offset the function by [c] in order to satisfy both constraints,
-         * giving us [f(x) = (1/(Δ^2/2))x^2].
+         * giving us [f(x) = (1/(Δ^2/2))x^2 + c].
          *)
         let c = 0.1 in
         let y = (delta ** 2.0) /. 2.0 in
