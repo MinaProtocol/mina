@@ -356,7 +356,23 @@ module Make (Message : Message_intf) : S with type msg := Message.msg = struct
                   (Hashtbl.find t.connections client_inet_addr)
                   ~f:Fn.id
               in
-              if
+              let is_client_banned =
+                let peer_status =
+                  Trust_system.Peer_trust.lookup t.trust_system
+                    client_inet_addr
+                in
+                match peer_status.banned with
+                | Banned_until _ ->
+                    true
+                | Unbanned ->
+                    false
+              in
+              if is_client_banned then (
+                Logger.info t.logger ~module_:__MODULE__ ~location:__LOC__
+                  "Rejecting connection from banned peer %s"
+                  (Socket.Address.Inet.to_string client) ;
+                Reader.close reader >>= fun _ -> Writer.close writer )
+              else if
                 Option.is_some t.max_concurrent_connections
                 && Hashtbl.length conn_map
                    >= Option.value_exn t.max_concurrent_connections
