@@ -1,6 +1,3 @@
-[%%import
-"../config.mlh"]
-
 open Core_kernel
 open Async_kernel
 open Pipe_lib
@@ -13,23 +10,11 @@ module type Security_intf = sig
 end
 
 module type Time_controller_intf = sig
-  [%%if time_offsets]
-
   type t
 
   val create : t -> t
 
   val basic : t
-
-  [%%else]
-
-  type t
-
-  val create : t -> t
-
-  val basic : t
-
-  [%%endif]
 end
 
 module type Sok_message_intf = sig
