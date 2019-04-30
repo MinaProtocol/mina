@@ -2306,16 +2306,11 @@ let generate_transition ~(previous_protocol_state : Protocol_state.Value.t)
 
 let received_within_window (epoch, slot) ~time_received =
   let open Time in
-  let open Result.Let_syntax in
   let open Int64 in
   let ( < ) x y = Pervasives.(compare x y < 0) in
   let ( >= ) x y = Pervasives.(compare x y >= 0) in
   let time_received =
     of_span_since_epoch (Span.of_ms (Unix_timestamp.to_int64 time_received))
-  in
-  let%bind received_epoch, received_slot =
-    try Ok (Epoch.epoch_and_slot_of_time_exn time_received)
-    with Invalid_argument _ -> Error `Too_early
   in
   let slot_diff =
     Epoch.diff_in_slots
