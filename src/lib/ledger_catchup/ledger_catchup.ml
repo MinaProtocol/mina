@@ -20,7 +20,7 @@ open Coda_base
     2. Each transition is checked through [Transition_processor.Validator] and
     [Protocol_state_validator]
 
-    If any of the external_transitions is invalid, 
+    If any of the external_transitions is invalid,
     1) the sender is punished;
     2) those external_transitions that already passed validation would be
        invalidated.
@@ -193,7 +193,7 @@ module Make (Inputs : Inputs.S) :
                       verify_transition ~logger ~trust_system ~frontier
                         ~unprocessed_transition_cache
                         (Envelope.Incoming.wrap ~data:transition
-                           ~sender:(Envelope.Sender.Remote peer)) )
+                           ~sender:(Envelope.Sender.Remote peer.host)) )
                 in
                 let split_last xs =
                   let init = List.take xs (List.length xs - 1) in

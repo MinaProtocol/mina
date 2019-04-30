@@ -78,15 +78,6 @@ module Make (Inputs : Inputs_intf) :
    fun ~frontier hash query ~logger ~trust_system ->
     let open Trust_system in
     let sender = Envelope.Incoming.sender query in
-    let%bind _ =
-      record_envelope_sender trust_system logger sender
-        ( Actions.Made_request
-        , Some
-            ( "syncable ledger query: $query"
-            , [ ( "query"
-                , Sync_ledger.Query.to_yojson (Envelope.Incoming.data query) )
-              ] ) )
-    in
     match get_ledger_by_hash ~frontier hash with
     | None ->
         let%map _ =
