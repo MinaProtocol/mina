@@ -344,13 +344,35 @@ module Make (Message : Message_intf) : S with type msg := Message.msg = struct
                   raise exn ))
             (Tcp.Where_to_listen.of_port config.me.Peer.communication_port)
             (fun client reader writer ->
+              let client_inet_addr = Socket.Address.Inet.addr client in
+              let%bind () =
+                Trust_system.(
+                  record t.trust_system t.logger client_inet_addr
+                    Actions.(Connected, None))
+              in
               let conn_map =
                 Option.value_map
                   ~default:(Hashtbl.create (module Uuid))
-                  (Hashtbl.find t.connections (Socket.Address.Inet.addr client))
+                  (Hashtbl.find t.connections client_inet_addr)
                   ~f:Fn.id
               in
-              if
+              let is_client_banned =
+                let peer_status =
+                  Trust_system.Peer_trust.lookup t.trust_system
+                    client_inet_addr
+                in
+                match peer_status.banned with
+                | Banned_until _ ->
+                    true
+                | Unbanned ->
+                    false
+              in
+              if is_client_banned then (
+                Logger.info t.logger ~module_:__MODULE__ ~location:__LOC__
+                  "Rejecting connection from banned peer %s"
+                  (Socket.Address.Inet.to_string client) ;
+                Reader.close reader >>= fun _ -> Writer.close writer )
+              else if
                 Option.is_some t.max_concurrent_connections
                 && Hashtbl.length conn_map
                    >= Option.value_exn t.max_concurrent_connections
@@ -365,9 +387,7 @@ module Make (Message : Message_intf) : S with type msg := Message.msg = struct
                 let conn_id = Uuid_unix.create () in
                 Hashtbl.add_exn conn_map ~key:conn_id
                   ~data:(Allowed (Ivar.create ())) ;
-                Hashtbl.set t.connections
-                  ~key:(Socket.Address.Inet.addr client)
-                  ~data:conn_map ;
+                Hashtbl.set t.connections ~key:client_inet_addr ~data:conn_map ;
                 let%map () =
                   Rpc.Connection.server_with_close reader writer
                     ~implementations
@@ -392,16 +412,13 @@ module Make (Message : Message_intf) : S with type msg := Message.msg = struct
                           Deferred.unit ))
                 in
                 let conn_map =
-                  Hashtbl.find_exn t.connections
-                    (Socket.Address.Inet.addr client)
+                  Hashtbl.find_exn t.connections client_inet_addr
                 in
                 Hashtbl.remove conn_map conn_id ;
                 if Hashtbl.is_empty conn_map then
-                  Hashtbl.remove t.connections
-                  @@ Socket.Address.Inet.addr client
+                  Hashtbl.remove t.connections client_inet_addr
                 else
-                  Hashtbl.set t.connections
-                    ~key:(Socket.Address.Inet.addr client)
+                  Hashtbl.set t.connections ~key:client_inet_addr
                     ~data:conn_map )
         in
         t )
