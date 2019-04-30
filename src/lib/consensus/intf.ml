@@ -260,6 +260,7 @@ module type S = sig
     *)
   val sync_local_state :
        logger:Logger.t
+    -> trust_system:Trust_system.t
     -> local_state:Local_state.t
     -> random_peers:(int -> Network_peer.Peer.t list)
     -> query_peer:Network_peer.query_peer
