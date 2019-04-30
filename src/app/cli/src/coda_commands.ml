@@ -12,8 +12,7 @@ module type Intf = sig
   module Config_in : Coda_inputs.Config_intf
 
   val send_payment :
-       Logger.t
-    -> Program.t
+       Program.t
     -> User_command.t
     -> Receipt.Chain_hash.t Base.Or_error.t Participating_state.T.t Deferred.t
 end
@@ -30,7 +29,8 @@ struct
   (** For status *)
   let txn_count = ref 0
 
-  let record_payment ~logger t (txn : User_command.t) account =
+  let record_payment t (txn : User_command.t) account =
+    let logger = Program.logger t in
     let previous = account.Account.Poly.receipt_chain_hash in
     let receipt_chain_database = receipt_chain_database t in
     match Receipt_chain_database.add receipt_chain_database ~previous txn with
@@ -77,13 +77,13 @@ struct
     in
     Option.is_some remainder
 
-  let schedule_payment log t (txn : User_command.t) account_opt =
+  let schedule_payment t (txn : User_command.t) account_opt =
     if not (is_valid_payment t txn account_opt) then
       Or_error.error_string "Invalid payment: account balance is too low"
     else
       let txn_pool = transaction_pool t in
       don't_wait_for (Transaction_pool.add txn_pool txn) ;
-      Logger.info log ~module_:__MODULE__ ~location:__LOC__
+      Logger.info (Program.logger t) ~module_:__MODULE__ ~location:__LOC__
         ~metadata:[("user_command", User_command.to_yojson txn)]
         "Added payment $user_command to pool successfully" ;
       txn_count := !txn_count + 1 ;
@@ -122,15 +122,15 @@ struct
     let%map account = Ledger.get ledger location in
     account.Account.Poly.nonce
 
-  let send_payment logger t (txn : User_command.t) =
+  let send_payment t (txn : User_command.t) =
     Deferred.return
     @@
     let public_key = Public_key.compress txn.sender in
     let open Participating_state.Let_syntax in
     let%map account_opt = get_account t public_key in
     let open Or_error.Let_syntax in
-    let%map () = schedule_payment logger t txn account_opt in
-    record_payment ~logger t txn (Option.value_exn account_opt)
+    let%map () = schedule_payment t txn account_opt in
+    record_payment t txn (Option.value_exn account_opt)
 
   let get_balance t (addr : Public_key.Compressed.t) =
     let open Participating_state.Option.Let_syntax in
@@ -168,16 +168,17 @@ struct
         verifying_txn
 
   (* TODO: Properly record receipt_chain_hash for multiple transactions. See #1143 *)
-  let schedule_payments logger t txns =
+  let schedule_payments t txns =
     List.map txns ~f:(fun (txn : User_command.t) ->
         let public_key = Public_key.compress txn.sender in
         let open Participating_state.Let_syntax in
         let%map account_opt = get_account t public_key in
-        match schedule_payment logger t txn account_opt with
+        match schedule_payment t txn account_opt with
         | Ok () ->
             ()
         | Error err ->
-            Logger.warn logger ~module_:__MODULE__ ~location:__LOC__
+            Logger.warn (Program.logger t) ~module_:__MODULE__
+              ~location:__LOC__
               ~metadata:[("error", `String (Error.to_string_hum err))]
               "Failure in schedule_payments: $error. This is not yet reported \
                to the client, see #1143" )

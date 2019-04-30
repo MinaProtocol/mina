@@ -426,13 +426,13 @@ module T = struct
             in
             let payment = build_txn amount sk pk fee in
             let%map receipt =
-              Run.Commands.send_payment logger coda (payment :> User_command.t)
+              Run.Commands.send_payment coda (payment :> User_command.t)
             in
             receipt |> Participating_state.active_exn
           in
           let coda_process_payment cmd =
             let%map receipt =
-              Run.Commands.send_payment logger coda (cmd :> User_command.t)
+              Run.Commands.send_payment coda (cmd :> User_command.t)
             in
             receipt |> Participating_state.active_exn
           in

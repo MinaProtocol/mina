@@ -101,10 +101,10 @@ struct
     in
     let client_impls =
       [ implement Daemon_rpcs.Send_user_command.rpc (fun () tx ->
-            let%map result = Commands.send_payment logger coda tx in
+            let%map result = Commands.send_payment coda tx in
             result |> Participating_state.active_exn )
       ; implement Daemon_rpcs.Send_user_commands.rpc (fun () ts ->
-            Commands.schedule_payments logger coda ts
+            Commands.schedule_payments coda ts
             |> Participating_state.active_exn ;
             Deferred.unit )
       ; implement Daemon_rpcs.Get_balance.rpc (fun () pk ->
