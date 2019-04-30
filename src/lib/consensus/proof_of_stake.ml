@@ -794,7 +794,7 @@ module Vrf = struct
         None )
 end
 
-module Lock_checkpoint = struct
+module Optional_state_hash = struct
   module Stable = struct
     module V1 = struct
       module T = struct
@@ -1049,7 +1049,7 @@ module Epoch_data = struct
   end)
 
   module Curr = Make (struct
-    include Lock_checkpoint
+    include Optional_state_hash
 
     let null = None
   end)

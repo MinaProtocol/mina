@@ -723,7 +723,7 @@ module type Staged_ledger_diff_intf = sig
     module Stable :
       sig
         module V1 : sig
-          type t [@@deriving sexp, bin_io, version {unnumbered}]
+          type t [@@deriving sexp, bin_io, version]
         end
       end
       with type V1.t = t
@@ -802,6 +802,10 @@ module type Staged_ledger_diff_intf = sig
   val forget : With_valid_signatures_and_proofs.t -> t
 
   val user_commands : t -> user_command list
+
+  val completed_works : t -> completed_work list
+
+  val coinbase : t -> Currency.Amount.t
 end
 
 module type Staged_ledger_transition_intf = sig

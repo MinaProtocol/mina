@@ -1,7 +1,7 @@
 open Tc;
 
 module Test = [%graphql {| query { version } |}];
-module TestQuery = ApolloShim.CreateQuery(Test);
+module TestQuery = ReasonApollo.CreateQuery(Test);
 
 module HooksTest = {
   [@react.component]
@@ -69,9 +69,9 @@ let make = (~message, ~settingsOrError, ~setSettingsOrError) =>
         className=Css.(style([width(`percent(100.)), margin(`rem(1.25))]))>
         <TestQuery>
           (
-            result =>
+            response =>
               ReasonReact.string(
-                switch (result) {
+                switch (response.result) {
                 | Loading => ""
                 | Error(error) => error##message
                 | Data(response) => response##version

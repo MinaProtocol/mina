@@ -7,7 +7,7 @@ module Single = struct
     module V1 = struct
       module T = struct
         type t = Public_key.Compressed.Stable.V1.t * Currency.Fee.Stable.V1.t
-        [@@deriving bin_io, sexp, compare, eq, yojson, version]
+        [@@deriving bin_io, sexp, compare, eq, yojson, version, hash]
       end
 
       include T
@@ -27,7 +27,7 @@ module Single = struct
   end
 
   (* bin_io omitted *)
-  type t = Stable.Latest.t [@@deriving sexp, compare, eq, yojson]
+  type t = Stable.Latest.t [@@deriving sexp, compare, eq, yojson, hash]
 end
 
 module Stable = struct
@@ -36,7 +36,7 @@ module Stable = struct
       type t =
         | One of Single.Stable.V1.t
         | Two of Single.Stable.V1.t * Single.Stable.V1.t
-      [@@deriving bin_io, sexp, compare, eq, yojson, version]
+      [@@deriving bin_io, sexp, compare, eq, yojson, version, hash]
     end
 
     include T
@@ -59,7 +59,7 @@ end
 type t = Stable.Latest.t =
   | One of Single.Stable.V1.t
   | Two of Single.Stable.V1.t * Single.Stable.V1.t
-[@@deriving sexp, compare, eq, yojson]
+[@@deriving sexp, compare, eq, yojson, hash]
 
 let to_list = function One x -> [x] | Two (x, y) -> [x; y]
 

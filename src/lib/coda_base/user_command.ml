@@ -14,7 +14,7 @@ module Poly = struct
       module T = struct
         type ('payload, 'pk, 'signature) t =
           {payload: 'payload; sender: 'pk; signature: 'signature}
-        [@@deriving bin_io, eq, sexp, hash, yojson, version {unnumbered}]
+        [@@deriving bin_io, eq, sexp, hash, yojson, version]
       end
 
       include T
@@ -120,7 +120,8 @@ module With_valid_signature = struct
   module Stable = struct
     module V1 = struct
       module T = struct
-        type t = Stable.V1.t [@@deriving sexp, eq, bin_io, yojson, version]
+        type t = Stable.V1.t
+        [@@deriving sexp, eq, bin_io, yojson, version, hash]
       end
 
       include T
