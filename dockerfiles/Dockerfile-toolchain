@@ -40,6 +40,7 @@ RUN cd /rocksdb && sudo make static_lib PORTABLE=1 -j$(nproc) && sudo cp librock
 # Opam dependencies
 # Pull freshest repository
 RUN git -C /home/opam/opam-repository pull
+RUN opam switch create coda ocaml-base-compiler.4.07.1
 RUN opam update -y && opam upgrade -y
 
 # Install other OPAM packages
