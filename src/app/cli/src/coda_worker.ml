@@ -368,10 +368,12 @@ module T = struct
           let%bind coda =
             Main.create
               (Main.Config.make ~logger ~trust_system ~net_config
-                 ~run_snark_worker:(Option.is_some snark_worker_config)
+                 ?snark_worker_key:
+                   (Option.map snark_worker_config ~f:(fun c -> c.public_key))
                  ~transaction_pool_disk_location:
                    (conf_dir ^/ "transaction_pool")
                  ~snark_pool_disk_location:(conf_dir ^/ "snark_pool")
+                 ~wallets_disk_location:(conf_dir ^/ "wallets")
                  ~time_controller ~receipt_chain_database
                  ~snark_work_fee:(Currency.Fee.of_int 0)
                  ?propose_keypair:Config.propose_keypair ~monitor
@@ -395,10 +397,13 @@ module T = struct
           let coda_peers () = return (Main.peers coda) in
           let coda_start () = return (Main.start coda) in
           let coda_get_balance pk =
-            return (Run.get_balance coda pk |> Participating_state.active_exn)
+            return
+              ( Run.Commands.get_balance coda pk
+              |> Participating_state.active_exn )
           in
           let coda_get_nonce pk =
-            return (Run.get_nonce coda pk |> Participating_state.active_exn)
+            return
+              (Run.Commands.get_nonce coda pk |> Participating_state.active_exn)
           in
           let coda_root_length () =
             return (Main.root_length coda |> Participating_state.active_exn)
@@ -409,7 +414,7 @@ module T = struct
             in
             let build_txn amount sender_sk receiver_pk fee =
               let nonce =
-                Run.get_nonce coda (pk_of_sk sender_sk)
+                Run.Commands.get_nonce coda (pk_of_sk sender_sk)
                 |> Participating_state.active_exn
                 |> Option.value_exn ?here:None ?message:None ?error:None
               in
@@ -421,19 +426,20 @@ module T = struct
             in
             let payment = build_txn amount sk pk fee in
             let%map receipt =
-              Run.send_payment logger coda (payment :> User_command.t)
+              Run.Commands.send_payment logger coda (payment :> User_command.t)
             in
             receipt |> Participating_state.active_exn
           in
           let coda_process_payment cmd =
             let%map receipt =
-              Run.send_payment logger coda (cmd :> User_command.t)
+              Run.Commands.send_payment logger coda (cmd :> User_command.t)
             in
             receipt |> Participating_state.active_exn
           in
           let coda_prove_receipt (proving_receipt, resulting_receipt) =
             match%map
-              Run.prove_receipt coda ~proving_receipt ~resulting_receipt
+              Run.Commands.prove_receipt coda ~proving_receipt
+                ~resulting_receipt
             with
             | Ok proof ->
                 Logger.info logger ~module_:__MODULE__ ~location:__LOC__
@@ -486,8 +492,7 @@ module T = struct
             Deferred.return (Option.value ~default:[] path)
           in
           let parse_sync_status_exn = function
-            | `Assoc [("data", `Assoc [("new_sync_update", `String status)])]
-              ->
+            | `Assoc [("data", `Assoc [("newSyncUpdate", `String status)])] ->
                 Sync_status.of_string status |> Or_error.ok_exn
             | unexpected_json ->
                 failwithf
@@ -497,7 +502,7 @@ module T = struct
           in
           let coda_sync_status () =
             let schema = Run.Graphql.schema in
-            match Graphql_parser.parse "subscription { new_sync_update }" with
+            match Graphql_parser.parse "subscription { newSyncUpdate }" with
             | Ok query -> (
                 match%map Graphql_async.Schema.execute schema coda query with
                 | Ok (`Stream pipe) ->

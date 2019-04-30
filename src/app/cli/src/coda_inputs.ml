@@ -62,8 +62,6 @@ module Frozen_ledger_hash = struct
   let of_ledger_hash = Frozen_ledger_hash.of_ledger_hash
 end
 
-module Incr_status = Incremental.Make ()
-
 module type Ledger_proof_verifier_intf = sig
   val verify :
        Ledger_proof.t
@@ -185,8 +183,6 @@ module type Main_intf = sig
         with type gossip_config := Gossip_net.Config.t
          and type time_controller := Time.Controller.t
     end
-
-    module Incr_status : Incremental.S
 
     module Sparse_ledger : sig
       type t
@@ -326,10 +322,11 @@ module type Main_intf = sig
       { logger: Logger.t
       ; trust_system: Trust_system.t
       ; propose_keypair: Keypair.t option
-      ; run_snark_worker: bool
+      ; snark_worker_key: Public_key.Compressed.Stable.V1.t option
       ; net_config: Inputs.Net.Config.t
       ; transaction_pool_disk_location: string
       ; snark_pool_disk_location: string
+      ; wallets_disk_location: string
       ; ledger_db_location: string option
       ; transition_frontier_location: string option
       ; staged_ledger_transition_backup_capacity: int [@default 10]
@@ -345,7 +342,9 @@ module type Main_intf = sig
 
   val propose_keypair : t -> Keypair.t option
 
-  val run_snark_worker : t -> bool
+  val snark_worker_key : t -> Public_key.Compressed.Stable.V1.t option
+
+  val snark_work_fee : t -> Currency.Fee.t
 
   val request_work : t -> Inputs.Snark_worker.Work.Spec.t option
 
@@ -362,7 +361,7 @@ module type Main_intf = sig
     t -> Inputs.Transition_frontier.Breadcrumb.t Participating_state.t
 
   val sync_status :
-    t -> [`Offline | `Synced | `Bootstrap] Inputs.Incr_status.Observer.t
+    t -> [`Offline | `Synced | `Bootstrap] Coda_incremental.Status.Observer.t
 
   val visualize_frontier : filename:string -> t -> unit Participating_state.t
 
@@ -380,16 +379,23 @@ module type Main_intf = sig
 
   val transaction_pool : t -> Inputs.Transaction_pool.t
 
+  val transaction_database : t -> Transaction_database.t
+
   val snark_pool : t -> Inputs.Snark_pool.t
 
   val create : Config.t -> t Deferred.t
 
   val staged_ledger_ledger_proof : t -> Inputs.Ledger_proof.t option
 
+  val transition_frontier :
+    t -> Inputs.Transition_frontier.t option Broadcast_pipe.Reader.t
+
   val get_ledger :
     t -> Staged_ledger_hash.t -> Account.t list Deferred.Or_error.t
 
   val receipt_chain_database : t -> Receipt_chain_database.t
+
+  val wallets : t -> Secrets.Wallets.t
 end
 
 module Pending_coinbase = struct
@@ -831,7 +837,6 @@ struct
   end
 
   module Root_sync_ledger = Sync_ledger.Db
-  module Incr_status = Incr_status
 
   module Net = Coda_networking.Make (struct
     include Inputs0

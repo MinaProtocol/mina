@@ -416,8 +416,6 @@ module type Inputs_intf = sig
      and type syncable_ledger_answer := Coda_base.Sync_ledger.Answer.t
      and type pending_coinbases := Pending_coinbase.t
      and type parallel_scan_state := Staged_ledger.Scan_state.t
-
-  module Incr_status : Incremental.S
 end
 
 module Make (Inputs : Inputs_intf) = struct
@@ -425,9 +423,9 @@ module Make (Inputs : Inputs_intf) = struct
 
   type t =
     { propose_keypair: Keypair.t option
-    ; run_snark_worker: bool
+    ; snark_worker_key: Public_key.Compressed.Stable.V1.t option
     ; net: Net.t
-          (* TODO: Is this the best spot for the transaction_pool ref? *)
+    ; wallets: Secrets.Wallets.t
     ; transaction_pool: Transaction_pool.t
     ; snark_pool: Snark_pool.t
     ; transition_frontier: Transition_frontier.t option Broadcast_pipe.Reader.t
@@ -448,7 +446,8 @@ module Make (Inputs : Inputs_intf) = struct
         Pipe.Writer.t
     ; time_controller: Time.Controller.t
     ; snark_work_fee: Currency.Fee.t
-    ; consensus_local_state: Consensus_mechanism.Local_state.t }
+    ; consensus_local_state: Consensus_mechanism.Local_state.t
+    ; transaction_database: Transaction_database.t }
 
   let peek_frontier frontier_broadcast_pipe =
     Broadcast_pipe.Reader.peek frontier_broadcast_pipe
@@ -458,7 +457,9 @@ module Make (Inputs : Inputs_intf) = struct
               "Cannot retrieve transition frontier now. Bootstrapping right \
                now.")
 
-  let run_snark_worker t = t.run_snark_worker
+  let wallets t = t.wallets
+
+  let snark_worker_key t = t.snark_worker_key
 
   let propose_keypair t = t.propose_keypair
 
@@ -466,6 +467,8 @@ module Make (Inputs : Inputs_intf) = struct
     let open Option.Let_syntax in
     let%map frontier = Broadcast_pipe.Reader.peek t.transition_frontier in
     Transition_frontier.best_tip frontier
+
+  let transition_frontier t = t.transition_frontier
 
   let root_length_opt t =
     let open Option.Let_syntax in
@@ -498,15 +501,7 @@ module Make (Inputs : Inputs_intf) = struct
   let root_length = compose_of_option root_length_opt
 
   module Incr = struct
-    open Incr_status
-
-    let of_broadcast_pipe pipe =
-      let init = Broadcast_pipe.Reader.peek pipe in
-      let var = Var.create init in
-      Broadcast_pipe.Reader.iter pipe ~f:(fun value ->
-          Var.set var value ; stabilize () ; Deferred.unit )
-      |> don't_wait_for ;
-      var
+    open Coda_incremental.Status
 
     let online_status t = of_broadcast_pipe @@ Net.online_status t.net
 
@@ -514,10 +509,10 @@ module Make (Inputs : Inputs_intf) = struct
   end
 
   let sync_status t =
-    let open Incr_status in
+    let open Coda_incremental.Status in
     let transition_frontier_incr = Var.watch @@ Incr.transition_frontier t in
     let incremental_status =
-      Incr_status.map2
+      map2
         (Var.watch @@ Incr.online_status t)
         transition_frontier_incr
         ~f:(fun online_status active_status ->
@@ -571,6 +566,8 @@ module Make (Inputs : Inputs_intf) = struct
 
   let transaction_pool t = t.transaction_pool
 
+  let transaction_database t = t.transaction_database
+
   let snark_pool t = t.snark_pool
 
   let peers t = Net.peers t.net
@@ -622,10 +619,11 @@ module Make (Inputs : Inputs_intf) = struct
       { logger: Logger.t
       ; trust_system: Trust_system.t
       ; propose_keypair: Keypair.t option
-      ; run_snark_worker: bool
+      ; snark_worker_key: Public_key.Compressed.Stable.V1.t option
       ; net_config: Net.Config.t
       ; transaction_pool_disk_location: string
       ; snark_pool_disk_location: string
+      ; wallets_disk_location: string
       ; ledger_db_location: string option
       ; transition_frontier_location: string option
       ; staged_ledger_transition_backup_capacity: int [@default 10]
@@ -770,6 +768,8 @@ module Make (Inputs : Inputs_intf) = struct
                       in
                       (Some persistence, root_snarked_ledger, frontier) )
             in
+            (* TODO: the name of transaction_database should be supplied by Config #2333 *)
+            let transaction_database = Transaction_database.create () in
             let frontier_broadcast_pipe_r, frontier_broadcast_pipe_w =
               Broadcast_pipe.create (Some transition_frontier)
             in
@@ -872,14 +872,19 @@ module Make (Inputs : Inputs_intf) = struct
                 ~incoming_diffs:(Net.snark_pool_diffs net)
                 ~frontier_broadcast_pipe:frontier_broadcast_pipe_r
             in
+            let%bind wallets =
+              Secrets.Wallets.load ~logger:config.logger
+                ~disk_location:config.wallets_disk_location
+            in
             don't_wait_for
               (Linear_pipe.iter (Snark_pool.broadcasts snark_pool) ~f:(fun x ->
                    Net.broadcast_snark_pool_diff net x ;
                    Deferred.unit )) ;
             return
               { propose_keypair= config.propose_keypair
-              ; run_snark_worker= config.run_snark_worker
+              ; snark_worker_key= config.snark_worker_key
               ; net
+              ; wallets
               ; transaction_pool
               ; snark_pool
               ; transition_frontier= frontier_broadcast_pipe_r
@@ -894,5 +899,6 @@ module Make (Inputs : Inputs_intf) = struct
               ; receipt_chain_database= config.receipt_chain_database
               ; snark_work_fee= config.snark_work_fee
               ; proposer_transition_writer
-              ; consensus_local_state= config.consensus_local_state } ) )
+              ; consensus_local_state= config.consensus_local_state
+              ; transaction_database } ) )
 end

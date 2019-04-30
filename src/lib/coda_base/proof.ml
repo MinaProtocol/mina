@@ -6,21 +6,25 @@ module Stable = struct
     (* TODO: This should be stable. *)
     module T = struct
       (* Tock.Proof.t is not bin_io; should we wrap that snarky type? *)
-      type t = Tock.Proof.t [@@deriving version {asserted}]
+      type t = Tock.Proof.t [@@deriving version {asserted; unnumbered}]
 
-      let to_string = Tock_backend.Proof.to_string
+      let to_string = Binable.to_string (module Tock_backend.Proof)
 
-      let of_string = Tock_backend.Proof.of_string
+      let of_string = Binable.of_string (module Tock_backend.Proof)
     end
 
     include T
     include Sexpable.Of_stringable (T)
 
-    let to_yojson t = `String (to_string t)
+    let to_yojson s = `String (Base64.encode_string (to_string s))
 
     let of_yojson = function
-      | `String x ->
-          Ok (of_string x)
+      | `String s -> (
+        match Base64.decode s with
+        | Ok s ->
+            Ok (of_string s)
+        | Error (`Msg e) ->
+            Error (sprintf "bad base64: %s" e) )
       | _ ->
           Error "expected `String"
 
