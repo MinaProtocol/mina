@@ -877,8 +877,7 @@ module Make (Inputs : Inputs_intf) = struct
                    if
                      Ok ()
                      = Consensus_mechanism.received_at_valid_time
-                         ~logger:config.logger ~time_received:now
-                         consensus_state
+                         ~time_received:now consensus_state
                    then (
                      Logger.trace config.logger ~module_:__MODULE__
                        ~location:__LOC__
