@@ -425,7 +425,6 @@ module Make (Inputs : Inputs_intf) = struct
     { propose_keypair: Keypair.t option
     ; snark_worker_key: Public_key.Compressed.Stable.V1.t option
     ; net: Net.t
-          (* TODO: Is this the best spot for the transaction_pool ref? *)
     ; wallets: Secrets.Wallets.t
     ; transaction_pool: Transaction_pool.t
     ; snark_pool: Snark_pool.t
@@ -447,7 +446,8 @@ module Make (Inputs : Inputs_intf) = struct
         Pipe.Writer.t
     ; time_controller: Time.Controller.t
     ; snark_work_fee: Currency.Fee.t
-    ; consensus_local_state: Consensus_mechanism.Local_state.t }
+    ; consensus_local_state: Consensus_mechanism.Local_state.t
+    ; transaction_database: Transaction_database.t }
 
   let peek_frontier frontier_broadcast_pipe =
     Broadcast_pipe.Reader.peek frontier_broadcast_pipe
@@ -565,6 +565,8 @@ module Make (Inputs : Inputs_intf) = struct
   let set_seen_jobs t seen_jobs = t.seen_jobs <- seen_jobs
 
   let transaction_pool t = t.transaction_pool
+
+  let transaction_database t = t.transaction_database
 
   let snark_pool t = t.snark_pool
 
@@ -766,6 +768,8 @@ module Make (Inputs : Inputs_intf) = struct
                       in
                       (Some persistence, root_snarked_ledger, frontier) )
             in
+            (* TODO: the name of transaction_database should be supplied by Config #2333 *)
+            let transaction_database = Transaction_database.create () in
             let frontier_broadcast_pipe_r, frontier_broadcast_pipe_w =
               Broadcast_pipe.create (Some transition_frontier)
             in
@@ -895,5 +899,6 @@ module Make (Inputs : Inputs_intf) = struct
               ; receipt_chain_database= config.receipt_chain_database
               ; snark_work_fee= config.snark_work_fee
               ; proposer_transition_writer
-              ; consensus_local_state= config.consensus_local_state } ) )
+              ; consensus_local_state= config.consensus_local_state
+              ; transaction_database } ) )
 end
