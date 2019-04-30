@@ -14,7 +14,7 @@ module Make (Inputs : Intf.Inputs_intf) = struct
   open Snark_work_lib
 
   module Get_work = struct
-    module T = struct
+    module Master = struct
       let name = "get_work"
 
       module T = struct
@@ -36,8 +36,8 @@ module Make (Inputs : Intf.Inputs_intf) = struct
       module Callee = T
     end
 
-    include T.T
-    module M = Versioned_rpc.Both_convert.Plain.Make (T)
+    include Master.T
+    module M = Versioned_rpc.Both_convert.Plain.Make (Master)
     include M
 
     module V1 = struct
@@ -71,7 +71,7 @@ module Make (Inputs : Intf.Inputs_intf) = struct
   end
 
   module Submit_work = struct
-    module T = struct
+    module Master = struct
       let name = "submit_work"
 
       module T = struct
@@ -93,8 +93,8 @@ module Make (Inputs : Intf.Inputs_intf) = struct
       module Callee = T
     end
 
-    include T.T
-    include Versioned_rpc.Both_convert.Plain.Make (T)
+    include Master.T
+    include Versioned_rpc.Both_convert.Plain.Make (Master)
 
     module V1 = struct
       module T = struct

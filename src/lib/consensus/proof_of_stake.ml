@@ -332,8 +332,7 @@ module Epoch_ledger = struct
         module T = struct
           type ('ledger_hash, 'amount) t =
             {hash: 'ledger_hash; total_currency: 'amount}
-          [@@deriving
-            sexp, bin_io, eq, compare, hash, to_yojson, version {unnumbered}]
+          [@@deriving sexp, bin_io, eq, compare, hash, to_yojson, version]
         end
 
         include T
@@ -793,7 +792,8 @@ module Optional_state_hash = struct
     module V1 = struct
       module T = struct
         type t = Coda_base.State_hash.Stable.V1.t option
-        [@@deriving sexp, bin_io, eq, compare, hash, to_yojson, version]
+        [@@deriving
+          sexp, bin_io, eq, compare, hash, to_yojson, version {unnumbered}]
       end
 
       include T
