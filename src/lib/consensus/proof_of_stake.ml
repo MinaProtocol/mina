@@ -251,6 +251,7 @@ module Epoch = struct
     [%test_eq: int64] (diff_in_slots (!^0, !^5) (!^0, !^0)) 5L ;
     [%test_eq: int64] (diff_in_slots (!^3, !^23) (!^3, !^20)) 3L ;
     [%test_eq: int64] (diff_in_slots (!^4, !^4) (!^3, !^0)) (epoch_size + 4L) ;
+    [%test_eq: int64] (diff_in_slots (!^5, !^2) (!^4, !@(epoch_size - 3L))) 5L ;
     [%test_eq: int64]
       (diff_in_slots (!^6, !^42) (!^2, !^16))
       ((epoch_size * 3L) + 42L + (epoch_size - 16L)) ;
