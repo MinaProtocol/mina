@@ -4,6 +4,8 @@ The parallel scan state currently is a full-binary tree with leaves (or called `
 
 Everytime a diff is applied, the transactions are transformed to new base jobs and added to the scan state. The diff also includes completed works that correspond to a sequence of jobs that already exist on the scan state. These, when added to scan state, create new merge jobs except when it is for the root node in which case the proof is simply returned as the result.
 
+Currently, parallel scan is implemeted using arrays and involve a lot of index manipulation. This makes the code difficult to read and maintain. This refactoring aims to make the structure declarative and more "functional" given that we can lax a bit on the efficiency since other expensive operations(sparse ledgers for witness) in `apply_diff`.
+
 The following constants dictate the structure and behaviour of the scan state.
 
 1. *Transaction_capacity_log_2*: $2^{transaction\_capacity\_log\_2}$ is the maximum number of transactions (or base jobs) that can be added per block and the maximum number of proofs that is to be done is $2^{transaction\_capacity\_log\_2 + 1} - 1$. Prorated work for a transaction is two proofs except for transaction that occupies the last slot which is just one proof.
@@ -132,6 +134,7 @@ module Completed_job : sig
 end
 
 val update :: ('a, 'd) t -> data:'d list -> work:'a Completed_job.t list -> ('a, 'd) t
+(*T(n) = O((log n)^2) *)
 
 ...
 
