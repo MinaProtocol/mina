@@ -83,7 +83,7 @@ module Make (Blockchain_state : Coda_base.Blockchain_state.S) = struct
     ; delegate= public_key account.delegate
     ; receipt_chain_hash=
         digest (account.receipt_chain_hash :> Tick.Pedersen.Digest.t)
-    ; participated= account.participated }
+    ; participated= false }
 
   let ledger_hash (h : Coda_base.Ledger_hash.t) : Lite_base.Ledger_hash.t =
     digest (h :> Tick.Pedersen.Digest.t)

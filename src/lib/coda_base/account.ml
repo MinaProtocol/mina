@@ -57,13 +57,12 @@ module Poly = struct
   module Stable = struct
     module V1 = struct
       module T = struct
-        type ('pk, 'amount, 'nonce, 'receipt_chain_hash, 'bool, 'state_hash) t =
+        type ('pk, 'amount, 'nonce, 'receipt_chain_hash, 'state_hash) t =
           { public_key: 'pk
           ; balance: 'amount
           ; nonce: 'nonce
           ; receipt_chain_hash: 'receipt_chain_hash
           ; delegate: 'pk
-          ; participated: 'bool
           ; voting_for: 'state_hash }
         [@@deriving sexp, bin_io, eq, compare, hash, yojson, version]
       end
@@ -74,12 +73,11 @@ module Poly = struct
     module Latest = V1
   end
 
-  type ('pk, 'amount, 'nonce, 'receipt_chain_hash, 'bool, 'state_hash) t =
+  type ('pk, 'amount, 'nonce, 'receipt_chain_hash, 'state_hash) t =
         ( 'pk
         , 'amount
         , 'nonce
         , 'receipt_chain_hash
-        , 'bool
         , 'state_hash )
         Stable.Latest.t =
     { public_key: 'pk
@@ -87,7 +85,6 @@ module Poly = struct
     ; nonce: 'nonce
     ; receipt_chain_hash: 'receipt_chain_hash
     ; delegate: 'pk
-    ; participated: 'bool
     ; voting_for: 'state_hash }
   [@@deriving sexp, eq, compare, hash, yojson]
 end
@@ -103,7 +100,6 @@ module Stable = struct
         , Balance.Stable.V1.t
         , Nonce.Stable.V1.t
         , Receipt.Chain_hash.Stable.V1.t
-        , bool
         , State_hash.Stable.V1.t )
         Poly.Stable.V1.t
       [@@deriving sexp, bin_io, eq, hash, compare, yojson, version]
@@ -142,7 +138,6 @@ type var =
   , Balance.var
   , Nonce.Unpacked.var
   , Receipt.Chain_hash.var
-  , Boolean.var
   , State_hash.var )
   Poly.t
 
@@ -151,7 +146,6 @@ type value =
   , Balance.t
   , Nonce.t
   , Receipt.Chain_hash.t
-  , bool
   , State_hash.t )
   Poly.t
 [@@deriving sexp]
@@ -164,7 +158,6 @@ let initialize public_key : t =
   ; nonce= Nonce.zero
   ; receipt_chain_hash= Receipt.Chain_hash.empty
   ; delegate= public_key
-  ; participated= false
   ; voting_for= State_hash.of_hash Null_field_element.null }
 
 let typ : (var, value) Typ.t =
@@ -175,108 +168,55 @@ let typ : (var, value) Typ.t =
     ; Nonce.Unpacked.typ
     ; Receipt.Chain_hash.typ
     ; Public_key.Compressed.typ
-    ; Boolean.typ
     ; State_hash.typ ]
   in
   let of_hlist
-        : 'a 'b 'c 'd 'e 'f.    ( unit
-                                ,    'a
-                                  -> 'b
-                                  -> 'c
-                                  -> 'd
-                                  -> 'a
-                                  -> 'e
-                                  -> 'f
-                                  -> unit )
-                                H_list.t -> ('a, 'b, 'c, 'd, 'e, 'f) Poly.t =
+        : 'a 'b 'c 'd 'e.    ( unit
+                             , 'a -> 'b -> 'c -> 'd -> 'a -> 'e -> unit )
+                             H_list.t -> ('a, 'b, 'c, 'd, 'e) Poly.t =
     let open H_list in
-    fun [ public_key
-        ; balance
-        ; nonce
-        ; receipt_chain_hash
-        ; delegate
-        ; participated
-        ; voting_for ] ->
-      { public_key
-      ; balance
-      ; nonce
-      ; receipt_chain_hash
-      ; delegate
-      ; participated
-      ; voting_for }
+    fun [public_key; balance; nonce; receipt_chain_hash; delegate; voting_for] ->
+      {public_key; balance; nonce; receipt_chain_hash; delegate; voting_for}
   in
   let to_hlist
       Poly.
-        { public_key
-        ; balance
-        ; nonce
-        ; receipt_chain_hash
-        ; delegate
-        ; participated
-        ; voting_for } =
+        {public_key; balance; nonce; receipt_chain_hash; delegate; voting_for}
+      =
     H_list.
-      [ public_key
-      ; balance
-      ; nonce
-      ; receipt_chain_hash
-      ; delegate
-      ; participated
-      ; voting_for ]
+      [public_key; balance; nonce; receipt_chain_hash; delegate; voting_for]
   in
   Typ.of_hlistable spec ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist
     ~value_to_hlist:to_hlist ~value_of_hlist:of_hlist
 
 let var_of_t
-    ({ public_key
-     ; balance
-     ; nonce
-     ; receipt_chain_hash
-     ; delegate
-     ; participated
-     ; voting_for } :
+    ({public_key; balance; nonce; receipt_chain_hash; delegate; voting_for} :
       value) =
   { Poly.public_key= Public_key.Compressed.var_of_t public_key
   ; balance= Balance.var_of_t balance
   ; nonce= Nonce.Unpacked.var_of_value nonce
   ; receipt_chain_hash= Receipt.Chain_hash.var_of_t receipt_chain_hash
   ; delegate= Public_key.Compressed.var_of_t delegate
-  ; participated= Boolean.var_of_value participated
   ; voting_for= State_hash.var_of_t voting_for }
 
 let var_to_triples
-    Poly.
-      { public_key
-      ; balance
-      ; nonce
-      ; receipt_chain_hash
-      ; delegate
-      ; participated
-      ; voting_for } =
+    Poly.{public_key; balance; nonce; receipt_chain_hash; delegate; voting_for}
+    =
   let%bind public_key = Public_key.Compressed.var_to_triples public_key
   and receipt_chain_hash = Receipt.Chain_hash.var_to_triples receipt_chain_hash
   and delegate = Public_key.Compressed.var_to_triples delegate in
   let balance = Balance.var_to_triples balance in
   let nonce = Nonce.Unpacked.var_to_triples nonce in
   let%map voting_for = State_hash.var_to_triples voting_for in
-  public_key @ balance @ nonce @ receipt_chain_hash @ delegate
-  @ [(participated, Boolean.false_, Boolean.false_)]
-  @ voting_for
+  public_key @ balance @ nonce @ receipt_chain_hash @ delegate @ voting_for
 
 let fold
-    ({ public_key
-     ; balance
-     ; nonce
-     ; receipt_chain_hash
-     ; delegate
-     ; participated
-     ; voting_for } :
+    ({public_key; balance; nonce; receipt_chain_hash; delegate; voting_for} :
       t) =
   let open Fold in
   Public_key.Compressed.fold public_key
   +> Balance.fold balance +> Nonce.fold nonce
   +> Receipt.Chain_hash.fold receipt_chain_hash
   +> Public_key.Compressed.fold delegate
-  +> Fold.return (participated, false, false)
   +> State_hash.fold voting_for
 
 let crypto_hash_prefix = Hash_prefix.account
@@ -290,7 +230,6 @@ let empty =
     ; nonce= Nonce.zero
     ; receipt_chain_hash= Receipt.Chain_hash.empty
     ; delegate= Public_key.Compressed.empty
-    ; participated= false
     ; voting_for= State_hash.of_hash Null_field_element.null }
 
 let digest t = Pedersen.State.digest (crypto_hash t)
@@ -302,7 +241,6 @@ let create public_key balance =
     ; nonce= Nonce.zero
     ; receipt_chain_hash= Receipt.Chain_hash.empty
     ; delegate= public_key
-    ; participated= false
     ; voting_for= State_hash.of_hash Null_field_element.null }
 
 let gen =
