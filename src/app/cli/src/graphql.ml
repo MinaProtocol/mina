@@ -205,7 +205,9 @@ module Make (Commands : Coda_commands.Intf) = struct
                 ~resolve:(fun _ account ->
                   Stringable.public_key account.Account.Poly.delegate )
             ; field "votingFor" ~typ:(non_null string)
-                ~doc:"TODO, not sure what this is"
+                ~doc:
+                  "The previous epoch lock hash of the chain which you are \
+                   voting for"
                 ~args:Arg.[]
                 ~resolve:(fun _ account ->
                   Coda_base.State_hash.to_bytes account.Account.Poly.voting_for

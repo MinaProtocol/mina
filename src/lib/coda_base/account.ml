@@ -158,7 +158,7 @@ let initialize public_key : t =
   ; nonce= Nonce.zero
   ; receipt_chain_hash= Receipt.Chain_hash.empty
   ; delegate= public_key
-  ; voting_for= State_hash.of_hash Null_field_element.null }
+  ; voting_for= State_hash.of_hash Outside_pedersen_image.t }
 
 let typ : (var, value) Typ.t =
   let spec =
@@ -201,12 +201,12 @@ let var_of_t
 let var_to_triples
     Poly.{public_key; balance; nonce; receipt_chain_hash; delegate; voting_for}
     =
-  let%bind public_key = Public_key.Compressed.var_to_triples public_key
+  let%map public_key = Public_key.Compressed.var_to_triples public_key
+  and voting_for = State_hash.var_to_triples voting_for
   and receipt_chain_hash = Receipt.Chain_hash.var_to_triples receipt_chain_hash
   and delegate = Public_key.Compressed.var_to_triples delegate in
   let balance = Balance.var_to_triples balance in
   let nonce = Nonce.Unpacked.var_to_triples nonce in
-  let%map voting_for = State_hash.var_to_triples voting_for in
   public_key @ balance @ nonce @ receipt_chain_hash @ delegate @ voting_for
 
 let fold
@@ -230,7 +230,7 @@ let empty =
     ; nonce= Nonce.zero
     ; receipt_chain_hash= Receipt.Chain_hash.empty
     ; delegate= Public_key.Compressed.empty
-    ; voting_for= State_hash.of_hash Null_field_element.null }
+    ; voting_for= State_hash.of_hash Outside_pedersen_image.t }
 
 let digest t = Pedersen.State.digest (crypto_hash t)
 
@@ -241,7 +241,7 @@ let create public_key balance =
     ; nonce= Nonce.zero
     ; receipt_chain_hash= Receipt.Chain_hash.empty
     ; delegate= public_key
-    ; voting_for= State_hash.of_hash Null_field_element.null }
+    ; voting_for= State_hash.of_hash Outside_pedersen_image.t }
 
 let gen =
   let open Quickcheck.Let_syntax in

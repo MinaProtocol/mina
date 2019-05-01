@@ -22,7 +22,7 @@ let main () =
   let loc = Ppxlib.Location.none in
   let structure =
     [%str
-      let null =
+      let t =
         [%e
           [%expr
             Snark_params.Tick.Field.t_of_sexp
