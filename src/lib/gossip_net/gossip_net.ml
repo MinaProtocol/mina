@@ -132,7 +132,16 @@ module Make (Message : Message_intf) : S with type msg := Message.msg = struct
     | Ok conn ->
         Versioned_rpc.Connection_with_menu.create conn
 
-  (* remove peer from set of peers and peers_by_ip *)
+  (* remove peer from set of peers and peers_by_ip
+
+     there are issues with this simple approach, because
+     Kademlia is not informed when peers are removed, so:
+
+     - the node may not be informed when a peer reconnects, so the
+        peer won't be re-added to the peer set
+     - Kademlia may propagate information about the removed peers
+        other nodes
+  *)
   let remove_peer t peer =
     Hash_set.remove t.peers peer ;
     Hashtbl.update t.peers_by_ip peer.host ~f:(function
