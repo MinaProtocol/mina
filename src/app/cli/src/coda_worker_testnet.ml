@@ -147,29 +147,6 @@ module Api = struct
     in
     user_cmd
 
-  (* TODO: his should be named: send_single_payment_with_finality_check  *)
-  let send_payment_and_check_root_finality t i ?acceptable_delay:(delay = 7)
-      sender_sk receiver_pk amount fee =
-    let open Deferred.Option.Let_syntax in
-    let worker = t.workers.(i) in
-    let%bind user_cmd = send_payment t i sender_sk receiver_pk amount fee in
-    let%map (all_passed_root : unit Ivar.t list) =
-      let open Deferred.Let_syntax in
-      Deferred.List.filter_map (t.status |> Array.to_list) ~f:(function
-        | `On (`Synced user_cmds_under_inspection) ->
-            let%map root_length = Coda_process.root_length_exn worker in
-            let passed_root = Ivar.create () in
-            Hashtbl.add_exn user_cmds_under_inspection ~key:user_cmd
-              ~data:
-                { expected_deadline= root_length + Consensus.Constants.k + delay
-                ; passed_root } ;
-            Option.return passed_root
-        | _ ->
-            return None )
-      >>| Option.return
-    in
-    all_passed_root
-
   (* TODO: resulting_receipt should be replaced with the sender's pk so that we prove the
       merkle_list of receipts up to the current state of a sender's receipt_chain hash for some blockchain.
       However, whenever we get a new transition, the blockchain does not update and `prove_receipt` would not query
@@ -440,7 +417,12 @@ let test logger n proposers snark_work_public_keys work_selection
 
 module Payments : sig
   val send_several_payments :
-    Api.t -> node:int -> keypairs:Keypair.t list -> n:int -> unit Deferred.t
+       ?acceptable_delay:int
+    -> Api.t
+    -> node:int
+    -> keypairs:Keypair.t list
+    -> n:int
+    -> unit Deferred.t
 
   val send_batch_consecutive_payments :
        Api.t
@@ -453,7 +435,8 @@ module Payments : sig
   val assert_retrievable_payments :
     Api.t -> User_command.t sexp_list -> unit Deferred.t
 end = struct
-  let send_several_payments testnet ~node ~keypairs ~n =
+  let send_several_payments ?acceptable_delay:(delay = 7) (testnet : Api.t)
+      ~node ~keypairs ~n =
     let amount = Currency.Amount.of_int 10 in
     let fee = Currency.Fee.of_int 1 in
     let%bind (_ : unit option list) =
@@ -468,8 +451,32 @@ end = struct
                 let receiver_pk =
                   receiver_keypair.public_key |> Public_key.compress
                 in
-                Api.send_payment_and_check_root_finality testnet node sender_sk
-                  receiver_pk amount fee )
+                let worker = testnet.workers.(node) in
+                let%bind user_cmd =
+                  Api.send_payment testnet node sender_sk receiver_pk amount
+                    fee
+                in
+                let%map (all_passed_root : unit Ivar.t list) =
+                  let open Deferred.Let_syntax in
+                  Deferred.List.filter_map (testnet.status |> Array.to_list)
+                    ~f:(function
+                    | `On (`Synced user_cmds_under_inspection) ->
+                        let%map root_length =
+                          Coda_process.root_length_exn worker
+                        in
+                        let passed_root = Ivar.create () in
+                        Hashtbl.add_exn user_cmds_under_inspection
+                          ~key:user_cmd
+                          ~data:
+                            { expected_deadline=
+                                root_length + Consensus.Constants.k + delay
+                            ; passed_root } ;
+                        Option.return passed_root
+                    | _ ->
+                        return None )
+                  >>| Option.return
+                in
+                all_passed_root )
             |> Deferred.Option.all
           in
           Deferred.map
