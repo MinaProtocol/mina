@@ -106,10 +106,6 @@ def random_curve_point():
     y = y1 if crs.next_bit() else y2
     return (x, y)
 
-params0 = [ random_curve_point() for _ in range(10) ]
-print ('done generating base-points')
-params = []
-
 def point_add(P1, P2):
     if (P1 is None):
         return P2
@@ -130,13 +126,20 @@ def point_sixteen_times(P):
     P8 = point_add(P4, P4)
     return point_add(P8, P8)
 
-for P in params0:
-    Q = P
-    for _ in range(N // 4):
-        params.append(Q)
-        Q = point_sixteen_times(Q)
+def generate_pedersen_params():
+    params0 = [ random_curve_point() for _ in range(10) ]
+    print ('done generating base-points')
+    params = []
 
-print ('done generating all pedersen parameters')
+    for P in params0:
+        Q = P
+        for _ in range(N // 4):
+            params.append(Q)
+            Q = point_sixteen_times(Q)
+    print ('done generating all pedersen parameters')
+    return params
+
+params = generate_pedersen_params()
 
 # p = 4x^2 + 1
 # x =  2^13 * 3 * 5^2 * 7 * 812042190598814369278464271 * 14652487457434080047781531290587846082350961711966140037946846663231932006768257
@@ -278,6 +281,6 @@ if __name__ == '__main__':
     if schnorr_verify(MSG, bytes_from_point(point_mul(G, KEY)), SIG):
         print('Signature verified')
     else:
-        print('Signature failed to verifie')
+        print('Signature failed to verify')
         sys.exit(1)
 
