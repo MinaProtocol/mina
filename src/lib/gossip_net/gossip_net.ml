@@ -132,6 +132,15 @@ module Make (Message : Message_intf) : S with type msg := Message.msg = struct
     | Ok conn ->
         Versioned_rpc.Connection_with_menu.create conn
 
+  (* remove peer from set of peers and peers_by_ip *)
+  let remove_peer t peer =
+    Hash_set.remove t.peers peer ;
+    Hashtbl.update t.peers_by_ip peer.host ~f:(function
+      | None ->
+          failwith "Peer to remove doesn't appear in peers_by_ip"
+      | Some ip_peers ->
+          List.filter ip_peers ~f:(fun ip_peer -> not (Peer.equal ip_peer peer)) )
+
   let try_call_rpc t (peer : Peer.t) dispatch query =
     let call () =
       try_with (fun () ->
@@ -158,17 +167,19 @@ module Make (Message : Message_intf) : S with type msg := Message.msg = struct
                 [ Sexp.Atom "src/connection.ml.Handshake_error.Handshake_error"
                 ; _ ] ) ->
               let%map () =
-                Trust_system.record t.trust_system t.logger peer.host
-                  ( Trust_system.Actions.Outgoing_connection_error
-                  , Some ("handshake error", []) )
+                Trust_system.(
+                  record t.trust_system t.logger peer.host
+                    Actions.
+                      (Outgoing_connection_error, Some ("handshake error", [])))
               in
-              (* TODO: cleanup peer from peer table and maybe remove existing connections? *)
-              Error err
+              remove_peer t peer ; Error err
           | Async_rpc_kernel.Rpc_error.Rpc (Connection_closed, _), _ ->
               let%map () =
-                Trust_system.record t.trust_system t.logger peer.host
-                  ( Trust_system.Actions.Outgoing_connection_error
-                  , Some ("closed connection", []) )
+                Trust_system.(
+                  record t.trust_system t.logger peer.host
+                    Actions.
+                      ( Outgoing_connection_error
+                      , Some ("closed connection", []) ))
               in
               Error err
           | _ ->
@@ -183,14 +194,26 @@ module Make (Message : Message_intf) : S with type msg := Message.msg = struct
                           , [("exn", `String (Error.to_string_hum err))] ) ))
               in
               return (Error err) )
-      | Error exn ->
+      | Error monitor_exn -> (
           (* call itself failed *)
-          (* TODO: learn what exceptions are raised here, punish peers for
-            handshake timeouts, possibly other exceptions
-          *)
-          Logger.error t.logger ~module_:__MODULE__ ~location:__LOC__
-            "RPC call raised an exception: %s" (Exn.to_string exn) ;
-          return (Or_error.of_exn exn)
+          (* TODO: learn what other exceptions are raised here *)
+          let exn = Monitor.extract_exn monitor_exn in
+          let is_unix_errno errno unix_errno =
+            Int.equal (Unix.Error.compare errno unix_errno) 0
+          in
+          match exn with
+          | Unix.Unix_error (errno, _, _)
+            when is_unix_errno errno Unix.ECONNREFUSED ->
+              let%map () =
+                Trust_system.(
+                  record t.trust_system t.logger peer.host
+                    Actions.(Outgoing_connection_error, None))
+              in
+              remove_peer t peer ; Or_error.of_exn exn
+          | _ ->
+              Logger.error t.logger ~module_:__MODULE__ ~location:__LOC__
+                "RPC call raised an exception: %s" (Exn.to_string exn) ;
+              return (Or_error.of_exn exn) )
     in
     match Hashtbl.find t.connections peer.host with
     | None ->
@@ -347,16 +370,7 @@ module Make (Message : Message_intf) : S with type msg := Message.msg = struct
                   Logger.info t.logger ~module_:__MODULE__ ~location:__LOC__
                     "Some peers disconnected %s"
                     (List.sexp_of_t Peer.sexp_of_t peers |> Sexp.to_string_hum) ;
-                  List.iter peers ~f:(fun peer ->
-                      Hash_set.remove t.peers peer ;
-                      (* filter out this disconnected peer *)
-                      Hashtbl.update t.peers_by_ip peer.host ~f:(function
-                        | None ->
-                            failwith
-                              "Disconnected peer doesn't appear in peers_by_ip"
-                        | Some ip_peers ->
-                            List.filter ip_peers ~f:(fun ip_peer ->
-                                not (Peer.equal ip_peer peer) ) ) ) ;
+                  List.iter peers ~f:(remove_peer t) ;
                   Deferred.unit )
             |> ignore ) ;
         let%map _ =
