@@ -367,6 +367,8 @@ module type Main_intf = sig
 
   val peers : t -> Network_peer.Peer.t list
 
+  val initial_peers : t -> Host_and_port.t list
+
   val verified_transitions :
        t
     -> (Inputs.External_transition.Verified.t, State_hash.t) With_hash.t

@@ -82,6 +82,8 @@ module type Network_intf = sig
     -> 'q
     -> 'r Deferred.Or_error.t
 
+  val initial_peers : t -> Host_and_port.t list
+
   module Config : sig
     type t
   end
@@ -573,6 +575,8 @@ module Make (Inputs : Inputs_intf) = struct
   let snark_pool t = t.snark_pool
 
   let peers t = Net.peers t.net
+
+  let initial_peers t = Net.initial_peers t.net
 
   let snark_work_fee t = t.snark_work_fee
 
