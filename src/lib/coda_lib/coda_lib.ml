@@ -202,6 +202,7 @@ module type Proposer_intf = sig
 
   val run :
        logger:Logger.t
+    -> trust_system:Trust_system.t
     -> get_completed_work:(   completed_work_statement
                            -> completed_work_checked option)
     -> transaction_pool:transaction_pool
@@ -425,7 +426,6 @@ module Make (Inputs : Inputs_intf) = struct
     { propose_keypair: Keypair.t option
     ; snark_worker_key: Public_key.Compressed.Stable.V1.t option
     ; net: Net.t
-          (* TODO: Is this the best spot for the transaction_pool ref? *)
     ; wallets: Secrets.Wallets.t
     ; transaction_pool: Transaction_pool.t
     ; snark_pool: Snark_pool.t
@@ -439,6 +439,7 @@ module Make (Inputs : Inputs_intf) = struct
         , unit Deferred.t )
         Writer.t
     ; logger: Logger.t
+    ; trust_system: Trust_system.t
     ; mutable seen_jobs: Work_selector.State.t
     ; receipt_chain_database: Coda_base.Receipt_chain_database.t
     ; staged_ledger_transition_backup_capacity: int
@@ -447,7 +448,8 @@ module Make (Inputs : Inputs_intf) = struct
         Pipe.Writer.t
     ; time_controller: Time.Controller.t
     ; snark_work_fee: Currency.Fee.t
-    ; consensus_local_state: Consensus_mechanism.Local_state.t }
+    ; consensus_local_state: Consensus_mechanism.Local_state.t
+    ; transaction_database: Transaction_database.t }
 
   let peek_frontier frontier_broadcast_pipe =
     Broadcast_pipe.Reader.peek frontier_broadcast_pipe
@@ -566,6 +568,8 @@ module Make (Inputs : Inputs_intf) = struct
 
   let transaction_pool t = t.transaction_pool
 
+  let transaction_database t = t.transaction_database
+
   let snark_pool t = t.snark_pool
 
   let peers t = Net.peers t.net
@@ -637,7 +641,8 @@ module Make (Inputs : Inputs_intf) = struct
 
   let start t =
     Option.iter t.propose_keypair ~f:(fun keypair ->
-        Proposer.run ~logger:t.logger ~transaction_pool:t.transaction_pool
+        Proposer.run ~logger:t.logger ~trust_system:t.trust_system
+          ~transaction_pool:t.transaction_pool
           ~get_completed_work:(Snark_pool.get_completed_work t.snark_pool)
           ~time_controller:t.time_controller ~keypair
           ~consensus_local_state:t.consensus_local_state
@@ -766,6 +771,8 @@ module Make (Inputs : Inputs_intf) = struct
                       in
                       (Some persistence, root_snarked_ledger, frontier) )
             in
+            (* TODO: the name of transaction_database should be supplied by Config #2333 *)
+            let transaction_database = Transaction_database.create () in
             let frontier_broadcast_pipe_r, frontier_broadcast_pipe_w =
               Broadcast_pipe.create (Some transition_frontier)
             in
@@ -855,10 +862,44 @@ module Make (Inputs : Inputs_intf) = struct
             don't_wait_for
               (Strict_pipe.Reader.iter_without_pushback
                  valid_transitions_for_network ~f:(fun transition_with_hash ->
-                   (* remove verified status for network broadcast *)
-                   Net.broadcast_state net
-                     (External_transition.of_verified
-                        (With_hash.data transition_with_hash)) )) ;
+                   let hash = With_hash.hash transition_with_hash in
+                   let consensus_state =
+                     With_hash.data transition_with_hash
+                     |> External_transition.Verified.protocol_state
+                     |> Consensus_mechanism.Protocol_state.consensus_state
+                   in
+                   let now =
+                     let open Time in
+                     now config.time_controller |> to_span_since_epoch
+                     |> Span.to_ms
+                   in
+                   if
+                     Ok ()
+                     = Consensus_mechanism.received_at_valid_time
+                         ~time_received:now consensus_state
+                   then (
+                     Logger.trace config.logger ~module_:__MODULE__
+                       ~location:__LOC__
+                       ~metadata:
+                         [ ("state_hash", Protocol_state_hash.to_yojson hash)
+                         ; ( "external_transition"
+                           , External_transition.Verified.to_yojson
+                               (With_hash.data transition_with_hash) ) ]
+                       "broadcasting $state_hash" ;
+                     (* remove verified status for network broadcast *)
+                     Net.broadcast_state net
+                       (External_transition.of_verified
+                          (With_hash.data transition_with_hash)) )
+                   else
+                     Logger.warn config.logger ~module_:__MODULE__
+                       ~location:__LOC__
+                       ~metadata:
+                         [ ("state_hash", Protocol_state_hash.to_yojson hash)
+                         ; ( "external_transition"
+                           , External_transition.Verified.to_yojson
+                               (With_hash.data transition_with_hash) ) ]
+                       "refusing to broadcast $state_hash becuase it is too \
+                        late" )) ;
             don't_wait_for
               (Strict_pipe.transfer (Net.states net)
                  external_transitions_writer ~f:ident) ;
@@ -889,11 +930,13 @@ module Make (Inputs : Inputs_intf) = struct
                   Strict_pipe.Writer.to_linear_pipe external_transitions_writer
               ; verified_transitions= valid_transitions_for_api
               ; logger= config.logger
+              ; trust_system= config.trust_system
               ; seen_jobs= Work_selector.State.init
               ; staged_ledger_transition_backup_capacity=
                   config.staged_ledger_transition_backup_capacity
               ; receipt_chain_database= config.receipt_chain_database
               ; snark_work_fee= config.snark_work_fee
               ; proposer_transition_writer
-              ; consensus_local_state= config.consensus_local_state } ) )
+              ; consensus_local_state= config.consensus_local_state
+              ; transaction_database } ) )
 end
