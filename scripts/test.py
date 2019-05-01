@@ -46,8 +46,7 @@ test_permutations = {
     'test_postake': [ 'transaction-snark-profiler -check-only' ],
     'test_postake_catchup': ['coda-restart-node-test'],
     'test_postake_bootstrap': ['coda-bootstrap-test'],
-    # TODO: Re-enable when relevant bugs are fixed
-    # 'test_postake_holy_grail': ['coda-restarts-and-txns-holy-grail -num-proposers 5'],
+    'test_postake_holy_grail': ['coda-restarts-and-txns-holy-grail -num-proposers 5'],
     'test_postake_txns': ['coda-shared-state-test'],
     'test_postake_five_even_snarkless': ['coda-shared-prefix-multiproposer-test -num-proposers 5'],
     'test_postake_five_even_txns': ['coda-shared-prefix-multiproposer-test -num-proposers 5 -payments'],
@@ -58,6 +57,7 @@ ci_blacklist = []
 # of all the generated CI jobs, allow these specific ones to fail (extra blacklist on top of ci_blacklist)
 required_blacklist = [
     'test_postake_five_even_snarkless:*',
+    'test_postake_holy_grail:*'
 ]
 
 # these extra jobs are not filters, they are full status check names
