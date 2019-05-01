@@ -181,7 +181,7 @@ module Make (Message : Message_intf) : S with type msg := Message.msg = struct
                       ( Outgoing_connection_error
                       , Some ("closed connection", []) ))
               in
-              Error err
+              remove_peer t peer ; Error err
           | _ ->
               (* call succeeded, result is an error *)
               let%bind () =
