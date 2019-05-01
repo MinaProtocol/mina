@@ -46,7 +46,8 @@ test_permutations = {
     'test_postake': [ 'transaction-snark-profiler -check-only' ],
     'test_postake_catchup': ['coda-restart-node-test'],
     'test_postake_bootstrap': ['coda-bootstrap-test'],
-    'test_postake_holy_grail': ['coda-restarts-and-txns-holy-grail -num-proposers 5'],
+    # TODO: Re-enable when relevant bugs are fixed
+    # 'test_postake_holy_grail': ['coda-restarts-and-txns-holy-grail -num-proposers 5'],
     'test_postake_txns': ['coda-shared-state-test'],
     'test_postake_five_even_snarkless': ['coda-shared-prefix-multiproposer-test -num-proposers 5'],
     'test_postake_five_even_txns': ['coda-shared-prefix-multiproposer-test -num-proposers 5 -payments'],
