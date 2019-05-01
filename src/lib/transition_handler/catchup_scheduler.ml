@@ -61,8 +61,8 @@ module Make (Inputs : Inputs.S) = struct
           list )
         Capped_supervisor.t }
 
-  let create ~logger ~frontier ~time_controller ~catchup_job_writer
-      ~catchup_breadcrumbs_writer ~clean_up_signal =
+  let create ~logger ~trust_system ~frontier ~time_controller
+      ~catchup_job_writer ~catchup_breadcrumbs_writer ~clean_up_signal =
     let collected_transitions = State_hash.Table.create () in
     let parent_root_timeouts = State_hash.Table.create () in
     upon (Ivar.read clean_up_signal) (fun () ->
@@ -75,8 +75,8 @@ module Make (Inputs : Inputs.S) = struct
       Capped_supervisor.create ~job_capacity:5
         (fun (initial_hash, transition_branches) ->
           match%map
-            Breadcrumb_builder.build_subtrees_of_breadcrumbs ~logger ~frontier
-              ~initial_hash transition_branches
+            Breadcrumb_builder.build_subtrees_of_breadcrumbs ~logger
+              ~trust_system ~frontier ~initial_hash transition_branches
           with
           | Ok trees_of_breadcrumbs ->
               Writer.write catchup_breadcrumbs_writer trees_of_breadcrumbs

@@ -1,5 +1,3 @@
-[%%import "../../config.mlh"]
-
 (** The timestamp for the genesis block *)
 val genesis_state_timestamp : Coda_base.Block_time.t
 

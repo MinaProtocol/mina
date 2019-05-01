@@ -1,6 +1,3 @@
-[%%import
-"../../config.mlh"]
-
 open Core
 open Signature_lib
 open Coda_base

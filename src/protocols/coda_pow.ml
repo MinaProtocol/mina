@@ -1,6 +1,3 @@
-[%%import
-"../config.mlh"]
-
 open Core_kernel
 open Async_kernel
 open Pipe_lib
@@ -13,23 +10,11 @@ module type Security_intf = sig
 end
 
 module type Time_controller_intf = sig
-  [%%if time_offsets]
-
   type t
 
   val create : t -> t
 
   val basic : t
-
-  [%%else]
-
-  type t
-
-  val create : t -> t
-
-  val basic : t
-
-  [%%endif]
 end
 
 module type Sok_message_intf = sig
@@ -1622,7 +1607,7 @@ module type Consensus_mechanism_intf = sig
   val received_at_valid_time :
        Consensus_state.Value.t
     -> time_received:Unix_timestamp.t
-    -> (unit, (string * Yojson.Safe.json) list) result
+    -> (unit, [`Too_early | `Too_late of int64]) result
 
   val next_proposal :
        Int64.t
@@ -1647,6 +1632,7 @@ module type Consensus_mechanism_intf = sig
 
   val sync_local_state :
        logger:Logger.t
+    -> trust_system:Trust_system.t
     -> local_state:Local_state.t
     -> random_peers:(int -> Network_peer.Peer.t list)
     -> query_peer:Network_peer.query_peer
