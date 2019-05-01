@@ -6,6 +6,7 @@
  (library_flags -linkall)
  (libraries
     lite_base
+    null_field_element
     linked_tree
     hash_prefixes
     syncable_ledger

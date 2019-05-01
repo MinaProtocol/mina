@@ -165,10 +165,7 @@ let initialize public_key : t =
   ; receipt_chain_hash= Receipt.Chain_hash.empty
   ; delegate= public_key
   ; participated= false
-  ; voting_for=
-      State_hash.(of_hash zero)
-      (* TODO: fix this once the out of scope field element is implemented *)
-  }
+  ; voting_for= State_hash.of_hash Null_field_element.null }
 
 let typ : (var, value) Typ.t =
   let spec =
@@ -294,9 +291,7 @@ let empty =
     ; receipt_chain_hash= Receipt.Chain_hash.empty
     ; delegate= Public_key.Compressed.empty
     ; participated= false
-    ; voting_for=
-        State_hash.(of_hash zero)
-        (* TODO: Fix this once out of scope field element is implemented *) }
+    ; voting_for= State_hash.of_hash Null_field_element.null }
 
 let digest t = Pedersen.State.digest (crypto_hash t)
 
@@ -308,9 +303,7 @@ let create public_key balance =
     ; receipt_chain_hash= Receipt.Chain_hash.empty
     ; delegate= public_key
     ; participated= false
-    ; voting_for=
-        State_hash.(of_hash zero)
-        (* TODO: Fix this once out of scope field element is implemented *) }
+    ; voting_for= State_hash.of_hash Null_field_element.null }
 
 let gen =
   let open Quickcheck.Let_syntax in
