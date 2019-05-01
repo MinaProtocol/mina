@@ -3,7 +3,7 @@ open Tc;
 
 let dev = true;
 
-ignore @@ DaemonProcess.start(8080);
+let killDaemon = DaemonProcess.start(8080);
 
 let createTray = settingsOrError => {
   let t = AppTray.get();
@@ -44,7 +44,7 @@ let createTray = settingsOrError => {
 // We need this handler here to prevent the application from exiting on all
 // windows closed. Keep in mind, we have the tray.
 App.on(`WindowAllClosed, () => ());
-App.on(`WillQuit, () => DaemonProcess.kill());
+App.on(`WillQuit, () => killDaemon());
 
 let task =
   Task.map2(
