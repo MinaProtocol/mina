@@ -31,7 +31,6 @@ let main () =
     Coda_worker_testnet.Payments.send_batch_consecutive_payments testnet
       ~node:0 ~keypairs ~sender:largest_account_keypair.private_key ~n:4
   in
-  let%bind () = after (Time.Span.of_sec 10.0) in
   let%bind () =
     Coda_worker_testnet.Payments.assert_retrievable_payments testnet payments
   in
