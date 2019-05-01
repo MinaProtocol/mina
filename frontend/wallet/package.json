@@ -31,9 +31,9 @@
     "query": "send-introspection-query http://localhost:8080/graphql",
     "query-fake": "concurrently --kill-others 'npm run fake' 'sleep 5 && npm run query'",
     "reformat": "bsrefmt --in-place src/*.re",
-    "test": "jest",
+    "test": "npm run build && jest",
     "dist": "build",
-    "dev": "concurrently --kill-others 'npm run fake' 'bsb -make-world -w' 'fpack watch --development ./lib/js/src/Index.js' 'sleep 2 && electron ./lib/js/src/App.js'"
+    "dev": "concurrently --kill-others 'bsb -make-world -w' 'fpack watch --development ./lib/js/src/Index.js' 'electron ./lib/js/src/App.js'"
   },
   "build": {
     "appId": "FOO.org.codaprotocol.prowallet",
