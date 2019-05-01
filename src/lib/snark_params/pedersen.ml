@@ -17,10 +17,17 @@ module type S = sig
   type curve
 
   module Digest : sig
-    type t [@@deriving bin_io, sexp, eq, hash, compare, yojson]
+    type t [@@deriving sexp, eq, hash, compare, yojson]
 
-    (* TODO : really version *)
-    val __versioned__ : bool
+    module Stable :
+      sig
+        module V1 : sig
+          type t [@@deriving sexp, bin_io, compare, hash, eq, version, yojson]
+        end
+
+        module Latest = V1
+      end
+      with type V1.t = t
 
     val size_in_bits : int
 
@@ -81,10 +88,34 @@ struct
   open Inputs
 
   module Digest = struct
-    type t = Field.t [@@deriving sexp, bin_io, compare, hash, eq]
+    module Stable = struct
+      module V1 = struct
+        module T = struct
+          type t = Field.t
+          [@@deriving
+            sexp, bin_io, compare, hash, eq, version {asserted; unnumbered}]
+        end
 
-    (* TODO : really version *)
-    let __versioned__ = true
+        include T
+
+        let to_yojson t = `String (Field.to_string t)
+
+        let of_yojson = function
+          | `String s -> (
+            try Ok (Field.of_string s)
+            with exn -> Error Error.(to_string_hum (of_exn exn)) )
+          | _ ->
+              Error "expected string"
+      end
+
+      module Latest = V1
+    end
+
+    (* omit bin_io, version *)
+    type t = Stable.Latest.t [@@deriving sexp, eq, hash, compare]
+
+    [%%define_locally
+    Stable.Latest.(of_yojson, to_yojson)]
 
     let size_in_bits = Field.size_in_bits
 
@@ -92,14 +123,6 @@ struct
 
     module Snarkable = Bits.Snarkable.Field
     module Bits = Bits.Make_field (Field) (Bigint)
-
-    let to_yojson t = `String (Field.to_string t)
-
-    let of_yojson = function
-      | `String s -> (
-        try Ok (Field.of_string s) with exn ->
-          Error Error.(to_string_hum (of_exn exn)) )
-      | _ -> Error "expected string"
 
     let fold t = Fold.group3 ~default:false (Bits.fold t)
   end
@@ -132,7 +155,7 @@ struct
           let bit_at s i =
             (Char.to_int s.[i / 8] lsr (7 - (i % 8))) land 1 = 1
           in
-          let dgst = (Digestif.SHA256.get ctx :> string) in
+          let dgst = Digestif.SHA256.(get ctx |> to_raw_string) in
           O1trace.trace_event "about to make field element" ;
           let bits = List.init 256 ~f:(bit_at dgst) in
           let x = Field.project bits in
@@ -161,8 +184,7 @@ struct
       ; synched: bool (* have we reached a chunk boundary *)
       ; chunk_rev: bool Triple.t list (* reversed chunk, or part of one *)
       ; chunk_rev_len: int (* length of chunk_rev *)
-      ; chunk_ndx: int
-      (* index into the chunk table to use *) }
+      ; chunk_ndx: int (* index into the chunk table to use *) }
 
     let update_fold_chunked (t : t) (fold : bool Triple.t Fold.t) =
       O1trace.measure "pedersen fold" (fun () ->

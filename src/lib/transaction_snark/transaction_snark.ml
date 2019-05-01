@@ -9,7 +9,7 @@ open Module_version
 let state_hash_size_in_triples = Tick.Field.size_in_triples
 
 let tick_input () =
-  let open Tick.Groth16 in
+  let open Tick in
   Data_spec.[Field.typ]
 
 let wrap_input = Tock.Data_spec.[Wrap_input.typ]
@@ -24,7 +24,7 @@ module Input = struct
     ; fee_excess: Currency.Amount.Signed.Stable.V1.t
     ; pending_coinbase_before: Pending_coinbase.Stack.Stable.V1.t
     ; pending_coinbase_after: Pending_coinbase.Stack.Stable.V1.t }
-  [@@deriving bin_io]
+  [@@deriving bin_io, sexp, compare]
 end
 
 module Proof_type = struct
@@ -166,7 +166,9 @@ module Statement = struct
     and supply_increase = Currency.Amount.gen
     and pending_coinbase_before = Pending_coinbase.Stack.gen
     and pending_coinbase_after = Pending_coinbase.Stack.gen
-    and proof_type = Bool.gen >>| fun b -> if b then `Merge else `Base in
+    and proof_type =
+      Bool.quickcheck_generator >>| fun b -> if b then `Merge else `Base
+    in
     { source
     ; target
     ; fee_excess
@@ -255,7 +257,8 @@ let construct_input ~proof_type ~sok_digest ~state1 ~state2 ~supply_increase
     +> Amount.Signed.fold fee_excess
   in
   match proof_type with
-  | `Base -> Tick.Pedersen.digest_fold Hash_prefix.base_snark fold
+  | `Base ->
+      Tick.Pedersen.digest_fold Hash_prefix.base_snark fold
   | `Merge wrap_vk_bits ->
       Tick.Pedersen.digest_fold Hash_prefix.merge_snark
         Fold.(fold +> group3 ~default:false (of_list wrap_vk_bits))
@@ -267,9 +270,9 @@ let merge_top_hash wrap_vk_bits =
 
 module Verification_keys = struct
   type t =
-    { base: Tick.Groth16.Verification_key.t
+    { base: Tick.Verification_key.t
     ; wrap: Tock.Verification_key.t
-    ; merge: Tick.Groth16.Verification_key.t }
+    ; merge: Tick.Verification_key.t }
   [@@deriving bin_io]
 
   let dummy : t =
@@ -283,10 +286,9 @@ module Keys0 = struct
 
   module Proving = struct
     type t =
-      { base: Tick.Groth16.Proving_key.t
+      { base: Tick.Proving_key.t
       ; wrap: Tock.Proving_key.t
-      ; merge: Tick.Groth16.Proving_key.t }
-    [@@deriving bin_io]
+      ; merge: Tick.Proving_key.t }
 
     let dummy =
       { merge= Dummy_values.Tick.Groth16.proving_key
@@ -363,7 +365,7 @@ module Base = struct
     let proposer = payload.body.public_key in
     let%bind is_coinbase = Transaction_union.Tag.Checked.is_coinbase tag in
     let%bind pending_coinbase_stack_after =
-      let coinbase = (proposer, receiver_increase) in
+      let coinbase = (proposer, payload.body.amount) in
       let%bind stack' =
         Pending_coinbase.Stack.Checked.push pending_coinbase_stack_before
           coinbase
@@ -372,10 +374,13 @@ module Base = struct
         ~else_:pending_coinbase_stack_before
     in
     let%bind root =
-      let%bind is_fee_transfer =
-        Transaction_union.Tag.Checked.is_fee_transfer tag
+      let%bind is_writeable =
+        let%bind is_fee_transfer =
+          Transaction_union.Tag.Checked.is_fee_transfer tag
+        in
+        Boolean.any [is_fee_transfer; is_coinbase]
       in
-      Frozen_ledger_hash.modify_account_send root ~is_fee_transfer
+      Frozen_ledger_hash.modify_account_send root ~is_writeable
         sender_compressed ~f:(fun ~is_empty_and_writeable account ->
           with_label __LOC__
             (let%bind next_nonce =
@@ -409,7 +414,7 @@ module Base = struct
              let%map balance =
                Balance.Checked.add_signed_amount account.balance sender_delta
              in
-             { Account.balance
+             { Account.Poly.balance
              ; public_key= sender_compressed
              ; nonce= next_nonce
              ; receipt_chain_hash
@@ -507,17 +512,19 @@ module Base = struct
     in
     ()
 
-  let reduced_main = lazy (Groth16.reduce_to_prover (tick_input ()) main)
+  let reduced_main = lazy (reduce_to_prover (tick_input ()) main)
 
-  let create_keys () = Groth16.generate_keypair main ~exposing:(tick_input ())
+  let create_keys () = generate_keypair main ~exposing:(tick_input ())
 
-  let transaction_union_proof ?(preeval = true) ~proving_key sok_digest state1
+  let transaction_union_proof ?(preeval = false) ~proving_key sok_digest state1
       state2 pending_coinbase_stack_state (transaction : Transaction_union.t)
       handler =
     let prover_state : Prover_state.t =
       {state1; state2; transaction; sok_digest; pending_coinbase_stack_state}
     in
-    let main = if preeval then Lazy.force reduced_main else main in
+    let main =
+      if preeval then failwith "preeval currently disabled" else main
+    in
     let main top_hash = handle (main top_hash) handler in
     let top_hash =
       base_top_hash ~sok_digest ~state1 ~state2
@@ -525,18 +532,16 @@ module Base = struct
         ~supply_increase:(Transaction_union.supply_increase transaction)
         ~pending_coinbase_stack_state
     in
-    ( top_hash
-    , Groth16.prove proving_key (tick_input ()) prover_state main top_hash )
+    (top_hash, prove proving_key (tick_input ()) prover_state main top_hash)
 
   let cached =
     let load =
       let open Cached.Let_syntax in
       let%map verification =
-        Cached.component ~label:"verification" ~f:Groth16.Keypair.vk
-          (module Groth16.Verification_key)
+        Cached.component ~label:"verification" ~f:Keypair.vk
+          (module Verification_key)
       and proving =
-        Cached.component ~label:"proving" ~f:Groth16.Keypair.pk
-          (module Groth16.Proving_key)
+        Cached.component ~label:"proving" ~f:Keypair.pk (module Proving_key)
       in
       (verification, {proving with value= ()})
     in
@@ -545,8 +550,8 @@ module Base = struct
       ~manual_install_path:Cache_dir.manual_install_path
       ~digest_input:(fun x ->
         Md5.to_hex (R1CS_constraint_system.digest (Lazy.force x)) )
-      ~input:(lazy (Groth16.constraint_system ~exposing:(tick_input ()) main))
-      ~create_env:(fun x -> Groth16.Keypair.generate (Lazy.force x))
+      ~input:(lazy (constraint_system ~exposing:(tick_input ()) main))
+      ~create_env:(fun x -> Keypair.generate (Lazy.force x))
 end
 
 module Transition_data = struct
@@ -587,7 +592,8 @@ module Merge = struct
   (* TODO: When we switch to the weierstrass curve use the shifted
    add-many function *)
   let disjoint_union_sections = function
-    | [] -> failwith "empty list"
+    | [] ->
+        failwith "empty list"
     | s :: ss ->
         Checked.List.fold
           ~f:(fun acc x -> Pedersen.Checked.Section.disjoint_union_exn acc x)
@@ -810,17 +816,16 @@ module Merge = struct
     in
     Boolean.Assert.all [verify_12; verify_23]
 
-  let create_keys () = Groth16.generate_keypair ~exposing:(input ()) main
+  let create_keys () = generate_keypair ~exposing:(input ()) main
 
   let cached =
     let load =
       let open Cached.Let_syntax in
       let%map verification =
-        Cached.component ~label:"verification" ~f:Groth16.Keypair.vk
-          (module Groth16.Verification_key)
+        Cached.component ~label:"verification" ~f:Keypair.vk
+          (module Verification_key)
       and proving =
-        Cached.component ~label:"proving" ~f:Groth16.Keypair.pk
-          (module Groth16.Proving_key)
+        Cached.component ~label:"proving" ~f:Keypair.pk (module Proving_key)
       in
       (verification, {proving with value= ()})
     in
@@ -829,8 +834,8 @@ module Merge = struct
       ~manual_install_path:Cache_dir.manual_install_path
       ~digest_input:(fun x ->
         Md5.to_hex (R1CS_constraint_system.digest (Lazy.force x)) )
-      ~input:(lazy (Groth16.constraint_system ~exposing:(input ()) main))
-      ~create_env:(fun x -> Groth16.Keypair.generate (Lazy.force x))
+      ~input:(lazy (constraint_system ~exposing:(input ()) main))
+      ~create_env:(fun x -> Keypair.generate (Lazy.force x))
 end
 
 module Verification = struct
@@ -996,9 +1001,9 @@ module Verification = struct
 end
 
 module Wrap (Vk : sig
-  val merge : Tick.Groth16.Verification_key.t
+  val merge : Tick.Verification_key.t
 
-  val base : Tick.Groth16.Verification_key.t
+  val base : Tick.Verification_key.t
 end) =
 struct
   open Tock
@@ -1015,7 +1020,7 @@ struct
     Verifier.Verification_key.Precomputation.create_constant base_vk
 
   module Prover_state = struct
-    type t = {proof_type: Proof_type.t; proof: Tick.Groth16.Proof.t}
+    type t = {proof_type: Proof_type.t; proof: Tick.Proof.t}
     [@@deriving fields]
   end
 
@@ -1130,7 +1135,9 @@ let check_transaction_union ?(preeval = false) sok_message source target
       ~supply_increase:(Transaction_union.supply_increase transaction)
   in
   let open Tick in
-  let main = if preeval then Lazy.force Base.reduced_main else Base.main in
+  let main =
+    if preeval then failwith "preeval currently disabled" else Base.main
+  in
   let main =
     handle
       (Checked.map (main (Field.Var.constant top_hash)) ~f:As_prover.return)
@@ -1169,8 +1176,10 @@ let generate_transaction_union_witness ?(preeval = false) sok_message source
       ~supply_increase:(Transaction_union.supply_increase transaction)
       ~pending_coinbase_stack_state
   in
-  let open Tick.Groth16 in
-  let main = if preeval then Lazy.force Base.reduced_main else Base.main in
+  let open Tick in
+  let main =
+    if preeval then failwith "preeval currently disabled" else Base.main
+  in
   let main x = handle (main x) handler in
   generate_auxiliary_input (tick_input ()) prover_state main top_hash
 
@@ -1241,8 +1250,8 @@ struct
       ; tock_vk= keys.verification.wrap }
     in
     ( top_hash
-    , Tick.Groth16.prove keys.proving.merge (tick_input ()) prover_state
-        Merge.main top_hash )
+    , Tick.prove keys.proving.merge (tick_input ()) prover_state Merge.main
+        top_hash )
 
   let of_transaction_union ?preeval sok_digest source target
       ~pending_coinbase_stack_state transaction handler =
@@ -1359,7 +1368,7 @@ module Keys = struct
       let open Storage in
       let logger = Logger.create () in
       let tick_controller =
-        Controller.create ~logger (module Tick.Groth16.Verification_key)
+        Controller.create ~logger (module Tick.Verification_key)
       in
       let tock_controller =
         Controller.create ~logger (module Tock.Verification_key)
@@ -1367,7 +1376,8 @@ module Keys = struct
       let open Async in
       let load c p =
         match%map load_with_checksum c p with
-        | Ok x -> x
+        | Ok x ->
+            x
         | Error _e ->
             failwithf
               !"Transaction_snark: load failed on %{sexp:Storage.location}"
@@ -1393,7 +1403,7 @@ module Keys = struct
       let open Storage in
       let logger = Logger.create () in
       let tick_controller =
-        Controller.create ~logger (module Tick.Groth16.Proving_key)
+        Controller.create ~logger (module Tick.Proving_key)
       in
       let tock_controller =
         Controller.create ~logger (module Tock.Proving_key)
@@ -1401,7 +1411,8 @@ module Keys = struct
       let open Async in
       let load c p =
         match%map load_with_checksum c p with
-        | Ok x -> x
+        | Ok x ->
+            x
         | Error _e ->
             failwithf
               !"Transaction_snark: load failed on %{sexp:Storage.location}"
@@ -1438,19 +1449,19 @@ module Keys = struct
     let merge = Merge.create_keys () in
     let wrap =
       let module Wrap = Wrap (struct
-        let base = Tick.Groth16.Keypair.vk base
+        let base = Tick.Keypair.vk base
 
-        let merge = Tick.Groth16.Keypair.vk merge
+        let merge = Tick.Keypair.vk merge
       end) in
       Wrap.create_keys ()
     in
     { proving=
-        { base= Tick.Groth16.Keypair.pk base
-        ; merge= Tick.Groth16.Keypair.pk merge
+        { base= Tick.Keypair.pk base
+        ; merge= Tick.Keypair.pk merge
         ; wrap= Tock.Keypair.pk wrap }
     ; verification=
-        { base= Tick.Groth16.Keypair.vk base
-        ; merge= Tick.Groth16.Keypair.vk merge
+        { base= Tick.Keypair.vk base
+        ; merge= Tick.Keypair.vk merge
         ; wrap= Tock.Keypair.vk wrap } }
 
   let cached () =
@@ -1558,7 +1569,57 @@ let%test_module "transaction_snark" =
       of_user_command ~sok_digest ~source ~target ~pending_coinbase_stack
         user_command handler
 
-    (*TODO: tests*)
+    (*
+                ~proposer:
+                  { x=
+                      Snark_params.Tick.Field.of_string
+                        "39876046544032071884326965137489542106804584544160987424424979200505499184903744868114140"
+                  ; is_odd= true }
+                ~fee_transfer:
+                  (Some
+                     ( { x=
+                           Snark_params.Tick.Field.of_string
+                             "221715137372156378645114069225806158618712943627692160064142985953895666487801880947288786"
+                       ; is_odd= true }
+       *)
+    let%test_unit "coinbase" =
+      Test_util.with_randomness 123456789 (fun () ->
+          let mk_pubkey () =
+            Public_key.(compress (of_private_key_exn (Private_key.create ())))
+          in
+          let proposer = mk_pubkey () in
+          let other = mk_pubkey () in
+          let pending_coinbase_init = Pending_coinbase.Stack.empty in
+          let cb =
+            Coinbase.create
+              ~amount:(Currency.Amount.of_int 10)
+              ~proposer
+              ~fee_transfer:(Some (other, Currency.Fee.of_int 1))
+            |> Or_error.ok_exn
+          in
+          let transaction = Transaction.Coinbase cb in
+          Ledger.with_ledger ~f:(fun ledger ->
+              Ledger.create_new_account_exn ledger proposer
+                (Account.create proposer Balance.zero) ;
+              let sparse_ledger =
+                Sparse_ledger.of_ledger_subset_exn ledger [proposer; other]
+              in
+              check_transaction transaction
+                (unstage (Sparse_ledger.handler sparse_ledger))
+                ~sok_message:
+                  (Coda_base.Sok_message.create ~fee:Currency.Fee.zero
+                     ~prover:Public_key.Compressed.empty)
+                ~source:(Sparse_ledger.merkle_root sparse_ledger)
+                ~target:
+                  Sparse_ledger.(
+                    merkle_root
+                      (apply_transaction_exn sparse_ledger transaction))
+                ~pending_coinbase_stack_state:
+                  { source= pending_coinbase_init
+                  ; target=
+                      Pending_coinbase.Stack.push pending_coinbase_init cb } )
+      )
+
     let%test_unit "new_account" =
       Test_util.with_randomness 123456789 (fun () ->
           let wallets = random_wallets () in
@@ -1693,10 +1754,8 @@ let constraint_system_digests () =
   let digest = Tick.R1CS_constraint_system.digest in
   let digest' = Tock.R1CS_constraint_system.digest in
   [ ( "transaction-merge"
-    , digest Merge.(Tick.Groth16.constraint_system ~exposing:(input ()) main)
-    )
+    , digest Merge.(Tick.constraint_system ~exposing:(input ()) main) )
   ; ( "transaction-base"
-    , digest
-        Base.(Tick.Groth16.constraint_system ~exposing:(tick_input ()) main) )
+    , digest Base.(Tick.constraint_system ~exposing:(tick_input ()) main) )
   ; ( "transaction-wrap"
     , digest' W.(Tock.constraint_system ~exposing:wrap_input main) ) ]

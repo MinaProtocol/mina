@@ -30,7 +30,7 @@ val force_write_maybe_drop_head :
 val write_or_exn : capacity:int -> 'a Writer.t -> 'b Reader.t -> 'a -> unit
 
 val iter :
-     ?consumer:Pipe.Consumer.t
+     ?flushed:Pipe.Flushed.t
   -> ?continue_on_error:bool (** default is [false] *)
   -> 'a Reader.t
   -> f:('a -> unit Deferred.t)

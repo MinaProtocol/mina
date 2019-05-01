@@ -3,9 +3,7 @@
 
 open Core
 open Import
-open Snark_params
 open Coda_numbers
-open Tick
 open Module_version
 module Fee = Currency.Fee
 module Payload = User_command_payload
@@ -16,7 +14,7 @@ module Poly = struct
       module T = struct
         type ('payload, 'pk, 'signature) t =
           {payload: 'payload; sender: 'pk; signature: 'signature}
-        [@@deriving bin_io, eq, sexp, hash, yojson, version {unnumbered}]
+        [@@deriving bin_io, eq, sexp, hash, yojson, version]
       end
 
       include T
@@ -24,6 +22,11 @@ module Poly = struct
 
     module Latest = V1
   end
+
+  type ('payload, 'pk, 'signature) t =
+        ('payload, 'pk, 'signature) Stable.Latest.t =
+    {payload: 'payload; sender: 'pk; signature: 'signature}
+  [@@deriving eq, sexp, hash, yojson]
 end
 
 module Stable = struct
@@ -80,11 +83,11 @@ include Comparable.Make (Stable.Latest)
 
 type value = t
 
-let payload Poly.Stable.Latest.({payload; _}) = payload
+let payload Poly.{payload; _} = payload
 
 let fee = Fn.compose Payload.fee payload
 
-let sender t = Public_key.compress Poly.Stable.Latest.(t.sender)
+let sender t = Public_key.compress Poly.(t.sender)
 
 let accounts_accessed ({payload; sender; _} : value) =
   Public_key.compress sender :: Payload.accounts_accessed payload
@@ -100,7 +103,7 @@ let gen ~keys ~max_amount ~max_fee =
   and receiver_idx = Int.gen_incl 0 (Array.length keys - 1)
   and fee = Int.gen_incl 0 max_fee >>| Currency.Fee.of_int
   and amount = Int.gen_incl 1 max_amount >>| Currency.Amount.of_int
-  and memo = String.gen in
+  and memo = String.quickcheck_generator in
   let sender = keys.(sender_idx) in
   let receiver = keys.(receiver_idx) in
   let payload : Payload.t =
@@ -117,7 +120,8 @@ module With_valid_signature = struct
   module Stable = struct
     module V1 = struct
       module T = struct
-        type t = Stable.V1.t [@@deriving sexp, eq, bin_io, yojson, version]
+        type t = Stable.V1.t
+        [@@deriving sexp, eq, bin_io, yojson, version, hash]
       end
 
       include T
@@ -152,7 +156,9 @@ let check_signature _ = true
 [%%else]
 
 let check_signature ({payload; sender; signature} : t) =
-  Schnorr.verify signature (Inner_curve.of_affine_coordinates sender) payload
+  Schnorr.verify signature
+    (Snark_params.Tick.Inner_curve.of_affine_coordinates sender)
+    payload
 
 [%%endif]
 

@@ -9,16 +9,20 @@ let rec funpow n f r = if n > 0 then funpow (n - 1) f (f r) else r
 module Query = struct
   module Stable = struct
     module V1 = struct
-      type 'addr t =
-        | What_child_hashes of 'addr
-            (** What are the hashes of the children of this address? *)
-        | What_contents of 'addr
-            (** What accounts are at this address? addr must have depth
+      module T = struct
+        type 'addr t =
+          | What_child_hashes of 'addr
+              (** What are the hashes of the children of this address? *)
+          | What_contents of 'addr
+              (** What accounts are at this address? addr must have depth
             tree_depth - account_subtree_height *)
-        | Num_accounts
-            (** How many accounts are there? Used to size data structure and
+          | Num_accounts
+              (** How many accounts are there? Used to size data structure and
             figure out what part of the tree is filled in. *)
-      [@@deriving bin_io, sexp, yojson]
+        [@@deriving bin_io, sexp, yojson, version]
+      end
+
+      include T
     end
 
     module Latest = V1
@@ -35,15 +39,19 @@ end
 module Answer = struct
   module Stable = struct
     module V1 = struct
-      type ('hash, 'account) t =
-        | Child_hashes_are of 'hash * 'hash
-            (** The requested address's children have these hashes **)
-        | Contents_are of 'account list
-            (** The requested address has these accounts *)
-        | Num_accounts of int * 'hash
-            (** There are this many accounts and the smallest subtree that
+      module T = struct
+        type ('hash, 'account) t =
+          | Child_hashes_are of 'hash * 'hash
+              (** The requested address's children have these hashes **)
+          | Contents_are of 'account list
+              (** The requested address has these accounts *)
+          | Num_accounts of int * 'hash
+              (** There are this many accounts and the smallest subtree that
                 contains all non-empty nodes has this hash. *)
-      [@@deriving bin_io, sexp, yojson]
+        [@@deriving bin_io, sexp, yojson, version]
+      end
+
+      include T
     end
 
     module Latest = V1
@@ -261,7 +269,8 @@ end = struct
                   ( MT.get_inner_hash_at_addr_exn mt lchild
                   , MT.get_inner_hash_at_addr_exn mt rchild ) )
           with
-          | Ok answer -> Either.First answer
+          | Ok answer ->
+              Either.First answer
           | Error _ ->
               Either.Second
                 ( Actions.Violated_protocol
@@ -334,7 +343,8 @@ end = struct
                  (len, MT.get_inner_hash_at_addr_exn mt content_root_addr))
       in
       match response_or_punish with
-      | Either.First answer -> Deferred.return @@ Some answer
+      | Either.First answer ->
+          Deferred.return @@ Some answer
       | Either.Second action ->
           let%map _ =
             record_envelope_sender trust_system logger sender action
@@ -527,8 +537,10 @@ end = struct
           happening. *)
       let already_done =
         match Ivar.peek t.validity_listener with
-        | Some `Ok -> true
-        | _ -> false
+        | Some `Ok ->
+            true
+        | _ ->
+            false
       in
       let sender = Envelope.Incoming.sender env in
       let answer = Envelope.Incoming.data env in
@@ -588,7 +600,8 @@ end = struct
                 credit_fulfilled_request () )
           | Query.What_contents addr, Answer.Contents_are leaves -> (
             match add_content t addr leaves with
-            | `Success -> credit_fulfilled_request ()
+            | `Success ->
+                credit_fulfilled_request ()
             | `Hash_mismatch (expected, actual) ->
                 let%map () =
                   record_envelope_sender t.trust_system t.logger sender
@@ -605,7 +618,8 @@ end = struct
                 requeue_query () )
           | Query.Num_accounts, Answer.Num_accounts (count, content_root) -> (
             match handle_num_accounts t count content_root with
-            | `Success -> credit_fulfilled_request ()
+            | `Success ->
+                credit_fulfilled_request ()
             | `Hash_mismatch (expected, actual) ->
                 let%map () =
                   record_envelope_sender t.trust_system t.logger sender
@@ -649,8 +663,10 @@ end = struct
   let new_goal t h ~data ~equal =
     let should_skip =
       match t.desired_root with
-      | None -> false
-      | Some h' -> Root_hash.equal h h'
+      | None ->
+          false
+      | Some h' ->
+          Root_hash.equal h h'
     in
     if not should_skip then (
       Option.iter t.desired_root ~f:(fun root_hash ->
@@ -680,21 +696,27 @@ end = struct
 
   let rec valid_tree t =
     match%bind Ivar.read t.validity_listener with
-    | `Ok -> return (t.tree, Option.value_exn t.auxiliary_data)
-    | `Target_changed _ -> valid_tree t
+    | `Ok ->
+        return (t.tree, Option.value_exn t.auxiliary_data)
+    | `Target_changed _ ->
+        valid_tree t
 
   let peek_valid_tree t =
     Option.bind (Ivar.peek t.validity_listener) ~f:(function
-      | `Ok -> Some t.tree
-      | `Target_changed _ -> None )
+      | `Ok ->
+          Some t.tree
+      | `Target_changed _ ->
+          None )
 
   let wait_until_valid t h =
     if not (Root_hash.equal h (desired_root_exn t)) then
       return (`Target_changed (t.desired_root, h))
     else
       Deferred.map (Ivar.read t.validity_listener) ~f:(function
-        | `Target_changed payload -> `Target_changed payload
-        | `Ok -> `Ok t.tree )
+        | `Target_changed payload ->
+            `Target_changed payload
+        | `Ok ->
+            `Ok t.tree )
 
   let fetch t rh ~data ~equal =
     new_goal t rh ~data ~equal |> ignore ;

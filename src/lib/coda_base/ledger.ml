@@ -45,11 +45,9 @@ module Ledger_inner = struct
 
     let public_key = Account.public_key
 
-    let balance = Account.balance
+    let balance Account.Poly.{balance; _} = balance
 
     let initialize = Account.initialize
-
-    let balance = Account.balance
   end
 
   module Inputs = struct
@@ -154,12 +152,12 @@ module Ledger_inner = struct
     let base_ledger, masked_ledger = create_ephemeral_with_base () in
     try
       let result = f masked_ledger in
-      let _ : Mask.t =
+      let (_ : Mask.t) =
         Maskable.unregister_mask_exn base_ledger masked_ledger
       in
       result
     with exn ->
-      let _ : Mask.t =
+      let (_ : Mask.t) =
         Maskable.unregister_mask_exn base_ledger masked_ledger
       in
       raise exn
@@ -204,15 +202,18 @@ module Ledger_inner = struct
   let get_or_create ledger key =
     let key, loc =
       match get_or_create_account_exn ledger key (Account.initialize key) with
-      | `Existed, loc -> ([], loc)
-      | `Added, loc -> ([key], loc)
+      | `Existed, loc ->
+          ([], loc)
+      | `Added, loc ->
+          ([key], loc)
     in
     (key, Option.value_exn (get ledger loc), loc)
 
   let create_empty ledger key =
     let start_hash = merkle_root ledger in
     match get_or_create_account_exn ledger key Account.empty with
-    | `Existed, _ -> failwith "create_empty for a key already present"
+    | `Existed, _ ->
+        failwith "create_empty for a key already present"
     | `Added, new_loc ->
         Debug_assert.debug_assert (fun () ->
             [%test_eq: Ledger_hash.t] start_hash (merkle_root ledger) ) ;

@@ -58,7 +58,8 @@ end
 
 let verify =
   let rec go acc = function
-    | [] -> acc
+    | [] ->
+        acc
     | h :: hs ->
         let acc =
           Protocol_state.hash ~hash_body:Fn.id
@@ -107,7 +108,8 @@ end = struct
 
   let verify_and_add =
     let rec go hs acc length = function
-      | [] -> (acc, List.rev hs)
+      | [] ->
+          (acc, List.rev hs)
       | body :: bs ->
           let length = Coda_numbers.Length.succ length in
           let full_state_hash =

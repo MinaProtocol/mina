@@ -26,7 +26,7 @@ module type Versioned_module_intf = sig
 end
 
 module type Version_intf = sig
-  type t [@@deriving bin_io, version]
+  type t [@@deriving bin_io, version {numbered}]
 end
 
 (* functor to create a registrar that can
@@ -111,14 +111,20 @@ module Make_version (Version : Version_intf) = struct
    *)
 
   let bin_read_t buf ~pos_ref =
-    let With_version.({version= read_version; t}) =
+    let With_version.{version= read_version; t} =
       With_version.bin_read_t buf ~pos_ref
     in
     (* sanity check *)
     assert (Int.equal read_version Version.version) ;
     t
 
-  let __bin_read_t__ = With_version.__bin_read_t__
+  let __bin_read_t__ buf ~pos_ref i =
+    let With_version.{version= read_version; t} =
+      With_version.__bin_read_t__ buf ~pos_ref i
+    in
+    (* sanity check *)
+    assert (Int.equal read_version Version.version) ;
+    t
 
   let bin_reader_t =
     Bin_prot.Type_class.{read= bin_read_t; vtag_read= __bin_read_t__}
@@ -200,8 +206,10 @@ let%test_module "Test versioned modules" =
       let buf = Bin_prot.Common.create_buf sz in
       ignore (Latest.bin_write_t buf ~pos:0 t) ;
       match Registrar.deserialize_binary_opt buf with
-      | None -> false
-      | Some (s', n') -> String.equal s s' && Int.equal n n'
+      | None ->
+          false
+      | Some (s', n') ->
+          String.equal s s' && Int.equal n n'
 
     let%test "serialize with older version, deserialize to latest version" =
       let ((n, s) as t) = (42, "hello, world") in
@@ -211,8 +219,10 @@ let%test_module "Test versioned modules" =
       ignore (V1.bin_write_t buf ~pos:0 t) ;
       (* but deserialized to Latest.t *)
       match Registrar.deserialize_binary_opt buf with
-      | None -> false
-      | Some (s', n') -> String.equal s s' && Int.equal n n'
+      | None ->
+          false
+      | Some (s', n') ->
+          String.equal s s' && Int.equal n n'
 
     module Client = struct
       type t = {number: int; some: Latest.t} [@@deriving bin_io]

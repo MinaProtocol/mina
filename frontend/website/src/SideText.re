@@ -1,7 +1,7 @@
 module Cta = {
   type t = {
     copy: string,
-    link: string,
+    link: Links.Named.t(string),
   };
 };
 
@@ -53,14 +53,15 @@ let make = (~className="", ~paragraphs, ~cta, _children) => {
       ...{Array.append(
         ps,
         [|
-          <a
+          <A
+            name={link.name}
             target="_blank"
-            href=link
+            href={link.link}
             className=Css.(
               merge([Style.Link.basic, style([marginTop(`rem(1.5))])])
             )>
             {ReasonReact.string(copy ++ {j|\u00A0→|j})}
-          </a>,
+          </A>,
         |],
       )}
     </div>;

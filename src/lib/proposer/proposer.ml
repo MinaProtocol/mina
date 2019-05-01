@@ -2,6 +2,7 @@ open Core
 open Async
 open Pipe_lib
 open O1trace
+module Time = Coda_base.Block_time
 
 module type Inputs_intf = sig
   include Protocols.Coda_pow.Inputs_intf
@@ -87,8 +88,10 @@ end = struct
 
   let rec with_value ~f t =
     match t.value with
-    | Some x -> f x
-    | None -> don't_wait_for (Ivar.read t.signal >>| fun () -> with_value ~f t)
+    | Some x ->
+        f x
+    | None ->
+        don't_wait_for (Ivar.read t.signal >>| fun () -> with_value ~f t)
 end
 
 module Singleton_supervisor : sig
@@ -112,7 +115,8 @@ end = struct
     | Some (ivar, _) ->
         Ivar.fill ivar () ;
         t.task <- None
-    | None -> ()
+    | None ->
+        ()
 
   let dispatch t data =
     cancel t ;
@@ -177,7 +181,8 @@ module Make (Inputs : Inputs_intf) :
       | Some timeout ->
           Time.Timeout.cancel t.time_controller timeout () ;
           t.timeout <- None
-      | None -> ()
+      | None ->
+          ()
 
     let schedule t time ~f =
       cancel t ;
@@ -293,8 +298,9 @@ module Make (Inputs : Inputs_intf) :
             in
             Some (protocol_state, internal_transition, witness) ) )
 
-  let run ~logger ~get_completed_work ~transaction_pool ~time_controller
-      ~keypair ~consensus_local_state ~frontier_reader ~transition_writer =
+  let run ~logger ~trust_system ~get_completed_work ~transaction_pool
+      ~time_controller ~keypair ~consensus_local_state ~frontier_reader
+      ~transition_writer ~random_peers ~query_peer =
     trace_task "proposer" (fun () ->
         let log_bootstrap_mode () =
           Logger.info logger ~module_:__MODULE__ ~location:__LOC__
@@ -305,7 +311,8 @@ module Make (Inputs : Inputs_intf) :
         let propose ivar proposal_data =
           let open Interruptible.Let_syntax in
           match Broadcast_pipe.Reader.peek frontier_reader with
-          | None -> Interruptible.return (log_bootstrap_mode ())
+          | None ->
+              log_bootstrap_mode () ; Interruptible.return ()
           | Some frontier -> (
               let crumb = Transition_frontier.best_tip frontier in
               Logger.trace logger ~module_:__MODULE__ ~location:__LOC__
@@ -333,7 +340,8 @@ module Make (Inputs : Inputs_intf) :
               in
               trace_event "next state generated" ;
               match next_state_opt with
-              | None -> Interruptible.return ()
+              | None ->
+                  Interruptible.return ()
               | Some
                   ( protocol_state
                   , internal_transition
@@ -342,10 +350,10 @@ module Make (Inputs : Inputs_intf) :
                       [%test_result: [`Take | `Keep]]
                         (Consensus_mechanism.select
                            ~existing:
-                             ( previous_protocol_state
-                             |> Protocol_state.consensus_state )
+                             (Protocol_state.consensus_state
+                                previous_protocol_state)
                            ~candidate:
-                             (protocol_state |> Protocol_state.consensus_state)
+                             (Protocol_state.consensus_state protocol_state)
                            ~logger)
                         ~expect:`Take
                         ~message:
@@ -361,7 +369,7 @@ module Make (Inputs : Inputs_intf) :
                         (Consensus_mechanism.select
                            ~existing:root_consensus_state
                            ~candidate:
-                             (protocol_state |> Protocol_state.consensus_state)
+                             (Protocol_state.consensus_state protocol_state)
                            ~logger)
                         ~expect:`Take
                         ~message:
@@ -383,7 +391,7 @@ module Make (Inputs : Inputs_intf) :
                           "failed to prove generated protocol state: %s"
                           (Error.to_string_hum err) ;
                         return ()
-                    | Ok protocol_state_proof ->
+                    | Ok protocol_state_proof -> (
                         let span = Time.diff (Time.now time_controller) t0 in
                         Logger.info logger ~module_:__MODULE__
                           ~location:__LOC__
@@ -407,15 +415,65 @@ module Make (Inputs : Inputs_intf) :
                           { With_hash.hash= Protocol_state.hash protocol_state
                           ; data= external_transition }
                         in
-                        Strict_pipe.Writer.write transition_writer
-                          external_transition_with_hash) )
+                        let metadata =
+                          [ ( "state_hash"
+                            , Protocol_state_hash.to_yojson
+                                external_transition_with_hash.hash ) ]
+                        in
+                        Logger.info logger ~module_:__MODULE__
+                          ~location:__LOC__
+                          !"Submitting transition to the transition frontier \
+                            controller"
+                          ~metadata ;
+                        let%bind () =
+                          Strict_pipe.Writer.write transition_writer
+                            external_transition_with_hash
+                        in
+                        Logger.info logger ~module_:__MODULE__
+                          ~location:__LOC__
+                          "Waiting for transition to be inserted into frontier" ;
+                        Deferred.choose
+                          [ Deferred.choice
+                              (Transition_frontier.wait_for_transition frontier
+                                 (With_hash.hash external_transition_with_hash))
+                              (Fn.const `Transition_accepted)
+                          ; Deferred.choice
+                              ( Time.Timeout.create time_controller
+                                  (* We allow up to 15 seconds for the transition to make its way from the transition_writer to the frontier.
+                                     This value is chosen to be reasonably generous. In theory, this should not take terribly long. But long
+                                     cycles do happen in our system, and with medium curves those long cycles can be substantial. *)
+                                  (Time.Span.of_ms 15000L)
+                                  ~f:(Fn.const ())
+                              |> Time.Timeout.to_deferred )
+                              (Fn.const `Timed_out) ]
+                        >>| function
+                        | `Transition_accepted ->
+                            Logger.info logger ~module_:__MODULE__
+                              ~location:__LOC__ ~metadata
+                              "Generated transition was accepted into \
+                               transition frontier"
+                        | `Timed_out ->
+                            let str =
+                              "Generated transition was never accepted into \
+                               transition frontier"
+                            in
+                            Logger.fatal logger ~module_:__MODULE__
+                              ~location:__LOC__ ~metadata "%s" str ;
+                            Error.raise (Error.of_string str) )) )
         in
         let proposal_supervisor = Singleton_supervisor.create ~task:propose in
         let scheduler = Singleton_scheduler.create time_controller in
         let rec check_for_proposal () =
           trace_recurring_task "check for proposal" (fun () ->
               match Broadcast_pipe.Reader.peek frontier_reader with
-              | None -> log_bootstrap_mode ()
+              | None ->
+                  log_bootstrap_mode () ;
+                  don't_wait_for
+                    (let%map () =
+                       Broadcast_pipe.Reader.iter_until frontier_reader
+                         ~f:(Fn.compose Deferred.return Option.is_some)
+                     in
+                     check_for_proposal ())
               | Some transition_frontier -> (
                   let breadcrumb =
                     Transition_frontier.best_tip transition_frontier
@@ -426,30 +484,56 @@ module Make (Inputs : Inputs_intf) :
                   let protocol_state =
                     External_transition.Verified.protocol_state transition
                   in
+                  let consensus_state =
+                    Protocol_state.consensus_state protocol_state
+                  in
                   match
-                    measure "asking conensus what to do" (fun () ->
-                        Consensus_mechanism.next_proposal
-                          (time_to_ms (Time.now time_controller))
-                          (Protocol_state.consensus_state protocol_state)
-                          ~local_state:consensus_local_state ~keypair ~logger
-                    )
+                    Consensus_mechanism.required_local_state_sync
+                      ~consensus_state ~local_state:consensus_local_state
                   with
-                  | `Check_again time ->
-                      Singleton_scheduler.schedule scheduler (time_of_ms time)
-                        ~f:check_for_proposal
-                  | `Propose_now data ->
-                      Interruptible.finally
-                        (Singleton_supervisor.dispatch proposal_supervisor data)
-                        ~f:check_for_proposal
-                      |> ignore
-                  | `Propose (time, data) ->
-                      Singleton_scheduler.schedule scheduler (time_of_ms time)
-                        ~f:(fun () ->
-                          ignore
-                            (Interruptible.finally
-                               (Singleton_supervisor.dispatch
-                                  proposal_supervisor data)
-                               ~f:check_for_proposal) ) ) )
+                  | Some sync_jobs ->
+                      Logger.info logger ~module_:__MODULE__ ~location:__LOC__
+                        "Synchronizing consensus local state" ;
+                      don't_wait_for
+                        (let%map res =
+                           Consensus_mechanism.sync_local_state
+                             ~local_state:consensus_local_state ~logger
+                             ~trust_system ~random_peers ~query_peer sync_jobs
+                         in
+                         ( match res with
+                         | Ok () ->
+                             ()
+                         | Error e ->
+                             Logger.error logger ~module_:__MODULE__
+                               ~location:__LOC__
+                               "error syncing local state: %s"
+                               (Error.to_string_hum e) ) ;
+                         check_for_proposal ())
+                  | None -> (
+                    match
+                      measure "asking conensus what to do" (fun () ->
+                          Consensus_mechanism.next_proposal
+                            (time_to_ms (Time.now time_controller))
+                            consensus_state ~local_state:consensus_local_state
+                            ~keypair ~logger )
+                    with
+                    | `Check_again time ->
+                        Singleton_scheduler.schedule scheduler
+                          (time_of_ms time) ~f:check_for_proposal
+                    | `Propose_now data ->
+                        Interruptible.finally
+                          (Singleton_supervisor.dispatch proposal_supervisor
+                             data)
+                          ~f:check_for_proposal
+                        |> ignore
+                    | `Propose (time, data) ->
+                        Singleton_scheduler.schedule scheduler
+                          (time_of_ms time) ~f:(fun () ->
+                            ignore
+                              (Interruptible.finally
+                                 (Singleton_supervisor.dispatch
+                                    proposal_supervisor data)
+                                 ~f:check_for_proposal) ) ) ) )
         in
         check_for_proposal () )
 end

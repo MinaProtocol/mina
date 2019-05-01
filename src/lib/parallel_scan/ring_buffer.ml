@@ -4,16 +4,11 @@ open Async_kernel
 module Stable = struct
   module V1 = struct
     module T = struct
-      type 'a t = {data: 'a Array.t; mutable position: int}
-      [@@deriving sexp, bin_io]
+      type 'a t = {data: 'a array; mutable position: int}
+      [@@deriving sexp, bin_io, version]
     end
 
     include T
-
-    (* TODO : int doesn't need versioning; wrap Array *)
-    let version = 1
-
-    let __versioned__ = true
   end
 
   module Latest = V1
@@ -69,7 +64,8 @@ let filter t ~f =
   let curr_position_neg_one = mod_ (t.position - 1) (Array.length t.data) in
   Sequence.unfold ~init:(`More t.position) ~f:(fun pos ->
       match pos with
-      | `Stop -> None
+      | `Stop ->
+          None
       | `More pos ->
           if pos = curr_position_neg_one then
             if not (f pos) then Some (None, `Stop)
@@ -86,7 +82,8 @@ let read_all t =
   let curr_position_neg_one = mod_ (t.position - 1) (Array.length t.data) in
   Sequence.unfold ~init:(`More t.position) ~f:(fun pos ->
       match pos with
-      | `Stop -> None
+      | `Stop ->
+          None
       | `More pos ->
           if pos = curr_position_neg_one then Some (t.data.(pos), `Stop)
           else Some (t.data.(pos), `More (mod_ (pos + 1) (Array.length t.data)))
@@ -128,7 +125,8 @@ let%test_unit "buffer wraps around" =
   assert (b.data = [|4; 2; 3|])
 
 let%test_unit "b = let s = read_all b; back1;add_many s;forwards1" =
-  Quickcheck.test ~sexp_of:[%sexp_of: int t] (gen Int.gen) ~f:(fun b ->
+  Quickcheck.test ~sexp_of:[%sexp_of: int t] (gen Int.quickcheck_generator)
+    ~f:(fun b ->
       let old = copy b in
       let stuff = read_all b in
       back ~n:1 b ;

@@ -55,7 +55,7 @@ struct
     let%map q = if_g2 b ~then_:then_.q ~else_:else_.q
     and coeffs =
       Checked.List.map (List.zip_exn then_.coeffs else_.coeffs)
-        ~f:(fun (t, e) -> if_coeff b ~then_:t ~else_:e )
+        ~f:(fun (t, e) -> if_coeff b ~then_:t ~else_:e)
     in
     {q; coeffs}
 

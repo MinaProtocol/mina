@@ -5,36 +5,20 @@ open Signature_lib
 let command_name = "snark-worker"
 
 module type Inputs_intf = sig
-  module Sparse_ledger : sig
-    type t [@@deriving bin_io, sexp]
-  end
-
   module Transaction_witness : sig
-    type t [@@deriving bin_io, sexp]
+    type t [@@deriving bin_io, sexp, version]
   end
 
   module Transaction : sig
-    type t [@@deriving bin_io, sexp]
+    type t [@@deriving bin_io, sexp, version]
   end
 
   module Proof : sig
-    type t [@@deriving bin_io, sexp]
+    type t [@@deriving bin_io, sexp, version]
   end
 
   module Statement : sig
-    type t [@@deriving sexp]
-
-    module Stable :
-      sig
-        module V1 : sig
-          type t [@@deriving bin_io, sexp]
-        end
-      end
-      with type V1.t = t
-  end
-
-  module Pending_coinbase : sig
-    type t [@@deriving bin_io, sexp]
+    type t [@@deriving bin_io, sexp, version]
   end
 
   open Snark_work_lib
@@ -93,19 +77,27 @@ module type S = sig
 
   module Rpcs : sig
     module Get_work : sig
-      type query = unit
+      module V1 : sig
+        type query = unit
 
-      type response = Work.Spec.t option
+        type response = Work.Spec.t option
 
-      val rpc : (query, response) Rpc.Rpc.t
+        val rpc : (query, response) Rpc.Rpc.t
+      end
+
+      module Latest = V1
     end
 
     module Submit_work : sig
-      type query = Work.Result.t
+      module V1 : sig
+        type query = Work.Result.t
 
-      type response = unit
+        type response = unit
 
-      val rpc : (query, response) Rpc.Rpc.t
+        val rpc : (query, response) Rpc.Rpc.t
+      end
+
+      module Latest = V1
     end
   end
 

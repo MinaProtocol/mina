@@ -25,7 +25,6 @@ Ideal candidates will be interested in:
 
 * Technical leadership
 * Mentorship
-* Functional programming
 
 There are no hard requirements and we're more interested in learning about your individual background.
 

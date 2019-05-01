@@ -11,8 +11,10 @@ include Binable.Of_stringable (struct
   let to_string = to_hex
 end)
 
-let equal t1 t2 = eq t1 t2
+let equal t1 t2 = equal t1 t2
 
 let empty = digest_string ""
 
 let merge t1 string = digestv_string [to_hex t1; string]
+
+let to_string = to_raw_string

@@ -8,26 +8,40 @@ let make = (~path, _) => {
     render: _self =>
       <div className="bxs-cb bg-white">
         <section
-          className="section-wrapper pv4 mw9 center bxs-bb ph6-l ph5-m ph4 mw9-l">
+          className="section-wrapper pv4 mw9 center bxs-bb ph3-l ph2-m mw9-l">
           <div className="center mw7">
             <div className="important-text">
               <div>
                 <div className="dn db-ns">
-                  <h3
-                    className="dib mw6 m-none lh-copy f2 mb3 mb4-ns tc tl-ns mt0 mr0 ml0">
+                  <h1
+                    className={
+                      "dib mw6 m-none mb3 mb4-ns mt0 mr0 ml0 "
+                      ++ Css.(
+                           merge([
+                             Style.H1.hero,
+                             style([color(Style.Colors.saville)]),
+                           ])
+                         )
+                    }>
                     {ReasonReact.string(title)}
-                  </h3>
+                  </h1>
                 </div>
                 <div className="db dn-ns">
-                  <div className="flex justify-center">
-                    <h3
-                      className="dib mw6 m-none lh-copy f2 mb3 mb4-ns tc tl-ns mt0 mr0 ml0">
-                      {ReasonReact.string(title)}
-                    </h3>
-                  </div>
+                  <h1
+                    className={
+                      "dib mw6 m-none mb3 mb4-ns mt0 mr0 ml0 "
+                      ++ Css.(
+                           merge([
+                             Style.H1.hero,
+                             style([color(Style.Colors.saville)]),
+                           ])
+                         )
+                    }>
+                    {ReasonReact.string(title)}
+                  </h1>
                 </div>
               </div>
-              <div className="lh-copy f4 fw3 silver tc tl-ns mt0 mr0 ml0">
+              <div className={"mt0 mr0 ml0 " ++ Style.Body.big}>
                 <p
                   className="mt0 mb0"
                   dangerouslySetInnerHTML={"__html": html}

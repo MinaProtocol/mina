@@ -30,6 +30,8 @@ module type Inputs_intf = sig
     Protocol_state_validator_intf
     with type time := Time.t
      and type state_hash := State_hash.t
+     and type envelope_sender := Envelope.Sender.t
+     and type trust_system := Trust_system.t
      and type external_transition := External_transition.t
      and type external_transition_proof_verified :=
                 External_transition.Proof_verified.t
@@ -102,8 +104,11 @@ module Make (Inputs : Inputs_intf) :
     in
     let best_tip = External_transition.of_verified best_verified_tip in
     let is_tip_better =
-      Consensus.select ~logger ~existing:(consensus_state best_tip)
-        ~candidate:seen_consensus_state
+      Consensus.select
+        ~logger:
+          (Logger.extend logger
+             [("selection_context", `String "Root_prover.prove")])
+        ~existing:(consensus_state best_tip) ~candidate:seen_consensus_state
       = `Keep
     in
     let%bind () = Option.some_if is_tip_better () in
@@ -149,7 +154,11 @@ module Make (Inputs : Inputs_intf) :
     let best_tip_hash = With_hash.hash best_tip_with_hash in
     (* This statement might not see a peer's best_tip as the best_tip *)
     let is_before_best_tip candidate =
-      Consensus.select ~logger ~existing:(consensus_state best_tip) ~candidate
+      Consensus.select
+        ~logger:
+          (Logger.extend logger
+             [("selection_context", `String "Root_prover.verify")])
+        ~existing:(consensus_state best_tip) ~candidate
       = `Keep
     in
     let%bind () =
@@ -164,9 +173,15 @@ module Make (Inputs : Inputs_intf) :
       check_error ~message:"Peer gave an invalid proof of it's root"
         (Merkle_list.verify ~init:root_hash merkle_list best_tip_hash)
     in
-    let%bind validated_root = Protocol_state_validator.validate_proof root in
+    let%bind validated_root =
+      Deferred.map
+        (Protocol_state_validator.validate_proof root)
+        ~f:(Result.map_error ~f:(Fn.const (Error.of_string "invalid proof")))
+    in
     let%map validated_best_tip =
-      Protocol_state_validator.validate_proof best_tip
+      Deferred.map
+        (Protocol_state_validator.validate_proof best_tip)
+        ~f:(Result.map_error ~f:(Fn.const (Error.of_string "invalid proof")))
     in
     ( {With_hash.data= validated_root; hash= root_hash}
     , {With_hash.data= validated_best_tip; hash= best_tip_hash} )

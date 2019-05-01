@@ -1,5 +1,3 @@
-[%%import "../../config.mlh"]
-
 (** The timestamp for the genesis block *)
 val genesis_state_timestamp : Coda_base.Block_time.t
 
@@ -21,3 +19,5 @@ val delta : int
 (** [c] is the number of slots in which we can probalistically expect at least 1
  * block. In sig, it's exactly 1 as blocks should be produced every slot. *)
 val c : int
+
+val inactivity_secs : int

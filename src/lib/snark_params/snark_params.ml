@@ -126,7 +126,6 @@ end
 module Tock = struct
   include (Tock0 : module type of Tock0 with module Proof := Tock0.Proof)
 
-  module Groth16 = Snarky.Snark.Make (Tock_backend.Full.Default)
   module Fq = Snarky_field_extensions.Field_extensions.F (Tock0)
   module Snarkette_tock = Snarkette.Mnt4_80
 
@@ -284,13 +283,8 @@ module Tock = struct
   module Proof = struct
     include Tock0.Proof
 
-    (* TODO : follow this include all the way and really version it *)
-    let __versioned__ = true
-
     let dummy = Dummy_values.Tock.GrothMaller17.proof
   end
-
-  module Groth_maller_verifier = Snarky_verifier.Groth_maller.Make (Pairing)
 
   module Groth_verifier = struct
     include Snarky_verifier.Groth.Make (Pairing)
@@ -334,19 +328,12 @@ end
 module Tick = struct
   include (Tick0 : module type of Tick0 with module Field := Tick0.Field)
 
-  module Groth16 = Snarky.Snark.Make (Tick_backend.Full.Default)
-
   module Field = struct
     include Tick0.Field
     include Hashable.Make (Tick0.Field)
     module Bits = Bits.Make_field (Tick0.Field) (Tick0.Bigint)
 
     let size_in_triples = Int.((size_in_bits + 2) / 3)
-
-    (* for now, assert this type, derived from snarky, is versioned; can we
-       prevent it changing?
-     *)
-    let __versioned__ = true
   end
 
   module Fq = Snarky_field_extensions.Field_extensions.F (Tick0)
@@ -374,7 +361,8 @@ module Tick = struct
 
     let point_near_x x =
       let rec go x = function
-        | Some y -> of_affine_coordinates (x, y)
+        | Some y ->
+            of_affine_coordinates (x, y)
         | None ->
             let x' = Field.(add one x) in
             go x' (find_y x')
@@ -448,15 +436,24 @@ module Tick = struct
       let gen_fold n =
         let gen_triple =
           Quickcheck.Generator.map (Int.gen_incl 0 7) ~f:(function
-            | 0 -> (false, false, false)
-            | 1 -> (false, false, true)
-            | 2 -> (false, true, false)
-            | 3 -> (false, true, true)
-            | 4 -> (true, false, false)
-            | 5 -> (true, false, true)
-            | 6 -> (true, true, false)
-            | 7 -> (true, true, true)
-            | _ -> failwith "gen_triple: got unexpected integer" )
+            | 0 ->
+                (false, false, false)
+            | 1 ->
+                (false, false, true)
+            | 2 ->
+                (false, true, false)
+            | 3 ->
+                (false, true, true)
+            | 4 ->
+                (true, false, false)
+            | 5 ->
+                (true, false, true)
+            | 6 ->
+                (true, true, false)
+            | 7 ->
+                (true, true, true)
+            | _ ->
+                failwith "gen_triple: got unexpected integer" )
         in
         let gen_triples n =
           Quickcheck.random_value
@@ -680,8 +677,6 @@ module Tick = struct
       ; h_gamma= Pairing.G2.constant vk.h_gamma
       ; g_alpha_h_beta= Pairing.Fqk.constant vk.g_alpha_h_beta }
   end
-
-  module Groth_verifier = Snarky_verifier.Groth.Make (Pairing)
 end
 
 let tock_vk_to_bool_list vk =

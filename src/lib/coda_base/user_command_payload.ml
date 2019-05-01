@@ -19,6 +19,10 @@ module Common = struct
 
       module Latest = V1
     end
+
+    type ('fee, 'nonce, 'memo) t = ('fee, 'nonce, 'memo) Stable.Latest.t =
+      {fee: 'fee; nonce: 'nonce; memo: 'memo}
+    [@@deriving eq, sexp, hash, yojson]
   end
 
   module Stable = struct
@@ -63,24 +67,20 @@ module Common = struct
     let%map fee = Currency.Fee.gen
     and nonce = Account_nonce.gen
     and memo =
-      String.gen_with_length Memo.max_size_in_bytes Char.gen
+      String.gen_with_length Memo.max_size_in_bytes Char.quickcheck_generator
       >>| Memo.create_exn
     in
-    Poly.Stable.Latest.{fee; nonce; memo}
+    Poly.{fee; nonce; memo}
 
   type var =
-    ( Currency.Fee.var
-    , Account_nonce.Unpacked.var
-    , Memo.Checked.t )
-    Poly.Stable.Latest.t
+    (Currency.Fee.var, Account_nonce.Unpacked.var, Memo.Checked.t) Poly.t
 
-  let to_hlist Poly.Stable.Latest.({fee; nonce; memo}) =
-    H_list.[fee; nonce; memo]
+  let to_hlist Poly.{fee; nonce; memo} = H_list.[fee; nonce; memo]
 
   let of_hlist : type fee nonce memo.
          (unit, fee -> nonce -> memo -> unit) H_list.t
-      -> (fee, nonce, memo) Poly.Stable.Latest.t =
-   fun H_list.([fee; nonce; memo]) -> {fee; nonce; memo}
+      -> (fee, nonce, memo) Poly.t =
+   fun H_list.[fee; nonce; memo] -> {fee; nonce; memo}
 
   let typ =
     Typ.of_hlistable
@@ -140,16 +140,19 @@ module Body = struct
   module Tag = Transaction_union_tag
 
   let fold = function
-    | Payment p -> Fold.(Tag.fold Payment +> Payment_payload.fold p)
+    | Payment p ->
+        Fold.(Tag.fold Payment +> Payment_payload.fold p)
     | Stake_delegation d ->
         Fold.(
           Tag.fold Stake_delegation +> Stake_delegation.fold d
           +> Fold.init (max_variant_size - Stake_delegation.length_in_triples)
-               ~f:(fun _ -> (false, false, false) ))
+               ~f:(fun _ -> (false, false, false)))
 
   let sender_cost = function
-    | Payment {amount; _} -> amount
-    | Stake_delegation _ -> Currency.Amount.zero
+    | Payment {amount; _} ->
+        amount
+    | Stake_delegation _ ->
+        Currency.Amount.zero
 
   let length_in_triples = Tag.length_in_triples + max_variant_size
 
@@ -173,6 +176,10 @@ module Poly = struct
 
     module Latest = V1
   end
+
+  type ('common, 'body) t = ('common, 'body) Stable.Latest.t =
+    {common: 'common; body: 'body}
+  [@@deriving eq, sexp, hash, yojson, compare]
 end
 
 module Stable = struct
@@ -215,10 +222,15 @@ let memo (t : t) = t.common.memo
 
 let body (t : t) = t.body
 
+let is_payment (t : t) =
+  match t.body with Payment _ -> true | Stake_delegation _ -> false
+
 let accounts_accessed (t : t) =
   match t.body with
-  | Payment payload -> [payload.receiver]
-  | Stake_delegation _ -> []
+  | Payment payload ->
+      [payload.receiver]
+  | Stake_delegation _ ->
+      []
 
 let dummy : t =
   { common=
@@ -233,4 +245,4 @@ let gen =
     |> Option.value_exn ?here:None ?error:None ?message:None
   in
   let%map body = Body.gen ~max_amount in
-  Poly.Stable.Latest.{common; body}
+  Poly.{common; body}

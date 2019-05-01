@@ -2,27 +2,64 @@
   "name": "coda-wallet",
   "version": "0.1.0",
   "description": "",
-  "main": "index.js",
+  "main": "bundle/index.js",
   "dependencies": {
+    "@glennsl/bs-jest": "^0.4.8",
+    "@glennsl/bs-json": "^3.0.0",
     "bs-css": "^8.0.2",
     "bs-electron": "github:Schmavery/bs-electron",
     "graphql_ppx": "^0.2.8",
-    "reason-apollo": "^0.15.2",
-    "reason-react": "^0.5.3"
+    "reason-apollo": "^0.16.0",
+    "reason-react": "^0.7.0",
+    "tablecloth-bucklescript": "file:./tablecloth/bs"
   },
   "devDependencies": {
-    "bs-platform": "^4.0.18",
+    "bs-platform": "^5.0.3",
     "concurrently": "^4.1.0",
-    "fastpack": "^0.8.4"
+    "electron-builder": "^20.39.0",
+    "fastpack": "^0.8.4",
+    "graphql-faker": "^1.9.0"
   },
   "scripts": {
     "start": "electron ./lib/js/src/App.js",
+    "fake": "graphql-faker --port 8080 -- schema.graphql",
+    "fake-inspector": "graphql-faker --open -- schema.graphql",
     "build": "bsb -make-world",
+    "build-ci": "npm run query-fake && npm run build",
     "clean": "bsb -clean-world",
     "pack": "fpack --development ./lib/js/src/Index.js",
     "query": "send-introspection-query http://localhost:8080/graphql",
+    "query-fake": "concurrently --kill-others 'npm run fake' 'sleep 5 && npm run query'",
     "reformat": "bsrefmt --in-place src/*.re",
-    "dev": "concurrently 'bsb -make-world -w' 'fpack watch --development ./lib/js/src/Index.js' 'electron ./lib/js/src/App.js'"
+    "test": "npm run build && jest",
+    "dist": "build",
+    "dev": "concurrently --kill-others 'bsb -make-world -w' 'fpack watch --development ./lib/js/src/Index.js' 'electron ./lib/js/src/App.js'"
+  },
+  "build": {
+    "appId": "FOO.org.codaprotocol.prowallet",
+    "dmg": {
+      "contents": [
+        {
+          "x": 110,
+          "y": 150
+        },
+        {
+          "x": 240,
+          "y": 150,
+          "type": "link",
+          "path": "/Applications"
+        }
+      ]
+    },
+    "linux": {
+      "target": [
+        "AppImage",
+        "deb"
+      ]
+    },
+    "win": {
+      "target": "NSIS"
+    }
   },
   "author": "",
   "license": "ISC"

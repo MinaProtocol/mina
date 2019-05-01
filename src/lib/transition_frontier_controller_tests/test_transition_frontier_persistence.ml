@@ -63,9 +63,12 @@ let%test_module "Transition Frontier Persistence" =
                   ~acc_hash worker frontier mutant_diff
               in
               ( match mutant_diff with
-              | Add_transition {With_hash.hash; _} -> remove_job hash
-              | New_frontier ({With_hash.hash; _}, _, _) -> remove_job hash
-              | _ -> () ) ;
+              | Add_transition {With_hash.hash; _} ->
+                  remove_job hash
+              | New_frontier ({With_hash.hash; _}, _, _) ->
+                  remove_job hash
+              | _ ->
+                  () ) ;
               new_hash ) )
       |> Deferred.ignore |> don't_wait_for ;
       let%bind () =
@@ -78,12 +81,21 @@ let%test_module "Transition Frontier Persistence" =
       let%bind frontier =
         create_root_frontier ~logger Genesis_ledger.accounts
       in
-      let worker =
-        Transition_frontier_persistence.create ~logger ?directory_name ()
-      in
-      let%map result = f (frontier, worker) in
-      Transition_frontier_persistence.Worker.close worker ;
-      result
+      Monitor.try_with_or_error (fun () ->
+          let worker =
+            Transition_frontier_persistence.create ~logger ?directory_name ()
+          in
+          let%map result = f (frontier, worker) in
+          Transition_frontier_persistence.Worker.close worker ;
+          result )
+      |> Deferred.map ~f:(function
+           | Ok value ->
+               value
+           | Error e ->
+               Logger.error ~module_:__MODULE__ ~location:__LOC__ logger
+                 "Encountered an error: Visualizing transition frontier" ;
+               Transition_frontier.visualize ~filename:"frontier.dot" frontier ;
+               Error.raise e )
 
     let with_database ~directory_name ~f =
       let database = Transition_storage.create ~directory:directory_name in
@@ -100,7 +112,7 @@ let%test_module "Transition Frontier Persistence" =
     let test_breadcrumbs ~gen_root_breadcrumb_builder num_breadcrumbs =
       Thread_safe.block_on_async_exn
       @@ fun () ->
-      let directory_name = Uuid.to_string (Uuid.create ()) in
+      let directory_name = Uuid.to_string (Uuid_unix.create ()) in
       let%map breadcrumbs =
         with_persistence ~logger ~directory_name ~f:(fun (frontier, t) ->
             let%bind breadcrumbs =
@@ -131,7 +143,7 @@ let%test_module "Transition Frontier Persistence" =
       Async.Scheduler.set_record_backtraces true ;
       Thread_safe.block_on_async_exn
       @@ fun () ->
-      let directory_name = Uuid.to_string (Uuid.create ()) in
+      let directory_name = Uuid.to_string (Uuid_unix.create ()) in
       let%map root, next_breadcrumb =
         with_persistence ~logger ~directory_name ~f:(fun (frontier, t) ->
             let create_breadcrumb =
@@ -167,10 +179,8 @@ let%test_module "Transition Frontier Persistence" =
       test_linear_breadcrumbs (max_length - 1)
 
     let%test_unit "Root changes multiple times" =
+      Printexc.record_backtrace true ;
       test_linear_breadcrumbs (2 * max_length)
-
-    let%test_unit "Randomly generate a tree" =
-      test_tree_breadcrumbs (2 * max_length)
 
     let%test_unit "Randomly generate a tree" =
       test_tree_breadcrumbs (2 * max_length)
@@ -183,7 +193,7 @@ let%test_module "Transition Frontier Persistence" =
       let num_breadcrumbs = max_length in
       Thread_safe.block_on_async_exn
       @@ fun () ->
-      let directory_name = Uuid.to_string (Uuid.create ()) in
+      let directory_name = Uuid.to_string (Uuid_unix.create ()) in
       let%bind frontier =
         create_root_frontier ~logger Genesis_ledger.accounts
       in

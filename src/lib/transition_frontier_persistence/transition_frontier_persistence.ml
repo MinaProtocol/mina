@@ -24,7 +24,7 @@ module Make (Inputs : Intf.Main_inputs) = struct
     t |> Transition_frontier.Breadcrumb.staged_ledger
     |> Staged_ledger.pending_coinbase_collection
 
-  let apply_diff (type mutant) frontier
+  let apply_diff (type mutant) ~logger frontier
       (diff :
         ( ( External_transition.Stable.Latest.t
           , State_hash.Stable.Latest.t )
@@ -32,7 +32,8 @@ module Make (Inputs : Intf.Main_inputs) = struct
         , mutant )
         Diff_mutant.t) : mutant =
     match diff with
-    | New_frontier _ -> ()
+    | New_frontier _ ->
+        ()
     | Add_transition {data= transition; _} ->
         let parent_hash = External_transition.parent_hash transition in
         Transition_frontier.find_exn frontier parent_hash
@@ -41,14 +42,36 @@ module Make (Inputs : Intf.Main_inputs) = struct
     | Remove_transitions external_transitions_with_hashes ->
         List.map external_transitions_with_hashes
           ~f:(Fn.compose External_transition.consensus_state With_hash.data)
-    | Update_root _ ->
+    | Update_root (new_root_hash, _, _) ->
         let previous_root =
-          Transition_frontier.previous_root frontier |> Option.value_exn
+          (let open Transition_frontier in
+          let open Option.Let_syntax in
+          let%bind root =
+            match find frontier new_root_hash with
+            | Some root ->
+                Some root
+            | None ->
+                find_in_root_history frontier new_root_hash
+          in
+          let previous_root_hash =
+            External_transition.Verified.parent_hash
+            @@ Breadcrumb.external_transition root
+          in
+          find_in_root_history frontier previous_root_hash)
+          |> Option.value_exn
         in
-        let state_hash =
+        let previous_state_hash =
           Transition_frontier.Breadcrumb.state_hash previous_root
         in
-        (state_hash, scan_state previous_root, pending_coinbase previous_root)
+        let mutant =
+          ( previous_state_hash
+          , scan_state previous_root
+          , pending_coinbase previous_root )
+        in
+        Logger.trace logger ~module_:__MODULE__ ~location:__LOC__
+          ~metadata:[("mutant", Diff_mutant.value_to_yojson diff mutant)]
+          "Ground truth root update" ;
+        mutant
 
   let to_state_hash_diff (type output)
       (diff :
@@ -60,12 +83,21 @@ module Make (Inputs : Intf.Main_inputs) = struct
         E
           (Remove_transitions
              (List.map ~f:With_hash.hash removed_transitions_with_hashes))
-    | New_frontier first_root -> E (New_frontier first_root)
-    | Add_transition added_transition -> E (Add_transition added_transition)
-    | Update_root new_root -> E (Update_root new_root)
+    | New_frontier first_root ->
+        E (New_frontier first_root)
+    | Add_transition added_transition ->
+        E (Add_transition added_transition)
+    | Update_root new_root ->
+        E (Update_root new_root)
 
   let write_diff_and_verify ~logger ~acc_hash worker frontier diff_mutant =
-    let ground_truth_diff = apply_diff frontier diff_mutant in
+    Logger.trace logger "Handling mutant diff" ~module_:__MODULE__
+      ~location:__LOC__
+      ~metadata:
+        [ ( "diff_mutant"
+          , Diff_mutant.key_to_yojson diff_mutant
+              ~f:(Fn.compose State_hash.to_yojson With_hash.hash) ) ] ;
+    let ground_truth_diff = apply_diff ~logger frontier diff_mutant in
     let ground_truth_hash =
       Diff_mutant.hash acc_hash diff_mutant ground_truth_diff
         ~f:(Fn.compose State_hash.to_bytes With_hash.hash)
@@ -80,13 +112,20 @@ module Make (Inputs : Intf.Main_inputs) = struct
     | Ok new_hash ->
         if Diff_hash.equal new_hash ground_truth_hash then ground_truth_hash
         else
-          failwith
-            "Unable to write mutant diff correctly as hashes are different"
+          failwithf
+            !"Unable to write mutant diff correctly as hashes are different:\n\
+             \ %s. Hash of groundtruth %s Hash of actual %s"
+            (Yojson.Safe.to_string
+               (Diff_mutant.key_to_yojson diff_mutant
+                  ~f:(Fn.compose State_hash.to_yojson With_hash.hash)))
+            (Diff_hash.to_string ground_truth_hash)
+            (Diff_hash.to_string new_hash)
+            ()
 
   let listen_to_frontier_broadcast_pipe ~logger
       (frontier_broadcast_pipe :
         Transition_frontier.t option Broadcast_pipe.Reader.t) worker =
-    let%bind _ : Diff_hash.t =
+    let%bind (_ : Diff_hash.t) =
       Broadcast_pipe.Reader.fold frontier_broadcast_pipe ~init:Diff_hash.empty
         ~f:(fun acc_hash frontier_opt ->
           match frontier_opt with
@@ -117,9 +156,13 @@ module Make (Inputs : Intf.Main_inputs) = struct
         Transition_frontier.Breadcrumb.build ~logger ~parent
           ~transition_with_hash
       with
-      | Ok child_breadcrumb -> child_breadcrumb
-      | Error (`Fatal_error exn) -> log_error () ; raise exn
-      | Error (`Validation_error error) -> log_error () ; Error.raise error
+      | Ok child_breadcrumb ->
+          child_breadcrumb
+      | Error (`Fatal_error exn) ->
+          log_error () ; raise exn
+      | Error (`Invalid_staged_ledger_diff error)
+      | Error (`Invalid_staged_ledger_hash error) ->
+          log_error () ; Error.raise error
     in
     let%map () =
       Transition_frontier.add_breadcrumb_exn transition_frontier
@@ -189,7 +232,8 @@ module Make (Inputs : Intf.Main_inputs) = struct
       List.map child_hashes ~f:(fun child_hash -> (child_hash, breadcrumb))
     in
     let rec dfs = function
-      | [] -> Deferred.unit
+      | [] ->
+          Deferred.unit
       | (state_hash, parent_breadcrumb) :: remaining_jobs ->
           let verified_transition, child_hashes =
             get_verified_transition state_hash

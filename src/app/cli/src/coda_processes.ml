@@ -4,7 +4,7 @@
 open Core
 open Async
 open Coda_worker
-open Coda_main
+open Coda_inputs
 
 let init () = Parallel.init_master ()
 
@@ -85,7 +85,8 @@ let stabalize_and_start_or_timeout ?(timeout_ms = 2000.) nodes =
 
 let spawn_local_processes_exn ?(first_delay = 0.0) configs =
   match configs with
-  | [] -> failwith "Configs should be non-empty"
+  | [] ->
+      failwith "Configs should be non-empty"
   | first :: rest ->
       let%bind first_created = Coda_process.spawn_exn first in
       let%bind () = after (Time.Span.of_sec first_delay) in

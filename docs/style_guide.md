@@ -195,7 +195,7 @@ We use [ppx_inline_test](https://github.com/janestreet/ppx_inline_test) for unit
 
 ```ocaml
 let%test_unit =
-  Quickcheck.test ~sexp:[%sexp_of: Int.t] Int.gen
+  Quickcheck.test ~sexp:[%sexp_of: Int.t] Int.quickcheck_generator
     ~f:(fun x -> assert (Int.equal (f_inv (f x)) x))
 ```
 

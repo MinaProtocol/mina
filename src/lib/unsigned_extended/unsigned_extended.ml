@@ -109,8 +109,6 @@ module Extend
   include Hashable.Make (T)
 
   (* TODO : actually version this type *)
-  let version = 1
-
   let __versioned__ = true
 
   include Bin_prot.Utils.Make_binable (struct
@@ -129,8 +127,10 @@ module Extend
   let to_yojson n = `String (to_string n)
 
   let of_yojson = function
-    | `String s -> Ok (of_string s)
-    | _ -> Error "expected string"
+    | `String s ->
+        Ok (of_string s)
+    | _ ->
+        Error "expected string"
 
   let to_uint64 = M.to_uint64
 

@@ -1,10 +1,21 @@
 open Core_kernel
+open Async
 open Tuple_lib
 open Fold_lib
 open Coda_numbers
 
 module type Prover_state_intf = sig
-  type t [@@deriving bin_io, sexp]
+  type t [@@deriving sexp]
+
+  module Stable :
+    sig
+      module V1 : sig
+        type t [@@deriving bin_io, sexp, version]
+      end
+
+      module Latest : module type of V1
+    end
+    with type V1.t = t
 
   type pending_coinbase_witness
 
@@ -34,17 +45,27 @@ module type S = sig
   val name : string
 
   module Local_state : sig
-    type t [@@deriving sexp]
+    type t [@@deriving sexp, to_yojson]
 
     val create : Signature_lib.Public_key.Compressed.t option -> t
   end
 
   module Consensus_transition_data : sig
-    type value [@@deriving bin_io, sexp]
+    module Value : sig
+      type t [@@deriving sexp]
 
-    include Snark_params.Tick.Snarkable.S with type value := value
+      module Stable :
+        sig
+          module V1 : sig
+            type t [@@deriving sexp, bin_io, version]
+          end
+        end
+        with type V1.t = t
+    end
 
-    val genesis : value
+    include Snark_params.Tick.Snarkable.S with type value := Value.t
+
+    val genesis : Value.t
   end
 
   module Consensus_state : sig
@@ -55,7 +76,8 @@ module type S = sig
       module Stable :
         sig
           module V1 : sig
-            type t [@@deriving hash, eq, compare, bin_io, sexp, to_yojson]
+            type t
+            [@@deriving hash, eq, compare, bin_io, sexp, to_yojson, version]
           end
         end
         with type V1.t = t
@@ -84,6 +106,13 @@ module type S = sig
     val to_lite : (Value.t -> Lite_base.Consensus_state.t) option
 
     val display : Value.t -> display
+  end
+
+  module Rpcs : sig
+    val implementations :
+         logger:Logger.t
+      -> local_state:Local_state.t
+      -> Host_and_port.t Rpc.Implementation.t list
   end
 
   module Blockchain_state : Coda_base.Blockchain_state.S
@@ -147,13 +176,15 @@ module type S = sig
     -> snarked_ledger_hash:Coda_base.Frozen_ledger_hash.t
     -> supply_increase:Currency.Amount.t
     -> logger:Logger.t
-    -> Protocol_state.Value.t * Consensus_transition_data.value
+    -> Protocol_state.Value.t * Consensus_transition_data.Value.t
 
   (**
    * Check that a consensus state was received at a valid time.
   *)
   val received_at_valid_time :
-    Consensus_state.Value.t -> time_received:Unix_timestamp.t -> bool
+       Consensus_state.Value.t
+    -> time_received:Unix_timestamp.t
+    -> (unit, [`Too_early | `Too_late of int64]) result
 
   (**
    * Create a constrained, checked var for the next consensus state of
@@ -212,6 +243,29 @@ module type S = sig
        existing:Consensus_state.Value.t
     -> candidate:Consensus_state.Value.t
     -> bool
+
+  (** Data needed to synchronize the local state. *)
+  type local_state_sync [@@deriving to_yojson]
+
+  (**
+    * Predicate indicating whether or not the local state requires synchronization.
+    *)
+  val required_local_state_sync :
+       consensus_state:Consensus_state.Value.t
+    -> local_state:Local_state.t
+    -> local_state_sync Non_empty_list.t option
+
+  (**
+    * Synchronize local state over the network.
+    *)
+  val sync_local_state :
+       logger:Logger.t
+    -> trust_system:Trust_system.t
+    -> local_state:Local_state.t
+    -> random_peers:(int -> Network_peer.Peer.t list)
+    -> query_peer:Network_peer.query_peer
+    -> local_state_sync Non_empty_list.t
+    -> unit Deferred.Or_error.t
 
   (** Return a string that tells a human what the consensus view of an instant in time is.
     *

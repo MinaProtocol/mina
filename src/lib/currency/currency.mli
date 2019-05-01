@@ -107,13 +107,17 @@ module type Signed_intf = sig
   type magnitude_var
 
   module Poly : sig
-    module Stable : sig
-      module V1 : sig
-        type ('magnitude, 'sgn) t [@@deriving version {unnumbered}]
-      end
+    type ('magnitude, 'sgn) t
 
-      module Latest = V1
-    end
+    module Stable :
+      sig
+        module V1 : sig
+          type ('magnitude, 'sgn) t [@@deriving version]
+        end
+
+        module Latest = V1
+      end
+      with type ('magnitude, 'sgn) V1.t = ('magnitude, 'sgn) t
   end
 
   module Stable : sig
@@ -131,14 +135,13 @@ module type Signed_intf = sig
 
   val length_in_triples : int
 
-  val create :
-    magnitude:'magnitude -> sgn:'sgn -> ('magnitude, 'sgn) Poly.Stable.Latest.t
+  val create : magnitude:'magnitude -> sgn:'sgn -> ('magnitude, 'sgn) Poly.t
 
   val sgn : t -> Sgn.t
 
   val magnitude : t -> magnitude
 
-  type var = (magnitude_var, Sgn.var) Poly.Stable.Latest.t
+  type var = (magnitude_var, Sgn.var) Poly.t
 
   val typ : (var, t) Typ.t
 
@@ -173,8 +176,7 @@ module type Signed_intf = sig
 
     val cswap :
          Boolean.var
-      -> (magnitude_var, Sgn.t) Poly.Stable.Latest.t
-         * (magnitude_var, Sgn.t) Poly.Stable.Latest.t
+      -> (magnitude_var, Sgn.t) Poly.t * (magnitude_var, Sgn.t) Poly.t
       -> (var * var, _) Checked.t
   end
 end

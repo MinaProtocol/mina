@@ -117,12 +117,14 @@ module Make (Inputs : Inputs_intf) = struct
         let uuid = C.get_uuid c in
         ( `Uuid uuid
         , `Hash
-            ( try C.merkle_root c with _ ->
+            ( try C.merkle_root c
+              with _ ->
                 Core.printf !"CAUGHT %{sexp: Uuid.t}\n%!" uuid ;
                 Hash.empty_account ) )
       in
       match Uuid.Table.find registered_masks (C.get_uuid c) with
-      | None -> Leaf summary
+      | None ->
+          Leaf summary
       | Some masks ->
           Node (summary, List.map masks ~f:(_crawl (module Mask.Attached)))
   end
@@ -144,10 +146,12 @@ module Make (Inputs : Inputs_intf) = struct
     let error_msg = "unregister_mask: no such registered mask" in
     let t_uuid = get_uuid t in
     match Uuid.Table.find registered_masks t_uuid with
-    | None -> failwith error_msg
+    | None ->
+        failwith error_msg
     | Some masks ->
         ( match List.find masks ~f:(fun m -> phys_equal m mask) with
-        | None -> failwith error_msg
+        | None ->
+            failwith error_msg
         | Some _ -> (
             let bad, good =
               List.partition_tf masks ~f:(fun m -> phys_equal m mask)
@@ -166,7 +170,8 @@ module Make (Inputs : Inputs_intf) = struct
   let set t location account =
     Base.set t location account ;
     match Uuid.Table.find registered_masks (get_uuid t) with
-    | None -> ()
+    | None ->
+        ()
     | Some masks ->
         List.iter masks ~f:(fun mask ->
             Mask.Attached.parent_set_notify mask account )
@@ -184,7 +189,8 @@ module Make (Inputs : Inputs_intf) = struct
 
   let batch_notify_mask_children t accounts =
     match Uuid.Table.find registered_masks (get_uuid t) with
-    | None -> ()
+    | None ->
+        ()
     | Some masks ->
         List.iter masks ~f:(fun mask ->
             List.iter accounts ~f:(fun account ->

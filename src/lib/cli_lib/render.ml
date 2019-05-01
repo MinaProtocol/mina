@@ -12,7 +12,8 @@ let print (type t) (module Print : Printable_intf with type t = t) is_json =
       if is_json then
         printf "%s\n" (Print.to_yojson t |> Yojson.Safe.pretty_to_string)
       else printf "%s\n" (Print.to_text t)
-  | Error e -> eprintf "%s" (Error.to_string_hum e)
+  | Error e ->
+      eprintf "%s" (Error.to_string_hum e)
 
 module String_list_formatter = struct
   type t = string list [@@deriving yojson]

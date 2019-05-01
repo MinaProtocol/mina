@@ -51,10 +51,9 @@ val gen :
 
 module With_valid_signature : sig
   module Stable : sig
-    module V1 : sig
-      type nonrec t = private t [@@deriving sexp, eq, bin_io, yojson]
-
-      val compare : t -> t -> int
+    module Latest : sig
+      type nonrec t = private t
+      [@@deriving sexp, eq, bin_io, yojson, version, compare, hash]
 
       val gen :
            keys:Signature_keypair.t array
@@ -63,10 +62,16 @@ module With_valid_signature : sig
         -> t Quickcheck.Generator.t
     end
 
-    module Latest : module type of V1
+    module V1 = Latest
   end
 
-  include module type of Stable.Latest
+  type t = Stable.Latest.t [@@deriving sexp, eq, yojson, compare, hash]
+
+  val gen :
+       keys:Signature_keypair.t array
+    -> max_amount:int
+    -> max_fee:int
+    -> t Quickcheck.Generator.t
 
   include Comparable.S with type t := t
 end

@@ -78,6 +78,7 @@ module type Key_value_database = sig
     -> unit
 
   val to_alist : t -> (Bigstring.t * Bigstring.t) list
+
   (* an association list, sorted by key *)
 end
 

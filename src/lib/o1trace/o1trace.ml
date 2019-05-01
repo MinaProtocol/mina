@@ -14,8 +14,7 @@ let buf = Bigstring.create 128
 let emit_event = Output.Binary.emit_event ~buf
 
 let timestamp () =
-  Time_stamp_counter.now () |> Time_stamp_counter.to_time_ns
-  |> Core.Time_ns.to_int63_ns_since_epoch |> Int63.to_int_exn
+  Time_stamp_counter.now () |> Time_stamp_counter.to_int63 |> Int63.to_int_exn
 
 let current_wr = ref None
 
@@ -67,7 +66,8 @@ let trace_task (name : string) (f : unit -> 'a) =
   match Scheduler.within_context new_ctx f with
   | Error () ->
       failwith "traced task failed, exception reported to parent monitor"
-  | Ok x -> x
+  | Ok x ->
+      x
 
 let trace_recurring_task (name : string) (f : unit -> 'a) =
   trace_task ("R&" ^ name) (fun () ->
@@ -81,7 +81,8 @@ let measure (name : string) (f : unit -> 'a) : 'a =
       let res = f () in
       emit_event wr (new_event Measure_end) ;
       res
-  | None -> f ()
+  | None ->
+      f ()
 
 let forget_tid (f : unit -> 'a) =
   let new_ctx =

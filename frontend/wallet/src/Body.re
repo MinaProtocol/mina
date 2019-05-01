@@ -1,48 +1,87 @@
-let component = ReasonReact.statelessComponent("Body");
+open Tc;
 
-module Test = [%graphql {| query { greeting } |}];
+module Test = [%graphql {| query { version } |}];
 module TestQuery = ReasonApollo.CreateQuery(Test);
 
-let make = (~message as _, _children) => {
-  ...component,
-  render: _self => {
-    <div
-      style={ReactDOMRe.Style.make(
-        ~color="white",
-        ~background="#121f2b11",
-        ~fontFamily="Sans-Serif",
-        ~display="flex",
-        ~overflow="hidden",
-        (),
-      )}>
+module HooksTest = {
+  [@react.component]
+  let make = (~name) => {
+    let (count, setCount) = React.useState(() => 0);
 
-        <div
-          style={ReactDOMRe.Style.make(
-            ~display="flex",
-            ~flexDirection="column",
-            ~justifyContent="flex-start",
-            ~width="20%",
-            ~height="auto",
-            ~overflowY="auto",
-            (),
-          )}>
-          <WalletItem name="Hot Wallet" balance=100.0 />
-          <WalletItem name="Vault" balance=234122.123 />
-        </div>
-        <div style={ReactDOMRe.Style.make(~margin="10px", ())}>
-          <TestQuery>
-            ...{({result}) =>
+    <div>
+      <p>
+        {React.string(
+           name ++ " clicked " ++ string_of_int(count) ++ " times",
+         )}
+      </p>
+      <button onClick={_ => setCount(count => count + 1)}>
+        {React.string("Click me")}
+      </button>
+    </div>;
+  };
+};
+
+[@react.component]
+let make = (~message, ~settingsOrError, ~setSettingsOrError) =>
+  switch (settingsOrError) {
+  | `Error(_) =>
+    <div>
+      <p>
+        {ReasonReact.string("There was an error loading the settings!")}
+      </p>
+      <p> {ReasonReact.string(message)} </p>
+    </div>
+  | `Settings(settings) =>
+    <div
+      className=Css.(
+        style([
+          display(`flex),
+          overflow(`hidden),
+          width(`percent(100.)),
+          color(Css.white),
+          backgroundColor(StyleGuide.Colors.bgWithAlpha),
+        ])
+      )>
+      <div
+        className=Css.(
+          style([
+            display(`flex),
+            flexDirection(`column),
+            justifyContent(`flexStart),
+            width(`percent(20.)),
+            height(`auto),
+            overflowY(`auto),
+          ])
+        )>
+        {SettingsRenderer.entries(settings)
+         // TODO: Replace with actual wallets graphql info
+         |> Array.map(~f=((key, _)) =>
+              <WalletItem
+                key={PublicKey.toString(key)}
+                wallet={Wallet.key, balance: 100}
+                settings
+                setSettingsOrError
+              />
+            )
+         |> ReasonReact.array}
+      </div>
+      <div
+        className=Css.(style([width(`percent(100.)), margin(`rem(1.25))]))>
+        <TestQuery>
+          (
+            response =>
               ReasonReact.string(
-                switch (result) {
+                switch (response.result) {
                 | Loading => ""
                 | Error(error) => error##message
-                | Data(response) => response##greeting
+                | Data(response) => response##version
                 },
               )
-            }
-          </TestQuery>
-        </div>
-      </div>;
-      // </div>
-  },
-};
+          )
+        </TestQuery>
+        <HooksTest name="test-hooks" />
+        <p> {ReasonReact.string(message)} </p>
+        <TransactionsView />
+      </div>
+    </div>
+  };

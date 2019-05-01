@@ -1,6 +1,3 @@
-[%%import
-"../../../config.mlh"]
-
 open Core
 open Async
 open Coda_base
@@ -89,16 +86,20 @@ module Worker = struct
         | "full" ->
             let%map (module M) = Worker_state.get w in
             M.verify_wrap chain.state chain.proof
-        | "check" | "none" -> Deferred.return true
-        | _ -> failwith "unknown proof_level"
+        | "check" | "none" ->
+            Deferred.return true
+        | _ ->
+            failwith "unknown proof_level"
 
       let verify_transaction_snark (w : Worker_state.t) (p, message) =
         match Coda_compile_config.proof_level with
         | "full" ->
             let%map (module M) = Worker_state.get w in
             M.verify_transaction_snark p ~message
-        | "check" | "none" -> Deferred.return true
-        | _ -> failwith "unknown proof_level"
+        | "check" | "none" ->
+            Deferred.return true
+        | _ ->
+            failwith "unknown proof_level"
 
       let functions =
         let f (i, o, f) =

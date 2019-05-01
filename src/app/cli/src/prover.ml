@@ -1,6 +1,3 @@
-[%%import
-"../../../config.mlh"]
-
 open Core
 open Async
 open Coda_base
@@ -97,8 +94,8 @@ module Worker_state = struct
                         state_for_handler ~pending_coinbase)
                  in
                  let prev_proof =
-                   Tick.Groth16.prove
-                     (Tick.Groth16.Keypair.pk Keys.Step.keys)
+                   Tick.prove
+                     (Tick.Keypair.pk Keys.Step.keys)
                      (Keys.Step.input ()) prover_state main next_state_top_hash
                  in
                  { Blockchain.state= next_state
@@ -139,14 +136,15 @@ module Worker_state = struct
                         state_for_handler ~pending_coinbase)
                  in
                  match
-                   Tick.Groth16.check
+                   Tick.check
                      (main @@ Tick.Field.Var.constant next_state_top_hash)
                      prover_state
                  with
                  | Ok () ->
                      { Blockchain.state= next_state
                      ; proof= Precomputed_values.base_proof }
-                 | Error e -> Error.raise e
+                 | Error e ->
+                     Error.raise e
 
                let verify state proof = true
              end
@@ -163,7 +161,8 @@ module Worker_state = struct
                let verify _ _ = true
              end
              : S )
-         | _ -> failwith "unknown proof_level set in compile config"
+         | _ ->
+             failwith "unknown proof_level set in compile config"
        in
        m)
 
@@ -190,9 +189,9 @@ module Functions = struct
       [%bin_type_class:
         Blockchain.t
         * Consensus_mechanism.Protocol_state.Value.Stable.V1.t
-        * Consensus_mechanism.Snark_transition.value
-        * Consensus_mechanism.Prover_state.t
-        * Pending_coinbase_witness.t] Blockchain.bin_t
+        * Consensus_mechanism.Snark_transition.Value.Stable.V1.t
+        * Consensus_mechanism.Prover_state.Stable.V1.t
+        * Pending_coinbase_witness.Stable.V1.t] Blockchain.bin_t
       (fun w
       ( ({Blockchain.state= prev_state; proof= prev_proof} as chain)
       , next_state

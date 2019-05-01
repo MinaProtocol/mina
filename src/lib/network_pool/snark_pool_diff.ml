@@ -2,20 +2,37 @@ open Core_kernel
 open Async
 open Module_version
 
-type ('work, 'priced_proof) diff = Add_solved_work of 'work * 'priced_proof
-[@@deriving bin_io, sexp, yojson]
+module Diff = struct
+  module Stable = struct
+    module V1 = struct
+      module T = struct
+        type ('work, 'priced_proof) t =
+          | Add_solved_work of 'work * 'priced_proof
+        [@@deriving bin_io, sexp, yojson, version]
+      end
+
+      include T
+    end
+
+    module Latest = V1
+  end
+
+  type ('work, 'priced_proof) t = ('work, 'priced_proof) Stable.Latest.t =
+    | Add_solved_work of 'work * 'priced_proof
+  [@@deriving sexp, yojson]
+end
 
 module Make (Proof : sig
-  type t [@@deriving bin_io, yojson, version {unnumbered}]
+  type t [@@deriving bin_io, yojson, version]
 end) (Fee : sig
-  type t [@@deriving bin_io, sexp, yojson, version {unnumbered}]
+  type t [@@deriving bin_io, sexp, yojson, version]
 end) (Work : sig
   type t [@@deriving sexp, yojson]
 
   module Stable :
     sig
       module V1 : sig
-        type t [@@deriving sexp, bin_io, yojson]
+        type t [@@deriving sexp, bin_io, yojson, version]
       end
     end
     with type V1.t = t
@@ -56,7 +73,8 @@ struct
                 let%bind proof_val = Proof.of_yojson proof_json in
                 let%map fee_val = Fee.of_yojson fee_json in
                 {proof= proof_val; fee= fee_val}
-            | _ -> Error "expected `Assoc"
+            | _ ->
+                Error "expected `Assoc"
         end
 
         include T
@@ -87,13 +105,8 @@ struct
   module Stable = struct
     module V1 = struct
       module T = struct
-        (* TODO : use version ppx *)
-        let version = 1
-
-        let __versioned__ = true
-
-        type t = (Work.Stable.V1.t, Priced_proof.Stable.V1.t) diff
-        [@@deriving bin_io, sexp, yojson]
+        type t = (Work.Stable.V1.t, Priced_proof.Stable.V1.t) Diff.Stable.V1.t
+        [@@deriving bin_io, sexp, yojson, version]
       end
 
       include T
@@ -116,7 +129,7 @@ struct
   type t = Stable.Latest.t [@@deriving sexp, yojson]
 
   let summary = function
-    | Add_solved_work (_, Priced_proof.({proof= _; fee})) ->
+    | Diff.Add_solved_work (_, Priced_proof.{proof= _; fee}) ->
         Printf.sprintf !"Snark_pool_diff add with fee %{sexp: Fee.t}" fee
 
   let apply (pool : Pool.t) (t : t Envelope.Incoming.t) :
@@ -125,9 +138,11 @@ struct
     let to_or_error = function
       | `Don't_rebroadcast ->
           Or_error.error_string "Worse fee or already in pool"
-      | `Rebroadcast -> Ok t
+      | `Rebroadcast ->
+          Ok t
     in
-    ( match t with Add_solved_work (work, {proof; fee}) ->
+    ( match t with
+    | Add_solved_work (work, {proof; fee}) ->
         Pool.add_snark pool ~work ~proof ~fee )
     |> to_or_error |> Deferred.return
 end

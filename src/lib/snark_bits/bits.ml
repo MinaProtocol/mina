@@ -271,7 +271,8 @@ module Snarkable = struct
         List.map2 then_ else_ ~f:(fun then_ else_ ->
             Boolean.if_ cond ~then_ ~else_ )
       with
-      | Ok result -> Checked.List.all result
+      | Ok result ->
+          Checked.List.all result
       | Unequal_lengths ->
           failwith "Bits.if_: unpacked bit lengths were unequal"
   end
