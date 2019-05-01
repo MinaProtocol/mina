@@ -1,6 +1,6 @@
-# Transaction Snark Scan State
+# Scan State Refactoring
 
-The parallel scan state is a full-binary tree with leaves (or called `Base` nodes) having values of type `Transaction_with_witness.t` and intermediate nodes (or called `Merge` nodes) having values of type `Ledger_proof_with_sok_message.t`
+The parallel scan state currently is a full-binary tree with leaves (or called `Base` nodes) having values of type `Transaction_with_witness.t` and intermediate nodes (or called `Merge` nodes) having values of type `Ledger_proof_with_sok_message.t`
 
 Everytime a diff is applied, the transactions are transformed to new base jobs and added to the scan state. The diff also includes completed works that correspond to a sequence of jobs that already exist on the scan state. These, when added to scan state, create new merge jobs except when it is for the root node in which case the proof is simply returned as the result.
 
@@ -10,9 +10,7 @@ The following constants dictate the structure and behaviour of the scan state.
 
 2. *Work_delay_factor*: Every block adds new jobs on to the scan state; some base jobs and others merge jobs. Since generating snarks take time, all the work that was added in the current block may not be completed by the time next block is generated. Therefore, we add *work_delay_factor* extra trees to accumulate enough work over *work_delay_factor* blocks. This ensures the amount of work that is required to be completed are created in blocks before the last *work_delay_factor* blocks which would give enough time for the snarks to be generated.
 
-Given these two constants, the parallel scan state is a forest of $work\_delay\_factor+2$ trees with each tree having exactly $2^{transaction\_capacity\_log\_2}$ leaves.
-
-The following are snapshots of the scan state after each block with $transaction\_capacity\_log\_2=2$ and $work\_delay\_factor=1$. Having a *work_delay_factor* of 1 ensures the work that needs to be done is from blocks before the last block.
+Given these two constants, the parallel scan state will now be a forest of $work\_delay\_factor+2$ trees with each tree having exactly $2^{transaction\_capacity\_log\_2}$ leaves. The following snapshots of the scan state after each block with $transaction\_capacity\_log\_2=2$ and $work\_delay\_factor=1$ will help visualizing how this would work. Having a *work_delay_factor* of 1 ensures the work that needs to be done is from blocks before the last block.
 
 Note: M*i* for merge nodes and B*i* for base nodes where *i* is the block in which the work was added
 
@@ -94,6 +92,8 @@ Block 11: Four transactions, complete seven proofs (B8, B8, B9, B9, M8, M8, M9) 
 1. Multiple proofs are not emitted per update
 
 2. The merge node that is to be updated after adding proofs corresponding to its children is always empty. This allows us keep the number of trees to a minumum of $work\_delay\_factor+2$.
+
+The latency in this impl is as good as it can get because it emits a ledger proof for every $2^{transaction\_capacity\_log\_2}$ transactions.
 
 ## Types
 
