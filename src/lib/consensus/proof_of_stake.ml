@@ -225,6 +225,41 @@ module Epoch = struct
     in
     (epoch, slot)
 
+  let diff_in_slots ((epoch, slot) : t * Slot.t) ((epoch', slot') : t * Slot.t)
+      : int64 =
+    let ( < ) x y = Pervasives.(Int64.compare x y < 0) in
+    let ( > ) x y = Pervasives.(Int64.compare x y > 0) in
+    let open Int64.Infix in
+    let of_uint32 = UInt32.to_int64 in
+    let epoch, slot = (of_uint32 epoch, of_uint32 slot) in
+    let epoch', slot' = (of_uint32 epoch', of_uint32 slot') in
+    let epoch_size = of_uint32 Constants.Epoch.size in
+    let epoch_diff = epoch - epoch' in
+    if epoch_diff > 0L then
+      ((epoch_diff - 1L) * epoch_size) + slot + (epoch_size - slot')
+    else if epoch_diff < 0L then
+      ((epoch_diff + 1L) * epoch_size) - (epoch_size - slot) - slot'
+    else slot - slot'
+
+  let%test_unit "test diff_in_slots" =
+    let open Int64.Infix in
+    let ( !^ ) = UInt32.of_int in
+    let ( !@ ) = Fn.compose ( !^ ) Int64.to_int in
+    let epoch_size = UInt32.to_int64 Constants.Epoch.size in
+    [%test_eq: int64] (diff_in_slots (!^0, !^5) (!^0, !^0)) 5L ;
+    [%test_eq: int64] (diff_in_slots (!^3, !^23) (!^3, !^20)) 3L ;
+    [%test_eq: int64] (diff_in_slots (!^4, !^4) (!^3, !^0)) (epoch_size + 4L) ;
+    [%test_eq: int64] (diff_in_slots (!^5, !^2) (!^4, !@(epoch_size - 3L))) 5L ;
+    [%test_eq: int64]
+      (diff_in_slots (!^6, !^42) (!^2, !^16))
+      ((epoch_size * 3L) + 42L + (epoch_size - 16L)) ;
+    [%test_eq: int64]
+      (diff_in_slots (!^2, !@(epoch_size - 1L)) (!^3, !^4))
+      (0L - 5L) ;
+    [%test_eq: int64]
+      (diff_in_slots (!^1, !^3) (!^7, !^27))
+      (0L - ((epoch_size * 5L) + (epoch_size - 3L) + 27L))
+
   let incr ((epoch, slot) : t * Slot.t) =
     let open UInt32 in
     if Slot.equal slot (sub Constants.Epoch.size one) then (add epoch one, zero)
@@ -2269,17 +2304,20 @@ let generate_transition ~(previous_protocol_state : Protocol_state.Value.t)
 
 let received_within_window (epoch, slot) ~time_received =
   let open Time in
+  let open Int64 in
+  let ( < ) x y = Pervasives.(compare x y < 0) in
+  let ( >= ) x y = Pervasives.(compare x y >= 0) in
   let time_received =
     of_span_since_epoch (Span.of_ms (Unix_timestamp.to_int64 time_received))
   in
-  let window_start = Epoch.slot_start_time epoch slot in
-  let window_end = add window_start Constants.delta_duration in
-  if window_start < time_received && time_received < window_end then Ok ()
-  else
-    Error
-      [ ("window_start", to_yojson window_start)
-      ; ("window_end", to_yojson window_end)
-      ; ("time_received", to_yojson time_received) ]
+  let slot_diff =
+    Epoch.diff_in_slots
+      (Epoch.epoch_and_slot_of_time_exn time_received)
+      (epoch, slot)
+  in
+  if slot_diff < 0L then Error `Too_early
+  else if slot_diff >= of_int Constants.delta then Error (`Too_late slot_diff)
+  else Ok ()
 
 let received_at_valid_time (consensus_state : Consensus_state.Value.t)
     ~time_received =

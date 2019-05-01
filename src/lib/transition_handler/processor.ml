@@ -17,6 +17,7 @@ open O1trace
 module Make (Inputs : Inputs.With_unprocessed_transition_cache.S) :
   Transition_handler_processor_intf
   with type state_hash := State_hash.t
+   and type trust_system := Trust_system.t
    and type time_controller := Inputs.Time.Controller.t
    and type external_transition_verified :=
               Inputs.External_transition.Verified.t
@@ -33,7 +34,7 @@ module Make (Inputs : Inputs.With_unprocessed_transition_cache.S) :
     Time.Span.of_ms
       (Consensus.Constants.block_window_duration_ms * 2 |> Int64.of_int)
 
-  let run ~logger ~time_controller ~frontier
+  let run ~logger ~trust_system ~time_controller ~frontier
       ~(primary_transition_reader :
          ( (External_transition.Verified.t, State_hash.t) With_hash.t
            Envelope.Incoming.t
@@ -65,7 +66,7 @@ module Make (Inputs : Inputs.With_unprocessed_transition_cache.S) :
          , unit Deferred.t )
          Writer.t) ~processed_transition_writer ~unprocessed_transition_cache =
     let catchup_scheduler =
-      Catchup_scheduler.create ~logger ~frontier ~time_controller
+      Catchup_scheduler.create ~logger ~trust_system ~frontier ~time_controller
         ~catchup_job_writer ~catchup_breadcrumbs_writer
         ~clean_up_signal:clean_up_catchup_scheduler
     in
@@ -132,63 +133,91 @@ module Make (Inputs : Inputs.With_unprocessed_transition_cache.S) :
                           transition frontier: %s"
                          (Error.to_string_hum err) )
                | `Valid_transition cached_transition -> (
-                 match
-                   Transition_frontier.find frontier
-                     (External_transition.Verified.parent_hash
-                        ( With_hash.data
-                        @@ Envelope.Incoming.data
-                             (Cached.peek cached_transition) ))
-                 with
-                 | None ->
-                     return
-                       (Catchup_scheduler.watch catchup_scheduler
-                          ~timeout_duration:catchup_timeout_duration
-                          ~cached_transition)
-                 | Some _ -> (
-                     match%map
-                       let open Deferred.Result.Let_syntax in
-                       let parent_hash =
-                         Cached.peek cached_transition
-                         |> Envelope.Incoming.data |> With_hash.data
-                         |> External_transition.Verified.parent_hash
-                       in
-                       let%bind parent =
-                         match
-                           Transition_frontier.find frontier parent_hash
-                         with
-                         | Some parent ->
-                             return parent
-                         | None ->
-                             Deferred.Or_error.error_string "parent not found"
-                       in
-                       let%bind breadcrumb =
-                         let open Deferred.Let_syntax in
-                         let%map cached_breadcrumb =
-                           Cached.transform cached_transition
-                             ~f:(fun transition_with_hash_enveloped ->
-                               let transition_with_hash =
-                                 Envelope.Incoming.data
-                                   transition_with_hash_enveloped
-                               in
-                               Transition_frontier.Breadcrumb.build ~logger
-                                 ~parent ~transition_with_hash )
-                           |> Cached.sequence_deferred
+                   let hash =
+                     With_hash.hash
+                       (Envelope.Incoming.data (Cached.peek cached_transition))
+                   in
+                   Logger.trace logger ~module_:__MODULE__ ~location:__LOC__
+                     ~metadata:[("state_hash", State_hash.to_yojson hash)]
+                     "begining to process external transition: $state_hash" ;
+                   match
+                     Transition_frontier.find frontier
+                       (External_transition.Verified.parent_hash
+                          ( With_hash.data
+                          @@ Envelope.Incoming.data
+                               (Cached.peek cached_transition) ))
+                   with
+                   | None ->
+                       return
+                         (Catchup_scheduler.watch catchup_scheduler
+                            ~timeout_duration:catchup_timeout_duration
+                            ~cached_transition)
+                   | Some _ -> (
+                       match%map
+                         let open Deferred.Result.Let_syntax in
+                         let parent_hash =
+                           Cached.peek cached_transition
+                           |> Envelope.Incoming.data |> With_hash.data
+                           |> External_transition.Verified.parent_hash
                          in
-                         match Cached.sequence_result cached_breadcrumb with
-                         | Error (`Validation_error e) ->
-                             (* TODO: Punish *) Error e
-                         | Error (`Fatal_error e) ->
-                             raise e
-                         | Ok b ->
-                             Ok b
-                       in
-                       add_and_finalize ~only_if_present:false breadcrumb
-                     with
-                     | Ok () ->
-                         ()
-                     | Error err ->
-                         Logger.error logger ~module_:__MODULE__
-                           ~location:__LOC__
-                           "error while adding transition: %s"
-                           (Error.to_string_hum err) ) ) ) ))
+                         let%bind parent =
+                           match
+                             Transition_frontier.find frontier parent_hash
+                           with
+                           | Some parent ->
+                               return parent
+                           | None ->
+                               Deferred.Or_error.error_string
+                                 "parent not found"
+                         in
+                         let%bind breadcrumb =
+                           let open Deferred.Let_syntax in
+                           let%bind cached_breadcrumb =
+                             Cached.transform cached_transition
+                               ~f:(fun transition_with_hash_enveloped ->
+                                 let transition_with_hash =
+                                   Envelope.Incoming.data
+                                     transition_with_hash_enveloped
+                                 in
+                                 let sender =
+                                   Envelope.Incoming.sender
+                                     transition_with_hash_enveloped
+                                 in
+                                 let%map breadcrumb_result =
+                                   Transition_frontier.Breadcrumb.build ~logger
+                                     ~parent ~transition_with_hash
+                                 in
+                                 Result.map_error breadcrumb_result
+                                   ~f:(fun error -> (sender, error)) )
+                             |> Cached.sequence_deferred
+                           in
+                           match Cached.sequence_result cached_breadcrumb with
+                           | Error (sender, `Invalid_staged_ledger_hash error)
+                           | Error (sender, `Invalid_staged_ledger_diff error)
+                             ->
+                               let%map () =
+                                 Trust_system.record_envelope_sender
+                                   trust_system logger sender
+                                   ( Trust_system.Actions
+                                     .Gossiped_invalid_transition
+                                   , Some
+                                       ( sprintf "invalid staged ledger: %s"
+                                           (Error.to_string_hum error)
+                                       , [] ) )
+                               in
+                               Error error
+                           | Error (_sender, `Fatal_error error) ->
+                               raise error
+                           | Ok breadcrumb ->
+                               return (Ok breadcrumb)
+                         in
+                         add_and_finalize ~only_if_present:false breadcrumb
+                       with
+                       | Ok () ->
+                           ()
+                       | Error err ->
+                           Logger.error logger ~module_:__MODULE__
+                             ~location:__LOC__
+                             "error while adding transition: %s"
+                             (Error.to_string_hum err) ) ) ) ))
 end
