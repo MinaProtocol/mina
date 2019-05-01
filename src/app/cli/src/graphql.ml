@@ -211,15 +211,6 @@ module Make (Commands : Coda_commands.Intf) = struct
             ] )
     end
 
-    let peer =
-      obj "Peer" ~fields:(fun _ ->
-          [ field "host" ~typ:(non_null string) ~doc:"Host name of peer"
-              ~args:Arg.[]
-              ~resolve:(fun _ {Host_and_port.host; _} -> host)
-          ; field "port" ~typ:(non_null int) ~doc:"Port of peer"
-              ~args:Arg.[]
-              ~resolve:(fun _ {Host_and_port.port; _} -> port) ] )
-
     let snark_worker =
       obj "SnarkWorker" ~fields:(fun _ ->
           [ field "key" ~typ:(non_null string)
@@ -380,11 +371,14 @@ module Make (Commands : Coda_commands.Intf) = struct
     let initial_peers =
       field "initialPeers"
         ~doc:
-          "The first peers that a user syncs with is an inidication of \
+          "The initial peers that a client syncs with is an inidication of \
            specifically the network they are in"
         ~args:Arg.[]
-        ~typ:(non_null @@ list @@ non_null Types.peer)
-        ~resolve:(fun {ctx= coda; _} () -> Program.initial_peers coda)
+        ~typ:(non_null @@ list @@ non_null string)
+        ~resolve:(fun {ctx= coda; _} () ->
+          List.map (Program.initial_peers coda)
+            ~f:(fun {Host_and_port.host; port} -> sprintf !"%s:%i" host port)
+          )
 
     let commands =
       [ sync_state
