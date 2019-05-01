@@ -107,7 +107,7 @@ def random_curve_point():
     return (x, y)
 
 params0 = [ random_curve_point() for _ in range(10) ]
-print ('done')
+print ('done generating base-points')
 params = []
 
 def point_add(P1, P2):
@@ -136,7 +136,7 @@ for P in params0:
         params.append(Q)
         Q = point_sixteen_times(Q)
 
-print ('done')
+print ('done generating all pedersen parameters')
 
 # p = 4x^2 + 1
 # x =  2^13 * 3 * 5^2 * 7 * 812042190598814369278464271 * 14652487457434080047781531290587846082350961711966140037946846663231932006768257
