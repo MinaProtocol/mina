@@ -862,10 +862,44 @@ module Make (Inputs : Inputs_intf) = struct
             don't_wait_for
               (Strict_pipe.Reader.iter_without_pushback
                  valid_transitions_for_network ~f:(fun transition_with_hash ->
-                   (* remove verified status for network broadcast *)
-                   Net.broadcast_state net
-                     (External_transition.of_verified
-                        (With_hash.data transition_with_hash)) )) ;
+                   let hash = With_hash.hash transition_with_hash in
+                   let consensus_state =
+                     With_hash.data transition_with_hash
+                     |> External_transition.Verified.protocol_state
+                     |> Consensus_mechanism.Protocol_state.consensus_state
+                   in
+                   let now =
+                     let open Time in
+                     now config.time_controller |> to_span_since_epoch
+                     |> Span.to_ms
+                   in
+                   if
+                     Ok ()
+                     = Consensus_mechanism.received_at_valid_time
+                         ~time_received:now consensus_state
+                   then (
+                     Logger.trace config.logger ~module_:__MODULE__
+                       ~location:__LOC__
+                       ~metadata:
+                         [ ("state_hash", Protocol_state_hash.to_yojson hash)
+                         ; ( "external_transition"
+                           , External_transition.Verified.to_yojson
+                               (With_hash.data transition_with_hash) ) ]
+                       "broadcasting $state_hash" ;
+                     (* remove verified status for network broadcast *)
+                     Net.broadcast_state net
+                       (External_transition.of_verified
+                          (With_hash.data transition_with_hash)) )
+                   else
+                     Logger.warn config.logger ~module_:__MODULE__
+                       ~location:__LOC__
+                       ~metadata:
+                         [ ("state_hash", Protocol_state_hash.to_yojson hash)
+                         ; ( "external_transition"
+                           , External_transition.Verified.to_yojson
+                               (With_hash.data transition_with_hash) ) ]
+                       "refusing to broadcast $state_hash becuase it is too \
+                        late" )) ;
             don't_wait_for
               (Strict_pipe.transfer (Net.states net)
                  external_transitions_writer ~f:ident) ;
