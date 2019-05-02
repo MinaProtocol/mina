@@ -253,87 +253,57 @@ module Make (Inputs : Inputs_intf) :
     ; proposer
     ; coinbase }
 
+  let to_hlist
+      { Poly.blockchain_state
+      ; consensus_data
+      ; sok_digest
+      ; supply_increase
+      ; ledger_proof
+      ; proposer
+      ; coinbase } =
+    Snarky.H_list.
+      [ blockchain_state
+      ; consensus_data
+      ; sok_digest
+      ; supply_increase
+      ; ledger_proof
+      ; proposer
+      ; coinbase ]
+
+  let of_hlist
+      ([ blockchain_state
+       ; consensus_data
+       ; sok_digest
+       ; supply_increase
+       ; ledger_proof
+       ; proposer
+       ; coinbase ] :
+        (unit, _) Snarky.H_list.t) =
+    { Poly.blockchain_state
+    ; consensus_data
+    ; sok_digest
+    ; supply_increase
+    ; ledger_proof
+    ; proposer
+    ; coinbase }
+
   let typ =
     let open Snark_params.Tick.Typ in
-    let store
-        { Poly.blockchain_state
-        ; consensus_data
-        ; sok_digest
-        ; supply_increase
-        ; ledger_proof
-        ; proposer
-        ; coinbase } =
-      let open Store.Let_syntax in
-      let%map blockchain_state = Blockchain_state.typ.store blockchain_state
-      and consensus_data = Consensus_data.typ.store consensus_data
-      and sok_digest = Sok_message.Digest.typ.store sok_digest
-      and supply_increase = Currency.Amount.typ.store supply_increase
-      and proposer = Signature_lib.Public_key.Compressed.typ.store proposer
-      and coinbase = Currency.Amount.typ.store coinbase in
-      { Poly.blockchain_state
-      ; consensus_data
-      ; sok_digest
-      ; supply_increase
+    let ledger_proof =
+      { store= Store.return
+      ; read= Read.return
+      ; check= (fun _ -> Snark_params.Tick.Checked.return ())
+      ; alloc= Alloc.return None }
+    in
+    of_hlistable ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist
+      ~value_to_hlist:to_hlist ~value_of_hlist:of_hlist
+      [ Blockchain_state.typ
+      ; Consensus_data.typ
+      ; Sok_message.Digest.typ
+      ; Currency.Amount.typ
       ; ledger_proof
-      ; proposer
-      ; coinbase }
-    in
-    let read
-        { Poly.blockchain_state
-        ; consensus_data
-        ; sok_digest
-        ; supply_increase
-        ; ledger_proof
-        ; proposer
-        ; coinbase } =
-      let open Read.Let_syntax in
-      let%map blockchain_state = Blockchain_state.typ.read blockchain_state
-      and consensus_data = Consensus_data.typ.read consensus_data
-      and sok_digest = Sok_message.Digest.typ.read sok_digest
-      and supply_increase = Currency.Amount.typ.read supply_increase
-      and proposer = Signature_lib.Public_key.Compressed.typ.read proposer
-      and coinbase = Currency.Amount.typ.read coinbase in
-      { Poly.blockchain_state
-      ; consensus_data
-      ; sok_digest
-      ; supply_increase
-      ; ledger_proof
-      ; proposer
-      ; coinbase }
-    in
-    let check
-        { Poly.blockchain_state
-        ; consensus_data
-        ; sok_digest
-        ; supply_increase
-        ; ledger_proof= _
-        ; proposer
-        ; coinbase } =
-      let open Snark_params.Tick in
-      let%map () = Blockchain_state.typ.check blockchain_state
-      and () = Consensus_data.typ.check consensus_data
-      and () = Sok_message.Digest.typ.check sok_digest
-      and () = Currency.Amount.typ.check supply_increase
-      and () = Signature_lib.Public_key.Compressed.typ.check proposer in
-      ()
-    in
-    let alloc =
-      let open Alloc.Let_syntax in
-      let%map blockchain_state = Blockchain_state.typ.alloc
-      and consensus_data = Consensus_data.typ.alloc
-      and sok_digest = Sok_message.Digest.typ.alloc
-      and supply_increase = Currency.Amount.typ.alloc
-      and proposer = Signature_lib.Public_key.Compressed.typ.alloc
-      and coinbase = Currency.Amount.typ.alloc in
-      { Poly.blockchain_state
-      ; consensus_data
-      ; sok_digest
-      ; supply_increase
-      ; ledger_proof= None
-      ; proposer
-      ; coinbase }
-    in
-    {Snarky.Types.Typ.store; read; check; alloc}
+      ; Signature_lib.Public_key.Compressed.typ
+      ; Currency.Amount.typ ]
 
   let genesis =
     { Poly.blockchain_state= Blockchain_state.genesis
