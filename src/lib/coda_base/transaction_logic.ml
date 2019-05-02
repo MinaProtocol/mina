@@ -32,6 +32,7 @@ module type S = sig
               }
           | Stake_delegation of
               { previous_delegate: Public_key.Compressed.Stable.V1.t }
+          | Chain_voting
         [@@deriving sexp]
 
         module Stable :
@@ -245,6 +246,7 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
                         Public_key.Compressed.Stable.V1.t list }
                 | Stake_delegation of
                     { previous_delegate: Public_key.Compressed.Stable.V1.t }
+                | Chain_voting
               [@@deriving sexp, bin_io, version]
             end
 
@@ -271,6 +273,7 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
               }
           | Stake_delegation of
               { previous_delegate: Public_key.Compressed.Stable.V1.t }
+          | Chain_voting
         [@@deriving sexp]
       end
 
@@ -494,6 +497,9 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
           set ledger receiver_location
             {receiver_account with balance= receiver_balance'} ;
           undo previous_empty_accounts
+    | Chain_voting hash ->
+        set ledger sender_location {sender_account with voting_for= hash} ;
+        return {Undo.User_command_undo.common; body= Chain_voting}
 
   let apply_user_command ledger
       (user_command : User_command.With_valid_signature.t) =

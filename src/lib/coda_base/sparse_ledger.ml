@@ -157,6 +157,8 @@ let apply_user_command_exn t ({sender; payload; signature= _} : User_command.t)
           balance=
             Option.value_exn
               (Balance.add_amount receiver_account.balance amount) }
+  | Chain_voting hash ->
+      set_exn t sender_idx {sender_account with voting_for= hash}
 
 let apply_fee_transfer_exn =
   let apply_single t ((pk, fee) : Fee_transfer.Single.t) =

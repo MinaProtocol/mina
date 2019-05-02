@@ -72,6 +72,8 @@ struct
             Some (Currency.Amount.of_fee fee)
         | Payment {amount; _} ->
             Currency.Amount.add_fee amount fee
+        | Chain_voting _ ->
+            Some (Currency.Amount.of_fee fee)
       in
       Currency.Balance.sub_amount account.Account.Poly.balance cost
     in

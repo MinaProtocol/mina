@@ -108,6 +108,7 @@ module Body = struct
         type t =
           | Payment of Payment_payload.Stable.V1.t
           | Stake_delegation of Stake_delegation.Stable.V1.t
+          | Chain_voting of State_hash.Stable.V1.t
         [@@deriving bin_io, eq, sexp, hash, yojson, version]
       end
 
@@ -131,11 +132,14 @@ module Body = struct
   type t = Stable.Latest.t =
     | Payment of Payment_payload.Stable.V1.t
     | Stake_delegation of Stake_delegation.Stable.V1.t
+    | Chain_voting of State_hash.Stable.V1.t
   [@@deriving eq, sexp, hash, yojson]
 
   let max_variant_size =
     List.reduce_exn ~f:Int.max
-      [Payment_payload.length_in_triples; Stake_delegation.length_in_triples]
+      [ Payment_payload.length_in_triples
+      ; Stake_delegation.length_in_triples
+      ; State_hash.length_in_triples ]
 
   module Tag = Transaction_union_tag
 
@@ -147,11 +151,15 @@ module Body = struct
           Tag.fold Stake_delegation +> Stake_delegation.fold d
           +> Fold.init (max_variant_size - Stake_delegation.length_in_triples)
                ~f:(fun _ -> (false, false, false)))
+    | Chain_voting hash ->
+        Fold.(Tag.fold Chain_voting +> State_hash.fold hash)
 
   let sender_cost = function
     | Payment {amount; _} ->
         amount
     | Stake_delegation _ ->
+        Currency.Amount.zero
+    | Chain_voting _ ->
         Currency.Amount.zero
 
   let length_in_triples = Tag.length_in_triples + max_variant_size
@@ -223,13 +231,21 @@ let memo (t : t) = t.common.memo
 let body (t : t) = t.body
 
 let is_payment (t : t) =
-  match t.body with Payment _ -> true | Stake_delegation _ -> false
+  match t.body with
+  | Payment _ ->
+      true
+  | Stake_delegation _ ->
+      false
+  | Chain_voting _ ->
+      false
 
 let accounts_accessed (t : t) =
   match t.body with
   | Payment payload ->
       [payload.receiver]
   | Stake_delegation _ ->
+      []
+  | Chain_voting _ ->
       []
 
 let dummy : t =

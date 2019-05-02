@@ -42,6 +42,8 @@ module Body = struct
              amount - fee should be defined. In other words,
              amount >= fee *)
             (Amount.of_fee fee, Amount.max_int)
+        | Chain_voting ->
+            (Amount.zero, max_amount_without_overflow)
       in
       Amount.gen_incl min max
     and public_key = Public_key.Compressed.gen in
@@ -69,6 +71,10 @@ module Body = struct
     | Stake_delegation (Set_delegate {new_delegate}) ->
         { tag= Tag.Stake_delegation
         ; public_key= new_delegate
+        ; amount= Currency.Amount.zero }
+    | Chain_voting _ ->
+        { tag= Tag.Chain_voting
+        ; public_key= (* TODO: What's the public_key here? *) failwith "todo"
         ; amount= Currency.Amount.zero }
 
   module Checked = struct
@@ -171,6 +177,13 @@ module Changes = struct
         ; excess= Amount.Signed.of_unsigned (Amount.of_fee fee)
         ; supply_increase= Amount.zero }
     | Stake_delegation ->
+        { sender_delta=
+            Amount.of_fee fee |> Amount.Signed.of_unsigned
+            |> Amount.Signed.negate
+        ; receiver_increase= Amount.zero
+        ; excess= Amount.Signed.of_unsigned (Amount.of_fee fee)
+        ; supply_increase= Amount.zero }
+    | Chain_voting ->
         { sender_delta=
             Amount.of_fee fee |> Amount.Signed.of_unsigned
             |> Amount.Signed.negate
@@ -312,13 +325,15 @@ let excess (payload : t) : Amount.Signed.t =
       |> Amount.Signed.of_unsigned |> Amount.Signed.negate
   | Coinbase ->
       Amount.Signed.zero
+  | Chain_voting ->
+      Amount.Signed.of_unsigned (Amount.of_fee fee)
 
 let supply_increase (payload : payload) =
   let tag = payload.body.tag in
   match tag with
   | Coinbase ->
       payload.body.amount
-  | Payment | Stake_delegation | Fee_transfer ->
+  | Payment | Stake_delegation | Fee_transfer | Chain_voting ->
       Amount.zero
 
 let%test_unit "fold_compatibility" =

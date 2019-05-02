@@ -8,6 +8,7 @@ module Body : sig
   type t =
     | Payment of Payment_payload.Stable.V1.t
     | Stake_delegation of Stake_delegation.Stable.V1.t
+    | Chain_voting of State_hash.Stable.V1.t
   [@@deriving eq, sexp, hash, yojson]
 
   module Stable : sig

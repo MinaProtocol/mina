@@ -67,7 +67,8 @@ module Make (Commands : Coda_commands.Intf) = struct
                     receiver |> Stringable.public_key
                 | Stake_delegation _ ->
                     failwith "Payment should not consist of a stake delegation"
-                )
+                | Chain_voting _ ->
+                    failwith "Payment should not consist of a chain voting" )
           ; uint64_field "amount" ~doc:"Amount that sender send to receiver"
               ~args:Arg.[]
               ~resolve:(fun _ payment ->
@@ -78,7 +79,8 @@ module Make (Commands : Coda_commands.Intf) = struct
                     amount |> Currency.Amount.to_uint64 |> Stringable.uint64
                 | Stake_delegation _ ->
                     failwith "Payment should not consist of a stake delegation"
-                )
+                | Chain_voting _ ->
+                    failwith "Payment should not consist of a chain voting" )
           ; uint64_field "fee"
               ~doc:
                 "Fee that sender is willing to pay for making the transaction"
