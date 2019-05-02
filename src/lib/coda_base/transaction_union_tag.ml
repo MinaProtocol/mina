@@ -10,33 +10,26 @@ let gen =
   Quickcheck.Generator.map (Int.gen_incl min max) ~f:(fun i ->
       Option.value_exn (of_enum i) )
 
-type var = Boolean.var * Boolean.var * Boolean.var
+type var = Boolean.var Triple.t
 
-let to_bits = function
-  | Payment ->
-      (false, false, false)
-  | Stake_delegation ->
-      (true, false, false)
-  | Fee_transfer ->
-      (false, true, false)
-  | Coinbase ->
-      (true, true, false)
-  | Chain_voting ->
-      (false, false, true)
+let nth_bit : int -> int -> bool = fun n i -> (n lsr i) land 1 = 1
 
-let of_bits = function
-  | false, false, false ->
-      Payment
-  | true, false, false ->
-      Stake_delegation
-  | false, true, false ->
-      Fee_transfer
-  | true, true, false ->
-      Coinbase
-  | false, false, true ->
-      Chain_voting
+let triple_to_list (x0, x1, x2) = [x0; x1; x2]
+
+let list_to_triple = function
+  | [x0; x1; x2] ->
+      (x0, x1, x2)
   | _ ->
-      failwith "unrecognized bits"
+      failwith "expected a list of length 3"
+
+let to_bits tag = List.init 3 ~f:(nth_bit (to_enum tag)) |> list_to_triple
+
+let of_bits bits =
+  Option.value_exn
+    ~error:(Error.of_string "unrecognized bits")
+    ( List.fold (triple_to_list bits) ~init:0 ~f:(fun acc b ->
+          (2 * acc) + Bool.to_int b )
+    |> of_enum )
 
 let%test_unit "to_bool of_bool inv" =
   let open Quickcheck in
@@ -66,15 +59,21 @@ module Checked = struct
 
   (* someday: Make these all cached *)
 
-  let is_payment (b0, b1, b2) = Boolean.(all [not b0; not b1; not b2])
+  let is tag triple =
+    let xs = List.map (triple_to_list (to_bits tag)) ~f:Boolean.var_of_value in
+    let ys = triple_to_list triple in
+    let open Checked in
+    Core.List.map2_exn xs ys ~f:Boolean.equal |> Checked.all >>= Boolean.all
 
-  let is_fee_transfer (b0, b1, b2) = Boolean.(all [not b0; b1; not b2])
+  let is_payment = is Payment
 
-  let is_stake_delegation (b0, b1, b2) = Boolean.(all [b0; not b1; not b2])
+  let is_fee_transfer = is Fee_transfer
 
-  let is_coinbase (b0, b1, b2) = Boolean.(all [b0; b1; not b2])
+  let is_stake_delegation = is Stake_delegation
 
-  let is_chain_voting (b0, b1, b2) = Boolean.(all [not b0; not b1; b2])
+  let is_coinbase = is Coinbase
+
+  let is_chain_voting = is Chain_voting
 
   let is_user_command bs =
     let%bind payment = is_payment bs
