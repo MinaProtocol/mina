@@ -182,7 +182,14 @@ module Make (Message : Message_intf) : S with type msg := Message.msg = struct
                       (Outgoing_connection_error, Some ("handshake error", [])))
               in
               remove_peer t peer ; Error err
-          | Async_rpc_kernel.Rpc_error.Rpc (Connection_closed, _), _ ->
+          | ( _
+            , Sexp.List
+                [ Sexp.List
+                    [ Sexp.Atom "rpc_error"
+                    ; Sexp.List [Sexp.Atom "Connection_closed"; _] ]
+                ; _connection_description
+                ; _rpc_tag
+                ; _rpc_version ] ) ->
               let%map () =
                 Trust_system.(
                   record t.trust_system t.logger peer.host
