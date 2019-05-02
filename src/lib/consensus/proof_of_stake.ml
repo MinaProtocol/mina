@@ -252,8 +252,8 @@ module Data = struct
       in
       (epoch, slot)
 
-    let diff_in_slots ((epoch, slot) : t * Slot.t) ((epoch', slot') : t * Slot.t)
-        : int64 =
+    let diff_in_slots ((epoch, slot) : t * Slot.t)
+        ((epoch', slot') : t * Slot.t) : int64 =
       let ( < ) x y = Pervasives.(Int64.compare x y < 0) in
       let ( > ) x y = Pervasives.(Int64.compare x y > 0) in
       let open Int64.Infix in
@@ -276,7 +276,9 @@ module Data = struct
       [%test_eq: int64] (diff_in_slots (!^0, !^5) (!^0, !^0)) 5L ;
       [%test_eq: int64] (diff_in_slots (!^3, !^23) (!^3, !^20)) 3L ;
       [%test_eq: int64] (diff_in_slots (!^4, !^4) (!^3, !^0)) (epoch_size + 4L) ;
-      [%test_eq: int64] (diff_in_slots (!^5, !^2) (!^4, !@(epoch_size - 3L))) 5L ;
+      [%test_eq: int64]
+        (diff_in_slots (!^5, !^2) (!^4, !@(epoch_size - 3L)))
+        5L ;
       [%test_eq: int64]
         (diff_in_slots (!^6, !^42) (!^2, !^16))
         ((epoch_size * 3L) + 42L + (epoch_size - 16L)) ;
@@ -289,7 +291,8 @@ module Data = struct
 
     let incr ((epoch, slot) : t * Slot.t) =
       let open UInt32 in
-      if Slot.equal slot (sub Constants.Epoch.size one) then (add epoch one, zero)
+      if Slot.equal slot (sub Constants.Epoch.size one) then
+        (add epoch one, zero)
       else (epoch, add slot one)
   end
 
@@ -1821,14 +1824,18 @@ module Data = struct
       ; has_ancestor_in_same_checkpoint_window= false
       ; checkpoints= Checkpoints.empty }
 
-    let create_genesis ~negative_one_protocol_state_hash : Value.t =
+    let create_genesis_from_transition ~negative_one_protocol_state_hash
+        ~consensus_transition : Value.t =
       Or_error.ok_exn
         (update ~proposer_vrf_result:Vrf.Precomputed.vrf_output
            ~previous_consensus_state:negative_one
            ~previous_protocol_state_hash:negative_one_protocol_state_hash
-           ~consensus_transition:Consensus_transition.genesis
-           ~supply_increase:Currency.Amount.zero
+           ~consensus_transition ~supply_increase:Currency.Amount.zero
            ~snarked_ledger_hash:genesis_ledger_hash)
+
+    let create_genesis ~negative_one_protocol_state_hash : Value.t =
+      create_genesis_from_transition ~negative_one_protocol_state_hash
+        ~consensus_transition:Consensus_transition.genesis
 
     (* Check that both epoch and slot are zero.
     *)
@@ -2261,62 +2268,62 @@ module Hooks = struct
       | ls ->
           Non_empty_list.of_list_opt ls )
 
-let sync_local_state ~logger ~trust_system ~local_state ~random_peers
-    ~(query_peer : Network_peer.query_peer) requested_syncs =
-  let open Local_state in
-  let open Snapshot in
-  let open Deferred.Let_syntax in
-  let requested_syncs = Non_empty_list.to_list requested_syncs in
-  Logger.info logger "syncing local state, %d jobs"
-    (List.length requested_syncs)
-    ~location:__LOC__ ~module_:__MODULE__
-    ~metadata:
-      [ ( "requested_syncs"
-        , `List (List.map requested_syncs ~f:local_state_sync_to_yojson) )
-      ; ("local_state", Local_state.to_yojson local_state) ] ;
-  let sync {snapshot_id; expected_root= target_ledger_hash} =
-    Deferred.List.exists (random_peers 3) ~f:(fun peer ->
-        match%bind
-          query_peer.query peer Rpcs.Get_epoch_ledger.dispatch_multi
-            (Coda_base.Frozen_ledger_hash.to_ledger_hash target_ledger_hash)
-        with
-        | Ok (Ok snapshot_ledger) ->
-            let%bind () =
-              Trust_system.(
-                record trust_system logger peer.host
-                  Actions.(Epoch_ledger_provided, None))
-            in
-            let delegators =
-              Option.map local_state.proposer_public_key ~f:(fun pk ->
-                  compute_delegators
-                    (`Include_self, pk)
-                    ~iter_accounts:(fun f ->
-                      Coda_base.Sparse_ledger.iteri snapshot_ledger ~f ) )
-              |> Option.value
-                   ~default:(Coda_base.Account.Index.Table.create ())
-            in
-            set_snapshot local_state snapshot_id
-              (Some {ledger= snapshot_ledger; delegators}) ;
-            return true
-        | Ok (Error err) ->
-            Logger.faulty_peer_without_punishment logger ~module_:__MODULE__
-              ~location:__LOC__
-              ~metadata:
-                [ ("peer", Network_peer.Peer.to_yojson peer)
-                ; ("error", `String err) ]
-              "peer $peer failed to serve requested epoch ledger: $error" ;
-            return false
-        | Error err ->
-            Logger.faulty_peer_without_punishment logger ~module_:__MODULE__
-              ~location:__LOC__
-              ~metadata:
-                [ ("peer", Network_peer.Peer.to_yojson peer)
-                ; ("error", `String (Error.to_string_hum err)) ]
-              "error querying peer $peer: $error" ;
-            return false )
-  in
-  if%map Deferred.List.for_all requested_syncs ~f:sync then Ok ()
-  else Error (Error.of_string "failed to synchronize epoch ledger")
+  let sync_local_state ~logger ~trust_system ~local_state ~random_peers
+      ~(query_peer : Network_peer.query_peer) requested_syncs =
+    let open Local_state in
+    let open Snapshot in
+    let open Deferred.Let_syntax in
+    let requested_syncs = Non_empty_list.to_list requested_syncs in
+    Logger.info logger "syncing local state, %d jobs"
+      (List.length requested_syncs)
+      ~location:__LOC__ ~module_:__MODULE__
+      ~metadata:
+        [ ( "requested_syncs"
+          , `List (List.map requested_syncs ~f:local_state_sync_to_yojson) )
+        ; ("local_state", Local_state.to_yojson local_state) ] ;
+    let sync {snapshot_id; expected_root= target_ledger_hash} =
+      Deferred.List.exists (random_peers 3) ~f:(fun peer ->
+          match%bind
+            query_peer.query peer Rpcs.Get_epoch_ledger.dispatch_multi
+              (Coda_base.Frozen_ledger_hash.to_ledger_hash target_ledger_hash)
+          with
+          | Ok (Ok snapshot_ledger) ->
+              let%bind () =
+                Trust_system.(
+                  record trust_system logger peer.host
+                    Actions.(Epoch_ledger_provided, None))
+              in
+              let delegators =
+                Option.map local_state.proposer_public_key ~f:(fun pk ->
+                    compute_delegators
+                      (`Include_self, pk)
+                      ~iter_accounts:(fun f ->
+                        Coda_base.Sparse_ledger.iteri snapshot_ledger ~f ) )
+                |> Option.value
+                     ~default:(Coda_base.Account.Index.Table.create ())
+              in
+              set_snapshot local_state snapshot_id
+                (Some {ledger= snapshot_ledger; delegators}) ;
+              return true
+          | Ok (Error err) ->
+              Logger.faulty_peer_without_punishment logger ~module_:__MODULE__
+                ~location:__LOC__
+                ~metadata:
+                  [ ("peer", Network_peer.Peer.to_yojson peer)
+                  ; ("error", `String err) ]
+                "peer $peer failed to serve requested epoch ledger: $error" ;
+              return false
+          | Error err ->
+              Logger.faulty_peer_without_punishment logger ~module_:__MODULE__
+                ~location:__LOC__
+                ~metadata:
+                  [ ("peer", Network_peer.Peer.to_yojson peer)
+                  ; ("error", `String (Error.to_string_hum err)) ]
+                "error querying peer $peer: $error" ;
+              return false )
+    in
+    if%map Deferred.List.for_all requested_syncs ~f:sync then Ok ()
+    else Error (Error.of_string "failed to synchronize epoch ledger")
 
   let received_within_window (epoch, slot) ~time_received =
     let open Time in
@@ -2332,14 +2339,15 @@ let sync_local_state ~logger ~trust_system ~local_state ~random_peers
         (epoch, slot)
     in
     if slot_diff < 0L then Error `Too_early
-    else if slot_diff >= of_int Constants.delta then Error (`Too_late slot_diff)
+    else if slot_diff >= of_int Constants.delta then
+      Error (`Too_late slot_diff)
     else Ok ()
 
-let received_at_valid_time (consensus_state : Consensus_state.Value.t)
-    ~time_received =
-  received_within_window
-    (consensus_state.curr_epoch, consensus_state.curr_slot)
-    ~time_received
+  let received_at_valid_time (consensus_state : Consensus_state.Value.t)
+      ~time_received =
+    received_within_window
+      (consensus_state.curr_epoch, consensus_state.curr_slot)
+      ~time_received
 
   let select ~existing ~candidate ~logger =
     let string_of_choice = function `Take -> "Take" | `Keep -> "Keep" in
@@ -2599,15 +2607,14 @@ let received_at_valid_time (consensus_state : Consensus_state.Value.t)
     recieved_time |> Time.to_span_since_epoch |> Time.Span.to_ms
     |> Unix_timestamp.of_int64
 
-  (* TODO
   let%test "Receive a valid consensus_state with a bit of delay" =
     let ({curr_epoch; curr_slot; _} : Consensus_state.Value.t) =
-      Consensus_state.genesis
+      Consensus_state.negative_one
     in
     let delay = Constants.delta / 2 |> UInt32.of_int in
     let new_slot = UInt32.Infix.(curr_slot + delay) in
     let time_received = Epoch.slot_start_time curr_epoch new_slot in
-    received_at_valid_time Consensus_state.genesis
+    received_at_valid_time Consensus_state.negative_one
       ~time_received:(to_unix_timestamp time_received)
     |> Result.is_ok
 
@@ -2615,8 +2622,10 @@ let received_at_valid_time (consensus_state : Consensus_state.Value.t)
     let epoch = Epoch.of_int 5 in
     let start_time = Epoch.start_time epoch in
     let curr_epoch, curr_slot = Epoch.epoch_and_slot_of_time_exn start_time in
-    let consensus_state = {Consensus_state.genesis with curr_epoch; curr_slot} in
-    let too_early = Epoch.start_time Consensus_state.genesis.curr_slot in
+    let consensus_state =
+      {Consensus_state.negative_one with curr_epoch; curr_slot}
+    in
+    let too_early = Epoch.start_time Consensus_state.negative_one.curr_slot in
     let too_late =
       let delay = Constants.delta * 2 |> UInt32.of_int in
       let delayed_slot = UInt32.Infix.(curr_slot + delay) in
@@ -2628,7 +2637,6 @@ let received_at_valid_time (consensus_state : Consensus_state.Value.t)
           ( received_at_valid_time consensus_state
               ~time_received:(to_unix_timestamp time)
           |> Result.is_ok ) )
-  *)
 
   module type State_hooks_intf =
     Intf.State_hooks_intf
@@ -2673,8 +2681,8 @@ let received_at_valid_time (consensus_state : Consensus_state.Value.t)
      and type snark_transition_var := Snark_transition.var = struct
     (* TODO: only track total currency from accounts > 1% of the currency using transactions *)
     let generate_transition ~(previous_protocol_state : Protocol_state.Value.t)
-        ~blockchain_state ~time ~proposal_data ~transactions:_ ~snarked_ledger_hash
-        ~supply_increase ~logger:_ =
+        ~blockchain_state ~time ~proposal_data ~transactions:_
+        ~snarked_ledger_hash ~supply_increase ~logger:_ =
       let previous_consensus_state =
         Protocol_state.consensus_state previous_protocol_state
       in
@@ -2682,13 +2690,11 @@ let received_at_valid_time (consensus_state : Consensus_state.Value.t)
         let time = Time.of_span_since_epoch (Time.Span.of_ms time) in
         Epoch.epoch_and_slot_of_time_exn time
       in
-      let consensus_transition_data =
-        Consensus_transition_data.Poly.{epoch; slot}
-      in
+      let consensus_transition = Consensus_transition.Poly.{epoch; slot} in
       let consensus_state =
         Or_error.ok_exn
           (Consensus_state.update ~previous_consensus_state
-             ~consensus_transition_data
+             ~consensus_transition
              ~proposer_vrf_result:proposal_data.Proposal_data.vrf_result
              ~previous_protocol_state_hash:
                (Protocol_state.hash previous_protocol_state)
@@ -2699,7 +2705,7 @@ let received_at_valid_time (consensus_state : Consensus_state.Value.t)
           ~previous_state_hash:(Protocol_state.hash previous_protocol_state)
           ~blockchain_state ~consensus_state
       in
-      (protocol_state, consensus_transition_data)
+      (protocol_state, consensus_transition)
 
     include struct
       let%snarkydef next_state_checked ~(prev_state : Protocol_state.var)
@@ -2715,22 +2721,6 @@ let received_at_valid_time (consensus_state : Consensus_state.Value.t)
     end
 
     module For_tests = struct
-      (* TODO
-      let create_genesis_protocol_state ledger =
-        let consensus_data = Snark_transition.(consensus_data genesis) in
-        let root_ledger_hash = Coda_base.Ledger.merkle_root ledger in
-        create_genesis_protocol_state consensus_data
-          { Blockchain_state.genesis with
-            staged_ledger_hash=
-              Coda_base.Staged_ledger_hash.(
-                of_aux_ledger_and_coinbase_hash Aux_hash.dummy root_ledger_hash
-                  (Coda_base.Pending_coinbase.create () |> Or_error.ok_exn))
-          ; snarked_ledger_hash=
-              Coda_base.Frozen_ledger_hash.of_ledger_hash root_ledger_hash }
-      *)
-
-      let create_genesis_protocol_state _ = failwith "TODO"
-
       let gen_consensus_state
           ~(gen_slot_advancement : int Quickcheck.Generator.t) :
           (   previous_protocol_state:( Protocol_state.Value.t
@@ -2803,30 +2793,28 @@ let time_hum (now : Core_kernel.Time.t) =
   Printf.sprintf "%d:%d" (Data.Epoch.to_int epoch)
     (Data.Epoch.Slot.to_int slot)
 
-(* TODO
 let%test_module "Proof of stake tests" =
   ( module struct
+    open Coda_base
     open Data
     open Consensus_state
 
     let%test_unit "update, update_var agree starting from same genesis state" =
       (* build pieces needed to apply "update" *)
-      let previous_protocol_state = genesis_protocol_state in
       let snarked_ledger_hash =
-        previous_protocol_state |> With_hash.data
-        |> Protocol_state.blockchain_state
-        |> Protocol_state.Blockchain_state.snarked_ledger_hash
+        Frozen_ledger_hash.of_ledger_hash (Ledger.merkle_root Genesis_ledger.t)
       in
-      let previous_consensus_state = genesis in
+      let previous_protocol_state_hash = State_hash.(of_hash zero) in
+      let previous_consensus_state =
+        Consensus_state.create_genesis
+          ~negative_one_protocol_state_hash:previous_protocol_state_hash
+      in
       let epoch, slot =
         Epoch.epoch_and_slot_of_time_exn
           (Time.of_time (Core_kernel.Time.now ()))
       in
       let consensus_transition : Consensus_transition.Value.t =
         {Consensus_transition.Poly.epoch; slot}
-      in
-      let previous_protocol_state_hash =
-        With_hash.hash previous_protocol_state
       in
       let supply_increase = Currency.Amount.of_int 42 in
       (* setup ledger, needed to compute proposer_vrf_result here and handler below *)
@@ -2903,4 +2891,3 @@ let%test_module "Proof of stake tests" =
       assert (Value.equal checked_value next_consensus_state) ;
       ()
   end )
-*)

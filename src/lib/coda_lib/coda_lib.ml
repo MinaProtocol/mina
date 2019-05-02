@@ -260,7 +260,9 @@ module type State_with_witness_intf = sig
 end
 
 module type Inputs_intf = sig
-  include Coda_pow.Inputs_intf
+  include
+    Coda_pow.Inputs_intf
+    with module Consensus_state = Consensus.Data.Consensus_state
 
   module Genesis_protocol_state : sig
     val t : (Protocol_state.Value.t, Protocol_state_hash.t) With_hash.t
@@ -866,7 +868,7 @@ module Make (Inputs : Inputs_intf) = struct
                    let consensus_state =
                      With_hash.data transition_with_hash
                      |> External_transition.Verified.protocol_state
-                     |> Consensus_mechanism.Protocol_state.consensus_state
+                     |> Protocol_state.consensus_state
                    in
                    let now =
                      let open Time in
@@ -875,7 +877,7 @@ module Make (Inputs : Inputs_intf) = struct
                    in
                    if
                      Ok ()
-                     = Consensus_mechanism.received_at_valid_time
+                     = Consensus.Hooks.received_at_valid_time
                          ~time_received:now consensus_state
                    then (
                      Logger.trace config.logger ~module_:__MODULE__

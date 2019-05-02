@@ -75,7 +75,8 @@ module Make (Inputs : Inputs_intf) :
       let open Deferred.Result.Let_syntax in
       let%bind () =
         Deferred.return
-          ( Consensus.Hooks.received_at_valid_time consensus_state ~time_received
+          ( Consensus.Hooks.received_at_valid_time consensus_state
+              ~time_received
             :> unit validation_result )
       in
       validate_proof transition

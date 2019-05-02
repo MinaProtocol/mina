@@ -90,10 +90,6 @@ module type State_hooks_intf = sig
           -> snarked_ledger_hash:Coda_base.Frozen_ledger_hash.t
           -> consensus_state)
          Quickcheck.Generator.t
-
-    val create_genesis_protocol_state :
-         Coda_base.Ledger.t
-      -> (protocol_state, Coda_base.State_hash.t) With_hash.t
   end
 end
 
@@ -143,6 +139,22 @@ module type S = sig
         -> Snark_params.Tick.Handler.t
     end
 
+    module Consensus_transition : sig
+      module Value : sig
+        module Stable : sig
+          module V1 : sig
+            type t [@@deriving sexp, bin_io, version]
+          end
+        end
+
+        type t = Stable.V1.t [@@deriving sexp]
+      end
+
+      include Snark_params.Tick.Snarkable.S with type value := Value.t
+
+      val genesis : Value.t
+    end
+
     module Consensus_state : sig
       module Value : sig
         (* bin_io omitted *)
@@ -164,6 +176,11 @@ module type S = sig
 
       val negative_one : Value.t
 
+      val create_genesis_from_transition :
+           negative_one_protocol_state_hash:Coda_base.State_hash.t
+        -> consensus_transition:Consensus_transition.Value.t
+        -> Value.t
+
       val create_genesis :
         negative_one_protocol_state_hash:Coda_base.State_hash.t -> Value.t
 
@@ -184,22 +201,6 @@ module type S = sig
       val to_lite : (Value.t -> Lite_base.Consensus_state.t) option
 
       val display : Value.t -> display
-    end
-
-    module Consensus_transition : sig
-      module Value : sig
-        module Stable : sig
-          module V1 : sig
-            type t [@@deriving sexp, bin_io, version]
-          end
-        end
-
-        type t = Stable.V1.t [@@deriving sexp]
-      end
-
-      include Snark_params.Tick.Snarkable.S with type value := Value.t
-
-      val genesis : Value.t
     end
 
     module Proposal_data : sig

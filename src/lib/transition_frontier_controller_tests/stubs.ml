@@ -362,8 +362,12 @@ struct
       Pending_coinbase.create () |> Or_error.ok_exn
     in
     let genesis_protocol_state_with_hash =
-      Consensus_state_hooks.For_tests.create_genesis_protocol_state
-        (Ledger.of_database root_snarked_ledger)
+      Genesis_protocol_state.create_with_custom_ledger
+        ~genesis_consensus_state:
+          (Consensus.Data.Consensus_state.create_genesis
+             ~negative_one_protocol_state_hash:
+               Protocol_state.(hash negative_one))
+        ~genesis_ledger:(Ledger.of_database root_snarked_ledger)
     in
     let genesis_protocol_state =
       With_hash.data genesis_protocol_state_with_hash
