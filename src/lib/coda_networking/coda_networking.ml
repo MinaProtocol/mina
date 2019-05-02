@@ -2,8 +2,58 @@ open Core_kernel
 open Async
 open Kademlia
 open Coda_base
+open Coda_state
 open Pipe_lib
+open Signature_lib
 open Network_peer
+
+module type Base_inputs_intf = sig
+  module Ledger_hash : Protocols.Coda_pow.Ledger_hash_intf
+
+  module Pending_coinbase_stack_state :
+    Protocols.Coda_pow.Pending_coinbase_stack_state_intf
+    with type pending_coinbase_stack := Pending_coinbase.Stack.t
+
+  module Ledger_proof_statement :
+    Protocols.Coda_pow.Ledger_proof_statement_intf
+    with type ledger_hash := Frozen_ledger_hash.t
+     and type pending_coinbase_stack_state := Pending_coinbase_stack_state.t
+
+  module Ledger_proof : sig
+    include
+      Protocols.Coda_pow.Ledger_proof_intf
+      with type statement := Ledger_proof_statement.t
+       and type ledger_hash := Frozen_ledger_hash.t
+       and type proof := Proof.t
+       and type sok_digest := Sok_message.Digest.t
+
+    include Sexpable.S with type t := t
+  end
+
+  module Transaction_snark_work :
+    Protocols.Coda_pow.Transaction_snark_work_intf
+    with type proof := Ledger_proof.t
+     and type statement := Ledger_proof_statement.t
+     and type public_key := Public_key.Compressed.t
+
+  module Staged_ledger_diff :
+    Protocols.Coda_pow.Staged_ledger_diff_intf
+    with type user_command := User_command.t
+     and type user_command_with_valid_signature :=
+                User_command.With_valid_signature.t
+     and type staged_ledger_hash := Staged_ledger_hash.t
+     and type public_key := Public_key.Compressed.t
+     and type completed_work := Transaction_snark_work.t
+     and type completed_work_checked := Transaction_snark_work.Checked.t
+     and type fee_transfer_single := Fee_transfer.Single.t
+
+  module External_transition :
+    Protocols.Coda_pow.External_transition_intf
+    with type protocol_state := Protocol_state.Value.t
+     and type staged_ledger_diff := Staged_ledger_diff.t
+     and type protocol_state_proof := Proof.t
+     and type state_hash := State_hash.t
+end
 
 (* assumption: the Rpcs functor is applied only once in the codebase, so that
    any versions appearing in Inputs represent unique types
@@ -13,6 +63,8 @@ open Network_peer
 *)
 
 module Rpcs (Inputs : sig
+  include Base_inputs_intf
+
   module Staged_ledger_aux_hash :
     Protocols.Coda_pow.Staged_ledger_aux_hash_intf
 
@@ -27,12 +79,6 @@ module Rpcs (Inputs : sig
       end
       with type V1.t = t
   end
-
-  module Ledger_hash : Protocols.Coda_pow.Ledger_hash_intf
-
-  module Blockchain_state : Blockchain_state.S
-
-  module External_transition : External_transition.S
 end) =
 struct
   open Inputs
@@ -199,7 +245,7 @@ struct
 
       module T = struct
         (* "master" types, do not change *)
-        type query = Consensus.Consensus_state.Value.t [@@deriving sexp]
+        type query = Consensus.Data.Consensus_state.Value.t [@@deriving sexp]
 
         type response =
           ( External_transition.Stable.V1.t
@@ -223,7 +269,7 @@ struct
 
     module V1 = struct
       module T = struct
-        type query = Consensus.Consensus_state.Value.Stable.V1.t
+        type query = Consensus.Data.Consensus_state.Value.Stable.V1.t
         [@@deriving bin_io, sexp, version {rpc}]
 
         type response =
@@ -250,6 +296,8 @@ struct
 end
 
 module Message (Inputs : sig
+  include Base_inputs_intf
+
   module Snark_pool_diff : sig
     type t [@@deriving sexp]
 
@@ -273,8 +321,6 @@ module Message (Inputs : sig
       end
       with type V1.t = t
   end
-
-  module External_transition : External_transition.S
 end) =
 struct
   open Inputs
@@ -327,18 +373,14 @@ struct
 end
 
 module type Inputs_intf = sig
-  module External_transition : External_transition.S
+  include Base_inputs_intf
 
   module Staged_ledger_aux_hash :
     Protocols.Coda_pow.Staged_ledger_aux_hash_intf
 
-  module Ledger_hash : Protocols.Coda_pow.Ledger_hash_intf
-
   (* we omit Staged_ledger_hash, because the available module in Inputs is not versioned; instead, in the
      versioned RPC modules, we use a specific version
    *)
-  module Blockchain_state : Coda_base.Blockchain_state.S
-
   module Staged_ledger_aux : sig
     type t
 
@@ -389,7 +431,7 @@ module type Config_intf = sig
     { logger: Logger.t
     ; gossip_net_params: gossip_config
     ; time_controller: time_controller
-    ; consensus_local_state: Consensus.Local_state.t }
+    ; consensus_local_state: Consensus.Data.Local_state.t }
 end
 
 module Make (Inputs : Inputs_intf) = struct
@@ -406,7 +448,7 @@ module Make (Inputs : Inputs_intf) = struct
       { logger: Logger.t
       ; gossip_net_params: Gossip_net.Config.t
       ; time_controller: Time.Controller.t
-      ; consensus_local_state: Consensus.Local_state.t }
+      ; consensus_local_state: Consensus.Data.Local_state.t }
   end
 
   module Rpcs = Rpcs (Inputs)
@@ -467,7 +509,7 @@ module Make (Inputs : Inputs_intf) = struct
             State_hash.t Envelope.Incoming.t
          -> External_transition.t Non_empty_list.t option Deferred.t)
       ~(get_ancestry :
-            Consensus.Consensus_state.Value.t Envelope.Incoming.t
+            Consensus.Data.Consensus_state.Value.t Envelope.Incoming.t
          -> ( External_transition.t
             , State_body_hash.t list * External_transition.t )
             Proof_carrying_data.t
@@ -504,7 +546,7 @@ module Make (Inputs : Inputs_intf) = struct
             answer_sync_ledger_query_rpc
         ; Rpcs.Transition_catchup.implement_multi transition_catchup_rpc
         ; Rpcs.Get_ancestry.implement_multi get_ancestry_rpc
-        ; Consensus.Rpcs.implementations ~logger:config.logger
+        ; Consensus.Hooks.Rpcs.implementations ~logger:config.logger
             ~local_state:config.consensus_local_state ]
     in
     let%map gossip_net =
@@ -527,7 +569,9 @@ module Make (Inputs : Inputs_intf) = struct
           | New_state state ->
               Perf_histograms.add_span ~name:"external_transition_latency"
                 (Core.Time.abs_diff (Core.Time.now ())
-                   (External_transition.timestamp state |> Block_time.to_time)) ;
+                   ( External_transition.protocol_state state
+                   |> Protocol_state.blockchain_state
+                   |> Blockchain_state.timestamp |> Block_time.to_time )) ;
               `Fst
                 ( Envelope.Incoming.map envelope ~f:(fun _ -> state)
                 , Time.now config.time_controller )

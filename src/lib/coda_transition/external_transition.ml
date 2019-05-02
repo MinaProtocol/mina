@@ -1,9 +1,11 @@
-open Core
+open Core_kernel
+open Coda_base
+open Coda_state
 open Module_version
 
 module type Base_intf = sig
   (* TODO: delegate forget here *)
-  type t [@@deriving sexp, compare, eq, to_yojson]
+  type t [@@deriving sexp, compare, to_yojson]
 
   include Comparable.S with type t := t
 
@@ -29,8 +31,6 @@ module type Base_intf = sig
 end
 
 module type S = sig
-  module Protocol_state : Protocol_state.S
-
   module Staged_ledger_diff : sig
     type t [@@deriving sexp]
 
@@ -48,13 +48,13 @@ module type S = sig
     with type protocol_state := Protocol_state.Value.t
      and type protocol_state_proof := Proof.t
      and type staged_ledger_diff := Staged_ledger_diff.t
-     and type consensus_state := Protocol_state.Consensus_state.Value.t
+     and type consensus_state := Consensus.Data.Consensus_state.Value.t
      and type state_hash := State_hash.t
 
   module Stable :
     sig
       module V1 : sig
-        type t [@@deriving sexp, bin_io, to_yojson, version]
+        type t [@@deriving sexp, eq, bin_io, to_yojson, version]
       end
 
       module Latest = V1
@@ -66,7 +66,7 @@ module type S = sig
     with type protocol_state := Protocol_state.Value.t
      and type protocol_state_proof := Proof.t
      and type staged_ledger_diff := Staged_ledger_diff.t
-     and type consensus_state := Protocol_state.Consensus_state.Value.t
+     and type consensus_state := Consensus.Data.Consensus_state.Value.t
      and type state_hash := State_hash.t
 
   module Verified :
@@ -74,7 +74,7 @@ module type S = sig
     with type protocol_state := Protocol_state.Value.t
      and type protocol_state_proof := Proof.t
      and type staged_ledger_diff := Staged_ledger_diff.t
-     and type consensus_state := Protocol_state.Consensus_state.Value.t
+     and type consensus_state := Consensus.Data.Consensus_state.Value.t
      and type state_hash := State_hash.t
 
   val create :
@@ -107,14 +107,8 @@ module Make (Staged_ledger_diff : sig
       end
     end
     with type V1.t = t
-end)
-(Protocol_state : Protocol_state.S) :
-  S
-  with module Staged_ledger_diff = Staged_ledger_diff
-   and module Protocol_state = Protocol_state = struct
+end) : S with module Staged_ledger_diff = Staged_ledger_diff = struct
   module Staged_ledger_diff = Staged_ledger_diff
-  module Protocol_state = Protocol_state
-  module Blockchain_state = Protocol_state.Blockchain_state
 
   module Stable = struct
     module V1 = struct
@@ -135,10 +129,6 @@ end)
         (* TODO: Important for bkase to review *)
         let compare t1 t2 =
           Protocol_state.Value.Stable.V1.compare t1.protocol_state
-            t2.protocol_state
-
-        let equal t1 t2 =
-          Protocol_state.Value.Stable.V1.equal t1.protocol_state
             t2.protocol_state
 
         let consensus_state {protocol_state; _} =
