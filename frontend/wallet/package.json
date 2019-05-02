@@ -33,7 +33,7 @@
     "query-fake": "concurrently --kill-others 'npm run fake' 'sleep 5 && npm run query'",
     "reformat": "bsrefmt --in-place src/*.re",
     "test": "npm run build && jest",
-    "dist": "npm run pack && build",
+    "dist": "npm run build && npm run pack && build",
     "dev": "concurrently --kill-others 'bsb -make-world -w' 'fpack watch --development ./lib/js/src/Index.js' 'electron ./lib/js/src/App.js'"
   },
   "build": {
