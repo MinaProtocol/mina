@@ -65,6 +65,8 @@ module type Inputs_intf = sig
     Protocol_state_validator_intf
     with type time := Time.t
      and type state_hash := State_hash.t
+     and type trust_system := Trust_system.t
+     and type envelope_sender := Envelope.Sender.t
      and type external_transition := External_transition.t
      and type external_transition_proof_verified :=
                 External_transition.Proof_verified.t
@@ -229,7 +231,8 @@ module Make (Inputs : Inputs_intf) :
         , valid_protocol_state_transition_writer ) =
       create_bufferred_pipe ~name:"valid transitions" ()
     in
-    Initial_validator.run ~logger ~transition_reader:network_transition_reader
+    Initial_validator.run ~logger ~trust_system
+      ~transition_reader:network_transition_reader
       ~valid_transition_writer:valid_protocol_state_transition_writer ;
     Strict_pipe.Reader.iter valid_protocol_state_transition_reader
       ~f:(fun network_transition ->

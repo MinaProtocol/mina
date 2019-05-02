@@ -76,9 +76,10 @@ let%test_module "Transition_handler.Catchup_scheduler tests" =
       Thread_safe.block_on_async_exn (fun () ->
           let open Deferred.Let_syntax in
           let%bind frontier = setup_random_frontier () in
+          let trust_system = Trust_system.null () in
           let scheduler =
-            Catchup_scheduler.create ~logger ~frontier ~time_controller
-              ~catchup_job_writer ~catchup_breadcrumbs_writer
+            Catchup_scheduler.create ~logger ~trust_system ~frontier
+              ~time_controller ~catchup_job_writer ~catchup_breadcrumbs_writer
               ~clean_up_signal:(Ivar.create ())
           in
           let randomly_chosen_breadcrumb =
@@ -135,9 +136,10 @@ let%test_module "Transition_handler.Catchup_scheduler tests" =
       Thread_safe.block_on_async_exn (fun () ->
           let open Deferred.Let_syntax in
           let%bind frontier = setup_random_frontier () in
+          let trust_system = Trust_system.null () in
           let scheduler =
-            Catchup_scheduler.create ~logger ~frontier ~time_controller
-              ~catchup_job_writer ~catchup_breadcrumbs_writer
+            Catchup_scheduler.create ~logger ~trust_system ~frontier
+              ~time_controller ~catchup_job_writer ~catchup_breadcrumbs_writer
               ~clean_up_signal:(Ivar.create ())
           in
           let randomly_chosen_breadcrumb =
@@ -216,9 +218,10 @@ let%test_module "Transition_handler.Catchup_scheduler tests" =
       Thread_safe.block_on_async_exn (fun () ->
           let open Deferred.Let_syntax in
           let%bind frontier = setup_random_frontier () in
+          let trust_system = Trust_system.null () in
           let scheduler =
-            Catchup_scheduler.create ~logger ~frontier ~time_controller
-              ~catchup_job_writer ~catchup_breadcrumbs_writer
+            Catchup_scheduler.create ~logger ~trust_system ~frontier
+              ~time_controller ~catchup_job_writer ~catchup_breadcrumbs_writer
               ~clean_up_signal:(Ivar.create ())
           in
           let randomly_chosen_breadcrumb =

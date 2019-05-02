@@ -22,6 +22,7 @@ module type Inputs_intf = sig
     Transition_handler_intf
     with type time_controller := Time.Controller.t
      and type external_transition_verified := External_transition.Verified.t
+     and type trust_system := Trust_system.t
      and type staged_ledger := Staged_ledger.t
      and type state_hash := State_hash.t
      and type transition_frontier := Transition_frontier.t
@@ -46,6 +47,7 @@ module type Inputs_intf = sig
     Catchup_intf
     with type external_transition_verified := External_transition.Verified.t
      and type state_hash := State_hash.t
+     and type trust_system := Trust_system.t
      and type unprocessed_transition_cache :=
                 Transition_handler.Unprocessed_transition_cache.t
      and type transition_frontier := Transition_frontier.t
@@ -103,7 +105,7 @@ module Make (Inputs : Inputs_intf) :
     let unprocessed_transition_cache =
       Transition_handler.Unprocessed_transition_cache.create ~logger
     in
-    Transition_handler.Validator.run ~logger ~frontier
+    Transition_handler.Validator.run ~logger ~trust_system ~frontier
       ~transition_reader:network_transition_reader ~valid_transition_writer
       ~unprocessed_transition_cache ;
     List.iter collected_transitions ~f:(fun t ->
@@ -117,8 +119,8 @@ module Make (Inputs : Inputs_intf) :
       ~f:(Strict_pipe.Writer.write primary_transition_writer)
     |> don't_wait_for ;
     let clean_up_catchup_scheduler = Ivar.create () in
-    Transition_handler.Processor.run ~logger ~time_controller ~frontier
-      ~primary_transition_reader
+    Transition_handler.Processor.run ~logger ~time_controller ~trust_system
+      ~frontier ~primary_transition_reader
       ~proposer_transition_reader:proposer_transition_reader_copy
       ~clean_up_catchup_scheduler ~catchup_job_writer
       ~catchup_breadcrumbs_reader ~catchup_breadcrumbs_writer
