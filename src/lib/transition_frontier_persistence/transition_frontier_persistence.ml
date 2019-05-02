@@ -148,8 +148,8 @@ module Make (Inputs : Intf.Main_inputs) = struct
     in
     Deferred.unit
 
-  let directly_add_breadcrumb ~logger transition_frontier transition_with_hash
-      parent =
+  let directly_add_breadcrumb ~logger ~trust_system transition_frontier
+      transition_with_hash parent =
     let log_error () =
       Logger.fatal logger ~module_:__MODULE__ ~location:__LOC__
         ~metadata:
@@ -158,8 +158,8 @@ module Make (Inputs : Intf.Main_inputs) = struct
     in
     let%bind child_breadcrumb =
       match%map
-        Transition_frontier.Breadcrumb.build ~logger ~parent
-          ~transition_with_hash
+        Transition_frontier.Breadcrumb.build ~logger ~trust_system ~parent
+          ~transition_with_hash ~sender:None
       with
       | Ok child_breadcrumb ->
           child_breadcrumb
@@ -190,7 +190,7 @@ module Make (Inputs : Intf.Main_inputs) = struct
     Transition_storage.close transition_storage ;
     result
 
-  let read ~logger ~root_snarked_ledger ~consensus_local_state
+  let read ~logger ~trust_system ~root_snarked_ledger ~consensus_local_state
       transition_storage =
     let state_hash, scan_state, pending_coinbases =
       Transition_storage.get transition_storage ~logger Root
@@ -244,7 +244,7 @@ module Make (Inputs : Intf.Main_inputs) = struct
             get_verified_transition state_hash
           in
           let%bind new_breadcrumb =
-            directly_add_breadcrumb ~logger transition_frontier
+            directly_add_breadcrumb ~logger ~trust_system transition_frontier
               With_hash.{data= verified_transition; hash= state_hash}
               parent_breadcrumb
           in
@@ -261,10 +261,11 @@ module Make (Inputs : Intf.Main_inputs) = struct
     in
     transition_frontier
 
-  let deserialize ~directory_name ~logger ~root_snarked_ledger
+  let deserialize ~directory_name ~logger ~trust_system ~root_snarked_ledger
       ~consensus_local_state =
     with_database ~directory_name
-      ~f:(read ~logger ~root_snarked_ledger ~consensus_local_state)
+      ~f:
+        (read ~logger ~trust_system ~root_snarked_ledger ~consensus_local_state)
 
   module For_tests = struct
     let write_diff_and_verify = write_diff_and_verify

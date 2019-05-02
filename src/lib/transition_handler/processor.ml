@@ -185,7 +185,9 @@ module Make (Inputs : Inputs.With_unprocessed_transition_cache.S) :
                                  in
                                  let%map breadcrumb_result =
                                    Transition_frontier.Breadcrumb.build ~logger
-                                     ~parent ~transition_with_hash
+                                     ~trust_system ~parent
+                                     ~transition_with_hash
+                                     ~sender:(Some sender)
                                  in
                                  Result.map_error breadcrumb_result
                                    ~f:(fun error -> (sender, error)) )

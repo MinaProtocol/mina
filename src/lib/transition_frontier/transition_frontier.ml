@@ -78,7 +78,7 @@ struct
 
     let copy t = {t with staged_ledger= Staged_ledger.copy t.staged_ledger}
 
-    let build ~logger ~parent ~transition_with_hash =
+    let build ~logger ~trust_system ~parent ~transition_with_hash ~sender =
       O1trace.measure "Breadcrumb.build" (fun () ->
           let open Deferred.Result.Let_syntax in
           let staged_ledger = parent.staged_ledger in
@@ -97,18 +97,37 @@ struct
                    , `Staged_ledger transitioned_staged_ledger
                    , `Pending_coinbase_data _ ) =
             let open Deferred.Let_syntax in
-            match%map
+            match%bind
               Staged_ledger.apply ~logger staged_ledger
                 (External_transition.Verified.staged_ledger_diff transition)
             with
             | Ok x ->
-                Ok x
+                return (Ok x)
             | Error (Staged_ledger.Staged_ledger_error.Unexpected e) ->
-                Error (`Fatal_error (Error.to_exn e))
-            | Error e ->
-                Error
-                  (`Invalid_staged_ledger_diff
-                    (Staged_ledger.Staged_ledger_error.to_error e))
+                return (Error (`Fatal_error (Error.to_exn e)))
+            | Error staged_ledger_error ->
+                let%bind () =
+                  match sender with
+                  | None | Some Envelope.Sender.Local ->
+                      return ()
+                  | Some (Envelope.Sender.Remote inet_addr) ->
+                      let error_string =
+                        Staged_ledger.Staged_ledger_error.to_string
+                          staged_ledger_error
+                      in
+                      Trust_system.(
+                        record trust_system logger inet_addr
+                          Actions.
+                            ( Violated_protocol
+                            , Some
+                                ( "Staged_ledger error: $error"
+                                , [("error", `String error_string)] ) ))
+                in
+                return
+                  (Error
+                     (`Invalid_staged_ledger_diff
+                       (Staged_ledger.Staged_ledger_error.to_error
+                          staged_ledger_error)))
           in
           let just_emitted_a_proof = Option.is_some proof_opt in
           let%map transitioned_staged_ledger =
