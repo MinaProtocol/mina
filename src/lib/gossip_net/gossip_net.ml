@@ -269,10 +269,10 @@ module Make (Message : Message_intf) : S with type msg := Message.msg = struct
           ; received_reader
           ; me= config.me
           ; peers= Peer.Hash_set.create ()
+          ; initial_peers= config.initial_peers
           ; peers_by_ip= Hashtbl.create (module Unix.Inet_addr)
           ; connections= Hashtbl.create (module Unix.Inet_addr)
-          ; max_concurrent_connections= config.max_concurrent_connections
-          ; initial_peers= config.initial_peers }
+          ; max_concurrent_connections= config.max_concurrent_connections }
         in
         don't_wait_for
           (Strict_pipe.Reader.iter (Trust_system.ban_pipe config.trust_system)
