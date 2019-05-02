@@ -4,6 +4,7 @@ open Protocols.Coda_transition_frontier
 open Cache_lib
 open Pipe_lib
 open Coda_base
+open Coda_state
 
 (** [Ledger_catchup] is a procedure that connects a foreign external transition
     into a transition frontier by requesting a path of external_transitions
@@ -69,7 +70,7 @@ module Make (Inputs : Inputs.S) :
             in
             With_hash.of_data verified_transition
               ~hash_data:
-                (Fn.compose Consensus.Protocol_state.hash
+                (Fn.compose Protocol_state.hash
                    External_transition.Verified.protocol_state) )
       in
       Deferred.return
@@ -155,7 +156,7 @@ module Make (Inputs : Inputs.S) :
                 let%bind () =
                   if
                     State_hash.equal
-                      (Consensus.Protocol_state.hash
+                      (Protocol_state.hash
                          (External_transition.protocol_state last))
                       target_hash
                   then return ()

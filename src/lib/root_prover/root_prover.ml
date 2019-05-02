@@ -3,6 +3,7 @@ open Core
 open Async
 open Protocols.Coda_transition_frontier
 open Coda_base
+open Coda_state
 
 module type Inputs_intf = sig
   include Transition_frontier.Inputs_intf
@@ -16,7 +17,7 @@ module type Inputs_intf = sig
      and type masked_ledger := Ledger.Mask.Attached.t
      and type transaction_snark_scan_state := Staged_ledger.Scan_state.t
      and type staged_ledger_diff := Staged_ledger_diff.t
-     and type consensus_local_state := Consensus.Local_state.t
+     and type consensus_local_state := Consensus.Data.Local_state.t
      and type user_command := User_command.t
      and type diff_mutant :=
                 ( External_transition.Stable.Latest.t
@@ -43,12 +44,12 @@ module Make (Inputs : Inputs_intf) :
    and type external_transition := Inputs.External_transition.t
    and type proof_verified_external_transition :=
               Inputs.External_transition.Proof_verified.t
-   and type consensus_state := Consensus.Consensus_state.Value.t
+   and type consensus_state := Consensus.Data.Consensus_state.Value.t
    and type state_hash := State_hash.t = struct
   open Inputs
 
   let hash_transition =
-    Fn.compose Consensus.Protocol_state.hash External_transition.protocol_state
+    Fn.compose Protocol_state.hash External_transition.protocol_state
 
   let consensus_state transition =
     External_transition.(
@@ -71,7 +72,7 @@ module Make (Inputs : Inputs_intf) :
     let get_previous ~context transition =
       let parent_hash =
         transition |> External_transition.Verified.protocol_state
-        |> Consensus.Protocol_state.previous_state_hash
+        |> Protocol_state.previous_state_hash
       in
       let open Option.Let_syntax in
       let%map breadcrumb = Transition_frontier.find context parent_hash in
@@ -79,7 +80,7 @@ module Make (Inputs : Inputs_intf) :
       @@ Transition_frontier.Breadcrumb.transition_with_hash breadcrumb
 
     let hash acc body_hash =
-      Protocol_state.hash ~hash_body:Fn.id
+      Protocol_state.hash_abstract ~hash_body:Fn.id
         {previous_state_hash= acc; body= body_hash}
   end)
 
@@ -102,7 +103,7 @@ module Make (Inputs : Inputs_intf) :
     in
     let best_tip = External_transition.of_verified best_verified_tip in
     let is_tip_better =
-      Consensus.select
+      Consensus.Hooks.select
         ~logger:
           (Logger.extend logger
              [("selection_context", `String "Root_prover.prove")])
@@ -152,7 +153,7 @@ module Make (Inputs : Inputs_intf) :
     let best_tip_hash = With_hash.hash best_tip_with_hash in
     (* This statement might not see a peer's best_tip as the best_tip *)
     let is_before_best_tip candidate =
-      Consensus.select
+      Consensus.Hooks.select
         ~logger:
           (Logger.extend logger
              [("selection_context", `String "Root_prover.verify")])

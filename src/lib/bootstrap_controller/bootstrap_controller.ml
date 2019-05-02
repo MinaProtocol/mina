@@ -2,6 +2,7 @@ open Core
 open Async
 open Protocols.Coda_pow
 open Coda_base
+open Coda_state
 open Pipe_lib.Strict_pipe
 
 module type Inputs_intf = sig
@@ -16,7 +17,7 @@ module type Inputs_intf = sig
      and type transaction_snark_scan_state := Staged_ledger.Scan_state.t
      and type staged_ledger_diff := Staged_ledger_diff.t
      and type staged_ledger := Staged_ledger.t
-     and type consensus_local_state := Consensus.Local_state.t
+     and type consensus_local_state := Consensus.Data.Local_state.t
      and type user_command := User_command.t
      and type diff_mutant :=
                 ( External_transition.Stable.Latest.t
@@ -40,7 +41,7 @@ module type Inputs_intf = sig
     with type peer := Network_peer.Peer.t
      and type state_hash := State_hash.t
      and type external_transition := External_transition.t
-     and type consensus_state := Consensus.Consensus_state.Value.t
+     and type consensus_state := Consensus.Data.Consensus_state.Value.t
      and type state_body_hash := State_body_hash.t
      and type ledger_hash := Ledger_hash.t
      and type sync_ledger_query := Sync_ledger.Query.t
@@ -77,7 +78,7 @@ module type Inputs_intf = sig
      and type external_transition := External_transition.t
      and type proof_verified_external_transition :=
                 External_transition.Proof_verified.t
-     and type consensus_state := Consensus.Consensus_state.Value.t
+     and type consensus_state := Consensus.Data.Consensus_state.Value.t
      and type state_hash := State_hash.t
 end
 
@@ -151,7 +152,7 @@ end = struct
 
   let worth_getting_root t candidate =
     `Take
-    = Consensus.select
+    = Consensus.Hooks.select
         ~logger:
           (Logger.extend t.logger
              [ ( "selection_context"
@@ -159,7 +160,7 @@ end = struct
         ~existing:
           ( t.best_seen_transition |> With_hash.data
           |> External_transition.Proof_verified.protocol_state
-          |> Consensus.Protocol_state.consensus_state )
+          |> Protocol_state.consensus_state )
         ~candidate
 
   let received_bad_proof t sender_host e =
@@ -178,7 +179,7 @@ end = struct
       (candidate_transition : External_transition.Proof_verified.t) =
     let candidate_state =
       External_transition.Proof_verified.protocol_state candidate_transition
-      |> Consensus.Protocol_state.consensus_state
+      |> Protocol_state.consensus_state
     in
     if
       done_syncing_root root_sync_ledger
@@ -215,14 +216,10 @@ end = struct
                 |> Protocol_state.blockchain_state
               in
               let expected_staged_ledger_hash =
-                blockchain_state
-                |> External_transition.Protocol_state.Blockchain_state
-                   .staged_ledger_hash
+                blockchain_state |> Blockchain_state.staged_ledger_hash
               in
               let snarked_ledger_hash =
-                blockchain_state
-                |> External_transition.Protocol_state.Blockchain_state
-                   .snarked_ledger_hash
+                blockchain_state |> Blockchain_state.snarked_ledger_hash
               in
               return
               @@
@@ -267,14 +264,12 @@ end = struct
           External_transition.Verified.protocol_state transition
         in
         let previous_state_hash =
-          External_transition.Protocol_state.previous_state_hash protocol_state
+          Protocol_state.previous_state_hash protocol_state
         in
         Transition_cache.add transition_graph ~parent:previous_state_hash
           incoming_transition ;
         (* TODO: Efficiently limiting the number of green threads in #1337 *)
-        if
-          worth_getting_root t
-            (Consensus.Protocol_state.consensus_state protocol_state)
+        if worth_getting_root t (Protocol_state.consensus_state protocol_state)
         then
           Deferred.ignore
           @@ on_transition t ~sender ~root_sync_ledger
@@ -384,7 +379,7 @@ end = struct
     type nonrec t = t
 
     let hash_data =
-      Fn.compose Consensus.Protocol_state.hash
+      Fn.compose Protocol_state.hash
         External_transition.Proof_verified.protocol_state
 
     let make_bootstrap ~logger ~trust_system ~genesis_root ~network =

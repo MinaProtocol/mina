@@ -2,6 +2,7 @@ open Async_kernel
 open Core_kernel
 open Pipe_lib.Strict_pipe
 open Coda_base
+open Coda_state
 open Cache_lib
 open Protocols.Coda_transition_frontier
 
@@ -16,7 +17,6 @@ module Make (Inputs : Inputs.With_unprocessed_transition_cache.S) :
    and type transition_frontier := Inputs.Transition_frontier.t
    and type staged_ledger := Inputs.Staged_ledger.t = struct
   open Inputs
-  open Consensus
 
   let validate_transition ~logger ~frontier ~unprocessed_transition_cache
       transition_with_hash =
@@ -47,7 +47,7 @@ module Make (Inputs : Inputs.With_unprocessed_transition_cache.S) :
     let%map () =
       Result.ok_if_true
         ( `Take
-        = Consensus.select
+        = Consensus.Hooks.select
             ~logger:
               (Logger.extend logger
                  [("selection_context", `String "Transition_handler.Validator")])

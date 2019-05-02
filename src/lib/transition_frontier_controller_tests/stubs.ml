@@ -2,6 +2,7 @@ open Async
 open Core_kernel
 open Protocols.Coda_pow
 open Coda_base
+open Coda_state
 open Signature_lib
 
 module Make (Inputs : sig
@@ -125,9 +126,7 @@ struct
   end)
 
   module External_transition =
-    Coda_base.External_transition.Make
-      (Staged_ledger_diff)
-      (Consensus.Protocol_state)
+    Coda_transition.External_transition.Make (Staged_ledger_diff)
 
   module Transaction = struct
     include Coda_base.Transaction.Stable.Latest
@@ -191,8 +190,6 @@ struct
         in
         User_command.sign sender_keypair payload )
 
-  module Blockchain_state = External_transition.Protocol_state.Blockchain_state
-  module Protocol_state = External_transition.Protocol_state
   module Diff_hash = Transition_frontier_persistence.Diff_hash
 
   module Diff_mutant_inputs = struct
@@ -231,7 +228,7 @@ struct
     let open Quickcheck.Let_syntax in
     let gen_slot_advancement = Int.gen_incl 1 10 in
     let%map make_next_consensus_state =
-      Consensus.For_tests.gen_consensus_state ~gen_slot_advancement
+      Consensus_state_hooks.For_tests.gen_consensus_state ~gen_slot_advancement
     in
     fun parent_breadcrumb_deferred ->
       let open Deferred.Let_syntax in
@@ -279,7 +276,7 @@ struct
       in
       let previous_ledger_hash =
         previous_protocol_state |> Protocol_state.blockchain_state
-        |> Protocol_state.Blockchain_state.snarked_ledger_hash
+        |> Blockchain_state.snarked_ledger_hash
       in
       let next_ledger_hash =
         Option.value_map ledger_proof_opt
@@ -293,9 +290,7 @@ struct
           ~snarked_ledger_hash:next_ledger_hash
           ~staged_ledger_hash:next_staged_ledger_hash
       in
-      let previous_state_hash =
-        Consensus.Protocol_state.hash previous_protocol_state
-      in
+      let previous_state_hash = Protocol_state.hash previous_protocol_state in
       let consensus_state =
         make_next_consensus_state ~snarked_ledger_hash:previous_ledger_hash
           ~previous_protocol_state:
@@ -319,7 +314,7 @@ struct
       let next_verified_external_transition_with_hash =
         With_hash.of_data next_verified_external_transition
           ~hash_data:
-            (Fn.compose Consensus.Protocol_state.hash
+            (Fn.compose Protocol_state.hash
                External_transition.Verified.protocol_state)
       in
       match%map
@@ -365,7 +360,7 @@ struct
       Pending_coinbase.create () |> Or_error.ok_exn
     in
     let genesis_protocol_state_with_hash =
-      Consensus.For_tests.create_genesis_protocol_state
+      Consensus_state_hooks.For_tests.create_genesis_protocol_state
         (Ledger.of_database root_snarked_ledger)
     in
     let genesis_protocol_state =
@@ -375,7 +370,7 @@ struct
       With_hash.hash genesis_protocol_state_with_hash
     in
     let root_ledger_hash =
-      genesis_protocol_state |> Consensus.Protocol_state.blockchain_state
+      genesis_protocol_state |> Protocol_state.blockchain_state
       |> Blockchain_state.snarked_ledger_hash
       |> Frozen_ledger_hash.to_ledger_hash
     in
@@ -418,7 +413,7 @@ struct
             ~root_transition:root_transition_with_data ~root_snarked_ledger
             ~root_staged_ledger
             ~consensus_local_state:
-              (Consensus.Local_state.create
+              (Consensus.Data.Local_state.create
                  (Some (Account.public_key proposer_account)))
         in
         frontier

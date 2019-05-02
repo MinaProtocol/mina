@@ -1,5 +1,6 @@
 open Protocols.Coda_pow
 open Coda_base
+open Coda_state
 open Core
 open Async
 open Cache_lib
@@ -59,7 +60,7 @@ module Make (Inputs : Inputs.S) :
                   let actual_parent_hash =
                     transition |> With_hash.data
                     |> External_transition.Verified.protocol_state
-                    |> External_transition.Protocol_state.previous_state_hash
+                    |> Protocol_state.previous_state_hash
                   in
                   let%bind () =
                     Deferred.return

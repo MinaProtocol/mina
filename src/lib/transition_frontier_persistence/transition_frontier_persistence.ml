@@ -1,5 +1,6 @@
 open Core_kernel
 open Coda_base
+open Coda_state
 open Async_kernel
 open Pipe_lib
 module Diff_mutant = Diff_mutant
@@ -38,10 +39,14 @@ module Make (Inputs : Intf.Main_inputs) = struct
         let parent_hash = External_transition.parent_hash transition in
         Transition_frontier.find_exn frontier parent_hash
         |> Transition_frontier.Breadcrumb.transition_with_hash
-        |> With_hash.data |> External_transition.Verified.consensus_state
+        |> With_hash.data |> External_transition.Verified.protocol_state
+        |> Protocol_state.consensus_state
     | Remove_transitions external_transitions_with_hashes ->
         List.map external_transitions_with_hashes
-          ~f:(Fn.compose External_transition.consensus_state With_hash.data)
+          ~f:(fun transition_with_hash ->
+            With_hash.data transition_with_hash
+            |> External_transition.protocol_state
+            |> Protocol_state.consensus_state )
     | Update_root (new_root_hash, _, _) ->
         let previous_root =
           (let open Transition_frontier in
@@ -173,7 +178,7 @@ module Make (Inputs : Intf.Main_inputs) = struct
     let open External_transition.Verified in
     let protocol_state = protocol_state transition in
     Coda_base.Staged_ledger_hash.ledger_hash
-      External_transition.Protocol_state.(
+      Protocol_state.(
         Blockchain_state.staged_ledger_hash @@ blockchain_state protocol_state)
 
   let with_database ~directory_name ~f =

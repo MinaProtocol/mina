@@ -3,6 +3,7 @@ open Async_kernel
 open Protocols.Coda_pow
 open Protocols.Coda_transition_frontier
 open Coda_base
+open Coda_state
 
 module type Inputs_intf = sig
   include Transition_frontier.Inputs_intf
@@ -10,9 +11,7 @@ module type Inputs_intf = sig
   module Time : Time_intf
 
   module State_proof :
-    Proof_intf
-    with type input := Consensus.Protocol_state.Value.t
-     and type t := Proof.t
+    Proof_intf with type input := Protocol_state.Value.t and type t := Proof.t
 end
 
 let transition_error msg = Or_error.errorf "transition rejected: %s" msg
@@ -48,11 +47,11 @@ module Make (Inputs : Inputs_intf) :
   let validate_consensus_state ~time_received transition =
     let time_received = to_unix_timestamp time_received in
     let consensus_state =
-      Fn.compose External_transition.Protocol_state.consensus_state
+      Fn.compose Protocol_state.consensus_state
         External_transition.protocol_state
     in
     match
-      Consensus.received_at_valid_time
+      Consensus.Hooks.received_at_valid_time
         (consensus_state transition)
         ~time_received
     with
