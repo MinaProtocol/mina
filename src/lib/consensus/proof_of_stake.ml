@@ -252,10 +252,44 @@ module Data = struct
       in
       (epoch, slot)
 
+    let diff_in_slots ((epoch, slot) : t * Slot.t) ((epoch', slot') : t * Slot.t)
+        : int64 =
+      let ( < ) x y = Pervasives.(Int64.compare x y < 0) in
+      let ( > ) x y = Pervasives.(Int64.compare x y > 0) in
+      let open Int64.Infix in
+      let of_uint32 = UInt32.to_int64 in
+      let epoch, slot = (of_uint32 epoch, of_uint32 slot) in
+      let epoch', slot' = (of_uint32 epoch', of_uint32 slot') in
+      let epoch_size = of_uint32 Constants.Epoch.size in
+      let epoch_diff = epoch - epoch' in
+      if epoch_diff > 0L then
+        ((epoch_diff - 1L) * epoch_size) + slot + (epoch_size - slot')
+      else if epoch_diff < 0L then
+        ((epoch_diff + 1L) * epoch_size) - (epoch_size - slot) - slot'
+      else slot - slot'
+
+    let%test_unit "test diff_in_slots" =
+      let open Int64.Infix in
+      let ( !^ ) = UInt32.of_int in
+      let ( !@ ) = Fn.compose ( !^ ) Int64.to_int in
+      let epoch_size = UInt32.to_int64 Constants.Epoch.size in
+      [%test_eq: int64] (diff_in_slots (!^0, !^5) (!^0, !^0)) 5L ;
+      [%test_eq: int64] (diff_in_slots (!^3, !^23) (!^3, !^20)) 3L ;
+      [%test_eq: int64] (diff_in_slots (!^4, !^4) (!^3, !^0)) (epoch_size + 4L) ;
+      [%test_eq: int64] (diff_in_slots (!^5, !^2) (!^4, !@(epoch_size - 3L))) 5L ;
+      [%test_eq: int64]
+        (diff_in_slots (!^6, !^42) (!^2, !^16))
+        ((epoch_size * 3L) + 42L + (epoch_size - 16L)) ;
+      [%test_eq: int64]
+        (diff_in_slots (!^2, !@(epoch_size - 1L)) (!^3, !^4))
+        (0L - 5L) ;
+      [%test_eq: int64]
+        (diff_in_slots (!^1, !^3) (!^7, !^27))
+        (0L - ((epoch_size * 5L) + (epoch_size - 3L) + 27L))
+
     let incr ((epoch, slot) : t * Slot.t) =
       let open UInt32 in
-      if Slot.equal slot (sub Constants.Epoch.size one) then
-        (add epoch one, zero)
+      if Slot.equal slot (sub Constants.Epoch.size one) then (add epoch one, zero)
       else (epoch, add slot one)
   end
 
@@ -2227,78 +2261,85 @@ module Hooks = struct
       | ls ->
           Non_empty_list.of_list_opt ls )
 
-  let sync_local_state ~logger ~local_state ~random_peers
-      ~(query_peer : Network_peer.query_peer) requested_syncs =
-    let open Local_state in
-    let open Snapshot in
-    let open Deferred.Let_syntax in
-    let requested_syncs = Non_empty_list.to_list requested_syncs in
-    Logger.info logger "syncing local state, %d jobs"
-      (List.length requested_syncs)
-      ~location:__LOC__ ~module_:__MODULE__
-      ~metadata:
-        [ ( "requested_syncs"
-          , `List (List.map requested_syncs ~f:local_state_sync_to_yojson) )
-        ; ("local_state", Local_state.to_yojson local_state) ] ;
-    let sync {snapshot_id; expected_root= target_ledger_hash} =
-      Deferred.List.exists (random_peers 3) ~f:(fun peer ->
-          match%map
-            query_peer.query peer Rpcs.Get_epoch_ledger.dispatch_multi
-              (Coda_base.Frozen_ledger_hash.to_ledger_hash target_ledger_hash)
-          with
-          | Ok (Ok snapshot_ledger) ->
-              let delegators =
-                Option.map local_state.proposer_public_key ~f:(fun pk ->
-                    compute_delegators
-                      (`Include_self, pk)
-                      ~iter_accounts:(fun f ->
-                        Coda_base.Sparse_ledger.iteri snapshot_ledger ~f ) )
-                |> Option.value
-                     ~default:(Coda_base.Account.Index.Table.create ())
-              in
-              set_snapshot local_state snapshot_id
-                (Some {ledger= snapshot_ledger; delegators}) ;
-              true
-          | Ok (Error err) ->
-              (* TODO: punish *)
-              Logger.faulty_peer_without_punishment logger ~module_:__MODULE__
-                ~location:__LOC__
-                ~metadata:
-                  [ ("peer", Network_peer.Peer.to_yojson peer)
-                  ; ("error", `String err) ]
-                "peer $peer failed to serve requested epoch ledger: $error" ;
-              false
-          | Error err ->
-              Logger.faulty_peer_without_punishment logger ~module_:__MODULE__
-                ~location:__LOC__
-                ~metadata:
-                  [ ("peer", Network_peer.Peer.to_yojson peer)
-                  ; ("error", `String (Error.to_string_hum err)) ]
-                "error querying peer $peer: $error" ;
-              false )
-    in
-    if%map Deferred.List.for_all requested_syncs ~f:sync then Ok ()
-    else Error (Error.of_string "failed to synchronize epoch ledger")
+let sync_local_state ~logger ~trust_system ~local_state ~random_peers
+    ~(query_peer : Network_peer.query_peer) requested_syncs =
+  let open Local_state in
+  let open Snapshot in
+  let open Deferred.Let_syntax in
+  let requested_syncs = Non_empty_list.to_list requested_syncs in
+  Logger.info logger "syncing local state, %d jobs"
+    (List.length requested_syncs)
+    ~location:__LOC__ ~module_:__MODULE__
+    ~metadata:
+      [ ( "requested_syncs"
+        , `List (List.map requested_syncs ~f:local_state_sync_to_yojson) )
+      ; ("local_state", Local_state.to_yojson local_state) ] ;
+  let sync {snapshot_id; expected_root= target_ledger_hash} =
+    Deferred.List.exists (random_peers 3) ~f:(fun peer ->
+        match%bind
+          query_peer.query peer Rpcs.Get_epoch_ledger.dispatch_multi
+            (Coda_base.Frozen_ledger_hash.to_ledger_hash target_ledger_hash)
+        with
+        | Ok (Ok snapshot_ledger) ->
+            let%bind () =
+              Trust_system.(
+                record trust_system logger peer.host
+                  Actions.(Epoch_ledger_provided, None))
+            in
+            let delegators =
+              Option.map local_state.proposer_public_key ~f:(fun pk ->
+                  compute_delegators
+                    (`Include_self, pk)
+                    ~iter_accounts:(fun f ->
+                      Coda_base.Sparse_ledger.iteri snapshot_ledger ~f ) )
+              |> Option.value
+                   ~default:(Coda_base.Account.Index.Table.create ())
+            in
+            set_snapshot local_state snapshot_id
+              (Some {ledger= snapshot_ledger; delegators}) ;
+            return true
+        | Ok (Error err) ->
+            Logger.faulty_peer_without_punishment logger ~module_:__MODULE__
+              ~location:__LOC__
+              ~metadata:
+                [ ("peer", Network_peer.Peer.to_yojson peer)
+                ; ("error", `String err) ]
+              "peer $peer failed to serve requested epoch ledger: $error" ;
+            return false
+        | Error err ->
+            Logger.faulty_peer_without_punishment logger ~module_:__MODULE__
+              ~location:__LOC__
+              ~metadata:
+                [ ("peer", Network_peer.Peer.to_yojson peer)
+                ; ("error", `String (Error.to_string_hum err)) ]
+              "error querying peer $peer: $error" ;
+            return false )
+  in
+  if%map Deferred.List.for_all requested_syncs ~f:sync then Ok ()
+  else Error (Error.of_string "failed to synchronize epoch ledger")
 
   let received_within_window (epoch, slot) ~time_received =
     let open Time in
+    let open Int64 in
+    let ( < ) x y = Pervasives.(compare x y < 0) in
+    let ( >= ) x y = Pervasives.(compare x y >= 0) in
     let time_received =
       of_span_since_epoch (Span.of_ms (Unix_timestamp.to_int64 time_received))
     in
-    let window_start = Epoch.slot_start_time epoch slot in
-    let window_end = add window_start Constants.delta_duration in
-    if window_start < time_received && time_received < window_end then Ok ()
-    else
-      Error
-        [ ("window_start", to_yojson window_start)
-        ; ("window_end", to_yojson window_end)
-        ; ("time_received", to_yojson time_received) ]
+    let slot_diff =
+      Epoch.diff_in_slots
+        (Epoch.epoch_and_slot_of_time_exn time_received)
+        (epoch, slot)
+    in
+    if slot_diff < 0L then Error `Too_early
+    else if slot_diff >= of_int Constants.delta then Error (`Too_late slot_diff)
+    else Ok ()
 
-  let received_at_valid_time (consensus_state : Consensus_state.Value.t)
-      ~time_received =
-    received_within_window
-      (consensus_state.curr_epoch, consensus_state.curr_slot)
-      ~time_received
+let received_at_valid_time (consensus_state : Consensus_state.Value.t)
+    ~time_received =
+  received_within_window
+    (consensus_state.curr_epoch, consensus_state.curr_slot)
+    ~time_received
 
   let select ~existing ~candidate ~logger =
     let string_of_choice = function `Take -> "Take" | `Keep -> "Keep" in
@@ -2632,8 +2673,8 @@ module Hooks = struct
      and type snark_transition_var := Snark_transition.var = struct
     (* TODO: only track total currency from accounts > 1% of the currency using transactions *)
     let generate_transition ~(previous_protocol_state : Protocol_state.Value.t)
-        ~blockchain_state ~time ~proposal_data ~transactions:_
-        ~snarked_ledger_hash ~supply_increase ~logger:_ =
+        ~blockchain_state ~time ~proposal_data ~transactions:_ ~snarked_ledger_hash
+        ~supply_increase ~logger:_ =
       let previous_consensus_state =
         Protocol_state.consensus_state previous_protocol_state
       in
@@ -2641,11 +2682,13 @@ module Hooks = struct
         let time = Time.of_span_since_epoch (Time.Span.of_ms time) in
         Epoch.epoch_and_slot_of_time_exn time
       in
-      let consensus_transition = Consensus_transition.Poly.{epoch; slot} in
+      let consensus_transition_data =
+        Consensus_transition_data.Poly.{epoch; slot}
+      in
       let consensus_state =
         Or_error.ok_exn
           (Consensus_state.update ~previous_consensus_state
-             ~consensus_transition
+             ~consensus_transition_data
              ~proposer_vrf_result:proposal_data.Proposal_data.vrf_result
              ~previous_protocol_state_hash:
                (Protocol_state.hash previous_protocol_state)
@@ -2656,7 +2699,7 @@ module Hooks = struct
           ~previous_state_hash:(Protocol_state.hash previous_protocol_state)
           ~blockchain_state ~consensus_state
       in
-      (protocol_state, consensus_transition)
+      (protocol_state, consensus_transition_data)
 
     include struct
       let%snarkydef next_state_checked ~(prev_state : Protocol_state.var)

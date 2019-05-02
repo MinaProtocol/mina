@@ -107,9 +107,8 @@ struct
                 Error (`Fatal_error (Error.to_exn e))
             | Error e ->
                 Error
-                  (`Validation_error
-                    (Error.of_string
-                       (Staged_ledger.Staged_ledger_error.to_string e)))
+                  (`Invalid_staged_ledger_diff
+                    (Staged_ledger.Staged_ledger_error.to_error e))
           in
           let just_emitted_a_proof = Option.is_some proof_opt in
           let%map transitioned_staged_ledger =
@@ -120,7 +119,7 @@ struct
               then Ok transitioned_staged_ledger
               else
                 Error
-                  (`Validation_error
+                  (`Invalid_staged_ledger_hash
                     (Error.of_string
                        "Snarked ledger hash and Staged ledger hash after \
                         applying the diff does not match blockchain state's \

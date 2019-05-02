@@ -1,6 +1,3 @@
-[%%import
-"../../../config.mlh"]
-
 open Core
 open Async
 open Coda_base

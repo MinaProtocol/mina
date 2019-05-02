@@ -1,6 +1,3 @@
-[%%import
-"../../config.mlh"]
-
 open Core_kernel
 open Async
 open Kademlia

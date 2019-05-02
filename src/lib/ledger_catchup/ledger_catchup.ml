@@ -45,8 +45,17 @@ module Make (Inputs : Inputs.S) :
    and type transition_frontier_breadcrumb :=
               Inputs.Transition_frontier.Breadcrumb.t
    and type state_hash := State_hash.t
-   and type network := Inputs.Network.t = struct
+   and type network := Inputs.Network.t
+   and type trust_system := Trust_system.t = struct
   open Inputs
+
+  type verification_error =
+    [ `In_frontier of State_hash.t
+    | `In_process of State_hash.t Cache_lib.Intf.final_state
+    | `Invalid_proof
+    | `Disconnected ]
+
+  type 'a verification_result = ('a, verification_error) Result.t
 
   let verify_transition ~logger ~trust_system ~frontier
       ~unprocessed_transition_cache transition_enveloped =
@@ -54,9 +63,9 @@ module Make (Inputs : Inputs.S) :
       let open Deferred.Result.Let_syntax in
       let transition = Envelope.Incoming.data transition_enveloped in
       let%bind (_ : External_transition.Proof_verified.t) =
-        Protocol_state_validator.validate_proof transition
-        |> Deferred.Result.map_error ~f:(fun error ->
-               `Invalid (Error.to_string_hum error) )
+        ( Protocol_state_validator.validate_proof transition
+          :> External_transition.Proof_verified.t verification_result
+             Deferred.t )
       in
       let verified_transition_with_hash_enveloped =
         Envelope.Incoming.map transition_enveloped ~f:(fun transition ->
@@ -74,11 +83,17 @@ module Make (Inputs : Inputs.S) :
                    External_transition.Verified.protocol_state) )
       in
       Deferred.return
-      @@ Transition_handler_validator.validate_transition ~logger ~frontier
-           ~unprocessed_transition_cache
-           verified_transition_with_hash_enveloped
+      @@ ( Transition_handler_validator.validate_transition ~logger ~frontier
+             ~unprocessed_transition_cache
+             verified_transition_with_hash_enveloped
+           :> ( (External_transition.Verified.t, State_hash.t) With_hash.t
+                Envelope.Incoming.t
+              , State_hash.t )
+              Cached.t
+              verification_result )
     in
     let open Deferred.Let_syntax in
+    let sender = Envelope.Incoming.sender transition_enveloped in
     match%bind cached_verified_transition with
     | Ok x ->
         Deferred.return @@ Ok (Either.Second x)
@@ -97,19 +112,19 @@ module Make (Inputs : Inputs.S) :
             Error (Error.of_string "Previous transition failed")
         | `Success hash ->
             Ok (Either.First hash) )
-    | Error (`Invalid reason) ->
-        let%bind () =
-          Trust_system.(
-            record_envelope_sender trust_system logger
-              (Envelope.Incoming.sender transition_enveloped)
-              Actions.
-                ( Violated_protocol
-                , Some
-                    ( "Transition queried during ledger catchup was not valid \
-                       because $reason"
-                    , [("reason", `String reason)] ) ))
+    | Error `Invalid_proof ->
+        let%map () =
+          Trust_system.record_envelope_sender trust_system logger sender
+            ( Trust_system.Actions.Gossiped_invalid_transition
+            , Some ("invalid proof", []) )
         in
-        Deferred.return @@ Error (Error.of_string reason)
+        Error (Error.of_string "invalid proof")
+    | Error `Disconnected ->
+        let%map () =
+          Trust_system.record_envelope_sender trust_system logger sender
+            (Trust_system.Actions.Disconnected_chain, None)
+        in
+        Error (Error.of_string "disconnected chain")
 
   let take_while_map_result_rev ~f list =
     let open Deferred.Or_error.Let_syntax in
@@ -200,7 +215,7 @@ module Make (Inputs : Inputs.S) :
                 let open Deferred.Let_syntax in
                 match%bind
                   Breadcrumb_builder.build_subtrees_of_breadcrumbs ~logger
-                    ~frontier ~initial_hash:initial_state_hash
+                    ~trust_system ~frontier ~initial_hash:initial_state_hash
                     subtrees_of_transitions
                 with
                 | Ok result ->

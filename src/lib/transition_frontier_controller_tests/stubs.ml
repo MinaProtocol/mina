@@ -332,8 +332,10 @@ struct
           new_breadcrumb
       | Error (`Fatal_error exn) ->
           raise exn
-      | Error (`Validation_error e) ->
-          failwithf !"Validation Error : %{sexp:Error.t}" e ()
+      | Error (`Invalid_staged_ledger_diff e) ->
+          failwithf !"Invalid staged ledger diff: %{sexp:Error.t}" e ()
+      | Error (`Invalid_staged_ledger_hash e) ->
+          failwithf !"Invalid staged ledger hash: %{sexp:Error.t}" e ()
 
   let create_snarked_ledger accounts_with_secret_keys =
     let accounts = List.map ~f:snd accounts_with_secret_keys in

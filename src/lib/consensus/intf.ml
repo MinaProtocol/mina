@@ -225,7 +225,7 @@ module type S = sig
     val received_at_valid_time :
          Consensus_state.Value.t
       -> time_received:Unix_timestamp.t
-      -> (unit, (string * Yojson.Safe.json) list) result
+      -> (unit, [`Too_early | `Too_late of int64]) result
 
     (**
      * Select between two ledger builder controller tips given the consensus
@@ -288,6 +288,7 @@ module type S = sig
       *)
     val sync_local_state :
          logger:Logger.t
+      -> trust_system:Trust_system.t
       -> local_state:Local_state.t
       -> random_peers:(int -> Network_peer.Peer.t list)
       -> query_peer:Network_peer.query_peer

@@ -165,7 +165,8 @@ module Make (Inputs : Intf.Main_inputs) = struct
           child_breadcrumb
       | Error (`Fatal_error exn) ->
           log_error () ; raise exn
-      | Error (`Validation_error error) ->
+      | Error (`Invalid_staged_ledger_diff error)
+      | Error (`Invalid_staged_ledger_hash error) ->
           log_error () ; Error.raise error
     in
     let%map () =
