@@ -4,6 +4,7 @@ open Pipe_lib
 open Signature_lib
 open Coda_numbers
 open Coda_base
+open Coda_state
 open O1trace
 
 module type Intf = sig
@@ -270,14 +271,11 @@ struct
       let num_accounts = Ledger.num_accounts ledger in
       let%bind state = best_protocol_state t in
       let state_hash =
-        Consensus.Protocol_state.hash state
-        |> [%sexp_of: State_hash.t] |> Sexp.to_string
+        Protocol_state.hash state |> [%sexp_of: State_hash.t] |> Sexp.to_string
       in
-      let consensus_state =
-        state |> Consensus.Protocol_state.consensus_state
-      in
+      let consensus_state = state |> Protocol_state.consensus_state in
       let block_count =
-        Length.to_int @@ Consensus.Consensus_state.length consensus_state
+        Length.to_int @@ Consensus.Data.Consensus_state.length consensus_state
       in
       let%bind sync_status =
         Coda_incremental.Status.stabilize () ;
@@ -295,7 +293,7 @@ struct
         |> Sexp.to_string
       in
       let consensus_time_best_tip =
-        Consensus.Consensus_state.time_hum consensus_state
+        Consensus.Data.Consensus_state.time_hum consensus_state
       in
       ( sync_status
       , { num_accounts= Some num_accounts

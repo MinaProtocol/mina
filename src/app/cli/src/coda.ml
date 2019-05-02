@@ -348,7 +348,7 @@ let daemon logger =
          M.Inputs.Time.Controller.create M.Inputs.Time.Controller.basic
        in
        let consensus_local_state =
-         Consensus.Local_state.create
+         Consensus.Data.Local_state.create
            (Option.map Config0.propose_keypair ~f:(fun keypair ->
                 let open Keypair in
                 Public_key.compress keypair.public_key ))
