@@ -46,3 +46,20 @@ module ChildProcess = {
   [@bs.val] [@bs.module "child_process"]
   external spawn: (string, array(string)) => Process.t = "";
 };
+
+module Fs = {
+  [@bs.val] [@bs.module "fs"]
+  external readFile:
+    (
+      string,
+      string,
+      (Js.Nullable.t(Js.Exn.t), Js.Nullable.t(string)) => unit
+    ) =>
+    unit =
+    "";
+
+  [@bs.val] [@bs.module "fs"]
+  external writeFile:
+    (string, string, string, Js.Nullable.t(Js.Exn.t) => unit) => unit =
+    "";
+};
