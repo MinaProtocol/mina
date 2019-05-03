@@ -1,4 +1,5 @@
 open Core_kernel
+open Coda_base
 open Module_version
 
 module Input = struct
@@ -62,7 +63,7 @@ let verify =
         acc
     | h :: hs ->
         let acc =
-          Protocol_state.hash ~hash_body:Fn.id
+          Protocol_state.hash_abstract ~hash_body:Fn.id
             {previous_state_hash= acc; body= h}
         in
         go acc hs
@@ -113,7 +114,7 @@ end = struct
       | body :: bs ->
           let length = Coda_numbers.Length.succ length in
           let full_state_hash =
-            Protocol_state.hash ~hash_body:Fn.id
+            Protocol_state.hash_abstract ~hash_body:Fn.id
               {previous_state_hash= acc; body}
           in
           go
@@ -150,7 +151,7 @@ let%test_unit "completeness" =
           ~f:(fun (prev, length) body ->
             let length = Length.succ length in
             let h =
-              Protocol_state.hash ~hash_body:Fn.id
+              Protocol_state.hash_abstract ~hash_body:Fn.id
                 {previous_state_hash= prev; body}
             in
             Prover.add prover ~prev_hash:prev ~hash:h ~length ~body_hash:body ;

@@ -62,7 +62,7 @@ module type Worker_inputs = sig
      and type staged_ledger := Staged_ledger.t
      and type masked_ledger := Ledger.Mask.Attached.t
      and type transaction_snark_scan_state := Staged_ledger.Scan_state.t
-     and type consensus_local_state := Consensus.Local_state.t
+     and type consensus_local_state := Consensus.Data.Local_state.t
      and type user_command := User_command.t
      and type diff_mutant :=
                 ( External_transition.Stable.Latest.t
