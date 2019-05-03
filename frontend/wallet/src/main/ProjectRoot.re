@@ -32,12 +32,12 @@ let userData =
   if (isPackaged) {
     getPath(`UserData);
   } else {
-    Node_path.join2(Option.getExn([%bs.node __dirname]), "../../..");
+    Node_path.join2(Option.getExn([%bs.node __dirname]), "../../../..");
   };
 
 let resource =
   if (isPackaged) {
     Filename.dirname(getAppPath());
   } else {
-    Node_path.join2(Option.getExn([%bs.node __dirname]), "../../..");
+    Node_path.join2(Option.getExn([%bs.node __dirname]), "../../../..");
   };
