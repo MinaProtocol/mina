@@ -2623,7 +2623,7 @@ let%test_module "test" =
           { diff: Diff.Stable.V1.t
           ; prev_hash: staged_ledger_hash
           ; creator: public_key }
-        [@@deriving sexp, yojson]
+        [@@deriving sexp, yojson, fields]
 
         module With_valid_signatures_and_proofs = struct
           type pre_diff_with_at_most_two_coinbase =
