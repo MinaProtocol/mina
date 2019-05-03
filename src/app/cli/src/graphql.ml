@@ -259,6 +259,15 @@ module Make (Commands : Coda_commands.Intf) = struct
                    a transaction fee"
                 ~typ:(non_null string)
             ; arg "memo" ~doc:"Public description of payment" ~typ:string ]
+
+      let payment_filter_input =
+        non_null
+          (obj "PaymentFilterType"
+             ~coerce:(fun public_key -> public_key)
+             ~fields:
+               [ arg "toOrFrom"
+                   ~doc:"Public key of transactions you are looking for"
+                   ~typ:(non_null string) ])
     end
   end
 
@@ -335,8 +344,37 @@ module Make (Commands : Coda_commands.Intf) = struct
           Option.map (Program.snark_worker_key coda) ~f:(fun k ->
               (k, Program.snark_work_fee coda) ) )
 
+    let payments =
+      field "payments"
+        ~doc:"Payments that a user with public key KEY sent or received"
+        ~args:Arg.[arg "publicKey" ~typ:Types.Input.payment_filter_input]
+        ~typ:(non_null @@ list @@ non_null Types.payment)
+        ~resolve:(fun {ctx= coda; _} () public_key ->
+          let public_key = Public_key.Compressed.of_base64_exn public_key in
+          let transaction_database = Program.transaction_database coda in
+          let transactions =
+            Transaction_database.get_transactions transaction_database
+              public_key
+          in
+          List.filter_map transactions ~f:(function
+            | Coda_base.Transaction.User_command checked_user_command ->
+                let user_command =
+                  User_command.forget_check checked_user_command
+                in
+                Option.some_if
+                  ( User_command_payload.is_payment
+                  @@ User_command.payload user_command )
+                  user_command
+            | _ ->
+                None ) )
+
     let commands =
-      [sync_state; version; owned_wallets; wallet; current_snark_worker]
+      [ sync_state
+      ; version
+      ; owned_wallets
+      ; wallet
+      ; current_snark_worker
+      ; payments ]
   end
 
   module Subscriptions = struct

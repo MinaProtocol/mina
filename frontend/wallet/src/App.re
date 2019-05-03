@@ -1,7 +1,7 @@
 open BsElectron;
 open Tc;
 
-let dev = true;
+let killDaemon = DaemonProcess.start(8080);
 
 let createTray = settingsOrError => {
   let t = AppTray.get();
@@ -9,7 +9,7 @@ let createTray = settingsOrError => {
     Menu.Item.[
       make(
         Label("Synced"),
-        ~icon=ProjectRoot.path ++ "public/circle-16.png",
+        ~icon=Filename.concat(ProjectRoot.resource, "public/circle-16.png"),
         (),
       ),
       make(Separator, ()),
@@ -42,6 +42,7 @@ let createTray = settingsOrError => {
 // We need this handler here to prevent the application from exiting on all
 // windows closed. Keep in mind, we have the tray.
 App.on(`WindowAllClosed, () => ());
+App.on(`WillQuit, () => killDaemon());
 
 let task =
   Task.map2(

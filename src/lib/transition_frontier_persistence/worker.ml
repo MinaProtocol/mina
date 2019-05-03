@@ -1,5 +1,6 @@
 open Core
 open Coda_base
+open Coda_state
 open Async
 
 module Make (Inputs : Intf.Worker_inputs) : sig
@@ -46,7 +47,8 @@ end = struct
         [ ("hash", State_hash.to_yojson hash)
         ; ("parent_hash", State_hash.to_yojson parent_hash) ]
       "Added transition $hash and $parent_hash !" ;
-    External_transition.consensus_state parent_transition
+    External_transition.protocol_state parent_transition
+    |> Protocol_state.consensus_state
 
   let hash = Diff_mutant.hash ~f:State_hash.to_bytes
 
@@ -81,7 +83,8 @@ end = struct
                   in
                   Transition_storage.Batch.remove batch
                     ~key:(Transition state_hash) ;
-                  External_transition.consensus_state removed_transition ) )
+                  External_transition.protocol_state removed_transition
+                  |> Protocol_state.consensus_state ) )
         in
         hash acc_hash diff mutant
     | Update_root new_root_data ->

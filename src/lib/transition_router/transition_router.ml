@@ -1,6 +1,7 @@
 open Core_kernel
 open Async_kernel
 open Coda_base
+open Coda_state
 open Protocols.Coda_pow
 open Pipe_lib
 open Protocols.Coda_transition_frontier
@@ -19,7 +20,7 @@ module type Inputs_intf = sig
      and type staged_ledger_diff := Staged_ledger_diff.t
      and type transaction_snark_scan_state := Staged_ledger.Scan_state.t
      and type masked_ledger := Coda_base.Ledger.t
-     and type consensus_local_state := Consensus.Local_state.t
+     and type consensus_local_state := Consensus.Data.Local_state.t
      and type user_command := User_command.t
      and type diff_mutant :=
                 ( External_transition.Stable.Latest.t
@@ -32,7 +33,7 @@ module type Inputs_intf = sig
     with type peer := Network_peer.Peer.t
      and type state_hash := State_hash.t
      and type external_transition := External_transition.t
-     and type consensus_state := Consensus.Consensus_state.Value.t
+     and type consensus_state := Consensus.Data.Consensus_state.Value.t
      and type state_body_hash := State_body_hash.t
      and type ledger_hash := Ledger_hash.t
      and type sync_ledger_query := Sync_ledger.Query.t
@@ -57,14 +58,14 @@ module type Inputs_intf = sig
      and type ledger_db := Ledger.Db.t
 
   module State_proof :
-    Proof_intf
-    with type input := Consensus.Protocol_state.Value.t
-     and type t := Proof.t
+    Proof_intf with type input := Protocol_state.Value.t and type t := Proof.t
 
   module Protocol_state_validator :
     Protocol_state_validator_intf
     with type time := Time.t
      and type state_hash := State_hash.t
+     and type trust_system := Trust_system.t
+     and type envelope_sender := Envelope.Sender.t
      and type external_transition := External_transition.t
      and type external_transition_proof_verified :=
                 External_transition.Proof_verified.t
@@ -100,9 +101,9 @@ module Make (Inputs : Inputs_intf) :
   let is_transition_for_bootstrap root_state new_transition =
     let open External_transition.Verified in
     let new_state = protocol_state new_transition in
-    Consensus.should_bootstrap
-      ~existing:(External_transition.Protocol_state.consensus_state root_state)
-      ~candidate:(External_transition.Protocol_state.consensus_state new_state)
+    Consensus.Hooks.should_bootstrap
+      ~existing:(Protocol_state.consensus_state root_state)
+      ~candidate:(Protocol_state.consensus_state new_state)
 
   let is_bootstrapping = function
     | `Bootstrap_controller (_, _) ->
@@ -176,7 +177,7 @@ module Make (Inputs : Inputs_intf) :
                 ( Envelope.Incoming.data transition
                 |> With_hash.of_data
                      ~hash_data:
-                       (Fn.compose Consensus.Protocol_state.hash
+                       (Fn.compose Protocol_state.hash
                           External_transition.Verified.protocol_state) ) ) )
     in
     let start_transition_frontier_controller ~verified_transition_writer
@@ -229,7 +230,8 @@ module Make (Inputs : Inputs_intf) :
         , valid_protocol_state_transition_writer ) =
       create_bufferred_pipe ~name:"valid transitions" ()
     in
-    Initial_validator.run ~logger ~transition_reader:network_transition_reader
+    Initial_validator.run ~logger ~trust_system
+      ~transition_reader:network_transition_reader
       ~valid_transition_writer:valid_protocol_state_transition_writer ;
     Strict_pipe.Reader.iter valid_protocol_state_transition_reader
       ~f:(fun network_transition ->
