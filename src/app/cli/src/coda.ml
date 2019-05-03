@@ -242,7 +242,7 @@ let daemon logger =
            && List.length initial_peers_cleaned = 0
          then (
            eprintf "Error: failed to connect to any peers\n" ;
-           exit 1 )
+           exit 10 )
          else Deferred.unit
        in
        let%bind ip =
@@ -263,7 +263,7 @@ let daemon logger =
              eprintf
                "Error: You cannot provide both `propose-key` and \
                 `propose-public-key`" ;
-             exit 1
+             exit 11
          | Some sk_file, None ->
              Secrets.Keypair.Terminal_stdin.read_exn sk_file >>| Option.some
          | None, Some wallet_pk -> (
@@ -278,7 +278,7 @@ let daemon logger =
                  eprintf
                    "Error: This public key was not found in the local \
                     daemon's wallet database" ;
-                 exit 1 )
+                 exit 12 )
          | None, None ->
              return None
        in
@@ -432,7 +432,7 @@ let rec ensure_testnet_id_still_good logger =
             ( local_id |> Option.map ~f:str
             |> Option.value ~default:"[COMMIT_SHA1 not set]" )
             remote_ids ;
-          exit 1
+          exit 13
         in
         match commit_id with
         | None ->
