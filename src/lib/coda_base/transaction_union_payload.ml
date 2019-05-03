@@ -7,18 +7,22 @@ open Currency
 module Tag = Transaction_union_tag
 
 module Body = struct
-  type ('tag, 'pk, 'amount) t_ = {tag: 'tag; public_key: 'pk; amount: 'amount}
+  type ('tag, 'field, 'bool, 'amount) t_ =
+    {tag: 'tag; field_elem: 'field; bit: 'bool; amount: 'amount}
   [@@deriving sexp]
 
-  type var = (Tag.var, Public_key.Compressed.var, Currency.Amount.var) t_
+  type var = (Tag.var, Field.Var.t, Boolean.var, Currency.Amount.var) t_
 
-  type t = (Tag.t, Public_key.Compressed.t, Currency.Amount.t) t_
-  [@@deriving sexp]
+  type t = (Tag.t, Field.t, Bool.t, Currency.Amount.t) t_ [@@deriving sexp]
 
-  let fold ({tag; public_key; amount} : t) =
+  let public_key body =
+    Public_key.Compressed.Poly.{x= body.field_elem; is_odd= body.bit}
+
+  let fold ({tag; field_elem; bit; amount} : t) =
     Fold.(
       Tag.fold tag
-      +> Public_key.Compressed.fold public_key
+      +> group3 (Field.Bits.fold field_elem) ~default:false
+      +> return (bit, false, false)
       +> Currency.Amount.fold amount)
 
   let gen ~fee =
@@ -43,49 +47,65 @@ module Body = struct
              amount >= fee *)
             (Amount.of_fee fee, Amount.max_int)
         | Chain_voting ->
-            (Amount.zero, max_amount_without_overflow)
+            (Amount.zero, Amount.zero)
       in
       Amount.gen_incl min max
-    and public_key = Public_key.Compressed.gen in
-    {tag; public_key; amount}
+    and field_elem, bit =
+      match tag with
+      | Payment | Stake_delegation | Fee_transfer | Coinbase -> (
+          match%map Public_key.Compressed.gen with {x; is_odd} -> (x, is_odd) )
+      | Chain_voting ->
+          let%map field_elem = Field.gen
+          and bit = Quickcheck.Generator.return false in
+          (field_elem, bit)
+    in
+    {tag; field_elem; bit; amount}
 
   let length_in_triples =
-    Tag.length_in_triples + Public_key.Compressed.length_in_triples
+    Tag.length_in_triples + Field.size_in_triples + 1
     + Currency.Amount.length_in_triples
 
-  let to_hlist {tag; public_key; amount} = H_list.[tag; public_key; amount]
+  let to_hlist {tag; field_elem; bit; amount} =
+    H_list.[tag; field_elem; bit; amount]
 
-  let spec =
-    Data_spec.[Tag.typ; Public_key.Compressed.typ; Currency.Amount.typ]
+  let spec = Data_spec.[Tag.typ; Field.typ; Boolean.typ; Currency.Amount.typ]
 
   let typ =
     Typ.of_hlistable spec ~var_to_hlist:to_hlist ~value_to_hlist:to_hlist
-      ~var_of_hlist:(fun H_list.[tag; public_key; amount] ->
-        {tag; public_key; amount} )
-      ~value_of_hlist:(fun H_list.[tag; public_key; amount] ->
-        {tag; public_key; amount} )
+      ~var_of_hlist:(fun H_list.[tag; field_elem; bit; amount] ->
+        {tag; field_elem; bit; amount} )
+      ~value_of_hlist:(fun H_list.[tag; field_elem; bit; amount] ->
+        {tag; field_elem; bit; amount} )
 
   let of_user_command_payload_body = function
-    | User_command_payload.Body.Payment {receiver; amount} ->
-        {tag= Tag.Payment; public_key= receiver; amount}
-    | Stake_delegation (Set_delegate {new_delegate}) ->
+    | User_command_payload.Body.Payment {receiver= {x; is_odd}; amount} ->
+        {tag= Tag.Payment; field_elem= x; bit= is_odd; amount}
+    | Stake_delegation (Set_delegate {new_delegate= {x; is_odd}}) ->
         { tag= Tag.Stake_delegation
-        ; public_key= new_delegate
+        ; field_elem= x
+        ; bit= is_odd
         ; amount= Currency.Amount.zero }
-    | Chain_voting _ ->
+    | Chain_voting hash ->
         { tag= Tag.Chain_voting
-        ; public_key= (* TODO: What's the public_key here? *) failwith "todo"
+        ; field_elem= (hash :> Pedersen.Digest.t)
+        ; bit= false
         ; amount= Currency.Amount.zero }
 
   module Checked = struct
-    let constant ({tag; public_key; amount} : t) : var =
+    let constant ({tag; field_elem; bit; amount} : t) : var =
       { tag= Tag.Checked.constant tag
-      ; public_key= Public_key.Compressed.var_of_t public_key
+      ; field_elem= Field.Var.constant field_elem
+      ; bit= Boolean.var_of_value bit
       ; amount= Currency.Amount.var_of_t amount }
 
-    let to_triples ({tag; public_key; amount} : var) =
-      let%map public_key = Public_key.Compressed.var_to_triples public_key in
-      Tag.Checked.to_triples tag @ public_key
+    let to_triples ({tag; field_elem; bit; amount} : var) =
+      let%map field_elem_bits =
+        Field.Checked.choose_preimage_var ~length:Field.size_in_bits field_elem
+      in
+      Tag.Checked.to_triples tag
+      @ Bitstring_lib.Bitstring.pad_to_triple_list field_elem_bits
+          ~default:Boolean.false_
+      @ [(bit, Boolean.false_, Boolean.false_)]
       @ Currency.Amount.var_to_triples amount
   end
 end

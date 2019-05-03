@@ -44,7 +44,7 @@ let of_transaction : Transaction.t -> t = function
       { payload= Transaction_union_payload.of_user_command_payload payload
       ; sender
       ; signature }
-  | Coinbase {proposer; fee_transfer; amount} ->
+  | Coinbase {proposer= {x; is_odd} as proposer; fee_transfer; amount} ->
       let other_pk, other_amount =
         Option.value ~default:(proposer, Fee.zero) fee_transfer
       in
@@ -53,22 +53,25 @@ let of_transaction : Transaction.t -> t = function
               { fee= other_amount
               ; nonce= Account.Nonce.zero
               ; memo= User_command_memo.dummy }
-          ; body= {public_key= proposer; amount; tag= Tag.Coinbase} }
+          ; body= {field_elem= x; bit= is_odd; amount; tag= Tag.Coinbase} }
       ; sender= Public_key.decompress_exn other_pk
       ; signature= Signature.dummy }
   | Fee_transfer tr -> (
       let two (pk1, fee1) (pk2, fee2) : t =
-        { payload=
-            { common=
-                { fee= fee2
-                ; nonce= Account.Nonce.zero
-                ; memo= User_command_memo.dummy }
-            ; body=
-                { public_key= pk1
-                ; amount= Amount.of_fee fee1
-                ; tag= Tag.Fee_transfer } }
-        ; sender= Public_key.decompress_exn pk2
-        ; signature= Signature.dummy }
+        match pk1 with
+        | Public_key.Compressed.Poly.{x; is_odd} ->
+            { payload=
+                { common=
+                    { fee= fee2
+                    ; nonce= Account.Nonce.zero
+                    ; memo= User_command_memo.dummy }
+                ; body=
+                    { field_elem= x
+                    ; bit= is_odd
+                    ; amount= Amount.of_fee fee1
+                    ; tag= Tag.Fee_transfer } }
+            ; sender= Public_key.decompress_exn pk2
+            ; signature= Signature.dummy }
       in
       match tr with
       | One (pk, fee) ->

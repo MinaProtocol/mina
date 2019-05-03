@@ -109,7 +109,8 @@ let%snarkydef modify_account t pk ~(filter : Account.var -> ('a, _) Checked.t)
 (*
    [modify_account_send t pk ~f] implements the following spec:
 
-   - finds an account [account] in [t] at path [addr] whose public key is [pk] OR it is a fee transfer and is an empty account
+   - finds an account [account] in [t] at path [addr] whose public key is [pk]
+     OR it is a fee transfer and is an empty account
    - returns a root [t'] of a tree of depth [depth]
    which is [t] but with the account [f account] at path [addr].
 *)

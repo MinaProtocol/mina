@@ -152,7 +152,10 @@ module Body = struct
           +> Fold.init (max_variant_size - Stake_delegation.length_in_triples)
                ~f:(fun _ -> (false, false, false)))
     | Chain_voting hash ->
-        Fold.(Tag.fold Chain_voting +> State_hash.fold hash)
+        Fold.(
+          Tag.fold Chain_voting +> State_hash.fold hash
+          +> Fold.init (max_variant_size - State_hash.length_in_triples)
+               ~f:(fun _ -> (false, false, false)))
 
   let sender_cost = function
     | Payment {amount; _} ->

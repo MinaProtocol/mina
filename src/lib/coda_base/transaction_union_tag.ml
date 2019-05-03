@@ -65,15 +65,15 @@ module Checked = struct
     let open Checked in
     Core.List.map2_exn xs ys ~f:Boolean.equal |> Checked.all >>= Boolean.all
 
-  let is_payment = is Payment
+  let is_payment x = is Payment x
 
-  let is_fee_transfer = is Fee_transfer
+  let is_fee_transfer x = is Fee_transfer x
 
-  let is_stake_delegation = is Stake_delegation
+  let is_stake_delegation x = is Stake_delegation x
 
-  let is_coinbase = is Coinbase
+  let is_coinbase x = is Coinbase x
 
-  let is_chain_voting = is Chain_voting
+  let is_chain_voting x = is Chain_voting x
 
   let is_user_command bs =
     let%bind payment = is_payment bs

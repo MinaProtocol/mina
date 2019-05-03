@@ -331,7 +331,7 @@ module Base = struct
           - merkle tree [root'] where the sender balance is decremented by
             [payload.amount] and the receiver balance is incremented by [payload.amount].
           - fee excess = +fee.
-          -if coinbase, then push it to the stack [pending_coinbase_stack_before]
+          - if coinbase, then push it to the stack [pending_coinbase_stack_before]
 
      - if tag = Fee_transfer
         - return:
@@ -362,7 +362,7 @@ module Base = struct
       Transaction_union.Tag.Checked.is_stake_delegation tag
     in
     let%bind sender_compressed = Public_key.compress_var sender in
-    let proposer = payload.body.public_key in
+    let proposer = Transaction_union_payload.Body.public_key payload.body in
     let%bind is_coinbase = Transaction_union.Tag.Checked.is_coinbase tag in
     let%bind pending_coinbase_stack_after =
       let coinbase = (proposer, payload.body.amount) in
@@ -408,8 +408,18 @@ module Base = struct
                if_ is_empty_and_writeable ~then_:(return sender_compressed)
                  ~else_:
                    (if_ is_stake_delegation
-                      ~then_:(return payload.body.public_key)
+                      ~then_:
+                        (return
+                           (Transaction_union_payload.Body.public_key
+                              payload.body))
                       ~else_:(return account.delegate))
+             in
+             let%bind is_chain_voting =
+               Transaction_union_tag.Checked.is_chain_voting tag
+             in
+             let%bind voting_for =
+               Field.Checked.if_ is_chain_voting ~then_:payload.body.field_elem
+                 ~else_:(State_hash.var_to_hash_packed account.voting_for)
              in
              let%map balance =
                Balance.Checked.add_signed_amount account.balance sender_delta
@@ -419,12 +429,13 @@ module Base = struct
              ; nonce= next_nonce
              ; receipt_chain_hash
              ; delegate
-             ; voting_for= account.voting_for }) )
+             ; voting_for= State_hash.var_of_hash_packed voting_for }) )
     in
     let%bind receiver =
       (* A stake delegation only uses the sender *)
       Public_key.Compressed.Checked.if_ is_stake_delegation
-        ~then_:sender_compressed ~else_:payload.body.public_key
+        ~then_:sender_compressed
+        ~else_:(Transaction_union_payload.Body.public_key payload.body)
     in
     (* we explicitly set the public_key because it could be zero if the account is new *)
     let%map root =
