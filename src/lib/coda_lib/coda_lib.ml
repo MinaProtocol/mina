@@ -768,6 +768,7 @@ module Make (Inputs : Inputs_intf) = struct
                       let%map frontier =
                         Transition_frontier_persistence.deserialize
                           ~directory_name ~logger:config.logger
+                          ~trust_system:config.trust_system
                           ~root_snarked_ledger
                           ~consensus_local_state:config.consensus_local_state
                       in
