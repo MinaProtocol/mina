@@ -136,9 +136,9 @@ def run(args):
                 on_failure()
         wet('$ ' + cmd, do)
 
-    def dune_build(target, build_log):
+    def dune_build(target, workspace, build_log):
         run_cmd(
-            'dune build --display=progress %s 2> %s' % (target, build_log),
+            'dune build --workspace=%s --display=progress %s 2> %s' % (workspace, target, build_log),
             lambda: fail_with_log('building %s failed' % target, build_log)
         )
 
@@ -182,16 +182,17 @@ def run(args):
             logproc_exe_path = os.path.join(coda_app_path, 'logproc/logproc.exe')
             logproc_exe = os.path.join(coda_build_dir('default'), logproc_exe_path)
             build_log = os.path.join(log_dir, 'logproc_build.log')
-            dune_build(logproc_exe, build_log)
+            dune_build(logproc_exe, 'dune-workspace', build_log)
 
     for profile in test_permutations.keys():
+        build_context = 'default' if profile == 'dev' else profile
         profile_log_dir = os.path.join(log_dir, profile)
         build_log = os.path.join(profile_log_dir, 'build.log')
         coda_exe = os.path.join(coda_build_dir(profile), coda_exe_path)
 
         wet('make directory: ' + profile_log_dir, lambda: os.mkdir(profile_log_dir))
         print('- %s:' % profile)
-        dune_build(coda_exe, build_log)
+        dune_build(coda_exe, 'dune-workspace.' + build_context, build_log)
 
         for test in test_permutations[profile]:
             print('  - %s' % test)
