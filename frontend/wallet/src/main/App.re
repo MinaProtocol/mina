@@ -1,8 +1,6 @@
 open BsElectron;
 open Tc;
 
-let dev = true;
-
 let killDaemon = DaemonProcess.start(8080);
 
 let createTray = settingsOrError => {
@@ -11,7 +9,7 @@ let createTray = settingsOrError => {
     Menu.Item.[
       make(
         Label("Synced"),
-        ~icon=ProjectRoot.path ++ "public/circle-16.png",
+        ~icon=Filename.concat(ProjectRoot.resource, "public/circle-16.png"),
         (),
       ),
       make(Separator, ()),

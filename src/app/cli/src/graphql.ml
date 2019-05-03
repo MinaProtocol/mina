@@ -109,13 +109,13 @@ module Make (Commands : Coda_commands.Intf) = struct
               ~doc:"Public key of the proposer creating the block"
               ~args:Arg.[]
               ~resolve:(fun _ external_transition ->
-                Stringable.public_key
-                @@ External_transition.proposer external_transition )
+                Stringable.public_key @@ Commands.proposer external_transition
+                )
           ; field "payments" ~doc:"List of payments in the block"
               ~typ:(non_null (list @@ non_null payment))
               ~args:Arg.[]
               ~resolve:(fun _ external_transition ->
-                External_transition.payments external_transition )
+                Commands.payments external_transition )
           ; field "snarkFees"
               ~doc:"Fees that a proposer for constructing proofs"
               ~typ:(non_null (list @@ non_null snark_fee))
@@ -220,7 +220,7 @@ module Make (Commands : Coda_commands.Intf) = struct
         obj "CreatePaymentPayload" ~fields:(fun _ ->
             [ field "payment" ~typ:(non_null payment)
                 ~args:Arg.[]
-                ~resolve:(fun _ cmd -> cmd) ] )
+                ~resolve:(fun _ -> Fn.id) ] )
     end
 
     module Input = struct
@@ -338,13 +338,26 @@ module Make (Commands : Coda_commands.Intf) = struct
           let public_key = Public_key.Compressed.of_base64_exn public_key in
           Commands.get_all_payments coda public_key )
 
+    let initial_peers =
+      field "initialPeers"
+        ~doc:
+          "The initial peers that a client syncs with is an inidication of \
+           specifically the network they are in"
+        ~args:Arg.[]
+        ~typ:(non_null @@ list @@ non_null string)
+        ~resolve:(fun {ctx= coda; _} () ->
+          List.map (Program.initial_peers coda)
+            ~f:(fun {Host_and_port.host; port} -> sprintf !"%s:%i" host port)
+          )
+
     let commands =
       [ sync_state
       ; version
       ; owned_wallets
       ; wallet
       ; current_snark_worker
-      ; payments ]
+      ; payments
+      ; initial_peers ]
   end
 
   module Subscriptions = struct

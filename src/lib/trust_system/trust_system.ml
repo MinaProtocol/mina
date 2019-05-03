@@ -34,6 +34,9 @@ module Actions = struct
         (** Peer has been determined to be on a chain that is not connected to our chain. *)
     | Sent_bad_hash
         (** Peer sent us some data that doesn't hash to the expected value. *)
+    | Sent_invalid_signature
+        (** Peer sent us something with a signature that doesn't check. *)
+    | Sent_invalid_proof  (** Peer sent us a proof that does not verify. *)
     | Violated_protocol
         (** Peer violated the specification of the protocol. *)
     | Made_request
@@ -87,6 +90,10 @@ module Actions = struct
     | Disconnected_chain ->
         Insta_ban
     | Sent_bad_hash ->
+        Insta_ban
+    | Sent_invalid_signature ->
+        Insta_ban
+    | Sent_invalid_proof ->
         Insta_ban
     | Outgoing_connection_error ->
         Trust_decrease 0.4

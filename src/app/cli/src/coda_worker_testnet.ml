@@ -221,7 +221,7 @@ let start_prefix_check logger workers events testnet ~acceptable_delay =
              ~metadata:
                [ ("chains", chains_json ())
                ; ("tf_vizs", `List (List.map ~f:(fun s -> `String s) tfs)) ] ;
-           exit 1)
+           exit 7)
           |> don't_wait_for
         else
           Logger.info logger ~module_:__MODULE__ ~location:__LOC__
@@ -256,7 +256,7 @@ let start_prefix_check logger workers events testnet ~acceptable_delay =
        then (
          Logger.fatal logger ~module_:__MODULE__ ~location:__LOC__
            "no recent blocks" ;
-         ignore (exit 1) ) ;
+         ignore (exit 8) ) ;
        let%bind () = after (Time.Span.of_sec 1.0) in
        go ()
      in
@@ -325,7 +325,7 @@ let start_payment_check logger root_pipe workers (testnet : Api.t) =
                         ; ("user_cmd", User_command.to_yojson user_cmd) ]
                       "transaction $user_cmd took too long to get into the \
                        root of node $worker_id" ;
-                    exit 1 |> ignore ) ) ;
+                    exit 9 |> ignore ) ) ;
               List.iter user_commands ~f:(fun user_cmd ->
                   Hashtbl.change user_cmds_under_inspection user_cmd
                     ~f:(function
@@ -540,14 +540,8 @@ end = struct
         let%map node_payments =
           query_relevant_payments testnet worker_index public_keys
         in
-        let result =
-          List.for_all expected_payments
-            ~f:(User_command.Set.mem node_payments)
-        in
-        Core.printf
-          !"Did Worker %i have all the payments: %b"
-          worker_index result ;
-        result )
+        List.for_all expected_payments ~f:(User_command.Set.mem node_payments)
+    )
     >>| List.for_all ~f:Fn.id
 
   let assert_retrievable_payments (testnet : Api.t)

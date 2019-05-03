@@ -4,6 +4,7 @@ open Pipe_lib
 open Signature_lib
 open Coda_numbers
 open Coda_base
+open Coda_state
 open O1trace
 
 module type Intf = sig
@@ -29,6 +30,13 @@ module type Intf = sig
 
   val get_all_payments :
     Program.t -> Public_key.Compressed.t -> User_command.t list
+
+  (* TODO: Remove once we have no more functors for external_transition *)
+  val payments : Program.Inputs.External_transition.t -> User_command.t list
+
+  (* TODO: Remove once we have no more functors for external_transition *)
+  val proposer :
+    Program.Inputs.External_transition.t -> Public_key.Compressed.t
 end
 
 module Make
@@ -283,14 +291,11 @@ struct
       let num_accounts = Ledger.num_accounts ledger in
       let%bind state = best_protocol_state t in
       let state_hash =
-        Consensus.Protocol_state.hash state
-        |> [%sexp_of: State_hash.t] |> Sexp.to_string
+        Protocol_state.hash state |> [%sexp_of: State_hash.t] |> Sexp.to_string
       in
-      let consensus_state =
-        state |> Consensus.Protocol_state.consensus_state
-      in
+      let consensus_state = state |> Protocol_state.consensus_state in
       let block_count =
-        Length.to_int @@ Consensus.Consensus_state.length consensus_state
+        Length.to_int @@ Consensus.Data.Consensus_state.length consensus_state
       in
       let%bind sync_status =
         Coda_incremental.Status.stabilize () ;
@@ -308,7 +313,7 @@ struct
         |> Sexp.to_string
       in
       let consensus_time_best_tip =
-        Consensus.Consensus_state.time_hum consensus_state
+        Consensus.Data.Consensus_state.time_hum consensus_state
       in
       ( sync_status
       , { num_accounts= Some num_accounts
@@ -370,6 +375,19 @@ struct
       | _ ->
           None )
 
+  let user_commands =
+    Fn.compose Staged_ledger_diff.user_commands
+      External_transition.staged_ledger_diff
+
+  let payments external_transition =
+    List.filter
+      (user_commands external_transition)
+      ~f:(Fn.compose User_command_payload.is_payment User_command.payload)
+
+  let proposer =
+    Fn.compose Staged_ledger_diff.creator
+      External_transition.staged_ledger_diff
+
   module Subscriptions = struct
     (* Creates a global pipe to feed a subscription that will be available throughout the entire duration that a daemon is runnning  *)
     let global_pipe coda ~to_pipe =
@@ -406,7 +424,7 @@ struct
               in
               Option.some_if
                 (Public_key.Compressed.equal
-                   (External_transition.proposer unverified_new_block)
+                   (proposer unverified_new_block)
                    public_key)
                 unverified_new_block ) )
 
@@ -415,7 +433,7 @@ struct
       global_pipe coda ~to_pipe:(fun new_block_incr ->
           let payments_incr =
             Coda_incremental.New_transition.map new_block_incr
-              ~f:External_transition.Verified.payments
+              ~f:(Fn.compose payments External_transition.of_verified)
           in
           let payments_observer =
             Coda_incremental.New_transition.observe payments_incr
