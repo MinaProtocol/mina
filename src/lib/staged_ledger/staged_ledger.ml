@@ -1728,6 +1728,9 @@ let%test_module "test" =
       module Compressed_public_key = struct
         type t = string [@@deriving sexp, compare, yojson, hash]
 
+        (* unused in test *)
+        type var = unit
+
         module Stable = struct
           module V1 = struct
             module T = struct
@@ -1761,7 +1764,10 @@ let%test_module "test" =
           module Latest = V1
         end
 
-        module Digest = Unit
+        module Digest = struct
+          include Unit
+          module Checked = Unit
+        end
 
         type t = Stable.Latest.t [@@deriving sexp, yojson]
 
@@ -2345,6 +2351,9 @@ let%test_module "test" =
         end
 
         type t = string [@@deriving sexp, eq, compare]
+
+        (* unused in test *)
+        type var = unit
 
         type ledger_hash = Ledger_hash.t
 
