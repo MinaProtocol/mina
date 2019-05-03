@@ -11,7 +11,7 @@
       any transactions after one we replace efficiently.
 
       See "Finger Trees, a simple general-purpose data structure" by Ralf Hinze
-      and Ross Patterson for more details.
+      and Ross Paterson for more details.
 
       http://www.staff.city.ac.uk/~ross/papers/FingerTree.pdf
 

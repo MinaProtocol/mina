@@ -5,6 +5,8 @@ module Digit = struct
   (* We use GADTs to track whether it's valid to remove/add an element to a
      digit, which gets us type safe (un)cons and (un)snoc. *)
 
+  [@@@warning "-37"]
+
   type addable = Type_addable
 
   type not_addable = Type_not_addable
@@ -13,8 +15,7 @@ module Digit = struct
 
   type not_removable = Type_not_removable
 
-  (* Silence the unused value warnings. Y U NO EmptyDataDecls, Ocaml? *)
-  let _ = (Type_addable, Type_not_addable, Type_removable, Type_not_removable)
+  [@@@warning "+37"]
 
   type (_, _, 'e) t =
     | One : 'e -> (addable, not_removable, 'e) t

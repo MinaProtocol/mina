@@ -79,8 +79,7 @@ val revalidate :
   -> t * User_command.With_valid_signature.t Sequence.t
 
 module For_tests : sig
-  (** Checks the invariants of the data structure. If this returns false there
-      is a bug.
-  *)
+  (** Checks the invariants of the data structure. If this throws an exception
+      there is a bug. *)
   val assert_invariants : t -> unit
 end

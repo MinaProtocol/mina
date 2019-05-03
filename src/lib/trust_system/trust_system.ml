@@ -21,7 +21,7 @@ module Actions = struct
     | Fulfilled_request  (** Peer fulfilled a request we made. *)
     | Epoch_ledger_provided  (** Special case of request fulfillment *)
     | Sent_useful_gossip
-        (** Peer sent us a gossip item that we added to out pool*)
+        (** Peer sent us a gossip item that we added to our pool*)
     | Sent_useless_gossip
         (** Peer sent us a gossip item that we rejected from our pool for reasons
           that may be innocent. e.g. too low of a fee for a user command, out of
