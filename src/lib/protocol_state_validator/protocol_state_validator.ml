@@ -3,6 +3,7 @@ open Async_kernel
 open Protocols.Coda_pow
 open Protocols.Coda_transition_frontier
 open Coda_base
+open Coda_state
 
 module type Inputs_intf = sig
   include Transition_frontier.Inputs_intf
@@ -10,9 +11,7 @@ module type Inputs_intf = sig
   module Time : Time_intf
 
   module State_proof :
-    Proof_intf
-    with type input := Consensus.Protocol_state.Value.t
-     and type t := Proof.t
+    Proof_intf with type input := Protocol_state.Value.t and type t := Proof.t
 end
 
 module Make (Inputs : Inputs_intf) :
@@ -69,14 +68,15 @@ module Make (Inputs : Inputs_intf) :
     let time_received = to_unix_timestamp time_received in
     let consensus_state =
       External_transition.protocol_state transition
-      |> External_transition.Protocol_state.consensus_state
+      |> Protocol_state.consensus_state
     in
     let open Deferred.Let_syntax in
     let%bind result =
       let open Deferred.Result.Let_syntax in
       let%bind () =
         Deferred.return
-          ( Consensus.received_at_valid_time consensus_state ~time_received
+          ( Consensus.Hooks.received_at_valid_time consensus_state
+              ~time_received
             :> unit validation_result )
       in
       validate_proof transition
