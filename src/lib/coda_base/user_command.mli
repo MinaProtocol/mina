@@ -38,12 +38,24 @@ val fee : t -> Currency.Fee.t
 val sender : t -> Public_key.Compressed.t
 
 (* Generate a single transaction between
- * $a, b \in keys$
+ * Generate random keys for sender and receiver
  * for fee $\in [0,max_fee]$
  * and an amount $\in [1,max_amount]$
  *)
 
 val gen :
+     key_gen:(Signature_keypair.t * Signature_keypair.t) Quickcheck.Generator.t
+  -> max_amount:int
+  -> max_fee:int
+  -> t Quickcheck.Generator.t
+
+(* Generate a single transaction between
+ * $a, b \in keys$
+ * for fee $\in [0,max_fee]$
+ * and an amount $\in [1,max_amount]$
+ *)
+
+val gen_with_random_participants :
      keys:Signature_keypair.t array
   -> max_amount:int
   -> max_fee:int
@@ -56,6 +68,13 @@ module With_valid_signature : sig
       [@@deriving sexp, eq, bin_io, yojson, version, compare, hash]
 
       val gen :
+           key_gen:(Signature_keypair.t * Signature_keypair.t)
+                   Quickcheck.Generator.t
+        -> max_amount:int
+        -> max_fee:int
+        -> t Quickcheck.Generator.t
+
+      val gen_with_random_participants :
            keys:Signature_keypair.t array
         -> max_amount:int
         -> max_fee:int
@@ -68,6 +87,13 @@ module With_valid_signature : sig
   type t = Stable.Latest.t [@@deriving sexp, eq, yojson, compare, hash]
 
   val gen :
+       key_gen:(Signature_keypair.t * Signature_keypair.t)
+               Quickcheck.Generator.t
+    -> max_amount:int
+    -> max_fee:int
+    -> t Quickcheck.Generator.t
+
+  val gen_with_random_participants :
        keys:Signature_keypair.t array
     -> max_amount:int
     -> max_fee:int

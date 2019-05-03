@@ -97,15 +97,12 @@ let sign (kp : Signature_keypair.t) (payload : Payload.t) : t =
   ; sender= kp.public_key
   ; signature= Schnorr.sign kp.private_key payload }
 
-let gen ~keys ~max_amount ~max_fee =
+let gen ~key_gen ~max_amount ~max_fee =
   let open Quickcheck.Generator.Let_syntax in
-  let%map sender_idx = Int.gen_incl 0 (Array.length keys - 1)
-  and receiver_idx = Int.gen_incl 0 (Array.length keys - 1)
+  let%map sender, receiver = key_gen
   and fee = Int.gen_incl 0 max_fee >>| Currency.Fee.of_int
   and amount = Int.gen_incl 1 max_amount >>| Currency.Amount.of_int
   and memo = String.quickcheck_generator in
-  let sender = keys.(sender_idx) in
-  let receiver = keys.(receiver_idx) in
   let payload : Payload.t =
     Payload.create ~fee ~nonce:Account_nonce.zero
       ~memo:(User_command_memo.create_exn memo)
@@ -115,6 +112,15 @@ let gen ~keys ~max_amount ~max_fee =
            ; amount })
   in
   sign sender payload
+
+let gen_with_random_participants ~keys ~max_amount ~max_fee =
+  let key_gen =
+    let open Quickcheck.Let_syntax in
+    let%map sender_idx = Int.gen_incl 0 (Array.length keys - 1)
+    and receiver_idx = Int.gen_incl 0 (Array.length keys - 1) in
+    (keys.(sender_idx), keys.(receiver_idx))
+  in
+  gen ~key_gen ~max_amount ~max_fee
 
 module With_valid_signature = struct
   module Stable = struct
@@ -130,6 +136,8 @@ module With_valid_signature = struct
       let compare = Stable.V1.compare
 
       let gen = gen
+
+      let gen_with_random_participants = gen_with_random_participants
     end
 
     module Latest = V1
@@ -164,7 +172,7 @@ let check_signature ({payload; sender; signature} : t) =
 
 let gen_test =
   let keys = Array.init 2 ~f:(fun _ -> Signature_keypair.create ()) in
-  gen ~keys ~max_amount:10000 ~max_fee:1000
+  gen_with_random_participants ~keys ~max_amount:10000 ~max_fee:1000
 
 let%test_unit "completeness" =
   Quickcheck.test ~trials:20 gen_test ~f:(fun t -> assert (check_signature t))

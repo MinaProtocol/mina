@@ -449,7 +449,9 @@ struct
                   ~f:(fun checked_user_command ->
                     Transaction_database.add transaction_database
                       (Coda_base.Transaction.User_command checked_user_command)
-                ) ;
+                      (* TODO: Time should be computed as when a payment gets into the transition frontier  *)
+                      ( Coda_base.Block_time.Time.now
+                      @@ Coda_base.Block_time.Time.Controller.basic ) ) ;
                 Strict_pipe.Writer.write frontier_payment_writer payment )
           in
           Coda_incremental.New_transition.Observer.on_update_exn
