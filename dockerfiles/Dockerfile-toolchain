@@ -71,3 +71,6 @@ RUN sudo apt-get install --yes apt-transport-https ca-certificates && \
       sudo apt-get update && \
       sudo apt-get install --yes coda-kademlia
 
+# The Ocaml images are set to London time for reason. UTC makes reading the logs
+# easier.
+RUN sudo ln -sf /usr/share/zoneinfo/UTC /etc/localtime
