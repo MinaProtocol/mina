@@ -115,13 +115,29 @@ struct
                         Staged_ledger.Staged_ledger_error.to_string
                           staged_ledger_error
                       in
-                      Trust_system.(
-                        record trust_system logger inet_addr
-                          Actions.
-                            ( Violated_protocol
-                            , Some
-                                ( "Staged_ledger error: $error"
-                                , [("error", `String error_string)] ) ))
+                      let make_actions action =
+                        ( action
+                        , Some
+                            ( "Staged_ledger error: $error"
+                            , [("error", `String error_string)] ) )
+                      in
+                      let open Trust_system.Actions in
+                      (* TODO : refine these actions, issue 2375 *)
+                      let action =
+                        match staged_ledger_error with
+                        | Invalid_proof _ | Bad_signature _ ->
+                            make_actions Violated_protocol
+                        | Coinbase_error _
+                        | Bad_prev_hash _
+                        | Insufficient_fee _
+                        | Non_zero_fee_excess _ ->
+                            make_actions Gossiped_invalid_transition
+                        | Unexpected _ ->
+                            failwith
+                              "build: Unexpected staged ledger error should \
+                               have been caught in another pattern"
+                      in
+                      Trust_system.record trust_system logger inet_addr action
                 in
                 return
                   (Error

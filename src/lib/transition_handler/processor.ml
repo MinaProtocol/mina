@@ -194,20 +194,10 @@ module Make (Inputs : Inputs.With_unprocessed_transition_cache.S) :
                              |> Cached.sequence_deferred
                            in
                            match Cached.sequence_result cached_breadcrumb with
-                           | Error (sender, `Invalid_staged_ledger_hash error)
-                           | Error (sender, `Invalid_staged_ledger_diff error)
+                           | Error (_sender, `Invalid_staged_ledger_hash error)
+                           | Error (_sender, `Invalid_staged_ledger_diff error)
                              ->
-                               let%map () =
-                                 Trust_system.record_envelope_sender
-                                   trust_system logger sender
-                                   ( Trust_system.Actions
-                                     .Gossiped_invalid_transition
-                                   , Some
-                                       ( sprintf "invalid staged ledger: %s"
-                                           (Error.to_string_hum error)
-                                       , [] ) )
-                               in
-                               Error error
+                               return (Error error)
                            | Error (_sender, `Fatal_error error) ->
                                raise error
                            | Ok breadcrumb ->
