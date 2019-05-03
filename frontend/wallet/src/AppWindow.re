@@ -60,8 +60,8 @@ include Single.Make({
       loadURL(
         window,
         "file://"
-        ++ ProjectRoot.path
-        ++ "public/index.html#"
+        ++ Filename.concat(ProjectRoot.resource, "public/index.html")
+        ++ "#"
         ++ Route.print(route),
       );
 

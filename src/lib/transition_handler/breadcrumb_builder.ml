@@ -1,5 +1,6 @@
 open Protocols.Coda_pow
 open Coda_base
+open Coda_state
 open Core
 open Async
 open Cache_lib
@@ -7,6 +8,7 @@ open Cache_lib
 module Make (Inputs : Inputs.S) :
   Breadcrumb_builder_intf
   with type state_hash := State_hash.t
+  with type trust_system := Trust_system.t
   with type external_transition_verified :=
               Inputs.External_transition.Verified.t
   with type transition_frontier := Inputs.Transition_frontier.t
@@ -14,8 +16,8 @@ module Make (Inputs : Inputs.S) :
               Inputs.Transition_frontier.Breadcrumb.t = struct
   open Inputs
 
-  let build_subtrees_of_breadcrumbs ~logger ~frontier ~initial_hash
-      subtrees_of_enveloped_transitions =
+  let build_subtrees_of_breadcrumbs ~logger ~trust_system ~frontier
+      ~initial_hash subtrees_of_enveloped_transitions =
     (* If the breadcrumb we are targetting is removed from the transition
      * frontier while we're catching up, it means this path is not on the
      * critical path that has been chosen in the frontier. As such, we should
@@ -51,6 +53,7 @@ module Make (Inputs : Inputs.S) :
                   let transition =
                     Envelope.Incoming.data enveloped_transition
                   in
+                  let sender = Envelope.Incoming.sender enveloped_transition in
                   let parent = Cached.peek cached_parent in
                   let expected_parent_hash =
                     Transition_frontier.Breadcrumb.transition_with_hash parent
@@ -59,7 +62,7 @@ module Make (Inputs : Inputs.S) :
                   let actual_parent_hash =
                     transition |> With_hash.data
                     |> External_transition.Verified.protocol_state
-                    |> External_transition.Protocol_state.previous_state_hash
+                    |> Protocol_state.previous_state_hash
                   in
                   let%bind () =
                     Deferred.return
@@ -73,19 +76,35 @@ module Make (Inputs : Inputs.S) :
                                hash"))
                   in
                   let open Deferred.Let_syntax in
-                  match%map
+                  (* TODO: propagate bans through subtree (#2299) *)
+                  match%bind
                     Transition_frontier.Breadcrumb.build ~logger ~parent
                       ~transition_with_hash:transition
                   with
                   | Ok new_breadcrumb ->
                       let open Result.Let_syntax in
-                      let%map (_ : Transition_frontier.Breadcrumb.t) =
-                        breadcrumb_if_present ()
-                      in
-                      new_breadcrumb
+                      Deferred.return
+                        (let%map (_ : Transition_frontier.Breadcrumb.t) =
+                           breadcrumb_if_present ()
+                         in
+                         new_breadcrumb)
                   | Error (`Fatal_error exn) ->
-                      Or_error.of_exn exn
-                  | Error (`Validation_error error) ->
+                      Deferred.return (Or_error.of_exn exn)
+                  | Error (`Invalid_staged_ledger_hash error) ->
+                      let%map () =
+                        Trust_system.record_envelope_sender trust_system logger
+                          sender
+                          ( Trust_system.Actions.Gossiped_invalid_transition
+                          , Some ("invalid staged ledger hash", []) )
+                      in
+                      Error error
+                  | Error (`Invalid_staged_ledger_diff error) ->
+                      let%map () =
+                        Trust_system.record_envelope_sender trust_system logger
+                          sender
+                          ( Trust_system.Actions.Gossiped_invalid_transition
+                          , Some ("invalid staged ledger diff", []) )
+                      in
                       Error error )
               |> Cached.sequence_deferred
             in
