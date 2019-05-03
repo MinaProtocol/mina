@@ -8,11 +8,12 @@
     "@glennsl/bs-json": "^3.0.0",
     "bs-css": "^8.0.2",
     "bs-electron": "github:Schmavery/bs-electron",
+    "bs-platform": "^5.0.3",
     "graphql_ppx": "^0.2.8",
+    "node-fetch": "^2.5.0",
     "reason-apollo": "^0.16.0",
     "reason-react": "^0.7.0",
-    "tablecloth-bucklescript": "file:./tablecloth/bs",
-    "bs-platform": "^5.0.3"
+    "tablecloth-bucklescript": "file:./tablecloth/bs"
   },
   "devDependencies": {
     "concurrently": "^4.1.0",

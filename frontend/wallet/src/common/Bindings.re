@@ -63,3 +63,7 @@ module Fs = {
     (string, string, string, Js.Nullable.t(Js.Exn.t) => unit) => unit =
     "";
 };
+
+module Fetch = {
+  [@bs.module] external fetch: ApolloClient.fetch = "node-fetch";
+};
