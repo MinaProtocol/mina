@@ -72,6 +72,9 @@ let account_nonce : Coda_base.Account.Nonce.t -> Lite_base.Account.Nonce.t =
 let balance : Currency.Balance.t -> Lite_base.Account.Balance.t =
   Fn.compose Lite_base.Account.Balance.t_of_sexp Currency.Balance.sexp_of_t
 
+let voting_for : Coda_base.State_hash.t -> Lite_base.State_hash.t =
+  Fn.compose Lite_base.State_hash.t_of_sexp Coda_base.State_hash.sexp_of_t
+
 let time : Coda_base.Block_time.t -> Lite_base.Block_time.t =
   Fn.compose Lite_base.Block_time.t_of_sexp Coda_base.Block_time.sexp_of_t
 
@@ -82,7 +85,7 @@ let account (account : Coda_base.Account.value) : Lite_base.Account.t =
   ; delegate= public_key account.delegate
   ; receipt_chain_hash=
       digest (account.receipt_chain_hash :> Tick.Pedersen.Digest.t)
-  ; participated= account.participated }
+  ; voting_for= voting_for account.voting_for }
 
 let ledger_hash (h : Coda_base.Ledger_hash.t) : Lite_base.Ledger_hash.t =
   digest (h :> Tick.Pedersen.Digest.t)
