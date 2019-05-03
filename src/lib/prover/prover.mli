@@ -1,14 +1,9 @@
-open Core
 open Async
 open Coda_base
 open Coda_state
 open Blockchain_snark
 
 module type S = sig
-  (* module Consensus_mechanism : Consensus.S
-
-  module Blockchain :
-    Blockchain.S with module Consensus_mechanism = Consensus_mechanism *)
   module Worker_state : sig
     type t
 
