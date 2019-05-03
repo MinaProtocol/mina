@@ -48,6 +48,7 @@ module type S = sig
     ; broadcast_writer: msg Linear_pipe.Writer.t
     ; received_reader: msg Envelope.Incoming.t Strict_pipe.Reader.t
     ; me: Peer.t
+    ; initial_peers: Host_and_port.t list
     ; peers: Peer.Hash_set.t
     ; peers_by_ip: (Unix.Inet_addr.t, Peer.t list) Hashtbl.t
     ; removed_peers: Peer.Hash_set.t
@@ -75,6 +76,8 @@ module type S = sig
 
   val peers : t -> Peer.t list
 
+  val initial_peers : t -> Host_and_port.t list
+
   val query_peer :
     t -> Peer.t -> ('q, 'r) dispatch -> 'q -> 'r Or_error.t Deferred.t
 
@@ -98,6 +101,7 @@ module Make (Message : Message_intf) : S with type msg := Message.msg = struct
     ; broadcast_writer: Message.msg Linear_pipe.Writer.t
     ; received_reader: Message.msg Envelope.Incoming.t Strict_pipe.Reader.t
     ; me: Peer.t
+    ; initial_peers: Host_and_port.t list
     ; peers: Peer.Hash_set.t
     ; peers_by_ip: (Unix.Inet_addr.t, Peer.t list) Hashtbl.t
     ; removed_peers: Peer.Hash_set.t
@@ -307,6 +311,7 @@ module Make (Message : Message_intf) : S with type msg := Message.msg = struct
           ; received_reader
           ; me= config.me
           ; peers= Peer.Hash_set.create ()
+          ; initial_peers= config.initial_peers
           ; peers_by_ip= Hashtbl.create (module Unix.Inet_addr)
           ; removed_peers= Peer.Hash_set.create ()
           ; connections= Hashtbl.create (module Unix.Inet_addr)
@@ -494,6 +499,8 @@ module Make (Message : Message_intf) : S with type msg := Message.msg = struct
   let broadcast t = t.broadcast_writer
 
   let peers t = Hash_set.to_list t.peers
+
+  let initial_peers t = t.initial_peers
 
   let broadcast_all t msg =
     let to_broadcast = ref (List.permute (Hash_set.to_list t.peers)) in

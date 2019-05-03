@@ -1,7 +1,6 @@
 [%%import
 "../../config.mlh"]
 
-module Constants = Constants
 include Intf
 
 [%%if
