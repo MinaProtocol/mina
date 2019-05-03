@@ -82,6 +82,8 @@ module type Network_intf = sig
     -> 'q
     -> 'r Deferred.Or_error.t
 
+  val initial_peers : t -> Host_and_port.t list
+
   module Config : sig
     type t
   end
@@ -578,6 +580,8 @@ module Make (Inputs : Inputs_intf) = struct
 
   let peers t = Net.peers t.net
 
+  let initial_peers t = Net.initial_peers t.net
+
   let snark_work_fee t = t.snark_work_fee
 
   let receipt_chain_database t = t.receipt_chain_database
@@ -764,6 +768,7 @@ module Make (Inputs : Inputs_intf) = struct
                       let%map frontier =
                         Transition_frontier_persistence.deserialize
                           ~directory_name ~logger:config.logger
+                          ~trust_system:config.trust_system
                           ~root_snarked_ledger
                           ~consensus_local_state:config.consensus_local_state
                       in

@@ -78,7 +78,7 @@ struct
 
     let copy t = {t with staged_ledger= Staged_ledger.copy t.staged_ledger}
 
-    let build ~logger ~parent ~transition_with_hash =
+    let build ~logger ~trust_system ~parent ~transition_with_hash ~sender =
       O1trace.measure "Breadcrumb.build" (fun () ->
           let open Deferred.Result.Let_syntax in
           let staged_ledger = parent.staged_ledger in
@@ -97,33 +97,82 @@ struct
                    , `Staged_ledger transitioned_staged_ledger
                    , `Pending_coinbase_data _ ) =
             let open Deferred.Let_syntax in
-            match%map
+            match%bind
               Staged_ledger.apply ~logger staged_ledger
                 (External_transition.Verified.staged_ledger_diff transition)
             with
             | Ok x ->
-                Ok x
+                return (Ok x)
             | Error (Staged_ledger.Staged_ledger_error.Unexpected e) ->
-                Error (`Fatal_error (Error.to_exn e))
-            | Error e ->
-                Error
-                  (`Invalid_staged_ledger_diff
-                    (Staged_ledger.Staged_ledger_error.to_error e))
+                return (Error (`Fatal_error (Error.to_exn e)))
+            | Error staged_ledger_error ->
+                let%bind () =
+                  match sender with
+                  | None | Some Envelope.Sender.Local ->
+                      return ()
+                  | Some (Envelope.Sender.Remote inet_addr) ->
+                      let error_string =
+                        Staged_ledger.Staged_ledger_error.to_string
+                          staged_ledger_error
+                      in
+                      let make_actions action =
+                        ( action
+                        , Some
+                            ( "Staged_ledger error: $error"
+                            , [("error", `String error_string)] ) )
+                      in
+                      let open Trust_system.Actions in
+                      (* TODO : refine these actions, issue 2375 *)
+                      let action =
+                        match staged_ledger_error with
+                        | Invalid_proof _ ->
+                            make_actions Sent_invalid_proof
+                        | Bad_signature _ ->
+                            make_actions Sent_invalid_signature
+                        | Coinbase_error _
+                        | Bad_prev_hash _
+                        | Insufficient_fee _
+                        | Non_zero_fee_excess _ ->
+                            make_actions Gossiped_invalid_transition
+                        | Unexpected _ ->
+                            failwith
+                              "build: Unexpected staged ledger error should \
+                               have been caught in another pattern"
+                      in
+                      Trust_system.record trust_system logger inet_addr action
+                in
+                return
+                  (Error
+                     (`Invalid_staged_ledger_diff
+                       (Staged_ledger.Staged_ledger_error.to_error
+                          staged_ledger_error)))
           in
           let just_emitted_a_proof = Option.is_some proof_opt in
           let%map transitioned_staged_ledger =
-            Deferred.return
-              ( if
-                Staged_ledger_hash.equal staged_ledger_hash
-                  blockchain_staged_ledger_hash
-              then Ok transitioned_staged_ledger
-              else
-                Error
-                  (`Invalid_staged_ledger_hash
-                    (Error.of_string
-                       "Snarked ledger hash and Staged ledger hash after \
-                        applying the diff does not match blockchain state's \
-                        ledger hash and staged ledger hash resp.\n")) )
+            if
+              Staged_ledger_hash.equal staged_ledger_hash
+                blockchain_staged_ledger_hash
+            then Deferred.return (Ok transitioned_staged_ledger)
+            else
+              let open Deferred.Let_syntax in
+              let%bind () =
+                match sender with
+                | None | Some Envelope.Sender.Local ->
+                    return ()
+                | Some (Envelope.Sender.Remote inet_addr) ->
+                    Trust_system.(
+                      record trust_system logger inet_addr
+                        Actions.
+                          ( Gossiped_invalid_transition
+                          , Some ("Invalid staged ledger hash", []) ))
+              in
+              return
+                (Error
+                   (`Invalid_staged_ledger_hash
+                     (Error.of_string
+                        "Snarked ledger hash and Staged ledger hash after \
+                         applying the diff does not match blockchain state's \
+                         ledger hash and staged ledger hash resp.")))
           in
           { transition_with_hash
           ; staged_ledger= transitioned_staged_ledger

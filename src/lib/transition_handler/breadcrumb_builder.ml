@@ -78,8 +78,10 @@ module Make (Inputs : Inputs.S) :
                   let open Deferred.Let_syntax in
                   (* TODO: propagate bans through subtree (#2299) *)
                   match%bind
-                    Transition_frontier.Breadcrumb.build ~logger ~parent
-                      ~transition_with_hash:transition
+                    Transition_frontier.Breadcrumb.build ~logger ~trust_system
+                      ~parent ~transition_with_hash:transition
+                      ~sender:
+                        (Some (Envelope.Incoming.sender enveloped_transition))
                   with
                   | Ok new_breadcrumb ->
                       let open Result.Let_syntax in
