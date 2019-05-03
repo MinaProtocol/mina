@@ -1,5 +1,6 @@
 open Protocols.Coda_pow
 open Coda_base
+open Coda_state
 open Core
 open Async
 open Cache_lib
@@ -61,7 +62,7 @@ module Make (Inputs : Inputs.S) :
                   let actual_parent_hash =
                     transition |> With_hash.data
                     |> External_transition.Verified.protocol_state
-                    |> External_transition.Protocol_state.previous_state_hash
+                    |> Protocol_state.previous_state_hash
                   in
                   let%bind () =
                     Deferred.return
@@ -77,8 +78,10 @@ module Make (Inputs : Inputs.S) :
                   let open Deferred.Let_syntax in
                   (* TODO: propagate bans through subtree (#2299) *)
                   match%bind
-                    Transition_frontier.Breadcrumb.build ~logger ~parent
-                      ~transition_with_hash:transition
+                    Transition_frontier.Breadcrumb.build ~logger ~trust_system
+                      ~parent ~transition_with_hash:transition
+                      ~sender:
+                        (Some (Envelope.Incoming.sender enveloped_transition))
                   with
                   | Ok new_breadcrumb ->
                       let open Result.Let_syntax in

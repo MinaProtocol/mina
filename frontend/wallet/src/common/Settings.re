@@ -3,6 +3,11 @@ open Tc;
 /// state is a dictionary from public-key to name
 type t = {state: Js.Dict.t(string)};
 
+let create = () =>
+  Js.Json.object_(
+    Js.Dict.fromList([("state", Js.Json.object_(Js.Dict.empty()))]),
+  );
+
 // TODO: Replace with something more automated like quicktype
 module Decode = {
   let state = json => Json.Decode.(json |> field("state", dict(string)));
