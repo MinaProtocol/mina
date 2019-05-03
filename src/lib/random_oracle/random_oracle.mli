@@ -6,7 +6,8 @@ module Digest : sig
 
   module Stable : sig
     module V1 : sig
-      type nonrec t = t [@@deriving bin_io, sexp, compare, hash, yojson]
+      type nonrec t = t
+      [@@deriving bin_io, sexp, compare, hash, yojson, version {numbered}]
 
       include Comparable.S with type t := t
     end
@@ -29,6 +30,8 @@ module Digest : sig
   val length_in_triples : int
 
   val of_string : string -> t
+
+  val to_string : t -> string
 
   val to_bits : t -> bool list
 

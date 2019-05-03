@@ -39,7 +39,7 @@ module type S = sig
 end
 
 module type Tick_keypair_intf = sig
-  val keys : Tick.Groth16.Keypair.t
+  val keys : Tick.Keypair.t
 end
 
 module type Tock_keypair_intf = sig
@@ -57,9 +57,9 @@ module Make (Digest : sig
 end)
 (System : S) =
 struct
-  let step_input () = Tick.Groth16.Data_spec.[Tick.Groth16.Field.typ]
+  let step_input () = Tick.Data_spec.[Tick.Field.typ]
 
-  let step_input_size = Tick.Groth16.Data_spec.size (step_input ())
+  let step_input_size = Tick.Data_spec.size (step_input ())
 
   module Step_base = struct
     open System
@@ -135,8 +135,10 @@ struct
           in
           (* true if not with_snark *)
           Verifier.verify wrap_vk precomp prev_top_hash proof
-      | "check" | "none" -> return Boolean.true_
-      | _ -> failwith "unknown proof_level"
+      | "check" | "none" ->
+          return Boolean.true_
+      | _ ->
+          failwith "unknown proof_level"
 
     let exists' typ ~f = exists typ ~compute:As_prover.(map get_state ~f)
 
@@ -179,7 +181,7 @@ struct
   end
 
   module type Step_vk_intf = sig
-    val verification_key : Tick.Groth16.Verification_key.t
+    val verification_key : Tick.Verification_key.t
   end
 
   module Wrap_base (Step_vk : Step_vk_intf) = struct
@@ -190,7 +192,7 @@ struct
     module Verifier = Tock.Groth_verifier
 
     module Prover_state = struct
-      type t = {proof: Tick.Groth16.Proof.t} [@@deriving fields]
+      type t = {proof: Tick.Proof.t} [@@deriving fields]
     end
 
     let step_vk = Verifier.vk_of_backend_vk Step_vk.verification_key

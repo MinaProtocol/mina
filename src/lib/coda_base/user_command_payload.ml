@@ -6,20 +6,34 @@ module Account_nonce = Coda_numbers.Account_nonce
 module Memo = User_command_memo
 
 module Common = struct
-  type ('fee, 'nonce, 'memo) t_ = {fee: 'fee; nonce: 'nonce; memo: 'memo}
-  [@@deriving bin_io, eq, sexp, hash, yojson]
+  module Poly = struct
+    module Stable = struct
+      module V1 = struct
+        module T = struct
+          type ('fee, 'nonce, 'memo) t = {fee: 'fee; nonce: 'nonce; memo: 'memo}
+          [@@deriving bin_io, eq, sexp, hash, yojson, version]
+        end
+
+        include T
+      end
+
+      module Latest = V1
+    end
+
+    type ('fee, 'nonce, 'memo) t = ('fee, 'nonce, 'memo) Stable.Latest.t =
+      {fee: 'fee; nonce: 'nonce; memo: 'memo}
+    [@@deriving eq, sexp, hash, yojson]
+  end
 
   module Stable = struct
     module V1 = struct
       module T = struct
-        let version = 1
-
         type t =
           ( Currency.Fee.Stable.V1.t
           , Account_nonce.Stable.V1.t
           , Memo.Stable.V1.t )
-          t_
-        [@@deriving bin_io, eq, sexp, hash, yojson]
+          Poly.Stable.V1.t
+        [@@deriving bin_io, eq, sexp, hash, yojson, version]
       end
 
       include T
@@ -53,18 +67,20 @@ module Common = struct
     let%map fee = Currency.Fee.gen
     and nonce = Account_nonce.gen
     and memo =
-      String.gen_with_length Memo.max_size_in_bytes Char.gen
+      String.gen_with_length Memo.max_size_in_bytes Char.quickcheck_generator
       >>| Memo.create_exn
     in
-    {fee; nonce; memo}
+    Poly.{fee; nonce; memo}
 
-  type var = (Currency.Fee.var, Account_nonce.Unpacked.var, Memo.Checked.t) t_
+  type var =
+    (Currency.Fee.var, Account_nonce.Unpacked.var, Memo.Checked.t) Poly.t
 
-  let to_hlist {fee; nonce; memo} = H_list.[fee; nonce; memo]
+  let to_hlist Poly.{fee; nonce; memo} = H_list.[fee; nonce; memo]
 
   let of_hlist : type fee nonce memo.
-      (unit, fee -> nonce -> memo -> unit) H_list.t -> (fee, nonce, memo) t_ =
-   fun H_list.([fee; nonce; memo]) -> {fee; nonce; memo}
+         (unit, fee -> nonce -> memo -> unit) H_list.t
+      -> (fee, nonce, memo) Poly.t =
+   fun H_list.[fee; nonce; memo] -> {fee; nonce; memo}
 
   let typ =
     Typ.of_hlistable
@@ -89,12 +105,10 @@ module Body = struct
   module Stable = struct
     module V1 = struct
       module T = struct
-        let version = 1
-
         type t =
           | Payment of Payment_payload.Stable.V1.t
           | Stake_delegation of Stake_delegation.Stable.V1.t
-        [@@deriving bin_io, eq, sexp, hash, yojson]
+        [@@deriving bin_io, eq, sexp, hash, yojson, version]
       end
 
       include T
@@ -126,16 +140,19 @@ module Body = struct
   module Tag = Transaction_union_tag
 
   let fold = function
-    | Payment p -> Fold.(Tag.fold Payment +> Payment_payload.fold p)
+    | Payment p ->
+        Fold.(Tag.fold Payment +> Payment_payload.fold p)
     | Stake_delegation d ->
         Fold.(
           Tag.fold Stake_delegation +> Stake_delegation.fold d
           +> Fold.init (max_variant_size - Stake_delegation.length_in_triples)
-               ~f:(fun _ -> (false, false, false) ))
+               ~f:(fun _ -> (false, false, false)))
 
   let sender_cost = function
-    | Payment {amount; _} -> amount
-    | Stake_delegation _ -> Currency.Amount.zero
+    | Payment {amount; _} ->
+        amount
+    | Stake_delegation _ ->
+        Currency.Amount.zero
 
   let length_in_triples = Tag.length_in_triples + max_variant_size
 
@@ -146,16 +163,30 @@ module Body = struct
       ~f:(function `A p -> Payment p | `B d -> Stake_delegation d)
 end
 
-type ('common, 'body) t_ = {common: 'common; body: 'body}
-[@@deriving bin_io, eq, sexp, hash, yojson, compare]
+module Poly = struct
+  module Stable = struct
+    module V1 = struct
+      module T = struct
+        type ('common, 'body) t = {common: 'common; body: 'body}
+        [@@deriving bin_io, eq, sexp, hash, yojson, compare, version]
+      end
+
+      include T
+    end
+
+    module Latest = V1
+  end
+
+  type ('common, 'body) t = ('common, 'body) Stable.Latest.t =
+    {common: 'common; body: 'body}
+  [@@deriving eq, sexp, hash, yojson, compare]
+end
 
 module Stable = struct
   module V1 = struct
     module T = struct
-      let version = 1
-
-      type t = (Common.Stable.V1.t, Body.Stable.V1.t) t_
-      [@@deriving bin_io, eq, sexp, hash, yojson]
+      type t = (Common.Stable.V1.t, Body.Stable.V1.t) Poly.Stable.V1.t
+      [@@deriving bin_io, eq, sexp, hash, yojson, version]
     end
 
     include T
@@ -191,10 +222,15 @@ let memo (t : t) = t.common.memo
 
 let body (t : t) = t.body
 
+let is_payment (t : t) =
+  match t.body with Payment _ -> true | Stake_delegation _ -> false
+
 let accounts_accessed (t : t) =
   match t.body with
-  | Payment payload -> [payload.receiver]
-  | Stake_delegation _ -> []
+  | Payment payload ->
+      [payload.receiver]
+  | Stake_delegation _ ->
+      []
 
 let dummy : t =
   { common=
@@ -209,4 +245,4 @@ let gen =
     |> Option.value_exn ?here:None ?error:None ?message:None
   in
   let%map body = Body.gen ~max_amount in
-  {common; body}
+  Poly.{common; body}

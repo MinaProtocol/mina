@@ -23,7 +23,7 @@ curve_size]
 
 module Tick_backend = struct
   module Full = Cycle.Mnt4
-  include Full.GM
+  include Full.Default
   module Inner_curve = Cycle.Mnt6.G1
   module Inner_twisted_curve = Cycle.Mnt6.G2
 end
@@ -113,8 +113,10 @@ module Wrap_input = struct
     let split_last_exn =
       let rec go acc x xs =
         match xs with
-        | [] -> (List.rev acc, x)
-        | x' :: xs -> go (x :: acc) x' xs
+        | [] ->
+            (List.rev acc, x)
+        | x' :: xs ->
+            go (x :: acc) x' xs
       in
       function
       | [] -> failwith "split_last: Empty list" | x :: xs -> go [] x xs
@@ -124,12 +126,12 @@ module Wrap_input = struct
     let typ : (var, t) Typ.t =
       Typ.of_hlistable spec
         ~var_to_hlist:(fun {low_bits; high_bit} -> [low_bits; high_bit])
-        ~var_of_hlist:(fun Snarky.H_list.([low_bits; high_bit]) ->
+        ~var_of_hlist:(fun Snarky.H_list.[low_bits; high_bit] ->
           {low_bits; high_bit} )
         ~value_to_hlist:(fun (x : Tick0.Field.t) ->
           let low_bits, high_bit = split_last_exn (Tick0.Field.unpack x) in
           [Tock0.Field.project low_bits; high_bit] )
-        ~value_of_hlist:(fun Snarky.H_list.([low_bits; high_bit]) ->
+        ~value_of_hlist:(fun Snarky.H_list.[low_bits; high_bit] ->
           Tick0.Field.project (Tock0.Field.unpack low_bits @ [high_bit]) )
 
     module Checked = struct

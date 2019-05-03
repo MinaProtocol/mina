@@ -35,7 +35,15 @@ open Coda_digestif
 
 (** A ring-buffer that backs our state *)
 module Ring_buffer : sig
-  type 'a t [@@deriving sexp, bin_io]
+  type 'a t [@@deriving sexp]
+
+  module Stable : sig
+    module V1 : sig
+      type nonrec 'a t = 'a t [@@deriving sexp, bin_io, version]
+    end
+
+    module Latest = V1
+  end
 
   val read_all : 'a t -> 'a list
 
@@ -46,17 +54,46 @@ module State : sig
   module Job : sig
     (** An incomplete job -- base may contain data ['d], merge can have zero components, one component (either the left or the right), or two components in which case there is an integer (sequence_no) representing a set of (completed)jobs in a sequence of (completed)jobs created.
      *)
-    type sequence_no = int [@@deriving sexp, bin_io]
+    module Sequence_no : sig
+      module Stable : sig
+        module V1 : sig
+          type t = int [@@deriving sexp, bin_io, version]
+        end
 
-    type 'a merge =
-      | Empty
-      | Lcomp of 'a
-      | Rcomp of 'a
-      | Bcomp of ('a * 'a * sequence_no)
-    [@@deriving sexp, bin_io]
+        module Latest = V1
+      end
+    end
 
-    type ('a, 'd) t = Merge of 'a merge | Base of ('d * sequence_no) option
-    [@@deriving sexp, bin_io]
+    module Merge : sig
+      module Stable : sig
+        module V1 : sig
+          type 'a t =
+            | Empty
+            | Lcomp of 'a
+            | Rcomp of 'a
+            | Bcomp of ('a * 'a * Sequence_no.Stable.V1.t)
+          [@@deriving sexp, bin_io, version]
+        end
+
+        module Latest = V1
+      end
+    end
+
+    module Stable : sig
+      module V1 : sig
+        type ('a, 'd) t =
+          | Merge of 'a Merge.Stable.V1.t
+          | Base of ('d * Sequence_no.Stable.V1.t) option
+        [@@deriving bin_io, sexp, version]
+      end
+
+      module Latest = V1
+    end
+
+    type ('a, 'd) t = ('a, 'd) Stable.Latest.t =
+      | Merge of 'a Merge.Stable.V1.t
+      | Base of ('d * Sequence_no.Stable.V1.t) option
+    [@@deriving sexp]
   end
 
   module Completed_job : sig
@@ -70,18 +107,16 @@ module State : sig
    * and partially complete ['a option * 'a option] merges.
    *)
 
-  (* bin_io omitted intentionally *)
+  (* bin_io, version omitted intentionally *)
   type ('a, 'd) t [@@deriving sexp]
 
-  module Stable :
-    sig
-      module V1 : sig
-        type ('a, 'd) t [@@deriving sexp, bin_io]
-      end
-
-      module Latest = V1
+  module Stable : sig
+    module V1 : sig
+      type nonrec ('a, 'd) t = ('a, 'd) t [@@deriving sexp, bin_io, version]
     end
-    with type ('a, 'd) V1.t = ('a, 'd) t
+
+    module Latest = V1
+  end
 
   (** Fold chronologically through the state. This is not the same as iterating
    * through the ring-buffer, rather we traverse the data structure in the same
@@ -154,7 +189,7 @@ module Job_view : sig
 end
 
 (** The initial state of the parallel scan at some parallelism *)
-val start : parallelism_log_2:int -> ('a, 'd) State.t
+val start : parallelism_log_2:int -> root_at_depth:int -> ('a, 'd) State.t
 
 (** Get the next k available jobs *)
 val next_k_jobs :
@@ -225,3 +260,7 @@ val view_jobs_with_position :
  * i.e., does not include base jobs that are part of previous trees not 
  * promoted to the merge jobs yet*)
 val base_jobs_on_latest_tree : ('a, 'd) State.t -> 'd list
+
+(*returns true only if the position of the next 'd that could be enqueued is  
+of the leftmost leaf of the tree*)
+val next_on_new_tree : ('a, 'd) State.t -> bool Or_error.t

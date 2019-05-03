@@ -1,7 +1,7 @@
 open Core
 open Async
 open Coda_worker
-open Coda_main
+open Coda_inputs
 open Coda_base
 open Signature_lib
 
@@ -21,12 +21,12 @@ let main () =
   in
   let%bind testnet =
     Coda_worker_testnet.test logger n proposers snark_work_public_keys
-      Protocols.Coda_pow.Work_selection.Seq
+      Protocols.Coda_pow.Work_selection.Seq ~max_concurrent_connections:None
   in
   let%bind () =
     Coda_worker_testnet.Restarts.trigger_catchup testnet ~logger ~node:1
   in
-  let%bind () = after (Time.Span.of_sec 180.) in
+  let%bind () = after (Time.Span.of_min 2.) in
   Coda_worker_testnet.Api.teardown testnet
 
 let command =

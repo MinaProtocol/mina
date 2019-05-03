@@ -49,6 +49,8 @@ struct
 
   let logger = Logger.null ()
 
+  let trust_system = Trust_system.null ()
+
   let () =
     Async.Scheduler.set_record_backtraces true ;
     Core.Backtrace.elide := false
@@ -57,21 +59,23 @@ struct
     let l1, _k1 = Ledger.load_ledger 1 1 in
     let l2, _k2 = Ledger.load_ledger num_accts 2 in
     let desired_root = Ledger.merkle_root l2 in
-    let lsync = Sync_ledger.create l1 ~logger in
+    let lsync = Sync_ledger.create l1 ~logger ~trust_system in
     let qr = Sync_ledger.query_reader lsync in
     let aw = Sync_ledger.answer_writer lsync in
     let seen_queries = ref [] in
     let sr =
       Sync_responder.create l2
         (fun q -> seen_queries := q :: !seen_queries)
-        ~logger
+        ~logger ~trust_system
     in
     don't_wait_for
       (Linear_pipe.iter_unordered ~max_concurrency:3 qr
          ~f:(fun (root_hash, query) ->
+           let%bind answ_opt =
+             Sync_responder.answer_query sr (Envelope.Incoming.local query)
+           in
            let answ =
-             Option.value_exn ~message:"refused to answer query"
-               (Sync_responder.answer_query sr query)
+             Option.value_exn ~message:"refused to answer query" answ_opt
            in
            let%bind () =
              if match query with What_contents _ -> true | _ -> false then
@@ -84,19 +88,21 @@ struct
        )) ;
     match
       Async.Thread_safe.block_on_async_exn (fun () ->
-          Sync_ledger.fetch lsync desired_root ~data:() )
+          Sync_ledger.fetch lsync desired_root ~data:() ~equal:(fun () () ->
+              true ) )
     with
     | `Ok mt ->
         total_queries := Some (List.length !seen_queries) ;
         Root_hash.equal desired_root (Ledger.merkle_root mt)
-    | `Target_changed _ -> false
+    | `Target_changed _ ->
+        false
 
   let%test_unit "new_goal_soon" =
     let l1, _k1 = Ledger.load_ledger num_accts 1 in
     let l2, _k2 = Ledger.load_ledger num_accts 2 in
     let l3, _k3 = Ledger.load_ledger num_accts 3 in
     let desired_root = ref @@ Ledger.merkle_root l2 in
-    let lsync = Sync_ledger.create l1 ~logger in
+    let lsync = Sync_ledger.create l1 ~logger ~trust_system in
     let qr = Sync_ledger.query_reader lsync in
     let aw = Sync_ledger.answer_writer lsync in
     let seen_queries = ref [] in
@@ -104,7 +110,7 @@ struct
       ref
       @@ Sync_responder.create l2
            (fun q -> seen_queries := q :: !seen_queries)
-           ~logger
+           ~logger ~trust_system
     in
     let ctr = ref 0 in
     don't_wait_for
@@ -116,14 +122,19 @@ struct
                  sr :=
                    Sync_responder.create l3
                      (fun q -> seen_queries := q :: !seen_queries)
-                     ~logger ;
+                     ~logger ~trust_system ;
                  desired_root := Ledger.merkle_root l3 ;
-                 Sync_ledger.new_goal lsync !desired_root ~data:() |> ignore ;
+                 Sync_ledger.new_goal lsync !desired_root ~data:()
+                   ~equal:(fun () () -> true)
+                 |> ignore ;
                  Deferred.unit )
                else
+                 let%bind answ_opt =
+                   Sync_responder.answer_query !sr
+                     (Envelope.Incoming.local query)
+                 in
                  let answ =
-                   Option.value_exn ~message:"refused to answer query"
-                     (Sync_responder.answer_query !sr query)
+                   Option.value_exn ~message:"refused to answer query" answ_opt
                  in
                  Linear_pipe.write aw
                    (!desired_root, query, Envelope.Incoming.local answ)
@@ -132,9 +143,11 @@ struct
              res )) ;
     match
       Async.Thread_safe.block_on_async_exn (fun () ->
-          Sync_ledger.fetch lsync !desired_root ~data:() )
+          Sync_ledger.fetch lsync !desired_root ~data:() ~equal:(fun () () ->
+              true ) )
     with
-    | `Ok _ -> failwith "shouldn't happen"
+    | `Ok _ ->
+        failwith "shouldn't happen"
     | `Target_changed _ -> (
       match
         Async.Thread_safe.block_on_async_exn (fun () ->
@@ -143,7 +156,8 @@ struct
       | `Ok mt ->
           [%test_result: Root_hash.t] ~expect:(Ledger.merkle_root l3)
             (Ledger.merkle_root mt)
-      | `Target_changed _ -> failwith "the target changed again" )
+      | `Target_changed _ ->
+          failwith "the target changed again" )
 end
 
 module Root_hash = struct
@@ -324,9 +338,10 @@ module Mask = struct
                     account
                 in
                 match action with
-                | `Existed -> Mask.Attached.set attached_mask location account
-                | `Added -> failwith "Expected to re-use an existing account"
-            ) ;
+                | `Existed ->
+                    Mask.Attached.set attached_mask location account
+                | `Added ->
+                    failwith "Expected to re-use an existing account" ) ;
             construct_layered_masks (iter - 1) (child_balance / 2)
               attached_mask
         in

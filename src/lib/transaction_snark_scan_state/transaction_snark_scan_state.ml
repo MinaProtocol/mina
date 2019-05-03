@@ -8,10 +8,12 @@ let option lab =
 let map2_or_error xs ys ~f =
   let rec go xs ys acc =
     match (xs, ys) with
-    | [], [] -> Ok (List.rev acc)
+    | [], [] ->
+        Ok (List.rev acc)
     | x :: xs, y :: ys -> (
       match f x y with Error e -> Error e | Ok z -> go xs ys (z :: acc) )
-    | _, _ -> Or_error.error_string "Length mismatch"
+    | _, _ ->
+        Or_error.error_string "Length mismatch"
   in
   go xs ys []
 
@@ -27,7 +29,14 @@ module type Monad_with_Or_error_intf = sig
   end
 end
 
-module Make (Inputs : Inputs.S) : sig
+module Make (Constants : sig
+  val transaction_capacity_log_2 : int
+
+  val work_delay_factor : int
+
+  val latency_factor : int
+end)
+(Inputs : Inputs.S) : sig
   include
     Coda_pow.Transaction_snark_scan_state_intf
     with type ledger := Inputs.Ledger.t
@@ -50,15 +59,12 @@ end = struct
     module Stable = struct
       module V1 = struct
         module T = struct
-          let version = 1
-
           (* TODO: The statement is redundant here - it can be computed from the witness and the transaction *)
-          (* TODO : version all fields *)
           type t =
             { transaction_with_info: Ledger.Undo.Stable.V1.t
             ; statement: Ledger_proof_statement.Stable.V1.t
-            ; witness: Transaction_witness.t sexp_opaque }
-          [@@deriving sexp, bin_io]
+            ; witness: Transaction_witness.Stable.V1.t sexp_opaque }
+          [@@deriving sexp, bin_io, version]
         end
 
         include T
@@ -88,10 +94,8 @@ end = struct
     module Stable = struct
       module V1 = struct
         module T = struct
-          let version = 1
-
           type t = Ledger_proof.Stable.V1.t * Sok_message.Stable.V1.t
-          [@@deriving sexp, bin_io]
+          [@@deriving sexp, bin_io, version]
         end
 
         include T
@@ -141,8 +145,10 @@ end = struct
       in
       let job_to_yojson =
         match job with
-        | Merge (x, y) -> `Assoc [("M", `List [opt_json x; opt_json y])]
-        | Base x -> `Assoc [("B", `List [opt_json x])]
+        | Merge (x, y) ->
+            `Assoc [("M", `List [opt_json x; opt_json y])]
+        | Base x ->
+            `Assoc [("B", `List [opt_json x])]
       in
       `List [`Int pos; job_to_yojson]
   end
@@ -154,23 +160,27 @@ end = struct
     Parallel_scan.State.Completed_job.t
   [@@deriving sexp, bin_io]
 
-  (*Work capacity represents max number of work(currently in the tree and the ones that would arise in the future when current jobs are done) in the tree. *)
-  let work_capacity () =
+  (*Work capacity represents max number of work in the tree. this includes the jobs that are currently in the tree and the ones that would arise in the future when current jobs are done*)
+  let work_capacity =
     let open Constants in
-    (*+1 because of <, +1 to give enough time to adjust the counter after proof is emitted, +1 to due to delay in proof emitting*)
-    (*For Evan: Having C= 2x(txns/block * total-no-of-trees) essentially means all the trees can have full leaves without having to do any work. This doesn't work with the succinct representation and FIFO work order during when this specific edge case occurs*)
-    (*Edge case:When there is a single slot at the end of the tree before continuing at the begining of the tree (referring to the last level), the jobs on the right side of the tree are done along with the jobs on the left (because it wasn't added until then). The root node has to wait until the right sub-tree has completed before the next round begins. By the time the right sub-tree is completed, the left tree is also ready with the proof but has to wait until the root is emitted. This won't work with our succint datastructure impl and FIFO work order.*)
-    let work_delay_factor = max 2 work_delay_factor in
-    let nearest_log_2_txn = Int.ceil_log2 transaction_capacity_log_2 in
-    let nearest_log_2_incr = Int.ceil_log2 work_delay_factor in
-    3 + nearest_log_2_incr + nearest_log_2_txn
-    + Int.pow 2 (transaction_capacity_log_2 + work_delay_factor)
+    let extra_jobs =
+      let rec go i count =
+        if i = work_delay_factor - 1 then count
+        else go (i + 1) (count + Int.pow 2 (i - 1))
+      in
+      go (max latency_factor 1) 0
+    in
+    (Int.pow 2 (transaction_capacity_log_2 + 1) - 1)
+    (*Transaction_capacity_tree size (c-tree) *)
+    * (Int.pow 2 (work_delay_factor - Int.max (latency_factor - 1) 0) - 1)
+    (*all but one c-tree that are in the tree formed at root_depth = latency_factor+1 *)
+    + extra_jobs
+
+  (*half the number of jobs on each level above work_delay_factor depth and below latency_factor depth*)
 
   module Stable = struct
     module V1 = struct
       module T = struct
-        let version = 1
-
         type t =
           { (*Job_count: Keeping track of the number of jobs added to the tree. Every transaction added amounts to two jobs*)
             tree:
@@ -178,7 +188,7 @@ end = struct
               , Transaction_with_witness.Stable.V1.t )
               Parallel_scan.State.Stable.V1.t
           ; mutable job_count: int }
-        [@@deriving sexp, bin_io]
+        [@@deriving sexp, bin_io, version]
       end
 
       include T
@@ -191,13 +201,14 @@ end = struct
             (Binable.to_string (module Transaction_with_witness.Stable.V1))
         in
         Staged_ledger_aux_hash.of_bytes
-          ((state_hash :> string) ^ Int.to_string t.job_count)
+          ( (state_hash |> Digestif.SHA256.to_raw_string)
+          ^ Int.to_string t.job_count )
 
       let is_valid t =
         let k = max Constants.work_delay_factor 2 in
         Parallel_scan.parallelism ~state:t.tree
         = Int.pow 2 (Constants.transaction_capacity_log_2 + k)
-        && t.job_count < work_capacity ()
+        && t.job_count <= work_capacity
         && Parallel_scan.is_valid t.tree
 
       include Binable.Of_binable
@@ -208,7 +219,7 @@ end = struct
                   let to_binable = Fn.id
 
                   let of_binable t =
-                    assert (is_valid t) ;
+                    (* assert (is_valid t) ; *)
                     t
                 end)
     end
@@ -233,7 +244,8 @@ end = struct
     ; mutable job_count: int }
   [@@deriving sexp]
 
-  let hash, is_valid = Stable.Latest.(hash, is_valid)
+  [%%define_locally
+  Stable.Latest.(hash, is_valid)]
 
   (**********Helpers*************)
 
@@ -257,8 +269,10 @@ end = struct
     in
     let pending_coinbase_after =
       match transaction with
-      | Coinbase c -> Pending_coinbase.Stack.push pending_coinbase_before c
-      | _ -> pending_coinbase_before
+      | Coinbase c ->
+          Pending_coinbase.Stack.push pending_coinbase_before c
+      | _ ->
+          pending_coinbase_before
     in
     let%bind fee_excess = Transaction.fee_excess transaction in
     let%map supply_increase = Transaction.supply_increase transaction in
@@ -342,7 +356,8 @@ end = struct
         let open Or_error.Let_syntax in
         with_error "Bad merge proof" ~f:(fun () ->
             match acc with
-            | None -> with_verification ~f:(fun () -> return (Some s2))
+            | None ->
+                with_verification ~f:(fun () -> return (Some s2))
             | Some s1 ->
                 with_verification ~f:(fun () ->
                     let%map merged_statement =
@@ -353,12 +368,13 @@ end = struct
       let fold_step acc_statement job =
         match job with
         | Parallel_scan.State.Job.Merge (Rcomp (p, message))
-         |Merge (Lcomp (p, message)) ->
+        | Merge (Lcomp (p, message)) ->
             merge_acc
               ~verify_proof:(fun () ->
                 Verifier.verify ~message p (Ledger_proof.statement p) )
               acc_statement (Ledger_proof.statement p)
-        | Merge Empty -> M.Or_error.return acc_statement
+        | Merge Empty ->
+            M.Or_error.return acc_statement
         | Merge (Bcomp ((proof_1, message_1), (proof_2, message_2), _place)) ->
             let open M.Or_error.Let_syntax in
             let%bind merged_statement =
@@ -377,7 +393,8 @@ end = struct
                            (Ledger_proof.statement proof) ))
                 in
                 List.for_all verified_list ~f:Fn.id )
-        | Base None -> M.Or_error.return acc_statement
+        | Base None ->
+            M.Or_error.return acc_statement
         | Base (Some (transaction, _place)) ->
             with_error "Bad base statement" ~f:(fun () ->
                 let open M.Or_error.Let_syntax in
@@ -401,13 +418,18 @@ end = struct
           ~finish:(Fn.compose M.return Result.return) ~f:(fun acc job ->
             let open Container.Continue_or_stop in
             match%map fold_step acc job with
-            | Ok next -> Continue next
-            | Error e -> Stop (Error e) )
+            | Ok next ->
+                Continue next
+            | Error e ->
+                Stop (Error e) )
       in
       match%map res with
-      | Ok None -> Error `Empty
-      | Ok (Some res) -> Ok res
-      | Error e -> Error (`Error e)
+      | Ok None ->
+          Error `Empty
+      | Ok (Some res) ->
+          Ok res
+      | Error e ->
+          Error (`Error e)
 
     let check_invariants t ~error_prefix ~ledger_hash_end:current_ledger_hash
         ~ledger_hash_begin:snarked_ledger_hash =
@@ -416,7 +438,8 @@ end = struct
       in
       let open M.Let_syntax in
       match%map scan_statement t with
-      | Error (`Error e) -> Error e
+      | Error (`Error e) ->
+          Error e
       | Error `Empty ->
           let current_ledger_hash = current_ledger_hash in
           Option.value_map ~default:(Ok ()) snarked_ledger_hash ~f:(fun hash ->
@@ -450,7 +473,8 @@ end = struct
   end
 
   let statement_of_job : job -> Ledger_proof_statement.t option = function
-    | Base ({statement; _}, _) -> Some statement
+    | Base ({statement; _}, _) ->
+        Some statement
     | Merge ((p1, _), (p2, _), _) ->
         let stmt1 = Ledger_proof.statement p1
         and stmt2 = Ledger_proof.statement p2 in
@@ -476,16 +500,19 @@ end = struct
 
   let capacity t = Parallel_scan.parallelism ~state:t.tree
 
-  let create ~transaction_capacity_log_2 =
+  let create ~latency_factor ~work_delay_factor ~transaction_capacity_log_2 =
     (* Transaction capacity log_2 is 1/2^work_delay_factor the capacity for work parallelism *)
-    let k = max Constants.work_delay_factor 2 in
+    let k = max work_delay_factor 2 in
+    assert (work_delay_factor - latency_factor >= 1) ;
     { tree=
-        Parallel_scan.start ~parallelism_log_2:(transaction_capacity_log_2 + k)
+        Parallel_scan.start
+          ~parallelism_log_2:(transaction_capacity_log_2 + k)
+          ~root_at_depth:latency_factor
     ; job_count= 0 }
 
   let empty () =
     let open Constants in
-    create ~transaction_capacity_log_2
+    create ~latency_factor ~work_delay_factor ~transaction_capacity_log_2
 
   let extract_txns txns_with_witnesses =
     (* TODO: This type checks, but are we actually pulling the inverse txn here? *)
@@ -528,10 +555,13 @@ end = struct
         work
         ~f:(fun (w : Transaction_snark_work.t) -> List.length w.proofs)
     in
+    let old_proof = Parallel_scan.last_emitted_value t.tree in
     let%bind () = Parallel_scan.update_curr_job_seq_no t.tree in
     let%bind proof_opt = fill_in_transaction_snark_work t.tree work in
     let%bind () = enqueue_transactions t.tree transactions in
-    (*important: Everytime a proof is emitted, reduce the job count by 1 because you only had to do (2^x - 1 extra jobs). This is important because otherwise the job count would never become zero*)
+    (*important: Everytime a proof is emitted, reduce the job count by 1 
+    because you only had to do (2^x - 2^latency_factor extra jobs). This is important because 
+    otherwise the job count would never become zero*)
     let adjust_job_count =
       Option.value_map ~default:0 ~f:(fun _ -> 1) proof_opt
     in
@@ -540,12 +570,26 @@ end = struct
       + (List.length transactions * 2)
       - work_count - adjust_job_count
     in
-    if new_count < work_capacity () then (
+    let%bind () =
+      Option.value_map ~default:(Ok ()) proof_opt ~f:(fun (proof, _) ->
+          let curr_source = (Ledger_proof.statement proof).source in
+          (*TODO: get genesis ledger hash if the old_proof is none*)
+          let prev_target =
+            Option.value_map ~default:curr_source old_proof
+              ~f:(fun ((p', _), _) -> (Ledger_proof.statement p').target)
+          in
+          if Frozen_ledger_hash.equal curr_source prev_target then Ok ()
+          else Or_error.error_string "Unexpected ledger proof emitted" )
+    in
+    if new_count <= work_capacity then (
       t.job_count <- new_count ;
       Ok proof_opt )
     else
       Or_error.error_string
-        "Job count exceeded work_capacity. Cannot enqueue the transactions"
+        (sprintf
+           "Job count (%d) exceeded work_capacity(%d). Cannot enqueue the \
+            transactions"
+           new_count work_capacity)
 
   let latest_ledger_proof t =
     let open Option.Let_syntax in
@@ -564,12 +608,14 @@ end = struct
 
   let next_jobs_sequence t = Parallel_scan.next_jobs_sequence ~state:t.tree
 
+  let next_on_new_tree t = Parallel_scan.next_on_new_tree t.tree
+
   let base_jobs_on_latest_tree t =
     Parallel_scan.base_jobs_on_latest_tree t.tree
 
   let staged_transactions t =
     List.map (Parallel_scan.current_data t.tree)
-      ~f:(fun (t : Transaction_with_witness.t) -> t.transaction_with_info )
+      ~f:(fun (t : Transaction_with_witness.t) -> t.transaction_with_info)
 
   let all_transactions t =
     List.map ~f:(fun (t : Transaction_with_witness.t) ->
@@ -590,7 +636,8 @@ end = struct
     match job with
     | Parallel_scan.Available_job.Base (d, _) ->
         First (d.transaction_with_info, d.statement, d.witness)
-    | Merge ((p1, _), (p2, _), _) -> Second (p1, p2)
+    | Merge ((p1, _), (p2, _), _) ->
+        Second (p1, p2)
 
   let snark_job_list_json t =
     let all_jobs : Job_view.t list =
@@ -609,8 +656,10 @@ end = struct
     Sequence.chunks_exn
       (Sequence.map work_seq ~f:(fun job ->
            match statement_of_job job with
-           | None -> assert false
-           | Some stmt -> stmt ))
+           | None ->
+               assert false
+           | Some stmt ->
+               stmt ))
       Transaction_snark_work.proofs_length
 end
 

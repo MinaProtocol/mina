@@ -7,10 +7,11 @@ open Tuple_lib
 open Let_syntax
 open Currency
 open Fold_lib
+open Module_version
 
 let coinbase_tree_depth = Snark_params.pending_coinbase_depth
 
-(*Total number of stacks*)
+(* Total number of stacks *)
 let coinbase_stacks = Int.pow 2 coinbase_tree_depth
 
 module Coinbase_data = struct
@@ -57,7 +58,16 @@ module Coinbase_data = struct
 end
 
 module Stack_id : sig
-  type t [@@deriving bin_io, sexp, compare, eq]
+  module Stable : sig
+    module V1 : sig
+      type t [@@deriving bin_io, sexp, compare, eq, version]
+    end
+
+    module Latest = V1
+  end
+
+  (* bin_io, version omitted *)
+  type t = Stable.Latest.t [@@deriving sexp, compare, eq]
 
   val of_int : int -> t
 
@@ -71,7 +81,32 @@ module Stack_id : sig
 
   val ( > ) : t -> t -> bool
 end = struct
-  include Int
+  module Stable = struct
+    module V1 = struct
+      module T = struct
+        type t = int [@@deriving sexp, compare, eq, bin_io, version]
+      end
+
+      include T
+      include Registration.Make_latest_version (T)
+    end
+
+    module Latest = V1
+
+    module Module_decl = struct
+      let name = "pending_coinbase_stack_id"
+
+      type latest = Latest.t
+    end
+
+    module Registrar = Registration.Make (Module_decl)
+    module Registered_V1 = Registrar.Register (V1)
+  end
+
+  type t = Stable.Latest.t [@@deriving sexp, compare, eq]
+
+  let ( > ), to_string, zero, to_int, of_int, equal =
+    Int.(( > ), to_string, zero, to_int, of_int, equal)
 
   let incr_by_one t1 =
     let t2 = t1 + 1 in
@@ -79,7 +114,16 @@ end = struct
 end
 
 module type Data_hash_binable_intf = sig
-  type t [@@deriving bin_io, sexp, hash, compare, eq, yojson]
+  type t [@@deriving sexp, compare, eq, yojson, hash]
+
+  module Stable : sig
+    module V1 : sig
+      type nonrec t = t
+      [@@deriving bin_io, sexp, compare, eq, yojson, hash, version]
+    end
+
+    module Latest = V1
+  end
 
   type var
 
@@ -103,41 +147,7 @@ module type Data_hash_binable_intf = sig
 end
 
 module Data_hash_binable = struct
-  module T = struct
-    include Data_hash.Make_full_size ()
-  end
-
-  include T.Stable.V1
-
-  type var = T.var
-
-  let ( var_to_hash_packed
-      , var_of_hash_packed
-      , typ
-      , var_of_t
-      , of_hash
-      , equal_var
-      , length_in_triples
-      , var_to_triples
-      , fold
-      , to_bytes
-      , to_bits
-      , if_
-      , gen ) =
-    T.
-      ( var_to_hash_packed
-      , var_of_hash_packed
-      , typ
-      , var_of_t
-      , of_hash
-      , equal_var
-      , length_in_triples
-      , var_to_triples
-      , fold
-      , to_bytes
-      , to_bits
-      , if_
-      , gen )
+  include Data_hash.Make_full_size ()
 end
 
 module Coinbase_stack = struct
@@ -190,8 +200,8 @@ module Coinbase_stack = struct
   end
 end
 
-(*Pending coinbase hash*)
-module Hash = struct
+(* Pending coinbase hash *)
+module Hash_builder = struct
   include Data_hash_binable
 
   let merge ~height (h1 : t) (h2 : t) =
@@ -211,20 +221,160 @@ module Hash = struct
   let of_digest = Fn.compose Fn.id of_hash
 end
 
+module Stack_builder = Coinbase_stack.Stack
+
+(* Sparse_ledger.Make is applied more than once in the code, so
+   it can't make assumptions about the internal structure of its module
+   arguments. Therefore, for modules with a bin_io type passed to the functor,
+   that type cannot be in a version module hierarchy. We build the required
+   modules for Hash and Stack.
+ *)
+
 module T = struct
   module Stack = struct
-    include Coinbase_stack.Stack
+    module Stable = struct
+      module V1 = struct
+        module T = struct
+          type t = Stack_builder.Stable.V1.t
+          [@@deriving bin_io, eq, yojson, hash, sexp, compare, version]
+        end
 
-    let hash (t : t) = Hash.of_digest (t :> field)
+        include T
+        include Registration.Make_latest_version (T)
+
+        let data_hash (t : t) = Hash_builder.of_digest (t :> field)
+      end
+
+      module Latest = V1
+
+      module Module_decl = struct
+        let name = "pending_coinbase_stack"
+
+        type latest = Latest.t
+      end
+
+      module Registrar = Registration.Make (Module_decl)
+      module Registered_V1 = Registrar.Register (V1)
+    end
+
+    (* bin_io, version omitted *)
+    type t = Stable.Latest.t [@@deriving eq, yojson, compare, sexp, hash]
+
+    type var = Stack_builder.var
+
+    let data_hash = Stable.Latest.data_hash
+
+    [%%define_locally
+    Stack_builder.
+      ( to_bits
+      , to_bytes
+      , fold
+      , equal_var
+      , length_in_triples
+      , var_to_triples
+      , hash_fold_t
+      , empty
+      , push
+      , gen
+      , var_of_t
+      , typ )]
+
+    module Checked = Stack_builder.Checked
   end
 
-  module Merkle_tree =
-    Sparse_ledger_lib.Sparse_ledger.Make (Hash) (Stack_id) (Stack)
+  module Hash = struct
+    module Stable = struct
+      module V1 = struct
+        module T = struct
+          type t = Hash_builder.Stable.V1.t
+          [@@deriving bin_io, eq, compare, sexp, version, yojson, hash]
+        end
+
+        include T
+        include Registration.Make_latest_version (T)
+
+        type var = Hash_builder.var
+
+        let merge = Hash_builder.merge
+      end
+
+      module Latest = V1
+
+      module Module_decl = struct
+        let name = "pending_coinbase_hash"
+
+        type latest = Latest.t
+      end
+
+      module Registrar = Registration.Make (Module_decl)
+      module Registered_V1 = Registrar.Register (V1)
+    end
+
+    (* bin_io, version omitted *)
+    type t = Stable.Latest.t [@@deriving eq, compare, sexp, yojson, hash]
+
+    type var = Stable.Latest.var
+
+    [%%define_locally
+    Stable.Latest.(merge)]
+
+    [%%define_locally
+    Hash_builder.
+      ( of_digest
+      , empty_hash
+      , gen
+      , to_bits
+      , to_bytes
+      , fold
+      , equal_var
+      , length_in_triples
+      , var_to_triples
+      , var_of_t
+      , var_of_hash_packed
+      , var_to_hash_packed
+      , typ )]
+  end
+
+  (* the arguments to Sparse_ledger.Make are all versioned; a particular choice of those
+     versions yields a version of the result
+   *)
+
+  module V1_make =
+    Sparse_ledger_lib.Sparse_ledger.Make (Hash.Stable.V1) (Stack_id.Stable.V1)
+      (Stack.Stable.V1)
+
+  module Merkle_tree = struct
+    module Stable = struct
+      module V1 = struct
+        module T = struct
+          type t = V1_make.Stable.V1.t
+          [@@deriving bin_io, sexp, version {unnumbered}]
+        end
+
+        include T
+      end
+
+      module Latest = V1
+    end
+
+    module Latest_make = V1_make
+
+    [%%define_locally
+    Latest_make.
+      ( of_hash
+      , get_exn
+      , path_exn
+      , set_exn
+      , find_index_exn
+      , add_path
+      , merkle_root
+      , iteri )]
+  end
 
   module Checked = struct
     open Coinbase_stack
 
-    type var = Hash.var
+    type var = Hash.Stable.V1.var
 
     module Merkle_tree =
       Snarky.Merkle_tree.Checked
@@ -287,7 +437,8 @@ module T = struct
           respond (Delegate (Set_coinbase_stack (addr, stack)))
       | Merkle_tree.Get_element addr ->
           respond (Delegate (Get_coinbase_stack addr))
-      | _ -> unhandled
+      | _ ->
+          unhandled
 
     let get t addr =
       handle
@@ -365,18 +516,52 @@ module T = struct
       (Hash.var_of_hash_packed new_root, prev)
   end
 
-  type t = {tree: Merkle_tree.t; pos_list: Stack_id.t list; new_pos: Stack_id.t}
-  [@@deriving sexp, bin_io]
+  module Poly = struct
+    module Stable = struct
+      module V1 = struct
+        module T = struct
+          type ('tree, 'stack_id) t =
+            {tree: 'tree; pos_list: 'stack_id list; new_pos: 'stack_id}
+          [@@deriving bin_io, sexp, version]
+        end
+
+        include T
+      end
+
+      module Latest = V1
+    end
+
+    type ('tree, 'stack_id) t = ('tree, 'stack_id) Stable.Latest.t =
+      {tree: 'tree; pos_list: 'stack_id list; new_pos: 'stack_id}
+  end
+
+  module Stable = struct
+    module V1 = struct
+      module T = struct
+        type t =
+          (Merkle_tree.Stable.V1.t, Stack_id.Stable.V1.t) Poly.Stable.V1.t
+        [@@deriving bin_io, sexp, version {unnumbered}]
+      end
+
+      include T
+    end
+
+    module Latest = V1
+  end
+
+  type t = Stable.Latest.t [@@deriving sexp]
 
   let create_exn' () =
-    let init_hash = Stack.hash Stack.empty in
+    let init_hash = Stack.data_hash Stack.empty in
     let hash_on_level, root_hash =
       List.fold
         (List.init coinbase_tree_depth ~f:(fun i -> i + 1))
         ~init:([(0, init_hash)], init_hash)
-        ~f:(fun (hashes, cur_hash) height ->
-          let merge = Hash.merge ~height:(height - 1) cur_hash cur_hash in
-          ((height, merge) :: hashes, merge) )
+        ~f:(fun (hashes, (cur_hash : Stack.t)) height ->
+          let (merged : Stack.t) =
+            Hash.merge ~height:(height - 1) cur_hash cur_hash
+          in
+          ((height, merged) :: hashes, merged) )
     in
     let rec create_path height path key =
       if height < 0 then path
@@ -390,7 +575,9 @@ module T = struct
           (key / 2)
     in
     let rec go t key =
-      if Stack_id.( > ) key (Stack_id.of_int @@ Int.pow 2 coinbase_tree_depth)
+      if
+        Stack_id.( > ) key
+          (Stack_id.of_int @@ (Int.pow 2 coinbase_tree_depth - 1))
       then t
       else
         let path =
@@ -400,7 +587,7 @@ module T = struct
           (Merkle_tree.add_path t path key Stack.empty)
           (Or_error.ok_exn (Stack_id.incr_by_one key))
     in
-    { tree=
+    { Poly.tree=
         go
           (Merkle_tree.of_hash ~depth:coinbase_tree_depth root_hash)
           Stack_id.zero
@@ -411,49 +598,55 @@ module T = struct
 
   let try_with = Or_error.try_with
 
-  let merkle_root t = Merkle_tree.merkle_root t.tree
+  let merkle_root (t : t) = Merkle_tree.merkle_root t.tree
 
-  let get_stack t index = try_with (fun () -> Merkle_tree.get_exn t.tree index)
+  let get_stack (t : t) index =
+    try_with (fun () -> Merkle_tree.get_exn t.tree index)
 
-  let path t index = try_with (fun () -> Merkle_tree.path_exn t.tree index)
+  let path (t : t) index =
+    try_with (fun () -> Merkle_tree.path_exn t.tree index)
 
-  let set_stack t index stack =
+  let set_stack (t : t) index stack =
     try_with (fun () -> {t with tree= Merkle_tree.set_exn t.tree index stack})
 
-  let find_index t key =
+  let find_index (t : t) key =
     try_with (fun () -> Merkle_tree.find_index_exn t.tree key)
 
-  let with_next_index t ~is_new_stack =
+  let with_next_index (t : t) ~is_new_stack =
     let open Or_error.Let_syntax in
     if is_new_stack then
       let%map new_pos =
-        if Stack_id.equal t.new_pos (Stack_id.of_int coinbase_stacks) then
-          Ok Stack_id.zero
+        if Stack_id.equal t.new_pos (Stack_id.of_int (coinbase_stacks - 1))
+        then Ok Stack_id.zero
         else Stack_id.incr_by_one t.new_pos
       in
       {t with pos_list= t.new_pos :: t.pos_list; new_pos}
     else Ok t
 
-  let latest_stack_id t ~is_new_stack =
+  let latest_stack_id (t : t) ~is_new_stack =
     if is_new_stack then Ok t.new_pos
     else
       match List.hd t.pos_list with
-      | Some x -> Ok x
-      | None -> Or_error.error_string "No Stack_id for the latest stack"
+      | Some x ->
+          Ok x
+      | None ->
+          Or_error.error_string "No Stack_id for the latest stack"
 
-  let latest_stack t ~is_new_stack =
+  let latest_stack (t : t) ~is_new_stack =
     let open Or_error.Let_syntax in
     let%bind key = latest_stack_id t ~is_new_stack in
     Or_error.try_with (fun () ->
         let index = Merkle_tree.find_index_exn t.tree key in
         Merkle_tree.get_exn t.tree index )
 
-  let oldest_stack_id t = List.last t.pos_list
+  let oldest_stack_id (t : t) = List.last t.pos_list
 
   let remove_oldest_stack_id t =
     match List.rev t with
-    | [] -> Or_error.error_string "No coinbase stack to pop"
-    | x :: xs -> Ok (x, List.rev xs)
+    | [] ->
+        Or_error.error_string "No coinbase stack to pop"
+    | x :: xs ->
+        Ok (x, List.rev xs)
 
   let oldest_stack t =
     let open Or_error.Let_syntax in
@@ -477,7 +670,7 @@ module T = struct
     let%bind t' = with_next_index t ~is_new_stack in
     set_stack t' stack_index stack
 
-  let remove_coinbase_stack t =
+  let remove_coinbase_stack (t : t) =
     let open Or_error.Let_syntax in
     let%bind oldest_stack, remaining = remove_oldest_stack_id t.pos_list in
     let%bind stack_index = find_index t oldest_stack in
@@ -485,14 +678,14 @@ module T = struct
     let%map t' = set_stack t stack_index Stack.empty in
     (stack, {t' with pos_list= remaining})
 
-  let hash_extra {pos_list; new_pos; _} =
+  let hash_extra ({pos_list; new_pos; _} : t) =
     let h = Digestif.SHA256.init () in
     let h =
       Digestif.SHA256.feed_string h
         (List.fold pos_list ~init:"" ~f:(fun s a -> s ^ Stack_id.to_string a))
     in
     let h = Digestif.SHA256.feed_string h (Stack_id.to_string new_pos) in
-    (Digestif.SHA256.get h :> string)
+    Digestif.SHA256.(get h |> to_raw_string)
 
   let handler (t : t) ~is_new_stack =
     let pending_coinbase = ref t in
@@ -520,8 +713,10 @@ module T = struct
         | Checked.Find_index_of_newest_stack ->
             let stack_id =
               match latest_stack_id !pending_coinbase ~is_new_stack with
-              | Ok id -> id
-              | _ -> Stack_id.zero
+              | Ok id ->
+                  id
+              | _ ->
+                  Stack_id.zero
             in
             let index =
               find_index !pending_coinbase stack_id |> Or_error.ok_exn
@@ -537,19 +732,16 @@ module T = struct
             pending_coinbase :=
               set_stack !pending_coinbase idx stack |> Or_error.ok_exn ;
             respond (Provide ())
-        | _ -> unhandled )
+        | _ ->
+            unhandled )
 end
 
 include T
 
 let%test_unit "add stack + remove stack = initial tree " =
   let pending_coinbases = ref (create () |> Or_error.ok_exn) in
-  let coinbases_gen =
-    Quickcheck.Generator.tuple2
-      (List.gen_with_length 20 Coinbase.gen)
-      (Int.gen_incl 1 coinbase_stacks)
-  in
-  Quickcheck.test coinbases_gen ~trials:10 ~f:(fun (cbs, _i) ->
+  let coinbases_gen = Quickcheck.Generator.list_non_empty Coinbase.gen in
+  Quickcheck.test coinbases_gen ~trials:50 ~f:(fun cbs ->
       Async.Thread_safe.block_on_async_exn (fun () ->
           let is_new = ref true in
           let init = merkle_root !pending_coinbases in
@@ -631,3 +823,73 @@ let%test_unit "Checked_tree = Unchecked_tree" =
         x
       in
       assert (Hash.equal (merkle_root unchecked) checked) )
+
+let%test_unit "push and pop multiple stacks" =
+  let open Quickcheck in
+  let pending_coinbases = ref (create () |> Or_error.ok_exn) in
+  let queue_of_stacks = Queue.create ~capacity:(coinbase_stacks + 1) () in
+  let max_coinbase_amount = Protocols.Coda_praos.coinbase_amount in
+  let coinbases_gen = Quickcheck.Generator.list Coinbase.gen in
+  let add_new_stack t = function
+    | [] ->
+        let t' = with_next_index t ~is_new_stack:true |> Or_error.ok_exn in
+        (Stack.empty, t')
+    | initial_coinbase :: coinbases ->
+        let t' =
+          add_coinbase t ~coinbase:initial_coinbase ~is_new_stack:true
+          |> Or_error.ok_exn
+        in
+        let updated =
+          List.fold coinbases ~init:t'
+            ~f:(fun pending_coinbases (coinbase : Coinbase.t) ->
+              let coinbase2 =
+                Coinbase.create
+                  ~amount:
+                    ( Amount.sub max_coinbase_amount coinbase.amount
+                    |> Option.value_exn ?here:None ?message:None ?error:None )
+                  ~proposer:coinbase.proposer ~fee_transfer:None
+                |> Or_error.ok_exn
+              in
+              if Amount.equal coinbase.amount Amount.zero then
+                pending_coinbases
+              else
+                let interim_tree =
+                  add_coinbase pending_coinbases ~coinbase ~is_new_stack:false
+                  |> Or_error.ok_exn
+                in
+                if Amount.equal coinbase2.amount Amount.zero then interim_tree
+                else
+                  add_coinbase interim_tree ~coinbase:coinbase2
+                    ~is_new_stack:false
+                  |> Or_error.ok_exn )
+        in
+        let new_stack =
+          Or_error.ok_exn @@ latest_stack updated ~is_new_stack:false
+        in
+        (new_stack, updated)
+  in
+  (*fill up to n stacks*)
+  let fill n =
+    iter ~trials:n coinbases_gen ~f:(fun coinbases ->
+        let new_stack, updated_pending_coinbases =
+          add_new_stack !pending_coinbases coinbases
+        in
+        pending_coinbases := updated_pending_coinbases ;
+        Queue.enqueue queue_of_stacks new_stack )
+  in
+  (*remove the oldest stack and check if that's the expected one *)
+  let check t expected_stack =
+    let popped_stack, updated_pending_coinbases =
+      remove_coinbase_stack t |> Or_error.ok_exn
+    in
+    assert (Stack.equal popped_stack expected_stack) ;
+    updated_pending_coinbases
+  in
+  let add_remove_check trials =
+    fill trials ;
+    Queue.iter queue_of_stacks ~f:(fun expected_stack ->
+        pending_coinbases := check !pending_coinbases expected_stack ) ;
+    Queue.clear queue_of_stacks
+  in
+  test ~trials:50 (Int.gen_incl 2 coinbase_stacks) ~f:(fun trials ->
+      add_remove_check trials )

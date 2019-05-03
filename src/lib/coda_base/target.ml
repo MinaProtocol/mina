@@ -6,9 +6,8 @@ open Module_version
 module Stable = struct
   module V1 = struct
     module T = struct
-      let version = 1
-
-      type t = Tick.Field.t [@@deriving bin_io, sexp, eq, compare]
+      type t = Tick.Field.t
+      [@@deriving bin_io, sexp, eq, compare, version {asserted}]
     end
 
     include T

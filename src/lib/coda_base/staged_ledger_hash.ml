@@ -13,18 +13,19 @@ module Aux_hash = struct
   module Stable = struct
     module V1 = struct
       module T = struct
-        let version = 1
-
-        type t = string [@@deriving bin_io, sexp, eq, compare, hash]
+        type t = string [@@deriving bin_io, sexp, eq, compare, hash, version]
 
         let to_yojson s = `String (Base64.encode_string s)
 
         let of_yojson = function
           | `String s -> (
             match Base64.decode s with
-            | Ok s -> Ok s
-            | Error (`Msg e) -> Error (sprintf "bad base64: %s" e) )
-          | _ -> Error "expected `String"
+            | Ok s ->
+                Ok s
+            | Error (`Msg e) ->
+                Error (sprintf "bad base64: %s" e) )
+          | _ ->
+              Error "expected `String"
       end
 
       include T
@@ -61,9 +62,19 @@ module Pending_coinbase_aux = struct
   module Stable = struct
     module V1 = struct
       module T = struct
-        let version = 1
+        type t = string [@@deriving bin_io, sexp, eq, compare, hash, version]
 
-        type t = string [@@deriving bin_io, sexp, eq, compare, hash, yojson]
+        let to_yojson s = `String (Base64.encode_string s)
+
+        let of_yojson = function
+          | `String s -> (
+            match Base64.decode s with
+            | Ok s ->
+                Ok s
+            | Error (`Msg e) ->
+                Error (sprintf "bad base64: %s" e) )
+          | _ ->
+              Error "expected `String"
       end
 
       include T
@@ -96,13 +107,11 @@ module Non_snark = struct
   module Stable = struct
     module V1 = struct
       module T = struct
-        let version = 1
-
         type t =
           { ledger_hash: Ledger_hash.Stable.V1.t
           ; aux_hash: Aux_hash.Stable.V1.t
           ; pending_coinbase_aux: Pending_coinbase_aux.Stable.V1.t }
-        [@@deriving bin_io, sexp, eq, compare, hash, yojson]
+        [@@deriving bin_io, sexp, eq, compare, hash, yojson, version]
       end
 
       include T
@@ -142,7 +151,7 @@ module Non_snark = struct
     let h = Digestif.SHA256.feed_string h (Ledger_hash.to_bytes ledger_hash) in
     let h = Digestif.SHA256.feed_string h aux_hash in
     let h = Digestif.SHA256.feed_string h pending_coinbase_aux in
-    (Digestif.SHA256.get h :> string)
+    Digestif.SHA256.(get h |> to_raw_string)
 
   let fold t = Fold.string_triples (digest t)
 
@@ -178,21 +187,40 @@ module Non_snark = struct
 end
 
 module Stable = struct
+  module Poly = struct
+    module Stable = struct
+      module V1 = struct
+        module T = struct
+          type ('non_snark, 'pending_coinbase_hash) t =
+            { non_snark: 'non_snark
+            ; pending_coinbase_hash: 'pending_coinbase_hash }
+          [@@deriving bin_io, sexp, eq, compare, hash, yojson, version]
+        end
+
+        include T
+      end
+
+      module Latest = V1
+    end
+
+    type ('non_snark, 'pending_coinbase_hash) t =
+          ('non_snark, 'pending_coinbase_hash) Stable.Latest.t =
+      {non_snark: 'non_snark; pending_coinbase_hash: 'pending_coinbase_hash}
+    [@@deriving sexp, eq, compare, hash, yojson]
+  end
+
   module V1 = struct
     module T = struct
-      let version = 1
-
-      type ('non_snark, 'pending_coinbase_hash) t_ =
-        {non_snark: 'non_snark; pending_coinbase_hash: 'pending_coinbase_hash}
-      [@@deriving bin_io, sexp, eq, compare, hash, yojson]
-
       (** Staged ledger hash has two parts
       1) merkle root of the pending coinbases
-      2) ledger hash, aux hash, and the FIFO order of the coinbase stacks(Non snark). 
-      Only part 1 is required for blockchain snark computation and therefore the remaining fields of the staged ledger are grouped together as "Non_snark" 
+      2) ledger hash, aux hash, and the FIFO order of the coinbase stacks(Non snark).
+      Only part 1 is required for blockchain snark computation and therefore the remaining fields of the staged ledger are grouped together as "Non_snark"
       *)
-      type t = (Non_snark.Stable.V1.t, Pending_coinbase.Hash.t) t_
-      [@@deriving bin_io, sexp, eq, compare, hash, yojson]
+      type t =
+        ( Non_snark.Stable.V1.t
+        , Pending_coinbase.Hash.Stable.V1.t )
+        Poly.Stable.V1.t
+      [@@deriving bin_io, sexp, eq, compare, hash, yojson, version]
     end
 
     include T
@@ -212,10 +240,10 @@ module Stable = struct
   module Registered_V1 = Registrar.Register (V1)
 end
 
-(* bin_io omitted *)
+(* bin_io, version omitted *)
 type t = Stable.Latest.t [@@deriving sexp, eq, compare, hash, yojson]
 
-type ('a, 'b) t_ = ('a, 'b) Stable.Latest.t_
+type ('a, 'b) t_ = ('a, 'b) Stable.Poly.t
 
 type value = t [@@deriving sexp, eq, compare, hash]
 

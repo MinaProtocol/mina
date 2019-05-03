@@ -6,6 +6,7 @@ open Asttypes
 open Parsetree
 open Longident
 open Core
+open Coda_state
 
 (* TODO: refactor to do compile time selection *)
 [%%if
@@ -36,7 +37,7 @@ end
 module Make_real (Keys : Keys_lib.Keys.S) = struct
   let loc = Ppxlib.Location.none
 
-  let base_hash = Keys.Step.instance_hash Consensus.genesis_protocol_state.data
+  let base_hash = Keys.Step.instance_hash Genesis_protocol_state.t.data
 
   let base_hash_expr =
     [%expr
@@ -58,15 +59,16 @@ module Make_real (Keys : Keys_lib.Keys.S) = struct
     let prover_state =
       { Keys.Step.Prover_state.prev_proof= Tock.Proof.dummy
       ; wrap_vk= Tock.Keypair.vk Keys.Wrap.keys
-      ; prev_state= Consensus.Protocol_state.negative_one
-      ; update= Consensus.Snark_transition.genesis }
+      ; prev_state= Protocol_state.negative_one
+      ; update= Snark_transition.genesis }
     in
     let main x =
-      Tick.handle (Keys.Step.main x) Consensus.Prover_state.precomputed_handler
+      Tick.handle (Keys.Step.main x)
+        Consensus.Data.Prover_state.precomputed_handler
     in
     let tick =
-      Tick.Groth16.prove
-        (Tick.Groth16.Keypair.pk Keys.Step.keys)
+      Tick.prove
+        (Tick.Keypair.pk Keys.Step.keys)
         (Keys.Step.input ()) prover_state main base_hash
     in
     let proof = wrap base_hash tick in

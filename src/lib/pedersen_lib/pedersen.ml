@@ -6,6 +6,7 @@ module type S = sig
   type curve
 
   module Digest : sig
+    (* TODO: version *)
     type t [@@deriving bin_io, sexp, eq, compare, yojson]
 
     val fold_bits : t -> bool Fold.t
@@ -62,9 +63,10 @@ end) : S with type curve := Curve.t and type Digest.t = Field.t = struct
 
     let of_yojson = function
       | `String s -> (
-        try Ok (Field.of_string s) with exn ->
-          Error Error.(to_string_hum (of_exn exn)) )
-      | _ -> Error "expected string"
+        try Ok (Field.of_string s)
+        with exn -> Error Error.(to_string_hum (of_exn exn)) )
+      | _ ->
+          Error "expected string"
 
     let fold_bits = Field.fold_bits
 
@@ -88,9 +90,12 @@ end) : S with type curve := Curve.t and type Digest.t = Field.t = struct
       let a0, a1, sign = triple in
       let res =
         match (a0, a1) with
-        | false, false -> g
-        | true, false -> Curve.(g + g)
-        | false, true -> Curve.(g + g + g)
+        | false, false ->
+            g
+        | true, false ->
+            Curve.(g + g)
+        | false, true ->
+            Curve.(g + g + g)
         | true, true ->
             let gg = Curve.(g + g) in
             Curve.(gg + gg)

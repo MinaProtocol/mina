@@ -23,7 +23,8 @@ module type Basic = sig
 
   module Stable : sig
     module V1 : sig
-      type nonrec t = t [@@deriving bin_io, sexp, compare, eq, hash, yojson]
+      type nonrec t = t
+      [@@deriving bin_io, sexp, compare, eq, hash, yojson, version]
 
       include Hashable_binable with type t := t
     end
@@ -79,10 +80,7 @@ struct
   module Stable = struct
     module V1 = struct
       module T = struct
-        let version = 1
-
-        (* TODO : version Pedersen.Digest *)
-        type t = Pedersen.Digest.t
+        type t = Pedersen.Digest.Stable.V1.t
         [@@deriving bin_io, sexp, eq, compare, hash, yojson, version]
       end
 
@@ -159,7 +157,8 @@ struct
 
   let%snarkydef var_to_bits t =
     match t.bits with
-    | Some bits -> return (bits :> Boolean.var list)
+    | Some bits ->
+        return (bits :> Boolean.var list)
     | None ->
         let%map bits = unpack t.digest in
         t.bits <- Some (Bitstring.Lsb_first.of_list bits) ;

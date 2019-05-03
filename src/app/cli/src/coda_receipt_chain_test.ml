@@ -1,7 +1,7 @@
 open Core
 open Async
 open Coda_worker
-open Coda_main
+open Coda_inputs
 open Coda_base
 open Signature_lib
 
@@ -42,6 +42,7 @@ let main () =
       ~acceptable_delay ~snark_worker_public_keys:None
       ~proposers:(Fn.const None) ~work_selection
       ~trace_dir:(Unix.getenv "CODA_TRACING")
+      ~max_concurrent_connections:None
   in
   let%bind workers = Coda_processes.spawn_local_processes_exn configs in
   let worker = List.hd_exn workers in

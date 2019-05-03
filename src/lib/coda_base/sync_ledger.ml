@@ -42,13 +42,11 @@ module Answer = struct
   module Stable = struct
     module V1 = struct
       module T = struct
-        let version = 1
-
         type t =
           ( Ledger_hash.Stable.V1.t
           , Account.Stable.V1.t )
           Syncable_ledger.Answer.Stable.V1.t
-        [@@deriving bin_io, sexp]
+        [@@deriving bin_io, sexp, version]
       end
 
       include T
@@ -75,11 +73,9 @@ module Query = struct
   module Stable = struct
     module V1 = struct
       module T = struct
-        let version = 1
-
         type t =
           Ledger.Location.Addr.Stable.V1.t Syncable_ledger.Query.Stable.V1.t
-        [@@deriving bin_io, sexp]
+        [@@deriving bin_io, sexp, to_yojson, version]
       end
 
       include T
@@ -99,5 +95,5 @@ module Query = struct
   end
 
   (* bin_io omitted from deriving list *)
-  type t = Stable.Latest.t [@@deriving sexp]
+  type t = Stable.Latest.t [@@deriving sexp, to_yojson]
 end

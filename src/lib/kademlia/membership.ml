@@ -1,6 +1,5 @@
 open Async_kernel
 open Core
-open Coda_base
 open Pipe_lib
 open Network_peer
 
@@ -66,11 +65,14 @@ let keep_trying :
   let open Deferred.Let_syntax in
   let rec go e xs : 'b Deferred.Or_error.t =
     match xs with
-    | [] -> return e
+    | [] ->
+        return e
     | x :: xs -> (
         match%bind f x with
-        | Ok r -> return (Ok r)
-        | Error e -> go (Error e) xs )
+        | Ok r ->
+            return (Ok r)
+        | Error e ->
+            go (Error e) xs )
   in
   go (Or_error.error_string "empty input") xs
 
@@ -141,8 +143,10 @@ module Haskell_process = struct
             |> Option.value ~default:coda_kademlia )
           ::
           ( match get_project_root () with
-          | Some path -> [path ^/ kademlia_binary]
-          | None -> [] ) )
+          | Some path ->
+              [path ^/ kademlia_binary]
+          | None ->
+              [] ) )
           ~f:(fun prog -> Process.create ~prog ~args ())
         |> Deferred.Or_error.map ~f:(fun process ->
                {failure_response= ref `Die; process; lock_path} )
@@ -152,7 +156,8 @@ module Haskell_process = struct
          * for #550 *)
           Deferred.upon (Process.wait p.process) (fun code ->
               match (!(p.failure_response), code) with
-              | `Ignore, _ | _, Ok () -> ()
+              | `Ignore, _ | _, Ok () ->
+                  ()
               | `Die, (Error _ as e) ->
                   Logger.fatal logger ~module_:__MODULE__ ~location:__LOC__
                     !"Kademlia process died: %s%!"
@@ -180,7 +185,8 @@ module Haskell_process = struct
               Logger.debug logger ~module_:__MODULE__ ~location:__LOC__
                 "Process %s does not exists and will not be killed" p ;
               return @@ Ok () )
-      | _ -> return @@ Ok ()
+      | _ ->
+          return @@ Ok ()
     in
     let open Deferred.Or_error.Let_syntax in
     let args =
@@ -207,7 +213,8 @@ module Haskell_process = struct
                Logger.error logger ~module_:__MODULE__ ~location:__LOC__ "%s"
                  str )) ;
         t
-    | _ -> Deferred.Or_error.errorf "Config directory (%s) must exist" conf_dir
+    | _ ->
+        Deferred.Or_error.errorf "Config directory (%s) must exist" conf_dir
 
   let output {process; _} ~logger =
     Pipe.filter_map
@@ -232,8 +239,9 @@ module Haskell_process = struct
               Logger.debug logger ~module_:__MODULE__ ~location:__LOC__ "%s"
                 line_no_prefix ;
               None
-          | "TRAC" -> (* trace is 99% ping/pong checks, omit *)
-                      None
+          | "TRAC" ->
+              (* trace is 99% ping/pong checks, omit *)
+              None
           | "EROR" ->
               Logger.error logger ~module_:__MODULE__ ~location:__LOC__ "%s"
                 line_no_prefix ;
@@ -242,7 +250,8 @@ module Haskell_process = struct
               Logger.info logger ~module_:__MODULE__ ~location:__LOC__ "%s"
                 line_no_prefix ;
               Some [line_no_prefix]
-          | _ -> pass_through () )
+          | _ ->
+              pass_through () )
 end
 
 module Make
@@ -252,7 +261,7 @@ module Make
         (* TODO punish peers from kad? *)
         (* val record : t -> Logger.t -> Unix.Inet_addr.Blocking_sexp.t -> Trust_system.Actions.t -> unit Deferred.t *)
         val lookup :
-          t -> Unix.Inet_addr.Blocking_sexp.t -> Peer_trust.Peer_status.t
+          t -> Unix.Inet_addr.Blocking_sexp.t -> Trust_system.Peer_status.t
     end) : sig
   include S with type trust_system := Trust_system.t
 
@@ -280,8 +289,10 @@ end = struct
 
   let is_banned trust_system (peer : Host_and_port.t) =
     match Trust_system.lookup trust_system (host_and_port_to_addr peer) with
-    | {banned= Banned_until _; _} -> true
-    | _ -> false
+    | {banned= Banned_until _; _} ->
+        true
+    | _ ->
+        false
 
   let live t (lives : (Peer.t * string) list) =
     let unbanned_lives =
@@ -344,8 +355,8 @@ end = struct
                          ~communication_port:(discovery_port - 1)
                      in
                      `Snd peer
-                 | _ -> failwith (Printf.sprintf "Unexpected line %s\n" line)
-             )
+                 | _ ->
+                     failwith (Printf.sprintf "Unexpected line %s\n" line) )
            in
            let open Deferred.Let_syntax in
            let () =
@@ -362,7 +373,8 @@ end = struct
 
   let peers t =
     let rec split ~f = function
-      | [] -> ([], [])
+      | [] ->
+          ([], [])
       | x :: xs ->
           let true_subresult, false_subresult = split ~f xs in
           if f x then (x :: true_subresult, false_subresult)
@@ -403,7 +415,7 @@ let%test_module "Tests" =
       type t = unit
 
       let lookup (_ : t) (_ : Unix.Inet_addr.t) =
-        Peer_trust.Peer_status.{trust= 0.0; banned= Unbanned}
+        Trust_system.Peer_status.{trust= 0.0; banned= Unbanned}
     end
 
     module type S_test = sig
@@ -443,8 +455,8 @@ let%test_module "Tests" =
               let%bind () = Async.after (Time.Span.of_sec 3.) in
               let%map () = M.stop t in
               !acc
-          | Error e -> failwith (Printf.sprintf "%s" (Error.to_string_hum e))
-      )
+          | Error e ->
+              failwith (Printf.sprintf "%s" (Error.to_string_hum e)) )
 
     module Scripted_process (Script : sig
       val s : [`On of int | `Off of int] list
@@ -483,8 +495,10 @@ let%test_module "Tests" =
         Process.create
           ~prog:
             ( match get_project_root () with
-            | Some path -> path ^/ "src/dummy.sh"
-            | None -> failwith "Can't run tests outside of source tree." )
+            | Some path ->
+                path ^/ "src/dummy.sh"
+            | None ->
+                failwith "Can't run tests outside of source tree." )
           ~args:[] ()
 
       let output t ~logger:_logger =
@@ -556,7 +570,7 @@ let%test_module "Tests" =
           Async.Thread_safe.block_on_async_exn (fun () ->
               File_system.with_temp_dir (conf_dir ^ "1") ~f:(fun conf_dir_1 ->
                   File_system.with_temp_dir (conf_dir ^ "2")
-                    ~f:(fun conf_dir_2 -> f conf_dir_1 conf_dir_2 ) ) ) )
+                    ~f:(fun conf_dir_2 -> f conf_dir_1 conf_dir_2) ) ) )
 
     let get_temp_dir () =
       let tmpdir = Filename.temp_dir "test_trust_db" "" in

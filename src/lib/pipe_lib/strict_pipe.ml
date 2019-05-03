@@ -1,9 +1,9 @@
 open Async_kernel
 open Core_kernel
 
-exception Overflow of string option
+exception Overflow of string
 
-exception Multiple_reads_attempted of string option
+exception Multiple_reads_attempted of string
 
 type crash = Overflow_behavior_crash
 
@@ -23,6 +23,8 @@ type (_, _) type_ =
       [`Capacity of int] * [`Overflow of 'b overflow_behavior]
       -> ('b buffered, unit) type_
 
+let value_or_empty = Option.value ~default:"<unnamed>"
+
 module Reader0 = struct
   type 't t =
     { reader: 't Pipe.Reader.t
@@ -35,8 +37,10 @@ module Reader0 = struct
     | ( :: ) : 'a t * downstreams -> downstreams
 
   let rec downstreams_from_list : 'a t list -> downstreams = function
-    | [] -> []
-    | r :: rs -> r :: downstreams_from_list rs
+    | [] ->
+        []
+    | r :: rs ->
+        r :: downstreams_from_list rs
 
   (* TODO: See #1281 *)
   let to_linear_pipe {reader= pipe; has_reader; downstreams= _} =
@@ -46,7 +50,8 @@ module Reader0 = struct
     {reader; has_reader; downstreams= []; name}
 
   let assert_not_read reader =
-    if reader.has_reader then raise (Multiple_reads_attempted reader.name)
+    if reader.has_reader then
+      raise (Multiple_reads_attempted (value_or_empty reader.name))
 
   let wrap_reader ?name reader =
     {reader; has_reader= false; downstreams= []; name}
@@ -64,7 +69,8 @@ module Reader0 = struct
     enforce_single_reader reader
       (let rec go b =
          match%bind Pipe.read reader.reader with
-         | `Eof -> return b
+         | `Eof ->
+             return b
          | `Ok a ->
              (* The async scheduler could yield here *)
              let%bind b' = f b a in
@@ -108,27 +114,32 @@ module Reader0 = struct
       let rec read_deferred readers =
         let%bind ready_reader =
           match List.find readers ~f:not_empty with
-          | Some reader -> Deferred.return (Some reader)
+          | Some reader ->
+              Deferred.return (Some reader)
           | None ->
               let%map () =
                 Deferred.choose
                   (List.map readers ~f:(fun r ->
                        Deferred.choice (Pipe.values_available r.reader)
-                         (fun _ -> () ) ))
+                         (fun _ -> ()) ))
               in
               List.find readers ~f:not_empty
         in
         match ready_reader with
         | Some reader -> (
           match Pipe.read_now reader.reader with
-          | `Nothing_available -> failwith "impossible"
-          | `Eof -> Deferred.unit
+          | `Nothing_available ->
+              failwith "impossible"
+          | `Eof ->
+              Deferred.unit
           | `Ok value ->
               Deferred.bind (f value) ~f:(fun () -> read_deferred readers) )
         | None -> (
           match List.filter readers ~f:(fun r -> not @@ is_closed r) with
-          | [] -> Deferred.unit
-          | open_readers -> read_deferred open_readers )
+          | [] ->
+              Deferred.unit
+          | open_readers ->
+              read_deferred open_readers )
       in
       List.iter readers ~f:assert_not_read ;
       read_deferred readers
@@ -164,13 +175,15 @@ module Reader0 = struct
   end
 
   let rec close_downstreams = function
-    | [] -> ()
+    | [] ->
+        ()
     (* The use of close_read is justified, because close_read would do
      * everything close does, and in addition:
      * 1. all pending flushes become determined with `Reader_closed.
      * 2. the pipe buffer is cleared.
      * 3. all subsequent reads will get `Eof. *)
-    | r :: rs -> Pipe.close_read r.reader ; close_downstreams rs
+    | r :: rs ->
+        Pipe.close_read r.reader ; close_downstreams rs
 end
 
 module Writer = struct
@@ -187,7 +200,8 @@ module Writer = struct
       ('t, b buffered, unit) t -> 't -> b overflow_behavior -> unit =
    fun writer data overflow_behavior ->
     match overflow_behavior with
-    | Crash -> raise (Overflow writer.name)
+    | Crash ->
+        raise (Overflow (value_or_empty writer.name))
     | Drop_head ->
         let logger = Logger.create () in
         let my_name = Option.value writer.name ~default:"<unnamed>" in
@@ -201,7 +215,8 @@ module Writer = struct
   let write : type type_ return. ('t, type_, return) t -> 't -> return =
    fun writer data ->
     match writer.type_ with
-    | Synchronous -> Pipe.write writer.writer data
+    | Synchronous ->
+        Pipe.write writer.writer data
     | Buffered (`Capacity capacity, `Overflow overflow) ->
         if Pipe.length writer.strict_reader.reader > capacity then
           handle_overflow writer data overflow
@@ -236,9 +251,12 @@ module Reader = struct
     don't_wait_for
       (Reader0.iter reader ~f:(fun x ->
            match f x with
-           | `Fst x -> Writer.write writer_a x
-           | `Snd x -> Writer.write writer_b x
-           | `Trd x -> Writer.write writer_c x )) ;
+           | `Fst x ->
+               Writer.write writer_a x
+           | `Snd x ->
+               Writer.write writer_b x
+           | `Trd x ->
+               Writer.write writer_c x )) ;
     don't_wait_for
       (let%map () = Pipe.closed reader_a.reader
        and () = Pipe.closed reader_b.reader
@@ -335,7 +353,9 @@ let%test_module "Strict_pipe.close" =
       and _, output_writer = create Synchronous in
       assert (not (Writer.is_closed input_writer)) ;
       assert (not (Writer.is_closed output_writer)) ;
-      let _ : unit Deferred.t = transfer input_reader output_writer ~f:Fn.id in
+      let (_ : unit Deferred.t) =
+        transfer input_reader output_writer ~f:Fn.id
+      in
       Writer.close input_writer ;
       assert (Writer.is_closed input_writer) ;
       assert (Writer.is_closed output_writer)

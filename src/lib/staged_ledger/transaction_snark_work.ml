@@ -13,7 +13,7 @@ end) (Ledger_proof_statement : sig
   module Stable :
     sig
       module V1 : sig
-        type t [@@deriving sexp, bin_io, hash, compare, yojson]
+        type t [@@deriving sexp, bin_io, hash, compare, yojson, version]
       end
     end
     with type V1.t = t
@@ -30,10 +30,8 @@ end) :
     module Stable = struct
       module V1 = struct
         module T = struct
-          let version = 1
-
           type t = Ledger_proof_statement.Stable.V1.t list
-          [@@deriving bin_io, sexp, hash, compare, yojson]
+          [@@deriving bin_io, sexp, hash, compare, yojson, version]
         end
 
         include T
@@ -67,13 +65,11 @@ end) :
     module Stable = struct
       module V1 = struct
         module T = struct
-          let version = 1
-
           type t =
             { fee: Fee.Unsigned.t
             ; proofs: Ledger_proof.t list
             ; prover: Public_key.Compressed.Stable.V1.t }
-          [@@deriving sexp, bin_io]
+          [@@deriving sexp, bin_io, version {asserted}]
         end
 
         include T

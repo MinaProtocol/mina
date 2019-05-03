@@ -1,7 +1,7 @@
 open Core
 open Async
 open Coda_worker
-open Coda_main
+open Coda_inputs
 open Signature_lib
 
 let name = "coda-shared-prefix-multiproposer-test"
@@ -17,7 +17,7 @@ let main n enable_payments () =
   in
   let%bind testnet =
     Coda_worker_testnet.test logger n Option.some snark_work_public_keys
-      Protocols.Coda_pow.Work_selection.Seq
+      Protocols.Coda_pow.Work_selection.Seq ~max_concurrent_connections:None
   in
   let%bind () =
     if enable_payments then

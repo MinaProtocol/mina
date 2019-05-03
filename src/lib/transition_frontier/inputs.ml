@@ -1,6 +1,7 @@
 open Core_kernel
 open Protocols.Coda_pow
 open Coda_base
+open Coda_state
 open Signature_lib
 
 module type Inputs_intf = sig
@@ -44,9 +45,11 @@ module type Inputs_intf = sig
      and type fee_transfer_single := Fee_transfer.Single.t
 
   module External_transition :
-    External_transition.S
-    with module Protocol_state = Consensus.Protocol_state
-     and module Staged_ledger_diff := Staged_ledger_diff
+    External_transition_intf
+    with type protocol_state := Protocol_state.Value.t
+     and type staged_ledger_diff := Staged_ledger_diff.t
+     and type protocol_state_proof := Proof.t
+     and type state_hash := State_hash.t
 
   module Transaction_witness :
     Transaction_witness_intf with type sparse_ledger := Sparse_ledger.t
@@ -74,6 +77,18 @@ module type Inputs_intf = sig
      and type user_command := User_command.t
      and type transaction_witness := Transaction_witness.t
      and type pending_coinbase_collection := Pending_coinbase.t
+
+  module Diff_hash : Diff_hash
+
+  module Diff_mutant :
+    Diff_mutant
+    with type external_transition := External_transition.Stable.Latest.t
+     and type state_hash := State_hash.t
+     and type scan_state := Staged_ledger.Scan_state.t
+     and type hash := Diff_hash.t
+     and type consensus_state :=
+                Consensus.Data.Consensus_state.Value.Stable.V1.t
+     and type pending_coinbases := Pending_coinbase.t
 
   val max_length : int
 end

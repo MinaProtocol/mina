@@ -1,6 +1,3 @@
-[%%import
-"../config.mlh"]
-
 open Core_kernel
 open Async_kernel
 open Pipe_lib
@@ -13,23 +10,11 @@ module type Security_intf = sig
 end
 
 module type Time_controller_intf = sig
-  [%%if time_offsets]
-
   type t
 
   val create : t -> t
 
   val basic : t
-
-  [%%else]
-
-  type t
-
-  val create : t -> t
-
-  val basic : t
-
-  [%%endif]
 end
 
 module type Sok_message_intf = sig
@@ -37,11 +22,15 @@ module type Sok_message_intf = sig
 
   module Digest : sig
     type t
+
+    module Checked : sig
+      type t
+    end
   end
 
   module Stable : sig
     module V1 : sig
-      type t [@@deriving sexp, bin_io]
+      type t [@@deriving sexp, bin_io, version]
     end
 
     module Latest = V1
@@ -65,6 +54,10 @@ module type Time_intf = sig
   type t [@@deriving sexp]
 
   type t0 = t
+
+  module Unpacked : sig
+    type var
+  end
 
   module Span : sig
     type t [@@deriving compare]
@@ -121,7 +114,7 @@ module type Ledger_hash_intf = sig
   module Stable :
     sig
       module V1 : sig
-        type t [@@deriving eq, sexp, compare, bin_io]
+        type t [@@deriving eq, sexp, compare, bin_io, version]
       end
 
       module Latest = V1
@@ -134,7 +127,7 @@ module type Ledger_hash_intf = sig
 end
 
 module type Pending_coinbase_hash_intf = sig
-  type t [@@deriving bin_io, eq, sexp, compare, hash]
+  type t [@@deriving eq, sexp, compare, hash]
 
   val to_bytes : t -> string
 
@@ -157,7 +150,7 @@ module type Pending_coinbase_intf = sig
   end
 
   module Stack : sig
-    type t [@@deriving sexp, bin_io, eq]
+    type t [@@deriving sexp, eq]
 
     val push : t -> coinbase -> t
 
@@ -192,11 +185,19 @@ end
 module type Transaction_witness_intf = sig
   type sparse_ledger
 
-  type t = {ledger: sparse_ledger} [@@deriving bin_io, sexp]
+  type t = {ledger: sparse_ledger} [@@deriving sexp]
+
+  module Stable : sig
+    module V1 : sig
+      type nonrec t = t [@@deriving bin_io, sexp, version]
+    end
+  end
 end
 
 module type Protocol_state_hash_intf = sig
-  type t [@@deriving bin_io, sexp, eq]
+  type t [@@deriving bin_io, sexp, eq, to_yojson]
+
+  type var
 
   include Hashable.S_binable with type t := t
 end
@@ -216,7 +217,19 @@ module type Staged_ledger_aux_hash_intf = sig
 end
 
 module type Staged_ledger_hash_intf = sig
-  type t [@@deriving bin_io, sexp, eq, compare]
+  type t [@@deriving sexp, eq, compare]
+
+  type var
+
+  module Stable :
+    sig
+      module V1 : sig
+        type t [@@deriving bin_io, sexp, eq, compare, version]
+
+        include Hashable.S_binable with type t := t
+      end
+    end
+    with type V1.t = t
 
   type ledger_hash
 
@@ -234,8 +247,6 @@ module type Staged_ledger_hash_intf = sig
 
   val of_aux_ledger_and_coinbase_hash :
     staged_ledger_aux_hash -> ledger_hash -> pending_coinbase -> t
-
-  include Hashable.S_binable with type t := t
 end
 
 module type Proof_intf = sig
@@ -309,7 +320,7 @@ module type Ledger_intf = sig
     module Stable :
       sig
         module V1 : sig
-          type t [@@deriving sexp, bin_io]
+          type t [@@deriving sexp, bin_io, version]
         end
 
         module Latest = V1
@@ -357,9 +368,7 @@ module Fee = struct
 
     include (
       Currency.Fee.Signed.Stable.V1 :
-        module type of Currency.Fee.Signed.Stable.Latest
-        with type t := t
-         and type ('a, 'b) t_ := ('a, 'b) t_ )
+        module type of Currency.Fee.Signed.Stable.Latest with type t := t )
   end
 end
 
@@ -372,7 +381,13 @@ module type Snark_pool_proof_intf = sig
 end
 
 module type User_command_intf = sig
-  type t [@@deriving sexp, eq, bin_io, yojson]
+  type t [@@deriving sexp, eq, yojson]
+
+  module Stable : sig
+    module V1 : sig
+      type nonrec t = t [@@deriving bin_io, sexp, eq, yojson, version]
+    end
+  end
 
   type public_key
 
@@ -399,12 +414,14 @@ module type Compressed_public_key_intf = sig
   module Stable :
     sig
       module V1 : sig
-        type t [@@deriving sexp, bin_io, compare, yojson]
+        type t [@@deriving sexp, bin_io, compare, yojson, version]
       end
     end
     with type V1.t = t
 
   include Comparable.S with type t := t
+
+  type var
 
   val empty : t
 end
@@ -448,7 +465,7 @@ module type Fee_transfer_intf = sig
     module Stable :
       sig
         module V1 : sig
-          type t [@@deriving sexp, bin_io, yojson]
+          type t [@@deriving sexp, bin_io, yojson, version]
         end
       end
       with type V1.t = t
@@ -501,7 +518,7 @@ module type Pending_coinbase_stack_state_intf = sig
   type pending_coinbase_stack
 
   type t = {source: pending_coinbase_stack; target: pending_coinbase_stack}
-  [@@deriving sexp, bin_io, compare]
+  [@@deriving sexp, compare]
 end
 
 module type Ledger_proof_statement_intf = sig
@@ -528,7 +545,7 @@ module type Ledger_proof_statement_intf = sig
           ; pending_coinbase_stack_state: pending_coinbase_stack_state
           ; fee_excess: Fee.Signed.t
           ; proof_type: [`Base | `Merge] }
-        [@@deriving sexp, bin_io, compare]
+        [@@deriving sexp, bin_io, compare, version]
       end
     end
     with type V1.t = t
@@ -553,7 +570,7 @@ module type Ledger_proof_intf = sig
   module Stable :
     sig
       module V1 : sig
-        type t [@@deriving sexp, bin_io, yojson]
+        type t [@@deriving sexp, bin_io, yojson, version]
       end
 
       module Latest = V1
@@ -602,7 +619,7 @@ module type Transaction_snark_work_intf = sig
     module Stable :
       sig
         module V1 : sig
-          type t [@@deriving yojson]
+          type t [@@deriving yojson, version]
 
           include Sexpable.S with type t := t
 
@@ -622,14 +639,14 @@ module type Transaction_snark_work_intf = sig
      H(all_statements_in_bundle || fee || public_key)
   *)
 
-  type t = {fee: Fee.Unsigned.t; proofs: proof list; prover: public_key}
+  type t =
+    {fee: Fee.Unsigned.Stable.V1.t; proofs: proof list; prover: public_key}
   [@@deriving sexp]
 
   module Stable :
     sig
       module V1 : sig
-        type t = {fee: Fee.Unsigned.t; proofs: proof list; prover: public_key}
-        [@@deriving sexp, bin_io]
+        type t [@@deriving sexp, bin_io, version]
       end
     end
     with type V1.t = t
@@ -668,43 +685,89 @@ module type Staged_ledger_diff_intf = sig
 
   module At_most_two : sig
     type 'a t = Zero | One of 'a option | Two of ('a * 'a option) option
-    [@@deriving sexp, bin_io]
+    [@@deriving sexp]
+
+    module Stable :
+      sig
+        module V1 : sig
+          type 'a t [@@deriving sexp, bin_io, version]
+        end
+      end
+      with type 'a V1.t = 'a t
 
     val increase : 'a t -> 'a list -> 'a t Or_error.t
   end
 
   module At_most_one : sig
-    type 'a t = Zero | One of 'a option [@@deriving sexp, bin_io]
+    type 'a t = Zero | One of 'a option [@@deriving sexp]
+
+    module Stable :
+      sig
+        module V1 : sig
+          type 'a t [@@deriving sexp, bin_io, version]
+        end
+      end
+      with type 'a V1.t = 'a t
 
     val increase : 'a t -> 'a list -> 'a t Or_error.t
   end
 
-  type pre_diff_with_at_most_two_coinbase =
-    { completed_works: completed_work list
-    ; user_commands: user_command list
-    ; coinbase: fee_transfer_single At_most_two.t }
-  [@@deriving sexp, bin_io]
+  module Pre_diff_with_at_most_two_coinbase : sig
+    type t =
+      { completed_works: completed_work list
+      ; user_commands: user_command list
+      ; coinbase: fee_transfer_single At_most_two.Stable.V1.t }
+    [@@deriving sexp]
 
-  type pre_diff_with_at_most_one_coinbase =
-    { completed_works: completed_work list
-    ; user_commands: user_command list
-    ; coinbase: fee_transfer_single At_most_one.t }
-  [@@deriving sexp, bin_io]
+    module Stable :
+      sig
+        module V1 : sig
+          type t [@@deriving sexp, bin_io, version]
+        end
+      end
+      with type V1.t = t
+  end
 
-  type diff =
-    pre_diff_with_at_most_two_coinbase
-    * pre_diff_with_at_most_one_coinbase option
-  [@@deriving sexp, bin_io]
+  module Pre_diff_with_at_most_one_coinbase : sig
+    type t =
+      { completed_works: completed_work list
+      ; user_commands: user_command list
+      ; coinbase: fee_transfer_single At_most_one.t }
+    [@@deriving sexp]
 
-  type t = {diff: diff; prev_hash: staged_ledger_hash; creator: public_key}
+    module Stable :
+      sig
+        module V1 : sig
+          type t [@@deriving sexp, bin_io, version]
+        end
+      end
+      with type V1.t = t
+  end
+
+  module Diff : sig
+    type t =
+      Pre_diff_with_at_most_two_coinbase.Stable.V1.t
+      * Pre_diff_with_at_most_one_coinbase.Stable.V1.t option
+    [@@deriving sexp]
+
+    module Stable :
+      sig
+        module V1 : sig
+          type t [@@deriving sexp, bin_io, version]
+        end
+      end
+      with type V1.t = t
+  end
+
+  type t = {diff: Diff.t; prev_hash: staged_ledger_hash; creator: public_key}
   [@@deriving sexp]
 
   module Stable :
     sig
       module V1 : sig
         type t =
-          {diff: diff; prev_hash: staged_ledger_hash; creator: public_key}
-        [@@deriving sexp, bin_io]
+          {diff: Diff.t; prev_hash: staged_ledger_hash; creator: public_key}
+        [@@deriving sexp, bin_io, version]
       end
 
       module Latest = V1
@@ -738,6 +801,10 @@ module type Staged_ledger_diff_intf = sig
   val forget : With_valid_signatures_and_proofs.t -> t
 
   val user_commands : t -> user_command list
+
+  val completed_works : t -> completed_work list
+
+  val coinbase : t -> Currency.Amount.t
 end
 
 module type Staged_ledger_transition_intf = sig
@@ -786,7 +853,7 @@ module type Transaction_snark_scan_state_intf = sig
   module Stable :
     sig
       module V1 : sig
-        type t [@@deriving sexp, bin_io]
+        type t [@@deriving sexp, bin_io, version]
 
         val hash : t -> staged_ledger_aux_hash
       end
@@ -813,6 +880,7 @@ module type Transaction_snark_scan_state_intf = sig
       { transaction_with_info: transaction_with_info
       ; statement: ledger_proof_statement
       ; witness: transaction_witness }
+    [@@deriving sexp]
   end
 
   module Ledger_proof_with_sok_message : sig
@@ -902,7 +970,9 @@ module type Transaction_snark_scan_state_intf = sig
 
   val current_job_count : t -> int
 
-  val work_capacity : unit -> int
+  val work_capacity : int
+
+  val next_on_new_tree : t -> bool Or_error.t
 end
 
 module type Staged_ledger_base_intf = sig
@@ -945,7 +1015,7 @@ module type Staged_ledger_base_intf = sig
     module Stable :
       sig
         module V1 : sig
-          type t [@@deriving sexp, bin_io]
+          type t [@@deriving sexp, bin_io, version]
 
           val hash : t -> staged_ledger_aux_hash
         end
@@ -975,6 +1045,10 @@ module type Staged_ledger_base_intf = sig
     val all_work_to_do : t -> statement Sequence.t Or_error.t
 
     val all_transactions : t -> transaction list Or_error.t
+
+    val work_capacity : int
+
+    val current_job_count : t -> int
   end
 
   module Staged_ledger_error : sig
@@ -1171,26 +1245,52 @@ module type Pending_coinbase_witness_intf = sig
   type t = {pending_coinbases: pending_coinbases; is_new_stack: bool}
 end
 
-module type Blockchain_state_intf = sig
-  type staged_ledger_hash
-
-  type frozen_ledger_hash
-
-  type time
-
+module type Consensus_transition_intf = sig
   module Value : sig
-    type t [@@deriving sexp]
-
-    module Stable :
-      sig
-        module V1 : sig
-          type t [@@deriving sexp, bin_io]
-        end
-      end
-      with type V1.t = t
+    type t
   end
 
   type var
+end
+
+module type Blockchain_state_intf = sig
+  type staged_ledger_hash
+
+  type staged_ledger_hash_var
+
+  type frozen_ledger_hash
+
+  type frozen_ledger_hash_var
+
+  type time
+
+  type time_var
+
+  module Poly : sig
+    module Stable : sig
+      module V1 : sig
+        type ('staged_ledger_hash, 'snarked_ledger_hash, 'time) t
+        [@@deriving sexp, bin_io]
+      end
+    end
+
+    type ('staged_ledger_hash, 'snarked_ledger_hash, 'time) t =
+      ('staged_ledger_hash, 'snarked_ledger_hash, 'time) Stable.V1.t
+    [@@deriving sexp]
+  end
+
+  module Value : sig
+    module Stable : sig
+      module V1 : sig
+        type t = (staged_ledger_hash, frozen_ledger_hash, time) Poly.t
+        [@@deriving sexp, bin_io]
+      end
+    end
+
+    type t = Stable.V1.t [@@deriving sexp]
+  end
+
+  type var = (staged_ledger_hash_var, frozen_ledger_hash_var, time_var) Poly.t
 
   val create_value :
        staged_ledger_hash:staged_ledger_hash
@@ -1198,36 +1298,85 @@ module type Blockchain_state_intf = sig
     -> timestamp:time
     -> Value.t
 
-  val staged_ledger_hash : Value.t -> staged_ledger_hash
+  val staged_ledger_hash :
+    ('staged_ledger_hash, _, _) Poly.t -> 'staged_ledger_hash
 
-  val snarked_ledger_hash : Value.t -> frozen_ledger_hash
+  val snarked_ledger_hash :
+    (_, 'frozen_ledger_hash, _) Poly.t -> 'frozen_ledger_hash
 
-  val timestamp : Value.t -> time
+  val timestamp : (_, _, 'time) Poly.t -> 'time
 end
 
 module type Protocol_state_intf = sig
   type state_hash
 
+  type state_hash_var
+
   type blockchain_state
+
+  type blockchain_state_var
 
   type consensus_state
 
-  module Value : sig
-    (* bin_io omitted *)
-    type t [@@deriving sexp, eq, compare]
+  type consensus_state_var
 
-    module Stable :
-      sig
+  module Poly : sig
+    module Stable : sig
+      module V1 : sig
+        type ('state_hash, 'body) t
+        [@@deriving eq, bin_io, hash, sexp, to_yojson, version]
+      end
+
+      module Latest = V1
+    end
+
+    type ('state_hash, 'body) t = ('state_hash, 'body) Stable.Latest.t
+    [@@deriving sexp]
+  end
+
+  module Body : sig
+    module Poly : sig
+      module Stable : sig
         module V1 : sig
-          type t [@@deriving sexp, bin_io, eq, compare]
+          type ('blockchain_state, 'consensus_state) t
+          [@@deriving bin_io, sexp]
         end
 
         module Latest = V1
       end
-      with type V1.t = t
+
+      type ('blockchain_state, 'consensus_state) t =
+        ('blockchain_state, 'consensus_state) Stable.V1.t
+      [@@deriving sexp]
+    end
+
+    module Value : sig
+      module Stable : sig
+        module V1 : sig
+          type t = (blockchain_state, consensus_state) Poly.Stable.V1.t
+          [@@deriving bin_io, sexp, to_yojson]
+        end
+      end
+    end
+
+    type var = (blockchain_state_var, consensus_state_var) Poly.Stable.V1.t
   end
 
-  type var
+  module Value : sig
+    module Stable : sig
+      module V1 : sig
+        type t = (state_hash, Body.Value.Stable.V1.t) Poly.Stable.V1.t
+        [@@deriving sexp, bin_io, eq, compare]
+      end
+
+      module Latest = V1
+    end
+
+    (* bin_io omitted *)
+    type t = Stable.V1.t [@@deriving sexp, eq, compare]
+  end
+
+  type var = (state_hash_var, Body.var) Poly.t
 
   val create_value :
        previous_state_hash:state_hash
@@ -1235,13 +1384,54 @@ module type Protocol_state_intf = sig
     -> consensus_state:consensus_state
     -> Value.t
 
-  val previous_state_hash : Value.t -> state_hash
+  val previous_state_hash : ('state_hash, _) Poly.t -> 'state_hash
 
-  val blockchain_state : Value.t -> blockchain_state
+  val body : (_, 'body) Poly.t -> 'body
 
-  val consensus_state : Value.t -> consensus_state
+  val blockchain_state :
+    (_, ('blockchain_state, _) Body.Poly.t) Poly.t -> 'blockchain_state
+
+  val consensus_state :
+    (_, (_, 'consensus_state) Body.Poly.t) Poly.t -> 'consensus_state
 
   val hash : Value.t -> state_hash
+end
+
+module type Snark_transition_intf = sig
+  type blockchain_state_var
+
+  type consensus_transition_var
+
+  type sok_digest_var
+
+  type amount_var
+
+  type public_key_var
+
+  module Poly : sig
+    type ( 'blockchain_state
+         , 'consensus_transition
+         , 'sok_digest
+         , 'amount
+         , 'public_key )
+         t
+    [@@deriving sexp]
+  end
+
+  module Value : sig
+    type t [@@deriving sexp]
+  end
+
+  type var =
+    ( blockchain_state_var
+    , consensus_transition_var
+    , sok_digest_var
+    , amount_var
+    , public_key_var )
+    Poly.t
+
+  val consensus_transition :
+    (_, 'consensus_transition, _, _, _) Poly.t -> 'consensus_transition
 end
 
 module type Internal_transition_intf = sig
@@ -1277,6 +1467,8 @@ module type Internal_transition_intf = sig
 end
 
 module type External_transition_intf = sig
+  type state_hash
+
   type protocol_state
 
   type protocol_state_proof
@@ -1285,14 +1477,14 @@ module type External_transition_intf = sig
 
   module Stable : sig
     module V1 : sig
-      type t [@@deriving sexp, bin_io, to_yojson]
+      type t [@@deriving sexp, eq, bin_io, to_yojson, version]
     end
 
     module Latest = V1
   end
 
   (* bin_io intentionally omitted *)
-  type t = Stable.Latest.t [@@deriving sexp, to_yojson]
+  type t = Stable.Latest.t [@@deriving sexp, eq, to_yojson]
 
   val create :
        protocol_state:protocol_state
@@ -1301,34 +1493,47 @@ module type External_transition_intf = sig
     -> t
 
   module Verified : sig
-    type t [@@deriving sexp, to_yojson]
+    type t [@@deriving sexp, eq, to_yojson]
 
     val protocol_state : t -> protocol_state
 
     val protocol_state_proof : t -> protocol_state_proof
 
     val staged_ledger_diff : t -> staged_ledger_diff
+
+    val parent_hash : t -> state_hash
   end
 
   module Proof_verified : sig
-    type t [@@deriving sexp]
+    type t [@@deriving sexp, eq]
 
     val protocol_state : t -> protocol_state
 
     val protocol_state_proof : t -> protocol_state_proof
 
     val staged_ledger_diff : t -> staged_ledger_diff
+
+    val parent_hash : t -> state_hash
   end
 
   val to_verified : t -> [`I_swear_this_is_safe_see_my_comment of Verified.t]
 
   val of_verified : Verified.t -> t
 
+  val to_proof_verified :
+    t -> [`I_swear_this_is_safe_see_my_comment of Proof_verified.t]
+
+  val of_proof_verified : Proof_verified.t -> t
+
+  val forget_consensus_state_verification : Verified.t -> Proof_verified.t
+
   val protocol_state : t -> protocol_state
 
   val protocol_state_proof : t -> protocol_state_proof
 
   val staged_ledger_diff : t -> staged_ledger_diff
+
+  val parent_hash : t -> state_hash
 end
 
 module type External_transition_validation_intf = sig
@@ -1361,7 +1566,11 @@ module type External_transition_validation_intf = sig
 
   type fully_valid = Truth.true_t all
 
-  type ('time_received, 'proof, 'frontier_dependencies, 'staged_ledger_diff) with_transition =
+  type ( 'time_received
+       , 'proof
+       , 'frontier_dependencies
+       , 'staged_ledger_diff )
+       with_transition =
     (external_transition, state_hash) With_hash.t
     * ('time_received, 'proof, 'frontier_dependencies, 'staged_ledger_diff) t
 
@@ -1433,120 +1642,16 @@ module type External_transition_validation_intf = sig
        Deferred.Result.t
 end
 
-module type Consensus_mechanism_intf = sig
-  type proof
+module type Prover_state_intf = sig
+  module Stable : sig
+    module V1 : sig
+      type t [@@deriving bin_io]
+    end
 
-  type ledger
-
-  type frozen_ledger_hash
-
-  type staged_ledger_hash
-
-  type staged_ledger_diff
-
-  type protocol_state_proof
-
-  type protocol_state_hash
-
-  type user_command
-
-  type sok_digest
-
-  type keypair
-
-  type compressed_public_key
-
-  type time
-
-  module Local_state : sig
-    type t [@@deriving sexp]
-
-    val create : compressed_public_key option -> t
+    module Latest : module type of V1
   end
 
-  module Consensus_transition_data : sig
-    type value [@@deriving sexp]
-
-    type var
-  end
-
-  module Consensus_state : Consensus_state_intf
-
-  module Blockchain_state :
-    Blockchain_state_intf
-    with type staged_ledger_hash := staged_ledger_hash
-     and type frozen_ledger_hash := frozen_ledger_hash
-     and type time := time
-
-  module Protocol_state :
-    Protocol_state_intf
-    with type state_hash := protocol_state_hash
-     and type blockchain_state := Blockchain_state.Value.t
-     and type consensus_state := Consensus_state.Value.t
-
-  module Prover_state : sig
-    type t [@@deriving bin_io]
-  end
-
-  module Proposal_data : sig
-    type t
-
-    val prover_state : t -> Prover_state.t
-  end
-
-  module Snark_transition : sig
-    type value
-
-    type var
-
-    val create_value :
-         ?sok_digest:sok_digest
-      -> ?ledger_proof:proof
-      -> supply_increase:Currency.Amount.t
-      -> blockchain_state:Blockchain_state.Value.t
-      -> consensus_data:Consensus_transition_data.value
-      -> proposer:compressed_public_key
-      -> coinbase:Currency.Amount.t
-      -> unit
-      -> value
-
-    val blockchain_state : value -> Blockchain_state.Value.t
-
-    val consensus_data : value -> Consensus_transition_data.value
-  end
-
-  val generate_transition :
-       previous_protocol_state:Protocol_state.Value.t
-    -> blockchain_state:Blockchain_state.Value.t
-    -> time:Int64.t
-    -> proposal_data:Proposal_data.t
-    -> transactions:user_command list
-    -> snarked_ledger_hash:frozen_ledger_hash
-    -> supply_increase:Currency.Amount.t
-    -> logger:Logger.t
-    -> Protocol_state.Value.t * Consensus_transition_data.value
-
-  val received_at_valid_time :
-    Consensus_state.Value.t -> time_received:Unix_timestamp.t -> bool
-
-  val next_proposal :
-       Int64.t
-    -> Consensus_state.Value.t
-    -> local_state:Local_state.t
-    -> keypair:keypair
-    -> logger:Logger.t
-    -> [ `Check_again of Int64.t
-       | `Propose_now of Proposal_data.t
-       | `Propose of Int64.t * Proposal_data.t ]
-
-  val select :
-       existing:Consensus_state.Value.t
-    -> candidate:Consensus_state.Value.t
-    -> logger:Logger.t
-    -> [`Keep | `Take]
-
-  val genesis_protocol_state :
-    (Protocol_state.Value.t, protocol_state_hash) With_hash.t
+  type t = Stable.V1.t
 end
 
 module type Time_close_validator_intf = sig
@@ -1681,6 +1786,8 @@ module type Inputs_intf = sig
 
   module Frozen_ledger_hash : sig
     include Ledger_hash_intf
+
+    type var
 
     val of_ledger_hash : Ledger_hash.t -> t
   end
@@ -1838,41 +1945,59 @@ Merge Snark:
 
   module Protocol_state_proof : Protocol_state_proof_intf
 
-  module Consensus_mechanism :
-    Consensus_mechanism_intf
-    with type proof := Proof.t
-     and type protocol_state_hash := Protocol_state_hash.t
-     and type protocol_state_proof := Protocol_state_proof.t
+  module Prover_state : Prover_state_intf
+
+  module Blockchain_state :
+    Blockchain_state_intf
+    with type staged_ledger_hash := Staged_ledger_hash.t
+     and type staged_ledger_hash_var := Staged_ledger_hash.var
      and type frozen_ledger_hash := Frozen_ledger_hash.t
-     and type staged_ledger_hash := Staged_ledger_hash.t
-     and type staged_ledger_diff := Staged_ledger_diff.t
-     and type user_command := User_command.t
-     and type sok_digest := Sok_message.Digest.t
-     and type ledger := Ledger.t
-     and type compressed_public_key := Public_key.Compressed.t
-     and type keypair := Keypair.t
+     and type frozen_ledger_hash_var := Frozen_ledger_hash.var
      and type time := Time.t
+     and type time_var := Time.Unpacked.var
+
+  module Consensus_state : Consensus_state_intf
+
+  module Protocol_state :
+    Protocol_state_intf
+    with type state_hash := Protocol_state_hash.t
+     and type state_hash_var := Protocol_state_hash.var
+     and type blockchain_state := Blockchain_state.Value.t
+     and type blockchain_state_var := Blockchain_state.var
+     and type consensus_state := Consensus_state.Value.t
+     and type consensus_state_var := Consensus_state.var
+
+  module Consensus_transition : Consensus_transition_intf
+
+  module Snark_transition :
+    Snark_transition_intf
+    with type blockchain_state_var := Blockchain_state.var
+     and type consensus_transition_var := Consensus_transition.var
+     and type sok_digest_var := Sok_message.Digest.Checked.t
+     and type amount_var := Currency.Amount.var
+     and type public_key_var := Public_key.Compressed.var
 
   module Internal_transition :
     Internal_transition_intf
-    with type snark_transition := Consensus_mechanism.Snark_transition.value
-     and type prover_state := Consensus_mechanism.Prover_state.t
+    with type snark_transition := Snark_transition.Value.t
+     and type prover_state := Prover_state.t
      and type staged_ledger_diff := Staged_ledger_diff.t
 
   module External_transition :
     External_transition_intf
-    with type protocol_state := Consensus_mechanism.Protocol_state.Value.t
+    with type protocol_state := Protocol_state.Value.t
      and type staged_ledger_diff := Staged_ledger_diff.t
      and type protocol_state_proof := Protocol_state_proof.t
+     and type state_hash := Protocol_state_hash.t
 
   module Tip :
     Tip_intf
     with type staged_ledger := Staged_ledger.t
-     and type protocol_state := Consensus_mechanism.Protocol_state.Value.t
+     and type protocol_state := Protocol_state.Value.t
      and type protocol_state_proof := Protocol_state_proof.t
      and type external_transition := External_transition.t
      and type serializable :=
-                Consensus_mechanism.Protocol_state.Value.t
+                Protocol_state.Value.t
                 * Protocol_state_proof.t
                 * Staged_ledger.serializable
 
@@ -1889,10 +2014,7 @@ module Make
     (Inputs : Inputs_intf)
     (Block_state_transition_proof : Block_state_transition_proof_intf
                                     with type protocol_state :=
-                                                Inputs.Consensus_mechanism
-                                                .Protocol_state
-                                                .Value
-                                                .t
+                                                Inputs.Protocol_state.Value.t
                                      and type protocol_state_proof :=
                                                 Inputs.Protocol_state_proof.t
                                      and type internal_transition :=
@@ -1902,9 +2024,7 @@ struct
 
   module Proof_carrying_state = struct
     type t =
-      ( Consensus_mechanism.Protocol_state.Value.t
-      , Protocol_state_proof.t )
-      Proof_carrying_data.t
+      (Protocol_state.Value.t, Protocol_state_proof.t) Proof_carrying_data.t
   end
 
   module Event = struct

@@ -52,9 +52,10 @@ let make = _ => {
       )
     );
 
-    <a
+    <A
+      name="announcementbar"
       id="announcementbar--anchor"
-      href="/testnet.html"
+      href="/blog/coda2019.html"
       className=Css.(
         style(
           Style.paddingX(`rem(1.25))
@@ -86,7 +87,7 @@ let make = _ => {
               ]),
             ])
           )>
-          {ReasonReact.string("Testnet is live!")}
+          {ReasonReact.string("New Fundraising!")}
         </p>
       </div>
       <p
@@ -101,8 +102,8 @@ let make = _ => {
             ]),
           ])
         )>
-        {ReasonReact.string({j|View the demo\u00A0→|j})}
+        {ReasonReact.string({j|Read Here\u00A0→|j})}
       </p>
-    </a>;
+    </A>;
   },
 };

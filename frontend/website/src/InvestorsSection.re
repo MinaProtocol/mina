@@ -2,49 +2,30 @@ let twoColumnMedia = "(min-width: 34rem)";
 
 module Investor = {
   let component = ReasonReact.statelessComponent("Investors.Investor");
-  let make = (~name, ~suffix, _) => {
-    let firstName = Js.String.split(" ", name)[0];
-    let suffixStr =
-      switch (suffix) {
-      | `Png => "png"
-      | `Jpg => "jpg"
-      };
-    let imageSrc =
-      "/static/img/investors/"
-      ++ String.lowercase(firstName)
-      ++ "."
-      ++ suffixStr;
-    {
-      ...component,
-      render: _self =>
-        <div
+  let make = (~name, _) => {
+    ...component,
+    render: _self =>
+      <div
+        className=Css.(
+          style([
+            display(`flex),
+            alignItems(`center),
+            backgroundColor(Style.Colors.greyishAlpha(1.0)),
+            height(`rem(1.75)),
+            marginRight(`rem(0.75)),
+            marginBottom(`rem(0.625)),
+          ])
+        )>
+        <h4
           className=Css.(
-            style([
-              display(`flex),
-              flexDirection(`row),
-              alignItems(`center),
-              media(twoColumnMedia, [marginLeft(`rem(3.))]),
+            merge([
+              Style.H3.Technical.title,
+              style(Style.paddingX(`rem(0.1875))),
             ])
           )>
-          // Note: change this alt text if we ever hide the investor name
-
-            <img
-              src=imageSrc
-              className=TeamSection.iconStyle
-              alt=""
-              ariaHidden=true
-            />
-            <h4
-              className=Css.(
-                merge([
-                  Style.Body.basic,
-                  style([color(Style.Colors.slate)]),
-                ])
-              )>
-              {ReasonReact.string(name)}
-            </h4>
-          </div>,
-    };
+          {ReasonReact.string(name)}
+        </h4>
+      </div>,
   };
 };
 
@@ -53,46 +34,49 @@ let make = _children => {
   ...component,
   render: _self =>
     <div>
-      <h3 className=Style.H3.wings> {ReasonReact.string("Investors")} </h3>
+      <h3 className=Style.H3.Technical.boxed>
+        {ReasonReact.string("O(1) Investors")}
+      </h3>
       <div
         className=Css.(
           style([
-            maxWidth(`rem(64.)),
-            display(`grid),
-            gridGap(`rem(1.)),
+            maxWidth(`rem(78.)),
+            display(`flex),
+            flexWrap(`wrap),
             marginTop(`rem(3.)),
             marginLeft(`auto),
             marginRight(`auto),
             justifyContent(`center),
-            gridTemplateColumns([`fr(1.), `fr(1.)]),
-            media(
-              twoColumnMedia,
-              [
-                // bs-css doesn't allow fr in minmax: https://github.com/SentiaAnalytics/bs-css/pull/124
-                unsafe(
-                  "grid-template-columns",
-                  "repeat(auto-fit, minmax(15rem, 1fr))",
-                ),
-              ],
-            ),
           ])
         )>
-        <Investor name="Metastable" suffix=`Png />
-        <Investor name="Polychain Capital" suffix=`Jpg />
-        <Investor name="ScifiVC" suffix=`Png />
-        <Investor name="Dekrypt Capital" suffix=`Png />
-        <Investor name="Electric Capital" suffix=`Png />
-        <Investor name="Curious Endeavors" suffix=`Jpg />
-        <Investor name="Kindred Ventures" suffix=`Png />
-        <Investor name="Caffeinated Capital" suffix=`Png />
-        <Investor name="Naval Ravikant" suffix=`Png />
-        <Investor name="Elad Gil" suffix=`Jpg />
-        <Investor name="Linda Xie" suffix=`Jpg />
-        <Investor name="Fred Ehrsam" suffix=`Jpg />
-        <Investor name="Jack Herrick" suffix=`Jpg />
-        <Investor name="Nima Capital" suffix=`Png />
-        <Investor name="Charlie Noyes" suffix=`Png />
-        <Investor name="O Group" suffix=`Png />
+        <Investor name="Metastable" />
+        <Investor name="Accomplice" />
+        <Investor name="Electric Capital" />
+        <Investor name="Polychain Capital" />
+        <Investor name="Paradigm" />
+        <Investor name="Coinbase Ventures" />
+        <Investor name="Dragonfly" />
+        <Investor name="Dekrypt Capital" />
+        <Investor name="Scifi vc" />
+        <Investor name="libertus" />
+        <Investor name="general catalyst" />
+        <Investor name="multicoin capital" />
+        <Investor name="collaborative fund" />
+        <Investor name="kilowatt capital" />
+        <Investor name="naval ravikant" />
+        <Investor name="elad gil" />
+        <Investor name="linda xie" />
+        <Investor name="fred ehrsam" />
+        <Investor name="jack herrick" />
+        <Investor name="charlie noyes" />
+        <Investor name="ed roman" />
+        <Investor name="andrew keys" />
+        <Investor name="kindred ventures" />
+        <Investor name="curious endeavors" />
+        <Investor name="blockchange" />
+        <Investor name="ogroup" />
+        <Investor name="nima capital" />
+        <Investor name="evolve vc" />
       </div>
     </div>,
 };

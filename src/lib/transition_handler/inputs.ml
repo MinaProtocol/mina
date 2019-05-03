@@ -1,5 +1,6 @@
 open Protocols.Coda_pow
 open Coda_base
+open Coda_state
 
 module type S = sig
   module Time : Time_intf
@@ -7,9 +8,7 @@ module type S = sig
   include Transition_frontier.Inputs_intf
 
   module State_proof :
-    Proof_intf
-    with type input := Consensus.Protocol_state.Value.t
-     and type t := Proof.t
+    Proof_intf with type input := Protocol_state.Value.t and type t := Proof.t
 
   module Transition_frontier :
     Transition_frontier_intf
@@ -20,8 +19,13 @@ module type S = sig
      and type masked_ledger := Ledger.Mask.Attached.t
      and type staged_ledger_diff := Staged_ledger_diff.t
      and type transaction_snark_scan_state := Staged_ledger.Scan_state.t
-     and type consensus_local_state := Consensus.Local_state.t
+     and type consensus_local_state := Consensus.Data.Local_state.t
      and type user_command := User_command.t
+     and type diff_mutant :=
+                ( External_transition.Stable.Latest.t
+                , State_hash.Stable.Latest.t )
+                With_hash.t
+                Diff_mutant.E.t
 end
 
 module With_unprocessed_transition_cache = struct
@@ -34,6 +38,7 @@ module With_unprocessed_transition_cache = struct
        and module Cache := Cache_lib.Cache
        and type source =
                   (External_transition.Verified.t, State_hash.t) With_hash.t
+                  Envelope.Incoming.t
        and type target = State_hash.t
   end
 end

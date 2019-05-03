@@ -1,14 +1,14 @@
 (** Pending_coinbase is to keep track of all the coinbase transactions that have been applied to the ledger but for which there is no ledger proof yet. Every ledger proof corresponds to a sequence of coinbase transactions which is part of all the transactions it proves. Each of these sequences[Stack] are stored using the merkle tree representation. The stacks are operated in a FIFO manner by keeping track of its positions in the merkle tree. Whenever a ledger proof is emitted, the oldest stack is removed from the tree and when a new coinbase is applied, the latest stack is updated with the new coinbase.
-The operations on the merkle tree of coinbase stacks include:
-1) adding a new singleton stack
-2) updating the latest stack when a new coinbase is added to it
-2) deleting the oldest stack
+    The operations on the merkle tree of coinbase stacks include:
+    1) adding a new singleton stack
+    2) updating the latest stack when a new coinbase is added to it
+    2) deleting the oldest stack
 
-A stack can be either be created or modified by pushing a coinbase on to it.
+    A stack can be either be created or modified by pushing a coinbase on to it.
 
-This module also provides an interface for the checked computations required required to prove it in snark
+    This module also provides an interface for the checked computations required required to prove it in snark
 
-Stack operations are done for transaction snarks and tree operations are done for the blockchain snark*)
+    Stack operations are done for transaction snarks and tree operations are done for the blockchain snark*)
 
 open Core
 open Snark_params
@@ -20,7 +20,15 @@ open Signature_lib
 open Currency
 
 module type S = sig
-  type t [@@deriving sexp, bin_io]
+  type t [@@deriving sexp]
+
+  module Stable : sig
+    module V1 : sig
+      type nonrec t = t [@@deriving bin_io, sexp, version]
+    end
+
+    module Latest = V1
+  end
 
   module Coinbase_data : sig
     type t = Public_key.Compressed.t * Amount.t [@@deriving bin_io, sexp]
@@ -39,7 +47,16 @@ module type S = sig
   end
 
   module type Data_hash_binable_intf = sig
-    type t [@@deriving bin_io, sexp, hash, compare, eq, yojson]
+    type t [@@deriving sexp, compare, eq, yojson, hash]
+
+    module Stable : sig
+      module V1 : sig
+        type nonrec t = t
+        [@@deriving bin_io, sexp, compare, eq, yojson, version, hash]
+      end
+
+      module Latest = V1
+    end
 
     type var
 
@@ -71,9 +88,11 @@ module type S = sig
 
     val of_digest : Pedersen.Digest.t -> t
   end
-  
+
   and Stack : sig
     include Data_hash_binable_intf
+
+    val data_hash : t -> Hash.t
 
     val push : t -> Coinbase.t -> t
 
@@ -88,8 +107,6 @@ module type S = sig
 
       val empty : t
     end
-
-    val hash : t -> Hash.t
   end
 
   val create : unit -> t Or_error.t
@@ -131,20 +148,20 @@ module type S = sig
     val get : var -> Address.var -> (Stack.var, _) Tick.Checked.t
 
     (**
-   [update_stack t ~is_new_stack updtaed_stack] implements the following spec:
-   - gets the address[addr] of the latest stack or a new stack
-   - finds a coinbase stack in [t] at path [addr] and pushes the coinbase_data on to the stack
-   - returns a root [t'] of the tree
-  *)
+       [update_stack t ~is_new_stack updtaed_stack] implements the following spec:
+       - gets the address[addr] of the latest stack or a new stack
+       - finds a coinbase stack in [t] at path [addr] and pushes the coinbase_data on to the stack
+       - returns a root [t'] of the tree
+    *)
     val add_coinbase : var -> Coinbase_data.var -> (var, 's) Tick.Checked.t
 
     (**
-   [pop_coinbases t pk updated_stack] implements the following spec:
+       [pop_coinbases t pk updated_stack] implements the following spec:
 
-   - gets the address[addr] of the oldest stack.
-   - finds a coinbase stack in [t] at path [addr] and replaces it with empty stack if a [proof_emitted] is true
-   - returns a root [t'] of the tree
-  *)
+       - gets the address[addr] of the oldest stack.
+       - finds a coinbase stack in [t] at path [addr] and replaces it with empty stack if a [proof_emitted] is true
+       - returns a root [t'] of the tree
+    *)
     val pop_coinbases :
       var -> proof_emitted:Boolean.var -> (var * Stack.var, 's) Tick.Checked.t
   end

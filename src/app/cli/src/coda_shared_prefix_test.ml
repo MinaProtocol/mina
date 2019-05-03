@@ -1,7 +1,7 @@
 open Core
 open Async
 open Coda_worker
-open Coda_main
+open Coda_inputs
 
 let name = "coda-shared-prefix-test"
 
@@ -12,7 +12,7 @@ let main who_proposes () =
   let snark_work_public_keys i = None in
   let%bind testnet =
     Coda_worker_testnet.test logger n proposers snark_work_public_keys
-      Protocols.Coda_pow.Work_selection.Seq
+      Protocols.Coda_pow.Work_selection.Seq ~max_concurrent_connections:None
   in
   let%bind () = after (Time.Span.of_sec 30.) in
   Coda_worker_testnet.Api.teardown testnet

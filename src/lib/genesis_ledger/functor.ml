@@ -17,7 +17,6 @@ module Make_from_base (Base : Base_intf) : Intf.S = struct
   let t =
     let ledger = Ledger.create_ephemeral () in
     List.iter accounts ~f:(fun (_, account) ->
-        let open Account in
         Ledger.create_new_account_exn ledger account.public_key account ) ;
     ledger
 
@@ -42,7 +41,7 @@ module Make_from_base (Base : Base_intf) : Intf.S = struct
     let private_key = Option.value_exn private_key ~message:sk_error_msg in
     let public_key =
       Option.value_exn
-        (Public_key.decompress account.public_key)
+        (Public_key.decompress account.Poly.Stable.Latest.public_key)
         ~message:pk_error_msg
     in
     {Keypair.public_key; private_key}
@@ -54,7 +53,7 @@ module Make_from_base (Base : Base_intf) : Intf.S = struct
     in
     Memo.unit (fun () ->
         List.max_elt accounts ~compare:(fun (_, a) (_, b) ->
-            Balance.compare (Account.balance a) (Account.balance b) )
+            Balance.compare a.balance b.balance )
         |> Option.value_exn ?here:None ?error:None ~message:error_msg )
 
   let largest_account_keypair_exn =

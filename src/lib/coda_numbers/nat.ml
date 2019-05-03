@@ -13,7 +13,8 @@ module type S = sig
 
   module Stable : sig
     module V1 : sig
-      type nonrec t = t [@@deriving bin_io, sexp, eq, compare, hash, yojson]
+      type nonrec t = t
+      [@@deriving bin_io, sexp, eq, compare, hash, yojson, version]
     end
 
     module Latest = V1
@@ -49,6 +50,13 @@ module type S = sig
     with type Unpacked.value = t
      and type Packed.value = t
 
+  open Snark_params.Tick
+
+  val is_succ_var :
+    pred:Unpacked.var -> succ:Unpacked.var -> (Boolean.var, _) Checked.t
+
+  val min_var : Unpacked.var -> Unpacked.var -> (Unpacked.var, _) Checked.t
+
   val fold : t -> bool Triple.t Fold.t
 end
 
@@ -69,7 +77,7 @@ module type F = functor
   -> S with type t := N.t and module Bits := Bits
 
 module Make (N : sig
-  type t [@@deriving bin_io, sexp, compare, hash]
+  type t [@@deriving bin_io, sexp, compare, hash, version]
 
   include Unsigned_extended.S with type t := t
 
@@ -83,9 +91,8 @@ struct
   module Stable = struct
     module V1 = struct
       module T = struct
-        let version = 1
-
-        type t = N.t [@@deriving bin_io, sexp, eq, compare, hash, yojson]
+        type t = N.t
+        [@@deriving bin_io, sexp, eq, compare, hash, yojson, version]
       end
 
       include T
@@ -111,6 +118,24 @@ struct
   include (N : module type of N with type t := t)
 
   include Bits_snarkable
+
+  let is_succ_var ~pred ~succ =
+    let open Snark_params.Tick in
+    let open Field in
+    Checked.(
+      equal
+        ((pack_var pred :> Var.t) + Var.constant one)
+        (pack_var succ :> Var.t))
+
+  let min_var x y =
+    let open Snark_params.Tick in
+    let%bind c =
+      Field.Checked.compare ~bit_length:length_in_bits
+        (pack_var x :> Field.Var.t)
+        (pack_var y :> Field.Var.t)
+    in
+    if_ c.less_or_equal ~then_:x ~else_:y
+
   module Bits = Bits
 
   let fold t = Fold.group3 ~default:false (Bits.fold t)

@@ -66,8 +66,10 @@ end = struct
           (bit_index, account) :: acc )
     in
     List.rev_filter_map result ~f:(function
-      | _, None -> None
-      | addr, Some account -> Some (addr, account) )
+      | _, None ->
+          None
+      | addr, Some account ->
+          Some (addr, account) )
 
   let rec compute_affected_locations_and_hashes t locations_and_hashes acc =
     let locations, _ = List.unzip locations_and_hashes in
@@ -138,7 +140,7 @@ end = struct
           in
           let max_index_in_all_accounts =
             Option.value_map current_last_index ~default:foreign_last_index
-              ~f:(fun max_index -> Int.max max_index foreign_last_index )
+              ~f:(fun max_index -> Int.max max_index foreign_last_index)
           in
           Inputs.Location.(Account (Addr.of_int_exn max_index_in_all_accounts))
         in

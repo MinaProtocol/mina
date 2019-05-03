@@ -4,7 +4,7 @@
 open Core
 open Async
 open Coda_worker
-open Coda_main
+open Coda_inputs
 
 let init () = Parallel.init_master ()
 
@@ -34,7 +34,7 @@ let offset =
 
 let local_configs ?proposal_interval ?(proposers = Fn.const None) n
     ~acceptable_delay ~program_dir ~snark_worker_public_keys ~work_selection
-    ~trace_dir =
+    ~trace_dir ~max_concurrent_connections =
   let discovery_ports, external_ports, peers = net_configs n in
   let peers = [] :: List.drop peers 1 in
   let args =
@@ -57,7 +57,7 @@ let local_configs ?proposal_interval ?(proposers = Fn.const None) n
         Coda_process.local_config ?proposal_interval ~peers ~discovery_port
           ~external_port ~snark_worker_config ~program_dir ~acceptable_delay
           ~proposer:(proposers i) ~work_selection ~trace_dir
-          ~offset:(Lazy.force offset) () )
+          ~offset:(Lazy.force offset) ~max_concurrent_connections () )
   in
   configs
 
@@ -85,7 +85,8 @@ let stabalize_and_start_or_timeout ?(timeout_ms = 2000.) nodes =
 
 let spawn_local_processes_exn ?(first_delay = 0.0) configs =
   match configs with
-  | [] -> failwith "Configs should be non-empty"
+  | [] ->
+      failwith "Configs should be non-empty"
   | first :: rest ->
       let%bind first_created = Coda_process.spawn_exn first in
       let%bind () = after (Time.Span.of_sec first_delay) in

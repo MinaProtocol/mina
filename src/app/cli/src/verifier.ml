@@ -1,9 +1,7 @@
-[%%import
-"../../../config.mlh"]
-
 open Core
 open Async
 open Coda_base
+open Coda_state
 open Util
 open Blockchain_snark
 open Cli_lib
@@ -25,7 +23,7 @@ end
 
 module Worker_state = struct
   module type S = sig
-    val verify_wrap : Consensus.Protocol_state.Value.t -> Tock.Proof.t -> bool
+    val verify_wrap : Protocol_state.Value.t -> Tock.Proof.t -> bool
 
     val verify_transaction_snark :
       Transaction_snark.t -> message:Sok_message.t -> bool
@@ -42,7 +40,7 @@ module Worker_state = struct
        let module T = Transaction_snark.Verification.Make (struct
          let keys = tx_vk
        end) in
-       let module B = Blockchain_transition.Make (Consensus) (T) in
+       let module B = Blockchain_transition.Make (T) in
        let module U =
          Blockchain_snark_utils.Verification
            (Consensus)
@@ -89,16 +87,20 @@ module Worker = struct
         | "full" ->
             let%map (module M) = Worker_state.get w in
             M.verify_wrap chain.state chain.proof
-        | "check" | "none" -> Deferred.return true
-        | _ -> failwith "unknown proof_level"
+        | "check" | "none" ->
+            Deferred.return true
+        | _ ->
+            failwith "unknown proof_level"
 
       let verify_transaction_snark (w : Worker_state.t) (p, message) =
         match Coda_compile_config.proof_level with
         | "full" ->
             let%map (module M) = Worker_state.get w in
             M.verify_transaction_snark p ~message
-        | "check" | "none" -> Deferred.return true
-        | _ -> failwith "unknown proof_level"
+        | "check" | "none" ->
+            Deferred.return true
+        | _ ->
+            failwith "unknown proof_level"
 
       let functions =
         let f (i, o, f) =

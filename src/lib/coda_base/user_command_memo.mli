@@ -8,7 +8,8 @@ type t [@@deriving sexp, eq, compare, hash, yojson]
 
 module Stable : sig
   module V1 : sig
-    type nonrec t = t [@@deriving sexp, bin_io, eq, compare, hash, yojson]
+    type nonrec t = t
+    [@@deriving sexp, bin_io, eq, compare, hash, yojson, version]
   end
 end
 
@@ -33,3 +34,5 @@ val dummy : t
 val max_size_in_bytes : int
 
 val create_exn : string -> t
+
+val to_string : t -> string
