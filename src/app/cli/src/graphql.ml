@@ -219,11 +219,14 @@ module Make (Commands : Coda_commands.Intf) = struct
                 ~args:Arg.[]
                 ~resolve:(fun _ account ->
                   Stringable.public_key account.Account.Poly.delegate )
-            ; field "participated" ~typ:(non_null bool)
-                ~doc:"TODO, not sure what this is"
+            ; field "votingFor" ~typ:(non_null string)
+                ~doc:
+                  "The previous epoch lock hash of the chain which you are \
+                   voting for"
                 ~args:Arg.[]
-                ~resolve:(fun _ account -> account.Account.Poly.participated)
-            ] )
+                ~resolve:(fun _ account ->
+                  Coda_base.State_hash.to_bytes account.Account.Poly.voting_for
+                  ) ] )
     end
 
     let snark_worker =
@@ -250,7 +253,7 @@ module Make (Commands : Coda_commands.Intf) = struct
         obj "CreatePaymentPayload" ~fields:(fun _ ->
             [ field "payment" ~typ:(non_null payment)
                 ~args:Arg.[]
-                ~resolve:(fun _ cmd -> cmd) ] )
+                ~resolve:(fun _ -> Fn.id) ] )
     end
 
     module Input = struct
@@ -299,7 +302,7 @@ module Make (Commands : Coda_commands.Intf) = struct
               ; balance
               ; receipt_chain_hash
               ; delegate
-              ; participated }
+              ; voting_for }
          ->
         { Account.Poly.public_key
         ; nonce
@@ -307,7 +310,7 @@ module Make (Commands : Coda_commands.Intf) = struct
         ; balance=
             {Types.Wallet.AnnotatedBalance.total= balance; unknown= balance}
         ; receipt_chain_hash
-        ; participated } )
+        ; voting_for } )
 
   module Queries = struct
     open Schema
@@ -391,13 +394,26 @@ module Make (Commands : Coda_commands.Intf) = struct
             | _ ->
                 None ) )
 
+    let initial_peers =
+      field "initialPeers"
+        ~doc:
+          "The initial peers that a client syncs with is an inidication of \
+           specifically the network they are in"
+        ~args:Arg.[]
+        ~typ:(non_null @@ list @@ non_null string)
+        ~resolve:(fun {ctx= coda; _} () ->
+          List.map (Program.initial_peers coda)
+            ~f:(fun {Host_and_port.host; port} -> sprintf !"%s:%i" host port)
+          )
+
     let commands =
       [ sync_state
       ; version
       ; owned_wallets
       ; wallet
       ; current_snark_worker
-      ; payments ]
+      ; payments
+      ; initial_peers ]
   end
 
   module Subscriptions = struct

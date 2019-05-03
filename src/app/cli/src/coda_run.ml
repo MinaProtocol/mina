@@ -4,6 +4,7 @@ open Pipe_lib
 open Signature_lib
 open Coda_numbers
 open Coda_base
+open Coda_state
 open O1trace
 module Graphql_cohttp_async =
   Graphql_cohttp.Make (Graphql_async.Schema) (Cohttp_async.Io)
@@ -22,8 +23,6 @@ struct
     let ledger_proof t = staged_ledger_ledger_proof t
   end
 
-  module Lite_compat = Lite_compat.Make (Consensus.Blockchain_state)
-
   let snark_job_list_json t =
     let open Participating_state.Let_syntax in
     let%map sl = best_staged_ledger t in
@@ -31,7 +30,7 @@ struct
 
   let get_lite_chain :
       (t -> Public_key.Compressed.t list -> Lite_base.Lite_chain.t) option =
-    Option.map Consensus.Consensus_state.to_lite
+    Option.map Consensus.Data.Consensus_state.to_lite
       ~f:(fun consensus_state_to_lite t pks ->
         let ledger = best_ledger t |> Participating_state.active_exn in
         let transition =
@@ -61,15 +60,15 @@ struct
         let protocol_state : Lite_base.Protocol_state.t =
           { previous_state_hash=
               Lite_compat.digest
-                ( Consensus.Protocol_state.previous_state_hash state
+                ( Protocol_state.previous_state_hash state
                   :> Snark_params.Tick.Pedersen.Digest.t )
           ; body=
               { blockchain_state=
                   Lite_compat.blockchain_state
-                    (Consensus.Protocol_state.blockchain_state state)
+                    (Protocol_state.blockchain_state state)
               ; consensus_state=
                   consensus_state_to_lite
-                    (Consensus.Protocol_state.consensus_state state) } }
+                    (Protocol_state.consensus_state state) } }
         in
         let proof = Lite_compat.proof proof in
         {Lite_base.Lite_chain.proof; ledger; protocol_state} )

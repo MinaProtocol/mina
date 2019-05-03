@@ -339,7 +339,7 @@ module T = struct
             Run.Inputs.Time.Controller.create Run.Inputs.Time.Controller.basic
           in
           let consensus_local_state =
-            Consensus.Local_state.create
+            Consensus.Data.Local_state.create
               (Option.map Config.propose_keypair ~f:(fun keypair ->
                    let open Keypair in
                    Public_key.compress keypair.public_key ))
@@ -462,8 +462,7 @@ module T = struct
                        (With_hash.data t)
                    in
                    let prev_state_hash =
-                     Main.Inputs.Consensus_mechanism.Protocol_state
-                     .previous_state_hash p
+                     Protocol_state.previous_state_hash p
                    in
                    let state_hash = With_hash.hash t in
                    let prev_state_hash = State_hash.to_bits prev_state_hash in

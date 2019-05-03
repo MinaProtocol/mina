@@ -15,7 +15,7 @@ module type Inputs_intf = sig
      and type masked_ledger := Ledger.Mask.Attached.t
      and type transaction_snark_scan_state := Staged_ledger.Scan_state.t
      and type staged_ledger_diff := Staged_ledger_diff.t
-     and type consensus_local_state := Consensus.Local_state.t
+     and type consensus_local_state := Consensus.Data.Local_state.t
      and type user_command := User_command.t
      and type diff_mutant :=
                 ( External_transition.Stable.Latest.t
@@ -29,6 +29,8 @@ module type Inputs_intf = sig
     Protocol_state_validator_intf
     with type time := Time.t
      and type state_hash := State_hash.t
+     and type envelope_sender := Envelope.Sender.t
+     and type trust_system := Trust_system.t
      and type external_transition := External_transition.t
      and type external_transition_proof_verified :=
                 External_transition.Proof_verified.t

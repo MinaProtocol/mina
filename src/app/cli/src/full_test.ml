@@ -4,6 +4,7 @@
 open Core
 open Async
 open Coda_base
+open Coda_state
 open Coda_inputs
 open Signature_lib
 open Pipe_lib
@@ -66,7 +67,7 @@ let run_test () : unit Deferred.t =
       in
       let time_controller = Main.Inputs.Time.Controller.(create basic) in
       let consensus_local_state =
-        Consensus.Local_state.create
+        Consensus.Data.Local_state.create
           (Some (Public_key.compress keypair.public_key))
       in
       let net_config =
@@ -253,9 +254,9 @@ let run_test () : unit Deferred.t =
               receiver (f_amount i) acc (Currency.Fee.of_int 0) )
       in
       let block_count t =
-        let open Main.Inputs.Consensus_mechanism in
         Run.best_protocol_state t |> Participating_state.active_exn
-        |> Protocol_state.consensus_state |> Consensus_state.length
+        |> Protocol_state.consensus_state
+        |> Consensus.Data.Consensus_state.length
       in
       let wait_for_proof_or_timeout timeout () =
         let cond t = Option.is_some @@ Run.For_tests.ledger_proof t in

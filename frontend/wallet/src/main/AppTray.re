@@ -6,6 +6,6 @@ include Single.Make({
 
   let make: (~drop: unit => unit, unit) => t =
     (~drop as _, ()) => {
-      Tray.make(ProjectRoot.path ++ "public/icon.png");
+      Tray.make(Filename.concat(ProjectRoot.resource, "public/icon.png"));
     };
 });

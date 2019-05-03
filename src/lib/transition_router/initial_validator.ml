@@ -3,14 +3,13 @@ open Async_kernel
 open Protocols.Coda_pow
 open Pipe_lib.Strict_pipe
 open Coda_base
+open Coda_state
 
 module type Inputs_intf = sig
   include Transition_frontier.Inputs_intf
 
   module State_proof :
-    Proof_intf
-    with type input := Consensus.Protocol_state.Value.t
-     and type t := Proof.t
+    Proof_intf with type input := Protocol_state.Value.t and type t := Proof.t
 
   module Time : Time_intf
 
@@ -23,7 +22,7 @@ module type Inputs_intf = sig
      and type transaction_snark_scan_state := Staged_ledger.Scan_state.t
      and type staged_ledger_diff := Staged_ledger_diff.t
      and type masked_ledger := Coda_base.Ledger.t
-     and type consensus_local_state := Consensus.Local_state.t
+     and type consensus_local_state := Consensus.Data.Local_state.t
      and type user_command := User_command.t
      and type diff_mutant :=
                 ( External_transition.Stable.Latest.t
@@ -35,6 +34,8 @@ module type Inputs_intf = sig
     Protocol_state_validator_intf
     with type time := Time.t
      and type state_hash := State_hash.t
+     and type trust_system := Trust_system.t
+     and type envelope_sender := Envelope.Sender.t
      and type external_transition := External_transition.t
      and type external_transition_proof_verified :=
                 External_transition.Proof_verified.t
@@ -45,12 +46,13 @@ module Make (Inputs : Inputs_intf) :
   Protocols.Coda_transition_frontier.Initial_validator_intf
   with type time := Inputs.Time.t
    and type state_hash := State_hash.t
+   and type trust_system := Trust_system.t
    and type external_transition := Inputs.External_transition.t
    and type external_transition_verified :=
               Inputs.External_transition.Verified.t = struct
   open Inputs
 
-  let run ~logger ~transition_reader ~valid_transition_writer =
+  let run ~logger ~trust_system ~transition_reader ~valid_transition_writer =
     Reader.iter transition_reader ~f:(fun network_transition ->
         let `Transition transition_env, `Time_received time_received =
           network_transition
@@ -60,20 +62,19 @@ module Make (Inputs : Inputs_intf) :
         in
         let sender = Envelope.Incoming.sender transition_env in
         match%map
-          Protocol_state_validator.validate_consensus_state ~time_received
-            transition
+          Protocol_state_validator.validate_consensus_state ~logger
+            ~trust_system ~time_received ~sender transition
         with
         | Ok verified_transition ->
             ( `Transition
                 (Envelope.Incoming.wrap ~data:verified_transition ~sender)
             , `Time_received time_received )
             |> Writer.write valid_transition_writer
-        | Error e ->
+        | Error () ->
             Logger.warn logger ~module_:__MODULE__ ~location:__LOC__
               ~metadata:
                 [ ("peer", Envelope.Sender.to_yojson sender)
-                ; ("error", `String (Error.to_string_hum e))
                 ; ("transition", External_transition.to_yojson transition) ]
-              !"Got an invalid transition from $peer: $error" )
+              !"Failed to validate transition from $peer" )
     |> don't_wait_for
 end

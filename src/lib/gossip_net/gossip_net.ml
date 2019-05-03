@@ -48,6 +48,7 @@ module type S = sig
     ; broadcast_writer: msg Linear_pipe.Writer.t
     ; received_reader: msg Envelope.Incoming.t Strict_pipe.Reader.t
     ; me: Peer.t
+    ; initial_peers: Host_and_port.t list
     ; peers: Peer.Hash_set.t
     ; peers_by_ip: (Unix.Inet_addr.t, Peer.t list) Hashtbl.t
     ; connections:
@@ -74,6 +75,8 @@ module type S = sig
 
   val peers : t -> Peer.t list
 
+  val initial_peers : t -> Host_and_port.t list
+
   val query_peer :
     t -> Peer.t -> ('q, 'r) dispatch -> 'q -> 'r Or_error.t Deferred.t
 
@@ -97,6 +100,7 @@ module Make (Message : Message_intf) : S with type msg := Message.msg = struct
     ; broadcast_writer: Message.msg Linear_pipe.Writer.t
     ; received_reader: Message.msg Envelope.Incoming.t Strict_pipe.Reader.t
     ; me: Peer.t
+    ; initial_peers: Host_and_port.t list
     ; peers: Peer.Hash_set.t
     ; peers_by_ip: (Unix.Inet_addr.t, Peer.t list) Hashtbl.t
     ; connections:
@@ -146,18 +150,43 @@ module Make (Message : Message_intf) : S with type msg := Message.msg = struct
       | Ok (Ok result) ->
           (* call succeeded, result is valid *)
           return (Ok result)
-      | Ok (Error err) ->
-          (* call succeeded, result is an error *)
-          let%bind () =
-            Trust_system.(
-              record t.trust_system t.logger peer.host
-                Actions.
-                  ( Violated_protocol
-                  , Some
-                      ( "RPC call failed, reason: $exn"
-                      , [("exn", `String (Error.to_string_hum err))] ) ))
-          in
-          return (Error err)
+      | Ok (Error err) -> (
+          Logger.error t.logger ~module_:__MODULE__ ~location:__LOC__
+            !"RPC call error: %s {{{%s}}} [[[%{sexp: Error.t}]]]"
+            (Exn.to_string (Error.to_exn err))
+            (Exn.to_string_mach (Error.to_exn err))
+            err ;
+          match (Error.to_exn err, Error.sexp_of_t err) with
+          | ( _
+            , Sexp.List
+                [ Sexp.Atom "src/connection.ml.Handshake_error.Handshake_error"
+                ; _ ] ) ->
+              let%map () =
+                Trust_system.record t.trust_system t.logger peer.host
+                  ( Trust_system.Actions.Outgoing_connection_error
+                  , Some ("handshake error", []) )
+              in
+              (* TODO: cleanup peer from peer table and maybe remove existing connections? *)
+              Error err
+          | Async_rpc_kernel.Rpc_error.Rpc (Connection_closed, _), _ ->
+              let%map () =
+                Trust_system.record t.trust_system t.logger peer.host
+                  ( Trust_system.Actions.Outgoing_connection_error
+                  , Some ("closed connection", []) )
+              in
+              Error err
+          | _ ->
+              (* call succeeded, result is an error *)
+              let%bind () =
+                Trust_system.(
+                  record t.trust_system t.logger peer.host
+                    Actions.
+                      ( Violated_protocol
+                      , Some
+                          ( "RPC call failed, reason: $exn"
+                          , [("exn", `String (Error.to_string_hum err))] ) ))
+              in
+              return (Error err) )
       | Error exn ->
           (* call itself failed *)
           (* TODO: learn what exceptions are raised here, punish peers for
@@ -240,6 +269,7 @@ module Make (Message : Message_intf) : S with type msg := Message.msg = struct
           ; received_reader
           ; me= config.me
           ; peers= Peer.Hash_set.create ()
+          ; initial_peers= config.initial_peers
           ; peers_by_ip= Hashtbl.create (module Unix.Inet_addr)
           ; connections= Hashtbl.create (module Unix.Inet_addr)
           ; max_concurrent_connections= config.max_concurrent_connections }
@@ -428,6 +458,8 @@ module Make (Message : Message_intf) : S with type msg := Message.msg = struct
   let broadcast t = t.broadcast_writer
 
   let peers t = Hash_set.to_list t.peers
+
+  let initial_peers t = t.initial_peers
 
   let broadcast_all t msg =
     let to_broadcast = ref (List.permute (Hash_set.to_list t.peers)) in

@@ -1,5 +1,6 @@
 open Core_kernel
 open Coda_base
+open Coda_state
 open Async_kernel
 open Pipe_lib
 module Diff_mutant = Diff_mutant
@@ -38,10 +39,14 @@ module Make (Inputs : Intf.Main_inputs) = struct
         let parent_hash = External_transition.parent_hash transition in
         Transition_frontier.find_exn frontier parent_hash
         |> Transition_frontier.Breadcrumb.transition_with_hash
-        |> With_hash.data |> External_transition.Verified.consensus_state
+        |> With_hash.data |> External_transition.Verified.protocol_state
+        |> Protocol_state.consensus_state
     | Remove_transitions external_transitions_with_hashes ->
         List.map external_transitions_with_hashes
-          ~f:(Fn.compose External_transition.consensus_state With_hash.data)
+          ~f:(fun transition_with_hash ->
+            With_hash.data transition_with_hash
+            |> External_transition.protocol_state
+            |> Protocol_state.consensus_state )
     | Update_root (new_root_hash, _, _) ->
         let previous_root =
           (let open Transition_frontier in
@@ -143,8 +148,8 @@ module Make (Inputs : Intf.Main_inputs) = struct
     in
     Deferred.unit
 
-  let directly_add_breadcrumb ~logger transition_frontier transition_with_hash
-      parent =
+  let directly_add_breadcrumb ~logger ~trust_system transition_frontier
+      transition_with_hash parent =
     let log_error () =
       Logger.fatal logger ~module_:__MODULE__ ~location:__LOC__
         ~metadata:
@@ -153,14 +158,15 @@ module Make (Inputs : Intf.Main_inputs) = struct
     in
     let%bind child_breadcrumb =
       match%map
-        Transition_frontier.Breadcrumb.build ~logger ~parent
-          ~transition_with_hash
+        Transition_frontier.Breadcrumb.build ~logger ~trust_system ~parent
+          ~transition_with_hash ~sender:None
       with
       | Ok child_breadcrumb ->
           child_breadcrumb
       | Error (`Fatal_error exn) ->
           log_error () ; raise exn
-      | Error (`Validation_error error) ->
+      | Error (`Invalid_staged_ledger_diff error)
+      | Error (`Invalid_staged_ledger_hash error) ->
           log_error () ; Error.raise error
     in
     let%map () =
@@ -173,7 +179,7 @@ module Make (Inputs : Intf.Main_inputs) = struct
     let open External_transition.Verified in
     let protocol_state = protocol_state transition in
     Coda_base.Staged_ledger_hash.ledger_hash
-      External_transition.Protocol_state.(
+      Protocol_state.(
         Blockchain_state.staged_ledger_hash @@ blockchain_state protocol_state)
 
   let with_database ~directory_name ~f =
@@ -184,7 +190,7 @@ module Make (Inputs : Intf.Main_inputs) = struct
     Transition_storage.close transition_storage ;
     result
 
-  let read ~logger ~root_snarked_ledger ~consensus_local_state
+  let read ~logger ~trust_system ~root_snarked_ledger ~consensus_local_state
       transition_storage =
     let state_hash, scan_state, pending_coinbases =
       Transition_storage.get transition_storage ~logger Root
@@ -238,7 +244,7 @@ module Make (Inputs : Intf.Main_inputs) = struct
             get_verified_transition state_hash
           in
           let%bind new_breadcrumb =
-            directly_add_breadcrumb ~logger transition_frontier
+            directly_add_breadcrumb ~logger ~trust_system transition_frontier
               With_hash.{data= verified_transition; hash= state_hash}
               parent_breadcrumb
           in
@@ -255,10 +261,11 @@ module Make (Inputs : Intf.Main_inputs) = struct
     in
     transition_frontier
 
-  let deserialize ~directory_name ~logger ~root_snarked_ledger
+  let deserialize ~directory_name ~logger ~trust_system ~root_snarked_ledger
       ~consensus_local_state =
     with_database ~directory_name
-      ~f:(read ~logger ~root_snarked_ledger ~consensus_local_state)
+      ~f:
+        (read ~logger ~trust_system ~root_snarked_ledger ~consensus_local_state)
 
   module For_tests = struct
     let write_diff_and_verify = write_diff_and_verify
