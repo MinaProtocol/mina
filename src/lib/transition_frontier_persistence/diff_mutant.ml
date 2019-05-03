@@ -22,7 +22,7 @@ module type Inputs = sig
       end
     end
 
-    val consensus_state : t -> Consensus.Consensus_state.Value.Stable.V1.t
+    val consensus_state : t -> Consensus.Data.Consensus_state.Value.Stable.V1.t
   end
 
   module Diff_hash : Diff_hash
@@ -37,7 +37,8 @@ module Make (Inputs : Inputs) : sig
      and type state_hash := State_hash.t
      and type scan_state := Scan_state.t
      and type hash := Diff_hash.t
-     and type consensus_state := Consensus.Consensus_state.Value.Stable.V1.t
+     and type consensus_state :=
+                Consensus.Data.Consensus_state.Value.Stable.V1.t
      and type pending_coinbases := Pending_coinbase.t
 end = struct
   open Inputs
@@ -79,12 +80,12 @@ end = struct
       | Add_transition :
           Key.Add_transition.t
           -> ( 'external_transition
-             , Consensus.Consensus_state.Value.Stable.V1.t )
+             , Consensus.Data.Consensus_state.Value.Stable.V1.t )
              t
       | Remove_transitions :
           'external_transition list
           -> ( 'external_transition
-             , Consensus.Consensus_state.Value.Stable.V1.t list )
+             , Consensus.Data.Consensus_state.Value.Stable.V1.t list )
              t
       | Update_root :
           Key.Update_root.t
@@ -98,10 +99,11 @@ end = struct
   type ('external_transition, 'output) t = ('external_transition, 'output) T.t
 
   let serialize_consensus_state =
-    Binable.to_string (module Consensus.Consensus_state.Value.Stable.V1)
+    Binable.to_string (module Consensus.Data.Consensus_state.Value.Stable.V1)
 
   let json_consensus_state consensus_state =
-    Consensus.Consensus_state.(display_to_yojson @@ display consensus_state)
+    Consensus.Data.Consensus_state.(
+      display_to_yojson @@ display consensus_state)
 
   let name (type a) : (_, a) t -> string = function
     | New_frontier _ ->
