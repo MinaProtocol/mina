@@ -1,0 +1,2 @@
+(lang dune 1.6)
+(context (opam (switch coda) (name testnet_postake_snarkless_fake_hash) (profile testnet_postake_snarkless_fake_hash)))

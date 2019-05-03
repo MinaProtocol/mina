@@ -1,0 +1,2 @@
+(lang dune 1.6)
+(context (opam (switch coda) (name testnet_posig) (profile testnet_posig)))

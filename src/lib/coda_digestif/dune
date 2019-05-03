@@ -33,18 +33,19 @@ let list_findi f =
   in
   loop 0
 
-let get_build_context () =
+let get_build_profile () =
   let parts = String.split_on_char '/' (Sys.getenv "OCAMLPATH") in
   let base_index = list_findi ((=) "_build") parts in
-  List.nth parts (base_index + 2)
+  let build_context = List.nth parts (base_index + 2) in
+  if build_context = "default" then "dev" else build_context
 
 (* this became necessary sometime between dune 1.6.3 and 1.9.1 *)
 let _ = Unix.system "mkdir -p $OCAMLFIND_IGNORE_DUPS_IN"
 
 let dune_string =
-  let build_context = get_build_context () in
+  let build_profile = get_build_profile () in
   let fd =
-    Unix.openfile ("../../config/"^build_context^".mlh") [Unix.O_RDONLY] 0
+    Unix.openfile ("../../config/"^build_profile^".mlh") [Unix.O_RDONLY] 0
   in
   let ich = Unix.in_channel_of_descr fd in
   let rec read_lines_rev acc =
