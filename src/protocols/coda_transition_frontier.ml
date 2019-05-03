@@ -240,10 +240,12 @@ module type Transition_frontier_Breadcrumb_intf = sig
 
   val build :
        logger:Logger.t
+    -> trust_system:Trust_system.t
     -> parent:t
     -> transition_with_hash:( external_transition_verified
                             , state_hash )
                             With_hash.t
+    -> sender:Envelope.Sender.t option
     -> ( t
        , [ `Invalid_staged_ledger_diff of Error.t
          | `Invalid_staged_ledger_hash of Error.t
