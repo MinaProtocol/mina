@@ -113,7 +113,7 @@ jobs:
     #              command: ./scripts/skip_if_only_frontend.sh bash -c 'eval `opam config env` && make build 2>&1 | tee /tmp/buildocaml.log'
     #        - run:
     #              name: Record Constraint System Digests
-    #              command: ./scripts/skip_if_only_frontend.sh bash -c 'src/_build/default/app/cli/src/coda.exe client constraint-system-digests | tee /tmp/constraint-system-digests.log'
+    #              command: ./scripts/skip_if_only_frontend.sh bash -c '_build/src/default/app/cli/src/coda.exe client constraint-system-digests | tee /tmp/constraint-system-digests.log'
     #        - run:
     #              name: Run all tests (on master)
     #              command: echo "FIXME Tests not yet working on mac"
@@ -147,7 +147,7 @@ jobs:
                   command: ./scripts/skip_if_only_frontend.sh make publish_deb
             - run:
                   name: Record Constraint System Digests
-                  command: ./scripts/skip_if_only_frontend.sh bash -c 'src/_build/default/app/cli/src/coda.exe client constraint-system-digests | tee /tmp/artifacts/constraint-system-digests.log'
+                  command: ./scripts/skip_if_only_frontend.sh bash -c '_build/default/src/app/cli/src/coda.exe client constraint-system-digests | tee /tmp/artifacts/constraint-system-digests.log'
             - store_artifacts:
                   path: /tmp/artifacts
             - run:
@@ -183,7 +183,7 @@ jobs:
                   command: ./scripts/skip_if_only_frontend.sh make publish_deb
             - run:
                   name: Record Constraint System Digests
-                  command: ./scripts/skip_if_only_frontend.sh bash -c 'src/_build/default/app/cli/src/coda.exe client constraint-system-digests | tee /tmp/artifacts/constraint-system-digests.log'
+                  command: ./scripts/skip_if_only_frontend.sh bash -c '_build/default/src/app/cli/src/coda.exe client constraint-system-digests | tee /tmp/artifacts/constraint-system-digests.log'
             - store_artifacts:
                   path: /tmp/artifacts
             - run:
@@ -219,7 +219,7 @@ jobs:
                   command: ./scripts/skip_if_only_frontend.sh make publish_deb
             - run:
                   name: Record Constraint System Digests
-                  command: ./scripts/skip_if_only_frontend.sh bash -c 'src/_build/default/app/cli/src/coda.exe client constraint-system-digests | tee /tmp/artifacts/constraint-system-digests.log'
+                  command: ./scripts/skip_if_only_frontend.sh bash -c '_build/default/src/app/cli/src/coda.exe client constraint-system-digests | tee /tmp/artifacts/constraint-system-digests.log'
             - store_artifacts:
                   path: /tmp/artifacts
             - run:

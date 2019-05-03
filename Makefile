@@ -173,7 +173,7 @@ containerstart: git_hooks
 deb:
 	$(WRAP) ./scripts/rebuild-deb.sh
 	@mkdir -p /tmp/artifacts
-	@cp src/_build/coda.deb /tmp/artifacts/.
+	@cp _build/src/coda.deb /tmp/artifacts/.
 
 publish_deb:
 	@./scripts/publish-deb.sh
