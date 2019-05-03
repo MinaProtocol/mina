@@ -9,7 +9,7 @@
    network_pool snark_worker_lib keys_lib storage logger transition_frontier transition_frontier_persistence
    transition_frontier_controller sync_handler ledger_catchup
    transition_handler bootstrap_controller transition_router async
-   async_extra rpc_parallel async_ssl cohttp o1trace cohttp-async parallel
+   async_extra rpc_parallel async_ssl cohttp o1trace cohttp-async parallel prover
    file_system yojson web_client_pipe work_selector graphql-async graphql-cohttp root_prover
    module_version incremental secrets transaction_database)
  (preprocessor_deps ../../../config.mlh)
