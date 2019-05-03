@@ -15,6 +15,14 @@ ifeq ($(DUNE_PROFILE),)
 DUNE_PROFILE := dev
 endif
 
+ifeq ($(DUNE_PROFILE),dev)
+DUNE_BUILD_CONTEXT := default
+DUNE_WORKSPACE := dune-workspace
+else
+DUNE_BUILD_CONTEXT := $(DUNE_PROFILE)
+DUNE_WORKSPACE := dune-workspace.$(DUNE_PROFILE)
+endif
+
 ifeq ($(USEDOCKER),TRUE)
  $(info INFO Using Docker Named $(DOCKERNAME))
  WRAP = docker exec -it $(DOCKERNAME)
@@ -67,7 +75,7 @@ dht: kademlia
 
 build: git_hooks reformat-diff
 	$(info Starting Build)
-	ulimit -s 65532 && (ulimit -n 10240 || true) && cd src && $(WRAPSRC) env CODA_COMMIT_SHA1=$(GITLONGHASH) dune build _build/default/app/logproc/logproc.exe _build/$(DUNE_PROFILE)/app/cli/src/coda.exe
+	ulimit -s 65532 && (ulimit -n 10240 || true) && $(WRAPSRC) env CODA_COMMIT_SHA1=$(GITLONGHASH) dune build --workspace=$(DUNE_WORKSPACE) _build/$(DUNE_BUILD_CONTEXT)/src/app/logproc/logproc.exe _build/$(DUNE_BUILD_CONTEXT)/src/app/cli/src/coda.exe
 	$(info Build complete)
 
 dev: codabuilder containerstart build
@@ -76,13 +84,15 @@ dev: codabuilder containerstart build
 ## Lint
 
 reformat: git_hooks
-	cd src; $(WRAPSRC) dune exec --profile=$(DUNE_PROFILE) app/reformat/reformat.exe -- -path .
+	$(WRAPSRC) dune build --workspace=$(DUNE_WORKSPACE) _build/$(DUNE_BUILD_CONTEXT)/src/app/reformat/reformat.exe; \
+       	$(WRAPSRC) ./_build/$(DUNE_BUILD_CONTEXT)/src/app/reformat/reformat.exe -path .
 
 reformat-diff:
 	ocamlformat --doc-comments=before --inplace $(shell git status -s | cut -c 4- | grep '.mli\?$$' | while IFS= read -r f; do stat "$$f" >/dev/null 2>&1 && echo "$$f"; done) || true
 
 check-format:
-	cd src; $(WRAPSRC) dune exec --profile=$(DUNE_PROFILE) app/reformat/reformat.exe -- -path . -check
+	$(WRAPSRC) dune build --workspace=$(DUNE_WORKSPACE) _build/$(DUNE_BUILD_CONTEXT)/src/app/reformat/reformat.exe; \
+	$(WRAPSRC) ./_build/$(DUNE_BUILD_CONTEXT)/src/app/reformat/reformat.exe -path . -check
 
 check-snarky-submodule:
 	./scripts/check-snarky-submodule.sh
@@ -203,28 +213,28 @@ web:
 
 test-coverage: SHELL := /bin/bash
 test-coverage:
-	source scripts/test_all.sh ; cd src ; run_unit_tests_with_coverage
+	source scripts/test_all.sh ; run_unit_tests_with_coverage
 
 # we don't depend on test-coverage, which forces a run of all unit tests
 coverage-html:
 ifeq ($(shell find src/_build/default -name bisect\*.out),"")
 	echo "No coverage output; run make test-coverage"
 else
-	cd src && bisect-ppx-report -I _build/default/ -html $(COVERAGE_DIR) `find . -name bisect\*.out`
+	bisect-ppx-report -I _build/default/ -html $(COVERAGE_DIR) `find . -name bisect\*.out`
 endif
 
 coverage-text:
 ifeq ($(shell find src/_build/default -name bisect\*.out),"")
 	echo "No coverage output; run make test-coverage"
 else
-	cd src && bisect-ppx-report -I _build/default/ -text $(COVERAGE_DIR)/coverage.txt `find . -name bisect\*.out`
+	bisect-ppx-report -I _build/default/ -text $(COVERAGE_DIR)/coverage.txt `find . -name bisect\*.out`
 endif
 
 coverage-coveralls:
 ifeq ($(shell find src/_build/default -name bisect\*.out),"")
 	echo "No coverage output; run make test-coverage"
 else
-	cd src && bisect-ppx-report -I _build/default/ -coveralls $(COVERAGE_DIR)/coveralls.json `find . -name bisect\*.out`
+	bisect-ppx-report -I _build/default/ -coveralls $(COVERAGE_DIR)/coveralls.json `find . -name bisect\*.out`
 endif
 
 ########################################
@@ -246,7 +256,7 @@ doc_diagrams: $(addsuffix .png,$(wildcard docs/res/*.tex) $(wildcard docs/res/*.
 # Generate odoc documentation
 
 ml-docs:
-	cd src; $(WRAPSRC) dune build --profile=$(DUNE_PROFILE) @doc
+	$(WRAPSRC) dune build --workspace=$(DUNE_WORKSPACE) @doc
 
 ########################################
 # To avoid unintended conflicts with file names, always add to .PHONY
