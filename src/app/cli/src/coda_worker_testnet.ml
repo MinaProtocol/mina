@@ -13,6 +13,7 @@ module Api = struct
 
   type restart_type = [`Catchup | `Bootstrap]
 
+  (* TODO: remove status #2336 *)
   type t =
     { workers: Coda_process.t Array.t
     ; configs: Coda_worker.Input.t list
@@ -61,35 +62,42 @@ module Api = struct
     | `Off ->
         false
 
-  let run_online_worker ~f ~arg t i =
+  let run_online_worker ~f t i =
     let worker = t.workers.(i) in
     if online t i then (
       let ongoing_rpcs, cond = t.locks.(i) in
       incr ongoing_rpcs ;
-      let%map res = f ~worker arg in
+      let%map res = f worker in
       decr ongoing_rpcs ;
       if !ongoing_rpcs = 0 then Condition.broadcast cond () ;
       Some res )
     else return None
 
   let get_balance t i pk =
-    run_online_worker ~arg:pk
-      ~f:(fun ~worker pk -> Coda_process.get_balance_exn worker pk)
+    run_online_worker
+      ~f:(fun worker -> Coda_process.get_balance_exn worker pk)
       t i
 
   let get_nonce t i pk =
-    run_online_worker ~arg:pk
-      ~f:(fun ~worker pk -> Coda_process.get_nonce_exn worker pk)
+    run_online_worker
+      ~f:(fun worker -> Coda_process.get_nonce_exn worker pk)
       t i
 
   let best_path t i =
-    run_online_worker ~arg:()
-      ~f:(fun ~worker () -> Coda_process.best_path worker)
-      t i
+    run_online_worker ~f:(fun worker -> Coda_process.best_path worker) t i
 
   let sync_status =
-    run_online_worker ~arg:() ~f:(fun ~worker () ->
-        Coda_process.sync_status_exn worker )
+    run_online_worker ~f:(fun worker -> Coda_process.sync_status_exn worker)
+
+  let new_payment t i public_key =
+    run_online_worker
+      ~f:(fun worker -> Coda_process.new_payment_exn worker public_key)
+      t i
+
+  let get_all_payments t i public_key =
+    run_online_worker
+      ~f:(fun worker -> Coda_process.get_all_payments_exn worker public_key)
+      t i
 
   let start t i =
     Linear_pipe.write t.start_writer
@@ -118,8 +126,7 @@ module Api = struct
     let%bind () = wait_for_no_rpcs () in
     Coda_process.disconnect t.workers.(i)
 
-  let send_payment t i ?acceptable_delay:(delay = 7) sender_sk receiver_pk
-      amount fee =
+  let send_payment t i sender_sk receiver_pk amount fee =
     let open Deferred.Option.Let_syntax in
     let worker = t.workers.(i) in
     let sender_pk =
@@ -134,26 +141,11 @@ module Api = struct
       ( User_command.sign (Keypair.of_private_key_exn sender_sk) payload
         :> User_command.t )
     in
-    let%bind receipt =
+    let%map _receipt =
       Coda_process.process_payment_exn worker user_cmd
       |> Deferred.map ~f:Or_error.ok
     in
-    let%map (all_passed_root : unit Ivar.t list) =
-      let open Deferred.Let_syntax in
-      Deferred.List.filter_map (t.status |> Array.to_list) ~f:(function
-        | `On (`Synced user_cmds_under_inspection) ->
-            let%map root_length = Coda_process.root_length_exn worker in
-            let passed_root = Ivar.create () in
-            Hashtbl.add_exn user_cmds_under_inspection ~key:user_cmd
-              ~data:
-                { expected_deadline= root_length + Consensus.Constants.k + delay
-                ; passed_root } ;
-            Option.return passed_root
-        | _ ->
-            return None )
-      >>| Option.return
-    in
-    all_passed_root
+    user_cmd
 
   (* TODO: resulting_receipt should be replaced with the sender's pk so that we prove the
       merkle_list of receipts up to the current state of a sender's receipt_chain hash for some blockchain.
@@ -161,8 +153,7 @@ module Api = struct
       the merkle list that we are looking for *)
   let prove_receipt t i proving_receipt resulting_receipt =
     run_online_worker
-      ~arg:(proving_receipt, resulting_receipt)
-      ~f:(fun ~worker (proving_receipt, resulting_receipt) ->
+      ~f:(fun worker ->
         Coda_process.prove_receipt_exn worker proving_receipt resulting_receipt
         )
       t i
@@ -426,9 +417,26 @@ let test logger n proposers snark_work_public_keys work_selection
 
 module Payments : sig
   val send_several_payments :
-    Api.t -> node:int -> keypairs:Keypair.t list -> n:int -> unit Deferred.t
+       ?acceptable_delay:int
+    -> Api.t
+    -> node:int
+    -> keypairs:Keypair.t list
+    -> n:int
+    -> unit Deferred.t
+
+  val send_batch_consecutive_payments :
+       Api.t
+    -> node:int
+    -> sender:Private_key.t
+    -> keypairs:Keypair.t list
+    -> n:int
+    -> User_command.t list Deferred.t
+
+  val assert_retrievable_payments :
+    Api.t -> User_command.t sexp_list -> unit Deferred.t
 end = struct
-  let send_several_payments testnet ~node ~keypairs ~n =
+  let send_several_payments ?acceptable_delay:(delay = 7) (testnet : Api.t)
+      ~node ~keypairs ~n =
     let amount = Currency.Amount.of_int 10 in
     let fee = Currency.Fee.of_int 1 in
     let%bind (_ : unit option list) =
@@ -443,8 +451,32 @@ end = struct
                 let receiver_pk =
                   receiver_keypair.public_key |> Public_key.compress
                 in
-                Api.send_payment testnet node sender_sk receiver_pk amount fee
-                )
+                let worker = testnet.workers.(node) in
+                let%bind user_cmd =
+                  Api.send_payment testnet node sender_sk receiver_pk amount
+                    fee
+                in
+                let%map (all_passed_root : unit Ivar.t list) =
+                  let open Deferred.Let_syntax in
+                  Deferred.List.filter_map (testnet.status |> Array.to_list)
+                    ~f:(function
+                    | `On (`Synced user_cmds_under_inspection) ->
+                        let%map root_length =
+                          Coda_process.root_length_exn worker
+                        in
+                        let passed_root = Ivar.create () in
+                        Hashtbl.add_exn user_cmds_under_inspection
+                          ~key:user_cmd
+                          ~data:
+                            { expected_deadline=
+                                root_length + Consensus.Constants.k + delay
+                            ; passed_root } ;
+                        Option.return passed_root
+                    | _ ->
+                        return None )
+                  >>| Option.return
+                in
+                all_passed_root )
             |> Deferred.Option.all
           in
           Deferred.map
@@ -452,6 +484,86 @@ end = struct
             ~f:(Fn.const (Some ())) )
     in
     Deferred.unit
+
+  (* TODO: code should be flexible enough even when bootstrapping. 
+     This is most appropriate todo when #2336 is completed *)
+  let send_batch_consecutive_payments (testnet : Api.t) ~node ~sender
+      ~(keypairs : Keypair.t list) ~n =
+    let amount = Currency.Amount.of_int 10 in
+    let fee = Currency.Fee.of_int 1 in
+    let%bind new_payment_readers =
+      Deferred.List.init (Array.length testnet.workers) ~f:(fun i ->
+          let%map pipe =
+            Api.new_payment testnet i
+              Public_key.(compress @@ of_private_key_exn sender)
+          in
+          Option.value_exn pipe )
+    in
+    Deferred.List.init ~how:`Sequential n ~f:(fun _ ->
+        let receiver_keypair = List.random_element_exn keypairs in
+        let receiver_pk = receiver_keypair.public_key |> Public_key.compress in
+        (* Everybody will be watching for a payment *)
+        let%bind user_command =
+          let%map payment =
+            Api.send_payment testnet node sender receiver_pk amount fee
+          in
+          Option.value_exn payment
+        in
+        let rec read_until_match reader =
+          match%bind Pipe.read reader with
+          | `Eof ->
+              Deferred.return false
+          | `Ok matching_user_command
+            when User_command.equal matching_user_command user_command ->
+              Deferred.return true
+          | `Ok _bad_user_command ->
+              read_until_match reader
+        in
+        let%map result =
+          Deferred.List.for_all new_payment_readers ~f:read_until_match
+        in
+        assert result ;
+        user_command )
+
+  let query_relevant_payments (testnet : Api.t) worker_index public_keys =
+    Deferred.List.concat_map public_keys ~f:(fun public_key ->
+        let%map payments =
+          Api.get_all_payments testnet worker_index public_key
+        in
+        Option.value_exn payments )
+    >>| User_command.Set.of_list
+
+  let check_all_nodes_received_payments (testnet : Api.t) public_keys
+      (expected_payments : User_command.t list) =
+    Deferred.List.init ~how:`Parallel (Array.length testnet.workers)
+      ~f:(fun worker_index ->
+        let%map node_payments =
+          query_relevant_payments testnet worker_index public_keys
+        in
+        List.for_all expected_payments ~f:(User_command.Set.mem node_payments)
+    )
+    >>| List.for_all ~f:Fn.id
+
+  let assert_retrievable_payments (testnet : Api.t)
+      (expected_payments : User_command.t list) =
+    let senders, receivers =
+      List.map expected_payments ~f:(fun user_command ->
+          match user_command.payload.body with
+          | Payment payment_payload ->
+              ( Public_key.compress user_command.sender
+              , payment_payload.receiver )
+          | Stake_delegation _ ->
+              failwith "Expected a list of payments" )
+      |> List.unzip
+    in
+    let%bind has_all_sender_payments =
+      check_all_nodes_received_payments testnet senders expected_payments
+    in
+    assert has_all_sender_payments ;
+    let%map has_all_receiver_payments =
+      check_all_nodes_received_payments testnet receivers expected_payments
+    in
+    assert has_all_receiver_payments
 end
 
 module Restarts : sig

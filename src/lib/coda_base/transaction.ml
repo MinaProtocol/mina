@@ -26,6 +26,7 @@ module T = struct
   end
 
   include Hashable.Make (T0)
+  include Comparable.Make (T0)
   include T0
 end
 
