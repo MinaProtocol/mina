@@ -30,7 +30,7 @@ jobs:
                   command: cd frontend/wallet && npm test
             - run:
                   name: Build dist wallet
-                  command: cd frontend/wallet && npm dist
+                  command: cd frontend/wallet && npm run dist
             - run:
                   name: Publish dist wallet
                   command: ./scripts/publish_wallet.sh
