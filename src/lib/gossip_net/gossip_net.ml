@@ -50,6 +50,7 @@ module type S = sig
     ; me: Peer.t
     ; peers: Peer.Hash_set.t
     ; peers_by_ip: (Unix.Inet_addr.t, Peer.t list) Hashtbl.t
+    ; removed_peers: Peer.Hash_set.t
     ; connections:
         ( Unix.Inet_addr.t
         , (Uuid.t, Connection_with_state.t) Hashtbl.t )
@@ -99,6 +100,7 @@ module Make (Message : Message_intf) : S with type msg := Message.msg = struct
     ; me: Peer.t
     ; peers: Peer.Hash_set.t
     ; peers_by_ip: (Unix.Inet_addr.t, Peer.t list) Hashtbl.t
+    ; removed_peers: Peer.Hash_set.t
     ; connections:
         ( Unix.Inet_addr.t
         , (Uuid.t, Connection_with_state.t) Hashtbl.t )
@@ -144,6 +146,7 @@ module Make (Message : Message_intf) : S with type msg := Message.msg = struct
   *)
   let remove_peer t peer =
     Hash_set.remove t.peers peer ;
+    Hash_set.add t.removed_peers peer ;
     Hashtbl.update t.peers_by_ip peer.host ~f:(function
       | None ->
           failwith "Peer to remove doesn't appear in peers_by_ip"
@@ -305,6 +308,7 @@ module Make (Message : Message_intf) : S with type msg := Message.msg = struct
           ; me= config.me
           ; peers= Peer.Hash_set.create ()
           ; peers_by_ip= Hashtbl.create (module Unix.Inet_addr)
+          ; removed_peers= Peer.Hash_set.create ()
           ; connections= Hashtbl.create (module Unix.Inet_addr)
           ; max_concurrent_connections= config.max_concurrent_connections }
         in
@@ -378,9 +382,16 @@ module Make (Message : Message_intf) : S with type msg := Message.msg = struct
                     "Some peers connected %s"
                     (List.sexp_of_t Peer.sexp_of_t peers |> Sexp.to_string_hum) ;
                   List.iter peers ~f:(fun peer ->
-                      Hash_set.add t.peers peer ;
-                      Hashtbl.add_multi t.peers_by_ip ~key:peer.host ~data:peer
-                  ) ;
+                      if Hash_set.mem t.removed_peers peer then
+                        Logger.info t.logger ~module_:__MODULE__
+                          ~location:__LOC__
+                          !"Not re-adding removed peer: %{sexp: \
+                            Network_peer.Peer.t}"
+                          peer
+                      else (
+                        Hash_set.add t.peers peer ;
+                        Hashtbl.add_multi t.peers_by_ip ~key:peer.host
+                          ~data:peer ) ) ;
                   Deferred.unit
               | Disconnect peers ->
                   Logger.info t.logger ~module_:__MODULE__ ~location:__LOC__
