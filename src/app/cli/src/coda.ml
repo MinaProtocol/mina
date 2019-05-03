@@ -51,7 +51,7 @@ let daemon logger =
             tracked by this daemon. You cannot provide both `propose-key` and \
             `propose-public-key`. (default: don't propose)"
          (optional public_key_compressed)
-     and peers =
+     and initial_peers_raw =
        flag "peer"
          ~doc:
            "HOST:PORT TCP daemon communications (can be given multiple times)"
@@ -203,9 +203,9 @@ let daemon logger =
            "work-selection" ~default:Protocols.Coda_pow.Work_selection.Seq
            work_selection_flag
        in
-       let peers =
+       let initial_peers_raw =
          List.concat
-           [ peers
+           [ initial_peers_raw
            ; List.map ~f:Host_and_port.of_string
              @@ or_from_config
                   (Fn.compose Option.some
@@ -215,26 +215,7 @@ let daemon logger =
        let discovery_port = external_port + 1 in
        let%bind () = Unix.mkdir ~p:() conf_dir in
        if enable_tracing then Coda_tracing.start conf_dir |> don't_wait_for ;
-       let%bind initial_peers_raw =
-         match peers with
-         | _ :: _ ->
-             return peers
-         | [] -> (
-             let peers_path = conf_dir ^/ "peers" in
-             match%bind
-               Reader.load_sexp peers_path [%of_sexp: Host_and_port.t list]
-             with
-             | Ok ls ->
-                 return ls
-             | Error e ->
-                 let default_initial_peers = [] in
-                 let%map () =
-                   Writer.save_sexp peers_path
-                     ([%sexp_of: Host_and_port.t list] default_initial_peers)
-                 in
-                 [] )
-       in
-       let%bind initial_peers =
+       let%bind initial_peers_cleaned =
          Deferred.List.filter_map ~how:(`Max_concurrent_jobs 8)
            initial_peers_raw ~f:(fun addr ->
              let host = Host_and_port.host addr in
@@ -256,9 +237,12 @@ let daemon logger =
                  return None )
        in
        let%bind () =
-         if List.length peers <> 0 && List.length initial_peers = 0 then (
+         if
+           List.length initial_peers_raw <> 0
+           && List.length initial_peers_cleaned = 0
+         then (
            eprintf "Error: failed to connect to any peers\n" ;
-           exit 1 )
+           exit 10 )
          else Deferred.unit
        in
        let%bind ip =
@@ -279,7 +263,7 @@ let daemon logger =
              eprintf
                "Error: You cannot provide both `propose-key` and \
                 `propose-public-key`" ;
-             exit 1
+             exit 11
          | Some sk_file, None ->
              Secrets.Keypair.Terminal_stdin.read_exn sk_file >>| Option.some
          | None, Some wallet_pk -> (
@@ -294,7 +278,7 @@ let daemon logger =
                  eprintf
                    "Error: This public key was not found in the local \
                     daemon's wallet database" ;
-                 exit 1 )
+                 exit 12 )
          | None, None ->
              return None
        in
@@ -362,7 +346,7 @@ let daemon logger =
              ; logger
              ; target_peer_count= 8
              ; conf_dir
-             ; initial_peers
+             ; initial_peers= initial_peers_cleaned
              ; me
              ; trust_system
              ; max_concurrent_connections } }
@@ -448,7 +432,7 @@ let rec ensure_testnet_id_still_good logger =
             ( local_id |> Option.map ~f:str
             |> Option.value ~default:"[COMMIT_SHA1 not set]" )
             remote_ids ;
-          exit 1
+          exit 13
         in
         match commit_id with
         | None ->

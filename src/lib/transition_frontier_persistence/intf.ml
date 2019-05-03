@@ -134,6 +134,7 @@ module type S = sig
   val deserialize :
        directory_name:string
     -> logger:Logger.t
+    -> trust_system:Trust_system.t
     -> root_snarked_ledger:root_snarked_ledger
     -> consensus_local_state:consensus_local_state
     -> frontier Deferred.t

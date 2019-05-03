@@ -221,7 +221,7 @@ struct
   module Transition_frontier =
     Transition_frontier.Make (Transition_frontier_inputs)
 
-  let gen_breadcrumb ~logger ~accounts_with_secret_keys :
+  let gen_breadcrumb ~logger ~trust_system ~accounts_with_secret_keys :
       (   Transition_frontier.Breadcrumb.t Deferred.t
        -> Transition_frontier.Breadcrumb.t Deferred.t)
       Quickcheck.Generator.t =
@@ -318,8 +318,10 @@ struct
                External_transition.Verified.protocol_state)
       in
       match%map
-        Transition_frontier.Breadcrumb.build ~logger ~parent:parent_breadcrumb
+        Transition_frontier.Breadcrumb.build ~logger ~trust_system
+          ~parent:parent_breadcrumb
           ~transition_with_hash:next_verified_external_transition_with_hash
+          ~sender:None
       with
       | Ok new_breadcrumb ->
           Logger.info logger ~module_:__MODULE__ ~location:__LOC__
@@ -437,43 +439,47 @@ struct
         let%bind breadcrumb = deferred_breadcrumb in
         Transition_frontier.add_breadcrumb_exn frontier breadcrumb )
 
-  let gen_linear_breadcrumbs ~logger ~size ~accounts_with_secret_keys
-      root_breadcrumb =
+  let gen_linear_breadcrumbs ~logger ~trust_system ~size
+      ~accounts_with_secret_keys root_breadcrumb =
     Quickcheck.Generator.with_size ~size
     @@ Quickcheck_lib.gen_imperative_list
          (root_breadcrumb |> return |> Quickcheck.Generator.return)
-         (gen_breadcrumb ~logger ~accounts_with_secret_keys)
+         (gen_breadcrumb ~logger ~trust_system ~accounts_with_secret_keys)
 
-  let add_linear_breadcrumbs ~logger ~size ~accounts_with_secret_keys ~frontier
-      ~parent =
+  let add_linear_breadcrumbs ~logger ~trust_system ~size
+      ~accounts_with_secret_keys ~frontier ~parent =
     let new_breadcrumbs =
-      gen_linear_breadcrumbs ~logger ~size ~accounts_with_secret_keys parent
+      gen_linear_breadcrumbs ~logger ~trust_system ~size
+        ~accounts_with_secret_keys parent
       |> Quickcheck.random_value
     in
     Deferred.List.iter new_breadcrumbs ~f:(fun breadcrumb ->
         let%bind breadcrumb = breadcrumb in
         Transition_frontier.add_breadcrumb_exn frontier breadcrumb )
 
-  let add_child ~logger ~accounts_with_secret_keys ~frontier ~parent =
+  let add_child ~logger ~trust_system ~accounts_with_secret_keys ~frontier
+      ~parent =
     let%bind new_node =
-      ( gen_breadcrumb ~logger ~accounts_with_secret_keys
+      ( gen_breadcrumb ~logger ~trust_system ~accounts_with_secret_keys
       |> Quickcheck.random_value )
       @@ Deferred.return parent
     in
     let%map () = Transition_frontier.add_breadcrumb_exn frontier new_node in
     new_node
 
-  let gen_tree ~logger ~size ~accounts_with_secret_keys root_breadcrumb =
+  let gen_tree ~logger ~trust_system ~size ~accounts_with_secret_keys
+      root_breadcrumb =
     Quickcheck.Generator.with_size ~size
     @@ Quickcheck_lib.gen_imperative_rose_tree
          (root_breadcrumb |> return |> Quickcheck.Generator.return)
-         (gen_breadcrumb ~logger ~accounts_with_secret_keys)
+         (gen_breadcrumb ~logger ~trust_system ~accounts_with_secret_keys)
 
-  let gen_tree_list ~logger ~size ~accounts_with_secret_keys root_breadcrumb =
+  let gen_tree_list ~logger ~trust_system ~size ~accounts_with_secret_keys
+      root_breadcrumb =
     Quickcheck.Generator.with_size ~size
     @@ Quickcheck_lib.gen_imperative_ktree
          (root_breadcrumb |> return |> Quickcheck.Generator.return)
-         (gen_breadcrumb ~logger ~accounts_with_secret_keys)
+         (gen_breadcrumb ~logger ~trust_system ~accounts_with_secret_keys)
 
   module Protocol_state_validator = Protocol_state_validator.Make (struct
     include Transition_frontier_inputs
@@ -643,7 +649,7 @@ struct
       let time = Int64.of_int 1
     end
 
-    let setup ~source_accounts ~logger configs =
+    let setup ~source_accounts ~logger ~trust_system configs =
       let%bind me = create_root_frontier ~logger source_accounts in
       let%map _, _, peers_with_frontiers =
         Deferred.List.fold
@@ -655,8 +661,8 @@ struct
             let%map () =
               build_frontier_randomly frontier
                 ~gen_root_breadcrumb_builder:
-                  (gen_linear_breadcrumbs ~logger ~size:num_breadcrumbs
-                     ~accounts_with_secret_keys:accounts)
+                  (gen_linear_breadcrumbs ~logger ~trust_system
+                     ~size:num_breadcrumbs ~accounts_with_secret_keys:accounts)
             in
             (* each peer has a distinct IP address, so we lookup frontiers by IP *)
             let peer =
@@ -688,9 +694,9 @@ struct
       {me; network; peers= List.rev peers_with_frontiers}
 
     let setup_me_and_a_peer ~source_accounts ~target_accounts ~logger
-        ~num_breadcrumbs =
+        ~trust_system ~num_breadcrumbs =
       let%map {me; network; peers} =
-        setup ~source_accounts ~logger
+        setup ~source_accounts ~logger ~trust_system
           [{num_breadcrumbs; accounts= target_accounts}]
       in
       (me, List.hd_exn peers, network)
