@@ -1672,6 +1672,9 @@ end = struct
                   (User_command t) )
           with
           | Error e ->
+              (* FIXME This should be fatal and crash the daemon but can't be
+               because of a buggy test. See #2346.
+            *)
               Logger.error logger ~module_:__MODULE__ ~location:__LOC__
                 ~metadata:
                   [ ( "user_command"
@@ -2620,7 +2623,7 @@ let%test_module "test" =
           { diff: Diff.Stable.V1.t
           ; prev_hash: staged_ledger_hash
           ; creator: public_key }
-        [@@deriving sexp, yojson]
+        [@@deriving sexp, yojson, fields]
 
         module With_valid_signatures_and_proofs = struct
           type pre_diff_with_at_most_two_coinbase =
