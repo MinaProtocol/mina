@@ -4,6 +4,8 @@ set -euo pipefail
 # Needed to check variables
 set +u
 
+cd frontend/wallet
+
 BUCKET=wallet.o1test.net
 VERSION=$(cat package.json | jq .name)
 NAME=$(cat package.json | jq .name)
