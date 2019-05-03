@@ -134,8 +134,6 @@ end = struct
             Error
               (Staged_ledger_error.Invalid_proof (proof, statement, prover)) )
 
-  (*TODO: Punish*)
-
   module M = struct
     include Monad.Ident
     module Or_error = Or_error
