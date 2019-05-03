@@ -1,5 +1,6 @@
 open Core
 open Async
+open Coda_state
 
 module Stubs = Stubs.Make (struct
   let max_length = 4
@@ -35,7 +36,7 @@ let%test_module "Root_prover" =
           in
           let observed_state =
             External_transition.Verified.protocol_state seen_transition
-            |> Consensus.Protocol_state.consensus_state
+            |> Protocol_state.consensus_state
           in
           let root_with_proof =
             Option.value_exn ~message:"Could not produce an ancestor proof"

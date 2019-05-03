@@ -7,8 +7,8 @@
   (libraries
     snarky_taylor
     core_kernel
-    lite_compat
     coda_base
+    genesis_ledger
     snark_params
     gossip_net
     perf_histograms
