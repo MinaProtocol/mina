@@ -93,7 +93,7 @@ let%test_module "Ledger catchup" =
       Thread_safe.block_on_async_exn (fun () ->
           let%bind me, peer, network =
             Network_builder.setup_me_and_a_peer
-              ~source_accounts:Genesis_ledger.accounts ~logger
+              ~source_accounts:Genesis_ledger.accounts ~logger ~trust_system
               ~target_accounts:Genesis_ledger.accounts
               ~num_breadcrumbs:(max_length / 2)
           in
@@ -116,7 +116,7 @@ let%test_module "Ledger catchup" =
             Int.gen_incl max_length (2 * max_length) |> Quickcheck.random_value
           in
           let%bind me, peer, network =
-            Network_builder.setup_me_and_a_peer ~logger
+            Network_builder.setup_me_and_a_peer ~logger ~trust_system
               ~source_accounts:Genesis_ledger.accounts
               ~target_accounts:Genesis_ledger.accounts ~num_breadcrumbs
           in
@@ -148,7 +148,7 @@ let%test_module "Ledger catchup" =
       let trust_system = Trust_system.null () in
       Thread_safe.block_on_async_exn (fun () ->
           let%bind me, peer, network =
-            Network_builder.setup_me_and_a_peer ~logger
+            Network_builder.setup_me_and_a_peer ~logger ~trust_system
               ~source_accounts:Genesis_ledger.accounts
               ~target_accounts:Genesis_ledger.accounts ~num_breadcrumbs:1
           in
@@ -174,7 +174,7 @@ let%test_module "Ledger catchup" =
       in
       Thread_safe.block_on_async_exn (fun () ->
           let%bind me, peer, network =
-            Network_builder.setup_me_and_a_peer ~logger
+            Network_builder.setup_me_and_a_peer ~logger ~trust_system
               ~source_accounts:Genesis_ledger.accounts
               ~target_accounts:Genesis_ledger.accounts
               ~num_breadcrumbs:max_length
@@ -239,7 +239,7 @@ let%test_module "Ledger catchup" =
           let open Deferred.Let_syntax in
           let%bind me, peer, network =
             Network_builder.setup_me_and_a_peer
-              ~source_accounts:Genesis_ledger.accounts ~logger
+              ~source_accounts:Genesis_ledger.accounts ~logger ~trust_system
               ~target_accounts:Genesis_ledger.accounts
               ~num_breadcrumbs:max_length
           in

@@ -22,6 +22,8 @@ let%test_module "Transition Frontier Persistence" =
   ( module struct
     let logger = Logger.create ()
 
+    let trust_system = Trust_system.null ()
+
     let check_transitions transition_storage written_breadcrumbs =
       List.iter written_breadcrumbs ~f:(fun breadcrumb ->
           let {With_hash.hash; data= expected_transition} =
@@ -104,7 +106,7 @@ let%test_module "Transition Frontier Persistence" =
       result
 
     let generate_breadcrumbs ~gen_root_breadcrumb_builder frontier size =
-      gen_root_breadcrumb_builder ~logger ~size
+      gen_root_breadcrumb_builder ~logger ~trust_system ~size
         ~accounts_with_secret_keys:Genesis_ledger.accounts
         (Transition_frontier.root frontier)
       |> Quickcheck.random_value |> Deferred.all
@@ -147,7 +149,7 @@ let%test_module "Transition Frontier Persistence" =
       let%map root, next_breadcrumb =
         with_persistence ~logger ~directory_name ~f:(fun (frontier, t) ->
             let create_breadcrumb =
-              gen_breadcrumb ~logger
+              gen_breadcrumb ~logger ~trust_system
                 ~accounts_with_secret_keys:Genesis_ledger.accounts
               |> Quickcheck.random_value
             in
@@ -213,7 +215,8 @@ let%test_module "Transition Frontier Persistence" =
           worker
       in
       let%map deserialized_frontier =
-        Transition_frontier_persistence.read ~logger ~root_snarked_ledger
+        Transition_frontier_persistence.read ~logger ~trust_system
+          ~root_snarked_ledger
           ~consensus_local_state:
             (Transition_frontier.consensus_local_state frontier)
           transition_storage

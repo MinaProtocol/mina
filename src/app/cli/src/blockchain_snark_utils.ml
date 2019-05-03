@@ -1,6 +1,7 @@
 open Core
 open Async
 open Coda_base
+open Coda_state
 open Util
 open Blockchain_snark
 open Snark_params
@@ -19,7 +20,7 @@ struct
       Tick.Pedersen.digest_fold Hash_prefix.transition_system_snark
         Fold.(
           group3 ~default:false (of_list self)
-          +> State_hash.fold (Consensus_mechanism.Protocol_state.hash state))
+          +> State_hash.fold (Protocol_state.hash state))
 
   let verify_wrap state proof =
     Tock.verify proof Wrap.key

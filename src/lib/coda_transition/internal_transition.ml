@@ -1,4 +1,5 @@
 open Core_kernel
+open Coda_state
 open Module_version
 
 module type S = sig
@@ -14,22 +15,6 @@ module type S = sig
       with type V1.t = t
   end
 
-  module Prover_state : sig
-    type t [@@deriving sexp]
-
-    module Stable :
-      sig
-        module V1 : sig
-          type t [@@deriving sexp, bin_io, version]
-        end
-
-        module Latest : module type of V1
-      end
-      with type V1.t = t
-  end
-
-  module Snark_transition : Snark_transition.S
-
   type t [@@deriving sexp]
 
   module Stable :
@@ -44,13 +29,13 @@ module type S = sig
 
   val create :
        snark_transition:Snark_transition.Value.t
-    -> prover_state:Prover_state.t
+    -> prover_state:Consensus.Data.Prover_state.t
     -> staged_ledger_diff:Staged_ledger_diff.t
     -> t
 
   val snark_transition : t -> Snark_transition.Value.t
 
-  val prover_state : t -> Prover_state.t
+  val prover_state : t -> Consensus.Data.Prover_state.t
 
   val staged_ledger_diff : t -> Staged_ledger_diff.t
 end
@@ -65,34 +50,15 @@ module Make (Staged_ledger_diff : sig
       end
     end
     with type V1.t = t
-end)
-(Snark_transition : Snark_transition.S) (Prover_state : sig
-    type t [@@deriving sexp]
-
-    module Stable :
-      sig
-        module V1 : sig
-          type t [@@deriving sexp, bin_io, version]
-        end
-
-        module Latest : module type of V1
-      end
-      with type V1.t = t
-end) :
-  S
-  with module Staged_ledger_diff = Staged_ledger_diff
-   and module Snark_transition = Snark_transition
-   and module Prover_state = Prover_state = struct
+end) : S with module Staged_ledger_diff = Staged_ledger_diff = struct
   module Staged_ledger_diff = Staged_ledger_diff
-  module Snark_transition = Snark_transition
-  module Prover_state = Prover_state
 
   module Stable = struct
     module V1 = struct
       module T = struct
         type t =
           { snark_transition: Snark_transition.Value.Stable.V1.t
-          ; prover_state: Prover_state.Stable.V1.t
+          ; prover_state: Consensus.Data.Prover_state.Stable.V1.t
           ; staged_ledger_diff: Staged_ledger_diff.Stable.V1.t }
         [@@deriving sexp, fields, bin_io, version]
       end
@@ -116,7 +82,7 @@ end) :
   (* bin_io, version omitted *)
   type t = Stable.Latest.t =
     { snark_transition: Snark_transition.Value.Stable.V1.t
-    ; prover_state: Prover_state.Stable.V1.t
+    ; prover_state: Consensus.Data.Prover_state.Stable.V1.t
     ; staged_ledger_diff: Staged_ledger_diff.Stable.V1.t }
   [@@deriving sexp, fields]
 

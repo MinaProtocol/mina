@@ -9,7 +9,6 @@ pull_request_rules:
           - "status-success=ci/circleci: test--fake_hash"
           - "status-success=ci/circleci: test--test_postake"
           - "status-success=ci/circleci: test--test_postake_bootstrap"
-          - "status-success=ci/circleci: test--test_postake_catchup"
           - "status-success=ci/circleci: test--test_postake_five_even_txns"
           - "status-success=ci/circleci: test--test_postake_snarkless"
           - "status-success=ci/circleci: test--test_postake_split"
