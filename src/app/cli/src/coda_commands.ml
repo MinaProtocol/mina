@@ -16,6 +16,26 @@ module type Intf = sig
        Program.t
     -> User_command.t
     -> Receipt.Chain_hash.t Base.Or_error.t Participating_state.T.t Deferred.t
+
+  module Subscriptions : sig
+    val new_block :
+         Program.t
+      -> Public_key.Compressed.t
+      -> Program.Inputs.External_transition.t Pipe.Reader.t
+
+    val new_payment :
+      Program.t -> Public_key.Compressed.t -> User_command.t Pipe.Reader.t
+  end
+
+  val get_all_payments :
+    Program.t -> Public_key.Compressed.t -> User_command.t list
+
+  (* TODO: Remove once we have no more functors for external_transition *)
+  val payments : Program.Inputs.External_transition.t -> User_command.t list
+
+  (* TODO: Remove once we have no more functors for external_transition *)
+  val proposer :
+    Program.Inputs.External_transition.t -> Public_key.Compressed.t
 end
 
 module Make
@@ -343,4 +363,114 @@ struct
     ; consensus_configuration }
 
   let clear_hist_status ~flag t = Perf_histograms.wipe () ; get_status ~flag t
+
+  let get_all_payments coda public_key =
+    let transaction_database = Program.transaction_database coda in
+    let transactions =
+      Transaction_database.get_transactions transaction_database public_key
+    in
+    List.filter_map transactions ~f:(function
+      | Coda_base.Transaction.User_command checked_user_command ->
+          let user_command = User_command.forget_check checked_user_command in
+          Option.some user_command
+      | _ ->
+          None )
+
+  let user_commands =
+    Fn.compose Staged_ledger_diff.user_commands
+      External_transition.staged_ledger_diff
+
+  let payments external_transition =
+    List.filter
+      (user_commands external_transition)
+      ~f:(Fn.compose User_command_payload.is_payment User_command.payload)
+
+  let proposer =
+    Fn.compose Staged_ledger_diff.creator
+      External_transition.staged_ledger_diff
+
+  module Subscriptions = struct
+    (* Creates a global pipe to feed a subscription that will be available throughout the entire duration that a daemon is runnning  *)
+    let global_pipe coda ~to_pipe =
+      let global_reader, global_writer = Pipe.create () in
+      let init, _ = Pipe.create () in
+      Broadcast_pipe.Reader.fold (Program.transition_frontier coda) ~init
+        ~f:(fun acc_pipe -> function
+        | None ->
+            Deferred.return acc_pipe
+        | Some transition_frontier ->
+            Pipe.close_read acc_pipe ;
+            let new_block_incr =
+              Transition_frontier.new_transition transition_frontier
+            in
+            let frontier_pipe = to_pipe new_block_incr in
+            Pipe.transfer frontier_pipe global_writer ~f:Fn.id
+            |> don't_wait_for ;
+            Deferred.return frontier_pipe )
+      |> Deferred.ignore |> don't_wait_for ;
+      global_reader
+
+    let new_block coda public_key =
+      global_pipe coda ~to_pipe:(fun new_block_incr ->
+          let new_block_observer =
+            Coda_incremental.New_transition.observe new_block_incr
+          in
+          Coda_incremental.New_transition.stabilize () ;
+          let frontier_new_block_reader =
+            Coda_incremental.New_transition.to_pipe new_block_observer
+          in
+          Pipe.filter_map frontier_new_block_reader ~f:(fun new_block ->
+              let unverified_new_block =
+                External_transition.of_verified new_block
+              in
+              Option.some_if
+                (Public_key.Compressed.equal
+                   (proposer unverified_new_block)
+                   public_key)
+                unverified_new_block ) )
+
+    let new_payment coda public_key =
+      let transaction_database = Program.transaction_database coda in
+      global_pipe coda ~to_pipe:(fun new_block_incr ->
+          let payments_incr =
+            Coda_incremental.New_transition.map new_block_incr
+              ~f:(Fn.compose payments External_transition.of_verified)
+          in
+          let payments_observer =
+            Coda_incremental.New_transition.observe payments_incr
+          in
+          Coda_incremental.New_transition.stabilize () ;
+          let frontier_payment_reader, frontier_payment_writer =
+            (* TODO: capacity should be the max amount of transactions in a block *)
+            Strict_pipe.(create (Buffered (`Capacity 20, `Overflow Drop_head)))
+          in
+          let write_user_commands user_commands =
+            List.filter user_commands ~f:(fun user_command ->
+                Public_key.Compressed.equal
+                  (User_command.sender user_command)
+                  public_key )
+            |> List.iter ~f:(fun user_command ->
+                   match User_command.check user_command with
+                   | Some checked_user_command ->
+                       Transaction_database.add transaction_database
+                         (Coda_base.Transaction.User_command
+                            checked_user_command) ;
+                       Strict_pipe.Writer.write frontier_payment_writer
+                         user_command
+                   | None ->
+                       Logger.error (Program.logger coda) ~module_:__MODULE__
+                         ~location:__LOC__
+                         "Could not check user command correctly" )
+          in
+          Coda_incremental.New_transition.Observer.on_update_exn
+            payments_observer ~f:(function
+            | Initialized user_commands ->
+                write_user_commands user_commands
+            | Changed (_, user_commands) ->
+                write_user_commands user_commands
+            | Invalidated ->
+                () ) ;
+          (Strict_pipe.Reader.to_linear_pipe frontier_payment_reader)
+            .Linear_pipe.Reader.pipe )
+  end
 end
