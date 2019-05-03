@@ -125,8 +125,10 @@ struct
                       (* TODO : refine these actions, issue 2375 *)
                       let action =
                         match staged_ledger_error with
-                        | Invalid_proof _ | Bad_signature _ ->
-                            make_actions Violated_protocol
+                        | Invalid_proof _ ->
+                            make_actions Sent_invalid_proof
+                        | Bad_signature _ ->
+                            make_actions Sent_invalid_signature
                         | Coinbase_error _
                         | Bad_prev_hash _
                         | Insufficient_fee _
@@ -147,18 +149,30 @@ struct
           in
           let just_emitted_a_proof = Option.is_some proof_opt in
           let%map transitioned_staged_ledger =
-            Deferred.return
-              ( if
-                Staged_ledger_hash.equal staged_ledger_hash
-                  blockchain_staged_ledger_hash
-              then Ok transitioned_staged_ledger
-              else
-                Error
-                  (`Invalid_staged_ledger_hash
-                    (Error.of_string
-                       "Snarked ledger hash and Staged ledger hash after \
-                        applying the diff does not match blockchain state's \
-                        ledger hash and staged ledger hash resp.\n")) )
+            if
+              Staged_ledger_hash.equal staged_ledger_hash
+                blockchain_staged_ledger_hash
+            then Deferred.return (Ok transitioned_staged_ledger)
+            else
+              let open Deferred.Let_syntax in
+              let%bind () =
+                match sender with
+                | None | Some Envelope.Sender.Local ->
+                    return ()
+                | Some (Envelope.Sender.Remote inet_addr) ->
+                    Trust_system.(
+                      record trust_system logger inet_addr
+                        Actions.
+                          ( Gossiped_invalid_transition
+                          , Some ("Invalid staged ledger hash", []) ))
+              in
+              return
+                (Error
+                   (`Invalid_staged_ledger_hash
+                     (Error.of_string
+                        "Snarked ledger hash and Staged ledger hash after \
+                         applying the diff does not match blockchain state's \
+                         ledger hash and staged ledger hash resp.")))
           in
           { transition_with_hash
           ; staged_ledger= transitioned_staged_ledger
