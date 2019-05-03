@@ -2,6 +2,7 @@ open Core_kernel
 open Async_kernel
 open Snark_params
 open Snark_bits
+open Coda_state
 open Fold_lib
 module Digest = Tick.Pedersen.Digest
 module Storage = Storage.List.Make (Storage.Disk)
@@ -122,29 +123,25 @@ module Keys = struct
     )
 end
 
-module Make
-    (Consensus_mechanism : Consensus.S)
-    (T : Transaction_snark.Verification.S) =
-struct
-  module Blockchain = Blockchain_state.Make (Consensus_mechanism)
-
+module Make (T : Transaction_snark.Verification.S) = struct
   module System = struct
-    module U = Blockchain.Make_update (T)
-    module Update = Consensus_mechanism.Snark_transition
+    module U = Blockchain_snark_state.Make_update (T)
+    module Update = Snark_transition
 
     module State = struct
-      include Consensus_mechanism.Protocol_state
+      include Protocol_state
 
       include (
-        Blockchain :
-          module type of Blockchain with module Checked := Blockchain.Checked )
+        Blockchain_snark_state :
+          module type of Blockchain_snark_state
+          with module Checked := Blockchain_snark_state.Checked )
 
       include (U : module type of U with module Checked := U.Checked)
 
       module Hash = Coda_base.State_hash
 
       module Checked = struct
-        include Blockchain.Checked
+        include Blockchain_snark_state.Checked
         include U.Checked
       end
     end
@@ -266,13 +263,9 @@ struct
 end
 
 let constraint_system_digests () =
-  let module M =
-    Make
-      (Consensus)
-      (Transaction_snark.Verification.Make (struct
-        let keys = Transaction_snark.Keys.Verification.dummy
-      end))
-  in
+  let module M = Make (Transaction_snark.Verification.Make (struct
+    let keys = Transaction_snark.Keys.Verification.dummy
+  end)) in
   let module W = M.Wrap_base (struct
     let verification_key = Dummy_values.Tick.Groth16.verification_key
   end) in
