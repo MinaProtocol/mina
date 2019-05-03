@@ -1,28 +1,59 @@
-(executable
-  (name fake_hash_value_gen)
-  (modules fake_hash_value_gen)
-  (libraries core_kernel)
-  (preprocess (pps ppx_optcomp))
-  (preprocessor_deps "../../config.mlh"))
+(* -*- tuareg -*- *)
 
-(rule
-  (targets fake_hash_value)
-  (deps fake_hash_value_gen)
-  (action (run %{exe:fake_hash_value_gen} fake_hash_value)))
+(* This disgusting hack of a file recursively invokes dune to build
+config.mlh, so we can read it to figure out if we should depend on digestif.c
+or digestif.ocaml. We only depend on digestif.c when fake_hash is set. This
+means `make web` will be entirely broken, but we shouldn't need it in those
+contexts anyway.
 
-(alias
-  (name fake_hash_enabled)
-  (deps fake_hash_value)
-  (action (run
-    [ %{exe:fake_hash_value} = "true" ] || exit 1)))
-;  (enabled_if (= %{read:fake_hash_value} "true")))
+If https://github.com/ocaml/dune/issues/1776 were implemented, we would
+not need this.
 
-(library
-  (name coda_digestif)
-  (public_name coda_digestif)
-  (modules coda_digestif)
-  (libraries
-    digestif
-    (select digestif from
-      (fake_hash_enabled -> digestif.c)
-      (!fake_hash_enabled -> digestif.ocaml))))
+We break the recursion with an environment variable. Otherwise we'd be
+infinitely invoking dune, and you'd run out of memory, file descriptors,
+or process table entries.
+
+*)
+
+#load "unix.cma"
+
+let make_dune digestif_name =
+  "(library\n\
+  \     (name coda_digestif)\n\
+  \     (public_name coda_digestif)\n\
+  \     (libraries " ^ digestif_name ^ "))"
+
+let detect_fake_hash lines =
+  List.exists (String.equal "[%%define fake_hash true]") lines
+
+let list_findi f =
+  let rec loop i = function
+    | [] -> failwith "list_findi: not found"
+    | h :: t -> if f h then i else loop (i + 1) t
+  in
+  loop 0
+
+let get_build_context () =
+  let parts = String.split_on_char '/' (Sys.getenv "OCAMLPATH") in
+  let base_index = list_findi ((=) "_build") parts in
+  List.nth parts (base_index + 2)
+
+(* this became necessary sometime between dune 1.6.3 and 1.9.1 *)
+let _ = Unix.system "mkdir -p $OCAMLFIND_IGNORE_DUPS_IN"
+
+let dune_string =
+  let build_context = get_build_context () in
+  let fd =
+    Unix.openfile ("../../config/"^build_context^".mlh") [Unix.O_RDONLY] 0
+  in
+  let ich = Unix.in_channel_of_descr fd in
+  let rec read_lines_rev acc =
+    try read_lines_rev (input_line ich :: acc) with End_of_file -> acc
+  in
+  let res =
+    if detect_fake_hash (read_lines_rev []) then make_dune "digestif.c"
+    else make_dune "digestif.ocaml"
+  in
+  close_in ich ; res
+
+let () = Jbuild_plugin.V1.send dune_string
