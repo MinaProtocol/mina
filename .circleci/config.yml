@@ -33,7 +33,7 @@ jobs:
                   command: cd frontend/wallet && npm run dist
             - run:
                   name: Publish dist wallet
-                  command: ./scripts/publish-wallet.sh
+                  command: (env HOMEBREW_NO_AUTO_UPDATE=1 brew install awscli) && ./scripts/publish-wallet.sh
             - run: cd frontend/website && npm install
             - run:
                   name: Decrypt PragmataPro font
