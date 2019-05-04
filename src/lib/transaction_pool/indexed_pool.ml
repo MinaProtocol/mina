@@ -8,7 +8,9 @@ open Signature_lib
    the network as a whole of checking, gossiping, and storing a transaction
    until it is included in a block. I did some napkin math and came up with
    $0.00007. Ideally we'd fetch an exchange rate and convert that into an amount
-   of currency, but a made up number will do for the testnets at least. *)
+   of currency, but a made up number will do for the testnets at least. See
+   issue #2385.
+*)
 let replace_fee : Currency.Fee.t = Currency.Fee.of_int 5
 
 (* Invariants, maintained whenever a t is exposed from this module:
