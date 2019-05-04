@@ -394,7 +394,7 @@ module T = struct
                  ?propose_keypair:Config.propose_keypair ~monitor
                  ~consensus_local_state ())
           in
-          Run.handle_shutdown ~monitor ~conf_dir ~logger coda ;
+          Run.handle_shutdown ~monitor ~conf_dir coda ;
           let%map () =
             with_monitor
               (fun () ->
@@ -403,9 +403,8 @@ module T = struct
                        let run_snark_worker =
                          `With_public_key config.public_key
                        in
-                       Run.setup_local_server ~client_port:config.port ~coda
-                         ~logger () ;
-                       Run.run_snark_worker ~logger ~client_port:config.port
+                       Run.setup_local_server ~client_port:config.port ~coda () ;
+                       Run.run_snark_worker ~client_port:config.port
                          run_snark_worker ) )
               ()
           in
@@ -441,13 +440,13 @@ module T = struct
             in
             let payment = build_txn amount sk pk fee in
             let%map receipt =
-              Run.Commands.send_payment logger coda (payment :> User_command.t)
+              Run.Commands.send_payment coda (payment :> User_command.t)
             in
             receipt |> Participating_state.active_exn
           in
           let coda_process_payment cmd =
             let%map receipt =
-              Run.Commands.send_payment logger coda (cmd :> User_command.t)
+              Run.Commands.send_payment coda (cmd :> User_command.t)
             in
             receipt |> Participating_state.active_exn
           in
