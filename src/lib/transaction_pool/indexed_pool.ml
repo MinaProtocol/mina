@@ -174,48 +174,19 @@ let member : t -> User_command.With_valid_signature.t -> bool =
   | Some cmds_at_fee ->
       Set.mem cmds_at_fee cmd
 
-(* Given a map with set values, a key, and a value, remove the value from the
-   associated set, removing the set from the map if it's now empty.
-*)
-let mapset_remove_exn :
-       ('k, ('v, 'cmpS) Set.t, 'cmpM) Map.t
-    -> 'k
-    -> 'v
-    -> ('k, ('v, 'cmpS) Set.t, 'cmpM) Map.t =
- fun map k v ->
-  let newset = Map.find_exn map k |> Fn.flip Set.remove v in
-  if Set.is_empty newset then Map.remove map k
-  else Map.set map ~key:k ~data:newset
-
-(* Given a map with set values, a key, and a value, add the value to the set at
-   the key if it exists, or create a singleton set if it doesn't. *)
-let mapset_insert :
-       ('v, 'cmpS) Set.comparator
-    -> ('k, ('v, 'cmpS) Set.t, 'cmpM) Map.t
-    -> 'k
-    -> 'v
-    -> ('k, ('v, 'cmpS) Set.t, 'cmpM) Map.t =
- fun comparator map k v ->
-  Map.change map k ~f:(fun set_opt ->
-      match set_opt with
-      | None ->
-          Some (Set.singleton comparator v)
-      | Some set ->
-          Some (Set.add set v) )
-
 (* Remove a command from the applicable_by_fee field. This may break an
    invariant. *)
 let remove_applicable_exn : t -> User_command.With_valid_signature.t -> t =
  fun t cmd ->
   let fee = User_command.forget_check cmd |> User_command.fee in
-  {t with applicable_by_fee= mapset_remove_exn t.applicable_by_fee fee cmd}
+  {t with applicable_by_fee= Map_set.remove_exn t.applicable_by_fee fee cmd}
 
 (* Remove a command from the all_by_fee field and decrement size. This may break
    an invariant. *)
 let remove_all_by_fee_exn : t -> User_command.With_valid_signature.t -> t =
  fun t cmd ->
   let fee = User_command.forget_check cmd |> User_command.fee in
-  {t with all_by_fee= mapset_remove_exn t.all_by_fee fee cmd; size= t.size - 1}
+  {t with all_by_fee= Map_set.remove_exn t.all_by_fee fee cmd; size= t.size - 1}
 
 (* Remove a given command from the pool, as well as any commands that depend on
    it. Called from revalidate and remove_lowest_fee, and when replacing
@@ -270,7 +241,7 @@ let remove_with_dependents_exn :
           Map.remove t'.all_by_sender sender ) )
     ; applicable_by_fee=
         ( if User_command.With_valid_signature.equal first_cmd cmd then
-          mapset_remove_exn t'.applicable_by_fee
+          Map_set.remove_exn t'.applicable_by_fee
             (User_command.fee unchecked)
             cmd
         else t'.applicable_by_fee ) } )
@@ -408,7 +379,7 @@ let handle_committed_txn :
             | None ->
                 t''.applicable_by_fee
             | Some (head_cmd, _) ->
-                mapset_insert
+                Map_set.insert
                   (module User_command.With_valid_signature)
                   t''.applicable_by_fee
                   (head_cmd |> User_command.forget_check |> User_command.fee)
@@ -456,14 +427,14 @@ let rec add_from_gossip_exn :
           else
             ( `Success Sequence.empty
             , { applicable_by_fee=
-                  mapset_insert
+                  Map_set.insert
                     (module User_command.With_valid_signature)
                     t.applicable_by_fee fee cmd
               ; all_by_sender=
                   Map.set t.all_by_sender ~key:sender
                     ~data:(F_sequence.singleton cmd, consumed)
               ; all_by_fee=
-                  mapset_insert
+                  Map_set.insert
                     (module User_command.With_valid_signature)
                     t.all_by_fee fee cmd
               ; size= t.size + 1 } )
@@ -492,7 +463,7 @@ let rec add_from_gossip_exn :
                         ~data:
                           (F_sequence.snoc queued_cmds cmd, reserved_currency')
                   ; all_by_fee=
-                      mapset_insert
+                      Map_set.insert
                         (module User_command.With_valid_signature)
                         t.all_by_fee fee cmd
                   ; size= t.size + 1 } )
@@ -577,11 +548,11 @@ let add_from_backtrack : t -> User_command.With_valid_signature.t -> t =
               *)
             ~data:(F_sequence.singleton cmd, consumed)
       ; all_by_fee=
-          mapset_insert
+          Map_set.insert
             (module User_command.With_valid_signature)
             t.all_by_fee fee cmd
       ; applicable_by_fee=
-          mapset_insert
+          Map_set.insert
             (module User_command.With_valid_signature)
             t.applicable_by_fee fee cmd
       ; size= t.size + 1 }
@@ -593,11 +564,11 @@ let add_from_backtrack : t -> User_command.With_valid_signature.t -> t =
           (first_queued |> User_command.forget_check |> User_command.nonce) ) ;
       let t' = remove_applicable_exn t first_queued in
       { applicable_by_fee=
-          mapset_insert
+          Map_set.insert
             (module User_command.With_valid_signature)
             t'.applicable_by_fee fee cmd
       ; all_by_fee=
-          mapset_insert
+          Map_set.insert
             (module User_command.With_valid_signature)
             t'.all_by_fee fee cmd
       ; all_by_sender=
