@@ -153,8 +153,8 @@ let run_test () : unit Deferred.t =
               (sprintf !"Invalid Account: %{sexp: Public_key.Compressed.t}" pk)
       in
       let client_port = 8123 in
-      Run.setup_local_server ~client_port ~coda ~logger () ;
-      Run.run_snark_worker ~logger ~client_port run_snark_worker ;
+      Run.setup_local_server ~client_port ~coda () ;
+      Run.run_snark_worker ~client_port run_snark_worker ;
       (* Let the system settle *)
       let%bind () = Async.after (Time.Span.of_ms 100.) in
       (* No proof emitted by the parallel scan at the begining *)

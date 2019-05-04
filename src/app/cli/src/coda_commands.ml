@@ -180,7 +180,7 @@ struct
       (User_command)
       (Receipt_chain_hash)
 
-  let verify_payment t log (addr : Public_key.Compressed.Stable.Latest.t)
+  let verify_payment t (addr : Public_key.Compressed.Stable.Latest.t)
       (verifying_txn : User_command.t) proof =
     let open Participating_state.Let_syntax in
     let%map account = get_account t addr in

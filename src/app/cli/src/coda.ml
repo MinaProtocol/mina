@@ -379,8 +379,8 @@ let daemon logger =
        let web_service = Web_pipe.get_service () in
        Web_pipe.run_service (module Run) coda web_service ~conf_dir ~logger ;
        Run.setup_local_server ?client_whitelist ?rest_server_port ~coda
-         ~client_port ~logger () ;
-       Run.run_snark_worker ~logger ~client_port run_snark_worker_action ;
+         ~client_port () ;
+       Run.run_snark_worker ~client_port run_snark_worker_action ;
        Logger.info logger ~module_:__MODULE__ ~location:__LOC__
          "Running coda services" ;
        Async.never ())

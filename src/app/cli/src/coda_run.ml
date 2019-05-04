@@ -94,7 +94,7 @@ struct
 
   (* TODO: handle participation_status more appropriately than doing participate_exn *)
   let setup_local_server ?(client_whitelist = []) ?rest_server_port ~coda
-      ~logger ~client_port () =
+      ~client_port () =
     let client_whitelist =
       Unix.Inet_addr.Set.of_list (Unix.Inet_addr.localhost :: client_whitelist)
     in
@@ -102,6 +102,11 @@ struct
     let implement rpc f =
       Rpc.Rpc.implement rpc (fun () input ->
           trace_recurring_task (Rpc.Rpc.name rpc) (fun () -> f () input) )
+    in
+    let logger =
+      Logger.extend
+        (Program.top_level_logger coda)
+        [("coda_run", `String "Setting up server logs")]
     in
     let client_impls =
       [ implement Daemon_rpcs.Send_user_command.rpc (fun () tx ->
@@ -117,7 +122,7 @@ struct
         )
       ; implement Daemon_rpcs.Verify_proof.rpc (fun () (pk, tx, proof) ->
             return
-              ( Commands.verify_payment coda logger pk tx proof
+              ( Commands.verify_payment coda pk tx proof
               |> Participating_state.active_exn ) )
       ; implement Daemon_rpcs.Prove_receipt.rpc
           (fun () (proving_receipt, pk) ->
@@ -262,8 +267,7 @@ struct
                       Deferred.unit )) ) )
     |> ignore
 
-  let create_snark_worker ~logger ~public_key ~client_port
-      ~shutdown_on_disconnect =
+  let create_snark_worker ~public_key ~client_port ~shutdown_on_disconnect =
     let open Snark_worker_lib in
     let%map p =
       let our_binary = Sys.executable_name in
@@ -286,14 +290,13 @@ struct
     |> don't_wait_for ;
     Deferred.unit
 
-  let run_snark_worker ?shutdown_on_disconnect:(s = true) ~logger ~client_port
+  let run_snark_worker ?shutdown_on_disconnect:(s = true) ~client_port
       run_snark_worker =
     match run_snark_worker with
     | `Don't_run ->
         ()
     | `With_public_key public_key ->
-        create_snark_worker ~shutdown_on_disconnect:s ~logger ~public_key
-          ~client_port
+        create_snark_worker ~shutdown_on_disconnect:s ~public_key ~client_port
         |> ignore
 
   let handle_shutdown ~monitor ~conf_dir t =

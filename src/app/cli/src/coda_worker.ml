@@ -403,9 +403,8 @@ module T = struct
                        let run_snark_worker =
                          `With_public_key config.public_key
                        in
-                       Run.setup_local_server ~client_port:config.port ~coda
-                         ~logger () ;
-                       Run.run_snark_worker ~logger ~client_port:config.port
+                       Run.setup_local_server ~client_port:config.port ~coda () ;
+                       Run.run_snark_worker ~client_port:config.port
                          run_snark_worker ) )
               ()
           in
