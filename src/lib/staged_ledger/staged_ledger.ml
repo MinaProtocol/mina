@@ -683,7 +683,6 @@ end = struct
                 | Some t ->
                     Continue (t :: acc)
                 | None ->
-                    (* TODO: punish *)
                     Stop (Error (Staged_ledger_error.Bad_signature t)) )
               ~finish:(fun acc -> Ok acc)
           in
