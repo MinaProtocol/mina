@@ -404,12 +404,12 @@ let rec add_from_gossip_exn :
     -> User_command.With_valid_signature.t
     -> Account_nonce.t
     -> Currency.Amount.t
-    -> [ `Success of User_command.With_valid_signature.t Sequence.t
-       | `Invalid_nonce
-       | `Insufficient_funds
-       | `Insufficient_replace_fee
-       | `Overflow ]
-       * t =
+    -> ( t * User_command.With_valid_signature.t Sequence.t
+       , [ `Invalid_nonce
+         | `Insufficient_funds
+         | `Insufficient_replace_fee
+         | `Overflow ] )
+       Result.t =
  fun t cmd current_nonce balance ->
   let unchecked = User_command.forget_check cmd in
   let fee = User_command.fee unchecked in
@@ -417,28 +417,30 @@ let rec add_from_gossip_exn :
   let nonce = User_command.nonce unchecked in
   match currency_consumed cmd with
   | None ->
-      (`Overflow, t)
+      Error `Overflow
   | Some consumed -> (
     match Map.find t.all_by_sender (User_command.sender unchecked) with
     | None ->
         (* nothing queued for this sender*)
         if Account_nonce.equal current_nonce nonce then
-          if Currency.Amount.(consumed > balance) then (`Insufficient_funds, t)
+          if Currency.Amount.(consumed > balance) then
+            Error `Insufficient_funds
           else
-            ( `Success Sequence.empty
-            , { applicable_by_fee=
-                  Map_set.insert
-                    (module User_command.With_valid_signature)
-                    t.applicable_by_fee fee cmd
-              ; all_by_sender=
-                  Map.set t.all_by_sender ~key:sender
-                    ~data:(F_sequence.singleton cmd, consumed)
-              ; all_by_fee=
-                  Map_set.insert
-                    (module User_command.With_valid_signature)
-                    t.all_by_fee fee cmd
-              ; size= t.size + 1 } )
-        else (`Invalid_nonce, t)
+            Result.Ok
+              ( { applicable_by_fee=
+                    Map_set.insert
+                      (module User_command.With_valid_signature)
+                      t.applicable_by_fee fee cmd
+                ; all_by_sender=
+                    Map.set t.all_by_sender ~key:sender
+                      ~data:(F_sequence.singleton cmd, consumed)
+                ; all_by_fee=
+                    Map_set.insert
+                      (module User_command.With_valid_signature)
+                      t.all_by_fee fee cmd
+                ; size= t.size + 1 }
+              , Sequence.empty )
+        else Error `Invalid_nonce
     | Some (queued_cmds, reserved_currency) ->
         (* commands queued for this sender *)
         assert (not @@ F_sequence.is_empty queued_cmds) ;
@@ -451,22 +453,24 @@ let rec add_from_gossip_exn :
           (* this command goes on the end *)
           match Currency.Amount.(consumed + reserved_currency) with
           | None ->
-              (`Overflow, t)
+              Error `Overflow
           | Some reserved_currency' ->
               if Currency.Amount.(balance < reserved_currency') then
-                (`Insufficient_funds, t)
+                Error `Insufficient_funds
               else
-                ( `Success Sequence.empty
-                , { t with
-                    all_by_sender=
-                      Map.set t.all_by_sender ~key:sender
-                        ~data:
-                          (F_sequence.snoc queued_cmds cmd, reserved_currency')
-                  ; all_by_fee=
-                      Map_set.insert
-                        (module User_command.With_valid_signature)
-                        t.all_by_fee fee cmd
-                  ; size= t.size + 1 } )
+                Result.Ok
+                  ( { t with
+                      all_by_sender=
+                        Map.set t.all_by_sender ~key:sender
+                          ~data:
+                            ( F_sequence.snoc queued_cmds cmd
+                            , reserved_currency' )
+                    ; all_by_fee=
+                        Map_set.insert
+                          (module User_command.With_valid_signature)
+                          t.all_by_fee fee cmd
+                    ; size= t.size + 1 }
+                  , Sequence.empty )
         else
           let first_queued_nonce =
             F_sequence.head_exn queued_cmds
@@ -493,7 +497,7 @@ let rec add_from_gossip_exn :
             in
             assert (Account_nonce.equal (User_command.nonce to_drop) nonce) ;
             if Currency.Fee.(fee < User_command.fee to_drop) then
-              (`Insufficient_replace_fee, t)
+              Error `Insufficient_replace_fee
             else
               let increment =
                 Currency.Fee.to_int
@@ -514,22 +518,19 @@ let rec add_from_gossip_exn :
                 [%test_eq: User_command.With_valid_signature.t Sequence.t]
                   dropped
                   (F_sequence.to_seq drop_queue) ;
-                let add_res, t'' =
-                  add_from_gossip_exn t' cmd current_nonce balance
-                in
-                match add_res with
-                | `Success dropped' ->
+                match add_from_gossip_exn t' cmd current_nonce balance with
+                | Ok (t'', dropped') ->
                     assert (
                       (* We've already removed them, so this should always be
                          empty. *)
                       Sequence.is_empty dropped' ) ;
-                    (`Success dropped, t'')
-                | `Insufficient_funds ->
-                    (`Insufficient_funds, t)
+                    Result.Ok (t'', dropped)
+                | Error `Insufficient_funds ->
+                    Error `Insufficient_funds
                 | _ ->
                     failwith "recursive add_exn failed" )
-              else (`Insufficient_replace_fee, t) )
-          else (`Invalid_nonce, t) )
+              else Error `Insufficient_replace_fee )
+          else Error `Invalid_nonce )
 
 let add_from_backtrack : t -> User_command.With_valid_signature.t -> t =
  fun t cmd ->
@@ -639,26 +640,23 @@ let%test_module _ =
     let%test_unit "singleton properties" =
       Quickcheck.test (gen_cmd ()) ~f:(fun cmd ->
           let pool = empty in
-          let status, pool' =
+          let add_res =
             add_from_gossip_exn pool cmd Account_nonce.zero
               (Currency.Amount.of_int 500)
           in
-          assert_invariants pool' ;
           if
             Option.value_exn (currency_consumed cmd)
             |> Currency.Amount.to_int > 500
           then
-            match status with
-            | `Insufficient_funds ->
-                [%test_eq: t] pool' pool ;
-                [%test_eq: Currency.Fee.t option] (min_fee pool') None ;
-                [%test_eq: User_command.With_valid_signature.t option]
-                  (get_highest_fee pool') None
+            match add_res with
+            | Error `Insufficient_funds ->
+                ()
             | _ ->
                 failwith "should've returned nsf"
           else
-            match status with
-            | `Success dropped ->
+            match add_res with
+            | Ok (pool', dropped) ->
+                assert_invariants pool' ;
                 assert (Sequence.is_empty dropped) ;
                 [%test_eq: int] (size pool') 1 ;
                 [%test_eq: User_command.With_valid_signature.t option]
@@ -767,24 +765,24 @@ let%test_module _ =
                 [%test_eq: Public_key.Compressed.t]
                   (Public_key.compress @@ test_keys.(sender).public_key)
                   (cmd |> User_command.forget_check |> User_command.sender) ;
-                let res, pool' =
+                let add_res =
                   add_from_gossip_exn !pool cmd nonces.(sender)
                     balances.(sender)
                 in
-                match res with
-                | `Success dropped ->
+                match add_res with
+                | Ok (pool', dropped) ->
                     [%test_eq: User_command.With_valid_signature.t Sequence.t]
                       dropped Sequence.empty ;
                     assert_invariants pool' ;
                     pool := pool' ;
                     go rest
-                | `Invalid_nonce ->
+                | Error `Invalid_nonce ->
                     failwith "bad nonce"
-                | `Insufficient_funds ->
+                | Error `Insufficient_funds ->
                     failwith "insufficient funds"
-                | `Insufficient_replace_fee ->
+                | Error `Insufficient_replace_fee ->
                     failwith "insufficient replace fee"
-                | `Overflow ->
+                | Error `Overflow ->
                     failwith "overflow" )
           in
           go cmds )
@@ -879,7 +877,7 @@ let%test_module _ =
           let t =
             List.fold_left setup_cmds ~init:empty ~f:(fun t cmd ->
                 match add_from_gossip_exn t cmd init_nonce init_balance with
-                | `Success removed, t' ->
+                | Ok (t', removed) ->
                     [%test_eq: User_command.With_valid_signature.t Sequence.t]
                       removed Sequence.empty ;
                     t'
@@ -925,26 +923,21 @@ let%test_module _ =
               in
               Currency.Amount.(a + replacer_currency_consumed))
           in
-          let res, t' =
+          let add_res =
             add_from_gossip_exn t replace_cmd init_nonce init_balance
           in
           if Currency.Amount.(currency_consumed_post_replace <= init_balance)
           then
-            match res with
-            | `Success dropped ->
+            match add_res with
+            | Ok (t', dropped) ->
                 assert (not (Sequence.is_empty dropped)) ;
                 assert_invariants t'
-            | `Insufficient_funds ->
-                failwith "nsf"
-            | `Insufficient_replace_fee ->
-                failwith "nsrf"
-            | _ ->
-                failwith "oh no a"
+            | Error _ ->
+                failwith "adding command failed"
           else
-            match res with
-            | `Insufficient_funds ->
-                assert_invariants t' ;
-                [%test_eq: t] t t'
+            match add_res with
+            | Error `Insufficient_funds ->
+                ()
             | _ ->
-                failwith "oh no b" )
+                failwith "should've returned nsf" )
   end )

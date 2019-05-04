@@ -340,7 +340,7 @@ struct
                               else true
                         in
                         if sufficient_fee then
-                          let res, pool' =
+                          let add_res =
                             Indexed_pool.add_from_gossip_exn pool tx'
                               account.nonce
                             @@ Currency.Balance.to_amount account.balance
@@ -349,8 +349,6 @@ struct
                             Fn.compose
                               (fun s -> `String s)
                               (function
-                                | `Success _ ->
-                                    failwith "impossible"
                                 | `Invalid_nonce ->
                                     "invalid nonce"
                                 | `Insufficient_funds ->
@@ -360,8 +358,8 @@ struct
                                 | `Overflow ->
                                     "overflow" )
                           in
-                          match res with
-                          | `Success dropped ->
+                          match add_res with
+                          | Ok (pool', dropped) ->
                               let%bind _ =
                                 trust_record
                                   ( Trust_system.Actions.Sent_useful_gossip
@@ -397,7 +395,7 @@ struct
                                     [ ( "cmds"
                                       , seq_cmd_to_yojson dropped_for_size ) ] ;
                               go txs'' pool'' (tx :: accepted)
-                          | `Insufficient_replace_fee ->
+                          | Error `Insufficient_replace_fee ->
                               (* We can't punish peers for this, since an
                                attacker can simultaneously send different
                                transactions at the same nonce to different
@@ -408,14 +406,14 @@ struct
                                  replace fee"
                                 ~metadata:[("cmd", User_command.to_yojson tx)] ;
                               go txs'' pool accepted
-                          | _ ->
+                          | Error err ->
                               let%bind _ =
                                 trust_record
                                   ( Trust_system.Actions.Sent_useless_gossip
                                   , Some
                                       ( "rejecting $cmd because of $reason"
                                       , [ ("cmd", User_command.to_yojson tx)
-                                        ; ("reason", yojson_fail_reason res) ]
+                                        ; ("reason", yojson_fail_reason err) ]
                                       ) )
                               in
                               go txs'' pool accepted
