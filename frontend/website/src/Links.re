@@ -45,6 +45,11 @@ module Static = {
     name: ("Read the Coda Whitepaper", "coda-whitepaper"),
     link: Cdn.url("/static/coda-whitepaper-05-10-2018-0.pdf"),
   };
+  
+  let modifiedBGsnark = () => {
+    name: ("Read about our New zkSNARK Construction", "modified-BG-snark"),
+    link: Cdn.url("/static/modified-BG-snark-05-03-2019-0.pdf"),
+  };
 
   let snarkette = {
     name: ("Snarkette: JavaScript Groth-Maller SNARK verifier", "snarkette"),
@@ -204,6 +209,7 @@ module Lists = {
     [
       render_post(name, title),
       Static.whitepaper(),
+      Static.modifiedBGsnark(),
       ThirdParty.coindeskStartupBlockchain,
       ThirdParty.codaMediumPost,
       ThirdParty.tokenDailyQA,
