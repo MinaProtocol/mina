@@ -89,3 +89,5 @@ end) : S with module Staged_ledger_diff = Staged_ledger_diff = struct
   let create ~snark_transition ~prover_state ~staged_ledger_diff =
     {Stable.Latest.snark_transition; staged_ledger_diff; prover_state}
 end
+
+include Make (Staged_ledger_diff)

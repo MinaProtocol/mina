@@ -3,6 +3,7 @@ open Async
 open Graphql_async
 open Pipe_lib
 open Coda_base
+open Coda_transition
 open Signature_lib
 open Currency
 

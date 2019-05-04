@@ -9,47 +9,23 @@ module type Base_intf = sig
 
   include Comparable.S with type t := t
 
-  type protocol_state
-
-  type protocol_state_proof
-
   type staged_ledger_diff
 
-  type state_hash
+  val protocol_state : t -> Protocol_state.Value.t
 
-  type consensus_state
-
-  val protocol_state : t -> protocol_state
-
-  val protocol_state_proof : t -> protocol_state_proof
+  val protocol_state_proof : t -> Proof.t
 
   val staged_ledger_diff : t -> staged_ledger_diff
 
-  val parent_hash : t -> state_hash
+  val parent_hash : t -> State_hash.t
 
-  val consensus_state : t -> consensus_state
+  val consensus_state : t -> Consensus.Data.Consensus_state.Value.t
 end
 
 module type S = sig
-  module Staged_ledger_diff : sig
-    type t [@@deriving sexp]
+  type staged_ledger_diff
 
-    module Stable :
-      sig
-        module V1 : sig
-          type t [@@deriving bin_io, sexp, version]
-        end
-      end
-      with type V1.t = t
-  end
-
-  include
-    Base_intf
-    with type protocol_state := Protocol_state.Value.t
-     and type protocol_state_proof := Proof.t
-     and type staged_ledger_diff := Staged_ledger_diff.t
-     and type consensus_state := Consensus.Data.Consensus_state.Value.t
-     and type state_hash := State_hash.t
+  include Base_intf with type staged_ledger_diff := staged_ledger_diff
 
   module Stable :
     sig
@@ -62,25 +38,15 @@ module type S = sig
     with type V1.t = t
 
   module Proof_verified :
-    Base_intf
-    with type protocol_state := Protocol_state.Value.t
-     and type protocol_state_proof := Proof.t
-     and type staged_ledger_diff := Staged_ledger_diff.t
-     and type consensus_state := Consensus.Data.Consensus_state.Value.t
-     and type state_hash := State_hash.t
+    Base_intf with type staged_ledger_diff := staged_ledger_diff
 
   module Verified :
-    Base_intf
-    with type protocol_state := Protocol_state.Value.t
-     and type protocol_state_proof := Proof.t
-     and type staged_ledger_diff := Staged_ledger_diff.t
-     and type consensus_state := Consensus.Data.Consensus_state.Value.t
-     and type state_hash := State_hash.t
+    Base_intf with type staged_ledger_diff := staged_ledger_diff
 
   val create :
        protocol_state:Protocol_state.Value.t
     -> protocol_state_proof:Proof.t
-    -> staged_ledger_diff:Staged_ledger_diff.t
+    -> staged_ledger_diff:staged_ledger_diff
     -> t
 
   val timestamp : t -> Block_time.t
@@ -98,25 +64,15 @@ module type S = sig
 end
 
 module Make (Staged_ledger_diff : sig
-  type t [@@deriving sexp]
-
-  module Stable :
-    sig
-      module V1 : sig
-        type t [@@deriving bin_io, sexp, version]
-      end
-    end
-    with type V1.t = t
-end) : S with module Staged_ledger_diff = Staged_ledger_diff = struct
-  module Staged_ledger_diff = Staged_ledger_diff
-
+  type t [@@deriving bin_io, sexp, version]
+end) : S with type staged_ledger_diff := Staged_ledger_diff.t = struct
   module Stable = struct
     module V1 = struct
       module T = struct
         type t =
           { protocol_state: Protocol_state.Value.Stable.V1.t
           ; protocol_state_proof: Proof.Stable.V1.t sexp_opaque
-          ; staged_ledger_diff: Staged_ledger_diff.Stable.V1.t }
+          ; staged_ledger_diff: Staged_ledger_diff.t }
         [@@deriving sexp, fields, bin_io, version]
 
         let to_yojson
@@ -189,3 +145,5 @@ end) : S with module Staged_ledger_diff = Staged_ledger_diff = struct
 
   let parent_hash = Stable.Latest.parent_hash
 end
+
+include Make (Staged_ledger_diff.Stable.V1)

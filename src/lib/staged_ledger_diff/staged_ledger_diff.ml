@@ -1,55 +1,32 @@
 open Core_kernel
-open Protocols
-open Coda_pow
+open Coda_base
+open Signature_lib
 open Module_version
 
-module Make (Inputs : sig
-  module Ledger_hash : Ledger_hash_intf
-
-  module Ledger_proof : sig
-    type t [@@deriving sexp, bin_io]
+module Make (Transaction_snark_work : sig
+  module Stable : sig
+    module V1 : sig
+      type t [@@deriving bin_io, sexp, version]
+    end
   end
 
-  module Compressed_public_key : Compressed_public_key_intf
+  type t = Stable.V1.t
 
-  module Staged_ledger_aux_hash : Staged_ledger_aux_hash_intf
-
-  module Fee_transfer :
-    Fee_transfer_intf with type public_key := Compressed_public_key.t
-
-  module Pending_coinbase : sig
-    type t [@@deriving sexp, bin_io]
+  module Checked : sig
+    type t [@@deriving sexp]
   end
 
-  module Pending_coinbase_hash : Pending_coinbase_hash_intf
-
-  module Staged_ledger_hash :
-    Staged_ledger_hash_intf
-    with type staged_ledger_aux_hash := Staged_ledger_aux_hash.t
-     and type ledger_hash := Ledger_hash.t
-     and type pending_coinbase := Pending_coinbase.t
-     and type pending_coinbase_hash := Pending_coinbase_hash.t
-
-  module User_command :
-    User_command_intf with type public_key := Compressed_public_key.t
-
-  module Transaction_snark_work :
-    Transaction_snark_work_intf
-    with type public_key := Compressed_public_key.t
-     and type statement := Transaction_snark.Statement.t
-     and type proof := Ledger_proof.t
+  val forget : Checked.t -> t
 end) :
-  Coda_pow.Staged_ledger_diff_intf
-  with type user_command := Inputs.User_command.t
+  Protocols.Coda_pow.Staged_ledger_diff_intf
+  with type user_command := User_command.t
    and type user_command_with_valid_signature :=
-              Inputs.User_command.With_valid_signature.t
-   and type staged_ledger_hash := Inputs.Staged_ledger_hash.t
-   and type public_key := Inputs.Compressed_public_key.t
-   and type completed_work := Inputs.Transaction_snark_work.t
-   and type completed_work_checked := Inputs.Transaction_snark_work.Checked.t
-   and type fee_transfer_single := Inputs.Fee_transfer.Single.t = struct
-  open Inputs
-
+              User_command.With_valid_signature.t
+   and type staged_ledger_hash := Staged_ledger_hash.t
+   and type public_key := Public_key.Compressed.t
+   and type completed_work := Transaction_snark_work.t
+   and type completed_work_checked := Transaction_snark_work.Checked.t
+   and type fee_transfer_single := Fee_transfer.Single.t = struct
   module At_most_two = struct
     module Stable = struct
       module V1 = struct
@@ -120,7 +97,7 @@ end) :
     module Stable = struct
       module V1 = struct
         module T = struct
-          type t = Inputs.Fee_transfer.Single.Stable.V1.t
+          type t = Fee_transfer.Single.Stable.V1.t
           [@@deriving sexp, bin_io, version {unnumbered}]
         end
 
@@ -206,7 +183,7 @@ end) :
         type t =
           { diff: Diff.Stable.V1.t
           ; prev_hash: Staged_ledger_hash.Stable.V1.t
-          ; creator: Compressed_public_key.Stable.V1.t }
+          ; creator: Public_key.Compressed.Stable.V1.t }
         [@@deriving sexp, bin_io, version]
       end
 
@@ -229,7 +206,7 @@ end) :
   type t = Stable.Latest.t =
     { diff: Diff.Stable.V1.t
     ; prev_hash: Staged_ledger_hash.Stable.V1.t
-    ; creator: Compressed_public_key.Stable.V1.t }
+    ; creator: Public_key.Compressed.Stable.V1.t }
   [@@deriving sexp]
 
   module With_valid_signatures_and_proofs = struct
@@ -253,7 +230,7 @@ end) :
     type t =
       { diff: diff
       ; prev_hash: Staged_ledger_hash.t
-      ; creator: Compressed_public_key.t }
+      ; creator: Public_key.Compressed.t }
     [@@deriving sexp]
 
     let user_commands t =
@@ -304,5 +281,7 @@ end) :
     | At_most_two.Zero, At_most_one.Zero ->
         Currency.Amount.zero
     | _ ->
-        Coda_praos.coinbase_amount
+        Protocols.Coda_praos.coinbase_amount
 end
+
+include Make (Transaction_snark_work)

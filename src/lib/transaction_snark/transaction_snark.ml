@@ -98,8 +98,8 @@ module Statement = struct
     module V1 = struct
       module T = struct
         type t =
-          { source: Coda_base.Frozen_ledger_hash.Stable.V1.t
-          ; target: Coda_base.Frozen_ledger_hash.Stable.V1.t
+          { source: Frozen_ledger_hash.Stable.V1.t
+          ; target: Frozen_ledger_hash.Stable.V1.t
           ; supply_increase: Currency.Amount.Stable.V1.t
           ; pending_coinbase_stack_state:
               Pending_coinbase_stack_state.Stable.V1.t
@@ -126,8 +126,8 @@ module Statement = struct
 
   (* bin_io omitted *)
   type t = Stable.Latest.t =
-    { source: Coda_base.Frozen_ledger_hash.Stable.V1.t
-    ; target: Coda_base.Frozen_ledger_hash.Stable.V1.t
+    { source: Frozen_ledger_hash.Stable.V1.t
+    ; target: Frozen_ledger_hash.Stable.V1.t
     ; supply_increase: Currency.Amount.Stable.V1.t
     ; pending_coinbase_stack_state: Pending_coinbase_stack_state.t
     ; fee_excess: Currency.Fee.Signed.Stable.V1.t
@@ -160,8 +160,8 @@ module Statement = struct
 
   let gen =
     let open Quickcheck.Generator.Let_syntax in
-    let%map source = Coda_base.Frozen_ledger_hash.gen
-    and target = Coda_base.Frozen_ledger_hash.gen
+    let%map source = Frozen_ledger_hash.gen
+    and target = Frozen_ledger_hash.gen
     and fee_excess = Currency.Fee.Signed.gen
     and supply_increase = Currency.Amount.gen
     and pending_coinbase_before = Pending_coinbase.Stack.gen

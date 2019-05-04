@@ -1,13 +1,12 @@
 open Core
 open Async
+open Coda_base
+open Signature_lib
 
 module Make (Inputs : Intf.Inputs_intf) :
-  Intf.S
-  with type transition := Inputs.Transaction.t
-   and type transaction_witness := Inputs.Transaction_witness.t
-   and type statement := Inputs.Statement.t
-   and type proof := Inputs.Proof.t = struct
+  Intf.S with module Ledger_proof := Inputs.Ledger_proof = struct
   open Inputs
+  module Rpcs = Rpcs.Make (Inputs)
 
   module Work = struct
     open Snark_work_lib
@@ -15,10 +14,10 @@ module Make (Inputs : Intf.Inputs_intf) :
     module Single = struct
       module Spec = struct
         type t =
-          ( Statement.t
+          ( Transaction_snark.Statement.t
           , Transaction.t
           , Transaction_witness.t
-          , Proof.t )
+          , Ledger_proof.t )
           Work.Single.Spec.t
         [@@deriving sexp]
       end
@@ -29,11 +28,9 @@ module Make (Inputs : Intf.Inputs_intf) :
     end
 
     module Result = struct
-      type t = (Spec.t, Proof.t) Work.Result.t
+      type t = (Spec.t, Ledger_proof.t) Work.Result.t
     end
   end
-
-  module Rpcs = Rpcs.Make (Inputs)
 
   let perform (s : Worker_state.t) public_key
       ({instances; fee} as spec : Work.Spec.t) =
@@ -162,7 +159,7 @@ module Make (Inputs : Intf.Inputs_intf) :
 
   let arguments ~public_key ~daemon_address ~shutdown_on_disconnect =
     [ "-public-key"
-    ; Signature_lib.Public_key.Compressed.to_base64 public_key
+    ; Public_key.Compressed.to_base64 public_key
     ; "-daemon-address"
     ; Host_and_port.to_string daemon_address
     ; "-shutdown-on-disconnect"
