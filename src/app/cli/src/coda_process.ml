@@ -110,6 +110,14 @@ let root_diff_exn (conn, proc, _) =
 let start_exn (conn, proc, _) =
   Coda_worker.Connection.run_exn conn ~f:Coda_worker.functions.start ~arg:()
 
+let new_payment_exn (conn, proc, _) pk =
+  Coda_worker.Connection.run_exn conn ~f:Coda_worker.functions.new_payment
+    ~arg:pk
+
+let get_all_payments_exn (conn, proc, _) pk =
+  Coda_worker.Connection.run_exn conn ~f:Coda_worker.functions.get_all_payments
+    ~arg:pk
+
 let dump_tf (conn, proc, _) =
   Coda_worker.Connection.run_exn conn ~f:Coda_worker.functions.dump_tf ~arg:()
 

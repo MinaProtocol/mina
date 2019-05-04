@@ -1,13 +1,9 @@
-open Core
 open Async
 open Coda_base
+open Coda_state
 open Blockchain_snark
 
 module type S = sig
-  (* module Consensus_mechanism : Consensus.S
-
-  module Blockchain :
-    Blockchain.S with module Consensus_mechanism = Consensus_mechanism *)
   module Worker_state : sig
     type t
 
@@ -23,9 +19,9 @@ module type S = sig
   val extend_blockchain :
        t
     -> Blockchain.t
-    -> Consensus.Protocol_state.Value.t
-    -> Consensus.Snark_transition.value
-    -> Consensus.Prover_state.t
+    -> Protocol_state.Value.t
+    -> Snark_transition.value
+    -> Consensus.Data.Prover_state.t
     -> Pending_coinbase_witness.t
     -> Blockchain.t Deferred.Or_error.t
 end

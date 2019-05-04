@@ -67,7 +67,7 @@ let%test_module "Bootstrap Controller" =
           in
           let parent_breadcrumb = Transition_frontier.best_tip frontier in
           let breadcrumbs_gen =
-            gen_linear_breadcrumbs ~logger ~size:num_breadcrumbs
+            gen_linear_breadcrumbs ~logger ~trust_system ~size:num_breadcrumbs
               ~accounts_with_secret_keys:Genesis_ledger.accounts
               parent_breadcrumb
             |> Quickcheck.Generator.with_size ~size:num_breadcrumbs
@@ -146,6 +146,7 @@ let%test_module "Bootstrap Controller" =
     let%test_unit "reconstruct staged_ledgers using \
                    of_scan_state_and_snarked_ledger" =
       let logger = Logger.null () in
+      let trust_system = Trust_system.null () in
       let num_breadcrumbs = 10 in
       let accounts = Genesis_ledger.accounts in
       Thread_safe.block_on_async_exn (fun () ->
@@ -153,8 +154,8 @@ let%test_module "Bootstrap Controller" =
           let%bind () =
             build_frontier_randomly frontier
               ~gen_root_breadcrumb_builder:
-                (gen_linear_breadcrumbs ~logger ~size:num_breadcrumbs
-                   ~accounts_with_secret_keys:accounts)
+                (gen_linear_breadcrumbs ~logger ~trust_system
+                   ~size:num_breadcrumbs ~accounts_with_secret_keys:accounts)
           in
           Deferred.List.iter (Transition_frontier.all_breadcrumbs frontier)
             ~f:(fun breadcrumb ->
@@ -190,7 +191,8 @@ let%test_module "Bootstrap Controller" =
       let num_breadcrumbs = 10 in
       Thread_safe.block_on_async_exn (fun () ->
           let%bind syncing_frontier, peer, network =
-            Network_builder.setup_me_and_a_peer ~logger ~num_breadcrumbs
+            Network_builder.setup_me_and_a_peer ~logger ~trust_system
+              ~num_breadcrumbs
               ~source_accounts:[List.hd_exn Genesis_ledger.accounts]
               ~target_accounts:Genesis_ledger.accounts
           in
@@ -227,7 +229,7 @@ let%test_module "Bootstrap Controller" =
       Thread_safe.block_on_async_exn (fun () ->
           let large_peer_accounts = Genesis_ledger.accounts in
           let%bind {me; peers; network} =
-            Network_builder.setup ~source_accounts ~logger
+            Network_builder.setup ~source_accounts ~logger ~trust_system
               [ { num_breadcrumbs= small_peer_num_breadcrumbs
                 ; accounts= small_peer_accounts }
               ; { num_breadcrumbs= large_peer_num_breadcrumbs
@@ -267,8 +269,8 @@ let%test_module "Bootstrap Controller" =
       let num_breadcrumbs = 10 in
       Thread_safe.block_on_async_exn (fun () ->
           let%bind syncing_frontier, peer_with_frontier, network =
-            Network_builder.setup_me_and_a_peer ~logger ~num_breadcrumbs
-              ~source_accounts:Genesis_ledger.accounts
+            Network_builder.setup_me_and_a_peer ~logger ~trust_system
+              ~num_breadcrumbs ~source_accounts:Genesis_ledger.accounts
               ~target_accounts:Genesis_ledger.accounts
           in
           let root_sync_ledger =

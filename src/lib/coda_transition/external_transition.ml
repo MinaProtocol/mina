@@ -1,9 +1,11 @@
-open Core
+open Core_kernel
+open Coda_base
+open Coda_state
 open Module_version
 
 module type Base_intf = sig
   (* TODO: delegate forget here *)
-  type t [@@deriving sexp, compare, eq, to_yojson]
+  type t [@@deriving sexp, compare, to_yojson]
 
   include Comparable.S with type t := t
 
@@ -26,35 +28,45 @@ module type Base_intf = sig
   val parent_hash : t -> state_hash
 
   val consensus_state : t -> consensus_state
+
+  val proposer : t -> Signature_lib.Public_key.Compressed.t
+
+  val user_commands : t -> User_command.t list
+
+  val payments : t -> User_command.t list
+end
+
+module type Staged_ledger_diff_intf = sig
+  type t [@@deriving sexp]
+
+  val creator : t -> Signature_lib.Public_key.Compressed.t
+
+  val user_commands : t -> User_command.t list
+
+  module Stable :
+    sig
+      module V1 : sig
+        type t [@@deriving bin_io, sexp, version]
+      end
+    end
+    with type V1.t = t
 end
 
 module type S = sig
-  module Protocol_state : Protocol_state.S
-
-  module Staged_ledger_diff : sig
-    type t [@@deriving sexp]
-
-    module Stable :
-      sig
-        module V1 : sig
-          type t [@@deriving bin_io, sexp, version]
-        end
-      end
-      with type V1.t = t
-  end
+  module Staged_ledger_diff : Staged_ledger_diff_intf
 
   include
     Base_intf
     with type protocol_state := Protocol_state.Value.t
      and type protocol_state_proof := Proof.t
      and type staged_ledger_diff := Staged_ledger_diff.t
-     and type consensus_state := Protocol_state.Consensus_state.Value.t
+     and type consensus_state := Consensus.Data.Consensus_state.Value.t
      and type state_hash := State_hash.t
 
   module Stable :
     sig
       module V1 : sig
-        type t [@@deriving sexp, bin_io, to_yojson, version]
+        type t [@@deriving sexp, eq, bin_io, to_yojson, version]
       end
 
       module Latest = V1
@@ -66,7 +78,7 @@ module type S = sig
     with type protocol_state := Protocol_state.Value.t
      and type protocol_state_proof := Proof.t
      and type staged_ledger_diff := Staged_ledger_diff.t
-     and type consensus_state := Protocol_state.Consensus_state.Value.t
+     and type consensus_state := Consensus.Data.Consensus_state.Value.t
      and type state_hash := State_hash.t
 
   module Verified :
@@ -74,7 +86,7 @@ module type S = sig
     with type protocol_state := Protocol_state.Value.t
      and type protocol_state_proof := Proof.t
      and type staged_ledger_diff := Staged_ledger_diff.t
-     and type consensus_state := Protocol_state.Consensus_state.Value.t
+     and type consensus_state := Consensus.Data.Consensus_state.Value.t
      and type state_hash := State_hash.t
 
   val create :
@@ -97,24 +109,9 @@ module type S = sig
   val forget_consensus_state_verification : Verified.t -> Proof_verified.t
 end
 
-module Make (Staged_ledger_diff : sig
-  type t [@@deriving sexp]
-
-  module Stable :
-    sig
-      module V1 : sig
-        type t [@@deriving bin_io, sexp, version]
-      end
-    end
-    with type V1.t = t
-end)
-(Protocol_state : Protocol_state.S) :
-  S
-  with module Staged_ledger_diff = Staged_ledger_diff
-   and module Protocol_state = Protocol_state = struct
+module Make (Staged_ledger_diff : Staged_ledger_diff_intf) :
+  S with module Staged_ledger_diff = Staged_ledger_diff = struct
   module Staged_ledger_diff = Staged_ledger_diff
-  module Protocol_state = Protocol_state
-  module Blockchain_state = Protocol_state.Blockchain_state
 
   module Stable = struct
     module V1 = struct
@@ -137,15 +134,23 @@ end)
           Protocol_state.Value.Stable.V1.compare t1.protocol_state
             t2.protocol_state
 
-        let equal t1 t2 =
-          Protocol_state.Value.Stable.V1.equal t1.protocol_state
-            t2.protocol_state
-
         let consensus_state {protocol_state; _} =
           Protocol_state.consensus_state protocol_state
 
         let parent_hash {protocol_state; _} =
           Protocol_state.previous_state_hash protocol_state
+
+        let proposer {staged_ledger_diff; _} =
+          Staged_ledger_diff.creator staged_ledger_diff
+
+        let user_commands {staged_ledger_diff; _} =
+          Staged_ledger_diff.user_commands staged_ledger_diff
+
+        let payments external_transition =
+          List.filter
+            (user_commands external_transition)
+            ~f:
+              (Fn.compose User_command_payload.is_payment User_command.payload)
       end
 
       include T
@@ -195,7 +200,7 @@ end)
     Protocol_state.blockchain_state protocol_state
     |> Blockchain_state.timestamp
 
-  let consensus_state = Stable.Latest.consensus_state
-
-  let parent_hash = Stable.Latest.parent_hash
+  [%%define_locally
+  Stable.Latest.
+    (consensus_state, parent_hash, proposer, user_commands, payments)]
 end

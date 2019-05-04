@@ -134,8 +134,6 @@ end = struct
             Error
               (Staged_ledger_error.Invalid_proof (proof, statement, prover)) )
 
-  (*TODO: Punish*)
-
   module M = struct
     include Monad.Ident
     module Or_error = Or_error
@@ -685,7 +683,6 @@ end = struct
                 | Some t ->
                     Continue (t :: acc)
                 | None ->
-                    (* TODO: punish *)
                     Stop (Error (Staged_ledger_error.Bad_signature t)) )
               ~finish:(fun acc -> Ok acc)
           in
@@ -1672,6 +1669,9 @@ end = struct
                   (User_command t) )
           with
           | Error e ->
+              (* FIXME This should be fatal and crash the daemon but can't be
+               because of a buggy test. See #2346.
+            *)
               Logger.error logger ~module_:__MODULE__ ~location:__LOC__
                 ~metadata:
                   [ ( "user_command"
@@ -1725,6 +1725,9 @@ let%test_module "test" =
       module Compressed_public_key = struct
         type t = string [@@deriving sexp, compare, yojson, hash]
 
+        (* unused in test *)
+        type var = unit
+
         module Stable = struct
           module V1 = struct
             module T = struct
@@ -1758,7 +1761,10 @@ let%test_module "test" =
           module Latest = V1
         end
 
-        module Digest = Unit
+        module Digest = struct
+          include Unit
+          module Checked = Unit
+        end
 
         type t = Stable.Latest.t [@@deriving sexp, yojson]
 
@@ -2343,6 +2349,9 @@ let%test_module "test" =
 
         type t = string [@@deriving sexp, eq, compare]
 
+        (* unused in test *)
+        type var = unit
+
         type ledger_hash = Ledger_hash.t
 
         type staged_ledger_aux_hash = Staged_ledger_aux_hash.t
@@ -2611,7 +2620,7 @@ let%test_module "test" =
           { diff: Diff.Stable.V1.t
           ; prev_hash: staged_ledger_hash
           ; creator: public_key }
-        [@@deriving sexp, yojson]
+        [@@deriving sexp, yojson, fields]
 
         module With_valid_signatures_and_proofs = struct
           type pre_diff_with_at_most_two_coinbase =
