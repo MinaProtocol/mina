@@ -7,8 +7,8 @@ set +u
 cd frontend/wallet
 
 BUCKET=wallet.o1test.net
-VERSION=$(cat package.json | jq .name)
-NAME=$(cat package.json | jq .name)
+VERSION=$(cat package.json | jq -r .version)
+NAME=$(cat package.json | jq -r .name)
 
 # check for AWS Creds
 if [ -z "$AWS_ACCESS_KEY_ID" ]; then
