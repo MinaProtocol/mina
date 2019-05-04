@@ -53,7 +53,7 @@ let rec random_point () =
 let max_input_size = 20000
 
 let params =
-  List.init (max_input_size / 4) ~f:(fun i ->
+  List.init (max_input_size / 3) ~f:(fun i ->
       let t = Group.of_affine_coordinates (random_point ()) in
       let tt = Group.double t in
       (t, tt, Group.add t tt, Group.double tt) )
