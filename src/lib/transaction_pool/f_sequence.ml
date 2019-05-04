@@ -380,9 +380,6 @@ let deep :
     , lazy middle
     , suffix )
 
-let is_empty : 'e t -> bool =
- fun t -> match t with Empty -> true | _ -> false
-
 let empty : 'e t = Empty
 
 (** Add a new element to the left end of the tree. *)
@@ -511,7 +508,22 @@ let rec foldr : ('e -> 'a -> 'a) -> 'a -> 'e t -> 'a =
   | Some (head, tail) ->
       f head (foldr f acc tail)
 
-let iter : ('e -> unit) -> 'e t -> unit = fun f -> foldl (Fn.const f) ()
+module C = Container.Make (struct
+  type nonrec 'a t = 'a t
+
+  let fold : 'a t -> init:'accum -> f:('accum -> 'a -> 'accum) -> 'accum =
+   fun t ~init ~f -> foldl f init t
+
+  let iter = `Define_using_fold
+
+  let length = `Custom (fun t -> measure (Fn.const 1) t)
+end)
+
+let is_empty = C.is_empty
+
+let length = C.length
+
+let iter = C.iter
 
 let to_seq : 'e t -> 'e Sequence.t = fun t -> Sequence.unfold ~init:t ~f:uncons
 
@@ -627,8 +639,6 @@ let split_at : 'e t -> int -> 'e t * 'e t =
   if measure (Fn.const 1) t > idx then
     match split (Fn.const 1) t idx 0 with lhs, m, rhs -> (lhs, cons m rhs)
   else (t, empty)
-
-let length : 'e t -> int = fun t -> measure (Fn.const 1) t
 
 let singleton : 'e -> 'e t = fun v -> Single v
 

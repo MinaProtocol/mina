@@ -38,7 +38,7 @@ val foldl : ('a -> 'e -> 'a) -> 'a -> 'e t -> 'a
 
 val foldr : ('e -> 'a -> 'a) -> 'a -> 'e t -> 'a
 
-val iter : ('e -> unit) -> 'e t -> unit
+val iter : 'e t -> f:('e -> unit) -> unit
 
 val to_seq : 'e t -> 'e Sequence.t
 
