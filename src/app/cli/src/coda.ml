@@ -371,7 +371,7 @@ let daemon logger =
               ?propose_keypair:Config0.propose_keypair ~monitor
               ~consensus_local_state ())
        in
-       Run.handle_shutdown ~monitor ~conf_dir ~logger coda ;
+       Run.handle_shutdown ~monitor ~conf_dir coda ;
        Async.Scheduler.within' ~monitor
        @@ fun () ->
        let%bind () = maybe_sleep 3. in

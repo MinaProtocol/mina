@@ -73,7 +73,12 @@ struct
         let proof = Lite_compat.proof proof in
         {Lite_base.Lite_chain.proof; ledger; protocol_state} )
 
-  let log_shutdown ~conf_dir ~logger t =
+  let log_shutdown ~conf_dir t =
+    let logger =
+      Logger.extend
+        (Program.top_level_logger t)
+        [("coda_run", `String "Logging state before program ends")]
+    in
     let frontier_file = conf_dir ^/ "frontier.dot" in
     let mask_file = conf_dir ^/ "registered_masks.dot" in
     Logger.info logger ~module_:__MODULE__ ~location:__LOC__ "%s"
@@ -291,13 +296,17 @@ struct
           ~client_port
         |> ignore
 
-  let handle_shutdown ~monitor ~conf_dir ~logger t =
+  let handle_shutdown ~monitor ~conf_dir t =
     Monitor.detach_and_iter_errors monitor ~f:(fun exn ->
-        log_shutdown ~conf_dir ~logger t ;
-        raise exn ) ;
+        log_shutdown ~conf_dir t ; raise exn ) ;
     Async_unix.Signal.(
       handle terminating ~f:(fun signal ->
-          log_shutdown ~conf_dir ~logger t ;
+          log_shutdown ~conf_dir t ;
+          let logger =
+            Logger.extend
+              (Program.top_level_logger t)
+              [("coda_run", `String "Program got killed by signal")]
+          in
           Logger.info logger ~module_:__MODULE__ ~location:__LOC__
             !"Coda process got interrupted by signal %{sexp:t}"
             signal ))

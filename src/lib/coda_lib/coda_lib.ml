@@ -586,7 +586,7 @@ module Make (Inputs : Inputs_intf) = struct
 
   let receipt_chain_database t = t.receipt_chain_database
 
-  let logger t = t.logger
+  let top_level_logger t = t.logger
 
   let staged_ledger_ledger_proof t =
     let open Option.Let_syntax in

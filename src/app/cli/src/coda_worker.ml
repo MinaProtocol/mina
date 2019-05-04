@@ -394,7 +394,7 @@ module T = struct
                  ?propose_keypair:Config.propose_keypair ~monitor
                  ~consensus_local_state ())
           in
-          Run.handle_shutdown ~monitor ~conf_dir ~logger coda ;
+          Run.handle_shutdown ~monitor ~conf_dir coda ;
           let%map () =
             with_monitor
               (fun () ->

@@ -51,7 +51,11 @@ struct
   let txn_count = ref 0
 
   let record_payment t (txn : User_command.t) account =
-    let logger = Program.logger t in
+    let logger =
+      Logger.extend
+        (Program.top_level_logger t)
+        [("coda_command", `String "Recording payment")]
+    in
     let previous = account.Account.Poly.receipt_chain_hash in
     let receipt_chain_database = receipt_chain_database t in
     match Receipt_chain_database.add receipt_chain_database ~previous txn with
@@ -104,7 +108,12 @@ struct
     else
       let txn_pool = transaction_pool t in
       don't_wait_for (Transaction_pool.add txn_pool txn) ;
-      Logger.info (Program.logger t) ~module_:__MODULE__ ~location:__LOC__
+      let logger =
+        Logger.extend
+          (Program.top_level_logger t)
+          [("coda_command", `String "scheduling a payment")]
+      in
+      Logger.info logger ~module_:__MODULE__ ~location:__LOC__
         ~metadata:[("user_command", User_command.to_yojson txn)]
         "Added payment $user_command to pool successfully" ;
       txn_count := !txn_count + 1 ;
@@ -198,8 +207,12 @@ struct
         | Ok () ->
             ()
         | Error err ->
-            Logger.warn (Program.logger t) ~module_:__MODULE__
-              ~location:__LOC__
+            let logger =
+              Logger.extend
+                (Program.top_level_logger t)
+                [("coda_command", `String "scheduling a payment")]
+            in
+            Logger.warn logger ~module_:__MODULE__ ~location:__LOC__
               ~metadata:[("error", `String (Error.to_string_hum err))]
               "Failure in schedule_payments: $error. This is not yet reported \
                to the client, see #1143" )
@@ -458,7 +471,13 @@ struct
                        Strict_pipe.Writer.write frontier_payment_writer
                          user_command
                    | None ->
-                       Logger.error (Program.logger coda) ~module_:__MODULE__
+                       let logger =
+                         Logger.extend
+                           (Program.top_level_logger coda)
+                           [ ( "coda_command"
+                             , `String "Checking user command failed" ) ]
+                       in
+                       Logger.error logger ~module_:__MODULE__
                          ~location:__LOC__
                          "Could not check user command correctly" )
           in

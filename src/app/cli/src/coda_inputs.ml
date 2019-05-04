@@ -402,7 +402,7 @@ module type Main_intf = sig
 
   val wallets : t -> Secrets.Wallets.t
 
-  val logger : t -> Logger.t
+  val top_level_logger : t -> Logger.t
 end
 
 module Pending_coinbase = struct
