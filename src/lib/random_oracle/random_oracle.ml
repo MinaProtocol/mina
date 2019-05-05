@@ -3,7 +3,6 @@ open Crypto_params
 
 module Digest = struct
   include Random_oracle_base.Digest
-
   open Tick0
 
   module Checked = struct
@@ -25,11 +24,11 @@ module Digest = struct
     Typ.transport
       (Typ.array ~length:Blake2.digest_size_in_bits Boolean.typ)
       ~there:(fun (t : t) -> Blake2.string_to_bits (t :> string))
-      ~back:(fun bs ->
-        of_string (Blake2.bits_to_string bs) )
+      ~back:(fun bs -> of_string (Blake2.bits_to_string bs))
 end
 
-let digest_string s = Blake2.(digest_string s |> to_raw_string) |> Digest.of_string
+let digest_string s =
+  Blake2.(digest_string s |> to_raw_string) |> Digest.of_string
 
 let digest_field =
   let field_to_bits x =
@@ -62,6 +61,4 @@ let%test_unit "checked-unchecked equality" =
 let%test_unit "checked-unchecked field" =
   Quickcheck.test ~trials:10 Tick0.Field.gen ~f:(fun bits ->
       Tick0.Test.test_equal ~sexp_of_t:Digest.sexp_of_t Tick0.Field.typ
-        Digest.typ Checked.digest_field 
-        digest_field
-        bits )
+        Digest.typ Checked.digest_field digest_field bits )
