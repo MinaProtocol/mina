@@ -4,7 +4,6 @@ open Fold_lib
 let ( = ) = `Don't_use_polymorphic_equality
 
 module type Backend_intf = sig
-
   module N : Nat_intf.S
 
   module Fq : Fields.Fp_intf with type nat := N.t
@@ -35,9 +34,8 @@ module type Backend_intf = sig
     val is_well_formed : t -> bool
   end
 
-  val hash :
-    a:G1.t -> b:G2.t -> c:G1.t -> h_delta_prime:G2.t -> G1.t
-  
+  val hash : a:G1.t -> b:G2.t -> c:G1.t -> h_delta_prime:G2.t -> G1.t
+
   module Fq_target : sig
     include Fields.Degree_2_extension_intf with type base = Fqe.t
 
@@ -55,10 +53,7 @@ module Make (Backend : Backend_intf) = struct
   open Backend
 
   module Verification_key = struct
-    type t =
-      { g_alpha_h_beta: Fq_target.t 
-      ; h_delta: G2.t
-      ; query: G1.t array } 
+    type t = {g_alpha_h_beta: Fq_target.t; h_delta: G2.t; query: G1.t array}
     [@@deriving bin_io, sexp]
 
     let map_to_two t ~f =
@@ -69,8 +64,7 @@ module Make (Backend : Backend_intf) = struct
       in
       (List.rev xs, List.rev ys)
 
-    let fold_bits {g_alpha_h_beta; h_delta; query}
-        =
+    let fold_bits {g_alpha_h_beta; h_delta; query} =
       let g1s = Array.to_list query in
       let g2s = [h_delta] in
       let gts = [Fq_target.unitary_inverse g_alpha_h_beta] in
@@ -114,10 +108,9 @@ module Make (Backend : Backend_intf) = struct
         ; query: G1.t array }
       [@@deriving bin_io, sexp]
 
-      let create {g_alpha_h_beta; h_delta; query}
-          =
+      let create {g_alpha_h_beta; h_delta; query} =
         { g_alpha_h_beta
-        ; h_delta_pc = Pairing.G2_precomputation.create h_delta
+        ; h_delta_pc= Pairing.G2_precomputation.create h_delta
         ; query }
     end
   end
@@ -125,7 +118,8 @@ module Make (Backend : Backend_intf) = struct
   let check b lab = if b then Ok () else Or_error.error_string lab
 
   module Proof = struct
-    type t = {a: G1.t; b: G2.t; c: G1.t; h_delta_prime: G2.t; z: G1.t} [@@deriving bin_io, sexp]
+    type t = {a: G1.t; b: G2.t; c: G1.t; h_delta_prime: G2.t; z: G1.t}
+    [@@deriving bin_io, sexp]
 
     let is_well_formed {a; b; c; h_delta_prime; z} =
       let open Or_error.Let_syntax in
@@ -135,7 +129,9 @@ module Make (Backend : Backend_intf) = struct
       let%bind () = check (G1.is_well_formed a) (err "a") in
       let%bind () = check (G2.is_well_formed b) (err "b") in
       let%bind () = check (G1.is_well_formed c) (err "c") in
-      let%bind () = check (G2.is_well_formed h_delta_prime) (err "h_delta_prime") in
+      let%bind () =
+        check (G2.is_well_formed h_delta_prime) (err "h_delta_prime")
+      in
       let%map () = check (G1.is_well_formed z) (err "z") in
       ()
   end
@@ -154,12 +150,9 @@ module Make (Backend : Backend_intf) = struct
           let q = vk.query.(1 + i) in
           G1.(acc + (x * q)) )
     in
-    let h_delta_prime_pc = Pairing.G2_precomputation.create h_delta_prime
-    in
+    let h_delta_prime_pc = Pairing.G2_precomputation.create h_delta_prime in
     let test1 =
-      let l =
-        Pairing.unreduced_pairing a b 
-      in
+      let l = Pairing.unreduced_pairing a b in
       let r1 = vk.g_alpha_h_beta in
       let r2 =
         Pairing.miller_loop
@@ -167,7 +160,9 @@ module Make (Backend : Backend_intf) = struct
           vk.h_delta_pc
       in
       let r3 =
-        Pairing.miller_loop (Pairing.G1_precomputation.create c) h_delta_prime_pc
+        Pairing.miller_loop
+          (Pairing.G1_precomputation.create c)
+          h_delta_prime_pc
       in
       let test =
         let open Fq_target in
@@ -179,7 +174,9 @@ module Make (Backend : Backend_intf) = struct
     let test2 =
       let ys = hash ~a ~b ~c ~h_delta_prime in
       let l =
-        Pairing.miller_loop (Pairing.G1_precomputation.create ys) h_delta_prime_pc
+        Pairing.miller_loop
+          (Pairing.G1_precomputation.create ys)
+          h_delta_prime_pc
       in
       let r =
         Pairing.miller_loop (Pairing.G1_precomputation.create z) vk.h_delta_pc
