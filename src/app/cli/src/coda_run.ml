@@ -73,7 +73,12 @@ struct
         let proof = Lite_compat.proof proof in
         {Lite_base.Lite_chain.proof; ledger; protocol_state} )
 
-  let log_shutdown ~conf_dir ~logger t =
+  let log_shutdown ~conf_dir t =
+    let logger =
+      Logger.extend
+        (Program.top_level_logger t)
+        [("coda_run", `String "Logging state before program ends")]
+    in
     let frontier_file = conf_dir ^/ "frontier.dot" in
     let mask_file = conf_dir ^/ "registered_masks.dot" in
     Logger.info logger ~module_:__MODULE__ ~location:__LOC__ "%s"
@@ -89,7 +94,7 @@ struct
 
   (* TODO: handle participation_status more appropriately than doing participate_exn *)
   let setup_local_server ?(client_whitelist = []) ?rest_server_port ~coda
-      ~logger ~client_port () =
+      ~client_port () =
     let client_whitelist =
       Unix.Inet_addr.Set.of_list (Unix.Inet_addr.localhost :: client_whitelist)
     in
@@ -98,12 +103,17 @@ struct
       Rpc.Rpc.implement rpc (fun () input ->
           trace_recurring_task (Rpc.Rpc.name rpc) (fun () -> f () input) )
     in
+    let logger =
+      Logger.extend
+        (Program.top_level_logger coda)
+        [("coda_run", `String "Setting up server logs")]
+    in
     let client_impls =
       [ implement Daemon_rpcs.Send_user_command.rpc (fun () tx ->
-            let%map result = Commands.send_payment logger coda tx in
+            let%map result = Commands.send_payment coda tx in
             result |> Participating_state.active_exn )
       ; implement Daemon_rpcs.Send_user_commands.rpc (fun () ts ->
-            Commands.schedule_payments logger coda ts
+            Commands.schedule_payments coda ts
             |> Participating_state.active_exn ;
             Deferred.unit )
       ; implement Daemon_rpcs.Get_balance.rpc (fun () pk ->
@@ -112,7 +122,7 @@ struct
         )
       ; implement Daemon_rpcs.Verify_proof.rpc (fun () (pk, tx, proof) ->
             return
-              ( Commands.verify_payment coda logger pk tx proof
+              ( Commands.verify_payment coda pk tx proof
               |> Participating_state.active_exn ) )
       ; implement Daemon_rpcs.Prove_receipt.rpc
           (fun () (proving_receipt, pk) ->
@@ -257,8 +267,7 @@ struct
                       Deferred.unit )) ) )
     |> ignore
 
-  let create_snark_worker ~logger ~public_key ~client_port
-      ~shutdown_on_disconnect =
+  let create_snark_worker ~public_key ~client_port ~shutdown_on_disconnect =
     let open Snark_worker_lib in
     let%map p =
       let our_binary = Sys.executable_name in
@@ -281,23 +290,26 @@ struct
     |> don't_wait_for ;
     Deferred.unit
 
-  let run_snark_worker ?shutdown_on_disconnect:(s = true) ~logger ~client_port
+  let run_snark_worker ?shutdown_on_disconnect:(s = true) ~client_port
       run_snark_worker =
     match run_snark_worker with
     | `Don't_run ->
         ()
     | `With_public_key public_key ->
-        create_snark_worker ~shutdown_on_disconnect:s ~logger ~public_key
-          ~client_port
+        create_snark_worker ~shutdown_on_disconnect:s ~public_key ~client_port
         |> ignore
 
-  let handle_shutdown ~monitor ~conf_dir ~logger t =
+  let handle_shutdown ~monitor ~conf_dir t =
     Monitor.detach_and_iter_errors monitor ~f:(fun exn ->
-        log_shutdown ~conf_dir ~logger t ;
-        raise exn ) ;
+        log_shutdown ~conf_dir t ; raise exn ) ;
     Async_unix.Signal.(
       handle terminating ~f:(fun signal ->
-          log_shutdown ~conf_dir ~logger t ;
+          log_shutdown ~conf_dir t ;
+          let logger =
+            Logger.extend
+              (Program.top_level_logger t)
+              [("coda_run", `String "Program got killed by signal")]
+          in
           Logger.info logger ~module_:__MODULE__ ~location:__LOC__
             !"Coda process got interrupted by signal %{sexp:t}"
             signal ))

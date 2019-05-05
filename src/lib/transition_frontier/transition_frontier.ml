@@ -78,7 +78,7 @@ struct
 
     let copy t = {t with staged_ledger= Staged_ledger.copy t.staged_ledger}
 
-    let build ~logger ~parent ~transition_with_hash =
+    let build ~logger ~trust_system ~parent ~transition_with_hash ~sender =
       O1trace.measure "Breadcrumb.build" (fun () ->
           let open Deferred.Result.Let_syntax in
           let staged_ledger = parent.staged_ledger in
@@ -97,33 +97,82 @@ struct
                    , `Staged_ledger transitioned_staged_ledger
                    , `Pending_coinbase_data _ ) =
             let open Deferred.Let_syntax in
-            match%map
+            match%bind
               Staged_ledger.apply ~logger staged_ledger
                 (External_transition.Verified.staged_ledger_diff transition)
             with
             | Ok x ->
-                Ok x
+                return (Ok x)
             | Error (Staged_ledger.Staged_ledger_error.Unexpected e) ->
-                Error (`Fatal_error (Error.to_exn e))
-            | Error e ->
-                Error
-                  (`Invalid_staged_ledger_diff
-                    (Staged_ledger.Staged_ledger_error.to_error e))
+                return (Error (`Fatal_error (Error.to_exn e)))
+            | Error staged_ledger_error ->
+                let%bind () =
+                  match sender with
+                  | None | Some Envelope.Sender.Local ->
+                      return ()
+                  | Some (Envelope.Sender.Remote inet_addr) ->
+                      let error_string =
+                        Staged_ledger.Staged_ledger_error.to_string
+                          staged_ledger_error
+                      in
+                      let make_actions action =
+                        ( action
+                        , Some
+                            ( "Staged_ledger error: $error"
+                            , [("error", `String error_string)] ) )
+                      in
+                      let open Trust_system.Actions in
+                      (* TODO : refine these actions, issue 2375 *)
+                      let action =
+                        match staged_ledger_error with
+                        | Invalid_proof _ ->
+                            make_actions Sent_invalid_proof
+                        | Bad_signature _ ->
+                            make_actions Sent_invalid_signature
+                        | Coinbase_error _
+                        | Bad_prev_hash _
+                        | Insufficient_fee _
+                        | Non_zero_fee_excess _ ->
+                            make_actions Gossiped_invalid_transition
+                        | Unexpected _ ->
+                            failwith
+                              "build: Unexpected staged ledger error should \
+                               have been caught in another pattern"
+                      in
+                      Trust_system.record trust_system logger inet_addr action
+                in
+                return
+                  (Error
+                     (`Invalid_staged_ledger_diff
+                       (Staged_ledger.Staged_ledger_error.to_error
+                          staged_ledger_error)))
           in
           let just_emitted_a_proof = Option.is_some proof_opt in
           let%map transitioned_staged_ledger =
-            Deferred.return
-              ( if
-                Staged_ledger_hash.equal staged_ledger_hash
-                  blockchain_staged_ledger_hash
-              then Ok transitioned_staged_ledger
-              else
-                Error
-                  (`Invalid_staged_ledger_hash
-                    (Error.of_string
-                       "Snarked ledger hash and Staged ledger hash after \
-                        applying the diff does not match blockchain state's \
-                        ledger hash and staged ledger hash resp.\n")) )
+            if
+              Staged_ledger_hash.equal staged_ledger_hash
+                blockchain_staged_ledger_hash
+            then Deferred.return (Ok transitioned_staged_ledger)
+            else
+              let open Deferred.Let_syntax in
+              let%bind () =
+                match sender with
+                | None | Some Envelope.Sender.Local ->
+                    return ()
+                | Some (Envelope.Sender.Remote inet_addr) ->
+                    Trust_system.(
+                      record trust_system logger inet_addr
+                        Actions.
+                          ( Gossiped_invalid_transition
+                          , Some ("Invalid staged ledger hash", []) ))
+              in
+              return
+                (Error
+                   (`Invalid_staged_ledger_hash
+                     (Error.of_string
+                        "Snarked ledger hash and Staged ledger hash after \
+                         applying the diff does not match blockchain state's \
+                         ledger hash and staged ledger hash resp.")))
           in
           { transition_with_hash
           ; staged_ledger= transitioned_staged_ledger
@@ -332,39 +381,43 @@ struct
         mb_write_to_pipe diff (Field.get field t) handler pipe
       in
       ( match diff with
-      | Transition_frontier_diff.New_breadcrumb breadcrumb ->
+      | Transition_frontier_diff.New_best_tip {old_root; new_root; _} ->
+          if not (Breadcrumb.equal old_root new_root) then
+            Root_history.enqueue t.root_history
+              (Breadcrumb.state_hash old_root)
+              old_root
+      | _ ->
+          () ) ;
+      let%map () =
+        Fields.fold ~init:diff
+          ~root_history:(fun _ _ -> Deferred.unit)
+          ~snark_pool_refcount:
+            (use Snark_pool_refcount.handle_diff pipes.snark_pool)
+          ~transition_registry:(fun acc _ -> acc)
+          ~best_tip_diff:(use Best_tip_diff.handle_diff pipes.best_tip_diff)
+          ~root_diff:(use Root_diff.handle_diff pipes.root_diff)
+          ~persistence_diff:
+            (use Persistence_diff.handle_diff pipes.persistence_diff)
+          ~new_transition:(fun acc _ -> acc)
+      in
+      let bc_opt =
+        match diff with
+        | New_breadcrumb bc ->
+            Some bc
+        | New_best_tip {added_to_best_tip_path; _} ->
+            Some (Non_empty_list.last added_to_best_tip_path)
+        | _ ->
+            None
+      in
+      Option.iter bc_opt ~f:(fun bc ->
+          (* Other components may be waiting on these, so it's important they're
+             updated after the views above so that those other components see
+             the views updated with the new breadcrumb. *)
           Transition_registry.notify t.transition_registry
-            (Breadcrumb.state_hash breadcrumb) ;
+            (Breadcrumb.state_hash bc) ;
           New_transition.Var.set t.new_transition
-            (Breadcrumb.external_transition breadcrumb) ;
-          New_transition.stabilize ()
-      | Transition_frontier_diff.New_frontier _ ->
-          ()
-      | Transition_frontier_diff.New_best_tip
-          { old_root
-          ; old_root_length
-          ; new_best_tip_length
-          ; added_to_best_tip_path
-          ; _ } ->
-          ( if new_best_tip_length - old_root_length > max_length then
-            let root_state_hash = Breadcrumb.state_hash old_root in
-            Root_history.enqueue t.root_history root_state_hash old_root ) ;
-          let new_breadcrumb = Non_empty_list.last added_to_best_tip_path in
-          Transition_registry.notify t.transition_registry
-            (Breadcrumb.state_hash new_breadcrumb) ;
-          New_transition.Var.set t.new_transition
-            (Breadcrumb.external_transition new_breadcrumb) ;
-          New_transition.stabilize () ) ;
-      Fields.fold ~init:diff
-        ~root_history:(fun _ _ -> Deferred.unit)
-        ~snark_pool_refcount:
-          (use Snark_pool_refcount.handle_diff pipes.snark_pool)
-        ~transition_registry:(fun acc _ -> acc)
-        ~best_tip_diff:(use Best_tip_diff.handle_diff pipes.best_tip_diff)
-        ~root_diff:(use Root_diff.handle_diff pipes.root_diff)
-        ~persistence_diff:
-          (use Persistence_diff.handle_diff pipes.persistence_diff)
-        ~new_transition:(fun acc _ -> acc)
+          @@ Breadcrumb.external_transition bc ;
+          New_transition.stabilize () )
   end
 
   module Node = struct

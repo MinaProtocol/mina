@@ -586,6 +586,8 @@ module Make (Inputs : Inputs_intf) = struct
 
   let receipt_chain_database t = t.receipt_chain_database
 
+  let top_level_logger t = t.logger
+
   let staged_ledger_ledger_proof t =
     let open Option.Let_syntax in
     let%bind sl = best_staged_ledger_opt t in
@@ -768,6 +770,7 @@ module Make (Inputs : Inputs_intf) = struct
                       let%map frontier =
                         Transition_frontier_persistence.deserialize
                           ~directory_name ~logger:config.logger
+                          ~trust_system:config.trust_system
                           ~root_snarked_ledger
                           ~consensus_local_state:config.consensus_local_state
                       in
