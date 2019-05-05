@@ -11,14 +11,14 @@ let to_field t = t.value
 
 let constant (type f) ~m:((module M) as m : f m) x =
   let open M in
-  assert (x < Field.Constant.size) ;
+  assert (x < Field.size) ;
   {value= Field.(constant (bigint_to_field ~m x)); upper_bound= B.(one + x)}
 
 let shift_left (type f) ~m:((module M) as m : f m) t k =
   let open M in
   let two_to_k = B.(one lsl k) in
   let upper_bound = B.(two_to_k * t.upper_bound) in
-  assert (B.(upper_bound < Field.Constant.size)) ;
+  assert (B.(upper_bound < Field.size)) ;
   {value= Field.(constant (bigint_to_field ~m two_to_k) * t.value); upper_bound}
 
 (* The number of bits needed to represent a number < x *)
