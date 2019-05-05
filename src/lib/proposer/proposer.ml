@@ -400,6 +400,9 @@ module Make (Inputs : Inputs_intf) :
                 , External_transition.Verified.protocol_state_proof transition
                 )
               in
+              let transactions =
+                Transaction_pool.transactions transaction_pool
+              in
               trace_event "waiting for ivar..." ;
               let%bind () =
                 Interruptible.lift (Deferred.return ()) (Ivar.read ivar)
@@ -408,9 +411,7 @@ module Make (Inputs : Inputs_intf) :
                 generate_next_state ~proposal_data ~previous_protocol_state
                   ~time_controller
                   ~staged_ledger:(Breadcrumb.staged_ledger crumb)
-                  ~transactions:
-                    (Transaction_pool.transactions transaction_pool)
-                  ~get_completed_work ~logger ~keypair
+                  ~transactions ~get_completed_work ~logger ~keypair
               in
               trace_event "next state generated" ;
               match next_state_opt with
@@ -495,16 +496,17 @@ module Make (Inputs : Inputs_intf) :
                         in
                         Logger.info logger ~module_:__MODULE__
                           ~location:__LOC__
-                          !"Submitting transition to the transition frontier \
-                            controller"
+                          !"Submitting transition $state_hash to the \
+                            transition frontier controller"
                           ~metadata ;
                         let%bind () =
                           Strict_pipe.Writer.write transition_writer
                             external_transition_with_hash
                         in
                         Logger.info logger ~module_:__MODULE__
-                          ~location:__LOC__
-                          "Waiting for transition to be inserted into frontier" ;
+                          ~location:__LOC__ ~metadata
+                          "Waiting for transition $state_hash to be inserted \
+                           into frontier" ;
                         Deferred.choose
                           [ Deferred.choice
                               (Transition_frontier.wait_for_transition frontier
@@ -523,12 +525,12 @@ module Make (Inputs : Inputs_intf) :
                         | `Transition_accepted ->
                             Logger.info logger ~module_:__MODULE__
                               ~location:__LOC__ ~metadata
-                              "Generated transition was accepted into \
-                               transition frontier"
+                              "Generated transition $state_hash was accepted \
+                               into transition frontier"
                         | `Timed_out ->
                             let str =
-                              "Generated transition was never accepted into \
-                               transition frontier"
+                              "Generated transition $state_hash was never \
+                               accepted into transition frontier"
                             in
                             Logger.fatal logger ~module_:__MODULE__
                               ~location:__LOC__ ~metadata "%s" str ;

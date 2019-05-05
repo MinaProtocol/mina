@@ -2,9 +2,7 @@ open Core
 open Async
 open Coda_base
 open Coda_state
-open Util
 open Blockchain_snark
-open Cli_lib
 
 module type S = sig
   module Worker_state : sig
@@ -113,7 +111,6 @@ module Worker_state = struct
          | "check" ->
              ( module struct
                open Snark_params
-               open Keys
                module Consensus_mechanism = Consensus
                module Transaction_snark = Transaction_snark
                module Blockchain_state = Blockchain_snark_state
@@ -149,15 +146,15 @@ module Worker_state = struct
                  | Error e ->
                      Error.raise e
 
-               let verify state proof = true
+               let verify _state _proof = true
              end
              : S )
          | "none" ->
              ( module struct
                module Transaction_snark = Transaction_snark
 
-               let extend_blockchain chain next_state block state_for_handler
-                   pending_coinbase =
+               let extend_blockchain _chain next_state _block
+                   _state_for_handler _pending_coinbase =
                  { Blockchain.proof= Precomputed_values.base_proof
                  ; state= next_state }
 
@@ -171,8 +168,6 @@ module Worker_state = struct
 
   let get = Fn.id
 end
-
-open Snark_params
 
 module Functions = struct
   type ('i, 'o) t =
@@ -195,13 +190,7 @@ module Functions = struct
         * Snark_transition.Value.Stable.V1.t
         * Consensus.Data.Prover_state.Stable.V1.t
         * Pending_coinbase_witness.Stable.V1.t] Blockchain.bin_t
-      (fun w
-      ( ({Blockchain.state= prev_state; proof= prev_proof} as chain)
-      , next_state
-      , transition
-      , prover_state
-      , pending_coinbase )
-      ->
+      (fun w (chain, next_state, transition, prover_state, pending_coinbase) ->
         let%map (module W) = Worker_state.get w in
         W.extend_blockchain chain next_state transition prover_state
           pending_coinbase )
@@ -245,7 +234,7 @@ module Worker = struct
       let functions =
         let f (i, o, f) =
           C.create_rpc
-            ~f:(fun ~worker_state ~conn_state i -> f worker_state i)
+            ~f:(fun ~worker_state ~conn_state:_ i -> f worker_state i)
             ~bin_input:i ~bin_output:o ()
         in
         let open Functions in
@@ -264,7 +253,7 @@ end
 
 type t = {connection: Worker.Connection.t; process: Process.t}
 
-let create ~conf_dir =
+let create ~conf_dir:_ =
   let%map connection, process =
     (* HACK: Need to make connection_timeout long since creating a prover can take a long time*)
     Worker.spawn_in_foreground_exn ~connection_timeout:(Time.Span.of_min 1.)
@@ -282,7 +271,3 @@ let extend_blockchain {connection; _} chain next_state block prover_state
     pending_coinbase =
   Worker.Connection.run connection ~f:Worker.functions.extend_blockchain
     ~arg:(chain, next_state, block, prover_state, pending_coinbase)
-
-let verify_blockchain {connection; _} chain =
-  Worker.Connection.run connection ~f:Worker.functions.verify_blockchain
-    ~arg:chain
