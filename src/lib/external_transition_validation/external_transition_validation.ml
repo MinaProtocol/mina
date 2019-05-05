@@ -2,15 +2,13 @@ open Core_kernel
 open Async_kernel
 open Protocols.Coda_pow
 open Coda_base
-open Consensus
+open Coda_state
 
 module type Inputs_intf = sig
   include Transition_frontier.Inputs_intf
 
   module State_proof :
-    Proof_intf
-    with type input := Consensus.Protocol_state.Value.t
-     and type t := Proof.t
+    Proof_intf with type input := Protocol_state.Value.t and type t := Proof.t
 
   module Transition_frontier :
     Transition_frontier_intf
@@ -164,7 +162,9 @@ module Make (Inputs : Inputs_intf) :
       With_hash.data t |> External_transition.protocol_state
       |> Protocol_state.consensus_state
     in
-    match Consensus.received_at_valid_time consensus_state ~time_received with
+    match
+      Consensus.Hooks.received_at_valid_time consensus_state ~time_received
+    with
     | Ok () ->
         Ok (t, Unsafe.set_valid_time_received validation)
     | Error _ ->
@@ -201,7 +201,7 @@ module Make (Inputs : Inputs_intf) :
     let%map () =
       Result.ok_if_true
         ( `Take
-        = Consensus.select
+        = Consensus.Hooks.select
             ~logger:
               (Logger.extend logger
                  [ ( "selection_context"

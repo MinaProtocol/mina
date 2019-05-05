@@ -1,9 +1,11 @@
-open Core_kernel
+open Core
 open Async_kernel
 open Pipe_lib
 open Cache_lib
 
 module Transition_frontier_diff = struct
+  (* TODO: Remove New_frontier. 
+    Each transition frontier extension should be initialized by the input, the root breadcrumb *)
   type 'a t =
     | New_breadcrumb of 'a
         (** Triggered when a new breadcrumb is added without changing the root or best_tip *)
@@ -29,6 +31,8 @@ module type Diff_hash = sig
   val empty : t
 
   val equal : t -> t -> bool
+
+  val to_string : t -> string
 end
 
 module type Diff_mutant = sig
@@ -188,14 +192,14 @@ module type Network_intf = sig
 
   val get_staged_ledger_aux_and_pending_coinbases_at_hash :
        t
-    -> peer
+    -> Unix.Inet_addr.t
     -> state_hash
     -> (parallel_scan_state * ledger_hash * pending_coinbases)
        Deferred.Or_error.t
 
   val get_ancestry :
        t
-    -> peer
+    -> Unix.Inet_addr.t
     -> consensus_state
     -> ( external_transition
        , state_body_hash list * external_transition )
@@ -236,11 +240,17 @@ module type Transition_frontier_Breadcrumb_intf = sig
 
   val build :
        logger:Logger.t
+    -> trust_system:Trust_system.t
     -> parent:t
     -> transition_with_hash:( external_transition_verified
                             , state_hash )
                             With_hash.t
-    -> (t, [`Validation_error of Error.t | `Fatal_error of exn]) Result.t
+    -> sender:Envelope.Sender.t option
+    -> ( t
+       , [ `Invalid_staged_ledger_diff of Error.t
+         | `Invalid_staged_ledger_hash of Error.t
+         | `Fatal_error of exn ] )
+       Result.t
        Deferred.t
 
   val transition_with_hash :
@@ -424,6 +434,9 @@ module type Transition_frontier_intf = sig
   val persistence_diff_pipe :
     t -> Extensions.Persistence_diff.view Broadcast_pipe.Reader.t
 
+  val new_transition :
+    t -> external_transition_verified Coda_incremental.New_transition.t
+
   val visualize_to_string : t -> string
 
   val visualize : filename:string -> t -> unit
@@ -449,6 +462,8 @@ module type Catchup_intf = sig
   type transition_frontier_breadcrumb
 
   type network
+
+  type trust_system
 
   val run :
        logger:Logger.t
@@ -486,12 +501,15 @@ module type Transition_handler_validator_intf = sig
 
   type unprocessed_transition_cache
 
+  type trust_system
+
   type transition_frontier
 
   type staged_ledger
 
   val run :
        logger:Logger.t
+    -> trust_system:trust_system
     -> frontier:transition_frontier
     -> transition_reader:( [ `Transition of
                              external_transition_verified Envelope.Incoming.t
@@ -521,13 +539,15 @@ module type Transition_handler_validator_intf = sig
          , state_hash )
          Cached.t
        , [ `In_frontier of state_hash
-         | `Invalid of string
-         | `In_process of state_hash Cache_lib.Intf.final_state ] )
+         | `In_process of state_hash Cache_lib.Intf.final_state
+         | `Disconnected ] )
        Result.t
 end
 
 module type Breadcrumb_builder_intf = sig
   type state_hash
+
+  type trust_system
 
   type transition_frontier
 
@@ -537,6 +557,7 @@ module type Breadcrumb_builder_intf = sig
 
   val build_subtrees_of_breadcrumbs :
        logger:Logger.t
+    -> trust_system:trust_system
     -> frontier:transition_frontier
     -> initial_hash:state_hash
     -> ( (external_transition_verified, state_hash) With_hash.t
@@ -554,6 +575,8 @@ module type Transition_handler_processor_intf = sig
 
   type time_controller
 
+  type trust_system
+
   type external_transition_verified
 
   type unprocessed_transition_cache
@@ -564,6 +587,7 @@ module type Transition_handler_processor_intf = sig
 
   val run :
        logger:Logger.t
+    -> trust_system:trust_system
     -> time_controller:time_controller
     -> frontier:transition_frontier
     -> primary_transition_reader:( ( external_transition_verified
@@ -642,6 +666,8 @@ module type Transition_handler_intf = sig
 
   type external_transition_verified
 
+  type trust_system
+
   type transition_frontier
 
   type staged_ledger
@@ -656,8 +682,9 @@ module type Transition_handler_intf = sig
   module Breadcrumb_builder :
     Breadcrumb_builder_intf
     with type state_hash := state_hash
-    with type external_transition_verified := external_transition_verified
-    with type transition_frontier := transition_frontier
+     and type trust_system := trust_system
+     and type external_transition_verified := external_transition_verified
+     and type transition_frontier := transition_frontier
     with type transition_frontier_breadcrumb := transition_frontier_breadcrumb
 
   module Validator :
@@ -666,6 +693,7 @@ module type Transition_handler_intf = sig
      and type state_hash := state_hash
      and type external_transition_verified := external_transition_verified
      and type unprocessed_transition_cache := Unprocessed_transition_cache.t
+     and type trust_system := trust_system
      and type transition_frontier := transition_frontier
      and type staged_ledger := staged_ledger
 
@@ -674,6 +702,7 @@ module type Transition_handler_intf = sig
     with type time_controller := time_controller
      and type external_transition_verified := external_transition_verified
      and type state_hash := state_hash
+     and type trust_system := trust_system
      and type unprocessed_transition_cache := Unprocessed_transition_cache.t
      and type transition_frontier := transition_frontier
      and type transition_frontier_breadcrumb := transition_frontier_breadcrumb
@@ -822,14 +851,21 @@ module type Protocol_state_validator_intf = sig
 
   type external_transition_verified
 
+  type trust_system
+
+  type envelope_sender
+
   val validate_proof :
        external_transition
-    -> external_transition_proof_verified Or_error.t Deferred.t
+    -> (external_transition_proof_verified, [`Invalid_proof]) Deferred.Result.t
 
   val validate_consensus_state :
-       time_received:time
+       logger:Logger.t
+    -> trust_system:trust_system
+    -> time_received:time
+    -> sender:envelope_sender
     -> external_transition
-    -> external_transition_verified Or_error.t Deferred.t
+    -> (external_transition_verified, unit) Deferred.Result.t
 end
 
 module type Initial_validator_intf = sig
@@ -837,12 +873,15 @@ module type Initial_validator_intf = sig
 
   type state_hash
 
+  type trust_system
+
   type external_transition
 
   type external_transition_verified
 
   val run :
        logger:Logger.t
+    -> trust_system:trust_system
     -> transition_reader:( [ `Transition of
                              external_transition Envelope.Incoming.t ]
                          * [`Time_received of time] )

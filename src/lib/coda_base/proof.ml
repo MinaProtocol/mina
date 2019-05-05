@@ -6,7 +6,7 @@ module Stable = struct
     (* TODO: This should be stable. *)
     module T = struct
       (* Tock.Proof.t is not bin_io; should we wrap that snarky type? *)
-      type t = Tock.Proof.t [@@deriving version {asserted}]
+      type t = Tock.Proof.t [@@deriving version {asserted; unnumbered}]
 
       let to_string = Binable.to_string (module Tock_backend.Proof)
 

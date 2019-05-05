@@ -10,8 +10,6 @@ type ('q, 'r) dispatch =
   Versioned_rpc.Connection_with_menu.t -> 'q -> 'r Deferred.Or_error.t
 
 module type Message_intf = sig
-  type content
-
   type msg [@@deriving to_yojson]
 
   include
@@ -19,11 +17,7 @@ module type Message_intf = sig
     with type callee_msg := msg
      and type caller_msg := msg
 
-  val content : msg -> content
-
   val summary : msg -> string
-
-  val sender : msg -> Envelope.Sender.t
 end
 
 module type Config_intf = sig
@@ -40,8 +34,6 @@ module type Config_intf = sig
 end
 
 module type S = sig
-  type content
-
   type msg
 
   module Connection_with_state : sig
@@ -54,9 +46,11 @@ module type S = sig
     ; trust_system: Trust_system.t
     ; target_peer_count: int
     ; broadcast_writer: msg Linear_pipe.Writer.t
-    ; received_reader: content Envelope.Incoming.t Strict_pipe.Reader.t
+    ; received_reader: msg Envelope.Incoming.t Strict_pipe.Reader.t
     ; me: Peer.t
+    ; initial_peers: Host_and_port.t list
     ; peers: Peer.Hash_set.t
+    ; peers_by_ip: (Unix.Inet_addr.t, Peer.t list) Hashtbl.t
     ; connections:
         ( Unix.Inet_addr.t
         , (Uuid.t, Connection_with_state.t) Hashtbl.t )
@@ -68,7 +62,7 @@ module type S = sig
   val create :
     Config.t -> Host_and_port.t Rpc.Implementation.t list -> t Deferred.t
 
-  val received : t -> content Envelope.Incoming.t Strict_pipe.Reader.t
+  val received : t -> msg Envelope.Incoming.t Strict_pipe.Reader.t
 
   val broadcast : t -> msg Linear_pipe.Writer.t
 
@@ -81,6 +75,8 @@ module type S = sig
 
   val peers : t -> Peer.t list
 
+  val initial_peers : t -> Host_and_port.t list
+
   val query_peer :
     t -> Peer.t -> ('q, 'r) dispatch -> 'q -> 'r Or_error.t Deferred.t
 
@@ -88,8 +84,7 @@ module type S = sig
     t -> int -> ('q, 'r) dispatch -> 'q -> 'r Or_error.t Deferred.t List.t
 end
 
-module Make (Message : Message_intf) :
-  S with type msg := Message.msg and type content := Message.content = struct
+module Make (Message : Message_intf) : S with type msg := Message.msg = struct
   module Connection_with_state = struct
     type t = Banned | Allowed of Rpc.Connection.t Ivar.t
 
@@ -103,9 +98,11 @@ module Make (Message : Message_intf) :
     ; trust_system: Trust_system.t
     ; target_peer_count: int
     ; broadcast_writer: Message.msg Linear_pipe.Writer.t
-    ; received_reader: Message.content Envelope.Incoming.t Strict_pipe.Reader.t
+    ; received_reader: Message.msg Envelope.Incoming.t Strict_pipe.Reader.t
     ; me: Peer.t
+    ; initial_peers: Host_and_port.t list
     ; peers: Peer.Hash_set.t
+    ; peers_by_ip: (Unix.Inet_addr.t, Peer.t list) Hashtbl.t
     ; connections:
         ( Unix.Inet_addr.t
         , (Uuid.t, Connection_with_state.t) Hashtbl.t )
@@ -153,18 +150,43 @@ module Make (Message : Message_intf) :
       | Ok (Ok result) ->
           (* call succeeded, result is valid *)
           return (Ok result)
-      | Ok (Error err) ->
-          (* call succeeded, result is an error *)
-          let%bind () =
-            Trust_system.(
-              record t.trust_system t.logger peer.host
-                Actions.
-                  ( Violated_protocol
-                  , Some
-                      ( "RPC call failed, reason: $exn"
-                      , [("exn", `String (Error.to_string_hum err))] ) ))
-          in
-          return (Error err)
+      | Ok (Error err) -> (
+          Logger.error t.logger ~module_:__MODULE__ ~location:__LOC__
+            !"RPC call error: %s {{{%s}}} [[[%{sexp: Error.t}]]]"
+            (Exn.to_string (Error.to_exn err))
+            (Exn.to_string_mach (Error.to_exn err))
+            err ;
+          match (Error.to_exn err, Error.sexp_of_t err) with
+          | ( _
+            , Sexp.List
+                [ Sexp.Atom "src/connection.ml.Handshake_error.Handshake_error"
+                ; _ ] ) ->
+              let%map () =
+                Trust_system.record t.trust_system t.logger peer.host
+                  ( Trust_system.Actions.Outgoing_connection_error
+                  , Some ("handshake error", []) )
+              in
+              (* TODO: cleanup peer from peer table and maybe remove existing connections? *)
+              Error err
+          | Async_rpc_kernel.Rpc_error.Rpc (Connection_closed, _), _ ->
+              let%map () =
+                Trust_system.record t.trust_system t.logger peer.host
+                  ( Trust_system.Actions.Outgoing_connection_error
+                  , Some ("closed connection", []) )
+              in
+              Error err
+          | _ ->
+              (* call succeeded, result is an error *)
+              let%bind () =
+                Trust_system.(
+                  record t.trust_system t.logger peer.host
+                    Actions.
+                      ( Violated_protocol
+                      , Some
+                          ( "RPC call failed, reason: $exn"
+                          , [("exn", `String (Error.to_string_hum err))] ) ))
+              in
+              return (Error err) )
       | Error exn ->
           (* call itself failed *)
           (* TODO: learn what exceptions are raised here, punish peers for
@@ -247,6 +269,8 @@ module Make (Message : Message_intf) :
           ; received_reader
           ; me= config.me
           ; peers= Peer.Hash_set.create ()
+          ; initial_peers= config.initial_peers
+          ; peers_by_ip= Hashtbl.create (module Unix.Inet_addr)
           ; connections= Hashtbl.create (module Unix.Inet_addr)
           ; max_concurrent_connections= config.max_concurrent_connections }
         in
@@ -284,17 +308,33 @@ module Make (Message : Message_intf) :
           let implementations =
             Versioned_rpc.Menu.add
               ( Message.implement_multi
-                  (fun _client_host_and_port ~version:_ msg ->
-                    (* TODO: maybe check client host matches IP in msg, punish if
-                        mismatch due to forgery
-                     *)
+                  (fun client_host_and_port ~version:_ msg ->
+                    (* wrap received message in envelope *)
+                    let sender =
+                      Envelope.Sender.Remote
+                        (Unix.Inet_addr.of_string
+                           client_host_and_port.Host_and_port.host)
+                    in
                     Strict_pipe.Writer.write received_writer
-                      (Envelope.Incoming.wrap ~data:(Message.content msg)
-                         ~sender:(Message.sender msg)) )
+                      (Envelope.Incoming.wrap ~data:msg ~sender) )
               @ implementation_list )
           in
+          let handle_unknown_rpc conn ~rpc_tag ~version =
+            let inet_addr = Unix.Inet_addr.of_string conn.Host_and_port.host in
+            Deferred.don't_wait_for
+              Trust_system.(
+                record t.trust_system t.logger inet_addr
+                  Actions.
+                    ( Violated_protocol
+                    , Some
+                        ( "Attempt to make unknown (fixed-version) RPC call \
+                           \"$rpc\" with version $version"
+                        , [("rpc", `String rpc_tag); ("version", `Int version)]
+                        ) )) ;
+            `Close_connection
+          in
           Rpc.Implementations.create_exn ~implementations
-            ~on_unknown_rpc:`Close_connection
+            ~on_unknown_rpc:(`Call handle_unknown_rpc)
         in
         trace_task "peer events" (fun () ->
             Linear_pipe.iter_unordered ~max_concurrency:64 peer_events
@@ -303,13 +343,25 @@ module Make (Message : Message_intf) :
                   Logger.info t.logger ~module_:__MODULE__ ~location:__LOC__
                     "Some peers connected %s"
                     (List.sexp_of_t Peer.sexp_of_t peers |> Sexp.to_string_hum) ;
-                  List.iter peers ~f:(fun peer -> Hash_set.add t.peers peer) ;
+                  List.iter peers ~f:(fun peer ->
+                      Hash_set.add t.peers peer ;
+                      Hashtbl.add_multi t.peers_by_ip ~key:peer.host ~data:peer
+                  ) ;
                   Deferred.unit
               | Disconnect peers ->
                   Logger.info t.logger ~module_:__MODULE__ ~location:__LOC__
                     "Some peers disconnected %s"
                     (List.sexp_of_t Peer.sexp_of_t peers |> Sexp.to_string_hum) ;
-                  List.iter peers ~f:(fun peer -> Hash_set.remove t.peers peer) ;
+                  List.iter peers ~f:(fun peer ->
+                      Hash_set.remove t.peers peer ;
+                      (* filter out this disconnected peer *)
+                      Hashtbl.update t.peers_by_ip peer.host ~f:(function
+                        | None ->
+                            failwith
+                              "Disconnected peer doesn't appear in peers_by_ip"
+                        | Some ip_peers ->
+                            List.filter ip_peers ~f:(fun ip_peer ->
+                                not (Peer.equal ip_peer peer) ) ) ) ;
                   Deferred.unit )
             |> ignore ) ;
         let%map _ =
@@ -322,13 +374,35 @@ module Make (Message : Message_intf) :
                   raise exn ))
             (Tcp.Where_to_listen.of_port config.me.Peer.communication_port)
             (fun client reader writer ->
+              let client_inet_addr = Socket.Address.Inet.addr client in
+              let%bind () =
+                Trust_system.(
+                  record t.trust_system t.logger client_inet_addr
+                    Actions.(Connected, None))
+              in
               let conn_map =
                 Option.value_map
                   ~default:(Hashtbl.create (module Uuid))
-                  (Hashtbl.find t.connections (Socket.Address.Inet.addr client))
+                  (Hashtbl.find t.connections client_inet_addr)
                   ~f:Fn.id
               in
-              if
+              let is_client_banned =
+                let peer_status =
+                  Trust_system.Peer_trust.lookup t.trust_system
+                    client_inet_addr
+                in
+                match peer_status.banned with
+                | Banned_until _ ->
+                    true
+                | Unbanned ->
+                    false
+              in
+              if is_client_banned then (
+                Logger.info t.logger ~module_:__MODULE__ ~location:__LOC__
+                  "Rejecting connection from banned peer %s"
+                  (Socket.Address.Inet.to_string client) ;
+                Reader.close reader >>= fun _ -> Writer.close writer )
+              else if
                 Option.is_some t.max_concurrent_connections
                 && Hashtbl.length conn_map
                    >= Option.value_exn t.max_concurrent_connections
@@ -343,10 +417,8 @@ module Make (Message : Message_intf) :
                 let conn_id = Uuid_unix.create () in
                 Hashtbl.add_exn conn_map ~key:conn_id
                   ~data:(Allowed (Ivar.create ())) ;
-                Hashtbl.set t.connections
-                  ~key:(Socket.Address.Inet.addr client)
-                  ~data:conn_map ;
-                let%map _ =
+                Hashtbl.set t.connections ~key:client_inet_addr ~data:conn_map ;
+                let%map () =
                   Rpc.Connection.server_with_close reader writer
                     ~implementations
                     ~connection_state:(fun conn ->
@@ -370,16 +442,13 @@ module Make (Message : Message_intf) :
                           Deferred.unit ))
                 in
                 let conn_map =
-                  Hashtbl.find_exn t.connections
-                    (Socket.Address.Inet.addr client)
+                  Hashtbl.find_exn t.connections client_inet_addr
                 in
                 Hashtbl.remove conn_map conn_id ;
                 if Hashtbl.is_empty conn_map then
-                  Hashtbl.remove t.connections
-                  @@ Socket.Address.Inet.addr client
+                  Hashtbl.remove t.connections client_inet_addr
                 else
-                  Hashtbl.set t.connections
-                    ~key:(Socket.Address.Inet.addr client)
+                  Hashtbl.set t.connections ~key:client_inet_addr
                     ~data:conn_map )
         in
         t )
@@ -389,6 +458,8 @@ module Make (Message : Message_intf) :
   let broadcast t = t.broadcast_writer
 
   let peers t = Hash_set.to_list t.peers
+
+  let initial_peers t = t.initial_peers
 
   let broadcast_all t msg =
     let to_broadcast = ref (List.permute (Hash_set.to_list t.peers)) in
@@ -411,7 +482,7 @@ module Make (Message : Message_intf) :
     try_call_rpc t peer rpc query
 
   let query_random_peers t n rpc query =
-    let peers = random_sublist (Hash_set.to_list t.peers) n in
+    let peers = random_peers t n in
     Logger.trace t.logger ~module_:__MODULE__ ~location:__LOC__
       !"Querying random peers: %{sexp: Peer.t list}"
       peers ;
