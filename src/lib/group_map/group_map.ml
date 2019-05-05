@@ -12,7 +12,8 @@
  * is well defined for at least |T| - 25 values of t and |Im(map| > (|T|-25)/26
  *)
 
-open Core
+open Core_kernel
+module Field_intf = Field_intf
 
 module Intf (F : sig
   type t
@@ -95,7 +96,7 @@ module Params = struct
           ; ((9, 0), "-3061257408")
           ; ((6, 2), "-6324912")
           ; ((3, 4), "-4356")
-          ; ((0, 6), "-1") ]
+          ; ((0, 6), "-6") ]
     ; d2=
         AB_pair.Table.of_alist_exn
           [ ((0, 0), "1")
@@ -132,7 +133,7 @@ module Params = struct
           ; ((9, 2), "-4041852271488")
           ; ((6, 4), "3844905120")
           ; ((3, 6), "-14904")
-          ; ((0, 8), "-6435")
+          ; ((0, 8), "6435")
           ; ((12, 1), "-1271178606627072")
           ; ((9, 3), "-557953136640")
           ; ((6, 5), "-5637798432")
@@ -342,7 +343,7 @@ module Params = struct
     ; b }
 end
 
-module Make_group_map
+module Make
     (Constant : Field_intf.S) (F : sig
         include Field_intf.S
 
@@ -410,3 +411,27 @@ struct
     let ts = powers ~mul:F.( * ) ~one:F.one t 15 in
     (make_x1 ts, make_x2 ts, make_x3 ts)
 end
+
+let to_group (type t) (module F : Field_intf.S_unchecked with type t = t)
+    ~params t =
+  let module M =
+    Make
+      (F)
+      (struct
+        include F
+
+        let constant = Fn.id
+      end)
+      (struct
+        let params = params
+      end)
+  in
+  let a = Params.a params in
+  let b = Params.b params in
+  let try_decode x =
+    let f x = F.((x * x * x) + (a * x) + b) in
+    let y = f x in
+    if F.is_square y then Some (x, F.sqrt y) else None
+  in
+  let x1, x2, x3 = M.potential_xs t in
+  List.find_map [x1; x2; x3] ~f:try_decode |> Option.value_exn
