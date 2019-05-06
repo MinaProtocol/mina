@@ -87,6 +87,7 @@ module For_tests = struct
             assert_all_by_fee tx ) ) ;
     Map.iteri all_by_sender
       ~f:(fun ~key:sender ~data:(tx_seq, currency_reserved) ->
+        assert (F_sequence.length tx_seq > 0) ;
         let check_consistent tx =
           [%test_eq: Public_key.Compressed.t]
             (User_command.forget_check tx |> User_command.sender)
