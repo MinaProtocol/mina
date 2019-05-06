@@ -760,7 +760,7 @@ module type Staged_ledger_diff_intf = sig
   end
 
   type t = {diff: Diff.t; prev_hash: staged_ledger_hash; creator: public_key}
-  [@@deriving sexp]
+  [@@deriving sexp, fields]
 
   module Stable :
     sig

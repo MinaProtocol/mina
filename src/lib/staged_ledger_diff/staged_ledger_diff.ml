@@ -207,7 +207,7 @@ end) :
     { diff: Diff.Stable.V1.t
     ; prev_hash: Staged_ledger_hash.Stable.V1.t
     ; creator: Public_key.Compressed.Stable.V1.t }
-  [@@deriving sexp]
+  [@@deriving sexp, fields]
 
   module With_valid_signatures_and_proofs = struct
     type pre_diff_with_at_most_two_coinbase =

@@ -42,8 +42,13 @@ struct
   module Transaction_snark_work =
     Transaction_snark_work.Make (Ledger_proof.Stable.V1)
   module Staged_ledger_diff = Staged_ledger_diff.Make (Transaction_snark_work)
-  module External_transition =
-    External_transition.Make (Staged_ledger_diff.Stable.V1)
+
+  module External_transition = External_transition.Make (struct
+    include Staged_ledger_diff.Stable.V1
+
+    [%%define_locally
+    Staged_ledger_diff.(creator, user_commands)]
+  end)
 
   module Staged_ledger_hash_binable = struct
     include Staged_ledger_hash

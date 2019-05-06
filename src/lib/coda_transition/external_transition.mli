@@ -19,6 +19,12 @@ module type Base_intf = sig
   val parent_hash : t -> State_hash.t
 
   val consensus_state : t -> Consensus.Data.Consensus_state.Value.t
+
+  val proposer : t -> Signature_lib.Public_key.Compressed.t
+
+  val user_commands : t -> User_command.t list
+
+  val payments : t -> User_command.t list
 end
 
 module type S = sig
@@ -62,8 +68,15 @@ module type S = sig
   val forget_consensus_state_verification : Verified.t -> Proof_verified.t
 end
 
-module Make (Staged_ledger_diff : sig
+module type Staged_ledger_diff_intf = sig
   type t [@@deriving bin_io, sexp, version]
-end) : S with type staged_ledger_diff := Staged_ledger_diff.t
 
-include S with type staged_ledger_diff := Staged_ledger_diff.t
+  val creator : t -> Signature_lib.Public_key.Compressed.t
+
+  val user_commands : t -> User_command.t list
+end
+
+module Make (Staged_ledger_diff : Staged_ledger_diff_intf) :
+  S with type staged_ledger_diff := Staged_ledger_diff.t
+
+include S with type staged_ledger_diff := Staged_ledger_diff.Stable.V1.t

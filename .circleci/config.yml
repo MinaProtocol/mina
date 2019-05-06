@@ -28,6 +28,12 @@ jobs:
             - run:
                   name: Test wallet
                   command: cd frontend/wallet && npm test
+            - run:
+                  name: Build dist wallet
+                  command: cd frontend/wallet && npm run dist
+            - run:
+                  name: Publish dist wallet
+                  command: (env HOMEBREW_NO_AUTO_UPDATE=1 brew install awscli) && ./scripts/publish-wallet.sh
             - run: cd frontend/website && npm install
             - run:
                   name: Decrypt PragmataPro font
@@ -399,6 +405,9 @@ jobs:
             - run:
                   name: Running test -- test_postake_txns:coda-shared-state-test
                   command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run "test_postake_txns:coda-shared-state-test"'
+            - run:
+                  name: Running test -- test_postake_txns:coda-batch-payment-test
+                  command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run "test_postake_txns:coda-batch-payment-test"'
             - store_artifacts:
                   path: test_logs
 

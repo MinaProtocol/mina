@@ -20,6 +20,12 @@ module type Base_intf = sig
   val parent_hash : t -> State_hash.t
 
   val consensus_state : t -> Consensus.Data.Consensus_state.Value.t
+
+  val proposer : t -> Signature_lib.Public_key.Compressed.t
+
+  val user_commands : t -> User_command.t list
+
+  val payments : t -> User_command.t list
 end
 
 module type S = sig
@@ -63,9 +69,16 @@ module type S = sig
   val forget_consensus_state_verification : Verified.t -> Proof_verified.t
 end
 
-module Make (Staged_ledger_diff : sig
+module type Staged_ledger_diff_intf = sig
   type t [@@deriving bin_io, sexp, version]
-end) : S with type staged_ledger_diff := Staged_ledger_diff.t = struct
+
+  val creator : t -> Signature_lib.Public_key.Compressed.t
+
+  val user_commands : t -> User_command.t list
+end
+
+module Make (Staged_ledger_diff : Staged_ledger_diff_intf) :
+  S with type staged_ledger_diff := Staged_ledger_diff.t = struct
   module Stable = struct
     module V1 = struct
       module T = struct
@@ -92,6 +105,18 @@ end) : S with type staged_ledger_diff := Staged_ledger_diff.t = struct
 
         let parent_hash {protocol_state; _} =
           Protocol_state.previous_state_hash protocol_state
+
+        let proposer {staged_ledger_diff; _} =
+          Staged_ledger_diff.creator staged_ledger_diff
+
+        let user_commands {staged_ledger_diff; _} =
+          Staged_ledger_diff.user_commands staged_ledger_diff
+
+        let payments external_transition =
+          List.filter
+            (user_commands external_transition)
+            ~f:
+              (Fn.compose User_command_payload.is_payment User_command.payload)
       end
 
       include T
@@ -141,9 +166,14 @@ end) : S with type staged_ledger_diff := Staged_ledger_diff.t = struct
     Protocol_state.blockchain_state protocol_state
     |> Blockchain_state.timestamp
 
-  let consensus_state = Stable.Latest.consensus_state
-
-  let parent_hash = Stable.Latest.parent_hash
+  [%%define_locally
+  Stable.Latest.
+    (consensus_state, parent_hash, proposer, user_commands, payments)]
 end
 
-include Make (Staged_ledger_diff.Stable.V1)
+include Make (struct
+  include Staged_ledger_diff.Stable.V1
+
+  [%%define_locally
+  Staged_ledger_diff.(creator, user_commands)]
+end)
