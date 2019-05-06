@@ -4,6 +4,7 @@
 open Core
 open Async
 open Coda_base
+open Coda_state
 open Coda_inputs
 open Signature_lib
 open Pipe_lib
@@ -55,7 +56,6 @@ let run_test () : unit Deferred.t =
       in
       let module Main = Coda_inputs.Make_coda (Init) in
       let module Run = Coda_run.Make (Config) (Main) in
-      let open Main in
       let%bind trust_dir = Async.Unix.mkdtemp (temp_conf_dir ^/ "trust_db") in
       let trust_system = Trust_system.create ~db_dir:trust_dir in
       let%bind receipt_chain_dir_name =
@@ -65,28 +65,27 @@ let run_test () : unit Deferred.t =
         Coda_base.Receipt_chain_database.create
           ~directory:receipt_chain_dir_name
       in
-      let time_controller =
-        Inputs.Time.Controller.create Inputs.Time.Controller.basic
-      in
+      let time_controller = Main.Inputs.Time.Controller.(create basic) in
       let consensus_local_state =
-        Consensus.Local_state.create
+        Consensus.Data.Local_state.create
           (Some (Public_key.compress keypair.public_key))
       in
       let net_config =
-        { Inputs.Net.Config.logger
-        ; time_controller
-        ; consensus_local_state
-        ; gossip_net_params=
-            { Inputs.Net.Gossip_net.Config.timeout= Time.Span.of_sec 3.
-            ; logger
-            ; target_peer_count= 8
-            ; initial_peers= []
-            ; conf_dir= temp_conf_dir
-            ; me=
-                Network_peer.Peer.create Unix.Inet_addr.localhost
-                  ~discovery_port:8001 ~communication_port:8000
-            ; trust_system
-            ; max_concurrent_connections= Some 10 } }
+        Main.Inputs.Net.Config.
+          { logger
+          ; time_controller
+          ; consensus_local_state
+          ; gossip_net_params=
+              { timeout= Time.Span.of_sec 3.
+              ; logger
+              ; target_peer_count= 8
+              ; initial_peers= []
+              ; conf_dir= temp_conf_dir
+              ; me=
+                  Network_peer.Peer.create Unix.Inet_addr.localhost
+                    ~discovery_port:8001 ~communication_port:8000
+              ; trust_system
+              ; max_concurrent_connections= Some 10 } }
       in
       Core.Backtrace.elide := false ;
       Async.Scheduler.set_record_backtraces true ;
@@ -115,7 +114,7 @@ let run_test () : unit Deferred.t =
         (Strict_pipe.Reader.iter_without_pushback
            (Main.verified_transitions coda)
            ~f:ignore) ;
-      let wait_until_cond ~(f : t -> bool) ~(timeout : Float.t) =
+      let wait_until_cond ~(f : Main.t -> bool) ~(timeout : Float.t) =
         let rec go () =
           if f coda then return ()
           else
@@ -127,7 +126,8 @@ let run_test () : unit Deferred.t =
       let balance_change_or_timeout ~initial_receiver_balance receiver_pk =
         let cond t =
           match
-            Run.get_balance t receiver_pk |> Participating_state.active_exn
+            Run.Commands.get_balance t receiver_pk
+            |> Participating_state.active_exn
           with
           | Some b when not (Currency.Balance.equal b initial_receiver_balance)
             ->
@@ -138,7 +138,9 @@ let run_test () : unit Deferred.t =
         wait_until_cond ~f:cond ~timeout:3.
       in
       let assert_balance pk amount =
-        match Run.get_balance coda pk |> Participating_state.active_exn with
+        match
+          Run.Commands.get_balance coda pk |> Participating_state.active_exn
+        with
         | Some balance ->
             if not (Currency.Balance.equal balance amount) then
               failwithf
@@ -151,8 +153,8 @@ let run_test () : unit Deferred.t =
               (sprintf !"Invalid Account: %{sexp: Public_key.Compressed.t}" pk)
       in
       let client_port = 8123 in
-      Run.setup_local_server ~client_port ~coda ~logger () ;
-      Run.run_snark_worker ~logger ~client_port run_snark_worker ;
+      Run.setup_local_server ~client_port ~coda () ;
+      Run.run_snark_worker ~client_port run_snark_worker ;
       (* Let the system settle *)
       let%bind () = Async.after (Time.Span.of_ms 100.) in
       (* No proof emitted by the parallel scan at the begining *)
@@ -165,7 +167,7 @@ let run_test () : unit Deferred.t =
       let build_payment amount sender_sk receiver_pk fee =
         trace_recurring_task "build_payment" (fun () ->
             let nonce =
-              Run.get_nonce coda (pk_of_sk sender_sk)
+              Run.Commands.get_nonce coda (pk_of_sk sender_sk)
               |> Participating_state.active_exn
               |> Option.value_exn ?here:None ?error:None ?message:None
             in
@@ -183,17 +185,17 @@ let run_test () : unit Deferred.t =
             (Currency.Fee.of_int 0)
         in
         let prev_sender_balance =
-          Run.get_balance coda (pk_of_sk sender_sk)
+          Run.Commands.get_balance coda (pk_of_sk sender_sk)
           |> Participating_state.active_exn
           |> Option.value_exn ?here:None ?error:None ?message:None
         in
         let prev_receiver_balance =
-          Run.get_balance coda receiver_pk
+          Run.Commands.get_balance coda receiver_pk
           |> Participating_state.active_exn
           |> Option.value ~default:Currency.Balance.zero
         in
         let%bind p1_res =
-          Run.send_payment logger coda (payment :> User_command.t)
+          Run.Commands.send_payment coda (payment :> User_command.t)
         in
         assert_ok (p1_res |> Participating_state.active_exn) ;
         (* Send a similar payment twice on purpose; this second one will be rejected
@@ -203,7 +205,7 @@ let run_test () : unit Deferred.t =
             (Currency.Fee.of_int 0)
         in
         let%bind p2_res =
-          Run.send_payment logger coda (payment' :> User_command.t)
+          Run.Commands.send_payment coda (payment' :> User_command.t)
         in
         assert_ok (p2_res |> Participating_state.active_exn) ;
         (* The payment fails, but the rpc command doesn't indicate that because that
@@ -235,7 +237,7 @@ let run_test () : unit Deferred.t =
                 (Currency.Balance.add_amount (Option.value_exn v) amount) )
         in
         let%map p_res =
-          Run.send_payment logger coda (payment :> User_command.t)
+          Run.Commands.send_payment coda (payment :> User_command.t)
         in
         p_res |> Participating_state.active_exn |> assert_ok ;
         new_balance_sheet'
@@ -253,8 +255,8 @@ let run_test () : unit Deferred.t =
       in
       let block_count t =
         Run.best_protocol_state t |> Participating_state.active_exn
-        |> Inputs.Consensus_mechanism.Protocol_state.consensus_state
-        |> Inputs.Consensus_mechanism.Consensus_state.length
+        |> Protocol_state.consensus_state
+        |> Consensus.Data.Consensus_state.length
       in
       let wait_for_proof_or_timeout timeout () =
         let cond t = Option.is_some @@ Run.For_tests.ledger_proof t in

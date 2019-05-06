@@ -53,7 +53,7 @@ module With_valid_signature : sig
   module Stable : sig
     module Latest : sig
       type nonrec t = private t
-      [@@deriving sexp, eq, bin_io, yojson, version, compare]
+      [@@deriving sexp, eq, bin_io, yojson, version, compare, hash]
 
       val gen :
            keys:Signature_keypair.t array
@@ -65,7 +65,7 @@ module With_valid_signature : sig
     module V1 = Latest
   end
 
-  type t = Stable.Latest.t [@@deriving sexp, eq, yojson, compare]
+  type t = Stable.Latest.t [@@deriving sexp, eq, yojson, compare, hash]
 
   val gen :
        keys:Signature_keypair.t array

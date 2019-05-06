@@ -82,6 +82,8 @@ module type Network_intf = sig
     -> 'q
     -> 'r Deferred.Or_error.t
 
+  val initial_peers : t -> Host_and_port.t list
+
   module Config : sig
     type t
   end
@@ -202,6 +204,7 @@ module type Proposer_intf = sig
 
   val run :
        logger:Logger.t
+    -> trust_system:Trust_system.t
     -> get_completed_work:(   completed_work_statement
                            -> completed_work_checked option)
     -> transaction_pool:transaction_pool
@@ -259,7 +262,13 @@ module type State_with_witness_intf = sig
 end
 
 module type Inputs_intf = sig
-  include Coda_pow.Inputs_intf
+  include
+    Coda_pow.Inputs_intf
+    with module Consensus_state = Consensus.Data.Consensus_state
+
+  module Genesis_protocol_state : sig
+    val t : (Protocol_state.Value.t, Protocol_state_hash.t) With_hash.t
+  end
 
   module Masked_ledger : sig
     type t
@@ -275,7 +284,8 @@ module type Inputs_intf = sig
      and type state_hash := Coda_base.State_hash.t
      and type scan_state := Staged_ledger.Scan_state.t
      and type hash := Diff_hash.t
-     and type consensus_state := Consensus.Consensus_state.Value.Stable.V1.t
+     and type consensus_state :=
+                Consensus.Data.Consensus_state.Value.Stable.V1.t
      and type pending_coinbases := Pending_coinbase.t
 
   module Transition_frontier :
@@ -287,7 +297,7 @@ module type Inputs_intf = sig
      and type staged_ledger := Staged_ledger.t
      and type staged_ledger_diff := Staged_ledger_diff.t
      and type transaction_snark_scan_state := Staged_ledger.Scan_state.t
-     and type consensus_local_state := Consensus_mechanism.Local_state.t
+     and type consensus_local_state := Consensus.Data.Local_state.t
      and type user_command := User_command.t
      and type diff_mutant :=
                 ( External_transition.Stable.Latest.t
@@ -301,7 +311,7 @@ module type Inputs_intf = sig
      and type 'output diff := 'output Diff_mutant.E.t
      and type diff_hash := Diff_hash.t
      and type root_snarked_ledger := Ledger_db.t
-     and type consensus_local_state := Consensus_mechanism.Local_state.t
+     and type consensus_local_state := Consensus.Data.Local_state.t
 
   module Transaction_pool :
     Transaction_pool_intf
@@ -337,7 +347,7 @@ module type Inputs_intf = sig
     with type state_with_witness := External_transition.t
      and type staged_ledger := Staged_ledger.t
      and type staged_ledger_hash := Staged_ledger_hash.t
-     and type protocol_state := Consensus_mechanism.Protocol_state.Value.t
+     and type protocol_state := Protocol_state.Value.t
      and type snark_pool_diff := Snark_pool.pool_diff
      and type transaction_pool_diff := Transaction_pool.pool_diff
      and type parallel_scan_state := Staged_ledger.Scan_state.t
@@ -347,7 +357,7 @@ module type Inputs_intf = sig
      and type time := Time.t
      and type state_hash := Coda_base.State_hash.t
      and type state_body_hash := State_body_hash.t
-     and type consensus_state := Consensus_mechanism.Consensus_state.Value.t
+     and type consensus_state := Consensus.Data.Consensus_state.Value.t
      and type pending_coinbases := Pending_coinbase.t
 
   module Transition_router :
@@ -368,7 +378,7 @@ module type Inputs_intf = sig
      and type external_transition := External_transition.t
      and type proof_verified_external_transition :=
                 External_transition.Proof_verified.t
-     and type consensus_state := Consensus_mechanism.Consensus_state.Value.t
+     and type consensus_state := Consensus.Data.Consensus_state.Value.t
      and type state_hash := Coda_base.State_hash.t
 
   module Proposer :
@@ -377,9 +387,9 @@ module type Inputs_intf = sig
      and type ledger_hash := Ledger_hash.t
      and type staged_ledger := Staged_ledger.t
      and type transaction := User_command.With_valid_signature.t
-     and type protocol_state := Consensus_mechanism.Protocol_state.Value.t
+     and type protocol_state := Protocol_state.Value.t
      and type protocol_state_proof := Protocol_state_proof.t
-     and type consensus_local_state := Consensus_mechanism.Local_state.t
+     and type consensus_local_state := Consensus.Data.Local_state.t
      and type completed_work_statement := Transaction_snark_work.Statement.t
      and type completed_work_checked := Transaction_snark_work.Checked.t
      and type external_transition := External_transition.t
@@ -396,10 +406,7 @@ module type Inputs_intf = sig
      and type dest := Ledger_db.t
 
   module Genesis : sig
-    val state :
-      ( Consensus_mechanism.Protocol_state.Value.t
-      , Protocol_state_hash.t )
-      With_hash.t
+    val state : (Protocol_state.Value.t, Protocol_state_hash.t) With_hash.t
 
     val ledger : Ledger.maskable_ledger
 
@@ -416,8 +423,6 @@ module type Inputs_intf = sig
      and type syncable_ledger_answer := Coda_base.Sync_ledger.Answer.t
      and type pending_coinbases := Pending_coinbase.t
      and type parallel_scan_state := Staged_ledger.Scan_state.t
-
-  module Incr_status : Incremental.S
 end
 
 module Make (Inputs : Inputs_intf) = struct
@@ -427,7 +432,6 @@ module Make (Inputs : Inputs_intf) = struct
     { propose_keypair: Keypair.t option
     ; snark_worker_key: Public_key.Compressed.Stable.V1.t option
     ; net: Net.t
-          (* TODO: Is this the best spot for the transaction_pool ref? *)
     ; wallets: Secrets.Wallets.t
     ; transaction_pool: Transaction_pool.t
     ; snark_pool: Snark_pool.t
@@ -441,6 +445,7 @@ module Make (Inputs : Inputs_intf) = struct
         , unit Deferred.t )
         Writer.t
     ; logger: Logger.t
+    ; trust_system: Trust_system.t
     ; mutable seen_jobs: Work_selector.State.t
     ; receipt_chain_database: Coda_base.Receipt_chain_database.t
     ; staged_ledger_transition_backup_capacity: int
@@ -449,7 +454,8 @@ module Make (Inputs : Inputs_intf) = struct
         Pipe.Writer.t
     ; time_controller: Time.Controller.t
     ; snark_work_fee: Currency.Fee.t
-    ; consensus_local_state: Consensus_mechanism.Local_state.t }
+    ; consensus_local_state: Consensus.Data.Local_state.t
+    ; transaction_database: Transaction_database.t }
 
   let peek_frontier frontier_broadcast_pipe =
     Broadcast_pipe.Reader.peek frontier_broadcast_pipe
@@ -469,6 +475,8 @@ module Make (Inputs : Inputs_intf) = struct
     let open Option.Let_syntax in
     let%map frontier = Broadcast_pipe.Reader.peek t.transition_frontier in
     Transition_frontier.best_tip frontier
+
+  let transition_frontier t = t.transition_frontier
 
   let root_length_opt t =
     let open Option.Let_syntax in
@@ -501,15 +509,7 @@ module Make (Inputs : Inputs_intf) = struct
   let root_length = compose_of_option root_length_opt
 
   module Incr = struct
-    open Incr_status
-
-    let of_broadcast_pipe pipe =
-      let init = Broadcast_pipe.Reader.peek pipe in
-      let var = Var.create init in
-      Broadcast_pipe.Reader.iter pipe ~f:(fun value ->
-          Var.set var value ; stabilize () ; Deferred.unit )
-      |> don't_wait_for ;
-      var
+    open Coda_incremental.Status
 
     let online_status t = of_broadcast_pipe @@ Net.online_status t.net
 
@@ -517,10 +517,10 @@ module Make (Inputs : Inputs_intf) = struct
   end
 
   let sync_status t =
-    let open Incr_status in
+    let open Coda_incremental.Status in
     let transition_frontier_incr = Var.watch @@ Incr.transition_frontier t in
     let incremental_status =
-      Incr_status.map2
+      map2
         (Var.watch @@ Incr.online_status t)
         transition_frontier_incr
         ~f:(fun online_status active_status ->
@@ -574,13 +574,19 @@ module Make (Inputs : Inputs_intf) = struct
 
   let transaction_pool t = t.transaction_pool
 
+  let transaction_database t = t.transaction_database
+
   let snark_pool t = t.snark_pool
 
   let peers t = Net.peers t.net
 
+  let initial_peers t = Net.initial_peers t.net
+
   let snark_work_fee t = t.snark_work_fee
 
   let receipt_chain_database t = t.receipt_chain_database
+
+  let top_level_logger t = t.logger
 
   let staged_ledger_ledger_proof t =
     let open Option.Let_syntax in
@@ -637,7 +643,7 @@ module Make (Inputs : Inputs_intf) = struct
       ; receipt_chain_database: Coda_base.Receipt_chain_database.t
       ; snark_work_fee: Currency.Fee.t
       ; monitor: Monitor.t option
-      ; consensus_local_state: Consensus_mechanism.Local_state.t
+      ; consensus_local_state: Consensus.Data.Local_state.t
             (* TODO: Pass banlist to modules discussed in Ban Reasons issue: https://github.com/CodaProtocol/coda/issues/852 *)
       }
     [@@deriving make]
@@ -645,7 +651,8 @@ module Make (Inputs : Inputs_intf) = struct
 
   let start t =
     Option.iter t.propose_keypair ~f:(fun keypair ->
-        Proposer.run ~logger:t.logger ~transaction_pool:t.transaction_pool
+        Proposer.run ~logger:t.logger ~trust_system:t.trust_system
+          ~transaction_pool:t.transaction_pool
           ~get_completed_work:(Snark_pool.get_completed_work t.snark_pool)
           ~time_controller:t.time_controller ~keypair
           ~consensus_local_state:t.consensus_local_state
@@ -672,9 +679,7 @@ module Make (Inputs : Inputs_intf) = struct
       ; creator= Account.public_key (snd (List.hd_exn Genesis_ledger.accounts))
       }
     in
-    let genesis_protocol_state =
-      With_hash.data Consensus_mechanism.genesis_protocol_state
-    in
+    let genesis_protocol_state = With_hash.data Genesis_protocol_state.t in
     (* the genesis transition is assumed to be valid *)
     let (`I_swear_this_is_safe_see_my_comment first_transition) =
       External_transition.to_verified
@@ -707,7 +712,7 @@ module Make (Inputs : Inputs_intf) = struct
         ~root_transition:
           (With_hash.of_data first_transition
              ~hash_data:
-               (Fn.compose Consensus_mechanism.Protocol_state.hash
+               (Fn.compose Protocol_state.hash
                   External_transition.Verified.protocol_state))
         ~root_staged_ledger ~root_snarked_ledger ~consensus_local_state
     in
@@ -765,6 +770,7 @@ module Make (Inputs : Inputs_intf) = struct
                       let%map frontier =
                         Transition_frontier_persistence.deserialize
                           ~directory_name ~logger:config.logger
+                          ~trust_system:config.trust_system
                           ~root_snarked_ledger
                           ~consensus_local_state:config.consensus_local_state
                       in
@@ -774,6 +780,8 @@ module Make (Inputs : Inputs_intf) = struct
                       in
                       (Some persistence, root_snarked_ledger, frontier) )
             in
+            (* TODO: the name of transaction_database should be supplied by Config #2333 *)
+            let transaction_database = Transaction_database.create () in
             let frontier_broadcast_pipe_r, frontier_broadcast_pipe_w =
               Broadcast_pipe.create (Some transition_frontier)
             in
@@ -863,10 +871,44 @@ module Make (Inputs : Inputs_intf) = struct
             don't_wait_for
               (Strict_pipe.Reader.iter_without_pushback
                  valid_transitions_for_network ~f:(fun transition_with_hash ->
-                   (* remove verified status for network broadcast *)
-                   Net.broadcast_state net
-                     (External_transition.of_verified
-                        (With_hash.data transition_with_hash)) )) ;
+                   let hash = With_hash.hash transition_with_hash in
+                   let consensus_state =
+                     With_hash.data transition_with_hash
+                     |> External_transition.Verified.protocol_state
+                     |> Protocol_state.consensus_state
+                   in
+                   let now =
+                     let open Time in
+                     now config.time_controller |> to_span_since_epoch
+                     |> Span.to_ms
+                   in
+                   if
+                     Ok ()
+                     = Consensus.Hooks.received_at_valid_time
+                         ~time_received:now consensus_state
+                   then (
+                     Logger.trace config.logger ~module_:__MODULE__
+                       ~location:__LOC__
+                       ~metadata:
+                         [ ("state_hash", Protocol_state_hash.to_yojson hash)
+                         ; ( "external_transition"
+                           , External_transition.Verified.to_yojson
+                               (With_hash.data transition_with_hash) ) ]
+                       "broadcasting $state_hash" ;
+                     (* remove verified status for network broadcast *)
+                     Net.broadcast_state net
+                       (External_transition.of_verified
+                          (With_hash.data transition_with_hash)) )
+                   else
+                     Logger.warn config.logger ~module_:__MODULE__
+                       ~location:__LOC__
+                       ~metadata:
+                         [ ("state_hash", Protocol_state_hash.to_yojson hash)
+                         ; ( "external_transition"
+                           , External_transition.Verified.to_yojson
+                               (With_hash.data transition_with_hash) ) ]
+                       "refusing to broadcast $state_hash becuase it is too \
+                        late" )) ;
             don't_wait_for
               (Strict_pipe.transfer (Net.states net)
                  external_transitions_writer ~f:ident) ;
@@ -897,11 +939,13 @@ module Make (Inputs : Inputs_intf) = struct
                   Strict_pipe.Writer.to_linear_pipe external_transitions_writer
               ; verified_transitions= valid_transitions_for_api
               ; logger= config.logger
+              ; trust_system= config.trust_system
               ; seen_jobs= Work_selector.State.init
               ; staged_ledger_transition_backup_capacity=
                   config.staged_ledger_transition_backup_capacity
               ; receipt_chain_database= config.receipt_chain_database
               ; snark_work_fee= config.snark_work_fee
               ; proposer_transition_writer
-              ; consensus_local_state= config.consensus_local_state } ) )
+              ; consensus_local_state= config.consensus_local_state
+              ; transaction_database } ) )
 end

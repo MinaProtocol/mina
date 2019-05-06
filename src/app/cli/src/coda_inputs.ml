@@ -4,6 +4,7 @@
 open Core
 open Async
 open Coda_base
+open Coda_state
 open Signature_lib
 open Blockchain_snark
 open Coda_numbers
@@ -61,8 +62,6 @@ module Frozen_ledger_hash = struct
 
   let of_ledger_hash = Frozen_ledger_hash.of_ledger_hash
 end
-
-module Incr_status = Incremental.Make ()
 
 module type Ledger_proof_verifier_intf = sig
   val verify :
@@ -186,8 +185,6 @@ module type Main_intf = sig
          and type time_controller := Time.Controller.t
     end
 
-    module Incr_status : Incremental.S
-
     module Sparse_ledger : sig
       type t
     end
@@ -280,15 +277,17 @@ module type Main_intf = sig
        and type pending_coinbase_collection := Pending_coinbase.t
 
     module Internal_transition :
-      Coda_base.Internal_transition.S
-      with module Snark_transition = Consensus.Snark_transition
-       and module Prover_state := Consensus.Prover_state
-       and module Staged_ledger_diff := Staged_ledger_diff
+      Protocols.Coda_pow.Internal_transition_intf
+      with type snark_transition := Snark_transition.Value.t
+       and type staged_ledger_diff := Staged_ledger_diff.t
+       and type prover_state := Consensus.Data.Prover_state.t
 
     module External_transition :
-      Coda_base.External_transition.S
-      with module Protocol_state = Consensus.Protocol_state
-       and module Staged_ledger_diff := Staged_ledger_diff
+      Protocols.Coda_pow.External_transition_intf
+      with type state_hash := State_hash.t
+       and type protocol_state := Protocol_state.Value.t
+       and type protocol_state_proof := Proof.t
+       and type staged_ledger_diff := Staged_ledger_diff.t
 
     module Diff_hash : Protocols.Coda_transition_frontier.Diff_hash
 
@@ -298,7 +297,8 @@ module type Main_intf = sig
        and type state_hash := State_hash.t
        and type scan_state := Staged_ledger.Scan_state.t
        and type hash := Diff_hash.t
-       and type consensus_state := Consensus.Consensus_state.Value.Stable.V1.t
+       and type consensus_state :=
+                  Consensus.Data.Consensus_state.Value.Stable.V1.t
        and type pending_coinbases := Pending_coinbase.t
 
     module Transition_frontier :
@@ -310,7 +310,7 @@ module type Main_intf = sig
        and type staged_ledger := Staged_ledger.t
        and type staged_ledger_diff := Staged_ledger_diff.t
        and type transaction_snark_scan_state := Staged_ledger.Scan_state.t
-       and type consensus_local_state := Consensus.Local_state.t
+       and type consensus_local_state := Consensus.Data.Local_state.t
        and type user_command := User_command.t
        and type diff_mutant :=
                   ( External_transition.Stable.Latest.t
@@ -338,7 +338,7 @@ module type Main_intf = sig
       ; receipt_chain_database: Receipt_chain_database.t
       ; snark_work_fee: Currency.Fee.t
       ; monitor: Async.Monitor.t option
-      ; consensus_local_state: Consensus.Local_state.t }
+      ; consensus_local_state: Consensus.Data.Local_state.t }
     [@@deriving make]
   end
 
@@ -358,18 +358,19 @@ module type Main_intf = sig
 
   val root_length : t -> int Participating_state.t
 
-  val best_protocol_state :
-    t -> Consensus.Protocol_state.Value.t Participating_state.t
+  val best_protocol_state : t -> Protocol_state.Value.t Participating_state.t
 
   val best_tip :
     t -> Inputs.Transition_frontier.Breadcrumb.t Participating_state.t
 
   val sync_status :
-    t -> [`Offline | `Synced | `Bootstrap] Inputs.Incr_status.Observer.t
+    t -> [`Offline | `Synced | `Bootstrap] Coda_incremental.Status.Observer.t
 
   val visualize_frontier : filename:string -> t -> unit Participating_state.t
 
   val peers : t -> Network_peer.Peer.t list
+
+  val initial_peers : t -> Host_and_port.t list
 
   val verified_transitions :
        t
@@ -383,11 +384,16 @@ module type Main_intf = sig
 
   val transaction_pool : t -> Inputs.Transaction_pool.t
 
+  val transaction_database : t -> Transaction_database.t
+
   val snark_pool : t -> Inputs.Snark_pool.t
 
   val create : Config.t -> t Deferred.t
 
   val staged_ledger_ledger_proof : t -> Inputs.Ledger_proof.t option
+
+  val transition_frontier :
+    t -> Inputs.Transition_frontier.t option Broadcast_pipe.Reader.t
 
   val get_ledger :
     t -> Staged_ledger_hash.t -> Account.t list Deferred.Or_error.t
@@ -395,6 +401,8 @@ module type Main_intf = sig
   val receipt_chain_database : t -> Receipt_chain_database.t
 
   val wallets : t -> Secrets.Wallets.t
+
+  val top_level_logger : t -> Logger.t
 end
 
 module Pending_coinbase = struct
@@ -473,10 +481,20 @@ module Make_inputs0
 struct
   open Protocols.Coda_pow
   open Init
-  module Protocol_state = Consensus.Protocol_state
-  module Protocol_state_hash = State_hash.Stable.Latest
+  module Protocol_state = Protocol_state
 
-  module Time : Time_intf with type t = Block_time.t = Block_time
+  module Protocol_state_hash = struct
+    include State_hash.Stable.Latest
+
+    type var = State_hash.var
+  end
+
+  module Time :
+    Time_intf
+    with type t = Block_time.t
+     and type Unpacked.var = Block_time.Unpacked.var
+     and type Controller.t = Block_time.Controller.t =
+    Block_time
 
   module Time_close_validator = struct
     let limit = Block_time.Span.of_time_span (Core.Time.Span.of_sec 15.)
@@ -626,12 +644,9 @@ struct
   end
 
   module Internal_transition =
-    Coda_base.Internal_transition.Make
-      (Staged_ledger_diff)
-      (Consensus.Snark_transition)
-      (Consensus.Prover_state)
+    Coda_transition.Internal_transition.Make (Staged_ledger_diff)
   module External_transition =
-    Coda_base.External_transition.Make (Staged_ledger_diff) (Protocol_state)
+    Coda_transition.External_transition.Make (Staged_ledger_diff)
 
   let max_length = Consensus.Constants.k
 
@@ -730,7 +745,6 @@ struct
   open Init
   module Inputs0 = Make_inputs0 (Init) (Ledger_proof_verifier)
   include Inputs0
-  module Blockchain_state = Coda_base.Blockchain_state
   module Staged_ledger_diff = Staged_ledger_diff
   module Transaction_snark_work = Transaction_snark_work
   module State_body_hash = State_body_hash
@@ -746,7 +760,7 @@ struct
   module Keypair = Keypair
 
   module Genesis = struct
-    let state = Consensus.genesis_protocol_state
+    let state = Genesis_protocol_state.t
 
     let ledger = Genesis_ledger.t
 
@@ -836,7 +850,6 @@ struct
   end
 
   module Root_sync_ledger = Sync_ledger.Db
-  module Incr_status = Incr_status
 
   module Net = Coda_networking.Make (struct
     include Inputs0
@@ -846,7 +859,9 @@ struct
     module Staged_ledger_hash = Staged_ledger_hash
     module Ledger_hash = Ledger_hash
     module Staged_ledger_aux_hash = Staged_ledger_aux_hash
-    module Blockchain_state = Consensus.Blockchain_state
+    module Staged_ledger_diff = Staged_ledger_diff
+    module Transaction_snark_work = Transaction_snark_work
+    module Ledger_proof_statement = Ledger_proof_statement
   end)
 
   module Protocol_state_validator = Protocol_state_validator.Make (struct
@@ -969,7 +984,6 @@ struct
     module Private_key = Private_key
     module Keypair = Keypair
     module Compressed_public_key = Public_key.Compressed
-    module Consensus_mechanism = Consensus
     module Transaction_validator = Transaction_validator
     module Pending_coinbase_witness = Pending_coinbase_witness
 
@@ -1069,8 +1083,13 @@ module Make_coda (Init : Init_intf) = struct
     module Genesis_ledger = Genesis_ledger
     module Ledger_proof_statement = Ledger_proof_statement
     module Snark_worker = Snark_worker_lib.Prod.Worker
-    module Consensus_mechanism = Consensus
     module Transaction_validator = Transaction_validator
+    module Genesis_protocol_state = Genesis_protocol_state
+    module Snark_transition = Snark_transition
+    module Consensus_transition = Consensus.Data.Consensus_transition
+    module Consensus_state = Consensus.Data.Consensus_state
+    module Blockchain_state = Blockchain_state
+    module Prover_state = Consensus.Data.Prover_state
   end
 
   include Coda_lib.Make (Inputs)
@@ -1093,8 +1112,13 @@ module Make_coda (Init : Init_intf) = struct
     module Genesis_ledger = Genesis_ledger
     module Ledger_proof_statement = Ledger_proof_statement
     module Snark_worker = Snark_worker_lib.Debug.Worker
-    module Consensus_mechanism = Consensus
     module Transaction_validator = Transaction_validator
+    module Prover_state = Consensus.Data.Prover_state
+    module Consensus_transition = Consensus.Data.Consensus_transition
+    module Blockchain_state = Blockchain_state
+    module Consensus_state = Consensus.Data.Consensus_state
+    module Snark_transition = Snark_transition
+    module Genesis_protocol_state = Genesis_protocol_state
   end
 
   include Coda_lib.Make (Inputs)

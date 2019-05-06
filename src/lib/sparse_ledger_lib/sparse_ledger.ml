@@ -111,7 +111,7 @@ end = struct
     module V1 = struct
       module T = struct
         type t = (Hash.t, Key.t, Account.t) Poly.Stable.V1.t
-        [@@deriving bin_io, sexp, version]
+        [@@deriving bin_io, sexp, version {unnumbered}]
       end
 
       include T
@@ -259,11 +259,11 @@ let%test_module "sparse-ledger-test" =
       module Stable = struct
         module V1 = struct
           module T = struct
-            let __versioned__ = true
+            type t = Core_kernel.Md5.Stable.V1.t
+            [@@deriving bin_io, sexp, version {unnumbered}]
 
-            let version = 1
-
-            type t = Md5.t [@@deriving bin_io, eq, sexp]
+            [%%define_locally
+            Md5.(equal)]
 
             let compare a b = String.compare (Md5.to_hex a) (Md5.to_hex b)
 
@@ -294,7 +294,7 @@ let%test_module "sparse-ledger-test" =
         module V1 = struct
           module T = struct
             type t = {name: string; favorite_number: int}
-            [@@deriving bin_io, eq, sexp, version]
+            [@@deriving bin_io, eq, sexp, version {unnumbered}]
           end
 
           include T
@@ -324,7 +324,7 @@ let%test_module "sparse-ledger-test" =
       module Stable = struct
         module V1 = struct
           module T = struct
-            type t = string [@@deriving bin_io, eq, sexp, version]
+            type t = string [@@deriving bin_io, eq, sexp, version {unnumbered}]
           end
 
           include T
