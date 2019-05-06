@@ -56,6 +56,11 @@ let currency_consumed :
     | Stake_delegation _ ->
         zero)
 
+let currency_consumed' :
+       User_command.With_valid_signature.t
+    -> (Currency.Amount.t, [> `Overflow]) Result.t =
+ fun cmd -> cmd |> currency_consumed |> Result.of_option ~error:`Overflow
+
 module For_tests = struct
   (* Check the invariants of the pool structure as listed in the comment above.
   *)
@@ -400,6 +405,22 @@ let get_highest_fee : t -> User_command.With_valid_signature.t option =
   Option.map ~f:(Fn.compose Set.min_elt_exn Tuple2.get2)
   @@ Map.max_elt t.applicable_by_fee
 
+(* Add a command that came in from gossip, or return an error. We need to check
+   a whole bunch of conditions here and return the appropriate errors.
+   Conditions:
+   1. Command nonce must be >= account nonce.
+   1a. If the sender's queue is empty, command nonce must equal account nonce.
+   1b. If the sender's queue is non-empty, command nonce must be <= the nonce of
+       the last queued command + 1
+   2. The sum of the currency consumed by all queued commands for the sender
+      must be <= the sender's balance.
+   3. If a command is replaced, the new command must have a fee greater than the
+      replaced command by at least replace fee * (number of commands after the
+      the replaced command + 1)
+   4. No integer overflows are allowed.
+
+   These conditions are referenced in the comments below.
+*)
 let rec add_from_gossip_exn :
        t
     -> User_command.With_valid_signature.t
@@ -416,122 +437,134 @@ let rec add_from_gossip_exn :
   let fee = User_command.fee unchecked in
   let sender = User_command.sender unchecked in
   let nonce = User_command.nonce unchecked in
-  match currency_consumed cmd with
+  (* Result errors indicate problems with the command, while assert failures
+     indicate bugs in Coda. *)
+  let open Result.Let_syntax in
+  let%bind consumed = currency_consumed' cmd in
+  (* C4 *)
+  match Map.find t.all_by_sender (User_command.sender unchecked) with
   | None ->
-      Error `Overflow
-  | Some consumed -> (
-    match Map.find t.all_by_sender (User_command.sender unchecked) with
-    | None ->
-        (* nothing queued for this sender*)
-        if Account_nonce.equal current_nonce nonce then
-          if Currency.Amount.(consumed > balance) then
-            Error `Insufficient_funds
-          else
-            Result.Ok
-              ( { applicable_by_fee=
-                    Map_set.insert
-                      (module User_command.With_valid_signature)
-                      t.applicable_by_fee fee cmd
-                ; all_by_sender=
-                    Map.set t.all_by_sender ~key:sender
-                      ~data:(F_sequence.singleton cmd, consumed)
-                ; all_by_fee=
-                    Map_set.insert
-                      (module User_command.With_valid_signature)
-                      t.all_by_fee fee cmd
-                ; size= t.size + 1 }
-              , Sequence.empty )
-        else Error `Invalid_nonce
-    | Some (queued_cmds, reserved_currency) ->
-        (* commands queued for this sender *)
-        assert (not @@ F_sequence.is_empty queued_cmds) ;
-        let last_queued_nonce =
-          F_sequence.last_exn queued_cmds
+      (* nothing queued for this sender *)
+      let%bind () =
+        Result.ok_if_true
+          (Account_nonce.equal current_nonce nonce)
+          ~error:`Invalid_nonce
+        (* C1/1a *)
+      in
+      let%bind () =
+        Result.ok_if_true
+          Currency.Amount.(consumed <= balance)
+          ~error:`Insufficient_funds
+        (* C2 *)
+      in
+      Result.Ok
+        ( { applicable_by_fee=
+              Map_set.insert
+                (module User_command.With_valid_signature)
+                t.applicable_by_fee fee cmd
+          ; all_by_sender=
+              Map.set t.all_by_sender ~key:sender
+                ~data:(F_sequence.singleton cmd, consumed)
+          ; all_by_fee=
+              Map_set.insert
+                (module User_command.With_valid_signature)
+                t.all_by_fee fee cmd
+          ; size= t.size + 1 }
+        , Sequence.empty )
+  | Some (queued_cmds, reserved_currency) -> (
+      (* commands queued for this sender *)
+      assert (not @@ F_sequence.is_empty queued_cmds) ;
+      let last_queued_nonce =
+        F_sequence.last_exn queued_cmds
+        |> User_command.forget_check |> User_command.nonce
+      in
+      if Account_nonce.equal (Account_nonce.succ last_queued_nonce) nonce then
+        (* this command goes on the end *)
+        let%bind reserved_currency' =
+          Currency.Amount.(consumed + reserved_currency)
+          |> Result.of_option ~error:`Overflow
+          (* C4 *)
+        in
+        let%bind () =
+          Result.ok_if_true
+            Currency.Amount.(balance >= reserved_currency')
+            ~error:`Insufficient_funds
+          (* C2 *)
+        in
+        Result.Ok
+          ( { t with
+              all_by_sender=
+                Map.set t.all_by_sender ~key:sender
+                  ~data:(F_sequence.snoc queued_cmds cmd, reserved_currency')
+            ; all_by_fee=
+                Map_set.insert
+                  (module User_command.With_valid_signature)
+                  t.all_by_fee fee cmd
+            ; size= t.size + 1 }
+          , Sequence.empty )
+      else
+        (* we're replacing a command *)
+        let first_queued_nonce =
+          F_sequence.head_exn queued_cmds
           |> User_command.forget_check |> User_command.nonce
         in
-        if Account_nonce.equal (Account_nonce.succ last_queued_nonce) nonce
-        then
-          (* this command goes on the end *)
-          match Currency.Amount.(consumed + reserved_currency) with
-          | None ->
-              Error `Overflow
-          | Some reserved_currency' ->
-              if Currency.Amount.(balance < reserved_currency') then
-                Error `Insufficient_funds
-              else
-                Result.Ok
-                  ( { t with
-                      all_by_sender=
-                        Map.set t.all_by_sender ~key:sender
-                          ~data:
-                            ( F_sequence.snoc queued_cmds cmd
-                            , reserved_currency' )
-                    ; all_by_fee=
-                        Map_set.insert
-                          (module User_command.With_valid_signature)
-                          t.all_by_fee fee cmd
-                    ; size= t.size + 1 }
-                  , Sequence.empty )
-        else
-          let first_queued_nonce =
-            F_sequence.head_exn queued_cmds
-            |> User_command.forget_check |> User_command.nonce
-          in
-          assert (Account_nonce.equal first_queued_nonce current_nonce) ;
-          if
-            Account_nonce.between ~low:first_queued_nonce
-              ~high:last_queued_nonce nonce
-          then (
-            (* we're replacing a command *)
-            assert (
-              F_sequence.length queued_cmds
-              = Account_nonce.to_int last_queued_nonce
-                - Account_nonce.to_int first_queued_nonce
-                + 1 ) ;
-            let _keep_queue, drop_queue =
-              F_sequence.split_at queued_cmds
-                ( Account_nonce.to_int nonce
-                - Account_nonce.to_int first_queued_nonce )
-            in
-            let to_drop =
-              F_sequence.head_exn drop_queue |> User_command.forget_check
-            in
-            assert (Account_nonce.equal (User_command.nonce to_drop) nonce) ;
-            if Currency.Fee.(fee < User_command.fee to_drop) then
-              Error `Insufficient_replace_fee
-            else
-              let increment =
-                Currency.Fee.to_int
-                @@ Option.value_exn
-                     Currency.Fee.(fee - User_command.fee to_drop)
-              in
-              if
-                increment
-                >= Currency.Fee.to_int replace_fee
-                   * F_sequence.length drop_queue
-              then (
-                (* sufficient replace fee *)
-                let dropped, t' =
-                  remove_with_dependents_exn t
-                  @@ F_sequence.head_exn drop_queue
-                in
-                (* check remove_exn dropped the right things *)
-                [%test_eq: User_command.With_valid_signature.t Sequence.t]
-                  dropped
-                  (F_sequence.to_seq drop_queue) ;
-                match add_from_gossip_exn t' cmd current_nonce balance with
-                | Ok (t'', dropped') ->
-                    assert (
-                      (* We've already removed them, so this should always be
-                         empty. *)
-                      Sequence.is_empty dropped' ) ;
-                    Result.Ok (t'', dropped)
-                | Error `Insufficient_funds ->
-                    Error `Insufficient_funds
-                | _ ->
-                    failwith "recursive add_exn failed" )
-              else Error `Insufficient_replace_fee )
-          else Error `Invalid_nonce )
+        assert (Account_nonce.equal first_queued_nonce current_nonce) ;
+        let%bind () =
+          Result.ok_if_true
+            (Account_nonce.between ~low:first_queued_nonce
+               ~high:last_queued_nonce nonce)
+            ~error:`Invalid_nonce
+          (* C1/C1b *)
+        in
+        assert (
+          F_sequence.length queued_cmds
+          = Account_nonce.to_int last_queued_nonce
+            - Account_nonce.to_int first_queued_nonce
+            + 1 ) ;
+        let _keep_queue, drop_queue =
+          F_sequence.split_at queued_cmds
+            ( Account_nonce.to_int nonce
+            - Account_nonce.to_int first_queued_nonce )
+        in
+        let to_drop =
+          F_sequence.head_exn drop_queue |> User_command.forget_check
+        in
+        assert (Account_nonce.equal (User_command.nonce to_drop) nonce) ;
+        (* We check the fee increase twice because we need to be sure the
+           subtraction is safe. *)
+        let%bind () =
+          Result.ok_if_true
+            Currency.Fee.(fee >= User_command.fee to_drop)
+            ~error:`Insufficient_replace_fee
+          (* C3 *)
+        in
+        let increment =
+          Currency.Fee.to_int
+          @@ Option.value_exn Currency.Fee.(fee - User_command.fee to_drop)
+        in
+        let%bind () =
+          Result.ok_if_true
+            ( increment
+            >= Currency.Fee.to_int replace_fee * F_sequence.length drop_queue
+            )
+            ~error:`Insufficient_replace_fee
+          (* C3 *)
+        in
+        let dropped, t' =
+          remove_with_dependents_exn t @@ F_sequence.head_exn drop_queue
+        in
+        (* check remove_exn dropped the right things *)
+        [%test_eq: User_command.With_valid_signature.t Sequence.t] dropped
+          (F_sequence.to_seq drop_queue) ;
+        match add_from_gossip_exn t' cmd current_nonce balance with
+        | Ok (t'', dropped') ->
+            (* We've already removed them, so this should always be empty. *)
+            assert (Sequence.is_empty dropped') ;
+            Result.Ok (t'', dropped)
+        | Error `Insufficient_funds ->
+            Error `Insufficient_funds (* C2 *)
+        | _ ->
+            failwith "recursive add_exn failed" )
 
 let add_from_backtrack : t -> User_command.With_valid_signature.t -> t =
  fun t cmd ->
