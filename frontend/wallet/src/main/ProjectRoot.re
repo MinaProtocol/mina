@@ -1,5 +1,3 @@
-open Tc;
-
 [@bs.module "electron"] [@bs.scope "app"] external isPackaged: bool = "";
 
 [@bs.module "electron"] [@bs.scope "app"]
@@ -32,12 +30,12 @@ let userData =
   if (isPackaged) {
     getPath(`UserData);
   } else {
-    Node_path.join2(Option.getExn([%bs.node __dirname]), "../../../..");
+    Node.Process.cwd();
   };
 
 let resource =
   if (isPackaged) {
     Filename.dirname(getAppPath());
   } else {
-    Node_path.join2(Option.getExn([%bs.node __dirname]), "../../../..");
+    Node.Process.cwd();
   };
