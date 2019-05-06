@@ -42,9 +42,11 @@ module Make (Inputs : Inputs.S) :
         let%bind init_breadcrumb =
           breadcrumb_if_present () |> Deferred.return
         in
-        Rose_tree.Deferred.Or_error.fold_map subtree_of_enveloped_transitions
-          ~init:(Cached.pure init_breadcrumb)
-          ~f:(fun cached_parent cached_enveloped_transition ->
+        Rose_tree.Deferred.Or_error.fold_map_over_subtrees
+          subtree_of_enveloped_transitions ~init:(Cached.pure init_breadcrumb)
+          ~f:(fun cached_parent
+             (Rose_tree.T (cached_enveloped_transition, _) as subtree)
+             ->
             let open Deferred.Let_syntax in
             let%map cached_result =
               Cached.transform cached_enveloped_transition
@@ -79,8 +81,7 @@ module Make (Inputs : Inputs.S) :
                   match%bind
                     Transition_frontier.Breadcrumb.build ~logger ~trust_system
                       ~parent ~transition_with_hash:transition
-                      ~sender:
-                        (Some (Envelope.Incoming.sender enveloped_transition))
+                      ~sender:(Some sender)
                   with
                   | Ok new_breadcrumb ->
                       let open Result.Let_syntax in
@@ -90,22 +91,14 @@ module Make (Inputs : Inputs.S) :
                          in
                          new_breadcrumb)
                   | Error err -> (
-                      (* propagate bans through subtrees *)
-                      let subtrees =
-                        Rose_tree.flatten subtree_of_enveloped_transitions
-                      in
-                      let initial_ip_addr_set =
-                        match sender with
-                        | Local ->
-                            Set.empty (module Unix.Inet_addr)
-                        | Remote ip_addr ->
-                            Set.singleton (module Unix.Inet_addr) ip_addr
-                      in
+                      (* propagate bans through subtree *)
+                      let subtrees = Rose_tree.flatten subtree in
                       let ip_address_set =
                         let sender_from_tree_node node =
                           Envelope.Incoming.sender (Cached.peek node)
                         in
-                        List.fold subtrees ~init:initial_ip_addr_set
+                        List.fold subtrees
+                          ~init:(Set.empty (module Unix.Inet_addr))
                           ~f:(fun inet_addrs node ->
                             match sender_from_tree_node node with
                             | Local ->

@@ -53,6 +53,9 @@ module type Ops_intf = sig
   val map : 'a t -> f:('a -> 'b Monad.t) -> 'b t Monad.t
 
   val fold_map : 'a t -> init:'b -> f:('b -> 'a -> 'b Monad.t) -> 'b t Monad.t
+
+  val fold_map_over_subtrees :
+    'a t -> init:'b -> f:('b -> 'a t -> 'b Monad.t) -> 'b t Monad.t
 end
 
 module Make_ops (Monad : Monad_intf) : Ops_intf with module Monad := Monad =
@@ -72,6 +75,13 @@ struct
     let%bind base' = f init base in
     let%map successors' =
       Monad.List.map successors ~f:(fold_map ~init:base' ~f)
+    in
+    T (base', successors')
+
+  let rec fold_map_over_subtrees (T (_, successors) as subtree) ~init ~f =
+    let%bind base' = f init subtree in
+    let%map successors' =
+      Monad.List.map successors ~f:(fold_map_over_subtrees ~init:base' ~f)
     in
     T (base', successors')
 end
