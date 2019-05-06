@@ -76,7 +76,6 @@ module Make (Inputs : Inputs.S) :
                                hash"))
                   in
                   let open Deferred.Let_syntax in
-                  (* TODO: propagate bans through subtree (#2299) *)
                   match%bind
                     Transition_frontier.Breadcrumb.build ~logger ~trust_system
                       ~parent ~transition_with_hash:transition
@@ -90,24 +89,50 @@ module Make (Inputs : Inputs.S) :
                            breadcrumb_if_present ()
                          in
                          new_breadcrumb)
-                  | Error (`Fatal_error exn) ->
-                      Deferred.return (Or_error.of_exn exn)
-                  | Error (`Invalid_staged_ledger_hash error) ->
-                      let%map () =
-                        Trust_system.record_envelope_sender trust_system logger
-                          sender
-                          ( Trust_system.Actions.Gossiped_invalid_transition
-                          , Some ("invalid staged ledger hash", []) )
+                  | Error err -> (
+                      (* propagate bans through subtrees *)
+                      let subtrees =
+                        Rose_tree.flatten subtree_of_enveloped_transitions
                       in
-                      Error error
-                  | Error (`Invalid_staged_ledger_diff error) ->
-                      let%map () =
-                        Trust_system.record_envelope_sender trust_system logger
-                          sender
-                          ( Trust_system.Actions.Gossiped_invalid_transition
-                          , Some ("invalid staged ledger diff", []) )
+                      let initial_ip_addr_set =
+                        match sender with
+                        | Local ->
+                            Set.empty (module Unix.Inet_addr)
+                        | Remote ip_addr ->
+                            Set.singleton (module Unix.Inet_addr) ip_addr
                       in
-                      Error error )
+                      let ip_address_set =
+                        let sender_from_tree_node node =
+                          Envelope.Incoming.sender (Cached.peek node)
+                        in
+                        List.fold subtrees ~init:initial_ip_addr_set
+                          ~f:(fun inet_addrs node ->
+                            match sender_from_tree_node node with
+                            | Local ->
+                                inet_addrs
+                            | Remote inet_addr ->
+                                Set.add inet_addrs inet_addr )
+                      in
+                      let ip_addresses = Set.to_list ip_address_set in
+                      let trust_system_record_invalid msg error =
+                        let%map () =
+                          Deferred.List.iter ip_addresses ~f:(fun ip_addr ->
+                              Trust_system.record trust_system logger ip_addr
+                                ( Trust_system.Actions
+                                  .Gossiped_invalid_transition
+                                , Some (msg, []) ) )
+                        in
+                        Error error
+                      in
+                      match err with
+                      | `Invalid_staged_ledger_hash error ->
+                          trust_system_record_invalid
+                            "invalid staged ledger hash" error
+                      | `Invalid_staged_ledger_diff error ->
+                          trust_system_record_invalid
+                            "invalid staged ledger diff" error
+                      | `Fatal_error exn ->
+                          Deferred.return (Or_error.of_exn exn) ) )
               |> Cached.sequence_deferred
             in
             Cached.sequence_result cached_result ) )
