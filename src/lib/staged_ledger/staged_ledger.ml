@@ -134,8 +134,6 @@ end = struct
             Error
               (Staged_ledger_error.Invalid_proof (proof, statement, prover)) )
 
-  (*TODO: Punish*)
-
   module M = struct
     include Monad.Ident
     module Or_error = Or_error
@@ -685,7 +683,6 @@ end = struct
                 | Some t ->
                     Continue (t :: acc)
                 | None ->
-                    (* TODO: punish *)
                     Stop (Error (Staged_ledger_error.Bad_signature t)) )
               ~finish:(fun acc -> Ok acc)
           in
