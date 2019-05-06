@@ -29,20 +29,14 @@ struct
     { user_transactions: Txn_with_date.Set.t Public_key.Compressed.Table.t
     ; all_transactions: Time.t Transaction.Table.t }
 
-  type t = {database: Database.t; cache: cache}
+  type t = {database: Database.t; cache: cache; logger: Logger.t}
 
-  let create ?directory_name () =
-    let directory =
-      match directory_name with
-      | None ->
-          Uuid.to_string (Uuid_unix.create ())
-      | Some name ->
-          name
-    in
+  let create logger directory =
     { database= Database.create ~directory
     ; cache=
         { user_transactions= Public_key.Compressed.Table.create ()
-        ; all_transactions= Transaction.Table.create () } }
+        ; all_transactions= Transaction.Table.create () }
+    ; logger }
 
   (* TODO: make load function #2333 *)
 
@@ -70,21 +64,28 @@ struct
         in
         [receiver; sender]
 
-  let add {database; cache= {all_transactions; user_transactions}} transaction
-      date =
-    if Option.is_none (Hashtbl.find all_transactions transaction) then (
-      Database.set database ~key:transaction ~data:date ;
-      Hashtbl.add_exn all_transactions ~key:transaction ~data:date ;
-      List.iter (get_participants transaction) ~f:(fun pk ->
-          let user_txns =
-            Option.value
-              (Hashtbl.find user_transactions pk)
-              ~default:Txn_with_date.Set.empty
-          in
-          let user_txns' =
-            Txn_with_date.Set.add user_txns (transaction, date)
-          in
-          Hashtbl.set user_transactions ~key:pk ~data:user_txns' ) )
+  let add {database; cache= {all_transactions; user_transactions}; logger}
+      transaction date =
+    match Hashtbl.find all_transactions transaction with
+    | Some _retrieved_transaction ->
+        Logger.trace logger
+          !"Not adding transaction into database since it already exists: \
+            $transaction"
+          ~module_:__MODULE__ ~location:__LOC__
+          ~meta:[("transaction", Transaction.to_yojson transaction)]
+    | None ->
+        Database.set database ~key:transaction ~data:date ;
+        Hashtbl.add_exn all_transactions ~key:transaction ~data:date ;
+        List.iter (get_participants transaction) ~f:(fun pk ->
+            let user_txns =
+              Option.value
+                (Hashtbl.find user_transactions pk)
+                ~default:Txn_with_date.Set.empty
+            in
+            let user_txns' =
+              Txn_with_date.Set.add user_txns (transaction, date)
+            in
+            Hashtbl.set user_transactions ~key:pk ~data:user_txns' )
 
   let get_transactions {cache= {user_transactions; _}; _} public_key =
     let open Option in
