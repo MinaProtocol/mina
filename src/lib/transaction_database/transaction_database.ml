@@ -8,7 +8,7 @@ module Payment_participants = struct
       module T = struct
         type t =
           { sender: Public_key.Compressed.Stable.V1.t option
-          ; receiver: Public_key.Compressed.Stable.V1.t }
+          ; receiver: Public_key.Compressed.Stable.V1.t option }
         [@@deriving bin_io, version {unnumbered}]
       end
 
@@ -19,7 +19,8 @@ module Payment_participants = struct
   end
 
   type t = Stable.Latest.t =
-    {sender: Public_key.Compressed.t option; receiver: Public_key.Compressed.t}
+    { sender: Public_key.Compressed.t option
+    ; receiver: Public_key.Compressed.t option }
 end
 
 module Database =
@@ -61,15 +62,16 @@ let add t transaction =
       let sender_and_receiver_pairs =
         match transaction with
         | Fee_transfer (One (pk, _)) ->
-            [Payment_participants.{receiver= pk; sender= None}]
+            [Payment_participants.{receiver= Some pk; sender= None}]
         | Fee_transfer (Two ((pk1, _), (pk2, _))) ->
-            [{receiver= pk1; sender= None}; {receiver= pk2; sender= None}]
+            [ {receiver= Some pk1; sender= None}
+            ; {receiver= Some pk2; sender= None} ]
         | Coinbase {Coinbase.proposer; fee_transfer; _} ->
             let pair1 =
-              {Payment_participants.receiver= proposer; sender= None}
+              {Payment_participants.receiver= Some proposer; sender= None}
             in
             Option.value_map fee_transfer ~default:[pair1] ~f:(fun (pk, _) ->
-                [pair1; {receiver= pk; sender= None}] )
+                [pair1; {receiver= Some pk; sender= None}] )
         | User_command checked_user_command ->
             let user_command =
               User_command.forget_check checked_user_command
@@ -79,9 +81,11 @@ let add t transaction =
             let receiver =
               match User_command_payload.body payload with
               | Stake_delegation (Set_delegate {new_delegate}) ->
-                  new_delegate
+                  Some new_delegate
               | Payment {receiver; _} ->
-                  receiver
+                  Some receiver
+              | Chain_voting _ ->
+                  None
             in
             [{receiver; sender}]
       in
@@ -98,12 +102,14 @@ let add t transaction =
                     {transactions with sent= transaction :: transactions.sent}
                 | None ->
                     {sent= [transaction]; received= []} ) ) ;
-          Hashtbl.update t.cache.user_transactions receiver ~f:(function
-            | Some transactions ->
-                { transactions with
-                  received= transaction :: transactions.received }
-            | None ->
-                {sent= []; received= [transaction]} ) )
+          Option.iter receiver ~f:(fun new_transaction_receiver ->
+              Hashtbl.update t.cache.user_transactions new_transaction_receiver
+                ~f:(function
+                | Some transactions ->
+                    { transactions with
+                      received= transaction :: transactions.received }
+                | None ->
+                    {sent= []; received= [transaction]} ) ) )
 
 let get_transactions {cache= {user_transactions; _}; _} public_key =
   let open Option in
