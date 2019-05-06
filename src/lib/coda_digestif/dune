@@ -29,8 +29,11 @@ let make_dune digestif_name =
 let detect_fake_hash lines =
   List.exists (String.equal "[%%define fake_hash true]") lines
 
+let dune_build_install_dir =
+  List.hd (String.split_on_char ':' (Unix.getenv "OCAMLFIND_IGNORE_DUPS_IN"))
+
 (* this became necessary sometime between dune 1.6.3 and 1.9.1 *)
-let _ = Unix.system "mkdir -p $OCAMLFIND_IGNORE_DUPS_IN"
+let _ = Unix.system ("mkdir -p \"" ^ dune_build_install_dir ^ "\"")
 
 let dune_string =
   if

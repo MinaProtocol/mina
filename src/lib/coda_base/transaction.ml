@@ -7,7 +7,7 @@ module Stable = struct
         | User_command of User_command.With_valid_signature.Stable.V1.t
         | Fee_transfer of Fee_transfer.Stable.V1.t
         | Coinbase of Coinbase.Stable.V1.t
-      [@@deriving bin_io, sexp, version, compare, eq]
+      [@@deriving bin_io, sexp, version, compare, eq, hash]
     end
 
     include T
@@ -16,11 +16,21 @@ module Stable = struct
   module Latest = V1
 end
 
-type t = Stable.Latest.t =
-  | User_command of User_command.With_valid_signature.Stable.Latest.t
-  | Fee_transfer of Fee_transfer.Stable.Latest.t
-  | Coinbase of Coinbase.Stable.Latest.t
-[@@deriving sexp, compare, eq]
+module T = struct
+  module T0 = struct
+    type t = Stable.Latest.t =
+      | User_command of User_command.With_valid_signature.Stable.Latest.t
+      | Fee_transfer of Fee_transfer.Stable.Latest.t
+      | Coinbase of Coinbase.Stable.Latest.t
+    [@@deriving sexp, compare, eq, hash]
+  end
+
+  include Hashable.Make (T0)
+  include Comparable.Make (T0)
+  include T0
+end
+
+include T
 
 let fee_excess = function
   | User_command t ->

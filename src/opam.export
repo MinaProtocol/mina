@@ -33,7 +33,6 @@ roots: [
   "rpc_parallel.v0.12.0"
   "sodium.dev"
   "utop.2.3.0"
-  "virtual_dom.v0.12.0"
   "yojson.1.5.0"
 ]
 installed: [
@@ -183,13 +182,11 @@ installed: [
   "time_now.v0.12.0"
   "topkg.1.0.0"
   "typerep.v0.12.0"
-  "tyxml.4.3.0"
   "uchar.0.0.2"
   "uri.2.2.0"
   "utop.2.3.0"
   "uutf.1.0.2"
   "variantslib.v0.12.0"
-  "virtual_dom.v0.12.0"
   "yojson.1.5.0"
   "zarith.1.7"
   "zed.1.6"

@@ -1,5 +1,6 @@
 open Core
 open Async
+open Coda_state
 
 module Stubs = Stubs.Make (struct
   let max_length = 4
@@ -15,6 +16,7 @@ let%test_module "Root_prover" =
 
     let%test "a node should be able to give a valid proof of their root" =
       let logger = Logger.null () in
+      let trust_system = Trust_system.null () in
       let max_length = 4 in
       (* Generating this many breadcrumbs will ernsure the transition_frontier to be full  *)
       let num_breadcrumbs = max_length + 2 in
@@ -25,7 +27,8 @@ let%test_module "Root_prover" =
           let%bind () =
             build_frontier_randomly frontier
               ~gen_root_breadcrumb_builder:
-                (gen_linear_breadcrumbs ~logger ~size:num_breadcrumbs
+                (gen_linear_breadcrumbs ~logger ~trust_system
+                   ~size:num_breadcrumbs
                    ~accounts_with_secret_keys:Genesis_ledger.accounts)
           in
           let seen_transition =
@@ -35,7 +38,7 @@ let%test_module "Root_prover" =
           in
           let observed_state =
             External_transition.Verified.protocol_state seen_transition
-            |> Consensus.Protocol_state.consensus_state
+            |> Protocol_state.consensus_state
           in
           let root_with_proof =
             Option.value_exn ~message:"Could not produce an ancestor proof"
