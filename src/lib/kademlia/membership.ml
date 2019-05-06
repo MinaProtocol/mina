@@ -258,8 +258,6 @@ module Make
     (P : Process_intf) (Trust_system : sig
         type t
 
-        (* TODO punish peers from kad? *)
-        (* val record : t -> Logger.t -> Unix.Inet_addr.Blocking_sexp.t -> Trust_system.Actions.t -> unit Deferred.t *)
         val lookup :
           t -> Unix.Inet_addr.Blocking_sexp.t -> Trust_system.Peer_status.t
     end) : sig

@@ -106,3 +106,40 @@ describe("Settings", () =>
     )
   )
 );
+
+describe("Bindings", () =>
+  describe("Spawn", () => {
+    open Bindings;
+    testAsync(
+      "echo and get stdout",
+      ~timeout=10,
+      cb => {
+        let echoProcess = ChildProcess.spawn("echo", [|"hello"|]);
+        let stdout = ChildProcess.Process.stdoutGet(echoProcess);
+        ChildProcess.ReadablePipe.on(stdout, "data", data =>
+          cb(expect(Node.Buffer.toString(data)) |> toEqual("hello\n"))
+        );
+      },
+    );
+    testAsync(
+      "kill sleep and get exit code",
+      ~timeout=10,
+      cb => {
+        let pauseProcess = ChildProcess.spawn("sleep", [|"10"|]);
+        ChildProcess.Process.onExit(pauseProcess, (n, _) =>
+          cb(expect(n) |> toEqual(0))
+        );
+        ChildProcess.Process.kill(pauseProcess);
+      },
+    );
+    testAsync(
+      "detect error",
+      ~timeout=10,
+      cb => {
+        let pauseProcess =
+          ChildProcess.spawn("this-program-doesn't-exist", [||]);
+        ChildProcess.Process.onError(pauseProcess, _ => cb(pass));
+      },
+    );
+  })
+);

@@ -165,7 +165,7 @@ end) :
             { completed_works: Transaction_snark_work.Stable.V1.t list
             ; user_commands: User_command.Stable.V1.t list
             ; coinbase: Ft.Stable.V1.t At_most_one.Stable.V1.t }
-          [@@deriving sexp, bin_io, version]
+          [@@deriving sexp, bin_io, version {unnumbered}]
         end
 
         include T
@@ -188,7 +188,7 @@ end) :
           type t =
             Pre_diff_with_at_most_two_coinbase.Stable.V1.t
             * Pre_diff_with_at_most_one_coinbase.Stable.V1.t option
-          [@@deriving sexp, bin_io, version]
+          [@@deriving sexp, bin_io, version {unnumbered}]
         end
 
         include T
@@ -230,7 +230,7 @@ end) :
     { diff: Diff.Stable.V1.t
     ; prev_hash: Staged_ledger_hash.Stable.V1.t
     ; creator: Compressed_public_key.Stable.V1.t }
-  [@@deriving sexp]
+  [@@deriving sexp, fields]
 
   module With_valid_signatures_and_proofs = struct
     type pre_diff_with_at_most_two_coinbase =
@@ -289,4 +289,20 @@ end) :
   let user_commands (t : t) =
     (fst t.diff).user_commands
     @ Option.value_map (snd t.diff) ~default:[] ~f:(fun d -> d.user_commands)
+
+  let completed_works (t : t) =
+    (fst t.diff).completed_works
+    @ Option.value_map (snd t.diff) ~default:[] ~f:(fun d -> d.completed_works)
+
+  let coinbase (t : t) =
+    let first_pre_diff, second_pre_diff_opt = t.diff in
+    match
+      ( first_pre_diff.coinbase
+      , Option.value_map second_pre_diff_opt ~default:At_most_one.Zero
+          ~f:(fun d -> d.coinbase) )
+    with
+    | At_most_two.Zero, At_most_one.Zero ->
+        Currency.Amount.zero
+    | _ ->
+        Coda_praos.coinbase_amount
 end
