@@ -593,7 +593,15 @@ module Make (Inputs : Inputs_intf) = struct
     let%bind sl = best_staged_ledger_opt t in
     Staged_ledger.current_ledger_proof sl
 
-  let verified_transitions t = t.verified_transitions
+  let verified_transitions t =
+    let reader, writer =
+      Strict_pipe.create ~name:"forked verified transitions"
+        (Buffered (`Capacity 30, `Overflow Crash))
+    in
+    Strict_pipe.Reader.iter_without_pushback t.verified_transitions
+      ~f:(Strict_pipe.Writer.write writer)
+    |> don't_wait_for ;
+    reader
 
   let root_diff t =
     let root_diff_reader, root_diff_writer =
