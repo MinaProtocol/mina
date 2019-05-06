@@ -4,6 +4,8 @@ open Tc;
 let killDaemon = DaemonProcess.start(8080);
 let apolloClient = GraphqlMain.createClient("http://localhost:8080/graphql");
 
+IpcLinkMain.start(apolloClient);
+
 let createTray = (settingsOrError, wallets) => {
   let t = AppTray.get();
   let prefixItems =

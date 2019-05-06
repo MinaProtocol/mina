@@ -6,6 +6,10 @@ let createClient = uri => {
   ReasonApollo.createApolloClient(~link=httpLink, ~cache=inMemoryCache, ());
 };
 
+let rawQuery = (instance, request: GraphqlLinkMessages.apolloOperation) => {
+  Task.liftPromise(instance##query(request));
+};
+
 module CreateQuery = (Config: ReasonApolloTypes.Config) => {
   module ReasonApolloInternal = ReasonApolloQuery.Make(Config);
   let query = instance => {
