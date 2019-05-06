@@ -324,11 +324,21 @@ end
 
 module Pending_coinbase = struct
   module V1 = struct
-    include Coda_base.Pending_coinbase.Stable.V1
+    include Pending_coinbase.Stable.V1
 
-    include (
-      Coda_base.Pending_coinbase :
-        module type of Coda_base.Pending_coinbase with type t := t )
+    [%%define_locally
+    Pending_coinbase.
+      ( hash_extra
+      , oldest_stack
+      , latest_stack
+      , create
+      , remove_coinbase_stack
+      , update_coinbase_stack
+      , merkle_root )]
+
+    module Stack = Pending_coinbase.Stack
+    module Coinbase_data = Pending_coinbase.Coinbase_data
+    module Hash = Pending_coinbase.Hash
   end
 end
 
