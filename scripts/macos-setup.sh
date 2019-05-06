@@ -60,9 +60,9 @@ if [[ $COMPILE_THINGS == "YES" ]]; then
 
   # Our pins
   env TERM=xterm opam pin -y add src/external/ocaml-sodium
-#  env TERM=xterm opam pin -y add src/external/rpc_parallel
+  env TERM=xterm opam pin -y add src/external/rpc_parallel
   env TERM=xterm opam pin -y add src/external/ocaml-extlib
-#  env TERM=xterm opam pin -y add src/external/digestif
+  env TERM=xterm opam pin -y add src/external/digestif
   env TERM=xterm opam pin -y add src/external/async_kernel
   eval $(opam config env)
 
