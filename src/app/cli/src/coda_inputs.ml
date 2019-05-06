@@ -401,6 +401,8 @@ module type Main_intf = sig
   val receipt_chain_database : t -> Receipt_chain_database.t
 
   val wallets : t -> Secrets.Wallets.t
+
+  val top_level_logger : t -> Logger.t
 end
 
 module Pending_coinbase = struct

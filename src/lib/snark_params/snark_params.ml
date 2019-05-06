@@ -6,6 +6,8 @@ open Bitstring_lib
 open Snark_bits
 module Tick_backend = Crypto_params.Tick_backend
 module Tock_backend = Crypto_params.Tock_backend
+module Snarkette_tick = Crypto_params.Snarkette_tick
+module Snarkette_tock = Crypto_params.Snarkette_tock
 
 module Make_snarkable (Impl : Snarky.Snark_intf.S) = struct
   open Impl
@@ -127,7 +129,6 @@ module Tock = struct
   include (Tock0 : module type of Tock0 with module Proof := Tock0.Proof)
 
   module Fq = Snarky_field_extensions.Field_extensions.F (Tock0)
-  module Snarkette_tock = Snarkette.Mnt4_80
 
   module Inner_curve = struct
     include Tock_backend.Inner_curve
@@ -496,7 +497,6 @@ module Tick = struct
   end
 
   module Util = Snark_util.Make (Tick0)
-  module Snarkette_tick = Snarkette.Mnt6_80
 
   module Pairing = struct
     module T = struct

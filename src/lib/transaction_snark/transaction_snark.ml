@@ -523,8 +523,6 @@ module Base = struct
     in
     ()
 
-  let reduced_main = lazy (reduce_to_prover (tick_input ()) main)
-
   let create_keys () = generate_keypair main ~exposing:(tick_input ())
 
   let transaction_union_proof ?(preeval = false) ~proving_key sok_digest state1

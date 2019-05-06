@@ -13,6 +13,8 @@ build_artifact_profiles = [
     'testnet_postake',
     'testnet_postake_many_proposers',
     'testnet_postake_snarkless_fake_hash',
+    # ihm: Commenting this out to get the big curves fixes in. The CI machines were too weak to build
+    # 'testnet_postake_medium_curves',
 ]
 
 unit_test_profiles = [
@@ -47,7 +49,7 @@ test_permutations = {
     'test_postake_catchup': ['coda-restart-node-test'],
     'test_postake_bootstrap': ['coda-bootstrap-test', 'coda-long-fork -num-proposers 2'],
     'test_postake_holy_grail': ['coda-restarts-and-txns-holy-grail -num-proposers 5', 'coda-long-fork -num-proposers 5'],
-    'test_postake_txns': ['coda-shared-state-test'],
+    'test_postake_txns': ['coda-shared-state-test', 'coda-batch-payment-test'],
     'test_postake_five_even_snarkless': ['coda-shared-prefix-multiproposer-test -num-proposers 5'],
     'test_postake_five_even_txns': ['coda-shared-prefix-multiproposer-test -num-proposers 5 -payments'],
 }

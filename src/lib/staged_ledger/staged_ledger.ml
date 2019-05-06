@@ -134,8 +134,6 @@ end = struct
             Error
               (Staged_ledger_error.Invalid_proof (proof, statement, prover)) )
 
-  (*TODO: Punish*)
-
   module M = struct
     include Monad.Ident
     module Or_error = Or_error
@@ -685,7 +683,6 @@ end = struct
                 | Some t ->
                     Continue (t :: acc)
                 | None ->
-                    (* TODO: punish *)
                     Stop (Error (Staged_ledger_error.Bad_signature t)) )
               ~finish:(fun acc -> Ok acc)
           in
@@ -2623,7 +2620,7 @@ let%test_module "test" =
           { diff: Diff.Stable.V1.t
           ; prev_hash: staged_ledger_hash
           ; creator: public_key }
-        [@@deriving sexp, yojson]
+        [@@deriving sexp, yojson, fields]
 
         module With_valid_signatures_and_proofs = struct
           type pre_diff_with_at_most_two_coinbase =
