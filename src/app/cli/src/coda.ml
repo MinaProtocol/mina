@@ -507,7 +507,7 @@ let () =
   (* Turn on snark debugging in prod for now *)
   Snarky.Snark.set_eval_constraints true ;
   Snarky.Libsnark.set_printing_fun
-    (Logger.debug logger ~module_:"Snarky__Libsnark"
+    (Logger.format_message logger ~module_:"Snarky__Libsnark"
        ~location:"File \"lib/snarky/src/libsnark.ml\", line 1, characters 0-1"
        "%s") ;
   Command.run (Command.group ~summary:"Coda" (coda_commands logger)) ;
