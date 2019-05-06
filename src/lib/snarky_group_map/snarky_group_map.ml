@@ -4,7 +4,7 @@ module Params = Group_map.Params
 let to_group (type t) (module F : Field_intf.S_unchecked with type t = t)
     ~params t =
   let module M =
-    Group_map.Make_group_map
+    Group_map.Make
       (F)
       (struct
         include F
