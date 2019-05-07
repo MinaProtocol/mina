@@ -56,14 +56,29 @@ let run_test () : unit Deferred.t =
       in
       let module Main = Coda_inputs.Make_coda (Init) in
       let module Run = Coda_run.Make (Config) (Main) in
+      let trace_database_initialization typ location =
+        Logger.trace logger "Creating %s at %s" ~module_:__MODULE__ ~location
+          typ
+      in
       let%bind trust_dir = Async.Unix.mkdtemp (temp_conf_dir ^/ "trust_db") in
       let trust_system = Trust_system.create ~db_dir:trust_dir in
+      trace_database_initialization "trust_system" __LOC__ trust_dir ;
       let%bind receipt_chain_dir_name =
         Async.Unix.mkdtemp (temp_conf_dir ^/ "receipt_chain")
       in
+      trace_database_initialization "receipt_chain_database" __LOC__
+        receipt_chain_dir_name ;
       let receipt_chain_database =
         Coda_base.Receipt_chain_database.create
           ~directory:receipt_chain_dir_name
+      in
+      let%bind transaction_database_dir =
+        Async.Unix.mkdtemp (temp_conf_dir ^/ "transaction_database")
+      in
+      trace_database_initialization "transaction_database" __LOC__
+        receipt_chain_dir_name ;
+      let transaction_database =
+        Transaction_database.create ~directory_name:transaction_database_dir ()
       in
       let time_controller = Main.Inputs.Time.Controller.(create basic) in
       let consensus_local_state =
@@ -108,7 +123,8 @@ let run_test () : unit Deferred.t =
              ~snark_pool_disk_location:(temp_conf_dir ^/ "snark_pool")
              ~wallets_disk_location:(temp_conf_dir ^/ "wallets")
              ~time_controller ~receipt_chain_database
-             ~snark_work_fee:(Currency.Fee.of_int 0) ~consensus_local_state ())
+             ~snark_work_fee:(Currency.Fee.of_int 0) ~consensus_local_state
+             ~transaction_database ())
       in
       Main.start coda ;
       don't_wait_for
@@ -161,8 +177,8 @@ let run_test () : unit Deferred.t =
       (* No proof emitted by the parallel scan at the begining *)
       assert (Option.is_none @@ Run.For_tests.ledger_proof coda) ;
       (* Note: This is much less than half of the high balance account so we can test
-   *       payment replays being prohibited
-   *)
+       *       payment replays being prohibited
+      *)
       let send_amount = Currency.Amount.of_int 10 in
       (* Send money to someone *)
       let build_payment amount sender_sk receiver_pk fee =
@@ -200,7 +216,7 @@ let run_test () : unit Deferred.t =
         in
         assert_ok (p1_res |> Participating_state.active_exn) ;
         (* Send a similar payment twice on purpose; this second one will be rejected
-       because the nonce is wrong *)
+           because the nonce is wrong *)
         let payment' =
           build_payment send_amount sender_sk receiver_pk
             (Currency.Fee.of_int 0)
@@ -210,7 +226,7 @@ let run_test () : unit Deferred.t =
         in
         assert_ok (p2_res |> Participating_state.active_exn) ;
         (* The payment fails, but the rpc command doesn't indicate that because that
-       failure comes from the network. *)
+           failure comes from the network. *)
         (* Let the system settle, mine some blocks *)
         let%map () =
           balance_change_or_timeout
@@ -296,7 +312,7 @@ let run_test () : unit Deferred.t =
             Public_key.compress keypair.public_key )
       in
       (*Need some accounts from the genesis ledger to test payment replays and
-  sending multiple payments*)
+        sending multiple payments*)
       let receiver_keypair =
         let receiver =
           Genesis_ledger.find_new_account_record_exn
