@@ -92,17 +92,19 @@ module Make (Inputs : Inputs.S) :
                          new_breadcrumb)
                   | Error err -> (
                       (* propagate bans through subtree *)
-                      let subtrees = Rose_tree.flatten subtree in
+                      let subtree_nodes = Rose_tree.flatten subtree in
                       let ip_address_set =
                         let sender_from_tree_node node =
                           Envelope.Incoming.sender (Cached.peek node)
                         in
-                        List.fold subtrees
+                        List.fold subtree_nodes
                           ~init:(Set.empty (module Unix.Inet_addr))
                           ~f:(fun inet_addrs node ->
                             match sender_from_tree_node node with
                             | Local ->
-                                inet_addrs
+                                failwith
+                                  "build_subtrees_of_breadcrumbs: sender of \
+                                   external transition should not be Local"
                             | Remote inet_addr ->
                                 Set.add inet_addrs inet_addr )
                       in
