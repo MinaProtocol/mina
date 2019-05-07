@@ -427,6 +427,9 @@ module type Inputs_intf = sig
      and type parallel_scan_state := Staged_ledger.Scan_state.t
 end
 
+(* used in error below to allow pattern-match against error *)
+let refused_answer_query_string = "Refused to answer_query"
+
 module Make (Inputs : Inputs_intf) = struct
   open Inputs
 
@@ -815,13 +818,13 @@ module Make (Inputs : Inputs_intf) = struct
                     (Envelope.Incoming.map ~f:Tuple2.get2 query_env)
                     ~logger:config.logger ~trust_system:config.trust_system
                   |> Deferred.map
+                     (* begin error string prefix so we can pattern-match *)
                        ~f:
                          (Result.of_option
                             ~error:
                               (Error.createf
-                                 !"Refused to answer query for ledger_hash: \
-                                   %{sexp:Ledger_hash.t}"
-                                 ledger_hash)) )
+                                 !"%s for ledger_hash: %{sexp:Ledger_hash.t}"
+                                 refused_answer_query_string ledger_hash)) )
                 ~transition_catchup:(fun enveloped_hash ->
                   let open Deferred.Option.Let_syntax in
                   let hash = Envelope.Incoming.data enveloped_hash in

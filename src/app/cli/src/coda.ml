@@ -344,6 +344,7 @@ let daemon logger =
        in
        let net_config =
          { M.Inputs.Net.Config.logger
+         ; trust_system
          ; time_controller
          ; consensus_local_state
          ; gossip_net_params=
