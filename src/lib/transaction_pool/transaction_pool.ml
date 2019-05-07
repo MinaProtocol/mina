@@ -94,7 +94,11 @@ struct
      low fee transactions the smaller-pooled nodes consider useless and get
      themselves banned.
   *)
-  let pool_max_size : int = 1024
+  [%%import
+  "../../config.mlh"]
+
+  [%%inject
+  "pool_max_size", pool_max_size]
 
   let drop_until_below_max_size :
          Indexed_pool.t
