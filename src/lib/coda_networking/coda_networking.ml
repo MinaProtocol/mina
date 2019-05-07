@@ -152,7 +152,8 @@ struct
         (* "master" types, do not change *)
         type query = Ledger_hash.Stable.V1.t * Sync_ledger.Query.Stable.V1.t
 
-        type response = Sync_ledger.Answer.Stable.V1.t Or_error.t
+        type response =
+          Sync_ledger.Answer.Stable.V1.t Core.Or_error.Stable.V1.t
       end
 
       module Caller = T
@@ -533,7 +534,7 @@ module Make (Inputs : Inputs_intf) = struct
               Actions.
                 ( Requested_unknown_item
                 , Some
-                    ( "Requested staged ledge and pending coinbases at hash: \
+                    ( "Requested staged ledger and pending coinbases at hash: \
                        $hash"
                     , [("hash", State_hash.to_yojson hash)] ) ))
         else return ()
@@ -549,19 +550,26 @@ module Make (Inputs : Inputs_intf) = struct
         | Ok _ ->
             return ()
         | Error err ->
-            Trust_system.(
-              record_envelope_sender config.trust_system config.logger
-                (Envelope.Incoming.sender sync_query_in_envelope)
-                Actions.
-                  ( Requested_unknown_item
-                  , Some
-                      ( "Sync ledger query with hash: $hash, query: $query, \
-                         with error: $error"
-                      , [ ("hash", Inputs.Ledger_hash.to_yojson hash)
-                        ; ( "query"
-                          , Syncable_ledger.Query.to_yojson
-                              Ledger.Addr.to_yojson query )
-                        ; ("error", `String (Error.to_string_hum err)) ] ) ))
+            (* N.B.: to_string_mach double-quotes the string, don't want that *)
+            let err_msg = Error.to_string_hum err in
+            if
+              String.is_prefix err_msg
+                ~prefix:Coda_lib.refused_answer_query_string
+            then
+              Trust_system.(
+                record_envelope_sender config.trust_system config.logger
+                  (Envelope.Incoming.sender sync_query_in_envelope)
+                  Actions.
+                    ( Requested_unknown_item
+                    , Some
+                        ( "Sync ledger query with hash: $hash, query: $query, \
+                           with error: $error"
+                        , [ ("hash", Inputs.Ledger_hash.to_yojson hash)
+                          ; ( "query"
+                            , Syncable_ledger.Query.to_yojson
+                                Ledger.Addr.to_yojson query )
+                          ; ("error", `String err_msg) ] ) ))
+            else return ()
       in
       return result
     in
