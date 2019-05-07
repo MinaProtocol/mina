@@ -45,10 +45,11 @@ module Keys = struct
         match%map load_with_checksum c p with
         | Ok x ->
             x
-        | Error _e ->
+        | Error e ->
             failwithf
-              !"Blockchain_snark: load failed on %{sexp:Storage.location}"
-              p ()
+              !"Blockchain_snark: load failed on %{sexp:Storage.location}: \
+                %{sexp:[`Checksum_no_match|`No_exist|`IO_error of Error.t]}"
+              p e ()
       in
       let%map step = load tick_controller step
       and wrap = load tock_controller wrap in

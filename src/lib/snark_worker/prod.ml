@@ -1,6 +1,6 @@
 open Core
 open Async
-open Signature_lib
+open Coda_base
 
 module Cache = struct
   module T = Hash_heap.Make (Transaction_snark.Statement)
@@ -19,6 +19,8 @@ module Cache = struct
 end
 
 module Inputs = struct
+  module Ledger_proof = Ledger_proof.Prod.Stable.V1
+
   module Worker_state = struct
     module type S = Transaction_snark.S
 
@@ -37,22 +39,8 @@ module Inputs = struct
     let worker_wait_time = 5.
   end
 
-  module Proof = Transaction_snark.Stable.V1
-  module Statement = Transaction_snark.Statement.Stable.V1
-
-  module Public_key = struct
-    include Public_key.Compressed
-
-    let arg_type = Cli_lib.Arg_type.public_key_compressed
-  end
-
-  module Transaction = Coda_base.Transaction.Stable.V1
-  module Sparse_ledger = Coda_base.Sparse_ledger.Stable.V1
-  module Pending_coinbase = Coda_base.Pending_coinbase.Stable.V1
-  module Transaction_witness = Coda_base.Transaction_witness.Stable.V1
-
   type single_spec =
-    ( Statement.t
+    ( Transaction_snark.Statement.t
     , Transaction.t
     , Transaction_witness.t
     , Transaction_snark.t )
@@ -90,13 +78,16 @@ module Inputs = struct
           ->
             process (fun () ->
                 Or_error.try_with (fun () ->
-                    M.of_transaction ~sok_digest ~source:input.Statement.source
+                    M.of_transaction ~sok_digest
+                      ~source:input.Transaction_snark.Statement.source
                       ~target:input.target t
                       ~pending_coinbase_stack_state:
-                        input.Statement.pending_coinbase_stack_state
+                        input
+                          .Transaction_snark.Statement
+                           .pending_coinbase_stack_state
                       (unstage (Coda_base.Sparse_ledger.handler w.ledger)) ) )
         | Merge (_, proof1, proof2) ->
             process (fun () -> M.merge ~sok_digest proof1 proof2) )
 end
 
-module Worker = Worker.Make (Inputs)
+module Worker = Functor.Make (Inputs)

@@ -588,6 +588,8 @@ module Make (Inputs : Inputs_intf) = struct
 
   let receipt_chain_database t = t.receipt_chain_database
 
+  let top_level_logger t = t.logger
+
   let staged_ledger_ledger_proof t =
     let open Option.Let_syntax in
     let%bind sl = best_staged_ledger_opt t in

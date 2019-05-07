@@ -371,7 +371,7 @@ let daemon logger =
               ?propose_keypair:Config0.propose_keypair ~monitor
               ~consensus_local_state ())
        in
-       Run.handle_shutdown ~monitor ~conf_dir ~logger coda ;
+       Run.handle_shutdown ~monitor ~conf_dir coda ;
        Async.Scheduler.within' ~monitor
        @@ fun () ->
        let%bind () = maybe_sleep 3. in
@@ -379,8 +379,8 @@ let daemon logger =
        let web_service = Web_pipe.get_service () in
        Web_pipe.run_service (module Run) coda web_service ~conf_dir ~logger ;
        Run.setup_local_server ?client_whitelist ?rest_server_port ~coda
-         ~client_port ~logger () ;
-       Run.run_snark_worker ~logger ~client_port run_snark_worker_action ;
+         ~client_port () ;
+       Run.run_snark_worker ~client_port run_snark_worker_action ;
        Logger.info logger ~module_:__MODULE__ ~location:__LOC__
          "Running coda services" ;
        Async.never ())
@@ -450,20 +450,7 @@ let ensure_testnet_id_still_good _ = Deferred.unit
 
 [%%endif]
 
-[%%if
-proof_level = "full"]
-
-let internal_commands =
-  [(Snark_worker_lib.Intf.command_name, Snark_worker_lib.Prod.Worker.command)]
-
-[%%else]
-
-(* TODO #1698: proof_level=check *)
-
-let internal_commands =
-  [(Snark_worker_lib.Intf.command_name, Snark_worker_lib.Debug.Worker.command)]
-
-[%%endif]
+let internal_commands = [(Snark_worker.Intf.command_name, Snark_worker.command)]
 
 let coda_commands logger =
   [ (Parallel.worker_command_name, Parallel.worker_command)
@@ -490,6 +477,8 @@ let coda_commands logger =
     ; ( Coda_restarts_and_txns_holy_grail.name
       , Coda_restarts_and_txns_holy_grail.command )
     ; (Coda_bootstrap_test.name, Coda_bootstrap_test.command)
+    ; (Coda_batch_payment_test.name, Coda_batch_payment_test.command)
+    ; (Coda_long_fork.name, Coda_long_fork.command)
     ; ("full-test", Full_test.command)
     ; ("transaction-snark-profiler", Transaction_snark_profiler.command) ]
   in

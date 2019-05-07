@@ -599,7 +599,7 @@ let%test_module _ =
           ; nonce= Account.Nonce.of_int nonce
           ; receipt_chain_hash= Receipt.Chain_hash.empty
           ; delegate= Public_key.Compressed.empty
-          ; participated= false } )
+          ; voting_for= Quickcheck.random_value State_hash.gen } )
 
     let%test_unit "Transactions are removed and added back in fork changes" =
       Thread_safe.block_on_async_exn (fun () ->
