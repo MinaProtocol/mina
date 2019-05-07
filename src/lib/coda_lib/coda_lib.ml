@@ -449,6 +449,7 @@ module Make (Inputs : Inputs_intf) = struct
     ; logger: Logger.t
     ; trust_system: Trust_system.t
     ; mutable seen_jobs: Work_selector.State.t
+    ; transaction_database: Transaction_database.t
     ; receipt_chain_database: Coda_base.Receipt_chain_database.t
     ; staged_ledger_transition_backup_capacity: int
     ; external_transitions_writer:
@@ -456,8 +457,7 @@ module Make (Inputs : Inputs_intf) = struct
         Pipe.Writer.t
     ; time_controller: Time.Controller.t
     ; snark_work_fee: Currency.Fee.t
-    ; consensus_local_state: Consensus.Data.Local_state.t
-    ; transaction_database: Transaction_database.t }
+    ; consensus_local_state: Consensus.Data.Local_state.t }
 
   let peek_frontier frontier_broadcast_pipe =
     Broadcast_pipe.Reader.peek frontier_broadcast_pipe
@@ -643,6 +643,7 @@ module Make (Inputs : Inputs_intf) = struct
       ; staged_ledger_transition_backup_capacity: int [@default 10]
       ; time_controller: Time.Controller.t
       ; receipt_chain_database: Coda_base.Receipt_chain_database.t
+      ; transaction_database: Transaction_database.t
       ; snark_work_fee: Currency.Fee.t
       ; monitor: Monitor.t option
       ; consensus_local_state: Consensus.Data.Local_state.t
@@ -782,8 +783,6 @@ module Make (Inputs : Inputs_intf) = struct
                       in
                       (Some persistence, root_snarked_ledger, frontier) )
             in
-            (* TODO: the name of transaction_database should be supplied by Config #2333 *)
-            let transaction_database = Transaction_database.create () in
             let frontier_broadcast_pipe_r, frontier_broadcast_pipe_w =
               Broadcast_pipe.create (Some transition_frontier)
             in
@@ -951,5 +950,5 @@ module Make (Inputs : Inputs_intf) = struct
               ; snark_work_fee= config.snark_work_fee
               ; proposer_transition_writer
               ; consensus_local_state= config.consensus_local_state
-              ; transaction_database } ) )
+              ; transaction_database= config.transaction_database } ) )
 end
