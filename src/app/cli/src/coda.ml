@@ -494,5 +494,9 @@ let () =
   don't_wait_for (ensure_testnet_id_still_good logger) ;
   (* Turn on snark debugging in prod for now *)
   Snarky.Snark.set_eval_constraints true ;
+  Snarky.Libsnark.set_printing_fun
+    (Logger.format_message logger ~level:Debug ~module_:"Snarky__Libsnark"
+       ~location:"File \"lib/snarky/src/libsnark.ml\", line 1, characters 0-1"
+       "%s") ;
   Command.run (Command.group ~summary:"Coda" (coda_commands logger)) ;
   Core.exit 0

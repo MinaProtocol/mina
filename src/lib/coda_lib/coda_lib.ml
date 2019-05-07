@@ -135,6 +135,7 @@ module type Transaction_pool_intf = sig
 
   val load :
        logger:Logger.t
+    -> trust_system:Trust_system.t
     -> disk_location:string
     -> incoming_diffs:pool_diff Envelope.Incoming.t Linear_pipe.Reader.t
     -> frontier_broadcast_pipe:transition_frontier Option.t
@@ -159,6 +160,7 @@ module type Snark_pool_intf = sig
 
   val load :
        logger:Logger.t
+    -> trust_system:Trust_system.t
     -> disk_location:string
     -> incoming_diffs:pool_diff Envelope.Incoming.t Linear_pipe.Reader.t
     -> frontier_broadcast_pipe:transition_frontier Option.t
@@ -858,6 +860,7 @@ module Make (Inputs : Inputs_intf) = struct
             in
             let%bind transaction_pool =
               Transaction_pool.load ~logger:config.logger
+                ~trust_system:config.trust_system
                 ~disk_location:config.transaction_pool_disk_location
                 ~incoming_diffs:(Net.transaction_pool_diffs net)
                 ~frontier_broadcast_pipe:frontier_broadcast_pipe_r
@@ -914,6 +917,7 @@ module Make (Inputs : Inputs_intf) = struct
                  external_transitions_writer ~f:ident) ;
             let%bind snark_pool =
               Snark_pool.load ~logger:config.logger
+                ~trust_system:config.trust_system
                 ~disk_location:config.snark_pool_disk_location
                 ~incoming_diffs:(Net.snark_pool_diffs net)
                 ~frontier_broadcast_pipe:frontier_broadcast_pipe_r
