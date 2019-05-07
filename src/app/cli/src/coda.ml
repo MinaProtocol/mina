@@ -323,11 +323,16 @@ let daemon logger =
          Option.value_map run_snark_worker_flag ~default:`Don't_run
            ~f:(fun k -> `With_public_key k)
        in
+       let trace_database_initialization typ location =
+         Logger.trace logger "Creating %s at %s" ~module_:__MODULE__ ~location
+           typ
+       in
        let trust_dir = conf_dir ^/ "trust" in
        let () = Snark_params.set_chunked_hashing true in
        let%bind () = Async.Unix.mkdir ~p:() trust_dir in
        let transition_frontier_location = conf_dir ^/ "transition_frontier" in
        let trust_system = Trust_system.create ~db_dir:trust_dir in
+       trace_database_initialization "trust_system" __LOC__ trust_dir ;
        let time_controller =
          M.Inputs.Time.Controller.create M.Inputs.Time.Controller.basic
        in
@@ -357,12 +362,16 @@ let daemon logger =
          Coda_base.Receipt_chain_database.create
            ~directory:receipt_chain_dir_name
        in
+       trace_database_initialization "receipt_chain_database" __LOC__
+         receipt_chain_dir_name ;
        let transaction_database_dir = conf_dir ^/ "transaction" in
        let%bind () = Async.Unix.mkdir ~p:() transaction_database_dir in
        let transaction_database =
          Transaction_database.create ~directory_name:transaction_database_dir
            ()
        in
+       trace_database_initialization "transaction_database" __LOC__
+         transaction_database_dir ;
        let monitor = Async.Monitor.create ~name:"coda" () in
        let%bind coda =
          Run.create

@@ -349,15 +349,24 @@ module T = struct
           let%bind transaction_database_dir =
             Unix.mkdtemp @@ conf_dir ^/ "transaction"
           in
+          let trace_database_initialization typ location =
+            Logger.trace logger "Creating %s at %s" ~module_:__MODULE__
+              ~location typ
+          in
           let receipt_chain_database =
             Coda_base.Receipt_chain_database.create
               ~directory:receipt_chain_dir_name
           in
+          trace_database_initialization "receipt_chain_database" __LOC__
+            receipt_chain_dir_name ;
+          let trust_system = Trust_system.create ~db_dir:trust_dir in
+          trace_database_initialization "trust_system" __LOC__ trust_dir ;
           let transaction_database =
             Transaction_database.create
               ~directory_name:transaction_database_dir ()
           in
-          let trust_system = Trust_system.create ~db_dir:trust_dir in
+          trace_database_initialization "transaction_database" __LOC__
+            transaction_database_dir ;
           let time_controller =
             Run.Inputs.Time.Controller.create Run.Inputs.Time.Controller.basic
           in
