@@ -72,7 +72,7 @@ let make = (~message, ~settingsOrError, ~setSettingsOrError) =>
             response =>
               ReasonReact.string(
                 switch (response.result) {
-                | Loading => ""
+                | Loading => "..."
                 | Error(error) => error##message
                 | Data(response) => response##version
                 },
