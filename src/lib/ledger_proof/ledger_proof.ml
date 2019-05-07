@@ -1,7 +1,16 @@
+[%%import
+"../../config.mlh"]
+
 open Core_kernel
-open Async_kernel
 open Coda_base
 open Module_version
+
+module type S =
+  Protocols.Coda_pow.Ledger_proof_intf
+  with type statement := Transaction_snark.Statement.t
+   and type sok_digest := Sok_message.Digest.t
+   and type ledger_hash := Frozen_ledger_hash.t
+   and type proof := Proof.t
 
 let to_signed_amount signed_fee =
   let magnitude =
@@ -9,13 +18,7 @@ let to_signed_amount signed_fee =
   and sgn = Currency.Fee.Signed.sgn signed_fee in
   Currency.Amount.Signed.create ~magnitude ~sgn
 
-module Prod :
-  Protocols.Coda_pow.Ledger_proof_intf
-  with type t = Transaction_snark.t
-   and type statement = Transaction_snark.Statement.t
-   and type sok_digest := Sok_message.Digest.t
-   and type ledger_hash := Frozen_ledger_hash.t
-   and type proof := Proof.t = struct
+module Prod : S with type t = Transaction_snark.t = struct
   module Stable = struct
     module V1 = struct
       module T = struct
@@ -41,8 +44,6 @@ module Prod :
 
   type t = Stable.Latest.t [@@deriving sexp, yojson]
 
-  type statement = Transaction_snark.Statement.t
-
   let sok_digest = Transaction_snark.sok_digest
 
   let statement = Transaction_snark.statement
@@ -65,12 +66,9 @@ module Prod :
 end
 
 module Debug :
-  Protocols.Coda_pow.Ledger_proof_intf
-  with type t = Transaction_snark.Statement.t * Sok_message.Digest.Stable.V1.t
-   and type statement = Transaction_snark.Statement.t
-   and type sok_digest := Sok_message.Digest.t
-   and type ledger_hash := Frozen_ledger_hash.t
-   and type proof := Proof.t = struct
+  S
+  with type t = Transaction_snark.Statement.t * Sok_message.Digest.Stable.V1.t =
+struct
   module Stable = struct
     module V1 = struct
       module T = struct
@@ -98,8 +96,6 @@ module Debug :
 
   type t = Stable.Latest.t [@@deriving sexp, yojson]
 
-  type statement = Transaction_snark.Statement.t
-
   let underlying_proof (_ : t) = Proof.dummy
 
   let statement ((t, _) : t) : Transaction_snark.Statement.t = t
@@ -108,5 +104,18 @@ module Debug :
 
   let sok_digest (_, d) = d
 
-  let create ~statement ~sok_digest ~proof = (statement, sok_digest)
+  let create ~statement ~sok_digest ~proof:_ = (statement, sok_digest)
 end
+
+[%%if
+proof_level = "full"]
+
+include Prod
+
+[%%else]
+
+(* TODO #1698: proof_level=check *)
+
+include Debug
+
+[%%endif]
