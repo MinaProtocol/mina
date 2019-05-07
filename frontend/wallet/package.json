@@ -2,7 +2,7 @@
   "name": "coda-wallet",
   "version": "0.1.0",
   "description": "",
-  "main": "./lib/js/src/main/App.js",
+  "main": "./app.js",
   "dependencies": {
     "@glennsl/bs-jest": "^0.4.8",
     "@glennsl/bs-json": "^3.0.0",
@@ -20,32 +20,34 @@
     "electron-builder": "^20.39.0",
     "fastpack": "^0.8.4",
     "graphql-faker": "^1.9.0",
-    "node": "^8.15.0"
+    "node": "^8.15.0",
+    "rollup": "^1.11.3",
+    "rollup-plugin-commonjs": "^9.3.4",
+    "rollup-plugin-node-resolve": "^4.2.3"
   },
   "scripts": {
-    "start": "electron ./lib/js/src/main/App.js",
     "fake": "graphql-faker --port 8080 -- schema.graphql",
     "fake-inspector": "graphql-faker --open -- schema.graphql",
     "build": "bsb -make-world",
     "build-ci": "npm run query-fake && npm run build",
     "clean": "bsb -clean-world",
     "pack": "fpack --development ./lib/js/src/render/Index.js",
+    "pack-main": "rollup --config ./rollup.config.js",
     "query": "send-introspection-query http://localhost:8080/graphql",
     "query-fake": "concurrently --kill-others 'npm run fake' 'sleep 5 && npm run query'",
     "reformat": "bsrefmt --in-place src/**/*.re",
     "test": "npm run build && jest",
-    "dist": "npm run build && npm run pack && build",
+    "dist": "npm run build && npm run pack && npm run pack-main && build",
     "dev": "concurrently --kill-others 'bsb -make-world -w' 'fpack watch --development ./lib/js/src/render/Index.js' 'electron ./lib/js/src/main/App.js'"
   },
   "build": {
     "appId": "FOO.org.codaprotocol.prowallet",
     "files": [
-      "lib/**/*",
-      "node_modules/**/*",
+      "./app.js",
       "package.json"
     ],
     "extraResources": [
-      "bundle/**/*",
+      "bundle/*",
       "public/*"
     ],
     "compression": "store",

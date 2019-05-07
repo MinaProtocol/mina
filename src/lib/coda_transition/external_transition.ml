@@ -28,20 +28,32 @@ module type Base_intf = sig
   val parent_hash : t -> state_hash
 
   val consensus_state : t -> consensus_state
+
+  val proposer : t -> Signature_lib.Public_key.Compressed.t
+
+  val user_commands : t -> User_command.t list
+
+  val payments : t -> User_command.t list
+end
+
+module type Staged_ledger_diff_intf = sig
+  type t [@@deriving sexp]
+
+  val creator : t -> Signature_lib.Public_key.Compressed.t
+
+  val user_commands : t -> User_command.t list
+
+  module Stable :
+    sig
+      module V1 : sig
+        type t [@@deriving bin_io, sexp, version]
+      end
+    end
+    with type V1.t = t
 end
 
 module type S = sig
-  module Staged_ledger_diff : sig
-    type t [@@deriving sexp]
-
-    module Stable :
-      sig
-        module V1 : sig
-          type t [@@deriving bin_io, sexp, version]
-        end
-      end
-      with type V1.t = t
-  end
+  module Staged_ledger_diff : Staged_ledger_diff_intf
 
   include
     Base_intf
@@ -97,17 +109,8 @@ module type S = sig
   val forget_consensus_state_verification : Verified.t -> Proof_verified.t
 end
 
-module Make (Staged_ledger_diff : sig
-  type t [@@deriving sexp]
-
-  module Stable :
-    sig
-      module V1 : sig
-        type t [@@deriving bin_io, sexp, version]
-      end
-    end
-    with type V1.t = t
-end) : S with module Staged_ledger_diff = Staged_ledger_diff = struct
+module Make (Staged_ledger_diff : Staged_ledger_diff_intf) :
+  S with module Staged_ledger_diff = Staged_ledger_diff = struct
   module Staged_ledger_diff = Staged_ledger_diff
 
   module Stable = struct
@@ -136,6 +139,18 @@ end) : S with module Staged_ledger_diff = Staged_ledger_diff = struct
 
         let parent_hash {protocol_state; _} =
           Protocol_state.previous_state_hash protocol_state
+
+        let proposer {staged_ledger_diff; _} =
+          Staged_ledger_diff.creator staged_ledger_diff
+
+        let user_commands {staged_ledger_diff; _} =
+          Staged_ledger_diff.user_commands staged_ledger_diff
+
+        let payments external_transition =
+          List.filter
+            (user_commands external_transition)
+            ~f:
+              (Fn.compose User_command_payload.is_payment User_command.payload)
       end
 
       include T
@@ -185,7 +200,7 @@ end) : S with module Staged_ledger_diff = Staged_ledger_diff = struct
     Protocol_state.blockchain_state protocol_state
     |> Blockchain_state.timestamp
 
-  let consensus_state = Stable.Latest.consensus_state
-
-  let parent_hash = Stable.Latest.parent_hash
+  [%%define_locally
+  Stable.Latest.
+    (consensus_state, parent_hash, proposer, user_commands, payments)]
 end
