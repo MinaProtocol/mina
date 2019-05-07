@@ -980,8 +980,10 @@ module Make_coda (Init : Init_intf) = struct
   module Inputs = struct
     include Make_inputs (Init) (Ledger_proof_verifier) (Storage.Disk)
     module Genesis_ledger = Genesis_ledger
+    module External_transition = External_transition
+    module Internal_transition = Internal_transition
     module Ledger_proof_statement = Transaction_snark.Statement
-    module Snark_worker = Snark_worker_lib
+    module Snark_worker = Snark_worker
     module Transaction_validator = Transaction_validator
     module Genesis_protocol_state = Genesis_protocol_state
     module Snark_transition = Snark_transition
