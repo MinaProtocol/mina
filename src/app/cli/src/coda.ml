@@ -450,20 +450,7 @@ let ensure_testnet_id_still_good _ = Deferred.unit
 
 [%%endif]
 
-[%%if
-proof_level = "full"]
-
-let internal_commands =
-  [(Snark_worker_lib.Intf.command_name, Snark_worker_lib.Prod.Worker.command)]
-
-[%%else]
-
-(* TODO #1698: proof_level=check *)
-
-let internal_commands =
-  [(Snark_worker_lib.Intf.command_name, Snark_worker_lib.Debug.Worker.command)]
-
-[%%endif]
+let internal_commands = [(Snark_worker.Intf.command_name, Snark_worker.command)]
 
 let coda_commands logger =
   [ (Parallel.worker_command_name, Parallel.worker_command)
@@ -506,5 +493,9 @@ let () =
   don't_wait_for (ensure_testnet_id_still_good logger) ;
   (* Turn on snark debugging in prod for now *)
   Snarky.Snark.set_eval_constraints true ;
+  Snarky.Libsnark.set_printing_fun
+    (Logger.format_message logger ~level:Debug ~module_:"Snarky__Libsnark"
+       ~location:"File \"lib/snarky/src/libsnark.ml\", line 1, characters 0-1"
+       "%s") ;
   Command.run (Command.group ~summary:"Coda" (coda_commands logger)) ;
   Core.exit 0
