@@ -1,27 +1,16 @@
 open Core
+open Coda_base
 open Async
 open Signature_lib
 
 let command_name = "snark-worker"
 
 module type Inputs_intf = sig
-  module Transaction_witness : sig
-    type t [@@deriving bin_io, sexp, version]
-  end
-
-  module Transaction : sig
-    type t [@@deriving bin_io, sexp, version]
-  end
-
-  module Proof : sig
-    type t [@@deriving bin_io, sexp, version]
-  end
-
-  module Statement : sig
-    type t [@@deriving bin_io, sexp, version]
-  end
-
   open Snark_work_lib
+
+  module Ledger_proof : sig
+    type t [@@deriving bin_io, sexp, version]
+  end
 
   module Worker_state : sig
     type t
@@ -34,22 +23,18 @@ module type Inputs_intf = sig
   val perform_single :
        Worker_state.t
     -> message:Coda_base.Sok_message.t
-    -> ( Statement.t
+    -> ( Transaction_snark.Statement.t
        , Transaction.t
        , Transaction_witness.t
-       , Proof.t )
+       , Ledger_proof.t )
        Work.Single.Spec.t
-    -> (Proof.t * Time.Span.t) Or_error.t
+    -> (Ledger_proof.t * Time.Span.t) Or_error.t
 end
 
 module type S = sig
-  type proof
-
-  type statement
-
-  type transition
-
-  type transaction_witness
+  module Ledger_proof : sig
+    type t [@@deriving bin_io, sexp, version]
+  end
 
   module Work : sig
     open Snark_work_lib
@@ -57,10 +42,10 @@ module type S = sig
     module Single : sig
       module Spec : sig
         type t =
-          ( statement
-          , transition
-          , transaction_witness
-          , proof )
+          ( Transaction_snark.Statement.t
+          , Transaction.t
+          , Transaction_witness.t
+          , Ledger_proof.t )
           Work.Single.Spec.t
         [@@deriving sexp]
       end
@@ -71,7 +56,7 @@ module type S = sig
     end
 
     module Result : sig
-      type t = (Spec.t, proof) Work.Result.t
+      type t = (Spec.t, Ledger_proof.t) Work.Result.t
     end
   end
 
