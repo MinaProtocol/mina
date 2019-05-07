@@ -44,6 +44,7 @@ module type S = sig
 
   val create :
        logger:Logger.t
+    -> trust_system:Trust_system.t
     -> frontier_broadcast_pipe:transition_frontier Option.t
                                Broadcast_pipe.Reader.t
     -> t
