@@ -65,6 +65,12 @@ let run_test () : unit Deferred.t =
         Coda_base.Receipt_chain_database.create
           ~directory:receipt_chain_dir_name
       in
+      let%bind transaction_database_dir =
+        Async.Unix.mkdtemp (temp_conf_dir ^/ "transaction_database")
+      in
+      let transaction_database =
+        Transaction_database.create ~directory_name:transaction_database_dir ()
+      in
       let time_controller = Main.Inputs.Time.Controller.(create basic) in
       let consensus_local_state =
         Consensus.Data.Local_state.create
@@ -107,7 +113,8 @@ let run_test () : unit Deferred.t =
              ~snark_pool_disk_location:(temp_conf_dir ^/ "snark_pool")
              ~wallets_disk_location:(temp_conf_dir ^/ "wallets")
              ~time_controller ~receipt_chain_database
-             ~snark_work_fee:(Currency.Fee.of_int 0) ~consensus_local_state ())
+             ~snark_work_fee:(Currency.Fee.of_int 0) ~consensus_local_state
+             ~transaction_database ())
       in
       Main.start coda ;
       don't_wait_for

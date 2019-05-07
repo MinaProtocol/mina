@@ -342,12 +342,20 @@ module T = struct
           in
           let module Main = Coda_inputs.Make_coda (Init) in
           let module Run = Coda_run.Make (Config) (Main) in
-          let receipt_chain_dir_name = conf_dir ^/ "receipt_chain" in
+          let%bind receipt_chain_dir_name =
+            Unix.mkdtemp @@ conf_dir ^/ "receipt_chain"
+          in
           let%bind trust_dir = Unix.mkdtemp (conf_dir ^/ "trust") in
-          let%bind () = File_system.create_dir receipt_chain_dir_name in
+          let%bind transaction_database_dir =
+            Unix.mkdtemp @@ conf_dir ^/ "transaction"
+          in
           let receipt_chain_database =
             Coda_base.Receipt_chain_database.create
               ~directory:receipt_chain_dir_name
+          in
+          let transaction_database =
+            Transaction_database.create
+              ~directory_name:transaction_database_dir ()
           in
           let trust_system = Trust_system.create ~db_dir:trust_dir in
           let time_controller =
@@ -392,7 +400,7 @@ module T = struct
                  ~time_controller ~receipt_chain_database
                  ~snark_work_fee:(Currency.Fee.of_int 0)
                  ?propose_keypair:Config.propose_keypair ~monitor
-                 ~consensus_local_state ())
+                 ~consensus_local_state ~transaction_database ())
           in
           Run.handle_shutdown ~monitor ~conf_dir coda ;
           let%map () =

@@ -357,6 +357,12 @@ let daemon logger =
          Coda_base.Receipt_chain_database.create
            ~directory:receipt_chain_dir_name
        in
+       let transaction_database_dir = conf_dir ^/ "transaction" in
+       let%bind () = Async.Unix.mkdir ~p:() transaction_database_dir in
+       let transaction_database =
+         Transaction_database.create ~directory_name:transaction_database_dir
+           ()
+       in
        let monitor = Async.Monitor.create ~name:"coda" () in
        let%bind coda =
          Run.create
@@ -369,7 +375,7 @@ let daemon logger =
               ~snark_work_fee:snark_work_fee_flag ~receipt_chain_database
               ~transition_frontier_location ~time_controller
               ?propose_keypair:Config0.propose_keypair ~monitor
-              ~consensus_local_state ())
+              ~consensus_local_state ~transaction_database ())
        in
        Run.handle_shutdown ~monitor ~conf_dir coda ;
        Async.Scheduler.within' ~monitor
