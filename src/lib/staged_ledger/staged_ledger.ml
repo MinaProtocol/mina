@@ -1979,7 +1979,7 @@ let%test_module "test" =
           module Latest = V1
         end
 
-        type t = int [@@deriving sexp, compare, hash, eq]
+        type t = int [@@deriving sexp, compare, hash, eq, yojson]
 
         include Hashable.Make_binable (Stable.Latest)
 
