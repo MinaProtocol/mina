@@ -779,7 +779,9 @@ module Make (Inputs : Inputs_intf) = struct
                       (Some persistence, root_snarked_ledger, frontier) )
             in
             (* TODO: the name of transaction_database should be supplied by Config #2333 *)
-            let transaction_database = Transaction_database.create () in
+            let transaction_database =
+              Transaction_database.create config.logger ()
+            in
             let frontier_broadcast_pipe_r, frontier_broadcast_pipe_w =
               Broadcast_pipe.create (Some transition_frontier)
             in

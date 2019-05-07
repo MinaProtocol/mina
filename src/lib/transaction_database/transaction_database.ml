@@ -69,10 +69,10 @@ struct
     match Hashtbl.find all_transactions transaction with
     | Some _retrieved_transaction ->
         Logger.trace logger
-          !"Not adding transaction into database since it already exists: \
-            $transaction"
+          !"Not adding transaction into transaction database since it already \
+            exists: $transaction"
           ~module_:__MODULE__ ~location:__LOC__
-          ~meta:[("transaction", Transaction.to_yojson transaction)]
+          ~metadata:[("transaction", Transaction.to_yojson transaction)]
     | None ->
         Database.set database ~key:transaction ~data:date ;
         Hashtbl.add_exn all_transactions ~key:transaction ~data:date ;
@@ -88,29 +88,36 @@ struct
             Hashtbl.set user_transactions ~key:pk ~data:user_txns' )
 
   let get_transactions {cache= {user_transactions; _}; _} public_key =
-    let open Option in
-    value ~default:[]
-    @@ ( Hashtbl.find user_transactions public_key
-       >>| Txn_with_date.Set.to_list
-       >>| List.map ~f:(fun (txn, _) -> txn) )
+    let queried_transactions =
+      let open Option.Let_syntax in
+      let%map transactions_with_dates_set =
+        Hashtbl.find user_transactions public_key
+      in
+      List.map (Txn_with_date.Set.to_list transactions_with_dates_set)
+        ~f:(fun (txn, _) -> txn)
+    in
+    Option.value queried_transactions ~default:[]
 
   let get_pagination_query ~f t public_key transaction =
-    (let open Option.Let_syntax in
-    let%bind transactions_with_dates =
-      Hashtbl.find t.cache.user_transactions public_key
+    let queried_transactions =
+      let open Option.Let_syntax in
+      let%bind transactions_with_dates =
+        Hashtbl.find t.cache.user_transactions public_key
+      in
+      let%map date = Hashtbl.find t.cache.all_transactions transaction in
+      let earlier, transaction_opt, later =
+        Set.split transactions_with_dates (transaction, date)
+      in
+      [%test_pred: Txn_with_date.t option]
+        ~message:
+          "Transaction should be in-memory cache database for public key"
+        Option.is_some transaction_opt ;
+      f earlier later
     in
-    let%map date = Hashtbl.find t.cache.all_transactions transaction in
-    let earlier, transaction_opt, later =
-      Set.split transactions_with_dates (transaction, date)
-    in
-    [%test_pred: Txn_with_date.t option]
-      ~message:"Transaction should be in-memory cache database for public key"
-      Option.is_some transaction_opt ;
-    f earlier later)
-    |> Option.value_map
-         ~default:([], `Has_earlier_page false, `Has_later_page false)
-         ~f:(fun (transactions_with_dates, has_previous, has_next) ->
-           (List.map transactions_with_dates ~f:fst, has_previous, has_next) )
+    Option.value_map queried_transactions
+      ~default:([], `Has_earlier_page false, `Has_later_page false)
+      ~f:(fun (transactions_with_dates, has_previous, has_next) ->
+        (List.map transactions_with_dates ~f:fst, has_previous, has_next) )
 
   let has_neighboring_page = Fn.compose not Set.is_empty
 
@@ -157,12 +164,14 @@ let%test_module "Transaction_database" =
 
     let keypair2 = Keypair.create ()
 
+    let logger = Logger.create ()
+
     let with_database ~trials ~f gen =
       Async.Thread_safe.block_on_async_exn
       @@ fun () ->
       Quickcheck.async_test gen ~trials ~f:(fun input ->
           File_system.with_temp_dir "/tmp/coda-test" ~f:(fun directory_name ->
-              let database = Database.create ~directory_name () in
+              let database = Database.create logger directory_name in
               f input database ) )
 
     let add_all_transactions database all_transactions_with_dates =
