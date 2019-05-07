@@ -1,5 +1,6 @@
 open Core
 open Import
+open Coda_numbers
 module Payload = User_command_payload
 
 module Poly : sig
@@ -35,6 +36,8 @@ val payload : t -> Payload.t
 
 val fee : t -> Currency.Fee.t
 
+val nonce : t -> Account_nonce.t
+
 val sender : t -> Public_key.Compressed.t
 
 (* Generate a single transaction between
@@ -45,8 +48,20 @@ val sender : t -> Public_key.Compressed.t
 
 val gen :
      keys:Signature_keypair.t array
+  -> ?nonce:Account_nonce.t
+  -> ?sender_idx:int option
   -> max_amount:int
   -> max_fee:int
+  -> unit
+  -> t Quickcheck.Generator.t
+
+val gen_with_fake_signature :
+     keys:Signature_keypair.t array
+  -> ?nonce:Account_nonce.t
+  -> ?sender_idx:int option
+  -> max_amount:int
+  -> max_fee:int
+  -> unit
   -> t Quickcheck.Generator.t
 
 module With_valid_signature : sig
@@ -57,8 +72,11 @@ module With_valid_signature : sig
 
       val gen :
            keys:Signature_keypair.t array
+        -> ?nonce:Account_nonce.t
+        -> ?sender_idx:int option
         -> max_amount:int
         -> max_fee:int
+        -> unit
         -> t Quickcheck.Generator.t
     end
 
@@ -69,14 +87,30 @@ module With_valid_signature : sig
 
   val gen :
        keys:Signature_keypair.t array
+    -> ?nonce:Account_nonce.t
+    -> ?sender_idx:int option
     -> max_amount:int
     -> max_fee:int
+    -> unit
+    -> t Quickcheck.Generator.t
+
+  val gen_with_fake_signature :
+       keys:Signature_keypair.t array
+    -> ?nonce:Account_nonce.t
+    -> ?sender_idx:int option
+    -> max_amount:int
+    -> max_fee:int
+    -> unit
     -> t Quickcheck.Generator.t
 
   include Comparable.S with type t := t
 end
 
 val sign : Signature_keypair.t -> Payload.t -> With_valid_signature.t
+
+module For_tests : sig
+  val fake_sign : Signature_keypair.t -> Payload.t -> With_valid_signature.t
+end
 
 val check : t -> With_valid_signature.t option
 
