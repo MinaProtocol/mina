@@ -24,18 +24,13 @@ let start = apolloClient =>
     | `Pipe_graphql_request(id, requestStr) =>
       // These are the same thing
       let r: ApolloClient.queryObj = Obj.magic(Js.Json.parseExn(requestStr));
-      let query =
-        Task.liftPromise(() =>
-          apolloClient##query(r)
-          |> Js.Promise.then_(v => Js.Promise.resolve(`Ok(v)))
-          |> Js.Promise.catch(e => Js.Promise.resolve(`Error(e)))
-        );
+      let query = Task.liftErrorPromise(() => apolloClient##query(r));
 
-      Task.perform(
+      Task.attempt(
         ~f=
-          v =>
-            switch (v) {
-            | `Ok(response) =>
+          result =>
+            switch (result) {
+            | Ok(response) =>
               let response: Tc.Result.t(string, string) =
                 switch (Js.Json.stringifyAny(response)) {
                 | Some(responseStr) => Ok(responseStr)
@@ -51,7 +46,7 @@ let start = apolloClient =>
                   ),
                 ),
               );
-            | `Error(err) =>
+            | Error(err) =>
               let error: Tc.Result.t(string, string) =
                 switch (Js.Json.stringifyAny(err)) {
                 | Some(responseStr) => Error(responseStr)
