@@ -502,7 +502,9 @@ module T = struct
                      Logger.error logger ~module_:__MODULE__ ~location:__LOC__
                        "why is this w pipe closed? did someone close the \
                         reader end? dropping this write..." ;
-                   Linear_pipe.write_if_open w (prev_state_hash, state_hash) )) ;
+                   Linear_pipe.write_without_pushback_if_open w
+                     (prev_state_hash, state_hash) ;
+                   Deferred.unit )) ;
             return r.pipe
           in
           let coda_root_diff () =

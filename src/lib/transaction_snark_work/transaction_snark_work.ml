@@ -7,22 +7,10 @@ open Module_version
 
 module Make (Ledger_proof : sig
   type t [@@deriving sexp, bin_io]
-end) (Ledger_proof_statement : sig
-  type t [@@deriving sexp, hash, compare]
-
-  module Stable :
-    sig
-      module V1 : sig
-        type t [@@deriving sexp, bin_io, hash, compare, yojson, version]
-      end
-    end
-    with type V1.t = t
-
-  val gen : t Quickcheck.Generator.t
 end) :
-  Coda_pow.Transaction_snark_work_intf
+  Protocols.Coda_pow.Transaction_snark_work_intf
   with type proof := Ledger_proof.t
-   and type statement := Ledger_proof_statement.t
+   and type statement := Transaction_snark.Statement.t
    and type public_key := Public_key.Compressed.t = struct
   let proofs_length = 2
 
@@ -30,7 +18,7 @@ end) :
     module Stable = struct
       module V1 = struct
         module T = struct
-          type t = Ledger_proof_statement.Stable.V1.t list
+          type t = Transaction_snark.Statement.Stable.V1.t list
           [@@deriving bin_io, sexp, hash, compare, yojson, version]
         end
 
@@ -58,7 +46,7 @@ end) :
 
     let gen =
       Quickcheck.Generator.list_with_length proofs_length
-        Ledger_proof_statement.gen
+        Transaction_snark.Statement.gen
   end
 
   module T = struct
@@ -108,3 +96,5 @@ end) :
 
   let forget = Fn.id
 end
+
+include Make (Ledger_proof.Stable.V1)

@@ -1,6 +1,7 @@
 open Core
 open Async
 open Coda_base
+open Coda_transition
 open Signature_lib
 open Pipe_lib
 
@@ -20,14 +21,6 @@ module type Coda_intf = sig
         -> finish:('accum -> 'stop)
         -> 'stop
     end
-
-    module External_transition : sig
-      type t
-
-      module Verified : sig
-        type t
-      end
-    end
   end
 
   val get_lite_chain :
@@ -36,7 +29,7 @@ module type Coda_intf = sig
 
   val verified_transitions :
        t
-    -> (Inputs.External_transition.Verified.t, State_hash.t) With_hash.t
+    -> (External_transition.Verified.t, State_hash.t) With_hash.t
        Strict_pipe.Reader.t
 end
 
