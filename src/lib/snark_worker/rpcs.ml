@@ -1,5 +1,6 @@
 open Core_kernel
 open Async
+open Coda_base
 
 (* for versioning of the types here, see
 
@@ -23,10 +24,10 @@ module Make (Inputs : Intf.Inputs_intf) = struct
         type query = unit
 
         type response =
-          ( Statement.t
+          ( Transaction_snark.Statement.t
           , Transaction.t
           , Transaction_witness.t
-          , Proof.t )
+          , Ledger_proof.t )
           Work.Single.Spec.t
           Work.Spec.t
           option
@@ -45,10 +46,10 @@ module Make (Inputs : Intf.Inputs_intf) = struct
         type query = unit [@@deriving bin_io, version {rpc}]
 
         type response =
-          ( Statement.t
-          , Transaction.t
-          , Transaction_witness.t
-          , Proof.t )
+          ( Transaction_snark.Statement.Stable.V1.t
+          , Transaction.Stable.V1.t
+          , Transaction_witness.Stable.V1.t
+          , Ledger_proof.t )
           Work.Single.Spec.Stable.V1.t
           Work.Spec.Stable.V1.t
           option
@@ -77,13 +78,13 @@ module Make (Inputs : Intf.Inputs_intf) = struct
       module T = struct
         (* "master" types, do not change *)
         type query =
-          ( ( Statement.t
+          ( ( Transaction_snark.Statement.t
             , Transaction.t
             , Transaction_witness.t
-            , Proof.t )
+            , Ledger_proof.t )
             Work.Single.Spec.t
             Work.Spec.t
-          , Proof.t )
+          , Ledger_proof.t )
           Work.Result.t
 
         type response = unit
@@ -99,13 +100,13 @@ module Make (Inputs : Intf.Inputs_intf) = struct
     module V1 = struct
       module T = struct
         type query =
-          ( ( Statement.t
-            , Transaction.t
-            , Transaction_witness.t
-            , Proof.t )
+          ( ( Transaction_snark.Statement.Stable.V1.t
+            , Transaction.Stable.V1.t
+            , Transaction_witness.Stable.V1.t
+            , Ledger_proof.t )
             Work.Single.Spec.Stable.V1.t
             Work.Spec.Stable.V1.t
-          , Proof.t )
+          , Ledger_proof.t )
           Work.Result.Stable.V1.t
         [@@deriving bin_io, version {rpc}]
 
