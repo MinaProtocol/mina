@@ -518,51 +518,47 @@ module Make (Inputs : Inputs_intf) = struct
             , State_body_hash.t list * External_transition.t )
             Proof_carrying_data.t
             Deferred.Option.t) =
-    (* each of the passed-in procedures expects an enveloped input, so
-       we wrap the data received via RPC *)
-    let get_staged_ledger_aux_and_pending_coinbases_at_hash_rpc conn ~version:_
-        hash =
-      let hash_in_envelope = wrap_rpc_data_in_envelope conn hash in
-      let sender = Envelope.Incoming.sender hash_in_envelope in
+    let run_for_rpc_result conn data ~f action_msg msg_args =
+      let data_in_envelope = wrap_rpc_data_in_envelope conn data in
+      let sender = Envelope.Incoming.sender data_in_envelope in
       let%bind () =
         Trust_system.(
           record_envelope_sender config.trust_system config.logger sender
-            Actions.
-              ( Made_request
-              , Some ("get_staged_ledger_aux_and_pending_coinbases_at_hash", [])
-              ))
+            Actions.(Made_request, Some (action_msg, msg_args)))
       in
-      let%bind result =
-        get_staged_ledger_aux_and_pending_coinbases_at_hash hash_in_envelope
-      in
+      let%bind result = f data_in_envelope in
+      return (result, sender)
+    in
+    let record_unknown_item result sender action_msg msg_args =
       let%bind () =
         if Option.is_none result then
           Trust_system.(
             record_envelope_sender config.trust_system config.logger sender
-              Actions.
-                ( Requested_unknown_item
-                , Some
-                    ( "Requested staged ledger and pending coinbases at hash: \
-                       $hash"
-                    , [("hash", State_hash.to_yojson hash)] ) ))
+              Actions.(Requested_unknown_item, Some (action_msg, msg_args)))
         else return ()
       in
       return result
     in
+    (* each of the passed-in procedures expects an enveloped input, so
+       we wrap the data received via RPC *)
+    let get_staged_ledger_aux_and_pending_coinbases_at_hash_rpc conn ~version:_
+        hash =
+      let action_msg = "Staged ledger and pending coinbases at hash: $hash" in
+      let msg_args = [("hash", State_hash.to_yojson hash)] in
+      let%bind result, sender =
+        run_for_rpc_result conn hash
+          ~f:get_staged_ledger_aux_and_pending_coinbases_at_hash action_msg
+          msg_args
+      in
+      record_unknown_item result sender action_msg msg_args
+    in
     let answer_sync_ledger_query_rpc conn ~version:_
         ((hash, query) as sync_query) =
-      let sync_query_in_envelope = wrap_rpc_data_in_envelope conn sync_query in
-      let sender = Envelope.Incoming.sender sync_query_in_envelope in
-      let%bind () =
-        Trust_system.(
-          record_envelope_sender config.trust_system config.logger sender
-            Actions.
-              ( Made_request
-              , Some
-                  ( "answer_sync_ledger_query: $query"
-                  , [("query", Sync_ledger.Query.to_yojson query)] ) ))
+      let%bind result, sender =
+        run_for_rpc_result conn sync_query ~f:answer_sync_ledger_query
+          "Answer_sync_ledger_query: $query"
+          [("query", Sync_ledger.Query.to_yojson query)]
       in
-      let%bind result = answer_sync_ledger_query sync_query_in_envelope in
       let%bind () =
         match result with
         | Ok _ ->
@@ -575,8 +571,7 @@ module Make (Inputs : Inputs_intf) = struct
                 ~prefix:Coda_lib.refused_answer_query_string
             then
               Trust_system.(
-                record_envelope_sender config.trust_system config.logger
-                  (Envelope.Incoming.sender sync_query_in_envelope)
+                record_envelope_sender config.trust_system config.logger sender
                   Actions.
                     ( Requested_unknown_item
                     , Some
@@ -594,50 +589,22 @@ module Make (Inputs : Inputs_intf) = struct
     let transition_catchup_rpc conn ~version:_ hash =
       Logger.info config.logger ~module_:__MODULE__ ~location:__LOC__
         "Peer with IP %s sent transition_catchup" conn.Host_and_port.host ;
-      let hash_in_envelope = wrap_rpc_data_in_envelope conn hash in
-      let sender = Envelope.Incoming.sender hash_in_envelope in
-      let%bind () =
-        Trust_system.(
-          record_envelope_sender config.trust_system config.logger sender
-            Actions.(Made_request, Some ("transition_catchup", [])))
+      let action_msg = "Transition catchup with hash $hash" in
+      let msg_args = [("hash", State_hash.to_yojson hash)] in
+      let%bind result, sender =
+        run_for_rpc_result conn hash ~f:transition_catchup action_msg msg_args
       in
-      let%bind result = transition_catchup hash_in_envelope in
-      let%bind () =
-        if Option.is_none result then
-          Trust_system.(
-            record_envelope_sender config.trust_system config.logger sender
-              Actions.
-                ( Requested_unknown_item
-                , Some
-                    ( "Transition catchup with hash $hash"
-                    , [("hash", State_hash.to_yojson hash)] ) ))
-        else return ()
-      in
-      return result
+      record_unknown_item result sender action_msg msg_args
     in
     let get_ancestry_rpc conn ~version:_ query =
       Logger.info config.logger ~module_:__MODULE__ ~location:__LOC__
         "Sending root proof to peer with IP %s" conn.Host_and_port.host ;
-      let query_in_envelope = wrap_rpc_data_in_envelope conn query in
-      let sender = Envelope.Incoming.sender query_in_envelope in
-      let%bind () =
-        Trust_system.(
-          record_envelope_sender config.trust_system config.logger sender
-            Actions.(Made_request, Some ("get_ancestry", [])))
+      let action_msg = "Get_ancestry query: $query" in
+      let msg_args = [("query", Rpcs.Get_ancestry.query_to_yojson query)] in
+      let%bind result, sender =
+        run_for_rpc_result conn query ~f:get_ancestry action_msg msg_args
       in
-      let%bind result = get_ancestry query_in_envelope in
-      let%bind () =
-        if Option.is_none result then
-          Trust_system.(
-            record_envelope_sender config.trust_system config.logger sender
-              Actions.
-                ( Requested_unknown_item
-                , Some
-                    ( "Get ancestry query: $query"
-                    , [("query", Rpcs.Get_ancestry.query_to_yojson query)] ) ))
-        else return ()
-      in
-      return result
+      record_unknown_item result sender action_msg msg_args
     in
     let implementations =
       List.concat
