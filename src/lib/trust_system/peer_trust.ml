@@ -97,8 +97,8 @@ struct
     Option.iter db ~f:Db.close ;
     Strict_pipe.Writer.close bans_writer
 
-  [%%if
-  defined(disable_trust_system)]
+  [%%if 
+  disable_trust_system = true]
 
   let record t logger peer action =
     let response = Action.to_trust_response action in
