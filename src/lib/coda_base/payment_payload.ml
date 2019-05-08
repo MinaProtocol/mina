@@ -32,7 +32,7 @@ module Stable = struct
         ( Public_key.Compressed.Stable.V1.t
         , Amount.Stable.V1.t )
         Poly.Stable.V1.t
-      [@@deriving bin_io, eq, sexp, hash, compare, yojson, version]
+      [@@deriving bin_io, compare, eq, sexp, hash, compare, yojson, version]
     end
 
     include T

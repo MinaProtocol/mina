@@ -16,9 +16,6 @@ let val_or_exn label = function
 let option lab =
   Option.value_map ~default:(Or_error.error_string lab) ~f:(fun x -> Ok x)
 
-module Make_completed_work = Transaction_snark_work.Make
-module Make_diff = Staged_ledger_diff.Make
-
 module Make_with_constants (Constants : sig
   val transaction_capacity_log_2 : int
 
@@ -1982,7 +1979,7 @@ let%test_module "test" =
           module Latest = V1
         end
 
-        type t = int [@@deriving sexp, compare, hash, eq]
+        type t = int [@@deriving sexp, compare, hash, eq, yojson]
 
         include Hashable.Make_binable (Stable.Latest)
 

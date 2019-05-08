@@ -5,6 +5,7 @@ open Signature_lib
 open Coda_numbers
 open Coda_base
 open Coda_state
+open Coda_transition
 open O1trace
 
 module type Intf = sig
@@ -21,7 +22,7 @@ module type Intf = sig
     val new_block :
          Program.t
       -> Public_key.Compressed.t
-      -> Program.Inputs.External_transition.t Pipe.Reader.t
+      -> External_transition.t Pipe.Reader.t
 
     val new_payment :
       Program.t -> Public_key.Compressed.t -> User_command.t Pipe.Reader.t
@@ -31,11 +32,10 @@ module type Intf = sig
     Program.t -> Public_key.Compressed.t -> User_command.t list
 
   (* TODO: Remove once we have no more functors for external_transition *)
-  val payments : Program.Inputs.External_transition.t -> User_command.t list
+  val payments : External_transition.t -> User_command.t list
 
   (* TODO: Remove once we have no more functors for external_transition *)
-  val proposer :
-    Program.Inputs.External_transition.t -> Public_key.Compressed.t
+  val proposer : External_transition.t -> Public_key.Compressed.t
 end
 
 module Make
@@ -468,8 +468,11 @@ struct
                    match User_command.check user_command with
                    | Some checked_user_command ->
                        Transaction_database.add transaction_database
+                         (* TODO: Time should be computed as when a payment gets into the transition frontier  *)
                          (Coda_base.Transaction.User_command
-                            checked_user_command) ;
+                            checked_user_command)
+                         ( Coda_base.Block_time.Time.now
+                         @@ Coda_base.Block_time.Time.Controller.basic ) ;
                        Strict_pipe.Writer.write frontier_payment_writer
                          user_command
                    | None ->

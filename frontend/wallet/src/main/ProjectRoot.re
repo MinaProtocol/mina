@@ -1,4 +1,4 @@
-open Tc;
+[@bs.module "process"] external env: Js.Dict.t(string) = "";
 
 [@bs.module "electron"] [@bs.scope "app"] external isPackaged: bool = "";
 
@@ -28,16 +28,21 @@ external getPath:
   string =
   "";
 
+let isJest = Js.Dict.get(env, "JEST_WORKER_ID") == Some("1");
+
+// TODO(bkase): Fix this by using IPC
 let userData =
-  if (isPackaged) {
+  if (!isJest && false /*isPackaged*/) {
     getPath(`UserData);
   } else {
-    Node_path.join2(Option.getExn([%bs.node __dirname]), "../../../..");
+    Node.Process.cwd();
   };
 
 let resource =
-  if (isPackaged) {
+  if (!isJest && false /*isPackaged*/) {
     Filename.dirname(getAppPath());
   } else {
-    Node_path.join2(Option.getExn([%bs.node __dirname]), "../../../..");
+    Node.Process.cwd();
   };
+
+let settings = Filename.concat(userData, "settings.json");

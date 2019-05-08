@@ -127,7 +127,7 @@ module type S = sig
             type t [@@deriving bin_io, sexp, version]
           end
 
-          module Latest : module type of V1
+          module Latest = V1
         end
         with type V1.t = t
 

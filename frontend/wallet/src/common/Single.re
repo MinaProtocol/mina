@@ -1,3 +1,6 @@
+/// "singleton"-like functionality that can also be dropped whenever the
+/// `~drop` callback is invoked.
+
 module Make =
        (
          T: {

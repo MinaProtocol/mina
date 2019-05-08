@@ -3,53 +3,50 @@ open Tc;
 let component = ReasonReact.statelessComponent("Page");
 
 let inMemoryCache = ApolloInMemoryCache.createInMemoryCache();
-let httpLink =
-  ApolloLinks.createHttpLink(~uri="http://localhost:8080/graphql", ());
+let ipcLink = IpcLinkRenderer.create();
 let instance =
-  ReasonApollo.createApolloClient(~link=httpLink, ~cache=inMemoryCache, ());
+  ReasonApollo.createApolloClient(~link=ipcLink, ~cache=inMemoryCache, ());
 
 /// The semantics are as follows:
 ///
 /// 1. Path is always aquired from a URL.
-/// 2. The initial DeepLink's settingsOrError via the url seeds the
-///    settingsOrError state.
-/// 3. Afterwards, changes to settingsOrError are captured entirely via
-///    responses to change messages sent from the GUI frontend. We'll call
-///    setSettingsOrError when the settings change task finishes. Notice that
-///    even though more deep link messages are sent with settingsOrError, only
-///    the first will be taken.
+/// 2. We listen to the main process for new routes while the page is open
 ///
 let useRoute = () => {
   let url = ReasonReact.Router.useUrl();
 
-  let (path, settingsOrError) =
-    switch (Route.parse(url.hash)) {
-    | None =>
-      Js.log2("Failed to parse route: ", url.hash);
-      (None, `Error(`Json_parse_error));
-    | Some({Route.path, settingsOrError}) => (Some(path), settingsOrError)
-    };
+  let path = Route.parse(url.hash);
 
-  let (settingsOrError, setSettingsOrError) =
-    React.useState(() => settingsOrError);
+  switch (path) {
+  | None => Js.log2("Failed to parse route: ", url.hash)
+  | Some(_) => ()
+  };
 
   React.useEffect(() => {
     let token = MainCommunication.listen();
     Some(() => MainCommunication.stopListening(token));
   });
 
-  (path, settingsOrError, s => setSettingsOrError(_ => s));
+  path;
+};
+
+let useSettings = () => {
+  let (settings, setSettings) =
+    React.useState(() => SettingsRenderer.loadSettings());
+
+  (settings, newVal => setSettings(_ => newVal));
 };
 
 [@react.component]
 let make = (~message) => {
-  let (path, settingsOrError, setSettingsOrError) = useRoute();
+  let path = useRoute();
+  let (settingsOrError, setSettingsOrError) = useSettings();
 
-  let closeModal = () => Router.navigate({path: Home, settingsOrError});
+  let closeModal = () => Router.navigate(Home);
   let modalView =
     switch (path) {
     | None => None
-    | Some(Route.Path.Send) =>
+    | Some(Route.Send) =>
       Some(
         <Send
           closeModal
@@ -59,7 +56,7 @@ let make = (~message) => {
           ]
           settings={
             switch (settingsOrError) {
-            | `Settings(settings) => settings
+            | Ok(settings) => settings
             | _ => failwith("Bad; we need settings")
             }
           }
@@ -75,12 +72,16 @@ let make = (~message) => {
   let settingsInfo = {
     let question = " (did you create a settings.json file with {\"state\": {}} ?)";
     switch (settingsOrError) {
-    | `Settings(_) => "Settings loaded successfully"
-    | `Error(`Json_parse_error) =>
+    | Ok(_) => "Settings loaded successfully"
+    | Error(`Json_parse_error) =>
       "Settings failed to load with a json parse error" ++ question
-    | `Error(`Decode_error(s)) =>
+    | Error(`Decode_error(s)) =>
       "Settings failed to decode with " ++ s ++ question
-    | `Error(`Error_reading_file(e)) =>
+    | Error(`Error_saving_file(e)) =>
+      "Settings failed to write with a js exception"
+      ++ question
+      ++ (Js.Exn.stack(e) |> Option.withDefault(~default=""))
+    | Error(`Error_reading_file(e)) =>
       "Settings failed to load with a js exception"
       ++ question
       ++ (Js.Exn.stack(e) |> Option.withDefault(~default=""))
@@ -121,11 +122,11 @@ let make = (~message) => {
             />
           </div>
           {testButton("Delete wallet", ~f=() =>
-             Router.(navigate({path: DeleteWallet, settingsOrError}))
+             Router.(navigate(DeleteWallet))
            )}
           {testButton("Change name: " ++ Js.Int.toString(randomNum), ~f=() =>
              switch (settingsOrError) {
-             | `Settings(settings) =>
+             | Ok(settings) =>
                let task =
                  SettingsRenderer.add(
                    settings,
@@ -133,11 +134,11 @@ let make = (~message) => {
                    ~name="Wallet " ++ Js.Int.toString(randomNum),
                  );
                Js.log("Add started");
-               Task.perform(
+               Task.attempt(
                  task,
-                 ~f=settingsOrError => {
-                   Js.log2("Add complete", settingsOrError);
-                   setSettingsOrError(settingsOrError);
+                 ~f=res => {
+                   Js.log2("Add complete", res);
+                   setSettingsOrError(res);
                  },
                );
              | _ => Js.log("There's an error")
@@ -146,14 +147,14 @@ let make = (~message) => {
         </div>
         <div>
           {switch (settingsOrError) {
-           | `Settings(settings) =>
+           | Ok(settings) =>
              <Footer
                stakingKey={PublicKey.ofStringExn("131243123")}
                settings
              />
-           | `Error(_) => <span />
+           | Error(_) => <span />
            }}
-          <Modal settingsOrError view=modalView />
+          <Modal view=modalView />
         </div>
       </div>
     </div>

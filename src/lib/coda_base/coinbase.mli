@@ -7,7 +7,7 @@ module Stable : sig
       { proposer: Public_key.Compressed.Stable.V1.t
       ; amount: Currency.Amount.Stable.V1.t
       ; fee_transfer: Fee_transfer.Single.Stable.V1.t option }
-    [@@deriving sexp, bin_io, compare, eq, version, hash]
+    [@@deriving sexp, bin_io, compare, eq, version, hash, yojson]
   end
 
   module Latest = V1
@@ -18,7 +18,7 @@ type t = Stable.Latest.t = private
   { proposer: Public_key.Compressed.Stable.V1.t
   ; amount: Currency.Amount.Stable.V1.t
   ; fee_transfer: Fee_transfer.Single.Stable.V1.t option }
-[@@deriving sexp, compare, eq, hash]
+[@@deriving sexp, compare, eq, hash, yojson]
 
 val create :
      amount:Currency.Amount.t

@@ -141,14 +141,14 @@ let make = (~wallet: Wallet.t, ~settings, ~setSettingsOrError) => {
         | ResetDebounce => {...state, debounce: false}
         | SaveName =>
           let _ = Js.Global.setTimeout(() => dispatch(ResetDebounce), 100);
-          Task.perform(
+          Task.attempt(
             SettingsRenderer.add(
               settings,
               ~key=wallet.key,
               ~name=state.currentName,
             ),
-            ~f=settingsOrError => {
-              setSettingsOrError(settingsOrError);
+            ~f=res => {
+              setSettingsOrError(res);
               // TODO: Loading needs to be on the whole wallet-item pane since
               // Settings updates are not commutative
               dispatch(LoadingDone);

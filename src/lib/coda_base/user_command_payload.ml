@@ -11,7 +11,7 @@ module Common = struct
       module V1 = struct
         module T = struct
           type ('fee, 'nonce, 'memo) t = {fee: 'fee; nonce: 'nonce; memo: 'memo}
-          [@@deriving bin_io, eq, sexp, hash, yojson, version]
+          [@@deriving bin_io, compare, eq, sexp, hash, yojson, version]
         end
 
         include T
@@ -33,7 +33,7 @@ module Common = struct
           , Account_nonce.Stable.V1.t
           , Memo.Stable.V1.t )
           Poly.Stable.V1.t
-        [@@deriving bin_io, eq, sexp, hash, yojson, version]
+        [@@deriving bin_io, compare, eq, sexp, hash, yojson, version]
       end
 
       include T
@@ -109,7 +109,7 @@ module Body = struct
           | Payment of Payment_payload.Stable.V1.t
           | Stake_delegation of Stake_delegation.Stable.V1.t
           | Chain_voting of State_hash.Stable.V1.t
-        [@@deriving bin_io, eq, sexp, hash, yojson, version]
+        [@@deriving bin_io, compare, eq, sexp, hash, yojson, version]
       end
 
       include T
@@ -197,7 +197,7 @@ module Stable = struct
   module V1 = struct
     module T = struct
       type t = (Common.Stable.V1.t, Body.Stable.V1.t) Poly.Stable.V1.t
-      [@@deriving bin_io, eq, sexp, hash, yojson, version]
+      [@@deriving bin_io, compare, eq, sexp, hash, yojson, version]
     end
 
     include T
