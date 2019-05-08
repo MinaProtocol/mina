@@ -25,6 +25,10 @@ module Encode = {
 let lookup = (t, key: PublicKey.t) =>
   Js.Dict.get(t.state, PublicKey.toString(key));
 
+let entries = (t: t) =>
+  Js.Dict.entries(t.state)
+  |> Array.map(~f=((key, name)) => (PublicKey.ofStringExn(key), name));
+
 let set = (t: t, ~key, ~name) => {
   let state' = Js.Dict.entries(t.state) |> Js.Dict.fromArray;
   Js.Dict.set(state', PublicKey.toString(key), name);
@@ -50,32 +54,36 @@ module Loader = {
            M: Monad.Fail.S2,
            R: {let readSettings: string => M.t(Js.Exn.t, string);},
          ) => {
-    let load = path =>
-      R.readSettings(path)
-      |> M.map(~f=v => `Json(v))
-      |> M.onError(~f=e => M.return(`Error_reading_file(e)))
-      |> M.andThen(~f=contents =>
-           switch (contents) {
-           | `Json(contents) =>
-             Js.log2("contents", contents);
-             switch (Json.parse(contents)) {
-             | Some(json) => M.return(json)
-             | None => M.fail(`Json_parse_error)
-             };
-           | `Error_reading_file(e) =>
-             Printf.fprintf(
-               stderr,
-               "Error loading settings from %s, falling back to default. Error:%s\n%!",
-               path,
-               Tc.Option.withDefault(Js.Exn.message(e), ~default="Unknown"),
-             );
-             M.return(create());
-           }
-         )
-      |> M.andThen(~f=json =>
-           try (Decode.t(json) |> M.return) {
-           | Json.Decode.DecodeError(str) => M.fail(`Decode_error(str))
-           }
-         );
+    let load: Intf(M).loadSettings(string, 'a) =
+      path =>
+        R.readSettings(path)
+        |> M.map(~f=v => `Json(v))
+        |> M.onError(~f=e => M.return(`Error_reading_file(e)))
+        |> M.andThen(~f=contents =>
+             switch (contents) {
+             | `Json(contents) =>
+               Js.log2("contents", contents);
+               switch (Json.parse(contents)) {
+               | Some(json) => M.return(json)
+               | None => M.fail(`Json_parse_error)
+               };
+             | `Error_reading_file(e) =>
+               Printf.fprintf(
+                 stderr,
+                 "Error loading settings from %s, falling back to default. Error:%s\n%!",
+                 path,
+                 Tc.Option.withDefault(
+                   Js.Exn.message(e),
+                   ~default="Unknown",
+                 ),
+               );
+               M.return(create());
+             }
+           )
+        |> M.andThen(~f=json =>
+             try (Decode.t(json) |> M.return) {
+             | Json.Decode.DecodeError(str) => M.fail(`Decode_error(str))
+             }
+           );
   };
 };

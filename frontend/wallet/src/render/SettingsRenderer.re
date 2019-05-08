@@ -12,9 +12,7 @@ external loadSettings: Settings_intf.loadSettings(unit, 'a) = "";
 
 let lookup = Settings.lookup;
 
-let entries = (t: Settings.t) =>
-  Js.Dict.entries(t.state)
-  |> Array.map(~f=((key, name)) => (PublicKey.ofStringExn(key), name));
+let entries = Settings.entries;
 
 let lookupWithFallback = (t, key: PublicKey.t) =>
   lookup(t, key) |> Option.withDefault(~default=PublicKey.toString(key));
