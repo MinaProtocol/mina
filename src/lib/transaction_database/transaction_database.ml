@@ -51,18 +51,17 @@ struct
     | Coinbase {Coinbase.proposer; fee_transfer; _} ->
         Option.value_map fee_transfer ~default:[proposer] ~f:(fun (pk, _) ->
             [proposer; pk] )
-    | User_command checked_user_command ->
+    | User_command checked_user_command -> (
         let user_command = User_command.forget_check checked_user_command in
         let sender = User_command.sender user_command in
         let payload = User_command.payload user_command in
-        let receiver =
-          match User_command_payload.body payload with
-          | Stake_delegation (Set_delegate {new_delegate}) ->
-              new_delegate
-          | Payment {receiver; _} ->
-              receiver
-        in
-        [receiver; sender]
+        match User_command_payload.body payload with
+        | Stake_delegation (Set_delegate {new_delegate}) ->
+            [sender; new_delegate]
+        | Payment {receiver; _} ->
+            [sender; receiver]
+        | Chain_voting _ ->
+            [sender] )
 
   let add {database; cache= {all_transactions; user_transactions}; logger}
       transaction date =

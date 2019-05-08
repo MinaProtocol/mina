@@ -54,6 +54,8 @@ let currency_consumed :
     | Payment {amount; _} ->
         amount
     | Stake_delegation _ ->
+        zero
+    | Chain_voting _ ->
         zero)
 
 let currency_consumed' :
