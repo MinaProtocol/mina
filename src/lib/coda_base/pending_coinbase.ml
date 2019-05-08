@@ -782,7 +782,7 @@ let%test_unit "Checked_stack = Unchecked_stack" =
 let%test_unit "Checked_tree = Unchecked_tree" =
   let open Quickcheck in
   let pending_coinbases = create () |> Or_error.ok_exn in
-  test ~trials:20 Coinbase.gen ~f:(fun coinbase ->
+  test ~trials:10 Coinbase.gen ~f:(fun coinbase ->
       let max_coinbase_amount = Protocols.Coda_praos.coinbase_amount in
       let coinbase_data = Coinbase_data.of_coinbase coinbase in
       let coinbase2 =
@@ -891,5 +891,5 @@ let%test_unit "push and pop multiple stacks" =
         pending_coinbases := check !pending_coinbases expected_stack ) ;
     Queue.clear queue_of_stacks
   in
-  test ~trials:50 (Int.gen_incl 2 coinbase_stacks) ~f:(fun trials ->
-      add_remove_check trials )
+  test ~trials:(coinbase_stacks / 2) (Int.gen_incl 2 coinbase_stacks)
+    ~f:(fun trials -> add_remove_check trials)
