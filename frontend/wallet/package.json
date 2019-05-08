@@ -50,6 +50,7 @@
       "package.json"
     ],
     "extraResources": [
+      "node_modules/graphql-faker/dist/index.js",
       "bundle/**/*",
       "public/*"
     ],
