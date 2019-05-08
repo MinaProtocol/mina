@@ -1,5 +1,17 @@
 open Tc;
 
+module Url = {
+  type t;
+  [@bs.new] external create: string => t = "URL";
+
+  module SearchParams = {
+    type t;
+    [@bs.send] external get: (t, string) => string = "";
+  };
+
+  [@bs.get] external searchParams: t => SearchParams.t = "";
+};
+
 module Navigator = {
   module Clipboard = {
     [@bs.val] [@bs.scope ("navigator", "clipboard")]

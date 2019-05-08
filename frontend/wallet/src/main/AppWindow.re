@@ -58,6 +58,8 @@ include Single.Make({
         window,
         "file://"
         ++ Filename.concat(ProjectRoot.resource, "public/index.html")
+        ++ "?settingsPath="
+        ++ Js.Global.encodeURI(ProjectRoot.settings)
         ++ "#"
         ++ Route.print(input.path),
       );
