@@ -190,7 +190,7 @@ let%test_module "Transaction_database" =
           list
           @@ User_command.With_valid_signature.gen_with_random_participants
                ~keys:(Array.of_list [keypair1; keypair2])
-               ~max_amount:10000 ~max_fee:1000)
+               ~max_amount:10000 ~max_fee:1000 ())
         ~f:(fun user_commands database ->
           let transactions =
             List.map user_commands ~f:(fun user_command ->
@@ -223,7 +223,7 @@ let%test_module "Transaction_database" =
           let open Quickcheck.Generator.Let_syntax in
           let%map user_command =
             User_command.With_valid_signature.gen ~key_gen:key
-              ~max_amount:10000 ~max_fee:1000
+              ~max_amount:10000 ~max_fee:1000 ()
           in
           Transaction.User_command user_command
 

@@ -3,6 +3,7 @@ open Async
 open Graphql_async
 open Pipe_lib
 open Coda_base
+open Coda_transition
 open Signature_lib
 open Currency
 
@@ -10,6 +11,16 @@ module Make (Commands : Coda_commands.Intf) = struct
   module Program = Commands.Program
   module Config_in = Commands.Config_in
   open Program.Inputs
+
+  let result_of_exn f v ~error = try Ok (f v) with _ -> Error error
+
+  let result_field ~resolve =
+    Schema.io_field ~resolve:(fun resolve_info src inputs ->
+        Deferred.return @@ resolve resolve_info src inputs )
+
+  let result_field_no_inputs ~resolve =
+    Schema.io_field ~resolve:(fun resolve_info src ->
+        Deferred.return @@ resolve resolve_info src )
 
   module Types = struct
     open Schema
@@ -29,9 +40,14 @@ module Make (Commands : Coda_commands.Intf) = struct
       let balance b = Balance.to_uint64 b |> uint64
     end
 
+    let uint64_doc = sprintf !"%s (%s is uint64 and is coerced as a string)"
+
     let uint64_field name ~doc =
-      field name ~typ:(non_null string)
-        ~doc:(sprintf !"%s (%s is uint64 and is coerced as a string" doc name)
+      field name ~typ:(non_null string) ~doc:(uint64_doc doc name)
+
+    let uint64_result_field name ~doc =
+      result_field_no_inputs name ~typ:(non_null string)
+        ~doc:(uint64_doc doc name)
 
     (* TODO: include submitted_at (date) and included_at (date). These two fields are not exposed in the user_command *)
     let payment : (Program.t, User_command.t option) typ =
@@ -46,7 +62,7 @@ module Make (Commands : Coda_commands.Intf) = struct
               ~args:Arg.[]
               ~resolve:(fun _ payment ->
                 User_command.sender payment |> Stringable.public_key )
-          ; field "receiver" ~typ:(non_null string)
+          ; result_field_no_inputs "receiver" ~typ:(non_null string)
               ~doc:"Public key of the receiver"
               ~args:Arg.[]
               ~resolve:(fun _ payment ->
@@ -54,21 +70,21 @@ module Make (Commands : Coda_commands.Intf) = struct
                   User_command_payload.body (User_command.payload payment)
                 with
                 | Payment {Payment_payload.Poly.receiver; _} ->
-                    receiver |> Stringable.public_key
+                    Ok (receiver |> Stringable.public_key)
                 | Stake_delegation _ ->
-                    failwith "Payment should not consist of a stake delegation"
-                )
-          ; uint64_field "amount" ~doc:"Amount that sender send to receiver"
+                    Error "Payment should not consist of a stake delegation" )
+          ; uint64_result_field "amount"
+              ~doc:"Amount that sender send to receiver"
               ~args:Arg.[]
               ~resolve:(fun _ payment ->
                 match
                   User_command_payload.body (User_command.payload payment)
                 with
                 | Payment {Payment_payload.Poly.amount; _} ->
-                    amount |> Currency.Amount.to_uint64 |> Stringable.uint64
+                    Ok
+                      (amount |> Currency.Amount.to_uint64 |> Stringable.uint64)
                 | Stake_delegation _ ->
-                    failwith "Payment should not consist of a stake delegation"
-                )
+                    Error "Payment should not consist of a stake delegation" )
           ; uint64_field "fee"
               ~doc:
                 "Fee that sender is willing to pay for making the transaction"
@@ -286,12 +302,12 @@ module Make (Commands : Coda_commands.Intf) = struct
     open Schema
 
     let sync_state =
-      io_field "syncStatus" ~typ:Types.sync_status
+      result_field_no_inputs "syncStatus" ~typ:Types.sync_status
         ~args:Arg.[]
         ~resolve:(fun {ctx= coda; _} () ->
-          Deferred.return
+          Result.map_error
             (Coda_incremental.Status.Observer.value @@ Program.sync_status coda)
-          >>| Result.map_error ~f:Error.to_string_hum )
+            ~f:Error.to_string_hum )
 
     let version =
       field "version" ~typ:string
@@ -311,7 +327,7 @@ module Make (Commands : Coda_commands.Intf) = struct
           |> List.filter_map ~f:(fun pk -> account_of_pk coda pk) )
 
     let wallet =
-      field "wallet"
+      result_field "wallet"
         ~doc:
           "Find any wallet via a public key. Null if the key was not found \
            for some reason (i.e. we're bootstrapping, or the account doesn't \
@@ -321,7 +337,11 @@ module Make (Commands : Coda_commands.Intf) = struct
           (* TODO: Is there anyway to describe `public_key` arg in a more typesafe way on our ocaml-side *)
         ~args:Arg.[arg "publicKey" ~typ:(non_null string)]
         ~resolve:(fun {ctx= coda; _} () pk_string ->
-          let pk = Public_key.Compressed.of_base64_exn pk_string in
+          let open Result.Let_syntax in
+          let%map pk =
+            result_of_exn ~error:"publicKey address is not valid."
+              Public_key.Compressed.of_base64_exn pk_string
+          in
           account_of_pk coda pk )
 
     let current_snark_worker =
@@ -333,12 +353,16 @@ module Make (Commands : Coda_commands.Intf) = struct
               (k, Program.snark_work_fee coda) ) )
 
     let payments =
-      field "payments"
+      result_field "payments"
         ~doc:"Payments that a user with public key KEY sent or received"
         ~args:Arg.[arg "publicKey" ~typ:Types.Input.payment_filter_input]
         ~typ:(non_null @@ list @@ non_null Types.payment)
         ~resolve:(fun {ctx= coda; _} () public_key ->
-          let public_key = Public_key.Compressed.of_base64_exn public_key in
+          let open Result.Let_syntax in
+          let%map public_key =
+            result_of_exn Public_key.Compressed.of_base64_exn public_key
+              ~error:"publicKey address is not valid."
+          in
           Commands.get_all_payments coda public_key )
 
     let initial_peers =
@@ -383,7 +407,12 @@ module Make (Commands : Coda_commands.Intf) = struct
         ~typ:(non_null Types.block)
         ~args:Arg.[arg "publicKey" ~typ:(non_null string)]
         ~resolve:(fun {ctx= coda; _} public_key ->
-          let public_key = Public_key.Compressed.of_base64_exn public_key in
+          let open Deferred.Result.Let_syntax in
+          let%bind public_key =
+            Deferred.return
+            @@ result_of_exn Public_key.Compressed.of_base64_exn public_key
+                 ~error:"publicKey is not valid"
+          in
           (* Pipes that will alert a subscriber of any new blocks throughout the entire time the daemon is on *)
           Deferred.Result.return
           @@ Commands.Subscriptions.new_block coda public_key )
@@ -416,8 +445,6 @@ module Make (Commands : Coda_commands.Intf) = struct
           let open Deferred.Let_syntax in
           let%map pk = Program.wallets coda |> Secrets.Wallets.generate_new in
           Result.return pk )
-
-    let result_of_exn f v ~error = try Ok (f v) with _ -> Error error
 
     let send_payment =
       io_field "sendPayment" ~doc:"Send a payment"
@@ -468,7 +495,7 @@ module Make (Commands : Coda_commands.Intf) = struct
               in
               let payment = User_command.sign sender_kp payload in
               let command = User_command.forget_check payment (*uhhh*) in
-              let sent = Commands.send_payment Config_in.logger coda command in
+              let sent = Commands.send_payment coda command in
               Deferred.map sent ~f:(function
                 | `Active (Ok _) ->
                     Ok command

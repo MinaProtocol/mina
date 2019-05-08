@@ -6,7 +6,7 @@ struct
   open P
 
   module B =
-    Group_map.Make_group_map
+    Group_map.Make
       (M.Field.Constant)
       (struct
         include M.Field

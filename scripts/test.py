@@ -13,6 +13,8 @@ build_artifact_profiles = [
     'testnet_postake',
     'testnet_postake_many_proposers',
     'testnet_postake_snarkless_fake_hash',
+    # ihm: Commenting this out to get the big curves fixes in. The CI machines were too weak to build
+    # 'testnet_postake_medium_curves',
 ]
 
 unit_test_profiles = [
@@ -196,7 +198,6 @@ def run(args):
             print('  - %s' % test)
             log = os.path.join(profile_dir, '%s.log' % test)
             cmd = 'set -o pipefail && %s integration-test %s 2>&1 ' % (coda_exe, test)
-            cmd += '| grep -v "* Elements of w " | grep -v "elements in proof:" '
             cmd += '| tee \'%s\' | %s -f \'%s\' ' % (log, logproc_exe, logproc_filter)
             print('Running: %s' % (cmd))
             run_cmd(cmd, lambda: fail('Test "%s:%s" failed' % (profile, test)))

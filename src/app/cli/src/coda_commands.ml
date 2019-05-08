@@ -5,6 +5,7 @@ open Signature_lib
 open Coda_numbers
 open Coda_base
 open Coda_state
+open Coda_transition
 open O1trace
 
 module type Intf = sig
@@ -13,8 +14,7 @@ module type Intf = sig
   module Config_in : Coda_inputs.Config_intf
 
   val send_payment :
-       Logger.t
-    -> Program.t
+       Program.t
     -> User_command.t
     -> Receipt.Chain_hash.t Base.Or_error.t Participating_state.T.t Deferred.t
 
@@ -22,7 +22,7 @@ module type Intf = sig
     val new_block :
          Program.t
       -> Public_key.Compressed.t
-      -> Program.Inputs.External_transition.t Pipe.Reader.t
+      -> External_transition.t Pipe.Reader.t
 
     val new_payment :
       Program.t -> Public_key.Compressed.t -> User_command.t Pipe.Reader.t
@@ -32,11 +32,10 @@ module type Intf = sig
     Program.t -> Public_key.Compressed.t -> User_command.t list
 
   (* TODO: Remove once we have no more functors for external_transition *)
-  val payments : Program.Inputs.External_transition.t -> User_command.t list
+  val payments : External_transition.t -> User_command.t list
 
   (* TODO: Remove once we have no more functors for external_transition *)
-  val proposer :
-    Program.Inputs.External_transition.t -> Public_key.Compressed.t
+  val proposer : External_transition.t -> Public_key.Compressed.t
 end
 
 module Make
@@ -51,7 +50,12 @@ struct
   (** For status *)
   let txn_count = ref 0
 
-  let record_payment ~logger t (txn : User_command.t) account =
+  let record_payment t (txn : User_command.t) account =
+    let logger =
+      Logger.extend
+        (Program.top_level_logger t)
+        [("coda_command", `String "Recording payment")]
+    in
     let previous = account.Account.Poly.receipt_chain_hash in
     let receipt_chain_database = receipt_chain_database t in
     match Receipt_chain_database.add receipt_chain_database ~previous txn with
@@ -98,13 +102,18 @@ struct
     in
     Option.is_some remainder
 
-  let schedule_payment log t (txn : User_command.t) account_opt =
+  let schedule_payment t (txn : User_command.t) account_opt =
     if not (is_valid_payment t txn account_opt) then
       Or_error.error_string "Invalid payment: account balance is too low"
     else
       let txn_pool = transaction_pool t in
       don't_wait_for (Transaction_pool.add txn_pool txn) ;
-      Logger.info log ~module_:__MODULE__ ~location:__LOC__
+      let logger =
+        Logger.extend
+          (Program.top_level_logger t)
+          [("coda_command", `String "scheduling a payment")]
+      in
+      Logger.info logger ~module_:__MODULE__ ~location:__LOC__
         ~metadata:[("user_command", User_command.to_yojson txn)]
         "Added payment $user_command to pool successfully" ;
       txn_count := !txn_count + 1 ;
@@ -143,15 +152,15 @@ struct
     let%map account = Ledger.get ledger location in
     account.Account.Poly.nonce
 
-  let send_payment logger t (txn : User_command.t) =
+  let send_payment t (txn : User_command.t) =
     Deferred.return
     @@
     let public_key = Public_key.compress txn.sender in
     let open Participating_state.Let_syntax in
     let%map account_opt = get_account t public_key in
     let open Or_error.Let_syntax in
-    let%map () = schedule_payment logger t txn account_opt in
-    record_payment ~logger t txn (Option.value_exn account_opt)
+    let%map () = schedule_payment t txn account_opt in
+    record_payment t txn (Option.value_exn account_opt)
 
   let get_balance t (addr : Public_key.Compressed.t) =
     let open Participating_state.Option.Let_syntax in
@@ -171,7 +180,7 @@ struct
       (User_command)
       (Receipt_chain_hash)
 
-  let verify_payment t log (addr : Public_key.Compressed.Stable.Latest.t)
+  let verify_payment t (addr : Public_key.Compressed.Stable.Latest.t)
       (verifying_txn : User_command.t) proof =
     let open Participating_state.Let_syntax in
     let%map account = get_account t addr in
@@ -189,15 +198,20 @@ struct
         verifying_txn
 
   (* TODO: Properly record receipt_chain_hash for multiple transactions. See #1143 *)
-  let schedule_payments logger t txns =
+  let schedule_payments t txns =
     List.map txns ~f:(fun (txn : User_command.t) ->
         let public_key = Public_key.compress txn.sender in
         let open Participating_state.Let_syntax in
         let%map account_opt = get_account t public_key in
-        match schedule_payment logger t txn account_opt with
+        match schedule_payment t txn account_opt with
         | Ok () ->
             ()
         | Error err ->
+            let logger =
+              Logger.extend
+                (Program.top_level_logger t)
+                [("coda_command", `String "scheduling a payment")]
+            in
             Logger.warn logger ~module_:__MODULE__ ~location:__LOC__
               ~metadata:[("error", `String (Error.to_string_hum err))]
               "Failure in schedule_payments: $error. This is not yet reported \
@@ -444,15 +458,31 @@ struct
             Strict_pipe.(create (Buffered (`Capacity 20, `Overflow Drop_head)))
           in
           let write_user_commands user_commands =
-            List.iter user_commands ~f:(fun payment ->
-                Option.iter (User_command.check payment)
-                  ~f:(fun checked_user_command ->
-                    Transaction_database.add transaction_database
-                      (Coda_base.Transaction.User_command checked_user_command)
-                      (* TODO: Time should be computed as when a payment gets into the transition frontier  *)
-                      ( Coda_base.Block_time.Time.now
-                      @@ Coda_base.Block_time.Time.Controller.basic ) ) ;
-                Strict_pipe.Writer.write frontier_payment_writer payment )
+            List.filter user_commands ~f:(fun user_command ->
+                Public_key.Compressed.equal
+                  (User_command.sender user_command)
+                  public_key )
+            |> List.iter ~f:(fun user_command ->
+                   match User_command.check user_command with
+                   | Some checked_user_command ->
+                       Transaction_database.add transaction_database
+                         (* TODO: Time should be computed as when a payment gets into the transition frontier  *)
+                         (Coda_base.Transaction.User_command
+                            checked_user_command)
+                         ( Coda_base.Block_time.Time.now
+                         @@ Coda_base.Block_time.Time.Controller.basic ) ;
+                       Strict_pipe.Writer.write frontier_payment_writer
+                         user_command
+                   | None ->
+                       let logger =
+                         Logger.extend
+                           (Program.top_level_logger coda)
+                           [ ( "coda_command"
+                             , `String "Checking user command failed" ) ]
+                       in
+                       Logger.error logger ~module_:__MODULE__
+                         ~location:__LOC__
+                         "Could not check user command correctly" )
           in
           Coda_incremental.New_transition.Observer.on_update_exn
             payments_observer ~f:(function

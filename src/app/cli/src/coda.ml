@@ -323,11 +323,16 @@ let daemon logger =
          Option.value_map run_snark_worker_flag ~default:`Don't_run
            ~f:(fun k -> `With_public_key k)
        in
+       let trace_database_initialization typ location =
+         Logger.trace logger "Creating %s at %s" ~module_:__MODULE__ ~location
+           typ
+       in
        let trust_dir = conf_dir ^/ "trust" in
        let () = Snark_params.set_chunked_hashing true in
        let%bind () = Async.Unix.mkdir ~p:() trust_dir in
        let transition_frontier_location = conf_dir ^/ "transition_frontier" in
        let trust_system = Trust_system.create ~db_dir:trust_dir in
+       trace_database_initialization "trust_system" __LOC__ trust_dir ;
        let time_controller =
          M.Inputs.Time.Controller.create M.Inputs.Time.Controller.basic
        in
@@ -339,6 +344,7 @@ let daemon logger =
        in
        let net_config =
          { M.Inputs.Net.Config.logger
+         ; trust_system
          ; time_controller
          ; consensus_local_state
          ; gossip_net_params=
@@ -357,6 +363,15 @@ let daemon logger =
          Coda_base.Receipt_chain_database.create
            ~directory:receipt_chain_dir_name
        in
+       trace_database_initialization "receipt_chain_database" __LOC__
+         receipt_chain_dir_name ;
+       let transaction_database_dir = conf_dir ^/ "transaction" in
+       let%bind () = Async.Unix.mkdir ~p:() transaction_database_dir in
+       let transaction_database =
+         Transaction_database.create logger transaction_database_dir
+       in
+       trace_database_initialization "transaction_database" __LOC__
+         transaction_database_dir ;
        let monitor = Async.Monitor.create ~name:"coda" () in
        let%bind coda =
          Run.create
@@ -369,9 +384,9 @@ let daemon logger =
               ~snark_work_fee:snark_work_fee_flag ~receipt_chain_database
               ~transition_frontier_location ~time_controller
               ?propose_keypair:Config0.propose_keypair ~monitor
-              ~consensus_local_state ())
+              ~consensus_local_state ~transaction_database ())
        in
-       Run.handle_shutdown ~monitor ~conf_dir ~logger coda ;
+       Run.handle_shutdown ~monitor ~conf_dir coda ;
        Async.Scheduler.within' ~monitor
        @@ fun () ->
        let%bind () = maybe_sleep 3. in
@@ -379,8 +394,8 @@ let daemon logger =
        let web_service = Web_pipe.get_service () in
        Web_pipe.run_service (module Run) coda web_service ~conf_dir ~logger ;
        Run.setup_local_server ?client_whitelist ?rest_server_port ~coda
-         ~client_port ~logger () ;
-       Run.run_snark_worker ~logger ~client_port run_snark_worker_action ;
+         ~client_port () ;
+       Run.run_snark_worker ~client_port run_snark_worker_action ;
        Logger.info logger ~module_:__MODULE__ ~location:__LOC__
          "Running coda services" ;
        Async.never ())
@@ -450,20 +465,7 @@ let ensure_testnet_id_still_good _ = Deferred.unit
 
 [%%endif]
 
-[%%if
-proof_level = "full"]
-
-let internal_commands =
-  [(Snark_worker_lib.Intf.command_name, Snark_worker_lib.Prod.Worker.command)]
-
-[%%else]
-
-(* TODO #1698: proof_level=check *)
-
-let internal_commands =
-  [(Snark_worker_lib.Intf.command_name, Snark_worker_lib.Debug.Worker.command)]
-
-[%%endif]
+let internal_commands = [(Snark_worker.Intf.command_name, Snark_worker.command)]
 
 let coda_commands logger =
   [ (Parallel.worker_command_name, Parallel.worker_command)
@@ -506,5 +508,9 @@ let () =
   don't_wait_for (ensure_testnet_id_still_good logger) ;
   (* Turn on snark debugging in prod for now *)
   Snarky.Snark.set_eval_constraints true ;
+  Snarky.Libsnark.set_printing_fun
+    (Logger.format_message logger ~level:Debug ~module_:"Snarky__Libsnark"
+       ~location:"File \"lib/snarky/src/libsnark.ml\", line 1, characters 0-1"
+       "%s") ;
   Command.run (Command.group ~summary:"Coda" (coda_commands logger)) ;
   Core.exit 0

@@ -3,10 +3,9 @@ open Tc;
 let component = ReasonReact.statelessComponent("Page");
 
 let inMemoryCache = ApolloInMemoryCache.createInMemoryCache();
-let httpLink =
-  ApolloLinks.createHttpLink(~uri="http://localhost:8080/graphql", ());
+let ipcLink = IpcLinkRenderer.create();
 let instance =
-  ReasonApollo.createApolloClient(~link=httpLink, ~cache=inMemoryCache, ());
+  ReasonApollo.createApolloClient(~link=ipcLink, ~cache=inMemoryCache, ());
 
 /// The semantics are as follows:
 ///

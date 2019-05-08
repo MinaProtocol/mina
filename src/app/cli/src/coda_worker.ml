@@ -342,14 +342,30 @@ module T = struct
           in
           let module Main = Coda_inputs.Make_coda (Init) in
           let module Run = Coda_run.Make (Config) (Main) in
-          let receipt_chain_dir_name = conf_dir ^/ "receipt_chain" in
+          let%bind receipt_chain_dir_name =
+            Unix.mkdtemp @@ conf_dir ^/ "receipt_chain"
+          in
           let%bind trust_dir = Unix.mkdtemp (conf_dir ^/ "trust") in
-          let%bind () = File_system.create_dir receipt_chain_dir_name in
+          let%bind transaction_database_dir =
+            Unix.mkdtemp @@ conf_dir ^/ "transaction"
+          in
+          let trace_database_initialization typ location =
+            Logger.trace logger "Creating %s at %s" ~module_:__MODULE__
+              ~location typ
+          in
           let receipt_chain_database =
             Coda_base.Receipt_chain_database.create
               ~directory:receipt_chain_dir_name
           in
+          trace_database_initialization "receipt_chain_database" __LOC__
+            receipt_chain_dir_name ;
           let trust_system = Trust_system.create ~db_dir:trust_dir in
+          trace_database_initialization "trust_system" __LOC__ trust_dir ;
+          let transaction_database =
+            Transaction_database.create logger transaction_database_dir
+          in
+          trace_database_initialization "transaction_database" __LOC__
+            transaction_database_dir ;
           let time_controller =
             Run.Inputs.Time.Controller.create Run.Inputs.Time.Controller.basic
           in
@@ -361,6 +377,7 @@ module T = struct
           in
           let net_config =
             { Main.Inputs.Net.Config.logger
+            ; trust_system
             ; time_controller
             ; consensus_local_state
             ; gossip_net_params=
@@ -392,9 +409,9 @@ module T = struct
                  ~time_controller ~receipt_chain_database
                  ~snark_work_fee:(Currency.Fee.of_int 0)
                  ?propose_keypair:Config.propose_keypair ~monitor
-                 ~consensus_local_state ())
+                 ~consensus_local_state ~transaction_database ())
           in
-          Run.handle_shutdown ~monitor ~conf_dir ~logger coda ;
+          Run.handle_shutdown ~monitor ~conf_dir coda ;
           let%map () =
             with_monitor
               (fun () ->
@@ -403,9 +420,8 @@ module T = struct
                        let run_snark_worker =
                          `With_public_key config.public_key
                        in
-                       Run.setup_local_server ~client_port:config.port ~coda
-                         ~logger () ;
-                       Run.run_snark_worker ~logger ~client_port:config.port
+                       Run.setup_local_server ~client_port:config.port ~coda () ;
+                       Run.run_snark_worker ~client_port:config.port
                          run_snark_worker ) )
               ()
           in
@@ -441,13 +457,13 @@ module T = struct
             in
             let payment = build_txn amount sk pk fee in
             let%map receipt =
-              Run.Commands.send_payment logger coda (payment :> User_command.t)
+              Run.Commands.send_payment coda (payment :> User_command.t)
             in
             receipt |> Participating_state.active_exn
           in
           let coda_process_payment cmd =
             let%map receipt =
-              Run.Commands.send_payment logger coda (cmd :> User_command.t)
+              Run.Commands.send_payment coda (cmd :> User_command.t)
             in
             receipt |> Participating_state.active_exn
           in
@@ -486,7 +502,9 @@ module T = struct
                      Logger.error logger ~module_:__MODULE__ ~location:__LOC__
                        "why is this w pipe closed? did someone close the \
                         reader end? dropping this write..." ;
-                   Linear_pipe.write_if_open w (prev_state_hash, state_hash) )) ;
+                   Linear_pipe.write_without_pushback_if_open w
+                     (prev_state_hash, state_hash) ;
+                   Deferred.unit )) ;
             return r.pipe
           in
           let coda_root_diff () =
