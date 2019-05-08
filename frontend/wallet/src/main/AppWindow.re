@@ -45,8 +45,8 @@ include Single.Make({
               makeWebPreferences(
                 ~preload=
                   Filename.concat(
-                    [%bs.node __dirname] |> Option.getExn,
-                    "../render/Preload.js",
+                    [%bs.node __dirname] |> Option.getExn |> Filename.dirname,
+                    "render/Preload.js",
                   ),
                 ~nodeIntegration=true,
                 (),
