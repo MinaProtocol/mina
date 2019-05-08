@@ -149,6 +149,9 @@ module Make (Message : Message_intf) : S with type msg := Message.msg = struct
         other nodes
   *)
   let remove_peer t peer =
+    Logger.info t.logger ~module_:__MODULE__ ~location:__LOC__
+      !"Removing peer from peer set: %{sexp: Peer.t}"
+      peer ;
     Hash_set.remove t.peers peer ;
     Hash_set.add t.removed_peers peer ;
     Hashtbl.update t.peers_by_ip peer.host ~f:(function
@@ -172,6 +175,7 @@ module Make (Message : Message_intf) : S with type msg := Message.msg = struct
           (* call succeeded, result is valid *)
           return (Ok result)
       | Ok (Error err) -> (
+          (* call succeeded, result is an error *)
           Logger.error t.logger ~module_:__MODULE__ ~location:__LOC__
             !"RPC call error: %s {{{%s}}} [[[%{sexp: Error.t}]]]"
             (Exn.to_string (Error.to_exn err))
@@ -202,11 +206,10 @@ module Make (Message : Message_intf) : S with type msg := Message.msg = struct
                   record t.trust_system t.logger peer.host
                     Actions.
                       ( Outgoing_connection_error
-                      , Some ("closed connection", []) ))
+                      , Some ("Closed connection", []) ))
               in
               remove_peer t peer ; Error err
           | _ ->
-              (* call succeeded, result is an error *)
               let%bind () =
                 Trust_system.(
                   record t.trust_system t.logger peer.host
@@ -230,7 +233,9 @@ module Make (Message : Message_intf) : S with type msg := Message.msg = struct
               let%map () =
                 Trust_system.(
                   record t.trust_system t.logger peer.host
-                    Actions.(Outgoing_connection_error, None))
+                    Actions.
+                      ( Outgoing_connection_error
+                      , Some ("Connection refused", []) ))
               in
               remove_peer t peer ; Or_error.of_exn exn
           | _ ->
