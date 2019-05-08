@@ -5,7 +5,7 @@ open Module_version
 
 module type S = sig
   type t = {state: Protocol_state.Value.t; proof: Proof.Stable.V1.t}
-  [@@deriving bin_io, fields]
+  [@@deriving bin_io, fields, sexp]
 
   val create : state:Protocol_state.Value.t -> proof:Proof.Stable.V1.t -> t
 end
@@ -15,7 +15,7 @@ module Stable = struct
     module T = struct
       type t =
         {state: Protocol_state.Value.Stable.V1.t; proof: Proof.Stable.V1.t}
-      [@@deriving bin_io, fields, version]
+      [@@deriving bin_io, fields, version, sexp]
     end
 
     include T
