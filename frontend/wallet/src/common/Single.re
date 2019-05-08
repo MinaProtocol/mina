@@ -4,36 +4,9 @@
 module Make =
        (
          T: {
-           // Since the input type will typically contain something that is
-           // capturing a failure (i.e. a `Result.t('x, 'a)`), and given that we
-           // wish to capture errors using polymorphic variants (see
-           // https://keleshev.com/composable-error-handling-in-ocaml for
-           // rationale):
-           //
-           // We need to be polymphoric over the subtype of some row of errors:
-           // i.e.
-           //   ```
-           //   [> | `Decode_failed]
-           //   ```
-           //   should unify with both
-           //   ```
-           //   [| `Decode_failed]
-           //   ```
-           //   and
-           //   ```
-           //   [| `Decode_failed | `Json_parse_error]
-           //   ```
-           //
-           // Counterintuitively, note that "at least A" is a supertype of
-           // "at least A or B" (think about it like: "at least A or B" is more
-           // restrictive than "at least A".
-           //
-           // The pattern: `'a constraint 'a = [> ]` tells reason that `'a` is
-           // used to quantify over rows of variants rather than the typical
-           // type variable.
-           type input('a) constraint 'a = [> ];
+           type input;
            type t;
-           let make: (~drop: unit => unit, input('a)) => t;
+           let make: (~drop: unit => unit, input) => t;
          },
        ) => {
   let cache: ref(option(T.t)) = ref(None);

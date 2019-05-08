@@ -62,11 +62,10 @@ module Loader = {
         |> M.andThen(~f=contents =>
              switch (contents) {
              | `Json(contents) =>
-               Js.log2("contents", contents);
                switch (Json.parse(contents)) {
                | Some(json) => M.return(json)
                | None => M.fail(`Json_parse_error)
-               };
+               }
              | `Error_reading_file(e) =>
                Printf.fprintf(
                  stderr,

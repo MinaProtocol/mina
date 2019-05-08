@@ -4,38 +4,30 @@ open Tc;
 include BrowserWindow.MakeBrowserWindow(Messages);
 
 module Input = {
-  type t('a) = {
+  type t = {
     path: Route.t,
-    settingsOrError: Result.t([> ] as 'a, Settings.t),
+    dispatch: Application.Action.t => unit,
   };
 };
 
 include Single.Make({
-  type input('a) = Input.t('a);
+  type input = Input.t;
 
   type t = BrowserWindow.t;
 
-  let listen = (t, settingsOrError) => {
+  let listen = (t, dispatch) => {
     let cb =
       (. _event, message) =>
         switch (message) {
         | `Set_name(key, name, pendingIdent) =>
-          switch (settingsOrError) {
-          | Belt.Result.Ok(settings) =>
-            let task = SettingsMain.add(settings, ~key, ~name);
-            Task.attempt(task, ~f=_res =>
-              send(t, `Respond_new_settings((pendingIdent, ())))
-            );
-          | Belt.Result.Error(_) =>
-            // TODO: Anything else we should do here to bubble the error up
-            send(t, `Respond_new_settings((pendingIdent, ())))
-          }
+          dispatch(Application.Action.SettingsUpdate((key, name)));
+          send(t, `Respond_new_settings((pendingIdent, ())));
         };
     RendererCommunication.on(cb);
     cb;
   };
 
-  let make: (~drop: unit => unit, input('a)) => t =
+  let make: (~drop: unit => unit, input) => t =
     (~drop, input) => {
       let window =
         make(
@@ -70,7 +62,7 @@ include Single.Make({
         ++ Route.print(input.path),
       );
 
-      let listener = listen(window, input.settingsOrError);
+      let listener = listen(window, input.dispatch);
       on(
         window,
         `Closed,
