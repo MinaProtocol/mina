@@ -2,7 +2,7 @@ let message = __MODULE__;
 
 module Typ = {
   type t('a) =
-    | SettingsOrError: t(Route.SettingsOrError.t);
+    | Unit: t(unit);
 
   let if_eq =
       (
@@ -15,17 +15,14 @@ module Typ = {
         ~not_equal as _: b => unit,
       ) => {
     switch (ta, tb) {
-    | (SettingsOrError, SettingsOrError) => is_equal(v)
+    | (Unit, Unit) => is_equal(v)
     };
   };
 };
 module CallTable = CallTable.Make(Typ);
 
 type mainToRendererMessages = [
-  | `Respond_new_settings(
-      CallTable.Ident.Encode.t,
-      /* Route.SettingsOrError.t */ string,
-    )
+  | `Respond_new_settings(CallTable.Ident.Encode.t, unit)
   | `Deep_link(/*Route.t*/ string)
 ];
 
