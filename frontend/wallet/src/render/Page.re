@@ -14,8 +14,11 @@ let make = (~message) => {
         <Send
           closeModal
           myWallets=[
-            {Wallet.key: PublicKey.ofStringExn("BK123123123"), balance: 100},
-            {Wallet.key: PublicKey.ofStringExn("BK8888888"), balance: 783},
+            {
+              Wallet.key: PublicKey.ofStringExn("BK123123123"),
+              balance: "100",
+            },
+            {Wallet.key: PublicKey.ofStringExn("BK8888888"), balance: "783"},
           ]
           settings={
             switch (settingsOrError) {

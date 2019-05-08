@@ -167,7 +167,7 @@ let make = (~wallet: Wallet.t, ~settings, ~setSettingsOrError) => {
      | Loading => <div> {ReasonReact.string("LOADING")} </div>
      }}
     <div className=Styles.balance>
-      {ReasonReact.string({js|■ |js} ++ Js.Int.toString(wallet.balance))}
+      {ReasonReact.string({js|■ |js} ++ wallet.balance)}
     </div>
   </div>;
 };
