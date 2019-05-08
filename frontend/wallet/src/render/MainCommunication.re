@@ -9,11 +9,7 @@ let callTable = CallTable.make();
 
 let setName = (key, name) => {
   let pending =
-    CallTable.nextPending(
-      callTable,
-      Messages.Typ.SettingsOrError,
-      ~loc=__LOC__,
-    );
+    CallTable.nextPending(callTable, Messages.Typ.Unit, ~loc=__LOC__);
   send(`Set_name((key, name, CallTable.Ident.Encode.t(pending.ident))));
   pending.task;
 };
@@ -26,16 +22,12 @@ let listen = () => {
   let cb =
     (. _event, message: Messages.mainToRendererMessages) =>
       switch (message) {
-      | `Respond_new_settings(ident, settingsOrErrorJson) =>
-        let settingsOrError =
-          Route.SettingsOrError.Decode.t(
-            Js.Json.parseExn(settingsOrErrorJson),
-          );
+      | `Respond_new_settings(ident, ()) =>
         CallTable.resolve(
           callTable,
-          CallTable.Ident.Decode.t(ident, Messages.Typ.SettingsOrError),
-          settingsOrError,
-        );
+          CallTable.Ident.Decode.t(ident, Messages.Typ.Unit),
+          (),
+        )
       | `Deep_link(routeString) =>
         Router.navigate(Route.parse(routeString) |> Option.getExn)
       };

@@ -48,8 +48,7 @@ let createTray = (settingsOrError, wallets) => {
       make(
         Label("Send"),
         ~accelerator="CmdOrCtrl+S",
-        ~click=
-          () => AppWindow.deepLink({path: Route.Path.Send, settingsOrError}),
+        ~click=() => AppWindow.deepLink({path: Route.Send, settingsOrError}),
         (),
       ),
       make(Separator, ()),
@@ -75,16 +74,15 @@ App.on(`WillQuit, () => killDaemon());
 let task =
   Task.map2(
     Task.uncallbackifyValue(App.on(`Ready)),
-    SettingsMain.load(),
+    SettingsMain.load(ProjectRoot.settings),
     ~f=((), settings) =>
-    `Settings(settings)
-  )
-  |> Task.onError(~f=e => Task.succeed(`Error(e)));
+    settings
+  );
 
 module Test = [%graphql {| query { wallets {publicKey} } |}];
 module TestQuery = GraphqlMain.CreateQuery(Test);
 
-Task.perform(
+Task.attempt(
   task,
   ~f=settingsOrError => {
     // TODO: Periodically poll this and/or use a subscription
@@ -103,6 +101,6 @@ Task.perform(
     );
 
     createTray(settingsOrError, None);
-    AppWindow.deepLink({path: Route.Path.Home, settingsOrError});
+    AppWindow.deepLink({AppWindow.Input.path: Route.Home, settingsOrError});
   },
 );

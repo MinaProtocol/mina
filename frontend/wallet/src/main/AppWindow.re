@@ -3,8 +3,16 @@ open Tc;
 
 include BrowserWindow.MakeBrowserWindow(Messages);
 
+module Input = {
+  type t('a) = {
+    path: Route.t,
+    settingsOrError: Result.t([> ] as 'a, Settings.t),
+  };
+};
+
 include Single.Make({
-  type input = Route.t;
+  type input('a) = Input.t('a);
+
   type t = BrowserWindow.t;
 
   let listen = (t, settingsOrError) => {
@@ -13,35 +21,22 @@ include Single.Make({
         switch (message) {
         | `Set_name(key, name, pendingIdent) =>
           switch (settingsOrError) {
-          | `Settings(settings) =>
+          | Belt.Result.Ok(settings) =>
             let task = SettingsMain.add(settings, ~key, ~name);
             Task.attempt(task, ~f=_res =>
-              send(
-                t,
-                `Respond_new_settings((
-                  pendingIdent,
-                  Js.Json.stringify(
-                    Route.SettingsOrError.Encode.t(`Settings(settings)),
-                  ),
-                )),
-              )
+              send(t, `Respond_new_settings((pendingIdent, ())))
             );
-          | e =>
-            send(
-              t,
-              `Respond_new_settings((
-                pendingIdent,
-                Js.Json.stringify(Route.SettingsOrError.Encode.t(e)),
-              )),
-            )
+          | Belt.Result.Error(_) =>
+            // TODO: Anything else we should do here to bubble the error up
+            send(t, `Respond_new_settings((pendingIdent, ())))
           }
         };
     RendererCommunication.on(cb);
     cb;
   };
 
-  let make: (~drop: unit => unit, input) => t =
-    (~drop, route) => {
+  let make: (~drop: unit => unit, input('a)) => t =
+    (~drop, input) => {
       let window =
         make(
           makeWindowConfig(
@@ -54,6 +49,16 @@ include Single.Make({
             ~title="Coda Wallet",
             ~backgroundColor=
               "#DD" ++ StyleGuide.Colors.(hexToString(bgColor)),
+            ~webPreferences=
+              makeWebPreferences(
+                ~preload=
+                  Filename.concat(
+                    [%bs.node __dirname] |> Option.getExn,
+                    "../render/Preload.js",
+                  ),
+                ~nodeIntegration=true,
+                (),
+              ),
             (),
           ),
         );
@@ -62,10 +67,10 @@ include Single.Make({
         "file://"
         ++ Filename.concat(ProjectRoot.resource, "public/index.html")
         ++ "#"
-        ++ Route.print(route),
+        ++ Route.print(input.path),
       );
 
-      let listener = listen(window, route.settingsOrError);
+      let listener = listen(window, input.settingsOrError);
       on(
         window,
         `Closed,
@@ -79,10 +84,10 @@ include Single.Make({
     };
 });
 
-let deepLink = route => {
-  let w = get(route);
+let deepLink = input => {
+  let w = get(input);
   // route handling is idempotent so doesn't matter if we also send the message
   // if window already exists
-  send(w, `Deep_link(Route.print(route)));
+  send(w, `Deep_link(Route.print(input.path)));
   ();
 };

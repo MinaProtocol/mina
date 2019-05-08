@@ -1,7 +1,7 @@
 open BsElectron;
 
 include Single.Make({
-  type input = unit;
+  type input('a) = unit constraint 'a = [> ];
   type t = Tray.t;
 
   let make: (~drop: unit => unit, unit) => t =

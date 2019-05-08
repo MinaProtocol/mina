@@ -1,9 +1,9 @@
 module Make =
        (
          T: {
-           type input;
+           type input('a) constraint 'a = [> ];
            type t;
-           let make: (~drop: unit => unit, input) => t;
+           let make: (~drop: unit => unit, input('a)) => t;
          },
        ) => {
   let cache: ref(option(T.t)) = ref(None);
