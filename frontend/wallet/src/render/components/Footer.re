@@ -1,5 +1,21 @@
 open Tc;
 
+module Styles = {
+  open Css;
+
+  let footer =
+    style([
+      position(`fixed),
+      bottom(`px(0)),
+      left(`px(0)),
+      right(`px(0)),
+      display(`flex),
+      justifyContent(`spaceBetween),
+      alignItems(`center),
+      padding(`rem(2.0)),
+    ]);
+};
+
 module StakingSwitch = {
   [@react.component]
   let make = (~pubKey, ~settings) => {
@@ -82,15 +98,7 @@ module RightButtons = {
 
 [@react.component]
 let make = (~stakingKey, ~settings) => {
-  <div
-    className=Css.(
-      style([
-        display(`flex),
-        justifyContent(`spaceBetween),
-        alignItems(`center),
-        padding(`rem(2.0)),
-      ])
-    )>
+  <div className=Styles.footer>
     <StakingSwitch pubKey=stakingKey settings />
     <ActivityLogButton />
     <RightButtons pubKeySelected=None settings />

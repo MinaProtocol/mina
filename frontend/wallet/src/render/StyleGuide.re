@@ -19,13 +19,14 @@ module Colors = {
   let sage = `hex("65906e");
   let blanco = `hex("e3e0d5");
 
-  let headerBgColor = `hex("06111bBB");
+  let headerBgColor = white;
   let headerGreyText = `hex("516679");
   let textColor = white;
 };
 
 module Typeface = {
   let lucidaGrande = fontFamily("LucidaGrande");
+  let sansSerif = fontFamily("IBM Plex Sans, Sans-Serif");
 };
 
 module CssElectron = {
@@ -34,6 +35,8 @@ module CssElectron = {
     | `drag => `declaration(("-webkit-app-region", "drag"))
     | `noDrag => `declaration(("-webkit-app-region", "no-drag"));
 };
+
+let headerHeight = `em(4.);
 
 let notText = style([cursor(`default), userSelect(`none)]);
 

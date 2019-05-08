@@ -1,12 +1,5 @@
 open Tc;
 
-let component = ReasonReact.statelessComponent("Page");
-
-let inMemoryCache = ApolloInMemoryCache.createInMemoryCache();
-let ipcLink = IpcLinkRenderer.create();
-let instance =
-  ReasonApollo.createApolloClient(~link=ipcLink, ~cache=inMemoryCache, ());
-
 /// The semantics are as follows:
 ///
 /// 1. Path is always aquired from a URL.
@@ -91,7 +84,7 @@ let make = (~message) => {
   let testButton = (str, ~f) => {
     <button onClick={_e => f()}> {ReasonReact.string(str)} </button>;
   };
-  <ReasonApollo.Provider client=instance>
+  <ReasonApollo.Provider client=Apollo.client>
     <div
       style={ReactDOMRe.Style.make(
         ~border="8px solid #11161b",
