@@ -2,6 +2,14 @@ open Core
 open Async
 open Pipe_lib
 
+[%%import
+"../../config.mlh"]
+
+[%%inject
+"integration_tests", integration_tests]
+
+type exn += Insta_ban_during_tests
+
 module Trust_response = struct
   type t = Insta_ban | Trust_increase of float | Trust_decrease of float
 end
@@ -92,7 +100,7 @@ struct
     Option.iter db ~f:Db.close ;
     Strict_pipe.Writer.close bans_writer
 
-  let record ({db; bans_writer} as t) logger peer action =
+  let true_record ({db; bans_writer} as t) logger peer action =
     let old_record =
       match get_db t peer with
       | None ->
@@ -140,6 +148,16 @@ struct
           Deferred.unit
     in
     Option.iter db ~f:(fun db' -> Db.set db' ~key:peer ~data:new_record)
+
+  let record t logger peer action =
+    if integration_tests then
+      let response = Action.to_trust_response action in
+      match response with
+      | Insta_ban ->
+          raise Insta_ban_during_tests
+      | _ ->
+          Deferred.unit
+    else true_record t logger peer action
 end
 
 let%test_module "peer_trust" =
