@@ -42,9 +42,11 @@ module Make (Inputs : Inputs.S) :
         let%bind init_breadcrumb =
           breadcrumb_if_present () |> Deferred.return
         in
-        Rose_tree.Deferred.Or_error.fold_map subtree_of_enveloped_transitions
-          ~init:(Cached.pure init_breadcrumb)
-          ~f:(fun cached_parent cached_enveloped_transition ->
+        Rose_tree.Deferred.Or_error.fold_map_over_subtrees
+          subtree_of_enveloped_transitions ~init:(Cached.pure init_breadcrumb)
+          ~f:(fun cached_parent
+             (Rose_tree.T (cached_enveloped_transition, _) as subtree)
+             ->
             let open Deferred.Let_syntax in
             let%map cached_result =
               Cached.transform cached_enveloped_transition
@@ -76,12 +78,10 @@ module Make (Inputs : Inputs.S) :
                                hash"))
                   in
                   let open Deferred.Let_syntax in
-                  (* TODO: propagate bans through subtree (#2299) *)
                   match%bind
                     Transition_frontier.Breadcrumb.build ~logger ~trust_system
                       ~parent ~transition_with_hash:transition
-                      ~sender:
-                        (Some (Envelope.Incoming.sender enveloped_transition))
+                      ~sender:(Some sender)
                   with
                   | Ok new_breadcrumb ->
                       let open Result.Let_syntax in
@@ -90,24 +90,44 @@ module Make (Inputs : Inputs.S) :
                            breadcrumb_if_present ()
                          in
                          new_breadcrumb)
-                  | Error (`Fatal_error exn) ->
-                      Deferred.return (Or_error.of_exn exn)
-                  | Error (`Invalid_staged_ledger_hash error) ->
-                      let%map () =
-                        Trust_system.record_envelope_sender trust_system logger
-                          sender
-                          ( Trust_system.Actions.Gossiped_invalid_transition
-                          , Some ("invalid staged ledger hash", []) )
+                  | Error err -> (
+                      (* propagate bans through subtree *)
+                      let subtree_nodes = Rose_tree.flatten subtree in
+                      let ip_address_set =
+                        let sender_from_tree_node node =
+                          Envelope.Incoming.sender (Cached.peek node)
+                        in
+                        List.fold subtree_nodes
+                          ~init:(Set.empty (module Unix.Inet_addr))
+                          ~f:(fun inet_addrs node ->
+                            match sender_from_tree_node node with
+                            | Local ->
+                                failwith
+                                  "build_subtrees_of_breadcrumbs: sender of \
+                                   external transition should not be Local"
+                            | Remote inet_addr ->
+                                Set.add inet_addrs inet_addr )
                       in
-                      Error error
-                  | Error (`Invalid_staged_ledger_diff error) ->
-                      let%map () =
-                        Trust_system.record_envelope_sender trust_system logger
-                          sender
-                          ( Trust_system.Actions.Gossiped_invalid_transition
-                          , Some ("invalid staged ledger diff", []) )
+                      let ip_addresses = Set.to_list ip_address_set in
+                      let trust_system_record_invalid msg error =
+                        let%map () =
+                          Deferred.List.iter ip_addresses ~f:(fun ip_addr ->
+                              Trust_system.record trust_system logger ip_addr
+                                ( Trust_system.Actions
+                                  .Gossiped_invalid_transition
+                                , Some (msg, []) ) )
+                        in
+                        Error error
                       in
-                      Error error )
+                      match err with
+                      | `Invalid_staged_ledger_hash error ->
+                          trust_system_record_invalid
+                            "invalid staged ledger hash" error
+                      | `Invalid_staged_ledger_diff error ->
+                          trust_system_record_invalid
+                            "invalid staged ledger diff" error
+                      | `Fatal_error exn ->
+                          Deferred.return (Or_error.of_exn exn) ) )
               |> Cached.sequence_deferred
             in
             Cached.sequence_result cached_result ) )
