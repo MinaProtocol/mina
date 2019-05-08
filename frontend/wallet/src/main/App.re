@@ -109,3 +109,5 @@ let run = () =>
       AppWindow.deepLink({AppWindow.Input.path: Route.Home, dispatch});
     },
   );
+
+run();
