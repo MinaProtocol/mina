@@ -1,6 +1,9 @@
 open Core_kernel
 open Quickcheck
 
+(** [of_array array] selects a random element from [array] to select an element *)
+val of_array : 'a array -> 'a Generator.t
+
 (** [map_gens ls ~f] maps over [ls], building one list generator using each generator
  *  returned from successive applications of [f] over elements of [ls]. *)
 val map_gens : 'a list -> f:('a -> 'b Generator.t) -> 'b list Generator.t
