@@ -2,7 +2,7 @@ open Tc;
 
 module Styles = {
   open Css;
-  open StyleGuide;
+  open Theme;
 
   let activeWalletItem = [color(white), backgroundColor(`hex("222b33CC"))];
   let walletItem =

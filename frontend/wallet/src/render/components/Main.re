@@ -5,8 +5,8 @@ module Styles = {
     style([
       display(`flex),
       flexDirection(`row),
-      paddingTop(StyleGuide.Spacing.headerHeight),
-      paddingBottom(StyleGuide.Spacing.footerHeight),
+      paddingTop(Theme.Spacing.headerHeight),
+      paddingBottom(Theme.Spacing.footerHeight),
       height(`vh(100.)),
       width(`vw(100.)),
     ]);

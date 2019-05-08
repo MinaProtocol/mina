@@ -2,7 +2,7 @@ let component = ReasonReact.statelessComponent("Header");
 
 module Styles = {
   open Css;
-  open StyleGuide;
+  open Theme;
   let header =
     merge([
       style([
@@ -20,7 +20,7 @@ module Styles = {
         color(black),
         fontFamily("IBM Plex Sans, Sans-Serif"),
         paddingLeft(`px(20)),
-        borderBottom(`px(1), `solid, rgba(0, 0, 0, 0.15)),
+        borderBottom(`px(1), `solid, Colors.borderColor),
         CssElectron.appRegion(`drag),
       ]),
       notText,
@@ -32,7 +32,7 @@ let make = () =>
   <div className=Styles.header>
     <div
       style={ReactDOMRe.Style.make(~display="flex", ~alignItems="center", ())}>
-      <div className=StyleGuide.codaLogoCurrent />
+      <div className=Theme.codaLogoCurrent />
       <p
         style={ReactDOMRe.Style.make(~fontWeight="100", ~fontSize="160%", ())}>
         {ReasonReact.string({j|CODA|j})}

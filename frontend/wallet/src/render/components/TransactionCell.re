@@ -146,7 +146,7 @@ module ActorName = {
       <span> {ReasonReact.string(PublicKey.toString(key))} </span>
     | Unknown => <span />
     | Minted =>
-      <span className=Css.(style([backgroundColor(StyleGuide.Colors.sage)]))>
+      <span className=Css.(style([backgroundColor(Theme.Colors.sage)]))>
         {ReasonReact.string("Minted")}
       </span>
     };
@@ -177,10 +177,10 @@ module Amount = {
       <span
         className=Css.(
           style([
-            StyleGuide.Typeface.lucidaGrande,
+            Theme.Typeface.lucidaGrande,
             color(
               value >= 0
-                ? StyleGuide.Colors.serpentine : StyleGuide.Colors.roseBud,
+                ? Theme.Colors.serpentine : Theme.Colors.roseBud,
             ),
           ])
         )>

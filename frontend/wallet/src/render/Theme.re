@@ -22,6 +22,7 @@ module Colors = {
   let headerBgColor = white;
   let headerGreyText = `hex("516679");
   let textColor = white;
+  let borderColor = rgba(0, 0, 0, 0.15);
 };
 
 module Typeface = {

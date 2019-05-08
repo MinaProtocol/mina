@@ -13,13 +13,14 @@ module Styles = {
       justifyContent(`spaceBetween),
       alignItems(`center),
       padding(`rem(2.0)),
+      borderTop(`px(1), `solid, Theme.Colors.borderColor),
     ]);
 };
 
 module StakingSwitch = {
   [@react.component]
   let make = (~pubKey, ~settings) => {
-    <div className=Css.(style([color(StyleGuide.Colors.serpentine)]))>
+    <div className=Css.(style([color(Theme.Colors.serpentine)]))>
       <input
         type_="checkbox"
         label="staking-switch"
