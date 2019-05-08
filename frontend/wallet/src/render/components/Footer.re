@@ -97,10 +97,16 @@ module RightButtons = {
 };
 
 [@react.component]
-let make = (~stakingKey, ~settings) => {
-  <div className=Styles.footer>
-    <StakingSwitch pubKey=stakingKey settings />
-    <ActivityLogButton />
-    <RightButtons pubKeySelected=None settings />
-  </div>;
+let make = () => {
+  let stakingKey = PublicKey.ofStringExn("131243123");
+  let (settingsOrError, _setSettingsOrError) = Hooks.useSettings();
+  switch (settingsOrError) {
+  | Ok(settings) =>
+    <div className=Styles.footer>
+      <StakingSwitch pubKey=stakingKey settings />
+      <ActivityLogButton />
+      <RightButtons pubKeySelected=None settings />
+    </div>
+  | Error(_) => <span />
+  };
 };

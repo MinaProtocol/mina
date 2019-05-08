@@ -1,39 +1,9 @@
 open Tc;
 
-/// The semantics are as follows:
-///
-/// 1. Path is always aquired from a URL.
-/// 2. We listen to the main process for new routes while the page is open
-///
-let useRoute = () => {
-  let url = ReasonReact.Router.useUrl();
-
-  let path = Route.parse(url.hash);
-
-  switch (path) {
-  | None => Js.log2("Failed to parse route: ", url.hash)
-  | Some(_) => ()
-  };
-
-  React.useEffect(() => {
-    let token = MainCommunication.listen();
-    Some(() => MainCommunication.stopListening(token));
-  });
-
-  path;
-};
-
-let useSettings = () => {
-  let (settings, setSettings) =
-    React.useState(() => SettingsRenderer.loadSettings());
-
-  (settings, newVal => setSettings(_ => newVal));
-};
-
 [@react.component]
 let make = (~message) => {
-  let path = useRoute();
-  let (settingsOrError, setSettingsOrError) = useSettings();
+  let path = Hooks.useRoute();
+  let (settingsOrError, setSettingsOrError) = Hooks.useSettings();
 
   let closeModal = () => Router.navigate(Home);
   let modalView =
@@ -138,17 +108,7 @@ let make = (~message) => {
              }
            )}
         </div>
-        <div>
-          {switch (settingsOrError) {
-           | Ok(settings) =>
-             <Footer
-               stakingKey={PublicKey.ofStringExn("131243123")}
-               settings
-             />
-           | Error(_) => <span />
-           }}
-          <Modal view=modalView />
-        </div>
+        <div> <Footer /> <Modal view=modalView /> </div>
       </div>
     </div>
   </ReasonApollo.Provider>;

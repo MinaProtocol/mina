@@ -36,7 +36,12 @@ module CssElectron = {
     | `noDrag => `declaration(("-webkit-app-region", "no-drag"));
 };
 
-let headerHeight = `em(4.);
+module Spacing = {
+  let defaultSpacing = `rem(1.);
+  let defaultPadding = padding(defaultSpacing);
+  let headerHeight = `rem(4.);
+  let footerHeight = `rem(5.);
+};
 
 let notText = style([cursor(`default), userSelect(`none)]);
 
