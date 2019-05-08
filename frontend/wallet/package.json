@@ -39,6 +39,8 @@
   "build": {
     "appId": "FOO.org.codaprotocol.prowallet",
     "files": [
+      "./lib/**/*",
+      "!./lib/js/src/render/Preload.js",
       "!node_modules/electron",
       "!node_modules/graphql_ppx",
       "!node_modules/bs-platform/lib",
@@ -46,7 +48,7 @@
       "package.json"
     ],
     "extraResources": [
-      "./lib/**/*",
+      "./lib/js/src/render/Preload.js",
       "bundle/**/*",
       "public/*"
     ],
