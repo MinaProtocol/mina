@@ -621,8 +621,8 @@ let%test_module _ =
     let test_keys = Array.init 10 ~f:(fun _ -> Signature_lib.Keypair.create ())
 
     let gen_cmd =
-      User_command.With_valid_signature.gen_with_fake_signature ~keys:test_keys
-        ~max_amount:1000 ~max_fee:10
+      User_command.With_valid_signature.gen_with_random_participants
+        ~keys:test_keys ~max_amount:1000 ~max_fee:10
 
     module Array_m (M : Monad.S) = struct
       (** Array.init but parameterized over a monad. *)
@@ -829,7 +829,8 @@ let%test_module _ =
           * User_command.With_valid_signature.t )
           Quickcheck.Generator.t =
         let open Quickcheck.Generator.Let_syntax in
-        let%bind sender = Int.gen_incl 0 9 in
+        let%bind sender_index = Int.gen_incl 0 9 in
+        let sender = test_keys.(sender_index) in
         let%bind init_nonce =
           Quickcheck.Generator.map ~f:Account_nonce.of_int
           @@ Int.gen_incl 0 1000
@@ -840,9 +841,12 @@ let%test_module _ =
         let rec go current_nonce current_balance n =
           if n > 0 then
             let%bind cmd =
-              User_command.gen_with_fake_signature ~keys:test_keys
-                ~sender_idx:(Some sender) ~nonce:current_nonce ~max_amount:1
-                ~max_fee:0 ()
+              let key_gen =
+                Quickcheck.Generator.tuple2 (return sender)
+                  (Quickcheck_lib.of_array test_keys)
+              in
+              User_command.gen ~sign_type:`Fake ~key_gen ~nonce:current_nonce
+                ~max_amount:1 ~max_fee:0 ()
             in
             let cmd_currency = amounts.(n - 1) in
             let%bind fee =
@@ -862,8 +866,7 @@ let%test_module _ =
                   failwith "generated user command that wasn't a payment"
             in
             let cmd' =
-              User_command.For_tests.fake_sign test_keys.(sender)
-                modified_payload
+              User_command.For_tests.fake_sign sender modified_payload
             in
             let consumed = Option.value_exn (currency_consumed cmd') in
             let%map rest =
@@ -882,8 +885,11 @@ let%test_module _ =
             (init_nonce_int + List.length setup_cmds - 1)
         in
         let%map replace_cmd_skeleton =
-          User_command.gen_with_fake_signature ~keys:test_keys
-            ~sender_idx:(Some sender)
+          let key_gen =
+            Quickcheck.Generator.tuple2 (return sender)
+              (Quickcheck_lib.of_array test_keys)
+          in
+          User_command.gen ~sign_type:`Fake ~key_gen
             ~nonce:(Account_nonce.of_int replaced_nonce)
             ~max_amount:(Currency.Amount.to_int init_balance)
             ~max_fee:0 ()
@@ -895,8 +901,7 @@ let%test_module _ =
                 fee= Currency.Fee.of_int (10 + (5 * (size + 1))) } }
         in
         let replace_cmd =
-          User_command.For_tests.fake_sign test_keys.(sender)
-            replace_cmd_payload
+          User_command.For_tests.fake_sign sender replace_cmd_payload
         in
         (init_nonce, init_balance, setup_cmds, replace_cmd)
       in

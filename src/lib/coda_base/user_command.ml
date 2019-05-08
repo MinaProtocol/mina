@@ -87,22 +87,13 @@ module For_tests = struct
     ; signature= (kp.private_key, kp.private_key) }
 end
 
-let gen_inner (sign' : Signature_lib.Keypair.t -> Payload.t -> t) ~keys
-    ?(nonce = Account_nonce.zero) ?(sender_idx = None) ~max_amount ~max_fee ()
-    =
+let gen_inner (sign' : Signature_lib.Keypair.t -> Payload.t -> t) ~key_gen
+    ?(nonce = Account_nonce.zero) ~max_amount ~max_fee () =
   let open Quickcheck.Generator.Let_syntax in
-  let%map sender_idx' =
-    match sender_idx with
-    | None ->
-        Int.gen_incl 0 (Array.length keys - 1)
-    | Some idx ->
-        Quickcheck.Generator.return idx
-  and receiver_idx = Int.gen_incl 0 (Array.length keys - 1)
+  let%map sender, receiver = key_gen
   and fee = Int.gen_incl 0 max_fee >>| Currency.Fee.of_int
   and amount = Int.gen_incl 1 max_amount >>| Currency.Amount.of_int
   and memo = String.quickcheck_generator in
-  let sender = keys.(sender_idx') in
-  let receiver = keys.(receiver_idx) in
   let payload : Payload.t =
     Payload.create ~fee ~nonce
       ~memo:(User_command_memo.create_exn memo)
@@ -113,9 +104,21 @@ let gen_inner (sign' : Signature_lib.Keypair.t -> Payload.t -> t) ~keys
   in
   sign' sender payload
 
-let gen = gen_inner sign
+let gen ?(sign_type = `Fake) =
+  match sign_type with
+  | `Fake ->
+      gen_inner For_tests.fake_sign
+  | `Real ->
+      gen_inner sign
 
-let gen_with_fake_signature = gen_inner For_tests.fake_sign
+let gen_with_random_participants ?sign_type ~keys ?nonce ~max_amount ~max_fee =
+  let key_gen =
+    let open Quickcheck.Let_syntax in
+    let%map sender_idx = Int.gen_incl 0 (Array.length keys - 1)
+    and receiver_idx = Int.gen_incl 0 (Array.length keys - 1) in
+    (keys.(sender_idx), keys.(receiver_idx))
+  in
+  gen ?sign_type ~key_gen ?nonce ~max_amount ~max_fee
 
 module With_valid_signature = struct
   module Stable = struct
@@ -132,7 +135,7 @@ module With_valid_signature = struct
 
       let gen = gen
 
-      let gen_with_fake_signature = gen_with_fake_signature
+      let gen_with_random_participants = gen_with_random_participants
     end
 
     module Latest = V1
@@ -167,7 +170,8 @@ let check_signature ({payload; sender; signature} : t) =
 
 let gen_test =
   let keys = Array.init 2 ~f:(fun _ -> Signature_keypair.create ()) in
-  gen ~keys ~max_amount:10000 ~max_fee:1000 ()
+  gen_with_random_participants ~sign_type:`Real ~keys ~max_amount:10000
+    ~max_fee:1000 ()
 
 let%test_unit "completeness" =
   Quickcheck.test ~trials:20 gen_test ~f:(fun t -> assert (check_signature t))

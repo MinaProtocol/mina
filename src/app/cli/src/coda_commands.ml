@@ -466,8 +466,11 @@ struct
                    match User_command.check user_command with
                    | Some checked_user_command ->
                        Transaction_database.add transaction_database
+                         (* TODO: Time should be computed as when a payment gets into the transition frontier  *)
                          (Coda_base.Transaction.User_command
-                            checked_user_command) ;
+                            checked_user_command)
+                         ( Coda_base.Block_time.Time.now
+                         @@ Coda_base.Block_time.Time.Controller.basic ) ;
                        Strict_pipe.Writer.write frontier_payment_writer
                          user_command
                    | None ->
