@@ -41,6 +41,14 @@ let createTray = (_settingsOrError, dispatch, wallets) => {
     Menu.Item.[
       make(Separator, ()),
       make(
+        Label("Debug"),
+        ~click=
+          () =>
+            AppWindow.get({path: Route.Home, dispatch})
+            |> AppWindow.openDevTools,
+        (),
+      ),
+      make(
         Label("Send"),
         ~accelerator="CmdOrCtrl+S",
         ~click=() => AppWindow.deepLink({path: Route.Send, dispatch}),
