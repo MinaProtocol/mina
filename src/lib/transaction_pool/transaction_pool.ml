@@ -191,7 +191,7 @@ struct
                Logger.debug t.logger ~module_:__MODULE__ ~location:__LOC__
                  "no frontier" ;
                (* Sanity check: the view pipe should have been closed before the
-                    frontier was destroyed. *)
+                      frontier was destroyed. *)
                match t.diff_reader with
                | None ->
                    Deferred.unit
@@ -401,9 +401,9 @@ struct
                               go txs'' pool'' (tx :: accepted)
                           | Error `Insufficient_replace_fee ->
                               (* We can't punish peers for this, since an
-                               attacker can simultaneously send different
-                               transactions at the same nonce to different
-                               nodes, which will then naturally gossip them. *)
+                             attacker can simultaneously send different
+                             transactions at the same nonce to different
+                             nodes, which will then naturally gossip them. *)
                               Logger.debug t.logger ~module_:__MODULE__
                                 ~location:__LOC__
                                 "rejecting $cmd because of insufficient \
@@ -544,9 +544,13 @@ let%test_module _ =
     let independent_cmds =
       let rec go n cmds =
         let open Quickcheck.Generator.Let_syntax in
-        if n < 10 then
+        if n < Array.length test_keys then
           let%bind cmd =
-            User_command.gen ~sender_idx:(Some n) ~keys:test_keys
+            let sender = test_keys.(n) in
+            User_command.gen ~sign_type:`Real
+              ~key_gen:
+                (Quickcheck.Generator.tuple2 (return sender)
+                   (Quickcheck_lib.of_array test_keys))
               ~max_amount:100 ~max_fee:10 ()
           in
           go (n + 1) (cmd :: cmds)
@@ -673,8 +677,12 @@ let%test_module _ =
           in
           assert_pool_txs [] ;
           let cmd1 =
+            let sender = test_keys.(0) in
             Quickcheck.random_value
-              (User_command.gen ~keys:test_keys ~sender_idx:(Some 0)
+              (User_command.gen ~sign_type:`Real
+                 ~key_gen:
+                   Quickcheck.Generator.(
+                     tuple2 (return sender) (Quickcheck_lib.of_array test_keys))
                  ~nonce:(Account.Nonce.of_int 1) ~max_amount:100 ~max_fee:10 ())
           in
           let%bind apply_res =
