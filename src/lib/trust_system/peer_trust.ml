@@ -92,16 +92,15 @@ struct
     Option.iter db ~f:Db.close ;
     Strict_pipe.Writer.close bans_writer
 
-  let record ({db; bans_writer} as _t) _logger _peer _action = return ()
-
-  (*    let old_record =
+  let record ({db; bans_writer} as t) logger peer action =
+    let old_record =
       match get_db t peer with
       | None ->
           Record_inst.init ()
       | Some trust_record ->
           trust_record
     in
-    let _new_record =
+    let new_record =
       match Action.to_trust_response action with
       | Insta_ban ->
           Record_inst.ban old_record
@@ -112,7 +111,6 @@ struct
           [%test_pred: Float.t] Float.is_positive incr ;
           Record_inst.add_trust old_record (-.incr)
     in
-    return ()
     let simple_old = Record_inst.to_peer_status old_record in
     let simple_new = Record_inst.to_peer_status new_record in
     let action_fmt, action_metadata = Action.to_log action in
@@ -141,7 +139,7 @@ struct
             action_fmt simple_new.trust ;
           Deferred.unit
     in
-    Option.iter db ~f:(fun db' -> Db.set db' ~key:peer ~data:new_record) *)
+    Option.iter db ~f:(fun db' -> Db.set db' ~key:peer ~data:new_record)
 end
 
 let%test_module "peer_trust" =
@@ -211,9 +209,7 @@ let%test_module "peer_trust" =
     let%test "Insta-bans actually do so" =
       Thread_safe.block_on_async_exn (fun () ->
           let db = setup_mock_db () in
-          let%map () =
-            Peer_trust_test.record db nolog 0 Trust_response.Insta_ban
-          in
+          let%map () = Peer_trust_test.record db nolog 0 Insta_ban in
           match Peer_trust_test.lookup db 0 with
           | {trust= -1.0; banned= Banned_until time} ->
               [%test_eq: Time.t] time

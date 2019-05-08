@@ -136,10 +136,6 @@ module Make (Message : Message_intf) : S with type msg := Message.msg = struct
     | Ok conn ->
         Versioned_rpc.Connection_with_menu.create conn
 
-  let add_peer t peer =
-    Hash_set.add t.peers peer ;
-    Hashtbl.add_multi t.peers_by_ip ~key:peer.host ~data:peer
-
   (* remove peer from set of peers and peers_by_ip
 
      there are issues with this simple approach, because
@@ -394,11 +390,9 @@ module Make (Message : Message_intf) : S with type msg := Message.msg = struct
                   List.iter peers ~f:(fun peer ->
                       match Trust_system.lookup t.trust_system peer.host with
                       | {banned= Unbanned; _} ->
-                          add_peer t peer
-                      | {banned= Banned_until _; _}
-                        when Unix.Inet_addr.equal peer.host
-                               Unix.Inet_addr.localhost ->
-                          add_peer t peer
+                          Hash_set.add t.peers peer ;
+                          Hashtbl.add_multi t.peers_by_ip ~key:peer.host
+                            ~data:peer
                       | {banned= Banned_until _; _} ->
                           Logger.warn t.logger ~module_:__MODULE__
                             ~location:__LOC__
