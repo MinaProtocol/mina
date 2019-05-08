@@ -24,14 +24,14 @@ module HooksTest = {
 [@react.component]
 let make = (~message, ~settingsOrError, ~setSettingsOrError) =>
   switch (settingsOrError) {
-  | `Error(_) =>
+  | Belt.Result.Error(_) =>
     <div>
       <p>
         {ReasonReact.string("There was an error loading the settings!")}
       </p>
       <p> {ReasonReact.string(message)} </p>
     </div>
-  | `Settings(settings) =>
+  | Belt.Result.Ok(settings) =>
     <div
       className=Css.(
         style([

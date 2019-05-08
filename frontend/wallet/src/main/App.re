@@ -6,7 +6,7 @@ let apolloClient = GraphqlMain.createClient("http://localhost:8080/graphql");
 
 IpcLinkMain.start(apolloClient);
 
-let createTray = (settingsOrError, wallets) => {
+let createTray = (_settingsOrError, dispatch, wallets) => {
   let t = AppTray.get();
   let prefixItems =
     Menu.Item.[
@@ -20,27 +20,22 @@ let createTray = (settingsOrError, wallets) => {
     ];
   let codaSymbol = {js|□|js};
   let walletItems =
-    switch (wallets) {
-    | Some(wallets) =>
-      List.map(
-        ~f=
-          wallet =>
-            Menu.Item.make(
-              Radio(
-                Printf.sprintf(
-                  "    %s %s %d",
-                  wallet##publicKey,
-                  codaSymbol,
-                  100,
-                ),
+    List.map(
+      ~f=
+        wallet =>
+          Menu.Item.make(
+            Radio(
+              Printf.sprintf(
+                "    %s %s %d",
+                wallet##publicKey,
+                codaSymbol,
+                100,
               ),
-              (),
             ),
-        Array.to_list(wallets),
-      )
-
-    | None => Menu.Item.[make(Label({js|    Loading...|js}), ())]
-    };
+            (),
+          ),
+      Array.to_list(wallets),
+    );
 
   let suffixItems =
     Menu.Item.[
@@ -48,8 +43,7 @@ let createTray = (settingsOrError, wallets) => {
       make(
         Label("Send"),
         ~accelerator="CmdOrCtrl+S",
-        ~click=
-          () => AppWindow.deepLink({path: Route.Path.Send, settingsOrError}),
+        ~click=() => AppWindow.deepLink({path: Route.Send, dispatch}),
         (),
       ),
       make(Separator, ()),
@@ -72,37 +66,46 @@ let createTray = (settingsOrError, wallets) => {
 App.on(`WindowAllClosed, () => ());
 App.on(`WillQuit, () => killDaemon());
 
-let task =
-  Task.map2(
-    Task.uncallbackifyValue(App.on(`Ready)),
-    SettingsMain.load(),
-    ~f=((), settings) =>
-    `Settings(settings)
-  )
-  |> Task.onError(~f=e => Task.succeed(`Error(e)));
-
 module Test = [%graphql {| query { wallets {publicKey} } |}];
 module TestQuery = GraphqlMain.CreateQuery(Test);
 
-Task.perform(
-  task,
-  ~f=settingsOrError => {
-    // TODO: Periodically poll this and/or use a subscription
-    ignore @@
-    Js.Global.setTimeout(
-      () => {
-        let q = TestQuery.query(apolloClient);
-        Task.perform(q, ~f=response =>
-          switch (response.data) {
-          | Some(d) => createTray(settingsOrError, Some(d##wallets))
-          | None => Js.log("Error getting wallets")
-          }
-        );
-      },
-      2000,
-    );
+let initialTask =
+  Task.map2(
+    Task.uncallbackifyValue(App.on(`Ready)),
+    SettingsMain.load(ProjectRoot.settings),
+    ~f=((), settings) =>
+    settings
+  );
 
-    createTray(settingsOrError, None);
-    AppWindow.deepLink({path: Route.Path.Home, settingsOrError});
-  },
-);
+let run = () =>
+  Task.attempt(
+    initialTask,
+    ~f=settingsOrError => {
+      let initialState = {Application.State.settingsOrError, wallets: [||]};
+
+      let dispatch = ref(_ => ());
+      let store =
+        Application.Store.create(
+          initialState, ~onNewState=(_last, curr: Application.State.t('a)) =>
+          createTray(curr.settingsOrError, dispatch^, curr.wallets)
+        );
+      dispatch := Application.Store.apply(store);
+      let dispatch = dispatch^;
+
+      ignore @@
+      Js.Global.setTimeout(
+        () => {
+          let q = TestQuery.query(apolloClient);
+          Task.perform(q, ~f=response =>
+            switch (response.data) {
+            | Some(d) => dispatch(Application.Action.WalletInfo(d##wallets))
+            | None => Js.log("Error getting wallets")
+            }
+          );
+        },
+        2000,
+      );
+
+      AppWindow.deepLink({AppWindow.Input.path: Route.Home, dispatch});
+    },
+  );

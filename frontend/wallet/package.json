@@ -7,7 +7,7 @@
     "@glennsl/bs-jest": "^0.4.8",
     "@glennsl/bs-json": "^3.0.0",
     "bs-css": "^8.0.2",
-    "bs-electron": "github:Schmavery/bs-electron",
+    "bs-electron": "github:Schmavery/bs-electron#1ca016763511d6dd092b5d164f903594d8cbd524",
     "bs-platform": "^5.0.3",
     "graphql_ppx": "^0.2.8",
     "node-fetch": "^2.5.0",
@@ -40,6 +40,7 @@
     "appId": "FOO.org.codaprotocol.prowallet",
     "files": [
       "./lib/**/*",
+      "!./lib/js/src/render/Preload.js",
       "!node_modules/electron",
       "!node_modules/graphql_ppx",
       "!node_modules/bs-platform/lib",
@@ -47,6 +48,7 @@
       "package.json"
     ],
     "extraResources": [
+      "./lib/js/src/render/Preload.js",
       "bundle/**/*",
       "public/*"
     ],
