@@ -22,7 +22,7 @@ let make = (~closeModal, ~myWallets, ~settings) => {
                      )
                 )
                 ++ {j|( ■ |j}
-                ++ Js.Int.toString(wallet.balance)
+                ++ wallet.balance
                 ++ " )",
               )}
            </option>

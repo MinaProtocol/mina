@@ -9,7 +9,4 @@ module Styles = {
 };
 
 [@react.component]
-let make = () =>
-  <div className=Styles.sidebar>
-    <WalletList />
-  </div>;
+let make = () => <div className=Styles.sidebar> <WalletList /> </div>;

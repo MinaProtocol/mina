@@ -48,10 +48,29 @@ let create = () => {
             ~loc=__LOC__,
           );
 
+        let kind = {
+          let definitions: array(GraphqlLinkMessages.definition) =
+            operation##query##definitions;
+          // Refmt rewrites Array.get and it's a compile error with tablecloth :/
+          let head = [@warning "-44"] Caml.(definitions[0]);
+          head##operation == "mutation"
+            ? GraphqlLinkMessages.Kind.Mutation : Query;
+        };
+
         GraphqlIpcRenderer.send(
           `Pipe_graphql_request((
             GraphqlLinkMessages.CallTable.Ident.Encode.t(pending.ident),
-            operationStr,
+            (
+              kind,
+              switch (kind) {
+              | Mutation =>
+                Js.Json.stringifyAny(
+                  GraphqlLinkMessages.mutationOfOperation(operation),
+                )
+                |> Option.getExn
+              | Query => operationStr
+              },
+            ),
           )),
         );
 

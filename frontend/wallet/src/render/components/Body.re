@@ -1,5 +1,3 @@
-open Tc;
-
 module Test = [%graphql {| query { version } |}];
 module TestQuery = ReasonApollo.CreateQuery(Test);
 
@@ -22,7 +20,7 @@ module HooksTest = {
 };
 
 [@react.component]
-let make = (~message, ~settingsOrError, ~setSettingsOrError) =>
+let make = (~message, ~settingsOrError) =>
   switch (settingsOrError) {
   | Belt.Result.Error(_) =>
     <div>
@@ -31,7 +29,7 @@ let make = (~message, ~settingsOrError, ~setSettingsOrError) =>
       </p>
       <p> {ReasonReact.string(message)} </p>
     </div>
-  | Belt.Result.Ok(settings) =>
+  | Belt.Result.Ok(_settings) =>
     <div
       className=Css.(
         style([
@@ -48,22 +46,13 @@ let make = (~message, ~settingsOrError, ~setSettingsOrError) =>
             display(`flex),
             flexDirection(`column),
             justifyContent(`flexStart),
-            width(`percent(20.)),
+            width(`rem(24.)),
+            borderRight(`px(1), `solid, white),
             height(`auto),
             overflowY(`auto),
           ])
         )>
-        {SettingsRenderer.entries(settings)
-         // TODO: Replace with actual wallets graphql info
-         |> Array.map(~f=((key, _)) =>
-              <WalletItem
-                key={PublicKey.toString(key)}
-                wallet={Wallet.key, balance: 100}
-                settings
-                setSettingsOrError
-              />
-            )
-         |> ReasonReact.array}
+        <WalletList />
       </div>
       <div
         className=Css.(style([width(`percent(100.)), margin(`rem(1.25))]))>

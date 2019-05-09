@@ -14,8 +14,11 @@ let make = (~message) => {
         <Send
           closeModal
           myWallets=[
-            {Wallet.key: PublicKey.ofStringExn("BK123123123"), balance: 100},
-            {Wallet.key: PublicKey.ofStringExn("BK8888888"), balance: 783},
+            {
+              Wallet.key: PublicKey.ofStringExn("BK123123123"),
+              balance: "100",
+            },
+            {Wallet.key: PublicKey.ofStringExn("BK8888888"), balance: "783"},
           ]
           settings={
             switch (settingsOrError) {
@@ -78,11 +81,7 @@ let make = (~message) => {
           <div
             className=Css.(style([display(`flex), flexDirection(`column)]))>
             <Header />
-            <Body
-              message={message ++ ";; " ++ settingsInfo}
-              settingsOrError
-              setSettingsOrError
-            />
+            <Body message={message ++ ";; " ++ settingsInfo} settingsOrError />
           </div>
           {testButton("Delete wallet", ~f=() =>
              Router.(navigate(DeleteWallet))

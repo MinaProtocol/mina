@@ -18,13 +18,25 @@ let sendStringified = (event, id, stringified, errorMsg) => {
   );
 };
 
-let start = apolloClient =>
+let start = (apolloClient: ApolloClient.generatedApolloClient) =>
   GraphqlIpcMain.on((. event, m) =>
     switch (m) {
-    | `Pipe_graphql_request(id, requestStr) =>
-      // These are the same thing
-      let r: ApolloClient.queryObj = Obj.magic(Js.Json.parseExn(requestStr));
-      let query = Task.liftErrorPromise(() => apolloClient##query(r));
+    | `Pipe_graphql_request(id, (kind, requestStr)) =>
+      let r = Js.Json.parseExn(requestStr);
+
+      let query =
+        switch (kind) {
+        | GraphqlLinkMessages.Kind.Query =>
+          Js.log("Treating as query");
+          let r: ApolloClient.queryObj = Obj.magic(r);
+          Task.liftErrorPromise(() => apolloClient##query(r))
+          |> Task.map(~f=Js.Json.stringifyAny);
+        | Mutation =>
+          Js.log("Treating as mutation");
+          let r: ApolloClient.mutationObj = Obj.magic(r);
+          Task.liftErrorPromise(() => apolloClient##mutate(r))
+          |> Task.map(~f=Js.Json.stringifyAny);
+        };
 
       Task.attempt(
         ~f=
@@ -32,7 +44,7 @@ let start = apolloClient =>
             switch (result) {
             | Ok(response) =>
               let response: Tc.Result.t(string, string) =
-                switch (Js.Json.stringifyAny(response)) {
+                switch (response) {
                 | Some(responseStr) => Ok(responseStr)
                 | None => Error("Could not serialize response")
                 };
