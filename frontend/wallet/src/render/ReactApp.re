@@ -2,7 +2,7 @@
 let make = () => {
   let (settings, setSettings) = Hooks.useSettings();
   let initialContext = {
-    settings: settings |> Tc.Result.toOption,
+    SettingsProvider.settings: Tc.Result.toOption(settings),
     setSettings: newSettings => {
       setSettings(Ok(newSettings));
     },
