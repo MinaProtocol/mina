@@ -45,8 +45,8 @@ include Single.Make({
               makeWebPreferences(
                 ~preload=
                   Filename.concat(
-                    [%bs.node __dirname] |> Option.getExn,
-                    "../render/Preload.js",
+                    [%bs.node __dirname] |> Option.getExn |> Filename.dirname,
+                    "render/Preload.js",
                   ),
                 ~nodeIntegration=true,
                 (),
@@ -58,6 +58,8 @@ include Single.Make({
         window,
         "file://"
         ++ Filename.concat(ProjectRoot.resource, "public/index.html")
+        ++ "?settingsPath="
+        ++ Js.Global.encodeURI(ProjectRoot.settings)
         ++ "#"
         ++ Route.print(input.path),
       );

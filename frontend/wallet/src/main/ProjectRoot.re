@@ -30,16 +30,15 @@ external getPath:
 
 let isJest = Js.Dict.get(env, "JEST_WORKER_ID") == Some("1");
 
-// TODO(bkase): Fix this by using IPC
 let userData =
-  if (!isJest && false /*isPackaged*/) {
+  if (!isJest && isPackaged) {
     getPath(`UserData);
   } else {
     Node.Process.cwd();
   };
 
 let resource =
-  if (!isJest && false /*isPackaged*/) {
+  if (!isJest && isPackaged) {
     Filename.dirname(getAppPath());
   } else {
     Node.Process.cwd();
