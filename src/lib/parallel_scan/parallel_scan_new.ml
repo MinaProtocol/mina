@@ -202,14 +202,17 @@ module Tree = struct
       Core.printf !"add merge: job count %d\n%!" (List.length jobs) ;
       let reset_weight a =
         match a with
-        | (0, 0), Merge.Empty ->
-            (*add new weights for the level[level-1] since  those are the next jobs we would be expecting*)
+        | 0, 0 ->
+            (*add new weights for all the levels above the cur_level since  those are the next jobs we would be expecting*)
+            Core.printf !" %d / %d \n %!" (Int.pow 2 update_level)
+              (Int.pow 2 (2 + cur_level)) ;
             let c = Int.pow 2 update_level / Int.pow 2 (2 + cur_level) in
-            ((c, c), Merge.Empty)
+            if update_level - 1 = 0 then (1, 0) else (c, c)
         | _ ->
             a
       in
       let left, right = weight in
+      Core.printf !"update_level %d \n%!" update_level ;
       if cur_level = update_level - 1 then
         let new_weight, m' =
           match (jobs, m) with
@@ -239,16 +242,16 @@ module Tree = struct
           | _ ->
               failwith "Invalid merge job (level-1)"
         in
-        (reset_weight (new_weight, m'), None)
+        ((reset_weight new_weight, m'), None)
       else if cur_level = update_level then
         match (jobs, m) with
         | [Merge a], Bcomp ({status= Job_status.Todo; _} as x) ->
-            let new_job =
-              (weight, Merge.Bcomp {x with status= Job_status.Done})
+            let new_job = Merge.Bcomp {x with status= Job_status.Done} in
+            let scan_result, weight' =
+              if cur_level = 0 then (Some a, (0, 0)) else (None, weight)
             in
-            let scan_result = if cur_level = 0 then Some a else None in
-            (new_job, scan_result)
-        | [], Empty | [], Dummy ->
+            ((weight', new_job), scan_result)
+        | [], m ->
             ((weight, m), None)
         | _ ->
             failwith "Invalid merge job"
@@ -257,11 +260,14 @@ module Tree = struct
         | [] | Base _ :: _ ->
             ((weight, m), None)
         | _ ->
-            let new_weight =
-              ( min 0 (left - List.length jobs)
-              , right - (List.length jobs - left) )
+            let jobs_left = List.length (List.take jobs left) in
+            let jobs_right =
+              List.length (List.take (List.drop jobs left) right)
             in
-            (reset_weight (new_weight, m), None)
+            let new_weight =
+              (max 0 (left - jobs_left), max 0 (right - jobs_right))
+            in
+            ((reset_weight new_weight, m), None)
       else ((weight, m), None)
     in
     let add_bases jobs (weight, d) =
@@ -272,6 +278,8 @@ module Tree = struct
           (weight, e)
       | [New_job.Base d], Base.Empty ->
           (weight - 1, Base.Full {job= d; seq_no; status= Job_status.Todo})
+      | [New_job.Merge _], Base.Full b ->
+          (weight, Base.Full {b with status= Job_status.Done})
       | _ ->
           failwith "Invalid base job"
     in
@@ -413,19 +421,21 @@ let create_tree_for_level ~level ~depth ~merge ~base =
 let create_tree ~depth =
   create_tree_for_level ~level:depth ~depth ~merge:Merge.Empty ~base:Base.Empty
 
+let max_trees t = ((Int.ceil_log2 t.max_base_jobs + 1) * (t.delay + 1)) + 1
+
 let create : max_base_jobs:int -> delay:int -> ('a, 'd) t =
  fun ~max_base_jobs ~delay ->
   let depth = Int.ceil_log2 max_base_jobs in
-  let new_tree = create_tree_for_level ~depth in
+  (*let new_tree = create_tree_for_level ~depth in
   let trees =
     List.map
       (List.init ((Int.ceil_log2 max_base_jobs + 1) * (delay + 1)) ~f:Fn.id)
       ~f:(fun _ ->
         new_tree ~level:(-1) ~merge:Merge.Dummy ~base:Base.Dummy
         (*depth -(i/(delay+1))*) )
-  in
+  in*)
   let next_tree = create_tree ~depth in
-  { trees= next_tree :: trees
+  { trees= [next_tree]
   ; acc= None
   ; next_base_pos= 0
   ; recent_tree_data= []
@@ -449,8 +459,7 @@ let rec leaves : type a d. (a, d) tree -> d = fun tree ->
 let work_to_do : ('a, 'd) Tree.t list -> int -> ('b, 'c) Available_job.t list =
  fun trees max_base_jobs ->
   let depth = Int.ceil_log2 max_base_jobs in
-  (*let work_trees = List.take (List.filteri trees ~f:(fun i _ -> Core.printf !"%d mod %d = %d\n%!" i delay (i%delay); i % delay = delay-1)) (depth+1) in*)
-  assert (List.length trees = depth + 1) ;
+  (*assert (List.length trees = depth + 1) ;*)
   List.concat_mapi trees ~f:(fun i tree ->
       Tree.jobs_on_level ~depth ~level:(depth - i) tree )
 
@@ -517,11 +526,12 @@ let update : type a d.
         fst b
   in
   let next_seq = t.curr_job_seq_no + 1 in
-  Core.printf !"adding new merges \n%!" ;
+  Core.printf !"adding new merges. Tree count: %d\n%!" (List.length t.trees) ;
   let updated_trees_merge, result_opt, _remaining_merge_jobs =
     List.foldi (List.tl_exn t.trees) ~init:([], None, new_merge_jobs)
       ~f:(fun i (trees, scan_result, jobs) tree ->
-        if i % delay = delay - 1 then
+        if i % delay = delay - 1 then (
+          Core.printf !"updating tree %d" i ;
           let tree', scan_result' =
             Tree.update
               (List.take jobs (required_job_count tree))
@@ -530,15 +540,23 @@ let update : type a d.
           in
           ( tree' :: trees
           , scan_result'
-          , List.drop jobs (required_job_count tree) )
+          , List.drop jobs (required_job_count tree) ) )
         else (tree :: trees, scan_result, jobs) )
   in
+  let updated_trees_merge = List.rev updated_trees_merge in
+  Core.printf
+    !"update tree count before %d\n"
+    (List.length updated_trees_merge) ;
   let updated_trees_merge =
     if Option.is_some result_opt then
       fst
         (List.split_n updated_trees_merge (List.length updated_trees_merge - 1))
     else updated_trees_merge
   in
+  Core.printf
+    !"result %b\nupdate tree count after %d\n"
+    (Option.is_some result_opt)
+    (List.length updated_trees_merge) ;
   Core.printf !"adding new bases \n%!" ;
   let updated_trees_base =
     let latest_tree = List.hd_exn t.trees in
@@ -563,10 +581,10 @@ let update : type a d.
         in
         [new_tree; cur_tree_updated]
   in
-  ( { t with
-      trees= updated_trees_base @ List.rev updated_trees_merge
-    ; curr_job_seq_no= next_seq }
-  , result_opt )
+  let trees = updated_trees_base @ updated_trees_merge in
+  let t = ({t with trees; curr_job_seq_no= next_seq}, result_opt) in
+  assert (List.length trees <= max_trees (fst t)) ;
+  t
 
 (*let%test_unit "test tree" =
   let t : (int, int) t = create ~max_base_jobs:4 ~delay:2 in
@@ -620,8 +638,8 @@ let view_int_trees (tree : (int Merge.t, int Base.t) Tree.t) =
   let show_status = function Job_status.Done -> "D" | Todo -> "T" in
   let show_a a =
     match snd a with
-    | Merge.Bcomp {seq_no; status; _} ->
-        sprintf "(Bo %d %s)" seq_no (show_status status)
+    | Merge.Bcomp {seq_no; status; left; right} ->
+        sprintf "(Bo %d %d %s)" (left + right) seq_no (show_status status)
     | Lcomp _ ->
         "L"
     | Empty ->
@@ -642,21 +660,27 @@ let view_int_trees (tree : (int Merge.t, int Base.t) Tree.t) =
 
 let%test_unit "test tree" =
   let t : (int, int) t = create ~max_base_jobs:8 ~delay:1 in
-  Core.printf !"init tree %{sexp: (int, int) t}\n %!" t ;
+  (*Core.printf !"init tree %{sexp: (int, int) t}\n %!" t ;*)
   Core.printf !"trees\n%s\n%!"
     (String.concat (List.map t.trees ~f:view_int_trees)) ;
   let _t' =
-    List.foldi ~init:t (List.init 10 ~f:Fn.id) ~f:(fun i t' _ ->
+    List.foldi ~init:t (List.init 20 ~f:Fn.id) ~f:(fun i t' _ ->
+        Core.printf !"Tree count %d\n" (List.length t'.trees) ;
         let data = List.init 8 ~f:(fun j -> i + j) in
         let work = work_for_current_tree t' in
         let new_merges =
           List.map work ~f:(fun job ->
               match job with Base i -> i | Merge (i, j) -> i + j )
         in
-        let t', _result_opt = update ~data ~completed_jobs:new_merges t' in
+        let t', result_opt = update ~data ~completed_jobs:new_merges t' in
+        let expected_result = List.sum (module Int) data ~f:Fn.id in
         Core.printf !"tree %{sexp: (int, int) t}\n %!" t' ;
-        Core.printf !"trees\n%s\n%!"
+        Core.printf
+          !"Result %{sexp: int option} expected %d\ntrees\n%s\n%!"
+          result_opt expected_result
           (String.concat ~sep:"\n" (List.map t'.trees ~f:view_int_trees)) ;
+        (*assert (
+          Option.value ~default:expected_result result_opt = expected_result ) ;*)
         t' )
   in
   ()
