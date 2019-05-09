@@ -912,7 +912,7 @@ module Make (Inputs : Inputs_intf) = struct
                          ; ( "external_transition"
                            , External_transition.Verified.to_yojson
                                (With_hash.data transition_with_hash) ) ]
-                       "refusing to broadcast $state_hash becuase it is too \
+                       "refusing to broadcast $state_hash because it is too \
                         late" )) ;
             don't_wait_for
               (Strict_pipe.transfer (Net.states net)
