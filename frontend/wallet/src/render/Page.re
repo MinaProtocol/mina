@@ -81,11 +81,7 @@ let make = (~message) => {
           <div
             className=Css.(style([display(`flex), flexDirection(`column)]))>
             <Header />
-            <Body
-              message={message ++ ";; " ++ settingsInfo}
-              settingsOrError
-              setSettingsOrError
-            />
+            <Body message={message ++ ";; " ++ settingsInfo} settingsOrError />
           </div>
           {testButton("Delete wallet", ~f=() =>
              Router.(navigate(DeleteWallet))

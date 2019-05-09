@@ -20,7 +20,7 @@ module HooksTest = {
 };
 
 [@react.component]
-let make = (~message, ~settingsOrError, ~setSettingsOrError) =>
+let make = (~message, ~settingsOrError) =>
   switch (settingsOrError) {
   | Belt.Result.Error(_) =>
     <div>
@@ -29,7 +29,7 @@ let make = (~message, ~settingsOrError, ~setSettingsOrError) =>
       </p>
       <p> {ReasonReact.string(message)} </p>
     </div>
-  | Belt.Result.Ok(settings) =>
+  | Belt.Result.Ok(_settings) =>
     <div
       className=Css.(
         style([
@@ -52,7 +52,7 @@ let make = (~message, ~settingsOrError, ~setSettingsOrError) =>
             overflowY(`auto),
           ])
         )>
-        <WalletList settings setSettingsOrError />
+        <WalletList />
       </div>
       <div
         className=Css.(style([width(`percent(100.)), margin(`rem(1.25))]))>

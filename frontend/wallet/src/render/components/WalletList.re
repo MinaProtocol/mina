@@ -30,7 +30,7 @@ let make = () => {
        |> Array.map(~f=((key, _)) =>
             <WalletItem
               key={PublicKey.toString(key)}
-              wallet={Wallet.key, balance: 100}
+              wallet={Wallet.key, balance: "100"}
               settings
               setSettingsOrError
             />
