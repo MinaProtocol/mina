@@ -21,8 +21,7 @@ module Body = struct
   let fold ({tag; field_elem; bit; amount} : t) =
     Fold.(
       Tag.fold tag
-      +> group3 (Field.Bits.fold field_elem) ~default:false
-      +> return (bit, false, false)
+      +> Public_key.Compressed.fold {x= field_elem; is_odd= bit}
       +> Currency.Amount.fold amount)
 
   let gen ~fee =
@@ -62,7 +61,7 @@ module Body = struct
     {tag; field_elem; bit; amount}
 
   let length_in_triples =
-    Tag.length_in_triples + Field.size_in_triples + 1
+    Tag.length_in_triples + Public_key.Compressed.length_in_triples
     + Currency.Amount.length_in_triples
 
   let to_hlist {tag; field_elem; bit; amount} =
@@ -99,13 +98,10 @@ module Body = struct
       ; amount= Currency.Amount.var_of_t amount }
 
     let to_triples ({tag; field_elem; bit; amount} : var) =
-      let%map field_elem_bits =
-        Field.Checked.choose_preimage_var ~length:Field.size_in_bits field_elem
+      let%map public_key =
+        Public_key.Compressed.var_to_triples {x= field_elem; is_odd= bit}
       in
-      Tag.Checked.to_triples tag
-      @ Bitstring_lib.Bitstring.pad_to_triple_list field_elem_bits
-          ~default:Boolean.false_
-      @ [(bit, Boolean.false_, Boolean.false_)]
+      Tag.Checked.to_triples tag @ public_key
       @ Currency.Amount.var_to_triples amount
   end
 end
