@@ -89,6 +89,10 @@ module type S = sig
     t -> int -> ('q, 'r) dispatch -> 'q -> 'r Or_error.t Deferred.t List.t
 
   val shutdown : t -> unit Deferred.t
+
+  module For_tests : sig
+    val induce_handshake_error : bool ref
+  end
 end
 
 module Make (Message : Message_intf) : S with type msg := Message.msg = struct
@@ -123,9 +127,12 @@ module Make (Message : Message_intf) : S with type msg := Message.msg = struct
     }
 
   let shutdown t =
-    Deferred.all [Membership.stop t.membership;
-    Option.value_map  ~default:Deferred.unit
-    ~f:(Tcp.Server.close ~close_existing_connections:true) t.tcp_server] >>| Fn.const ()
+    Deferred.all
+      [ Membership.stop t.membership
+      ; Option.value_map ~default:Deferred.unit
+          ~f:(Tcp.Server.close ~close_existing_connections:true)
+          t.tcp_server ]
+    >>| Fn.const ()
 
   module Config = struct
     type t =
@@ -473,67 +480,71 @@ module Make (Message : Message_intf) : S with type msg := Message.msg = struct
                 (Bind_to_address.Address t.addrs_and_ports.bind_ip)
                 (Bind_to_port.On_port t.addrs_and_ports.communication_port))
             (fun client reader writer ->
-                if !For_tests.induce_handshake_error then (Writer.close writer; Reader.close reader) else (
-              let client_inet_addr = Socket.Address.Inet.addr client in
-              let%bind () =
-                Trust_system.(
-                  record t.trust_system t.logger client_inet_addr
-                    Actions.(Connected, None))
-              in
-              let conn_map =
-                Option.value_map
-                  ~default:(Hashtbl.create (module Uuid))
-                  (Hashtbl.find t.connections client_inet_addr)
-                  ~f:Fn.id
-              in
-              let is_client_banned =
-                let peer_status =
-                  Trust_system.Peer_trust.lookup t.trust_system
-                    client_inet_addr
-                in
-                match peer_status.banned with
-                | Banned_until _ ->
-                    true
-                | Unbanned ->
-                    false
-              in
-              if is_client_banned then (
-                Logger.info t.logger ~module_:__MODULE__ ~location:__LOC__
-                  "Rejecting connection from banned peer %s"
-                  (Socket.Address.Inet.to_string client) ;
-                Reader.close reader >>= fun _ -> Writer.close writer )
-              else if
-                Option.is_some t.max_concurrent_connections
-                && Hashtbl.length conn_map
-                   >= Option.value_exn t.max_concurrent_connections
-              then (
-                Logger.error t.logger ~module_:__MODULE__ ~location:__LOC__
-                  "Cannot open another connection. Number of open connections \
-                   from %s equals the limit %d."
-                  (Socket.Address.Inet.to_string client)
-                  (Option.value_exn t.max_concurrent_connections) ;
-                Reader.close reader >>= fun _ -> Writer.close writer )
+              if !For_tests.induce_handshake_error then
+                let%bind () = Writer.close writer in
+                Reader.close reader
               else
-                let conn_id = Uuid_unix.create () in
-                Hashtbl.add_exn conn_map ~key:conn_id
-                  ~data:(Allowed (Ivar.create ())) ;
-                Hashtbl.set t.connections ~key:client_inet_addr ~data:conn_map ;
-                let%map () =
-                  Rpc.Connection.server_with_close reader writer
-                    ~implementations
-                    ~connection_state:(fun conn ->
-                      (* connection state is the client's IP and ephemeral port
+                let client_inet_addr = Socket.Address.Inet.addr client in
+                let%bind () =
+                  Trust_system.(
+                    record t.trust_system t.logger client_inet_addr
+                      Actions.(Connected, None))
+                in
+                let conn_map =
+                  Option.value_map
+                    ~default:(Hashtbl.create (module Uuid))
+                    (Hashtbl.find t.connections client_inet_addr)
+                    ~f:Fn.id
+                in
+                let is_client_banned =
+                  let peer_status =
+                    Trust_system.Peer_trust.lookup t.trust_system
+                      client_inet_addr
+                  in
+                  match peer_status.banned with
+                  | Banned_until _ ->
+                      true
+                  | Unbanned ->
+                      false
+                in
+                if is_client_banned then (
+                  Logger.info t.logger ~module_:__MODULE__ ~location:__LOC__
+                    "Rejecting connection from banned peer %s"
+                    (Socket.Address.Inet.to_string client) ;
+                  Reader.close reader >>= fun _ -> Writer.close writer )
+                else if
+                  Option.is_some t.max_concurrent_connections
+                  && Hashtbl.length conn_map
+                     >= Option.value_exn t.max_concurrent_connections
+                then (
+                  Logger.error t.logger ~module_:__MODULE__ ~location:__LOC__
+                    "Cannot open another connection. Number of open \
+                     connections from %s equals the limit %d."
+                    (Socket.Address.Inet.to_string client)
+                    (Option.value_exn t.max_concurrent_connections) ;
+                  Reader.close reader >>= fun _ -> Writer.close writer )
+                else
+                  let conn_id = Uuid_unix.create () in
+                  Hashtbl.add_exn conn_map ~key:conn_id
+                    ~data:(Allowed (Ivar.create ())) ;
+                  Hashtbl.set t.connections ~key:client_inet_addr
+                    ~data:conn_map ;
+                  let%map () =
+                    Rpc.Connection.server_with_close reader writer
+                      ~implementations
+                      ~connection_state:(fun conn ->
+                        (* connection state is the client's IP and ephemeral port
                         when connecting to the server over TCP; the ephemeral
                         port is distinct from the client's discovery and
                         communication ports *)
-                      Connection_with_state.value_map
-                        (Hashtbl.find_exn conn_map conn_id)
-                        ~when_allowed:(fun ivar -> Ivar.fill ivar conn)
-                        ~when_banned:() ;
-                      Hashtbl.set t.connections
-                        ~key:(Socket.Address.Inet.addr client)
-                        ~data:conn_map ;
-                      Socket.Address.Inet.to_host_and_port client )
+                        Connection_with_state.value_map
+                          (Hashtbl.find_exn conn_map conn_id)
+                          ~when_allowed:(fun ivar -> Ivar.fill ivar conn)
+                          ~when_banned:() ;
+                        Hashtbl.set t.connections
+                          ~key:(Socket.Address.Inet.addr client)
+                          ~data:conn_map ;
+                        Socket.Address.Inet.to_host_and_port client )
                     ~on_handshake_error:
                       (`Call
                         (fun exn ->
@@ -545,18 +556,18 @@ module Make (Message : Message_intf) : S with type msg := Message.msg = struct
                                     ( "Handshake error: $exn"
                                     , [("exn", `String (Exn.to_string exn))] )
                                 )) ))
-                in
-                let conn_map =
-                  Hashtbl.find_exn t.connections client_inet_addr
-                in
-                Hashtbl.remove conn_map conn_id ;
-                if Hashtbl.is_empty conn_map then
-                  Hashtbl.remove t.connections client_inet_addr
-                else
-                  Hashtbl.set t.connections ~key:client_inet_addr
-                    ~data:conn_map ))
+                  in
+                  let conn_map =
+                    Hashtbl.find_exn t.connections client_inet_addr
+                  in
+                  Hashtbl.remove conn_map conn_id ;
+                  if Hashtbl.is_empty conn_map then
+                    Hashtbl.remove t.connections client_inet_addr
+                  else
+                    Hashtbl.set t.connections ~key:client_inet_addr
+                      ~data:conn_map )
         in
-        { t with tcp_server= Some tcp_server } )
+        {t with tcp_server= Some tcp_server} )
 
   let received t = t.received_reader
 
@@ -594,166 +605,251 @@ module Make (Message : Message_intf) : S with type msg := Message.msg = struct
     List.map peers ~f:(fun peer -> query_peer t peer rpc query)
 end
 
-let%test_module "edge cases trust actions test" = (module struct
+let%test_module "edge cases trust actions test" =
+  ( module struct
+    open Trust_system.Actions
 
-  module Message = struct
-    module T = struct
-      type msg = string [@@deriving to_yojson]
-      let summary s = s
-    end
-
-    include T
-
-    include Versioned_rpc.Both_convert.One_way.Make (struct
-      include T
-      module Caller = T
-      module Callee = T
-      let name = "message"
-    end)
-
-  end
-
-  module Gossip_net = Make(Message)
-
-  module Ping_rpc = struct
-    module Master = struct
-      let name = "ping_rpc"
-
+    module Message = struct
       module T = struct
-        (* "master" types, do not change *)
-        type query = unit
+        type msg = string [@@deriving to_yojson]
 
-        type response = unit
+        let summary s = s
       end
 
-      module Caller = T
-      module Callee = T
+      include T
+
+      include Versioned_rpc.Both_convert.One_way.Make (struct
+        include T
+        module Caller = T
+        module Callee = T
+
+        let name = "message"
+      end)
     end
 
-    include Master.T
-    module M = Versioned_rpc.Both_convert.Plain.Make (Master)
-    include M
-  end
+    let () = Backtrace.elide := false
 
-  let make_peer n =
-    let discovery_port = 23000 + 2*n in
-    let communication_port = discovery_port + 1 in
-    {Peer.host= Unix.Inet_addr.localhost; discovery_port; communication_port}
+    let () = Async.Scheduler.set_record_backtraces true
 
-  let logger = Logger.create ()
+    module Gossip_net = Make (Message)
 
-  let make_config n tmpdir =
-    let our_dir = tmpdir ^/ (sprintf "node_%d" n) in
-    let ts_db = our_dir ^/ "trust_system" in
-    let me = make_peer n in
-    { Gossip_net.Config.timeout= Time.Span.of_min 5.
-    ; target_peer_count= 8
-    ; initial_peers= []
-    ; me= me
-    ; conf_dir= tmpdir ^/ (sprintf "node_%d" n)
-    ; logger
-    ; trust_system= Trust_system.create ~db_dir:ts_db
-    ; max_concurrent_connections= None }
+    module Ping_rpc = struct
+      module Master = struct
+        let name = "ping_rpc"
 
-  let within d ~expect ~observed =
-    let upper = expect +. d in
-    let lower = expect -. d in
-    d <=. upper && d >=. lower
+        module T = struct
+          (* "master" types, do not change *)
+          type query = unit
 
-  let trust_score_adj action = match Trust_system.Actions.to_trust_response action with | Trust_increase x -> x | Trust_decrease x -> 0. -. x | Insta_ban -> failwith "This should not be a ban"
+          type response = unit
+        end
 
-  let blocking_rpc_called = Ivar.create ()
+        module Caller = T
+        module Callee = T
+      end
 
-  let rpcs = [ Ping_rpc.implement_multi (fun _ ~version:_ () -> return ()) ]
-  let faulty_rpc = [ Ping_rpc.implement_multi (fun _ ~version:_ () -> raise (Failure "failed on purpose")) ]
-  let blocking_rpc = [ Ping_rpc.implement_multi (fun _ ~version:_ () -> (Ivar.fill blocking_rpc_called (); Deferred.never ())) ]
+      include Master.T
+      module M = Versioned_rpc.Both_convert.Plain.Make (Master)
+      include M
+    end
 
-  let teardown gns =
-    Deferred.List.all_unit (List.map gns ~f:Gossip_net.shutdown)
+    let make_peer n =
+      let discovery_port = 23000 + (2 * n) in
+      let communication_port = discovery_port + 1 in
+      {Peer.host= Unix.Inet_addr.localhost; discovery_port; communication_port}
 
-  let%test_unit "success" =
-    (* FIXME: is eps correct? *)
-    let eps = 1. -. Trust_system.For_tests.Record.decay_rate in
-    (* Connection refused *)
-    let x : unit Deferred.t = File_system.with_temp_dir ~f:(fun tmpdir ->
-      let one_config = make_config 1 tmpdir in
-      let two_config = make_config 2 tmpdir in
-      let two = Gossip_net.create two_config rpcs in
-      (match%bind Gossip_net.query_peer two (one_config.me) Ping_rpc.dispatch ()  with
-      | Ok _ ->  ()
-      | Error e -> failwith "Should have succeeded!") ;
-      teardown [one; two]
-    in
-    Async.Thread_safe.block_on_async_exn (fun () -> x)
+    let logger = Logger.create ()
 
-  let%test_unit "connection closed" =
-    (* FIXME: is eps correct? *)
-    let eps = 1. -. Trust_system.For_tests.Record.decay_rate in
-    (* Connection refused *)
-    let x : unit Deferred.t = File_system.with_temp_dir ~f:(fun tmpdir ->
-      let one_config = make_config 1 tmpdir in
-      let two_config = make_config 2 tmpdir in
-      let one = Gossip_net.create one_config blocking_rpc in
-      let two = Gossip_net.create two_config [] in
-      (match%bind Gossip_net.query_peer two (one_config.me) Ping_rpc.dispatch ()  with
-      | Ok _ ->  failwith "other peer should have blocked forever"
-      | Error e ->
-        let conn_refused_score_adj = trust_score_adj Outgoing_connection_error in
-        let {observed_trust; _} = Trust_system.lookup two_config.trust_system one_config.me in
-        assert (within eps ~expect:(trust + conn_refused_score_adj) ~observed:observed_trust) ;
-        Ivar.fill iv2 () )
-      |> don't_wait_for ;
-      let%bind iv = () in
-      Gossip_net.shutdown one ;
-      let%bind iv2 = () in
-      Deferred.unit
-    ) "gossip_net_test"
-    in
-    Async.Thread_safe.block_on_async_exn (fun () -> x)
+    let make_config n tmpdir =
+      let our_dir = tmpdir ^/ sprintf "node_%d" n in
+      let ts_db = our_dir ^/ "trust_system" in
+      let%map () = Unix.mkdir ~p:() ts_db in
+      let me = make_peer n in
+      { Gossip_net.Config.timeout= Time.Span.of_min 5.
+      ; target_peer_count= 8
+      ; initial_peers= []
+      ; me
+      ; conf_dir= tmpdir ^/ sprintf "node_%d" n
+      ; logger
+      ; trust_system= Trust_system.create ~db_dir:ts_db
+      ; max_concurrent_connections= None }
 
-  let%test_unit "handshake" =
-    (* FIXME: is eps correct? *)
-    let eps = 1. -. Trust_system.For_tests.Record.decay_rate in
-    (* Connection refused *)
-    let x : unit Deferred.t = File_system.with_temp_dir ~f:(fun tmpdir ->
-      let one_config = make_config 1 tmpdir in
-      let two_config = make_config 2 tmpdir in
-      let one = Gossip_net.create one_config rpcs in
-      Gossip_net.For_tests.induce_handshake_error := true ;
-      let two = Gossip_net.create two_config rpcs in
-      match%bind Gossip_net.query_peer two (one_config.me) Ping_rpc.dispatch ()  with
-      | Ok _ ->  failwith "induce_handshake_error should have prevented success"
-      | Error e -> ()
-      ;
-      Gossip_net.For_tests.induce_handshake_error := false ;
-      let conn_refused_score_adj = trust_score_adj Outgoing_connection_error in
-      let {observed_trust; _} = Trust_system.lookup two_config.trust_system one_config.me in
-      assert (within eps ~expect:(trust + conn_refused_score_adj) ~observed:observed_trust) ;
-      Deferred.unit
-    ) "gossip_net_test"
-    in
-    Async.Thread_safe.block_on_async_exn (fun () -> x)
+    let within d ~expect ~observed =
+      let upper = expect +. d in
+      let lower = expect -. d in
+      observed <=. upper && observed >=. lower
 
-  let%test_unit "rpc failed" =
-    (* FIXME: is eps correct? *)
-    let eps = 1. -. Trust_system.For_tests.Record.decay_rate in
-    (* Connection refused *)
-    let x : unit Deferred.t = File_system.with_temp_dir ~f:(fun tmpdir ->
-      let one_config = make_config 1 tmpdir in
-      let two_config = make_config 2 tmpdir in
-      let one = Gossip_net.create one_config faulty_rpcs in
-      Gossip_net.For_tests.induce_handshake_error := true ;
-      let two = Gossip_net.create two_config rpcs in
-      match%bind Gossip_net.query_peer two (one_config.me) Ping_rpc.dispatch ()  with
-      | Ok _ ->  failwith "induce_handshake_error should have prevented success"
-      | Error e -> ()
-      ;
-      Gossip_net.For_tests.induce_handshake_error := false ;
-      let conn_refused_score_adj = trust_score_adj Outgoing_connection_error in
-      let {observed_trust; _} = Trust_system.lookup two_config.trust_system one_config.me in
-      assert (within eps ~expect:(trust + conn_refused_score_adj) ~observed:observed_trust) ;
-      Deferred.unit
-    ) "gossip_net_test"
-    in
-    Async.Thread_safe.block_on_async_exn (fun () -> x)
-end)
+    let trust_score_adj action =
+      match Trust_system.Actions.to_trust_response (action, None) with
+      | Trust_increase x ->
+          x
+      | Trust_decrease x ->
+          0. -. x
+      | Insta_ban ->
+          failwith "This should not be a ban"
+
+    let blocking_rpc_called = Ivar.create ()
+
+    let rpcs = Ping_rpc.implement_multi (fun _ ~version:_ () -> return ())
+
+    let faulty_rpc =
+      Ping_rpc.implement_multi (fun _ ~version:_ () ->
+          raise (Failure "failed on purpose") )
+
+    let blocking_rpc =
+      Ping_rpc.implement_multi (fun _ ~version:_ () ->
+          Ivar.fill blocking_rpc_called () ;
+          Deferred.never () )
+
+    let teardown gns =
+      Deferred.List.all_unit (List.map gns ~f:Gossip_net.shutdown)
+
+    let%test_unit "success" =
+      let x : unit Deferred.t =
+        File_system.with_temp_dir
+          ~f:(fun tmpdir ->
+            let%bind one_config = make_config 1 tmpdir in
+            let%bind two_config = make_config 2 tmpdir in
+            let%bind two = Gossip_net.create two_config rpcs in
+            let%bind res =
+              Gossip_net.query_peer two one_config.me Ping_rpc.dispatch_multi
+                ()
+            in
+            ( match res with
+            | Ok _ ->
+                ()
+            | Error _ ->
+                failwith "Should have succeeded!" ) ;
+            teardown [two] )
+          "gossip_net_test"
+      in
+      Async.Thread_safe.block_on_async_exn (fun () -> x)
+
+    let%test_unit "connection closed" =
+      (* FIXME: is eps correct? *)
+      let eps = 1. -. Trust_system.For_tests.Record.decay_rate in
+      let x : unit Deferred.t =
+        File_system.with_temp_dir
+          ~f:(fun tmpdir ->
+            let%bind one_config = make_config 1 tmpdir in
+            let%bind two_config = make_config 2 tmpdir in
+            let%bind one = Gossip_net.create one_config blocking_rpc in
+            let%bind two = Gossip_net.create two_config [] in
+            let%bind () = after (Time.Span.of_ms 100.) in
+            let {Trust_system.Peer_status.trust= old_trust; _} =
+              Trust_system.lookup two_config.trust_system
+                Unix.Inet_addr.localhost
+            in
+            let%bind () = after (Time.Span.of_ms 100.) in
+            let finished_handling_failure = Ivar.create () in
+            ( match%map
+                Gossip_net.query_peer two one_config.me Ping_rpc.dispatch_multi
+                  ()
+              with
+            | Ok _ ->
+                failwith "other peer should have blocked forever"
+            | Error _ ->
+                let conn_refused_score_adj =
+                  trust_score_adj Outgoing_connection_error
+                in
+                let {Trust_system.Peer_status.trust= observed_trust; _} =
+                  Trust_system.lookup two_config.trust_system
+                    Unix.Inet_addr.localhost
+                in
+                assert (
+                  within eps
+                    ~expect:(old_trust +. conn_refused_score_adj)
+                    ~observed:observed_trust ) ;
+                Ivar.fill finished_handling_failure () )
+            |> don't_wait_for ;
+            let%bind () = Ivar.read blocking_rpc_called in
+            let%bind () = Gossip_net.shutdown one in
+            let%bind () = Ivar.read finished_handling_failure in
+            teardown [one; two] )
+          "gossip_net_test"
+      in
+      Async.Thread_safe.block_on_async_exn (fun () -> x)
+
+    let%test_unit "handshake" =
+      (* FIXME: is eps correct? *)
+      let eps = 1. -. Trust_system.For_tests.Record.decay_rate in
+      let x : unit Deferred.t =
+        File_system.with_temp_dir
+          ~f:(fun tmpdir ->
+            let%bind one_config = make_config 1 tmpdir in
+            let%bind two_config = make_config 2 tmpdir in
+            let%bind one = Gossip_net.create one_config rpcs in
+            Gossip_net.For_tests.induce_handshake_error := true ;
+            let%bind two = Gossip_net.create two_config rpcs in
+            let%bind () = after (Time.Span.of_ms 100.) in
+            let {Trust_system.Peer_status.trust= old_trust; _} =
+              Trust_system.lookup two_config.trust_system
+                Unix.Inet_addr.localhost
+            in
+            let%bind res =
+              Gossip_net.query_peer two one_config.me Ping_rpc.dispatch_multi
+                ()
+            in
+            ( match res with
+            | Ok _ ->
+                failwith "induce_handshake_error should have prevented success"
+            | Error _ ->
+                () ;
+                Gossip_net.For_tests.induce_handshake_error := false ;
+                let conn_refused_score_adj =
+                  trust_score_adj Outgoing_connection_error
+                in
+                let {Trust_system.Peer_status.trust= observed_trust; _} =
+                  Trust_system.lookup two_config.trust_system
+                    Unix.Inet_addr.localhost
+                in
+                assert (
+                  within eps
+                    ~expect:(old_trust +. conn_refused_score_adj)
+                    ~observed:observed_trust ) ) ;
+            teardown [one; two] )
+          "gossip_net_test"
+      in
+      Async.Thread_safe.block_on_async_exn (fun () -> x)
+
+    let%test_unit "rpc failed" =
+      (* FIXME: is eps correct? *)
+      let eps = 1. -. Trust_system.For_tests.Record.decay_rate in
+      (* Connection refused *)
+      let x : unit Deferred.t =
+        File_system.with_temp_dir
+          ~f:(fun tmpdir ->
+            let%bind one_config = make_config 1 tmpdir in
+            let%bind two_config = make_config 2 tmpdir in
+            let%bind one = Gossip_net.create one_config faulty_rpc in
+            let%bind two = Gossip_net.create two_config rpcs in
+            let%bind () = after (Time.Span.of_ms 100.) in
+            let {Trust_system.Peer_status.trust= old_trust; _} =
+              Trust_system.lookup two_config.trust_system
+                Unix.Inet_addr.localhost
+            in
+            let%bind res =
+              Gossip_net.query_peer two one_config.me Ping_rpc.dispatch_multi
+                ()
+            in
+            ( match res with
+            | Ok _ ->
+                failwith "induce_handshake_error should have prevented success"
+            | Error _ ->
+                () ;
+                let conn_refused_score_adj =
+                  trust_score_adj Outgoing_connection_error
+                in
+                let {Trust_system.Peer_status.trust= observed_trust; _} =
+                  Trust_system.lookup two_config.trust_system
+                    Unix.Inet_addr.localhost
+                in
+                assert (
+                  within eps
+                    ~expect:(old_trust +. conn_refused_score_adj)
+                    ~observed:observed_trust ) ) ;
+            teardown [one; two] )
+          "gossip_net_test"
+      in
+      Async.Thread_safe.block_on_async_exn (fun () -> x)
+  end )
