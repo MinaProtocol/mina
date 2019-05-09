@@ -147,6 +147,9 @@ end
 module Banned_status = Banned_status
 module Peer_status = Peer_status
 module Peer_trust = Peer_trust.Make (Actions)
+module For_tests = struct
+    module Record = Record
+end
 include Peer_trust
 
 let record_envelope_sender :
