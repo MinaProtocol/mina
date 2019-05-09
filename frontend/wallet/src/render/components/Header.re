@@ -2,20 +2,25 @@ let component = ReasonReact.statelessComponent("Header");
 
 module Styles = {
   open Css;
-  open StyleGuide;
+  open Theme;
   let header =
     merge([
       style([
-        height(`em(4.)),
-        maxHeight(`em(4.)),
-        minHeight(`em(4.)),
+        position(`fixed),
+        top(`px(0)),
+        left(`px(0)),
+        right(`px(0)),
+        height(Spacing.headerHeight),
+        maxHeight(Spacing.headerHeight),
+        minHeight(Spacing.headerHeight),
         display(`flex),
         alignItems(`center),
         justifyContent(`spaceBetween),
         backgroundColor(Colors.headerBgColor),
-        color(white),
+        color(black),
         fontFamily("IBM Plex Sans, Sans-Serif"),
-        paddingLeft(`px(20)),
+        padding2(~v=`px(0), ~h=Theme.Spacing.defaultSpacing),
+        borderBottom(`px(1), `solid, Colors.borderColor),
         CssElectron.appRegion(`drag),
       ]),
       notText,
@@ -27,44 +32,11 @@ let make = () =>
   <div className=Styles.header>
     <div
       style={ReactDOMRe.Style.make(~display="flex", ~alignItems="center", ())}>
-      <div className=StyleGuide.codaLogoCurrent />
+      <div className=Theme.codaLogoCurrent />
       <p
         style={ReactDOMRe.Style.make(~fontWeight="100", ~fontSize="160%", ())}>
         {ReasonReact.string({j|CODA|j})}
       </p>
-    </div>
-    <p style={ReactDOMRe.Style.make(~color="#516679", ())}>
-      {ReasonReact.string({j|Master @B37CF8 |j})}
-    </p>
-    <p style={ReactDOMRe.Style.make(~color="#516679", ())}>
-      {ReasonReact.string({j|Seed IP|j})}
-    </p>
-    <select
-      style={ReactDOMRe.Style.make(
-        ~padding="10px",
-        ~background="#17212d",
-        ~color="#4789c4",
-        ~border="2px solid #2a3f58",
-        ~outline="none",
-        ~fontWeight="500",
-        ~width="11em",
-        ~height="2em",
-        (),
-      )}>
-      <option value="testnet"> {ReasonReact.string("Testnet")} </option>
-      <option value="network2"> {ReasonReact.string("Network 2")} </option>
-      <option value="network3"> {ReasonReact.string("Network 3")} </option>
-    </select>
-    <div
-      style={ReactDOMRe.Style.make(
-        ~padding="10px",
-        ~fontSize="180%",
-        ~color="#516679",
-        ~fontWeight="bold",
-        ~transform="rotate(-45deg)",
-        (),
-      )}>
-      {ReasonReact.string({js|⚲|js})}
     </div>
     <div
       style={ReactDOMRe.Style.make(

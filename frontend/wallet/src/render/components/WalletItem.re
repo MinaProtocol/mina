@@ -2,7 +2,7 @@ open Tc;
 
 module Styles = {
   open Css;
-  open StyleGuide;
+  open Theme;
 
   let activeWalletItem = [color(white), backgroundColor(`hex("222b33CC"))];
   let walletItem =
@@ -10,12 +10,12 @@ module Styles = {
       flexShrink(0),
       display(`flex),
       flexDirection(`column),
+      alignItems(`flexStart),
+      justifyContent(`center),
+      height(`rem(4.5)),
       fontFamily("IBM Plex Sans, Sans-Serif"),
       color(grey),
-      backgroundColor(`hex("121f2b44")),
-      margin(`px(2)),
-      marginBottom(`px(0)),
-      padding(`px(5)),
+      padding2(~v=`px(0), ~h=Theme.Spacing.defaultSpacing),
     ]);
   let inactiveWalletItem =
     merge([walletItem, style([hover(activeWalletItem)]), notText]);
@@ -47,8 +47,7 @@ module Styles = {
   let separator =
     style([
       margin(`px(2)),
-      border(`px(0), `solid, transparent),
-      borderTop(`px(1), `solid, `hex("2a3f58")),
+      borderBottom(`px(1), `solid, Theme.Colors.borderColor),
     ]);
 
   let settingLabel = style([marginLeft(`em(1.)), height(`em(1.5))]);
@@ -70,24 +69,21 @@ module Action = {
     | SaveName
     | ChangeName(string)
     | LoadingDone
-    | ResetDebounce
-    | ToggleExpand;
+    | ResetDebounce;
 
   let print =
     fun
     | SaveName => "saveName"
     | ChangeName(_) => "changeName"
     | LoadingDone => "loadingDone"
-    | ResetDebounce => "resetDebounce"
-    | ToggleExpand => "toggleExpand";
+    | ResetDebounce => "resetDebounce";
 };
 
 module State = {
   module Visibility = {
     type t =
       | Shrunk
-      | Loading
-      | Expanded;
+      | Loading;
   };
 
   type t = {
@@ -117,7 +113,7 @@ let useReducerWithDispatch = (reduceWithDispatch, initialState) => {
 
 [@react.component]
 let make = (~wallet: Wallet.t, ~settings, ~setSettingsOrError) => {
-  let (state: State.t, dispatch) =
+  let (state: State.t, _dispatch) =
     useReducerWithDispatch(
       (dispatch, state: State.t, action) => {
         Js.log4(
@@ -128,15 +124,6 @@ let make = (~wallet: Wallet.t, ~settings, ~setSettingsOrError) => {
         );
         switch (action) {
         | Action.ChangeName(newName) => {...state, currentName: newName}
-        | ToggleExpand =>
-          switch (state.visibility, state.debounce) {
-          | (Shrunk, false) => {...state, visibility: Expanded}
-          | (Expanded, false) => {...state, visibility: Shrunk}
-          // ignore these ones
-          | (Shrunk, true)
-          | (Expanded, true)
-          | (Loading, _) => state
-          }
         | LoadingDone => {...state, visibility: Shrunk}
         | ResetDebounce => {...state, debounce: false}
         | SaveName =>
@@ -169,52 +156,18 @@ let make = (~wallet: Wallet.t, ~settings, ~setSettingsOrError) => {
     className={
       switch (state.visibility) {
       | Shrunk => Styles.inactiveWalletItem
-      | Expanded => Styles.activeWalletItem
       | Loading => Css.(style([backgroundColor(`rgb((255, 0, 0)))]))
       }
-    }
-    onClick={_event => dispatch(ToggleExpand)}>
+    }>
     {switch (state.visibility) {
      | Shrunk =>
        <div className=Styles.walletName>
          {ReasonReact.string(state.currentName)}
        </div>
-     | Expanded =>
-       <input
-         type_="text"
-         className=Styles.walletNameTextField
-         value={state.currentName}
-         onBlur={_ => dispatch(SaveName)}
-         onChange={e =>
-           dispatch(ChangeName(ReactEvent.Synthetic.target(e)##value))
-         }
-         onClick={e => ReactEvent.Synthetic.stopPropagation(e)}
-       />
      | Loading => <div> {ReasonReact.string("LOADING")} </div>
      }}
     <div className=Styles.balance>
       {ReasonReact.string({js|■ |js} ++ Js.Int.toString(wallet.balance))}
     </div>
-    {switch (state.visibility) {
-     | Shrunk
-     | Loading => ReasonReact.null
-     | Expanded =>
-       <>
-         <hr className=Styles.separator />
-         <div className=Styles.settingLabel>
-           {ReasonReact.string("Staking")}
-         </div>
-         <hr className=Styles.separator />
-         <div className=Styles.settingLabel>
-           {ReasonReact.string("Private key")}
-         </div>
-         <hr className=Styles.separator />
-         <button
-           className=Styles.deleteButton
-           onClick={_event => dispatch(ToggleExpand)}>
-           {ReasonReact.string("Delete wallet")}
-         </button>
-       </>
-     }}
   </div>;
 };

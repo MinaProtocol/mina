@@ -39,7 +39,7 @@ let make = (~message, ~settingsOrError, ~setSettingsOrError) =>
           overflow(`hidden),
           width(`percent(100.)),
           color(Css.white),
-          backgroundColor(StyleGuide.Colors.bgWithAlpha),
+          backgroundColor(Theme.Colors.bgWithAlpha),
         ])
       )>
       <div

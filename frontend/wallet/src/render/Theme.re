@@ -1,6 +1,8 @@
 /** Shared styles and colors */
 open Css;
 
+global("*", [boxSizing(`borderBox)]);
+
 module Colors = {
   let hexToString = (`hex(s)) => s;
 
@@ -19,13 +21,15 @@ module Colors = {
   let sage = `hex("65906e");
   let blanco = `hex("e3e0d5");
 
-  let headerBgColor = `hex("06111bBB");
+  let headerBgColor = white;
   let headerGreyText = `hex("516679");
   let textColor = white;
+  let borderColor = rgba(0, 0, 0, 0.15);
 };
 
 module Typeface = {
   let lucidaGrande = fontFamily("LucidaGrande");
+  let sansSerif = fontFamily("IBM Plex Sans, Sans-Serif");
 };
 
 module CssElectron = {
@@ -33,6 +37,13 @@ module CssElectron = {
     fun
     | `drag => `declaration(("-webkit-app-region", "drag"))
     | `noDrag => `declaration(("-webkit-app-region", "no-drag"));
+};
+
+module Spacing = {
+  let defaultSpacing = `rem(1.);
+  let defaultPadding = padding(defaultSpacing);
+  let headerHeight = `rem(4.);
+  let footerHeight = `rem(5.);
 };
 
 let notText = style([cursor(`default), userSelect(`none)]);

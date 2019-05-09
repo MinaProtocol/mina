@@ -14,7 +14,7 @@ let make = (~view) => {
           alignItems(`center),
           width(`percent(100.)),
           height(`percent(100.)),
-          backgroundColor(StyleGuide.Colors.savilleAlpha(0.95)),
+          backgroundColor(Theme.Colors.savilleAlpha(0.95)),
         ])
       )
       onClick={_ => Router.navigate(Home)}>

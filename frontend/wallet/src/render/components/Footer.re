@@ -1,9 +1,28 @@
 open Tc;
 
+module Styles = {
+  open Css;
+
+  let footer =
+    style([
+      position(`fixed),
+      bottom(`px(0)),
+      left(`px(0)),
+      right(`px(0)),
+      display(`flex),
+      height(Theme.Spacing.footerHeight),
+      justifyContent(`spaceBetween),
+      alignItems(`center),
+      padding2(~v= `px(0), ~h= `rem(2.)),
+      borderTop(`px(1), `solid, Theme.Colors.borderColor),
+    ]);
+};
+
 module StakingSwitch = {
   [@react.component]
-  let make = (~pubKey, ~settings) => {
-    <div className=Css.(style([color(StyleGuide.Colors.serpentine)]))>
+  let make = (~pubKey) => {
+    let context = React.useContext(SettingsProvider.context);
+    <div className=Css.(style([color(Theme.Colors.serpentine)]))>
       <input
         type_="checkbox"
         label="staking-switch"
@@ -16,9 +35,9 @@ module StakingSwitch = {
       </span>
       <span>
         {ReasonReact.string(
-           SettingsRenderer.lookup(settings, pubKey)
-           |> Option.withDefault(~default=pubKey |> PublicKey.toString),
-         )}
+          Tc.Option.andThen(~f=(s => SettingsRenderer.lookup(s, pubKey)), context.settings)
+          |> Option.withDefault(~default=pubKey |> PublicKey.toString)
+        )}
       </span>
     </div>;
   };
@@ -67,7 +86,7 @@ module RightButtons = {
 
   module SendButton = {
     [@react.component]
-    let make = (~settings as _) => {
+    let make = () => {
       <button onClick={_e => Router.navigate(Route.Send)}>
         {ReasonReact.string("Send")}
       </button>;
@@ -75,24 +94,17 @@ module RightButtons = {
   };
 
   [@react.component]
-  let make = (~pubKeySelected, ~settings) => {
-    <div> <PublicKeyButton pubKeySelected /> <SendButton settings /> </div>;
+  let make = (~pubKeySelected) => {
+    <div> <PublicKeyButton pubKeySelected /> <SendButton /> </div>;
   };
 };
 
 [@react.component]
-let make = (~stakingKey, ~settings) => {
-  <div
-    className=Css.(
-      style([
-        display(`flex),
-        justifyContent(`spaceBetween),
-        alignItems(`center),
-        padding(`rem(2.0)),
-      ])
-    )>
-    <StakingSwitch pubKey=stakingKey settings />
+let make = () => {
+  let stakingKey = PublicKey.ofStringExn("131243123");
+  <div className=Styles.footer>
+    <StakingSwitch pubKey=stakingKey />
     <ActivityLogButton />
-    <RightButtons pubKeySelected=None settings />
-  </div>;
+    <RightButtons pubKeySelected=None />
+  </div>
 };
