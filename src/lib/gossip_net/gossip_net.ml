@@ -437,13 +437,14 @@ module Make (Message : Message_intf) : S with type msg := Message.msg = struct
                     ~on_handshake_error:
                       (`Call
                         (fun exn ->
-                          Logger.error t.logger ~module_:__MODULE__
-                            ~location:__LOC__ "%s" (Exn.to_string_mach exn) ;
                           Trust_system.(
                             record t.trust_system t.logger client_inet_addr
                               Actions.
                                 ( Incoming_connection_error
-                                , Some ("Handshake error", []) )) ))
+                                , Some
+                                    ( "Handshake error: $exn"
+                                    , [("exn", `String (Exn.to_string exn))] )
+                                )) ))
                 in
                 let conn_map =
                   Hashtbl.find_exn t.connections client_inet_addr
