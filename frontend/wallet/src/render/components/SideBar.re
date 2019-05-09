@@ -11,5 +11,5 @@ module Styles = {
 [@react.component]
 let make = () =>
   <div className=Styles.sidebar>
-    {React.string("Wallet list goes here")}
+    <WalletList />
   </div>;

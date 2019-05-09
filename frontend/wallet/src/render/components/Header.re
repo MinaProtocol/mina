@@ -19,7 +19,7 @@ module Styles = {
         backgroundColor(Colors.headerBgColor),
         color(black),
         fontFamily("IBM Plex Sans, Sans-Serif"),
-        paddingLeft(`px(20)),
+        padding2(~v=`px(0), ~h=Theme.Spacing.defaultSpacing),
         borderBottom(`px(1), `solid, Colors.borderColor),
         CssElectron.appRegion(`drag),
       ]),

@@ -10,9 +10,10 @@ module Styles = {
       left(`px(0)),
       right(`px(0)),
       display(`flex),
+      height(Theme.Spacing.footerHeight),
       justifyContent(`spaceBetween),
       alignItems(`center),
-      padding(`rem(2.0)),
+      padding2(~v= `px(0), ~h= `rem(2.)),
       borderTop(`px(1), `solid, Theme.Colors.borderColor),
     ]);
 };
