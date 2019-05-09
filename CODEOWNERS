@@ -9,7 +9,7 @@
 /config/ @imeckler @nholland94
 /CODE_OF_CONDUCT.md @imeckler @cmr
 /CONTRIBUTING.md @imeckler @cmr
-/DIRECTORY_STRUCTURE.md @ihn @jkrauska
+/DIRECTORY_STRUCTURE.md @imeckler @jkrauska
 /LICENSE @imeckler
 /README* @cmr
 /azure-pipelines.yml @jkrauska
@@ -27,7 +27,7 @@
 /src/lib/bignum_bigint/ @nholland94 @bkase
 /src/lib/blake2/ @rbkhmrcr @vanishreerao
 /src/lib/blockchain_snark/ @nholland94 @bkase
-/src/lib/bootstrap_controller/ @nholland94
+/src/lib/bootstrap_controller/ @nholland94 @johnwu93
 /src/lib/cache_dir/ @cmr
 /src/lib/cached/ @nholland94
 /src/lib/chunked_triples/ @psteckler @rbkhmrcr @vanishreerao
@@ -67,17 +67,15 @@
 /src/lib/kademlia @bkase @cmr @enolan
 /src/lib/key_value_database/ @johnwu93 @bkase
 /src/lib/keys_lib/ @cmr
-/src/lib/ledger_builder/ @deepthiskumar
-/src/lib/ledger_builder_controller/ @nholland94
-/src/lib/ledger_catchup/ @cmr
+/src/lib/ledger_catchup/ @nholland94 @johnwu93
 /src/lib/ledger_proof/ @nholland94
 /src/lib/linked_tree/ @cmr
 /src/lib/lite_base/ @bkase @cmr
 /src/lib/lite_lib/ @bkase @cmr
 /src/lib/lite_params/ @rbkhmrcr @vanishreerao
 /src/lib/logger/ @nholland94
-/src/lib/merkle_address/ @cmr @bkase
-/src/lib/merkle_ledger/ @cmr
+/src/lib/merkle_address/ @cmr @bkase @nholland94 @johnwu93
+/src/lib/merkle_ledger/ @cmr @nholland94
 /src/lib/merkle_list/ @johnwu93 @cmr
 /src/lib/merkle_mask/ @nholland94 @psteckler
 /src/lib/module_version/ @psteckler @mrmr1993
@@ -110,7 +108,7 @@
 /src/lib/rocksdb/ @psteckler @nholland94
 /src/lib/rocksdb_database/ @psteckler @nholland94
 /src/lib/root_history/ @cmr
-/src/lib/root_prover/ @nholland94 @johnwu93
+/src/lib/root_prover/ @johnwu93 @bkase
 /src/lib/rose_tree/ @bkase @nholland94
 /src/lib/secrets/ @cmr
 /src/lib/sgn/ @deepthiskumar @bkase
@@ -121,7 +119,6 @@
 /src/lib/snark_pool/ @enolan
 /src/lib/snark_work_lib/ @deepthiskumar
 /src/lib/snark_worker/ @cmr @nholland94
-/src/lib/snark_worker_lib/ @cmr @nholland94
 /src/lib/snarkette/ @bkase
 # /src/lib/snarky (submodule!)
 /src/lib/snarky_blake2/ @rbkhmrcr @vanishreerao
@@ -149,7 +146,7 @@
 /src/lib/transaction_snark_work/ @deepthiskumar
 /src/lib/transition_frontier/ @nholland94
 /src/lib/transition_frontier_controller/ @nholland94
-/src/lib/transition_frontier_controller_tests/ @nholland94
+/src/lib/transition_frontier_controller_tests/ @nholland94 @johnwu93
 /src/lib/transition_frontier_persistence/ @nholland94
 /src/lib/transition_handler/ @nholland94
 /src/lib/transition_router/ @nholland94
