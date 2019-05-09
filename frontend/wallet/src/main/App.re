@@ -6,9 +6,9 @@ let apolloClient = GraphqlMain.createClient("http://localhost:8080/graphql");
 
 IpcLinkMain.start(apolloClient);
 
-let createTray = (_settingsOrError, dispatch, wallets) => {
+let createTray = dispatch => {
   let t = AppTray.get();
-  let prefixItems =
+  let trayItems =
     Menu.Item.[
       make(
         Label("Synced"),
@@ -16,47 +16,33 @@ let createTray = (_settingsOrError, dispatch, wallets) => {
         (),
       ),
       make(Separator, ()),
-      make(Label("Wallets:"), ~enabled=false, ()),
-    ];
-  let codaSymbol = {js|□|js};
-  let walletItems =
-    List.map(
-      ~f=
-        wallet =>
-          Menu.Item.make(
-            Radio(
-              Printf.sprintf(
-                "    %s %s %d",
-                wallet##publicKey,
-                codaSymbol,
-                100,
-              ),
-            ),
-            (),
-          ),
-      Array.to_list(wallets),
-    );
-
-  let suffixItems =
-    Menu.Item.[
-      make(Separator, ()),
       make(
-        Label("Send"),
-        ~accelerator="CmdOrCtrl+S",
-        ~click=() => AppWindow.deepLink({path: Route.Send, dispatch}),
+        Label("Debug"),
+        ~click=
+          () =>
+            AppWindow.get({path: Route.Home, dispatch})
+            |> AppWindow.openDevTools,
         (),
       ),
       make(Separator, ()),
-      make(Label("Request"), ~accelerator="CmdOrCtrl+R", ()),
-      make(Separator, ()),
-      make(Label("Settings:"), ~enabled=false, ()),
-      make(Checkbox("    Snark worker"), ()),
+      make(
+        Label("Open"),
+        ~accelerator="CmdOrCtrl+O",
+        ~click=() => AppWindow.deepLink({path: Route.Home, dispatch}),
+        (),
+      ),
+      make(
+        Label("Settings"),
+        ~accelerator="CmdOrCtrl+,",
+        ~click=() => AppWindow.deepLink({path: Route.Home, dispatch}),
+        (),
+      ),
       make(Separator, ()),
       make(Label("Quit"), ~accelerator="CmdOrCtrl+Q", ~role="quit", ()),
     ];
 
   let menu = Menu.make();
-  List.iter(~f=Menu.append(menu), prefixItems @ walletItems @ suffixItems);
+  List.iter(~f=Menu.append(menu), trayItems);
 
   Tray.setContextMenu(t, menu);
 };
@@ -86,25 +72,13 @@ let run = () =>
       let dispatch = ref(_ => ());
       let store =
         Application.Store.create(
-          initialState, ~onNewState=(_last, curr: Application.State.t('a)) =>
-          createTray(curr.settingsOrError, dispatch^, curr.wallets)
+          initialState, ~onNewState=(_last, _curr: Application.State.t('a)) =>
+          createTray(dispatch^)
         );
       dispatch := Application.Store.apply(store);
       let dispatch = dispatch^;
 
-      ignore @@
-      Js.Global.setTimeout(
-        () => {
-          let q = TestQuery.query(apolloClient);
-          Task.perform(q, ~f=response =>
-            switch (response.data) {
-            | Some(d) => dispatch(Application.Action.WalletInfo(d##wallets))
-            | None => Js.log("Error getting wallets")
-            }
-          );
-        },
-        2000,
-      );
+      createTray(dispatch);
 
       AppWindow.deepLink({AppWindow.Input.path: Route.Home, dispatch});
     },

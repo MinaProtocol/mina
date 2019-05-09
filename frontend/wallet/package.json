@@ -38,9 +38,11 @@
   },
   "build": {
     "appId": "FOO.org.codaprotocol.prowallet",
+    "asarUnpack": [
+      "lib"
+    ],
     "files": [
-      "./lib/**/*",
-      "!./lib/js/src/render/Preload.js",
+      "lib/**/*",
       "!node_modules/electron",
       "!node_modules/graphql_ppx",
       "!node_modules/bs-platform/lib",
@@ -48,7 +50,7 @@
       "package.json"
     ],
     "extraResources": [
-      "./lib/js/src/render/Preload.js",
+      "node_modules/graphql-faker/dist/index.js",
       "bundle/**/*",
       "public/*"
     ],

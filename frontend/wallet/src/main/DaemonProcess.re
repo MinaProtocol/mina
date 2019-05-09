@@ -4,8 +4,17 @@ let start = port => {
   print_endline("Starting graphql-faker");
   let p =
     ChildProcess.spawn(
-      "./node_modules/.bin/graphql-faker",
-      [|"--port", string_of_int(port), "--", "schema.graphql"|],
+      "node",
+      [|
+        Filename.concat(
+          ProjectRoot.resource,
+          "node_modules/graphql-faker/dist/index.js",
+        ),
+        "--port",
+        string_of_int(port),
+        "--",
+        "schema.graphql",
+      |],
     );
 
   ChildProcess.Process.onError(p, e =>
