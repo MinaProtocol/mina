@@ -20,7 +20,8 @@ module Styles = {
 
 module StakingSwitch = {
   [@react.component]
-  let make = (~pubKey, ~settings) => {
+  let make = (~pubKey) => {
+    let context = React.useContext(SettingsProvider.context);
     <div className=Css.(style([color(Theme.Colors.serpentine)]))>
       <input
         type_="checkbox"
@@ -34,9 +35,9 @@ module StakingSwitch = {
       </span>
       <span>
         {ReasonReact.string(
-           SettingsRenderer.lookup(settings, pubKey)
-           |> Option.withDefault(~default=pubKey |> PublicKey.toString),
-         )}
+          Tc.Option.andThen(~f=(s => SettingsRenderer.lookup(s, pubKey)), context.settings)
+          |> Option.withDefault(~default=pubKey |> PublicKey.toString)
+        )}
       </span>
     </div>;
   };
@@ -85,7 +86,7 @@ module RightButtons = {
 
   module SendButton = {
     [@react.component]
-    let make = (~settings as _) => {
+    let make = () => {
       <button onClick={_e => Router.navigate(Route.Send)}>
         {ReasonReact.string("Send")}
       </button>;
@@ -93,22 +94,17 @@ module RightButtons = {
   };
 
   [@react.component]
-  let make = (~pubKeySelected, ~settings) => {
-    <div> <PublicKeyButton pubKeySelected /> <SendButton settings /> </div>;
+  let make = (~pubKeySelected) => {
+    <div> <PublicKeyButton pubKeySelected /> <SendButton /> </div>;
   };
 };
 
 [@react.component]
 let make = () => {
   let stakingKey = PublicKey.ofStringExn("131243123");
-  let (settingsOrError, _setSettingsOrError) = Hooks.useSettings();
-  switch (settingsOrError) {
-  | Ok(settings) =>
-    <div className=Styles.footer>
-      <StakingSwitch pubKey=stakingKey settings />
-      <ActivityLogButton />
-      <RightButtons pubKeySelected=None settings />
-    </div>
-  | Error(_) => <span />
-  };
+  <div className=Styles.footer>
+    <StakingSwitch pubKey=stakingKey />
+    <ActivityLogButton />
+    <RightButtons pubKeySelected=None />
+  </div>
 };
