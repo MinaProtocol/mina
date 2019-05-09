@@ -1,3 +1,6 @@
+[%%import
+"../../config.mlh"]
+
 open Async_kernel
 open Core
 open Pipe_lib
@@ -292,9 +295,30 @@ end = struct
     | _ ->
         false
 
+  [%%if
+  fixup_localhost_for_testing]
+
+  let fixup_peer peer =
+    (* make sure the same calcuation is done in Coda_process.get_localhost *)
+    if Unix.Inet_addr.equal peer.Peer.host Unix.Inet_addr.localhost then
+      { peer with
+        host=
+          Unix.Inet_addr.of_string
+            (Printf.sprintf "127.0.0.%d" (peer.discovery_port - 23000)) }
+    else peer
+
+  [%%else]
+
+  let fixup_peer peer = peer
+
+  [%%endif]
+
   let live t (lives : (Peer.t * string) list) =
+    let peers, ss = List.unzip lives in
+    let fixedup_peers = List.map peers ~f:fixup_peer in
+    let fixedup_lives = List.zip_exn fixedup_peers ss in
     let unbanned_lives =
-      List.filter lives ~f:(fun (peer, _) ->
+      List.filter fixedup_lives ~f:(fun (peer, _) ->
           not (is_banned t.trust_system (Peer.to_discovery_host_and_port peer))
       )
     in
@@ -307,9 +331,10 @@ end = struct
     else Deferred.unit
 
   let dead t (deads : Peer.t list) =
-    List.iter deads ~f:(fun peer -> Peer.Table.remove t.peers peer) ;
+    let fixedup_deads = List.map deads ~f:fixup_peer in
+    List.iter fixedup_deads ~f:(fun peer -> Peer.Table.remove t.peers peer) ;
     if List.length deads > 0 then
-      Linear_pipe.write t.changes_writer (Peer.Event.Disconnect deads)
+      Linear_pipe.write t.changes_writer (Peer.Event.Disconnect fixedup_deads)
     else Deferred.unit
 
   let connect ~(initial_peers : Host_and_port.t list) ~(me : Peer.t) ~logger

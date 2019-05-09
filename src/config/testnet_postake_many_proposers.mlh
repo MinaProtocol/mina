@@ -17,4 +17,4 @@
 
 [%%define integration_tests false]
 [%%define force_updates false]
-[%%define disable_trust_system false]
+[%%define fixup_localhost_for_testing false]
