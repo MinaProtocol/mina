@@ -6,7 +6,7 @@ author: Coda
 author_website: https://twitter.com/codaprotocol
 ---
 
-Coda Protocol, CoinList, and DeKrypt are partnering to launch a $100k global public research contest to dramatically speed up zk-SNARKs. We expect the contest to produce huge advancements in the state of the art. We'll be contributing all of those advancements back to the public domain with a permissive open-source license that allows them to be used by the broader crypto ecosystem.
+Coda Protocol, CoinList, and DeKrypt are partnering to launch a [$100k global public research challenge](https://coinlist.co/build/coda) to dramatically speed up zk-SNARKs. We expect the contest to produce huge advancements in the state of the art. We'll be contributing all of those advancements back to the public domain with a permissive open-source license that allows them to be used by the broader crypto ecosystem.
 
 SNARKs have been developing rapidly in the past few years, and in crypto they're one of the most promising ways to bring scalability and privacy to blockchains. But in many ways we're still at the surface of what's possible. This gap between opportunity and current state is due to the significant increases in SNARK performance that remain to be unlocked. For example, while many of the computational steps involved in SNARK proving are perfectly parallelizable, this property hasn't yet been fully implemented on hardware designed to exploit it, such as GPUs. 
 
