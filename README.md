@@ -1,4 +1,4 @@
-# Coda
+# Coda (diff)
 
 Coda is a new cryptocurrency protocol with a lightweight, constant sized blockchain.
 
