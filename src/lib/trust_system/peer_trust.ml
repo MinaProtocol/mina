@@ -97,19 +97,6 @@ struct
     Option.iter db ~f:Db.close ;
     Strict_pipe.Writer.close bans_writer
 
-  [%%if
-  disable_trust_system = true]
-
-  let record t logger peer action =
-    let response = Action.to_trust_response action in
-    match response with
-    | Insta_ban ->
-        raise Insta_ban_during_tests
-    | _ ->
-        Deferred.unit
-
-  [%%else]
-
   let record ({db; bans_writer} as t) logger peer action =
     let old_record =
       match get_db t peer with
@@ -158,8 +145,6 @@ struct
           Deferred.unit
     in
     Option.iter db ~f:(fun db' -> Db.set db' ~key:peer ~data:new_record)
-
-  [%%endif]
 end
 
 let%test_module "peer_trust" =
