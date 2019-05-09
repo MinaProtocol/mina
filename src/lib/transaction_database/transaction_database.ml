@@ -3,22 +3,30 @@ open Core
 open Async
 open Signature_lib
 
-module Make (Time : sig
+(* TODO: Remove Transaction functor when we need to query transactions other
+   than user_commands *)
+module Make (Transaction : sig
+  type t [@@deriving bin_io, compare, sexp, hash, to_yojson]
+
+  include Comparable.S with type t := t
+
+  include Hashable.S with type t := t
+
+  val get_participants : t -> Public_key.Compressed.t list
+end) (Time : sig
   type t [@@deriving bin_io, compare, sexp]
 end) =
 struct
-  module Database = Rocksdb.Serializable.Make (Transaction.Stable.V1) (Time)
+  module Database = Rocksdb.Serializable.Make (Transaction) (Time)
 
   module Txn_with_date = struct
     module T = struct
       type t = Transaction.t * Time.t [@@deriving sexp]
 
-      let compare (txn1, time1) (txn2, time2) =
-        match Time.compare time1 time2 with
-        | 0 ->
-            Transaction.compare txn1 txn2
-        | x ->
-            x
+      let compare =
+        Comparable.lift
+          ~f:(fun (txn, date) -> (date, txn))
+          [%compare: Time.t * Transaction.t]
     end
 
     include T
@@ -42,28 +50,6 @@ struct
 
   let close {database; _} = Database.close database
 
-  let get_participants (transaction : Transaction.t) =
-    match transaction with
-    | Fee_transfer (One (pk, _)) ->
-        [pk]
-    | Fee_transfer (Two ((pk1, _), (pk2, _))) ->
-        [pk1; pk2]
-    | Coinbase {Coinbase.proposer; fee_transfer; _} ->
-        Option.value_map fee_transfer ~default:[proposer] ~f:(fun (pk, _) ->
-            [proposer; pk] )
-    | User_command checked_user_command ->
-        let user_command = User_command.forget_check checked_user_command in
-        let sender = User_command.sender user_command in
-        let payload = User_command.payload user_command in
-        let receiver =
-          match User_command_payload.body payload with
-          | Stake_delegation (Set_delegate {new_delegate}) ->
-              new_delegate
-          | Payment {receiver; _} ->
-              receiver
-        in
-        [receiver; sender]
-
   let add {database; cache= {all_transactions; user_transactions}; logger}
       transaction date =
     match Hashtbl.find all_transactions transaction with
@@ -76,7 +62,7 @@ struct
     | None ->
         Database.set database ~key:transaction ~data:date ;
         Hashtbl.add_exn all_transactions ~key:transaction ~data:date ;
-        List.iter (get_participants transaction) ~f:(fun pk ->
+        List.iter (Transaction.get_participants transaction) ~f:(fun pk ->
             let user_txns =
               Option.value
                 (Hashtbl.find user_transactions pk)
@@ -86,6 +72,13 @@ struct
               Txn_with_date.Set.add user_txns (transaction, date)
             in
             Hashtbl.set user_transactions ~key:pk ~data:user_txns' )
+
+  let get_total_transactions {cache= {user_transactions; _}; _} public_key =
+    let open Option.Let_syntax in
+    let%map transactions_with_dates_set =
+      Hashtbl.find user_transactions public_key
+    in
+    Set.length transactions_with_dates_set
 
   let get_transactions {cache= {user_transactions; _}; _} public_key =
     let queried_transactions =
@@ -98,64 +91,150 @@ struct
     in
     Option.value queried_transactions ~default:[]
 
-  let get_pagination_query ~f t public_key transaction =
-    let queried_transactions =
+  module With_non_null_transaction = struct
+    let get_pagination_query ~f t public_key transaction =
       let open Option.Let_syntax in
-      let%bind transactions_with_dates =
-        Hashtbl.find t.cache.user_transactions public_key
+      let queried_transactions_opt =
+        let%bind transactions_with_dates =
+          Hashtbl.find t.cache.user_transactions public_key
+        in
+        let%map transaction_with_date =
+          let%map date = Hashtbl.find t.cache.all_transactions transaction in
+          (transaction, date)
+        in
+        let earlier, transaction_opt, later =
+          Set.split transactions_with_dates transaction_with_date
+        in
+        [%test_pred: Txn_with_date.t option]
+          ~message:
+            "Transaction should be in-memory cache database for public key"
+          Option.is_some transaction_opt ;
+        f earlier later
       in
-      let%map date = Hashtbl.find t.cache.all_transactions transaction in
-      let earlier, transaction_opt, later =
-        Set.split transactions_with_dates (transaction, date)
+      let%map transactions_with_dates, has_previous, has_next =
+        queried_transactions_opt
       in
-      [%test_pred: Txn_with_date.t option]
-        ~message:
-          "Transaction should be in-memory cache database for public key"
-        Option.is_some transaction_opt ;
-      f earlier later
-    in
-    Option.value_map queried_transactions
-      ~default:([], `Has_earlier_page false, `Has_later_page false)
-      ~f:(fun (transactions_with_dates, has_previous, has_next) ->
-        (List.map transactions_with_dates ~f:fst, has_previous, has_next) )
+      (List.map transactions_with_dates ~f:fst, has_previous, has_next)
 
-  let has_neighboring_page = Fn.compose not Set.is_empty
+    let has_neighboring_page = Fn.compose not Set.is_empty
 
-  let get_earlier_transactions t public_key transaction n =
-    get_pagination_query t public_key transaction ~f:(fun earlier later ->
-        let has_later = `Has_later_page (has_neighboring_page later) in
-        match Set.nth earlier (Set.length earlier - n) with
-        | None ->
+    let get_earlier_transactions t public_key transaction amount_to_query_opt =
+      get_pagination_query t public_key transaction ~f:(fun earlier later ->
+          let has_later = `Has_later_page (has_neighboring_page later) in
+          let get_all_earlier_transactions_result () =
             (Set.to_list earlier, `Has_earlier_page false, has_later)
-        | Some earliest_transaction ->
-            let more_early_transactions, _, next_page_transactions =
-              Set.split earlier earliest_transaction
-            in
-            ( Set.to_list @@ Set.add next_page_transactions earliest_transaction
-            , `Has_earlier_page (has_neighboring_page more_early_transactions)
-            , has_later ) )
+          in
+          match amount_to_query_opt with
+          | None ->
+              get_all_earlier_transactions_result ()
+          | Some n -> (
+            match Set.nth earlier (Set.length earlier - n) with
+            | None ->
+                get_all_earlier_transactions_result ()
+            | Some earliest_transaction ->
+                let more_early_transactions, _, next_page_transactions =
+                  Set.split earlier earliest_transaction
+                in
+                ( Set.to_list
+                  @@ Set.add next_page_transactions earliest_transaction
+                , `Has_earlier_page
+                    (has_neighboring_page more_early_transactions)
+                , has_later ) ) )
 
-  let get_later_transactions t public_key transaction n =
-    get_pagination_query t public_key transaction ~f:(fun earlier later ->
-        let has_earlier = `Has_earlier_page (has_neighboring_page earlier) in
-        match Set.nth later n with
-        | None ->
+    let get_later_transactions t public_key transaction amount_to_query_opt =
+      get_pagination_query t public_key transaction ~f:(fun earlier later ->
+          let has_earlier = `Has_earlier_page (has_neighboring_page earlier) in
+          let get_all_later_transactions_result () =
             (Set.to_list later, has_earlier, `Has_later_page false)
-        | Some latest_transaction ->
-            let next_page_transactions, _, _ =
-              Set.split later latest_transaction
+          in
+          match amount_to_query_opt with
+          | None ->
+              get_all_later_transactions_result ()
+          | Some n -> (
+            match Set.nth later n with
+            | None ->
+                get_all_later_transactions_result ()
+            | Some latest_transaction ->
+                let next_page_transactions, _, _ =
+                  Set.split later latest_transaction
+                in
+                ( Set.to_list next_page_transactions
+                , has_earlier
+                , `Has_later_page true ) ) )
+  end
+
+  let get_pagination_query ~get_default ~get_queries
+      ({cache= {user_transactions; _}; _} as t) public_key =
+    Fn.flip
+    @@ fun amount_to_query_opt ->
+    Fn.compose
+      (Option.value
+         ~default:([], `Has_earlier_page false, `Has_later_page false))
+      (function
+        | None -> (
+            let open Option.Let_syntax in
+            let%bind user_transactions =
+              Hashtbl.find user_transactions public_key
             in
-            ( Set.to_list next_page_transactions
-            , has_earlier
-            , `Has_later_page true ) )
+            let%bind default_transaction, _ = get_default user_transactions in
+            match amount_to_query_opt with
+            | None ->
+                let%map queries, has_earlier_page, has_later_page =
+                  get_queries t public_key default_transaction None
+                in
+                ( default_transaction :: queries
+                , has_earlier_page
+                , has_later_page )
+            | Some amount_to_query when amount_to_query = 1 ->
+                Some
+                  ( [default_transaction]
+                  , `Has_earlier_page false
+                  , `Has_later_page false )
+            | Some amount_to_query ->
+                let%map queries, has_earlier_page, has_later_page =
+                  get_queries t public_key default_transaction
+                    (Some (amount_to_query - 1))
+                in
+                ( default_transaction :: queries
+                , has_earlier_page
+                , has_later_page ) )
+        | Some transaction ->
+            get_queries t public_key transaction amount_to_query_opt )
+
+  let get_earlier_transactions =
+    get_pagination_query ~get_default:Set.max_elt
+      ~get_queries:With_non_null_transaction.get_earlier_transactions
+
+  let get_later_transactions =
+    get_pagination_query ~get_default:Set.min_elt
+      ~get_queries:With_non_null_transaction.get_later_transactions
+end
+
+module User_command = struct
+  include Coda_base.User_command.Stable.V1
+
+  let get_participants user_command =
+    let sender = User_command.sender user_command in
+    let payload = User_command.payload user_command in
+    let receiver =
+      match User_command_payload.body payload with
+      | Stake_delegation (Set_delegate {new_delegate}) ->
+          new_delegate
+      | Payment {receiver; _} ->
+          receiver
+    in
+    [receiver; sender]
+
+  [%%define_locally
+  User_command.(gen, gen_with_random_participants)]
 end
 
 let%test_module "Transaction_database" =
   ( module struct
-    module Database = Make (Int)
+    module Database = Make (User_command) (Int)
 
     let assert_transactions expected_transactions transactions =
-      Transaction.Set.(
+      User_command.Set.(
         [%test_eq: t] (of_list expected_transactions) (of_list transactions))
 
     let ({Keypair.public_key= pk1; _} as keypair1) = Keypair.create ()
@@ -188,19 +267,17 @@ let%test_module "Transaction_database" =
       with_database ~trials
         Quickcheck.Generator.(
           list
-          @@ User_command.With_valid_signature.gen_with_random_participants
+          @@ User_command.gen_with_random_participants
                ~keys:(Array.of_list [keypair1; keypair2])
                ~max_amount:10000 ~max_fee:1000 ())
         ~f:(fun user_commands database ->
-          let transactions =
-            List.map user_commands ~f:(fun user_command ->
-                Transaction.User_command user_command )
-          in
           add_all_transactions database
-            (List.map transactions ~f:(fun txn -> (txn, time))) ;
+            (List.map user_commands ~f:(fun txn -> (txn, time))) ;
           let pk1_expected_transactions =
-            List.filter transactions ~f:(fun transaction ->
-                let participants = Database.get_participants transaction in
+            List.filter user_commands ~f:(fun user_command ->
+                let participants =
+                  User_command.get_participants user_command
+                in
                 List.mem participants pk1 ~equal:Public_key.Compressed.equal )
           in
           let pk1_queried_transactions =
@@ -220,12 +297,7 @@ let%test_module "Transaction_database" =
         let key = gen_key_as_sender_or_receiver keypair1 keypair2
 
         let user_command =
-          let open Quickcheck.Generator.Let_syntax in
-          let%map user_command =
-            User_command.With_valid_signature.gen ~key_gen:key
-              ~max_amount:10000 ~max_fee:1000 ()
-          in
-          Transaction.User_command user_command
+          User_command.gen ~key_gen:key ~max_amount:10000 ~max_fee:1000 ()
 
         let user_command_with_time lower_bound_incl upper_bound_incl =
           Quickcheck.Generator.tuple2 user_command
@@ -265,9 +337,31 @@ let%test_module "Transaction_database" =
             (user_command_with_time time time)
             (non_empty_list @@ user_command_with_time (time + 1) Int.max_value)
             (Int.gen_incl 0 10)
+
+        let test_no_transaction_input =
+          let open Quickcheck.Generator in
+          let open Quickcheck.Generator.Let_syntax in
+          let%bind num_transactions = Int.gen_incl 2 20 in
+          let%bind transactions =
+            list_with_length num_transactions
+              (tuple2 user_command Int.quickcheck_generator)
+          in
+          let%bind amount_to_query = Int.gen_incl 1 (num_transactions - 1) in
+          tuple2
+            (Quickcheck.Generator.of_list [None; Some amount_to_query])
+            (return transactions)
       end
 
-      let test ~trials gen ~query_next_page =
+      type query_next_page =
+           Database.t
+        -> Public_key.Compressed.t
+        -> User_command.t option
+        -> int option
+        -> User_command.t list
+           * [`Has_earlier_page of bool]
+           * [`Has_later_page of bool]
+
+      let test ~trials gen ~(query_next_page : query_next_page) =
         with_database gen ~trials
           ~f:(fun ( earlier_transactions_with_dates
                   , next_page_transactions_with_dates
@@ -282,14 +376,13 @@ let%test_module "Transaction_database" =
             in
             add_all_transactions database all_transactions_with_dates ;
             let expected_next_page_transactions =
-              List.map next_page_transactions_with_dates ~f:(fun (txn, _) ->
-                  txn )
+              extract_transactions next_page_transactions_with_dates
             in
             let ( next_page_transactions
                 , `Has_earlier_page has_earlier
                 , `Has_later_page has_later ) =
-              query_next_page database pk1 query_transaction
-              @@ List.length next_page_transactions_with_dates
+              query_next_page database pk1 (Some query_transaction)
+                (Some (List.length next_page_transactions_with_dates))
             in
             assert_transactions expected_next_page_transactions
               next_page_transactions ;
@@ -297,7 +390,66 @@ let%test_module "Transaction_database" =
             assert has_later ;
             Deferred.unit )
 
-      let test_with_cutoff ~trials ~query_next_page gen ~check_pages =
+      let test_no_amount_input ~trials gen ~(query_next_page : query_next_page)
+          ~check_pages =
+        with_database gen ~trials
+          ~f:(fun ( earlier_transactions_with_dates
+                  , next_page_transactions_with_dates
+                  , ((query_transaction, _) as query_transaction_with_time)
+                  , later_transactions_with_dates )
+             database
+             ->
+            let all_transactions_with_dates =
+              earlier_transactions_with_dates
+              @ next_page_transactions_with_dates
+              @ (query_transaction_with_time :: later_transactions_with_dates)
+            in
+            add_all_transactions database all_transactions_with_dates ;
+            let expected_next_page_transactions =
+              extract_transactions
+                ( earlier_transactions_with_dates
+                @ next_page_transactions_with_dates )
+            in
+            let ( next_page_transactions
+                , `Has_earlier_page has_earlier
+                , `Has_later_page has_later ) =
+              query_next_page database pk1 (Some query_transaction) None
+            in
+            assert_transactions expected_next_page_transactions
+              next_page_transactions ;
+            check_pages has_earlier has_later ;
+            Deferred.unit )
+
+      let test_no_transaction_input ~trials gen
+          ~(query_next_page : query_next_page) ~check_pages ~compare =
+        with_database gen ~trials
+          ~f:(fun (amount_to_query_opt, transactions_with_dates) database ->
+            Option.iter amount_to_query_opt ~f:(fun amount_to_query ->
+                assert (List.length transactions_with_dates >= amount_to_query)
+            ) ;
+            add_all_transactions database transactions_with_dates ;
+            let expected_next_page_transactions =
+              let sorted_transaction_with_dates =
+                List.sort ~compare transactions_with_dates
+              in
+              let sorted_transactions =
+                extract_transactions sorted_transaction_with_dates
+              in
+              Option.value_map amount_to_query_opt ~default:sorted_transactions
+                ~f:(List.take sorted_transactions)
+            in
+            let ( next_page_transactions
+                , `Has_earlier_page has_earlier
+                , `Has_later_page has_later ) =
+              query_next_page database pk1 None amount_to_query_opt
+            in
+            assert_transactions expected_next_page_transactions
+              next_page_transactions ;
+            check_pages has_earlier has_later ;
+            Deferred.unit )
+
+      let test_with_cutoff ~trials ~(query_next_page : query_next_page) gen
+          ~check_pages =
         with_database ~trials gen
           ~f:(fun ( earlier_transactions_with_dates
                   , ( (querying_transaction, _) as
@@ -320,7 +472,8 @@ let%test_module "Transaction_database" =
             let ( next_page_transactions
                 , `Has_earlier_page has_earlier
                 , `Has_later_page has_later ) =
-              query_next_page database pk1 querying_transaction amount_to_query
+              query_next_page database pk1 (Some querying_transaction)
+                (Some amount_to_query)
             in
             assert_transactions expected_next_page_transactions
               next_page_transactions ;
@@ -346,25 +499,43 @@ let%test_module "Transaction_database" =
               ~message:"We should have at least one later transaction"
               ~equal:Bool.equal ~expect:true has_later )
 
+      let%test_unit "Get the n most latest transactions if transactions are \
+                     not provided" =
+        test_no_transaction_input ~trials:5 Gen.test_no_transaction_input
+          ~query_next_page:Database.get_earlier_transactions
+          ~check_pages:(fun _has_earlier has_later -> assert (not has_later))
+          ~compare:
+            (Comparable.lift
+               ~f:(fun (txn, date) -> (-1 * date, txn))
+               [%compare: int * User_command.t])
+
+      let%test_unit "Get all transactions that were added before an arbitrary \
+                     transaction" =
+        test_no_amount_input ~trials:2 Gen.transaction_test_input
+          ~query_next_page:Database.get_earlier_transactions
+          ~check_pages:(fun has_earlier has_later ->
+            assert (not has_earlier) ;
+            assert has_later )
+
       let invert_transaction_time =
         List.map ~f:(fun (txn, date) -> (txn, -1 * date))
 
+      let later_pagination_transaction_gen =
+        let open Quickcheck.Generator.Let_syntax in
+        let%map ( earlier_transactions_with_dates
+                , next_page_transactions_with_dates
+                , (query_transaction, time)
+                , later_transactions_with_dates ) =
+          Gen.transaction_test_input
+        in
+        ( invert_transaction_time earlier_transactions_with_dates
+        , invert_transaction_time next_page_transactions_with_dates
+        , (query_transaction, -1 * time)
+        , invert_transaction_time later_transactions_with_dates )
+
       let%test_unit "Get n transactions that were added after an arbitrary \
                      transaction" =
-        let later_pagination_transaction_gen =
-          let open Quickcheck.Generator.Let_syntax in
-          let%map ( earlier_transactions_with_dates
-                  , next_page_transactions_with_dates
-                  , (query_transaction, time)
-                  , later_transactions_with_dates ) =
-            Gen.transaction_test_input
-          in
-          ( invert_transaction_time earlier_transactions_with_dates
-          , invert_transaction_time next_page_transactions_with_dates
-          , (query_transaction, -1 * time)
-          , invert_transaction_time later_transactions_with_dates )
-        in
-        test ~trials:10 later_pagination_transaction_gen
+        test ~trials:5 later_pagination_transaction_gen
           ~query_next_page:Database.get_later_transactions
 
       let%test_unit "Trying to query n transactions that occurred after \
@@ -393,8 +564,26 @@ let%test_module "Transaction_database" =
             [%test_result: bool]
               ~message:"We should not be able to query any more later queries"
               ~equal:Bool.equal ~expect:false has_later )
+
+      let%test_unit "Get all transactions that were added after an arbitrary \
+                     transaction" =
+        test_no_amount_input ~trials:2 later_pagination_transaction_gen
+          ~query_next_page:Database.get_later_transactions
+          ~check_pages:(fun has_earlier has_later ->
+            assert has_earlier ;
+            assert (not has_later) )
+
+      let%test_unit "Get the n most earliest transactions if transactions are \
+                     not provided" =
+        test_no_transaction_input ~trials:5 Gen.test_no_transaction_input
+          ~query_next_page:Database.get_later_transactions
+          ~check_pages:(fun has_earlier _has_later -> assert (not has_earlier))
+          ~compare:
+            (Comparable.lift
+               ~f:(fun (txn, date) -> (date, txn))
+               [%compare: int * User_command.t])
     end
   end )
 
-module T = Make (Block_time.Time.Stable.V1)
+module T = Make (User_command) (Block_time.Time.Stable.V1)
 include T

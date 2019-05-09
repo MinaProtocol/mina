@@ -43,6 +43,7 @@ module Stable = struct
     include T
     include Registration.Make_latest_version (T)
     include Comparable.Make (T)
+    include Hashable.Make (T)
   end
 
   module Latest = V1
