@@ -9,6 +9,7 @@ settings.json
 /lib
 /bundle
 /dist
+app.js
 *.exe
 *.cmi
 *.cmx

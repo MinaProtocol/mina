@@ -92,17 +92,33 @@ let null () = {null= true; metadata= Metadata.empty}
 
 let extend t metadata = {t with metadata= Metadata.extend t.metadata metadata}
 
+let make_message (t : t) ~level ~module_ ~location ~metadata ~message =
+  { Message.timestamp= Time.now ()
+  ; level
+  ; source= Source.create ~module_ ~location
+  ; message
+  ; metadata= Metadata.extend t.metadata metadata }
+
+let format_message t ~level ~module_ ~location ?(metadata = []) fmt =
+  let f message =
+    if t.null then ""
+    else
+      let message =
+        make_message t ~level ~module_ ~location ~metadata ~message
+      in
+      if Message.check_invariants message then
+        Message.to_yojson message |> Yojson.Safe.to_string
+      else (* TODO: handle gracefully *)
+        ""
+  in
+  ksprintf f fmt
+
 let log t ~level ~module_ ~location ?(metadata = []) fmt =
   let f message =
-    let open Message in
     if t.null then ()
     else
       let message =
-        { timestamp= Time.now ()
-        ; level
-        ; source= Source.create ~module_ ~location
-        ; message
-        ; metadata= Metadata.extend t.metadata metadata }
+        make_message t ~level ~module_ ~location ~metadata ~message
       in
       if Message.check_invariants message then
         Message.to_yojson message |> Yojson.Safe.to_string

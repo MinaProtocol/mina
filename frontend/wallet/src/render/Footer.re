@@ -67,14 +67,8 @@ module RightButtons = {
 
   module SendButton = {
     [@react.component]
-    let make = (~settings) => {
-      <button
-        onClick={_e =>
-          Router.navigate({
-            path: Route.Path.Send,
-            settingsOrError: `Settings(settings),
-          })
-        }>
+    let make = (~settings as _) => {
+      <button onClick={_e => Router.navigate(Route.Send)}>
         {ReasonReact.string("Send")}
       </button>;
     };

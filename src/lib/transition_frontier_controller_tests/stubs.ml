@@ -3,6 +3,7 @@ open Core_kernel
 open Protocols.Coda_pow
 open Coda_base
 open Coda_state
+open Coda_transition
 open Signature_lib
 
 module Make (Inputs : sig
@@ -12,50 +13,15 @@ struct
   (** [Stubs] is a set of modules used for testing different components of tfc  *)
   let max_length = Inputs.max_length
 
-  module Time = Coda_base.Block_time
+  module Time = Block_time
 
   module State_proof = struct
-    include Coda_base.Proof
+    include Proof
 
     let verify _ _ = return true
   end
 
-  module Ledger_proof_statement = Transaction_snark.Statement
-  module Pending_coinbase_stack_state =
-    Transaction_snark.Pending_coinbase_stack_state
-
-  module Ledger_proof = struct
-    module Stable = struct
-      module V1 = struct
-        module T = struct
-          type t =
-            Ledger_proof_statement.Stable.V1.t * Sok_message.Digest.Stable.V1.t
-          [@@deriving sexp, bin_io, yojson, version]
-        end
-
-        include T
-      end
-
-      module Latest = V1
-    end
-
-    (* TODO: remove bin_io, after fixing functors to accept this *)
-    type t = Stable.V1.t [@@deriving sexp, bin_io, yojson]
-
-    let underlying_proof (_ : t) = Proof.dummy
-
-    let statement ((t, _) : t) : Ledger_proof_statement.t = t
-
-    let statement_target (t : Ledger_proof_statement.t) = t.target
-
-    let sok_digest (_, d) = d
-
-    let dummy =
-      ( Ledger_proof_statement.gen |> Quickcheck.random_value
-      , Sok_message.Digest.default )
-
-    let create ~statement ~sok_digest ~proof:_ = (statement, sok_digest)
-  end
+  module Ledger_proof = Ledger_proof.Debug
 
   module Ledger_proof_verifier = struct
     let verify _ _ ~message:_ = return true
@@ -69,34 +35,20 @@ struct
     let to_bytes = Staged_ledger_hash.Aux_hash.to_bytes
   end
 
-  module Transaction_witness = Coda_base.Transaction_witness
-
-  module Pending_coinbase = struct
-    include Coda_base.Pending_coinbase.Stable.V1
-
-    let ( hash_extra
-        , oldest_stack
-        , latest_stack
-        , create
-        , remove_coinbase_stack
-        , update_coinbase_stack
-        , merkle_root ) =
-      Coda_base.Pending_coinbase.
-        ( hash_extra
-        , oldest_stack
-        , latest_stack
-        , create
-        , remove_coinbase_stack
-        , update_coinbase_stack
-        , merkle_root )
-
-    module Stack = Coda_base.Pending_coinbase.Stack
-    module Coinbase_data = Coda_base.Pending_coinbase.Coinbase_data
-  end
-
-  module Pending_coinbase_hash = Coda_base.Pending_coinbase.Hash
+  module Transaction_witness = Transaction_witness
+  module Ledger_proof_statement = Transaction_snark.Statement
+  module Pending_coinbase_stack_state =
+    Transaction_snark.Pending_coinbase_stack_state
   module Transaction_snark_work =
-    Staged_ledger.Make_completed_work (Ledger_proof) (Ledger_proof_statement)
+    Transaction_snark_work.Make (Ledger_proof.Stable.V1)
+  module Staged_ledger_diff = Staged_ledger_diff.Make (Transaction_snark_work)
+
+  module External_transition = External_transition.Make (struct
+    include Staged_ledger_diff.Stable.V1
+
+    [%%define_locally
+    Staged_ledger_diff.(creator, user_commands)]
+  end)
 
   module Staged_ledger_hash_binable = struct
     include Staged_ledger_hash
@@ -112,27 +64,10 @@ struct
         , pending_coinbase_hash )
   end
 
-  module Staged_ledger_diff = Staged_ledger.Make_diff (struct
-    module Fee_transfer = Fee_transfer
-    module Ledger_proof = Ledger_proof
-    module Ledger_hash = Ledger_hash
-    module Staged_ledger_hash = Staged_ledger_hash_binable
-    module Staged_ledger_aux_hash = Staged_ledger_aux_hash
-    module Compressed_public_key = Public_key.Compressed
-    module User_command = User_command
-    module Transaction_snark_work = Transaction_snark_work
-    module Pending_coinbase = Pending_coinbase
-    module Pending_coinbase_hash = Pending_coinbase_hash
-  end)
-
-  module External_transition =
-    Coda_transition.External_transition.Make (Staged_ledger_diff)
-
   module Transaction = struct
-    include Coda_base.Transaction.Stable.Latest
+    include Transaction.Stable.Latest
 
-    let fee_excess, supply_increase =
-      Coda_base.Transaction.(fee_excess, supply_increase)
+    let fee_excess, supply_increase = Transaction.(fee_excess, supply_increase)
   end
 
   module Staged_ledger = Staged_ledger.Make (struct
@@ -143,7 +78,7 @@ struct
     module Transaction = Transaction
     module Ledger_hash = Coda_base.Ledger_hash
     module Frozen_ledger_hash = Coda_base.Frozen_ledger_hash
-    module Ledger_proof_statement = Ledger_proof_statement
+    module Ledger_proof_statement = Transaction_snark.Statement
     module Proof = Proof
     module Sok_message = Coda_base.Sok_message
     module Ledger_proof = Ledger_proof
@@ -156,9 +91,17 @@ struct
     module Account = Coda_base.Account
     module Ledger = Coda_base.Ledger
     module Sparse_ledger = Coda_base.Sparse_ledger
-    module Pending_coinbase = Pending_coinbase
-    module Pending_coinbase_hash = Pending_coinbase_hash
-    module Pending_coinbase_stack_state = Pending_coinbase_stack_state
+
+    module Pending_coinbase = struct
+      include Pending_coinbase.Stable.V1
+
+      include (
+        Pending_coinbase : module type of Pending_coinbase with type t := t )
+    end
+
+    module Pending_coinbase_hash = Pending_coinbase.Hash
+    module Pending_coinbase_stack_state =
+      Transaction_snark.Pending_coinbase_stack_state
     module Transaction_witness = Transaction_witness
   end)
 
@@ -194,7 +137,7 @@ struct
 
   module Diff_mutant_inputs = struct
     module Staged_ledger_aux_hash = Staged_ledger_aux_hash
-    module Ledger_proof_statement = Ledger_proof_statement
+    module Ledger_proof_statement = Transaction_snark.Statement
     module Ledger_proof = Ledger_proof
     module Transaction_snark_work = Transaction_snark_work
     module Staged_ledger_diff = Staged_ledger_diff
@@ -203,8 +146,9 @@ struct
     module Staged_ledger = Staged_ledger
     module Diff_hash = Diff_hash
     module Scan_state = Staged_ledger.Scan_state
-    module Pending_coinbase_stack_state = Pending_coinbase_stack_state
-    module Pending_coinbase_hash = Pending_coinbase_hash
+    module Pending_coinbase_stack_state =
+      Transaction_snark.Pending_coinbase_stack_state
+    module Pending_coinbase_hash = Pending_coinbase.Hash
     module Pending_coinbase = Pending_coinbase
   end
 
