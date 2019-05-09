@@ -22,7 +22,8 @@ let list_to_triple = function
   | _ ->
       failwith "expected a list of length 3"
 
-let to_bits tag = List.init 3 ~f:(nth_bit (to_enum tag)) |> list_to_triple
+let to_bits tag =
+  List.init 3 ~f:(nth_bit (to_enum tag)) |> List.rev |> list_to_triple
 
 let of_bits bits =
   Option.value_exn
@@ -31,11 +32,12 @@ let of_bits bits =
           (2 * acc) + Bool.to_int b )
     |> of_enum )
 
-let%test_unit "to_bool of_bool inv" =
+let%test_unit "to_bits of_bits inv" =
   let open Quickcheck in
   test
-    (Generator.tuple3 Bool.quickcheck_generator Bool.quickcheck_generator
-       Bool.quickcheck_generator) ~f:(fun b -> assert (b = to_bits (of_bits b)))
+    (Generator.tuple3 (Generator.return false) Bool.quickcheck_generator
+       Bool.quickcheck_generator)
+    ~f:(fun b -> assert (b = to_bits (of_bits b)))
 
 let typ =
   Typ.transport
@@ -98,7 +100,11 @@ module Checked = struct
 
       let%test_unit "is_coinbase" = test_predicate is_coinbase (( = ) Coinbase)
 
+      let%test_unit "is_chain_voting" =
+        test_predicate is_chain_voting (( = ) Chain_voting)
+
       let%test_unit "is_user_command" =
-        test_predicate is_user_command (one_of [Payment; Stake_delegation])
+        test_predicate is_user_command
+          (one_of [Payment; Stake_delegation; Chain_voting])
     end )
 end
