@@ -164,42 +164,39 @@ struct
   end
 
   let get_pagination_query ~get_default ~get_queries
-      ({cache= {user_transactions; _}; _} as t) public_key =
-    Fn.flip
-    @@ fun amount_to_query_opt ->
-    Fn.compose
-      (Option.value
-         ~default:([], `Has_earlier_page false, `Has_later_page false))
-      (function
-        | None -> (
-            let open Option.Let_syntax in
-            let%bind user_transactions =
-              Hashtbl.find user_transactions public_key
-            in
-            let%bind default_transaction, _ = get_default user_transactions in
-            match amount_to_query_opt with
-            | None ->
-                let%map queries, has_earlier_page, has_later_page =
-                  get_queries t public_key default_transaction None
-                in
-                ( default_transaction :: queries
-                , has_earlier_page
-                , has_later_page )
-            | Some amount_to_query when amount_to_query = 1 ->
-                Some
-                  ( [default_transaction]
-                  , `Has_earlier_page false
-                  , `Has_later_page false )
-            | Some amount_to_query ->
-                let%map queries, has_earlier_page, has_later_page =
-                  get_queries t public_key default_transaction
-                    (Some (amount_to_query - 1))
-                in
-                ( default_transaction :: queries
-                , has_earlier_page
-                , has_later_page ) )
-        | Some transaction ->
-            get_queries t public_key transaction amount_to_query_opt )
+      ({cache= {user_transactions; _}; _} as t) public_key transaction_opt
+      amount_to_query_opt =
+    let query_opt =
+      match transaction_opt with
+      | None -> (
+          let open Option.Let_syntax in
+          let%bind user_transactions =
+            Hashtbl.find user_transactions public_key
+          in
+          let%bind default_transaction, _ = get_default user_transactions in
+          match amount_to_query_opt with
+          | None ->
+              let%map queries, has_earlier_page, has_later_page =
+                get_queries t public_key default_transaction None
+              in
+              (default_transaction :: queries, has_earlier_page, has_later_page)
+          | Some amount_to_query when amount_to_query = 1 ->
+              Some
+                ( [default_transaction]
+                , `Has_earlier_page false
+                , `Has_later_page false )
+          | Some amount_to_query ->
+              let%map queries, has_earlier_page, has_later_page =
+                get_queries t public_key default_transaction
+                  (Some (amount_to_query - 1))
+              in
+              (default_transaction :: queries, has_earlier_page, has_later_page)
+          )
+      | Some transaction ->
+          get_queries t public_key transaction amount_to_query_opt
+    in
+    Option.value query_opt
+      ~default:([], `Has_earlier_page false, `Has_later_page false)
 
   let get_earlier_transactions =
     get_pagination_query ~get_default:Set.max_elt

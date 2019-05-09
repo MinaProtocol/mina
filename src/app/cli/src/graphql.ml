@@ -414,8 +414,15 @@ module Make (Commands : Coda_commands.Intf) = struct
           Option.map (Program.snark_worker_key coda) ~f:(fun k ->
               (k, Program.snark_work_fee coda) ) )
 
-    let hi transaction_database public_key cursor num_to_query
-        queried_transaction has_previous_page has_next_page =
+    let build_connection ~query transaction_database public_key cursor
+        num_to_query =
+      let ( queried_transactions
+          , `Has_earlier_page has_previous_page
+          , `Has_later_page has_next_page ) =
+        query transaction_database public_key
+          (Option.map ~f:Types.Pagination.Payment.Cursor.deserialize cursor)
+          num_to_query
+      in
       let page_info =
         {Types.Pagination.Page_info.has_previous_page; has_next_page}
       in
@@ -424,7 +431,7 @@ module Make (Commands : Coda_commands.Intf) = struct
           (Transaction_database.get_total_transactions transaction_database
              public_key)
       in
-      { Types.Pagination.Connection.edges= queried_transaction
+      { Types.Pagination.Connection.edges= queried_transactions
       ; page_info
       ; total_count }
 
@@ -432,8 +439,7 @@ module Make (Commands : Coda_commands.Intf) = struct
       io_field "payments"
         ~args:
           Arg.
-            [ (* TODO: deal with case where payment filter can be null *)
-              arg "filter" ~typ:(non_null Types.Input.payment_filter_input)
+            [ arg "filter" ~typ:(non_null Types.Input.payment_filter_input)
             ; arg "first" ~typ:int
             ; arg "after" ~typ:string
             ; arg "last" ~typ:int
@@ -455,31 +461,15 @@ module Make (Commands : Coda_commands.Intf) = struct
                 "Illegal query: first and last must not be non-null value at \
                  the same time"
           | num_to_query, cursor, None, _ ->
-              let ( queried_transactions
-                  , `Has_earlier_page has_previous_page
-                  , `Has_later_page has_next_page ) =
-                Transaction_database.get_earlier_transactions
-                  transaction_database public_key
-                  (Option.map ~f:Types.Pagination.Payment.Cursor.deserialize
-                     cursor)
-                  num_to_query
-              in
               Ok
-                (hi transaction_database public_key cursor num_to_query
-                   queried_transactions has_previous_page has_next_page)
+                (build_connection
+                   ~query:Transaction_database.get_earlier_transactions
+                   transaction_database public_key cursor num_to_query)
           | None, _, num_to_query, cursor ->
-              let ( queried_transactions
-                  , `Has_earlier_page has_previous_page
-                  , `Has_later_page has_next_page ) =
-                Transaction_database.get_later_transactions
-                  transaction_database public_key
-                  (Option.map ~f:Types.Pagination.Payment.Cursor.deserialize
-                     cursor)
-                  num_to_query
-              in
               Ok
-                (hi transaction_database public_key cursor num_to_query
-                   queried_transactions has_previous_page has_next_page) )
+                (build_connection
+                   ~query:Transaction_database.get_later_transactions
+                   transaction_database public_key cursor num_to_query) )
 
     let initial_peers =
       field "initialPeers"
