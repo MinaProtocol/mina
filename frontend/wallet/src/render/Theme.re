@@ -1,6 +1,8 @@
 /** Shared styles and colors */
 open Css;
 
+global("*", [boxSizing(`borderBox)]);
+
 module Colors = {
   let hexToString = (`hex(s)) => s;
 
