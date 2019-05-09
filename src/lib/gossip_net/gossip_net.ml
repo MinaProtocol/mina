@@ -439,7 +439,11 @@ module Make (Message : Message_intf) : S with type msg := Message.msg = struct
                         (fun exn ->
                           Logger.error t.logger ~module_:__MODULE__
                             ~location:__LOC__ "%s" (Exn.to_string_mach exn) ;
-                          Deferred.unit ))
+                          Trust_system.(
+                            record t.trust_system t.logger client_inet_addr
+                              Actions.
+                                ( Incoming_connection_error
+                                , Some ("Handshake error", []) )) ))
                 in
                 let conn_map =
                   Hashtbl.find_exn t.connections client_inet_addr
