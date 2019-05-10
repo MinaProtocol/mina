@@ -6,11 +6,12 @@ global("*", [boxSizing(`borderBox)]);
 module Colors = {
   let hexToString = (`hex(s)) => s;
 
-  let bgWithAlpha = `hex("121F2B11");
-  let bgColor = `hex("121F2B");
+  let bgColor = white;
 
   let savilleAlpha = a => `rgba((31, 45, 61, a));
   let saville = savilleAlpha(1.);
+
+  let hyperlinkAlpha = a => `rgba((45, 158, 219, a));
 
   let slateAlpha = a => `rgba((81, 102, 121, a));
 

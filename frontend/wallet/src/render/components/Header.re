@@ -29,7 +29,7 @@ module Styles = {
 
 [@react.component]
 let make = () =>
-  <div className=Styles.header>
+  <header className=Styles.header>
     <div
       style={ReactDOMRe.Style.make(~display="flex", ~alignItems="center", ())}>
       <div className=Theme.codaLogoCurrent />
@@ -41,23 +41,22 @@ let make = () =>
     <div
       style={ReactDOMRe.Style.make(
         ~fontWeight="500",
-        // ~height="1em",
-        ~color="#c49d41",
+        ~color="#479056",
         ~marginRight="10px",
         ~padding="0.25em",
         ~paddingLeft="2em",
         ~paddingRight="2em",
+        ~overflow="hidden",
         ~borderRadius="4px",
-        ~border="2px solid #60542c",
         ~background=
           {|repeating-linear-gradient(
                 to right,
                 transparent,
                 transparent 2px,
-                #60542c 2px,
-                #60542c 4px)|},
+                rgba(71, 144, 86, 0.3) 2px,
+                rgba(71, 144, 86, 0.3) 4px)|},
         (),
       )}>
-      {ReasonReact.string({j|Syncing|j})}
+      {ReasonReact.string({j|SYNCED 1.4s|j})}
     </div>
-  </div>;
+  </header>;

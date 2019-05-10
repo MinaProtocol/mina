@@ -16,26 +16,8 @@ module Styles = {
 };
 
 [@react.component]
-let make = () => {
-  let (settingsOrError, setSettingsOrError) = Hooks.useSettings();
-  switch (settingsOrError) {
-  | Belt.Result.Error(_) =>
-    <div>
-      <p> {React.string("There was an error loading your wallets.")} </p>
-    </div>
-  | Belt.Result.Ok(settings) =>
-    <div className=Styles.container>
-      {SettingsRenderer.entries(settings)
-       // TODO: Replace with actual wallets graphql info
-       |> Array.map(~f=((key, _)) =>
-            <WalletItem
-              key={PublicKey.toString(key)}
-              wallet={Wallet.key, balance: "100"}
-              settings
-              setSettingsOrError
-            />
-          )
-       |> ReasonReact.array}
-    </div>
-  };
+let make = (~wallets) => {
+  <div className=Styles.container>
+    {React.array(Array.map(~f=wallet => <WalletItem wallet />, wallets))}
+  </div>;
 };
