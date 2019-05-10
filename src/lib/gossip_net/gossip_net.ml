@@ -157,16 +157,35 @@ module Make (Message : Message_intf) : S with type msg := Message.msg = struct
       | Some ip_peers ->
           List.filter ip_peers ~f:(fun ip_peer -> not (Peer.equal ip_peer peer)) )
 
+  let reader_writer_of_sock sock =
+    let fd = Socket.fd sock in
+    (Reader.create fd, Writer.create fd)
+
+  let get_available_port =
+    let start_port = 9001 in
+    let stop_port = 10000 in
+    let port = ref start_port in
+    let reset () = port := start_port in
+    fun () ->
+      let result = !port in
+      incr port ;
+      if !port >= stop_port then reset () ;
+      result
+
   let try_call_rpc t (peer : Peer.t) dispatch query =
     let call () =
+      let unbound_socket = Async.Socket.(create Type.tcp) in
+      let local_addr = `Inet (t.me.host, get_available_port ()) in
+      let socket = Async.Socket.bind_inet unbound_socket local_addr in
+      let peer_addr = `Inet (peer.host, peer.communication_port) in
+      let%bind active_socket = Async.Socket.connect socket peer_addr in
       try_with (fun () ->
-          Tcp.with_connection
-            (Tcp.Where_to_connect.of_host_and_port
-               (Peer.to_communications_host_and_port peer))
-            ~timeout:t.timeout
-            (fun _ r w ->
-              create_connection_with_menu peer r w
-              >>=? fun conn -> dispatch conn query ) )
+          let reader, writer = reader_writer_of_sock active_socket in
+          create_connection_with_menu peer reader writer
+          >>=? fun conn ->
+          let result = dispatch conn query in
+          Async.Socket.shutdown active_socket `Both ;
+          result )
       >>= function
       | Ok (Ok result) ->
           (* call succeeded, result is valid *)
