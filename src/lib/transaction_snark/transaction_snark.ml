@@ -373,14 +373,14 @@ module Base = struct
       Pending_coinbase.Stack.Checked.if_ is_coinbase ~then_:stack'
         ~else_:pending_coinbase_stack_before
     in
-    let%bind root =
+    let%bind root, _ =
       let%bind is_writeable =
         let%bind is_fee_transfer =
           Transaction_union.Tag.Checked.is_fee_transfer tag
         in
         Boolean.any [is_fee_transfer; is_coinbase]
       in
-      Frozen_ledger_hash.modify_account_send root ~is_writeable
+      Frozen_ledger_hash.modify_account_send_or_get_account root ~is_writeable
         sender_compressed ~f:(fun ~is_empty_and_writeable account ->
           with_label __LOC__
             (let%bind next_nonce =
@@ -438,9 +438,9 @@ module Base = struct
         ~else_:(Transaction_union_payload.Body.public_key payload.body)
     in
     (* we explicitly set the public_key because it could be zero if the account is new *)
-    let%map root =
+    let%map root, _ =
       (* This update should be a no-op in the stake delegation case *)
-      Frozen_ledger_hash.modify_account_recv root receiver
+      Frozen_ledger_hash.modify_account_recv_or_get_account root receiver
         ~f:(fun ~is_empty_and_writeable account ->
           let%map balance =
             (* receiver_increase will be zero in the stake delegation case *)
@@ -1279,10 +1279,10 @@ struct
     ; proof= wrap `Base proof top_hash }
 
   let of_transaction ?preeval ~sok_digest ~source ~target
-      ~pending_coinbase_stack_state transition handler =
+      ~pending_coinbase_stack_state transaction handler =
     of_transaction_union ?preeval sok_digest source target
       ~pending_coinbase_stack_state
-      (Transaction_union.of_transaction transition)
+      (Transaction_union.of_transaction transaction)
       handler
 
   let of_user_command ~sok_digest ~source ~target ~pending_coinbase_stack

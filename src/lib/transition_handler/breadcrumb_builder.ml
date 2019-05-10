@@ -79,8 +79,11 @@ module Make (Inputs : Inputs.S) :
                   in
                   let open Deferred.Let_syntax in
                   match%bind
-                    Transition_frontier.Breadcrumb.build ~logger ~trust_system
-                      ~parent ~transition_with_hash:transition
+                    Transition_frontier.Breadcrumb.build ~logger
+                      ~epoch_ledger:
+                        (Coda_base.Sparse_ledger.of_root Ledger_hash.empty_hash)
+                        (* TODO: We need to fix this ASAP *)
+                      ~trust_system ~parent ~transition_with_hash:transition
                       ~sender:(Some sender)
                   with
                   | Ok new_breadcrumb ->

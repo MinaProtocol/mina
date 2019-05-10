@@ -116,6 +116,8 @@ module type S = sig
       type t [@@deriving sexp, to_yojson]
 
       val create : Signature_lib.Public_key.Compressed.t option -> t
+
+      val get_last_epoch_ledger : t -> Coda_base.Sparse_ledger.t
     end
 
     module Prover_state : sig

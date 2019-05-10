@@ -156,10 +156,14 @@ module Make (Inputs : Intf.Main_inputs) = struct
           [("hash", State_hash.to_yojson (With_hash.hash transition_with_hash))]
         "Failed to add breadcrumb into $hash"
     in
+    let epoch_ledger =
+      Transition_frontier.consensus_local_state transition_frontier
+      |> Consensus.Data.Local_state.get_last_epoch_ledger
+    in
     let%bind child_breadcrumb =
       match%map
-        Transition_frontier.Breadcrumb.build ~logger ~trust_system ~parent
-          ~transition_with_hash ~sender:None
+        Transition_frontier.Breadcrumb.build ~epoch_ledger ~logger
+          ~trust_system ~parent ~transition_with_hash ~sender:None
       with
       | Ok child_breadcrumb ->
           child_breadcrumb

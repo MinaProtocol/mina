@@ -236,6 +236,7 @@ module type Main_intf = sig
                   , State_hash.Stable.Latest.t )
                   With_hash.t
                   Diff_mutant.E.t
+       and type sparse_ledger = Coda_base.Sparse_ledger.t
        and type Extensions.Work.t = Transaction_snark_work.Statement.t
   end
 
@@ -564,6 +565,7 @@ struct
     module Pending_coinbase_stack_state =
       Transaction_snark.Pending_coinbase_stack_state
     module Pending_coinbase = Pending_coinbase
+    module Sparse_ledger = Coda_base.Sparse_ledger
 
     let max_length = max_length
   end

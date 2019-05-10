@@ -78,6 +78,12 @@ module type Inputs_intf = sig
      and type transaction_witness := Transaction_witness.t
      and type pending_coinbase_collection := Pending_coinbase.t
 
+  module Sparse_ledger :
+    Sparse_ledger_lib.Sparse_ledger.S
+    with type hash := Ledger_hash.t
+     and type key := Public_key.Compressed.t
+     and type account := Account.t
+
   module Diff_hash : Diff_hash
 
   module Diff_mutant :

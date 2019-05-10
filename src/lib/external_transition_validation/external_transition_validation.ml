@@ -19,6 +19,7 @@ module type Inputs_intf = sig
      and type staged_ledger_diff := Staged_ledger_diff.t
      and type transaction_snark_scan_state := Staged_ledger.Scan_state.t
      and type masked_ledger := Coda_base.Ledger.t
+     and type sparse_ledger := Sparse_ledger.t
 end
 
 module Make (Inputs : Inputs_intf) :
@@ -27,7 +28,8 @@ module Make (Inputs : Inputs_intf) :
    and type external_transition := Inputs.External_transition.t
    and type staged_ledger := Inputs.Staged_ledger.t
    and type staged_ledger_error := Inputs.Staged_ledger.Staged_ledger_error.t
-   and type transition_frontier := Inputs.Transition_frontier.t = struct
+   and type transition_frontier := Inputs.Transition_frontier.t
+   and type sparse_ledger := Inputs.Sparse_ledger.t = struct
   open Inputs
 
   type ('time_received, 'proof, 'frontier_dependencies, 'staged_ledger_diff) t =
@@ -225,6 +227,7 @@ module Make (Inputs : Inputs_intf) :
          with_transition
       -> logger:Logger.t
       -> parent_staged_ledger:Staged_ledger.t
+      -> epoch_ledger:Sparse_ledger.t
       -> ( ( 'time_received
            , 'proof
            , 'frontier_dependencies
@@ -235,7 +238,7 @@ module Make (Inputs : Inputs_intf) :
            | `Staged_ledger_application_failed of
              Staged_ledger.Staged_ledger_error.t ] )
          Deferred.Result.t =
-   fun (t, validation) ~logger ~parent_staged_ledger ->
+   fun (t, validation) ~logger ~parent_staged_ledger ~epoch_ledger ->
     let open Deferred.Result.Let_syntax in
     let transition = With_hash.data t in
     let blockchain_state =
@@ -249,7 +252,8 @@ module Make (Inputs : Inputs_intf) :
              , `Ledger_proof proof_opt
              , `Staged_ledger transitioned_staged_ledger
              , `Pending_coinbase_data _ ) =
-      Staged_ledger.apply ~logger parent_staged_ledger staged_ledger_diff
+      Staged_ledger.apply ~logger ~epoch_ledger parent_staged_ledger
+        staged_ledger_diff
       |> Deferred.Result.map_error ~f:(fun e ->
              `Staged_ledger_application_failed e )
     in

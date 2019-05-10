@@ -120,6 +120,7 @@ module type Inputs_intf = sig
                 , Coda_base.State_hash.Stable.Latest.t )
                 With_hash.t
                 Diff_mutant.E.t
+     and type sparse_ledger := Sparse_ledger.t
 
   module Transaction_pool :
     Coda_lib.Transaction_pool_read_intf
@@ -268,11 +269,14 @@ module Make (Inputs : Inputs_intf) :
       t.timeout <- Some timeout
   end
 
-  let generate_next_state ~previous_protocol_state ~time_controller
-      ~staged_ledger ~transactions ~get_completed_work ~logger
+  let generate_next_state ~previous_protocol_state ~consensus_local_state
+      ~time_controller ~staged_ledger ~transactions ~get_completed_work ~logger
       ~(keypair : Keypair.t) ~proposal_data =
     let open Interruptible.Let_syntax in
     let self = Public_key.compress keypair.public_key in
+    let epoch_ledger =
+      Consensus.Data.Local_state.get_last_epoch_ledger consensus_local_state
+    in
     let%bind ( diff
              , next_staged_ledger_hash
              , ledger_proof_opt
@@ -290,7 +294,7 @@ module Make (Inputs : Inputs_intf) :
                 , `Staged_ledger _transitioned_staged_ledger
                 , `Pending_coinbase_data (is_new_stack, coinbase_amount) ) =
           let%map or_error =
-            Staged_ledger.apply_diff_unchecked staged_ledger diff
+            Staged_ledger.apply_diff_unchecked staged_ledger diff ~epoch_ledger
           in
           Or_error.ok_exn or_error
         in
@@ -408,8 +412,8 @@ module Make (Inputs : Inputs_intf) :
                 Interruptible.lift (Deferred.return ()) (Ivar.read ivar)
               in
               let%bind next_state_opt =
-                generate_next_state ~proposal_data ~previous_protocol_state
-                  ~time_controller
+                generate_next_state ~proposal_data ~consensus_local_state
+                  ~previous_protocol_state ~time_controller
                   ~staged_ledger:(Breadcrumb.staged_ledger crumb)
                   ~transactions ~get_completed_work ~logger ~keypair
               in

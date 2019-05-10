@@ -208,7 +208,29 @@ let apply_transaction_exn t (transition : Transaction.t) =
 
 let merkle_root t = Ledger_hash.of_hash (merkle_root t :> Pedersen.Digest.t)
 
-let handler t =
+(*
+type ledger_tag = ..
+
+type _ Snarky.Request.t +=
+| Get_element : { tag : ledger_tag; idx : int }  -> (Account. * Ledger_hash.path) Snarky.Request.t
+
+type ledger_tag = Epoch | Curr
+
+module type Tag_intf = sig
+  type ledger_tag += T
+end
+
+type tag = (module Tag_intf)
+let create_tag : unit -> tag =
+  fun () ->
+    let module M = struct
+      type ledger_tag += T
+    end
+    in
+    (module M)
+*)
+
+let handler (*(module Tag : Tag_intf)*) t =
   let ledger = ref t in
   let path_exn idx =
     List.map (path_exn !ledger idx) ~f:(function `Left h -> h | `Right h -> h)

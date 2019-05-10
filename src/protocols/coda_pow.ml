@@ -185,7 +185,8 @@ end
 module type Transaction_witness_intf = sig
   type sparse_ledger
 
-  type t = {ledger: sparse_ledger} [@@deriving sexp]
+  type t = {curr_ledger: sparse_ledger; epoch_ledger: sparse_ledger}
+  [@@deriving sexp]
 
   module Stable : sig
     module V1 : sig
@@ -1007,6 +1008,8 @@ module type Staged_ledger_base_intf = sig
 
   type pending_coinbase_collection
 
+  type sparse_ledger
+
   type serializable [@@deriving bin_io]
 
   module Scan_state : sig
@@ -1099,6 +1102,7 @@ module type Staged_ledger_base_intf = sig
        t
     -> diff
     -> logger:Logger.t
+    -> epoch_ledger:sparse_ledger
     -> ( [`Hash_after_applying of staged_ledger_hash]
          * [`Ledger_proof of (ledger_proof * transaction list) option]
          * [`Staged_ledger of t]
@@ -1109,6 +1113,7 @@ module type Staged_ledger_base_intf = sig
   val apply_diff_unchecked :
        t
     -> valid_diff
+    -> epoch_ledger:sparse_ledger
     -> ( [`Hash_after_applying of staged_ledger_hash]
        * [`Ledger_proof of (ledger_proof * transaction list) option]
        * [`Staged_ledger of t]
@@ -1129,8 +1134,6 @@ module type Staged_ledger_intf = sig
   type user_command_with_valid_signature
 
   type ledger_proof_statement_set
-
-  type sparse_ledger
 
   type completed_work_checked
 
@@ -1547,6 +1550,8 @@ module type External_transition_validation_intf = sig
 
   type transition_frontier
 
+  type sparse_ledger
+
   type ('time_received, 'proof, 'frontier_dependencies, 'staged_ledger_diff) t =
     'time_received * 'proof * 'frontier_dependencies * 'staged_ledger_diff
     constraint 'time_received = [`Time_received] * _ Truth.t
@@ -1631,6 +1636,7 @@ module type External_transition_validation_intf = sig
        with_transition
     -> logger:Logger.t
     -> parent_staged_ledger:staged_ledger
+    -> epoch_ledger:sparse_ledger
     -> ( ( 'time_received
          , 'proof
          , 'frontier_dependencies

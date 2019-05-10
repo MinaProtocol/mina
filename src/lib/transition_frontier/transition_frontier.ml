@@ -25,6 +25,7 @@ module Make (Inputs : Inputs_intf) :
               , State_hash.Stable.Latest.t )
               With_hash.t
               Inputs.Diff_mutant.E.t
+   and type sparse_ledger := Sparse_ledger.t
    and module Extensions.Work = Inputs.Transaction_snark_work.Statement =
 struct
   open Inputs
@@ -78,7 +79,8 @@ struct
 
     let copy t = {t with staged_ledger= Staged_ledger.copy t.staged_ledger}
 
-    let build ~logger ~trust_system ~parent ~transition_with_hash ~sender =
+    let build ~logger ~epoch_ledger ~trust_system ~parent ~transition_with_hash
+        ~sender =
       O1trace.measure "Breadcrumb.build" (fun () ->
           let open Deferred.Result.Let_syntax in
           let staged_ledger = parent.staged_ledger in
@@ -98,7 +100,7 @@ struct
                    , `Pending_coinbase_data _ ) =
             let open Deferred.Let_syntax in
             match%bind
-              Staged_ledger.apply ~logger staged_ledger
+              Staged_ledger.apply ~logger staged_ledger ~epoch_ledger
                 (External_transition.Verified.staged_ledger_diff transition)
             with
             | Ok x ->

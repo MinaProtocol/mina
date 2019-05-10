@@ -306,6 +306,7 @@ module type Inputs_intf = sig
                 , Coda_base.State_hash.Stable.Latest.t )
                 With_hash.t
                 Diff_mutant.E.t
+     and type sparse_ledger := Sparse_ledger.t
 
   module Transition_frontier_persistence :
     Transition_frontier_persistence.Intf.S

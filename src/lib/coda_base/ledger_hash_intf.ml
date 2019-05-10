@@ -22,20 +22,20 @@ module type S = sig
 
   val of_digest : Pedersen.Digest.t -> t
 
-  val modify_account_send :
+  val modify_account_send_or_get_account :
        var
     -> Public_key.Compressed.var
     -> is_writeable:Boolean.var
     -> f:(   is_empty_and_writeable:Boolean.var
           -> Account.var
           -> (Account.var, 's) Checked.t)
-    -> (var, 's) Checked.t
+    -> (var * Account.var, 's) Checked.t
 
-  val modify_account_recv :
+  val modify_account_recv_or_get_account :
        var
     -> Public_key.Compressed.var
     -> f:(   is_empty_and_writeable:Boolean.var
           -> Account.var
           -> (Account.var, 's) Checked.t)
-    -> (var, 's) Checked.t
+    -> (var * Account.var, 's) Checked.t
 end

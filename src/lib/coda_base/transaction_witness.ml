@@ -3,7 +3,9 @@ open Module_version
 module Stable = struct
   module V1 = struct
     module T = struct
-      type t = {ledger: Sparse_ledger.Stable.V1.t}
+      type t =
+        { curr_ledger: Sparse_ledger.Stable.V1.t
+        ; epoch_ledger: Sparse_ledger.Stable.V1.t }
       [@@deriving sexp, bin_io, version]
     end
 
@@ -14,5 +16,7 @@ module Stable = struct
   module Latest = V1
 end
 
-type t = Stable.Latest.t = {ledger: Sparse_ledger.Stable.V1.t}
+type t = Stable.Latest.t =
+  { curr_ledger: Sparse_ledger.Stable.V1.t
+  ; epoch_ledger: Sparse_ledger.Stable.V1.t }
 [@@deriving sexp]

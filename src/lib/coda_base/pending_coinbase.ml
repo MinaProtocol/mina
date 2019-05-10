@@ -456,8 +456,8 @@ module T = struct
         if_ b ~then_ ~else_
       in
       handle
-        (Merkle_tree.modify_req ~depth (Hash.var_to_hash_packed t) addr
-           ~f:(fun stack ->
+        (Merkle_tree.modify_or_get_elem_req ~depth (Hash.var_to_hash_packed t)
+           addr ~f:(fun stack ->
              let total_coinbase_amount =
                Currency.Amount.var_of_t Protocols.Coda_praos.coinbase_amount
              in
@@ -479,7 +479,7 @@ module T = struct
                  (Stack.if_ amount2_equal_to_zero ~then_:stack_with_amount1
                     ~else_:stack_with_amount2) ))
         reraise_merkle_requests
-      >>| Hash.var_of_hash_packed
+      >>| Fn.compose Hash.var_of_hash_packed fst
 
     let%snarkydef pop_coinbases t ~proof_emitted =
       let%bind addr =

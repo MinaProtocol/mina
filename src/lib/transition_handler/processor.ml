@@ -183,9 +183,15 @@ module Make (Inputs : Inputs.With_unprocessed_transition_cache.S) :
                                    Envelope.Incoming.sender
                                      transition_with_hash_enveloped
                                  in
+                                 let epoch_ledger =
+                                   Transition_frontier.consensus_local_state
+                                     frontier
+                                   |> Consensus.Data.Local_state
+                                      .get_last_epoch_ledger
+                                 in
                                  let%map breadcrumb_result =
                                    Transition_frontier.Breadcrumb.build ~logger
-                                     ~trust_system ~parent
+                                     ~epoch_ledger ~trust_system ~parent
                                      ~transition_with_hash
                                      ~sender:(Some sender)
                                  in

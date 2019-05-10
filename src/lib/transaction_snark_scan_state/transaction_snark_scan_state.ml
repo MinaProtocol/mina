@@ -254,12 +254,13 @@ end = struct
     let open Or_error.Let_syntax in
     let source =
       Frozen_ledger_hash.of_ledger_hash
-      @@ Sparse_ledger.merkle_root witness.ledger
+      @@ Sparse_ledger.merkle_root witness.curr_ledger
     in
     let%bind transaction = Ledger.Undo.transaction transaction_with_info in
     let%bind after =
       Or_error.try_with (fun () ->
-          Sparse_ledger.apply_transaction_exn witness.ledger transaction )
+          Sparse_ledger.apply_transaction_exn witness.curr_ledger transaction
+      )
     in
     let target =
       Frozen_ledger_hash.of_ledger_hash @@ Sparse_ledger.merkle_root after
