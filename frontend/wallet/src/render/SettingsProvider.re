@@ -1,20 +1,8 @@
-type context = {
-  settings: option(Settings.t),
-  setSettings: Settings.t => unit,
+module SettingsContextType = {
+  type t = (option(Settings.t), Settings.t => unit);
+
+  let initialContext = (None, _ => ());
 };
 
-let initialContext = {settings: None, setSettings: _ => ()};
-
-let context = React.createContext(initialContext);
-
-let make = context->React.Context.provider;
-
-[@bs.obj]
-external makeProps:
-  (~value: context, ~children: React.element, ~key: string=?, unit) =>
-  {
-    .
-    "value": context,
-    "children": React.element,
-  } =
-  "";
+type t = SettingsContextType.t;
+include ContextProvider.Make(SettingsContextType);
