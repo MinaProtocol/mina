@@ -379,15 +379,7 @@ struct
 
   let get_all_payments coda public_key =
     let transaction_database = Program.transaction_database coda in
-    let transactions =
-      Transaction_database.get_transactions transaction_database public_key
-    in
-    List.filter_map transactions ~f:(function
-      | Coda_base.Transaction.User_command checked_user_command ->
-          let user_command = User_command.forget_check checked_user_command in
-          Option.some user_command
-      | _ ->
-          None )
+    Transaction_database.get_transactions transaction_database public_key
 
   let user_commands =
     Fn.compose Staged_ledger_diff.user_commands
@@ -463,26 +455,12 @@ struct
                   (User_command.sender user_command)
                   public_key )
             |> List.iter ~f:(fun user_command ->
-                   match User_command.check user_command with
-                   | Some checked_user_command ->
-                       Transaction_database.add transaction_database
-                         (* TODO: Time should be computed as when a payment gets into the transition frontier  *)
-                         (Coda_base.Transaction.User_command
-                            checked_user_command)
-                         ( Coda_base.Block_time.Time.now
-                         @@ Coda_base.Block_time.Time.Controller.basic ) ;
-                       Strict_pipe.Writer.write frontier_payment_writer
-                         user_command
-                   | None ->
-                       let logger =
-                         Logger.extend
-                           (Program.top_level_logger coda)
-                           [ ( "coda_command"
-                             , `String "Checking user command failed" ) ]
-                       in
-                       Logger.error logger ~module_:__MODULE__
-                         ~location:__LOC__
-                         "Could not check user command correctly" )
+                   (* TODO: Time should be computed when a payment gets into the transition frontier  *)
+                   Transaction_database.add transaction_database user_command
+                     ( Coda_base.Block_time.Time.now
+                     @@ Coda_base.Block_time.Time.Controller.basic ) ;
+                   Strict_pipe.Writer.write frontier_payment_writer
+                     user_command )
           in
           Coda_incremental.New_transition.Observer.on_update_exn
             payments_observer ~f:(function
