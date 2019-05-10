@@ -72,7 +72,9 @@ module Make (Commands : Coda_commands.Intf) = struct
                 | Payment {Payment_payload.Poly.receiver; _} ->
                     Ok (receiver |> Stringable.public_key)
                 | Stake_delegation _ ->
-                    Error "Payment should not consist of a stake delegation" )
+                    Error "Payment should not consist of a stake delegation"
+                | Chain_voting _ ->
+                    Error "Payment should not consist of a chain voting" )
           ; uint64_result_field "amount"
               ~doc:"Amount that sender send to receiver"
               ~args:Arg.[]
@@ -84,7 +86,9 @@ module Make (Commands : Coda_commands.Intf) = struct
                     Ok
                       (amount |> Currency.Amount.to_uint64 |> Stringable.uint64)
                 | Stake_delegation _ ->
-                    Error "Payment should not consist of a stake delegation" )
+                    Error "Payment should not consist of a stake delegation"
+                | Chain_voting _ ->
+                    Error "Payment should not consist of a chain voting" )
           ; uint64_field "fee"
               ~doc:
                 "Fee that sender is willing to pay for making the transaction"

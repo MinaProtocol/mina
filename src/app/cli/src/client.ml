@@ -365,7 +365,7 @@ let delegate_stake =
         ~doc:"PUBLICKEY Public-key address you want to set as your delegate"
         (required public_key_compressed)
     in
-    User_command_payload.Body.Stake_delegation (Set_delegate {new_delegate})
+    User_command_payload.Body.Stake_delegation {new_delegate}
   in
   user_command body ~label:"stake delegation"
     ~summary:"Set your proof-of-stake delegate" ~error:"Failed to set delegate"

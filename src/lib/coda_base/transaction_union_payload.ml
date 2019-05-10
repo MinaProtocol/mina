@@ -65,12 +65,19 @@ module Body = struct
       ~value_of_hlist:(fun H_list.[tag; public_key; amount] ->
         {tag; public_key; amount} )
 
-  let of_user_command_payload_body = function
+  let of_user_command_payload_body : User_command_payload.Body.t -> t =
+    function
     | User_command_payload.Body.Payment {receiver; amount} ->
         {tag= Tag.Payment; public_key= receiver; amount}
-    | Stake_delegation (Set_delegate {new_delegate}) ->
+    | Stake_delegation {new_delegate} ->
         { tag= Tag.Stake_delegation
         ; public_key= new_delegate
+        ; amount= Currency.Amount.zero }
+    | Chain_voting {voting_for} ->
+        { tag= Tag.Chain_voting
+        ; public_key=
+            Public_key.Compressed.Poly.
+              {x= (voting_for :> Pedersen.Digest.t); is_odd= false}
         ; amount= Currency.Amount.zero }
 
   module Checked = struct

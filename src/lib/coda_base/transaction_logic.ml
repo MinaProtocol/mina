@@ -32,6 +32,7 @@ module type S = sig
               }
           | Stake_delegation of
               { previous_delegate: Public_key.Compressed.Stable.V1.t }
+          | Chain_voting
         [@@deriving sexp]
 
         module Stable :
@@ -245,6 +246,7 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
                         Public_key.Compressed.Stable.V1.t list }
                 | Stake_delegation of
                     { previous_delegate: Public_key.Compressed.Stable.V1.t }
+                | Chain_voting
               [@@deriving sexp, bin_io, version]
             end
 
@@ -271,6 +273,7 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
               }
           | Stake_delegation of
               { previous_delegate: Public_key.Compressed.Stable.V1.t }
+          | Chain_voting
         [@@deriving sexp]
       end
 
@@ -468,12 +471,15 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
       return ({account with balance}, common)
     in
     match User_command.Payload.body payload with
-    | Stake_delegation (Set_delegate {new_delegate}) ->
+    | Stake_delegation {new_delegate} ->
         set ledger sender_location {sender_account with delegate= new_delegate} ;
         return
           { Undo.User_command_undo.common
           ; body= Stake_delegation {previous_delegate= sender_account.delegate}
           }
+    | Chain_voting {voting_for} ->
+        set ledger sender_location {sender_account with voting_for} ;
+        return {Undo.User_command_undo.common; body= Chain_voting}
     | Payment Payment_payload.Poly.{amount; receiver} ->
         let%bind sender_balance' = sub_amount sender_account.balance amount in
         let undo emptys : Undo.User_command_undo.t =
@@ -640,10 +646,13 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
         ; receipt_chain_hash= previous_receipt_chain_hash }
     in
     match (User_command.Payload.body payload, body) with
-    | Stake_delegation (Set_delegate _), Stake_delegation {previous_delegate}
-      ->
+    | Stake_delegation _, Stake_delegation {previous_delegate} ->
         set ledger sender_location
           {sender_account with delegate= previous_delegate} ;
+        return ()
+    | Chain_voting _, Chain_voting ->
+        set ledger sender_location
+          {sender_account with voting_for= State_hash.(of_hash zero)} ;
         return ()
     | Payment {amount; receiver}, Payment {previous_empty_accounts} ->
         let%bind sender_balance' = add_amount sender_account.balance amount in
