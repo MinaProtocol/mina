@@ -42,6 +42,8 @@ module Body = struct
              amount - fee should be defined. In other words,
              amount >= fee *)
             (Amount.of_fee fee, Amount.max_int)
+        | Chain_voting ->
+            (Amount.zero, Amount.zero)
       in
       Amount.gen_incl min max
     and public_key = Public_key.Compressed.gen in
@@ -192,6 +194,8 @@ module Changes = struct
             |> Option.value_exn ?here:None ?message:None ?error:None
         ; excess= Amount.Signed.zero
         ; supply_increase= coinbase_amount }
+    | Chain_voting ->
+        failwith "not implemented yet"
 
   let%test_unit "invariant" =
     Quickcheck.test gen ~f:(fun t -> invariant (of_payload t))
@@ -312,13 +316,15 @@ let excess (payload : t) : Amount.Signed.t =
       |> Amount.Signed.of_unsigned |> Amount.Signed.negate
   | Coinbase ->
       Amount.Signed.zero
+  | Chain_voting ->
+      Amount.Signed.of_unsigned (Amount.of_fee fee)
 
 let supply_increase (payload : payload) =
   let tag = payload.body.tag in
   match tag with
   | Coinbase ->
       payload.body.amount
-  | Payment | Stake_delegation | Fee_transfer ->
+  | Payment | Stake_delegation | Fee_transfer | Chain_voting ->
       Amount.zero
 
 let%test_unit "fold_compatibility" =
