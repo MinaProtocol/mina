@@ -242,6 +242,70 @@ module Make (Commands : Coda_commands.Intf) = struct
                 ~resolve:(fun _ -> Fn.id) ] )
     end
 
+    module Pagination = struct
+      module Page_info = struct
+        type t = {has_previous_page: bool; has_next_page: bool}
+
+        let typ =
+          obj "PageInfo" ~fields:(fun _ ->
+              [ field "hasPreviousPage" ~typ:(non_null bool)
+                  ~args:Arg.[]
+                  ~resolve:(fun _ {has_previous_page; _} -> has_previous_page)
+              ; field "hasNextPage" ~typ:(non_null bool)
+                  ~args:Arg.[]
+                  ~resolve:(fun _ {has_next_page; _} -> has_next_page) ] )
+      end
+
+      module Connection = struct
+        type 'a t = {edges: 'a list; total_count: int; page_info: Page_info.t}
+      end
+
+      module Payment = struct
+        module Cursor = struct
+          let serialize payment =
+            let bigstring =
+              Bin_prot.Utils.bin_dump
+                Coda_base.User_command.Stable.V1.bin_t.writer payment
+            in
+            Base64.encode_exn @@ Bigstring.to_string bigstring
+
+          let deserialize serialized_payment =
+            let serialized_transaction =
+              Base64.decode_exn serialized_payment
+            in
+            Coda_base.User_command.Stable.V1.bin_t.reader.read
+              (Bigstring.of_string serialized_transaction)
+              ~pos_ref:(ref 0)
+        end
+
+        let edge =
+          obj "PaymentEdge" ~fields:(fun _ ->
+              [ field "cursor" ~typ:(non_null string)
+                  ~doc:
+                    "Payment cursor is the base64 version of a serialized \
+                     transaction (via Jane Street bin_prot)"
+                  ~args:Arg.[]
+                  ~resolve:(fun _ user_command -> Cursor.serialize user_command)
+              ; field "node" ~typ:(non_null payment)
+                  ~args:Arg.[]
+                  ~resolve:(fun _ -> Fn.id) ] )
+
+        let connection =
+          obj "PaymentConnection" ~fields:(fun _ ->
+              [ field "edges"
+                  ~typ:(non_null @@ list @@ non_null payment)
+                  ~args:Arg.[]
+                  ~resolve:(fun _ {Connection.edges; _} -> edges)
+              ; field "totalCount" ~typ:(non_null int)
+                  ~doc:"Total number of payments that daemon holds"
+                  ~args:Arg.[]
+                  ~resolve:(fun _ {Connection.total_count; _} -> total_count)
+              ; field "pageInfo" ~typ:(non_null Page_info.typ)
+                  ~args:Arg.[]
+                  ~resolve:(fun _ {Connection.page_info; _} -> page_info) ] )
+      end
+    end
+
     module Input = struct
       open Schema.Arg
 
@@ -265,13 +329,12 @@ module Make (Commands : Coda_commands.Intf) = struct
             ; arg "memo" ~doc:"Public description of payment" ~typ:string ]
 
       let payment_filter_input =
-        non_null
-          (obj "PaymentFilterType"
-             ~coerce:(fun public_key -> public_key)
-             ~fields:
-               [ arg "toOrFrom"
-                   ~doc:"Public key of transactions you are looking for"
-                   ~typ:(non_null string) ])
+        obj "PaymentFilterType"
+          ~coerce:(fun public_key -> public_key)
+          ~fields:
+            [ arg "toOrFrom"
+                ~doc:"Public key of transactions you are looking for"
+                ~typ:(non_null string) ]
     end
   end
 
@@ -302,8 +365,7 @@ module Make (Commands : Coda_commands.Intf) = struct
     open Schema
 
     let sync_state =
-      result_field_no_inputs "syncStatus" ~typ:Types.sync_status
-        ~args:Arg.[]
+      result_field_no_inputs "syncStatus" ~args:[] ~typ:Types.sync_status
         ~resolve:(fun {ctx= coda; _} () ->
           Result.map_error
             (Coda_incremental.Status.Observer.value @@ Program.sync_status coda)
@@ -352,18 +414,62 @@ module Make (Commands : Coda_commands.Intf) = struct
           Option.map (Program.snark_worker_key coda) ~f:(fun k ->
               (k, Program.snark_work_fee coda) ) )
 
+    let build_connection ~query transaction_database public_key cursor
+        num_to_query =
+      let ( queried_transactions
+          , `Has_earlier_page has_previous_page
+          , `Has_later_page has_next_page ) =
+        query transaction_database public_key
+          (Option.map ~f:Types.Pagination.Payment.Cursor.deserialize cursor)
+          num_to_query
+      in
+      let page_info =
+        {Types.Pagination.Page_info.has_previous_page; has_next_page}
+      in
+      let total_count =
+        Option.value_exn
+          (Transaction_database.get_total_transactions transaction_database
+             public_key)
+      in
+      { Types.Pagination.Connection.edges= queried_transactions
+      ; page_info
+      ; total_count }
+
     let payments =
-      result_field "payments"
-        ~doc:"Payments that a user with public key KEY sent or received"
-        ~args:Arg.[arg "publicKey" ~typ:Types.Input.payment_filter_input]
-        ~typ:(non_null @@ list @@ non_null Types.payment)
-        ~resolve:(fun {ctx= coda; _} () public_key ->
-          let open Result.Let_syntax in
-          let%map public_key =
-            result_of_exn Public_key.Compressed.of_base64_exn public_key
-              ~error:"publicKey address is not valid."
+      io_field "payments"
+        ~args:
+          Arg.
+            [ arg "filter" ~typ:(non_null Types.Input.payment_filter_input)
+            ; arg "first" ~typ:int
+            ; arg "after" ~typ:string
+            ; arg "last" ~typ:int
+            ; arg "before" ~typ:string ]
+        ~typ:(non_null Types.Pagination.Payment.connection)
+        ~resolve:(fun {ctx= coda; _} () public_key first after last before ->
+          let open Deferred.Result.Let_syntax in
+          let%bind public_key =
+            Deferred.return
+            @@ result_of_exn Public_key.Compressed.of_base64_exn public_key
+                 ~error:"publicKey address is not valid."
           in
-          Commands.get_all_payments coda public_key )
+          let transaction_database = Program.transaction_database coda in
+          Deferred.return
+          @@
+          match (first, after, last, before) with
+          | Some _n_queries_before, _, Some _n_queries_after, _ ->
+              Error
+                "Illegal query: first and last must not be non-null value at \
+                 the same time"
+          | num_to_query, cursor, None, _ ->
+              Ok
+                (build_connection
+                   ~query:Transaction_database.get_earlier_transactions
+                   transaction_database public_key cursor num_to_query)
+          | None, _, num_to_query, cursor ->
+              Ok
+                (build_connection
+                   ~query:Transaction_database.get_later_transactions
+                   transaction_database public_key cursor num_to_query) )
 
     let initial_peers =
       field "initialPeers"
