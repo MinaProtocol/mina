@@ -42,11 +42,14 @@ module StakingSwitch = {
         )>
         {ReasonReact.string("Earn Coda > Vault")}
       </span>
-      <span> 
+      <span>
         {ReasonReact.string(
-          Tc.Option.andThen(~f=(s => SettingsRenderer.lookup(s, pubKey)), settings)
-          |> Option.withDefault(~default=pubKey |> PublicKey.toString)
-        )}
+           Tc.Option.andThen(
+             ~f=s => SettingsRenderer.lookup(s, pubKey),
+             settings,
+           )
+           |> Option.withDefault(~default=pubKey |> PublicKey.toString),
+         )}
       </span>
     </div>;
   };
