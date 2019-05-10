@@ -2,6 +2,8 @@ open Async
 open Core_kernel
 open Protocols.Coda_pow
 open Coda_base
+open Coda_state
+open Coda_transition
 open Signature_lib
 
 module Make (Inputs : sig
@@ -11,50 +13,15 @@ struct
   (** [Stubs] is a set of modules used for testing different components of tfc  *)
   let max_length = Inputs.max_length
 
-  module Time = Coda_base.Block_time
+  module Time = Block_time
 
   module State_proof = struct
-    include Coda_base.Proof
+    include Proof
 
     let verify _ _ = return true
   end
 
-  module Ledger_proof_statement = Transaction_snark.Statement
-  module Pending_coinbase_stack_state =
-    Transaction_snark.Pending_coinbase_stack_state
-
-  module Ledger_proof = struct
-    module Stable = struct
-      module V1 = struct
-        module T = struct
-          type t =
-            Ledger_proof_statement.Stable.V1.t * Sok_message.Digest.Stable.V1.t
-          [@@deriving sexp, bin_io, yojson, version]
-        end
-
-        include T
-      end
-
-      module Latest = V1
-    end
-
-    (* TODO: remove bin_io, after fixing functors to accept this *)
-    type t = Stable.V1.t [@@deriving sexp, bin_io, yojson]
-
-    let underlying_proof (_ : t) = Proof.dummy
-
-    let statement ((t, _) : t) : Ledger_proof_statement.t = t
-
-    let statement_target (t : Ledger_proof_statement.t) = t.target
-
-    let sok_digest (_, d) = d
-
-    let dummy =
-      ( Ledger_proof_statement.gen |> Quickcheck.random_value
-      , Sok_message.Digest.default )
-
-    let create ~statement ~sok_digest ~proof:_ = (statement, sok_digest)
-  end
+  module Ledger_proof = Ledger_proof.Debug
 
   module Ledger_proof_verifier = struct
     let verify _ _ ~message:_ = return true
@@ -68,34 +35,20 @@ struct
     let to_bytes = Staged_ledger_hash.Aux_hash.to_bytes
   end
 
-  module Transaction_witness = Coda_base.Transaction_witness
-
-  module Pending_coinbase = struct
-    include Coda_base.Pending_coinbase.Stable.V1
-
-    let ( hash_extra
-        , oldest_stack
-        , latest_stack
-        , create
-        , remove_coinbase_stack
-        , update_coinbase_stack
-        , merkle_root ) =
-      Coda_base.Pending_coinbase.
-        ( hash_extra
-        , oldest_stack
-        , latest_stack
-        , create
-        , remove_coinbase_stack
-        , update_coinbase_stack
-        , merkle_root )
-
-    module Stack = Coda_base.Pending_coinbase.Stack
-    module Coinbase_data = Coda_base.Pending_coinbase.Coinbase_data
-  end
-
-  module Pending_coinbase_hash = Coda_base.Pending_coinbase.Hash
+  module Transaction_witness = Transaction_witness
+  module Ledger_proof_statement = Transaction_snark.Statement
+  module Pending_coinbase_stack_state =
+    Transaction_snark.Pending_coinbase_stack_state
   module Transaction_snark_work =
-    Staged_ledger.Make_completed_work (Ledger_proof) (Ledger_proof_statement)
+    Transaction_snark_work.Make (Ledger_proof.Stable.V1)
+  module Staged_ledger_diff = Staged_ledger_diff.Make (Transaction_snark_work)
+
+  module External_transition = External_transition.Make (struct
+    include Staged_ledger_diff.Stable.V1
+
+    [%%define_locally
+    Staged_ledger_diff.(creator, user_commands)]
+  end)
 
   module Staged_ledger_hash_binable = struct
     include Staged_ledger_hash
@@ -111,29 +64,10 @@ struct
         , pending_coinbase_hash )
   end
 
-  module Staged_ledger_diff = Staged_ledger.Make_diff (struct
-    module Fee_transfer = Fee_transfer
-    module Ledger_proof = Ledger_proof
-    module Ledger_hash = Ledger_hash
-    module Staged_ledger_hash = Staged_ledger_hash_binable
-    module Staged_ledger_aux_hash = Staged_ledger_aux_hash
-    module Compressed_public_key = Public_key.Compressed
-    module User_command = User_command
-    module Transaction_snark_work = Transaction_snark_work
-    module Pending_coinbase = Pending_coinbase
-    module Pending_coinbase_hash = Pending_coinbase_hash
-  end)
-
-  module External_transition =
-    Coda_base.External_transition.Make
-      (Staged_ledger_diff)
-      (Consensus.Protocol_state)
-
   module Transaction = struct
-    include Coda_base.Transaction.Stable.Latest
+    include Transaction.Stable.Latest
 
-    let fee_excess, supply_increase =
-      Coda_base.Transaction.(fee_excess, supply_increase)
+    let fee_excess, supply_increase = Transaction.(fee_excess, supply_increase)
   end
 
   module Staged_ledger = Staged_ledger.Make (struct
@@ -144,7 +78,7 @@ struct
     module Transaction = Transaction
     module Ledger_hash = Coda_base.Ledger_hash
     module Frozen_ledger_hash = Coda_base.Frozen_ledger_hash
-    module Ledger_proof_statement = Ledger_proof_statement
+    module Ledger_proof_statement = Transaction_snark.Statement
     module Proof = Proof
     module Sok_message = Coda_base.Sok_message
     module Ledger_proof = Ledger_proof
@@ -157,9 +91,17 @@ struct
     module Account = Coda_base.Account
     module Ledger = Coda_base.Ledger
     module Sparse_ledger = Coda_base.Sparse_ledger
-    module Pending_coinbase = Pending_coinbase
-    module Pending_coinbase_hash = Pending_coinbase_hash
-    module Pending_coinbase_stack_state = Pending_coinbase_stack_state
+
+    module Pending_coinbase = struct
+      include Pending_coinbase.Stable.V1
+
+      include (
+        Pending_coinbase : module type of Pending_coinbase with type t := t )
+    end
+
+    module Pending_coinbase_hash = Pending_coinbase.Hash
+    module Pending_coinbase_stack_state =
+      Transaction_snark.Pending_coinbase_stack_state
     module Transaction_witness = Transaction_witness
   end)
 
@@ -191,13 +133,11 @@ struct
         in
         User_command.sign sender_keypair payload )
 
-  module Blockchain_state = External_transition.Protocol_state.Blockchain_state
-  module Protocol_state = External_transition.Protocol_state
   module Diff_hash = Transition_frontier_persistence.Diff_hash
 
   module Diff_mutant_inputs = struct
     module Staged_ledger_aux_hash = Staged_ledger_aux_hash
-    module Ledger_proof_statement = Ledger_proof_statement
+    module Ledger_proof_statement = Transaction_snark.Statement
     module Ledger_proof = Ledger_proof
     module Transaction_snark_work = Transaction_snark_work
     module Staged_ledger_diff = Staged_ledger_diff
@@ -206,8 +146,9 @@ struct
     module Staged_ledger = Staged_ledger
     module Diff_hash = Diff_hash
     module Scan_state = Staged_ledger.Scan_state
-    module Pending_coinbase_stack_state = Pending_coinbase_stack_state
-    module Pending_coinbase_hash = Pending_coinbase_hash
+    module Pending_coinbase_stack_state =
+      Transaction_snark.Pending_coinbase_stack_state
+    module Pending_coinbase_hash = Pending_coinbase.Hash
     module Pending_coinbase = Pending_coinbase
   end
 
@@ -224,14 +165,14 @@ struct
   module Transition_frontier =
     Transition_frontier.Make (Transition_frontier_inputs)
 
-  let gen_breadcrumb ~logger ~accounts_with_secret_keys :
+  let gen_breadcrumb ~logger ~trust_system ~accounts_with_secret_keys :
       (   Transition_frontier.Breadcrumb.t Deferred.t
        -> Transition_frontier.Breadcrumb.t Deferred.t)
       Quickcheck.Generator.t =
     let open Quickcheck.Let_syntax in
     let gen_slot_advancement = Int.gen_incl 1 10 in
     let%map make_next_consensus_state =
-      Consensus.For_tests.gen_consensus_state ~gen_slot_advancement
+      Consensus_state_hooks.For_tests.gen_consensus_state ~gen_slot_advancement
     in
     fun parent_breadcrumb_deferred ->
       let open Deferred.Let_syntax in
@@ -279,7 +220,7 @@ struct
       in
       let previous_ledger_hash =
         previous_protocol_state |> Protocol_state.blockchain_state
-        |> Protocol_state.Blockchain_state.snarked_ledger_hash
+        |> Blockchain_state.snarked_ledger_hash
       in
       let next_ledger_hash =
         Option.value_map ledger_proof_opt
@@ -293,9 +234,7 @@ struct
           ~snarked_ledger_hash:next_ledger_hash
           ~staged_ledger_hash:next_staged_ledger_hash
       in
-      let previous_state_hash =
-        Consensus.Protocol_state.hash previous_protocol_state
-      in
+      let previous_state_hash = Protocol_state.hash previous_protocol_state in
       let consensus_state =
         make_next_consensus_state ~snarked_ledger_hash:previous_ledger_hash
           ~previous_protocol_state:
@@ -319,12 +258,14 @@ struct
       let next_verified_external_transition_with_hash =
         With_hash.of_data next_verified_external_transition
           ~hash_data:
-            (Fn.compose Consensus.Protocol_state.hash
+            (Fn.compose Protocol_state.hash
                External_transition.Verified.protocol_state)
       in
       match%map
-        Transition_frontier.Breadcrumb.build ~logger ~parent:parent_breadcrumb
+        Transition_frontier.Breadcrumb.build ~logger ~trust_system
+          ~parent:parent_breadcrumb
           ~transition_with_hash:next_verified_external_transition_with_hash
+          ~sender:None
       with
       | Ok new_breadcrumb ->
           Logger.info logger ~module_:__MODULE__ ~location:__LOC__
@@ -367,8 +308,12 @@ struct
       Pending_coinbase.create () |> Or_error.ok_exn
     in
     let genesis_protocol_state_with_hash =
-      Consensus.For_tests.create_genesis_protocol_state
-        (Ledger.of_database root_snarked_ledger)
+      Genesis_protocol_state.create_with_custom_ledger
+        ~genesis_consensus_state:
+          (Consensus.Data.Consensus_state.create_genesis
+             ~negative_one_protocol_state_hash:
+               Protocol_state.(hash negative_one))
+        ~genesis_ledger:(Ledger.of_database root_snarked_ledger)
     in
     let genesis_protocol_state =
       With_hash.data genesis_protocol_state_with_hash
@@ -377,7 +322,7 @@ struct
       With_hash.hash genesis_protocol_state_with_hash
     in
     let root_ledger_hash =
-      genesis_protocol_state |> Consensus.Protocol_state.blockchain_state
+      genesis_protocol_state |> Protocol_state.blockchain_state
       |> Blockchain_state.snarked_ledger_hash
       |> Frozen_ledger_hash.to_ledger_hash
     in
@@ -420,7 +365,7 @@ struct
             ~root_transition:root_transition_with_data ~root_snarked_ledger
             ~root_staged_ledger
             ~consensus_local_state:
-              (Consensus.Local_state.create
+              (Consensus.Data.Local_state.create
                  (Some (Account.public_key proposer_account)))
         in
         frontier
@@ -438,43 +383,47 @@ struct
         let%bind breadcrumb = deferred_breadcrumb in
         Transition_frontier.add_breadcrumb_exn frontier breadcrumb )
 
-  let gen_linear_breadcrumbs ~logger ~size ~accounts_with_secret_keys
-      root_breadcrumb =
+  let gen_linear_breadcrumbs ~logger ~trust_system ~size
+      ~accounts_with_secret_keys root_breadcrumb =
     Quickcheck.Generator.with_size ~size
     @@ Quickcheck_lib.gen_imperative_list
          (root_breadcrumb |> return |> Quickcheck.Generator.return)
-         (gen_breadcrumb ~logger ~accounts_with_secret_keys)
+         (gen_breadcrumb ~logger ~trust_system ~accounts_with_secret_keys)
 
-  let add_linear_breadcrumbs ~logger ~size ~accounts_with_secret_keys ~frontier
-      ~parent =
+  let add_linear_breadcrumbs ~logger ~trust_system ~size
+      ~accounts_with_secret_keys ~frontier ~parent =
     let new_breadcrumbs =
-      gen_linear_breadcrumbs ~logger ~size ~accounts_with_secret_keys parent
+      gen_linear_breadcrumbs ~logger ~trust_system ~size
+        ~accounts_with_secret_keys parent
       |> Quickcheck.random_value
     in
     Deferred.List.iter new_breadcrumbs ~f:(fun breadcrumb ->
         let%bind breadcrumb = breadcrumb in
         Transition_frontier.add_breadcrumb_exn frontier breadcrumb )
 
-  let add_child ~logger ~accounts_with_secret_keys ~frontier ~parent =
+  let add_child ~logger ~trust_system ~accounts_with_secret_keys ~frontier
+      ~parent =
     let%bind new_node =
-      ( gen_breadcrumb ~logger ~accounts_with_secret_keys
+      ( gen_breadcrumb ~logger ~trust_system ~accounts_with_secret_keys
       |> Quickcheck.random_value )
       @@ Deferred.return parent
     in
     let%map () = Transition_frontier.add_breadcrumb_exn frontier new_node in
     new_node
 
-  let gen_tree ~logger ~size ~accounts_with_secret_keys root_breadcrumb =
+  let gen_tree ~logger ~trust_system ~size ~accounts_with_secret_keys
+      root_breadcrumb =
     Quickcheck.Generator.with_size ~size
     @@ Quickcheck_lib.gen_imperative_rose_tree
          (root_breadcrumb |> return |> Quickcheck.Generator.return)
-         (gen_breadcrumb ~logger ~accounts_with_secret_keys)
+         (gen_breadcrumb ~logger ~trust_system ~accounts_with_secret_keys)
 
-  let gen_tree_list ~logger ~size ~accounts_with_secret_keys root_breadcrumb =
+  let gen_tree_list ~logger ~trust_system ~size ~accounts_with_secret_keys
+      root_breadcrumb =
     Quickcheck.Generator.with_size ~size
     @@ Quickcheck_lib.gen_imperative_ktree
          (root_breadcrumb |> return |> Quickcheck.Generator.return)
-         (gen_breadcrumb ~logger ~accounts_with_secret_keys)
+         (gen_breadcrumb ~logger ~trust_system ~accounts_with_secret_keys)
 
   module Protocol_state_validator = Protocol_state_validator.Make (struct
     include Transition_frontier_inputs
@@ -644,7 +593,7 @@ struct
       let time = Int64.of_int 1
     end
 
-    let setup ~source_accounts ~logger configs =
+    let setup ~source_accounts ~logger ~trust_system configs =
       let%bind me = create_root_frontier ~logger source_accounts in
       let%map _, _, peers_with_frontiers =
         Deferred.List.fold
@@ -656,8 +605,8 @@ struct
             let%map () =
               build_frontier_randomly frontier
                 ~gen_root_breadcrumb_builder:
-                  (gen_linear_breadcrumbs ~logger ~size:num_breadcrumbs
-                     ~accounts_with_secret_keys:accounts)
+                  (gen_linear_breadcrumbs ~logger ~trust_system
+                     ~size:num_breadcrumbs ~accounts_with_secret_keys:accounts)
             in
             (* each peer has a distinct IP address, so we lookup frontiers by IP *)
             let peer =
@@ -689,9 +638,9 @@ struct
       {me; network; peers= List.rev peers_with_frontiers}
 
     let setup_me_and_a_peer ~source_accounts ~target_accounts ~logger
-        ~num_breadcrumbs =
+        ~trust_system ~num_breadcrumbs =
       let%map {me; network; peers} =
-        setup ~source_accounts ~logger
+        setup ~source_accounts ~logger ~trust_system
           [{num_breadcrumbs; accounts= target_accounts}]
       in
       (me, List.hd_exn peers, network)

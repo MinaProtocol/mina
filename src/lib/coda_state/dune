@@ -1,0 +1,5 @@
+(library
+  (name coda_state)
+  (public_name coda_state)
+  (preprocess (pps ppx_coda ppx_snarky ppx_jane ppx_deriving.std ppx_deriving_yojson))
+  (libraries core_kernel coda_base snark_params consensus genesis_ledger bitstring_lib fold_lib tuple_lib with_hash))

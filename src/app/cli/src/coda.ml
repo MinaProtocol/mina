@@ -51,7 +51,7 @@ let daemon logger =
             tracked by this daemon. You cannot provide both `propose-key` and \
             `propose-public-key`. (default: don't propose)"
          (optional public_key_compressed)
-     and peers =
+     and initial_peers_raw =
        flag "peer"
          ~doc:
            "HOST:PORT TCP daemon communications (can be given multiple times)"
@@ -203,9 +203,9 @@ let daemon logger =
            "work-selection" ~default:Protocols.Coda_pow.Work_selection.Seq
            work_selection_flag
        in
-       let peers =
+       let initial_peers_raw =
          List.concat
-           [ peers
+           [ initial_peers_raw
            ; List.map ~f:Host_and_port.of_string
              @@ or_from_config
                   (Fn.compose Option.some
@@ -215,26 +215,7 @@ let daemon logger =
        let discovery_port = external_port + 1 in
        let%bind () = Unix.mkdir ~p:() conf_dir in
        if enable_tracing then Coda_tracing.start conf_dir |> don't_wait_for ;
-       let%bind initial_peers_raw =
-         match peers with
-         | _ :: _ ->
-             return peers
-         | [] -> (
-             let peers_path = conf_dir ^/ "peers" in
-             match%bind
-               Reader.load_sexp peers_path [%of_sexp: Host_and_port.t list]
-             with
-             | Ok ls ->
-                 return ls
-             | Error e ->
-                 let default_initial_peers = [] in
-                 let%map () =
-                   Writer.save_sexp peers_path
-                     ([%sexp_of: Host_and_port.t list] default_initial_peers)
-                 in
-                 [] )
-       in
-       let%bind initial_peers =
+       let%bind initial_peers_cleaned =
          Deferred.List.filter_map ~how:(`Max_concurrent_jobs 8)
            initial_peers_raw ~f:(fun addr ->
              let host = Host_and_port.host addr in
@@ -256,9 +237,12 @@ let daemon logger =
                  return None )
        in
        let%bind () =
-         if List.length peers <> 0 && List.length initial_peers = 0 then (
+         if
+           List.length initial_peers_raw <> 0
+           && List.length initial_peers_cleaned = 0
+         then (
            eprintf "Error: failed to connect to any peers\n" ;
-           exit 1 )
+           exit 10 )
          else Deferred.unit
        in
        let%bind ip =
@@ -279,7 +263,7 @@ let daemon logger =
              eprintf
                "Error: You cannot provide both `propose-key` and \
                 `propose-public-key`" ;
-             exit 1
+             exit 11
          | Some sk_file, None ->
              Secrets.Keypair.Terminal_stdin.read_exn sk_file >>| Option.some
          | None, Some wallet_pk -> (
@@ -294,7 +278,7 @@ let daemon logger =
                  eprintf
                    "Error: This public key was not found in the local \
                     daemon's wallet database" ;
-                 exit 1 )
+                 exit 12 )
          | None, None ->
              return None
        in
@@ -339,22 +323,28 @@ let daemon logger =
          Option.value_map run_snark_worker_flag ~default:`Don't_run
            ~f:(fun k -> `With_public_key k)
        in
+       let trace_database_initialization typ location =
+         Logger.trace logger "Creating %s at %s" ~module_:__MODULE__ ~location
+           typ
+       in
        let trust_dir = conf_dir ^/ "trust" in
        let () = Snark_params.set_chunked_hashing true in
        let%bind () = Async.Unix.mkdir ~p:() trust_dir in
        let transition_frontier_location = conf_dir ^/ "transition_frontier" in
        let trust_system = Trust_system.create ~db_dir:trust_dir in
+       trace_database_initialization "trust_system" __LOC__ trust_dir ;
        let time_controller =
          M.Inputs.Time.Controller.create M.Inputs.Time.Controller.basic
        in
        let consensus_local_state =
-         Consensus.Local_state.create
+         Consensus.Data.Local_state.create
            (Option.map Config0.propose_keypair ~f:(fun keypair ->
                 let open Keypair in
                 Public_key.compress keypair.public_key ))
        in
        let net_config =
          { M.Inputs.Net.Config.logger
+         ; trust_system
          ; time_controller
          ; consensus_local_state
          ; gossip_net_params=
@@ -362,7 +352,7 @@ let daemon logger =
              ; logger
              ; target_peer_count= 8
              ; conf_dir
-             ; initial_peers
+             ; initial_peers= initial_peers_cleaned
              ; me
              ; trust_system
              ; max_concurrent_connections } }
@@ -373,6 +363,15 @@ let daemon logger =
          Coda_base.Receipt_chain_database.create
            ~directory:receipt_chain_dir_name
        in
+       trace_database_initialization "receipt_chain_database" __LOC__
+         receipt_chain_dir_name ;
+       let transaction_database_dir = conf_dir ^/ "transaction" in
+       let%bind () = Async.Unix.mkdir ~p:() transaction_database_dir in
+       let transaction_database =
+         Transaction_database.create logger transaction_database_dir
+       in
+       trace_database_initialization "transaction_database" __LOC__
+         transaction_database_dir ;
        let monitor = Async.Monitor.create ~name:"coda" () in
        let%bind coda =
          Run.create
@@ -385,9 +384,9 @@ let daemon logger =
               ~snark_work_fee:snark_work_fee_flag ~receipt_chain_database
               ~transition_frontier_location ~time_controller
               ?propose_keypair:Config0.propose_keypair ~monitor
-              ~consensus_local_state ())
+              ~consensus_local_state ~transaction_database ())
        in
-       Run.handle_shutdown ~monitor ~conf_dir ~logger coda ;
+       Run.handle_shutdown ~monitor ~conf_dir coda ;
        Async.Scheduler.within' ~monitor
        @@ fun () ->
        let%bind () = maybe_sleep 3. in
@@ -395,8 +394,8 @@ let daemon logger =
        let web_service = Web_pipe.get_service () in
        Web_pipe.run_service (module Run) coda web_service ~conf_dir ~logger ;
        Run.setup_local_server ?client_whitelist ?rest_server_port ~coda
-         ~client_port ~logger () ;
-       Run.run_snark_worker ~logger ~client_port run_snark_worker_action ;
+         ~client_port () ;
+       Run.run_snark_worker ~client_port run_snark_worker_action ;
        Logger.info logger ~module_:__MODULE__ ~location:__LOC__
          "Running coda services" ;
        Async.never ())
@@ -448,7 +447,7 @@ let rec ensure_testnet_id_still_good logger =
             ( local_id |> Option.map ~f:str
             |> Option.value ~default:"[COMMIT_SHA1 not set]" )
             remote_ids ;
-          exit 1
+          exit 13
         in
         match commit_id with
         | None ->
@@ -466,20 +465,7 @@ let ensure_testnet_id_still_good _ = Deferred.unit
 
 [%%endif]
 
-[%%if
-proof_level = "full"]
-
-let internal_commands =
-  [(Snark_worker_lib.Intf.command_name, Snark_worker_lib.Prod.Worker.command)]
-
-[%%else]
-
-(* TODO #1698: proof_level=check *)
-
-let internal_commands =
-  [(Snark_worker_lib.Intf.command_name, Snark_worker_lib.Debug.Worker.command)]
-
-[%%endif]
+let internal_commands = [(Snark_worker.Intf.command_name, Snark_worker.command)]
 
 let coda_commands logger =
   [ (Parallel.worker_command_name, Parallel.worker_command)
@@ -506,6 +492,8 @@ let coda_commands logger =
     ; ( Coda_restarts_and_txns_holy_grail.name
       , Coda_restarts_and_txns_holy_grail.command )
     ; (Coda_bootstrap_test.name, Coda_bootstrap_test.command)
+    ; (Coda_batch_payment_test.name, Coda_batch_payment_test.command)
+    ; (Coda_long_fork.name, Coda_long_fork.command)
     ; ("full-test", Full_test.command)
     ; ("transaction-snark-profiler", Transaction_snark_profiler.command) ]
   in
@@ -520,5 +508,9 @@ let () =
   don't_wait_for (ensure_testnet_id_still_good logger) ;
   (* Turn on snark debugging in prod for now *)
   Snarky.Snark.set_eval_constraints true ;
+  Snarky.Libsnark.set_printing_fun
+    (Logger.format_message logger ~level:Debug ~module_:"Snarky__Libsnark"
+       ~location:"File \"lib/snarky/src/libsnark.ml\", line 1, characters 0-1"
+       "%s") ;
   Command.run (Command.group ~summary:"Coda" (coda_commands logger)) ;
   Core.exit 0

@@ -66,47 +66,6 @@ describe("CallTable", () => {
   );
 });
 
-describe("Settings", () =>
-  describe("serialization", () =>
-    testAll(
-      "print/parse roundtrip",
-      // TODO: Quickcheck this
-      [
-        Route.{path: Home, settingsOrError: `Error(`Json_parse_error)},
-        Route.{path: Send, settingsOrError: `Error(`Decode_error("Oops"))},
-        Route.{
-          path: DeleteWallet,
-          settingsOrError:
-            `Error(
-              `Error_reading_file(
-                Obj.magic(
-                  Route.SettingsOrError.Decode.Error.create(
-                    ~name="Error",
-                    ~message="an error",
-                    ~stack="some stack trace",
-                  ),
-                ),
-              ),
-            ),
-        },
-        Route.{
-          path: Home,
-          settingsOrError:
-            `Settings({
-              Settings.state:
-                Js.Dict.fromList([
-                  ("a123", "Test Wallet1"),
-                  ("a234", "Test Wallet2"),
-                ]),
-            }),
-        },
-      ],
-      a =>
-      expect(a |> Route.print |> Route.parse) |> toEqual(Some(a))
-    )
-  )
-);
-
 describe("Bindings", () =>
   describe("Spawn", () => {
     open Bindings;
