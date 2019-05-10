@@ -179,7 +179,7 @@ module Changes = struct
         ; receiver_increase= amount
         ; excess= Amount.Signed.of_unsigned (Amount.of_fee fee)
         ; supply_increase= Amount.zero }
-    | Stake_delegation ->
+    | Stake_delegation | Chain_voting ->
         { sender_delta=
             Amount.of_fee fee |> Amount.Signed.of_unsigned
             |> Amount.Signed.negate
@@ -201,8 +201,6 @@ module Changes = struct
             |> Option.value_exn ?here:None ?message:None ?error:None
         ; excess= Amount.Signed.zero
         ; supply_increase= coinbase_amount }
-    | Chain_voting ->
-        failwith "not implemented yet"
 
   let%test_unit "invariant" =
     Quickcheck.test gen ~f:(fun t -> invariant (of_payload t))
