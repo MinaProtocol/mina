@@ -123,54 +123,54 @@ let genesis =
   ; proposer= Signature_lib.Public_key.Compressed.empty
   ; coinbase= Currency.Amount.zero }
 
-  let to_hlist
-      { Poly.blockchain_state
-      ; consensus_data
-      ; sok_digest
-      ; supply_increase
-      ; ledger_proof
-      ; proposer
-      ; coinbase } =
-    Snarky.H_list.
-      [ blockchain_state
-      ; consensus_data
-      ; sok_digest
-      ; supply_increase
-      ; ledger_proof
-      ; proposer
-      ; coinbase ]
-
-  let of_hlist
-      ([ blockchain_state
-       ; consensus_data
-       ; sok_digest
-       ; supply_increase
-       ; ledger_proof
-       ; proposer
-       ; coinbase ] :
-        (unit, _) Snarky.H_list.t) =
+let to_hlist
     { Poly.blockchain_state
     ; consensus_data
     ; sok_digest
     ; supply_increase
     ; ledger_proof
     ; proposer
-    ; coinbase }
+    ; coinbase } =
+  Snarky.H_list.
+    [ blockchain_state
+    ; consensus_data
+    ; sok_digest
+    ; supply_increase
+    ; ledger_proof
+    ; proposer
+    ; coinbase ]
 
-  let typ =
-    let open Snark_params.Tick.Typ in
-    let ledger_proof =
-      { store= Store.return
-      ; read= Read.return
-      ; check= (fun _ -> Snark_params.Tick.Checked.return ())
-      ; alloc= Alloc.return None }
-    in
-    of_hlistable ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist
-      ~value_to_hlist:to_hlist ~value_of_hlist:of_hlist
-      [ Blockchain_state.typ
-      ; Consensus_data.typ
-      ; Sok_message.Digest.typ
-      ; Currency.Amount.typ
-      ; ledger_proof
-      ; Signature_lib.Public_key.Compressed.typ
-      ; Currency.Amount.typ ]
+let of_hlist
+    ([ blockchain_state
+     ; consensus_data
+     ; sok_digest
+     ; supply_increase
+     ; ledger_proof
+     ; proposer
+     ; coinbase ] :
+      (unit, _) Snarky.H_list.t) =
+  { Poly.blockchain_state
+  ; consensus_data
+  ; sok_digest
+  ; supply_increase
+  ; ledger_proof
+  ; proposer
+  ; coinbase }
+
+let typ =
+  let open Snark_params.Tick.Typ in
+  let ledger_proof =
+    { store= Store.return
+    ; read= Read.return
+    ; check= (fun _ -> Snark_params.Tick.Checked.return ())
+    ; alloc= Alloc.return None }
+  in
+  of_hlistable ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist
+    ~value_to_hlist:to_hlist ~value_of_hlist:of_hlist
+    [ Blockchain_state.typ
+    ; Consensus_data.typ
+    ; Sok_message.Digest.typ
+    ; Currency.Amount.typ
+    ; ledger_proof
+    ; Signature_lib.Public_key.Compressed.typ
+    ; Currency.Amount.typ ]
