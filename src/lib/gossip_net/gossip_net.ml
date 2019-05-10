@@ -1,3 +1,6 @@
+[%%import
+"../../config.mlh"]
+
 open Core
 open Async
 open Pipe_lib
@@ -157,9 +160,11 @@ module Make (Message : Message_intf) : S with type msg := Message.msg = struct
       | Some ip_peers ->
           List.filter ip_peers ~f:(fun ip_peer -> not (Peer.equal ip_peer peer)) )
 
-  let reader_writer_of_sock sock =
-    let fd = Socket.fd sock in
-    (Reader.create fd, Writer.create fd)
+  let is_unix_errno errno unix_errno =
+    Int.equal (Unix.Error.compare errno unix_errno) 0
+
+  [%%if
+  fixup_localhost_for_testing]
 
   let get_available_port =
     let start_port = 9001 in
@@ -172,19 +177,50 @@ module Make (Message : Message_intf) : S with type msg := Message.msg = struct
       if !port >= stop_port then reset () ;
       result
 
+  (* bind socket to current host *)
+  let bind_socket t sock =
+    let max_bind_tries = 1000 in
+    let rec try_addr n =
+      if n > max_bind_tries then
+        failwith "Could not bind socket to local address" ;
+      let local_addr = `Inet (t.me.host, get_available_port ()) in
+      try Async.Socket.bind_inet sock local_addr
+      with
+      | Unix.Unix_error (errno, "bind", _)
+      when is_unix_errno errno Unix.Error.EADDRINUSE
+      ->
+        Logger.info t.logger ~module_:__MODULE__ ~location:__LOC__
+          !"Socket bind, address already in use: %{sexp: Socket.Address.Inet.t}"
+          local_addr ;
+        try_addr (n + 1)
+    in
+    try_addr 0
+
+  [%%else]
+
+  (* don't actually bind socket here *)
+  let bind_socket _t sock = sock
+
+  [%%endif]
+
   let try_call_rpc t (peer : Peer.t) dispatch query =
     let call () =
-      let unbound_socket = Async.Socket.(create Type.tcp) in
-      let local_addr = `Inet (t.me.host, get_available_port ()) in
-      let socket = Async.Socket.bind_inet unbound_socket local_addr in
+      let socket = Async.Socket.(create Type.tcp) in
+      (* maybe bind socket for testing *)
+      let maybe_bound_socket = bind_socket t socket in
       let peer_addr = `Inet (peer.host, peer.communication_port) in
-      let%bind active_socket = Async.Socket.connect socket peer_addr in
+      let%bind connected_socket =
+        Async.Socket.connect maybe_bound_socket peer_addr
+      in
       try_with (fun () ->
-          let reader, writer = reader_writer_of_sock active_socket in
+          let reader, writer =
+            let fd = Socket.fd connected_socket in
+            (Reader.create fd, Writer.create fd)
+          in
           create_connection_with_menu peer reader writer
           >>=? fun conn ->
           let result = dispatch conn query in
-          Async.Socket.shutdown active_socket `Both ;
+          Async.Socket.shutdown connected_socket `Both ;
           result )
       >>= function
       | Ok (Ok result) ->
@@ -240,9 +276,6 @@ module Make (Message : Message_intf) : S with type msg := Message.msg = struct
           (* call itself failed *)
           (* TODO: learn what other exceptions are raised here *)
           let exn = Monitor.extract_exn monitor_exn in
-          let is_unix_errno errno unix_errno =
-            Int.equal (Unix.Error.compare errno unix_errno) 0
-          in
           match exn with
           | Unix.Unix_error (errno, _, _)
             when is_unix_errno errno Unix.ECONNREFUSED ->
