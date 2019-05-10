@@ -1,0 +1,41 @@
+digraph deamon_architecture {
+  rankdir=LR;
+
+  {
+    rank=source;
+    node [shape=box,width=2];
+    Protocol [height=6];
+    API [height=3];
+  }
+
+  {Transition_router, Bootstrap_controller, Transition_frontier_controller};
+  {Transition_frontier, Transition_frontier_extensions, Transition_frontier_persistence};
+  {Proposer, Snark_worker};
+  {Snark_pool, Transaction_pool};
+  {Verifier, Prover};
+
+  Protocol
+    -> Transition_router
+    -> {Bootstrap_controller, Transition_frontier_controller}
+    -> Transition_frontier
+    -> Proposer;
+  Proposer -> Transition_frontier_controller [constraint=false];
+  Proposer -> Prover;
+  Transition_router -> Verifier;
+
+  subgraph cluster_Transition_frontier {
+    style=invis;
+    Transition_frontier -> Transition_frontier_extensions [dir=none,constraint=false];
+    Transition_frontier_extensions -> Transition_frontier_persistence;
+  }
+
+  Protocol -> {Snark_pool, Transaction_pool} -> Protocol;
+  Transition_frontier_extensions -> {Snark_pool, Transaction_pool} [constraint=false];
+
+  Transition_frontier -> Snark_worker;
+  Snark_worker -> Snark_pool [constraint=false];
+  Snark_pool -> Snark_worker;
+
+  Transition_frontier -> API [constraint=false];
+  API -> Transaction_pool;
+}
