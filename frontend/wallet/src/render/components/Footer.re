@@ -21,7 +21,7 @@ module Styles = {
 module StakingSwitch = {
   [@react.component]
   let make = (~pubKey) => {
-    let context = React.useContext(SettingsProvider.context);
+    let (settings, _) = React.useContext(SettingsProvider.context);
     <div className=Css.(style([color(Theme.Colors.serpentine)]))>
       <input
         type_="checkbox"
@@ -35,7 +35,7 @@ module StakingSwitch = {
       </span>
       <span>
         {ReasonReact.string(
-          Tc.Option.andThen(~f=(s => SettingsRenderer.lookup(s, pubKey)), context.settings)
+          Tc.Option.andThen(~f=(s => SettingsRenderer.lookup(s, pubKey)), settings)
           |> Option.withDefault(~default=pubKey |> PublicKey.toString)
         )}
       </span>
