@@ -652,7 +652,8 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
         return ()
     | Chain_voting _, Chain_voting ->
         set ledger sender_location
-          {sender_account with voting_for= State_hash.(of_hash zero)} ;
+          { sender_account with
+            voting_for= State_hash.of_hash Outside_pedersen_image.t } ;
         return ()
     | Payment {amount; receiver}, Payment {previous_empty_accounts} ->
         let%bind sender_balance' = add_amount sender_account.balance amount in
