@@ -208,11 +208,11 @@ module Make (Message : Message_intf) : S with type msg := Message.msg = struct
       let socket = Async.Socket.(create Type.tcp) in
       (* maybe bind socket for testing *)
       let maybe_bound_socket = bind_socket t socket in
-      let peer_addr = `Inet (peer.host, peer.communication_port) in
-      let%bind connected_socket =
-        Async.Socket.connect maybe_bound_socket peer_addr
-      in
       try_with (fun () ->
+          let peer_addr = `Inet (peer.host, peer.communication_port) in
+          let%bind connected_socket =
+            Async.Socket.connect maybe_bound_socket peer_addr
+          in
           let reader, writer =
             let fd = Socket.fd connected_socket in
             (Reader.create fd, Writer.create fd)
