@@ -2,9 +2,6 @@ open BsElectron;
 open Tc;
 
 let killDaemon = DaemonProcess.start(8080);
-let apolloClient = GraphqlMain.createClient("http://localhost:8080/graphql");
-
-IpcLinkMain.start(apolloClient);
 
 let createTray = dispatch => {
   let t = AppTray.get();
