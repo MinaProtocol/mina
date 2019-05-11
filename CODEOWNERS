@@ -23,7 +23,6 @@
 /src/app/trace-tool/ @cmr
 /src/app/website/ @bkase @schmavery
 
-/src/lib/banlist_lib/ @enolan
 /src/lib/bignum_bigint/ @nholland94 @bkase
 /src/lib/blake2/ @rbkhmrcr @vanishreerao
 /src/lib/blockchain_snark/ @nholland94 @bkase
@@ -89,7 +88,6 @@
 /src/lib/parallel/ @bkase
 /src/lib/parallel_scan/ @deepthiskumar @bkase
 /src/lib/pedersen_lib/ @cmr
-/src/lib/peer_trust/ @enolan
 /src/lib/perf_histograms/ @bkase
 /src/lib/pipe_lib/ @nholland94
 /src/lib/pokolog/ @bkase @vanishreerao @rbkhmrcr
@@ -135,7 +133,7 @@
 /src/lib/storage/ @bkase
 /src/lib/sync_handler/ @cmr
 /src/lib/sync_status/ @johnwu93
-/src/lib/syncable_ledger/ @cmr
+/src/lib/syncable_ledger/ @cmr @enolan
 /src/lib/test_mocks/ @nholland94
 /src/lib/test_util/ @nholland94
 /src/lib/time_simulator/ @bkase
