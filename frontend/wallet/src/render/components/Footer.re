@@ -6,14 +6,14 @@ module Styles = {
   let footer =
     style([
       position(`fixed),
-      bottom(`px(0)),
-      left(`px(0)),
-      right(`px(0)),
+      bottom(`zero),
+      left(`zero),
+      right(`zero),
       display(`flex),
       height(Theme.Spacing.footerHeight),
       justifyContent(`spaceBetween),
       alignItems(`center),
-      padding2(~v=`px(0), ~h=`rem(2.)),
+      padding2(~v=`zero, ~h=`rem(2.)),
       borderTop(`px(1), `solid, Theme.Colors.borderColor),
     ]);
 };
@@ -44,10 +44,8 @@ module StakingSwitch = {
       </span>
       <span>
         {ReasonReact.string(
-           Tc.Option.andThen(
-             ~f=s => SettingsRenderer.lookup(s, pubKey),
-             settings,
-           )
+           settings
+           |> Option.andThen(~f=s => SettingsRenderer.lookup(s, pubKey))
            |> Option.withDefault(~default=pubKey |> PublicKey.toString),
          )}
       </span>
