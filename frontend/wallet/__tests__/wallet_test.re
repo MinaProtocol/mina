@@ -102,3 +102,96 @@ describe("Bindings", () =>
     );
   })
 );
+
+describe("Time", () => {
+  let testNow =
+    Js.Date.makeWithYMDHMS(
+      ~year=2019.,
+      ~month=0.,
+      ~date=23.,
+      ~hours=14.,
+      ~minutes=33.,
+      ~seconds=22.,
+      (),
+    );
+  let f = Time.render(~now=testNow);
+  test("seconds ago", () => {
+    let date =
+      Js.Date.makeWithYMDHMS(
+        ~year=2019.,
+        ~month=0.,
+        ~date=23.,
+        ~hours=14.,
+        ~minutes=33.,
+        ~seconds=15.,
+        (),
+      );
+    expect(f(~date)) |> toBe("seconds ago");
+  });
+  test("same day ago", () => {
+    let date =
+      Js.Date.makeWithYMDHMS(
+        ~year=2019.,
+        ~month=0.,
+        ~date=23.,
+        ~hours=2.,
+        ~minutes=33.,
+        ~seconds=15.,
+        (),
+      );
+    expect(f(~date)) |> toBe("2:33am");
+  });
+  test("same day midnightish am", () => {
+    let date =
+      Js.Date.makeWithYMDHMS(
+        ~year=2019.,
+        ~month=0.,
+        ~date=23.,
+        ~hours=0.,
+        ~minutes=33.,
+        ~seconds=15.,
+        (),
+      );
+    expect(f(~date)) |> toBe("12:33am");
+  });
+  test("same day pm", () => {
+    let date =
+      Js.Date.makeWithYMDHMS(
+        ~year=2019.,
+        ~month=0.,
+        ~date=23.,
+        ~hours=13.,
+        ~minutes=33.,
+        ~seconds=15.,
+        (),
+      );
+    expect(f(~date)) |> toBe("1:33pm");
+  });
+  test("same day noonish pm", () => {
+    let date =
+      Js.Date.makeWithYMDHMS(
+        ~year=2019.,
+        ~month=0.,
+        ~date=23.,
+        ~hours=12.,
+        ~minutes=33.,
+        ~seconds=15.,
+        (),
+      );
+    expect(f(~date)) |> toBe("12:33pm");
+  });
+
+  test("further back ago", () => {
+    let date =
+      Js.Date.makeWithYMDHMS(
+        ~year=2018.,
+        ~month=5.,
+        ~date=23.,
+        ~hours=12.,
+        ~minutes=33.,
+        ~seconds=15.,
+        (),
+      );
+    expect(f(~date)) |> toBe("June 23rd - 12:33pm");
+  });
+});
