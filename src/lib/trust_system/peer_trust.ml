@@ -2,11 +2,6 @@ open Core
 open Async
 open Pipe_lib
 
-[%%import
-"../../config.mlh"]
-
-type exn += Insta_ban_during_tests
-
 module Trust_response = struct
   type t = Insta_ban | Trust_increase of float | Trust_decrease of float
 end
