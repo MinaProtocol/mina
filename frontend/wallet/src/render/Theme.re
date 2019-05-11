@@ -4,7 +4,14 @@ open Css;
 global("*", [boxSizing(`borderBox)]);
 
 module Colors = {
-  let hexToString = (`hex(s)) => s;
+  let string =
+    fun
+    | `rgb(r, g, b) => Printf.sprintf("rgb(%d,%d,%d)", r, g, b)
+    | `rgba(r, g, b, a) => Printf.sprintf("rgba(%d,%d,%d,%f)", r, g, b, a)
+    | `hsl(h, s, l) => Printf.sprintf("hsl(%d,%d%%,%d%%)", h, s, l)
+    | `hex(s) => Printf.sprintf("#%s", s)
+    | `hsla(h, s, l, a) =>
+      Printf.sprintf("hsla(%d,%d%%,%d%%,%f)", h, s, l, a);
 
   let bgColor = white;
 
@@ -19,6 +26,11 @@ module Colors = {
 
   let serpentine = `hex("479056");
 
+  let yeezy = `hex("C53131");
+
+  let slate = `hex("516679");
+  let slate20 = `rgba(81, 102, 121, 0.2);
+
   let sage = `hex("65906e");
   let blanco = `hex("e3e0d5");
 
@@ -31,6 +43,25 @@ module Colors = {
 module Typeface = {
   let lucidaGrande = fontFamily("LucidaGrande");
   let sansSerif = fontFamily("IBM Plex Sans, Sans-Serif");
+  let mono = fontFamily("OCR A Std, monospace");
+};
+
+module Text = {
+  let body =
+    style([
+      Typeface.sansSerif,
+      fontWeight(`medium),
+      fontSize(`rem(1.)),
+      lineHeight(`rem(1.5)),
+    ]);
+
+  let mono =
+    style([
+      Typeface.mono,
+      fontWeight(`medium),
+      fontSize(`rem(1.)),
+      lineHeight(`rem(1.5)),
+    ]);
 };
 
 module CssElectron = {

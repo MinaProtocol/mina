@@ -8,10 +8,12 @@ module Styles = {
       display(`inlineFlex),
       alignItems(`center),
       justifyContent(`center),
+      paddingTop(`px(2)),
       height(`rem(1.5)),
+      marginBottom(`px(4)),
       padding2(~v=`px(0), ~h=`rem(0.5)),
       borderRadius(`px(4)),
-      backgroundColor(lightgrey),
+      backgroundColor(Theme.Colors.slate20),
     ]);
 };
 
@@ -158,7 +160,7 @@ module ActorName = {
   let make = (~value: ViewModel.Actor.t) => {
     switch (value) {
     | Key(key) =>
-      <span className=Styles.pill>
+      <span className=Css.merge([Styles.pill, Theme.Text.mono])>
         {ReasonReact.string(PublicKey.toString(key))}
       </span>
     | Unknown => <span> {React.string("Unknown")} </span>
