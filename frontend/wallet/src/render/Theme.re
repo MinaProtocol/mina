@@ -30,6 +30,7 @@ module Colors = {
 
   let sage = `hex("65906e");
   let blanco = `hex("e3e0d5");
+  let modalDisableBgAlpha = a => `rgba((31, 45, 61, a));
 
   let headerBgColor = white;
   let headerGreyText = `hex("516679");
@@ -73,6 +74,7 @@ module Spacing = {
   let defaultPadding = padding(defaultSpacing);
   let headerHeight = `rem(4.);
   let footerHeight = `rem(5.);
+  let modalWidth = `rem(20.);
 };
 
 let notText = style([cursor(`default), userSelect(`none)]);
