@@ -15,7 +15,7 @@ let make = () => {
 
   <ActiveWalletProvider value=activeWalletContext>
     <SettingsProvider value=settingsContext>
-      <ReasonApollo.Provider client=Apollo.client>
+      <ReasonApollo.Provider client=Apollo.faker>
         <Window>
           <Header />
           <Main> <SideBar /> <Router /> </Main>
