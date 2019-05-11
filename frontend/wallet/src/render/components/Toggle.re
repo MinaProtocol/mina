@@ -13,11 +13,11 @@ module Styles = {
   let slider =
     style([
       position(`absolute),
-      backgroundColor(`hex("ccc")),
-      bottom(`px(0)),
-      left(`px(0)),
-      right(`px(0)),
-      top(`px(0)),
+      backgroundColor(Theme.Colors.slateAlpha(0.7)),
+      bottom(`zero),
+      left(`zero),
+      right(`zero),
+      top(`zero),
       transition(~duration=400, "all"),
       borderRadius(`px(12)),
       cursor(`pointer),
@@ -29,7 +29,7 @@ module Styles = {
         width(`rem(1.)),
         transition(~duration=400, "all"),
         backgroundColor(white),
-        unsafe("content", "\"\""),
+        contentRule("\"\""),
         borderRadius(`percent(50.)),
       ]),
     ]);
@@ -41,6 +41,9 @@ module Styles = {
         selector(" + div:before", [transform(`translateX(`rem(1.)))]),
       ]),
     ]);
+
+  let label = style([]);
+
 };
 
 [@react.component]

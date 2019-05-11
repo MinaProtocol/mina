@@ -13,7 +13,7 @@ module Styles = {
       marginBottom(`px(4)),
       padding2(~v=`px(0), ~h=`rem(0.5)),
       borderRadius(`px(4)),
-      backgroundColor(Theme.Colors.slate20),
+      backgroundColor(Theme.Colors.slateAlpha(0.2)),
     ]);
 };
 

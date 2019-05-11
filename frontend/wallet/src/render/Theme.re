@@ -28,9 +28,6 @@ module Colors = {
 
   let yeezy = `hex("C53131");
 
-  let slate = `hex("516679");
-  let slate20 = `rgba(81, 102, 121, 0.2);
-
   let sage = `hex("65906e");
   let blanco = `hex("e3e0d5");
 
