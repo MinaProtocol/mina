@@ -203,6 +203,17 @@ module Make (Message : Message_intf) : S with type msg := Message.msg = struct
 
   [%%endif]
 
+  let collect_errors writer f =
+    let monitor = Writer.monitor writer in
+    ignore (Monitor.detach_and_get_error_stream monitor) ;
+    choose
+      [ choice (Monitor.get_next_error monitor) (fun e -> Error e)
+      ; choice (try_with ~name:"Tcp.collect_errors" f) Fn.id ]
+
+  let close_connection_via_reader_and_writer reader writer =
+    Writer.close writer ~force_close:(Clock.after (sec 30.))
+    >>= fun () -> Reader.close reader
+
   let try_call_rpc t (peer : Peer.t) dispatch query =
     let call () =
       let socket = Async.Socket.(create Type.tcp) in
@@ -217,11 +228,18 @@ module Make (Message : Message_intf) : S with type msg := Message.msg = struct
             let fd = Socket.fd connected_socket in
             (Reader.create fd, Writer.create fd)
           in
-          create_connection_with_menu peer reader writer
-          >>=? fun conn ->
-          let result = dispatch conn query in
-          Async.Socket.shutdown connected_socket `Both ;
-          result )
+          let run () =
+            create_connection_with_menu peer reader writer
+            >>=? fun conn -> dispatch conn query
+          in
+          let res = collect_errors writer run in
+          Deferred.any
+            [ (res >>| fun (_ : ('a, exn) Result.t) -> ())
+            ; Reader.close_finished reader
+            ; Writer.close_finished writer ]
+          >>= fun () ->
+          close_connection_via_reader_and_writer reader writer
+          >>= fun () -> res >>| function Ok v -> v | Error e -> raise e )
       >>= function
       | Ok (Ok result) ->
           (* call succeeded, result is valid *)
