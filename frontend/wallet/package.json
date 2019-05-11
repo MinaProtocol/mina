@@ -7,10 +7,11 @@
     "@glennsl/bs-jest": "^0.4.8",
     "@glennsl/bs-json": "^3.0.0",
     "bs-css": "^8.0.2",
-    "bs-electron": "github:Schmavery/bs-electron#1ca016763511d6dd092b5d164f903594d8cbd524",
+    "bs-electron": "github:Schmavery/bs-electron#8cb95b74d861105f9025c29715aea3ffd4d84326",
     "bs-platform": "5.0.3",
     "graphql_ppx": "^0.2.8",
     "node-fetch": "^2.5.0",
+    "react-modal": "^3.8.1",
     "reason-apollo": "^0.16.0",
     "reason-react": "^0.7.0",
     "tablecloth-bucklescript": "file:./tablecloth/bs"

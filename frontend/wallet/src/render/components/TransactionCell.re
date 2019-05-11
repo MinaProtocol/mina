@@ -1,5 +1,22 @@
 open Tc;
 
+module Styles = {
+  open Css;
+
+  let pill =
+    style([
+      display(`inlineFlex),
+      alignItems(`center),
+      justifyContent(`center),
+      paddingTop(`px(2)),
+      height(`rem(1.5)),
+      marginBottom(`px(4)),
+      padding2(~v=`px(0), ~h=`rem(0.5)),
+      borderRadius(`px(4)),
+      backgroundColor(Theme.Colors.slateAlpha(0.2)),
+    ]);
+};
+
 module Transaction = {
   module RewardDetails = {
     type t = {
@@ -143,8 +160,10 @@ module ActorName = {
   let make = (~value: ViewModel.Actor.t) => {
     switch (value) {
     | Key(key) =>
-      <span> {ReasonReact.string(PublicKey.toString(key))} </span>
-    | Unknown => <span />
+      <span className=Css.merge([Styles.pill, Theme.Text.mono])>
+        {ReasonReact.string(PublicKey.toString(key))}
+      </span>
+    | Unknown => <span> {React.string("Unknown")} </span>
     | Minted =>
       <span className=Css.(style([backgroundColor(Theme.Colors.sage)]))>
         {ReasonReact.string("Minted")}
@@ -173,14 +192,13 @@ module TimeDisplay = {
 module Amount = {
   [@react.component]
   let make = (~decorated: bool, ~value: int) => {
-    <span>
+    <span className=Css.(style([alignSelf(`flexEnd)]))>
       <span
         className=Css.(
           style([
             Theme.Typeface.lucidaGrande,
             color(
-              value >= 0
-                ? Theme.Colors.serpentine : Theme.Colors.roseBud,
+              value >= 0 ? Theme.Colors.serpentine : Theme.Colors.roseBud,
             ),
           ])
         )>
@@ -196,7 +214,8 @@ module Amount = {
 
 module InfoSection = {
   [@react.component]
-  let make = (~expanded: bool, ~viewModel: ViewModel.t) => {
+  let make = (~viewModel: ViewModel.t) => {
+    let (expanded, setExpanded) = React.useState(() => false);
     let mainRow = message => {
       <div
         className=Css.(
@@ -207,37 +226,15 @@ module InfoSection = {
           ])
         )>
         <p> {ReasonReact.string(message)} </p>
-        <Amount decorated=false value={viewModel.amountDelta} />
       </div>;
     };
-    <div>
-      <div
-        className=Css.(style([display(`flex), justifyContent(`flexEnd)]))>
-        {expanded
-           ? <span> {ReasonReact.string({j|Collapse 🠻|j})} </span>
-           : (
-             switch (viewModel.info) {
-             | Memo(_, date)
-             | Empty(date)
-             | StakingReward(_, date) =>
-               <>
-                 {switch (viewModel.action) {
-                  | Transfer => <span />
-                  | Pending =>
-                    <span className=Css.(style([textTransform(`uppercase)]))>
-                      {ReasonReact.string("pending")}
-                    </span>
-                  | Failed =>
-                    <span className=Css.(style([textTransform(`uppercase)]))>
-                      {ReasonReact.string("failed")}
-                    </span>
-                  }}
-                 <TimeDisplay date />
-               </>
-             | MissingReceipts => <span />
-             }
-           )}
-      </div>
+    <div
+      onClick={_e =>
+        switch (viewModel.info) {
+        | StakingReward(_, _) => setExpanded(expanded => !expanded)
+        | _ => ()
+        }
+      }>
       {switch (viewModel.info) {
        | Memo(message, _) => mainRow(message)
        | Empty(_) => mainRow("")
@@ -271,51 +268,58 @@ module InfoSection = {
   };
 };
 
-// TODO: As suggested in https://github.com/CodaProtocol/coda/pull/2260 , we
-// should probably switch to CSS Grid
-//
-// We can represent one of these cells as a row in an HTML table in the
-// following manner:
-//
-// ┌────────┬────┬───────────┬─────────────────────────
-// │ Sender │ -> │ Recipient │ Info (including amount)
-//
-// The final column is info and amount in order to more easily support the
-// expanded view of the staking reward
+// These cells are returned as a fragment so that the parent container can
+// use a consistent grid layout to keep everything lined up.
 
 [@react.component]
 let make = (~transaction: Transaction.t, ~myWallets: list(PublicKey.t)) => {
-  let (expanded, setExpanded) = React.useState(() => false);
-
   let viewModel = ViewModel.ofTransaction(transaction, ~myWallets);
 
-  <tr
-    onClick={_e =>
-      switch (viewModel.info) {
-      | StakingReward(_, _) => setExpanded(expanded => !expanded)
-      | _ => ()
-      }
-    }>
-    <td className=Css.(style([verticalAlign(`baseline)]))>
+  <>
+    <span>
       <ActorName value={viewModel.sender} />
-    </td>
-    <td className=Css.(style([verticalAlign(`baseline)]))>
-      {ReasonReact.string(
-         switch (viewModel.action) {
-         | Transfer => "->"
-         | Pending => ">>"
-         | Failed => "x"
-         },
-       )}
-    </td>
-    <td className=Css.(style([verticalAlign(`baseline)]))>
-      <ActorName value={viewModel.recipient} />
-    </td>
-    <td
+      <div>
+        {ReasonReact.string(
+           switch (viewModel.action) {
+           | Transfer => " -> "
+           | Pending => " ... "
+           | Failed => " x "
+           },
+         )}
+        <ActorName value={viewModel.recipient} />
+      </div>
+    </span>
+    <span
       className=Css.(
         style([verticalAlign(`baseline), width(`percent(100.))])
       )>
-      <InfoSection expanded viewModel />
-    </td>
-  </tr>;
+      <InfoSection viewModel />
+    </span>
+    <span className=Css.(style([justifySelf(`flexEnd)]))>
+      <div
+        className=Css.(style([display(`flex), justifyContent(`flexEnd)]))>
+        {switch (viewModel.info) {
+         | Memo(_, date)
+         | Empty(date)
+         | StakingReward(_, date) =>
+           <>
+             {switch (viewModel.action) {
+              | Transfer => <span />
+              | Pending =>
+                <span className=Css.(style([textTransform(`uppercase)]))>
+                  {ReasonReact.string("pending")}
+                </span>
+              | Failed =>
+                <span className=Css.(style([textTransform(`uppercase)]))>
+                  {ReasonReact.string("failed")}
+                </span>
+              }}
+             <TimeDisplay date />
+           </>
+         | MissingReceipts => <span />
+         }}
+      </div>
+      <Amount decorated=false value={viewModel.amountDelta} />
+    </span>
+  </>;
 };

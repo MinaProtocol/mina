@@ -32,14 +32,16 @@ include Single.Make({
       let window =
         make(
           makeWindowConfig(
-            ~transparent=true,
             ~width=880,
             ~height=500,
+            ~minWidth=880,
+            ~minHeight=500,
             ~frame=false,
             ~fullscreenable=false,
             ~resizeable=false,
             ~title="Coda Wallet",
-            ~backgroundColor="#DD" ++ Theme.Colors.(hexToString(bgColor)),
+            ~titleBarStyle=`Hidden,
+            ~backgroundColor=Theme.Colors.(string(bgColor)),
             ~webPreferences=
               makeWebPreferences(
                 ~preload=
