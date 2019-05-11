@@ -1,6 +1,3 @@
-[%%import
-"../../config.mlh"]
-
 open Async_kernel
 open Core
 open Pipe_lib
@@ -295,35 +292,13 @@ end = struct
     | _ ->
         false
 
-  [%%if
-  fixup_localhost_for_testing]
-
-  let fixup_peer peer =
-    (* make sure the same calcuation is done in Coda_process.get_localhost *)
-    if Unix.Inet_addr.equal peer.Peer.host Unix.Inet_addr.localhost then
-      { peer with
-        host=
-          Unix.Inet_addr.of_string
-            (Printf.sprintf "127.0.0.%d" (peer.discovery_port - 23000)) }
-    else peer
-
-  [%%else]
-
-  let fixup_peer peer = peer
-
-  [%%endif]
-
   let live t (lives : (Peer.t * string) list) =
-    let peers, ss = List.unzip lives in
-    let fixedup_peers = List.map peers ~f:fixup_peer in
-    let fixedup_lives = List.zip_exn fixedup_peers ss in
     let unbanned_lives =
-      List.filter fixedup_lives ~f:(fun (peer, _) ->
+      List.filter lives ~f:(fun (peer, _) ->
           not (is_banned t.trust_system (Peer.to_discovery_host_and_port peer))
       )
     in
     List.iter unbanned_lives ~f:(fun (peer, kkey) ->
-        Stdlib.Printf.eprintf !"ADDING: %{sexp: Peer.t}\n%!" peer ;
         let _ = Peer.Table.add ~key:peer ~data:kkey t.peers in
         () ) ;
     if List.length unbanned_lives > 0 then
@@ -332,12 +307,9 @@ end = struct
     else Deferred.unit
 
   let dead t (deads : Peer.t list) =
-    let fixedup_deads = List.map deads ~f:fixup_peer in
-    List.iter fixedup_deads ~f:(fun peer ->
-        Stdlib.Printf.eprintf !"REMOVING: %{sexp: Peer.t}\n%!" peer ;
-        Peer.Table.remove t.peers peer ) ;
-    if List.length fixedup_deads > 0 then
-      Linear_pipe.write t.changes_writer (Peer.Event.Disconnect fixedup_deads)
+    List.iter deads ~f:(fun peer -> Peer.Table.remove t.peers peer) ;
+    if List.length deads > 0 then
+      Linear_pipe.write t.changes_writer (Peer.Event.Disconnect deads)
     else Deferred.unit
 
   let connect ~(initial_peers : Host_and_port.t list) ~(me : Peer.t) ~logger
@@ -345,10 +317,6 @@ end = struct
     let open Deferred.Or_error.Let_syntax in
     let filtered_peers =
       List.filter initial_peers ~f:(Fn.compose not (is_banned trust_system))
-    in
-    let _ =
-      List.iter filtered_peers
-        ~f:(Stdlib.Printf.eprintf !"INIT PEER: %{sexp: Host_and_port.t}\n%!")
     in
     let%map p = P.create ~initial_peers:filtered_peers ~me ~logger ~conf_dir in
     let peers = Peer.Table.create () in
@@ -366,7 +334,6 @@ end = struct
              List.partition_map lines ~f:(fun line ->
                  match String.split ~on:' ' line with
                  | [addr; kademliaKey; "on"] ->
-                     Stdlib.Printf.eprintf "ON ADDR: %s\n%!" addr ;
                      let addr = Host_and_port.of_string addr in
                      let discovery_port = Host_and_port.port addr in
                      let peer =
@@ -377,7 +344,6 @@ end = struct
                      in
                      `Fst (peer, kademliaKey)
                  | [addr; _; "off"] ->
-                     Stdlib.Printf.eprintf "OFF ADDR: %s\n%!" addr ;
                      let addr = Host_and_port.of_string addr in
                      let discovery_port = Host_and_port.port addr in
                      let peer =

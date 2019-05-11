@@ -25,7 +25,6 @@ let spawn_exn (config : Coda_worker.Input.t) =
 fixup_localhost_for_testing]
 
 let get_localhost ~discovery_port =
-  (* make sure this agrees with calculation in Kademlia.Membership.fixup_peer *)
   Printf.sprintf "127.0.0.%d" (discovery_port - 23000)
 
 [%%else]
