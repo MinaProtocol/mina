@@ -1,14 +1,9 @@
-/* open Tc; */
-
-type document;
-[@bs.send] external getElementById: (document, string) => Dom.element = "";
-[@bs.val] external document: document = "";
-
 module Styles = {
   open Css;
 
-  let inner =
+  let content =
     style([
+      outlineStyle(`none),
       width(Theme.Spacing.modalWidth),
       minHeight(`rem(10.)),
       backgroundColor(Theme.Colors.bgColor),
@@ -23,7 +18,7 @@ module Styles = {
       ),
     ]);
 
-  let outer =
+  let overlay =
     style([
       position(`fixed),
       left(`zero),
@@ -35,20 +30,33 @@ module Styles = {
       alignItems(`center),
       width(`percent(100.)),
       height(`percent(100.)),
-      backgroundColor(Theme.Colors.modalDisableBgAlpha(0.67))
+      backgroundColor(Theme.Colors.modalDisableBgAlpha(0.67)),
     ]);
 };
 
-[@react.component]
-let make = (~onClickOutside, ~children) => {
-  ReactDOMRe.createPortal(
-    <div className=Styles.outer onClick={_ => onClickOutside()}>
-      <div
-        className=Styles.inner
-        onClick={e => ReactEvent.Mouse.stopPropagation(e)}>
-        children
-      </div>
-    </div>,
-    getElementById(document, "modal"),
-  );
+module Binding = {
+  [@react.component] [@bs.module]
+  external make:
+    (
+      ~isOpen: bool,
+      ~onRequestClose: unit => unit,
+      ~contentLabel: string,
+      ~className: string=?,
+      ~overlayClassName: string=?,
+      ~children: React.element
+    ) =>
+    React.element =
+    "react-modal";
 };
+
+// Wrap react-modal with a default style
+[@react.component]
+let make = (~isOpen, ~onRequestClose, ~contentLabel, ~children) =>
+  <Binding
+    isOpen
+    onRequestClose
+    contentLabel
+    className=Styles.content
+    overlayClassName=Styles.overlay>
+    children
+  </Binding>;

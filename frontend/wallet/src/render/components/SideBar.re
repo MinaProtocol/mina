@@ -37,12 +37,17 @@ let make = () => {
     <button onClick={_ => setModalOpen(_ => true)}>
       {React.string("+ Add wallet")}
     </button>
-    {if (addWalletModalOpen) {
-       <Modal onClickOutside={() => setModalOpen(_ => false)}>
-         {React.string("testing modal")}
-       </Modal>;
-     } else {
-       React.null;
-     }}
+    <Modal
+      isOpen=addWalletModalOpen
+      contentLabel="Add Wallet"
+      onRequestClose={() => setModalOpen(_ => false)}>
+      {React.string("Add wallet:")}
+      <br />
+      <input type_="text" value="test" />
+      <br />
+      <button onClick={_ => setModalOpen(_ => false)}>
+        {React.string("Cancel")}
+      </button>
+    </Modal>
   </div>;
 };
