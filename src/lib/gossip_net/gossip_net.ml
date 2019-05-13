@@ -283,7 +283,7 @@ module Make (Message : Message_intf) : S with type msg := Message.msg = struct
               in
               remove_peer t peer ; Error err
           | _ ->
-              let%bind () =
+              let%map () =
                 Trust_system.(
                   record t.trust_system t.logger peer.host
                     Actions.
@@ -292,7 +292,7 @@ module Make (Message : Message_intf) : S with type msg := Message.msg = struct
                           ( "RPC call failed, reason: $exn"
                           , [("exn", `String (Error.to_string_hum err))] ) ))
               in
-              return (Error err) )
+              remove_peer t peer ; Error err )
       | Error monitor_exn -> (
           (* call itself failed *)
           (* TODO: learn what other exceptions are raised here *)
