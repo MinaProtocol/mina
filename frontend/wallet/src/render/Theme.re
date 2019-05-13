@@ -32,6 +32,7 @@ module Colors = {
   let midnight = `hex("1F2D3D");
   let marineLight = `rgba((51, 104, 151, 0.1));
   let marine = `hex("336897");
+  let jungle = `hex("2BAC46");
   let sage = `hex("65906e");
   let blanco = `hex("e3e0d5");
   let modalDisableBgAlpha = a => `rgba((31, 45, 61, a));
