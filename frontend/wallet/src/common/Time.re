@@ -28,29 +28,24 @@ let render = (~date, ~now) => {
   let militaryHours = int(Js.Date.getHours, date);
   let minutes = int(Js.Date.getMinutes, date);
 
-  let epsilon = 1000. *. 60.; // 60 seconds in millis
-  if (Js.Date.getTime(date) +. epsilon >= Js.Date.getTime(now)) {
-    "seconds ago";
-  } else {
-    let (hours, meridiem) =
-      if (militaryHours >= 12) {
-        (militaryHours == 12 ? militaryHours : militaryHours - 12, "pm");
-      } else {
-        (militaryHours == 0 ? 12 : militaryHours, "am");
-      };
-
-    let hoursMins = Printf.sprintf("%d:%02d%s", hours, minutes, meridiem);
-    if (Js.Date.getDay(date) == Js.Date.getDay(now)) {
-      hoursMins;
+  let (hours, meridiem) =
+    if (militaryHours >= 12) {
+      (militaryHours == 12 ? militaryHours : militaryHours - 12, "pm");
     } else {
-      let dateDay = int(Js.Date.getDate, date);
-      Printf.sprintf(
-        "%s %d%s - %s",
-        int(Js.Date.getMonth, date) |> monthOfIntExn,
-        dateDay,
-        thOfDate(dateDay),
-        hoursMins,
-      );
+      (militaryHours == 0 ? 12 : militaryHours, "am");
     };
+
+  let hoursMins = Printf.sprintf("%d:%02d%s", hours, minutes, meridiem);
+  if (Js.Date.getDay(date) == Js.Date.getDay(now)) {
+    hoursMins;
+  } else {
+    let dateDay = int(Js.Date.getDate, date);
+    Printf.sprintf(
+      "%s %d%s - %s",
+      int(Js.Date.getMonth, date) |> monthOfIntExn,
+      dateDay,
+      thOfDate(dateDay),
+      hoursMins,
+    );
   };
 };

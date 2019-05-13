@@ -115,19 +115,6 @@ describe("Time", () => {
       (),
     );
   let f = Time.render(~now=testNow);
-  test("seconds ago", () => {
-    let date =
-      Js.Date.makeWithYMDHMS(
-        ~year=2019.,
-        ~month=0.,
-        ~date=23.,
-        ~hours=14.,
-        ~minutes=33.,
-        ~seconds=15.,
-        (),
-      );
-    expect(f(~date)) |> toBe("seconds ago");
-  });
   test("same day ago", () => {
     let date =
       Js.Date.makeWithYMDHMS(
