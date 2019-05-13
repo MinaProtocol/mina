@@ -20,9 +20,8 @@ module Styles = {
 
 module StakingSwitch = {
   [@react.component]
-  let make = (~pubKey) => {
+  let make = () => {
     let (staking, setStaking) = React.useState(() => true);
-    let (settings, _) = React.useContext(SettingsProvider.context);
     <div
       className=Css.(
         style([
@@ -34,20 +33,14 @@ module StakingSwitch = {
       <Toggle value=staking onChange={_e => setStaking(staking => !staking)} />
       <span
         className=Css.(
-          style([
-            Theme.Typeface.sansSerif,
-            lineHeight(`rem(1.5)),
-            marginLeft(`rem(1.)),
-          ])
+          merge([
+            Theme.Text.body,
+            style([
+              color(staking ? Theme.Colors.serpentine : Theme.Colors.slateAlpha(0.7)),
+              marginLeft(`rem(1.)),
+            ])])
         )>
         {ReasonReact.string("Earn Coda > Vault")}
-      </span>
-      <span>
-        {ReasonReact.string(
-           settings
-           |> Option.andThen(~f=s => SettingsRenderer.lookup(s, pubKey))
-           |> Option.withDefault(~default=pubKey |> PublicKey.toString),
-         )}
       </span>
     </div>;
   };
@@ -92,9 +85,8 @@ module SendButton = {
 
 [@react.component]
 let make = () => {
-  let stakingKey = PublicKey.ofStringExn("131243123");
   <div className=Styles.footer>
-    <StakingSwitch pubKey=stakingKey />
+    <StakingSwitch />
     <div> <PublicKeyButton pubKeySelected=None /> <SendButton /> </div>
   </div>;
 };

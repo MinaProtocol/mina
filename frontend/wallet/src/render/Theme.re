@@ -25,9 +25,13 @@ module Colors = {
   let roseBud = `hex("a3536f");
 
   let serpentine = `hex("479056");
+  let serpentineLight = `rgba((101, 144, 110, 0.2));
 
   let yeezy = `hex("C53131");
 
+  let midnight = `hex("1F2D3D");
+  let marineLight = `rgba((51, 104, 151, 0.1));
+  let marine = `hex("336897");
   let sage = `hex("65906e");
   let blanco = `hex("e3e0d5");
   let modalDisableBgAlpha = a => `rgba((31, 45, 61, a));
@@ -40,17 +44,25 @@ module Colors = {
 
 module Typeface = {
   let lucidaGrande = fontFamily("LucidaGrande");
-  let sansSerif = fontFamily("IBM Plex Sans, Sans-Serif");
+  let plex = fontFamily("IBM Plex Sans, Sans-Serif");
   let mono = fontFamily("OCR A Std, monospace");
 };
 
 module Text = {
   let body =
     style([
-      Typeface.sansSerif,
+      Typeface.plex,
       fontWeight(`medium),
       fontSize(`rem(1.)),
       lineHeight(`rem(1.5)),
+    ]);
+
+  let smallHeader =
+    style([
+      Typeface.plex,
+      fontWeight(`normal),
+      fontSize(`rem(0.75)),
+      lineHeight(`rem(1.)),
     ]);
 
   let mono =
@@ -59,6 +71,8 @@ module Text = {
       fontWeight(`medium),
       fontSize(`rem(1.)),
       lineHeight(`rem(1.5)),
+      // Due to the font weirdness, we need to offset by 4px
+      paddingTop(`px(4)),
     ]);
 };
 
