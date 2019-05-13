@@ -11,7 +11,8 @@ type ConsensusState {
   estimatedPercentConfirmed: Float!
 }
 
-type Payment {
+type UserCommand {
+  isDelegation: Boolean,
   nonce: Int!,
   submittedAt: String! @fake(type: pastDate)
   includedAt: String @fake(type: pastDate)
@@ -22,8 +23,8 @@ type Payment {
   memo: String @fake(type:hackerPhrase)
 }
 
-type PaymentUpdate {
-  payment: Payment
+type UserCommandUpdate {
+  userCommand: UserCommand
   consensus: ConsensusState!
 }
 
@@ -58,7 +59,7 @@ type SnarkFeeUpdate {
 type Block {
   coinbase: String! @fake(type: money)
   creator: String! @examples(values: ["PUB_KEY_E9873DF4453213303DA61F2", "PUB_KEY_F1173DF4453213303DA61F2"])
-  payments: [Payment]!
+  userCommands: [UserCommand]!
   snarkFees: [SnarkFee]!
 }
 
@@ -85,24 +86,6 @@ type NodeStatus {
   network: String @examples(values: ["testnet"])
 }
 
-type Delegation {
-  nonce: String!, @fake(type: number)
-  submittedAt: String! @fake(type: pastDate)
-  includedAt: String @fake(type: pastDate)
-  from: String! @examples(values: ["PUB_KEY_E9873DF4453213303DA61F2", "PUB_KEY_F1173DF4453213303DA61F2"])
-  to: String! @examples(values: ["PUB_KEY_E9873DF4453213303DA61F2", "PUB_KEY_F1173DF4453213303DA61F2"])
-  fee: String!, @fake(type: money)
-  memo: String @fake(type:hackerPhrase)
-}
-
-type DelegationUpdate {
-  status: Delegation!
-
-  # We may have reached consensus but still be waiting for the correct epoch
-  active: Boolean!
-
-  consensus: ConsensusState!
-}
 
 ## Input types
 
@@ -136,7 +119,13 @@ input CreatePaymentInput {
   memo: String
 }
 
-input PaymentFilterInput {
+input CreateDelegationInput {
+  from: String!,
+  to: String,
+  fee: String!,
+}
+
+input UserCommandFilterInput {
   toOrFrom: String,
 }
 
@@ -148,17 +137,14 @@ input SetStakingInput {
   on: Boolean
 }
 
-input SetDelegationInput {
-  from: String!
-  to: String!
-  fee: String!
-  memo: String
-}
-
 ## Payload types
 
 type CreatePaymentPayload {
-  payment: Payment
+  payment: UserCommand
+}
+
+type CreateDelegationPayload {
+  delegation: UserCommand
 }
 
 type SetSnarkWorkerPayload {
@@ -170,7 +156,7 @@ type SetNetworkPayload {
 }
 
 type AddPaymentReceiptPayload {
-  payment: Payment
+  payment: UserCommand
 }
 
 type AddWalletPayload {
@@ -185,10 +171,6 @@ type SetStakingPayload {
   on: Boolean
 }
 
-type SetDelegationPayload {
-  delegation: Delegation
-}
-
 # Pagination types
 
 type PageInfo {
@@ -196,14 +178,14 @@ type PageInfo {
   hasNextPage: Boolean! @examples(values: [false])
 }
 
-type PaymentEdge {
+type UserCommandEdge {
   cursor: String
-  node: PaymentUpdate
+  node: UserCommandUpdate
 }
 
-type PaymentConnection {
-  edges: [PaymentEdge]
-  nodes: [PaymentUpdate]
+type UserCommandConnection {
+  edges: [UserCommandEdge]
+  nodes: [UserCommandUpdate]
   pageInfo: PageInfo!
   totalCount: Int
 }
@@ -229,12 +211,12 @@ type Query {
   # state to be the "real" balance
   balance(publicKey: String!, consensus: ConsensusStatus): String!
   
-  payments(
-    filter: PaymentFilterInput,
+  userCommand(
+    filter: UserCommandFilterInput,
     first: Int,
     after: String,
     last: Int,
-    before: String): PaymentConnection
+    before: String): UserCommandConnection
   
   blocks(
     filter: BlockFilterInput,
@@ -259,6 +241,8 @@ type Query {
 
 type Mutation {
   createPayment(input: CreatePaymentInput!): CreatePaymentPayload
+
+  createDelegation(input: CreateDelegationInput!): CreateDelegationPayload
   
   setSnarkWorker(input: SetSnarkWorkerInput!): SetSnarkWorkerPayload
   
@@ -275,7 +259,6 @@ type Mutation {
   deleteWallet(input: DeleteWalletInput!): DeleteWalletPayload
 
   setStaking(input: SetStakingInput!): SetStakingPayload
-  setDelegation(input: SetDelegationInput!): SetDelegationPayload
 }
 
 type Subscription {
@@ -283,15 +266,13 @@ type Subscription {
   newSyncUpdate: SyncUpdate!
   
   # Subscribe to payments for which this key is the sender or receiver
-  newPaymentUpdate(filterBySenderOrReceiver: String!): PaymentUpdate!
+  newUserCommandUpdate(filterBySenderOrReceiver: String!): UserCommandUpdate!
   
   # Subscribe all blocks created by `key`
   newBlock(key: String): BlockUpdate!
   
   # Subscribe to fees earned by key
   newSnarkFee(key: String): SnarkFee!
-  
-  newDelegationUpdate(publicKey: String): DelegationUpdate!
 }
 
 schema {
