@@ -123,6 +123,7 @@ input CreateDelegationInput {
   from: String!,
   to: String,
   fee: String!,
+  memo: String
 }
 
 input UserCommandFilterInput {
