@@ -1,10 +1,4 @@
 open Tc;
-let createClient = uri => {
-  let inMemoryCache = ApolloInMemoryCache.createInMemoryCache();
-  let httpLink =
-    ApolloLinks.createHttpLink(~uri, ~fetch=Bindings.Fetch.fetch, ());
-  ReasonApollo.createApolloClient(~link=httpLink, ~cache=inMemoryCache, ());
-};
 
 module CreateQuery = (Config: ReasonApolloTypes.Config) => {
   module ReasonApolloInternal = ReasonApolloQuery.Make(Config);
