@@ -6,8 +6,7 @@ let make = () => {
     newSettings => setSettings(Ok(newSettings)),
   );
 
-  let (activeWallet, setActiveWallet) =
-    React.useState(() => Some(PublicKey.ofStringExn("test1")));
+  let (activeWallet, setActiveWallet) = React.useState(() => None);
   let activeWalletContext = (
     activeWallet,
     newWallet => setActiveWallet(_ => Some(newWallet)),
