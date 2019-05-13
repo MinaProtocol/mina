@@ -25,7 +25,8 @@ let createTray = dispatch => {
       make(
         Label("Open"),
         ~accelerator="CmdOrCtrl+O",
-        ~click=() => AppWindow.deepLink({path: Route.Home, dispatch}),
+        ~click=
+          () => AppWindow.get({path: Route.Home, dispatch}) |> AppWindow.show,
         (),
       ),
       make(
