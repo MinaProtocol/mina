@@ -15,8 +15,7 @@ let lookup = (t, key) => Option.andThen(t, ~f=t => Settings.lookup(t, key));
 let entries = Settings.entries;
 
 let getWalletName = (t, key: PublicKey.t) =>
-  Option.andThen(t, ~f=t => Settings.lookup(t, key))
-  |> Option.withDefault(~default=PublicKey.prettyPrint(key));
+  lookup(t, key) |> Option.withDefault(~default=PublicKey.prettyPrint(key));
 
 let add = (t: Settings.t, ~key, ~name) => {
   let t' = Settings.set(t, ~key, ~name);
