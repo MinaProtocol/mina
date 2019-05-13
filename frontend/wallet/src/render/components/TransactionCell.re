@@ -219,11 +219,11 @@ module TimeDisplay = {
           whiteSpace(`nowrap),
           overflow(`hidden),
           textOverflow(`ellipsis),
-          maxWidth(`rem(6.0)),
+          maxWidth(`rem(10.0)),
         ])
       )>
-       {ReasonReact.string(Js.Date.toString(date))} </span>;
-      // TODO: Format properly
+      {ReasonReact.string(Time.render(~date, ~now=Js.Date.make()))}
+    </span>;
   };
 };
 
