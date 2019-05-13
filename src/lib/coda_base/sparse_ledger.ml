@@ -140,8 +140,10 @@ let apply_user_command_exn t ({sender; payload; signature= _} : User_command.t)
         |> Option.value_exn ?here:None ?error:None ?message:None }
   in
   match User_command.Payload.body payload with
-  | Stake_delegation (Set_delegate {new_delegate}) ->
+  | Stake_delegation {new_delegate} ->
       set_exn t sender_idx {sender_account with delegate= new_delegate}
+  | Chain_voting {voting_for} ->
+      set_exn t sender_idx {sender_account with voting_for}
   | Payment {amount; receiver} ->
       let t =
         set_exn t sender_idx

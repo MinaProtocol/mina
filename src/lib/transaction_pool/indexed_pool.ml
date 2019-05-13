@@ -53,7 +53,7 @@ let currency_consumed :
     match cmd'.payload.body with
     | Payment {amount; _} ->
         amount
-    | Stake_delegation _ ->
+    | Stake_delegation _ | Chain_voting _ ->
         zero)
 
 let currency_consumed' :

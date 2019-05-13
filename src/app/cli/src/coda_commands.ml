@@ -93,7 +93,7 @@ struct
       and cost =
         let fee = txn.payload.common.fee in
         match txn.payload.body with
-        | Stake_delegation (Set_delegate _) ->
+        | Stake_delegation _ | Chain_voting _ ->
             Some (Currency.Amount.of_fee fee)
         | Payment {amount; _} ->
             Currency.Amount.add_fee amount fee

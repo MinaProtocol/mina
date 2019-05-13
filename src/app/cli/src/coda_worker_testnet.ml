@@ -552,7 +552,7 @@ end = struct
           | Payment payment_payload ->
               ( Public_key.compress user_command.sender
               , payment_payload.receiver )
-          | Stake_delegation _ ->
+          | Stake_delegation _ | Chain_voting _ ->
               failwith "Expected a list of payments" )
       |> List.unzip
     in

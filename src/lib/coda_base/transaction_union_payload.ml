@@ -42,6 +42,8 @@ module Body = struct
              amount - fee should be defined. In other words,
              amount >= fee *)
             (Amount.of_fee fee, Amount.max_int)
+        | Chain_voting ->
+            (Amount.zero, Amount.zero)
       in
       Amount.gen_incl min max
     and public_key = Public_key.Compressed.gen in
@@ -63,12 +65,19 @@ module Body = struct
       ~value_of_hlist:(fun H_list.[tag; public_key; amount] ->
         {tag; public_key; amount} )
 
-  let of_user_command_payload_body = function
+  let of_user_command_payload_body : User_command_payload.Body.t -> t =
+    function
     | User_command_payload.Body.Payment {receiver; amount} ->
         {tag= Tag.Payment; public_key= receiver; amount}
-    | Stake_delegation (Set_delegate {new_delegate}) ->
+    | Stake_delegation {new_delegate} ->
         { tag= Tag.Stake_delegation
         ; public_key= new_delegate
+        ; amount= Currency.Amount.zero }
+    | Chain_voting {voting_for} ->
+        { tag= Tag.Chain_voting
+        ; public_key=
+            Public_key.Compressed.Poly.
+              {x= (voting_for :> Pedersen.Digest.t); is_odd= false}
         ; amount= Currency.Amount.zero }
 
   module Checked = struct
@@ -170,7 +179,7 @@ module Changes = struct
         ; receiver_increase= amount
         ; excess= Amount.Signed.of_unsigned (Amount.of_fee fee)
         ; supply_increase= Amount.zero }
-    | Stake_delegation ->
+    | Stake_delegation | Chain_voting ->
         { sender_delta=
             Amount.of_fee fee |> Amount.Signed.of_unsigned
             |> Amount.Signed.negate
@@ -312,13 +321,15 @@ let excess (payload : t) : Amount.Signed.t =
       |> Amount.Signed.of_unsigned |> Amount.Signed.negate
   | Coinbase ->
       Amount.Signed.zero
+  | Chain_voting ->
+      Amount.Signed.of_unsigned (Amount.of_fee fee)
 
 let supply_increase (payload : payload) =
   let tag = payload.body.tag in
   match tag with
   | Coinbase ->
       payload.body.amount
-  | Payment | Stake_delegation | Fee_transfer ->
+  | Payment | Stake_delegation | Fee_transfer | Chain_voting ->
       Amount.zero
 
 let%test_unit "fold_compatibility" =
