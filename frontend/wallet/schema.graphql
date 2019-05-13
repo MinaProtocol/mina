@@ -12,7 +12,7 @@ type ConsensusState {
 }
 
 type UserCommand {
-  isDelegation: Boolean,
+  isDelegation: Boolean!,
   nonce: Int!,
   submittedAt: String! @fake(type: pastDate)
   includedAt: String @fake(type: pastDate)
