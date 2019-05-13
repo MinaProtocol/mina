@@ -100,7 +100,7 @@ module Make (Commands : Coda_commands.Intf) = struct
               ~args:Arg.[]
               ~resolve:(fun _ payment ->
                 User_command_payload.memo @@ User_command.payload payment
-                |> User_command_memo.to_string ) ] )
+                |> User_command_memo.to_base64 ) ] )
 
     let snark_fee : (Program.t, Transaction_snark_work.t option) typ =
       obj "SnarkFee" ~fields:(fun _ ->

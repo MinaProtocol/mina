@@ -36,3 +36,7 @@ val max_size_in_bytes : int
 val create_exn : string -> t
 
 val to_string : t -> string
+
+val to_base64 : t -> string
+
+val of_base64_exn : string -> t
