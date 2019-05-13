@@ -24,7 +24,7 @@ module Styles = {
     merge([base, style([backgroundColor(Theme.Colors.serpentineLight)])]);
 
   let blue =
-    merge([base, style([backgroundColor(Theme.Colors.marineLight)])]);
+    merge([base, style([backgroundColor(Theme.Colors.marineAlpha(0.1))])]);
 };
 
 [@react.component]

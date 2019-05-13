@@ -30,9 +30,9 @@ module Styles = {
     merge([
       base,
       style([
-        backgroundColor(Theme.Colors.marineLight),
-        color(Theme.Colors.marine),
-        hover([backgroundColor(Theme.Colors.marine), color(white)]),
+        backgroundColor(Theme.Colors.marineAlpha(0.1)),
+        color(Theme.Colors.marineAlpha(1.)),
+        hover([backgroundColor(Theme.Colors.marineAlpha(1.)), color(white)]),
       ]),
     ]);
 
