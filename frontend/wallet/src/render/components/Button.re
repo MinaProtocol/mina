@@ -30,9 +30,9 @@ module Styles = {
     merge([
       base,
       style([
-        backgroundColor(lightblue),
-        color(white),
-        hover([backgroundColor(Theme.Colors.jungle)]),
+        backgroundColor(Theme.Colors.marineLight),
+        color(Theme.Colors.marine),
+        hover([backgroundColor(Theme.Colors.marine), color(white)]),
       ]),
     ]);
 
@@ -60,16 +60,17 @@ module Styles = {
     merge([
       base,
       style([
-        backgroundColor(grey),
-        color(white),
-        hover([backgroundColor(darkgrey)])
+        backgroundColor(Theme.Colors.slateAlpha(0.05)),
+        color(Theme.Colors.midnight),
+        hover([backgroundColor(Theme.Colors.slateAlpha(0.2))])
       ]),
     ]);
 };
 
 [@react.component]
-let make = (~label, ~style=Blue) =>
+let make = (~label, ~onClick=?, ~style=Blue) =>
   <button
+    ?onClick
     className={
       switch (style) {
       | Blue => Styles.blue

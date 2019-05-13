@@ -1,5 +1,3 @@
-open Tc;
-
 module Styles = {
   open Css;
 
@@ -36,9 +34,13 @@ module StakingSwitch = {
           merge([
             Theme.Text.body,
             style([
-              color(staking ? Theme.Colors.serpentine : Theme.Colors.slateAlpha(0.7)),
+              color(
+                staking
+                  ? Theme.Colors.serpentine : Theme.Colors.slateAlpha(0.7),
+              ),
               marginLeft(`rem(1.)),
-            ])])
+            ]),
+          ])
         )>
         {ReasonReact.string("Earn Coda > Vault")}
       </span>
@@ -49,7 +51,7 @@ module StakingSwitch = {
 [@react.component]
 let make = () => {
   <div className=Styles.footer>
-    <StakingSwitch pubKey=stakingKey />
+    <StakingSwitch />
     <Button label="Send" />
   </div>;
 };
