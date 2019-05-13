@@ -1,6 +1,6 @@
 ---
 title: Zero-knowledge Proofs&#58; An Intuitive Explanation
-date: 2019-04-02
+date: 2019-05-13
 author: Vanishree Rao
 ---
 
