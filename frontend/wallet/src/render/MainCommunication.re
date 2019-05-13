@@ -1,5 +1,4 @@
 open BsElectron;
-open Tc;
 
 include IpcRenderer.MakeIpcRenderer(Messages);
 
@@ -29,7 +28,7 @@ let listen = () => {
           (),
         )
       | `Deep_link(routeString) =>
-        Router.navigate(Route.parse(routeString) |> Option.getExn)
+ReasonReact.Router.push(routeString)
       };
   on(cb);
   cb;

@@ -3,17 +3,14 @@ open Tc;
 module Styles = {
   open Css;
 
-  let container =
-    style([
-      height(`percent(100.)),
-    ]);
+  let container = style([height(`percent(100.))]);
 
   let row =
     style([
       display(`grid),
       gridTemplateColumns([`rem(16.), `fr(1.), `px(200)]),
       gridGap(Theme.Spacing.defaultSpacing),
-      alignItems(`center),
+      alignItems(`flexStart),
       padding(`rem(1.)),
       borderBottom(`px(1), `solid, Theme.Colors.borderColor),
       lastChild([borderBottom(`px(0), `solid, white)]),
@@ -24,17 +21,19 @@ module Styles = {
       padding2(~v=`px(0), ~h=`rem(1.)),
       textTransform(`uppercase),
       height(`rem(2.)),
+      alignItems(`center),
+      color(Theme.Colors.slateAlpha(1.)),
     ]);
 
   let body =
     style([
       width(`percent(100.)),
       overflow(`auto),
-      maxHeight(`calc(`sub, `percent(100.), `rem(2.))),
+      maxHeight(`calc((`sub, `percent(100.), `rem(2.)))),
     ]);
 };
 
-let myWallets = [PublicKey.ofStringExn("123456789")];
+let myWallets = [PublicKey.ofStringExn("PUB_KEY_E9873DF4453213303DA61F2")];
 let otherKey = PublicKey.ofStringExn("BDK342322");
 
 let mockTransactions =
@@ -110,7 +109,12 @@ let mockTransactions =
 [@react.component]
 let make = () =>
   <div className=Styles.container>
-    <div className={Css.merge([Styles.row, Styles.headerRow])}>
+    <div
+      className={Css.merge([
+        Styles.row,
+        Theme.Text.smallHeader,
+        Styles.headerRow,
+      ])}>
       <span> {ReasonReact.string("Sender")} </span>
       <span> {ReasonReact.string("Memo")} </span>
       <span className=Css.(style([textAlign(`right)]))>
@@ -118,14 +122,14 @@ let make = () =>
       </span>
     </div>
     <div className=Styles.body>
-    {Array.map(
-       ~f=
-         transaction =>
-           <div className=Styles.row>
-             <TransactionCell transaction myWallets />
-           </div>,
-       mockTransactions,
-     )
-     |> React.array}
-     </div>
+      {Array.map(
+         ~f=
+           transaction =>
+             <div className=Styles.row>
+               <TransactionCell transaction myWallets />
+             </div>,
+         mockTransactions,
+       )
+       |> React.array}
+    </div>
   </div>;
