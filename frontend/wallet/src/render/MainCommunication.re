@@ -27,8 +27,7 @@ let listen = () => {
           CallTable.Ident.Decode.t(ident, Messages.Typ.Unit),
           (),
         )
-      | `Deep_link(routeString) =>
-ReasonReact.Router.push(routeString)
+      | `Deep_link(routeString) => ReasonReact.Router.push(routeString)
       };
   on(cb);
   cb;
