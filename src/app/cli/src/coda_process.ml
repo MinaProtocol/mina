@@ -22,7 +22,7 @@ let spawn_exn (config : Coda_worker.Input.t) =
   return (conn, process, config)
 
 [%%if
-fixup_localhost_for_testing]
+fixup_localhost_ips_for_testing]
 
 let get_localhost ~discovery_port =
   Printf.sprintf "127.0.0.%d" (discovery_port - 23000)

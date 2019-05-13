@@ -16,8 +16,7 @@ module Styles = {
 };
 
 [@react.component]
-let make = (~wallets) => {
+let make = (~wallets) =>
   <div className=Styles.container>
     {React.array(Array.map(~f=wallet => <WalletItem wallet />, wallets))}
   </div>;
-};

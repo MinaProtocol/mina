@@ -164,11 +164,13 @@ module Make (Message : Message_intf) : S with type msg := Message.msg = struct
     Int.equal (Unix.Error.compare errno unix_errno) 0
 
   [%%if
-  fixup_localhost_for_testing]
+  fixup_localhost_ips_for_testing]
+
+  let start_port = 9501
+
+  let stop_port = 9801
 
   let get_available_port =
-    let start_port = 9001 in
-    let stop_port = 10000 in
     let port = ref start_port in
     let reset () = port := start_port in
     fun () ->
@@ -179,7 +181,7 @@ module Make (Message : Message_intf) : S with type msg := Message.msg = struct
 
   (* bind socket to current host *)
   let bind_socket t sock =
-    let max_bind_tries = 1000 in
+    let max_bind_tries = stop_port - start_port + 1 in
     let rec try_addr n =
       if n > max_bind_tries then
         failwith "Could not bind socket to local address" ;
@@ -196,50 +198,51 @@ module Make (Message : Message_intf) : S with type msg := Message.msg = struct
     in
     try_addr 0
 
+  let get_socket t =
+    let socket = Async.Socket.(create Type.tcp) in
+    bind_socket t socket
+
   [%%else]
 
-  (* don't actually bind socket here *)
-  let bind_socket _t sock = sock
+  (* don't bind socket *)
+  let get_socket _t = Async.Socket.(create Type.tcp)
 
   [%%endif]
 
-  let collect_errors writer f =
-    let monitor = Writer.monitor writer in
-    ignore (Monitor.detach_and_get_error_stream monitor) ;
-    choose
-      [ choice (Monitor.get_next_error monitor) (fun e -> Error e)
-      ; choice (try_with ~name:"Tcp.collect_errors" f) Fn.id ]
-
-  let close_connection_via_reader_and_writer reader writer =
-    Writer.close writer ~force_close:(Clock.after (sec 30.))
-    >>= fun () -> Reader.close reader
-
   let try_call_rpc t (peer : Peer.t) dispatch query =
+    (* use error collection, close connection strategy of Tcp.with_connection *)
+    let collect_errors writer f =
+      let monitor = Writer.monitor writer in
+      ignore (Monitor.detach_and_get_error_stream monitor) ;
+      choose
+        [ choice (Monitor.get_next_error monitor) (fun e -> Error e)
+        ; choice (try_with ~name:"Tcp.collect_errors" f) Fn.id ]
+    in
+    let close_connection reader writer =
+      Writer.close writer ~force_close:(Clock.after (sec 30.))
+      >>= fun () -> Reader.close reader
+    in
     let call () =
-      let socket = Async.Socket.(create Type.tcp) in
-      (* maybe bind socket for testing *)
-      let maybe_bound_socket = bind_socket t socket in
       try_with (fun () ->
+          let socket = get_socket t in
           let peer_addr = `Inet (peer.host, peer.communication_port) in
-          let%bind connected_socket =
-            Async.Socket.connect maybe_bound_socket peer_addr
-          in
+          let%bind connected_socket = Async.Socket.connect socket peer_addr in
           let reader, writer =
             let fd = Socket.fd connected_socket in
             (Reader.create fd, Writer.create fd)
           in
-          let run () =
+          let run_query () =
             create_connection_with_menu peer reader writer
             >>=? fun conn -> dispatch conn query
           in
-          let res = collect_errors writer run in
+          let result = collect_errors writer run_query in
           Deferred.any
-            [ (res >>| fun (_ : ('a, exn) Result.t) -> ())
+            [ (result >>| fun (_ : ('a, exn) Result.t) -> ())
             ; Reader.close_finished reader
             ; Writer.close_finished writer ]
           >>= fun () ->
-          close_connection_via_reader_and_writer reader writer
-          >>= fun () -> res >>| function Ok v -> v | Error e -> raise e )
+          close_connection reader writer
+          >>= fun () -> result >>| function Ok v -> v | Error e -> raise e )
       >>= function
       | Ok (Ok result) ->
           (* call succeeded, result is valid *)
@@ -280,7 +283,7 @@ module Make (Message : Message_intf) : S with type msg := Message.msg = struct
               in
               remove_peer t peer ; Error err
           | _ ->
-              let%bind () =
+              let%map () =
                 Trust_system.(
                   record t.trust_system t.logger peer.host
                     Actions.
@@ -289,7 +292,7 @@ module Make (Message : Message_intf) : S with type msg := Message.msg = struct
                           ( "RPC call failed, reason: $exn"
                           , [("exn", `String (Error.to_string_hum err))] ) ))
               in
-              return (Error err) )
+              remove_peer t peer ; Error err )
       | Error monitor_exn -> (
           (* call itself failed *)
           (* TODO: learn what other exceptions are raised here *)
