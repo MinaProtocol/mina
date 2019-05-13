@@ -10,7 +10,9 @@ module type S = sig
 
   type _ Request.t +=
     | Get_path : Account.Index.t -> path Request.t
-    | Get_element : Account.Index.t -> (Account.t * path) Request.t
+    | Get_element :
+        [< `Curr_ledger | `Epoch_ledger] * Account.Index.t
+        -> (Account.t * path) Request.t
     | Set : Account.Index.t * Account.t -> unit Request.t
     | Find_index : Public_key.Compressed.t -> Account.Index.t Request.t
 
@@ -31,11 +33,12 @@ module type S = sig
           -> (Account.var, 's) Checked.t)
     -> (var, 's) Checked.t
 
-  val modify_account_recv :
+  val modify_or_get_account_recv :
        var
     -> Public_key.Compressed.var
     -> f:(   is_empty_and_writeable:Boolean.var
           -> Account.var
           -> (Account.var, 's) Checked.t)
-    -> (var, 's) Checked.t
+    -> tag:[< `Curr_ledger | `Epoch_ledger]
+    -> (var * Account.var, 's) Checked.t
 end

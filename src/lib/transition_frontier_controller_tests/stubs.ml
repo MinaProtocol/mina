@@ -203,12 +203,17 @@ struct
           ~self:largest_account_public_key ~transactions_by_fee:transactions
           ~get_completed_work
       in
+      let epoch_ledger =
+        Genesis_ledger.t
+        |> Ledger.Any_ledger.cast (module Ledger)
+        |> Sparse_ledger.of_any_ledger
+      in
       let%bind ( `Hash_after_applying next_staged_ledger_hash
                , `Ledger_proof ledger_proof_opt
                , `Staged_ledger _
                , `Pending_coinbase_data _ ) =
         Staged_ledger.apply_diff_unchecked parent_staged_ledger
-          staged_ledger_diff
+          staged_ledger_diff ~epoch_ledger
         |> Deferred.Or_error.ok_exn
       in
       let previous_transition_with_hash =
@@ -265,7 +270,7 @@ struct
         Transition_frontier.Breadcrumb.build ~logger ~trust_system
           ~parent:parent_breadcrumb
           ~transition_with_hash:next_verified_external_transition_with_hash
-          ~sender:None
+          ~sender:None ~epoch_ledger
       with
       | Ok new_breadcrumb ->
           Logger.info logger ~module_:__MODULE__ ~location:__LOC__

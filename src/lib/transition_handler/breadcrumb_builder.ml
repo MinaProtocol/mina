@@ -77,11 +77,15 @@ module Make (Inputs : Inputs.S) :
                                equal to current external transition's parent \
                                hash"))
                   in
+                  let epoch_ledger =
+                    Transition_frontier.consensus_local_state frontier
+                    |> Consensus.Data.Local_state.get_last_epoch_ledger
+                  in
                   let open Deferred.Let_syntax in
                   match%bind
                     Transition_frontier.Breadcrumb.build ~logger ~trust_system
                       ~parent ~transition_with_hash:transition
-                      ~sender:(Some sender)
+                      ~sender:(Some sender) ~epoch_ledger
                   with
                   | Ok new_breadcrumb ->
                       let open Result.Let_syntax in

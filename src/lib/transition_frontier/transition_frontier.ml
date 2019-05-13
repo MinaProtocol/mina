@@ -16,6 +16,7 @@ module Make (Inputs : Inputs_intf) :
    and type ledger_database := Ledger.Db.t
    and type staged_ledger_diff := Inputs.Staged_ledger_diff.t
    and type staged_ledger := Inputs.Staged_ledger.t
+   and type sparse_ledger := Sparse_ledger.t
    and type masked_ledger := Ledger.Mask.Attached.t
    and type transaction_snark_scan_state := Inputs.Staged_ledger.Scan_state.t
    and type consensus_local_state := Consensus.Data.Local_state.t
@@ -78,7 +79,8 @@ struct
 
     let copy t = {t with staged_ledger= Staged_ledger.copy t.staged_ledger}
 
-    let build ~logger ~trust_system ~parent ~transition_with_hash ~sender =
+    let build ~logger ~trust_system ~parent ~transition_with_hash ~sender
+        ~epoch_ledger =
       O1trace.measure "Breadcrumb.build" (fun () ->
           let open Deferred.Result.Let_syntax in
           let staged_ledger = parent.staged_ledger in
@@ -98,7 +100,7 @@ struct
                    , `Pending_coinbase_data _ ) =
             let open Deferred.Let_syntax in
             match%bind
-              Staged_ledger.apply ~logger staged_ledger
+              Staged_ledger.apply ~epoch_ledger ~logger staged_ledger
                 (External_transition.Verified.staged_ledger_diff transition)
             with
             | Ok x ->

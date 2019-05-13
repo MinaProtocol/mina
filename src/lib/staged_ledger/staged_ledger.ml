@@ -452,7 +452,8 @@ end = struct
       ; proof_type= `Base }
     , pending_coinbase_after )
 
-  let apply_transaction_and_get_witness ledger current_stack s =
+  let apply_transaction_and_get_witness ~curr_ledger ~epoch_ledger
+      current_stack s =
     let open Deferred.Let_syntax in
     let public_keys = function
       | Transaction.Fee_transfer t ->
@@ -467,31 +468,33 @@ end = struct
           in
           c.proposer :: ft_receivers
     in
-    let ledger_witness =
+    let curr_ledger_witness =
       measure "sparse ledger" (fun () ->
-          Sparse_ledger.of_ledger_subset_exn ledger (public_keys s) )
+          Sparse_ledger.of_ledger_subset_exn curr_ledger (public_keys s) )
     in
     let%bind () = Async.Scheduler.yield () in
     let r =
       measure "apply+stmt" (fun () ->
-          apply_transaction_and_get_statement ledger current_stack s )
+          apply_transaction_and_get_statement curr_ledger current_stack s )
     in
     let%map () = Async.Scheduler.yield () in
     let open Result.Let_syntax in
     let%map undo, statement, updated_coinbase_stack = r in
     ( { Scan_state.Transaction_with_witness.transaction_with_info= undo
-      ; witness= {ledger= ledger_witness}
+      ; witness= {curr_ledger= curr_ledger_witness; epoch_ledger}
       ; statement }
     , updated_coinbase_stack )
 
-  let update_ledger_and_get_statements ledger current_stack ts =
+  let update_ledger_and_get_statements ~curr_ledger ~epoch_ledger current_stack
+      ts =
     let open Deferred.Let_syntax in
     let rec go coinbase_stack acc = function
       | [] ->
           return (Ok (List.rev acc, coinbase_stack))
       | t :: ts -> (
           match%bind
-            apply_transaction_and_get_witness ledger coinbase_stack t
+            apply_transaction_and_get_witness ~curr_ledger ~epoch_ledger
+              coinbase_stack t
           with
           | Ok (res, updated_coinbase_stack) ->
               go updated_coinbase_stack (res :: acc) ts
@@ -762,7 +765,7 @@ end = struct
       ~f:(fun _ -> check (List.drop data partitions.first) partitions)
       partitions.second
 
-  let update_coinbase_stack_and_get_data scan_state ledger
+  let update_coinbase_stack_and_get_data scan_state ~curr_ledger ~epoch_ledger
       pending_coinbase_collection transactions =
     let open Deferred.Result.Let_syntax in
     let coinbase_exists ~get_transaction txns =
@@ -797,7 +800,8 @@ end = struct
           |> Deferred.return
         in
         let%map data, updated_stack =
-          update_ledger_and_get_statements ledger working_stack transactions
+          update_ledger_and_get_statements ~curr_ledger ~epoch_ledger
+            working_stack transactions
         in
         (is_new_stack, data, `Update_one updated_stack)
     | Some _ ->
@@ -812,7 +816,8 @@ end = struct
           |> Deferred.return
         in
         let%bind data1, updated_stack1 =
-          update_ledger_and_get_statements ledger working_stack1
+          update_ledger_and_get_statements ~curr_ledger ~epoch_ledger
+            working_stack1
             (List.take transactions first)
         in
         let%bind working_stack2 =
@@ -820,7 +825,8 @@ end = struct
           |> Deferred.return
         in
         let%bind data2, updated_stack2 =
-          update_ledger_and_get_statements ledger working_stack2
+          update_ledger_and_get_statements ~curr_ledger ~epoch_ledger
+            working_stack2
             (List.drop transactions first)
         in
         let%map first_has_coinbase =
@@ -909,7 +915,7 @@ end = struct
 
   (* N.B.: we don't expose apply_diff_unverified
      in For_tests only, we expose apply apply_unverified, which calls apply_diff_unverified *)
-  let apply_diff t (sl_diff : Staged_ledger_diff.t) ~logger =
+  let apply_diff t (sl_diff : Staged_ledger_diff.t) ~epoch_ledger ~logger =
     let open Deferred.Result.Let_syntax in
     let max_throughput =
       Int.pow 2
@@ -976,8 +982,8 @@ end = struct
       , p1.coinbases @ p2.coinbases )
     in
     let%bind is_new_stack, data, stack_update =
-      update_coinbase_stack_and_get_data scan_state' new_ledger
-        t.pending_coinbase_collection transactions
+      update_coinbase_stack_and_get_data scan_state' ~curr_ledger:new_ledger
+        ~epoch_ledger t.pending_coinbase_collection transactions
     in
     let%bind () = check_completed_works scan_state' works in
     let%bind () = Deferred.return (check_zero_fee_excess scan_state' data) in
@@ -1027,7 +1033,8 @@ end = struct
     , `Staged_ledger new_staged_ledger
     , `Pending_coinbase_data (is_new_stack, coinbase_amount) )
 
-  let apply t witness ~logger = apply_diff t witness ~logger
+  let apply t witness ~epoch_ledger ~logger =
+    apply_diff t witness ~epoch_ledger ~logger
 
   let ok_exn' (t : ('a, Staged_ledger_error.t) Result.t) =
     match t with
@@ -1071,7 +1078,8 @@ end = struct
     (transactions, txn_works, coinbase_parts)
 
   let apply_diff_unchecked t
-      (sl_diff : Staged_ledger_diff.With_valid_signatures_and_proofs.t) =
+      (sl_diff : Staged_ledger_diff.With_valid_signatures_and_proofs.t)
+      ~epoch_ledger =
     let open Deferred.Or_error.Let_syntax in
     let apply_pre_diff_with_at_most_two
         (pre_diff1 :
@@ -1116,8 +1124,8 @@ end = struct
     let%bind is_new_stack, data, updated_coinbase_stack =
       let open Deferred.Let_syntax in
       let%bind x =
-        update_coinbase_stack_and_get_data scan_state' new_ledger
-          t.pending_coinbase_collection transactions
+        update_coinbase_stack_and_get_data scan_state' ~curr_ledger:new_ledger
+          ~epoch_ledger t.pending_coinbase_collection transactions
       in
       Staged_ledger_error.to_or_error x |> Deferred.return
     in
@@ -2689,7 +2697,8 @@ let%test_module "test" =
         module Stable = struct
           module V1 = struct
             module T = struct
-              type t = {ledger: Sparse_ledger.t}
+              type t =
+                {curr_ledger: Sparse_ledger.t; epoch_ledger: Sparse_ledger.t}
               [@@deriving bin_io, sexp, version {for_test}]
             end
 
@@ -2699,7 +2708,9 @@ let%test_module "test" =
           module Latest = V1
         end
 
-        type t = Stable.Latest.t = {ledger: Sparse_ledger.t} [@@deriving sexp]
+        type t = Stable.Latest.t =
+          {curr_ledger: Sparse_ledger.t; epoch_ledger: Sparse_ledger.t}
+        [@@deriving sexp]
       end
     end
 
@@ -2748,7 +2759,7 @@ let%test_module "test" =
               , `Ledger_proof ledger_proof
               , `Staged_ledger sl'
               , `Pending_coinbase_data _ ) =
-        match%map Sl.apply !sl diff' ~logger with
+        match%map Sl.apply !sl diff' ~epoch_ledger:0 ~logger with
         | Ok x ->
             x
         | Error e ->
@@ -2986,7 +2997,7 @@ let%test_module "test" =
                   (Sequence.to_list work_done)
                   partitions
               in
-              match%map Sl.apply !sl diff ~logger with
+              match%map Sl.apply !sl diff ~epoch_ledger:0 ~logger with
               | Error (Sl.Staged_ledger_error.Non_zero_fee_excess _) ->
                   ()
               | Error _ ->
@@ -3270,7 +3281,7 @@ let%test_module "test" =
                         , `Ledger_proof _
                         , `Staged_ledger sl'
                         , `Pending_coinbase_data _ ) =
-                  match%map Sl.apply !sl diff' ~logger with
+                  match%map Sl.apply !sl diff' ~epoch_ledger:0 ~logger with
                   | Ok x ->
                       x
                   | Error e ->

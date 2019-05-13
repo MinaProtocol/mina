@@ -206,25 +206,40 @@ let apply_transaction_exn t (transition : Transaction.t) =
 
 let merkle_root t = Ledger_hash.of_hash (merkle_root t :> Pedersen.Digest.t)
 
-let handler t =
-  let ledger = ref t in
-  let path_exn idx =
-    List.map (path_exn !ledger idx) ~f:(function `Left h -> h | `Right h -> h)
+let handler ~curr_ledger ~epoch_ledger =
+  let curr_ledger_ref = ref curr_ledger in
+  let curr_ledger_path_exn idx =
+    List.map (path_exn !curr_ledger_ref idx) ~f:(function
+      | `Left h ->
+          h
+      | `Right h ->
+          h )
+  in
+  let epoch_ledger_path_exn idx =
+    List.map (path_exn epoch_ledger idx) ~f:(function
+      | `Left h ->
+          h
+      | `Right h ->
+          h )
   in
   stage (fun (With {request; respond}) ->
       match request with
-      | Ledger_hash.Get_element idx ->
-          let elt = get_exn !ledger idx in
-          let path = (path_exn idx :> Pedersen.Digest.t list) in
+      | Ledger_hash.Get_element (`Curr_ledger, idx) ->
+          let elt = get_exn !curr_ledger_ref idx in
+          let path = (curr_ledger_path_exn idx :> Pedersen.Digest.t list) in
+          respond (Provide (elt, path))
+      | Ledger_hash.Get_element (`Epoch_ledger, idx) ->
+          let elt = get_exn epoch_ledger idx in
+          let path = (epoch_ledger_path_exn idx :> Pedersen.Digest.t list) in
           respond (Provide (elt, path))
       | Ledger_hash.Get_path idx ->
-          let path = (path_exn idx :> Pedersen.Digest.t list) in
+          let path = (curr_ledger_path_exn idx :> Pedersen.Digest.t list) in
           respond (Provide path)
       | Ledger_hash.Set (idx, account) ->
-          ledger := set_exn !ledger idx account ;
+          curr_ledger_ref := set_exn !curr_ledger_ref idx account ;
           respond (Provide ())
       | Ledger_hash.Find_index pk ->
-          let index = find_index_exn !ledger pk in
+          let index = find_index_exn !curr_ledger_ref pk in
           respond (Provide index)
       | _ ->
           unhandled )

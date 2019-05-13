@@ -17,6 +17,7 @@ module type Inputs_intf = sig
      and type transaction_snark_scan_state := Staged_ledger.Scan_state.t
      and type staged_ledger_diff := Staged_ledger_diff.t
      and type staged_ledger := Staged_ledger.t
+     and type sparse_ledger := Sparse_ledger.t
      and type consensus_local_state := Consensus.Data.Local_state.t
      and type user_command := User_command.t
      and type diff_mutant :=

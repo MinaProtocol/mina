@@ -370,6 +370,13 @@ module Data = struct
       | Curr_epoch_snapshot ->
           t.curr_epoch_snapshot
 
+    let get_last_epoch_ledger t : Coda_base.Sparse_ledger.t =
+      match t.last_epoch_snapshot with
+      | Some {ledger; _} ->
+          ledger
+      | None ->
+          t.genesis_epoch_snapshot.ledger
+
     let set_snapshot t id v =
       match id with
       | Last_epoch_snapshot ->

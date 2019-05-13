@@ -185,7 +185,8 @@ end
 module type Transaction_witness_intf = sig
   type sparse_ledger
 
-  type t = {ledger: sparse_ledger} [@@deriving sexp]
+  type t = {curr_ledger: sparse_ledger; epoch_ledger: sparse_ledger}
+  [@@deriving sexp]
 
   module Stable : sig
     module V1 : sig
@@ -1001,6 +1002,8 @@ module type Staged_ledger_base_intf = sig
   (** The ledger in a staged ledger is always a mask *)
   type ledger
 
+  type sparse_ledger
+
   type ledger_proof_statement
 
   type public_key
@@ -1098,6 +1101,7 @@ module type Staged_ledger_base_intf = sig
   val apply :
        t
     -> diff
+    -> epoch_ledger:sparse_ledger
     -> logger:Logger.t
     -> ( [`Hash_after_applying of staged_ledger_hash]
          * [`Ledger_proof of (ledger_proof * transaction list) option]
@@ -1109,6 +1113,7 @@ module type Staged_ledger_base_intf = sig
   val apply_diff_unchecked :
        t
     -> valid_diff
+    -> epoch_ledger:sparse_ledger
     -> ( [`Hash_after_applying of staged_ledger_hash]
        * [`Ledger_proof of (ledger_proof * transaction list) option]
        * [`Staged_ledger of t]
@@ -1129,8 +1134,6 @@ module type Staged_ledger_intf = sig
   type user_command_with_valid_signature
 
   type ledger_proof_statement_set
-
-  type sparse_ledger
 
   type completed_work_checked
 
@@ -1543,6 +1546,8 @@ module type External_transition_validation_intf = sig
 
   type staged_ledger
 
+  type sparse_ledger
+
   type staged_ledger_error
 
   type transition_frontier
@@ -1631,6 +1636,7 @@ module type External_transition_validation_intf = sig
        with_transition
     -> logger:Logger.t
     -> parent_staged_ledger:staged_ledger
+    -> epoch_ledger:sparse_ledger
     -> ( ( 'time_received
          , 'proof
          , 'frontier_dependencies

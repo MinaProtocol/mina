@@ -110,6 +110,7 @@ module type Inputs_intf = sig
      and type external_transition_verified := External_transition.Verified.t
      and type ledger_database := Ledger_db.t
      and type staged_ledger := Staged_ledger.t
+     and type sparse_ledger := Sparse_ledger.t
      and type staged_ledger_diff := Staged_ledger_diff.t
      and type transaction_snark_scan_state := Staged_ledger.Scan_state.t
      and type masked_ledger := Masked_ledger.t
@@ -268,8 +269,8 @@ module Make (Inputs : Inputs_intf) :
       t.timeout <- Some timeout
   end
 
-  let generate_next_state ~previous_protocol_state ~time_controller
-      ~staged_ledger ~transactions ~get_completed_work ~logger
+  let generate_next_state ~previous_protocol_state ~consensus_local_state
+      ~time_controller ~staged_ledger ~transactions ~get_completed_work ~logger
       ~(keypair : Keypair.t) ~proposal_data =
     let open Interruptible.Let_syntax in
     let self = Public_key.compress keypair.public_key in
@@ -285,12 +286,16 @@ module Make (Inputs : Inputs_intf) :
               Staged_ledger.create_diff staged_ledger ~self ~logger
                 ~transactions_by_fee:transactions ~get_completed_work )
         in
+        let epoch_ledger =
+          Consensus.Data.Local_state.get_last_epoch_ledger
+            consensus_local_state
+        in
         let%map ( `Hash_after_applying next_staged_ledger_hash
                 , `Ledger_proof ledger_proof_opt
                 , `Staged_ledger _transitioned_staged_ledger
                 , `Pending_coinbase_data (is_new_stack, coinbase_amount) ) =
           let%map or_error =
-            Staged_ledger.apply_diff_unchecked staged_ledger diff
+            Staged_ledger.apply_diff_unchecked staged_ledger diff ~epoch_ledger
           in
           Or_error.ok_exn or_error
         in
@@ -409,7 +414,7 @@ module Make (Inputs : Inputs_intf) :
               in
               let%bind next_state_opt =
                 generate_next_state ~proposal_data ~previous_protocol_state
-                  ~time_controller
+                  ~consensus_local_state ~time_controller
                   ~staged_ledger:(Breadcrumb.staged_ledger crumb)
                   ~transactions ~get_completed_work ~logger ~keypair
               in

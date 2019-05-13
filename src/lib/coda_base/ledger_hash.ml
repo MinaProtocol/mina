@@ -62,7 +62,9 @@ type path = Pedersen.Digest.t list
 
 type _ Request.t +=
   | Get_path : Account.Index.t -> path Request.t
-  | Get_element : Account.Index.t -> (Account.t * path) Request.t
+  | Get_element :
+      [< `Curr_ledger | `Epoch_ledger] * Account.Index.t
+      -> (Account.t * path) Request.t
   | Set : Account.Index.t * Account.t -> unit Request.t
   | Find_index : Public_key.Compressed.t -> Account.Index.t Request.t
 
@@ -72,8 +74,8 @@ let reraise_merkle_requests (With {request; respond}) =
       respond (Delegate (Get_path addr))
   | Merkle_tree.Set (addr, account) ->
       respond (Delegate (Set (addr, account)))
-  | Merkle_tree.Get_element addr ->
-      respond (Delegate (Get_element addr))
+  | Merkle_tree.Get_element (tag, addr) ->
+      respond (Delegate (Get_element (tag, addr)))
   | _ ->
       unhandled
 
@@ -105,6 +107,23 @@ let%snarkydef modify_account t pk ~(filter : Account.var -> ('a, _) Checked.t)
          f x account ))
     reraise_merkle_requests
   >>| var_of_hash_packed
+
+let%snarkydef modify_or_get_account t pk
+    ~(filter : Account.var -> ('a, _) Checked.t) ~f ~tag =
+  let%bind addr =
+    request_witness Account.Index.Unpacked.typ
+      As_prover.(
+        map (read Public_key.Compressed.typ pk) ~f:(fun s -> Find_index s))
+  in
+  let%map new_root, account =
+    handle
+      (Merkle_tree.modify_or_get_req ~tag ~depth (var_to_hash_packed t) addr
+         ~f:(fun account ->
+           let%bind x = filter account in
+           f x account ))
+      reraise_merkle_requests
+  in
+  (var_of_hash_packed new_root, account)
 
 (*
    [modify_account_send t pk ~f] implements the following spec:
@@ -139,8 +158,8 @@ let%snarkydef modify_account_send t pk ~is_writeable ~f =
    - returns a root [t'] of a tree of depth [depth]
    which is [t] but with the account [f account] at path [addr].
 *)
-let%snarkydef modify_account_recv t pk ~f =
-  modify_account t pk
+let%snarkydef modify_or_get_account_recv t pk ~f ~tag =
+  modify_or_get_account t pk ~tag
     ~filter:(fun account ->
       let%bind account_already_there =
         Public_key.Compressed.Checked.equal account.public_key pk
