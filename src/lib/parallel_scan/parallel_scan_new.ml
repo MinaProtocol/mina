@@ -47,6 +47,10 @@ module New_job = struct
   type ('a, 'd) t = Base of 'd | Merge of 'a [@@deriving sexp]
 end
 
+module Space_partition = struct
+  type t = {first: int; second: int option} [@@deriving sexp]
+end
+
 module Tree = struct
   type ('a, 'd) t =
     | Leaf of 'd
@@ -414,7 +418,7 @@ module T = struct
   type ('a, 'd) t =
     { trees: ('a Merge.t, 'd Base.t) Tree.t Non_empty_list.t
           (*use non empty list*)
-    ; acc: (int * ('a * 'd list)) option
+    ; acc: ('a * 'd list) option
           (*last emitted proof and the corresponding transactions*)
     ; next_base_pos: int
           (*All new base jobs will start from the first tree in the list*)
@@ -621,6 +625,10 @@ let work_for_next_update : type a d.
     set1 @ set2
   else set1
 
+let free_space_on_current_tree t =
+  let tree = Non_empty_list.head t.trees in
+  Tree.required_job_count tree
+
 let cons b bs =
   Option.value_map (Non_empty_list.of_list_opt bs)
     ~default:(Non_empty_list.singleton b) ~f:(fun bs ->
@@ -630,9 +638,8 @@ let append bs bs' =
   Option.value_map (Non_empty_list.of_list_opt bs') ~default:bs ~f:(fun bs' ->
       Non_empty_list.append bs bs' )
 
-let add_merge_jobs :
-    completed_jobs:'a list -> next_seq:int -> ('b, 'a, _) State_monad.t =
- fun ~completed_jobs ~next_seq ->
+let add_merge_jobs : completed_jobs:'a list -> ('b, 'a, _) State_monad.t =
+ fun ~completed_jobs ->
   let open State_monad.Let_syntax in
   let%bind state = State_monad.get in
   let delay = state.delay + 1 in
@@ -649,7 +656,7 @@ let add_merge_jobs :
             Tree.update
               (List.take jobs (Tree.required_job_count tree))
               ~update_level:(depth - (i / delay))
-              ~sequence_no:next_seq ~depth tree
+              ~sequence_no:state.curr_job_seq_no ~depth tree
           in
           ( tree' :: trees
           , scan_result'
@@ -674,8 +681,8 @@ let add_merge_jobs :
   let%map _ = State_monad.put {state with trees= all_trees} in
   result_opt
 
-let add_data : data:'d list -> next_seq:int -> (_, _, 'd) State_monad.t =
- fun ~data ~next_seq ->
+let add_data : data:'d list -> (_, _, 'd) State_monad.t =
+ fun ~data ->
   let open State_monad.Let_syntax in
   let%bind state = State_monad.get in
   let depth = Int.ceil_log2 state.max_base_jobs in
@@ -683,7 +690,8 @@ let add_data : data:'d list -> next_seq:int -> (_, _, 'd) State_monad.t =
   let base_jobs = List.map data ~f:(fun j -> New_job.Base j) in
   let available_space = Tree.required_job_count tree in
   let tree, _ =
-    Tree.update base_jobs ~update_level:depth ~sequence_no:next_seq ~depth tree
+    Tree.update base_jobs ~update_level:depth
+      ~sequence_no:state.curr_job_seq_no ~depth tree
   in
   let updated_trees =
     if List.length base_jobs = available_space then
@@ -695,6 +703,12 @@ let add_data : data:'d list -> next_seq:int -> (_, _, 'd) State_monad.t =
       {state with trees= append updated_trees (Non_empty_list.tail state.trees)}
   in
   ()
+
+let incr_sequence_no =
+  let open State_monad in
+  let open State_monad.Let_syntax in
+  let%bind state = get in
+  put {state with curr_job_seq_no= state.curr_job_seq_no + 1}
 
 let update_helper :
     data:'d list -> completed_jobs:'a list -> ('b, 'a, 'd) State_monad.t =
@@ -711,7 +725,8 @@ let update_helper :
            (List.length data) t.max_base_jobs)
   in
   let delay = t.delay + 1 in
-  let next_seq = t.curr_job_seq_no + 1 in
+  (*Increment the sequence number*)
+  let%bind () = incr_sequence_no in
   let latest_tree = Non_empty_list.head t.trees in
   let available_space = Tree.required_job_count latest_tree in
   (*Possible that new base jobs be added to a new tree within an update. This happens when the throughput is not always at max. Which also requires merge jobs to be done one two different set of trees*)
@@ -724,11 +739,11 @@ let update_helper :
     List.split_n completed_jobs required_jobs_for_current_tree
   in
   (*update fist set of jobs and data*)
-  let%bind result_opt = add_merge_jobs ~completed_jobs:jobs1 ~next_seq in
-  let%bind () = add_data ~data:data1 ~next_seq in
+  let%bind result_opt = add_merge_jobs ~completed_jobs:jobs1 in
+  let%bind () = add_data ~data:data1 in
   (*update second set of jobs and data. This will be empty if all the data fit in the current tree*)
-  let%bind _ = add_merge_jobs ~completed_jobs:jobs2 ~next_seq in
-  let%bind () = add_data ~data:data2 ~next_seq in
+  let%bind _ = add_merge_jobs ~completed_jobs:jobs2 in
+  let%bind () = add_data ~data:data2 in
   (*Check the tree-list length is under max*)
   let%bind state = State_monad.get in
   let%map () =
@@ -749,6 +764,44 @@ let update :
     -> ('a option * ('a, 'd) t) Or_error.t =
  fun ~data ~completed_jobs t ->
   State_monad.run_state (update_helper ~data ~completed_jobs) ~state:t
+
+let next_k_jobs :
+    ('a, 'd) t -> k:int -> ('a, 'd) Available_job.t list Or_error.t =
+ fun t ~k ->
+  let work = all_work t in
+  if k > List.length work then
+    Or_error.errorf "You asked for %d jobs, but I only have %d available" k
+      (List.length work)
+  else Ok (List.take work k)
+
+let next_jobs : ('a, 'd) t -> ('a, 'd) Available_job.t list = all_work
+
+let jobs_for_next_update = work_for_next_update
+
+let free_space t = t.max_base_jobs
+
+let last_emitted_result : ('a, 'd) t -> ('a * 'd list) option = fun t -> t.acc
+
+let current_job_sequence_number t = t.curr_job_seq_no
+
+let base_jobs_on_latest_tree t =
+  let depth = Int.ceil_log2 t.max_base_jobs in
+  List.filter_map
+    (Tree.jobs_on_level ~depth ~level:depth (Non_empty_list.head t.trees))
+    ~f:(fun job -> match job with Base d -> Some d | Merge _ -> None)
+
+let partition_if_overflowing : ('a, 'd) t -> Space_partition.t =
+ fun t ->
+  let cur_tree_space = free_space_on_current_tree t in
+  { first= cur_tree_space
+  ; second=
+      ( if cur_tree_space < t.max_base_jobs then
+        Some (t.max_base_jobs - cur_tree_space)
+      else None ) }
+
+let next_on_new_tree t =
+  let curr_tree_space = free_space_on_current_tree t in
+  curr_tree_space = t.max_base_jobs
 
 let view_int_trees (tree : (int Merge.t, int Base.t) Tree.t) =
   let show_status = function Job_status.Done -> "D" | Todo -> "T" in
