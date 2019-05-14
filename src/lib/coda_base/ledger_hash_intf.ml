@@ -33,12 +33,12 @@ module type S = sig
           -> (Account.var, 's) Checked.t)
     -> (var, 's) Checked.t
 
-  val modify_or_get_account_recv :
+  val modify_account_recv :
        var
     -> Public_key.Compressed.var
     -> f:(   is_empty_and_writeable:Boolean.var
           -> Account.var
           -> (Account.var, 's) Checked.t)
-    -> tag:[< `Curr_ledger | `Epoch_ledger]
+    -> is_chain_voting:Boolean.var
     -> (var * Account.var, 's) Checked.t
 end

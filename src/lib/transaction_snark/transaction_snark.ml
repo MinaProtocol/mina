@@ -439,10 +439,10 @@ module Base = struct
         ~then_:sender_compressed ~else_:payload.body.public_key
     in
     (* we explicitly set the public_key because it could be zero if the account is new *)
-    let%map root, _ =
+    let%map root, voting_stake_increase =
       (* This update should be a no-op in the stake delegation case *)
-      Frozen_ledger_hash.modify_or_get_account_recv root receiver
-        ~tag:`Epoch_ledger ~f:(fun ~is_empty_and_writeable account ->
+      Frozen_ledger_hash.modify_account_recv root receiver ~is_chain_voting
+        ~f:(fun ~is_empty_and_writeable account ->
           let%map balance =
             (* receiver_increase will be zero in the stake delegation case *)
             Balance.Checked.(account.balance + receiver_increase)
@@ -452,7 +452,11 @@ module Base = struct
           in
           {account with balance; delegate; public_key= receiver} )
     in
-    (root, pending_coinbase_stack_after, excess, supply_increase)
+    ( root
+    , pending_coinbase_stack_after
+    , excess
+    , supply_increase
+    , voting_stake_increase )
 
   (* Someday:
    write the following soundness tests:
@@ -496,7 +500,11 @@ module Base = struct
       exists' Pending_coinbase.Stack.typ ~f:(fun s ->
           (Prover_state.pending_coinbase_stack_state s).source )
     in
-    let%bind root_after, pending_coinbase_after, fee_excess, supply_increase =
+    let%bind ( root_after
+             , pending_coinbase_after
+             , fee_excess
+             , supply_increase
+             , _voting_stake_increase ) =
       apply_tagged_transaction
         (module Shifted)
         root_before pending_coinbase_before t
