@@ -30,8 +30,8 @@ module Colors = {
   let yeezy = `hex("C53131");
 
   let midnight = `hex("1F2D3D");
-  let marineLight = `rgba((51, 104, 151, 0.1));
-  let marine = `hex("336897");
+  let marineAlpha = a => `rgba((51, 104, 151, a));
+  let jungle = `hex("2BAC46");
   let sage = `hex("65906e");
   let blanco = `hex("e3e0d5");
   let modalDisableBgAlpha = a => `rgba((31, 45, 61, a));

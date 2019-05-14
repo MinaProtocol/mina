@@ -1,5 +1,3 @@
-open Tc;
-
 module Styles = {
   open Css;
 
@@ -36,9 +34,13 @@ module StakingSwitch = {
           merge([
             Theme.Text.body,
             style([
-              color(staking ? Theme.Colors.serpentine : Theme.Colors.slateAlpha(0.7)),
+              color(
+                staking
+                  ? Theme.Colors.serpentine : Theme.Colors.slateAlpha(0.7),
+              ),
               marginLeft(`rem(1.)),
-            ])])
+            ]),
+          ])
         )>
         {ReasonReact.string("Earn Coda > Vault")}
       </span>
@@ -46,47 +48,10 @@ module StakingSwitch = {
   };
 };
 
-module PublicKeyButton = {
-  [@react.component]
-  let make = (~pubKeySelected) => {
-    let str = ReasonReact.string("Copy public key");
-    // The switch is over the <button> rather than within the onClick because
-    // if there exists an onClick the button is no longer disabled (despite
-    // disabled being true), and there is no way to give JSX an `option` for
-    // the click handler.
-    switch (pubKeySelected) {
-    | Some(pubKey) =>
-      <button
-        onClick={_e => {
-          let task =
-            Bindings.Navigator.Clipboard.writeTextTask(
-              PublicKey.toString(pubKey),
-            );
-          Task.perform(task, ~f=()
-            // TODO: Should we toast when this happens? Do we need to handle errors?
-            => Js.log("Copied to clipboard"));
-        }}
-        disabled=false>
-        str
-      </button>
-    | None => <button disabled=true> str </button>
-    };
-  };
-};
-
-module SendButton = {
-  [@react.component]
-  let make = () => {
-    <button onClick={_e => Router.navigate(Route.Send)}>
-      {ReasonReact.string("Send")}
-    </button>;
-  };
-};
-
 [@react.component]
 let make = () => {
   <div className=Styles.footer>
     <StakingSwitch />
-    <div> <PublicKeyButton pubKeySelected=None /> <SendButton /> </div>
+    <Button label="Send" />
   </div>;
 };

@@ -173,7 +173,7 @@ module ActorName = {
               style([
                 color(
                   activeWallet === Some(key)
-                    ? Theme.Colors.marine : Theme.Colors.midnight,
+                    ? Theme.Colors.marineAlpha(1.) : Theme.Colors.midnight,
                 ),
                 opacity(0.7),
               ]),

@@ -15,6 +15,7 @@ module Styles = {
       fontFamily("IBM Plex Sans, Sans-Serif"),
       color(grey),
       padding2(~v=`px(0), ~h=Theme.Spacing.defaultSpacing),
+      borderBottom(`px(1), `solid, Theme.Colors.borderColor),
     ]);
 
   let inactiveWalletItem =
@@ -24,7 +25,7 @@ module Styles = {
     merge([
       walletItem,
       style([
-        color(Colors.marine),
+        color(Colors.marineAlpha(1.)),
         backgroundColor(Colors.hyperlinkAlpha(0.15)),
       ]),
       notText,
