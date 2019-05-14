@@ -3,6 +3,7 @@ open Async_kernel
 open Protocols.Coda_transition_frontier
 open Coda_base
 open Coda_state
+open Coda_transition
 open Pipe_lib
 open Coda_incremental
 
@@ -11,20 +12,24 @@ module type Inputs_intf = Inputs.Inputs_intf
 module Make (Inputs : Inputs_intf) :
   Transition_frontier_intf
   with type state_hash := State_hash.t
-   and type external_transition_verified :=
-              Inputs.External_transition.Verified.t
+   and type mostly_validated_external_transition :=
+              ( [`Time_received] * Truth.true_t
+              , [`Proof] * Truth.true_t
+              , [`Frontier_dependencies] * Truth.true_t
+              , [`Staged_ledger_diff] * Truth.false_t )
+              Inputs.External_transition.Validation.with_transition
+   and type external_transition_validated :=
+              Inputs.External_transition.Validated.t
    and type ledger_database := Ledger.Db.t
    and type staged_ledger_diff := Inputs.Staged_ledger_diff.t
    and type staged_ledger := Inputs.Staged_ledger.t
    and type masked_ledger := Ledger.Mask.Attached.t
    and type transaction_snark_scan_state := Inputs.Staged_ledger.Scan_state.t
+   and type consensus_state := Consensus.Data.Consensus_state.Value.t
    and type consensus_local_state := Consensus.Data.Local_state.t
    and type user_command := User_command.t
-   and type diff_mutant :=
-              ( Inputs.External_transition.Stable.Latest.t
-              , State_hash.Stable.Latest.t )
-              With_hash.t
-              Inputs.Diff_mutant.E.t
+   and type pending_coinbase := Pending_coinbase.t
+   and type verifier := Inputs.Verifier.t
    and module Extensions.Work = Inputs.Transaction_snark_work.Statement =
 struct
   open Inputs
@@ -35,31 +40,11 @@ struct
 
   exception Already_exists of State_hash.t
 
-  module Fake_db = struct
-    include Coda_base.Ledger.Db
-
-    type location = Location.t
-
-    let get_or_create ledger key =
-      let key, loc =
-        match
-          get_or_create_account_exn ledger key (Account.initialize key)
-        with
-        | `Existed, loc ->
-            ([], loc)
-        | `Added, loc ->
-            ([key], loc)
-      in
-      (key, get ledger loc |> Option.value_exn, loc)
-  end
-
-  module TL = Coda_base.Transaction_logic.Make (Fake_db)
-
   module Breadcrumb = struct
     (* TODO: external_transition should be type : External_transition.With_valid_protocol_state.t #1344 *)
     type t =
       { transition_with_hash:
-          (External_transition.Verified.t, State_hash.t) With_hash.t
+          (External_transition.Validated.t, State_hash.t) With_hash.t
       ; mutable staged_ledger: Staged_ledger.t sexp_opaque
       ; just_emitted_a_proof: bool }
     [@@deriving sexp, fields]
@@ -68,7 +53,7 @@ struct
         =
       `Assoc
         [ ( "transition_with_hash"
-          , With_hash.to_yojson External_transition.Verified.to_yojson
+          , With_hash.to_yojson External_transition.Validated.to_yojson
               State_hash.to_yojson transition_with_hash )
         ; ("staged_ledger", `String "<opaque>")
         ; ("just_emitted_a_proof", `Bool just_emitted_a_proof) ]
@@ -78,84 +63,32 @@ struct
 
     let copy t = {t with staged_ledger= Staged_ledger.copy t.staged_ledger}
 
-    let build ~logger ~trust_system ~parent ~transition_with_hash ~sender =
+    module Staged_ledger_validation =
+      External_transition.Staged_ledger_validation (Staged_ledger)
+
+    let build ~logger ~verifier ~trust_system ~parent
+        ~transition:transition_with_validation ~sender =
       O1trace.measure "Breadcrumb.build" (fun () ->
-          let open Deferred.Result.Let_syntax in
-          let staged_ledger = parent.staged_ledger in
-          let transition = With_hash.data transition_with_hash in
-          let transition_protocol_state =
-            External_transition.Verified.protocol_state transition
-          in
-          let blockchain_state =
-            Protocol_state.blockchain_state transition_protocol_state
-          in
-          let blockchain_staged_ledger_hash =
-            Blockchain_state.staged_ledger_hash blockchain_state
-          in
-          let%bind ( `Hash_after_applying staged_ledger_hash
-                   , `Ledger_proof proof_opt
-                   , `Staged_ledger transitioned_staged_ledger
-                   , `Pending_coinbase_data _ ) =
-            let open Deferred.Let_syntax in
-            match%bind
-              Staged_ledger.apply ~logger staged_ledger
-                (External_transition.Verified.staged_ledger_diff transition)
-            with
-            | Ok x ->
-                return (Ok x)
-            | Error (Staged_ledger.Staged_ledger_error.Unexpected e) ->
-                return (Error (`Fatal_error (Error.to_exn e)))
-            | Error staged_ledger_error ->
-                let%bind () =
-                  match sender with
-                  | None | Some Envelope.Sender.Local ->
-                      return ()
-                  | Some (Envelope.Sender.Remote inet_addr) ->
-                      let error_string =
-                        Staged_ledger.Staged_ledger_error.to_string
-                          staged_ledger_error
-                      in
-                      let make_actions action =
-                        ( action
-                        , Some
-                            ( "Staged_ledger error: $error"
-                            , [("error", `String error_string)] ) )
-                      in
-                      let open Trust_system.Actions in
-                      (* TODO : refine these actions, issue 2375 *)
-                      let action =
-                        match staged_ledger_error with
-                        | Invalid_proof _ ->
-                            make_actions Sent_invalid_proof
-                        | Bad_signature _ ->
-                            make_actions Sent_invalid_signature
-                        | Coinbase_error _
-                        | Bad_prev_hash _
-                        | Insufficient_fee _
-                        | Non_zero_fee_excess _ ->
-                            make_actions Gossiped_invalid_transition
-                        | Unexpected _ ->
-                            failwith
-                              "build: Unexpected staged ledger error should \
-                               have been caught in another pattern"
-                      in
-                      Trust_system.record trust_system logger inet_addr action
-                in
-                return
-                  (Error
-                     (`Invalid_staged_ledger_diff
-                       (Staged_ledger.Staged_ledger_error.to_error
-                          staged_ledger_error)))
-          in
-          let just_emitted_a_proof = Option.is_some proof_opt in
-          let%map transitioned_staged_ledger =
-            if
-              Staged_ledger_hash.equal staged_ledger_hash
-                blockchain_staged_ledger_hash
-            then Deferred.return (Ok transitioned_staged_ledger)
-            else
-              let open Deferred.Let_syntax in
-              let%bind () =
+          let open Deferred.Let_syntax in
+          match%bind
+            Staged_ledger_validation.validate_staged_ledger_diff ~logger
+              ~verifier ~parent_staged_ledger:parent.staged_ledger
+              transition_with_validation
+          with
+          | Ok
+              ( `Just_emitted_a_proof just_emitted_a_proof
+              , `External_transition_with_validation
+                  fully_valid_external_transition
+              , `Staged_ledger transitioned_staged_ledger ) ->
+              return
+                (Ok
+                   { transition_with_hash=
+                       External_transition.Validation.lift
+                         fully_valid_external_transition
+                   ; staged_ledger= transitioned_staged_ledger
+                   ; just_emitted_a_proof })
+          | Error `Invalid_ledger_hash_after_staged_ledger_application ->
+              let%map () =
                 match sender with
                 | None | Some Envelope.Sender.Local ->
                     return ()
@@ -166,17 +99,56 @@ struct
                           ( Gossiped_invalid_transition
                           , Some ("Invalid staged ledger hash", []) ))
               in
-              return
-                (Error
-                   (`Invalid_staged_ledger_hash
-                     (Error.of_string
-                        "Snarked ledger hash and Staged ledger hash after \
-                         applying the diff does not match blockchain state's \
-                         ledger hash and staged ledger hash resp.")))
-          in
-          { transition_with_hash
-          ; staged_ledger= transitioned_staged_ledger
-          ; just_emitted_a_proof } )
+              Error
+                (`Invalid_staged_ledger_hash
+                  (Error.of_string
+                     "Snarked ledger hash and Staged ledger hash after \
+                      applying the diff does not match blockchain state's \
+                      ledger hash and staged ledger hash resp."))
+          | Error
+              (`Staged_ledger_application_failed
+                (Staged_ledger.Staged_ledger_error.Unexpected e)) ->
+              return (Error (`Fatal_error (Error.to_exn e)))
+          | Error (`Staged_ledger_application_failed staged_ledger_error) ->
+              let%map () =
+                match sender with
+                | None | Some Envelope.Sender.Local ->
+                    return ()
+                | Some (Envelope.Sender.Remote inet_addr) ->
+                    let error_string =
+                      Staged_ledger.Staged_ledger_error.to_string
+                        staged_ledger_error
+                    in
+                    let make_actions action =
+                      ( action
+                      , Some
+                          ( "Staged_ledger error: $error"
+                          , [("error", `String error_string)] ) )
+                    in
+                    let open Trust_system.Actions in
+                    (* TODO : refine these actions, issue 2375 *)
+                    let action =
+                      match staged_ledger_error with
+                      | Invalid_proof _ ->
+                          make_actions Sent_invalid_proof
+                      | Bad_signature _ ->
+                          make_actions Sent_invalid_signature
+                      | Coinbase_error _
+                      | Bad_prev_hash _
+                      | Insufficient_fee _
+                      | Non_zero_fee_excess _ ->
+                          make_actions Gossiped_invalid_transition
+                      | Unexpected _ ->
+                          failwith
+                            "build: Unexpected staged ledger error should \
+                             have been caught in another pattern"
+                    in
+                    Trust_system.record trust_system logger inet_addr action
+              in
+              Error
+                (`Invalid_staged_ledger_diff
+                  (Staged_ledger.Staged_ledger_error.to_error
+                     staged_ledger_error)) )
 
     let external_transition {transition_with_hash; _} =
       With_hash.data transition_with_hash
@@ -186,7 +158,7 @@ struct
 
     let parent_hash {transition_with_hash; _} =
       With_hash.data transition_with_hash
-      |> External_transition.Verified.protocol_state
+      |> External_transition.Validated.protocol_state
       |> Protocol_state.previous_state_hash
 
     let equal breadcrumb1 breadcrumb2 =
@@ -199,12 +171,12 @@ struct
 
     let consensus_state {transition_with_hash; _} =
       With_hash.data transition_with_hash
-      |> External_transition.Verified.protocol_state
+      |> External_transition.Validated.protocol_state
       |> Protocol_state.consensus_state
 
     let blockchain_state {transition_with_hash; _} =
       With_hash.data transition_with_hash
-      |> External_transition.Verified.protocol_state
+      |> External_transition.Validated.protocol_state
       |> Protocol_state.blockchain_state
 
     let name t =
@@ -230,10 +202,258 @@ struct
 
     let to_user_commands
         {transition_with_hash= {data= external_transition; _}; _} =
-      let open External_transition.Verified in
+      let open External_transition.Validated in
       let open Staged_ledger_diff in
       user_commands @@ staged_ledger_diff external_transition
   end
+
+  module Diff_hash = struct
+    open Digestif.SHA256
+
+    type nonrec t = t
+
+    include Binable.Of_stringable (struct
+      type nonrec t = t
+
+      let of_string = of_hex
+
+      let to_string = to_hex
+    end)
+
+    let equal t1 t2 = equal t1 t2
+
+    let empty = digest_string ""
+
+    let merge t1 string = digestv_string [to_hex t1; string]
+
+    let to_string = to_raw_string
+  end
+
+  module Diff_mutant = struct
+    module Key = struct
+      module New_frontier = struct
+        (* TODO: version *)
+        type t =
+          ( External_transition.Validated.Stable.V1.t
+          , State_hash.Stable.V1.t )
+          With_hash.Stable.V1.t
+          * Staged_ledger.Scan_state.Stable.V1.t
+          * Pending_coinbase.Stable.V1.t
+        [@@deriving bin_io]
+      end
+
+      module Add_transition = struct
+        (* TODO: version *)
+        type t =
+          ( External_transition.Validated.Stable.V1.t
+          , State_hash.Stable.V1.t )
+          With_hash.Stable.V1.t
+        [@@deriving bin_io]
+      end
+
+      module Update_root = struct
+        (* TODO: version *)
+        type t =
+          State_hash.Stable.V1.t
+          * Staged_ledger.Scan_state.Stable.V1.t
+          * Pending_coinbase.Stable.V1.t
+        [@@deriving bin_io]
+      end
+    end
+
+    type _ t =
+      | New_frontier : Key.New_frontier.t -> unit t
+      | Add_transition :
+          Key.Add_transition.t
+          -> Consensus.Data.Consensus_state.Value.Stable.V1.t t
+      | Remove_transitions :
+          ( External_transition.Validated.Stable.V1.t
+          , State_hash.Stable.V1.t )
+          With_hash.Stable.V1.t
+          list
+          -> Consensus.Data.Consensus_state.Value.Stable.V1.t list t
+      | Update_root :
+          Key.Update_root.t
+          -> ( State_hash.Stable.V1.t
+             * Staged_ledger.Scan_state.Stable.V1.t
+             * Pending_coinbase.t )
+             t
+
+    type 'a diff_mutant = 'a t
+
+    let serialize_consensus_state =
+      Binable.to_string (module Consensus.Data.Consensus_state.Value.Stable.V1)
+
+    let json_consensus_state consensus_state =
+      Consensus.Data.Consensus_state.(
+        display_to_yojson @@ display consensus_state)
+
+    let name : type a. a t -> string = function
+      | New_frontier _ ->
+          "New_frontier"
+      | Add_transition _ ->
+          "Add_transition"
+      | Remove_transitions _ ->
+          "Remove_transitions"
+      | Update_root _ ->
+          "Update_root"
+
+    let update_root_to_yojson (state_hash, scan_state, pending_coinbase) =
+      (* We need some representation of scan_state and pending_coinbase,
+        so the serialized version of these states would be fine *)
+      `Assoc
+        [ ("state_hash", State_hash.to_yojson state_hash)
+        ; ( "scan_state"
+          , `Int
+              ( String.hash
+              @@ Binable.to_string
+                   (module Staged_ledger.Scan_state.Stable.V1)
+                   scan_state ) )
+        ; ( "pending_coinbase"
+          , `Int
+              ( String.hash
+              @@ Binable.to_string
+                   (module Pending_coinbase.Stable.V1)
+                   pending_coinbase ) ) ]
+
+    (* Yojson is not performant and should be turned off *)
+    let value_to_yojson (type a) (key : a t) (value : a) =
+      let json_value =
+        match (key, value) with
+        | New_frontier _, () ->
+            `Null
+        | Add_transition _, parent_consensus_state ->
+            json_consensus_state parent_consensus_state
+        | Remove_transitions _, removed_consensus_state ->
+            `List (List.map removed_consensus_state ~f:json_consensus_state)
+        | Update_root _, (old_state_hash, old_scan_state, old_pending_coinbase)
+          ->
+            update_root_to_yojson
+              (old_state_hash, old_scan_state, old_pending_coinbase)
+      in
+      `List [`String (name key); json_value]
+
+    let key_to_yojson (type a) (key : a t) =
+      let json_key =
+        match key with
+        | New_frontier (With_hash.{hash; _}, _, _) ->
+            State_hash.to_yojson hash
+        | Add_transition With_hash.{hash; _} ->
+            State_hash.to_yojson hash
+        | Remove_transitions removed_transitions ->
+            `List
+              (List.map removed_transitions ~f:(fun With_hash.{hash; _} ->
+                   State_hash.to_yojson hash ))
+        | Update_root (state_hash, scan_state, pending_coinbase) ->
+            update_root_to_yojson (state_hash, scan_state, pending_coinbase)
+      in
+      `List [`String (name key); json_key]
+
+    let merge = Fn.flip Diff_hash.merge
+
+    let hash_root_data (hash, scan_state, pending_coinbase) acc =
+      merge
+        ( Bin_prot.Utils.bin_dump
+            [%bin_type_class:
+              State_hash.Stable.V1.t
+              * Staged_ledger.Scan_state.Stable.V1.t
+              * Pending_coinbase.Stable.V1.t]
+              .writer
+            (hash, scan_state, pending_coinbase)
+        |> Bigstring.to_string )
+        acc
+
+    let hash_diff_contents (type mutant) (t : mutant t) acc =
+      match t with
+      | New_frontier ({With_hash.hash; _}, scan_state, pending_coinbase) ->
+          hash_root_data (hash, scan_state, pending_coinbase) acc
+      | Add_transition {With_hash.hash; _} ->
+          Diff_hash.merge acc (State_hash.to_bytes hash)
+      | Remove_transitions removed_transitions ->
+          List.fold removed_transitions ~init:acc
+            ~f:(fun acc_hash With_hash.{hash= state_hash; _} ->
+              Diff_hash.merge acc_hash (State_hash.to_bytes state_hash) )
+      | Update_root (new_hash, new_scan_state, pending_coinbase) ->
+          hash_root_data (new_hash, new_scan_state, pending_coinbase) acc
+
+    let hash_mutant (type mutant) (t : mutant t) (mutant : mutant) acc =
+      match (t, mutant) with
+      | New_frontier _, () ->
+          acc
+      | Add_transition _, parent_external_transition ->
+          merge (serialize_consensus_state parent_external_transition) acc
+      | Remove_transitions _, removed_transitions ->
+          List.fold removed_transitions ~init:acc
+            ~f:(fun acc_hash removed_transition ->
+              merge (serialize_consensus_state removed_transition) acc_hash )
+      | Update_root _, (old_root, old_scan_state, old_pending_coinbase) ->
+          hash_root_data (old_root, old_scan_state, old_pending_coinbase) acc
+
+    let hash (type mutant) acc_hash (t : mutant t) (mutant : mutant) =
+      let diff_contents_hash = hash_diff_contents t acc_hash in
+      hash_mutant t mutant diff_contents_hash
+
+    module E = struct
+      type t = E : 'output diff_mutant -> t
+
+      (* HACK:  This makes the existential type easily binable *)
+      include Binable.Of_binable (struct
+                  type t =
+                    [ `New_frontier of Key.New_frontier.t
+                    | `Add_transition of Key.Add_transition.t
+                    | `Remove_transitions of
+                      ( External_transition.Validated.Stable.V1.t
+                      , State_hash.Stable.V1.t )
+                      With_hash.Stable.V1.t
+                      list
+                    | `Update_root of Key.Update_root.t ]
+                  [@@deriving bin_io]
+                end)
+                (struct
+                  type nonrec t = t
+
+                  let of_binable = function
+                    | `New_frontier data ->
+                        E (New_frontier data)
+                    | `Add_transition data ->
+                        E (Add_transition data)
+                    | `Remove_transitions transitions ->
+                        E (Remove_transitions transitions)
+                    | `Update_root data ->
+                        E (Update_root data)
+
+                  let to_binable = function
+                    | E (New_frontier data) ->
+                        `New_frontier data
+                    | E (Add_transition data) ->
+                        `Add_transition data
+                    | E (Remove_transitions transitions) ->
+                        `Remove_transitions transitions
+                    | E (Update_root data) ->
+                        `Update_root data
+                end)
+    end
+  end
+
+  module Fake_db = struct
+    include Coda_base.Ledger.Db
+
+    type location = Location.t
+
+    let get_or_create ledger key =
+      let key, loc =
+        match
+          get_or_create_account_exn ledger key (Account.initialize key)
+        with
+        | `Existed, loc ->
+            ([], loc)
+        | `Added, loc ->
+            ([key], loc)
+      in
+      (key, get ledger loc |> Option.value_exn, loc)
+  end
+
+  module TL = Coda_base.Transaction_logic.Make (Fake_db)
 
   module type Transition_frontier_extension_intf =
     Transition_frontier_extension_intf0
@@ -299,13 +519,71 @@ struct
                   [ivar] ) )
     end
 
+    (** A transition frontier extension that exposes the changes in the transactions
+        in the best tip. *)
+    module Persistence_diff = struct
+      type t = unit
+
+      type input = unit
+
+      type view = Diff_mutant.E.t list
+
+      let create () = ()
+
+      let initial_view () = []
+
+      let scan_state breadcrumb =
+        breadcrumb |> Breadcrumb.staged_ledger |> Staged_ledger.scan_state
+
+      let pending_coinbase breadcrumb =
+        breadcrumb |> Breadcrumb.staged_ledger
+        |> Staged_ledger.pending_coinbase_collection
+
+      let handle_diff () (diff : Breadcrumb.t Transition_frontier_diff.t) :
+          view option =
+        let open Transition_frontier_diff in
+        let open Diff_mutant.E in
+        Option.return
+        @@
+        match diff with
+        | New_frontier breadcrumb ->
+            [ E
+                (New_frontier
+                   ( Breadcrumb.transition_with_hash breadcrumb
+                   , scan_state breadcrumb
+                   , pending_coinbase breadcrumb )) ]
+        | New_breadcrumb breadcrumb ->
+            [E (Add_transition (Breadcrumb.transition_with_hash breadcrumb))]
+        | New_best_tip {garbage; added_to_best_tip_path; new_root; old_root; _}
+          ->
+            let added_transition =
+              E
+                (Add_transition
+                   ( Non_empty_list.last added_to_best_tip_path
+                   |> Breadcrumb.transition_with_hash ))
+            in
+            let remove_transition =
+              E
+                (Remove_transitions
+                   (List.map garbage ~f:Breadcrumb.transition_with_hash))
+            in
+            if
+              State_hash.equal
+                (Breadcrumb.state_hash old_root)
+                (Breadcrumb.state_hash new_root)
+            then [added_transition; remove_transition]
+            else
+              [ added_transition
+              ; E
+                  (Update_root
+                     ( Breadcrumb.state_hash new_root
+                     , scan_state new_root
+                     , pending_coinbase new_root ))
+              ; remove_transition ]
+    end
+
     module Best_tip_diff = Best_tip_diff.Make (Breadcrumb)
     module Root_diff = Root_diff.Make (Breadcrumb)
-
-    module Persistence_diff = Persistence_diff.Make (struct
-      include Inputs
-      module Breadcrumb = Breadcrumb
-    end)
 
     type t =
       { root_history: Root_history.t
@@ -314,7 +592,7 @@ struct
       ; best_tip_diff: Best_tip_diff.t
       ; root_diff: Root_diff.t
       ; persistence_diff: Persistence_diff.t
-      ; new_transition: External_transition.Verified.t New_transition.Var.t }
+      ; new_transition: External_transition.Validated.t New_transition.Var.t }
     [@@deriving fields]
 
     (* TODO: Each of these extensions should be created with the input of the breadcrumb *)
@@ -488,11 +766,11 @@ struct
   (* TODO: load from and write to disk *)
   let create ~logger
       ~(root_transition :
-         (External_transition.Verified.t, State_hash.t) With_hash.t)
+         (External_transition.Validated.t, State_hash.t) With_hash.t)
       ~root_snarked_ledger ~root_staged_ledger ~consensus_local_state =
     let root_hash = With_hash.hash root_transition in
     let root_protocol_state =
-      External_transition.Verified.protocol_state
+      External_transition.Validated.protocol_state
         (With_hash.data root_transition)
     in
     let root_blockchain_state =
@@ -824,7 +1102,7 @@ struct
     O1trace.measure "add_breadcrumb" (fun () ->
         let consensus_state_of_breadcrumb b =
           Breadcrumb.transition_with_hash b
-          |> With_hash.data |> External_transition.Verified.protocol_state
+          |> With_hash.data |> External_transition.Validated.protocol_state
           |> Protocol_state.consensus_state
         in
         let hash =
@@ -1117,3 +1395,25 @@ struct
       Extensions.Root_history.is_empty extensions.root_history
   end
 end
+
+include Make (struct
+  module Staged_ledger_aux_hash = struct
+    include Staged_ledger_hash.Aux_hash.Stable.V1
+
+    [%%define_locally
+    Staged_ledger_hash.Aux_hash.(of_bytes, to_bytes)]
+  end
+
+  module Verifier = Verifier
+  module Pending_coinbase_stack_state =
+    Transaction_snark.Pending_coinbase_stack_state
+  module Ledger_proof_statement = Transaction_snark.Statement
+  module Ledger_proof = Ledger_proof
+  module Transaction_snark_work = Transaction_snark_work
+  module Staged_ledger_diff = Staged_ledger_diff
+  module External_transition = External_transition
+  module Transaction_witness = Transaction_witness
+  module Staged_ledger = Staged_ledger
+
+  let max_length = Consensus.Constants.k
+end)

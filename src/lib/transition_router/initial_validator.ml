@@ -4,77 +4,80 @@ open Protocols.Coda_pow
 open Pipe_lib.Strict_pipe
 open Coda_base
 open Coda_state
+open Coda_transition
 
-module type Inputs_intf = sig
-  include Transition_frontier.Inputs_intf
+type validation_error =
+  [ `Invalid_time_received of [`Too_early | `Too_late of int64]
+  | `Invalid_proof
+  | `Verifier_error of Error.t ]
 
-  module State_proof :
-    Proof_intf with type input := Protocol_state.Value.t and type t := Proof.t
+type ('time_received_valid, 'proof_valid) validation_result =
+  ( ( [`Time_received] * 'time_received_valid
+    , [`Proof] * 'proof_valid
+    , [`Frontier_dependencies] * Truth.false_t
+    , [`Staged_ledger_diff] * Truth.false_t )
+    External_transition.Validation.with_transition
+  , validation_error )
+  Deferred.Result.t
 
-  module Time : Time_intf
+let handle_validation_error ~logger ~trust_system ~sender ~state_hash
+    (error : validation_error) =
+  match error with
+  | `Verifier_error err ->
+      Logger.error logger ~module_:__MODULE__ ~location:__LOC__
+        ~metadata:[("state_hash", State_hash.to_yojson state_hash)]
+        "Error while verifying blockchain proof for $state_hash: %s"
+        (Error.to_string_hum err) ;
+      return ()
+  | `Invalid_time_received `Too_early ->
+      Trust_system.record_envelope_sender trust_system logger sender
+        (Trust_system.Actions.Gossiped_future_transition, None)
+  | `Invalid_time_received (`Too_late slot_diff) ->
+      Trust_system.record_envelope_sender trust_system logger sender
+        ( Trust_system.Actions.Gossiped_old_transition slot_diff
+        , Some
+            ( "off by $slot_diff slots"
+            , [("slot_diff", `String (Int64.to_string slot_diff))] ) )
+  | `Invalid_proof ->
+      Trust_system.record_envelope_sender trust_system logger sender
+        (Trust_system.Actions.Gossiped_invalid_transition, None)
 
-  module Transition_frontier :
-    Transition_frontier_intf
-    with type state_hash := State_hash.t
-     and type external_transition_verified := External_transition.Verified.t
-     and type ledger_database := Ledger.Db.t
-     and type staged_ledger := Staged_ledger.t
-     and type transaction_snark_scan_state := Staged_ledger.Scan_state.t
-     and type staged_ledger_diff := Staged_ledger_diff.t
-     and type masked_ledger := Coda_base.Ledger.t
-     and type consensus_local_state := Consensus.Data.Local_state.t
-     and type user_command := User_command.t
-     and type diff_mutant :=
-                ( External_transition.Stable.Latest.t
-                , State_hash.Stable.Latest.t )
-                With_hash.t
-                Diff_mutant.E.t
-
-  module Protocol_state_validator :
-    Protocol_state_validator_intf
-    with type time := Time.t
-     and type state_hash := State_hash.t
-     and type trust_system := Trust_system.t
-     and type envelope_sender := Envelope.Sender.t
-     and type external_transition := External_transition.t
-     and type external_transition_proof_verified :=
-                External_transition.Proof_verified.t
-     and type external_transition_verified := External_transition.Verified.t
-end
-
-module Make (Inputs : Inputs_intf) :
-  Protocols.Coda_transition_frontier.Initial_validator_intf
-  with type time := Inputs.Time.t
-   and type state_hash := State_hash.t
-   and type trust_system := Trust_system.t
-   and type external_transition := Inputs.External_transition.t
-   and type external_transition_verified :=
-              Inputs.External_transition.Verified.t = struct
-  open Inputs
-
-  let run ~logger ~trust_system ~transition_reader ~valid_transition_writer =
-    Reader.iter transition_reader ~f:(fun network_transition ->
-        let `Transition transition_env, `Time_received time_received =
-          network_transition
+let run ~logger ~trust_system ~transition_reader ~valid_transition_writer =
+  let open Deferred.Let_syntax in
+  Reader.iter transition_reader ~f:(fun network_transition ->
+      let `Transition transition_env, `Time_received time_received =
+        network_transition
+      in
+      let (transition : External_transition.t) =
+        Envelope.Incoming.data transition_env
+      in
+      let sender = Envelope.Incoming.sender transition_env in
+      match%map
+        let open Deferred.Result.Let_syntax in
+        let transition = External_transition.Validation.wrap transition in
+        let%bind transition =
+          ( Deferred.return
+              (External_transition.validate_time_received transition
+                 ~time_received)
+            :> (Truth.true_t, Truth.false_t) validation_result )
         in
-        let (transition : External_transition.t) =
-          Envelope.Incoming.data transition_env
-        in
-        let sender = Envelope.Incoming.sender transition_env in
-        match%map
-          Protocol_state_validator.validate_consensus_state ~logger
-            ~trust_system ~time_received ~sender transition
-        with
-        | Ok verified_transition ->
-            ( `Transition
-                (Envelope.Incoming.wrap ~data:verified_transition ~sender)
-            , `Time_received time_received )
-            |> Writer.write valid_transition_writer
-        | Error () ->
-            Logger.warn logger ~module_:__MODULE__ ~location:__LOC__
-              ~metadata:
-                [ ("peer", Envelope.Sender.to_yojson sender)
-                ; ("transition", External_transition.to_yojson transition) ]
-              !"Failed to validate transition from $peer" )
-    |> don't_wait_for
-end
+        ( External_transition.validate_proof transition ~verifier
+          :> (Truth.true_t, Truth.true_t) validation_result )
+      with
+      | Ok verified_transition ->
+          ( `Transition
+              (Envelope.Incoming.wrap ~data:verified_transition ~sender)
+          , `Time_received time_received )
+          |> Writer.write valid_transition_writer ;
+          return ()
+      | Error () ->
+          let%map () =
+            handle_validation_error ~logger ~trust_system ~sender ~state_hash
+              error
+          in
+          Logger.warn logger ~module_:__MODULE__ ~location:__LOC__
+            ~metadata:
+              [ ("peer", Envelope.Sender.to_yojson sender)
+              ; ("transition", External_transition.to_yojson transition) ]
+            !"Failed to validate transition from $peer" )
+  |> don't_wait_for

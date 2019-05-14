@@ -48,14 +48,6 @@ module Frozen_ledger_hash = struct
   let of_ledger_hash = Frozen_ledger_hash.of_ledger_hash
 end
 
-module type Ledger_proof_verifier_intf = sig
-  val verify :
-       Ledger_proof.t
-    -> Transaction_snark.Statement.t
-    -> message:Sok_message.t
-    -> bool Deferred.t
-end
-
 module type Work_selector_F = functor
   (Inputs : Work_selector.Inputs.Inputs_intf)
   -> Protocols.Coda_pow.Work_selector_intf
@@ -371,10 +363,7 @@ let make_init ~should_propose (module Config : Config_intf) :
   end in
   (module Init : Init_intf)
 
-module Make_inputs0
-    (Init : Init_intf)
-    (Ledger_proof_verifier : Ledger_proof_verifier_intf) =
-struct
+module Make_inputs0 (Init : Init_intf) = struct
   open Protocols.Coda_pow
   open Init
   module Protocol_state = Protocol_state
@@ -486,7 +475,7 @@ struct
       module Transaction = Transaction
       module Ledger = Ledger
       module Ledger_proof = Ledger_proof
-      module Ledger_proof_verifier = Ledger_proof_verifier
+      module Ledger_proof_verifier = Verifier
       module Ledger_proof_statement = Transaction_snark.Statement
       module Ledger_hash = Ledger_hash
       module Frozen_ledger_hash = Frozen_ledger_hash
@@ -509,7 +498,7 @@ struct
         | Ok ps ->
             let%map good =
               Deferred.List.for_all ps ~f:(fun (proof, stmt) ->
-                  Ledger_proof_verifier.verify ~message proof stmt )
+                  Verifier.verify_transaction_snark ~message proof stmt )
             in
             Option.some_if good
               (Transaction_snark_work.Checked.create_unsafe t)
@@ -535,40 +524,6 @@ struct
       {old; diff= Staged_ledger_diff.forget diff}
   end
 
-  let max_length = Consensus.Constants.k
-
-  module Diff_hash = Transition_frontier_persistence.Diff_hash
-
-  module Diff_mutant_inputs = struct
-    module Diff_hash = Diff_hash
-    module Scan_state = Staged_ledger.Scan_state
-    module External_transition = External_transition
-  end
-
-  module Diff_mutant =
-    Transition_frontier_persistence.Diff_mutant.Make (Diff_mutant_inputs)
-
-  module Transition_frontier_inputs = struct
-    module Pending_coinbase_hash = Pending_coinbase_hash
-    module Transaction_witness = Transaction_witness
-    module Staged_ledger_aux_hash = Staged_ledger_aux_hash
-    module Ledger_proof_statement = Transaction_snark.Statement
-    module Ledger_proof = Ledger_proof
-    module Transaction_snark_work = Transaction_snark_work
-    module Staged_ledger_diff = Staged_ledger_diff
-    module External_transition = External_transition
-    module Staged_ledger = Staged_ledger
-    module Diff_hash = Diff_hash
-    module Diff_mutant = Diff_mutant
-    module Pending_coinbase_stack_state =
-      Transaction_snark.Pending_coinbase_stack_state
-    module Pending_coinbase = Pending_coinbase
-
-    let max_length = max_length
-  end
-
-  module Transition_frontier =
-    Transition_frontier.Make (Transition_frontier_inputs)
   module Transition_storage =
     Transition_frontier_persistence.Transition_storage.Make
       (Transition_frontier_inputs)
@@ -627,18 +582,17 @@ end
 
 module Make_inputs
     (Init : Init_intf)
-    (Ledger_proof_verifier : Ledger_proof_verifier_intf)
     (Store : Storage.With_checksum_intf with type location = string) =
 struct
   open Init
-  module Inputs0 = Make_inputs0 (Init) (Ledger_proof_verifier)
+  module Inputs0 = Make_inputs0 (Init)
   include Inputs0
   module Staged_ledger_diff = Staged_ledger_diff
   module Transaction_snark_work = Transaction_snark_work
   module State_body_hash = State_body_hash
   module Staged_ledger_hash = Staged_ledger_hash
   module Staged_ledger_aux_hash = Staged_ledger_aux_hash
-  module Ledger_proof_verifier = Ledger_proof_verifier
+  module Ledger_proof_verifier = Verifier
   module Ledger_hash = Ledger_hash
   module Frozen_ledger_hash = Frozen_ledger_hash
   module User_command = User_command
@@ -871,7 +825,7 @@ struct
     module Genesis_ledger = Genesis_ledger
     module State_hash = State_hash
     module Staged_ledger_diff = Staged_ledger_diff
-    module Ledger_proof_verifier = Ledger_proof_verifier
+    module Ledger_proof_verifier = Verifier
     module Transaction_snark_work = Transaction_snark_work
     module Staged_ledger_hash = Staged_ledger_hash
     module Staged_ledger_aux_hash = Staged_ledger_aux_hash
@@ -951,34 +905,9 @@ struct
     else Some {Snark_work_lib.Work.Spec.instances; fee}
 end
 
-[%%if
-proof_level = "full"]
-
 module Make_coda (Init : Init_intf) = struct
-  module Ledger_proof_verifier = struct
-    let verify t stmt ~message =
-      if
-        not
-          (Int.( = )
-             (Transaction_snark.Statement.compare (Ledger_proof.statement t)
-                stmt)
-             0)
-      then Deferred.return false
-      else
-        match%map
-          Verifier.verify_transaction_snark Init.verifier t ~message
-        with
-        | Ok b ->
-            b
-        | Error e ->
-            Logger.warn Init.logger ~module_:__MODULE__ ~location:__LOC__
-              ~metadata:[("error", `String (Error.to_string_hum e))]
-              "Bad transaction snark: $error" ;
-            false
-  end
-
   module Inputs = struct
-    include Make_inputs (Init) (Ledger_proof_verifier) (Storage.Disk)
+    include Make_inputs (Init) (Storage.Disk)
     module Genesis_ledger = Genesis_ledger
     module Ledger_proof_statement = Transaction_snark.Statement
     module Snark_worker = Snark_worker_lib
@@ -997,36 +926,3 @@ module Make_coda (Init : Init_intf) = struct
     Inputs.request_work ~logger:t.logger ~best_staged_ledger ~seen_jobs
       ~set_seen_jobs ~snark_pool t (snark_work_fee t)
 end
-
-[%%else]
-
-(* TODO #1698: proof_level=check ledger proofs *)
-module Make_coda (Init : Init_intf) = struct
-  module Ledger_proof_verifier = struct
-    let verify _ _ ~message:_ = return true
-  end
-
-  module Inputs = struct
-    include Make_inputs (Init) (Ledger_proof_verifier) (Storage.Disk)
-    module Genesis_ledger = Genesis_ledger
-    module External_transition = External_transition
-    module Internal_transition = Internal_transition
-    module Ledger_proof_statement = Transaction_snark.Statement
-    module Snark_worker = Snark_worker
-    module Transaction_validator = Transaction_validator
-    module Prover_state = Consensus.Data.Prover_state
-    module Consensus_transition = Consensus.Data.Consensus_transition
-    module Blockchain_state = Blockchain_state
-    module Consensus_state = Consensus.Data.Consensus_state
-    module Snark_transition = Snark_transition
-    module Genesis_protocol_state = Genesis_protocol_state
-  end
-
-  include Coda_lib.Make (Inputs)
-
-  let request_work t =
-    Inputs.request_work ~logger:t.logger ~best_staged_ledger ~seen_jobs
-      ~set_seen_jobs ~snark_pool t (snark_work_fee t)
-end
-
-[%%endif]

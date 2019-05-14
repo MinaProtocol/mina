@@ -19,35 +19,44 @@ module Make (Inputs : Inputs.With_unprocessed_transition_cache.S) :
   with type state_hash := State_hash.t
    and type trust_system := Trust_system.t
    and type time_controller := Inputs.Time.Controller.t
-   and type external_transition_verified :=
-              Inputs.External_transition.Verified.t
+   and type external_transition_with_initial_validation :=
+              Inputs.External_transition.with_initial_validation
+   and type external_transition_validated :=
+              Inputs.External_transition.Validated.t
    and type unprocessed_transition_cache :=
               Inputs.Unprocessed_transition_cache.t
    and type transition_frontier := Inputs.Transition_frontier.t
    and type transition_frontier_breadcrumb :=
-              Inputs.Transition_frontier.Breadcrumb.t = struct
+              Inputs.Transition_frontier.Breadcrumb.t
+   and type verifier := Inputs.Verifier.t = struct
   open Inputs
   module Catchup_scheduler = Catchup_scheduler.Make (Inputs)
+  module Transition_frontier_validation =
+    External_transition.Transition_frontier_validation (Transition_frontier)
+
+  type external_transition_with_initial_validation =
+    ( [`Time_received] * Truth.true_t
+    , [`Proof] * Truth.true_t
+    , [`Frontier_dependencies] * Truth.false_t
+    , [`Staged_ledger_diff] * Truth.false_t )
+    External_transition.Validation.with_transition
 
   (* TODO: calculate a sensible value from postake consensus arguments *)
   let catchup_timeout_duration =
     Time.Span.of_ms
       (Consensus.Constants.block_window_duration_ms * 2 |> Int64.of_int)
 
-  let run ~logger ~trust_system ~time_controller ~frontier
+  let run ~logger ~verifier ~trust_system ~time_controller ~frontier
       ~(primary_transition_reader :
-         ( (External_transition.Verified.t, State_hash.t) With_hash.t
-           Envelope.Incoming.t
+         ( external_transition_with_initial_validation Envelope.Incoming.t
          , State_hash.t )
          Cached.t
          Reader.t)
-      ~(proposer_transition_reader :
-         (External_transition.Verified.t, State_hash.t) With_hash.t Reader.t)
+      ~(proposer_transition_reader : Transition_frontier.Breadcrumb.t Reader.t)
       ~(clean_up_catchup_scheduler : unit Ivar.t)
       ~(catchup_job_writer :
          ( State_hash.t
-           * ( (External_transition.Verified.t, State_hash.t) With_hash.t
-               Envelope.Incoming.t
+           * ( external_transition_with_initial_validation Envelope.Incoming.t
              , State_hash.t )
              Cached.t
              Rose_tree.t
@@ -66,8 +75,8 @@ module Make (Inputs : Inputs.With_unprocessed_transition_cache.S) :
          , unit Deferred.t )
          Writer.t) ~processed_transition_writer ~unprocessed_transition_cache =
     let catchup_scheduler =
-      Catchup_scheduler.create ~logger ~trust_system ~frontier ~time_controller
-        ~catchup_job_writer ~catchup_breadcrumbs_writer
+      Catchup_scheduler.create ~logger ~verifier ~trust_system ~frontier
+        ~time_controller ~catchup_job_writer ~catchup_breadcrumbs_writer
         ~clean_up_signal:clean_up_catchup_scheduler
     in
     (* add a breadcrumb and perform post processing *)
@@ -95,20 +104,17 @@ module Make (Inputs : Inputs.With_unprocessed_transition_cache.S) :
     in
     ignore
       (Reader.Merge.iter
-         [ Reader.map proposer_transition_reader ~f:(fun vt ->
-               (* The proposer transitions are registered into the cache in order to prevent
-                * duplicate internal proposals. Otherwise, this could just be wrapped with a
-                * phantom Cached.t *)
-               let enveloped_transition =
-                 Envelope.Incoming.wrap ~data:vt ~sender:Envelope.Sender.Local
-               in
-               `Valid_transition
-                 (Unprocessed_transition_cache.register_exn
-                    unprocessed_transition_cache enveloped_transition) )
+         (* It is fine to skip the cache layer on propose transitions because it
+            * is extradornarily unlikely we would write an internal bug triggering this
+            * case, and the external case (where we received an identical external
+            * transition from the network) can happen iff there is another node
+            * with the exact same private key and view of the transaction pool. *)
+         [ Reader.map proposer_transition_reader ~f:(fun breadcrumb ->
+               `Proposed_breadcrumb (Cached.pure breadcrumb) )
          ; Reader.map catchup_breadcrumbs_reader ~f:(fun cb ->
                `Catchup_breadcrumbs cb )
          ; Reader.map primary_transition_reader ~f:(fun vt ->
-               `Valid_transition vt ) ]
+               `Partially_valid_transition vt ) ]
          ~f:(fun msg ->
            let open Deferred.Let_syntax in
            trace_recurring_task "transition_handler_processor" (fun () ->
@@ -132,49 +138,63 @@ module Make (Inputs : Inputs.With_unprocessed_transition_cache.S) :
                          "failed to attach all catchup breadcrumbs to \
                           transition frontier: %s"
                          (Error.to_string_hum err) )
-               | `Valid_transition cached_transition -> (
-                   let hash =
-                     With_hash.hash
-                       (Envelope.Incoming.data (Cached.peek cached_transition))
-                   in
+               | `Proposed_breadcrumb breadcrumb -> (
+                   match%map
+                     add_and_finalize ~only_if_present:false breadcrumb
+                   with
+                   | Ok () ->
+                       ()
+                   | Error err ->
+                       Logger.error logger ~module_:__MODULE__
+                         ~location:__LOC__
+                         "failed to attach breadcrumb proposed internally to \
+                          transition frontier: %s"
+                         (Error.to_string_hum err) )
+               | `Partially_valid_transition
+                   cached_transition_with_initial_validation -> (
                    Logger.trace logger ~module_:__MODULE__ ~location:__LOC__
-                     ~metadata:[("state_hash", State_hash.to_yojson hash)]
+                     ~metadata:
+                       [("state_hash", State_hash.to_yojson transition_hash)]
                      "begining to process external transition: $state_hash" ;
                    match
-                     Transition_frontier.find frontier
-                       (External_transition.Verified.parent_hash
-                          ( With_hash.data
-                          @@ Envelope.Incoming.data
-                               (Cached.peek cached_transition) ))
+                     Transition_frontier_validation
+                     .validate_frontier_dependencies ~logger ~frontier
+                       (Envelope.Incoming.data (Cached.peek cached_transition))
                    with
-                   | None ->
-                       return
-                         (Catchup_scheduler.watch catchup_scheduler
-                            ~timeout_duration:catchup_timeout_duration
-                            ~cached_transition)
-                   | Some _ -> (
+                   | Error `Not_selected_over_frontier_root ->
+                       () (* TODO: punish *)
+                   | Error `Already_in_frontier ->
+                       failwith "impossible? (probably not)"
+                   | Error `Parent_missing_from_frontier ->
+                       Catchup_scheduler.watch catchup_scheduler
+                         ~timeout_duration:catchup_timeout_duration
+                         ~cached_transition:
+                           cached_transition_with_initial_validation ;
+                       return ()
+                   | Ok transition_with_validation -> (
+                       (* TODO: look up parent only once (parent is already looked up in call to validate dependencies *)
+                       (*
+                       let cached_transition_with_validation =
+                         Cached.transform cached_transition_with_initial_validation
+                          ~f:(Fn.const transition_with_validation)
+                       in
+                       *)
+                       let ( {With_hash.hash= transition_hash; data= transition}
+                           , _ ) =
+                         transition_with_validation
+                       in
+                       let parent_hash =
+                         External_transition.parent_hash transition
+                       in
+                       let parent =
+                         Option.value_exn
+                           (Transition_frontier.find frontier parent_hash)
+                       in
                        match%map
-                         let open Deferred.Result.Let_syntax in
-                         let parent_hash =
-                           Cached.peek cached_transition
-                           |> Envelope.Incoming.data |> With_hash.data
-                           |> External_transition.Verified.parent_hash
-                         in
-                         let%bind parent =
-                           match
-                             Transition_frontier.find frontier parent_hash
-                           with
-                           | Some parent ->
-                               return parent
-                           | None ->
-                               Deferred.Or_error.error_string
-                                 "parent not found"
-                         in
                          let%bind breadcrumb =
                            let open Deferred.Let_syntax in
                            let%bind cached_breadcrumb =
-                             Cached.transform cached_transition
-                               ~f:(fun transition_with_hash_enveloped ->
+                             Cached.transform cached_transition ~f:(fun _ ->
                                  let transition_with_hash =
                                    Envelope.Incoming.data
                                      transition_with_hash_enveloped
@@ -185,7 +205,7 @@ module Make (Inputs : Inputs.With_unprocessed_transition_cache.S) :
                                  in
                                  let%map breadcrumb_result =
                                    Transition_frontier.Breadcrumb.build ~logger
-                                     ~trust_system ~parent
+                                     ~verifier ~trust_system ~parent
                                      ~transition_with_hash
                                      ~sender:(Some sender)
                                  in

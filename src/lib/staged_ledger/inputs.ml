@@ -63,12 +63,13 @@ module type S = sig
        and type sok_digest := Sok_message.Digest.t
 
     include Sexpable.S with type t := t
+
+    val statement : t -> Ledger_proof_statement.t
   end
 
   module Ledger_proof_verifier :
     Ledger_proof_verifier_intf
-    with type statement := Ledger_proof_statement.t
-     and type message := Sok_message.t
+    with type message := Sok_message.t
      and type ledger_proof := Ledger_proof.t
 
   module Staged_ledger_aux_hash : Coda_pow.Staged_ledger_aux_hash_intf

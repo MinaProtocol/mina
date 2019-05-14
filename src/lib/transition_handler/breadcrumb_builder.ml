@@ -8,15 +8,16 @@ open Cache_lib
 module Make (Inputs : Inputs.S) :
   Breadcrumb_builder_intf
   with type state_hash := State_hash.t
-  with type trust_system := Trust_system.t
-  with type external_transition_verified :=
-              Inputs.External_transition.Verified.t
-  with type transition_frontier := Inputs.Transition_frontier.t
-  with type transition_frontier_breadcrumb :=
-              Inputs.Transition_frontier.Breadcrumb.t = struct
+   and type trust_system := Trust_system.t
+   and type external_transition_with_initial_validation :=
+              Inputs.External_transition.with_initial_validation
+   and type transition_frontier := Inputs.Transition_frontier.t
+   and type transition_frontier_breadcrumb :=
+              Inputs.Transition_frontier.Breadcrumb.t
+   and type verifier := Inputs.Verifier.t = struct
   open Inputs
 
-  let build_subtrees_of_breadcrumbs ~logger ~trust_system ~frontier
+  let build_subtrees_of_breadcrumbs ~logger ~verifier ~trust_system ~frontier
       ~initial_hash subtrees_of_enveloped_transitions =
     (* If the breadcrumb we are targetting is removed from the transition
      * frontier while we're catching up, it means this path is not on the
@@ -50,8 +51,16 @@ module Make (Inputs : Inputs.S) :
               Cached.transform cached_enveloped_transition
                 ~f:(fun enveloped_transition ->
                   let open Deferred.Or_error.Let_syntax in
-                  let transition =
+                  let transition_with_initial_validation =
                     Envelope.Incoming.data enveloped_transition
+                  in
+                  let transition_with_hash, _ =
+                    transition_with_initial_validation
+                  in
+                  let mostly_validated_transition =
+                    failwith "TODO"
+                    (* this is incorrect... need some way to short circuit this *)
+                    (* Transition_frontier.validate_transition_dependencies frontier transition_with_initial_validation *)
                   in
                   let sender = Envelope.Incoming.sender enveloped_transition in
                   let parent = Cached.peek cached_parent in
@@ -60,8 +69,8 @@ module Make (Inputs : Inputs.S) :
                     |> With_hash.hash
                   in
                   let actual_parent_hash =
-                    transition |> With_hash.data
-                    |> External_transition.Verified.protocol_state
+                    transition_with_hash |> With_hash.data
+                    |> External_transition.protocol_state
                     |> Protocol_state.previous_state_hash
                   in
                   let%bind () =
@@ -78,8 +87,9 @@ module Make (Inputs : Inputs.S) :
                   let open Deferred.Let_syntax in
                   (* TODO: propagate bans through subtree (#2299) *)
                   match%bind
-                    Transition_frontier.Breadcrumb.build ~logger ~trust_system
-                      ~parent ~transition_with_hash:transition
+                    Transition_frontier.Breadcrumb.build ~logger ~verifier
+                      ~trust_system ~parent
+                      ~transition:mostly_validated_transition
                       ~sender:
                         (Some (Envelope.Incoming.sender enveloped_transition))
                   with
