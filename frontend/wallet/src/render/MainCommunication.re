@@ -1,5 +1,4 @@
 open BsElectron;
-open Tc;
 
 include IpcRenderer.MakeIpcRenderer(Messages);
 
@@ -28,8 +27,7 @@ let listen = () => {
           CallTable.Ident.Decode.t(ident, Messages.Typ.Unit),
           (),
         )
-      | `Deep_link(routeString) =>
-        Router.navigate(Route.parse(routeString) |> Option.getExn)
+      | `Deep_link(routeString) => ReasonReact.Router.push(routeString)
       };
   on(cb);
   cb;

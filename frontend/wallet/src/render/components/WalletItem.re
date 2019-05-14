@@ -15,6 +15,7 @@ module Styles = {
       fontFamily("IBM Plex Sans, Sans-Serif"),
       color(grey),
       padding2(~v=`px(0), ~h=Theme.Spacing.defaultSpacing),
+      borderBottom(`px(1), `solid, Theme.Colors.borderColor),
     ]);
 
   let inactiveWalletItem =
@@ -24,20 +25,21 @@ module Styles = {
     merge([
       walletItem,
       style([
-        color(Colors.saville),
+        color(Colors.marineAlpha(1.)),
         backgroundColor(Colors.hyperlinkAlpha(0.15)),
       ]),
       notText,
     ]);
 
-  let walletName = style([fontWeight(`num(500)), fontSize(`px(16))]);
+  let walletName = Text.body;
 
   let balance =
     style([
-      fontWeight(`num(300)),
-      marginTop(`em(0.25)),
-      fontSize(`px(19)),
-      height(`em(1.5)),
+      fontWeight(`num(500)),
+      marginTop(`rem(0.25)),
+      fontSize(`rem(1.25)),
+      height(`rem(1.5)),
+      marginBottom(`rem(0.25)),
     ]);
 };
 
@@ -53,11 +55,7 @@ let make = (~wallet: Wallet.t) => {
       Option.map(~f=active => active == wallet.key, activeWallet),
     );
 
-  let walletName =
-    Option.withDefault(
-      ~default=PublicKey.toString(wallet.key),
-      Option.andThen(~f=s => SettingsRenderer.lookup(s, wallet.key), settings),
-    );
+  let walletName = SettingsRenderer.getWalletName(settings, wallet.key);
 
   <div
     className={

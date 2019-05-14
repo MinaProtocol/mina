@@ -8,10 +8,12 @@ module Styles = {
       display(`inlineFlex),
       alignItems(`center),
       justifyContent(`center),
+      paddingTop(`px(2)),
       height(`rem(1.5)),
+      marginBottom(`px(4)),
       padding2(~v=`px(0), ~h=`rem(0.5)),
       borderRadius(`px(4)),
-      backgroundColor(lightgrey),
+      backgroundColor(Theme.Colors.slateAlpha(0.2)),
     ]);
 };
 
@@ -156,16 +158,54 @@ module ViewModel = {
 module ActorName = {
   [@react.component]
   let make = (~value: ViewModel.Actor.t) => {
+    let (activeWallet, _) = React.useContext(ActiveWalletProvider.context);
+    let (settings, _) = React.useContext(SettingsProvider.context);
     switch (value) {
     | Key(key) =>
-      <span className=Styles.pill>
-        {ReasonReact.string(PublicKey.toString(key))}
-      </span>
-    | Unknown => <span> {React.string("Unknown")} </span>
+      <Pill mode={activeWallet === Some(key) ? Pill.Blue : Pill.Grey}>
+        <span
+          className=Css.(
+            merge([
+              Option.isSome(
+                SettingsRenderer.lookup(settings, key),
+              )
+                ? Theme.Text.body : Theme.Text.mono,
+              style([
+                color(
+                  activeWallet === Some(key)
+                    ? Theme.Colors.marineAlpha(1.) : Theme.Colors.midnight,
+                ),
+                opacity(0.7),
+              ]),
+            ])
+          )>
+          {ReasonReact.string(SettingsRenderer.getWalletName(settings, key))}
+        </span>
+      </Pill>
+    | Unknown =>
+      <Pill>
+        <span
+          className=Css.(
+            merge([
+              Theme.Text.body,
+              style([color(Theme.Colors.midnight), opacity(0.7)]),
+            ])
+          )>
+          {React.string("Unknown")}
+        </span>
+      </Pill>
     | Minted =>
-      <span className=Css.(style([backgroundColor(Theme.Colors.sage)]))>
-        {ReasonReact.string("Minted")}
-      </span>
+      <Pill mode=Pill.Green>
+        <span
+          className=Css.(
+            merge([
+              Theme.Text.body,
+              style([color(Theme.Colors.serpentine)]),
+            ])
+          )>
+          {ReasonReact.string("Minted")}
+        </span>
+      </Pill>
     };
   };
 };
@@ -179,11 +219,11 @@ module TimeDisplay = {
           whiteSpace(`nowrap),
           overflow(`hidden),
           textOverflow(`ellipsis),
-          maxWidth(`rem(6.0)),
+          maxWidth(`rem(10.0)),
         ])
       )>
-       {ReasonReact.string(Js.Date.toString(date))} </span>;
-      // TODO: Format properly
+      {ReasonReact.string(Time.render(~date, ~now=Js.Date.make()))}
+    </span>;
   };
 };
 
@@ -221,9 +261,10 @@ module InfoSection = {
             display(`flex),
             justifyContent(`spaceBetween),
             alignItems(`center),
+            color(Theme.Colors.midnight),
           ])
         )>
-        <p> {ReasonReact.string(message)} </p>
+        <p className=Theme.Text.body> {ReasonReact.string(message)} </p>
       </div>;
     };
     <div
@@ -276,7 +317,7 @@ let make = (~transaction: Transaction.t, ~myWallets: list(PublicKey.t)) => {
   <>
     <span>
       <ActorName value={viewModel.sender} />
-      <div>
+      <div className=Css.(style([marginTop(`rem(0.25))]))>
         {ReasonReact.string(
            switch (viewModel.action) {
            | Transfer => " -> "
