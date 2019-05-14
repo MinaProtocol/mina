@@ -435,7 +435,7 @@ module T = struct
           respond (Delegate (Coinbase_stack_path addr))
       | Merkle_tree.Set (addr, stack) ->
           respond (Delegate (Set_coinbase_stack (addr, stack)))
-      | Merkle_tree.Get_element addr ->
+      | Merkle_tree.Get_element (_, addr) ->
           respond (Delegate (Get_coinbase_stack addr))
       | _ ->
           unhandled

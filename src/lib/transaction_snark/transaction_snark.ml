@@ -414,15 +414,24 @@ module Base = struct
                       ~then_:(return payload.body.public_key)
                       ~else_:(return account.delegate))
              in
-             let%map balance =
+             let%bind balance =
                Balance.Checked.add_signed_amount account.balance sender_delta
+             in
+             let epoch_ledger_hash =
+               match payload.body.public_key with
+               | Public_key.Compressed.Poly.{x; _} ->
+                   State_hash.var_of_hash_packed x
+             in
+             let%map voting_for =
+               State_hash.if_ is_chain_voting ~then_:epoch_ledger_hash
+                 ~else_:account.voting_for
              in
              { Account.Poly.balance
              ; public_key= sender_compressed
              ; nonce= next_nonce
              ; receipt_chain_hash
              ; delegate
-             ; voting_for= account.voting_for }) )
+             ; voting_for }) )
     in
     let%bind receiver =
       (* A stake delegation only uses the sender *)
@@ -1606,7 +1615,9 @@ let%test_module "transaction_snark" =
                 Sparse_ledger.of_ledger_subset_exn ledger [proposer; other]
               in
               check_transaction transaction
-                (unstage (Sparse_ledger.handler sparse_ledger))
+                (unstage
+                   (Sparse_ledger.handler ~curr_ledger:sparse_ledger
+                      ~epoch_ledger:sparse_ledger))
                 ~sok_message:
                   (Coda_base.Sok_message.create ~fee:Currency.Fee.zero
                      ~prover:Public_key.Compressed.empty)
@@ -1655,7 +1666,9 @@ let%test_module "transaction_snark" =
               check_user_command ~sok_message
                 ~source:(Ledger.merkle_root ledger)
                 ~target pending_coinbase_stack t1
-                (unstage @@ Sparse_ledger.handler sparse_ledger) ) )
+                ( unstage
+                @@ Sparse_ledger.handler ~curr_ledger:sparse_ledger
+                     ~epoch_ledger:sparse_ledger ) ) )
 
     let%test "base_and_merge" =
       Test_util.with_randomness 123456789 (fun () ->
@@ -1701,7 +1714,9 @@ let%test_module "transaction_snark" =
               let proof12 =
                 of_user_command' sok_digest ledger t1
                   Pending_coinbase.Stack.empty
-                  (unstage @@ Sparse_ledger.handler sparse_ledger)
+                  ( unstage
+                  @@ Sparse_ledger.handler ~curr_ledger:sparse_ledger
+                       ~epoch_ledger:sparse_ledger )
               in
               let sparse_ledger =
                 Sparse_ledger.apply_user_command_exn sparse_ledger
@@ -1714,7 +1729,9 @@ let%test_module "transaction_snark" =
               let proof23 =
                 of_user_command' sok_digest ledger t2
                   Pending_coinbase.Stack.empty
-                  (unstage @@ Sparse_ledger.handler sparse_ledger)
+                  ( unstage
+                  @@ Sparse_ledger.handler ~curr_ledger:sparse_ledger
+                       ~epoch_ledger:sparse_ledger )
               in
               let sparse_ledger =
                 Sparse_ledger.apply_user_command_exn sparse_ledger

@@ -803,7 +803,9 @@ module Data = struct
           Coda_base.Pending_coinbase.create () |> Or_error.ok_exn
         in
         let ledger_handler =
-          unstage (Coda_base.Sparse_ledger.handler dummy_sparse_ledger)
+          unstage
+            (Coda_base.Sparse_ledger.handler ~curr_ledger:dummy_sparse_ledger
+               ~epoch_ledger:dummy_sparse_ledger)
         in
         let pending_coinbase_handler =
           unstage
@@ -839,7 +841,7 @@ module Data = struct
     end
 
     let check ~epoch ~slot ~seed ~private_key ~total_stake ~logger
-        ~epoch_snapshot =
+        ~epoch_snapshot ~epoch_ledger =
       let open Message in
       let open Local_state in
       let open Snapshot in
@@ -868,7 +870,10 @@ module Data = struct
                 return
                   (Some
                      { Proposal_data.stake_proof=
-                         {private_key; delegator; ledger= epoch_snapshot.ledger}
+                         { private_key
+                         ; delegator
+                         ; curr_ledger= epoch_snapshot.ledger
+                         ; epoch_ledger }
                      ; vrf_result }) ) ;
           None )
   end
@@ -2024,10 +2029,12 @@ module Data = struct
 
     let precomputed_handler = Vrf.Precomputed.handler
 
-    let handler {delegator; ledger; private_key}
+    let handler {delegator; curr_ledger; epoch_ledger; private_key}
         ~pending_coinbase:{ Coda_base.Pending_coinbase_witness.pending_coinbases
                           ; is_new_stack } : Snark_params.Tick.Handler.t =
-      let ledger_handler = unstage (Coda_base.Sparse_ledger.handler ledger) in
+      let ledger_handler =
+        unstage (Coda_base.Sparse_ledger.handler ~curr_ledger ~epoch_ledger)
+      in
       let pending_coinbase_handler =
         unstage
           (Coda_base.Pending_coinbase.handler pending_coinbases ~is_new_stack)
@@ -2538,6 +2545,7 @@ module Hooks = struct
       let proposal_data slot =
         Vrf.check ~epoch ~slot ~seed:epoch_data.seed ~epoch_snapshot
           ~private_key:keypair.private_key ~total_stake ~logger
+          ~epoch_ledger:(Local_state.get_last_epoch_ledger local_state)
       in
       let rec find_winning_slot slot =
         if UInt32.of_int (Epoch.Slot.to_int slot) >= Constants.Epoch.size then
@@ -2884,7 +2892,12 @@ let%test_module "Proof of stake tests" =
         in
         let handler =
           Prover_state.handler
-            {delegator; ledger= sparse_ledger; private_key}
+            { delegator
+            ; curr_ledger= sparse_ledger
+            ; epoch_ledger=
+                Sparse_ledger.of_any_ledger
+                  (Ledger.Any_ledger.cast (module Ledger) Genesis_ledger.t)
+            ; private_key }
             ~pending_coinbase:
               {Pending_coinbase_witness.pending_coinbases; is_new_stack= true}
         in
