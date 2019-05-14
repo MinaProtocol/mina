@@ -12,7 +12,9 @@ let net_configs n =
   let external_ports = List.init n ~f:(fun i -> 23000 + (i * 2)) in
   let discovery_ports = List.init n ~f:(fun i -> 23000 + 1 + (i * 2)) in
   let all_peers =
-    List.map discovery_ports ~f:(fun p -> Host_and_port.create "127.0.0.1" p)
+    List.map discovery_ports ~f:(fun port ->
+        let host = Coda_process.get_localhost ~discovery_port:port in
+        Host_and_port.create host port )
   in
   let peers =
     List.init n ~f:(fun i -> List.take all_peers i @ List.drop all_peers (i + 1)
