@@ -214,8 +214,8 @@ module TimeDisplay = {
     <span
       className=Css.(
         merge([
-          style([color(Theme.Colors.greyish(0.5))]),
           Theme.Text.Body.small,
+          style([color(Theme.Colors.greyish(0.5))]),
           style([
             whiteSpace(`nowrap),
             overflow(`hidden),
