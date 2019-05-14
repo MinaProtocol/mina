@@ -32,9 +32,9 @@ include Single.Make({
       let window =
         make(
           makeWindowConfig(
-            ~width=880,
-            ~height=500,
-            ~minWidth=880,
+            ~width=960,
+            ~height=610,
+            ~minWidth=800,
             ~minHeight=500,
             ~frame=false,
             ~fullscreenable=false,

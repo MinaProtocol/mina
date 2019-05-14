@@ -16,7 +16,6 @@ module Styles = {
         display(`flex),
         alignItems(`center),
         justifyContent(`spaceBetween),
-        backgroundColor(Colors.headerBgColor),
         color(black),
         fontFamily("IBM Plex Sans, Sans-Serif"),
         padding2(~v=`px(0), ~h=Theme.Spacing.defaultSpacing),
