@@ -2,7 +2,7 @@ open Core_kernel
 
 module type S = sig
   module Field : sig
-    type t [@@deriving sexp, bin_io, compare, hash, eq]
+    type t [@@deriving sexp, bin_io, compare, hash]
 
     include Stringable.S with type t := t
 
