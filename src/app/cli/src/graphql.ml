@@ -42,6 +42,10 @@ module Make (Commands : Coda_commands.Intf) = struct
 
     let uint64_doc = sprintf !"%s (%s is uint64 and is coerced as a string)"
 
+    let uint64_arg name ~doc ~typ =
+      let open Schema.Arg in
+      arg name ~typ ~doc:(uint64_doc name doc)
+
     let uint64_field name ~doc =
       field name ~typ:(non_null string) ~doc:(uint64_doc doc name)
 
@@ -50,9 +54,23 @@ module Make (Commands : Coda_commands.Intf) = struct
         ~doc:(uint64_doc doc name)
 
     (* TODO: include submitted_at (date) and included_at (date). These two fields are not exposed in the user_command *)
-    let payment : (Program.t, User_command.t option) typ =
-      obj "Payment" ~fields:(fun _ ->
-          [ field "nonce" ~typ:(non_null int) ~doc:"Nonce of the transaction"
+    let user_command : (Program.t, User_command.t option) typ =
+      obj "UserCommand" ~fields:(fun _ ->
+          [ field "isDelegation" ~typ:(non_null bool)
+              ~doc:
+                "If true, then User command is a Stake Delegation kind, \
+                 otherwise it is a payment kind"
+              ~args:Arg.[]
+              ~resolve:(fun _ user_command ->
+                match
+                  User_command.Payload.body
+                  @@ User_command.payload user_command
+                with
+                | Stake_delegation _ ->
+                    true
+                | Payment _ ->
+                    false )
+          ; field "nonce" ~typ:(non_null int) ~doc:"Nonce of the transaction"
               ~args:Arg.[]
               ~resolve:(fun _ payment ->
                 User_command_payload.nonce @@ User_command.payload payment
@@ -62,7 +80,7 @@ module Make (Commands : Coda_commands.Intf) = struct
               ~args:Arg.[]
               ~resolve:(fun _ payment ->
                 User_command.sender payment |> Stringable.public_key )
-          ; result_field_no_inputs "receiver" ~typ:(non_null string)
+          ; field "receiver" ~typ:(non_null string)
               ~doc:"Public key of the receiver"
               ~args:Arg.[]
               ~resolve:(fun _ payment ->
@@ -70,9 +88,9 @@ module Make (Commands : Coda_commands.Intf) = struct
                   User_command_payload.body (User_command.payload payment)
                 with
                 | Payment {Payment_payload.Poly.receiver; _} ->
-                    Ok (receiver |> Stringable.public_key)
-                | Stake_delegation _ ->
-                    Error "Payment should not consist of a stake delegation" )
+                    Stringable.public_key receiver
+                | Stake_delegation (Set_delegate {new_delegate}) ->
+                    Stringable.public_key new_delegate )
           ; uint64_result_field "amount"
               ~doc:"Amount that sender send to receiver"
               ~args:Arg.[]
@@ -125,13 +143,13 @@ module Make (Commands : Coda_commands.Intf) = struct
               ~doc:"Public key of the proposer creating the block"
               ~args:Arg.[]
               ~resolve:(fun _ external_transition ->
-                Stringable.public_key @@ Commands.proposer external_transition
-                )
-          ; field "payments" ~doc:"List of payments in the block"
-              ~typ:(non_null (list @@ non_null payment))
+                Stringable.public_key
+                @@ External_transition.proposer external_transition )
+          ; field "userCommands" ~doc:"List of user commands in the block"
+              ~typ:(non_null (list @@ non_null user_command))
               ~args:Arg.[]
               ~resolve:(fun _ external_transition ->
-                Commands.payments external_transition )
+                External_transition.user_commands external_transition )
           ; field "snarkFees"
               ~doc:"Fees that a proposer for constructing proofs"
               ~typ:(non_null (list @@ non_null snark_fee))
@@ -237,7 +255,13 @@ module Make (Commands : Coda_commands.Intf) = struct
 
       let create_payment =
         obj "CreatePaymentPayload" ~fields:(fun _ ->
-            [ field "payment" ~typ:(non_null payment)
+            [ field "payment" ~typ:(non_null user_command)
+                ~args:Arg.[]
+                ~resolve:(fun _ -> Fn.id) ] )
+
+      let set_delegation =
+        obj "SetDelegationPayload" ~fields:(fun _ ->
+            [ field "delegation" ~typ:(non_null user_command)
                 ~args:Arg.[]
                 ~resolve:(fun _ -> Fn.id) ] )
     end
@@ -260,7 +284,7 @@ module Make (Commands : Coda_commands.Intf) = struct
         type 'a t = {edges: 'a list; total_count: int; page_info: Page_info.t}
       end
 
-      module Payment = struct
+      module User_command = struct
         module Cursor = struct
           let serialize payment =
             let bigstring =
@@ -282,18 +306,18 @@ module Make (Commands : Coda_commands.Intf) = struct
           obj "PaymentEdge" ~fields:(fun _ ->
               [ field "cursor" ~typ:(non_null string)
                   ~doc:
-                    "Payment cursor is the base64 version of a serialized \
-                     transaction (via Jane Street bin_prot)"
+                    "Cursor is the base64 version of a serialized user \
+                     command (via Jane Street bin_prot)"
                   ~args:Arg.[]
                   ~resolve:(fun _ user_command -> Cursor.serialize user_command)
-              ; field "node" ~typ:(non_null payment)
+              ; field "node" ~typ:(non_null user_command)
                   ~args:Arg.[]
                   ~resolve:(fun _ -> Fn.id) ] )
 
         let connection =
           obj "PaymentConnection" ~fields:(fun _ ->
               [ field "edges"
-                  ~typ:(non_null @@ list @@ non_null payment)
+                  ~typ:(non_null @@ list @@ non_null user_command)
                   ~args:Arg.[]
                   ~resolve:(fun _ {Connection.edges; _} -> edges)
               ; field "totalCount" ~typ:(non_null int)
@@ -309,27 +333,41 @@ module Make (Commands : Coda_commands.Intf) = struct
     module Input = struct
       open Schema.Arg
 
+      module Fields = struct
+        let from ~doc = arg "from" ~typ:(non_null string) ~doc
+
+        let to_ ~doc = arg "to" ~typ:(non_null string) ~doc
+
+        let fee ~doc = uint64_arg "fee" ~typ:(non_null string) ~doc
+
+        let memo ~doc = uint64_arg "memo" ~typ:string ~doc
+      end
+
       let create_payment =
+        let open Fields in
         obj "CreatePaymentInput"
           ~coerce:(fun from to_ amount fee memo ->
             (from, to_, amount, fee, memo) )
           ~fields:
-            [ arg "from" ~doc:"Public key of recipient of payment"
+            [ from ~doc:"Public key of recipient of payment"
+            ; to_ ~doc:"Public key of sender of payment"
+            ; uint64_arg "amount" ~doc:"amount to send to to receiver"
                 ~typ:(non_null string)
-            ; arg "to" ~doc:"Public key of sender of payment"
-                ~typ:(non_null string)
-            ; arg "amount"
-                ~doc:"String representation of uint64 number of tokens to send"
-                ~typ:(non_null string)
-            ; arg "fee"
-                ~doc:
-                  "String representation of uint64 number of tokens to pay as \
-                   a transaction fee"
-                ~typ:(non_null string)
-            ; arg "memo" ~doc:"Public description of payment" ~typ:string ]
+            ; fee ~doc:"Fee amount in order to send payment"
+            ; memo ~doc:"Public description of payment" ]
 
-      let payment_filter_input =
-        obj "PaymentFilterType"
+      let set_delegation =
+        let open Fields in
+        obj "SetDelegationInput"
+          ~coerce:(fun from to_ fee memo -> (from, to_, fee, memo))
+          ~fields:
+            [ from ~doc:"Public key of recipient of a stake delegation"
+            ; to_ ~doc:"Public key of sender of a stake delegation"
+            ; fee ~doc:"Fee amount in order to send a stake delegation"
+            ; memo ~doc:"Public description of a stake delegation" ]
+
+      let user_command_filter_input =
+        obj "UserCommandFilterType"
           ~coerce:(fun public_key -> public_key)
           ~fields:
             [ arg "toOrFrom"
@@ -420,7 +458,8 @@ module Make (Commands : Coda_commands.Intf) = struct
           , `Has_earlier_page has_previous_page
           , `Has_later_page has_next_page ) =
         query transaction_database public_key
-          (Option.map ~f:Types.Pagination.Payment.Cursor.deserialize cursor)
+          (Option.map ~f:Types.Pagination.User_command.Cursor.deserialize
+             cursor)
           num_to_query
       in
       let page_info =
@@ -435,16 +474,16 @@ module Make (Commands : Coda_commands.Intf) = struct
       ; page_info
       ; total_count }
 
-    let payments =
-      io_field "payments"
+    let user_command =
+      io_field "user_command"
         ~args:
           Arg.
-            [ arg "filter" ~typ:(non_null Types.Input.payment_filter_input)
+            [ arg "filter" ~typ:(non_null Types.Input.user_command_filter_input)
             ; arg "first" ~typ:int
             ; arg "after" ~typ:string
             ; arg "last" ~typ:int
             ; arg "before" ~typ:string ]
-        ~typ:(non_null Types.Pagination.Payment.connection)
+        ~typ:(non_null Types.Pagination.User_command.connection)
         ~resolve:(fun {ctx= coda; _} () public_key first after last before ->
           let open Deferred.Result.Let_syntax in
           let%bind public_key =
@@ -489,7 +528,7 @@ module Make (Commands : Coda_commands.Intf) = struct
       ; owned_wallets
       ; wallet
       ; current_snark_worker
-      ; payments
+      ; user_command
       ; initial_peers ]
   end
 
@@ -523,19 +562,19 @@ module Make (Commands : Coda_commands.Intf) = struct
           Deferred.Result.return
           @@ Commands.Subscriptions.new_block coda public_key )
 
-    let new_payment_update =
-      subscription_field "newPaymentUpdate"
+    let new_user_command_update =
+      subscription_field "newUserCommandUpdate"
         ~doc:
           "Subscribes for payments with the sender's public key KEY whenever \
            we receive a block"
-        ~typ:(non_null Types.payment)
+        ~typ:(non_null Types.user_command)
         ~args:Arg.[arg "publicKey" ~typ:(non_null string)]
         ~resolve:(fun {ctx= coda; _} public_key ->
           let public_key = Public_key.Compressed.of_base64_exn public_key in
           Deferred.Result.return
           @@ Commands.Subscriptions.new_payment coda public_key )
 
-    let commands = [new_sync_update; new_block; new_payment_update]
+    let commands = [new_sync_update; new_block; new_user_command_update]
   end
 
   module Mutations = struct
@@ -552,67 +591,94 @@ module Make (Commands : Coda_commands.Intf) = struct
           let%map pk = Program.wallets coda |> Secrets.Wallets.generate_new in
           Result.return pk )
 
+    let user_command coda {Account.Poly.nonce; _} sender_kp memo payment_body
+        fee =
+      let payload =
+        User_command.Payload.create ~fee ~nonce ~memo ~body:payment_body
+      in
+      let payment = User_command.sign sender_kp payload in
+      let command = User_command.forget_check payment (*uhhh*) in
+      match%map Commands.send_payment coda command with
+      | `Active (Ok _) ->
+          Ok command
+      | `Active (Error e) ->
+          Error ("Couldn't send user_command: " ^ Error.to_string_hum e)
+      | `Bootstrapping ->
+          Error "Daemon is bootstrapping"
+
+    let parse_user_command_input ~kind coda from to_ fee maybe_memo =
+      let open Result.Let_syntax in
+      let%bind receiver =
+        result_of_exn Public_key.Compressed.of_base64_exn to_
+          ~error:"`to` address is not a valid public key."
+      in
+      let%bind sender =
+        result_of_exn Public_key.Compressed.of_base64_exn from
+          ~error:"`from` address is not a valid public key."
+      in
+      let%bind sender_account =
+        Result.of_option
+          (account_of_pk coda sender)
+          ~error:"Couldn't find the account for specified `sender`."
+      in
+      let%bind fee =
+        result_of_exn Currency.Fee.of_string fee
+          ~error:(sprintf "Invalid %s `fee` provided." kind)
+      in
+      let%bind sender_kp =
+        Result.of_option
+          (Secrets.Wallets.find (Program.wallets coda) ~needle:sender)
+          ~error:
+            (sprintf
+               "Couldn't find the private key for specified `sender`. Do you \
+                own the wallet you're making a %s from?"
+               kind)
+      in
+      let%map memo =
+        Option.value_map maybe_memo ~default:(Ok User_command_memo.dummy)
+          ~f:(fun memo ->
+            result_of_exn User_command_memo.create_exn memo
+              ~error:"Invalid `memo` provided." )
+      in
+      (sender_account, sender_kp, memo, receiver, fee)
+
+    let set_delegation =
+      io_field "sendPayment" ~doc:"Send a payment"
+        ~typ:(non_null Types.Payload.create_payment)
+        ~args:Arg.[arg "input" ~typ:(non_null Types.Input.create_payment)]
+        ~resolve:(fun {ctx= coda; _} () (from, to_, amount, fee, maybe_memo) ->
+          let open Deferred.Result.Let_syntax in
+          let%bind sender_account, sender_kp, memo, new_delegate, fee =
+            Deferred.return
+            @@ parse_user_command_input ~kind:"stake delegation" coda from to_
+                 fee maybe_memo
+          in
+          let body =
+            User_command_payload.Body.Stake_delegation
+              (Set_delegate {new_delegate})
+          in
+          user_command coda sender_account sender_kp memo body fee )
+
     let send_payment =
       io_field "sendPayment" ~doc:"Send a payment"
         ~typ:(non_null Types.Payload.create_payment)
         ~args:Arg.[arg "input" ~typ:(non_null Types.Input.create_payment)]
         ~resolve:(fun {ctx= coda; _} () (from, to_, amount, fee, maybe_memo) ->
-          let open Result.Monad_infix in
-          let maybe_info =
-            result_of_exn Currency.Amount.of_string amount
-              ~error:"Invalid payment `amount` provided."
-            >>= fun amount ->
-            result_of_exn Currency.Fee.of_string fee
-              ~error:"Invalid payment `fee` provided."
-            >>= fun fee ->
-            result_of_exn Public_key.Compressed.of_base64_exn to_
-              ~error:"`to` address is not a valid public key."
-            >>= fun receiver ->
-            result_of_exn Public_key.Compressed.of_base64_exn from
-              ~error:"`from` address is not a valid public key."
-            >>= fun sender ->
-            Result.of_option
-              (account_of_pk coda sender)
-              ~error:"Couldn't find the account for specified `sender`."
-            >>= fun account ->
-            Result.of_option
-              (Secrets.Wallets.find (Program.wallets coda) ~needle:sender)
-              ~error:
-                "Couldn't find the private key for specified `sender`. Do you \
-                 own the wallet you're making a payment from?"
-            >>= fun sender_kp ->
-            ( match maybe_memo with
-            | Some m ->
-                result_of_exn User_command_memo.create_exn m
-                  ~error:"Invalid `memo` provided."
-            | None ->
-                Ok User_command_memo.dummy )
-            >>= fun memo ->
-            Result.return (account, sender_kp, memo, receiver, amount, fee)
+          let open Deferred.Result.Let_syntax in
+          let%bind amount =
+            Deferred.return
+            @@ result_of_exn Currency.Amount.of_string amount
+                 ~error:"Invalid payment `amount` provided."
           in
-          match maybe_info with
-          | Ok (account, sender_kp, memo, receiver, amount, fee) ->
-              let body =
-                User_command_payload.Body.Payment {receiver; amount}
-              in
-              let payload =
-                User_command.Payload.create ~fee ~nonce:account.nonce ~memo
-                  ~body
-              in
-              let payment = User_command.sign sender_kp payload in
-              let command = User_command.forget_check payment (*uhhh*) in
-              let sent = Commands.send_payment coda command in
-              Deferred.map sent ~f:(function
-                | `Active (Ok _) ->
-                    Ok command
-                | `Active (Error e) ->
-                    Error ("Couldn't send payment: " ^ Error.to_string_hum e)
-                | `Bootstrapping ->
-                    Error "Daemon is bootstrapping" )
-          | Error e ->
-              Deferred.return (Error e) )
+          let%bind sender_account, sender_kp, memo, receiver, fee =
+            Deferred.return
+            @@ parse_user_command_input ~kind:"payment" coda from to_ fee
+                 maybe_memo
+          in
+          let body = User_command_payload.Body.Payment {receiver; amount} in
+          user_command coda sender_account sender_kp memo body fee )
 
-    let commands = [add_wallet; send_payment]
+    let commands = [add_wallet; send_payment; set_delegation]
   end
 
   let schema =
