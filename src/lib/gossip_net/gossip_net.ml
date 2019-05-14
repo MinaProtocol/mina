@@ -1,3 +1,6 @@
+[%%import
+"../../config.mlh"]
+
 open Core
 open Async
 open Pipe_lib
@@ -136,21 +139,116 @@ module Make (Message : Message_intf) : S with type msg := Message.msg = struct
     | Ok conn ->
         Versioned_rpc.Connection_with_menu.create conn
 
+  (* remove peer from set of peers and peers_by_ip
+
+     there are issues with this simple approach, because
+     Kademlia is not informed when peers are removed, so:
+
+     - the node may not be informed when a peer reconnects, so the
+        peer won't be re-added to the peer set
+     - Kademlia may propagate information about the removed peers
+        other nodes
+  *)
+  let remove_peer t peer =
+    Logger.info t.logger ~module_:__MODULE__ ~location:__LOC__
+      !"Removing peer from peer set: %{sexp: Peer.t}"
+      peer ;
+    Hash_set.remove t.peers peer ;
+    Hashtbl.update t.peers_by_ip peer.host ~f:(function
+      | None ->
+          failwith "Peer to remove doesn't appear in peers_by_ip"
+      | Some ip_peers ->
+          List.filter ip_peers ~f:(fun ip_peer -> not (Peer.equal ip_peer peer)) )
+
+  let is_unix_errno errno unix_errno =
+    Int.equal (Unix.Error.compare errno unix_errno) 0
+
+  [%%if
+  fixup_localhost_ips_for_testing]
+
+  let start_port = 9501
+
+  let stop_port = 9801
+
+  let get_available_port =
+    let port = ref start_port in
+    let reset () = port := start_port in
+    fun () ->
+      let result = !port in
+      incr port ;
+      if !port >= stop_port then reset () ;
+      result
+
+  (* bind socket to current host *)
+  let bind_socket t sock =
+    let max_bind_tries = stop_port - start_port + 1 in
+    let rec try_addr n =
+      if n > max_bind_tries then
+        failwith "Could not bind socket to local address" ;
+      let local_addr = `Inet (t.me.host, get_available_port ()) in
+      try Async.Socket.bind_inet sock local_addr
+      with
+      | Unix.Unix_error (errno, "bind", _)
+      when is_unix_errno errno Unix.Error.EADDRINUSE
+      ->
+        Logger.info t.logger ~module_:__MODULE__ ~location:__LOC__
+          !"Socket bind, address already in use: %{sexp: Socket.Address.Inet.t}"
+          local_addr ;
+        try_addr (n + 1)
+    in
+    try_addr 0
+
+  let get_socket t =
+    let socket = Async.Socket.(create Type.tcp) in
+    bind_socket t socket
+
+  [%%else]
+
+  (* don't bind socket *)
+  let get_socket _t = Async.Socket.(create Type.tcp)
+
+  [%%endif]
+
   let try_call_rpc t (peer : Peer.t) dispatch query =
+    (* use error collection, close connection strategy of Tcp.with_connection *)
+    let collect_errors writer f =
+      let monitor = Writer.monitor writer in
+      ignore (Monitor.detach_and_get_error_stream monitor) ;
+      choose
+        [ choice (Monitor.get_next_error monitor) (fun e -> Error e)
+        ; choice (try_with ~name:"Tcp.collect_errors" f) Fn.id ]
+    in
+    let close_connection reader writer =
+      Writer.close writer ~force_close:(Clock.after (sec 30.))
+      >>= fun () -> Reader.close reader
+    in
     let call () =
       try_with (fun () ->
-          Tcp.with_connection
-            (Tcp.Where_to_connect.of_host_and_port
-               (Peer.to_communications_host_and_port peer))
-            ~timeout:t.timeout
-            (fun _ r w ->
-              create_connection_with_menu peer r w
-              >>=? fun conn -> dispatch conn query ) )
+          let socket = get_socket t in
+          let peer_addr = `Inet (peer.host, peer.communication_port) in
+          let%bind connected_socket = Async.Socket.connect socket peer_addr in
+          let reader, writer =
+            let fd = Socket.fd connected_socket in
+            (Reader.create fd, Writer.create fd)
+          in
+          let run_query () =
+            create_connection_with_menu peer reader writer
+            >>=? fun conn -> dispatch conn query
+          in
+          let result = collect_errors writer run_query in
+          Deferred.any
+            [ (result >>| fun (_ : ('a, exn) Result.t) -> ())
+            ; Reader.close_finished reader
+            ; Writer.close_finished writer ]
+          >>= fun () ->
+          close_connection reader writer
+          >>= fun () -> result >>| function Ok v -> v | Error e -> raise e )
       >>= function
       | Ok (Ok result) ->
           (* call succeeded, result is valid *)
           return (Ok result)
       | Ok (Error err) -> (
+          (* call succeeded, result is an error *)
           Logger.error t.logger ~module_:__MODULE__ ~location:__LOC__
             !"RPC call error: %s {{{%s}}} [[[%{sexp: Error.t}]]]"
             (Exn.to_string (Error.to_exn err))
@@ -162,22 +260,30 @@ module Make (Message : Message_intf) : S with type msg := Message.msg = struct
                 [ Sexp.Atom "src/connection.ml.Handshake_error.Handshake_error"
                 ; _ ] ) ->
               let%map () =
-                Trust_system.record t.trust_system t.logger peer.host
-                  ( Trust_system.Actions.Outgoing_connection_error
-                  , Some ("handshake error", []) )
+                Trust_system.(
+                  record t.trust_system t.logger peer.host
+                    Actions.
+                      (Outgoing_connection_error, Some ("handshake error", [])))
               in
-              (* TODO: cleanup peer from peer table and maybe remove existing connections? *)
-              Error err
-          | Async_rpc_kernel.Rpc_error.Rpc (Connection_closed, _), _ ->
+              remove_peer t peer ; Error err
+          | ( _
+            , Sexp.List
+                [ Sexp.List
+                    [ Sexp.Atom "rpc_error"
+                    ; Sexp.List [Sexp.Atom "Connection_closed"; _] ]
+                ; _connection_description
+                ; _rpc_tag
+                ; _rpc_version ] ) ->
               let%map () =
-                Trust_system.record t.trust_system t.logger peer.host
-                  ( Trust_system.Actions.Outgoing_connection_error
-                  , Some ("closed connection", []) )
+                Trust_system.(
+                  record t.trust_system t.logger peer.host
+                    Actions.
+                      ( Outgoing_connection_error
+                      , Some ("Closed connection", []) ))
               in
-              Error err
+              remove_peer t peer ; Error err
           | _ ->
-              (* call succeeded, result is an error *)
-              let%bind () =
+              let%map () =
                 Trust_system.(
                   record t.trust_system t.logger peer.host
                     Actions.
@@ -186,15 +292,26 @@ module Make (Message : Message_intf) : S with type msg := Message.msg = struct
                           ( "RPC call failed, reason: $exn"
                           , [("exn", `String (Error.to_string_hum err))] ) ))
               in
-              return (Error err) )
-      | Error exn ->
+              remove_peer t peer ; Error err )
+      | Error monitor_exn -> (
           (* call itself failed *)
-          (* TODO: learn what exceptions are raised here, punish peers for
-            handshake timeouts, possibly other exceptions
-          *)
-          Logger.error t.logger ~module_:__MODULE__ ~location:__LOC__
-            "RPC call raised an exception: %s" (Exn.to_string exn) ;
-          return (Or_error.of_exn exn)
+          (* TODO: learn what other exceptions are raised here *)
+          let exn = Monitor.extract_exn monitor_exn in
+          match exn with
+          | Unix.Unix_error (errno, _, _)
+            when is_unix_errno errno Unix.ECONNREFUSED ->
+              let%map () =
+                Trust_system.(
+                  record t.trust_system t.logger peer.host
+                    Actions.
+                      ( Outgoing_connection_error
+                      , Some ("Connection refused", []) ))
+              in
+              remove_peer t peer ; Or_error.of_exn exn
+          | _ ->
+              Logger.error t.logger ~module_:__MODULE__ ~location:__LOC__
+                "RPC call raised an exception: %s" (Exn.to_string exn) ;
+              return (Or_error.of_exn exn) )
     in
     match Hashtbl.find t.connections peer.host with
     | None ->
@@ -352,16 +469,7 @@ module Make (Message : Message_intf) : S with type msg := Message.msg = struct
                   Logger.info t.logger ~module_:__MODULE__ ~location:__LOC__
                     "Some peers disconnected %s"
                     (List.sexp_of_t Peer.sexp_of_t peers |> Sexp.to_string_hum) ;
-                  List.iter peers ~f:(fun peer ->
-                      Hash_set.remove t.peers peer ;
-                      (* filter out this disconnected peer *)
-                      Hashtbl.update t.peers_by_ip peer.host ~f:(function
-                        | None ->
-                            failwith
-                              "Disconnected peer doesn't appear in peers_by_ip"
-                        | Some ip_peers ->
-                            List.filter ip_peers ~f:(fun ip_peer ->
-                                not (Peer.equal ip_peer peer) ) ) ) ;
+                  List.iter peers ~f:(remove_peer t) ;
                   Deferred.unit )
             |> ignore ) ;
         let%map _ =

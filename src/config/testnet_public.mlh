@@ -17,3 +17,4 @@
 
 [%%define integration_tests false]
 [%%define force_updates true]
+[%%define fixup_localhost_ips_for_testing false]
