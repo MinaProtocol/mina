@@ -40,6 +40,9 @@ module Colors = {
   let headerGreyText = `hex("516679");
   let textColor = white;
   let borderColor = rgba(0, 0, 0, 0.15);
+
+  // TODO: Rename
+  let greyish = a => `rgba((51, 66, 79, a));
 };
 
 module Typeface = {
@@ -49,13 +52,23 @@ module Typeface = {
 };
 
 module Text = {
-  let body =
-    style([
-      Typeface.plex,
-      fontWeight(`medium),
-      fontSize(`rem(1.)),
-      lineHeight(`rem(1.5)),
-    ]);
+  module Body = {
+    let regular =
+      style([
+        Typeface.plex,
+        fontWeight(`medium),
+        fontSize(`rem(1.)),
+        lineHeight(`rem(1.5)),
+      ]);
+
+    let small =
+      style([
+        Typeface.plex,
+        fontWeight(`normal),
+        fontSize(`rem(0.8125)),
+        lineHeight(`rem(1.25)),
+      ]);
+  };
 
   let smallHeader =
     style([

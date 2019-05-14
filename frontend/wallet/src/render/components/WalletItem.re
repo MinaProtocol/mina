@@ -31,7 +31,7 @@ module Styles = {
       notText,
     ]);
 
-  let walletName = Text.body;
+  let walletName = Text.Body.regular;
 
   let balance =
     style([
@@ -65,9 +65,7 @@ let make = (~wallet: Wallet.t) => {
       }
     }
     onClick={_ => setActiveWallet(wallet.key)}>
-    <div className=Styles.walletName>
-      {ReasonReact.string(walletName)}
-    </div>
+    <div className=Styles.walletName> {ReasonReact.string(walletName)} </div>
     <div className=Styles.balance>
       {ReasonReact.string({js|■ |js} ++ wallet.balance)}
     </div>

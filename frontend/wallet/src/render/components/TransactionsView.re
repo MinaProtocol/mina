@@ -11,7 +11,8 @@ module Styles = {
       gridTemplateColumns([`rem(16.), `fr(1.), `px(200)]),
       gridGap(Theme.Spacing.defaultSpacing),
       alignItems(`flexStart),
-      padding(`rem(1.)),
+      marginLeft(`rem(0.25)),
+      padding2(~h=`rem(0.75), ~v=`rem(1.)),
       borderBottom(`px(1), `solid, Theme.Colors.borderColor),
       lastChild([borderBottom(`px(0), `solid, white)]),
     ]);
@@ -83,7 +84,7 @@ let mockTransactions =
         to_: List.head(myWallets) |> Option.getExn,
         amount: 1540,
         fee: 10,
-        memo: Some("Remitance payment"),
+        memo: Some("Remittance payment"),
         includedAt: Some(Js.Date.fromString("16 Apr 2019 21:46:00 PST")),
         submittedAt: Js.Date.fromString("15 Apr 2019 21:46:00 PST"),
       },

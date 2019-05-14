@@ -166,10 +166,8 @@ module ActorName = {
         <span
           className=Css.(
             merge([
-              Option.isSome(
-                SettingsRenderer.lookup(settings, key),
-              )
-                ? Theme.Text.body : Theme.Text.mono,
+              Option.isSome(SettingsRenderer.lookup(settings, key))
+                ? Theme.Text.Body.regular : Theme.Text.mono,
               style([
                 color(
                   activeWallet === Some(key)
@@ -187,7 +185,7 @@ module ActorName = {
         <span
           className=Css.(
             merge([
-              Theme.Text.body,
+              Theme.Text.Body.regular,
               style([color(Theme.Colors.midnight), opacity(0.7)]),
             ])
           )>
@@ -199,7 +197,7 @@ module ActorName = {
         <span
           className=Css.(
             merge([
-              Theme.Text.body,
+              Theme.Text.Body.regular,
               style([color(Theme.Colors.serpentine)]),
             ])
           )>
@@ -215,11 +213,15 @@ module TimeDisplay = {
   let make = (~date: Js.Date.t) => {
     <span
       className=Css.(
-        style([
-          whiteSpace(`nowrap),
-          overflow(`hidden),
-          textOverflow(`ellipsis),
-          maxWidth(`rem(10.0)),
+        merge([
+          style([color(Theme.Colors.greyish(0.5))]),
+          Theme.Text.Body.small,
+          style([
+            whiteSpace(`nowrap),
+            overflow(`hidden),
+            textOverflow(`ellipsis),
+            maxWidth(`rem(10.0)),
+          ]),
         ])
       )>
       {ReasonReact.string(Time.render(~date, ~now=Js.Date.make()))}
@@ -264,7 +266,9 @@ module InfoSection = {
             color(Theme.Colors.midnight),
           ])
         )>
-        <p className=Theme.Text.body> {ReasonReact.string(message)} </p>
+        <p className=Theme.Text.Body.regular>
+          {ReasonReact.string(message)}
+        </p>
       </div>;
     };
     <div

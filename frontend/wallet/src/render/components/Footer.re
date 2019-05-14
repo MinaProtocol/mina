@@ -32,7 +32,7 @@ module StakingSwitch = {
       <span
         className=Css.(
           merge([
-            Theme.Text.body,
+            Theme.Text.Body.regular,
             style([
               color(
                 staking
