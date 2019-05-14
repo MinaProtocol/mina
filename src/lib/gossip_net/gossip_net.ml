@@ -461,17 +461,9 @@ module Make (Message : Message_intf) : S with type msg := Message.msg = struct
                     "Some peers connected %s"
                     (List.sexp_of_t Peer.sexp_of_t peers |> Sexp.to_string_hum) ;
                   List.iter peers ~f:(fun peer ->
-                      match Trust_system.lookup t.trust_system peer.host with
-                      | {banned= Unbanned; _} ->
-                          Hash_set.add t.peers peer ;
-                          Hashtbl.add_multi t.peers_by_ip ~key:peer.host
-                            ~data:peer
-                      | {banned= Banned_until _; _} ->
-                          Logger.warn t.logger ~module_:__MODULE__
-                            ~location:__LOC__
-                            !"Not adding banned peer: %{sexp: \
-                              Network_peer.Peer.t}"
-                            peer ) ;
+                      Hash_set.add t.peers peer ;
+                      Hashtbl.add_multi t.peers_by_ip ~key:peer.host ~data:peer
+                  ) ;
                   Deferred.unit
               | Disconnect peers ->
                   Logger.info t.logger ~module_:__MODULE__ ~location:__LOC__
