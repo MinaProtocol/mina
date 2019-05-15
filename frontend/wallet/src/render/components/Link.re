@@ -7,8 +7,8 @@ module Styles = {
       style([
         display(`inlineFlex),
         alignItems(`center),
+        cursor(`default),
         color(Theme.Colors.slateAlpha(0.5)),
-        cursor(`pointer),
         hover([color(Theme.Colors.hyperlinkAlpha(0.7))]),
       ]),
     ]);

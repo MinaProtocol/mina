@@ -20,7 +20,6 @@ module Styles = {
         background(white),
         border(`px(0), `solid, white),
         borderRadius(`rem(0.25)),
-        cursor(`pointer),
         active([outlineStyle(`none)]),
         focus([outlineStyle(`none)]),
       ]),
