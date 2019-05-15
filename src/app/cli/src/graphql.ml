@@ -116,6 +116,16 @@ module Make (Commands : Coda_commands.Intf) = struct
                 User_command_payload.memo @@ User_command.payload payment
                 |> User_command_memo.to_string ) ] )
 
+    let delegation_update =
+      obj "DelegationUpdate" ~fields:(fun _ ->
+          [ field "status"
+              ~args:Arg.[]
+              ~typ:(non_null user_command)
+              ~resolve:(fun _ user_command -> user_command)
+            (* TODO: include active field *)
+            (* TODO: include consensus field *)
+           ] )
+
     let snark_fee : (Program.t, Transaction_snark_work.t option) typ =
       obj "SnarkFee" ~fields:(fun _ ->
           [ field "snarkCreator" ~typ:(non_null string)
@@ -399,6 +409,12 @@ module Make (Commands : Coda_commands.Intf) = struct
         ; receipt_chain_hash
         ; voting_for } )
 
+  module Arguments = struct
+    let public_key ~name public_key =
+      result_of_exn Public_key.Compressed.of_base64_exn public_key
+        ~error:(sprintf !"%s address is not valid." name)
+  end
+
   module Queries = struct
     open Schema
 
@@ -438,10 +454,7 @@ module Make (Commands : Coda_commands.Intf) = struct
         ~args:Arg.[arg "publicKey" ~typ:(non_null string)]
         ~resolve:(fun {ctx= coda; _} () pk_string ->
           let open Result.Let_syntax in
-          let%map pk =
-            result_of_exn ~error:"publicKey address is not valid."
-              Public_key.Compressed.of_base64_exn pk_string
-          in
+          let%map pk = Arguments.public_key ~name:"publicKey" pk_string in
           account_of_pk coda pk )
 
     let current_snark_worker =
@@ -488,8 +501,7 @@ module Make (Commands : Coda_commands.Intf) = struct
           let open Deferred.Result.Let_syntax in
           let%bind public_key =
             Deferred.return
-            @@ result_of_exn Public_key.Compressed.of_base64_exn public_key
-                 ~error:"publicKey address is not valid."
+            @@ Arguments.public_key ~name:"publicKey" public_key
           in
           let transaction_database = Program.transaction_database coda in
           Deferred.return
@@ -509,6 +521,18 @@ module Make (Commands : Coda_commands.Intf) = struct
                 (build_connection
                    ~query:Transaction_database.get_later_transactions
                    transaction_database public_key cursor num_to_query) )
+
+    let delegation_status =
+      result_field "delegationStatus"
+        ~args:Arg.[arg "key" ~typ:(non_null string)]
+        ~typ:Types.delegation_update
+        ~resolve:(fun {ctx= coda; _} () public_key ->
+          let open Result.Let_syntax in
+          let%map public_key =
+            Arguments.public_key ~name:"publicKey" public_key
+          in
+          let transaction_database = Program.transaction_database coda in
+          Transaction_database.get_delegator transaction_database public_key )
 
     let initial_peers =
       field "initialPeers"
@@ -555,8 +579,7 @@ module Make (Commands : Coda_commands.Intf) = struct
           let open Deferred.Result.Let_syntax in
           let%bind public_key =
             Deferred.return
-            @@ result_of_exn Public_key.Compressed.of_base64_exn public_key
-                 ~error:"publicKey is not valid"
+            @@ Arguments.public_key ~name:"publicKey" public_key
           in
           (* Pipes that will alert a subscriber of any new blocks throughout the entire time the daemon is on *)
           Deferred.Result.return
@@ -608,14 +631,8 @@ module Make (Commands : Coda_commands.Intf) = struct
 
     let parse_user_command_input ~kind coda from to_ fee maybe_memo =
       let open Result.Let_syntax in
-      let%bind receiver =
-        result_of_exn Public_key.Compressed.of_base64_exn to_
-          ~error:"`to` address is not a valid public key."
-      in
-      let%bind sender =
-        result_of_exn Public_key.Compressed.of_base64_exn from
-          ~error:"`from` address is not a valid public key."
-      in
+      let%bind receiver = Arguments.public_key ~name:"to" to_ in
+      let%bind sender = Arguments.public_key ~name:"from" from in
       let%bind sender_account =
         Result.of_option
           (account_of_pk coda sender)
