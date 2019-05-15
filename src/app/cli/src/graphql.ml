@@ -528,7 +528,7 @@ module Make (Commands : Coda_commands.Intf) = struct
         ~typ:Types.delegation_update
         ~resolve:(fun {ctx= coda; _} () public_key ->
           let open Result.Let_syntax in
-          let%bind public_key =
+          let%map public_key =
             Arguments.public_key ~name:"publicKey" public_key
           in
           let transaction_database = Program.transaction_database coda in
