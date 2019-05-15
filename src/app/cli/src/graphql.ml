@@ -591,13 +591,13 @@ module Make (Commands : Coda_commands.Intf) = struct
           let%map pk = Program.wallets coda |> Secrets.Wallets.generate_new in
           Result.return pk )
 
-    let user_command coda {Account.Poly.nonce; _} sender_kp memo payment_body
-        fee =
+    let build_user_command coda {Account.Poly.nonce; _} sender_kp memo
+        payment_body fee =
       let payload =
         User_command.Payload.create ~fee ~nonce ~memo ~body:payment_body
       in
       let payment = User_command.sign sender_kp payload in
-      let command = User_command.forget_check payment (*uhhh*) in
+      let command = User_command.forget_check payment in
       match%map Commands.send_payment coda command with
       | `Active (Ok _) ->
           Ok command
@@ -657,7 +657,7 @@ module Make (Commands : Coda_commands.Intf) = struct
             User_command_payload.Body.Stake_delegation
               (Set_delegate {new_delegate})
           in
-          user_command coda sender_account sender_kp memo body fee )
+          build_user_command coda sender_account sender_kp memo body fee )
 
     let send_payment =
       io_field "sendPayment" ~doc:"Send a payment"
@@ -676,7 +676,7 @@ module Make (Commands : Coda_commands.Intf) = struct
                  maybe_memo
           in
           let body = User_command_payload.Body.Payment {receiver; amount} in
-          user_command coda sender_account sender_kp memo body fee )
+          build_user_command coda sender_account sender_kp memo body fee )
 
     let commands = [add_wallet; send_payment; set_delegation]
   end
