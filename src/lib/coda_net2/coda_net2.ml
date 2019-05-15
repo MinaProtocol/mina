@@ -481,8 +481,10 @@ let configure net ~me ~maddrs ~statedir ~network_id =
   | Error e ->
       Error e
 
+(** TODO: do we need this? *)
 let peers net = Deferred.return []
 
+(** TODO: do we need this? *)
 let random_peers net count = Deferred.return []
 
 let listen_on net ma =
@@ -502,6 +504,7 @@ let listen_on net ma =
   | Error e ->
       Error e
 
+(** TODO: implement *)
 let shutdown net = Deferred.return (Ok ())
 
 module Stream = struct
