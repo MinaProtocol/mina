@@ -43,15 +43,35 @@ struct
 
   type t = {database: Database.t; cache: cache; logger: Logger.t}
 
-  let create logger directory =
-    { database= Database.create ~directory
-    ; cache=
-        { user_transactions= Public_key.Compressed.Table.create ()
-        ; all_transactions= Transaction.Table.create ()
-        ; delegators= Public_key.Compressed.Table.create () }
-    ; logger }
+  let choose_delegator delegators ((txn, _) as txn_with_time) =
+    Transaction.on_delegation_command txn ~f:(fun sender ->
+        Hashtbl.update delegators sender ~f:(function
+          | None ->
+              txn_with_time
+          | Some queried_txn_with_time ->
+              Txn_with_date.max queried_txn_with_time txn_with_time ) )
 
-  (* TODO: make load function #2333 *)
+  let add_user_transaction user_transactions (transaction, date) =
+    List.iter (Transaction.get_participants transaction) ~f:(fun pk ->
+        let user_txns =
+          Option.value
+            (Hashtbl.find user_transactions pk)
+            ~default:Txn_with_date.Set.empty
+        in
+        let user_txns' = Txn_with_date.Set.add user_txns (transaction, date) in
+        Hashtbl.set user_transactions ~key:pk ~data:user_txns' )
+
+  let create logger directory =
+    let database = Database.create ~directory in
+    let user_transactions = Public_key.Compressed.Table.create () in
+    let all_transactions = Transaction.Table.create () in
+    let delegators = Public_key.Compressed.Table.create () in
+    List.iter (Database.to_alist database)
+      ~f:(fun ((txn, time) as txn_with_time) ->
+        Transaction.Table.add_exn all_transactions ~key:txn ~data:time ;
+        add_user_transaction user_transactions txn_with_time ;
+        choose_delegator delegators txn_with_time ) ;
+    {database; cache= {user_transactions; all_transactions; delegators}; logger}
 
   let close {database; _} = Database.close database
 
@@ -69,18 +89,8 @@ struct
     | None ->
         Database.set database ~key:transaction ~data:date ;
         Hashtbl.add_exn all_transactions ~key:transaction ~data:date ;
-        Transaction.on_delegation_command transaction ~f:(fun sender ->
-            Hashtbl.set delegators ~key:sender ~data:(transaction, date) ) ;
-        List.iter (Transaction.get_participants transaction) ~f:(fun pk ->
-            let user_txns =
-              Option.value
-                (Hashtbl.find user_transactions pk)
-                ~default:Txn_with_date.Set.empty
-            in
-            let user_txns' =
-              Txn_with_date.Set.add user_txns (transaction, date)
-            in
-            Hashtbl.set user_transactions ~key:pk ~data:user_txns' )
+        choose_delegator delegators (transaction, date) ;
+        add_user_transaction user_transactions (transaction, date)
 
   let get_delegator {cache= {delegators; _}; _} public_key =
     let open Option.Let_syntax in
@@ -603,6 +613,41 @@ let%test_module "Transaction_database" =
           ~query_next_page:Database.get_later_transactions
           ~check_pages:(fun has_earlier _has_later -> assert (not has_earlier))
           ~compare:compare_txns_with_dates
+
+      let%test_unit "After the database closes, we should be able to requery \
+                     the transactions" =
+        let gen =
+          let open Quickcheck.Generator in
+          let key_gen =
+            tuple2 (return keypair1) (of_list [keypair1; keypair2])
+          in
+          let payment_gen =
+            User_command.Gen.payment ~key_gen ~max_amount:10000 ~max_fee:1000
+              ()
+          in
+          small_non_negative_int
+          >>= fun size ->
+          list_with_length size @@ tuple2 payment_gen @@ Int.gen_incl 0 50
+        in
+        Async.Thread_safe.block_on_async_exn
+        @@ fun () ->
+        Quickcheck.async_test gen ~trials:5 ~f:(fun user_commands_with_time ->
+            File_system.with_temp_dir "/tmp/coda-test"
+              ~f:(fun directory_name ->
+                let database = Database.create logger directory_name in
+                add_all_transactions database user_commands_with_time ;
+                Database.close database ;
+                let reopened_database =
+                  Database.create logger directory_name
+                in
+                let retrieved_transactions, _, _ =
+                  Database.get_earlier_transactions reopened_database pk1 None
+                    None
+                in
+                Deferred.return
+                @@ assert_transactions
+                     (List.map ~f:fst user_commands_with_time)
+                     retrieved_transactions ) )
 
       let%test_unit "Get the most recent delegator" =
         let keys =
