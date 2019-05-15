@@ -378,6 +378,9 @@ module TopLevelStyles = {
         width(`percent(100.)),
         marginTop(`rem(0.5)),
       ]);
+
+    let action =
+      merge([Theme.Text.Body.small, style([marginRight(`rem(1.0))])]);
   };
 };
 
@@ -417,11 +420,8 @@ let make = (~transaction: Transaction.t, ~myWallets: list(PublicKey.t)) => {
                 <span
                   className=Css.(
                     merge([
-                      Theme.Text.Body.small,
-                      style([
-                        marginRight(`rem(1.0)),
-                        color(Theme.Colors.pendingOrange),
-                      ]),
+                      TopLevelStyles.RightSide.action,
+                      style([color(Theme.Colors.pendingOrange)]),
                     ])
                   )>
                   {ReasonReact.string("Pending")}
@@ -430,11 +430,8 @@ let make = (~transaction: Transaction.t, ~myWallets: list(PublicKey.t)) => {
                 <span
                   className=Css.(
                     merge([
-                      Theme.Text.Body.small,
-                      style([
-                        marginRight(`rem(1.0)),
-                        color(Theme.Colors.roseBud),
-                      ]),
+                      TopLevelStyles.RightSide.action,
+                      style([color(Theme.Colors.roseBud)]),
                     ])
                   )>
                   {ReasonReact.string("Failed")}
