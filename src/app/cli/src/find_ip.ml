@@ -22,4 +22,4 @@ let find () =
   Deferred.List.fold services ~init:None ~f:handler
   >>| fun x ->
   Unix.Inet_addr.of_string
-  @@ Option.value_exn ~message:"couldn't figure out own IP from the internet" x
+  @@ Option.value_exn ~message:"couldn't determine our IP from the internet" x

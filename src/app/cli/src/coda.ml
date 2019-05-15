@@ -87,10 +87,13 @@ let daemon logger =
            "PORT local REST-server for daemon interaction (default no \
             rest-server)"
          (optional int16)
-     and external_ip =
-       flag "external-ip" ~doc:"External IP address for others to connect to"
+     and external_ip_opt =
+       flag "external-ip"
+         ~doc:
+           "External IP address for other nodes to connect to. You only need \
+            to set this if auto-discovery fails for some reason."
          (optional string)
-     and bind_ip =
+     and bind_ip_opt =
        flag "bind-ip" ~doc:"IP of network interface to use" (optional string)
      and is_background =
        flag "background" no_arg ~doc:"Run process on the background"
@@ -248,14 +251,15 @@ let daemon logger =
          else Deferred.unit
        in
        let%bind external_ip =
-         match external_ip with
+         match external_ip_opt with
          | None ->
              Find_ip.find ()
          | Some ip ->
              return @@ Unix.Inet_addr.of_string ip
        in
        let bind_ip =
-         Option.value bind_ip ~default:"0.0.0.0" |> Unix.Inet_addr.of_string
+         Option.value bind_ip_opt ~default:"0.0.0.0"
+         |> Unix.Inet_addr.of_string
        in
        let addrs_and_ports : Kademlia.Node_addrs_and_ports.t =
          { external_ip

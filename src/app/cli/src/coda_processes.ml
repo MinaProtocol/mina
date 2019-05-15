@@ -15,21 +15,21 @@ let net_configs n =
     List.init n ~f:(fun i ->
         Unix.Inet_addr.of_string @@ sprintf "127.0.0.%i" (i + 10) )
   in
-  let addrs_and_portses =
+  let addrs_and_ports_list =
     List.map3_exn external_ports discovery_ports ips
       ~f:(fun communication_port discovery_port ip ->
         Kademlia.Node_addrs_and_ports.
           {external_ip= ip; bind_ip= ip; discovery_port; communication_port} )
   in
   let all_peers =
-    List.map addrs_and_portses
+    List.map addrs_and_ports_list
       ~f:Kademlia.Node_addrs_and_ports.to_discovery_host_and_port
   in
   let peers =
     List.init n ~f:(fun i -> List.take all_peers i @ List.drop all_peers (i + 1)
     )
   in
-  (addrs_and_portses, peers)
+  (addrs_and_ports_list, peers)
 
 [%%inject
 "genesis_state_timestamp_string", genesis_state_timestamp]
@@ -46,9 +46,9 @@ let offset =
 let local_configs ?proposal_interval ?(proposers = Fn.const None) n
     ~acceptable_delay ~program_dir ~snark_worker_public_keys ~work_selection
     ~trace_dir ~max_concurrent_connections =
-  let addrs_and_portses, peers = net_configs n in
+  let addrs_and_ports_list, peers = net_configs n in
   let peers = [] :: List.drop peers 1 in
-  let args = List.zip_exn addrs_and_portses peers in
+  let args = List.zip_exn addrs_and_ports_list peers in
   let configs =
     List.mapi args ~f:(fun i (addrs_and_ports, peers) ->
         let public_key =
