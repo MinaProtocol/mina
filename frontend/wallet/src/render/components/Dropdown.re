@@ -26,13 +26,16 @@ module Styles = {
       style([
         textTransform(`uppercase),
         color(Theme.Colors.slateAlpha(0.7)),
+        cursor(`default),
       ]),
     ]);
 
   let value =
     merge([
       Theme.Text.Body.regular,
-      style([paddingBottom(`px(2)), color(Theme.Colors.teal)]),
+      style([paddingBottom(`px(2)), color(Theme.Colors.teal),
+        cursor(`default),
+      ]),
     ]);
 
   let hidden = style([display(`none)]);
@@ -48,6 +51,7 @@ module Styles = {
       border(`px(1), `solid, Theme.Colors.marineAlpha(0.3)),
       borderBottomLeftRadius(`rem(0.25)),
       borderBottomRightRadius(`rem(0.25)),
+        cursor(`default),
     ]);
 
   let item =
