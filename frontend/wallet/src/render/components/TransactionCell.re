@@ -294,9 +294,7 @@ module InfoSection = {
        | StakingReward(rewards, _) =>
          <>
            <MainRow>
-             {React.string("Staking reward")}
-             <Spacer width=0.5 />
-             <Link> {React.string(expanded ? "Collapse" : "Expand")} </Link>
+             <Link> {React.string(expanded ? "Collapse" : "Details")} </Link>
            </MainRow>
            {expanded
               ? <ul>
