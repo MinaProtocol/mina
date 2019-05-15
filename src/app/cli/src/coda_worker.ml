@@ -14,7 +14,7 @@ end
 
 module Input = struct
   type t =
-    { host: string
+    { addrs_and_ports: Kademlia.Node_addrs_and_ports.t
     ; env: (string * string) list
     ; proposer: int option
     ; snark_worker_config: Snark_worker_config.t option
@@ -22,8 +22,6 @@ module Input = struct
     ; conf_dir: string
     ; trace_dir: string option
     ; program_dir: string
-    ; external_port: int
-    ; discovery_port: int
     ; acceptable_delay: Time.Span.t
     ; peers: Host_and_port.t list
     ; max_concurrent_connections: int option }
@@ -288,20 +286,22 @@ module T = struct
       ; get_all_payments }
 
     let init_worker_state
-        { host
+        { addrs_and_ports
         ; proposer
         ; snark_worker_config
         ; work_selection
         ; conf_dir
         ; trace_dir
         ; program_dir
-        ; external_port
         ; peers
-        ; discovery_port
         ; max_concurrent_connections } =
       let logger =
         Logger.create
-          ~metadata:[("host", `String host); ("port", `Int external_port)]
+          ~metadata:
+            [ ( "host"
+              , `String (Unix.Inet_addr.to_string addrs_and_ports.external_ip)
+              )
+            ; ("port", `Int addrs_and_ports.communication_port) ]
           ()
       in
       let%bind () =
@@ -385,10 +385,7 @@ module T = struct
                 ; target_peer_count= 8
                 ; conf_dir
                 ; initial_peers= peers
-                ; me=
-                    Network_peer.Peer.create
-                      (Unix.Inet_addr.of_string host)
-                      ~discovery_port ~communication_port:external_port
+                ; addrs_and_ports
                 ; logger
                 ; trust_system
                 ; max_concurrent_connections } }

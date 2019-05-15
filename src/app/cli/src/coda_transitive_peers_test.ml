@@ -27,21 +27,17 @@ let main () =
       ~max_concurrent_connections
   in
   let%bind workers = Coda_processes.spawn_local_processes_exn configs in
-  let discovery_ports, external_ports, peers =
-    Coda_processes.net_configs (n + 1)
-  in
+  let addrs_and_portses, peers = Coda_processes.net_configs (n + 1) in
   let expected_peers = List.nth_exn peers n in
   let peers = [List.hd_exn expected_peers] in
-  let external_port = List.nth_exn external_ports n in
-  let discovery_port = List.nth_exn discovery_ports n in
+  let addrs_and_ports = List.nth_exn addrs_and_portses n in
   Logger.debug logger ~module_:__MODULE__ ~location:__LOC__
     !"connecting to peers %{sexp: Host_and_port.t list}\n"
     peers ;
   let config =
-    Coda_process.local_config ~peers ~external_port ~discovery_port
-      ~acceptable_delay ~snark_worker_config:None ~proposer:None ~program_dir
-      ~work_selection ~trace_dir ~offset:Time.Span.zero ()
-      ~max_concurrent_connections
+    Coda_process.local_config ~peers ~addrs_and_ports ~acceptable_delay
+      ~snark_worker_config:None ~proposer:None ~program_dir ~work_selection
+      ~trace_dir ~offset:Time.Span.zero () ~max_concurrent_connections
   in
   let%bind worker = Coda_process.spawn_exn config in
   let%bind _ = after (Time.Span.of_sec 10.) in

@@ -87,9 +87,11 @@ let daemon logger =
            "PORT local REST-server for daemon interaction (default no \
             rest-server)"
          (optional int16)
-     and ip =
-       flag "ip" ~doc:"IP External IP address for others to connect"
+     and external_ip =
+       flag "external-ip" ~doc:"External IP address for others to connect to"
          (optional string)
+     and bind_ip =
+       flag "bind-ip" ~doc:"IP of network interface to use" (optional string)
      and is_background =
        flag "background" no_arg ~doc:"Run process on the background"
      and snark_work_fee =
@@ -245,13 +247,21 @@ let daemon logger =
            exit 10 )
          else Deferred.unit
        in
-       let%bind ip =
-         match ip with None -> Find_ip.find () | Some ip -> return ip
+       let%bind external_ip =
+         match external_ip with
+         | None ->
+             Find_ip.find ()
+         | Some ip ->
+             return @@ Unix.Inet_addr.of_string ip
        in
-       let me =
-         Network_peer.Peer.create
-           (Unix.Inet_addr.of_string ip)
-           ~discovery_port ~communication_port:external_port
+       let bind_ip =
+         Option.value bind_ip ~default:"0.0.0.0" |> Unix.Inet_addr.of_string
+       in
+       let addrs_and_ports : Kademlia.Node_addrs_and_ports.t =
+         { external_ip
+         ; bind_ip
+         ; discovery_port
+         ; communication_port= external_port }
        in
        let wallets_disk_location = conf_dir ^/ "wallets" in
        (* HACK: Until we can properly change propose keys at runtime we'll
@@ -353,7 +363,7 @@ let daemon logger =
              ; target_peer_count= 8
              ; conf_dir
              ; initial_peers= initial_peers_cleaned
-             ; me
+             ; addrs_and_ports
              ; trust_system
              ; max_concurrent_connections } }
        in
