@@ -1,21 +1,33 @@
 module Styles = {
   open Css;
+  let title = isRed =>
+    merge([
+      Theme.Text.title,
+      style([
+        color(isRed ? Theme.Colors.roseBud : Theme.Colors.teal),
+        textAlign(`center),
+        margin(`zero),
+        padding2(~v=`rem(0.), ~h=`rem(1.)),
+      ]),
+    ]);
 
   let content =
-    style([
-      outlineStyle(`none),
-      width(Theme.Spacing.modalWidth),
-      minHeight(`rem(10.)),
-      backgroundColor(Theme.Colors.bgColor),
-      borderRadius(`px(12)),
-      padding(`px(12)),
-      boxShadow(
-        ~x=`zero,
-        ~y=`zero,
-        ~blur=`px(50),
-        ~spread=`px(2),
-        `rgba((0, 0, 0, 0.5)),
-      ),
+    merge([
+      Window.Styles.bg,
+      style([
+        outlineStyle(`none),
+        width(Theme.Spacing.modalWidth),
+        minHeight(`rem(10.)),
+        borderRadius(`px(12)),
+        padding(`rem(2.)),
+        boxShadow(
+          ~x=`zero,
+          ~y=`zero,
+          ~blur=`px(50),
+          ~spread=`px(2),
+          `rgba((0, 0, 0, 0.5)),
+        ),
+      ]),
     ]);
 
   let overlay =
@@ -43,20 +55,27 @@ module Binding = {
       ~contentLabel: string,
       ~className: string=?,
       ~overlayClassName: string=?,
+      ~appElement: Dom.element,
       ~children: React.element
     ) =>
     React.element =
     "react-modal";
+
+  type document;
+  [@bs.val] external document: document = "";
+  [@bs.send] external getElementById: (document, string) => Dom.element = "";
 };
 
 // Wrap react-modal with a default style
 [@react.component]
-let make = (~isOpen, ~onRequestClose, ~contentLabel, ~children) =>
+let make = (~isOpen, ~isRed=false, ~onRequestClose, ~title, ~children) =>
   <Binding
     isOpen
     onRequestClose
-    contentLabel
+    contentLabel=title
+    appElement={Binding.getElementById(Binding.document, "index")}
     className=Styles.content
     overlayClassName=Styles.overlay>
+    <h1 className={Styles.title(isRed)}> {React.string(title)} </h1>
     children
   </Binding>;

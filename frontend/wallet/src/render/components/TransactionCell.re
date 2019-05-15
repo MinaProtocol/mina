@@ -158,16 +158,52 @@ module ViewModel = {
 module ActorName = {
   [@react.component]
   let make = (~value: ViewModel.Actor.t) => {
+    let (activeWallet, _) = React.useContext(ActiveWalletProvider.context);
+    let (settings, _) = React.useContext(SettingsProvider.context);
     switch (value) {
     | Key(key) =>
-      <span className=Css.merge([Styles.pill, Theme.Text.mono])>
-        {ReasonReact.string(PublicKey.toString(key))}
-      </span>
-    | Unknown => <span> {React.string("Unknown")} </span>
+      <Pill mode={activeWallet === Some(key) ? Pill.Blue : Pill.Grey}>
+        <span
+          className=Css.(
+            merge([
+              Option.isSome(SettingsRenderer.lookup(settings, key))
+                ? Theme.Text.Body.regular : Theme.Text.mono,
+              style([
+                color(
+                  activeWallet === Some(key)
+                    ? Theme.Colors.marineAlpha(1.) : Theme.Colors.midnight,
+                ),
+                opacity(0.7),
+              ]),
+            ])
+          )>
+          {ReasonReact.string(SettingsRenderer.getWalletName(settings, key))}
+        </span>
+      </Pill>
+    | Unknown =>
+      <Pill>
+        <span
+          className=Css.(
+            merge([
+              Theme.Text.Body.regular,
+              style([color(Theme.Colors.midnight), opacity(0.7)]),
+            ])
+          )>
+          {React.string("Unknown")}
+        </span>
+      </Pill>
     | Minted =>
-      <span className=Css.(style([backgroundColor(Theme.Colors.sage)]))>
-        {ReasonReact.string("Minted")}
-      </span>
+      <Pill mode=Pill.Green>
+        <span
+          className=Css.(
+            merge([
+              Theme.Text.Body.regular,
+              style([color(Theme.Colors.serpentine)]),
+            ])
+          )>
+          {ReasonReact.string("Minted")}
+        </span>
+      </Pill>
     };
   };
 };
@@ -177,15 +213,19 @@ module TimeDisplay = {
   let make = (~date: Js.Date.t) => {
     <span
       className=Css.(
-        style([
-          whiteSpace(`nowrap),
-          overflow(`hidden),
-          textOverflow(`ellipsis),
-          maxWidth(`rem(6.0)),
+        merge([
+          Theme.Text.Body.small,
+          style([color(Theme.Colors.greyish(0.5))]),
+          style([
+            whiteSpace(`nowrap),
+            overflow(`hidden),
+            textOverflow(`ellipsis),
+            maxWidth(`rem(10.0)),
+          ]),
         ])
       )>
-       {ReasonReact.string(Js.Date.toString(date))} </span>;
-      // TODO: Format properly
+      {ReasonReact.string(Time.render(~date, ~now=Js.Date.make()))}
+    </span>;
   };
 };
 
@@ -213,21 +253,30 @@ module Amount = {
 };
 
 module InfoSection = {
-  [@react.component]
-  let make = (~viewModel: ViewModel.t) => {
-    let (expanded, setExpanded) = React.useState(() => false);
-    let mainRow = message => {
+  module MainRow = {
+    [@react.component]
+    let make = (~children) =>
       <div
         className=Css.(
           style([
             display(`flex),
             justifyContent(`spaceBetween),
             alignItems(`center),
+            color(Theme.Colors.midnight),
           ])
         )>
-        <p> {ReasonReact.string(message)} </p>
+        <p
+          className=Css.(
+            merge([Theme.Text.Body.regular, style([display(`flex)])])
+          )>
+          children
+        </p>
       </div>;
-    };
+  };
+
+  [@react.component]
+  let make = (~viewModel: ViewModel.t) => {
+    let (expanded, setExpanded) = React.useState(() => false);
     <div
       onClick={_e =>
         switch (viewModel.info) {
@@ -236,12 +285,17 @@ module InfoSection = {
         }
       }>
       {switch (viewModel.info) {
-       | Memo(message, _) => mainRow(message)
-       | Empty(_) => mainRow("")
-       | MissingReceipts => mainRow("+ Insert transaction receipts")
+       | Memo(message, _) => <MainRow> {React.string(message)} </MainRow>
+       | Empty(_) => <MainRow> {React.string("")} </MainRow>
+       | MissingReceipts =>
+         <MainRow>
+           <Link> {React.string("+ Insert transaction receipts")} </Link>
+         </MainRow>
        | StakingReward(rewards, _) =>
          <>
-           {mainRow("Staking reward")}
+           <MainRow>
+             <Link> {React.string(expanded ? "Collapse" : "Details")} </Link>
+           </MainRow>
            {expanded
               ? <ul>
                   {List.map(rewards, ~f=((message, amount)) =>
@@ -278,7 +332,7 @@ let make = (~transaction: Transaction.t, ~myWallets: list(PublicKey.t)) => {
   <>
     <span>
       <ActorName value={viewModel.sender} />
-      <div>
+      <div className=Css.(style([marginTop(`rem(0.25))]))>
         {ReasonReact.string(
            switch (viewModel.action) {
            | Transfer => " -> "

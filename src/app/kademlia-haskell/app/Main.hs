@@ -128,7 +128,7 @@ main = do
       let logTrace = putStrLn . ("TRAC: " ++)
 
       logInfo $ "Creating instance"
-      kInstance <- K.createL ("127.0.0.1", myPort) (externalIp, myPort) myKey config logTrace logError
+      kInstance <- K.createL (externalIp, myPort) (externalIp, myPort) myKey config logTrace logError
 
       {- If this is an initial peer, then don't try to connect to others -}
       _ <- if length peers == 0 then return () else do
