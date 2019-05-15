@@ -12,10 +12,7 @@ module Styles = {
       borderRight(`px(1), `solid, Theme.Colors.borderColor),
     ]);
 
-  let footer =
-    style([
-      padding2(~v=`rem(0.5),~h=`rem(1.))
-    ]);
+  let footer = style([padding2(~v=`rem(0.5), ~h=`rem(1.))]);
 };
 
 module Wallets = [%graphql
@@ -25,7 +22,7 @@ module WalletQuery = ReasonApollo.CreateQuery(Wallets);
 
 [@react.component]
 let make = () => {
-  let (addWalletModalOpen, setModalOpen) = React.useState(() => false);
+  let (modalState, setModalState) = React.useState(() => None);
 
   <div className=Styles.sidebar>
     <WalletQuery>
@@ -40,21 +37,10 @@ let make = () => {
          }}
     </WalletQuery>
     <div className=Styles.footer>
-      <Link onClick={_ => setModalOpen(_ => true)}>
+      <Link onClick={_ => setModalState(_ => Some("My Wallet"))}>
         {React.string("+ Add wallet")}
       </Link>
     </div>
-    <Modal
-      isOpen=addWalletModalOpen
-      contentLabel="Add Wallet"
-      onRequestClose={() => setModalOpen(_ => false)}>
-      {React.string("Add wallet:")}
-      <br />
-      <input type_="text" value="test" />
-      <br />
-      <button onClick={_ => setModalOpen(_ => false)}>
-        {React.string("Cancel")}
-      </button>
-    </Modal>
+    <AddWalletModal modalState setModalState />
   </div>;
 };
