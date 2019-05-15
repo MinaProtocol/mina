@@ -43,6 +43,7 @@ module Colors = {
 
   // TODO: Rename
   let greyish = a => `rgba((51, 66, 79, a));
+  let teal = `hex("4782A0");
 };
 
 module Typeface = {
@@ -69,6 +70,14 @@ module Text = {
         lineHeight(`rem(1.25)),
       ]);
   };
+
+  let title =
+    style([
+      Typeface.plex,
+      fontWeight(`normal),
+      fontSize(`rem(2.25)),
+      lineHeight(`rem(3.)),
+    ]);
 
   let smallHeader =
     style([
@@ -101,7 +110,7 @@ module Spacing = {
   let defaultPadding = padding(defaultSpacing);
   let headerHeight = `rem(5.);
   let footerHeight = `rem(5.);
-  let modalWidth = `rem(20.);
+  let modalWidth = `rem(30.);
 };
 
 let notText = style([cursor(`default), userSelect(`none)]);
