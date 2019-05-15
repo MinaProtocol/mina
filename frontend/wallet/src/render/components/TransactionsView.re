@@ -11,7 +11,8 @@ module Styles = {
       gridTemplateColumns([`rem(16.), `fr(1.), `px(200)]),
       gridGap(Theme.Spacing.defaultSpacing),
       alignItems(`flexStart),
-      padding(`rem(1.)),
+      marginLeft(`rem(0.25)),
+      padding2(~h=`rem(0.75), ~v=`zero),
       borderBottom(`px(1), `solid, Theme.Colors.borderColor),
       lastChild([borderBottom(`px(0), `solid, white)]),
     ]);
@@ -38,6 +39,10 @@ let otherKey = PublicKey.ofStringExn("BDK342322");
 
 let mockTransactions =
   Array.fromList([
+    TransactionCell.Transaction.Unknown({
+      key: List.head(myWallets) |> Option.getExn,
+      amount: 2415,
+    }),
     TransactionCell.Transaction.Payment(
       {
         from: otherKey,
@@ -50,10 +55,6 @@ let mockTransactions =
       },
       {status: ConsensusState.Status.Failed, estimatedPercentConfirmed: 0.0},
     ),
-    TransactionCell.Transaction.Unknown({
-      key: List.head(myWallets) |> Option.getExn,
-      amount: 2415,
-    }),
     TransactionCell.Transaction.Payment(
       {
         from: List.head(myWallets) |> Option.getExn,
