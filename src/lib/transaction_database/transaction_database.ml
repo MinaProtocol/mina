@@ -641,3 +641,52 @@ let%test_module "Transaction_database" =
 
 module T = Make (User_command) (Block_time.Time.Stable.V1)
 include T
+
+module For_tests = struct
+  open Quickcheck.Generator
+  open Let_syntax
+
+  let of_year years = Int64.of_int (years * 365 * 24 * 60 * 60 * 1000)
+
+  let populate_database ~directory num_users num_commands =
+    let keypairs = List.init num_users ~f:(fun _ -> Keypair.create ()) in
+    let max_amount = 10_000 in
+    let max_fee = 100 in
+    let key_gen =
+      match%map List.gen_permutations @@ keypairs with
+      | keypair1 :: keypair2 :: _ ->
+          (keypair1, keypair2)
+      | _ ->
+          failwith
+            "Need to select two elements from a list with at least two elements"
+    in
+    let payment_gen =
+      User_command.Gen.payment ~key_gen ~max_amount ~max_fee ()
+    in
+    let delegation_gen =
+      User_command.Gen.stake_delegation ~key_gen ~max_fee ()
+    in
+    let command_gen =
+      Quickcheck.Generator.weighted_union
+        [(0.90, payment_gen); (0.1, delegation_gen)]
+    in
+    let time_gen =
+      let time_now =
+        Block_time.Time.to_span_since_epoch
+          (Block_time.Time.now Block_time.Time.Controller.basic)
+      in
+      let time_max = Block_time.Time.Span.to_ms time_now in
+      let time_min = Int64.(time_max - of_year 5) in
+      let%map time_span_gen = Int64.gen_incl time_min time_max in
+      Block_time.Time.of_span_since_epoch
+      @@ Block_time.Time.Span.of_ms time_span_gen
+    in
+    let gen = list_with_length num_commands @@ tuple2 command_gen time_gen in
+    let logger = Logger.create () in
+    let database = T.create logger directory in
+    List.iter (Quickcheck.random_value gen) ~f:(fun (command, time) ->
+        T.add database command time ) ;
+    ( database
+    , List.map keypairs ~f:(fun {public_key; _} ->
+          Public_key.compress public_key ) )
+end
