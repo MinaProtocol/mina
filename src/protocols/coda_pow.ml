@@ -106,6 +106,10 @@ module type Time_intf = sig
   val modulus : t -> Span.t -> Span.t
 
   val now : Controller.t -> t
+
+  val to_string : t -> string
+
+  val of_string_exn : string -> t
 end
 
 module type Ledger_hash_intf = sig
