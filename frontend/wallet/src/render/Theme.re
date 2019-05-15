@@ -40,6 +40,10 @@ module Colors = {
   let headerGreyText = `hex("516679");
   let textColor = white;
   let borderColor = rgba(0, 0, 0, 0.15);
+
+  // TODO: Rename
+  let greyish = a => `rgba((51, 66, 79, a));
+  let teal = `hex("4782A0");
 };
 
 module Typeface = {
@@ -49,18 +53,36 @@ module Typeface = {
 };
 
 module Text = {
-  let body =
+  module Body = {
+    let regular =
+      style([
+        Typeface.plex,
+        fontWeight(`medium),
+        fontSize(`rem(1.)),
+        lineHeight(`rem(1.5)),
+      ]);
+
+    let small =
+      style([
+        Typeface.plex,
+        fontWeight(`normal),
+        fontSize(`rem(0.8125)),
+        lineHeight(`rem(1.25)),
+      ]);
+  };
+
+  let title =
     style([
       Typeface.plex,
-      fontWeight(`medium),
-      fontSize(`rem(1.)),
-      lineHeight(`rem(1.5)),
+      fontWeight(`normal),
+      fontSize(`rem(2.25)),
+      lineHeight(`rem(3.)),
     ]);
 
   let smallHeader =
     style([
       Typeface.plex,
-      fontWeight(`normal),
+      fontWeight(`medium),
       fontSize(`rem(0.75)),
       lineHeight(`rem(1.)),
     ]);
@@ -86,9 +108,9 @@ module CssElectron = {
 module Spacing = {
   let defaultSpacing = `rem(1.);
   let defaultPadding = padding(defaultSpacing);
-  let headerHeight = `rem(4.);
+  let headerHeight = `rem(5.);
   let footerHeight = `rem(5.);
-  let modalWidth = `rem(20.);
+  let modalWidth = `rem(30.);
 };
 
 let notText = style([cursor(`default), userSelect(`none)]);

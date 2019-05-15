@@ -166,10 +166,8 @@ module ActorName = {
         <span
           className=Css.(
             merge([
-              Option.isSome(
-                SettingsRenderer.lookup(settings, key),
-              )
-                ? Theme.Text.body : Theme.Text.mono,
+              Option.isSome(SettingsRenderer.lookup(settings, key))
+                ? Theme.Text.Body.regular : Theme.Text.mono,
               style([
                 color(
                   activeWallet === Some(key)
@@ -187,7 +185,7 @@ module ActorName = {
         <span
           className=Css.(
             merge([
-              Theme.Text.body,
+              Theme.Text.Body.regular,
               style([color(Theme.Colors.midnight), opacity(0.7)]),
             ])
           )>
@@ -199,7 +197,7 @@ module ActorName = {
         <span
           className=Css.(
             merge([
-              Theme.Text.body,
+              Theme.Text.Body.regular,
               style([color(Theme.Colors.serpentine)]),
             ])
           )>
@@ -215,11 +213,15 @@ module TimeDisplay = {
   let make = (~date: Js.Date.t) => {
     <span
       className=Css.(
-        style([
-          whiteSpace(`nowrap),
-          overflow(`hidden),
-          textOverflow(`ellipsis),
-          maxWidth(`rem(10.0)),
+        merge([
+          Theme.Text.Body.small,
+          style([color(Theme.Colors.greyish(0.5))]),
+          style([
+            whiteSpace(`nowrap),
+            overflow(`hidden),
+            textOverflow(`ellipsis),
+            maxWidth(`rem(10.0)),
+          ]),
         ])
       )>
       {ReasonReact.string(Time.render(~date, ~now=Js.Date.make()))}
@@ -251,10 +253,9 @@ module Amount = {
 };
 
 module InfoSection = {
-  [@react.component]
-  let make = (~viewModel: ViewModel.t) => {
-    let (expanded, setExpanded) = React.useState(() => false);
-    let mainRow = message => {
+  module MainRow = {
+    [@react.component]
+    let make = (~children) =>
       <div
         className=Css.(
           style([
@@ -264,9 +265,18 @@ module InfoSection = {
             color(Theme.Colors.midnight),
           ])
         )>
-        <p className=Theme.Text.body> {ReasonReact.string(message)} </p>
+        <p
+          className=Css.(
+            merge([Theme.Text.Body.regular, style([display(`flex)])])
+          )>
+          children
+        </p>
       </div>;
-    };
+  };
+
+  [@react.component]
+  let make = (~viewModel: ViewModel.t) => {
+    let (expanded, setExpanded) = React.useState(() => false);
     <div
       onClick={_e =>
         switch (viewModel.info) {
@@ -275,12 +285,17 @@ module InfoSection = {
         }
       }>
       {switch (viewModel.info) {
-       | Memo(message, _) => mainRow(message)
-       | Empty(_) => mainRow("")
-       | MissingReceipts => mainRow("+ Insert transaction receipts")
+       | Memo(message, _) => <MainRow> {React.string(message)} </MainRow>
+       | Empty(_) => <MainRow> {React.string("")} </MainRow>
+       | MissingReceipts =>
+         <MainRow>
+           <Link> {React.string("+ Insert transaction receipts")} </Link>
+         </MainRow>
        | StakingReward(rewards, _) =>
          <>
-           {mainRow("Staking reward")}
+           <MainRow>
+             <Link> {React.string(expanded ? "Collapse" : "Details")} </Link>
+           </MainRow>
            {expanded
               ? <ul>
                   {List.map(rewards, ~f=((message, amount)) =>
