@@ -14,7 +14,7 @@ module Styles = {
         display(`inlineFlex),
         alignItems(`center),
         justifyContent(`center),
-        height(`rem(2.5)),
+        height(`rem(3.)),
         minWidth(`rem(12.5)),
         padding2(~v=`zero, ~h=`rem(1.)),
         background(white),

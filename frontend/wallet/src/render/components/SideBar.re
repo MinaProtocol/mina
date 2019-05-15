@@ -11,6 +11,11 @@ module Styles = {
       justifyContent(`spaceBetween),
       borderRight(`px(1), `solid, Theme.Colors.borderColor),
     ]);
+
+  let footer =
+    style([
+      padding2(~v=`rem(0.5),~h=`rem(1.))
+    ]);
 };
 
 module Wallets = [%graphql
@@ -34,9 +39,11 @@ let make = () => {
            />
          }}
     </WalletQuery>
-    <button onClick={_ => setModalOpen(_ => true)}>
-      {React.string("+ Add wallet")}
-    </button>
+    <div className=Styles.footer>
+      <Link onClick={_ => setModalOpen(_ => true)}>
+        {React.string("+ Add wallet")}
+      </Link>
+    </div>
     <Modal
       isOpen=addWalletModalOpen
       contentLabel="Add Wallet"
