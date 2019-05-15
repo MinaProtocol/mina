@@ -1,3 +1,6 @@
+[%%import
+"../../../config.mlh"]
+
 open Core
 open Async
 open Coda_worker
@@ -18,10 +21,22 @@ let spawn_exn (config : Coda_worker.Input.t) =
   File_system.dup_stderr process ;
   return (conn, process, config)
 
+[%%if
+fixup_localhost_ips_for_testing]
+
+let get_localhost ~discovery_port =
+  Printf.sprintf "127.0.0.%d" (discovery_port - 23000)
+
+[%%else]
+
+let get_localhost ~discovery_port:_ = "127.0.0.1"
+
+[%%endif]
+
 let local_config ?proposal_interval ~peers ~discovery_port ~external_port
     ~acceptable_delay ~program_dir ~proposer ~snark_worker_config
     ~work_selection ~offset ~trace_dir ~max_concurrent_connections () =
-  let host = "127.0.0.1" in
+  let host = get_localhost ~discovery_port in
   let conf_dir =
     Filename.temp_dir_name
     ^/ String.init 16 ~f:(fun _ -> (Int.to_string (Random.int 10)).[0])
