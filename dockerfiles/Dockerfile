@@ -1,4 +1,4 @@
-FROM codaprotocol/coda:toolchain-6c0a0a9793774fd375c302ca2696aa7810cafc5b
+FROM codaprotocol/coda:toolchain-a667ae88520eaa5acc6eac754dccc724092ff2f2
 
 ENV OPAM_DIR             "/home/opam/.opam/4.07"
 ENV PATH                 "${OPAM_DIR}/bin:$PATH"
