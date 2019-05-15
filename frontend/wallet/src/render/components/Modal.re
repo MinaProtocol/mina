@@ -64,7 +64,6 @@ module Binding = {
   type document;
   [@bs.val] external document: document = "";
   [@bs.send] external getElementById: (document, string) => Dom.element = "";
-  let appElement = getElementById(document, "index");
 };
 
 // Wrap react-modal with a default style
@@ -74,7 +73,7 @@ let make = (~isOpen, ~isRed=false, ~onRequestClose, ~title, ~children) =>
     isOpen
     onRequestClose
     contentLabel=title
-    appElement=Binding.appElement
+    appElement={Binding.getElementById(Binding.document, "index")}
     className=Styles.content
     overlayClassName=Styles.overlay>
     <h1 className={Styles.title(isRed)}> {React.string(title)} </h1>
