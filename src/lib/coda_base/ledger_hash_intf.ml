@@ -8,11 +8,23 @@ module type S = sig
 
   type path = Pedersen.Digest.t list
 
+  module Tag : sig
+    type t = Curr_ledger | Epoch_ledger
+
+    module Checked : sig
+      type var
+
+      val if_ : Boolean.var -> then_:var -> else_:var -> (var, 'a) Checked.t
+    end
+
+    val curr_ledger : Checked.var
+
+    val epoch_ledger : Checked.var
+  end
+
   type _ Request.t +=
     | Get_path : Account.Index.t -> path Request.t
-    | Get_element :
-        [< `Curr_ledger | `Epoch_ledger] * Account.Index.t
-        -> (Account.t * path) Request.t
+    | Get_element : Tag.t * Account.Index.t -> (Account.t * path) Request.t
     | Set : Account.Index.t * Account.t -> unit Request.t
     | Find_index : Public_key.Compressed.t -> Account.Index.t Request.t
 
@@ -39,6 +51,6 @@ module type S = sig
     -> f:(   is_empty_and_writeable:Boolean.var
           -> Account.var
           -> (Account.var, 's) Checked.t)
-    -> is_chain_voting:Boolean.var
+    -> tag:Tag.Checked.var
     -> (var * Account.var, 's) Checked.t
 end

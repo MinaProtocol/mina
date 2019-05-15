@@ -435,7 +435,7 @@ module T = struct
           respond (Delegate (Coinbase_stack_path addr))
       | Merkle_tree.Set (addr, stack) ->
           respond (Delegate (Set_coinbase_stack (addr, stack)))
-      | Merkle_tree.Get_element (_, addr) ->
+      | Merkle_tree.Get_element addr ->
           respond (Delegate (Get_coinbase_stack addr))
       | _ ->
           unhandled
@@ -456,29 +456,28 @@ module T = struct
         if_ b ~then_ ~else_
       in
       handle
-        ( Merkle_tree.modify_req ~is_chain_voting:Boolean.false_ ~depth
-            (Hash.var_to_hash_packed t) addr ~f:(fun stack ->
-              let total_coinbase_amount =
-                Currency.Amount.var_of_t Protocols.Coda_praos.coinbase_amount
-              in
-              let%bind rem_amount =
-                Currency.Amount.Checked.sub total_coinbase_amount amount
-              in
-              let%bind amount1_equal_to_zero = equal_to_zero amount in
-              let%bind amount2_equal_to_zero = equal_to_zero rem_amount in
-              (*TODO:Optimize here since we are pushing twice to the same stack*)
-              let%bind stack_with_amount1 =
-                Coinbase_stack.Stack.Checked.push stack (pk, amount)
-              in
-              let%bind stack_with_amount2 =
-                Coinbase_stack.Stack.Checked.push stack_with_amount1
-                  (pk, rem_amount)
-              in
-              chain Stack.if_ amount1_equal_to_zero ~then_:(return stack)
-                ~else_:
-                  (Stack.if_ amount2_equal_to_zero ~then_:stack_with_amount1
-                     ~else_:stack_with_amount2) )
-        >>| fst )
+        (Merkle_tree.modify_req ~depth (Hash.var_to_hash_packed t) addr
+           ~f:(fun stack ->
+             let total_coinbase_amount =
+               Currency.Amount.var_of_t Protocols.Coda_praos.coinbase_amount
+             in
+             let%bind rem_amount =
+               Currency.Amount.Checked.sub total_coinbase_amount amount
+             in
+             let%bind amount1_equal_to_zero = equal_to_zero amount in
+             let%bind amount2_equal_to_zero = equal_to_zero rem_amount in
+             (*TODO:Optimize here since we are pushing twice to the same stack*)
+             let%bind stack_with_amount1 =
+               Coinbase_stack.Stack.Checked.push stack (pk, amount)
+             in
+             let%bind stack_with_amount2 =
+               Coinbase_stack.Stack.Checked.push stack_with_amount1
+                 (pk, rem_amount)
+             in
+             chain Stack.if_ amount1_equal_to_zero ~then_:(return stack)
+               ~else_:
+                 (Stack.if_ amount2_equal_to_zero ~then_:stack_with_amount1
+                    ~else_:stack_with_amount2) ))
         reraise_merkle_requests
       >>| Hash.var_of_hash_packed
 

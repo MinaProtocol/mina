@@ -439,9 +439,13 @@ module Base = struct
         ~then_:sender_compressed ~else_:payload.body.public_key
     in
     (* we explicitly set the public_key because it could be zero if the account is new *)
+    let%bind tag =
+      Frozen_ledger_hash.Tag.(
+        Checked.if_ is_chain_voting ~then_:epoch_ledger ~else_:curr_ledger)
+    in
     let%map root, voting_stake_increase =
       (* This update should be a no-op in the stake delegation case *)
-      Frozen_ledger_hash.modify_account_recv root receiver ~is_chain_voting
+      Frozen_ledger_hash.modify_account_recv root receiver ~tag
         ~f:(fun ~is_empty_and_writeable account ->
           let%map balance =
             (* receiver_increase will be zero in the stake delegation case *)

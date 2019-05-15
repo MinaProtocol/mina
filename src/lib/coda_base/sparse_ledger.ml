@@ -226,11 +226,11 @@ let handler ~curr_ledger ~epoch_ledger =
   in
   stage (fun (With {request; respond}) ->
       match request with
-      | Ledger_hash.Get_element (`Curr_ledger, idx) ->
+      | Ledger_hash.Get_element (Ledger_hash.Tag.Curr_ledger, idx) ->
           let elt = get_exn !curr_ledger_ref idx in
           let path = (curr_ledger_path_exn idx :> Pedersen.Digest.t list) in
           respond (Provide (elt, path))
-      | Ledger_hash.Get_element (`Epoch_ledger, idx) ->
+      | Ledger_hash.Get_element (Ledger_hash.Tag.Epoch_ledger, idx) ->
           let elt = get_exn epoch_ledger idx in
           let path = (epoch_ledger_path_exn idx :> Pedersen.Digest.t list) in
           respond (Provide (elt, path))
