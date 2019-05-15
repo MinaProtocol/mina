@@ -1,0 +1,4 @@
+(library
+ (name coda_net2)
+ (libraries core async yojson callipyge digestif.ocaml pipe_lib envelope logger)
+ (preprocess (pps ppx_jane ppx_let)))
