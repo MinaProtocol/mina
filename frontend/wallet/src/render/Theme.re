@@ -73,7 +73,7 @@ module Text = {
   let smallHeader =
     style([
       Typeface.plex,
-      fontWeight(`normal),
+      fontWeight(`medium),
       fontSize(`rem(0.75)),
       lineHeight(`rem(1.)),
     ]);
@@ -99,7 +99,7 @@ module CssElectron = {
 module Spacing = {
   let defaultSpacing = `rem(1.);
   let defaultPadding = padding(defaultSpacing);
-  let headerHeight = `rem(4.);
+  let headerHeight = `rem(5.);
   let footerHeight = `rem(5.);
   let modalWidth = `rem(20.);
 };
