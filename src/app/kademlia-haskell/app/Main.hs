@@ -104,7 +104,7 @@ hasPeers inst = do
 formatAddress :: (Show a, Show b) => a -> b -> B.ByteString -> String
 formatAddress ip port key = show ip ++ ":" ++ show port ++ ", " ++ show (B64.encode key)
 
-{- Usage: ./$0 test '("127.0.0.1", 3000)' '("127.0.0.1", 3001)' -}
+{- Usage: ./$0 test 0.0.0.0 '("127.0.0.1", 3000)' '("127.0.0.1", 3001)' -}
 main :: IO ()
 main = do
     (state : bindIp : rest) <- getArgs
