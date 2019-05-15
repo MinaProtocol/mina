@@ -83,7 +83,7 @@ let mockTransactions =
         to_: List.head(myWallets) |> Option.getExn,
         amount: 1540,
         fee: 10,
-        memo: Some("Remitance payment"),
+        memo: Some("Remittance payment"),
         includedAt: Some(Js.Date.fromString("16 Apr 2019 21:46:00 PST")),
         submittedAt: Js.Date.fromString("15 Apr 2019 21:46:00 PST"),
       },
