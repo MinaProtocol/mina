@@ -30,12 +30,6 @@ module type Intf = sig
 
   val get_all_payments :
     Program.t -> Public_key.Compressed.t -> User_command.t list
-
-  (* TODO: Remove once we have no more functors for external_transition *)
-  val payments : External_transition.t -> User_command.t list
-
-  (* TODO: Remove once we have no more functors for external_transition *)
-  val proposer : External_transition.t -> Public_key.Compressed.t
 end
 
 module Make
@@ -381,19 +375,6 @@ struct
     let transaction_database = Program.transaction_database coda in
     Transaction_database.get_transactions transaction_database public_key
 
-  let user_commands =
-    Fn.compose Staged_ledger_diff.user_commands
-      External_transition.staged_ledger_diff
-
-  let payments external_transition =
-    List.filter
-      (user_commands external_transition)
-      ~f:(Fn.compose User_command_payload.is_payment User_command.payload)
-
-  let proposer =
-    Fn.compose Staged_ledger_diff.creator
-      External_transition.staged_ledger_diff
-
   module Subscriptions = struct
     (* Creates a global pipe to feed a subscription that will be available throughout the entire duration that a daemon is runnning  *)
     let global_pipe coda ~to_pipe =
@@ -430,19 +411,19 @@ struct
               in
               Option.some_if
                 (Public_key.Compressed.equal
-                   (proposer unverified_new_block)
+                   (External_transition.proposer unverified_new_block)
                    public_key)
                 unverified_new_block ) )
 
     let new_payment coda public_key =
       let transaction_database = Program.transaction_database coda in
       global_pipe coda ~to_pipe:(fun new_block_incr ->
-          let payments_incr =
+          let user_command_incr =
             Coda_incremental.New_transition.map new_block_incr
-              ~f:(Fn.compose payments External_transition.of_verified)
+              ~f:External_transition.Verified.user_commands
           in
           let payments_observer =
-            Coda_incremental.New_transition.observe payments_incr
+            Coda_incremental.New_transition.observe user_command_incr
           in
           Coda_incremental.New_transition.stabilize () ;
           let frontier_payment_reader, frontier_payment_writer =
