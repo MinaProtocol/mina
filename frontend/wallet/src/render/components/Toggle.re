@@ -18,9 +18,10 @@ module Styles = {
       left(`zero),
       right(`zero),
       top(`zero),
-      transition(~duration=400, "all"),
+      transition(~duration=400, "background"),
+      transition(~duration=100, "transform"),
       borderRadius(`px(12)),
-      cursor(`pointer),
+      hover([transform(`scale(1.05, 1.05))]),
       before([
         position(`absolute),
         bottom(`px(4)),

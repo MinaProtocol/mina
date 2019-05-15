@@ -253,10 +253,9 @@ module Amount = {
 };
 
 module InfoSection = {
-  [@react.component]
-  let make = (~viewModel: ViewModel.t) => {
-    let (expanded, setExpanded) = React.useState(() => false);
-    let mainRow = message => {
+  module MainRow = {
+    [@react.component]
+    let make = (~children) =>
       <div
         className=Css.(
           style([
@@ -266,11 +265,18 @@ module InfoSection = {
             color(Theme.Colors.midnight),
           ])
         )>
-        <p className=Theme.Text.Body.regular>
-          {ReasonReact.string(message)}
+        <p
+          className=Css.(
+            merge([Theme.Text.Body.regular, style([display(`flex)])])
+          )>
+          children
         </p>
       </div>;
-    };
+  };
+
+  [@react.component]
+  let make = (~viewModel: ViewModel.t) => {
+    let (expanded, setExpanded) = React.useState(() => false);
     <div
       onClick={_e =>
         switch (viewModel.info) {
@@ -279,12 +285,17 @@ module InfoSection = {
         }
       }>
       {switch (viewModel.info) {
-       | Memo(message, _) => mainRow(message)
-       | Empty(_) => mainRow("")
-       | MissingReceipts => mainRow("+ Insert transaction receipts")
+       | Memo(message, _) => <MainRow> {React.string(message)} </MainRow>
+       | Empty(_) => <MainRow> {React.string("")} </MainRow>
+       | MissingReceipts =>
+         <MainRow>
+           <Link> {React.string("+ Insert transaction receipts")} </Link>
+         </MainRow>
        | StakingReward(rewards, _) =>
          <>
-           {mainRow("Staking reward")}
+           <MainRow>
+             <Link> {React.string(expanded ? "Collapse" : "Details")} </Link>
+           </MainRow>
            {expanded
               ? <ul>
                   {List.map(rewards, ~f=((message, amount)) =>
