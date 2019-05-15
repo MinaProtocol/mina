@@ -28,7 +28,7 @@ module type Config_intf = sig
     { timeout: Time.Span.t
     ; target_peer_count: int
     ; initial_peers: Host_and_port.t list
-    ; me: Peer.t
+    ; addrs_and_ports: Kademlia.Node_addrs_and_ports.t
     ; conf_dir: string
     ; logger: Logger.t
     ; trust_system: Trust_system.t
@@ -50,7 +50,7 @@ module type S = sig
     ; target_peer_count: int
     ; broadcast_writer: msg Linear_pipe.Writer.t
     ; received_reader: msg Envelope.Incoming.t Strict_pipe.Reader.t
-    ; me: Peer.t
+    ; addrs_and_ports: Kademlia.Node_addrs_and_ports.t
     ; initial_peers: Host_and_port.t list
     ; peers: Peer.Hash_set.t
     ; peers_by_ip: (Unix.Inet_addr.t, Peer.t list) Hashtbl.t
@@ -102,7 +102,7 @@ module Make (Message : Message_intf) : S with type msg := Message.msg = struct
     ; target_peer_count: int
     ; broadcast_writer: Message.msg Linear_pipe.Writer.t
     ; received_reader: Message.msg Envelope.Incoming.t Strict_pipe.Reader.t
-    ; me: Peer.t
+    ; addrs_and_ports: Kademlia.Node_addrs_and_ports.t
     ; initial_peers: Host_and_port.t list
     ; peers: Peer.Hash_set.t
     ; peers_by_ip: (Unix.Inet_addr.t, Peer.t list) Hashtbl.t
@@ -121,7 +121,7 @@ module Make (Message : Message_intf) : S with type msg := Message.msg = struct
       { timeout: Time.Span.t
       ; target_peer_count: int
       ; initial_peers: Host_and_port.t list
-      ; me: Peer.t
+      ; addrs_and_ports: Kademlia.Node_addrs_and_ports.t
       ; conf_dir: string
       ; logger: Logger.t
       ; trust_system: Trust_system.t
@@ -163,51 +163,21 @@ module Make (Message : Message_intf) : S with type msg := Message.msg = struct
   let is_unix_errno errno unix_errno =
     Int.equal (Unix.Error.compare errno unix_errno) 0
 
-  [%%if
-  fixup_localhost_ips_for_testing]
-
-  let start_port = 9501
-
-  let stop_port = 9801
-
-  let get_available_port =
-    let port = ref start_port in
-    let reset () = port := start_port in
-    fun () ->
-      let result = !port in
-      incr port ;
-      if !port >= stop_port then reset () ;
-      result
-
-  (* bind socket to current host *)
-  let bind_socket t sock =
-    let max_bind_tries = stop_port - start_port + 1 in
-    let rec try_addr n =
-      if n > max_bind_tries then
-        failwith "Could not bind socket to local address" ;
-      let local_addr = `Inet (t.me.host, get_available_port ()) in
-      try Async.Socket.bind_inet sock local_addr
-      with
-      | Unix.Unix_error (errno, "bind", _)
-      when is_unix_errno errno Unix.Error.EADDRINUSE
-      ->
-        Logger.info t.logger ~module_:__MODULE__ ~location:__LOC__
-          !"Socket bind, address already in use: %{sexp: Socket.Address.Inet.t}"
-          local_addr ;
-        try_addr (n + 1)
-    in
-    try_addr 0
-
+  (* Create a socket bound to the correct IP, for outgoing connections. *)
   let get_socket t =
     let socket = Async.Socket.(create Type.tcp) in
-    bind_socket t socket
-
-  [%%else]
-
-  (* don't bind socket *)
-  let get_socket _t = Async.Socket.(create Type.tcp)
-
-  [%%endif]
+    (* Binding with a source port of 0 tells the kernel to pick a free one for
+       us. Because we're binding an address and port before the kernel knows
+       whether this will be a listen socket or an outgoing socket, it won't
+       allocate the same source port twice, even when the destination IP will be
+       different. So we could in very extreme cases run out of ephemeral ports.
+       The IP_BIND_ADDRESS_NO_PORT socket option informs the kernel we're
+       binding the socket to an IP and intending to make an outgoing connection,
+       but it only works on Linux. I think we don't need to worry about it,
+       there are a lot of ephemeral ports and we don't make very many
+       simultaneous connections.
+    *)
+    Async.Socket.bind_inet socket @@ `Inet (t.addrs_and_ports.bind_ip, 0)
 
   let try_call_rpc t (peer : Peer.t) dispatch query =
     (* use error collection, close connection strategy of Tcp.with_connection *)
@@ -361,7 +331,8 @@ module Make (Message : Message_intf) : S with type msg := Message.msg = struct
           match%map
             trace_task "membership" (fun () ->
                 Membership.connect ~initial_peers:config.initial_peers
-                  ~me:config.me ~conf_dir:config.conf_dir ~logger:config.logger
+                  ~node_addrs_and_ports:config.addrs_and_ports
+                  ~conf_dir:config.conf_dir ~logger:config.logger
                   ~trust_system:config.trust_system )
           with
           | Ok membership ->
@@ -384,7 +355,7 @@ module Make (Message : Message_intf) : S with type msg := Message.msg = struct
           ; target_peer_count= config.target_peer_count
           ; broadcast_writer
           ; received_reader
-          ; me= config.me
+          ; addrs_and_ports= config.addrs_and_ports
           ; peers= Peer.Hash_set.create ()
           ; initial_peers= config.initial_peers
           ; peers_by_ip= Hashtbl.create (module Unix.Inet_addr)
@@ -480,7 +451,10 @@ module Make (Message : Message_intf) : S with type msg := Message.msg = struct
                   Logger.error t.logger ~module_:__MODULE__ ~location:__LOC__
                     "%s" (Exn.to_string_mach exn) ;
                   raise exn ))
-            (Tcp.Where_to_listen.of_port config.me.Peer.communication_port)
+            Tcp.(
+              Where_to_listen.bind_to
+                (Bind_to_address.Address t.addrs_and_ports.bind_ip)
+                (Bind_to_port.On_port t.addrs_and_ports.communication_port))
             (fun client reader writer ->
               let client_inet_addr = Socket.Address.Inet.addr client in
               let%bind () =
