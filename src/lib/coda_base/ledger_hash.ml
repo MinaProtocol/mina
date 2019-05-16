@@ -86,15 +86,14 @@ let reraise_merkle_requests ~tag (With {request; respond}) =
   | Merkle_tree.Set (addr, account) ->
       respond (Delegate (Set (addr, account)))
   | Merkle_tree.Get_element addr ->
-      respond (Delegate (Get_element (Option.value_exn !tag, addr)))
+      respond (Delegate (Get_element (tag, addr)))
   | _ ->
       unhandled
 
 let get t addr =
-  let tag = ref (Some Tag.Curr_ledger) in
   handle
     (Merkle_tree.get_req ~depth (var_to_hash_packed t) addr)
-    (reraise_merkle_requests ~tag)
+    (reraise_merkle_requests ~tag:Tag.Curr_ledger)
 
 (*
    [fetch_and_update_account t pk ~filter ~f] implements the following spec:
@@ -112,19 +111,16 @@ let%snarkydef fetch_and_update_account t pk
       As_prover.(
         map (read Public_key.Compressed.typ pk) ~f:(fun s -> Find_index s))
   in
-  let tag_ref = ref None in
-  let%bind () =
-    as_prover
-      As_prover.(
-        map (read Tag.Checked.typ tag) ~f:(fun tag -> tag_ref := Some tag))
-  in
   let%map new_root, account =
-    handle
+    handle_as_prover
       (Merkle_tree.fetch_and_update_req ~depth (var_to_hash_packed t) addr
          ~f:(fun account ->
            let%bind x = filter account in
            f x account ))
-      (reraise_merkle_requests ~tag:tag_ref)
+      As_prover.(
+        Let_syntax.(
+          let%map tag = read Tag.Checked.typ tag in
+          reraise_merkle_requests ~tag))
   in
   (var_of_hash_packed new_root, account)
 
