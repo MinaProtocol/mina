@@ -296,24 +296,14 @@ struct
         assert (status = `Added) ) ;
     (root_snarked_ledger, proposer_account)
 
-  let create_root_frontier ~logger accounts_with_secret_keys :
-      Transition_frontier.t Deferred.t =
-    let root_snarked_ledger, proposer_account =
-      create_snarked_ledger accounts_with_secret_keys
-    in
+  let create_frontier_from_genesis_protocol_state ~logger
+      ~consensus_local_state root_snarked_ledger
+      genesis_protocol_state_with_hash =
     let root_transaction_snark_scan_state =
       Staged_ledger.Scan_state.empty ()
     in
     let root_pending_coinbases =
       Pending_coinbase.create () |> Or_error.ok_exn
-    in
-    let genesis_protocol_state_with_hash =
-      Genesis_protocol_state.create_with_custom_ledger
-        ~genesis_consensus_state:
-          (Consensus.Data.Consensus_state.create_genesis
-             ~negative_one_protocol_state_hash:
-               Protocol_state.(hash negative_one))
-        ~genesis_ledger:(Ledger.of_database root_snarked_ledger)
     in
     let genesis_protocol_state =
       With_hash.data genesis_protocol_state_with_hash
@@ -338,7 +328,7 @@ struct
             ; user_commands= []
             ; coinbase= Staged_ledger_diff.At_most_two.Zero }
           , None )
-      ; prev_hash= Coda_base.Staged_ledger_hash.genesis
+      ; prev_hash= Staged_ledger_hash.genesis
       ; creator }
     in
     (* the genesis transition is assumed to be valid *)
@@ -363,14 +353,42 @@ struct
         let%map frontier =
           Transition_frontier.create ~logger
             ~root_transition:root_transition_with_data ~root_snarked_ledger
-            ~root_staged_ledger
-            ~consensus_local_state:
-              (Consensus.Data.Local_state.create
-                 (Some (Account.public_key proposer_account)))
+            ~root_staged_ledger ~consensus_local_state
         in
         frontier
     | Error err ->
         Error.raise err
+
+  module Ledger_transfer = Coda_base.Ledger_transfer.Make (Ledger) (Ledger.Db)
+
+  let genesis_frontier ~logger =
+    let ledger_db = Coda_base.Ledger.Db.create () in
+    let root_snarked_ledger =
+      Ledger_transfer.transfer_accounts ~src:Genesis_ledger.t ~dest:ledger_db
+    in
+    let consensus_local_state = Consensus.Data.Local_state.create None in
+    create_frontier_from_genesis_protocol_state ~logger ~consensus_local_state
+      root_snarked_ledger Genesis_protocol_state.t
+
+  let create_root_frontier ~logger accounts_with_secret_keys :
+      Transition_frontier.t Deferred.t =
+    let root_snarked_ledger, proposer_account =
+      create_snarked_ledger accounts_with_secret_keys
+    in
+    let consensus_local_state =
+      Consensus.Data.Local_state.create
+        (Some (Account.public_key proposer_account))
+    in
+    let genesis_protocol_state_with_hash =
+      Genesis_protocol_state.create_with_custom_ledger
+        ~genesis_consensus_state:
+          (Consensus.Data.Consensus_state.create_genesis
+             ~negative_one_protocol_state_hash:
+               Protocol_state.(hash negative_one))
+        ~genesis_ledger:(Ledger.of_database root_snarked_ledger)
+    in
+    create_frontier_from_genesis_protocol_state ~logger ~consensus_local_state
+      root_snarked_ledger genesis_protocol_state_with_hash
 
   let build_frontier_randomly ~gen_root_breadcrumb_builder frontier :
       unit Deferred.t =

@@ -306,9 +306,9 @@ module type S = sig
     module Make_state_hooks
         (Blockchain_state : Protocols.Coda_pow.Blockchain_state_intf
                             with type staged_ledger_hash :=
-                                        Coda_base.Staged_ledger_hash.t
+                                        Staged_ledger_hash.t
                              and type staged_ledger_hash_var :=
-                                        Coda_base.Staged_ledger_hash.var
+                                        Staged_ledger_hash.var
                              and type frozen_ledger_hash :=
                                         Coda_base.Frozen_ledger_hash.t
                              and type frozen_ledger_hash_var :=
