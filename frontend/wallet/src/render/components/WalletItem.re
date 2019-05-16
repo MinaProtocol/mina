@@ -1,5 +1,3 @@
-open Tc;
-
 module Styles = {
   open Css;
   open Theme;
@@ -46,14 +44,9 @@ module Styles = {
 [@react.component]
 let make = (~wallet: Wallet.t) => {
   let (settings, _setSettings) = React.useContext(SettingsProvider.context);
-  let (activeWallet, setActiveWallet) =
-    React.useContext(ActiveWalletProvider.context);
+  let url = ReasonReact.Router.useUrl();
 
-  let isActive =
-    Option.withDefault(
-      ~default=false,
-      Option.map(~f=active => active == wallet.key, activeWallet),
-    );
+  let isActive = url.path == ["wallet", PublicKey.toString(wallet.key)];
 
   let walletName = SettingsRenderer.getWalletName(settings, wallet.key);
 
@@ -64,7 +57,7 @@ let make = (~wallet: Wallet.t) => {
       | true => Styles.activeWalletItem
       }
     }
-    onClick={_ => setActiveWallet(wallet.key)}>
+    onClick={_ => ReasonReact.Router.push("/wallet/" ++ PublicKey.toString(wallet.key))}>
     <div className=Styles.walletName> {ReasonReact.string(walletName)} </div>
     <div className=Styles.balance>
       {ReasonReact.string({js|■ |js} ++ wallet.balance)}
