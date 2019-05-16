@@ -1,38 +1,45 @@
 open Core
 open Async
 
+let render_keys public_keys =
+  String.concat ~sep:"\n"
+  @@ List.map public_keys ~f:Signature_lib.Public_key.Compressed.to_base64
+
 let command =
   let open Command.Let_syntax in
   let%map_open config_directory = anon ("config-directory" %: string)
   and num_transactions =
     flag "num-transactions"
       ~doc:
-        "NUMTRANSACTION is the number of transactions that should be in the \
-         database"
+        "NUMTRANSACTION is the number of transactions recorded in the \
+         application"
       (optional int)
-  and num_users =
-    flag "num-users"
+  and num_wallets =
+    flag "num-wallets"
+      ~doc:"NUMWALLETS is the number of wallets in the application"
+      (optional int)
+  and num_foreign_users =
+    flag "num-foreign-users"
       ~doc:
-        "NUMUSERS is the number of users that are involved in the \
-         transactions sent in the database"
+        "NUMFOREIGNUSERS is the number of other users that are not wallets in \
+         the application"
       (optional int)
   in
   fun () ->
-    let directory = config_directory ^/ "transaction" in
+    let directory = config_directory in
     let open Deferred.Let_syntax in
-    let%map () = Unix.mkdir ~p:() directory in
-    let _, public_keys =
+    let%bind () = Unix.mkdir ~p:() directory in
+    let%map _, wallets, foreign_keys =
       Transaction_database.For_tests.populate_database ~directory
-        (Option.value ~default:5 num_users)
+        ~num_wallets:(Option.value ~default:3 num_wallets)
+        ~num_foreign:(Option.value ~default:5 num_foreign_users)
         (Option.value ~default:1000 num_transactions)
     in
-    Core.printf
-      !"Generated Database at %s\nHere are the participants' public key:\n%s"
-      directory
-      ( String.concat ~sep:"\n"
-      @@ List.map public_keys ~f:Signature_lib.Public_key.Compressed.to_base64
-      )
+    Core.printf !"Generated Database at %s\n" directory ;
+    Core.printf "Here are the wallets' public keys:\n%s\n\n"
+    @@ render_keys wallets ;
+    Core.printf "Here are other public keys:\n%s\n" @@ render_keys foreign_keys
 
 let () =
   Command.run
-  @@ Command.async ~summary:"Mock data for front-end wallet" command
+  @@ Command.async ~summary:"Mock data for wallet application" command

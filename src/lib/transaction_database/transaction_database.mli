@@ -1,3 +1,4 @@
+open Async
 open Coda_base
 open Signature_lib
 
@@ -8,5 +9,10 @@ include
 
 module For_tests : sig
   val populate_database :
-    directory:string -> int -> int -> t * Public_key.Compressed.t list
+       directory:string
+    -> num_wallets:int
+    -> num_foreign:int
+    -> int
+    -> (t * Public_key.Compressed.t list * Public_key.Compressed.t list)
+       Deferred.t
 end
