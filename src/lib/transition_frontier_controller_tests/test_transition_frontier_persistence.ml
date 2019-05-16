@@ -225,14 +225,17 @@ let%test_module "Transition Frontier Persistence" =
       in
       test_deserialization max_length frontier
 
-    let%test "Serializing a frontier and then deserializing it  from genesis \
-              should give us the same transition_frontier" =
+    let%test_unit "Serializing a frontier and then deserializing it  from \
+                   genesis should give us the same transition_frontier" =
       Core.Backtrace.elide := false ;
       Async.Scheduler.set_record_backtraces true ;
       Thread_safe.block_on_async_exn
       @@ fun () ->
-      let%bind frontier = genesis_frontier ~logger in
-      test_deserialization (max_length / 2) frontier
+      Stubs.with_genesis_frontier ~logger ~f:(fun frontier ->
+          let%map is_serialization_correct =
+            test_deserialization (max_length / 2) frontier
+          in
+          assert is_serialization_correct )
 
     (* TODO: create a test where a batch of diffs are being applied, but the
        worker dies in the middle. The transition_frontier_database can be left

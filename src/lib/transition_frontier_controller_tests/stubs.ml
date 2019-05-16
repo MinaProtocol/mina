@@ -361,18 +361,25 @@ struct
 
   module Ledger_transfer = Coda_base.Ledger_transfer.Make (Ledger) (Ledger.Db)
 
-  let with_genesis_frontier ~logger =
-    let%bind ledger_dir =
-      Unix.mkdtemp @@ Uuid.to_string (Uuid_unix.create ())
-    in
-    let ledger_db = Coda_base.Ledger.Db.create ~directory_name:ledger_dir () in
-    let root_snarked_ledger =
-      Ledger_transfer.transfer_accounts ~src:Genesis_ledger.t ~dest:ledger_db
-    in
-    let consensus_local_state = Consensus.Data.Local_state.create None in
-    create_frontier_from_genesis_protocol_state ~logger ~consensus_local_state
-      ~genesis_protocol_state_with_hash:Genesis_protocol_state.t
-      root_snarked_ledger
+  let with_genesis_frontier ~logger ~f =
+    File_system.with_temp_dir
+      (Uuid.to_string (Uuid_unix.create ()))
+      ~f:(fun ledger_dir ->
+        let ledger_db =
+          Coda_base.Ledger.Db.create ~directory_name:ledger_dir ()
+        in
+        let root_snarked_ledger =
+          Ledger_transfer.transfer_accounts ~src:Genesis_ledger.t
+            ~dest:ledger_db
+        in
+        let consensus_local_state = Consensus.Data.Local_state.create None in
+        let%bind frontier =
+          create_frontier_from_genesis_protocol_state ~logger
+            ~consensus_local_state
+            ~genesis_protocol_state_with_hash:Genesis_protocol_state.t
+            root_snarked_ledger
+        in
+        f frontier )
 
   let create_root_frontier ~logger accounts_with_secret_keys :
       Transition_frontier.t Deferred.t =
