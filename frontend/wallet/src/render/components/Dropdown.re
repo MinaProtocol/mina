@@ -1,4 +1,5 @@
 open Tc;
+open Bindings;
 
 module Styles = {
   open Css;
@@ -33,8 +34,11 @@ module Styles = {
   let value =
     merge([
       Theme.Text.Body.regular,
-      style([paddingBottom(`px(2)), color(Theme.Colors.teal),
+      style([
+        paddingBottom(`px(2)),
+        color(Theme.Colors.teal),
         cursor(`default),
+        flexGrow(1.),
       ]),
     ]);
 
@@ -51,7 +55,7 @@ module Styles = {
       border(`px(1), `solid, Theme.Colors.marineAlpha(0.3)),
       borderBottomLeftRadius(`rem(0.25)),
       borderBottomRightRadius(`rem(0.25)),
-        cursor(`default),
+      cursor(`default),
     ]);
 
   let item =
@@ -66,16 +70,28 @@ module Styles = {
         hover([backgroundColor(Theme.Colors.slateAlpha(0.1))]),
       ]),
     ]);
+
+  let icon =
+    style([
+      color(Theme.Colors.teal), height(`rem(1.5)), marginRight(`px(-5))]);
 };
 
 [@react.component]
 let make = (~onChange, ~value, ~label, ~options) => {
   let (isOpen, setOpen) = React.useState(() => false);
   let toggleOpen = () => setOpen(isOpen => !isOpen);
-  <div className={Styles.container(isOpen)} onClick={_e => toggleOpen()}>
+  Window.onClick(Window.current, () => setOpen(_ => false));
+  <div
+    className={Styles.container(isOpen)}
+    onClick={e => {
+      ReactEvent.Mouse.stopPropagation(e);
+      toggleOpen();
+    }}>
     <span className=Styles.label> {React.string(label ++ ":")} </span>
     <Spacer width=0.5 />
     <span className=Styles.value> {React.string(value)} </span>
+    <Spacer width=0.5 />
+    <span className=Styles.icon> <Icon kind=Icon.ChevronDown /> </span>
     <div className={isOpen ? Styles.options : Styles.hidden}>
       {List.map(
          ~f=
