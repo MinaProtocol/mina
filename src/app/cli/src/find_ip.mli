@@ -1,1 +1,3 @@
-val find : unit -> string Async_kernel.Deferred.t
+open Core
+
+val find : unit -> Unix.Inet_addr.t Async_kernel.Deferred.t

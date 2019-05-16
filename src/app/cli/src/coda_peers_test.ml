@@ -25,7 +25,7 @@ let main () =
       ~max_concurrent_connections:None
   in
   let%bind workers = Coda_processes.spawn_local_processes_exn configs in
-  let _, _, expected_peers = Coda_processes.net_configs n in
+  let _, expected_peers = Coda_processes.net_configs n in
   let%bind _ = after (Time.Span.of_sec 10.) in
   let%bind () =
     Deferred.all_unit

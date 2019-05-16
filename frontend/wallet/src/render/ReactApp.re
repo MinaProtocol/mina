@@ -6,8 +6,7 @@ let make = () => {
     newSettings => setSettings(Ok(newSettings)),
   );
 
-  let (activeWallet, setActiveWallet) =
-    React.useState(() => Some(PublicKey.ofStringExn("test1")));
+  let (activeWallet, setActiveWallet) = React.useState(() => None);
   let activeWalletContext = (
     activeWallet,
     newWallet => setActiveWallet(_ => Some(newWallet)),
@@ -15,7 +14,7 @@ let make = () => {
 
   <ActiveWalletProvider value=activeWalletContext>
     <SettingsProvider value=settingsContext>
-      <ReasonApollo.Provider client=Apollo.client>
+      <ReasonApollo.Provider client=Apollo.faker>
         <Window>
           <Header />
           <Main> <SideBar /> <Router /> </Main>

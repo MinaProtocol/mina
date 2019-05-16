@@ -66,6 +66,12 @@ module Checked = struct
     let open Checked in
     Core.List.map2_exn xs ys ~f:Boolean.equal |> Checked.all >>= Boolean.all
 
+  let is tag triple =
+    let xs = triple_to_list (to_bits tag) in
+    let ys = triple_to_list triple in
+    let eq x y = if x then y else Boolean.not y in
+    List.map2_exn xs ys ~f:eq |> Boolean.all
+
   let is_payment triple = is Payment triple
 
   let is_fee_transfer triple = is Fee_transfer triple
