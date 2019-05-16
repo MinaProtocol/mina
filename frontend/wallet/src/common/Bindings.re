@@ -82,6 +82,10 @@ module Fs = {
   external writeFile:
     (string, string, string, Js.Nullable.t(Js.Exn.t) => unit) => unit =
     "";
+
+  [@bs.val] [@bs.module "fs"]
+  external watchFile:
+    (string, unit => unit) => unit = "";
 };
 
 module Fetch = {
