@@ -61,12 +61,6 @@ module Checked = struct
   let to_triples bits = [bits]
 
   let is tag triple =
-    let xs = List.map (triple_to_list (to_bits tag)) ~f:Boolean.var_of_value in
-    let ys = triple_to_list triple in
-    let open Checked in
-    Core.List.map2_exn xs ys ~f:Boolean.equal |> Checked.all >>= Boolean.all
-
-  let is tag triple =
     let xs = triple_to_list (to_bits tag) in
     let ys = triple_to_list triple in
     let eq x y = if x then y else Boolean.not y in
