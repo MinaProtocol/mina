@@ -55,7 +55,7 @@ module Make_real (Keys : Keys_lib.Keys.S) = struct
         (Tock.Keypair.pk Wrap.keys)
         Wrap.input {Wrap.Prover_state.proof} Wrap.main input
     in
-    assert (Tock.verify (Tock.Keypair.vk Wrap.keys) Wrap.input input) ;
+    assert (Tock.verify proof (Tock.Keypair.vk Wrap.keys) Wrap.input input) ;
     proof
 
   let base_proof_expr =
@@ -75,6 +75,10 @@ module Make_real (Keys : Keys_lib.Keys.S) = struct
         (Tick.Keypair.pk Keys.Step.keys)
         (Keys.Step.input ()) prover_state main base_hash
     in
+    assert (
+      Tick.verify tick
+        (Tick.Keypair.vk Keys.Step.keys)
+        (Keys.Step.input ()) base_hash ) ;
     let proof = wrap base_hash tick in
     [%expr
       Coda_base.Proof.Stable.V1.t_of_sexp
