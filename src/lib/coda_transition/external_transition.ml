@@ -14,7 +14,6 @@ module type S =
    and type consensus_state := Consensus.Data.Consensus_state.Value.t
    and type protocol_state := Protocol_state.Value.t
    and type proof := Proof.t
-   and type verifier := Verifier.t
    and type staged_ledger_hash := Staged_ledger_hash.t
    and type ledger_proof := Ledger_proof.t
    and type transaction := Transaction.t
@@ -27,8 +26,12 @@ module type Staged_ledger_diff_intf = sig
   val user_commands : t -> User_command.t list
 end
 
-module Make (Staged_ledger_diff : Staged_ledger_diff_intf) :
-  S with type staged_ledger_diff := Staged_ledger_diff.t = struct
+module Make
+    (Verifier : Verifier.S)
+    (Staged_ledger_diff : Staged_ledger_diff_intf) :
+  S
+  with type verifier := Verifier.t
+   and type staged_ledger_diff := Staged_ledger_diff.t = struct
   module Stable = struct
     module V1 = struct
       module T = struct
@@ -121,7 +124,7 @@ module Make (Staged_ledger_diff : Staged_ledger_diff_intf) :
     include Stable.Latest
     module Stable = Stable
 
-    let create_unsafe x = `I_swear_this_is_safe_see_my_comment x
+    let create_unsafe t = `I_swear_this_is_safe_see_my_comment t
 
     let forget_validation = Fn.id
   end
@@ -171,6 +174,8 @@ module Make (Staged_ledger_diff : Staged_ledger_diff_intf) :
     let wrap t = (t, fully_invalid)
 
     let lift (t, _) = t
+
+    let lower t v = (t, v)
 
     module Unsafe = struct
       let set_valid_time_received :
@@ -453,9 +458,11 @@ module Make (Staged_ledger_diff : Staged_ledger_diff_intf) :
   end
 end
 
-include Make (struct
-  include Staged_ledger_diff.Stable.V1
+include Make
+          (Verifier)
+          (struct
+            include Staged_ledger_diff.Stable.V1
 
-  [%%define_locally
-  Staged_ledger_diff.(creator, user_commands)]
-end)
+            [%%define_locally
+            Staged_ledger_diff.(creator, user_commands)]
+          end)

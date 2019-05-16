@@ -126,6 +126,8 @@ module type S = sig
 
   type diff_hash
 
+  type verifier
+
   type root_snarked_ledger
 
   type consensus_local_state
@@ -141,6 +143,7 @@ module type S = sig
   val deserialize :
        directory_name:string
     -> logger:Logger.t
+    -> verifier:verifier
     -> trust_system:Trust_system.t
     -> root_snarked_ledger:root_snarked_ledger
     -> consensus_local_state:consensus_local_state

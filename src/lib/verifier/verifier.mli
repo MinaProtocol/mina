@@ -22,7 +22,8 @@ end
 
 module Prod : S with type ledger_proof = Ledger_proof.Prod.t
 
-module Dummy : S with type ledger_proof = Ledger_proof.Debug.t
+module Dummy :
+  S with type t = unit and type ledger_proof = Ledger_proof.Debug.t
 
 [%%if proof_level = "full"]
 

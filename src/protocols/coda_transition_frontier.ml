@@ -438,7 +438,7 @@ end
 module type Catchup_intf = sig
   type state_hash
 
-  type external_transition_validated
+  type external_transition_with_initial_validation
 
   type unprocessed_transition_cache
 
@@ -450,15 +450,16 @@ module type Catchup_intf = sig
 
   type trust_system
 
+  type verifier
+
   val run :
        logger:Logger.t
     -> trust_system:Trust_system.t
+    -> verifier:verifier
     -> network:network
     -> frontier:transition_frontier
     -> catchup_job_reader:( state_hash
-                          * ( ( external_transition_validated
-                              , state_hash )
-                              With_hash.t
+                          * ( external_transition_with_initial_validation
                               Envelope.Incoming.t
                             , state_hash )
                             Cached.t
@@ -564,8 +565,6 @@ module type Transition_handler_processor_intf = sig
 
   type external_transition_with_initial_validation
 
-  type unprocessed_transition_cache
-
   type transition_frontier
 
   type transition_frontier_breadcrumb
@@ -578,22 +577,16 @@ module type Transition_handler_processor_intf = sig
     -> trust_system:trust_system
     -> time_controller:time_controller
     -> frontier:transition_frontier
-    -> primary_transition_reader:( ( external_transition_with_initial_validation
-                                   , state_hash )
-                                   With_hash.t
+    -> primary_transition_reader:( external_transition_with_initial_validation
                                    Envelope.Incoming.t
                                  , state_hash )
                                  Cached.t
                                  Strict_pipe.Reader.t
-    -> proposer_transition_reader:( external_transition_validated
-                                  , state_hash )
-                                  With_hash.t
+    -> proposer_transition_reader:transition_frontier_breadcrumb
                                   Strict_pipe.Reader.t
     -> clean_up_catchup_scheduler:unit Ivar.t
     -> catchup_job_writer:( state_hash
-                            * ( ( external_transition_validated
-                                , state_hash )
-                                With_hash.t
+                            * ( external_transition_with_initial_validation
                                 Envelope.Incoming.t
                               , state_hash )
                               Cached.t
@@ -622,7 +615,6 @@ module type Transition_handler_processor_intf = sig
                                    , Strict_pipe.crash Strict_pipe.buffered
                                    , unit )
                                    Strict_pipe.Writer.t
-    -> unprocessed_transition_cache:unprocessed_transition_cache
     -> unit
 end
 
@@ -637,10 +629,8 @@ module type Unprocessed_transition_cache_intf = sig
 
   val register_exn :
        t
-    -> (external_transition_with_initial_validation, state_hash) With_hash.t
-       Envelope.Incoming.t
-    -> ( (external_transition_with_initial_validation, state_hash) With_hash.t
-         Envelope.Incoming.t
+    -> external_transition_with_initial_validation Envelope.Incoming.t
+    -> ( external_transition_with_initial_validation Envelope.Incoming.t
        , state_hash )
        Cached.t
 end
@@ -649,6 +639,8 @@ module type Transition_handler_intf = sig
   type time_controller
 
   type time
+
+  type verifier
 
   type state_hash
 
@@ -674,10 +666,11 @@ module type Transition_handler_intf = sig
     Breadcrumb_builder_intf
     with type state_hash := state_hash
      and type trust_system := trust_system
+     and type verifier := verifier
      and type external_transition_with_initial_validation :=
                 external_transition_with_initial_validation
      and type transition_frontier := transition_frontier
-    with type transition_frontier_breadcrumb := transition_frontier_breadcrumb
+     and type transition_frontier_breadcrumb := transition_frontier_breadcrumb
 
   module Validator :
     Transition_handler_validator_intf
@@ -693,11 +686,12 @@ module type Transition_handler_intf = sig
   module Processor :
     Transition_handler_processor_intf
     with type time_controller := time_controller
+     and type external_transition_validated := external_transition_validated
      and type external_transition_with_initial_validation :=
                 external_transition_with_initial_validation
      and type state_hash := state_hash
      and type trust_system := trust_system
-     and type unprocessed_transition_cache := Unprocessed_transition_cache.t
+     and type verifier := verifier
      and type transition_frontier := transition_frontier
      and type transition_frontier_breadcrumb := transition_frontier_breadcrumb
 end
@@ -777,65 +771,73 @@ module type Root_prover_intf = sig
 end
 
 module type Bootstrap_controller_intf = sig
+  type time
+
   type network
+
+  type verifier
 
   type transition_frontier
 
-  type external_transition_verified
+  type external_transition_with_initial_validation
 
   type ledger_db
 
   val run :
        logger:Logger.t
     -> trust_system:Trust_system.t
+    -> verifier:verifier
     -> network:network
     -> frontier:transition_frontier
     -> ledger_db:ledger_db
     -> transition_reader:( [< `Transition of
-                              external_transition_verified Envelope.Incoming.t
-                           ]
-                         * [< `Time_received of int64] )
+                              external_transition_with_initial_validation
+                              Envelope.Incoming.t ]
+                         * [< `Time_received of time] )
                          Strict_pipe.Reader.t
     -> ( transition_frontier
-       * external_transition_verified Envelope.Incoming.t list )
+       * external_transition_with_initial_validation Envelope.Incoming.t list
+       )
        Deferred.t
 end
 
 module type Transition_frontier_controller_intf = sig
   type time_controller
 
-  type external_transition_verified
+  type external_transition_validated
+
+  type external_transition_with_initial_validation
 
   type state_hash
 
   type transition_frontier
 
+  type breadcrumb
+
   type network
+
+  type verifier
 
   type time
 
   val run :
        logger:Logger.t
     -> trust_system:Trust_system.t
+    -> verifier:verifier
     -> network:network
     -> time_controller:time_controller
-    -> collected_transitions:( external_transition_verified
-                             , state_hash )
-                             With_hash.t
+    -> collected_transitions:external_transition_with_initial_validation
                              Envelope.Incoming.t
                              list
     -> frontier:transition_frontier
     -> network_transition_reader:( [ `Transition of
-                                     external_transition_verified
+                                     external_transition_with_initial_validation
                                      Envelope.Incoming.t ]
                                  * [`Time_received of time] )
                                  Strict_pipe.Reader.t
-    -> proposer_transition_reader:( external_transition_verified
-                                  , state_hash )
-                                  With_hash.t
-                                  Strict_pipe.Reader.t
+    -> proposer_transition_reader:breadcrumb Strict_pipe.Reader.t
     -> clear_reader:[`Clear] Strict_pipe.Reader.t
-    -> (external_transition_verified, state_hash) With_hash.t
+    -> (external_transition_validated, state_hash) With_hash.t
        Strict_pipe.Reader.t
 end
 
@@ -848,7 +850,7 @@ module type Initial_validator_intf = sig
 
   type external_transition
 
-  type external_transition_verified
+  type external_transition_with_initial_validation
 
   val run :
        logger:Logger.t
@@ -858,7 +860,7 @@ module type Initial_validator_intf = sig
                          * [`Time_received of time] )
                          Strict_pipe.Reader.t
     -> valid_transition_writer:( [ `Transition of
-                                   external_transition_verified
+                                   external_transition_with_initial_validation
                                    Envelope.Incoming.t ]
                                  * [`Time_received of time]
                                , Strict_pipe.crash Strict_pipe.buffered
@@ -869,6 +871,8 @@ end
 
 module type Transition_router_intf = sig
   type time_controller
+
+  type verifier
 
   type external_transition
 
@@ -889,6 +893,7 @@ module type Transition_router_intf = sig
   val run :
        logger:Logger.t
     -> trust_system:Trust_system.t
+    -> verifier:verifier
     -> network:network
     -> time_controller:time_controller
     -> frontier_broadcast_pipe:transition_frontier option

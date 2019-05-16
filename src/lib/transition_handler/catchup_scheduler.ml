@@ -96,12 +96,11 @@ module Make (Inputs : Inputs.S) = struct
 
   let mem t transition =
     Hashtbl.mem t.collected_transitions
-      (With_hash.data transition |> External_transition.Validated.parent_hash)
+      (External_transition.parent_hash transition)
 
   let has_timeout t transition =
     Hashtbl.mem t.parent_root_timeouts
-      ( With_hash.data @@ Envelope.Incoming.data transition
-      |> External_transition.Validated.parent_hash )
+      (External_transition.parent_hash transition)
 
   let is_empty t =
     Hashtbl.is_empty t.collected_transitions

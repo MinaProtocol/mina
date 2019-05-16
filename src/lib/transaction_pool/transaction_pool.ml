@@ -398,6 +398,7 @@ end)
   Make0 (Coda_base.User_command) (Coda_base.Ledger) (Staged_ledger)
     (Coda_base.Transaction_validator)
     (Transition_frontier)
+include Make (Staged_ledger) (Transition_frontier)
 
 let%test_module _ =
   ( module struct

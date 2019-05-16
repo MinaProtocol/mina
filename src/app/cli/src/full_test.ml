@@ -98,8 +98,8 @@ let run_test () : unit Deferred.t =
       in
       let%bind coda =
         Main.create
-          (Main.Config.make ~logger ~trust_system ~net_config
-             ~propose_keypair:keypair
+          (Main.Config.make ~logger ~trust_system ~verifier:Init.verifier
+             ~net_config ~propose_keypair:keypair
              ~snark_worker_key:
                (Public_key.compress largest_account_keypair.public_key)
              ~transaction_pool_disk_location:
@@ -112,7 +112,7 @@ let run_test () : unit Deferred.t =
       Main.start coda ;
       don't_wait_for
         (Strict_pipe.Reader.iter_without_pushback
-           (Main.verified_transitions coda)
+           (Main.validated_transitions coda)
            ~f:ignore) ;
       let wait_until_cond ~(f : Main.t -> bool) ~(timeout : Float.t) =
         let rec go () =

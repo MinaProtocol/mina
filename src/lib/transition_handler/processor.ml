@@ -11,10 +11,11 @@ open Async_kernel
 open Protocols.Coda_pow
 open Pipe_lib.Strict_pipe
 open Coda_base
+open Coda_state
 open Cache_lib
 open O1trace
 
-module Make (Inputs : Inputs.With_unprocessed_transition_cache.S) :
+module Make (Inputs : Inputs.S) :
   Transition_handler_processor_intf
   with type state_hash := State_hash.t
    and type trust_system := Trust_system.t
@@ -23,8 +24,6 @@ module Make (Inputs : Inputs.With_unprocessed_transition_cache.S) :
               Inputs.External_transition.with_initial_validation
    and type external_transition_validated :=
               Inputs.External_transition.Validated.t
-   and type unprocessed_transition_cache :=
-              Inputs.Unprocessed_transition_cache.t
    and type transition_frontier := Inputs.Transition_frontier.t
    and type transition_frontier_breadcrumb :=
               Inputs.Transition_frontier.Breadcrumb.t
@@ -45,6 +44,104 @@ module Make (Inputs : Inputs.With_unprocessed_transition_cache.S) :
   let catchup_timeout_duration =
     Time.Span.of_ms
       (Consensus.Constants.block_window_duration_ms * 2 |> Int64.of_int)
+
+  let cached_transform_deferred_result ~transform_cached ~transform_result
+      cached =
+    Cached.transform cached ~f:transform_cached
+    |> Cached.sequence_deferred
+    >>= Fn.compose transform_result Cached.sequence_result
+
+  (* add a breadcrumb and perform post processing *)
+  let add_and_finalize ~frontier ~catchup_scheduler
+      ~processed_transition_writer ~only_if_present cached_breadcrumb =
+    let breadcrumb = Cached.invalidate_with_success cached_breadcrumb in
+    let transition =
+      Transition_frontier.Breadcrumb.transition_with_hash breadcrumb
+    in
+    let add_breadcrumb =
+      if only_if_present then Transition_frontier.add_breadcrumb_if_present_exn
+      else Transition_frontier.add_breadcrumb_exn
+    in
+    let%map () = add_breadcrumb frontier breadcrumb in
+    Writer.write processed_transition_writer transition ;
+    Catchup_scheduler.notify catchup_scheduler
+      ~hash:(With_hash.hash transition)
+
+  let process_transition ~logger ~trust_system ~verifier ~frontier
+      ~catchup_scheduler ~processed_transition_writer
+      ~transition:cached_initially_validated_transition =
+    let enveloped_initially_validated_transition =
+      Cached.peek cached_initially_validated_transition
+    in
+    let sender =
+      Envelope.Incoming.sender enveloped_initially_validated_transition
+    in
+    let initially_validated_transition =
+      Envelope.Incoming.data enveloped_initially_validated_transition
+    in
+    let {With_hash.hash= transition_hash; data= transition}, _ =
+      initially_validated_transition
+    in
+    let metadata = [("state_hash", State_hash.to_yojson transition_hash)] in
+    Deferred.map ~f:(Fn.const ())
+      (let open Deferred.Result.Let_syntax in
+      let%bind mostly_validated_transition =
+        let open Deferred.Let_syntax in
+        match
+          Transition_frontier_validation.validate_frontier_dependencies ~logger
+            ~frontier initially_validated_transition
+        with
+        | Ok t ->
+            return (Ok t)
+        | Error `Not_selected_over_frontier_root ->
+            let%map () =
+              Trust_system.record_envelope_sender trust_system logger sender
+                ( Trust_system.Actions.Gossiped_invalid_transition
+                , Some
+                    ( "$state_hash was not selected of transition frontier root"
+                    , metadata ) )
+            in
+            Error ()
+        | Error `Already_in_frontier ->
+            Logger.warn logger ~module_:__MODULE__ ~location:__LOC__ ~metadata
+              "refusing to process $state_hash because is is already in the \
+               transition frontier" ;
+            return (Error ())
+        | Error `Parent_missing_from_frontier ->
+            Catchup_scheduler.watch catchup_scheduler
+              ~timeout_duration:catchup_timeout_duration
+              ~cached_transition:cached_initially_validated_transition ;
+            return (Error ())
+      in
+      (* TODO: only access parent in transition frontier once (already done in call to validate dependencies) *)
+      let parent_hash =
+        Protocol_state.previous_state_hash
+          (External_transition.protocol_state transition)
+      in
+      let parent_breadcrumb =
+        Transition_frontier.find_exn frontier parent_hash
+      in
+      let%bind breadcrumb =
+        cached_transform_deferred_result cached_initially_validated_transition
+          ~transform_cached:(fun _ ->
+            Transition_frontier.Breadcrumb.build ~logger ~verifier
+              ~trust_system ~sender:(Some sender) ~parent:parent_breadcrumb
+              ~transition:mostly_validated_transition )
+          ~transform_result:(function
+            | Error (`Invalid_staged_ledger_hash error)
+            | Error (`Invalid_staged_ledger_diff error) ->
+                Logger.error logger ~module_:__MODULE__ ~location:__LOC__
+                  ~metadata "error while building breadcrumb in processor: %s"
+                  (Error.to_string_hum error) ;
+                Deferred.return (Error ())
+            | Error (`Fatal_error exn) ->
+                raise exn
+            | Ok breadcrumb ->
+                Deferred.return (Ok breadcrumb) )
+      in
+      Deferred.map ~f:Result.return
+        (add_and_finalize ~frontier ~catchup_scheduler
+           ~processed_transition_writer ~only_if_present:false breadcrumb))
 
   let run ~logger ~verifier ~trust_system ~time_controller ~frontier
       ~(primary_transition_reader :
@@ -73,34 +170,19 @@ module Make (Inputs : Inputs.With_unprocessed_transition_cache.S) :
            list
          , synchronous
          , unit Deferred.t )
-         Writer.t) ~processed_transition_writer ~unprocessed_transition_cache =
+         Writer.t) ~processed_transition_writer =
     let catchup_scheduler =
       Catchup_scheduler.create ~logger ~verifier ~trust_system ~frontier
         ~time_controller ~catchup_job_writer ~catchup_breadcrumbs_writer
         ~clean_up_signal:clean_up_catchup_scheduler
     in
-    (* add a breadcrumb and perform post processing *)
-    let add_and_finalize ~only_if_present cached_breadcrumb =
-      let open Deferred.Or_error.Let_syntax in
-      let%bind breadcrumb =
-        Deferred.Or_error.return
-          (Cached.invalidate_with_success cached_breadcrumb)
-      in
-      let transition =
-        Transition_frontier.Breadcrumb.transition_with_hash breadcrumb
-      in
-      let add_breadcrumb =
-        if only_if_present then
-          Transition_frontier.add_breadcrumb_if_present_exn
-        else Transition_frontier.add_breadcrumb_exn
-      in
-      let%bind () =
-        Deferred.map ~f:Result.return (add_breadcrumb frontier breadcrumb)
-      in
-      Writer.write processed_transition_writer transition ;
-      Deferred.return
-        (Catchup_scheduler.notify catchup_scheduler
-           ~hash:(With_hash.hash transition))
+    let add_and_finalize =
+      add_and_finalize ~frontier ~catchup_scheduler
+        ~processed_transition_writer
+    in
+    let process_transition =
+      process_transition ~logger ~trust_system ~verifier ~frontier
+        ~catchup_scheduler ~processed_transition_writer
     in
     ignore
       (Reader.Merge.iter
@@ -150,86 +232,6 @@ module Make (Inputs : Inputs.With_unprocessed_transition_cache.S) :
                          "failed to attach breadcrumb proposed internally to \
                           transition frontier: %s"
                          (Error.to_string_hum err) )
-               | `Partially_valid_transition
-                   cached_transition_with_initial_validation -> (
-                   Logger.trace logger ~module_:__MODULE__ ~location:__LOC__
-                     ~metadata:
-                       [("state_hash", State_hash.to_yojson transition_hash)]
-                     "begining to process external transition: $state_hash" ;
-                   match
-                     Transition_frontier_validation
-                     .validate_frontier_dependencies ~logger ~frontier
-                       (Envelope.Incoming.data (Cached.peek cached_transition))
-                   with
-                   | Error `Not_selected_over_frontier_root ->
-                       () (* TODO: punish *)
-                   | Error `Already_in_frontier ->
-                       failwith "impossible? (probably not)"
-                   | Error `Parent_missing_from_frontier ->
-                       Catchup_scheduler.watch catchup_scheduler
-                         ~timeout_duration:catchup_timeout_duration
-                         ~cached_transition:
-                           cached_transition_with_initial_validation ;
-                       return ()
-                   | Ok transition_with_validation -> (
-                       (* TODO: look up parent only once (parent is already looked up in call to validate dependencies *)
-                       (*
-                       let cached_transition_with_validation =
-                         Cached.transform cached_transition_with_initial_validation
-                          ~f:(Fn.const transition_with_validation)
-                       in
-                       *)
-                       let ( {With_hash.hash= transition_hash; data= transition}
-                           , _ ) =
-                         transition_with_validation
-                       in
-                       let parent_hash =
-                         External_transition.parent_hash transition
-                       in
-                       let parent =
-                         Option.value_exn
-                           (Transition_frontier.find frontier parent_hash)
-                       in
-                       match%map
-                         let%bind breadcrumb =
-                           let open Deferred.Let_syntax in
-                           let%bind cached_breadcrumb =
-                             Cached.transform cached_transition ~f:(fun _ ->
-                                 let transition_with_hash =
-                                   Envelope.Incoming.data
-                                     transition_with_hash_enveloped
-                                 in
-                                 let sender =
-                                   Envelope.Incoming.sender
-                                     transition_with_hash_enveloped
-                                 in
-                                 let%map breadcrumb_result =
-                                   Transition_frontier.Breadcrumb.build ~logger
-                                     ~verifier ~trust_system ~parent
-                                     ~transition_with_hash
-                                     ~sender:(Some sender)
-                                 in
-                                 Result.map_error breadcrumb_result
-                                   ~f:(fun error -> (sender, error)) )
-                             |> Cached.sequence_deferred
-                           in
-                           match Cached.sequence_result cached_breadcrumb with
-                           | Error (_sender, `Invalid_staged_ledger_hash error)
-                           | Error (_sender, `Invalid_staged_ledger_diff error)
-                             ->
-                               return (Error error)
-                           | Error (_sender, `Fatal_error error) ->
-                               raise error
-                           | Ok breadcrumb ->
-                               return (Ok breadcrumb)
-                         in
-                         add_and_finalize ~only_if_present:false breadcrumb
-                       with
-                       | Ok () ->
-                           ()
-                       | Error err ->
-                           Logger.error logger ~module_:__MODULE__
-                             ~location:__LOC__
-                             "error while adding transition: %s"
-                             (Error.to_string_hum err) ) ) ) ))
+               | `Partially_valid_transition transition ->
+                   process_transition ~transition ) ))
 end

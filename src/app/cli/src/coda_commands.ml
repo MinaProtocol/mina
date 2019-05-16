@@ -434,7 +434,7 @@ struct
           in
           Pipe.filter_map frontier_new_block_reader ~f:(fun new_block ->
               let unverified_new_block =
-                External_transition.of_verified new_block
+                External_transition.Validated.forget_validation new_block
               in
               Option.some_if
                 (Public_key.Compressed.equal
@@ -447,7 +447,9 @@ struct
       global_pipe coda ~to_pipe:(fun new_block_incr ->
           let payments_incr =
             Coda_incremental.New_transition.map new_block_incr
-              ~f:(Fn.compose payments External_transition.of_verified)
+              ~f:
+                (Fn.compose payments
+                   External_transition.Validated.forget_validation)
           in
           let payments_observer =
             Coda_incremental.New_transition.observe payments_incr

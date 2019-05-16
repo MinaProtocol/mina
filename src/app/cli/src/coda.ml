@@ -360,8 +360,8 @@ let daemon logger =
        let monitor = Async.Monitor.create ~name:"coda" () in
        let%bind coda =
          Run.create
-           (Run.Config.make ~logger ~trust_system ~net_config
-              ?snark_worker_key:run_snark_worker_flag
+           (Run.Config.make ~logger ~trust_system ~verifier:Init.verifier
+              ~net_config ?snark_worker_key:run_snark_worker_flag
               ~transaction_pool_disk_location:(conf_dir ^/ "transaction_pool")
               ~snark_pool_disk_location:(conf_dir ^/ "snark_pool")
               ~wallets_disk_location:(conf_dir ^/ "wallets")

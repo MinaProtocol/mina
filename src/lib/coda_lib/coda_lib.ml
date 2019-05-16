@@ -294,6 +294,7 @@ module type Inputs_intf = sig
      and type consensus_local_state := Consensus.Data.Local_state.t
      and type user_command := User_command.t
      and type verifier := Verifier.t
+     and type pending_coinbase := Pending_coinbase.t
 
   module Transition_frontier_persistence :
     Transition_frontier_persistence.Intf.S
@@ -302,6 +303,7 @@ module type Inputs_intf = sig
      and type diff_hash := Transition_frontier.Diff_hash.t
      and type root_snarked_ledger := Ledger_db.t
      and type consensus_local_state := Consensus.Data.Local_state.t
+     and type verifier := Verifier.t
 
   module Transaction_pool :
     Transaction_pool_intf
@@ -361,6 +363,7 @@ module type Inputs_intf = sig
      and type network := Net.t
      and type ledger_db := Ledger_db.t
      and type breadcrumb := Transition_frontier.Breadcrumb.t
+     and type verifier := Verifier.t
 
   module Root_prover :
     Protocols.Coda_transition_frontier.Root_prover_intf
@@ -371,6 +374,7 @@ module type Inputs_intf = sig
                 External_transition.with_initial_validation
      and type consensus_state := Consensus.Data.Consensus_state.Value.t
      and type state_hash := Coda_base.State_hash.t
+     and type verifier := Verifier.t
 
   module Proposer :
     Proposer_intf
@@ -409,6 +413,7 @@ module type Inputs_intf = sig
     with type ledger_hash := Ledger_hash.t
      and type state_hash := Coda_base.State_hash.t
      and type external_transition := External_transition.t
+     and type external_transition_validated := External_transition.Validated.t
      and type transition_frontier := Transition_frontier.t
      and type syncable_ledger_query := Coda_base.Sync_ledger.Query.t
      and type syncable_ledger_answer := Coda_base.Sync_ledger.Answer.t
@@ -764,7 +769,7 @@ module Make (Inputs : Inputs_intf) = struct
                         Transition_frontier_persistence.deserialize
                           ~directory_name ~logger:config.logger
                           ~trust_system:config.trust_system
-                          ~root_snarked_ledger
+                          ~verifier:config.verifier ~root_snarked_ledger
                           ~consensus_local_state:config.consensus_local_state
                       in
                       let persistence =
@@ -836,8 +841,8 @@ module Make (Inputs : Inputs_intf) = struct
             in
             let valid_transitions =
               Transition_router.run ~logger:config.logger
-                ~trust_system:config.trust_system ~network:net
-                ~time_controller:config.time_controller
+                ~trust_system:config.trust_system ~verifier:config.verifier
+                ~network:net ~time_controller:config.time_controller
                 ~frontier_broadcast_pipe:
                   (frontier_broadcast_pipe_r, frontier_broadcast_pipe_w)
                 ~ledger_db

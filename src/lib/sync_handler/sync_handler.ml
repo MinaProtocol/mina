@@ -10,6 +10,12 @@ module type Inputs_intf = sig
     Transition_frontier_intf
     with type state_hash := State_hash.t
      and type external_transition_validated := External_transition.Validated.t
+     and type mostly_validated_external_transition :=
+                ( [`Time_received] * Truth.true_t
+                , [`Proof] * Truth.true_t
+                , [`Frontier_dependencies] * Truth.true_t
+                , [`Staged_ledger_diff] * Truth.false_t )
+                External_transition.Validation.with_transition
      and type ledger_database := Ledger.Db.t
      and type staged_ledger := Staged_ledger.t
      and type masked_ledger := Ledger.Mask.Attached.t
@@ -18,6 +24,8 @@ module type Inputs_intf = sig
      and type consensus_local_state := Consensus.Data.Local_state.t
      and type user_command := User_command.t
      and type verifier := Verifier.t
+     and type pending_coinbase := Pending_coinbase.t
+     and type consensus_state := Consensus.Data.Consensus_state.Value.t
 
   module Time : Protocols.Coda_pow.Time_intf
 end

@@ -1212,35 +1212,6 @@ module type Work_selector_intf = sig
     -> work list * State.t
 end
 
-module type Tip_intf = sig
-  type protocol_state
-
-  type protocol_state_proof
-
-  type staged_ledger
-
-  type serializable
-
-  type external_transition
-
-  type external_transition_verified
-
-  (* N.B.: can't derive bin_io for staged ledger containing persistent ledger *)
-  type t =
-    { state: protocol_state
-    ; proof: protocol_state_proof
-    ; staged_ledger: staged_ledger }
-  [@@deriving sexp, fields]
-
-  (* serializer for tip components other than the persistent database in the staged ledger *)
-  val bin_tip : serializable Bin_prot.Type_class.t
-
-  val of_verified_transition_and_staged_ledger :
-    external_transition_verified -> staged_ledger -> t
-
-  val copy : t -> t
-end
-
 module type Consensus_state_intf = sig
   module Value : sig
     type t
@@ -1630,6 +1601,19 @@ module type External_transition_intf = sig
     val lift :
          (external_transition, state_hash) With_hash.t * fully_valid
       -> (Validated.t, state_hash) With_hash.t
+
+    val lower :
+         (Validated.t, state_hash) With_hash.t
+      -> ( 'time_received
+         , 'proof
+         , 'frontier_dependencies
+         , 'staged_ledger_diff )
+         t
+      -> ( 'time_received
+         , 'proof
+         , 'frontier_dependencies
+         , 'staged_ledger_diff )
+         with_transition
   end
 
   type with_initial_validation =
@@ -2138,17 +2122,7 @@ Merge Snark:
      and type staged_ledger_hash := Staged_ledger_hash.t
      and type ledger_proof := Ledger_proof.t
      and type transaction := Transaction.t
-
-  module Tip :
-    Tip_intf
-    with type staged_ledger := Staged_ledger.t
-     and type protocol_state := Protocol_state.Value.t
-     and type protocol_state_proof := Protocol_state_proof.t
-     and type external_transition := External_transition.t
-     and type serializable :=
-                Protocol_state.Value.t
-                * Protocol_state_proof.t
-                * Staged_ledger.serializable
+     and type time := Time.t
 
   module Transaction_validator :
     Transaction_validator_intf

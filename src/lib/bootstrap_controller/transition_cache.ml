@@ -6,7 +6,7 @@ open Core
 module type S = sig
   type t
 
-  type external_transition_validated
+  type external_transition_with_initial_validation
 
   type state_hash
 
@@ -15,21 +15,22 @@ module type S = sig
   val add :
        t
     -> parent:state_hash
-    -> external_transition_validated Envelope.Incoming.t
+    -> external_transition_with_initial_validation Envelope.Incoming.t
     -> unit
 
-  val data : t -> external_transition_validated Envelope.Incoming.t list
+  val data :
+    t -> external_transition_with_initial_validation Envelope.Incoming.t list
 end
 
 module type Inputs_intf = Transition_frontier.Inputs_intf
 
 module Make (Inputs : Inputs_intf) :
   S
-  with type external_transition_validated :=
-              Inputs.External_transition.Validated.t
+  with type external_transition_with_initial_validation :=
+              Inputs.External_transition.with_initial_validation
    and type state_hash := State_hash.t = struct
   type t =
-    Inputs.External_transition.Validated.t Envelope.Incoming.t list
+    Inputs.External_transition.with_initial_validation Envelope.Incoming.t list
     State_hash.Table.t
 
   let create () = State_hash.Table.create ()
@@ -42,8 +43,9 @@ module Make (Inputs : Inputs_intf) :
           if
             List.mem children new_child
               ~equal:
-                (Envelope.Incoming.equal
-                   Inputs.External_transition.Validated.equal)
+                (Envelope.Incoming.equal (fun (a, _) (b, _) ->
+                     Inputs.External_transition.equal (With_hash.data a)
+                       (With_hash.data b) ))
           then children
           else new_child :: children )
 
