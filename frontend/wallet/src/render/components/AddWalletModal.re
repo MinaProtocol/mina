@@ -24,9 +24,8 @@ let make = (~modalState, ~setModalState) => {
         ])
       )>
       <div className=Styles.bodyMargin>
-        {React.string("Name:")}
-        <input
-          type_="text"
+        <TextField
+          label="Name"
           onChange={e => {
             let value = ReactEvent.Form.target(e)##value;
             setModalState(_ => Some(value));
