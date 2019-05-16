@@ -19,9 +19,17 @@ include (
 module Task = {
   include Tablecloth.Task;
 
-  /// Take a `unit => Promise.t('a)` into a `Task.t('x, 'a)`
+  let return = a => succeed(a);
+
+  /// Take a `unit => Promise.t('a)`, make it into a `Task.t('x, 'a)`
   let liftPromise = (f, ()) =>
     f() |> Js.Promise.then_(a => Js.Promise.resolve(Belt.Result.Ok(a)));
+
+  /// Take a `unit => Promise.t('a)` which throws err, make it into a `Task.t(err, 'a)`
+  let liftErrorPromise = (f, ()) =>
+    f()
+    |> Js.Promise.then_(a => Js.Promise.resolve(Belt.Result.Ok(a)))
+    |> Js.Promise.catch(err => Js.Promise.resolve(Belt.Result.Error(err)));
 
   let uncallbackifyValue = f => {
     create(cb => f(a => cb(Belt.Result.Ok(a))));
@@ -58,6 +66,18 @@ module Task = {
 module Result = {
   include Tablecloth.Result;
 
+  let map = (t, ~f) => map(f, t);
+  let andThen = (t, ~f) => andThen(~f, t);
+
+  let return = a => Belt.Result.Ok(a);
+  let fail = x => Belt.Result.Error(x);
+
+  let onError = (t: t('x, 'a), ~f) =>
+    switch (t) {
+    | Ok(v) => Belt.Result.Ok(v)
+    | Error(e) => f(e)
+    };
+
   let ok_exn = (t: t(Js.Exn.t, 'a)): 'a => {
     let string_of_str_option = s =>
       switch (s) {
@@ -82,6 +102,23 @@ module Option = {
     switch (t1, t2) {
     | (Some(a), Some(b)) => Some(f(a, b))
     | _ => None
+    };
+  };
+};
+
+module Monad = {
+  module type S2 = {
+    type t('x, 'a);
+    let return: 'a => t('x, 'a);
+    let map: (t('x, 'a), ~f: 'a => 'b) => t('x, 'b);
+    let andThen: (t('x, 'a), ~f: 'a => t('x, 'b)) => t('x, 'b);
+  };
+
+  module Fail = {
+    module type S2 = {
+      include S2;
+      let fail: 'x => t('x, 'a);
+      let onError: (t('x, 'a), ~f: 'x => t('y, 'a)) => t('y, 'a);
     };
   };
 };

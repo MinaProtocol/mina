@@ -106,15 +106,19 @@ module type Time_intf = sig
   val modulus : t -> Span.t -> Span.t
 
   val now : Controller.t -> t
+
+  val to_string : t -> string
+
+  val of_string_exn : string -> t
 end
 
 module type Ledger_hash_intf = sig
-  type t [@@deriving eq, sexp, compare]
+  type t [@@deriving eq, sexp, compare, yojson]
 
   module Stable :
     sig
       module V1 : sig
-        type t [@@deriving eq, sexp, compare, bin_io, version]
+        type t [@@deriving eq, sexp, compare, bin_io, version, yojson]
       end
 
       module Latest = V1

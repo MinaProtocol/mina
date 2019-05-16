@@ -4,6 +4,7 @@ open Pipe_lib
 open Signature_lib
 open Coda_numbers
 open Coda_base
+open Coda_transition
 open Coda_state
 open O1trace
 module Graphql_cohttp_async =
@@ -268,12 +269,12 @@ struct
     |> ignore
 
   let create_snark_worker ~public_key ~client_port ~shutdown_on_disconnect =
-    let open Snark_worker_lib in
+    let open Snark_worker in
     let%map p =
       let our_binary = Sys.executable_name in
       Process.create_exn () ~prog:our_binary
         ~args:
-          ( "internal" :: Snark_worker_lib.Intf.command_name
+          ( "internal" :: Snark_worker.Intf.command_name
           :: Snark_worker.arguments ~public_key
                ~daemon_address:
                  (Host_and_port.create ~host:"127.0.0.1" ~port:client_port)

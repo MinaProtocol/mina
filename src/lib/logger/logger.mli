@@ -36,6 +36,15 @@ module Message : sig
   [@@deriving yojson]
 end
 
+val format_message :
+     t
+  -> level:Level.t
+  -> module_:string
+  -> location:string
+  -> ?metadata:(string, Yojson.Safe.json) List.Assoc.t
+  -> ('a, unit, string, string) format4
+  -> 'a
+
 type 'a log_function =
      t
   -> module_:string

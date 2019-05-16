@@ -76,18 +76,9 @@ module Make (Inputs : Inputs_intf) :
       -> trust_system:Trust_system.t
       -> Sync_ledger.Answer.t Option.t Deferred.t =
    fun ~frontier hash query ~logger ~trust_system ->
-    let open Trust_system in
-    let sender = Envelope.Incoming.sender query in
     match get_ledger_by_hash ~frontier hash with
     | None ->
-        let%map _ =
-          record_envelope_sender trust_system logger sender
-            ( Actions.Requested_unknown_item
-            , Some
-                ( "tried to sync ledger with hash: $hash"
-                , [("hash", Ledger_hash.to_yojson hash)] ) )
-        in
-        None
+        return None
     | Some ledger ->
         let responder =
           Sync_ledger.Mask.Responder.create ledger ignore ~logger ~trust_system

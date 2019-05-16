@@ -1,5 +1,25 @@
 open Tc;
 
+module Window = {
+  type t;
+
+  [@bs.val] external current: t = "window";
+
+  [@bs.set] external onClick: (t, unit => unit) => unit = "onclick";
+};
+
+module Url = {
+  type t;
+  [@bs.new] external create: string => t = "URL";
+
+  module SearchParams = {
+    type t;
+    [@bs.send] external get: (t, string) => string = "";
+  };
+
+  [@bs.get] external searchParams: t => SearchParams.t = "";
+};
+
 module Navigator = {
   module Clipboard = {
     [@bs.val] [@bs.scope ("navigator", "clipboard")]
@@ -62,4 +82,8 @@ module Fs = {
   external writeFile:
     (string, string, string, Js.Nullable.t(Js.Exn.t) => unit) => unit =
     "";
+};
+
+module Fetch = {
+  [@bs.module] external fetch: ApolloClient.fetch = "node-fetch";
 };

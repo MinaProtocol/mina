@@ -14,7 +14,7 @@ end
 
 module Input = struct
   type t =
-    { host: string
+    { addrs_and_ports: Kademlia.Node_addrs_and_ports.t
     ; env: (string * string) list
     ; proposer: int option
     ; snark_worker_config: Snark_worker_config.t option
@@ -22,8 +22,6 @@ module Input = struct
     ; conf_dir: string
     ; trace_dir: string option
     ; program_dir: string
-    ; external_port: int
-    ; discovery_port: int
     ; acceptable_delay: Time.Span.t
     ; peers: Host_and_port.t list
     ; max_concurrent_connections: int option }
@@ -288,20 +286,22 @@ module T = struct
       ; get_all_payments }
 
     let init_worker_state
-        { host
+        { addrs_and_ports
         ; proposer
         ; snark_worker_config
         ; work_selection
         ; conf_dir
         ; trace_dir
         ; program_dir
-        ; external_port
         ; peers
-        ; discovery_port
         ; max_concurrent_connections } =
       let logger =
         Logger.create
-          ~metadata:[("host", `String host); ("port", `Int external_port)]
+          ~metadata:
+            [ ( "host"
+              , `String (Unix.Inet_addr.to_string addrs_and_ports.external_ip)
+              )
+            ; ("port", `Int addrs_and_ports.communication_port) ]
           ()
       in
       let%bind () =
@@ -342,14 +342,30 @@ module T = struct
           in
           let module Main = Coda_inputs.Make_coda (Init) in
           let module Run = Coda_run.Make (Config) (Main) in
-          let receipt_chain_dir_name = conf_dir ^/ "receipt_chain" in
+          let%bind receipt_chain_dir_name =
+            Unix.mkdtemp @@ conf_dir ^/ "receipt_chain"
+          in
           let%bind trust_dir = Unix.mkdtemp (conf_dir ^/ "trust") in
-          let%bind () = File_system.create_dir receipt_chain_dir_name in
+          let%bind transaction_database_dir =
+            Unix.mkdtemp @@ conf_dir ^/ "transaction"
+          in
+          let trace_database_initialization typ location =
+            Logger.trace logger "Creating %s at %s" ~module_:__MODULE__
+              ~location typ
+          in
           let receipt_chain_database =
             Coda_base.Receipt_chain_database.create
               ~directory:receipt_chain_dir_name
           in
+          trace_database_initialization "receipt_chain_database" __LOC__
+            receipt_chain_dir_name ;
           let trust_system = Trust_system.create ~db_dir:trust_dir in
+          trace_database_initialization "trust_system" __LOC__ trust_dir ;
+          let transaction_database =
+            Transaction_database.create logger transaction_database_dir
+          in
+          trace_database_initialization "transaction_database" __LOC__
+            transaction_database_dir ;
           let time_controller =
             Run.Inputs.Time.Controller.create Run.Inputs.Time.Controller.basic
           in
@@ -361,6 +377,7 @@ module T = struct
           in
           let net_config =
             { Main.Inputs.Net.Config.logger
+            ; trust_system
             ; time_controller
             ; consensus_local_state
             ; gossip_net_params=
@@ -368,10 +385,7 @@ module T = struct
                 ; target_peer_count= 8
                 ; conf_dir
                 ; initial_peers= peers
-                ; me=
-                    Network_peer.Peer.create
-                      (Unix.Inet_addr.of_string host)
-                      ~discovery_port ~communication_port:external_port
+                ; addrs_and_ports
                 ; logger
                 ; trust_system
                 ; max_concurrent_connections } }
@@ -392,7 +406,7 @@ module T = struct
                  ~time_controller ~receipt_chain_database
                  ~snark_work_fee:(Currency.Fee.of_int 0)
                  ?propose_keypair:Config.propose_keypair ~monitor
-                 ~consensus_local_state ())
+                 ~consensus_local_state ~transaction_database ())
           in
           Run.handle_shutdown ~monitor ~conf_dir coda ;
           let%map () =
@@ -485,7 +499,9 @@ module T = struct
                      Logger.error logger ~module_:__MODULE__ ~location:__LOC__
                        "why is this w pipe closed? did someone close the \
                         reader end? dropping this write..." ;
-                   Linear_pipe.write_if_open w (prev_state_hash, state_hash) )) ;
+                   Linear_pipe.write_without_pushback_if_open w
+                     (prev_state_hash, state_hash) ;
+                   Deferred.unit )) ;
             return r.pipe
           in
           let coda_root_diff () =
