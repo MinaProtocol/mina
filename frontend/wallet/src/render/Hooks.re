@@ -20,10 +20,3 @@ let useRoute = () => {
 
   path;
 };
-
-let useSettings = () => {
-  let (settings, setSettings) =
-    React.useState(() => SettingsRenderer.loadSettings());
-
-  (settings, newVal => setSettings(_ => newVal));
-};

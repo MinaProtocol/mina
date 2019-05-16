@@ -9,7 +9,7 @@ module Styles = {
 // TODO: Add validation that the wallet name isn't already in use
 
 [@react.component]
-let make = (~modalState, ~setModalState) => {
+let make = (~modalState, ~setModalState, ~onSubmit) => {
   <Modal
     isOpen={Option.isSome(modalState)}
     title="Add Wallet"
@@ -24,9 +24,8 @@ let make = (~modalState, ~setModalState) => {
         ])
       )>
       <div className=Styles.bodyMargin>
-        {React.string("Name:")}
-        <input
-          type_="text"
+        <TextField
+          label="Name"
           onChange={e => {
             let value = ReactEvent.Form.target(e)##value;
             setModalState(_ => Some(value));
@@ -44,7 +43,10 @@ let make = (~modalState, ~setModalState) => {
         <Button
           label="Create"
           style=Button.Green
-          onClick={_ => setModalState(_ => None)}
+          onClick={_ => {
+            onSubmit(Option.getExn(modalState));
+            setModalState(_ => None);
+          }}
         />
       </div>
     </div>
