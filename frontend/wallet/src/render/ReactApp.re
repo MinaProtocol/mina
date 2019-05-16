@@ -1,15 +1,8 @@
 [@react.component]
 let make = () => {
-  let (settings, setSettings) = Hooks.useSettings();
-  let settingsContext = (
-    Tc.Result.toOption(settings),
-    newSettings => setSettings(Ok(newSettings)),
-  );
+  let settingsValue = SettingsProvider.createContext();
 
-  // TODO: route to the initial wallet
-  ReasonReact.Router.push("/");
-
-  <SettingsProvider value=settingsContext>
+  <SettingsProvider value=settingsValue>
     <ReasonApollo.Provider client=Apollo.faker>
       <Window>
         <Header />

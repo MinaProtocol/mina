@@ -21,15 +21,8 @@ let useRoute = () => {
   path;
 };
 
-let useSettings = () => {
-  let (settings, setSettings) =
-    React.useState(() => SettingsRenderer.loadSettings());
-
-  (settings, newVal => setSettings(_ => newVal));
-};
-
 let useActiveWallet = () => {
-  let url = ReasonReact.Router.useUrl();  
+  let url = ReasonReact.Router.useUrl();
   switch (url.path) {
   | ["wallet", walletKey] => Some(PublicKey.ofStringExn(walletKey))
   | _ => None
