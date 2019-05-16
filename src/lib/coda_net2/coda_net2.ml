@@ -6,6 +6,8 @@ open Pipe_lib
 
 [@@@ocaml.warning "-27"]
 
+exception Child_died
+
 (* BTC alphabet *)
 let alphabet =
   B58.make_alphabet
@@ -48,8 +50,11 @@ module Helper = struct
   (* duplicate record field names in same module *)
   type t =
     { subprocess: Process.t
+    ; mutable failure_response: [`Die | `Ignore]
+    ; lock_path: string
     ; outstanding_requests: (int, Yojson.Safe.json Or_error.t Ivar.t) Hashtbl.t
     ; seqno: int ref
+    ; logger: Logger.t
     ; subscriptions:
         ( int
         , ( string Envelope.Incoming.t
@@ -107,8 +112,10 @@ module Helper = struct
           ; ("body", `Assoc body) ]
       in
       let rpc = Yojson.Safe.to_string actual_obj in
+      Logger.trace t.logger "sending line to libp2p_helper: $line"
+        ~module_:__MODULE__ ~location:__LOC__
+        ~metadata:[("line", `String rpc)] ;
       Writer.write_line (Process.stdin t.subprocess) rpc ;
-      Core.eprintf "<:%s\n%!" rpc ;
       Ivar.read res )
     else Deferred.Or_error.error_string "helper process already exited"
 
@@ -174,11 +181,11 @@ module Helper = struct
               in
               () (* TODO: sender *)
             else
-              Core.eprintf
-                "!:received msg about %d after unsubscribe, was it still in \
-                 the stdout pipe?\n\
-                 %!"
-                idx ;
+              Logger.warn t.logger
+                "received msg for subscription $sub after unsubscribe, was it \
+                 still in the stdout pipe?"
+                ~module_:__MODULE__ ~location:__LOC__
+                ~metadata:[("sub", `Int idx)] ;
             Ok ()
         | None ->
             Or_error.errorf
@@ -275,11 +282,13 @@ module Helper = struct
     | s ->
         Or_error.errorf "unknown upcall %s" s
 
-  let create logger helper_path =
+  let create logger subprocess lock_path =
     let open Deferred.Or_error.Let_syntax in
-    let%map subprocess = Process.create ~prog:helper_path ~args:[] () in
     let t =
       { subprocess
+      ; failure_response= `Die
+      ; lock_path
+      ; logger
       ; outstanding_requests= Hashtbl.create (module Int)
       ; subscriptions= Hashtbl.create (module Int)
       ; validators= Hashtbl.create (module String)
@@ -291,24 +300,15 @@ module Helper = struct
     let err = Process.stderr subprocess in
     let errlines = Reader.lines err in
     let lines = Process.stdout subprocess |> Reader.lines in
-    (let open Deferred.Let_syntax in
-    let%map exit_status = Process.wait subprocess in
-    t.finished <- true ;
-    eprintf
-      !"libp2p_helper exited with %{sexp:Core.Unix.Exit_or_signal.t}\n%!"
-      exit_status ;
-    Hashtbl.iter t.outstanding_requests ~f:(fun iv ->
-        Ivar.fill iv
-          (Or_error.error_string "libp2p_helper process died before answering")
-    ))
-    |> don't_wait_for ;
     Pipe.iter errlines ~f:(fun line ->
-        Core.eprintf "#:%s\n%!" line ;
+        (* TODO: the log messages from go are structured, we should copy the log level *)
+        Logger.debug logger ~module_:__MODULE__ ~location:__LOC__
+          "log message from libp2p_helper: $line"
+          ~metadata:[("line", `String line)] ;
         Deferred.unit )
     |> don't_wait_for ;
     Pipe.iter lines ~f:(fun line ->
         let open Yojson.Safe.Util in
-        Core.eprintf ">:%s\n%!" line ;
         let v = Yojson.Safe.from_string line in
         ( match
             if member "upcall" v = `Null then handle_response t v
@@ -317,8 +317,11 @@ module Helper = struct
         | Ok () ->
             ()
         | Error e ->
-            Core.eprintf "handling line from helper failed: %s\n%!"
-              (Error.to_string_hum e) ) ;
+            Logger.error logger "handling line from helper failed! $err"
+              ~module_:__MODULE__ ~location:__LOC__
+              ~metadata:
+                [ ("line", `String line)
+                ; ("err", `String (Error.to_string_hum e)) ] ) ;
         Deferred.unit )
     |> don't_wait_for ;
     t
@@ -461,8 +464,6 @@ module Pubsub = struct
             Error e )
 end
 
-let create = Helper.create
-
 let configure net ~me ~maddrs ~statedir ~network_id =
   match%map
     Helper.do_rpc net "configure"
@@ -504,8 +505,16 @@ let listen_on net ma =
   | Error e ->
       Error e
 
-(** TODO: implement *)
-let shutdown net = Deferred.return (Ok ())
+(** TODO: graceful shutdown *)
+let shutdown (net : net) =
+  net.failure_response <- `Ignore ;
+  let%bind _ =
+    Process.run_exn ~prog:"kill"
+      ~args:[Pid.to_string (Process.pid net.subprocess)]
+      ()
+  in
+  let%bind _ = Process.wait net.subprocess in
+  Sys.remove net.lock_path
 
 module Stream = struct
   type t = Helper.stream
@@ -591,3 +600,123 @@ let open_stream net ~protocol peer =
         (Yojson.Safe.to_string v)
   | Error e ->
       Error e
+
+(* Create and helpers for create *)
+
+(* Unfortunately, `dune runtest` runs in a pwd deep inside the build
+ * directory. This hack finds the project root by recursively looking for the
+   dune-project file. *)
+let get_project_root () =
+  let open Filename in
+  let rec go dir =
+    if Core.Sys.file_exists_exn @@ dir ^/ "src/dune-project" then Some dir
+    else if String.equal dir "/" then None
+    else go @@ fst @@ split dir
+  in
+  go @@ realpath current_dir_name
+
+let lock_file = "libp2p_helper.lock"
+
+let write_lock_file lock_path pid =
+  Async.Writer.save lock_path ~contents:(Pid.to_string pid)
+
+let keep_trying :
+    f:('a -> 'b Deferred.Or_error.t) -> 'a list -> 'b Deferred.Or_error.t =
+ fun ~f xs ->
+  let open Deferred.Let_syntax in
+  let rec go e xs : 'b Deferred.Or_error.t =
+    match xs with
+    | [] ->
+        return e
+    | x :: xs -> (
+        match%bind f x with
+        | Ok r ->
+            return (Ok r)
+        | Error e ->
+            go (Error e) xs )
+  in
+  go (Or_error.error_string "empty input") xs
+
+let create ~logger ~conf_dir =
+  let lock_path = Filename.concat conf_dir lock_file in
+  let run_p2p () =
+    (* This is where nix dumps the go artifact *)
+    let libp2p_helper_binary =
+      "src/app/libp2p_helper/result/bin/libp2p_helper"
+    in
+    (* This is where you'd manually install kademlia *)
+    let coda_libp2p_helper = "coda-libp2p_helper" in
+    let open Deferred.Let_syntax in
+    match%map
+      keep_trying
+        ( ( Unix.getenv "CODA_LIBP2P_HELPER_PATH"
+          |> Option.value ~default:coda_libp2p_helper )
+        ::
+        ( match get_project_root () with
+        | Some path ->
+            [path ^/ libp2p_helper_binary]
+        | None ->
+            [] ) )
+        ~f:(fun prog -> Process.create ~prog ~args:[] ())
+      |> Deferred.Or_error.map ~f:(fun p -> Helper.create logger p lock_path)
+    with
+    | Ok p ->
+        (* If the libp2p_helper process dies, kill the parent daemon process. Fix
+        * for #550 *)
+        Deferred.upon (Process.wait p.subprocess) (fun code ->
+            p.finished <- true ;
+            ( match (p.failure_response, code) with
+            | `Ignore, _ | _, Ok () ->
+                ()
+            | `Die, (Error _ as e) ->
+                Logger.fatal logger ~module_:__MODULE__ ~location:__LOC__
+                  !"libp2p_helper process died: %s"
+                  (Unix.Exit_or_signal.to_string_hum e) ;
+                raise Child_died ) ;
+            Hashtbl.iter p.outstanding_requests ~f:(fun iv ->
+                Ivar.fill iv
+                  (Or_error.error_string
+                     "libp2p_helper process died before answering") ) ) ;
+        Ok p
+    | Error e ->
+        Or_error.error_string
+          ( "If you are a dev, did you forget to `make libp2p_helper` and set \
+             CODA_LIBP2P_HELPER_PATH? Try \
+             CODA_LIBP2P_HELPER_PATH=$PWD/src/app/libp2p_helper/result/bin/libp2p_helper "
+          ^ Error.to_string_hum e )
+  in
+  let kill_locked_process ~logger =
+    match%bind Sys.file_exists lock_path with
+    | `Yes -> (
+        let%bind p = Reader.file_contents lock_path in
+        match%bind Process.run ~prog:"kill" ~args:[p] () with
+        | Ok _ ->
+            Logger.debug logger ~module_:__MODULE__ ~location:__LOC__
+              "Killing Dead libp2p_helper Process %s" p ;
+            let%map () = Sys.remove lock_path in
+            Ok ()
+        | Error _ ->
+            Logger.debug logger ~module_:__MODULE__ ~location:__LOC__
+              "Process %s does not exists and will not be killed" p ;
+            return @@ Ok () )
+    | _ ->
+        return @@ Ok ()
+  in
+  let open Deferred.Or_error.Let_syntax in
+  let%bind () = kill_locked_process ~logger in
+  match%bind Sys.is_directory conf_dir |> Deferred.map ~f:Or_error.return with
+  | `Yes ->
+      let%bind t = run_p2p () in
+      let%map () =
+        write_lock_file lock_path (Process.pid t.subprocess)
+        |> Deferred.map ~f:Or_error.return
+      in
+      don't_wait_for
+        (Pipe.iter_without_pushback
+           (Reader.pipe (Process.stderr t.subprocess))
+           ~f:(fun str ->
+             Logger.error logger ~module_:__MODULE__ ~location:__LOC__ "%s" str
+             )) ;
+      t
+  | _ ->
+      Deferred.Or_error.errorf "Config directory (%s) must exist" conf_dir
