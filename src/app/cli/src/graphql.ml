@@ -99,7 +99,7 @@ module Make (Commands : Coda_commands.Intf) = struct
                     Stringable.public_key new_delegate
                 | Chain_voting _ ->
                     (* TODO: Chain_voting does not have a receiver *)
-                    "chain voting doesn't have a receiver" )
+                    "chain voting doesn't have a receiver field" )
           ; uint64_result_field "amount"
               ~doc:"Amount that sender send to receiver"
               ~args:Arg.[]

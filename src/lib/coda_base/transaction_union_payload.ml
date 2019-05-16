@@ -75,9 +75,7 @@ module Body = struct
         ; amount= Currency.Amount.zero }
     | Chain_voting {voting_for} ->
         { tag= Tag.Chain_voting
-        ; public_key=
-            Public_key.Compressed.Poly.
-              {x= (voting_for :> Pedersen.Digest.t); is_odd= false}
+        ; public_key= Chain_voting.to_public_key Chain_voting.{voting_for}
         ; amount= Currency.Amount.zero }
 
   module Checked = struct
