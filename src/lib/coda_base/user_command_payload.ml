@@ -160,12 +160,6 @@ module Body = struct
           +> Fold.init (max_variant_size - Chain_voting.length_in_triples)
                ~f:(fun _ -> (false, false, false)))
 
-  let sender_cost = function
-    | Payment {amount; _} ->
-        amount
-    | Stake_delegation _ | Chain_voting _ ->
-        Currency.Amount.zero
-
   let length_in_triples = Tag.length_in_triples + max_variant_size
 
   let gen ~max_amount =

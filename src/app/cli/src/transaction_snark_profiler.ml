@@ -10,6 +10,10 @@ module Sparse_ledger = struct
   let merkle_root t = Frozen_ledger_hash.of_ledger_hash @@ merkle_root t
 end
 
+let genesis_sparse_ledger =
+  Sparse_ledger.of_any_ledger
+    (Ledger.Any_ledger.cast (module Ledger) Genesis_ledger.t)
+
 let create_ledger_and_transactions num_transitions =
   let open Tick in
   let num_accounts = 4 in
@@ -128,7 +132,7 @@ let profile (module T : Transaction_snark.S) sparse_ledger0
                 t
                 (unstage
                    (Sparse_ledger.handler ~curr_ledger:sparse_ledger
-                      ~epoch_ledger:sparse_ledger)) )
+                      ~epoch_ledger:genesis_sparse_ledger)) )
         in
         ((Time.Span.max span max_span, sparse_ledger'), proof) )
   in
@@ -181,7 +185,7 @@ let check_base_snarks sparse_ledger0 (transitions : Transaction.t list) preeval
             t
             (unstage
                (Sparse_ledger.handler ~curr_ledger:sparse_ledger
-                  ~epoch_ledger:sparse_ledger))
+                  ~epoch_ledger:genesis_sparse_ledger))
         in
         sparse_ledger' )
   in
@@ -216,7 +220,7 @@ let generate_base_snarks_witness sparse_ledger0
             t
             (unstage
                (Sparse_ledger.handler ~curr_ledger:sparse_ledger
-                  ~epoch_ledger:sparse_ledger))
+                  ~epoch_ledger:genesis_sparse_ledger))
         in
         sparse_ledger' )
   in

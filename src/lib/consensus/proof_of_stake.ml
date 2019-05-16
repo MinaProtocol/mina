@@ -799,13 +799,18 @@ module Data = struct
         let dummy_sparse_ledger =
           Coda_base.Sparse_ledger.of_ledger_subset_exn Genesis_ledger.t [pk]
         in
+        let genesis_sparse_ledger =
+          Coda_base.(
+            Sparse_ledger.of_any_ledger
+              (Ledger.Any_ledger.cast (module Ledger) Genesis_ledger.t))
+        in
         let empty_pending_coinbase =
           Coda_base.Pending_coinbase.create () |> Or_error.ok_exn
         in
         let ledger_handler =
           unstage
             (Coda_base.Sparse_ledger.handler ~curr_ledger:dummy_sparse_ledger
-               ~epoch_ledger:dummy_sparse_ledger)
+               ~epoch_ledger:genesis_sparse_ledger)
         in
         let pending_coinbase_handler =
           unstage
