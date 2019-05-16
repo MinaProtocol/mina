@@ -1,34 +1,169 @@
 open Core_kernel
 
+module Sequence_no = struct
+  module Stable = struct
+    module V1 = struct
+      module T = struct
+        type t = int [@@deriving sexp, bin_io, version]
+      end
+
+      include T
+    end
+
+    module Latest = V1
+  end
+
+  type t = Stable.Latest.t [@@deriving sexp]
+end
+
 module Sequence_number = struct
-  type t = int [@@deriving sexp]
+  module Stable = struct
+    module V1 = struct
+      module T = struct
+        type t = int [@@deriving sexp, bin_io, version]
+      end
+
+      include T
+    end
+
+    module Latest = V1
+  end
+
+  type t = Stable.Latest.t [@@deriving sexp]
 end
 
 (*Each node on the tree is viewed as a job that needs to be completed. When a job is completed, it creates a new "Todo" job and marks the old job as "Done"*)
 module Job_status = struct
-  type t = Todo | Done [@@deriving sexp]
+  module Stable = struct
+    module V1 = struct
+      module T = struct
+        type t = Todo | Done [@@deriving sexp, bin_io, version]
+      end
+
+      include T
+    end
+
+    module Latest = V1
+  end
+
+  type t = Stable.Latest.t = Todo | Done [@@deriving sexp]
 end
 
 (*number of jobs that can be added to this tree. This number corresponding to a specific level of the tree. New jobs received is distributed across the tree based on this number. *)
-(*type weight = int [@@deriving sexp]*)
+module Weight = struct
+  module Stable = struct
+    module V1 = struct
+      module T = struct
+        type t = int [@@deriving sexp, bin_io, version]
+      end
+
+      include T
+    end
+
+    module Latest = V1
+  end
+
+  type t = Stable.Latest.t [@@deriving sexp]
+end
 
 (*Base Job: Proving new transactions*)
 module Base = struct
-  type weight = int [@@deriving sexp]
+  module Job = struct
+    module Stable = struct
+      module V1 = struct
+        module T = struct
+          type 'd t =
+            | Empty
+            | Full of
+                { job: 'd
+                ; seq_no: Sequence_number.Stable.V1.t
+                ; status: Job_status.Stable.V1.t }
+          [@@deriving sexp, bin_io, version]
+        end
 
-  type 'd base =
-    | Empty
-    | Full of {job: 'd; seq_no: Sequence_number.t; status: Job_status.t}
-  [@@deriving sexp]
+        include T
+      end
 
-  type 'd t = weight * 'd base [@@deriving sexp]
+      module Latest = V1
+    end
+
+    type 'd t = 'd Stable.Latest.t =
+      | Empty
+      | Full of
+          { job: 'd
+          ; seq_no: Sequence_number.Stable.V1.t
+          ; status: Job_status.Stable.V1.t }
+    [@@deriving sexp]
+  end
+
+  module Stable = struct
+    module V1 = struct
+      module T = struct
+        type 'd t = Weight.Stable.V1.t * 'd Job.Stable.V1.t
+        [@@deriving sexp, bin_io, version]
+      end
+
+      include T
+    end
+
+    module Latest = V1
+  end
+
+  type 'd t = 'd Stable.Latest.t [@@deriving sexp]
 end
 
 (* Merge Job: Merging two proofs*)
 module Merge = struct
-  type weight = int [@@deriving sexp]
+  module Job = struct
+    module Stable = struct
+      module V1 = struct
+        module T = struct
+          type 'a t =
+            | Empty
+            | Part of 'a (*Only the left component of the job is available yet since we always complete the jobs from left to right*)
+            | Full of
+                { left: 'a
+                ; right: 'a
+                ; seq_no: Sequence_number.Stable.V1.t
+                      (*Update no, for debugging*)
+                ; status: Job_status.Stable.V1.t }
+          [@@deriving sexp, bin_io, version]
+        end
 
-  type 'a merge =
+        include T
+      end
+
+      module Latest = V1
+    end
+
+    type 'a t = 'a Stable.Latest.t =
+      | Empty
+      | Part of 'a
+      | Full of
+          { left: 'a
+          ; right: 'a
+          ; seq_no: Sequence_number.Stable.V1.t
+          ; status: Job_status.Stable.V1.t }
+    [@@deriving sexp]
+  end
+
+  module Stable = struct
+    module V1 = struct
+      module T = struct
+        type 'a t =
+          (Weight.Stable.V1.t * Weight.Stable.V1.t) * 'a Job.Stable.V1.t
+        [@@deriving sexp, bin_io, version]
+      end
+
+      include T
+    end
+
+    module Latest = V1
+  end
+
+  type 'a t = 'a Stable.Latest.t [@@deriving sexp]
+
+  (*type 'a merge =
     | Empty
     | Part of 'a (*Only the left component of the job is available yet since we always complete the jobs from left to right*)
     | Full of
@@ -38,17 +173,43 @@ module Merge = struct
         ; status: Job_status.t }
   [@@deriving sexp]
 
-  type 'a t = (weight * weight) * 'a merge [@@deriving sexp]
+  type 'a t = (weight * weight) * 'a merge [@@deriving sexp]*)
 end
 
 (*All the jobs on a tree that can be done. Base.Full and Merge.Bcomp*)
 module Available_job = struct
-  type ('a, 'd) t = Base of 'd | Merge of 'a * 'a [@@deriving sexp]
+  module Stable = struct
+    module V1 = struct
+      module T = struct
+        type ('a, 'd) t = Base of 'd | Merge of 'a * 'a [@@deriving sexp]
+      end
+
+      include T
+    end
+
+    module Latest = V1
+  end
+
+  type ('a, 'd) t = ('a, 'd) Stable.Latest.t = Base of 'd | Merge of 'a * 'a
+  [@@deriving sexp]
 end
 
 (*New jobs to be added (including new transactions or new merge jobs)*)
 module New_job = struct
-  type ('a, 'd) t = Base of 'd | Merge of 'a [@@deriving sexp]
+  module Stable = struct
+    module V1 = struct
+      module T = struct
+        type ('a, 'd) t = Base of 'd | Merge of 'a [@@deriving sexp]
+      end
+
+      include T
+    end
+
+    module Latest = V1
+  end
+
+  type ('a, 'd) t = ('a, 'd) Stable.Latest.t = Base of 'd | Merge of 'a
+  [@@deriving sexp]
 end
 
 module Space_partition = struct
@@ -56,15 +217,63 @@ module Space_partition = struct
 end
 
 module Job_view = struct
-  type 'a node = Base of 'a option | Merge of 'a option * 'a option
-  [@@deriving sexp]
+  module Node = struct
+    module Stable = struct
+      module V1 = struct
+        module T = struct
+          type 'a t = Base of 'a option | Merge of 'a option * 'a option
+          [@@deriving sexp, bin_io, version]
+        end
 
-  type 'a t = {position: int; seq_no: int; status: Job_status.t; value: 'a node}
-  [@@deriving sexp]
+        include T
+      end
+
+      module Latest = V1
+    end
+
+    type 'a t = 'a Stable.Latest.t =
+      | Base of 'a option
+      | Merge of 'a option * 'a option
+    [@@deriving sexp]
+  end
+
+  module Stable = struct
+    module V1 = struct
+      module T = struct
+        type 'a t =
+          { position: int
+          ; seq_no: Sequence_number.Stable.V1.t
+          ; status: Job_status.Stable.V1.t
+          ; value: 'a Node.Stable.V1.t }
+        [@@deriving sexp, bin_io, version]
+      end
+
+      include T
+    end
+
+    module Latest = V1
+  end
+
+  type 'a t = 'a Stable.Latest.t [@@deriving sexp]
 end
 
 module Tree = struct
-  type ('a, 'd) t =
+  module Stable = struct
+    module V1 = struct
+      module T = struct
+        type ('a, 'd) t =
+          | Leaf of 'd
+          | Node of {depth: int; value: 'a; sub_tree: ('a * 'a, 'd * 'd) t}
+        [@@deriving sexp]
+      end
+
+      include T
+    end
+
+    module Latest = V1
+  end
+
+  type ('a, 'd) t = ('a, 'd) Stable.Latest.t =
     | Leaf of 'd
     | Node of {depth: int; value: 'a; sub_tree: ('a * 'a, 'd * 'd) t}
   [@@deriving sexp]
@@ -342,10 +551,9 @@ module Tree = struct
           match (jobs, m) with
           | [], e ->
               (weight, e)
-          | [New_job.Merge a; Merge b], Merge.Empty ->
+          | [New_job.Merge a; Merge b], Merge.Job.Empty ->
               ( (left - 1, right - 1)
-              , Merge.Full {left= a; right= b; seq_no; status= Job_status.Todo}
-              )
+              , Full {left= a; right= b; seq_no; status= Job_status.Todo} )
           | [Merge a], Empty ->
               ((left - 1, right), Part a)
           | [Merge b], Part a ->
@@ -369,7 +577,7 @@ module Tree = struct
         (*Mark completed jobs as Done*)
         match (jobs, m) with
         | [Merge a], Full ({status= Job_status.Todo; _} as x) ->
-            let new_job = Merge.Full {x with status= Job_status.Done} in
+            let new_job = Merge.Job.Full {x with status= Job_status.Done} in
             let scan_result, weight' =
               if cur_level = 0 then (Some a, (0, 0)) else (None, weight)
             in
@@ -398,10 +606,10 @@ module Tree = struct
       match (jobs, d) with
       | [], e ->
           (weight, e)
-      | [New_job.Base d], Base.Empty ->
-          (weight - 1, Base.Full {job= d; seq_no; status= Job_status.Todo})
-      | [New_job.Merge _], Base.Full b ->
-          (weight, Base.Full {b with status= Job_status.Done})
+      | [New_job.Base d], Base.Job.Empty ->
+          (weight - 1, Base.Job.Full {job= d; seq_no; status= Job_status.Todo})
+      | [New_job.Merge _], Full b ->
+          (weight, Full {b with status= Job_status.Done})
       | _ ->
           failwith "Invalid base job"
     in
@@ -413,7 +621,7 @@ module Tree = struct
    fun tree ->
     let f_base base =
       match base with
-      | _weight, Base.Full {status= Job_status.Todo; _} ->
+      | _weight, Base.Job.Full {status= Job_status.Todo; _} ->
           ((1, snd base), Data_list.Single (1, 0))
       | _ ->
           ((0, snd base), Single (0, 0))
@@ -421,7 +629,7 @@ module Tree = struct
     let f_merge lst m =
       let (l1, r1), (l2, r2) = Data_list.to_data lst in
       match m with
-      | (_, _), Merge.Full {status= Job_status.Todo; _} ->
+      | (_, _), Merge.Job.Full {status= Job_status.Todo; _} ->
           (((1, 0), snd m), Data_list.Single (1, 0))
       | _ ->
           (((l1 + r1, l2 + r2), snd m), Single (l1 + r1, l2 + r2))
@@ -434,13 +642,13 @@ module Tree = struct
     fold_depth ~init:[] ~f:List.append
       ~fa:(fun i a ->
         match (i = level, a) with
-        | true, (_weight, Merge.Full {left; right; status= Todo; _}) ->
+        | true, (_weight, Merge.Job.Full {left; right; status= Todo; _}) ->
             [Available_job.Merge (left, right)]
         | _ ->
             [] )
       ~fd:(fun d ->
         match (level = depth, d) with
-        | true, (_weight, Base.Full {job; status= Todo; _}) ->
+        | true, (_weight, Base.Job.Full {job; status= Todo; _}) ->
             [Available_job.Base job]
         | _ ->
             [] )
@@ -513,8 +721,8 @@ module T = struct
       (base_weight, base)
 
   let create_tree ~depth =
-    create_tree_for_level ~level:depth ~depth ~merge:Merge.Empty
-      ~base:Base.Empty
+    create_tree_for_level ~level:depth ~depth ~merge:Merge.Job.Empty
+      ~base:Base.Job.Empty
 
   let empty : type a d. max_base_jobs:int -> delay:int -> (a, d) t =
    fun ~max_base_jobs ~delay ->

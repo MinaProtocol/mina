@@ -187,6 +187,20 @@ module State : sig
   end
 
   val hash : ('a, 'd) t -> ('a -> string) -> ('d -> string) -> Hash.t
+
+  open Container
+
+  module Make_foldable (M : Monad.S) : sig
+    (** Effectfully fold chronologically. See {!fold_chronological} *)
+    val fold_chronological_until :
+         ('a, 'd) t
+      -> init:'acc
+      -> fa:('a -> ('c, 'stop) Continue_or_stop.t)
+      -> fd:('d -> ('c, 'stop) Continue_or_stop.t)
+      -> f:('c -> 'c -> 'c)
+      -> finish:('acc -> 'stop M.t)
+      -> 'stop M.t
+  end
 end
 
 module Available_job : sig
