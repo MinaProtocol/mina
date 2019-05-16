@@ -131,7 +131,7 @@ end = struct
     type t = Ledger_proof_statement.t Parallel_scan.Job_view.t
     [@@deriving sexp]
 
-    let to_yojson ((pos, job) : t) : Yojson.Safe.json =
+    let to_yojson ({seq_no; position; status; value} : t) : Yojson.Safe.json =
       let hash_string h = Sexp.to_string (Frozen_ledger_hash.sexp_of_t h) in
       let statement_to_yojson (s : Ledger_proof_statement.t) =
         `Assoc
@@ -144,24 +144,24 @@ end = struct
         Option.value_map x ~default:(`List []) ~f:statement_to_yojson
       in
       let job_to_yojson =
-        match job with
+        match value with
         | Merge (x, y) ->
             `Assoc [("M", `List [opt_json x; opt_json y])]
         | Base x ->
             `Assoc [("B", `List [opt_json x])]
       in
-      `List [`Int pos; job_to_yojson]
+      `List [`Int position; job_to_yojson]
   end
 
   type job = Available_job.t [@@deriving sexp]
 
-  type parallel_scan_completed_job =
+  (*type parallel_scan_completed_job =
     Ledger_proof_with_sok_message.Stable.V1.t
     Parallel_scan.State.Completed_job.t
-  [@@deriving sexp, bin_io]
+  [@@deriving sexp, bin_io]*)
 
   (*Work capacity represents max number of work in the tree. this includes the jobs that are currently in the tree and the ones that would arise in the future when current jobs are done*)
-  let work_capacity =
+  (*let work_capacity =
     let open Constants in
     let extra_jobs =
       let rec go i count =
@@ -174,7 +174,7 @@ end = struct
     (*Transaction_capacity_tree size (c-tree) *)
     * (Int.pow 2 (work_delay_factor - Int.max (latency_factor - 1) 0) - 1)
     (*all but one c-tree that are in the tree formed at root_depth = latency_factor+1 *)
-    + extra_jobs
+    + extra_jobs*)
 
   (*half the number of jobs on each level above work_delay_factor depth and below latency_factor depth*)
 
@@ -204,12 +204,13 @@ end = struct
           ( (state_hash |> Digestif.SHA256.to_raw_string)
           ^ Int.to_string t.job_count )
 
-      let is_valid t =
-        let k = max Constants.work_delay_factor 2 in
+      let is_valid t = failwith "TODO"
+
+      (*let k = max Constants.work_delay_factor 2 in
         Parallel_scan.parallelism ~state:t.tree
         = Int.pow 2 (Constants.transaction_capacity_log_2 + k)
         && t.job_count <= work_capacity
-        && Parallel_scan.is_valid t.tree
+        && Parallel_scan.is_valid t.tree*)
 
       include Binable.Of_binable
                 (T)
@@ -286,14 +287,14 @@ end = struct
     ; proof_type= `Base }
 
   let completed_work_to_scanable_work (job : job) (fee, current_proof, prover)
-      : parallel_scan_completed_job Or_error.t =
+      : 'a Or_error.t =
     let sok_digest = Ledger_proof.sok_digest current_proof
     and proof = Ledger_proof.underlying_proof current_proof in
     match job with
-    | Base ({statement; _}, _) ->
+    | Base {statement; _} ->
         let ledger_proof = Ledger_proof.create ~statement ~sok_digest ~proof in
-        Ok (Lifted (ledger_proof, Sok_message.create ~fee ~prover))
-    | Merge ((p, _), (p', _), _) ->
+        Ok (ledger_proof, Sok_message.create ~fee ~prover)
+    | Merge ((p, _), (p', _)) ->
         let s = Ledger_proof.statement p and s' = Ledger_proof.statement p' in
         let open Or_error.Let_syntax in
         let%map fee_excess =
@@ -313,9 +314,8 @@ end = struct
           ; fee_excess
           ; proof_type= `Merge }
         in
-        Parallel_scan.State.Completed_job.Merged
-          ( Ledger_proof.create ~statement ~sok_digest ~proof
-          , Sok_message.create ~fee ~prover )
+        ( Ledger_proof.create ~statement ~sok_digest ~proof
+        , Sok_message.create ~fee ~prover )
 
   let total_proofs (works : Transaction_snark_work.t list) =
     List.sum (module Int) works ~f:(fun w -> List.length w.proofs)

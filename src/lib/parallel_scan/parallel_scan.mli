@@ -21,20 +21,22 @@
  *
  * Specifically, the state of this scan is has the following primary operations:
  *
- * {!start} to create the initial state
+ * {!empty} to create the initial state
  *
- * {!enqueue_data} adding raw data that will be lifted and processed later
+ * {!update} adding raw data that will be lifted and processed later; adding 
+ * merges for the completed raw/merged data. This moves us closer to emitting
+ * something from a tree
  *
  * {!next_jobs} to get the next work to complete from this data
  *
- * {!fill_in_completed_jobs} moves us closer to emitting something from a tree
  *)
 
 open Core_kernel
 open Coda_digestif
 
 (** A ring-buffer that backs our state *)
-module Ring_buffer : sig
+
+(*module Ring_buffer : sig
   type 'a t [@@deriving sexp]
 
   module Stable : sig
@@ -166,15 +168,36 @@ D D _ _ (_(A(_
       -> finish:('acc -> 'stop M.t)
       -> 'stop M.t
   end
+end*)
+
+module State : sig
+  (* bin_io, version omitted intentionally *)
+  type ('a, 'd) t [@@deriving sexp]
+
+  module Stable : sig
+    module V1 : sig
+      type nonrec ('a, 'd) t = ('a, 'd) t [@@deriving sexp, bin_io, version]
+    end
+
+    module Latest = V1
+  end
+
+  module Hash : sig
+    type t = Digestif.SHA256.t
+  end
+
+  val hash : ('a, 'd) t -> ('a -> string) -> ('d -> string) -> Hash.t
 end
 
 module Available_job : sig
   (** An available job is an incomplete job that has enough information for one
    * to process it into a completed job *)
-  type sequence_no = int [@@deriving sexp]
 
-  type ('a, 'd) t = Base of 'd * sequence_no | Merge of 'a * 'a * sequence_no
-  [@@deriving sexp]
+  type ('a, 'd) t = Base of 'd | Merge of 'a * 'a [@@deriving sexp]
+end
+
+module Job_status : sig
+  type t = Done | Todo [@@deriving sexp]
 end
 
 module Space_partition : sig
@@ -185,36 +208,39 @@ module Job_view : sig
   type 'a node = Base of 'a option | Merge of 'a option * 'a option
   [@@deriving sexp]
 
-  type 'a t = int * 'a node [@@deriving sexp]
+  type 'a t = {position: int; seq_no: int; status: Job_status.t; value: 'a node}
+  [@@deriving sexp]
 end
 
 (** The initial state of the parallel scan at some parallelism *)
-val start : parallelism_log_2:int -> root_at_depth:int -> ('a, 'd) State.t
+val empty : max_base_jobs:int -> delay:int -> ('a, 'd) State.t
 
 (** Get the next k available jobs *)
 val next_k_jobs :
   state:('a, 'd) State.t -> k:int -> ('a, 'd) Available_job.t list Or_error.t
 
 (** Get all the available jobs *)
-val next_jobs :
-  state:('a, 'd) State.t -> ('a, 'd) Available_job.t list Or_error.t
+val next_jobs : ('a, 'd) State.t -> ('a, 'd) Available_job.t list
 
 (** Get all the available jobs as a sequence *)
-val next_jobs_sequence :
-  state:('a, 'd) State.t -> ('a, 'd) Available_job.t Sequence.t Or_error.t
+
+(*val next_jobs_sequence :
+  state:('a, 'd) State.t -> ('a, 'd) Available_job.t Sequence.t*)
 
 (** Add data to parallel scan state *)
-val enqueue_data : state:('a, 'd) State.t -> data:'d list -> unit Or_error.t
+
+(*val enqueue_data : state:('a, 'd) State.t -> data:'d list -> unit Or_error.t*)
 
 (** Compute how much data ['d] elements we are allowed to add to the state *)
-val free_space : state:('a, 'd) State.t -> int
+val free_space : ('a, 'd) State.t -> int
 
 (** Complete jobs needed at this state -- optionally emits the ['a] at the top
  * of the tree along with the ['d list] responsible for emitting the ['a]. *)
-val fill_in_completed_jobs :
-     state:('a, 'd) State.t
-  -> completed_jobs:'a State.Completed_job.t list
-  -> ('a * 'd list) option Or_error.t
+val update :
+     data:'d list
+  -> completed_jobs:'a list
+  -> ('a, 'd) State.t
+  -> ('a option * ('a, 'd) State.t) Or_error.t
 
 (** The last ['a] we emitted from the top of the tree and the ['d list]
  * responsible for that ['a]. *)
@@ -224,11 +250,11 @@ val last_emitted_value : ('a, 'd) State.t -> ('a * 'd list) option
  * continuing onto the next virtual tree, split max_slots = (x,y) such that
  * x = number of slots till the end of the current tree and y = max_slots - x
  * (starts from the begining of the next tree)  *)
-val partition_if_overflowing :
-  max_slots:int -> ('a, 'd) State.t -> Space_partition.t
+val partition_if_overflowing : ('a, 'd) State.t -> Space_partition.t
 
 (** How much parallelism did we instantiate the state with *)
-val parallelism : state:('a, 'd) State.t -> int
+
+(*val parallelism : state:('a, 'd) t -> int*)
 
 (** Do all the invariants of our parallel scan state hold; namely:
   * 1. The {!free_space} is equal to the number of empty leaves
@@ -241,11 +267,11 @@ val parallelism : state:('a, 'd) State.t -> int
   *)
 val is_valid : ('a, 'd) State.t -> bool
 
-(** The data ['d] that is pending and would be returned by available [Base]
+(** The base jobs ['d] that are pending and would be returned by available [Base]
  * jobs *)
 val current_data : ('a, 'd) State.t -> 'd list
 
-val update_curr_job_seq_no : ('a, 'd) State.t -> unit Or_error.t
+(*val update_curr_job_seq_no : ('a, 'd) t -> unit Or_error.t*)
 
 (*Update the current job sequence number by 1. All the completed jobs created will have the current job sequence number*)
 
@@ -263,4 +289,6 @@ val base_jobs_on_latest_tree : ('a, 'd) State.t -> 'd list
 
 (*returns true only if the position of the next 'd that could be enqueued is  
 of the leftmost leaf of the tree*)
-val next_on_new_tree : ('a, 'd) State.t -> bool Or_error.t
+val next_on_new_tree : ('a, 'd) State.t -> bool
+
+val pending_data : ('a, 'd) State.t -> 'd list

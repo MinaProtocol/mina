@@ -917,7 +917,7 @@ module type Transaction_snark_scan_state_intf = sig
 
   val empty : unit -> t
 
-  val capacity : t -> int
+  (*val capacity : t -> int*)
 
   val fill_work_and_enqueue_transactions :
        t
@@ -952,7 +952,7 @@ module type Transaction_snark_scan_state_intf = sig
        , ledger_proof * ledger_proof )
        Either.t
 
-  val copy : t -> t
+  (*val copy : t -> t*)
 
   val partition_if_overflowing : t -> Space_partition.t
 
@@ -967,7 +967,7 @@ module type Transaction_snark_scan_state_intf = sig
 
   val current_job_count : t -> int
 
-  val work_capacity : int
+  (*val work_capacity : int*)
 
   val next_on_new_tree : t -> bool Or_error.t
 end
