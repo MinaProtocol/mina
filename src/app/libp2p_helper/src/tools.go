@@ -3,5 +3,5 @@
 package tools
 
 import (
-    _ "github.com/campoy/jsonenums"
+	_ "github.com/campoy/jsonenums"
 )

@@ -438,7 +438,7 @@ func (cs *sendStreamMsgMsg) run(app *app) (interface{}, error) {
 	}
 
 	if stream, ok := app.Streams[cs.StreamIdx]; ok {
-		n, err := stream.Write(data)
+		_, err := stream.Write(data)
 		if err != nil {
 			return nil, badp2p(err)
 		}

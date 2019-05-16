@@ -10,6 +10,7 @@ DOCKERNAME = codabuilder-$(MYUID)
 
 # Unique signature of kademlia code tree
 KADEMLIA_SIG = $(shell cd src/app/kademlia-haskell ; find . -type f -print0  | xargs -0 sha1sum | sort | sha1sum | cut -f 1 -d ' ')
+LIBP2P_HELPER_SIG = $(shell cd src/app/libp2p_helper ; find . -type f -print0  | xargs -0 sha1sum | sort | sha1sum | cut -f 1 -d ' ')
 
 ifeq ($(DUNE_PROFILE),)
 DUNE_PROFILE := dev
@@ -62,8 +63,11 @@ kademlia:
 	@# FIXME: Bash wrap here is awkward but required to get nix-env
 	bash -c "source ~/.profile && cd src/app/kademlia-haskell && nix-build release2.nix"
 
+libp2p_helper:
+	bash -c "source ~/.profile && cd src/app/libp2p_helper && nix-build default.nix"
+
 # Alias
-dht: kademlia
+dht: kademlia libp2p_helper
 
 build: git_hooks reformat-diff
 	$(info Starting Build)

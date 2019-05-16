@@ -156,6 +156,13 @@ jobs:
                     cd src/app/kademlia-haskell
                     nix-build release2.nix
             - run:
+                name: Build libp2p_helper using cachix
+                command: |
+                    . ~/.nix-profile/etc/profile.d/nix.sh
+                    cachix use codaprotocol
+                    cd src/app/libp2p_helper
+                    nix-build default.nix
+            - run:
                 name: Build ocaml
                 environment:
                     DUNE_PROFILE: testnet_postake_medium_curves
