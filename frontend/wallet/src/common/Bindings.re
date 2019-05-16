@@ -3,11 +3,9 @@ open Tc;
 module Window = {
   type t;
 
-  [@bs.val]
-  external current: t = "window";
+  [@bs.val] external current: t = "window";
 
-  [@bs.set]
-  external onClick: (t, unit => unit) => unit = "onclick";
+  [@bs.set] external onClick: (t, unit => unit) => unit = "onclick";
 };
 
 module Url = {
