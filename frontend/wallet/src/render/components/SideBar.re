@@ -16,13 +16,27 @@ module Styles = {
 };
 
 module Wallets = [%graphql
-  {| query { wallets {publicKey, balance {total}} } |}
+  {| query getWallets { wallets {publicKey, balance {total}} } |}
 ];
 module WalletQuery = ReasonApollo.CreateQuery(Wallets);
+
+module AddWallet = [%graphql
+  {|
+  mutation {
+      addWallet(input: {}) {
+          publicKey
+      }
+  }
+|}
+];
+
+module AddWalletMutation = ReasonApollo.CreateMutation(AddWallet);
 
 [@react.component]
 let make = () => {
   let (modalState, setModalState) = React.useState(() => None);
+  let (_settings, updateSettings) =
+    React.useContext(SettingsProvider.context);
 
   <div className=Styles.sidebar>
     <WalletQuery>
@@ -41,6 +55,35 @@ let make = () => {
         {React.string("+ Add wallet")}
       </Link>
     </div>
-    <AddWalletModal modalState setModalState />
+    <AddWalletMutation>
+      {(mutation, _) =>
+         <AddWalletModal
+           modalState
+           setModalState
+           onSubmit={name => {
+             let performMutation =
+               Task.liftPromise(() =>
+                 mutation(~refetchQueries=[|"getWallets"|], ())
+               );
+             Task.perform(
+               performMutation,
+               ~f=
+                 fun
+                 | EmptyResponse => ()
+                 | Errors(_) => print_endline("Error adding wallet")
+                 | Data(data) =>
+                   data##addWallet
+                   |> Option.andThen(~f=addWallet => addWallet##publicKey)
+                   |> Option.map(~f=pk => {
+                        let key = PublicKey.ofStringExn(pk);
+                        updateSettings(
+                          Option.map(~f=Settings.set(~key, ~name)),
+                        );
+                      })
+                   |> ignore,
+             );
+           }}
+         />}
+    </AddWalletMutation>
   </div>;
 };

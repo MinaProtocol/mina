@@ -16,11 +16,3 @@ let entries = Settings.entries;
 
 let getWalletName = (t, key: PublicKey.t) =>
   lookup(t, key) |> Option.withDefault(~default=PublicKey.prettyPrint(key));
-
-let add = (t: Settings.t, ~key, ~name) => {
-  let t' = Settings.set(t, ~key, ~name);
-
-  saveSettings(t')
-  |> Task.andThen(~f=() => MainCommunication.setName(key, name))
-  |> Task.map(~f=() => t');
-};

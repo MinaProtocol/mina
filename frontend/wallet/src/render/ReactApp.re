@@ -1,19 +1,15 @@
 [@react.component]
 let make = () => {
-  let (settings, setSettings) = Hooks.useSettings();
-  let settingsContext = (
-    Tc.Result.toOption(settings),
-    newSettings => setSettings(Ok(newSettings)),
-  );
-
   let (activeWallet, setActiveWallet) = React.useState(() => None);
   let activeWalletContext = (
     activeWallet,
     newWallet => setActiveWallet(_ => Some(newWallet)),
   );
 
+  let settingsValue = SettingsProvider.createContext();
+
   <ActiveWalletProvider value=activeWalletContext>
-    <SettingsProvider value=settingsContext>
+    <SettingsProvider value=settingsValue>
       <ReasonApollo.Provider client=Apollo.faker>
         <Window>
           <Header />
