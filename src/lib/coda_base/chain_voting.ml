@@ -56,6 +56,6 @@ let fold {voting_for} =
      Here we are compiling the body of the chain_voting (which is just a
      hash/field element) into the body of a [Transaction_union_payload] by
      stuffing the hash into the public_key. *)
-  Fn.compose Public_key.Compressed.fold to_public_key
+  Public_key.Compressed.fold (to_public_key {voting_for})
 
 let length_in_triples = Public_key.Compressed.length_in_triples
