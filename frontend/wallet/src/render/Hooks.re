@@ -20,3 +20,11 @@ let useRoute = () => {
 
   path;
 };
+
+let useActiveWallet = () => {
+  let url = ReasonReact.Router.useUrl();
+  switch (url.path) {
+  | ["wallet", walletKey] => Some(PublicKey.ofStringExn(walletKey))
+  | _ => None
+  };
+};
