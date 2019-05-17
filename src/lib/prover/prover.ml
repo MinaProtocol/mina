@@ -4,6 +4,16 @@ open Coda_base
 open Coda_state
 open Blockchain_snark
 
+module Extend_blockchain_input = struct
+  type t =
+    { chain: Blockchain.t
+    ; next_state: Protocol_state.Value.Stable.Latest.t
+    ; block: Snark_transition.Value.Stable.Latest.t
+    ; prover_state: Consensus.Data.Prover_state.Stable.Latest.t
+    ; pending_coinbase: Pending_coinbase_witness.Stable.Latest.t }
+  [@@deriving bin_io, sexp]
+end
+
 module type S = sig
   module Worker_state : sig
     type t
@@ -40,7 +50,7 @@ module Worker_state = struct
       -> Snark_transition.value
       -> Consensus.Data.Prover_state.t
       -> Pending_coinbase_witness.t
-      -> Blockchain.t
+      -> Blockchain.t Or_error.t
 
     val verify : Protocol_state.Value.t -> Proof.t -> bool
   end
@@ -93,13 +103,15 @@ module Worker_state = struct
                      (Consensus.Data.Prover_state.handler state_for_handler
                         ~pending_coinbase)
                  in
-                 let prev_proof =
-                   Tick.prove
-                     (Tick.Keypair.pk Keys.Step.keys)
-                     (Keys.Step.input ()) prover_state main next_state_top_hash
-                 in
-                 { Blockchain.state= next_state
-                 ; proof= wrap next_state_top_hash prev_proof }
+                 Or_error.try_with (fun () ->
+                     let prev_proof =
+                       Tick.prove
+                         (Tick.Keypair.pk Keys.Step.keys)
+                         (Keys.Step.input ()) prover_state main
+                         next_state_top_hash
+                     in
+                     { Blockchain.state= next_state
+                     ; proof= wrap next_state_top_hash prev_proof } )
 
                let verify state proof =
                  Tock.verify proof
@@ -135,16 +147,13 @@ module Worker_state = struct
                      (Consensus.Data.Prover_state.handler state_for_handler
                         ~pending_coinbase)
                  in
-                 match
-                   Tick.check
-                     (main @@ Tick.Field.Var.constant next_state_top_hash)
-                     prover_state
-                 with
-                 | Ok () ->
+                 Or_error.map
+                   (Tick.check
+                      (main @@ Tick.Field.Var.constant next_state_top_hash)
+                      prover_state)
+                   ~f:(fun () ->
                      { Blockchain.state= next_state
-                     ; proof= Precomputed_values.base_proof }
-                 | Error e ->
-                     Error.raise e
+                     ; proof= Precomputed_values.base_proof } )
 
                let verify _state _proof = true
              end
@@ -155,8 +164,9 @@ module Worker_state = struct
 
                let extend_blockchain _chain next_state _block
                    _state_for_handler _pending_coinbase =
-                 { Blockchain.proof= Precomputed_values.base_proof
-                 ; state= next_state }
+                 Ok
+                   { Blockchain.proof= Precomputed_values.base_proof
+                   ; state= next_state }
 
                let verify _ _ = true
              end
@@ -183,16 +193,11 @@ module Functions = struct
         `Initialized )
 
   let extend_blockchain =
-    create
-      [%bin_type_class:
-        Blockchain.t
-        * Protocol_state.Value.Stable.V1.t
-        * Snark_transition.Value.Stable.V1.t
-        * Consensus.Data.Prover_state.Stable.V1.t
-        * Pending_coinbase_witness.Stable.V1.t] Blockchain.bin_t
-      (fun w (chain, next_state, transition, prover_state, pending_coinbase) ->
+    create Extend_blockchain_input.bin_t
+      [%bin_type_class: Blockchain.t Or_error.t]
+      (fun w {chain; next_state; block; prover_state; pending_coinbase} ->
         let%map (module W) = Worker_state.get w in
-        W.extend_blockchain chain next_state transition prover_state
+        W.extend_blockchain chain next_state block prover_state
           pending_coinbase )
 
   let verify_blockchain =
@@ -208,14 +213,7 @@ module Worker = struct
     type 'w functions =
       { initialized: ('w, unit, [`Initialized]) F.t
       ; extend_blockchain:
-          ( 'w
-          , Blockchain.t
-            * Protocol_state.Value.t
-            * Snark_transition.value
-            * Consensus.Data.Prover_state.t
-            * Pending_coinbase_witness.t
-          , Blockchain.t )
-          F.t
+          ('w, Extend_blockchain_input.t, Blockchain.t Or_error.t) F.t
       ; verify_blockchain: ('w, Blockchain.t, bool) F.t }
 
     module Worker_state = Worker_state
@@ -269,5 +267,28 @@ let initialized {connection; _} =
 
 let extend_blockchain {connection; _} chain next_state block prover_state
     pending_coinbase =
-  Worker.Connection.run connection ~f:Worker.functions.extend_blockchain
-    ~arg:(chain, next_state, block, prover_state, pending_coinbase)
+  let input =
+    { Extend_blockchain_input.chain
+    ; next_state
+    ; block
+    ; prover_state
+    ; pending_coinbase }
+  in
+  match%map
+    Worker.Connection.run connection ~f:Worker.functions.extend_blockchain
+      ~arg:input
+    >>| Or_error.join
+  with
+  | Ok x ->
+      Ok x
+  | Error e ->
+      Logger.error (Logger.create ()) ~module_:__MODULE__ ~location:__LOC__
+        ~metadata:
+          [ ( "input-sexp"
+            , `String
+                (Sexp.to_string (Extend_blockchain_input.sexp_of_t input)) )
+          ; ( "input-bin-io"
+            , `String
+                (Binable.to_string (module Extend_blockchain_input) input) ) ]
+        "Prover failed: %s" (Error.to_string_hum e) ;
+      Error.raise e

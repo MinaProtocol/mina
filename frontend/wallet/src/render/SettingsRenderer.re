@@ -1,14 +1,18 @@
 open Tc;
 
-let lookup = Settings.lookup;
+module Settings_intf = Settings.Intf(Result);
 
-let entries = (t: Settings.t) =>
-  Js.Dict.entries(t.state)
-  |> Array.map(~f=((key, name)) => (PublicKey.ofStringExn(key), name));
+type saveSettings('a) =
+  Settings.t => Task.t([> | `Error_saving_file(Js.Exn.t)] as 'a, unit);
 
-let lookupWithFallback = (t, key: PublicKey.t) =>
-  lookup(t, key) |> Option.withDefault(~default=PublicKey.toString(key));
+[@bs.val] [@bs.scope "window"]
+external loadSettings: Settings_intf.loadSettings(unit, 'a) = "";
 
-let add = (_t, ~key, ~name) => {
-  MainCommunication.setName(key, name);
-};
+[@bs.val] [@bs.scope "window"] external saveSettings: saveSettings('a) = "";
+
+let lookup = (t, key) => Option.andThen(t, ~f=t => Settings.lookup(t, key));
+
+let entries = Settings.entries;
+
+let getWalletName = (t, key: PublicKey.t) =>
+  lookup(t, key) |> Option.withDefault(~default=PublicKey.prettyPrint(key));

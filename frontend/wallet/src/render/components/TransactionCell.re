@@ -1,5 +1,22 @@
 open Tc;
 
+module Styles = {
+  open Css;
+
+  let pill =
+    style([
+      display(`inlineFlex),
+      alignItems(`center),
+      justifyContent(`center),
+      paddingTop(`px(2)),
+      height(`rem(1.5)),
+      marginBottom(`px(4)),
+      padding2(~v=`px(0), ~h=`rem(0.5)),
+      borderRadius(`px(4)),
+      backgroundColor(Theme.Colors.slateAlpha(0.2)),
+    ]);
+};
+
 module Transaction = {
   module RewardDetails = {
     type t = {
@@ -141,14 +158,52 @@ module ViewModel = {
 module ActorName = {
   [@react.component]
   let make = (~value: ViewModel.Actor.t) => {
+    let (activeWallet, _) = React.useContext(ActiveWalletProvider.context);
+    let (settings, _) = React.useContext(SettingsProvider.context);
     switch (value) {
     | Key(key) =>
-      <span> {ReasonReact.string(PublicKey.toString(key))} </span>
-    | Unknown => <span />
+      <Pill mode={activeWallet === Some(key) ? Pill.Blue : Pill.Grey}>
+        <span
+          className=Css.(
+            merge([
+              Option.isSome(SettingsRenderer.lookup(settings, key))
+                ? Theme.Text.Body.regular : Theme.Text.mono,
+              style([
+                color(
+                  activeWallet === Some(key)
+                    ? Theme.Colors.marineAlpha(1.) : Theme.Colors.midnight,
+                ),
+                opacity(0.7),
+              ]),
+            ])
+          )>
+          {ReasonReact.string(SettingsRenderer.getWalletName(settings, key))}
+        </span>
+      </Pill>
+    | Unknown =>
+      <Pill>
+        <span
+          className=Css.(
+            merge([
+              Theme.Text.Body.regular,
+              style([color(Theme.Colors.midnight), opacity(0.7)]),
+            ])
+          )>
+          {React.string("Unknown")}
+        </span>
+      </Pill>
     | Minted =>
-      <span className=Css.(style([backgroundColor(StyleGuide.Colors.sage)]))>
-        {ReasonReact.string("Minted")}
-      </span>
+      <Pill mode=Pill.Green>
+        <span
+          className=Css.(
+            merge([
+              Theme.Text.Body.regular,
+              style([color(Theme.Colors.serpentine)]),
+            ])
+          )>
+          {ReasonReact.string("Minted")}
+        </span>
+      </Pill>
     };
   };
 };
@@ -158,29 +213,32 @@ module TimeDisplay = {
   let make = (~date: Js.Date.t) => {
     <span
       className=Css.(
-        style([
-          whiteSpace(`nowrap),
-          overflow(`hidden),
-          textOverflow(`ellipsis),
-          maxWidth(`rem(6.0)),
+        merge([
+          Theme.Text.Body.small,
+          style([color(Theme.Colors.greyish(0.5))]),
+          style([
+            whiteSpace(`nowrap),
+            overflow(`hidden),
+            textOverflow(`ellipsis),
+            maxWidth(`rem(10.0)),
+          ]),
         ])
       )>
-       {ReasonReact.string(Js.Date.toString(date))} </span>;
-      // TODO: Format properly
+      {ReasonReact.string(Time.render(~date, ~now=Js.Date.make()))}
+    </span>;
   };
 };
 
 module Amount = {
   [@react.component]
   let make = (~decorated: bool, ~value: int) => {
-    <span>
+    <span className=Css.(style([alignSelf(`flexEnd)]))>
       <span
         className=Css.(
           style([
-            StyleGuide.Typeface.lucidaGrande,
+            Theme.Typeface.lucidaGrande,
             color(
-              value >= 0
-                ? StyleGuide.Colors.serpentine : StyleGuide.Colors.roseBud,
+              value >= 0 ? Theme.Colors.serpentine : Theme.Colors.roseBud,
             ),
           ])
         )>
@@ -195,56 +253,49 @@ module Amount = {
 };
 
 module InfoSection = {
-  [@react.component]
-  let make = (~expanded: bool, ~viewModel: ViewModel.t) => {
-    let mainRow = message => {
+  module MainRow = {
+    [@react.component]
+    let make = (~children) =>
       <div
         className=Css.(
           style([
             display(`flex),
             justifyContent(`spaceBetween),
             alignItems(`center),
+            color(Theme.Colors.midnight),
           ])
         )>
-        <p> {ReasonReact.string(message)} </p>
-        <Amount decorated=false value={viewModel.amountDelta} />
+        <p
+          className=Css.(
+            merge([Theme.Text.Body.regular, style([display(`flex)])])
+          )>
+          children
+        </p>
       </div>;
-    };
-    <div>
-      <div
-        className=Css.(style([display(`flex), justifyContent(`flexEnd)]))>
-        {expanded
-           ? <span> {ReasonReact.string({j|Collapse 🠻|j})} </span>
-           : (
-             switch (viewModel.info) {
-             | Memo(_, date)
-             | Empty(date)
-             | StakingReward(_, date) =>
-               <>
-                 {switch (viewModel.action) {
-                  | Transfer => <span />
-                  | Pending =>
-                    <span className=Css.(style([textTransform(`uppercase)]))>
-                      {ReasonReact.string("pending")}
-                    </span>
-                  | Failed =>
-                    <span className=Css.(style([textTransform(`uppercase)]))>
-                      {ReasonReact.string("failed")}
-                    </span>
-                  }}
-                 <TimeDisplay date />
-               </>
-             | MissingReceipts => <span />
-             }
-           )}
-      </div>
+  };
+
+  [@react.component]
+  let make = (~viewModel: ViewModel.t) => {
+    let (expanded, setExpanded) = React.useState(() => false);
+    <div
+      onClick={_e =>
+        switch (viewModel.info) {
+        | StakingReward(_, _) => setExpanded(expanded => !expanded)
+        | _ => ()
+        }
+      }>
       {switch (viewModel.info) {
-       | Memo(message, _) => mainRow(message)
-       | Empty(_) => mainRow("")
-       | MissingReceipts => mainRow("+ Insert transaction receipts")
+       | Memo(message, _) => <MainRow> {React.string(message)} </MainRow>
+       | Empty(_) => <MainRow> {React.string("")} </MainRow>
+       | MissingReceipts =>
+         <MainRow>
+           <Link> {React.string("+ Insert transaction receipts")} </Link>
+         </MainRow>
        | StakingReward(rewards, _) =>
          <>
-           {mainRow("Staking reward")}
+           <MainRow>
+             <Link> {React.string(expanded ? "Collapse" : "Details")} </Link>
+           </MainRow>
            {expanded
               ? <ul>
                   {List.map(rewards, ~f=((message, amount)) =>
@@ -271,51 +322,58 @@ module InfoSection = {
   };
 };
 
-// TODO: As suggested in https://github.com/CodaProtocol/coda/pull/2260 , we
-// should probably switch to CSS Grid
-//
-// We can represent one of these cells as a row in an HTML table in the
-// following manner:
-//
-// ┌────────┬────┬───────────┬─────────────────────────
-// │ Sender │ -> │ Recipient │ Info (including amount)
-//
-// The final column is info and amount in order to more easily support the
-// expanded view of the staking reward
+// These cells are returned as a fragment so that the parent container can
+// use a consistent grid layout to keep everything lined up.
 
 [@react.component]
 let make = (~transaction: Transaction.t, ~myWallets: list(PublicKey.t)) => {
-  let (expanded, setExpanded) = React.useState(() => false);
-
   let viewModel = ViewModel.ofTransaction(transaction, ~myWallets);
 
-  <tr
-    onClick={_e =>
-      switch (viewModel.info) {
-      | StakingReward(_, _) => setExpanded(expanded => !expanded)
-      | _ => ()
-      }
-    }>
-    <td className=Css.(style([verticalAlign(`baseline)]))>
+  <>
+    <span>
       <ActorName value={viewModel.sender} />
-    </td>
-    <td className=Css.(style([verticalAlign(`baseline)]))>
-      {ReasonReact.string(
-         switch (viewModel.action) {
-         | Transfer => "->"
-         | Pending => ">>"
-         | Failed => "x"
-         },
-       )}
-    </td>
-    <td className=Css.(style([verticalAlign(`baseline)]))>
-      <ActorName value={viewModel.recipient} />
-    </td>
-    <td
+      <div className=Css.(style([marginTop(`rem(0.25))]))>
+        {ReasonReact.string(
+           switch (viewModel.action) {
+           | Transfer => " -> "
+           | Pending => " ... "
+           | Failed => " x "
+           },
+         )}
+        <ActorName value={viewModel.recipient} />
+      </div>
+    </span>
+    <span
       className=Css.(
         style([verticalAlign(`baseline), width(`percent(100.))])
       )>
-      <InfoSection expanded viewModel />
-    </td>
-  </tr>;
+      <InfoSection viewModel />
+    </span>
+    <span className=Css.(style([justifySelf(`flexEnd)]))>
+      <div
+        className=Css.(style([display(`flex), justifyContent(`flexEnd)]))>
+        {switch (viewModel.info) {
+         | Memo(_, date)
+         | Empty(date)
+         | StakingReward(_, date) =>
+           <>
+             {switch (viewModel.action) {
+              | Transfer => <span />
+              | Pending =>
+                <span className=Css.(style([textTransform(`uppercase)]))>
+                  {ReasonReact.string("pending")}
+                </span>
+              | Failed =>
+                <span className=Css.(style([textTransform(`uppercase)]))>
+                  {ReasonReact.string("failed")}
+                </span>
+              }}
+             <TimeDisplay date />
+           </>
+         | MissingReceipts => <span />
+         }}
+      </div>
+      <Amount decorated=false value={viewModel.amountDelta} />
+    </span>
+  </>;
 };

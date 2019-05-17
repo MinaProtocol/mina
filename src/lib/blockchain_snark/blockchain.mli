@@ -4,6 +4,6 @@ open Coda_base
 open Coda_state
 
 type t = {state: Protocol_state.Value.t; proof: Proof.Stable.V1.t}
-[@@deriving bin_io, fields]
+[@@deriving bin_io, fields, sexp]
 
 val create : state:Protocol_state.Value.t -> proof:Proof.Stable.V1.t -> t

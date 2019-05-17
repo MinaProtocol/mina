@@ -1,8 +1,3 @@
-scalar PublicKey
-scalar PrivateKey
-scalar UInt64
-scalar UInt32
-
 enum ConsensusStatus {
   SUBMITTED
   INCLUDED # Included in any block
@@ -16,19 +11,20 @@ type ConsensusState {
   estimatedPercentConfirmed: Float!
 }
 
-type Payment {
+type UserCommand {
+  isDelegation: Boolean!,
   nonce: Int!,
   submittedAt: String! @fake(type: pastDate)
   includedAt: String @fake(type: pastDate)
-  from: PublicKey! @examples(values: ["PUB_KEY_E9873DF4453213303DA61F2", "PUB_KEY_F1173DF4453213303DA61F2"]) 
-  to: PublicKey! @examples(values: ["PUB_KEY_E9873DF4453213303DA61F2", "PUB_KEY_F1173DF4453213303DA61F2"])
-  amount: UInt64! @fake(type: money)
-  fee: UInt32! @fake(type: money)
+  from: String! @examples(values: ["PUB_KEY_E9873DF4453213303DA61F2", "PUB_KEY_F1173DF4453213303DA61F2"]) 
+  to: String! @examples(values: ["PUB_KEY_E9873DF4453213303DA61F2", "PUB_KEY_F1173DF4453213303DA61F2"])
+  amount: String! @fake(type: money)
+  fee: String! @fake(type: money)
   memo: String @fake(type:hackerPhrase)
 }
 
-type PaymentUpdate {
-  payment: Payment
+type UserCommandUpdate {
+  userCommand: UserCommand
   consensus: ConsensusState!
 }
 
@@ -46,13 +42,13 @@ type SyncUpdate {
 }
 
 type SnarkWorker {
-  key: PublicKey! @examples(values: ["PUB_KEY_E9873DF4453213303DA61F2", "PUB_KEY_F1173DF4453213303DA61F2"])
-  fee: UInt32! @fake(type: money)
+  key: String! @examples(values: ["PUB_KEY_E9873DF4453213303DA61F2", "PUB_KEY_F1173DF4453213303DA61F2"])
+  fee: String! @fake(type: money)
 }
 
 type SnarkFee {
-  snarkCreator: PublicKey! @examples(values: ["PUB_KEY_E9873DF4453213303DA61F2", "PUB_KEY_F1173DF4453213303DA61F2"])
-  fee: UInt32! @fake(type: money)
+  snarkCreator: String! @examples(values: ["PUB_KEY_E9873DF4453213303DA61F2", "PUB_KEY_F1173DF4453213303DA61F2"])
+  fee: String! @fake(type: money)
 }
 
 type SnarkFeeUpdate {
@@ -61,9 +57,9 @@ type SnarkFeeUpdate {
 }
 
 type Block {
-  coinbase: UInt32! @fake(type: money)
-  creator: PublicKey! @examples(values: ["PUB_KEY_E9873DF4453213303DA61F2", "PUB_KEY_F1173DF4453213303DA61F2"])
-  payments: [Payment]!
+  coinbase: String! @fake(type: money)
+  creator: String! @examples(values: ["PUB_KEY_E9873DF4453213303DA61F2", "PUB_KEY_F1173DF4453213303DA61F2"])
+  userCommands: [UserCommand]!
   snarkFees: [SnarkFee]!
 }
 
@@ -72,44 +68,34 @@ type BlockUpdate {
   consensus: ConsensusState!
 }
 
+type AnnotatedBalance {
+  total: String! @fake(type: money)
+  unknown: String! @fake(type: money)
+}
+
 type Wallet {
-  publicKey: PublicKey! @examples(values: ["PUB_KEY_E9873DF4453213303DA61F2", "PUB_KEY_F1173DF4453213303DA61F2"])
-  privateKey: PrivateKey! @examples(values: ["PRIVATE_KEY_E9873DF4453213303DA61F2", "PRIVATE_KEY_F1173DF4453213303DA61F2"])
-  balance(consensus: ConsensusStatus): UInt64! @fake(type: money)
+  publicKey: String! @examples(values: ["PUB_KEY_E9873DF4453213303DA61F2", "PUB_KEY_F1173DF4453213303DA61F2"])
+  nonce: String!
+  receiptChainHash: String!
+  delegate: String!
+  vatingFor: String!
+  balance: AnnotatedBalance!
 }
 
 type NodeStatus {
   network: String @examples(values: ["testnet"])
 }
 
-type Delegation {
-  nonce: UInt32!, @fake(type: number)
-  submittedAt: String! @fake(type: pastDate)
-  includedAt: String @fake(type: pastDate)
-  from: PublicKey! @examples(values: ["PUB_KEY_E9873DF4453213303DA61F2", "PUB_KEY_F1173DF4453213303DA61F2"])
-  to: PublicKey! @examples(values: ["PUB_KEY_E9873DF4453213303DA61F2", "PUB_KEY_F1173DF4453213303DA61F2"])
-  fee: UInt32!, @fake(type: money)
-  memo: String @fake(type:hackerPhrase)
-}
-
-type DelegationUpdate {
-  status: Delegation!
-
-  # We may have reached consensus but still be waiting for the correct epoch
-  active: Boolean!
-
-  consensus: ConsensusState!
-}
 
 ## Input types
 
 input AddWalletInput {
-  public: PublicKey
-  private: PrivateKey
+  publicKey: String
+  privateKey: String
 }
 
 input DeleteWalletInput {
-  public: PublicKey
+  publicKey: String
 }
 
 input AddPaymentReceiptInput {
@@ -121,41 +107,45 @@ input SetNetworkInput {
 }
 
 input SetSnarkWorkerInput {
-  worker: PublicKey!
-  fee: UInt32!
+  worker: String!
+  fee: String!
 }
 
 input CreatePaymentInput {
-  from: PublicKey!,
-  to: PublicKey!,
-  amount: UInt64!,
-  fee: UInt32!,
+  from: String!,
+  to: String!,
+  amount: String!,
+  fee: String!,
   memo: String
 }
 
-input PaymentFilterInput {
-  toOrFrom: PublicKey,
+input CreateDelegationInput {
+  from: String!,
+  to: String,
+  fee: String!,
+  memo: String
+}
+
+input UserCommandFilterInput {
+  toOrFrom: String,
 }
 
 input BlockFilterInput {
-  creator: PublicKey,
+  creator: String,
 }
 
 input SetStakingInput {
   on: Boolean
 }
 
-input SetDelegationInput {
-  from: PublicKey!
-  to: PublicKey!
-  fee: UInt32!
-  memo: String
-}
-
 ## Payload types
 
 type CreatePaymentPayload {
-  payment: Payment
+  payment: UserCommand
+}
+
+type CreateDelegationPayload {
+  delegation: UserCommand
 }
 
 type SetSnarkWorkerPayload {
@@ -167,23 +157,19 @@ type SetNetworkPayload {
 }
 
 type AddPaymentReceiptPayload {
-  payment: Payment
+  payment: UserCommand
 }
 
 type AddWalletPayload {
-  publicKey: PublicKey @examples(values: ["PUB_KEY_E9873DF4453213303DA61F2", "PUB_KEY_F1173DF4453213303DA61F2"])
+  publicKey: String @examples(values: ["PUB_KEY_E9873DF4453213303DA61F2", "PUB_KEY_F1173DF4453213303DA61F2"])
 }
 
 type DeleteWalletPayload {
-  publicKey: PublicKey @examples(values: ["PUB_KEY_E9873DF4453213303DA61F2", "PUB_KEY_F1173DF4453213303DA61F2"])
+  publicKey: String @examples(values: ["PUB_KEY_E9873DF4453213303DA61F2", "PUB_KEY_F1173DF4453213303DA61F2"])
 }
 
 type SetStakingPayload {
   on: Boolean
-}
-
-type SetDelegationPayload {
-  delegation: Delegation
 }
 
 # Pagination types
@@ -193,14 +179,14 @@ type PageInfo {
   hasNextPage: Boolean! @examples(values: [false])
 }
 
-type PaymentEdge {
+type UserCommandEdge {
   cursor: String
-  node: PaymentUpdate
+  node: UserCommandUpdate
 }
 
-type PaymentConnection {
-  edges: [PaymentEdge]
-  nodes: [PaymentUpdate]
+type UserCommandConnection {
+  edges: [UserCommandEdge]
+  nodes: [UserCommandUpdate]
   pageInfo: PageInfo!
   totalCount: Int
 }
@@ -224,14 +210,14 @@ type Query {
   # Gets balance of key at a certain consensus state
   # Note: `consensus` is optional as we will likely decide one
   # state to be the "real" balance
-  balance(publicKey: PublicKey!, consensus: ConsensusStatus): UInt64!
+  balance(publicKey: String!, consensus: ConsensusStatus): String!
   
-  payments(
-    filter: PaymentFilterInput,
+  userCommand(
+    filter: UserCommandFilterInput,
     first: Int,
     after: String,
     last: Int,
-    before: String): PaymentConnection
+    before: String): UserCommandConnection
   
   blocks(
     filter: BlockFilterInput,
@@ -256,6 +242,8 @@ type Query {
 
 type Mutation {
   createPayment(input: CreatePaymentInput!): CreatePaymentPayload
+
+  createDelegation(input: CreateDelegationInput!): CreateDelegationPayload
   
   setSnarkWorker(input: SetSnarkWorkerInput!): SetSnarkWorkerPayload
   
@@ -272,7 +260,6 @@ type Mutation {
   deleteWallet(input: DeleteWalletInput!): DeleteWalletPayload
 
   setStaking(input: SetStakingInput!): SetStakingPayload
-  setDelegation(input: SetDelegationInput!): SetDelegationPayload
 }
 
 type Subscription {
@@ -280,15 +267,13 @@ type Subscription {
   newSyncUpdate: SyncUpdate!
   
   # Subscribe to payments for which this key is the sender or receiver
-  newPaymentUpdate(filterBySenderOrReceiver: PublicKey!): PaymentUpdate!
+  newUserCommandUpdate(filterBySenderOrReceiver: String!): UserCommandUpdate!
   
   # Subscribe all blocks created by `key`
-  newBlock(key: PublicKey): BlockUpdate!
+  newBlock(key: String): BlockUpdate!
   
   # Subscribe to fees earned by key
-  newSnarkFee(key: PublicKey): SnarkFee!
-  
-  newDelegationUpdate(publicKey: PublicKey): DelegationUpdate!
+  newSnarkFee(key: String): SnarkFee!
 }
 
 schema {

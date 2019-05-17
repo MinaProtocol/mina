@@ -55,7 +55,7 @@ let make = _ => {
     <A
       name="announcementbar"
       id="announcementbar--anchor"
-      href="/blog/coda2019.html"
+      href="/blog/snark-challenge.html"
       className=Css.(
         style(
           Style.paddingX(`rem(1.25))
@@ -87,7 +87,7 @@ let make = _ => {
               ]),
             ])
           )>
-          {ReasonReact.string("New Fundraising!")}
+          {ReasonReact.string("SNARK Challenge")}
         </p>
       </div>
       <p

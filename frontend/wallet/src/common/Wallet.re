@@ -1,4 +1,9 @@
 type t = {
   key: PublicKey.t,
-  balance: int // TODO: Make this uint64
+  balance: string // TODO: Make this uint64
+};
+
+let ofGraphqlExn = data => {
+  key: PublicKey.ofStringExn(data##publicKey),
+  balance: data##balance##total,
 };

@@ -9,6 +9,7 @@ module type Pool_intf = sig
 
   val create :
        logger:Logger.t
+    -> trust_system:Trust_system.t
     -> frontier_broadcast_pipe:transition_frontier Option.t
                                Broadcast_pipe.Reader.t
     -> t
@@ -35,6 +36,7 @@ module type Network_pool_intf = sig
 
   val create :
        logger:Logger.t
+    -> trust_system:Trust_system.t
     -> incoming_diffs:pool_diff Envelope.Incoming.t Linear_pipe.Reader.t
     -> frontier_broadcast_pipe:transition_frontier Option.t
                                Broadcast_pipe.Reader.t
@@ -93,9 +95,9 @@ module Make
     |> ignore ;
     network_pool
 
-  let create ~logger ~incoming_diffs ~frontier_broadcast_pipe =
+  let create ~logger ~trust_system ~incoming_diffs ~frontier_broadcast_pipe =
     of_pool_and_diffs
-      (Pool.create ~logger ~frontier_broadcast_pipe)
+      (Pool.create ~logger ~trust_system ~frontier_broadcast_pipe)
       ~logger ~incoming_diffs
 end
 
@@ -186,6 +188,8 @@ let%test_module "network pool test" =
       end
     end
 
+    let trust_system = Trust_system.null ()
+
     module Mock_snark_pool =
       Snark_pool.Make (Mock_proof.Stable.V1) (Mock_fee.Stable.V1) (Mock_work)
         (Mock_transition_frontier)
@@ -204,7 +208,7 @@ let%test_module "network pool test" =
         Broadcast_pipe.create (Some (Mock_transition_frontier.create ()))
       in
       let network_pool =
-        Mock_network_pool.create ~logger:(Logger.null ())
+        Mock_network_pool.create ~logger:(Logger.null ()) ~trust_system
           ~incoming_diffs:pool_reader
           ~frontier_broadcast_pipe:frontier_broadcast_pipe_r
       in
@@ -246,7 +250,7 @@ let%test_module "network pool test" =
           Broadcast_pipe.create (Some (Mock_transition_frontier.create ()))
         in
         let network_pool =
-          Mock_network_pool.create ~logger:(Logger.null ())
+          Mock_network_pool.create ~logger:(Logger.null ()) ~trust_system
             ~incoming_diffs:work_diffs
             ~frontier_broadcast_pipe:frontier_broadcast_pipe_r
         in
