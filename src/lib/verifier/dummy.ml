@@ -4,7 +4,7 @@ type t = unit
 
 type ledger_proof = Ledger_proof.Debug.t
 
-let create ~conf_dir:_ = Deferred.return ()
+let create () = Deferred.return ()
 
 let verify_blockchain_snark _ _ = Deferred.Or_error.return true
 

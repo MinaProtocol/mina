@@ -116,7 +116,7 @@ end
 type t = Worker.Connection.t
 
 (* TODO: investigate why conf_dir wasn't being used *)
-let create ~conf_dir:_ =
+let create () =
   let%map connection, process =
     Worker.spawn_in_foreground_exn ~connection_timeout:(Time.Span.of_min 1.)
       ~on_failure:Error.raise ~shutdown_on:Disconnect

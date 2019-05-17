@@ -23,7 +23,7 @@ module type S = sig
 
   type t
 
-  val create : conf_dir:string -> t Deferred.t
+  val create : unit -> t Deferred.t
 
   val initialized : t -> [`Initialized] Deferred.Or_error.t
 
@@ -251,7 +251,7 @@ end
 
 type t = {connection: Worker.Connection.t; process: Process.t}
 
-let create ~conf_dir:_ =
+let create () =
   let%map connection, process =
     (* HACK: Need to make connection_timeout long since creating a prover can take a long time*)
     Worker.spawn_in_foreground_exn ~connection_timeout:(Time.Span.of_min 1.)

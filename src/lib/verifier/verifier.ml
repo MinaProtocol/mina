@@ -11,7 +11,7 @@ module type S = sig
 
   type ledger_proof
 
-  val create : conf_dir:string -> t Deferred.t
+  val create : unit -> t Deferred.t
 
   val verify_blockchain_snark : t -> Blockchain.t -> bool Or_error.t Deferred.t
 
