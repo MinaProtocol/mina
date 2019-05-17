@@ -25,7 +25,7 @@ case $1 in
 esac
 
 if [[ $DOWNLOAD_THINGS == "YES" ]]; then
-  PACKAGES="gpatch opam cmake gmp pkg-config openssl libffi libsodium boost zlib libomp"
+  PACKAGES="gpatch opam cmake gmp pkg-config openssl libffi libsodium boost zlib"
 
   # removing already installed packages from the list
   for p in $(env HOMEBREW_NO_AUTO_UPDATE=1 brew list); do
