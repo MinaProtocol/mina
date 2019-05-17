@@ -8,8 +8,8 @@ TODO: separate internal helper errors from underlying libp2p errors.
 In general, functions in this module return ['a Deferred.Or_error.t]. Unless
 otherwise mentioned, the deferred is resolved immediately once the RPC action
 to the libp2p helper is finished. Unless otherwise mentioned, everything can
-fail due to an internal helper error. These indicate a bug in this module,
-and not misuse.
+throw an exception due to an internal helper error. These indicate a bug in
+this module/the helper, and not misuse.
 *)
 
 open Async
@@ -30,6 +30,8 @@ module Keypair : sig
   val random : net -> t Deferred.Or_error.t
 
   val to_string : t -> string
+
+  val to_peerid : t -> peer_id
 end
 
 module Multiaddr : sig
@@ -41,11 +43,11 @@ module Multiaddr : sig
 end
 
 module PeerID : sig
-  type t
+  type t = peer_id
 
   val to_string : t -> string
 
-  val of_string : string -> t
+  val of_keypair : Keypair.t -> t
 end
 
 module Pubsub : sig
@@ -59,12 +61,12 @@ module Pubsub : sig
     * This function continues to work even if [unsubscribe t] has been called.
     * It is exactly [Pubsub.publish] with the topic this subscription was
     * created for, and fails in the same way. *)
-    val publish : t -> string -> unit Deferred.Or_error.t
+    val publish : t -> string -> unit Deferred.t
 
     (** Unsubscribe from this topic, closing the write pipe.
     *
     * Returned deferred is resolved once the unsubscription is complete.
-    * This can only fail due to internal errors. *)
+    * This can fail if already unsubscribed. *)
     val unsubscribe : t -> unit Deferred.Or_error.t
   end
 
@@ -73,15 +75,13 @@ module Pubsub : sig
   * Returned deferred is resolved once the publish is enqueued.
   * This can fail if signing the message failed.
   *  *)
-  val publish : net -> topic:string -> data:string -> unit Deferred.Or_error.t
+  val publish : net -> topic:string -> data:string -> unit Deferred.t
 
   (** Subscribe to a pubsub topic.
     *
     * Fails if already subscribed. If it succeeds, incoming messages for that
     * topic will be written to the pipe. Returned deferred is resolved with [Ok
     * sub] as soon as the subscription is enqueued.
-
-    * Otherwise, this can only fail due to internal errors.
     *)
   val subscribe :
        net
@@ -92,11 +92,13 @@ module Pubsub : sig
        Strict_pipe.Writer.t
     -> Subscription.t Deferred.Or_error.t
 
-  (** Validate messages on a topic with [f] before forwarding them.
+  (** [register_validator net topic f] validates messages on [topic] with [f] before forwarding them.
     *
     * [f] will be called once per new message, and will not be called again until
     * the deferred it returns is resolved. The helper process waits 5 seconds for
     * the result of [f] to be reported, otherwise it considers the message invalid.
+    *
+    * This can fail if a validator is already registered for [topic].
   *)
   val register_validator :
        net
@@ -105,16 +107,26 @@ module Pubsub : sig
     -> unit Deferred.Or_error.t
 end
 
-(** [create logger path] uses [path] to start a helper subprocess for a new [net] *)
-val create : Logger.t -> string -> net Deferred.Or_error.t
+(** [create ~logger ~conf_dir] starts a new [net] storing its state in [conf_dir]
+  *
+  * The new [net] isn't connected to any network until [configure] is called.
+  *
+  * This can fail for a variety of reasons related to spawning the subprocess.
+*)
+val create : logger:Logger.t -> conf_dir:string -> net Deferred.Or_error.t
 
 (** Configure the network connection.
+  *
+  * Listens on each address in [maddrs].
+  *
+  * This will only connect to peers that share the same [network_id].
+  *
+  * This fails if initializing libp2p fails for any reason.
 *)
 val configure :
      net
   -> me:Keypair.t
   -> maddrs:Multiaddr.t list
-  -> statedir:string
   -> network_id:string
   -> unit Deferred.Or_error.t
 
@@ -165,7 +177,7 @@ module Protocol_handler : sig
   [reset_existing_streams] controls whether open streams for this protocol
   will be reset, and defaults to [false].
   *)
-  val close : ?reset_existing_streams:bool -> t -> unit Deferred.Or_error.t
+  val close : ?reset_existing_streams:bool -> t -> unit Deferred.t
 end
 
 (** Opens a stream with a peer on a particular protocol.
@@ -173,6 +185,9 @@ end
   Close the write pipe when you are done. This won't close the reading end.
   The reading end will be closed when the remote peer closes their writing
   end. Once both write ends are closed, the connection terminates.
+
+  This can fail if the peer isn't reachable, doesn't implement the requrested
+  protocol, and probably for other reasons.
  *)
 val open_stream :
   net -> protocol:string -> PeerID.t -> Stream.t Deferred.Or_error.t
@@ -202,5 +217,5 @@ val handle_protocol :
 *)
 val listen_on : net -> Multiaddr.t -> Multiaddr.t list Deferred.Or_error.t
 
-(** Stop listening, close all connections and subscription pipes. *)
-val shutdown : net -> unit Deferred.Or_error.t
+(** Stop listening, close all connections and subscription pipes, and kill the subprocess. *)
+val shutdown : net -> unit Deferred.t

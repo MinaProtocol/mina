@@ -38,20 +38,13 @@ let to_string_res x =
   | None ->
       Or_error.error_string "needed a string"
 
-module PeerID = struct
-  type t = string
-
-  let to_string t = t
-
-  let of_string s = s
-end
-
 module Helper = struct
   (* duplicate record field names in same module *)
   type t =
     { subprocess: Process.t
     ; mutable failure_response: [`Die | `Ignore]
     ; lock_path: string
+    ; conf_dir: string
     ; outstanding_requests: (int, Yojson.Safe.json Or_error.t Ivar.t) Hashtbl.t
     ; seqno: int ref
     ; logger: Logger.t
@@ -282,12 +275,12 @@ module Helper = struct
     | s ->
         Or_error.errorf "unknown upcall %s" s
 
-  let create logger subprocess lock_path =
-    let open Deferred.Or_error.Let_syntax in
+  let create logger subprocess conf_dir lock_path =
     let t =
       { subprocess
       ; failure_response= `Die
       ; lock_path
+      ; conf_dir
       ; logger
       ; outstanding_requests= Hashtbl.create (module Int)
       ; subscriptions= Hashtbl.create (module Int)
@@ -333,15 +326,19 @@ type peer_id = string
 
 (* We hardcode support for only Ed25519 keys so we can keygen without calling go *)
 module Keypair = struct
-  type t = {secret: string; public: string}
+  type t = {secret: string; public: string; peer_id: string}
 
   let random net =
     match%map Helper.do_rpc net "generateKeypair" [] with
-    | Ok (`Assoc [("privk", `String secret); ("pubk", `String public)]) ->
+    | Ok
+        (`Assoc
+          [ ("privk", `String secret)
+          ; ("pubk", `String public)
+          ; ("peer_id", `String peer_id) ]) ->
         let open Or_error.Let_syntax in
         let%bind secret = of_b58_data (`String secret) in
         let%map public = of_b58_data (`String public) in
-        {secret; public}
+        {secret; public; peer_id}
     | Ok j ->
         Or_error.errorf "helper broke RPC protocol: generateKeypair got %s"
           (Yojson.Safe.to_string j)
@@ -350,8 +347,18 @@ module Keypair = struct
 
   let safe_secret {secret; _} = to_b58_data secret
 
-  let to_string {secret; public} =
+  let to_string {secret; public; _} =
     String.concat ~sep:";" [to_b58_data secret; to_b58_data public]
+
+  let to_peerid {peer_id; _} = peer_id
+end
+
+module PeerID = struct
+  type t = peer_id
+
+  let to_string t = t
+
+  let of_keypair = Keypair.to_peerid
 end
 
 module Multiaddr = struct
@@ -367,14 +374,13 @@ module Pubsub = struct
     match%map
       Helper.do_rpc net "publish"
         [("topic", `String topic); ("data", `String (to_b58_data data))]
+      |> Deferred.Or_error.ok_exn
     with
-    | Ok (`String "publish success") ->
-        Ok ()
-    | Ok v ->
-        Or_error.errorf "helper broke RPC protocol: publish got %s"
-          (Yojson.Safe.to_string v)
-    | Error e ->
-        Error e
+    | `String "publish success" ->
+        ()
+    | v ->
+        failwithf "helper broke RPC protocol: publish got %s"
+          (Yojson.Safe.to_string v) ()
 
   module Subscription = struct
     type t = Helper.subscription =
@@ -397,14 +403,13 @@ module Pubsub = struct
         Strict_pipe.Writer.close write_pipe ;
         match%map
           Helper.do_rpc net "unsubscribe" [("subscription_idx", `Int idx)]
+          |> Deferred.Or_error.ok_exn
         with
-        | Ok (`String "unsubscribe success") ->
+        | `String "unsubscribe success" ->
             Ok ()
-        | Ok v ->
-            Or_error.errorf "helper broke RPC protocol: unsubscribe got %s"
-              (Yojson.Safe.to_string v)
-        | Error e ->
-            Error e )
+        | v ->
+            failwithf "helper broke RPC protocol: unsubscribe got %s"
+              (Yojson.Safe.to_string v) () )
       else Deferred.Or_error.error_string "already unsubscribed"
   end
 
@@ -429,18 +434,18 @@ module Pubsub = struct
       ; idx= sub_num
       ; write_pipe= cast_pipe }
     in
+    (* TODO: check if already subscribed to topic, fail. *)
     Hashtbl.add_exn net.subscriptions ~key:sub_num ~data:(cast_pipe, sub) ;
     match%map
       Helper.do_rpc net "subscribe"
         [("topic", `String topic); ("subscription_idx", `Int sub_num)]
+      |> Deferred.Or_error.ok_exn
     with
-    | Ok (`String "subscribe success") ->
+    | `String "subscribe success" ->
         Ok sub
-    | Ok v ->
-        Or_error.errorf "helper broke RPC protocol: unsubscribe got %s"
-          (Yojson.Safe.to_string v)
-    | Error e ->
-        Error e
+    | v ->
+        failwithf "helper broke RPC protocol: unsubscribe got %s"
+          (Yojson.Safe.to_string v) ()
 
   let register_validator (net : net) topic ~f =
     match Hashtbl.find net.validators topic with
@@ -453,22 +458,20 @@ module Pubsub = struct
         match%map
           Helper.do_rpc net "registerValidator"
             [("topic", `String topic); ("idx", `Int idx)]
+          |> Deferred.Or_error.ok_exn
         with
-        | Ok (`String "register validator success") ->
+        | `String "register validator success" ->
             Ok ()
-        | Ok v ->
-            Or_error.errorf
-              "helper broke RPC protocol: registerValidator got %s"
-              (Yojson.Safe.to_string v)
-        | Error e ->
-            Error e )
+        | v ->
+            failwithf "helper broke RPC protocol: registerValidator got %s"
+              (Yojson.Safe.to_string v) () )
 end
 
-let configure net ~me ~maddrs ~statedir ~network_id =
+let configure net ~me ~maddrs ~network_id =
   match%map
     Helper.do_rpc net "configure"
       [ ("privk", `String (Keypair.safe_secret me))
-      ; ("statedir", `String statedir)
+      ; ("statedir", `String net.conf_dir)
       ; ( "ifaces"
         , `List (List.map ~f:(fun s -> `String (Multiaddr.to_string s)) maddrs)
         )
@@ -477,8 +480,8 @@ let configure net ~me ~maddrs ~statedir ~network_id =
   | Ok (`String "configure success") ->
       Ok ()
   | Ok j ->
-      Or_error.errorf "helper broke RPC protocol: configure got %s"
-        (Yojson.Safe.to_string j)
+      failwithf "helper broke RPC protocol: configure got %s"
+        (Yojson.Safe.to_string j) ()
   | Error e ->
       Error e
 
@@ -540,50 +543,44 @@ module Protocol_handler = struct
   let is_closed ({closed; _} : t) = closed
 
   let close_connections (net : net) for_real for_protocol =
-    if for_real then (
+    if for_real then
       Hashtbl.filter_inplace net.streams
         ~f:(fun ({protocol; idx; _} as stream) ->
           if protocol <> for_protocol then false
           else (
             Stream.reset stream >>| Fn.const () |> don't_wait_for ;
-            true ) ) ;
-      Deferred.return (Ok ()) )
-    else Deferred.return (Ok ())
+            true ) )
 
   let close ?(reset_existing_streams = false) ({net; protocol_name; _} : t) =
     Hashtbl.remove net.protocol_handlers protocol_name ;
-    match%bind
+    match%map
       Helper.do_rpc net "removeStreamHandler"
         [("protocol", `String protocol_name)]
+      |> Deferred.Or_error.ok_exn
     with
-    | Ok (`String "removeStreamHandler success") ->
+    | `String "removeStreamHandler success" ->
         close_connections net reset_existing_streams protocol_name
-    | Ok v ->
-        let%bind _ =
-          close_connections net reset_existing_streams protocol_name
-        in
-        Deferred.Or_error.errorf
-          "helper broke RPC protocol: addStreamHandler got %s"
-          (Yojson.Safe.to_string v)
-    | Error e ->
-        Deferred.return (Error e)
+    | v ->
+        close_connections net reset_existing_streams protocol_name ;
+        failwithf "helper broke RPC protocol: addStreamHandler got %s"
+          (Yojson.Safe.to_string v) ()
 end
 
 let handle_protocol net ~on_handler_error ~protocol f =
   let ph : Protocol_handler.t =
     {net; closed= false; on_handler_error; f; protocol_name= protocol}
   in
+  (* TODO: check if protocol is already handled *)
   match%map
     Helper.do_rpc net "addStreamHandler" [("protocol", `String protocol)]
+    |> Deferred.Or_error.ok_exn
   with
-  | Ok (`String "addStreamHandler success") ->
+  | `String "addStreamHandler success" ->
       Hashtbl.add_exn net.protocol_handlers ~key:protocol ~data:ph ;
       Ok ph
-  | Ok v ->
-      Or_error.errorf "helper broke RPC protocol: addStreamHandler got %s"
-        (Yojson.Safe.to_string v)
-  | Error e ->
-      Error e
+  | v ->
+      failwithf "helper broke RPC protocol: addStreamHandler got %s"
+        (Yojson.Safe.to_string v) ()
 
 let open_stream net ~protocol peer =
   match%map
@@ -638,6 +635,8 @@ let keep_trying :
   go (Or_error.error_string "empty input") xs
 
 let create ~logger ~conf_dir =
+  let conf_dir = conf_dir ^/ "libp2p_helper" in
+  let%bind () = Unix.mkdir ~p:() conf_dir in
   let lock_path = Filename.concat conf_dir lock_file in
   let run_p2p () =
     (* This is where nix dumps the go artifact *)
@@ -658,7 +657,8 @@ let create ~logger ~conf_dir =
         | None ->
             [] ) )
         ~f:(fun prog -> Process.create ~prog ~args:[] ())
-      |> Deferred.Or_error.map ~f:(fun p -> Helper.create logger p lock_path)
+      |> Deferred.Or_error.map ~f:(fun p ->
+             Helper.create logger p conf_dir lock_path )
     with
     | Ok p ->
         (* If the libp2p_helper process dies, kill the parent daemon process. Fix

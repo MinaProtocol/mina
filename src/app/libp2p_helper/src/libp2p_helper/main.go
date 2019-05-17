@@ -140,7 +140,7 @@ func (m *configureMsg) run(app *app) (interface{}, error) {
 	for i, v := range m.ListenOn {
 		res, err := multiaddr.NewMultiaddr(v)
 		if err != nil {
-			return nil, badp2p(err)
+			return nil, badRPC(err)
 		}
 		maddrs[i] = res
 	}
@@ -306,6 +306,7 @@ type generateKeypairMsg struct {
 type generatedKeypair struct {
 	Private string `json:"privk"`
 	Public  string `json:"pubk"`
+	PeerID  string `json:"peer_id"`
 }
 
 func (*generateKeypairMsg) run(app *app) (interface{}, error) {
@@ -323,7 +324,12 @@ func (*generateKeypairMsg) run(app *app) (interface{}, error) {
 		return nil, badRPC(err)
 	}
 
-	return generatedKeypair{Private: b58.Encode(privkBytes), Public: b58.Encode(pubkBytes)}, nil
+	peerID, err := peer.IDFromPublicKey(pubk)
+	if err != nil {
+		return nil, badp2p(err)
+	}
+
+	return generatedKeypair{Private: b58.Encode(privkBytes), Public: b58.Encode(pubkBytes), PeerID: peer.IDB58Encode(peerID)}, nil
 }
 
 type streamLostUpcall struct {
@@ -384,7 +390,7 @@ func (o *openStreamMsg) run(app *app) (interface{}, error) {
 	streamIdx := <-seqs
 	peer, err := peer.IDB58Decode(o.Peer)
 	if err != nil {
-		return nil, badRPC(err)
+		return nil, badRPC(err) // TODO: this isn't an RPC error
 	}
 
 	if stream, err := app.P2p.Host.NewStream(app.Ctx, peer, protocol.ID(o.ProtocolID)); err != nil {
@@ -397,7 +403,7 @@ func (o *openStreamMsg) run(app *app) (interface{}, error) {
 }
 
 type closeStreamMsg struct {
-	StreamIdx int `json:"stream_idx`
+	StreamIdx int `json:"stream_idx"`
 }
 
 func (cs *closeStreamMsg) run(app *app) (interface{}, error) {
@@ -412,7 +418,7 @@ func (cs *closeStreamMsg) run(app *app) (interface{}, error) {
 }
 
 type resetStreamMsg struct {
-	StreamIdx int `json:"stream_idx`
+	StreamIdx int `json:"stream_idx"`
 }
 
 func (cs *resetStreamMsg) run(app *app) (interface{}, error) {
@@ -427,7 +433,7 @@ func (cs *resetStreamMsg) run(app *app) (interface{}, error) {
 }
 
 type sendStreamMsgMsg struct {
-	StreamIdx int    `json:"stream_idx`
+	StreamIdx int    `json:"stream_idx"`
 	Data      string `json:"data"`
 }
 
