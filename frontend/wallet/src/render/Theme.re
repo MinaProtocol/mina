@@ -23,6 +23,8 @@ module Colors = {
   let slateAlpha = a => `rgba((81, 102, 121, a));
 
   let roseBud = `hex("a3536f");
+  let pendingOrange = `hex("967103");
+  let greenblack = `hex("2a3c2e");
 
   let serpentine = `hex("479056");
   let serpentineLight = `rgba((101, 144, 110, 0.2));

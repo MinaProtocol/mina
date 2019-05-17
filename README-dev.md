@@ -20,7 +20,9 @@ Currently, Coda builds/runs on Linux & macOS. MacOS may have some issues that yo
 The short version:
 
  1. Start with Ubuntu 18 or run it in a [virtual machine](https://www.osboxes.org/ubuntu/)
- 2. Pull in the snarky sub-module: `git submodule init && git submodule update --recursive`
+ 2. Pull in our submodules: `git submodule update --init`. This might fail with
+    `git@github.com: Permission denied (publickey).`, if that happens it means
+    you need to [set up SSH keys on your machine](https://help.github.com/en/articles/generating-a-new-ssh-key-and-adding-it-to-the-ssh-agent).
  3. Install Docker, GNU make, and bash
  4. `make USEDOCKER=TRUE dev`
  5. `make USEDOCKER=TRUE deb`
@@ -31,8 +33,8 @@ You should also run:
 
  6. `git config --local --add submodule.recurse true`
 
-so that the snarky sub-module gets updated automatically when updating your local
-copy of the repo.
+so that the submodules get updated automatically when updating your local copy
+of the repo.
 
 ### Developer Setup (MacOS)
 
