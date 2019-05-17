@@ -720,3 +720,53 @@ let create ~logger ~conf_dir =
       t
   | _ ->
       Deferred.Or_error.errorf "Config directory (%s) must exist" conf_dir
+
+let%test_module "coda network tests" =
+  ( module struct
+
+    let () = Backtrace.elide := false
+    let () = Async.Scheduler.set_record_backtraces true
+
+    let logger = Logger.create ()
+
+    let testmsg =
+      "This is a test. This is a test of the Outdoor Warning System. This is \
+       only a test."
+
+    let%test_unit "stream" =
+      let test_def =
+        let open Deferred.Let_syntax in
+        let%bind a = create ~logger ~conf_dir:"/tmp/a" >>| Or_error.ok_exn in
+        let%bind b = create ~logger ~conf_dir:"/tmp/b" >>| Or_error.ok_exn in
+        let%bind kp_a = Keypair.random a >>| Or_error.ok_exn in
+        let%bind kp_b = Keypair.random a >>| Or_error.ok_exn in
+        let a_peerid = Keypair.to_peerid kp_a in
+        let maddrs = ["/ip4/127.0.0.1/tcp/0"] in
+        let network_id = "test_stream" in
+        let%bind () =
+          configure a ~me:kp_a ~maddrs ~network_id >>| Or_error.ok_exn
+        in
+        let%bind () =
+          configure b ~me:kp_b ~maddrs ~network_id >>| Or_error.ok_exn
+        in
+        let handler_finished = ref false in
+        let%bind echo_handler =
+          handle_protocol a ~on_handler_error:`Raise ~protocol:"echo"
+            (fun stream ->
+              let r, w = Stream.pipes stream in
+              let%map () = Pipe.transfer r w ~f:Fn.id in
+              handler_finished := true )
+        in
+        let%bind stream =
+          open_stream b ~protocol:"echo" a_peerid >>| Or_error.ok_exn
+        in
+        let r, w = Stream.pipes stream in
+        Pipe.write_without_pushback w testmsg ;
+        Pipe.close w ;
+        let%bind msg = Pipe.read r in
+        assert (msg = `Ok testmsg) ;
+        assert !handler_finished ;
+        return ()
+      in
+      Async.Thread_safe.block_on_async_exn (fun () -> test_def)
+  end )
