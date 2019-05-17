@@ -1776,7 +1776,10 @@ module type External_transition_intf = sig
                , [`Staged_ledger_diff] * Truth.true_t )
                Validation.with_transition ]
            * [`Staged_ledger of Staged_ledger.t]
-         , [ `Invalid_ledger_hash_after_staged_ledger_application
+         , [ `Invalid_staged_ledger_diff of
+             [ `Incorrect_target_staged_ledger_hash
+             | `Incorrect_target_snarked_ledger_hash ]
+             list
            | `Staged_ledger_application_failed of
              Staged_ledger.Staged_ledger_error.t ] )
          Deferred.Result.t

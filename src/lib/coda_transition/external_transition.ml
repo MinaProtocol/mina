@@ -414,7 +414,10 @@ module Make
                  , [`Staged_ledger_diff] * Truth.true_t )
                  Validation.with_transition ]
              * [`Staged_ledger of Staged_ledger.t]
-           , [ `Invalid_ledger_hash_after_staged_ledger_application
+           , [ `Invalid_staged_ledger_diff of
+               [ `Incorrect_target_staged_ledger_hash
+               | `Incorrect_target_snarked_ledger_hash ]
+               list
              | `Staged_ledger_application_failed of
                Staged_ledger.Staged_ledger_error.t ] )
            Deferred.Result.t =
@@ -446,19 +449,29 @@ module Make
         | Some (proof, _) ->
             target_hash_of_ledger_proof proof
       in
+      let maybe_errors =
+        Option.all
+          [ Option.some_if
+              (not
+                 (Staged_ledger_hash.equal staged_ledger_hash
+                    (Blockchain_state.staged_ledger_hash blockchain_state)))
+              `Incorrect_target_staged_ledger_hash
+          ; Option.some_if
+              (not
+                 (Frozen_ledger_hash.equal target_ledger_hash
+                    (Blockchain_state.snarked_ledger_hash blockchain_state)))
+              `Incorrect_target_snarked_ledger_hash ]
+      in
       Deferred.return
-        ( if
-          Frozen_ledger_hash.equal target_ledger_hash
-            (Blockchain_state.snarked_ledger_hash blockchain_state)
-          && Staged_ledger_hash.equal staged_ledger_hash
-               (Blockchain_state.staged_ledger_hash blockchain_state)
-        then
-          Ok
-            ( `Just_emitted_a_proof (Option.is_some proof_opt)
-            , `External_transition_with_validation
-                (t, Validation.Unsafe.set_valid_staged_ledger_diff validation)
-            , `Staged_ledger transitioned_staged_ledger )
-        else Error `Invalid_ledger_hash_after_staged_ledger_application )
+        ( match maybe_errors with
+        | Some errors ->
+            Error (`Invalid_staged_ledger_diff errors)
+        | None ->
+            Ok
+              ( `Just_emitted_a_proof (Option.is_some proof_opt)
+              , `External_transition_with_validation
+                  (t, Validation.Unsafe.set_valid_staged_ledger_diff validation)
+              , `Staged_ledger transitioned_staged_ledger ) )
   end
 end
 

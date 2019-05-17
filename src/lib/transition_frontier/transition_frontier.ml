@@ -87,7 +87,18 @@ struct
                          fully_valid_external_transition
                    ; staged_ledger= transitioned_staged_ledger
                    ; just_emitted_a_proof })
-          | Error `Invalid_ledger_hash_after_staged_ledger_application ->
+          | Error (`Invalid_staged_ledger_diff errors) ->
+              let reasons =
+                String.concat ~sep:" && "
+                  (List.map errors ~f:(function
+                    | `Incorrect_target_staged_ledger_hash ->
+                        "staged ledger hash"
+                    | `Incorrect_target_snarked_ledger_hash ->
+                        "snarked ledger hash" ))
+              in
+              let message =
+                "invalid staged ledger diff: incorrect " ^ reasons
+              in
               let%map () =
                 match sender with
                 | None | Some Envelope.Sender.Local ->
@@ -96,15 +107,9 @@ struct
                     Trust_system.(
                       record trust_system logger inet_addr
                         Actions.
-                          ( Gossiped_invalid_transition
-                          , Some ("Invalid staged ledger hash", []) ))
+                          (Gossiped_invalid_transition, Some (message, [])))
               in
-              Error
-                (`Invalid_staged_ledger_hash
-                  (Error.of_string
-                     "Snarked ledger hash and Staged ledger hash after \
-                      applying the diff does not match blockchain state's \
-                      ledger hash and staged ledger hash resp."))
+              Error (`Invalid_staged_ledger_hash (Error.of_string message))
           | Error
               (`Staged_ledger_application_failed
                 (Staged_ledger.Staged_ledger_error.Unexpected e)) ->
