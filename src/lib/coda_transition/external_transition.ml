@@ -107,12 +107,10 @@ module Make
     , parent_hash
     , proposer
     , user_commands
-    , payments )]
+    , payments
+    , to_yojson )]
 
   include Comparable.Make (Stable.Latest)
-
-  [%%define_locally
-  Stable.Latest.(to_yojson)]
 
   let create ~protocol_state ~protocol_state_proof ~staged_ledger_diff =
     {protocol_state; protocol_state_proof; staged_ledger_diff}
