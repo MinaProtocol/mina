@@ -7,7 +7,10 @@ include Single.Make({
   let make: (~drop: unit => unit, unit) => t =
     (~drop as _, ()) => {
       Tray.make(
-        Filename.concat(ProjectRoot.resource, "public/menubar-icon.png"),
+        Filename.concat(
+          ProjectRoot.resource,
+          "public/menubar-iconTemplate.png",
+        ),
       );
     };
 });
