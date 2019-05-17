@@ -1,5 +1,11 @@
 open Tc;
 
+let (+^) = Int64.add;
+let ( *^ ) = Int64.mul;
+let (-^) = Int64.sub;
+let (>=^) = (a, b) => Int64.compare(a, b) >= 0;
+let (<=^) = (a, b) => Int64.compare(a, b) <= 0;
+
 module Styles = {
   open Css;
 
@@ -21,10 +27,10 @@ module Transaction = {
   module RewardDetails = {
     type t = {
       key: PublicKey.t,
-      coinbase: int,
-      transactionFees: int,
-      proofFees: int,
-      delegationFees: int,
+      coinbase: int64,
+      transactionFees: int64,
+      proofFees: int64,
+      delegationFees: int64,
       includedAt: Js.Date.t,
     };
   };
@@ -33,8 +39,8 @@ module Transaction = {
     type t = {
       from: PublicKey.t,
       to_: PublicKey.t,
-      amount: int,
-      fee: int,
+      amount: int64,
+      fee: int64,
       memo: option(string),
       submittedAt: Js.Date.t,
       includedAt: option(Js.Date.t),
@@ -44,7 +50,7 @@ module Transaction = {
   module UnknownDetails = {
     type t = {
       key: PublicKey.t,
-      amount: int,
+      amount: int64,
     };
   };
 
@@ -75,7 +81,7 @@ module ViewModel = {
     type t =
       | Memo(string, Js.Date.t)
       | Empty(Js.Date.t)
-      | StakingReward(list((string, int)), Js.Date.t)
+      | StakingReward(list((string, int64)), Js.Date.t)
       | MissingReceipts;
   };
 
@@ -84,7 +90,7 @@ module ViewModel = {
     recipient: Actor.t,
     action: Action.t,
     info: Info.t,
-    amountDelta: int // signed
+    amountDelta: int64 // signed
   };
 
   let ofTransaction =
@@ -106,12 +112,13 @@ module ViewModel = {
             [
               ("Coinbase", coinbase),
               ("Transaction fees", transactionFees),
-              ("Proof fees", (-1) * proofFees),
-              ("Delegation fees", (-1) * delegationFees),
+              ("Proof fees", Int64.(neg(one) *^ proofFees)),
+              ("Delegation fees", Int64.(neg(one) *^ delegationFees)),
             ],
             includedAt,
           ),
-        amountDelta: coinbase + transactionFees - proofFees - delegationFees,
+        amountDelta:
+          coinbase +^ transactionFees -^ proofFees -^ delegationFees,
       }
     | Payment(
         {
@@ -142,7 +149,7 @@ module ViewModel = {
           |> Option.withDefault(~default=Info.Empty(date)),
         amountDelta:
           Caml.List.exists(PublicKey.equal(from), myWallets)
-            ? (-1) * amount - fee : amount,
+            ? Int64.(neg(one)) *^ amount -^ fee : amount,
       };
     | Unknown({UnknownDetails.key, amount}) => {
         sender: Actor.Unknown,
@@ -209,46 +216,63 @@ module ActorName = {
 };
 
 module TimeDisplay = {
+  module Styles = {
+    open Css;
+
+    let time =
+      merge([
+        Theme.Text.Body.small,
+        style([
+          color(Theme.Colors.greyish(0.5)),
+          whiteSpace(`nowrap),
+          overflow(`hidden),
+          textOverflow(`ellipsis),
+          maxWidth(`rem(10.0)),
+        ]),
+      ]);
+  };
+
   [@react.component]
   let make = (~date: Js.Date.t) => {
-    <span
-      className=Css.(
-        merge([
-          Theme.Text.Body.small,
-          style([color(Theme.Colors.greyish(0.5))]),
-          style([
-            whiteSpace(`nowrap),
-            overflow(`hidden),
-            textOverflow(`ellipsis),
-            maxWidth(`rem(10.0)),
-          ]),
-        ])
-      )>
+    <span className=Styles.time>
       {ReasonReact.string(Time.render(~date, ~now=Js.Date.make()))}
     </span>;
   };
 };
 
 module Amount = {
+  module Styles = {
+    open Css;
+    let square = value =>
+      style([
+        Theme.Typeface.lucidaGrande,
+        color(
+          value >=^ Int64.zero
+            ? Theme.Colors.serpentine : Theme.Colors.roseBud,
+        ),
+      ]);
+
+    let currency =
+      style([color(Theme.Colors.greenblack), Theme.Typeface.plex]);
+  };
+
   [@react.component]
-  let make = (~decorated: bool, ~value: int) => {
-    <span className=Css.(style([alignSelf(`flexEnd)]))>
-      <span
-        className=Css.(
-          style([
-            Theme.Typeface.lucidaGrande,
-            color(
-              value >= 0 ? Theme.Colors.serpentine : Theme.Colors.roseBud,
-            ),
-          ])
-        )>
+  let make = (~value: int64) => {
+    <>
+      <span className={Styles.square(value)}>
         {ReasonReact.string({j|■|j})}
       </span>
-      <span> {ReasonReact.string(Js.Int.toString(value))} </span>
-      {decorated
-         ? <span> {ReasonReact.string(value >= 0 ? "+" : "-")} </span>
-         : <span />}
-    </span>;
+      <span className=Styles.currency>
+        {ReasonReact.string(
+           " "
+           ++ Int64.to_string(
+                value < Int64.zero ? value *^ Int64.(neg(one)) : value,
+              ),
+         )}
+      </span>
+      {value <=^ Int64.zero
+         ? <span> {ReasonReact.string(" -")} </span> : <span />}
+    </>;
   };
 };
 
@@ -309,7 +333,7 @@ module InfoSection = {
                          ])
                        )>
                        <p> {ReasonReact.string(message)} </p>
-                       <Amount decorated=true value=amount />
+                       <Amount value=amount />
                      </li>
                    )
                    |> Array.fromList
@@ -322,17 +346,66 @@ module InfoSection = {
   };
 };
 
+// Making a separate styles module here to collocate the styles in the below
+// make function closer to the layout
+module TopLevelStyles = {
+  open Css;
+
+  module Actors = {
+    let wrapper = style([padding2(~h=`zero, ~v=`rem(0.625))]);
+
+    let mode = style([marginTop(`rem(0.25))]);
+  };
+
+  let infoSection =
+    style([
+      verticalAlign(`baseline),
+      width(`percent(100.)),
+      height(`calc((`sub, `percent(100.0), `rem(0.75)))),
+      marginTop(`rem(0.75)),
+      display(`flex),
+      alignItems(`center),
+    ]);
+
+  module RightSide = {
+    let outerWrapper =
+      style([
+        justifySelf(`flexEnd),
+        marginTop(`rem(0.25)),
+        width(`percent(100.)),
+      ]);
+
+    let topInfoWrapper =
+      style([
+        display(`flex),
+        justifyContent(`flexEnd),
+        height(`rem(1.25)),
+      ]);
+
+    let amount =
+      style([
+        textAlign(`right),
+        display(`inlineBlock),
+        padding2(~v=`zero, ~h=`rem(0.625)),
+        width(`percent(100.)),
+        marginTop(`rem(0.5)),
+      ]);
+
+    let action =
+      merge([Theme.Text.Body.small, style([marginRight(`rem(1.0))])]);
+  };
+};
+
 // These cells are returned as a fragment so that the parent container can
 // use a consistent grid layout to keep everything lined up.
-
 [@react.component]
 let make = (~transaction: Transaction.t, ~myWallets: list(PublicKey.t)) => {
   let viewModel = ViewModel.ofTransaction(transaction, ~myWallets);
 
   <>
-    <span>
+    <span className=TopLevelStyles.Actors.wrapper>
       <ActorName value={viewModel.sender} />
-      <div className=Css.(style([marginTop(`rem(0.25))]))>
+      <div className=TopLevelStyles.Actors.mode>
         {React.string(
            switch (viewModel.action) {
            | Transfer => "-> "
@@ -343,15 +416,11 @@ let make = (~transaction: Transaction.t, ~myWallets: list(PublicKey.t)) => {
         <ActorName value={viewModel.recipient} />
       </div>
     </span>
-    <span
-      className=Css.(
-        style([verticalAlign(`baseline), width(`percent(100.))])
-      )>
+    <span className=TopLevelStyles.infoSection>
       <InfoSection viewModel />
     </span>
-    <span className=Css.(style([justifySelf(`flexEnd)]))>
-      <div
-        className=Css.(style([display(`flex), justifyContent(`flexEnd)]))>
+    <span className=TopLevelStyles.RightSide.outerWrapper>
+      <div className=TopLevelStyles.RightSide.topInfoWrapper>
         {switch (viewModel.info) {
          | Memo(_, date)
          | Empty(date)
@@ -360,12 +429,24 @@ let make = (~transaction: Transaction.t, ~myWallets: list(PublicKey.t)) => {
              {switch (viewModel.action) {
               | Transfer => <span />
               | Pending =>
-                <span className=Css.(style([textTransform(`uppercase)]))>
-                  {ReasonReact.string("pending")}
+                <span
+                  className=Css.(
+                    merge([
+                      TopLevelStyles.RightSide.action,
+                      style([color(Theme.Colors.pendingOrange)]),
+                    ])
+                  )>
+                  {ReasonReact.string("Pending")}
                 </span>
               | Failed =>
-                <span className=Css.(style([textTransform(`uppercase)]))>
-                  {ReasonReact.string("failed")}
+                <span
+                  className=Css.(
+                    merge([
+                      TopLevelStyles.RightSide.action,
+                      style([color(Theme.Colors.roseBud)]),
+                    ])
+                  )>
+                  {ReasonReact.string("Failed")}
                 </span>
               }}
              <TimeDisplay date />
@@ -373,7 +454,9 @@ let make = (~transaction: Transaction.t, ~myWallets: list(PublicKey.t)) => {
          | MissingReceipts => <span />
          }}
       </div>
-      <Amount decorated=false value={viewModel.amountDelta} />
+      <span className=TopLevelStyles.RightSide.amount>
+        <Amount value={viewModel.amountDelta} />
+      </span>
     </span>
   </>;
 };
