@@ -16,7 +16,7 @@ The Coda Wallet is written in Reason (https://reasonml.github.io/), and built wi
 
 First build the app:
 
-1. Clone the repo: `git clone git@github.com:CodaProtocol/coda.git`
+1. Clone the repo via SSH: `git clone git@github.com:CodaProtocol/coda.git`
 2. Navigate into coda/frontend/wallet
 3. Update submodules: `git submodule update --init`
 4. `yarn install` to install dependencies
@@ -31,3 +31,9 @@ Run locally with hot reloading:
 3. Run `git lfs install` to update hooks
 4. Run `git lfs pull` to download files
 5. `yarn dev` to start dev server
+
+### Common Issues
+1. Only use SSH for cloning via `git@github.com:CodaProtocol/coda.git`
+    * Using HTTPS will likely result in errors when running `git submodule update --init`
+    * How to clone with [SSH URLs](!https://help.github.com/en/articles/which-remote-url-should-i-use#cloning-with-ssh-urls)
+    * How to generate [SSH keys](!https://help.github.com/en/articles/connecting-to-github-with-ssh)
