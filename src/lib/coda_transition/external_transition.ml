@@ -111,7 +111,8 @@ module Make
 
   include Comparable.Make (Stable.Latest)
 
-  let to_yojson = Stable.Latest.to_yojson
+  [%%define_locally
+  Stable.Latest.(to_yojson)]
 
   let create ~protocol_state ~protocol_state_proof ~staged_ledger_diff =
     {protocol_state; protocol_state_proof; staged_ledger_diff}
@@ -338,9 +339,7 @@ module Make
       let root_protocol_state =
         Transition_frontier.root frontier
         |> Transition_frontier.Breadcrumb.transition_with_hash
-        |> With_hash.data
-        (* TODO: remove verified when this is plugged in *)
-        |> Validated.protocol_state
+        |> With_hash.data |> Validated.protocol_state
       in
       let%bind () =
         Result.ok_if_true

@@ -101,7 +101,8 @@ module Make (Inputs : Inputs.S) :
               Trust_system.record_envelope_sender trust_system logger sender
                 ( Trust_system.Actions.Gossiped_invalid_transition
                 , Some
-                    ( "$state_hash was not selected of transition frontier root"
+                    ( "$state_hash was not selected over transition frontier \
+                       root"
                     , metadata ) )
             in
             Error ()
@@ -116,7 +117,7 @@ module Make (Inputs : Inputs.S) :
               ~cached_transition:cached_initially_validated_transition ;
             return (Error ())
       in
-      (* TODO: only access parent in transition frontier once (already done in call to validate dependencies) *)
+      (* TODO: only access parent in transition frontier once (already done in call to validate dependencies) #2485 *)
       let parent_hash =
         Protocol_state.previous_state_hash
           (External_transition.protocol_state transition)
@@ -134,8 +135,10 @@ module Make (Inputs : Inputs.S) :
             | Error (`Invalid_staged_ledger_hash error)
             | Error (`Invalid_staged_ledger_diff error) ->
                 Logger.error logger ~module_:__MODULE__ ~location:__LOC__
-                  ~metadata "error while building breadcrumb in processor: %s"
-                  (Error.to_string_hum error) ;
+                  ~metadata:
+                    ( metadata
+                    @ [("error", `String (Error.to_string_hum error))] )
+                  "error while building breadcrumb in processor: $error" ;
                 Deferred.return (Error ())
             | Error (`Fatal_error exn) ->
                 raise exn
@@ -232,9 +235,10 @@ module Make (Inputs : Inputs.S) :
                    | Error err ->
                        Logger.error logger ~module_:__MODULE__
                          ~location:__LOC__
+                         ~metadata:
+                           [("error", `String (Error.to_string_hum err))]
                          "failed to attach breadcrumb proposed internally to \
-                          transition frontier: %s"
-                         (Error.to_string_hum err) )
+                          transition frontier: $error" )
                | `Partially_valid_transition transition ->
                    process_transition ~transition ) ))
 end

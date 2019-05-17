@@ -23,25 +23,28 @@ module Make (Inputs : Transition_frontier.Inputs_intf) = struct
 
   let handle_validation_error ~logger ~trust_system ~sender ~state_hash
       (error : validation_error) =
+    let open Trust_system.Actions in
+    let punish action message =
+      Trust_system.record_envelope_sender trust_system logger sender
+        (action, message)
+    in
     match error with
     | `Verifier_error err ->
+        let error_metadata = [("error", `String (Error.to_string_hum err))] in
         Logger.error logger ~module_:__MODULE__ ~location:__LOC__
-          ~metadata:[("state_hash", State_hash.to_yojson state_hash)]
-          "Error while verifying blockchain proof for $state_hash: %s"
-          (Error.to_string_hum err) ;
-        return ()
-    | `Invalid_time_received `Too_early ->
-        Trust_system.record_envelope_sender trust_system logger sender
-          (Trust_system.Actions.Gossiped_future_transition, None)
-    | `Invalid_time_received (`Too_late slot_diff) ->
-        Trust_system.record_envelope_sender trust_system logger sender
-          ( Trust_system.Actions.Gossiped_old_transition slot_diff
-          , Some
-              ( "off by $slot_diff slots"
-              , [("slot_diff", `String (Int64.to_string slot_diff))] ) )
+          ~metadata:
+            (error_metadata @ [("state_hash", State_hash.to_yojson state_hash)])
+          "Error while verifying blockchain proof for $state_hash: $error" ;
+        punish Sent_invalid_proof (Some ("verifier error", error_metadata))
     | `Invalid_proof ->
-        Trust_system.record_envelope_sender trust_system logger sender
-          (Trust_system.Actions.Gossiped_invalid_transition, None)
+        punish Sent_invalid_proof None
+    | `Invalid_time_received `Too_early ->
+        punish Gossiped_future_transition None
+    | `Invalid_time_received (`Too_late slot_diff) ->
+        punish (Gossiped_old_transition slot_diff)
+          (Some
+             ( "off by $slot_diff slots"
+             , [("slot_diff", `String (Int64.to_string slot_diff))] ))
 
   let run ~logger ~trust_system ~verifier ~transition_reader
       ~valid_transition_writer =

@@ -107,9 +107,9 @@ module Make (Inputs : Inputs.S) :
             Ok (Either.First hash) )
     | Error (`Verifier_error error) ->
         Logger.warn logger ~module_:__MODULE__ ~location:__LOC__
+          ~metadata:[("error", `String (Error.to_string_hum error))]
           "verifier threw an error while verifying transiton queried during \
-           ledger catchup: %s"
-          (Error.to_string_hum error) ;
+           ledger catchup: $error" ;
         return
           (Error
              (Error.of_string
