@@ -331,10 +331,15 @@ let make = (~transaction: Transaction.t, ~myWallets: list(PublicKey.t)) => {
 
   <>
     <span>
-      <span className=Theme.Text.Body.regular>{React.string("From: ")}</span>
       <ActorName value={viewModel.sender} />
       <div className=Css.(style([marginTop(`rem(0.25))]))>
-        <span className=Theme.Text.Body.regular>{React.string("To: ")}</span>
+        {React.string(
+           switch (viewModel.action) {
+           | Transfer => "-> "
+           | Pending => "... "
+           | Failed => "x "
+           },
+         )}
         <ActorName value={viewModel.recipient} />
       </div>
     </span>

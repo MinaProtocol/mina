@@ -75,6 +75,7 @@ include Single.Make({
         },
       );
 
+      // Watches the bundle to reload the window on changes
       Bindings.Fs.watchFile(
         Filename.concat(ProjectRoot.resource, "bundle/index.js"), () =>
         loadURL(window, indexURL)
