@@ -1,13 +1,15 @@
 #!/bin/bash
 
 #
+# ONLY USED FOR DEBUGGING
 # Use this script to verify that dist builds build on other machines
 #
 
 # Change to whatever dist.zip you stick on s3
-DIST_ZIP="dist3.zip"
+DIST_ZIP=""
+BUCKET=""
 
-curl "https://s3-us-west-2.amazonaws.com/wallet.o1test.net/$DIST_ZIP" > "$DIST_ZIP"
+curl "https://s3-us-west-2.amazonaws.com/$BUCKET/$DIST_ZIP" > "$DIST_ZIP"
 
 unzip "$DIST_ZIP" -d dist
 

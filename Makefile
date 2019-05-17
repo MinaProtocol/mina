@@ -72,11 +72,11 @@ build: git_hooks reformat-diff
 
 dev: codabuilder containerstart build
 
-macos-dist: build dht
-	rm -rf _build/dist/
-	rm -rf _build/dist.zip
-	./scripts/macos-dist.sh src/_build/default/app/cli/src/coda.exe src/app/kademlia-haskell/result/bin/kademlia _build/dist
-	zip -r _build/dist.zip _build/dist/
+macos-dist:
+	@rm -rf _build/dist/
+	@rm -rf _build/dist.zip
+	@./scripts/macos-dist.sh src/_build/default/app/cli/src/coda.exe src/app/kademlia-haskell/result/bin/kademlia _build/dist
+	@zip -r _build/dist.zip _build/dist/
 	@echo Find dist.zip inside _build/
 
 ########################################
