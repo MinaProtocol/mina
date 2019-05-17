@@ -216,6 +216,7 @@ module TimeDisplay = {
       merge([
         Theme.Text.Body.small,
         style([
+          color(Theme.Colors.greyish(0.5)),
           whiteSpace(`nowrap),
           overflow(`hidden),
           textOverflow(`ellipsis),
@@ -226,10 +227,7 @@ module TimeDisplay = {
 
   [@react.component]
   let make = (~date: Js.Date.t) => {
-    <span
-      className=Css.(
-        merge([Styles.time, style([color(Theme.Colors.greyish(0.5))])])
-      )>
+    <span className=Styles.time>
       {ReasonReact.string(Time.render(~date, ~now=Js.Date.make()))}
     </span>;
   };
