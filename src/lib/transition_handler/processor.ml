@@ -54,7 +54,10 @@ module Make (Inputs : Inputs.S) :
   (* add a breadcrumb and perform post processing *)
   let add_and_finalize ~frontier ~catchup_scheduler
       ~processed_transition_writer ~only_if_present cached_breadcrumb =
-    let breadcrumb = Cached.invalidate_with_success cached_breadcrumb in
+    let breadcrumb =
+      if Cached.is_pure cached_breadcrumb then Cached.peek cached_breadcrumb
+      else Cached.invalidate_with_success cached_breadcrumb
+    in
     let transition =
       Transition_frontier.Breadcrumb.transition_with_hash breadcrumb
     in
