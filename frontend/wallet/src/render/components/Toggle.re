@@ -21,7 +21,7 @@ module Styles = {
       transition(~duration=400, "background"),
       transition(~duration=100, "transform"),
       borderRadius(`px(12)),
-      hover([transform(`scale(1.05, 1.05))]),
+      hover([transform(`scale(1.07, 1.05))]),
       before([
         position(`absolute),
         bottom(`px(4)),

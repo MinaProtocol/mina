@@ -1,5 +1,13 @@
 open Tc;
 
+module Window = {
+  type t;
+
+  [@bs.val] external current: t = "window";
+
+  [@bs.set] external onClick: (t, unit => unit) => unit = "onclick";
+};
+
 module Url = {
   type t;
   [@bs.new] external create: string => t = "URL";
@@ -74,6 +82,9 @@ module Fs = {
   external writeFile:
     (string, string, string, Js.Nullable.t(Js.Exn.t) => unit) => unit =
     "";
+
+  [@bs.val] [@bs.module "fs"]
+  external watchFile: (string, unit => unit) => unit = "";
 };
 
 module Fetch = {

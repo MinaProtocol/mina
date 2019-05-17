@@ -72,6 +72,13 @@ build: git_hooks reformat-diff
 
 dev: codabuilder containerstart build
 
+macos-portable:
+	@rm -rf _build/coda-daemon-macos/
+	@rm -rf _build/coda-daemon-macos.zip
+	@./scripts/macos-portable.sh src/_build/default/app/cli/src/coda.exe src/app/kademlia-haskell/result/bin/kademlia _build/coda-daemon-macos
+	@zip -r _build/coda-daemon-macos.zip _build/coda-daemon-macos/
+	@echo Find coda-daemon-macos.zip inside _build/
+
 ########################################
 ## Lint
 

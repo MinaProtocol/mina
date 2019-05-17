@@ -49,10 +49,14 @@ module Make_real (Keys : Keys_lib.Keys.S) = struct
   let wrap hash proof =
     let open Snark_params in
     let module Wrap = Keys.Wrap in
-    Tock.prove
-      (Tock.Keypair.pk Wrap.keys)
-      Wrap.input {Wrap.Prover_state.proof} Wrap.main
-      (Wrap_input.of_tick_field hash)
+    let input = Wrap_input.of_tick_field hash in
+    let proof =
+      Tock.prove
+        (Tock.Keypair.pk Wrap.keys)
+        Wrap.input {Wrap.Prover_state.proof} Wrap.main input
+    in
+    assert (Tock.verify proof (Tock.Keypair.vk Wrap.keys) Wrap.input input) ;
+    proof
 
   let base_proof_expr =
     let open Snark_params in
@@ -71,6 +75,10 @@ module Make_real (Keys : Keys_lib.Keys.S) = struct
         (Tick.Keypair.pk Keys.Step.keys)
         (Keys.Step.input ()) prover_state main base_hash
     in
+    assert (
+      Tick.verify tick
+        (Tick.Keypair.vk Keys.Step.keys)
+        (Keys.Step.input ()) base_hash ) ;
     let proof = wrap base_hash tick in
     [%expr
       Coda_base.Proof.Stable.V1.t_of_sexp

@@ -14,7 +14,7 @@ jobs:
 
     build-wallet:
         macos:
-            xcode: "10.1.0"
+            xcode: "10.2.0"
         steps:
             - checkout
             - run: git submodule sync && git submodule update --init --recursive
@@ -28,12 +28,12 @@ jobs:
             - run:
                   name: Test wallet
                   command: cd frontend/wallet && yarn test
-            - run:
-                  name: Build dist wallet
-                  command: cd frontend/wallet && yarn run dist
-            - run:
-                  name: Publish dist wallet
-                  command: (env HOMEBREW_NO_AUTO_UPDATE=1 brew install awscli) && ./scripts/publish-wallet.sh
+#            - run:
+#                  name: Build dist wallet
+#                  command: cd frontend/wallet && yarn run dist
+#            - run:
+#                  name: Publish dist wallet
+#                  command: (env HOMEBREW_NO_AUTO_UPDATE=1 brew install awscli) && ./scripts/publish-wallet.sh
             - run: cd frontend/website && yarn install
             - run:
                   name: Decrypt PragmataPro font

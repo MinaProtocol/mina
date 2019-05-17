@@ -16,7 +16,7 @@ The Coda Wallet is written in Reason (https://reasonml.github.io/), and built wi
 
 First build the app:
 
-1. Clone the repo: `git clone git@github.com:CodaProtocol/coda.git`
+1. Clone the repo via SSH: `git clone git@github.com:CodaProtocol/coda.git`
 2. Navigate into coda/frontend/wallet
 3. Update submodules: `git submodule update --init`
 4. `yarn install` to install dependencies
@@ -31,3 +31,9 @@ Run locally with hot reloading:
 3. Run `git lfs install` to update hooks
 4. Run `git lfs pull` to download files
 5. `yarn dev` to start dev server
+
+### Common Issues
+1. If you see something like: `git@github.com: Permission denied (publickey).`
+   when updating the submodules you need to set up SSH keys with GitHub, since
+   our submodules use SSH URLS. GitHub has some documentation on how to do that
+   [here](https://help.github.com/en/articles/generating-a-new-ssh-key-and-adding-it-to-the-ssh-agent).

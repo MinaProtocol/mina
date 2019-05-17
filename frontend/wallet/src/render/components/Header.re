@@ -46,7 +46,7 @@ let make = () =>
       </p>
     </div>
     <div className=Styles.rightButtons> 
-      <Link>
+      <Link onClick={_e => ReasonReact.Router.push("/settings")}>
         <Icon kind=Icon.Settings />
         <Spacer width={0.25} />
         {React.string("Settings")}
