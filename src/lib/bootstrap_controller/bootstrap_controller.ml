@@ -351,17 +351,12 @@ end = struct
                 , Some ("Received valid scan state from peer", []) ))
         in
         let new_root =
-          With_hash.map (fst t.current_root) ~f:(fun _root ->
-              (* Need to coerce new_root from a proof_verified transition to a
-             fully verified transition because it will be added into transition
-             frontier*)
-              (*
-              let (`I_swear_this_is_safe_see_my_comment verified_root) =
-                External_transition.(root |> of_proof_verified |> to_verified)
+          With_hash.map (fst t.current_root) ~f:(fun root ->
+              (* TODO: review the correctness of this action #2480 *)
+              let (`I_swear_this_is_safe_see_my_comment root') =
+                External_transition.Validated.create_unsafe root
               in
-              verified_root )
-              *)
-              failwith "TODO" )
+              root' )
         in
         let%map new_frontier =
           Transition_frontier.create ~logger ~root_transition:new_root

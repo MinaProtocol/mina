@@ -312,6 +312,10 @@ module Make
     | Error e ->
         Error (`Verifier_error e)
 
+  let skip_frontier_dependencies_validation
+      `This_transition_belongs_to_a_detached_subtree (t, validation) =
+    (t, Validation.Unsafe.set_valid_frontier_dependencies validation)
+
   module Transition_frontier_validation (Transition_frontier : sig
     type t
 

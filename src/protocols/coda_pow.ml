@@ -1724,6 +1724,19 @@ module type External_transition_intf = sig
          Result.t
   end
 
+  val skip_frontier_dependencies_validation :
+       [`This_transition_belongs_to_a_detached_subtree]
+    -> ( 'time_received
+       , 'proof
+       , [`Frontier_dependencies] * Truth.false_t
+       , 'staged_ledger_diff )
+       Validation.with_transition
+    -> ( 'time_received
+       , 'proof
+       , [`Frontier_dependencies] * Truth.true_t
+       , 'staged_ledger_diff )
+       Validation.with_transition
+
   (* TODO: this functor can be killed once Staged_ledger is defunctor *)
   module Staged_ledger_validation (Staged_ledger : sig
     type t

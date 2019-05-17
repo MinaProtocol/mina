@@ -60,9 +60,12 @@ module Make (Inputs : Inputs.S) :
                     transition_with_initial_validation
                   in
                   let mostly_validated_transition =
-                    failwith "TODO"
-                    (* this is incorrect... need some way to short circuit this *)
-                    (* Transition_frontier.validate_transition_dependencies frontier transition_with_initial_validation *)
+                    (* TODO: handle this edge case more gracefully *)
+                    (* since we are building a disconnected subtree of breadcrumbs,
+                     * we skip this step in validation *)
+                    External_transition.skip_frontier_dependencies_validation
+                      `This_transition_belongs_to_a_detached_subtree
+                      transition_with_initial_validation
                   in
                   let sender = Envelope.Incoming.sender enveloped_transition in
                   let parent = Cached.peek cached_parent in
