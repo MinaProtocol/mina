@@ -12,7 +12,7 @@ module type S = sig
 
   val connect :
        initial_peers:Host_and_port.t list
-    -> me:Peer.t
+    -> node_addrs_and_ports:Node_addrs_and_ports.t
     -> logger:Logger.t
     -> conf_dir:string
     -> trust_system:trust_system
@@ -34,7 +34,7 @@ module type Process_intf = sig
 
   val create :
        initial_peers:Host_and_port.t list
-    -> me:Peer.t
+    -> node_addrs_and_ports:Node_addrs_and_ports.t
     -> logger:Logger.t
     -> conf_dir:string
     -> t Deferred.Or_error.t
@@ -94,40 +94,57 @@ module Haskell_process = struct
     let%bind _ = Process.wait process in
     Sys.remove lock_path
 
-  let cli_format (peer : Peer.t) : string =
-    (* assertion for discovery_port = external_port - 1 *)
-    assert (Int.equal (peer.Peer.discovery_port - 1) peer.communication_port) ;
+  let cli_format : Unix.Inet_addr.t -> int -> string =
+   fun host discovery_port ->
     Printf.sprintf "(\"%s\", %d)"
-      (Unix.Inet_addr.to_string peer.host)
-      peer.discovery_port
+      (Unix.Inet_addr.to_string host)
+      discovery_port
 
   let cli_format_initial_peer (addr : Host_and_port.t) : string =
     Printf.sprintf "(\"%s\", %d)" (Host_and_port.host addr)
       (Host_and_port.port addr)
 
-  let filter_initial_peers (initial_peers : Host_and_port.t list) (me : Peer.t)
-      =
-    let me_host_and_discovery_port = Peer.to_discovery_host_and_port me in
+  let filter_initial_peers (initial_peers : Host_and_port.t list)
+      (me : Node_addrs_and_ports.t) =
+    let external_host_and_port =
+      Host_and_port.create
+        ~host:(Unix.Inet_addr.to_string me.external_ip)
+        ~port:me.discovery_port
+    in
     List.filter initial_peers ~f:(fun peer ->
-        not (Host_and_port.equal peer me_host_and_discovery_port) )
+        not (Host_and_port.equal peer external_host_and_port) )
 
   let%test "filter_initial_peers_test" =
+    let ip1 = Unix.Inet_addr.of_string "1.1.1.1" in
     let me =
-      Peer.create
-        (Unix.Inet_addr.of_string "1.1.1.1")
-        ~discovery_port:8000 ~communication_port:8001
+      Node_addrs_and_ports.
+        { external_ip= ip1
+        ; bind_ip= ip1
+        ; discovery_port= 8000
+        ; communication_port= 8001 }
     in
+    let me_discovery = Host_and_port.create ~host:"1.1.1.1" ~port:8000 in
     let other = Host_and_port.create ~host:"1.1.1.2" ~port:8000 in
-    filter_initial_peers [Peer.to_discovery_host_and_port me; other] me
-    = [other]
+    filter_initial_peers [me_discovery; other] me = [other]
 
-  let create ~(initial_peers : Host_and_port.t list) ~(me : Peer.t) ~logger
-      ~conf_dir =
+  let create :
+         initial_peers:Host_and_port.t list
+      -> node_addrs_and_ports:Node_addrs_and_ports.t
+      -> logger:Logger.t
+      -> conf_dir:string
+      -> t Deferred.Or_error.t =
+   fun ~initial_peers
+       ~node_addrs_and_ports:( {discovery_port; bind_ip; external_ip; _} as
+                             node_addrs_and_ports ) ~logger ~conf_dir ->
     let lock_path = Filename.concat conf_dir lock_file in
-    let filtered_initial_peers = filter_initial_peers initial_peers me in
+    let filtered_initial_peers =
+      filter_initial_peers initial_peers node_addrs_and_ports
+    in
     let run_kademlia () =
       let args =
-        ["test"; cli_format me]
+        [ "test"
+        ; Unix.Inet_addr.to_string bind_ip
+        ; cli_format external_ip discovery_port ]
         @ List.map filtered_initial_peers ~f:cli_format_initial_peer
       in
       Logger.debug logger ~module_:__MODULE__ ~location:__LOC__ "Args: %s\n"
@@ -189,12 +206,6 @@ module Haskell_process = struct
           return @@ Ok ()
     in
     let open Deferred.Or_error.Let_syntax in
-    let args =
-      ["test"; cli_format me]
-      @ List.map initial_peers ~f:cli_format_initial_peer
-    in
-    Logger.debug logger ~module_:__MODULE__ ~location:__LOC__ "Args: %s"
-      (List.sexp_of_t String.sexp_of_t args |> Sexp.to_string_hum) ;
     let%bind () = kill_locked_process ~logger in
     match%bind
       Sys.is_directory conf_dir |> Deferred.map ~f:Or_error.return
@@ -258,8 +269,6 @@ module Make
     (P : Process_intf) (Trust_system : sig
         type t
 
-        (* TODO punish peers from kad? *)
-        (* val record : t -> Logger.t -> Unix.Inet_addr.Blocking_sexp.t -> Trust_system.Actions.t -> unit Deferred.t *)
         val lookup :
           t -> Unix.Inet_addr.Blocking_sexp.t -> Trust_system.Peer_status.t
     end) : sig
@@ -267,7 +276,7 @@ module Make
 
   module For_tests : sig
     val node :
-         Peer.t
+         Node_addrs_and_ports.t
       -> Host_and_port.t sexp_list
       -> string
       -> Trust_system.t
@@ -314,13 +323,17 @@ end = struct
       Linear_pipe.write t.changes_writer (Peer.Event.Disconnect deads)
     else Deferred.unit
 
-  let connect ~(initial_peers : Host_and_port.t list) ~(me : Peer.t) ~logger
-      ~conf_dir ~trust_system =
+  let connect ~(initial_peers : Host_and_port.t list)
+      ~(node_addrs_and_ports : Node_addrs_and_ports.t) ~logger ~conf_dir
+      ~trust_system =
     let open Deferred.Or_error.Let_syntax in
     let filtered_peers =
       List.filter initial_peers ~f:(Fn.compose not (is_banned trust_system))
     in
-    let%map p = P.create ~initial_peers:filtered_peers ~me ~logger ~conf_dir in
+    let%map p =
+      P.create ~initial_peers:filtered_peers ~node_addrs_and_ports ~logger
+        ~conf_dir
+    in
     let peers = Peer.Table.create () in
     let changes_reader, changes_writer = Linear_pipe.create () in
     let first_peers_ivar = ref None in
@@ -397,10 +410,10 @@ end = struct
   let stop t = P.kill t.p
 
   module For_tests = struct
-    let node (me : Peer.t) (peers : Host_and_port.t list) conf_dir trust_system
-        =
-      connect ~initial_peers:peers ~me ~logger:(Logger.null ()) ~conf_dir
-        ~trust_system
+    let node node_addrs_and_ports (peers : Host_and_port.t list) conf_dir
+        trust_system =
+      connect ~initial_peers:peers ~node_addrs_and_ports
+        ~logger:(Logger.null ()) ~conf_dir ~trust_system
       >>| Or_error.ok_exn
   end
 end
@@ -423,7 +436,7 @@ let%test_module "Tests" =
 
       val connect :
            initial_peers:Host_and_port.t list
-        -> me:Peer.t
+        -> node_addrs_and_ports:Node_addrs_and_ports.t
         -> logger:Logger.t
         -> conf_dir:string
         -> t Deferred.Or_error.t
@@ -441,9 +454,11 @@ let%test_module "Tests" =
       Async.Thread_safe.block_on_async_exn (fun () ->
           match%bind
             M.connect ~initial_peers:[]
-              ~me:
-                (Peer.create Unix.Inet_addr.localhost ~discovery_port:3001
-                   ~communication_port:3000)
+              ~node_addrs_and_ports:
+                { external_ip= Unix.Inet_addr.localhost
+                ; bind_ip= Unix.Inet_addr.localhost
+                ; discovery_port= 3001
+                ; communication_port= 3000 }
               ~logger:(Logger.null ())
               ~conf_dir:(Filename.temp_dir_name ^/ "membership-test")
           with
@@ -466,7 +481,8 @@ let%test_module "Tests" =
 
       let kill _ = return ()
 
-      let create ~initial_peers:_ ~me:_ ~logger:_ ~conf_dir:_ =
+      let create ~initial_peers:_ ~node_addrs_and_ports:_ ~logger:_ ~conf_dir:_
+          =
         let on p = Printf.sprintf "127.0.0.1:%d key on" p in
         let off p = Printf.sprintf "127.0.0.1:%d key off" p in
         let render cmds =
@@ -491,7 +507,8 @@ let%test_module "Tests" =
         in
         ()
 
-      let create ~initial_peers:_ ~me:_ ~logger:_ ~conf_dir:_ =
+      let create ~initial_peers:_ ~node_addrs_and_ports:_ ~logger:_ ~conf_dir:_
+          =
         Process.create
           ~prog:
             ( match get_project_root () with
@@ -549,9 +566,12 @@ let%test_module "Tests" =
       (* Just make sure the dummy is outputting things *)
       fold_membership (module M) ~init:false ~f:(fun b _e -> b || true)
 
-    let peer_of_int i =
-      Peer.create Unix.Inet_addr.localhost ~discovery_port:(3006 + i)
-        ~communication_port:(3005 + i)
+    let node_addrs_and_ports_of_int i =
+      Node_addrs_and_ports.
+        { external_ip= Unix.Inet_addr.localhost
+        ; bind_ip= Unix.Inet_addr.localhost
+        ; discovery_port= 3006 + i
+        ; communication_port= 3005 + i }
 
     let conf_dir = Filename.temp_dir_name ^/ ".kademlia-test-"
 
@@ -584,11 +604,14 @@ let%test_module "Tests" =
       run_connection_test ~f:(fun conf_dir_1 conf_dir_2 ->
           let open Deferred.Let_syntax in
           let%bind n0 =
-            Haskell.For_tests.node (peer_of_int 0) [] conf_dir_1
-              (create_trust_system ())
+            Haskell.For_tests.node
+              (node_addrs_and_ports_of_int 0)
+              [] conf_dir_1 (create_trust_system ())
           and n1 =
-            Haskell.For_tests.node (peer_of_int 1)
-              [Peer.to_discovery_host_and_port (peer_of_int 0)]
+            Haskell.For_tests.node
+              (node_addrs_and_ports_of_int 1)
+              [ node_addrs_and_ports_of_int 0
+                |> Node_addrs_and_ports.to_discovery_host_and_port ]
               conf_dir_2 (create_trust_system ())
           in
           let%bind n0_peers =
@@ -604,8 +627,11 @@ let%test_module "Tests" =
           in
           assert (List.length n1_peers <> 0) ;
           assert (
-            List.hd_exn n0_peers = peer_of_int 1
-            && List.hd_exn n1_peers = peer_of_int 0 ) ;
+            List.hd_exn n0_peers
+            = (node_addrs_and_ports_of_int 1 |> Node_addrs_and_ports.to_peer)
+            && List.hd_exn n1_peers
+               = (node_addrs_and_ports_of_int 0 |> Node_addrs_and_ports.to_peer)
+          ) ;
           let%bind () = Haskell.stop n0 and () = Haskell.stop n1 in
           Deferred.unit )
 
@@ -647,8 +673,8 @@ let%test_module "Tests" =
         let%test_unit "connect with ban logic" =
             (* This flakes 1 in 20 times, so try a couple times if it fails *)
             run_connection_test ~f:(fun banner_conf_dir normal_conf_dir ->
-                let banner_addr = peer_of_int 0 in
-                let normal_addr = peer_of_int 1 in
+                let banner_addr = node_addrs_and_ports_of_int 0 in
+                let normal_addr = node_addrs_and_ports_of_int 1 in
                 let normal_peer = Peer.to_discovery_host_and_port normal_addr in
                 let trust_system = Trust_system.create () in
                 let%bind banner_node =
@@ -685,7 +711,7 @@ let%test_module "Tests" =
                       Deferred.return
                       @@ Option.is_some
                         (List.find peers_after_reconnect ~f:(fun p ->
-                             p = peer_of_int 1 )) )
+                             p = node_addrs_and_ports_of_int 1 )) )
                 in
                 assert is_reconnecting_to_banned_peer ;
                 let%bind () = Haskell_trust.stop new_banner_node
@@ -700,8 +726,9 @@ let%test_module "Tests" =
           let open Deferred.Let_syntax in
           File_system.with_temp_dir conf_dir ~f:(fun temp_dir ->
               let%bind n =
-                Haskell.For_tests.node (peer_of_int 1) [] temp_dir
-                  (create_trust_system ())
+                Haskell.For_tests.node
+                  (node_addrs_and_ports_of_int 1)
+                  [] temp_dir (create_trust_system ())
               in
               let lock_path = Filename.concat temp_dir lock_file in
               let%bind yes_result = Sys.file_exists lock_path in

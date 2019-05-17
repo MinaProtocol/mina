@@ -1,6 +1,7 @@
 open Core
 open Async
 open Coda_base
+open Coda_state
 open Util
 open Blockchain_snark
 open Cli_lib
@@ -22,7 +23,7 @@ end
 
 module Worker_state = struct
   module type S = sig
-    val verify_wrap : Consensus.Protocol_state.Value.t -> Tock.Proof.t -> bool
+    val verify_wrap : Protocol_state.Value.t -> Tock.Proof.t -> bool
 
     val verify_transaction_snark :
       Transaction_snark.t -> message:Sok_message.t -> bool
@@ -39,18 +40,20 @@ module Worker_state = struct
        let module T = Transaction_snark.Verification.Make (struct
          let keys = tx_vk
        end) in
-       let module B = Blockchain_transition.Make (Consensus) (T) in
-       let module U =
-         Blockchain_snark_utils.Verification
-           (Consensus)
-           (struct
-             let key = bc_vk.wrap
-
-             let key_to_bool_list = Snark_params.tock_vk_to_bool_list
-           end)
+       let instance_hash state =
+         let self = Snark_params.tock_vk_to_bool_list bc_vk.wrap in
+         Tick.Pedersen.digest_fold Hash_prefix.transition_system_snark
+           Fold_lib.Fold.(
+             group3 ~default:false (of_list self)
+             +> State_hash.fold (Protocol_state.hash state))
+       in
+       let verify_wrap state proof =
+         Tock.verify proof bc_vk.wrap
+           Tock.Data_spec.[Wrap_input.typ]
+           (Wrap_input.of_tick_field (instance_hash state))
        in
        let module M = struct
-         let verify_wrap = U.verify_wrap
+         let verify_wrap = verify_wrap
 
          let verify_transaction_snark = T.verify
        end in

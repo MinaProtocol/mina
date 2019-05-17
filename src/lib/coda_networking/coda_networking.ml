@@ -2,8 +2,58 @@ open Core_kernel
 open Async
 open Kademlia
 open Coda_base
+open Coda_state
 open Pipe_lib
+open Signature_lib
 open Network_peer
+
+module type Base_inputs_intf = sig
+  module Ledger_hash : Protocols.Coda_pow.Ledger_hash_intf
+
+  module Pending_coinbase_stack_state :
+    Protocols.Coda_pow.Pending_coinbase_stack_state_intf
+    with type pending_coinbase_stack := Pending_coinbase.Stack.t
+
+  module Ledger_proof_statement :
+    Protocols.Coda_pow.Ledger_proof_statement_intf
+    with type ledger_hash := Frozen_ledger_hash.t
+     and type pending_coinbase_stack_state := Pending_coinbase_stack_state.t
+
+  module Ledger_proof : sig
+    include
+      Protocols.Coda_pow.Ledger_proof_intf
+      with type statement := Ledger_proof_statement.t
+       and type ledger_hash := Frozen_ledger_hash.t
+       and type proof := Proof.t
+       and type sok_digest := Sok_message.Digest.t
+
+    include Sexpable.S with type t := t
+  end
+
+  module Transaction_snark_work :
+    Protocols.Coda_pow.Transaction_snark_work_intf
+    with type proof := Ledger_proof.t
+     and type statement := Ledger_proof_statement.t
+     and type public_key := Public_key.Compressed.t
+
+  module Staged_ledger_diff :
+    Protocols.Coda_pow.Staged_ledger_diff_intf
+    with type user_command := User_command.t
+     and type user_command_with_valid_signature :=
+                User_command.With_valid_signature.t
+     and type staged_ledger_hash := Staged_ledger_hash.t
+     and type public_key := Public_key.Compressed.t
+     and type completed_work := Transaction_snark_work.t
+     and type completed_work_checked := Transaction_snark_work.Checked.t
+     and type fee_transfer_single := Fee_transfer.Single.t
+
+  module External_transition :
+    Protocols.Coda_pow.External_transition_intf
+    with type protocol_state := Protocol_state.Value.t
+     and type staged_ledger_diff := Staged_ledger_diff.t
+     and type protocol_state_proof := Proof.t
+     and type state_hash := State_hash.t
+end
 
 (* assumption: the Rpcs functor is applied only once in the codebase, so that
    any versions appearing in Inputs represent unique types
@@ -13,6 +63,8 @@ open Network_peer
 *)
 
 module Rpcs (Inputs : sig
+  include Base_inputs_intf
+
   module Staged_ledger_aux_hash :
     Protocols.Coda_pow.Staged_ledger_aux_hash_intf
 
@@ -27,12 +79,6 @@ module Rpcs (Inputs : sig
       end
       with type V1.t = t
   end
-
-  module Ledger_hash : Protocols.Coda_pow.Ledger_hash_intf
-
-  module Blockchain_state : Blockchain_state.S
-
-  module External_transition : External_transition.S
 end) =
 struct
   open Inputs
@@ -106,7 +152,8 @@ struct
         (* "master" types, do not change *)
         type query = Ledger_hash.Stable.V1.t * Sync_ledger.Query.Stable.V1.t
 
-        type response = Sync_ledger.Answer.Stable.V1.t Or_error.t
+        type response =
+          Sync_ledger.Answer.Stable.V1.t Core.Or_error.Stable.V1.t
       end
 
       module Caller = T
@@ -199,7 +246,8 @@ struct
 
       module T = struct
         (* "master" types, do not change *)
-        type query = Consensus.Consensus_state.Value.t [@@deriving sexp]
+        type query = Consensus.Data.Consensus_state.Value.t
+        [@@deriving sexp, to_yojson]
 
         type response =
           ( External_transition.Stable.V1.t
@@ -223,7 +271,7 @@ struct
 
     module V1 = struct
       module T = struct
-        type query = Consensus.Consensus_state.Value.Stable.V1.t
+        type query = Consensus.Data.Consensus_state.Value.Stable.V1.t
         [@@deriving bin_io, sexp, version {rpc}]
 
         type response =
@@ -250,6 +298,8 @@ struct
 end
 
 module Message (Inputs : sig
+  include Base_inputs_intf
+
   module Snark_pool_diff : sig
     type t [@@deriving sexp]
 
@@ -273,8 +323,6 @@ module Message (Inputs : sig
       end
       with type V1.t = t
   end
-
-  module External_transition : External_transition.S
 end) =
 struct
   open Inputs
@@ -327,18 +375,14 @@ struct
 end
 
 module type Inputs_intf = sig
-  module External_transition : External_transition.S
+  include Base_inputs_intf
 
   module Staged_ledger_aux_hash :
     Protocols.Coda_pow.Staged_ledger_aux_hash_intf
 
-  module Ledger_hash : Protocols.Coda_pow.Ledger_hash_intf
-
   (* we omit Staged_ledger_hash, because the available module in Inputs is not versioned; instead, in the
      versioned RPC modules, we use a specific version
    *)
-  module Blockchain_state : Coda_base.Blockchain_state.S
-
   module Staged_ledger_aux : sig
     type t
 
@@ -387,9 +431,10 @@ module type Config_intf = sig
 
   type t =
     { logger: Logger.t
+    ; trust_system: Trust_system.t
     ; gossip_net_params: gossip_config
     ; time_controller: time_controller
-    ; consensus_local_state: Consensus.Local_state.t }
+    ; consensus_local_state: Consensus.Data.Local_state.t }
 end
 
 module Make (Inputs : Inputs_intf) = struct
@@ -404,9 +449,10 @@ module Make (Inputs : Inputs_intf) = struct
      and type time_controller := Time.Controller.t = struct
     type t =
       { logger: Logger.t
+      ; trust_system: Trust_system.t
       ; gossip_net_params: Gossip_net.Config.t
       ; time_controller: Time.Controller.t
-      ; consensus_local_state: Consensus.Local_state.t }
+      ; consensus_local_state: Consensus.Data.Local_state.t }
   end
 
   module Rpcs = Rpcs (Inputs)
@@ -467,33 +513,98 @@ module Make (Inputs : Inputs_intf) = struct
             State_hash.t Envelope.Incoming.t
          -> External_transition.t Non_empty_list.t option Deferred.t)
       ~(get_ancestry :
-            Consensus.Consensus_state.Value.t Envelope.Incoming.t
+            Consensus.Data.Consensus_state.Value.t Envelope.Incoming.t
          -> ( External_transition.t
             , State_body_hash.t list * External_transition.t )
             Proof_carrying_data.t
             Deferred.Option.t) =
+    let run_for_rpc_result conn data ~f action_msg msg_args =
+      let data_in_envelope = wrap_rpc_data_in_envelope conn data in
+      let sender = Envelope.Incoming.sender data_in_envelope in
+      let%bind () =
+        Trust_system.(
+          record_envelope_sender config.trust_system config.logger sender
+            Actions.(Made_request, Some (action_msg, msg_args)))
+      in
+      let%bind result = f data_in_envelope in
+      return (result, sender)
+    in
+    let record_unknown_item result sender action_msg msg_args =
+      let%bind () =
+        if Option.is_none result then
+          Trust_system.(
+            record_envelope_sender config.trust_system config.logger sender
+              Actions.(Requested_unknown_item, Some (action_msg, msg_args)))
+        else return ()
+      in
+      return result
+    in
     (* each of the passed-in procedures expects an enveloped input, so
        we wrap the data received via RPC *)
     let get_staged_ledger_aux_and_pending_coinbases_at_hash_rpc conn ~version:_
         hash =
-      let hash_in_envelope = wrap_rpc_data_in_envelope conn hash in
-      get_staged_ledger_aux_and_pending_coinbases_at_hash hash_in_envelope
+      let action_msg = "Staged ledger and pending coinbases at hash: $hash" in
+      let msg_args = [("hash", State_hash.to_yojson hash)] in
+      let%bind result, sender =
+        run_for_rpc_result conn hash
+          ~f:get_staged_ledger_aux_and_pending_coinbases_at_hash action_msg
+          msg_args
+      in
+      record_unknown_item result sender action_msg msg_args
     in
-    let answer_sync_ledger_query_rpc conn ~version:_ query =
-      let query_in_envelope = wrap_rpc_data_in_envelope conn query in
-      answer_sync_ledger_query query_in_envelope
+    let answer_sync_ledger_query_rpc conn ~version:_
+        ((hash, query) as sync_query) =
+      let%bind result, sender =
+        run_for_rpc_result conn sync_query ~f:answer_sync_ledger_query
+          "Answer_sync_ledger_query: $query"
+          [("query", Sync_ledger.Query.to_yojson query)]
+      in
+      let%bind () =
+        match result with
+        | Ok _ ->
+            return ()
+        | Error err ->
+            (* N.B.: to_string_mach double-quotes the string, don't want that *)
+            let err_msg = Error.to_string_hum err in
+            if
+              String.is_prefix err_msg
+                ~prefix:Coda_lib.refused_answer_query_string
+            then
+              Trust_system.(
+                record_envelope_sender config.trust_system config.logger sender
+                  Actions.
+                    ( Requested_unknown_item
+                    , Some
+                        ( "Sync ledger query with hash: $hash, query: $query, \
+                           with error: $error"
+                        , [ ("hash", Inputs.Ledger_hash.to_yojson hash)
+                          ; ( "query"
+                            , Syncable_ledger.Query.to_yojson
+                                Ledger.Addr.to_yojson query )
+                          ; ("error", `String err_msg) ] ) ))
+            else return ()
+      in
+      return result
     in
     let transition_catchup_rpc conn ~version:_ hash =
       Logger.info config.logger ~module_:__MODULE__ ~location:__LOC__
         "Peer with IP %s sent transition_catchup" conn.Host_and_port.host ;
-      let hash_in_envelope = wrap_rpc_data_in_envelope conn hash in
-      transition_catchup hash_in_envelope
+      let action_msg = "Transition catchup with hash $hash" in
+      let msg_args = [("hash", State_hash.to_yojson hash)] in
+      let%bind result, sender =
+        run_for_rpc_result conn hash ~f:transition_catchup action_msg msg_args
+      in
+      record_unknown_item result sender action_msg msg_args
     in
     let get_ancestry_rpc conn ~version:_ query =
       Logger.info config.logger ~module_:__MODULE__ ~location:__LOC__
         "Sending root proof to peer with IP %s" conn.Host_and_port.host ;
-      let query_in_envelope = wrap_rpc_data_in_envelope conn query in
-      get_ancestry query_in_envelope
+      let action_msg = "Get_ancestry query: $query" in
+      let msg_args = [("query", Rpcs.Get_ancestry.query_to_yojson query)] in
+      let%bind result, sender =
+        run_for_rpc_result conn query ~f:get_ancestry action_msg msg_args
+      in
+      record_unknown_item result sender action_msg msg_args
     in
     let implementations =
       List.concat
@@ -504,7 +615,7 @@ module Make (Inputs : Inputs_intf) = struct
             answer_sync_ledger_query_rpc
         ; Rpcs.Transition_catchup.implement_multi transition_catchup_rpc
         ; Rpcs.Get_ancestry.implement_multi get_ancestry_rpc
-        ; Consensus.Rpcs.implementations ~logger:config.logger
+        ; Consensus.Hooks.Rpcs.implementations ~logger:config.logger
             ~local_state:config.consensus_local_state ]
     in
     let%map gossip_net =
@@ -527,7 +638,9 @@ module Make (Inputs : Inputs_intf) = struct
           | New_state state ->
               Perf_histograms.add_span ~name:"external_transition_latency"
                 (Core.Time.abs_diff (Core.Time.now ())
-                   (External_transition.timestamp state |> Block_time.to_time)) ;
+                   ( External_transition.protocol_state state
+                   |> Protocol_state.blockchain_state
+                   |> Blockchain_state.timestamp |> Block_time.to_time )) ;
               `Fst
                 ( Envelope.Incoming.map envelope ~f:(fun _ -> state)
                 , Time.now config.time_controller )
@@ -593,6 +706,8 @@ module Make (Inputs : Inputs_intf) = struct
 
   let peers t = Gossip_net.peers t.gossip_net
 
+  let initial_peers t = Gossip_net.initial_peers t.gossip_net
+
   let online_status t = t.online_status
 
   let random_peers {gossip_net; _} = Gossip_net.random_peers gossip_net
@@ -601,11 +716,6 @@ module Make (Inputs : Inputs_intf) = struct
     Gossip_net.random_peers_except gossip_net n ~except
 
   let catchup_transition t peer state_hash =
-    let%bind () =
-      Trust_system.(
-        record t.trust_system t.logger peer.Peer.host
-          Actions.(Made_request, Some ("transition_catchup", [])))
-    in
     Gossip_net.query_peer t.gossip_net peer
       Rpcs.Transition_catchup.dispatch_multi state_hash
 
@@ -699,24 +809,11 @@ module Make (Inputs : Inputs_intf) = struct
         try_non_preferred_peers t input peers ~rpc
 
   let get_staged_ledger_aux_and_pending_coinbases_at_hash t inet_addr input =
-    let%bind () =
-      Trust_system.(
-        record t.trust_system t.logger inet_addr
-          Actions.
-            ( Made_request
-            , Some ("get_staged_ledger_aux_and_pending_coinbases_at_hash", [])
-            ))
-    in
     try_preferred_peer t inet_addr input
       ~rpc:
         Rpcs.Get_staged_ledger_aux_and_pending_coinbases_at_hash.dispatch_multi
 
   let get_ancestry t inet_addr input =
-    let%bind () =
-      Trust_system.(
-        record t.trust_system t.logger inet_addr
-          Actions.(Made_request, Some ("get_ancestry", [])))
-    in
     try_preferred_peer t inet_addr input ~rpc:Rpcs.Get_ancestry.dispatch_multi
 
   let glue_sync_ledger t query_reader response_writer =
@@ -739,16 +836,6 @@ module Make (Inputs : Inputs_intf) = struct
               !"Asking %{sexp: Peer.t} query regarding ledger_hash %{sexp: \
                 Ledger_hash.t}"
               peer (fst query) ;
-            let%bind () =
-              Trust_system.(
-                record t.trust_system t.logger peer.host
-                  Actions.
-                    ( Made_request
-                    , Some
-                        ( "answer_sync_ledger_query: $query"
-                        , [("query", Sync_ledger.Query.to_yojson (snd query))]
-                        ) ))
-            in
             match%map
               Gossip_net.query_peer t.gossip_net peer
                 Rpcs.Answer_sync_ledger_query.dispatch_multi query
