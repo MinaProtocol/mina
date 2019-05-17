@@ -84,8 +84,7 @@ module Fs = {
     "";
 
   [@bs.val] [@bs.module "fs"]
-  external watchFile:
-    (string, unit => unit) => unit = "";
+  external watchFile: (string, unit => unit) => unit = "";
 };
 
 module Fetch = {

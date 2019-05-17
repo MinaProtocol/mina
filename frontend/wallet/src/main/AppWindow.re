@@ -77,8 +77,7 @@ include Single.Make({
 
       Bindings.Fs.watchFile(
         Filename.concat(ProjectRoot.resource, "bundle/index.js"), () =>
-        loadURL(window, indexURL
-        )
+        loadURL(window, indexURL)
       );
 
       window;
