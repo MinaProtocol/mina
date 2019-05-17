@@ -10,7 +10,8 @@ let navigate = route => ReasonReact.Router.push("#" ++ Route.print(route));
 let make = () => {
   let url = ReasonReactRouter.useUrl();
   <div className=Styles.container>
-    {switch (url.hash) {
+    {switch (url.path) {
+     | ["settings"] => <SettingsPage />
      | _ => <TransactionsView />
      }}
   </div>;

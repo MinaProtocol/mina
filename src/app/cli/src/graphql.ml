@@ -22,6 +22,15 @@ module Make (Commands : Coda_commands.Intf) = struct
     Schema.io_field ~resolve:(fun resolve_info src ->
         Deferred.return @@ resolve resolve_info src )
 
+  module Doc = struct
+    let uint64 = sprintf !"%s (%s is uint64 and is coerced as a string)"
+
+    let date =
+      sprintf
+        !"%s (%s is the Unix form of time, which is the number of \
+          milliseconds that elapsed from January 1, 1970)"
+  end
+
   module Types = struct
     open Schema
 
@@ -30,8 +39,7 @@ module Make (Commands : Coda_commands.Intf) = struct
       let public_key = Public_key.Compressed.to_base64
 
       (** Unix form of time, which is the number of milliseconds that elapsed from January 1, 1970 *)
-      let date time =
-        Time.to_span_since_epoch time |> Time.Span.to_ms |> Int64.to_string
+      let date = Time.to_string
 
       (** Javascript only has 53-bit integers so we need to make them into strings  *)
       let uint64 uint64 = Unsigned.UInt64.to_string uint64
@@ -40,18 +48,16 @@ module Make (Commands : Coda_commands.Intf) = struct
       let balance b = Balance.to_uint64 b |> uint64
     end
 
-    let uint64_doc = sprintf !"%s (%s is uint64 and is coerced as a string)"
-
     let uint64_arg name ~doc ~typ =
       let open Schema.Arg in
-      arg name ~typ ~doc:(uint64_doc name doc)
+      arg name ~typ ~doc:(Doc.uint64 name doc)
 
     let uint64_field name ~doc =
-      field name ~typ:(non_null string) ~doc:(uint64_doc doc name)
+      field name ~typ:(non_null string) ~doc:(Doc.uint64 doc name)
 
     let uint64_result_field name ~doc =
       result_field_no_inputs name ~typ:(non_null string)
-        ~doc:(uint64_doc doc name)
+        ~doc:(Doc.uint64 doc name)
 
     (* TODO: include submitted_at (date) and included_at (date). These two fields are not exposed in the user_command *)
     let user_command : (Program.t, User_command.t option) typ =
@@ -274,6 +280,12 @@ module Make (Commands : Coda_commands.Intf) = struct
             [ field "delegation" ~typ:(non_null user_command)
                 ~args:Arg.[]
                 ~resolve:(fun _ -> Fn.id) ] )
+
+      let add_payment_receipt =
+        obj "AddPaymentReceipt" ~fields:(fun _ ->
+            [ field "payment" ~typ:(non_null user_command)
+                ~args:Arg.[]
+                ~resolve:(fun _ -> Fn.id) ] )
     end
 
     module Pagination = struct
@@ -293,51 +305,52 @@ module Make (Commands : Coda_commands.Intf) = struct
       module Connection = struct
         type 'a t = {edges: 'a list; total_count: int; page_info: Page_info.t}
       end
+    end
 
-      module User_command = struct
-        module Cursor = struct
-          let serialize payment =
-            let bigstring =
-              Bin_prot.Utils.bin_dump
-                Coda_base.User_command.Stable.V1.bin_t.writer payment
-            in
-            Base64.encode_exn @@ Bigstring.to_string bigstring
+    module User_command = struct
+      module Cursor = struct
+        let serialize payment =
+          let bigstring =
+            Bin_prot.Utils.bin_dump
+              Coda_base.User_command.Stable.V1.bin_t.writer payment
+          in
+          Base64.encode_exn @@ Bigstring.to_string bigstring
 
-          let deserialize serialized_payment =
-            let serialized_transaction =
-              Base64.decode_exn serialized_payment
-            in
-            Coda_base.User_command.Stable.V1.bin_t.reader.read
-              (Bigstring.of_string serialized_transaction)
-              ~pos_ref:(ref 0)
-        end
-
-        let edge =
-          obj "PaymentEdge" ~fields:(fun _ ->
-              [ field "cursor" ~typ:(non_null string)
-                  ~doc:
-                    "Cursor is the base64 version of a serialized user \
-                     command (via Jane Street bin_prot)"
-                  ~args:Arg.[]
-                  ~resolve:(fun _ user_command -> Cursor.serialize user_command)
-              ; field "node" ~typ:(non_null user_command)
-                  ~args:Arg.[]
-                  ~resolve:(fun _ -> Fn.id) ] )
-
-        let connection =
-          obj "PaymentConnection" ~fields:(fun _ ->
-              [ field "edges"
-                  ~typ:(non_null @@ list @@ non_null user_command)
-                  ~args:Arg.[]
-                  ~resolve:(fun _ {Connection.edges; _} -> edges)
-              ; field "totalCount" ~typ:(non_null int)
-                  ~doc:"Total number of payments that daemon holds"
-                  ~args:Arg.[]
-                  ~resolve:(fun _ {Connection.total_count; _} -> total_count)
-              ; field "pageInfo" ~typ:(non_null Page_info.typ)
-                  ~args:Arg.[]
-                  ~resolve:(fun _ {Connection.page_info; _} -> page_info) ] )
+        let deserialize serialized_payment =
+          let serialized_transaction = Base64.decode_exn serialized_payment in
+          Coda_base.User_command.Stable.V1.bin_t.reader.read
+            (Bigstring.of_string serialized_transaction)
+            ~pos_ref:(ref 0)
       end
+
+      let edge =
+        obj "PaymentEdge" ~fields:(fun _ ->
+            [ field "cursor" ~typ:(non_null string)
+                ~doc:
+                  "Cursor is the base64 version of a serialized user command \
+                   (via Jane Street bin_prot)"
+                ~args:Arg.[]
+                ~resolve:(fun _ user_command -> Cursor.serialize user_command)
+            ; field "node" ~typ:(non_null user_command)
+                ~args:Arg.[]
+                ~resolve:(fun _ -> Fn.id) ] )
+
+      let connection =
+        obj "PaymentConnection" ~fields:(fun _ ->
+            [ field "edges"
+                ~typ:(non_null @@ list @@ non_null user_command)
+                ~args:Arg.[]
+                ~resolve:(fun _ {Pagination.Connection.edges; _} -> edges)
+            ; field "totalCount" ~typ:(non_null int)
+                ~doc:"Total number of payments that daemon holds"
+                ~args:Arg.[]
+                ~resolve:(fun _ {Pagination.Connection.total_count; _} ->
+                  total_count )
+            ; field "pageInfo"
+                ~typ:(non_null Pagination.Page_info.typ)
+                ~args:Arg.[]
+                ~resolve:(fun _ {Pagination.Connection.page_info; _} ->
+                  page_info ) ] )
     end
 
     module Input = struct
@@ -383,6 +396,26 @@ module Make (Commands : Coda_commands.Intf) = struct
             [ arg "toOrFrom"
                 ~doc:"Public key of transactions you are looking for"
                 ~typ:(non_null string) ]
+
+      module AddPaymentReceipt = struct
+        type t = {payment: string; added_time: string}
+
+        let typ =
+          obj "AddPaymentReceiptInput"
+            ~coerce:(fun payment added_time -> {payment; added_time})
+            ~fields:
+              [ arg "payment"
+                  ~doc:
+                    "Payment is the base64 version of a serialized payment \
+                     (via Jane Street bin_prot)"
+                  ~typ:(non_null string)
+              ; (* TODO: create a formal method for verifying that the provided added_time is correct  *)
+                arg "added_time" ~typ:(non_null string)
+                  ~doc:
+                    (Doc.date "added_time"
+                       "Time that a payment gets added to another clients \
+                        transaction database") ]
+      end
     end
   end
 
@@ -471,8 +504,7 @@ module Make (Commands : Coda_commands.Intf) = struct
           , `Has_earlier_page has_previous_page
           , `Has_later_page has_next_page ) =
         query transaction_database public_key
-          (Option.map ~f:Types.Pagination.User_command.Cursor.deserialize
-             cursor)
+          (Option.map ~f:Types.User_command.Cursor.deserialize cursor)
           num_to_query
       in
       let page_info =
@@ -496,7 +528,7 @@ module Make (Commands : Coda_commands.Intf) = struct
             ; arg "after" ~typ:string
             ; arg "last" ~typ:int
             ; arg "before" ~typ:string ]
-        ~typ:(non_null Types.Pagination.User_command.connection)
+        ~typ:(non_null Types.User_command.connection)
         ~resolve:(fun {ctx= coda; _} () public_key first after last before ->
           let open Deferred.Result.Let_syntax in
           let%bind public_key =
@@ -695,7 +727,30 @@ module Make (Commands : Coda_commands.Intf) = struct
           let body = User_command_payload.Body.Payment {receiver; amount} in
           build_user_command coda sender_account sender_kp memo body fee )
 
-    let commands = [add_wallet; send_payment; set_delegation]
+    let add_payment_receipt =
+      result_field "AddPaymentReceipt"
+        ~doc:"Add payment into transation database"
+        ~args:
+          Arg.[arg "input" ~typ:(non_null Types.Input.AddPaymentReceipt.typ)]
+        ~typ:Types.Payload.add_payment_receipt
+        ~resolve:
+          (fun {ctx= coda; _} ()
+               {Types.Input.AddPaymentReceipt.payment; added_time} ->
+          let open Result.Let_syntax in
+          let%bind added_time =
+            result_of_exn Block_time.Time.of_string_exn added_time
+              ~error:"Invalid `time` provided"
+          in
+          let%map payment =
+            result_of_exn Types.User_command.Cursor.deserialize payment
+              ~error:"Invaid `payment` provided"
+          in
+          let transaction_database = Program.transaction_database coda in
+          Transaction_database.add transaction_database payment added_time ;
+          Some payment )
+
+    let commands =
+      [add_wallet; send_payment; set_delegation; add_payment_receipt]
   end
 
   let schema =
