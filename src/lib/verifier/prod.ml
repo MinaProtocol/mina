@@ -2,24 +2,11 @@ open Core
 open Async
 open Coda_base
 open Coda_state
-open Util
 open Blockchain_snark
-open Cli_lib
 open Snark_params
+open Fold_lib
 
-module type S = sig
-  type t
-
-  val create : conf_dir:string -> t Deferred.t
-
-  val verify_blockchain : t -> Blockchain.t -> bool Or_error.t Deferred.t
-
-  val verify_transaction_snark :
-       t
-    -> Transaction_snark.t
-    -> message:Sok_message.t
-    -> bool Or_error.t Deferred.t
-end
+type ledger_proof = Ledger_proof.Prod.t
 
 module Worker_state = struct
   module type S = sig
@@ -37,23 +24,22 @@ module Worker_state = struct
     Deferred.return
       (let%map bc_vk = Snark_keys.blockchain_verification ()
        and tx_vk = Snark_keys.transaction_verification () in
+       let self_wrap = tock_vk_to_bool_list bc_vk.wrap in
        let module T = Transaction_snark.Verification.Make (struct
          let keys = tx_vk
        end) in
-       let instance_hash state =
-         let self = Snark_params.tock_vk_to_bool_list bc_vk.wrap in
-         Tick.Pedersen.digest_fold Hash_prefix.transition_system_snark
-           Fold_lib.Fold.(
-             group3 ~default:false (of_list self)
-             +> State_hash.fold (Protocol_state.hash state))
-       in
-       let verify_wrap state proof =
-         Tock.verify proof bc_vk.wrap
-           Tock.Data_spec.[Wrap_input.typ]
-           (Wrap_input.of_tick_field (instance_hash state))
-       in
+       let module B = Blockchain_transition.Make (T) in
        let module M = struct
-         let verify_wrap = verify_wrap
+         let verify_wrap state proof =
+           let instance_hash =
+             Tick.Pedersen.digest_fold Hash_prefix.transition_system_snark
+               Fold.(
+                 group3 ~default:false (of_list self_wrap)
+                 +> State_hash.fold (Protocol_state.hash state))
+           in
+           Tock.verify proof bc_vk.wrap
+             Tock.Data_spec.[Wrap_input.typ]
+             (Wrap_input.of_tick_field instance_hash)
 
          let verify_transaction_snark = T.verify
        end in
@@ -107,7 +93,7 @@ module Worker = struct
       let functions =
         let f (i, o, f) =
           C.create_rpc
-            ~f:(fun ~worker_state ~conn_state i -> f worker_state i)
+            ~f:(fun ~worker_state ~conn_state:_ i -> f worker_state i)
             ~bin_input:i ~bin_output:o ()
         in
         { verify_blockchain= f (Blockchain.bin_t, Bool.bin_t, verify_blockchain)
@@ -129,7 +115,8 @@ end
 
 type t = Worker.Connection.t
 
-let create ~conf_dir =
+(* TODO: investigate why conf_dir wasn't being used *)
+let create () =
   let%map connection, process =
     Worker.spawn_in_foreground_exn ~connection_timeout:(Time.Span.of_min 1.)
       ~on_failure:Error.raise ~shutdown_on:Disconnect
@@ -139,7 +126,7 @@ let create ~conf_dir =
   File_system.dup_stderr process ;
   connection
 
-let verify_blockchain t chain =
+let verify_blockchain_snark t chain =
   Worker.Connection.run t ~f:Worker.functions.verify_blockchain ~arg:chain
 
 let verify_transaction_snark t snark ~message =

@@ -3,10 +3,8 @@ open Coda_base
 open Coda_state
 open Async_kernel
 open Pipe_lib
-module Diff_mutant = Diff_mutant
 module Worker = Worker
 module Intf = Intf
-module Diff_hash = Diff_hash
 module Transition_storage = Transition_storage
 
 module Make (Inputs : Intf.Main_inputs) = struct
@@ -26,26 +24,23 @@ module Make (Inputs : Intf.Main_inputs) = struct
     |> Staged_ledger.pending_coinbase_collection
 
   let apply_diff (type mutant) ~logger frontier
-      (diff :
-        ( ( External_transition.Stable.Latest.t
-          , State_hash.Stable.Latest.t )
-          With_hash.t
-        , mutant )
-        Diff_mutant.t) : mutant =
+      (diff : mutant Transition_frontier.Diff_mutant.t) : mutant =
     match diff with
     | New_frontier _ ->
         ()
     | Add_transition {data= transition; _} ->
-        let parent_hash = External_transition.parent_hash transition in
+        let parent_hash =
+          External_transition.Validated.parent_hash transition
+        in
         Transition_frontier.find_exn frontier parent_hash
         |> Transition_frontier.Breadcrumb.transition_with_hash
-        |> With_hash.data |> External_transition.Verified.protocol_state
+        |> With_hash.data |> External_transition.Validated.protocol_state
         |> Protocol_state.consensus_state
     | Remove_transitions external_transitions_with_hashes ->
         List.map external_transitions_with_hashes
           ~f:(fun transition_with_hash ->
             With_hash.data transition_with_hash
-            |> External_transition.protocol_state
+            |> External_transition.Validated.protocol_state
             |> Protocol_state.consensus_state )
     | Update_root (new_root_hash, _, _) ->
         let previous_root =
@@ -59,7 +54,7 @@ module Make (Inputs : Intf.Main_inputs) = struct
                 find_in_root_history frontier new_root_hash
           in
           let previous_root_hash =
-            External_transition.Verified.parent_hash
+            External_transition.Validated.parent_hash
             @@ Breadcrumb.external_transition root
           in
           find_in_root_history frontier previous_root_hash)
@@ -74,20 +69,19 @@ module Make (Inputs : Intf.Main_inputs) = struct
           , pending_coinbase previous_root )
         in
         Logger.trace logger ~module_:__MODULE__ ~location:__LOC__
-          ~metadata:[("mutant", Diff_mutant.value_to_yojson diff mutant)]
+          ~metadata:
+            [ ( "mutant"
+              , Transition_frontier.Diff_mutant.value_to_yojson diff mutant )
+            ]
           "Ground truth root update" ;
         mutant
 
   let to_state_hash_diff (type output)
-      (diff :
-        ( (External_transition.t, State_hash.t) With_hash.t
-        , output )
-        Diff_mutant.t) : State_hash.t Diff_mutant.E.t =
+      (diff : output Transition_frontier.Diff_mutant.t) :
+      Transition_frontier.Diff_mutant.E.t =
     match diff with
-    | Remove_transitions removed_transitions_with_hashes ->
-        E
-          (Remove_transitions
-             (List.map ~f:With_hash.hash removed_transitions_with_hashes))
+    | Remove_transitions removed_transitions ->
+        E (Remove_transitions removed_transitions)
     | New_frontier first_root ->
         E (New_frontier first_root)
     | Add_transition added_transition ->
@@ -100,12 +94,11 @@ module Make (Inputs : Intf.Main_inputs) = struct
       ~location:__LOC__
       ~metadata:
         [ ( "diff_mutant"
-          , Diff_mutant.key_to_yojson diff_mutant
-              ~f:(Fn.compose State_hash.to_yojson With_hash.hash) ) ] ;
+          , Transition_frontier.Diff_mutant.key_to_yojson diff_mutant ) ] ;
     let ground_truth_diff = apply_diff ~logger frontier diff_mutant in
     let ground_truth_hash =
-      Diff_mutant.hash acc_hash diff_mutant ground_truth_diff
-        ~f:(Fn.compose State_hash.to_bytes With_hash.hash)
+      Transition_frontier.Diff_mutant.hash acc_hash diff_mutant
+        ground_truth_diff
     in
     match%map
       Worker.handle_diff worker acc_hash (to_state_hash_diff diff_mutant)
@@ -115,23 +108,24 @@ module Make (Inputs : Intf.Main_inputs) = struct
           "Could not connect to worker" ;
         Error.raise e
     | Ok new_hash ->
-        if Diff_hash.equal new_hash ground_truth_hash then ground_truth_hash
+        if Transition_frontier.Diff_hash.equal new_hash ground_truth_hash then
+          ground_truth_hash
         else
           failwithf
             !"Unable to write mutant diff correctly as hashes are different:\n\
              \ %s. Hash of groundtruth %s Hash of actual %s"
             (Yojson.Safe.to_string
-               (Diff_mutant.key_to_yojson diff_mutant
-                  ~f:(Fn.compose State_hash.to_yojson With_hash.hash)))
-            (Diff_hash.to_string ground_truth_hash)
-            (Diff_hash.to_string new_hash)
+               (Transition_frontier.Diff_mutant.key_to_yojson diff_mutant))
+            (Transition_frontier.Diff_hash.to_string ground_truth_hash)
+            (Transition_frontier.Diff_hash.to_string new_hash)
             ()
 
   let listen_to_frontier_broadcast_pipe ~logger
       (frontier_broadcast_pipe :
         Transition_frontier.t option Broadcast_pipe.Reader.t) worker =
-    let%bind (_ : Diff_hash.t) =
-      Broadcast_pipe.Reader.fold frontier_broadcast_pipe ~init:Diff_hash.empty
+    let%bind (_ : Transition_frontier.Diff_hash.t) =
+      Broadcast_pipe.Reader.fold frontier_broadcast_pipe
+        ~init:Transition_frontier.Diff_hash.empty
         ~f:(fun acc_hash frontier_opt ->
           match frontier_opt with
           | Some frontier ->
@@ -144,22 +138,30 @@ module Make (Inputs : Intf.Main_inputs) = struct
                         mutant ) )
           | None ->
               (* TODO: need to delete persistence once it get's back up *)
-              Deferred.return Diff_hash.empty )
+              Deferred.return Transition_frontier.Diff_hash.empty )
     in
     Deferred.unit
 
-  let directly_add_breadcrumb ~logger ~trust_system transition_frontier
-      transition_with_hash parent =
+  let directly_add_breadcrumb ~logger ~verifier ~trust_system
+      transition_frontier transition parent =
     let log_error () =
       Logger.fatal logger ~module_:__MODULE__ ~location:__LOC__
-        ~metadata:
-          [("hash", State_hash.to_yojson (With_hash.hash transition_with_hash))]
+        ~metadata:[("hash", State_hash.to_yojson (With_hash.hash transition))]
         "Failed to add breadcrumb into $hash"
+    in
+    (* TMP HACK: our transition is already validated, so we "downgrade" it's validation #2486 *)
+    let mostly_validated_external_transition =
+      ( With_hash.map ~f:External_transition.Validated.forget_validation
+          transition
+      , ( (`Time_received, Truth.True)
+        , (`Proof, Truth.True)
+        , (`Frontier_dependencies, Truth.True)
+        , (`Staged_ledger_diff, Truth.False) ) )
     in
     let%bind child_breadcrumb =
       match%map
-        Transition_frontier.Breadcrumb.build ~logger ~trust_system ~parent
-          ~transition_with_hash ~sender:None
+        Transition_frontier.Breadcrumb.build ~logger ~verifier ~trust_system
+          ~parent ~transition:mostly_validated_external_transition ~sender:None
       with
       | Ok child_breadcrumb ->
           child_breadcrumb
@@ -176,7 +178,7 @@ module Make (Inputs : Intf.Main_inputs) = struct
     child_breadcrumb
 
   let staged_ledger_hash transition =
-    let open External_transition.Verified in
+    let open External_transition.Validated in
     let protocol_state = protocol_state transition in
     Staged_ledger_hash.ledger_hash
       Protocol_state.(
@@ -190,21 +192,13 @@ module Make (Inputs : Intf.Main_inputs) = struct
     Transition_storage.close transition_storage ;
     result
 
-  let read ~logger ~trust_system ~root_snarked_ledger ~consensus_local_state
-      transition_storage =
+  let read ~logger ~verifier ~trust_system ~root_snarked_ledger
+      ~consensus_local_state transition_storage =
     let state_hash, scan_state, pending_coinbases =
       Transition_storage.get transition_storage ~logger Root
     in
     let get_verified_transition state_hash =
-      let transition, root_successor_hashes =
-        Transition_storage.get transition_storage ~logger
-          (Transition state_hash)
-      in
-      (* We read a transition that was already verified before it was written to disk *)
-      let (`I_swear_this_is_safe_see_my_comment verified_transition) =
-        External_transition.to_verified transition
-      in
-      (verified_transition, root_successor_hashes)
+      Transition_storage.get transition_storage ~logger (Transition state_hash)
     in
     let root_transition, root_successor_hashes =
       let verified_transition, children_hashes =
@@ -213,8 +207,8 @@ module Make (Inputs : Intf.Main_inputs) = struct
       ({With_hash.data= verified_transition; hash= state_hash}, children_hashes)
     in
     let%bind root_staged_ledger =
-      Staged_ledger.of_scan_state_pending_coinbases_and_snarked_ledger
-        ~scan_state
+      Staged_ledger.of_scan_state_pending_coinbases_and_snarked_ledger ~logger
+        ~verifier ~scan_state
         ~snarked_ledger:(Ledger.of_database root_snarked_ledger)
         ~pending_coinbases
         ~expected_merkle_root:
@@ -236,7 +230,8 @@ module Make (Inputs : Intf.Main_inputs) = struct
             get_verified_transition state_hash
           in
           let%bind new_breadcrumb =
-            directly_add_breadcrumb ~logger ~trust_system transition_frontier
+            directly_add_breadcrumb ~logger ~verifier ~trust_system
+              transition_frontier
               With_hash.{data= verified_transition; hash= state_hash}
               parent_breadcrumb
           in
@@ -253,11 +248,12 @@ module Make (Inputs : Intf.Main_inputs) = struct
     in
     transition_frontier
 
-  let deserialize ~directory_name ~logger ~trust_system ~root_snarked_ledger
-      ~consensus_local_state =
+  let deserialize ~directory_name ~logger ~verifier ~trust_system
+      ~root_snarked_ledger ~consensus_local_state =
     with_database ~directory_name
       ~f:
-        (read ~logger ~trust_system ~root_snarked_ledger ~consensus_local_state)
+        (read ~logger ~verifier ~trust_system ~root_snarked_ledger
+           ~consensus_local_state)
 
   module For_tests = struct
     let write_diff_and_verify = write_diff_and_verify

@@ -3,6 +3,10 @@ open Async_kernel
 open Pipe_lib
 include Coda_transition_frontier
 
+module type Verifier_intf = sig
+  type t
+end
+
 module type Security_intf = sig
   (** In production we set this to (hopefully a prefix of) k for our consensus
    * mechanism; infinite is for tests *)
@@ -593,13 +597,14 @@ module type Ledger_proof_intf = sig
 end
 
 module type Ledger_proof_verifier_intf = sig
+  type t
+
   type ledger_proof
 
   type message
 
-  type statement
-
-  val verify : ledger_proof -> statement -> message:message -> bool Deferred.t
+  val verify_transaction_snark :
+    t -> ledger_proof -> message:message -> bool Deferred.Or_error.t
 end
 
 module Work_selection = struct
@@ -905,17 +910,23 @@ module type Transaction_snark_scan_state_intf = sig
 
   module Make_statement_scanner
       (M : Monad_with_Or_error_intf) (Verifier : sig
+          type t
+
           val verify :
-               ledger_proof
-            -> ledger_proof_statement
+               verifier:t
+            -> proof:ledger_proof
+            -> statement:ledger_proof_statement
             -> message:sok_message
             -> sexp_bool M.t
       end) : sig
     val scan_statement :
-      t -> (ledger_proof_statement, [`Empty | `Error of Error.t]) result M.t
+         t
+      -> verifier:Verifier.t
+      -> (ledger_proof_statement, [`Empty | `Error of Error.t]) result M.t
 
     val check_invariants :
          t
+      -> verifier:Verifier.t
       -> error_prefix:string
       -> ledger_hash_end:frozen_ledger_hash
       -> ledger_hash_begin:frozen_ledger_hash sexp_option
@@ -1009,6 +1020,8 @@ module type Staged_ledger_base_intf = sig
 
   type public_key
 
+  type verifier
+
   type pending_coinbase_collection
 
   type serializable [@@deriving bin_io]
@@ -1080,7 +1093,9 @@ module type Staged_ledger_base_intf = sig
   val create_exn : ledger:ledger -> t
 
   val of_scan_state_and_ledger :
-       snarked_ledger_hash:frozen_ledger_hash
+       logger:Logger.t
+    -> verifier:verifier
+    -> snarked_ledger_hash:frozen_ledger_hash
     -> ledger:ledger
     -> scan_state:Scan_state.t
     -> pending_coinbase_collection:pending_coinbase_collection
@@ -1103,6 +1118,7 @@ module type Staged_ledger_base_intf = sig
        t
     -> diff
     -> logger:Logger.t
+    -> verifier:verifier
     -> ( [`Hash_after_applying of staged_ledger_hash]
          * [`Ledger_proof of (ledger_proof * transaction list) option]
          * [`Staged_ledger of t]
@@ -1168,7 +1184,9 @@ module type Staged_ledger_intf = sig
   val statement_exn : t -> [`Non_empty of ledger_proof_statement | `Empty]
 
   val of_scan_state_pending_coinbases_and_snarked_ledger :
-       scan_state:Scan_state.t
+       logger:Logger.t
+    -> verifier:verifier
+    -> scan_state:Scan_state.t
     -> snarked_ledger:ledger
     -> expected_merkle_root:ledger_hash
     -> pending_coinbases:pending_coinbase_collection
@@ -1196,35 +1214,6 @@ module type Work_selector_intf = sig
     -> staged_ledger
     -> State.t
     -> work list * State.t
-end
-
-module type Tip_intf = sig
-  type protocol_state
-
-  type protocol_state_proof
-
-  type staged_ledger
-
-  type serializable
-
-  type external_transition
-
-  type external_transition_verified
-
-  (* N.B.: can't derive bin_io for staged ledger containing persistent ledger *)
-  type t =
-    { state: protocol_state
-    ; proof: protocol_state_proof
-    ; staged_ledger: staged_ledger }
-  [@@deriving sexp, fields]
-
-  (* serializer for tip components other than the persistent database in the staged ledger *)
-  val bin_tip : serializable Bin_prot.Type_class.t
-
-  val of_verified_transition_and_staged_ledger :
-    external_transition_verified -> staged_ledger -> t
-
-  val copy : t -> t
 end
 
 module type Consensus_state_intf = sig
@@ -1470,180 +1459,331 @@ module type Internal_transition_intf = sig
   val staged_ledger_diff : t -> staged_ledger_diff
 end
 
-module type External_transition_intf = sig
+module type External_transition_base_intf = sig
   type state_hash
+
+  type compressed_public_key
+
+  type user_command
+
+  type consensus_state
 
   type protocol_state
 
-  type protocol_state_proof
+  type proof
 
   type staged_ledger_diff
 
+  (* TODO: delegate forget here *)
+  type t [@@deriving sexp, compare, to_yojson]
+
+  type external_transition = t
+
+  include Comparable.S with type t := t
+
   module Stable : sig
     module V1 : sig
-      type t [@@deriving sexp, eq, bin_io, to_yojson, version]
+      type t = external_transition
+      [@@deriving sexp, eq, bin_io, to_yojson, version]
     end
 
     module Latest = V1
   end
 
-  (* bin_io intentionally omitted *)
-  type t = Stable.Latest.t [@@deriving sexp, eq, to_yojson]
-
-  val create :
-       protocol_state:protocol_state
-    -> protocol_state_proof:protocol_state_proof
-    -> staged_ledger_diff:staged_ledger_diff
-    -> t
-
-  module Verified : sig
-    type t [@@deriving sexp, eq, to_yojson]
-
-    val protocol_state : t -> protocol_state
-
-    val protocol_state_proof : t -> protocol_state_proof
-
-    val staged_ledger_diff : t -> staged_ledger_diff
-
-    val parent_hash : t -> state_hash
-  end
-
-  module Proof_verified : sig
-    type t [@@deriving sexp, eq]
-
-    val protocol_state : t -> protocol_state
-
-    val protocol_state_proof : t -> protocol_state_proof
-
-    val staged_ledger_diff : t -> staged_ledger_diff
-
-    val parent_hash : t -> state_hash
-  end
-
-  val to_verified : t -> [`I_swear_this_is_safe_see_my_comment of Verified.t]
-
-  val of_verified : Verified.t -> t
-
-  val to_proof_verified :
-    t -> [`I_swear_this_is_safe_see_my_comment of Proof_verified.t]
-
-  val of_proof_verified : Proof_verified.t -> t
-
-  val forget_consensus_state_verification : Verified.t -> Proof_verified.t
-
   val protocol_state : t -> protocol_state
 
-  val protocol_state_proof : t -> protocol_state_proof
+  val protocol_state_proof : t -> proof
 
   val staged_ledger_diff : t -> staged_ledger_diff
 
   val parent_hash : t -> state_hash
+
+  val consensus_state : t -> consensus_state
+
+  val proposer : t -> compressed_public_key
+
+  val user_commands : t -> user_command list
+
+  val payments : t -> user_command list
 end
 
-module type External_transition_validation_intf = sig
+module type External_transition_intf = sig
+  type time
+
   type state_hash
 
-  type external_transition
+  type compressed_public_key
 
-  type staged_ledger
+  type user_command
 
-  type staged_ledger_error
+  type consensus_state
 
-  type transition_frontier
+  type protocol_state
 
-  type ('time_received, 'proof, 'frontier_dependencies, 'staged_ledger_diff) t =
-    'time_received * 'proof * 'frontier_dependencies * 'staged_ledger_diff
-    constraint 'time_received = [`Time_received] * _ Truth.t
-    constraint 'proof = [`Proof] * _ Truth.t
-    constraint 'frontier_dependencies = [`Frontier_dependencies] * _ Truth.t
-    constraint 'staged_ledger_diff = [`Staged_ledger_diff] * _ Truth.t
+  type proof
 
-  type 'a all =
-    ( [`Time_received] * 'a
-    , [`Proof] * 'a
-    , [`Frontier_dependencies] * 'a
-    , [`Staged_ledger_diff] * 'a )
-    t
-    constraint 'a = _ Truth.t
+  type verifier
 
-  type fully_invalid = Truth.false_t all
+  type staged_ledger_diff
 
-  type fully_valid = Truth.true_t all
+  type staged_ledger_hash
 
-  type ( 'time_received
+  type ledger_proof
+
+  type transaction
+
+  include
+    External_transition_base_intf
+    with type state_hash := state_hash
+     and type compressed_public_key := compressed_public_key
+     and type user_command := user_command
+     and type consensus_state := consensus_state
+     and type protocol_state := protocol_state
+     and type proof := proof
+     and type staged_ledger_diff := staged_ledger_diff
+
+  module Validated : sig
+    type t
+
+    val create_unsafe :
+      external_transition -> [`I_swear_this_is_safe_see_my_comment of t]
+
+    val forget_validation : t -> external_transition
+
+    include
+      External_transition_base_intf
+      with type state_hash := state_hash
+       and type compressed_public_key := compressed_public_key
+       and type user_command := user_command
+       and type consensus_state := consensus_state
+       and type protocol_state := protocol_state
+       and type proof := proof
+       and type staged_ledger_diff := staged_ledger_diff
+       and type t := t
+  end
+
+  module Validation : sig
+    type ( 'time_received
+         , 'proof
+         , 'frontier_dependencies
+         , 'staged_ledger_diff )
+         t =
+      'time_received * 'proof * 'frontier_dependencies * 'staged_ledger_diff
+      constraint 'time_received = [`Time_received] * _ Truth.t
+      constraint 'proof = [`Proof] * _ Truth.t
+      constraint 'frontier_dependencies = [`Frontier_dependencies] * _ Truth.t
+      constraint 'staged_ledger_diff = [`Staged_ledger_diff] * _ Truth.t
+
+    type 'a all =
+      ( [`Time_received] * 'a
+      , [`Proof] * 'a
+      , [`Frontier_dependencies] * 'a
+      , [`Staged_ledger_diff] * 'a )
+      t
+      constraint 'a = _ Truth.t
+
+    type fully_invalid = Truth.false_t all
+
+    type fully_valid = Truth.true_t all
+
+    type ( 'time_received
+         , 'proof
+         , 'frontier_dependencies
+         , 'staged_ledger_diff )
+         with_transition =
+      (external_transition, state_hash) With_hash.t
+      * ('time_received, 'proof, 'frontier_dependencies, 'staged_ledger_diff) t
+
+    val fully_valid : fully_valid
+
+    val fully_invalid : fully_invalid
+
+    val wrap :
+         (external_transition, state_hash) With_hash.t
+      -> (external_transition, state_hash) With_hash.t * fully_invalid
+
+    val lift :
+         (external_transition, state_hash) With_hash.t * fully_valid
+      -> (Validated.t, state_hash) With_hash.t
+
+    val lower :
+         (Validated.t, state_hash) With_hash.t
+      -> ( 'time_received
+         , 'proof
+         , 'frontier_dependencies
+         , 'staged_ledger_diff )
+         t
+      -> ( 'time_received
+         , 'proof
+         , 'frontier_dependencies
+         , 'staged_ledger_diff )
+         with_transition
+  end
+
+  type with_initial_validation =
+    ( [`Time_received] * Truth.true_t
+    , [`Proof] * Truth.true_t
+    , [`Frontier_dependencies] * Truth.false_t
+    , [`Staged_ledger_diff] * Truth.false_t )
+    Validation.with_transition
+
+  val create :
+       protocol_state:protocol_state
+    -> protocol_state_proof:proof
+    -> staged_ledger_diff:staged_ledger_diff
+    -> t
+
+  val timestamp : t -> time
+
+  val skip_time_received_validation :
+       [`This_transition_was_not_received_via_gossip]
+    -> ( [`Time_received] * Truth.false_t
        , 'proof
        , 'frontier_dependencies
        , 'staged_ledger_diff )
-       with_transition =
-    (external_transition, state_hash) With_hash.t
-    * ('time_received, 'proof, 'frontier_dependencies, 'staged_ledger_diff) t
-
-  val fully_invalid : fully_invalid
-
-  val fully_valid : fully_valid
+       Validation.with_transition
+    -> ( [`Time_received] * Truth.true_t
+       , 'proof
+       , 'frontier_dependencies
+       , 'staged_ledger_diff )
+       Validation.with_transition
 
   val validate_time_received :
        ( [`Time_received] * Truth.false_t
        , 'proof
        , 'frontier_dependencies
        , 'staged_ledger_diff )
-       with_transition
-    -> time_received:Unix_timestamp.t
+       Validation.with_transition
+    -> time_received:time
     -> ( ( [`Time_received] * Truth.true_t
          , 'proof
          , 'frontier_dependencies
          , 'staged_ledger_diff )
-         with_transition
-       , [`Invalid_time_received] )
+         Validation.with_transition
+       , [`Invalid_time_received of [`Too_early | `Too_late of int64]] )
        Result.t
+
+  val skip_proof_validation :
+       [`This_transition_was_generated_internally]
+    -> ( 'time_received
+       , [`Proof] * Truth.false_t
+       , 'frontier_dependencies
+       , 'staged_ledger_diff )
+       Validation.with_transition
+    -> ( 'time_received
+       , [`Proof] * Truth.true_t
+       , 'frontier_dependencies
+       , 'staged_ledger_diff )
+       Validation.with_transition
 
   val validate_proof :
        ( 'time_received
        , [`Proof] * Truth.false_t
        , 'frontier_dependencies
        , 'staged_ledger_diff )
-       with_transition
+       Validation.with_transition
+    -> verifier:verifier
     -> ( ( 'time_received
          , [`Proof] * Truth.true_t
          , 'frontier_dependencies
          , 'staged_ledger_diff )
-         with_transition
-       , [`Invalid_proof] )
+         Validation.with_transition
+       , [`Invalid_proof | `Verifier_error of Error.t] )
        Deferred.Result.t
 
-  val validate_frontier_dependencies :
-       ( 'time_received
+  (* This functor is necessary to break the dependency cycle between the Transition_fronter and the External_transition *)
+  module Transition_frontier_validation (Transition_frontier : sig
+    type t
+
+    module Breadcrumb : sig
+      type t
+
+      val transition_with_hash : t -> (Validated.t, state_hash) With_hash.t
+    end
+
+    val root : t -> Breadcrumb.t
+
+    val find : t -> state_hash -> Breadcrumb.t option
+  end) : sig
+    val validate_frontier_dependencies :
+         ( 'time_received
+         , 'proof
+         , [`Frontier_dependencies] * Truth.false_t
+         , 'staged_ledger_diff )
+         Validation.with_transition
+      -> logger:Logger.t
+      -> frontier:Transition_frontier.t
+      -> ( ( 'time_received
+           , 'proof
+           , [`Frontier_dependencies] * Truth.true_t
+           , 'staged_ledger_diff )
+           Validation.with_transition
+         , [ `Already_in_frontier
+           | `Parent_missing_from_frontier
+           | `Not_selected_over_frontier_root ] )
+         Result.t
+  end
+
+  val skip_frontier_dependencies_validation :
+       [`This_transition_belongs_to_a_detached_subtree]
+    -> ( 'time_received
        , 'proof
        , [`Frontier_dependencies] * Truth.false_t
        , 'staged_ledger_diff )
-       with_transition
-    -> logger:Logger.t
-    -> frontier:transition_frontier
-    -> ( ( 'time_received
-         , 'proof
-         , [`Frontier_dependencies] * Truth.true_t
-         , 'staged_ledger_diff )
-         with_transition
-       , [`Already_in_frontier | `Not_selected_over_frontier_root] )
-       Result.t
-
-  val validate_staged_ledger_diff :
-       ( 'time_received
+       Validation.with_transition
+    -> ( 'time_received
        , 'proof
-       , 'frontier_dependencies
-       , [`Staged_ledger_diff] * Truth.false_t )
-       with_transition
-    -> logger:Logger.t
-    -> parent_staged_ledger:staged_ledger
-    -> ( ( 'time_received
+       , [`Frontier_dependencies] * Truth.true_t
+       , 'staged_ledger_diff )
+       Validation.with_transition
+
+  (* TODO: this functor can be killed once Staged_ledger is defunctor *)
+  module Staged_ledger_validation (Staged_ledger : sig
+    type t
+
+    module Staged_ledger_error : sig
+      type t
+    end
+
+    val apply :
+         t
+      -> staged_ledger_diff
+      -> logger:Logger.t
+      -> verifier:verifier
+      -> ( [`Hash_after_applying of staged_ledger_hash]
+           * [`Ledger_proof of (ledger_proof * transaction list) option]
+           * [`Staged_ledger of t]
+           * [`Pending_coinbase_data of bool * Currency.Amount.t]
+         , Staged_ledger_error.t )
+         Deferred.Result.t
+
+    val current_ledger_proof : t -> ledger_proof option
+  end) : sig
+    val validate_staged_ledger_diff :
+         ( 'time_received
          , 'proof
          , 'frontier_dependencies
-         , [`Staged_ledger_diff] * Truth.true_t )
-         with_transition
-         * staged_ledger
-       , [ `Invalid_ledger_hash_after_staged_ledger_application
-         | `Staged_ledger_application_failed of staged_ledger_error ] )
-       Deferred.Result.t
+         , [`Staged_ledger_diff] * Truth.false_t )
+         Validation.with_transition
+      -> logger:Logger.t
+      -> verifier:verifier
+      -> parent_staged_ledger:Staged_ledger.t
+      -> ( [`Just_emitted_a_proof of bool]
+           * [ `External_transition_with_validation of
+               ( 'time_received
+               , 'proof
+               , 'frontier_dependencies
+               , [`Staged_ledger_diff] * Truth.true_t )
+               Validation.with_transition ]
+           * [`Staged_ledger of Staged_ledger.t]
+         , [ `Invalid_staged_ledger_diff of
+             [ `Incorrect_target_staged_ledger_hash
+             | `Incorrect_target_snarked_ledger_hash ]
+             list
+           | `Staged_ledger_application_failed of
+             Staged_ledger.Staged_ledger_error.t ] )
+         Deferred.Result.t
+  end
 end
 
 module type Prover_state_intf = sig
@@ -1755,6 +1895,8 @@ end
 module type Inputs_intf = sig
   module Time : Time_intf
 
+  module Verifier : Verifier_intf
+
   module Private_key : Private_key_intf
 
   module Compressed_public_key : Compressed_public_key_intf
@@ -1830,7 +1972,6 @@ module type Inputs_intf = sig
     Ledger_proof_verifier_intf
     with type message := Sok_message.t
      and type ledger_proof := Ledger_proof.t
-     and type statement := Ledger_proof_statement.t
 
   module Account : sig
     type t
@@ -1937,6 +2078,7 @@ Merge Snark:
      and type user_command := User_command.t
      and type transaction_witness := Transaction_witness.t
      and type pending_coinbase_collection := Pending_coinbase.t
+     and type verifier := Verifier.t
 
   module Staged_ledger_transition :
     Staged_ledger_transition_intf
@@ -1989,21 +2131,18 @@ Merge Snark:
 
   module External_transition :
     External_transition_intf
-    with type protocol_state := Protocol_state.Value.t
-     and type staged_ledger_diff := Staged_ledger_diff.t
-     and type protocol_state_proof := Protocol_state_proof.t
-     and type state_hash := Protocol_state_hash.t
-
-  module Tip :
-    Tip_intf
-    with type staged_ledger := Staged_ledger.t
+    with type state_hash := Protocol_state_hash.t
+     and type compressed_public_key := Compressed_public_key.t
+     and type user_command := User_command.t
+     and type consensus_state := Consensus_state.Value.t
      and type protocol_state := Protocol_state.Value.t
-     and type protocol_state_proof := Protocol_state_proof.t
-     and type external_transition := External_transition.t
-     and type serializable :=
-                Protocol_state.Value.t
-                * Protocol_state_proof.t
-                * Staged_ledger.serializable
+     and type proof := Protocol_state_proof.t
+     and type verifier := Verifier.t
+     and type staged_ledger_diff := Staged_ledger_diff.t
+     and type staged_ledger_hash := Staged_ledger_hash.t
+     and type ledger_proof := Ledger_proof.t
+     and type transaction := Transaction.t
+     and type time := Time.t
 
   module Transaction_validator :
     Transaction_validator_intf

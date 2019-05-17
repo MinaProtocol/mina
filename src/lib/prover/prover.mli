@@ -12,7 +12,7 @@ module type S = sig
 
   type t
 
-  val create : conf_dir:string -> t Deferred.t
+  val create : unit -> t Deferred.t
 
   val initialized : t -> [`Initialized] Deferred.Or_error.t
 
