@@ -9,4 +9,5 @@
     chunked_triples
     core_kernel
     snark_bits
-    snarky ))
+    snarky
+    coda_digestif ))
