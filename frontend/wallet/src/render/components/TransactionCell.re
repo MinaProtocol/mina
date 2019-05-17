@@ -158,7 +158,7 @@ module ViewModel = {
 module ActorName = {
   [@react.component]
   let make = (~value: ViewModel.Actor.t) => {
-    let (activeWallet, _) = React.useContext(ActiveWalletProvider.context);
+    let activeWallet = Hooks.useActiveWallet();
     let (settings, _) = React.useContext(SettingsProvider.context);
     switch (value) {
     | Key(key) =>
@@ -333,11 +333,11 @@ let make = (~transaction: Transaction.t, ~myWallets: list(PublicKey.t)) => {
     <span>
       <ActorName value={viewModel.sender} />
       <div className=Css.(style([marginTop(`rem(0.25))]))>
-        {ReasonReact.string(
+        {React.string(
            switch (viewModel.action) {
-           | Transfer => " -> "
-           | Pending => " ... "
-           | Failed => " x "
+           | Transfer => "-> "
+           | Pending => "... "
+           | Failed => "x "
            },
          )}
         <ActorName value={viewModel.recipient} />
