@@ -41,14 +41,14 @@ let mockTransactions =
   Array.fromList([
     TransactionCell.Transaction.Unknown({
       key: List.head(myWallets) |> Option.getExn,
-      amount: 2415,
+      amount: Int64.of_int(2415),
     }),
     TransactionCell.Transaction.Payment(
       {
         from: otherKey,
         to_: List.head(myWallets) |> Option.getExn,
-        amount: 2415,
-        fee: 10,
+        amount: Int64.of_int(2415),
+        fee: Int64.of_int(10),
         memo: Some("Order #: 2347B342"),
         includedAt: Some(Js.Date.fromString("16 Apr 2019 21:46:00 PST")),
         submittedAt: Js.Date.fromString("15 Apr 2019 21:46:00 PST"),
@@ -59,8 +59,8 @@ let mockTransactions =
       {
         from: List.head(myWallets) |> Option.getExn,
         to_: otherKey,
-        amount: 1540,
-        fee: 10,
+        amount: Int64.of_int(1540),
+        fee: Int64.of_int(10),
         memo: Some("Funds sent"),
         includedAt: Some(Js.Date.fromString("16 Apr 2019 21:46:00 PST")),
         submittedAt: Js.Date.fromString("15 Apr 2019 21:46:00 PST"),
@@ -72,18 +72,18 @@ let mockTransactions =
     ),
     TransactionCell.Transaction.Minted({
       key: List.head(myWallets) |> Option.getExn,
-      coinbase: 2000,
-      transactionFees: 858,
-      proofFees: 200,
-      delegationFees: 215,
+      coinbase: Int64.of_int(2000),
+      transactionFees: Int64.of_int(858),
+      proofFees: Int64.of_int(200),
+      delegationFees: Int64.of_int(215),
       includedAt: Js.Date.fromString("16 Apr 2019 21:46:00 PST"),
     }),
     TransactionCell.Transaction.Payment(
       {
         from: otherKey,
         to_: List.head(myWallets) |> Option.getExn,
-        amount: 1540,
-        fee: 10,
+        amount: Int64.of_int(1540),
+        fee: Int64.of_int(10),
         memo: Some("Remittance payment"),
         includedAt: Some(Js.Date.fromString("16 Apr 2019 21:46:00 PST")),
         submittedAt: Js.Date.fromString("15 Apr 2019 21:46:00 PST"),
@@ -97,8 +97,8 @@ let mockTransactions =
       {
         from: otherKey,
         to_: List.head(myWallets) |> Option.getExn,
-        amount: 2415,
-        fee: 10,
+        amount: Int64.of_int(2415),
+        fee: Int64.of_int(10),
         memo: Some("Order #: 2347B342"),
         includedAt: Some(Js.Date.fromString("16 Apr 2019 21:46:00 PST")),
         submittedAt: Js.Date.fromString("15 Apr 2019 21:46:00 PST"),

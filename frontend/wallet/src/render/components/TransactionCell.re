@@ -1,5 +1,11 @@
 open Tc;
 
+let (+^) = Int64.add;
+let ( *^ ) = Int64.mul;
+let (-^) = Int64.sub;
+let (>=^) = (a, b) => Int64.compare(a, b) >= 0;
+let (<=^) = (a, b) => Int64.compare(a, b) <= 0;
+
 module Styles = {
   open Css;
 
@@ -21,10 +27,10 @@ module Transaction = {
   module RewardDetails = {
     type t = {
       key: PublicKey.t,
-      coinbase: int,
-      transactionFees: int,
-      proofFees: int,
-      delegationFees: int,
+      coinbase: int64,
+      transactionFees: int64,
+      proofFees: int64,
+      delegationFees: int64,
       includedAt: Js.Date.t,
     };
   };
@@ -33,8 +39,8 @@ module Transaction = {
     type t = {
       from: PublicKey.t,
       to_: PublicKey.t,
-      amount: int,
-      fee: int,
+      amount: int64,
+      fee: int64,
       memo: option(string),
       submittedAt: Js.Date.t,
       includedAt: option(Js.Date.t),
@@ -44,7 +50,7 @@ module Transaction = {
   module UnknownDetails = {
     type t = {
       key: PublicKey.t,
-      amount: int,
+      amount: int64,
     };
   };
 
@@ -75,7 +81,7 @@ module ViewModel = {
     type t =
       | Memo(string, Js.Date.t)
       | Empty(Js.Date.t)
-      | StakingReward(list((string, int)), Js.Date.t)
+      | StakingReward(list((string, int64)), Js.Date.t)
       | MissingReceipts;
   };
 
@@ -84,7 +90,7 @@ module ViewModel = {
     recipient: Actor.t,
     action: Action.t,
     info: Info.t,
-    amountDelta: int // signed
+    amountDelta: int64 // signed
   };
 
   let ofTransaction =
@@ -106,12 +112,13 @@ module ViewModel = {
             [
               ("Coinbase", coinbase),
               ("Transaction fees", transactionFees),
-              ("Proof fees", (-1) * proofFees),
-              ("Delegation fees", (-1) * delegationFees),
+              ("Proof fees", Int64.(neg(one) *^ proofFees)),
+              ("Delegation fees", Int64.(neg(one) *^ delegationFees)),
             ],
             includedAt,
           ),
-        amountDelta: coinbase + transactionFees - proofFees - delegationFees,
+        amountDelta:
+          coinbase +^ transactionFees -^ proofFees -^ delegationFees,
       }
     | Payment(
         {
@@ -142,7 +149,7 @@ module ViewModel = {
           |> Option.withDefault(~default=Info.Empty(date)),
         amountDelta:
           Caml.List.exists(PublicKey.equal(from), myWallets)
-            ? (-1) * amount - fee : amount,
+            ? Int64.(neg(one)) *^ amount -^ fee : amount,
       };
     | Unknown({UnknownDetails.key, amount}) => {
         sender: Actor.Unknown,
@@ -239,7 +246,10 @@ module Amount = {
     let square = value =>
       style([
         Theme.Typeface.lucidaGrande,
-        color(value >= 0 ? Theme.Colors.serpentine : Theme.Colors.roseBud),
+        color(
+          value >=^ Int64.zero
+            ? Theme.Colors.serpentine : Theme.Colors.roseBud,
+        ),
       ]);
 
     let currency =
@@ -247,17 +257,21 @@ module Amount = {
   };
 
   [@react.component]
-  let make = (~value: int) => {
+  let make = (~value: int64) => {
     <>
       <span className={Styles.square(value)}>
         {ReasonReact.string({j|■|j})}
       </span>
       <span className=Styles.currency>
         {ReasonReact.string(
-           " " ++ Js.Int.toString(value < 0 ? value * (-1) : value),
+           " "
+           ++ Int64.to_string(
+                value < Int64.zero ? value *^ Int64.(neg(one)) : value,
+              ),
          )}
       </span>
-      {value <= 0 ? <span> {ReasonReact.string(" -")} </span> : <span />}
+      {value <=^ Int64.zero
+         ? <span> {ReasonReact.string(" -")} </span> : <span />}
     </>;
   };
 };
