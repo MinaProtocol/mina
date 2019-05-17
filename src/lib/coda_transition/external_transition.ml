@@ -345,7 +345,7 @@ module Make
       in
       let%bind () =
         Result.ok_if_true
-          (Transition_frontier.find frontier parent_hash |> Option.is_none)
+          (Transition_frontier.find frontier parent_hash |> Option.is_some)
           ~error:`Parent_missing_from_frontier
       in
       let%map () =
