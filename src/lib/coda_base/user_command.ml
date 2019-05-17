@@ -143,8 +143,7 @@ module Gen = struct
         (fun {public_key= new_delegate; _} ->
           Quickcheck.Generator.return
           @@ User_command_payload.Body.Stake_delegation
-               (Set_delegate {new_delegate= Public_key.compress new_delegate})
-      )
+               {new_delegate= Public_key.compress new_delegate} )
 
     let gen_with_random_participants ~keys ?nonce ~max_fee =
       with_random_participants ~keys ~gen:(gen ?nonce ~max_fee)

@@ -74,7 +74,7 @@ module Make (Commands : Coda_commands.Intf) = struct
                 with
                 | Stake_delegation _ ->
                     true
-                | Payment _ ->
+                | Payment _ | Chain_voting _ ->
                     false )
           ; field "nonce" ~typ:(non_null int) ~doc:"Nonce of the transaction"
               ~args:Arg.[]
@@ -95,8 +95,10 @@ module Make (Commands : Coda_commands.Intf) = struct
                 with
                 | Payment {Payment_payload.Poly.receiver; _} ->
                     Stringable.public_key receiver
-                | Stake_delegation (Set_delegate {new_delegate}) ->
-                    Stringable.public_key new_delegate )
+                | Stake_delegation {new_delegate} ->
+                    Stringable.public_key new_delegate
+                | Chain_voting _ ->
+                    "chain voting does have a receiver field" )
           ; uint64_result_field "amount"
               ~doc:"Amount that sender send to receiver"
               ~args:Arg.[]
@@ -108,7 +110,9 @@ module Make (Commands : Coda_commands.Intf) = struct
                     Ok
                       (amount |> Currency.Amount.to_uint64 |> Stringable.uint64)
                 | Stake_delegation _ ->
-                    Error "Payment should not consist of a stake delegation" )
+                    Error "Payment should not consist of a stake delegation"
+                | Chain_voting _ ->
+                    Error "Payment should not consist of a chain voting" )
           ; uint64_field "fee"
               ~doc:
                 "Fee that sender is willing to pay for making the transaction"
@@ -703,8 +707,7 @@ module Make (Commands : Coda_commands.Intf) = struct
                  fee maybe_memo
           in
           let body =
-            User_command_payload.Body.Stake_delegation
-              (Set_delegate {new_delegate})
+            User_command_payload.Body.Stake_delegation {new_delegate}
           in
           build_user_command coda sender_account sender_kp memo body fee )
 

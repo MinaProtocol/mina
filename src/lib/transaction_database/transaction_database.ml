@@ -227,21 +227,20 @@ module User_command = struct
   let get_participants user_command =
     let sender = User_command.sender user_command in
     let payload = User_command.payload user_command in
-    let receiver =
-      match User_command_payload.body payload with
-      | Stake_delegation (Set_delegate {new_delegate}) ->
-          new_delegate
-      | Payment {receiver; _} ->
-          receiver
-    in
-    [receiver; sender]
+    match User_command_payload.body payload with
+    | Stake_delegation {new_delegate} ->
+        [sender; new_delegate]
+    | Payment {receiver; _} ->
+        [sender; receiver]
+    | Chain_voting _ ->
+        [sender]
 
   module Gen = User_command.Gen
 
   let on_delegation_command user_command ~f =
     let sender = User_command.sender user_command in
     match User_command.(Payload.body @@ payload user_command) with
-    | Payment _ ->
+    | Payment _ | Chain_voting _ ->
         ()
     | Stake_delegation _ ->
         f sender

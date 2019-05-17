@@ -108,6 +108,7 @@ module Body = struct
         type t =
           | Payment of Payment_payload.Stable.V1.t
           | Stake_delegation of Stake_delegation.Stable.V1.t
+          | Chain_voting of Chain_voting.Stable.V1.t
         [@@deriving bin_io, compare, eq, sexp, hash, yojson, version]
       end
 
@@ -131,21 +132,32 @@ module Body = struct
   type t = Stable.Latest.t =
     | Payment of Payment_payload.Stable.V1.t
     | Stake_delegation of Stake_delegation.Stable.V1.t
+    | Chain_voting of Chain_voting.Stable.V1.t
   [@@deriving eq, sexp, hash, yojson]
 
   let max_variant_size =
     List.reduce_exn ~f:Int.max
-      [Payment_payload.length_in_triples; Stake_delegation.length_in_triples]
+      [ Payment_payload.length_in_triples
+      ; Stake_delegation.length_in_triples
+      ; Chain_voting.length_in_triples ]
 
   module Tag = Transaction_union_tag
 
   let fold = function
     | Payment p ->
-        Fold.(Tag.fold Payment +> Payment_payload.fold p)
+        Fold.(
+          Tag.fold Payment +> Payment_payload.fold p
+          +> Fold.init (max_variant_size - Payment_payload.length_in_triples)
+               ~f:(fun _ -> (false, false, false)))
     | Stake_delegation d ->
         Fold.(
           Tag.fold Stake_delegation +> Stake_delegation.fold d
           +> Fold.init (max_variant_size - Stake_delegation.length_in_triples)
+               ~f:(fun _ -> (false, false, false)))
+    | Chain_voting v ->
+        Fold.(
+          Tag.fold Chain_voting +> Chain_voting.fold v
+          +> Fold.init (max_variant_size - Chain_voting.length_in_triples)
                ~f:(fun _ -> (false, false, false)))
 
   let length_in_triples = Tag.length_in_triples + max_variant_size
@@ -153,8 +165,16 @@ module Body = struct
   let gen ~max_amount =
     let open Quickcheck.Generator in
     map
-      (variant2 (Payment_payload.gen ~max_amount) Stake_delegation.gen)
-      ~f:(function `A p -> Payment p | `B d -> Stake_delegation d)
+      (variant3
+         (Payment_payload.gen ~max_amount)
+         Stake_delegation.gen Chain_voting.gen)
+      ~f:(function
+        | `A p ->
+            Payment p
+        | `B d ->
+            Stake_delegation d
+        | `C v ->
+            Chain_voting v )
 end
 
 module Poly = struct
@@ -217,13 +237,17 @@ let memo (t : t) = t.common.memo
 let body (t : t) = t.body
 
 let is_payment (t : t) =
-  match t.body with Payment _ -> true | Stake_delegation _ -> false
+  match t.body with
+  | Payment _ ->
+      true
+  | Stake_delegation _ | Chain_voting _ ->
+      false
 
 let accounts_accessed (t : t) =
   match t.body with
   | Payment payload ->
       [payload.receiver]
-  | Stake_delegation _ ->
+  | Stake_delegation _ | Chain_voting _ ->
       []
 
 let dummy : t =

@@ -5,8 +5,7 @@ open Module_version
 module Stable = struct
   module V1 = struct
     module T = struct
-      type t =
-        | Set_delegate of {new_delegate: Public_key.Compressed.Stable.V1.t}
+      type t = {new_delegate: Public_key.Compressed.Stable.V1.t}
       [@@deriving bin_io, compare, eq, sexp, hash, yojson, version]
     end
 
@@ -27,16 +26,13 @@ module Stable = struct
 end
 
 (* bin_io omitted *)
-type t = Stable.Latest.t =
-  | Set_delegate of {new_delegate: Public_key.Compressed.Stable.V1.t}
+type t = Stable.Latest.t = {new_delegate: Public_key.Compressed.Stable.V1.t}
 [@@deriving eq, sexp, hash, yojson]
 
 let gen =
   Quickcheck.Generator.map Public_key.Compressed.gen ~f:(fun k ->
-      Set_delegate {new_delegate= k} )
+      {new_delegate= k} )
 
-let fold = function
-  | Set_delegate {new_delegate} ->
-      Public_key.Compressed.fold new_delegate
+let fold {new_delegate} = Public_key.Compressed.fold new_delegate
 
 let length_in_triples = Public_key.Compressed.length_in_triples

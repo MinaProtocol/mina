@@ -3,71 +3,83 @@ open Fold_lib
 open Tuple_lib
 open Snark_params.Tick
 
-type t = Payment | Stake_delegation | Fee_transfer | Coinbase
+type t = Payment | Stake_delegation | Fee_transfer | Coinbase | Chain_voting
 [@@deriving enum, eq, sexp]
 
 let gen =
   Quickcheck.Generator.map (Int.gen_incl min max) ~f:(fun i ->
       Option.value_exn (of_enum i) )
 
-type var = Boolean.var * Boolean.var
+type var = Boolean.var Triple.t
 
-let to_bits = function
-  | Payment ->
-      (false, false)
-  | Stake_delegation ->
-      (true, false)
-  | Fee_transfer ->
-      (false, true)
-  | Coinbase ->
-      (true, true)
+let nth_bit x n = (x lsr n) land 1 = 1
 
-let of_bits = function
-  | false, false ->
-      Payment
-  | true, false ->
-      Stake_delegation
-  | false, true ->
-      Fee_transfer
-  | true, true ->
-      Coinbase
+let list_to_triple_exn = function
+  | [x0; x1; x2] ->
+      (x0, x1, x2)
+  | _ ->
+      failwith "expected a list of length 3"
 
-let%test_unit "to_bool of_bool inv" =
+let triple_to_list (x0, x1, x2) = [x0; x1; x2]
+
+let to_bits tag = List.init 3 ~f:(nth_bit (to_enum tag)) |> list_to_triple_exn
+
+let of_bits_exn bits =
+  Option.value_exn
+    ~error:(Error.of_string "unrecognized bits")
+    ( List.fold_right (triple_to_list bits) ~init:0 ~f:(fun b acc ->
+          (2 * acc) + Bool.to_int b )
+    |> of_enum )
+
+let%test_unit "to_bits of_bits inv" =
   let open Quickcheck in
-  test (Generator.tuple2 Bool.quickcheck_generator Bool.quickcheck_generator)
-    ~f:(fun b -> assert (b = to_bits (of_bits b)))
+  test
+    (Generator.tuple3 Bool.quickcheck_generator Bool.quickcheck_generator
+       (Generator.return false))
+    ~f:(fun b -> assert (b = to_bits (of_bits_exn b)))
 
 let typ =
-  Typ.transport Typ.(Boolean.typ * Boolean.typ) ~there:to_bits ~back:of_bits
+  Typ.transport
+    Typ.(tuple3 Boolean.typ Boolean.typ Boolean.typ)
+    ~there:to_bits ~back:of_bits_exn
 
-let fold (t : t) : bool Triple.t Fold.t =
+let fold (tag : t) : bool Triple.t Fold.t =
   { fold=
       (fun ~init ~f ->
-        let b0, b1 = to_bits t in
-        f init (b0, b1, false) ) }
+        let b0, b1, b2 = to_bits tag in
+        f init (b0, b1, b2) ) }
 
 let length_in_triples = 1
 
 module Checked = struct
   open Let_syntax
 
-  let constant t =
-    let x, y = to_bits t in
-    Boolean.(var_of_value x, var_of_value y)
+  let constant tag =
+    let b0, b1, b2 = to_bits tag in
+    Boolean.(var_of_value b0, var_of_value b1, var_of_value b2)
 
-  let to_triples ((x, y) : var) = [(x, y, Boolean.false_)]
+  let to_triples bits = [bits]
 
-  (* someday: Make these all cached *)
+  let is tag triple =
+    let xs = triple_to_list (to_bits tag) in
+    let ys = triple_to_list triple in
+    let eq x y = if x then y else Boolean.not y in
+    List.map2_exn xs ys ~f:eq |> Boolean.all
 
-  let is_payment (b0, b1) = Boolean.((not b0) && not b1)
+  let is_payment triple = is Payment triple
 
-  let is_fee_transfer (b0, b1) = Boolean.((not b0) && b1)
+  let is_fee_transfer triple = is Fee_transfer triple
 
-  let is_stake_delegation (b0, b1) = Boolean.(b0 && not b1)
+  let is_stake_delegation triple = is Stake_delegation triple
 
-  let is_coinbase (b0, b1) = Boolean.(b0 && b1)
+  let is_coinbase triple = is Coinbase triple
 
-  let is_user_command (_, b1) = return (Boolean.not b1)
+  let is_chain_voting triple = is Chain_voting triple
+
+  let is_user_command triple =
+    Checked.all
+      [is_payment triple; is_stake_delegation triple; is_chain_voting triple]
+    >>= Boolean.any
 
   let%test_module "predicates" =
     ( module struct
@@ -86,7 +98,11 @@ module Checked = struct
 
       let%test_unit "is_coinbase" = test_predicate is_coinbase (( = ) Coinbase)
 
+      let%test_unit "is_chain_voting" =
+        test_predicate is_chain_voting (( = ) Chain_voting)
+
       let%test_unit "is_user_command" =
-        test_predicate is_user_command (one_of [Payment; Stake_delegation])
+        test_predicate is_user_command
+          (one_of [Payment; Stake_delegation; Chain_voting])
     end )
 end

@@ -109,6 +109,7 @@ module Undo : sig
       type t =
         | Payment of {previous_empty_accounts: Public_key.Compressed.t list}
         | Stake_delegation of {previous_delegate: Public_key.Compressed.t}
+        | Chain_voting
       [@@deriving sexp]
 
       module Stable :
