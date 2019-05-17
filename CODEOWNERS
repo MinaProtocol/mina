@@ -28,7 +28,7 @@
 /src/lib/blockchain_snark/ @nholland94 @bkase
 /src/lib/bootstrap_controller/ @nholland94 @johnwu93
 /src/lib/cache_dir/ @cmr
-/src/lib/cached/ @nholland94
+/src/lib/cache_lib/ @nholland94
 /src/lib/chunked_triples/ @psteckler @rbkhmrcr @vanishreerao
 /src/lib/cli_lib/ @johnwu93
 /src/lib/coda_base/ @cmr @nholland94 @bkase
