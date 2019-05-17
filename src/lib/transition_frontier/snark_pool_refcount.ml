@@ -33,10 +33,7 @@ struct
   let get_work (breadcrumb : Inputs.Breadcrumb.t) : Work.t Sequence.t =
     let ledger = Inputs.Breadcrumb.staged_ledger breadcrumb in
     let scan_state = Inputs.Staged_ledger.scan_state ledger in
-    let work_to_do =
-      Inputs.Staged_ledger.Scan_state.all_work_to_do scan_state
-    in
-    Or_error.ok_exn work_to_do
+    Inputs.Staged_ledger.Scan_state.all_work_to_do scan_state
 
   (** Returns true if this update changed which elements are in the table
   (but not if the same elements exist with a different reference count) *)

@@ -923,7 +923,7 @@ module type Transaction_snark_scan_state_intf = sig
        t
     -> Transaction_with_witness.t list
     -> transaction_snark_work list
-    -> (ledger_proof * transaction list) option Or_error.t
+    -> ((ledger_proof * transaction list) option * t) Or_error.t
 
   val latest_ledger_proof :
     t -> (Ledger_proof_with_sok_message.t * transaction list) option
@@ -932,9 +932,9 @@ module type Transaction_snark_scan_state_intf = sig
 
   val next_k_jobs : t -> k:int -> Available_job.t list Or_error.t
 
-  val next_jobs : t -> Available_job.t list Or_error.t
+  val next_jobs : t -> Available_job.t list
 
-  val next_jobs_sequence : t -> Available_job.t Sequence.t Or_error.t
+  val next_jobs_sequence : t -> Available_job.t Sequence.t
 
   val base_jobs_on_latest_tree : t -> Transaction_with_witness.t list
 
@@ -962,14 +962,15 @@ module type Transaction_snark_scan_state_intf = sig
 
   val snark_job_list_json : t -> string
 
-  val all_work_to_do :
-    t -> transaction_snark_work_statement Sequence.t Or_error.t
+  val all_work_to_do : t -> transaction_snark_work_statement Sequence.t
+
+  val work_for_new_diff : t -> transaction_snark_work_statement Sequence.t
 
   val current_job_count : t -> int
 
   (*val work_capacity : int*)
 
-  val next_on_new_tree : t -> bool Or_error.t
+  val next_on_new_tree : t -> bool
 end
 
 module type Staged_ledger_base_intf = sig
@@ -1039,11 +1040,11 @@ module type Staged_ledger_base_intf = sig
 
     val partition_if_overflowing : t -> Space_partition.t
 
-    val all_work_to_do : t -> statement Sequence.t Or_error.t
+    val all_work_to_do : t -> statement Sequence.t
 
     val all_transactions : t -> transaction list Or_error.t
 
-    val work_capacity : int
+    (*val work_capacity : int*)
 
     val current_job_count : t -> int
   end

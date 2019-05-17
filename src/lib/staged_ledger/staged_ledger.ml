@@ -23,8 +23,6 @@ module Make_with_constants (Constants : sig
   val transaction_capacity_log_2 : int
 
   val work_delay_factor : int
-
-  val latency_factor : int
 end)
 (Inputs : Inputs.S) : sig
   include
@@ -197,7 +195,7 @@ end = struct
   let chunks_of xs ~n = List.groupi xs ~break:(fun i _ _ -> i mod n = 0)
 
   let all_work_pairs_exn t =
-    let all_jobs = Scan_state.next_jobs t.scan_state |> Or_error.ok_exn in
+    let all_jobs = Scan_state.next_jobs t.scan_state in
     let module A = Scan_state.Available_job in
     let module L = Ledger_proof_statement in
     let single_spec (job : job) =
@@ -266,12 +264,13 @@ end = struct
     let txns_still_being_worked_on =
       Scan_state.staged_transactions scan_state
     in
-    Debug_assert.debug_assert (fun () ->
+    (*TODO: change the math*)
+    (*Debug_assert.debug_assert (fun () ->
         let parallelism = Scan_state.capacity scan_state in
         let total_capacity_log_2 = Int.ceil_log2 parallelism in
         [%test_pred: int]
           (( >= ) (total_capacity_log_2 * parallelism))
-          (List.length txns_still_being_worked_on) ) ;
+          (List.length txns_still_being_worked_on) ) ;*)
     let snarked_ledger = Ledger.register_mask ledger (Ledger.Mask.create ()) in
     let%bind () =
       List.fold_left txns_still_being_worked_on ~init:(Ok ()) ~f:(fun acc t ->
@@ -368,7 +367,7 @@ end = struct
 
   let copy {scan_state; ledger; pending_coinbase_collection} =
     let new_mask = Ledger.Mask.create () in
-    { scan_state= Scan_state.copy scan_state
+    { scan_state
     ; ledger= Ledger.register_mask ledger new_mask
     ; pending_coinbase_collection }
 
@@ -792,10 +791,7 @@ end = struct
         (*Single partition:
          1.Check if a new stack is required and get a working stack [working_stack]
          2.create data for enqueuing into the scan state *)
-        let%bind is_new_tree =
-          Scan_state.next_on_new_tree scan_state
-          |> to_staged_ledger_or_error |> Deferred.return
-        in
+        let is_new_tree = Scan_state.next_on_new_tree scan_state in
         let have_data_to_enqueue = List.length transactions > 0 in
         let is_new_stack = is_new_tree && have_data_to_enqueue in
         let%bind working_stack =
@@ -921,11 +917,8 @@ end = struct
       Int.pow 2
         Transaction_snark_scan_state.Constants.transaction_capacity_log_2
     in
-    let%bind spots_available, proofs_waiting =
-      let%map jobs =
-        Deferred.return
-        @@ (Scan_state.next_jobs t.scan_state |> to_staged_ledger_or_error)
-      in
+    let spots_available, proofs_waiting =
+      let jobs = Scan_state.next_jobs t.scan_state in
       ( Int.min (Scan_state.free_space t.scan_state) max_throughput
       , List.length jobs )
     in
@@ -961,7 +954,6 @@ end = struct
     in
     let new_mask = Inputs.Ledger.Mask.create () in
     let new_ledger = Inputs.Ledger.register_mask t.ledger new_mask in
-    let scan_state' = Scan_state.copy t.scan_state in
     let%bind transactions, works, user_commands_count, coinbases =
       let%bind p1 = apply_pre_diff_with_at_most_two (fst sl_diff.diff) in
       let%map p2 =
@@ -982,15 +974,15 @@ end = struct
       , p1.coinbases @ p2.coinbases )
     in
     let%bind is_new_stack, data, stack_update =
-      update_coinbase_stack_and_get_data scan_state' new_ledger
+      update_coinbase_stack_and_get_data t.scan_state new_ledger
         t.pending_coinbase_collection transactions
     in
-    let%bind () = check_completed_works scan_state' works in
-    let%bind () = Deferred.return (check_zero_fee_excess scan_state' data) in
-    let%bind res_opt =
+    let%bind () = check_completed_works t.scan_state works in
+    let%bind () = Deferred.return (check_zero_fee_excess t.scan_state data) in
+    let%bind res_opt, scan_state' =
       (* TODO: Add rollback *)
       let r =
-        Scan_state.fill_work_and_enqueue_transactions scan_state' data works
+        Scan_state.fill_work_and_enqueue_transactions t.scan_state data works
       in
       Or_error.iter_error r ~f:(fun e ->
           (* TODO: Pass a logger here *)
@@ -1107,7 +1099,6 @@ end = struct
     in
     let new_mask = Inputs.Ledger.Mask.create () in
     let new_ledger = Inputs.Ledger.register_mask t.ledger new_mask in
-    let scan_state' = Scan_state.copy t.scan_state in
     let transactions, works, coinbases =
       let data1, work1, coinbases1 =
         apply_pre_diff_with_at_most_two (fst sl_diff.diff)
@@ -1122,14 +1113,14 @@ end = struct
     let%bind is_new_stack, data, updated_coinbase_stack =
       let open Deferred.Let_syntax in
       let%bind x =
-        update_coinbase_stack_and_get_data scan_state' new_ledger
+        update_coinbase_stack_and_get_data t.scan_state new_ledger
           t.pending_coinbase_collection transactions
       in
       Staged_ledger_error.to_or_error x |> Deferred.return
     in
-    let res_opt =
+    let res_opt, scan_state' =
       Or_error.ok_exn
-        (Scan_state.fill_work_and_enqueue_transactions scan_state' data works)
+        (Scan_state.fill_work_and_enqueue_transactions t.scan_state data works)
     in
     let%bind coinbase_amount =
       coinbase_for_blockchain_snark coinbases
@@ -1174,9 +1165,11 @@ end = struct
 
     type t =
       { max_space: int (*max space available currently*)
-      ; max_jobs: int (*Max amount of work that can be purchased*)
-      ; cur_work_count: int (*Current work capacity of the scan state *)
-      ; work_capacity: int
+      ; max_jobs: int
+            (*Max amount of work that can be purchased*)
+            (*; cur_work_count: int*)
+            (*Current work capacity of the scan state *)
+            (*; work_capacity: int*)
             (*max number of pending jobs (currently in the tree and the ones that would arise in the future when current jobs are done) allowed on the tree*)
       ; user_commands_rev: User_command.With_valid_signature.t Sequence.t
       ; completed_work_rev: Transaction_snark_work.Checked.t Sequence.t
@@ -1194,7 +1187,7 @@ end = struct
 
     let init (uc_seq : User_command.With_valid_signature.t Sequence.t)
         (cw_seq : Transaction_snark_work.Checked.t Sequence.t) max_job_count
-        max_space self_pk ~add_coinbase cur_work_count logger =
+        max_space self_pk ~add_coinbase logger =
       let seq_rev seq =
         let rec go seq rev_seq =
           match Sequence.next seq with
@@ -1208,15 +1201,14 @@ end = struct
       let cw_unchecked =
         Sequence.map cw_seq ~f:Transaction_snark_work.forget
       in
-      let work_capacity = Scan_state.work_capacity in
       let coinbase, rem_cw =
         match (add_coinbase, Sequence.next cw_unchecked) with
         | true, Some (cw, rem_cw) ->
             (Staged_ledger_diff.At_most_two.One (coinbase_ft cw), rem_cw)
         | true, None ->
             (*new count after a coinbase is added should be less than the capacity*)
-            let new_count = cur_work_count + 2 in
-            if max_job_count = 0 || new_count <= work_capacity then
+            (*let new_count = cur_work_count + 2 in*)
+            if max_job_count = 0 (*|| new_count <= work_capacity*) then
               (One None, cw_unchecked)
             else (Zero, cw_unchecked)
         | _ ->
@@ -1246,9 +1238,7 @@ end = struct
         ; user_commands_rev= Sequence.empty }
       in
       { max_space
-      ; max_jobs= max_job_count
-      ; cur_work_count
-      ; work_capacity
+      ; max_jobs= max_job_count (*; cur_work_count*)
       ; user_commands_rev=
           uc_seq
           (*Completed work in reverse order for faster removal of proofs if budget doesn't suffice*)
@@ -1284,7 +1274,7 @@ end = struct
       | Two _ ->
           2
 
-    let max_work_done t =
+    let work_done t =
       let no_of_proof_bundles = Sequence.length t.completed_work_rev in
       no_of_proof_bundles = t.max_jobs
 
@@ -1309,7 +1299,7 @@ end = struct
 
     let available_space t = t.max_space - slots_occupied t
 
-    let new_work_count t =
+    (*let new_work_count t =
       let occupied = slots_occupied t in
       let total_proofs work =
         Sequence.sum
@@ -1319,11 +1309,11 @@ end = struct
             List.length w.proofs )
       in
       let no_of_proofs = total_proofs t.completed_work_rev in
-      t.cur_work_count + (occupied * 2) - no_of_proofs
+      t.cur_work_count + (occupied * 2) - no_of_proofs*)
 
-    let within_capacity t =
+    (*let within_capacity t =
       let new_count = new_work_count t in
-      new_count <= t.work_capacity
+      new_count <= t.work_capacity*)
 
     let incr_coinbase_part_by t count =
       let open Or_error.Let_syntax in
@@ -1340,7 +1330,7 @@ end = struct
       let by_one res =
         let res' =
           match
-            (Sequence.next res.discarded.completed_work, max_work_done res)
+            (Sequence.next res.discarded.completed_work, work_done res)
           with
           | Some (w, rem_work), _ ->
               let w' = Transaction_snark_work.forget w in
@@ -1353,12 +1343,14 @@ end = struct
           | None, true ->
               let%map coinbase = incr (res.coinbase, None) in
               {res with coinbase}
-          | _ ->
-              Ok res
+          | None, false ->
+              Or_error.error_string
+                "Could not increment coinbase transaction count because of \
+                 insufficient work"
         in
         match res' with
         | Ok res'' ->
-            if within_capacity res'' then res'' else res
+            res''
         | Error e ->
             Logger.error t.logger ~module_:__MODULE__ ~location:__LOC__ "%s"
               (Error.to_string_hum e) ;
@@ -1368,12 +1360,12 @@ end = struct
 
     let work_constraint_satisfied (t : t) =
       (*Are we doing all the work available? *)
-      let all_proofs = max_work_done t in
+      let all_proofs = work_done t in
       (*check if the job count doesn't exceed the capacity*)
-      let work_capacity_satisfied = within_capacity t in
+      (*let work_capacity_satisfied = within_capacity t in*)
       (*if there are no user_commands then it doesn't matter how many proofs you have*)
       let uc_count = Sequence.length t.user_commands_rev in
-      all_proofs || work_capacity_satisfied || uc_count = 0
+      all_proofs || (* work_capacity_satisfied || *) uc_count = 0
 
     let non_coinbase_work t =
       let len = Sequence.length t.completed_work_rev in
@@ -1512,17 +1504,16 @@ end = struct
       check_constraints_and_update (Resources.discard_user_command resources)
 
   let one_prediff cw_seq ts_seq self ~add_coinbase available_queue_space
-      max_job_count cur_work_count logger =
+      max_job_count logger =
     O1trace.measure "one_prediff" (fun () ->
         let init_resources =
           Resources.init ts_seq cw_seq max_job_count available_queue_space self
-            ~add_coinbase cur_work_count logger
+            ~add_coinbase logger
         in
         check_constraints_and_update init_resources )
 
   let generate logger cw_seq ts_seq self
-      (partitions : Scan_state.Space_partition.t) max_job_count cur_work_count
-      =
+      (partitions : Scan_state.Space_partition.t) _max_job_count =
     let pre_diff_with_one (res : Resources.t) :
         Staged_ledger_diff.With_valid_signatures_and_proofs
         .pre_diff_with_at_most_one_coinbase =
@@ -1556,11 +1547,10 @@ end = struct
       (pre_diff_with_two res1, Option.map res2_opt ~f:pre_diff_with_one)
     in
     let second_pre_diff (res : Resources.t) slots ~add_coinbase =
-      let work_count = Sequence.length res.completed_work_rev in
-      let max_jobs = max_job_count - work_count in
-      let new_capacity = Resources.new_work_count res in
+      let max_jobs = slots in
+      (*let new_capacity = Resources.new_work_count res in*)
       one_prediff res.discarded.completed_work res.discarded.user_commands_rev
-        self slots ~add_coinbase max_jobs new_capacity logger
+        self slots ~add_coinbase max_jobs logger
     in
     let has_no_user_commands (res : Resources.t) =
       Sequence.length res.user_commands_rev = 0
@@ -1570,18 +1560,19 @@ end = struct
       && Resources.coinbase_added res + Sequence.length res.completed_work_rev
          = 0
     in
+    let max_bundle_count = partitions.first * 2 in
     (*Partitioning explained in PR #687 *)
     match partitions.second with
     | None ->
         let res =
           one_prediff cw_seq ts_seq self partitions.first ~add_coinbase:true
-            max_job_count cur_work_count logger
+            max_bundle_count logger
         in
         make_diff res None
     | Some y ->
         let res =
           one_prediff cw_seq ts_seq self partitions.first ~add_coinbase:false
-            max_job_count cur_work_count logger
+            max_bundle_count logger
         in
         let res1, res2 =
           match Resources.available_space res with
@@ -1614,7 +1605,7 @@ end = struct
               (* Too many slots left in the first partition. Either there wasn't enough work to add transactions or there weren't enough transactions. Create a new pre_diff for just the first partition*)
               let new_res =
                 one_prediff cw_seq ts_seq self partitions.first
-                  ~add_coinbase:true max_job_count cur_work_count logger
+                  ~add_coinbase:true max_bundle_count logger
               in
               (new_res, None)
         in
@@ -1627,9 +1618,11 @@ end = struct
           (*Coinbase takes priority over user-commands. Create a diff in partitions.first with coinbase first and user commands if possible*)
           let res =
             one_prediff cw_seq ts_seq self partitions.first ~add_coinbase:true
-              max_job_count cur_work_count logger
+              max_bundle_count logger
           in
           make_diff res None
+
+  (**TODO: when getting jobs, get list of lists and have a bundle of single job for every tree*)
 
   let create_diff t ~self ~logger
       ~(transactions_by_fee : User_command.With_valid_signature.t Sequence.t)
@@ -1643,13 +1636,11 @@ end = struct
     let partitions = Scan_state.partition_if_overflowing t.scan_state in
     O1trace.trace_event "partitioned" ;
     (*TODO: return an or_error here *)
-    let all_work_to_do =
-      Scan_state.all_work_to_do t.scan_state |> Or_error.ok_exn
-    in
+    let work_to_do = Scan_state.work_for_new_diff t.scan_state in
     let unbundled_job_count = Scan_state.current_job_count t.scan_state in
     O1trace.trace_event "computed_work" ;
     let completed_works_seq, proof_count =
-      Sequence.fold_until all_work_to_do ~init:(Sequence.empty, 0)
+      Sequence.fold_until work_to_do ~init:(Sequence.empty, 0)
         ~f:(fun (seq, count) w ->
           match get_completed_work w with
           | Some cw_checked ->
@@ -1660,8 +1651,6 @@ end = struct
               Stop (seq, count) )
         ~finish:Fn.id
     in
-    (* max number of jobs that can be done *)
-    let max_jobs_count = Sequence.length all_work_to_do in
     O1trace.trace_event "found completed work" ;
     (*Transactions in reverse order for faster removal if there is no space when creating the diff*)
     let valid_on_this_ledger =
@@ -1686,7 +1675,7 @@ end = struct
     let diff =
       O1trace.measure "generate diff" (fun () ->
           generate logger completed_works_seq valid_on_this_ledger self
-            partitions max_jobs_count unbundled_job_count )
+            partitions unbundled_job_count )
     in
     Logger.info logger ~module_:__MODULE__ ~location:__LOC__
       "Block stats: Proofs ready for purchase: %d" proof_count ;
@@ -2957,9 +2946,7 @@ let%test_module "test" =
               let logger = Logger.null () in
               let txns = txns i (fun x -> (x + 1) * 100) (fun _ -> 4) in
               let scan_state = Sl.scan_state !sl in
-              let work =
-                Or_error.ok_exn (Sl.Scan_state.all_work_to_do scan_state)
-              in
+              let work = Sl.Scan_state.all_work_to_do scan_state in
               let partitions =
                 Sl.Scan_state.partition_if_overflowing scan_state
               in
@@ -3218,16 +3205,13 @@ let%test_module "test" =
         let work_delay = 5
 
         let sl_modules =
-          List.init work_delay ~f:(fun i ->
-              let module Constants = struct
-                let transaction_capacity_log_2 = transaction_capacity_log_2
+          let module Constants = struct
+            let transaction_capacity_log_2 = transaction_capacity_log_2
 
-                let work_delay_factor = work_delay
-
-                let latency_factor = i
-              end in
-              (module Make_with_constants (Constants) (Inputs)
-              : Staged_ledger_intf ) )
+            let work_delay_factor = work_delay
+          end in
+          [ (module Make_with_constants (Constants) (Inputs)
+            : Staged_ledger_intf ) ]
 
         let%test_unit "max throughput at any latency: random number of \
                        proofs-one prover" =
@@ -3278,11 +3262,12 @@ let%test_module "test" =
                       in
                       let work_list : Transaction_snark_work.Statement.t list =
                         let proofs_required =
-                          max
+                          List.length all_ts
+                          (*max
                             ( Sl.Scan_state.current_job_count
                                 (Sl.scan_state !staged_ledger)
                             + (2 * p) - Sl.Scan_state.work_capacity )
-                            0
+                            0*)
                         in
                         let spec_list =
                           List.take
