@@ -187,18 +187,9 @@ let%test_module "Transition Frontier Persistence" =
     let%test_unit "Randomly generate a tree" =
       test_tree_breadcrumbs (2 * max_length)
 
-    let%test "Serializing a tree and then deserializing it should give us the \
-              same transition_frontier" =
-      Core.Backtrace.elide := false ;
-      Async.Scheduler.set_record_backtraces true ;
+    let test_deserialization num_breadcrumbs frontier =
       let logger = Logger.create () in
-      let num_breadcrumbs = max_length in
-      Thread_safe.block_on_async_exn
-      @@ fun () ->
       let directory_name = Uuid.to_string (Uuid_unix.create ()) in
-      let%bind frontier =
-        create_root_frontier ~logger Genesis_ledger.accounts
-      in
       let worker =
         Transition_frontier_persistence.create ~logger ~directory_name ()
       in
@@ -222,6 +213,29 @@ let%test_module "Transition Frontier Persistence" =
           transition_storage
       in
       Transition_frontier.equal frontier deserialized_frontier
+
+    let%test "Serializing a tree and then deserializing it should give us the \
+              same transition_frontier" =
+      Core.Backtrace.elide := false ;
+      Async.Scheduler.set_record_backtraces true ;
+      Thread_safe.block_on_async_exn
+      @@ fun () ->
+      let%bind frontier =
+        create_root_frontier ~logger Genesis_ledger.accounts
+      in
+      test_deserialization max_length frontier
+
+    let%test_unit "Serializing a frontier and then deserializing it  from \
+                   genesis should give us the same transition_frontier" =
+      Core.Backtrace.elide := false ;
+      Async.Scheduler.set_record_backtraces true ;
+      Thread_safe.block_on_async_exn
+      @@ fun () ->
+      Stubs.with_genesis_frontier ~logger ~f:(fun frontier ->
+          let%map is_serialization_correct =
+            test_deserialization (max_length / 2) frontier
+          in
+          assert is_serialization_correct )
 
     (* TODO: create a test where a batch of diffs are being applied, but the
        worker dies in the middle. The transition_frontier_database can be left
