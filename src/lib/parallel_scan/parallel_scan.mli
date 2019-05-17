@@ -308,14 +308,15 @@ end
 module Space_partition : sig
   module Stable : sig
     module V1 : sig
-      type t = {first: int; second: int option}
+      type t = {first: int * int; second: (int * int) option}
       [@@deriving sexp, bin_io, version]
     end
 
     module Latest = V1
   end
 
-  type t = Stable.Latest.t = {first: int; second: int option} [@@deriving sexp]
+  type t = Stable.Latest.t = {first: int * int; second: (int * int) option}
+  [@@deriving sexp]
 end
 
 module Job_view : sig
@@ -391,10 +392,11 @@ val next_k_jobs :
   state:('a, 'd) State.t -> k:int -> ('a, 'd) Available_job.t list Or_error.t
 
 (** Get all the available jobs *)
-val next_jobs : ('a, 'd) State.t -> ('a, 'd) Available_job.t list
+val next_jobs : ('a, 'd) State.t -> ('a, 'd) Available_job.t list list
 
 (** Get all the available jobs to be done in the next update *)
-val jobs_for_next_update : ('a, 'd) State.t -> ('a, 'd) Available_job.t list
+val jobs_for_next_update :
+  ('a, 'd) State.t -> ('a, 'd) Available_job.t list list
 
 (** Get all the available jobs as a sequence *)
 

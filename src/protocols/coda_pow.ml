@@ -889,7 +889,7 @@ module type Transaction_snark_scan_state_intf = sig
   end
 
   module Space_partition : sig
-    type t = {first: int; second: int option} [@@deriving sexp]
+    type t = {first: int * int; second: (int * int) option} [@@deriving sexp]
   end
 
   module Job_view : sig
@@ -932,9 +932,9 @@ module type Transaction_snark_scan_state_intf = sig
 
   val next_k_jobs : t -> k:int -> Available_job.t list Or_error.t
 
-  val next_jobs : t -> Available_job.t list
+  val next_jobs : t -> Available_job.t list list
 
-  val next_jobs_sequence : t -> Available_job.t Sequence.t
+  val next_jobs_sequence : t -> Available_job.t Sequence.t Sequence.t
 
   val base_jobs_on_latest_tree : t -> Transaction_with_witness.t list
 
@@ -1027,7 +1027,7 @@ module type Staged_ledger_base_intf = sig
     end
 
     module Space_partition : sig
-      type t = {first: int; second: int option} [@@deriving sexp]
+      type t = {first: int * int; second: (int * int) option} [@@deriving sexp]
     end
 
     val hash : t -> staged_ledger_aux_hash

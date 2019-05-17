@@ -624,7 +624,10 @@ end = struct
 
   let next_jobs t = Parallel_scan.next_jobs t.tree
 
-  let next_jobs_sequence t = Parallel_scan.next_jobs t.tree |> Sequence.of_list
+  let next_jobs_sequence t =
+    Parallel_scan.next_jobs t.tree
+    |> Sequence.of_list
+    |> Sequence.map ~f:Sequence.of_list
 
   let next_on_new_tree t = Parallel_scan.next_on_new_tree t.tree
 
@@ -644,7 +647,14 @@ end = struct
   (*let copy {tree; job_count} = {tree= Parallel_scan.State.copy tree; job_count}*)
 
   let partition_if_overflowing t =
-    Parallel_scan.partition_if_overflowing t.tree
+    let bundle_count work_count = (work_count + 1) / 2 in
+    let {Space_partition.first= slots, job_count; second} =
+      Parallel_scan.partition_if_overflowing t.tree
+    in
+    { Space_partition.first= (slots, bundle_count job_count)
+    ; second=
+        Option.map second ~f:(fun (slots, job_count) ->
+            (slots, bundle_count job_count) ) }
 
   let current_job_sequence_number {tree; _} =
     Parallel_scan.current_job_sequence_number tree
@@ -667,28 +677,33 @@ end = struct
     Yojson.Safe.to_string (`List (List.map all_jobs ~f:Job_view.to_yojson))
 
   let all_work_to_do t : Transaction_snark_work.Statement.t Sequence.t =
-    let work_seq = next_jobs_sequence t in
-    Sequence.chunks_exn
-      (Sequence.map work_seq ~f:(fun job ->
-           match statement_of_job job with
-           | None ->
-               assert false
-           | Some stmt ->
-               stmt ))
-      Transaction_snark_work.proofs_length
+    let work_seqs = next_jobs_sequence t in
+    Sequence.concat_map work_seqs ~f:(fun work_seq ->
+        Sequence.chunks_exn
+          (Sequence.map work_seq ~f:(fun job ->
+               match statement_of_job job with
+               | None ->
+                   assert false
+               | Some stmt ->
+                   stmt ))
+          Transaction_snark_work.proofs_length )
 
+  (*Always fixed proof budles *)
   let work_for_new_diff t : Transaction_snark_work.Statement.t Sequence.t =
-    let work_seq =
-      Parallel_scan.jobs_for_next_update t.tree |> Sequence.of_list
+    let work_seqs =
+      Sequence.map
+        (Parallel_scan.jobs_for_next_update t.tree |> Sequence.of_list)
+        ~f:Sequence.of_list
     in
-    Sequence.chunks_exn
-      (Sequence.map work_seq ~f:(fun job ->
-           match statement_of_job job with
-           | None ->
-               assert false
-           | Some stmt ->
-               stmt ))
-      Transaction_snark_work.proofs_length
+    Sequence.concat_map work_seqs ~f:(fun work_seq ->
+        Sequence.chunks_exn
+          (Sequence.map work_seq ~f:(fun job ->
+               match statement_of_job job with
+               | None ->
+                   assert false
+               | Some stmt ->
+                   stmt ))
+          Transaction_snark_work.proofs_length )
 end
 
 module Constants = Constants
