@@ -180,7 +180,7 @@ module Make (Inputs : Intf.Main_inputs) = struct
   let staged_ledger_hash transition =
     let open External_transition.Validated in
     let protocol_state = protocol_state transition in
-    Coda_base.Staged_ledger_hash.ledger_hash
+    Staged_ledger_hash.ledger_hash
       Protocol_state.(
         Blockchain_state.staged_ledger_hash @@ blockchain_state protocol_state)
 

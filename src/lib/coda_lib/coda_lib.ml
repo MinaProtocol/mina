@@ -771,6 +771,10 @@ module Make (Inputs : Inputs_intf) = struct
                         Ledger_db.create
                           ?directory_name:config.ledger_db_location ()
                       in
+                      Logger.debug config.logger ~module_:__MODULE__
+                        ~location:__LOC__
+                        !"Reading persistence data from %s"
+                        transition_frontier_location ;
                       let%map frontier =
                         Transition_frontier_persistence.deserialize
                           ~directory_name ~logger:config.logger

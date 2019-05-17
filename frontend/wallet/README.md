@@ -33,7 +33,7 @@ Run locally with hot reloading:
 5. `yarn dev` to start dev server
 
 ### Common Issues
-1. Only use SSH for cloning via `git@github.com:CodaProtocol/coda.git`
-    * Using HTTPS will likely result in errors when running `git submodule update --init`
-    * How to clone with [SSH URLs](!https://help.github.com/en/articles/which-remote-url-should-i-use#cloning-with-ssh-urls)
-    * How to generate [SSH keys](!https://help.github.com/en/articles/connecting-to-github-with-ssh)
+1. If you see something like: `git@github.com: Permission denied (publickey).`
+   when updating the submodules you need to set up SSH keys with GitHub, since
+   our submodules use SSH URLS. GitHub has some documentation on how to do that
+   [here](https://help.github.com/en/articles/generating-a-new-ssh-key-and-adding-it-to-the-ssh-agent).
