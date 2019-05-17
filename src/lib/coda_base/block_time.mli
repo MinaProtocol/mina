@@ -110,6 +110,10 @@ module Time : sig
   val to_time : t -> Time.t
 
   val now : Controller.t -> t
+
+  val to_string : t -> string
+
+  val of_string_exn : string -> t
 end
 
 include module type of Time

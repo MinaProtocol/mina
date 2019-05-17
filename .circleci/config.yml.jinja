@@ -28,12 +28,12 @@ jobs:
             - run:
                   name: Test wallet
                   command: cd frontend/wallet && yarn test
-            - run:
-                  name: Build dist wallet
-                  command: cd frontend/wallet && yarn run dist
-            - run:
-                  name: Publish dist wallet
-                  command: (env HOMEBREW_NO_AUTO_UPDATE=1 brew install awscli) && ./scripts/publish-wallet.sh
+#            - run:
+#                  name: Build dist wallet
+#                  command: cd frontend/wallet && yarn run dist
+#            - run:
+#                  name: Publish dist wallet
+#                  command: (env HOMEBREW_NO_AUTO_UPDATE=1 brew install awscli) && ./scripts/publish-wallet.sh
             - run: cd frontend/website && yarn install
             - run:
                   name: Decrypt PragmataPro font
@@ -50,7 +50,7 @@ jobs:
 
     lint:
         docker:
-            - image: codaprotocol/coda:toolchain-8959b8dfda29263d2f88f13a284ef34c9da0a081
+            - image: codaprotocol/coda:toolchain-a667ae88520eaa5acc6eac754dccc724092ff2f2
         steps:
             - checkout
             - run: git submodule sync && git submodule update --init --recursive
@@ -128,7 +128,7 @@ jobs:
     build-artifacts--{{profile}}:
         resource_class: large
         docker:
-            - image: codaprotocol/coda:toolchain-8959b8dfda29263d2f88f13a284ef34c9da0a081
+            - image: codaprotocol/coda:toolchain-a667ae88520eaa5acc6eac754dccc724092ff2f2
         environment:
             DUNE_PROFILE: {{profile}}
         steps:
@@ -167,7 +167,7 @@ jobs:
     test-unit--{{profile}}:
         resource_class: large
         docker:
-            - image: codaprotocol/coda:toolchain-8959b8dfda29263d2f88f13a284ef34c9da0a081
+            - image: codaprotocol/coda:toolchain-a667ae88520eaa5acc6eac754dccc724092ff2f2
         steps:
             - checkout
             - run: git submodule sync && git submodule update --init --recursive
@@ -180,7 +180,7 @@ jobs:
     test--{{profile}}:
         resource_class: large
         docker:
-            - image: codaprotocol/coda:toolchain-8959b8dfda29263d2f88f13a284ef34c9da0a081
+            - image: codaprotocol/coda:toolchain-a667ae88520eaa5acc6eac754dccc724092ff2f2
         steps:
             - checkout
             - run: git submodule sync && git submodule update --init --recursive

@@ -1,15 +1,24 @@
 module Styles = {
   open Css;
 
-  let window =
+  let bg =
     style([
-      display(flexBox),
-      flexDirection(column),
-      alignItems(stretch),
-      backgroundColor(white),
-      width(pct(100.)),
-      height(vh(100.)),
-      overflow(`hidden),
+      transition(~duration=200, "background"),
+      background(`url("light-bg-texture.svg")),
+      backgroundSize(`cover),
+    ]);
+
+  let window =
+    merge([
+      style([
+        display(flexBox),
+        flexDirection(column),
+        alignItems(stretch),
+        width(pct(100.)),
+        height(vh(100.)),
+        overflow(`hidden),
+      ]),
+      bg,
     ]);
 };
 

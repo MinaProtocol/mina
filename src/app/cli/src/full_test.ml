@@ -97,9 +97,11 @@ let run_test () : unit Deferred.t =
               ; target_peer_count= 8
               ; initial_peers= []
               ; conf_dir= temp_conf_dir
-              ; me=
-                  Network_peer.Peer.create Unix.Inet_addr.localhost
-                    ~discovery_port:8001 ~communication_port:8000
+              ; addrs_and_ports=
+                  { external_ip= Unix.Inet_addr.localhost
+                  ; bind_ip= Unix.Inet_addr.localhost
+                  ; discovery_port= 8001
+                  ; communication_port= 8000 }
               ; trust_system
               ; max_concurrent_connections= Some 10 } }
       in

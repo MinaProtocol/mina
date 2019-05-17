@@ -5,34 +5,51 @@ open Coda_numbers
 module type Gen_intf = sig
   type t
 
-  (* Generate a single transaction between
-   * Generate random keys for sender and receiver
-   * for fee $\in [0,max_fee]$
-   * and an amount $\in [1,max_amount]$
-  *)
-  val gen :
-       ?sign_type:[`Fake | `Real]
-    -> key_gen:(Signature_keypair.t * Signature_keypair.t)
-               Quickcheck.Generator.t
-    -> ?nonce:Account_nonce.t
-    -> max_amount:int
-    -> max_fee:int
-    -> unit
-    -> t Quickcheck.Generator.t
+  module Gen : sig
+    (* Generate a single transaction between
+    * Generate random keys for sender and receiver
+    * for fee $\in [0,max_fee]$
+    * and an amount $\in [1,max_amount]$
+    *)
+    val payment :
+         ?sign_type:[`Fake | `Real]
+      -> key_gen:(Signature_keypair.t * Signature_keypair.t)
+                 Quickcheck.Generator.t
+      -> ?nonce:Account_nonce.t
+      -> max_amount:int
+      -> max_fee:int
+      -> unit
+      -> t Quickcheck.Generator.t
 
-  (* Generate a single transaction between
-   * $a, b \in keys$
-   * for fee $\in [0,max_fee]$
-   * and an amount $\in [1,max_amount]$
-  *)
-  val gen_with_random_participants :
-       ?sign_type:[`Fake | `Real]
-    -> keys:Signature_keypair.t array
-    -> ?nonce:Account_nonce.t
-    -> max_amount:int
-    -> max_fee:int
-    -> unit
-    -> t Quickcheck.Generator.t
+    (* Generate a single transaction between
+    * $a, b \in keys$
+    * for fee $\in [0,max_fee]$
+    * and an amount $\in [1,max_amount]$
+    *)
+    val payment_with_random_participants :
+         ?sign_type:[`Fake | `Real]
+      -> keys:Signature_keypair.t array
+      -> ?nonce:Account_nonce.t
+      -> max_amount:int
+      -> max_fee:int
+      -> unit
+      -> t Quickcheck.Generator.t
+
+    val stake_delegation :
+         key_gen:(Signature_keypair.t * Signature_keypair.t)
+                 Quickcheck.Generator.t
+      -> ?nonce:Account_nonce.t
+      -> max_fee:int
+      -> unit
+      -> t Quickcheck.Generator.t
+
+    val stake_delegation_with_random_participants :
+         keys:Signature_keypair.t array
+      -> ?nonce:Account_nonce.t
+      -> max_fee:int
+      -> unit
+      -> t Quickcheck.Generator.t
+  end
 end
 
 module type S = sig
