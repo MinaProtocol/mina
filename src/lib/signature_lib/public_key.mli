@@ -4,19 +4,22 @@ open Tick
 open Tuple_lib
 open Fold_lib
 
-type t = Field.t * Field.t [@@deriving bin_io, sexp, hash]
+type t = Field.t * Field.t [@@deriving sexp, hash]
 
 include Codable.S with type t := t
 
 module Stable : sig
   module V1 : sig
-    type nonrec t = t [@@deriving bin_io, sexp, compare, eq, hash]
+    type nonrec t = t
+    [@@deriving bin_io, sexp, compare, eq, hash, yojson, version]
   end
+
+  module Latest = V1
 end
 
 include Comparable.S_binable with type t := t
 
-type var = Field.var * Field.var
+type var = Field.Var.t * Field.Var.t
 
 val typ : (var, t) Typ.t
 
@@ -25,18 +28,32 @@ val var_of_t : t -> var
 val of_private_key_exn : Private_key.t -> t
 
 module Compressed : sig
-  type ('field, 'boolean) t_ = {x: 'field; is_odd: 'boolean}
+  module Poly : sig
+    type ('field, 'boolean) t = {x: 'field; is_odd: 'boolean}
 
-  type t = (Field.t, bool) t_ [@@deriving bin_io, sexp, hash, yojson]
+    module Stable :
+      sig
+        module V1 : sig
+          type ('field, 'boolean) t
+        end
+
+        module Latest = V1
+      end
+      with type ('field, 'boolean) V1.t = ('field, 'boolean) t
+  end
+
+  type t = (Field.t, bool) Poly.t [@@deriving sexp, hash]
 
   include Codable.S with type t := t
 
   module Stable : sig
     module V1 : sig
-      type nonrec t = t [@@deriving sexp, bin_io, eq, compare, hash, yojson]
+      type nonrec t = t [@@deriving sexp, bin_io, eq, compare, hash, version]
 
       include Codable.S with type t := t
     end
+
+    module Latest = V1
   end
 
   val gen : t Quickcheck.Generator.t
@@ -45,13 +62,13 @@ module Compressed : sig
 
   val length_in_triples : int
 
-  type var = (Field.var, Boolean.var) t_
+  type var = (Field.Var.t, Boolean.var) Poly.t
 
   val typ : (var, t) Typ.t
 
   val var_of_t : t -> var
 
-  include Comparable.S_binable with type t := t
+  include Comparable.S with type t := t
 
   include Hashable.S_binable with type t := t
 
@@ -62,6 +79,8 @@ module Compressed : sig
   val of_base64_exn : string -> t
 
   val to_base64 : t -> string
+
+  val to_string : t -> string
 
   module Checked : sig
     val equal : var -> var -> (Boolean.var, _) Checked.t

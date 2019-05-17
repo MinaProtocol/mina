@@ -1,22 +1,26 @@
 open Core
 
-module Make
-    (Key : Intf.Key)
-    (Account : Intf.Account with type key := Key.t)
-    (Hash : Intf.Hash with type account := Account.t)
-    (Depth : Intf.Depth)
-    (Location : Location_intf.S)
-    (Kvdb : Intf.Key_value_database)
-    (Storage_locations : Intf.Storage_locations) :
+module type Inputs_intf = sig
+  include Base_inputs_intf.S
+
+  module Location : Location_intf.S
+
+  module Kvdb : Intf.Key_value_database
+
+  module Storage_locations : Intf.Storage_locations
+end
+
+module Make (Inputs : Inputs_intf) :
   Database_intf.S
-  with module Location = Location
-   and module Addr = Location.Addr
-   and type account := Account.t
-   and type root_hash := Hash.t
-   and type hash := Hash.t
-   and type key := Key.t
-   and type key_set := Key.Set.t = struct
+  with module Location = Inputs.Location
+   and module Addr = Inputs.Location.Addr
+   and type account := Inputs.Account.t
+   and type root_hash := Inputs.Hash.t
+   and type hash := Inputs.Hash.t
+   and type key := Inputs.Key.t
+   and type key_set := Inputs.Key.Set.t = struct
   (* The max depth of a merkle tree can never be greater than 253. *)
+  open Inputs
   include Depth
 
   let () = assert (Depth.depth < 0xfe)
@@ -44,11 +48,13 @@ module Make
   let get_uuid t = t.uuid
 
   let create ?directory_name () =
-    let uuid = Uuid.create () in
+    let uuid = Uuid_unix.create () in
     let directory =
       match directory_name with
-      | None -> Uuid.to_string uuid
-      | Some name -> name
+      | None ->
+          Uuid.to_string uuid
+      | Some name ->
+          name
     in
     let kvdb = Kvdb.create ~directory in
     {uuid; kvdb}
@@ -63,23 +69,14 @@ module Make
     with exn -> close t ; raise exn
 
   let empty_hashes =
-    let empty_hashes =
-      Array.create ~len:(Depth.depth + 1) Hash.empty_account
-    in
-    let rec loop last_hash height =
-      if height <= Depth.depth then (
-        let hash = Hash.merge ~height:(height - 1) last_hash last_hash in
-        empty_hashes.(height) <- hash ;
-        loop hash (height + 1) )
-    in
-    loop Hash.empty_account 1 ;
-    Immutable_array.of_array empty_hashes
+    Empty_hashes.cache (module Hash) ~init_hash:Hash.empty_account Depth.depth
 
   let get_raw {kvdb; _} location =
     Kvdb.get kvdb ~key:(Location.serialize location)
 
   let get_bin mdb location bin_read =
-    get_raw mdb location |> Option.map ~f:(fun v -> bin_read v ~pos_ref:(ref 0))
+    get_raw mdb location
+    |> Option.map ~f:(fun v -> bin_read v ~pos_ref:(ref 0))
 
   let delete_raw {kvdb; _} location =
     Kvdb.remove kvdb ~key:(Location.serialize location)
@@ -91,8 +88,10 @@ module Make
   let get_hash mdb location =
     assert (Location.is_hash location) ;
     match get_bin mdb location Hash.bin_read_t with
-    | Some hash -> hash
-    | None -> Immutable_array.get empty_hashes (Location.height location)
+    | Some hash ->
+        hash
+    | None ->
+        Immutable_array.get empty_hashes (Location.height location)
 
   let account_list_bin {kvdb; _} account_bin_read : Account.t list =
     let all_keys_values = Kvdb.to_alist kvdb in
@@ -134,22 +133,7 @@ module Make
       (loc, buf)
     in
     let locs_bufs = List.map locations_vs ~f:create_buf in
-    set_raw_batch mdb locs_bufs
-
-  let rec set_hash mdb location new_hash =
-    assert (Location.is_hash location) ;
-    set_bin mdb location Hash.bin_size_t Hash.bin_write_t new_hash ;
-    let height = Location.height location in
-    if height < Depth.depth then
-      let sibling_hash = get_hash mdb (Location.sibling location) in
-      let parent_hash =
-        let left_hash, right_hash =
-          Location.order_siblings location new_hash sibling_hash
-        in
-        assert (height <= Depth.depth) ;
-        Hash.merge ~height left_hash right_hash
-      in
-      set_hash mdb (Location.parent location) parent_hash
+    set_raw_batch ~remove_keys:[] mdb locs_bufs
 
   let get_inner_hash_at_addr_exn mdb address =
     assert (Addr.depth address <= Depth.depth) ;
@@ -166,29 +150,40 @@ module Make
       assert (Location.is_generic location) ;
       get_raw mdb location
 
-    (* encodes a key as a location used as a database key, so we can find the account
-       location associated with that key
-     *)
+    (* encodes a key as a location used as a database key, so we can find the
+       account location associated with that key *)
     let build_location key =
       Location.build_generic
         (Bigstring.of_string ("$" ^ Format.sprintf !"%{sexp: Key.t}" key))
 
     let get mdb key =
       match get_generic mdb (build_location key) with
-      | None -> Error Db_error.Account_location_not_found
+      | None ->
+          Error Db_error.Account_location_not_found
       | Some location_bin ->
-          Location.parse location_bin
-          |> Result.map_error ~f:(fun () -> Db_error.Malformed_database)
+          let result =
+            Location.parse location_bin
+            |> Result.map_error ~f:(fun () -> Db_error.Malformed_database)
+          in
+          result
 
     let delete mdb key = delete_raw mdb (build_location key)
 
-    let set mdb key location = set_raw mdb (build_location key) location
+    let set mdb key location =
+      set_raw mdb (build_location key) (Location.serialize location)
 
-    let last_location () =
+    let set_batch mdb keys_to_locations =
+      let serialize_location (key, location) =
+        (Location.serialize @@ key, Location.serialize location)
+      in
+      let serialized = List.map keys_to_locations ~f:serialize_location in
+      Kvdb.set_batch mdb.kvdb ~key_data_pairs:serialized
+
+    let last_location_key () =
       Location.build_generic (Bigstring.of_string "last_account_location")
 
     let increment_last_account_location mdb =
-      let location = last_location () in
+      let location = last_location_key () in
       match get_generic mdb location with
       | None ->
           let first_location =
@@ -200,7 +195,8 @@ module Make
           Result.return first_location
       | Some prev_location -> (
         match Location.parse prev_location with
-        | Error () -> Error Db_error.Malformed_database
+        | Error () ->
+            Error Db_error.Malformed_database
         | Ok prev_account_location ->
             Location.next prev_account_location
             |> Result.of_option ~error:Db_error.Out_of_leaves
@@ -212,32 +208,80 @@ module Make
     let allocate mdb key =
       let location_result = increment_last_account_location mdb in
       Result.map location_result ~f:(fun location ->
-          set mdb key (Location.serialize location) ;
-          location )
+          set mdb key location ; location )
 
     let last_location_address mdb =
       match
-        last_location () |> get_raw mdb |> Result.of_option ~error:()
+        last_location_key () |> get_raw mdb |> Result.of_option ~error:()
         |> Result.bind ~f:Location.parse
       with
-      | Error () -> None
-      | Ok parsed_location -> Some (Location.to_path_exn parsed_location)
+      | Error () ->
+          None
+      | Ok parsed_location ->
+          Some (Location.to_path_exn parsed_location)
 
     let last_location mdb =
       match
-        last_location () |> get_raw mdb |> Result.of_option ~error:()
+        last_location_key () |> get_raw mdb |> Result.of_option ~error:()
         |> Result.bind ~f:Location.parse
       with
-      | Error () -> None
-      | Ok parsed_location -> Some parsed_location
+      | Error () ->
+          None
+      | Ok parsed_location ->
+          Some parsed_location
   end
 
   let location_of_key t key =
     match Account_location.get t key with
-    | Error _ -> None
-    | Ok location -> Some location
+    | Error _ ->
+        None
+    | Ok location ->
+        Some location
 
   let last_filled t = Account_location.last_location t
+
+  include Util.Make (struct
+    module Key = Key
+    module Balance = Balance
+    module Location = Location
+    module Account = Account
+    module Hash = Hash
+    module Depth = Depth
+
+    module Base = struct
+      type nonrec t = t
+
+      let get = get
+
+      let last_filled = last_filled
+    end
+
+    let get_hash = get_hash
+
+    let location_of_account_addr addr = Location.Account addr
+
+    let location_of_hash_addr addr = Location.Hash addr
+
+    let set_raw_hash_batch mdb addresses_and_hashes =
+      set_bin_batch mdb Hash.bin_size_t Hash.bin_write_t addresses_and_hashes
+
+    let set_location_batch ~last_location mdb key_to_location_list =
+      let last_location_key_value =
+        (Account_location.last_location_key (), last_location)
+      in
+      Account_location.set_batch ~remove_keys:[] mdb
+        ( Non_empty_list.cons last_location_key_value
+            (Non_empty_list.map key_to_location_list ~f:(fun (key, location) ->
+                 (Account_location.build_location key, location) ))
+        |> Non_empty_list.to_list )
+
+    let set_raw_account_batch mdb
+        (addresses_and_accounts : (location * Account.t) list) =
+      set_bin_batch mdb Account.bin_size_t Account.bin_write_t
+        addresses_and_accounts
+  end)
+
+  let set_hash mdb location new_hash = set_hash_batch mdb [(location, new_hash)]
 
   module For_tests = struct
     let gen_account_location =
@@ -257,16 +301,6 @@ module Make
     set_hash mdb
       (Location.Hash (Location.to_path_exn location))
       (Hash.hash_account account)
-
-  let set_batch mdb locations_accounts =
-    set_bin_batch mdb Account.bin_size_t Account.bin_write_t locations_accounts ;
-    let set_one_hash (location, account) =
-      set_hash mdb
-        (Location.Hash (Location.to_path_exn location))
-        (Hash.hash_account account)
-    in
-    (* TODO: is there something better we can do? *)
-    List.iter locations_accounts ~f:set_one_hash
 
   let index_of_key_exn mdb key =
     let location = location_of_key mdb key |> Option.value_exn in
@@ -292,7 +326,8 @@ module Make
           Error (Error.create "get_or_create_account" err Db_error.sexp_of_t) )
     | Error err ->
         Error (Error.create "get_or_create_account" err Db_error.sexp_of_t)
-    | Ok location -> Ok (`Existed, location)
+    | Ok location ->
+        Ok (`Existed, location)
 
   let get_or_create_account_exn mdb key account =
     get_or_create_account mdb key account
@@ -301,36 +336,27 @@ module Make
 
   let num_accounts t =
     match Account_location.last_location_address t with
-    | None -> 0
-    | Some addr -> Addr.to_int addr + 1
+    | None ->
+        0
+    | Some addr ->
+        Addr.to_int addr + 1
 
-  let get_all_accounts_rooted_at_exn mdb address =
-    let first_node, last_node = Addr.Range.subtree_range address in
-    let result =
-      Addr.Range.fold (first_node, last_node) ~init:[] ~f:(fun bit_index acc ->
-          let account = get mdb (Location.Account bit_index) in
-          account :: acc )
-    in
-    List.rev_filter_map result ~f:Fn.id
-
-  let set_all_accounts_rooted_at_exn mdb address (accounts : Account.t list) =
-    let first_node, last_node = Addr.Range.subtree_range address in
-    Addr.Range.fold (first_node, last_node) ~init:accounts ~f:(fun addr ->
-      function
-      | account :: accounts ->
-          set mdb (Location.Account addr) account ;
-          accounts
-      | [] -> [] )
-    |> ignore
+  let iteri t ~f =
+    match Account_location.last_location_address t with
+    | None ->
+        ()
+    | Some last_addr ->
+        Sequence.range ~stop:`inclusive 0 (Addr.to_int last_addr)
+        |> Sequence.iter ~f:(fun i -> f i (get_at_index_exn t i))
 
   (* TODO : if key-value store supports iteration mechanism, like RocksDB,
-     maybe use that here, instead of loading all accounts into memory
-     See Issue #1191
-  *)
+     maybe use that here, instead of loading all accounts into memory See Issue
+     #1191 *)
   let foldi_with_ignored_keys t ignored_keys ~init ~f =
     let f' index accum account = f (Addr.of_int_exn index) accum account in
     match Account_location.last_location_address t with
-    | None -> init
+    | None ->
+        init
     | Some last_addr ->
         let ignored_indices =
           Int.Set.map ignored_keys ~f:(fun key ->
@@ -357,6 +383,9 @@ module Make
       foldi t ~init ~f:f'
 
     let iter = `Define_using_fold
+
+    (* Use num_accounts instead? *)
+    let length = `Define_using_fold
   end)
 
   let fold_until = C.fold_until
@@ -368,15 +397,19 @@ module Make
       (* if we don't have a location for all keys, raise an exception *)
       let rec loop keys accum =
         match keys with
-        | [] -> accum (* no need to reverse *)
+        | [] ->
+            accum (* no need to reverse *)
         | key :: rest -> (
           match Account_location.get t key with
-          | Ok loc -> loop rest (loc :: accum)
-          | Error err -> raise (Db_error.Db_exception err) )
+          | Ok loc ->
+              loop rest (loc :: accum)
+          | Error err ->
+              raise (Db_error.Db_exception err) )
       in
       loop keys []
     in
-    (* N.B.: we're not using stack database here to make available newly-freed locations *)
+    (* N.B.: we're not using stack database here to make available newly-freed
+       locations *)
     List.iter keys ~f:(Account_location.delete t) ;
     List.iter locations ~f:(fun loc -> delete_raw t loc) ;
     (* recalculate hashes for each removed account *)

@@ -71,13 +71,15 @@ module type S = sig
     val create : G2.t -> (t, _) Checked.t
 
     val create_constant : G2.Unchecked.t -> t
+
+    val if_ : Boolean.var -> then_:t -> else_:t -> (t, _) Checked.t
   end
 
   module Fqk : sig
     type t
 
     module Unchecked : sig
-      type t
+      type t [@@deriving sexp]
     end
 
     val typ : (t, Unchecked.t) Typ.t
@@ -87,6 +89,8 @@ module type S = sig
     val equal : t -> t -> (Boolean.var, _) Checked.t
 
     val one : t
+
+    val if_ : Boolean.var -> then_:t -> else_:t -> (t, _) Checked.t
   end
 
   module Fqe : sig
@@ -95,6 +99,12 @@ module type S = sig
     val real_part : 'a t_ -> 'a
 
     val to_list : 'a t_ -> 'a list
+
+    val if_ :
+         Boolean.var
+      -> then_:Field.Var.t t_
+      -> else_:Field.Var.t t_
+      -> (Field.Var.t t_, _) Checked.t
   end
 
   val batch_miller_loop :

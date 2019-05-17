@@ -1,25 +1,27 @@
 open Core_kernel
 
-module Make
-    (Key : Intf.Key)
-    (Account : Intf.Account with type key := Key.t)
-    (Hash : Intf.Hash with type account := Account.t)
-    (Location : Location_intf.S) (Depth : sig
-        val depth : int
-    end) : sig
+module type Inputs_intf = sig
+  include Base_inputs_intf.S
+
+  module Location : Location_intf.S
+end
+
+module Make (Inputs : Inputs_intf) : sig
   include
     Base_ledger_intf.S
-    with module Addr = Location.Addr
-    with module Location = Location
-    with type key := Key.t
-     and type key_set := Key.Set.t
-     and type hash := Hash.t
-     and type root_hash := Hash.t
-     and type account := Account.t
+    with module Addr = Inputs.Location.Addr
+    with module Location = Inputs.Location
+    with type key := Inputs.Key.t
+     and type key_set := Inputs.Key.Set.t
+     and type hash := Inputs.Hash.t
+     and type root_hash := Inputs.Hash.t
+     and type account := Inputs.Account.t
 
   val create : unit -> t
 end = struct
-  type t = Core.Uuid.t [@@deriving sexp_of]
+  open Inputs
+
+  type t = Uuid.t [@@deriving sexp_of]
 
   let t_of_sexp _ = failwith "t_of_sexp unimplemented"
 
@@ -32,7 +34,7 @@ end = struct
 
   module Addr = Location.Addr
 
-  let create () = Core.Uuid.create ()
+  let create () = Uuid_unix.create ()
 
   let remove_accounts_exn _t =
     failwith "remove_accounts_exn: null ledgers cannot be mutated"
@@ -107,6 +109,8 @@ end = struct
 
   let keys _t = Key.Set.empty
 
+  let iteri _t ~f:_ = ()
+
   let fold_until _t ~init ~f:_ ~finish = finish init
 
   let foldi_with_ignored_keys _t _ ~init ~f:_ = init
@@ -118,10 +122,19 @@ end = struct
   let make_space_for _t _tot = ()
 
   let get_all_accounts_rooted_at_exn _t addr =
-    List.init (1 lsl Addr.height addr) ~f:(Fn.const Account.empty)
+    let first_node, last_node = Addr.Range.subtree_range addr in
+    let first_index = Addr.to_int first_node in
+    let last_index = Addr.to_int last_node in
+    List.(
+      zip_exn
+        (map ~f:Addr.of_int_exn (range first_index last_index))
+        (init (1 lsl Addr.height addr) ~f:(Fn.const Account.empty)))
 
   let set_all_accounts_rooted_at_exn _t =
     failwith "set_all_accounts_rooted_at_exn: null ledgers cannot be mutated"
+
+  let set_batch_accounts _t =
+    failwith "set_batch_accounts: null ledgers cannot be mutated"
 
   let set_inner_hash_at_addr_exn _t =
     failwith "set_inner_hash_at_addr_exn: null ledgers cannot be mutated"

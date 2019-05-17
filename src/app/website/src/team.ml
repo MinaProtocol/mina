@@ -21,7 +21,8 @@ module Member = struct
           [text name]
       and affiliation =
         match affiliation with
-        | None -> span [] []
+        | None ->
+            span [] []
         | Some affiliation ->
             h4
               [Style.(render (Styles.heading_style + ["silver f5"]))]
@@ -162,6 +163,21 @@ let core () =
        revolves around cryptography and privacy, particularly privacy in \
        cryptocurrencies. Rebekah holds an MSc in Information Security from \
        UCL and a BSc in Mathematics from the University of Manchester."
+  and jiawei =
+    plain "Jiawei Tang" "Protocol Engineer"
+      "Jiawei loves writing interpreters and type checkers. He received his \
+       BS in computer science from Indiana University, and he's fascinated by \
+       categorical semantics and dependent type theory. Currently, he is \
+       implementing a toy dependently typed language called Pie."
+  and avery =
+    plain "Avery Morin" "Protocol Engineer"
+      "Avery first encountered OCaml during his BSc in software engineering \
+       at McGill University. Since graduating, he's been involved in the \
+       ReasonML community in his free time. He's worked on several projects \
+       including Reprocessing, a cross-platform port of Processing designed \
+       for beginners to the language. Avery is interested in making the \
+       helpful aspects of functional programming and type systems more \
+       accessible to people who aren’t already taking advantage of them."
   and nacera =
     plain "Nacera Rodstein" "Operations Associate"
       "Nacera has had a career spanning startups, medium sized companies, and \
@@ -171,6 +187,13 @@ let core () =
        acquisition by Turner), Mokum Solutions, Sephora, Venture Beat, AMSI, \
        Oracle, and a software sales business which she helped start up and \
        scale."
+  and harold =
+    plain "Harold Herbert" "Lead Designer"
+      "Harold previously designed brands, products, and experiences at Hired, \
+       Flipboard, Zillow, and with a range of technology companies while \
+       running an independent design studio. He believes that all design is \
+       experience design. Regardless of the medium, the end goal is for the \
+       well-being of the user."
   and joe =
     advisor "Joseph Bonneau"
       {literal|
@@ -227,7 +250,10 @@ She holds a MSc from Magdalen College, Oxford, and an AB from Harvard, where she
     ; echo
     ; matthew
     ; rebekah
+    ; jiawei
+    ; avery
     ; nacera
+    ; harold
     ; joe
     ; akis
     ; benedikt

@@ -1,0 +1,10 @@
+(library
+ (name cached)
+ (public_name cached)
+ (flags :standard -short-paths -warn-error -34-37-58)
+ (library_flags -linkall)
+ (inline_tests)
+ (libraries core storage async)
+ (preprocess
+  (pps ppx_jane bisect_ppx -- -conditional))
+ (synopsis "Cache computation results on disk"))

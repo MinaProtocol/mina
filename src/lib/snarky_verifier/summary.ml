@@ -37,8 +37,8 @@ module Make (Inputs : Inputs_intf) = struct
       @ List.concat_map g2s ~f:(fun (x, _) -> Fqe.to_list x)
       @ List.concat_map gts ~f:(fun (a, _) -> Fqe.to_list a)
       |> Checked.List.map ~f:(fun x ->
-             Field.Checked.choose_preimage_var x ~length:Field.size_in_bits
-             >>| List.hd_exn )
+             Field.Checked.choose_preimage_var x ~length:Field.size_in_bits )
+      >>| List.concat
     and signs =
       let parity x =
         let%map bs = Field.Checked.unpack_full x in
@@ -62,7 +62,7 @@ module Make (Inputs : Inputs_intf) = struct
       List.map g1s ~f:(fun (x, _) -> x)
       @ List.concat_map g2s ~f:(fun (x, _) -> Fqe.to_list x)
       @ List.concat_map gts ~f:(fun (a, _) -> Fqe.to_list a)
-      |> List.map ~f:parity
+      |> List.concat_map ~f:Field.unpack
     and signs =
       let real_part_parity a =
         let x = Fqe.real_part a in

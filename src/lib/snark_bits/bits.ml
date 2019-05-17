@@ -158,8 +158,8 @@ module Snarkable = struct
     with type ('a, 'b) typ := ('a, 'b) Impl.Typ.t
      and type ('a, 'b) checked := ('a, 'b) Impl.Checked.t
      and type boolean_var := Impl.Boolean.var
-     and type field_var := Impl.Field.Checked.t
-     and type Packed.var = Impl.Field.Checked.t
+     and type field_var := Impl.Field.Var.t
+     and type Packed.var = Impl.Field.Var.t
      and type Packed.value = V.t
      and type Unpacked.var = Impl.Boolean.var list
      and type Unpacked.value = V.t
@@ -178,7 +178,7 @@ module Snarkable = struct
       go V.empty 0
 
     module Packed = struct
-      type var = Field.Checked.t
+      type var = Field.Var.t
 
       type value = V.t
 
@@ -191,7 +191,6 @@ module Snarkable = struct
           init ~f:(fun i -> Bigint.test_bit n i)
         in
         let store t =
-          let open Store.Let_syntax in
           let rec go two_to_the_i i acc =
             if i = V.length then acc
             else
@@ -214,7 +213,7 @@ module Snarkable = struct
       List.foldi vs ~init:V.empty ~f:(fun i acc b ->
           if i < V.length then V.set acc i b else acc )
 
-    let pack_var = Field.Checked.project
+    let pack_var = Field.Var.project
 
     let pack_value = Fn.id
 
@@ -241,6 +240,8 @@ module Snarkable = struct
 
     let var_of_field = unpack_var
 
+    let var_of_field_unsafe = Fn.id
+
     let unpack_value (x : Packed.value) : Unpacked.value = x
 
     let compare_var x y =
@@ -248,14 +249,14 @@ module Snarkable = struct
 
     let%snarkydef increment_if_var bs (b : Boolean.var) =
       let open Impl in
-      let v = Field.Checked.pack bs in
-      let v' = Field.Checked.add v (b :> Field.Checked.t) in
+      let v = Field.Var.pack bs in
+      let v' = Field.Var.add v (b :> Field.Var.t) in
       Field.Checked.unpack v' ~length:V.length
 
     let%snarkydef increment_var bs =
       let open Impl in
-      let v = Field.Checked.pack bs in
-      let v' = Field.Checked.add v (Field.Checked.constant Field.one) in
+      let v = Field.Var.pack bs in
+      let v' = Field.Var.add v (Field.Var.constant Field.one) in
       Field.Checked.unpack v' ~length:V.length
 
     let%snarkydef equal_var (n : Unpacked.var) (n' : Unpacked.var) =
@@ -270,7 +271,8 @@ module Snarkable = struct
         List.map2 then_ else_ ~f:(fun then_ else_ ->
             Boolean.if_ cond ~then_ ~else_ )
       with
-      | Ok result -> Checked.List.all result
+      | Ok result ->
+          Checked.List.all result
       | Unequal_lengths ->
           failwith "Bits.if_: unpacked bit lengths were unequal"
   end
@@ -289,7 +291,7 @@ module Snarkable = struct
     include M
 
     module Packed = struct
-      type var = Field.Checked.t
+      type var = Field.Var.t
 
       type value = Field.t
 
@@ -321,7 +323,7 @@ module Snarkable = struct
 
     let project_value = Fn.id
 
-    let project_var = Field.Checked.project
+    let project_var = Field.Var.project
 
     let choose_preimage_var : Packed.var -> (Unpacked.var, _) Checked.t =
       Field.Checked.choose_preimage_var ~length:bit_length
@@ -334,7 +336,7 @@ module Snarkable = struct
     with type ('a, 'b) typ := ('a, 'b) Impl.Typ.t
      and type ('a, 'b) checked := ('a, 'b) Impl.Checked.t
      and type boolean_var := Impl.Boolean.var
-     and type Packed.var = Impl.Field.Checked.t
+     and type Packed.var = Impl.Field.Var.t
      and type Packed.value = Impl.Field.t
      and type Unpacked.var = Impl.Boolean.var list
      and type Unpacked.value = Impl.Field.t =
@@ -352,7 +354,7 @@ module Snarkable = struct
     with type ('a, 'b) typ := ('a, 'b) Impl.Typ.t
      and type ('a, 'b) checked := ('a, 'b) Impl.Checked.t
      and type boolean_var := Impl.Boolean.var
-     and type Packed.var = Impl.Field.Checked.t
+     and type Packed.var = Impl.Field.Var.t
      and type Packed.value = Impl.Field.t
      and type Unpacked.var = Impl.Boolean.var list
      and type Unpacked.value = Impl.Field.t = struct

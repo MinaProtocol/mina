@@ -1,7 +1,7 @@
 open Core
 open Async
 open Coda_worker
-open Coda_main
+open Coda_inputs
 open Coda_base
 open Signature_lib
 
@@ -24,8 +24,10 @@ let main () =
       [largest_account_keypair.public_key]
     |> Genesis_ledger.keypair_of_account_record_exn
   in
-  let proposal_interval =
-    Int64.to_int_exn Consensus.Mechanism.block_interval_ms
+  let proposal_interval = Consensus.Constants.block_window_duration_ms in
+  let acceptable_delay =
+    Time.Span.of_ms
+      (proposal_interval * Consensus.Constants.delta |> Float.of_int)
   in
   let n = 2 in
   let receiver_pk = Public_key.compress another_account_keypair.public_key in
@@ -37,8 +39,10 @@ let main () =
   Parallel.init_master () ;
   let configs =
     Coda_processes.local_configs n ~program_dir ~proposal_interval
-      ~snark_worker_public_keys:None ~should_propose:(Fn.const false)
-      ~work_selection
+      ~acceptable_delay ~snark_worker_public_keys:None
+      ~proposers:(Fn.const None) ~work_selection
+      ~trace_dir:(Unix.getenv "CODA_TRACING")
+      ~max_concurrent_connections:None
   in
   let%bind workers = Coda_processes.spawn_local_processes_exn configs in
   let worker = List.hd_exn workers in
@@ -49,7 +53,7 @@ let main () =
   in
   let receipt_chain_hash = Or_error.ok_exn receipt_chain_hash in
   let%bind restarted_worker = restart_node ~config worker in
-  let%map proof =
+  let%bind proof =
     Coda_process.prove_receipt_exn restarted_worker receipt_chain_hash
       receipt_chain_hash
   in
@@ -58,7 +62,8 @@ let main () =
       (Payment_proof.initial_receipt proof)
       receipt_chain_hash
   in
-  assert result
+  assert result ;
+  Deferred.List.iter workers ~f:Coda_process.disconnect
 
 let command =
   let open Command.Let_syntax in

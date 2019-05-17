@@ -150,7 +150,6 @@ module Make_weierstrass_checked
   type t = F.t * F.t
 
   let assert_on_curve (x, y) =
-    let open Let_syntax in
     let open F in
     let%bind x2 = square x in
     let%bind x3 = x2 * x in
@@ -172,7 +171,6 @@ module Make_weierstrass_checked
     F.(constant x, constant y)
 
   let assert_equal (x1, y1) (x2, y2) =
-    let open Let_syntax in
     let%map () = F.assert_equal x1 x2 and () = F.assert_equal y1 y2 in
     ()
 
@@ -313,11 +311,11 @@ module Make_weierstrass_checked
   let if_value (cond : Boolean.var) ~then_ ~else_ =
     let x1, y1 = Curve.to_affine_coordinates then_ in
     let x2, y2 = Curve.to_affine_coordinates else_ in
-    let cond = (cond :> Field.Checked.t) in
+    let cond = (cond :> Field.Var.t) in
     let choose a1 a2 =
       let open Field.Checked in
       F.map2_ a1 a2 ~f:(fun a1 a2 ->
-          Infix.((a1 * cond) + (a2 * (constant Field.one - cond))) )
+          (a1 * cond) + (a2 * (Field.Var.constant Field.one - cond)) )
     in
     (choose x1 x2, choose y1 y2)
 
@@ -329,7 +327,8 @@ module Make_weierstrass_checked
     let open Let_syntax in
     let rec go i bs0 acc pt =
       match bs0 with
-      | [] -> return acc
+      | [] ->
+          return acc
       | b :: bs ->
           let%bind acc' =
             with_label (sprintf "acc_%d" i)
@@ -349,12 +348,12 @@ module Make_weierstrass_checked
     let%map b0_and_b1 = Boolean.( && ) b0 b1 in
     let lookup_one (a1, a2, a3, a4) =
       let open F.Unchecked in
-      let ( * ) x b = F.map_ x ~f:(fun x -> Field.Checked.scale b x) in
+      let ( * ) x b = F.map_ x ~f:(fun x -> Field.Var.scale b x) in
       let ( +^ ) = F.( + ) in
       F.constant a1
-      +^ ((a2 - a1) * (b0 :> Field.Checked.t))
-      +^ ((a3 - a1) * (b1 :> Field.Checked.t))
-      +^ ((a4 + a1 - a2 - a3) * (b0_and_b1 :> Field.Checked.t))
+      +^ ((a2 - a1) * (b0 :> Field.Var.t))
+      +^ ((a3 - a1) * (b1 :> Field.Var.t))
+      +^ ((a4 + a1 - a2 - a3) * (b0_and_b1 :> Field.Var.t))
     in
     let x1, y1 = Curve.to_affine_coordinates t1
     and x2, y2 = Curve.to_affine_coordinates t2
@@ -367,9 +366,7 @@ module Make_weierstrass_checked
     let lookup_one (a1, a2) =
       let open F in
       constant a1
-      + map_
-          Unchecked.(a2 - a1)
-          ~f:(Field.Checked.scale (b :> Field.Checked.t))
+      + map_ Unchecked.(a2 - a1) ~f:(Field.Var.scale (b :> Field.Var.t))
     in
     let x1, y1 = Curve.to_affine_coordinates t1
     and x2, y2 = Curve.to_affine_coordinates t2 in
@@ -434,7 +431,8 @@ module Make_weierstrass_checked
         Can get away with using an unsafe add if we modify this a bit. *)
     let rec go acc two_to_the_i bits =
       match bits with
-      | [] -> return acc
+      | [] ->
+          return acc
       | [b_i] ->
           let term =
             lookup_single_bit b_i (sigma, Curve.(sigma + two_to_the_i))
@@ -461,14 +459,17 @@ module Make_weierstrass_checked
 
   let scale m t c ~init =
     match to_constant t with
-    | Some t -> scale_known m t c ~init
-    | None -> scale m t c ~init
+    | Some t ->
+        scale_known m t c ~init
+    | None ->
+        scale m t c ~init
 
   let sum (type shifted) (module Shifted : Shifted.S with type t = shifted) xs
       ~init =
     let open Let_syntax in
     let rec go acc = function
-      | [] -> return acc
+      | [] ->
+          return acc
       | t :: ts ->
           let%bind acc' = Shifted.add acc t in
           go acc' ts

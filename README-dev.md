@@ -1,6 +1,6 @@
 # Coda
 
-Coda is a new cryptocurrency protocol with a lightweight, constant sized blockchain.
+Coda is a new cryptocurrency protocol with a lightweight, constant-sized blockchain.
 
 * [Developer homepage](https://codaprotocol.com/code.html)
 * [Roadmap](https://github.com/orgs/CodaProtocol/projects/1)
@@ -15,7 +15,7 @@ Coda, this is the right file!
 Building Coda can be slightly involved. There are many C library dependencies that need
 to be present in the system, as well as some OCaml-specific setup.
 
-Currently, Coda only builds/runs on Linux. Building on macOS [is tracked in this issue](https://github.com/CodaProtocol/coda/issues/962).
+Currently, Coda builds/runs on Linux & macOS. MacOS may have some issues that you can track [here](https://github.com/CodaProtocol/coda/issues/962).
 
 The short version:
 
@@ -26,6 +26,13 @@ The short version:
  5. `make USEDOCKER=TRUE deb`
 
 Now you'll have a `src/_build/codaclient.deb` ready to install on Ubuntu or Debian!
+
+You should also run:
+
+ 6. `git config --local --add submodule.recurse true`
+
+so that the snarky sub-module gets updated automatically when updating your local
+copy of the repo.
 
 ### Developer Setup (MacOS)
 
@@ -48,7 +55,7 @@ Now you'll have a `src/_build/codaclient.deb` ready to install on Ubuntu or Debi
 
 * Pull down developer container image  (~2GB download, go stretch your legs)
 
-`docker pull codaprotocol/coda:toolchain-7df6b2b12bc316cb71592b12255d80e19396831e`
+`docker pull codaprotocol/coda:toolchain-a667ae88520eaa5acc6eac754dccc724092ff2f2`
 
 * Create local builder image
 
@@ -137,8 +144,11 @@ you need, you run `opam switch import src/opam.export`.
 Some of our dependencies aren't taken from `opam`, and aren't integrated
 with `dune`, so you need to add them manually:
 
+* `opam pin add src/external/digestif`
+* `opam pin add src/external/async_kernel`
 * `opam pin add src/external/ocaml-sodium`
 * `opam pin add src/external/rpc_parallel`
+* `opam pin add src/external/ocaml-extlib`
 
 There are a variety of C libraries we expect to be available in the system.
 These are also listed in the dockerfiles. Unlike most of the C libraries,

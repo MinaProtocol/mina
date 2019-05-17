@@ -148,7 +148,7 @@
 
 }
 
-.blog-content .code .footnoteRef {
+.blog-content .code .footnote-ref {
   position: absolute;
   left: 100%;
   top: 0rem;
@@ -213,7 +213,7 @@
 }
 
 /* links */
-.blog-content a:not(.footnoteRef) {
+.blog-content a:not(.footnote-ref):not(.sourceLine) {
   position: relative;
   color: rgb(70, 99, 131); /* blue black */
   text-decoration: none;
@@ -221,31 +221,31 @@
   border-bottom: 1px solid rgb(45,158,219); /* color & weight */
 }
 
-.blog-content a:not(.footnoteRef):hover {
+.blog-content a:not(.footnote-ref):not(.sourceLine):hover {
   color: rgb(45,158,219); /* blue */
 }
 
-.blog-content a.footnoteRef, .side-footnote sup {
+.blog-content a.footnote-ref, .side-footnote sup {
   position: relative;
   text-decoration: none;
   color: rgb(45,158,219); /* blue */
   border: none;
 }
 
-.blog-content a.footnoteRef:hover sup {
+.blog-content a.footnote-ref:hover sup {
   color: rgb(45,158,219); /* blue */
   padding-bottom: 0rem; /* offset */
   border-bottom: 1px solid rgb(45,158,219); /* color & weight */
 }
 
-.blog-content a[href^="#"]:not(.footnoteRef) {
+.blog-content a[href^="#"]:not(.footnote-ref) {
   position: relative;
   text-decoration: none;
   color: rgb(45,158,219); /* blue */
   border: none;
 }
 
-.blog-content a[href^="#"]:not(.footnoteRef):hover {
+.blog-content a[href^="#"]:not(.footnote-ref):hover {
   color: rgb(45,158,219); /* blue */
   padding-bottom: 0rem; /* offset */
   border-bottom: 1px solid rgb(45,158,219); /* color & weight */
@@ -302,7 +302,7 @@
   padding-bottom: 1px; /* offset */
 }
 
-.share a:not(.footnoteRef):hover {
+.share a:not(.footnote-ref):not(.sourceLine):hover {
   color: rgb(45,158,219);
   padding-bottom: 0; /* offset */
   border-bottom: 1px solid rgb(45,158,219); /* color & weight */
@@ -354,7 +354,7 @@
   display: none;
 }
 
-.side-footnotes a.footnoteRef:hover {
+.side-footnotes a.footnote-ref:hover {
   cursor: default;
 }
 
@@ -364,7 +364,7 @@
 }
 
 
-.side-footnotes a.footnoteRef:hover sup {
+.side-footnotes a.footnote-ref:hover sup {
   cursor: default;
   border-bottom: none;
 }

@@ -10,21 +10,26 @@ let dispatch rpc query port =
     (fun _ r w ->
       let open Deferred.Let_syntax in
       match%bind Rpc.Connection.create r w ~connection_state:(fun _ -> ()) with
-      | Error exn -> return (Or_error.of_exn exn)
-      | Ok conn -> Rpc.Rpc.dispatch rpc conn query )
+      | Error exn ->
+          return (Or_error.of_exn exn)
+      | Ok conn ->
+          Rpc.Rpc.dispatch rpc conn query )
 
 (** Call an RPC, passing handlers for a successful call and a failing one. Note
    that a successful *call* may have failed on the server side and returned a
    failing result. To deal with that, the success handler returns an
    Or_error. *)
 let dispatch_with_message rpc query port ~success ~error =
-  let fail err = eprintf "%s\n" err ; exit 1 in
+  let fail err = eprintf "%s\n%!" err ; exit 14 in
   match%bind dispatch rpc query port with
   | Ok x -> (
     match success x with
-    | Ok res -> printf "%s\n" res ; Deferred.unit
-    | Error e -> fail (Error.to_string_hum e) )
-  | Error e -> fail (error e)
+    | Ok res ->
+        printf "%s\n" res ; Deferred.unit
+    | Error e ->
+        fail (Error.to_string_hum e) )
+  | Error e ->
+      fail (error e)
 
 let dispatch_pretty_message (type t)
     (module Print : Cli_lib.Render.Printable_intf with type t = t)
@@ -49,7 +54,8 @@ let stop_daemon =
   Command.async ~summary:"Stop the daemon"
     (Cli_lib.Background_daemon.init (return ()) ~f:(fun port () ->
          match%map dispatch Stop_daemon.rpc () port with
-         | Ok () -> printf "Daemon stopping\n"
+         | Ok () ->
+             printf "Daemon stopping\n"
          | Error e ->
              printf "Daemon likely stopped: %s\n" (Error.to_string_hum e) ))
 
@@ -69,7 +75,8 @@ let get_balance =
              (Public_key.compress address)
              port
          with
-         | Ok (Some b) -> printf "%s\n" (Currency.Balance.to_string b)
+         | Ok (Some b) ->
+             printf "%s\n" (Currency.Balance.to_string b)
          | Ok None ->
              printf "No account found at that public_key (zero balance)\n"
          | Error e ->
@@ -85,7 +92,7 @@ let get_public_keys =
   in
   Command.async ~summary:"Get public keys"
     (Cli_lib.Background_daemon.init
-       (return (fun a b -> (a, b)) <*> with_balances_flag <*> Cli_lib.Flag.json)
+       (Args.zip2 with_balances_flag Cli_lib.Flag.json)
        ~f:(fun port (is_balance_included, json) ->
          if is_balance_included then
            dispatch_pretty_message ~json
@@ -130,12 +137,12 @@ let verify_payment =
   let proof_path_flag =
     flag "proof-path"
       ~doc:"PROOFFILE File to read json version of payment proof"
-      (required file)
+      (required string)
   in
   let payment_path_flag =
     flag "payment-path"
       ~doc:"PAYMENTPATH File to read json version of verifying payment"
-      (required file)
+      (required string)
   in
   let address_flag =
     flag "address" ~doc:"PUBLICKEY Public-key address of sender"
@@ -160,17 +167,22 @@ let verify_payment =
            dispatch Verify_proof.rpc (pk, payment, proof) port
          in
          match%map dispatch_result with
-         | Ok (Ok ()) -> printf "Payment is valid on the existing blockchain!"
-         | Error e | Ok (Error e) -> eprintf "%s" (Error.to_string_hum e) ))
+         | Ok (Ok ()) ->
+             printf "Payment is valid on the existing blockchain!\n"
+         | Error e | Ok (Error e) ->
+             eprintf "%s" (Error.to_string_hum e) ))
 
 let get_nonce addr port =
   let open Deferred.Let_syntax in
   match%map
     dispatch Daemon_rpcs.Get_nonce.rpc (Public_key.compress addr) port
   with
-  | Ok (Some n) -> Ok n
-  | Ok None -> Error "No account found at that public_key"
-  | Error e -> Error (Error.to_string_hum e)
+  | Ok (Some n) ->
+      Ok n
+  | Ok None ->
+      Error "No account found at that public_key"
+  | Error e ->
+      Error (Error.to_string_hum e)
 
 let get_nonce_cmd =
   let open Command.Param in
@@ -183,7 +195,7 @@ let get_nonce_cmd =
          match%bind get_nonce address port with
          | Error e ->
              eprintf "Failed to get nonce: %s\n" e ;
-             exit 1
+             exit 2
          | Ok nonce ->
              printf "%s\n" (Account.Nonce.to_string nonce) ;
              exit 0 ))
@@ -192,11 +204,7 @@ let status =
   let open Deferred.Let_syntax in
   let open Daemon_rpcs in
   let open Command.Param in
-  let flag =
-    let open Command.Param in
-    return (fun a b -> (a, b))
-    <*> Cli_lib.Flag.json <*> Cli_lib.Flag.performance
-  in
+  let flag = Args.zip2 Cli_lib.Flag.json Cli_lib.Flag.performance in
   Command.async ~summary:"Get running daemon status"
     (Cli_lib.Background_daemon.init flag ~f:(fun port (json, performance) ->
          dispatch_pretty_message ~json
@@ -208,11 +216,7 @@ let status =
 let status_clear_hist =
   let open Deferred.Let_syntax in
   let open Daemon_rpcs in
-  let flag =
-    let open Command.Param in
-    return (fun a b -> (a, b))
-    <*> Cli_lib.Flag.json <*> Cli_lib.Flag.performance
-  in
+  let flag = Args.zip2 Cli_lib.Flag.json Cli_lib.Flag.performance in
   Command.async ~summary:"Clear histograms reported in status"
     (Cli_lib.Background_daemon.init flag ~f:(fun port (json, performance) ->
          dispatch_pretty_message ~json
@@ -225,16 +229,18 @@ let get_nonce_exn public_key port =
   match%bind get_nonce public_key port with
   | Error e ->
       eprintf "Failed to get nonce %s\n" e ;
-      exit 1
-  | Ok nonce -> return nonce
+      exit 3
+  | Ok nonce ->
+      return nonce
 
 let handle_exception_nicely (type a) (f : unit -> a Deferred.t) () :
     a Deferred.t =
   match%bind Deferred.Or_error.try_with ~extract_exn:true f with
-  | Ok e -> return e
+  | Ok e ->
+      return e
   | Error e ->
       eprintf "Error: %s" (Error.to_string_hum e) ;
-      exit 1
+      exit 4
 
 let batch_send_payments =
   let module Payment_info = struct
@@ -248,7 +254,8 @@ let batch_send_payments =
     match%bind
       Reader.load_sexp payments_path [%of_sexp: Payment_info.t list]
     with
-    | Ok x -> return x
+    | Ok x ->
+        return x
     | Error e ->
         let sample_info () : Payment_info.t =
           let keypair = Keypair.create () in
@@ -264,11 +271,11 @@ let batch_send_payments =
           (Sexp.to_string_hum
              ([%sexp_of: Payment_info.t list]
                 (List.init 3 ~f:(fun _ -> sample_info ())))) ;
-        exit 1
+        exit 5
   in
   let main port (privkey_path, payments_path) =
     let open Deferred.Let_syntax in
-    let%bind keypair = Cli_lib.Keypair.Terminal_stdin.read_exn privkey_path
+    let%bind keypair = Secrets.Keypair.Terminal_stdin.read_exn privkey_path
     and infos = get_infos payments_path in
     let%bind nonce0 = get_nonce_exn keypair.public_key port in
     let _, ts =
@@ -290,7 +297,7 @@ let batch_send_payments =
       ~error:(fun e ->
         sprintf "Failed to send payments %s" (Error.to_string_hum e) )
   in
-  Command.async ~summary:"send multiple payments from a file"
+  Command.async ~summary:"Send multiple payments from a file"
     (Cli_lib.Background_daemon.init
        (Args.zip2 Cli_lib.Flag.privkey_read_path payment_path_flag)
        ~f:main)
@@ -300,20 +307,21 @@ let user_command (body_args : User_command_payload.Body.t Command.Param.t)
   let open Command.Param in
   let open Cli_lib.Arg_type in
   let amount_flag =
-    flag "fee" ~doc:"VALUE  fee you're willing to pay (default: 1)"
+    flag "fee"
+      ~doc:
+        (Printf.sprintf
+           "FEE Amount you are willing to pay to process the transaction \
+            (default: %d)"
+           (Currency.Fee.to_int Cli_lib.Fee.default_transaction))
       (optional txn_fee)
   in
-  let flag =
-    let open Command.Param in
-    return (fun a b c -> (a, b, c))
-    <*> body_args <*> Cli_lib.Flag.privkey_read_path <*> amount_flag
-  in
+  let flag = Args.zip3 body_args Cli_lib.Flag.privkey_read_path amount_flag in
   Command.async ~summary
     (Cli_lib.Background_daemon.init flag
        ~f:(fun port (body, from_account, fee) ->
          let open Deferred.Let_syntax in
          let%bind sender_kp =
-           Cli_lib.Keypair.Terminal_stdin.read_exn from_account
+           Secrets.Keypair.Terminal_stdin.read_exn from_account
          in
          let%bind nonce = get_nonce_exn sender_kp.public_key port in
          let fee = Option.value ~default:(Currency.Fee.of_int 1) fee in
@@ -327,9 +335,7 @@ let user_command (body_args : User_command_payload.Body.t Command.Param.t)
            port
            ~success:
              (Or_error.map ~f:(fun receipt_chain_hash ->
-                  sprintf
-                    "Successfully enqueued %s in pool\nReceipt_chain_hash: %s"
-                    label
+                  sprintf "Initiated %s\nReceipt chain hash: %s" label
                     (Receipt.Chain_hash.to_string receipt_chain_hash) ))
            ~error:(fun e -> sprintf "%s: %s" error (Error.to_string_hum e)) ))
 
@@ -339,7 +345,7 @@ let send_payment =
     let open Cli_lib.Arg_type in
     let%map_open receiver =
       flag "receiver"
-        ~doc:"PUBLICKEY Public-key address to which you want to send money"
+        ~doc:"PUBLICKEY Public key address to which you want to send money"
         (required public_key_compressed)
     and amount =
       flag "amount" ~doc:"VALUE Payment amount you want to send"
@@ -372,13 +378,13 @@ let wrap_key =
     @@ fun () ->
     let open Deferred.Let_syntax in
     let%bind privkey =
-      Cli_lib.Password.hidden_line_or_env "Private key: " ~env:"CODA_PRIVKEY"
+      Secrets.Password.hidden_line_or_env "Private key: " ~env:"CODA_PRIVKEY"
     in
     let pk =
       Private_key.of_base64_exn (privkey |> Or_error.ok_exn |> Bytes.to_string)
     in
     let kp = Keypair.of_private_key_exn pk in
-    Cli_lib.Keypair.Terminal_stdin.write_exn kp ~privkey_path)
+    Secrets.Keypair.Terminal_stdin.write_exn kp ~privkey_path)
 
 let dump_keypair =
   Command.async ~summary:"Print out a keypair from a private key file"
@@ -388,9 +394,9 @@ let dump_keypair =
     @@ fun () ->
     let open Deferred.Let_syntax in
     let%map kp =
-      Cli_lib.Keypair.read_exn ~privkey_path
+      Secrets.Keypair.read_exn ~privkey_path
         ~password:
-          (lazy (Cli_lib.Password.read "Password for private key file: "))
+          (lazy (Secrets.Password.read "Password for private key file: "))
     in
     printf "Public key: %s\nPrivate key: %s\n"
       (kp.public_key |> Public_key.compress |> Public_key.Compressed.to_base64)
@@ -404,7 +410,7 @@ let generate_keypair =
     @@ fun () ->
     let open Deferred.Let_syntax in
     let kp = Keypair.create () in
-    let%bind () = Cli_lib.Keypair.Terminal_stdin.write_exn kp ~privkey_path in
+    let%bind () = Secrets.Keypair.Terminal_stdin.write_exn kp ~privkey_path in
     printf "Public key: %s\n"
       (kp.public_key |> Public_key.compress |> Public_key.Compressed.to_base64) ;
     exit 0)
@@ -416,18 +422,21 @@ let dump_ledger =
       Arg_type.create (fun s ->
           Sexp.of_string_conv_exn s Staged_ledger_hash.Stable.V1.t_of_sexp )
     in
-    anon ("ledger-builder-hash" %: h)
+    anon ("staged-ledger-hash" %: h)
   in
   Command.async ~summary:"Print the ledger with given merkle root as a sexp"
     (Cli_lib.Background_daemon.init sl_hash ~f:(fun port sl_hash ->
          dispatch Daemon_rpcs.Get_ledger.rpc sl_hash port
          >>| function
-         | Error e -> eprintf !"Error: %{sexp:Error.t}\n" e
-         | Ok (Error e) -> printf !"Ledger not found: %{sexp:Error.t}\n" e
-         | Ok (Ok accounts) -> printf !"%{sexp:Account.t list}\n" accounts ))
+         | Error e ->
+             eprintf !"Error: %{sexp:Error.t}\n" e
+         | Ok (Error e) ->
+             printf !"Ledger not found: %{sexp:Error.t}\n" e
+         | Ok (Ok accounts) ->
+             printf !"%{sexp:Account.t list}\n" accounts ))
 
 let constraint_system_digests =
-  Command.async ~summary:"Print the md5 digest of each SNARK constraint system"
+  Command.async ~summary:"Print MD5 digest of each SNARK constraint"
     (Command.Param.return (fun () ->
          let all =
            Transaction_snark.constraint_system_digests ()
@@ -435,7 +444,7 @@ let constraint_system_digests =
                ()
          in
          let all =
-           List.sort (fun (k1, _) (k2, _) -> String.compare k1 k2) all
+           List.sort ~compare:(fun (k1, _) (k2, _) -> String.compare k1 k2) all
          in
          List.iter all ~f:(fun (k, v) -> printf "%s\t%s\n" k (Md5.to_hex v)) ;
          Deferred.unit ))
@@ -447,14 +456,86 @@ let snark_job_list =
   Command.async ~summary:"List of snark jobs in JSON format"
     (Cli_lib.Background_daemon.init (return ()) ~f:(fun port () ->
          match%map dispatch Daemon_rpcs.Snark_job_list.rpc () port with
-         | Ok str -> printf "%s" str
-         | Error e -> eprintf !"Error: %{sexp:Error.t}\n" e ))
+         | Ok str ->
+             printf "%s" str
+         | Error e ->
+             eprintf !"Error: %{sexp:Error.t}\n" e ))
+
+let start_tracing =
+  let open Deferred.Let_syntax in
+  let open Daemon_rpcs in
+  let open Command.Param in
+  Command.async ~summary:"Start async tracing to $config-directory/$pid.trace"
+    (Cli_lib.Background_daemon.init (return ()) ~f:(fun port () ->
+         match%map dispatch Daemon_rpcs.Start_tracing.rpc () port with
+         | Ok () ->
+             printf "Daemon started tracing!"
+         | Error e ->
+             eprintf !"Error: %{sexp:Error.t}\n" e ))
+
+let stop_tracing =
+  let open Deferred.Let_syntax in
+  let open Daemon_rpcs in
+  let open Command.Param in
+  Command.async ~summary:"Stop async tracing"
+    (Cli_lib.Background_daemon.init (return ()) ~f:(fun port () ->
+         match%map dispatch Daemon_rpcs.Stop_tracing.rpc () port with
+         | Ok () ->
+             printf "Daemon stopped printing!"
+         | Error e ->
+             eprintf !"Error: %{sexp:Error.t}\n" e ))
+
+module Visualization = struct
+  let create_command (type rpc_response) ~name ~f
+      (rpc : (string, rpc_response) Rpc.Rpc.t) =
+    let open Deferred.Let_syntax in
+    let open Command.Param in
+    Command.async
+      ~summary:(sprintf !"Produce a visualization of the %s" name)
+      (Cli_lib.Background_daemon.init
+         Command.Param.(anon @@ ("output-filepath" %: string))
+         ~f:(fun port filename ->
+           let%map message =
+             match%map dispatch rpc filename port with
+             | Ok response ->
+                 f filename response
+             | Error e ->
+                 sprintf "Could not save file: %s\n" (Error.to_string_hum e)
+           in
+           print_string message ))
+
+  module Frontier = struct
+    let name = "transition-frontier"
+
+    let command =
+      create_command ~name Daemon_rpcs.Visualization.Frontier.rpc
+        ~f:(fun filename -> function
+        | `Active () ->
+            Visualization_message.success name filename
+        | `Bootstrapping ->
+            Visualization_message.bootstrap name )
+  end
+
+  module Registered_masks = struct
+    let name = "registered-masks"
+
+    let command =
+      create_command ~name Daemon_rpcs.Visualization.Registered_masks.rpc
+        ~f:(fun filename () -> Visualization_message.success name filename)
+  end
+
+  let command_group =
+    Command.group ~summary:"Visualize data structures special to Coda"
+      [ (Frontier.name, Frontier.command)
+      ; (Registered_masks.name, Registered_masks.command) ]
+end
 
 let command =
-  Command.group ~summary:"Lightweight client process"
+  Command.group ~summary:"Lightweight client commands"
     [ ("get-balance", get_balance)
     ; ("get-public-keys", get_public_keys)
     ; ("prove-payment", prove_payment)
+    ; ("verify-payment", verify_payment)
     ; ("get-nonce", get_nonce_cmd)
     ; ("send-payment", send_payment)
     ; ("stop-daemon", stop_daemon)
@@ -466,4 +547,7 @@ let command =
     ; ("dump-ledger", dump_ledger)
     ; ("constraint-system-digests", constraint_system_digests)
     ; ("generate-keypair", generate_keypair)
-    ; ("snark-job-list", snark_job_list) ]
+    ; ("start-tracing", start_tracing)
+    ; ("stop-tracing", stop_tracing)
+    ; ("snark-job-list", snark_job_list)
+    ; ("visualization", Visualization.command_group) ]

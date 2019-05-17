@@ -1,0 +1,6 @@
+(library
+  (name empty_hashes)
+  (public_name empty_hashes)
+  (library_flags (-linkall))
+  (libraries core immutable_array )
+   )

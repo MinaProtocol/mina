@@ -23,9 +23,9 @@ include
   Snarkable.Bits.Faithful
   with type Unpacked.value = t
    and type Packed.value = t
-   and type Packed.var = private Field.Checked.t
+   and type Packed.var = private Field.Var.t
 
-val var_to_unpacked : Field.Checked.t -> (Unpacked.var, _) Tick.Checked.t
+val var_to_unpacked : Field.Var.t -> (Unpacked.var, _) Tick.Checked.t
 
 val constant : Packed.value -> Packed.var
 

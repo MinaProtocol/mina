@@ -6,11 +6,12 @@ open Snark_bits
 open Bitstring_lib
 open Fold_lib
 open Tuple_lib
+open Module_version
 
 type uint64 = Unsigned.uint64
 
 module type Basic = sig
-  type t [@@deriving bin_io, sexp, compare, hash, yojson]
+  type t [@@deriving sexp, compare, hash, yojson]
 
   val max_int : t
 
@@ -22,8 +23,11 @@ module type Basic = sig
 
   module Stable : sig
     module V1 : sig
-      type nonrec t = t [@@deriving bin_io, sexp, compare, eq, hash, yojson]
+      type nonrec t = t
+      [@@deriving bin_io, sexp, compare, eq, hash, yojson, version]
     end
+
+    module Latest = V1
   end
 
   include Bits_intf.S with type t := t
@@ -57,6 +61,8 @@ module type Basic = sig
   val var_to_number : var -> Number.t
 
   val var_to_triples : var -> Boolean.var Triple.t list
+
+  val equal_var : var -> var -> (Boolean.var, _) Checked.t
 end
 
 module type Arithmetic_intf = sig
@@ -76,30 +82,42 @@ module type Signed_intf = sig
 
   type magnitude_var
 
-  type ('magnitude, 'sgn) t_
+  module Poly : sig
+    type ('magnitude, 'sgn) t
 
-  type t = (magnitude, Sgn.t) t_
-  [@@deriving sexp, hash, bin_io, compare, eq, to_yojson]
+    module Stable :
+      sig
+        module V1 : sig
+          type ('magnitude, 'sgn) t [@@deriving version]
+        end
 
-  val gen : t Quickcheck.Generator.t
+        module Latest = V1
+      end
+      with type ('magnitude, 'sgn) V1.t = ('magnitude, 'sgn) t
+  end
 
   module Stable : sig
     module V1 : sig
-      type nonrec ('magnitude, 'sgn) t_ = ('magnitude, 'sgn) t_
-
-      type nonrec t = t [@@deriving bin_io, sexp, hash, compare, eq, to_yojson]
+      type t = (magnitude, Sgn.Stable.V1.t) Poly.Stable.V1.t
+      [@@deriving bin_io, sexp, hash, compare, eq, yojson, version]
     end
+
+    module Latest = V1
   end
+
+  type t = Stable.Latest.t [@@deriving sexp, hash, compare, eq, yojson]
+
+  val gen : t Quickcheck.Generator.t
 
   val length_in_triples : int
 
-  val create : magnitude:'magnitude -> sgn:'sgn -> ('magnitude, 'sgn) t_
+  val create : magnitude:'magnitude -> sgn:'sgn -> ('magnitude, 'sgn) Poly.t
 
   val sgn : t -> Sgn.t
 
   val magnitude : t -> magnitude
 
-  type nonrec var = (magnitude_var, Sgn.var) t_
+  type var = (magnitude_var, Sgn.var) Poly.t
 
   val typ : (var, t) Typ.t
 
@@ -130,11 +148,11 @@ module type Signed_intf = sig
 
     val ( + ) : var -> var -> (var, _) Checked.t
 
-    val to_field_var : var -> (Field.var, _) Checked.t
+    val to_field_var : var -> (Field.Var.t, _) Checked.t
 
     val cswap :
          Boolean.var
-      -> (magnitude_var, Sgn.t) t_ * (magnitude_var, Sgn.t) t_
+      -> (magnitude_var, Sgn.t) Poly.t * (magnitude_var, Sgn.t) Poly.t
       -> (var * var, _) Checked.t
   end
 end
@@ -195,9 +213,9 @@ end) : sig
 
   val var_of_bits : Boolean.var Bitstring.Lsb_first.t -> var
 
-  val unpack_var : Field.Checked.t -> (var, _) Tick.Checked.t
+  val unpack_var : Field.Var.t -> (var, _) Tick.Checked.t
 
-  val pack_var : var -> Field.Checked.t
+  val pack_var : var -> Field.Var.t
 end = struct
   let max_int = Unsigned.max_int
 
@@ -208,7 +226,7 @@ end = struct
   module Stable = struct
     module V1 = struct
       module T = struct
-        type t = Unsigned.t [@@deriving bin_io, sexp, compare, hash]
+        type t = Unsigned.t [@@deriving bin_io, sexp, compare, hash, version]
 
         let of_int = Unsigned.of_int
 
@@ -216,13 +234,27 @@ end = struct
       end
 
       include T
+      include Registration.Make_latest_version (T)
       include Codable.Make_of_int (T)
       include Hashable.Make (T)
       include Comparable.Make (T)
     end
+
+    module Latest = V1
+
+    module Module_decl = struct
+      let name = "make_currency"
+
+      type latest = Latest.t
+    end
+
+    module Registrar = Registration.Make (Module_decl)
+    module Registered_V1 = Registrar.Register (V1)
   end
 
-  include Stable.V1
+  (* bin_io, version omitted *)
+  (*  type t = Stable.Latest.t  [@@deriving sexp, compare, hash] *)
+  include Stable.Latest
 
   let to_uint64 = Unsigned.to_uint64
 
@@ -297,7 +329,7 @@ end = struct
   let var_of_t t =
     List.init M.length ~f:(fun i -> Boolean.var_of_value (Vector.get t i))
 
-  type magnitude = t [@@deriving sexp, bin_io, hash, compare, eq, to_yojson]
+  type magnitude = t [@@deriving sexp, bin_io, hash, compare, yojson]
 
   let fold_bits = fold
 
@@ -308,19 +340,60 @@ end = struct
     >>= unpack_var
 
   module Signed = struct
-    module Stable = struct
-      module V1 = struct
-        type ('magnitude, 'sgn) t_ = {magnitude: 'magnitude; sgn: 'sgn}
-        [@@deriving bin_io, sexp, hash, compare, fields, eq, to_yojson]
+    module Poly = struct
+      module Stable = struct
+        module V1 = struct
+          module T = struct
+            type ('magnitude, 'sgn) t = {magnitude: 'magnitude; sgn: 'sgn}
+            [@@deriving bin_io, sexp, hash, compare, eq, yojson, version]
+          end
 
-        let create ~magnitude ~sgn = {magnitude; sgn}
+          include T
+        end
 
-        type t = (magnitude, Sgn.t) t_
-        [@@deriving bin_io, sexp, hash, compare, eq, to_yojson]
+        module Latest = V1
       end
+
+      type ('magnitude, 'sgn) t = ('magnitude, 'sgn) Stable.Latest.t =
+        {magnitude: 'magnitude; sgn: 'sgn}
     end
 
-    include Stable.V1
+    module Stable_outer = Stable
+
+    module Stable = struct
+      module V1 = struct
+        module T = struct
+          type t = (Stable.V1.t, Sgn.Stable.V1.t) Poly.Stable.V1.t
+          [@@deriving bin_io, sexp, hash, compare, eq, yojson, version]
+        end
+
+        include T
+        include Registration.Make_latest_version (T)
+      end
+
+      module Latest = V1
+
+      module Module_decl = struct
+        let name = "currency_signed"
+
+        type latest = Latest.t
+      end
+
+      module Registrar = Registration.Make (Module_decl)
+      module Registered_V1 = Registrar.Register (V1)
+    end
+
+    (* bin_io, version omitted *)
+    type t = (Stable_outer.V1.t, Sgn.Stable.V1.t) Poly.Stable.V1.t
+    [@@deriving sexp, hash, compare, eq, yojson]
+
+    (* = Stable.Latest.t *)
+
+    let create ~magnitude ~sgn = Poly.{magnitude; sgn}
+
+    let sgn Poly.{sgn; _} = sgn
+
+    let magnitude Poly.{magnitude; _} = magnitude
 
     let zero = create ~magnitude:zero ~sgn:Sgn.Pos
 
@@ -328,16 +401,17 @@ end = struct
       Quickcheck.Generator.map2 gen Sgn.gen ~f:(fun magnitude sgn ->
           create ~magnitude ~sgn )
 
-    type nonrec var = (var, Sgn.var) t_
+    type nonrec var = (var, Sgn.var) Poly.t
 
     let length_in_bits = Int.( + ) length_in_bits 1
 
     let length_in_triples = Int.((length_in_bits + 2) / 3)
 
-    let of_hlist : (unit, 'a -> 'b -> unit) Snarky.H_list.t -> ('a, 'b) t_ =
+    let of_hlist : (unit, 'a -> 'b -> unit) Snarky.H_list.t -> ('a, 'b) Poly.t
+        =
       Snarky.H_list.(fun [magnitude; sgn] -> {magnitude; sgn})
 
-    let to_hlist {magnitude; sgn} = Snarky.H_list.[magnitude; sgn]
+    let to_hlist Poly.{magnitude; sgn} = Snarky.H_list.[magnitude; sgn]
 
     let typ =
       Typ.of_hlistable
@@ -363,45 +437,46 @@ end = struct
       | Neg, (Neg as sgn) | Pos, (Pos as sgn) ->
           let open Option.Let_syntax in
           let%map magnitude = add x.magnitude y.magnitude in
-          {sgn; magnitude}
+          create ~sgn ~magnitude
       | Pos, Neg | Neg, Pos ->
           let c = compare_magnitude x.magnitude y.magnitude in
           Some
             ( if Int.( < ) c 0 then
-              { sgn= y.sgn
-              ; magnitude= Unsigned.Infix.(y.magnitude - x.magnitude) }
+              create ~sgn:y.sgn
+                ~magnitude:Unsigned.Infix.(y.magnitude - x.magnitude)
             else if Int.( > ) c 0 then
-              { sgn= x.sgn
-              ; magnitude= Unsigned.Infix.(x.magnitude - y.magnitude) }
+              create ~sgn:x.sgn
+                ~magnitude:Unsigned.Infix.(x.magnitude - y.magnitude)
             else zero )
 
-    let negate t = {t with sgn= Sgn.negate t.sgn}
+    let negate t = Poly.{t with sgn= Sgn.negate t.sgn}
 
-    let of_unsigned magnitude = {magnitude; sgn= Sgn.Pos}
+    let of_unsigned magnitude = create ~magnitude ~sgn:Sgn.Pos
 
     let ( + ) = add
 
     module Checked = struct
-      let to_bits {magnitude; sgn} =
+      let to_bits Poly.{magnitude; sgn} =
         (var_to_bits magnitude :> Boolean.var list) @ [Sgn.Checked.is_pos sgn]
 
-      let constant {magnitude; sgn} =
-        {magnitude= var_of_t magnitude; sgn= Sgn.Checked.constant sgn}
+      let constant Poly.{magnitude; sgn} =
+        Poly.{magnitude= var_of_t magnitude; sgn= Sgn.Checked.constant sgn}
 
-      let of_unsigned magnitude = {magnitude; sgn= Sgn.Checked.pos}
+      let of_unsigned magnitude = Poly.{magnitude; sgn= Sgn.Checked.pos}
 
       let if_ cond ~then_ ~else_ =
-        let%map sgn = Sgn.Checked.if_ cond ~then_:then_.sgn ~else_:else_.sgn
-        and magnitude =
-          if_ cond ~then_:then_.magnitude ~else_:else_.magnitude
-        in
-        {sgn; magnitude}
+        Poly.Stable.Latest.(
+          let%map sgn = Sgn.Checked.if_ cond ~then_:then_.sgn ~else_:else_.sgn
+          and magnitude =
+            if_ cond ~then_:then_.magnitude ~else_:else_.magnitude
+          in
+          {sgn; magnitude})
 
       let to_triples t =
         Bitstring.pad_to_triple_list ~default:Boolean.false_ (to_bits t)
 
       let to_field_var ({magnitude; sgn} : var) =
-        Tick.Field.Checked.mul (pack_var magnitude) (sgn :> Field.Checked.t)
+        Tick.Field.Checked.mul (pack_var magnitude) (sgn :> Field.Var.t)
 
       let add (x : var) (y : var) =
         let%bind xv = to_field_var x and yv = to_field_var y in
@@ -414,30 +489,32 @@ end = struct
               (Option.value_exn (add x y)).sgn)
         in
         let%bind res =
-          Tick.Field.Checked.mul
-            (sgn :> Field.Checked.t)
-            (Field.Checked.add xv yv)
+          Tick.Field.Checked.mul (sgn :> Field.Var.t) (Field.Var.add xv yv)
         in
         let%map magnitude = unpack_var res in
-        {magnitude; sgn}
+        Poly.{magnitude; sgn}
 
       let ( + ) = add
 
       let cswap_field (b : Boolean.var) (x, y) =
         (* (x + b(y - x), y + b(x - y)) *)
-        let open Field.Checked.Infix in
+        let open Field.Checked in
         let%map b_y_minus_x =
-          Tick.Field.Checked.mul (b :> Field.Checked.t) (y - x)
+          Tick.Field.Checked.mul (b :> Field.Var.t) (y - x)
         in
         (x + b_y_minus_x, y - b_y_minus_x)
 
       let cswap b (x, y) =
         let l_sgn, r_sgn =
-          match (x.sgn, y.sgn) with
-          | Sgn.Pos, Sgn.Pos -> Sgn.Checked.(pos, pos)
-          | Neg, Neg -> Sgn.Checked.(neg, neg)
-          | Pos, Neg -> (Sgn.Checked.neg_if_true b, Sgn.Checked.pos_if_true b)
-          | Neg, Pos -> (Sgn.Checked.pos_if_true b, Sgn.Checked.neg_if_true b)
+          match Poly.(x.sgn, y.sgn) with
+          | Sgn.Pos, Sgn.Pos ->
+              Sgn.Checked.(pos, pos)
+          | Neg, Neg ->
+              Sgn.Checked.(neg, neg)
+          | Pos, Neg ->
+              (Sgn.Checked.neg_if_true b, Sgn.Checked.pos_if_true b)
+          | Neg, Pos ->
+              (Sgn.Checked.pos_if_true b, Sgn.Checked.neg_if_true b)
         in
         let%map l_mag, r_mag =
           let%bind l, r =
@@ -446,7 +523,7 @@ end = struct
           let%map l = unpack_var l and r = unpack_var r in
           (l, r)
         in
-        ({sgn= l_sgn; magnitude= l_mag}, {sgn= r_sgn; magnitude= r_mag})
+        Poly.({sgn= l_sgn; magnitude= l_mag}, {sgn= r_sgn; magnitude= r_mag})
     end
   end
 
@@ -456,17 +533,21 @@ end = struct
     let if_value cond ~then_ ~else_ : var =
       List.init M.length ~f:(fun i ->
           match (Vector.get then_ i, Vector.get else_ i) with
-          | true, true -> Boolean.true_
-          | false, false -> Boolean.false_
-          | true, false -> cond
-          | false, true -> Boolean.not cond )
+          | true, true ->
+              Boolean.true_
+          | false, false ->
+              Boolean.false_
+          | true, false ->
+              cond
+          | false, true ->
+              Boolean.not cond )
 
     (* Unpacking protects against underflow *)
     let sub (x : Unpacked.var) (y : Unpacked.var) =
-      unpack_var (Field.Checked.sub (pack_var x) (pack_var y))
+      unpack_var (Field.Var.sub (pack_var x) (pack_var y))
 
     let sub_flagged x y =
-      let z = Field.Checked.sub (pack_var x) (pack_var y) in
+      let z = Field.Var.sub (pack_var x) (pack_var y) in
       let%map bits, `Success no_underflow =
         Field.Checked.unpack_flagged z ~length:length_in_bits
       in
@@ -493,10 +574,10 @@ end = struct
 
     (* Unpacking protects against overflow *)
     let add (x : Unpacked.var) (y : Unpacked.var) =
-      unpack_var (Field.Checked.add (pack_var x) (pack_var y))
+      unpack_var (Field.Var.add (pack_var x) (pack_var y))
 
     let add_flagged x y =
-      let z = Field.Checked.add (pack_var x) (pack_var y) in
+      let z = Field.Var.add (pack_var x) (pack_var y) in
       let%map bits, `Success no_overflow =
         Field.Checked.unpack_flagged z ~length:length_in_bits
       in
@@ -508,13 +589,19 @@ end = struct
 
     let add_signed (t : var) (d : Signed.var) =
       let%bind d = Signed.Checked.to_field_var d in
-      Field.Checked.add (pack_var t) d |> unpack_var
+      Field.Var.add (pack_var t) d |> unpack_var
 
     let%test_module "currency_test" =
       ( module struct
-        let expect_failure err c = if check c () then failwith err
+        let expect_failure err c =
+          if Or_error.is_ok (check c ()) then failwith err
 
-        let expect_success err c = if not (check c ()) then failwith err
+        let expect_success err c =
+          match check c () with
+          | Ok () ->
+              ()
+          | Error e ->
+              Error.(raise (tag ~tag:err e))
 
         let to_bigint x = Bignum_bigint.of_string (Unsigned.to_string x)
 
@@ -602,7 +689,7 @@ module Amount = struct
         let length = currency_length
       end)
 
-  type amount = T.Stable.V1.t [@@deriving bin_io, sexp]
+  type amount = T.Stable.Latest.t [@@deriving bin_io, sexp]
 
   include (
     T :
@@ -627,7 +714,7 @@ module Amount = struct
     let to_fee (t : var) : Fee.var = t
 
     let add_fee (t : var) (fee : Fee.var) =
-      Field.Checked.add (pack_var t) (Fee.pack_var fee) |> unpack_var
+      Field.Var.add (pack_var t) (Fee.pack_var fee) |> unpack_var
   end
 end
 

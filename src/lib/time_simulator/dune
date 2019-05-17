@@ -1,0 +1,10 @@
+(library
+ (name time_simulator)
+ (public_name time_simulator)
+ (flags :standard -short-paths -warn-error -58)
+ (library_flags -linkall)
+ (inline_tests)
+ (libraries protocols)
+ (preprocess
+  (pps ppx_jane ppx_deriving.eq bisect_ppx -- -conditional))
+ (synopsis "Time simulator. Time moves faster if nothing is happening."))

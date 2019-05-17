@@ -15,14 +15,24 @@ genesis_ledger = "test"]
 include Test_ledger
 
 [%%elif
-genesis_ledger = "testnet_posig"]
+genesis_ledger = "test_split_two_stakers"]
 
-include Testnet_posig_ledger
+include Test_split_two_stakes_ledger
+
+[%%elif
+genesis_ledger = "test_five_even_stakes"]
+
+include Test_five_even_stakes
 
 [%%elif
 genesis_ledger = "testnet_postake"]
 
 include Testnet_postake_ledger
+
+[%%elif
+genesis_ledger = "testnet_postake_many_proposers"]
+
+include Testnet_postake_ledger_many_proposers
 
 [%%else]
 

@@ -1,0 +1,9 @@
+(library
+ (name transaction_database)
+ (public_name transaction_database)
+ (library_flags -linkall)
+ (inline_tests)
+ (libraries core rocksdb coda_base)
+ (preprocess
+  (pps ppx_jane ppx_coda ppx_deriving_yojson))
+ (synopsis "Database to store transactions that a user sends and receives"))

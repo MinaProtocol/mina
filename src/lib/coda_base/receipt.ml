@@ -5,9 +5,11 @@ open Fold_lib
 module Chain_hash = struct
   include Data_hash.Make_full_size ()
 
-  let to_string t = Binable.to_string (module Stable.V1) t |> B64.encode
+  let to_string t =
+    Binable.to_string (module Stable.Latest) t |> Base64.encode_string
 
-  let of_string s = B64.decode s |> Binable.of_string (module Stable.V1)
+  let of_string s =
+    Base64.decode_exn s |> Binable.of_string (module Stable.Latest)
 
   include Codable.Make_of_string (struct
     type nonrec t = t
@@ -18,12 +20,7 @@ module Chain_hash = struct
   end)
 
   let empty =
-    of_hash
-      ( Pedersen.(
-          State.salt params
-            Curve_chunk_table.{curve_points_table}
-            "CodaReceiptEmpty")
-      |> Pedersen.State.digest )
+    of_hash (Pedersen.(State.salt "CodaReceiptEmpty") |> Pedersen.State.digest)
 
   let cons payload t =
     Pedersen.digest_fold Hash_prefix.receipt_chain
@@ -32,14 +29,13 @@ module Chain_hash = struct
 
   module Checked = struct
     let constant (t : t) =
-      var_of_hash_packed (Field.Checked.constant (t :> Field.t))
+      var_of_hash_packed (Field.Var.constant (t :> Field.t))
 
     type t = var
 
     let if_ = if_
 
     let cons ~payload t =
-      let open Let_syntax in
       let init =
         Pedersen.Checked.Section.create
           ~acc:(`Value Hash_prefix.receipt_chain.acc)
@@ -67,7 +63,7 @@ module Chain_hash = struct
         let unchecked = cons payload base in
         let checked =
           let comp =
-            let open Snark_params.Tick.Let_syntax in
+            let open Snark_params.Tick.Checked.Let_syntax in
             let%bind payload =
               Schnorr.Message.var_of_payload
                 Transaction_union_payload.(

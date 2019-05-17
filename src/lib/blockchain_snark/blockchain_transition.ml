@@ -2,6 +2,7 @@ open Core_kernel
 open Async_kernel
 open Snark_params
 open Snark_bits
+open Coda_state
 open Fold_lib
 module Digest = Tick.Pedersen.Digest
 module Storage = Storage.List.Make (Storage.Disk)
@@ -27,25 +28,28 @@ module Keys = struct
     type t = {step: Tick.Proving_key.t; wrap: Tock.Proving_key.t}
 
     let dummy =
-      {step= Dummy_values.Tick.proving_key; wrap= Dummy_values.Tock.proving_key}
+      { step= Dummy_values.Tick.Groth16.proving_key
+      ; wrap= Dummy_values.Tock.GrothMaller17.proving_key }
 
     let load ({step; wrap} : Location.t) =
       let open Storage in
-      let parent_log = Logger.create () in
+      let logger = Logger.create () in
       let tick_controller =
-        Controller.create ~parent_log (module Tick.Proving_key)
+        Controller.create ~logger (module Tick.Proving_key)
       in
       let tock_controller =
-        Controller.create ~parent_log (module Tock.Proving_key)
+        Controller.create ~logger (module Tock.Proving_key)
       in
       let open Async in
       let load c p =
         match%map load_with_checksum c p with
-        | Ok x -> x
-        | Error _e ->
+        | Ok x ->
+            x
+        | Error e ->
             failwithf
-              !"Blockchain_snark: load failed on %{sexp:Storage.location}"
-              p ()
+              !"Blockchain_snark: load failed on %{sexp:Storage.location}: \
+                %{sexp:[`Checksum_no_match|`No_exist|`IO_error of Error.t]}"
+              p e ()
       in
       let%map step = load tick_controller step
       and wrap = load tock_controller wrap in
@@ -64,22 +68,23 @@ module Keys = struct
     type t = {step: Tick.Verification_key.t; wrap: Tock.Verification_key.t}
 
     let dummy =
-      { step= Dummy_values.Tick.verification_key
-      ; wrap= Dummy_values.Tock.verification_key }
+      { step= Dummy_values.Tick.Groth16.verification_key
+      ; wrap= Dummy_values.Tock.GrothMaller17.verification_key }
 
     let load ({step; wrap} : Location.t) =
       let open Storage in
-      let parent_log = Logger.create () in
+      let logger = Logger.create () in
       let tick_controller =
-        Controller.create ~parent_log (module Tick.Verification_key)
+        Controller.create ~logger (module Tick.Verification_key)
       in
       let tock_controller =
-        Controller.create ~parent_log (module Tock.Verification_key)
+        Controller.create ~logger (module Tock.Verification_key)
       in
       let open Async in
       let load c p =
         match%map load_with_checksum c p with
-        | Ok x -> x
+        | Ok x ->
+            x
         | Error _e ->
             failwithf
               !"Blockchain_snark: load failed on %{sexp:Storage.location}"
@@ -118,29 +123,25 @@ module Keys = struct
     )
 end
 
-module Make
-    (Consensus_mechanism : Consensus.Mechanism.S)
-    (T : Transaction_snark.Verification.S) =
-struct
-  module Blockchain = Blockchain_state.Make (Consensus_mechanism)
-
+module Make (T : Transaction_snark.Verification.S) = struct
   module System = struct
-    module U = Blockchain.Make_update (T)
-    module Update = Consensus_mechanism.Snark_transition
+    module U = Blockchain_snark_state.Make_update (T)
+    module Update = Snark_transition
 
     module State = struct
-      include Consensus_mechanism.Protocol_state
+      include Protocol_state
 
       include (
-        Blockchain :
-          module type of Blockchain with module Checked := Blockchain.Checked )
+        Blockchain_snark_state :
+          module type of Blockchain_snark_state
+          with module Checked := Blockchain_snark_state.Checked )
 
       include (U : module type of U with module Checked := U.Checked)
 
       module Hash = Coda_base.State_hash
 
       module Checked = struct
-        include Blockchain.Checked
+        include Blockchain_snark_state.Checked
         include U.Checked
       end
     end
@@ -262,15 +263,11 @@ struct
 end
 
 let constraint_system_digests () =
-  let module M =
-    Make
-      (Consensus.Mechanism)
-      (Transaction_snark.Verification.Make (struct
-        let keys = Transaction_snark.Keys.Verification.dummy
-      end))
-  in
+  let module M = Make (Transaction_snark.Verification.Make (struct
+    let keys = Transaction_snark.Keys.Verification.dummy
+  end)) in
   let module W = M.Wrap_base (struct
-    let verification_key = Dummy_values.Tick.verification_key
+    let verification_key = Dummy_values.Tick.Groth16.verification_key
   end) in
   let digest = Tick.R1CS_constraint_system.digest in
   let digest' = Tock.R1CS_constraint_system.digest in

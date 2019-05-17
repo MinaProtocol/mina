@@ -3,7 +3,7 @@
   (public_name snarky_verifier)
   (preprocess (pps ppx_jane ppx_deriving.eq))
   (libraries
-    sgn
+    sgn_type
     snarky
     snarkette
     core_kernel ))

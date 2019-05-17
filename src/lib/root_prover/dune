@@ -1,0 +1,5 @@
+(library
+  (name root_prover)
+  (public_name root_prover)
+  (preprocess (pps ppx_jane ppx_deriving.eq))
+  (libraries async_kernel core_kernel protocols coda_base transition_frontier consensus merkle_list))

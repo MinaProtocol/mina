@@ -48,6 +48,11 @@ module Make (F : Intf.Basic) = struct
 
   let assert_r1cs = F.assert_r1cs
 
+  let equal x y =
+    Checked.all
+      (List.map2_exn (F.to_list x) (F.to_list y) ~f:Field.Checked.equal)
+    >>= Boolean.all
+
   let assert_equal x y =
     assert_all
       (List.map2_exn
@@ -70,7 +75,8 @@ module Make (F : Intf.Basic) = struct
 
   let div_unsafe x y =
     match (to_constant x, to_constant y) with
-    | Some x, Some y -> return (constant Unchecked.(x / y))
+    | Some x, Some y ->
+        return (constant Unchecked.(x / y))
     | _, _ ->
         let%bind x_over_y =
           exists typ
@@ -82,16 +88,20 @@ module Make (F : Intf.Basic) = struct
 
   let assert_square =
     match assert_square with
-    | `Custom f -> f
-    | `Define -> fun a a2 -> assert_r1cs a a a2
+    | `Custom f ->
+        f
+    | `Define ->
+        fun a a2 -> assert_r1cs a a a2
 
   let ( * ) =
     match ( * ) with
-    | `Custom f -> f
+    | `Custom f ->
+        f
     | `Define -> (
         fun x y ->
           match (to_constant x, to_constant y) with
-          | Some x, Some y -> return (constant Unchecked.(x * y))
+          | Some x, Some y ->
+              return (constant Unchecked.(x * y))
           | _, _ ->
               let%bind res =
                 exists typ
@@ -108,11 +118,13 @@ module Make (F : Intf.Basic) = struct
 
   let square =
     match square with
-    | `Custom f -> f
+    | `Custom f ->
+        f
     | `Define -> (
         fun x ->
           match to_constant x with
-          | Some x -> return (constant (Unchecked.square x))
+          | Some x ->
+              return (constant (Unchecked.square x))
           | None ->
               let%bind res =
                 exists typ
@@ -127,11 +139,13 @@ module Make (F : Intf.Basic) = struct
 
   let inv_exn =
     match inv_exn with
-    | `Custom f -> f
+    | `Custom f ->
+        f
     | `Define -> (
         fun t ->
           match to_constant t with
-          | Some x -> return (constant (Unchecked.inv x))
+          | Some x ->
+              return (constant (Unchecked.inv x))
           | None ->
               let%bind res =
                 exists typ
@@ -158,8 +172,10 @@ struct
         Some
           (A.map t ~f:(fun x ->
                match F.to_constant x with
-               | Some x -> x
-               | None -> raise None_exn ))
+               | Some x ->
+                   x
+               | None ->
+                   raise None_exn ))
       with None_exn -> None
 
   let if_ b ~then_ ~else_ =
@@ -198,7 +214,7 @@ struct
         type t = Field.t t_
       end
 
-      type t = Field.Checked.t t_
+      type t = Field.Var.t t_
 
       let map_ = map_
     end
@@ -217,32 +233,29 @@ struct
 
     let to_list x = [x]
 
-    module Unchecked = struct
-      include Field
-      include Field.Infix
-    end
+    module Unchecked = Field
 
-    type t = Field.Checked.t
+    type t = Field.Var.t
 
     let if_ = Field.Checked.if_
 
     let typ = Field.typ
 
-    let constant = Field.Checked.constant
+    let constant = Field.Var.constant
 
-    let to_constant = Field.Checked.to_constant
+    let to_constant = Field.Var.to_constant
 
-    let scale = Field.Checked.scale
+    let scale = Field.Var.scale
 
     let mul_field = Field.Checked.mul
 
     let assert_r1cs a b c = assert_r1cs a b c
 
-    let ( + ) = Field.Checked.Infix.( + )
+    let ( + ) = Field.Checked.( + )
 
-    let ( - ) = Field.Checked.Infix.( - )
+    let ( - ) = Field.Checked.( - )
 
-    let negate t = Field.Checked.scale t Unchecked.(negate one)
+    let negate t = Field.Var.scale t Unchecked.(negate one)
 
     let assert_square = `Custom (fun a c -> assert_square a c)
 
@@ -265,18 +278,21 @@ module E2
         val non_residue : F.Unchecked.t
 
         val mul_by_non_residue : F.t -> F.t
-    end) :
-  Intf.S_with_primitive_element
-  with module Impl = F.Impl
-   and module Base = F
-   and type 'a A.t = 'a * 'a = struct
+    end) : sig
+  include
+    Intf.S_with_primitive_element
+    with module Impl = F.Impl
+     and module Base = F
+     and type 'a A.t = 'a * 'a
+
+  val unitary_inverse : t -> t
+end = struct
   open Params
 
   module T = struct
     module Base = F
     module Impl = F.Impl
     open Impl
-    open Let_syntax
     module Unchecked = Snarkette.Fields.Make_fp2 (F.Unchecked) (Params)
 
     module A = struct
@@ -325,7 +341,7 @@ module E2
 
     let assert_square (a, b) (a2, b2) =
       let open F in
-      let ab = scale b2 Field.(Infix.(one / of_int 2)) in
+      let ab = scale b2 Field.(one / of_int 2) in
       let%map () = assert_r1cs a b ab
       and () =
         assert_r1cs (a + b)
@@ -374,6 +390,8 @@ module E2
 
   include T
   include Make (T)
+
+  let unitary_inverse (a, b) = (a, Base.negate b)
 end
 
 (* Given a prime order field F and s : F (called [non_residue] below)
@@ -410,7 +428,6 @@ module E3
     module Unchecked = Snarkette.Fields.Make_fp3 (F.Unchecked) (Params)
     module Impl = F.Impl
     open Impl
-    open Let_syntax
 
     module A = struct
       include T3
@@ -565,7 +582,6 @@ module F3
     module Unchecked = Snarkette.Fields.Make_fp3 (F.Unchecked) (Params)
     module Impl = F.Impl
     open Impl
-    open Let_syntax
 
     let mul_by_primitive_element (a, b, c) =
       (F.scale c Params.non_residue, a, b)
@@ -642,7 +658,6 @@ module Cyclotomic_square = struct
     let cyclotomic_square (c0, c1) =
       let open F2 in
       let open Impl in
-      let open Let_syntax in
       let%map b_squared = square (c0 + c1) and a = square c1 in
       let c = b_squared - a in
       let d = mul_by_primitive_element a in
@@ -661,7 +676,6 @@ module Cyclotomic_square = struct
   struct
     let cyclotomic_square ((x00, x01, x02), (x10, x11, x12)) =
       let open F2.Impl in
-      let open Let_syntax in
       let ((a0, a1) as a) = (x00, x11) in
       let ((b0, b1) as b) = (x10, x02) in
       let ((c0, c1) as c) = (x01, x12) in
@@ -669,14 +683,157 @@ module Cyclotomic_square = struct
       and bsq0, bsq1 = F2.square b
       and csq0, csq1 = F2.square c in
       let fpos x y =
-        Field.(Checked.(add (scale x (of_int 3)) (scale y (of_int 2))))
+        Field.(Var.(add (scale x (of_int 3)) (scale y (of_int 2))))
       in
       let fneg x y =
-        Field.(Checked.(sub (scale x (of_int 3)) (scale y (of_int 2))))
+        Field.(Var.(sub (scale x (of_int 3)) (scale y (of_int 2))))
       in
       ( (fneg asq0 a0, fneg bsq0 c0, fneg csq0 b1)
-      , ( fpos (Field.Checked.scale csq1 Params.cubic_non_residue) b0
+      , ( fpos (Field.Var.scale csq1 Params.cubic_non_residue) b0
         , fpos asq1 a1
         , fpos bsq1 c1 ) )
   end
+end
+
+module F6
+    (Fq : Intf.S with type 'a A.t = 'a and type 'a Base.t_ = 'a)
+    (Fq2 : Intf.S_with_primitive_element
+           with module Impl = Fq.Impl
+            and type 'a A.t = 'a * 'a
+            and type 'a Base.t_ = 'a Fq.t_) (Fq3 : sig
+        include
+          Intf.S_with_primitive_element
+          with module Impl = Fq.Impl
+           and type 'a A.t = 'a * 'a * 'a
+           and type 'a Base.t_ = 'a Fq.t_
+
+        module Params : sig
+          val non_residue : Fq.Unchecked.t
+
+          val frobenius_coeffs_c1 : Fq.Unchecked.t array
+
+          val frobenius_coeffs_c2 : Fq.Unchecked.t array
+        end
+    end) (Params : sig
+      val frobenius_coeffs_c1 : Fq.Unchecked.t array
+    end) =
+struct
+  include E2
+            (Fq3)
+            (struct
+              let non_residue : Fq3.Unchecked.t =
+                Fq.Unchecked.(zero, one, zero)
+
+              let mul_by_non_residue = Fq3.mul_by_primitive_element
+            end)
+
+  let fq_mul_by_non_residue x = Fq.scale x Fq3.Params.non_residue
+
+  let special_mul (a0, a1) (b0, b1) =
+    let open Impl in
+    let%bind v1 = Fq3.(a1 * b1) in
+    let%bind v0 =
+      let a00, a01, a02 = a0 in
+      let _, _, b02 = b0 in
+      let%map a00b02 = Fq.(a00 * b02)
+      and a01b02 = Fq.(a01 * b02)
+      and a02b02 = Fq.(a02 * b02) in
+      (fq_mul_by_non_residue a01b02, fq_mul_by_non_residue a02b02, a00b02)
+    in
+    let beta_v1 = Fq3.mul_by_primitive_element v1 in
+    let%map t = Fq3.((a0 + a1) * (b0 + b1)) in
+    Fq3.(v0 + beta_v1, t - v0 - v1)
+
+  let assert_special_mul ((((a00, a01, a02) as a0), a1) : t)
+      ((((_, _, b02) as b0), b1) : t) ((c00, c01, c02), c1) =
+    let open Impl in
+    let%bind ((v10, v11, v12) as v1) = Fq3.(a1 * b1) in
+    let%bind v0 =
+      exists Fq3.typ
+        ~compute:
+          As_prover.(
+            map2 ~f:Fq3.Unchecked.( * ) (read Fq3.typ a0) (read Fq3.typ b0))
+      (* v0
+          = (a00 + s a01 s^2 a02) (s^2 b02)
+        = non_residue a01 b02 + non_residue s a02 b02 + s^2 a00 b02 *)
+    in
+    let%map () =
+      let%map () =
+        Fq.assert_r1cs a01
+          (Fq.scale b02 Fq3.Params.non_residue)
+          (Field.Var.linear_combination
+             [(Field.one, c00); (Field.negate Fq3.Params.non_residue, v12)])
+      and () =
+        Fq.assert_r1cs a02 (Fq.scale b02 Fq3.Params.non_residue) Fq.(c01 - v10)
+      and () = Fq.assert_r1cs a00 b02 Fq.(c02 - v11) in
+      ()
+    and () = Fq3.assert_r1cs Fq3.(a0 + a1) Fq3.(b0 + b1) Fq3.(c1 + v0 + v1) in
+    ()
+
+  let special_div_unsafe a b =
+    let open Impl in
+    let%bind result =
+      exists typ
+        ~compute:As_prover.(map2 ~f:Unchecked.( / ) (read typ a) (read typ b))
+    in
+    (* result * b = a *)
+    let%map () = assert_special_mul result b a in
+    result
+
+  (* TODO: Make sure this is ok *)
+  let special_div = special_div_unsafe
+
+  include Cyclotomic_square.Make_F6
+            (Fq2)
+            (struct
+              let cubic_non_residue = Fq3.Params.non_residue
+            end)
+
+  let frobenius ((c00, c01, c02), (c10, c11, c12)) power =
+    let module Field = Impl.Field in
+    let p3 = power mod 3 in
+    let p6 = power mod 6 in
+    let ( * ) s x = Field.Var.scale x s in
+    ( ( c00
+      , Fq3.Params.frobenius_coeffs_c1.(p3) * c01
+      , Fq3.Params.frobenius_coeffs_c2.(p3) * c02 )
+    , ( Params.frobenius_coeffs_c1.(p6) * c10
+      , Field.mul
+          Params.frobenius_coeffs_c1.(p6)
+          Fq3.Params.frobenius_coeffs_c1.(p3)
+        * c11
+      , Field.mul
+          Params.frobenius_coeffs_c1.(p6)
+          Fq3.Params.frobenius_coeffs_c2.(p3)
+        * c12 ) )
+end
+
+module F4
+    (Fq2 : Intf.S_with_primitive_element
+           with type 'a A.t = 'a * 'a
+            and type 'a Base.t_ = 'a) (Params : sig
+        val frobenius_coeffs_c1 : Fq2.Impl.Field.t array
+    end) =
+struct
+  include E2
+            (Fq2)
+            (struct
+              let non_residue = Fq2.Impl.Field.(zero, one)
+
+              let mul_by_non_residue = Fq2.mul_by_primitive_element
+            end)
+
+  let special_mul = ( * )
+
+  (* TODO: Make sure this is ok *)
+  let special_div = div_unsafe
+
+  include Cyclotomic_square.Make_F4 (Fq2)
+
+  let frobenius ((c00, c01), (c10, c11)) power =
+    let module Field = Impl.Field in
+    let p2 = Params.frobenius_coeffs_c1.(Int.( * ) (power mod 2) 2) in
+    let p4 = Params.frobenius_coeffs_c1.(power mod 4) in
+    let ( * ) s x = Field.Var.scale x s in
+    ((c00, p2 * c01), (p4 * c10, Field.(p4 * p2) * c11))
 end

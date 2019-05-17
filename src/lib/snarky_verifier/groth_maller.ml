@@ -39,14 +39,15 @@ module Make (Inputs : Inputs.S) = struct
     let of_hlist :
            (unit, _ -> _ -> _ -> _ -> _ -> _ -> _ -> _ -> unit) Snarky.H_list.t
         -> _ =
-     fun Snarky.H_list.([ query_base
-                        ; query
-                        ; h
-                        ; g_alpha
-                        ; h_beta
-                        ; g_gamma
-                        ; h_gamma
-                        ; g_alpha_h_beta ]) ->
+     fun Snarky.H_list.
+           [ query_base
+           ; query
+           ; h
+           ; g_alpha
+           ; h_beta
+           ; g_gamma
+           ; h_gamma
+           ; g_alpha_h_beta ] ->
       {query_base; query; h; g_alpha; h_beta; g_gamma; h_gamma; g_alpha_h_beta}
 
     let typ ~input_size =
@@ -93,6 +94,11 @@ module Make (Inputs : Inputs.S) = struct
         let%map h_gamma = G2_precomputation.create vk.h_gamma
         and h = G2_precomputation.create vk.h in
         {h_gamma; h}
+
+      let create_constant (vk : (_, _, _) vk) =
+        let h_gamma = G2_precomputation.create_constant vk.h_gamma
+        and h = G2_precomputation.create_constant vk.h in
+        {h_gamma; h}
     end
   end
 
@@ -104,7 +110,8 @@ module Make (Inputs : Inputs.S) = struct
     let of_hlist :
         (unit, 'a -> 'b -> 'a -> unit) Snarky.H_list.t -> ('a, 'b) t_ =
       function
-      | [a; b; c] -> {a; b; c}
+      | [a; b; c] ->
+          {a; b; c}
 
     let typ =
       Typ.of_hlistable

@@ -1,3 +1,4 @@
+open Core_kernel
 open Sgn_type
 
 module type Inputs_intf = sig
@@ -24,6 +25,8 @@ module type Inputs_intf = sig
     val special_mul : t -> t -> (t, _) Impl.Checked.t
 
     val special_div : t -> t -> (t, _) Impl.Checked.t
+
+    val unitary_inverse : t -> t
   end
 
   module G1_precomputation :
@@ -77,9 +80,10 @@ module Make (Inputs : Inputs_intf) = struct
        in
        (p.py_twist_squared, c1))
 
-  let unitary_inverse ((c0, c1) : Fqk.t) = (c0, Fqe.negate c1)
-
   let uncons_exn = function [] -> failwith "uncons_exn" | x :: xs -> (x, xs)
+
+  let finalize =
+    if Params.loop_count_is_neg then Fqk.unitary_inverse else Fn.id
 
   let miller_loop (p : G1_precomputation.t) (q : G2_precomputation.t) =
     let naf = Snarkette.Fields.find_wnaf (module N) 1 Params.loop_count in
@@ -99,9 +103,8 @@ module Make (Inputs : Inputs_intf) = struct
           go (i - 1) found_nonzero coeffs f
         else go (i - 1) found_nonzero coeffs f
     in
-    with_label __LOC__
-      (let%map res = go (Array.length naf - 1) false q.coeffs Fqk.one in
-       if Params.loop_count_is_neg then unitary_inverse res else res)
+    with_label __LOC__ (go (Array.length naf - 1) false q.coeffs Fqk.one)
+    >>| finalize
 
   let batch_miller_loop
       (pairs : (Sgn.t * G1_precomputation.t * G2_precomputation.t) list) =
@@ -112,8 +115,10 @@ module Make (Inputs : Inputs_intf) = struct
           let%bind a = f p c q.q in
           let%map acc =
             match (sgn : Sgn.t) with
-            | Pos -> Fqk.special_mul acc a
-            | Neg -> Fqk.special_div acc a
+            | Pos ->
+                Fqk.special_mul acc a
+            | Neg ->
+                Fqk.special_div acc a
             (* TODO: Use an unsafe div here if appropriate. I think it should be fine
              since py_twisted is py (a curve y-coorindate, guaranteed to be non-zero)
              times a constant.
@@ -137,6 +142,5 @@ module Make (Inputs : Inputs_intf) = struct
           go (i - 1) found_nonzero pairs f
         else go (i - 1) found_nonzero pairs f
     in
-    let%map res = go (Array.length naf - 1) false pairs Fqk.one in
-    if Params.loop_count_is_neg then unitary_inverse res else res
+    go (Array.length naf - 1) false pairs Fqk.one >>| finalize
 end

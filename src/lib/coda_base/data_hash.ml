@@ -7,10 +7,11 @@ open Snark_bits
 open Bitstring_lib
 open Tuple_lib
 open Fold_lib
+open Module_version
 
 module type Basic = sig
   type t = private Pedersen.Digest.t
-  [@@deriving bin_io, sexp, eq, compare, hash]
+  [@@deriving sexp, eq, compare, hash, yojson]
 
   val gen : t Quickcheck.Generator.t
 
@@ -22,10 +23,13 @@ module type Basic = sig
 
   module Stable : sig
     module V1 : sig
-      type nonrec t = t [@@deriving bin_io, sexp, compare, eq, hash]
+      type nonrec t = t
+      [@@deriving bin_io, sexp, compare, eq, hash, yojson, version]
 
       include Hashable_binable with type t := t
     end
+
+    module Latest : module type of V1
   end
 
   type var
@@ -46,7 +50,7 @@ module type Basic = sig
 
   include Bits_intf.S with type t := t
 
-  include Hashable_binable with type t := t
+  include Hashable with type t := t
 
   val fold : t -> bool Triple.t Fold.t
 end
@@ -76,15 +80,30 @@ struct
   module Stable = struct
     module V1 = struct
       module T = struct
-        type t = Pedersen.Digest.t [@@deriving bin_io, sexp, eq, compare, hash]
+        type t = Pedersen.Digest.Stable.V1.t
+        [@@deriving bin_io, sexp, eq, compare, hash, yojson, version]
       end
 
       include T
+      include Registration.Make_latest_version (T)
       include Hashable.Make_binable (T)
     end
+
+    module Latest = V1
+
+    module Module_decl = struct
+      let name = "data_hash_basic"
+
+      type latest = Latest.t
+    end
+
+    module Registrar = Registration.Make (Module_decl)
+    module Registered_V1 = Registrar.Register (V1)
   end
 
-  include Stable.V1
+  type t = Stable.Latest.t [@@deriving sexp, eq, compare, hash, yojson]
+
+  include Hashable.Make (Stable.Latest)
 
   let to_bytes t =
     Fold_lib.Fold.bool_t_to_string (Fold.of_list (Field.unpack t))
@@ -105,7 +124,7 @@ struct
       Bignum_bigint.(gen_incl zero m)
       ~f:(fun x -> Bigint.(to_field (of_bignum_bigint x)))
 
-  let ( = ) = equal
+  let ( = ) = Stable.Latest.equal
 
   type var =
     { digest: Pedersen.Checked.Digest.var
@@ -113,7 +132,7 @@ struct
 
   let var_of_t t =
     let n = Bigint.of_field t in
-    { digest= Field.Checked.constant t
+    { digest= Field.Var.constant t
     ; bits=
         Some
           (Bitstring.Lsb_first.of_list
@@ -138,7 +157,8 @@ struct
 
   let%snarkydef var_to_bits t =
     match t.bits with
-    | Some bits -> return (bits :> Boolean.var list)
+    | Some bits ->
+        return (bits :> Boolean.var list)
     | None ->
         let%map bits = unpack t.digest in
         t.bits <- Some (Bitstring.Lsb_first.of_list bits) ;
@@ -166,8 +186,7 @@ struct
           go (i - 1) (b :: acc)
       in
       let%map bits = go (Field.size_in_bits - 1) [] in
-      { bits= Some bits
-      ; digest= Field.Checked.project (bits :> Boolean.var list) }
+      {bits= Some bits; digest= Field.Var.project (bits :> Boolean.var list)}
     in
     let read (t : var) = Field.typ.read t.digest in
     let alloc =
@@ -179,8 +198,7 @@ struct
           go (i - 1) (b :: acc)
       in
       let%map bits = go (Field.size_in_bits - 1) [] in
-      { bits= Some bits
-      ; digest= Field.Checked.project (bits :> Boolean.var list) }
+      {bits= Some bits; digest= Field.Var.project (bits :> Boolean.var list)}
     in
     let check {bits; _} =
       Checked.List.iter
@@ -200,7 +218,6 @@ module Make_full_size () = struct
   let of_hash = Fn.id
 
   let if_ cond ~then_ ~else_ =
-    let open Let_syntax in
     let%map digest =
       Field.Checked.if_ cond ~then_:then_.digest ~else_:else_.digest
     in
@@ -214,7 +231,6 @@ struct
   let () = assert (M.length_in_bits < Field.size_in_bits)
 
   include Make_basic (M)
-  open Let_syntax
 
   let var_of_hash_packed digest =
     let%map bits = unpack digest in

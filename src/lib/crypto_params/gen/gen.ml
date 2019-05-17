@@ -1,3 +1,6 @@
+[%%import
+"../../../config.mlh"]
+
 open Ppxlib
 open Asttypes
 open Parsetree
@@ -38,7 +41,6 @@ let rec random_point () =
   let x = random_field_element () in
   let y2 =
     let open Impl.Field in
-    let open Infix in
     (x * square x)
     + (Crypto_params_init.Tick_backend.Inner_curve.Coefficients.a * x)
     + Crypto_params_init.Tick_backend.Inner_curve.Coefficients.b
@@ -51,7 +53,7 @@ let rec random_point () =
 let max_input_size = 20000
 
 let params =
-  List.init (max_input_size / 4) ~f:(fun i ->
+  List.init (max_input_size / 3) ~f:(fun i ->
       let t = Group.of_affine_coordinates (random_point ()) in
       let tt = Group.double t in
       (t, tt, Group.add t tt, Group.double tt) )
@@ -111,6 +113,15 @@ let compute_chunk_value ~start n =
      for each possible chunk (2 ** (size * 3) of them)
        store its value in the array
 *)
+
+[%%if
+defined fake_hash && fake_hash]
+
+(* don't bother building table *)
+let get_chunk_table () = [||]
+
+[%%else]
+
 let get_chunk_table () =
   let num_params = Array.length params_array in
   let max_chunks = num_params / Chunk.size in
@@ -126,6 +137,8 @@ let get_chunk_table () =
   in
   let result = loop ~chunk:0 [] in
   result
+
+[%%endif]
 
 (* the AST representation of the chunk table is its string serialization
    - an AST for the table itself, using string representations of
@@ -155,16 +168,11 @@ let chunk_table_structure ~loc =
     open Core
     module Group = Crypto_params_init.Tick_backend.Inner_curve
 
-    let chunk_table_string_opt_ref = ref (Some [%e chunk_table_ast ~loc])
-
-    let chunk_table : Chunk_table.t =
-      let chunk_table_string = Option.value_exn !chunk_table_string_opt_ref in
-      let result = Binable.of_string (module Chunk_table) chunk_table_string in
-      (* allow string to be GCed *)
-      chunk_table_string_opt_ref := None ;
-      result
-
-    let curve_points_table = chunk_table.table_data]
+    let chunk_table =
+      lazy
+        (let s = [%e chunk_table_ast ~loc] in
+         let t = Binable.of_string (module Chunk_table) s in
+         t.table_data)]
 
 let generate_ml_file filename structure =
   let fmt = Format.formatter_of_out_channel (Out_channel.create filename) in
