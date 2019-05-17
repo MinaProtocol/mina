@@ -125,7 +125,7 @@ let genesis =
 
 let to_hlist
     { Poly.blockchain_state
-    ; consensus_data
+    ; consensus_transition
     ; sok_digest
     ; supply_increase
     ; ledger_proof
@@ -133,7 +133,7 @@ let to_hlist
     ; coinbase } =
   Snarky.H_list.
     [ blockchain_state
-    ; consensus_data
+    ; consensus_transition
     ; sok_digest
     ; supply_increase
     ; ledger_proof
@@ -142,7 +142,7 @@ let to_hlist
 
 let of_hlist
     ([ blockchain_state
-     ; consensus_data
+     ; consensus_transition
      ; sok_digest
      ; supply_increase
      ; ledger_proof
@@ -150,7 +150,7 @@ let of_hlist
      ; coinbase ] :
       (unit, _) Snarky.H_list.t) =
   { Poly.blockchain_state
-  ; consensus_data
+  ; consensus_transition
   ; sok_digest
   ; supply_increase
   ; ledger_proof
@@ -168,7 +168,7 @@ let typ =
   of_hlistable ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist
     ~value_to_hlist:to_hlist ~value_of_hlist:of_hlist
     [ Blockchain_state.typ
-    ; Consensus_data.typ
+    ; Consensus.Data.Consensus_transition.typ
     ; Sok_message.Digest.typ
     ; Currency.Amount.typ
     ; ledger_proof
