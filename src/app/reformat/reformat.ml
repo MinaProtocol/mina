@@ -1,7 +1,7 @@
 open Core
 open Async
 
-(* If OCamlformat ever breaks on any files add their paths here *)
+(* If OCamlformat ever breaks on any files add their paths to this whitelist to skip *)
 let whitelist = []
 
 let dirs_whitelist =
