@@ -55,15 +55,15 @@ include Single.Make({
             (),
           ),
         );
-      loadURL(
-        window,
+
+      let indexURL =
         "file://"
         ++ Filename.concat(ProjectRoot.resource, "public/index.html")
         ++ "?settingsPath="
         ++ Js.Global.encodeURI(ProjectRoot.settings)
         ++ "#"
-        ++ Route.print(input.path),
-      );
+        ++ Route.print(input.path);
+      loadURL(window, indexURL);
 
       let listener = listen(window, input.dispatch);
       on(
@@ -73,6 +73,12 @@ include Single.Make({
           RendererCommunication.removeListener(listener);
           drop();
         },
+      );
+
+      // Watches the bundle to reload the window on changes
+      Bindings.Fs.watchFile(
+        Filename.concat(ProjectRoot.resource, "bundle/index.js"), () =>
+        loadURL(window, indexURL)
       );
 
       window;

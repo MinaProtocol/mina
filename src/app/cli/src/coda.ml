@@ -90,11 +90,12 @@ let daemon logger =
      and external_ip_opt =
        flag "external-ip"
          ~doc:
-           "External IP address for other nodes to connect to. You only need \
-            to set this if auto-discovery fails for some reason."
+           "IP External IP address for other nodes to connect to. You only \
+            need to set this if auto-discovery fails for some reason."
          (optional string)
      and bind_ip_opt =
-       flag "bind-ip" ~doc:"IP of network interface to use" (optional string)
+       flag "bind-ip" ~doc:"IP IP of network interface to use"
+         (optional string)
      and is_background =
        flag "background" no_arg ~doc:"Run process on the background"
      and snark_work_fee =
