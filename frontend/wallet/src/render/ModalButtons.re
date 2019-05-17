@@ -8,7 +8,7 @@ module Button = {
           className,
           style([
             backgroundColor(bgColor),
-            color(StyleGuide.Colors.blanco),
+            color(Theme.Colors.blanco),
             paddingLeft(`rem(2.0)),
             paddingRight(`rem(2.0)),
             paddingTop(`rem(1.0)),
@@ -36,7 +36,7 @@ let make = (~onSecondaryClick, ~onPrimaryClick, ~primaryColor, ~primaryCopy) => 
     <Button
       className=Css.(style([marginRight(`rem(1.0))]))
       onClick=onSecondaryClick
-      bgColor={StyleGuide.Colors.slateAlpha(0.3)}
+      bgColor={Theme.Colors.slateAlpha(0.3)}
       copy="Cancel"
     />
     <Button onClick=onPrimaryClick bgColor=primaryColor copy=primaryCopy />

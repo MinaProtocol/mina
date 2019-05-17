@@ -5,5 +5,5 @@
  (inline_tests)
  (libraries core rocksdb coda_base)
  (preprocess
-  (pps ppx_jane ppx_coda))
+  (pps ppx_jane ppx_coda ppx_deriving_yojson))
  (synopsis "Database to store transactions that a user sends and receives"))

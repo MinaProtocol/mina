@@ -1,5 +1,12 @@
 let message = __MODULE__;
 
+module Kind = {
+  type t =
+    | Query
+    | Mutation;
+  // | Subscription;
+};
+
 module Typ = {
   type t('a) =
     | ResultString: t(Tc.Result.t(string, string));
@@ -21,11 +28,27 @@ module Typ = {
 };
 module CallTable = CallTable.Make(Typ);
 
+type definition = {. "operation": string};
+type query = {. "definitions": array(definition)};
+
 type apolloOperation = {
   .
   "operationName": string,
-  "query": ReasonApolloTypes.queryString,
+  "query": query,
   "variables": Js.Json.t,
+};
+
+type apolloMutation = {
+  .
+  "operationName": string,
+  "mutation": query,
+  "variables": Js.Json.t,
+};
+
+let mutationOfOperation = operation => {
+  "operationName": operation##operationName,
+  "mutation": operation##query,
+  "variables": operation##variables,
 };
 
 type mainToRendererMessages = [
@@ -36,5 +59,5 @@ type mainToRendererMessages = [
 ];
 
 type rendererToMainMessages = [
-  | `Pipe_graphql_request(CallTable.Ident.Encode.t, string)
+  | `Pipe_graphql_request(CallTable.Ident.Encode.t, (Kind.t, string))
 ];
