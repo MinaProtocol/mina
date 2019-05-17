@@ -150,7 +150,7 @@ module Make (Inputs : Inputs_intf) : Intf.Main.S = struct
       if was_finalized t then raise (of_string msg)
 
     let peek (type a b) (t : (a, b) t) : a =
-      assert_not_consumed t "cannot peek at consumed Cached.t" ;
+      assert_not_finalized t "cannot peek at finalized Cached.t" ;
       value t
 
     let mark_transformed : type a b. (a, b) t -> unit = function
