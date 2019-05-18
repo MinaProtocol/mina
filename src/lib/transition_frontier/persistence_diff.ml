@@ -14,6 +14,7 @@ module type Inputs_intf = sig
      and type staged_ledger := Staged_ledger.t
      and type external_transition_verified := External_transition.Verified.t
      and type user_command := User_command.t
+     and type sparse_ledger := Sparse_ledger.t
 end
 
 module Make (Inputs : Inputs_intf) :

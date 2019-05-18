@@ -373,6 +373,9 @@ module Base = struct
       Pending_coinbase.Stack.Checked.if_ is_coinbase ~then_:stack'
         ~else_:pending_coinbase_stack_before
     in
+    let%bind is_chain_voting =
+      Transaction_union.Tag.Checked.is_chain_voting tag
+    in
     let%bind root =
       let%bind is_writeable =
         let%bind is_fee_transfer =
@@ -380,56 +383,68 @@ module Base = struct
         in
         Boolean.any [is_fee_transfer; is_coinbase]
       in
-      Frozen_ledger_hash.modify_account_send root ~is_writeable
-        sender_compressed ~f:(fun ~is_empty_and_writeable account ->
-          with_label __LOC__
-            (let%bind next_nonce =
-               Account.Nonce.increment_if_var account.nonce is_user_command
-             in
-             let%bind () =
-               with_label __LOC__
-                 (let%bind nonce_matches =
-                    Account.Nonce.equal_var nonce account.nonce
-                  in
-                  Boolean.Assert.any
-                    [Boolean.not is_user_command; nonce_matches])
-             in
-             let%bind receipt_chain_hash =
-               let current = account.receipt_chain_hash in
-               let%bind r =
-                 Receipt.Chain_hash.Checked.cons ~payload:payload_section
-                   current
+      Frozen_ledger_hash.(
+        modify_account_send ~tag:Tag.curr_ledger root ~is_writeable
+          sender_compressed ~f:(fun ~is_empty_and_writeable account ->
+            with_label __LOC__
+              (let%bind next_nonce =
+                 Account.Nonce.increment_if_var account.nonce is_user_command
                in
-               Receipt.Chain_hash.Checked.if_ is_user_command ~then_:r
-                 ~else_:current
-             in
-             let%bind delegate =
-               let if_ = chain Public_key.Compressed.Checked.if_ in
-               if_ is_empty_and_writeable ~then_:(return sender_compressed)
-                 ~else_:
-                   (if_ is_stake_delegation
-                      ~then_:(return payload.body.public_key)
-                      ~else_:(return account.delegate))
-             in
-             let%map balance =
-               Balance.Checked.add_signed_amount account.balance sender_delta
-             in
-             { Account.Poly.balance
-             ; public_key= sender_compressed
-             ; nonce= next_nonce
-             ; receipt_chain_hash
-             ; delegate
-             ; voting_for= account.voting_for }) )
+               let%bind () =
+                 with_label __LOC__
+                   (let%bind nonce_matches =
+                      Account.Nonce.equal_var nonce account.nonce
+                    in
+                    Boolean.Assert.any
+                      [Boolean.not is_user_command; nonce_matches])
+               in
+               let%bind receipt_chain_hash =
+                 let current = account.receipt_chain_hash in
+                 let%bind r =
+                   Receipt.Chain_hash.Checked.cons ~payload:payload_section
+                     current
+                 in
+                 Receipt.Chain_hash.Checked.if_ is_user_command ~then_:r
+                   ~else_:current
+               in
+               let%bind delegate =
+                 let if_ = chain Public_key.Compressed.Checked.if_ in
+                 if_ is_empty_and_writeable ~then_:(return sender_compressed)
+                   ~else_:
+                     (if_ is_stake_delegation
+                        ~then_:(return payload.body.public_key)
+                        ~else_:(return account.delegate))
+               in
+               let%bind voting_for =
+                 State_hash.if_ is_chain_voting
+                   ~then_:
+                     ( payload.body.public_key.x
+                     |> State_hash.var_of_hash_packed )
+                   ~else_:account.voting_for
+               in
+               let%map balance =
+                 Balance.Checked.add_signed_amount account.balance sender_delta
+               in
+               { Account.Poly.balance
+               ; public_key= sender_compressed
+               ; nonce= next_nonce
+               ; receipt_chain_hash
+               ; delegate
+               ; voting_for }) ))
     in
     let%bind receiver =
       (* A stake delegation only uses the sender *)
       Public_key.Compressed.Checked.if_ is_stake_delegation
         ~then_:sender_compressed ~else_:payload.body.public_key
     in
+    let%bind tag =
+      Frozen_ledger_hash.Tag.(
+        if_ is_chain_voting ~then_:epoch_ledger ~else_:curr_ledger)
+    in
     (* we explicitly set the public_key because it could be zero if the account is new *)
     let%map root =
       (* This update should be a no-op in the stake delegation case *)
-      Frozen_ledger_hash.modify_account_recv root receiver
+      Frozen_ledger_hash.modify_account_recv ~tag root receiver
         ~f:(fun ~is_empty_and_writeable account ->
           let%map balance =
             (* receiver_increase will be zero in the stake delegation case *)
@@ -516,14 +531,16 @@ module Base = struct
 
   let transaction_union_proof ?(preeval = false) ~proving_key sok_digest state1
       state2 pending_coinbase_stack_state (transaction : Transaction_union.t)
-      handler =
+      ~curr_ledger_handler ~epoch_ledger_handler =
     let prover_state : Prover_state.t =
       {state1; state2; transaction; sok_digest; pending_coinbase_stack_state}
     in
     let main =
       if preeval then failwith "preeval currently disabled" else main
     in
-    let main top_hash = handle (main top_hash) handler in
+    let main top_hash =
+      handle (handle (main top_hash) curr_ledger_handler) epoch_ledger_handler
+    in
     let top_hash =
       base_top_hash ~sok_digest ~state1 ~state2
         ~fee_excess:(Transaction_union.excess transaction)
@@ -1092,7 +1109,8 @@ module type S = sig
     -> target:Frozen_ledger_hash.t
     -> pending_coinbase_stack_state:Pending_coinbase_stack_state.t
     -> Transaction.t
-    -> Tick.Handler.t
+    -> curr_ledger_handler:Tick.Handler.t
+    -> epoch_ledger_handler:Tick.Handler.t
     -> t
 
   val of_user_command :
@@ -1101,7 +1119,8 @@ module type S = sig
     -> target:Frozen_ledger_hash.t
     -> pending_coinbase_stack:Pending_coinbase.Stack.t
     -> User_command.With_valid_signature.t
-    -> Tick.Handler.t
+    -> curr_ledger_handler:Tick.Handler.t
+    -> epoch_ledger_handler:Tick.Handler.t
     -> t
 
   val of_fee_transfer :
@@ -1110,14 +1129,16 @@ module type S = sig
     -> target:Frozen_ledger_hash.t
     -> pending_coinbase_stack:Pending_coinbase.Stack.t
     -> Fee_transfer.t
-    -> Tick.Handler.t
+    -> curr_ledger_handler:Tick.Handler.t
+    -> epoch_ledger_handler:Tick.Handler.t
     -> t
 
   val merge : t -> t -> sok_digest:Sok_message.Digest.t -> t Or_error.t
 end
 
 let check_transaction_union ?(preeval = false) sok_message source target
-    pending_coinbase_stack_state transaction handler =
+    pending_coinbase_stack_state transaction ~curr_ledger_handler
+    ~epoch_ledger_handler =
   let sok_digest = Sok_message.digest sok_message in
   let prover_state : Base.Prover_state.t =
     { state1= source
@@ -1138,28 +1159,32 @@ let check_transaction_union ?(preeval = false) sok_message source target
   in
   let main =
     handle
-      (Checked.map (main (Field.Var.constant top_hash)) ~f:As_prover.return)
-      handler
+      (handle
+         (Checked.map (main (Field.Var.constant top_hash)) ~f:As_prover.return)
+         curr_ledger_handler)
+      epoch_ledger_handler
   in
   Or_error.ok_exn (run_and_check main prover_state) |> ignore
 
 let check_transaction ?preeval ~sok_message ~source ~target
-    ~pending_coinbase_stack_state (t : Transaction.t) handler =
+    ~pending_coinbase_stack_state (t : Transaction.t) ~curr_ledger_handler
+    ~epoch_ledger_handler =
   check_transaction_union ?preeval sok_message source target
     pending_coinbase_stack_state
     (Transaction_union.of_transaction t)
-    handler
+    ~curr_ledger_handler ~epoch_ledger_handler
 
 let check_user_command ~sok_message ~source ~target pending_coinbase_stack t
-    handler =
+    ~curr_ledger_handler ~epoch_ledger_handler =
   check_transaction ~sok_message ~source ~target
     ~pending_coinbase_stack_state:
       Pending_coinbase_stack_state.Stable.Latest.
         {source= pending_coinbase_stack; target= pending_coinbase_stack}
-    (User_command t) handler
+    (User_command t) ~curr_ledger_handler ~epoch_ledger_handler
 
 let generate_transaction_union_witness ?(preeval = false) sok_message source
-    target transaction pending_coinbase_stack_state handler =
+    target transaction pending_coinbase_stack_state ~curr_ledger_handler
+    ~epoch_ledger_handler =
   let sok_digest = Sok_message.digest sok_message in
   let prover_state : Base.Prover_state.t =
     { state1= source
@@ -1178,14 +1203,17 @@ let generate_transaction_union_witness ?(preeval = false) sok_message source
   let main =
     if preeval then failwith "preeval currently disabled" else Base.main
   in
-  let main x = handle (main x) handler in
+  let main x =
+    handle (handle (main x) curr_ledger_handler) epoch_ledger_handler
+  in
   generate_auxiliary_input (tick_input ()) prover_state main top_hash
 
 let generate_transaction_witness ?preeval ~sok_message ~source ~target
-    pending_coinbase_stack_state (t : Transaction.t) handler =
+    pending_coinbase_stack_state (t : Transaction.t) ~curr_ledger_handler
+    ~epoch_ledger_handler =
   generate_transaction_union_witness ?preeval sok_message source target
     (Transaction_union.of_transaction t)
-    pending_coinbase_stack_state handler
+    pending_coinbase_stack_state ~curr_ledger_handler ~epoch_ledger_handler
 
 let verification_keys_of_keys {Keys0.verification; _} = verification
 
@@ -1252,11 +1280,13 @@ struct
         top_hash )
 
   let of_transaction_union ?preeval sok_digest source target
-      ~pending_coinbase_stack_state transaction handler =
+      ~pending_coinbase_stack_state transaction ~curr_ledger_handler
+      ~epoch_ledger_handler =
     let top_hash, proof =
       Base.transaction_union_proof ?preeval sok_digest
         ~proving_key:keys.proving.base source target
-        pending_coinbase_stack_state transaction handler
+        pending_coinbase_stack_state transaction ~curr_ledger_handler
+        ~epoch_ledger_handler
     in
     { source
     ; sok_digest
@@ -1268,27 +1298,28 @@ struct
     ; proof= wrap `Base proof top_hash }
 
   let of_transaction ?preeval ~sok_digest ~source ~target
-      ~pending_coinbase_stack_state transition handler =
+      ~pending_coinbase_stack_state transition ~curr_ledger_handler
+      ~epoch_ledger_handler =
     of_transaction_union ?preeval sok_digest source target
       ~pending_coinbase_stack_state
       (Transaction_union.of_transaction transition)
-      handler
+      ~curr_ledger_handler ~epoch_ledger_handler
 
   let of_user_command ~sok_digest ~source ~target ~pending_coinbase_stack
-      user_command handler =
+      user_command ~curr_ledger_handler ~epoch_ledger_handler =
     of_transaction ~sok_digest ~source ~target
       ~pending_coinbase_stack_state:
         Pending_coinbase_stack_state.Stable.Latest.
           {source= pending_coinbase_stack; target= pending_coinbase_stack}
-      (User_command user_command) handler
+      (User_command user_command) ~curr_ledger_handler ~epoch_ledger_handler
 
   let of_fee_transfer ~sok_digest ~source ~target ~pending_coinbase_stack
-      transfer handler =
+      transfer ~curr_ledger_handler ~epoch_ledger_handler =
     of_transaction ~sok_digest ~source ~target
       ~pending_coinbase_stack_state:
         Pending_coinbase_stack_state.Stable.Latest.
           {source= pending_coinbase_stack; target= pending_coinbase_stack}
-      (Fee_transfer transfer) handler
+      (Fee_transfer transfer) ~curr_ledger_handler ~epoch_ledger_handler
 
   let merge t1 t2 ~sok_digest =
     if not (Frozen_ledger_hash.( = ) t1.target t2.source) then
@@ -1559,13 +1590,13 @@ let%test_module "transaction_snark" =
     end)
 
     let of_user_command' sok_digest ledger user_command pending_coinbase_stack
-        handler =
+        ~curr_ledger_handler ~epoch_ledger_handler =
       let source = Ledger.merkle_root ledger in
       let target =
         Ledger.merkle_root_after_user_command_exn ledger user_command
       in
       of_user_command ~sok_digest ~source ~target ~pending_coinbase_stack
-        user_command handler
+        user_command ~curr_ledger_handler ~epoch_ledger_handler
 
     (*
                 ~proposer:
@@ -1602,8 +1633,18 @@ let%test_module "transaction_snark" =
               let sparse_ledger =
                 Sparse_ledger.of_ledger_subset_exn ledger [proposer; other]
               in
-              check_transaction transaction
-                (unstage (Sparse_ledger.handler sparse_ledger))
+              let curr_ledger_handler =
+                unstage
+                  (Sparse_ledger.handler ~tag:Ledger_hash.Tag.Curr_ledger
+                     sparse_ledger)
+              in
+              let epoch_ledger_handler =
+                unstage
+                  (Sparse_ledger.handler ~tag:Ledger_hash.Tag.Epoch_ledger
+                     sparse_ledger)
+              in
+              check_transaction transaction ~curr_ledger_handler
+                ~epoch_ledger_handler
                 ~sok_message:
                   (Coda_base.Sok_message.create ~fee:Currency.Fee.zero
                      ~prover:Public_key.Compressed.empty)
@@ -1652,7 +1693,14 @@ let%test_module "transaction_snark" =
               check_user_command ~sok_message
                 ~source:(Ledger.merkle_root ledger)
                 ~target pending_coinbase_stack t1
-                (unstage @@ Sparse_ledger.handler sparse_ledger) ) )
+                ~curr_ledger_handler:
+                  ( unstage
+                  @@ Sparse_ledger.handler ~tag:Ledger_hash.Tag.Curr_ledger
+                       sparse_ledger )
+                ~epoch_ledger_handler:
+                  ( unstage
+                  @@ Sparse_ledger.handler ~tag:Ledger_hash.Tag.Epoch_ledger
+                       sparse_ledger ) ) )
 
     let%test "base_and_merge" =
       Test_util.with_randomness 123456789 (fun () ->
@@ -1698,7 +1746,14 @@ let%test_module "transaction_snark" =
               let proof12 =
                 of_user_command' sok_digest ledger t1
                   Pending_coinbase.Stack.empty
-                  (unstage @@ Sparse_ledger.handler sparse_ledger)
+                  ~curr_ledger_handler:
+                    ( unstage
+                    @@ Sparse_ledger.handler ~tag:Ledger_hash.Tag.Curr_ledger
+                         sparse_ledger )
+                  ~epoch_ledger_handler:
+                    ( unstage
+                    @@ Sparse_ledger.handler ~tag:Ledger_hash.Tag.Epoch_ledger
+                         sparse_ledger )
               in
               let sparse_ledger =
                 Sparse_ledger.apply_user_command_exn sparse_ledger
@@ -1711,7 +1766,14 @@ let%test_module "transaction_snark" =
               let proof23 =
                 of_user_command' sok_digest ledger t2
                   Pending_coinbase.Stack.empty
-                  (unstage @@ Sparse_ledger.handler sparse_ledger)
+                  ~curr_ledger_handler:
+                    ( unstage
+                    @@ Sparse_ledger.handler ~tag:Ledger_hash.Tag.Curr_ledger
+                         sparse_ledger )
+                  ~epoch_ledger_handler:
+                    ( unstage
+                    @@ Sparse_ledger.handler ~tag:Ledger_hash.Tag.Epoch_ledger
+                         sparse_ledger )
               in
               let sparse_ledger =
                 Sparse_ledger.apply_user_command_exn sparse_ledger

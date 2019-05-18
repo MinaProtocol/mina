@@ -173,7 +173,8 @@ val check_transaction :
   -> target:Frozen_ledger_hash.t
   -> pending_coinbase_stack_state:Pending_coinbase_stack_state.t
   -> Transaction.t
-  -> Tick.Handler.t
+  -> curr_ledger_handler:Tick.Handler.t
+  -> epoch_ledger_handler:Tick.Handler.t
   -> unit
 
 val check_user_command :
@@ -182,7 +183,8 @@ val check_user_command :
   -> target:Frozen_ledger_hash.t
   -> Pending_coinbase.Stack.t
   -> User_command.With_valid_signature.t
-  -> Tick.Handler.t
+  -> curr_ledger_handler:Tick.Handler.t
+  -> epoch_ledger_handler:Tick.Handler.t
   -> unit
 
 val generate_transaction_witness :
@@ -192,7 +194,8 @@ val generate_transaction_witness :
   -> target:Frozen_ledger_hash.t
   -> Pending_coinbase_stack_state.t
   -> Transaction.t
-  -> Tick.Handler.t
+  -> curr_ledger_handler:Tick.Handler.t
+  -> epoch_ledger_handler:Tick.Handler.t
   -> unit
 
 module type S = sig
@@ -205,7 +208,8 @@ module type S = sig
     -> target:Frozen_ledger_hash.t
     -> pending_coinbase_stack_state:Pending_coinbase_stack_state.t
     -> Transaction.t
-    -> Tick.Handler.t
+    -> curr_ledger_handler:Tick.Handler.t
+    -> epoch_ledger_handler:Tick.Handler.t
     -> t
 
   val of_user_command :
@@ -214,7 +218,8 @@ module type S = sig
     -> target:Frozen_ledger_hash.t
     -> pending_coinbase_stack:Pending_coinbase.Stack.t
     -> User_command.With_valid_signature.t
-    -> Tick.Handler.t
+    -> curr_ledger_handler:Tick.Handler.t
+    -> epoch_ledger_handler:Tick.Handler.t
     -> t
 
   val of_fee_transfer :
@@ -223,7 +228,8 @@ module type S = sig
     -> target:Frozen_ledger_hash.t
     -> pending_coinbase_stack:Pending_coinbase.Stack.t
     -> Fee_transfer.t
-    -> Tick.Handler.t
+    -> curr_ledger_handler:Tick.Handler.t
+    -> epoch_ledger_handler:Tick.Handler.t
     -> t
 
   val merge : t -> t -> sok_digest:Sok_message.Digest.t -> t Or_error.t

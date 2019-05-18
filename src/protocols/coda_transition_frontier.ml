@@ -230,6 +230,8 @@ module type Transition_frontier_Breadcrumb_intf = sig
 
   type user_command
 
+  type sparse_ledger
+
   val create :
        (external_transition_verified, state_hash) With_hash.t
     -> staged_ledger
@@ -246,6 +248,7 @@ module type Transition_frontier_Breadcrumb_intf = sig
                             , state_hash )
                             With_hash.t
     -> sender:Envelope.Sender.t option
+    -> epoch_ledger:sparse_ledger
     -> ( t
        , [ `Invalid_staged_ledger_diff of Error.t
          | `Invalid_staged_ledger_hash of Error.t
@@ -292,6 +295,8 @@ module type Transition_frontier_base_intf = sig
 
   type diff_mutant
 
+  type sparse_ledger
+
   type t [@@deriving eq]
 
   module Breadcrumb :
@@ -300,6 +305,7 @@ module type Transition_frontier_base_intf = sig
      and type state_hash := state_hash
      and type staged_ledger := staged_ledger
      and type user_command := user_command
+     and type sparse_ledger := sparse_ledger
 
   val create :
        logger:Logger.t

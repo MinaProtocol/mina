@@ -38,4 +38,4 @@ val of_ledger_index_subset_exn : Ledger.Any_ledger.witness -> int list -> t
 
 val iteri : t -> f:(Account.Index.t -> Account.t -> unit) -> unit
 
-val handler : t -> Handler.t Staged.t
+val handler : tag:Ledger_hash.Tag.t -> t -> Handler.t Staged.t

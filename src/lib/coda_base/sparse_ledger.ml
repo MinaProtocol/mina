@@ -208,25 +208,37 @@ let apply_transaction_exn t (transition : Transaction.t) =
 
 let merkle_root t = Ledger_hash.of_hash (merkle_root t :> Pedersen.Digest.t)
 
-let handler t =
+let handler ~tag t =
   let ledger = ref t in
-  let path_exn idx =
-    List.map (path_exn !ledger idx) ~f:(function `Left h -> h | `Right h -> h)
+  let path_exn ledger idx =
+    List.map (path_exn ledger idx) ~f:(function
+      | `Left h ->
+          (h :> Pedersen.Digest.t)
+      | `Right h ->
+          (h :> Pedersen.Digest.t) )
   in
   stage (fun (With {request; respond}) ->
       match request with
-      | Ledger_hash.Get_element idx ->
-          let elt = get_exn !ledger idx in
-          let path = (path_exn idx :> Pedersen.Digest.t list) in
-          respond (Provide (elt, path))
-      | Ledger_hash.Get_path idx ->
-          let path = (path_exn idx :> Pedersen.Digest.t list) in
-          respond (Provide path)
-      | Ledger_hash.Set (idx, account) ->
-          ledger := set_exn !ledger idx account ;
-          respond (Provide ())
-      | Ledger_hash.Find_index pk ->
-          let index = find_index_exn !ledger pk in
-          respond (Provide index)
+      | Ledger_hash.Get_element (tag', idx) ->
+          if tag = tag' then
+            let elt = get_exn !ledger idx in
+            let path = path_exn !ledger idx in
+            respond @@ Provide (elt, path)
+          else unhandled
+      | Ledger_hash.Get_path (tag', idx) ->
+          if tag = tag' then
+            let path = path_exn !ledger idx in
+            respond @@ Provide path
+          else unhandled
+      | Ledger_hash.Set (tag', idx, account) ->
+          if tag = tag' then (
+            ledger := set_exn !ledger idx account ;
+            respond @@ Provide () )
+          else unhandled
+      | Ledger_hash.Find_index (tag', pk) ->
+          if tag = tag' then
+            let idx = find_index_exn !ledger pk in
+            respond @@ Provide idx
+          else unhandled
       | _ ->
           unhandled )

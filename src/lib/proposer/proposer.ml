@@ -120,6 +120,7 @@ module type Inputs_intf = sig
                 , Coda_base.State_hash.Stable.Latest.t )
                 With_hash.t
                 Diff_mutant.E.t
+     and type sparse_ledger := Sparse_ledger.t
 
   module Transaction_pool :
     Coda_lib.Transaction_pool_read_intf
@@ -291,6 +292,7 @@ module Make (Inputs : Inputs_intf) :
                 , `Pending_coinbase_data (is_new_stack, coinbase_amount) ) =
           let%map or_error =
             Staged_ledger.apply_diff_unchecked staged_ledger diff
+              ~epoch_ledger:(failwith "DO IT NEXT TIME")
           in
           Or_error.ok_exn or_error
         in

@@ -165,6 +165,10 @@ struct
   module Transition_frontier =
     Transition_frontier.Make (Transition_frontier_inputs)
 
+  let genesis_ledger =
+    Sparse_ledger.of_any_ledger
+      (Ledger.Any_ledger.cast (module Ledger) Genesis_ledger.t)
+
   let gen_breadcrumb ~logger ~trust_system ~accounts_with_secret_keys :
       (   Transition_frontier.Breadcrumb.t Deferred.t
        -> Transition_frontier.Breadcrumb.t Deferred.t)
@@ -208,7 +212,7 @@ struct
                , `Staged_ledger _
                , `Pending_coinbase_data _ ) =
         Staged_ledger.apply_diff_unchecked parent_staged_ledger
-          staged_ledger_diff
+          staged_ledger_diff ~epoch_ledger:genesis_ledger
         |> Deferred.Or_error.ok_exn
       in
       let previous_transition_with_hash =
@@ -265,7 +269,7 @@ struct
         Transition_frontier.Breadcrumb.build ~logger ~trust_system
           ~parent:parent_breadcrumb
           ~transition_with_hash:next_verified_external_transition_with_hash
-          ~sender:None
+          ~sender:None ~epoch_ledger:genesis_ledger
       with
       | Ok new_breadcrumb ->
           Logger.info logger ~module_:__MODULE__ ~location:__LOC__

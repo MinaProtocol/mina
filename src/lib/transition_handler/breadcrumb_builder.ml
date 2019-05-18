@@ -82,6 +82,7 @@ module Make (Inputs : Inputs.S) :
                     Transition_frontier.Breadcrumb.build ~logger ~trust_system
                       ~parent ~transition_with_hash:transition
                       ~sender:(Some sender)
+                      ~epoch_ledger:(failwith "DO IT NEXT TIME")
                   with
                   | Ok new_breadcrumb ->
                       let open Result.Let_syntax in

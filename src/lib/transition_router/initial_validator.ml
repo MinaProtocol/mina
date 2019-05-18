@@ -29,6 +29,7 @@ module type Inputs_intf = sig
                 , State_hash.Stable.Latest.t )
                 With_hash.t
                 Diff_mutant.E.t
+     and type sparse_ledger := Sparse_ledger.t
 
   module Protocol_state_validator :
     Protocol_state_validator_intf

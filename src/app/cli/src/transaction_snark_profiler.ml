@@ -126,7 +126,14 @@ let profile (module T : Transaction_snark.S) sparse_ledger0
                   { source= Pending_coinbase.Stack.empty
                   ; target= coinbase_stack_target }
                 t
-                (unstage (Sparse_ledger.handler sparse_ledger)) )
+                ~curr_ledger_handler:
+                  (unstage
+                     (Sparse_ledger.handler ~tag:Ledger_hash.Tag.Curr_ledger
+                        sparse_ledger))
+                ~epoch_ledger_handler:
+                  (unstage
+                     (Sparse_ledger.handler ~tag:Ledger_hash.Tag.Epoch_ledger
+                        sparse_ledger)) )
         in
         ((Time.Span.max span max_span, sparse_ledger'), proof) )
   in
@@ -177,7 +184,14 @@ let check_base_snarks sparse_ledger0 (transitions : Transaction.t list) preeval
               { source= Pending_coinbase.Stack.empty
               ; target= coinbase_stack_target }
             t
-            (unstage (Sparse_ledger.handler sparse_ledger))
+            ~curr_ledger_handler:
+              (unstage
+                 (Sparse_ledger.handler ~tag:Ledger_hash.Tag.Curr_ledger
+                    sparse_ledger))
+            ~epoch_ledger_handler:
+              (unstage
+                 (Sparse_ledger.handler ~tag:Ledger_hash.Tag.Epoch_ledger
+                    sparse_ledger))
         in
         sparse_ledger' )
   in
@@ -210,7 +224,14 @@ let generate_base_snarks_witness sparse_ledger0
                 Pending_coinbase.Stack.empty
             ; target= coinbase_stack_target }
             t
-            (unstage (Sparse_ledger.handler sparse_ledger))
+            ~curr_ledger_handler:
+              (unstage
+                 (Sparse_ledger.handler ~tag:Ledger_hash.Tag.Curr_ledger
+                    sparse_ledger))
+            ~epoch_ledger_handler:
+              (unstage
+                 (Sparse_ledger.handler ~tag:Ledger_hash.Tag.Epoch_ledger
+                    sparse_ledger))
         in
         sparse_ledger' )
   in

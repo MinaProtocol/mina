@@ -60,61 +60,84 @@ let of_digest = Fn.compose Fn.id of_hash
 
 type path = Pedersen.Digest.t list
 
-type _ Request.t +=
-  | Get_path : Account.Index.t -> path Request.t
-  | Get_element : Account.Index.t -> (Account.t * path) Request.t
-  | Set : Account.Index.t * Account.t -> unit Request.t
-  | Find_index : Public_key.Compressed.t -> Account.Index.t Request.t
+module Tag0 = struct
+  type t = Curr_ledger | Epoch_ledger [@@deriving eq, enum]
+end
 
-let reraise_merkle_requests (With {request; respond}) =
+module Tag = struct
+  include Tag0
+  include Enumerable (Tag0)
+
+  let curr_ledger = var Curr_ledger
+
+  let epoch_ledger = var Epoch_ledger
+end
+
+type _ Request.t +=
+  | Get_path : Tag.t * Account.Index.t -> path Request.t
+  | Get_element : Tag.t * Account.Index.t -> (Account.t * path) Request.t
+  | Set : Tag.t * Account.Index.t * Account.t -> unit Request.t
+  | Find_index : Tag.t * Public_key.Compressed.t -> Account.Index.t Request.t
+
+let reraise_merkle_requests ~tag (With {request; respond}) =
   match request with
   | Merkle_tree.Get_path addr ->
-      respond (Delegate (Get_path addr))
+      respond (Delegate (Get_path (tag, addr)))
   | Merkle_tree.Set (addr, account) ->
-      respond (Delegate (Set (addr, account)))
+      respond (Delegate (Set (tag, addr, account)))
   | Merkle_tree.Get_element addr ->
-      respond (Delegate (Get_element addr))
+      respond (Delegate (Get_element (tag, addr)))
   | _ ->
       unhandled
 
-let get t addr =
-  handle
+let get ~tag t addr =
+  handle_as_prover
     (Merkle_tree.get_req ~depth (var_to_hash_packed t) addr)
-    reraise_merkle_requests
+    As_prover.(read Tag.typ tag >>| fun tag -> reraise_merkle_requests ~tag)
 
 (*
-   [modify_account t pk ~filter ~f] implements the following spec:
+   [fetch_and_update_account ~tag t pk ~filter ~f] implements the following spec:
 
    - finds an account [account] in [t] for [pk] at path [addr] where [filter account] holds.
      note that the account is not guaranteed to have public key [pk]; it might be a new account
      created to satisfy this request.
-   - returns a root [t'] of a tree of depth [depth]
+   - returns a root [t'] of a tree of depth [depth] and the old [account]
    which is [t] but with the account [f account] at path [addr].
 *)
-let%snarkydef modify_account t pk ~(filter : Account.var -> ('a, _) Checked.t)
-    ~f =
+let%snarkydef fetch_and_update_account ~tag t pk
+    ~(filter : Account.var -> ('a, _) Checked.t) ~f =
   let%bind addr =
     request_witness Account.Index.Unpacked.typ
       As_prover.(
-        map (read Public_key.Compressed.typ pk) ~f:(fun s -> Find_index s))
+        let%map tag = read Tag.typ tag
+        and pk = read Public_key.Compressed.typ pk in
+        Find_index (tag, pk))
   in
-  handle
-    (Merkle_tree.modify_req ~depth (var_to_hash_packed t) addr
-       ~f:(fun account ->
-         let%bind x = filter account in
-         f x account ))
-    reraise_merkle_requests
-  >>| var_of_hash_packed
+  let%map new_root, account =
+    handle_as_prover
+      (Merkle_tree.fetch_and_update_req ~depth (var_to_hash_packed t) addr
+         ~f:(fun account ->
+           let%bind x = filter account in
+           f x account ))
+      As_prover.(
+        let%map tag = read Tag.typ tag in
+        reraise_merkle_requests ~tag)
+  in
+  (var_of_hash_packed new_root, account)
+
+let%snarkydef modify_account ~tag t pk
+    ~(filter : Account.var -> ('a, _) Checked.t) ~f =
+  fetch_and_update_account ~tag t pk ~filter ~f >>| fst
 
 (*
-   [modify_account_send t pk ~f] implements the following spec:
+   [modify_account_send ~tag t pk ~f] implements the following spec:
 
    - finds an account [account] in [t] at path [addr] whose public key is [pk] OR it is a fee transfer and is an empty account
    - returns a root [t'] of a tree of depth [depth]
    which is [t] but with the account [f account] at path [addr].
 *)
-let%snarkydef modify_account_send t pk ~is_writeable ~f =
-  modify_account t pk
+let%snarkydef modify_account_send ~tag t pk ~is_writeable ~f =
+  modify_account ~tag t pk
     ~filter:(fun account ->
       let%bind account_already_there =
         Public_key.Compressed.Checked.equal account.public_key pk
@@ -133,14 +156,14 @@ let%snarkydef modify_account_send t pk ~is_writeable ~f =
     ~f:(fun is_empty_and_writeable x -> f ~is_empty_and_writeable x)
 
 (*
-   [modify_account_recv t ~pk ~f] implements the following spec:
+   [modify_account_recv ~tag t ~pk ~f] implements the following spec:
 
    - finds an account [account] in [t] at path [addr] whose public key is [pk] OR which is an empty account
    - returns a root [t'] of a tree of depth [depth]
    which is [t] but with the account [f account] at path [addr].
 *)
-let%snarkydef modify_account_recv t pk ~f =
-  modify_account t pk
+let%snarkydef modify_account_recv ~tag t pk ~f =
+  modify_account ~tag t pk
     ~filter:(fun account ->
       let%bind account_already_there =
         Public_key.Compressed.Checked.equal account.public_key pk

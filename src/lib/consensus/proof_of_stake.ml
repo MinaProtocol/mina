@@ -753,7 +753,8 @@ module Data = struct
       in
       let winner_addr = message.Message.delegator in
       let%bind account =
-        with_label __LOC__ (Frozen_ledger_hash.get ledger winner_addr)
+        with_label __LOC__
+          Frozen_ledger_hash.(get ~tag:Tag.epoch_ledger ledger winner_addr)
       in
       let%bind delegate =
         with_label __LOC__ (Public_key.decompress_var account.delegate)
@@ -796,7 +797,10 @@ module Data = struct
           Coda_base.Pending_coinbase.create () |> Or_error.ok_exn
         in
         let ledger_handler =
-          unstage (Coda_base.Sparse_ledger.handler dummy_sparse_ledger)
+          unstage
+            Coda_base.(
+              Sparse_ledger.handler ~tag:Ledger_hash.Tag.Epoch_ledger
+                dummy_sparse_ledger)
         in
         let pending_coinbase_handler =
           unstage
@@ -2020,7 +2024,11 @@ module Data = struct
     let handler {delegator; ledger; private_key}
         ~pending_coinbase:{ Coda_base.Pending_coinbase_witness.pending_coinbases
                           ; is_new_stack } : Snark_params.Tick.Handler.t =
-      let ledger_handler = unstage (Coda_base.Sparse_ledger.handler ledger) in
+      let ledger_handler =
+        unstage
+          Coda_base.(
+            Sparse_ledger.handler ~tag:Ledger_hash.Tag.Epoch_ledger ledger)
+      in
       let pending_coinbase_handler =
         unstage
           (Coda_base.Pending_coinbase.handler pending_coinbases ~is_new_stack)
