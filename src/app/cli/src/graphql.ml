@@ -108,7 +108,8 @@ module Make (Commands : Coda_commands.Intf) = struct
                     Ok
                       (amount |> Currency.Amount.to_uint64 |> Stringable.uint64)
                 | Stake_delegation _ ->
-                    Error "Payment should not consist of a stake delegation" )
+                    (* Stake delegation does not have an amount, so we set it to 0 *)
+                    Ok "0" )
           ; uint64_field "fee"
               ~doc:
                 "Fee that sender is willing to pay for making the transaction"

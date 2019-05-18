@@ -94,10 +94,10 @@ let frozen_ledger_hash (h : Coda_base.Frozen_ledger_hash.t) :
     Lite_base.Ledger_hash.t =
   digest (h :> Tick.Pedersen.Digest.t)
 
-let ledger_builder_hash (h : Coda_base.Staged_ledger_hash.t) =
+let ledger_builder_hash (h : Staged_ledger_hash.t) =
   { Lite_base.Staged_ledger_hash.ledger_hash=
-      ledger_hash (Coda_base.Staged_ledger_hash.ledger_hash h)
-  ; aux_hash= Coda_base.Staged_ledger_hash.(Aux_hash.to_bytes (aux_hash h)) }
+      ledger_hash (Staged_ledger_hash.ledger_hash h)
+  ; aux_hash= Staged_ledger_hash.(Aux_hash.to_bytes (aux_hash h)) }
 
 let blockchain_state
     ({staged_ledger_hash= lbh; snarked_ledger_hash= lh; timestamp} :

@@ -49,10 +49,18 @@ module type Base_inputs_intf = sig
 
   module External_transition :
     Protocols.Coda_pow.External_transition_intf
-    with type protocol_state := Protocol_state.Value.t
-     and type staged_ledger_diff := Staged_ledger_diff.t
-     and type protocol_state_proof := Proof.t
+    with type time := Block_time.t
      and type state_hash := State_hash.t
+     and type compressed_public_key := Public_key.Compressed.t
+     and type user_command := User_command.t
+     and type consensus_state := Consensus.Data.Consensus_state.Value.t
+     and type protocol_state := Protocol_state.Value.t
+     and type proof := Proof.t
+     and type verifier := Verifier.t
+     and type staged_ledger_hash := Staged_ledger_hash.t
+     and type ledger_proof := Ledger_proof.t
+     and type transaction := Transaction.t
+     and type staged_ledger_diff := Staged_ledger_diff.t
 end
 
 (* assumption: the Rpcs functor is applied only once in the codebase, so that

@@ -1,4 +1,5 @@
 open Core
+open Coda_base
 open Fold_lib
 open Tuple_lib
 open Snark_params.Tick

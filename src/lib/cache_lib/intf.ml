@@ -37,6 +37,8 @@ module Cached = struct
      *)
     val pure : 't -> ('t, _) t
 
+    val is_pure : (_, _) t -> bool
+
     (** [peek c] inspects the value of [c] without consuming
      *  [c].
      *)
