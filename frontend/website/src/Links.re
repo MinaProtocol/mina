@@ -47,7 +47,7 @@ module Static = {
   };
 
   let modifiedsnark = () => {
-    name: ("Read the zkSNARK We Are Using", "modified-BG-snark"),
+    name: ("Read About the zkSNARK construction We're Using", "modified-BG-snark"),
     link: Cdn.url("/static/modified-BG-snark-05-03-2019-0.pdf"),
   };
 
