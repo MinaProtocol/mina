@@ -11,9 +11,7 @@ Zero-knowledge proofs (ZKPs) are a powerful cryptography primitive that enables 
 
 ## What are Zero-knowledge Proofs?
 
-Let’s say you have a secret. Recall that, using ZKPs, you can prove that you have the secret without even revealing the it.
-
-Now let’s look at a puzzle and see how you could convince anybody that you know a solution without revealing it. 
+Now let’s consider a puzzle and see how you could convince anybody that you know a solution without revealing it. 
 
 
 ### A Puzzle called 3-Coloring. 
@@ -41,7 +39,7 @@ Notice that if you didnt really know a 3-coloring (meaning there is at least one
 
 ## Soundness
 
-Note that there is still some significant probability that you could cheat and still get away with it (namely, $(1 - 1/E)$). This probability is called the _soundness error_.  We would like to reduce this error to negligible. Here is an idea.  Repeat the above protocol multiple times. Now, you can get away only if you get away in each one of those executions. This significantly reduces the soundness error, as quantified in the following.   
+Note that there is still some significant probability that you could cheat and still get away with it (namely, $(1 - 1/E)$). This probability is called the _soundness error_.  We would like to reduce this error to negligible. Here is an idea:  Repeat the above protocol multiple times. Now, you can get away only if you get away in each one of those executions. This significantly reduces the soundness error, as quantified in the following.   
 
 
 
@@ -75,7 +73,7 @@ Let $N$ be the total number of rounds.
 
 ## Zero Knowledgeness
 
-Unfortunately, there is an issue in the above protocol. Since Verifier gets to see the coloring two nodes at a time, she can learn the entire 3-coloring by running enough rounds. Here is an idea on how we can get around this issue. After every round, you would ask Verifier to step out of sight, you would randomly permute the colors and again cover all the nodes. That way, anything that Verifier might have learned in one round is not relevant in the subsequent rounds, since whatever Verifier viewed can be simulated by just picking two random, but differently-colored balls in each round. 
+Unfortunately, there is an issue in the above protocol. Since Verifier gets to see the coloring two nodes at a time, she can learn the entire 3-coloring by running enough rounds. Luckily, we can get around this issue: After every round, you would ask Verifier to step out of sight, you would randomly permute the colors and again cover all the nodes. That way, anything that Verifier might have learned in one round is not relevant in the subsequent rounds, since whatever Verifier viewed can be simulated by just picking two random, but differently-colored balls in each round. 
 
 
  
