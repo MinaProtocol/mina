@@ -34,142 +34,6 @@
 open Core_kernel
 open Coda_digestif
 
-(** A ring-buffer that backs our state *)
-
-(*module Ring_buffer : sig
-  type 'a t [@@deriving sexp]
-
-  module Stable : sig
-    module V1 : sig
-      type nonrec 'a t = 'a t [@@deriving sexp, bin_io, version]
-    end
-
-    module Latest = V1
-  end
-
-  val read_all : 'a t -> 'a list
-
-  val read_k : 'a t -> int -> 'a list
-end
-
-module State : sig
-  module Job : sig
-    (** An incomplete job -- base may contain data ['d], merge can have zero components, one component (either the left or the right), or two components in which case there is an integer (sequence_no) representing a set of (completed)jobs in a sequence of (completed)jobs created.
-     *)
-    module Sequence_no : sig
-      module Stable : sig
-        module V1 : sig
-          type t = int [@@deriving sexp, bin_io, version]
-        end
-
-        module Latest = V1
-      end
-    end
-
-    module Merge : sig
-      module Stable : sig
-        module V1 : sig
-          type 'a t =
-            | Empty
-            | Lcomp of 'a
-            | Rcomp of 'a
-            | Bcomp of ('a * 'a * Sequence_no.Stable.V1.t)
-          [@@deriving sexp, bin_io, version]
-        end
-
-        module Latest = V1
-      end
-    end
-
-    module Stable : sig
-      module V1 : sig
-        type ('a, 'd) t =
-          | Merge of 'a Merge.Stable.V1.t
-          | Base of ('d * Sequence_no.Stable.V1.t) option
-        [@@deriving bin_io, sexp, version]
-      end
-
-      module Latest = V1
-    end
-
-    type ('a, 'd) t = ('a, 'd) Stable.Latest.t =
-      | Merge of 'a Merge.Stable.V1.t
-      | Base of ('d * Sequence_no.Stable.V1.t) option
-    [@@deriving sexp]
-  end
-
-  module Completed_job : sig
-    (** A completed job is either some [Lifted 'a] corresponding to some
-     * [Base 'd] or a [Merged 'a] corresponding to some [Merge ('a * 'a)]
-     *)
-    type 'a t = Lifted of 'a | Merged of 'a [@@deriving bin_io, sexp]
-  end
-
-  (** State of the parallel scan possibly containing base ['d] entities
-   * and partially complete ['a option * 'a option] merges.
-   *)
-
-  (* bin_io, version omitted intentionally *)
-  type ('a, 'd) t [@@deriving sexp]
-
-  module Stable : sig
-    module V1 : sig
-      type nonrec ('a, 'd) t = ('a, 'd) t [@@deriving sexp, bin_io, version]
-    end
-
-    module Latest = V1
-  end
-
-  (** Fold chronologically through the state. This is not the same as iterating
-   * through the ring-buffer, rather we traverse the data structure in the same
-   * order we expect the completed jobs to be filled in.
-   *)
-  val fold_chronological :
-    ('a, 'd) t -> init:'acc -> f:('acc -> ('a, 'd) Job.t -> 'acc) -> 'acc
-
-  (** Returns a list of all the collected transactions in the scan state. The
-    * order of the transactions in the list is the same as the order when they
-    * were added. Namely the head of the list is the first transaction that
-    * was collected by the scan state.
-    *)
-  val transactions : ('a, 'd) t -> 'd sexp_list
-
-  val copy : ('a, 'd) t -> ('a, 'd) t
-
-  (** Visualize produces a tree in a way that's a bit buggy, but still was
-   * helpful for debugging. [visualize state ~draw_a:(Fn.const "A") ~draw_d:(Fn.const "D")]
-   * creates a tree that looks like this:
-   *
-                                                            (_,_)
-                            (A,A)                                                           (_,_)
-            (_,_)                           (A,A)                           (_,_)
-      _             (_,_)           (A,A)           (_,_)
-   _       _     (_,_)   (A,A)   (_,_)
- D   _   _  (_,_(A,A(_,_
-D D _ _ (_(A(_
-   *)
-  val visualize :
-    ('a, 'd) t -> draw_a:('a -> string) -> draw_d:('d -> string) -> string
-
-  module Hash : sig
-    type t = Digestif.SHA256.t
-  end
-
-  val hash : ('a, 'd) t -> ('a -> string) -> ('d -> string) -> Hash.t
-
-  module Make_foldable (M : Monad.S) : sig
-    (** Effectfully fold chronologically. See {!fold_chronological} *)
-    val fold_chronological_until :
-         ('a, 'd) t
-      -> init:'acc
-      -> f:(   'acc
-            -> ('a, 'd) Job.t
-            -> ('acc, 'stop) Container.Continue_or_stop.t M.t)
-      -> finish:('acc -> 'stop M.t)
-      -> 'stop M.t
-  end
-end*)
-
 module Sequence_number : sig
   module Stable : sig
     module V1 : sig
@@ -258,7 +122,7 @@ module Merge : sig
               { left: 'a
               ; right: 'a
               ; seq_no: Sequence_number.Stable.V1.t
-                    (*Update no, for debugging*)
+                    (*Update number, for debugging*)
               ; status: Job_status.Stable.V1.t }
         [@@deriving sexp, bin_io, version]
       end
@@ -398,15 +262,6 @@ val next_jobs : ('a, 'd) State.t -> ('a, 'd) Available_job.t list list
 val jobs_for_next_update :
   ('a, 'd) State.t -> ('a, 'd) Available_job.t list list
 
-(** Get all the available jobs as a sequence *)
-
-(*val next_jobs_sequence :
-  state:('a, 'd) State.t -> ('a, 'd) Available_job.t Sequence.t*)
-
-(** Add data to parallel scan state *)
-
-(*val enqueue_data : state:('a, 'd) State.t -> data:'d list -> unit Or_error.t*)
-
 (** Compute how much data ['d] elements we are allowed to add to the state *)
 val free_space : ('a, 'd) State.t -> int
 
@@ -428,10 +283,6 @@ val last_emitted_value : ('a, 'd) State.t -> ('a * 'd list) option
  * (starts from the begining of the next tree)  *)
 val partition_if_overflowing : ('a, 'd) State.t -> Space_partition.t
 
-(** How much parallelism did we instantiate the state with *)
-
-(*val parallelism : state:('a, 'd) t -> int*)
-
 (** Do all the invariants of our parallel scan state hold; namely:
   * 1. The {!free_space} is equal to the number of empty leaves
   * 2. The empty leaves are in a contiguous chunk
@@ -446,10 +297,6 @@ val is_valid : ('a, 'd) State.t -> bool
 (** The base jobs ['d] that are pending and would be returned by available [Base]
  * jobs *)
 val current_data : ('a, 'd) State.t -> 'd list
-
-(*val update_curr_job_seq_no : ('a, 'd) t -> unit Or_error.t*)
-
-(*Update the current job sequence number by 1. All the completed jobs created will have the current job sequence number*)
 
 val current_job_sequence_number : ('a, 'd) State.t -> int
 
@@ -467,4 +314,5 @@ val base_jobs_on_latest_tree : ('a, 'd) State.t -> 'd list
 of the leftmost leaf of the tree*)
 val next_on_new_tree : ('a, 'd) State.t -> bool
 
+(*All the 'ds for which scan results are yet to computed*)
 val pending_data : ('a, 'd) State.t -> 'd list
