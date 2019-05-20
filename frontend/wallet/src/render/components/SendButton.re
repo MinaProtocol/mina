@@ -4,24 +4,106 @@ module Styles = {
   open Css;
   let errorText =
     merge([Theme.Text.Body.regular, style([color(Theme.Colors.roseBud)])]);
+
+  let contentContainer =
+    style([
+      display(`flex),
+      width(`percent(100.)),
+      flexDirection(`column),
+      alignItems(`center),
+      justifyContent(`center),
+    ]);
 };
 
-type unvalidatedModalState = {
-  fromStr: option(PublicKey.t),
-  toStr: string,
-  amountStr: string,
-  feeStr: string,
-  memoOpt: option(string),
-  errorOpt: option(string),
+module ModalState = {
+  module Validated = {
+    type t = {
+      from: PublicKey.t,
+      to_: PublicKey.t,
+      amount: string,
+      fee: string,
+      memoOpt: option(string),
+    };
+  };
+  module Unvalidated = {
+    type t = {
+      fromStr: option(PublicKey.t),
+      toStr: string,
+      amountStr: string,
+      feeStr: string,
+      memoOpt: option(string),
+      errorOpt: option(string),
+    };
+  };
 };
 
-let emptyModal = activeWallet => {
-  fromStr: activeWallet,
-  toStr: "",
-  amountStr: "",
-  feeStr: "",
-  memoOpt: None,
-  errorOpt: None,
+let emptyModal: option(PublicKey.t) => ModalState.Unvalidated.t =
+  activeWallet => {
+    fromStr: activeWallet,
+    toStr: "",
+    amountStr: "",
+    feeStr: "",
+    memoOpt: None,
+    errorOpt: None,
+  };
+
+let validateInt64 = s =>
+  switch (Int64.of_string(s)) {
+  | i => i > Int64.zero
+  | exception (Failure(_)) => false
+  };
+
+let validatePubkey = s =>
+  switch (PublicKey.ofStringExn(s)) {
+  | k => Some(k)
+  | exception _ => None
+  };
+
+let validate:
+  ModalState.Unvalidated.t => Belt.Result.t(ModalState.Validated.t, string) =
+  state =>
+    switch (state, validatePubkey(state.toStr)) {
+    | ({fromStr: None}, _) => Error("Please specify a wallet to send from.")
+    | ({toStr: ""}, _) => Error("Please specify a destination address.")
+    | (_, None) => Error("Destination is invalid public key.")
+    | ({amountStr}, _) when !validateInt64(amountStr) =>
+      Error("Please specify a non-zero amount.")
+    | ({feeStr}, _) when !validateInt64(feeStr) =>
+      Error("Please specify a non-zero fee.")
+    | ({fromStr: Some(fromPk), amountStr, feeStr, memoOpt}, Some(toPk)) =>
+      Ok({from: fromPk, to_: toPk, amount: amountStr, fee: feeStr, memoOpt})
+    };
+
+let modalButtons = (unvalidated, setModalState, onSubmit) => {
+  let setError = e =>
+    setModalState(
+      Option.map(~f=s => {...s, ModalState.Unvalidated.errorOpt: Some(e)}),
+    );
+
+  <div className=Css.(style([display(`flex)]))>
+    <Button
+      label="Cancel"
+      style=Button.Gray
+      onClick={_ => setModalState(_ => None)}
+    />
+    <Spacer width=1. />
+    <Button
+      label="Send"
+      style=Button.Green
+      onClick={_ =>
+        switch (validate(unvalidated)) {
+        | Error(e) => setError(e)
+        | Ok(validated) =>
+          onSubmit(
+            validated,
+            fun
+            | Belt.Result.Error(e) => setError(e)
+            | Ok () => setModalState(_ => None),
+          )
+        }
+      }
+    />
+  </div>;
 };
 
 [@react.component]
@@ -31,134 +113,102 @@ let make = (~wallets, ~onSubmit) => {
     React.useContext(SettingsProvider.context);
   let activeWallet = Hooks.useActiveWallet();
   let spacer = <Spacer height=0.5 />;
-
-  <>
-    <Button
-      label="Send"
-      onClick={_ => setModalState(_ => Some(emptyModal(activeWallet)))}
-    />
-    {switch (sendState) {
-     | None => React.null
-     | Some(
-         {fromStr, toStr, amountStr, feeStr, memoOpt, errorOpt} as fullState,
-       ) =>
-       <Modal
-         title="Send Coda" onRequestClose={() => setModalState(_ => None)}>
-         <div
-           className=Css.(
-             style([
-               display(`flex),
-               width(`percent(100.)),
-               flexDirection(`column),
-               alignItems(`center),
-               justifyContent(`center),
-             ])
-           )>
-           {switch (errorOpt) {
-            | None => React.null
-            | Some(err) =>
-              <div className=Styles.errorText>
-                {React.string("Error: " ++ err)}
-              </div>
-            }}
-           spacer
-           <Dropdown
-             label="From"
-             value=fromStr
-             onChange={value =>
-               setModalState(Option.map(~f=s => {...s, fromStr: value}))
-             }
-             options={
-               wallets
-               |> Array.map(~f=wallet =>
-                    (
-                      wallet.Wallet.key,
-                      SettingsRenderer.getWalletName(settings, wallet.key),
+  ModalState.Unvalidated.(
+    <>
+      <Button
+        label="Send"
+        onClick={_ => setModalState(_ => Some(emptyModal(activeWallet)))}
+      />
+      {switch (sendState) {
+       | None => React.null
+       | Some(
+           {fromStr, toStr, amountStr, feeStr, memoOpt, errorOpt} as fullState,
+         ) =>
+         <Modal
+           title="Send Coda" onRequestClose={() => setModalState(_ => None)}>
+           <div className=Styles.contentContainer>
+             {switch (errorOpt) {
+              | None => React.null
+              | Some(err) =>
+                <div className=Styles.errorText>
+                  {React.string("Error: " ++ err)}
+                </div>
+              }}
+             spacer
+             <Dropdown
+               label="From"
+               value=fromStr
+               onChange={value =>
+                 setModalState(Option.map(~f=s => {...s, fromStr: value}))
+               }
+               options={
+                 wallets
+                 |> Array.map(~f=wallet =>
+                      (
+                        wallet.Wallet.key,
+                        SettingsRenderer.getWalletName(settings, wallet.key),
+                      )
                     )
-                  )
-               |> Array.toList
-             }
-           />
-           spacer
-           <TextField
-             label="To"
-             onChange={value =>
-               setModalState(Option.map(~f=s => {...s, toStr: value}))
-             }
-             value=toStr
-             placeholder="Recipient Public Key"
-           />
-           spacer
-           <TextField
-             isCurrency=true
-             label="QTY"
-             onChange={value =>
-               setModalState(Option.map(~f=s => {...s, amountStr: value}))
-             }
-             value=amountStr
-             placeholder="0"
-           />
-           spacer
-           <TextField
-             isCurrency=true
-             label="Fee"
-             onChange={value =>
-               setModalState(Option.map(~f=s => {...s, feeStr: value}))
-             }
-             value=feeStr
-             placeholder="0"
-           />
-           spacer
-           {switch (memoOpt) {
-            | None =>
-              <div className=Css.(style([alignSelf(`flexEnd)]))>
-                <Link
-                  onClick={_ =>
-                    setModalState(
-                      Option.map(~f=s => {...s, memoOpt: Some("")}),
-                    )
-                  }>
-                  {React.string("+ Add memo")}
-                </Link>
-              </div>
-            | Some(memoStr) =>
-              <TextField
-                label="Memo"
-                onChange={value =>
-                  setModalState(
-                    Option.map(~f=s => {...s, memoOpt: Some(value)}),
-                  )
-                }
-                value=memoStr
-                placeholder="Thanks!"
-              />
-            }}
-           <Spacer height=1.0 />
-           <div className=Css.(style([display(`flex)]))>
-             <Button
-               label="Cancel"
-               style=Button.Gray
-               onClick={_ => setModalState(_ => None)}
-             />
-             <Spacer width=1. />
-             <Button
-               label="Send"
-               style=Button.Green
-               onClick={_ =>
-                 onSubmit(
-                   fullState,
-                   fun
-                   | Some(err) =>
-                     setModalState(
-                       Option.map(~f=s => {...s, errorOpt: Some(err)}),
-                     )
-                   | None => setModalState(_ => None),
-                 )
+                 |> Array.toList
                }
              />
+             spacer
+             <TextField
+               label="To"
+               onChange={value =>
+                 setModalState(Option.map(~f=s => {...s, toStr: value}))
+               }
+               value=toStr
+               placeholder="Recipient Public Key"
+             />
+             spacer
+             <TextField.Currency
+               label="QTY"
+               onChange={value =>
+                 setModalState(Option.map(~f=s => {...s, amountStr: value}))
+               }
+               value=amountStr
+               placeholder="0"
+             />
+             spacer
+             <TextField.Currency
+               label="Fee"
+               onChange={value =>
+                 setModalState(Option.map(~f=s => {...s, feeStr: value}))
+               }
+               value=feeStr
+               placeholder="0"
+             />
+             spacer
+             {switch (memoOpt) {
+              | None =>
+                <div className=Css.(style([alignSelf(`flexEnd)]))>
+                  <Link
+                    onClick={_ =>
+                      setModalState(
+                        Option.map(~f=s => {...s, memoOpt: Some("")}),
+                      )
+                    }>
+                    {React.string("+ Add memo")}
+                  </Link>
+                </div>
+              | Some(memoStr) =>
+                <TextField
+                  label="Memo"
+                  onChange={value =>
+                    setModalState(
+                      Option.map(~f=s => {...s, memoOpt: Some(value)}),
+                    )
+                  }
+                  value=memoStr
+                  placeholder="Thanks!"
+                />
+              }}
+             <Spacer height=1.0 />
+             {modalButtons(fullState, setModalState, onSubmit)}
            </div>
-         </div>
-       </Modal>
-     }}
-  </>;
+         </Modal>
+       }}
+    </>
+  );
 };

@@ -24,10 +24,13 @@ module Styles = {
       ]),
     ]);
 
+  let placeholderColor = Theme.Colors.slateAlpha(0.5);
+
   let input =
     merge([
       Theme.Text.Body.regular,
       style([
+        placeholder([color(placeholderColor)]),
         border(`zero, `solid, white),
         flexGrow(1.),
         padding(`zero),
@@ -38,38 +41,48 @@ module Styles = {
       ]),
     ]);
 
-  let square =
+  let square = active =>
     style([
       marginRight(`rem(0.25)),
+      paddingBottom(`px(2)),
       Theme.Typeface.lucidaGrande,
-      color(Theme.Colors.teal),
+      color(active ? Theme.Colors.teal : placeholderColor),
     ]);
 };
 
+module Currency = {
+  [@react.component]
+  let make = (~onChange, ~value, ~label, ~placeholder=?) =>
+    <label className=Styles.container>
+      <span className=Styles.label> {React.string(label ++ ":")} </span>
+      <Spacer width=0.5 />
+      <span className={Styles.square(value != "")}>
+        {ReasonReact.string({j|■|j})}
+      </span>
+      <input
+        className=Styles.input
+        type_="text"
+        onChange={e => {
+          let value =
+            ReactEvent.Form.target(e)##value
+            |> Js.String.replaceByRe([%re "/[^0-9]/g"], "");
+          onChange(value);
+        }}
+        value
+        ?placeholder
+      />
+    </label>;
+};
+
 [@react.component]
-let make = (~onChange, ~isCurrency=false, ~value, ~label, ~placeholder=?) =>
+let make = (~onChange, ~value, ~label, ~placeholder=?) =>
   <label className=Styles.container>
     <span className=Styles.label> {React.string(label ++ ":")} </span>
     <Spacer width=0.5 />
-    {isCurrency
-       ? <span className=Styles.square>
-           {ReasonReact.string({j|■|j})}
-         </span>
-       : React.null}
     <input
       className=Styles.input
-      min=0
       type_="text"
-      onChange={e => {
-        let value =
-          if (isCurrency) {
-            ReactEvent.Form.target(e)##value
-            |> Js.String.replaceByRe([%re "/[^0-9]/g"], "");
-          } else {
-            ReactEvent.Form.target(e)##value;
-          };
-        onChange(value);
-      }}
+      onChange={e => onChange(ReactEvent.Form.target(e)##value)}
       value
       ?placeholder
     />

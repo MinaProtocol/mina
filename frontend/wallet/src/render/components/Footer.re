@@ -76,12 +76,6 @@ module SendPayment = [%graphql
 
 module SendPaymentMutation = ReasonApollo.CreateMutation(SendPayment);
 
-let validateInt64 = s =>
-  switch (Int64.of_string(s)) {
-  | i => i > Int64.zero
-  | exception (Failure(_)) => false
-  };
-
 [@react.component]
 let make = () => {
   <div className=Styles.footer>
@@ -98,54 +92,37 @@ let make = () => {
                  <SendButton
                    wallets={Array.map(~f=Wallet.ofGraphqlExn, data##wallets)}
                    onSubmit={(
-                     {SendButton.fromStr, toStr, amountStr, feeStr, memoOpt},
+                     {from, to_, amount, fee, memoOpt}: SendButton.ModalState.Validated.t,
                      afterSubmit,
-                   ) =>
-                     switch (fromStr) {
-                     | None =>
-                       afterSubmit(
-                         Some("Please specify a wallet to send from."),
-                       )
-                     | _ when toStr == "" =>
-                       afterSubmit(
-                         Some("Please specify a destination address."),
-                       )
-                     | _ when !validateInt64(amountStr) =>
-                       afterSubmit(Some("Please specify a non-zero amount."))
-                     | _ when !validateInt64(feeStr) =>
-                       afterSubmit(Some("Please specify a non-zero fee."))
-                     | Some(fromStr) =>
-                       let variables =
-                         SendPayment.make(
-                           ~from=PublicKey.toString(fromStr),
-                           ~to_=toStr,
-                           ~amount=amountStr,
-                           ~fee=feeStr,
-                           ~memo=?memoOpt,
-                           (),
-                         )##variables;
-                       let performMutation =
-                         Task.liftPromise(() => mutation(~variables, ()));
-                       Task.perform(
-                         performMutation,
-                         ~f=
-                           fun
-                           | Data(_)
-                           | EmptyResponse => afterSubmit(None)
-                           | Errors(err) => {
-                               /* TODO: Display more than first error? */
-                               let message =
-                                 err
-                                 |> Array.get(~index=0)
-                                 |> Option.map(~f=e => e##message)
-                                 |> Option.withDefault(
-                                      ~default="Server error",
-                                    );
-                               afterSubmit(Some(message));
-                             },
-                       );
-                     }
-                   }
+                   ) => {
+                     let variables =
+                       SendPayment.make(
+                         ~from=PublicKey.toString(from),
+                         ~to_=PublicKey.toString(to_),
+                         ~amount,
+                         ~fee,
+                         ~memo=?memoOpt,
+                         (),
+                       )##variables;
+                     let performMutation =
+                       Task.liftPromise(() => mutation(~variables, ()));
+                     Task.perform(
+                       performMutation,
+                       ~f=
+                         fun
+                         | Data(_)
+                         | EmptyResponse => afterSubmit(Belt.Result.Ok())
+                         | Errors(err) => {
+                             /* TODO: Display more than first error? */
+                             let message =
+                               err
+                               |> Array.get(~index=0)
+                               |> Option.map(~f=e => e##message)
+                               |> Option.withDefault(~default="Server error");
+                             afterSubmit(Error(message));
+                           },
+                     );
+                   }}
                  />
              )
            </SendPaymentMutation>
