@@ -237,9 +237,16 @@ module Make (Inputs : Inputs.S) :
                     Deferred.return error ) ) )
 
   let run ~logger ~trust_system ~verifier ~network ~frontier
-      ~catchup_job_reader ~catchup_breadcrumbs_writer
-      ~unprocessed_transition_cache =
-    Strict_pipe.Reader.iter catchup_job_reader ~f:(fun (hash, subtrees) ->
+      ~catchup_job_reader
+      ~(catchup_breadcrumbs_writer :
+         ( (Inputs.Transition_frontier.Breadcrumb.t, State_hash.t) Cached.t
+           Rose_tree.t
+           list
+         , Strict_pipe.crash Strict_pipe.buffered
+         , unit )
+         Strict_pipe.Writer.t) ~unprocessed_transition_cache : unit =
+    Strict_pipe.Reader.iter_without_pushback catchup_job_reader
+      ~f:(fun (hash, subtrees) ->
         ( match%bind
             get_transitions_and_compute_breadcrumbs ~logger ~trust_system
               ~verifier ~network ~frontier ~num_peers:8
@@ -253,7 +260,9 @@ module Make (Inputs : Inputs.S) :
                 "catchup breadcrumbs pipe was closed; attempt to write to \
                  closed pipe" ;
               Deferred.unit )
-            else Strict_pipe.Writer.write catchup_breadcrumbs_writer trees
+            else
+              Strict_pipe.Writer.write catchup_breadcrumbs_writer trees
+              |> Deferred.return
         | Error e ->
             Logger.info logger ~module_:__MODULE__ ~location:__LOC__
               !"All peers either sent us bad data, didn't have the info, or \
@@ -266,7 +275,6 @@ module Make (Inputs : Inputs.S) :
             Logger.trace logger ~module_:__MODULE__ ~location:__LOC__
               "garbage collected failed cached transitions" ;
             Deferred.unit )
-        |> don't_wait_for ;
-        Deferred.unit )
+        |> don't_wait_for )
     |> don't_wait_for
 end

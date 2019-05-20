@@ -30,8 +30,8 @@ module Make (Inputs : Inputs.S) = struct
             Cached.t
             Rose_tree.t
             list
-        , synchronous
-        , unit Deferred.t )
+        , crash buffered
+        , unit )
         Writer.t
           (** `collected_transitins` stores all seen transitions as its keys,
               and values are a list of direct children of those transitions.
@@ -59,7 +59,22 @@ module Make (Inputs : Inputs.S) = struct
         Capped_supervisor.t }
 
   let create ~logger ~verifier ~trust_system ~frontier ~time_controller
-      ~catchup_job_writer ~catchup_breadcrumbs_writer ~clean_up_signal =
+      ~(catchup_job_writer :
+         ( State_hash.t
+           * ( External_transition.with_initial_validation Envelope.Incoming.t
+             , State_hash.t )
+             Cached.t
+             Rose_tree.t
+             list
+         , crash buffered
+         , unit )
+         Writer.t)
+      ~(catchup_breadcrumbs_writer :
+         ( (Transition_frontier.Breadcrumb.t, State_hash.t) Cached.t Rose_tree.t
+           list
+         , crash buffered
+         , unit )
+         Writer.t) ~clean_up_signal =
     let collected_transitions = State_hash.Table.create () in
     let parent_root_timeouts = State_hash.Table.create () in
     upon (Ivar.read clean_up_signal) (fun () ->
@@ -77,7 +92,6 @@ module Make (Inputs : Inputs.S) = struct
           with
           | Ok trees_of_breadcrumbs ->
               Writer.write catchup_breadcrumbs_writer trees_of_breadcrumbs
-              |> don't_wait_for
           | Error err ->
               Logger.trace logger ~module_:__MODULE__ ~location:__LOC__
                 !"Error during buildup breadcrumbs inside catchup_scheduler: %s"
@@ -169,12 +183,10 @@ module Make (Inputs : Inputs.S) = struct
             "timed out waiting for the parent of $cached_transition after \
              $duration ms, signalling a catchup job" ;
           (* it's ok to create a new thread here because the thread essentially does no work *)
-          don't_wait_for
-            ( if Writer.is_closed t.catchup_job_writer then (
-              Logger.trace t.logger ~module_:__MODULE__ ~location:__LOC__
-                "catchup job pipe was closed; attempt to write to closed pipe" ;
-              Deferred.unit )
-            else Writer.write t.catchup_job_writer forest ) )
+          if Writer.is_closed t.catchup_job_writer then
+            Logger.trace t.logger ~module_:__MODULE__ ~location:__LOC__
+              "catchup job pipe was closed; attempt to write to closed pipe"
+          else Writer.write t.catchup_job_writer forest )
     in
     match Hashtbl.find t.collected_transitions parent_hash with
     | None ->

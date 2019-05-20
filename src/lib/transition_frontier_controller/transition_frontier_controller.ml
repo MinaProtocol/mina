@@ -101,10 +101,12 @@ module Make (Inputs : Inputs_intf) :
         (Buffered (`Capacity 30, `Overflow Crash))
     in
     let catchup_job_reader, catchup_job_writer =
-      Strict_pipe.create ~name:"catchup jobs" Synchronous
+      Strict_pipe.create ~name:"catchup jobs"
+        (Buffered (`Capacity 30, `Overflow Crash))
     in
     let catchup_breadcrumbs_reader, catchup_breadcrumbs_writer =
-      Strict_pipe.create ~name:"catchup breadcrumbs" Synchronous
+      Strict_pipe.create ~name:"catchup breadcrumbs"
+        (Buffered (`Capacity 30, `Overflow Crash))
     in
     let proposer_transition_reader_copy, proposer_transition_writer_copy =
       Strict_pipe.create ~name:"proposer transition copy" Synchronous
