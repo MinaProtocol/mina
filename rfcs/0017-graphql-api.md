@@ -20,6 +20,8 @@ Related Goals:
 
 [detailed-design]: #detailed-design
 
+★ Note: Included below is the initial design which describes some of the goals and thoughts associated with creating this api. The full schema (under development) is specified at https://github.com/CodaProtocol/coda/blob/master/frontend/wallet/schema.graphql.
+
 This design is heavily influenced by which data is stored on the node and which is intended to be stored by the client.
 Most importantly, we assume the node knows about some private keys which it associates to public keys for which it will
 try to store related transactions indefinitely (where "related" means being sent to or from the public key). We may also
