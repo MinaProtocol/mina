@@ -62,8 +62,8 @@ module Typeface = {
     (`normal, "Light"),
     (`medium, "Regular"),
     (`semiBold, "Medium"),
-    (`Bold, "SemiBold"),
-    (`ExtraBold, "Bold"),
+    (`bold, "SemiBold"),
+    (`extraBold, "Bold"),
   ];
 
   let () =
@@ -73,8 +73,8 @@ module Typeface = {
         fontFace(
           ~fontFamily="IBM Plex Sans",
           ~src=[
-            "/static/font/IMBPlexSans-" ++ name ++ "-Latin1.woff2",
-            "/static/font/IBMPlexSans-" ++ name ++ "-Latin1.woff",
+            url("/static/font/IMBPlexSans-" ++ name ++ "-Latin1.woff2"),
+            url("/static/font/IBMPlexSans-" ++ name ++ "-Latin1.woff"),
           ],
           ~fontStyle=`normal,
           ~fontWeight=weight,
@@ -87,8 +87,8 @@ module Typeface = {
     fontFace(
       ~fontFamily="IBM Plex Mono",
       ~src=[
-        "/static/font/IBMPlexMono-Medium-Latin1.woff2",
-        "/static/font/IBMPlexSans-Medium-Latin1.woff",
+        url("/static/font/IBMPlexMono-Medium-Latin1.woff2"),
+        url("/static/font/IBMPlexSans-Medium-Latin1.woff"),
       ],
       ~fontStyle=`normal,
       ~fontWeight=`semiBold,
@@ -99,8 +99,8 @@ module Typeface = {
     fontFace(
       ~fontFamily="IBM Plex Mono",
       ~src=[
-        "/static/font/IBMPlexMono-SemiBold-Latin1.woff2",
-        "/static/font/IBMPlexSans-SemiBold-Latin1.woff",
+        url("/static/font/IBMPlexMono-SemiBold-Latin1.woff2"),
+        url("/static/font/IBMPlexSans-SemiBold-Latin1.woff"),
       ],
       ~fontStyle=`normal,
       ~fontWeight=`bold,
@@ -108,15 +108,17 @@ module Typeface = {
     );
 
   let ibmplexserif =
-    fontFace(
-      ~fontFamily="IBM Plex Serif",
-      ~src=[
-        "/static/font/IBMPlexSerif-Medium-Latin1.woff2",
-        "/static/font/IBMPlexSerif-Medium-Latin1.woff",
-      ],
-      ~fontStyle=`normal,
-      ~fontWeight=`medium,
-      (),
+    fontFamily(
+      fontFace(
+        ~fontFamily="IBM Plex Serif",
+        ~src=[
+          url("/static/font/IBMPlexSerif-Medium-Latin1.woff2"),
+          url("/static/font/IBMPlexSerif-Medium-Latin1.woff"),
+        ],
+        ~fontStyle=`normal,
+        ~fontWeight=`medium,
+        (),
+      ),
     );
 
   let ibmplexsans =
