@@ -42,7 +42,6 @@ type BlockchainState {
   date: String! @fake(type: pastDate)
   snarkedLedgerHash: String!
   stagedLedgerHash: String!
-  supplyIncrease: String! @fake(type: number)
 }
 
 type ProtocolState {
@@ -275,7 +274,7 @@ type Subscription {
   
   # Triggered whenever the best tip changes
   # to another branch in the transition frontier
-  reorg: Boolean!
+  chainReorganization: Boolean!
 }
 
 schema {
