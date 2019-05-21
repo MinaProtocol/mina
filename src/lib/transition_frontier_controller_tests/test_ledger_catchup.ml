@@ -35,10 +35,11 @@ let%test_module "Ledger catchup" =
         (me : Transition_frontier.t) transition expected_breadcrumbs =
       let catchup_job_reader, catchup_job_writer =
         Strict_pipe.create ~name:(__MODULE__ ^ __LOC__)
-          (Buffered (`Capacity 10, `Overflow Drop_head))
+          (Buffered (`Capacity 10, `Overflow Crash))
       in
       let catchup_breadcrumbs_reader, catchup_breadcrumbs_writer =
-        Strict_pipe.create ~name:(__MODULE__ ^ __LOC__) Synchronous
+        Strict_pipe.create ~name:(__MODULE__ ^ __LOC__)
+          (Buffered (`Capacity 10, `Overflow Crash))
       in
       let unprocessed_transition_cache =
         Transition_handler.Unprocessed_transition_cache.create ~logger
@@ -182,10 +183,10 @@ let%test_module "Ledger catchup" =
       let logger = Logger.create () in
       let trust_system = Trust_system.null () in
       let catchup_job_reader, catchup_job_writer =
-        Strict_pipe.create (Buffered (`Capacity 10, `Overflow Drop_head))
+        Strict_pipe.create (Buffered (`Capacity 10, `Overflow Crash))
       in
       let _catchup_breadcrumbs_reader, catchup_breadcrumbs_writer =
-        Strict_pipe.create Synchronous
+        Strict_pipe.create (Buffered (`Capacity 10, `Overflow Crash))
       in
       let unprocessed_transition_cache =
         Transition_handler.Unprocessed_transition_cache.create ~logger
@@ -261,10 +262,10 @@ let%test_module "Ledger catchup" =
       let logger = Logger.create () in
       let trust_system = Trust_system.null () in
       let catchup_job_reader, catchup_job_writer =
-        Strict_pipe.create (Buffered (`Capacity 10, `Overflow Drop_head))
+        Strict_pipe.create (Buffered (`Capacity 10, `Overflow Crash))
       in
       let catchup_breadcrumbs_reader, catchup_breadcrumbs_writer =
-        Strict_pipe.create Synchronous
+        Strict_pipe.create (Buffered (`Capacity 10, `Overflow Crash))
       in
       let unprocessed_transition_cache =
         Transition_handler.Unprocessed_transition_cache.create ~logger
