@@ -12,11 +12,13 @@ let main n () =
   let snark_work_public_keys =
     Fn.const
     @@ Some
-         (List.nth_exn Genesis_ledger.accounts 5 |> snd |> Account.public_key)
+         (List.nth_exn Genesis_ledger.accounts n |> snd |> Account.public_key)
   in
   let%bind testnet =
-    Coda_worker_testnet.test logger n Option.some snark_work_public_keys
-      Protocols.Coda_pow.Work_selection.Seq ~max_concurrent_connections:None
+    Coda_worker_testnet.test logger (n + 1)
+      (fun i -> if i < n then Some n else None)
+      snark_work_public_keys Protocols.Coda_pow.Work_selection.Seq
+      ~max_concurrent_connections:None
   in
   (* SEND TXNS *)
   let keypairs =
