@@ -371,7 +371,7 @@ end = struct
               ~verify_proof:(fun () ->
                 Verifier.verify ~message p (Ledger_proof.statement p) )
               acc_statement (Ledger_proof.statement p)
-        | Empty ->
+        | Empty | Full {status= Parallel_scan.Job_status.Done; _} ->
             M.Or_error.return acc_statement
         | Full {left= proof_1, message_1; right= proof_2, message_2; _} ->
             let open M.Or_error.Let_syntax in
@@ -394,7 +394,8 @@ end = struct
       in
       let fold_step_d acc_statement job =
         match job with
-        | Parallel_scan.Base.Job.Empty ->
+        | Parallel_scan.Base.Job.Empty
+        | Full {status= Parallel_scan.Job_status.Done; _} ->
             M.Or_error.return acc_statement
         | Full {job= transaction; _} ->
             with_error "Bad base statement" ~f:(fun () ->
@@ -541,8 +542,10 @@ end = struct
     let fill_in_transaction_snark_work t
         (works : Transaction_snark_work.t list) :
         (Ledger_proof.t * Sok_message.t) list Or_error.t =
-      let%bind next_jobs =
-        Parallel_scan.next_k_jobs ~state:t ~k:(total_proofs works)
+      let next_jobs =
+        List.take
+          (List.concat @@ Parallel_scan.jobs_for_next_update t)
+          (total_proofs works)
       in
       map2_or_error next_jobs
         (List.concat_map works
@@ -620,12 +623,29 @@ end = struct
 
   let free_space t = Parallel_scan.free_space t.tree
 
-  let next_k_jobs t ~k = Parallel_scan.next_k_jobs ~state:t.tree ~k
+  let next_k_jobs t ~k =
+    let jobses =
+      List.concat_map (Parallel_scan.jobs_for_next_update t.tree)
+        ~f:(fun work_list ->
+          List.chunks_of work_list ~length:Transaction_snark_work.proofs_length
+      )
+    in
+    if List.length jobses >= k then Ok (List.take jobses k)
+    else
+      Or_error.errorf
+        !"Requested %d jobs but only %d are available for the next update"
+        k (List.length jobses)
 
-  let next_jobs t = Parallel_scan.next_jobs t.tree
+  (*Ok (List.take (List.concat @@ Parallel_scan.jobs_for_next_update t.tree) k) *)
 
-  let next_jobs_sequence t =
-    Parallel_scan.next_jobs t.tree
+  (*Parallel_scan.next_k_jobs ~state:t.tree ~k*)
+
+  let all_jobs t = Parallel_scan.all_jobs t.tree
+
+  let next_jobs t = Parallel_scan.jobs_for_next_update t.tree
+
+  let all_jobs_sequence t =
+    Parallel_scan.all_jobs t.tree
     |> Sequence.of_list
     |> Sequence.map ~f:Sequence.of_list
 
@@ -635,7 +655,7 @@ end = struct
     Parallel_scan.base_jobs_on_latest_tree t.tree
 
   let staged_transactions t =
-    List.map (Parallel_scan.current_data t.tree)
+    List.map (Parallel_scan.pending_data t.tree)
       ~f:(fun (t : Transaction_with_witness.t) -> t.transaction_with_info)
 
   let all_transactions t =
@@ -677,7 +697,7 @@ end = struct
     Yojson.Safe.to_string (`List (List.map all_jobs ~f:Job_view.to_yojson))
 
   let all_work_to_do t : Transaction_snark_work.Statement.t Sequence.t =
-    let work_seqs = next_jobs_sequence t in
+    let work_seqs = all_jobs_sequence t in
     Sequence.concat_map work_seqs ~f:(fun work_seq ->
         Sequence.chunks_exn
           (Sequence.map work_seq ~f:(fun job ->

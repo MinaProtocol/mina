@@ -690,7 +690,7 @@ module Tree = struct
     fold_depth ~init:[]
       ~fa:(fun _ _ _ -> [])
       ~fd:(fun acc d ->
-        match d with _, Base.Job.Full {job; _} -> job :: acc | _ -> [] )
+        match d with _, Base.Job.Full {job; _} -> job :: acc | _ -> acc )
       tree
     |> List.rev
 
@@ -710,8 +710,8 @@ module Tree = struct
         curr ^ subtree
 
   let required_job_count = function
-    | Node {value= job_count, _; _} ->
-        fst job_count + snd job_count
+    | Node {value= (l, r), _; _} ->
+        l + r
     | Leaf b ->
         fst b
 end
@@ -1042,7 +1042,7 @@ let all_work : type a d. (a, d) t -> (a, d) Available_job.t list list =
           (List.filteri trees ~f:(fun i _ -> i % delay = delay - 1))
           (depth + 1)
       in
-      let work = work_to_do work_trees ~max_base_jobs:t.max_base_jobs in
+      let work = work work_trees in
       let remaining_trees =
         List.filteri trees ~f:(fun i _ -> i % delay <> delay - 1)
       in
@@ -1120,6 +1120,7 @@ let add_merge_jobs : completed_jobs:'a list -> (_, 'a, _) State_monad.t =
       ~f:(fun i (trees, scan_result, jobs) tree ->
         if i % delay = delay - 1 then
           (*All the trees with delay number of trees between them*)
+          (*TODO: dont updste if required job count is zero*)
           let tree', scan_result' =
             Tree.update
               (List.take jobs (Tree.required_job_count tree))
@@ -1218,8 +1219,13 @@ let update_helper :
   (*update second set of jobs and data. This will be empty if all the data fit in the current tree*)
   let%bind _ = add_merge_jobs ~completed_jobs:jobs2 in
   let%bind () = add_data ~data:data2 in
-  (*Check the tree-list length is under max*)
   let%bind state = State_monad.get in
+  (*update the latest emitted value *)
+  let%bind () =
+    State_monad.put
+      {state with acc= Option.merge result_opt state.acc ~f:Fn.const}
+  in
+  (*Check the tree-list length is under max*)
   let%map () =
     error_if
       (Non_empty_list.length state.trees > max_trees state)
@@ -1248,7 +1254,7 @@ let next_k_jobs :
       (List.length work)
   else Ok (List.take work k)
 
-let next_jobs : ('a, 'd) t -> ('a, 'd) Available_job.t list list = all_work
+let all_jobs : ('a, 'd) t -> ('a, 'd) Available_job.t list list = all_work
 
 let jobs_for_next_update t = work_for_next_update t ~data_count:t.max_base_jobs
 
@@ -1258,8 +1264,8 @@ let last_emitted_value : ('a, 'd) t -> ('a * 'd list) option = fun t -> t.acc
 
 let current_job_sequence_number t = t.curr_job_seq_no
 
-let current_data state =
-  state.recent_tree_data @ List.concat state.other_trees_data
+(*let current_data state =
+  state.recent_tree_data @ List.concat state.other_trees_data*)
 
 let base_jobs_on_latest_tree t =
   let depth = Int.ceil_log2 t.max_base_jobs in
@@ -1290,7 +1296,9 @@ let next_on_new_tree t =
   curr_tree_space = t.max_base_jobs
 
 let pending_data t =
-  List.(rev (concat (t.recent_tree_data :: t.other_trees_data)))
+  List.concat_map Non_empty_list.(to_list @@ rev t.trees) ~f:Tree.leaves
+
+(*List.(rev (concat (t.recent_tree_data :: t.other_trees_data)))*)
 
 let is_valid _ = failwith ""
 

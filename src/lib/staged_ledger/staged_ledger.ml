@@ -1,5 +1,5 @@
-[%%import
-"../../config.mlh"]
+(*[%%import
+"../../config.mlh"]*)
 
 open Core_kernel
 open Async_kernel
@@ -195,7 +195,7 @@ end = struct
   let chunks_of xs ~n = List.groupi xs ~break:(fun i _ _ -> i mod n = 0)
 
   let all_work_pairs_exn t =
-    let all_jobs = Scan_state.next_jobs t.scan_state in
+    let all_jobs = Scan_state.all_jobs t.scan_state in
     let module A = Scan_state.Available_job in
     let module L = Ledger_proof_statement in
     let single_spec (job : job) =
@@ -265,6 +265,10 @@ end = struct
     let txns_still_being_worked_on =
       Scan_state.staged_transactions scan_state
     in
+    Core.printf
+      !"Ledger Transactions still being worked on %{sexp: Ledger.Undo.t list}\n\
+       \ %!"
+      txns_still_being_worked_on ;
     (*TODO: change the math*)
     (*Debug_assert.debug_assert (fun () ->
         let parallelism = Scan_state.capacity scan_state in
@@ -284,9 +288,9 @@ end = struct
     in
     if not (Frozen_ledger_hash.equal snarked_ledger_hash expected_target) then
       Or_error.errorf
-        !"Error materializing the snarked ledger with hash \
-          %{sexp:Frozen_ledger_hash.t}: "
-        expected_target
+        !"Error materializing the snarked ledger, expecting  \
+          %{sexp:Frozen_ledger_hash.t} got %{sexp:Frozen_ledger_hash.t}: "
+        expected_target snarked_ledger_hash
     else
       match Scan_state.latest_ledger_proof scan_state with
       | None ->
@@ -379,14 +383,14 @@ end = struct
       (Ledger.merkle_root ledger)
       pending_coinbase_collection
 
-  [%%if
+  (*[%%if
   call_logger]
 
   let hash t =
     Coda_debug.Call_logger.record_call "Staged_ledger.hash" ;
     hash t
 
-  [%%endif]
+  [%%endif]*)
 
   let ledger {ledger; _} = ledger
 
@@ -408,8 +412,8 @@ end = struct
       (Ledger.merkle_root ledger) ;
     {t with ledger}
 
-  let total_proofs (works : Transaction_snark_work.t list) =
-    List.sum (module Int) works ~f:(fun w -> List.length w.proofs)
+  (*let total_proofs (works : Transaction_snark_work.t list) =
+    List.sum (module Int) works ~f:(fun w -> List.length w.proofs)*)
 
   let sum_fees xs ~f =
     with_return (fun {return} ->
@@ -510,13 +514,8 @@ end = struct
     let open Deferred.Result.Let_syntax in
     let%bind jobses =
       Deferred.return
-        (let open Result.Let_syntax in
-        let%map jobs =
-          to_staged_ledger_or_error
-            (Scan_state.next_k_jobs scan_state
-               ~k:(total_proofs completed_works))
-        in
-        chunks_of jobs ~n:Transaction_snark_work.proofs_length)
+        (to_staged_ledger_or_error
+           (Scan_state.next_k_jobs scan_state ~k:(List.length completed_works)))
     in
     let check job_proofs prover message =
       let open Deferred.Let_syntax in
@@ -990,6 +989,7 @@ end = struct
           eprintf !"Unexpected error: %s %{sexp:Error.t} \n%!" __LOC__ e ) ;
       Deferred.return (to_staged_ledger_or_error r)
     in
+    Core.printf !"scan state %{sexp: Scan_state.t}\n %!" scan_state' ;
     let%bind updated_pending_coinbase_collection' =
       update_pending_coinbase_collection t.pending_coinbase_collection
         stack_update ~is_new_stack ~ledger_proof:res_opt
@@ -1132,10 +1132,10 @@ end = struct
         updated_coinbase_stack ~is_new_stack ~ledger_proof:res_opt
       |> Staged_ledger_error.to_or_error |> Deferred.return
     in
-    Or_error.ok_exn
+    (*Or_error.ok_exn
       (verify_scan_state_after_apply
          (Frozen_ledger_hash.of_ledger_hash (Ledger.merkle_root new_ledger))
-         scan_state') ;
+         scan_state') ;*)
     let new_staged_ledger =
       { scan_state= scan_state'
       ; ledger= new_ledger
@@ -1199,8 +1199,10 @@ end = struct
         in
         go seq Sequence.empty
       in
+      let cw_seq_needed = Sequence.take cw_seq job_count in
+      let cw_seq_discarded = Sequence.drop cw_seq job_count in
       let cw_unchecked =
-        Sequence.map cw_seq ~f:Transaction_snark_work.forget
+        Sequence.map cw_seq_needed ~f:Transaction_snark_work.forget
       in
       let coinbase, rem_cw =
         match (add_coinbase, Sequence.next cw_unchecked) with
@@ -1235,15 +1237,15 @@ end = struct
         |> Or_error.join
       in
       let discarded =
-        { Discarded.completed_work= Sequence.empty
+        { Discarded.completed_work= cw_seq_discarded
         ; user_commands_rev= Sequence.empty }
       in
       { max_space= slots
-      ; max_jobs= job_count (*; cur_work_count*)
+      ; max_jobs= job_count
       ; user_commands_rev=
           uc_seq
           (*Completed work in reverse order for faster removal of proofs if budget doesn't suffice*)
-      ; completed_work_rev= seq_rev cw_seq
+      ; completed_work_rev= seq_rev cw_seq_needed
       ; fee_transfers
       ; self_pk
       ; coinbase
@@ -1366,7 +1368,10 @@ end = struct
       (*let work_capacity_satisfied = within_capacity t in*)
       (*if there are no user_commands then it doesn't matter how many proofs you have*)
       let uc_count = Sequence.length t.user_commands_rev in
-      all_proofs || (* work_capacity_satisfied || *) uc_count = 0
+      let slots = slots_occupied t in
+      let cw_count = Sequence.length t.completed_work_rev in
+      all_proofs (* work_capacity_satisfied || *) || uc_count = 0
+      || cw_count = slots
 
     let non_coinbase_work t =
       let len = Sequence.length t.completed_work_rev in
@@ -1545,9 +1550,9 @@ end = struct
     let make_diff res1 res2_opt =
       (pre_diff_with_two res1, Option.map res2_opt ~f:pre_diff_with_one)
     in
-    let second_pre_diff (res : Resources.t) partition ~add_coinbase =
-      one_prediff res.discarded.completed_work res.discarded.user_commands_rev
-        self partition ~add_coinbase logger
+    let second_pre_diff (res : Resources.t) partition ~add_coinbase work =
+      one_prediff work res.discarded.user_commands_rev self partition
+        ~add_coinbase logger
     in
     let has_no_user_commands (res : Resources.t) =
       Sequence.length res.user_commands_rev = 0
@@ -1566,41 +1571,53 @@ end = struct
         in
         make_diff res None
     | Some y ->
+        assert (Sequence.length cw_seq <= snd partitions.first + snd y) ;
+        let cw_seq_1 = Sequence.take cw_seq (snd partitions.first) in
+        let cw_seq_2 = Sequence.drop cw_seq (snd partitions.first) in
+        Core.printf
+          !"work1:%{sexp: Transaction_snark_work.Checked.t Sequence.t} work2: \
+            %{sexp:Transaction_snark_work.Checked.t Sequence.t}\n\
+           \ %!"
+          cw_seq_1 cw_seq_2 ;
         let res =
-          one_prediff cw_seq ts_seq self partitions.first ~add_coinbase:false
+          one_prediff cw_seq_1 ts_seq self partitions.first ~add_coinbase:false
             logger
         in
         let res1, res2 =
           match Resources.available_space res with
           | 0 ->
               (*generate the next prediff with a coinbase at least*)
-              let res2 = second_pre_diff res y ~add_coinbase:true in
+              let res2 = second_pre_diff res y ~add_coinbase:true cw_seq_2 in
               (res, Some res2)
           | 1 ->
               (*There's a slot available in the first partition, fill it with coinbase and create another pre_diff for the slots in the second partiton with the remaining user commands and work *)
               let new_res = Resources.incr_coinbase_part_by res `One in
-              let res2 = second_pre_diff new_res y ~add_coinbase:false in
+              let res2 =
+                second_pre_diff new_res y ~add_coinbase:false cw_seq_2
+              in
               if isEmpty res2 then (new_res, None) else (new_res, Some res2)
           | 2 ->
               (*There are two slots which cannot be filled using user commands, so we split the coinbase into two parts and fill those two spots*)
               let new_res = Resources.incr_coinbase_part_by res `Two in
-              let res2 = second_pre_diff new_res y ~add_coinbase:false in
+              let res2 =
+                second_pre_diff new_res y ~add_coinbase:false cw_seq_2
+              in
               if has_no_user_commands res2 then
                 (*Wait, no transactions included in the next slot? don't split the coinbase*)
                 let new_res = Resources.incr_coinbase_part_by res `One in
                 (*There could be some free work in res2. Append the free work to res2. We know this is free work because provers are paid using transaction fees and there are no transactions or coinbase in res2*)
-                let new_res' =
+                (*let new_res' =
                   { new_res with
                     completed_work_rev=
                       Sequence.append res2.completed_work_rev
                         new_res.completed_work_rev }
-                in
-                (new_res', None)
+                in*)
+                (new_res, None)
               else (new_res, Some res2)
           | _ ->
               (* Too many slots left in the first partition. Either there wasn't enough work to add transactions or there weren't enough transactions. Create a new pre_diff for just the first partition*)
               let new_res =
-                one_prediff cw_seq ts_seq self partitions.first
+                one_prediff cw_seq_1 ts_seq self partitions.first
                   ~add_coinbase:true logger
               in
               (new_res, None)
@@ -1613,8 +1630,8 @@ end = struct
         else
           (*Coinbase takes priority over user-commands. Create a diff in partitions.first with coinbase first and user commands if possible*)
           let res =
-            one_prediff cw_seq ts_seq self partitions.first ~add_coinbase:true
-              logger
+            one_prediff cw_seq_1 ts_seq self partitions.first
+              ~add_coinbase:true logger
           in
           make_diff res None
 
@@ -1630,6 +1647,9 @@ end = struct
     let validating_ledger = Transaction_validator.create t.ledger in
     O1trace.trace_event "done mask" ;
     let partitions = Scan_state.partition_if_overflowing t.scan_state in
+    Core.printf
+      !"partitions: %{sexp: Scan_state.Space_partition.t} \n%!"
+      partitions ;
     O1trace.trace_event "partitioned" ;
     (*TODO: return an or_error here *)
     let work_to_do = Scan_state.work_for_new_diff t.scan_state in
@@ -2719,6 +2739,15 @@ let%test_module "test" =
         Sl.create_diff !sl ~self:self_pk ~logger ~transactions_by_fee:txns
           ~get_completed_work:stmt_to_work
       in
+      let jobs = Sl.Scan_state.all_work_to_do (Sl.scan_state !sl) in
+      Core.printf
+        !"Jobs: %{sexp: Transaction_snark_work.Statement.t Sequence.t}\n%!"
+        jobs ;
+      Core.printf
+        !"diff created %{sexp: \
+          Staged_ledger_diff.With_valid_signatures_and_proofs.t}\n\
+         \ %!"
+        diff ;
       let diff' = Staged_ledger_diff.forget diff in
       let%map ( `Hash_after_applying hash
               , `Ledger_proof ledger_proof
@@ -2730,6 +2759,7 @@ let%test_module "test" =
         | Error e ->
             Error.raise (Sl.Staged_ledger_error.to_error e)
       in
+      Core.printf !"diff applied \n%!" ;
       assert (Staged_ledger_hash.equal hash (Sl.hash sl')) ;
       sl := sl' ;
       (ledger_proof, diff')
@@ -2776,6 +2806,7 @@ let%test_module "test" =
       Quickcheck.test g ~trials:1000 ~f:(fun _ ->
           Async.Thread_safe.block_on_async_exn (fun () ->
               let old_ledger = !(Sl.ledger !sl) in
+              Core.printf !"SL: %{sexp: Sl.t}\n%!" !sl ;
               let all_ts = txns p (fun x -> (x + 1) * 100) (fun _ -> 4) in
               let%map ledger_proof, diff =
                 create_and_apply sl logger (Sequence.of_list all_ts)
@@ -2923,14 +2954,14 @@ let%test_module "test" =
                 ({completed_works; user_commands= txns; coinbase= Zero}, None)
             ; prev_hash
             ; creator= "C" }
-        | Some _ ->
-            let slots = fst partition.first in
+        | Some (_, _) ->
+            let slots, job_count1 = partition.first in
             let diff : Staged_ledger_diff.Diff.t =
-              ( { completed_works
+              ( { completed_works= List.take completed_works job_count1
                 ; user_commands= List.take txns slots
                 ; coinbase= Zero }
               , Some
-                  { completed_works= []
+                  { completed_works= List.drop completed_works job_count1
                   ; user_commands= List.drop txns slots
                   ; coinbase= Zero } )
             in
@@ -2942,7 +2973,7 @@ let%test_module "test" =
               let logger = Logger.null () in
               let txns = txns i (fun x -> (x + 1) * 100) (fun _ -> 4) in
               let scan_state = Sl.scan_state !sl in
-              let work = Sl.Scan_state.all_work_to_do scan_state in
+              let work = Sl.Scan_state.work_for_new_diff scan_state in
               let partitions =
                 Sl.Scan_state.partition_if_overflowing scan_state
               in
@@ -2964,7 +2995,8 @@ let%test_module "test" =
               match%map Sl.apply !sl diff ~logger with
               | Error (Sl.Staged_ledger_error.Non_zero_fee_excess _) ->
                   ()
-              | Error _ ->
+              | Error e ->
+                  Core.printf !"%s" (Sl.Staged_ledger_error.to_string e) ;
                   assert false
               | Ok
                   ( `Hash_after_applying _hash
@@ -3020,14 +3052,17 @@ let%test_module "test" =
               let old_ledger = !(Sl.ledger !sl) in
               let all_ts = txns p (fun x -> (x + 1) * 100) (fun _ -> 4) in
               let work_list : Transaction_snark_work.Statement.t list =
-                let spec_list = Sl.all_work_pairs_exn !sl in
+                (*let spec_list = *)
+                Sl.Scan_state.all_work_to_do (Sl.scan_state !sl)
+                |> Sequence.to_list
+                (*in
                 List.map spec_list ~f:(fun (s1, s2_opt) ->
                     let stmt1 = Snark_work_lib.Work.Single.Spec.statement s1 in
                     let stmt2 =
                       Option.value_map s2_opt ~default:[] ~f:(fun s ->
                           [Snark_work_lib.Work.Single.Spec.statement s] )
                     in
-                    stmt1 :: stmt2 )
+                    stmt1 :: stmt2 )*)
               in
               let%map proof, diff =
                 create_and_apply sl logger (Sequence.of_list all_ts)
@@ -3070,14 +3105,8 @@ let%test_module "test" =
               let all_ts = txns p (fun x -> (x + 1) * 100) (fun _ -> 4) in
               let ts = List.take all_ts i in
               let work_list : Transaction_snark_work.Statement.t list =
-                let spec_list = Sl.all_work_pairs_exn !sl in
-                List.map spec_list ~f:(fun (s1, s2_opt) ->
-                    let stmt1 = Snark_work_lib.Work.Single.Spec.statement s1 in
-                    let stmt2 =
-                      Option.value_map s2_opt ~default:[] ~f:(fun s ->
-                          [Snark_work_lib.Work.Single.Spec.statement s] )
-                    in
-                    stmt1 :: stmt2 )
+                Sl.Scan_state.all_work_to_do (Sl.scan_state !sl)
+                |> Sequence.to_list
               in
               let%map proof, diff =
                 create_and_apply sl logger (Sequence.of_list ts)
@@ -3132,14 +3161,8 @@ let%test_module "test" =
               let all_ts = txns p (fun x -> (x + 1) * 100) (fun _ -> 4) in
               let ts = List.take all_ts i in
               let work_list : Transaction_snark_work.Statement.t list =
-                let spec_list = Sl.all_work_pairs_exn !sl in
-                List.map spec_list ~f:(fun (s1, s2_opt) ->
-                    let stmt1 = Snark_work_lib.Work.Single.Spec.statement s1 in
-                    let stmt2 =
-                      Option.value_map s2_opt ~default:[] ~f:(fun s ->
-                          [Snark_work_lib.Work.Single.Spec.statement s] )
-                    in
-                    stmt1 :: stmt2 )
+                Sl.Scan_state.all_work_to_do (Sl.scan_state !sl)
+                |> Sequence.to_list
               in
               let%map proof, diff =
                 create_and_apply sl logger (Sequence.of_list ts)
@@ -3159,12 +3182,13 @@ let%test_module "test" =
               (*With just one prover, coinbase should never be split*)
               if j > 0 then assert (cb = 1) ;
               let x = List.length (Staged_ledger_diff.user_commands diff) in
-              (*There are than two proof bundles. Should be able to add at least one payment. First and the second proof bundles would go for coinbase and fee_transfer resp.*)
+              (*There are more than two proof bundles. Should be able to add at least one payment. First and the second proof bundles would go for coinbase and fee_transfer resp.*)
+              Core.printf !"i:%d j:%d x:%d\n" i j x ;
               if j > 2 then assert (x > 0) ;
               let expected_value = expected_ledger x all_ts old_ledger in
               if cb > 0 then assert (!(Sl.ledger !sl) = expected_value) ) )
 
-    let%test_module "staged ledgers with different latency factors" =
+    (*let%test_module "staged ledgers with different latency factors" =
       ( module struct
         module Inputs = Test_input1
 
@@ -3292,5 +3316,5 @@ let%test_module "test" =
                       in
                       (*max throughput*)
                       assert (x + cb = p) ) ) )
-      end )
+      end )*)
   end )

@@ -930,11 +930,13 @@ module type Transaction_snark_scan_state_intf = sig
 
   val free_space : t -> int
 
-  val next_k_jobs : t -> k:int -> Available_job.t list Or_error.t
+  val next_k_jobs : t -> k:int -> Available_job.t list list Or_error.t
 
   val next_jobs : t -> Available_job.t list list
 
-  val next_jobs_sequence : t -> Available_job.t Sequence.t Sequence.t
+  val all_jobs : t -> Available_job.t list list
+
+  val all_jobs_sequence : t -> Available_job.t Sequence.t Sequence.t
 
   val base_jobs_on_latest_tree : t -> Transaction_with_witness.t list
 
@@ -1041,6 +1043,8 @@ module type Staged_ledger_base_intf = sig
     val partition_if_overflowing : t -> Space_partition.t
 
     val all_work_to_do : t -> statement Sequence.t
+
+    val work_for_new_diff : t -> statement Sequence.t
 
     val all_transactions : t -> transaction list Or_error.t
 
