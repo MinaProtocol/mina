@@ -1,33 +1,3 @@
-enum ConsensusStatus {
-  SUBMITTED
-  INCLUDED # Included in any block
-  FINALIZED
-  SNARKED
-  FAILED
-}
-
-type ConsensusState {
-  status: ConsensusStatus!
-  estimatedPercentConfirmed: Float!
-}
-
-type UserCommand {
-  isDelegation: Boolean!,
-  nonce: Int!,
-  submittedAt: String! @fake(type: pastDate)
-  includedAt: String @fake(type: pastDate)
-  from: String! @examples(values: ["PUB_KEY_E9873DF4453213303DA61F2", "PUB_KEY_F1173DF4453213303DA61F2"]) 
-  to: String! @examples(values: ["PUB_KEY_E9873DF4453213303DA61F2", "PUB_KEY_F1173DF4453213303DA61F2"])
-  amount: String! @fake(type: money)
-  fee: String! @fake(type: money)
-  memo: String @fake(type:hackerPhrase)
-}
-
-type UserCommandUpdate {
-  userCommand: UserCommand
-  consensus: ConsensusState!
-}
-
 enum SyncStatus {
   ERROR
   BOOTSTRAP # Resyncing
@@ -43,34 +13,65 @@ type SyncUpdate {
 
 type SnarkWorker {
   key: String! @examples(values: ["PUB_KEY_E9873DF4453213303DA61F2", "PUB_KEY_F1173DF4453213303DA61F2"])
-  fee: String! @fake(type: money)
+  fee: String! @fake(type: number)
 }
 
-type SnarkFee {
-  snarkCreator: String! @examples(values: ["PUB_KEY_E9873DF4453213303DA61F2", "PUB_KEY_F1173DF4453213303DA61F2"])
-  fee: String! @fake(type: money)
+type UserCommand {
+  id: String!
+  isDelegation: Boolean!
+  nonce: Int!
+  date: String! @fake(type: pastDate)
+  from: String! @examples(values: ["PUB_KEY_E9873DF4453213303DA61F2", "PUB_KEY_F1173DF4453213303DA61F2"]) 
+  to: String! @examples(values: ["PUB_KEY_E9873DF4453213303DA61F2", "PUB_KEY_F1173DF4453213303DA61F2"])
+  amount: String! @fake(type: number)
+  fee: String! @fake(type: number)
+  memo: String @fake(type:hackerPhrase)
 }
 
-type SnarkFeeUpdate {
-  fee: SnarkFee
-  consensus: ConsensusState!
+type FeeTransfer {
+  recipient: String! @examples(values: ["PUB_KEY_E9873DF4453213303DA61F2", "PUB_KEY_F1173DF4453213303DA61F2"])
+  fee: String! @fake(type: number)
+}
+
+type CoinbaseTransaction {
+	amount: String! @fake(type: number)
+	feeTransfer: FeeTransfer!
+}
+
+type BlockchainState {
+  date: String! @fake(type: pastDate)
+  snarkedLedgerHash: String!
+  stagedLedgerHash: String!
+  supplyIncrease: String! @fake(type: number)
+}
+
+type ProtocolState {
+  previousStateHash: String!
+  blockchainState: BlockchainState!
+}
+
+type Transactions {
+  userCommands: [UserCommand!]!
+  feeTransfer: [FeeTransfer!]!
+  coinbase: CoinbaseTransaction!
 }
 
 type Block {
-  coinbase: String! @fake(type: money)
   creator: String! @examples(values: ["PUB_KEY_E9873DF4453213303DA61F2", "PUB_KEY_F1173DF4453213303DA61F2"])
-  userCommands: [UserCommand]!
-  snarkFees: [SnarkFee]!
+  numConfirmations: Int!
+  stateHash: String!
+  protocolState: ProtocolState!
+  transactions: Transactions!
 }
 
-type BlockUpdate {
-  block: Block!
-  consensus: ConsensusState!
+type BlockConfirmation {
+  stateHash: String!
+  numConfirmations: Int!
 }
 
 type AnnotatedBalance {
-  total: String! @fake(type: money)
-  unknown: String! @fake(type: money)
+  total: String! @fake(type: number)
+  unknown: String! @fake(type: number)
 }
 
 type Wallet {
@@ -78,14 +79,13 @@ type Wallet {
   nonce: String!
   receiptChainHash: String!
   delegate: String!
-  vatingFor: String!
+  votingFor: String!
   balance: AnnotatedBalance!
 }
 
 type NodeStatus {
   network: String @examples(values: ["testnet"])
 }
-
 
 ## Input types
 
@@ -127,11 +127,11 @@ input CreateDelegationInput {
 }
 
 input UserCommandFilterInput {
-  toOrFrom: String,
+  from: String,
 }
 
 input BlockFilterInput {
-  creator: String,
+  relatedTo: String,
 }
 
 input SetStakingInput {
@@ -177,54 +177,56 @@ type SetStakingPayload {
 type PageInfo {
   hasPreviousPage: Boolean! @examples(values: [false])
   hasNextPage: Boolean! @examples(values: [false])
+  firstCursor: String
+  lastCursor: String
 }
 
 type UserCommandEdge {
-  cursor: String
-  node: UserCommandUpdate
+  cursor: String!
+  node: UserCommand!
 }
 
 type UserCommandConnection {
-  edges: [UserCommandEdge]
-  nodes: [UserCommandUpdate]
+  edges: [UserCommandEdge!]!
+  nodes: [UserCommand!]!
   pageInfo: PageInfo!
-  totalCount: Int
+  totalCount: Int!
 }
 
 type BlockEdge {
-  cursor: String
-  node: BlockUpdate
+  cursor: String!
+  node: Block!
 }
 
 type BlockConnection {
-  edges: [BlockEdge]
-  nodes: [BlockUpdate]
+  edges: [BlockEdge!]!
+  nodes: [Block!]!
   pageInfo: PageInfo!
-  totalCount: Int
+  totalCount: Int!
 }
 
 type Query {
   # List of wallets currently tracked by the node
-  wallets: [Wallet!]!
+  ownedWallets: [Wallet!]!
   
   # Gets balance of key at a certain consensus state
   # Note: `consensus` is optional as we will likely decide one
   # state to be the "real" balance
-  balance(publicKey: String!, consensus: ConsensusStatus): String!
+  balance(publicKey: String!): String!
   
-  userCommand(
+  pooledUserCommands(
     filter: UserCommandFilterInput,
     first: Int,
     after: String,
     last: Int,
-    before: String): UserCommandConnection
+    before: String): UserCommandConnection!
   
   blocks(
     filter: BlockFilterInput,
     first: Int,
     after: String,
     last: Int,
-    before: String): BlockConnection
+    before: String): BlockConnection!
   
   # Null if node isn't performing snark work
   currentSnarkWorker: SnarkWorker
@@ -233,7 +235,7 @@ type Query {
   syncState: SyncUpdate!
   
   # version of the node (commit hash or version #)
-  version: String! @examples(values: ["0.1.0"])
+  version: String! @examples(values: ["aa8c3f93ec2bad4718c308914df9e47b586f8ecd"])
   
   # Network that the node is connected to
   network: String @examples(values: ["testnet"])
@@ -250,7 +252,7 @@ type Mutation {
   # Configure which network your node is connected to
   setNetwork(input: SetNetworkInput!): SetNetworkPayload
   
-  # Adds transaction to the node (note: Not sure how we want to represent this yet)
+  # Adds transaction to the node
   addPaymentReceipt(input: AddPaymentReceiptInput!): AddPaymentReceiptPayload
   
   # Tell server to track a private key and all associated transactions
@@ -266,14 +268,14 @@ type Subscription {
   # Subscribe to sync status of the node
   newSyncUpdate: SyncUpdate!
   
-  # Subscribe to payments for which this key is the sender or receiver
-  newUserCommandUpdate(filterBySenderOrReceiver: String!): UserCommandUpdate!
+  blockConfirmation: BlockConfirmation!
   
-  # Subscribe all blocks created by `key`
-  newBlock(key: String): BlockUpdate!
+  # Subscribe to all blocks related to `key`
+  newBlock(key: String): Block!
   
-  # Subscribe to fees earned by key
-  newSnarkFee(key: String): SnarkFee!
+  # Triggered whenever the best tip changes
+  # to another branch in the transition frontier
+  reorg: Boolean!
 }
 
 schema {
