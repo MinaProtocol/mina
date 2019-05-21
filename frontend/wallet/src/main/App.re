@@ -50,9 +50,6 @@ let createTray = dispatch => {
 App.on(`WindowAllClosed, () => ());
 App.on(`WillQuit, () => killDaemons());
 
-module Test = [%graphql {| query { wallets {publicKey} } |}];
-module TestQuery = GraphqlMain.CreateQuery(Test);
-
 let initialTask =
   Task.map2(
     Task.uncallbackifyValue(App.on(`Ready)),
