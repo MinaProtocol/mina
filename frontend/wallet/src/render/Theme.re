@@ -15,6 +15,8 @@ module Colors = {
 
   let bgColor = white;
 
+  let bgColorElectronWindow = "E9E9E9";
+
   let savilleAlpha = a => `rgba((31, 45, 61, a));
   let saville = savilleAlpha(1.);
 

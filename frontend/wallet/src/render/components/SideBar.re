@@ -5,7 +5,8 @@ module Styles = {
 
   let sidebar =
     style([
-      width(`rem(12.)),
+      width(`rem(14.)),
+      overflow(`hidden),
       display(`flex),
       flexDirection(`column),
       justifyContent(`spaceBetween),
@@ -57,33 +58,37 @@ let make = () => {
     </div>
     <AddWalletMutation>
       {(mutation, _) =>
-         <AddWalletModal
-           modalState
-           setModalState
-           onSubmit={name => {
-             let performMutation =
-               Task.liftPromise(() =>
-                 mutation(~refetchQueries=[|"getWallets"|], ())
+         switch (modalState) {
+         | None => React.null
+         | Some(newWalletName) =>
+           <AddWalletModal
+             walletName=newWalletName
+             setModalState
+             onSubmit={name => {
+               let performMutation =
+                 Task.liftPromise(() =>
+                   mutation(~refetchQueries=[|"getWallets"|], ())
+                 );
+               Task.perform(
+                 performMutation,
+                 ~f=
+                   fun
+                   | EmptyResponse => ()
+                   | Errors(_) => print_endline("Error adding wallet")
+                   | Data(data) =>
+                     data##addWallet
+                     |> Option.andThen(~f=addWallet => addWallet##publicKey)
+                     |> Option.map(~f=pk => {
+                          let key = PublicKey.ofStringExn(pk);
+                          updateSettings(
+                            Option.map(~f=Settings.set(~key, ~name)),
+                          );
+                        })
+                     |> ignore,
                );
-             Task.perform(
-               performMutation,
-               ~f=
-                 fun
-                 | EmptyResponse => ()
-                 | Errors(_) => print_endline("Error adding wallet")
-                 | Data(data) =>
-                   data##addWallet
-                   |> Option.andThen(~f=addWallet => addWallet##publicKey)
-                   |> Option.map(~f=pk => {
-                        let key = PublicKey.ofStringExn(pk);
-                        updateSettings(
-                          Option.map(~f=Settings.set(~key, ~name)),
-                        );
-                      })
-                   |> ignore,
-             );
-           }}
-         />}
+             }}
+           />
+         }}
     </AddWalletMutation>
   </div>;
 };
