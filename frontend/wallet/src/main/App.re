@@ -1,7 +1,7 @@
 open BsElectron;
 open Tc;
 
-let killDaemon = DaemonProcess.start(8080);
+let killDaemons = DaemonProcess.startAll(~fakerPort=8080, ~codaPort=0xc0da);
 
 let createTray = dispatch => {
   let t = AppTray.get();
@@ -48,7 +48,7 @@ let createTray = dispatch => {
 // We need this handler here to prevent the application from exiting on all
 // windows closed. Keep in mind, we have the tray.
 App.on(`WindowAllClosed, () => ());
-App.on(`WillQuit, () => killDaemon());
+App.on(`WillQuit, () => killDaemons());
 
 module Test = [%graphql {| query { wallets {publicKey} } |}];
 module TestQuery = GraphqlMain.CreateQuery(Test);

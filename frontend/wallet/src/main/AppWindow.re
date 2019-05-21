@@ -41,7 +41,7 @@ include Single.Make({
             ~resizeable=false,
             ~title="Coda Wallet",
             ~titleBarStyle=`Hidden,
-            ~backgroundColor=Theme.Colors.(string(bgColor)),
+            ~backgroundColor=Theme.Colors.bgColorElectronWindow,
             ~webPreferences=
               makeWebPreferences(
                 ~preload=

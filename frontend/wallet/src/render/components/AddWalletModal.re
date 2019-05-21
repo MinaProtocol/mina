@@ -1,5 +1,3 @@
-open Tc;
-
 module Styles = {
   open Css;
 
@@ -9,9 +7,8 @@ module Styles = {
 // TODO: Add validation that the wallet name isn't already in use
 
 [@react.component]
-let make = (~modalState, ~setModalState, ~onSubmit) => {
+let make = (~walletName, ~setModalState, ~onSubmit) => {
   <Modal
-    isOpen={Option.isSome(modalState)}
     title="Add Wallet"
     onRequestClose={() => setModalState(_ => None)}>
     <div
@@ -26,11 +23,10 @@ let make = (~modalState, ~setModalState, ~onSubmit) => {
       <div className=Styles.bodyMargin>
         <TextField
           label="Name"
-          onChange={e => {
-            let value = ReactEvent.Form.target(e)##value;
+          onChange={value => {
             setModalState(_ => Some(value));
           }}
-          value={Option.withDefault(modalState, ~default="")}
+          value=walletName
         />
       </div>
       <div className=Css.(style([display(`flex)]))>
@@ -44,7 +40,7 @@ let make = (~modalState, ~setModalState, ~onSubmit) => {
           label="Create"
           style=Button.Green
           onClick={_ => {
-            onSubmit(Option.getExn(modalState));
+            onSubmit(walletName);
             setModalState(_ => None);
           }}
         />
