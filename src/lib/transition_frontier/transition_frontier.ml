@@ -1231,7 +1231,7 @@ struct
               Breadcrumb.staged_ledger new_root_node.breadcrumb
             in
             (* 4.VII *)
-            Consensus.Hooks.lock_transition
+            Consensus.Hooks.frontier_root_transition
               (Breadcrumb.consensus_state root_node.breadcrumb)
               (Breadcrumb.consensus_state new_root_node.breadcrumb)
               ~local_state:t.consensus_local_state
@@ -1254,7 +1254,7 @@ struct
                       Logger.fatal t.logger
                         "after lock transition, the best tip consensus state \
                          is out of sync with the local state -- bug in either \
-                         required_local_state_sync or lock_transition."
+                         required_local_state_sync or frontier_root_transition."
                         ~module_:__MODULE__ ~location:__LOC__
                         ~metadata:
                           [ ( "sync_jobs"

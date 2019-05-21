@@ -2583,7 +2583,7 @@ module Hooks = struct
         `Check_again epoch_end_time
 
   (* TODO *)
-  let lock_transition (prev : Consensus_state.Value.t)
+  let frontier_root_transition (prev : Consensus_state.Value.t)
       (next : Consensus_state.Value.t) ~local_state ~snarked_ledger =
     let open Local_state in
     if not (Epoch.equal prev.curr_epoch next.curr_epoch) then (
