@@ -88,7 +88,7 @@ module Typeface = {
       ~fontFamily="IBM Plex Mono",
       ~src=[
         url("/static/font/IBMPlexMono-Medium-Latin1.woff2"),
-        url("/static/font/IBMPlexSans-Medium-Latin1.woff"),
+        url("/static/font/IBMPlexMono-Medium-Latin1.woff"),
       ],
       ~fontStyle=`normal,
       ~fontWeight=`semiBold,
