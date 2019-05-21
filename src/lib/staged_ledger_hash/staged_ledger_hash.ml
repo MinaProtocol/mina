@@ -1,4 +1,5 @@
 open Core
+open Coda_base
 open Fold_lib
 open Tuple_lib
 open Snark_params.Tick
@@ -45,7 +46,7 @@ module Aux_hash = struct
   end
 
   (* bin_io omitted *)
-  type t = Stable.Latest.t [@@deriving sexp, eq, compare, hash, yojson]
+  type t = Stable.Latest.t [@@deriving sexp, compare, hash, yojson]
 
   let of_bytes = Fn.id
 
@@ -94,11 +95,7 @@ module Pending_coinbase_aux = struct
   end
 
   (* bin_io omitted *)
-  type t = Stable.Latest.t [@@deriving sexp, eq, compare, hash, yojson]
-
-  let of_bytes = Fn.id
-
-  let to_bytes = Fn.id
+  type t = Stable.Latest.t [@@deriving sexp, compare, hash, yojson]
 
   let dummy : t = String.init length_in_bytes ~f:(fun _ -> '\000')
 end
@@ -131,12 +128,12 @@ module Non_snark = struct
   end
 
   (* bin_io omitted *)
-  type t = Stable.Latest.t [@@deriving sexp, eq, compare, hash, yojson]
+  type t = Stable.Latest.t [@@deriving sexp, compare, hash, yojson]
 
   type value = t [@@deriving sexp, compare, hash, yojson]
 
   let dummy : t =
-    { ledger_hash= Ledger_hash.of_hash Field.zero
+    { ledger_hash= Ledger.merkle_root Genesis_ledger.t
     ; aux_hash= Aux_hash.dummy
     ; pending_coinbase_aux= Pending_coinbase_aux.dummy }
 
@@ -206,7 +203,7 @@ module Stable = struct
     type ('non_snark, 'pending_coinbase_hash) t =
           ('non_snark, 'pending_coinbase_hash) Stable.Latest.t =
       {non_snark: 'non_snark; pending_coinbase_hash: 'pending_coinbase_hash}
-    [@@deriving sexp, eq, compare, hash, yojson]
+    [@@deriving sexp, compare, hash, yojson]
   end
 
   module V1 = struct

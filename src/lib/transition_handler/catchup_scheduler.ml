@@ -25,8 +25,7 @@ module Make (Inputs : Inputs.S) = struct
     ; time_controller: Time.Controller.t
     ; catchup_job_writer:
         ( State_hash.t
-          * ( (External_transition.Verified.t, State_hash.t) With_hash.t
-              Envelope.Incoming.t
+          * ( External_transition.with_initial_validation Envelope.Incoming.t
             , State_hash.t )
             Cached.t
             Rose_tree.t
@@ -41,8 +40,7 @@ module Make (Inputs : Inputs.S) = struct
               its corresponding value in the hash table would just be an empty
               list. *)
     ; collected_transitions:
-        ( (External_transition.Verified.t, State_hash.t) With_hash.t
-          Envelope.Incoming.t
+        ( External_transition.with_initial_validation Envelope.Incoming.t
         , State_hash.t )
         Cached.t
         list
@@ -53,15 +51,14 @@ module Make (Inputs : Inputs.S) = struct
     ; parent_root_timeouts: unit Time.Timeout.t State_hash.Table.t
     ; breadcrumb_builder_supervisor:
         ( State_hash.t
-        * ( (External_transition.Verified.t, State_hash.t) With_hash.t
-            Envelope.Incoming.t
+        * ( External_transition.with_initial_validation Envelope.Incoming.t
           , State_hash.t )
           Cached.t
           Rose_tree.t
           list )
         Capped_supervisor.t }
 
-  let create ~logger ~trust_system ~frontier ~time_controller
+  let create ~logger ~verifier ~trust_system ~frontier ~time_controller
       ~catchup_job_writer ~catchup_breadcrumbs_writer ~clean_up_signal =
     let collected_transitions = State_hash.Table.create () in
     let parent_root_timeouts = State_hash.Table.create () in
@@ -75,7 +72,7 @@ module Make (Inputs : Inputs.S) = struct
       Capped_supervisor.create ~job_capacity:5
         (fun (initial_hash, transition_branches) ->
           match%map
-            Breadcrumb_builder.build_subtrees_of_breadcrumbs ~logger
+            Breadcrumb_builder.build_subtrees_of_breadcrumbs ~logger ~verifier
               ~trust_system ~frontier ~initial_hash transition_branches
           with
           | Ok trees_of_breadcrumbs ->
@@ -99,12 +96,11 @@ module Make (Inputs : Inputs.S) = struct
 
   let mem t transition =
     Hashtbl.mem t.collected_transitions
-      (With_hash.data transition |> External_transition.Verified.parent_hash)
+      (External_transition.parent_hash transition)
 
   let has_timeout t transition =
     Hashtbl.mem t.parent_root_timeouts
-      ( With_hash.data @@ Envelope.Incoming.data transition
-      |> External_transition.Verified.parent_hash )
+      (External_transition.parent_hash transition)
 
   let is_empty t =
     Hashtbl.is_empty t.collected_transitions
@@ -122,11 +118,11 @@ module Make (Inputs : Inputs.S) = struct
     remaining_time
 
   let rec extract_subtree t cached_transition =
+    let {With_hash.hash; _}, _ =
+      Envelope.Incoming.data (Cached.peek cached_transition)
+    in
     let successors =
-      Option.value ~default:[]
-        (Hashtbl.find t.collected_transitions
-           ( With_hash.hash
-           @@ Envelope.Incoming.data (Cached.peek cached_transition) ))
+      Option.value ~default:[] (Hashtbl.find t.collected_transitions hash)
     in
     Rose_tree.T (cached_transition, List.map successors ~f:(extract_subtree t))
 
@@ -143,17 +139,18 @@ module Make (Inputs : Inputs.S) = struct
     in
     Hashtbl.remove t.collected_transitions parent_hash ;
     List.iter children ~f:(fun child ->
-        remove_tree t
-          (With_hash.hash @@ Envelope.Incoming.data (Cached.peek child)) )
+        let {With_hash.hash; _}, _ =
+          Envelope.Incoming.data (Cached.peek child)
+        in
+        remove_tree t hash )
 
   let watch t ~timeout_duration ~cached_transition =
-    let transition_with_hash =
+    let transition_with_hash, _ =
       Envelope.Incoming.data (Cached.peek cached_transition)
     in
     let hash = With_hash.hash transition_with_hash in
     let parent_hash =
-      With_hash.data transition_with_hash
-      |> External_transition.Verified.parent_hash
+      With_hash.data transition_with_hash |> External_transition.parent_hash
     in
     let make_timeout duration =
       Time.Timeout.create t.time_controller duration ~f:(fun _ ->
@@ -167,9 +164,8 @@ module Make (Inputs : Inputs.S) = struct
                 , `Int (Inputs.Time.Span.to_ms duration |> Int64.to_int_trunc)
                 )
               ; ( "cached_transition"
-                , Cached.peek cached_transition
-                  |> Envelope.Incoming.data |> With_hash.data
-                  |> Inputs.External_transition.Verified.to_yojson ) ]
+                , With_hash.data transition_with_hash
+                  |> Inputs.External_transition.to_yojson ) ]
             "timed out waiting for the parent of $cached_transition after \
              $duration ms, signalling a catchup job" ;
           (* it's ok to create a new thread here because the thread essentially does no work *)
@@ -196,10 +192,10 @@ module Make (Inputs : Inputs.S) = struct
         if
           List.exists cached_sibling_transitions
             ~f:(fun cached_sibling_transition ->
-              State_hash.equal hash
-                ( With_hash.hash
-                @@ Envelope.Incoming.data
-                     (Cached.peek cached_sibling_transition) ) )
+              let {With_hash.hash= sibling_hash; _}, _ =
+                Envelope.Incoming.data (Cached.peek cached_sibling_transition)
+              in
+              State_hash.equal hash sibling_hash )
         then
           Logger.info t.logger ~module_:__MODULE__ ~location:__LOC__
             ~metadata:[("state_hash", State_hash.to_yojson hash)]

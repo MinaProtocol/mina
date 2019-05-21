@@ -396,7 +396,8 @@ module T = struct
           in
           let%bind coda =
             Main.create
-              (Main.Config.make ~logger ~trust_system ~net_config
+              (Main.Config.make ~logger ~trust_system ~verifier:Init.verifier
+                 ~net_config
                  ?snark_worker_key:
                    (Option.map snark_worker_config ~f:(fun c -> c.public_key))
                  ~transaction_pool_disk_location:
@@ -482,11 +483,11 @@ module T = struct
           let coda_verified_transitions () =
             let r, w = Linear_pipe.create () in
             don't_wait_for
-              (Strict_pipe.Reader.iter (Main.verified_transitions coda)
+              (Strict_pipe.Reader.iter (Main.validated_transitions coda)
                  ~f:(fun t ->
                    let open Main.Inputs in
                    let p =
-                     External_transition.Verified.protocol_state
+                     External_transition.Validated.protocol_state
                        (With_hash.data t)
                    in
                    let prev_state_hash =

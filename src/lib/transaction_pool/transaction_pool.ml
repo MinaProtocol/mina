@@ -450,6 +450,7 @@ end)
 (Transition_frontier : Transition_frontier_intf
                        with type staged_ledger := Staged_ledger.t) =
   Make0 (Coda_base.Ledger) (Staged_ledger) (Transition_frontier)
+include Make (Staged_ledger) (Transition_frontier)
 
 let%test_module _ =
   ( module struct
