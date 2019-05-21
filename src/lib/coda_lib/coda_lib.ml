@@ -304,8 +304,6 @@ module type Inputs_intf = sig
   module Transition_frontier_persistence :
     Transition_frontier_persistence.Intf.S
     with type frontier := Transition_frontier.t
-     and type diff := Transition_frontier.Diff_mutant.E.t
-     and type diff_hash := Transition_frontier.Diff_hash.t
      and type root_snarked_ledger := Ledger_db.t
      and type consensus_local_state := Consensus.Data.Local_state.t
      and type verifier := Verifier.t
@@ -768,6 +766,7 @@ module Make (Inputs : Inputs_intf) = struct
               Strict_pipe.create Synchronous
             in
             let net_ivar = Ivar.create () in
+            let persistence_buffer_capacity = 30 in
             let%bind persistence, ledger_db, transition_frontier =
               match config.transition_frontier_location with
               | None ->
@@ -794,7 +793,7 @@ module Make (Inputs : Inputs_intf) = struct
                       let persistence =
                         Transition_frontier_persistence.create
                           ~directory_name:transition_frontier_location
-                          ~logger:config.logger ()
+                          ~logger:config.logger persistence_buffer_capacity
                       in
                       let%map root_snarked_ledger, frontier =
                         create_genesis_frontier config
@@ -819,7 +818,7 @@ module Make (Inputs : Inputs_intf) = struct
                       in
                       let persistence =
                         Transition_frontier_persistence.create ~directory_name
-                          ~logger:config.logger ()
+                          ~logger:config.logger persistence_buffer_capacity
                       in
                       (Some persistence, root_snarked_ledger, frontier) )
             in
@@ -828,8 +827,8 @@ module Make (Inputs : Inputs_intf) = struct
             in
             Option.iter persistence ~f:(fun persistence ->
                 Transition_frontier_persistence
-                .listen_to_frontier_broadcast_pipe ~logger:config.logger
-                  frontier_broadcast_pipe_r persistence
+                .listen_to_frontier_broadcast_pipe frontier_broadcast_pipe_r
+                  persistence
                 |> don't_wait_for ) ;
             let%bind net =
               Net.create config.net_config

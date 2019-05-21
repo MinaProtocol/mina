@@ -7,7 +7,7 @@ module Transition_frontier_diff = struct
   (* TODO: Remove New_frontier. 
     Each transition frontier extension should be initialized by the input, the root breadcrumb *)
   type 'a t =
-    | New_breadcrumb of 'a
+    | New_breadcrumb of {previous: 'a; added: 'a}
         (** Triggered when a new breadcrumb is added without changing the root or best_tip *)
     | New_frontier of 'a
         (** First breadcrumb to become the root of the frontier  *)
@@ -17,6 +17,7 @@ module Transition_frontier_diff = struct
         ; new_root: 'a  (** Same as old root if the root doesn't change *)
         ; added_to_best_tip_path: 'a Non_empty_list.t (* oldest first *)
         ; new_best_tip_length: int
+        ; parent: 'a
         ; removed_from_best_tip_path: 'a list (* also oldest first *)
         ; garbage: 'a list }
         (** Triggered when a new breadcrumb is added, causing a new best_tip *)
@@ -331,9 +332,7 @@ module type Transition_frontier_intf = sig
             adding the transition, we add the transition to its parent list of
             successors. To certify that we added it to the right parent. The
             consensus_state of the parent can accomplish this. *)
-      | Remove_transitions :
-          (external_transition_validated, state_hash) With_hash.t list
-          -> consensus_state list t
+      | Remove_transitions : state_hash list -> consensus_state list t
           (** Remove_transitions: Remove_transitions is an operation that removes
             a set of transitions. We need to make sure that we are deleting the
             right transition and we use their consensus_state to accomplish
@@ -359,6 +358,8 @@ module type Transition_frontier_intf = sig
       type t = E : 'output diff_mutant -> t
 
       include Binable.S with type t := t
+
+      type pair = Pair : 'output diff_mutant * 'output -> pair
     end
   end
 
@@ -398,7 +399,8 @@ module type Transition_frontier_intf = sig
       with type view = user_command Root_diff_view.t
 
     module Persistence_diff :
-      Transition_frontier_extension_intf with type view = Diff_mutant.E.t list
+      Transition_frontier_extension_intf
+      with type view = Diff_mutant.E.pair list
 
     type readers =
       { snark_pool: Snark_pool_refcount.view Broadcast_pipe.Reader.t
