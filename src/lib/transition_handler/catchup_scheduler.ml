@@ -84,7 +84,7 @@ module Make (Inputs : Inputs.S) = struct
         Hashtbl.iter parent_root_timeouts ~f:(fun timeout ->
             Time.Timeout.cancel time_controller timeout () ) ) ;
     let breadcrumb_builder_supervisor =
-      Capped_supervisor.create ~job_capacity:5
+      Capped_supervisor.create ~job_capacity:30
         (fun (initial_hash, transition_branches) ->
           match%map
             Breadcrumb_builder.build_subtrees_of_breadcrumbs ~logger ~verifier
