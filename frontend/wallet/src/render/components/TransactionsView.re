@@ -107,8 +107,32 @@ let mockTransactions =
     ),
   ]);
 
+module Transactions = [%graphql
+  {|
+    query transactions($publicKey: String!) {
+      userCommand(filter: { toOrFrom: $publicKey }) {
+      edges{
+	  node {
+	   userCommand {
+	    to_: to @bsDecoder(fn: "Apollo.Decoders.publicKey")
+	    from @bsDecoder(fn: "Apollo.Decoders.publicKey")
+	    amount @bsDecoder(fn: "Apollo.Decoders.int64")
+	    fee @bsDecoder(fn: "Apollo.Decoders.int64")
+	    memo @bsDecoder(fn: "Apollo.Decoders.optInt64")
+	    submittedAt @bsDecoder(fn: "Apollo.Decoders.date")
+	    includedAt @bsDecoder(fn: "Apollo.Decoders.optDate")
+	   }
+	  }
+	}
+      }
+    }
+  |}
+];
+module TransactionsQuery = ReasonApollo.CreateQuery(Transactions);
+
 [@react.component]
-let make = () =>
+let make = () => {
+  let transactionsQueryThing = Transactions.make(~publicKey="123", ());
   <div className=Styles.container>
     <div
       className={Css.merge([
@@ -122,15 +146,27 @@ let make = () =>
         {ReasonReact.string("Transaction")}
       </span>
     </div>
-    <div className=Styles.body>
-      {Array.map(
-         ~f=
-           transaction =>
-             <div className=Styles.row>
-               <TransactionCell transaction myWallets />
-             </div>,
-         mockTransactions,
-       )
-       |> React.array}
-    </div>
+    <TransactionsQuery variables=transactionsQueryThing##variables>
+      {response =>
+         switch (response.result) {
+         | Loading => React.string("...") /* TODO replace with a spinner */
+         | Error(err) => React.string(err##message) /* TODO format this error message */
+         | Data(data) =>
+           <div className=Styles.body>
+             {Array.map(
+                ~f=
+                  transaction =>
+                    <div className=Styles.row>
+                      <TransactionCell transaction myWallets />
+                    </div>,
+                data##userCommand
+                |> Option.map(~f=v => v##edges)
+                |> Option.withDefault(~default=[||])
+                |> Array.map(~f=edge => edge##node##userCommand),
+              )
+              |> React.array}
+           </div>
+         }}
+    </TransactionsQuery>
   </div>;
+};

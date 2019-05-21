@@ -61,8 +61,6 @@ module Transaction = {
 };
 
 module ViewModel = {
-  open Transaction;
-
   module Actor = {
     type t =
       | Minted
@@ -93,71 +91,21 @@ module ViewModel = {
     amountDelta: int64 // signed
   };
 
-  let ofTransaction =
-      (transaction: Transaction.t, ~myWallets: list(PublicKey.t)) => {
-    switch (transaction) {
-    | Minted({
-        RewardDetails.key,
-        coinbase,
-        transactionFees,
-        proofFees,
-        delegationFees,
-        includedAt,
-      }) => {
-        sender: Actor.Minted,
-        recipient: Actor.Key(key),
-        action: Action.Transfer,
-        info:
-          Info.StakingReward(
-            [
-              ("Coinbase", coinbase),
-              ("Transaction fees", transactionFees),
-              ("Proof fees", Int64.(neg(one) *^ proofFees)),
-              ("Delegation fees", Int64.(neg(one) *^ delegationFees)),
-            ],
-            includedAt,
-          ),
-        amountDelta:
-          coinbase +^ transactionFees -^ proofFees -^ delegationFees,
-      }
-    | Payment(
-        {
-          PaymentDetails.from,
-          to_,
-          amount,
-          fee,
-          memo,
-          submittedAt,
-          includedAt,
-        },
-        {ConsensusState.status, _},
-      ) =>
-      let date = Option.withDefault(includedAt, ~default=submittedAt);
-      {
-        sender: Actor.Key(from),
-        recipient: Actor.Key(to_),
-        action:
-          switch (status) {
-          | ConsensusState.Status.Failed => Action.Failed
-          | Submitted => Action.Pending
-          | Included
-          | Snarked
-          | Finalized => Action.Transfer
-          },
-        info:
-          Option.map(memo, ~f=x => Info.Memo(x, date))
-          |> Option.withDefault(~default=Info.Empty(date)),
-        amountDelta:
-          Caml.List.exists(PublicKey.equal(from), myWallets)
-            ? Int64.(neg(one)) *^ amount -^ fee : amount,
-      };
-    | Unknown({UnknownDetails.key, amount}) => {
-        sender: Actor.Unknown,
-        recipient: Actor.Key(key),
-        action: Action.Transfer,
-        info: Info.MissingReceipts,
-        amountDelta: amount,
-      }
+  let ofTransaction = (transaction, ~myWallets: list(PublicKey.t)) => {
+    let date =
+      Option.map(~f=Js.Date.fromString, transaction##includedAt)
+      |> Option.withDefault(~default=transaction##submittedAt);
+    {
+      sender: Actor.Key(transaction##from),
+      recipient: Actor.Key(transaction##to_),
+      action: Action.Transfer,
+      info:
+        Option.map(transaction##memo, ~f=x => Info.Memo(x, date))
+        |> Option.withDefault(~default=Info.Empty(date)),
+      amountDelta:
+        Caml.List.exists(PublicKey.equal(transaction##from), myWallets)
+          ? Int64.(neg(one)) *^ transaction##amount -^ transaction##fee
+          : transaction##amount,
     };
   };
 };
@@ -270,8 +218,6 @@ module Amount = {
               ),
          )}
       </span>
-      {value <=^ Int64.zero
-         ? <span> {ReasonReact.string(" -")} </span> : <span />}
     </>;
   };
 };
@@ -291,7 +237,16 @@ module InfoSection = {
         )>
         <p
           className=Css.(
-            merge([Theme.Text.Body.regular, style([display(`flex)])])
+            merge([
+              Theme.Text.Body.regular,
+              style([
+                display(`inlineBlock),
+                width(`px(240)),
+                overflow(`hidden),
+                whiteSpace(`nowrap),
+                textOverflow(`ellipsis),
+              ]),
+            ])
           )>
           children
         </p>
@@ -399,7 +354,7 @@ module TopLevelStyles = {
 // These cells are returned as a fragment so that the parent container can
 // use a consistent grid layout to keep everything lined up.
 [@react.component]
-let make = (~transaction: Transaction.t, ~myWallets: list(PublicKey.t)) => {
+let make = (~transaction, ~myWallets: list(PublicKey.t)) => {
   let viewModel = ViewModel.ofTransaction(transaction, ~myWallets);
 
   <>

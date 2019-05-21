@@ -18,13 +18,13 @@ type UserCommand {
   includedAt: String @fake(type: pastDate)
   from: String! @examples(values: ["PUB_KEY_E9873DF4453213303DA61F2", "PUB_KEY_F1173DF4453213303DA61F2"]) 
   to: String! @examples(values: ["PUB_KEY_E9873DF4453213303DA61F2", "PUB_KEY_F1173DF4453213303DA61F2"])
-  amount: String! @fake(type: money)
-  fee: String! @fake(type: money)
+  amount: String! @fake(type: number)
+  fee: String! @fake(type: number)
   memo: String @fake(type:hackerPhrase)
 }
 
 type UserCommandUpdate {
-  userCommand: UserCommand
+  userCommand: UserCommand!
   consensus: ConsensusState!
 }
 
@@ -43,12 +43,12 @@ type SyncUpdate {
 
 type SnarkWorker {
   key: String! @examples(values: ["PUB_KEY_E9873DF4453213303DA61F2", "PUB_KEY_F1173DF4453213303DA61F2"])
-  fee: String! @fake(type: money)
+  fee: String! @fake(type: number)
 }
 
 type SnarkFee {
   snarkCreator: String! @examples(values: ["PUB_KEY_E9873DF4453213303DA61F2", "PUB_KEY_F1173DF4453213303DA61F2"])
-  fee: String! @fake(type: money)
+  fee: String! @fake(type: number)
 }
 
 type SnarkFeeUpdate {
@@ -57,7 +57,7 @@ type SnarkFeeUpdate {
 }
 
 type Block {
-  coinbase: String! @fake(type: money)
+  coinbase: String! @fake(type: number)
   creator: String! @examples(values: ["PUB_KEY_E9873DF4453213303DA61F2", "PUB_KEY_F1173DF4453213303DA61F2"])
   userCommands: [UserCommand]!
   snarkFees: [SnarkFee]!
@@ -69,8 +69,8 @@ type BlockUpdate {
 }
 
 type AnnotatedBalance {
-  total: String! @fake(type: money)
-  unknown: String! @fake(type: money)
+  total: String! @fake(type: number)
+  unknown: String! @fake(type: number)
 }
 
 type Wallet {
@@ -180,13 +180,13 @@ type PageInfo {
 }
 
 type UserCommandEdge {
-  cursor: String
-  node: UserCommandUpdate
+  cursor: String!
+  node: UserCommandUpdate!
 }
 
 type UserCommandConnection {
-  edges: [UserCommandEdge]
-  nodes: [UserCommandUpdate]
+  edges: [UserCommandEdge!]!
+  nodes: [UserCommandUpdate!]!
   pageInfo: PageInfo!
   totalCount: Int
 }
@@ -205,7 +205,7 @@ type BlockConnection {
 
 type Query {
   # List of wallets currently tracked by the node
-  wallets: [Wallet!]!
+  ownedWallets: [Wallet!]!
   
   # Gets balance of key at a certain consensus state
   # Note: `consensus` is optional as we will likely decide one
