@@ -26,6 +26,7 @@
   "scripts": {
     "fake": "graphql-faker --port 8080 -- schema.graphql",
     "fake-inspector": "graphql-faker --open -- schema.graphql",
+    "pull-macos-binary": "curl https://s3-us-west-2.amazonaws.com/wallet.o1test.net/coda-daemon-macos.zip > coda-daemon-macos.zip && rm -rf _build/coda-daemon-macos/ && unzip coda-daemon-macos.zip",
     "build": "bsb -make-world",
     "build-ci": "yarn run query-fake && yarn run build",
     "clean": "bsb -clean-world",
@@ -51,6 +52,7 @@
       "package.json"
     ],
     "extraResources": [
+      "_build/",
       "node_modules/graphql-faker/dist/index.js",
       "bundle/**/*",
       "public/*"
