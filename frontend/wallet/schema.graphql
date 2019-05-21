@@ -5,6 +5,10 @@ enum SyncStatus {
   SYNCED
 }
 
+enum ChainReorganizationStatus {
+  CHANGED
+}
+
 type SyncUpdate {
   status: SyncStatus!
   estimatedPercentSynced: Float!
@@ -274,7 +278,7 @@ type Subscription {
   
   # Triggered whenever the best tip changes
   # to another branch in the transition frontier
-  chainReorganization: Boolean!
+  chainReorganization: ChainReorganizationStatus!
 }
 
 schema {
