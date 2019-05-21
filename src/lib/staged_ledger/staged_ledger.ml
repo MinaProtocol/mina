@@ -265,10 +265,6 @@ end = struct
     let txns_still_being_worked_on =
       Scan_state.staged_transactions scan_state
     in
-    Core.printf
-      !"Ledger Transactions still being worked on %{sexp: Ledger.Undo.t list}\n\
-       \ %!"
-      txns_still_being_worked_on ;
     (*TODO: change the math*)
     (*Debug_assert.debug_assert (fun () ->
         let parallelism = Scan_state.capacity scan_state in
@@ -989,7 +985,6 @@ end = struct
           eprintf !"Unexpected error: %s %{sexp:Error.t} \n%!" __LOC__ e ) ;
       Deferred.return (to_staged_ledger_or_error r)
     in
-    Core.printf !"scan state %{sexp: Scan_state.t}\n %!" scan_state' ;
     let%bind updated_pending_coinbase_collection' =
       update_pending_coinbase_collection t.pending_coinbase_collection
         stack_update ~is_new_stack ~ledger_proof:res_opt
@@ -1180,15 +1175,15 @@ end = struct
           Staged_ledger_diff.At_most_two.t
       ; self_pk: Compressed_public_key.t
       ; budget: Currency.Fee.t Or_error.t
-      ; discarded: Discarded.t
-      ; logger: Logger.t }
+      ; discarded: Discarded.t (*; logger: Logger.t*) }
+    [@@deriving sexp_of]
 
     let coinbase_ft (cw : Transaction_snark_work.t) =
       Option.some_if (cw.fee > Currency.Fee.zero) (cw.prover, cw.fee)
 
     let init (uc_seq : User_command.With_valid_signature.t Sequence.t)
         (cw_seq : Transaction_snark_work.Checked.t Sequence.t)
-        (slots, job_count) self_pk ~add_coinbase logger =
+        (slots, job_count) self_pk ~add_coinbase _logger =
       let seq_rev seq =
         let rec go seq rev_seq =
           match Sequence.next seq with
@@ -1250,8 +1245,7 @@ end = struct
       ; self_pk
       ; coinbase
       ; budget
-      ; discarded
-      ; logger }
+      ; discarded (*; logger*) }
 
     let re_budget t =
       let revenue =
@@ -1354,9 +1348,9 @@ end = struct
         match res' with
         | Ok res'' ->
             res''
-        | Error e ->
-            Logger.error t.logger ~module_:__MODULE__ ~location:__LOC__ "%s"
-              (Error.to_string_hum e) ;
+        | Error _e ->
+            (*Logger.error t.logger ~module_:__MODULE__ ~location:__LOC__ "%s"
+              (Error.to_string_hum e) ;*)
             res
       in
       match count with `One -> by_one t | `Two -> by_one (by_one t)
@@ -1371,7 +1365,7 @@ end = struct
       let slots = slots_occupied t in
       let cw_count = Sequence.length t.completed_work_rev in
       all_proofs (* work_capacity_satisfied || *) || uc_count = 0
-      || cw_count = slots
+      || cw_count >= slots
 
     let non_coinbase_work t =
       let len = Sequence.length t.completed_work_rev in
@@ -1574,11 +1568,6 @@ end = struct
         assert (Sequence.length cw_seq <= snd partitions.first + snd y) ;
         let cw_seq_1 = Sequence.take cw_seq (snd partitions.first) in
         let cw_seq_2 = Sequence.drop cw_seq (snd partitions.first) in
-        Core.printf
-          !"work1:%{sexp: Transaction_snark_work.Checked.t Sequence.t} work2: \
-            %{sexp:Transaction_snark_work.Checked.t Sequence.t}\n\
-           \ %!"
-          cw_seq_1 cw_seq_2 ;
         let res =
           one_prediff cw_seq_1 ts_seq self partitions.first ~add_coinbase:false
             logger
@@ -1647,9 +1636,6 @@ end = struct
     let validating_ledger = Transaction_validator.create t.ledger in
     O1trace.trace_event "done mask" ;
     let partitions = Scan_state.partition_if_overflowing t.scan_state in
-    Core.printf
-      !"partitions: %{sexp: Scan_state.Space_partition.t} \n%!"
-      partitions ;
     O1trace.trace_event "partitioned" ;
     (*TODO: return an or_error here *)
     let work_to_do = Scan_state.work_for_new_diff t.scan_state in
@@ -2739,15 +2725,6 @@ let%test_module "test" =
         Sl.create_diff !sl ~self:self_pk ~logger ~transactions_by_fee:txns
           ~get_completed_work:stmt_to_work
       in
-      let jobs = Sl.Scan_state.all_work_to_do (Sl.scan_state !sl) in
-      Core.printf
-        !"Jobs: %{sexp: Transaction_snark_work.Statement.t Sequence.t}\n%!"
-        jobs ;
-      Core.printf
-        !"diff created %{sexp: \
-          Staged_ledger_diff.With_valid_signatures_and_proofs.t}\n\
-         \ %!"
-        diff ;
       let diff' = Staged_ledger_diff.forget diff in
       let%map ( `Hash_after_applying hash
               , `Ledger_proof ledger_proof
@@ -2759,7 +2736,6 @@ let%test_module "test" =
         | Error e ->
             Error.raise (Sl.Staged_ledger_error.to_error e)
       in
-      Core.printf !"diff applied \n%!" ;
       assert (Staged_ledger_hash.equal hash (Sl.hash sl')) ;
       sl := sl' ;
       (ledger_proof, diff')
@@ -2806,7 +2782,6 @@ let%test_module "test" =
       Quickcheck.test g ~trials:1000 ~f:(fun _ ->
           Async.Thread_safe.block_on_async_exn (fun () ->
               let old_ledger = !(Sl.ledger !sl) in
-              Core.printf !"SL: %{sexp: Sl.t}\n%!" !sl ;
               let all_ts = txns p (fun x -> (x + 1) * 100) (fun _ -> 4) in
               let%map ledger_proof, diff =
                 create_and_apply sl logger (Sequence.of_list all_ts)
@@ -2996,7 +2971,10 @@ let%test_module "test" =
               | Error (Sl.Staged_ledger_error.Non_zero_fee_excess _) ->
                   ()
               | Error e ->
-                  Core.printf !"%s" (Sl.Staged_ledger_error.to_string e) ;
+                  Logger.error logger ~module_:__MODULE__ ~location:__LOC__
+                    ~metadata:
+                      [("error", `String (Sl.Staged_ledger_error.to_string e))]
+                    "Could not materialize snarked ledger: $error" ;
                   assert false
               | Ok
                   ( `Hash_after_applying _hash
@@ -3183,7 +3161,6 @@ let%test_module "test" =
               if j > 0 then assert (cb = 1) ;
               let x = List.length (Staged_ledger_diff.user_commands diff) in
               (*There are more than two proof bundles. Should be able to add at least one payment. First and the second proof bundles would go for coinbase and fee_transfer resp.*)
-              Core.printf !"i:%d j:%d x:%d\n" i j x ;
               if j > 2 then assert (x > 0) ;
               let expected_value = expected_ledger x all_ts old_ledger in
               if cb > 0 then assert (!(Sl.ledger !sl) = expected_value) ) )
