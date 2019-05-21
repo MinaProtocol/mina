@@ -822,6 +822,8 @@ module Data = struct
               respond (Provide 0)
           | Private_key ->
               respond (Provide sk)
+          | Public_key ->
+              respond (Provide (Public_key.decompress_exn pk))
           | _ ->
               respond
                 (Provide
