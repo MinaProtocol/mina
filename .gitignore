@@ -13,5 +13,4 @@ src/external/ocaml-rocksdb/rocksdb
 test_logs
 .firebase/
 node_modules/
-coda-daemon-macos.zip
 

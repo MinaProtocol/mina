@@ -1,7 +1,7 @@
 open BsElectron;
 open Tc;
 
-let killDaemons = DaemonProcess.startAll(~fakerPort=8080, ~codaPort=4444);
+let killDaemons = DaemonProcess.startAll(~fakerPort=8080, ~codaPort=0xc0da);
 
 let createTray = dispatch => {
   let t = AppTray.get();

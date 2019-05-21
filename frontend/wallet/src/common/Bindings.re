@@ -64,9 +64,12 @@ module ChildProcess = {
       );
   };
   [@bs.val] [@bs.module "child_process"]
-  external spawn:
+  external spawn: (string, array(string)) => Process.t = "spawn";
+
+  [@bs.val] [@bs.module "child_process"]
+  external spawnWithEnv:
     (string, array(string), {. "env": Js.Dict.t(string)}) => Process.t =
-    "";
+    "spawn";
 };
 
 module Fs = {

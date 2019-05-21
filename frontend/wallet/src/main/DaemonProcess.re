@@ -1,10 +1,11 @@
+open Tc;
 open Bindings;
 
 module Command = {
   type t = {
     executable: string,
     args: array(string),
-    env: Js.Dict.t(string),
+    env: option(Js.Dict.t(string)),
   };
 };
 
@@ -13,11 +14,15 @@ module Process = {
     print_endline("Starting graphql-faker");
 
     let p =
-      ChildProcess.spawn(
-        command.executable,
-        command.args,
-        {"env": command.env},
-      );
+      switch (command.env) {
+      | None => ChildProcess.spawn(command.executable, command.args)
+      | Some(env) =>
+        ChildProcess.spawnWithEnv(
+          command.executable,
+          command.args,
+          {"env": env},
+        )
+      };
 
     ChildProcess.Process.onError(p, e =>
       prerr_endline(
@@ -43,7 +48,7 @@ module Process = {
           stderr,
           "Daemon process exited with non-zero exit code: Exit:%d, msg:%s%!\n",
           n,
-          Tc.Option.withDefault(
+          Option.withDefault(
             s,
             ~default="Port " ++ Js.Int.toString(port) ++ " already in use?",
           ),
@@ -61,7 +66,7 @@ let (^/) = Filename.concat;
 
 let startAll = (~fakerPort, ~codaPort) => {
   let graphqlFaker = {
-    Command.executable: "/run/current-system/sw/bin/node",
+    Command.executable: "node",
     args: [|
       Filename.concat(
         ProjectRoot.resource,
@@ -72,7 +77,7 @@ let startAll = (~fakerPort, ~codaPort) => {
       "--",
       "schema.graphql",
     |],
-    env: Js.Dict.empty(),
+    env: None,
   };
   let codaPath = "_build/coda-daemon-macos";
   let coda = {
@@ -85,12 +90,14 @@ let startAll = (~fakerPort, ~codaPort) => {
       ProjectRoot.resource ^/ codaPath ^/ "config",
     |],
     env:
-      Js.Dict.fromList([
-        (
-          "CODA_KADEMLIA_PATH",
-          ProjectRoot.resource ^/ codaPath ^/ "kademlia",
-        ),
-      ]),
+      Some(
+        Js.Dict.fromList([
+          (
+            "CODA_KADEMLIA_PATH",
+            ProjectRoot.resource ^/ codaPath ^/ "kademlia",
+          ),
+        ]),
+      ),
   };
   let kill1 = Process.start(graphqlFaker, fakerPort);
   let kill2 = Process.start(coda, codaPort);
