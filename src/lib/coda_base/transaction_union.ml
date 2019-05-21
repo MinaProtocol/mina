@@ -38,7 +38,7 @@ let typ : (var, t) Typ.t =
 *)
 let of_transaction : Transaction.t -> t = function
   | User_command cmd ->
-      let {User_command.sender; payload; signature} =
+      let User_command.Poly.Stable.Latest.{sender; payload; signature} =
         (cmd :> User_command.t)
       in
       { payload= Transaction_union_payload.of_user_command_payload payload
@@ -50,14 +50,11 @@ let of_transaction : Transaction.t -> t = function
       in
       { payload=
           { common=
-              { fee= Amount.to_fee amount
+              { fee= other_amount
               ; nonce= Account.Nonce.zero
               ; memo= User_command_memo.dummy }
-          ; body=
-              { public_key= other_pk
-              ; amount= Amount.of_fee other_amount
-              ; tag= Tag.Coinbase } }
-      ; sender= Public_key.decompress_exn proposer
+          ; body= {public_key= proposer; amount; tag= Tag.Coinbase} }
+      ; sender= Public_key.decompress_exn other_pk
       ; signature= Signature.dummy }
   | Fee_transfer tr -> (
       let two (pk1, fee1) (pk2, fee2) : t =
@@ -74,8 +71,10 @@ let of_transaction : Transaction.t -> t = function
         ; signature= Signature.dummy }
       in
       match tr with
-      | One (pk, fee) -> two (pk, fee) (pk, Fee.zero)
-      | Two (t1, t2) -> two t1 t2 )
+      | One (pk, fee) ->
+          two (pk, fee) (pk, Fee.zero)
+      | Two (t1, t2) ->
+          two t1 t2 )
 
 let excess (t : t) = Transaction_union_payload.excess t.payload
 

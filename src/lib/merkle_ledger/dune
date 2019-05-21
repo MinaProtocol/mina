@@ -7,5 +7,5 @@
    dyn_array merkle_address direction rocks key_value_database empty_hashes module_version
    visualization non_empty_list)
  (preprocess
-  (pps ppx_jane ppx_deriving.eq ppx_deriving.show))
+  (pps ppx_jane ppx_deriving.eq ppx_deriving.show ppx_deriving_yojson))
  (synopsis "Implementation of different account databases"))

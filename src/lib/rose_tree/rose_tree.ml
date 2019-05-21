@@ -2,16 +2,31 @@ open Core_kernel
 
 type 'a t = T of 'a * 'a t list
 
+type 'a display = {value: 'a; children: 'a display list} [@@deriving yojson]
+
+let rec to_display (T (value, children)) =
+  {value; children= List.map ~f:to_display children}
+
+let rec of_display {value; children} =
+  T (value, List.map ~f:of_display children)
+
+let to_yojson conv t = display_to_yojson conv (to_display t)
+
+let of_yojson conv json =
+  Result.map ~f:of_display (display_of_yojson conv json)
+
 let rec of_list_exn = function
   | [] ->
       raise
         (Invalid_argument
            "Rose_tree.of_list_exn: cannot construct rose tree from empty list")
-  | [h] -> T (h, [])
-  | h :: t -> T (h, [of_list_exn t])
+  | [h] ->
+      T (h, [])
+  | h :: t ->
+      T (h, [of_list_exn t])
 
 let rec equal ~f (T (value1, children1)) (T (value2, children2)) =
-  f value1 value2 && List.equal ~equal:(equal ~f) children1 children2
+  f value1 value2 && List.equal (equal ~f) children1 children2
 
 let subset ~f xs ys = List.for_all xs ~f:(fun x -> List.mem ys x ~equal:f)
 
@@ -38,6 +53,9 @@ module type Ops_intf = sig
   val map : 'a t -> f:('a -> 'b Monad.t) -> 'b t Monad.t
 
   val fold_map : 'a t -> init:'b -> f:('b -> 'a -> 'b Monad.t) -> 'b t Monad.t
+
+  val fold_map_over_subtrees :
+    'a t -> init:'b -> f:('b -> 'a t -> 'b Monad.t) -> 'b t Monad.t
 end
 
 module Make_ops (Monad : Monad_intf) : Ops_intf with module Monad := Monad =
@@ -57,6 +75,13 @@ struct
     let%bind base' = f init base in
     let%map successors' =
       Monad.List.map successors ~f:(fold_map ~init:base' ~f)
+    in
+    T (base', successors')
+
+  let rec fold_map_over_subtrees (T (_, successors) as subtree) ~init ~f =
+    let%bind base' = f init subtree in
+    let%map successors' =
+      Monad.List.map successors ~f:(fold_map_over_subtrees ~init:base' ~f)
     in
     T (base', successors')
 end

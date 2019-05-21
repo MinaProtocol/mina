@@ -5,6 +5,7 @@ open Ppxlib
 open Asttypes
 open Parsetree
 open Core
+open Coda_state
 
 [%%if
 proof_level = "full"]
@@ -16,8 +17,6 @@ let key_generation = true
 let key_generation = false
 
 [%%endif]
-
-module Lite_compat = Lite_compat.Make (Consensus.Blockchain_state)
 
 let pedersen_params ~loc =
   let module E = Ppxlib.Ast_builder.Make (struct
@@ -71,13 +70,11 @@ let wrap_vk ~loc =
       (module Lite_base.Crypto_params.Tock.Groth_maller.Verification_key)
       (Base64.decode_exn [%e estring vk_base64])]
 
-let protocol_state (s : Consensus.Protocol_state.value) :
-    Lite_base.Protocol_state.t =
-  let open Consensus in
+let protocol_state (s : Protocol_state.Value.t) : Lite_base.Protocol_state.t =
   let consensus_state =
     (* hack a stub for proof of stake right now so builds still work *)
     Protocol_state.consensus_state s
-    |> Option.value Consensus_state.to_lite ~default:(fun _ ->
+    |> Option.value Consensus.Data.Consensus_state.to_lite ~default:(fun _ ->
            let open Lite_base.Consensus_state in
            { length= Int32.of_int_exn 0
            ; signer_public_key=
@@ -92,8 +89,7 @@ let protocol_state (s : Consensus.Protocol_state.value) :
           :> Snark_params.Tick.Pedersen.Digest.t )
   ; body=
       { blockchain_state=
-          Lite_compat.blockchain_state
-            (Consensus.Protocol_state.blockchain_state s)
+          Lite_compat.blockchain_state (Protocol_state.blockchain_state s)
       ; consensus_state } }
 
 let genesis ~loc =
@@ -101,7 +97,7 @@ let genesis ~loc =
     let loc = loc
   end) in
   let open E in
-  let protocol_state = protocol_state Consensus.genesis_protocol_state.data in
+  let protocol_state = protocol_state Genesis_protocol_state.t.data in
   let ledger =
     Sparse_ledger_lib.Sparse_ledger.of_hash ~depth:0
       protocol_state.body.blockchain_state.staged_ledger_hash.ledger_hash

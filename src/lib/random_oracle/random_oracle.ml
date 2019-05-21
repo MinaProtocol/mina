@@ -1,13 +1,6 @@
 open Core_kernel
 open Snark_params
-
-let digest_size_in_bits = 256
-
-let digest_size_in_bytes = 256 / 8
-
-module Blake2 = Digestif.Make_BLAKE2S (struct
-  let digest_size = digest_size_in_bytes
-end)
+open Module_version
 
 module Digest = struct
   open Fold_lib
@@ -24,11 +17,43 @@ module Digest = struct
           in
           go init 0 ) }
 
-  module T = struct
-    type t = string [@@deriving sexp, bin_io, compare, hash, yojson]
+  module Stable = struct
+    module V1 = struct
+      module T = struct
+        type t = string [@@deriving sexp, bin_io, compare, hash, version]
+      end
+
+      include T
+
+      let to_yojson s = `String (Base64.encode_string s)
+
+      let of_yojson = function
+        | `String s -> (
+          match Base64.decode s with
+          | Ok s ->
+              Ok s
+          | Error (`Msg e) ->
+              Error (sprintf "bad base64: %s" e) )
+        | _ ->
+            Error "expected `String"
+
+      include Comparable.Make (T)
+      include Registration.Make_latest_version (T)
+    end
+
+    module Latest = V1
+
+    module Module_decl = struct
+      let name = "random_oracle_digest"
+
+      type latest = Latest.t
+    end
+
+    module Registrar = Registration.Make (Module_decl)
+    module Registered_V1 = Registrar.Register (V1)
   end
 
-  let to_bits = Snarky_blake2.string_to_bits
+  let to_bits = Blake2.string_to_bits
 
   let length_in_bytes = 32
 
@@ -36,28 +61,33 @@ module Digest = struct
 
   let length_in_triples = (length_in_bits + 2) / 3
 
-  let gen = String.gen_with_length length_in_bytes Char.gen
+  let gen = String.gen_with_length length_in_bytes Char.quickcheck_generator
 
   let%test_unit "to_bits compatible with fold" =
     Quickcheck.test gen ~f:(fun t ->
         assert (Array.of_list (Fold.to_list (fold_bits t)) = to_bits t) )
 
-  let of_bits = Snarky_blake2.bits_to_string
+  let of_bits = Blake2.bits_to_string
 
   let%test_unit "of_bits . to_bits = id" =
     Quickcheck.test gen ~f:(fun t ->
         assert (String.equal (of_bits (to_bits t)) t) )
 
   let%test_unit "to_bits . of_bits = id" =
-    Quickcheck.test (List.gen_with_length length_in_bits Bool.gen) ~f:(fun t ->
+    Quickcheck.test
+      (List.gen_with_length length_in_bits Bool.quickcheck_generator)
+      ~f:(fun t ->
         assert (Array.to_list (to_bits (of_bits (List.to_array t))) = t) )
 
-  include T
-  include Comparable.Make (T)
+  type t = Stable.Latest.t [@@deriving sexp, compare, hash, yojson]
+
+  include Comparable.Make (Stable.Latest)
 
   let fold t = Fold_lib.Fold.group3 ~default:false (fold_bits t)
 
   let of_string = Fn.id
+
+  let to_string = Fn.id
 
   open Tick
 
@@ -74,16 +104,15 @@ module Digest = struct
       Array.map (to_bits s) ~f:Boolean.var_of_value
   end
 
-  let to_bits (t : t) =
-    Array.to_list (Snarky_blake2.string_to_bits (t :> string))
+  let to_bits (t : t) = Array.to_list (Blake2.string_to_bits (t :> string))
 
   let typ : (Checked.t, t) Typ.t =
-    Typ.transport (Typ.array ~length:digest_size_in_bits Boolean.typ)
-      ~there:Snarky_blake2.string_to_bits ~back:(fun bs ->
-        of_string (Snarky_blake2.bits_to_string bs) )
+    Typ.transport (Typ.array ~length:Blake2.digest_size_in_bits Boolean.typ)
+      ~there:Blake2.string_to_bits ~back:(fun bs ->
+        of_string (Blake2.bits_to_string bs) )
 end
 
-let digest_string s = (Blake2.digest_string s :> string)
+let digest_string s = Blake2.(digest_string s |> to_raw_string)
 
 let digest_field =
   let field_to_bits x =
@@ -91,8 +120,7 @@ let digest_field =
     let n = Bigint.of_field x in
     Array.init Field.size_in_bits ~f:(Bigint.test_bit n)
   in
-  fun x ->
-    (digest_string (Snarky_blake2.bits_to_string (field_to_bits x)) :> string)
+  fun x -> digest_string (Blake2.bits_to_string (field_to_bits x))
 
 module Checked = struct
   include Snarky_blake2.Make (Tick)
@@ -106,13 +134,12 @@ module Checked = struct
 end
 
 let%test_unit "checked-unchecked equality" =
-  Quickcheck.test ~trials:10 (Quickcheck.Generator.list Bool.gen)
-    ~f:(fun bits ->
+  Quickcheck.test ~trials:10
+    (Quickcheck.Generator.list Bool.quickcheck_generator) ~f:(fun bits ->
       Tick.Test.test_equal ~sexp_of_t:Digest.sexp_of_t
         (Tick.Typ.list ~length:(List.length bits) Tick.Boolean.typ)
         Digest.typ Checked.digest_bits
-        (fun bs ->
-          digest_string (Snarky_blake2.bits_to_string (Array.of_list bs)) )
+        (fun bs -> digest_string (Blake2.bits_to_string (Array.of_list bs)))
         bits )
 
 let%test_unit "checked-unchecked field" =

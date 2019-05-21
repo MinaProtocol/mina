@@ -1,3 +1,6 @@
+[%%import
+"../../config.mlh"]
+
 open Util
 open Core_kernel
 open Snark_params
@@ -12,9 +15,8 @@ module Time = struct
   module Stable = struct
     module V1 = struct
       module T = struct
-        let version = 1
-
-        type t = UInt64.t [@@deriving bin_io, sexp, compare, eq, hash]
+        type t = UInt64.t
+        [@@deriving bin_io, sexp, compare, eq, hash, yojson, version]
       end
 
       include T
@@ -34,13 +36,31 @@ module Time = struct
   end
 
   module Controller = struct
+    [%%if
+    time_offsets]
+
+    type t = Time.Span.t Lazy.t
+
+    let create offset = offset
+
+    let basic =
+      lazy
+        ( Core_kernel.Time.Span.of_int_sec @@ Int.of_string
+        @@ Unix.getenv "CODA_TIME_OFFSET" )
+
+    [%%else]
+
     type t = unit
 
     let create () = ()
+
+    let basic = ()
+
+    [%%endif]
   end
 
   (* DO NOT add bin_io the deriving list *)
-  type t = Stable.Latest.t [@@deriving sexp, compare, eq, hash]
+  type t = Stable.Latest.t [@@deriving sexp, compare, eq, hash, yojson]
 
   type t0 = t
 
@@ -59,9 +79,7 @@ module Time = struct
     module Stable = struct
       module V1 = struct
         module T = struct
-          let version = 1
-
-          type t = UInt64.t [@@deriving bin_io, sexp, compare]
+          type t = UInt64.t [@@deriving bin_io, sexp, compare, version]
         end
 
         include T
@@ -128,7 +146,16 @@ module Time = struct
     Time.of_span_since_epoch
       (Time.Span.of_ms (Int64.to_float (UInt64.to_int64 t)))
 
+  [%%if
+  time_offsets]
+
+  let now offset = of_time (Time.sub (Time.now ()) (Lazy.force offset))
+
+  [%%else]
+
   let now _ = of_time (Time.now ())
+
+  [%%endif]
 
   let field_var_to_unpacked (x : Tick.Field.Var.t) =
     Tick.Field.Checked.unpack ~length:64 x
@@ -147,13 +174,19 @@ module Time = struct
 
   let diff_checked x y =
     let pack = Tick.Field.Var.project in
-    Span.unpack_var Tick.Field.Checked.Infix.(pack x - pack y)
+    Span.unpack_var Tick.Field.Checked.(pack x - pack y)
 
   let modulus t span = UInt64.rem t span
 
   let unpacked_to_number var =
     let bits = Span.Unpacked.var_to_bits var in
     Number.of_bits (bits :> Boolean.var list)
+
+  let to_string time =
+    to_span_since_epoch time |> Span.to_ms |> Int64.to_string
+
+  let of_string_exn string =
+    Int64.of_string string |> Span.of_ms |> of_span_since_epoch
 end
 
 include Time

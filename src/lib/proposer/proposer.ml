@@ -1,10 +1,97 @@
 open Core
 open Async
 open Pipe_lib
+open Coda_base
+open Coda_state
+open Signature_lib
 open O1trace
+module Time = Coda_base.Block_time
 
 module type Inputs_intf = sig
-  include Protocols.Coda_pow.Inputs_intf
+  open Protocols.Coda_pow
+
+  module Pending_coinbase_witness :
+    Pending_coinbase_witness_intf
+    with type pending_coinbases := Pending_coinbase.t
+
+  module Pending_coinbase_stack_state :
+    Pending_coinbase_stack_state_intf
+    with type pending_coinbase_stack := Pending_coinbase.Stack.t
+
+  module Ledger_proof_statement :
+    Ledger_proof_statement_intf
+    with type ledger_hash := Frozen_ledger_hash.t
+     and type pending_coinbase_stack_state := Pending_coinbase_stack_state.t
+
+  module Ledger_proof :
+    Ledger_proof_intf
+    with type ledger_hash := Frozen_ledger_hash.t
+     and type statement := Ledger_proof_statement.t
+     and type proof := Proof.t
+     and type sok_digest := Sok_message.Digest.t
+
+  module Transaction_snark_work :
+    Transaction_snark_work_intf
+    with type proof := Ledger_proof.t
+     and type statement := Ledger_proof_statement.t
+     and type public_key := Public_key.Compressed.t
+
+  module Staged_ledger_diff :
+    Staged_ledger_diff_intf
+    with type user_command := User_command.t
+     and type user_command_with_valid_signature :=
+                User_command.With_valid_signature.t
+     and type staged_ledger_hash := Staged_ledger_hash.t
+     and type public_key := Public_key.Compressed.t
+     and type completed_work := Transaction_snark_work.t
+     and type completed_work_checked := Transaction_snark_work.Checked.t
+     and type fee_transfer_single := Fee_transfer.Single.t
+
+  module Staged_ledger :
+    Staged_ledger_intf
+    with type diff := Staged_ledger_diff.t
+     and type valid_diff :=
+                Staged_ledger_diff.With_valid_signatures_and_proofs.t
+     and type staged_ledger_hash := Staged_ledger_hash.t
+     and type staged_ledger_aux_hash := Staged_ledger_hash.Aux_hash.t
+     and type ledger_hash := Ledger_hash.t
+     and type frozen_ledger_hash := Frozen_ledger_hash.t
+     and type public_key := Public_key.Compressed.t
+     and type ledger := Ledger.t
+     and type ledger_proof := Ledger_proof.t
+     and type user_command_with_valid_signature :=
+                User_command.With_valid_signature.t
+     and type statement := Transaction_snark_work.Statement.t
+     and type completed_work_checked := Transaction_snark_work.Checked.t
+     and type sparse_ledger := Sparse_ledger.t
+     and type ledger_proof_statement := Ledger_proof_statement.t
+     and type ledger_proof_statement_set := Ledger_proof_statement.Set.t
+     and type transaction := Transaction.t
+     and type user_command := User_command.t
+     and type transaction_witness := Transaction_witness.t
+     and type pending_coinbase_collection := Pending_coinbase.t
+     and type verifier := Verifier.t
+
+  module External_transition :
+    External_transition_intf
+    with type state_hash := State_hash.t
+     and type time := Time.t
+     and type protocol_state := Protocol_state.Value.t
+     and type staged_ledger_diff := Staged_ledger_diff.t
+     and type proof := Proof.t
+     and type consensus_state := Consensus.Data.Consensus_state.Value.t
+     and type user_command := User_command.t
+     and type compressed_public_key := Public_key.Compressed.t
+     and type verifier := Verifier.t
+     and type staged_ledger_hash := Staged_ledger_hash.t
+     and type ledger_proof := Ledger_proof.t
+     and type transaction := Transaction.t
+
+  module Internal_transition :
+    Internal_transition_intf
+    with type snark_transition := Snark_transition.Value.t
+     and type prover_state := Consensus.Data.Prover_state.t
+     and type staged_ledger_diff := Staged_ledger_diff.t
 
   module Ledger_db : sig
     type t
@@ -15,16 +102,25 @@ module type Inputs_intf = sig
   end
 
   module Transition_frontier :
-    Protocols.Coda_transition_frontier.Transition_frontier_intf
-    with type state_hash := Protocol_state_hash.t
-     and type external_transition_verified := External_transition.Verified.t
+    Transition_frontier_intf
+    with type state_hash := State_hash.t
+     and type consensus_state := Consensus.Data.Consensus_state.Value.t
+     and type mostly_validated_external_transition :=
+                ( [`Time_received] * Truth.true_t
+                , [`Proof] * Truth.true_t
+                , [`Frontier_dependencies] * Truth.true_t
+                , [`Staged_ledger_diff] * Truth.false_t )
+                External_transition.Validation.with_transition
+     and type external_transition_validated := External_transition.Validated.t
+     and type pending_coinbase := Pending_coinbase.t
      and type ledger_database := Ledger_db.t
      and type staged_ledger := Staged_ledger.t
      and type staged_ledger_diff := Staged_ledger_diff.t
      and type transaction_snark_scan_state := Staged_ledger.Scan_state.t
      and type masked_ledger := Masked_ledger.t
-     and type consensus_local_state := Consensus.Local_state.t
+     and type consensus_local_state := Consensus.Data.Local_state.t
      and type user_command := User_command.t
+     and type verifier := Verifier.t
 
   module Transaction_pool :
     Coda_lib.Transaction_pool_read_intf
@@ -33,11 +129,12 @@ module type Inputs_intf = sig
 
   module Prover : sig
     val prove :
-         prev_state:Consensus_mechanism.Protocol_state.value
-      -> prev_state_proof:Protocol_state_proof.t
-      -> next_state:Consensus_mechanism.Protocol_state.value
+         prev_state:Protocol_state.Value.t
+      -> prev_state_proof:Proof.t
+      -> next_state:Protocol_state.Value.t
       -> Internal_transition.t
-      -> Protocol_state_proof.t Deferred.Or_error.t
+      -> Pending_coinbase_witness.t
+      -> Proof.t Deferred.Or_error.t
   end
 end
 
@@ -66,8 +163,10 @@ end = struct
 
   let rec with_value ~f t =
     match t.value with
-    | Some x -> f x
-    | None -> don't_wait_for (Ivar.read t.signal >>| fun () -> with_value ~f t)
+    | Some x ->
+        f x
+    | None ->
+        don't_wait_for (Ivar.read t.signal >>| fun () -> with_value ~f t)
 end
 
 module Singleton_supervisor : sig
@@ -91,7 +190,8 @@ end = struct
     | Some (ivar, _) ->
         Ivar.fill ivar () ;
         t.task <- None
-    | None -> ()
+    | None ->
+        ()
 
   let dispatch t data =
     cancel t ;
@@ -109,26 +209,26 @@ end
 
 module Make (Inputs : Inputs_intf) :
   Coda_lib.Proposer_intf
-  with type external_transition := Inputs.External_transition.t
-   and type external_transition_verified :=
-              Inputs.External_transition.Verified.t
-   and type state_hash := Inputs.Protocol_state_hash.t
-   and type ledger_hash := Inputs.Ledger_hash.t
+  with type breadcrumb := Inputs.Transition_frontier.Breadcrumb.t
+   and type state_hash := State_hash.t
+   and type ledger_hash := Ledger_hash.t
    and type staged_ledger := Inputs.Staged_ledger.t
-   and type transaction := Inputs.User_command.With_valid_signature.t
-   and type protocol_state := Inputs.Consensus_mechanism.Protocol_state.value
-   and type protocol_state_proof := Inputs.Protocol_state_proof.t
-   and type consensus_local_state := Inputs.Consensus_mechanism.Local_state.t
+   and type transaction := User_command.With_valid_signature.t
+   and type protocol_state := Protocol_state.Value.t
+   and type protocol_state_proof := Proof.t
+   and type consensus_local_state := Consensus.Data.Local_state.t
    and type completed_work_statement :=
               Inputs.Transaction_snark_work.Statement.t
    and type completed_work_checked := Inputs.Transaction_snark_work.Checked.t
-   and type time_controller := Inputs.Time.Controller.t
-   and type keypair := Inputs.Keypair.t
+   and type time_controller := Time.Controller.t
+   and type keypair := Keypair.t
    and type transition_frontier := Inputs.Transition_frontier.t
    and type transaction_pool := Inputs.Transaction_pool.t
-   and type time := Inputs.Time.t = struct
+   and type time := Time.t
+   and type verifier := Verifier.t = struct
   open Inputs
-  open Consensus_mechanism
+  module Transition_frontier_validation =
+    External_transition.Transition_frontier_validation (Transition_frontier)
 
   let time_to_ms = Fn.compose Time.Span.to_ms Time.to_span_since_epoch
 
@@ -156,7 +256,8 @@ module Make (Inputs : Inputs_intf) :
       | Some timeout ->
           Time.Timeout.cancel t.time_controller timeout () ;
           t.timeout <- None
-      | None -> ()
+      | None ->
+          ()
 
     let schedule t time ~f =
       cancel t ;
@@ -173,26 +274,34 @@ module Make (Inputs : Inputs_intf) :
       ~staged_ledger ~transactions ~get_completed_work ~logger
       ~(keypair : Keypair.t) ~proposal_data =
     let open Interruptible.Let_syntax in
-    let%bind diff, next_staged_ledger_hash, ledger_proof_opt =
+    let self = Public_key.compress keypair.public_key in
+    let%bind ( diff
+             , next_staged_ledger_hash
+             , ledger_proof_opt
+             , is_new_stack
+             , coinbase_amount ) =
       Interruptible.uninterruptible
         (let open Deferred.Let_syntax in
         let diff =
           measure "create_diff" (fun () ->
-              Staged_ledger.create_diff staged_ledger
-                ~self:(Public_key.compress keypair.public_key)
-                ~logger ~transactions_by_fee:transactions ~get_completed_work
-          )
+              Staged_ledger.create_diff staged_ledger ~self ~logger
+                ~transactions_by_fee:transactions ~get_completed_work )
         in
         let%map ( `Hash_after_applying next_staged_ledger_hash
                 , `Ledger_proof ledger_proof_opt
-                , `Staged_ledger _transitioned_staged_ledger ) =
+                , `Staged_ledger _transitioned_staged_ledger
+                , `Pending_coinbase_data (is_new_stack, coinbase_amount) ) =
           let%map or_error =
             Staged_ledger.apply_diff_unchecked staged_ledger diff
           in
           Or_error.ok_exn or_error
         in
         (*staged_ledger remains unchanged and transitioned_staged_ledger is discarded because the external transtion created out of this diff will be applied in Transition_frontier*)
-        (diff, next_staged_ledger_hash, ledger_proof_opt))
+        ( diff
+        , next_staged_ledger_hash
+        , ledger_proof_opt
+        , is_new_stack
+        , coinbase_amount ))
     in
     let%bind protocol_state, consensus_transition_data =
       lift_sync (fun () ->
@@ -223,8 +332,8 @@ module Make (Inputs : Inputs_intf) :
             |> Time.Span.to_ms
           in
           measure "consensus generate_transition" (fun () ->
-              Consensus_mechanism.generate_transition ~previous_protocol_state
-                ~blockchain_state ~time ~proposal_data
+              Consensus_state_hooks.generate_transition
+                ~previous_protocol_state ~blockchain_state ~time ~proposal_data
                 ~transactions:
                   ( Staged_ledger_diff.With_valid_signatures_and_proofs
                     .user_commands diff
@@ -249,21 +358,28 @@ module Make (Inputs : Inputs_intf) :
                      ledger_proof_opt)
                 ~blockchain_state:
                   (Protocol_state.blockchain_state protocol_state)
-                ~consensus_data:consensus_transition_data ()
+                ~consensus_transition:consensus_transition_data ~proposer:self
+                ~coinbase:coinbase_amount ()
             in
             let internal_transition =
               Internal_transition.create ~snark_transition
-                ~prover_state:(Proposal_data.prover_state proposal_data)
+                ~prover_state:
+                  (Consensus.Data.Proposal_data.prover_state proposal_data)
                 ~staged_ledger_diff:(Staged_ledger_diff.forget diff)
             in
-            Some (protocol_state, internal_transition) ) )
+            let witness =
+              { Pending_coinbase_witness.pending_coinbases=
+                  Staged_ledger.pending_coinbase_collection staged_ledger
+              ; is_new_stack }
+            in
+            Some (protocol_state, internal_transition, witness) ) )
 
-  let run ~parent_log ~get_completed_work ~transaction_pool ~time_controller
-      ~keypair ~consensus_local_state ~frontier_reader ~transition_writer =
+  let run ~logger ~verifier ~trust_system ~get_completed_work ~transaction_pool
+      ~time_controller ~keypair ~consensus_local_state ~frontier_reader
+      ~transition_writer ~random_peers ~query_peer =
     trace_task "proposer" (fun () ->
-        let logger = Logger.child parent_log __MODULE__ in
         let log_bootstrap_mode () =
-          Logger.info logger
+          Logger.info logger ~module_:__MODULE__ ~location:__LOC__
             "Bootstrapping right now. Cannot generate new blockchains or \
              schedule event"
         in
@@ -271,20 +387,23 @@ module Make (Inputs : Inputs_intf) :
         let propose ivar proposal_data =
           let open Interruptible.Let_syntax in
           match Broadcast_pipe.Reader.peek frontier_reader with
-          | None -> Interruptible.return (log_bootstrap_mode ())
+          | None ->
+              log_bootstrap_mode () ; Interruptible.return ()
           | Some frontier -> (
               let crumb = Transition_frontier.best_tip frontier in
-              Logger.trace logger
-                !"Begining to propose off of crumb %{sexp: Breadcrumb.t}%!"
-                crumb ;
-              Core.printf !"%!" ;
+              Logger.trace logger ~module_:__MODULE__ ~location:__LOC__
+                ~metadata:[("breadcrumb", Breadcrumb.to_yojson crumb)]
+                !"Begining to propose off of crumb $breadcrumb%!" ;
               let previous_protocol_state, previous_protocol_state_proof =
-                let transition : External_transition.Verified.t =
+                let transition : External_transition.Validated.t =
                   (Breadcrumb.transition_with_hash crumb).data
                 in
-                ( External_transition.Verified.protocol_state transition
-                , External_transition.Verified.protocol_state_proof transition
+                ( External_transition.Validated.protocol_state transition
+                , External_transition.Validated.protocol_state_proof transition
                 )
+              in
+              let transactions =
+                Transaction_pool.transactions transaction_pool
               in
               trace_event "waiting for ivar..." ;
               let%bind () =
@@ -294,23 +413,24 @@ module Make (Inputs : Inputs_intf) :
                 generate_next_state ~proposal_data ~previous_protocol_state
                   ~time_controller
                   ~staged_ledger:(Breadcrumb.staged_ledger crumb)
-                  ~transactions:
-                    (Transaction_pool.transactions transaction_pool)
-                  ~get_completed_work ~logger ~keypair
+                  ~transactions ~get_completed_work ~logger ~keypair
               in
               trace_event "next state generated" ;
               match next_state_opt with
-              | None -> Interruptible.return ()
-              | Some (protocol_state, internal_transition) ->
+              | None ->
+                  Interruptible.return ()
+              | Some
+                  ( protocol_state
+                  , internal_transition
+                  , pending_coinbase_witness ) ->
                   Debug_assert.debug_assert (fun () ->
-                      let logger = Logger.child logger "Assert_selection" in
                       [%test_result: [`Take | `Keep]]
-                        (Consensus_mechanism.select
+                        (Consensus.Hooks.select
                            ~existing:
-                             ( previous_protocol_state
-                             |> Protocol_state.consensus_state )
+                             (Protocol_state.consensus_state
+                                previous_protocol_state)
                            ~candidate:
-                             (protocol_state |> Protocol_state.consensus_state)
+                             (Protocol_state.consensus_state protocol_state)
                            ~logger)
                         ~expect:`Take
                         ~message:
@@ -319,14 +439,13 @@ module Make (Inputs : Inputs_intf) :
                       let root_consensus_state =
                         Transition_frontier.root frontier
                         |> (fun x -> (Breadcrumb.transition_with_hash x).data)
-                        |> External_transition.Verified.protocol_state
+                        |> External_transition.Validated.protocol_state
                         |> Protocol_state.consensus_state
                       in
                       [%test_result: [`Take | `Keep]]
-                        (Consensus_mechanism.select
-                           ~existing:root_consensus_state
+                        (Consensus.Hooks.select ~existing:root_consensus_state
                            ~candidate:
-                             (protocol_state |> Protocol_state.consensus_state)
+                             (Protocol_state.consensus_state protocol_state)
                            ~logger)
                         ~expect:`Take
                         ~message:
@@ -339,43 +458,149 @@ module Make (Inputs : Inputs_intf) :
                       measure "proving state transition valid" (fun () ->
                           Prover.prove ~prev_state:previous_protocol_state
                             ~prev_state_proof:previous_protocol_state_proof
-                            ~next_state:protocol_state internal_transition )
+                            ~next_state:protocol_state internal_transition
+                            pending_coinbase_witness )
                     with
                     | Error err ->
-                        Logger.error logger
+                        Logger.error logger ~module_:__MODULE__
+                          ~location:__LOC__
                           "failed to prove generated protocol state: %s"
                           (Error.to_string_hum err) ;
                         return ()
-                    | Ok protocol_state_proof ->
+                    | Ok protocol_state_proof -> (
                         let span = Time.diff (Time.now time_controller) t0 in
-                        Logger.info logger
-                          !"Protocol_state_proof proving time took: %{sexp: \
-                            int64}ms\n\
-                            %!"
-                          (Time.Span.to_ms span) ;
-                        (* since we generated this transition, we do not need to verify it *)
-                        let (`I_swear_this_is_safe_see_my_comment
-                              external_transition) =
-                          External_transition.to_verified
-                            (External_transition.create ~protocol_state
-                               ~protocol_state_proof
-                               ~staged_ledger_diff:
-                                 (Internal_transition.staged_ledger_diff
-                                    internal_transition))
+                        Logger.info logger ~module_:__MODULE__
+                          ~location:__LOC__
+                          ~metadata:
+                            [ ( "proving_time"
+                              , `Int (Time.Span.to_ms span |> Int64.to_int_exn)
+                              ) ]
+                          !"Protocol_state_proof proving time took: \
+                            $proving_time%!" ;
+                        let staged_ledger_diff =
+                          Internal_transition.staged_ledger_diff
+                            internal_transition
                         in
-                        let external_transition_with_hash =
-                          { With_hash.hash= Protocol_state.hash protocol_state
-                          ; data= external_transition }
+                        let transition_hash =
+                          Protocol_state.hash protocol_state
                         in
-                        Strict_pipe.Writer.write transition_writer
-                          external_transition_with_hash) )
+                        let transition =
+                          External_transition.Validation.wrap
+                            { With_hash.hash= transition_hash
+                            ; data=
+                                External_transition.create ~protocol_state
+                                  ~protocol_state_proof ~staged_ledger_diff }
+                          |> External_transition.skip_time_received_validation
+                               `This_transition_was_not_received_via_gossip
+                          |> External_transition.skip_proof_validation
+                               `This_transition_was_generated_internally
+                          |> Transition_frontier_validation
+                             .validate_frontier_dependencies ~logger ~frontier
+                          |> Result.map_error ~f:(fun err ->
+                                 let exn name =
+                                   Error.to_exn
+                                     (Error.of_string
+                                        (sprintf
+                                           "Error validating proposed \
+                                            transition frontier dependencies: \
+                                            %s"
+                                           name))
+                                 in
+                                 match err with
+                                 | `Already_in_frontier ->
+                                     exn "already in frontier"
+                                 | `Not_selected_over_frontier_root ->
+                                     exn "not selected over frontier root"
+                                 | `Parent_missing_from_frontier ->
+                                     exn "parent missing from frontier" )
+                          |> Result.ok_exn
+                        in
+                        let%bind breadcrumb_result =
+                          Breadcrumb.build ~logger ~verifier ~trust_system
+                            ~parent:crumb ~transition ~sender:None
+                        in
+                        let breadcrumb =
+                          Result.map_error breadcrumb_result ~f:(fun err ->
+                              let exn name =
+                                Error.to_exn
+                                  (Error.of_string
+                                     (sprintf
+                                        "Error building breadcrumb from \
+                                         proposed transition: %s"
+                                        name))
+                              in
+                              match err with
+                              | `Fatal_error e ->
+                                  exn
+                                    (sprintf "fatal error -- %s"
+                                       (Exn.to_string e))
+                              | `Invalid_staged_ledger_diff e ->
+                                  exn
+                                    (sprintf "invalid staged ledger diff -- %s"
+                                       (Error.to_string_hum e))
+                              | `Invalid_staged_ledger_hash e ->
+                                  exn
+                                    (sprintf "invalid staged ledger hash -- %s"
+                                       (Error.to_string_hum e)) )
+                          |> Result.ok_exn
+                        in
+                        let metadata =
+                          [("state_hash", State_hash.to_yojson transition_hash)]
+                        in
+                        Logger.info logger ~module_:__MODULE__
+                          ~location:__LOC__
+                          !"Submitting transition $state_hash to the \
+                            transition frontier controller"
+                          ~metadata ;
+                        let%bind () =
+                          Strict_pipe.Writer.write transition_writer breadcrumb
+                        in
+                        Logger.info logger ~module_:__MODULE__
+                          ~location:__LOC__ ~metadata
+                          "Waiting for transition $state_hash to be inserted \
+                           into frontier" ;
+                        Deferred.choose
+                          [ Deferred.choice
+                              (Transition_frontier.wait_for_transition frontier
+                                 transition_hash)
+                              (Fn.const `Transition_accepted)
+                          ; Deferred.choice
+                              ( Time.Timeout.create time_controller
+                                  (* We allow up to 15 seconds for the transition to make its way from the transition_writer to the frontier.
+                                     This value is chosen to be reasonably generous. In theory, this should not take terribly long. But long
+                                     cycles do happen in our system, and with medium curves those long cycles can be substantial. *)
+                                  (Time.Span.of_ms 15000L)
+                                  ~f:(Fn.const ())
+                              |> Time.Timeout.to_deferred )
+                              (Fn.const `Timed_out) ]
+                        >>| function
+                        | `Transition_accepted ->
+                            Logger.info logger ~module_:__MODULE__
+                              ~location:__LOC__ ~metadata
+                              "Generated transition $state_hash was accepted \
+                               into transition frontier"
+                        | `Timed_out ->
+                            let str =
+                              "Generated transition $state_hash was never \
+                               accepted into transition frontier"
+                            in
+                            Logger.fatal logger ~module_:__MODULE__
+                              ~location:__LOC__ ~metadata "%s" str ;
+                            Error.raise (Error.of_string str) )) )
         in
         let proposal_supervisor = Singleton_supervisor.create ~task:propose in
         let scheduler = Singleton_scheduler.create time_controller in
         let rec check_for_proposal () =
           trace_recurring_task "check for proposal" (fun () ->
               match Broadcast_pipe.Reader.peek frontier_reader with
-              | None -> log_bootstrap_mode ()
+              | None ->
+                  log_bootstrap_mode () ;
+                  don't_wait_for
+                    (let%map () =
+                       Broadcast_pipe.Reader.iter_until frontier_reader
+                         ~f:(Fn.compose Deferred.return Option.is_some)
+                     in
+                     check_for_proposal ())
               | Some transition_frontier -> (
                   let breadcrumb =
                     Transition_frontier.best_tip transition_frontier
@@ -384,32 +609,58 @@ module Make (Inputs : Inputs_intf) :
                     (Breadcrumb.transition_with_hash breadcrumb).data
                   in
                   let protocol_state =
-                    External_transition.Verified.protocol_state transition
+                    External_transition.Validated.protocol_state transition
+                  in
+                  let consensus_state =
+                    Protocol_state.consensus_state protocol_state
                   in
                   match
-                    measure "asking conensus what to do" (fun () ->
-                        Consensus_mechanism.next_proposal
-                          (time_to_ms (Time.now time_controller))
-                          (Protocol_state.consensus_state protocol_state)
-                          ~local_state:consensus_local_state ~keypair ~logger
-                    )
+                    Consensus.Hooks.required_local_state_sync ~consensus_state
+                      ~local_state:consensus_local_state
                   with
-                  | `Check_again time ->
-                      Singleton_scheduler.schedule scheduler (time_of_ms time)
-                        ~f:check_for_proposal
-                  | `Propose_now data ->
-                      Interruptible.finally
-                        (Singleton_supervisor.dispatch proposal_supervisor data)
-                        ~f:check_for_proposal
-                      |> ignore
-                  | `Propose (time, data) ->
-                      Singleton_scheduler.schedule scheduler (time_of_ms time)
-                        ~f:(fun () ->
-                          ignore
-                            (Interruptible.finally
-                               (Singleton_supervisor.dispatch
-                                  proposal_supervisor data)
-                               ~f:check_for_proposal) ) ) )
+                  | Some sync_jobs ->
+                      Logger.info logger ~module_:__MODULE__ ~location:__LOC__
+                        "Synchronizing consensus local state" ;
+                      don't_wait_for
+                        (let%map res =
+                           Consensus.Hooks.sync_local_state
+                             ~local_state:consensus_local_state ~logger
+                             ~trust_system ~random_peers ~query_peer sync_jobs
+                         in
+                         ( match res with
+                         | Ok () ->
+                             ()
+                         | Error e ->
+                             Logger.error logger ~module_:__MODULE__
+                               ~location:__LOC__
+                               "error syncing local state: %s"
+                               (Error.to_string_hum e) ) ;
+                         check_for_proposal ())
+                  | None -> (
+                    match
+                      measure "asking conensus what to do" (fun () ->
+                          Consensus.Hooks.next_proposal
+                            (time_to_ms (Time.now time_controller))
+                            consensus_state ~local_state:consensus_local_state
+                            ~keypair ~logger )
+                    with
+                    | `Check_again time ->
+                        Singleton_scheduler.schedule scheduler
+                          (time_of_ms time) ~f:check_for_proposal
+                    | `Propose_now data ->
+                        Interruptible.finally
+                          (Singleton_supervisor.dispatch proposal_supervisor
+                             data)
+                          ~f:check_for_proposal
+                        |> ignore
+                    | `Propose (time, data) ->
+                        Singleton_scheduler.schedule scheduler
+                          (time_of_ms time) ~f:(fun () ->
+                            ignore
+                              (Interruptible.finally
+                                 (Singleton_supervisor.dispatch
+                                    proposal_supervisor data)
+                                 ~f:check_for_proposal) ) ) ) )
         in
         check_for_proposal () )
 end

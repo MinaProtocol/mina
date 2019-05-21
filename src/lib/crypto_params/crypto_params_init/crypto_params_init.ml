@@ -1,15 +1,42 @@
+[%%import
+"../../../config.mlh"]
+
+[%%if
+curve_size = 298]
+
+module Cycle = Snarky.Libsnark.Mnt298
+module Snarkette_tick = Snarkette.Mnt6_80
+module Snarkette_tock = Snarkette.Mnt4_80
+
+[%%elif
+curve_size = 753]
+
+module Cycle = Snarky.Libsnark.Mnt753
+module Snarkette_tick = Snarkette.Mnt6753
+module Snarkette_tock = Snarkette.Mnt4753
+
+[%%else]
+
+[%%show
+curve_size]
+
+[%%error
+"invalid value for \"curve_size\""]
+
+[%%endif]
+
 module Tick_backend = struct
-  module Full = Snarky.Backends.Mnt4
-  include Full.GM
-  module Inner_curve = Snarky.Libsnark.Mnt6.G1
-  module Inner_twisted_curve = Snarky.Libsnark.Mnt6.G2
+  module Full = Cycle.Mnt4
+  include Full.Default
+  module Inner_curve = Cycle.Mnt6.G1
+  module Inner_twisted_curve = Cycle.Mnt6.G2
 end
 
 module Tock_backend = struct
-  module Full = Snarky.Backends.Mnt6
+  module Full = Cycle.Mnt6
   include Full.GM
-  module Inner_curve = Snarky.Libsnark.Mnt4.G1
-  module Inner_twisted_curve = Snarky.Libsnark.Mnt4.G2
+  module Inner_curve = Cycle.Mnt4.G1
+  module Inner_twisted_curve = Cycle.Mnt4.G2
 end
 
 module Tick0 = Snarky.Snark.Make (Tick_backend)
@@ -90,8 +117,10 @@ module Wrap_input = struct
     let split_last_exn =
       let rec go acc x xs =
         match xs with
-        | [] -> (List.rev acc, x)
-        | x' :: xs -> go (x :: acc) x' xs
+        | [] ->
+            (List.rev acc, x)
+        | x' :: xs ->
+            go (x :: acc) x' xs
       in
       function
       | [] -> failwith "split_last: Empty list" | x :: xs -> go [] x xs
@@ -101,12 +130,12 @@ module Wrap_input = struct
     let typ : (var, t) Typ.t =
       Typ.of_hlistable spec
         ~var_to_hlist:(fun {low_bits; high_bit} -> [low_bits; high_bit])
-        ~var_of_hlist:(fun Snarky.H_list.([low_bits; high_bit]) ->
+        ~var_of_hlist:(fun Snarky.H_list.[low_bits; high_bit] ->
           {low_bits; high_bit} )
         ~value_to_hlist:(fun (x : Tick0.Field.t) ->
           let low_bits, high_bit = split_last_exn (Tick0.Field.unpack x) in
           [Tock0.Field.project low_bits; high_bit] )
-        ~value_of_hlist:(fun Snarky.H_list.([low_bits; high_bit]) ->
+        ~value_of_hlist:(fun Snarky.H_list.[low_bits; high_bit] ->
           Tick0.Field.project (Tock0.Field.unpack low_bits @ [high_bit]) )
 
     module Checked = struct

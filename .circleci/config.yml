@@ -4,7 +4,7 @@ version: 3
 jobs:
     tracetool:
         docker:
-            - image: codaprotocol/coda:toolchain-rust-b2e9fa0d25f2f9b7c7f01d6f8727e2c6c7690712
+            - image: codaprotocol/coda:toolchain-rust-8959b8dfda29263d2f88f13a284ef34c9da0a081
         steps:
             - checkout
             - run: git submodule sync && git submodule update --init --recursive
@@ -14,23 +14,49 @@ jobs:
 
     build-wallet:
         macos:
-            xcode: "10.1.0"
-        steps:
-            - checkout
-            - run: cd frontend/wallet && npm install
-            - run:
-                  name: Lint wallet
-                  command: cd frontend/wallet && npm run reformat && git diff --exit-code src
-            - run:
-                  name: Build wallet
-                  command: cd frontend/wallet && npm run build
-
-    lint:
-        docker:
-            - image: codaprotocol/coda:toolchain-0c5f0ad97e6a7a4c50ef6c47b75924a24fa6e05f
+            xcode: "10.2.0"
         steps:
             - checkout
             - run: git submodule sync && git submodule update --init --recursive
+            - run: cd frontend/wallet && yarn
+            - run:
+                  name: Lint wallet
+                  command: cd frontend/wallet && yarn run reformat && git diff --exit-code src
+            - run:
+                  name: Build wallet
+                  command: cd frontend/wallet && yarn run build-ci
+            - run:
+                  name: Test wallet
+                  command: cd frontend/wallet && yarn test
+#            - run:
+#                  name: Build dist wallet
+#                  command: cd frontend/wallet && yarn run dist
+#            - run:
+#                  name: Publish dist wallet
+#                  command: (env HOMEBREW_NO_AUTO_UPDATE=1 brew install awscli) && ./scripts/publish-wallet.sh
+            - run: cd frontend/website && yarn install
+            - run:
+                  name: Decrypt PragmataPro font
+                  command: cd frontend/website && yarn run decrypt-ci
+            - run:
+                  name: Lint website
+                  command: cd frontend/website && yarn run reformat && git diff --exit-code src
+            - run:
+                  name: Build website
+                  command: cd frontend/website && yarn run build && (env HOMEBREW_NO_AUTO_UPDATE=1 brew install pandoc) && node ./lib/js/src/Render.js
+            - run:
+                  name: Deploy staging
+                  command: cd frontend/website && (if [ "$CIRCLE_BRANCH" == "master" ]; then yarn run deploy-ci; fi)
+
+    lint:
+        docker:
+            - image: codaprotocol/coda:toolchain-a667ae88520eaa5acc6eac754dccc724092ff2f2
+        steps:
+            - checkout
+            - run: git submodule sync && git submodule update --init --recursive
+            - run:
+                  name: Check circle CI configuration rendering
+                  command: ./scripts/test.py render --check .circleci/config.yml.jinja .mergify.yml.jinja
             - run:
                   name: OCamlformat (make check-format)
                   command: eval `opam config env` && make check-format
@@ -38,129 +64,69 @@ jobs:
                   name: Snarky tracks master (make check-snarky-submodule)
                   command: make check-snarky-submodule
 
-    build-macos:
-        macos:
-            xcode: "10.1.0"
-        working_directory: /Users/distiller/coda
-        environment:
-            HOMEBREW_LOGS: /Users/distiller/homebrew.log
-            OPAMYES: 1
+    update-branch-protection:
+        docker:
+            - image: python:3
         steps:
             - run:
-                name: Make /nix paths
-                command: |
-                    sudo mkdir /nix
-                    sudo chown distiller /nix
+                name: Install dependencies
+                command: pip install --user requests jinja2
             - checkout
-            - restore_cache:
-                  keys:
-                      - homebrew-v1-{{ checksum "scripts/macos-setup.sh" }}
-                      - homebrew-v1-
-            - restore_cache:
-                  keys:
-                      - opam-v2-{{ checksum "src/opam.export" }}
-                      - opam-v2-
-            - run: git submodule sync && git submodule update --init --recursive
             - run:
-                  name: Download Deps -- make macos-setup-download
-                  command: make macos-setup-download
-            - run:
-                  name: Compile Deps -- make macos-setup-compile
-                  command: make macos-setup-compile
-            - save_cache:
-                  key: homebrew-v1-{{ checksum "scripts/macos-setup.sh" }}
-                  paths:
-                      - "/usr/local/Homebrew"
-                      - "/Users/distiller/Library/Caches/Homebrew"
-            - save_cache:
-                  key: opam-v2-{{ checksum "src/opam.export" }}
-                  paths:
-                      - "/Users/distiller/.opam"
-            - run:
-                  name: Build OCaml
-                  command: eval `opam config env` && make build 2>&1 | tee /tmp/buildocaml.log
-            - run:
-                  name: Record Constraint System Digests
-                  command: src/_build/default/app/cli/src/coda.exe client constraint-system-digests | tee /tmp/constraint-system-digests.log
-            - run:
-                  name: Run all tests (on master)
-                  command: echo "FIXME Tests not yet working on mac"
-    build_dev:
+                  name: Update branch protection rule from test configuration
+                  command: ./scripts/test.py required-status >required_status && cat required_status && ./scripts/update_branch_rule.py required_status
+
+    #build-macos:
+    #    macos:
+    #        xcode: "10.1.0"
+    #    working_directory: /Users/distiller/coda
+    #    environment:
+    #        HOMEBREW_LOGS: /Users/distiller/homebrew.log
+    #        OPAMYES: 1
+    #    steps:
+    #        - run:
+    #            name: Make /nix paths
+    #            command: |
+    #                sudo mkdir /nix
+    #                sudo chown distiller /nix
+    #        - checkout
+    #        - restore_cache:
+    #              keys:
+    #                  - homebrew-v1-{{ checksum "scripts/macos-setup.sh" }}
+    #                  - homebrew-v1-
+    #        - restore_cache:
+    #              keys:
+    #                  - opam-v3-{{ checksum "src/opam.export" }}
+    #                  - opam-v3-
+    #        - run: git submodule sync && git submodule update --init --recursive
+    #        - run:
+    #              name: Download Deps -- make macos-setup-download
+    #              command: ./scripts/skip_if_only_frontend.sh make macos-setup-download
+    #        - run:
+    #              name: Compile Deps -- make macos-setup-compile
+    #              command: ./scripts/skip_if_only_frontend.sh make macos-setup-compile
+    #        - save_cache:
+    #              key: homebrew-v1-{{ checksum "scripts/macos-setup.sh" }}
+    #              paths:
+    #                  - "/usr/local/Homebrew"
+    #                  - "/Users/distiller/Library/Caches/Homebrew"
+    #        - save_cache:
+    #              key: opam-v3-{{ checksum "src/opam.export" }}
+    #              paths:
+    #                  - "/Users/distiller/.opam"
+    #        - run:
+    #              name: Build OCaml
+    #              command: ./scripts/skip_if_only_frontend.sh bash -c 'eval `opam config env` && make build 2>&1 | tee /tmp/buildocaml.log'
+    #        - run:
+    #              name: Record Constraint System Digests
+    #              command: ./scripts/skip_if_only_frontend.sh bash -c 'src/_build/default/app/cli/src/coda.exe client constraint-system-digests | tee /tmp/constraint-system-digests.log'
+    #        - run:
+    #              name: Run all tests (on master)
+    #              command: echo "FIXME Tests not yet working on mac"
+    build-artifacts--testnet_postake:
         resource_class: large
         docker:
-            - image: codaprotocol/coda:toolchain-0c5f0ad97e6a7a4c50ef6c47b75924a24fa6e05f
-        environment:
-            DUNE_PROFILE: dev
-        steps:
-            - checkout
-            - run: mkdir -p /tmp/artifacts
-            - run: git submodule sync && git submodule update --init --recursive
-            - run:
-                  name: Download Stable Proving Keys
-                  command: scripts/getkeys.sh
-            - run:
-                  name: Build OCaml
-                  command: eval `opam config env` && make build 2>&1 | tee /tmp/artifacts/buildocaml.log
-            - run:
-                  name: Build deb Package with keys
-                  command: make deb
-            - run:
-                  name: Store Generated Proving and Verifying Keys
-                  command: make provingkeys
-            - run:
-                  name: Store Genesis Public/Private Keypairs
-                  command: make genesiskeys
-            - run:
-                  name: Upload deb to repo
-                  command: make publish_deb
-            - run:
-                  name: Record Constraint System Digests
-                  command: src/_build/default/app/cli/src/coda.exe client constraint-system-digests | tee /tmp/artifacts/constraint-system-digests.log
-            - store_artifacts:
-                  path: /tmp/artifacts
-            - run:
-                  name: Copy artifacts to Google Cloud
-                  command: scripts/artifacts.sh
-    build_testnet_posig:
-        resource_class: large
-        docker:
-            - image: codaprotocol/coda:toolchain-0c5f0ad97e6a7a4c50ef6c47b75924a24fa6e05f
-        environment:
-            DUNE_PROFILE: testnet_posig
-        steps:
-            - checkout
-            - run: mkdir -p /tmp/artifacts
-            - run: git submodule sync && git submodule update --init --recursive
-            - run:
-                  name: Download Stable Proving Keys
-                  command: scripts/getkeys.sh
-            - run:
-                  name: Build OCaml
-                  command: eval `opam config env` && make build 2>&1 | tee /tmp/artifacts/buildocaml.log
-            - run:
-                  name: Build deb Package with keys
-                  command: make deb
-            - run:
-                  name: Store Generated Proving and Verifying Keys
-                  command: make provingkeys
-            - run:
-                  name: Store Genesis Public/Private Keypairs
-                  command: make genesiskeys
-            - run:
-                  name: Upload deb to repo
-                  command: make publish_deb
-            - run:
-                  name: Record Constraint System Digests
-                  command: src/_build/default/app/cli/src/coda.exe client constraint-system-digests | tee /tmp/artifacts/constraint-system-digests.log
-            - store_artifacts:
-                  path: /tmp/artifacts
-            - run:
-                  name: Copy artifacts to Google Cloud
-                  command: scripts/artifacts.sh
-    build_testnet_postake:
-        resource_class: large
-        docker:
-            - image: codaprotocol/coda:toolchain-0c5f0ad97e6a7a4c50ef6c47b75924a24fa6e05f
+            - image: codaprotocol/coda:toolchain-a667ae88520eaa5acc6eac754dccc724092ff2f2
         environment:
             DUNE_PROFILE: testnet_postake
         steps:
@@ -169,70 +135,70 @@ jobs:
             - run: git submodule sync && git submodule update --init --recursive
             - run:
                   name: Download Stable Proving Keys
-                  command: scripts/getkeys.sh
+                  command: ./scripts/skip_if_only_frontend.sh scripts/getkeys.sh
             - run:
                   name: Build OCaml
-                  command: eval `opam config env` && make build 2>&1 | tee /tmp/artifacts/buildocaml.log
+                  command: ./scripts/skip_if_only_frontend.sh bash -c 'eval `opam config env` && make build 2>&1 | tee /tmp/artifacts/buildocaml.log'
             - run:
                   name: Build deb Package with keys
-                  command: make deb
+                  command: ./scripts/skip_if_only_frontend.sh make deb
             - run:
                   name: Store Generated Proving and Verifying Keys
-                  command: make provingkeys
+                  command: ./scripts/skip_if_only_frontend.sh make provingkeys
             - run:
                   name: Store Genesis Public/Private Keypairs
-                  command: make genesiskeys
+                  command: ./scripts/skip_if_only_frontend.sh make genesiskeys
             - run:
                   name: Upload deb to repo
-                  command: make publish_deb
+                  command: ./scripts/skip_if_only_frontend.sh make publish_deb
             - run:
                   name: Record Constraint System Digests
-                  command: src/_build/default/app/cli/src/coda.exe client constraint-system-digests | tee /tmp/artifacts/constraint-system-digests.log
+                  command: ./scripts/skip_if_only_frontend.sh bash -c 'src/_build/default/app/cli/src/coda.exe client constraint-system-digests | tee /tmp/artifacts/constraint-system-digests.log'
             - store_artifacts:
                   path: /tmp/artifacts
             - run:
                   name: Copy artifacts to Google Cloud
-                  command: scripts/artifacts.sh
-    build_testnet_public:
+                  command: ./scripts/skip_if_only_frontend.sh scripts/artifacts.sh
+    build-artifacts--testnet_postake_many_proposers:
         resource_class: large
         docker:
-            - image: codaprotocol/coda:toolchain-0c5f0ad97e6a7a4c50ef6c47b75924a24fa6e05f
+            - image: codaprotocol/coda:toolchain-a667ae88520eaa5acc6eac754dccc724092ff2f2
         environment:
-            DUNE_PROFILE: testnet_public
+            DUNE_PROFILE: testnet_postake_many_proposers
         steps:
             - checkout
             - run: mkdir -p /tmp/artifacts
             - run: git submodule sync && git submodule update --init --recursive
             - run:
                   name: Download Stable Proving Keys
-                  command: scripts/getkeys.sh
+                  command: ./scripts/skip_if_only_frontend.sh scripts/getkeys.sh
             - run:
                   name: Build OCaml
-                  command: eval `opam config env` && make build 2>&1 | tee /tmp/artifacts/buildocaml.log
+                  command: ./scripts/skip_if_only_frontend.sh bash -c 'eval `opam config env` && make build 2>&1 | tee /tmp/artifacts/buildocaml.log'
             - run:
                   name: Build deb Package with keys
-                  command: make deb
+                  command: ./scripts/skip_if_only_frontend.sh make deb
             - run:
                   name: Store Generated Proving and Verifying Keys
-                  command: make provingkeys
+                  command: ./scripts/skip_if_only_frontend.sh make provingkeys
             - run:
                   name: Store Genesis Public/Private Keypairs
-                  command: make genesiskeys
+                  command: ./scripts/skip_if_only_frontend.sh make genesiskeys
             - run:
                   name: Upload deb to repo
-                  command: make publish_deb
+                  command: ./scripts/skip_if_only_frontend.sh make publish_deb
             - run:
                   name: Record Constraint System Digests
-                  command: src/_build/default/app/cli/src/coda.exe client constraint-system-digests | tee /tmp/artifacts/constraint-system-digests.log
+                  command: ./scripts/skip_if_only_frontend.sh bash -c 'src/_build/default/app/cli/src/coda.exe client constraint-system-digests | tee /tmp/artifacts/constraint-system-digests.log'
             - store_artifacts:
                   path: /tmp/artifacts
             - run:
                   name: Copy artifacts to Google Cloud
-                  command: scripts/artifacts.sh
-    build_testnet_postake_snarkless_fake_hash:
+                  command: ./scripts/skip_if_only_frontend.sh scripts/artifacts.sh
+    build-artifacts--testnet_postake_snarkless_fake_hash:
         resource_class: large
         docker:
-            - image: codaprotocol/coda:toolchain-0c5f0ad97e6a7a4c50ef6c47b75924a24fa6e05f
+            - image: codaprotocol/coda:toolchain-a667ae88520eaa5acc6eac754dccc724092ff2f2
         environment:
             DUNE_PROFILE: testnet_postake_snarkless_fake_hash
         steps:
@@ -241,213 +207,234 @@ jobs:
             - run: git submodule sync && git submodule update --init --recursive
             - run:
                   name: Download Stable Proving Keys
-                  command: scripts/getkeys.sh
+                  command: ./scripts/skip_if_only_frontend.sh scripts/getkeys.sh
             - run:
                   name: Build OCaml
-                  command: eval `opam config env` && make build 2>&1 | tee /tmp/artifacts/buildocaml.log
+                  command: ./scripts/skip_if_only_frontend.sh bash -c 'eval `opam config env` && make build 2>&1 | tee /tmp/artifacts/buildocaml.log'
             - run:
                   name: Build deb Package with keys
-                  command: make deb
+                  command: ./scripts/skip_if_only_frontend.sh make deb
             - run:
                   name: Store Generated Proving and Verifying Keys
-                  command: make provingkeys
+                  command: ./scripts/skip_if_only_frontend.sh make provingkeys
             - run:
                   name: Store Genesis Public/Private Keypairs
-                  command: make genesiskeys
+                  command: ./scripts/skip_if_only_frontend.sh make genesiskeys
             - run:
                   name: Upload deb to repo
-                  command: make publish_deb
+                  command: ./scripts/skip_if_only_frontend.sh make publish_deb
             - run:
                   name: Record Constraint System Digests
-                  command: src/_build/default/app/cli/src/coda.exe client constraint-system-digests | tee /tmp/artifacts/constraint-system-digests.log
+                  command: ./scripts/skip_if_only_frontend.sh bash -c 'src/_build/default/app/cli/src/coda.exe client constraint-system-digests | tee /tmp/artifacts/constraint-system-digests.log'
             - store_artifacts:
                   path: /tmp/artifacts
             - run:
                   name: Copy artifacts to Google Cloud
-                  command: scripts/artifacts.sh
-
-    test-unit-test:
+                  command: ./scripts/skip_if_only_frontend.sh scripts/artifacts.sh
+    test-unit--test_postake_snarkless:
         resource_class: large
         docker:
-            - image: codaprotocol/coda:toolchain-0c5f0ad97e6a7a4c50ef6c47b75924a24fa6e05f
+            - image: codaprotocol/coda:toolchain-a667ae88520eaa5acc6eac754dccc724092ff2f2
         steps:
             - checkout
             - run: git submodule sync && git submodule update --init --recursive
             - run:
-                  name: Test make test-runtest
-                  command: source ~/.profile && DUNE_PROFILE=test_posig_snarkless MYPROCS=8 make test-runtest
-    test-fake_hash_full_test:
+                  name: Run unit tests
+                  command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && dune build --profile=test_postake_snarkless -j8 && dune runtest --profile=test_postake_snarkless -j8'
+    test-unit--dev:
         resource_class: large
         docker:
-            - image: codaprotocol/coda:toolchain-0c5f0ad97e6a7a4c50ef6c47b75924a24fa6e05f
+            - image: codaprotocol/coda:toolchain-a667ae88520eaa5acc6eac754dccc724092ff2f2
         steps:
             - checkout
             - run: git submodule sync && git submodule update --init --recursive
             - run:
-                  name: Check .circleci Render
-                  command: make check-render-circleci
-            - run:
-                  name: Build OCaml
-                  command: eval `opam config env` && DUNE_PROFILE=fake_hash make build 2>&1 | tee /tmp/buildocaml.log
-            - run:
-                  name: Running test - Fake Hash | full-test
-                  command: source ~/.profile && export DUNE_PROFILE=fake_hash && source scripts/test_all.sh && cd src/ && 'run_integration_test' 'full-test'
-            
-    test-posig_integration_tests:
+                  name: Run unit tests
+                  command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && dune build --profile=dev -j8 && dune runtest --profile=dev -j8'
+    test--fake_hash:
         resource_class: large
         docker:
-            - image: codaprotocol/coda:toolchain-0c5f0ad97e6a7a4c50ef6c47b75924a24fa6e05f
+            - image: codaprotocol/coda:toolchain-a667ae88520eaa5acc6eac754dccc724092ff2f2
         steps:
             - checkout
             - run: git submodule sync && git submodule update --init --recursive
             - run:
-                  name: Check .circleci Render
-                  command: make check-render-circleci
-            - run:
-                  name: Build OCaml
-                  command: eval `opam config env` && DUNE_PROFILE=test_posig_snarkless make build 2>&1 | tee /tmp/buildocaml.log
-            - run:
-                  name: Running test - Proof of Signature Tests | full-test
-                  command: source ~/.profile && export DUNE_PROFILE=test_posig_snarkless && source scripts/test_all.sh && cd src/ && 'run_integration_test' 'full-test'
-            
-            - run:
-                  name: Running test - Proof of Signature Tests | transaction-snark-profiler -check-only
-                  command: source ~/.profile && export DUNE_PROFILE=test_posig_snarkless && source scripts/test_all.sh && cd src/ && 'run_integration_test' 'transaction-snark-profiler -check-only'
-            
-            - run:
-                  name: Running test - Proof of Signature Tests | coda-peers-test
-                  command: source ~/.profile && export DUNE_PROFILE=test_posig_snarkless && source scripts/test_all.sh && cd src/ && 'run_integration_test' 'coda-peers-test'
-            
-            - run:
-                  name: Running test - Proof of Signature Tests | coda-transitive-peers-test
-                  command: source ~/.profile && export DUNE_PROFILE=test_posig_snarkless && source scripts/test_all.sh && cd src/ && 'run_integration_test' 'coda-transitive-peers-test'
-            
-            - run:
-                  name: Running test - Proof of Signature Tests | coda-block-production-test
-                  command: source ~/.profile && export DUNE_PROFILE=test_posig_snarkless && source scripts/test_all.sh && cd src/ && 'run_integration_test' 'coda-block-production-test'
-            
-            - run:
-                  name: Running test - Proof of Signature Tests | coda-shared-prefix-test -who-proposes 0
-                  command: source ~/.profile && export DUNE_PROFILE=test_posig_snarkless && source scripts/test_all.sh && cd src/ && 'run_integration_test' 'coda-shared-prefix-test -who-proposes 0'
-            
-            - run:
-                  name: Running test - Proof of Signature Tests | coda-shared-prefix-test -who-proposes 1
-                  command: source ~/.profile && export DUNE_PROFILE=test_posig_snarkless && source scripts/test_all.sh && cd src/ && 'run_integration_test' 'coda-shared-prefix-test -who-proposes 1'
-            
-            - run:
-                  name: Running test - Proof of Signature Tests | coda-shared-state-test
-                  command: source ~/.profile && export DUNE_PROFILE=test_posig_snarkless && source scripts/test_all.sh && cd src/ && 'run_integration_test' 'coda-shared-state-test'
-            
-    test-postake_integration_tests:
+                  name: Running test -- fake_hash:full-test
+                  command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run "fake_hash:full-test"'
+            - store_artifacts:
+                  path: test_logs
+    test--test_postake:
         resource_class: large
         docker:
-            - image: codaprotocol/coda:toolchain-0c5f0ad97e6a7a4c50ef6c47b75924a24fa6e05f
+            - image: codaprotocol/coda:toolchain-a667ae88520eaa5acc6eac754dccc724092ff2f2
         steps:
             - checkout
             - run: git submodule sync && git submodule update --init --recursive
             - run:
-                  name: Check .circleci Render
-                  command: make check-render-circleci
-            - run:
-                  name: Build OCaml
-                  command: eval `opam config env` && DUNE_PROFILE=test_postake_snarkless make build 2>&1 | tee /tmp/buildocaml.log
-            - run:
-                  name: Running test - Proof of Stake Tests | full-test
-                  command: source ~/.profile && export DUNE_PROFILE=test_postake_snarkless && source scripts/test_all.sh && cd src/ && 'run_integration_test' 'full-test'
-            
-            - run:
-                  name: Running test - Proof of Stake Tests | transaction-snark-profiler -check-only
-                  command: source ~/.profile && export DUNE_PROFILE=test_postake_snarkless && source scripts/test_all.sh && cd src/ && 'run_integration_test' 'transaction-snark-profiler -check-only'
-            
-    test-postake_split_integration_tests:
+                  name: Running test -- test_postake:transaction-snark-profiler -check-only
+                  command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run "test_postake:transaction-snark-profiler -check-only"'
+            - store_artifacts:
+                  path: test_logs
+    test--test_postake_bootstrap:
         resource_class: large
         docker:
-            - image: codaprotocol/coda:toolchain-0c5f0ad97e6a7a4c50ef6c47b75924a24fa6e05f
+            - image: codaprotocol/coda:toolchain-a667ae88520eaa5acc6eac754dccc724092ff2f2
         steps:
             - checkout
             - run: git submodule sync && git submodule update --init --recursive
             - run:
-                  name: Check .circleci Render
-                  command: make check-render-circleci
+                  name: Running test -- test_postake_bootstrap:coda-bootstrap-test
+                  command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run "test_postake_bootstrap:coda-bootstrap-test"'
             - run:
-                  name: Build OCaml
-                  command: eval `opam config env` && DUNE_PROFILE=test_postake_split_snarkless make build 2>&1 | tee /tmp/buildocaml.log
-            - run:
-                  name: Running test - Proof of Stake (split stake) Tests | coda-peers-test
-                  command: source ~/.profile && export DUNE_PROFILE=test_postake_split_snarkless && source scripts/test_all.sh && cd src/ && 'run_integration_test' 'coda-peers-test'
-            
-            - run:
-                  name: Running test - Proof of Stake (split stake) Tests | coda-transitive-peers-test
-                  command: source ~/.profile && export DUNE_PROFILE=test_postake_split_snarkless && source scripts/test_all.sh && cd src/ && 'run_integration_test' 'coda-transitive-peers-test'
-            
-            - run:
-                  name: Running test - Proof of Stake (split stake) Tests | coda-block-production-test
-                  command: source ~/.profile && export DUNE_PROFILE=test_postake_split_snarkless && source scripts/test_all.sh && cd src/ && 'run_integration_test' 'coda-block-production-test'
-            
-            - run:
-                  name: Running test - Proof of Stake (split stake) Tests | coda-shared-prefix-test -who-proposes 0
-                  command: source ~/.profile && export DUNE_PROFILE=test_postake_split_snarkless && source scripts/test_all.sh && cd src/ && 'run_integration_test' 'coda-shared-prefix-test -who-proposes 0'
-            
-            - run:
-                  name: Running test - Proof of Stake (split stake) Tests | coda-shared-prefix-test -who-proposes 1
-                  command: source ~/.profile && export DUNE_PROFILE=test_postake_split_snarkless && source scripts/test_all.sh && cd src/ && 'run_integration_test' 'coda-shared-prefix-test -who-proposes 1'
-            
-            - run:
-                  name: Running test - Proof of Stake (split stake) Tests | coda-shared-state-test
-                  command: source ~/.profile && export DUNE_PROFILE=test_postake_split_snarkless && source scripts/test_all.sh && cd src/ && 'run_integration_test' 'coda-shared-state-test'
-            
-    test-withsnark-sig:
+                  name: Running test -- test_postake_bootstrap:coda-long-fork -num-proposers 2
+                  command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run "test_postake_bootstrap:coda-long-fork -num-proposers 2"'
+            - store_artifacts:
+                  path: test_logs
+    test--test_postake_catchup:
         resource_class: large
         docker:
-            - image: codaprotocol/coda:toolchain-0c5f0ad97e6a7a4c50ef6c47b75924a24fa6e05f
+            - image: codaprotocol/coda:toolchain-a667ae88520eaa5acc6eac754dccc724092ff2f2
         steps:
             - checkout
             - run: git submodule sync && git submodule update --init --recursive
             - run:
-                  name: Check .circleci Render
-                  command: make check-render-circleci
-            - run:
-                  name: Build OCaml
-                  command: eval `opam config env` && DUNE_PROFILE=test_posig make build 2>&1 | tee /tmp/buildocaml.log
-            - run:
-                  name: Running test - Full test with SNARK (sig) | full-test
-                  command: source ~/.profile && export DUNE_PROFILE=test_posig && source scripts/test_all.sh && cd src/ && 'run_integration_test' 'full-test'
-            
-    test-withsnark-stake:
+                  name: Running test -- test_postake_catchup:coda-restart-node-test
+                  command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run "test_postake_catchup:coda-restart-node-test"'
+            - store_artifacts:
+                  path: test_logs
+    test--test_postake_five_even_snarkless:
         resource_class: large
         docker:
-            - image: codaprotocol/coda:toolchain-0c5f0ad97e6a7a4c50ef6c47b75924a24fa6e05f
+            - image: codaprotocol/coda:toolchain-a667ae88520eaa5acc6eac754dccc724092ff2f2
         steps:
             - checkout
             - run: git submodule sync && git submodule update --init --recursive
             - run:
-                  name: Check .circleci Render
-                  command: make check-render-circleci
+                  name: Running test -- test_postake_five_even_snarkless:coda-shared-prefix-multiproposer-test -num-proposers 5
+                  command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run "test_postake_five_even_snarkless:coda-shared-prefix-multiproposer-test -num-proposers 5"'
+            - store_artifacts:
+                  path: test_logs
+    test--test_postake_five_even_txns:
+        resource_class: large
+        docker:
+            - image: codaprotocol/coda:toolchain-a667ae88520eaa5acc6eac754dccc724092ff2f2
+        steps:
+            - checkout
+            - run: git submodule sync && git submodule update --init --recursive
             - run:
-                  name: Build OCaml
-                  command: eval `opam config env` && DUNE_PROFILE=test_postake make build 2>&1 | tee /tmp/buildocaml.log
+                  name: Running test -- test_postake_five_even_txns:coda-shared-prefix-multiproposer-test -num-proposers 5 -payments
+                  command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run "test_postake_five_even_txns:coda-shared-prefix-multiproposer-test -num-proposers 5 -payments"'
+            - store_artifacts:
+                  path: test_logs
+    test--test_postake_holy_grail:
+        resource_class: large
+        docker:
+            - image: codaprotocol/coda:toolchain-a667ae88520eaa5acc6eac754dccc724092ff2f2
+        steps:
+            - checkout
+            - run: git submodule sync && git submodule update --init --recursive
             - run:
-                  name: Running test - Full test with SNARK (stake) | full-test
-                  command: source ~/.profile && export DUNE_PROFILE=test_postake && source scripts/test_all.sh && cd src/ && 'run_integration_test' 'full-test'
-            
+                  name: Running test -- test_postake_holy_grail:coda-restarts-and-txns-holy-grail -num-proposers 5
+                  command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run "test_postake_holy_grail:coda-restarts-and-txns-holy-grail -num-proposers 5"'
+            - run:
+                  name: Running test -- test_postake_holy_grail:coda-long-fork -num-proposers 5
+                  command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run "test_postake_holy_grail:coda-long-fork -num-proposers 5"'
+            - store_artifacts:
+                  path: test_logs
+    test--test_postake_snarkless:
+        resource_class: large
+        docker:
+            - image: codaprotocol/coda:toolchain-a667ae88520eaa5acc6eac754dccc724092ff2f2
+        steps:
+            - checkout
+            - run: git submodule sync && git submodule update --init --recursive
+            - run:
+                  name: Running test -- test_postake_snarkless:full-test
+                  command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run "test_postake_snarkless:full-test"'
+            - run:
+                  name: Running test -- test_postake_snarkless:transaction-snark-profiler
+                  command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run "test_postake_snarkless:transaction-snark-profiler"'
+            - store_artifacts:
+                  path: test_logs
+    test--test_postake_split:
+        resource_class: large
+        docker:
+            - image: codaprotocol/coda:toolchain-a667ae88520eaa5acc6eac754dccc724092ff2f2
+        steps:
+            - checkout
+            - run: git submodule sync && git submodule update --init --recursive
+            - run:
+                  name: Running test -- test_postake_split:coda-shared-prefix-multiproposer-test -num-proposers 2
+                  command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run "test_postake_split:coda-shared-prefix-multiproposer-test -num-proposers 2"'
+            - store_artifacts:
+                  path: test_logs
+    test--test_postake_split_snarkless:
+        resource_class: large
+        docker:
+            - image: codaprotocol/coda:toolchain-a667ae88520eaa5acc6eac754dccc724092ff2f2
+        steps:
+            - checkout
+            - run: git submodule sync && git submodule update --init --recursive
+            - run:
+                  name: Running test -- test_postake_split_snarkless:coda-peers-test
+                  command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run "test_postake_split_snarkless:coda-peers-test"'
+            - run:
+                  name: Running test -- test_postake_split_snarkless:coda-transitive-peers-test
+                  command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run "test_postake_split_snarkless:coda-transitive-peers-test"'
+            - run:
+                  name: Running test -- test_postake_split_snarkless:coda-block-production-test
+                  command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run "test_postake_split_snarkless:coda-block-production-test"'
+            - run:
+                  name: Running test -- test_postake_split_snarkless:coda-shared-prefix-test -who-proposes 0
+                  command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run "test_postake_split_snarkless:coda-shared-prefix-test -who-proposes 0"'
+            - run:
+                  name: Running test -- test_postake_split_snarkless:coda-shared-prefix-test -who-proposes 1
+                  command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run "test_postake_split_snarkless:coda-shared-prefix-test -who-proposes 1"'
+            - run:
+                  name: Running test -- test_postake_split_snarkless:coda-restart-node-test
+                  command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run "test_postake_split_snarkless:coda-restart-node-test"'
+            - store_artifacts:
+                  path: test_logs
+    test--test_postake_txns:
+        resource_class: large
+        docker:
+            - image: codaprotocol/coda:toolchain-a667ae88520eaa5acc6eac754dccc724092ff2f2
+        steps:
+            - checkout
+            - run: git submodule sync && git submodule update --init --recursive
+            - run:
+                  name: Running test -- test_postake_txns:coda-shared-state-test
+                  command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run "test_postake_txns:coda-shared-state-test"'
+            - run:
+                  name: Running test -- test_postake_txns:coda-batch-payment-test
+                  command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run "test_postake_txns:coda-batch-payment-test"'
+            - store_artifacts:
+                  path: test_logs
 
 workflows:
     version: 2
     coda_parallel:
         jobs:
             - lint
-            - build-macos
-            - build_dev
-            - build_testnet_posig
-            - build_testnet_postake
-            - build_testnet_public
-            - build_testnet_postake_snarkless_fake_hash
-            - test-fake_hash_full_test
-            - test-posig_integration_tests
-            - test-postake_integration_tests
-            - test-postake_split_integration_tests
-            - test-withsnark-sig
-            - test-withsnark-stake
-            - test-unit-test
+            - update-branch-protection:
+                filters:
+                  branches:
+                    only: master
             - tracetool
             - build-wallet
+            - build-artifacts--testnet_postake
+            - build-artifacts--testnet_postake_many_proposers
+            - build-artifacts--testnet_postake_snarkless_fake_hash
+            - test-unit--test_postake_snarkless
+            - test-unit--dev
+            - test--fake_hash
+            - test--test_postake
+            - test--test_postake_bootstrap
+            - test--test_postake_catchup
+            - test--test_postake_five_even_snarkless
+            - test--test_postake_five_even_txns
+            - test--test_postake_holy_grail
+            - test--test_postake_snarkless
+            - test--test_postake_split
+            - test--test_postake_split_snarkless
+            - test--test_postake_txns

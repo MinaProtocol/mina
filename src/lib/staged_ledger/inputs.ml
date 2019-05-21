@@ -15,7 +15,7 @@ module type S = sig
   module Coinbase :
     Coda_pow.Coinbase_intf
     with type public_key := Compressed_public_key.t
-     and type fee_transfer := Fee_transfer.single
+     and type fee_transfer := Fee_transfer.Single.t
 
   module Transaction :
     Coda_pow.Transaction_intf
@@ -31,9 +31,21 @@ module type S = sig
     val of_ledger_hash : Ledger_hash.t -> t
   end
 
+  module Pending_coinbase_hash : Coda_pow.Pending_coinbase_hash_intf
+
+  module Pending_coinbase :
+    Coda_pow.Pending_coinbase_intf
+    with type pending_coinbase_hash := Pending_coinbase_hash.t
+     and type coinbase := Coinbase.t
+
+  module Pending_coinbase_stack_state :
+    Coda_pow.Pending_coinbase_stack_state_intf
+    with type pending_coinbase_stack := Pending_coinbase.Stack.t
+
   module Ledger_proof_statement :
     Coda_pow.Ledger_proof_statement_intf
     with type ledger_hash := Frozen_ledger_hash.t
+     and type pending_coinbase_stack_state := Pending_coinbase_stack_state.t
 
   module Proof : sig
     type t
@@ -50,15 +62,14 @@ module type S = sig
        and type proof := Proof.t
        and type sok_digest := Sok_message.Digest.t
 
-    include Binable.S with type t := t
-
     include Sexpable.S with type t := t
+
+    val statement : t -> Ledger_proof_statement.t
   end
 
   module Ledger_proof_verifier :
     Ledger_proof_verifier_intf
-    with type statement := Ledger_proof_statement.t
-     and type message := Sok_message.t
+    with type message := Sok_message.t
      and type ledger_proof := Ledger_proof.t
 
   module Staged_ledger_aux_hash : Coda_pow.Staged_ledger_aux_hash_intf
@@ -67,6 +78,8 @@ module type S = sig
     Coda_pow.Staged_ledger_hash_intf
     with type ledger_hash := Ledger_hash.t
      and type staged_ledger_aux_hash := Staged_ledger_aux_hash.t
+     and type pending_coinbase := Pending_coinbase.t
+     and type pending_coinbase_hash := Pending_coinbase_hash.t
 
   module Transaction_snark_work :
     Coda_pow.Transaction_snark_work_intf
@@ -83,7 +96,7 @@ module type S = sig
                 User_command.With_valid_signature.t
      and type public_key := Compressed_public_key.t
      and type staged_ledger_hash := Staged_ledger_hash.t
-     and type fee_transfer_single := Fee_transfer.single
+     and type fee_transfer_single := Fee_transfer.Single.t
 
   module Account : sig
     type t
@@ -105,7 +118,7 @@ module type S = sig
      and type ledger_hash := Ledger_hash.t
 
   module Sparse_ledger : sig
-    type t [@@deriving sexp, bin_io]
+    type t
 
     val of_ledger_subset_exn : Ledger.t -> Compressed_public_key.t list -> t
 
@@ -113,4 +126,7 @@ module type S = sig
 
     val apply_transaction_exn : t -> Transaction.t -> t
   end
+
+  module Transaction_witness :
+    Transaction_witness_intf with type sparse_ledger := Sparse_ledger.t
 end

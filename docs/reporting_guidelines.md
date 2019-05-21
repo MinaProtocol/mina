@@ -12,7 +12,7 @@ In your report please include:
 * Names (legal, nicknames, or pseudonyms) of any individuals involved.
   * If there were other witnesses besides you, please try to include them as well.
 * When and where the incident occurred. Please be as specific as possible.
-* Your account of what occurred. 
+* Your account of what occurred.
   * If there is a publicly available record (e.g. a mailing list archive or a public IRC logger) please include a link.
 * Any extra context you believe existed for the incident.
 * If you believe this incident is ongoing.

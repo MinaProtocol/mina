@@ -1,7 +1,22 @@
 open Core_kernel
 
 (* A non-empty list is a tuple of the head and the rest (as a list) *)
-type 'a t = 'a * 'a list [@@deriving sexp, compare, eq, hash, bin_io]
+module Stable = struct
+  (* underlying type has a parameter, so don't register versions *)
+  module V1 = struct
+    module T = struct
+      type 'a t = 'a * 'a list
+      [@@deriving sexp, compare, eq, hash, bin_io, version]
+    end
+
+    include T
+  end
+
+  module Latest = V1
+end
+
+(* bin_io omitted intentionally *)
+type 'a t = 'a Stable.Latest.t [@@deriving sexp, compare, eq, hash]
 
 let init x xs = (x, xs)
 
@@ -33,6 +48,8 @@ module C = Container.Make (struct
   let fold (x, xs) ~init ~f = List.fold xs ~init:(f init x) ~f
 
   let iter = `Custom (fun (x, xs) ~f -> f x ; List.iter xs ~f)
+
+  let length = `Define_using_fold
 end)
 
 let find = C.find
@@ -50,9 +67,12 @@ let to_list (x, xs) = x :: xs
 let append (x, xs) ys = (x, xs @ to_list ys)
 
 let take (x, xs) = function
-  | 0 -> None
-  | 1 -> Some (x, [])
-  | n -> Some (x, List.take xs (n - 1))
+  | 0 ->
+      None
+  | 1 ->
+      Some (x, [])
+  | n ->
+      Some (x, List.take xs (n - 1))
 
 let min_elt ~compare (x, xs) =
   Option.value_map ~default:x (List.min_elt ~compare xs) ~f:(fun mininum ->

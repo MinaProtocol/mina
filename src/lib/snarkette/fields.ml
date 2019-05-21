@@ -29,11 +29,13 @@ end
 module type Fp_intf = sig
   include Intf
 
+  include Stringable.S with type t := t
+
   type nat
 
-  val of_int : int -> t
+  include Stringable.S with type t := t
 
-  val of_string : string -> t
+  val of_int : int -> t
 
   val of_bits : bool list -> t option
 
@@ -68,6 +70,7 @@ module Make_fp
     end) : Fp_intf with type nat := N.t = struct
   include Info
 
+  (* TODO version *)
   type t = N.t [@@deriving eq, bin_io, sexp, compare]
 
   let to_bigint = Fn.id
@@ -81,7 +84,8 @@ module Make_fp
   let gen =
     let length_in_int32s = (length_in_bits + 31) / 32 in
     Quickcheck.Generator.(
-      map (list_with_length length_in_int32s Int32.gen) ~f:(fun xs ->
+      map (list_with_length length_in_int32s Int32.quickcheck_generator)
+        ~f:(fun xs ->
           List.foldi xs ~init:zero ~f:(fun i acc x ->
               N.log_or acc
                 (N.shift_left (N.of_int (Int32.to_int_exn x)) (32 * i)) ) ))
@@ -99,7 +103,8 @@ module Make_fp
 
   let of_bits bits =
     let rec go acc i = function
-      | [] -> acc
+      | [] ->
+          acc
       | b :: bs ->
           let acc = if b then N.log_or acc (N.shift_left one i) else acc in
           go acc (i + 1) bs
@@ -113,11 +118,14 @@ module Make_fp
 
   let of_string = N.of_string
 
+  let to_string = N.to_string
+
   let rec extended_euclidean a b =
     if equal b zero then (a, one, zero)
     else
-      match extended_euclidean b (a % b) with d, x, y ->
-        (d, y, x - (a // b * y))
+      match extended_euclidean b (a % b) with
+      | d, x, y ->
+          (d, y, x - (a // b * y))
 
   let ( + ) x y = (x + y) % Info.order
 

@@ -12,9 +12,19 @@ module type Transition_frontier_intf = sig
 
   module Extensions : sig
     module Work : sig
-      type t [@@deriving sexp, bin_io]
+      type t [@@deriving sexp]
 
-      include Hashable.S_binable with type t := t
+      module Stable :
+        sig
+          module V1 : sig
+            type t [@@deriving sexp, bin_io]
+
+            include Hashable.S_binable with type t := t
+          end
+        end
+        with type V1.t = t
+
+      include Hashable.S with type t := t
     end
   end
 
@@ -34,7 +44,8 @@ module type S = sig
   type t [@@deriving bin_io]
 
   val create :
-       parent_log:Logger.t
+       logger:Logger.t
+    -> trust_system:Trust_system.t
     -> frontier_broadcast_pipe:transition_frontier Option.t
                                Broadcast_pipe.Reader.t
     -> t
@@ -59,9 +70,19 @@ end) (Fee : sig
 
   include Comparable.S with type t := t
 end) (Work : sig
-  type t [@@deriving sexp, bin_io]
+  type t [@@deriving sexp]
 
-  include Hashable.S_binable with type t := t
+  module Stable :
+    sig
+      module V1 : sig
+        type t [@@deriving sexp, bin_io]
+
+        include Hashable.S_binable with type t := t
+      end
+    end
+    with type V1.t = t
+
+  include Hashable.S with type t := t
 end)
 (Transition_frontier : Transition_frontier_intf
                        with module Extensions.Work = Work) :
@@ -87,9 +108,10 @@ end)
     let fee (t : t) = t.fee
   end
 
+  (* TODO : Version this type *)
   type t =
-    { snark_table: Priced_proof.t Work.Table.t
-    ; mutable ref_table: int Work.Table.t option }
+    { snark_table: Priced_proof.t Work.Stable.V1.Table.t
+    ; mutable ref_table: int Work.Stable.V1.Table.t option }
   [@@deriving sexp, bin_io]
 
   (* shadow generated bin_io code so that ref table is always None when written *)
@@ -136,7 +158,7 @@ end)
     in
     Deferred.don't_wait_for tf_deferred
 
-  let create ~parent_log:_ ~frontier_broadcast_pipe =
+  let create ~logger:_ ~trust_system:_ ~frontier_broadcast_pipe =
     let t = {snark_table= Work.Table.create (); ref_table= None} in
     listen_to_frontier_broadcast_pipe frontier_broadcast_pipe t ;
     t
@@ -145,11 +167,14 @@ end)
     when the refcount for the given work is 0 *)
   let work_is_referenced t work =
     match t.ref_table with
-    | None -> true
+    | None ->
+        true
     | Some ref_table -> (
       match Work.Table.find ref_table work with
-      | None -> false
-      | Some _ -> true )
+      | None ->
+          false
+      | Some _ ->
+          true )
 
   let add_snark t ~work ~proof ~fee =
     if work_is_referenced t work then
@@ -159,7 +184,8 @@ end)
         `Rebroadcast
       in
       match Work.Table.find t.snark_table work with
-      | None -> update_and_rebroadcast ()
+      | None ->
+          update_and_rebroadcast ()
       | Some prev ->
           if Fee.( < ) fee prev.fee then update_and_rebroadcast ()
           else `Don't_rebroadcast
@@ -179,7 +205,23 @@ let%test_module "random set test" =
 
       let verify _ _ = return true
 
-      let gen = Int.gen
+      let gen = Int.quickcheck_generator
+    end
+
+    module Mock_work = struct
+      (* no bin_io except in Stable versions *)
+      module T = struct
+        type t = Int.t [@@deriving sexp, hash, compare]
+
+        let gen = Int.quickcheck_generator
+      end
+
+      include T
+      include Hashable.Make (T)
+
+      module Stable = struct
+        module V1 = Int
+      end
     end
 
     module Mock_transition_frontier = struct
@@ -188,7 +230,7 @@ let%test_module "random set test" =
       let create () : t = ""
 
       module Extensions = struct
-        module Work = Int
+        module Work = Mock_work
       end
 
       let snark_pool_refcount_pipe _ =
@@ -198,7 +240,6 @@ let%test_module "random set test" =
         reader
     end
 
-    module Mock_work = Int
     module Mock_fee = Int
 
     module Mock_Priced_proof = struct
@@ -217,14 +258,16 @@ let%test_module "random set test" =
     let gen =
       let open Quickcheck.Generator.Let_syntax in
       let gen_entry () =
-        Quickcheck.Generator.tuple3 Mock_work.gen Mock_work.gen Mock_fee.gen
+        Quickcheck.Generator.tuple3 Mock_work.gen Mock_work.gen
+          Mock_fee.quickcheck_generator
       in
       let%map sample_solved_work = Quickcheck.Generator.list (gen_entry ()) in
       let frontier_broadcast_pipe_r, _ =
         Broadcast_pipe.create (Some (Mock_transition_frontier.create ()))
       in
       let pool =
-        Mock_snark_pool.create ~parent_log:(Logger.create ())
+        Mock_snark_pool.create ~logger:(Logger.null ())
+          ~trust_system:(Trust_system.null ())
           ~frontier_broadcast_pipe:frontier_broadcast_pipe_r
       in
       List.iter sample_solved_work ~f:(fun (work, proof, fee) ->
@@ -235,7 +278,8 @@ let%test_module "random set test" =
                    the snark pool, the fee of the work is at most the minimum \
                    of those fees" =
       let gen_entry () =
-        Quickcheck.Generator.tuple2 Mock_proof.gen Mock_fee.gen
+        Quickcheck.Generator.tuple2 Mock_proof.gen
+          Mock_fee.quickcheck_generator
       in
       Quickcheck.test
         ~sexp_of:
@@ -267,8 +311,9 @@ let%test_module "random set test" =
             * Mock_fee.t
             * Mock_proof.t
             * Mock_proof.t]
-        (Quickcheck.Generator.tuple6 gen Mock_work.gen Mock_fee.gen
-           Mock_fee.gen Mock_proof.gen Mock_proof.gen)
+        (Quickcheck.Generator.tuple6 gen Mock_work.gen
+           Mock_fee.quickcheck_generator Mock_fee.quickcheck_generator
+           Mock_proof.gen Mock_proof.gen)
         ~f:(fun (t, work, fee_1, fee_2, cheap_proof, expensive_proof) ->
           Mock_snark_pool.remove_solved_work t work ;
           let expensive_fee = max fee_1 fee_2

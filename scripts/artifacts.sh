@@ -10,6 +10,12 @@ if [[ ! "$CIRCLE_BUILD_NUM" ]]; then
     exit 0
 fi
 
+# No creds
+if [[ -z "$JSON_GCLOUD_CREDENTIALS" || "$JSON_GCLOUD_CREDENTIALS" == "" ]]; then
+    echo "Skipping artifact upload as creds are missing"
+    exit 0
+fi
+
 do_copy () {
     # GC credentials
     echo $JSON_GCLOUD_CREDENTIALS > google_creds.json
@@ -27,7 +33,6 @@ do_copy () {
 }
 
 case $CIRCLE_JOB in
-  "build_testnet_postake" | "build_testnet_postake_snarkless_fake_hash") do_copy;;
+  "build-artifacts--testnet_postake" | "build-artifacts--testnet_postake_snarkless_fake_hash") do_copy;;
    *) echo "Not an active testnet job, stopping." ; exit 0 ;;
 esac
-

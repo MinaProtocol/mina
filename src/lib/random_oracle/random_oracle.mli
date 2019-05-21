@@ -2,7 +2,18 @@ open Core_kernel
 open Snark_params
 
 module Digest : sig
-  type t = private string [@@deriving sexp, bin_io, compare, hash, yojson]
+  type t = private string [@@deriving sexp, compare, hash, yojson]
+
+  module Stable : sig
+    module V1 : sig
+      type nonrec t = t
+      [@@deriving bin_io, sexp, compare, hash, yojson, version {numbered}]
+
+      include Comparable.S with type t := t
+    end
+
+    module Latest = V1
+  end
 
   include Comparable.S with type t := t
 
@@ -19,6 +30,8 @@ module Digest : sig
   val length_in_triples : int
 
   val of_string : string -> t
+
+  val to_string : t -> string
 
   val to_bits : t -> bool list
 

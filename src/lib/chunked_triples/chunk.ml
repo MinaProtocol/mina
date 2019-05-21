@@ -24,14 +24,22 @@ let to_int t =
   let shift_and_add accum triple =
     let n =
       match triple with
-      | false, false, false -> 0
-      | false, false, true -> 1
-      | false, true, false -> 2
-      | false, true, true -> 3
-      | true, false, false -> 4
-      | true, false, true -> 5
-      | true, true, false -> 6
-      | true, true, true -> 7
+      | false, false, false ->
+          0
+      | false, false, true ->
+          1
+      | false, true, false ->
+          2
+      | false, true, true ->
+          3
+      | true, false, false ->
+          4
+      | true, false, true ->
+          5
+      | true, true, false ->
+          6
+      | true, true, true ->
+          7
     in
     (accum lsl 3) + n
   in

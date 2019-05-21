@@ -5,19 +5,22 @@ open Tuple_lib
 open Fold_lib
 
 module Time : sig
-  type t [@@deriving sexp, eq]
+  type t [@@deriving sexp, eq, yojson]
 
   type t0 = t
 
   module Controller : sig
-    type t = unit
+    type t
 
-    val create : unit -> t
+    val create : t -> t
+
+    val basic : t
   end
 
   module Stable : sig
     module V1 : sig
-      type nonrec t = t [@@deriving sexp, bin_io, compare, eq, hash]
+      type nonrec t = t
+      [@@deriving sexp, bin_io, compare, eq, hash, yojson, version]
     end
   end
 
@@ -107,6 +110,10 @@ module Time : sig
   val to_time : t -> Time.t
 
   val now : Controller.t -> t
+
+  val to_string : t -> string
+
+  val of_string_exn : string -> t
 end
 
 include module type of Time

@@ -3,46 +3,47 @@
 
 open Core
 open Import
-open Snark_params
 open Coda_numbers
-open Tick
 open Module_version
 module Fee = Currency.Fee
 module Payload = User_command_payload
 
+module Poly = struct
+  module Stable = struct
+    module V1 = struct
+      module T = struct
+        type ('payload, 'pk, 'signature) t =
+          {payload: 'payload; sender: 'pk; signature: 'signature}
+        [@@deriving bin_io, compare, eq, sexp, hash, yojson, version]
+      end
+
+      include T
+    end
+
+    module Latest = V1
+  end
+
+  type ('payload, 'pk, 'signature) t =
+        ('payload, 'pk, 'signature) Stable.Latest.t =
+    {payload: 'payload; sender: 'pk; signature: 'signature}
+  [@@deriving eq, sexp, hash, yojson]
+end
+
 module Stable = struct
   module V1 = struct
     module T = struct
-      let version = 1
-
-      type ('payload, 'pk, 'signature) t_ =
-        {payload: 'payload; sender: 'pk; signature: 'signature}
-      [@@deriving bin_io, eq, sexp, hash, yojson]
-
-      type t = (Payload.Stable.V1.t, Public_key.t, Signature.t) t_
-      [@@deriving bin_io, eq, sexp, hash, yojson]
+      type t =
+        ( Payload.Stable.V1.t
+        , Public_key.Stable.V1.t
+        , Signature.Stable.V1.t )
+        Poly.Stable.V1.t
+      [@@deriving bin_io, compare, eq, sexp, hash, yojson, version]
     end
 
     include T
     include Registration.Make_latest_version (T)
-
-    type with_seed = string * t [@@deriving hash]
-
-    let compare ~seed (t : t) (t' : t) =
-      let same_sender = Public_key.equal t.sender t'.sender in
-      let fee_compare =
-        -Fee.compare (Payload.fee t.payload) (Payload.fee t'.payload)
-      in
-      if same_sender then
-        (* We pick the one with a smaller nonce to go first *)
-        let nonce_compare =
-          Account_nonce.compare (Payload.nonce t.payload)
-            (Payload.nonce t'.payload)
-        in
-        if nonce_compare <> 0 then nonce_compare else fee_compare
-      else
-        let hash x = hash_with_seed (seed, x) in
-        if fee_compare <> 0 then fee_compare else hash t - hash t'
+    include Comparable.Make (T)
+    include Hashable.Make (T)
   end
 
   module Latest = V1
@@ -57,11 +58,19 @@ module Stable = struct
   module Registered_V1 = Registrar.Register (V1)
 end
 
-include Stable.Latest
+type t = Stable.Latest.t [@@deriving sexp, yojson, hash]
+
+include Comparable.Make (Stable.Latest)
 
 type value = t
 
-let payload {payload; _} = payload
+let payload Poly.{payload; _} = payload
+
+let fee = Fn.compose Payload.fee payload
+
+let nonce = Fn.compose Payload.nonce payload
+
+let sender t = Public_key.compress Poly.(t.sender)
 
 let accounts_accessed ({payload; sender; _} : value) =
   Public_key.compress sender :: Payload.accounts_accessed payload
@@ -71,32 +80,92 @@ let sign (kp : Signature_keypair.t) (payload : Payload.t) : t =
   ; sender= kp.public_key
   ; signature= Schnorr.sign kp.private_key payload }
 
-let gen ~keys ~max_amount ~max_fee =
-  let open Quickcheck.Generator.Let_syntax in
-  let%map sender_idx = Int.gen_incl 0 (Array.length keys - 1)
-  and receiver_idx = Int.gen_incl 0 (Array.length keys - 1)
-  and fee = Int.gen_incl 0 max_fee >>| Currency.Fee.of_int
-  and amount = Int.gen_incl 1 max_amount >>| Currency.Amount.of_int
-  and memo = String.gen in
-  let sender = keys.(sender_idx) in
-  let receiver = keys.(receiver_idx) in
-  let payload : Payload.t =
-    Payload.create ~fee ~nonce:Account_nonce.zero
-      ~memo:(User_command_memo.create_exn memo)
-      ~body:
-        (Payment
-           { receiver= Public_key.compress receiver.Signature_keypair.public_key
-           ; amount })
-  in
-  sign sender payload
+module For_tests = struct
+  (* Pretend to sign a command. Much faster than actually signing. *)
+  let fake_sign (kp : Signature_keypair.t) (payload : Payload.t) : t =
+    { payload
+    ; sender= kp.public_key
+    ; signature= (kp.private_key, kp.private_key) }
+end
+
+module Gen = struct
+  let gen_inner (sign' : Signature_lib.Keypair.t -> Payload.t -> t) ~key_gen
+      ?(nonce = Account_nonce.zero) ~max_fee create_body =
+    let open Quickcheck.Generator.Let_syntax in
+    let%bind sender, (receiver : Signature_keypair.t) = key_gen
+    and fee = Int.gen_incl 0 max_fee >>| Currency.Fee.of_int
+    and memo = String.quickcheck_generator in
+    let%map body = create_body receiver in
+    let payload : Payload.t =
+      Payload.create ~fee ~nonce
+        ~memo:(User_command_memo.create_exn memo)
+        ~body
+    in
+    sign' sender payload
+
+  let gen ?(sign_type = `Fake) =
+    match sign_type with
+    | `Fake ->
+        gen_inner For_tests.fake_sign
+    | `Real ->
+        gen_inner sign
+
+  let with_random_participants ~keys ~gen =
+    let key_gen = Quickcheck_lib.gen_pair @@ Quickcheck_lib.of_array keys in
+    gen ~key_gen
+
+  module Payment = struct
+    let gen_inner (sign' : Signature_lib.Keypair.t -> Payload.t -> t) ~key_gen
+        ?(nonce = Account_nonce.zero) ~max_amount ~max_fee () =
+      gen_inner sign' ~key_gen ~nonce ~max_fee
+      @@ fun {public_key= receiver; _} ->
+      let open Quickcheck.Generator.Let_syntax in
+      let%map amount = Int.gen_incl 1 max_amount >>| Currency.Amount.of_int in
+      User_command_payload.Body.Payment
+        {receiver= Public_key.compress receiver; amount}
+
+    let gen ?(sign_type = `Fake) =
+      match sign_type with
+      | `Fake ->
+          gen_inner For_tests.fake_sign
+      | `Real ->
+          gen_inner sign
+
+    let gen_with_random_participants ?sign_type ~keys ?nonce ~max_amount
+        ~max_fee =
+      with_random_participants ~keys ~gen:(fun ~key_gen ->
+          gen ?sign_type ~key_gen ?nonce ~max_amount ~max_fee )
+  end
+
+  module Stake_delegation = struct
+    let gen ~key_gen ?nonce ~max_fee () =
+      gen_inner For_tests.fake_sign ~key_gen ?nonce ~max_fee
+        (fun {public_key= new_delegate; _} ->
+          Quickcheck.Generator.return
+          @@ User_command_payload.Body.Stake_delegation
+               (Set_delegate {new_delegate= Public_key.compress new_delegate})
+      )
+
+    let gen_with_random_participants ~keys ?nonce ~max_fee =
+      with_random_participants ~keys ~gen:(gen ?nonce ~max_fee)
+  end
+
+  let payment = Payment.gen
+
+  let payment_with_random_participants = Payment.gen_with_random_participants
+
+  let stake_delegation = Stake_delegation.gen
+
+  let stake_delegation_with_random_participants =
+    Stake_delegation.gen_with_random_participants
+end
 
 module With_valid_signature = struct
   module Stable = struct
     module V1 = struct
       module T = struct
-        let version = 1
-
-        type t = Stable.V1.t [@@deriving sexp, eq, bin_io]
+        type t = Stable.V1.t
+        [@@deriving sexp, eq, bin_io, yojson, version, hash]
       end
 
       include T
@@ -104,7 +173,7 @@ module With_valid_signature = struct
 
       let compare = Stable.V1.compare
 
-      let gen = gen
+      module Gen = Gen
     end
 
     module Latest = V1
@@ -120,6 +189,7 @@ module With_valid_signature = struct
   end
 
   include Stable.Latest
+  include Comparable.Make (Stable.Latest)
 end
 
 [%%if
@@ -130,13 +200,16 @@ let check_signature _ = true
 [%%else]
 
 let check_signature ({payload; sender; signature} : t) =
-  Schnorr.verify signature (Inner_curve.of_affine_coordinates sender) payload
+  Schnorr.verify signature
+    (Snark_params.Tick.Inner_curve.of_affine_coordinates sender)
+    payload
 
 [%%endif]
 
 let gen_test =
   let keys = Array.init 2 ~f:(fun _ -> Signature_keypair.create ()) in
-  gen ~keys ~max_amount:10000 ~max_fee:1000
+  Gen.payment_with_random_participants ~sign_type:`Real ~keys ~max_amount:10000
+    ~max_fee:1000 ()
 
 let%test_unit "completeness" =
   Quickcheck.test ~trials:20 gen_test ~f:(fun t -> assert (check_signature t))

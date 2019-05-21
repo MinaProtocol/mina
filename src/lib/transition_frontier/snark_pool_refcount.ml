@@ -11,9 +11,16 @@ module type Inputs_intf = sig
   module Breadcrumb :
     Transition_frontier_Breadcrumb_intf
     with type state_hash := State_hash.t
-     and type external_transition_verified := External_transition.Verified.t
+     and type mostly_validated_external_transition :=
+                ( [`Time_received] * Truth.true_t
+                , [`Proof] * Truth.true_t
+                , [`Frontier_dependencies] * Truth.true_t
+                , [`Staged_ledger_diff] * Truth.false_t )
+                External_transition.Validation.with_transition
+     and type external_transition_validated := External_transition.Validated.t
      and type staged_ledger := Staged_ledger.t
      and type user_command := User_command.t
+     and type verifier := Verifier.t
 end
 
 module Make (Inputs : Inputs_intf) :
@@ -45,10 +52,10 @@ struct
         match Work.Table.find table work with
         | Some count ->
             Work.Table.set table ~key:work ~data:(count + 1) ;
-            acc || false
+            acc
         | None ->
             Work.Table.set table ~key:work ~data:1 ;
-            acc || true )
+            true )
 
   (** Returns true if this update changed which elements are in the table
   (but not if the same elements exist with a different reference count) *)
@@ -57,20 +64,21 @@ struct
         match Work.Table.find table work with
         | Some 1 ->
             Work.Table.remove table work ;
-            acc || true
+            true
         | Some v ->
             Work.Table.set table ~key:work ~data:(v - 1) ;
-            acc || false
-        | None -> failwith "Removed a breadcrumb we didn't know about" )
+            acc
+        | None ->
+            failwith "Removed a breadcrumb we didn't know about" )
 
   let create () = Work.Table.create ()
 
-  let initial_view = (0, Work.Table.create ())
+  let initial_view () = (0, Work.Table.create ())
 
   let handle_diff t diff =
     let removed, added =
       match (diff : Inputs.Breadcrumb.t Transition_frontier_diff.t) with
-      | New_breadcrumb breadcrumb ->
+      | New_breadcrumb breadcrumb | New_frontier breadcrumb ->
           (0, add_breadcrumb_to_ref_table t breadcrumb)
       | New_best_tip {old_root; new_root; added_to_best_tip_path; garbage; _}
         ->
