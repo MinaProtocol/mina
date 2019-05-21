@@ -107,12 +107,12 @@ module Typeface = {
       (),
     );
 
-  let ibmplexserif = 
+  let ibmplexserif =
     fontFace(
       ~fontFamily="IBM Plex Serif",
       ~src=[
-       "/static/font/IBMPlexSerif-Medium-Latin1.woff2",
-       "/static/font/IBMPlexSerif-Medium-Latin1.woff",
+        "/static/font/IBMPlexSerif-Medium-Latin1.woff2",
+        "/static/font/IBMPlexSerif-Medium-Latin1.woff",
       ],
       ~fontStyle=`normal,
       ~fontWeight=`medium,
