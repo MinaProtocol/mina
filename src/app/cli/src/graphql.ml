@@ -613,18 +613,6 @@ module Make (Commands : Coda_commands.Intf) = struct
                    ~query:Transaction_database.get_later_transactions
                    transaction_database public_key cursor num_to_query) )
 
-    let delegation_status =
-      result_field "delegationStatus"
-        ~args:Arg.[arg "key" ~typ:(non_null string)]
-        ~typ:Types.delegation_update
-        ~resolve:(fun {ctx= coda; _} () public_key ->
-          let open Result.Let_syntax in
-          let%map public_key =
-            Arguments.public_key ~name:"publicKey" public_key
-          in
-          let transaction_database = Program.transaction_database coda in
-          Transaction_database.get_delegator transaction_database public_key )
-
     let initial_peers =
       field "initialPeers"
         ~doc:
