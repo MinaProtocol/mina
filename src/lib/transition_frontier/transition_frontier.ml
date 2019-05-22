@@ -1219,7 +1219,10 @@ struct
                 [ ("garbage", `List (List.map garbage ~f:State_hash.to_yojson))
                 ; ("length_of_garbage", `Int (List.length garbage))
                 ; ( "bad_hashes"
-                  , `List (List.map bad_hashes ~f:State_hash.to_yojson) ) ]
+                  , `List (List.map bad_hashes ~f:State_hash.to_yojson) )
+                ; ( "local_state"
+                  , Consensus.Data.Local_state.to_yojson
+                      t.consensus_local_state ) ]
               "collecting $length_of_garbage nodes rooted from $bad_hashes" ;
             let garbage_breadcrumbs =
               List.map garbage ~f:(fun g ->
