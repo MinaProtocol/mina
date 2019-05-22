@@ -34,7 +34,13 @@ module type Backend_intf = sig
     val is_well_formed : t -> bool
   end
 
-  val hash : a:G1.t -> b:G2.t -> c:G1.t -> h_delta_prime:G2.t -> G1.t
+  val hash :
+       ?message:bool array
+    -> a:G1.t
+    -> b:G2.t
+    -> c:G1.t
+    -> h_delta_prime:G2.t
+    -> G1.t
 
   module Fq_target : sig
     include Fields.Degree_2_extension_intf with type base = Fqe.t
@@ -136,7 +142,7 @@ module Make (Backend : Backend_intf) = struct
       ()
   end
 
-  let verify (vk : Verification_key.Processed.t) input
+  let verify ?message (vk : Verification_key.Processed.t) input
       ({Proof.a; b; c; h_delta_prime; z} as proof) =
     let open Or_error.Let_syntax in
     let%bind () =
@@ -172,7 +178,7 @@ module Make (Backend : Backend_intf) = struct
     in
     let%bind () = check test1 "First pairing check failed" in
     let test2 =
-      let ys = hash ~a ~b ~c ~h_delta_prime in
+      let ys = hash ?message ~a ~b ~c ~h_delta_prime in
       let l =
         Pairing.miller_loop
           (Pairing.G1_precomputation.create ys)
