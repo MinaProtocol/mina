@@ -8,7 +8,7 @@
     "clean": "bsb -clean-world",
     "watch": "bsb -make-world -w",
     "start": "npx reload -d site -p 8000",
-    "dev": "npx concurrently 'bsb -make-world -w' 'npx nodemon ./lib/js/src/Render.js' 'yarn start -w site'",
+    "dev": "npx concurrently 'bsb -make-world -w' 'npx nodemon ./lib/js/src/Render.js' 'npx reload -d site -p 8000 -w site'",
     "reformat": "bsrefmt --in-place src/*.re",
     "deploy-ci": "FIREBASE_TOKEN=\"$FIREBASE_TOKEN\" ./deploy-website.sh ci",
     "decrypt": "cd static/font && unzip PragmataPro.zip",
