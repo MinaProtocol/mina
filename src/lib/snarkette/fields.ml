@@ -178,7 +178,7 @@ module Make_fp
 
     let first f =
       let rec go i = match f i with Some x -> x | None -> go Int.(i + 1) in
-      go 0
+      go 1
 
     let create () =
       let p_minus_one = N.(Info.order - one) in
@@ -201,6 +201,12 @@ module Make_fp
 
   let ( = ) = equal
 
+  let rec pow2 b n = if n > 0 then pow2 (square b) Int.(n - 1) else b
+
+  let%test_unit "pow2" =
+    let b = 7 in
+    [%test_eq: t] (pow2 (of_int b) 3) (of_int Int.(7 ** 8))
+
   let sqrt =
     let pow2_order b =
       loop
@@ -209,7 +215,6 @@ module Make_fp
         (fun (b2m, m) -> (square b2m, Int.succ m))
       |> snd
     in
-    let rec pow2 b n = if n > 0 then pow2 (square b) Int.(n - 1) else b in
     let module Loop_params = struct
       type nonrec t = {z: t; b: t; x: t; v: int}
     end in
@@ -230,11 +235,19 @@ module Make_fp
           (fun {z; b; x; v} ->
             let m = pow2_order b in
             let w = pow2 z Int.(v - m - 1) in
-            {z= square w; b= b * z; x= x * w; v= m} )
+            let z = square w in
+            {z; b= b * z; x= x * w; v= m} )
       in
       x
 
-  let%test_unit "sqrt test" = [%test_eq: t] (of_int 100) (of_int 10)
+  let%test_unit "sqrt test" =
+    let rec mem a = function
+      | [] ->
+          ()
+      | x :: xs -> (
+        try [%test_eq: t] a x with _ -> mem a xs )
+    in
+    mem (sqrt (of_int 100)) [of_int 10; Info.order - of_int 10]
 end
 
 module type Degree_2_extension_intf = sig
