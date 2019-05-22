@@ -55,7 +55,7 @@
       "_build/",
       "node_modules/graphql-faker/dist/index.js",
       "bundle/**/*",
-      "public/*"
+      "public/**/*"
     ],
     "compression": "store",
     "dmg": {
