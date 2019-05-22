@@ -16,7 +16,7 @@ let main n () =
   in
   let%bind testnet =
     Coda_worker_testnet.test logger (n + 1)
-      (fun i -> if i < n then Some n else None)
+      (fun i -> if i < n then Some i else None)
       snark_work_public_keys Protocols.Coda_pow.Work_selection.Seq
       ~max_concurrent_connections:None
   in
