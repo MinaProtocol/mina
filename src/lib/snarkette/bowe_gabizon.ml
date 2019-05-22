@@ -39,7 +39,7 @@ module type Backend_intf = sig
     -> a:G1.t
     -> b:G2.t
     -> c:G1.t
-    -> h_delta_prime:G2.t
+    -> delta_prime:G2.t
     -> G1.t
 
   module Fq_target : sig
@@ -124,10 +124,10 @@ module Make (Backend : Backend_intf) = struct
   let check b lab = if b then Ok () else Or_error.error_string lab
 
   module Proof = struct
-    type t = {a: G1.t; b: G2.t; c: G1.t; h_delta_prime: G2.t; z: G1.t}
+    type t = {a: G1.t; b: G2.t; c: G1.t; delta_prime: G2.t; z: G1.t}
     [@@deriving bin_io, sexp]
 
-    let is_well_formed {a; b; c; h_delta_prime; z} =
+    let is_well_formed {a; b; c; delta_prime; z} =
       let open Or_error.Let_syntax in
       let err x =
         sprintf "proof was not well-formed (%s was off its curve)" x
@@ -136,14 +136,14 @@ module Make (Backend : Backend_intf) = struct
       let%bind () = check (G2.is_well_formed b) (err "b") in
       let%bind () = check (G1.is_well_formed c) (err "c") in
       let%bind () =
-        check (G2.is_well_formed h_delta_prime) (err "h_delta_prime")
+        check (G2.is_well_formed delta_prime) (err "delta_prime")
       in
       let%map () = check (G1.is_well_formed z) (err "z") in
       ()
   end
 
   let verify ?message (vk : Verification_key.Processed.t) input
-      ({Proof.a; b; c; h_delta_prime; z} as proof) =
+      ({Proof.a; b; c; delta_prime; z} as proof) =
     let open Or_error.Let_syntax in
     let%bind () =
       check
@@ -156,7 +156,7 @@ module Make (Backend : Backend_intf) = struct
           let q = vk.query.(1 + i) in
           G1.(acc + (x * q)) )
     in
-    let h_delta_prime_pc = Pairing.G2_precomputation.create h_delta_prime in
+    let delta_prime_pc = Pairing.G2_precomputation.create delta_prime in
     let test1 =
       let l = Pairing.unreduced_pairing a b in
       let r1 = vk.g_alpha_h_beta in
@@ -166,9 +166,7 @@ module Make (Backend : Backend_intf) = struct
           vk.h_delta_pc
       in
       let r3 =
-        Pairing.miller_loop
-          (Pairing.G1_precomputation.create c)
-          h_delta_prime_pc
+        Pairing.miller_loop (Pairing.G1_precomputation.create c) delta_prime_pc
       in
       let test =
         let open Fq_target in
@@ -178,11 +176,11 @@ module Make (Backend : Backend_intf) = struct
     in
     let%bind () = check test1 "First pairing check failed" in
     let test2 =
-      let ys = hash ?message ~a ~b ~c ~h_delta_prime in
+      let ys = hash ?message ~a ~b ~c ~delta_prime in
       let l =
         Pairing.miller_loop
           (Pairing.G1_precomputation.create ys)
-          h_delta_prime_pc
+          delta_prime_pc
       in
       let r =
         Pairing.miller_loop (Pairing.G1_precomputation.create z) vk.h_delta_pc
