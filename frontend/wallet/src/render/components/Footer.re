@@ -51,7 +51,7 @@ module StakingSwitch = {
 };
 
 module Wallets = [%graphql
-  {| query getWallets { wallets {publicKey, balance {total}} } |}
+  {| query getWallets { ownedWallets {publicKey, balance {total}} } |}
 ];
 
 module WalletQuery = ReasonApollo.CreateQuery(Wallets);
@@ -90,7 +90,10 @@ let make = () => {
              (
                (mutation, _) =>
                  <SendButton
-                   wallets={Array.map(~f=Wallet.ofGraphqlExn, data##wallets)}
+                   wallets={Array.map(
+                     ~f=Wallet.ofGraphqlExn,
+                     data##ownedWallets,
+                   )}
                    onSubmit={(
                      {from, to_, amount, fee, memoOpt}: SendButton.ModalState.Validated.t,
                      afterSubmit,

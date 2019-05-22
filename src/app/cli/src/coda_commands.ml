@@ -139,11 +139,8 @@ struct
         , account.Account.Poly.balance |> Currency.Balance.to_int ) )
 
   let get_nonce t (addr : Public_key.Compressed.t) =
-    let open Participating_state.Let_syntax in
-    let%map ledger = best_ledger t in
-    let open Option.Let_syntax in
-    let%bind location = Ledger.location_of_key ledger addr in
-    let%map account = Ledger.get ledger location in
+    let open Participating_state.Option.Let_syntax in
+    let%map account = get_account t addr in
     account.Account.Poly.nonce
 
   let send_payment t (txn : User_command.t) =
