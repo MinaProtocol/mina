@@ -2,7 +2,7 @@
 
 First get the code:
 1. Clone the repo via SSH: `git clone git@github.com:CodaProtocol/coda.git`
-2. Navigate into `coda/frontend/wallet`
+2. Navigate into `coda/frontend/website`
 3. Run `yarn` to install dependencies (alternatively `npm install`)
 
 To develop:
@@ -12,7 +12,7 @@ To develop:
 
 ## To create a new blog post
 1. Follow the build instructions above
-2. Create a new markdown file in `coda/frontend/wallet/posts`. You can use the other files in that folder as an example. It should start with something like this:
+2. Create a new markdown file in `coda/frontend/website/posts`. You can use the other files in that folder as an example. It should start with something like this:
 
 ```
 ---
