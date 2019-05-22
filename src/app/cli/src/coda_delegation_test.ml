@@ -6,18 +6,36 @@ open Coda_base
 
 let name = "coda-delegation-test"
 
+let logger = Logger.create ()
+
+let heartbeat_flag = ref true
+
+let print_heartbeat () =
+  let rec loop () =
+    if !heartbeat_flag then (
+      Logger.warn logger ~module_:__MODULE__ ~location:__LOC__
+        "Heartbeat for CI" ;
+      let%bind () = after (Time.Span.of_min 5.) in
+      loop () )
+    else return ()
+  in
+  loop ()
+
 let main () =
-  let logger = Logger.create () in
-  let n = 3 in
+  let num_proposers = 3 in
   let snark_work_public_keys ndx =
     List.nth_exn Genesis_ledger.accounts ndx
     |> fun (_, acct) -> Some (Account.public_key acct)
   in
   let%bind testnet =
-    Coda_worker_testnet.test logger n Option.some snark_work_public_keys
-      Protocols.Coda_pow.Work_selection.Seq ~max_concurrent_connections:None
+    Coda_worker_testnet.test logger num_proposers Option.some
+      snark_work_public_keys Protocols.Coda_pow.Work_selection.Seq
+      ~max_concurrent_connections:None
   in
   Logger.info logger ~module_:__MODULE__ ~location:__LOC__ "Started test net" ;
+  (* keep CI alive *)
+  Deferred.don't_wait_for (print_heartbeat ()) ;
+  (* dump account info to log *)
   List.iteri Genesis_ledger.accounts (fun ndx ((_, acct) as record) ->
       let keypair = Genesis_ledger.keypair_of_account_record_exn record in
       Logger.info logger ~module_:__MODULE__ ~location:__LOC__
@@ -111,6 +129,7 @@ let main () =
   let%bind () = Ivar.read delegatee_ivar in
   Logger.info logger ~module_:__MODULE__ ~location:__LOC__
     "Saw %i blocks proposed by delegatee" !delegatee_proposal_count ;
+  heartbeat_flag := false ;
   Coda_worker_testnet.Api.teardown testnet
 
 let command =
