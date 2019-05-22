@@ -13,9 +13,6 @@ module Make (Transaction : sig
   include Hashable.S with type t := t
 
   val get_participants : t -> Public_key.Compressed.t list
-
-  (* TODO: Remove Transaction functor when we query on actual transactions *)
-  val on_delegation_command : t -> f:(Public_key.Compressed.t -> unit) -> unit
 end) (Time : sig
   type t [@@deriving bin_io, compare, sexp]
 end) =
@@ -38,18 +35,9 @@ struct
 
   type cache =
     { user_transactions: Txn_with_date.Set.t Public_key.Compressed.Table.t
-    ; delegators: Txn_with_date.t Public_key.Compressed.Table.t
     ; all_transactions: Time.t Transaction.Table.t }
 
   type t = {database: Database.t; cache: cache; logger: Logger.t}
-
-  let choose_delegator delegators ((txn, _) as txn_with_time) =
-    Transaction.on_delegation_command txn ~f:(fun sender ->
-        Hashtbl.update delegators sender ~f:(function
-          | None ->
-              txn_with_time
-          | Some queried_txn_with_time ->
-              Txn_with_date.max queried_txn_with_time txn_with_time ) )
 
   let add_user_transaction user_transactions (transaction, date) =
     List.iter (Transaction.get_participants transaction) ~f:(fun pk ->
@@ -65,20 +53,16 @@ struct
     let database = Database.create ~directory in
     let user_transactions = Public_key.Compressed.Table.create () in
     let all_transactions = Transaction.Table.create () in
-    let delegators = Public_key.Compressed.Table.create () in
     List.iter (Database.to_alist database)
       ~f:(fun ((txn, time) as txn_with_time) ->
         Transaction.Table.add_exn all_transactions ~key:txn ~data:time ;
-        add_user_transaction user_transactions txn_with_time ;
-        choose_delegator delegators txn_with_time ) ;
-    {database; cache= {user_transactions; all_transactions; delegators}; logger}
+        add_user_transaction user_transactions txn_with_time ) ;
+    {database; cache= {user_transactions; all_transactions}; logger}
 
   let close {database; _} = Database.close database
 
-  let add
-      { database
-      ; cache= {all_transactions; user_transactions; delegators}
-      ; logger } transaction date =
+  let add {database; cache= {all_transactions; user_transactions}; logger}
+      transaction date =
     match Hashtbl.find all_transactions transaction with
     | Some _retrieved_transaction ->
         Logger.trace logger
@@ -89,13 +73,7 @@ struct
     | None ->
         Database.set database ~key:transaction ~data:date ;
         Hashtbl.add_exn all_transactions ~key:transaction ~data:date ;
-        choose_delegator delegators (transaction, date) ;
         add_user_transaction user_transactions (transaction, date)
-
-  let get_delegator {cache= {delegators; _}; _} public_key =
-    let open Option.Let_syntax in
-    let%map delegation_user_command, _ = Hashtbl.find delegators public_key in
-    delegation_user_command
 
   let get_total_transactions {cache= {user_transactions; _}; _} public_key =
     let open Option.Let_syntax in
@@ -247,14 +225,6 @@ module User_command = struct
     [receiver; sender]
 
   module Gen = User_command.Gen
-
-  let on_delegation_command user_command ~f =
-    let sender = User_command.sender user_command in
-    match User_command.(Payload.body @@ payload user_command) with
-    | Payment _ ->
-        ()
-    | Stake_delegation _ ->
-        f sender
 end
 
 let%test_module "Transaction_database" =
@@ -648,39 +618,6 @@ let%test_module "Transaction_database" =
                 @@ assert_transactions
                      (List.map ~f:fst user_commands_with_time)
                      retrieved_transactions ) )
-
-      let%test_unit "Get the most recent delegator" =
-        let keys =
-          Array.init 3 ~f:(fun _ -> Signature_lib.Keypair.create ())
-        in
-        let key_gen =
-          let open Quickcheck.Generator.Let_syntax in
-          let%map reciever = Quickcheck_lib.of_array keys in
-          (keypair1, reciever)
-        in
-        let gen_stake_delegation =
-          User_command.Gen.stake_delegation ~key_gen ~max_fee:1 ()
-        in
-        let gen_user_commands_with_time =
-          let open Quickcheck.Generator.Let_syntax in
-          let%bind num_commands = Int.gen_incl 1 50 in
-          let%bind time = Int.gen_incl 0 10 in
-          let%bind stake_delegation = gen_stake_delegation in
-          Quickcheck.Generator.list_with_length num_commands
-          @@ Quickcheck.Generator.return (stake_delegation, time)
-        in
-        with_database ~trials:10 gen_user_commands_with_time
-          ~f:(fun commands_with_time database ->
-            add_all_transactions database commands_with_time ;
-            let most_recent_delegation, _ =
-              Option.value_exn
-                (List.max_elt commands_with_time
-                   ~compare:compare_txns_with_dates)
-            in
-            Deferred.return
-            @@ [%test_eq: User_command.t] ~equal:User_command.equal
-                 most_recent_delegation
-                 (Option.value_exn (Database.get_delegator database pk1)) )
     end
   end )
 

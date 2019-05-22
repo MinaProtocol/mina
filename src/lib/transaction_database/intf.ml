@@ -17,10 +17,6 @@ module type S = sig
 
   val add : t -> transaction -> time -> unit
 
-  (** [get_transactions t pk] queries the most recent delegator for [pk] in the
-      transaction database *)
-  val get_delegator : t -> Public_key.Compressed.t -> transaction option
-
   val get_total_transactions : t -> Public_key.Compressed.t -> int option
 
   (** [get_transactions t pk] queries all the transactions involving [pk] as a
