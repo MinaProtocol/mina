@@ -17,7 +17,7 @@ module Styles = {
 };
 
 module Wallets = [%graphql
-  {| query getWallets { wallets {publicKey, balance {total}} } |}
+  {| query getWallets { ownedWallets {publicKey, balance {total}} } |}
 ];
 module WalletQuery = ReasonApollo.CreateQuery(Wallets);
 
@@ -47,7 +47,7 @@ let make = () => {
          | Error(err) => React.string(err##message)
          | Data(data) =>
            <WalletList
-             wallets={Array.map(~f=Wallet.ofGraphqlExn, data##wallets)}
+             wallets={Array.map(~f=Wallet.ofGraphqlExn, data##ownedWallets)}
            />
          }}
     </WalletQuery>
