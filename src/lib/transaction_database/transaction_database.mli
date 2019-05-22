@@ -1,12 +1,18 @@
+open Async
 open Coda_base
 open Signature_lib
 
-type t
+include
+  Intf.S
+  with type time := Block_time.Time.Stable.V1.t
+   and type transaction := User_command.Stable.V1.t
 
-val create : ?directory_name:string -> unit -> t
-
-val close : t -> unit
-
-val add : t -> Transaction.t -> unit
-
-val get_transactions : t -> Public_key.Compressed.t -> Transaction.t list
+module For_tests : sig
+  val populate_database :
+       directory:string
+    -> num_wallets:int
+    -> num_foreign:int
+    -> int
+    -> (t * Public_key.Compressed.t list * Public_key.Compressed.t list)
+       Deferred.t
+end

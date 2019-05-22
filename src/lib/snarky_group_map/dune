@@ -4,6 +4,7 @@
   (preprocess (pps ppx_jane ppx_deriving.eq))
   (inline_tests)
   (libraries
+    group_map
     snarky
     snarkette
     core_kernel ))

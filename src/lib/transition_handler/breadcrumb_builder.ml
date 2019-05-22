@@ -8,15 +8,16 @@ open Cache_lib
 module Make (Inputs : Inputs.S) :
   Breadcrumb_builder_intf
   with type state_hash := State_hash.t
-  with type trust_system := Trust_system.t
-  with type external_transition_verified :=
-              Inputs.External_transition.Verified.t
-  with type transition_frontier := Inputs.Transition_frontier.t
-  with type transition_frontier_breadcrumb :=
-              Inputs.Transition_frontier.Breadcrumb.t = struct
+   and type trust_system := Trust_system.t
+   and type external_transition_with_initial_validation :=
+              Inputs.External_transition.with_initial_validation
+   and type transition_frontier := Inputs.Transition_frontier.t
+   and type transition_frontier_breadcrumb :=
+              Inputs.Transition_frontier.Breadcrumb.t
+   and type verifier := Inputs.Verifier.t = struct
   open Inputs
 
-  let build_subtrees_of_breadcrumbs ~logger ~trust_system ~frontier
+  let build_subtrees_of_breadcrumbs ~logger ~verifier ~trust_system ~frontier
       ~initial_hash subtrees_of_enveloped_transitions =
     (* If the breadcrumb we are targetting is removed from the transition
      * frontier while we're catching up, it means this path is not on the
@@ -42,16 +43,29 @@ module Make (Inputs : Inputs.S) :
         let%bind init_breadcrumb =
           breadcrumb_if_present () |> Deferred.return
         in
-        Rose_tree.Deferred.Or_error.fold_map subtree_of_enveloped_transitions
-          ~init:(Cached.pure init_breadcrumb)
-          ~f:(fun cached_parent cached_enveloped_transition ->
+        Rose_tree.Deferred.Or_error.fold_map_over_subtrees
+          subtree_of_enveloped_transitions ~init:(Cached.pure init_breadcrumb)
+          ~f:(fun cached_parent
+             (Rose_tree.T (cached_enveloped_transition, _) as subtree)
+             ->
             let open Deferred.Let_syntax in
             let%map cached_result =
               Cached.transform cached_enveloped_transition
                 ~f:(fun enveloped_transition ->
                   let open Deferred.Or_error.Let_syntax in
-                  let transition =
+                  let transition_with_initial_validation =
                     Envelope.Incoming.data enveloped_transition
+                  in
+                  let transition_with_hash, _ =
+                    transition_with_initial_validation
+                  in
+                  let mostly_validated_transition =
+                    (* TODO: handle this edge case more gracefully *)
+                    (* since we are building a disconnected subtree of breadcrumbs,
+                     * we skip this step in validation *)
+                    External_transition.skip_frontier_dependencies_validation
+                      `This_transition_belongs_to_a_detached_subtree
+                      transition_with_initial_validation
                   in
                   let sender = Envelope.Incoming.sender enveloped_transition in
                   let parent = Cached.peek cached_parent in
@@ -60,8 +74,8 @@ module Make (Inputs : Inputs.S) :
                     |> With_hash.hash
                   in
                   let actual_parent_hash =
-                    transition |> With_hash.data
-                    |> External_transition.Verified.protocol_state
+                    transition_with_hash |> With_hash.data
+                    |> External_transition.protocol_state
                     |> Protocol_state.previous_state_hash
                   in
                   let%bind () =
@@ -76,12 +90,11 @@ module Make (Inputs : Inputs.S) :
                                hash"))
                   in
                   let open Deferred.Let_syntax in
-                  (* TODO: propagate bans through subtree (#2299) *)
                   match%bind
-                    Transition_frontier.Breadcrumb.build ~logger ~trust_system
-                      ~parent ~transition_with_hash:transition
-                      ~sender:
-                        (Some (Envelope.Incoming.sender enveloped_transition))
+                    Transition_frontier.Breadcrumb.build ~logger ~verifier
+                      ~trust_system ~parent
+                      ~transition:mostly_validated_transition
+                      ~sender:(Some sender)
                   with
                   | Ok new_breadcrumb ->
                       let open Result.Let_syntax in
@@ -90,24 +103,44 @@ module Make (Inputs : Inputs.S) :
                            breadcrumb_if_present ()
                          in
                          new_breadcrumb)
-                  | Error (`Fatal_error exn) ->
-                      Deferred.return (Or_error.of_exn exn)
-                  | Error (`Invalid_staged_ledger_hash error) ->
-                      let%map () =
-                        Trust_system.record_envelope_sender trust_system logger
-                          sender
-                          ( Trust_system.Actions.Gossiped_invalid_transition
-                          , Some ("invalid staged ledger hash", []) )
+                  | Error err -> (
+                      (* propagate bans through subtree *)
+                      let subtree_nodes = Rose_tree.flatten subtree in
+                      let ip_address_set =
+                        let sender_from_tree_node node =
+                          Envelope.Incoming.sender (Cached.peek node)
+                        in
+                        List.fold subtree_nodes
+                          ~init:(Set.empty (module Unix.Inet_addr))
+                          ~f:(fun inet_addrs node ->
+                            match sender_from_tree_node node with
+                            | Local ->
+                                failwith
+                                  "build_subtrees_of_breadcrumbs: sender of \
+                                   external transition should not be Local"
+                            | Remote inet_addr ->
+                                Set.add inet_addrs inet_addr )
                       in
-                      Error error
-                  | Error (`Invalid_staged_ledger_diff error) ->
-                      let%map () =
-                        Trust_system.record_envelope_sender trust_system logger
-                          sender
-                          ( Trust_system.Actions.Gossiped_invalid_transition
-                          , Some ("invalid staged ledger diff", []) )
+                      let ip_addresses = Set.to_list ip_address_set in
+                      let trust_system_record_invalid msg error =
+                        let%map () =
+                          Deferred.List.iter ip_addresses ~f:(fun ip_addr ->
+                              Trust_system.record trust_system logger ip_addr
+                                ( Trust_system.Actions
+                                  .Gossiped_invalid_transition
+                                , Some (msg, []) ) )
+                        in
+                        Error error
                       in
-                      Error error )
+                      match err with
+                      | `Invalid_staged_ledger_hash error ->
+                          trust_system_record_invalid
+                            "invalid staged ledger hash" error
+                      | `Invalid_staged_ledger_diff error ->
+                          trust_system_record_invalid
+                            "invalid staged ledger diff" error
+                      | `Fatal_error exn ->
+                          Deferred.return (Or_error.of_exn exn) ) )
               |> Cached.sequence_deferred
             in
             Cached.sequence_result cached_result ) )

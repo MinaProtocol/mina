@@ -2,6 +2,8 @@ open Core_kernel
 open Quickcheck.Generator
 open Quickcheck.Let_syntax
 
+let of_array array = Quickcheck.Generator.of_list @@ Array.to_list array
+
 let rec map_gens ls ~f =
   match ls with
   | [] ->

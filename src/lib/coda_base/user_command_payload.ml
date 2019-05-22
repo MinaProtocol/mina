@@ -11,7 +11,7 @@ module Common = struct
       module V1 = struct
         module T = struct
           type ('fee, 'nonce, 'memo) t = {fee: 'fee; nonce: 'nonce; memo: 'memo}
-          [@@deriving bin_io, eq, sexp, hash, yojson, version]
+          [@@deriving bin_io, compare, eq, sexp, hash, yojson, version]
         end
 
         include T
@@ -33,7 +33,7 @@ module Common = struct
           , Account_nonce.Stable.V1.t
           , Memo.Stable.V1.t )
           Poly.Stable.V1.t
-        [@@deriving bin_io, eq, sexp, hash, yojson, version]
+        [@@deriving bin_io, compare, eq, sexp, hash, yojson, version]
       end
 
       include T
@@ -108,7 +108,7 @@ module Body = struct
         type t =
           | Payment of Payment_payload.Stable.V1.t
           | Stake_delegation of Stake_delegation.Stable.V1.t
-        [@@deriving bin_io, eq, sexp, hash, yojson, version]
+        [@@deriving bin_io, compare, eq, sexp, hash, yojson, version]
       end
 
       include T
@@ -148,12 +148,6 @@ module Body = struct
           +> Fold.init (max_variant_size - Stake_delegation.length_in_triples)
                ~f:(fun _ -> (false, false, false)))
 
-  let sender_cost = function
-    | Payment {amount; _} ->
-        amount
-    | Stake_delegation _ ->
-        Currency.Amount.zero
-
   let length_in_triples = Tag.length_in_triples + max_variant_size
 
   let gen ~max_amount =
@@ -186,7 +180,7 @@ module Stable = struct
   module V1 = struct
     module T = struct
       type t = (Common.Stable.V1.t, Body.Stable.V1.t) Poly.Stable.V1.t
-      [@@deriving bin_io, eq, sexp, hash, yojson, version]
+      [@@deriving bin_io, compare, eq, sexp, hash, yojson, version]
     end
 
     include T

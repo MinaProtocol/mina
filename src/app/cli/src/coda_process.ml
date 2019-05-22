@@ -1,3 +1,6 @@
+[%%import
+"../../../config.mlh"]
+
 open Core
 open Async
 open Coda_worker
@@ -18,16 +21,15 @@ let spawn_exn (config : Coda_worker.Input.t) =
   File_system.dup_stderr process ;
   return (conn, process, config)
 
-let local_config ?proposal_interval ~peers ~discovery_port ~external_port
-    ~acceptable_delay ~program_dir ~proposer ~snark_worker_config
-    ~work_selection ~offset ~trace_dir ~max_concurrent_connections () =
-  let host = "127.0.0.1" in
+let local_config ?proposal_interval ~peers ~addrs_and_ports ~acceptable_delay
+    ~program_dir ~proposer ~snark_worker_config ~work_selection ~offset
+    ~trace_dir ~max_concurrent_connections () =
   let conf_dir =
     Filename.temp_dir_name
     ^/ String.init 16 ~f:(fun _ -> (Int.to_string (Random.int 10)).[0])
   in
   let config =
-    { Coda_worker.Input.host
+    { Coda_worker.Input.addrs_and_ports
     ; env=
         ( "CODA_TIME_OFFSET"
         , Time.Span.to_int63_seconds_round_down_exn offset
@@ -41,7 +43,6 @@ let local_config ?proposal_interval ~peers ~discovery_port ~external_port
                      (function [a; b] -> Some (a, b) | _ -> None)
                      (String.split ~on:'=')) )
     ; proposer
-    ; external_port
     ; snark_worker_config
     ; work_selection
     ; peers
@@ -49,7 +50,6 @@ let local_config ?proposal_interval ~peers ~discovery_port ~external_port
     ; trace_dir
     ; program_dir
     ; acceptable_delay
-    ; discovery_port
     ; max_concurrent_connections }
   in
   config

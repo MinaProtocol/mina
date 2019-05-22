@@ -45,6 +45,7 @@ module type S = sig
 
   val create :
        logger:Logger.t
+    -> trust_system:Trust_system.t
     -> frontier_broadcast_pipe:transition_frontier Option.t
                                Broadcast_pipe.Reader.t
     -> t
@@ -157,7 +158,7 @@ end)
     in
     Deferred.don't_wait_for tf_deferred
 
-  let create ~logger:_ ~frontier_broadcast_pipe =
+  let create ~logger:_ ~trust_system:_ ~frontier_broadcast_pipe =
     let t = {snark_table= Work.Table.create (); ref_table= None} in
     listen_to_frontier_broadcast_pipe frontier_broadcast_pipe t ;
     t
@@ -266,6 +267,7 @@ let%test_module "random set test" =
       in
       let pool =
         Mock_snark_pool.create ~logger:(Logger.null ())
+          ~trust_system:(Trust_system.null ())
           ~frontier_broadcast_pipe:frontier_broadcast_pipe_r
       in
       List.iter sample_solved_work ~f:(fun (work, proof, fee) ->

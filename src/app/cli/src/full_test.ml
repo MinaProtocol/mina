@@ -56,14 +56,29 @@ let run_test () : unit Deferred.t =
       in
       let module Main = Coda_inputs.Make_coda (Init) in
       let module Run = Coda_run.Make (Config) (Main) in
+      let trace_database_initialization typ location =
+        Logger.trace logger "Creating %s at %s" ~module_:__MODULE__ ~location
+          typ
+      in
       let%bind trust_dir = Async.Unix.mkdtemp (temp_conf_dir ^/ "trust_db") in
       let trust_system = Trust_system.create ~db_dir:trust_dir in
+      trace_database_initialization "trust_system" __LOC__ trust_dir ;
       let%bind receipt_chain_dir_name =
         Async.Unix.mkdtemp (temp_conf_dir ^/ "receipt_chain")
       in
+      trace_database_initialization "receipt_chain_database" __LOC__
+        receipt_chain_dir_name ;
       let receipt_chain_database =
         Coda_base.Receipt_chain_database.create
           ~directory:receipt_chain_dir_name
+      in
+      let%bind transaction_database_dir =
+        Async.Unix.mkdtemp (temp_conf_dir ^/ "transaction_database")
+      in
+      trace_database_initialization "transaction_database" __LOC__
+        receipt_chain_dir_name ;
+      let transaction_database =
+        Transaction_database.create logger transaction_database_dir
       in
       let time_controller = Main.Inputs.Time.Controller.(create basic) in
       let consensus_local_state =
@@ -73,6 +88,7 @@ let run_test () : unit Deferred.t =
       let net_config =
         Main.Inputs.Net.Config.
           { logger
+          ; trust_system
           ; time_controller
           ; consensus_local_state
           ; gossip_net_params=
@@ -81,9 +97,11 @@ let run_test () : unit Deferred.t =
               ; target_peer_count= 8
               ; initial_peers= []
               ; conf_dir= temp_conf_dir
-              ; me=
-                  Network_peer.Peer.create Unix.Inet_addr.localhost
-                    ~discovery_port:8001 ~communication_port:8000
+              ; addrs_and_ports=
+                  { external_ip= Unix.Inet_addr.localhost
+                  ; bind_ip= Unix.Inet_addr.localhost
+                  ; discovery_port= 8001
+                  ; communication_port= 8000 }
               ; trust_system
               ; max_concurrent_connections= Some 10 } }
       in
@@ -98,8 +116,8 @@ let run_test () : unit Deferred.t =
       in
       let%bind coda =
         Main.create
-          (Main.Config.make ~logger ~trust_system ~net_config
-             ~propose_keypair:keypair
+          (Main.Config.make ~logger ~trust_system ~verifier:Init.verifier
+             ~net_config ~propose_keypair:keypair
              ~snark_worker_key:
                (Public_key.compress largest_account_keypair.public_key)
              ~transaction_pool_disk_location:
@@ -107,12 +125,13 @@ let run_test () : unit Deferred.t =
              ~snark_pool_disk_location:(temp_conf_dir ^/ "snark_pool")
              ~wallets_disk_location:(temp_conf_dir ^/ "wallets")
              ~time_controller ~receipt_chain_database
-             ~snark_work_fee:(Currency.Fee.of_int 0) ~consensus_local_state ())
+             ~snark_work_fee:(Currency.Fee.of_int 0) ~consensus_local_state
+             ~transaction_database ())
       in
       Main.start coda ;
       don't_wait_for
         (Strict_pipe.Reader.iter_without_pushback
-           (Main.verified_transitions coda)
+           (Main.validated_transitions coda)
            ~f:ignore) ;
       let wait_until_cond ~(f : Main.t -> bool) ~(timeout : Float.t) =
         let rec go () =
@@ -160,8 +179,8 @@ let run_test () : unit Deferred.t =
       (* No proof emitted by the parallel scan at the begining *)
       assert (Option.is_none @@ Run.For_tests.ledger_proof coda) ;
       (* Note: This is much less than half of the high balance account so we can test
-   *       payment replays being prohibited
-   *)
+       *       payment replays being prohibited
+      *)
       let send_amount = Currency.Amount.of_int 10 in
       (* Send money to someone *)
       let build_payment amount sender_sk receiver_pk fee =
@@ -199,7 +218,7 @@ let run_test () : unit Deferred.t =
         in
         assert_ok (p1_res |> Participating_state.active_exn) ;
         (* Send a similar payment twice on purpose; this second one will be rejected
-       because the nonce is wrong *)
+           because the nonce is wrong *)
         let payment' =
           build_payment send_amount sender_sk receiver_pk
             (Currency.Fee.of_int 0)
@@ -209,7 +228,7 @@ let run_test () : unit Deferred.t =
         in
         assert_ok (p2_res |> Participating_state.active_exn) ;
         (* The payment fails, but the rpc command doesn't indicate that because that
-       failure comes from the network. *)
+           failure comes from the network. *)
         (* Let the system settle, mine some blocks *)
         let%map () =
           balance_change_or_timeout
@@ -295,7 +314,7 @@ let run_test () : unit Deferred.t =
             Public_key.compress keypair.public_key )
       in
       (*Need some accounts from the genesis ledger to test payment replays and
-  sending multiple payments*)
+        sending multiple payments*)
       let receiver_keypair =
         let receiver =
           Genesis_ledger.find_new_account_record_exn

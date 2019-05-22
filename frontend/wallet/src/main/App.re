@@ -1,11 +1,11 @@
 open BsElectron;
 open Tc;
 
-let killDaemon = DaemonProcess.start(8080);
+let killDaemons = DaemonProcess.startAll(~fakerPort=8080, ~codaPort=0xc0da);
 
-let createTray = settingsOrError => {
+let createTray = dispatch => {
   let t = AppTray.get();
-  let items =
+  let trayItems =
     Menu.Item.[
       make(
         Label("Synced"),
@@ -13,28 +13,34 @@ let createTray = settingsOrError => {
         (),
       ),
       make(Separator, ()),
-      make(Label("Wallets:"), ~enabled=false, ()),
-      make(Radio({js|    Wallet_1  □ 100|js}), ()),
-      make(Radio({js|    Vault  □ 100,000|js}), ()),
-      make(Separator, ()),
       make(
-        Label("Send"),
-        ~accelerator="CmdOrCtrl+S",
+        Label("Debug"),
         ~click=
-          () => AppWindow.deepLink({path: Route.Path.Send, settingsOrError}),
+          () =>
+            AppWindow.get({path: Route.Home, dispatch})
+            |> AppWindow.openDevTools,
         (),
       ),
       make(Separator, ()),
-      make(Label("Request"), ~accelerator="CmdOrCtrl+R", ()),
-      make(Separator, ()),
-      make(Label("Settings:"), ~enabled=false, ()),
-      make(Checkbox("    Snark_worker"), ()),
+      make(
+        Label("Open"),
+        ~accelerator="CmdOrCtrl+O",
+        ~click=
+          () => AppWindow.get({path: Route.Home, dispatch}) |> AppWindow.show,
+        (),
+      ),
+      make(
+        Label("Settings"),
+        ~accelerator="CmdOrCtrl+,",
+        ~click=() => AppWindow.deepLink({path: Route.Home, dispatch}),
+        (),
+      ),
       make(Separator, ()),
       make(Label("Quit"), ~accelerator="CmdOrCtrl+Q", ~role="quit", ()),
     ];
 
   let menu = Menu.make();
-  List.iter(~f=Menu.append(menu), items);
+  List.iter(~f=Menu.append(menu), trayItems);
 
   Tray.setContextMenu(t, menu);
 };
@@ -42,22 +48,35 @@ let createTray = settingsOrError => {
 // We need this handler here to prevent the application from exiting on all
 // windows closed. Keep in mind, we have the tray.
 App.on(`WindowAllClosed, () => ());
-App.on(`WillQuit, () => killDaemon());
+App.on(`WillQuit, () => killDaemons());
 
-let task =
+let initialTask =
   Task.map2(
     Task.uncallbackifyValue(App.on(`Ready)),
-    SettingsMain.load(),
+    SettingsMain.load(ProjectRoot.settings),
     ~f=((), settings) =>
-    `Settings(settings)
-  )
-  |> Task.onError(~f=e => Task.succeed(`Error(e)));
+    settings
+  );
 
-Task.perform(
-  task,
-  ~f=settingsOrError => {
-    // TODO: Send whatever settings are relevant to the relevant pieces
-    createTray(settingsOrError);
-    AppWindow.deepLink({path: Route.Path.Home, settingsOrError});
-  },
-);
+let run = () =>
+  Task.attempt(
+    initialTask,
+    ~f=settingsOrError => {
+      let initialState = {Application.State.settingsOrError, wallets: [||]};
+
+      let dispatch = ref(_ => ());
+      let store =
+        Application.Store.create(
+          initialState, ~onNewState=(_last, _curr: Application.State.t('a)) =>
+          createTray(dispatch^)
+        );
+      dispatch := Application.Store.apply(store);
+      let dispatch = dispatch^;
+
+      createTray(dispatch);
+
+      AppWindow.deepLink({AppWindow.Input.path: Route.Home, dispatch});
+    },
+  );
+
+run();

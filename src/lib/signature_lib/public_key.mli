@@ -25,6 +25,8 @@ val typ : (var, t) Typ.t
 
 val var_of_t : t -> var
 
+val assert_equal : var -> var -> (unit, 'a) Checked.t
+
 val of_private_key_exn : Private_key.t -> t
 
 module Compressed : sig
