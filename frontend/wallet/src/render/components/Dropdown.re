@@ -73,13 +73,22 @@ module Styles = {
 
   let icon =
     style([
-      color(Theme.Colors.teal), height(`rem(1.5)), marginRight(`px(-5))]);
+      color(Theme.Colors.teal),
+      height(`rem(1.5)),
+      marginRight(`px(-5)),
+    ]);
 };
 
 [@react.component]
 let make = (~onChange, ~value, ~label, ~options) => {
   let (isOpen, setOpen) = React.useState(() => false);
   let toggleOpen = () => setOpen(isOpen => !isOpen);
+
+  let currentLabel =
+    value
+    |> Option.map(~f=v => Caml.List.assoc(v, options))
+    |> Option.withDefault(~default="");
+
   Window.onClick(Window.current, () => setOpen(_ => false));
   <div
     className={Styles.container(isOpen)}
@@ -89,15 +98,18 @@ let make = (~onChange, ~value, ~label, ~options) => {
     }}>
     <span className=Styles.label> {React.string(label ++ ":")} </span>
     <Spacer width=0.5 />
-    <span className=Styles.value> {React.string(value)} </span>
+    <span className=Styles.value> {React.string(currentLabel)} </span>
     <Spacer width=0.5 />
     <span className=Styles.icon> <Icon kind=Icon.ChevronDown /> </span>
     <div className={isOpen ? Styles.options : Styles.hidden}>
       {List.map(
          ~f=
-           item =>
-             <div className=Styles.item onClick={_e => onChange(item)}>
-               {React.string(item)}
+           ((value, label)) =>
+             <div
+               key=label
+               className=Styles.item
+               onClick={_e => onChange(Some(value))}>
+               {React.string(label)}
              </div>,
          options,
        )

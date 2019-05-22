@@ -164,8 +164,8 @@ module Make (Inputs : Inputs.S) :
              Cached.t
              Rose_tree.t
              list
-         , synchronous
-         , unit Deferred.t )
+         , crash buffered
+         , unit )
          Writer.t)
       ~(catchup_breadcrumbs_reader :
          (Transition_frontier.Breadcrumb.t, State_hash.t) Cached.t Rose_tree.t
@@ -174,8 +174,8 @@ module Make (Inputs : Inputs.S) :
       ~(catchup_breadcrumbs_writer :
          ( (Transition_frontier.Breadcrumb.t, State_hash.t) Cached.t Rose_tree.t
            list
-         , synchronous
-         , unit Deferred.t )
+         , crash buffered
+         , unit )
          Writer.t) ~processed_transition_writer =
     let catchup_scheduler =
       Catchup_scheduler.create ~logger ~verifier ~trust_system ~frontier
