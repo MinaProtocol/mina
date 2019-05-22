@@ -38,9 +38,7 @@ struct
     let database = Database.create ~directory in
     let pagination = Pagination.create () in
     List.iter (Database.to_alist database) ~f:(add_user_transaction pagination) ;
-    { database= Database.create ~directory
-    ; pagination= failwith "Need to implement"
-    ; logger }
+    {database; pagination; logger}
 
   let close {database; _} = Database.close database
 
@@ -94,6 +92,7 @@ let%test_module "Transaction_database" =
 
     let%test_unit "We can get all the transactions associated with a public key"
         =
+      Backtrace.elide := false ;
       let trials = 10 in
       let time = 1 in
       with_database ~trials
