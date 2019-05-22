@@ -35,7 +35,7 @@ module Rimraf = {
 Array.length(Sys.argv) > 2
 && (Sys.argv[2] == "prod" || Sys.argv[2] == "staging")
   ? {
-    Links.Cdn.prefix := "https://cdn.codaprotocol.com/v2";
+    Links.Cdn.prefix := "https://cdn.codaprotocol.com/v4";
   }
   : ();
 
