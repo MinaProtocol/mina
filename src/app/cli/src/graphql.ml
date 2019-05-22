@@ -215,11 +215,11 @@ module Make (Commands : Coda_commands.Intf) = struct
           ~fields:(fun _ ->
             [ pubkey_field ~resolve:(fun _ account ->
                   (* Hack: Account.Poly.t is only parameterized over 'pk once
-                   * and so in order for delegate to optional we must also make
-                   * account public_key optional even though it's always Some.
-                   * In an attempt to avoid a large refactoring, and also avoid
-                   * making a new record, we'll deal with a value_exn here and
-                   * be sad. *)
+                   * and so, in order for delegate to be optional, we must also
+                   * make account public_key optional even though it's always
+                   * Some. In an attempt to avoid a large refactoring, and also
+                   * avoid making a new record, we'll deal with a value_exn here
+                   * and be sad. *)
                   Stringable.public_key
                     ( account.Account.Poly.public_key
                     |> Option.value_exn ?here:None ?error:None ?message:None )
