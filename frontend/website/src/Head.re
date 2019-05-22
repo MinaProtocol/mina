@@ -50,11 +50,6 @@ let make = (~extra, ~filename, _children) => {
       <link
         rel="stylesheet"
         type_="text/css"
-        href={Links.Cdn.url("/fonts.css")}
-      />
-      <link
-        rel="stylesheet"
-        type_="text/css"
         href="https://use.typekit.net/mta7mwm.css"
       />
       <link

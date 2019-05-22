@@ -11,9 +11,16 @@ module type Inputs_intf = sig
   module Breadcrumb :
     Transition_frontier_Breadcrumb_intf
     with type state_hash := State_hash.t
-     and type external_transition_verified := External_transition.Verified.t
+     and type mostly_validated_external_transition :=
+                ( [`Time_received] * Truth.true_t
+                , [`Proof] * Truth.true_t
+                , [`Frontier_dependencies] * Truth.true_t
+                , [`Staged_ledger_diff] * Truth.false_t )
+                External_transition.Validation.with_transition
+     and type external_transition_validated := External_transition.Validated.t
      and type staged_ledger := Staged_ledger.t
      and type user_command := User_command.t
+     and type verifier := Verifier.t
 end
 
 module Make (Inputs : Inputs_intf) :

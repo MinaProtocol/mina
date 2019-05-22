@@ -27,9 +27,9 @@ module type Coda_intf = sig
     (t -> Signature_lib.Public_key.Compressed.t list -> Lite_base.Lite_chain.t)
     option
 
-  val verified_transitions :
+  val validated_transitions :
        t
-    -> (External_transition.Verified.t, State_hash.t) With_hash.t
+    -> (External_transition.Validated.t, State_hash.t) With_hash.t
        Strict_pipe.Reader.t
 end
 
@@ -61,7 +61,7 @@ struct
 
   let run ~filename ~logger coda =
     let%bind web_client_pipe = Web_pipe.create ~filename ~logger in
-    Strict_pipe.Reader.iter (Program.verified_transitions coda) ~f:(fun _ ->
+    Strict_pipe.Reader.iter (Program.validated_transitions coda) ~f:(fun _ ->
         let chain = get_proposer_chain coda in
         Web_pipe.store web_client_pipe chain )
 end
@@ -131,7 +131,7 @@ let run_service (type t) (module Program : Coda_intf with type t = t) coda
           "Not running a web client pipe" ;
         don't_wait_for
           (Strict_pipe.Reader.iter_without_pushback
-             (Program.verified_transitions coda)
+             (Program.validated_transitions coda)
              ~f:ignore)
     | `Local path ->
         let open Keypair in
@@ -143,7 +143,7 @@ let run_service (type t) (module Program : Coda_intf with type t = t) coda
         |> don't_wait_for ;
         let get_lite_chain = Option.value_exn Program.get_lite_chain in
         let keypair = Genesis_ledger.largest_account_keypair_exn () in
-        Strict_pipe.Reader.iter (Program.verified_transitions coda)
+        Strict_pipe.Reader.iter (Program.validated_transitions coda)
           ~f:(fun _ ->
             Writer.save (path ^/ "chain")
               ~contents:

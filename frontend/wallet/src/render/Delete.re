@@ -25,7 +25,7 @@ let make = (~closeModal, ~walletName) => {
     <ModalButtons
       onSecondaryClick={_e => closeModal()}
       onPrimaryClick={_e => ()}
-      primaryColor=StyleGuide.Colors.roseBud
+      primaryColor=Theme.Colors.roseBud
       primaryCopy="Delete"
     />
   </div>;

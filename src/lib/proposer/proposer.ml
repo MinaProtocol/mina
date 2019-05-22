@@ -70,13 +70,22 @@ module type Inputs_intf = sig
      and type user_command := User_command.t
      and type transaction_witness := Transaction_witness.t
      and type pending_coinbase_collection := Pending_coinbase.t
+     and type verifier := Verifier.t
 
   module External_transition :
     External_transition_intf
     with type state_hash := State_hash.t
+     and type time := Time.t
      and type protocol_state := Protocol_state.Value.t
      and type staged_ledger_diff := Staged_ledger_diff.t
-     and type protocol_state_proof := Proof.t
+     and type proof := Proof.t
+     and type consensus_state := Consensus.Data.Consensus_state.Value.t
+     and type user_command := User_command.t
+     and type compressed_public_key := Public_key.Compressed.t
+     and type verifier := Verifier.t
+     and type staged_ledger_hash := Staged_ledger_hash.t
+     and type ledger_proof := Ledger_proof.t
+     and type transaction := Transaction.t
 
   module Internal_transition :
     Internal_transition_intf
@@ -92,22 +101,18 @@ module type Inputs_intf = sig
     type t
   end
 
-  module Diff_hash : Protocols.Coda_transition_frontier.Diff_hash
-
-  module Diff_mutant :
-    Diff_mutant
-    with type external_transition := External_transition.Stable.Latest.t
-     and type state_hash := Coda_base.State_hash.t
-     and type scan_state := Staged_ledger.Scan_state.t
-     and type hash := Diff_hash.t
-     and type consensus_state :=
-                Consensus.Data.Consensus_state.Value.Stable.V1.t
-     and type pending_coinbases := Pending_coinbase.t
-
   module Transition_frontier :
     Transition_frontier_intf
     with type state_hash := State_hash.t
-     and type external_transition_verified := External_transition.Verified.t
+     and type consensus_state := Consensus.Data.Consensus_state.Value.t
+     and type mostly_validated_external_transition :=
+                ( [`Time_received] * Truth.true_t
+                , [`Proof] * Truth.true_t
+                , [`Frontier_dependencies] * Truth.true_t
+                , [`Staged_ledger_diff] * Truth.false_t )
+                External_transition.Validation.with_transition
+     and type external_transition_validated := External_transition.Validated.t
+     and type pending_coinbase := Pending_coinbase.t
      and type ledger_database := Ledger_db.t
      and type staged_ledger := Staged_ledger.t
      and type staged_ledger_diff := Staged_ledger_diff.t
@@ -115,11 +120,7 @@ module type Inputs_intf = sig
      and type masked_ledger := Masked_ledger.t
      and type consensus_local_state := Consensus.Data.Local_state.t
      and type user_command := User_command.t
-     and type diff_mutant :=
-                ( External_transition.Stable.Latest.t
-                , Coda_base.State_hash.Stable.Latest.t )
-                With_hash.t
-                Diff_mutant.E.t
+     and type verifier := Verifier.t
 
   module Transaction_pool :
     Coda_lib.Transaction_pool_read_intf
@@ -208,9 +209,7 @@ end
 
 module Make (Inputs : Inputs_intf) :
   Coda_lib.Proposer_intf
-  with type external_transition := Inputs.External_transition.t
-   and type external_transition_verified :=
-              Inputs.External_transition.Verified.t
+  with type breadcrumb := Inputs.Transition_frontier.Breadcrumb.t
    and type state_hash := State_hash.t
    and type ledger_hash := Ledger_hash.t
    and type staged_ledger := Inputs.Staged_ledger.t
@@ -225,8 +224,11 @@ module Make (Inputs : Inputs_intf) :
    and type keypair := Keypair.t
    and type transition_frontier := Inputs.Transition_frontier.t
    and type transaction_pool := Inputs.Transaction_pool.t
-   and type time := Time.t = struct
+   and type time := Time.t
+   and type verifier := Verifier.t = struct
   open Inputs
+  module Transition_frontier_validation =
+    External_transition.Transition_frontier_validation (Transition_frontier)
 
   let time_to_ms = Fn.compose Time.Span.to_ms Time.to_span_since_epoch
 
@@ -372,7 +374,7 @@ module Make (Inputs : Inputs_intf) :
             in
             Some (protocol_state, internal_transition, witness) ) )
 
-  let run ~logger ~trust_system ~get_completed_work ~transaction_pool
+  let run ~logger ~verifier ~trust_system ~get_completed_work ~transaction_pool
       ~time_controller ~keypair ~consensus_local_state ~frontier_reader
       ~transition_writer ~random_peers ~query_peer =
     trace_task "proposer" (fun () ->
@@ -393,11 +395,11 @@ module Make (Inputs : Inputs_intf) :
                 ~metadata:[("breadcrumb", Breadcrumb.to_yojson crumb)]
                 !"Begining to propose off of crumb $breadcrumb%!" ;
               let previous_protocol_state, previous_protocol_state_proof =
-                let transition : External_transition.Verified.t =
+                let transition : External_transition.Validated.t =
                   (Breadcrumb.transition_with_hash crumb).data
                 in
-                ( External_transition.Verified.protocol_state transition
-                , External_transition.Verified.protocol_state_proof transition
+                ( External_transition.Validated.protocol_state transition
+                , External_transition.Validated.protocol_state_proof transition
                 )
               in
               let transactions =
@@ -437,7 +439,7 @@ module Make (Inputs : Inputs_intf) :
                       let root_consensus_state =
                         Transition_frontier.root frontier
                         |> (fun x -> (Breadcrumb.transition_with_hash x).data)
-                        |> External_transition.Verified.protocol_state
+                        |> External_transition.Validated.protocol_state
                         |> Protocol_state.consensus_state
                       in
                       [%test_result: [`Take | `Keep]]
@@ -475,24 +477,75 @@ module Make (Inputs : Inputs_intf) :
                               ) ]
                           !"Protocol_state_proof proving time took: \
                             $proving_time%!" ;
-                        (* since we generated this transition, we do not need to verify it *)
-                        let (`I_swear_this_is_safe_see_my_comment
-                              external_transition) =
-                          External_transition.to_verified
-                            (External_transition.create ~protocol_state
-                               ~protocol_state_proof
-                               ~staged_ledger_diff:
-                                 (Internal_transition.staged_ledger_diff
-                                    internal_transition))
+                        let staged_ledger_diff =
+                          Internal_transition.staged_ledger_diff
+                            internal_transition
                         in
-                        let external_transition_with_hash =
-                          { With_hash.hash= Protocol_state.hash protocol_state
-                          ; data= external_transition }
+                        let transition_hash =
+                          Protocol_state.hash protocol_state
+                        in
+                        let transition =
+                          External_transition.Validation.wrap
+                            { With_hash.hash= transition_hash
+                            ; data=
+                                External_transition.create ~protocol_state
+                                  ~protocol_state_proof ~staged_ledger_diff }
+                          |> External_transition.skip_time_received_validation
+                               `This_transition_was_not_received_via_gossip
+                          |> External_transition.skip_proof_validation
+                               `This_transition_was_generated_internally
+                          |> Transition_frontier_validation
+                             .validate_frontier_dependencies ~logger ~frontier
+                          |> Result.map_error ~f:(fun err ->
+                                 let exn name =
+                                   Error.to_exn
+                                     (Error.of_string
+                                        (sprintf
+                                           "Error validating proposed \
+                                            transition frontier dependencies: \
+                                            %s"
+                                           name))
+                                 in
+                                 match err with
+                                 | `Already_in_frontier ->
+                                     exn "already in frontier"
+                                 | `Not_selected_over_frontier_root ->
+                                     exn "not selected over frontier root"
+                                 | `Parent_missing_from_frontier ->
+                                     exn "parent missing from frontier" )
+                          |> Result.ok_exn
+                        in
+                        let%bind breadcrumb_result =
+                          Breadcrumb.build ~logger ~verifier ~trust_system
+                            ~parent:crumb ~transition ~sender:None
+                        in
+                        let breadcrumb =
+                          Result.map_error breadcrumb_result ~f:(fun err ->
+                              let exn name =
+                                Error.to_exn
+                                  (Error.of_string
+                                     (sprintf
+                                        "Error building breadcrumb from \
+                                         proposed transition: %s"
+                                        name))
+                              in
+                              match err with
+                              | `Fatal_error e ->
+                                  exn
+                                    (sprintf "fatal error -- %s"
+                                       (Exn.to_string e))
+                              | `Invalid_staged_ledger_diff e ->
+                                  exn
+                                    (sprintf "invalid staged ledger diff -- %s"
+                                       (Error.to_string_hum e))
+                              | `Invalid_staged_ledger_hash e ->
+                                  exn
+                                    (sprintf "invalid staged ledger hash -- %s"
+                                       (Error.to_string_hum e)) )
+                          |> Result.ok_exn
                         in
                         let metadata =
-                          [ ( "state_hash"
-                            , State_hash.to_yojson
-                                external_transition_with_hash.hash ) ]
+                          [("state_hash", State_hash.to_yojson transition_hash)]
                         in
                         Logger.info logger ~module_:__MODULE__
                           ~location:__LOC__
@@ -500,8 +553,7 @@ module Make (Inputs : Inputs_intf) :
                             transition frontier controller"
                           ~metadata ;
                         let%bind () =
-                          Strict_pipe.Writer.write transition_writer
-                            external_transition_with_hash
+                          Strict_pipe.Writer.write transition_writer breadcrumb
                         in
                         Logger.info logger ~module_:__MODULE__
                           ~location:__LOC__ ~metadata
@@ -510,7 +562,7 @@ module Make (Inputs : Inputs_intf) :
                         Deferred.choose
                           [ Deferred.choice
                               (Transition_frontier.wait_for_transition frontier
-                                 (With_hash.hash external_transition_with_hash))
+                                 transition_hash)
                               (Fn.const `Transition_accepted)
                           ; Deferred.choice
                               ( Time.Timeout.create time_controller
@@ -557,7 +609,7 @@ module Make (Inputs : Inputs_intf) :
                     (Breadcrumb.transition_with_hash breadcrumb).data
                   in
                   let protocol_state =
-                    External_transition.Verified.protocol_state transition
+                    External_transition.Validated.protocol_state transition
                   in
                   let consensus_state =
                     Protocol_state.consensus_state protocol_state

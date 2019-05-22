@@ -22,7 +22,7 @@ let make = (~closeModal, ~myWallets, ~settings) => {
                      )
                 )
                 ++ {j|( ■ |j}
-                ++ Js.Int.toString(wallet.balance)
+                ++ wallet.balance
                 ++ " )",
               )}
            </option>
@@ -40,7 +40,7 @@ let make = (~closeModal, ~myWallets, ~settings) => {
     <ModalButtons
       onSecondaryClick={_e => closeModal()}
       onPrimaryClick={_e => ()}
-      primaryColor=StyleGuide.Colors.serpentine
+      primaryColor=Theme.Colors.serpentine
       primaryCopy="Send"
     />
   </div>;

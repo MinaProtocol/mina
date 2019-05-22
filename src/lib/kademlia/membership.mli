@@ -1,5 +1,5 @@
 open Async_kernel
-open Core_kernel
+open Core
 open Pipe_lib
 open Network_peer
 
@@ -10,7 +10,7 @@ module Haskell : sig
 
   val connect :
        initial_peers:Host_and_port.t list
-    -> me:Peer.t
+    -> node_addrs_and_ports:Node_addrs_and_ports.t
     -> logger:Logger.t
     -> conf_dir:string
     -> trust_system:Trust_system.t
