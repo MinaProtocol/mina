@@ -51,6 +51,39 @@ module Colors = {
 };
 
 module Typeface = {
+  // fontFace has the sideEffect of loading the font
+  let _ = {
+    [
+      fontFace(
+        ~fontFamily="IBM Plex Sans",
+        ~src=[
+          `url("fonts/IBMPlexSans-Medium-Latin1.woff2"),
+          `url("fonts/IBMPlexSans-Medium-Latin1.woff"),
+        ],
+        ~fontStyle=`normal,
+        ~fontWeight=`medium,
+        (),
+      ),
+      fontFace(
+        ~fontFamily="IBM Plex Sans",
+        ~src=[
+          `url("fonts/IBMPlexSans-Regular-Latin1.woff2"),
+          `url("fonts/IBMPlexSans-Regular-Latin1.woff"),
+        ],
+        ~fontStyle=`normal,
+        ~fontWeight=`normal,
+        (),
+      ),
+      fontFace(
+        ~fontFamily="OCR A Std",
+        ~src=[`url("fonts/OCR A Std Regular.ttf")],
+        ~fontStyle=`normal,
+        ~fontWeight=`normal,
+        (),
+      ),
+    ];
+  };
+
   let lucidaGrande = fontFamily("LucidaGrande");
   let plex = fontFamily("IBM Plex Sans, Sans-Serif");
   let mono = fontFamily("OCR A Std, monospace");
