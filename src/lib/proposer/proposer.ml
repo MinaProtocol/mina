@@ -638,7 +638,7 @@ module Make (Inputs : Inputs_intf) :
                          check_for_proposal ())
                   | None -> (
                     match
-                      measure "asking conensus what to do" (fun () ->
+                      measure "asking consensus what to do" (fun () ->
                           Consensus.Hooks.next_proposal
                             (time_to_ms (Time.now time_controller))
                             consensus_state ~local_state:consensus_local_state

@@ -509,6 +509,7 @@ let coda_commands logger =
     ; (Coda_bootstrap_test.name, Coda_bootstrap_test.command)
     ; (Coda_batch_payment_test.name, Coda_batch_payment_test.command)
     ; (Coda_long_fork.name, Coda_long_fork.command)
+    ; (Coda_delegation_test.name, Coda_delegation_test.command)
     ; ("full-test", Full_test.command)
     ; ("transaction-snark-profiler", Transaction_snark_profiler.command) ]
   in

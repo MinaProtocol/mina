@@ -74,13 +74,14 @@ let root_length_exn (conn, proc, _) =
   Coda_worker.Connection.run_exn conn ~f:Coda_worker.functions.root_length
     ~arg:()
 
-let send_payment_exn (conn, proc, _) sk pk amount fee memo =
-  Coda_worker.Connection.run_exn conn ~f:Coda_worker.functions.send_payment
+let send_user_command_exn (conn, proc, _) sk pk amount fee memo =
+  Coda_worker.Connection.run_exn conn
+    ~f:Coda_worker.functions.send_user_command
     ~arg:(sk, pk, amount, fee, memo)
 
-let process_payment_exn (conn, proc, _) cmd =
-  Coda_worker.Connection.run_exn conn ~f:Coda_worker.functions.process_payment
-    ~arg:cmd
+let process_user_command_exn (conn, proc, _) cmd =
+  Coda_worker.Connection.run_exn conn
+    ~f:Coda_worker.functions.process_user_command ~arg:cmd
 
 let prove_receipt_exn (conn, proc, _) proving_receipt resulting_receipt =
   Coda_worker.Connection.run_exn conn ~f:Coda_worker.functions.prove_receipt
@@ -100,6 +101,13 @@ let verified_transitions_exn (conn, proc, _) =
   in
   Linear_pipe.wrap_reader r
 
+let new_block_exn (conn, proc, __) key =
+  let%map r =
+    Coda_worker.Connection.run_exn conn ~f:Coda_worker.functions.new_block
+      ~arg:key
+  in
+  Linear_pipe.wrap_reader r
+
 let root_diff_exn (conn, proc, _) =
   let%map r =
     Coda_worker.Connection.run_exn conn ~f:Coda_worker.functions.root_diff
@@ -110,13 +118,13 @@ let root_diff_exn (conn, proc, _) =
 let start_exn (conn, proc, _) =
   Coda_worker.Connection.run_exn conn ~f:Coda_worker.functions.start ~arg:()
 
-let new_payment_exn (conn, proc, _) pk =
-  Coda_worker.Connection.run_exn conn ~f:Coda_worker.functions.new_payment
+let new_user_command_exn (conn, proc, _) pk =
+  Coda_worker.Connection.run_exn conn ~f:Coda_worker.functions.new_user_command
     ~arg:pk
 
-let get_all_payments_exn (conn, proc, _) pk =
-  Coda_worker.Connection.run_exn conn ~f:Coda_worker.functions.get_all_payments
-    ~arg:pk
+let get_all_user_commands_exn (conn, proc, _) pk =
+  Coda_worker.Connection.run_exn conn
+    ~f:Coda_worker.functions.get_all_user_commands ~arg:pk
 
 let dump_tf (conn, proc, _) =
   Coda_worker.Connection.run_exn conn ~f:Coda_worker.functions.dump_tf ~arg:()

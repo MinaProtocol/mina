@@ -341,6 +341,18 @@ jobs:
                   command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run "test_postake_holy_grail:coda-long-fork -num-proposers 5"'
             - store_artifacts:
                   path: test_logs
+    test--test_postake_delegation:
+        resource_class: large
+        docker:
+            - image: codaprotocol/coda:toolchain-a667ae88520eaa5acc6eac754dccc724092ff2f2
+        steps:
+            - checkout
+            - run: git submodule sync && git submodule update --init --recursive
+            - run:
+                  name: Running test -- test_postake_delegation:coda-delegation-test
+                  command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run "test_postake_delegation:coda-delegation-test"'
+            - store_artifacts:
+                  path: test_logs
     test--test_postake_snarkless:
         resource_class: large
         docker:
@@ -434,6 +446,7 @@ workflows:
             - test--test_postake_five_even_snarkless
             - test--test_postake_five_even_txns
             - test--test_postake_holy_grail
+            - test--test_postake_delegation
             - test--test_postake_snarkless
             - test--test_postake_split
             - test--test_postake_split_snarkless

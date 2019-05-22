@@ -32,21 +32,10 @@ let genesis_ledger_hash =
 let compute_delegators self_pk ~iter_accounts =
   let open Coda_base in
   let t = Account.Index.Table.create () in
-  let matches_pubkey pubkey =
-    match self_pk with
-    | `Include_self, pk ->
-        Public_key.Compressed.equal pk pubkey
-    | `Don't_include_self, _ ->
-        false
-  in
+  let matches_pubkey pubkey = Public_key.Compressed.equal self_pk pubkey in
   iter_accounts (fun i (acct : Account.t) ->
-      (* TODO: The second disjunct is a hack and should be removed once the delegation
-             command PR lands. *)
-      if
-        Public_key.Compressed.equal (snd self_pk) acct.delegate
-        || matches_pubkey acct.public_key
-      then Hashtbl.add t ~key:i ~data:acct.balance |> ignore
-      else () ) ;
+      if matches_pubkey acct.delegate then
+        Hashtbl.add t ~key:i ~data:acct.balance |> ignore ) ;
   t
 
 module Segment_id = Nat.Make32 ()
@@ -338,10 +327,7 @@ module Data = struct
         | Some key ->
             let open Snapshot in
             let delegators =
-              compute_delegators
-                (* TODO: Propagate Include_self to the right place *)
-                (`Include_self, key)
-                ~iter_accounts:(fun f ->
+              compute_delegators key ~iter_accounts:(fun f ->
                   let open Coda_base in
                   Ledger.foldi ~init:() Genesis_ledger.t ~f:(fun i () acct ->
                       f (Ledger.Addr.to_int i) acct ) )
@@ -755,12 +741,15 @@ module Data = struct
       let%bind public_key =
         request_witness Public_key.typ (As_prover.return Public_key)
       in
-      let winner_addr = message.Message.delegator in
+      let staker_addr = message.Message.delegator in
       let%bind account =
-        with_label __LOC__ (Frozen_ledger_hash.get ledger winner_addr)
+        with_label __LOC__ (Frozen_ledger_hash.get ledger staker_addr)
       in
       let%bind delegate =
         with_label __LOC__ (Public_key.decompress_var account.delegate)
+      in
+      let%bind () =
+        with_label __LOC__ (Public_key.assert_equal public_key delegate)
       in
       let%bind () =
         with_label __LOC__ (Public_key.assert_equal public_key delegate)
@@ -2309,9 +2298,7 @@ module Hooks = struct
               in
               let delegators =
                 Option.map local_state.proposer_public_key ~f:(fun pk ->
-                    compute_delegators
-                      (`Include_self, pk)
-                      ~iter_accounts:(fun f ->
+                    compute_delegators pk ~iter_accounts:(fun f ->
                         Coda_base.Sparse_ledger.iteri snapshot_ledger ~f ) )
                 |> Option.value
                      ~default:(Coda_base.Account.Index.Table.create ())
@@ -2591,9 +2578,7 @@ module Hooks = struct
         Option.map local_state.proposer_public_key ~f:(fun pk ->
             let open Local_state.Snapshot in
             let delegators =
-              compute_delegators
-                (`Include_self, pk)
-                ~iter_accounts:(fun f ->
+              compute_delegators pk ~iter_accounts:(fun f ->
                   Coda_base.Ledger.Any_ledger.M.iteri snarked_ledger ~f )
             in
             let ledger =

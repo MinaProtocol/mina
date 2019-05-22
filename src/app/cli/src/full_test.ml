@@ -214,7 +214,7 @@ let run_test () : unit Deferred.t =
           |> Option.value ~default:Currency.Balance.zero
         in
         let%bind p1_res =
-          Run.Commands.send_payment coda (payment :> User_command.t)
+          Run.Commands.send_user_command coda (payment :> User_command.t)
         in
         assert_ok (p1_res |> Participating_state.active_exn) ;
         (* Send a similar payment twice on purpose; this second one will be rejected
@@ -224,7 +224,7 @@ let run_test () : unit Deferred.t =
             (Currency.Fee.of_int 0)
         in
         let%bind p2_res =
-          Run.Commands.send_payment coda (payment' :> User_command.t)
+          Run.Commands.send_user_command coda (payment' :> User_command.t)
         in
         assert_ok (p2_res |> Participating_state.active_exn) ;
         (* The payment fails, but the rpc command doesn't indicate that because that
@@ -256,7 +256,7 @@ let run_test () : unit Deferred.t =
                 (Currency.Balance.add_amount (Option.value_exn v) amount) )
         in
         let%map p_res =
-          Run.Commands.send_payment coda (payment :> User_command.t)
+          Run.Commands.send_user_command coda (payment :> User_command.t)
         in
         p_res |> Participating_state.active_exn |> assert_ok ;
         new_balance_sheet'
