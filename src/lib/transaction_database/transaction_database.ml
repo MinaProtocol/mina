@@ -12,9 +12,6 @@ module Make (Transaction : sig
   include Hashable.S with type t := t
 
   val get_participants : t -> Public_key.Compressed.t list
-
-  (* TODO: Remove Transaction functor when we query on actual transactions *)
-  val on_delegation_command : t -> f:(Public_key.Compressed.t -> unit) -> unit
 end) (Time : sig
   type t [@@deriving bin_io, compare, sexp]
 end) =
@@ -22,23 +19,30 @@ struct
   module Database = Rocksdb.Serializable.Make (Transaction) (Time)
   module Pagination = Pagination.Make (Transaction) (Time)
 
-  type cache =
-    { pagination: Pagination.t
-    ; delegators: Transaction.t Public_key.Compressed.Table.t }
+  type t = {database: Database.t; pagination: Pagination.t; logger: Logger.t}
 
-  type t = {database: Database.t; cache: cache; logger: Logger.t}
+  let add_user_transaction (pagination : Pagination.t) (transaction, date) =
+    Hashtbl.add_exn pagination.all_values ~key:transaction ~data:date ;
+    List.iter (Transaction.get_participants transaction) ~f:(fun pk ->
+        let user_txns =
+          Option.value
+            (Hashtbl.find pagination.user_values pk)
+            ~default:Pagination.Value_with_date.Set.empty
+        in
+        let user_txns' =
+          Pagination.Value_with_date.Set.add user_txns (transaction, date)
+        in
+        Hashtbl.set pagination.user_values ~key:pk ~data:user_txns' )
 
   let create logger directory =
-    { database= Database.create ~directory
-    ; cache=
-        { pagination= Pagination.create ()
-        ; delegators= Public_key.Compressed.Table.create () }
-    ; logger }
+    let database = Database.create ~directory in
+    let pagination = Pagination.create () in
+    List.iter (Database.to_alist database) ~f:(add_user_transaction pagination) ;
+    {database; pagination; logger}
 
   let close {database; _} = Database.close database
 
-  let add {database; cache= {pagination; delegators}; logger} transaction date
-      =
+  let add {database; pagination; logger} transaction date =
     match Hashtbl.find pagination.all_values transaction with
     | Some _retrieved_transaction ->
         Logger.trace logger
@@ -48,33 +52,17 @@ struct
           ~metadata:[("transaction", Transaction.to_yojson transaction)]
     | None ->
         Database.set database ~key:transaction ~data:date ;
-        Hashtbl.add_exn pagination.all_values ~key:transaction ~data:date ;
-        Transaction.on_delegation_command transaction ~f:(fun sender ->
-            Hashtbl.set delegators ~key:sender ~data:transaction ) ;
-        List.iter (Transaction.get_participants transaction) ~f:(fun pk ->
-            let user_txns =
-              Option.value
-                (Hashtbl.find pagination.user_values pk)
-                ~default:Pagination.Value_with_date.Set.empty
-            in
-            let user_txns' = Set.add user_txns (transaction, date) in
-            Hashtbl.set pagination.user_values ~key:pk ~data:user_txns' )
+        add_user_transaction pagination (transaction, date)
 
-  let get_delegator {cache= {delegators; _}; _} public_key =
-    let open Option.Let_syntax in
-    let%map delegation_user_command = Hashtbl.find delegators public_key in
-    delegation_user_command
-
-  let get_total_transactions {cache= {pagination; _}; _} =
+  let get_total_transactions {pagination; _} =
     Pagination.get_total_values pagination
 
-  let get_transactions {cache= {pagination; _}; _} =
-    Pagination.get_values pagination
+  let get_transactions {pagination; _} = Pagination.get_values pagination
 
-  let get_earlier_transactions {cache= {pagination; _}; _} =
+  let get_earlier_transactions {pagination; _} =
     Pagination.get_earlier_values pagination
 
-  let get_later_transactions {cache= {pagination; _}; _} =
+  let get_later_transactions {pagination; _} =
     Pagination.get_later_values pagination
 end
 
@@ -104,6 +92,7 @@ let%test_module "Transaction_database" =
 
     let%test_unit "We can get all the transactions associated with a public key"
         =
+      Backtrace.elide := false ;
       let trials = 10 in
       let time = 1 in
       with_database ~trials
@@ -128,41 +117,6 @@ let%test_module "Transaction_database" =
           User_command.assert_same_set pk1_expected_transactions
             pk1_queried_transactions ;
           Deferred.unit )
-
-    let compare_txns_with_dates =
-      Comparable.lift
-        ~f:(fun (txn, date) -> (date, txn))
-        [%compare: int * User_command.t]
-
-    let%test_unit "Get the most recent delegator" =
-      let keys = Array.init 3 ~f:(fun _ -> Signature_lib.Keypair.create ()) in
-      let key_gen =
-        let open Quickcheck.Generator.Let_syntax in
-        let%map reciever = Quickcheck_lib.of_array keys in
-        (keypair1, reciever)
-      in
-      let gen_stake_delegation =
-        User_command.Gen.stake_delegation ~key_gen ~max_fee:1 ()
-      in
-      let gen_user_commands_with_time =
-        let open Quickcheck.Generator.Let_syntax in
-        let%bind num_commands = Int.gen_incl 1 50 in
-        let%bind time = Int.gen_incl 0 10 in
-        let%bind stake_delegation = gen_stake_delegation in
-        Quickcheck.Generator.list_with_length num_commands
-        @@ Quickcheck.Generator.return (stake_delegation, time)
-      in
-      with_database ~trials:10 gen_user_commands_with_time
-        ~f:(fun commands_with_time database ->
-          add_all_transactions database commands_with_time ;
-          let most_recent_delegation, _ =
-            Option.value_exn
-              (List.max_elt commands_with_time ~compare:compare_txns_with_dates)
-          in
-          Deferred.return
-          @@ [%test_eq: User_command.t] ~equal:User_command.equal
-               most_recent_delegation
-               (Option.value_exn (Database.get_delegator database pk1)) )
   end )
 
 module Block_time = Coda_base.Block_time
