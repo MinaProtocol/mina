@@ -24,9 +24,6 @@ mkdir -p lib/website/static
 cp site/static/main.bc.js lib/website/static
 cp site/static/verifier_main.bc.js lib/website/static
 
-# Keep all top-level except fonts.css
-rm lib/website/fonts.css
-
 CI=no
 if [[ "$1" == "staging" ]]; then
   TARGET=coda-staging-84430
