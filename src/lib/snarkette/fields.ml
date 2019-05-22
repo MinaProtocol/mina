@@ -2,6 +2,8 @@ open Core_kernel
 open Fold_lib
 open Tuple_lib
 
+let ( = ) = `Don't_use_polymorphic_equality
+
 module type Intf = sig
   type t [@@deriving eq, bin_io, sexp, compare]
 
@@ -48,6 +50,10 @@ module type Fp_intf = sig
   val fold : t -> bool Triple.t Fold.t
 
   val length_in_bits : int
+
+  val is_square : t -> bool
+
+  val sqrt : t -> t
 end
 
 module type Extension_intf = sig
@@ -94,7 +100,7 @@ module Make_fp
     { fold=
         (fun ~init ~f ->
           let rec go acc i =
-            if i = length_in_bits then acc
+            if Int.(i = length_in_bits) then acc
             else go (f acc (N.test_bit n i)) (i + 1)
           in
           go init 0 ) }
@@ -135,7 +141,24 @@ module Make_fp
 
   let ( * ) x y = x * y % Info.order
 
-  let square x = x * x
+  let square x = x * x % Info.order
+
+  let ( ** ) x n =
+    let k = N.num_bits n in
+    let rec go acc i =
+      if Int.(i < 0) then acc
+      else
+        let acc = acc * acc in
+        let acc = if N.test_bit n i then acc * x else acc in
+        go acc Int.(i - 1)
+    in
+    go one Int.(k - 1)
+
+  let%test_unit "exp test" = [%test_eq: t] (of_int 8) (of_int 2 ** of_int 3)
+
+  let is_square =
+    let euler = N.((Info.order - one) // of_int 2) in
+    fun x -> N.equal (x ** euler) one
 
   let inv_no_mod x =
     let _, a, _b = extended_euclidean x Info.order in
@@ -144,6 +167,74 @@ module Make_fp
   let inv x = inv_no_mod x % Info.order
 
   let ( / ) x y = x * inv_no_mod y
+
+  module Sqrt_params = struct
+    let two_adicity n =
+      let rec go i = if N.test_bit n i then i else go Int.(i + 1) in
+      go 0
+
+    type nonrec t =
+      {two_adicity: int; quadratic_non_residue_to_t: t; t_minus_1_over_2: t}
+
+    let first f =
+      let rec go i = match f i with Some x -> x | None -> go Int.(i + 1) in
+      go 0
+
+    let create () =
+      let p_minus_one = N.(Info.order - one) in
+      let s = two_adicity p_minus_one in
+      let t = N.shift_right p_minus_one s in
+      let quadratic_non_residue =
+        first (fun i ->
+            let i = of_int i in
+            Option.some_if (not (is_square i)) i )
+      in
+      { two_adicity= s
+      ; quadratic_non_residue_to_t= quadratic_non_residue ** t
+      ; t_minus_1_over_2= (t - one) / of_int 2 }
+
+    let t = lazy (create ())
+  end
+
+  let rec loop ~while_ ~init f =
+    if while_ init then loop ~while_ ~init:(f init) f else init
+
+  let ( = ) = equal
+
+  let sqrt =
+    let pow2_order b =
+      loop
+        ~while_:(fun (b2m, _) -> not (b2m = one))
+        ~init:(b, 0)
+        (fun (b2m, m) -> (square b2m, Int.succ m))
+      |> snd
+    in
+    let rec pow2 b n = if n > 0 then pow2 (square b) Int.(n - 1) else b in
+    let module Loop_params = struct
+      type nonrec t = {z: t; b: t; x: t; v: int}
+    end in
+    let open Loop_params in
+    fun a ->
+      let { Sqrt_params.two_adicity= v
+          ; quadratic_non_residue_to_t= z
+          ; t_minus_1_over_2 } =
+        Lazy.force Sqrt_params.t
+      in
+      let w = a ** t_minus_1_over_2 in
+      let x = a * w in
+      let b = x * w in
+      let {x; _} =
+        loop
+          ~while_:(fun p -> not (p.b = one))
+          ~init:{z; b; x; v}
+          (fun {z; b; x; v} ->
+            let m = pow2_order b in
+            let w = pow2 z Int.(v - m - 1) in
+            {z= square w; b= b * z; x= x * w; v= m} )
+      in
+      x
+
+  let%test_unit "sqrt test" = [%test_eq: t] (of_int 100) (of_int 10)
 end
 
 module type Degree_2_extension_intf = sig
