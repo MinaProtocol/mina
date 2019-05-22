@@ -221,9 +221,7 @@ module Make (Commands : Coda_commands.Intf) = struct
                    * avoid making a new record, we'll deal with a value_exn here
                    * and be sad. *)
                   Stringable.public_key
-                    ( account.Account.Poly.public_key
-                    |> Option.value_exn ?here:None ?error:None ?message:None )
-              )
+                  @@ Option.value_exn account.Account.Poly.public_key )
             ; field "balance"
                 ~typ:(non_null AnnotatedBalance.obj)
                 ~doc:"A balance of Coda as a stringified uint64"
@@ -245,8 +243,9 @@ module Make (Commands : Coda_commands.Intf) = struct
                     account.Account.Poly.receipt_chain_hash )
             ; field "delegate" ~typ:string
                 ~doc:
-                  "The public key to which you are delegating. Your own key \
-                   if you are delegating to yourself."
+                  "The public key to which you are delegating. If you are not \
+                   delegating to anybody, than this would return your public \
+                   key."
                 ~args:Arg.[]
                 ~resolve:(fun _ account ->
                   Option.map ~f:Stringable.public_key
