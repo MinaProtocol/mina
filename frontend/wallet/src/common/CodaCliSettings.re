@@ -4,18 +4,12 @@ module ProvingKey = {
   type t = string;
 };
 
-module WithKey = {
-  type t('a) =
-    | NoKey
-    | Key(ProvingKey.t, 'a);
-};
-
 module General = {
   type t = {testnet: Url.t};
 };
 
 module Wallets = {
-  type t = WithKey.t(option(PublicKey.t));
+  type t = option(PublicKey.t);
 };
 
 module Compression = {
@@ -28,7 +22,7 @@ module Compression = {
     };
   };
 
-  type t = WithKey.t(Form.t);
+  type t = option(Form.t);
 };
 
 type t = {
@@ -41,6 +35,6 @@ let default = (~testnet) => {
   general: {
     General.testnet: testnet,
   },
-  compression: WithKey.NoKey,
-  wallets: WithKey.NoKey,
+  compression: None,
+  wallets: None,
 };
