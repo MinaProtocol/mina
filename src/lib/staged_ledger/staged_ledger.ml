@@ -178,7 +178,7 @@ end)
   type t =
     { scan_state: Scan_state.t
           (* Invariant: this is the ledger after having applied all the transactions in
-       *the above state. *)
+     *the above state. *)
     ; ledger: Ledger.attached_mask sexp_opaque
     ; pending_coinbase_collection: Pending_coinbase.t }
   [@@deriving sexp]
@@ -687,59 +687,6 @@ end)
       ; coinbases: Coinbase.t list }
   end
 
-  let apply_pre_diff coinbase_parts proposer user_commands completed_works =
-    let open Deferred.Result.Let_syntax in
-    let%map user_commands, coinbase, transactions =
-      Deferred.return
-        (let open Result.Let_syntax in
-        let%bind user_commands =
-          let%map user_commands' =
-            List.fold_until user_commands ~init:[]
-              ~f:(fun acc t ->
-                match User_command.check t with
-                | Some t ->
-                    Continue (t :: acc)
-                | None ->
-                    Stop (Error (Staged_ledger_error.Bad_signature t)) )
-              ~finish:(fun acc -> Ok acc)
-          in
-          List.rev user_commands'
-        in
-        let coinbase_fts =
-          match coinbase_parts with
-          | `Zero ->
-              []
-          | `One (Some ft) ->
-              [ft]
-          | `Two (Some (ft, None)) ->
-              [ft]
-          | `Two (Some (ft1, Some ft2)) ->
-              [ft1; ft2]
-          | _ ->
-              []
-        in
-        let%bind coinbase_work_fees =
-          sum_fees coinbase_fts ~f:snd |> to_staged_ledger_or_error
-        in
-        let%bind coinbase = create_coinbase coinbase_parts proposer in
-        let%bind delta =
-          fee_remainder user_commands completed_works coinbase_work_fees
-        in
-        let%map fee_transfers =
-          create_fee_transfers completed_works delta proposer coinbase_fts
-        in
-        let transactions =
-          List.map user_commands ~f:(fun t -> Transaction.User_command t)
-          @ List.map coinbase ~f:(fun t -> Transaction.Coinbase t)
-          @ List.map fee_transfers ~f:(fun t -> Transaction.Fee_transfer t)
-        in
-        (user_commands, coinbase, transactions))
-    in
-    { Prediff_info.data= transactions
-    ; work= completed_works
-    ; user_commands_count= List.length user_commands
-    ; coinbases= coinbase }
-
   (**The total fee excess caused by any diff should be zero. In the case where
      the slots are split into two partitions, total fee excess of the transactions
      to be enqueued on each of the partitions should be zero respectively *)
@@ -804,8 +751,8 @@ end)
     match second with
     | None ->
         (*Single partition:
-         1.Check if a new stack is required and get a working stack [working_stack]
-         2.create data for enqueuing into the scan state *)
+        1.Check if a new stack is required and get a working stack [working_stack]
+        2.create data for enqueuing into the scan state *)
         let%bind is_new_tree =
           Scan_state.next_on_new_tree scan_state
           |> to_staged_ledger_or_error |> Deferred.return
@@ -823,10 +770,10 @@ end)
     | Some _ ->
         (*Two partition:
         Assumption: Only one of the partition will have coinbase transaction(s)in it.
-         1. Get the latest stack for coinbase in the first set of transactions
-         2. get the first set of scan_state data[data1]
-         3. get a new stack for the second parition because the second set of transactions would start from the begining of the scan_state
-         4. get the second set of scan_state data[data2]*)
+        1. Get the latest stack for coinbase in the first set of transactions
+        2. get the first set of scan_state data[data1]
+        3. get a new stack for the second parition because the second set of transactions would start from the begining of the scan_state
+        4. get the second set of scan_state data[data2]*)
         let%bind working_stack1 =
           working_stack pending_coinbase_collection ~is_new_stack:false
           |> Deferred.return
@@ -927,6 +874,104 @@ end)
         Error
           (Staged_ledger_error.Coinbase_error "More than two coinbase parts")
 
+  let get_pre_diff_info coinbase_parts proposer user_commands completed_works =
+    let open Result.Let_syntax in
+    let%map user_commands, coinbase, transactions =
+      let open Result.Let_syntax in
+      let%bind user_commands =
+        let%map user_commands' =
+          List.fold_until user_commands ~init:[]
+            ~f:(fun acc t ->
+              match User_command.check t with
+              | Some t ->
+                  Continue (t :: acc)
+              | None ->
+                  Stop (Error (Staged_ledger_error.Bad_signature t)) )
+            ~finish:(fun acc -> Ok acc)
+        in
+        List.rev user_commands'
+      in
+      let coinbase_fts =
+        match coinbase_parts with
+        | `Zero ->
+            []
+        | `One (Some ft) ->
+            [ft]
+        | `Two (Some (ft, None)) ->
+            [ft]
+        | `Two (Some (ft1, Some ft2)) ->
+            [ft1; ft2]
+        | _ ->
+            []
+      in
+      let%bind coinbase_work_fees =
+        sum_fees coinbase_fts ~f:snd |> to_staged_ledger_or_error
+      in
+      let%bind coinbase = create_coinbase coinbase_parts proposer in
+      let%bind delta =
+        fee_remainder user_commands completed_works coinbase_work_fees
+      in
+      let%map fee_transfers =
+        create_fee_transfers completed_works delta proposer coinbase_fts
+      in
+      let transactions =
+        List.map user_commands ~f:(fun t -> Transaction.User_command t)
+        @ List.map coinbase ~f:(fun t -> Transaction.Coinbase t)
+        @ List.map fee_transfers ~f:(fun t -> Transaction.Fee_transfer t)
+      in
+      (user_commands, coinbase, transactions)
+    in
+    { Prediff_info.data= transactions
+    ; work= completed_works
+    ; user_commands_count= List.length user_commands
+    ; coinbases= coinbase }
+
+  let apply_pre_diff (sl_diff : Staged_ledger_diff.t) =
+    let apply_pre_diff_with_at_most_two
+        (pre_diff1 : Staged_ledger_diff.Pre_diff_with_at_most_two_coinbase.t) =
+      let coinbase_parts =
+        match pre_diff1.coinbase with
+        | Zero ->
+            `Zero
+        | One x ->
+            `One x
+        | Two x ->
+            `Two x
+      in
+      get_pre_diff_info coinbase_parts sl_diff.creator pre_diff1.user_commands
+        pre_diff1.completed_works
+    in
+    let apply_pre_diff_with_at_most_one
+        (pre_diff2 : Staged_ledger_diff.Pre_diff_with_at_most_one_coinbase.t) =
+      let coinbase_added =
+        match pre_diff2.coinbase with Zero -> `Zero | One x -> `One x
+      in
+      get_pre_diff_info coinbase_added sl_diff.creator pre_diff2.user_commands
+        pre_diff2.completed_works
+    in
+    let open Result.Let_syntax in
+    let%bind p1 = apply_pre_diff_with_at_most_two (fst sl_diff.diff) in
+    let%map p2 =
+      Option.value_map
+        ~f:(fun d -> apply_pre_diff_with_at_most_one d)
+        (snd sl_diff.diff)
+        ~default:
+          (Ok
+             { Prediff_info.data= []
+             ; work= []
+             ; user_commands_count= 0
+             ; coinbases= [] })
+    in
+    ( p1.data @ p2.data
+    , p1.work @ p2.work
+    , p1.user_commands_count + p2.user_commands_count
+    , p1.coinbases @ p2.coinbases )
+
+  let get_diff_transactions (sl_diff : Staged_ledger_diff.t) =
+    let open Result.Let_syntax in
+    let%map transactions, _, _, _ = apply_pre_diff sl_diff in
+    transactions
+
   (* N.B.: we don't expose apply_diff_unverified
      in For_tests only, we expose apply apply_unverified, which calls apply_diff_unverified *)
   let apply_diff ~logger ~verifier t (sl_diff : Staged_ledger_diff.t) =
@@ -943,28 +988,6 @@ end)
       ( Int.min (Scan_state.free_space t.scan_state) max_throughput
       , List.length jobs )
     in
-    let apply_pre_diff_with_at_most_two
-        (pre_diff1 : Staged_ledger_diff.Pre_diff_with_at_most_two_coinbase.t) =
-      let coinbase_parts =
-        match pre_diff1.coinbase with
-        | Zero ->
-            `Zero
-        | One x ->
-            `One x
-        | Two x ->
-            `Two x
-      in
-      apply_pre_diff coinbase_parts sl_diff.creator pre_diff1.user_commands
-        pre_diff1.completed_works
-    in
-    let apply_pre_diff_with_at_most_one
-        (pre_diff2 : Staged_ledger_diff.Pre_diff_with_at_most_one_coinbase.t) =
-      let coinbase_added =
-        match pre_diff2.coinbase with Zero -> `Zero | One x -> `One x
-      in
-      apply_pre_diff coinbase_added sl_diff.creator pre_diff2.user_commands
-        pre_diff2.completed_works
-    in
     let%bind () =
       let curr_hash = hash t in
       if Staged_ledger_hash.equal sl_diff.prev_hash (hash t) then return ()
@@ -977,23 +1000,7 @@ end)
     let new_ledger = Inputs.Ledger.register_mask t.ledger new_mask in
     let scan_state' = Scan_state.copy t.scan_state in
     let%bind transactions, works, user_commands_count, coinbases =
-      let%bind p1 = apply_pre_diff_with_at_most_two (fst sl_diff.diff) in
-      let%map p2 =
-        Option.value_map
-          ~f:(fun d -> apply_pre_diff_with_at_most_one d)
-          (snd sl_diff.diff)
-          ~default:
-            (Deferred.return
-               (Ok
-                  { Prediff_info.data= []
-                  ; work= []
-                  ; user_commands_count= 0
-                  ; coinbases= [] }))
-      in
-      ( p1.data @ p2.data
-      , p1.work @ p2.work
-      , p1.user_commands_count + p2.user_commands_count
-      , p1.coinbases @ p2.coinbases )
+      Deferred.return @@ apply_pre_diff sl_diff
     in
     let%bind is_new_stack, data, stack_update =
       update_coinbase_stack_and_get_data scan_state' new_ledger

@@ -383,7 +383,8 @@ let daemon logger =
        let transaction_database_dir = conf_dir ^/ "transaction" in
        let%bind () = Async.Unix.mkdir ~p:() transaction_database_dir in
        let transaction_database =
-         Transaction_database.create logger transaction_database_dir
+         Auxiliary_database.Transaction_database.create logger
+           transaction_database_dir
        in
        trace_database_initialization "transaction_database" __LOC__
          transaction_database_dir ;

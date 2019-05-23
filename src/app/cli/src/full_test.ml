@@ -78,7 +78,8 @@ let run_test () : unit Deferred.t =
       trace_database_initialization "transaction_database" __LOC__
         receipt_chain_dir_name ;
       let transaction_database =
-        Transaction_database.create logger transaction_database_dir
+        Auxiliary_database.Transaction_database.create logger
+          transaction_database_dir
       in
       let time_controller = Main.Inputs.Time.Controller.(create basic) in
       let consensus_local_state =

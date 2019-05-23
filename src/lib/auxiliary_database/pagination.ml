@@ -33,6 +33,16 @@ struct
     { user_values= Public_key.Compressed.Table.create ()
     ; all_values= Value.Table.create () }
 
+  let add_involved_participants (pagination : t) participants value_with_date =
+    List.iter participants ~f:(fun pk ->
+        let user_values =
+          Option.value
+            (Hashtbl.find pagination.user_values pk)
+            ~default:Value_with_date.Set.empty
+        in
+        Hashtbl.set pagination.user_values ~key:pk
+          ~data:(Set.add user_values value_with_date) )
+
   let get_total_values {user_values; _} public_key =
     let open Option.Let_syntax in
     let%map value_with_dates_set = Hashtbl.find user_values public_key in
@@ -46,6 +56,8 @@ struct
         ~f:(fun (txn, _) -> txn)
     in
     Option.value queried_values ~default:[]
+
+  (* let add_involved_participants  *)
 
   module With_non_null_value = struct
     let get_pagination_query ~f t public_key value =
@@ -177,8 +189,7 @@ let%test_module "Pagination" =
               Hashtbl.set t.user_values ~key:pk
                 ~data:(Set.add user_txns (txn, time)) ) )
 
-    let%test_unit "We can get all the transactions associated with a public key"
-        =
+    let%test_unit "We can get all values associated with a public key" =
       let trials = 10 in
       let time = 1 in
       Quickcheck.test ~trials

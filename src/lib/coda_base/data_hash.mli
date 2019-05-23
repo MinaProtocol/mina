@@ -22,6 +22,8 @@ module type Basic = sig
       [@@deriving bin_io, sexp, compare, eq, hash, yojson, version]
 
       include Hashable_binable with type t := t
+
+      include Comparable.S with type t := t
     end
 
     module Latest : module type of V1

@@ -1166,6 +1166,10 @@ module type Staged_ledger_intf = sig
     -> get_completed_work:(statement -> completed_work_checked option)
     -> valid_diff
 
+  (* TODO: This should be delegated to staged_ledger_diff *)
+  val get_diff_transactions :
+    diff -> (transaction list, Staged_ledger_error.t) Result.t
+
   val all_work_pairs_exn :
        t
     -> ( ( ledger_proof_statement

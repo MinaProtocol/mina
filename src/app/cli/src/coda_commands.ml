@@ -370,7 +370,8 @@ struct
 
   let get_all_payments coda public_key =
     let transaction_database = Program.transaction_database coda in
-    Transaction_database.get_transactions transaction_database public_key
+    Auxiliary_database.Transaction_database.get_values transaction_database
+      public_key
 
   module Subscriptions = struct
     (* Creates a global pipe to feed a subscription that will be available throughout the entire duration that a daemon is runnning  *)
@@ -434,7 +435,8 @@ struct
                   public_key )
             |> List.iter ~f:(fun user_command ->
                    (* TODO: Time should be computed when a payment gets into the transition frontier  *)
-                   Transaction_database.add transaction_database user_command
+                   Auxiliary_database.Transaction_database.add
+                     transaction_database user_command
                      ( Coda_base.Block_time.Time.now
                      @@ Coda_base.Block_time.Time.Controller.basic ) ;
                    Strict_pipe.Writer.write frontier_payment_writer

@@ -11,7 +11,7 @@
    transition_handler bootstrap_controller transition_router async
    async_extra rpc_parallel async_ssl cohttp o1trace cohttp-async parallel prover
    file_system yojson web_client_pipe work_selector graphql-async graphql-cohttp root_prover
-   module_version incremental secrets transaction_database)
+   module_version incremental secrets auxiliary_database)
  (preprocessor_deps ../../../config.mlh)
  (preprocess
   (pps ppx_deriving.eq ppx_deriving.make ppx_inline_test ppx_coda
