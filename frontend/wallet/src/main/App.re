@@ -50,18 +50,13 @@ let createTray = dispatch => {
 App.on(`WindowAllClosed, () => ());
 App.on(`WillQuit, () => killDaemons());
 
-let initialTask =
-  Task.map(Task.uncallbackifyValue(App.on(`Ready)), ~f=() => ());
+let initialTask = Task.uncallbackifyValue(App.on(`Ready));
 
 let run = () =>
   Task.attempt(
     initialTask,
     ~f=_ => {
-      let initialState = {
-        // TODO: Remove all settings logic from App
-        Application.State.settingsOrError: Error(`Json_parse_error),
-        wallets: [||],
-      };
+      let initialState = ();
 
       let dispatch = ref(_ => ());
       let store =
