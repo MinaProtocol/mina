@@ -240,14 +240,15 @@ module Make_fp
       in
       x
 
-  let%test_unit "sqrt test" =
+  let%test_unit "sqrt agrees with integer square root on small values" =
     let rec mem a = function
       | [] ->
           ()
       | x :: xs -> (
         try [%test_eq: t] a x with _ -> mem a xs )
     in
-    Quickcheck.test Int.quickcheck_generator ~f:(fun n ->
+    let gen = Int.gen_incl 1 Int.max_value_30_bits in
+    Quickcheck.test ~trials:100 gen ~f:(fun n ->
         let n = abs n in
         let n2 = Int.(n * n) in
         mem (sqrt (of_int n2)) [of_int n; Info.order - of_int n] )
