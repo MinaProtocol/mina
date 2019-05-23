@@ -182,3 +182,22 @@ describe("Time", () => {
     expect(f(~date)) |> toBe("June 23rd - 12:33pm");
   });
 });
+
+describe("AddressBook", () =>
+  describe("serialization", () =>
+    test("roundtrip", () => {
+      let before =
+        Js.Dict.fromList([
+          ("pk1", Js.Json.string("name")),
+          ("pk2", Js.Json.string("name 2")),
+          ("pk3", Js.Json.string("name-3")),
+        ])
+        |> Js.Json.object_
+        |> Js.Json.stringify;
+
+      let after = before |> Settings.fromJsonString |> Settings.toJsonString;
+
+      expect(before) |> toEqual(after);
+    })
+  )
+);

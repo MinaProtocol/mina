@@ -80,9 +80,7 @@ let make = () => {
                      |> Option.andThen(~f=addWallet => addWallet##publicKey)
                      |> Option.map(~f=pk => {
                           let key = PublicKey.ofStringExn(pk);
-                          updateSettings(
-                            Option.map(~f=Settings.set(~key, ~name)),
-                          );
+                          updateSettings(Settings.set(~key, ~name));
                         })
                      |> ignore,
                );

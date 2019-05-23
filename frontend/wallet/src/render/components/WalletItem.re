@@ -53,7 +53,7 @@ let make = (~wallet: Wallet.t) => {
     )
     |> Option.withDefault(~default=false);
 
-  let walletName = SettingsRenderer.getWalletName(settings, wallet.key);
+  let walletName = Settings.getWalletName(settings, wallet.key);
 
   <div
     className={

@@ -51,18 +51,17 @@ App.on(`WindowAllClosed, () => ());
 App.on(`WillQuit, () => killDaemons());
 
 let initialTask =
-  Task.map2(
-    Task.uncallbackifyValue(App.on(`Ready)),
-    SettingsMain.load(ProjectRoot.settings),
-    ~f=((), settings) =>
-    settings
-  );
+  Task.map(Task.uncallbackifyValue(App.on(`Ready)), ~f=() => ());
 
 let run = () =>
   Task.attempt(
     initialTask,
-    ~f=settingsOrError => {
-      let initialState = {Application.State.settingsOrError, wallets: [||]};
+    ~f=_ => {
+      let initialState = {
+        // TODO: Remove all settings logic from App
+        Application.State.settingsOrError: Error(`Json_parse_error),
+        wallets: [||],
+      };
 
       let dispatch = ref(_ => ());
       let store =

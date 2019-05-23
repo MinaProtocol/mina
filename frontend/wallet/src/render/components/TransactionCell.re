@@ -173,7 +173,7 @@ module ActorName = {
         <span
           className=Css.(
             merge([
-              Option.isSome(SettingsRenderer.lookup(settings, key))
+              Option.isSome(Settings.lookup(settings, key))
                 ? Theme.Text.Body.regular : Theme.Text.mono,
               style([
                 color(
@@ -184,7 +184,7 @@ module ActorName = {
               ]),
             ])
           )>
-          {ReasonReact.string(SettingsRenderer.getWalletName(settings, key))}
+          {ReasonReact.string(Settings.getWalletName(settings, key))}
         </span>
       </Pill>
     | Unknown =>

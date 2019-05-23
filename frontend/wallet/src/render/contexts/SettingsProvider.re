@@ -1,33 +1,36 @@
 open Tc;
 
-module SettingsContextType = {
-  type t = (
-    option(Settings.t),
-    (option(Settings.t) => option(Settings.t)) => unit,
-  );
+module AddressBookContextType = {
+  type t = (Settings.t, (Settings.t => Settings.t) => unit);
 
-  let initialContext = (None, _ => ());
+  let initialContext = (Settings.empty, _ => ());
 };
 
-type t = SettingsContextType.t;
-include ContextProvider.Make(SettingsContextType);
+type t = AddressBookContextType.t;
+include ContextProvider.Make(AddressBookContextType);
 
 let createContext = () => {
+  let localStorageKeyName = "addressbook";
+
   let (settings, setSettings) =
-    React.useState(() => Result.toOption(SettingsRenderer.loadSettings()));
+    React.useState(() =>
+      localStorageKeyName
+      |> Bindings.LocalStorage.getItem
+      |> Js.Nullable.toOption
+      |> Option.map(~f=Settings.fromJsonString)
+      |> Option.withDefault(~default=Settings.empty)
+    );
 
   (
     settings,
     createNewSettings =>
-      setSettings(settings =>
-        createNewSettings(settings)
-        |> Option.map(~f=newSettings => {
-             Task.attempt(
-               ~f=_ => (),
-               SettingsRenderer.saveSettings(newSettings),
-             );
-             newSettings;
-           })
-      ),
+      setSettings(settings => {
+        let newSettings = createNewSettings(settings);
+        Bindings.LocalStorage.setItem(
+          localStorageKeyName,
+          Settings.toJsonString(newSettings),
+        );
+        newSettings;
+      }),
   );
 };

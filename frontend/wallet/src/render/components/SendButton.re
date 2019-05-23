@@ -146,7 +146,7 @@ let make = (~wallets, ~onSubmit) => {
                  |> Array.map(~f=wallet =>
                       (
                         wallet.Wallet.key,
-                        SettingsRenderer.getWalletName(settings, wallet.key),
+                        Settings.getWalletName(settings, wallet.key),
                       )
                     )
                  |> Array.toList
