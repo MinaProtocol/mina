@@ -1,11 +1,12 @@
 ### How to build the website
 
-First get the code:
+Setup:
 1. Clone the repo via SSH: `git clone git@github.com:CodaProtocol/coda.git`
 2. Navigate into `coda/frontend/website`
 3. Run `yarn` to install dependencies (alternatively `npm install`)
+4. Install [pandoc](https://pandoc.org/) via `brew install pandoc` or similar.
 
-To develop:
+Develop:
 
 4. Run `yarn dev` to build (with a watcher) and start a server (alternatively `npm run dev`)
 5. Open `localhost:8000` in your browser to see the site. You can edit files in `src` and save to see changes.
