@@ -18,7 +18,7 @@ module Make (Inputs : Inputs_intf.S) = struct
   let random_oracle =
     let field_to_bits = Fn.compose Array.of_list Field.to_bits in
     fun x ->
-      Blake2.digest_bits (field_to_bits x)
+      field_to_bits x |> Blake2.bits_to_string |> Blake2.digest_string
       |> Blake2.to_raw_string |> Blake2.string_to_bits |> Array.to_list
 
   let hash ?message ~a ~b ~c ~delta_prime =
