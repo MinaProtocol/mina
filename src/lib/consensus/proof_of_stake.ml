@@ -361,7 +361,7 @@ module Data = struct
       ; proposer_public_key }
 
     type snapshot_identifier = Last_epoch_snapshot | Curr_epoch_snapshot
-    [@@deriving to_yojson]
+    [@@deriving to_yojson, eq]
 
     let get_snapshot t id =
       match id with
@@ -2296,45 +2296,64 @@ module Hooks = struct
           , `List (List.map requested_syncs ~f:local_state_sync_to_yojson) )
         ; ("local_state", Local_state.to_yojson local_state) ] ;
     let sync {snapshot_id; expected_root= target_ledger_hash} =
-      Deferred.List.exists (random_peers 3) ~f:(fun peer ->
-          match%bind
-            query_peer.query peer Rpcs.Get_epoch_ledger.dispatch_multi
-              (Coda_base.Frozen_ledger_hash.to_ledger_hash target_ledger_hash)
-          with
-          | Ok (Ok snapshot_ledger) ->
-              let%bind () =
-                Trust_system.(
-                  record trust_system logger peer.host
-                    Actions.(Epoch_ledger_provided, None))
-              in
-              let delegators =
-                Option.map local_state.proposer_public_key ~f:(fun pk ->
-                    compute_delegators
-                      (`Include_self, pk)
-                      ~iter_accounts:(fun f ->
-                        Coda_base.Sparse_ledger.iteri snapshot_ledger ~f ) )
-                |> Option.value
-                     ~default:(Coda_base.Account.Index.Table.create ())
-              in
-              set_snapshot local_state snapshot_id
-                (Some {ledger= snapshot_ledger; delegators}) ;
-              return true
-          | Ok (Error err) ->
-              Logger.faulty_peer_without_punishment logger ~module_:__MODULE__
-                ~location:__LOC__
-                ~metadata:
-                  [ ("peer", Network_peer.Peer.to_yojson peer)
-                  ; ("error", `String err) ]
-                "peer $peer failed to serve requested epoch ledger: $error" ;
-              return false
-          | Error err ->
-              Logger.faulty_peer_without_punishment logger ~module_:__MODULE__
-                ~location:__LOC__
-                ~metadata:
-                  [ ("peer", Network_peer.Peer.to_yojson peer)
-                  ; ("error", `String (Error.to_string_hum err)) ]
-                "error querying peer $peer: $error" ;
-              return false )
+      (* if requested last epoch ledger is equal to the current epoch ledger
+         then we don't need make a rpc call to the peers. *)
+      if
+        snapshot_id = Last_epoch_snapshot
+        && Option.fold local_state.curr_epoch_snapshot ~init:false
+             ~f:(fun _ curr_snapshot ->
+               Coda_base.(
+                 Ledger_hash.equal
+                   (Frozen_ledger_hash.to_ledger_hash target_ledger_hash)
+                   (Sparse_ledger.merkle_root curr_snapshot.ledger)) )
+      then (
+        let curr_snapshot = Option.value_exn local_state.curr_epoch_snapshot in
+        set_snapshot local_state Last_epoch_snapshot
+          (Some
+             { ledger= curr_snapshot.ledger
+             ; delegators= curr_snapshot.delegators }) ;
+        set_snapshot local_state Curr_epoch_snapshot None ;
+        return true )
+      else
+        Deferred.List.exists (random_peers 3) ~f:(fun peer ->
+            match%bind
+              query_peer.query peer Rpcs.Get_epoch_ledger.dispatch_multi
+                (Coda_base.Frozen_ledger_hash.to_ledger_hash target_ledger_hash)
+            with
+            | Ok (Ok snapshot_ledger) ->
+                let%bind () =
+                  Trust_system.(
+                    record trust_system logger peer.host
+                      Actions.(Epoch_ledger_provided, None))
+                in
+                let delegators =
+                  Option.map local_state.proposer_public_key ~f:(fun pk ->
+                      compute_delegators
+                        (`Include_self, pk)
+                        ~iter_accounts:(fun f ->
+                          Coda_base.Sparse_ledger.iteri snapshot_ledger ~f ) )
+                  |> Option.value
+                       ~default:(Coda_base.Account.Index.Table.create ())
+                in
+                set_snapshot local_state snapshot_id
+                  (Some {ledger= snapshot_ledger; delegators}) ;
+                return true
+            | Ok (Error err) ->
+                Logger.faulty_peer_without_punishment logger
+                  ~module_:__MODULE__ ~location:__LOC__
+                  ~metadata:
+                    [ ("peer", Network_peer.Peer.to_yojson peer)
+                    ; ("error", `String err) ]
+                  "peer $peer failed to serve requested epoch ledger: $error" ;
+                return false
+            | Error err ->
+                Logger.faulty_peer_without_punishment logger
+                  ~module_:__MODULE__ ~location:__LOC__
+                  ~metadata:
+                    [ ("peer", Network_peer.Peer.to_yojson peer)
+                    ; ("error", `String (Error.to_string_hum err)) ]
+                  "error querying peer $peer: $error" ;
+                return false )
     in
     if%map Deferred.List.for_all requested_syncs ~f:sync then Ok ()
     else Error (Error.of_string "failed to synchronize epoch ledger")
