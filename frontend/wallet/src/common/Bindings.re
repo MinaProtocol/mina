@@ -1,5 +1,10 @@
 open Tc;
 
+// Ignores cancellation
+let setTimeout: int => Task.t('x, unit) =
+  millis =>
+    Task.uncallbackifyValue(cb => ignore(Js.Global.setTimeout(cb, millis)));
+
 module Window = {
   type t;
 

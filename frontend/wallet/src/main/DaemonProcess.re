@@ -7,6 +7,32 @@ module Command = {
     args: array(string),
     env: option(Js.Dict.t(string)),
   };
+
+  let addArgs = (t, args) => {...t, args: Js.Array.concat(t.args, args)};
+};
+
+let (^/) = Filename.concat;
+let baseCodaCommand = port => {
+  let codaPath = "_build/coda-daemon-macos";
+  {
+    Command.executable: ProjectRoot.resource ^/ codaPath ^/ "coda.exe",
+    args: [|
+      "daemon",
+      "-rest-port",
+      Js.Int.toString(port),
+      "-config-directory",
+      ProjectRoot.resource ^/ codaPath ^/ "config",
+    |],
+    env:
+      Some(
+        Js.Dict.fromList([
+          (
+            "CODA_KADEMLIA_PATH",
+            ProjectRoot.resource ^/ codaPath ^/ "kademlia",
+          ),
+        ]),
+      ),
+  };
 };
 
 module Process = {
@@ -58,11 +84,32 @@ module Process = {
       }
     );
 
-    () => ChildProcess.Process.kill(p);
+    p;
   };
 };
 
-let (^/) = Filename.concat;
+module CodaProcess = {
+  type t = ChildProcess.Process.t;
+
+  let kill: t => unit = t => ChildProcess.Process.kill(t);
+
+  let start:
+    list(string) =>
+    Result.t(string, (ChildProcess.Process.t, Task.t('x, [> | `Ready]))) =
+    args => {
+      let p =
+        Process.start(
+          Command.addArgs(baseCodaCommand(0xc0da), args |> Array.fromList),
+          0xc0da,
+        );
+      // TODO: Actually detect when graphql is ready. According to experimentation,
+      //    waiting around 5 seconds is sufficient for now
+      Belt.Result.Ok((
+        p,
+        Bindings.setTimeout(5000) |> Task.map(~f=() => `Ready),
+      ));
+    };
+};
 
 let startAll = (~fakerPort, ~codaPort) => {
   let graphqlFaker = {
@@ -99,10 +146,10 @@ let startAll = (~fakerPort, ~codaPort) => {
         ]),
       ),
   };
-  let kill1 = Process.start(graphqlFaker, fakerPort);
-  let kill2 = Process.start(coda, codaPort);
+  let p1 = Process.start(graphqlFaker, fakerPort);
+  let p2 = Process.start(coda, codaPort);
   () => {
-    kill1();
-    kill2();
+    ChildProcess.Process.kill(p1);
+    ChildProcess.Process.kill(p2);
   };
 };
