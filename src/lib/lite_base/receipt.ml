@@ -1,5 +1,5 @@
 module Chain_hash = struct
-  type t = Crypto_params.Tock.Fq.t [@@deriving bin_io, sexp, eq]
+  type t = Lite_params.Tock.Fq.t [@@deriving bin_io, sexp, eq]
 
-  let fold = Crypto_params.Tock.Fq.fold
+  let fold = Lite_params.Tock.Fq.fold
 end
