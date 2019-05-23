@@ -15,7 +15,6 @@ echo "*** Building"
 
 npm run build && node lib/js/src/Render.js prod
 
-cp site/fonts.css lib/cdn/
 cp -r site/static lib/cdn/
 
 cd lib/cdn
