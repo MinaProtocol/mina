@@ -14,3 +14,4 @@ app.js
 *.cmi
 *.cmx
 *.o
+coda-daemon-macos.zip

@@ -3,69 +3,67 @@ open Tc;
 
 include BrowserWindow.MakeBrowserWindow(Messages);
 
+module Input = {
+  type t = {
+    path: Route.t,
+    dispatch: Application.Action.t => unit,
+  };
+};
+
 include Single.Make({
-  type input = Route.t;
+  type input = Input.t;
+
   type t = BrowserWindow.t;
 
-  let listen = (t, settingsOrError) => {
+  let listen = (_t, _dispatch) => {
     let cb =
       (. _event, message) =>
         switch (message) {
-        | `Set_name(key, name, pendingIdent) =>
-          switch (settingsOrError) {
-          | `Settings(settings) =>
-            let task = SettingsMain.add(settings, ~key, ~name);
-            Task.attempt(task, ~f=_res =>
-              send(
-                t,
-                `Respond_new_settings((
-                  pendingIdent,
-                  Js.Json.stringify(
-                    Route.SettingsOrError.Encode.t(`Settings(settings)),
-                  ),
-                )),
-              )
-            );
-          | e =>
-            send(
-              t,
-              `Respond_new_settings((
-                pendingIdent,
-                Js.Json.stringify(Route.SettingsOrError.Encode.t(e)),
-              )),
-            )
-          }
+        | `Set_name(_, _, _) => ()
         };
     RendererCommunication.on(cb);
     cb;
   };
 
   let make: (~drop: unit => unit, input) => t =
-    (~drop, route) => {
+    (~drop, input) => {
       let window =
         make(
           makeWindowConfig(
-            ~transparent=true,
-            ~width=880,
-            ~height=500,
+            ~width=960,
+            ~height=610,
+            ~minWidth=800,
+            ~minHeight=500,
             ~frame=false,
             ~fullscreenable=false,
             ~resizeable=false,
             ~title="Coda Wallet",
-            ~backgroundColor=
-              "#DD" ++ StyleGuide.Colors.(hexToString(bgColor)),
+            ~titleBarStyle=`Hidden,
+            ~backgroundColor=Theme.Colors.bgColorElectronWindow,
+            ~webPreferences=
+              makeWebPreferences(
+                ~preload=
+                  Filename.concat(
+                    [%bs.node __dirname] |> Option.getExn |> Filename.dirname,
+                    "render/Preload.js",
+                  ),
+                ~nodeIntegration=true,
+                (),
+              ),
             (),
           ),
         );
-      loadURL(
-        window,
+
+      let indexURL =
         "file://"
         ++ Filename.concat(ProjectRoot.resource, "public/index.html")
+        ++ "?settingsPath="
+        ++ Js.Global.encodeURI(ProjectRoot.settings)
         ++ "#"
-        ++ Route.print(route),
-      );
+        ++ Route.print(input.path);
+      loadURL(window, indexURL);
 
-      let listener = listen(window, route.settingsOrError);
+      let listener = listen(window, input.dispatch);
       on(
         window,
         `Closed,
@@ -75,14 +73,20 @@ include Single.Make({
         },
       );
 
+      // Watches the bundle to reload the window on changes
+      Bindings.Fs.watchFile(
+        Filename.concat(ProjectRoot.resource, "bundle/index.js"), () =>
+        loadURL(window, indexURL)
+      );
+
       window;
     };
 });
 
-let deepLink = route => {
-  let w = get(route);
+let deepLink = input => {
+  let w = get(input);
   // route handling is idempotent so doesn't matter if we also send the message
   // if window already exists
-  send(w, `Deep_link(Route.print(route)));
+  send(w, `Deep_link(Route.print(input.path)));
   ();
 };

@@ -57,6 +57,8 @@ team on github.
 Maintainers should assign reviewers to pull requests, and tag them with any
 relevant labels.
 
+Once a PR has been reviewed and approved, and all CI tests have passed, tag the PR with the `ready-to-merge` label to trigger Mergify and automatically merge the code.
+
 ## Documentation
 
 There are three main pieces of Coda documentation:

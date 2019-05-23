@@ -22,9 +22,13 @@ module Stable : sig
       , Signature.Stable.V1.t )
       Poly.Stable.V1.t
     [@@deriving bin_io, eq, sexp, hash, yojson, version]
+
+    include Comparable.S with type t := t
+
+    include Hashable.S with type t := t
   end
 
-  module Latest : module type of V1
+  module Latest = V1
 end
 
 include User_command_intf.S with type t = Stable.Latest.t

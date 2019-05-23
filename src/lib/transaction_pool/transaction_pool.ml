@@ -450,6 +450,7 @@ end)
 (Transition_frontier : Transition_frontier_intf
                        with type staged_ledger := Staged_ledger.t) =
   Make0 (Coda_base.Ledger) (Staged_ledger) (Transition_frontier)
+include Make (Staged_ledger) (Transition_frontier)
 
 let%test_module _ =
   ( module struct
@@ -547,7 +548,7 @@ let%test_module _ =
         if n < Array.length test_keys then
           let%bind cmd =
             let sender = test_keys.(n) in
-            User_command.gen ~sign_type:`Real
+            User_command.Gen.payment ~sign_type:`Real
               ~key_gen:
                 (Quickcheck.Generator.tuple2 (return sender)
                    (Quickcheck_lib.of_array test_keys))
@@ -679,7 +680,7 @@ let%test_module _ =
           let cmd1 =
             let sender = test_keys.(0) in
             Quickcheck.random_value
-              (User_command.gen ~sign_type:`Real
+              (User_command.Gen.payment ~sign_type:`Real
                  ~key_gen:
                    Quickcheck.Generator.(
                      tuple2 (return sender) (Quickcheck_lib.of_array test_keys))

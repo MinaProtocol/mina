@@ -9,7 +9,13 @@ module type Inputs_intf = sig
   module Transition_frontier :
     Transition_frontier_intf
     with type state_hash := State_hash.t
-     and type external_transition_verified := External_transition.Verified.t
+     and type external_transition_validated := External_transition.Validated.t
+     and type mostly_validated_external_transition :=
+                ( [`Time_received] * Truth.true_t
+                , [`Proof] * Truth.true_t
+                , [`Frontier_dependencies] * Truth.true_t
+                , [`Staged_ledger_diff] * Truth.false_t )
+                External_transition.Validation.with_transition
      and type ledger_database := Ledger.Db.t
      and type staged_ledger := Staged_ledger.t
      and type masked_ledger := Ledger.Mask.Attached.t
@@ -17,24 +23,11 @@ module type Inputs_intf = sig
      and type staged_ledger_diff := Staged_ledger_diff.t
      and type consensus_local_state := Consensus.Data.Local_state.t
      and type user_command := User_command.t
-     and type diff_mutant :=
-                ( External_transition.Stable.Latest.t
-                , State_hash.Stable.Latest.t )
-                With_hash.t
-                Diff_mutant.E.t
+     and type verifier := Verifier.t
+     and type pending_coinbase := Pending_coinbase.t
+     and type consensus_state := Consensus.Data.Consensus_state.Value.t
 
   module Time : Protocols.Coda_pow.Time_intf
-
-  module Protocol_state_validator :
-    Protocol_state_validator_intf
-    with type time := Time.t
-     and type state_hash := State_hash.t
-     and type envelope_sender := Envelope.Sender.t
-     and type trust_system := Trust_system.t
-     and type external_transition := External_transition.t
-     and type external_transition_proof_verified :=
-                External_transition.Proof_verified.t
-     and type external_transition_verified := External_transition.Verified.t
 end
 
 module Make (Inputs : Inputs_intf) :
@@ -42,6 +35,8 @@ module Make (Inputs : Inputs_intf) :
   with type ledger_hash := Ledger_hash.t
    and type state_hash := State_hash.t
    and type external_transition := Inputs.External_transition.t
+   and type external_transition_validated :=
+              Inputs.External_transition.Validated.t
    and type transition_frontier := Inputs.Transition_frontier.t
    and type syncable_ledger_query := Sync_ledger.Query.t
    and type syncable_ledger_answer := Sync_ledger.Answer.t
@@ -91,7 +86,8 @@ module Make (Inputs : Inputs_intf) :
       Transition_frontier.root_history_path_map frontier
         ~f:(fun b ->
           Transition_frontier.Breadcrumb.transition_with_hash b
-          |> With_hash.data |> External_transition.of_verified )
+          |> With_hash.data |> External_transition.Validated.forget_validation
+          )
         state_hash
     in
     let length =

@@ -14,43 +14,43 @@ jobs:
 
     build-wallet:
         macos:
-            xcode: "10.1.0"
+            xcode: "10.2.0"
         steps:
             - checkout
             - run: git submodule sync && git submodule update --init --recursive
-            - run: cd frontend/wallet && npm install
+            - run: cd frontend/wallet && yarn
             - run:
                   name: Lint wallet
-                  command: cd frontend/wallet && npm run reformat && git diff --exit-code src
+                  command: cd frontend/wallet && yarn run reformat && git diff --exit-code src
             - run:
                   name: Build wallet
-                  command: cd frontend/wallet && npm run build-ci
+                  command: cd frontend/wallet && yarn run build-ci
             - run:
                   name: Test wallet
-                  command: cd frontend/wallet && npm test
-            - run:
-                  name: Build dist wallet
-                  command: cd frontend/wallet && npm run dist
-            - run:
-                  name: Publish dist wallet
-                  command: (env HOMEBREW_NO_AUTO_UPDATE=1 brew install awscli) && ./scripts/publish-wallet.sh
-            - run: cd frontend/website && npm install
+                  command: cd frontend/wallet && yarn test
+#            - run:
+#                  name: Build dist wallet
+#                  command: cd frontend/wallet && yarn run dist
+#            - run:
+#                  name: Publish dist wallet
+#                  command: (env HOMEBREW_NO_AUTO_UPDATE=1 brew install awscli) && ./scripts/publish-wallet.sh
+            - run: cd frontend/website && yarn install
             - run:
                   name: Decrypt PragmataPro font
-                  command: cd frontend/website && npm run decrypt-ci
+                  command: cd frontend/website && yarn run decrypt-ci
             - run:
                   name: Lint website
-                  command: cd frontend/website && npm run reformat && git diff --exit-code src
+                  command: cd frontend/website && yarn run reformat && git diff --exit-code src
             - run:
                   name: Build website
-                  command: cd frontend/website && npm run build && (env HOMEBREW_NO_AUTO_UPDATE=1 brew install pandoc) && node ./lib/js/src/Render.js
+                  command: cd frontend/website && yarn run build && (env HOMEBREW_NO_AUTO_UPDATE=1 brew install pandoc) && node ./lib/js/src/Render.js
             - run:
                   name: Deploy staging
-                  command: cd frontend/website && (if [ "$CIRCLE_BRANCH" == "master" ]; then npm run deploy-ci; fi)
+                  command: cd frontend/website && (if [ "$CIRCLE_BRANCH" == "master" ]; then yarn run deploy-ci; fi)
 
     lint:
         docker:
-            - image: codaprotocol/coda:toolchain-8959b8dfda29263d2f88f13a284ef34c9da0a081
+            - image: codaprotocol/coda:toolchain-a667ae88520eaa5acc6eac754dccc724092ff2f2
         steps:
             - checkout
             - run: git submodule sync && git submodule update --init --recursive
@@ -128,7 +128,7 @@ jobs:
     build-artifacts--{{profile}}:
         resource_class: large
         docker:
-            - image: codaprotocol/coda:toolchain-8959b8dfda29263d2f88f13a284ef34c9da0a081
+            - image: codaprotocol/coda:toolchain-a667ae88520eaa5acc6eac754dccc724092ff2f2
         environment:
             DUNE_PROFILE: {{profile}}
         steps:
@@ -167,7 +167,7 @@ jobs:
     test-unit--{{profile}}:
         resource_class: large
         docker:
-            - image: codaprotocol/coda:toolchain-8959b8dfda29263d2f88f13a284ef34c9da0a081
+            - image: codaprotocol/coda:toolchain-a667ae88520eaa5acc6eac754dccc724092ff2f2
         steps:
             - checkout
             - run: git submodule sync && git submodule update --init --recursive
@@ -180,7 +180,7 @@ jobs:
     test--{{profile}}:
         resource_class: large
         docker:
-            - image: codaprotocol/coda:toolchain-8959b8dfda29263d2f88f13a284ef34c9da0a081
+            - image: codaprotocol/coda:toolchain-a667ae88520eaa5acc6eac754dccc724092ff2f2
         steps:
             - checkout
             - run: git submodule sync && git submodule update --init --recursive

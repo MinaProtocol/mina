@@ -39,9 +39,9 @@ struct
             (Transition_frontier.Breadcrumb.transition_with_hash
                (best_tip t |> Participating_state.active_exn))
         in
-        let state = External_transition.Verified.protocol_state transition in
+        let state = External_transition.Validated.protocol_state transition in
         let proof =
-          External_transition.Verified.protocol_state_proof transition
+          External_transition.Validated.protocol_state_proof transition
         in
         let ledger =
           List.fold pks

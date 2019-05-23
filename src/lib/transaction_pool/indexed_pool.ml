@@ -593,10 +593,18 @@ let add_from_backtrack : t -> User_command.With_valid_signature.t -> t =
       ; size= t.size + 1 }
   | Some (queue, currency_reserved) ->
       let first_queued = F_sequence.head_exn queue in
-      assert (
-        Account_nonce.equal
-          (unchecked |> User_command.nonce |> Account_nonce.succ)
-          (first_queued |> User_command.forget_check |> User_command.nonce) ) ;
+      if
+        not
+          (Account_nonce.equal
+             (unchecked |> User_command.nonce |> Account_nonce.succ)
+             (first_queued |> User_command.forget_check |> User_command.nonce))
+      then
+        failwith
+        @@ sprintf
+             !"indexed pool nonces inconsistent when adding from backtrack. \
+               Trying to add %{sexp:User_command.With_valid_signature.t} to \
+               %{sexp: t}"
+             cmd t ;
       let t' = remove_applicable_exn t first_queued in
       { applicable_by_fee=
           Map_set.insert
@@ -621,7 +629,7 @@ let%test_module _ =
     let test_keys = Array.init 10 ~f:(fun _ -> Signature_lib.Keypair.create ())
 
     let gen_cmd =
-      User_command.With_valid_signature.gen_with_random_participants
+      User_command.With_valid_signature.Gen.payment_with_random_participants
         ~keys:test_keys ~max_amount:1000 ~max_fee:10
 
     module Array_m (M : Monad.S) = struct
@@ -845,8 +853,8 @@ let%test_module _ =
                 Quickcheck.Generator.tuple2 (return sender)
                   (Quickcheck_lib.of_array test_keys)
               in
-              User_command.gen ~sign_type:`Fake ~key_gen ~nonce:current_nonce
-                ~max_amount:1 ~max_fee:0 ()
+              User_command.Gen.payment ~sign_type:`Fake ~key_gen
+                ~nonce:current_nonce ~max_amount:1 ~max_fee:0 ()
             in
             let cmd_currency = amounts.(n - 1) in
             let%bind fee =
@@ -889,7 +897,7 @@ let%test_module _ =
             Quickcheck.Generator.tuple2 (return sender)
               (Quickcheck_lib.of_array test_keys)
           in
-          User_command.gen ~sign_type:`Fake ~key_gen
+          User_command.Gen.payment ~sign_type:`Fake ~key_gen
             ~nonce:(Account_nonce.of_int replaced_nonce)
             ~max_amount:(Currency.Amount.to_int init_balance)
             ~max_fee:0 ()

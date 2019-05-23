@@ -3,7 +3,8 @@ open Coda_base
 
 module Make (Inputs : Transition_frontier.Inputs_intf) :
   Intf.Transition_database_schema
-  with type external_transition := Inputs.External_transition.t
+  with type external_transition_validated :=
+              Inputs.External_transition.Validated.t
    and type scan_state := Inputs.Staged_ledger.Scan_state.t
    and type state_hash := State_hash.t
    and type pending_coinbases := Pending_coinbase.t = struct
@@ -12,7 +13,8 @@ module Make (Inputs : Transition_frontier.Inputs_intf) :
   module Data = struct
     module Transition = struct
       (* TODO: version *)
-      type t = External_transition.Stable.V1.t * State_hash.Stable.V1.t list
+      type t =
+        External_transition.Validated.Stable.V1.t * State_hash.Stable.V1.t list
       [@@deriving bin_io]
     end
 
