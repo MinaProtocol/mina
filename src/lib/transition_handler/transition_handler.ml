@@ -9,8 +9,11 @@ module Make (Inputs : Inputs.S) :
   Transition_handler_intf
   with type time := Inputs.Time.t
    and type time_controller := Inputs.Time.Controller.t
-   and type external_transition_verified :=
-              Inputs.External_transition.Verified.t
+   and type verifier := Inputs.Verifier.t
+   and type external_transition_with_initial_validation :=
+              Inputs.External_transition.with_initial_validation
+   and type external_transition_validated :=
+              Inputs.External_transition.Validated.t
    and type staged_ledger := Inputs.Staged_ledger.t
    and type state_hash := State_hash.t
    and type trust_system := Trust_system.t

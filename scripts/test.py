@@ -24,7 +24,7 @@ unit_test_profiles = [
 
 simple_tests = [
     'full-test',
-    'transaction-snark-profiler -check-only',
+    'transaction-snark-profiler',
 ]
 
 integration_tests = [

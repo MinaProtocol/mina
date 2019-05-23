@@ -1,0 +1,9 @@
+(library
+ (name one_or_two)
+ (public_name one_or_two)
+ (flags :standard -short-paths)
+ (library_flags -linkall)
+ (libraries core async module_version)
+ (preprocess
+  (pps ppx_base ppx_bin_prot ppx_coda ppx_deriving.std ppx_deriving_yojson ppx_let))
+ )

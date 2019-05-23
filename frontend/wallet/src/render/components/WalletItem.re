@@ -45,17 +45,16 @@ module Styles = {
 
 [@react.component]
 let make = (~wallet: Wallet.t) => {
-  let (settings, _setSettings) = React.useContext(SettingsProvider.context);
-  let (activeWallet, setActiveWallet) =
-    React.useContext(ActiveWalletProvider.context);
+  let (settings, _setAddressBook) =
+    React.useContext(AddressBookProvider.context);
 
   let isActive =
-    Option.withDefault(
-      ~default=false,
-      Option.map(~f=active => active == wallet.key, activeWallet),
-    );
+    Option.map(Hooks.useActiveWallet(), ~f=activeWallet =>
+      PublicKey.equal(activeWallet, wallet.key)
+    )
+    |> Option.withDefault(~default=false);
 
-  let walletName = SettingsRenderer.getWalletName(settings, wallet.key);
+  let walletName = AddressBook.getWalletName(settings, wallet.key);
 
   <div
     className={
@@ -64,7 +63,9 @@ let make = (~wallet: Wallet.t) => {
       | true => Styles.activeWalletItem
       }
     }
-    onClick={_ => setActiveWallet(wallet.key)}>
+    onClick={_ =>
+      ReasonReact.Router.push("/wallet/" ++ PublicKey.toString(wallet.key))
+    }>
     <div className=Styles.walletName> {ReasonReact.string(walletName)} </div>
     <div className=Styles.balance>
       {ReasonReact.string({js|■ |js} ++ wallet.balance)}
