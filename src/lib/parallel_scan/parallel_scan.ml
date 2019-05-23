@@ -482,33 +482,39 @@ module Tree = struct
       -> fd:(b -> d -> d)
       -> weight_a:(a -> c * c)
       -> jobs:b Data_list.t
+      -> update_level:int
       -> jobs_split:(c * c -> b -> b * b)
       -> (a, d) t
       -> (a, d) t * e option =
-   fun ~fa ~fd ~weight_a ~jobs ~jobs_split t ->
+   fun ~fa ~fd ~weight_a ~jobs ~update_level ~jobs_split t ->
     match t with
     | Leaf d ->
-        (Leaf (fd (Data_list.to_data jobs) d), None)
+        let x = (Leaf (fd (Data_list.to_data jobs) d), None) in
+        x
     | Node {depth; value; sub_tree} ->
         let weight_left_subtree, weight_right_subtree = weight_a value in
         (*update the jobs at the current level*)
         let value', scan_result = fa (Data_list.to_data jobs) depth value in
-        (*split the jobs for the next level*)
-        let new_jobs_list =
-          Data_list.split jobs
-            (jobs_split (weight_left_subtree, weight_right_subtree))
-        in
         (*get the updated subtree*)
         let sub, _ =
-          update_split
-            ~fa:(fun (b, b') i (x, y) ->
-              let left = fa b i x in
-              let right = fa b' i y in
-              ((fst left, fst right), Option.both (snd left) (snd right)) )
-            ~fd:(fun (b, b') (x, x') -> (fd b x, fd b' x'))
-            ~weight_a:(fun (a, b) -> (weight_a a, weight_a b))
-            ~jobs_split:(fun (x, y) (a, b) -> (jobs_split x a, jobs_split y b))
-            ~jobs:new_jobs_list sub_tree
+          if update_level = depth then (sub_tree, None)
+          else
+            (*split the jobs for the next level*)
+            let new_jobs_list =
+              Data_list.split jobs
+                (jobs_split (weight_left_subtree, weight_right_subtree))
+            in
+            update_split
+              ~fa:(fun (b, b') i (x, y) ->
+                let left = fa b i x in
+                let right = fa b' i y in
+                ((fst left, fst right), Option.both (snd left) (snd right)) )
+              ~fd:(fun (b, b') (x, x') -> (fd b x, fd b' x'))
+              ~weight_a:(fun (a, b) -> (weight_a a, weight_a b))
+              ~update_level
+              ~jobs_split:(fun (x, y) (a, b) ->
+                (jobs_split x a, jobs_split y b) )
+              ~jobs:new_jobs_list sub_tree
         in
         (Node {depth; value= value'; sub_tree= sub}, scan_result)
 
@@ -623,7 +629,8 @@ module Tree = struct
     in
     let jobs = Data_list.Single completed_jobs in
     update_split ~fa:add_merges ~fd:add_bases tree ~weight_a:fst ~jobs
-      ~jobs_split:(fun (l, r) a -> (List.take a l, List.take (List.drop a l) r))
+      ~update_level ~jobs_split:(fun (l, r) a ->
+        (List.take a l, List.take (List.drop a l) r) )
 
   let reset_weights : ('a, 'd) t -> ('a, 'd) t =
    fun tree ->
