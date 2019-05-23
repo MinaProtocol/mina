@@ -15,7 +15,7 @@ let print_heartbeat () =
     if !heartbeat_flag then (
       Logger.warn logger ~module_:__MODULE__ ~location:__LOC__
         "Heartbeat for CI" ;
-      let%bind () = after (Time.Span.of_min 5.) in
+      let%bind () = after (Time.Span.of_min 1.) in
       loop () )
     else return ()
   in
@@ -67,7 +67,7 @@ let main () =
   *)
   let delegatee_has_proposed = ref false in
   let delegator_proposal_count = ref 0 in
-  let delegator_proposal_goal = 20 in
+  let delegator_proposal_goal = 30 in
   Deferred.don't_wait_for
     (Pipe_lib.Linear_pipe.iter delegator_transition_reader
        ~f:(fun transition ->
@@ -93,7 +93,7 @@ let main () =
   (* delegatee's transition reader will fill this ivar when it has seen a few blocks *)
   let delegatee_ivar : unit Ivar.t = Ivar.create () in
   (* how many blocks we should wait for from the delegatee *)
-  let delegatee_proposal_goal = 20 in
+  let delegatee_proposal_goal = 10 in
   Deferred.don't_wait_for
     (Pipe_lib.Linear_pipe.iter delegatee_transition_reader
        ~f:(fun transition ->
