@@ -153,39 +153,13 @@ end = struct
 
   type job = Available_job.t [@@deriving sexp]
 
-  (*type parallel_scan_completed_job =
-    Ledger_proof_with_sok_message.Stable.V1.t
-    Parallel_scan.State.Completed_job.t
-  [@@deriving sexp, bin_io]*)
-
-  (*Work capacity represents max number of work in the tree. this includes the jobs that are currently in the tree and the ones that would arise in the future when current jobs are done*)
-  (*let work_capacity =
-    let open Constants in
-    let extra_jobs =
-      let rec go i count =
-        if i = work_delay_factor - 1 then count
-        else go (i + 1) (count + Int.pow 2 (i - 1))
-      in
-      go (max latency_factor 1) 0
-    in
-    (Int.pow 2 (transaction_capacity_log_2 + 1) - 1)
-    (*Transaction_capacity_tree size (c-tree) *)
-    * (Int.pow 2 (work_delay_factor - Int.max (latency_factor - 1) 0) - 1)
-    (*all but one c-tree that are in the tree formed at root_depth = latency_factor+1 *)
-    + extra_jobs*)
-
-  (*half the number of jobs on each level above work_delay_factor depth and below latency_factor depth*)
-
   module Stable = struct
     module V1 = struct
       module T = struct
         type t =
-          { (*Job_count: Keeping track of the number of jobs added to the tree. Every transaction added amounts to two jobs*)
-            tree:
-              ( Ledger_proof_with_sok_message.Stable.V1.t
-              , Transaction_with_witness.Stable.V1.t )
-              Parallel_scan.State.Stable.V1.t
-          ; mutable job_count: int }
+          ( Ledger_proof_with_sok_message.Stable.V1.t
+          , Transaction_with_witness.Stable.V1.t )
+          Parallel_scan.State.Stable.V1.t
         [@@deriving sexp, bin_io, version]
       end
 
@@ -194,13 +168,12 @@ end = struct
 
       let hash t =
         let state_hash =
-          Parallel_scan.State.hash t.tree
+          Parallel_scan.State.hash t
             (Binable.to_string (module Ledger_proof_with_sok_message.Stable.V1))
             (Binable.to_string (module Transaction_with_witness.Stable.V1))
         in
         Staged_ledger_aux_hash.of_bytes
-          ( (state_hash |> Digestif.SHA256.to_raw_string)
-          ^ Int.to_string t.job_count )
+          (state_hash |> Digestif.SHA256.to_raw_string)
 
       let is_valid _t = failwith "TODO"
 
@@ -235,13 +208,7 @@ end = struct
     module Registered_V1 = Registrar.Register (V1)
   end
 
-  type t = Stable.Latest.t =
-    { tree:
-        ( Ledger_proof_with_sok_message.Stable.V1.t
-        , Transaction_with_witness.Stable.V1.t )
-        Parallel_scan.State.Stable.V1.t
-    ; mutable job_count: int }
-  [@@deriving sexp]
+  type t = Stable.Latest.t [@@deriving sexp]
 
   [%%define_locally
   Stable.Latest.(hash, is_valid)]
@@ -332,7 +299,7 @@ end = struct
     module Fold = Parallel_scan.State.Make_foldable (M)
 
     (*TODO: fold over the pending_coinbase tree and validate the statements?*)
-    let scan_statement {tree; _} :
+    let scan_statement tree :
         (Ledger_proof_statement.t, [`Error of Error.t | `Empty]) Result.t M.t =
       let write_error description =
         sprintf !"Staged_ledger.scan_statement: %s\n" description
@@ -432,13 +399,6 @@ end = struct
             | e ->
                 Stop e )
           ~finish:(Fn.compose M.return Result.return)
-        (*~f:(fun acc job ->
-            let open Container.Continue_or_stop in
-            match%map fold_step acc job with
-            | Ok next ->
-                Continue next
-            | Error e ->
-                Stop (Error e) )*)
       in
       match%map res with
       | Ok None ->
@@ -515,13 +475,10 @@ end = struct
         ; fee_excess
         ; proof_type= `Merge }
 
-  (*l*et capacity _t = Parallel_scan.parallelism ~state:t.tree*)
-
   let create ~work_delay_factor ~transaction_capacity_log_2 =
     (* Transaction capacity log_2 is 1/2^work_delay_factor the capacity for work parallelism *)
     let k = Int.pow 2 transaction_capacity_log_2 in
-    { tree= Parallel_scan.empty ~delay:work_delay_factor ~max_base_jobs:k
-    ; job_count= 0 }
+    Parallel_scan.empty ~delay:work_delay_factor ~max_base_jobs:k
 
   let empty () =
     let open Constants in
@@ -536,9 +493,6 @@ end = struct
 
   let fill_work_and_enqueue_transactions t transactions work =
     let open Or_error.Let_syntax in
-    (*let enqueue_transactions t transactions =
-      Parallel_scan.enqueue_data ~state:t ~data:transactions
-    in*)
     let fill_in_transaction_snark_work t
         (works : Transaction_snark_work.t list) :
         (Ledger_proof.t * Sok_message.t) list Or_error.t =
@@ -552,41 +506,12 @@ end = struct
            ~f:(fun {Transaction_snark_work.fee; proofs; prover} ->
              List.map proofs ~f:(fun proof -> (fee, proof, prover)) ))
         ~f:completed_work_to_scanable_work
-      (*in
-      let%map result =
-        Parallel_scan.fill_in_completed_jobs ~state:t
-          ~completed_jobs:scanable_work_list
-      in
-      let really_result =
-        Option.map result ~f:(fun ((proof, _), txns_with_witnesses) ->
-            (proof, extract_txns txns_with_witnesses) )
-      in
-      really_result
     in
-    let work_count =
-      List.sum
-        (module Int)
-        work
-        ~f:(fun (w : Transaction_snark_work.t) -> List.length w.proofs)*)
-    in
-    let old_proof = Parallel_scan.last_emitted_value t.tree in
-    (*let%bind () = Parallel_scan.update_curr_job_seq_no t.tree in*)
-    let%bind work_list = fill_in_transaction_snark_work t.tree work in
+    let old_proof = Parallel_scan.last_emitted_value t in
+    let%bind work_list = fill_in_transaction_snark_work t work in
     let%bind proof_opt, updated_tree =
-      Parallel_scan.update t.tree ~completed_jobs:work_list ~data:transactions
+      Parallel_scan.update t ~completed_jobs:work_list ~data:transactions
     in
-    (*let%bind () = enqueue_transactions t.tree transactions in*)
-    (*important: Everytime a proof is emitted, reduce the job count by 1 
-    because you only had to do (2^x - 2^latency_factor extra jobs). This is important because 
-    otherwise the job count would never become zero*)
-    (*let adjust_job_count =
-      Option.value_map ~default:0 ~f:(fun _ -> 1) proof_opt
-    in
-    let new_count =
-      t.job_count
-      + (List.length transactions * 2)
-      - work_count - adjust_job_count
-    in*)
     let%map result_opt =
       Option.value_map ~default:(Ok None) proof_opt
         ~f:(fun ((proof, _), txns_with_witnesses) ->
@@ -600,32 +525,23 @@ end = struct
             Ok (Some (proof, extract_txns txns_with_witnesses))
           else Or_error.error_string "Unexpected ledger proof emitted" )
     in
-    (*if new_count <= work_capacity then (
-      t.job_count <- new_count ;*)
-    (result_opt, {t with tree= updated_tree})
-
-  (*
-    else
-      Or_error.error_string
-        (sprintf
-           "Job count (%d) exceeded work_capacity(%d). Cannot enqueue the \
-            transactions"
-           new_count work_capacity)*)
+    (result_opt, updated_tree)
 
   let latest_ledger_proof t =
     let open Option.Let_syntax in
-    let%map proof, txns_with_witnesses =
-      Parallel_scan.last_emitted_value t.tree
-    in
+    let%map proof, txns_with_witnesses = Parallel_scan.last_emitted_value t in
     (proof, extract_txns txns_with_witnesses)
 
-  let current_job_count t = t.job_count
+  let free_space = Parallel_scan.free_space
 
-  let free_space t = Parallel_scan.free_space t.tree
+  (*This needs to be grouped like in work_to_do function. Group of two jobs per list and not group of two jobs after concatenating the lists*)
+  let all_jobs = Parallel_scan.all_jobs
+
+  let next_jobs = Parallel_scan.jobs_for_next_update
 
   let next_k_jobs t ~k =
     let jobses =
-      List.concat_map (Parallel_scan.jobs_for_next_update t.tree)
+      List.concat_map (Parallel_scan.jobs_for_next_update t)
         ~f:(fun work_list ->
           List.chunks_of work_list ~length:Transaction_snark_work.proofs_length
       )
@@ -636,32 +552,22 @@ end = struct
         !"Requested %d jobs but only %d are available for the next update"
         k (List.length jobses)
 
-  (*Ok (List.take (List.concat @@ Parallel_scan.jobs_for_next_update t.tree) k) *)
-
-  (*Parallel_scan.next_k_jobs ~state:t.tree ~k*)
-
-  let all_jobs t = Parallel_scan.all_jobs t.tree
-
-  let next_jobs t = Parallel_scan.jobs_for_next_update t.tree
-
   let all_jobs_sequence t =
-    Parallel_scan.all_jobs t.tree
-    |> Sequence.of_list
+    Parallel_scan.all_jobs t |> Sequence.of_list
     |> Sequence.map ~f:Sequence.of_list
 
-  let next_on_new_tree t = Parallel_scan.next_on_new_tree t.tree
+  let next_on_new_tree = Parallel_scan.next_on_new_tree
 
-  let base_jobs_on_latest_tree t =
-    Parallel_scan.base_jobs_on_latest_tree t.tree
+  let base_jobs_on_latest_tree = Parallel_scan.base_jobs_on_latest_tree
 
   let staged_transactions t =
-    List.map (Parallel_scan.pending_data t.tree)
+    List.map (Parallel_scan.pending_data t)
       ~f:(fun (t : Transaction_with_witness.t) -> t.transaction_with_info)
 
   let all_transactions t =
     List.map ~f:(fun (t : Transaction_with_witness.t) ->
         t.transaction_with_info |> Ledger.Undo.transaction )
-    @@ Parallel_scan.pending_data t.tree
+    @@ Parallel_scan.pending_data t
     |> Or_error.all
 
   (*let copy {tree; job_count} = {tree= Parallel_scan.State.copy tree; job_count}*)
@@ -669,14 +575,14 @@ end = struct
   let partition_if_overflowing t =
     let bundle_count work_count = (work_count + 1) / 2 in
     let {Space_partition.first= slots, job_count; second} =
-      Parallel_scan.partition_if_overflowing t.tree
+      Parallel_scan.partition_if_overflowing t
     in
     { Space_partition.first= (slots, bundle_count job_count)
     ; second=
         Option.map second ~f:(fun (slots, job_count) ->
             (slots, bundle_count job_count) ) }
 
-  let current_job_sequence_number {tree; _} =
+  let current_job_sequence_number tree =
     Parallel_scan.current_job_sequence_number tree
 
   let extract_from_job (job : job) =
@@ -692,10 +598,11 @@ end = struct
         Ledger_proof.statement (fst a)
       in
       let fd (d : Transaction_with_witness.t) = d.statement in
-      Parallel_scan.view_jobs_with_position t.tree fa fd
+      Parallel_scan.view_jobs_with_position t fa fd
     in
     Yojson.Safe.to_string (`List (List.map all_jobs ~f:Job_view.to_yojson))
 
+  (*Always the same pairing of jobs*)
   let all_work_to_do t : Transaction_snark_work.Statement.t Sequence.t =
     let work_seqs = all_jobs_sequence t in
     Sequence.concat_map work_seqs ~f:(fun work_seq ->
@@ -708,11 +615,11 @@ end = struct
                    stmt ))
           Transaction_snark_work.proofs_length )
 
-  (*Always fixed proof budles *)
+  (*Always the same pairing of jobs*)
   let work_for_new_diff t : Transaction_snark_work.Statement.t Sequence.t =
     let work_seqs =
       Sequence.map
-        (Parallel_scan.jobs_for_next_update t.tree |> Sequence.of_list)
+        (Parallel_scan.jobs_for_next_update t |> Sequence.of_list)
         ~f:Sequence.of_list
     in
     Sequence.concat_map work_seqs ~f:(fun work_seq ->

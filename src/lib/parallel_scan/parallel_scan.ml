@@ -1128,75 +1128,80 @@ let append bs bs' =
 let add_merge_jobs : completed_jobs:'a list -> (_, 'a, _) State_monad.t =
  fun ~completed_jobs ->
   let open State_monad.Let_syntax in
-  let%bind state = State_monad.get in
-  let delay = state.delay + 1 in
-  let depth = Int.ceil_log2 state.max_base_jobs in
-  let merge_jobs = List.map completed_jobs ~f:(fun j -> New_job.Merge j) in
-  let jobs_required = work_for_current_tree state in
-  let curr_tree = Non_empty_list.head state.trees in
-  let updated_trees, result_opt, _ =
-    List.foldi (Non_empty_list.tail state.trees) ~init:([], None, merge_jobs)
-      ~f:(fun i (trees, scan_result, jobs) tree ->
-        if i % delay = delay - 1 then
-          (*All the trees with delay number of trees between them*)
-          (*TODO: dont updste if required job count is zero*)
-          let tree', scan_result' =
-            Tree.update
-              (List.take jobs (Tree.required_job_count tree))
-              ~update_level:(depth - (i / delay))
-              ~sequence_no:state.curr_job_seq_no ~depth tree
-          in
-          ( tree' :: trees
-          , scan_result'
-          , List.drop jobs (Tree.required_job_count tree) )
-        else (tree :: trees, scan_result, jobs) )
-  in
-  let updated_trees, result_opt =
-    let updated_trees, result_opt =
-      Option.value_map result_opt
-        ~default:(List.rev updated_trees, None)
-        ~f:(fun res ->
-          match updated_trees with
-          | [] ->
-              ([], None)
-          | t :: ts ->
-              let data_list = Tree.leaves t in
-              (List.rev ts, Some (res, data_list)) )
+  if List.length completed_jobs = 0 then return None
+  else
+    let%bind state = State_monad.get in
+    let delay = state.delay + 1 in
+    let depth = Int.ceil_log2 state.max_base_jobs in
+    let merge_jobs = List.map completed_jobs ~f:(fun j -> New_job.Merge j) in
+    let jobs_required = work_for_current_tree state in
+    let curr_tree = Non_empty_list.head state.trees in
+    let updated_trees, result_opt, _ =
+      List.foldi (Non_empty_list.tail state.trees) ~init:([], None, merge_jobs)
+        ~f:(fun i (trees, scan_result, jobs) tree ->
+          if i % delay = delay - 1 then
+            (*All the trees with delay number of trees between them*)
+            (*TODO: dont updste if required job count is zero*)
+            let tree', scan_result' =
+              Tree.update
+                (List.take jobs (Tree.required_job_count tree))
+                ~update_level:(depth - (i / delay))
+                ~sequence_no:state.curr_job_seq_no ~depth tree
+            in
+            ( tree' :: trees
+            , scan_result'
+            , List.drop jobs (Tree.required_job_count tree) )
+          else (tree :: trees, scan_result, jobs) )
     in
-    if
-      Option.is_some result_opt
-      || List.length (curr_tree :: updated_trees) < max_trees state
-         && List.length completed_jobs = List.length jobs_required
-      (*exact number of jobs*)
-    then (List.map updated_trees ~f:Tree.reset_weights, result_opt)
-    else (updated_trees, result_opt)
-  in
-  let all_trees = cons curr_tree updated_trees in
-  let%map _ = State_monad.put {state with trees= all_trees} in
-  result_opt
+    let updated_trees, result_opt =
+      let updated_trees, result_opt =
+        Option.value_map result_opt
+          ~default:(List.rev updated_trees, None)
+          ~f:(fun res ->
+            match updated_trees with
+            | [] ->
+                ([], None)
+            | t :: ts ->
+                let data_list = Tree.leaves t in
+                (List.rev ts, Some (res, data_list)) )
+      in
+      if
+        Option.is_some result_opt
+        || List.length (curr_tree :: updated_trees) < max_trees state
+           && List.length completed_jobs = List.length jobs_required
+        (*exact number of jobs*)
+      then (List.map updated_trees ~f:Tree.reset_weights, result_opt)
+      else (updated_trees, result_opt)
+    in
+    let all_trees = cons curr_tree updated_trees in
+    let%map _ = State_monad.put {state with trees= all_trees} in
+    result_opt
 
 let add_data : data:'d list -> (_, _, 'd) State_monad.t =
  fun ~data ->
   let open State_monad.Let_syntax in
-  let%bind state = State_monad.get in
-  let depth = Int.ceil_log2 state.max_base_jobs in
-  let tree = Non_empty_list.head state.trees in
-  let base_jobs = List.map data ~f:(fun j -> New_job.Base j) in
-  let available_space = Tree.required_job_count tree in
-  let tree, _ =
-    Tree.update base_jobs ~update_level:depth
-      ~sequence_no:state.curr_job_seq_no ~depth tree
-  in
-  let updated_trees =
-    if List.length base_jobs = available_space then
-      cons (create_tree ~depth) [Tree.reset_weights tree]
-    else Non_empty_list.singleton tree
-  in
-  let%map _ =
-    State_monad.put
-      {state with trees= append updated_trees (Non_empty_list.tail state.trees)}
-  in
-  ()
+  if List.length data = 0 then return ()
+  else
+    let%bind state = State_monad.get in
+    let depth = Int.ceil_log2 state.max_base_jobs in
+    let tree = Non_empty_list.head state.trees in
+    let base_jobs = List.map data ~f:(fun j -> New_job.Base j) in
+    let available_space = Tree.required_job_count tree in
+    let tree, _ =
+      Tree.update base_jobs ~update_level:depth
+        ~sequence_no:state.curr_job_seq_no ~depth tree
+    in
+    let updated_trees =
+      if List.length base_jobs = available_space then
+        cons (create_tree ~depth) [Tree.reset_weights tree]
+      else Non_empty_list.singleton tree
+    in
+    let%map _ =
+      State_monad.put
+        { state with
+          trees= append updated_trees (Non_empty_list.tail state.trees) }
+    in
+    ()
 
 let incr_sequence_no = function
   | state ->

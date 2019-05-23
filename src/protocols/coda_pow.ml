@@ -968,10 +968,6 @@ module type Transaction_snark_scan_state_intf = sig
 
   val work_for_new_diff : t -> transaction_snark_work_statement Sequence.t
 
-  val current_job_count : t -> int
-
-  (*val work_capacity : int*)
-
   val next_on_new_tree : t -> bool
 end
 
@@ -1047,10 +1043,6 @@ module type Staged_ledger_base_intf = sig
     val work_for_new_diff : t -> statement Sequence.t
 
     val all_transactions : t -> transaction list Or_error.t
-
-    (*val work_capacity : int*)
-
-    val current_job_count : t -> int
   end
 
   module Staged_ledger_error : sig
