@@ -33,7 +33,7 @@
     "pack": "fpack --development ./lib/js/src/render/Index.js",
     "query": "send-introspection-query http://localhost:8080/graphql",
     "query-fake": "concurrently --kill-others 'yarn run fake' 'sleep 5 && yarn run query' || true",
-    "reformat": "bsrefmt --in-place src/**/*.re",
+    "reformat": "bsrefmt --in-place $(find src -name '*.re' -print)",
     "test": "yarn run build && jest",
     "dist": "yarn run build && yarn run pack && build",
     "dev": "concurrently --kill-others 'bsb -make-world -w' 'fpack watch --development ./lib/js/src/render/Index.js' 'electron ./lib/js/src/main/App.js'"
