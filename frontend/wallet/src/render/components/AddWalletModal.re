@@ -8,9 +8,7 @@ module Styles = {
 
 [@react.component]
 let make = (~walletName, ~setModalState, ~onSubmit) => {
-  <Modal
-    title="Add Wallet"
-    onRequestClose={() => setModalState(_ => None)}>
+  <Modal title="Add Wallet" onRequestClose={() => setModalState(_ => None)}>
     <div
       className=Css.(
         style([
@@ -23,9 +21,7 @@ let make = (~walletName, ~setModalState, ~onSubmit) => {
       <div className=Styles.bodyMargin>
         <TextField
           label="Name"
-          onChange={value => {
-            setModalState(_ => Some(value));
-          }}
+          onChange={value => setModalState(_ => Some(value))}
           value=walletName
         />
       </div>

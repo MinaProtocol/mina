@@ -32,11 +32,14 @@ module Rimraf = {
   [@bs.val] [@bs.module "rimraf"] external sync: string => unit = "";
 };
 
-Array.length(Sys.argv) > 2 && Sys.argv[2] == "prod"
+Array.length(Sys.argv) > 2
+&& (Sys.argv[2] == "prod" || Sys.argv[2] == "staging")
   ? {
-    Links.Cdn.prefix := "https://cdn.codaprotocol.com/v2";
+    Links.Cdn.prefix := "https://cdn.codaprotocol.com/v4";
   }
   : ();
+
+Style.Typeface.load();
 
 let writeStatic = (path, rootComponent) => {
   let rendered =
