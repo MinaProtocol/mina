@@ -1,8 +1,8 @@
 [@react.component]
 let make = () => {
-  let settingsValue = SettingsProvider.createContext();
+  let settingsValue = AddressBookProvider.createContext();
 
-  <SettingsProvider value=settingsValue>
+  <AddressBookProvider value=settingsValue>
     <ReasonApollo.Provider client=Apollo.faker>
       <Window>
         <Header />
@@ -10,5 +10,5 @@ let make = () => {
         <Footer />
       </Window>
     </ReasonApollo.Provider>
-  </SettingsProvider>;
+  </AddressBookProvider>;
 };
