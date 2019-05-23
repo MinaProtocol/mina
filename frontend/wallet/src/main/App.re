@@ -57,7 +57,7 @@ let run = () =>
     initialTask,
     ~f=_ => {
       let initialState = {
-        wallets: [||],
+        Application.State.wallets: [||],
         coda: Application.State.CodaProcessState.Stopped(Belt.Result.Ok()),
         window: None,
       };
@@ -65,8 +65,7 @@ let run = () =>
       let dispatch = ref(_ => ());
       let store =
         Application.Store.create(
-          initialState,
-          ~onNewState=(_last, _curr: Application.Store.state('a)) =>
+          initialState, ~onNewState=(_last, _curr: Application.Store.state) =>
           createTray(dispatch^)
         );
       dispatch := Application.Store.apply((), store);

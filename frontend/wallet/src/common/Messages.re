@@ -35,14 +35,15 @@ module Typ = {
 module CallTable = CallTable.Make(Typ);
 
 type mainToRendererMessages = [
-  | `Respond_new_settings(CallTable.Ident.Encode.t, unit)
   | `Deep_link(/*Route.t*/ string)
   | `Respond_control_coda(CallTable.Ident.Encode.t, ControlCodaResponse.t)
 ];
 
 type rendererToMainMessages = [
-  | `Set_name(PublicKey.t, string, CallTable.Ident.Encode.t)
-    // None = stop
-    // Some(args) = spawn args
-  | `Control_coda_daemon(option(list(string)), CallTable.Ident.Encode.t)
+  | `Control_coda_daemon // None = stop
+                         // Some(args) = spawn args
+(
+      option(list(string)),
+      CallTable.Ident.Encode.t,
+    )
 ];

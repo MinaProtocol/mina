@@ -320,8 +320,7 @@ module TestApplication = Application.Make(TestProcess, TestWindow);
 
 describe("ApplicationReducer", () => {
   let baseState = {
-    Application.State.settingsOrError: Belt.Result.Error(`Json_parse_error),
-    wallets: [||],
+    Application.State.wallets: [||],
     coda: Application.State.CodaProcessState.Stopped(Belt.Result.Ok()),
     window: Some(ref([])),
   };

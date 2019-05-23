@@ -71,6 +71,7 @@ include Single.Make({
         () => {
           RendererCommunication.removeListener(listener);
           drop();
+          input.dispatch(Action.PutWindow(None));
         },
       );
 
@@ -80,6 +81,8 @@ include Single.Make({
         loadURL(window, indexURL)
       );
 
+      // TODO: Have only one source of truth for window
+      input.dispatch(Action.PutWindow(Some(window)));
       window;
     };
 });

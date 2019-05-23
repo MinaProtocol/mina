@@ -6,13 +6,6 @@ module CallTable = Messages.CallTable;
 
 let callTable = CallTable.make();
 
-let setName = (key, name) => {
-  let pending =
-    CallTable.nextPending(callTable, Messages.Typ.Unit, ~loc=__LOC__);
-  send(`Set_name((key, name, CallTable.Ident.Encode.t(pending.ident))));
-  pending.task;
-};
-
 let controlCodaDaemon = maybeArgs => {
   let pending =
     CallTable.nextPending(
@@ -42,12 +35,6 @@ let listen = () => {
           callTable,
           CallTable.Ident.Decode.t(ident, Messages.Typ.ControlCodaResponse),
           maybeErr,
-        )
-      | `Respond_new_settings(ident, ()) =>
-        CallTable.resolve(
-          callTable,
-          CallTable.Ident.Decode.t(ident, Messages.Typ.Unit),
-          (),
         )
       | `Deep_link(routeString) => ReasonReact.Router.push(routeString)
       };

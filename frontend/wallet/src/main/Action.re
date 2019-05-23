@@ -1,8 +1,6 @@
 // Actions for the application
 
 type t('window) =
-  | SettingsUpdate((PublicKey.t, string))
-  | NewSettings(Settings.t)
   | WalletInfo(array({. "publicKey": string}))
   | PutWindow(option('window))
   // stop by sending None

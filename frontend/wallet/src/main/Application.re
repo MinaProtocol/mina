@@ -69,7 +69,7 @@ module Make =
     };
 
     fun
-    | PutWindow(windowOpt) => {...acc, State.window: windowOpt}
+    | Action.PutWindow(windowOpt) => {...acc, State.window: windowOpt}
     | WalletInfo(wallets) => {...acc, State.wallets}
     | CodaGraphQLReady(args) => {
         ...acc,
