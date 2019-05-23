@@ -1,39 +1,15 @@
-open Tc;
-
 module Action = {
   type t =
-    | SettingsUpdate((PublicKey.t, string))
-    | NewSettings(Settings.t)
-    | WalletInfo(array({. "publicKey": string}));
+    | DoAction;
 };
 
 module State = {
-  type t('a) = {
-    settingsOrError:
-      Result.t(
-        [> | `Decode_error(string) | `Json_parse_error] as 'a,
-        Settings.t,
-      ),
-    wallets: array({. "publicKey": string}),
-  };
+  type t('a) = unit;
 };
 
-let reduce = acc =>
+let reduce = _acc =>
   fun
-  | Action.NewSettings(settings) => {
-      ...acc,
-      State.settingsOrError: Result.return(settings),
-    }
-  | WalletInfo(wallets) => {...acc, State.wallets}
-  | SettingsUpdate((key, name)) => {
-      ...acc,
-      State.settingsOrError:
-        switch (acc.settingsOrError) {
-        | Belt.Result.Ok(settings) =>
-          Ok(Settings.set(settings, ~key, ~name))
-        | Error(_) => acc.settingsOrError
-        },
-    };
+  | Action.DoAction => ();
 
 module Store = {
   type t('a) = {
