@@ -766,7 +766,7 @@ module Make (Inputs : Inputs_intf) = struct
               Strict_pipe.create Synchronous
             in
             let net_ivar = Ivar.create () in
-            let persistence_buffer_capacity = 30 in
+            let flush_capacity = 30 in
             let%bind persistence, ledger_db, transition_frontier =
               match config.transition_frontier_location with
               | None ->
@@ -793,7 +793,8 @@ module Make (Inputs : Inputs_intf) = struct
                       let persistence =
                         Transition_frontier_persistence.create
                           ~directory_name:transition_frontier_location
-                          ~logger:config.logger persistence_buffer_capacity
+                          ~logger:config.logger ~flush_capacity
+                          ~max_buffer_capacity:(4 * flush_capacity) ()
                       in
                       let%map root_snarked_ledger, frontier =
                         create_genesis_frontier config
@@ -818,7 +819,8 @@ module Make (Inputs : Inputs_intf) = struct
                       in
                       let persistence =
                         Transition_frontier_persistence.create ~directory_name
-                          ~logger:config.logger persistence_buffer_capacity
+                          ~logger:config.logger ~flush_capacity
+                          ~max_buffer_capacity:(4 * flush_capacity) ()
                       in
                       (Some persistence, root_snarked_ledger, frontier) )
             in

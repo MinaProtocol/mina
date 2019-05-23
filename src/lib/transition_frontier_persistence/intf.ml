@@ -127,7 +127,13 @@ module type S = sig
 
   type consensus_local_state
 
-  val create : ?directory_name:string -> logger:Logger.t -> int -> t
+  val create :
+       ?directory_name:string
+    -> logger:Logger.t
+    -> flush_capacity:int
+    -> max_buffer_capacity:int
+    -> unit
+    -> t
 
   val listen_to_frontier_broadcast_pipe :
     frontier option Broadcast_pipe.Reader.t -> t -> unit Deferred.t

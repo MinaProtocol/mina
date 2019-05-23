@@ -35,6 +35,10 @@ let%test_module "Transition Frontier Persistence" =
           [%test_eq: External_transition.Validated.t] expected_transition
             queried_transition )
 
+    let create_persistence ~directory_name =
+      Transition_frontier_persistence.create ~logger ?directory_name
+        ~flush_capacity:30 ~max_buffer_capacity:120 ()
+
     let store_transitions frontier breadcrumbs =
       Deferred.List.iter breadcrumbs
         ~f:(Transition_frontier.add_breadcrumb_exn frontier)
@@ -44,9 +48,7 @@ let%test_module "Transition Frontier Persistence" =
         create_root_frontier ~logger Genesis_ledger.accounts
       in
       Monitor.try_with (fun () ->
-          let frontier_persistence =
-            Transition_frontier_persistence.create ~logger ?directory_name 30
-          in
+          let frontier_persistence = create_persistence ~directory_name in
           let%bind result = f (frontier, frontier_persistence) in
           let%map () =
             Transition_frontier_persistence.close_and_finish_copy
@@ -114,16 +116,21 @@ let%test_module "Transition Frontier Persistence" =
             let%map next_breadcrumb =
               create_breadcrumb (Deferred.return root)
             in
-            let open Transition_frontier.Breadcrumb in
-            let staged_ledger = staged_ledger root in
+            let staged_ledger =
+              Transition_frontier.Breadcrumb.staged_ledger root
+            in
             Transition_frontier_persistence.Worker.handle_diff t.worker
               Transition_frontier.Diff_hash.empty
               (E
                  (New_frontier
-                    ( Transition_frontier.Breadcrumb.transition_with_hash root
-                    , Staged_ledger.scan_state staged_ledger
-                    , Staged_ledger.pending_coinbase_collection staged_ledger
-                    )))
+                    Transition_frontier.Diff_mutant.Root.Poly.
+                      { root=
+                          Transition_frontier.Breadcrumb.transition_with_hash
+                            root
+                      ; scan_state= Staged_ledger.scan_state staged_ledger
+                      ; pending_coinbase=
+                          Staged_ledger.pending_coinbase_collection
+                            staged_ledger }))
             |> ignore ;
             Transition_frontier_persistence.Worker.handle_diff t.worker
               Transition_frontier.Diff_hash.empty
@@ -148,12 +155,9 @@ let%test_module "Transition Frontier Persistence" =
       test_tree_breadcrumbs (2 * max_length)
 
     let test_deserialization num_breadcrumbs frontier =
-      let logger = Logger.create () in
-      let directory_name = Uuid.to_string (Uuid_unix.create ()) in
+      let directory_name = Some (Uuid.to_string (Uuid_unix.create ())) in
       let frontier_reader, _ = Broadcast_pipe.create (Some frontier) in
-      let frontier_persistence =
-        Transition_frontier_persistence.create ~logger ~directory_name 30
-      in
+      let frontier_persistence = create_persistence ~directory_name in
       let%bind breadcrumbs =
         generate_breadcrumbs ~gen_root_breadcrumb_builder:gen_tree_list
           frontier num_breadcrumbs
@@ -165,8 +169,10 @@ let%test_module "Transition Frontier Persistence" =
       @@ Transition_frontier_persistence.listen_to_frontier_broadcast_pipe
            frontier_reader frontier_persistence ;
       let%bind () = store_transitions frontier breadcrumbs in
-      Transition_frontier_persistence.flush frontier_persistence ;
-      Pipe.close frontier_persistence.writer ;
+      let%bind () =
+        Transition_frontier_persistence.flush frontier_persistence
+      in
+      Ivar.fill frontier_persistence.stop_signal `Stop ;
       let%bind () = frontier_persistence.worker_thread in
       let%map deserialized_frontier =
         Transition_frontier_persistence.read ~logger ~trust_system ~verifier:()

@@ -56,9 +56,10 @@ end = struct
       (E diff : Transition_frontier.Diff_mutant.E.t) =
     match diff with
     | New_frontier
-        ( {With_hash.hash= first_root_hash; data= first_root}
-        , scan_state
-        , pending_coinbase ) ->
+        Transition_frontier.Diff_mutant.Root.Poly.
+          { root= {With_hash.hash= first_root_hash; data= first_root}
+          ; scan_state
+          ; pending_coinbase } ->
         Transition_storage.Batch.with_batch t.transition_storage
           ~f:(fun batch ->
             Transition_storage.Batch.set batch ~key:Root
@@ -89,12 +90,18 @@ end = struct
                   |> Protocol_state.consensus_state ) )
         in
         Transition_frontier.Diff_mutant.hash acc_hash diff mutant
-    | Update_root new_root_data ->
+    | Update_root {root; scan_state; pending_coinbase} ->
+        let new_root_data = (root, scan_state, pending_coinbase) in
         let old_root_data =
           Logger.trace t.logger !"Getting old root data" ~module_:__MODULE__
             ~location:__LOC__ ;
-          Transition_storage.get t.transition_storage ~logger:t.logger
-            ~location:__LOC__ Transition_storage.Schema.Root
+          let root, scan_state, pending_coinbase =
+            Transition_storage.get t.transition_storage ~logger:t.logger
+              ~location:__LOC__ Transition_storage.Schema.Root
+          in
+          { Transition_frontier.Diff_mutant.Root.Poly.root
+          ; scan_state
+          ; pending_coinbase }
         in
         Logger.trace t.logger !"Setting old root data" ~module_:__MODULE__
           ~location:__LOC__ ;
