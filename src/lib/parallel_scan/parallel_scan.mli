@@ -256,7 +256,7 @@ val next_k_jobs :
   state:('a, 'd) State.t -> k:int -> ('a, 'd) Available_job.t list Or_error.t
 
 (** Get all the available jobs *)
-val next_jobs : ('a, 'd) State.t -> ('a, 'd) Available_job.t list list
+val all_jobs : ('a, 'd) State.t -> ('a, 'd) Available_job.t list list
 
 (** Get all the available jobs to be done in the next update *)
 val jobs_for_next_update :
@@ -296,7 +296,8 @@ val is_valid : ('a, 'd) State.t -> bool
 
 (** The base jobs ['d] that are pending and would be returned by available [Base]
  * jobs *)
-val current_data : ('a, 'd) State.t -> 'd list
+
+(*val current_data : ('a, 'd) State.t -> 'd list*)
 
 val current_job_sequence_number : ('a, 'd) State.t -> int
 
