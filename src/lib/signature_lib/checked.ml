@@ -18,6 +18,8 @@ module type Message_intf = sig
 
   type var
 
+  val to_bits : t -> bool list
+
   val hash : t -> nonce:bool list -> curve_scalar
 
   val hash_checked :
@@ -28,7 +30,10 @@ module type S = sig
 
   module Field : sig
     type t
+    val ( + ) : t -> t -> t
+    val ( * ) : t -> t -> t
     val equal : t -> t -> bool
+    val of_bits : bool list -> t
   end
 
   type boolean_var
@@ -61,9 +66,9 @@ module type S = sig
      and type ('a, 'b) checked := ('a, 'b) checked
 
   module Signature : sig
-    type t = curve_scalar * curve_scalar [@@deriving sexp]
+    type t = bool list * curve_scalar [@@deriving sexp]
 
-    type var = curve_scalar_var * curve_scalar_var
+    type var = boolean_var list * curve_scalar_var
 
     val typ : (var, t) typ
   end
@@ -79,9 +84,10 @@ module type S = sig
   end
 
   module Checked : sig
-    val get_x : curve_var -> field_var
-    val get_y : curve_var -> field_var
+    val get_x : curve_var -> (boolean_var list, _) checked
+    val get_y : curve_var -> (boolean_var list, _) checked
     val compress : curve_var -> (boolean_var list, _) checked
+    val is_even : (boolean_var list, _) checked -> (boolean_var, _) checked
 
     val verification_hash :
          (module Shifted.S with type t = 't)
@@ -105,9 +111,10 @@ module type S = sig
       -> (unit, _) checked
   end
 
-  val get_x : curve -> Field.t
-  val get_y curve -> Field.t
+  val get_x : curve -> bool list
+  val get_y : curve -> bool list
   val compress : curve -> bool list
+  val is_even : bool list -> bool
 
   val sign : Private_key.t -> Message.t -> Signature.t
 
@@ -128,10 +135,16 @@ module Schnorr
           val typ : (var, t) Typ.t
 
           val random : unit -> t
+          val zero : t
+          val order : t
+          val field_order : t
 
           val ( * ) : t -> t -> t
-
+          val ( + ) : t -> t -> t
           val ( - ) : t -> t -> t
+
+          val to_bits : t -> bool list
+          val of_bits : bool list -> t
 
           val test_bit : t -> int -> bool
 
@@ -164,12 +177,15 @@ module Schnorr
         val zero : t
 
         val add : t -> t -> t
+        val subtract : t -> t -> t
 
         val double : t -> t
 
         val scale : t -> Scalar.t -> t
 
         val to_affine_coordinates : t -> Field.t * Field.t
+        val is_on_curve : t -> bool
+        val is_inf : t -> bool
     end)
     (Message : Message_intf
                with type boolean_var := Impl.Boolean.var
@@ -206,21 +222,21 @@ module Schnorr
 
   let get_x (t : Curve.t) =
     let x, _ = Curve.to_affine_coordinates t in
-    x
+    Field.unpack x
 
   let get_y (t : Curve.t) =
     let _, y = Curve.to_affine_coordinates t in
-    y
+    Field.unpack y
 
   let compress (t : Curve.t) =
     let x, _ = Curve.to_affine_coordinates t in
     Field.unpack x
 
-  let get_x_bits (t : Curve.t) =
-    Field.unpack get_x t
-
-  let get_y (t : Curve.t) =
-    Field.unpack get_y t
+  let is_even (t : bool list) =
+    let b = List.hd (List.rev t) in
+    match b with
+    | None -> failwith "list should not be empty"
+    | Some x -> x = false
 
   module Public_key : sig
     type t = Curve.t
@@ -261,26 +277,26 @@ module Schnorr
            * currently only Random_oracle.Checked.digest_bits is defined *)
           |> Curve.Scalar.of_bits
     in
-    assert (not Curve.Scalar.(equal k_prime zero)) ;
     (* TODO : should this be an if/else instead ? *)
+    assert (not (Curve.Scalar.(equal k_prime zero))) ;
     let r_point = Curve.scale Curve.one k_prime in
     let yr = get_y r_point in
     let k =
-      (* TODO : is this testing that y is even? *)
-    if Bigint.(test_bit (of_field y) 0) then k_prime
+    if is_even yr then k_prime
     else Curve.Scalar.(order - k_prime) in
-    let e = (get_x_bits r_point) @ (compress Curve.scale Curve.one d) @ (Message.to_bits m) in
-    let s = Curve.Scalar.(k + (e * d)) in
+    let e = (get_x r_point) @ (compress (Curve.scale Curve.one d)) @ (Message.to_bits m) in
+    let s = Curve.Scalar.(k + (of_bits e) * d) in
     (get_x r_point, s)
 
   let verify ((r, s) : Signature.t) (pk : Public_key.t) (m : Message.t) =
     assert (Curve.is_on_curve pk) ;
-    assert (r < Curve.field_order) ;
+    assert (r < Curve.Scalar.field_order) ;
     assert (Curve.Scalar.(s < order)) ;
-    let r_point = Curve.(scale one s - scale pk e) in
-    assert (not Curve.(equal inf r_point)) ;
-    assert (Bigint.(test_bit (of_field y) 0)) ;
-    assert (Field.equal (get_x r_point) r) ;
+    let e = Curve.Scalar.of_bits (r @ (compress pk) @ (Message.to_bits m)) in
+    let r_point = Curve.(subtract (scale one s) (scale pk e)) in
+    assert (not (Curve.is_inf r_point)) ;
+    assert (is_even (get_y r_point)) ;
+    assert Field.(equal (of_bits (get_x r_point)) (of_bits r)) ;
 
   [%%if
   call_logger]

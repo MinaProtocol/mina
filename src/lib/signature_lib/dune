@@ -3,7 +3,7 @@
  (public_name signature_lib)
  (flags :standard -short-paths -warn-error -58-32)
  (library_flags -linkall)
- (libraries snarky base64 snark_params core non_zero_curve_point yojson)
+ (libraries snarky base64 snark_params core non_zero_curve_point yojson blake2 random_oracle)
  (preprocessor_deps ../../config.mlh)
  (preprocess
   (pps ppx_snarky ppx_coda ppx_jane ppx_deriving.eq ppx_deriving_yojson))
