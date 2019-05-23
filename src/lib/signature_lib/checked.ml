@@ -25,6 +25,12 @@ module type Message_intf = sig
 end
 
 module type S = sig
+
+  module Field : sig
+    type t
+    val equal : t -> t -> bool
+  end
+
   type boolean_var
 
   type curve
@@ -73,6 +79,8 @@ module type S = sig
   end
 
   module Checked : sig
+    val get_x : curve_var -> field_var
+    val get_y : curve_var -> field_var
     val compress : curve_var -> (boolean_var list, _) checked
 
     val verification_hash :
@@ -97,6 +105,8 @@ module type S = sig
       -> (unit, _) checked
   end
 
+  val get_x : curve -> Field.t
+  val get_y curve -> Field.t
   val compress : curve -> bool list
 
   val sign : Private_key.t -> Message.t -> Signature.t
@@ -194,9 +204,23 @@ module Schnorr
     type t = Curve.Scalar.t
   end
 
+  let get_x (t : Curve.t) =
+    let x, _ = Curve.to_affine_coordinates t in
+    x
+
+  let get_y (t : Curve.t) =
+    let _, y = Curve.to_affine_coordinates t in
+    y
+
   let compress (t : Curve.t) =
     let x, _ = Curve.to_affine_coordinates t in
     Field.unpack x
+
+  let get_x_bits (t : Curve.t) =
+    Field.unpack get_x t
+
+  let get_y (t : Curve.t) =
+    Field.unpack get_y t
 
   module Public_key : sig
     type t = Curve.t
@@ -204,13 +228,6 @@ module Schnorr
     type var = Curve.var
   end =
     Curve
-
-  let sign (k : Private_key.t) m =
-    let e_r = Curve.Scalar.random () in
-    let r = compress (Curve.scale Curve.one e_r) in
-    let h = Message.hash ~nonce:r m in
-    let s = Curve.Scalar.(e_r - (k * h)) in
-    (s, h)
 
   (* TODO: Have expect test for this *)
   let shamir_sum ((sp, p) : Curve.Scalar.t * Curve.t)
@@ -235,13 +252,35 @@ module Schnorr
     in
     go (Curve.Scalar.length_in_bits - 1) Curve.zero
 
-  let verify ((s, h) : Signature.t) (pk : Public_key.t) (m : Message.t) =
-    let pre_r = shamir_sum (s, Curve.one) (h, pk) in
-    if Curve.equal Curve.zero pre_r then false
-    else
-      let r = compress pre_r in
-      let h' = Message.hash ~nonce:r m in
-      Curve.Scalar.equal h' h
+  let sign (d : Private_key.t) m =
+    let k_prime =
+      ((Curve.Scalar.to_bits d) @ (Message.to_bits m))
+          |> Blake2.bits_to_string
+          |> Random_oracle.digest_string
+          (* TODO : should Random_oracle.digest_bits exist ?
+           * currently only Random_oracle.Checked.digest_bits is defined *)
+          |> Curve.Scalar.of_bits
+    in
+    assert (not Curve.Scalar.(equal k_prime zero)) ;
+    (* TODO : should this be an if/else instead ? *)
+    let r_point = Curve.scale Curve.one k_prime in
+    let yr = get_y r_point in
+    let k =
+      (* TODO : is this testing that y is even? *)
+    if Bigint.(test_bit (of_field y) 0) then k_prime
+    else Curve.Scalar.(order - k_prime) in
+    let e = (get_x_bits r_point) @ (compress Curve.scale Curve.one d) @ (Message.to_bits m) in
+    let s = Curve.Scalar.(k + (e * d)) in
+    (get_x r_point, s)
+
+  let verify ((r, s) : Signature.t) (pk : Public_key.t) (m : Message.t) =
+    assert (Curve.is_on_curve pk) ;
+    assert (r < Curve.field_order) ;
+    assert (Curve.Scalar.(s < order)) ;
+    let r_point = Curve.(scale one s - scale pk e) in
+    assert (not Curve.(equal inf r_point)) ;
+    assert (Bigint.(test_bit (of_field y) 0)) ;
+    assert (Field.equal (get_x r_point) r) ;
 
   [%%if
   call_logger]
