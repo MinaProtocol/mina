@@ -64,7 +64,12 @@ module ChildProcess = {
       );
   };
   [@bs.val] [@bs.module "child_process"]
-  external spawn: (string, array(string)) => Process.t = "";
+  external spawn: (string, array(string)) => Process.t = "spawn";
+
+  [@bs.val] [@bs.module "child_process"]
+  external spawnWithEnv:
+    (string, array(string), {. "env": Js.Dict.t(string)}) => Process.t =
+    "spawn";
 };
 
 module Fs = {
@@ -89,4 +94,12 @@ module Fs = {
 
 module Fetch = {
   [@bs.module] external fetch: ApolloClient.fetch = "node-fetch";
+};
+
+module LocalStorage = {
+  [@bs.val] [@bs.scope "localStorage"]
+  external setItem: (string, string) => unit = "";
+
+  [@bs.val] [@bs.scope "localStorage"]
+  external getItem: string => Js.nullable(string) = "";
 };

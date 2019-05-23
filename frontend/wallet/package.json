@@ -26,13 +26,14 @@
   "scripts": {
     "fake": "graphql-faker --port 8080 -- schema.graphql",
     "fake-inspector": "graphql-faker --open -- schema.graphql",
+    "pull-macos-binary": "curl https://s3-us-west-2.amazonaws.com/wallet.o1test.net/coda-daemon-macos.zip > coda-daemon-macos.zip && rm -rf _build/coda-daemon-macos/ && unzip coda-daemon-macos.zip",
     "build": "bsb -make-world",
     "build-ci": "yarn run query-fake && yarn run build",
     "clean": "bsb -clean-world",
     "pack": "fpack --development ./lib/js/src/render/Index.js",
     "query": "send-introspection-query http://localhost:8080/graphql",
     "query-fake": "concurrently --kill-others 'yarn run fake' 'sleep 5 && yarn run query' || true",
-    "reformat": "bsrefmt --in-place src/**/*.re",
+    "reformat": "bsrefmt --in-place $(find src -name '*.re' -or -name '*.rei' -print)",
     "test": "yarn run build && jest",
     "dist": "yarn run build && yarn run pack && build",
     "dev": "concurrently --kill-others 'bsb -make-world -w' 'fpack watch --development ./lib/js/src/render/Index.js' 'electron ./lib/js/src/main/App.js'"
@@ -51,9 +52,10 @@
       "package.json"
     ],
     "extraResources": [
+      "_build/",
       "node_modules/graphql-faker/dist/index.js",
       "bundle/**/*",
-      "public/*"
+      "public/**/*"
     ],
     "compression": "store",
     "dmg": {
