@@ -17,8 +17,6 @@ module type S = sig
 
   val add : t -> transaction -> time -> unit
 
-  val get_delegator : t -> Public_key.Compressed.t -> transaction option
-
   val get_total_transactions : t -> Public_key.Compressed.t -> int option
 
   val get_transactions : t -> Public_key.Compressed.t -> transaction list
