@@ -331,29 +331,24 @@ module Data = struct
 
     let create proposer_public_key =
       (* TODO: remove duplicated genesis ledger *)
-      let genesis_epoch_snapshot =
-        match proposer_public_key with
-        | None ->
-            Snapshot.create_empty ()
-        | Some key ->
-            let open Snapshot in
-            let delegators =
-              compute_delegators
-                (* TODO: Propagate Include_self to the right place *)
-                (`Include_self, key)
-                ~iter_accounts:(fun f ->
-                  let open Coda_base in
-                  Ledger.foldi ~init:() Genesis_ledger.t ~f:(fun i () acct ->
-                      f (Ledger.Addr.to_int i) acct ) )
-            in
-            let ledger =
-              Coda_base.Sparse_ledger.of_any_ledger
-                (Coda_base.Ledger.Any_ledger.cast
-                   (module Coda_base.Ledger)
-                   Genesis_ledger.t)
-            in
-            {delegators; ledger}
+      let delegators =
+        Option.value ~default:(Core.Int.Table.create ~size:0 ())
+          proposer_public_key (fun key ->
+            compute_delegators
+              (* TODO: Propagate Include_self to the right place *)
+              (`Include_self, key)
+              ~iter_accounts:(fun f ->
+                let open Coda_base in
+                Ledger.foldi ~init:() Genesis_ledger.t ~f:(fun i () acct ->
+                    f (Ledger.Addr.to_int i) acct ) ) )
       in
+      let ledger =
+        Coda_base.Sparse_ledger.of_any_ledger
+          (Coda_base.Ledger.Any_ledger.cast
+             (module Coda_base.Ledger)
+             Genesis_ledger.t)
+      in
+      let genesis_epoch_snapshot = {Snapshot.delegators; ledger} in
       { last_epoch_snapshot= None
       ; curr_epoch_snapshot= None
       ; genesis_epoch_snapshot
