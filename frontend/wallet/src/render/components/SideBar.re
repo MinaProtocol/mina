@@ -36,8 +36,8 @@ module AddWalletMutation = ReasonApollo.CreateMutation(AddWallet);
 [@react.component]
 let make = () => {
   let (modalState, setModalState) = React.useState(() => None);
-  let (_settings, updateSettings) =
-    React.useContext(SettingsProvider.context);
+  let (_settings, updateAddressBook) =
+    React.useContext(AddressBookProvider.context);
 
   <div className=Styles.sidebar>
     <WalletQuery>
@@ -80,9 +80,7 @@ let make = () => {
                      |> Option.andThen(~f=addWallet => addWallet##publicKey)
                      |> Option.map(~f=pk => {
                           let key = PublicKey.ofStringExn(pk);
-                          updateSettings(
-                            Option.map(~f=Settings.set(~key, ~name)),
-                          );
+                          updateAddressBook(AddressBook.set(~key, ~name));
                         })
                      |> ignore,
                );

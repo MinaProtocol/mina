@@ -50,19 +50,13 @@ let createTray = dispatch => {
 App.on(`WindowAllClosed, () => ());
 App.on(`WillQuit, () => killDaemons());
 
-let initialTask =
-  Task.map2(
-    Task.uncallbackifyValue(App.on(`Ready)),
-    SettingsMain.load(ProjectRoot.settings),
-    ~f=((), settings) =>
-    settings
-  );
+let initialTask = Task.uncallbackifyValue(App.on(`Ready));
 
 let run = () =>
   Task.attempt(
     initialTask,
-    ~f=settingsOrError => {
-      let initialState = {Application.State.settingsOrError, wallets: [||]};
+    ~f=_ => {
+      let initialState = ();
 
       let dispatch = ref(_ => ());
       let store =
