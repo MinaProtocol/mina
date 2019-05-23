@@ -85,7 +85,6 @@ let posts = {
 module Router = {
   type t =
     | File(string, ReasonReact.reactElement)
-    | Css_file(string, string)
     | Dir(string, array(t));
 
   let generateStatic = {
@@ -93,9 +92,6 @@ module Router = {
       fun
       | File(name, elem) => {
           writeStatic(path ++ "/" ++ name, elem);
-        }
-      | Css_file(name, content) => {
-          Node.Fs.writeFileAsUtf8Sync(path ++ "/" ++ name ++ ".css", content);
         }
       | Dir(name, routes) => {
           let path_ = path ++ "/" ++ name;
@@ -111,16 +107,11 @@ let jobOpenings = [|
   ("engineering-manager", "Engineering Manager (San Francisco)."),
   ("product-manager", "Product Manager (San Francisco)."),
   ("senior-frontend-engineer", "Senior Frontend Engineer (San Francisco)."),
-  (
-    "protocol-reliability-engineer",
-    "Protocol Reliability Engineer (San Francisco).",
-  ),
   ("protocol-engineer", "Senior Protocol Engineer (San Francisco)."),
   (
     "director-of-business-development",
     "Director of Business Development (San Francisco).",
   ),
-  ("developer-advocate", "Developer Advocate (San Francisco)."),
 |];
 
 // GENERATE
@@ -137,7 +128,6 @@ Router.(
     Dir(
       "site",
       [|
-        Css_file("fonts", Style.Typeface.Loader.load()),
         File(
           "index",
           <Page page=`Home name="index" footerColor=Style.Colors.navyBlue>

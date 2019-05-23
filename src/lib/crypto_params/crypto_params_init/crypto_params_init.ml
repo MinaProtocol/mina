@@ -5,11 +5,15 @@
 curve_size = 298]
 
 module Cycle = Snarky.Libsnark.Mnt298
+module Snarkette_tick = Snarkette.Mnt6_80
+module Snarkette_tock = Snarkette.Mnt4_80
 
 [%%elif
 curve_size = 753]
 
 module Cycle = Snarky.Libsnark.Mnt753
+module Snarkette_tick = Snarkette.Mnt6753
+module Snarkette_tock = Snarkette.Mnt4753
 
 [%%else]
 
@@ -23,7 +27,7 @@ curve_size]
 
 module Tick_backend = struct
   module Full = Cycle.Mnt4
-  include Full.GM
+  include Full.Default
   module Inner_curve = Cycle.Mnt6.G1
   module Inner_twisted_curve = Cycle.Mnt6.G2
 end

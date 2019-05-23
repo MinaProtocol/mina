@@ -8,4 +8,4 @@
    network_peer trust_system)
  (preprocess
   (pps ppx_jane bisect_ppx -- -conditional))
- (synopsis "Kademlia DHT -- only being used for it's membership"))
+ (synopsis "Kademlia DHT -- only being used for its membership"))

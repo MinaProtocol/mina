@@ -8,7 +8,7 @@ module Stable = struct
         { proposer: Public_key.Compressed.Stable.V1.t
         ; amount: Currency.Amount.Stable.V1.t
         ; fee_transfer: Fee_transfer.Single.Stable.V1.t option }
-      [@@deriving sexp, bin_io, compare, eq, version]
+      [@@deriving sexp, bin_io, compare, eq, version, hash, yojson]
     end
 
     include T
@@ -56,7 +56,7 @@ type t = Stable.Latest.t =
   { proposer: Public_key.Compressed.Stable.V1.t
   ; amount: Currency.Amount.Stable.V1.t
   ; fee_transfer: Fee_transfer.Single.Stable.V1.t option }
-[@@deriving sexp, compare, eq]
+[@@deriving sexp, compare, eq, hash, yojson]
 
 let is_valid = Stable.Latest.is_valid
 

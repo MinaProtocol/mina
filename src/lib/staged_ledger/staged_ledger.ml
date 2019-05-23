@@ -16,39 +16,35 @@ let val_or_exn label = function
 let option lab =
   Option.value_map ~default:(Or_error.error_string lab) ~f:(fun x -> Ok x)
 
-module Make_completed_work = Transaction_snark_work.Make
-module Make_diff = Staged_ledger_diff.Make
-
 module Make_with_constants (Constants : sig
   val transaction_capacity_log_2 : int
 
   val work_delay_factor : int
 end)
-(Inputs : Inputs.S) : sig
-  include
-    Coda_pow.Staged_ledger_intf
-    with type diff := Inputs.Staged_ledger_diff.t
-     and type valid_diff :=
-                Inputs.Staged_ledger_diff.With_valid_signatures_and_proofs.t
-     and type ledger_hash := Inputs.Ledger_hash.t
-     and type frozen_ledger_hash := Inputs.Frozen_ledger_hash.t
-     and type staged_ledger_hash := Inputs.Staged_ledger_hash.t
-     and type public_key := Inputs.Compressed_public_key.t
-     and type ledger := Inputs.Ledger.t
-     and type user_command_with_valid_signature :=
-                Inputs.User_command.With_valid_signature.t
-     and type statement := Inputs.Transaction_snark_work.Statement.t
-     and type completed_work_checked := Inputs.Transaction_snark_work.Checked.t
-     and type ledger_proof := Inputs.Ledger_proof.t
-     and type staged_ledger_aux_hash := Inputs.Staged_ledger_aux_hash.t
-     and type sparse_ledger := Inputs.Sparse_ledger.t
-     and type ledger_proof_statement := Inputs.Ledger_proof_statement.t
-     and type ledger_proof_statement_set := Inputs.Ledger_proof_statement.Set.t
-     and type transaction := Inputs.Transaction.t
-     and type user_command := Inputs.User_command.t
-     and type transaction_witness := Inputs.Transaction_witness.t
-     and type pending_coinbase_collection := Inputs.Pending_coinbase.t
-end = struct
+(Inputs : Inputs.S) :
+  Coda_pow.Staged_ledger_intf
+  with type diff := Inputs.Staged_ledger_diff.t
+   and type valid_diff :=
+              Inputs.Staged_ledger_diff.With_valid_signatures_and_proofs.t
+   and type ledger_hash := Inputs.Ledger_hash.t
+   and type frozen_ledger_hash := Inputs.Frozen_ledger_hash.t
+   and type staged_ledger_hash := Inputs.Staged_ledger_hash.t
+   and type public_key := Inputs.Compressed_public_key.t
+   and type ledger := Inputs.Ledger.t
+   and type user_command_with_valid_signature :=
+              Inputs.User_command.With_valid_signature.t
+   and type statement := Inputs.Transaction_snark_work.Statement.t
+   and type completed_work_checked := Inputs.Transaction_snark_work.Checked.t
+   and type ledger_proof := Inputs.Ledger_proof.t
+   and type staged_ledger_aux_hash := Inputs.Staged_ledger_aux_hash.t
+   and type sparse_ledger := Inputs.Sparse_ledger.t
+   and type ledger_proof_statement := Inputs.Ledger_proof_statement.t
+   and type ledger_proof_statement_set := Inputs.Ledger_proof_statement.Set.t
+   and type transaction := Inputs.Transaction.t
+   and type user_command := Inputs.User_command.t
+   and type transaction_witness := Inputs.Transaction_witness.t
+   and type pending_coinbase_collection := Inputs.Pending_coinbase.t
+   and type verifier := Inputs.Ledger_proof_verifier.t = struct
   open Inputs
   module Scan_state = Transaction_snark_scan_state.Make (Constants) (Inputs)
 
@@ -114,10 +110,24 @@ end = struct
 
   type job = Scan_state.Available_job.t [@@deriving sexp]
 
-  let verify_proof proof statement ~message =
-    Inputs.Ledger_proof_verifier.verify proof statement ~message
+  let verify_proof ~logger ~verifier ~proof ~statement ~message =
+    let statement_eq a b = Int.(Ledger_proof_statement.compare a b = 0) in
+    if not (statement_eq (Ledger_proof.statement proof) statement) then
+      Deferred.return false
+    else
+      match%map
+        Inputs.Ledger_proof_verifier.verify_transaction_snark verifier proof
+          ~message
+      with
+      | Ok b ->
+          b
+      | Error e ->
+          Logger.warn logger ~module_:__MODULE__ ~location:__LOC__
+            ~metadata:[("error", `String (Error.to_string_hum e))]
+            "Bad transaction snark: $error" ;
+          false
 
-  let verify ~message job proof prover =
+  let verify ~logger ~verifier ~message job proof prover =
     let open Deferred.Let_syntax in
     match Scan_state.statement_of_job job with
     | None ->
@@ -125,14 +135,14 @@ end = struct
           ( Or_error.errorf !"Error creating statement from job %{sexp:job}" job
           |> to_staged_ledger_or_error )
     | Some statement -> (
-        match%map verify_proof proof statement ~message with
+        match%map
+          verify_proof ~logger ~verifier ~proof ~statement ~message
+        with
         | true ->
             Ok ()
         | _ ->
             Error
               (Staged_ledger_error.Invalid_proof (proof, statement, prover)) )
-
-  (*TODO: Punish*)
 
   module M = struct
     include Monad.Ident
@@ -143,18 +153,22 @@ end = struct
     include Scan_state.Make_statement_scanner
               (M)
               (struct
-                let verify (_ : Ledger_proof.t) (_ : Ledger_proof_statement.t)
-                    ~message:(_ : Sok_message.t) =
-                  true
+                type t = unit
+
+                let verify ~verifier:() ~proof:_ ~statement:_ ~message:_ = true
               end)
+  end
+
+  module Statement_scanner_proof_verifier = struct
+    type t = {logger: Logger.t; verifier: Ledger_proof_verifier.t}
+
+    let verify ~verifier:{logger; verifier} = verify_proof ~logger ~verifier
   end
 
   module Statement_scanner_with_proofs =
     Scan_state.Make_statement_scanner
       (Deferred)
-      (struct
-        let verify proof stmt ~message = verify_proof proof stmt ~message
-      end)
+      (Statement_scanner_proof_verifier)
 
   type pending_coinbase_collection = Pending_coinbase.t
   [@@deriving sexp, bin_io]
@@ -250,11 +264,11 @@ end = struct
     in
     match Scan_state.latest_ledger_proof scan_state with
     | None ->
-        Statement_scanner.check_invariants scan_state ~error_prefix
-          ~ledger_hash_end:ledger ~ledger_hash_begin:None
+        Statement_scanner.check_invariants scan_state ~verifier:()
+          ~error_prefix ~ledger_hash_end:ledger ~ledger_hash_begin:None
     | Some proof ->
-        Statement_scanner.check_invariants scan_state ~error_prefix
-          ~ledger_hash_end:ledger
+        Statement_scanner.check_invariants scan_state ~verifier:()
+          ~error_prefix ~ledger_hash_end:ledger
           ~ledger_hash_begin:(Some (get_target proof))
 
   (* TODO: Remove this. This is deprecated *)
@@ -296,7 +310,7 @@ end = struct
               target expected_target
 
   let statement_exn t =
-    match Statement_scanner.scan_statement t.scan_state with
+    match Statement_scanner.scan_statement t.scan_state ~verifier:() with
     | Ok s ->
         `Non_empty s
     | Error `Empty ->
@@ -304,8 +318,8 @@ end = struct
     | Error (`Error e) ->
         failwithf !"statement_exn: %{sexp:Error.t}" e ()
 
-  let of_scan_state_and_ledger ~snarked_ledger_hash ~ledger ~scan_state
-      ~pending_coinbase_collection =
+  let of_scan_state_and_ledger ~logger ~verifier ~snarked_ledger_hash ~ledger
+      ~scan_state ~pending_coinbase_collection =
     let open Deferred.Or_error.Let_syntax in
     let verify_snarked_ledger t snarked_ledger_hash =
       match snarked_ledger t ~snarked_ledger_hash with
@@ -319,6 +333,7 @@ end = struct
     let t = {ledger; scan_state; pending_coinbase_collection} in
     let%bind () =
       Statement_scanner_with_proofs.check_invariants scan_state
+        ~verifier:{Statement_scanner_proof_verifier.logger; verifier}
         ~error_prefix:"Staged_ledger.of_scan_state_and_ledger"
         ~ledger_hash_end:
           (Frozen_ledger_hash.of_ledger_hash (Ledger.merkle_root ledger))
@@ -329,8 +344,8 @@ end = struct
     in
     return t
 
-  let of_scan_state_pending_coinbases_and_snarked_ledger ~scan_state
-      ~snarked_ledger ~expected_merkle_root ~pending_coinbases =
+  let of_scan_state_pending_coinbases_and_snarked_ledger ~logger ~verifier
+      ~scan_state ~snarked_ledger ~expected_merkle_root ~pending_coinbases =
     let open Deferred.Or_error.Let_syntax in
     let snarked_ledger_hash = Ledger.merkle_root snarked_ledger in
     let snarked_frozen_ledger_hash =
@@ -355,9 +370,9 @@ end = struct
                   Got:%{sexp:Ledger_hash.t}"
                 expected_merkle_root staged_ledger_hash)
     in
-    of_scan_state_and_ledger ~snarked_ledger_hash:snarked_frozen_ledger_hash
-      ~ledger:snarked_ledger ~scan_state
-      ~pending_coinbase_collection:pending_coinbases
+    of_scan_state_and_ledger ~logger ~verifier
+      ~snarked_ledger_hash:snarked_frozen_ledger_hash ~ledger:snarked_ledger
+      ~scan_state ~pending_coinbase_collection:pending_coinbases
 
   let copy {scan_state; ledger; pending_coinbase_collection} =
     let new_mask = Ledger.Mask.create () in
@@ -495,7 +510,7 @@ end = struct
     in
     go current_stack [] ts
 
-  let check_completed_works scan_state
+  let check_completed_works ~logger ~verifier scan_state
       (completed_works : Transaction_snark_work.t list) =
     let open Deferred.Result.Let_syntax in
     let%bind jobses =
@@ -506,7 +521,7 @@ end = struct
     let check job_proofs prover message =
       let open Deferred.Let_syntax in
       Deferred.List.find_map job_proofs ~f:(fun (job, proof) ->
-          match%map verify ~message job proof prover with
+          match%map verify ~logger ~verifier ~message job proof prover with
           | Ok () ->
               None
           | Error e ->
@@ -670,7 +685,6 @@ end = struct
                 | Some t ->
                     Continue (t :: acc)
                 | None ->
-                    (* TODO: punish *)
                     Stop (Error (Staged_ledger_error.Bad_signature t)) )
               ~finish:(fun acc -> Ok acc)
           in
@@ -897,7 +911,7 @@ end = struct
 
   (* N.B.: we don't expose apply_diff_unverified
      in For_tests only, we expose apply apply_unverified, which calls apply_diff_unverified *)
-  let apply_diff t (sl_diff : Staged_ledger_diff.t) ~logger =
+  let apply_diff ~logger ~verifier t (sl_diff : Staged_ledger_diff.t) =
     let open Deferred.Result.Let_syntax in
     let max_throughput =
       Int.pow 2
@@ -963,7 +977,7 @@ end = struct
       update_coinbase_stack_and_get_data t.scan_state new_ledger
         t.pending_coinbase_collection transactions
     in
-    let%bind () = check_completed_works t.scan_state works in
+    let%bind () = check_completed_works ~logger ~verifier t.scan_state works in
     let%bind () = Deferred.return (check_zero_fee_excess t.scan_state data) in
     let%bind res_opt, scan_state' =
       (* TODO: Add rollback *)
@@ -1621,6 +1635,9 @@ end = struct
                   (User_command t) )
           with
           | Error e ->
+              (* FIXME This should be fatal and crash the daemon but can't be
+               because of a buggy test. See #2346.
+            *)
               Logger.error logger ~module_:__MODULE__ ~location:__LOC__
                 ~metadata:
                   [ ( "user_command"
@@ -1651,6 +1668,65 @@ end
 
 module Make = Make_with_constants (Transaction_snark_scan_state.Constants)
 
+include Make (struct
+  open Coda_base
+  module Compressed_public_key = Signature_lib.Public_key.Compressed
+  module User_command = User_command
+  module Fee_transfer = Fee_transfer
+  module Coinbase = Coinbase
+
+  module Transaction = struct
+    include Transaction.Stable.V1
+
+    [%%define_locally
+    Transaction.(supply_increase, fee_excess)]
+  end
+
+  module Ledger_hash = Ledger_hash
+  module Frozen_ledger_hash = Frozen_ledger_hash
+  module Pending_coinbase_hash = Pending_coinbase.Hash
+
+  module Pending_coinbase = struct
+    include Pending_coinbase.Stable.V1
+    module Stack = Pending_coinbase.Stack
+    module Coinbase_data = Pending_coinbase.Coinbase_data
+
+    [%%define_locally
+    Pending_coinbase.
+      ( oldest_stack
+      , latest_stack
+      , create
+      , remove_coinbase_stack
+      , merkle_root
+      , hash_extra
+      , update_coinbase_stack )]
+  end
+
+  module Pending_coinbase_stack_state =
+    Transaction_snark.Pending_coinbase_stack_state
+  module Ledger_proof_statement = Transaction_snark.Statement
+  module Proof = Proof
+  module Sok_message = Sok_message
+  module Ledger_proof = Ledger_proof
+  module Ledger_proof_verifier = Verifier
+
+  module Staged_ledger_aux_hash = struct
+    include Staged_ledger_hash.Aux_hash.Stable.V1
+
+    [%%define_locally
+    Staged_ledger_hash.Aux_hash.(to_bytes, of_bytes)]
+  end
+
+  module Staged_ledger_hash = Staged_ledger_hash
+  module Transaction_snark_work = Transaction_snark_work
+  module Staged_ledger_diff = Staged_ledger_diff
+  module Account = Account
+  module Ledger = Ledger
+  module Transaction_validator = Transaction_validator
+  module Sparse_ledger = Sparse_ledger
+  module Transaction_witness = Transaction_witness
+end)
+
 let%test_module "test" =
   ( module struct
     module Test_input1 = struct
@@ -1674,11 +1750,15 @@ let%test_module "test" =
       module Compressed_public_key = struct
         type t = string [@@deriving sexp, compare, yojson, hash]
 
+        (* unused in test *)
+        type var = unit
+
         module Stable = struct
           module V1 = struct
             module T = struct
               type t = string
-              [@@deriving sexp, bin_io, compare, eq, yojson, hash, version]
+              [@@deriving
+                sexp, bin_io, compare, eq, yojson, hash, version {unnumbered}]
             end
 
             include T
@@ -1696,7 +1776,8 @@ let%test_module "test" =
         module Stable = struct
           module V1 = struct
             module T = struct
-              type t = unit [@@deriving bin_io, sexp, yojson, version]
+              type t = unit
+              [@@deriving bin_io, sexp, yojson, version {unnumbered}]
             end
 
             include T
@@ -1705,7 +1786,10 @@ let%test_module "test" =
           module Latest = V1
         end
 
-        module Digest = Unit
+        module Digest = struct
+          include Unit
+          module Checked = Unit
+        end
 
         type t = Stable.Latest.t [@@deriving sexp, yojson]
 
@@ -1786,12 +1870,7 @@ let%test_module "test" =
                 | One of Single.Stable.V1.t
                 | Two of Single.Stable.V1.t * Single.Stable.V1.t
               [@@deriving
-                bin_io
-                , sexp
-                , compare
-                , eq
-                , yojson
-                , version {for_test; unnumbered}]
+                bin_io, sexp, compare, eq, yojson, version {for_test}]
             end
 
             include T
@@ -1918,7 +1997,8 @@ let%test_module "test" =
           module V1 = struct
             module T = struct
               type t = int
-              [@@deriving sexp, bin_io, compare, hash, eq, yojson, version]
+              [@@deriving
+                sexp, bin_io, compare, hash, eq, yojson, version {unnumbered}]
             end
 
             include T
@@ -1927,7 +2007,7 @@ let%test_module "test" =
           module Latest = V1
         end
 
-        type t = int [@@deriving sexp, compare, hash, eq]
+        type t = int [@@deriving sexp, compare, hash, eq, yojson]
 
         include Hashable.Make_binable (Stable.Latest)
 
@@ -2136,9 +2216,10 @@ let%test_module "test" =
       end
 
       module Ledger_proof_verifier = struct
-        let verify (_ : Ledger_proof.t) (_ : Ledger_proof_statement.t)
-            ~message:_ : bool Deferred.t =
-          return true
+        type t = unit
+
+        let verify_transaction_snark () _proof ~message:_ =
+          Deferred.Or_error.return true
       end
 
       module Ledger = struct
@@ -2281,7 +2362,8 @@ let%test_module "test" =
           module V1 = struct
             module T = struct
               type t = string
-              [@@deriving bin_io, sexp, hash, compare, eq, yojson, version]
+              [@@deriving
+                bin_io, sexp, hash, compare, eq, yojson, version {unnumbered}]
             end
 
             include T
@@ -2292,6 +2374,9 @@ let%test_module "test" =
         end
 
         type t = string [@@deriving sexp, eq, compare]
+
+        (* unused in test *)
+        type var = unit
 
         type ledger_hash = Ledger_hash.t
 
@@ -2481,8 +2566,7 @@ let%test_module "test" =
                   ; user_commands: user_command list
                   ; coinbase: fee_transfer_single At_most_two.Stable.Latest.t
                   }
-                [@@deriving
-                  sexp, bin_io, yojson, version {for_test; unnumbered}]
+                [@@deriving sexp, bin_io, yojson, version {for_test}]
               end
 
               include T
@@ -2530,7 +2614,7 @@ let%test_module "test" =
                 type t =
                   Pre_diff_with_at_most_two_coinbase.Stable.V1.t
                   * Pre_diff_with_at_most_one_coinbase.Stable.V1.t option
-                [@@deriving sexp, bin_io, yojson, version]
+                [@@deriving sexp, bin_io, yojson, version {unnumbered}]
               end
 
               include T
@@ -2562,7 +2646,7 @@ let%test_module "test" =
           { diff: Diff.Stable.V1.t
           ; prev_hash: staged_ledger_hash
           ; creator: public_key }
-        [@@deriving sexp, yojson]
+        [@@deriving sexp, yojson, fields]
 
         module With_valid_signatures_and_proofs = struct
           type pre_diff_with_at_most_two_coinbase =
@@ -2624,6 +2708,10 @@ let%test_module "test" =
           (fst t.diff).user_commands
           @ Option.value_map (snd t.diff) ~default:[] ~f:(fun d ->
                 d.user_commands )
+
+        let completed_works _ = failwith "completed_work : Need to implement"
+
+        let coinbase _ = failwith "coinbase: Need to implement"
       end
 
       module Transaction_witness = struct
@@ -2689,7 +2777,7 @@ let%test_module "test" =
               , `Ledger_proof ledger_proof
               , `Staged_ledger sl'
               , `Pending_coinbase_data _ ) =
-        match%map Sl.apply !sl diff' ~logger with
+        match%map Sl.apply !sl diff' ~logger ~verifier:() with
         | Ok x ->
             x
         | Error e ->
@@ -2926,7 +3014,7 @@ let%test_module "test" =
                   (Sequence.to_list work_done)
                   partitions
               in
-              match%map Sl.apply !sl diff ~logger with
+              match%map Sl.apply !sl diff ~logger ~verifier:() with
               | Error (Sl.Staged_ledger_error.Non_zero_fee_excess _) ->
                   ()
               | Error e ->

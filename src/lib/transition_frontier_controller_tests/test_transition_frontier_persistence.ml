@@ -22,6 +22,8 @@ let%test_module "Transition Frontier Persistence" =
   ( module struct
     let logger = Logger.create ()
 
+    let trust_system = Trust_system.null ()
+
     let check_transitions transition_storage written_breadcrumbs =
       List.iter written_breadcrumbs ~f:(fun breadcrumb ->
           let {With_hash.hash; data= expected_transition} =
@@ -31,8 +33,7 @@ let%test_module "Transition Frontier Persistence" =
             Transition_storage.get ~logger transition_storage
               (Transition_storage.Schema.Transition hash)
           in
-          [%test_eq: External_transition.t]
-            (External_transition.of_verified expected_transition)
+          [%test_eq: External_transition.Validated.t] expected_transition
             queried_transition )
 
     let store_transitions worker frontier breadcrumbs =
@@ -47,15 +48,8 @@ let%test_module "Transition Frontier Persistence" =
       in
       Broadcast_pipe.Reader.fold
         (Transition_frontier.persistence_diff_pipe frontier)
-        ~init:Diff_hash.empty
-        ~f:(fun acc_hash
-           (diffs :
-             ( External_transition.Stable.Latest.t
-             , State_hash.Stable.Latest.t )
-             With_hash.t
-             Diff_mutant.E.t
-             list)
-           ->
+        ~init:Transition_frontier.Diff_hash.empty
+        ~f:(fun acc_hash (diffs : Transition_frontier.Diff_mutant.E.t list) ->
           Deferred.List.fold diffs ~init:acc_hash
             ~f:(fun acc_hash (E mutant_diff) ->
               let%map new_hash =
@@ -104,7 +98,7 @@ let%test_module "Transition Frontier Persistence" =
       result
 
     let generate_breadcrumbs ~gen_root_breadcrumb_builder frontier size =
-      gen_root_breadcrumb_builder ~logger ~size
+      gen_root_breadcrumb_builder ~logger ~trust_system ~size
         ~accounts_with_secret_keys:Genesis_ledger.accounts
         (Transition_frontier.root frontier)
       |> Quickcheck.random_value |> Deferred.all
@@ -131,11 +125,6 @@ let%test_module "Transition Frontier Persistence" =
     let test_tree_breadcrumbs =
       test_breadcrumbs ~gen_root_breadcrumb_builder:gen_tree_list
 
-    let get_transition =
-      Fn.compose
-        (With_hash.map ~f:External_transition.of_verified)
-        Transition_frontier.Breadcrumb.transition_with_hash
-
     let%test_unit "Should be able to query transitions from \
                    transition_storage after writing New_frontier and \
                    Add_transition diffs into the storage" =
@@ -147,7 +136,7 @@ let%test_module "Transition Frontier Persistence" =
       let%map root, next_breadcrumb =
         with_persistence ~logger ~directory_name ~f:(fun (frontier, t) ->
             let create_breadcrumb =
-              gen_breadcrumb ~logger
+              gen_breadcrumb ~logger ~trust_system
                 ~accounts_with_secret_keys:Genesis_ledger.accounts
               |> Quickcheck.random_value
             in
@@ -158,17 +147,20 @@ let%test_module "Transition Frontier Persistence" =
             let open Transition_frontier.Breadcrumb in
             let staged_ledger = staged_ledger root in
             Transition_frontier_persistence.Worker.handle_diff t
-              Diff_hash.empty
+              Transition_frontier.Diff_hash.empty
               (E
                  (New_frontier
-                    ( get_transition root
+                    ( Transition_frontier.Breadcrumb.transition_with_hash root
                     , Staged_ledger.scan_state staged_ledger
                     , Staged_ledger.pending_coinbase_collection staged_ledger
                     )))
             |> ignore ;
             Transition_frontier_persistence.Worker.handle_diff t
-              Diff_hash.empty
-              (E (Add_transition (get_transition next_breadcrumb)))
+              Transition_frontier.Diff_hash.empty
+              (E
+                 (Add_transition
+                    (Transition_frontier.Breadcrumb.transition_with_hash
+                       next_breadcrumb)))
             |> ignore ;
             (root, next_breadcrumb) )
       in
@@ -179,23 +171,15 @@ let%test_module "Transition Frontier Persistence" =
       test_linear_breadcrumbs (max_length - 1)
 
     let%test_unit "Root changes multiple times" =
+      Printexc.record_backtrace true ;
       test_linear_breadcrumbs (2 * max_length)
 
     let%test_unit "Randomly generate a tree" =
       test_tree_breadcrumbs (2 * max_length)
 
-    let%test "Serializing a tree and then deserializing it should give us the \
-              same transition_frontier" =
-      Core.Backtrace.elide := false ;
-      Async.Scheduler.set_record_backtraces true ;
+    let test_deserialization num_breadcrumbs frontier =
       let logger = Logger.create () in
-      let num_breadcrumbs = max_length in
-      Thread_safe.block_on_async_exn
-      @@ fun () ->
       let directory_name = Uuid.to_string (Uuid_unix.create ()) in
-      let%bind frontier =
-        create_root_frontier ~logger Genesis_ledger.accounts
-      in
       let worker =
         Transition_frontier_persistence.create ~logger ~directory_name ()
       in
@@ -212,12 +196,36 @@ let%test_module "Transition Frontier Persistence" =
           worker
       in
       let%map deserialized_frontier =
-        Transition_frontier_persistence.read ~logger ~root_snarked_ledger
+        Transition_frontier_persistence.read ~logger ~trust_system ~verifier:()
+          ~root_snarked_ledger
           ~consensus_local_state:
             (Transition_frontier.consensus_local_state frontier)
           transition_storage
       in
       Transition_frontier.equal frontier deserialized_frontier
+
+    let%test "Serializing a tree and then deserializing it should give us the \
+              same transition_frontier" =
+      Core.Backtrace.elide := false ;
+      Async.Scheduler.set_record_backtraces true ;
+      Thread_safe.block_on_async_exn
+      @@ fun () ->
+      let%bind frontier =
+        create_root_frontier ~logger Genesis_ledger.accounts
+      in
+      test_deserialization max_length frontier
+
+    let%test_unit "Serializing a frontier and then deserializing it  from \
+                   genesis should give us the same transition_frontier" =
+      Core.Backtrace.elide := false ;
+      Async.Scheduler.set_record_backtraces true ;
+      Thread_safe.block_on_async_exn
+      @@ fun () ->
+      Stubs.with_genesis_frontier ~logger ~f:(fun frontier ->
+          let%map is_serialization_correct =
+            test_deserialization (max_length / 2) frontier
+          in
+          assert is_serialization_correct )
 
     (* TODO: create a test where a batch of diffs are being applied, but the
        worker dies in the middle. The transition_frontier_database can be left

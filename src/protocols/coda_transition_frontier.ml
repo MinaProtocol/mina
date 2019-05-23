@@ -1,9 +1,11 @@
-open Core_kernel
+open Core
 open Async_kernel
 open Pipe_lib
 open Cache_lib
 
 module Transition_frontier_diff = struct
+  (* TODO: Remove New_frontier. 
+    Each transition frontier extension should be initialized by the input, the root breadcrumb *)
   type 'a t =
     | New_breadcrumb of 'a
         (** Triggered when a new breadcrumb is added without changing the root or best_tip *)
@@ -19,101 +21,6 @@ module Transition_frontier_diff = struct
         ; garbage: 'a list }
         (** Triggered when a new breadcrumb is added, causing a new best_tip *)
   [@@deriving sexp]
-end
-
-module type Diff_hash = sig
-  type t [@@deriving bin_io]
-
-  val merge : t -> string -> t
-
-  val empty : t
-
-  val equal : t -> t -> bool
-end
-
-module type Diff_mutant = sig
-  type external_transition
-
-  type state_hash
-
-  type scan_state
-
-  type pending_coinbases
-
-  type consensus_state
-
-  (** Diff_mutant is a GADT that represents operations that affect the changes
-      on the transition_frontier. The left-hand side of the GADT represents
-      change that will occur to the transition_frontier. The right-hand side of
-      the GADT represents which components are are effected by these changes
-      and a certification that these components are handled appropriately.
-      There are comments for each GADT that will discuss the operations that
-      changes a `transition_frontier` and their corresponding side-effects.*)
-  module T : sig
-    type ('external_transition, _) t =
-      | New_frontier :
-          ( (external_transition, state_hash) With_hash.t
-          * scan_state
-          * pending_coinbases )
-          -> ('external_transition, unit) t
-          (** New_frontier: When creating a new transition frontier, the
-            transition_frontier will begin with a single breadcrumb that can be
-            constructed mainly with a root external transition and a
-            scan_state. There are no components in the frontier that affects
-            the frontier. Therefore, the type of this diff is tagged as a unit. *)
-      | Add_transition :
-          (external_transition, state_hash) With_hash.t
-          -> ('external_transition, consensus_state) t
-          (** Add_transition: Add_transition would simply add a transition to the
-            frontier and is therefore the parameter for Add_transition. After
-            adding the transition, we add the transition to its parent list of
-            successors. To certify that we added it to the right parent. The
-            consensus_state of the parent can accomplish this. *)
-      | Remove_transitions :
-          'external_transition list
-          -> ('external_transition, consensus_state list) t
-          (** Remove_transitions: Remove_transitions is an operation that removes
-            a set of transitions. We need to make sure that we are deleting the
-            right transition and we use their consensus_state to accomplish
-            this. Therefore the type of Remove_transitions is indexed by a list
-            of consensus_state. *)
-      | Update_root :
-          (state_hash * scan_state * pending_coinbases)
-          -> ( 'external_transition
-             , state_hash * scan_state * pending_coinbases )
-             t
-          (** Update_root: Update root is an indication that the root state_hash
-            and the root scan_state state. To verify that we update the right
-            root, we can indicate the old root is being updated. Therefore, the
-            type of Update_root is indexed by a state_hash and scan_state. *)
-  end
-
-  type ('a, 'b) t = ('a, 'b) T.t
-
-  type hash
-
-  val key_to_yojson :
-       ('external_transition, 'output) T.t
-    -> f:('external_transition -> Yojson.Safe.json)
-    -> Yojson.Safe.json
-
-  val value_to_yojson :
-    ('external_transition, 'output) T.t -> 'output -> Yojson.Safe.json
-
-  val hash :
-       hash
-    -> ('external_transition, 'output) T.t
-    -> f:('external_transition -> string)
-    -> 'output
-    -> hash
-
-  module E : sig
-    type 'external_transition t =
-      | E : ('external_transition, 'output) T.t -> 'external_transition t
-
-    include
-      Binable.S1 with type 'external_transition t := 'external_transition t
-  end
 end
 
 (** An extension to the transition frontier that provides a view onto the data
@@ -188,14 +95,14 @@ module type Network_intf = sig
 
   val get_staged_ledger_aux_and_pending_coinbases_at_hash :
        t
-    -> peer
+    -> Unix.Inet_addr.t
     -> state_hash
     -> (parallel_scan_state * ledger_hash * pending_coinbases)
        Deferred.Or_error.t
 
   val get_ancestry :
        t
-    -> peer
+    -> Unix.Inet_addr.t
     -> consensus_state
     -> ( external_transition
        , state_body_hash list * external_transition )
@@ -222,12 +129,16 @@ module type Transition_frontier_Breadcrumb_intf = sig
 
   type staged_ledger
 
-  type external_transition_verified
+  type mostly_validated_external_transition
+
+  type external_transition_validated
 
   type user_command
 
+  type verifier
+
   val create :
-       (external_transition_verified, state_hash) With_hash.t
+       (external_transition_validated, state_hash) With_hash.t
     -> staged_ledger
     -> t
 
@@ -236,21 +147,26 @@ module type Transition_frontier_Breadcrumb_intf = sig
 
   val build :
        logger:Logger.t
+    -> verifier:verifier
+    -> trust_system:Trust_system.t
     -> parent:t
-    -> transition_with_hash:( external_transition_verified
-                            , state_hash )
-                            With_hash.t
-    -> (t, [`Validation_error of Error.t | `Fatal_error of exn]) Result.t
+    -> transition:mostly_validated_external_transition
+    -> sender:Envelope.Sender.t option
+    -> ( t
+       , [ `Invalid_staged_ledger_diff of Error.t
+         | `Invalid_staged_ledger_hash of Error.t
+         | `Fatal_error of exn ] )
+       Result.t
        Deferred.t
 
   val transition_with_hash :
-    t -> (external_transition_verified, state_hash) With_hash.t
+    t -> (external_transition_validated, state_hash) With_hash.t
 
   val staged_ledger : t -> staged_ledger
 
   val hash : t -> int
 
-  val external_transition : t -> external_transition_verified
+  val external_transition : t -> external_transition_validated
 
   val state_hash : t -> state_hash
 
@@ -264,9 +180,15 @@ end
 module type Transition_frontier_base_intf = sig
   type state_hash
 
-  type external_transition_verified
+  type consensus_state
+
+  type mostly_validated_external_transition
+
+  type external_transition_validated
 
   type transaction_snark_scan_state
+
+  type pending_coinbase
 
   type masked_ledger
 
@@ -280,20 +202,23 @@ module type Transition_frontier_base_intf = sig
 
   type staged_ledger_diff
 
-  type diff_mutant
+  type verifier
 
   type t [@@deriving eq]
 
   module Breadcrumb :
     Transition_frontier_Breadcrumb_intf
-    with type external_transition_verified := external_transition_verified
+    with type mostly_validated_external_transition :=
+                mostly_validated_external_transition
+     and type external_transition_validated := external_transition_validated
      and type state_hash := state_hash
      and type staged_ledger := staged_ledger
      and type user_command := user_command
+     and type verifier := verifier
 
   val create :
        logger:Logger.t
-    -> root_transition:(external_transition_verified, state_hash) With_hash.t
+    -> root_transition:(external_transition_validated, state_hash) With_hash.t
     -> root_snarked_ledger:ledger_database
     -> root_staged_ledger:staged_ledger
     -> consensus_local_state:consensus_local_state
@@ -367,6 +292,76 @@ module type Transition_frontier_intf = sig
 
   val wait_for_transition : t -> state_hash -> unit Deferred.t
 
+  module Diff_hash : sig
+    type t [@@deriving bin_io]
+
+    val merge : t -> string -> t
+
+    val empty : t
+
+    val equal : t -> t -> bool
+
+    val to_string : t -> string
+  end
+
+  module Diff_mutant : sig
+    (** Diff_mutant is a GADT that represents operations that affect the changes
+        on the transition_frontier. The left-hand side of the GADT represents
+        change that will occur to the transition_frontier. The right-hand side of
+        the GADT represents which components are are effected by these changes
+        and a certification that these components are handled appropriately.
+        There are comments for each GADT that will discuss the operations that
+        changes a `transition_frontier` and their corresponding side-effects.*)
+    type _ t =
+      | New_frontier :
+          ( (external_transition_validated, state_hash) With_hash.t
+          * transaction_snark_scan_state
+          * pending_coinbase )
+          -> unit t
+          (** New_frontier: When creating a new transition frontier, the
+            transition_frontier will begin with a single breadcrumb that can be
+            constructed mainly with a root external transition and a
+            scan_state. There are no components in the frontier that affects
+            the frontier. Therefore, the type of this diff is tagged as a unit. *)
+      | Add_transition :
+          (external_transition_validated, state_hash) With_hash.t
+          -> consensus_state t
+          (** Add_transition: Add_transition would simply add a transition to the
+            frontier and is therefore the parameter for Add_transition. After
+            adding the transition, we add the transition to its parent list of
+            successors. To certify that we added it to the right parent. The
+            consensus_state of the parent can accomplish this. *)
+      | Remove_transitions :
+          (external_transition_validated, state_hash) With_hash.t list
+          -> consensus_state list t
+          (** Remove_transitions: Remove_transitions is an operation that removes
+            a set of transitions. We need to make sure that we are deleting the
+            right transition and we use their consensus_state to accomplish
+            this. Therefore the type of Remove_transitions is indexed by a list
+            of consensus_state. *)
+      | Update_root :
+          (state_hash * transaction_snark_scan_state * pending_coinbase)
+          -> (state_hash * transaction_snark_scan_state * pending_coinbase) t
+          (** Update_root: Update root is an indication that the root state_hash
+            and the root scan_state state. To verify that we update the right
+            root, we can indicate the old root is being updated. Therefore, the
+            type of Update_root is indexed by a state_hash and scan_state. *)
+
+    type 'a diff_mutant = 'a t
+
+    val key_to_yojson : 'output t -> Yojson.Safe.json
+
+    val value_to_yojson : 'output t -> 'output -> Yojson.Safe.json
+
+    val hash : Diff_hash.t -> 'output t -> 'output -> Diff_hash.t
+
+    module E : sig
+      type t = E : 'output diff_mutant -> t
+
+      include Binable.S with type t := t
+    end
+  end
+
   module type Transition_frontier_extension_intf =
     Transition_frontier_extension_intf0
     with type transition_frontier_breadcrumb := Breadcrumb.t
@@ -403,7 +398,7 @@ module type Transition_frontier_intf = sig
       with type view = user_command Root_diff_view.t
 
     module Persistence_diff :
-      Transition_frontier_extension_intf with type view = diff_mutant list
+      Transition_frontier_extension_intf with type view = Diff_mutant.E.t list
 
     type readers =
       { snark_pool: Snark_pool_refcount.view Broadcast_pipe.Reader.t
@@ -424,6 +419,9 @@ module type Transition_frontier_intf = sig
   val persistence_diff_pipe :
     t -> Extensions.Persistence_diff.view Broadcast_pipe.Reader.t
 
+  val new_transition :
+    t -> external_transition_validated Coda_incremental.New_transition.t
+
   val visualize_to_string : t -> string
 
   val visualize : filename:string -> t -> unit
@@ -440,7 +438,7 @@ end
 module type Catchup_intf = sig
   type state_hash
 
-  type external_transition_verified
+  type external_transition_with_initial_validation
 
   type unprocessed_transition_cache
 
@@ -450,15 +448,18 @@ module type Catchup_intf = sig
 
   type network
 
+  type trust_system
+
+  type verifier
+
   val run :
        logger:Logger.t
     -> trust_system:Trust_system.t
+    -> verifier:verifier
     -> network:network
     -> frontier:transition_frontier
     -> catchup_job_reader:( state_hash
-                          * ( ( external_transition_verified
-                              , state_hash )
-                              With_hash.t
+                          * ( external_transition_with_initial_validation
                               Envelope.Incoming.t
                             , state_hash )
                             Cached.t
@@ -470,8 +471,8 @@ module type Catchup_intf = sig
                                     Cached.t
                                     Rose_tree.t
                                     list
-                                  , Strict_pipe.synchronous
-                                  , unit Deferred.t )
+                                  , Strict_pipe.crash Strict_pipe.buffered
+                                  , unit )
                                   Strict_pipe.Writer.t
     -> unprocessed_transition_cache:unprocessed_transition_cache
     -> unit
@@ -482,9 +483,11 @@ module type Transition_handler_validator_intf = sig
 
   type state_hash
 
-  type external_transition_verified
+  type external_transition_with_initial_validation
 
   type unprocessed_transition_cache
+
+  type trust_system
 
   type transition_frontier
 
@@ -492,15 +495,14 @@ module type Transition_handler_validator_intf = sig
 
   val run :
        logger:Logger.t
+    -> trust_system:trust_system
     -> frontier:transition_frontier
     -> transition_reader:( [ `Transition of
-                             external_transition_verified Envelope.Incoming.t
-                           ]
+                             external_transition_with_initial_validation
+                             Envelope.Incoming.t ]
                          * [`Time_received of time] )
                          Strict_pipe.Reader.t
-    -> valid_transition_writer:( ( ( external_transition_verified
-                                   , state_hash )
-                                   With_hash.t
+    -> valid_transition_writer:( ( external_transition_with_initial_validation
                                    Envelope.Incoming.t
                                  , state_hash )
                                  Cached.t
@@ -514,33 +516,36 @@ module type Transition_handler_validator_intf = sig
        logger:Logger.t
     -> frontier:transition_frontier
     -> unprocessed_transition_cache:unprocessed_transition_cache
-    -> (external_transition_verified, state_hash) With_hash.t
-       Envelope.Incoming.t
-    -> ( ( (external_transition_verified, state_hash) With_hash.t
-           Envelope.Incoming.t
+    -> external_transition_with_initial_validation Envelope.Incoming.t
+    -> ( ( external_transition_with_initial_validation Envelope.Incoming.t
          , state_hash )
          Cached.t
        , [ `In_frontier of state_hash
-         | `Invalid of string
-         | `In_process of state_hash Cache_lib.Intf.final_state ] )
+         | `In_process of state_hash Cache_lib.Intf.final_state
+         | `Disconnected ] )
        Result.t
 end
 
 module type Breadcrumb_builder_intf = sig
   type state_hash
 
+  type trust_system
+
   type transition_frontier
 
   type transition_frontier_breadcrumb
 
-  type external_transition_verified
+  type external_transition_with_initial_validation
+
+  type verifier
 
   val build_subtrees_of_breadcrumbs :
        logger:Logger.t
+    -> verifier:verifier
+    -> trust_system:trust_system
     -> frontier:transition_frontier
     -> initial_hash:state_hash
-    -> ( (external_transition_verified, state_hash) With_hash.t
-         Envelope.Incoming.t
+    -> ( external_transition_with_initial_validation Envelope.Incoming.t
        , state_hash )
        Cached.t
        Rose_tree.t
@@ -554,41 +559,41 @@ module type Transition_handler_processor_intf = sig
 
   type time_controller
 
-  type external_transition_verified
+  type trust_system
 
-  type unprocessed_transition_cache
+  type external_transition_validated
+
+  type external_transition_with_initial_validation
 
   type transition_frontier
 
   type transition_frontier_breadcrumb
 
+  type verifier
+
   val run :
        logger:Logger.t
+    -> verifier:verifier
+    -> trust_system:trust_system
     -> time_controller:time_controller
     -> frontier:transition_frontier
-    -> primary_transition_reader:( ( external_transition_verified
-                                   , state_hash )
-                                   With_hash.t
+    -> primary_transition_reader:( external_transition_with_initial_validation
                                    Envelope.Incoming.t
                                  , state_hash )
                                  Cached.t
                                  Strict_pipe.Reader.t
-    -> proposer_transition_reader:( external_transition_verified
-                                  , state_hash )
-                                  With_hash.t
+    -> proposer_transition_reader:transition_frontier_breadcrumb
                                   Strict_pipe.Reader.t
     -> clean_up_catchup_scheduler:unit Ivar.t
     -> catchup_job_writer:( state_hash
-                            * ( ( external_transition_verified
-                                , state_hash )
-                                With_hash.t
+                            * ( external_transition_with_initial_validation
                                 Envelope.Incoming.t
                               , state_hash )
                               Cached.t
                               Rose_tree.t
                               list
-                          , Strict_pipe.synchronous
-                          , unit Deferred.t )
+                          , Strict_pipe.crash Strict_pipe.buffered
+                          , unit )
                           Strict_pipe.Writer.t
     -> catchup_breadcrumbs_reader:( transition_frontier_breadcrumb
                                   , state_hash )
@@ -601,23 +606,22 @@ module type Transition_handler_processor_intf = sig
                                     Cached.t
                                     Rose_tree.t
                                     list
-                                  , Strict_pipe.synchronous
-                                  , unit Deferred.t )
+                                  , Strict_pipe.crash Strict_pipe.buffered
+                                  , unit )
                                   Strict_pipe.Writer.t
-    -> processed_transition_writer:( ( external_transition_verified
+    -> processed_transition_writer:( ( external_transition_validated
                                      , state_hash )
                                      With_hash.t
                                    , Strict_pipe.crash Strict_pipe.buffered
                                    , unit )
                                    Strict_pipe.Writer.t
-    -> unprocessed_transition_cache:unprocessed_transition_cache
     -> unit
 end
 
 module type Unprocessed_transition_cache_intf = sig
   type state_hash
 
-  type external_transition_verified
+  type external_transition_with_initial_validation
 
   type t
 
@@ -625,10 +629,8 @@ module type Unprocessed_transition_cache_intf = sig
 
   val register_exn :
        t
-    -> (external_transition_verified, state_hash) With_hash.t
-       Envelope.Incoming.t
-    -> ( (external_transition_verified, state_hash) With_hash.t
-         Envelope.Incoming.t
+    -> external_transition_with_initial_validation Envelope.Incoming.t
+    -> ( external_transition_with_initial_validation Envelope.Incoming.t
        , state_hash )
        Cached.t
 end
@@ -638,9 +640,15 @@ module type Transition_handler_intf = sig
 
   type time
 
+  type verifier
+
   type state_hash
 
-  type external_transition_verified
+  type external_transition_with_initial_validation
+
+  type external_transition_validated
+
+  type trust_system
 
   type transition_frontier
 
@@ -651,30 +659,39 @@ module type Transition_handler_intf = sig
   module Unprocessed_transition_cache :
     Unprocessed_transition_cache_intf
     with type state_hash := state_hash
-     and type external_transition_verified := external_transition_verified
+     and type external_transition_with_initial_validation :=
+                external_transition_with_initial_validation
 
   module Breadcrumb_builder :
     Breadcrumb_builder_intf
     with type state_hash := state_hash
-    with type external_transition_verified := external_transition_verified
-    with type transition_frontier := transition_frontier
-    with type transition_frontier_breadcrumb := transition_frontier_breadcrumb
+     and type trust_system := trust_system
+     and type verifier := verifier
+     and type external_transition_with_initial_validation :=
+                external_transition_with_initial_validation
+     and type transition_frontier := transition_frontier
+     and type transition_frontier_breadcrumb := transition_frontier_breadcrumb
 
   module Validator :
     Transition_handler_validator_intf
     with type time := time
      and type state_hash := state_hash
-     and type external_transition_verified := external_transition_verified
+     and type external_transition_with_initial_validation :=
+                external_transition_with_initial_validation
      and type unprocessed_transition_cache := Unprocessed_transition_cache.t
+     and type trust_system := trust_system
      and type transition_frontier := transition_frontier
      and type staged_ledger := staged_ledger
 
   module Processor :
     Transition_handler_processor_intf
     with type time_controller := time_controller
-     and type external_transition_verified := external_transition_verified
+     and type external_transition_validated := external_transition_validated
+     and type external_transition_with_initial_validation :=
+                external_transition_with_initial_validation
      and type state_hash := state_hash
-     and type unprocessed_transition_cache := Unprocessed_transition_cache.t
+     and type trust_system := trust_system
+     and type verifier := verifier
      and type transition_frontier := transition_frontier
      and type transition_frontier_breadcrumb := transition_frontier_breadcrumb
 end
@@ -687,6 +704,8 @@ module type Sync_handler_intf = sig
   type state_hash
 
   type external_transition
+
+  type external_transition_validated
 
   type syncable_ledger_query
 
@@ -724,9 +743,11 @@ module type Root_prover_intf = sig
 
   type external_transition
 
+  type external_transition_with_initial_validation
+
   type consensus_state
 
-  type proof_verified_external_transition
+  type verifier
 
   val prove :
        logger:Logger.t
@@ -739,97 +760,85 @@ module type Root_prover_intf = sig
 
   val verify :
        logger:Logger.t
+    -> verifier:verifier
     -> observed_state:consensus_state
     -> peer_root:( external_transition
                  , state_body_hash list * external_transition )
                  Proof_carrying_data.t
-    -> ( (proof_verified_external_transition, state_hash) With_hash.t
-       * (proof_verified_external_transition, state_hash) With_hash.t )
+    -> ( external_transition_with_initial_validation
+       * external_transition_with_initial_validation )
        Deferred.Or_error.t
 end
 
 module type Bootstrap_controller_intf = sig
+  type time
+
   type network
+
+  type verifier
 
   type transition_frontier
 
-  type external_transition_verified
+  type external_transition_with_initial_validation
 
   type ledger_db
 
   val run :
        logger:Logger.t
     -> trust_system:Trust_system.t
+    -> verifier:verifier
     -> network:network
     -> frontier:transition_frontier
     -> ledger_db:ledger_db
     -> transition_reader:( [< `Transition of
-                              external_transition_verified Envelope.Incoming.t
-                           ]
-                         * [< `Time_received of int64] )
+                              external_transition_with_initial_validation
+                              Envelope.Incoming.t ]
+                         * [< `Time_received of time] )
                          Strict_pipe.Reader.t
     -> ( transition_frontier
-       * external_transition_verified Envelope.Incoming.t list )
+       * external_transition_with_initial_validation Envelope.Incoming.t list
+       )
        Deferred.t
 end
 
 module type Transition_frontier_controller_intf = sig
   type time_controller
 
-  type external_transition_verified
+  type external_transition_validated
+
+  type external_transition_with_initial_validation
 
   type state_hash
 
   type transition_frontier
 
+  type breadcrumb
+
   type network
+
+  type verifier
 
   type time
 
   val run :
        logger:Logger.t
     -> trust_system:Trust_system.t
+    -> verifier:verifier
     -> network:network
     -> time_controller:time_controller
-    -> collected_transitions:( external_transition_verified
-                             , state_hash )
-                             With_hash.t
+    -> collected_transitions:external_transition_with_initial_validation
                              Envelope.Incoming.t
                              list
     -> frontier:transition_frontier
     -> network_transition_reader:( [ `Transition of
-                                     external_transition_verified
+                                     external_transition_with_initial_validation
                                      Envelope.Incoming.t ]
                                  * [`Time_received of time] )
                                  Strict_pipe.Reader.t
-    -> proposer_transition_reader:( external_transition_verified
-                                  , state_hash )
-                                  With_hash.t
-                                  Strict_pipe.Reader.t
+    -> proposer_transition_reader:breadcrumb Strict_pipe.Reader.t
     -> clear_reader:[`Clear] Strict_pipe.Reader.t
-    -> (external_transition_verified, state_hash) With_hash.t
+    -> (external_transition_validated, state_hash) With_hash.t
        Strict_pipe.Reader.t
-end
-
-module type Protocol_state_validator_intf = sig
-  type time
-
-  type state_hash
-
-  type external_transition
-
-  type external_transition_proof_verified
-
-  type external_transition_verified
-
-  val validate_proof :
-       external_transition
-    -> external_transition_proof_verified Or_error.t Deferred.t
-
-  val validate_consensus_state :
-       time_received:time
-    -> external_transition
-    -> external_transition_verified Or_error.t Deferred.t
 end
 
 module type Initial_validator_intf = sig
@@ -837,18 +846,21 @@ module type Initial_validator_intf = sig
 
   type state_hash
 
+  type trust_system
+
   type external_transition
 
-  type external_transition_verified
+  type external_transition_with_initial_validation
 
   val run :
        logger:Logger.t
+    -> trust_system:trust_system
     -> transition_reader:( [ `Transition of
                              external_transition Envelope.Incoming.t ]
                          * [`Time_received of time] )
                          Strict_pipe.Reader.t
     -> valid_transition_writer:( [ `Transition of
-                                   external_transition_verified
+                                   external_transition_with_initial_validation
                                    Envelope.Incoming.t ]
                                  * [`Time_received of time]
                                , Strict_pipe.crash Strict_pipe.buffered
@@ -860,6 +872,8 @@ end
 module type Transition_router_intf = sig
   type time_controller
 
+  type verifier
+
   type external_transition
 
   type external_transition_verified
@@ -867,6 +881,8 @@ module type Transition_router_intf = sig
   type state_hash
 
   type transition_frontier
+
+  type breadcrumb
 
   type network
 
@@ -877,6 +893,7 @@ module type Transition_router_intf = sig
   val run :
        logger:Logger.t
     -> trust_system:Trust_system.t
+    -> verifier:verifier
     -> network:network
     -> time_controller:time_controller
     -> frontier_broadcast_pipe:transition_frontier option
@@ -888,10 +905,7 @@ module type Transition_router_intf = sig
                                      external_transition Envelope.Incoming.t ]
                                  * [`Time_received of time] )
                                  Strict_pipe.Reader.t
-    -> proposer_transition_reader:( external_transition_verified
-                                  , state_hash )
-                                  With_hash.t
-                                  Strict_pipe.Reader.t
+    -> proposer_transition_reader:breadcrumb Strict_pipe.Reader.t
     -> (external_transition_verified, state_hash) With_hash.t
        Strict_pipe.Reader.t
 end

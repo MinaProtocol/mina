@@ -1,20 +1,64 @@
+[%%import
+"../../config.mlh"]
+
 (** The trust system, instantiated with Coda-specific stuff. *)
 open Core
 
 open Async
 
+[%%if
+consensus_mechanism = "proof_of_stake"]
+
+[%%inject
+"delta_int", delta]
+
+let delta = float_of_int delta_int
+
+[%%else]
+
+let delta = 1.0
+
+[%%endif]
+
 module Actions = struct
   type action =
+    | Incoming_connection_error
+        (** Connection error while peer connected to node. *)
+    | Outgoing_connection_error
+        (** Encountered connection error while connecting to a peer. *)
+    | Gossiped_old_transition of int64
+        (** Peer gossiped a transition which was too old. Includes time before cutoff period in which the transition was received, expressed in slots. *)
+    | Gossiped_future_transition
+        (** Peer gossiped a transition before its slot. *)
+    | Gossiped_invalid_transition
+        (** Peer gossiped an invalid transition to us. *)
+    | Disconnected_chain
+        (** Peer has been determined to be on a chain that is not connected to our chain. *)
     | Sent_bad_hash
         (** Peer sent us some data that doesn't hash to the expected value *)
-    | Violated_protocol  (** Peer violated the specification of the protocol *)
+    | Sent_invalid_signature
+        (** Peer sent us something with a signature that doesn't check *)
+    | Sent_invalid_proof  (** Peer sent us a proof that does not verify. *)
+    | Violated_protocol
+        (** Peer violated the specification of the protocol. *)
     | Made_request
         (** Peer made a valid request. This causes a small decrease to mitigate
             DoS. *)
+    | Connected
+        (** Peer connected to TCP server. Very small decrease to mitigate DoS *)
     | Requested_unknown_item
         (** Peer requested something we don't know. They might be ahead of us or
           they might be malicious. *)
     | Fulfilled_request  (** Peer fulfilled a request we made. *)
+    | Epoch_ledger_provided  (** Special case of request fulfillment *)
+    | Sent_useful_gossip
+        (** Peer sent us a gossip item that we added to our pool*)
+    | Sent_useless_gossip
+        (** Peer sent us a gossip item that we rejected from our pool for reasons
+          that may be innocent. e.g. too low of a fee for a user command, out of
+          date, etc.
+      *)
+    | Sent_old_gossip  (** Peer sent us a gossip item we already knew. *)
   [@@deriving show]
 
   (** The action they took, paired with a message and associated JSON metadata
@@ -24,18 +68,72 @@ module Actions = struct
   let to_trust_response (action, _) =
     let open Peer_trust.Trust_response in
     (* FIXME figure out a good value for this *)
-    let request_increment = Peer_trust.max_rate 10. in
+    let fulfilled_increment = Peer_trust.max_rate 10. in
+    (* the summed decreases of a connection and request equals
+       the increase of a fulfilled request *)
+    let request_increment = 0.90 *. fulfilled_increment in
+    let connected_increment = 0.10 *. fulfilled_increment in
+    let epoch_ledger_provided_increment = 10. *. fulfilled_increment in
+    let old_gossip_increment = Peer_trust.max_rate 20. in
     match action with
+    | Gossiped_old_transition slot_diff ->
+        (* NOTE: slot_diff here is [received_slot - (proposed_slot + Δ)]
+         *
+         * We want to decrease the score exponentially based on how out of date the transition
+         * we received was. We would like the base score decrease to be some constant
+         * [c], and we would like to instantly ban any peers who send us transitions
+         * received more than [Δ] slots out of date. Therefore, we want some function
+         * [f] where [f(1) = c] and [f(Δ) >= 2]. We start by fitting an geometric function
+         * such that [f(Δ) = 2]. [(1/y)x^2] should be [2] when [x] is [Δ], so if we solve for
+         * [(1/y)Δ^2 = 2], we get [y = Δ^2/2]. Therefore, we can define our function
+         * [f(x) = (1/(Δ^2/2))x^2]. This does not satisfy [f(1) = c], but since we only constrain
+         * [f(Δ) >= 2], we can just offset the function by [c] in order to satisfy both constraints,
+         * giving us [f(x) = (1/(Δ^2/2))x^2 + c].
+         *)
+        let c = 0.1 in
+        let y = (delta ** 2.0) /. 2.0 in
+        let f x = (1.0 /. y *. (x ** 2.0)) +. c in
+        Trust_decrease (f (Int64.to_float slot_diff))
+    | Gossiped_future_transition ->
+        Insta_ban
+    | Gossiped_invalid_transition ->
+        Insta_ban
+    | Disconnected_chain ->
+        Insta_ban
     | Sent_bad_hash ->
         Insta_ban
+    | Sent_invalid_signature ->
+        Insta_ban
+    | Sent_invalid_proof ->
+        Insta_ban
+    | Incoming_connection_error ->
+        Trust_decrease 0.2
+    | Outgoing_connection_error ->
+        Trust_decrease 0.4
     | Violated_protocol ->
         Insta_ban
     | Made_request ->
         Trust_decrease request_increment
+    | Connected ->
+        Trust_decrease connected_increment
     | Requested_unknown_item ->
         Trust_decrease (Peer_trust.max_rate 1.)
     | Fulfilled_request ->
-        (* trade 1:1 *) Trust_increase request_increment
+        Trust_increase fulfilled_increment
+    | Epoch_ledger_provided ->
+        Trust_increase epoch_ledger_provided_increment
+    (* Processing old gossip is fast, a single lookup in our table, while
+       processing useless gossip is more expensive since we have to do
+       validation on it. In expectation, we get every gossipped message
+       'replication factor' times, which is 8. That ratio applies to individual
+       peers too, so we give 7x credit for useful gossip than we take away for
+       old gossip, plus some headroom for normal variance. *)
+    | Sent_useful_gossip ->
+        Trust_increase (old_gossip_increment *. 10.)
+    | Sent_useless_gossip ->
+        Trust_decrease (old_gossip_increment *. 3.)
+    | Sent_old_gossip ->
+        Trust_decrease old_gossip_increment
 
   let to_log : t -> string * (string, Yojson.Safe.json) List.Assoc.t =
    fun (action, extra_opt) ->
@@ -61,5 +159,5 @@ let record_envelope_sender :
         ~metadata:action_metadata
         "Attempted to record trust action of ourselves: %s" action_fmt ;
       Deferred.unit
-  | Remote {host; _} ->
-      record t logger host action
+  | Remote inet_addr ->
+      record t logger inet_addr action

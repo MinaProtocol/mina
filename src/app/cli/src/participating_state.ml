@@ -35,6 +35,8 @@ module Option = struct
   include Monad.Make (T)
 end
 
+let active = function `Active x -> Some x | `Bootstrapping -> None
+
 let active_exn = function
   | `Active x ->
       x

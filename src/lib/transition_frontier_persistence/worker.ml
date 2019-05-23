@@ -1,5 +1,6 @@
 open Core
 open Coda_base
+open Coda_state
 open Async
 
 module Make (Inputs : Intf.Worker_inputs) : sig
@@ -7,8 +8,8 @@ module Make (Inputs : Intf.Worker_inputs) : sig
 
   include
     Intf.Worker
-    with type hash := Diff_hash.t
-     and type diff := State_hash.t Diff_mutant.E.t
+    with type hash := Inputs.Transition_frontier.Diff_hash.t
+     and type diff := Inputs.Transition_frontier.Diff_mutant.E.t
      and type transition_storage := Transition_storage.t
 end = struct
   open Inputs
@@ -32,7 +33,9 @@ end = struct
   let apply_add_transition ({transition_storage; logger}, batch)
       With_hash.{hash; data= external_transition} =
     let open Transition_storage.Schema in
-    let parent_hash = External_transition.parent_hash external_transition in
+    let parent_hash =
+      External_transition.Validated.parent_hash external_transition
+    in
     let parent_transition, children_hashes =
       Transition_storage.get transition_storage ~logger
         (Transition parent_hash) ~location:__LOC__
@@ -46,14 +49,13 @@ end = struct
         [ ("hash", State_hash.to_yojson hash)
         ; ("parent_hash", State_hash.to_yojson parent_hash) ]
       "Added transition $hash and $parent_hash !" ;
-    External_transition.consensus_state parent_transition
+    External_transition.Validated.protocol_state parent_transition
+    |> Protocol_state.consensus_state
 
-  let log_mutant (t : t) diff mutant =
-    Logger.trace t.logger ~module_:__MODULE__ ~location:__LOC__
-      ~metadata:[("mutant", Diff_mutant.value_to_yojson diff mutant)]
-      "Worker response diff: "
+  let hash = Transition_frontier.Diff_mutant.hash
 
-  let handle_diff (t : t) acc_hash (E diff : State_hash.t Diff_mutant.E.t) =
+  let handle_diff (t : t) acc_hash
+      (E diff : Transition_frontier.Diff_mutant.E.t) =
     match diff with
     | New_frontier
         ( {With_hash.hash= first_root_hash; data= first_root}
@@ -65,63 +67,52 @@ end = struct
               ~data:(first_root_hash, scan_state, pending_coinbase) ;
             Transition_storage.Batch.set batch
               ~key:(Transition first_root_hash) ~data:(first_root, []) ;
-            log_mutant t diff () ;
-            Diff_mutant.hash ~f:State_hash.to_bytes acc_hash diff () )
+            hash acc_hash diff () )
     | Add_transition transition_with_hash ->
         Transition_storage.Batch.with_batch t.transition_storage
           ~f:(fun batch ->
             let mutant =
               apply_add_transition (t, batch) transition_with_hash
             in
-            log_mutant t diff mutant ;
-            Diff_mutant.hash ~f:State_hash.to_bytes acc_hash diff mutant )
+            hash acc_hash diff mutant )
     | Remove_transitions removed_transitions ->
         let mutant =
           Transition_storage.Batch.with_batch t.transition_storage
             ~f:(fun batch ->
-              List.map removed_transitions ~f:(fun state_hash ->
+              List.map removed_transitions
+                ~f:(fun {With_hash.hash= state_hash; data= _} ->
                   let removed_transition, _ =
                     Transition_storage.get ~logger:t.logger
                       t.transition_storage (Transition state_hash)
                   in
                   Transition_storage.Batch.remove batch
                     ~key:(Transition state_hash) ;
-                  External_transition.consensus_state removed_transition ) )
+                  External_transition.Validated.protocol_state
+                    removed_transition
+                  |> Protocol_state.consensus_state ) )
         in
-        log_mutant t diff mutant ;
-        Diff_mutant.hash ~f:State_hash.to_bytes acc_hash diff mutant
+        hash acc_hash diff mutant
     | Update_root new_root_data ->
-        (* We can get the serialized root_data from the database and then hash it, rather than using `Transition_storage.get` to deserialize the data and then hash it again which is slower *)
-        let serialized_old_root_data =
-          Transition_storage.get_raw t.transition_storage
-            ~key:Transition_storage.Schema.Root
-          |> Option.value_exn
-        in
-        let bin_key =
-          Transition_storage.Schema.binable_data_type
-            Transition_storage.Schema.Root
-        in
         let old_root_data =
-          bin_key.reader.read serialized_old_root_data ~pos_ref:(ref 0)
+          Logger.trace t.logger !"Getting old root data" ~module_:__MODULE__
+            ~location:__LOC__ ;
+          Transition_storage.get t.transition_storage ~logger:t.logger
+            ~location:__LOC__ Transition_storage.Schema.Root
         in
-        log_mutant t diff old_root_data ;
-        let bin =
-          [%bin_type_class:
-            State_hash.Stable.Latest.t
-            * Staged_ledger.Scan_state.Stable.Latest.t
-            * Pending_coinbase.Stable.Latest.t]
-        in
-        let serialized_new_root_data =
-          Bin_prot.Utils.bin_dump bin.writer new_root_data
-        in
-        Transition_storage.set_raw t.transition_storage ~key:Root
-          ~data:serialized_new_root_data ;
-        let diff_contents_hash =
-          Diff_hash.merge acc_hash
-            (serialized_new_root_data |> Bigstring.to_string)
-        in
-        Diff_hash.merge diff_contents_hash
-          (serialized_old_root_data |> Bigstring.to_string)
+        Logger.trace t.logger !"Setting old root data" ~module_:__MODULE__
+          ~location:__LOC__ ;
+        Transition_storage.set t.transition_storage ~key:Root
+          ~data:new_root_data ;
+        Logger.trace t.logger
+          !"Finished setting old root data"
+          ~module_:__MODULE__ ~location:__LOC__ ;
+        Logger.trace t.logger ~module_:__MODULE__ ~location:__LOC__
+          ~metadata:
+            [ ( "mutant"
+              , Transition_frontier.Diff_mutant.value_to_yojson diff
+                  old_root_data ) ]
+          "Worker root update mutant" ;
+        hash acc_hash diff old_root_data
 
   module For_tests = struct
     let transition_storage {transition_storage; _} = transition_storage

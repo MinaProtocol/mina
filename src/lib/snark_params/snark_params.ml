@@ -6,6 +6,8 @@ open Bitstring_lib
 open Snark_bits
 module Tick_backend = Crypto_params.Tick_backend
 module Tock_backend = Crypto_params.Tock_backend
+module Snarkette_tick = Crypto_params.Snarkette_tick
+module Snarkette_tock = Crypto_params.Snarkette_tock
 
 module Make_snarkable (Impl : Snarky.Snark_intf.S) = struct
   open Impl
@@ -126,9 +128,7 @@ end
 module Tock = struct
   include (Tock0 : module type of Tock0 with module Proof := Tock0.Proof)
 
-  module Groth16 = Snarky.Snark.Make (Tock_backend.Full.Default)
   module Fq = Snarky_field_extensions.Field_extensions.F (Tock0)
-  module Snarkette_tock = Snarkette.Mnt4_80
 
   module Inner_curve = struct
     include Tock_backend.Inner_curve
@@ -287,8 +287,6 @@ module Tock = struct
     let dummy = Dummy_values.Tock.GrothMaller17.proof
   end
 
-  module Groth_maller_verifier = Snarky_verifier.Groth_maller.Make (Pairing)
-
   module Groth_verifier = struct
     include Snarky_verifier.Groth.Make (Pairing)
 
@@ -330,8 +328,6 @@ end
 
 module Tick = struct
   include (Tick0 : module type of Tick0 with module Field := Tick0.Field)
-
-  module Groth16 = Snarky.Snark.Make (Tick_backend.Full.Default)
 
   module Field = struct
     include Tick0.Field
@@ -501,7 +497,6 @@ module Tick = struct
   end
 
   module Util = Snark_util.Make (Tick0)
-  module Snarkette_tick = Snarkette.Mnt6_80
 
   module Pairing = struct
     module T = struct
@@ -682,8 +677,6 @@ module Tick = struct
       ; h_gamma= Pairing.G2.constant vk.h_gamma
       ; g_alpha_h_beta= Pairing.Fqk.constant vk.g_alpha_h_beta }
   end
-
-  module Groth_verifier = Snarky_verifier.Groth.Make (Pairing)
 end
 
 let tock_vk_to_bool_list vk =

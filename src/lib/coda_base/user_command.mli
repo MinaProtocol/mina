@@ -22,65 +22,13 @@ module Stable : sig
       , Signature.Stable.V1.t )
       Poly.Stable.V1.t
     [@@deriving bin_io, eq, sexp, hash, yojson, version]
+
+    include Comparable.S with type t := t
+
+    include Hashable.S with type t := t
   end
 
-  module Latest : module type of V1
+  module Latest = V1
 end
 
-type t = Stable.Latest.t [@@deriving sexp, yojson, hash]
-
-include Comparable.S with type t := t
-
-val payload : t -> Payload.t
-
-val fee : t -> Currency.Fee.t
-
-val sender : t -> Public_key.Compressed.t
-
-(* Generate a single transaction between
- * $a, b \in keys$
- * for fee $\in [0,max_fee]$
- * and an amount $\in [1,max_amount]$
- *)
-
-val gen :
-     keys:Signature_keypair.t array
-  -> max_amount:int
-  -> max_fee:int
-  -> t Quickcheck.Generator.t
-
-module With_valid_signature : sig
-  module Stable : sig
-    module Latest : sig
-      type nonrec t = private t
-      [@@deriving sexp, eq, bin_io, yojson, version, compare]
-
-      val gen :
-           keys:Signature_keypair.t array
-        -> max_amount:int
-        -> max_fee:int
-        -> t Quickcheck.Generator.t
-    end
-
-    module V1 = Latest
-  end
-
-  type t = Stable.Latest.t [@@deriving sexp, eq, yojson, compare]
-
-  val gen :
-       keys:Signature_keypair.t array
-    -> max_amount:int
-    -> max_fee:int
-    -> t Quickcheck.Generator.t
-
-  include Comparable.S with type t := t
-end
-
-val sign : Signature_keypair.t -> Payload.t -> With_valid_signature.t
-
-val check : t -> With_valid_signature.t option
-
-(** Forget the signature check. *)
-val forget_check : With_valid_signature.t -> t
-
-val accounts_accessed : t -> Public_key.Compressed.t list
+include User_command_intf.S with type t = Stable.Latest.t

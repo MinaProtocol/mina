@@ -1,5 +1,3 @@
-[%%import "../../config.mlh"]
-
 open Core_kernel
 open Snark_params
 open Snark_bits
@@ -12,23 +10,11 @@ module Time : sig
   type t0 = t
 
   module Controller : sig
-    [%%if time_offsets]
-
     type t
 
     val create : t -> t
 
     val basic : t
-
-    [%%else]
-
-    type t = unit
-
-    val create : unit -> t
-
-    val basic : unit
-
-    [%%endif]
   end
 
   module Stable : sig
@@ -124,6 +110,10 @@ module Time : sig
   val to_time : t -> Time.t
 
   val now : Controller.t -> t
+
+  val to_string : t -> string
+
+  val of_string_exn : string -> t
 end
 
 include module type of Time

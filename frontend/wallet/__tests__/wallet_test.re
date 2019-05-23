@@ -66,43 +66,119 @@ describe("CallTable", () => {
   );
 });
 
-describe("Settings", () =>
-  describe("serialization", () =>
-    testAll(
-      "print/parse roundtrip",
-      // TODO: Quickcheck this
-      [
-        Route.{path: Home, settingsOrError: `Error(`Json_parse_error)},
-        Route.{path: Send, settingsOrError: `Error(`Decode_error("Oops"))},
-        Route.{
-          path: DeleteWallet,
-          settingsOrError:
-            `Error(
-              `Error_reading_file(
-                Obj.magic(
-                  Route.SettingsOrError.Decode.Error.create(
-                    ~name="Error",
-                    ~message="an error",
-                    ~stack="some stack trace",
-                  ),
-                ),
-              ),
-            ),
-        },
-        Route.{
-          path: Home,
-          settingsOrError:
-            `Settings({
-              Settings.state:
-                Js.Dict.fromList([
-                  ("a123", "Test Wallet1"),
-                  ("a234", "Test Wallet2"),
-                ]),
-            }),
-        },
-      ],
-      a =>
-      expect(a |> Route.print |> Route.parse) |> toEqual(Some(a))
-    )
-  )
+describe("Bindings", () =>
+  describe("Spawn", () => {
+    open Bindings;
+    testAsync(
+      "echo and get stdout",
+      ~timeout=10,
+      cb => {
+        let echoProcess = ChildProcess.spawn("echo", [|"hello"|]);
+        let stdout = ChildProcess.Process.stdoutGet(echoProcess);
+        ChildProcess.ReadablePipe.on(stdout, "data", data =>
+          cb(expect(Node.Buffer.toString(data)) |> toEqual("hello\n"))
+        );
+      },
+    );
+    testAsync(
+      "kill sleep and get exit code",
+      ~timeout=10,
+      cb => {
+        let pauseProcess = ChildProcess.spawn("sleep", [|"10"|]);
+        ChildProcess.Process.onExit(pauseProcess, (n, _) =>
+          cb(expect(n) |> toEqual(0))
+        );
+        ChildProcess.Process.kill(pauseProcess);
+      },
+    );
+    testAsync(
+      "detect error",
+      ~timeout=10,
+      cb => {
+        let pauseProcess =
+          ChildProcess.spawn("this-program-doesn't-exist", [||]);
+        ChildProcess.Process.onError(pauseProcess, _ => cb(pass));
+      },
+    );
+  })
 );
+
+describe("Time", () => {
+  let testNow =
+    Js.Date.makeWithYMDHMS(
+      ~year=2019.,
+      ~month=0.,
+      ~date=23.,
+      ~hours=14.,
+      ~minutes=33.,
+      ~seconds=22.,
+      (),
+    );
+  let f = Time.render(~now=testNow);
+  test("same day ago", () => {
+    let date =
+      Js.Date.makeWithYMDHMS(
+        ~year=2019.,
+        ~month=0.,
+        ~date=23.,
+        ~hours=2.,
+        ~minutes=33.,
+        ~seconds=15.,
+        (),
+      );
+    expect(f(~date)) |> toBe("2:33am");
+  });
+  test("same day midnightish am", () => {
+    let date =
+      Js.Date.makeWithYMDHMS(
+        ~year=2019.,
+        ~month=0.,
+        ~date=23.,
+        ~hours=0.,
+        ~minutes=33.,
+        ~seconds=15.,
+        (),
+      );
+    expect(f(~date)) |> toBe("12:33am");
+  });
+  test("same day pm", () => {
+    let date =
+      Js.Date.makeWithYMDHMS(
+        ~year=2019.,
+        ~month=0.,
+        ~date=23.,
+        ~hours=13.,
+        ~minutes=33.,
+        ~seconds=15.,
+        (),
+      );
+    expect(f(~date)) |> toBe("1:33pm");
+  });
+  test("same day noonish pm", () => {
+    let date =
+      Js.Date.makeWithYMDHMS(
+        ~year=2019.,
+        ~month=0.,
+        ~date=23.,
+        ~hours=12.,
+        ~minutes=33.,
+        ~seconds=15.,
+        (),
+      );
+    expect(f(~date)) |> toBe("12:33pm");
+  });
+
+  test("further back ago", () => {
+    let date =
+      Js.Date.makeWithYMDHMS(
+        ~year=2018.,
+        ~month=5.,
+        ~date=23.,
+        ~hours=12.,
+        ~minutes=33.,
+        ~seconds=15.,
+        (),
+      );
+    expect(f(~date)) |> toBe("June 23rd - 12:33pm");
+  });
+});

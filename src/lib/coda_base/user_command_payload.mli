@@ -89,7 +89,7 @@ end
 module Stable : sig
   module V1 : sig
     type t = (Common.Stable.V1.t, Body.Stable.V1.t) Poly.Stable.V1.t
-    [@@deriving bin_io, eq, sexp, hash, yojson, version]
+    [@@deriving bin_io, compare, eq, sexp, hash, yojson, version]
   end
 
   module Latest = V1
@@ -117,6 +117,8 @@ val nonce : t -> Coda_numbers.Account_nonce.t
 val memo : t -> User_command_memo.t
 
 val body : t -> Body.t
+
+val is_payment : t -> bool
 
 val accounts_accessed : t -> Public_key.Compressed.t list
 

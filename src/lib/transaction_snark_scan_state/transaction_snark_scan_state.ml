@@ -289,9 +289,12 @@ end = struct
 
   module Make_statement_scanner
       (M : Monad_with_Or_error_intf) (Verifier : sig
+          type t
+
           val verify :
-               Ledger_proof.t
-            -> Ledger_proof_statement.t
+               verifier:t
+            -> proof:Ledger_proof.t
+            -> statement:Ledger_proof_statement.t
             -> message:Sok_message.t
             -> sexp_bool M.t
       end) =
@@ -299,7 +302,7 @@ end = struct
     module Fold = Parallel_scan.State.Make_foldable (M)
 
     (*TODO: fold over the pending_coinbase tree and validate the statements?*)
-    let scan_statement tree :
+    let scan_statement tree ~verifier :
         (Ledger_proof_statement.t, [`Error of Error.t | `Empty]) Result.t M.t =
       let write_error description =
         sprintf !"Staged_ledger.scan_statement: %s\n" description
@@ -332,12 +335,12 @@ end = struct
       in
       let fold_step_a acc_statement job =
         match job with
-        | Parallel_scan.Merge.Job.Part (p, message)
-        (*| Merge (Lcomp (p, message))*) ->
+        | Parallel_scan.Merge.Job.Part (proof, message) ->
+            let statement = Ledger_proof.statement proof in
             merge_acc
               ~verify_proof:(fun () ->
-                Verifier.verify ~message p (Ledger_proof.statement p) )
-              acc_statement (Ledger_proof.statement p)
+                Verifier.verify ~verifier ~message ~proof ~statement )
+              acc_statement statement
         | Empty | Full {status= Parallel_scan.Job_status.Done; _} ->
             M.Or_error.return acc_statement
         | Full {left= proof_1, message_1; right= proof_2, message_2; _} ->
@@ -354,8 +357,9 @@ end = struct
                   M.all
                     (List.map [(proof_1, message_1); (proof_2, message_2)]
                        ~f:(fun (proof, message) ->
-                         Verifier.verify ~message proof
-                           (Ledger_proof.statement proof) ))
+                         Verifier.verify ~verifier ~proof
+                           ~statement:(Ledger_proof.statement proof)
+                           ~message ))
                 in
                 List.for_all verified_list ~f:Fn.id )
       in
@@ -408,13 +412,14 @@ end = struct
       | Error e ->
           Error (`Error e)
 
-    let check_invariants t ~error_prefix ~ledger_hash_end:current_ledger_hash
+    let check_invariants t ~verifier ~error_prefix
+        ~ledger_hash_end:current_ledger_hash
         ~ledger_hash_begin:snarked_ledger_hash =
       let clarify_error cond err =
         if not cond then Or_error.errorf "%s : %s" error_prefix err else Ok ()
       in
       let open M.Let_syntax in
-      match%map scan_statement t with
+      match%map scan_statement ~verifier t with
       | Error (`Error e) ->
           Error e
       | Error `Empty ->
