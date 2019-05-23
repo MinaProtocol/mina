@@ -1,5 +1,4 @@
 open Core_kernel
-open Crypto_params
 
 module Digest : sig
   type t = private string [@@deriving sexp, compare, hash, yojson]
@@ -34,28 +33,6 @@ module Digest : sig
   val to_string : t -> string
 
   val to_bits : t -> bool list
-
-  module Checked : sig
-    type unchecked = t
-
-    type t = private Tick0.Boolean.var array
-
-    val to_triples : t -> Tick0.Boolean.var Tuple_lib.Triple.t list
-
-    val constant : unchecked -> t
-  end
-
-  val typ : (Checked.t, t) Tick0.Typ.t
 end
 
 val digest_string : string -> Digest.t
-
-val digest_field : Tick0.Field.t -> Digest.t
-
-module Checked : sig
-  open Tick0
-
-  val digest_bits : Boolean.var list -> (Digest.Checked.t, _) Checked.t
-
-  val digest_field : Field.Var.t -> (Digest.Checked.t, _) Checked.t
-end
