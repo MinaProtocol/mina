@@ -50,7 +50,7 @@ let rec random_point () =
     if random_bool () then (x, a) else (x, b)
   else random_point ()
 
-let scalar_size_in_triples = Curve_choice.Tock0.Field.size_in_bits / 4
+let scalar_size_in_triples = Curve_choice.Tock_full.Field.size_in_bits / 4
 
 let max_input_size_in_bits = 20000
 
