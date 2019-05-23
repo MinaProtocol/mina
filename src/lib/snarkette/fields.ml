@@ -141,7 +141,7 @@ module Make_fp
 
   let ( * ) x y = x * y % Info.order
 
-  let square x = x * x % Info.order
+  let square x = x * x
 
   let ( ** ) x n =
     let k = N.num_bits n in
@@ -247,7 +247,10 @@ module Make_fp
       | x :: xs -> (
         try [%test_eq: t] a x with _ -> mem a xs )
     in
-    mem (sqrt (of_int 100)) [of_int 10; Info.order - of_int 10]
+    Quickcheck.test Int.quickcheck_generator ~f:(fun n ->
+        let n = abs n in
+        let n2 = Int.(n * n) in
+        mem (sqrt (of_int n2)) [of_int n; Info.order - of_int n] )
 end
 
 module type Degree_2_extension_intf = sig
