@@ -56,4 +56,3 @@ module Tick_backend = struct
 end
 
 module Tick0 = Snarky.Snark.Make (Tick_backend)
-

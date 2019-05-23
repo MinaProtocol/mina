@@ -106,9 +106,7 @@ struct
   end
 end
 
-module Make_inner_curve_aux
-    (Impl : Snark_intf.S)
-    (Other_impl : Snark_intf.S) =
+module Make_inner_curve_aux (Impl : Snark_intf.S) (Other_impl : Snark_intf.S) =
 struct
   open Impl
 

@@ -13,7 +13,6 @@ module Tick_pedersen = Chunked_pedersen_lib.Pedersen.Make (struct
   let chunk_table = Pedersen_chunk_table.chunk_table
 end)
 
-
 module Tock_backend = struct
   module Full = Cycle.Mnt6
   include Full.GM
