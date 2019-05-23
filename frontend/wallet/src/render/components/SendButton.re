@@ -109,8 +109,8 @@ let modalButtons = (unvalidated, setModalState, onSubmit) => {
 [@react.component]
 let make = (~wallets, ~onSubmit) => {
   let (sendState, setModalState) = React.useState(_ => None);
-  let (settings, _updateSettings) =
-    React.useContext(SettingsProvider.context);
+  let (settings, _updateAddressBook) =
+    React.useContext(AddressBookProvider.context);
   let activeWallet = Hooks.useActiveWallet();
   let spacer = <Spacer height=0.5 />;
   ModalState.Unvalidated.(
@@ -146,7 +146,7 @@ let make = (~wallets, ~onSubmit) => {
                  |> Array.map(~f=wallet =>
                       (
                         wallet.Wallet.key,
-                        Settings.getWalletName(settings, wallet.key),
+                        AddressBook.getWalletName(settings, wallet.key),
                       )
                     )
                  |> Array.toList

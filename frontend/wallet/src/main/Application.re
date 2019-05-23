@@ -3,34 +3,30 @@ open Tc;
 module Action = {
   type t =
     | SettingsUpdate((PublicKey.t, string))
-    | NewSettings(Settings.t)
+    | NewSettings(unit)
     | WalletInfo(array({. "publicKey": string}));
 };
 
 module State = {
   type t('a) = {
     settingsOrError:
-      Result.t(
-        [> | `Decode_error(string) | `Json_parse_error] as 'a,
-        Settings.t,
-      ),
+      Result.t([> | `Decode_error(string) | `Json_parse_error] as 'a, unit),
     wallets: array({. "publicKey": string}),
   };
 };
 
 let reduce = acc =>
   fun
-  | Action.NewSettings(settings) => {
+  | Action.NewSettings(_settings) => {
       ...acc,
-      State.settingsOrError: Result.return(settings),
+      State.settingsOrError: Result.return(),
     }
   | WalletInfo(wallets) => {...acc, State.wallets}
-  | SettingsUpdate((key, name)) => {
+  | SettingsUpdate((_, _)) => {
       ...acc,
       State.settingsOrError:
         switch (acc.settingsOrError) {
-        | Belt.Result.Ok(settings) =>
-          Ok(Settings.set(settings, ~key, ~name))
+        | Belt.Result.Ok(_) => Ok()
         | Error(_) => acc.settingsOrError
         },
     };

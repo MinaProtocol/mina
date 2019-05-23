@@ -195,7 +195,8 @@ describe("AddressBook", () =>
         |> Js.Json.object_
         |> Js.Json.stringify;
 
-      let after = before |> Settings.fromJsonString |> Settings.toJsonString;
+      let after =
+        before |> AddressBook.fromJsonString |> AddressBook.toJsonString;
 
       expect(before) |> toEqual(after);
     })

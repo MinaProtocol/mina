@@ -166,14 +166,14 @@ module ActorName = {
   [@react.component]
   let make = (~value: ViewModel.Actor.t) => {
     let activeWallet = Hooks.useActiveWallet();
-    let (settings, _) = React.useContext(SettingsProvider.context);
+    let (settings, _) = React.useContext(AddressBookProvider.context);
     switch (value) {
     | Key(key) =>
       <Pill mode={activeWallet === Some(key) ? Pill.Blue : Pill.Grey}>
         <span
           className=Css.(
             merge([
-              Option.isSome(Settings.lookup(settings, key))
+              Option.isSome(AddressBook.lookup(settings, key))
                 ? Theme.Text.Body.regular : Theme.Text.mono,
               style([
                 color(
@@ -184,7 +184,7 @@ module ActorName = {
               ]),
             ])
           )>
-          {ReasonReact.string(Settings.getWalletName(settings, key))}
+          {ReasonReact.string(AddressBook.getWalletName(settings, key))}
         </span>
       </Pill>
     | Unknown =>

@@ -45,7 +45,8 @@ module Styles = {
 
 [@react.component]
 let make = (~wallet: Wallet.t) => {
-  let (settings, _setSettings) = React.useContext(SettingsProvider.context);
+  let (settings, _setAddressBook) =
+    React.useContext(AddressBookProvider.context);
 
   let isActive =
     Option.map(Hooks.useActiveWallet(), ~f=activeWallet =>
@@ -53,7 +54,7 @@ let make = (~wallet: Wallet.t) => {
     )
     |> Option.withDefault(~default=false);
 
-  let walletName = Settings.getWalletName(settings, wallet.key);
+  let walletName = AddressBook.getWalletName(settings, wallet.key);
 
   <div
     className={
