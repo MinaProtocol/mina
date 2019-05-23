@@ -314,16 +314,11 @@ module Data = struct
                 |> List.map ~f:(fun (account, balance) ->
                        ( Int.to_string account
                        , `Int (Currency.Balance.to_int balance) ) ) ) ) ]
-
-      let create_empty () =
-        { ledger=
-            Coda_base.Sparse_ledger.of_root Coda_base.Ledger_hash.empty_hash
-        ; delegators= Coda_base.Account.Index.Table.create () }
     end
 
     type t =
-      { mutable last_epoch_snapshot: Snapshot.t option
-      ; mutable curr_epoch_snapshot: Snapshot.t option
+      { mutable last_epoch_snapshot: Snapshot.t
+      ; mutable curr_epoch_snapshot: Snapshot.t
       ; mutable last_checked_slot_and_epoch: Epoch.t * Epoch.Slot.t
       ; genesis_epoch_snapshot: Snapshot.t
       ; proposer_public_key: Public_key.Compressed.t option }
@@ -331,26 +326,16 @@ module Data = struct
 
     let create proposer_public_key =
       (* TODO: remove duplicated genesis ledger *)
-      let delegators =
-        Option.value ~default:(Core.Int.Table.create ~size:0 ())
-          proposer_public_key (fun key ->
-            compute_delegators
-              (* TODO: Propagate Include_self to the right place *)
-              (`Include_self, key)
-              ~iter_accounts:(fun f ->
-                let open Coda_base in
-                Ledger.foldi ~init:() Genesis_ledger.t ~f:(fun i () acct ->
-                    f (Ledger.Addr.to_int i) acct ) ) )
-      in
+      let delegators = failwith "..." in
       let ledger =
         Coda_base.Sparse_ledger.of_any_ledger
           (Coda_base.Ledger.Any_ledger.cast
              (module Coda_base.Ledger)
              Genesis_ledger.t)
       in
-      let genesis_epoch_snapshot = {Snapshot.delegators; ledger} in
-      { last_epoch_snapshot= None
-      ; curr_epoch_snapshot= None
+      let genesis_epoch_snapshot = Snapshot.{delegators; ledger} in
+      { last_epoch_snapshot= genesis_epoch_snapshot
+      ; curr_epoch_snapshot= genesis_epoch_snapshot
       ; genesis_epoch_snapshot
       ; last_checked_slot_and_epoch= (Epoch.zero, Epoch.Slot.zero)
       ; proposer_public_key }
@@ -840,11 +825,9 @@ module Data = struct
       let open Message in
       let open Local_state in
       let open Snapshot in
-      let open Option.Let_syntax in
       Logger.info logger ~module_:__MODULE__ ~location:__LOC__
         "Checking vrf evaluations at %d:%d" (Epoch.to_int epoch)
         (Epoch.Slot.to_int slot) ;
-      let%bind epoch_snapshot = epoch_snapshot in
       with_return (fun {return} ->
           Hashtbl.iteri epoch_snapshot.delegators
             ~f:(fun ~key:delegator ~data:balance ->
@@ -2112,7 +2095,6 @@ module Hooks = struct
         let open Host_and_port in
         let open Local_state in
         let open Snapshot in
-        let open Option.Let_syntax in
         Deferred.create (fun ivar ->
             Logger.info logger ~module_:__MODULE__ ~location:__LOC__
               ~metadata:
@@ -2130,14 +2112,13 @@ module Hooks = struct
                   [ local_state.last_epoch_snapshot
                   ; local_state.curr_epoch_snapshot ]
                 in
-                List.find_map candidate_snapshots ~f:(fun snapshot_opt ->
-                    let%map snapshot = snapshot_opt in
+                List.find_map candidate_snapshots ~f:(fun snapshot ->
                     if
                       Ledger_hash.equal ledger_hash
                         (Sparse_ledger.merkle_root snapshot.ledger)
-                    then Ok snapshot.ledger
-                    else Error "missing epoch ledger" )
-                |> Option.value ~default:(Error "epoch ledger not found")
+                    then Some snapshot.ledger
+                    else None )
+                |> Result.of_option ~error:"epoch ledger not found"
             in
             Result.iter_error response ~f:(fun err ->
                 Logger.info logger ~module_:__MODULE__ ~location:__LOC__
@@ -2213,8 +2194,7 @@ module Hooks = struct
     let epoch_is_finalized =
       consensus_state.curr_epoch_data.length > Length.of_int Constants.k
     in
-    if is_genesis_snapshot then
-      (`Genesis, Some local_state.genesis_epoch_snapshot)
+    if is_genesis_snapshot then (`Genesis, local_state.genesis_epoch_snapshot)
     else if in_next_epoch || not epoch_is_finalized then
       (`Curr, local_state.curr_epoch_snapshot)
     else (`Last, local_state.last_epoch_snapshot)
@@ -2243,16 +2223,13 @@ module Hooks = struct
       select_epoch_snapshot ~consensus_state ~local_state ~epoch ~epoch_data
     in
     let required_snapshot_sync snapshot_id expected_root =
-      match Local_state.get_snapshot local_state snapshot_id with
-      | None ->
-          Some {snapshot_id; expected_root}
-      | Some s ->
-          Option.some_if
-            (not
-               (Ledger_hash.equal
-                  (Frozen_ledger_hash.to_ledger_hash expected_root)
-                  (Sparse_ledger.merkle_root s.ledger)))
-            {snapshot_id; expected_root}
+      Option.some_if
+        (not
+           (Ledger_hash.equal
+              (Frozen_ledger_hash.to_ledger_hash expected_root)
+              (Sparse_ledger.merkle_root
+                 (Local_state.get_snapshot local_state snapshot_id).ledger)))
+        {snapshot_id; expected_root}
     in
     match source with
     | `Genesis ->
@@ -2295,19 +2272,15 @@ module Hooks = struct
          then we don't need make a rpc call to the peers. *)
       if
         snapshot_id = Last_epoch_snapshot
-        && Option.fold local_state.curr_epoch_snapshot ~init:false
-             ~f:(fun _ curr_snapshot ->
-               Coda_base.(
-                 Ledger_hash.equal
-                   (Frozen_ledger_hash.to_ledger_hash target_ledger_hash)
-                   (Sparse_ledger.merkle_root curr_snapshot.ledger)) )
+        && Coda_base.(
+             Ledger_hash.equal
+               (Frozen_ledger_hash.to_ledger_hash target_ledger_hash)
+               (Sparse_ledger.merkle_root
+                  local_state.curr_epoch_snapshot.ledger))
       then (
-        let curr_snapshot = Option.value_exn local_state.curr_epoch_snapshot in
         set_snapshot local_state Last_epoch_snapshot
-          (Some
-             { ledger= curr_snapshot.ledger
-             ; delegators= curr_snapshot.delegators }) ;
-        set_snapshot local_state Curr_epoch_snapshot None ;
+          { ledger= local_state.curr_epoch_snapshot.ledger
+          ; delegators= local_state.curr_epoch_snapshot.delegators } ;
         return true )
       else
         Deferred.List.exists (random_peers 3) ~f:(fun peer ->
@@ -2331,7 +2304,7 @@ module Hooks = struct
                        ~default:(Coda_base.Account.Index.Table.create ())
                 in
                 set_snapshot local_state snapshot_id
-                  (Some {ledger= snapshot_ledger; delegators}) ;
+                  {ledger= snapshot_ledger; delegators} ;
                 return true
             | Ok (Error err) ->
                 Logger.faulty_peer_without_punishment logger
@@ -2542,18 +2515,10 @@ module Hooks = struct
           select_epoch_snapshot ~consensus_state:state ~local_state ~epoch
             ~epoch_data
         in
-        ( match snapshot with
-        | None ->
-            Logger.info logger ~module_:__MODULE__ ~location:__LOC__
-              "Unable to check vrf evaluation: %s_epoch_ledger does not exist \
-               in local state"
-              (epoch_snapshot_name source)
-        | Some snapshot ->
-            Logger.info logger ~module_:__MODULE__ ~location:__LOC__
-              !"using %s_epoch_snapshot root hash \
-                %{sexp:Coda_base.Ledger_hash.t}"
-              (epoch_snapshot_name source)
-              (Coda_base.Sparse_ledger.merkle_root snapshot.ledger) ) ;
+        Logger.info logger ~module_:__MODULE__ ~location:__LOC__
+          !"using %s_epoch_snapshot root hash %{sexp:Coda_base.Ledger_hash.t}"
+          (epoch_snapshot_name source)
+          (Coda_base.Sparse_ledger.merkle_root snapshot.ledger) ;
         snapshot
       in
       let proposal_data slot =
@@ -2613,7 +2578,7 @@ module Hooks = struct
       let ledger = Coda_base.Sparse_ledger.of_any_ledger snarked_ledger in
       let epoch_snapshot = {Local_state.Snapshot.delegators; ledger} in
       local_state.last_epoch_snapshot <- local_state.curr_epoch_snapshot ;
-      local_state.curr_epoch_snapshot <- Some epoch_snapshot )
+      local_state.curr_epoch_snapshot <- epoch_snapshot )
 
   let should_bootstrap_len ~existing ~candidate =
     let length = Length.to_int in
