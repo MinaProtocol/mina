@@ -78,8 +78,21 @@ module SendPaymentMutation = ReasonApollo.CreateMutation(SendPayment);
 
 [@react.component]
 let make = () => {
+  let (downloading, setDownloadState) = React.useState(() => false);
   <div className=Styles.footer>
     <StakingSwitch />
+    {if (downloading) {
+       let downloadName = "keys-temporary_hack-testnet_postake.tar.bz2";
+       <Downloader
+         keyName=downloadName
+         onFinish={_ => setDownloadState(_ => false)}
+       />;
+     } else {
+       <Button
+         label="Download keys"
+         onClick={_ => setDownloadState(_ => true)}
+       />;
+     }}
     <WalletQuery>
       {response =>
          switch (response.result) {
