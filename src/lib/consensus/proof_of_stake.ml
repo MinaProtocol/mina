@@ -2602,26 +2602,23 @@ module Hooks = struct
         `Check_again epoch_end_time
 
   (* TODO *)
-  let lock_transition (prev : Consensus_state.Value.t)
+  let frontier_root_transition (prev : Consensus_state.Value.t)
       (next : Consensus_state.Value.t) ~local_state ~snarked_ledger =
     let open Local_state in
     if not (Epoch.equal prev.curr_epoch next.curr_epoch) then (
-      let epoch_snapshot =
-        Option.map local_state.proposer_public_key ~f:(fun pk ->
-            let open Local_state.Snapshot in
-            let delegators =
-              compute_delegators
-                (`Include_self, pk)
-                ~iter_accounts:(fun f ->
-                  Coda_base.Ledger.Any_ledger.M.iteri snarked_ledger ~f )
-            in
-            let ledger =
-              Coda_base.Sparse_ledger.of_any_ledger snarked_ledger
-            in
-            {delegators; ledger} )
+      (* If we are not proposing, then we don't care about the delegators table. *)
+      let delegators =
+        Option.value_map ~default:(Core.Int.Table.create ~size:0 ())
+          local_state.proposer_public_key ~f:(fun pk ->
+            compute_delegators
+              (`Include_self, pk)
+              ~iter_accounts:(fun f ->
+                Coda_base.Ledger.Any_ledger.M.iteri snarked_ledger ~f ) )
       in
+      let ledger = Coda_base.Sparse_ledger.of_any_ledger snarked_ledger in
+      let epoch_snapshot = {Local_state.Snapshot.delegators; ledger} in
       local_state.last_epoch_snapshot <- local_state.curr_epoch_snapshot ;
-      local_state.curr_epoch_snapshot <- epoch_snapshot )
+      local_state.curr_epoch_snapshot <- Some epoch_snapshot )
 
   let should_bootstrap_len ~existing ~candidate =
     let length = Length.to_int in
