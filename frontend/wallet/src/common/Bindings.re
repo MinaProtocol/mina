@@ -95,3 +95,11 @@ module Fs = {
 module Fetch = {
   [@bs.module] external fetch: ApolloClient.fetch = "node-fetch";
 };
+
+module LocalStorage = {
+  [@bs.val] [@bs.scope "localStorage"]
+  external setItem: (string, string) => unit = "";
+
+  [@bs.val] [@bs.scope "localStorage"]
+  external getItem: string => Js.nullable(string) = "";
+};
