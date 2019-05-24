@@ -248,7 +248,7 @@ module Make_fp
         try [%test_eq: t] a x with _ -> mem a xs )
     in
     let gen = Int.gen_incl 1 Int.max_value_30_bits in
-    Quickcheck.test ~trials:100 gen ~f:(fun n ->
+    Quickcheck.test ~trials:10 gen ~f:(fun n ->
         let n = abs n in
         let n2 = Int.(n * n) in
         mem (sqrt (of_int n2)) [of_int n; Info.order - of_int n] )
