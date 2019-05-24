@@ -15,13 +15,11 @@ include Single.Make({
 
   type t = BrowserWindow.t;
 
-  let listen = (t, dispatch) => {
+  let listen = (_t, _dispatch) => {
     let cb =
       (. _event, message) =>
         switch (message) {
-        | `Set_name(key, name, pendingIdent) =>
-          dispatch(Application.Action.SettingsUpdate((key, name)));
-          send(t, `Respond_new_settings((pendingIdent, ())));
+        | `Set_name(_, _, _) => ()
         };
     RendererCommunication.on(cb);
     cb;
