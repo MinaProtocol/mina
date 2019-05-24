@@ -11,7 +11,8 @@
 /CONTRIBUTING.md @imeckler @cmr
 /DIRECTORY_STRUCTURE.md @imeckler @jkrauska
 /LICENSE @imeckler
-/README* @cmr
+/README.md @cmr
+/README-dev.md @cmr
 /azure-pipelines.yml @jkrauska
 
 /src/app/cli/ @cmr @nholland94 @bkase
@@ -32,8 +33,6 @@
 /src/lib/chunked_triples/ @psteckler @rbkhmrcr @vanishreerao
 /src/lib/cli_lib/ @johnwu93
 /src/lib/coda_base/ @cmr @nholland94 @bkase
-/src/lib/coda_base/pending_coinbase* @deepthiskumar
-/src/lib/coda_base/coinbase* @deepthiskumar
 /src/lib/coda_compile_config/ @nholland94
 /src/lib/coda_debug/ @nholland94
 /src/lib/coda_networking/ @cmr
@@ -57,7 +56,7 @@
 /src/lib/file_stack_database/ @johnwu93 @bkase
 /src/lib/file_system/ @johnwu93 @bkase
 /src/lib/genesis_ledger/ @nholland94 @bkase @cmr
-/src/lib/global_signer_private_key/ @nholland94 # dead code?
+/src/lib/global_signer_private_key/ @nholland94
 /src/lib/gossip_net/ @cmr
 /src/lib/group_map/ @rbkhmrcr @vanishreerao
 /src/lib/hash_prefixes/ @rbkhmrcr @vanishreerao
