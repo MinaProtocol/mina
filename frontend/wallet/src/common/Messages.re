@@ -1,17 +1,8 @@
-open Tc;
-
 let message = __MODULE__;
-
-module ControlCodaResponse = {
-  // Ok(true) = started
-  // Ok(false) = stopped
-  // Error = Failed to perform action
-  type t = Result.t(string, bool);
-};
 
 module Typ = {
   type t('a) =
-    | ControlCodaResponse: t(ControlCodaResponse.t)
+    | String: t(string)
     | Unit: t(unit);
 
   let if_eq =
@@ -25,8 +16,8 @@ module Typ = {
         ~not_equal: b => unit,
       ) => {
     switch (ta, tb) {
-    | (ControlCodaResponse, ControlCodaResponse) => is_equal(v)
-    | (_, ControlCodaResponse) => not_equal(v)
+    | (String, String) => is_equal(v)
+    | (_, String) => not_equal(v)
     | (Unit, Unit) => is_equal(v)
     | (_, Unit) => not_equal(v)
     };
@@ -36,7 +27,7 @@ module CallTable = CallTable.Make(Typ);
 
 type mainToRendererMessages = [
   | `Deep_link(/*Route.t*/ string)
-  | `Respond_control_coda(CallTable.Ident.Encode.t, ControlCodaResponse.t)
+  | `Coda_crashed(/* error message */ string)
 ];
 
 type rendererToMainMessages = [
@@ -44,6 +35,5 @@ type rendererToMainMessages = [
                          // Some(args) = spawn args
 (
       option(list(string)),
-      CallTable.Ident.Encode.t,
     )
 ];

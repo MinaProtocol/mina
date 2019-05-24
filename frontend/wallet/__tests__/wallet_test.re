@@ -98,8 +98,12 @@ describe("Bindings", () =>
       ~timeout=10,
       cb => {
         let pauseProcess = ChildProcess.spawn("sleep", [|"10"|]);
-        ChildProcess.Process.onExit(pauseProcess, (n, _) =>
-          cb(expect(n) |> toEqual(0))
+        ChildProcess.Process.onExit(
+          pauseProcess,
+          fun
+          | `Code(n) =>
+            failwith(Printf.sprintf("Unexpected exit via code: %d", n))
+          | `Signal(s) => cb(expect(s) |> toEqual("SIGTERM")),
         );
         ChildProcess.Process.kill(pauseProcess);
       },
@@ -221,10 +225,9 @@ module TestProcess = {
     type t = {
       stopped: int,
       started: int,
-      ready: int,
     };
 
-    let empty = {stopped: 0, started: 0, ready: 0};
+    let empty = {stopped: 0, started: 0};
 
     // HACK: counts keyed on the first arg used (so we can differentiate between
     // tests).
@@ -246,8 +249,11 @@ module TestProcess = {
 
     let stop = write(c => {...c, stopped: c.stopped + 1});
     let start = write(c => {...c, started: c.started + 1});
-    let makeReady = write(c => {...c, ready: c.ready + 1});
   };
+
+  module CallTable = Messages.CallTable;
+
+  let callTable = CallTable.make();
 
   module State = {
     type t =
@@ -257,28 +263,43 @@ module TestProcess = {
   };
 
   type t = {
+    pending: Messages.CallTable.Pending.t(Tablecloth.Never.t, string),
     state: ref(State.t),
     args: list(string),
   };
 
-  let kill = (t: t) => {
+  let exit = (t: t, signal: option(string)) => {
     assert(t.state^ != State.Stopped);
     Counts.stop(t.args);
     t.state := State.Stopped;
+    CallTable.resolve(
+      callTable,
+      t.pending.ident,
+      Option.withDefault(~default="", signal),
+    );
   };
 
+  let waitExit = (t: t) => {
+    let res: Task.t('x, [> | `Code(int) | `Signal(string)]) =
+      t.pending.task
+      |> Task.map(~f=s => s == "" ? `Code(0) : `Signal(s))
+      // it's a unit test, so who cares if we obj.magic
+      |> Obj.magic;
+    res;
+  };
+
+  let stop = (t: t) => exit(t, None);
+
+  let crash = (t: t) => exit(t, Some("CRASH"));
+
+  let kill = (t: t) => exit(t, Some("SIGTERM"));
+
   let start = args => {
-    let t = {state: ref(State.Started), args};
+    let pending =
+      CallTable.nextPending(callTable, Messages.Typ.String, ~loc=__LOC__);
+    let t = {state: ref(State.Started), args, pending};
     Counts.start(args);
-    Belt.Result.Ok((
-      t,
-      Bindings.setTimeout(30)
-      |> Task.map(~f=() => {
-           t.state := State.Ready;
-           Counts.makeReady(args);
-           `Ready;
-         }),
-    ));
+    Belt.Result.Ok(t);
   };
 };
 
@@ -289,30 +310,10 @@ module TestWindow = {
 
   type t = ref(list(Messages.mainToRendererMessages));
 
-  let controlCodaDaemon = maybeArgs => {
-    let pending =
-      CallTable.nextPending(
-        callTable,
-        Messages.Typ.ControlCodaResponse,
-        ~loc=__LOC__,
-      );
-    (
-      Action.ControlCoda(maybeArgs, CallTable.Ident.Encode.t(pending.ident)),
-      pending.task,
-    );
-  };
+  let controlCodaDaemon = maybeArgs => Action.ControlCoda(maybeArgs);
 
   let send = (t, message) => {
     t := [message, ...t^];
-    switch (message) {
-    | `Respond_control_coda(ident, response) =>
-      CallTable.resolve(
-        callTable,
-        CallTable.Ident.Decode.t(ident, Messages.Typ.ControlCodaResponse),
-        response,
-      )
-    | _ => ()
-    };
   };
 };
 
@@ -320,106 +321,147 @@ module TestApplication = Application.Make(TestProcess, TestWindow);
 
 describe("ApplicationReducer", () => {
   let baseState = {
-    Application.State.wallets: [||],
-    coda: Application.State.CodaProcessState.Stopped(Belt.Result.Ok()),
+    Application.State.coda:
+      Application.State.CodaProcessState.Stopped(Belt.Result.Ok()),
     window: Some(ref([])),
   };
 
   describe("CodaProcess", () => {
     module Counts = TestProcess.Counts;
 
-    let setup = () => {
-      ...baseState,
-      coda: Application.State.CodaProcessState.Stopped(Belt.Result.Ok()),
-    };
-    let store = initialState =>
-      TestApplication.Store.create(
-        initialState, ~onNewState=(_oldState, _state)
-        // Js.log2("Old", Application.State.toString(oldState));
-        // Js.log2("New", Application.State.toString(state));
-        => ());
-    let dispatch = TestApplication.Store.apply((), store(setup()));
+    module Machine = {
+      type t = {
+        store: TestApplication.Store.t,
+        dispatch: TestApplication.Store.action => unit,
+      };
 
-    testAsync(
-      "Start a stopped Coda",
-      ~timeout=50,
-      cb => {
-        let args = ["test0", "a", "b"];
-        Counts.zero(args);
-        let (action, task) = TestWindow.controlCodaDaemon(Some(args));
-        TestApplication.Store.apply((), store(setup()), action);
-        Task.perform(task, ~f=res =>
-          cb(expect(res) |> toEqual(Belt.Result.Ok(true)))
+      let create = () => {
+        let initial = {
+          ...baseState,
+          coda: Application.State.CodaProcessState.Stopped(Belt.Result.Ok()),
+        };
+        let store =
+          TestApplication.Store.create(
+            initial, ~onNewState=(_oldState, _state) =>
+            ()
+          );
+        let dispatch = TestApplication.Store.apply((), store);
+        {store, dispatch};
+      };
+
+      let foldCoda = (t, ~initial, ~started, ~stopped) => {
+        let state = TestApplication.Store.currentState(t.store);
+        switch (state.coda) {
+        | Application.State.CodaProcessState.Started(args', p) =>
+          started(initial, args', p)
+        | Stopped(res) => stopped(initial, res)
+        };
+      };
+
+      let checkCodaState = (t, ~started, ~stopped) =>
+        foldCoda(
+          t,
+          ~initial=(),
+          ~started=() => started,
+          ~stopped=() => stopped,
         );
-      },
-    );
+    };
+
+    test("Start a stopped Coda", () => {
+      let args = ["test0", "a", "b"];
+      let m = Machine.create();
+      Counts.zero(args);
+      let action = TestWindow.controlCodaDaemon(Some(args));
+      m.dispatch(action);
+
+      Machine.checkCodaState(
+        m,
+        ~started=
+          (args', p) =>
+            expect((args', p.state^))
+            |> toEqual((args', TestProcess.State.Started)),
+        ~stopped=_ => failwith("Bad state, should have started"),
+      );
+    });
 
     testAsync(
       "Start a stopped Coda few times with the same args",
       ~timeout=300,
       cb => {
         let args = ["test1", "a", "b"];
+        let m = Machine.create();
         Counts.zero(args);
 
         let run = () => {
-          let (action, task) = TestWindow.controlCodaDaemon(Some(args));
-          dispatch(action);
-          task;
+          m.dispatch(TestWindow.controlCodaDaemon(Some(args)));
         };
 
         let task =
           Task.map3(
             // start it immediately
-            run(),
-            // start it after 2ms (before graphql on)
-            Bindings.setTimeout(0) |> Task.andThen(~f=() => run()),
-            // start it after 50ms (after graphql on)
-            Bindings.setTimeout(50) |> Task.andThen(~f=() => run()),
-            ~f=(r1, r2, r3) =>
-            (r1, r2, r3)
+            Task.succeed(run()),
+            // start it after some time
+            Bindings.setTimeout(5) |> Task.map(~f=run),
+            // start and again
+            Bindings.setTimeout(50) |> Task.map(~f=run),
+            ~f=((), (), ()) =>
+            ()
           );
 
-        Task.perform(
-          task,
-          ~f=((r1, r2, r3)) => {
-            let ok = Belt.Result.Ok(true);
-            cb(
-              expect((r1, r2, r3, Counts.get(args).started))
-              |> toEqual((ok, ok, ok, 1)),
-            );
-          },
+        Task.perform(task, ~f=() =>
+          Machine.checkCodaState(
+            m,
+            ~started=
+              (args', p) =>
+                cb(
+                  expect((args', p.state^, Counts.get(args).started))
+                  |> toEqual((args', TestProcess.State.Started, 1)),
+                ),
+            ~stopped=_ => failwith("Bad state, should have started"),
+          )
         );
       },
     );
 
     testAsync(
       "Stop a coda",
-      ~timeout=200,
+      ~timeout=300,
       cb => {
         let args = ["test2", "a", "b"];
+        let m = Machine.create();
         Counts.zero(args);
 
         // start coda
-        let (action, coda1) = TestWindow.controlCodaDaemon(Some(args));
-        dispatch(action);
+        m.dispatch(TestWindow.controlCodaDaemon(Some(args)));
 
         // after we're ready, stop it
         let task =
-          coda1
-          |> Task.andThen(~f=res => {
-               assert(res == Belt.Result.Ok(true));
-               let (action, coda2) = TestWindow.controlCodaDaemon(None);
-               dispatch(action);
-               coda2;
-             });
+          Bindings.setTimeout(1)
+          |> Task.map(~f=() => {
+               Machine.checkCodaState(
+                 m,
+                 ~started=(_args', _p) => (),
+                 ~stopped=_ => failwith("Bad state, should have started"),
+               );
+
+               m.dispatch(TestWindow.controlCodaDaemon(None));
+             })
+          |> Task.andThen(~f=() => Bindings.setTimeout(10));
 
         Task.perform(
           task,
-          ~f=res => {
+          ~f=() => {
             let counts = Counts.get(args);
-            cb(
-              expect((res, counts.ready, counts.stopped))
-              |> toEqual((Belt.Result.Ok(false), 1, 1)),
+
+            Machine.checkCodaState(
+              m,
+              ~started=(_, _) => failwith("Bad state, should be stopped"),
+              ~stopped=
+                res =>
+                  cb(
+                    expect((res, counts.stopped))
+                    |> toEqual((Belt.Result.Error(`Signal("SIGTERM")), 1)),
+                  ),
             );
           },
         );
@@ -432,34 +474,145 @@ describe("ApplicationReducer", () => {
       cb => {
         let args1 = ["test3", "a", "b"];
         let args2 = ["test3", "a", "b", "c"];
+        let m = Machine.create();
         Counts.zero(args1);
 
         // start coda
-        let (action, coda1) = TestWindow.controlCodaDaemon(Some(args1));
-        dispatch(action);
+        m.dispatch(TestWindow.controlCodaDaemon(Some(args1)));
+
+        // exit for the first one
+        let exitFirst =
+          Machine.checkCodaState(
+            m,
+            ~started=(_args', p) => TestProcess.waitExit(p),
+            ~stopped=_ => failwith("Bad state, should have started"),
+          );
 
         // after we're ready, start it again with different args
         let task =
-          coda1
-          |> Task.andThen(~f=res => {
-               assert(res == Belt.Result.Ok(true));
-               let (action, coda2) =
-                 TestWindow.controlCodaDaemon(Some(args2));
-               dispatch(action);
-               coda2;
+          Bindings.setTimeout(1)
+          |> Task.map(~f=() => {
+               Machine.checkCodaState(
+                 m,
+                 ~started=(_args', _p) => (),
+                 ~stopped=_ => failwith("Bad state, should have started"),
+               );
+               m.dispatch(TestWindow.controlCodaDaemon(Some(args2)));
              });
 
-        Task.perform(
-          task,
-          ~f=res => {
-            let counts = Counts.get(args1);
-            cb(
-              expect((res, counts.ready, counts.stopped))
-              |> toEqual((Belt.Result.Ok(true), 2, 1)),
-            );
-          },
+        let results = Task.map2(exitFirst, task, ~f=(s, ()) => s);
+
+        Task.perform(results, ~f=s =>
+          Machine.checkCodaState(
+            m,
+            ~started=
+              (args', p) =>
+                cb(
+                  expect((args', p.state^, Counts.get(args2).started, s))
+                  |> toEqual((
+                       args',
+                       TestProcess.State.Started,
+                       2,
+                       `Signal("SIGTERM"),
+                     )),
+                ),
+            ~stopped=_ => failwith("Bad state, should have started"),
+          )
         );
       },
+    );
+
+    testAsync(
+      "Wait for coda to die (successful)",
+      ~timeout=200,
+      cb => {
+        let args = ["test4", "a", "b"];
+        let m = Machine.create();
+        Counts.zero(args);
+
+        // start coda
+        m.dispatch(TestWindow.controlCodaDaemon(Some(args)));
+
+        let exitTask =
+          Machine.checkCodaState(
+            m,
+            ~started=(_args', p) => TestProcess.waitExit(p),
+            ~stopped=_ => failwith("Bad state, should have started"),
+          );
+
+        // after a bit, stop the process
+        let task =
+          Bindings.setTimeout(30)
+          |> Task.map(~f=() =>
+               Machine.checkCodaState(
+                 m,
+                 ~started=(_args', p) => TestProcess.stop(p),
+                 ~stopped=_ => failwith("Bad state, should have started"),
+               )
+             );
+
+        let results = Task.map2(exitTask, task, ~f=(s, ()) => s);
+
+        Task.perform(
+          results,
+          ~f=
+            fun
+            | `Signal(_) =>
+              failwith("Bad state, should be exited with a code")
+            | `Code(c) => cb(expect(c) |> toBe(0)),
+        );
+      },
+    );
+
+    let codaDiesTest = (~haltProcess, ~expectedExitResult, cb) => {
+      let args = ["test5", "a", "b"];
+      let m = Machine.create();
+      Counts.zero(args);
+
+      // start coda
+      m.dispatch(TestWindow.controlCodaDaemon(Some(args)));
+
+      let exitTask =
+        Machine.checkCodaState(
+          m,
+          ~started=(_args', p) => TestProcess.waitExit(p),
+          ~stopped=_ => failwith("Bad state, should have started"),
+        );
+
+      // after a bit, stop the process
+      let task =
+        Bindings.setTimeout(30)
+        |> Task.map(~f=() =>
+             Machine.checkCodaState(
+               m,
+               ~started=(_args', p) => haltProcess(p),
+               ~stopped=_ => failwith("Bad state, should have started"),
+             )
+           );
+
+      let results = Task.map2(exitTask, task, ~f=(s, ()) => s);
+
+      Task.perform(results, ~f=r =>
+        cb(expect(r) |> toEqual(expectedExitResult))
+      );
+    };
+
+    testAsync(
+      "Wait for coda to die (successfully)",
+      ~timeout=200,
+      codaDiesTest(
+        ~haltProcess=TestProcess.stop,
+        ~expectedExitResult=`Code(0),
+      ),
+    );
+
+    testAsync(
+      "Wait for coda to die (crash)",
+      ~timeout=200,
+      codaDiesTest(
+        ~haltProcess=TestProcess.crash,
+        ~expectedExitResult=`Signal("CRASH"),
+      ),
     );
   });
 });

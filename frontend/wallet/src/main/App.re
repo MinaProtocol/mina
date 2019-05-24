@@ -57,8 +57,8 @@ let run = () =>
     initialTask,
     ~f=_ => {
       let initialState = {
-        Application.State.wallets: [||],
-        coda: Application.State.CodaProcessState.Stopped(Belt.Result.Ok()),
+        Application.State.coda:
+          Application.State.CodaProcessState.Stopped(Belt.Result.Ok()),
         window: None,
       };
 

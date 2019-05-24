@@ -19,8 +19,8 @@ include Single.Make({
     let cb =
       (. _event, message) =>
         switch (message) {
-        | `Control_coda_daemon(maybeArgs, pendingIdent) =>
-          dispatch(Action.ControlCoda(maybeArgs, pendingIdent))
+        | `Control_coda_daemon(maybeArgs) =>
+          dispatch(Action.ControlCoda(maybeArgs))
         };
     RendererCommunication.on(cb);
     cb;
@@ -86,6 +86,8 @@ include Single.Make({
       window;
     };
 });
+
+type t = BrowserWindow.t;
 
 let deepLink = input => {
   let w = get(input);

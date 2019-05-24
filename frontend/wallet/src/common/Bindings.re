@@ -57,16 +57,32 @@ module ChildProcess = {
     };
 
     [@bs.send] external kill: t => unit = "";
-    [@bs.send] external onError: (t, string, Error.t => unit) => unit = "on";
-    let onError = (t, cb) => onError(t, "error", cb);
 
     [@bs.send]
-    external onExit: (t, string, (float, Js.nullable(string)) => unit) => unit =
+    external onError: (t, [@bs.as "error"] _, Error.t => unit) => unit = "on";
+
+    [@bs.send]
+    external onExit:
+      (
+        t,
+        [@bs.as "exit"] _,
+        (Js.nullable(float), Js.nullable(string)) => unit
+      ) =>
+      unit =
       "on";
+
     let onExit = (t, cb) =>
-      onExit(t, "exit", (f, s) =>
-        cb(int_of_float(f), Js.Nullable.toOption(s))
+      onExit(t, (f, s) =>
+        switch (Js.Nullable.toOption(f), Js.Nullable.toOption(s)) {
+        | (None, None) =>
+          failwith("Expected one of code,signal to be non-null")
+        | (Some(code), None) => cb(`Code(int_of_float(code)))
+        | (None, Some(signal)) => cb(`Signal(signal))
+        | (Some(_), Some(_)) =>
+          failwith("Expected one of code,signal to be null")
+        }
       );
+    let onExitTask = t => Task.uncallbackifyValue(onExit(t));
   };
   [@bs.val] [@bs.module "child_process"]
   external spawn: (string, array(string)) => Process.t = "spawn";

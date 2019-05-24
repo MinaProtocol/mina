@@ -1,10 +1,8 @@
-open Tc;
-
 module ListenToken: {type t;};
 
 /// Start or stop the coda daemon
-let controlCodaDaemon:
-  option(list(string)) => Task.t('x, Messages.ControlCodaResponse.t);
+/// Afterwards you'll poll the graphql endpoint until it succeeds
+let controlCodaDaemon: option(list(string)) => unit;
 
 let listen: unit => ListenToken.t;
 let stopListening: ListenToken.t => unit;

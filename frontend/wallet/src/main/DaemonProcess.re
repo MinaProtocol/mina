@@ -36,7 +36,7 @@ let baseCodaCommand = port => {
 };
 
 module Process = {
-  let start = (command: Command.t, port) => {
+  let start = (command: Command.t) => {
     print_endline("Starting graphql-faker");
 
     let p =
@@ -68,20 +68,26 @@ module Process = {
       )
     );
 
-    ChildProcess.Process.onExit(p, (n, s) =>
-      if (n == 1) {
-        Printf.fprintf(
-          stderr,
-          "Daemon process exited with non-zero exit code: Exit:%d, msg:%s%!\n",
-          n,
-          Option.withDefault(
-            s,
-            ~default="Port " ++ Js.Int.toString(port) ++ " already in use?",
-          ),
-        );
-      } else {
-        print_endline("Shutting down daemon process.");
-      }
+    ChildProcess.Process.onExit(
+      p,
+      fun
+      | `Code(code) =>
+        if (code != 0) {
+          Printf.fprintf(
+            stderr,
+            "Daemon process died with non-zero exit code: %d\n",
+            code,
+          );
+        } else {
+          print_endline("Shutting down daemon process.");
+        }
+      | `Signal(signal) => {
+          Printf.fprintf(
+            stderr,
+            "Daemon process died via signal: %s\n",
+            signal,
+          );
+        },
     );
 
     p;
@@ -91,23 +97,18 @@ module Process = {
 module CodaProcess = {
   type t = ChildProcess.Process.t;
 
+  let waitExit: t => Task.t('x, [> | `Code(int) | `Signal(string)]) =
+    t => ChildProcess.Process.onExitTask(t);
+
   let kill: t => unit = t => ChildProcess.Process.kill(t);
 
-  let start:
-    list(string) =>
-    Result.t(string, (ChildProcess.Process.t, Task.t('x, [> | `Ready]))) =
+  let start: list(string) => Result.t(string, t) =
     args => {
       let p =
         Process.start(
           Command.addArgs(baseCodaCommand(0xc0da), args |> Array.fromList),
-          0xc0da,
         );
-      // TODO: Actually detect when graphql is ready. According to experimentation,
-      //    waiting around 5 seconds is sufficient for now
-      Belt.Result.Ok((
-        p,
-        Bindings.setTimeout(5000) |> Task.map(~f=() => `Ready),
-      ));
+      Belt.Result.Ok(p);
     };
 };
 
@@ -146,8 +147,8 @@ let startAll = (~fakerPort, ~codaPort) => {
         ]),
       ),
   };
-  let p1 = Process.start(graphqlFaker, fakerPort);
-  let p2 = Process.start(coda, codaPort);
+  let p1 = Process.start(graphqlFaker);
+  let p2 = Process.start(coda);
   () => {
     ChildProcess.Process.kill(p1);
     ChildProcess.Process.kill(p2);
