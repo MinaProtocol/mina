@@ -24,40 +24,37 @@ module Styles = {
 };
 
 module Transaction = {
-  module RewardDetails = {
+  module BlockReward = {
+    type feeTransfer = {
+      .
+      "recipient": PublicKey.t,
+      "amount": int64,
+    };
+
     type t = {
-      key: PublicKey.t,
+      date: Js.Date.t,
+      creator: PublicKey.t,
       coinbase: int64,
-      transactionFees: int64,
-      proofFees: int64,
-      delegationFees: int64,
-      includedAt: Js.Date.t,
+      feeTransfers: array(feeTransfer),
     };
   };
 
   module PaymentDetails = {
     type t = {
+      .
+      isDelegation: bool,
       from: PublicKey.t,
       to_: PublicKey.t,
       amount: int64,
       fee: int64,
       memo: option(string),
-      submittedAt: Js.Date.t,
-      includedAt: option(Js.Date.t),
-    };
-  };
-
-  module UnknownDetails = {
-    type t = {
-      key: PublicKey.t,
-      amount: int64,
+      date: Js.Date.t,
     };
   };
 
   type t =
-    | Minted(RewardDetails.t)
-    | Payment(PaymentDetails.t, ConsensusState.t)
-    | Unknown(UnknownDetails.t);
+    | UserCommand(Js.t(PaymentDetails.t))
+    | BlockReward(BlockReward.t);
 };
 
 module ViewModel = {
@@ -79,7 +76,7 @@ module ViewModel = {
     type t =
       | Memo(string, Js.Date.t)
       | Empty(Js.Date.t)
-      | StakingReward(list((string, int64)), Js.Date.t)
+      | StakingReward(list((PublicKey.t, int64)), Js.Date.t)
       | MissingReceipts;
   };
 
@@ -91,21 +88,38 @@ module ViewModel = {
     amountDelta: int64 // signed
   };
 
-  let ofTransaction = (transaction, ~myWallets: list(PublicKey.t)) => {
-    let date =
-      Option.map(~f=Js.Date.fromString, transaction##includedAt)
-      |> Option.withDefault(~default=transaction##submittedAt);
-    {
-      sender: Actor.Key(transaction##from),
-      recipient: Actor.Key(transaction##to_),
-      action: Action.Transfer,
-      info:
-        Option.map(transaction##memo, ~f=x => Info.Memo(x, date))
-        |> Option.withDefault(~default=Info.Empty(date)),
-      amountDelta:
-        Caml.List.exists(PublicKey.equal(transaction##from), myWallets)
-          ? Int64.(neg(one)) *^ transaction##amount -^ transaction##fee
-          : transaction##amount,
+  let ofTransaction =
+      (transaction: Transaction.t, ~myWallets: list(PublicKey.t)) => {
+    switch (transaction) {
+    | UserCommand(userCmd) =>
+      let date = userCmd##date;
+      {
+        sender: Actor.Key(userCmd##from),
+        recipient: Actor.Key(userCmd##to_),
+        action: Action.Transfer,
+        info:
+          Option.map(userCmd##memo, ~f=x => Info.Memo(x, date))
+          |> Option.withDefault(~default=Info.Empty(date)),
+        amountDelta:
+          Caml.List.exists(PublicKey.equal(userCmd##from), myWallets)
+            ? Int64.(neg(one)) *^ userCmd##amount -^ userCmd##fee
+            : userCmd##amount,
+      };
+    | BlockReward({coinbase, creator, date, feeTransfers}) => {
+        sender: Actor.Minted,
+        recipient: Actor.Key(creator),
+        action: Action.Transfer,
+        info:
+          Info.StakingReward(
+            Array.map(
+              ~f=transfer => (transfer##recipient, transfer##amount),
+              feeTransfers,
+            )
+            |> Array.toList,
+            date,
+          ),
+        amountDelta: coinbase,
+      }
     };
   };
 };
@@ -273,22 +287,30 @@ module InfoSection = {
        | StakingReward(rewards, _) =>
          <>
            <MainRow>
-             <Link> {React.string(expanded ? "Collapse" : "Details")} </Link>
+             <Link>
+               {React.string(expanded ? "Collapse" : "Show fee transfers")}
+             </Link>
            </MainRow>
            {expanded
-              ? <ul>
-                  {List.map(rewards, ~f=((message, amount)) =>
+              ? <ul className=Css.(style([margin(`zero), padding(`zero)]))>
+                  {List.map(rewards, ~f=((pubkey, amount)) =>
                      <li
-                       key=message
+                       key={
+                         PublicKey.toString(pubkey)
+                         ++ Int64.to_string(amount)
+                       }
                        className=Css.(
                          style([
                            display(`flex),
                            justifyContent(`spaceBetween),
                            alignItems(`center),
+                           marginBottom(`rem(1.)),
                          ])
                        )>
-                       <p> {ReasonReact.string(message)} </p>
+                       <ActorName value={ViewModel.Actor.Key(pubkey)} />
+                       <span>
                        <Amount value=amount />
+                       </span>
                      </li>
                    )
                    |> Array.fromList
@@ -309,7 +331,7 @@ module TopLevelStyles = {
   module Actors = {
     let wrapper = style([padding2(~h=`zero, ~v=`rem(0.625))]);
 
-    let mode = style([marginTop(`rem(0.25))]);
+    let mode = style([color(Theme.Colors.slateAlpha(1.)), display(`flex), alignItems(`center), marginTop(`rem(0.25))]);
   };
 
   let infoSection =
@@ -354,20 +376,18 @@ module TopLevelStyles = {
 // These cells are returned as a fragment so that the parent container can
 // use a consistent grid layout to keep everything lined up.
 [@react.component]
-let make = (~transaction, ~myWallets: list(PublicKey.t)) => {
+let make = (~transaction: Transaction.t, ~myWallets: list(PublicKey.t)) => {
   let viewModel = ViewModel.ofTransaction(transaction, ~myWallets);
 
   <>
     <span className=TopLevelStyles.Actors.wrapper>
       <ActorName value={viewModel.sender} />
       <div className=TopLevelStyles.Actors.mode>
-        {React.string(
-           switch (viewModel.action) {
-           | Transfer => "-> "
-           | Pending => "... "
-           | Failed => "x "
-           },
-         )}
+        {switch (viewModel.action) {
+         | Transfer => <Icon kind=Icon.BentArrow />
+         | Pending => React.string("... ")
+         | Failed => React.string("x ")
+         }}
         <ActorName value={viewModel.recipient} />
       </div>
     </span>

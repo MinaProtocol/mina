@@ -9,9 +9,7 @@ module Styles = {
     ]);
 };
 
-module SettingsQueryString = [%graphql
-  {| query settings { version } |}
-];
+module SettingsQueryString = [%graphql {| query settings { version } |}];
 
 module SettingsQuery = ReasonApollo.CreateQuery(SettingsQueryString);
 
@@ -22,11 +20,13 @@ let make = () =>
     <Spacer height=1. />
     <SettingsQuery>
       {response =>
-        switch(response.result) {
-        | Loading => React.string("...")
-        | Error(err) => React.string(err##message)
-        | Data(data) =>
-          <span className=Theme.Text.Body.regular> {React.string("Wallet version: " ++ data##version)} </span>
-      }}
+         switch (response.result) {
+         | Loading => React.string("...")
+         | Error(err) => React.string(err##message)
+         | Data(data) =>
+           <span className=Theme.Text.Body.regular>
+             {React.string("Wallet version: " ++ data##version)}
+           </span>
+         }}
     </SettingsQuery>
   </div>;

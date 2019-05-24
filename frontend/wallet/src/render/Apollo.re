@@ -15,6 +15,5 @@ module Decoders = {
   let publicKey = PublicKey.ofStringExn;
 
   let date = Js.Date.fromString;
-  let optDate = optionalDate =>
-    Option.map(~f=Js.Date.fromString, optionalDate);
+  let optDate = Option.map(~f=Js.Date.fromString);
 };

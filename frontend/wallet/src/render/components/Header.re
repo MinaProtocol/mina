@@ -26,6 +26,13 @@ module Styles = {
       notText,
     ]);
 
+  let logo =
+    style([
+      display(`flex),
+      alignItems(`center),
+      marginLeft(`px(4)),
+    ]);
+
   let rightButtons =
     style([
       display(`flex),
@@ -37,21 +44,16 @@ module Styles = {
 [@react.component]
 let make = () =>
   <header className=Styles.header>
-    <div
-      style={ReactDOMRe.Style.make(~display="flex", ~alignItems="center", ())}>
-      <div className=Theme.codaLogoCurrent />
-      <p
-        style={ReactDOMRe.Style.make(~fontWeight="100", ~fontSize="160%", ())}>
-        {React.string({j|CODA|j})}
-      </p>
+    <div className=Styles.logo>
+      <img src="CodaLogo.svg" alt="Coda logo" />
     </div>
-    <div className=Styles.rightButtons> 
+    <div className=Styles.rightButtons>
       <Link onClick={_e => ReasonReact.Router.push("/settings")}>
         <Icon kind=Icon.Settings />
-        <Spacer width={0.25} />
+        <Spacer width=0.25 />
         {React.string("Settings")}
       </Link>
-      <Spacer width={1.5} />
+      <Spacer width=1.5 />
       <div
         style={ReactDOMRe.Style.make(
           ~fontWeight="500",
