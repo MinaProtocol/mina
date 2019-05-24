@@ -751,9 +751,6 @@ module Data = struct
       let%bind () =
         with_label __LOC__ (Public_key.assert_equal public_key delegate)
       in
-      let%bind () =
-        with_label __LOC__ (Public_key.assert_equal public_key delegate)
-      in
       let%map evaluation =
         with_label __LOC__
           (T.Checked.eval_and_check_public_key shifted ~private_key
