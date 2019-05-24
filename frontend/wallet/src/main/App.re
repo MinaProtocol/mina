@@ -56,15 +56,19 @@ let run = () =>
   Task.attempt(
     initialTask,
     ~f=_ => {
-      let initialState = ();
+      let initialState = {
+        Application.State.coda:
+          Application.State.CodaProcessState.Stopped(Belt.Result.Ok()),
+        window: None,
+      };
 
       let dispatch = ref(_ => ());
       let store =
         Application.Store.create(
-          initialState, ~onNewState=(_last, _curr: Application.State.t('a)) =>
+          initialState, ~onNewState=(_last, _curr: Application.Store.state) =>
           createTray(dispatch^)
         );
-      dispatch := Application.Store.apply(store);
+      dispatch := Application.Store.apply((), store);
       let dispatch = dispatch^;
 
       createTray(dispatch);

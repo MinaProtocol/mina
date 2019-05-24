@@ -1,9 +1,8 @@
-open Tc;
-
 module ListenToken: {type t;};
 
-/// Tell the main process that we changed a wallet name
-let setName: (PublicKey.t, string) => Task.t('x, unit);
+/// Start or stop the coda daemon
+/// Afterwards you'll poll the graphql endpoint until it succeeds
+let controlCodaDaemon: option(list(string)) => unit;
 
 let listen: unit => ListenToken.t;
 let stopListening: ListenToken.t => unit;
