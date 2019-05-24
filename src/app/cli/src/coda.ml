@@ -515,6 +515,7 @@ let coda_commands logger =
         ; (module Coda_bootstrap_test)
         ; (module Coda_batch_payment_test)
         ; (module Coda_long_fork)
+        ; (module Coda_delegation_test)
         ; (module Full_test)
         ; (module Transaction_snark_profiler) ]
         : (module Integration_test) list )
