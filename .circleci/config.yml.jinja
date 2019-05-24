@@ -63,6 +63,9 @@ jobs:
             - run:
                   name: Snarky tracks master (make check-snarky-submodule)
                   command: make check-snarky-submodule
+            - run:
+                  name: Check CODEOWNERS file format
+                  command: ./scripts/lint_codeowners.sh
 
     update-branch-protection:
         docker:
