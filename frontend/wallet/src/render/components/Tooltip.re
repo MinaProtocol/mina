@@ -64,7 +64,7 @@ module Styles = {
           width(`zero),
           height(`zero),
           borderColor(Theme.Colors.slate),
-          transforms([`rotate(`deg(225)), `translate((`px(6), `zero))]),
+          transforms([`rotate(`deg(225)), `translate((`px(7), `zero))]),
           borderLeft(`px(5), `solid, Theme.Colors.slate),
           borderRight(`px(5), `solid, transparent),
           borderTop(`px(5), `solid, Theme.Colors.slate),
