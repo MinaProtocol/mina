@@ -1,31 +1,5 @@
 open Core
-module Tick = Snark_params.Tick
-module Tock = Snark_params.Tock
-module LTock = Lite_base.Crypto_params.Tock
-
-let field : Tick.Field.t -> LTock.Fq.t =
-  Fn.compose LTock.Fq.of_string Tick.Field.to_string
-
-let digest = field
-
-let twist_field x : LTock.Fq3.t =
-  let module V = Snark_params.Tick_backend.Field.Vector in
-  let c i = field (V.get x i) in
-  (c 0, c 1, c 2)
-
-let g1 (t : Tick.Inner_curve.t) : LTock.G1.t =
-  let x, y = Tick.Inner_curve.to_affine_coordinates t in
-  {x= field x; y= field y; z= LTock.Fq.one}
-
-let g2 (t : Crypto_params.Cycle.Mnt6.G2.t) : LTock.G2.t =
-  let x, y =
-    Crypto_params.Tick_backend.Inner_twisted_curve.to_affine_coordinates t
-  in
-  {x= twist_field x; y= twist_field y; z= LTock.Fq3.one}
-
-let g1_vector v =
-  let module V = Snark_params.Tick.Inner_curve.Vector in
-  Array.init (V.length v) ~f:(fun i -> g1 (V.get v i))
+include Lite_compat_algebra
 
 let verification_key vk =
   let open Crypto_params.Tock_backend.Full.GM_verification_key_accessors in
@@ -94,10 +68,10 @@ let frozen_ledger_hash (h : Coda_base.Frozen_ledger_hash.t) :
     Lite_base.Ledger_hash.t =
   digest (h :> Tick.Pedersen.Digest.t)
 
-let ledger_builder_hash (h : Coda_base.Staged_ledger_hash.t) =
+let ledger_builder_hash (h : Staged_ledger_hash.t) =
   { Lite_base.Staged_ledger_hash.ledger_hash=
-      ledger_hash (Coda_base.Staged_ledger_hash.ledger_hash h)
-  ; aux_hash= Coda_base.Staged_ledger_hash.(Aux_hash.to_bytes (aux_hash h)) }
+      ledger_hash (Staged_ledger_hash.ledger_hash h)
+  ; aux_hash= Staged_ledger_hash.(Aux_hash.to_bytes (aux_hash h)) }
 
 let blockchain_state
     ({staged_ledger_hash= lbh; snarked_ledger_hash= lh; timestamp} :

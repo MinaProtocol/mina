@@ -593,10 +593,18 @@ let add_from_backtrack : t -> User_command.With_valid_signature.t -> t =
       ; size= t.size + 1 }
   | Some (queue, currency_reserved) ->
       let first_queued = F_sequence.head_exn queue in
-      assert (
-        Account_nonce.equal
-          (unchecked |> User_command.nonce |> Account_nonce.succ)
-          (first_queued |> User_command.forget_check |> User_command.nonce) ) ;
+      if
+        not
+          (Account_nonce.equal
+             (unchecked |> User_command.nonce |> Account_nonce.succ)
+             (first_queued |> User_command.forget_check |> User_command.nonce))
+      then
+        failwith
+        @@ sprintf
+             !"indexed pool nonces inconsistent when adding from backtrack. \
+               Trying to add %{sexp:User_command.With_valid_signature.t} to \
+               %{sexp: t}"
+             cmd t ;
       let t' = remove_applicable_exn t first_queued in
       { applicable_by_fee=
           Map_set.insert

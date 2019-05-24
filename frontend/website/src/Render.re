@@ -32,11 +32,14 @@ module Rimraf = {
   [@bs.val] [@bs.module "rimraf"] external sync: string => unit = "";
 };
 
-Array.length(Sys.argv) > 2 && Sys.argv[2] == "prod"
+Array.length(Sys.argv) > 2
+&& (Sys.argv[2] == "prod" || Sys.argv[2] == "staging")
   ? {
-    Links.Cdn.prefix := "https://cdn.codaprotocol.com/v2";
+    Links.Cdn.prefix := "https://cdn.codaprotocol.com/v4";
   }
   : ();
+
+Style.Typeface.load();
 
 let writeStatic = (path, rootComponent) => {
   let rendered =
@@ -85,7 +88,6 @@ let posts = {
 module Router = {
   type t =
     | File(string, ReasonReact.reactElement)
-    | Css_file(string, string)
     | Dir(string, array(t));
 
   let generateStatic = {
@@ -93,9 +95,6 @@ module Router = {
       fun
       | File(name, elem) => {
           writeStatic(path ++ "/" ++ name, elem);
-        }
-      | Css_file(name, content) => {
-          Node.Fs.writeFileAsUtf8Sync(path ++ "/" ++ name ++ ".css", content);
         }
       | Dir(name, routes) => {
           let path_ = path ++ "/" ++ name;
@@ -132,7 +131,6 @@ Router.(
     Dir(
       "site",
       [|
-        Css_file("fonts", Style.Typeface.Loader.load()),
         File(
           "index",
           <Page page=`Home name="index" footerColor=Style.Colors.navyBlue>

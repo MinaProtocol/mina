@@ -109,10 +109,9 @@ module Make (Commands : Coda_commands.Intf) = struct
                 | Payment {Payment_payload.Poly.amount; _} ->
                     Ok
                       (amount |> Currency.Amount.to_uint64 |> Stringable.uint64)
-                | Stake_delegation _ ->
-                    Error "Payment should not consist of a stake delegation"
-                | Chain_voting _ ->
-                    Error "Payment should not consist of a chain voting" )
+                | Stake_delegation _ | Chain_voting _ ->
+                    (* Stake delegation and voting don't have an amount, so we set it to 0 *)
+                    Ok "0" )
           ; uint64_field "fee"
               ~doc:
                 "Fee that sender is willing to pay for making the transaction"
@@ -217,40 +216,50 @@ module Make (Commands : Coda_commands.Intf) = struct
         obj "Wallet" ~doc:"An account record according to the daemon"
           ~fields:(fun _ ->
             [ pubkey_field ~resolve:(fun _ account ->
-                  Stringable.public_key account.Account.Poly.public_key )
+                  (* Hack: Account.Poly.t is only parameterized over 'pk once
+                   * and so, in order for delegate to be optional, we must also
+                   * make account public_key optional even though it's always
+                   * Some. In an attempt to avoid a large refactoring, and also
+                   * avoid making a new record, we'll deal with a value_exn here
+                   * and be sad. *)
+                  Stringable.public_key
+                  @@ Option.value_exn account.Account.Poly.public_key )
             ; field "balance"
                 ~typ:(non_null AnnotatedBalance.obj)
                 ~doc:"A balance of Coda as a stringified uint64"
                 ~args:Arg.[]
                 ~resolve:(fun _ account -> account.Account.Poly.balance)
-            ; field "nonce" ~typ:(non_null string)
+            ; field "nonce" ~typ:string
                 ~doc:
                   "Nonces are natural numbers that increase each transaction. \
                    Stringified uint32"
                 ~args:Arg.[]
                 ~resolve:(fun _ account ->
-                  Account.Nonce.to_string account.Account.Poly.nonce )
-            ; field "receiptChainHash" ~typ:(non_null string)
+                  Option.map ~f:Account.Nonce.to_string
+                    account.Account.Poly.nonce )
+            ; field "receiptChainHash" ~typ:string
                 ~doc:"Top hash of the receipt chain merkle-list"
                 ~args:Arg.[]
                 ~resolve:(fun _ account ->
-                  Receipt.Chain_hash.to_string
+                  Option.map ~f:Receipt.Chain_hash.to_string
                     account.Account.Poly.receipt_chain_hash )
-            ; field "delegate" ~typ:(non_null string)
+            ; field "delegate" ~typ:string
                 ~doc:
-                  "The public key to which you are delegating (including the \
-                   empty key!)"
+                  "The public key to which you are delegating. If you are not \
+                   delegating to anybody, than this would return your public \
+                   key."
                 ~args:Arg.[]
                 ~resolve:(fun _ account ->
-                  Stringable.public_key account.Account.Poly.delegate )
-            ; field "votingFor" ~typ:(non_null string)
+                  Option.map ~f:Stringable.public_key
+                    account.Account.Poly.delegate )
+            ; field "votingFor" ~typ:string
                 ~doc:
                   "The previous epoch lock hash of the chain which you are \
                    voting for"
                 ~args:Arg.[]
                 ~resolve:(fun _ account ->
-                  Coda_base.State_hash.to_bytes account.Account.Poly.voting_for
-                  ) ] )
+                  Option.map ~f:Coda_base.State_hash.to_bytes
+                    account.Account.Poly.voting_for ) ] )
     end
 
     let snark_worker =
@@ -423,28 +432,73 @@ module Make (Commands : Coda_commands.Intf) = struct
     end
   end
 
-  let account_of_pk coda pk =
-    let account =
-      Program.best_ledger coda |> Participating_state.active
-      |> Option.bind ~f:(fun ledger ->
-             Ledger.location_of_key ledger pk
-             |> Option.bind ~f:(Ledger.get ledger) )
-    in
-    Option.map account
-      ~f:(fun { Account.Poly.public_key
-              ; nonce
-              ; balance
-              ; receipt_chain_hash
-              ; delegate
-              ; voting_for }
-         ->
+  module Partial_account = struct
+    let to_full_account
         { Account.Poly.public_key
         ; nonce
-        ; delegate
-        ; balance=
-            {Types.Wallet.AnnotatedBalance.total= balance; unknown= balance}
+        ; balance
         ; receipt_chain_hash
-        ; voting_for } )
+        ; delegate
+        ; voting_for } =
+      let open Option.Let_syntax in
+      let%bind public_key = public_key in
+      let%bind nonce = nonce in
+      let%bind receipt_chain_hash = receipt_chain_hash in
+      let%bind delegate = delegate in
+      let%map voting_for = voting_for in
+      { Account.Poly.public_key
+      ; nonce
+      ; balance
+      ; receipt_chain_hash
+      ; delegate
+      ; voting_for }
+
+    let of_full_account
+        { Account.Poly.public_key
+        ; nonce
+        ; balance
+        ; receipt_chain_hash
+        ; delegate
+        ; voting_for } =
+      { Account.Poly.public_key= Some public_key
+      ; nonce= Some nonce
+      ; balance
+      ; receipt_chain_hash= Some receipt_chain_hash
+      ; delegate= Some delegate
+      ; voting_for= Some voting_for }
+
+    let of_pk coda pk =
+      let account =
+        Program.best_ledger coda |> Participating_state.active
+        |> Option.bind ~f:(fun ledger ->
+               Ledger.location_of_key ledger pk
+               |> Option.bind ~f:(Ledger.get ledger) )
+      in
+      match account with
+      | Some
+          { Account.Poly.public_key
+          ; nonce
+          ; balance
+          ; receipt_chain_hash
+          ; delegate
+          ; voting_for } ->
+          { Account.Poly.public_key= Some public_key
+          ; nonce= Some nonce
+          ; delegate= Some delegate
+          ; balance=
+              {Types.Wallet.AnnotatedBalance.total= balance; unknown= balance}
+          ; receipt_chain_hash= Some receipt_chain_hash
+          ; voting_for= Some voting_for }
+      | None ->
+          { Account.Poly.public_key= Some pk
+          ; nonce= None
+          ; delegate= None
+          ; balance=
+              { Types.Wallet.AnnotatedBalance.total= Balance.zero
+              ; unknown= Balance.zero }
+          ; receipt_chain_hash= None
+          ; voting_for= None }
+  end
 
   module Arguments = struct
     let public_key ~name public_key =
@@ -471,13 +525,13 @@ module Make (Commands : Coda_commands.Intf) = struct
     let owned_wallets =
       field "ownedWallets"
         ~doc:
-          "Wallets for which the daemon knows the private key that are found \
-           in our ledger"
+          "Wallets for which the daemon knows the private key. If they are \
+           found in our ledger, all the fields will be non-null"
         ~typ:(non_null (list (non_null Types.Wallet.wallet)))
         ~args:Arg.[]
         ~resolve:(fun {ctx= coda; _} () ->
           Program.wallets coda |> Secrets.Wallets.pks
-          |> List.filter_map ~f:(fun pk -> account_of_pk coda pk) )
+          |> List.map ~f:(fun pk -> Partial_account.of_pk coda pk) )
 
     let wallet =
       result_field "wallet"
@@ -492,7 +546,9 @@ module Make (Commands : Coda_commands.Intf) = struct
         ~resolve:(fun {ctx= coda; _} () pk_string ->
           let open Result.Let_syntax in
           let%map pk = Arguments.public_key ~name:"publicKey" pk_string in
-          account_of_pk coda pk )
+          Partial_account.(
+            of_pk coda pk |> to_full_account |> Option.map ~f:of_full_account)
+          )
 
     let current_snark_worker =
       field "currentSnarkWorker" ~typ:Types.snark_worker
@@ -515,16 +571,17 @@ module Make (Commands : Coda_commands.Intf) = struct
         {Types.Pagination.Page_info.has_previous_page; has_next_page}
       in
       let total_count =
-        Option.value_exn
+        Option.value
           (Transaction_database.get_total_transactions transaction_database
              public_key)
+          ~default:0
       in
       { Types.Pagination.Connection.edges= queried_transactions
       ; page_info
       ; total_count }
 
     let user_command =
-      io_field "user_command"
+      io_field "userCommand"
         ~args:
           Arg.
             [ arg "filter" ~typ:(non_null Types.Input.user_command_filter_input)
@@ -557,18 +614,6 @@ module Make (Commands : Coda_commands.Intf) = struct
                 (build_connection
                    ~query:Transaction_database.get_later_transactions
                    transaction_database public_key cursor num_to_query) )
-
-    let delegation_status =
-      result_field "delegationStatus"
-        ~args:Arg.[arg "key" ~typ:(non_null string)]
-        ~typ:Types.delegation_update
-        ~resolve:(fun {ctx= coda; _} () public_key ->
-          let open Result.Let_syntax in
-          let%map public_key =
-            Arguments.public_key ~name:"publicKey" public_key
-          in
-          let transaction_database = Program.transaction_database coda in
-          Transaction_database.get_delegator transaction_database public_key )
 
     let initial_peers =
       field "initialPeers"
@@ -671,7 +716,7 @@ module Make (Commands : Coda_commands.Intf) = struct
       let%bind sender = Arguments.public_key ~name:"from" from in
       let%bind sender_account =
         Result.of_option
-          (account_of_pk coda sender)
+          Partial_account.(of_pk coda sender |> to_full_account)
           ~error:"Couldn't find the account for specified `sender`."
       in
       let%bind fee =
@@ -731,7 +776,7 @@ module Make (Commands : Coda_commands.Intf) = struct
           build_user_command coda sender_account sender_kp memo body fee )
 
     let add_payment_receipt =
-      result_field "AddPaymentReceipt"
+      result_field "addPaymentReceipt"
         ~doc:"Add payment into transation database"
         ~args:
           Arg.[arg "input" ~typ:(non_null Types.Input.AddPaymentReceipt.typ)]
