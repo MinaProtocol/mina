@@ -380,7 +380,8 @@ end = struct
                   ~random_peers:(Network.random_peers t.network)
                   ~query_peer:
                     { Network_peer.query=
-                        (fun a b c -> Network.query_peer t.network a b c) }
+                        (fun peer f query ->
+                          Network.query_peer t.network peer f query ) }
                   sync_jobs
               with
               | Ok () ->
