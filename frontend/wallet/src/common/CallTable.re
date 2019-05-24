@@ -37,7 +37,7 @@ module Make =
       let t = ((id, loc), typ) => {id, loc, typ};
     };
 
-    let key = ({id, loc: _, typ: _}) => Js.Int.toString(id);
+    let key = ({id}) => Js.Int.toString(id);
   };
 
   module Any = {
