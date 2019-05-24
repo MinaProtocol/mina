@@ -3,6 +3,7 @@
 
 module Bignum_bigint = Bigint
 open Core_kernel
+open Tuple_lib
 open Snarky
 
 module type Message_intf = sig
@@ -20,21 +21,13 @@ module type Message_intf = sig
 
   val to_bits : t -> bool list
 
-  val hash : t -> nonce:bool list -> curve_scalar
+  val hash : t -> nonce:bool Triple.t list -> curve_scalar
 
   val hash_checked :
-    var -> nonce:boolean_var list -> (curve_scalar_var, _) checked
+    var -> nonce:boolean_var Triple.t list -> (curve_scalar_var, _) checked
 end
 
 module type S = sig
-
-  module Field : sig
-    type t
-    val ( + ) : t -> t -> t
-    val ( * ) : t -> t -> t
-    val equal : t -> t -> bool
-    val of_bits : bool list -> t
-  end
 
   type boolean_var
 
@@ -111,14 +104,9 @@ module type S = sig
       -> (unit, _) checked
   end
 
-  val get_x : curve -> bool list
-  val get_y : curve -> bool list
   val compress : curve -> bool list
-  val is_even : bool list -> bool
 
   val sign : Private_key.t -> Message.t -> Signature.t
-
-  val shamir_sum : curve_scalar * curve -> curve_scalar * curve -> curve
 
   val verify : Signature.t -> Public_key.t -> Message.t -> bool
 end
@@ -205,15 +193,11 @@ module Schnorr
   open Impl
 
   module Signature = struct
-    type 'a t_ = 'a * 'a [@@deriving sexp]
-
-    type var = Curve.Scalar.var t_
-
-    type t = Curve.Scalar.t t_ [@@deriving sexp]
+    type t = Field.t * Curve.Scalar.t  [@@deriving sexp]
+    type var = Field.Var.t * Curve.Scalar.var
 
     let typ : (var, t) Typ.t =
-      let typ = Curve.Scalar.typ in
-      Typ.tuple2 typ typ
+      Typ.tuple2 Field.typ Curve.Scalar.typ
   end
 
   module Private_key = struct
@@ -222,21 +206,18 @@ module Schnorr
 
   let get_x (t : Curve.t) =
     let x, _ = Curve.to_affine_coordinates t in
-    Field.unpack x
+    x
 
   let get_y (t : Curve.t) =
     let _, y = Curve.to_affine_coordinates t in
-    Field.unpack y
+    y
 
   let compress (t : Curve.t) =
     let x, _ = Curve.to_affine_coordinates t in
     Field.unpack x
 
-  let is_even (t : bool list) =
-    let b = List.hd (List.rev t) in
-    match b with
-    | None -> failwith "list should not be empty"
-    | Some x -> x = false
+  let is_even (t : Field.t) =
+    not (Bigint.test_bit (Bigint.of_field t) 0)
 
   module Public_key : sig
     type t = Curve.t
@@ -268,35 +249,32 @@ module Schnorr
     in
     go (Curve.Scalar.length_in_bits - 1) Curve.zero
 
+    open Fold_lib
+
+  (* use with Field.unpack for field elements, Curve.Scalar.to_bits with scalars... *)
+  let to_triples x =
+    Fold.to_list Fold.(group3 ~default:false (of_list x))
+
+
   let sign (d : Private_key.t) m =
-    let k_prime =
-      ((Curve.Scalar.to_bits d) @ (Message.to_bits m))
-          |> Blake2.bits_to_string
-          |> Random_oracle.digest_string
-          (* TODO : should Random_oracle.digest_bits exist ?
-           * currently only Random_oracle.Checked.digest_bits is defined *)
-          |> Curve.Scalar.of_bits
+    let k_prime = Message.hash m ~nonce:(to_triples (Curve.Scalar.to_bits d))
     in
-    (* TODO : should this be an if/else instead ? *)
     assert (not (Curve.Scalar.(equal k_prime zero))) ;
     let r_point = Curve.scale Curve.one k_prime in
     let yr = get_y r_point in
     let k =
     if is_even yr then k_prime
     else Curve.Scalar.(order - k_prime) in
-    let e = (get_x r_point) @ (compress (Curve.scale Curve.one d)) @ (Message.to_bits m) in
-    let s = Curve.Scalar.(k + (of_bits e) * d) in
+    let e = Message.hash m
+    ~nonce:(to_triples ((compress r_point) @ compress (Curve.scale Curve.one d))) in
+    let s = Curve.Scalar.(k + e * d) in
     (get_x r_point, s)
 
   let verify ((r, s) : Signature.t) (pk : Public_key.t) (m : Message.t) =
-    assert (Curve.is_on_curve pk) ;
-    assert (r < Curve.Scalar.field_order) ;
-    assert (Curve.Scalar.(s < order)) ;
-    let e = Curve.Scalar.of_bits (r @ (compress pk) @ (Message.to_bits m)) in
+    let e = Message.hash m ~nonce:(to_triples (Field.unpack r @ (compress pk))) in
     let r_point = Curve.(subtract (scale one s) (scale pk e)) in
-    assert (not (Curve.is_inf r_point)) ;
-    assert (is_even (get_y r_point)) ;
-    assert Field.(equal (of_bits (get_x r_point)) (of_bits r)) ;
+    (not Curve.(equal zero r_point)) && (is_even (get_y r_point)) &&
+    Field.(equal (get_x r_point) r)
 
   [%%if
   call_logger]
