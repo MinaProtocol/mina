@@ -6,7 +6,7 @@ include BrowserWindow.MakeBrowserWindow(Messages);
 module Input = {
   type t = {
     path: Route.t,
-    dispatch: Application.Action.t => unit,
+    dispatch: Action.t(BrowserWindow.t) => unit,
   };
 };
 
@@ -15,13 +15,12 @@ include Single.Make({
 
   type t = BrowserWindow.t;
 
-  let listen = (t, dispatch) => {
+  let listen = (_t, dispatch) => {
     let cb =
       (. _event, message) =>
         switch (message) {
-        | `Set_name(key, name, pendingIdent) =>
-          dispatch(Application.Action.SettingsUpdate((key, name)));
-          send(t, `Respond_new_settings((pendingIdent, ())));
+        | `Control_coda_daemon(maybeArgs) =>
+          dispatch(Action.ControlCoda(maybeArgs))
         };
     RendererCommunication.on(cb);
     cb;
@@ -72,6 +71,7 @@ include Single.Make({
         () => {
           RendererCommunication.removeListener(listener);
           drop();
+          input.dispatch(Action.PutWindow(None));
         },
       );
 
@@ -81,9 +81,13 @@ include Single.Make({
         loadURL(window, indexURL)
       );
 
+      // TODO: Have only one source of truth for window
+      input.dispatch(Action.PutWindow(Some(window)));
       window;
     };
 });
+
+type t = BrowserWindow.t;
 
 let deepLink = input => {
   let w = get(input);

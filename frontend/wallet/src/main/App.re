@@ -50,27 +50,25 @@ let createTray = dispatch => {
 App.on(`WindowAllClosed, () => ());
 App.on(`WillQuit, () => killDaemons());
 
-let initialTask =
-  Task.map2(
-    Task.uncallbackifyValue(App.on(`Ready)),
-    SettingsMain.load(ProjectRoot.settings),
-    ~f=((), settings) =>
-    settings
-  );
+let initialTask = Task.uncallbackifyValue(App.on(`Ready));
 
 let run = () =>
   Task.attempt(
     initialTask,
-    ~f=settingsOrError => {
-      let initialState = {Application.State.settingsOrError, wallets: [||]};
+    ~f=_ => {
+      let initialState = {
+        Application.State.coda:
+          Application.State.CodaProcessState.Stopped(Belt.Result.Ok()),
+        window: None,
+      };
 
       let dispatch = ref(_ => ());
       let store =
         Application.Store.create(
-          initialState, ~onNewState=(_last, _curr: Application.State.t('a)) =>
+          initialState, ~onNewState=(_last, _curr: Application.Store.state) =>
           createTray(dispatch^)
         );
-      dispatch := Application.Store.apply(store);
+      dispatch := Application.Store.apply((), store);
       let dispatch = dispatch^;
 
       createTray(dispatch);

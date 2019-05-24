@@ -36,6 +36,8 @@ module Make:
         type t0('a) = t('a);
         type t;
         let t: t0('a) => t;
+
+        module Set: Set.S with type elt := t;
       };
 
       module Decode: {let t: (Encode.t, Typ.t('a)) => t('a);};
