@@ -322,9 +322,7 @@ module Data = struct
       let delegators =
         Option.value_map ~default:(Core.Int.Table.create ~size:0 ())
           proposer_public_key ~f:(fun key ->
-            compute_delegators
-              key
-              ~iter_accounts:(fun f ->
+            compute_delegators key ~iter_accounts:(fun f ->
                 let open Coda_base in
                 Ledger.foldi ~init:() Genesis_ledger.t ~f:(fun i () acct ->
                     f (Ledger.Addr.to_int i) acct ) ) )
@@ -381,8 +379,7 @@ module Data = struct
           module T = struct
             type ('ledger_hash, 'amount) t =
               {hash: 'ledger_hash; total_currency: 'amount}
-            [@@deriving
-              sexp, bin_io, eq, compare, hash, to_yojson, version {unnumbered}]
+            [@@deriving sexp, bin_io, eq, compare, hash, to_yojson, version]
           end
 
           include T
@@ -917,8 +914,7 @@ module Data = struct
               ; start_checkpoint: 'start_checkpoint
               ; lock_checkpoint: 'lock_checkpoint
               ; length: 'length }
-            [@@deriving
-              sexp, bin_io, eq, compare, hash, to_yojson, version {unnumbered}]
+            [@@deriving sexp, bin_io, eq, compare, hash, to_yojson, version]
           end
 
           include T
@@ -1180,7 +1176,7 @@ module Data = struct
         module V1 = struct
           module T = struct
             type ('epoch, 'slot) t = {epoch: 'epoch; slot: 'slot}
-            [@@deriving sexp, bin_io, compare, version {unnumbered}]
+            [@@deriving sexp, bin_io, compare, version]
           end
 
           include T
@@ -1462,8 +1458,7 @@ module Data = struct
               ; curr_epoch_data: 'curr_epoch_data
               ; has_ancestor_in_same_checkpoint_window: 'bool
               ; checkpoints: 'checkpoints }
-            [@@deriving
-              sexp, bin_io, eq, compare, hash, to_yojson, version {unnumbered}]
+            [@@deriving sexp, bin_io, eq, compare, hash, to_yojson, version]
           end
 
           include T
@@ -2571,9 +2566,7 @@ module Hooks = struct
       let delegators =
         Option.value_map ~default:(Core.Int.Table.create ~size:0 ())
           local_state.proposer_public_key ~f:(fun pk ->
-            compute_delegators
-              pk
-              ~iter_accounts:(fun f ->
+            compute_delegators pk ~iter_accounts:(fun f ->
                 Coda_base.Ledger.Any_ledger.M.iteri snarked_ledger ~f ) )
       in
       let ledger = Coda_base.Sparse_ledger.of_any_ledger snarked_ledger in
