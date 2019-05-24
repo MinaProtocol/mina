@@ -1783,7 +1783,7 @@ module Data = struct
             (Global_slot.create ~epoch:next_epoch ~slot:next_slot)
       ; checkpoints }
 
-    module M = Snarky.Snark.Run.Make (Crypto_params_init.Tick_backend)
+    module M = Snarky.Snark.Run.Make (Curve_choice.Tick_backend)
 
     let m : M.field Snarky.Snark.m = (module M)
 
