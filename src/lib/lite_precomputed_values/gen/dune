@@ -6,8 +6,12 @@
      crypto_params
      snarky
      snarkette
+     snark_keys
      ppxlib
-     lite_compat_algebra)
+     lite_compat
+     coda_base
+     coda_state
+     precomputed_values)
    (preprocessor_deps "../../../config.mlh")
    (preprocess (pps ppx_jane ppxlib.metaquot ppxlib.runner))
    (modes native))
