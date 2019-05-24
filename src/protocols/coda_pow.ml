@@ -990,6 +990,33 @@ module type Transaction_snark_scan_state_intf = sig
   val next_on_new_tree : t -> bool Or_error.t
 end
 
+module Pre_diff_error = struct
+  type 'user_command t =
+    | Bad_signature of 'user_command
+    | Coinbase_error of string
+    | Insufficient_fee of Currency.Fee.t * Currency.Fee.t
+    | Unexpected of Error.t
+  [@@deriving sexp]
+
+  let to_string user_command_to_sexp = function
+    | Bad_signature t ->
+        Format.asprintf
+          !"Bad signature of the user command: %{sexp: Sexp.t} \n"
+          (user_command_to_sexp t)
+    | Coinbase_error err ->
+        Format.asprintf !"Coinbase error: %s \n" err
+    | Insufficient_fee (f1, f2) ->
+        Format.asprintf
+          !"Transaction fee %{sexp: Currency.Fee.t} does not suffice proof \
+            fee %{sexp: Currency.Fee.t} \n"
+          f1 f2
+    | Unexpected e ->
+        Error.to_string_hum e
+
+  let to_error user_command_to_sexp =
+    Fn.compose Error.of_string (to_string user_command_to_sexp)
+end
+
 module type Staged_ledger_base_intf = sig
   type t [@@deriving sexp]
 
@@ -1070,12 +1097,10 @@ module type Staged_ledger_base_intf = sig
 
   module Staged_ledger_error : sig
     type t =
-      | Bad_signature of user_command
-      | Coinbase_error of string
       | Bad_prev_hash of staged_ledger_hash * staged_ledger_hash
-      | Insufficient_fee of Currency.Fee.t * Currency.Fee.t
       | Non_zero_fee_excess of Scan_state.Space_partition.t * transaction list
       | Invalid_proof of ledger_proof * ledger_proof_statement * public_key
+      | Pre_diff of user_command Pre_diff_error.t
       | Unexpected of Error.t
     [@@deriving sexp]
 
@@ -1165,10 +1190,6 @@ module type Staged_ledger_intf = sig
     -> transactions_by_fee:user_command_with_valid_signature Sequence.t
     -> get_completed_work:(statement -> completed_work_checked option)
     -> valid_diff
-
-  (* TODO: This should be delegated to staged_ledger_diff *)
-  val get_diff_transactions :
-    diff -> (transaction list, Staged_ledger_error.t) Result.t
 
   val all_work_pairs_exn :
        t

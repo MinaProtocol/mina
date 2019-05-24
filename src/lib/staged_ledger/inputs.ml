@@ -98,6 +98,15 @@ module type S = sig
      and type staged_ledger_hash := Staged_ledger_hash.t
      and type fee_transfer_single := Fee_transfer.Single.t
 
+  module Pre_diff_info :
+    Pre_diff_info.S
+    with type user_command := User_command.t
+     and type transaction := Transaction.t
+     and type completed_work := Transaction_snark_work.t
+     and type staged_ledger_diff := Staged_ledger_diff.t
+     and type valid_staged_ledger_diff :=
+                Staged_ledger_diff.With_valid_signatures_and_proofs.t
+
   module Account : sig
     type t
   end

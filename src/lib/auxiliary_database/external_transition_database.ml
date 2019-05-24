@@ -52,14 +52,15 @@ let add_user_blocks ~logger (pagination : Pagination.t)
   let staged_ledger_diff =
     External_transition.Validated.staged_ledger_diff external_transition
   in
-  match Staged_ledger.get_diff_transactions staged_ledger_diff with
+  match Staged_ledger.Pre_diff_info.get_transactions staged_ledger_diff with
   | Error staged_ledger_error ->
       Logger.error logger
         !"Could not extract transactions from external_transition \
           $state_hash: %s"
         ~module_:__MODULE__ ~location:__LOC__
         ( Error.to_string_hum
-        @@ Staged_ledger.Staged_ledger_error.to_error staged_ledger_error )
+        @@ Protocols.Coda_pow.Pre_diff_error.to_error User_command.sexp_of_t
+             staged_ledger_error )
         ~metadata:[("state_hash", State_hash.to_yojson state_hash)]
   | Ok transactions ->
       List.iter transactions ~f:(fun transaction ->
