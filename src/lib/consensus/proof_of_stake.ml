@@ -325,8 +325,18 @@ module Data = struct
     [@@deriving sexp, to_yojson]
 
     let create proposer_public_key =
-      (* TODO: remove duplicated genesis ledger *)
-      let delegators = failwith "..." in
+      let delegators =
+        Option.value_map ~default:(Core.Int.Table.create ~size:0 ())
+          proposer_public_key ~f:(fun key ->
+            compute_delegators
+              (* TODO: Propagate Include_self to the right place *)
+              (`Include_self, key)
+              ~iter_accounts:(fun f ->
+                let open Coda_base in
+                Ledger.foldi ~init:() Genesis_ledger.t ~f:(fun i () acct ->
+                    f (Ledger.Addr.to_int i) acct ) ) )
+      in
+      (* TODO: remove this duplicate of the genesis ledger *)
       let ledger =
         Coda_base.Sparse_ledger.of_any_ledger
           (Coda_base.Ledger.Any_ledger.cast
@@ -2561,7 +2571,6 @@ module Hooks = struct
           (Int64.to_int epoch_end_time) ;
         `Check_again epoch_end_time
 
-  (* TODO *)
   let frontier_root_transition (prev : Consensus_state.Value.t)
       (next : Consensus_state.Value.t) ~local_state ~snarked_ledger =
     let open Local_state in
