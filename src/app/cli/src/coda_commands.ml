@@ -139,11 +139,8 @@ struct
         , account.Account.Poly.balance |> Currency.Balance.to_int ) )
 
   let get_nonce t (addr : Public_key.Compressed.t) =
-    let open Participating_state.Let_syntax in
-    let%map ledger = best_ledger t in
-    let open Option.Let_syntax in
-    let%bind location = Ledger.location_of_key ledger addr in
-    let%map account = Ledger.get ledger location in
+    let open Participating_state.Option.Let_syntax in
+    let%map account = get_account t addr in
     account.Account.Poly.nonce
 
   let send_payment t (txn : User_command.t) =
@@ -407,7 +404,7 @@ struct
           in
           Pipe.filter_map frontier_new_block_reader ~f:(fun new_block ->
               let unverified_new_block =
-                External_transition.of_verified new_block
+                External_transition.Validated.forget_validation new_block
               in
               Option.some_if
                 (Public_key.Compressed.equal
@@ -420,7 +417,7 @@ struct
       global_pipe coda ~to_pipe:(fun new_block_incr ->
           let user_command_incr =
             Coda_incremental.New_transition.map new_block_incr
-              ~f:External_transition.Verified.user_commands
+              ~f:External_transition.Validated.user_commands
           in
           let payments_observer =
             Coda_incremental.New_transition.observe user_command_incr

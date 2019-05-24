@@ -12,6 +12,7 @@ module type Inputs_intf = sig
     with type ledger_hash := Ledger_hash.t
      and type state_hash := State_hash.t
      and type external_transition := External_transition.t
+     and type external_transition_validated := External_transition.Validated.t
      and type transition_frontier := Transition_frontier.t
      and type syncable_ledger_query := Sync_ledger.Query.t
      and type syncable_ledger_answer := Sync_ledger.Answer.t
@@ -21,11 +22,14 @@ module type Inputs_intf = sig
   module Transition_handler :
     Transition_handler_intf
     with type time_controller := Time.Controller.t
-     and type external_transition_verified := External_transition.Verified.t
+     and type external_transition_with_initial_validation :=
+                External_transition.with_initial_validation
+     and type external_transition_validated := External_transition.Validated.t
      and type trust_system := Trust_system.t
      and type staged_ledger := Staged_ledger.t
      and type state_hash := State_hash.t
      and type transition_frontier := Transition_frontier.t
+     and type verifier := Verifier.t
      and type time := Time.t
      and type transition_frontier_breadcrumb :=
                 Transition_frontier.Breadcrumb.t
@@ -45,7 +49,8 @@ module type Inputs_intf = sig
 
   module Catchup :
     Catchup_intf
-    with type external_transition_verified := External_transition.Verified.t
+    with type external_transition_with_initial_validation :=
+                External_transition.with_initial_validation
      and type state_hash := State_hash.t
      and type trust_system := Trust_system.t
      and type unprocessed_transition_cache :=
@@ -54,24 +59,29 @@ module type Inputs_intf = sig
      and type transition_frontier_breadcrumb :=
                 Transition_frontier.Breadcrumb.t
      and type network := Network.t
+     and type verifier := Verifier.t
 end
 
 module Make (Inputs : Inputs_intf) :
   Transition_frontier_controller_intf
   with type time_controller := Inputs.Time.Controller.t
-   and type external_transition_verified :=
-              Inputs.External_transition.Verified.t
+   and type external_transition_validated :=
+              Inputs.External_transition.Validated.t
+   and type external_transition_with_initial_validation :=
+              Inputs.External_transition.with_initial_validation
    and type transition_frontier := Inputs.Transition_frontier.t
+   and type breadcrumb := Inputs.Transition_frontier.Breadcrumb.t
    and type time := Inputs.Time.t
    and type state_hash := State_hash.t
-   and type network := Inputs.Network.t = struct
+   and type network := Inputs.Network.t
+   and type verifier := Inputs.Verifier.t = struct
   open Inputs
 
   let kill reader writer =
     Strict_pipe.Reader.clear reader ;
     Strict_pipe.Writer.close writer
 
-  let run ~logger ~trust_system ~network ~time_controller
+  let run ~logger ~trust_system ~verifier ~network ~time_controller
       ~collected_transitions ~frontier ~network_transition_reader
       ~proposer_transition_reader ~clear_reader =
     let valid_transition_pipe_capacity = 30 in
@@ -91,10 +101,12 @@ module Make (Inputs : Inputs_intf) :
         (Buffered (`Capacity 30, `Overflow Crash))
     in
     let catchup_job_reader, catchup_job_writer =
-      Strict_pipe.create ~name:"catchup jobs" Synchronous
+      Strict_pipe.create ~name:"catchup jobs"
+        (Buffered (`Capacity 30, `Overflow Crash))
     in
     let catchup_breadcrumbs_reader, catchup_breadcrumbs_writer =
-      Strict_pipe.create ~name:"catchup breadcrumbs" Synchronous
+      Strict_pipe.create ~name:"catchup breadcrumbs"
+        (Buffered (`Capacity 30, `Overflow Crash))
     in
     let proposer_transition_reader_copy, proposer_transition_writer_copy =
       Strict_pipe.create ~name:"proposer transition copy" Synchronous
@@ -120,13 +132,14 @@ module Make (Inputs : Inputs_intf) :
     |> don't_wait_for ;
     let clean_up_catchup_scheduler = Ivar.create () in
     Transition_handler.Processor.run ~logger ~time_controller ~trust_system
-      ~frontier ~primary_transition_reader
+      ~verifier ~frontier ~primary_transition_reader
       ~proposer_transition_reader:proposer_transition_reader_copy
       ~clean_up_catchup_scheduler ~catchup_job_writer
       ~catchup_breadcrumbs_reader ~catchup_breadcrumbs_writer
-      ~processed_transition_writer ~unprocessed_transition_cache ;
-    Catchup.run ~logger ~trust_system ~network ~frontier ~catchup_job_reader
-      ~catchup_breadcrumbs_writer ~unprocessed_transition_cache ;
+      ~processed_transition_writer ;
+    Catchup.run ~logger ~trust_system ~verifier ~network ~frontier
+      ~catchup_job_reader ~catchup_breadcrumbs_writer
+      ~unprocessed_transition_cache ;
     Strict_pipe.Reader.iter_without_pushback clear_reader ~f:(fun _ ->
         kill valid_transition_reader valid_transition_writer ;
         kill primary_transition_reader primary_transition_writer ;

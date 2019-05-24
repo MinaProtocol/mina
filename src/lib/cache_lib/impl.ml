@@ -65,6 +65,14 @@ module Make (Inputs : Inputs_intf) : Intf.Main.S = struct
 
     let pure x = Pure x
 
+    let is_pure : type a b. (a, b) t -> bool = function
+      | Base _ ->
+          false
+      | Derivative _ ->
+          false
+      | Pure _ ->
+          true
+
     let cache : type a b. (a, b) t -> b Cache.t = function
       | Base x ->
           x.cache
