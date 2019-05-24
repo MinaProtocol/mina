@@ -1,9 +1,9 @@
 /src/ @imeckler
 /CODEOWNERS @imeckler @bkase
-/frontend/ @schmavery @bkase
+/frontend/ @schmavery @bkase @figitaki
 /dockerfiles/ @jkrauska
 /rfcs/ @imeckler @es92 @bkase
-/docs/ @rbkhmrcr @imeckler @bkase @nholland94 @cmr
+/docs/ @rbkhmrcr @imeckler @bkase @nholland94 @cmr @o1pranay
 /scripts/ @nholland94 @jkrauska
 /Makefile @jkrauska
 /config/ @imeckler @nholland94
@@ -11,9 +11,10 @@
 /CONTRIBUTING.md @imeckler @cmr
 /DIRECTORY_STRUCTURE.md @imeckler @jkrauska
 /LICENSE @imeckler
-/README.md @cmr
-/README-dev.md @cmr
+/README.md @cmr @imeckler @o1pranay
+/README-dev.md @cmr @imeckler @o1pranay
 /azure-pipelines.yml @jkrauska
+/.circleci @jkrauska @bkase
 
 /src/app/cli/ @cmr @nholland94 @bkase
 /src/app/kademlia-haskell/ @bkase @enolan
@@ -22,7 +23,7 @@
 /src/app/reformat/ @bkase
 /src/app/testone/ @johnwu93
 /src/app/trace-tool/ @cmr
-/src/app/website/ @bkase @schmavery
+/src/app/website/ @bkase @schmavery @figitaki
 
 /src/lib/bignum_bigint/ @nholland94 @bkase
 /src/lib/blake2/ @rbkhmrcr @vanishreerao
