@@ -17,12 +17,13 @@ module Colors = {
 
   let bgColorElectronWindow = "E9E9E9";
 
-  let savilleAlpha = a => `rgba((31, 45, 61, a));
+  let savilleAlpha = a => `rgba((61, 88, 120, a));
   let saville = savilleAlpha(1.);
 
   let hyperlinkAlpha = a => `rgba((45, 158, 219, a));
 
   let slateAlpha = a => `rgba((81, 102, 121, a));
+  let slate = slateAlpha(1.);
 
   let roseBud = `hex("a3536f");
   let pendingOrange = `hex("967103");
