@@ -308,9 +308,7 @@ module InfoSection = {
                          ])
                        )>
                        <ActorName value={ViewModel.Actor.Key(pubkey)} />
-                       <span>
-                       <Amount value=amount />
-                       </span>
+                       <span> <Amount value=amount /> </span>
                      </li>
                    )
                    |> Array.fromList
@@ -331,7 +329,13 @@ module TopLevelStyles = {
   module Actors = {
     let wrapper = style([padding2(~h=`zero, ~v=`rem(0.625))]);
 
-    let mode = style([color(Theme.Colors.slateAlpha(1.)), display(`flex), alignItems(`center), marginTop(`rem(0.25))]);
+    let mode =
+      style([
+        color(Theme.Colors.slateAlpha(1.)),
+        display(`flex),
+        alignItems(`center),
+        marginTop(`rem(0.25)),
+      ]);
   };
 
   let infoSection =
@@ -376,7 +380,14 @@ module TopLevelStyles = {
 // These cells are returned as a fragment so that the parent container can
 // use a consistent grid layout to keep everything lined up.
 [@react.component]
-let make = (~transaction: Transaction.t, ~myWallets: list(PublicKey.t)) => {
+let make = (~transaction: Transaction.t) => {
+  let (settings, _) = React.useContext(SettingsProvider.context);
+  // Extract wallets from settings, default to empty list
+  let myWallets =
+    Option.map(~f=SettingsRenderer.entries, settings)
+    |> Option.withDefault(~default=Array.empty)
+    |> Array.map(~f=entry => { let (key, _) = entry; key } )
+    |> Array.toList;
   let viewModel = ViewModel.ofTransaction(transaction, ~myWallets);
 
   <>

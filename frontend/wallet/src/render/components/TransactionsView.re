@@ -34,9 +34,6 @@ module Styles = {
     ]);
 };
 
-let myWallets = [PublicKey.ofStringExn("PUB_KEY_E9873DF4453213303DA61F2")];
-let otherKey = PublicKey.ofStringExn("BDK342322");
-
 module Transactions = [%graphql
   {|
     query transactions($publicKey: String!) {
@@ -116,7 +113,7 @@ let make = () => {
                 ~f=
                   transaction =>
                     <div className=Styles.row>
-                      <TransactionCell transaction myWallets />
+                      <TransactionCell transaction />
                     </div>,
                 extractTransactions(data),
               )
