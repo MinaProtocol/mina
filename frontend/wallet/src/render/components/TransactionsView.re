@@ -88,7 +88,7 @@ let extractTransactions: Js.t('a) => array(TransactionCell.Transaction.t) = data
 
 [@react.component]
 let make = () => {
-  let transactionsQueryThing = Transactions.make(~publicKey="123", ());
+  let transactionQuery = Transactions.make(~publicKey="123", ());
   <div className=Styles.container>
     <div
       className={Css.merge([
@@ -102,7 +102,7 @@ let make = () => {
         {ReasonReact.string("Transaction")}
       </span>
     </div>
-    <TransactionsQuery variables=transactionsQueryThing##variables>
+    <TransactionsQuery variables=transactionQuery##variables>
       {response =>
          switch (response.result) {
          | Loading => React.string("...") /* TODO replace with a spinner */
