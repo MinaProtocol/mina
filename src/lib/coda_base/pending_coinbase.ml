@@ -103,7 +103,7 @@ end = struct
     module Registered_V1 = Registrar.Register (V1)
   end
 
-  type t = Stable.Latest.t [@@deriving sexp, compare, eq]
+  type t = Stable.Latest.t [@@deriving sexp, compare]
 
   let ( > ), to_string, zero, to_int, of_int, equal =
     Int.(( > ), to_string, zero, to_int, of_int, equal)
@@ -367,8 +367,7 @@ module T = struct
       , set_exn
       , find_index_exn
       , add_path
-      , merkle_root
-      , iteri )]
+      , merkle_root )]
   end
 
   module Checked = struct
@@ -612,7 +611,7 @@ module T = struct
   let find_index (t : t) key =
     try_with (fun () -> Merkle_tree.find_index_exn t.tree key)
 
-  let with_next_index (t : t) ~is_new_stack =
+  let incr_index (t : t) ~is_new_stack =
     let open Or_error.Let_syntax in
     if is_new_stack then
       let%map new_pos =
@@ -660,14 +659,14 @@ module T = struct
     let%bind stack_index = find_index t key in
     let%bind stack_before = get_stack t stack_index in
     let stack_after = Stack.push stack_before coinbase in
-    let%bind t' = with_next_index t ~is_new_stack in
+    let%bind t' = incr_index t ~is_new_stack in
     set_stack t' stack_index stack_after
 
   let update_coinbase_stack t stack ~is_new_stack =
     let open Or_error.Let_syntax in
     let%bind key = latest_stack_id t ~is_new_stack in
     let%bind stack_index = find_index t key in
-    let%bind t' = with_next_index t ~is_new_stack in
+    let%bind t' = incr_index t ~is_new_stack in
     set_stack t' stack_index stack
 
   let remove_coinbase_stack (t : t) =
@@ -827,12 +826,11 @@ let%test_unit "Checked_tree = Unchecked_tree" =
 let%test_unit "push and pop multiple stacks" =
   let open Quickcheck in
   let pending_coinbases = ref (create () |> Or_error.ok_exn) in
-  let queue_of_stacks = Queue.create ~capacity:(coinbase_stacks + 1) () in
   let max_coinbase_amount = Protocols.Coda_praos.coinbase_amount in
   let coinbases_gen = Quickcheck.Generator.list Coinbase.gen in
   let add_new_stack t = function
     | [] ->
-        let t' = with_next_index t ~is_new_stack:true |> Or_error.ok_exn in
+        let t' = incr_index t ~is_new_stack:true |> Or_error.ok_exn in
         (Stack.empty, t')
     | initial_coinbase :: coinbases ->
         let t' =
@@ -868,28 +866,30 @@ let%test_unit "push and pop multiple stacks" =
         in
         (new_stack, updated)
   in
-  (*fill up to n stacks*)
-  let fill n =
-    iter ~trials:n coinbases_gen ~f:(fun coinbases ->
-        let new_stack, updated_pending_coinbases =
-          add_new_stack !pending_coinbases coinbases
-        in
-        pending_coinbases := updated_pending_coinbases ;
-        Queue.enqueue queue_of_stacks new_stack )
+  (*push the coinbases*)
+  let add coinbases_list pending_coinbases =
+    List.fold ~init:([], pending_coinbases) coinbases_list
+      ~f:(fun (stacks, pc) coinbases ->
+        let new_stack, pc = add_new_stack pc coinbases in
+        (new_stack :: stacks, pc) )
   in
   (*remove the oldest stack and check if that's the expected one *)
-  let check t expected_stack =
+  let remove_check t expected_stack =
     let popped_stack, updated_pending_coinbases =
       remove_coinbase_stack t |> Or_error.ok_exn
     in
     assert (Stack.equal popped_stack expected_stack) ;
     updated_pending_coinbases
   in
-  let add_remove_check trials =
-    fill trials ;
-    Queue.iter queue_of_stacks ~f:(fun expected_stack ->
-        pending_coinbases := check !pending_coinbases expected_stack ) ;
-    Queue.clear queue_of_stacks
+  let add_remove_check coinbases_list =
+    let stacks, pending_coinbases_updated =
+      add coinbases_list !pending_coinbases
+    in
+    pending_coinbases :=
+      List.fold ~init:pending_coinbases_updated (List.rev stacks)
+        ~f:(fun pc expected_stack -> remove_check pc expected_stack)
   in
-  test ~trials:(coinbase_stacks / 2) (Int.gen_incl 2 coinbase_stacks)
-    ~f:(fun trials -> add_remove_check trials)
+  let list_of_list_gen =
+    Quickcheck.Generator.list_with_length coinbase_stacks coinbases_gen
+  in
+  test ~trials:20 list_of_list_gen ~f:add_remove_check
