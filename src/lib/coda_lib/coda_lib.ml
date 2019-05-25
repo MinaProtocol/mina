@@ -699,7 +699,8 @@ module Make (Inputs : Inputs_intf) = struct
           ~transition_writer:t.proposer_transition_writer
           ~random_peers:(Net.random_peers t.net)
           ~query_peer:
-            {Network_peer.query= (fun a b c -> Net.query_peer t.net a b c)} )
+            { Network_peer.query=
+                (fun peer f query -> Net.query_peer t.net peer f query) } )
 
   let create_genesis_frontier (config : Config.t) =
     let consensus_local_state = config.consensus_local_state in

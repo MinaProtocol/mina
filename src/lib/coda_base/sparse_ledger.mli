@@ -19,6 +19,8 @@ end
 
 val merkle_root : t -> Ledger_hash.t
 
+val get_exn : t -> int -> Account.t
+
 val path_exn :
   t -> int -> [`Left of Ledger_hash.t | `Right of Ledger_hash.t] list
 
