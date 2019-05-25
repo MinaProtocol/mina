@@ -43,7 +43,7 @@ jobs:
                   command: cd frontend/website && yarn run reformat && git diff --exit-code src
             - run:
                   name: Build website
-                  command: cd frontend/website && yarn run build && (env HOMEBREW_NO_AUTO_UPDATE=1 brew install pandoc) && node ./lib/js/src/Render.js
+                  command: cd frontend/website && (env HOMEBREW_NO_AUTO_UPDATE=1 brew install pandoc) && yarn run build
             - run:
                   name: Deploy staging
                   command: cd frontend/website && (if [ "$CIRCLE_BRANCH" == "master" ]; then yarn run deploy-ci; fi)
@@ -271,8 +271,11 @@ jobs:
             - checkout
             - run: git submodule sync && git submodule update --init --recursive
             - run:
-                  name: Running test -- test_postake:transaction-snark-profiler -check-only
-                  command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run "test_postake:transaction-snark-profiler -check-only"'
+                  name: Running test -- test_postake:full-test
+                  command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run "test_postake:full-test"'
+            - run:
+                  name: Running test -- test_postake:transaction-snark-profiler
+                  command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run "test_postake:transaction-snark-profiler"'
             - store_artifacts:
                   path: test_logs
     test--test_postake_bootstrap:

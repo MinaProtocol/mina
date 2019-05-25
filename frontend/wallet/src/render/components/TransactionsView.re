@@ -23,7 +23,7 @@ module Styles = {
       textTransform(`uppercase),
       height(`rem(2.)),
       alignItems(`center),
-      color(Theme.Colors.slateAlpha(1.)),
+      color(Theme.Colors.slate),
     ]);
 
   let body =

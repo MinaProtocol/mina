@@ -1,1 +1,1 @@
-include Crypto_params_init
+include Curve_choice
