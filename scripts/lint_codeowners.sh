@@ -9,8 +9,12 @@ error() {
 }
 
 while read line; do
-  if [[ $line =~ ^\ *$ ]] || [[ $line =~ ^\ *\# ]]; then
+  if [[ $line =~ ^\ *$ ]] || [[ $line =~ ^\# ]]; then
     continue
+  fi
+
+  if [[ $line =~ ^[^\#]*\# ]]; then
+    error 'invalid comment ("#" must appear at the beginning of a line)'
   fi
 
   target=$(echo $line | cut -d' ' -f1)
