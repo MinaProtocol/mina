@@ -19,7 +19,6 @@ module Params : sig
 
   val b : 'f t -> 'f
 
-  val create : (module Field_intf.S with type t = 'f) -> a:'f -> b:'f -> 'f t
 end
 
 module Make
