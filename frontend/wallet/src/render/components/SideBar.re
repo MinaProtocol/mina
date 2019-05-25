@@ -5,7 +5,8 @@ module Styles = {
 
   let sidebar =
     style([
-      width(`rem(12.)),
+      width(`rem(14.)),
+      overflow(`hidden),
       display(`flex),
       flexDirection(`column),
       justifyContent(`spaceBetween),
@@ -16,7 +17,7 @@ module Styles = {
 };
 
 module Wallets = [%graphql
-  {| query getWallets { wallets {publicKey, balance {total}} } |}
+  {| query getWallets { ownedWallets {publicKey, balance {total}} } |}
 ];
 module WalletQuery = ReasonApollo.CreateQuery(Wallets);
 
@@ -35,8 +36,8 @@ module AddWalletMutation = ReasonApollo.CreateMutation(AddWallet);
 [@react.component]
 let make = () => {
   let (modalState, setModalState) = React.useState(() => None);
-  let (_settings, updateSettings) =
-    React.useContext(SettingsProvider.context);
+  let (_settings, updateAddressBook) =
+    React.useContext(AddressBookProvider.context);
 
   <div className=Styles.sidebar>
     <WalletQuery>
@@ -46,7 +47,7 @@ let make = () => {
          | Error(err) => React.string(err##message)
          | Data(data) =>
            <WalletList
-             wallets={Array.map(~f=Wallet.ofGraphqlExn, data##wallets)}
+             wallets={Array.map(~f=Wallet.ofGraphqlExn, data##ownedWallets)}
            />
          }}
     </WalletQuery>
@@ -57,33 +58,35 @@ let make = () => {
     </div>
     <AddWalletMutation>
       {(mutation, _) =>
-         <AddWalletModal
-           modalState
-           setModalState
-           onSubmit={name => {
-             let performMutation =
-               Task.liftPromise(() =>
-                 mutation(~refetchQueries=[|"getWallets"|], ())
+         switch (modalState) {
+         | None => React.null
+         | Some(newWalletName) =>
+           <AddWalletModal
+             walletName=newWalletName
+             setModalState
+             onSubmit={name => {
+               let performMutation =
+                 Task.liftPromise(() =>
+                   mutation(~refetchQueries=[|"getWallets"|], ())
+                 );
+               Task.perform(
+                 performMutation,
+                 ~f=
+                   fun
+                   | EmptyResponse => ()
+                   | Errors(_) => print_endline("Error adding wallet")
+                   | Data(data) =>
+                     data##addWallet
+                     |> Option.andThen(~f=addWallet => addWallet##publicKey)
+                     |> Option.map(~f=pk => {
+                          let key = PublicKey.ofStringExn(pk);
+                          updateAddressBook(AddressBook.set(~key, ~name));
+                        })
+                     |> ignore,
                );
-             Task.perform(
-               performMutation,
-               ~f=
-                 fun
-                 | EmptyResponse => ()
-                 | Errors(_) => print_endline("Error adding wallet")
-                 | Data(data) =>
-                   data##addWallet
-                   |> Option.andThen(~f=addWallet => addWallet##publicKey)
-                   |> Option.map(~f=pk => {
-                        let key = PublicKey.ofStringExn(pk);
-                        updateSettings(
-                          Option.map(~f=Settings.set(~key, ~name)),
-                        );
-                      })
-                   |> ignore,
-             );
-           }}
-         />}
+             }}
+           />
+         }}
     </AddWalletMutation>
   </div>;
 };

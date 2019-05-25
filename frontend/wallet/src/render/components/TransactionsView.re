@@ -13,7 +13,7 @@ module Styles = {
       alignItems(`flexStart),
       marginLeft(`rem(0.25)),
       padding2(~h=`rem(0.75), ~v=`zero),
-      borderBottom(`px(1), `solid, Theme.Colors.borderColor),
+      borderBottom(`px(1), `solid, Theme.Colors.savilleAlpha(0.1)),
       lastChild([borderBottom(`px(0), `solid, white)]),
     ]);
 
@@ -23,7 +23,7 @@ module Styles = {
       textTransform(`uppercase),
       height(`rem(2.)),
       alignItems(`center),
-      color(Theme.Colors.slateAlpha(1.)),
+      color(Theme.Colors.slate),
     ]);
 
   let body =

@@ -1,3 +1,6 @@
+[%%import
+"../../config.mlh"]
+
 open Core_kernel
 open Async_kernel
 open Async_rpc_kernel
@@ -518,6 +521,36 @@ module Make (Inputs : Inputs_intf) = struct
     let transition_frontier t = of_broadcast_pipe @@ t.transition_frontier
   end
 
+  [%%if
+  mock_frontend_data]
+
+  let sync_status _ =
+    let variable = Coda_incremental.Status.Var.create `Offline in
+    let incr = Coda_incremental.Status.Var.watch variable in
+    let rec loop () =
+      let%bind () = Async.after (Core.Time.Span.of_sec 5.0) in
+      let current_value = Coda_incremental.Status.Var.value variable in
+      let new_sync_status =
+        List.random_element_exn
+          ( match current_value with
+          | `Offline ->
+              [`Bootstrap; `Synced]
+          | `Synced ->
+              [`Offline; `Bootstrap]
+          | `Bootstrap ->
+              [`Offline; `Synced] )
+      in
+      Coda_incremental.Status.Var.set variable new_sync_status ;
+      Coda_incremental.Status.stabilize () ;
+      loop ()
+    in
+    let observer = Coda_incremental.Status.observe incr in
+    Coda_incremental.Status.stabilize () ;
+    don't_wait_for @@ loop () ;
+    observer
+
+  [%%else]
+
   let sync_status t =
     let open Coda_incremental.Status in
     let transition_frontier_incr = Var.watch @@ Incr.transition_frontier t in
@@ -535,6 +568,8 @@ module Make (Inputs : Inputs_intf) = struct
     in
     let observer = observe incremental_status in
     stabilize () ; observer
+
+  [%%endif]
 
   let visualize_frontier ~filename =
     compose_of_option
@@ -664,7 +699,8 @@ module Make (Inputs : Inputs_intf) = struct
           ~transition_writer:t.proposer_transition_writer
           ~random_peers:(Net.random_peers t.net)
           ~query_peer:
-            {Network_peer.query= (fun a b c -> Net.query_peer t.net a b c)} )
+            { Network_peer.query=
+                (fun peer f query -> Net.query_peer t.net peer f query) } )
 
   let create_genesis_frontier (config : Config.t) =
     let consensus_local_state = config.consensus_local_state in

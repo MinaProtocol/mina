@@ -32,21 +32,10 @@ let genesis_ledger_hash =
 let compute_delegators self_pk ~iter_accounts =
   let open Coda_base in
   let t = Account.Index.Table.create () in
-  let matches_pubkey pubkey =
-    match self_pk with
-    | `Include_self, pk ->
-        Public_key.Compressed.equal pk pubkey
-    | `Don't_include_self, _ ->
-        false
-  in
+  let matches_pubkey pubkey = Public_key.Compressed.equal self_pk pubkey in
   iter_accounts (fun i (acct : Account.t) ->
-      (* TODO: The second disjunct is a hack and should be removed once the delegation
-             command PR lands. *)
-      if
-        Public_key.Compressed.equal (snd self_pk) acct.delegate
-        || matches_pubkey acct.public_key
-      then Hashtbl.add t ~key:i ~data:acct.balance |> ignore
-      else () ) ;
+      if matches_pubkey acct.delegate then
+        Hashtbl.add t ~key:i ~data:acct.balance |> ignore ) ;
   t
 
 module Segment_id = Nat.Make32 ()
@@ -330,30 +319,22 @@ module Data = struct
     [@@deriving sexp, to_yojson]
 
     let create proposer_public_key =
-      (* TODO: remove duplicated genesis ledger *)
-      let genesis_epoch_snapshot =
-        match proposer_public_key with
-        | None ->
-            Snapshot.create_empty ()
-        | Some key ->
-            let open Snapshot in
-            let delegators =
-              compute_delegators
-                (* TODO: Propagate Include_self to the right place *)
-                (`Include_self, key)
-                ~iter_accounts:(fun f ->
-                  let open Coda_base in
-                  Ledger.foldi ~init:() Genesis_ledger.t ~f:(fun i () acct ->
-                      f (Ledger.Addr.to_int i) acct ) )
-            in
-            let ledger =
-              Coda_base.Sparse_ledger.of_any_ledger
-                (Coda_base.Ledger.Any_ledger.cast
-                   (module Coda_base.Ledger)
-                   Genesis_ledger.t)
-            in
-            {delegators; ledger}
+      let delegators =
+        Option.value_map ~default:(Core.Int.Table.create ~size:0 ())
+          proposer_public_key ~f:(fun key ->
+            compute_delegators key ~iter_accounts:(fun f ->
+                let open Coda_base in
+                Ledger.foldi ~init:() Genesis_ledger.t ~f:(fun i () acct ->
+                    f (Ledger.Addr.to_int i) acct ) ) )
       in
+      (* TODO: remove this duplicate of the genesis ledger *)
+      let ledger =
+        Coda_base.Sparse_ledger.of_any_ledger
+          (Coda_base.Ledger.Any_ledger.cast
+             (module Coda_base.Ledger)
+             Genesis_ledger.t)
+      in
+      let genesis_epoch_snapshot = {Snapshot.delegators; ledger} in
       { last_epoch_snapshot= None
       ; curr_epoch_snapshot= None
       ; genesis_epoch_snapshot
@@ -398,8 +379,7 @@ module Data = struct
           module T = struct
             type ('ledger_hash, 'amount) t =
               {hash: 'ledger_hash; total_currency: 'amount}
-            [@@deriving
-              sexp, bin_io, eq, compare, hash, to_yojson, version {unnumbered}]
+            [@@deriving sexp, bin_io, eq, compare, hash, to_yojson, version]
           end
 
           include T
@@ -744,6 +724,7 @@ module Data = struct
     type _ Snarky.Request.t +=
       | Winner_address : Coda_base.Account.Index.t Snarky.Request.t
       | Private_key : Scalar.value Snarky.Request.t
+      | Public_key : Public_key.t Snarky.Request.t
 
     let%snarkydef get_vrf_evaluation shifted ~ledger ~message =
       let open Coda_base in
@@ -751,12 +732,18 @@ module Data = struct
       let%bind private_key =
         request_witness Scalar.typ (As_prover.return Private_key)
       in
-      let winner_addr = message.Message.delegator in
+      let%bind public_key =
+        request_witness Public_key.typ (As_prover.return Public_key)
+      in
+      let staker_addr = message.Message.delegator in
       let%bind account =
-        with_label __LOC__ (Frozen_ledger_hash.get ledger winner_addr)
+        with_label __LOC__ (Frozen_ledger_hash.get ledger staker_addr)
       in
       let%bind delegate =
         with_label __LOC__ (Public_key.decompress_var account.delegate)
+      in
+      let%bind () =
+        with_label __LOC__ (Public_key.assert_equal public_key delegate)
       in
       let%map evaluation =
         with_label __LOC__
@@ -815,6 +802,8 @@ module Data = struct
               respond (Provide 0)
           | Private_key ->
               respond (Provide sk)
+          | Public_key ->
+              respond (Provide (Public_key.decompress_exn pk))
           | _ ->
               respond
                 (Provide
@@ -831,7 +820,7 @@ module Data = struct
           ; delegator= 0 }
     end
 
-    let check ~epoch ~slot ~seed ~private_key ~total_stake ~logger
+    let check ~epoch ~slot ~seed ~private_key ~public_key ~total_stake ~logger
         ~epoch_snapshot =
       let open Message in
       let open Local_state in
@@ -861,7 +850,10 @@ module Data = struct
                 return
                   (Some
                      { Proposal_data.stake_proof=
-                         {private_key; delegator; ledger= epoch_snapshot.ledger}
+                         { private_key
+                         ; public_key
+                         ; delegator
+                         ; ledger= epoch_snapshot.ledger }
                      ; vrf_result }) ) ;
           None )
   end
@@ -871,7 +863,8 @@ module Data = struct
       module V1 = struct
         module T = struct
           type t = Coda_base.State_hash.Stable.V1.t option
-          [@@deriving sexp, bin_io, eq, compare, hash, to_yojson, version]
+          [@@deriving
+            sexp, bin_io, eq, compare, hash, to_yojson, version {unnumbered}]
         end
 
         include T
@@ -880,7 +873,7 @@ module Data = struct
       module Latest = V1
     end
 
-    type t = Stable.Latest.t [@@deriving sexp, eq, compare, hash, to_yojson]
+    type t = Stable.Latest.t [@@deriving sexp, compare, hash, to_yojson]
 
     type var = Coda_base.State_hash.var
 
@@ -921,8 +914,7 @@ module Data = struct
               ; start_checkpoint: 'start_checkpoint
               ; lock_checkpoint: 'lock_checkpoint
               ; length: 'length }
-            [@@deriving
-              sexp, bin_io, eq, compare, hash, to_yojson, version {unnumbered}]
+            [@@deriving sexp, bin_io, eq, compare, hash, to_yojson, version]
           end
 
           include T
@@ -948,7 +940,7 @@ module Data = struct
         ; start_checkpoint: 'start_checkpoint
         ; lock_checkpoint: 'lock_checkpoint
         ; length: 'length }
-      [@@deriving sexp, compare, eq, hash, to_yojson]
+      [@@deriving sexp, compare, hash, to_yojson]
     end
 
     type var =
@@ -1038,8 +1030,7 @@ module Data = struct
         end
 
         module Latest : sig
-          type t
-          [@@deriving sexp, bin_io, eq, compare, hash, to_yojson, version]
+          type t [@@deriving sexp, bin_io, compare, hash, to_yojson, version]
         end
       end
 
@@ -1089,7 +1080,7 @@ module Data = struct
           , Lock_checkpoint.Stable.Latest.t
           , Length.Stable.Latest.t )
           Poly.t
-        [@@deriving sexp, eq, compare, hash, to_yojson]
+        [@@deriving sexp, compare, hash, to_yojson]
       end
 
       let data_spec =
@@ -1185,7 +1176,7 @@ module Data = struct
         module V1 = struct
           module T = struct
             type ('epoch, 'slot) t = {epoch: 'epoch; slot: 'slot}
-            [@@deriving sexp, bin_io, compare, version {unnumbered}]
+            [@@deriving sexp, bin_io, compare, version]
           end
 
           include T
@@ -1467,8 +1458,7 @@ module Data = struct
               ; curr_epoch_data: 'curr_epoch_data
               ; has_ancestor_in_same_checkpoint_window: 'bool
               ; checkpoints: 'checkpoints }
-            [@@deriving
-              sexp, bin_io, eq, compare, hash, to_yojson, version {unnumbered}]
+            [@@deriving sexp, bin_io, eq, compare, hash, to_yojson, version]
           end
 
           include T
@@ -1783,7 +1773,7 @@ module Data = struct
             (Global_slot.create ~epoch:next_epoch ~slot:next_slot)
       ; checkpoints }
 
-    module M = Snarky.Snark.Run.Make (Crypto_params_init.Tick_backend)
+    module M = Snarky.Snark.Run.Make (Curve_choice.Tick_backend)
 
     let m : M.field Snarky.Snark.m = (module M)
 
@@ -2017,7 +2007,7 @@ module Data = struct
 
     let precomputed_handler = Vrf.Precomputed.handler
 
-    let handler {delegator; ledger; private_key}
+    let handler {delegator; ledger; private_key; public_key}
         ~pending_coinbase:{ Coda_base.Pending_coinbase_witness.pending_coinbases
                           ; is_new_stack } : Snark_params.Tick.Handler.t =
       let ledger_handler = unstage (Coda_base.Sparse_ledger.handler ledger) in
@@ -2037,6 +2027,8 @@ module Data = struct
             respond (Provide delegator)
         | Vrf.Private_key ->
             respond (Provide private_key)
+        | Vrf.Public_key ->
+            respond (Provide public_key)
         | _ ->
             respond
               (Provide
@@ -2295,9 +2287,7 @@ module Hooks = struct
               in
               let delegators =
                 Option.map local_state.proposer_public_key ~f:(fun pk ->
-                    compute_delegators
-                      (`Include_self, pk)
-                      ~iter_accounts:(fun f ->
+                    compute_delegators pk ~iter_accounts:(fun f ->
                         Coda_base.Sparse_ledger.iteri snapshot_ledger ~f ) )
                 |> Option.value
                      ~default:(Coda_base.Account.Index.Table.create ())
@@ -2530,7 +2520,8 @@ module Hooks = struct
       in
       let proposal_data slot =
         Vrf.check ~epoch ~slot ~seed:epoch_data.seed ~epoch_snapshot
-          ~private_key:keypair.private_key ~total_stake ~logger
+          ~private_key:keypair.private_key ~public_key:keypair.public_key
+          ~total_stake ~logger
       in
       let rec find_winning_slot slot =
         if UInt32.of_int (Epoch.Slot.to_int slot) >= Constants.Epoch.size then
@@ -2567,27 +2558,21 @@ module Hooks = struct
           (Int64.to_int epoch_end_time) ;
         `Check_again epoch_end_time
 
-  (* TODO *)
-  let lock_transition (prev : Consensus_state.Value.t)
+  let frontier_root_transition (prev : Consensus_state.Value.t)
       (next : Consensus_state.Value.t) ~local_state ~snarked_ledger =
     let open Local_state in
     if not (Epoch.equal prev.curr_epoch next.curr_epoch) then (
-      let epoch_snapshot =
-        Option.map local_state.proposer_public_key ~f:(fun pk ->
-            let open Local_state.Snapshot in
-            let delegators =
-              compute_delegators
-                (`Include_self, pk)
-                ~iter_accounts:(fun f ->
-                  Coda_base.Ledger.Any_ledger.M.iteri snarked_ledger ~f )
-            in
-            let ledger =
-              Coda_base.Sparse_ledger.of_any_ledger snarked_ledger
-            in
-            {delegators; ledger} )
+      (* If we are not proposing, then we don't care about the delegators table. *)
+      let delegators =
+        Option.value_map ~default:(Core.Int.Table.create ~size:0 ())
+          local_state.proposer_public_key ~f:(fun pk ->
+            compute_delegators pk ~iter_accounts:(fun f ->
+                Coda_base.Ledger.Any_ledger.M.iteri snarked_ledger ~f ) )
       in
+      let ledger = Coda_base.Sparse_ledger.of_any_ledger snarked_ledger in
+      let epoch_snapshot = {Local_state.Snapshot.delegators; ledger} in
       local_state.last_epoch_snapshot <- local_state.curr_epoch_snapshot ;
-      local_state.curr_epoch_snapshot <- epoch_snapshot )
+      local_state.curr_epoch_snapshot <- Some epoch_snapshot )
 
   let should_bootstrap_len ~existing ~candidate =
     let length = Length.to_int in
@@ -2824,8 +2809,10 @@ let%test_module "Proof of stake tests" =
       let pending_coinbases = Pending_coinbase.create () |> Or_error.ok_exn in
       let maybe_sk, account = Genesis_ledger.largest_account_exn () in
       let private_key = Option.value_exn maybe_sk in
-      let public_key = Account.public_key account in
-      let location = Ledger.Any_ledger.M.location_of_key ledger public_key in
+      let public_key_compressed = Account.public_key account in
+      let location =
+        Ledger.Any_ledger.M.location_of_key ledger public_key_compressed
+      in
       let delegator =
         Option.value_exn location |> Ledger.Any_ledger.M.Location.to_path_exn
         |> Ledger.Addr.to_int
@@ -2874,9 +2861,10 @@ let%test_module "Proof of stake tests" =
         let sparse_ledger =
           Sparse_ledger.of_ledger_index_subset_exn ledger indices
         in
+        let public_key = Public_key.decompress_exn public_key_compressed in
         let handler =
           Prover_state.handler
-            {delegator; ledger= sparse_ledger; private_key}
+            {delegator; ledger= sparse_ledger; private_key; public_key}
             ~pending_coinbase:
               {Pending_coinbase_witness.pending_coinbases; is_new_stack= true}
         in
