@@ -4,9 +4,9 @@
 /dockerfiles/ @jkrauska
 /rfcs/ @imeckler @es92 @bkase
 /docs/ @rbkhmrcr @imeckler @bkase @nholland94 @cmr @o1pranay
-/scripts/ @nholland94 @jkrauska
+/scripts/ @nholland94 @jkrauska @cmr
 /Makefile @jkrauska
-/config/ @imeckler @nholland94
+/src/config/ @imeckler @nholland94
 /CODE_OF_CONDUCT.md @imeckler @cmr
 /CONTRIBUTING.md @imeckler @cmr
 /DIRECTORY_STRUCTURE.md @imeckler @jkrauska
@@ -30,7 +30,7 @@
 /src/lib/blockchain_snark/ @nholland94 @bkase
 /src/lib/bootstrap_controller/ @nholland94 @johnwu93
 /src/lib/cache_dir/ @cmr
-/src/lib/cached/ @nholland94
+/src/lib/cache_lib/ @nholland94
 /src/lib/chunked_triples/ @psteckler @rbkhmrcr @vanishreerao
 /src/lib/cli_lib/ @johnwu93
 /src/lib/coda_base/ @cmr @nholland94 @bkase
@@ -53,7 +53,6 @@
 /src/lib/dyn_array/ @johnwu93
 /src/lib/empty_hashes/ @johnwu93
 /src/lib/envelope/ @psteckler @cmr
-/src/lib/external_transition_validation/ @nholland94
 /src/lib/file_stack_database/ @johnwu93 @bkase
 /src/lib/file_system/ @johnwu93 @bkase
 /src/lib/genesis_ledger/ @nholland94 @bkase @cmr
@@ -92,19 +91,16 @@
 /src/lib/pipe_lib/ @nholland94
 /src/lib/pokolog/ @bkase @vanishreerao @rbkhmrcr
 /src/lib/ppx_coda/ @psteckler @mrmr1993
-/src/lib/ppx_snarky/ @mrmr1993
 /src/lib/ppx_util/ @mrmr1993
 /src/lib/precomputed_values/ @cmr @bkase
 /src/lib/proof_carrying_data/ @psteckler @bkase
 /src/lib/proposer/ @nholland94 @cmr
-/src/lib/protocol_state_validator/ @nholland94
 /src/lib/prover/ @nholland94 @bkase
 /src/lib/quickcheck_lib/ @nholland94 @ghost-not-in-the-shell
 /src/lib/random_oracle/ @cmr
 /src/lib/rc_pool/ @nholland94 @cmr
 /src/lib/receipt_chain_database_lib/ @johnwu93
 /src/lib/rocksdb/ @psteckler @nholland94
-/src/lib/rocksdb_database/ @psteckler @nholland94
 /src/lib/root_history/ @cmr
 /src/lib/root_prover/ @johnwu93 @bkase
 /src/lib/rose_tree/ @bkase @nholland94

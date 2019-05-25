@@ -44,9 +44,7 @@ test_permutations = {
     'test_postake_snarkless': simple_tests,
     'test_postake_split_snarkless': integration_tests,
     'test_postake_split': ['coda-shared-prefix-multiproposer-test -num-proposers 2'],
-    # Temporarily not doing all `simple_tests` because it's failing
-    # TODO: Deepthi will re-enable
-    'test_postake': [ 'transaction-snark-profiler -check-only' ],
+    'test_postake': simple_tests,
     'test_postake_catchup': ['coda-restart-node-test'],
     'test_postake_bootstrap': ['coda-bootstrap-test', 'coda-long-fork -num-proposers 2'],
     'test_postake_holy_grail': ['coda-restarts-and-txns-holy-grail -num-proposers 5', 'coda-long-fork -num-proposers 5'],
