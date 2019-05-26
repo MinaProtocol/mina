@@ -27,21 +27,14 @@ struct
 end
 
 module Conic = struct
-  type 'f t =
-    { z : 'f
-    ; y : 'f
-    }
+  type 'f t = {z: 'f; y: 'f}
 end
 
 module S = struct
   (* S = S(u, v, y) : y^2(u^2 + uv + v^2 + a) = −f(u)
      from (12)
   *)
-  type 'f t =
-    { u : 'f
-    ; v : 'f
-    ; y : 'f
-    }
+  type 'f t = {u: 'f; v: 'f; y: 'f}
 end
 
 module V = struct
@@ -52,63 +45,49 @@ module V = struct
 end
 
 module Params = struct
-  type 'f t =
-    { u : 'f 
-    ; projection_point : 'f Conic.t
-    ; conic_c : 'f
-    ; a : 'f
-    ; b : 'f
-    }
+  type 'f t = {u: 'f; projection_point: 'f Conic.t; conic_c: 'f; a: 'f; b: 'f}
   [@@deriving fields]
 
-  let create (type t) ((module F : Field_intf.S_unchecked with type t = t)) ~a ~b =
+  let create (type t) (module F : Field_intf.S_unchecked with type t = t) ~a ~b
+      =
     let open F in
     let first_map f =
-      let rec go i =
-        match f i with
-        | Some x -> x
-        | None -> go (i + one)
-      in
+      let rec go i = match f i with Some x -> x | None -> go (i + one) in
       go zero
     in
     let first f = first_map (fun x -> Option.some_if (f x) x) in
     let three_fourths = of_int 3 / of_int 4 in
-    let curve_eqn u = u*u*u + a*u + b in
+    let curve_eqn u = (u * u * u) + (a * u) + b in
     let u =
-        first (fun u ->
+      first (fun u ->
           (* from (15), A = 0, B = Params.a *)
-          let check = three_fourths * u * u + a in
-          not (check = zero) && not (curve_eqn u = zero))
+          let check = (three_fourths * u * u) + a in
+          (not (check = zero)) && not (curve_eqn u = zero) )
     in
     (* The coefficients defining the conic z^2 + c y^2 = d
        in (15). *)
-    let conic_c = three_fourths * u * u + a in
+    let conic_c = (three_fourths * u * u) + a in
     let conic_d = negate (curve_eqn u) in
     let projection_point =
       first_map (fun y ->
-          let z2 = conic_d - conic_c * y * y in
-          if F.is_square z2
-          then Some {Conic.z=F.sqrt z2; y}
-          else None)
+          let z2 = conic_d - (conic_c * y * y) in
+          if F.is_square z2 then Some {Conic.z= F.sqrt z2; y} else None )
     in
-    { u
-    ; conic_c
-    ; projection_point
-    ; a; b
-    }
+    {u; conic_c; projection_point; a; b}
 end
 
 module Make
     (Constant : Field_intf.S) (F : sig
         include Field_intf.S
+
         val constant : Constant.t -> t
     end) (P : sig
-            val params : Constant.t Params.t
+      val params : Constant.t Params.t
     end) =
 struct
   let conic_c =
     let open Constant in
-    lazy ((of_int 3 / of_int 4) * P.params.u * P.params.u + P.params.a)
+    lazy ((of_int 3 / of_int 4 * P.params.u * P.params.u) + P.params.a)
 
   open F
 
@@ -116,30 +95,35 @@ struct
      is one other point on the curve which is also on the line through (z0, y0)
      with slope t. This function returns that point. *)
   let field_to_conic t =
-    let z0, y0 = constant P.params.projection_point.z, constant P.params.projection_point.y in
+    let z0, y0 =
+      ( constant P.params.projection_point.z
+      , constant P.params.projection_point.y )
+    in
     let ct = constant (Lazy.force conic_c) * t in
-    let s = of_int 2 * (ct + z0) / (ct * t + one) in
-    {Conic.z=z0 - s; y = y0 - s * t}
+    let s = of_int 2 * (ct + z0) / ((ct * t) + one) in
+    {Conic.z= z0 - s; y= y0 - (s * t)}
 
   let u_over_2 = lazy Constant.(P.params.u / of_int 2)
 
-(* (16) : φ(λ) : F →  S : λ → ( u, α(λ)/β(λ) - u/2, β(λ) ) *)
+  (* (16) : φ(λ) : F →  S : λ → ( u, α(λ)/β(λ) - u/2, β(λ) ) *)
   let field_to_s t =
-    let { Conic.z; y } = field_to_conic t in
-    { S.u = constant P.params.u
-    ; v = (z / y) - constant (Lazy.force u_over_2) (* From (16) *)
-    ; y
-    }
+    let {Conic.z; y} = field_to_conic t in
+    { S.u= constant P.params.u
+    ; v= (z / y) - constant (Lazy.force u_over_2) (* From (16) *)
+    ; y }
 
   (* This is here for explanatory purposes. See s_to_v_truncated. *)
-  let _s_to_v { S.u; v; y } =
-    let curve_eqn x = x * x * x + constant P.params.a * x + constant P.params.b in
-    let h = u*u + u*v + v*v + constant P.params.a in
-    ( v, negate (u + v), u + y*y, curve_eqn (u + y*y) * h / y) (* from (13) *)
+  let _s_to_v {S.u; v; y} =
+    let curve_eqn x =
+      (x * x * x) + (constant P.params.a * x) + constant P.params.b
+    in
+    let h = (u * u) + (u * v) + (v * v) + constant P.params.a in
+    (v, negate (u + v), u + (y * y), curve_eqn (u + (y * y)) * h / y)
+
+  (* from (13) *)
 
   (* We don't actually need to compute the final coordinate in V *)
-  let s_to_v_truncated {S.u; v; y} =
-    ( v, negate (u + v), u + y*y )
+  let s_to_v_truncated {S.u; v; y} = (v, negate (u + v), u + (y * y))
 
   let potential_xs = s_to_v_truncated
 end
@@ -151,6 +135,7 @@ let to_group (type t) (module F : Field_intf.S_unchecked with type t = t)
       (F)
       (struct
         include F
+
         let constant = Fn.id
       end)
       (struct
