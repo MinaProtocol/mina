@@ -2,7 +2,7 @@ module Params : sig
   type 'f t
 
   val create :
-    (module Group_map.Field_intf.S with type t = 'f) -> a:'f -> b:'f -> 'f t
+    (module Group_map.Field_intf.S_unchecked with type t = 'f) -> a:'f -> b:'f -> 'f t
 end
 
 val to_group :
