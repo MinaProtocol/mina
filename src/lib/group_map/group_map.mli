@@ -18,7 +18,6 @@ module Params : sig
   val a : 'f t -> 'f
 
   val b : 'f t -> 'f
-
 end
 
 module Make
