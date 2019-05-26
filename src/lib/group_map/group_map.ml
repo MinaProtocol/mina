@@ -17,6 +17,10 @@
 open Core_kernel
 module Field_intf = Field_intf
 
+let ( = ) = `Don't_use_polymorphic_compare
+
+let _ = ( = )
+
 module Intf (F : sig
   type t
 end) =
@@ -62,7 +66,16 @@ module Params = struct
       first (fun u ->
           (* from (15), A = 0, B = Params.a *)
           let check = (three_fourths * u * u) + a in
-          (not (check = zero)) && not (curve_eqn u = zero) )
+          let fu = curve_eqn u in
+          (not (equal check zero))
+          && (not (equal fu zero))
+          && not (is_square (negate fu))
+          (* imeckler: I added this condition. It prevents the possibility of having
+   a point (z, 0) on the conic, which is useful because in the map from the
+   conic to S we divide by the "y" coordinate of the conic. It's not strictly
+   necessary when we have a random input in a large field, but it is still nice to avoid the 
+   bad case in theory (and for the tests below with a small field). *)
+      )
     in
     (* The coefficients defining the conic z^2 + c y^2 = d
        in (15). *)
@@ -85,10 +98,6 @@ module Make
       val params : Constant.t Params.t
     end) =
 struct
-  let conic_c =
-    let open Constant in
-    lazy ((of_int 3 / of_int 4 * P.params.u * P.params.u) + P.params.a)
-
   open F
 
   (* For a curve z^2 + c y^2 = d and a point (z0, y0) on the curve, there
@@ -99,9 +108,10 @@ struct
       ( constant P.params.projection_point.z
       , constant P.params.projection_point.y )
     in
-    let ct = constant (Lazy.force conic_c) * t in
-    let s = of_int 2 * (ct + z0) / ((ct * t) + one) in
-    {Conic.z= z0 - s; y= y0 - (s * t)}
+    let ct = constant P.params.conic_c * t in
+    let s = of_int 2 * ((ct * y0) + z0) / ((ct * t) + one) in
+    let c = {Conic.z= z0 - s; y= y0 - (s * t)} in
+    c
 
   let u_over_2 = lazy Constant.(P.params.u / of_int 2)
 
@@ -113,7 +123,7 @@ struct
     ; y }
 
   (* This is here for explanatory purposes. See s_to_v_truncated. *)
-  let _s_to_v {S.u; v; y} =
+  let _s_to_v {S.u; v; y} : _ V.t =
     let curve_eqn x =
       (x * x * x) + (constant P.params.a * x) + constant P.params.b
     in
@@ -125,7 +135,7 @@ struct
   (* We don't actually need to compute the final coordinate in V *)
   let s_to_v_truncated {S.u; v; y} = (v, negate (u + v), u + (y * y))
 
-  let potential_xs = s_to_v_truncated
+  let potential_xs t = s_to_v_truncated (field_to_s t)
 end
 
 let to_group (type t) (module F : Field_intf.S_unchecked with type t = t)
@@ -151,3 +161,94 @@ let to_group (type t) (module F : Field_intf.S_unchecked with type t = t)
   in
   let x1, x2, x3 = M.potential_xs t in
   List.find_map [x1; x2; x3] ~f:try_decode |> Option.value_exn
+
+let%test_module "test" =
+  ( module struct
+    module F = struct
+      type t = int [@@deriving sexp]
+
+      let p = 13
+
+      let ( + ) x y = (x + y) mod p
+
+      let ( * ) x y = x * y mod p
+
+      let negate x = (p - x) mod p
+
+      let ( - ) x y = (x - y + p) mod p
+
+      let equal = Int.equal
+
+      let ( / ) x y =
+        let rec go i = if equal x (i * y) then i else go (i + 1) in
+        if equal y 0 then failwith "Divide by 0" else go 1
+
+      let sqrt' x =
+        let rec go i =
+          if Int.equal i p then None
+          else if equal (i * i) x then Some i
+          else go Int.(i + 1)
+        in
+        go 0
+
+      let sqrt x = Option.value_exn (sqrt' x)
+
+      let is_square x = Option.is_some (sqrt' x)
+
+      let zero = 0
+
+      let one = 1
+
+      let of_int = Fn.id
+
+      let constant = Fn.id
+
+      let gen = Int.gen_incl 0 Int.(p - 1)
+    end
+
+    let a = 1
+
+    let b = 3
+
+    let params = Params.create (module F) ~a ~b
+
+    let curve_eqn u = (u * u * u) + (params.a * u) + params.b
+
+    let conic_d =
+      let open F in
+      negate (curve_eqn params.u)
+
+    let on_conic {Conic.z; y} =
+      F.(equal ((z * z) + (params.conic_c * y * y)) conic_d)
+
+    module M =
+      Make (F) (F)
+        (struct
+          let params = params
+        end)
+
+    let%test "projection point well-formed" = on_conic params.projection_point
+
+    let gen =
+      Quickcheck.Generator.filter F.gen ~f:(fun t ->
+          not F.(equal ((params.conic_c * t * t) + one) zero) )
+
+    let%test_unit "field-to-conic" =
+      Quickcheck.test ~sexp_of:F.sexp_of_t gen ~f:(fun t ->
+          assert (on_conic (M.field_to_conic t)) )
+
+    let on_s {S.u; v; y} =
+      F.(equal conic_d (y * y * ((u * u) + (u * v) + (v * v) + a)))
+
+    let%test_unit "field-to-S" =
+      Quickcheck.test ~sexp_of:F.sexp_of_t gen ~f:(fun t ->
+          assert (on_s (M.field_to_s t)) )
+
+    let on_v (x1, x2, x3, x4) =
+      F.(equal (curve_eqn x1 * curve_eqn x2 * curve_eqn x3) (x4 * x4))
+
+    let%test_unit "field-to-S" =
+      Quickcheck.test ~sexp_of:F.sexp_of_t gen ~f:(fun t ->
+          let s = M.field_to_s t in
+          assert (on_v (M._s_to_v s)) )
+  end )
