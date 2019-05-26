@@ -1,5 +1,5 @@
-(* Points on elliptic curves over finite fields by M. SKALBA
- * found at eg https://www.impan.pl/pl/wydawnictwa/czasopisma-i-serie-wydawnicze/acta-arithmetica/all/117/3/82159/points-on-elliptic-curves-over-finite-fields
+(* Construction of Rational Points on Elliptic Curves over Finite Fields by Andrew Shallue and Christiaan E. van de Woestijne.
+ * found at eg https://works.bepress.com/andrew_shallue/1/download/
  *)
 
 module Field_intf = Field_intf
