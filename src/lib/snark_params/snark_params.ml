@@ -53,6 +53,16 @@ module Tick0 = struct
   module Snarkable = Make_snarkable (Crypto_params.Tick0)
 end
 
+let%test_unit "group-map test" =
+  let params =
+    Group_map.Params.create
+      (module Tick0.Field)
+      ~a:Tick_backend.Inner_curve.Coefficients.a
+      ~b:Tick_backend.Inner_curve.Coefficients.b
+  in
+  Quickcheck.test ~trials:3 Tick0.Field.gen ~f:(fun t ->
+      Group_map.to_group (module Tick0.Field) ~params t |> ignore )
+
 module Wrap_input = Crypto_params.Wrap_input
 
 module Make_inner_curve_scalar
