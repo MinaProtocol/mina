@@ -18,6 +18,9 @@ module Params : sig
   val a : 'f t -> 'f
 
   val b : 'f t -> 'f
+
+  val create :
+    (module Field_intf.S_unchecked with type t = 'f) -> a:'f -> b:'f -> 'f t
 end
 
 module Make
