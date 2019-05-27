@@ -19,113 +19,57 @@ With this feature, clients will be able to join the network from any device at a
 
 [detailed-design]: #detailed-design
 
-### Part 1: min-epoch
+### Part 1: min-window
 
 This version of the implementation is correct given that [50% + epsilon] of stake has always been participating and honest. 
 
-* Add a new field to `protocol_state` called `min_epoch`, initally set to `24k`
-* Add a new field to `protocol_state` called `current_epoch_length`, initially set to 0
-* `let epoch_diff = FLOOR(current_protocol_state.global_slot_number/(24k)) - FLOOR(previous_protocol_state.global_slot_number/(24k))`
-* if `epoch_diff == 0`
-  * set `current_protocol_state.current_epoch_length` to `previous_protocol_state.current_epoch_length + 1`
-* else if `epoch_diff == 1`
-  * set `current_protocol_state.min_epoch` to `MIN(current_protocol_state.current_epoch_length, previous_protocol_state.min_epoch)`
-  * set `current_protocol_state.current_epoch_length` to `1`
+* Add a new field to `protocol_state` called `min_window`, initally set to `8k`
+* Add a new field to `protocol_state` called `current_window_length`, initially set to 0
+* `let window_diff = FLOOR(current_protocol_state.global_slot_number/(28)) - FLOOR(previous_protocol_state.global_slot_number/(8k))`
+* if `window_diff == 0`
+  * set `current_protocol_state.current_window_length` to `previous_protocol_state.current_window_length + 1`
+* else if `window_iff == 1`
+  * set `current_protocol_state.min_window` to `MIN(current_protocol_state.current_window_length, previous_protocol_state.min_window)`
+  * set `current_protocol_state.current_window_length` to `1`
 * else
-  * set `current_protocol_state.min_epoch` to `0`
-  * set `current_protocol_state.current_epoch_length` to `1`
+  * set `current_protocol_state.min_window` to `0`
+  * set `current_protocol_state.current_window_length` to `1`
 
 Add to the chain select(A,B) function:
 
-* If the previous-epoch checkpoint does not match between current and proposed, choose the chain with the greater `min_epoch`. If its a tie choose the already held chain.
+* If the previous-epoch checkpoint does not match between current and proposed, choose the chain with the greater `min_`. If its a tie choose the already held chain.
 
-The intuition is each `current_epoch_length` is a sample from a distribution parameterized by the chain's participation. `min-epoch` then will asymptote over time to a low percentile of the distruibution, which will always be large enough to differentiate between the honest chain and an adversary's. 
+The intuition is each `current_window_length` is a sample from a distribution parameterized by the chain's participation. `min-window` then will asymptote over time to a low percentile of the distruibution, which will always be large enough to differentiate between the honest chain and an adversary's. 
 
-Consider this proof sketch, relying on Ouroboros Genesis. Consider an attacker trying to create a distant fork. Assume they were able to create a long fork with no low participation epochs. If true the same attack would be possible in Ouroboros Genesis. However Ouroboros Genesis showed trying to make a distant fork would create a low participation region immediately after the fork was attempted. Therefore its not possible to create such a fork without a participation epoch significantly lower than the honest chain, and this method of chain selection is secure for distant forks.
+Consider this proof sketch, relying on Ouroboros Genesis. Consider an attacker trying to create a distant fork. Assume they were able to create a long fork with no low participation windows. If true the same attack would be possible in Ouroboros Genesis. However Ouroboros Genesis showed trying to make a distant fork would create a low participation region immediately after the fork was attempted. Therefore its not possible to create such a fork without a participation window significantly lower than the honest chain, and this method of chain selection is secure for distant forks.
 
+### Part 2: Recovery via Reset Hash
 
-### Part 2: min-epoch with voting
+If the assumption that [50% + epsilon] of the stake has always been participating and honest is violated, at the point this happens safety will be compromised. The `min_window` will be a low value susceptible to attack.
 
-If the assumption that [50% + epsilon] of the stake has always been participating and honest is violated, at the point this happens safety will be compromised. We can add another feature to consensus to ensure that this temporary compromising will not become permanent.
+How susceptible depends on the `min_window`. (see unresolved questions for converting `min_window` to an estimate). For example a `min_window` corresponding to 40% total participation will be susceptible to a 20% attack.
 
-* define a constant, `min_epochs_length`
-* define a constant, `min_epoch_period`
-* define a constant, `recent_epochs_length` (where `recent_epochs_length*epoch_length = min_epoch_period`)
-* define a constant, `inflation`
-* add the following fields:
-  * to each account
-    * `vote_hash` initially set to `0`
-  * to protocol state
-    * `min_epochs`, a ring buffer initially set to `[1]*min_epochs_length`
-    * `recent_epochs`, a ring buffer initially set to `[1]*recent_epochs_length`
-    * `tail_min_epoch` initially set to `1`
-    * `min_epoch` initially set to `1`
-    * `current_epoch_length` initially set to `0`
-  * to ledger state
-    * `vote_stake` initially set to `0`
-    * `vote_hash` initially set to `0`
-  * to transactions
-    * `vote_hash`
+This could happen for a variety of reasons including:
 
-Add to transaction application logic:
-```
-if transaction.vote_hash == staged_ledger.vote_hash
-  staged_leger_.vote_stake += get_ledger_of_hash(staged_ledger.vote_hash).stake_of(transaction.public_key)
-else
-  staged_leger_.vote_stake = 0
-  staged_ledger.vote_hash = transaction.vote_hash
-```
+* network outage
+* client software outage (via bug or attack)
 
-Add to the protocol state update logic:
+(Note too that these are because ouroboros requires a synchronous network)
 
-* `let epoch_diff = FLOOR(current_protocol_state.global_slot_number/(24k)) - FLOOR(previous_protocol_state.global_slot_number/(24k))`
-* if `epoch_diff == 0`
-  * set `current_protocol_state.current_epoch_length` to `previous_protocol_state.current_epoch_length + 1`
-* if `epoch_diff == 1`
-  * set `current_protocol_state.min_epoch` to `MIN(current_protocol_state.current_epoch_length, previous_protocol_state.min_epoch)`
-  * set `current_protocol_state.current_epoch_length` to `1`
-  * push `current_protocol_state.min_epoch` to `current_protocol_state.recent_epochs`
-* else
-  * set `current_protocol_state.min_epoch` to `0`
-  * set `current_protocol_state.current_epoch_length` to `1`
-  * push `0, epoch_start_hash` to `current_protocol_state.recent_epochs`
+When this happens we can recover in the following way:
 
-* `let min_epoch_period_diff = FLOOR(current_protocol_state.global_slot_number/min_epoch_period) - FLOOR(previous_protocol_state.global_slot_number/min_epoch_period)`
-* if `min_epoch_period_diff == 0`
-  * set most recent `current_protocol_state.min_epochs` to `MIN(most recent current_protocol_state.min_epochs, current_protocol_state.min_epoch)`
-* else if `min_epoch_period_diff == 1`
-  * push `current_protocol_state.min_epoch, epoch_start_hash` to `current_protocol_state.min_epochs`
-  * set `current_protocol_state.tail_min_epochs` to `MIN(pop current_protocol_state.min_epochs, current_protocol_state.tail_min_epochs)`
-* else
-  * push `0` to `current_protocol_state.min_epochs, epoch_start_hash`
-  * set `current_protocol_state.tail_min_epochs` to `MIN(pop current_protocol_state.min_epochs, current_protocol_state.tail_min_epochs)`
+* add a new field to `protocol_state` called `reset_hash`, initially set to `0`
+* add to client software a field called `expected_reset_hash`, initially set to `0`
+* when deciding whether to accept a protocol state, check that `client.expected_reset_hash = protocol_state.reset_hash`
+* when creating a new `protocol_state`, if the `client.expected_reset_hash` does not equal the previous protocol states' `reset_hash`, update the `reset_hash` in the new protocol state to `client.expected_reset_hash`.
+* Add to the `protocol_state` update logic that if the `reset_hash` has been updated, reset `min_window` to `1`
+* Add the `reset_hash` value to the VRF evaluation
 
-* if the `snarked_ledger` is being updated
-  * `if new_snarked_ledger.vote_hash == new_protocol_state.last_epoch_locked_checkpoint`
-    * set `current_protocol_state.min_epoch` to `MAX(current_protocol_state.min_epoch, new_snarked_ledger.voted_stake/staged_ledger.total_stake)`
-* else
-  * do nothing
+If an outage occurs and a recovery is necessary, the community will choose a hash, and clients will have to manually tell their clients the new `expected_reset_hash`.
 
-Add to the transaction accepting logic:
-* if in the first 2/3 of an epoch
-  * only accept a transaction to the staged ledger if its `transaction.vote_hash` matches the previous epoch locked hash
+### Past 3: Recovery via Voting
 
-Add to the transaction submission logic:
-* honest nodes never submit transactions with different `lock_hashes` within an epoch. For each epoch, they do not submit blocks to multiple chains with different `locked_hash`s
-
-Add to the protocol state accepting logic
-  * for updates in the first 2/3 slots of the epoch, only accept a new protocol state if all transactions included follow the above transaction accepting logic
-
-Add to the chain selection function:
-* if checkpoints do not match:
-  * find most recent matching hash between `recent_epoch_lengths` and `min_epochs`, take chain with higher participation immediately after that matching hash
-  * if no such matching hash, compare `tail_min_epochs`
-
-Vote triggering
-  * if an epoch is observed with lower participation than [50% + epsilon], or the most recent `epoch_length` was better than the `min_epoch_length` by some constant (on the order of say, 5%), vote in the next epoch.
-
-Incentives discussion
-  * By sending transactions / accepting them, Coda holders increase the expected value of their holdings, so are motivated to submit transactions and accept them if a vote was to be triggered
+Recovery via `reset_hash` as mentioned above requires centralized coordination and a manual update. This can be improved by allowing parties to create a `recovery_snark` proving `> 50%` of stake voted for a reset to a new `reset_hash`. That way, once the recovery proof is produced, all clients can update to the new `reset_hash` automatically.
 
 ## Drawbacks
 [drawbacks]: #drawbacks
@@ -140,8 +84,7 @@ This will
 
 Other designs considered were:
 
-* Track unique stake participation each epoch, use recent unique stake participation as the long distance fork strength. This has the upside that its relatively simple, but the downside that it relies on assuming the number of staking parties is significantly less than the number of slots in an epoch. It also relies on annual checkpoints, which this verison does not require.
-* min-epoch (Stage 1) with a "reset" mechanism that would generate new checkpoints. Has the upside again that its simple, but the downside that it would require consensus outside the protocol to agree on a checkpoint which would create a point for centralization.
+* On-chain recovery. This is harder to analyze for correctness, particularly for forks stealing the vote transactions. It also requires referring to the protocol state from within the staged ledger which is not supported yet.
 
 ## Prior art
 [prior-art]: #prior-art
@@ -155,6 +98,8 @@ Prior art:
 ## Unresolved questions
 [unresolved-questions]: #unresolved-questions
 
-* security proof of min-epoch
-* proof adding voting does not break min-epoch
-* careful analysis of different scenarior where the 51% honesty assumption could be violated, what could play out, and operationally what different parties should plan to do
+* security proof of `min_window`
+* conversion of `window_length` to percent participating for the purpose of calculating when the chain can no longer be trusted and a recovery should occur
+* proof adding recovery does not break min-window
+* proof that an adversary cannot reuse a recovery to create a fork
+* careful analysis recovery under different scenarios where the 51% honesty assumption could be violated, what could play out, and operationally what different parties should plan to do
