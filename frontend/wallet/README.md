@@ -26,6 +26,7 @@ Download and build the app:
 2. Navigate into coda/frontend/wallet
 3. Update submodules: `git submodule update --init`
 4. `yarn install` to install dependencies
+5. `yarn pull-macos-binary` to grab the latest coda.exe (macOS only for now)
 6. `yarn run query-fake` to generate graphql_schema.json
 7. `yarn build` to build app
 
@@ -33,6 +34,7 @@ Run locally with hot reloading:
 1. `yarn dev` to start dev server
 
 ### Common Issues
+
 1. If you see something like: `git@github.com: Permission denied (publickey).`
    when updating the submodules you need to set up SSH keys with GitHub, since
    our submodules use SSH URLS. GitHub has some documentation on how to do that
@@ -41,3 +43,12 @@ Run locally with hot reloading:
    see that they're just small text files, then git lfs may not have been set
    up before you pulled the code. Make sure you ran `git lfs install` and then
    run `git lfs pull` to download files.
+
+### Repackaging coda.exe
+
+1. cd to root of repo
+2. `make build`
+3. `make macos-portable`
+4. Upload `_build/coda-daemon-macos.zip` to our wallet s3 bucket
+5. cd to frontend/wallet
+6. `yarn pull-macos-binary` to grab it

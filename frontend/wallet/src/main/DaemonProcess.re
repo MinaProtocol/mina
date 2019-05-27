@@ -8,7 +8,7 @@ module Command = {
     env: option(Js.Dict.t(string)),
   };
 
-  let addArgs = (t, args) => {...t, args: Js.Array.concat(t.args, args)};
+  let addArgs = (t, args) => {...t, args: Js.Array.concat(args, t.args)};
 };
 
 let (^/) = Filename.concat;
@@ -37,7 +37,8 @@ let baseCodaCommand = port => {
 
 module Process = {
   let start = (command: Command.t) => {
-    print_endline("Starting graphql-faker");
+    let {Command.executable, args} = command;
+    print_endline({j|Starting $executable with $args|j});
 
     let p =
       switch (command.env) {
@@ -68,6 +69,15 @@ module Process = {
       )
     );
 
+    ChildProcess.ReadablePipe.on(ChildProcess.Process.stdoutGet(p), "data", s =>
+      prerr_endline(
+        "Daemon "
+        ++ command.executable
+        ++ " stdout: "
+        ++ Node.Buffer.toString(s),
+      )
+    );
+
     ChildProcess.Process.onExit(
       p,
       fun
@@ -75,16 +85,20 @@ module Process = {
         if (code != 0) {
           Printf.fprintf(
             stderr,
-            "Daemon process died with non-zero exit code: %d\n",
+            "Daemon process %s died with non-zero exit code: %d\n",
+            command.executable,
             code,
           );
         } else {
-          print_endline("Shutting down daemon process.");
+          print_endline(
+            "Shutting down daemon process: " ++ command.executable,
+          );
         }
       | `Signal(signal) => {
           Printf.fprintf(
             stderr,
-            "Daemon process died via signal: %s\n",
+            "Daemon process %s died via signal: %s\n",
+            command.executable,
             signal,
           );
         },
@@ -100,19 +114,17 @@ module CodaProcess = {
   let waitExit: t => Task.t('x, [> | `Code(int) | `Signal(string)]) =
     t => ChildProcess.Process.onExitTask(t);
 
-  let kill: t => unit = t => ChildProcess.Process.kill(t);
+  let kill: t => unit = t => ChildProcess.Process.kill(t, "SIGINT");
 
-  let start: list(string) => Result.t(string, t) =
+  let start: list(string) => t =
     args => {
-      let p =
-        Process.start(
-          Command.addArgs(baseCodaCommand(0xc0da), args |> Array.fromList),
-        );
-      Belt.Result.Ok(p);
+      Process.start(
+        Command.addArgs(baseCodaCommand(0xc0da), args |> Array.fromList),
+      );
     };
 };
 
-let startAll = (~fakerPort, ~codaPort) => {
+let startAll = (~fakerPort, ~codaPort as _) => {
   let graphqlFaker = {
     Command.executable: "node",
     args: [|
@@ -127,30 +139,8 @@ let startAll = (~fakerPort, ~codaPort) => {
     |],
     env: None,
   };
-  let codaPath = "_build/coda-daemon-macos";
-  let coda = {
-    Command.executable: ProjectRoot.resource ^/ codaPath ^/ "coda.exe",
-    args: [|
-      "daemon",
-      "-rest-port",
-      Js.Int.toString(codaPort),
-      "-config-directory",
-      ProjectRoot.resource ^/ codaPath ^/ "config",
-    |],
-    env:
-      Some(
-        Js.Dict.fromList([
-          (
-            "CODA_KADEMLIA_PATH",
-            ProjectRoot.resource ^/ codaPath ^/ "kademlia",
-          ),
-        ]),
-      ),
-  };
   let p1 = Process.start(graphqlFaker);
-  let p2 = Process.start(coda);
   () => {
-    ChildProcess.Process.kill(p1);
-    ChildProcess.Process.kill(p2);
+    ChildProcess.Process.kill(p1, "SIGINT");
   };
 };
