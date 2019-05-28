@@ -670,9 +670,23 @@ module Tree = struct
       tree
     |> List.rev
 
-  let hash : ('a, 'd) t -> fa:('a -> string) -> fd:('d -> string) -> string =
-   fun t ~fa ~fd ->
-    fold ~init:"" ~fa:(fun acc a -> acc ^ fa a) ~fd:(fun acc d -> acc ^ fd d) t
+  let to_raw_jobs : ('a, 'd) t -> ('b, 'c) New_job.t list =
+   fun tree ->
+    fold ~init:[]
+      ~fa:(fun acc a ->
+        match a with
+        | _, Merge.Job.Full {status= Job_status.Done; _} ->
+            acc
+        | _ ->
+            New_job.Merge a :: acc )
+      ~fd:(fun acc d ->
+        match d with
+        | _, Base.Job.Full {status= Job_status.Done; _} ->
+            acc
+        | _ ->
+            New_job.Base d :: acc )
+      tree
+    |> List.rev
 
   let to_jobs : ('a, 'd) t -> ('b, 'c) Available_job.t list =
    fun tree ->
@@ -691,6 +705,17 @@ module Tree = struct
             acc )
       tree
     |> List.rev
+
+  let hash : ('a, 'd) t -> fa:('a -> string) -> fd:('d -> string) -> string =
+   fun t ~fa ~fd ->
+    let buf = Buffer.create 0 in
+    let () =
+      fold ~init:()
+        ~fa:(fun _ a -> Buffer.add_string buf (fa a))
+        ~fd:(fun _ d -> Buffer.add_string buf (fd d))
+        t
+    in
+    Buffer.contents buf
 
   let leaves : ('a, 'b) t -> 'd list =
    fun tree ->
@@ -899,27 +924,42 @@ module State = struct
   let hash {trees; acc; max_base_jobs; curr_job_seq_no; delay; _} fa fd =
     let h = ref (Digestif.SHA256.init ()) in
     let add_string s = h := Digestif.SHA256.feed_string !h s in
-    Non_empty_list.iter trees ~f:(fun tree ->
-        let w_to_string (l, r) = Int.to_string l ^ Int.to_string r in
-        let fa = function
-          | w, Merge.Job.Empty ->
-              w_to_string w ^ "Empty"
-          | w, Merge.Job.Full {left; right; status; seq_no} ->
-              w_to_string w ^ "Full" ^ fa left ^ fa right
-              ^ Int.to_string seq_no
-              ^ Job_status.to_string status
-          | w, Merge.Job.Part j ->
-              w_to_string w ^ "Part" ^ fa j
-        in
-        let fd = function
-          | w, Base.Job.Empty ->
-              Int.to_string w ^ "Empty"
-          | w, Base.Job.Full {job; status; seq_no} ->
-              Int.to_string w ^ "Full" ^ fd job
-              ^ Job_status.to_string status
-              ^ Int.to_string seq_no
-        in
-        add_string (Tree.hash tree ~fa ~fd) ) ;
+    let () =
+      let tree_acc = Buffer.create 0 in
+      let buff a = Buffer.add_string tree_acc a in
+      let tree_hash tree fa fd =
+        List.iter (Tree.to_raw_jobs tree) ~f:(fun job ->
+            match job with New_job.Merge a -> fa a | Base d -> fd d )
+      in
+      let () =
+        Non_empty_list.iter trees ~f:(fun tree ->
+            let w_to_string (l, r) = Int.to_string l ^ Int.to_string r in
+            let fa = function
+              | w, Merge.Job.Empty ->
+                  buff (w_to_string w ^ "Empty")
+              | w, Merge.Job.Full {left; right; status; seq_no} ->
+                  buff
+                    ( w_to_string w ^ "Full" ^ Int.to_string seq_no
+                    ^ Job_status.to_string status ) ;
+                  buff (fa left) ;
+                  buff (fa right)
+              | w, Merge.Job.Part j ->
+                  buff (w_to_string w ^ "Part") ;
+                  buff (fa j)
+            in
+            let fd = function
+              | w, Base.Job.Empty ->
+                  buff (Int.to_string w ^ "Empty")
+              | w, Base.Job.Full {job; status; seq_no} ->
+                  buff
+                    ( Int.to_string w ^ "Full" ^ Int.to_string seq_no
+                    ^ Job_status.to_string status ) ;
+                  buff (fd job)
+            in
+            tree_hash tree fa fd )
+      in
+      add_string (Buffer.contents tree_acc)
+    in
     let acc_string =
       Option.value_map acc ~default:"None" ~f:(fun (a, d_lst) ->
           fa a ^ List.fold ~init:"" d_lst ~f:(fun acc d -> acc ^ fd d) )
