@@ -258,7 +258,7 @@ module type S = sig
     (**
      * A hook for managing local state when the locked tip is updated.
     *)
-    val lock_transition :
+    val frontier_root_transition :
          Consensus_state.Value.t
       -> Consensus_state.Value.t
       -> local_state:Local_state.t

@@ -676,7 +676,7 @@ module Make (Commands : Coda_commands.Intf) = struct
         ~resolve:(fun {ctx= coda; _} public_key ->
           let public_key = Public_key.Compressed.of_base64_exn public_key in
           Deferred.Result.return
-          @@ Commands.Subscriptions.new_payment coda public_key )
+          @@ Commands.Subscriptions.new_user_command coda public_key )
 
     let commands = [new_sync_update; new_block; new_user_command_update]
   end
@@ -702,7 +702,7 @@ module Make (Commands : Coda_commands.Intf) = struct
       in
       let payment = User_command.sign sender_kp payload in
       let command = User_command.forget_check payment in
-      match%map Commands.send_payment coda command with
+      match%map Commands.send_user_command coda command with
       | `Active (Ok _) ->
           Ok command
       | `Active (Error e) ->
