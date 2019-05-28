@@ -33,12 +33,14 @@ module Digest : sig
 
   val to_string : t -> string
 
-  val to_bits : t -> bool list
+  val to_bits : t -> bool array
 
   module Checked : sig
     type unchecked = t
 
     type t = private Tick0.Boolean.var array
+
+    val to_bits : t -> Tick0.Boolean.var array
 
     val to_triples : t -> Tick0.Boolean.var Tuple_lib.Triple.t list
 
