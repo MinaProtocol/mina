@@ -110,8 +110,7 @@ struct
     in
     let ct = constant P.params.conic_c * t in
     let s = of_int 2 * ((ct * y0) + z0) / ((ct * t) + one) in
-    let c = {Conic.z= z0 - s; y= y0 - (s * t)} in
-    c
+    {Conic.z= z0 - s; y= y0 - (s * t)}
 
   let u_over_2 = lazy Constant.(P.params.u / of_int 2)
 
@@ -286,6 +285,11 @@ let%test_module "test" =
         Quickcheck.test ~sexp_of:F.sexp_of_t gen ~f:(fun t ->
             let s = M.field_to_s t in
             assert (on_v (M._s_to_v s)) )
+
+      let%test_unit "full map" =
+        Quickcheck.test ~sexp_of:F.sexp_of_t gen ~f:(fun t ->
+            let x, y = to_group (module F) ~params t in
+            assert (equal (curve_eqn x) (y * y)) )
     end
 
     module T0 = Make_tests (F13)
