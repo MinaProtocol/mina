@@ -376,7 +376,7 @@ module Make (Inputs : Inputs_intf) :
 
   let run ~logger ~verifier ~trust_system ~get_completed_work ~transaction_pool
       ~time_controller ~keypair ~consensus_local_state ~frontier_reader
-      ~transition_writer ~random_peers ~query_peer =
+      ~transition_writer =
     trace_task "proposer" (fun () ->
         let log_bootstrap_mode () =
           Logger.info logger ~module_:__MODULE__ ~location:__LOC__
@@ -614,53 +614,33 @@ module Make (Inputs : Inputs_intf) :
                   let consensus_state =
                     Protocol_state.consensus_state protocol_state
                   in
-                  match
+                  assert (
                     Consensus.Hooks.required_local_state_sync ~consensus_state
                       ~local_state:consensus_local_state
+                    = None ) ;
+                  match
+                    measure "asking conensus what to do" (fun () ->
+                        Consensus.Hooks.next_proposal
+                          (time_to_ms (Time.now time_controller))
+                          consensus_state ~local_state:consensus_local_state
+                          ~keypair ~logger )
                   with
-                  | Some sync_jobs ->
-                      Logger.info logger ~module_:__MODULE__ ~location:__LOC__
-                        "Synchronizing consensus local state" ;
-                      don't_wait_for
-                        (let%map res =
-                           Consensus.Hooks.sync_local_state
-                             ~local_state:consensus_local_state ~logger
-                             ~trust_system ~random_peers ~query_peer sync_jobs
-                         in
-                         ( match res with
-                         | Ok () ->
-                             ()
-                         | Error e ->
-                             Logger.error logger ~module_:__MODULE__
-                               ~location:__LOC__
-                               "error syncing local state: %s"
-                               (Error.to_string_hum e) ) ;
-                         check_for_proposal ())
-                  | None -> (
-                    match
-                      measure "asking conensus what to do" (fun () ->
-                          Consensus.Hooks.next_proposal
-                            (time_to_ms (Time.now time_controller))
-                            consensus_state ~local_state:consensus_local_state
-                            ~keypair ~logger )
-                    with
-                    | `Check_again time ->
-                        Singleton_scheduler.schedule scheduler
-                          (time_of_ms time) ~f:check_for_proposal
-                    | `Propose_now data ->
-                        Interruptible.finally
-                          (Singleton_supervisor.dispatch proposal_supervisor
-                             data)
-                          ~f:check_for_proposal
-                        |> ignore
-                    | `Propose (time, data) ->
-                        Singleton_scheduler.schedule scheduler
-                          (time_of_ms time) ~f:(fun () ->
-                            ignore
-                              (Interruptible.finally
-                                 (Singleton_supervisor.dispatch
-                                    proposal_supervisor data)
-                                 ~f:check_for_proposal) ) ) ) )
+                  | `Check_again time ->
+                      Singleton_scheduler.schedule scheduler (time_of_ms time)
+                        ~f:check_for_proposal
+                  | `Propose_now data ->
+                      Interruptible.finally
+                        (Singleton_supervisor.dispatch proposal_supervisor data)
+                        ~f:check_for_proposal
+                      |> ignore
+                  | `Propose (time, data) ->
+                      Singleton_scheduler.schedule scheduler (time_of_ms time)
+                        ~f:(fun () ->
+                          ignore
+                            (Interruptible.finally
+                               (Singleton_supervisor.dispatch
+                                  proposal_supervisor data)
+                               ~f:check_for_proposal) ) ) )
         in
         check_for_proposal () )
 end

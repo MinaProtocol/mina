@@ -358,11 +358,41 @@ end = struct
               in
               root' )
         in
+        let consensus_state =
+          With_hash.data new_root
+          |> External_transition.Validated.protocol_state
+          |> Protocol_state.consensus_state
+        in
+        let local_state = Transition_frontier.consensus_local_state frontier in
+        let%bind () =
+          match
+            Consensus.Hooks.required_local_state_sync ~consensus_state
+              ~local_state
+          with
+          | None ->
+              Deferred.unit
+          | Some sync_jobs -> (
+              Logger.info logger ~module_:__MODULE__ ~location:__LOC__
+                "Synchronizing consensus local state" ;
+              match%map
+                Consensus.Hooks.sync_local_state ~local_state ~logger
+                  ~trust_system
+                  ~random_peers:(Network.random_peers t.network)
+                  ~query_peer:
+                    { Network_peer.query=
+                        (fun peer f query ->
+                          Network.query_peer t.network peer f query ) }
+                  sync_jobs
+              with
+              | Ok () ->
+                  ()
+              | Error e ->
+                  Error.raise e )
+        in
         let%map new_frontier =
           Transition_frontier.create ~logger ~root_transition:new_root
             ~root_snarked_ledger:synced_db ~root_staged_ledger
-            ~consensus_local_state:
-              (Transition_frontier.consensus_local_state frontier)
+            ~consensus_local_state:local_state
         in
         Logger.info logger ~module_:__MODULE__ ~location:__LOC__
           "Bootstrap state: complete." ;
