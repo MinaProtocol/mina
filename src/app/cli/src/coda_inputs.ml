@@ -465,7 +465,7 @@ module Make_inputs0 (Init : Init_intf) = struct
   module Transaction_witness = Coda_base.Transaction_witness
 
   module Staged_ledger = struct
-    module Base_inputs = struct
+    module Inputs = struct
       module Sok_message = Sok_message
       module Account = Account
       module Proof = Proof
@@ -526,11 +526,6 @@ module Make_inputs0 (Init : Init_intf) = struct
             in
             Option.some_if good
               (Transaction_snark_work.Checked.create_unsafe t)
-    end
-
-    module Inputs = struct
-      include Base_inputs
-      module Pre_diff_info = Pre_diff_info.Make (Base_inputs)
     end
 
     include Staged_ledger.Make (Inputs)

@@ -1,5 +1,0 @@
-(library
-  (name pre_diff_info)
-  (public_name pre_diff_info)
-  (libraries core_kernel coda_base transaction_snark_work staged_ledger_hash)
-  (preprocess (pps ppx_jane ppx_coda ppx_deriving_yojson)))

@@ -4,8 +4,8 @@ open Coda_transition
 open Signature_lib
 module Time = Block_time
 
-(** Block_data is the external_transition data that GraphQL needs *)
-module Block_data = struct
+(** Filtered_external_transition is the external_transition data that GraphQL needs *)
+module Filtered_external_transition = struct
   module Transactions = struct
     module Stable = struct
       module V1 = struct
@@ -122,7 +122,7 @@ module Database = struct
     module Stable = struct
       module V1 = struct
         module T = struct
-          type t = Block_data.Stable.V1.t * Time.Stable.V1.t
+          type t = Filtered_external_transition.Stable.V1.t * Time.Stable.V1.t
           [@@deriving bin_io, version {unnumbered}]
         end
 
@@ -153,7 +153,8 @@ let fee_transfer_participants (pk, _) = [pk]
 type t = {pagination: Pagination.t; database: Database.t; logger: Logger.t}
 
 let add_user_blocks (pagination : Pagination.t)
-    ( {With_hash.hash= state_hash; data= {Block_data.transactions; creator; _}}
+    ( { With_hash.hash= state_hash
+      ; data= {Filtered_external_transition.transactions; creator; _} }
     , time ) =
   Hashtbl.set pagination.all_values ~key:state_hash ~data:time ;
   List.iter transactions.fee_transfers ~f:(fun fee_transfer ->
@@ -185,7 +186,7 @@ let add {database; pagination; logger}
         ~module_:__MODULE__ ~location:__LOC__
         ~metadata:[("transaction", State_hash.to_yojson state_hash)]
   | None -> (
-    match Block_data.of_transition external_transition with
+    match Filtered_external_transition.of_transition external_transition with
     | Ok block ->
         Database.set database ~key:state_hash ~data:(block, date) ;
         add_user_blocks pagination

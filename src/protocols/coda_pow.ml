@@ -1166,6 +1166,32 @@ module type Staged_ledger_base_intf = sig
   end
 end
 
+module type Pre_diff_info_intf = sig
+  type user_command
+
+  type transaction
+
+  type completed_work
+
+  type staged_ledger_diff
+
+  type valid_staged_ledger_diff
+
+  val get :
+       staged_ledger_diff
+    -> ( transaction list * completed_work list * int * Currency.Amount.t list
+       , user_command Pre_diff_error.t )
+       result
+
+  val get_unchecked :
+       valid_staged_ledger_diff
+    -> transaction list * completed_work list * Currency.Amount.t list
+
+  val get_transactions :
+       staged_ledger_diff
+    -> (transaction list, user_command Pre_diff_error.t) result
+end
+
 module type Staged_ledger_intf = sig
   include Staged_ledger_base_intf
 
@@ -1178,6 +1204,14 @@ module type Staged_ledger_intf = sig
   type sparse_ledger
 
   type completed_work_checked
+
+  module Pre_diff_info :
+    Pre_diff_info_intf
+    with type user_command := user_command
+     and type transaction := transaction
+     and type completed_work := completed_work_checked
+     and type staged_ledger_diff := diff
+     and type valid_staged_ledger_diff := valid_diff
 
   val current_ledger_proof : t -> ledger_proof option
 

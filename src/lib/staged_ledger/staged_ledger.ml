@@ -49,6 +49,7 @@ end)
    and type verifier := Inputs.Ledger_proof_verifier.t = struct
   open Inputs
   module Scan_state = Transaction_snark_scan_state.Make (Constants) (Inputs)
+  module Pre_diff_info = Pre_diff_info.Make (Inputs)
 
   module Staged_ledger_error = struct
     type t =
@@ -1410,7 +1411,7 @@ end
 
 module Make = Make_with_constants (Transaction_snark_scan_state.Constants)
 
-module Base_inputs = struct
+include Make (struct
   open Coda_base
   module Compressed_public_key = Signature_lib.Public_key.Compressed
   module User_command = User_command
@@ -1462,15 +1463,6 @@ module Base_inputs = struct
   module Staged_ledger_hash = Staged_ledger_hash
   module Transaction_snark_work = Transaction_snark_work
   module Staged_ledger_diff = Staged_ledger_diff
-end
-
-module Make_pre_diff_info = Pre_diff_info.Make
-module Pre_diff_info = Make_pre_diff_info (Base_inputs)
-
-include Make (struct
-  open Coda_base
-  include Base_inputs
-  module Pre_diff_info = Pre_diff_info
   module Account = Account
   module Ledger = Ledger
   module Transaction_validator = Transaction_validator
@@ -2483,12 +2475,7 @@ let%test_module "test" =
       end
     end
 
-    module Test_input2 = struct
-      include Test_input1
-      module Pre_diff_info = Make_pre_diff_info (Test_input1)
-    end
-
-    module Sl = Make (Test_input2)
+    module Sl = Make (Test_input1)
     open Test_input1
 
     let self_pk = "me"
@@ -2976,7 +2963,7 @@ let%test_module "test" =
 
     let%test_module "staged ledgers with different latency factors" =
       ( module struct
-        module Inputs = Test_input2
+        module Inputs = Test_input1
 
         module type Staged_ledger_intf =
           Coda_pow.Staged_ledger_intf

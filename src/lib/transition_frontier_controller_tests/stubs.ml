@@ -70,7 +70,7 @@ struct
     let fee_excess, supply_increase = Transaction.(fee_excess, supply_increase)
   end
 
-  module Staged_ledger_base_inputs = struct
+  module Staged_ledger = Staged_ledger.Make (struct
     module Compressed_public_key = Signature_lib.Public_key.Compressed
     module User_command = User_command
     module Fee_transfer = Coda_base.Fee_transfer
@@ -103,11 +103,6 @@ struct
     module Pending_coinbase_stack_state =
       Transaction_snark.Pending_coinbase_stack_state
     module Transaction_witness = Transaction_witness
-  end
-
-  module Staged_ledger = Staged_ledger.Make (struct
-    include Staged_ledger_base_inputs
-    module Pre_diff_info = Pre_diff_info.Make (Staged_ledger_base_inputs)
   end)
 
   (* Generate valid payments for each blockchain state by having

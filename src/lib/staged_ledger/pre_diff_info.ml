@@ -1,11 +1,11 @@
 open Core
 open Protocols.Coda_pow
 
-module Make (Inputs : Intf.Inputs) : sig
+module Make (Inputs : Inputs.S) : sig
   open Inputs
 
   include
-    Intf.S
+    Pre_diff_info_intf
     with type user_command := User_command.t
      and type transaction := Transaction.t
      and type completed_work := Transaction_snark_work.t
@@ -342,5 +342,3 @@ end = struct
     let%map transactions, _, _, _ = get sl_diff in
     transactions
 end
-
-module type S = Intf.S
