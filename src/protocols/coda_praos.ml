@@ -1,8 +1,6 @@
 open Core_kernel
 open Async_kernel
 
-let coinbase_amount = Currency.Amount.of_int 10
-
 module type Time_intf = sig
   module Stable : sig
     module V1 : sig

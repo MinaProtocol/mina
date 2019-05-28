@@ -281,7 +281,7 @@ end) :
     | At_most_two.Zero, At_most_one.Zero ->
         Currency.Amount.zero
     | _ ->
-        Protocols.Coda_praos.coinbase_amount
+        Coda_compile_config.coinbase
 end
 
 include Make (Transaction_snark_work)

@@ -606,7 +606,7 @@ end)
   *)
   let create_coinbase coinbase_parts proposer =
     let open Result.Let_syntax in
-    let coinbase = Protocols.Coda_praos.coinbase_amount in
+    let coinbase = Coda_compile_config.coinbase in
     let coinbase_or_error = function
       | Ok x ->
           Ok x
@@ -2861,7 +2861,7 @@ let%test_module "test" =
 
     let expected_ledger no_txns_included txns_sent old_ledger =
       old_ledger
-      + Currency.Amount.to_int Protocols.Coda_praos.coinbase_amount
+      + Currency.Amount.to_int Coda_compile_config.coinbase
       + List.sum
           (module Int)
           (List.take txns_sent no_txns_included)
