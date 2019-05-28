@@ -13,13 +13,19 @@ include (
               module Never := Tablecloth.Never and
               module Task := Tablecloth.Task and
               module Result := Tablecloth.Result and
-              module Option := Tablecloth.Option
+              module Option := Tablecloth.Option and
+              module List := Tablecloth.List
         );
 
 module Task = {
   include Tablecloth.Task;
 
   let return = a => succeed(a);
+
+  let map3 = (t1, t2, t3, ~f) =>
+    map2(map2(t1, t2, ~f=(a, b) => (a, b)), t3, ~f=((a, b), c) =>
+      f(a, b, c)
+    );
 
   /// Take a `unit => Promise.t('a)`, make it into a `Task.t('x, 'a)`
   let liftPromise = (f, ()) =>
@@ -96,6 +102,8 @@ module Result = {
 module Option = {
   include Tablecloth.Option;
 
+  let iter = (t, ~f) => map(t, ~f=a => f(a) |> ignore) |> ignore;
+
   let getExn = x => Belt.Option.getExn(x);
 
   let map2 = (t1, t2, ~f) => {
@@ -121,4 +129,18 @@ module Monad = {
       let onError: (t('x, 'a), ~f: 'x => t('y, 'a)) => t('y, 'a);
     };
   };
+};
+
+module List = {
+  include Tablecloth.List;
+
+  let rec equal: (~a_equal: ('a, 'a) => bool, list('a), list('a)) => bool =
+    (~a_equal, l1, l2) => {
+      switch (l1, l2) {
+      | ([], []) => true
+      | ([x, ...xs], [y, ...ys]) when a_equal(x, y) =>
+        equal(~a_equal, xs, ys)
+      | (_, _) => false
+      };
+    };
 };
