@@ -8,8 +8,8 @@ module Make (Inputs : Intf.Worker_inputs) : sig
 
   include
     Intf.Worker
-    with type hash := Inputs.Transition_frontier.Diff_hash.t
-     and type diff := Inputs.Transition_frontier.Diff_mutant.E.t
+    with type hash := Inputs.Transition_frontier.Diff.Hash.t
+     and type diff := Inputs.Transition_frontier.Diff.Mutant.E.t
      and type transition_storage := Transition_storage.t
 end = struct
   open Inputs
@@ -52,10 +52,10 @@ end = struct
     External_transition.Validated.protocol_state parent_transition
     |> Protocol_state.consensus_state
 
-  let hash = Transition_frontier.Diff_mutant.hash
+  let hash = Transition_frontier.Diff.Mutant.hash
 
   let handle_diff (t : t) acc_hash
-      (E diff : Transition_frontier.Diff_mutant.E.t) =
+      (E diff : Transition_frontier.Diff.Mutant.E.t) =
     match diff with
     | New_frontier
         ( {With_hash.hash= first_root_hash; data= first_root}
@@ -109,7 +109,7 @@ end = struct
         Logger.trace t.logger ~module_:__MODULE__ ~location:__LOC__
           ~metadata:
             [ ( "mutant"
-              , Transition_frontier.Diff_mutant.value_to_yojson diff
+              , Transition_frontier.Diff.Mutant.value_to_yojson diff
                   old_root_data ) ]
           "Worker root update mutant" ;
         hash acc_hash diff old_root_data

@@ -1,58 +1,37 @@
 open Core_kernel
 open Async_kernel
-open Protocols.Coda_transition_frontier
-open Coda_base
 open Pipe_lib
 
 module type Inputs_intf = sig
   include Sync_handler.Inputs_intf
 
   module Sync_handler :
-    Sync_handler_intf
-    with type ledger_hash := Ledger_hash.t
-     and type state_hash := State_hash.t
-     and type external_transition := External_transition.t
+    Coda_intf.Sync_handler_intf
+    with type external_transition := External_transition.t
      and type external_transition_validated := External_transition.Validated.t
      and type transition_frontier := Transition_frontier.t
-     and type syncable_ledger_query := Sync_ledger.Query.t
-     and type syncable_ledger_answer := Sync_ledger.Answer.t
-     and type pending_coinbases := Pending_coinbase.t
      and type parallel_scan_state := Staged_ledger.Scan_state.t
 
   module Transition_handler :
-    Transition_handler_intf
-    with type time_controller := Time.Controller.t
-     and type external_transition_with_initial_validation :=
+    Coda_intf.Transition_handler_intf
+    with type external_transition_with_initial_validation :=
                 External_transition.with_initial_validation
      and type external_transition_validated := External_transition.Validated.t
-     and type trust_system := Trust_system.t
      and type staged_ledger := Staged_ledger.t
-     and type state_hash := State_hash.t
      and type transition_frontier := Transition_frontier.t
      and type verifier := Verifier.t
-     and type time := Time.t
      and type transition_frontier_breadcrumb :=
                 Transition_frontier.Breadcrumb.t
 
   module Network :
-    Network_intf
-    with type peer := Network_peer.Peer.t
-     and type state_hash := State_hash.t
-     and type external_transition := External_transition.t
-     and type consensus_state := Consensus.Data.Consensus_state.Value.t
-     and type state_body_hash := State_body_hash.t
-     and type ledger_hash := Ledger_hash.t
-     and type sync_ledger_query := Sync_ledger.Query.t
-     and type sync_ledger_answer := Sync_ledger.Answer.t
-     and type parallel_scan_state := Staged_ledger.Scan_state.t
-     and type pending_coinbases := Pending_coinbase.t
+    Coda_intf.Network_intf
+    with type external_transition := External_transition.t
+     and type transaction_snark_scan_state := Staged_ledger.Scan_state.t
 
   module Catchup :
-    Catchup_intf
+    Coda_intf.Catchup_intf
     with type external_transition_with_initial_validation :=
                 External_transition.with_initial_validation
-     and type state_hash := State_hash.t
-     and type trust_system := Trust_system.t
      and type unprocessed_transition_cache :=
                 Transition_handler.Unprocessed_transition_cache.t
      and type transition_frontier := Transition_frontier.t
@@ -63,16 +42,13 @@ module type Inputs_intf = sig
 end
 
 module Make (Inputs : Inputs_intf) :
-  Transition_frontier_controller_intf
-  with type time_controller := Inputs.Time.Controller.t
-   and type external_transition_validated :=
+  Coda_intf.Transition_frontier_controller_intf
+  with type external_transition_validated :=
               Inputs.External_transition.Validated.t
    and type external_transition_with_initial_validation :=
               Inputs.External_transition.with_initial_validation
    and type transition_frontier := Inputs.Transition_frontier.t
    and type breadcrumb := Inputs.Transition_frontier.Breadcrumb.t
-   and type time := Inputs.Time.t
-   and type state_hash := State_hash.t
    and type network := Inputs.Network.t
    and type verifier := Inputs.Verifier.t = struct
   open Inputs

@@ -24,7 +24,7 @@ module Make (Inputs : Intf.Main_inputs) = struct
     |> Staged_ledger.pending_coinbase_collection
 
   let apply_diff (type mutant) ~logger frontier
-      (diff : mutant Transition_frontier.Diff_mutant.t) : mutant =
+      (diff : mutant Transition_frontier.Diff.Mutant.t) : mutant =
     match diff with
     | New_frontier _ ->
         ()
@@ -71,14 +71,14 @@ module Make (Inputs : Intf.Main_inputs) = struct
         Logger.trace logger ~module_:__MODULE__ ~location:__LOC__
           ~metadata:
             [ ( "mutant"
-              , Transition_frontier.Diff_mutant.value_to_yojson diff mutant )
+              , Transition_frontier.Diff.Mutant.value_to_yojson diff mutant )
             ]
           "Ground truth root update" ;
         mutant
 
   let to_state_hash_diff (type output)
-      (diff : output Transition_frontier.Diff_mutant.t) :
-      Transition_frontier.Diff_mutant.E.t =
+      (diff : output Transition_frontier.Diff.Mutant.t) :
+      Transition_frontier.Diff.Mutant.E.t =
     match diff with
     | Remove_transitions removed_transitions ->
         E (Remove_transitions removed_transitions)
@@ -94,10 +94,10 @@ module Make (Inputs : Intf.Main_inputs) = struct
       ~location:__LOC__
       ~metadata:
         [ ( "diff_mutant"
-          , Transition_frontier.Diff_mutant.key_to_yojson diff_mutant ) ] ;
+          , Transition_frontier.Diff.Mutant.key_to_yojson diff_mutant ) ] ;
     let ground_truth_diff = apply_diff ~logger frontier diff_mutant in
     let ground_truth_hash =
-      Transition_frontier.Diff_mutant.hash acc_hash diff_mutant
+      Transition_frontier.Diff.Mutant.hash acc_hash diff_mutant
         ground_truth_diff
     in
     match%map
@@ -108,24 +108,24 @@ module Make (Inputs : Intf.Main_inputs) = struct
           "Could not connect to worker" ;
         Error.raise e
     | Ok new_hash ->
-        if Transition_frontier.Diff_hash.equal new_hash ground_truth_hash then
+        if Transition_frontier.Diff.Hash.equal new_hash ground_truth_hash then
           ground_truth_hash
         else
           failwithf
             !"Unable to write mutant diff correctly as hashes are different:\n\
              \ %s. Hash of groundtruth %s Hash of actual %s"
             (Yojson.Safe.to_string
-               (Transition_frontier.Diff_mutant.key_to_yojson diff_mutant))
-            (Transition_frontier.Diff_hash.to_string ground_truth_hash)
-            (Transition_frontier.Diff_hash.to_string new_hash)
+               (Transition_frontier.Diff.Mutant.key_to_yojson diff_mutant))
+            (Transition_frontier.Diff.Hash.to_string ground_truth_hash)
+            (Transition_frontier.Diff.Hash.to_string new_hash)
             ()
 
   let listen_to_frontier_broadcast_pipe ~logger
       (frontier_broadcast_pipe :
         Transition_frontier.t option Broadcast_pipe.Reader.t) worker =
-    let%bind (_ : Transition_frontier.Diff_hash.t) =
+    let%bind (_ : Transition_frontier.Diff.Hash.t) =
       Broadcast_pipe.Reader.fold frontier_broadcast_pipe
-        ~init:Transition_frontier.Diff_hash.empty
+        ~init:Transition_frontier.Diff.Hash.empty
         ~f:(fun acc_hash frontier_opt ->
           match frontier_opt with
           | Some frontier ->
@@ -138,7 +138,7 @@ module Make (Inputs : Intf.Main_inputs) = struct
                         mutant ) )
           | None ->
               (* TODO: need to delete persistence once it get's back up *)
-              Deferred.return Transition_frontier.Diff_hash.empty )
+              Deferred.return Transition_frontier.Diff.Hash.empty )
     in
     Deferred.unit
 

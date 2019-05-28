@@ -1,6 +1,6 @@
 open Async
 open Core_kernel
-open Protocols.Coda_pow
+open Currency
 open Coda_base
 open Coda_state
 open Coda_transition
@@ -12,8 +12,6 @@ end) =
 struct
   (** [Stubs] is a set of modules used for testing different components of tfc  *)
   let max_length = Inputs.max_length
-
-  module Time = Block_time
 
   module State_proof = struct
     include Proof
@@ -41,14 +39,15 @@ struct
   module Staged_ledger_diff = Staged_ledger_diff.Make (Transaction_snark_work)
 
   module External_transition =
-    External_transition.Make
-      (Verifier)
+    External_transition.Make (Ledger_proof) (Verifier)
       (struct
         include Staged_ledger_diff.Stable.V1
 
         [%%define_locally
         Staged_ledger_diff.(creator, user_commands)]
       end)
+
+  module Internal_transition = Internal_transition.Make (Staged_ledger_diff)
 
   module Staged_ledger_hash_binable = struct
     include Staged_ledger_hash
@@ -85,12 +84,15 @@ struct
     module Ledger_proof_verifier = Verifier
     module Staged_ledger_aux_hash = Staged_ledger_aux_hash
     module Staged_ledger_hash = Staged_ledger_hash_binable
+    module Transaction_snark_statement = Transaction_snark.Statement
     module Transaction_snark_work = Transaction_snark_work
     module Transaction_validator = Transaction_validator
     module Staged_ledger_diff = Staged_ledger_diff
     module Account = Coda_base.Account
     module Ledger = Coda_base.Ledger
     module Sparse_ledger = Coda_base.Sparse_ledger
+    module Verifier = Verifier
+    module Proof_type = Transaction_snark.Proof_type
 
     module Pending_coinbase = struct
       include Pending_coinbase.Stable.V1
@@ -100,6 +102,7 @@ struct
     end
 
     module Pending_coinbase_hash = Pending_coinbase.Hash
+    module Pending_coinbase_stack = Pending_coinbase.Stack
     module Pending_coinbase_stack_state =
       Transaction_snark.Pending_coinbase_stack_state
     module Transaction_witness = Transaction_witness
@@ -126,7 +129,7 @@ struct
         in
         let%map _ = Currency.Amount.sub sender_account_amount send_amount in
         let payload : User_command.Payload.t =
-          User_command.Payload.create ~fee:Fee.Unsigned.zero
+          User_command.Payload.create ~fee:Fee.zero
             ~nonce:sender_account.Account.Poly.nonce
             ~memo:User_command_memo.dummy
             ~body:(Payment {receiver= receiver_pk; amount= send_amount})
@@ -140,6 +143,7 @@ struct
     module Transaction_snark_work = Transaction_snark_work
     module Staged_ledger_diff = Staged_ledger_diff
     module External_transition = External_transition
+    module Internal_transition = Internal_transition
     module Transaction_witness = Transaction_witness
     module Staged_ledger = Staged_ledger
     module Scan_state = Staged_ledger.Scan_state
@@ -182,7 +186,7 @@ struct
         let prover = Public_key.compress public_key in
         Some
           Transaction_snark_work.Checked.
-            { fee= Fee.Unsigned.of_int 1
+            { fee= Fee.of_int 1
             ; proofs=
                 List.map stmts ~f:(fun stmt ->
                     (stmt, Sok_message.Digest.default) )
@@ -220,7 +224,7 @@ struct
       in
       let next_blockchain_state =
         Blockchain_state.create_value
-          ~timestamp:(Block_time.now Time.Controller.basic)
+          ~timestamp:(Block_time.now Block_time.Controller.basic)
           ~snarked_ledger_hash:next_ledger_hash
           ~staged_ledger_hash:next_staged_ledger_hash
       in
@@ -452,13 +456,11 @@ struct
 
   module Sync_handler = Sync_handler.Make (struct
     include Transition_frontier_inputs
-    module Time = Time
     module Transition_frontier = Transition_frontier
   end)
 
   module Root_prover = Root_prover.Make (struct
     include Transition_frontier_inputs
-    module Time = Time
     module Transition_frontier = Transition_frontier
   end)
 

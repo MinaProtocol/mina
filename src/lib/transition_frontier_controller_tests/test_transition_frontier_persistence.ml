@@ -48,8 +48,8 @@ let%test_module "Transition Frontier Persistence" =
       in
       Broadcast_pipe.Reader.fold
         (Transition_frontier.persistence_diff_pipe frontier)
-        ~init:Transition_frontier.Diff_hash.empty
-        ~f:(fun acc_hash (diffs : Transition_frontier.Diff_mutant.E.t list) ->
+        ~init:Transition_frontier.Diff.Hash.empty
+        ~f:(fun acc_hash (diffs : Transition_frontier.Diff.Mutant.E.t list) ->
           Deferred.List.fold diffs ~init:acc_hash
             ~f:(fun acc_hash (E mutant_diff) ->
               let%map new_hash =
@@ -147,7 +147,7 @@ let%test_module "Transition Frontier Persistence" =
             let open Transition_frontier.Breadcrumb in
             let staged_ledger = staged_ledger root in
             Transition_frontier_persistence.Worker.handle_diff t
-              Transition_frontier.Diff_hash.empty
+              Transition_frontier.Diff.Hash.empty
               (E
                  (New_frontier
                     ( Transition_frontier.Breadcrumb.transition_with_hash root
@@ -156,7 +156,7 @@ let%test_module "Transition Frontier Persistence" =
                     )))
             |> ignore ;
             Transition_frontier_persistence.Worker.handle_diff t
-              Transition_frontier.Diff_hash.empty
+              Transition_frontier.Diff.Hash.empty
               (E
                  (Add_transition
                     (Transition_frontier.Breadcrumb.transition_with_hash

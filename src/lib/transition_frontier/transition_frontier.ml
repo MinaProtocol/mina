@@ -1,18 +1,15 @@
 open Core_kernel
 open Async_kernel
-open Protocols.Coda_transition_frontier
 open Coda_base
 open Coda_state
 open Coda_transition
-open Pipe_lib
 open Coda_incremental
 
 module type Inputs_intf = Inputs.Inputs_intf
 
 module Make (Inputs : Inputs_intf) :
-  Transition_frontier_intf
-  with type state_hash := State_hash.t
-   and type mostly_validated_external_transition :=
+  Coda_intf.Transition_frontier_intf
+  with type mostly_validated_external_transition :=
               ( [`Time_received] * Truth.true_t
               , [`Proof] * Truth.true_t
               , [`Frontier_dependencies] * Truth.true_t
@@ -20,18 +17,10 @@ module Make (Inputs : Inputs_intf) :
               Inputs.External_transition.Validation.with_transition
    and type external_transition_validated :=
               Inputs.External_transition.Validated.t
-   and type ledger_database := Ledger.Db.t
    and type staged_ledger_diff := Inputs.Staged_ledger_diff.t
    and type staged_ledger := Inputs.Staged_ledger.t
-   and type masked_ledger := Ledger.Mask.Attached.t
    and type transaction_snark_scan_state := Inputs.Staged_ledger.Scan_state.t
-   and type consensus_state := Consensus.Data.Consensus_state.Value.t
-   and type consensus_local_state := Consensus.Data.Local_state.t
-   and type user_command := User_command.t
-   and type pending_coinbase := Pending_coinbase.t
-   and type verifier := Inputs.Verifier.t
-   and module Extensions.Work = Inputs.Transaction_snark_work.Statement =
-struct
+   and type verifier := Inputs.Verifier.t = struct
   open Inputs
 
   (* NOTE: is Consensus_mechanism.select preferable over distance? *)
@@ -41,7 +30,6 @@ struct
   exception Already_exists of State_hash.t
 
   module Breadcrumb = struct
-    (* TODO: external_transition should be type : External_transition.With_valid_protocol_state.t #1344 *)
     type t =
       { transition_with_hash:
           (External_transition.Validated.t, State_hash.t) With_hash.t
@@ -212,234 +200,6 @@ struct
       user_commands @@ staged_ledger_diff external_transition
   end
 
-  module Diff_hash = struct
-    open Digestif.SHA256
-
-    type nonrec t = t
-
-    include Binable.Of_stringable (struct
-      type nonrec t = t
-
-      let of_string = of_hex
-
-      let to_string = to_hex
-    end)
-
-    let equal t1 t2 = equal t1 t2
-
-    let empty = digest_string ""
-
-    let merge t1 string = digestv_string [to_hex t1; string]
-
-    let to_string = to_raw_string
-  end
-
-  module Diff_mutant = struct
-    module Key = struct
-      module New_frontier = struct
-        (* TODO: version *)
-        type t =
-          ( External_transition.Validated.Stable.V1.t
-          , State_hash.Stable.V1.t )
-          With_hash.Stable.V1.t
-          * Staged_ledger.Scan_state.Stable.V1.t
-          * Pending_coinbase.Stable.V1.t
-        [@@deriving bin_io]
-      end
-
-      module Add_transition = struct
-        (* TODO: version *)
-        type t =
-          ( External_transition.Validated.Stable.V1.t
-          , State_hash.Stable.V1.t )
-          With_hash.Stable.V1.t
-        [@@deriving bin_io]
-      end
-
-      module Update_root = struct
-        (* TODO: version *)
-        type t =
-          State_hash.Stable.V1.t
-          * Staged_ledger.Scan_state.Stable.V1.t
-          * Pending_coinbase.Stable.V1.t
-        [@@deriving bin_io]
-      end
-    end
-
-    type _ t =
-      | New_frontier : Key.New_frontier.t -> unit t
-      | Add_transition :
-          Key.Add_transition.t
-          -> Consensus.Data.Consensus_state.Value.Stable.V1.t t
-      | Remove_transitions :
-          ( External_transition.Validated.Stable.V1.t
-          , State_hash.Stable.V1.t )
-          With_hash.Stable.V1.t
-          list
-          -> Consensus.Data.Consensus_state.Value.Stable.V1.t list t
-      | Update_root :
-          Key.Update_root.t
-          -> ( State_hash.Stable.V1.t
-             * Staged_ledger.Scan_state.Stable.V1.t
-             * Pending_coinbase.t )
-             t
-
-    type 'a diff_mutant = 'a t
-
-    let serialize_consensus_state =
-      Binable.to_string (module Consensus.Data.Consensus_state.Value.Stable.V1)
-
-    let json_consensus_state consensus_state =
-      Consensus.Data.Consensus_state.(
-        display_to_yojson @@ display consensus_state)
-
-    let name : type a. a t -> string = function
-      | New_frontier _ ->
-          "New_frontier"
-      | Add_transition _ ->
-          "Add_transition"
-      | Remove_transitions _ ->
-          "Remove_transitions"
-      | Update_root _ ->
-          "Update_root"
-
-    let update_root_to_yojson (state_hash, scan_state, pending_coinbase) =
-      (* We need some representation of scan_state and pending_coinbase,
-        so the serialized version of these states would be fine *)
-      `Assoc
-        [ ("state_hash", State_hash.to_yojson state_hash)
-        ; ( "scan_state"
-          , `Int
-              ( String.hash
-              @@ Binable.to_string
-                   (module Staged_ledger.Scan_state.Stable.V1)
-                   scan_state ) )
-        ; ( "pending_coinbase"
-          , `Int
-              ( String.hash
-              @@ Binable.to_string
-                   (module Pending_coinbase.Stable.V1)
-                   pending_coinbase ) ) ]
-
-    (* Yojson is not performant and should be turned off *)
-    let value_to_yojson (type a) (key : a t) (value : a) =
-      let json_value =
-        match (key, value) with
-        | New_frontier _, () ->
-            `Null
-        | Add_transition _, parent_consensus_state ->
-            json_consensus_state parent_consensus_state
-        | Remove_transitions _, removed_consensus_state ->
-            `List (List.map removed_consensus_state ~f:json_consensus_state)
-        | Update_root _, (old_state_hash, old_scan_state, old_pending_coinbase)
-          ->
-            update_root_to_yojson
-              (old_state_hash, old_scan_state, old_pending_coinbase)
-      in
-      `List [`String (name key); json_value]
-
-    let key_to_yojson (type a) (key : a t) =
-      let json_key =
-        match key with
-        | New_frontier (With_hash.{hash; _}, _, _) ->
-            State_hash.to_yojson hash
-        | Add_transition With_hash.{hash; _} ->
-            State_hash.to_yojson hash
-        | Remove_transitions removed_transitions ->
-            `List
-              (List.map removed_transitions ~f:(fun With_hash.{hash; _} ->
-                   State_hash.to_yojson hash ))
-        | Update_root (state_hash, scan_state, pending_coinbase) ->
-            update_root_to_yojson (state_hash, scan_state, pending_coinbase)
-      in
-      `List [`String (name key); json_key]
-
-    let merge = Fn.flip Diff_hash.merge
-
-    let hash_root_data (hash, scan_state, pending_coinbase) acc =
-      merge
-        ( Bin_prot.Utils.bin_dump
-            [%bin_type_class:
-              State_hash.Stable.V1.t
-              * Staged_ledger.Scan_state.Stable.V1.t
-              * Pending_coinbase.Stable.V1.t]
-              .writer
-            (hash, scan_state, pending_coinbase)
-        |> Bigstring.to_string )
-        acc
-
-    let hash_diff_contents (type mutant) (t : mutant t) acc =
-      match t with
-      | New_frontier ({With_hash.hash; _}, scan_state, pending_coinbase) ->
-          hash_root_data (hash, scan_state, pending_coinbase) acc
-      | Add_transition {With_hash.hash; _} ->
-          Diff_hash.merge acc (State_hash.to_bytes hash)
-      | Remove_transitions removed_transitions ->
-          List.fold removed_transitions ~init:acc
-            ~f:(fun acc_hash With_hash.{hash= state_hash; _} ->
-              Diff_hash.merge acc_hash (State_hash.to_bytes state_hash) )
-      | Update_root (new_hash, new_scan_state, pending_coinbase) ->
-          hash_root_data (new_hash, new_scan_state, pending_coinbase) acc
-
-    let hash_mutant (type mutant) (t : mutant t) (mutant : mutant) acc =
-      match (t, mutant) with
-      | New_frontier _, () ->
-          acc
-      | Add_transition _, parent_external_transition ->
-          merge (serialize_consensus_state parent_external_transition) acc
-      | Remove_transitions _, removed_transitions ->
-          List.fold removed_transitions ~init:acc
-            ~f:(fun acc_hash removed_transition ->
-              merge (serialize_consensus_state removed_transition) acc_hash )
-      | Update_root _, (old_root, old_scan_state, old_pending_coinbase) ->
-          hash_root_data (old_root, old_scan_state, old_pending_coinbase) acc
-
-    let hash (type mutant) acc_hash (t : mutant t) (mutant : mutant) =
-      let diff_contents_hash = hash_diff_contents t acc_hash in
-      hash_mutant t mutant diff_contents_hash
-
-    module E = struct
-      type t = E : 'output diff_mutant -> t
-
-      (* HACK:  This makes the existential type easily binable *)
-      include Binable.Of_binable (struct
-                  type t =
-                    [ `New_frontier of Key.New_frontier.t
-                    | `Add_transition of Key.Add_transition.t
-                    | `Remove_transitions of
-                      ( External_transition.Validated.Stable.V1.t
-                      , State_hash.Stable.V1.t )
-                      With_hash.Stable.V1.t
-                      list
-                    | `Update_root of Key.Update_root.t ]
-                  [@@deriving bin_io]
-                end)
-                (struct
-                  type nonrec t = t
-
-                  let of_binable = function
-                    | `New_frontier data ->
-                        E (New_frontier data)
-                    | `Add_transition data ->
-                        E (Add_transition data)
-                    | `Remove_transitions transitions ->
-                        E (Remove_transitions transitions)
-                    | `Update_root data ->
-                        E (Update_root data)
-
-                  let to_binable = function
-                    | E (New_frontier data) ->
-                        `New_frontier data
-                    | E (Add_transition data) ->
-                        `Add_transition data
-                    | E (Remove_transitions transitions) ->
-                        `Remove_transitions transitions
-                    | E (Update_root data) ->
-                        `Update_root data
-                end)
-    end
-  end
-
   module Fake_db = struct
     include Coda_base.Ledger.Db
 
@@ -460,248 +220,18 @@ struct
 
   module TL = Coda_base.Transaction_logic.Make (Fake_db)
 
-  module type Transition_frontier_extension_intf =
-    Transition_frontier_extension_intf0
-    with type transition_frontier_breadcrumb := Breadcrumb.t
-
   let max_length = max_length
 
-  module Extensions = struct
-    module Work = Transaction_snark_work.Statement
+  module Diff = Diff.Make (struct
+    include Inputs
+    module Breadcrumb = Breadcrumb
+  end)
 
-    module Snark_pool_refcount = Snark_pool_refcount.Make (struct
-      include Inputs
-      module Breadcrumb = Breadcrumb
-    end)
-
-    module Root_history = struct
-      module Queue = Hash_queue.Make (State_hash)
-
-      type t =
-        { history: Breadcrumb.t Queue.t
-        ; capacity: int
-        ; mutable most_recent: Breadcrumb.t option }
-
-      let create capacity =
-        let history = Queue.create () in
-        {history; capacity; most_recent= None}
-
-      let lookup {history; _} = Queue.lookup history
-
-      let most_recent {most_recent; _} = most_recent
-
-      let mem {history; _} = Queue.mem history
-
-      let enqueue ({history; capacity; _} as t) state_hash breadcrumb =
-        if Queue.length history >= capacity then
-          Queue.dequeue_front_exn history |> ignore ;
-        Queue.enqueue_back history state_hash breadcrumb |> ignore ;
-        t.most_recent <- Some breadcrumb
-
-      let is_empty {history; _} = Queue.is_empty history
-    end
-
-    (* TODO: guard against waiting for transitions that already exist in the frontier *)
-    module Transition_registry = struct
-      type t = unit Ivar.t list State_hash.Table.t
-
-      let create () = State_hash.Table.create ()
-
-      let notify t state_hash =
-        State_hash.Table.change t state_hash ~f:(function
-          | Some ls ->
-              List.iter ls ~f:(Fn.flip Ivar.fill ()) ;
-              None
-          | None ->
-              None )
-
-      let register t state_hash =
-        Deferred.create (fun ivar ->
-            State_hash.Table.update t state_hash ~f:(function
-              | Some ls ->
-                  ivar :: ls
-              | None ->
-                  [ivar] ) )
-    end
-
-    (** A transition frontier extension that exposes the changes in the transactions
-        in the best tip. *)
-    module Persistence_diff = struct
-      type t = unit
-
-      type input = unit
-
-      type view = Diff_mutant.E.t list
-
-      let create () = ()
-
-      let initial_view () = []
-
-      let scan_state breadcrumb =
-        breadcrumb |> Breadcrumb.staged_ledger |> Staged_ledger.scan_state
-
-      let pending_coinbase breadcrumb =
-        breadcrumb |> Breadcrumb.staged_ledger
-        |> Staged_ledger.pending_coinbase_collection
-
-      let handle_diff () (diff : Breadcrumb.t Transition_frontier_diff.t) :
-          view option =
-        let open Transition_frontier_diff in
-        let open Diff_mutant.E in
-        Option.return
-        @@
-        match diff with
-        | New_frontier breadcrumb ->
-            [ E
-                (New_frontier
-                   ( Breadcrumb.transition_with_hash breadcrumb
-                   , scan_state breadcrumb
-                   , pending_coinbase breadcrumb )) ]
-        | New_breadcrumb breadcrumb ->
-            [E (Add_transition (Breadcrumb.transition_with_hash breadcrumb))]
-        | New_best_tip {garbage; added_to_best_tip_path; new_root; old_root; _}
-          ->
-            let added_transition =
-              E
-                (Add_transition
-                   ( Non_empty_list.last added_to_best_tip_path
-                   |> Breadcrumb.transition_with_hash ))
-            in
-            let remove_transition =
-              E
-                (Remove_transitions
-                   (List.map garbage ~f:Breadcrumb.transition_with_hash))
-            in
-            if
-              State_hash.equal
-                (Breadcrumb.state_hash old_root)
-                (Breadcrumb.state_hash new_root)
-            then [added_transition; remove_transition]
-            else
-              [ added_transition
-              ; E
-                  (Update_root
-                     ( Breadcrumb.state_hash new_root
-                     , scan_state new_root
-                     , pending_coinbase new_root ))
-              ; remove_transition ]
-    end
-
-    module Best_tip_diff = Best_tip_diff.Make (Breadcrumb)
-    module Root_diff = Root_diff.Make (Breadcrumb)
-
-    type t =
-      { root_history: Root_history.t
-      ; snark_pool_refcount: Snark_pool_refcount.t
-      ; transition_registry: Transition_registry.t
-      ; best_tip_diff: Best_tip_diff.t
-      ; root_diff: Root_diff.t
-      ; persistence_diff: Persistence_diff.t
-      ; new_transition: External_transition.Validated.t New_transition.Var.t }
-    [@@deriving fields]
-
-    (* TODO: Each of these extensions should be created with the input of the breadcrumb *)
-    let create root_breadcrumb =
-      let new_transition =
-        New_transition.Var.create
-          (Breadcrumb.external_transition root_breadcrumb)
-      in
-      { root_history= Root_history.create (2 * max_length)
-      ; snark_pool_refcount= Snark_pool_refcount.create ()
-      ; transition_registry= Transition_registry.create ()
-      ; best_tip_diff= Best_tip_diff.create ()
-      ; root_diff= Root_diff.create ()
-      ; persistence_diff= Persistence_diff.create ()
-      ; new_transition }
-
-    type writers =
-      { snark_pool: Snark_pool_refcount.view Broadcast_pipe.Writer.t
-      ; best_tip_diff: Best_tip_diff.view Broadcast_pipe.Writer.t
-      ; root_diff: Root_diff.view Broadcast_pipe.Writer.t
-      ; persistence_diff: Persistence_diff.view Broadcast_pipe.Writer.t }
-
-    type readers =
-      { snark_pool: Snark_pool_refcount.view Broadcast_pipe.Reader.t
-      ; best_tip_diff: Best_tip_diff.view Broadcast_pipe.Reader.t
-      ; root_diff: Root_diff.view Broadcast_pipe.Reader.t
-      ; persistence_diff: Persistence_diff.view Broadcast_pipe.Reader.t }
-    [@@deriving fields]
-
-    let make_pipes () : readers * writers =
-      let snark_reader, snark_writer =
-        Broadcast_pipe.create (Snark_pool_refcount.initial_view ())
-      and best_tip_reader, best_tip_writer =
-        Broadcast_pipe.create (Best_tip_diff.initial_view ())
-      and root_diff_reader, root_diff_writer =
-        Broadcast_pipe.create (Root_diff.initial_view ())
-      and persistence_diff_reader, persistence_diff_writer =
-        Broadcast_pipe.create (Persistence_diff.initial_view ())
-      in
-      ( { snark_pool= snark_reader
-        ; best_tip_diff= best_tip_reader
-        ; root_diff= root_diff_reader
-        ; persistence_diff= persistence_diff_reader }
-      , { snark_pool= snark_writer
-        ; best_tip_diff= best_tip_writer
-        ; root_diff= root_diff_writer
-        ; persistence_diff= persistence_diff_writer } )
-
-    let close_pipes
-        ({snark_pool; best_tip_diff; root_diff; persistence_diff} : writers) =
-      Broadcast_pipe.Writer.close snark_pool ;
-      Broadcast_pipe.Writer.close best_tip_diff ;
-      Broadcast_pipe.Writer.close root_diff ;
-      Broadcast_pipe.Writer.close persistence_diff
-
-    let mb_write_to_pipe diff ext_t handle pipe =
-      Option.value ~default:Deferred.unit
-      @@ Option.map ~f:(Broadcast_pipe.Writer.write pipe) (handle ext_t diff)
-
-    let handle_diff t (pipes : writers)
-        (diff : Breadcrumb.t Transition_frontier_diff.t) : unit Deferred.t =
-      let use handler pipe acc field =
-        let%bind () = acc in
-        mb_write_to_pipe diff (Field.get field t) handler pipe
-      in
-      ( match diff with
-      | Transition_frontier_diff.New_best_tip {old_root; new_root; _} ->
-          if not (Breadcrumb.equal old_root new_root) then
-            Root_history.enqueue t.root_history
-              (Breadcrumb.state_hash old_root)
-              old_root
-      | _ ->
-          () ) ;
-      let%map () =
-        Fields.fold ~init:diff
-          ~root_history:(fun _ _ -> Deferred.unit)
-          ~snark_pool_refcount:
-            (use Snark_pool_refcount.handle_diff pipes.snark_pool)
-          ~transition_registry:(fun acc _ -> acc)
-          ~best_tip_diff:(use Best_tip_diff.handle_diff pipes.best_tip_diff)
-          ~root_diff:(use Root_diff.handle_diff pipes.root_diff)
-          ~persistence_diff:
-            (use Persistence_diff.handle_diff pipes.persistence_diff)
-          ~new_transition:(fun acc _ -> acc)
-      in
-      let bc_opt =
-        match diff with
-        | New_breadcrumb bc ->
-            Some bc
-        | New_best_tip {added_to_best_tip_path; _} ->
-            Some (Non_empty_list.last added_to_best_tip_path)
-        | _ ->
-            None
-      in
-      Option.iter bc_opt ~f:(fun bc ->
-          (* Other components may be waiting on these, so it's important they're
-             updated after the views above so that those other components see
-             the views updated with the new breadcrumb. *)
-          Transition_registry.notify t.transition_registry
-            (Breadcrumb.state_hash bc) ;
-          New_transition.Var.set t.new_transition
-          @@ Breadcrumb.external_transition bc ;
-          New_transition.stabilize () )
-  end
+  module Extensions = Extensions.Make (struct
+    include Inputs
+    module Breadcrumb = Breadcrumb
+    module Diff = Diff
+  end)
 
   module Node = struct
     type t =
@@ -812,7 +342,7 @@ struct
     in
     let%map () =
       Extensions.handle_diff t.extensions t.extension_writers
-        (Transition_frontier_diff.New_frontier root_breadcrumb)
+        (Diff.New_frontier root_breadcrumb)
     in
     t
 
@@ -1329,9 +859,9 @@ struct
         Extensions.handle_diff t.extensions t.extension_writers
           ( match best_tip_change with
           | `Keep ->
-              Transition_frontier_diff.New_breadcrumb node.breadcrumb
+              Diff.New_breadcrumb node.breadcrumb
           | `Take ->
-              Transition_frontier_diff.New_best_tip
+              Diff.New_best_tip
                 { old_root= root_node.breadcrumb
                 ; old_root_length= root_node.length
                 ; new_root= new_root_node.breadcrumb
@@ -1406,22 +936,12 @@ struct
 end
 
 include Make (struct
-  module Staged_ledger_aux_hash = struct
-    include Staged_ledger_hash.Aux_hash.Stable.V1
-
-    [%%define_locally
-    Staged_ledger_hash.Aux_hash.(of_bytes, to_bytes)]
-  end
-
   module Verifier = Verifier
-  module Pending_coinbase_stack_state =
-    Transaction_snark.Pending_coinbase_stack_state
-  module Ledger_proof_statement = Transaction_snark.Statement
   module Ledger_proof = Ledger_proof
   module Transaction_snark_work = Transaction_snark_work
-  module Staged_ledger_diff = Staged_ledger_diff
   module External_transition = External_transition
-  module Transaction_witness = Transaction_witness
+  module Internal_transition = Internal_transition
+  module Staged_ledger_diff = Staged_ledger_diff
   module Staged_ledger = Staged_ledger
 
   let max_length = Consensus.Constants.k
