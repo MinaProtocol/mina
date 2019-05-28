@@ -202,10 +202,8 @@ module Make (Inputs : Inputs_intf) = struct
       ~transition_reader:network_transition_reader
       ~valid_transition_writer:valid_protocol_state_transition_writer ;
     Strict_pipe.Reader.iter_without_pushback
-      valid_protocol_state_transition_reader ~f:(fun network_transition ->
-        let `Transition incoming_transition, `Time_received tm =
-          network_transition
-        in
+      valid_protocol_state_transition_reader ~f:(fun valid_transition ->
+        let `Transition incoming_transition, _ = valid_transition in
         let new_transition_with_validation =
           Envelope.Incoming.data incoming_transition
         in
@@ -223,14 +221,14 @@ module Make (Inputs : Inputs_intf) = struct
                 ~controller_type ~clear_reader ~clear_writer
                 ~transition_frontier_controller_reader
                 ~transition_frontier_controller_writer ~old_frontier:frontier
-                ~verified_transition_writer network_transition
+                ~verified_transition_writer valid_transition
             else
               Strict_pipe.Writer.write transition_frontier_controller_writer
-                network_transition
+                valid_transition
         | `Bootstrap_controller (root_state, bootstrap_controller_writer) ->
             if is_transition_for_bootstrap root_state new_transition then
               Strict_pipe.Writer.write bootstrap_controller_writer
-                network_transition )
+                valid_transition )
     |> don't_wait_for ;
     verified_transition_reader
 end
