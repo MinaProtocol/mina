@@ -1,5 +1,6 @@
 open Core
 open Async_kernel
+open Async_rpc_kernel
 open Pipe_lib
 open Cache_lib
 
@@ -118,6 +119,13 @@ module type Network_intf = sig
        * sync_ledger_answer Envelope.Incoming.t )
        Pipe_lib.Linear_pipe.Writer.t
     -> unit
+
+  val query_peer :
+       t
+    -> peer
+    -> (Versioned_rpc.Connection_with_menu.t -> 'q -> 'r Deferred.Or_error.t)
+    -> 'q
+    -> 'r Deferred.Or_error.t
 end
 
 module type Transition_frontier_Breadcrumb_intf = sig
@@ -471,8 +479,8 @@ module type Catchup_intf = sig
                                     Cached.t
                                     Rose_tree.t
                                     list
-                                  , Strict_pipe.synchronous
-                                  , unit Deferred.t )
+                                  , Strict_pipe.crash Strict_pipe.buffered
+                                  , unit )
                                   Strict_pipe.Writer.t
     -> unprocessed_transition_cache:unprocessed_transition_cache
     -> unit
@@ -592,8 +600,8 @@ module type Transition_handler_processor_intf = sig
                               Cached.t
                               Rose_tree.t
                               list
-                          , Strict_pipe.synchronous
-                          , unit Deferred.t )
+                          , Strict_pipe.crash Strict_pipe.buffered
+                          , unit )
                           Strict_pipe.Writer.t
     -> catchup_breadcrumbs_reader:( transition_frontier_breadcrumb
                                   , state_hash )
@@ -606,8 +614,8 @@ module type Transition_handler_processor_intf = sig
                                     Cached.t
                                     Rose_tree.t
                                     list
-                                  , Strict_pipe.synchronous
-                                  , unit Deferred.t )
+                                  , Strict_pipe.crash Strict_pipe.buffered
+                                  , unit )
                                   Strict_pipe.Writer.t
     -> processed_transition_writer:( ( external_transition_validated
                                      , state_hash )

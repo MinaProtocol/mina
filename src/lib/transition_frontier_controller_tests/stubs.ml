@@ -525,6 +525,8 @@ struct
 
     let mplus ma mb = if Option.is_some ma then ma else mb
 
+    let query_peer {ip_table= _; _} _peer _f _r = failwith "..."
+
     let get_staged_ledger_aux_and_pending_coinbases_at_hash {ip_table; _}
         inet_addr hash =
       Deferred.return

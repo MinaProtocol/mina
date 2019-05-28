@@ -67,6 +67,15 @@ include Comparable.Make_binable (Stable.Latest)
 
 type var = Tick.Field.Var.t * Tick.Field.Var.t
 
+let assert_equal var1 var2 =
+  let open Tick0.Checked.Let_syntax in
+  let open Tick.Field.Checked.Assert in
+  let v1_f1, v1_f2 = var1 in
+  let v2_f1, v2_f2 = var2 in
+  let%bind () = equal v1_f1 v2_f1 in
+  let%bind () = equal v1_f2 v2_f2 in
+  return ()
+
 let var_of_t (x, y) = (Tick.Field.Var.constant x, Tick.Field.Var.constant y)
 
 let typ : (var, t) Tick.Typ.t = Tick.Typ.(field * field)

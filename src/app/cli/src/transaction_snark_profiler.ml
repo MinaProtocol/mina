@@ -3,6 +3,8 @@ open Signature_lib
 open Coda_base
 open Snark_params
 
+let name = "transaction-snark-profiler"
+
 (* We're just profiling, so okay to monkey-patch here *)
 module Sparse_ledger = struct
   include Sparse_ledger
