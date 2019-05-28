@@ -276,12 +276,12 @@ let%test_module "test" =
       let on_v (x1, x2, x3, x4) =
         F.(equal (curve_eqn x1 * curve_eqn x2 * curve_eqn x3) (x4 * x4))
 
-(* Schwarz-zippel says if this tests succeeds once, then the probability that 
+      (* Schwarz-zippel says if this tests succeeds once, then the probability that 
    the implementation is correct is at least 1 - (D / field-size), where D is
    the total degree of the polynomial defining_equation_of_V(s_to_v(t)) which should
    be less than, say, 10. So, this test succeeding gives good evidence of the
    correctness of the implementation (assuming that the implementation is just a
-   polynomial, which it is if you inspect it.) *)
+   polynomial, which it is by parametricity!) *)
       let%test_unit "field-to-S" =
         Quickcheck.test ~sexp_of:F.sexp_of_t gen ~f:(fun t ->
             let s = M.field_to_s t in
