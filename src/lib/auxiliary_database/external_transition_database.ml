@@ -72,7 +72,7 @@ module Filtered_external_transition = struct
     ; protocol_state: Protocol_state.t
     ; transactions: Transactions.t }
 
-  let of_transition external_transition =
+  let of_transition external_transition ~tracked_participants =
     let open External_transition.Validated in
     let creator = proposer external_transition in
     let protocol_state =
@@ -93,13 +93,25 @@ module Filtered_external_transition = struct
           ; fee_transfers= []
           ; coinbase= Currency.Amount.zero } ~f:(fun acc_transactions ->
         function
-        | User_command user_command ->
-            { acc_transactions with
-              user_commands=
-                User_command.forget_check user_command
-                :: acc_transactions.user_commands }
+        | User_command checked_user_command ->
+            let user_command =
+              User_command.forget_check checked_user_command
+            in
+            if
+              List.exists
+                (User_command.accounts_accessed user_command)
+                ~f:(Public_key.Compressed.Set.mem tracked_participants)
+            then
+              { acc_transactions with
+                user_commands=
+                  User_command.forget_check checked_user_command
+                  :: acc_transactions.user_commands }
+            else acc_transactions
         | Fee_transfer fee_transfer ->
             let fee_transfers =
+              List.filter ~f:(fun (pk, _) ->
+                  Public_key.Compressed.Set.mem tracked_participants pk )
+              @@
               match fee_transfer with
               | One fee_transfer1 ->
                   [fee_transfer1]
@@ -176,7 +188,7 @@ let create ~logger directory =
   ; pagination= Pagination.create ()
   ; logger }
 
-let add {database; pagination; logger}
+let add ~tracked_participants {database; pagination; logger}
     {With_hash.hash= state_hash; data= external_transition} date =
   match Hashtbl.find pagination.all_values state_hash with
   | Some _ ->
@@ -186,7 +198,10 @@ let add {database; pagination; logger}
         ~module_:__MODULE__ ~location:__LOC__
         ~metadata:[("transaction", State_hash.to_yojson state_hash)]
   | None -> (
-    match Filtered_external_transition.of_transition external_transition with
+    match
+      Filtered_external_transition.of_transition ~tracked_participants
+        external_transition
+    with
     | Ok block ->
         Database.set database ~key:state_hash ~data:(block, date) ;
         add_user_blocks pagination

@@ -79,7 +79,12 @@ module type External_transition = sig
 
   val close : t -> unit
 
-  val add : t -> (external_transition, hash) With_hash.t -> time -> unit
+  val add :
+       tracked_participants:Public_key.Compressed.Set.t
+    -> t
+    -> (external_transition, hash) With_hash.t
+    -> time
+    -> unit
 
   include
     Pagination with type t := t and type time := time and type value := hash

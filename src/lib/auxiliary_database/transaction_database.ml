@@ -1,6 +1,7 @@
 open Core
 open Async
 open Signature_lib
+open Coda_base
 
 (* TODO: Remove Transaction functor when we need to query transactions other
    than user_commands *)
@@ -11,7 +12,7 @@ module Make (Transaction : sig
 
   include Hashable.S with type t := t
 
-  val get_participants : t -> Public_key.Compressed.t list
+  val accounts_accessed : t -> Public_key.Compressed.t list
 end) (Time : sig
   type t [@@deriving bin_io, compare, sexp]
 end) =
@@ -23,7 +24,7 @@ struct
 
   let add_user_transaction (pagination : Pagination.t) (transaction, date) =
     Pagination.add_involved_participants pagination
-      (Transaction.get_participants transaction)
+      (Transaction.accounts_accessed transaction)
       (transaction, date) ;
     Hashtbl.add_exn pagination.all_values ~key:transaction ~data:date
 
@@ -58,7 +59,7 @@ struct
 end
 
 module Block_time = Coda_base.Block_time
-module T = Make (User_command) (Block_time.Time.Stable.V1)
+module T = Make (User_command.Stable.V1) (Block_time.Time.Stable.V1)
 include T
 
 module For_tests = struct
