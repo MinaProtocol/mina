@@ -230,7 +230,7 @@ module Make (Inputs : Inputs_intf) = struct
         | `Bootstrap_controller (root_state, bootstrap_controller_writer) ->
             if is_transition_for_bootstrap root_state new_transition then
               Strict_pipe.Writer.write bootstrap_controller_writer
-                (`Transition incoming_transition, `Time_received tm) )
+                network_transition )
     |> don't_wait_for ;
     verified_transition_reader
 end
