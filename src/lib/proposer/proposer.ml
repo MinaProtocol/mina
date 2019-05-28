@@ -614,6 +614,10 @@ module Make (Inputs : Inputs_intf) :
                   let consensus_state =
                     Protocol_state.consensus_state protocol_state
                   in
+                  assert (
+                    Consensus.Hooks.required_local_state_sync ~consensus_state
+                      ~local_state:consensus_local_state
+                    = None ) ;
                   match
                     measure "asking conensus what to do" (fun () ->
                         Consensus.Hooks.next_proposal
