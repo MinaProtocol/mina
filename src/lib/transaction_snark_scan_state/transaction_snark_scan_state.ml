@@ -565,15 +565,18 @@ end = struct
 
   let base_jobs_on_latest_tree = Parallel_scan.base_jobs_on_latest_tree
 
+  (*All the transactions in the order in which they were applied*)
   let staged_transactions t =
-    List.map (Parallel_scan.pending_data t)
-      ~f:(fun (t : Transaction_with_witness.t) -> t.transaction_with_info)
-
-  let all_transactions t =
     List.map ~f:(fun (t : Transaction_with_witness.t) ->
         t.transaction_with_info |> Ledger.Undo.transaction )
     @@ Parallel_scan.pending_data t
     |> Or_error.all
+
+  (*All the staged transactions in the reverse order of their application (Latest first)*)
+  let staged_transactions_with_info_rev t =
+    List.map
+      (Parallel_scan.pending_data t |> List.rev)
+      ~f:(fun (t : Transaction_with_witness.t) -> t.transaction_with_info)
 
   (*let copy {tree; job_count} = {tree= Parallel_scan.State.copy tree; job_count}*)
 

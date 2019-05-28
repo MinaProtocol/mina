@@ -277,7 +277,7 @@ end)
    fun {ledger; scan_state; _} ~snarked_ledger_hash:expected_target ->
     let open Or_error.Let_syntax in
     let txns_still_being_worked_on =
-      Scan_state.staged_transactions scan_state
+      Scan_state.staged_transactions_with_info_rev scan_state
     in
     let snarked_ledger = Ledger.register_mask ledger (Ledger.Mask.create ()) in
     let%bind () =
@@ -351,7 +351,9 @@ end)
     let snarked_frozen_ledger_hash =
       Frozen_ledger_hash.of_ledger_hash snarked_ledger_hash
     in
-    let%bind txs = Scan_state.all_transactions scan_state |> Deferred.return in
+    let%bind txs =
+      Scan_state.staged_transactions scan_state |> Deferred.return
+    in
     let%bind () =
       List.fold_result
         ~f:(fun _ tx ->
