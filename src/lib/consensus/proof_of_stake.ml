@@ -32,21 +32,10 @@ let genesis_ledger_hash =
 let compute_delegators self_pk ~iter_accounts =
   let open Coda_base in
   let t = Account.Index.Table.create () in
-  let matches_pubkey pubkey =
-    match self_pk with
-    | `Include_self, pk ->
-        Public_key.Compressed.equal pk pubkey
-    | `Don't_include_self, _ ->
-        false
-  in
+  let matches_pubkey pubkey = Public_key.Compressed.equal self_pk pubkey in
   iter_accounts (fun i (acct : Account.t) ->
-      (* TODO: The second disjunct is a hack and should be removed once the delegation
-             command PR lands. *)
-      if
-        Public_key.Compressed.equal (snd self_pk) acct.delegate
-        || matches_pubkey acct.public_key
-      then Hashtbl.add t ~key:i ~data:acct.balance |> ignore
-      else () ) ;
+      if matches_pubkey acct.delegate then
+        Hashtbl.add t ~key:i ~data:acct.balance |> ignore ) ;
   t
 
 module Segment_id = Nat.Make32 ()
@@ -330,30 +319,22 @@ module Data = struct
     [@@deriving sexp, to_yojson]
 
     let create proposer_public_key =
-      (* TODO: remove duplicated genesis ledger *)
-      let genesis_epoch_snapshot =
-        match proposer_public_key with
-        | None ->
-            Snapshot.create_empty ()
-        | Some key ->
-            let open Snapshot in
-            let delegators =
-              compute_delegators
-                (* TODO: Propagate Include_self to the right place *)
-                (`Include_self, key)
-                ~iter_accounts:(fun f ->
-                  let open Coda_base in
-                  Ledger.foldi ~init:() Genesis_ledger.t ~f:(fun i () acct ->
-                      f (Ledger.Addr.to_int i) acct ) )
-            in
-            let ledger =
-              Coda_base.Sparse_ledger.of_any_ledger
-                (Coda_base.Ledger.Any_ledger.cast
-                   (module Coda_base.Ledger)
-                   Genesis_ledger.t)
-            in
-            {delegators; ledger}
+      let delegators =
+        Option.value_map ~default:(Core.Int.Table.create ~size:0 ())
+          proposer_public_key ~f:(fun key ->
+            compute_delegators key ~iter_accounts:(fun f ->
+                let open Coda_base in
+                Ledger.foldi ~init:() Genesis_ledger.t ~f:(fun i () acct ->
+                    f (Ledger.Addr.to_int i) acct ) ) )
       in
+      (* TODO: remove this duplicate of the genesis ledger *)
+      let ledger =
+        Coda_base.Sparse_ledger.of_any_ledger
+          (Coda_base.Ledger.Any_ledger.cast
+             (module Coda_base.Ledger)
+             Genesis_ledger.t)
+      in
+      let genesis_epoch_snapshot = {Snapshot.delegators; ledger} in
       { last_epoch_snapshot= None
       ; curr_epoch_snapshot= None
       ; genesis_epoch_snapshot
@@ -398,8 +379,7 @@ module Data = struct
           module T = struct
             type ('ledger_hash, 'amount) t =
               {hash: 'ledger_hash; total_currency: 'amount}
-            [@@deriving
-              sexp, bin_io, eq, compare, hash, to_yojson, version {unnumbered}]
+            [@@deriving sexp, bin_io, eq, compare, hash, to_yojson, version]
           end
 
           include T
@@ -755,9 +735,9 @@ module Data = struct
       let%bind public_key =
         request_witness Public_key.typ (As_prover.return Public_key)
       in
-      let winner_addr = message.Message.delegator in
+      let staker_addr = message.Message.delegator in
       let%bind account =
-        with_label __LOC__ (Frozen_ledger_hash.get ledger winner_addr)
+        with_label __LOC__ (Frozen_ledger_hash.get ledger staker_addr)
       in
       let%bind delegate =
         with_label __LOC__ (Public_key.decompress_var account.delegate)
@@ -934,8 +914,7 @@ module Data = struct
               ; start_checkpoint: 'start_checkpoint
               ; lock_checkpoint: 'lock_checkpoint
               ; length: 'length }
-            [@@deriving
-              sexp, bin_io, eq, compare, hash, to_yojson, version {unnumbered}]
+            [@@deriving sexp, bin_io, eq, compare, hash, to_yojson, version]
           end
 
           include T
@@ -1197,7 +1176,7 @@ module Data = struct
         module V1 = struct
           module T = struct
             type ('epoch, 'slot) t = {epoch: 'epoch; slot: 'slot}
-            [@@deriving sexp, bin_io, compare, version {unnumbered}]
+            [@@deriving sexp, bin_io, compare, version]
           end
 
           include T
@@ -1479,8 +1458,7 @@ module Data = struct
               ; curr_epoch_data: 'curr_epoch_data
               ; has_ancestor_in_same_checkpoint_window: 'bool
               ; checkpoints: 'checkpoints }
-            [@@deriving
-              sexp, bin_io, eq, compare, hash, to_yojson, version {unnumbered}]
+            [@@deriving sexp, bin_io, eq, compare, hash, to_yojson, version]
           end
 
           include T
@@ -1795,7 +1773,7 @@ module Data = struct
             (Global_slot.create ~epoch:next_epoch ~slot:next_slot)
       ; checkpoints }
 
-    module M = Snarky.Snark.Run.Make (Crypto_params_init.Tick_backend)
+    module M = Snarky.Snark.Run.Make (Curve_choice.Tick_backend)
 
     let m : M.field Snarky.Snark.m = (module M)
 
@@ -2309,9 +2287,7 @@ module Hooks = struct
               in
               let delegators =
                 Option.map local_state.proposer_public_key ~f:(fun pk ->
-                    compute_delegators
-                      (`Include_self, pk)
-                      ~iter_accounts:(fun f ->
+                    compute_delegators pk ~iter_accounts:(fun f ->
                         Coda_base.Sparse_ledger.iteri snapshot_ledger ~f ) )
                 |> Option.value
                      ~default:(Coda_base.Account.Index.Table.create ())
@@ -2582,27 +2558,21 @@ module Hooks = struct
           (Int64.to_int epoch_end_time) ;
         `Check_again epoch_end_time
 
-  (* TODO *)
-  let lock_transition (prev : Consensus_state.Value.t)
+  let frontier_root_transition (prev : Consensus_state.Value.t)
       (next : Consensus_state.Value.t) ~local_state ~snarked_ledger =
     let open Local_state in
     if not (Epoch.equal prev.curr_epoch next.curr_epoch) then (
-      let epoch_snapshot =
-        Option.map local_state.proposer_public_key ~f:(fun pk ->
-            let open Local_state.Snapshot in
-            let delegators =
-              compute_delegators
-                (`Include_self, pk)
-                ~iter_accounts:(fun f ->
-                  Coda_base.Ledger.Any_ledger.M.iteri snarked_ledger ~f )
-            in
-            let ledger =
-              Coda_base.Sparse_ledger.of_any_ledger snarked_ledger
-            in
-            {delegators; ledger} )
+      (* If we are not proposing, then we don't care about the delegators table. *)
+      let delegators =
+        Option.value_map ~default:(Core.Int.Table.create ~size:0 ())
+          local_state.proposer_public_key ~f:(fun pk ->
+            compute_delegators pk ~iter_accounts:(fun f ->
+                Coda_base.Ledger.Any_ledger.M.iteri snarked_ledger ~f ) )
       in
+      let ledger = Coda_base.Sparse_ledger.of_any_ledger snarked_ledger in
+      let epoch_snapshot = {Local_state.Snapshot.delegators; ledger} in
       local_state.last_epoch_snapshot <- local_state.curr_epoch_snapshot ;
-      local_state.curr_epoch_snapshot <- epoch_snapshot )
+      local_state.curr_epoch_snapshot <- Some epoch_snapshot )
 
   let should_bootstrap_len ~existing ~candidate =
     let length = Length.to_int in

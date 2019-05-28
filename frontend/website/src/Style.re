@@ -54,6 +54,8 @@ module Colors = {
 module Typeface = {
   open Css;
 
+  let cdnUrl = u => url(Links.Cdn.url(u));
+
   let weights = [
     // The weights are intentionally shifted thinner one unit
     (`thin, "Thin"),
@@ -66,60 +68,65 @@ module Typeface = {
     (`extraBold, "Bold"),
   ];
 
-  let () =
-    List.iter(
-      ((weight, name)) =>
-        ignore @@
-        fontFace(
-          ~fontFamily="IBM Plex Sans",
-          ~src=[
-            url("/static/font/IMBPlexSans-" ++ name ++ "-Latin1.woff2"),
-            url("/static/font/IBMPlexSans-" ++ name ++ "-Latin1.woff"),
-          ],
-          ~fontStyle=`normal,
-          ~fontWeight=weight,
-          (),
-        ),
-      weights,
-    );
+  let load = () => {
+    let () =
+      List.iter(
+        ((weight, name)) =>
+          ignore @@
+          fontFace(
+            ~fontFamily="IBM Plex Sans",
+            ~src=[
+              cdnUrl("/static/font/IBMPlexSans-" ++ name ++ "-Latin1.woff2"),
+              cdnUrl("/static/font/IBMPlexSans-" ++ name ++ "-Latin1.woff"),
+            ],
+            ~fontStyle=`normal,
+            ~fontWeight=weight,
+            (),
+          ),
+        weights,
+      );
 
-  let _ =
-    fontFace(
-      ~fontFamily="IBM Plex Mono",
-      ~src=[
-        url("/static/font/IBMPlexMono-Medium-Latin1.woff2"),
-        url("/static/font/IBMPlexMono-Medium-Latin1.woff"),
-      ],
-      ~fontStyle=`normal,
-      ~fontWeight=`semiBold,
-      (),
-    );
-
-  let _ =
-    fontFace(
-      ~fontFamily="IBM Plex Mono",
-      ~src=[
-        url("/static/font/IBMPlexMono-SemiBold-Latin1.woff2"),
-        url("/static/font/IBMPlexSans-SemiBold-Latin1.woff"),
-      ],
-      ~fontStyle=`normal,
-      ~fontWeight=`bold,
-      (),
-    );
-
-  let ibmplexserif =
-    fontFamily(
+    let _ =
       fontFace(
-        ~fontFamily="IBM Plex Serif",
+        ~fontFamily="IBM Plex Mono",
         ~src=[
-          url("/static/font/IBMPlexSerif-Medium-Latin1.woff2"),
-          url("/static/font/IBMPlexSerif-Medium-Latin1.woff"),
+          cdnUrl("/static/font/IBMPlexMono-Medium-Latin1.woff2"),
+          cdnUrl("/static/font/IBMPlexMono-Medium-Latin1.woff"),
         ],
         ~fontStyle=`normal,
-        ~fontWeight=`medium,
+        ~fontWeight=`semiBold,
         (),
-      ),
-    );
+      );
+
+    let _ =
+      fontFace(
+        ~fontFamily="IBM Plex Mono",
+        ~src=[
+          cdnUrl("/static/font/IBMPlexMono-SemiBold-Latin1.woff2"),
+          cdnUrl("/static/font/IBMPlexMono-SemiBold-Latin1.woff"),
+        ],
+        ~fontStyle=`normal,
+        ~fontWeight=`bold,
+        (),
+      );
+
+    let _ =
+      fontFamily(
+        fontFace(
+          ~fontFamily="IBM Plex Serif",
+          ~src=[
+            cdnUrl("/static/font/IBMPlexSerif-Medium-Latin1.woff2"),
+            cdnUrl("/static/font/IBMPlexSerif-Medium-Latin1.woff"),
+          ],
+          ~fontStyle=`normal,
+          ~fontWeight=`medium,
+          (),
+        ),
+      );
+    ();
+  };
+
+  let ibmplexserif = fontFamily("IBM Plex Serif, serif");
 
   let ibmplexsans =
     fontFamily("IBM Plex Sans, Helvetica Neue, Arial, sans-serif");

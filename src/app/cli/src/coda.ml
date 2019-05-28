@@ -492,25 +492,33 @@ let coda_commands logger =
 [%%if
 integration_tests]
 
+module type Integration_test = sig
+  val name : string
+
+  val command : Async.Command.t
+end
+
 let coda_commands logger =
   let group =
-    [ (Coda_peers_test.name, Coda_peers_test.command)
-    ; (Coda_block_production_test.name, Coda_block_production_test.command)
-    ; (Coda_shared_state_test.name, Coda_shared_state_test.command)
-    ; (Coda_transitive_peers_test.name, Coda_transitive_peers_test.command)
-    ; (Coda_shared_prefix_test.name, Coda_shared_prefix_test.command)
-    ; ( Coda_shared_prefix_multiproposer_test.name
-      , Coda_shared_prefix_multiproposer_test.command )
-    ; (Coda_five_nodes_test.name, Coda_five_nodes_test.command)
-    ; (Coda_restart_node_test.name, Coda_restart_node_test.command)
-    ; (Coda_receipt_chain_test.name, Coda_receipt_chain_test.command)
-    ; ( Coda_restarts_and_txns_holy_grail.name
-      , Coda_restarts_and_txns_holy_grail.command )
-    ; (Coda_bootstrap_test.name, Coda_bootstrap_test.command)
-    ; (Coda_batch_payment_test.name, Coda_batch_payment_test.command)
-    ; (Coda_long_fork.name, Coda_long_fork.command)
-    ; ("full-test", Full_test.command)
-    ; ("transaction-snark-profiler", Transaction_snark_profiler.command) ]
+    List.map
+      ~f:(fun (module T) -> (T.name, T.command))
+      ( [ (module Coda_peers_test)
+        ; (module Coda_block_production_test)
+        ; (module Coda_shared_state_test)
+        ; (module Coda_transitive_peers_test)
+        ; (module Coda_shared_prefix_test)
+        ; (module Coda_shared_prefix_multiproposer_test)
+        ; (module Coda_five_nodes_test)
+        ; (module Coda_restart_node_test)
+        ; (module Coda_receipt_chain_test)
+        ; (module Coda_restarts_and_txns_holy_grail)
+        ; (module Coda_bootstrap_test)
+        ; (module Coda_batch_payment_test)
+        ; (module Coda_long_fork)
+        ; (module Coda_delegation_test)
+        ; (module Full_test)
+        ; (module Transaction_snark_profiler) ]
+        : (module Integration_test) list )
   in
   coda_commands logger
   @ [("integration-tests", Command.group ~summary:"Integration tests" group)]
