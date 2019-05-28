@@ -50,10 +50,14 @@ let%test_module "Transition Frontier Persistence" =
       Monitor.try_with (fun () ->
           let frontier_persistence = create_persistence ~directory_name in
           let%bind result = f (frontier, frontier_persistence) in
-          let%map () =
-            Transition_frontier_persistence.close_and_finish_copy
-              frontier_persistence
+          frontier_persistence.is_accepting_diffs <- false ;
+          let%bind () =
+            Transition_frontier_persistence.flush frontier_persistence
           in
+          Strict_pipe.Writer.close frontier_persistence.worker_writer ;
+          let%map () = frontier_persistence.worker_thread in
+          Transition_frontier_persistence.Worker.close
+            frontier_persistence.worker ;
           result )
       |> Deferred.map ~f:(function
            | Ok value ->
@@ -169,10 +173,11 @@ let%test_module "Transition Frontier Persistence" =
       @@ Transition_frontier_persistence.listen_to_frontier_broadcast_pipe
            frontier_reader frontier_persistence ;
       let%bind () = store_transitions frontier breadcrumbs in
+      frontier_persistence.is_accepting_diffs <- false ;
       let%bind () =
         Transition_frontier_persistence.flush frontier_persistence
       in
-      Ivar.fill frontier_persistence.stop_signal `Stop ;
+      Strict_pipe.Writer.close frontier_persistence.worker_writer ;
       let%bind () = frontier_persistence.worker_thread in
       let%map deserialized_frontier =
         Transition_frontier_persistence.read ~logger ~trust_system ~verifier:()
