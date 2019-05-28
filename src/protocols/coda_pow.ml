@@ -962,9 +962,9 @@ module type Transaction_snark_scan_state_intf = sig
 
   val hash : t -> staged_ledger_aux_hash
 
-  val staged_transactions : t -> transaction_with_info list
+  val staged_transactions_with_info_rev : t -> transaction_with_info list
 
-  val all_transactions : t -> transaction list Or_error.t
+  val staged_transactions : t -> transaction list Or_error.t
 
   val extract_from_job :
        Available_job.t
@@ -1062,7 +1062,7 @@ module type Staged_ledger_base_intf = sig
 
     val work_for_new_diff : t -> statement Sequence.t
 
-    val all_transactions : t -> transaction list Or_error.t
+    val staged_transactions : t -> transaction list Or_error.t
   end
 
   module Staged_ledger_error : sig
