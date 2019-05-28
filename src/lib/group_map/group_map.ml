@@ -164,7 +164,19 @@ let to_group (type t) (module F : Field_intf.S_unchecked with type t = t)
 
 let%test_module "test" =
   ( module struct
-    module F = struct
+    module Fp = struct
+      include Snarkette.Fields.Make_fp
+                (Snarkette.Nat)
+                (struct
+                  let order = Snarkette.Nat.of_int 100003
+                end)
+
+      let a = of_int 1
+
+      let b = of_int 3
+    end
+
+    module F13 = struct
       type t = int [@@deriving sexp]
 
       let p = 13
@@ -201,54 +213,81 @@ let%test_module "test" =
 
       let of_int = Fn.id
 
-      let constant = Fn.id
-
       let gen = Int.gen_incl 0 Int.(p - 1)
+
+      let a = 1
+
+      let b = 3
     end
 
-    let a = 1
+    module Make_tests (F : sig
+      include Field_intf.S_unchecked
 
-    let b = 3
+      val gen : t Quickcheck.Generator.t
 
-    let params = Params.create (module F) ~a ~b
+      val a : t
 
-    let curve_eqn u = (u * u * u) + (params.a * u) + params.b
+      val b : t
+    end) =
+    struct
+      module F = struct
+        include F
 
-    let conic_d =
-      let open F in
-      negate (curve_eqn params.u)
+        let constant = Fn.id
+      end
 
-    let on_conic {Conic.z; y} =
-      F.(equal ((z * z) + (params.conic_c * y * y)) conic_d)
+      open F
 
-    module M =
-      Make (F) (F)
-        (struct
-          let params = params
-        end)
+      let params = Params.create (module F) ~a ~b
 
-    let%test "projection point well-formed" = on_conic params.projection_point
+      let curve_eqn u = (u * u * u) + (params.a * u) + params.b
 
-    let gen =
-      Quickcheck.Generator.filter F.gen ~f:(fun t ->
-          not F.(equal ((params.conic_c * t * t) + one) zero) )
+      let conic_d =
+        let open F in
+        negate (curve_eqn params.u)
 
-    let%test_unit "field-to-conic" =
-      Quickcheck.test ~sexp_of:F.sexp_of_t gen ~f:(fun t ->
-          assert (on_conic (M.field_to_conic t)) )
+      let on_conic {Conic.z; y} =
+        F.(equal ((z * z) + (params.conic_c * y * y)) conic_d)
 
-    let on_s {S.u; v; y} =
-      F.(equal conic_d (y * y * ((u * u) + (u * v) + (v * v) + a)))
+      module M =
+        Make (F) (F)
+          (struct
+            let params = params
+          end)
 
-    let%test_unit "field-to-S" =
-      Quickcheck.test ~sexp_of:F.sexp_of_t gen ~f:(fun t ->
-          assert (on_s (M.field_to_s t)) )
+      let%test "projection point well-formed" =
+        on_conic params.projection_point
 
-    let on_v (x1, x2, x3, x4) =
-      F.(equal (curve_eqn x1 * curve_eqn x2 * curve_eqn x3) (x4 * x4))
+      let gen =
+        Quickcheck.Generator.filter F.gen ~f:(fun t ->
+            not F.(equal ((params.conic_c * t * t) + one) zero) )
 
-    let%test_unit "field-to-S" =
-      Quickcheck.test ~sexp_of:F.sexp_of_t gen ~f:(fun t ->
-          let s = M.field_to_s t in
-          assert (on_v (M._s_to_v s)) )
+      let%test_unit "field-to-conic" =
+        Quickcheck.test ~sexp_of:F.sexp_of_t gen ~f:(fun t ->
+            assert (on_conic (M.field_to_conic t)) )
+
+      let on_s {S.u; v; y} =
+        F.(equal conic_d (y * y * ((u * u) + (u * v) + (v * v) + a)))
+
+      let%test_unit "field-to-S" =
+        Quickcheck.test ~sexp_of:F.sexp_of_t gen ~f:(fun t ->
+            assert (on_s (M.field_to_s t)) )
+
+      let on_v (x1, x2, x3, x4) =
+        F.(equal (curve_eqn x1 * curve_eqn x2 * curve_eqn x3) (x4 * x4))
+
+(* Schwarz-zippel says if this tests succeeds once, then the probability that 
+   the implementation is correct is at least 1 - (D / field-size), where D is
+   the total degree of the polynomial defining_equation_of_V(s_to_v(t)) which should
+   be less than, say, 10. So, this test succeeding gives good evidence of the
+   correctness of the implementation (assuming that the implementation is just a
+   polynomial, which it is if you inspect it.) *)
+      let%test_unit "field-to-S" =
+        Quickcheck.test ~sexp_of:F.sexp_of_t gen ~f:(fun t ->
+            let s = M.field_to_s t in
+            assert (on_v (M._s_to_v s)) )
+    end
+
+    module T0 = Make_tests (F13)
+    module T1 = Make_tests (Fp)
   end )
