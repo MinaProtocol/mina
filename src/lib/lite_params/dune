@@ -2,9 +2,9 @@
   (name lite_params)
   (public_name lite_params)
   (preprocess (pps ppx_jane ppx_deriving.eq ppx_coda))
-  (libraries pedersen_lib lite_curve_choice snarkette core_kernel base64))
+  (libraries hash_prefixes bowe_gabizon_hash pedersen_lib lite_curve_choice snarkette core_kernel base64))
 
 (rule
-  (targets pedersen_params.ml)
+  (targets precomputed_params.ml)
   (deps    gen/gen.exe)
   (action  (run gen/gen.exe ${@})))
