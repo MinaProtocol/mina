@@ -13,8 +13,8 @@ let seed = "CodaPedersenParams"
 
 let random_bool = Crs.create ~seed
 
-module Impl = Crypto_params_init.Tick0
-module Group = Crypto_params_init.Tick_backend.Inner_curve
+module Impl = Curve_choice.Tick0
+module Group = Curve_choice.Tick_backend.Inner_curve
 open Tuple_lib
 
 let bigint_of_bits bits =
@@ -42,15 +42,15 @@ let rec random_point () =
   let y2 =
     let open Impl.Field in
     (x * square x)
-    + (Crypto_params_init.Tick_backend.Inner_curve.Coefficients.a * x)
-    + Crypto_params_init.Tick_backend.Inner_curve.Coefficients.b
+    + (Curve_choice.Tick_backend.Inner_curve.Coefficients.a * x)
+    + Curve_choice.Tick_backend.Inner_curve.Coefficients.b
   in
   if Impl.Field.is_square y2 then
     let a, b = sqrt y2 in
     if random_bool () then (x, a) else (x, b)
   else random_point ()
 
-let scalar_size_in_triples = Crypto_params_init.Tock0.Field.size_in_bits / 4
+let scalar_size_in_triples = Curve_choice.Tock_full.Field.size_in_bits / 4
 
 let max_input_size_in_bits = 20000
 
@@ -103,7 +103,7 @@ let params_structure ~loc =
     let loc = loc
   end) in
   let open E in
-  [%str open Crypto_params_init
+  [%str open Curve_choice
 
         let params = [%e params_ast ~loc]]
 
@@ -181,7 +181,7 @@ let chunk_table_structure ~loc =
   let open E in
   [%str
     open Core
-    module Group = Crypto_params_init.Tick_backend.Inner_curve
+    module Group = Curve_choice.Tick_backend.Inner_curve
 
     let chunk_table =
       lazy

@@ -1,5 +1,6 @@
 open Core
 open Async_kernel
+open Async_rpc_kernel
 open Pipe_lib
 open Cache_lib
 
@@ -118,6 +119,13 @@ module type Network_intf = sig
        * sync_ledger_answer Envelope.Incoming.t )
        Pipe_lib.Linear_pipe.Writer.t
     -> unit
+
+  val query_peer :
+       t
+    -> peer
+    -> (Versioned_rpc.Connection_with_menu.t -> 'q -> 'r Deferred.Or_error.t)
+    -> 'q
+    -> 'r Deferred.Or_error.t
 end
 
 module type Transition_frontier_Breadcrumb_intf = sig

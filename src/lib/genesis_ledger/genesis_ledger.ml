@@ -25,6 +25,11 @@ genesis_ledger = "test_five_even_stakes"]
 include Test_five_even_stakes
 
 [%%elif
+genesis_ledger = "test_postake_delegation"]
+
+include Test_delegation_ledger
+
+[%%elif
 genesis_ledger = "testnet_postake"]
 
 include Testnet_postake_ledger

@@ -106,23 +106,13 @@ struct
   end
 end
 
-module Make_inner_curve_aux
-    (Impl : Snark_intf.S)
-    (Other_impl : Snark_intf.S) (Coefficients : sig
-        val a : Impl.Field.t
-
-        val b : Impl.Field.t
-    end) =
+module Make_inner_curve_aux (Impl : Snark_intf.S) (Other_impl : Snark_intf.S) =
 struct
   open Impl
 
   type var = Field.Var.t * Field.Var.t
 
   module Scalar = Make_inner_curve_scalar (Impl) (Other_impl)
-
-  let find_y x =
-    let y2 = Field.((x * square x) + (Coefficients.a * x) + Coefficients.b) in
-    if Field.is_square y2 then Some (Field.sqrt y2) else None
 end
 
 module Tock = struct
@@ -145,7 +135,6 @@ module Tock = struct
               end)
 
     include Make_inner_curve_aux (Tock0) (Tick0)
-              (Tock_backend.Inner_curve.Coefficients)
 
     let ctypes_typ = typ
 
@@ -354,21 +343,10 @@ module Tick = struct
               end)
 
     include Make_inner_curve_aux (Tick0) (Tock0)
-              (Tick_backend.Inner_curve.Coefficients)
 
     let ctypes_typ = typ
 
     let scale = scale_field
-
-    let point_near_x x =
-      let rec go x = function
-        | Some y ->
-            of_affine_coordinates (x, y)
-        | None ->
-            let x' = Field.(add one x) in
-            go x' (find_y x')
-      in
-      go x (find_y x)
 
     module Checked = struct
       include Snarky_curves.Make_weierstrass_checked (Fq) (Scalar)
@@ -388,16 +366,7 @@ module Tick = struct
   module Pedersen = struct
     include Crypto_params.Pedersen_params
     include Crypto_params.Pedersen_chunk_table
-
-    include Pedersen.Make (struct
-      module Field = Field
-      module Bigint = Bigint
-      module Curve = Inner_curve
-
-      let params = params
-
-      let chunk_table = chunk_table
-    end)
+    include Crypto_params.Tick_pedersen
 
     let zero_hash =
       digest_fold (State.create ())

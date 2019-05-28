@@ -58,12 +58,12 @@ module T = struct
         , Coda_numbers.Account_nonce.t option )
         Rpc_parallel.Function.t
     ; root_length: ('worker, unit, int) Rpc_parallel.Function.t
-    ; send_payment:
+    ; send_user_command:
         ( 'worker
         , Send_payment_input.t
         , Receipt.Chain_hash.t Or_error.t )
         Rpc_parallel.Function.t
-    ; process_payment:
+    ; process_user_command:
         ( 'worker
         , User_command.t
         , Receipt.Chain_hash.t Or_error.t )
@@ -72,12 +72,12 @@ module T = struct
         ('worker, unit, state_hashes Pipe.Reader.t) Rpc_parallel.Function.t
     ; sync_status:
         ('worker, unit, Sync_status.t Pipe.Reader.t) Rpc_parallel.Function.t
-    ; get_all_payments:
+    ; get_all_user_commands:
         ( 'worker
         , Public_key.Compressed.t
         , User_command.t list )
         Rpc_parallel.Function.t
-    ; new_payment:
+    ; new_user_command:
         ( 'worker
         , Public_key.Compressed.t
         , User_command.t Pipe.Reader.t )
@@ -92,6 +92,11 @@ module T = struct
         ( 'worker
         , Receipt.Chain_hash.t * Receipt.Chain_hash.t
         , Payment_proof.t )
+        Rpc_parallel.Function.t
+    ; new_block:
+        ( 'worker
+        , Account.key
+        , Coda_transition.External_transition.t Pipe.Reader.t )
         Rpc_parallel.Function.t
     ; dump_tf: ('worker, unit, string) Rpc_parallel.Function.t
     ; best_path:
@@ -112,15 +117,15 @@ module T = struct
     ; coda_root_length: unit -> int Deferred.t
     ; coda_send_payment:
         Send_payment_input.t -> Receipt.Chain_hash.t Or_error.t Deferred.t
-    ; coda_process_payment:
+    ; coda_process_user_command:
         User_command.t -> Receipt.Chain_hash.t Or_error.t Deferred.t
     ; coda_verified_transitions: unit -> state_hashes Pipe.Reader.t Deferred.t
     ; coda_sync_status:
         unit -> Sync_status.Stable.V1.t Pipe.Reader.t Deferred.t
-    ; coda_new_payment:
+    ; coda_new_user_command:
            Public_key.Compressed.Stable.V1.t
         -> User_command.Stable.V1.t Pipe.Reader.t Deferred.t
-    ; coda_get_all_payments:
+    ; coda_get_all_user_commands:
            Public_key.Compressed.Stable.V1.t
         -> User_command.Stable.V1.t list Deferred.t
     ; coda_root_diff:
@@ -131,6 +136,9 @@ module T = struct
     ; coda_prove_receipt:
            Receipt.Chain_hash.t * Receipt.Chain_hash.t
         -> Payment_proof.t Deferred.t
+    ; coda_new_block:
+           Account.key
+        -> Coda_transition.External_transition.t Pipe.Reader.t Deferred.t
     ; coda_dump_tf: unit -> string Deferred.t
     ; coda_best_path: unit -> State_hash.Stable.Latest.t list Deferred.t }
 
@@ -159,11 +167,11 @@ module T = struct
     let sync_status_impl ~worker_state ~conn_state:() () =
       worker_state.coda_sync_status ()
 
-    let new_payment_impl ~worker_state ~conn_state:() pk =
-      worker_state.coda_new_payment pk
+    let new_user_command_impl ~worker_state ~conn_state:() pk =
+      worker_state.coda_new_user_command pk
 
-    let get_all_payments_impl ~worker_state ~conn_state:() pk =
-      worker_state.coda_get_all_payments pk
+    let get_all_user_commands_impl ~worker_state ~conn_state:() pk =
+      worker_state.coda_get_all_user_commands pk
 
     let root_diff_impl ~worker_state ~conn_state:() () =
       worker_state.coda_root_diff ()
@@ -180,11 +188,14 @@ module T = struct
     let send_payment_impl ~worker_state ~conn_state:() input =
       worker_state.coda_send_payment input
 
-    let process_payment_impl ~worker_state ~conn_state:() cmd =
-      worker_state.coda_process_payment cmd
+    let process_user_command_impl ~worker_state ~conn_state:() cmd =
+      worker_state.coda_process_user_command cmd
 
     let prove_receipt_impl ~worker_state ~conn_state:() input =
       worker_state.coda_prove_receipt input
+
+    let new_block_impl ~worker_state ~conn_state:() key =
+      worker_state.coda_new_block key
 
     let start_impl ~worker_state ~conn_state:() () = worker_state.coda_start ()
 
@@ -224,13 +235,19 @@ module T = struct
             Receipt.Chain_hash.Stable.V1.t * Receipt.Chain_hash.Stable.V1.t]
         ~bin_output:Payment_proof.bin_t ()
 
-    let send_payment =
+    let new_block =
+      C.create_pipe ~f:new_block_impl
+        ~bin_input:[%bin_type_class: Account.Stable.V1.key]
+        ~bin_output:
+          [%bin_type_class: Coda_transition.External_transition.Stable.V1.t] ()
+
+    let send_user_command =
       C.create_rpc ~f:send_payment_impl ~bin_input:Send_payment_input.bin_t
         ~bin_output:
           [%bin_type_class: Receipt.Chain_hash.Stable.V1.t Or_error.t] ()
 
-    let process_payment =
-      C.create_rpc ~f:process_payment_impl
+    let process_user_command =
+      C.create_rpc ~f:process_user_command_impl
         ~bin_input:User_command.Stable.Latest.bin_t
         ~bin_output:
           [%bin_type_class: Receipt.Chain_hash.Stable.V1.t Or_error.t] ()
@@ -250,13 +267,13 @@ module T = struct
       C.create_pipe ~f:sync_status_impl ~bin_input:Unit.bin_t
         ~bin_output:Sync_status.Stable.V1.bin_t ()
 
-    let new_payment =
-      C.create_pipe ~f:new_payment_impl
+    let new_user_command =
+      C.create_pipe ~f:new_user_command_impl
         ~bin_input:Public_key.Compressed.Stable.V1.bin_t
         ~bin_output:User_command.Stable.V1.bin_t ()
 
-    let get_all_payments =
-      C.create_rpc ~f:get_all_payments_impl
+    let get_all_user_commands =
+      C.create_rpc ~f:get_all_user_commands_impl
         ~bin_input:Public_key.Compressed.Stable.V1.bin_t
         ~bin_output:[%bin_type_class: User_command.Stable.V1.t list] ()
 
@@ -276,14 +293,15 @@ module T = struct
       ; get_balance
       ; get_nonce
       ; root_length
-      ; send_payment
-      ; process_payment
+      ; send_user_command
+      ; process_user_command
       ; prove_receipt
+      ; new_block
       ; dump_tf
       ; best_path
       ; sync_status
-      ; new_payment
-      ; get_all_payments }
+      ; new_user_command
+      ; get_all_user_commands }
 
     let init_worker_state
         { addrs_and_ports
@@ -455,13 +473,13 @@ module T = struct
             in
             let payment = build_txn amount sk pk fee in
             let%map receipt =
-              Run.Commands.send_payment coda (payment :> User_command.t)
+              Run.Commands.send_user_command coda (payment :> User_command.t)
             in
             receipt |> Participating_state.active_exn
           in
-          let coda_process_payment cmd =
+          let coda_process_user_command cmd =
             let%map receipt =
-              Run.Commands.send_payment coda (cmd :> User_command.t)
+              Run.Commands.send_user_command coda (cmd :> User_command.t)
             in
             receipt |> Participating_state.active_exn
           in
@@ -479,6 +497,9 @@ module T = struct
                 failwithf
                   !"Failed to construct payment proof: %{sexp:Error.t}"
                   e ()
+          in
+          let coda_new_block key =
+            Deferred.return @@ Run.Commands.Subscriptions.new_block coda key
           in
           let coda_verified_transitions () =
             let r, w = Linear_pipe.create () in
@@ -548,12 +569,13 @@ module T = struct
                   !"unable to retrieve sync update subscription: %s"
                   e ()
           in
-          let coda_new_payment =
+          let coda_new_user_command =
             Fn.compose Deferred.return
-            @@ Run.Commands.Subscriptions.new_payment coda
+            @@ Run.Commands.Subscriptions.new_user_command coda
           in
-          let coda_get_all_payments =
-            Fn.compose Deferred.return @@ Run.Commands.get_all_payments coda
+          let coda_get_all_user_commands =
+            Fn.compose Deferred.return
+            @@ Run.Commands.get_all_user_commands coda
           in
           { coda_peers= with_monitor coda_peers
           ; coda_verified_transitions= with_monitor coda_verified_transitions
@@ -562,14 +584,16 @@ module T = struct
           ; coda_get_nonce= with_monitor coda_get_nonce
           ; coda_root_length= with_monitor coda_root_length
           ; coda_send_payment= with_monitor coda_send_payment
-          ; coda_process_payment= with_monitor coda_process_payment
+          ; coda_process_user_command= with_monitor coda_process_user_command
           ; coda_prove_receipt= with_monitor coda_prove_receipt
+          ; coda_new_block= with_monitor coda_new_block
           ; coda_start= with_monitor coda_start
           ; coda_dump_tf= with_monitor coda_dump_tf
           ; coda_best_path= with_monitor coda_best_path
           ; coda_sync_status= with_monitor coda_sync_status
-          ; coda_new_payment= with_monitor coda_new_payment
-          ; coda_get_all_payments= with_monitor coda_get_all_payments } )
+          ; coda_new_user_command= with_monitor coda_new_user_command
+          ; coda_get_all_user_commands= with_monitor coda_get_all_user_commands
+          } )
 
     let init_connection_state ~connection:_ ~worker_state:_ = return
   end
