@@ -6,7 +6,7 @@ include BrowserWindow.MakeBrowserWindow(Messages);
 module Input = {
   type t = {
     path: Route.t,
-    dispatch: Action.t(BrowserWindow.t) => unit,
+    dispatch: Action.t(BrowserWindow.t, DaemonProcess.CodaProcess.t) => unit,
   };
 };
 
