@@ -21,8 +21,7 @@ module Make (Inputs : Intf.Main_inputs) = struct
         , Strict_pipe.synchronous
         , unit Deferred.t )
         Strict_pipe.Writer.t
-    ; buffer: Transition_frontier.Diff_mutant.E.with_value Queue.t
-    ; mutable is_accepting_diffs: bool }
+    ; buffer: Transition_frontier.Diff_mutant.E.with_value Queue.t }
 
   let write_diff_and_verify ~logger ~acc_hash worker (diff, ground_truth_mutant)
       =
@@ -84,16 +83,20 @@ module Make (Inputs : Intf.Main_inputs) = struct
     ; flush_capacity
     ; max_buffer_capacity
     ; buffer
-    ; worker_thread
-    ; is_accepting_diffs= true }
+    ; worker_thread }
 
-  (* Without [is_accepting_diffs], we would not be able to accept work
-     from the buffer if the worker_writer pipe is closed *)
-  let close_and_finish_copy t =
-    t.is_accepting_diffs <- false ;
-    let%bind () = flush t in
+  (* TODO: Remove once #2115 is solved *)
+  let close_and_finish_copy_without_closing_worker t =
+    (* Flush the remaining amount of work into worker pipe *)
+    let list = Queue.to_list t.buffer in
+    Queue.clear t.buffer ;
+    Strict_pipe.Writer.write t.worker_writer list |> don't_wait_for ;
+    (* Synchronously close pipe so that the worker only process remaining work in the pipe *)
     Strict_pipe.Writer.close t.worker_writer ;
-    let%map () = t.worker_thread in
+    t.worker_thread
+
+  let close_and_finish_copy t =
+    let%map () = close_and_finish_copy_without_closing_worker t in
     Worker.close t.worker
 
   let select_work ({max_buffer_capacity; flush_capacity; buffer; _} as t)
@@ -124,7 +127,7 @@ module Make (Inputs : Intf.Main_inputs) = struct
                   ~f:(fun worker_thread new_diffs ->
                     Deferred.return
                     @@
-                    if t.is_accepting_diffs then (
+                    if not @@ Strict_pipe.Writer.is_closed t.worker_writer then (
                       Queue.enqueue_all t.buffer new_diffs ;
                       select_work t worker_thread )
                     else worker_thread ) ))
