@@ -131,7 +131,7 @@ type t = Stable.Latest.t [@@deriving sexp, eq, hash, compare]
 [%%define_locally
 Stable.Latest.(public_key)]
 
-type key = Stable.Latest.key
+type key = Stable.Latest.key [@@deriving sexp, eq, hash, compare, yojson]
 
 type var =
   ( Public_key.Compressed.var
