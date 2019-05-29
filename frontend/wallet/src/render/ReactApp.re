@@ -11,10 +11,10 @@ let make = () => {
   <AddressBookProvider value=settingsValue>
     <ReasonApollo.Provider client=Apollo.client>
       <CodaProcess>
-        {dispatch =>
+        {_dispatch =>
            {<Window>
               <Header />
-              <Main> <SideBar /> <Router dispatch /> </Main>
+              <Main> <SideBar /> <Router /> </Main>
               <Footer />
             </Window>}}
       </CodaProcess>

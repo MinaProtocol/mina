@@ -7,11 +7,11 @@ module Styles = {
 let navigate = route => ReasonReact.Router.push("#" ++ Route.print(route));
 
 [@react.component]
-let make = (~dispatch: CodaProcess.Action.t => unit) => {
+let make = () => {
   let url = ReasonReactRouter.useUrl();
   <div className=Styles.container>
     {switch (url.path) {
-     | ["settings"] => <SettingsPage dispatch />
+     | ["settings"] => <SettingsPage />
      | _ => <TransactionsView />
      }}
   </div>;

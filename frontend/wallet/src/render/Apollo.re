@@ -1,3 +1,5 @@
+open Tc;
+
 let createClient = (~faker, ~coda) => {
   let inMemoryCache = ApolloInMemoryCache.createInMemoryCache();
   let fakerLink =
@@ -26,3 +28,12 @@ let client =
     ~faker="http://localhost:8080/graphql",
     ~coda="http://localhost:49370/graphql",
   );
+
+module Decoders = {
+  let int64 = Int64.of_string;
+  let optInt64 = Option.map(~f=Int64.of_string);
+  let publicKey = PublicKey.ofStringExn;
+
+  let date = Js.Date.fromString;
+  let optDate = Option.map(~f=Js.Date.fromString);
+};
