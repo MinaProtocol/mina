@@ -1,26 +1,12 @@
 open Core_kernel
 
-module Sequence_no = struct
-  module Stable = struct
-    module V1 = struct
-      module T = struct
-        type t = int [@@deriving sexp, bin_io, version]
-      end
-
-      include T
-    end
-
-    module Latest = V1
-  end
-
-  type t = Stable.Latest.t [@@deriving sexp]
-end
-
+(**Sequence number for jobs in the scan state that corresponds to the order in 
+which they were added*)
 module Sequence_number = struct
   module Stable = struct
     module V1 = struct
       module T = struct
-        type t = int [@@deriving sexp, bin_io, version]
+        type t = int [@@deriving sexp, bin_io, version {unnumbered}]
       end
 
       include T
@@ -32,12 +18,13 @@ module Sequence_number = struct
   type t = Stable.Latest.t [@@deriving sexp]
 end
 
-(*Each node on the tree is viewed as a job that needs to be completed. When a job is completed, it creates a new "Todo" job and marks the old job as "Done"*)
+(**Each node on the tree is viewed as a job that needs to be completed. When a 
+job is completed, it creates a new "Todo" job and marks the old job as "Done"*)
 module Job_status = struct
   module Stable = struct
     module V1 = struct
       module T = struct
-        type t = Todo | Done [@@deriving sexp, bin_io, version]
+        type t = Todo | Done [@@deriving sexp, bin_io, version {unnumbered}]
       end
 
       include T
@@ -51,12 +38,14 @@ module Job_status = struct
   let to_string = function Todo -> "Todo" | Done -> "Done"
 end
 
-(*number of jobs that can be added to this tree. This number corresponding to a specific level of the tree. New jobs received is distributed across the tree based on this number. *)
+(**The number of new jobs that can be added to this tree. This could be new 
+base jobs or new merge jobs. Each node has a weight associated to it and the 
+new jobs received are distributed across the tree based on this number. *)
 module Weight = struct
   module Stable = struct
     module V1 = struct
       module T = struct
-        type t = int [@@deriving sexp, bin_io, version]
+        type t = int [@@deriving sexp, bin_io, version {unnumbered}]
       end
 
       include T
@@ -68,7 +57,7 @@ module Weight = struct
   type t = Stable.Latest.t [@@deriving sexp]
 end
 
-(*Base Job: Proving new transactions*)
+(**For base proofs (Proving new transactions)*)
 module Base = struct
   module Job = struct
     module Stable = struct
@@ -114,7 +103,7 @@ module Base = struct
   type 'd t = 'd Stable.Latest.t [@@deriving sexp]
 end
 
-(* Merge Job: Merging two proofs*)
+(** For merge proofs: Merging two base proofs or two merge proofs*)
 module Merge = struct
   module Job = struct
     module Stable = struct
@@ -122,12 +111,11 @@ module Merge = struct
         module T = struct
           type 'a t =
             | Empty
-            | Part of 'a (*Only the left component of the job is available yet since we always complete the jobs from left to right*)
+            | Part of 'a (*When only the left component of the job is available since we always complete the jobs from left to right*)
             | Full of
                 { left: 'a
                 ; right: 'a
                 ; seq_no: Sequence_number.Stable.V1.t
-                      (*Update no, for debugging*)
                 ; status: Job_status.Stable.V1.t }
           [@@deriving sexp, bin_io, version]
         end
@@ -166,7 +154,7 @@ module Merge = struct
   type 'a t = 'a Stable.Latest.t [@@deriving sexp]
 end
 
-(*All the jobs on a tree that can be done. Base.Full and Merge.Bcomp*)
+(**All the jobs on a tree that can be done. Base.Full and Merge.Bcomp*)
 module Available_job = struct
   module Stable = struct
     module V1 = struct
@@ -184,7 +172,7 @@ module Available_job = struct
   [@@deriving sexp]
 end
 
-(*New jobs to be added (including new transactions or new merge jobs)*)
+(**New jobs to be added (including new transactions or new merge jobs)*)
 module New_job = struct
   module Stable = struct
     module V1 = struct
@@ -202,13 +190,13 @@ module New_job = struct
   [@@deriving sexp]
 end
 
-(*Space available and number of jobs required to enqueue data*)
+(**Space available and number of jobs required to enqueue data. When there isn't enough space on the current tree for all the base jobs per update, the remainder of it would be added on to a new tree. The partition specifies how much space is available and the number on the each of the trees *)
 module Space_partition = struct
   module Stable = struct
     module V1 = struct
       module T = struct
         type t = {first: int * int; second: (int * int) option}
-        [@@deriving sexp, bin_io, version]
+        [@@deriving sexp, bin_io, version {unnumbered}]
       end
 
       include T
@@ -221,6 +209,7 @@ module Space_partition = struct
   [@@deriving sexp]
 end
 
+(**View of a job for json output*)
 module Job_view = struct
   module Node = struct
     module Stable = struct
@@ -266,6 +255,7 @@ module Hash = struct
   type t = Digestif.SHA256.t
 end
 
+(**A single tree with number of leaves = max_base_jobs = 2^transaction_capacity_log_2 *)
 module Tree = struct
   module Stable = struct
     module V1 = struct
@@ -874,9 +864,7 @@ functor
 
       let return : type a b d. b -> (b, a, d) t = fun a s -> Ok (a, s)
 
-      let bind
-          (*: type a b c d. (b, a, d) t -> f: (b -> (c, a, d) t) -> (c, a, d) t = fun*)
-          m ~f = function
+      let bind m ~f = function
         | s ->
             let open Or_error.Let_syntax in
             let%bind a, s' = m s in
@@ -1251,7 +1239,7 @@ let update_helper :
   let jobs1, jobs2 =
     List.split_n completed_jobs required_jobs_for_current_tree
   in
-  (*update fist set of jobs and data*)
+  (*update first set of jobs and data*)
   let%bind result_opt = add_merge_jobs ~completed_jobs:jobs1 in
   let%bind () = add_data ~data:data1 in
   (*update second set of jobs and data. This will be empty if all the data fit in the current tree*)
