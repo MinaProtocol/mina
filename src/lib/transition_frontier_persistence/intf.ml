@@ -103,17 +103,16 @@ module type Main_inputs = sig
   include Worker_inputs
 
   module Make_worker (Inputs : Worker_inputs) : sig
+    open Inputs.Transition_frontier
+
     include
       Worker
-      with type hash := Inputs.Transition_frontier.Diff_hash.t
-       and type diff := Inputs.Transition_frontier.Diff_mutant.E.t
+      with type hash := Diff_hash.t
+       and type diff := Diff_mutant.E.t
        and type transition_storage := Inputs.Transition_storage.t
 
     val handle_diff :
-         t
-      -> Inputs.Transition_frontier.Diff_hash.t
-      -> Inputs.Transition_frontier.Diff_mutant.E.t
-      -> Inputs.Transition_frontier.Diff_hash.t Deferred.Or_error.t
+      t -> Diff_hash.t -> Diff_mutant.E.t -> Diff_hash.t Deferred.Or_error.t
   end
 end
 
@@ -122,23 +121,22 @@ module type S = sig
 
   type t
 
-  type diff
-
-  type diff_hash
-
   type verifier
 
   type root_snarked_ledger
 
   type consensus_local_state
 
-  val create : ?directory_name:string -> logger:Logger.t -> unit -> t
+  val create :
+       ?directory_name:string
+    -> logger:Logger.t
+    -> flush_capacity:int
+    -> max_buffer_capacity:int
+    -> unit
+    -> t
 
   val listen_to_frontier_broadcast_pipe :
-       logger:Logger.t
-    -> frontier option Broadcast_pipe.Reader.t
-    -> t
-    -> unit Deferred.t
+    frontier option Broadcast_pipe.Reader.t -> t -> unit Deferred.t
 
   val deserialize :
        directory_name:string
