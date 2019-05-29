@@ -130,7 +130,6 @@
 /src/lib/sync_handler/ @cmr
 /src/lib/sync_status/ @johnwu93
 /src/lib/syncable_ledger/ @cmr @enolan
-/src/lib/test_mocks/ @nholland94
 /src/lib/test_util/ @nholland94
 /src/lib/time_simulator/ @bkase
 /src/lib/transaction_database/ @johnwu93 @bkase
