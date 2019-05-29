@@ -123,12 +123,29 @@ let create () : (module S) Async.Deferred.t =
                 (State_hash.fold (Protocol_state.hash state))
 
           let main x =
-            let there {Prover_state.wrap_vk; prev_proof; prev_state; update; expected_next_state} =
-              {Step.Prover_state.wrap_vk; prev_proof; prev_state; update; expected_next_state}
+            let there
+                { Prover_state.wrap_vk
+                ; prev_proof
+                ; prev_state
+                ; update
+                ; expected_next_state } =
+              { Step.Prover_state.wrap_vk
+              ; prev_proof
+              ; prev_state
+              ; update
+              ; expected_next_state }
             in
-            let back {Step.Prover_state.wrap_vk; prev_proof; prev_state; update; expected_next_state}
-                =
-              {Prover_state.wrap_vk; prev_proof; prev_state; update; expected_next_state}
+            let back
+                { Step.Prover_state.wrap_vk
+                ; prev_proof
+                ; prev_state
+                ; update
+                ; expected_next_state } =
+              { Prover_state.wrap_vk
+              ; prev_proof
+              ; prev_state
+              ; update
+              ; expected_next_state }
             in
             let open Tick in
             with_state
