@@ -14,7 +14,7 @@ module SettingsQueryString = [%graphql {| query settings { version } |}];
 module SettingsQuery = ReasonApollo.CreateQuery(SettingsQueryString);
 
 [@react.component]
-let make = () =>
+let make = () => {
   <div className=Styles.container>
     <span className=Theme.Text.title> {React.string("Settings")} </span>
     <Spacer height=1. />
@@ -30,3 +30,4 @@ let make = () =>
          }}
     </SettingsQuery>
   </div>;
+};
