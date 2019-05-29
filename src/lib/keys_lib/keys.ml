@@ -9,7 +9,7 @@ module type S = sig
       { wrap_vk: Tock.Verification_key.t
       ; prev_proof: Tock.Proof.t
       ; prev_state: Protocol_state.value
-      ; expected_next_state: Protocol_state.value
+      ; expected_next_state: Protocol_state.value option
       ; update: Snark_transition.value }
   end
 
@@ -89,7 +89,7 @@ let create () : (module S) Async.Deferred.t =
             { wrap_vk: Tock.Verification_key.t
             ; prev_proof: Tock.Proof.t
             ; prev_state: Protocol_state.value
-            ; expected_next_state: Protocol_state.value
+            ; expected_next_state: Protocol_state.value option
             ; update: Snark_transition.value }
         end
 

@@ -69,7 +69,7 @@ struct
         { wrap_vk: Tock.Verification_key.t
         ; prev_proof: Tock.Proof.t
         ; prev_state: State.value
-        ; expected_next_state: State.value
+        ; expected_next_state: State.value option
         ; update: Update.value }
       [@@deriving fields]
     end
