@@ -178,7 +178,8 @@ end = struct
       | None ->
           update_and_rebroadcast ()
       | Some prev ->
-          if Fee_with_prover.( < ) fee prev.fee then update_and_rebroadcast ()
+          if Currency.Fee.( < ) fee.fee prev.fee.fee then
+            update_and_rebroadcast ()
           else `Don't_rebroadcast
     else `Don't_rebroadcast
 
@@ -273,8 +274,8 @@ let%test_module "random set test" =
            Fee_with_prover.gen) ~f:(fun (t, work, fee_1, fee_2) ->
           ignore (Mock_snark_pool.add_snark t ~work ~proof:[] ~fee:fee_1) ;
           ignore (Mock_snark_pool.add_snark t ~work ~proof:[] ~fee:fee_2) ;
-          let fee_upper_bound = Fee_with_prover.min fee_1 fee_2 in
-          let {Priced_proof.fee; _} =
+          let fee_upper_bound = Currency.Fee.min fee_1.fee fee_2.fee in
+          let {Priced_proof.fee= {fee; _}; _} =
             Option.value_exn (Mock_snark_pool.request_proof t work)
           in
           assert (fee <= fee_upper_bound) )
@@ -299,6 +300,7 @@ let%test_module "random set test" =
             Mock_snark_pool.add_snark t ~work ~proof:[] ~fee:expensive_fee
             = `Don't_rebroadcast ) ;
           assert (
-            {Priced_proof.fee= cheap_fee; proof= []}
-            = Option.value_exn (Mock_snark_pool.request_proof t work) ) )
+            cheap_fee.fee
+            = (Option.value_exn (Mock_snark_pool.request_proof t work)).fee.fee
+          ) )
   end )
