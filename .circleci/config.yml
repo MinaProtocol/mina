@@ -43,7 +43,7 @@ jobs:
                   command: cd frontend/website && yarn run reformat && git diff --exit-code src
             - run:
                   name: Build website
-                  command: cd frontend/website && yarn run build && (env HOMEBREW_NO_AUTO_UPDATE=1 brew install pandoc) && node ./lib/js/src/Render.js
+                  command: cd frontend/website && (env HOMEBREW_NO_AUTO_UPDATE=1 brew install pandoc) && yarn run build
             - run:
                   name: Deploy staging
                   command: cd frontend/website && (if [ "$CIRCLE_BRANCH" == "master" ]; then yarn run deploy-ci; fi)
@@ -63,6 +63,9 @@ jobs:
             - run:
                   name: Snarky tracks master (make check-snarky-submodule)
                   command: make check-snarky-submodule
+            - run:
+                  name: Check CODEOWNERS file format
+                  command: ./scripts/lint_codeowners.sh
 
     update-branch-protection:
         docker:
@@ -271,8 +274,11 @@ jobs:
             - checkout
             - run: git submodule sync && git submodule update --init --recursive
             - run:
-                  name: Running test -- test_postake:transaction-snark-profiler -check-only
-                  command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run "test_postake:transaction-snark-profiler -check-only"'
+                  name: Running test -- test_postake:full-test
+                  command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run "test_postake:full-test"'
+            - run:
+                  name: Running test -- test_postake:transaction-snark-profiler
+                  command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run "test_postake:transaction-snark-profiler"'
             - store_artifacts:
                   path: test_logs
     test--test_postake_bootstrap:
@@ -300,6 +306,18 @@ jobs:
             - run:
                   name: Running test -- test_postake_catchup:coda-restart-node-test
                   command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run "test_postake_catchup:coda-restart-node-test"'
+            - store_artifacts:
+                  path: test_logs
+    test--test_postake_delegation:
+        resource_class: large
+        docker:
+            - image: codaprotocol/coda:toolchain-a667ae88520eaa5acc6eac754dccc724092ff2f2
+        steps:
+            - checkout
+            - run: git submodule sync && git submodule update --init --recursive
+            - run:
+                  name: Running test -- test_postake_delegation:coda-delegation-test
+                  command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run "test_postake_delegation:coda-delegation-test"'
             - store_artifacts:
                   path: test_logs
     test--test_postake_five_even_snarkless:
@@ -431,6 +449,7 @@ workflows:
             - test--test_postake
             - test--test_postake_bootstrap
             - test--test_postake_catchup
+            - test--test_postake_delegation
             - test--test_postake_five_even_snarkless
             - test--test_postake_five_even_txns
             - test--test_postake_holy_grail

@@ -7,10 +7,36 @@ module Command = {
     args: array(string),
     env: option(Js.Dict.t(string)),
   };
+
+  let addArgs = (t, args) => {...t, args: Js.Array.concat(t.args, args)};
+};
+
+let (^/) = Filename.concat;
+let baseCodaCommand = port => {
+  let codaPath = "_build/coda-daemon-macos";
+  {
+    Command.executable: ProjectRoot.resource ^/ codaPath ^/ "coda.exe",
+    args: [|
+      "daemon",
+      "-rest-port",
+      Js.Int.toString(port),
+      "-config-directory",
+      ProjectRoot.resource ^/ codaPath ^/ "config",
+    |],
+    env:
+      Some(
+        Js.Dict.fromList([
+          (
+            "CODA_KADEMLIA_PATH",
+            ProjectRoot.resource ^/ codaPath ^/ "kademlia",
+          ),
+        ]),
+      ),
+  };
 };
 
 module Process = {
-  let start = (command: Command.t, port) => {
+  let start = (command: Command.t) => {
     print_endline("Starting graphql-faker");
 
     let p =
@@ -42,27 +68,49 @@ module Process = {
       )
     );
 
-    ChildProcess.Process.onExit(p, (n, s) =>
-      if (n == 1) {
-        Printf.fprintf(
-          stderr,
-          "Daemon process exited with non-zero exit code: Exit:%d, msg:%s%!\n",
-          n,
-          Option.withDefault(
-            s,
-            ~default="Port " ++ Js.Int.toString(port) ++ " already in use?",
-          ),
-        );
-      } else {
-        print_endline("Shutting down daemon process.");
-      }
+    ChildProcess.Process.onExit(
+      p,
+      fun
+      | `Code(code) =>
+        if (code != 0) {
+          Printf.fprintf(
+            stderr,
+            "Daemon process died with non-zero exit code: %d\n",
+            code,
+          );
+        } else {
+          print_endline("Shutting down daemon process.");
+        }
+      | `Signal(signal) => {
+          Printf.fprintf(
+            stderr,
+            "Daemon process died via signal: %s\n",
+            signal,
+          );
+        },
     );
 
-    () => ChildProcess.Process.kill(p);
+    p;
   };
 };
 
-let (^/) = Filename.concat;
+module CodaProcess = {
+  type t = ChildProcess.Process.t;
+
+  let waitExit: t => Task.t('x, [> | `Code(int) | `Signal(string)]) =
+    t => ChildProcess.Process.onExitTask(t);
+
+  let kill: t => unit = t => ChildProcess.Process.kill(t);
+
+  let start: list(string) => Result.t(string, t) =
+    args => {
+      let p =
+        Process.start(
+          Command.addArgs(baseCodaCommand(0xc0da), args |> Array.fromList),
+        );
+      Belt.Result.Ok(p);
+    };
+};
 
 let startAll = (~fakerPort, ~codaPort) => {
   let graphqlFaker = {
@@ -99,10 +147,10 @@ let startAll = (~fakerPort, ~codaPort) => {
         ]),
       ),
   };
-  let kill1 = Process.start(graphqlFaker, fakerPort);
-  let kill2 = Process.start(coda, codaPort);
+  let p1 = Process.start(graphqlFaker);
+  let p2 = Process.start(coda);
   () => {
-    kill1();
-    kill2();
+    ChildProcess.Process.kill(p1);
+    ChildProcess.Process.kill(p2);
   };
 };
