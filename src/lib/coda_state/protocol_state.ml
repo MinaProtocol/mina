@@ -85,13 +85,13 @@ module Body = struct
       module Registered_V1 = Registrar.Register (V1)
     end
 
-    type t = Stable.Latest.t [@@deriving sexp, to_yojson]
+    type t = Stable.Latest.t [@@deriving sexp, to_yojson, equal]
   end
 
   type ('blockchain_state, 'consensus_state) t =
     ('blockchain_state, 'consensus_state) Poly.t
 
-  type value = Value.t [@@deriving sexp, to_yojson]
+  type value = Value.t [@@deriving sexp, to_yojson, equal]
 
   type var = (Blockchain_state.var, Consensus.Data.Consensus_state.var) Poly.t
 
@@ -165,7 +165,7 @@ module Value = struct
   include Hashable.Make (Stable.Latest)
 end
 
-type value = Value.t [@@deriving sexp, to_yojson]
+type value = Value.t [@@deriving sexp, to_yojson, equal]
 
 type var = (State_hash.var, Body.var) Poly.t
 

@@ -21,7 +21,7 @@ module type S = sig
 
     type var
 
-    type value [@@deriving sexp]
+    type value [@@deriving sexp, equal]
 
     val typ : (var, value) Typ.t
 
@@ -69,6 +69,7 @@ struct
         { wrap_vk: Tock.Verification_key.t
         ; prev_proof: Tock.Proof.t
         ; prev_state: State.value
+        ; expected_next_state: State.value
         ; update: Update.value }
       [@@deriving fields]
     end
@@ -149,6 +150,29 @@ struct
       let%bind next_state_hash, _next_state, `Success success =
         with_label __LOC__
           (State.Checked.update (prev_state_hash, prev_state) update)
+      in
+      let%bind () =
+        exists Typ.unit
+          ~compute:
+            As_prover.(
+              Let_syntax.(
+                let%bind in_snark_next_state = read State.typ _next_state in
+                let%map prover_state = get_state in
+                let updated = State.sexp_of_value in_snark_next_state in
+                let original =
+                  Prover_state.expected_next_state prover_state
+                  |> State.sexp_of_value
+                in
+                if not (Sexp.equal original updated) then
+                  let diff =
+                    Sexp_diff_kernel.Algo.diff ~original ~updated ()
+                  in
+                  failwithf
+                    "In-snark and out-of-snark disagree on what the next \
+                     state should be. State sexp diff: %s"
+                    (Sexp_diff_kernel.Display.display_as_plain_string diff)
+                    ()
+                else ()))
       in
       let%bind wrap_vk =
         exists' (Verifier.Verification_key.typ ~input_size:wrap_input_size)
