@@ -269,6 +269,7 @@ module InfoSection = {
 
   [@react.component]
   let make = (~viewModel: ViewModel.t) => {
+    let activeWallet = Hooks.useActiveWallet();
     let (expanded, setExpanded) = React.useState(() => false);
     <div
       onClick={_e =>
@@ -308,7 +309,18 @@ module InfoSection = {
                          ])
                        )>
                        <ActorName value={ViewModel.Actor.Key(pubkey)} />
-                       <span> <Amount value=amount /> </span>
+                       <span>
+                         <Amount
+                           value={
+                             Option.map(
+                               ~f=PublicKey.equal(pubkey),
+                               activeWallet,
+                             )
+                             |> Option.withDefault(~default=false)
+                               ? amount : Int64.neg(amount)
+                           }
+                         />
+                       </span>
                      </li>
                    )
                    |> Array.fromList
@@ -381,13 +393,10 @@ module TopLevelStyles = {
 // use a consistent grid layout to keep everything lined up.
 [@react.component]
 let make = (~transaction: Transaction.t) => {
-  let (settings, _) = React.useContext(SettingsProvider.context);
-  // Extract wallets from settings, default to empty list
+  let activeWallet = Hooks.useActiveWallet();
   let myWallets =
-    Option.map(~f=SettingsRenderer.entries, settings)
-    |> Option.withDefault(~default=Array.empty)
-    |> Array.map(~f=entry => { let (key, _) = entry; key } )
-    |> Array.toList;
+    Option.map(~f=wallet => [wallet], activeWallet)
+    |> Option.withDefault(~default=[]);
   let viewModel = ViewModel.ofTransaction(transaction, ~myWallets);
 
   <>
