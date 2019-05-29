@@ -315,5 +315,5 @@ val base_jobs_on_latest_tree : ('a, 'd) State.t -> 'd list
 of the leftmost leaf of the tree*)
 val next_on_new_tree : ('a, 'd) State.t -> bool
 
-(*All the 'ds for which scan results are yet to computed*)
+(*All the 'ds (in the order in which they were added) for which scan results are yet to computed*)
 val pending_data : ('a, 'd) State.t -> 'd list
