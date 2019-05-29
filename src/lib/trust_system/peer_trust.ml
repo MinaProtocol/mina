@@ -20,26 +20,6 @@ let max_rate secs =
      ban threshold (-1) *)
   1. -. (Record.decay_rate ** interval)
 
-module type S = sig
-  type t
-
-  type peer
-
-  type action
-
-  val create : db_dir:string -> t
-
-  val null : unit -> t
-
-  val ban_pipe : t -> peer Strict_pipe.Reader.t
-
-  val record : t -> Logger.t -> peer -> action -> unit Deferred.t
-
-  val lookup : t -> peer -> Peer_status.t
-
-  val close : t -> unit
-end
-
 module Make0 (Peer_id : sig
   type t [@@deriving sexp, yojson]
 end) (Now : sig
