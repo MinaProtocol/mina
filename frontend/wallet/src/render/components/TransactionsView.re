@@ -34,81 +34,61 @@ module Styles = {
     ]);
 };
 
-let myWallets = [PublicKey.ofStringExn("PUB_KEY_E9873DF4453213303DA61F2")];
-let otherKey = PublicKey.ofStringExn("BDK342322");
+module Transactions = [%graphql
+  {|
+    query transactions($publicKey: String!) {
+      blocks(filter: { relatedTo: $publicKey }) {
+        nodes {
+          creator @bsDecoder(fn: "Apollo.Decoders.publicKey")
+          protocolState {
+            blockchainState {
+              date @bsDecoder(fn: "Apollo.Decoders.date")
+            }
+          }
+          transactions {
+            userCommands {
+              to_: to @bsDecoder(fn: "Apollo.Decoders.publicKey")
+              from @bsDecoder(fn: "Apollo.Decoders.publicKey")
+              amount @bsDecoder(fn: "Apollo.Decoders.int64")
+              fee @bsDecoder(fn: "Apollo.Decoders.int64")
+              memo
+              isDelegation
+              date @bsDecoder(fn: "Apollo.Decoders.date")
+            }
+            feeTransfer {
+              recipient @bsDecoder(fn: "Apollo.Decoders.publicKey")
+              amount @bsDecoder(fn: "Apollo.Decoders.int64")
+            }
+            coinbase @bsDecoder(fn: "Apollo.Decoders.int64")
+          }
+        }
+      }
+    }
+  |}
+];
+module TransactionsQuery = ReasonApollo.CreateQuery(Transactions);
 
-let mockTransactions =
-  Array.fromList([
-    TransactionCell.Transaction.Unknown({
-      key: List.head(myWallets) |> Option.getExn,
-      amount: Int64.of_int(2415),
-    }),
-    TransactionCell.Transaction.Payment(
-      {
-        from: otherKey,
-        to_: List.head(myWallets) |> Option.getExn,
-        amount: Int64.of_int(2415),
-        fee: Int64.of_int(10),
-        memo: Some("Order #: 2347B342"),
-        includedAt: Some(Js.Date.fromString("16 Apr 2019 21:46:00 PST")),
-        submittedAt: Js.Date.fromString("15 Apr 2019 21:46:00 PST"),
-      },
-      {status: ConsensusState.Status.Failed, estimatedPercentConfirmed: 0.0},
-    ),
-    TransactionCell.Transaction.Payment(
-      {
-        from: List.head(myWallets) |> Option.getExn,
-        to_: otherKey,
-        amount: Int64.of_int(1540),
-        fee: Int64.of_int(10),
-        memo: Some("Funds sent"),
-        includedAt: Some(Js.Date.fromString("16 Apr 2019 21:46:00 PST")),
-        submittedAt: Js.Date.fromString("15 Apr 2019 21:46:00 PST"),
-      },
-      {
-        status: ConsensusState.Status.Finalized,
-        estimatedPercentConfirmed: 0.95,
-      },
-    ),
-    TransactionCell.Transaction.Minted({
-      key: List.head(myWallets) |> Option.getExn,
-      coinbase: Int64.of_int(2000),
-      transactionFees: Int64.of_int(858),
-      proofFees: Int64.of_int(200),
-      delegationFees: Int64.of_int(215),
-      includedAt: Js.Date.fromString("16 Apr 2019 21:46:00 PST"),
-    }),
-    TransactionCell.Transaction.Payment(
-      {
-        from: otherKey,
-        to_: List.head(myWallets) |> Option.getExn,
-        amount: Int64.of_int(1540),
-        fee: Int64.of_int(10),
-        memo: Some("Remittance payment"),
-        includedAt: Some(Js.Date.fromString("16 Apr 2019 21:46:00 PST")),
-        submittedAt: Js.Date.fromString("15 Apr 2019 21:46:00 PST"),
-      },
-      {
-        status: ConsensusState.Status.Submitted,
-        estimatedPercentConfirmed: 0.0,
-      },
-    ),
-    TransactionCell.Transaction.Payment(
-      {
-        from: otherKey,
-        to_: List.head(myWallets) |> Option.getExn,
-        amount: Int64.of_int(2415),
-        fee: Int64.of_int(10),
-        memo: Some("Order #: 2347B342"),
-        includedAt: Some(Js.Date.fromString("16 Apr 2019 21:46:00 PST")),
-        submittedAt: Js.Date.fromString("15 Apr 2019 21:46:00 PST"),
-      },
-      {status: ConsensusState.Status.Failed, estimatedPercentConfirmed: 0.0},
-    ),
-  ]);
+let extractTransactions: Js.t('a) => array(TransactionCell.Transaction.t) = data => {
+  data##blocks##nodes
+  |> Array.map(~f=block => {
+       open TransactionCell.Transaction;
+       let userCommands =
+         block##transactions##userCommands
+         |> Array.map(~f=userCommand => UserCommand(userCommand));
+       let blockReward =
+         BlockReward({
+           date: block##protocolState##blockchainState##date,
+           creator: block##creator,
+           coinbase: block##transactions##coinbase,
+           feeTransfers: block##transactions##feeTransfer,
+         });
+       Array.append(userCommands, [|blockReward|]);
+     }) |> Array.concatenate;
+};
 
 [@react.component]
-let make = () =>
+let make = () => {
+  let transactionQuery = Transactions.make(~publicKey="123", ());
   <div className=Styles.container>
     <div
       className={Css.merge([
@@ -122,15 +102,24 @@ let make = () =>
         {ReasonReact.string("Transaction")}
       </span>
     </div>
-    <div className=Styles.body>
-      {Array.map(
-         ~f=
-           transaction =>
-             <div className=Styles.row>
-               <TransactionCell transaction myWallets />
-             </div>,
-         mockTransactions,
-       )
-       |> React.array}
-    </div>
+    <TransactionsQuery variables=transactionQuery##variables>
+      {response =>
+         switch (response.result) {
+         | Loading => React.string("...") /* TODO replace with a spinner */
+         | Error(err) => React.string(err##message) /* TODO format this error message */
+         | Data(data) =>
+           <div className=Styles.body>
+             {Array.map(
+                ~f=
+                  transaction =>
+                    <div className=Styles.row>
+                      <TransactionCell transaction />
+                    </div>,
+                extractTransactions(data),
+              )
+              |> React.array}
+           </div>
+         }}
+    </TransactionsQuery>
   </div>;
+};

@@ -1,5 +1,10 @@
 open Core
+open Coda_base
 open Signature_lib
+
+let assert_same_set expected_transactions transactions =
+  User_command.Set.(
+    [%test_eq: t] (of_list expected_transactions) (of_list transactions))
 
 module Make (Value : sig
   type t [@@deriving bin_io, compare, sexp, hash]
@@ -33,6 +38,16 @@ struct
     { user_values= Public_key.Compressed.Table.create ()
     ; all_values= Value.Table.create () }
 
+  let add_involved_participants (pagination : t) participants value_with_date =
+    List.iter participants ~f:(fun pk ->
+        let user_values =
+          Option.value
+            (Hashtbl.find pagination.user_values pk)
+            ~default:Value_with_date.Set.empty
+        in
+        Hashtbl.set pagination.user_values ~key:pk
+          ~data:(Set.add user_values value_with_date) )
+
   let get_total_values {user_values; _} public_key =
     let open Option.Let_syntax in
     let%map value_with_dates_set = Hashtbl.find user_values public_key in
@@ -46,6 +61,8 @@ struct
         ~f:(fun (txn, _) -> txn)
     in
     Option.value queried_values ~default:[]
+
+  (* let add_involved_participants  *)
 
   module With_non_null_value = struct
     let get_pagination_query ~f t public_key value =
@@ -153,7 +170,7 @@ end
 
 let%test_module "Pagination" =
   ( module struct
-    module Pagination = Make (User_command) (Int)
+    module Pagination = Make (User_command.Stable.V1) (Int)
 
     let ({Keypair.public_key= pk1; _} as keypair1) = Keypair.create ()
 
@@ -168,7 +185,7 @@ let%test_module "Pagination" =
       List.iter transactions_with_dates ~f:(fun (txn, time) ->
           if Option.is_none @@ Hashtbl.find t.all_values txn then
             Hashtbl.add_exn t.all_values ~key:txn ~data:time ;
-          List.iter (User_command.get_participants txn) ~f:(fun pk ->
+          List.iter (User_command.accounts_accessed txn) ~f:(fun pk ->
               let user_txns =
                 Option.value
                   (Hashtbl.find t.user_values pk)
@@ -177,8 +194,7 @@ let%test_module "Pagination" =
               Hashtbl.set t.user_values ~key:pk
                 ~data:(Set.add user_txns (txn, time)) ) )
 
-    let%test_unit "We can get all the transactions associated with a public key"
-        =
+    let%test_unit "We can get all values associated with a public key" =
       let trials = 10 in
       let time = 1 in
       Quickcheck.test ~trials
@@ -194,13 +210,12 @@ let%test_module "Pagination" =
           let pk1_expected_transactions =
             List.filter user_commands ~f:(fun user_command ->
                 let participants =
-                  User_command.get_participants user_command
+                  User_command.accounts_accessed user_command
                 in
                 List.mem participants pk1 ~equal:Public_key.Compressed.equal )
           in
           let pk1_queried_transactions = Pagination.get_values t pk1 in
-          User_command.assert_same_set pk1_expected_transactions
-            pk1_queried_transactions )
+          assert_same_set pk1_expected_transactions pk1_queried_transactions )
 
     module Gen = struct
       let gen_key_as_sender_or_receiver keypair1 keypair2 =
@@ -298,7 +313,7 @@ let%test_module "Pagination" =
             query_next_page t pk1 (Some query_transaction)
               (Some (List.length next_page_transactions_with_dates))
           in
-          User_command.assert_same_set expected_next_page_transactions
+          assert_same_set expected_next_page_transactions
             next_page_transactions ;
           assert has_earlier ;
           assert has_later )
@@ -327,7 +342,7 @@ let%test_module "Pagination" =
               , `Has_later_page has_later ) =
             query_next_page t pk1 (Some query_transaction) None
           in
-          User_command.assert_same_set expected_next_page_transactions
+          assert_same_set expected_next_page_transactions
             next_page_transactions ;
           check_pages has_earlier has_later )
 
@@ -355,7 +370,7 @@ let%test_module "Pagination" =
               , `Has_later_page has_later ) =
             query_next_page t pk1 None amount_to_query_opt
           in
-          User_command.assert_same_set expected_next_page_transactions
+          assert_same_set expected_next_page_transactions
             next_page_transactions ;
           check_pages has_earlier has_later )
 
@@ -385,7 +400,7 @@ let%test_module "Pagination" =
             query_next_page t pk1 (Some querying_transaction)
               (Some amount_to_query)
           in
-          User_command.assert_same_set expected_next_page_transactions
+          assert_same_set expected_next_page_transactions
             next_page_transactions ;
           check_pages has_earlier has_later )
 
