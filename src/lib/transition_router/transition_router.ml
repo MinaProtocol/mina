@@ -115,32 +115,6 @@ module Make (Inputs : Inputs_intf) = struct
   let run ~logger ~trust_system ~verifier ~network ~time_controller
       ~frontier_broadcast_pipe:(frontier_r, frontier_w) ~ledger_db
       ~network_transition_reader ~proposer_transition_reader =
-    let clean_transition_frontier_controller_and_start_bootstrap
-        ~controller_type ~clear_writer ~transition_frontier_controller_reader
-        ~transition_frontier_controller_writer ~old_frontier
-        (`Transition _incoming_transition, `Time_received tm) =
-      kill transition_frontier_controller_reader
-        transition_frontier_controller_writer ;
-      Strict_pipe.Writer.write clear_writer `Clear |> don't_wait_for ;
-      let bootstrap_controller_reader, bootstrap_controller_writer =
-        Strict_pipe.create ~name:"bootstrap controller"
-          (Buffered (`Capacity 10, `Overflow Crash))
-      in
-      Logger.info logger ~module_:__MODULE__ ~location:__LOC__
-        "Bootstrap state: starting." ;
-      let root_state = get_root_state old_frontier in
-      set_bootstrap_phase ~controller_type root_state
-        bootstrap_controller_writer ;
-      Strict_pipe.Writer.write bootstrap_controller_writer
-        (`Transition _incoming_transition, `Time_received tm) ;
-      let%map new_frontier, collected_transitions =
-        Bootstrap_controller.run ~logger ~trust_system ~verifier ~network
-          ~ledger_db ~frontier:old_frontier
-          ~transition_reader:bootstrap_controller_reader
-      in
-      kill bootstrap_controller_reader bootstrap_controller_writer ;
-      (new_frontier, collected_transitions)
-    in
     let start_transition_frontier_controller ~verified_transition_writer
         ~clear_reader ~collected_transitions frontier =
       let transition_reader, transition_writer =
@@ -160,6 +134,39 @@ module Make (Inputs : Inputs_intf) = struct
              (Strict_pipe.Writer.write verified_transition_writer))
       |> don't_wait_for ;
       (transition_reader, transition_writer)
+    in
+    let clean_transition_frontier_controller_and_start_bootstrap
+        ~controller_type ~clear_reader ~clear_writer
+        ~transition_frontier_controller_reader
+        ~transition_frontier_controller_writer ~old_frontier
+        ~verified_transition_writer
+        (`Transition _incoming_transition, `Time_received tm) =
+      kill transition_frontier_controller_reader
+        transition_frontier_controller_writer ;
+      Strict_pipe.Writer.write clear_writer `Clear |> don't_wait_for ;
+      let bootstrap_controller_reader, bootstrap_controller_writer =
+        Strict_pipe.create ~name:"bootstrap controller"
+          (Buffered (`Capacity 10, `Overflow Crash))
+      in
+      Logger.info logger ~module_:__MODULE__ ~location:__LOC__
+        "Bootstrap state: starting." ;
+      let root_state = get_root_state old_frontier in
+      set_bootstrap_phase ~controller_type root_state
+        bootstrap_controller_writer ;
+      Strict_pipe.Writer.write bootstrap_controller_writer
+        (`Transition _incoming_transition, `Time_received tm) ;
+      upon
+        (Bootstrap_controller.run ~logger ~trust_system ~verifier ~network
+           ~ledger_db ~frontier:old_frontier
+           ~transition_reader:bootstrap_controller_reader)
+        (fun (new_frontier, collected_transitions) ->
+          kill bootstrap_controller_reader bootstrap_controller_writer ;
+          let reader, writer =
+            start_transition_frontier_controller ~verified_transition_writer
+              ~clear_reader ~collected_transitions new_frontier
+          in
+          set_transition_frontier_controller_phase ~controller_type
+            new_frontier reader writer )
     in
     let clear_reader, clear_writer =
       Strict_pipe.create ~name:"clear" Synchronous
@@ -194,11 +201,9 @@ module Make (Inputs : Inputs_intf) = struct
     Initial_validator.run ~logger ~trust_system ~verifier
       ~transition_reader:network_transition_reader
       ~valid_transition_writer:valid_protocol_state_transition_writer ;
-    Strict_pipe.Reader.iter valid_protocol_state_transition_reader
-      ~f:(fun network_transition ->
-        let `Transition incoming_transition, `Time_received tm =
-          network_transition
-        in
+    Strict_pipe.Reader.iter_without_pushback
+      valid_protocol_state_transition_reader ~f:(fun valid_transition ->
+        let `Transition incoming_transition, _ = valid_transition in
         let new_transition_with_validation =
           Envelope.Incoming.data incoming_transition
         in
@@ -212,29 +217,18 @@ module Make (Inputs : Inputs_intf) = struct
             , transition_frontier_controller_writer ) ->
             let root_state = get_root_state frontier in
             if is_transition_for_bootstrap root_state new_transition then
-              let%map new_frontier, collected_transitions =
-                clean_transition_frontier_controller_and_start_bootstrap
-                  ~controller_type ~clear_writer
-                  ~transition_frontier_controller_reader
-                  ~transition_frontier_controller_writer ~old_frontier:frontier
-                  network_transition
-              in
-              let reader, writer =
-                start_transition_frontier_controller
-                  ~verified_transition_writer ~clear_reader
-                  ~collected_transitions new_frontier
-              in
-              set_transition_frontier_controller_phase ~controller_type
-                new_frontier reader writer
-            else (
+              clean_transition_frontier_controller_and_start_bootstrap
+                ~controller_type ~clear_reader ~clear_writer
+                ~transition_frontier_controller_reader
+                ~transition_frontier_controller_writer ~old_frontier:frontier
+                ~verified_transition_writer valid_transition
+            else
               Strict_pipe.Writer.write transition_frontier_controller_writer
-                network_transition ;
-              Deferred.unit )
+                valid_transition
         | `Bootstrap_controller (root_state, bootstrap_controller_writer) ->
             if is_transition_for_bootstrap root_state new_transition then
               Strict_pipe.Writer.write bootstrap_controller_writer
-                (`Transition incoming_transition, `Time_received tm) ;
-            Deferred.unit )
+                valid_transition )
     |> don't_wait_for ;
     verified_transition_reader
 end
