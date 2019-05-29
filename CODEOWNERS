@@ -133,7 +133,7 @@
 /src/lib/test_mocks/ @nholland94
 /src/lib/test_util/ @nholland94
 /src/lib/time_simulator/ @bkase
-/src/lib/transaction_database/ @johnwu93 @bkase
+/src/lib/auxiliary_database/ @johnwu93 @bkase
 /src/lib/transaction_pool/ @enolan
 /src/lib/transaction_snark/ @deepthiskumar @bkase
 /src/lib/transaction_snark_scan_state/ @deepthiskumar
