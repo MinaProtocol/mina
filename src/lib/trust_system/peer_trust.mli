@@ -70,4 +70,11 @@ module Make (Action : Action_intf) : sig
 
   (** Shut down. *)
   val close : t -> unit
+
+  module For_tests : sig
+    (** Get a pipe of the actions being recorded. Close it when you're done to
+        avoid a memory leak. *)
+    val get_action_pipe :
+      t -> (Action.t * Unix.Inet_addr.Blocking_sexp.t) Pipe.Reader.t
+  end
 end

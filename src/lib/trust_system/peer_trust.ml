@@ -40,7 +40,8 @@ struct
         ( Peer_id.t
         , Strict_pipe.synchronous
         , unit Deferred.t )
-        Strict_pipe.Writer.t }
+        Strict_pipe.Writer.t
+    ; mutable actions_writers: (Action.t * Peer_id.t) Pipe.Writer.t list }
 
   module Record_inst = Record.Make (Now)
 
@@ -48,14 +49,15 @@ struct
     let reader, writer = Strict_pipe.create Strict_pipe.Synchronous in
     { db= Some (Db.create ~directory:db_dir)
     ; bans_reader= reader
-    ; bans_writer= writer }
+    ; bans_writer= writer
+    ; actions_writers= [] }
 
   let null : unit -> t =
    fun () ->
     let bans_reader, bans_writer =
       Strict_pipe.create Strict_pipe.Synchronous
     in
-    {db= None; bans_reader; bans_writer}
+    {db= None; bans_reader; bans_writer; actions_writers= []}
 
   let ban_pipe {bans_reader} = bans_reader
 
@@ -73,6 +75,10 @@ struct
     Strict_pipe.Writer.close bans_writer
 
   let record ({db; bans_writer} as t) logger peer action =
+    t.actions_writers
+    <- List.filter t.actions_writers ~f:(Fn.compose not Pipe.is_closed) ;
+    List.iter t.actions_writers
+      ~f:(Fn.flip Pipe.write_without_pushback (action, peer)) ;
     let old_record =
       match get_db t peer with
       | None ->
@@ -120,6 +126,14 @@ struct
           Deferred.unit
     in
     Option.iter db ~f:(fun db' -> Db.set db' ~key:peer ~data:new_record)
+
+  module For_tests = struct
+    let get_action_pipe : t -> (Action.t * Peer_id.t) Pipe.Reader.t =
+     fun t ->
+      let reader, writer = Pipe.create () in
+      t.actions_writers <- writer :: t.actions_writers ;
+      reader
+  end
 end
 
 let%test_module "peer_trust" =
@@ -142,7 +156,7 @@ let%test_module "peer_trust" =
 
     module Action = struct
       type t = Insta_ban | Slow_punish | Slow_credit | Big_credit
-      [@@deriving sexp, yojson]
+      [@@deriving compare, sexp, yojson]
 
       let to_trust_response t =
         match t with
@@ -298,6 +312,27 @@ let%test_module "peer_trust" =
           let%map () = Peer_trust_test.record db nolog 1 Action.Insta_ban in
           assert_ban_pipe [1; 0] (* Reverse order since it's a snoc list. *) ;
           true )
+
+    let%test_unit "actions are written to the pipe" =
+      Thread_safe.block_on_async_exn (fun () ->
+          let db = setup_mock_db () in
+          let pipe = Peer_trust_test.For_tests.get_action_pipe db in
+          let%bind () = Peer_trust_test.record db nolog 0 Action.Insta_ban in
+          let%bind () = Peer_trust_test.record db nolog 1 Action.Big_credit in
+          let%bind () = Peer_trust_test.record db nolog 1 Action.Slow_credit in
+          match%bind Pipe.read_exactly pipe ~num_values:3 with
+          | `Exactly queue ->
+              [%test_eq: (Action.t * int) list]
+                Action.[(Insta_ban, 0); (Big_credit, 1); (Slow_credit, 1)]
+                (Queue.to_list queue) ;
+              Pipe.close_read pipe ;
+              let%bind () =
+                Peer_trust_test.record db nolog 2 Action.Insta_ban
+              in
+              assert (List.is_empty db.actions_writers) ;
+              Deferred.unit
+          | _ ->
+              failwith "wrong number of actions written to pipe" )
   end )
 
 module Make =
