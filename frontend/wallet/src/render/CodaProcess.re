@@ -113,13 +113,10 @@ let make = (~children) => {
     Hooks.Reducer.useReducer(reduce, {State.args: [], mode: Stable});
 
   let () =
-    React.useEffect1(
-      () => {
-        dispatch(Action.ForceStartCoda);
-        None;
-      },
-      [||],
-    );
+    React.useEffect0(() => {
+      dispatch(Action.ForceStartCoda);
+      None;
+    });
 
   children(dispatch);
 };

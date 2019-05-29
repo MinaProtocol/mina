@@ -7,22 +7,25 @@ module Command = {
     args: array(string),
     env: option(Js.Dict.t(string)),
   };
-
-  let addArgs = (t, args) => {...t, args: Js.Array.concat(args, t.args)};
 };
 
 let (^/) = Filename.concat;
-let baseCodaCommand = port => {
+let codaCommand = (~port, ~extraArgs) => {
   let codaPath = "_build/coda-daemon-macos";
   {
     Command.executable: ProjectRoot.resource ^/ codaPath ^/ "coda.exe",
-    args: [|
-      "daemon",
-      "-rest-port",
-      Js.Int.toString(port),
-      "-config-directory",
-      ProjectRoot.resource ^/ codaPath ^/ "config",
-    |],
+    // yes Js.Array.concat is backwards :(
+    args:
+      Js.Array.concat(
+        extraArgs,
+        [|
+          "daemon",
+          "-rest-port",
+          Js.Int.toString(port),
+          "-config-directory",
+          ProjectRoot.resource ^/ codaPath ^/ "config",
+        |],
+      ),
     env:
       Some(
         Js.Dict.fromList([
@@ -119,12 +122,12 @@ module CodaProcess = {
   let start: list(string) => t =
     args => {
       Process.start(
-        Command.addArgs(baseCodaCommand(0xc0da), args |> Array.fromList),
+        codaCommand(~port=0xc0da, ~extraArgs=args |> Array.fromList),
       );
     };
 };
 
-let startAll = (~fakerPort, ~codaPort as _) => {
+let startFaker = port => {
   let graphqlFaker = {
     Command.executable: "node",
     args: [|
@@ -133,14 +136,14 @@ let startAll = (~fakerPort, ~codaPort as _) => {
         "node_modules/graphql-faker/dist/index.js",
       ),
       "--port",
-      string_of_int(fakerPort),
+      string_of_int(port),
       "--",
       "schema.graphql",
     |],
     env: None,
   };
-  let p1 = Process.start(graphqlFaker);
+  let p = Process.start(graphqlFaker);
   () => {
-    ChildProcess.Process.kill(p1, "SIGINT");
+    ChildProcess.Process.kill(p, "SIGINT");
   };
 };

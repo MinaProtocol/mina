@@ -3,13 +3,10 @@ let make = () => {
   let settingsValue = AddressBookProvider.createContext();
 
   let () =
-    React.useEffect1(
-      () => {
-        let token = MainCommunication.listen();
-        Some(() => MainCommunication.stopListening(token));
-      },
-      [||],
-    );
+    React.useEffect0(() => {
+      let token = MainCommunication.listen();
+      Some(() => MainCommunication.stopListening(token));
+    });
 
   <AddressBookProvider value=settingsValue>
     <ReasonApollo.Provider client=Apollo.client>

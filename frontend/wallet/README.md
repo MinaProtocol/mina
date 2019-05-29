@@ -50,5 +50,3 @@ Run locally with hot reloading:
 2. `make build`
 3. `make macos-portable`
 4. Upload `_build/coda-daemon-macos.zip` to our wallet s3 bucket
-5. cd to frontend/wallet
-6. `yarn pull-macos-binary` to grab it

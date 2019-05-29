@@ -371,6 +371,8 @@ describe("ApplicationReducer", () => {
   };
 
   describe("CodaProcess", () => {
+    let getTask = t => snd(t);
+
     module Counts = TestProcess.Counts;
 
     module Machine = {
@@ -448,9 +450,9 @@ describe("ApplicationReducer", () => {
             // start it immediately
             Task.succeed(run()),
             // start it after some time
-            snd(Bindings.setTimeout(5)) |> Task.map(~f=_ => run()),
+            getTask(Bindings.setTimeout(5)) |> Task.map(~f=_ => run()),
             // start and again
-            snd(Bindings.setTimeout(50)) |> Task.map(~f=_ => run()),
+            getTask(Bindings.setTimeout(50)) |> Task.map(~f=_ => run()),
             ~f=((), (), ()) =>
             ()
           );
@@ -484,7 +486,7 @@ describe("ApplicationReducer", () => {
 
         // after we're ready, stop it
         let task =
-          snd(Bindings.setTimeout(1))
+          getTask(Bindings.setTimeout(1))
           |> Task.map(~f=_ => {
                Machine.checkCodaState(
                  m,
@@ -496,7 +498,7 @@ describe("ApplicationReducer", () => {
 
                m.dispatch(TestWindow.controlCodaDaemon(None));
              })
-          |> Task.andThen(~f=() => snd(Bindings.setTimeout(10)));
+          |> Task.andThen(~f=() => getTask(Bindings.setTimeout(10)));
 
         Task.perform(
           task,
@@ -546,14 +548,14 @@ describe("ApplicationReducer", () => {
 
         // after we're ready, start it again with different args
         let task =
-          snd(Bindings.setTimeout(1))
+          getTask(Bindings.setTimeout(1))
           |> Task.map(~f=_ =>
                m.dispatch(TestWindow.controlCodaDaemon(Some(args2)))
              );
 
         // after a longer while, will-start will have actually started
         let waitLonger =
-          snd(Bindings.setTimeout(300))
+          getTask(Bindings.setTimeout(300))
           |> Task.map(~f=_ =>
                Machine.checkCodaState(
                  m,
@@ -611,7 +613,7 @@ describe("ApplicationReducer", () => {
 
         // after a bit, stop the process
         let task =
-          snd(Bindings.setTimeout(30))
+          getTask(Bindings.setTimeout(30))
           |> Task.map(~f=_ =>
                Machine.checkCodaState(
                  m,
@@ -653,7 +655,7 @@ describe("ApplicationReducer", () => {
 
       // after a bit, stop the process
       let task =
-        snd(Bindings.setTimeout(30))
+        getTask(Bindings.setTimeout(30))
         |> Task.map(~f=_ =>
              Machine.checkCodaState(
                m,
