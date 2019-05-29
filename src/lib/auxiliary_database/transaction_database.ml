@@ -1,6 +1,7 @@
 open Core
 open Async
 open Signature_lib
+open Coda_base
 
 (* TODO: Remove Transaction functor when we need to query transactions other
    than user_commands *)
@@ -11,7 +12,7 @@ module Make (Transaction : sig
 
   include Hashable.S with type t := t
 
-  val get_participants : t -> Public_key.Compressed.t list
+  val accounts_accessed : t -> Public_key.Compressed.t list
 end) (Time : sig
   type t [@@deriving bin_io, compare, sexp]
 end) =
@@ -22,19 +23,12 @@ struct
   type t = {database: Database.t; pagination: Pagination.t; logger: Logger.t}
 
   let add_user_transaction (pagination : Pagination.t) (transaction, date) =
-    Hashtbl.add_exn pagination.all_values ~key:transaction ~data:date ;
-    List.iter (Transaction.get_participants transaction) ~f:(fun pk ->
-        let user_txns =
-          Option.value
-            (Hashtbl.find pagination.user_values pk)
-            ~default:Pagination.Value_with_date.Set.empty
-        in
-        let user_txns' =
-          Pagination.Value_with_date.Set.add user_txns (transaction, date)
-        in
-        Hashtbl.set pagination.user_values ~key:pk ~data:user_txns' )
+    Pagination.add_involved_participants pagination
+      (Transaction.accounts_accessed transaction)
+      (transaction, date) ;
+    Hashtbl.add_exn pagination.all_values ~key:transaction ~data:date
 
-  let create logger directory =
+  let create ~logger directory =
     let database = Database.create ~directory in
     let pagination = Pagination.create () in
     List.iter (Database.to_alist database) ~f:(add_user_transaction pagination) ;
@@ -54,73 +48,18 @@ struct
         Database.set database ~key:transaction ~data:date ;
         add_user_transaction pagination (transaction, date)
 
-  let get_total_transactions {pagination; _} =
-    Pagination.get_total_values pagination
+  let get_total_values {pagination; _} = Pagination.get_total_values pagination
 
-  let get_transactions {pagination; _} = Pagination.get_values pagination
+  let get_values {pagination; _} = Pagination.get_values pagination
 
-  let get_earlier_transactions {pagination; _} =
+  let get_earlier_values {pagination; _} =
     Pagination.get_earlier_values pagination
 
-  let get_later_transactions {pagination; _} =
-    Pagination.get_later_values pagination
+  let get_later_values {pagination; _} = Pagination.get_later_values pagination
 end
 
-let%test_module "Transaction_database" =
-  ( module struct
-    module Database = Make (User_command) (Int)
-
-    let ({Keypair.public_key= pk1; _} as keypair1) = Keypair.create ()
-
-    let pk1 = Public_key.compress pk1
-
-    let keypair2 = Keypair.create ()
-
-    let logger = Logger.create ()
-
-    let with_database ~trials ~f gen =
-      Async.Thread_safe.block_on_async_exn
-      @@ fun () ->
-      Quickcheck.async_test gen ~trials ~f:(fun input ->
-          File_system.with_temp_dir "/tmp/coda-test" ~f:(fun directory_name ->
-              let database = Database.create logger directory_name in
-              f input database ) )
-
-    let add_all_transactions database all_transactions_with_dates =
-      List.iter all_transactions_with_dates ~f:(fun (txn, time) ->
-          Database.add database txn time )
-
-    let%test_unit "We can get all the transactions associated with a public key"
-        =
-      Backtrace.elide := false ;
-      let trials = 10 in
-      let time = 1 in
-      with_database ~trials
-        Quickcheck.Generator.(
-          list
-          @@ User_command.Gen.payment_with_random_participants
-               ~keys:(Array.of_list [keypair1; keypair2])
-               ~max_amount:10000 ~max_fee:1000 ())
-        ~f:(fun user_commands database ->
-          add_all_transactions database
-            (List.map user_commands ~f:(fun txn -> (txn, time))) ;
-          let pk1_expected_transactions =
-            List.filter user_commands ~f:(fun user_command ->
-                let participants =
-                  User_command.get_participants user_command
-                in
-                List.mem participants pk1 ~equal:Public_key.Compressed.equal )
-          in
-          let pk1_queried_transactions =
-            Database.get_transactions database pk1
-          in
-          User_command.assert_same_set pk1_expected_transactions
-            pk1_queried_transactions ;
-          Deferred.unit )
-  end )
-
 module Block_time = Coda_base.Block_time
-module T = Make (User_command) (Block_time.Time.Stable.V1)
+module T = Make (User_command.Stable.V1) (Block_time.Time.Stable.V1)
 include T
 
 module For_tests = struct
@@ -207,7 +146,7 @@ module For_tests = struct
       in
       user_with_delegation_and_payments @ commands_with_time
     in
-    let database = T.create logger (directory ^/ "transactions") in
+    let database = T.create ~logger (directory ^/ "transactions") in
     List.iter (Quickcheck.random_value ~seed:Quickcheck.default_seed gen)
       ~f:(fun (command, time) -> T.add database command time) ;
     ( database
