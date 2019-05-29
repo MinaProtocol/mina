@@ -1,5 +1,6 @@
 type kind =
   | Settings
+  | BentArrow
   | ChevronDown
   | Question
   | Warning
@@ -14,6 +15,7 @@ let make = (~kind) =>
     height="24"
     viewBox="0 0 24 24"
     fill="currentColor"
+    stroke="currentColor"
     xmlns="http://www.w3.org/2000/svg">
     {switch (kind) {
      | Settings =>
@@ -26,6 +28,8 @@ let make = (~kind) =>
        <path
          d="M10.8339 15.5531L5.48633 10.605C4.44743 9.64366 5.18322 8 6.65244 8L17.3476 8C18.8168 8 19.5526 9.64366 18.5137 10.605L13.1661 15.5531C12.5221 16.149 11.4779 16.149 10.8339 15.5531Z"
        />
+    | BentArrow =>
+<path d="M7.3273 6V14.2316H13.0437V11.5L18.5 14.8353L13.0437 18V15.4391H6V6H7.3273Z" strokeWidth="0.5"/>
      | Question =>
        <path
          fillRule="evenodd"
