@@ -24,45 +24,40 @@ module Styles = {
 };
 
 module Transaction = {
-  module RewardDetails = {
+  module BlockReward = {
+    type feeTransfer = {
+      .
+      "recipient": PublicKey.t,
+      "amount": int64,
+    };
+
     type t = {
-      key: PublicKey.t,
+      date: Js.Date.t,
+      creator: PublicKey.t,
       coinbase: int64,
-      transactionFees: int64,
-      proofFees: int64,
-      delegationFees: int64,
-      includedAt: Js.Date.t,
+      feeTransfers: array(feeTransfer),
     };
   };
 
   module PaymentDetails = {
     type t = {
+      .
+      isDelegation: bool,
       from: PublicKey.t,
       to_: PublicKey.t,
       amount: int64,
       fee: int64,
       memo: option(string),
-      submittedAt: Js.Date.t,
-      includedAt: option(Js.Date.t),
-    };
-  };
-
-  module UnknownDetails = {
-    type t = {
-      key: PublicKey.t,
-      amount: int64,
+      date: Js.Date.t,
     };
   };
 
   type t =
-    | Minted(RewardDetails.t)
-    | Payment(PaymentDetails.t, ConsensusState.t)
-    | Unknown(UnknownDetails.t);
+    | UserCommand(Js.t(PaymentDetails.t))
+    | BlockReward(BlockReward.t);
 };
 
 module ViewModel = {
-  open Transaction;
-
   module Actor = {
     type t =
       | Minted
@@ -81,7 +76,7 @@ module ViewModel = {
     type t =
       | Memo(string, Js.Date.t)
       | Empty(Js.Date.t)
-      | StakingReward(list((string, int64)), Js.Date.t)
+      | StakingReward(list((PublicKey.t, int64)), Js.Date.t)
       | MissingReceipts;
   };
 
@@ -96,67 +91,34 @@ module ViewModel = {
   let ofTransaction =
       (transaction: Transaction.t, ~myWallets: list(PublicKey.t)) => {
     switch (transaction) {
-    | Minted({
-        RewardDetails.key,
-        coinbase,
-        transactionFees,
-        proofFees,
-        delegationFees,
-        includedAt,
-      }) => {
+    | UserCommand(userCmd) =>
+      let date = userCmd##date;
+      {
+        sender: Actor.Key(userCmd##from),
+        recipient: Actor.Key(userCmd##to_),
+        action: Action.Transfer,
+        info:
+          Option.map(userCmd##memo, ~f=x => Info.Memo(x, date))
+          |> Option.withDefault(~default=Info.Empty(date)),
+        amountDelta:
+          Caml.List.exists(PublicKey.equal(userCmd##from), myWallets)
+            ? Int64.(neg(one)) *^ userCmd##amount -^ userCmd##fee
+            : userCmd##amount,
+      };
+    | BlockReward({coinbase, creator, date, feeTransfers}) => {
         sender: Actor.Minted,
-        recipient: Actor.Key(key),
+        recipient: Actor.Key(creator),
         action: Action.Transfer,
         info:
           Info.StakingReward(
-            [
-              ("Coinbase", coinbase),
-              ("Transaction fees", transactionFees),
-              ("Proof fees", Int64.(neg(one) *^ proofFees)),
-              ("Delegation fees", Int64.(neg(one) *^ delegationFees)),
-            ],
-            includedAt,
+            Array.map(
+              ~f=transfer => (transfer##recipient, transfer##amount),
+              feeTransfers,
+            )
+            |> Array.toList,
+            date,
           ),
-        amountDelta:
-          coinbase +^ transactionFees -^ proofFees -^ delegationFees,
-      }
-    | Payment(
-        {
-          PaymentDetails.from,
-          to_,
-          amount,
-          fee,
-          memo,
-          submittedAt,
-          includedAt,
-        },
-        {ConsensusState.status, _},
-      ) =>
-      let date = Option.withDefault(includedAt, ~default=submittedAt);
-      {
-        sender: Actor.Key(from),
-        recipient: Actor.Key(to_),
-        action:
-          switch (status) {
-          | ConsensusState.Status.Failed => Action.Failed
-          | Submitted => Action.Pending
-          | Included
-          | Snarked
-          | Finalized => Action.Transfer
-          },
-        info:
-          Option.map(memo, ~f=x => Info.Memo(x, date))
-          |> Option.withDefault(~default=Info.Empty(date)),
-        amountDelta:
-          Caml.List.exists(PublicKey.equal(from), myWallets)
-            ? Int64.(neg(one)) *^ amount -^ fee : amount,
-      };
-    | Unknown({UnknownDetails.key, amount}) => {
-        sender: Actor.Unknown,
-        recipient: Actor.Key(key),
-        action: Action.Transfer,
-        info: Info.MissingReceipts,
-        amountDelta: amount,
+        amountDelta: coinbase,
       }
     };
   };
@@ -166,14 +128,14 @@ module ActorName = {
   [@react.component]
   let make = (~value: ViewModel.Actor.t) => {
     let activeWallet = Hooks.useActiveWallet();
-    let (settings, _) = React.useContext(SettingsProvider.context);
+    let (settings, _) = React.useContext(AddressBookProvider.context);
     switch (value) {
     | Key(key) =>
       <Pill mode={activeWallet === Some(key) ? Pill.Blue : Pill.Grey}>
         <span
           className=Css.(
             merge([
-              Option.isSome(SettingsRenderer.lookup(settings, key))
+              Option.isSome(AddressBook.lookup(settings, key))
                 ? Theme.Text.Body.regular : Theme.Text.mono,
               style([
                 color(
@@ -184,7 +146,7 @@ module ActorName = {
               ]),
             ])
           )>
-          {ReasonReact.string(SettingsRenderer.getWalletName(settings, key))}
+          {ReasonReact.string(AddressBook.getWalletName(settings, key))}
         </span>
       </Pill>
     | Unknown =>
@@ -270,8 +232,6 @@ module Amount = {
               ),
          )}
       </span>
-      {value <=^ Int64.zero
-         ? <span> {ReasonReact.string(" -")} </span> : <span />}
     </>;
   };
 };
@@ -291,7 +251,16 @@ module InfoSection = {
         )>
         <p
           className=Css.(
-            merge([Theme.Text.Body.regular, style([display(`flex)])])
+            merge([
+              Theme.Text.Body.regular,
+              style([
+                display(`inlineBlock),
+                width(`px(240)),
+                overflow(`hidden),
+                whiteSpace(`nowrap),
+                textOverflow(`ellipsis),
+              ]),
+            ])
           )>
           children
         </p>
@@ -300,6 +269,7 @@ module InfoSection = {
 
   [@react.component]
   let make = (~viewModel: ViewModel.t) => {
+    let activeWallet = Hooks.useActiveWallet();
     let (expanded, setExpanded) = React.useState(() => false);
     <div
       onClick={_e =>
@@ -318,22 +288,39 @@ module InfoSection = {
        | StakingReward(rewards, _) =>
          <>
            <MainRow>
-             <Link> {React.string(expanded ? "Collapse" : "Details")} </Link>
+             <Link>
+               {React.string(expanded ? "Collapse" : "Show fee transfers")}
+             </Link>
            </MainRow>
            {expanded
-              ? <ul>
-                  {List.map(rewards, ~f=((message, amount)) =>
+              ? <ul className=Css.(style([margin(`zero), padding(`zero)]))>
+                  {List.map(rewards, ~f=((pubkey, amount)) =>
                      <li
-                       key=message
+                       key={
+                         PublicKey.toString(pubkey)
+                         ++ Int64.to_string(amount)
+                       }
                        className=Css.(
                          style([
                            display(`flex),
                            justifyContent(`spaceBetween),
                            alignItems(`center),
+                           marginBottom(`rem(1.)),
                          ])
                        )>
-                       <p> {ReasonReact.string(message)} </p>
-                       <Amount value=amount />
+                       <ActorName value={ViewModel.Actor.Key(pubkey)} />
+                       <span>
+                         <Amount
+                           value={
+                             Option.map(
+                               ~f=PublicKey.equal(pubkey),
+                               activeWallet,
+                             )
+                             |> Option.withDefault(~default=false)
+                               ? amount : Int64.neg(amount)
+                           }
+                         />
+                       </span>
                      </li>
                    )
                    |> Array.fromList
@@ -354,7 +341,13 @@ module TopLevelStyles = {
   module Actors = {
     let wrapper = style([padding2(~h=`zero, ~v=`rem(0.625))]);
 
-    let mode = style([marginTop(`rem(0.25))]);
+    let mode =
+      style([
+        color(Theme.Colors.slateAlpha(1.)),
+        display(`flex),
+        alignItems(`center),
+        marginTop(`rem(0.25)),
+      ]);
   };
 
   let infoSection =
@@ -399,20 +392,22 @@ module TopLevelStyles = {
 // These cells are returned as a fragment so that the parent container can
 // use a consistent grid layout to keep everything lined up.
 [@react.component]
-let make = (~transaction: Transaction.t, ~myWallets: list(PublicKey.t)) => {
+let make = (~transaction: Transaction.t) => {
+  let activeWallet = Hooks.useActiveWallet();
+  let myWallets =
+    Option.map(~f=wallet => [wallet], activeWallet)
+    |> Option.withDefault(~default=[]);
   let viewModel = ViewModel.ofTransaction(transaction, ~myWallets);
 
   <>
     <span className=TopLevelStyles.Actors.wrapper>
       <ActorName value={viewModel.sender} />
       <div className=TopLevelStyles.Actors.mode>
-        {React.string(
-           switch (viewModel.action) {
-           | Transfer => "-> "
-           | Pending => "... "
-           | Failed => "x "
-           },
-         )}
+        {switch (viewModel.action) {
+         | Transfer => <Icon kind=Icon.BentArrow />
+         | Pending => React.string("... ")
+         | Failed => React.string("x ")
+         }}
         <ActorName value={viewModel.recipient} />
       </div>
     </span>

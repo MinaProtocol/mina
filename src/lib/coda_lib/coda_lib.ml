@@ -222,8 +222,6 @@ module type Proposer_intf = sig
                          , synchronous
                          , unit Deferred.t )
                          Strict_pipe.Writer.t
-    -> random_peers:(int -> Network_peer.Peer.t list)
-    -> query_peer:Network_peer.query_peer
     -> unit
 end
 
@@ -694,10 +692,7 @@ module Make (Inputs : Inputs_intf) = struct
           ~time_controller:t.time_controller ~keypair
           ~consensus_local_state:t.consensus_local_state
           ~frontier_reader:t.transition_frontier
-          ~transition_writer:t.proposer_transition_writer
-          ~random_peers:(Net.random_peers t.net)
-          ~query_peer:
-            {Network_peer.query= (fun a b c -> Net.query_peer t.net a b c)} )
+          ~transition_writer:t.proposer_transition_writer )
 
   let create_genesis_frontier (config : Config.t) =
     let consensus_local_state = config.consensus_local_state in

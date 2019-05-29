@@ -15,12 +15,15 @@ module Colors = {
 
   let bgColor = white;
 
-  let savilleAlpha = a => `rgba((31, 45, 61, a));
+  let bgColorElectronWindow = "E9E9E9";
+
+  let savilleAlpha = a => `rgba((61, 88, 120, a));
   let saville = savilleAlpha(1.);
 
   let hyperlinkAlpha = a => `rgba((45, 158, 219, a));
 
   let slateAlpha = a => `rgba((81, 102, 121, a));
+  let slate = slateAlpha(1.);
 
   let roseBud = `hex("a3536f");
   let pendingOrange = `hex("967103");
@@ -29,10 +32,21 @@ module Colors = {
   let serpentine = `hex("479056");
   let serpentineLight = `rgba((101, 144, 110, 0.2));
 
-  let yeezy = `hex("C53131");
+  let yeezyAlpha = a => `rgba((197, 49, 49, a));
+  let yeezy = yeezyAlpha(1.0);
+
+  let clover = `rgb((71, 144, 86));
+
+  let amberAlpha = a => `rgba((242, 149, 68, a));
+
+  let mossAlpha = a => `rgba((101, 144, 110, a));
+
+  let clay = `rgb((150, 113, 3));
+
+  let marineAlpha = a => `rgba((51, 104, 151, a));
+  let marine = marineAlpha(1.0);
 
   let midnight = `hex("1F2D3D");
-  let marineAlpha = a => `rgba((51, 104, 151, a));
   let jungle = `hex("2BAC46");
   let sage = `hex("65906e");
   let blanco = `hex("e3e0d5");
@@ -49,6 +63,49 @@ module Colors = {
 };
 
 module Typeface = {
+  // fontFace has the sideEffect of loading the font
+  let _ = {
+    [
+      fontFace(
+        ~fontFamily="IBM Plex Sans",
+        ~src=[
+          `url("fonts/IBMPlexSans-SemiBold-Latin1.woff2"),
+          `url("fonts/IBMPlexSans-SemiBold-Latin1.woff"),
+        ],
+        ~fontStyle=`normal,
+        ~fontWeight=`semiBold,
+        (),
+      ),
+      fontFace(
+        ~fontFamily="IBM Plex Sans",
+        ~src=[
+          `url("fonts/IBMPlexSans-Medium-Latin1.woff2"),
+          `url("fonts/IBMPlexSans-Medium-Latin1.woff"),
+        ],
+        ~fontStyle=`normal,
+        ~fontWeight=`medium,
+        (),
+      ),
+      fontFace(
+        ~fontFamily="IBM Plex Sans",
+        ~src=[
+          `url("fonts/IBMPlexSans-Regular-Latin1.woff2"),
+          `url("fonts/IBMPlexSans-Regular-Latin1.woff"),
+        ],
+        ~fontStyle=`normal,
+        ~fontWeight=`normal,
+        (),
+      ),
+      fontFace(
+        ~fontFamily="OCR A Std",
+        ~src=[`url("fonts/OCR A Std Regular.ttf")],
+        ~fontStyle=`normal,
+        ~fontWeight=`normal,
+        (),
+      ),
+    ];
+  };
+
   let lucidaGrande = fontFamily("LucidaGrande");
   let plex = fontFamily("IBM Plex Sans, Sans-Serif");
   let mono = fontFamily("OCR A Std, monospace");
@@ -70,6 +127,15 @@ module Text = {
         fontWeight(`normal),
         fontSize(`rem(0.8125)),
         lineHeight(`rem(1.25)),
+      ]);
+
+    let smallSemiBold =
+      style([
+        Typeface.plex,
+        fontWeight(`semiBold),
+        fontSize(`rem(1.)),
+        lineHeight(`rem(1.5)),
+        letterSpacing(`rem(-0.0125)),
       ]);
   };
 

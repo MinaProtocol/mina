@@ -9,7 +9,7 @@ let prettyPrint = s =>
   if (String.length(s) < 16) {
     s;
   } else {
-    String.sub(s, 0, 10) ++ "..." ++ String.sub(s, String.length(s) - 7, 6);
+    String.sub(s, 0, 6) ++ "..." ++ String.sub(s, String.length(s) - 5, 4);
   };
 
 let equal = (a, b) => a === b;

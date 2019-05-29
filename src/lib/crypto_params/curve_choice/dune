@@ -1,6 +1,6 @@
 (library
- (name crypto_params_init)
- (public_name crypto_params.init)
+ (name curve_choice)
+ (public_name crypto_params.curve_choice)
  (libraries snarkette snarky)
  (preprocess
   (pps ppx_jane)))

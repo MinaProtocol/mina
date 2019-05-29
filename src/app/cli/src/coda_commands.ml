@@ -13,7 +13,7 @@ module type Intf = sig
 
   module Config_in : Coda_inputs.Config_intf
 
-  val send_payment :
+  val send_user_command :
        Program.t
     -> User_command.t
     -> Receipt.Chain_hash.t Base.Or_error.t Participating_state.T.t Deferred.t
@@ -24,11 +24,11 @@ module type Intf = sig
       -> Public_key.Compressed.t
       -> External_transition.t Pipe.Reader.t
 
-    val new_payment :
+    val new_user_command :
       Program.t -> Public_key.Compressed.t -> User_command.t Pipe.Reader.t
   end
 
-  val get_all_payments :
+  val get_all_user_commands :
     Program.t -> Public_key.Compressed.t -> User_command.t list
 end
 
@@ -80,7 +80,7 @@ struct
            collision should not happen." ;
         Core.exit 1
 
-  let is_valid_payment t (txn : User_command.t) account_opt =
+  let is_valid_user_command t (txn : User_command.t) account_opt =
     let remainder =
       let open Option.Let_syntax in
       let%bind account = account_opt
@@ -96,20 +96,20 @@ struct
     in
     Option.is_some remainder
 
-  let schedule_payment t (txn : User_command.t) account_opt =
-    if not (is_valid_payment t txn account_opt) then
-      Or_error.error_string "Invalid payment: account balance is too low"
+  let schedule_user_command t (txn : User_command.t) account_opt =
+    if not (is_valid_user_command t txn account_opt) then
+      Or_error.error_string "Invalid user command: account balance is too low"
     else
       let txn_pool = transaction_pool t in
       don't_wait_for (Transaction_pool.add txn_pool txn) ;
       let logger =
         Logger.extend
           (Program.top_level_logger t)
-          [("coda_command", `String "scheduling a payment")]
+          [("coda_command", `String "scheduling a user command")]
       in
       Logger.info logger ~module_:__MODULE__ ~location:__LOC__
         ~metadata:[("user_command", User_command.to_yojson txn)]
-        "Added payment $user_command to pool successfully" ;
+        "Added command $user_command to pool successfully" ;
       txn_count := !txn_count + 1 ;
       Or_error.return ()
 
@@ -139,21 +139,18 @@ struct
         , account.Account.Poly.balance |> Currency.Balance.to_int ) )
 
   let get_nonce t (addr : Public_key.Compressed.t) =
-    let open Participating_state.Let_syntax in
-    let%map ledger = best_ledger t in
-    let open Option.Let_syntax in
-    let%bind location = Ledger.location_of_key ledger addr in
-    let%map account = Ledger.get ledger location in
+    let open Participating_state.Option.Let_syntax in
+    let%map account = get_account t addr in
     account.Account.Poly.nonce
 
-  let send_payment t (txn : User_command.t) =
+  let send_user_command t (txn : User_command.t) =
     Deferred.return
     @@
     let public_key = Public_key.compress txn.sender in
     let open Participating_state.Let_syntax in
     let%map account_opt = get_account t public_key in
     let open Or_error.Let_syntax in
-    let%map () = schedule_payment t txn account_opt in
+    let%map () = schedule_user_command t txn account_opt in
     record_payment t txn (Option.value_exn account_opt)
 
   let get_balance t (addr : Public_key.Compressed.t) =
@@ -192,24 +189,24 @@ struct
         verifying_txn
 
   (* TODO: Properly record receipt_chain_hash for multiple transactions. See #1143 *)
-  let schedule_payments t txns =
+  let schedule_user_commands t txns =
     List.map txns ~f:(fun (txn : User_command.t) ->
         let public_key = Public_key.compress txn.sender in
         let open Participating_state.Let_syntax in
         let%map account_opt = get_account t public_key in
-        match schedule_payment t txn account_opt with
+        match schedule_user_command t txn account_opt with
         | Ok () ->
             ()
         | Error err ->
             let logger =
               Logger.extend
                 (Program.top_level_logger t)
-                [("coda_command", `String "scheduling a payment")]
+                [("coda_command", `String "scheduling a user command")]
             in
             Logger.warn logger ~module_:__MODULE__ ~location:__LOC__
               ~metadata:[("error", `String (Error.to_string_hum err))]
-              "Failure in schedule_payments: $error. This is not yet reported \
-               to the client, see #1143" )
+              "Failure in schedule_user_commands: $error. This is not yet \
+               reported to the client, see #1143" )
     |> Participating_state.sequence
     |> Participating_state.map ~f:ignore
 
@@ -371,7 +368,7 @@ struct
 
   let clear_hist_status ~flag t = Perf_histograms.wipe () ; get_status ~flag t
 
-  let get_all_payments coda public_key =
+  let get_all_user_commands coda public_key =
     let transaction_database = Program.transaction_database coda in
     Transaction_database.get_transactions transaction_database public_key
 
@@ -415,7 +412,7 @@ struct
                    public_key)
                 unverified_new_block ) )
 
-    let new_payment coda public_key =
+    let new_user_command coda public_key =
       let transaction_database = Program.transaction_database coda in
       global_pipe coda ~to_pipe:(fun new_block_incr ->
           let user_command_incr =
