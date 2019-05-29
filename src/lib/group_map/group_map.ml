@@ -49,7 +49,13 @@ module V = struct
 end
 
 module Params = struct
-  type 'f t = {u: 'f; projection_point: 'f Conic.t; conic_c: 'f; a: 'f; b: 'f}
+  type 'f t =
+    { u: 'f
+    ; u_over_2: 'f
+    ; projection_point: 'f Conic.t
+    ; conic_c: 'f
+    ; a: 'f
+    ; b: 'f }
   [@@deriving fields]
 
   let create (type t) (module F : Field_intf.S_unchecked with type t = t) ~a ~b
@@ -86,7 +92,7 @@ module Params = struct
           let z2 = conic_d - (conic_c * y * y) in
           if F.is_square z2 then Some {Conic.z= F.sqrt z2; y} else None )
     in
-    {u; conic_c; projection_point; a; b}
+    {u; u_over_2= u / of_int 2; conic_c; projection_point; a; b}
 end
 
 module Make
@@ -112,13 +118,10 @@ struct
     let s = of_int 2 * ((ct * y0) + z0) / ((ct * t) + one) in
     {Conic.z= z0 - s; y= y0 - (s * t)}
 
-  let u_over_2 = lazy Constant.(P.params.u / of_int 2)
-
-  (* (16) : φ(λ) : F →  S : λ → ( u, α(λ)/β(λ) - u/2, β(λ) ) *)
-  let field_to_s t =
-    let {Conic.z; y} = field_to_conic t in
+  (* From (16) : φ(λ) : F → S : λ → ( u, α(λ)/β(λ) - u/2, β(λ) ) *)
+  let conic_to_s {Conic.z; y} =
     { S.u= constant P.params.u
-    ; v= (z / y) - constant (Lazy.force u_over_2) (* From (16) *)
+    ; v= (z / y) - constant P.params.u_over_2 (* From (16) *)
     ; y }
 
   (* This is here for explanatory purposes. See s_to_v_truncated. *)
@@ -134,7 +137,9 @@ struct
   (* We don't actually need to compute the final coordinate in V *)
   let s_to_v_truncated {S.u; v; y} = (v, negate (u + v), u + (y * y))
 
-  let potential_xs t = s_to_v_truncated (field_to_s t)
+  let potential_xs =
+    let ( @ ) = Fn.compose in
+    s_to_v_truncated @ conic_to_s @ field_to_conic
 end
 
 let to_group (type t) (module F : Field_intf.S_unchecked with type t = t)
@@ -248,6 +253,20 @@ let%test_module "test" =
       let on_conic {Conic.z; y} =
         F.(equal ((z * z) + (params.conic_c * y * y)) conic_d)
 
+      let on_s {S.u; v; y} =
+        F.(equal conic_d (y * y * ((u * u) + (u * v) + (v * v) + a)))
+
+      let on_v (x1, x2, x3, x4) =
+        F.(equal (curve_eqn x1 * curve_eqn x2 * curve_eqn x3) (x4 * x4))
+
+      (* Filter the two points which cause the group-map to blow up. This
+   is not an issue in practice because the points we feed into this function
+   will be the output of blake2s, and thus (modeling blake2s as a random oracle)
+   will not be either of those two points. *)
+      let gen =
+        Quickcheck.Generator.filter F.gen ~f:(fun t ->
+            not F.(equal ((params.conic_c * t * t) + one) zero) )
+
       module M =
         Make (F) (F)
           (struct
@@ -257,23 +276,21 @@ let%test_module "test" =
       let%test "projection point well-formed" =
         on_conic params.projection_point
 
-      let gen =
-        Quickcheck.Generator.filter F.gen ~f:(fun t ->
-            not F.(equal ((params.conic_c * t * t) + one) zero) )
-
       let%test_unit "field-to-conic" =
         Quickcheck.test ~sexp_of:F.sexp_of_t gen ~f:(fun t ->
             assert (on_conic (M.field_to_conic t)) )
 
-      let on_s {S.u; v; y} =
-        F.(equal conic_d (y * y * ((u * u) + (u * v) + (v * v) + a)))
+      let%test_unit "conic-to-S" =
+        let conic_gen =
+          Quickcheck.Generator.filter_map F.gen ~f:(fun y ->
+              let z2 = conic_d - (params.conic_c * y * y) in
+              if is_square z2 then Some {Conic.z= sqrt z2; y} else None )
+        in
+        Quickcheck.test conic_gen ~f:(fun p -> assert (on_s (M.conic_to_s p)))
 
       let%test_unit "field-to-S" =
         Quickcheck.test ~sexp_of:F.sexp_of_t gen ~f:(fun t ->
-            assert (on_s (M.field_to_s t)) )
-
-      let on_v (x1, x2, x3, x4) =
-        F.(equal (curve_eqn x1 * curve_eqn x2 * curve_eqn x3) (x4 * x4))
+            assert (on_s (Fn.compose M.conic_to_s M.field_to_conic t)) )
 
       (* Schwarz-zippel says if this tests succeeds once, then the probability that 
    the implementation is correct is at least 1 - (D / field-size), where D is
@@ -281,12 +298,12 @@ let%test_module "test" =
    be less than, say, 10. So, this test succeeding gives good evidence of the
    correctness of the implementation (assuming that the implementation is just a
    polynomial, which it is by parametricity!) *)
-      let%test_unit "field-to-S" =
+      let%test_unit "field-to-V" =
         Quickcheck.test ~sexp_of:F.sexp_of_t gen ~f:(fun t ->
-            let s = M.field_to_s t in
+            let s = M.conic_to_s (M.field_to_conic t) in
             assert (on_v (M._s_to_v s)) )
 
-      let%test_unit "full map" =
+      let%test_unit "full map works" =
         Quickcheck.test ~sexp_of:F.sexp_of_t gen ~f:(fun t ->
             let x, y = to_group (module F) ~params t in
             assert (equal (curve_eqn x) (y * y)) )
