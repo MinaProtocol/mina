@@ -34,12 +34,7 @@ type UserCommand {
 
 type FeeTransfer {
   recipient: String! @examples(values: ["PUB_KEY_E9873DF4453213303DA61F2", "PUB_KEY_F1173DF4453213303DA61F2"])
-  fee: String! @fake(type: number)
-}
-
-type CoinbaseTransaction {
-	amount: String! @fake(type: number)
-	feeTransfer: FeeTransfer!
+  amount: String! @fake(type: number)
 }
 
 type BlockchainState {
@@ -56,12 +51,11 @@ type ProtocolState {
 type Transactions {
   userCommands: [UserCommand!]!
   feeTransfer: [FeeTransfer!]!
-  coinbase: CoinbaseTransaction!
+  coinbase: String! @fake(type: number)
 }
 
 type Block {
   creator: String! @examples(values: ["PUB_KEY_E9873DF4453213303DA61F2", "PUB_KEY_F1173DF4453213303DA61F2"])
-  numConfirmations: Int!
   stateHash: String!
   protocolState: ProtocolState!
   transactions: Transactions!

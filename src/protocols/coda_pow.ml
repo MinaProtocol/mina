@@ -989,6 +989,33 @@ module type Transaction_snark_scan_state_intf = sig
   val next_on_new_tree : t -> bool
 end
 
+module Pre_diff_error = struct
+  type 'user_command t =
+    | Bad_signature of 'user_command
+    | Coinbase_error of string
+    | Insufficient_fee of Currency.Fee.t * Currency.Fee.t
+    | Unexpected of Error.t
+  [@@deriving sexp]
+
+  let to_string user_command_to_sexp = function
+    | Bad_signature t ->
+        Format.asprintf
+          !"Bad signature of the user command: %{sexp: Sexp.t} \n"
+          (user_command_to_sexp t)
+    | Coinbase_error err ->
+        Format.asprintf !"Coinbase error: %s \n" err
+    | Insufficient_fee (f1, f2) ->
+        Format.asprintf
+          !"Transaction fee %{sexp: Currency.Fee.t} does not suffice proof \
+            fee %{sexp: Currency.Fee.t} \n"
+          f1 f2
+    | Unexpected e ->
+        Error.to_string_hum e
+
+  let to_error user_command_to_sexp =
+    Fn.compose Error.of_string (to_string user_command_to_sexp)
+end
+
 module type Staged_ledger_base_intf = sig
   type t [@@deriving sexp]
 
@@ -1067,12 +1094,10 @@ module type Staged_ledger_base_intf = sig
 
   module Staged_ledger_error : sig
     type t =
-      | Bad_signature of user_command
-      | Coinbase_error of string
       | Bad_prev_hash of staged_ledger_hash * staged_ledger_hash
-      | Insufficient_fee of Currency.Fee.t * Currency.Fee.t
       | Non_zero_fee_excess of Scan_state.Space_partition.t * transaction list
       | Invalid_proof of ledger_proof * ledger_proof_statement * public_key
+      | Pre_diff of user_command Pre_diff_error.t
       | Unexpected of Error.t
     [@@deriving sexp]
 
@@ -1138,6 +1163,32 @@ module type Staged_ledger_base_intf = sig
   end
 end
 
+module type Pre_diff_info_intf = sig
+  type user_command
+
+  type transaction
+
+  type completed_work
+
+  type staged_ledger_diff
+
+  type valid_staged_ledger_diff
+
+  val get :
+       staged_ledger_diff
+    -> ( transaction list * completed_work list * int * Currency.Amount.t list
+       , user_command Pre_diff_error.t )
+       result
+
+  val get_unchecked :
+       valid_staged_ledger_diff
+    -> transaction list * completed_work list * Currency.Amount.t list
+
+  val get_transactions :
+       staged_ledger_diff
+    -> (transaction list, user_command Pre_diff_error.t) result
+end
+
 module type Staged_ledger_intf = sig
   include Staged_ledger_base_intf
 
@@ -1150,6 +1201,14 @@ module type Staged_ledger_intf = sig
   type sparse_ledger
 
   type completed_work_checked
+
+  module Pre_diff_info :
+    Pre_diff_info_intf
+    with type user_command := user_command
+     and type transaction := transaction
+     and type completed_work := completed_work_checked
+     and type staged_ledger_diff := diff
+     and type valid_staged_ledger_diff := valid_diff
 
   val current_ledger_proof : t -> ledger_proof option
 

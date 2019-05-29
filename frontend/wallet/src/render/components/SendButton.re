@@ -2,8 +2,6 @@ open Tc;
 
 module Styles = {
   open Css;
-  let errorText =
-    merge([Theme.Text.Body.regular, style([color(Theme.Colors.roseBud)])]);
 
   let contentContainer =
     style([
@@ -129,10 +127,7 @@ let make = (~wallets, ~onSubmit) => {
            <div className=Styles.contentContainer>
              {switch (errorOpt) {
               | None => React.null
-              | Some(err) =>
-                <div className=Styles.errorText>
-                  {React.string("Error: " ++ err)}
-                </div>
+              | Some(err) => <Alert kind=`Danger message=err />
               }}
              spacer
              <Dropdown

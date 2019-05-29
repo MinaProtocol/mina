@@ -1,57 +1,11 @@
 open Signature_lib
 
-(** Transaction database is a database that stores transactions for a client.
-    It queries a set of transactions involving a peer with a certain public
-    key. This database allows a developer to store transactions and perform
-    pagination queries of transactions via GraphQL *)
-module type S = sig
-  type t
-
-  type time
-
-  type transaction
-
-  val create : Logger.t -> string -> t
-
-  val close : t -> unit
-
-  val add : t -> transaction -> time -> unit
-
-  val get_total_transactions : t -> Public_key.Compressed.t -> int option
-
-  val get_transactions : t -> Public_key.Compressed.t -> transaction list
-
-  val get_earlier_transactions :
-       t
-    -> Public_key.Compressed.t
-    -> transaction option
-    -> int option
-    -> transaction list
-       * [`Has_earlier_page of bool]
-       * [`Has_later_page of bool]
-
-  val get_later_transactions :
-       t
-    -> Public_key.Compressed.t
-    -> transaction option
-    -> int option
-    -> transaction list
-       * [`Has_earlier_page of bool]
-       * [`Has_later_page of bool]
-end
-
 module type Pagination = sig
   type time
 
   type value
 
-  type value_with_time_witness
-
-  type t =
-    { user_values:
-        (value * time, value_with_time_witness) Core.Set.t
-        Public_key.Compressed.Table.t
-    ; all_values: (value, time) Hashtbl.t }
+  type t
 
   val get_total_values : t -> Public_key.Compressed.t -> int option
 
@@ -86,4 +40,52 @@ module type Pagination = sig
     -> value option
     -> int option
     -> value list * [`Has_earlier_page of bool] * [`Has_later_page of bool]
+end
+
+(** Transaction database is a database that stores transactions for a client.
+    It queries a set of transactions involving a peer with a certain public
+    key. This database allows a developer to store transactions and perform
+    pagination queries of transactions via GraphQL *)
+module type Transaction = sig
+  type t
+
+  type time
+
+  type transaction
+
+  val create : logger:Logger.t -> string -> t
+
+  val close : t -> unit
+
+  val add : t -> transaction -> time -> unit
+
+  include
+    Pagination
+    with type t := t
+     and type time := time
+     and type value := transaction
+end
+
+module type External_transition = sig
+  type t
+
+  type external_transition
+
+  type hash
+
+  type time
+
+  val create : logger:Logger.t -> string -> t
+
+  val close : t -> unit
+
+  val add :
+       tracked_participants:Public_key.Compressed.Set.t
+    -> t
+    -> (external_transition, hash) With_hash.t
+    -> time
+    -> unit
+
+  include
+    Pagination with type t := t and type time := time and type value := hash
 end

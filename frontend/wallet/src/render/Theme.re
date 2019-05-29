@@ -32,10 +32,21 @@ module Colors = {
   let serpentine = `hex("479056");
   let serpentineLight = `rgba((101, 144, 110, 0.2));
 
-  let yeezy = `hex("C53131");
+  let yeezyAlpha = a => `rgba((197, 49, 49, a));
+  let yeezy = yeezyAlpha(1.0);
+
+  let clover = `rgb((71, 144, 86));
+
+  let amberAlpha = a => `rgba((242, 149, 68, a));
+
+  let mossAlpha = a => `rgba((101, 144, 110, a));
+
+  let clay = `rgb((150, 113, 3));
+
+  let marineAlpha = a => `rgba((51, 104, 151, a));
+  let marine = marineAlpha(1.0);
 
   let midnight = `hex("1F2D3D");
-  let marineAlpha = a => `rgba((51, 104, 151, a));
   let jungle = `hex("2BAC46");
   let sage = `hex("65906e");
   let blanco = `hex("e3e0d5");
@@ -55,6 +66,16 @@ module Typeface = {
   // fontFace has the sideEffect of loading the font
   let _ = {
     [
+      fontFace(
+        ~fontFamily="IBM Plex Sans",
+        ~src=[
+          `url("fonts/IBMPlexSans-SemiBold-Latin1.woff2"),
+          `url("fonts/IBMPlexSans-SemiBold-Latin1.woff"),
+        ],
+        ~fontStyle=`normal,
+        ~fontWeight=`semiBold,
+        (),
+      ),
       fontFace(
         ~fontFamily="IBM Plex Sans",
         ~src=[
@@ -106,6 +127,15 @@ module Text = {
         fontWeight(`normal),
         fontSize(`rem(0.8125)),
         lineHeight(`rem(1.25)),
+      ]);
+
+    let smallSemiBold =
+      style([
+        Typeface.plex,
+        fontWeight(`semiBold),
+        fontSize(`rem(1.)),
+        lineHeight(`rem(1.5)),
+        letterSpacing(`rem(-0.0125)),
       ]);
   };
 

@@ -570,8 +570,8 @@ module Make (Commands : Coda_commands.Intf) = struct
       in
       let total_count =
         Option.value
-          (Transaction_database.get_total_transactions transaction_database
-             public_key)
+          (Auxiliary_database.Transaction_database.get_total_values
+             transaction_database public_key)
           ~default:0
       in
       { Types.Pagination.Connection.edges= queried_transactions
@@ -605,12 +605,14 @@ module Make (Commands : Coda_commands.Intf) = struct
           | num_to_query, cursor, None, _ ->
               Ok
                 (build_connection
-                   ~query:Transaction_database.get_earlier_transactions
+                   ~query:
+                     Auxiliary_database.Transaction_database.get_earlier_values
                    transaction_database public_key cursor num_to_query)
           | None, _, num_to_query, cursor ->
               Ok
                 (build_connection
-                   ~query:Transaction_database.get_later_transactions
+                   ~query:
+                     Auxiliary_database.Transaction_database.get_later_values
                    transaction_database public_key cursor num_to_query) )
 
     let initial_peers =
@@ -793,7 +795,8 @@ module Make (Commands : Coda_commands.Intf) = struct
               ~error:"Invaid `payment` provided"
           in
           let transaction_database = Program.transaction_database coda in
-          Transaction_database.add transaction_database payment added_time ;
+          Auxiliary_database.Transaction_database.add transaction_database
+            payment added_time ;
           Some payment )
 
     let commands =

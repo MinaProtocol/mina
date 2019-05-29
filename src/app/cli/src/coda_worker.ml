@@ -380,7 +380,8 @@ module T = struct
           let trust_system = Trust_system.create ~db_dir:trust_dir in
           trace_database_initialization "trust_system" __LOC__ trust_dir ;
           let transaction_database =
-            Transaction_database.create logger transaction_database_dir
+            Auxiliary_database.Transaction_database.create logger
+              transaction_database_dir
           in
           trace_database_initialization "transaction_database" __LOC__
             transaction_database_dir ;
