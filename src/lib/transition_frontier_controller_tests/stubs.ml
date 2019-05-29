@@ -507,12 +507,42 @@ struct
   end
 
   module Network = struct
+    type snark_pool_diff = unit
+
+    type transaction_pool_diff = unit
+
     type t =
       { logger: Logger.t
       ; ip_table: (Unix.Inet_addr.t, Transition_frontier.t) Hashtbl.t
       ; peers: Network_peer.Peer.t Hash_set.t }
 
-    let create ~logger ~ip_table ~peers = {logger; ip_table; peers}
+    module Gossip_net = struct
+      module Config = struct
+        type t =
+          { timeout: Time.Span.t
+          ; target_peer_count: int
+          ; initial_peers: Host_and_port.t list
+          ; addrs_and_ports: Kademlia.Node_addrs_and_ports.t
+          ; conf_dir: string
+          ; logger: Logger.t
+          ; trust_system: Trust_system.t
+          ; max_concurrent_connections: int option }
+        [@@deriving make]
+      end
+    end
+
+    module Config = struct
+      type t =
+        { logger: Logger.t
+        ; trust_system: Trust_system.t
+        ; gossip_net_params: Gossip_net.Config.t
+        ; time_controller: Block_time.Controller.t
+        ; consensus_local_state: Consensus.Data.Local_state.t }
+    end
+
+    let create _ = failwith "stub"
+
+    let create_stub ~logger ~ip_table ~peers = {logger; ip_table; peers}
 
     let random_peers {peers; _} num_peers =
       let peer_list = Hash_set.to_list peers in
@@ -592,6 +622,24 @@ struct
               Pipe_lib.Linear_pipe.write response_writer
                 (ledger_hash, sync_ledger_query, answer) )
       |> don't_wait_for
+
+    let initial_peers _ = failwith "stub"
+
+    let broadcast_state _ _ = failwith "stub"
+
+    let broadcast_snark_pool_diff _ _ = failwith "stub"
+
+    let broadcast_transaction_pool_diff _ _ = failwith "stub"
+
+    let online_status _ = failwith "stub"
+
+    let peers _ = failwith "stub"
+
+    let states _ = failwith "stub"
+
+    let transaction_pool_diffs _ = failwith "stub"
+
+    let snark_pool_diffs _ = failwith "stub"
   end
 
   module Network_builder = struct
@@ -649,7 +697,7 @@ struct
           List.map peers_with_frontiers ~f:(fun {peer; _} -> peer)
           |> Hash_set.of_list (module Network_peer.Peer)
         in
-        Network.create ~logger
+        Network.create_stub ~logger
           ~ip_table:
             (Hashtbl.of_alist_exn
                (module Unix.Inet_addr)

@@ -36,8 +36,8 @@ module type Catchup_intf = sig
                                     Cached.t
                                     Rose_tree.t
                                     list
-                                  , Strict_pipe.synchronous
-                                  , unit Deferred.t )
+                                  , Strict_pipe.crash Strict_pipe.buffered
+                                  , unit )
                                   Strict_pipe.Writer.t
     -> unprocessed_transition_cache:unprocessed_transition_cache
     -> unit
@@ -142,8 +142,8 @@ module type Transition_handler_processor_intf = sig
                               Cached.t
                               Rose_tree.t
                               list
-                          , Strict_pipe.synchronous
-                          , unit Deferred.t )
+                          , Strict_pipe.crash Strict_pipe.buffered
+                          , unit )
                           Strict_pipe.Writer.t
     -> catchup_breadcrumbs_reader:( transition_frontier_breadcrumb
                                   , State_hash.t )
@@ -156,8 +156,8 @@ module type Transition_handler_processor_intf = sig
                                     Cached.t
                                     Rose_tree.t
                                     list
-                                  , Strict_pipe.synchronous
-                                  , unit Deferred.t )
+                                  , Strict_pipe.crash Strict_pipe.buffered
+                                  , unit )
                                   Strict_pipe.Writer.t
     -> processed_transition_writer:( ( external_transition_validated
                                      , State_hash.t )
