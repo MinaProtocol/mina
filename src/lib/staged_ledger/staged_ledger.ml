@@ -19,7 +19,7 @@ let option lab =
 module Make_with_constants (Constants : sig
   val transaction_capacity_log_2 : int
 
-  val work_delay_factor : int
+  val work_delay : int
 end)
 (Inputs : Inputs.S) :
   Coda_pow.Staged_ledger_intf
@@ -920,9 +920,9 @@ end)
         Transaction_snark_scan_state.Constants.transaction_capacity_log_2
     in
     let spots_available, proofs_waiting =
-      let jobs = Scan_state.next_jobs t.scan_state in
+      let jobs = Scan_state.all_work_to_do t.scan_state in
       ( Int.min (Scan_state.free_space t.scan_state) max_throughput
-      , List.length jobs )
+      , Sequence.length jobs )
     in
     let apply_pre_diff_with_at_most_two
         (pre_diff1 : Staged_ledger_diff.Pre_diff_with_at_most_two_coinbase.t) =
@@ -948,7 +948,7 @@ end)
     in
     let%bind () =
       let curr_hash = hash t in
-      if Staged_ledger_hash.equal sl_diff.prev_hash (hash t) then return ()
+      if Staged_ledger_hash.equal sl_diff.prev_hash curr_hash then return ()
       else
         Deferred.return
           (Error
@@ -1011,12 +1011,12 @@ end)
         [ ("user_command_count", `Int user_commands_count)
         ; ("coinbase_count", `Int (List.length coinbases))
         ; ("spots_available", `Int spots_available)
-        ; ("proofs_waiting", `Int proofs_waiting)
+        ; ("proof_bundles_waiting", `Int proofs_waiting)
         ; ("work_count", `Int (List.length works)) ]
       "apply_diff block info: No of transactions included:$user_command_count\n\
       \      Coinbase parts:$coinbase_count Spots\n\
       \      available:$spots_available Pending work in the \
-       scan-state:$proofs_waiting Work included:$work_count" ;
+       scan-state:$proof_bundles_waiting Work included:$work_count" ;
     let new_staged_ledger =
       { scan_state= scan_state'
       ; ledger= new_ledger

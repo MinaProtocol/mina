@@ -32,7 +32,7 @@ end
 module Make (Constants : sig
   val transaction_capacity_log_2 : int
 
-  val work_delay_factor : int
+  val work_delay : int
 end)
 (Inputs : Inputs.S) : sig
   include
@@ -176,12 +176,6 @@ end = struct
           (state_hash |> Digestif.SHA256.to_raw_string)
 
       let is_valid _t = failwith "TODO"
-
-      (*let k = max Constants.work_delay_factor 2 in
-        Parallel_scan.parallelism ~state:t.tree
-        = Int.pow 2 (Constants.transaction_capacity_log_2 + k)
-        && t.job_count <= work_capacity
-        && Parallel_scan.is_valid t.tree*)
 
       include Binable.Of_binable
                 (T)
@@ -480,14 +474,13 @@ end = struct
         ; fee_excess
         ; proof_type= `Merge }
 
-  let create ~work_delay_factor ~transaction_capacity_log_2 =
-    (* Transaction capacity log_2 is 1/2^work_delay_factor the capacity for work parallelism *)
+  let create ~work_delay ~transaction_capacity_log_2 =
     let k = Int.pow 2 transaction_capacity_log_2 in
-    Parallel_scan.empty ~delay:work_delay_factor ~max_base_jobs:k
+    Parallel_scan.empty ~delay:work_delay ~max_base_jobs:k
 
   let empty () =
     let open Constants in
-    create ~work_delay_factor ~transaction_capacity_log_2
+    create ~work_delay ~transaction_capacity_log_2
 
   let extract_txns txns_with_witnesses =
     (* TODO: This type checks, but are we actually pulling the inverse txn here? *)
