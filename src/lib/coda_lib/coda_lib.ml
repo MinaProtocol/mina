@@ -8,6 +8,7 @@ open Protocols
 open Pipe_lib
 open Strict_pipe
 open O1trace
+open Auxiliary_database
 
 module type Network_intf = sig
   type t

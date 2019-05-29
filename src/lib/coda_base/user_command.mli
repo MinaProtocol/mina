@@ -26,6 +26,8 @@ module Stable : sig
     include Comparable.S with type t := t
 
     include Hashable.S with type t := t
+
+    val accounts_accessed : t -> Public_key.Compressed.t list
   end
 
   module Latest = V1

@@ -133,16 +133,14 @@ struct
                     in
                     let open Trust_system.Actions in
                     (* TODO : refine these actions, issue 2375 *)
+                    let open Protocols.Coda_pow.Pre_diff_error in
                     let action =
                       match staged_ledger_error with
                       | Invalid_proof _ ->
                           make_actions Sent_invalid_proof
-                      | Bad_signature _ ->
+                      | Pre_diff (Bad_signature _) ->
                           make_actions Sent_invalid_signature
-                      | Coinbase_error _
-                      | Bad_prev_hash _
-                      | Insufficient_fee _
-                      | Non_zero_fee_excess _ ->
+                      | Pre_diff _ | Bad_prev_hash _ | Non_zero_fee_excess _ ->
                           make_actions Gossiped_invalid_transition
                       | Unexpected _ ->
                           failwith
