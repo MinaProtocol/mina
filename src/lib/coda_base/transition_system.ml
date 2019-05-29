@@ -170,7 +170,8 @@ struct
                        state should be. State sexp diff: %s"
                       (Sexp_diff_kernel.Display.display_as_plain_string diff)
                       ()
-                  else () ) |> ignore ;
+                  else () )
+              |> ignore ;
               ()))
       in
       let%bind wrap_vk =
