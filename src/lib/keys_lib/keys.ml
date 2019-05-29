@@ -9,6 +9,7 @@ module type S = sig
       { wrap_vk: Tock.Verification_key.t
       ; prev_proof: Tock.Proof.t
       ; prev_state: Protocol_state.value
+      ; expected_next_state: Protocol_state.value
       ; update: Snark_transition.value }
   end
 
@@ -88,6 +89,7 @@ let create () : (module S) Async.Deferred.t =
             { wrap_vk: Tock.Verification_key.t
             ; prev_proof: Tock.Proof.t
             ; prev_state: Protocol_state.value
+            ; expected_next_state: Protocol_state.value
             ; update: Snark_transition.value }
         end
 
@@ -121,12 +123,12 @@ let create () : (module S) Async.Deferred.t =
                 (State_hash.fold (Protocol_state.hash state))
 
           let main x =
-            let there {Prover_state.wrap_vk; prev_proof; prev_state; update} =
-              {Step.Prover_state.wrap_vk; prev_proof; prev_state; update}
+            let there {Prover_state.wrap_vk; prev_proof; prev_state; update; expected_next_state} =
+              {Step.Prover_state.wrap_vk; prev_proof; prev_state; update; expected_next_state}
             in
-            let back {Step.Prover_state.wrap_vk; prev_proof; prev_state; update}
+            let back {Step.Prover_state.wrap_vk; prev_proof; prev_state; update; expected_next_state}
                 =
-              {Prover_state.wrap_vk; prev_proof; prev_state; update}
+              {Prover_state.wrap_vk; prev_proof; prev_state; update; expected_next_state}
             in
             let open Tick in
             with_state
