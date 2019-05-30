@@ -26,7 +26,7 @@ let make = (~kind, ~message) => {
     );
   <div className={Styles.box(bgColor, textColor)}>
     <Icon kind=iconKind />
-    <Spacer width=0.5 />
+    <Spacer width=0.25 />
     <div className=Styles.text> {React.string(message)} </div>
   </div>;
 };
