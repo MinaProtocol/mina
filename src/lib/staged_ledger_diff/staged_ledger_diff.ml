@@ -18,15 +18,10 @@ module Make (Transaction_snark_work : sig
 
   val forget : Checked.t -> t
 end) :
-  Protocols.Coda_pow.Staged_ledger_diff_intf
-  with type user_command := User_command.t
-   and type user_command_with_valid_signature :=
-              User_command.With_valid_signature.t
-   and type staged_ledger_hash := Staged_ledger_hash.t
-   and type public_key := Public_key.Compressed.t
-   and type completed_work := Transaction_snark_work.t
-   and type completed_work_checked := Transaction_snark_work.Checked.t
-   and type fee_transfer_single := Fee_transfer.Single.t = struct
+  Coda_intf.Staged_ledger_diff_intf
+  with type transaction_snark_work := Transaction_snark_work.t
+   and type transaction_snark_work_checked := Transaction_snark_work.Checked.t =
+struct
   module At_most_two = struct
     module Stable = struct
       module V1 = struct
@@ -281,7 +276,7 @@ end) :
     | At_most_two.Zero, At_most_one.Zero ->
         Currency.Amount.zero
     | _ ->
-        Protocols.Coda_praos.coinbase_amount
+        Coda_compile_config.coinbase
 end
 
 include Make (Transaction_snark_work)
