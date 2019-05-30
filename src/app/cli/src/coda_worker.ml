@@ -367,6 +367,9 @@ module T = struct
           let%bind transaction_database_dir =
             Unix.mkdtemp @@ conf_dir ^/ "transaction"
           in
+          let%bind external_transition_database_dir =
+            Unix.mkdtemp @@ conf_dir ^/ "external_transition"
+          in
           let trace_database_initialization typ location =
             Logger.trace logger "Creating %s at %s" ~module_:__MODULE__
               ~location typ
@@ -380,11 +383,17 @@ module T = struct
           let trust_system = Trust_system.create ~db_dir:trust_dir in
           trace_database_initialization "trust_system" __LOC__ trust_dir ;
           let transaction_database =
-            Auxiliary_database.Transaction_database.create logger
+            Auxiliary_database.Transaction_database.create ~logger
               transaction_database_dir
           in
           trace_database_initialization "transaction_database" __LOC__
             transaction_database_dir ;
+          let external_transition_database =
+            Auxiliary_database.External_transition_database.create ~logger
+              external_transition_database_dir
+          in
+          trace_database_initialization "external_transition_database" __LOC__
+            external_transition_database_dir ;
           let time_controller =
             Run.Inputs.Time.Controller.create Run.Inputs.Time.Controller.basic
           in
@@ -426,7 +435,8 @@ module T = struct
                  ~time_controller ~receipt_chain_database
                  ~snark_work_fee:(Currency.Fee.of_int 0)
                  ?propose_keypair:Config.propose_keypair ~monitor
-                 ~consensus_local_state ~transaction_database ())
+                 ~consensus_local_state ~transaction_database
+                 ~external_transition_database ())
           in
           Run.handle_shutdown ~monitor ~conf_dir coda ;
           let%map () =

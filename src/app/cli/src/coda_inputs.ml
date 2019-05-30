@@ -247,6 +247,8 @@ module type Main_intf = sig
       ; time_controller: Inputs.Time.Controller.t
       ; receipt_chain_database: Receipt_chain_database.t
       ; transaction_database: Auxiliary_database.Transaction_database.t
+      ; external_transition_database:
+          Auxiliary_database.External_transition_database.t
       ; snark_work_fee: Currency.Fee.t
       ; monitor: Async.Monitor.t option
       ; consensus_local_state: Consensus.Data.Local_state.t }
@@ -296,6 +298,11 @@ module type Main_intf = sig
   val transaction_pool : t -> Inputs.Transaction_pool.t
 
   val transaction_database : t -> Auxiliary_database.Transaction_database.t
+
+  val external_transition_database :
+    t -> Auxiliary_database.External_transition_database.t
+
+  val subscribed_users : t -> Public_key.Compressed.Hash_set.t
 
   val snark_pool : t -> Inputs.Snark_pool.t
 
@@ -585,7 +592,6 @@ module Make_inputs0 (Init : Init_intf) = struct
 
     type pool_diff = Pool.Diff.t
 
-    (* TODO *)
     let load ~logger ~trust_system ~disk_location:_ ~incoming_diffs
         ~frontier_broadcast_pipe =
       return

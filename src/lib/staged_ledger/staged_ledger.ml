@@ -1491,7 +1491,11 @@ let%test_module "test" =
 
       (* mirrors module structure of Public_key.Compressed *)
       module Compressed_public_key = struct
-        type t = string [@@deriving sexp, compare, yojson, hash]
+        module T = struct
+          type t = string [@@deriving sexp, compare, yojson, hash]
+        end
+
+        include T
 
         (* unused in test *)
         type var = unit
@@ -1511,6 +1515,7 @@ let%test_module "test" =
         let to_yojson, of_yojson = String.(to_yojson, of_yojson)
 
         include Comparable.Make_binable (String)
+        include Hashable.Make (T)
 
         let empty, gen = String.(empty, quickcheck_generator)
       end

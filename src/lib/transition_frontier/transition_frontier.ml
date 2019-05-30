@@ -9,8 +9,7 @@ open Coda_incremental
 
 module type Inputs_intf = Inputs.Inputs_intf
 
-module Make (Inputs : Inputs_intf) =
-(* :
+module Make (Inputs : Inputs_intf) :
   Transition_frontier_intf
   with type state_hash := State_hash.t
    and type mostly_validated_external_transition :=
@@ -31,7 +30,7 @@ module Make (Inputs : Inputs_intf) =
    and type user_command := User_command.t
    and type pending_coinbase := Pending_coinbase.t
    and type verifier := Inputs.Verifier.t
-   and module Extensions.Work = Inputs.Transaction_snark_work.Statement  *)
+   and module Extensions.Work = Inputs.Transaction_snark_work.Statement =
 struct
   open Inputs
 
