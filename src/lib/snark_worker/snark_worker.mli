@@ -1,3 +1,3 @@
 module Intf : module type of Intf
 
-include Intf.S with module Ledger_proof := Ledger_proof.Stable.V1
+include Intf.S with type ledger_proof := Ledger_proof.t

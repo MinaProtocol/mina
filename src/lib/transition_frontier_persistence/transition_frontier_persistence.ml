@@ -17,40 +17,40 @@ module Make (Inputs : Intf.Main_inputs) = struct
     ; max_buffer_capacity: int
     ; flush_capacity: int
     ; worker_writer:
-        ( Transition_frontier.Diff_mutant.E.with_value list
+        ( Transition_frontier.Diff.Mutant.E.with_value list
         , Strict_pipe.synchronous
         , unit Deferred.t )
         Strict_pipe.Writer.t
-    ; buffer: Transition_frontier.Diff_mutant.E.with_value Queue.t }
+    ; buffer: Transition_frontier.Diff.Mutant.E.with_value Queue.t }
 
   let write_diff_and_verify ~logger ~acc_hash worker (diff, ground_truth_mutant)
       =
     Logger.trace logger "Handling mutant diff" ~module_:__MODULE__
       ~location:__LOC__
       ~metadata:
-        [("diff_mutant", Transition_frontier.Diff_mutant.key_to_yojson diff)] ;
+        [("diff_mutant", Transition_frontier.Diff.Mutant.key_to_yojson diff)] ;
     let ground_truth_hash =
-      Transition_frontier.Diff_mutant.hash acc_hash diff ground_truth_mutant
+      Transition_frontier.Diff.Mutant.hash acc_hash diff ground_truth_mutant
     in
     match%map
       Worker.handle_diff worker acc_hash
-        (Transition_frontier.Diff_mutant.E.E diff)
+        (Transition_frontier.Diff.Mutant.E.E diff)
     with
     | Error e ->
         Logger.error ~module_:__MODULE__ ~location:__LOC__ logger
           "Could not connect to worker" ;
         Error.raise e
     | Ok new_hash ->
-        if Transition_frontier.Diff_hash.equal new_hash ground_truth_hash then
+        if Transition_frontier.Diff.Hash.equal new_hash ground_truth_hash then
           ground_truth_hash
         else
           failwithf
             !"Unable to write mutant diff correctly as hashes are different:\n\
              \ %s. Hash of groundtruth %s Hash of actual %s"
             (Yojson.Safe.to_string
-               (Transition_frontier.Diff_mutant.key_to_yojson diff))
-            (Transition_frontier.Diff_hash.to_string ground_truth_hash)
-            (Transition_frontier.Diff_hash.to_string new_hash)
+               (Transition_frontier.Diff.Mutant.key_to_yojson diff))
+            (Transition_frontier.Diff.Hash.to_string ground_truth_hash)
+            (Transition_frontier.Diff.Hash.to_string new_hash)
             ()
 
   let rec flush ({buffer; worker_writer; flush_capacity; _} as t) =
@@ -67,11 +67,11 @@ module Make (Inputs : Intf.Main_inputs) = struct
         Strict_pipe.Synchronous
     in
     let worker_thread =
-      Strict_pipe.Reader.fold reader ~init:Transition_frontier.Diff_hash.empty
+      Strict_pipe.Reader.fold reader ~init:Transition_frontier.Diff.Hash.empty
         ~f:(fun init_hash diff_pairs ->
           Deferred.List.fold diff_pairs ~init:init_hash
             ~f:(fun acc_hash
-               (Transition_frontier.Diff_mutant.E.With_value
+               (Transition_frontier.Diff.Mutant.E.With_value
                  (diff, ground_truth_mutant))
                ->
               write_diff_and_verify ~logger ~acc_hash worker

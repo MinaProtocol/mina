@@ -1,27 +1,13 @@
 open Core_kernel
 open Async
 
-module type For_tests_intf = sig
-  type work
-
-  type snark_pool
-
-  type fee
+module type Work_selector_with_tests_intf = sig
+  include Intf.S
 
   module For_tests : sig
     val does_not_have_better_fee :
       snark_pool:snark_pool -> fee:fee -> work list -> bool
   end
-end
-
-module type Work_selector_with_tests_intf = sig
-  include Protocols.Coda_pow.Work_selector_intf
-
-  include
-    For_tests_intf
-    with type work := work
-     and type snark_pool := snark_pool
-     and type fee := fee
 end
 
 module type Work_selector_F = functor (Inputs : Inputs.Inputs_intf) -> Work_selector_with_tests_intf

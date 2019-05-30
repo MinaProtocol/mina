@@ -21,7 +21,7 @@ let main () =
   in
   let%bind testnet =
     Coda_worker_testnet.test logger n proposers snark_work_public_keys
-      Protocols.Coda_pow.Work_selection.Seq ~max_concurrent_connections:None
+      Cli_lib.Arg_type.Seq ~max_concurrent_connections:None
   in
   let previous_status = Sync_status.Hash_set.create () in
   let bootstrapping_node = 1 in
