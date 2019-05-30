@@ -4,64 +4,9 @@ open Kademlia
 open Coda_base
 open Coda_state
 open Pipe_lib
-open Signature_lib
 open Network_peer
 
-module type Base_inputs_intf = sig
-  module Ledger_hash : Protocols.Coda_pow.Ledger_hash_intf
-
-  module Pending_coinbase_stack_state :
-    Protocols.Coda_pow.Pending_coinbase_stack_state_intf
-    with type pending_coinbase_stack := Pending_coinbase.Stack.t
-
-  module Ledger_proof_statement :
-    Protocols.Coda_pow.Ledger_proof_statement_intf
-    with type ledger_hash := Frozen_ledger_hash.t
-     and type pending_coinbase_stack_state := Pending_coinbase_stack_state.t
-
-  module Ledger_proof : sig
-    include
-      Protocols.Coda_pow.Ledger_proof_intf
-      with type statement := Ledger_proof_statement.t
-       and type ledger_hash := Frozen_ledger_hash.t
-       and type proof := Proof.t
-       and type sok_digest := Sok_message.Digest.t
-
-    include Sexpable.S with type t := t
-  end
-
-  module Transaction_snark_work :
-    Protocols.Coda_pow.Transaction_snark_work_intf
-    with type proof := Ledger_proof.t
-     and type statement := Ledger_proof_statement.t
-     and type public_key := Public_key.Compressed.t
-
-  module Staged_ledger_diff :
-    Protocols.Coda_pow.Staged_ledger_diff_intf
-    with type user_command := User_command.t
-     and type user_command_with_valid_signature :=
-                User_command.With_valid_signature.t
-     and type staged_ledger_hash := Staged_ledger_hash.t
-     and type public_key := Public_key.Compressed.t
-     and type completed_work := Transaction_snark_work.t
-     and type completed_work_checked := Transaction_snark_work.Checked.t
-     and type fee_transfer_single := Fee_transfer.Single.t
-
-  module External_transition :
-    Protocols.Coda_pow.External_transition_intf
-    with type time := Block_time.t
-     and type state_hash := State_hash.t
-     and type compressed_public_key := Public_key.Compressed.t
-     and type user_command := User_command.t
-     and type consensus_state := Consensus.Data.Consensus_state.Value.t
-     and type protocol_state := Protocol_state.Value.t
-     and type proof := Proof.t
-     and type verifier := Verifier.t
-     and type staged_ledger_hash := Staged_ledger_hash.t
-     and type ledger_proof := Ledger_proof.t
-     and type transaction := Transaction.t
-     and type staged_ledger_diff := Staged_ledger_diff.t
-end
+module type Base_inputs_intf = Coda_intf.Inputs_intf
 
 (* assumption: the Rpcs functor is applied only once in the codebase, so that
    any versions appearing in Inputs represent unique types
@@ -70,25 +15,7 @@ end
    inside the Rpcs functor, rather than at the locus of application
 *)
 
-module Rpcs (Inputs : sig
-  include Base_inputs_intf
-
-  module Staged_ledger_aux_hash :
-    Protocols.Coda_pow.Staged_ledger_aux_hash_intf
-
-  module Staged_ledger_aux : sig
-    type t
-
-    module Stable :
-      sig
-        module V1 : sig
-          type t [@@deriving bin_io, version]
-        end
-      end
-      with type V1.t = t
-  end
-end) =
-struct
+module Make_rpcs (Inputs : Base_inputs_intf) = struct
   open Inputs
 
   (* for versioning of the types here, see
@@ -108,7 +35,7 @@ struct
         type query = State_hash.Stable.V1.t
 
         type response =
-          ( Staged_ledger_aux.Stable.V1.t
+          ( Staged_ledger.Scan_state.Stable.V1.t
           * Ledger_hash.Stable.V1.t
           * Pending_coinbase.Stable.V1.t )
           option
@@ -132,7 +59,7 @@ struct
         type query = State_hash.Stable.V1.t [@@deriving bin_io, version {rpc}]
 
         type response =
-          ( Staged_ledger_aux.Stable.V1.t
+          ( Staged_ledger.Scan_state.Stable.V1.t
           * Ledger_hash.Stable.V1.t
           * Pending_coinbase.Stable.V1.t )
           option
@@ -305,7 +232,7 @@ struct
   end
 end
 
-module Message (Inputs : sig
+module Make_message (Inputs : sig
   include Base_inputs_intf
 
   module Snark_pool_diff : sig
@@ -385,26 +312,6 @@ end
 module type Inputs_intf = sig
   include Base_inputs_intf
 
-  module Staged_ledger_aux_hash :
-    Protocols.Coda_pow.Staged_ledger_aux_hash_intf
-
-  (* we omit Staged_ledger_hash, because the available module in Inputs is not versioned; instead, in the
-     versioned RPC modules, we use a specific version
-   *)
-  module Staged_ledger_aux : sig
-    type t
-
-    module Stable :
-      sig
-        module V1 : sig
-          type t [@@deriving bin_io, version]
-        end
-      end
-      with type V1.t = t
-
-    val hash : t -> Staged_ledger_aux_hash.t
-  end
-
   module Snark_pool_diff : sig
     type t [@@deriving sexp, to_yojson]
 
@@ -428,50 +335,47 @@ module type Inputs_intf = sig
       end
       with type V1.t = t
   end
-
-  module Time : Protocols.Coda_pow.Time_intf
 end
 
 module type Config_intf = sig
   type gossip_config
 
-  type time_controller
-
   type t =
     { logger: Logger.t
     ; trust_system: Trust_system.t
     ; gossip_net_params: gossip_config
-    ; time_controller: time_controller
+    ; time_controller: Block_time.Controller.t
     ; consensus_local_state: Consensus.Data.Local_state.t }
 end
 
 module Make (Inputs : Inputs_intf) = struct
   open Inputs
-  module Message = Message (Inputs)
+  module Message = Make_message (Inputs)
+  module Rpcs = Make_rpcs (Inputs)
   module Gossip_net = Gossip_net.Make (Message)
+  module Membership = Membership.Haskell
   module Peer = Peer
 
-  module Config :
-    Config_intf
-    with type gossip_config := Gossip_net.Config.t
-     and type time_controller := Time.Controller.t = struct
+  type snark_pool_diff = Inputs.Snark_pool_diff.t
+
+  type transaction_pool_diff = Inputs.Transaction_pool_diff.t
+
+  module Config : Config_intf with type gossip_config := Gossip_net.Config.t =
+  struct
     type t =
       { logger: Logger.t
       ; trust_system: Trust_system.t
       ; gossip_net_params: Gossip_net.Config.t
-      ; time_controller: Time.Controller.t
+      ; time_controller: Block_time.Controller.t
       ; consensus_local_state: Consensus.Data.Local_state.t }
   end
-
-  module Rpcs = Rpcs (Inputs)
-  module Membership = Membership.Haskell
 
   type t =
     { gossip_net: Gossip_net.t
     ; logger: Logger.t
     ; trust_system: Trust_system.t
     ; states:
-        (External_transition.t Envelope.Incoming.t * Time.t)
+        (External_transition.t Envelope.Incoming.t * Block_time.t)
         Strict_pipe.Reader.t
     ; transaction_pool_diffs:
         Transaction_pool_diff.t Envelope.Incoming.t Linear_pipe.Reader.t
@@ -481,23 +385,23 @@ module Make (Inputs : Inputs_intf) = struct
   [@@deriving fields]
 
   let offline_time =
-    Time.Span.of_ms @@ Int64.of_int Consensus.Constants.inactivity_secs
+    Block_time.Span.of_ms @@ Int64.of_int Consensus.Constants.inactivity_secs
 
   let setup_timer time_controller sync_state_broadcaster =
-    Time.Timeout.create time_controller offline_time ~f:(fun _ ->
+    Block_time.Timeout.create time_controller offline_time ~f:(fun _ ->
         Broadcast_pipe.Writer.write sync_state_broadcaster `Offline
         |> don't_wait_for )
 
   let online_broadcaster time_controller received_messages =
     let online_reader, online_writer = Broadcast_pipe.create `Offline in
     let init =
-      Time.Timeout.create time_controller
-        (Time.Span.of_ms Int64.zero)
+      Block_time.Timeout.create time_controller
+        (Block_time.Span.of_ms Int64.zero)
         ~f:ignore
     in
     Strict_pipe.Reader.fold received_messages ~init ~f:(fun old_timeout _ ->
         let%map () = Broadcast_pipe.Writer.write online_writer `Online in
-        Time.Timeout.cancel time_controller old_timeout () ;
+        Block_time.Timeout.cancel time_controller old_timeout () ;
         setup_timer time_controller online_writer )
     |> Deferred.ignore |> don't_wait_for ;
     online_reader
@@ -510,7 +414,7 @@ module Make (Inputs : Inputs_intf) = struct
   let create (config : Config.t)
       ~(get_staged_ledger_aux_and_pending_coinbases_at_hash :
             State_hash.t Envelope.Incoming.t
-         -> (Staged_ledger_aux.Stable.V1.t * Ledger_hash.t * Pending_coinbase.t)
+         -> (Staged_ledger.Scan_state.t * Ledger_hash.t * Pending_coinbase.t)
             option
             Deferred.t)
       ~(answer_sync_ledger_query :
@@ -585,7 +489,7 @@ module Make (Inputs : Inputs_intf) = struct
                     , Some
                         ( "Sync ledger query with hash: $hash, query: $query, \
                            with error: $error"
-                        , [ ("hash", Inputs.Ledger_hash.to_yojson hash)
+                        , [ ("hash", Ledger_hash.to_yojson hash)
                           ; ( "query"
                             , Syncable_ledger.Query.to_yojson
                                 Ledger.Addr.to_yojson query )
@@ -651,7 +555,7 @@ module Make (Inputs : Inputs_intf) = struct
                    |> Blockchain_state.timestamp |> Block_time.to_time )) ;
               `Fst
                 ( Envelope.Incoming.map envelope ~f:(fun _ -> state)
-                , Time.now config.time_controller )
+                , Block_time.now config.time_controller )
           | Snark_pool_diff diff ->
               `Snd (Envelope.Incoming.map envelope ~f:(fun _ -> diff))
           | Transaction_pool_diff diff ->
@@ -889,3 +793,16 @@ module Make (Inputs : Inputs_intf) = struct
       ~f:(answer_query 0 (Peer.Hash_set.of_list []))
     |> don't_wait_for
 end
+
+include Make (struct
+  open Coda_transition
+  module Ledger_proof = Ledger_proof
+  module Verifier = Verifier
+  module Transaction_snark_work = Transaction_snark_work
+  module Staged_ledger_diff = Staged_ledger_diff
+  module External_transition = External_transition
+  module Internal_transition = Internal_transition
+  module Staged_ledger = Staged_ledger
+  module Transaction_pool_diff = Transaction_pool.Diff
+  module Snark_pool_diff = Network_pool.Snark_pool_diff
+end)

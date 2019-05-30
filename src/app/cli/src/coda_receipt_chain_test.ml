@@ -35,7 +35,7 @@ let main () =
   let send_amount = Currency.Amount.of_int 10 in
   let fee = Currency.Fee.of_int 0 in
   let%bind program_dir = Unix.getcwd () in
-  let work_selection = Protocols.Coda_pow.Work_selection.Seq in
+  let work_selection = Cli_lib.Arg_type.Seq in
   Parallel.init_master () ;
   let configs =
     Coda_processes.local_configs n ~program_dir ~proposal_interval

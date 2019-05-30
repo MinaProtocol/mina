@@ -1,27 +1,37 @@
 open Core_kernel
+open Coda_base
 open Pipe_lib
 
 module Priced_proof : sig
-  type ('proof, 'fee) t = {proof: 'proof; fee: 'fee}
-  [@@deriving bin_io, sexp, fields]
+  module Stable : sig
+    module V1 : sig
+      type 'proof t = {proof: 'proof; fee: Fee_with_prover.Stable.V1.t}
+      [@@deriving bin_io, sexp, fields, yojson, version]
+    end
+
+    module Latest = V1
+  end
+
+  type 'proof t = 'proof Stable.Latest.t =
+    {proof: 'proof; fee: Fee_with_prover.Stable.V1.t}
 end
 
 module type Transition_frontier_intf = sig
+  type work
+
   type t
 
   module Extensions : sig
     module Work : sig
-      type t [@@deriving sexp]
+      type t = work [@@deriving sexp]
 
-      module Stable :
-        sig
-          module V1 : sig
-            type t [@@deriving sexp, bin_io]
+      module Stable : sig
+        module V1 : sig
+          type nonrec t = t [@@deriving sexp, bin_io]
 
-            include Hashable.S_binable with type t := t
-          end
+          include Hashable.S_binable with type t := t
         end
-        with type V1.t = t
+      end
 
       include Hashable.S with type t := t
     end
@@ -32,11 +42,9 @@ module type Transition_frontier_intf = sig
 end
 
 module type S = sig
+  type ledger_proof
+
   type work
-
-  type proof
-
-  type fee
 
   type transition_frontier
 
@@ -52,22 +60,18 @@ module type S = sig
   val add_snark :
        t
     -> work:work
-    -> proof:proof
-    -> fee:fee
+    -> proof:ledger_proof list
+    -> fee:Fee_with_prover.t
     -> [`Rebroadcast | `Don't_rebroadcast]
 
-  val request_proof : t -> work -> (proof, fee) Priced_proof.t option
+  val request_proof : t -> work -> ledger_proof list Priced_proof.t option
 
   val listen_to_frontier_broadcast_pipe :
     transition_frontier option Broadcast_pipe.Reader.t -> t -> unit
 end
 
-module Make (Proof : sig
-  type t [@@deriving bin_io]
-end) (Fee : sig
-  type t [@@deriving sexp, bin_io]
-
-  include Comparable.S with type t := t
+module Make (Ledger_proof : sig
+  type t [@@deriving bin_io, sexp, version]
 end) (Work : sig
   type t [@@deriving sexp]
 
@@ -83,10 +87,14 @@ end) (Work : sig
 
   include Hashable.S with type t := t
 end)
-(Transition_frontier : Transition_frontier_intf
-                       with module Extensions.Work = Work) :
+(Transition_frontier : Transition_frontier_intf with type work := Work.t) :
   S
   with type work := Work.t
-   and type proof := Proof.t
-   and type fee := Fee.t
    and type transition_frontier := Transition_frontier.t
+   and type ledger_proof := Ledger_proof.t
+
+include
+  S
+  with type work := Transaction_snark_work.Statement.t
+   and type transition_frontier := Transition_frontier.t
+   and type ledger_proof := Ledger_proof.t

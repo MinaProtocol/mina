@@ -206,8 +206,7 @@ let daemon logger =
          or_from_config
            (Fn.compose Option.return
               (Fn.compose work_selection_val YJ.Util.to_string))
-           "work-selection" ~default:Protocols.Coda_pow.Work_selection.Seq
-           work_selection_flag
+           "work-selection" ~default:Cli_lib.Arg_type.Seq work_selection_flag
        in
        let initial_peers_raw =
          List.concat
@@ -349,7 +348,7 @@ let daemon logger =
        let trust_system = Trust_system.create ~db_dir:trust_dir in
        trace_database_initialization "trust_system" __LOC__ trust_dir ;
        let time_controller =
-         M.Inputs.Time.Controller.create M.Inputs.Time.Controller.basic
+         Block_time.Controller.create Block_time.Controller.basic
        in
        let consensus_local_state =
          Consensus.Data.Local_state.create
@@ -383,7 +382,8 @@ let daemon logger =
        let transaction_database_dir = conf_dir ^/ "transaction" in
        let%bind () = Async.Unix.mkdir ~p:() transaction_database_dir in
        let transaction_database =
-         Transaction_database.create logger transaction_database_dir
+         Auxiliary_database.Transaction_database.create logger
+           transaction_database_dir
        in
        trace_database_initialization "transaction_database" __LOC__
          transaction_database_dir ;

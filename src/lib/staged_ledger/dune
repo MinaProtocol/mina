@@ -5,7 +5,7 @@
  (flags :standard -short-paths -warn-error -58)
  (inline_tests)
  (libraries core transaction_snark_scan_state sgn transaction_snark coda_base
-   protocols merkle_mask pipe_lib logger async async_extra module_version ppx_fields_conv
+   coda_intf merkle_mask pipe_lib logger async async_extra module_version ppx_fields_conv
    ledger_proof verifier transaction_snark_work staged_ledger_diff)
  (preprocessor_deps ../../config.mlh)
  (preprocess
