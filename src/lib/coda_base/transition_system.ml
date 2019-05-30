@@ -168,13 +168,13 @@ struct
         as_prover
           As_prover.(
             Let_syntax.(
-              let%bind in_snark_next_state = read State.typ _next_state in
-              let%bind next_top_hash = read Field.typ next_top_hash in
-              let%bind top_hash = read Field.typ top_hash in
               let%map prover_state = get_state in
-              let updated = State.sexp_of_value in_snark_next_state in
               Option.map (Prover_state.expected_next_state prover_state)
                 ~f:(fun expected_next_state ->
+                  let%bind in_snark_next_state = read State.typ _next_state in
+                  let%bind next_top_hash = read Field.typ next_top_hash in
+                  let%bind top_hash = read Field.typ top_hash in
+                  let updated = State.sexp_of_value in_snark_next_state in
                   let original = State.sexp_of_value expected_next_state in
                   if not (Field.equal next_top_hash top_hash) then
                     let diff =
@@ -186,7 +186,7 @@ struct
                        (some differences are inessential): %s"
                       (Sexp_diff_kernel.Display.display_as_plain_string diff)
                       ()
-                  else () )
+                  else return () )
               |> ignore ;
               ()))
       in
