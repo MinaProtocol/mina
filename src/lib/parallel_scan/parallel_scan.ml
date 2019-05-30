@@ -1,5 +1,14 @@
 open Core_kernel
 
+(*Glossary of type variables used in this file:
+  1. 'base: polymorphic type for jobs in the leaves of the scan state tree
+  2. 'merge: polymorphic type for jobs in the intermediate nodes of the scan state tree
+  3. 'base_t: 'base Base.t
+  4. 'merge_t: 'merge Merge.t
+  5. 'base_job: Base.Job.t
+  6. 'merge_job: Merge.Job.t
+  *)
+
 (**Sequence number for jobs in the scan state that corresponds to the order in 
 which they were added*)
 module Sequence_number = struct
@@ -63,10 +72,10 @@ module Base = struct
     module Stable = struct
       module V1 = struct
         module T = struct
-          type 'd t =
+          type 'base t =
             | Empty
             | Full of
-                { job: 'd
+                { job: 'base
                 ; seq_no: Sequence_number.Stable.V1.t
                 ; status: Job_status.Stable.V1.t }
           [@@deriving sexp, bin_io, version]
@@ -78,10 +87,10 @@ module Base = struct
       module Latest = V1
     end
 
-    type 'd t = 'd Stable.Latest.t =
+    type 'base t = 'base Stable.Latest.t =
       | Empty
       | Full of
-          { job: 'd
+          { job: 'base
           ; seq_no: Sequence_number.Stable.V1.t
           ; status: Job_status.Stable.V1.t }
     [@@deriving sexp]
@@ -90,7 +99,7 @@ module Base = struct
   module Stable = struct
     module V1 = struct
       module T = struct
-        type 'd t = Weight.Stable.V1.t * 'd Job.Stable.V1.t
+        type 'base t = Weight.Stable.V1.t * 'base Job.Stable.V1.t
         [@@deriving sexp, bin_io, version]
       end
 
@@ -100,7 +109,7 @@ module Base = struct
     module Latest = V1
   end
 
-  type 'd t = 'd Stable.Latest.t [@@deriving sexp]
+  type 'base t = 'base Stable.Latest.t [@@deriving sexp]
 end
 
 (** For merge proofs: Merging two base proofs or two merge proofs*)
@@ -109,12 +118,12 @@ module Merge = struct
     module Stable = struct
       module V1 = struct
         module T = struct
-          type 'a t =
+          type 'merge t =
             | Empty
-            | Part of 'a (*When only the left component of the job is available since we always complete the jobs from left to right*)
+            | Part of 'merge (*When only the left component of the job is available since we always complete the jobs from left to right*)
             | Full of
-                { left: 'a
-                ; right: 'a
+                { left: 'merge
+                ; right: 'merge
                 ; seq_no: Sequence_number.Stable.V1.t
                 ; status: Job_status.Stable.V1.t }
           [@@deriving sexp, bin_io, version]
@@ -126,12 +135,12 @@ module Merge = struct
       module Latest = V1
     end
 
-    type 'a t = 'a Stable.Latest.t =
+    type 'merge t = 'merge Stable.Latest.t =
       | Empty
-      | Part of 'a
+      | Part of 'merge
       | Full of
-          { left: 'a
-          ; right: 'a
+          { left: 'merge
+          ; right: 'merge
           ; seq_no: Sequence_number.Stable.V1.t
           ; status: Job_status.Stable.V1.t }
     [@@deriving sexp]
@@ -140,8 +149,8 @@ module Merge = struct
   module Stable = struct
     module V1 = struct
       module T = struct
-        type 'a t =
-          (Weight.Stable.V1.t * Weight.Stable.V1.t) * 'a Job.Stable.V1.t
+        type 'merge t =
+          (Weight.Stable.V1.t * Weight.Stable.V1.t) * 'merge Job.Stable.V1.t
         [@@deriving sexp, bin_io, version]
       end
 
@@ -151,7 +160,7 @@ module Merge = struct
     module Latest = V1
   end
 
-  type 'a t = 'a Stable.Latest.t [@@deriving sexp]
+  type 'merge t = 'merge Stable.Latest.t [@@deriving sexp]
 end
 
 (**All the jobs on a tree that can be done. Base.Full and Merge.Bcomp*)
@@ -159,7 +168,8 @@ module Available_job = struct
   module Stable = struct
     module V1 = struct
       module T = struct
-        type ('a, 'd) t = Base of 'd | Merge of 'a * 'a [@@deriving sexp]
+        type ('merge, 'base) t = Base of 'base | Merge of 'merge * 'merge
+        [@@deriving sexp]
       end
 
       include T
@@ -168,7 +178,9 @@ module Available_job = struct
     module Latest = V1
   end
 
-  type ('a, 'd) t = ('a, 'd) Stable.Latest.t = Base of 'd | Merge of 'a * 'a
+  type ('merge, 'base) t = ('merge, 'base) Stable.Latest.t =
+    | Base of 'base
+    | Merge of 'merge * 'merge
   [@@deriving sexp]
 end
 
@@ -177,7 +189,8 @@ module New_job = struct
   module Stable = struct
     module V1 = struct
       module T = struct
-        type ('a, 'd) t = Base of 'd | Merge of 'a [@@deriving sexp]
+        type ('merge, 'base) t = Base of 'base | Merge of 'merge
+        [@@deriving sexp]
       end
 
       include T
@@ -186,7 +199,9 @@ module New_job = struct
     module Latest = V1
   end
 
-  type ('a, 'd) t = ('a, 'd) Stable.Latest.t = Base of 'd | Merge of 'a
+  type ('merge, 'base) t = ('merge, 'base) Stable.Latest.t =
+    | Base of 'base
+    | Merge of 'merge
   [@@deriving sexp]
 end
 
@@ -260,9 +275,12 @@ module Tree = struct
   module Stable = struct
     module V1 = struct
       module T = struct
-        type ('a, 'd) t =
-          | Leaf of 'd
-          | Node of {depth: int; value: 'a; sub_tree: ('a * 'a, 'd * 'd) t}
+        type ('merge_t, 'base_t) t =
+          | Leaf of 'base_t
+          | Node of
+              { depth: int
+              ; value: 'merge_t
+              ; sub_tree: ('merge_t * 'merge_t, 'base_t * 'base_t) t }
         [@@deriving sexp, bin_io, version]
       end
 
@@ -272,9 +290,12 @@ module Tree = struct
     module Latest = V1
   end
 
-  type ('a, 'd) t = ('a, 'd) Stable.Latest.t =
-    | Leaf of 'd
-    | Node of {depth: int; value: 'a; sub_tree: ('a * 'a, 'd * 'd) t}
+  type ('merge_t, 'base_t) t = ('merge_t, 'base_t) Stable.Latest.t =
+    | Leaf of 'base_t
+    | Node of
+        { depth: int
+        ; value: 'merge_t
+        ; sub_tree: ('merge_t * 'merge_t, 'base_t * 'base_t) t }
   [@@deriving sexp]
 
   (*Eg: Tree depth = 3
@@ -289,69 +310,83 @@ module Tree = struct
    *)
 
   (*mapi where i is the level of the tree*)
-  let rec map_depth : type a b c d.
-      fa:(int -> a -> b) -> fd:(d -> c) -> (a, d) t -> (b, c) t =
-   fun ~fa ~fd tree ->
+  let rec map_depth : type a_merge b_merge c_base d_base.
+         f_merge:(int -> a_merge -> b_merge)
+      -> f_base:(c_base -> d_base)
+      -> (a_merge, c_base) t
+      -> (b_merge, d_base) t =
+   fun ~f_merge ~f_base tree ->
     match tree with
     | Leaf d ->
-        Leaf (fd d)
+        Leaf (f_base d)
     | Node {depth; value; sub_tree} ->
         Node
           { depth
-          ; value= fa depth value
+          ; value= f_merge depth value
           ; sub_tree=
               map_depth
-                ~fa:(fun i (x, y) -> (fa i x, fa i y))
-                ~fd:(fun (x, y) -> (fd x, fd y))
+                ~f_merge:(fun i (x, y) -> (f_merge i x, f_merge i y))
+                ~f_base:(fun (x, y) -> (f_base x, f_base y))
                 sub_tree }
 
-  let map : type a b c d. fa:(a -> b) -> fd:(d -> c) -> (a, d) t -> (b, c) t =
-   fun ~fa ~fd tree -> map_depth tree ~fd ~fa:(fun _ -> fa)
+  let map : type a_merge b_merge c_base d_base.
+         f_merge:(a_merge -> b_merge)
+      -> f_base:(c_base -> d_base)
+      -> (a_merge, c_base) t
+      -> (b_merge, d_base) t =
+   fun ~f_merge ~f_base tree ->
+    map_depth tree ~f_base ~f_merge:(fun _ -> f_merge)
 
   (* foldi where i is the cur_level*)
   module Make_foldable (M : Monad.S) = struct
-    let rec fold_depth_until' : type a c d e.
-           fa:(int -> c -> a -> (c, e) Continue_or_stop.t M.t)
-        -> fd:(c -> d -> (c, e) Continue_or_stop.t M.t)
-        -> init:c
-        -> (a, d) t
-        -> (c, e) Continue_or_stop.t M.t =
-     fun ~fa ~fd ~init:acc t ->
+    let rec fold_depth_until' : type merge_t accum base_t final.
+           f_merge:(   int
+                    -> accum
+                    -> merge_t
+                    -> (accum, final) Continue_or_stop.t M.t)
+        -> f_base:(accum -> base_t -> (accum, final) Continue_or_stop.t M.t)
+        -> init:accum
+        -> (merge_t, base_t) t
+        -> (accum, final) Continue_or_stop.t M.t =
+     fun ~f_merge ~f_base ~init:acc t ->
       let open Container.Continue_or_stop in
       let open M.Let_syntax in
       match t with
       | Leaf d ->
-          fd acc d
+          f_base acc d
       | Node {depth; value; sub_tree} -> (
-          match%bind fa depth acc value with
+          match%bind f_merge depth acc value with
           | Continue acc' ->
               fold_depth_until'
-                ~fa:(fun i acc (x, y) ->
-                  match%bind fa i acc x with
+                ~f_merge:(fun i acc (x, y) ->
+                  match%bind f_merge i acc x with
                   | Continue r ->
-                      fa i r y
+                      f_merge i r y
                   | x ->
                       M.return x )
-                ~fd:(fun acc (x, y) ->
-                  match%bind fd acc x with
+                ~f_base:(fun acc (x, y) ->
+                  match%bind f_base acc x with
                   | Continue r ->
-                      fd r y
+                      f_base r y
                   | x ->
                       M.return x )
                 ~init:acc' sub_tree
           | x ->
               M.return x )
 
-    let fold_depth_until : type a c d e.
-           fa:(int -> c -> a -> (c, e) Continue_or_stop.t M.t)
-        -> fd:(c -> d -> (c, e) Continue_or_stop.t M.t)
-        -> init:c
-        -> finish:(c -> e M.t)
-        -> (a, d) t
-        -> e M.t =
-     fun ~fa ~fd ~init ~finish t ->
+    let fold_depth_until : type merge_t base_t accum final.
+           f_merge:(   int
+                    -> accum
+                    -> merge_t
+                    -> (accum, final) Continue_or_stop.t M.t)
+        -> f_base:(accum -> base_t -> (accum, final) Continue_or_stop.t M.t)
+        -> init:accum
+        -> finish:(accum -> final M.t)
+        -> (merge_t, base_t) t
+        -> final M.t =
+     fun ~f_merge ~f_base ~init ~finish t ->
       let open M.Let_syntax in
-      match%bind fold_depth_until' ~fa ~fd ~init t with
+      match%bind fold_depth_until' ~f_merge ~f_base ~init t with
       | Continue result ->
           finish result
       | Stop e ->
@@ -360,27 +395,38 @@ module Tree = struct
 
   module Foldable_ident = Make_foldable (Monad.Ident)
 
-  let fold_depth : type a c d.
-      fa:(int -> c -> a -> c) -> fd:(c -> d -> c) -> init:c -> (a, d) t -> c =
-   fun ~fa ~fd ~init t ->
+  let fold_depth : type merge_t base_t accum.
+         f_merge:(int -> accum -> merge_t -> accum)
+      -> f_base:(accum -> base_t -> accum)
+      -> init:accum
+      -> (merge_t, base_t) t
+      -> accum =
+   fun ~f_merge ~f_base ~init t ->
     Foldable_ident.fold_depth_until
-      ~fa:(fun i acc a -> Continue (fa i acc a))
-      ~fd:(fun acc d -> Continue (fd acc d))
+      ~f_merge:(fun i acc a -> Continue (f_merge i acc a))
+      ~f_base:(fun acc d -> Continue (f_base acc d))
       ~init ~finish:Fn.id t
 
-  let fold : type a c d.
-      fa:(c -> a -> c) -> fd:(c -> d -> c) -> init:c -> (a, d) t -> c =
-   fun ~fa ~fd ~init t -> fold_depth t ~init ~fa:(fun _ -> fa) ~fd
+  let fold : type merge_t base_t accum.
+         f_merge:(accum -> merge_t -> accum)
+      -> f_base:(accum -> base_t -> accum)
+      -> init:accum
+      -> (merge_t, base_t) t
+      -> accum =
+   fun ~f_merge ~f_base ~init t ->
+    fold_depth t ~init ~f_merge:(fun _ -> f_merge) ~f_base
 
-  let fold_until : type a c d e.
-         fa:(c -> a -> (c, e) Continue_or_stop.t)
-      -> fd:(c -> d -> (c, e) Continue_or_stop.t)
-      -> init:c
-      -> finish:(c -> e)
-      -> (a, d) t
-      -> e =
-   fun ~fa ~fd ~init ~finish t ->
-    Foldable_ident.fold_depth_until ~fa:(fun _ -> fa) ~fd ~init ~finish t
+  let fold_until : type merge_t base_t accum final.
+         f_merge:(accum -> merge_t -> (accum, final) Continue_or_stop.t)
+      -> f_base:(accum -> base_t -> (accum, final) Continue_or_stop.t)
+      -> init:accum
+      -> finish:(accum -> final)
+      -> (merge_t, base_t) t
+      -> final =
+   fun ~f_merge ~f_base ~init ~finish t ->
+    Foldable_ident.fold_depth_until
+      ~f_merge:(fun _ -> f_merge)
+      ~f_base ~init ~finish t
 
   (*List of things that map to a specific level on the tree*)
   module Data_list = struct
@@ -419,14 +465,14 @@ module Tree = struct
       | Double a ->
           fold a ~f:(fun acc (a, b) -> f (f acc a) b) ~init
 
-    let rec of_tree : type a b c d.
-           c t
-        -> (a, d) tree
-        -> weight_a:(a -> b * b)
-        -> weight_d:(d -> b * b)
-        -> f_split:(b * b -> c -> c * c)
+    let rec of_tree : type merge_t weight data base_t.
+           data t
+        -> (merge_t, base_t) tree
+        -> weight_a:(merge_t -> weight * weight)
+        -> weight_d:(base_t -> weight * weight)
+        -> f_split:(weight * weight -> data -> data * data)
         -> on_level:int
-        -> c t =
+        -> data t =
      fun job_list tree ~weight_a ~weight_d ~f_split ~on_level ->
       match tree with
       | Node {depth; value; sub_tree} ->
@@ -461,30 +507,28 @@ module Tree = struct
   end
 
   (*
-    a -> 'a Merge.t
-    b -> New_job.t Data_list.t
-    c -> weight
-    d -> 'd Base.t
-    e -> 'a (final proof)
-    fa, fb are to update the nodes with new jobs and mark old jobs to "Done"*)
-  let rec update_split : type a b c d e.
-         fa:(b -> int -> a -> a * e option)
-      -> fd:(b -> d -> d)
-      -> weight_a:(a -> c * c)
-      -> jobs:b Data_list.t
+    result -> final proof
+    f_merge, f_base are to update the nodes with new jobs and mark old jobs to "Done"*)
+  let rec update_split : type merge_t base_t data weight result.
+         f_merge:(data -> int -> merge_t -> merge_t * result option)
+      -> f_base:(data -> base_t -> base_t)
+      -> weight_merge:(merge_t -> weight * weight)
+      -> jobs:data Data_list.t
       -> update_level:int
-      -> jobs_split:(c * c -> b -> b * b)
-      -> (a, d) t
-      -> (a, d) t * e option =
-   fun ~fa ~fd ~weight_a ~jobs ~update_level ~jobs_split t ->
+      -> jobs_split:(weight * weight -> data -> data * data)
+      -> (merge_t, base_t) t
+      -> (merge_t, base_t) t * result option =
+   fun ~f_merge ~f_base ~weight_merge ~jobs ~update_level ~jobs_split t ->
     match t with
     | Leaf d ->
-        let x = (Leaf (fd (Data_list.to_data jobs) d), None) in
+        let x = (Leaf (f_base (Data_list.to_data jobs) d), None) in
         x
     | Node {depth; value; sub_tree} ->
-        let weight_left_subtree, weight_right_subtree = weight_a value in
+        let weight_left_subtree, weight_right_subtree = weight_merge value in
         (*update the jobs at the current level*)
-        let value', scan_result = fa (Data_list.to_data jobs) depth value in
+        let value', scan_result =
+          f_merge (Data_list.to_data jobs) depth value
+        in
         (*get the updated subtree*)
         let sub, _ =
           if update_level = depth then (sub_tree, None)
@@ -495,12 +539,12 @@ module Tree = struct
                 (jobs_split (weight_left_subtree, weight_right_subtree))
             in
             update_split
-              ~fa:(fun (b, b') i (x, y) ->
-                let left = fa b i x in
-                let right = fa b' i y in
+              ~f_merge:(fun (b, b') i (x, y) ->
+                let left = f_merge b i x in
+                let right = f_merge b' i y in
                 ((fst left, fst right), Option.both (snd left) (snd right)) )
-              ~fd:(fun (b, b') (x, x') -> (fd b x, fd b' x'))
-              ~weight_a:(fun (a, b) -> (weight_a a, weight_a b))
+              ~f_base:(fun (b, b') (x, x') -> (f_base b x, f_base b' x'))
+              ~weight_merge:(fun (a, b) -> (weight_merge a, weight_merge b))
               ~update_level
               ~jobs_split:(fun (x, y) (a, b) ->
                 (jobs_split x a, jobs_split y b) )
@@ -508,43 +552,45 @@ module Tree = struct
         in
         (Node {depth; value= value'; sub_tree= sub}, scan_result)
 
-  let rec update_merge : type a b d.
-         fa:((b * b) Data_list.t -> a -> a * b Data_list.t)
-      -> fd:(d -> d * b Data_list.t)
-      -> (a, d) t
-      -> (a, d) t * b Data_list.t =
-   fun ~fa ~fd t ->
+  let rec update_accumulate : type merge_t base_t data.
+         f_merge:(   (data * data) Data_list.t
+                  -> merge_t
+                  -> merge_t * data Data_list.t)
+      -> f_base:(base_t -> base_t * data Data_list.t)
+      -> (merge_t, base_t) t
+      -> (merge_t, base_t) t * data Data_list.t =
+   fun ~f_merge ~f_base t ->
     match t with
     | Leaf d ->
-        let new_base, count_list = fd d in
+        let new_base, count_list = f_base d in
         (Leaf new_base, count_list)
     | Node {depth; value; sub_tree} ->
         (*get the updated subtree*)
         let sub, counts =
-          update_merge
-            ~fa:(fun b (x, y) ->
+          update_accumulate
+            ~f_merge:(fun b (x, y) ->
               let b1, b2 = Data_list.to_data b in
-              let left, count1 = fa (Single b1) x in
-              let right, count2 = fa (Single b2) y in
+              let left, count1 = f_merge (Single b1) x in
+              let right, count2 = f_merge (Single b2) y in
               let count = Data_list.merge count1 count2 in
               ((left, right), count) )
-            ~fd:(fun (x, y) ->
-              let left, count1 = fd x in
-              let right, count2 = fd y in
+            ~f_base:(fun (x, y) ->
+              let left, count1 = f_base x in
+              let right, count2 = f_base y in
               let count = Data_list.merge count1 count2 in
               ((left, right), count) )
             sub_tree
         in
-        let value', count_list = fa counts value in
+        let value', count_list = f_merge counts value in
         (Node {depth; value= value'; sub_tree= sub}, count_list)
 
   let update :
-         ('b, 'c) New_job.t list
+         ('merge_job, 'base_job) New_job.t list
       -> update_level:int
       -> sequence_no:int
       -> depth:int
-      -> ('a, 'd) t
-      -> ('a, 'd) t * 'b option =
+      -> ('merge_t, 'base_t) t
+      -> ('merge_t, 'base_t) t * 'b option =
    fun completed_jobs ~update_level ~sequence_no:seq_no ~depth:_ tree ->
     let add_merges (jobs : ('b, 'c) New_job.t list) cur_level (weight, m) =
       let left, right = weight in
@@ -618,11 +664,11 @@ module Tree = struct
           failwith "Invalid base job"
     in
     let jobs = Data_list.Single completed_jobs in
-    update_split ~fa:add_merges ~fd:add_bases tree ~weight_a:fst ~jobs
-      ~update_level ~jobs_split:(fun (l, r) a ->
+    update_split ~f_merge:add_merges ~f_base:add_bases tree ~weight_merge:fst
+      ~jobs ~update_level ~jobs_split:(fun (l, r) a ->
         (List.take a l, List.take (List.drop a l) r) )
 
-  let reset_weights : ('a, 'd) t -> ('a, 'd) t =
+  let reset_weights : ('merge_t, 'base_t) t -> ('merge_t, 'base_t) t =
    fun tree ->
     let f_base base =
       match base with
@@ -639,19 +685,22 @@ module Tree = struct
       | _ ->
           (((l1 + r1, l2 + r2), snd m), Single (l1 + r1, l2 + r2))
     in
-    fst (update_merge ~fa:f_merge ~fd:f_base tree)
+    fst (update_accumulate ~f_merge ~f_base tree)
 
   let jobs_on_level :
-      depth:int -> level:int -> ('a, 'd) t -> ('b, 'c) Available_job.t list =
+         depth:int
+      -> level:int
+      -> ('merge_t, 'base_t) t
+      -> ('merge_job, 'base_job) Available_job.t list =
    fun ~depth ~level tree ->
     fold_depth ~init:[]
-      ~fa:(fun i acc a ->
+      ~f_merge:(fun i acc a ->
         match (i = level, a) with
         | true, (_weight, Merge.Job.Full {left; right; status= Todo; _}) ->
             Available_job.Merge (left, right) :: acc
         | _ ->
             acc )
-      ~fd:(fun acc d ->
+      ~f_base:(fun acc d ->
         match (level = depth, d) with
         | true, (_weight, Base.Job.Full {job; status= Todo; _}) ->
             Available_job.Base job :: acc
@@ -660,16 +709,17 @@ module Tree = struct
       tree
     |> List.rev
 
-  let to_raw_jobs : ('a, 'd) t -> ('b, 'c) New_job.t list =
+  let to_hashable_jobs :
+      ('merge_t, 'base_t) t -> ('merge_job, 'base_job) New_job.t list =
    fun tree ->
     fold ~init:[]
-      ~fa:(fun acc a ->
+      ~f_merge:(fun acc a ->
         match a with
         | _, Merge.Job.Full {status= Job_status.Done; _} ->
             acc
         | _ ->
             New_job.Merge a :: acc )
-      ~fd:(fun acc d ->
+      ~f_base:(fun acc d ->
         match d with
         | _, Base.Job.Full {status= Job_status.Done; _} ->
             acc
@@ -678,16 +728,17 @@ module Tree = struct
       tree
     |> List.rev
 
-  let to_jobs : ('a, 'd) t -> ('b, 'c) Available_job.t list =
+  let to_jobs :
+      ('merge_t, 'base_t) t -> ('merge_job, 'base_job) Available_job.t list =
    fun tree ->
     fold ~init:[]
-      ~fa:(fun acc a ->
+      ~f_merge:(fun acc a ->
         match a with
         | _weight, Merge.Job.Full {left; right; status= Todo; _} ->
             Available_job.Merge (left, right) :: acc
         | _ ->
             acc )
-      ~fd:(fun acc d ->
+      ~f_base:(fun acc d ->
         match d with
         | _weight, Base.Job.Full {job; status= Todo; _} ->
             Available_job.Base job :: acc
@@ -696,38 +747,32 @@ module Tree = struct
       tree
     |> List.rev
 
-  let hash : ('a, 'd) t -> fa:('a -> string) -> fd:('d -> string) -> string =
-   fun t ~fa ~fd ->
-    let buf = Buffer.create 0 in
-    let () =
-      fold ~init:()
-        ~fa:(fun _ a -> Buffer.add_string buf (fa a))
-        ~fd:(fun _ d -> Buffer.add_string buf (fd d))
-        t
-    in
-    Buffer.contents buf
-
-  let leaves : ('a, 'b) t -> 'd list =
+  let leaves : ('merge_t, 'base_t) t -> 'base_job list =
    fun tree ->
     fold_depth ~init:[]
-      ~fa:(fun _ _ _ -> [])
-      ~fd:(fun acc d ->
+      ~f_merge:(fun _ _ _ -> [])
+      ~f_base:(fun acc d ->
         match d with _, Base.Job.Full {job; _} -> job :: acc | _ -> acc )
       tree
     |> List.rev
 
-  let rec view_tree : type a d.
-      (a, d) t -> show_a:(a -> string) -> show_d:(d -> string) -> string =
-   fun tree ~show_a ~show_d ->
+  let rec view_tree : type merge_t base_t.
+         (merge_t, base_t) t
+      -> show_merge:(merge_t -> string)
+      -> show_base:(base_t -> string)
+      -> string =
+   fun tree ~show_merge ~show_base ->
     match tree with
     | Leaf d ->
-        sprintf !"Leaf %s\n" (show_d d)
+        sprintf !"Leaf %s\n" (show_base d)
     | Node {value; sub_tree; _} ->
-        let curr = sprintf !"Node %s\n" (show_a value) in
+        let curr = sprintf !"Node %s\n" (show_merge value) in
         let subtree =
           view_tree sub_tree
-            ~show_a:(fun (x, y) -> sprintf !"%s  %s" (show_a x) (show_a y))
-            ~show_d:(fun (x, y) -> sprintf !"%s  %s" (show_d x) (show_d y))
+            ~show_merge:(fun (x, y) ->
+              sprintf !"%s  %s" (show_merge x) (show_merge y) )
+            ~show_base:(fun (x, y) ->
+              sprintf !"%s  %s" (show_base x) (show_base y) )
         in
         curr ^ subtree
 
@@ -743,16 +788,15 @@ module T = struct
   module Stable = struct
     module V1 = struct
       module T = struct
-        type ('a, 'd) t =
+        type ('merge, 'base) t =
           { trees:
-              ('a Merge.Stable.V1.t, 'd Base.Stable.V1.t) Tree.Stable.V1.t
+              ( 'merge Merge.Stable.V1.t
+              , 'base Base.Stable.V1.t )
+              Tree.Stable.V1.t
               Non_empty_list.Stable.V1.t
                 (*use non empty list*)
-          ; acc: ('a * 'd list) option
+          ; acc: ('merge * 'base list) option
                 (*last emitted proof and the corresponding transactions*)
-          ; recent_tree_data: 'd list
-          ; other_trees_data: 'd list list
-                (*Keeping track of all the transactions corresponding to a proof returned*)
           ; curr_job_seq_no: int
                 (*Sequence number for the jobs added every block*)
           ; max_base_jobs: int (*transaction_capacity_log_2*)
@@ -766,21 +810,20 @@ module T = struct
     module Latest = V1
   end
 
-  type ('a, 'd) t = ('a, 'd) Stable.Latest.t =
+  type ('merge, 'base) t = ('merge, 'base) Stable.Latest.t =
     { trees:
-        ('a Merge.Stable.V1.t, 'd Base.Stable.V1.t) Tree.Stable.V1.t
+        ('merge Merge.Stable.V1.t, 'base Base.Stable.V1.t) Tree.Stable.V1.t
         Non_empty_list.Stable.V1.t
-    ; acc: ('a * 'd list) option
+    ; acc: ('merge * 'base list) option
           (*last emitted proof and the corresponding transactions*)
-    ; recent_tree_data: 'd list
-    ; other_trees_data: 'd list list
     ; curr_job_seq_no: int
     ; max_base_jobs: int
     ; delay: int }
   [@@deriving sexp]
 
-  let create_tree_for_level ~level ~depth ~merge ~base =
-    let rec go : type a d. int -> (int -> a) -> d -> (a, d) Tree.t =
+  let create_tree_for_level ~level ~depth ~merge_job ~base_job =
+    let rec go : type merge_t base_t.
+        int -> (int -> merge_t) -> base_t -> (merge_t, base_t) Tree.t =
      fun d fmerge base ->
       if d >= depth then Leaf base
       else
@@ -798,56 +841,59 @@ module T = struct
             let x = Int.pow 2 level / Int.pow 2 (d + 1) in
             (x, x)
         in
-        (weight, merge) )
-      (base_weight, base)
+        (weight, merge_job) )
+      (base_weight, base_job)
 
   let create_tree ~depth =
-    create_tree_for_level ~level:depth ~depth ~merge:Merge.Job.Empty
-      ~base:Base.Job.Empty
+    create_tree_for_level ~level:depth ~depth ~merge_job:Merge.Job.Empty
+      ~base_job:Base.Job.Empty
 
-  let empty : type a d. max_base_jobs:int -> delay:int -> (a, d) t =
+  let empty : type merge base.
+      max_base_jobs:int -> delay:int -> (merge, base) t =
    fun ~max_base_jobs ~delay ->
     let depth = Int.ceil_log2 max_base_jobs in
     let first_tree = create_tree ~depth in
     { trees= Non_empty_list.singleton first_tree
     ; acc= None
-    ; recent_tree_data= []
-    ; other_trees_data= []
     ; curr_job_seq_no= 0
     ; max_base_jobs
     ; delay }
 
-  let delay : type a d. (a, d) t -> int = fun t -> t.delay
+  let delay : type merge base. (merge, base) t -> int = fun t -> t.delay
 
-  let max_base_jobs : type a d. (a, d) t -> int = fun t -> t.max_base_jobs
+  let max_base_jobs : type merge base. (merge, base) t -> int =
+   fun t -> t.max_base_jobs
 end
 
 module type State_intf = sig
-  type ('a, 'd) t
+  type ('merge, 'base) t
 
-  val empty : max_base_jobs:int -> delay:int -> ('a, 'd) t
+  val empty : max_base_jobs:int -> delay:int -> ('merge, 'base) t
 
-  val max_base_jobs : ('a, 'd) t -> int
+  val max_base_jobs : ('merge, 'base) t -> int
 
-  val delay : ('a, 'd) t -> int
+  val delay : ('merge, 'base) t -> int
 end
 
 module type State_monad_intf = functor (State : State_intf) -> sig
   include Monad.S3
 
   val run_state :
-       ('b, 'a, 'd) t
-    -> state:('a, 'd) State.t
-    -> ('b * ('a, 'd) State.t) Or_error.t
+       ('a, 'merge, 'base) t
+    -> state:('merge, 'base) State.t
+    -> ('a * ('merge, 'base) State.t) Or_error.t
 
-  val eval_state : ('b, 'a, 'd) t -> state:('a, 'd) State.t -> 'b Or_error.t
+  val eval_state :
+    ('a, 'merge, 'base) t -> state:('merge, 'base) State.t -> 'a Or_error.t
 
   val exec_state :
-    ('b, 'a, 'd) t -> state:('a, 'd) State.t -> ('a, 'd) State.t Or_error.t
+       ('a, 'merge, 'base) t
+    -> state:('merge, 'base) State.t
+    -> ('merge, 'base) State.t Or_error.t
 
-  val get : (('a, 'd) State.t, 'a, 'd) t
+  val get : (('merge, 'base) State.t, 'merge, 'base) t
 
-  val put : ('a, 'd) State.t -> (unit, 'a, 'd) t
+  val put : ('merge, 'base) State.t -> (unit, 'merge, 'base) t
 
   val error_if : bool -> message:string -> (unit, _, _) t
 end
@@ -858,11 +904,13 @@ functor
   ->
   struct
     module T = struct
-      type ('a, 'd) state = ('a, 'd) State.t
+      type ('merge, 'base) state = ('merge, 'base) State.t
 
-      type ('b, 'a, 'd) t = ('a, 'd) state -> ('b * ('a, 'd) state) Or_error.t
+      type ('a, 'merge, 'base) t =
+        ('merge, 'base) state -> ('a * ('merge, 'base) state) Or_error.t
 
-      let return : type a b d. b -> (b, a, d) t = fun a s -> Ok (a, s)
+      let return : type a merge base. a -> (a, merge, base) t =
+       fun a s -> Ok (a, s)
 
       let bind m ~f = function
         | s ->
@@ -876,28 +924,24 @@ functor
     include T
     include Monad.Make3 (T)
 
-    let get : type a d. ((a, d) state, a, d) t = function s -> Ok (s, s)
+    let get (*: type merge base. ((merge, base) state, merge, base) t*) =
+      function
+      | s ->
+          Ok (s, s)
 
     let put s = function _ -> Ok ((), s)
 
-    let run_state : type a b d.
-        (b, a, d) t -> state:(a, d) state -> (b * (a, d) state) Or_error.t =
-     fun t ~state -> t state
+    let run_state t ~state = t state
 
-    let error_if : type a d. bool -> message:string -> (unit, a, d) t =
-     fun b ~message ->
+    let error_if b ~message =
       if b then fun _ -> Or_error.error_string message else return ()
 
-    let eval_state : type a b d.
-        (b, a, d) t -> state:(a, d) state -> b Or_error.t =
-     fun t ~state ->
+    let eval_state t ~state =
       let open Or_error.Let_syntax in
       let%map b, _ = run_state t ~state in
       b
 
-    let exec_state : type a b d.
-        (b, a, d) t -> state:(a, d) state -> (a, d) state Or_error.t =
-     fun t ~state ->
+    let exec_state t ~state =
       let open Or_error.Let_syntax in
       let%map _, s = run_state t ~state in
       s
@@ -907,48 +951,50 @@ module State = struct
   include T
   module Hash = Hash
 
-  let hash {trees; acc; max_base_jobs; curr_job_seq_no; delay; _} fa fd =
+  let hash {trees; acc; max_base_jobs; curr_job_seq_no; delay; _} f_merge
+      f_base =
     let h = ref (Digestif.SHA256.init ()) in
     let add_string s = h := Digestif.SHA256.feed_string !h s in
     let () =
       let tree_acc = Buffer.create 0 in
       let buff a = Buffer.add_string tree_acc a in
-      let tree_hash tree fa fd =
-        List.iter (Tree.to_raw_jobs tree) ~f:(fun job ->
-            match job with New_job.Merge a -> fa a | Base d -> fd d )
+      let tree_hash tree f_merge f_base =
+        List.iter (Tree.to_hashable_jobs tree) ~f:(fun job ->
+            match job with New_job.Merge a -> f_merge a | Base d -> f_base d )
       in
       let () =
         Non_empty_list.iter trees ~f:(fun tree ->
             let w_to_string (l, r) = Int.to_string l ^ Int.to_string r in
-            let fa = function
+            let f_merge = function
               | w, Merge.Job.Empty ->
                   buff (w_to_string w ^ "Empty")
               | w, Merge.Job.Full {left; right; status; seq_no} ->
                   buff
                     ( w_to_string w ^ "Full" ^ Int.to_string seq_no
                     ^ Job_status.to_string status ) ;
-                  buff (fa left) ;
-                  buff (fa right)
+                  buff (f_merge left) ;
+                  buff (f_merge right)
               | w, Merge.Job.Part j ->
                   buff (w_to_string w ^ "Part") ;
-                  buff (fa j)
+                  buff (f_merge j)
             in
-            let fd = function
+            let f_base = function
               | w, Base.Job.Empty ->
                   buff (Int.to_string w ^ "Empty")
               | w, Base.Job.Full {job; status; seq_no} ->
                   buff
                     ( Int.to_string w ^ "Full" ^ Int.to_string seq_no
                     ^ Job_status.to_string status ) ;
-                  buff (fd job)
+                  buff (f_base job)
             in
-            tree_hash tree fa fd )
+            tree_hash tree f_merge f_base )
       in
       add_string (Buffer.contents tree_acc)
     in
     let acc_string =
       Option.value_map acc ~default:"None" ~f:(fun (a, d_lst) ->
-          fa a ^ List.fold ~init:"" d_lst ~f:(fun acc d -> acc ^ fd d) )
+          f_merge a ^ List.fold ~init:"" d_lst ~f:(fun acc d -> acc ^ f_base d)
+      )
     in
     add_string acc_string ;
     add_string (Int.to_string curr_job_seq_no) ;
@@ -960,13 +1006,17 @@ module State = struct
     module Tree_foldable = Tree.Make_foldable (M)
 
     let fold_chronological_until :
-           ('a, 'd) t
+           ('merge, 'base) t
         -> init:'acc
-        -> fa:('c -> 'a Merge.t -> ('c, 'stop) Continue_or_stop.t M.t)
-        -> fd:('c -> 'd Base.t -> ('c, 'stop) Continue_or_stop.t M.t)
-        -> finish:('acc -> 'stop M.t)
-        -> 'stop M.t =
-     fun t ~init ~fa ~fd ~finish ->
+        -> f_merge:(   'acc
+                    -> 'merge Merge.t
+                    -> ('acc, 'final) Continue_or_stop.t M.t)
+        -> f_base:(   'acc
+                   -> 'base Base.t
+                   -> ('acc, 'final) Continue_or_stop.t M.t)
+        -> finish:('acc -> 'final M.t)
+        -> 'final M.t =
+     fun t ~init ~f_merge ~f_base ~finish ->
       let open M.Let_syntax in
       let open Container.Continue_or_stop in
       let work_trees = Non_empty_list.rev t.trees |> Non_empty_list.to_list in
@@ -976,8 +1026,8 @@ module State = struct
         | tree :: trees -> (
             match%bind
               Tree_foldable.fold_depth_until'
-                ~fa:(fun _ -> fa)
-                ~fd ~init:acc tree
+                ~f_merge:(fun _ -> f_merge)
+                ~f_base ~init:acc tree
             with
             | Continue r ->
                 go r trees
@@ -993,11 +1043,11 @@ module State = struct
 
   module Foldable_ident = Make_foldable (Monad.Ident)
 
-  let fold_chronological t ~init ~fa ~fd =
+  let fold_chronological t ~init ~f_merge ~f_base =
     let open Container.Continue_or_stop in
     Foldable_ident.fold_chronological_until t ~init
-      ~fa:(fun acc a -> Continue (fa acc a))
-      ~fd:(fun acc d -> Continue (fd acc d))
+      ~f_merge:(fun acc a -> Continue (f_merge acc a))
+      ~f_base:(fun acc d -> Continue (f_base acc d))
       ~finish:Fn.id
 end
 
@@ -1048,23 +1098,23 @@ module State_monad = Make_state_monad (T)
       new_seq_no )
 end*)
 
-let max_trees : ('a, 'd) t -> int =
+let max_trees : ('merge, 'base) t -> int =
  fun t -> ((Int.ceil_log2 t.max_base_jobs + 1) * (t.delay + 1)) + 1
 
-let work_to_do : type a d.
-       (a Merge.t, d Base.t) Tree.t list
+let work_to_do : type merge base.
+       (merge Merge.t, base Base.t) Tree.t list
     -> max_base_jobs:int
-    -> (a, d) Available_job.t list =
+    -> (merge, base) Available_job.t list =
  fun trees ~max_base_jobs ->
   let depth = Int.ceil_log2 max_base_jobs in
   List.concat_mapi trees ~f:(fun i tree ->
       Tree.jobs_on_level ~depth ~level:(depth - i) tree )
 
-let work : type a d.
-       (a Merge.t, d Base.t) Tree.t list
+let work : type merge base.
+       (merge Merge.t, base Base.t) Tree.t list
     -> delay:int
     -> max_base_jobs:int
-    -> (a, d) Available_job.t list =
+    -> (merge, base) Available_job.t list =
  fun trees ~delay ~max_base_jobs ->
   let depth = Int.ceil_log2 max_base_jobs in
   let work_trees =
@@ -1079,7 +1129,8 @@ let work_for_current_tree t =
   work (Non_empty_list.tail t.trees) ~max_base_jobs:t.max_base_jobs ~delay
 
 (*work on all the level and all the trees*)
-let all_work : type a d. (a, d) t -> (a, d) Available_job.t list list =
+let all_work : type merge base.
+    (merge, base) t -> (merge, base) Available_job.t list list =
  fun t ->
   let depth = Int.ceil_log2 t.max_base_jobs in
   let set1 = work_for_current_tree t in
@@ -1093,8 +1144,10 @@ let all_work : type a d. (a, d) t -> (a, d) Available_job.t list list =
   in
   set1 :: List.rev other_sets
 
-let work_for_next_update : type a d.
-    (a, d) t -> data_count:int -> (a, d) Available_job.t list list =
+let work_for_next_update : type merge base.
+       (merge, base) t
+    -> data_count:int
+    -> (merge, base) Available_job.t list list =
  fun t ~data_count ->
   let delay = t.delay + 1 in
   let current_tree_space =
@@ -1128,7 +1181,8 @@ let append bs bs' =
   Option.value_map (Non_empty_list.of_list_opt bs') ~default:bs ~f:(fun bs' ->
       Non_empty_list.append bs bs' )
 
-let add_merge_jobs : completed_jobs:'a list -> (_, 'a, _) State_monad.t =
+let add_merge_jobs : completed_jobs:'merge list -> (_, 'merge, _) State_monad.t
+    =
  fun ~completed_jobs ->
   let open State_monad.Let_syntax in
   if List.length completed_jobs = 0 then return None
@@ -1180,7 +1234,7 @@ let add_merge_jobs : completed_jobs:'a list -> (_, 'a, _) State_monad.t =
     let%map _ = State_monad.put {state with trees= all_trees} in
     result_opt
 
-let add_data : data:'d list -> (_, _, 'd) State_monad.t =
+let add_data : data:'base list -> (_, _, 'base) State_monad.t =
  fun ~data ->
   let open State_monad.Let_syntax in
   if List.length data = 0 then return ()
@@ -1212,7 +1266,9 @@ let incr_sequence_no = function
       put {state with curr_job_seq_no= state.curr_job_seq_no + 1}
 
 let update_helper :
-    data:'d list -> completed_jobs:'a list -> ('b, 'a, 'd) State_monad.t =
+       data:'base list
+    -> completed_jobs:'merge list
+    -> ('a, 'merge, 'base) State_monad.t =
  fun ~data ~completed_jobs ->
   let open State_monad in
   let open State_monad.Let_syntax in
@@ -1264,30 +1320,27 @@ let update_helper :
   result_opt
 
 let update :
-       data:'d list
-    -> completed_jobs:'a list
-    -> ('a, 'd) t
-    -> (('a * 'd list) option * ('a, 'd) t) Or_error.t =
+       data:'base list
+    -> completed_jobs:'merge list
+    -> ('merge, 'base) t
+    -> (('merge * 'base list) option * ('merge, 'base) t) Or_error.t =
  fun ~data ~completed_jobs state ->
   State_monad.run_state (update_helper ~data ~completed_jobs) ~state
 
-let next_k_jobs :
-    state:('a, 'd) t -> k:int -> ('a, 'd) Available_job.t list Or_error.t =
- fun ~state ~k ->
+(*let next_k_jobs ~state ~k =
   let work = all_work state |> List.concat in
   if k > List.length work then
     Or_error.errorf "You asked for %d jobs, but I only have %d available" k
       (List.length work)
-  else Ok (List.take work k)
+  else Ok (List.take work k)*)
 
-let all_jobs : ('a, 'd) t -> ('a, 'd) Available_job.t list list =
- fun t -> all_work t
+let all_jobs t = all_work t
 
 let jobs_for_next_update t = work_for_next_update t ~data_count:t.max_base_jobs
 
 let free_space t = t.max_base_jobs
 
-let last_emitted_value : ('a, 'd) t -> ('a * 'd list) option = fun t -> t.acc
+let last_emitted_value t = t.acc
 
 let current_job_sequence_number t = t.curr_job_seq_no
 
@@ -1297,7 +1350,7 @@ let base_jobs_on_latest_tree t =
     (Tree.jobs_on_level ~depth ~level:depth (Non_empty_list.head t.trees))
     ~f:(fun job -> match job with Base d -> Some d | Merge _ -> None)
 
-let partition_if_overflowing : ('a, 'd) t -> Space_partition.t =
+let partition_if_overflowing : ('merge, 'base) t -> Space_partition.t =
  fun t ->
   let cur_tree_space = free_space_on_current_tree t in
   (*Check actual work count because it would be zero initially*)
@@ -1324,7 +1377,8 @@ let pending_data t =
 
 let is_valid _ = failwith ""
 
-let view_jobs_with_position (_t : ('a, 'd) State.t) _fa _fd = failwith "TODO"
+let view_jobs_with_position (_t : ('merge, 'base) State.t) _fa _fd =
+  failwith "TODO"
 
 let%test_module "test" =
   ( module struct
