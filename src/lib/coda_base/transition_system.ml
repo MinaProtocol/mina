@@ -190,7 +190,9 @@ struct
               |> ignore ;
               ()))
       in
-      let%bind () = Field.Checked.Assert.equal next_top_hash top_hash in
+      let%bind () =
+        with_label __LOC__ Field.Checked.Assert.(equal next_top_hash top_hash)
+      in
       let%bind prev_state_valid =
         prev_state_valid wrap_vk_section wrap_vk prev_state_hash
       in
