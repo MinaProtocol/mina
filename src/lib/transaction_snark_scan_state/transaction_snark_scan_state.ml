@@ -382,14 +382,14 @@ end = struct
       in
       let res =
         Fold.fold_chronological_until tree ~init:None
-          ~fa:(fun acc (_weight, job) ->
+          ~f_merge:(fun acc (_weight, job) ->
             let open Container.Continue_or_stop in
             match%map fold_step_a acc job with
             | Ok next ->
                 Continue next
             | e ->
                 Stop e )
-          ~fd:(fun acc (_weight, job) ->
+          ~f_base:(fun acc (_weight, job) ->
             let open Container.Continue_or_stop in
             match%map fold_step_d acc job with
             | Ok next ->
