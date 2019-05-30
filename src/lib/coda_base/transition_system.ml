@@ -151,43 +151,46 @@ struct
         with_label __LOC__
           (State.Checked.update (prev_state_hash, prev_state) update)
       in
-      let%bind () =
-        as_prover
-          As_prover.(
-            Let_syntax.(
-              let%bind in_snark_next_state = read State.typ _next_state in
-              let%map prover_state = get_state in
-              let updated = State.sexp_of_value in_snark_next_state in
-              Option.map (Prover_state.expected_next_state prover_state)
-                ~f:(fun expected_next_state ->
-                  let original = State.sexp_of_value expected_next_state in
-                  if not (Sexp.equal original updated) then
-                    let diff =
-                      Sexp_diff_kernel.Algo.diff ~original ~updated ()
-                    in
-                    failwithf
-                      "In-snark and out-of-snark disagree on what the next \
-                       state should be. State sexp diff: %s"
-                      (Sexp_diff_kernel.Display.display_as_plain_string diff)
-                      ()
-                  else () )
-              |> ignore ;
-              ()))
-      in
       let%bind wrap_vk =
         exists' (Verifier.Verification_key.typ ~input_size:wrap_input_size)
           ~f:(fun {Prover_state.wrap_vk; _} ->
             Verifier.vk_of_backend_vk wrap_vk )
       in
       let%bind wrap_vk_section = hash_vk wrap_vk in
-      let%bind () =
+      let%bind next_top_hash =
         with_label __LOC__
           (let%bind sh = State.Hash.var_to_triples next_state_hash in
            (* We could be reusing the intermediate state of the hash on sh here instead of
                hashing anew *)
-           compute_top_hash wrap_vk_section sh
-           >>= Field.Checked.Assert.equal top_hash)
+           compute_top_hash wrap_vk_section sh)
       in
+      let%bind () =
+        as_prover
+          As_prover.(
+            Let_syntax.(
+              let%bind in_snark_next_state = read State.typ _next_state in
+              let%bind next_top_hash = read Field.typ next_top_hash in
+              let%bind top_hash = read Field.typ top_hash in
+              let%map prover_state = get_state in
+              let updated = State.sexp_of_value in_snark_next_state in
+              Option.map (Prover_state.expected_next_state prover_state)
+                ~f:(fun expected_next_state ->
+                  let original = State.sexp_of_value expected_next_state in
+                  if not Field.(next_top_hash = top_hash) then
+                    let diff =
+                      Sexp_diff_kernel.Algo.diff ~original ~updated ()
+                    in
+                    failwithf
+                      "Out-of-snark (left) and in-snark (right) disagree on \
+                       what the next top_hash should be. State sexp diff \
+                       (some differences are inessential): %s"
+                      (Sexp_diff_kernel.Display.display_as_plain_string diff)
+                      ()
+                  else () )
+              |> ignore ;
+              ()))
+      in
+      let%bind () = Field.Checked.Assert.equal next_top_hash top_hash in
       let%bind prev_state_valid =
         prev_state_valid wrap_vk_section wrap_vk prev_state_hash
       in
