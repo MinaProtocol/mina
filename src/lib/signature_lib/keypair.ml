@@ -17,3 +17,16 @@ let of_private_key_exn private_key =
   {public_key; private_key}
 
 let create () = of_private_key_exn (Private_key.create ())
+
+module And_compressed_pk = struct
+  module T = struct
+    type t = T.t * Public_key.Compressed.t [@@deriving sexp]
+
+    let compare ({public_key= pk1; private_key= _}, _)
+        ({public_key= pk2; private_key= _}, _) =
+      Public_key.compare pk1 pk2
+  end
+
+  include T
+  include Comparable.Make (T)
+end

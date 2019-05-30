@@ -5,6 +5,7 @@ open Coda_base
 open Coda_state
 open Signature_lib
 open O1trace
+open Otp_lib
 module Time = Coda_base.Block_time
 
 module type Inputs_intf = sig
@@ -38,37 +39,6 @@ module type Inputs_intf = sig
       -> Pending_coinbase_witness.t
       -> Proof.t Deferred.Or_error.t
   end
-end
-
-module Agent : sig
-  type 'a t
-
-  val create : f:('a -> 'b) -> 'a Strict_pipe.Reader.t -> 'b t
-
-  val get : 'a t -> 'a option
-
-  val with_value : f:('a -> unit) -> 'a t -> unit
-end = struct
-  type 'a t = {signal: unit Ivar.t; mutable value: 'a option}
-
-  let create ~(f : 'a -> 'b) (reader : 'a Strict_pipe.Reader.t) : 'b t =
-    let t = {signal= Ivar.create (); value= None} in
-    don't_wait_for
-      (Strict_pipe.Reader.iter reader ~f:(fun x ->
-           let old_value = t.value in
-           t.value <- Some (f x) ;
-           if old_value = None then Ivar.fill t.signal () ;
-           return () )) ;
-    t
-
-  let get t = t.value
-
-  let rec with_value ~f t =
-    match t.value with
-    | Some x ->
-        f x
-    | None ->
-        don't_wait_for (Ivar.read t.signal >>| fun () -> with_value ~f t)
 end
 
 module Singleton_supervisor : sig
@@ -281,7 +251,7 @@ module Make (Inputs : Inputs_intf) :
             Some (protocol_state, internal_transition, witness) ) )
 
   let run ~logger ~verifier ~trust_system ~get_completed_work ~transaction_pool
-      ~time_controller ~keypairs_pipe ~consensus_local_state ~frontier_reader
+      ~time_controller ~keypairs ~consensus_local_state ~frontier_reader
       ~transition_writer =
     trace_task "proposer" (fun () ->
         let log_bootstrap_mode () =
@@ -495,25 +465,25 @@ module Make (Inputs : Inputs_intf) :
                             Error.raise (Error.of_string str) )) )
         in
         let proposal_supervisor = Singleton_supervisor.create ~task:propose in
-        let keypairs_agent = Agent.create ~f:Fn.id keypairs_pipe in
-        let scheduler = Singleton_scheduler.create time_controller in
-        let last_keypairs =
-          Agent.get keypairs_agent |> Option.value ~default:Keypair.Set.empty
+        let last_keypairs_agent =
+          Agent.create ~f:Fn.id (Agent.Read_only.get keypairs)
         in
+        let scheduler = Singleton_scheduler.create time_controller in
         let rec check_for_proposal () =
           trace_recurring_task "check for proposal" (fun () ->
               (* See if we want to change keypairs *)
-              let keypairs =
-                Agent.get keypairs_agent
-                |> Option.value ~default:Keypair.Set.empty
-              in
-              if not (Keypair.Set.equal keypairs last_keypairs) then
+              let keypairs = Agent.Read_only.get keypairs in
+              let last_keypairs = Agent.get last_keypairs_agent in
+              if
+                not
+                  (Keypair.And_compressed_pk.Set.equal keypairs last_keypairs)
+              then (
                 (* Perform proposer swap since we have new keypairs *)
                 Consensus.Data.Local_state.proposer_swap consensus_local_state
-                  ( Keypair.Set.to_list keypairs
-                  |> List.map ~f:(fun kp ->
-                         Public_key.compress kp.Keypair.public_key )
-                  |> Public_key.Compressed.Set.of_list ) ;
+                  ( Keypair.And_compressed_pk.Set.to_list keypairs
+                  |> List.map ~f:snd |> Public_key.Compressed.Set.of_list )
+                  (Time.now time_controller) ;
+                Agent.update last_keypairs_agent keypairs ) ;
               (* Begin proposal checking *)
               match Broadcast_pipe.Reader.peek frontier_reader with
               | None ->
@@ -574,7 +544,7 @@ module Make (Inputs : Inputs_intf) :
          * erase this timeout even if the last run of the proposer wants to wait
          * for a long while.
          * *)
-        Agent.with_value keypairs_agent ~f:(fun _new_keypairs ->
+        Agent.Read_only.on_update keypairs ~f:(fun _new_keypairs ->
             Singleton_scheduler.schedule scheduler (Time.now time_controller)
               ~f:check_for_proposal ) ;
         check_for_proposal () )

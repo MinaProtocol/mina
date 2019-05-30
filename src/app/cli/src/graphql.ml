@@ -852,10 +852,15 @@ module Make (Commands : Coda_commands.Intf) = struct
           in
           let kps =
             List.filter_map pks ~f:(fun pk ->
-                Program.wallets coda |> Secrets.Wallets.find ~needle:pk )
+                let open Option.Let_syntax in
+                let%map kps =
+                  Program.wallets coda |> Secrets.Wallets.find ~needle:pk
+                in
+                (kps, pk) )
           in
           let old_propose_keys = Program.propose_public_keys coda in
-          Program.replace_propose_keypairs coda (Keypair.Set.of_list kps) ;
+          Program.replace_propose_keypairs coda
+            (Keypair.And_compressed_pk.Set.of_list kps) ;
           Public_key.Compressed.Set.to_list old_propose_keys )
 
     let commands =

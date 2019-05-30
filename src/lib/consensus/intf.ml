@@ -287,7 +287,10 @@ module type S = sig
       (** Swap in a new set of proposers and invalidate and/or recompute cached
        * data *)
       val proposer_swap :
-        t -> Signature_lib.Public_key.Compressed.Set.t -> unit
+           t
+        -> Signature_lib.Public_key.Compressed.Set.t
+        -> Coda_base.Block_time.t
+        -> unit
     end
 
     module Prover_state : sig
@@ -422,7 +425,7 @@ module type S = sig
          Unix_timestamp.t
       -> Consensus_state.Value.t
       -> local_state:Local_state.t
-      -> keypairs:Signature_lib.Keypair.Set.t
+      -> keypairs:Signature_lib.Keypair.And_compressed_pk.Set.t
       -> logger:Logger.t
       -> [ `Check_again of Unix_timestamp.t
          | `Propose_now of Signature_lib.Keypair.t * Proposal_data.t

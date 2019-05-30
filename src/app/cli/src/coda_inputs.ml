@@ -138,7 +138,7 @@ module type Main_intf = sig
   (** Derived from local state (aka they may not reflect the latest public keys to which you've attempted to change *)
   val propose_public_keys : t -> Public_key.Compressed.Set.t
 
-  val replace_propose_keypairs : t -> Keypair.Set.t -> unit
+  val replace_propose_keypairs : t -> Keypair.And_compressed_pk.Set.t -> unit
 
   val snark_worker_key : t -> Public_key.Compressed.Stable.V1.t option
 

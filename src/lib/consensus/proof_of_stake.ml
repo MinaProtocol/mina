@@ -29,24 +29,22 @@ let genesis_ledger_hash =
   Coda_base.Ledger.merkle_root Genesis_ledger.t
   |> Coda_base.Frozen_ledger_hash.of_ledger_hash
 
-let compute_delegators self_pk ~iter_accounts =
+let compute_delegatee_table keys ~iter_accounts =
   let open Coda_base in
-  let t = Account.Index.Table.create () in
-  let matches_pubkey pubkey = Public_key.Compressed.equal self_pk pubkey in
+  let outer_table = Public_key.Compressed.Table.create () in
   iter_accounts (fun i (acct : Account.t) ->
-      if matches_pubkey acct.delegate then
-        Hashtbl.add t ~key:i ~data:acct.balance |> ignore ) ;
-  t
+      if Public_key.Compressed.Set.mem keys acct.delegate then
+        Public_key.Compressed.Table.change outer_table acct.delegate
+          ~f:(fun maybe_table ->
+            let table =
+              Option.value maybe_table ~default:(Account.Index.Table.create ())
+            in
+            Account.Index.Table.add_exn table ~key:i ~data:acct.balance ;
+            Some table ) ) ;
+  outer_table
 
-let delegators_per_staker keys ~iter_accounts =
-  Public_key.Compressed.Set.fold keys
-    ~init:(Public_key.Compressed.Table.create ()) ~f:(fun table key ->
-      let balances = compute_delegators key ~iter_accounts in
-      Public_key.Compressed.Table.add_exn table ~key ~data:balances ;
-      table )
-
-let delegators_per_staker_sparse_ledger keys ledger =
-  delegators_per_staker keys ~iter_accounts:(fun f ->
+let compute_delegatee_table_sparse_ledger keys ledger =
+  compute_delegatee_table keys ~iter_accounts:(fun f ->
       Coda_base.Sparse_ledger.iteri ledger ~f:(fun i acct -> f i acct) )
 
 module Segment_id = Nat.Make32 ()
@@ -300,22 +298,22 @@ module Data = struct
     module Snapshot = struct
       type t =
         { ledger: Coda_base.Sparse_ledger.t
-        ; delegators_per_staker:
+        ; delegatee_table:
             Currency.Balance.t Coda_base.Account.Index.Table.t
             Public_key.Compressed.Table.t }
       [@@deriving sexp]
 
       let delegators_exn t key =
-        Public_key.Compressed.Table.find_exn t.delegators_per_staker key
+        Public_key.Compressed.Table.find_exn t.delegatee_table key
 
-      let to_yojson {ledger; delegators_per_staker} =
+      let to_yojson {ledger; delegatee_table} =
         `Assoc
           [ ( "ledger_hash"
             , Coda_base.(
                 Sparse_ledger.merkle_root ledger |> Ledger_hash.to_yojson) )
           ; ( "delegators"
             , `Assoc
-                ( Hashtbl.to_alist delegators_per_staker
+                ( Hashtbl.to_alist delegatee_table
                 |> List.map ~f:(fun (key, delegators) ->
                        ( Public_key.Compressed.to_string key
                        , `Assoc
@@ -331,7 +329,8 @@ module Data = struct
       type t =
         { mutable last_epoch_snapshot: Snapshot.t
         ; mutable curr_epoch_snapshot: Snapshot.t
-        ; mutable last_checked_slot_and_epoch: Epoch.t * Epoch.Slot.t
+        ; last_checked_slot_and_epoch:
+            (Epoch.t * Epoch.Slot.t) Public_key.Compressed.Table.t
         ; genesis_epoch_snapshot: Snapshot.t
         ; proposer_public_keys: Public_key.Compressed.Set.t }
       [@@deriving sexp]
@@ -343,8 +342,13 @@ module Data = struct
           ; ( "curr_epoch_snapshot"
             , [%to_yojson: Snapshot.t] t.curr_epoch_snapshot )
           ; ( "last_checked_slot_and_epoch"
-            , [%to_yojson: Epoch.t * Epoch.Slot.t]
-                t.last_checked_slot_and_epoch )
+            , `Assoc
+                ( Public_key.Compressed.Table.to_alist
+                    t.last_checked_slot_and_epoch
+                |> List.map ~f:(fun (key, epoch_and_slot) ->
+                       ( Public_key.Compressed.to_string key
+                       , [%to_yojson: Epoch.t * Epoch.Slot.t] epoch_and_slot )
+                   ) ) )
           ; ( "genesis_epoch_snapshot"
             , [%to_yojson: Snapshot.t] t.genesis_epoch_snapshot )
           ; ( "proposer_public_keys"
@@ -359,6 +363,15 @@ module Data = struct
 
     let current_proposers t = !t.Data.proposer_public_keys
 
+    let make_last_checked_slot_and_epoch_table old_table new_keys ~default =
+      let module Set = Public_key.Compressed.Set in
+      let module Table = Public_key.Compressed.Table in
+      let last_checked_slot_and_epoch = Table.create () in
+      Set.iter new_keys ~f:(fun pk ->
+          let data = Option.value (Table.find old_table pk) ~default in
+          Table.add_exn last_checked_slot_and_epoch ~key:pk ~data ) ;
+      last_checked_slot_and_epoch
+
     let create proposer_public_keys =
       (* TODO: remove this duplicate of the genesis ledger *)
       let ledger =
@@ -367,23 +380,28 @@ module Data = struct
              (module Coda_base.Ledger)
              Genesis_ledger.t)
       in
-      let delegators_per_staker =
-        delegators_per_staker_sparse_ledger proposer_public_keys ledger
+      let delegatee_table =
+        compute_delegatee_table_sparse_ledger proposer_public_keys ledger
       in
-      let genesis_epoch_snapshot = Snapshot.{delegators_per_staker; ledger} in
+      let genesis_epoch_snapshot = Snapshot.{delegatee_table; ledger} in
       ref
         { Data.last_epoch_snapshot= genesis_epoch_snapshot
         ; curr_epoch_snapshot= genesis_epoch_snapshot
         ; genesis_epoch_snapshot
-        ; last_checked_slot_and_epoch= (Epoch.zero, Epoch.Slot.zero)
+        ; last_checked_slot_and_epoch=
+            make_last_checked_slot_and_epoch_table
+              (Public_key.Compressed.Table.create ())
+              proposer_public_keys
+              ~default:(Epoch.zero, Epoch.Slot.zero)
         ; proposer_public_keys }
 
-    let proposer_swap t proposer_public_keys =
+    let proposer_swap t proposer_public_keys now =
       let old : Data.t = !t in
-      let s {Snapshot.ledger; delegators_per_staker= _} =
+      let s {Snapshot.ledger; delegatee_table= _} =
         { Snapshot.ledger
-        ; delegators_per_staker=
-            delegators_per_staker_sparse_ledger proposer_public_keys ledger }
+        ; delegatee_table=
+            compute_delegatee_table_sparse_ledger proposer_public_keys ledger
+        }
       in
       t :=
         { Data.last_epoch_snapshot= s old.last_epoch_snapshot
@@ -392,7 +410,14 @@ module Data = struct
             s old.genesis_epoch_snapshot
             (* assume these keys are different and therefore we haven't checked any
          * slots or epochs *)
-        ; last_checked_slot_and_epoch= (Epoch.zero, Epoch.Slot.zero)
+        ; last_checked_slot_and_epoch=
+            make_last_checked_slot_and_epoch_table
+              (Public_key.Compressed.Table.create ())
+              proposer_public_keys
+              ~default:
+                ((* TODO: Be smarter so that we don't have to look at the slot before again *)
+                 let epoch, slot = Epoch.epoch_and_slot_of_time_exn now in
+                 (epoch, UInt32.(if slot > zero then sub slot one else slot)))
         ; proposer_public_keys }
 
     type snapshot_identifier = Last_epoch_snapshot | Curr_epoch_snapshot
@@ -413,17 +438,29 @@ module Data = struct
           !t.curr_epoch_snapshot <- v
 
     let seen_slot (t : t) epoch slot =
-      match
-        Tuple2.compare ~cmp1:Epoch.compare ~cmp2:Epoch.Slot.compare
-          !t.last_checked_slot_and_epoch (epoch, slot)
-      with
-      | i when i >= 0 ->
-          `Seen
-      | i when i < 0 ->
-          !t.last_checked_slot_and_epoch <- (epoch, slot) ;
-          `Unseen
-      | _ ->
-          failwith "forall x : int. x >= 0 || x < 0 is impossibly false"
+      let module Table = Public_key.Compressed.Table in
+      let unseens =
+        Table.to_alist !t.last_checked_slot_and_epoch
+        |> List.filter_map ~f:(fun (pk, old_epoch_and_slot) ->
+               match
+                 Tuple2.compare ~cmp1:Epoch.compare ~cmp2:Epoch.Slot.compare
+                   old_epoch_and_slot (epoch, slot)
+               with
+               | i when i >= 0 ->
+                   None
+               | i when i < 0 ->
+                   Table.set !t.last_checked_slot_and_epoch ~key:pk
+                     ~data:(epoch, slot) ;
+                   Some pk
+               | _ ->
+                   failwith
+                     "forall x : int. x >= 0 || x < 0 is impossibly false" )
+      in
+      match unseens with
+      | [] ->
+          `All_seen
+      | nel ->
+          `Unseen (Public_key.Compressed.Set.of_list nel)
   end
 
   module Epoch_ledger = struct
@@ -733,12 +770,12 @@ module Data = struct
       let c = of_int c_int
 
       (*  Check if
-          vrf_output / 2^256 <= c * my_stake / total_currency
+        vrf_output / 2^256 <= c * my_stake / total_currency
 
-          So that we don't have to do division we check
+        So that we don't have to do division we check
 
-          vrf_output * total_currency <= c * my_stake * 2^256
-      *)
+        vrf_output * total_currency <= c * my_stake * 2^256
+    *)
       let is_satisfied ~my_stake ~total_stake vrf_output =
         of_bit_fold_lsb (Random_oracle.Digest.fold_bits vrf_output)
         * of_uint64_exn (Amount.to_uint64 total_stake)
@@ -764,7 +801,7 @@ module Data = struct
           lhs <= rhs
 
         (* It was somewhat involved to implement that check with the small field, so
-           we've stubbed it out for now. *)
+         we've stubbed it out for now. *)
         let is_satisfied ~my_stake:_ ~total_stake:_ _vrf_output =
           let () = assert Coda_base.Insecure.vrf_threshold_check in
           Snark_params.Tick.(Checked.return Boolean.true_)
@@ -874,8 +911,8 @@ module Data = struct
           ; delegator= 0 }
     end
 
-    let check ~epoch ~slot ~seed ~private_key ~public_key ~total_stake ~logger
-        ~epoch_snapshot =
+    let check ~epoch ~slot ~seed ~private_key ~public_key
+        ~public_key_compressed ~total_stake ~logger ~epoch_snapshot =
       let open Message in
       let open Local_state in
       let open Snapshot in
@@ -884,9 +921,7 @@ module Data = struct
         (Epoch.Slot.to_int slot) ;
       with_return (fun {return} ->
           Hashtbl.iteri
-            (Snapshot.delegators_exn epoch_snapshot
-               (* TODO: Okay to compress pk here or do we need to cache this compression for perf reasons? Vrf should be pretty slow anyway, so may be fine. *)
-               (Public_key.compress public_key))
+            (Snapshot.delegators_exn epoch_snapshot public_key_compressed)
             ~f:(fun ~key:delegator ~data:balance ->
               let vrf_result =
                 T.eval ~private_key {epoch; slot; seed; delegator}
@@ -1185,8 +1220,8 @@ module Data = struct
         { curr with
           lock_checkpoint=
             (* TODO: This is just a hack to make code compatible with old
-                     implementation. We should change it once Issue #2328
-                     is properly addressed. *)
+                   implementation. We should change it once Issue #2328
+                   is properly addressed. *)
             Option.value curr.lock_checkpoint
               ~default:Coda_base.State_hash.(of_hash zero) }
 
@@ -1300,7 +1335,7 @@ module Data = struct
     include Nat.Make32 ()
 
     (* Make sure this optimization makes sense versus using
-       an (epoch, slot) pair *)
+     an (epoch, slot) pair *)
     let () =
       assert (
         Core.Int.(
@@ -1317,7 +1352,7 @@ module Data = struct
 
     module Checked = struct
       (* TODO: It's possible to share this hash computation with
-         the hashing of the state. Might be worth doing. *)
+       the hashing of the state. Might be worth doing. *)
       let create ~(epoch : Epoch.Unpacked.var)
           ~(slot : Epoch.Slot.Unpacked.var) =
         var_of_field_unsafe
@@ -1352,7 +1387,7 @@ module Data = struct
           module T = struct
             type t =
               { (* TODO: Make a nice way to force this to have bounded (or fixed) size for
-                   bin_io reasons *)
+                 bin_io reasons *)
                 prefix:
                   Coda_base.State_hash.Stable.V1.t Core.Fqueue.Stable.V1.t
               ; tail: Hash.Stable.V1.t }
@@ -1474,19 +1509,19 @@ module Data = struct
   end
 
   (* We have a list of state hashes. When we extend the blockchain,
-     we see if the **previous** state should be saved as a checkpoint.
-     This is because we have convenient access to the entire previous
-     protocol state hash.
+   we see if the **previous** state should be saved as a checkpoint.
+   This is because we have convenient access to the entire previous
+   protocol state hash.
 
-     We divide the slots of an epoch into "checkpoint windows": chunks of
-     size [checkpoint_window_size]. The goal is to record the first block
-     in a given window as a check-point if there are any blocks in that
-     window, and zero checkpoints if the window was empty.
+   We divide the slots of an epoch into "checkpoint windows": chunks of
+   size [checkpoint_window_size]. The goal is to record the first block
+   in a given window as a check-point if there are any blocks in that
+   window, and zero checkpoints if the window was empty.
 
-     To that end, we store in each state a bit [checkpoint_window_filled] which
-     is true iff there has already been a state in the history of the given state
-     which is in the same checkpoint window as the given state.
-  *)
+   To that end, we store in each state a bit [checkpoint_window_filled] which
+   is true iff there has already been a state in the history of the given state
+   which is in the same checkpoint window as the given state.
+*)
   module Consensus_state = struct
     module Poly = struct
       module Stable = struct
@@ -1883,7 +1918,7 @@ module Data = struct
         ~consensus_transition:Consensus_transition.genesis
 
     (* Check that both epoch and slot are zero.
-    *)
+  *)
     let is_genesis (epoch : Epoch.Unpacked.var)
         (slot : Epoch.Slot.Unpacked.var) =
       let open Field in
@@ -1979,7 +2014,7 @@ module Data = struct
             ~then_:previous_protocol_state_hash
             ~else_:previous_state.curr_epoch_data.start_checkpoint
         (* Want this to be the protocol state hash once we leave the seed
-           update range. *)
+         update range. *)
         and lock_checkpoint =
           let%bind base =
             (* TODO: Should this be zero or some other sentinel value? *)
@@ -2000,8 +2035,8 @@ module Data = struct
         ; lock_checkpoint }
       and length = Length.increment_var previous_state.length
       (* TODO: keep track of total_currency in transaction snark. The current_slot
-       * implementation would allow an adversary to make then total_currency incorrect by
-       * not adding the coinbase to their account. *)
+     * implementation would allow an adversary to make then total_currency incorrect by
+     * not adding the coinbase to their account. *)
       and new_total_currency =
         Amount.Checked.add previous_state.total_currency supply_increase
       and epoch_length =
@@ -2336,8 +2371,8 @@ module Hooks = struct
       then (
         set_snapshot local_state Last_epoch_snapshot
           { ledger= !local_state.curr_epoch_snapshot.ledger
-          ; delegators_per_staker=
-              !local_state.curr_epoch_snapshot.delegators_per_staker } ;
+          ; delegatee_table= !local_state.curr_epoch_snapshot.delegatee_table
+          } ;
         return true )
       else
         Deferred.List.exists (random_peers 3) ~f:(fun peer ->
@@ -2351,12 +2386,12 @@ module Hooks = struct
                     record trust_system logger peer.host
                       Actions.(Epoch_ledger_provided, None))
                 in
-                let delegators_per_staker =
-                  delegators_per_staker_sparse_ledger
+                let delegatee_table =
+                  compute_delegatee_table_sparse_ledger
                     !local_state.proposer_public_keys snapshot_ledger
                 in
                 set_snapshot local_state snapshot_id
-                  {ledger= snapshot_ledger; delegators_per_staker} ;
+                  {ledger= snapshot_ledger; delegatee_table} ;
                 return true
             | Ok (Error err) ->
                 Logger.faulty_peer_without_punishment logger
@@ -2572,19 +2607,25 @@ module Hooks = struct
           (Coda_base.Sparse_ledger.merkle_root snapshot.ledger) ;
         snapshot
       in
-      let proposal_data slot =
-        (* Try vrfs for all keypairs within this slot until one wins or all lose *)
-        Keypair.Set.fold_until keypairs ~init:()
-          ~f:(fun () keypair ->
-            match
-              Vrf.check ~epoch ~slot ~seed:epoch_data.seed ~epoch_snapshot
-                ~private_key:keypair.private_key ~public_key:keypair.public_key
-                ~total_stake ~logger
-            with
-            | None ->
-                Continue_or_stop.Continue ()
-            | Some data ->
-                Continue_or_stop.Stop (Some (keypair, data)) )
+      let proposal_data unseen_pks slot =
+        (* Try vrfs for all keypairs that are unseen within this slot until one wins or all lose *)
+        (* TODO: Don't do this, and instead pick the one that has the highest
+         * chance of winning *)
+        Keypair.And_compressed_pk.Set.fold_until keypairs ~init:()
+          ~f:(fun () (keypair, public_key_compressed) ->
+            if Public_key.Compressed.Set.mem unseen_pks public_key_compressed
+            then Continue_or_stop.Continue ()
+            else
+              match
+                Vrf.check ~epoch ~slot ~seed:epoch_data.seed ~epoch_snapshot
+                  ~private_key:keypair.private_key
+                  ~public_key:keypair.public_key ~public_key_compressed
+                  ~total_stake ~logger
+              with
+              | None ->
+                  Continue_or_stop.Continue ()
+              | Some data ->
+                  Continue_or_stop.Stop (Some (keypair, data)) )
           ~finish:(fun () -> None)
       in
       let rec find_winning_slot (slot : Epoch.Slot.t) =
@@ -2592,10 +2633,10 @@ module Hooks = struct
           None
         else
           match Local_state.seen_slot local_state epoch slot with
-          | `Seen ->
+          | `All_seen ->
               find_winning_slot (Epoch.Slot.succ slot)
-          | `Unseen -> (
-            match proposal_data slot with
+          | `Unseen pks -> (
+            match proposal_data pks slot with
             | None ->
                 find_winning_slot (Epoch.Slot.succ slot)
             | Some (keypair, data) ->
@@ -2628,15 +2669,13 @@ module Hooks = struct
       (next : Consensus_state.Value.t) ~local_state ~snarked_ledger =
     let open Local_state in
     if not (Epoch.equal prev.curr_epoch next.curr_epoch) then (
-      let delegators_per_staker =
-        delegators_per_staker !local_state.Data.proposer_public_keys
+      let delegatee_table =
+        compute_delegatee_table !local_state.Data.proposer_public_keys
           ~iter_accounts:(fun f ->
             Coda_base.Ledger.Any_ledger.M.iteri snarked_ledger ~f )
       in
       let ledger = Coda_base.Sparse_ledger.of_any_ledger snarked_ledger in
-      let epoch_snapshot =
-        {Local_state.Snapshot.delegators_per_staker; ledger}
-      in
+      let epoch_snapshot = {Local_state.Snapshot.delegatee_table; ledger} in
       !local_state.last_epoch_snapshot <- !local_state.curr_epoch_snapshot ;
       !local_state.curr_epoch_snapshot <- epoch_snapshot )
 
