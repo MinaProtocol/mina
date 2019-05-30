@@ -1,6 +1,5 @@
 open Core
 open Async
-open Protocols.Coda_transition_frontier
 open Cache_lib
 open Pipe_lib
 open Coda_base
@@ -36,7 +35,7 @@ open Coda_state
     the [Processor] via writing them to catchup_breadcrumbs_writer. *)
 
 module Make (Inputs : Inputs.S) :
-  Catchup_intf
+  Coda_intf.Catchup_intf
   with type external_transition_with_initial_validation :=
               Inputs.External_transition.with_initial_validation
    and type unprocessed_transition_cache :=
@@ -44,9 +43,7 @@ module Make (Inputs : Inputs.S) :
    and type transition_frontier := Inputs.Transition_frontier.t
    and type transition_frontier_breadcrumb :=
               Inputs.Transition_frontier.Breadcrumb.t
-   and type state_hash := State_hash.t
    and type network := Inputs.Network.t
-   and type trust_system := Trust_system.t
    and type verifier := Inputs.Verifier.t = struct
   open Inputs
 
