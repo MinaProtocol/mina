@@ -54,9 +54,7 @@ let create ~logger directory =
   let pagination = Pagination.create () in
   List.iter (Database.to_alist database) ~f:(fun (hash, (block_data, time)) ->
       add_user_blocks pagination ({With_hash.hash; data= block_data}, time) ) ;
-  { database= Database.create ~directory
-  ; pagination= Pagination.create ()
-  ; logger }
+  {database; pagination= Pagination.create (); logger}
 
 let add ~tracked_participants {database; pagination; logger}
     ({With_hash.hash= state_hash; _} as external_transition) date =
