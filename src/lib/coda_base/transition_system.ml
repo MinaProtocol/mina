@@ -176,7 +176,7 @@ struct
               Option.map (Prover_state.expected_next_state prover_state)
                 ~f:(fun expected_next_state ->
                   let original = State.sexp_of_value expected_next_state in
-                  if not Field.(next_top_hash = top_hash) then
+                  if not (Field.equal next_top_hash top_hash) then
                     let diff =
                       Sexp_diff_kernel.Algo.diff ~original ~updated ()
                     in
