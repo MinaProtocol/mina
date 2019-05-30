@@ -16,7 +16,7 @@ let main () =
     Time.Span.of_ms
       (proposal_interval * Consensus.Constants.delta |> Float.of_int)
   in
-  let work_selection = Protocols.Coda_pow.Work_selection.Seq in
+  let work_selection = Cli_lib.Arg_type.Seq in
   Coda_processes.init () ;
   let trace_dir = Unix.getenv "CODA_TRACING" in
   let max_concurrent_connections = None in

@@ -9,10 +9,9 @@ module type Base_ledger_intf =
    and type hash := Ledger_hash.t
    and type root_hash := Ledger_hash.t
 
-module Make (Source : Base_ledger_intf) (Dest : Base_ledger_intf) :
-  Protocols.Coda_pow.Ledger_transfer_intf
-  with type src := Source.t
-   and type dest := Dest.t = struct
+module Make (Source : Base_ledger_intf) (Dest : Base_ledger_intf) : sig
+  val transfer_accounts : src:Source.t -> dest:Dest.t -> Dest.t
+end = struct
   let transfer_accounts ~src ~dest =
     let sorted =
       Source.foldi src ~init:[] ~f:(fun addr acc account ->

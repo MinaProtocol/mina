@@ -43,7 +43,7 @@ let run_test () : unit Deferred.t =
 
         let commit_id = None
 
-        let work_selection = Protocols.Coda_pow.Work_selection.Seq
+        let work_selection = Cli_lib.Arg_type.Seq
       end in
       let%bind (module Init) =
         make_init ~should_propose:true (module Config)
@@ -80,9 +80,10 @@ let run_test () : unit Deferred.t =
       trace_database_initialization "transaction_database" __LOC__
         receipt_chain_dir_name ;
       let transaction_database =
-        Transaction_database.create logger transaction_database_dir
+        Auxiliary_database.Transaction_database.create logger
+          transaction_database_dir
       in
-      let time_controller = Main.Inputs.Time.Controller.(create basic) in
+      let time_controller = Block_time.Controller.(create basic) in
       let consensus_local_state =
         Consensus.Data.Local_state.create
           (Some (Public_key.compress keypair.public_key))

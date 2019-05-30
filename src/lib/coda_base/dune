@@ -20,7 +20,6 @@
     snark_params
     unsigned_extended
     sparse_ledger_lib
-    protocols
     core
     dummy_values
     o1trace

@@ -1,9 +1,28 @@
 open Tc;
 
-// Ignores cancellation
-let setTimeout: int => Task.t('x, unit) =
-  millis =>
-    Task.uncallbackifyValue(cb => ignore(Js.Global.setTimeout(cb, millis)));
+let setTimeout:
+  int =>
+  ([ | `Canceller(unit => unit)], Task.t('x, [ | `Cancelled | `Finished])) =
+  millis => {
+    let synchronousCancel = ref(false);
+    let cancel: ref(unit => unit) = ref(() => synchronousCancel := true);
+    let task =
+      Task.uncallbackifyValue(cb =>
+        if (synchronousCancel^) {
+          cb(`Cancelled);
+        } else {
+          let token = Js.Global.setTimeout(() => cb(`Finished), millis);
+          cancel :=
+            (
+              () => {
+                Js.Global.clearTimeout(token);
+                cb(`Cancelled);
+              }
+            );
+        }
+      );
+    (`Canceller(() => cancel^()), task);
+  };
 
 module Window = {
   type t;
@@ -56,7 +75,7 @@ module ChildProcess = {
       stderr: ReadablePipe.t,
     };
 
-    [@bs.send] external kill: t => unit = "";
+    [@bs.send] external kill: (t, string) => unit = "";
 
     [@bs.send]
     external onError: (t, [@bs.as "error"] _, Error.t => unit) => unit = "on";

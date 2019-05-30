@@ -17,13 +17,13 @@ module Styles = {
 };
 
 module Wallets = [%graphql
-  {| query getWallets { ownedWallets {publicKey, balance {total}} } |}
+  {| query getWallets { ownedWallets {publicKey, balance{total}}} |}
 ];
 module WalletQuery = ReasonApollo.CreateQuery(Wallets);
 
 module AddWallet = [%graphql
   {|
-  mutation {
+  mutation addWallet {
       addWallet(input: {}) {
           publicKey
       }
