@@ -39,7 +39,7 @@ let%test_module "Sync_handler" =
                   ~discovery_port:0 ~communication_port:1
               in
               let network =
-                Network.create ~logger
+                Network.create_stub ~logger
                   ~ip_table:
                     (Hashtbl.of_alist_exn
                        (module Unix.Inet_addr)

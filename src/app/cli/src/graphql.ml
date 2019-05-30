@@ -461,7 +461,7 @@ module Make (Commands : Coda_commands.Intf) = struct
               ; field "firstCursor" ~typ:string
                   ~args:Arg.[]
                   ~resolve:(fun _ {first_cursor; _} -> first_cursor)
-              ; field "firstCursor" ~typ:string
+              ; field "lastCursor" ~typ:string
                   ~args:Arg.[]
                   ~resolve:(fun _ {last_cursor; _} -> last_cursor) ] )
       end

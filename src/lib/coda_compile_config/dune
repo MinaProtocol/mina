@@ -1,4 +1,5 @@
 (library
   (name coda_compile_config)
   (public_name coda_compile_config)
+  (libraries currency)
   (preprocess (pps ppx_base ppx_optcomp)))

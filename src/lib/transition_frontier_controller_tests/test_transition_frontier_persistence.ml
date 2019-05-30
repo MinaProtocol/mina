@@ -120,10 +120,10 @@ let%test_module "Transition Frontier Persistence" =
               Transition_frontier.Breadcrumb.staged_ledger root
             in
             Transition_frontier_persistence.Worker.handle_diff t.worker
-              Transition_frontier.Diff_hash.empty
+              Transition_frontier.Diff.Hash.empty
               (E
                  (New_frontier
-                    Transition_frontier.Diff_mutant.Root.Poly.
+                    Transition_frontier.Diff.Mutant.Root.Poly.
                       { root=
                           Transition_frontier.Breadcrumb.transition_with_hash
                             root
@@ -133,7 +133,7 @@ let%test_module "Transition Frontier Persistence" =
                             staged_ledger }))
             |> ignore ;
             Transition_frontier_persistence.Worker.handle_diff t.worker
-              Transition_frontier.Diff_hash.empty
+              Transition_frontier.Diff.Hash.empty
               (E
                  (Add_transition
                     (Transition_frontier.Breadcrumb.transition_with_hash
