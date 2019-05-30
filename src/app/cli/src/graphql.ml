@@ -213,32 +213,32 @@ module Make (Commands : Coda_commands.Intf) = struct
       let wallet =
         obj "Wallet" ~doc:"An account record according to the daemon"
           ~fields:(fun _ ->
-            [ pubkey_field ~resolve:(fun _ account ->
+            [ pubkey_field ~resolve:(fun _ (account, _) ->
                   (* Hack: Account.Poly.t is only parameterized over 'pk once
-                   * and so, in order for delegate to be optional, we must also
-                   * make account public_key optional even though it's always
-                   * Some. In an attempt to avoid a large refactoring, and also
-                   * avoid making a new record, we'll deal with a value_exn here
-                   * and be sad. *)
+                         * and so, in order for delegate to be optional, we must also
+                         * make account public_key optional even though it's always
+                         * Some. In an attempt to avoid a large refactoring, and also
+                         * avoid making a new record, we'll deal with a value_exn here
+                         * and be sad. *)
                   Stringable.public_key
                   @@ Option.value_exn account.Account.Poly.public_key )
             ; field "balance"
                 ~typ:(non_null AnnotatedBalance.obj)
                 ~doc:"A balance of Coda as a stringified uint64"
                 ~args:Arg.[]
-                ~resolve:(fun _ account -> account.Account.Poly.balance)
+                ~resolve:(fun _ (account, _) -> account.Account.Poly.balance)
             ; field "nonce" ~typ:string
                 ~doc:
                   "Nonces are natural numbers that increase each transaction. \
                    Stringified uint32"
                 ~args:Arg.[]
-                ~resolve:(fun _ account ->
+                ~resolve:(fun _ (account, _) ->
                   Option.map ~f:Account.Nonce.to_string
                     account.Account.Poly.nonce )
             ; field "receiptChainHash" ~typ:string
                 ~doc:"Top hash of the receipt chain merkle-list"
                 ~args:Arg.[]
-                ~resolve:(fun _ account ->
+                ~resolve:(fun _ (account, _) ->
                   Option.map ~f:Receipt.Chain_hash.to_string
                     account.Account.Poly.receipt_chain_hash )
             ; field "delegate" ~typ:string
@@ -247,7 +247,7 @@ module Make (Commands : Coda_commands.Intf) = struct
                    delegating to anybody, than this would return your public \
                    key."
                 ~args:Arg.[]
-                ~resolve:(fun _ account ->
+                ~resolve:(fun _ (account, _) ->
                   Option.map ~f:Stringable.public_key
                     account.Account.Poly.delegate )
             ; field "votingFor" ~typ:string
@@ -255,9 +255,16 @@ module Make (Commands : Coda_commands.Intf) = struct
                   "The previous epoch lock hash of the chain which you are \
                    voting for"
                 ~args:Arg.[]
-                ~resolve:(fun _ account ->
+                ~resolve:(fun _ (account, _) ->
                   Option.map ~f:Coda_base.State_hash.to_bytes
-                    account.Account.Poly.voting_for ) ] )
+                    account.Account.Poly.voting_for )
+            ; field "stakingActive" ~typ:(non_null bool)
+                ~doc:
+                  "Actively staking. There is a lag between switching staking \
+                   keys and them appearing here as you may be in the middle \
+                   of a staking procedure with other keys."
+                ~args:Arg.[]
+                ~resolve:(fun _ (_, staking_active) -> staking_active) ] )
     end
 
     let snark_worker =
@@ -297,6 +304,17 @@ module Make (Commands : Coda_commands.Intf) = struct
             [ field "payment" ~typ:(non_null user_command)
                 ~args:Arg.[]
                 ~resolve:(fun _ -> Fn.id) ] )
+
+      let set_staking =
+        obj "SetStakingPayload" ~fields:(fun _ ->
+            [ field "lastStaking"
+                ~doc:
+                  "Returns the last wallet public keys that were staking \
+                   before or empty if there were none"
+                ~typ:(non_null (list (non_null string)))
+                ~args:Arg.[]
+                ~resolve:(fun _ keys -> List.map ~f:Stringable.public_key keys)
+            ] )
     end
 
     module Pagination = struct
@@ -400,13 +418,22 @@ module Make (Commands : Coda_commands.Intf) = struct
             ; fee ~doc:"Fee amount in order to send a stake delegation"
             ; memo ~doc:"Public description of a stake delegation" ]
 
-      let user_command_filter_input =
+      let user_command_filter =
         obj "UserCommandFilterType"
           ~coerce:(fun public_key -> public_key)
           ~fields:
             [ arg "toOrFrom"
                 ~doc:"Public key of transactions you are looking for"
                 ~typ:(non_null string) ]
+
+      let set_staking =
+        let open Fields in
+        obj "SetStakingInput"
+          ~coerce:(fun wallets -> wallets)
+          ~fields:
+            [ arg "wallets"
+                ~typ:(non_null (list (non_null string)))
+                ~doc:"Public keys of own wallets you wish to stake" ]
 
       module AddPaymentReceipt = struct
         type t = {payment: string; added_time: string}
@@ -528,8 +555,11 @@ module Make (Commands : Coda_commands.Intf) = struct
         ~typ:(non_null (list (non_null Types.Wallet.wallet)))
         ~args:Arg.[]
         ~resolve:(fun {ctx= coda; _} () ->
+          let propose_public_keys = Program.propose_public_keys coda in
           Program.wallets coda |> Secrets.Wallets.pks
-          |> List.map ~f:(fun pk -> Partial_account.of_pk coda pk) )
+          |> List.map ~f:(fun pk ->
+                 ( Partial_account.of_pk coda pk
+                 , Public_key.Compressed.Set.mem propose_public_keys pk ) ) )
 
     let wallet =
       result_field "wallet"
@@ -541,12 +571,16 @@ module Make (Commands : Coda_commands.Intf) = struct
           Types.Wallet.wallet
           (* TODO: Is there anyway to describe `public_key` arg in a more typesafe way on our ocaml-side *)
         ~args:Arg.[arg "publicKey" ~typ:(non_null string)]
-        ~resolve:(fun {ctx= coda; _} () pk_string ->
+        ~resolve:(fun {ctx= coda; _} () (pk_string : string) ->
           let open Result.Let_syntax in
+          let propose_public_keys = Program.propose_public_keys coda in
           let%map pk = Arguments.public_key ~name:"publicKey" pk_string in
-          Partial_account.(
-            of_pk coda pk |> to_full_account |> Option.map ~f:of_full_account)
-          )
+          Option.map
+            Partial_account.(
+              of_pk coda pk |> to_full_account |> Option.map ~f:of_full_account)
+            ~f:(fun account ->
+              (account, Public_key.Compressed.Set.mem propose_public_keys pk)
+              ) )
 
     let current_snark_worker =
       field "currentSnarkWorker" ~typ:Types.snark_worker
@@ -582,7 +616,7 @@ module Make (Commands : Coda_commands.Intf) = struct
       io_field "userCommand"
         ~args:
           Arg.
-            [ arg "filter" ~typ:(non_null Types.Input.user_command_filter_input)
+            [ arg "filter" ~typ:(non_null Types.Input.user_command_filter)
             ; arg "first" ~typ:int
             ; arg "after" ~typ:string
             ; arg "last" ~typ:int
@@ -799,8 +833,37 @@ module Make (Commands : Coda_commands.Intf) = struct
             payment added_time ;
           Some payment )
 
+    let set_staking =
+      result_field "setStaking"
+        ~doc:
+          "Set keys you wish to stake with. Silently fails if you pass keys \
+           we aren't tracking in ownedWallets"
+        ~args:Arg.[arg "input" ~typ:(non_null Types.Input.set_staking)]
+        ~typ:(non_null Types.Payload.set_staking)
+        ~resolve:(fun {ctx= coda; _} () pk_strings ->
+          let open Result.Let_syntax in
+          (* TODO: Handle errors like: duplicates, etc *)
+          let%map pks =
+            List.fold pk_strings ~init:(Result.return [])
+              ~f:(fun acc pk_string ->
+                let%bind acc = acc in
+                let%map pk = Arguments.public_key ~name:"wallets" pk_string in
+                pk :: acc )
+          in
+          let kps =
+            List.filter_map pks ~f:(fun pk ->
+                Program.wallets coda |> Secrets.Wallets.find ~needle:pk )
+          in
+          let old_propose_keys = Program.propose_public_keys coda in
+          Program.replace_propose_keypairs coda (Keypair.Set.of_list kps) ;
+          Public_key.Compressed.Set.to_list old_propose_keys )
+
     let commands =
-      [add_wallet; send_payment; set_delegation; add_payment_receipt]
+      [ add_wallet
+      ; send_payment
+      ; set_delegation
+      ; add_payment_receipt
+      ; set_staking ]
   end
 
   let schema =

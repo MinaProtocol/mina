@@ -78,6 +78,7 @@ type Wallet {
   delegate: String!
   votingFor: String!
   balance: AnnotatedBalance!
+  stakingActive: Boolean! # Actively staking. There is a lag between switching staking keys and them appearing here as you may be in the middle of a staking procedure with other keys.
 }
 
 type NodeStatus {
@@ -132,7 +133,9 @@ input BlockFilterInput {
 }
 
 input SetStakingInput {
-  on: Boolean
+  # Set to empty to stop staking
+  # Set to a non-empty list of public keys to start staking on these keys
+  wallets: [String!]!
 }
 
 ## Payload types
@@ -166,7 +169,9 @@ type DeleteWalletPayload {
 }
 
 type SetStakingPayload {
-  on: Boolean
+  # Returns the last wallet public keys that were staking before
+  # or empty if there were none
+  lastStaking: [String!]!
 }
 
 # Pagination types
@@ -258,7 +263,7 @@ type Mutation {
   # Deletes private key associated with `key` and all related information
   deleteWallet(input: DeleteWalletInput!): DeleteWalletPayload
 
-  setStaking(input: SetStakingInput!): SetStakingPayload
+  setStaking(input: SetStakingInput!): SetStakingPayload!
 }
 
 type Subscription {

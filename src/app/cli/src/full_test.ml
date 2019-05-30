@@ -45,9 +45,7 @@ let run_test () : unit Deferred.t =
 
         let work_selection = Cli_lib.Arg_type.Seq
       end in
-      let%bind (module Init) =
-        make_init ~should_propose:true (module Config)
-      in
+      let%bind (module Init) = make_init (module Config) in
       let%bind () =
         match Unix.getenv "CODA_TRACING" with
         | Some trace_dir ->
@@ -86,7 +84,8 @@ let run_test () : unit Deferred.t =
       let time_controller = Block_time.Controller.(create basic) in
       let consensus_local_state =
         Consensus.Data.Local_state.create
-          (Some (Public_key.compress keypair.public_key))
+          (Public_key.Compressed.Set.singleton
+             (Public_key.compress keypair.public_key))
       in
       let net_config =
         Main.Inputs.Net.Config.
@@ -120,7 +119,8 @@ let run_test () : unit Deferred.t =
       let%bind coda =
         Main.create
           (Main.Config.make ~logger ~trust_system ~verifier:Init.verifier
-             ~net_config ~propose_keypair:keypair
+             ~net_config
+             ~initial_propose_keypairs:(Keypair.Set.singleton keypair)
              ~snark_worker_key:
                (Public_key.compress largest_account_keypair.public_key)
              ~transaction_pool_disk_location:

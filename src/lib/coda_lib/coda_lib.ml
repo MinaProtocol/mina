@@ -91,7 +91,7 @@ module type Proposer_intf = sig
                            -> completed_work_checked option)
     -> transaction_pool:transaction_pool
     -> time_controller:Block_time.Controller.t
-    -> keypair:Keypair.t
+    -> keypairs_pipe:Keypair.Set.t Strict_pipe.Reader.t
     -> consensus_local_state:Consensus.Data.Local_state.t
     -> frontier_reader:transition_frontier option Broadcast_pipe.Reader.t
     -> transition_writer:( breadcrumb
@@ -248,7 +248,9 @@ module Make (Inputs : Inputs_intf) = struct
   module Ledger_transfer = Ledger_transfer.Make (Ledger) (Ledger.Db)
 
   type t =
-    { propose_keypair: Keypair.t option
+    { propose_keypairs: Keypair.Set.t Strict_pipe.Reader.t
+    ; propose_keypairs_writer:
+        (Keypair.Set.t, drop_head buffered, unit) Strict_pipe.Writer.t
     ; snark_worker_key: Public_key.Compressed.Stable.V1.t option
     ; net: Net.t
     ; verifier: Verifier.t
@@ -289,7 +291,11 @@ module Make (Inputs : Inputs_intf) = struct
 
   let snark_worker_key t = t.snark_worker_key
 
-  let propose_keypair t = t.propose_keypair
+  let propose_public_keys t =
+    Consensus.Data.Local_state.current_proposers t.consensus_local_state
+
+  let replace_propose_keypairs t kps =
+    Strict_pipe.Writer.write t.propose_keypairs_writer kps
 
   let best_tip_opt t =
     let open Option.Let_syntax in
@@ -483,7 +489,7 @@ module Make (Inputs : Inputs_intf) = struct
       { logger: Logger.t
       ; trust_system: Trust_system.t
       ; verifier: Verifier.t
-      ; propose_keypair: Keypair.t option
+      ; initial_propose_keypairs: Keypair.Set.t
       ; snark_worker_key: Public_key.Compressed.Stable.V1.t option
       ; net_config: Net.Config.t
       ; transaction_pool_disk_location: string
@@ -504,14 +510,13 @@ module Make (Inputs : Inputs_intf) = struct
   end
 
   let start t =
-    Option.iter t.propose_keypair ~f:(fun keypair ->
-        Proposer.run ~logger:t.logger ~verifier:t.verifier
-          ~trust_system:t.trust_system ~transaction_pool:t.transaction_pool
-          ~get_completed_work:(Snark_pool.get_completed_work t.snark_pool)
-          ~time_controller:t.time_controller ~keypair
-          ~consensus_local_state:t.consensus_local_state
-          ~frontier_reader:t.transition_frontier
-          ~transition_writer:t.proposer_transition_writer )
+    Proposer.run ~logger:t.logger ~verifier:t.verifier
+      ~trust_system:t.trust_system ~transaction_pool:t.transaction_pool
+      ~get_completed_work:(Snark_pool.get_completed_work t.snark_pool)
+      ~time_controller:t.time_controller ~keypairs_pipe:t.propose_keypairs
+      ~consensus_local_state:t.consensus_local_state
+      ~frontier_reader:t.transition_frontier
+      ~transition_writer:t.proposer_transition_writer
 
   let create_genesis_frontier (config : Config.t) =
     let consensus_local_state = config.consensus_local_state in
@@ -784,8 +789,16 @@ module Make (Inputs : Inputs_intf) = struct
               (Linear_pipe.iter (Snark_pool.broadcasts snark_pool) ~f:(fun x ->
                    Net.broadcast_snark_pool_diff net x ;
                    Deferred.unit )) ;
+            let proposer_kps_r, proposer_kps_w =
+              Strict_pipe.(
+                create ~name:"propose_keypairs"
+                  (Buffered (`Capacity 1, `Overflow Drop_head)))
+            in
+            Strict_pipe.Writer.write proposer_kps_w
+              config.initial_propose_keypairs ;
             return
-              { propose_keypair= config.propose_keypair
+              { propose_keypairs= proposer_kps_r
+              ; propose_keypairs_writer= proposer_kps_w
               ; snark_worker_key= config.snark_worker_key
               ; net
               ; verifier= config.verifier

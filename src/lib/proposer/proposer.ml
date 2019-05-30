@@ -43,7 +43,7 @@ end
 module Agent : sig
   type 'a t
 
-  val create : f:('a -> 'b) -> 'a Linear_pipe.Reader.t -> 'b t
+  val create : f:('a -> 'b) -> 'a Strict_pipe.Reader.t -> 'b t
 
   val get : 'a t -> 'a option
 
@@ -51,10 +51,10 @@ module Agent : sig
 end = struct
   type 'a t = {signal: unit Ivar.t; mutable value: 'a option}
 
-  let create ~(f : 'a -> 'b) (reader : 'a Linear_pipe.Reader.t) : 'b t =
+  let create ~(f : 'a -> 'b) (reader : 'a Strict_pipe.Reader.t) : 'b t =
     let t = {signal= Ivar.create (); value= None} in
     don't_wait_for
-      (Linear_pipe.iter reader ~f:(fun x ->
+      (Strict_pipe.Reader.iter reader ~f:(fun x ->
            let old_value = t.value in
            t.value <- Some (f x) ;
            if old_value = None then Ivar.fill t.signal () ;
@@ -136,6 +136,7 @@ module Make (Inputs : Inputs_intf) :
 
     val create : Time.Controller.t -> t
 
+    (** If you reschedule when already scheduled, take the min of the two schedulings *)
     val schedule : t -> Time.t -> f:(unit -> unit) -> unit
   end = struct
     type t =
@@ -153,10 +154,22 @@ module Make (Inputs : Inputs_intf) :
           ()
 
     let schedule t time ~f =
+      let remaining_time =
+        Option.map t.timeout ~f:Time.Timeout.remaining_time
+      in
       cancel t ;
       let span_till_time = Time.diff time (Time.now t.time_controller) in
+      let wait_span =
+        match remaining_time with
+        | Some remaining
+          when Time.Span.(remaining > Time.Span.of_ms Int64.zero) ->
+            let min a b = if Time.Span.(a < b) then a else b in
+            min remaining span_till_time
+        | None | Some _ ->
+            span_till_time
+      in
       let timeout =
-        Time.Timeout.create t.time_controller span_till_time ~f:(fun _ ->
+        Time.Timeout.create t.time_controller wait_span ~f:(fun _ ->
             t.timeout <- None ;
             f () )
       in
@@ -268,7 +281,7 @@ module Make (Inputs : Inputs_intf) :
             Some (protocol_state, internal_transition, witness) ) )
 
   let run ~logger ~verifier ~trust_system ~get_completed_work ~transaction_pool
-      ~time_controller ~keypair ~consensus_local_state ~frontier_reader
+      ~time_controller ~keypairs_pipe ~consensus_local_state ~frontier_reader
       ~transition_writer =
     trace_task "proposer" (fun () ->
         let log_bootstrap_mode () =
@@ -277,7 +290,7 @@ module Make (Inputs : Inputs_intf) :
              schedule event"
         in
         let module Breadcrumb = Transition_frontier.Breadcrumb in
-        let propose ivar proposal_data =
+        let propose ivar (keypair, proposal_data) =
           let open Interruptible.Let_syntax in
           match Broadcast_pipe.Reader.peek frontier_reader with
           | None ->
@@ -460,8 +473,8 @@ module Make (Inputs : Inputs_intf) :
                           ; Deferred.choice
                               ( Time.Timeout.create time_controller
                                   (* We allow up to 15 seconds for the transition to make its way from the transition_writer to the frontier.
-                                     This value is chosen to be reasonably generous. In theory, this should not take terribly long. But long
-                                     cycles do happen in our system, and with medium curves those long cycles can be substantial. *)
+                                    This value is chosen to be reasonably generous. In theory, this should not take terribly long. But long
+                                    cycles do happen in our system, and with medium curves those long cycles can be substantial. *)
                                   (Time.Span.of_ms 15000L)
                                   ~f:(Fn.const ())
                               |> Time.Timeout.to_deferred )
@@ -482,9 +495,26 @@ module Make (Inputs : Inputs_intf) :
                             Error.raise (Error.of_string str) )) )
         in
         let proposal_supervisor = Singleton_supervisor.create ~task:propose in
+        let keypairs_agent = Agent.create ~f:Fn.id keypairs_pipe in
         let scheduler = Singleton_scheduler.create time_controller in
+        let last_keypairs =
+          Agent.get keypairs_agent |> Option.value ~default:Keypair.Set.empty
+        in
         let rec check_for_proposal () =
           trace_recurring_task "check for proposal" (fun () ->
+              (* See if we want to change keypairs *)
+              let keypairs =
+                Agent.get keypairs_agent
+                |> Option.value ~default:Keypair.Set.empty
+              in
+              if not (Keypair.Set.equal keypairs last_keypairs) then
+                (* Perform proposer swap since we have new keypairs *)
+                Consensus.Data.Local_state.proposer_swap consensus_local_state
+                  ( Keypair.Set.to_list keypairs
+                  |> List.map ~f:(fun kp ->
+                         Public_key.compress kp.Keypair.public_key )
+                  |> Public_key.Compressed.Set.of_list ) ;
+              (* Begin proposal checking *)
               match Broadcast_pipe.Reader.peek frontier_reader with
               | None ->
                   log_bootstrap_mode () ;
@@ -516,24 +546,36 @@ module Make (Inputs : Inputs_intf) :
                         Consensus.Hooks.next_proposal
                           (time_to_ms (Time.now time_controller))
                           consensus_state ~local_state:consensus_local_state
-                          ~keypair ~logger )
+                          ~keypairs ~logger )
                   with
                   | `Check_again time ->
                       Singleton_scheduler.schedule scheduler (time_of_ms time)
                         ~f:check_for_proposal
-                  | `Propose_now data ->
+                  | `Propose_now (keypair, data) ->
                       Interruptible.finally
-                        (Singleton_supervisor.dispatch proposal_supervisor data)
+                        (Singleton_supervisor.dispatch proposal_supervisor
+                           (keypair, data))
                         ~f:check_for_proposal
                       |> ignore
-                  | `Propose (time, data) ->
+                  | `Propose (time, keypair, data) ->
                       Singleton_scheduler.schedule scheduler (time_of_ms time)
                         ~f:(fun () ->
                           ignore
                             (Interruptible.finally
                                (Singleton_supervisor.dispatch
-                                  proposal_supervisor data)
+                                  proposal_supervisor (keypair, data))
                                ~f:check_for_proposal) ) ) )
         in
+        (* Schedule to wake up immediately on the next tick of the proposer
+         * instead of immediately mutating local_state here as there could be a
+         * race.
+         *
+         * Given that rescheduling takes the min of the two timeouts, we won't
+         * erase this timeout even if the last run of the proposer wants to wait
+         * for a long while.
+         * *)
+        Agent.with_value keypairs_agent ~f:(fun _new_keypairs ->
+            Singleton_scheduler.schedule scheduler (Time.now time_controller)
+              ~f:check_for_proposal ) ;
         check_for_proposal () )
 end

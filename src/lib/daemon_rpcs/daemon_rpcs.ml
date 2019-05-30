@@ -202,11 +202,10 @@ module Types = struct
 
       let sync_status = map_entry "Sync Status" ~f:Sync_status.to_string
 
-      let propose_pubkey =
-        map_entry "Proposer Running"
-          ~f:
-            (Option.value_map ~default:"false"
-               ~f:(Printf.sprintf !"%{sexp: Public_key.t}"))
+      let propose_pubkeys =
+        map_entry "Proposers Running" ~f:(fun keys ->
+            Printf.sprintf "Total: %d " (List.length keys)
+            ^ List.to_string ~f:Public_key.Compressed.to_string keys )
 
       let histograms = option_entry "Histograms" ~f:Histograms.to_text
 
@@ -243,7 +242,7 @@ module Types = struct
       ; user_commands_sent: int
       ; run_snark_worker: bool
       ; sync_status: Sync_status.Stable.V1.t
-      ; propose_pubkey: Public_key.Stable.Latest.t option
+      ; propose_pubkeys: Public_key.Compressed.Stable.V1.t list
       ; histograms: Histograms.t option
       ; consensus_time_best_tip: string option
       ; consensus_time_now: string
@@ -260,7 +259,7 @@ module Types = struct
       let open M in
       Fields.to_list ~sync_status ~num_accounts ~block_count ~uptime_secs
         ~ledger_merkle_root ~staged_ledger_hash ~state_hash ~commit_id
-        ~conf_dir ~peers ~user_commands_sent ~run_snark_worker ~propose_pubkey
+        ~conf_dir ~peers ~user_commands_sent ~run_snark_worker ~propose_pubkeys
         ~histograms ~consensus_time_best_tip ~consensus_time_now
         ~consensus_mechanism ~consensus_configuration
       |> List.filter_map ~f:Fn.id
