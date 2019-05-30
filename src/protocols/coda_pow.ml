@@ -417,17 +417,19 @@ module type Private_key_intf = sig
 end
 
 module type Compressed_public_key_intf = sig
-  type t [@@deriving sexp, compare, yojson]
+  type t [@@deriving sexp, compare, yojson, hash]
 
   module Stable :
     sig
       module V1 : sig
-        type t [@@deriving sexp, bin_io, compare, yojson, version]
+        type t [@@deriving sexp, bin_io, compare, yojson, version, hash]
       end
     end
     with type V1.t = t
 
   include Comparable.S with type t := t
+
+  include Hashable.S with type t := t
 
   type var
 

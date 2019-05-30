@@ -450,7 +450,9 @@ module Make (Inputs : Inputs_intf) = struct
     ; trust_system: Trust_system.t
     ; mutable seen_jobs: Work_selector.State.t
     ; transaction_database: Transaction_database.t
+    ; external_transition_database: External_transition_database.t
     ; receipt_chain_database: Coda_base.Receipt_chain_database.t
+    ; subscribed_users: Signature_lib.Public_key.Compressed.Hash_set.t
     ; staged_ledger_transition_backup_capacity: int
     ; external_transitions_writer:
         (External_transition.t Envelope.Incoming.t * Inputs.Time.t)
@@ -468,6 +470,8 @@ module Make (Inputs : Inputs_intf) = struct
                now.")
 
   let wallets t = t.wallets
+
+  let subscribed_users t = t.subscribed_users
 
   let snark_worker_key t = t.snark_worker_key
 
@@ -610,6 +614,8 @@ module Make (Inputs : Inputs_intf) = struct
 
   let transaction_database t = t.transaction_database
 
+  let external_transition_database t = t.external_transition_database
+
   let snark_pool t = t.snark_pool
 
   let peers t = Net.peers t.net
@@ -677,6 +683,7 @@ module Make (Inputs : Inputs_intf) = struct
       ; time_controller: Time.Controller.t
       ; receipt_chain_database: Coda_base.Receipt_chain_database.t
       ; transaction_database: Transaction_database.t
+      ; external_transition_database: External_transition_database.t
       ; snark_work_fee: Currency.Fee.t
       ; monitor: Monitor.t option
       ; consensus_local_state: Consensus.Data.Local_state.t
@@ -962,6 +969,10 @@ module Make (Inputs : Inputs_intf) = struct
               Secrets.Wallets.load ~logger:config.logger
                 ~disk_location:config.wallets_disk_location
             in
+            let subscribed_users =
+              Signature_lib.Public_key.Compressed.Hash_set.of_list
+              @@ Secrets.Wallets.pks wallets
+            in
             don't_wait_for
               (Linear_pipe.iter (Snark_pool.broadcasts snark_pool) ~f:(fun x ->
                    Net.broadcast_snark_pool_diff net x ;
@@ -988,5 +999,8 @@ module Make (Inputs : Inputs_intf) = struct
               ; snark_work_fee= config.snark_work_fee
               ; proposer_transition_writer
               ; consensus_local_state= config.consensus_local_state
-              ; transaction_database= config.transaction_database } ) )
+              ; transaction_database= config.transaction_database
+              ; external_transition_database=
+                  config.external_transition_database
+              ; subscribed_users } ) )
 end

@@ -1,4 +1,4 @@
-enum SyncStatus {
+\enum SyncStatus {
   ERROR
   BOOTSTRAP # Resyncing
   STALE # You haven't seen any activity recently

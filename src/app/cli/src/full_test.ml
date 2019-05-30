@@ -80,8 +80,17 @@ let run_test () : unit Deferred.t =
       trace_database_initialization "transaction_database" __LOC__
         receipt_chain_dir_name ;
       let transaction_database =
-        Auxiliary_database.Transaction_database.create logger
+        Auxiliary_database.Transaction_database.create ~logger
           transaction_database_dir
+      in
+      let%bind external_transition_database_dir =
+        Async.Unix.mkdtemp (temp_conf_dir ^/ "external_transition_database")
+      in
+      trace_database_initialization "external_transition_database" __LOC__
+        external_transition_database_dir ;
+      let external_transition_database =
+        Auxiliary_database.External_transition_database.create ~logger
+          external_transition_database_dir
       in
       let time_controller = Main.Inputs.Time.Controller.(create basic) in
       let consensus_local_state =
@@ -129,7 +138,7 @@ let run_test () : unit Deferred.t =
              ~wallets_disk_location:(temp_conf_dir ^/ "wallets")
              ~time_controller ~receipt_chain_database
              ~snark_work_fee:(Currency.Fee.of_int 0) ~consensus_local_state
-             ~transaction_database ())
+             ~transaction_database ~external_transition_database ())
       in
       Main.start coda ;
       don't_wait_for
