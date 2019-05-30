@@ -161,7 +161,7 @@ module Make (Commands : Coda_commands.Intf) = struct
               ~typ:(non_null @@ list @@ non_null user_command)
               ~args:Arg.[]
               ~resolve:(fun _ {user_commands; _} -> user_commands)
-          ; field "FeeTransfer"
+          ; field "feeTransfer"
               ~typ:(non_null @@ list @@ non_null fee_transfer)
               ~args:Arg.[]
               ~resolve:(fun _ {fee_transfers; _} -> fee_transfers)
@@ -277,11 +277,11 @@ module Make (Commands : Coda_commands.Intf) = struct
           ~fields:(fun _ ->
             [ pubkey_field ~resolve:(fun _ account ->
                   (* Hack: Account.Poly.t is only parameterized over 'pk once
-                             * and so, in order for delegate to be optional, we must also
-                             * make account public_key optional even though it's always
-                             * Some. In an attempt to avoid a large refactoring, and also
-                             * avoid making a new record, we'll deal with a value_exn here
-                             * and be sad. *)
+                     and so, in order for delegate to be optional, we must also
+                     make account public_key optional even though it's always
+                     Some. In an attempt to avoid a large refactoring, and also
+                     avoid making a new record, we'll deal with a value_exn
+                     here and be sad. *)
                   Stringable.public_key
                   @@ Option.value_exn account.Account.Poly.public_key )
             ; field "balance"
@@ -403,6 +403,7 @@ module Make (Commands : Coda_commands.Intf) = struct
             ; fee ~doc:"Fee amount in order to send a stake delegation"
             ; memo ~doc:"Public description of a stake delegation" ]
 
+      (* TODO: Treat cases where filter_input has a null argument *)
       let filter_input ~title ~arg_name ~arg_doc =
         obj title ~coerce:Fn.id
           ~fields:[arg arg_name ~doc:arg_doc ~typ:(non_null string)]
@@ -443,7 +444,11 @@ module Make (Commands : Coda_commands.Intf) = struct
 
     module Pagination = struct
       module Page_info = struct
-        type t = {has_previous_page: bool; has_next_page: bool}
+        type t =
+          { has_previous_page: bool
+          ; has_next_page: bool
+          ; first_cursor: string option
+          ; last_cursor: string option }
 
         let obj =
           obj "PageInfo" ~fields:(fun _ ->
@@ -452,7 +457,13 @@ module Make (Commands : Coda_commands.Intf) = struct
                   ~resolve:(fun _ {has_previous_page; _} -> has_previous_page)
               ; field "hasNextPage" ~typ:(non_null bool)
                   ~args:Arg.[]
-                  ~resolve:(fun _ {has_next_page; _} -> has_next_page) ] )
+                  ~resolve:(fun _ {has_next_page; _} -> has_next_page)
+              ; field "firstCursor" ~typ:string
+                  ~args:Arg.[]
+                  ~resolve:(fun _ {first_cursor; _} -> first_cursor)
+              ; field "firstCursor" ~typ:string
+                  ~args:Arg.[]
+                  ~resolve:(fun _ {last_cursor; _} -> last_cursor) ] )
       end
 
       module Edge = struct
@@ -502,7 +513,7 @@ module Make (Commands : Coda_commands.Intf) = struct
         open Inputs
 
         let edge =
-          obj (Type.name ^ "edge") ~fields:(fun _ ->
+          obj (Type.name ^ "Edge") ~fields:(fun _ ->
               [ field "cursor" ~typ:(non_null string) ~doc:Cursor.doc
                   ~args:Arg.[]
                   ~resolve:(fun _ {Edge.cursor; _} -> cursor)
@@ -532,7 +543,20 @@ module Make (Commands : Coda_commands.Intf) = struct
             ( queried_transactions
             , `Has_earlier_page has_previous_page
             , `Has_later_page has_next_page ) total_count =
-          let page_info = {Page_info.has_previous_page; has_next_page} in
+          let first_cursor =
+            Option.map ~f:(fun {Edge.cursor} -> cursor)
+            @@ List.hd queried_transactions
+          in
+          let last_cursor =
+            Option.map ~f:(fun {Edge.cursor} -> cursor)
+            @@ List.last queried_transactions
+          in
+          let page_info =
+            { Page_info.has_previous_page
+            ; has_next_page
+            ; first_cursor
+            ; last_cursor }
+          in
           {Connection.edges= queried_transactions; page_info; total_count}
 
         let query =

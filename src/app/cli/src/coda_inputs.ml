@@ -302,8 +302,6 @@ module type Main_intf = sig
   val external_transition_database :
     t -> Auxiliary_database.External_transition_database.t
 
-  val subscribed_users : t -> Public_key.Compressed.Hash_set.t
-
   val snark_pool : t -> Inputs.Snark_pool.t
 
   val create : Config.t -> t Deferred.t

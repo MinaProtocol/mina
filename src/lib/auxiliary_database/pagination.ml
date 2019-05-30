@@ -427,7 +427,7 @@ let%test_module "Pagination" =
             ~message:"We should have at least one later transaction"
             ~equal:Bool.equal ~expect:true has_later )
 
-    let%test_unit "Get the n most latest transactions if transactions are not \
+    let%test_unit "Get the n latest transactions if transactions are not \
                    provided" =
       test_no_transaction_input ~trials:5 Gen.test_no_transaction_input
         ~query_next_page:Pagination.get_earlier_values
