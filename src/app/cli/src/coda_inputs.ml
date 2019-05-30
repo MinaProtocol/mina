@@ -86,6 +86,7 @@ module type Main_intf = sig
        and type valid_diff :=
                   Staged_ledger_diff.With_valid_signatures_and_proofs.t
        and type ledger_proof := Ledger_proof.t
+       and type transaction_snark_work := Transaction_snark_work.t
        and type transaction_snark_work_statement :=
                   Transaction_snark_work.Statement.t
        and type transaction_snark_work_checked :=
@@ -125,7 +126,7 @@ module type Main_intf = sig
       ; staged_ledger_transition_backup_capacity: int [@default 10]
       ; time_controller: Block_time.Controller.t
       ; receipt_chain_database: Receipt_chain_database.t
-      ; transaction_database: Transaction_database.t
+      ; transaction_database: Auxiliary_database.Transaction_database.t
       ; snark_work_fee: Currency.Fee.t
       ; monitor: Async.Monitor.t option
       ; consensus_local_state: Consensus.Data.Local_state.t }
@@ -172,7 +173,7 @@ module type Main_intf = sig
 
   val transaction_pool : t -> Inputs.Transaction_pool.t
 
-  val transaction_database : t -> Transaction_database.t
+  val transaction_database : t -> Auxiliary_database.Transaction_database.t
 
   val snark_pool : t -> Inputs.Snark_pool.t
 

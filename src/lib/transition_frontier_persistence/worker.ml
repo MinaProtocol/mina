@@ -52,35 +52,33 @@ end = struct
     External_transition.Validated.protocol_state parent_transition
     |> Protocol_state.consensus_state
 
-  let hash = Transition_frontier.Diff.Mutant.hash
-
   let handle_diff (t : t) acc_hash
       (E diff : Transition_frontier.Diff.Mutant.E.t) =
     match diff with
     | New_frontier
-        ( {With_hash.hash= first_root_hash; data= first_root}
-        , scan_state
-        , pending_coinbase ) ->
+        Transition_frontier.Diff.Mutant.Root.Poly.
+          { root= {With_hash.hash= first_root_hash; data= first_root}
+          ; scan_state
+          ; pending_coinbase } ->
         Transition_storage.Batch.with_batch t.transition_storage
           ~f:(fun batch ->
             Transition_storage.Batch.set batch ~key:Root
               ~data:(first_root_hash, scan_state, pending_coinbase) ;
             Transition_storage.Batch.set batch
               ~key:(Transition first_root_hash) ~data:(first_root, []) ;
-            hash acc_hash diff () )
+            Transition_frontier.Diff.Mutant.hash acc_hash diff () )
     | Add_transition transition_with_hash ->
         Transition_storage.Batch.with_batch t.transition_storage
           ~f:(fun batch ->
             let mutant =
               apply_add_transition (t, batch) transition_with_hash
             in
-            hash acc_hash diff mutant )
+            Transition_frontier.Diff.Mutant.hash acc_hash diff mutant )
     | Remove_transitions removed_transitions ->
         let mutant =
           Transition_storage.Batch.with_batch t.transition_storage
             ~f:(fun batch ->
-              List.map removed_transitions
-                ~f:(fun {With_hash.hash= state_hash; data= _} ->
+              List.map removed_transitions ~f:(fun state_hash ->
                   let removed_transition, _ =
                     Transition_storage.get ~logger:t.logger
                       t.transition_storage (Transition state_hash)
@@ -91,13 +89,19 @@ end = struct
                     removed_transition
                   |> Protocol_state.consensus_state ) )
         in
-        hash acc_hash diff mutant
-    | Update_root new_root_data ->
+        Transition_frontier.Diff.Mutant.hash acc_hash diff mutant
+    | Update_root {root; scan_state; pending_coinbase} ->
+        let new_root_data = (root, scan_state, pending_coinbase) in
         let old_root_data =
           Logger.trace t.logger !"Getting old root data" ~module_:__MODULE__
             ~location:__LOC__ ;
-          Transition_storage.get t.transition_storage ~logger:t.logger
-            ~location:__LOC__ Transition_storage.Schema.Root
+          let root, scan_state, pending_coinbase =
+            Transition_storage.get t.transition_storage ~logger:t.logger
+              ~location:__LOC__ Transition_storage.Schema.Root
+          in
+          { Transition_frontier.Diff.Mutant.Root.Poly.root
+          ; scan_state
+          ; pending_coinbase }
         in
         Logger.trace t.logger !"Setting old root data" ~module_:__MODULE__
           ~location:__LOC__ ;
@@ -112,7 +116,7 @@ end = struct
               , Transition_frontier.Diff.Mutant.value_to_yojson diff
                   old_root_data ) ]
           "Worker root update mutant" ;
-        hash acc_hash diff old_root_data
+        Transition_frontier.Diff.Mutant.hash acc_hash diff old_root_data
 
   module For_tests = struct
     let transition_storage {transition_storage; _} = transition_storage

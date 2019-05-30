@@ -120,16 +120,14 @@ module Make (Inputs : Inputs_intf) :
                     in
                     let open Trust_system.Actions in
                     (* TODO : refine these actions, issue 2375 *)
+                    let open Staged_ledger.Pre_diff_info.Error in
                     let action =
                       match staged_ledger_error with
                       | Invalid_proof _ ->
                           make_actions Sent_invalid_proof
-                      | Bad_signature _ ->
+                      | Pre_diff (Bad_signature _) ->
                           make_actions Sent_invalid_signature
-                      | Coinbase_error _
-                      | Bad_prev_hash _
-                      | Insufficient_fee _
-                      | Non_zero_fee_excess _ ->
+                      | Pre_diff _ | Bad_prev_hash _ | Non_zero_fee_excess _ ->
                           make_actions Gossiped_invalid_transition
                       | Unexpected _ ->
                           failwith
@@ -859,12 +857,14 @@ module Make (Inputs : Inputs_intf) :
         Extensions.handle_diff t.extensions t.extension_writers
           ( match best_tip_change with
           | `Keep ->
-              Diff.New_breadcrumb node.breadcrumb
+              Diff.New_breadcrumb
+                {previous= parent_node.breadcrumb; added= node.breadcrumb}
           | `Take ->
               Diff.New_best_tip
                 { old_root= root_node.breadcrumb
                 ; old_root_length= root_node.length
                 ; new_root= new_root_node.breadcrumb
+                ; parent= parent_node.breadcrumb
                 ; added_to_best_tip_path=
                     Non_empty_list.of_list_opt added_to_best_tip_path
                     |> Option.value_exn

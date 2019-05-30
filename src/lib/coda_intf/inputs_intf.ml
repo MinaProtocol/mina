@@ -21,6 +21,7 @@ module type Inputs_intf = sig
     with type diff := Staged_ledger_diff.t
      and type valid_diff :=
                 Staged_ledger_diff.With_valid_signatures_and_proofs.t
+     and type transaction_snark_work := Transaction_snark_work.t
      and type transaction_snark_work_statement :=
                 Transaction_snark_work.Statement.t
      and type transaction_snark_work_checked :=

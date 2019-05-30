@@ -89,7 +89,7 @@ end) :
     let handle_diff t diff =
       let removed, added =
         match (diff : Diff.t) with
-        | New_breadcrumb breadcrumb | New_frontier breadcrumb ->
+        | New_breadcrumb {added= breadcrumb; _} | New_frontier breadcrumb ->
             (0, add_breadcrumb_to_ref_table t breadcrumb)
         | New_best_tip {old_root; new_root; added_to_best_tip_path; garbage; _}
           ->
@@ -255,8 +255,8 @@ end) :
     in
     let bc_opt =
       match diff with
-      | New_breadcrumb bc ->
-          Some bc
+      | New_breadcrumb {added; _} ->
+          Some added
       | New_best_tip {added_to_best_tip_path; _} ->
           Some (Non_empty_list.last added_to_best_tip_path)
       | _ ->

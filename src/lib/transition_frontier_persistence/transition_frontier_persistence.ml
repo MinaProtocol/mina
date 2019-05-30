@@ -11,97 +11,30 @@ module Make (Inputs : Intf.Main_inputs) = struct
   open Inputs
   module Worker = Inputs.Make_worker (Inputs)
 
-  type t = Worker.t
+  type t =
+    { worker: Worker.t
+    ; worker_thread: unit Deferred.t
+    ; max_buffer_capacity: int
+    ; flush_capacity: int
+    ; worker_writer:
+        ( Transition_frontier.Diff.Mutant.E.with_value list
+        , Strict_pipe.synchronous
+        , unit Deferred.t )
+        Strict_pipe.Writer.t
+    ; buffer: Transition_frontier.Diff.Mutant.E.with_value Queue.t }
 
-  let create = Worker.create
-
-  let scan_state t =
-    t |> Transition_frontier.Breadcrumb.staged_ledger
-    |> Inputs.Staged_ledger.scan_state
-
-  let pending_coinbase t =
-    t |> Transition_frontier.Breadcrumb.staged_ledger
-    |> Staged_ledger.pending_coinbase_collection
-
-  let apply_diff (type mutant) ~logger frontier
-      (diff : mutant Transition_frontier.Diff.Mutant.t) : mutant =
-    match diff with
-    | New_frontier _ ->
-        ()
-    | Add_transition {data= transition; _} ->
-        let parent_hash =
-          External_transition.Validated.parent_hash transition
-        in
-        Transition_frontier.find_exn frontier parent_hash
-        |> Transition_frontier.Breadcrumb.transition_with_hash
-        |> With_hash.data |> External_transition.Validated.protocol_state
-        |> Protocol_state.consensus_state
-    | Remove_transitions external_transitions_with_hashes ->
-        List.map external_transitions_with_hashes
-          ~f:(fun transition_with_hash ->
-            With_hash.data transition_with_hash
-            |> External_transition.Validated.protocol_state
-            |> Protocol_state.consensus_state )
-    | Update_root (new_root_hash, _, _) ->
-        let previous_root =
-          (let open Transition_frontier in
-          let open Option.Let_syntax in
-          let%bind root =
-            match find frontier new_root_hash with
-            | Some root ->
-                Some root
-            | None ->
-                find_in_root_history frontier new_root_hash
-          in
-          let previous_root_hash =
-            External_transition.Validated.parent_hash
-            @@ Breadcrumb.external_transition root
-          in
-          find_in_root_history frontier previous_root_hash)
-          |> Option.value_exn
-        in
-        let previous_state_hash =
-          Transition_frontier.Breadcrumb.state_hash previous_root
-        in
-        let mutant =
-          ( previous_state_hash
-          , scan_state previous_root
-          , pending_coinbase previous_root )
-        in
-        Logger.trace logger ~module_:__MODULE__ ~location:__LOC__
-          ~metadata:
-            [ ( "mutant"
-              , Transition_frontier.Diff.Mutant.value_to_yojson diff mutant )
-            ]
-          "Ground truth root update" ;
-        mutant
-
-  let to_state_hash_diff (type output)
-      (diff : output Transition_frontier.Diff.Mutant.t) :
-      Transition_frontier.Diff.Mutant.E.t =
-    match diff with
-    | Remove_transitions removed_transitions ->
-        E (Remove_transitions removed_transitions)
-    | New_frontier first_root ->
-        E (New_frontier first_root)
-    | Add_transition added_transition ->
-        E (Add_transition added_transition)
-    | Update_root new_root ->
-        E (Update_root new_root)
-
-  let write_diff_and_verify ~logger ~acc_hash worker frontier diff_mutant =
+  let write_diff_and_verify ~logger ~acc_hash worker (diff, ground_truth_mutant)
+      =
     Logger.trace logger "Handling mutant diff" ~module_:__MODULE__
       ~location:__LOC__
       ~metadata:
-        [ ( "diff_mutant"
-          , Transition_frontier.Diff.Mutant.key_to_yojson diff_mutant ) ] ;
-    let ground_truth_diff = apply_diff ~logger frontier diff_mutant in
+        [("diff_mutant", Transition_frontier.Diff.Mutant.key_to_yojson diff)] ;
     let ground_truth_hash =
-      Transition_frontier.Diff.Mutant.hash acc_hash diff_mutant
-        ground_truth_diff
+      Transition_frontier.Diff.Mutant.hash acc_hash diff ground_truth_mutant
     in
     match%map
-      Worker.handle_diff worker acc_hash (to_state_hash_diff diff_mutant)
+      Worker.handle_diff worker acc_hash
+        (Transition_frontier.Diff.Mutant.E.E diff)
     with
     | Error e ->
         Logger.error ~module_:__MODULE__ ~location:__LOC__ logger
@@ -115,32 +48,89 @@ module Make (Inputs : Intf.Main_inputs) = struct
             !"Unable to write mutant diff correctly as hashes are different:\n\
              \ %s. Hash of groundtruth %s Hash of actual %s"
             (Yojson.Safe.to_string
-               (Transition_frontier.Diff.Mutant.key_to_yojson diff_mutant))
+               (Transition_frontier.Diff.Mutant.key_to_yojson diff))
             (Transition_frontier.Diff.Hash.to_string ground_truth_hash)
             (Transition_frontier.Diff.Hash.to_string new_hash)
             ()
 
-  let listen_to_frontier_broadcast_pipe ~logger
-      (frontier_broadcast_pipe :
-        Transition_frontier.t option Broadcast_pipe.Reader.t) worker =
-    let%bind (_ : Transition_frontier.Diff.Hash.t) =
-      Broadcast_pipe.Reader.fold frontier_broadcast_pipe
-        ~init:Transition_frontier.Diff.Hash.empty
-        ~f:(fun acc_hash frontier_opt ->
-          match frontier_opt with
-          | Some frontier ->
-              Broadcast_pipe.Reader.fold
-                (Transition_frontier.persistence_diff_pipe frontier)
-                ~init:acc_hash ~f:(fun acc_hash diffs ->
-                  Deferred.List.fold diffs ~init:acc_hash
-                    ~f:(fun acc_hash (E mutant) ->
-                      write_diff_and_verify ~logger ~acc_hash worker frontier
-                        mutant ) )
-          | None ->
-              (* TODO: need to delete persistence once it get's back up *)
-              Deferred.return Transition_frontier.Diff.Hash.empty )
+  let rec flush ({buffer; worker_writer; flush_capacity; _} as t) =
+    let list = Queue.to_list buffer in
+    Queue.clear buffer ;
+    let%bind () = Strict_pipe.Writer.write worker_writer list in
+    if Queue.length buffer >= flush_capacity then flush t else Deferred.unit
+
+  let create ?directory_name ~logger ~flush_capacity ~max_buffer_capacity () =
+    let worker = Worker.create ?directory_name ~logger () in
+    let buffer = Queue.create () in
+    let reader, writer =
+      Strict_pipe.create ~name:"Transition_frontier_persistence worker"
+        Strict_pipe.Synchronous
     in
-    Deferred.unit
+    let worker_thread =
+      Strict_pipe.Reader.fold reader ~init:Transition_frontier.Diff.Hash.empty
+        ~f:(fun init_hash diff_pairs ->
+          Deferred.List.fold diff_pairs ~init:init_hash
+            ~f:(fun acc_hash
+               (Transition_frontier.Diff.Mutant.E.With_value
+                 (diff, ground_truth_mutant))
+               ->
+              write_diff_and_verify ~logger ~acc_hash worker
+                (diff, ground_truth_mutant) ) )
+      |> Deferred.ignore
+    in
+    { worker
+    ; worker_writer= writer
+    ; flush_capacity
+    ; max_buffer_capacity
+    ; buffer
+    ; worker_thread }
+
+  (* TODO: Remove once #2115 is solved *)
+  let close_and_finish_copy_without_closing_worker t =
+    (* Flush the remaining amount of work into worker pipe *)
+    let list = Queue.to_list t.buffer in
+    Queue.clear t.buffer ;
+    Strict_pipe.Writer.write t.worker_writer list |> don't_wait_for ;
+    (* Synchronously close pipe so that the worker only process remaining work in the pipe *)
+    Strict_pipe.Writer.close t.worker_writer ;
+    t.worker_thread
+
+  let close_and_finish_copy t =
+    let%map () = close_and_finish_copy_without_closing_worker t in
+    Worker.close t.worker
+
+  let select_work ({max_buffer_capacity; flush_capacity; buffer; _} as t)
+      current_work =
+    if
+      Queue.length buffer >= flush_capacity
+      && Deferred.is_determined current_work
+    then flush t
+    else if Queue.length buffer > max_buffer_capacity then
+      Debug_assert.debug_assert_deferred
+      @@ fun () ->
+      failwithf
+        !"There is too many work that a Transition Frontier Persistence \
+          worker is waiting for. Retune buffer parameters: {flush_capacity: \
+          %i, buffer_capacity: %i}"
+        flush_capacity max_buffer_capacity ()
+    else current_work
+
+  let listen_to_frontier_broadcast_pipe
+      (frontier_broadcast_pipe :
+        Transition_frontier.t option Broadcast_pipe.Reader.t) t =
+    Broadcast_pipe.Reader.iter frontier_broadcast_pipe
+      ~f:
+        (Option.value_map ~default:Deferred.unit ~f:(fun frontier ->
+             Deferred.join
+             @@ Broadcast_pipe.Reader.fold ~init:Deferred.unit
+                  (Transition_frontier.persistence_diff_pipe frontier)
+                  ~f:(fun worker_thread new_diffs ->
+                    Deferred.return
+                    @@
+                    if not @@ Strict_pipe.Writer.is_closed t.worker_writer then (
+                      Queue.enqueue_all t.buffer new_diffs ;
+                      select_work t worker_thread )
+                    else worker_thread ) ))
 
   let directly_add_breadcrumb ~logger ~verifier ~trust_system
       transition_frontier transition parent =

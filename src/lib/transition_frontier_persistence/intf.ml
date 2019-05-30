@@ -113,30 +113,25 @@ module type S = sig
 
   type t
 
-  type diff
-
-  type diff_hash
-
   type verifier
 
-  type root_snarked_ledger
-
-  type consensus_local_state
-
-  val create : ?directory_name:string -> logger:Logger.t -> unit -> t
+  val create :
+       ?directory_name:string
+    -> logger:Logger.t
+    -> flush_capacity:int
+    -> max_buffer_capacity:int
+    -> unit
+    -> t
 
   val listen_to_frontier_broadcast_pipe :
-       logger:Logger.t
-    -> frontier option Broadcast_pipe.Reader.t
-    -> t
-    -> unit Deferred.t
+    frontier option Broadcast_pipe.Reader.t -> t -> unit Deferred.t
 
   val deserialize :
        directory_name:string
     -> logger:Logger.t
     -> verifier:verifier
     -> trust_system:Trust_system.t
-    -> root_snarked_ledger:root_snarked_ledger
-    -> consensus_local_state:consensus_local_state
+    -> root_snarked_ledger:Ledger.Db.t
+    -> consensus_local_state:Consensus.Data.Local_state.t
     -> frontier Deferred.t
 end

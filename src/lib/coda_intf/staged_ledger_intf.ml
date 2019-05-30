@@ -3,6 +3,47 @@ open Async_kernel
 open Signature_lib
 open Coda_base
 
+module type Staged_ledger_pre_diff_info_generalized_intf = sig
+  type transaction
+
+  type user_command
+
+  type transaction_snark_work
+
+  type staged_ledger_diff
+
+  type valid_staged_ledger_diff
+
+  module Error : sig
+    type t =
+      | Bad_signature of user_command
+      | Coinbase_error of string
+      | Insufficient_fee of Currency.Fee.t * Currency.Fee.t
+      | Unexpected of Error.t
+    [@@deriving sexp]
+
+    val to_string : t -> string
+
+    val to_error : t -> Error.t
+  end
+
+  val get :
+       staged_ledger_diff
+    -> ( transaction list
+         * transaction_snark_work list
+         * int
+         * Currency.Amount.t list
+       , Error.t )
+       result
+
+  val get_unchecked :
+       valid_staged_ledger_diff
+    -> transaction list * transaction_snark_work list * Currency.Amount.t list
+
+  val get_transactions :
+    staged_ledger_diff -> (transaction list, Error.t) result
+end
+
 (* TODO: this is temporarily required due to staged ledger test stubs *)
 module type Staged_ledger_diff_generalized_intf = sig
   type fee_transfer_single
@@ -334,6 +375,8 @@ module type Staged_ledger_generalized_intf = sig
 
   type verifier
 
+  type transaction_snark_work
+
   type transaction_snark_work_statement
 
   type transaction_snark_work_checked
@@ -363,6 +406,14 @@ module type Staged_ledger_generalized_intf = sig
   type transaction_snark_statement
 
   type serializable [@@deriving bin_io]
+
+  module Pre_diff_info :
+    Staged_ledger_pre_diff_info_generalized_intf
+    with type user_command := user_command
+     and type transaction := transaction
+     and type transaction_snark_work := transaction_snark_work
+     and type staged_ledger_diff := diff
+     and type valid_staged_ledger_diff := valid_diff
 
   module Scan_state : sig
     type t [@@deriving sexp]
@@ -409,13 +460,11 @@ module type Staged_ledger_generalized_intf = sig
 
   module Staged_ledger_error : sig
     type t =
-      | Bad_signature of user_command
-      | Coinbase_error of string
       | Bad_prev_hash of staged_ledger_hash * staged_ledger_hash
-      | Insufficient_fee of Currency.Fee.t * Currency.Fee.t
       | Non_zero_fee_excess of Scan_state.Space_partition.t * transaction list
       | Invalid_proof of
           ledger_proof * transaction_snark_statement * compressed_public_key
+      | Pre_diff of Pre_diff_info.Error.t
       | Unexpected of Error.t
     [@@deriving sexp]
 

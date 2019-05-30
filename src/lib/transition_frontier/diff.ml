@@ -26,7 +26,7 @@ end) :
   (* TODO: Remove New_frontier. 
     Each transition frontier extension should be initialized by the input, the root breadcrumb *)
   type t =
-    | New_breadcrumb of Breadcrumb.t
+    | New_breadcrumb of {previous: Breadcrumb.t; added: Breadcrumb.t}
         (** Triggered when a new breadcrumb is added without changing the root or best_tip *)
     | New_frontier of Breadcrumb.t
         (** First breadcrumb to become the root of the frontier  *)
@@ -37,6 +37,7 @@ end) :
               (** Same as old root if the root doesn't change *)
         ; added_to_best_tip_path: Breadcrumb.t Non_empty_list.t
               (* oldest first *)
+        ; parent: Breadcrumb.t
         ; new_best_tip_length: int
         ; removed_from_best_tip_path: Breadcrumb.t list (* also oldest first *)
         ; garbage: Breadcrumb.t list }
@@ -68,15 +69,45 @@ end) :
   end
 
   module Mutant = struct
+    module Root = struct
+      module Poly = struct
+        module Stable = struct
+          module V1 = struct
+            module T = struct
+              type ('root, 'scan_state, 'pending_coinbase) t =
+                { root: 'root
+                ; scan_state: 'scan_state
+                ; pending_coinbase: 'pending_coinbase }
+              [@@deriving bin_io, version]
+            end
+
+            include T
+          end
+
+          module Latest = V1
+        end
+
+        type ('root, 'scan_state, 'pending_coinbase) t =
+              ('root, 'scan_state, 'pending_coinbase) Stable.Latest.t =
+          { root: 'root
+          ; scan_state: 'scan_state
+          ; pending_coinbase: 'pending_coinbase }
+      end
+
+      type 'root t =
+        ('root, Staged_ledger.Scan_state.t, Pending_coinbase.t) Poly.t
+    end
+
     module Key = struct
       module New_frontier = struct
         (* TODO: version *)
         type t =
-          ( External_transition.Validated.Stable.V1.t
-          , State_hash.Stable.V1.t )
-          With_hash.Stable.V1.t
-          * Staged_ledger.Scan_state.Stable.V1.t
-          * Pending_coinbase.Stable.V1.t
+          ( ( External_transition.Validated.Stable.V1.t
+            , State_hash.Stable.V1.t )
+            With_hash.Stable.V1.t
+          , Staged_ledger.Scan_state.Stable.V1.t
+          , Pending_coinbase.Stable.V1.t )
+          Root.Poly.Stable.V1.t
         [@@deriving bin_io]
       end
 
@@ -92,9 +123,10 @@ end) :
       module Update_root = struct
         (* TODO: version *)
         type t =
-          State_hash.Stable.V1.t
-          * Staged_ledger.Scan_state.Stable.V1.t
-          * Pending_coinbase.Stable.V1.t
+          ( State_hash.Stable.V1.t
+          , Staged_ledger.Scan_state.Stable.V1.t
+          , Pending_coinbase.Stable.V1.t )
+          Root.Poly.Stable.V1.t
         [@@deriving bin_io]
       end
     end
@@ -105,17 +137,9 @@ end) :
           Key.Add_transition.t
           -> Consensus.Data.Consensus_state.Value.Stable.V1.t t
       | Remove_transitions :
-          ( External_transition.Validated.Stable.V1.t
-          , State_hash.Stable.V1.t )
-          With_hash.Stable.V1.t
-          list
+          State_hash.t list
           -> Consensus.Data.Consensus_state.Value.Stable.V1.t list t
-      | Update_root :
-          Key.Update_root.t
-          -> ( State_hash.Stable.V1.t
-             * Staged_ledger.Scan_state.Stable.V1.t
-             * Pending_coinbase.t )
-             t
+      | Update_root : Key.Update_root.t -> State_hash.Stable.V1.t Root.t t
 
     type 'a diff_mutant = 'a t
 
@@ -138,7 +162,7 @@ end) :
 
     let update_root_to_yojson (state_hash, scan_state, pending_coinbase) =
       (* We need some representation of scan_state and pending_coinbase,
-        so the serialized version of these states would be fine *)
+         so the serialized version of these states would be fine *)
       `Assoc
         [ ("state_hash", State_hash.to_yojson state_hash)
         ; ( "scan_state"
@@ -164,8 +188,10 @@ end) :
             json_consensus_state parent_consensus_state
         | Remove_transitions _, removed_consensus_state ->
             `List (List.map removed_consensus_state ~f:json_consensus_state)
-        | Update_root _, (old_state_hash, old_scan_state, old_pending_coinbase)
-          ->
+        | ( Update_root _
+          , { Root.Poly.root= old_state_hash
+            ; scan_state= old_scan_state
+            ; pending_coinbase= old_pending_coinbase } ) ->
             update_root_to_yojson
               (old_state_hash, old_scan_state, old_pending_coinbase)
       in
@@ -174,15 +200,14 @@ end) :
     let key_to_yojson (type a) (key : a t) =
       let json_key =
         match key with
-        | New_frontier (With_hash.{hash; _}, _, _) ->
+        | New_frontier {Root.Poly.root= With_hash.{hash; _}; _} ->
             State_hash.to_yojson hash
         | Add_transition With_hash.{hash; _} ->
             State_hash.to_yojson hash
         | Remove_transitions removed_transitions ->
-            `List
-              (List.map removed_transitions ~f:(fun With_hash.{hash; _} ->
-                   State_hash.to_yojson hash ))
-        | Update_root (state_hash, scan_state, pending_coinbase) ->
+            `List (List.map ~f:State_hash.to_yojson removed_transitions)
+        | Update_root {Root.Poly.root= state_hash; scan_state; pending_coinbase}
+          ->
             update_root_to_yojson (state_hash, scan_state, pending_coinbase)
       in
       `List [`String (name key); json_key]
@@ -203,16 +228,21 @@ end) :
 
     let hash_diff_contents (type mutant) (t : mutant t) acc =
       match t with
-      | New_frontier ({With_hash.hash; _}, scan_state, pending_coinbase) ->
+      | New_frontier
+          {Root.Poly.root= {With_hash.hash; _}; scan_state; pending_coinbase}
+        ->
           hash_root_data (hash, scan_state, pending_coinbase) acc
       | Add_transition {With_hash.hash; _} ->
           Hash.merge acc (State_hash.to_bytes hash)
       | Remove_transitions removed_transitions ->
           List.fold removed_transitions ~init:acc
-            ~f:(fun acc_hash With_hash.{hash= state_hash; _} ->
-              Hash.merge acc_hash (State_hash.to_bytes state_hash) )
-      | Update_root (new_hash, new_scan_state, pending_coinbase) ->
-          hash_root_data (new_hash, new_scan_state, pending_coinbase) acc
+            ~f:(fun acc_hash transition ->
+              Hash.merge acc_hash (State_hash.to_bytes transition) )
+      | Update_root
+          { Root.Poly.root= new_hash
+          ; scan_state= new_scan_state
+          ; pending_coinbase= new_pending_coinbase } ->
+          hash_root_data (new_hash, new_scan_state, new_pending_coinbase) acc
 
     let hash_mutant (type mutant) (t : mutant t) (mutant : mutant) acc =
       match (t, mutant) with
@@ -224,7 +254,10 @@ end) :
           List.fold removed_transitions ~init:acc
             ~f:(fun acc_hash removed_transition ->
               merge (serialize_consensus_state removed_transition) acc_hash )
-      | Update_root _, (old_root, old_scan_state, old_pending_coinbase) ->
+      | ( Update_root _
+        , { Root.Poly.root= old_root
+          ; scan_state= old_scan_state
+          ; pending_coinbase= old_pending_coinbase } ) ->
           hash_root_data (old_root, old_scan_state, old_pending_coinbase) acc
 
     let hash (type mutant) acc_hash (t : mutant t) (mutant : mutant) =
@@ -239,11 +272,7 @@ end) :
                   type t =
                     [ `New_frontier of Key.New_frontier.t
                     | `Add_transition of Key.Add_transition.t
-                    | `Remove_transitions of
-                      ( External_transition.Validated.Stable.V1.t
-                      , State_hash.Stable.V1.t )
-                      With_hash.Stable.V1.t
-                      list
+                    | `Remove_transitions of State_hash.Stable.V1.t list
                     | `Update_root of Key.Update_root.t ]
                   [@@deriving bin_io]
                 end)
@@ -270,6 +299,9 @@ end) :
                     | E (Update_root data) ->
                         `Update_root data
                 end)
+
+      type with_value =
+        | With_value : 'output diff_mutant * 'output -> with_value
     end
   end
 
@@ -346,7 +378,7 @@ end) :
 
     type input = unit
 
-    type view = Mutant.E.t list
+    type view = Mutant.E.with_value list
 
     let create () = ()
 
@@ -359,44 +391,56 @@ end) :
       breadcrumb |> Breadcrumb.staged_ledger
       |> Staged_ledger.pending_coinbase_collection
 
-    let handle_diff () (diff : diff) : view option =
-      let open Mutant.E in
-      Option.return
-      @@
-      match diff with
+    let consensus_state breadcrumb =
+      breadcrumb |> Breadcrumb.transition_with_hash |> With_hash.data
+      |> External_transition.Validated.protocol_state
+      |> Coda_state.Protocol_state.consensus_state
+
+    let get_root_data root =
+      { Mutant.Root.Poly.root= Breadcrumb.state_hash root
+      ; scan_state= scan_state root
+      ; pending_coinbase= pending_coinbase root }
+
+    let compute_ground_truth_mutants = function
       | New_frontier breadcrumb ->
-          [ E
-              (New_frontier
-                 ( Breadcrumb.transition_with_hash breadcrumb
-                 , scan_state breadcrumb
-                 , pending_coinbase breadcrumb )) ]
-      | New_breadcrumb breadcrumb ->
-          [E (Add_transition (Breadcrumb.transition_with_hash breadcrumb))]
-      | New_best_tip {garbage; added_to_best_tip_path; new_root; old_root; _}
-        ->
+          [ Mutant.E.With_value
+              ( New_frontier
+                  { Mutant.Root.Poly.root=
+                      Breadcrumb.transition_with_hash breadcrumb
+                  ; scan_state= scan_state breadcrumb
+                  ; pending_coinbase= pending_coinbase breadcrumb }
+              , () ) ]
+      | New_breadcrumb {previous; added} ->
+          [ With_value
+              ( Add_transition (Breadcrumb.transition_with_hash added)
+              , consensus_state previous ) ]
+      | New_best_tip
+          {garbage; added_to_best_tip_path; new_root; old_root; parent; _} ->
           let added_transition =
-            E
-              (Add_transition
-                 ( Non_empty_list.last added_to_best_tip_path
-                 |> Breadcrumb.transition_with_hash ))
+            Mutant.E.With_value
+              ( Add_transition
+                  ( Breadcrumb.transition_with_hash
+                  @@ Non_empty_list.last added_to_best_tip_path )
+              , consensus_state parent )
           in
           let remove_transition =
-            E
-              (Remove_transitions
-                 (List.map garbage ~f:Breadcrumb.transition_with_hash))
+            Mutant.E.With_value
+              ( Remove_transitions (List.map garbage ~f:Breadcrumb.state_hash)
+              , List.map garbage ~f:consensus_state )
           in
           if
             State_hash.equal
               (Breadcrumb.state_hash old_root)
               (Breadcrumb.state_hash new_root)
-          then [added_transition; remove_transition]
+          then [added_transition]
           else
-            [ added_transition
-            ; E
-                (Update_root
-                   ( Breadcrumb.state_hash new_root
-                   , scan_state new_root
-                   , pending_coinbase new_root ))
-            ; remove_transition ]
+            let update_root_diff =
+              Mutant.E.With_value
+                (Update_root (get_root_data new_root), get_root_data old_root)
+            in
+            [added_transition; update_root_diff; remove_transition]
+
+    let handle_diff () (diff : diff) =
+      Option.return @@ compute_ground_truth_mutants diff
   end
 end

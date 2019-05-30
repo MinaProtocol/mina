@@ -39,7 +39,7 @@ module type Transition_frontier_diff_intf = sig
   (* TODO: Remove New_frontier. 
     Each transition frontier extension should be initialized by the input, the root breadcrumb *)
   type t =
-    | New_breadcrumb of breadcrumb
+    | New_breadcrumb of {previous: breadcrumb; added: breadcrumb}
         (** Triggered when a new breadcrumb is added without changing the root or best_tip *)
     | New_frontier of breadcrumb
         (** First breadcrumb to become the root of the frontier  *)
@@ -50,6 +50,7 @@ module type Transition_frontier_diff_intf = sig
               (** Same as old root if the root doesn't change *)
         ; added_to_best_tip_path: breadcrumb Non_empty_list.t
               (* oldest first *)
+        ; parent: breadcrumb
         ; new_best_tip_length: int
         ; removed_from_best_tip_path: breadcrumb list (* also oldest first *)
         ; garbage: breadcrumb list }
@@ -69,6 +70,19 @@ module type Transition_frontier_diff_intf = sig
   end
 
   module Mutant : sig
+    module Root : sig
+      (** Data representing the root of a transition frontier. 'root can either be an external_transition with hash or a state_hash  *)
+      module Poly : sig
+        type ('root, 'scan_state, 'pending_coinbase) t =
+          { root: 'root
+          ; scan_state: 'scan_state
+          ; pending_coinbase: 'pending_coinbase }
+      end
+
+      type 'root t =
+        ('root, transaction_snark_scan_state, Pending_coinbase.t) Poly.t
+    end
+
     (** Diff.Mutant is a GADT that represents operations that affect the changes
         on the transition_frontier. The left-hand side of the GADT represents
         change that will occur to the transition_frontier. The right-hand side of
@@ -78,39 +92,34 @@ module type Transition_frontier_diff_intf = sig
         changes a `transition_frontier` and their corresponding side-effects.*)
     type _ t =
       | New_frontier :
-          ( (external_transition_validated, State_hash.t) With_hash.t
-          * transaction_snark_scan_state
-          * Pending_coinbase.t )
+          (external_transition_validated, State_hash.t) With_hash.t Root.t
           -> unit t
           (** New_frontier: When creating a new transition frontier, the
-            transition_frontier will begin with a single breadcrumb that can be
-            constructed mainly with a root external transition and a
-            scan_state. There are no components in the frontier that affects
-            the frontier. Therefore, the type of this diff is tagged as a unit. *)
+          transition_frontier will begin with a single breadcrumb that can be
+          constructed mainly with a root external transition and a
+          scan_state. There are no components in the frontier that affects
+          the frontier. Therefore, the type of this diff is tagged as a unit. *)
       | Add_transition :
           (external_transition_validated, State_hash.t) With_hash.t
           -> Consensus.Data.Consensus_state.Value.t t
           (** Add_transition: Add_transition would simply add a transition to the
-            frontier and is therefore the parameter for Add_transition. After
-            adding the transition, we add the transition to its parent list of
-            successors. To certify that we added it to the right parent. The
-            consensus_state of the parent can accomplish this. *)
+          frontier and is therefore the parameter for Add_transition. After
+          adding the transition, we add the transition to its parent list of
+          successors. To certify that we added it to the right parent. The
+          consensus_state of the parent can accomplish this. *)
       | Remove_transitions :
-          (external_transition_validated, State_hash.t) With_hash.t list
+          State_hash.t list
           -> Consensus.Data.Consensus_state.Value.t list t
           (** Remove_transitions: Remove_transitions is an operation that removes
-            a set of transitions. We need to make sure that we are deleting the
-            right transition and we use their consensus_state to accomplish
-            this. Therefore the type of Remove_transitions is indexed by a list
-            of consensus_state. *)
-      | Update_root :
-          (State_hash.t * transaction_snark_scan_state * Pending_coinbase.t)
-          -> (State_hash.t * transaction_snark_scan_state * Pending_coinbase.t)
-             t
+          a set of transitions. We need to make sure that we are deleting the
+          right transition and we use their consensus_state to accomplish
+          this. Therefore the type of Remove_transitions is indexed by a list
+          of consensus_state. *)
+      | Update_root : State_hash.t Root.t -> State_hash.t Root.t t
           (** Update_root: Update root is an indication that the root state_hash
-            and the root scan_state state. To verify that we update the right
-            root, we can indicate the old root is being updated. Therefore, the
-            type of Update_root is indexed by a state_hash and scan_state. *)
+          and the root scan_state state. To verify that we update the right
+          root, we can indicate the old root is being updated. Therefore, the
+          type of Update_root is indexed by a state_hash and scan_state. *)
 
     type 'a diff_mutant = 'a t
 
@@ -124,6 +133,9 @@ module type Transition_frontier_diff_intf = sig
       type t = E : 'output diff_mutant -> t
 
       include Binable.S with type t := t
+
+      type with_value =
+        | With_value : 'output diff_mutant * 'output -> with_value
     end
   end
 
@@ -154,7 +166,7 @@ module type Transition_frontier_diff_intf = sig
   module Persistence_diff :
     Transition_frontier_extension_intf
     with type transition_frontier_diff := t
-     and type view = Mutant.E.t list
+     and type view = Mutant.E.with_value list
      and type input = unit
 end
 
