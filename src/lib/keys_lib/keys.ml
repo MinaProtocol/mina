@@ -151,7 +151,7 @@ let create () : (module S) Async.Deferred.t =
             with_state
               ~and_then:(fun s -> As_prover.set_state (back s))
               As_prover.(map get_state ~f:there)
-              (main x)
+              (main (Logger.create ()) x)
         end
 
         module Wrap = struct

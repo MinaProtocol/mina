@@ -143,7 +143,8 @@ struct
 
     let exists' typ ~f = exists typ ~compute:As_prover.(map get_state ~f)
 
-    let%snarkydef main (top_hash : Digest.Tick.Packed.var) =
+    let%snarkydef main (logger : Logger.t) (top_hash : Digest.Tick.Packed.var)
+        =
       let%bind prev_state = exists' State.typ ~f:Prover_state.prev_state
       and update = exists' Update.typ ~f:Prover_state.update in
       let%bind prev_state_hash = State.Checked.hash prev_state in
@@ -176,18 +177,27 @@ struct
                   let%bind top_hash = read Field.typ top_hash in
                   let updated = State.sexp_of_value in_snark_next_state in
                   let original = State.sexp_of_value expected_next_state in
-                  if not (Field.equal next_top_hash top_hash) then
+                  ( if not (Field.equal next_top_hash top_hash) then
                     let diff =
                       Sexp_diff_kernel.Algo.diff ~original ~updated ()
                     in
-                    failwithf
+                    Logger.fatal logger
                       "Out-of-snark (left) and in-snark (right) disagree on \
-                       what the next top_hash should be. State sexp diff \
-                       (some differences are inessential): %s"
-                      (Sexp_diff_kernel.Display.display_as_plain_string diff)
-                      ()
-                  else return () )
+                       what the next top_hash should be."
+                      ~metadata:
+                        [ ( "state_sexp_diff"
+                          , `String
+                              (Sexp_diff_kernel.Display.display_as_plain_string
+                                 diff) ) ]
+                      ~location:__LOC__ ~module_:__MODULE__ ) ;
+                  return () )
               |> ignore ;
+              if Option.is_none (Prover_state.expected_next_state prover_state)
+              then
+                Logger.error logger
+                  "expected_next_state is empty; this should only be true \
+                   during precomputed_values"
+                  ~location:__LOC__ ~module_:__MODULE__ ;
               ()))
       in
       let%bind () =
