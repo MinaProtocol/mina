@@ -8,118 +8,20 @@ open O1trace
 module Time = Coda_base.Block_time
 
 module type Inputs_intf = sig
-  open Protocols.Coda_pow
-
-  module Pending_coinbase_witness :
-    Pending_coinbase_witness_intf
-    with type pending_coinbases := Pending_coinbase.t
-
-  module Pending_coinbase_stack_state :
-    Pending_coinbase_stack_state_intf
-    with type pending_coinbase_stack := Pending_coinbase.Stack.t
-
-  module Ledger_proof_statement :
-    Ledger_proof_statement_intf
-    with type ledger_hash := Frozen_ledger_hash.t
-     and type pending_coinbase_stack_state := Pending_coinbase_stack_state.t
-
-  module Ledger_proof :
-    Ledger_proof_intf
-    with type ledger_hash := Frozen_ledger_hash.t
-     and type statement := Ledger_proof_statement.t
-     and type proof := Proof.t
-     and type sok_digest := Sok_message.Digest.t
-
-  module Transaction_snark_work :
-    Transaction_snark_work_intf
-    with type proof := Ledger_proof.t
-     and type statement := Ledger_proof_statement.t
-     and type public_key := Public_key.Compressed.t
-
-  module Staged_ledger_diff :
-    Staged_ledger_diff_intf
-    with type user_command := User_command.t
-     and type user_command_with_valid_signature :=
-                User_command.With_valid_signature.t
-     and type staged_ledger_hash := Staged_ledger_hash.t
-     and type public_key := Public_key.Compressed.t
-     and type completed_work := Transaction_snark_work.t
-     and type completed_work_checked := Transaction_snark_work.Checked.t
-     and type fee_transfer_single := Fee_transfer.Single.t
-
-  module Staged_ledger :
-    Staged_ledger_intf
-    with type diff := Staged_ledger_diff.t
-     and type valid_diff :=
-                Staged_ledger_diff.With_valid_signatures_and_proofs.t
-     and type staged_ledger_hash := Staged_ledger_hash.t
-     and type staged_ledger_aux_hash := Staged_ledger_hash.Aux_hash.t
-     and type ledger_hash := Ledger_hash.t
-     and type frozen_ledger_hash := Frozen_ledger_hash.t
-     and type public_key := Public_key.Compressed.t
-     and type ledger := Ledger.t
-     and type ledger_proof := Ledger_proof.t
-     and type user_command_with_valid_signature :=
-                User_command.With_valid_signature.t
-     and type statement := Transaction_snark_work.Statement.t
-     and type completed_work_checked := Transaction_snark_work.Checked.t
-     and type sparse_ledger := Sparse_ledger.t
-     and type ledger_proof_statement := Ledger_proof_statement.t
-     and type ledger_proof_statement_set := Ledger_proof_statement.Set.t
-     and type transaction := Transaction.t
-     and type user_command := User_command.t
-     and type transaction_witness := Transaction_witness.t
-     and type pending_coinbase_collection := Pending_coinbase.t
-     and type verifier := Verifier.t
-
-  module External_transition :
-    External_transition_intf
-    with type state_hash := State_hash.t
-     and type time := Time.t
-     and type protocol_state := Protocol_state.Value.t
-     and type staged_ledger_diff := Staged_ledger_diff.t
-     and type proof := Proof.t
-     and type consensus_state := Consensus.Data.Consensus_state.Value.t
-     and type user_command := User_command.t
-     and type compressed_public_key := Public_key.Compressed.t
-     and type verifier := Verifier.t
-     and type staged_ledger_hash := Staged_ledger_hash.t
-     and type ledger_proof := Ledger_proof.t
-     and type transaction := Transaction.t
-
-  module Internal_transition :
-    Internal_transition_intf
-    with type snark_transition := Snark_transition.Value.t
-     and type prover_state := Consensus.Data.Prover_state.t
-     and type staged_ledger_diff := Staged_ledger_diff.t
-
-  module Ledger_db : sig
-    type t
-  end
-
-  module Masked_ledger : sig
-    type t
-  end
+  include Coda_intf.Inputs_intf
 
   module Transition_frontier :
-    Transition_frontier_intf
-    with type state_hash := State_hash.t
-     and type consensus_state := Consensus.Data.Consensus_state.Value.t
-     and type mostly_validated_external_transition :=
+    Coda_intf.Transition_frontier_intf
+    with type mostly_validated_external_transition :=
                 ( [`Time_received] * Truth.true_t
                 , [`Proof] * Truth.true_t
                 , [`Frontier_dependencies] * Truth.true_t
                 , [`Staged_ledger_diff] * Truth.false_t )
                 External_transition.Validation.with_transition
      and type external_transition_validated := External_transition.Validated.t
-     and type pending_coinbase := Pending_coinbase.t
-     and type ledger_database := Ledger_db.t
      and type staged_ledger := Staged_ledger.t
      and type staged_ledger_diff := Staged_ledger_diff.t
      and type transaction_snark_scan_state := Staged_ledger.Scan_state.t
-     and type masked_ledger := Masked_ledger.t
-     and type consensus_local_state := Consensus.Data.Local_state.t
-     and type user_command := User_command.t
      and type verifier := Verifier.t
 
   module Transaction_pool :
@@ -210,22 +112,13 @@ end
 module Make (Inputs : Inputs_intf) :
   Coda_lib.Proposer_intf
   with type breadcrumb := Inputs.Transition_frontier.Breadcrumb.t
-   and type state_hash := State_hash.t
-   and type ledger_hash := Ledger_hash.t
    and type staged_ledger := Inputs.Staged_ledger.t
-   and type transaction := User_command.With_valid_signature.t
-   and type protocol_state := Protocol_state.Value.t
-   and type protocol_state_proof := Proof.t
-   and type consensus_local_state := Consensus.Data.Local_state.t
    and type completed_work_statement :=
               Inputs.Transaction_snark_work.Statement.t
    and type completed_work_checked := Inputs.Transaction_snark_work.Checked.t
-   and type time_controller := Time.Controller.t
-   and type keypair := Keypair.t
    and type transition_frontier := Inputs.Transition_frontier.t
    and type transaction_pool := Inputs.Transaction_pool.t
-   and type time := Time.t
-   and type verifier := Verifier.t = struct
+   and type verifier := Inputs.Verifier.t = struct
   open Inputs
   module Transition_frontier_validation =
     External_transition.Transition_frontier_validation (Transition_frontier)
