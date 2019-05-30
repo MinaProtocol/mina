@@ -77,10 +77,10 @@ module Base : sig
   module Job : sig
     module Stable : sig
       module V1 : sig
-        type 'd t =
+        type 'base t =
           | Empty
           | Full of
-              { job: 'd
+              { job: 'base
               ; seq_no: Sequence_number.Stable.V1.t
               ; status: Job_status.Stable.V1.t }
         [@@deriving sexp, bin_io, version]
@@ -89,10 +89,10 @@ module Base : sig
       module Latest = V1
     end
 
-    type 'd t = 'd Stable.Latest.t =
+    type 'base t = 'base Stable.Latest.t =
       | Empty
       | Full of
-          { job: 'd
+          { job: 'base
           ; seq_no: Sequence_number.Stable.V1.t
           ; status: Job_status.Stable.V1.t }
     [@@deriving sexp]
@@ -100,14 +100,14 @@ module Base : sig
 
   module Stable : sig
     module V1 : sig
-      type 'd t = Weight.Stable.V1.t * 'd Job.Stable.V1.t
+      type 'base t = Weight.Stable.V1.t * 'base Job.Stable.V1.t
       [@@deriving sexp, bin_io, version]
     end
 
     module Latest = V1
   end
 
-  type 'd t = 'd Stable.Latest.t [@@deriving sexp]
+  type 'base t = 'base Stable.Latest.t [@@deriving sexp]
 end
 
 (* Merge Job: Merging two proofs*)
@@ -115,12 +115,12 @@ module Merge : sig
   module Job : sig
     module Stable : sig
       module V1 : sig
-        type 'a t =
+        type 'merge t =
           | Empty
-          | Part of 'a (*Only the left component of the job is available yet since we always complete the jobs from left to right*)
+          | Part of 'merge (*Only the left component of the job is available yet since we always complete the jobs from left to right*)
           | Full of
-              { left: 'a
-              ; right: 'a
+              { left: 'merge
+              ; right: 'merge
               ; seq_no: Sequence_number.Stable.V1.t
                     (*Update number, for debugging*)
               ; status: Job_status.Stable.V1.t }
@@ -130,12 +130,12 @@ module Merge : sig
       module Latest = V1
     end
 
-    type 'a t = 'a Stable.Latest.t =
+    type 'merge t = 'merge Stable.Latest.t =
       | Empty
-      | Part of 'a
+      | Part of 'merge
       | Full of
-          { left: 'a
-          ; right: 'a
+          { left: 'merge
+          ; right: 'merge
           ; seq_no: Sequence_number.Stable.V1.t
           ; status: Job_status.Stable.V1.t }
     [@@deriving sexp]
@@ -143,15 +143,15 @@ module Merge : sig
 
   module Stable : sig
     module V1 : sig
-      type 'a t =
-        (Weight.Stable.V1.t * Weight.Stable.V1.t) * 'a Job.Stable.V1.t
+      type 'merge t =
+        (Weight.Stable.V1.t * Weight.Stable.V1.t) * 'merge Job.Stable.V1.t
       [@@deriving sexp, bin_io, version]
     end
 
     module Latest = V1
   end
 
-  type 'a t = 'a Stable.Latest.t [@@deriving sexp]
+  type 'merge t = 'merge Stable.Latest.t [@@deriving sexp]
 end
 
 (** An available job is an incomplete job that has enough information for one
@@ -159,13 +159,16 @@ end
 module Available_job : sig
   module Stable : sig
     module V1 : sig
-      type ('a, 'd) t = Base of 'd | Merge of 'a * 'a [@@deriving sexp]
+      type ('merge, 'base) t = Base of 'base | Merge of 'merge * 'merge
+      [@@deriving sexp]
     end
 
     module Latest = V1
   end
 
-  type ('a, 'd) t = ('a, 'd) Stable.Latest.t = Base of 'd | Merge of 'a * 'a
+  type ('merge, 'base) t = ('merge, 'base) Stable.Latest.t =
+    | Base of 'base
+    | Merge of 'merge * 'merge
   [@@deriving sexp]
 end
 
@@ -218,11 +221,12 @@ end
 
 module State : sig
   (* bin_io, version omitted intentionally *)
-  type ('a, 'd) t [@@deriving sexp]
+  type ('merge, 'base) t [@@deriving sexp]
 
   module Stable : sig
     module V1 : sig
-      type nonrec ('a, 'd) t = ('a, 'd) t [@@deriving sexp, bin_io, version]
+      type nonrec ('merge, 'base) t = ('merge, 'base) t
+      [@@deriving sexp, bin_io, version]
     end
 
     module Latest = V1
@@ -232,56 +236,59 @@ module State : sig
     type t = Digestif.SHA256.t
   end
 
-  val hash : ('a, 'd) t -> ('a -> string) -> ('d -> string) -> Hash.t
+  val hash :
+    ('merge, 'base) t -> ('merge -> string) -> ('base -> string) -> Hash.t
 
   open Container
 
   module Make_foldable (M : Monad.S) : sig
     (** Effectfully fold chronologically. See {!fold_chronological} *)
     val fold_chronological_until :
-         ('a, 'd) t
-      -> init:'c
-      -> fa:('c -> 'a Merge.t -> ('c, 'stop) Continue_or_stop.t M.t)
-      -> fd:('c -> 'd Base.t -> ('c, 'stop) Continue_or_stop.t M.t)
-      -> finish:('c -> 'stop M.t)
-      -> 'stop M.t
+         ('merge, 'base) t
+      -> init:'accum
+      -> f_merge:(   'accum
+                  -> 'merge Merge.t
+                  -> ('accum, 'final) Continue_or_stop.t M.t)
+      -> f_base:(   'accum
+                 -> 'base Base.t
+                 -> ('accum, 'final) Continue_or_stop.t M.t)
+      -> finish:('accum -> 'final M.t)
+      -> 'final M.t
   end
 end
 
 (** The initial state of the parallel scan at some parallelism *)
-val empty : max_base_jobs:int -> delay:int -> ('a, 'd) State.t
-
-(** Get the next k available jobs *)
-val next_k_jobs :
-  state:('a, 'd) State.t -> k:int -> ('a, 'd) Available_job.t list Or_error.t
+val empty : max_base_jobs:int -> delay:int -> ('merge, 'base) State.t
 
 (** Get all the available jobs *)
-val all_jobs : ('a, 'd) State.t -> ('a, 'd) Available_job.t list list
+val all_jobs :
+  ('merge, 'base) State.t -> ('merge, 'base) Available_job.t list list
 
 (** Get all the available jobs to be done in the next update *)
 val jobs_for_next_update :
-  ('a, 'd) State.t -> ('a, 'd) Available_job.t list list
+  ('merge, 'base) State.t -> ('merge, 'base) Available_job.t list list
 
 (** Compute how much data ['d] elements we are allowed to add to the state *)
-val free_space : ('a, 'd) State.t -> int
+val free_space : ('merge, 'base) State.t -> int
 
 (** Complete jobs needed at this state -- optionally emits the ['a] at the top
  * of the tree along with the ['d list] responsible for emitting the ['a]. *)
 val update :
-     data:'d list
-  -> completed_jobs:'a list
-  -> ('a, 'd) State.t
-  -> (('a * 'd list) option * ('a, 'd) State.t) Or_error.t
+     data:'base list
+  -> completed_jobs:'merge list
+  -> ('merge, 'base) State.t
+  -> (('merge * 'base list) option * ('merge, 'base) State.t) Or_error.t
 
 (** The last ['a] we emitted from the top of the tree and the ['d list]
  * responsible for that ['a]. *)
-val last_emitted_value : ('a, 'd) State.t -> ('a * 'd list) option
+val last_emitted_value :
+  ('merge, 'base) State.t -> ('merge * 'base list) option
 
 (** If there aren't enough slots for [max_slots] many ['d], then before
  * continuing onto the next virtual tree, split max_slots = (x,y) such that
  * x = number of slots till the end of the current tree and y = max_slots - x
  * (starts from the begining of the next tree)  *)
-val partition_if_overflowing : ('a, 'd) State.t -> Space_partition.t
+val partition_if_overflowing : ('merge, 'base) State.t -> Space_partition.t
 
 (** Do all the invariants of our parallel scan state hold; namely:
   * 1. The {!free_space} is equal to the number of empty leaves
@@ -292,28 +299,26 @@ val partition_if_overflowing : ('a, 'd) State.t -> Space_partition.t
   * 6. The tree is non-empty
   * 7. There exists non-zero free space (we're not deadlocked)
   *)
-val is_valid : ('a, 'd) State.t -> bool
+val is_valid : ('merge, 'base) State.t -> bool
 
-(** The base jobs ['d] that are pending and would be returned by available [Base]
- * jobs *)
-
-(*val current_data : ('a, 'd) State.t -> 'd list*)
-
-val current_job_sequence_number : ('a, 'd) State.t -> int
+val current_job_sequence_number : ('merge, 'base) State.t -> int
 
 (*Get the current job sequence number *)
 
 val view_jobs_with_position :
-  ('a, 'd) State.t -> ('a -> 'c) -> ('d -> 'c) -> 'c Job_view.t list
+     ('merge, 'base) State.t
+  -> ('merge -> 'c)
+  -> ('base -> 'c)
+  -> 'c Job_view.t list
 
 (** All the base jobs that are part of the latest tree being filled 
  * i.e., does not include base jobs that are part of previous trees not 
  * promoted to the merge jobs yet*)
-val base_jobs_on_latest_tree : ('a, 'd) State.t -> 'd list
+val base_jobs_on_latest_tree : ('merge, 'base) State.t -> 'base list
 
 (*returns true only if the position of the next 'd that could be enqueued is  
 of the leftmost leaf of the tree*)
-val next_on_new_tree : ('a, 'd) State.t -> bool
+val next_on_new_tree : ('merge, 'base) State.t -> bool
 
 (*All the 'ds (in the order in which they were added) for which scan results are yet to computed*)
-val pending_data : ('a, 'd) State.t -> 'd list
+val pending_data : ('merge, 'base) State.t -> 'base list
