@@ -1,19 +1,44 @@
 open Core
-open Protocols.Coda_pow
 
-module Make (Inputs : Inputs.S) : sig
+module Make (Inputs : Coda_intf.Tmp_test_stub_hack.For_staged_ledger_intf) : sig
   open Inputs
 
   include
-    Pre_diff_info_intf
+    Coda_intf.Staged_ledger_pre_diff_info_generalized_intf
     with type user_command := User_command.t
      and type transaction := Transaction.t
-     and type completed_work := Transaction_snark_work.t
+     and type transaction_snark_work := Transaction_snark_work.t
      and type staged_ledger_diff := Staged_ledger_diff.t
      and type valid_staged_ledger_diff :=
                 Staged_ledger_diff.With_valid_signatures_and_proofs.t
 end = struct
   open Inputs
+
+  module Error = struct
+    type t =
+      | Bad_signature of User_command.t
+      | Coinbase_error of string
+      | Insufficient_fee of Currency.Fee.t * Currency.Fee.t
+      | Unexpected of Error.t
+    [@@deriving sexp]
+
+    let to_string = function
+      | Bad_signature t ->
+          Format.asprintf
+            !"Bad signature of the user command: %{sexp: Sexp.t} \n"
+            (User_command.sexp_of_t t)
+      | Coinbase_error err ->
+          Format.asprintf !"Coinbase error: %s \n" err
+      | Insufficient_fee (f1, f2) ->
+          Format.asprintf
+            !"Transaction fee %{sexp: Currency.Fee.t} does not suffice proof \
+              fee %{sexp: Currency.Fee.t} \n"
+            f1 f2
+      | Unexpected e ->
+          Error.to_string_hum e
+
+    let to_error = Fn.compose Error.of_string to_string
+  end
 
   type t =
     { transactions: Transaction.t list
@@ -42,18 +67,18 @@ end = struct
   *)
   let create_coinbase coinbase_parts (proposer : Compressed_public_key.t) =
     let open Result.Let_syntax in
-    let coinbase = Protocols.Coda_praos.coinbase_amount in
+    let coinbase = Coda_compile_config.coinbase in
     let coinbase_or_error = function
       | Ok x ->
           Ok x
       | Error e ->
-          Error (Pre_diff_error.Coinbase_error (Core.Error.to_string_hum e))
+          Error (Error.Coinbase_error (Core.Error.to_string_hum e))
     in
     let overflow_err a1 a2 =
       Option.value_map
         ~default:
           (Error
-             (Pre_diff_error.Coinbase_error
+             (Error.Coinbase_error
                 (sprintf
                    !"overflow when splitting coinbase: Minuend: %{sexp: \
                      Currency.Amount.t} Subtrahend: %{sexp: \
@@ -96,15 +121,15 @@ end = struct
   let sum_fees xs ~f =
     with_return (fun {return} ->
         Ok
-          (List.fold ~init:Fee.Unsigned.zero xs ~f:(fun acc x ->
-               match Fee.Unsigned.add acc (f x) with
+          (List.fold ~init:Currency.Fee.zero xs ~f:(fun acc x ->
+               match Currency.Fee.add acc (f x) with
                | None ->
                    return (Or_error.error_string "Fee overflow")
                | Some res ->
                    res )) )
 
   let to_staged_ledger_or_error =
-    Result.map_error ~f:(fun error -> Pre_diff_error.Unexpected error)
+    Result.map_error ~f:(fun error -> Error.Unexpected error)
 
   let fee_remainder (user_commands : User_command.With_valid_signature.t list)
       completed_works coinbase_fee =
@@ -123,24 +148,23 @@ end = struct
         (Currency.Fee.sub work_fee coinbase_fee)
     in
     Option.value_map
-      ~default:
-        (Error (Pre_diff_error.Insufficient_fee (budget, total_work_fee)))
+      ~default:(Error (Error.Insufficient_fee (budget, total_work_fee)))
       ~f:(fun x -> Ok x)
-      (Fee.Unsigned.sub budget total_work_fee)
+      (Currency.Fee.sub budget total_work_fee)
 
   let create_fee_transfers completed_works delta public_key coinbase_fts =
     let open Result.Let_syntax in
     let singles =
-      (if Fee.Unsigned.(equal zero delta) then [] else [(public_key, delta)])
+      (if Currency.Fee.(equal zero delta) then [] else [(public_key, delta)])
       @ List.filter_map completed_works
           ~f:(fun {Transaction_snark_work.fee; prover; _} ->
-            if Fee.Unsigned.equal fee Fee.Unsigned.zero then None
+            if Currency.Fee.equal fee Currency.Fee.zero then None
             else Some (prover, fee) )
     in
     let%bind singles_map =
       Or_error.try_with (fun () ->
           Compressed_public_key.Map.of_alist_reduce singles ~f:(fun f1 f2 ->
-              Option.value_exn (Fee.Unsigned.add f1 f2) ) )
+              Option.value_exn (Currency.Fee.add f1 f2) ) )
       |> to_staged_ledger_or_error
     in
     (* deduct the coinbase work fee from the singles_map. It is already part of the coinbase *)
@@ -175,7 +199,7 @@ end = struct
               | Some t ->
                   Continue (t :: acc)
               | None ->
-                  Stop (Error (Pre_diff_error.Bad_signature t)) )
+                  Stop (Error (Error.Bad_signature t)) )
             ~finish:(fun acc -> Ok acc)
         in
         List.rev user_commands'
@@ -257,12 +281,8 @@ end = struct
     , List.map (p1.coinbases @ p2.coinbases) ~f:(fun Coinbase.{amount; _} ->
           amount ) )
 
-  let ok_exn' (t : ('a, User_command.t Pre_diff_error.t) Result.t) =
-    match t with
-    | Ok x ->
-        x
-    | Error e ->
-        Core.Error.raise (Pre_diff_error.to_error User_command.sexp_of_t e)
+  let ok_exn' (t : ('a, Error.t) Result.t) =
+    match t with Ok x -> x | Error e -> Core.Error.raise (Error.to_error e)
 
   let get_individual_diff_unchecked coinbase_parts proposer user_commands
       completed_works =

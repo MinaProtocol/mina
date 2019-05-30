@@ -212,8 +212,7 @@ let add ~tracked_participants {database; pagination; logger}
             $state_hash: %s"
           ~module_:__MODULE__ ~location:__LOC__
           ( Error.to_string_hum
-          @@ Protocols.Coda_pow.Pre_diff_error.to_error User_command.sexp_of_t
-               error )
+          @@ Staged_ledger.Pre_diff_info.Error.to_error error )
           ~metadata:[("state_hash", State_hash.to_yojson state_hash)] )
 
 let get_total_values {pagination; _} = Pagination.get_total_values pagination

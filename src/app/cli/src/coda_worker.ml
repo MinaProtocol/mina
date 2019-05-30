@@ -1,6 +1,7 @@
 open Core
 open Async
 open Coda_base
+open Coda_state
 open Signature_lib
 open Coda_inputs
 open Signature_lib
@@ -18,7 +19,7 @@ module Input = struct
     ; env: (string * string) list
     ; proposer: int option
     ; snark_worker_config: Snark_worker_config.t option
-    ; work_selection: Protocols.Coda_pow.Work_selection.t
+    ; work_selection: Cli_lib.Arg_type.work_selection
     ; conf_dir: string
     ; trace_dir: string option
     ; program_dir: string
@@ -85,8 +86,7 @@ module T = struct
     ; root_diff:
         ( 'worker
         , unit
-        , User_command.t Protocols.Coda_transition_frontier.Root_diff_view.t
-          Pipe.Reader.t )
+        , Transition_frontier.Diff.Root_diff.view Pipe.Reader.t )
         Rpc_parallel.Function.t
     ; prove_receipt:
         ( 'worker
@@ -130,9 +130,7 @@ module T = struct
         -> User_command.Stable.V1.t list Deferred.t
     ; coda_root_diff:
            unit
-        -> User_command.t Protocols.Coda_transition_frontier.Root_diff_view.t
-           Pipe.Reader.t
-           Deferred.t
+        -> Transition_frontier.Diff.Root_diff.view Pipe.Reader.t Deferred.t
     ; coda_prove_receipt:
            Receipt.Chain_hash.t * Receipt.Chain_hash.t
         -> Payment_proof.t Deferred.t
@@ -258,10 +256,8 @@ module T = struct
 
     let root_diff =
       C.create_pipe ~f:root_diff_impl ~bin_input:Unit.bin_t
-        ~bin_output:
-          [%bin_type_class:
-            User_command.Stable.Latest.t
-            Protocols.Coda_transition_frontier.Root_diff_view.t] ()
+        ~bin_output:[%bin_type_class: Transition_frontier.Diff.Root_diff.view]
+        ()
 
     let sync_status =
       C.create_pipe ~f:sync_status_impl ~bin_input:Unit.bin_t
@@ -386,7 +382,7 @@ module T = struct
           trace_database_initialization "transaction_database" __LOC__
             transaction_database_dir ;
           let time_controller =
-            Run.Inputs.Time.Controller.create Run.Inputs.Time.Controller.basic
+            Block_time.Controller.create Block_time.Controller.basic
           in
           let consensus_local_state =
             Consensus.Data.Local_state.create

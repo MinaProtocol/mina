@@ -1,4 +1,3 @@
-open Protocols.Coda_transition_frontier
 open Coda_base
 open Async_kernel
 open Pipe_lib
@@ -57,26 +56,18 @@ module type Worker_inputs = sig
   end
 
   module Transition_frontier :
-    Transition_frontier_intf
-    with type state_hash := State_hash.t
+    Coda_intf.Transition_frontier_intf
+    with type external_transition_validated := External_transition.Validated.t
      and type mostly_validated_external_transition :=
                 ( [`Time_received] * Truth.true_t
                 , [`Proof] * Truth.true_t
                 , [`Frontier_dependencies] * Truth.true_t
                 , [`Staged_ledger_diff] * Truth.false_t )
                 External_transition.Validation.with_transition
-     and type external_transition_validated := External_transition.Validated.t
-     and type ledger_database := Ledger.Db.t
+     and type transaction_snark_scan_state := Staged_ledger.Scan_state.t
      and type staged_ledger_diff := Staged_ledger_diff.t
      and type staged_ledger := Staged_ledger.t
-     and type masked_ledger := Ledger.Mask.Attached.t
-     and type transaction_snark_scan_state := Staged_ledger.Scan_state.t
-     and type user_command := User_command.t
-     and type pending_coinbase := Pending_coinbase.t
-     and type consensus_state := Consensus.Data.Consensus_state.Value.t
-     and type consensus_local_state := Consensus.Data.Local_state.t
      and type verifier := Verifier.t
-     and module Extensions.Work = Transaction_snark_work.Statement
 end
 
 module type Worker = sig
@@ -103,16 +94,17 @@ module type Main_inputs = sig
   include Worker_inputs
 
   module Make_worker (Inputs : Worker_inputs) : sig
-    open Inputs.Transition_frontier
-
     include
       Worker
-      with type hash := Diff_hash.t
-       and type diff := Diff_mutant.E.t
+      with type hash := Inputs.Transition_frontier.Diff.Hash.t
+       and type diff := Inputs.Transition_frontier.Diff.Mutant.E.t
        and type transition_storage := Inputs.Transition_storage.t
 
     val handle_diff :
-      t -> Diff_hash.t -> Diff_mutant.E.t -> Diff_hash.t Deferred.Or_error.t
+         t
+      -> Inputs.Transition_frontier.Diff.Hash.t
+      -> Inputs.Transition_frontier.Diff.Mutant.E.t
+      -> Inputs.Transition_frontier.Diff.Hash.t Deferred.Or_error.t
   end
 end
 
@@ -122,10 +114,6 @@ module type S = sig
   type t
 
   type verifier
-
-  type root_snarked_ledger
-
-  type consensus_local_state
 
   val create :
        ?directory_name:string
@@ -143,7 +131,7 @@ module type S = sig
     -> logger:Logger.t
     -> verifier:verifier
     -> trust_system:Trust_system.t
-    -> root_snarked_ledger:root_snarked_ledger
-    -> consensus_local_state:consensus_local_state
+    -> root_snarked_ledger:Ledger.Db.t
+    -> consensus_local_state:Consensus.Data.Local_state.t
     -> frontier Deferred.t
 end

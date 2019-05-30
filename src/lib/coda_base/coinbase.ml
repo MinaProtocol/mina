@@ -92,7 +92,7 @@ let gen =
   let open Quickcheck.Let_syntax in
   let%bind proposer = Public_key.Compressed.gen in
   let%bind amount =
-    Currency.Amount.(gen_incl zero Protocols.Coda_praos.coinbase_amount)
+    Currency.Amount.(gen_incl zero Coda_compile_config.coinbase)
   in
   let fee =
     Currency.Fee.gen_incl Currency.Fee.zero (Currency.Amount.to_fee amount)

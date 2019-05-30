@@ -1,4 +1,3 @@
-open Protocols.Coda_pow
 open Coda_base
 open Coda_state
 open Core
@@ -6,10 +5,8 @@ open Async
 open Cache_lib
 
 module Make (Inputs : Inputs.S) :
-  Breadcrumb_builder_intf
-  with type state_hash := State_hash.t
-   and type trust_system := Trust_system.t
-   and type external_transition_with_initial_validation :=
+  Coda_intf.Breadcrumb_builder_intf
+  with type external_transition_with_initial_validation :=
               Inputs.External_transition.with_initial_validation
    and type transition_frontier := Inputs.Transition_frontier.t
    and type transition_frontier_breadcrumb :=
