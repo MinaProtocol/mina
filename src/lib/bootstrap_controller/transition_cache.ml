@@ -49,5 +49,10 @@ module Make (Inputs : Inputs_intf) :
           then children
           else new_child :: children )
 
-  let data t = State_hash.Table.data t |> List.concat
+  let data t =
+    let collected_transitions = State_hash.Table.data t |> List.concat in
+    assert (
+      List.length collected_transitions
+      = List.length (List.stable_dedup collected_transitions) ) ;
+    collected_transitions
 end
