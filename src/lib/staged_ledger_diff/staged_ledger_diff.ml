@@ -3,8 +3,25 @@ open Coda_base
 open Signature_lib
 open Module_version
 
-module Make (Transaction_snark_work : Intf.Transaction_snark_work) :
-  Intf.Make_Staged_ledger_diff(Transaction_snark_work).S = struct
+module Make (Transaction_snark_work : sig
+  module Stable : sig
+    module V1 : sig
+      type t [@@deriving bin_io, sexp, version]
+    end
+  end
+
+  type t = Stable.V1.t
+
+  module Checked : sig
+    type t [@@deriving sexp]
+  end
+
+  val forget : Checked.t -> t
+end) :
+  Coda_intf.Staged_ledger_diff_intf
+  with type transaction_snark_work := Transaction_snark_work.t
+   and type transaction_snark_work_checked := Transaction_snark_work.Checked.t =
+struct
   module At_most_two = struct
     module Stable = struct
       module V1 = struct
@@ -259,7 +276,7 @@ module Make (Transaction_snark_work : Intf.Transaction_snark_work) :
     | At_most_two.Zero, At_most_one.Zero ->
         Currency.Amount.zero
     | _ ->
-        Protocols.Coda_praos.coinbase_amount
+        Coda_compile_config.coinbase
 end
 
 include Make (Transaction_snark_work)

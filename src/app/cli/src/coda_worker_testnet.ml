@@ -295,8 +295,7 @@ let start_payment_check logger root_pipe workers (testnet : Api.t) =
   Linear_pipe.iter root_pipe ~f:(function
       | `Root
           ( worker_id
-          , Protocols.Coda_transition_frontier.Root_diff_view.
-              {user_commands; root_length} )
+          , Transition_frontier.Diff.Root_diff.{user_commands; root_length} )
       ->
       Option.fold root_length ~init:Deferred.unit ~f:(fun _ length ->
           match testnet.status.(worker_id) with

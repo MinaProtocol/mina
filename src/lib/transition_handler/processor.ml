@@ -8,7 +8,6 @@
 
 open Core_kernel
 open Async_kernel
-open Protocols.Coda_pow
 open Pipe_lib.Strict_pipe
 open Coda_base
 open Coda_state
@@ -16,11 +15,8 @@ open Cache_lib
 open O1trace
 
 module Make (Inputs : Inputs.S) :
-  Transition_handler_processor_intf
-  with type state_hash := State_hash.t
-   and type trust_system := Trust_system.t
-   and type time_controller := Inputs.Time.Controller.t
-   and type external_transition_with_initial_validation :=
+  Coda_intf.Transition_handler_processor_intf
+  with type external_transition_with_initial_validation :=
               Inputs.External_transition.with_initial_validation
    and type external_transition_validated :=
               Inputs.External_transition.Validated.t
@@ -42,7 +38,7 @@ module Make (Inputs : Inputs.S) :
 
   (* TODO: calculate a sensible value from postake consensus arguments *)
   let catchup_timeout_duration =
-    Time.Span.of_ms
+    Block_time.Span.of_ms
       (Consensus.Constants.block_window_duration_ms * 2 |> Int64.of_int)
 
   let cached_transform_deferred_result ~transform_cached ~transform_result

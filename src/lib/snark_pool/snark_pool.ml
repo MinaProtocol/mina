@@ -1,28 +1,42 @@
 open Core_kernel
 open Async_kernel
+open Coda_base
 open Pipe_lib
 
 module Priced_proof = struct
-  type ('proof, 'fee) t = {proof: 'proof; fee: 'fee}
-  [@@deriving bin_io, sexp, fields]
+  module Stable = struct
+    module V1 = struct
+      module T = struct
+        type 'proof t = {proof: 'proof; fee: Fee_with_prover.Stable.V1.t}
+        [@@deriving bin_io, sexp, fields, yojson, version]
+      end
+
+      include T
+    end
+
+    module Latest = V1
+  end
+
+  type 'proof t = 'proof Stable.Latest.t =
+    {proof: 'proof; fee: Fee_with_prover.Stable.V1.t}
 end
 
 module type Transition_frontier_intf = sig
+  type work
+
   type t
 
   module Extensions : sig
     module Work : sig
-      type t [@@deriving sexp]
+      type t = work [@@deriving sexp]
 
-      module Stable :
-        sig
-          module V1 : sig
-            type t [@@deriving sexp, bin_io]
+      module Stable : sig
+        module V1 : sig
+          type nonrec t = t [@@deriving sexp, bin_io]
 
-            include Hashable.S_binable with type t := t
-          end
+          include Hashable.S_binable with type t := t
         end
-        with type V1.t = t
+      end
 
       include Hashable.S with type t := t
     end
@@ -33,11 +47,9 @@ module type Transition_frontier_intf = sig
 end
 
 module type S = sig
+  type ledger_proof
+
   type work
-
-  type proof
-
-  type fee
 
   type transition_frontier
 
@@ -53,22 +65,18 @@ module type S = sig
   val add_snark :
        t
     -> work:work
-    -> proof:proof
-    -> fee:fee
+    -> proof:ledger_proof list
+    -> fee:Fee_with_prover.t
     -> [`Rebroadcast | `Don't_rebroadcast]
 
-  val request_proof : t -> work -> (proof, fee) Priced_proof.t option
+  val request_proof : t -> work -> ledger_proof list Priced_proof.t option
 
   val listen_to_frontier_broadcast_pipe :
     transition_frontier option Broadcast_pipe.Reader.t -> t -> unit
 end
 
-module Make (Proof : sig
-  type t [@@deriving bin_io]
-end) (Fee : sig
-  type t [@@deriving sexp, bin_io]
-
-  include Comparable.S with type t := t
+module Make (Ledger_proof : sig
+  type t [@@deriving bin_io, sexp, version]
 end) (Work : sig
   type t [@@deriving sexp]
 
@@ -84,33 +92,21 @@ end) (Work : sig
 
   include Hashable.S with type t := t
 end)
-(Transition_frontier : Transition_frontier_intf
-                       with module Extensions.Work = Work) :
-  sig
-    include S with type transition_frontier = Transition_frontier.t
+(Transition_frontier : Transition_frontier_intf with type work := Work.t) : sig
+  include
+    S
+    with type work := Work.t
+     and type transition_frontier := Transition_frontier.t
+     and type ledger_proof := Ledger_proof.t
 
-    val sexp_of_t : t -> Sexp.t
+  val sexp_of_t : t -> Sexp.t
 
-    val remove_solved_work : t -> work -> unit
-  end
-  with type work := Work.t
-   and type proof := Proof.t
-   and type fee := Fee.t
-   and type transition_frontier := Transition_frontier.t = struct
-  module Priced_proof = struct
-    type t = (Proof.t sexp_opaque, Fee.t) Priced_proof.t
-    [@@deriving sexp, bin_io]
-
-    let create proof fee : (Proof.t, Fee.t) Priced_proof.t = {proof; fee}
-
-    let proof (t : t) = t.proof
-
-    let fee (t : t) = t.fee
-  end
-
+  val remove_solved_work : t -> Work.t -> unit
+end = struct
   (* TODO : Version this type *)
   type t =
-    { snark_table: Priced_proof.t Work.Stable.V1.Table.t
+    { snark_table:
+        Ledger_proof.t list Priced_proof.Stable.V1.t Work.Stable.V1.Table.t
     ; mutable ref_table: int Work.Stable.V1.Table.t option }
   [@@deriving sexp, bin_io]
 
@@ -121,10 +117,6 @@ end)
     bin_write_t buf ~pos t_no_ref_tbl
 
   let bin_writer_t = Bin_prot.Type_class.{size= bin_size_t; write= bin_write_t}
-
-  let bit_t =
-    Bin_prot.Type_class.
-      {shape= bin_shape_t; writer= bin_writer_t; reader= bin_reader_t}
 
   let removed_breadcrumb_wait = 10
 
@@ -179,15 +171,15 @@ end)
   let add_snark t ~work ~proof ~fee =
     if work_is_referenced t work then
       let update_and_rebroadcast () =
-        Hashtbl.set t.snark_table ~key:work
-          ~data:(Priced_proof.create proof fee) ;
+        Hashtbl.set t.snark_table ~key:work ~data:{proof; fee} ;
         `Rebroadcast
       in
       match Work.Table.find t.snark_table work with
       | None ->
           update_and_rebroadcast ()
       | Some prev ->
-          if Fee.( < ) fee prev.fee then update_and_rebroadcast ()
+          if Currency.Fee.( < ) fee.fee prev.fee.fee then
+            update_and_rebroadcast ()
           else `Don't_rebroadcast
     else `Don't_rebroadcast
 
@@ -196,16 +188,23 @@ end)
   let remove_solved_work t = Work.Table.remove t.snark_table
 end
 
+include Make (Ledger_proof.Stable.V1) (Transaction_snark_work.Statement)
+          (Transition_frontier)
+
 let%test_module "random set test" =
   ( module struct
     module Mock_proof = struct
-      type input = Int.t
+      module Stable = struct
+        module V1 = struct
+          module T = struct
+            type t = int [@@deriving bin_io, sexp, version {unnumbered}]
+          end
 
-      type t = Int.t [@@deriving sexp, bin_io]
+          include T
+        end
+      end
 
-      let verify _ _ = return true
-
-      let gen = Int.quickcheck_generator
+      include Stable.V1.T
     end
 
     module Mock_work = struct
@@ -240,28 +239,15 @@ let%test_module "random set test" =
         reader
     end
 
-    module Mock_fee = Int
-
-    module Mock_Priced_proof = struct
-      type proof = Mock_proof.t [@@deriving sexp, bin_io]
-
-      type fee = Mock_fee.t [@@deriving sexp, bin_io]
-
-      type t = {proof: proof; fee: fee} [@@deriving sexp, bin_io]
-
-      let proof t = t.proof
-    end
-
     module Mock_snark_pool =
-      Make (Mock_proof) (Mock_fee) (Mock_work) (Mock_transition_frontier)
+      Make (Mock_proof) (Mock_work) (Mock_transition_frontier)
 
     let gen =
       let open Quickcheck.Generator.Let_syntax in
-      let gen_entry () =
-        Quickcheck.Generator.tuple3 Mock_work.gen Mock_work.gen
-          Mock_fee.quickcheck_generator
+      let gen_entry =
+        Quickcheck.Generator.tuple2 Mock_work.gen Fee_with_prover.gen
       in
-      let%map sample_solved_work = Quickcheck.Generator.list (gen_entry ()) in
+      let%map sample_solved_work = Quickcheck.Generator.list gen_entry in
       let frontier_broadcast_pipe_r, _ =
         Broadcast_pipe.create (Some (Mock_transition_frontier.create ()))
       in
@@ -270,31 +256,26 @@ let%test_module "random set test" =
           ~trust_system:(Trust_system.null ())
           ~frontier_broadcast_pipe:frontier_broadcast_pipe_r
       in
-      List.iter sample_solved_work ~f:(fun (work, proof, fee) ->
-          ignore (Mock_snark_pool.add_snark pool ~work ~proof ~fee) ) ;
+      List.iter sample_solved_work ~f:(fun (work, fee) ->
+          ignore (Mock_snark_pool.add_snark pool ~work ~proof:[] ~fee) ) ;
       pool
 
     let%test_unit "When two priced proofs of the same work are inserted into \
                    the snark pool, the fee of the work is at most the minimum \
                    of those fees" =
-      let gen_entry () =
-        Quickcheck.Generator.tuple2 Mock_proof.gen
-          Mock_fee.quickcheck_generator
-      in
       Quickcheck.test
         ~sexp_of:
           [%sexp_of:
             Mock_snark_pool.t
             * Mock_work.t
-            * (Mock_proof.t * Mock_fee.t)
-            * (Mock_proof.t * Mock_fee.t)]
-        (Quickcheck.Generator.tuple4 gen Mock_work.gen (gen_entry ())
-           (gen_entry ()))
-        ~f:(fun (t, work, (proof_1, fee_1), (proof_2, fee_2)) ->
-          ignore (Mock_snark_pool.add_snark t ~work ~proof:proof_1 ~fee:fee_1) ;
-          ignore (Mock_snark_pool.add_snark t ~work ~proof:proof_2 ~fee:fee_2) ;
-          let fee_upper_bound = Mock_fee.min fee_1 fee_2 in
-          let {Priced_proof.fee; _} =
+            * Fee_with_prover.t
+            * Fee_with_prover.t]
+        (Quickcheck.Generator.tuple4 gen Mock_work.gen Fee_with_prover.gen
+           Fee_with_prover.gen) ~f:(fun (t, work, fee_1, fee_2) ->
+          ignore (Mock_snark_pool.add_snark t ~work ~proof:[] ~fee:fee_1) ;
+          ignore (Mock_snark_pool.add_snark t ~work ~proof:[] ~fee:fee_2) ;
+          let fee_upper_bound = Currency.Fee.min fee_1.fee fee_2.fee in
+          let {Priced_proof.fee= {fee; _}; _} =
             Option.value_exn (Mock_snark_pool.request_proof t work)
           in
           assert (fee <= fee_upper_bound) )
@@ -307,25 +288,19 @@ let%test_module "random set test" =
           [%sexp_of:
             Mock_snark_pool.t
             * Mock_work.t
-            * Mock_fee.t
-            * Mock_fee.t
-            * Mock_proof.t
-            * Mock_proof.t]
-        (Quickcheck.Generator.tuple6 gen Mock_work.gen
-           Mock_fee.quickcheck_generator Mock_fee.quickcheck_generator
-           Mock_proof.gen Mock_proof.gen)
-        ~f:(fun (t, work, fee_1, fee_2, cheap_proof, expensive_proof) ->
+            * Fee_with_prover.t
+            * Fee_with_prover.t]
+        (Quickcheck.Generator.tuple4 gen Mock_work.gen Fee_with_prover.gen
+           Fee_with_prover.gen) ~f:(fun (t, work, fee_1, fee_2) ->
           Mock_snark_pool.remove_solved_work t work ;
           let expensive_fee = max fee_1 fee_2
           and cheap_fee = min fee_1 fee_2 in
-          ignore
-            (Mock_snark_pool.add_snark t ~work ~proof:cheap_proof
-               ~fee:cheap_fee) ;
+          ignore (Mock_snark_pool.add_snark t ~work ~proof:[] ~fee:cheap_fee) ;
           assert (
-            Mock_snark_pool.add_snark t ~work ~proof:expensive_proof
-              ~fee:expensive_fee
+            Mock_snark_pool.add_snark t ~work ~proof:[] ~fee:expensive_fee
             = `Don't_rebroadcast ) ;
           assert (
-            {Priced_proof.fee= cheap_fee; proof= cheap_proof}
-            = Option.value_exn (Mock_snark_pool.request_proof t work) ) )
+            cheap_fee.fee
+            = (Option.value_exn (Mock_snark_pool.request_proof t work)).fee.fee
+          ) )
   end )
