@@ -83,7 +83,7 @@ module Value : sig
   include Hashable.S with type t := t
 end
 
-type value = Value.t [@@deriving sexp, to_yojson, equal]
+type value = Value.t [@@deriving sexp, to_yojson]
 
 type var = (State_hash.var, Body.var) Poly.t
 

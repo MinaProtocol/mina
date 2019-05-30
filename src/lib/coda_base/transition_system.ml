@@ -21,7 +21,7 @@ module type S = sig
 
     type var
 
-    type value [@@deriving sexp, equal]
+    type value [@@deriving sexp]
 
     val typ : (var, value) Typ.t
 
