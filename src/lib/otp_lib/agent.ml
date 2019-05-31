@@ -1,31 +1,28 @@
 open Core_kernel
 
-module type Read_only_intf = sig
-  type 'a t
+type read_write
 
-  val get : 'a t -> 'a
+type read_only
 
-  val on_update : 'a t -> f:('a -> unit) -> unit
-end
+type _ flag = Read_write : read_write flag | Read_only : read_only flag
 
-module T = struct
-  type 'a t = {mutable a: 'a; mutable on_update: 'a -> unit}
+type 'a t_ = {mutable a: 'a; mutable on_update: 'a -> unit; mutable dirty: bool}
 
-  let create ~(f : 'a -> 'b) x : 'b t = {a= f x; on_update= Fn.ignore}
+type ('flag, 'a) t = 'a t_ constraint 'flag = _ flag
 
-  let get t = t.a
+let create ~(f : 'a -> 'b) x : (_ flag, 'b) t =
+  {a= f x; on_update= Fn.ignore; dirty= false}
 
-  let update t a =
-    t.a <- a ;
-    t.on_update a
+let get (t : (_ flag, 'a) t) =
+  if t.dirty then (
+    t.dirty <- false ;
+    (t.a, `Different) )
+  else (t.a, `Same)
 
-  let on_update t ~f = t.on_update <- (fun a -> t.on_update a ; f a)
-end
+let update (t : (read_write flag, 'a) t) a =
+  t.a <- a ;
+  t.dirty <- true ;
+  t.on_update a
 
-include T
-
-module Read_only = struct
-  include T
-end
-
-let read_only = Fn.id
+let on_update (t : (_ flag, 'a) t) ~f =
+  t.on_update <- (fun a -> t.on_update a ; f a)

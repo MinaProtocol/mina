@@ -1,17 +1,19 @@
-module type Read_only_intf = sig
-  type 'a t
+(** Can only be used Linearly, you will miss updates if you have two consumers *)
 
-  val get : 'a t -> 'a
+type read_write
 
-  val on_update : 'a t -> f:('a -> unit) -> unit
-end
+type read_only
 
-module Read_only : Read_only_intf
+type _ flag = Read_write : read_write flag | Read_only : read_only flag
 
-include Read_only_intf
+type 'a t_
 
-val create : f:('a -> 'b) -> 'a -> 'b t
+type ('flag, 'a) t = 'a t_ constraint 'flag = _ flag
 
-val update : 'a t -> 'a -> unit
+val create : f:('a -> 'b) -> 'a -> (read_write flag, 'b) t
 
-val read_only : 'a t -> 'a Read_only.t
+val get : (_ flag, 'a) t -> 'a * [> `Different | `Same]
+
+val update : (read_write flag, 'a) t -> 'a -> unit
+
+val on_update : (_ flag, 'a) t -> f:('a -> unit) -> unit

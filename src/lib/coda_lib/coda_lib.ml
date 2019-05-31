@@ -92,7 +92,7 @@ module type Proposer_intf = sig
                            -> completed_work_checked option)
     -> transaction_pool:transaction_pool
     -> time_controller:Block_time.Controller.t
-    -> keypairs:Keypair.And_compressed_pk.Set.t Agent.Read_only.t
+    -> keypairs:(_, Keypair.And_compressed_pk.Set.t) Agent.t
     -> consensus_local_state:Consensus.Data.Local_state.t
     -> frontier_reader:transition_frontier option Broadcast_pipe.Reader.t
     -> transition_writer:( breadcrumb
@@ -249,7 +249,8 @@ module Make (Inputs : Inputs_intf) = struct
   module Ledger_transfer = Ledger_transfer.Make (Ledger) (Ledger.Db)
 
   type t =
-    { propose_keypairs: Keypair.And_compressed_pk.Set.t Agent.t
+    { propose_keypairs:
+        (Agent.read_write Agent.flag, Keypair.And_compressed_pk.Set.t) Agent.t
     ; snark_worker_key: Public_key.Compressed.Stable.V1.t option
     ; net: Net.t
     ; verifier: Verifier.t
@@ -511,8 +512,7 @@ module Make (Inputs : Inputs_intf) = struct
     Proposer.run ~logger:t.logger ~verifier:t.verifier
       ~trust_system:t.trust_system ~transaction_pool:t.transaction_pool
       ~get_completed_work:(Snark_pool.get_completed_work t.snark_pool)
-      ~time_controller:t.time_controller
-      ~keypairs:(Agent.read_only t.propose_keypairs)
+      ~time_controller:t.time_controller ~keypairs:t.propose_keypairs
       ~consensus_local_state:t.consensus_local_state
       ~frontier_reader:t.transition_frontier
       ~transition_writer:t.proposer_transition_writer

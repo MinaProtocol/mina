@@ -331,8 +331,7 @@ module Data = struct
         ; mutable curr_epoch_snapshot: Snapshot.t
         ; last_checked_slot_and_epoch:
             (Epoch.t * Epoch.Slot.t) Public_key.Compressed.Table.t
-        ; genesis_epoch_snapshot: Snapshot.t
-        ; proposer_public_keys: Public_key.Compressed.Set.t }
+        ; genesis_epoch_snapshot: Snapshot.t }
       [@@deriving sexp]
 
       let to_yojson t =
@@ -350,18 +349,15 @@ module Data = struct
                        , [%to_yojson: Epoch.t * Epoch.Slot.t] epoch_and_slot )
                    ) ) )
           ; ( "genesis_epoch_snapshot"
-            , [%to_yojson: Snapshot.t] t.genesis_epoch_snapshot )
-          ; ( "proposer_public_keys"
-            , `List
-                (List.map ~f:[%to_yojson: Public_key.Compressed.t]
-                   (Public_key.Compressed.Set.to_list t.proposer_public_keys))
-            ) ]
+            , [%to_yojson: Snapshot.t] t.genesis_epoch_snapshot ) ]
     end
 
     (* The outer ref changes whenever we swap in new staker set; all the snapshots are recomputed *)
     type t = Data.t ref [@@deriving sexp, to_yojson]
 
-    let current_proposers t = !t.Data.proposer_public_keys
+    let current_proposers t =
+      Public_key.Compressed.Table.keys !t.Data.last_checked_slot_and_epoch
+      |> Public_key.Compressed.Set.of_list
 
     let make_last_checked_slot_and_epoch_table old_table new_keys ~default =
       let module Set = Public_key.Compressed.Set in
@@ -392,8 +388,7 @@ module Data = struct
             make_last_checked_slot_and_epoch_table
               (Public_key.Compressed.Table.create ())
               proposer_public_keys
-              ~default:(Epoch.zero, Epoch.Slot.zero)
-        ; proposer_public_keys }
+              ~default:(Epoch.zero, Epoch.Slot.zero) }
 
     let proposer_swap t proposer_public_keys now =
       let old : Data.t = !t in
@@ -412,13 +407,12 @@ module Data = struct
          * slots or epochs *)
         ; last_checked_slot_and_epoch=
             make_last_checked_slot_and_epoch_table
-              (Public_key.Compressed.Table.create ())
-              proposer_public_keys
+              !t.Data.last_checked_slot_and_epoch proposer_public_keys
               ~default:
                 ((* TODO: Be smarter so that we don't have to look at the slot before again *)
                  let epoch, slot = Epoch.epoch_and_slot_of_time_exn now in
                  (epoch, UInt32.(if slot > zero then sub slot one else slot)))
-        ; proposer_public_keys }
+        }
 
     type snapshot_identifier = Last_epoch_snapshot | Curr_epoch_snapshot
     [@@deriving to_yojson, eq]
@@ -442,19 +436,15 @@ module Data = struct
       let unseens =
         Table.to_alist !t.last_checked_slot_and_epoch
         |> List.filter_map ~f:(fun (pk, old_epoch_and_slot) ->
-               match
+               let i =
                  Tuple2.compare ~cmp1:Epoch.compare ~cmp2:Epoch.Slot.compare
                    old_epoch_and_slot (epoch, slot)
-               with
-               | i when i >= 0 ->
-                   None
-               | i when i < 0 ->
-                   Table.set !t.last_checked_slot_and_epoch ~key:pk
-                     ~data:(epoch, slot) ;
-                   Some pk
-               | _ ->
-                   failwith
-                     "forall x : int. x >= 0 || x < 0 is impossibly false" )
+               in
+               if i >= 0 then None
+               else (
+                 Table.set !t.last_checked_slot_and_epoch ~key:pk
+                   ~data:(epoch, slot) ;
+                 Some pk ) )
       in
       match unseens with
       | [] ->
@@ -2388,7 +2378,8 @@ module Hooks = struct
                 in
                 let delegatee_table =
                   compute_delegatee_table_sparse_ledger
-                    !local_state.proposer_public_keys snapshot_ledger
+                    (Local_state.current_proposers local_state)
+                    snapshot_ledger
                 in
                 set_snapshot local_state snapshot_id
                   {ledger= snapshot_ledger; delegatee_table} ;
@@ -2610,7 +2601,7 @@ module Hooks = struct
       let proposal_data unseen_pks slot =
         (* Try vrfs for all keypairs that are unseen within this slot until one wins or all lose *)
         (* TODO: Don't do this, and instead pick the one that has the highest
-         * chance of winning *)
+         * chance of winning. See #2573 *)
         Keypair.And_compressed_pk.Set.fold_until keypairs ~init:()
           ~f:(fun () (keypair, public_key_compressed) ->
             if Public_key.Compressed.Set.mem unseen_pks public_key_compressed
@@ -2667,10 +2658,9 @@ module Hooks = struct
 
   let frontier_root_transition (prev : Consensus_state.Value.t)
       (next : Consensus_state.Value.t) ~local_state ~snarked_ledger =
-    let open Local_state in
     if not (Epoch.equal prev.curr_epoch next.curr_epoch) then (
       let delegatee_table =
-        compute_delegatee_table !local_state.Data.proposer_public_keys
+        compute_delegatee_table (Local_state.current_proposers local_state)
           ~iter_accounts:(fun f ->
             Coda_base.Ledger.Any_ledger.M.iteri snarked_ledger ~f )
       in

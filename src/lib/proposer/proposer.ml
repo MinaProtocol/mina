@@ -106,8 +106,8 @@ module Make (Inputs : Inputs_intf) :
 
     val create : Time.Controller.t -> t
 
-    (** If you reschedule when already scheduled, take the min of the two schedulings *)
     val schedule : t -> Time.t -> f:(unit -> unit) -> unit
+    (** If you reschedule when already scheduled, take the min of the two schedulings *)
   end = struct
     type t =
       { mutable timeout: unit Time.Timeout.t option
@@ -465,25 +465,24 @@ module Make (Inputs : Inputs_intf) :
                             Error.raise (Error.of_string str) )) )
         in
         let proposal_supervisor = Singleton_supervisor.create ~task:propose in
-        let last_keypairs_agent =
-          Agent.create ~f:Fn.id (Agent.Read_only.get keypairs)
-        in
         let scheduler = Singleton_scheduler.create time_controller in
         let rec check_for_proposal () =
           trace_recurring_task "check for proposal" (fun () ->
               (* See if we want to change keypairs *)
-              let keypairs = Agent.Read_only.get keypairs in
-              let last_keypairs = Agent.get last_keypairs_agent in
-              if
-                not
-                  (Keypair.And_compressed_pk.Set.equal keypairs last_keypairs)
-              then (
-                (* Perform proposer swap since we have new keypairs *)
-                Consensus.Data.Local_state.proposer_swap consensus_local_state
-                  ( Keypair.And_compressed_pk.Set.to_list keypairs
-                  |> List.map ~f:snd |> Public_key.Compressed.Set.of_list )
-                  (Time.now time_controller) ;
-                Agent.update last_keypairs_agent keypairs ) ;
+              let keypairs =
+                match Agent.get keypairs with
+                | keypairs, `Different ->
+                    (* Perform proposer swap since we have new keypairs *)
+                    Consensus.Data.Local_state.proposer_swap
+                      consensus_local_state
+                      ( Keypair.And_compressed_pk.Set.to_list keypairs
+                      |> List.map ~f:snd |> Public_key.Compressed.Set.of_list
+                      )
+                      (Time.now time_controller) ;
+                    keypairs
+                | keypairs, `Same ->
+                    keypairs
+              in
               (* Begin proposal checking *)
               match Broadcast_pipe.Reader.peek frontier_reader with
               | None ->
@@ -544,7 +543,7 @@ module Make (Inputs : Inputs_intf) :
          * erase this timeout even if the last run of the proposer wants to wait
          * for a long while.
          * *)
-        Agent.Read_only.on_update keypairs ~f:(fun _new_keypairs ->
+        Agent.on_update keypairs ~f:(fun _new_keypairs ->
             Singleton_scheduler.schedule scheduler (Time.now time_controller)
               ~f:check_for_proposal ) ;
         check_for_proposal () )
