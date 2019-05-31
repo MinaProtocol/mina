@@ -303,8 +303,8 @@ module Data = struct
             Public_key.Compressed.Table.t }
       [@@deriving sexp]
 
-      let delegators_exn t key =
-        Public_key.Compressed.Table.find_exn t.delegatee_table key
+      let delegators t key =
+        Public_key.Compressed.Table.find t.delegatee_table key
 
       let to_yojson {ledger; delegatee_table} =
         `Assoc
@@ -911,7 +911,8 @@ module Data = struct
         (Epoch.Slot.to_int slot) ;
       with_return (fun {return} ->
           Hashtbl.iteri
-            (Snapshot.delegators_exn epoch_snapshot public_key_compressed)
+            ( Snapshot.delegators epoch_snapshot public_key_compressed
+            |> Option.value ~default:(Core_kernel.Int.Table.create ()) )
             ~f:(fun ~key:delegator ~data:balance ->
               let vrf_result =
                 T.eval ~private_key {epoch; slot; seed; delegator}
