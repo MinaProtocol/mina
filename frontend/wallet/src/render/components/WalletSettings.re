@@ -26,7 +26,149 @@ module Styles = {
       ]),
     ]);
 
+  let deleteModalLabel = merge([label, style([alignSelf(`flexStart)])]);
+
+  let deleteAlert = style([margin2(~v=`rem(0.5), ~h=`zero)]);
+
   let textBox = style([maxWidth(`rem(21.))]);
+
+  let modalContainer =
+    style([
+      width(`rem(21.)),
+      display(`flex),
+      flexDirection(`column),
+      alignItems(`center),
+      margin(`auto),
+    ]);
+
+  let buttonWrapper = style([display(`flex)]);
+};
+
+module DeleteWallet = [%graphql
+  {|
+  mutation deleteWallet($key: String!) {
+      deleteWallet(input: {publicKey: $key}) {
+        publicKey
+      }
+  }
+|}
+];
+
+module DeleteWalletMutation = ReasonApollo.CreateMutation(DeleteWallet);
+
+module DeleteButton = {
+  type modalState = {
+    text: string,
+    error: option(string),
+  };
+  [@react.component]
+  let make = (~publicKey) => {
+    let (modalState, updateModal) = React.useState(() => None);
+    let (addressBook, _) = React.useContext(AddressBookProvider.context);
+    let walletName = AddressBook.getWalletName(addressBook, publicKey);
+    let warningMessage =
+      "Are you sure you want to delete "
+      ++ walletName
+      ++ "? \
+      This can't be undone, and you may lose the funds in this wallet.";
+    <>
+      <Link
+        onClick={_ =>
+          updateModal(x => Option.or_(Some({text: "", error: None}), x))
+        }>
+        {React.string("Delete wallet")}
+      </Link>
+      {switch (modalState) {
+       | None => React.null
+       | Some({text, error}) =>
+         <Modal
+           title="Delete Wallet"
+           isRed=true
+           onRequestClose={_ => updateModal(_ => None)}>
+           <div className=Styles.modalContainer>
+             <div className=Styles.deleteAlert>
+               <Alert kind=`Warning message=warningMessage />
+             </div>
+             {switch (error) {
+              | Some(errorText) => <Alert kind=`Danger message=errorText />
+              | None => React.null
+              }}
+             <div className=Styles.deleteModalLabel>
+               {React.string("Type wallet name to confirm:")}
+             </div>
+             <TextField
+               label="Name"
+               value=text
+               onChange={s => updateModal(_ => Some({text: s, error: None}))}
+             />
+             <Spacer height=2. />
+             <div className=Styles.buttonWrapper>
+               <Button
+                 label="Cancel"
+                 style=Button.Gray
+                 onClick={_ => updateModal(_ => None)}
+               />
+               <Spacer width=1. />
+               <DeleteWalletMutation>
+                 (
+                   (mutation, _) =>
+                     <Button
+                       label="Delete"
+                       style=Button.Red
+                       onClick={_ => {
+                         let variables =
+                           DeleteWallet.make(
+                             ~key=PublicKey.toString(publicKey),
+                             (),
+                           )##variables;
+                         let performMutation =
+                           Task.liftErrorPromise(() =>
+                             mutation(
+                               ~variables,
+                               ~refetchQueries=[|"getWallets"|],
+                               (),
+                             )
+                           );
+                         Task.attempt(
+                           performMutation,
+                           ~f=
+                             fun
+                             | Ok(Data(_))
+                             | Ok(EmptyResponse) => {
+                                 updateModal(_ => None);
+                                 ReasonReact.Router.push("/settings");
+                               }
+                             | Ok(Errors(err)) => {
+                                 let message =
+                                   err
+                                   |> Array.get(~index=0)
+                                   |> Option.map(~f=e => e##message)
+                                   |> Option.withDefault(
+                                        ~default="Server error",
+                                      );
+                                 updateModal(_ =>
+                                   Some({text, error: Some(message)})
+                                 );
+                               }
+                             | Error(e) =>
+                               updateModal(_ =>
+                                 Some({
+                                   text,
+                                   error: Some(Js.String.make(e)),
+                                 })
+                               ),
+                         );
+                       }}
+                       disabled={text != walletName}
+                     />
+                 )
+               </DeleteWalletMutation>
+             </div>
+           </div>
+         </Modal>
+       }}
+    </>;
+  };
 };
 
 [@react.component]
@@ -74,6 +216,6 @@ let make = (~publicKey) => {
     <div className=Styles.textBox>
       <TextField label="Path" value="" onChange={_ => ()} />
     </div>
-    <Link> {React.string("Delete wallet")} </Link>
+    <DeleteButton publicKey />
   </div>;
 };

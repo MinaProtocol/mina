@@ -25,7 +25,7 @@ module Styles = {
     merge([
       Theme.Text.Body.regular,
       style([
-        margin(`rem(0.5)),
+        padding(`rem(0.5)),
         color(Theme.Colors.midnight),
         display(`flex),
         alignItems(`center),

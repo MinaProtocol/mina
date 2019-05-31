@@ -11,6 +11,8 @@ module Styles = {
     ]);
 
   let text = Theme.Text.Body.semiBold;
+
+  let icon = style([flexShrink(0)]);
 };
 
 [@react.component]
@@ -25,7 +27,7 @@ let make = (~kind, ~message) => {
       }
     );
   <div className={Styles.box(bgColor, textColor)}>
-    <Icon kind=iconKind />
+    <span className=Styles.icon> <Icon kind=iconKind /> </span>
     <Spacer width=0.25 />
     <div className=Styles.text> {React.string(message)} </div>
   </div>;
