@@ -660,7 +660,7 @@ let%test_module "edge cases trust actions test" =
       ; trust_system= Trust_system.create ~db_dir:ts_db
       ; max_concurrent_connections= None }
 
-    (* *)
+    (* This gets used to wait for the RPC to be in progress before shutting down the receiver. *)
     let blocking_rpc_called = Ivar.create ()
 
     let ping_rpc =
@@ -696,6 +696,8 @@ let%test_module "edge cases trust actions test" =
 
     let config_to_hp c = Peer.to_discovery_host_and_port (config_to_peer c)
 
+    (* Read events from [action_pipe] and make sure they match [expected].
+       This will NOT ensure they are the only actions! *)
     let expect_actions
         (action_pipe : (Trust_system.Actions.t * _) Pipe.Reader.t)
         ~(expected : Trust_system.Actions.action list) =
@@ -792,6 +794,8 @@ let%test_module "edge cases trust actions test" =
       Async.Thread_safe.block_on_async_exn (fun () -> x)
 
     let%test_unit "handshake" =
+      (* This closes the TCP connection on the receiver before passing the reader/writer to RPC.
+         The resulting handshake error should result in an Outgoing_connection_error. *)
       let x : unit Deferred.t =
         File_system.with_temp_dir
           ~f:(fun tmpdir ->
@@ -828,7 +832,7 @@ let%test_module "edge cases trust actions test" =
       Async.Thread_safe.block_on_async_exn (fun () -> x)
 
     let%test_unit "rpc failed" =
-      (* If the RPC fails,  *)
+      (* If the RPC fails, we should get Violated_protocol *)
       let x : unit Deferred.t =
         File_system.with_temp_dir
           ~f:(fun tmpdir ->
