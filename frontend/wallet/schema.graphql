@@ -128,7 +128,7 @@ input UserCommandFilterInput {
 }
 
 input BlockFilterInput {
-  relatedTo: String,
+  relatedTo: String!,
 }
 
 input SetStakingInput {
@@ -219,7 +219,7 @@ type Query {
     before: String): UserCommandConnection!
   
   blocks(
-    filter: BlockFilterInput,
+    filter: BlockFilterInput!,
     first: Int,
     after: String,
     last: Int,
