@@ -33,6 +33,9 @@ let compute_delegatee_table keys ~iter_accounts =
   let open Coda_base in
   let outer_table = Public_key.Compressed.Table.create () in
   iter_accounts (fun i (acct : Account.t) ->
+      Logger.warn (Logger.create ()) ~module_:__MODULE__ ~location:__LOC__
+        ~metadata:[("account", Account.Stable.V1.to_yojson acct)]
+        "On %d $account" i ;
       if Public_key.Compressed.Set.mem keys acct.delegate then
         Public_key.Compressed.Table.change outer_table acct.delegate
           ~f:(fun maybe_table ->
@@ -380,15 +383,21 @@ module Data = struct
         compute_delegatee_table_sparse_ledger proposer_public_keys ledger
       in
       let genesis_epoch_snapshot = Snapshot.{delegatee_table; ledger} in
-      ref
-        { Data.last_epoch_snapshot= genesis_epoch_snapshot
-        ; curr_epoch_snapshot= genesis_epoch_snapshot
-        ; genesis_epoch_snapshot
-        ; last_checked_slot_and_epoch=
-            make_last_checked_slot_and_epoch_table
-              (Public_key.Compressed.Table.create ())
-              proposer_public_keys
-              ~default:(Epoch.zero, Epoch.Slot.zero) }
+      let t =
+        ref
+          { Data.last_epoch_snapshot= genesis_epoch_snapshot
+          ; curr_epoch_snapshot= genesis_epoch_snapshot
+          ; genesis_epoch_snapshot
+          ; last_checked_slot_and_epoch=
+              make_last_checked_slot_and_epoch_table
+                (Public_key.Compressed.Table.create ())
+                proposer_public_keys
+                ~default:(Epoch.zero, Epoch.Slot.zero) }
+      in
+      Logger.warn (Logger.create ()) ~module_:__MODULE__ ~location:__LOC__
+        ~metadata:[("local_state", Data.to_yojson !t)]
+        "Local_state is $local_state" ;
+      t
 
     let proposer_swap t proposer_public_keys now =
       let old : Data.t = !t in
@@ -760,12 +769,12 @@ module Data = struct
       let c = of_int c_int
 
       (*  Check if
-        vrf_output / 2^256 <= c * my_stake / total_currency
+          vrf_output / 2^256 <= c * my_stake / total_currency
 
-        So that we don't have to do division we check
+          So that we don't have to do division we check
 
-        vrf_output * total_currency <= c * my_stake * 2^256
-    *)
+          vrf_output * total_currency <= c * my_stake * 2^256
+      *)
       let is_satisfied ~my_stake ~total_stake vrf_output =
         of_bit_fold_lsb (Random_oracle.Digest.fold_bits vrf_output)
         * of_uint64_exn (Amount.to_uint64 total_stake)
@@ -791,7 +800,7 @@ module Data = struct
           lhs <= rhs
 
         (* It was somewhat involved to implement that check with the small field, so
-         we've stubbed it out for now. *)
+           we've stubbed it out for now. *)
         let is_satisfied ~my_stake:_ ~total_stake:_ _vrf_output =
           let () = assert Coda_base.Insecure.vrf_threshold_check in
           Snark_params.Tick.(Checked.return Boolean.true_)
@@ -1325,7 +1334,7 @@ module Data = struct
     include Nat.Make32 ()
 
     (* Make sure this optimization makes sense versus using
-     an (epoch, slot) pair *)
+       an (epoch, slot) pair *)
     let () =
       assert (
         Core.Int.(
@@ -1342,7 +1351,7 @@ module Data = struct
 
     module Checked = struct
       (* TODO: It's possible to share this hash computation with
-       the hashing of the state. Might be worth doing. *)
+         the hashing of the state. Might be worth doing. *)
       let create ~(epoch : Epoch.Unpacked.var)
           ~(slot : Epoch.Slot.Unpacked.var) =
         var_of_field_unsafe
@@ -1377,7 +1386,7 @@ module Data = struct
           module T = struct
             type t =
               { (* TODO: Make a nice way to force this to have bounded (or fixed) size for
-                 bin_io reasons *)
+                   bin_io reasons *)
                 prefix:
                   Coda_base.State_hash.Stable.V1.t Core.Fqueue.Stable.V1.t
               ; tail: Hash.Stable.V1.t }
@@ -1499,19 +1508,19 @@ module Data = struct
   end
 
   (* We have a list of state hashes. When we extend the blockchain,
-   we see if the **previous** state should be saved as a checkpoint.
-   This is because we have convenient access to the entire previous
-   protocol state hash.
+     we see if the **previous** state should be saved as a checkpoint.
+     This is because we have convenient access to the entire previous
+     protocol state hash.
 
-   We divide the slots of an epoch into "checkpoint windows": chunks of
-   size [checkpoint_window_size]. The goal is to record the first block
-   in a given window as a check-point if there are any blocks in that
-   window, and zero checkpoints if the window was empty.
+     We divide the slots of an epoch into "checkpoint windows": chunks of
+     size [checkpoint_window_size]. The goal is to record the first block
+     in a given window as a check-point if there are any blocks in that
+     window, and zero checkpoints if the window was empty.
 
-   To that end, we store in each state a bit [checkpoint_window_filled] which
-   is true iff there has already been a state in the history of the given state
-   which is in the same checkpoint window as the given state.
-*)
+     To that end, we store in each state a bit [checkpoint_window_filled] which
+     is true iff there has already been a state in the history of the given state
+     which is in the same checkpoint window as the given state.
+  *)
   module Consensus_state = struct
     module Poly = struct
       module Stable = struct
@@ -1908,7 +1917,7 @@ module Data = struct
         ~consensus_transition:Consensus_transition.genesis
 
     (* Check that both epoch and slot are zero.
-  *)
+    *)
     let is_genesis (epoch : Epoch.Unpacked.var)
         (slot : Epoch.Slot.Unpacked.var) =
       let open Field in
@@ -2004,7 +2013,7 @@ module Data = struct
             ~then_:previous_protocol_state_hash
             ~else_:previous_state.curr_epoch_data.start_checkpoint
         (* Want this to be the protocol state hash once we leave the seed
-         update range. *)
+           update range. *)
         and lock_checkpoint =
           let%bind base =
             (* TODO: Should this be zero or some other sentinel value? *)
@@ -2025,8 +2034,8 @@ module Data = struct
         ; lock_checkpoint }
       and length = Length.increment_var previous_state.length
       (* TODO: keep track of total_currency in transaction snark. The current_slot
-     * implementation would allow an adversary to make then total_currency incorrect by
-     * not adding the coinbase to their account. *)
+       * implementation would allow an adversary to make then total_currency incorrect by
+       * not adding the coinbase to their account. *)
       and new_total_currency =
         Amount.Checked.add previous_state.total_currency supply_increase
       and epoch_length =

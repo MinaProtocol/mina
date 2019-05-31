@@ -219,7 +219,7 @@ module Ledger_inner = struct
             [%test_eq: Ledger_hash.t] start_hash (merkle_root ledger) ) ;
         (merkle_path ledger new_loc, Account.empty)
 
-  let handler t =
+  let _handler t =
     let open Snark_params.Tick in
     let path_exn idx =
       List.map (merkle_path_at_index_exn t idx) ~f:(function

@@ -106,8 +106,8 @@ module Make (Inputs : Inputs_intf) :
 
     val create : Time.Controller.t -> t
 
-    val schedule : t -> Time.t -> f:(unit -> unit) -> unit
     (** If you reschedule when already scheduled, take the min of the two schedulings *)
+    val schedule : t -> Time.t -> f:(unit -> unit) -> unit
   end = struct
     type t =
       { mutable timeout: unit Time.Timeout.t option
