@@ -363,15 +363,9 @@ module T = struct
           let%bind transaction_database_dir =
             Unix.mkdtemp @@ conf_dir ^/ "transaction"
           in
-          Core.printf
-            !"Location of External transition database: %s"
-            transaction_database_dir ;
           let%bind external_transition_database_dir =
             Unix.mkdtemp @@ conf_dir ^/ "external_transition"
           in
-          Core.printf
-            !"Location of External transition database: %s"
-            external_transition_database_dir ;
           let trace_database_initialization typ location =
             Logger.trace logger "Creating %s at %s" ~module_:__MODULE__
               ~location typ
