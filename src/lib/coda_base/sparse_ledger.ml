@@ -207,9 +207,6 @@ let handler t =
   stage (fun (With {request; respond}) ->
       match request with
       | Ledger_hash.Get_element idx ->
-          Logger.info (Logger.create ()) ~module_:__MODULE__ ~location:__LOC__
-            !"Trying to get idx %d sparse ledger %{sexp: t}"
-            idx !ledger ;
           let elt = get_exn !ledger idx in
           let path = (path_exn idx :> Pedersen.Digest.t list) in
           respond (Provide (elt, path))

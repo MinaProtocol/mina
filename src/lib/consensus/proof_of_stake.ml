@@ -33,9 +33,6 @@ let compute_delegatee_table keys ~iter_accounts =
   let open Coda_base in
   let outer_table = Public_key.Compressed.Table.create () in
   iter_accounts (fun i (acct : Account.t) ->
-      Logger.warn (Logger.create ()) ~module_:__MODULE__ ~location:__LOC__
-        ~metadata:[("account", Account.Stable.V1.to_yojson acct)]
-        "On %d $account" i ;
       if Public_key.Compressed.Set.mem keys acct.delegate then
         Public_key.Compressed.Table.change outer_table acct.delegate
           ~f:(fun maybe_table ->
@@ -383,21 +380,15 @@ module Data = struct
         compute_delegatee_table_sparse_ledger proposer_public_keys ledger
       in
       let genesis_epoch_snapshot = Snapshot.{delegatee_table; ledger} in
-      let t =
-        ref
-          { Data.last_epoch_snapshot= genesis_epoch_snapshot
-          ; curr_epoch_snapshot= genesis_epoch_snapshot
-          ; genesis_epoch_snapshot
-          ; last_checked_slot_and_epoch=
-              make_last_checked_slot_and_epoch_table
-                (Public_key.Compressed.Table.create ())
-                proposer_public_keys
-                ~default:(Epoch.zero, Epoch.Slot.zero) }
-      in
-      Logger.warn (Logger.create ()) ~module_:__MODULE__ ~location:__LOC__
-        ~metadata:[("local_state", Data.to_yojson !t)]
-        "Local_state is $local_state" ;
-      t
+      ref
+        { Data.last_epoch_snapshot= genesis_epoch_snapshot
+        ; curr_epoch_snapshot= genesis_epoch_snapshot
+        ; genesis_epoch_snapshot
+        ; last_checked_slot_and_epoch=
+            make_last_checked_slot_and_epoch_table
+              (Public_key.Compressed.Table.create ())
+              proposer_public_keys
+              ~default:(Epoch.zero, Epoch.Slot.zero) }
 
     let proposer_swap t proposer_public_keys now =
       let old : Data.t = !t in
@@ -2636,18 +2627,13 @@ module Hooks = struct
         else
           match Local_state.seen_slot local_state epoch slot with
           | `All_seen ->
-              Logger.info logger ~module_:__MODULE__ ~location:__LOC__
-                "All seen" ;
               find_winning_slot (Epoch.Slot.succ slot)
           | `Unseen pks -> (
-              Logger.info logger ~module_:__MODULE__ ~location:__LOC__
-                !"Some unseen: %{sexp: Public_key.Compressed.Set.t}"
-                pks ;
-              match proposal_data pks slot with
-              | None ->
-                  find_winning_slot (Epoch.Slot.succ slot)
-              | Some (keypair, data) ->
-                  Some (slot, keypair, data) )
+            match proposal_data pks slot with
+            | None ->
+                find_winning_slot (Epoch.Slot.succ slot)
+            | Some (keypair, data) ->
+                Some (slot, keypair, data) )
       in
       find_winning_slot slot
     in
