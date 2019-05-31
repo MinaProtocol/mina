@@ -50,9 +50,6 @@ module Styles = {
     ]);
 };
 
-[@bs.val] [@bs.scope "window.history"]
-external historyBack: unit => unit = "back";
-
 module SyncStatus = [%graphql
   {|
 subscription syncStatus {
