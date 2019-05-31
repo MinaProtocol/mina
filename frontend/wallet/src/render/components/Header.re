@@ -72,7 +72,7 @@ let make = () => {
     | _ => false
     };
   <header className=Styles.header>
-    <div className=Styles.logo>
+    <div className=Styles.logo onClick={_ => ReasonReact.Router.push("/")}>
       <img src="CodaLogo.svg" alt="Coda logo" />
     </div>
     <div className=Styles.rightButtons>

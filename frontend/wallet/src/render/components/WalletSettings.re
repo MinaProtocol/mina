@@ -5,10 +5,10 @@ module Styles = {
 
   let container = style([padding(`rem(1.0))]);
 
-  let backHeader =
+  let backHeader = style([display(`flex), alignItems(`center)]);
+
+  let backIcon =
     style([
-      display(`flex),
-      alignItems(`center),
       color(Theme.Colors.hyperlinkAlpha(1.0)),
       hover([color(Theme.Colors.hyperlinkAlpha(0.5))]),
     ]);
@@ -34,13 +34,18 @@ let make = (~publicKey) => {
   let (addressBook, updateAddressBook) =
     React.useContext(AddressBookProvider.context);
   <div className=Styles.container>
-    <div
-      className=Styles.backHeader
-      onClick={_ => ReasonReact.Router.push("/settings")}>
-      <div> <Icon kind=Icon.BackArrow /> </div>
-      <div className=Styles.backHeaderText>
-        {React.string("Hot Wallet settings")}
-      </div>
+    <div className=Styles.backHeader>
+      <span
+        className=Styles.backIcon
+        onClick={_ => ReasonReact.Router.push("/settings")}>
+        <Icon kind=Icon.BackArrow />
+      </span>
+      <Spacer width=0.5 />
+      <span className=Styles.backHeaderText>
+        {React.string(
+           AddressBook.getWalletName(addressBook, publicKey) ++ " settings",
+         )}
+      </span>
     </div>
     <div className=Styles.label> {React.string("Wallet name")} </div>
     <div className=Styles.textBox>
