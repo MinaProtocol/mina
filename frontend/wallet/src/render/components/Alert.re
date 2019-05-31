@@ -10,7 +10,7 @@ module Styles = {
       padding2(~v=`rem(0.25), ~h=`rem(0.5)),
     ]);
 
-  let text = Theme.Text.Body.smallSemiBold;
+  let text = Theme.Text.Body.semiBold;
 };
 
 [@react.component]

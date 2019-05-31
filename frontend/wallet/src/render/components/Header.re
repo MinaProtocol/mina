@@ -69,7 +69,11 @@ module SyncStatusSubscription = ReasonApollo.CreateSubscription(SyncStatus);
 [@react.component]
 let make = () => {
   let url = ReasonReact.Router.useUrl();
-  let onSettingsPage = url.path == ["settings"];
+  let onSettingsPage =
+    switch (url.path) {
+    | ["settings", ..._] => true
+    | _ => false
+    };
   <header className=Styles.header>
     <div className=Styles.logo>
       <img src="CodaLogo.svg" alt="Coda logo" />
@@ -98,7 +102,8 @@ let make = () => {
         }
         onClick={_e =>
           onSettingsPage
-            ? historyBack() : ReasonReact.Router.push("/settings")
+            ? ReasonReact.Router.push("/")
+            : ReasonReact.Router.push("/settings")
         }>
         <Icon kind=Icon.Settings />
         <Spacer width=0.25 />

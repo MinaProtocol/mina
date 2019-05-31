@@ -18,7 +18,10 @@ module Styles = {
     ]);
 
   let grey =
-    merge([base, style([backgroundColor(Theme.Colors.slateAlpha(0.06))])]);
+    merge([
+      base,
+      style([backgroundColor(Theme.Colors.midnightAlpha(0.06))]),
+    ]);
 
   let green =
     merge([base, style([backgroundColor(Theme.Colors.serpentineLight)])]);
