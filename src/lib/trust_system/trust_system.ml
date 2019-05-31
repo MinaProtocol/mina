@@ -59,7 +59,7 @@ module Actions = struct
           date, etc.
       *)
     | Sent_old_gossip  (** Peer sent us a gossip item we already knew. *)
-  [@@deriving show]
+  [@@deriving show, compare, sexp]
 
   (** The action they took, paired with a message and associated JSON metadata
       for logging. *)
@@ -147,9 +147,6 @@ end
 module Banned_status = Banned_status
 module Peer_status = Peer_status
 module Peer_trust = Peer_trust.Make (Actions)
-module For_tests = struct
-    module Record = Record
-end
 include Peer_trust
 
 let record_envelope_sender :

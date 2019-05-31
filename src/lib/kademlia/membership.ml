@@ -174,7 +174,10 @@ module Haskell_process = struct
           Deferred.upon (Process.wait p.process) (fun code ->
               match (!(p.failure_response), code) with
               | `Ignore, _ | _, Ok () ->
-                  ()
+                  Logger.info logger ~module_:__MODULE__ ~location:__LOC__
+                    "Kademlia process %s died (ignoring): %s"
+                    (Process.pid p.process |> Pid.to_string)
+                    (Unix.Exit_or_signal.to_string_hum code)
               | `Die, (Error _ as e) ->
                   Logger.fatal logger ~module_:__MODULE__ ~location:__LOC__
                     !"Kademlia process died: %s%!"
