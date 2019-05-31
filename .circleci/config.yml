@@ -240,20 +240,30 @@ jobs:
             - image: codaprotocol/coda:toolchain-4c1060cf4d7094ecddd40e4f1db677633f080c40
         steps:
             - checkout
+            - run: ulimit -c unlimited
+            - run: mkdir /tmp/cores
+            - run: sudo sysctl -w kernel.core_pattern=/tmp/cores/core-%e.%p.%h.%t
             - run: git submodule sync && git submodule update --init --recursive
             - run:
                   name: Run unit tests
                   command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && dune build --profile=test_postake_snarkless -j8 && dune runtest --profile=test_postake_snarkless -j8'
+            - store_artifacts:
+                path: /tmp/cores
     test-unit--dev:
         resource_class: large
         docker:
             - image: codaprotocol/coda:toolchain-4c1060cf4d7094ecddd40e4f1db677633f080c40
         steps:
             - checkout
+            - run: ulimit -c unlimited
+            - run: mkdir /tmp/cores
+            - run: sudo sysctl -w kernel.core_pattern=/tmp/cores/core-%e.%p.%h.%t
             - run: git submodule sync && git submodule update --init --recursive
             - run:
                   name: Run unit tests
                   command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && dune build --profile=dev -j8 && dune runtest --profile=dev -j8'
+            - store_artifacts:
+                path: /tmp/cores
     test--fake_hash:
         resource_class: large
         docker:
