@@ -435,10 +435,10 @@ module Data = struct
       let module Table = Public_key.Compressed.Table in
       let unseens =
         Table.to_alist !t.last_checked_slot_and_epoch
-        |> List.filter_map ~f:(fun (pk, old_epoch_and_slot) ->
+        |> List.filter_map ~f:(fun (pk, last_checked_epoch_and_slot) ->
                let i =
                  Tuple2.compare ~cmp1:Epoch.compare ~cmp2:Epoch.Slot.compare
-                   old_epoch_and_slot (epoch, slot)
+                   last_checked_epoch_and_slot (epoch, slot)
                in
                if i >= 0 then None
                else (
@@ -2604,7 +2604,9 @@ module Hooks = struct
          * chance of winning. See #2573 *)
         Keypair.And_compressed_pk.Set.fold_until keypairs ~init:()
           ~f:(fun () (keypair, public_key_compressed) ->
-            if Public_key.Compressed.Set.mem unseen_pks public_key_compressed
+            if
+              not
+              @@ Public_key.Compressed.Set.mem unseen_pks public_key_compressed
             then Continue_or_stop.Continue ()
             else
               match
@@ -2625,13 +2627,18 @@ module Hooks = struct
         else
           match Local_state.seen_slot local_state epoch slot with
           | `All_seen ->
+              Logger.info logger ~module_:__MODULE__ ~location:__LOC__
+                "All seen" ;
               find_winning_slot (Epoch.Slot.succ slot)
           | `Unseen pks -> (
-            match proposal_data pks slot with
-            | None ->
-                find_winning_slot (Epoch.Slot.succ slot)
-            | Some (keypair, data) ->
-                Some (slot, keypair, data) )
+              Logger.info logger ~module_:__MODULE__ ~location:__LOC__
+                !"Some unseen: %{sexp: Public_key.Compressed.Set.t}"
+                pks ;
+              match proposal_data pks slot with
+              | None ->
+                  find_winning_slot (Epoch.Slot.succ slot)
+              | Some (keypair, data) ->
+                  Some (slot, keypair, data) )
       in
       find_winning_slot slot
     in
