@@ -786,7 +786,7 @@ let%test_module "edge cases trust actions test" =
             let%bind () = Gossip_net.shutdown one in
             let%bind () = Ivar.read finished_handling_failure in
             Pipe.close_read two_ts_pipe ;
-            teardown [one; two] )
+            Gossip_net.shutdown two )
           "gossip_net_test"
       in
       Async.Thread_safe.block_on_async_exn (fun () -> x)
