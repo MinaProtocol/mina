@@ -8,9 +8,7 @@ let command_name = "snark-worker"
 module type Inputs_intf = sig
   open Snark_work_lib
 
-  module Ledger_proof : sig
-    type t [@@deriving bin_io, sexp, version]
-  end
+  module Ledger_proof : Coda_intf.Ledger_proof_intf
 
   module Worker_state : sig
     type t
@@ -32,9 +30,7 @@ module type Inputs_intf = sig
 end
 
 module type S = sig
-  module Ledger_proof : sig
-    type t [@@deriving bin_io, sexp, version]
-  end
+  type ledger_proof
 
   module Work : sig
     open Snark_work_lib
@@ -45,7 +41,7 @@ module type S = sig
           ( Transaction_snark.Statement.t
           , Transaction.t
           , Transaction_witness.t
-          , Ledger_proof.t )
+          , ledger_proof )
           Work.Single.Spec.t
         [@@deriving sexp]
       end
@@ -56,7 +52,7 @@ module type S = sig
     end
 
     module Result : sig
-      type t = (Spec.t, Ledger_proof.t) Work.Result.t
+      type t = (Spec.t, ledger_proof) Work.Result.t
     end
   end
 

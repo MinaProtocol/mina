@@ -7,21 +7,8 @@ open Pipe_lib
 
 let request_service_name = "CODA_WEB_CLIENT_SERVICE"
 
-module type Coda_intf = sig
+module type Intf = sig
   type t
-
-  module Inputs : sig
-    module Ledger : sig
-      type t
-
-      val fold_until :
-           t
-        -> init:'accum
-        -> f:('accum -> Account.t -> ('accum, 'stop) Base.Continue_or_stop.t)
-        -> finish:('accum -> 'stop)
-        -> 'stop
-    end
-  end
 
   val get_lite_chain :
     (t -> Signature_lib.Public_key.Compressed.t list -> Lite_base.Lite_chain.t)
@@ -40,9 +27,7 @@ module Storage (Bin : Binable.S) = struct
     Writer.save location ~contents:(to_base64 (module Bin) data)
 end
 
-module Make_broadcaster
-    (Program : Coda_intf)
-    (Put_request : Web_request.Intf.S) =
+module Make_broadcaster (Program : Intf) (Put_request : Web_request.Intf.S) =
 struct
   let get_proposer_chain coda =
     let open Base in
@@ -123,8 +108,8 @@ let copy ~src ~dst =
 
 let project_directory = "CODA_PROJECT_DIR"
 
-let run_service (type t) (module Program : Coda_intf with type t = t) coda
-    ~conf_dir ~logger =
+let run_service (type t) (module Program : Intf with type t = t) coda ~conf_dir
+    ~logger =
   O1trace.trace_task "web pipe" (fun () -> function
     | `None ->
         Logger.info logger ~module_:__MODULE__ ~location:__LOC__

@@ -206,8 +206,7 @@ let daemon logger =
          or_from_config
            (Fn.compose Option.return
               (Fn.compose work_selection_val YJ.Util.to_string))
-           "work-selection" ~default:Protocols.Coda_pow.Work_selection.Seq
-           work_selection_flag
+           "work-selection" ~default:Cli_lib.Arg_type.Seq work_selection_flag
        in
        let initial_peers_raw =
          List.concat
@@ -349,7 +348,7 @@ let daemon logger =
        let trust_system = Trust_system.create ~db_dir:trust_dir in
        trace_database_initialization "trust_system" __LOC__ trust_dir ;
        let time_controller =
-         M.Inputs.Time.Controller.create M.Inputs.Time.Controller.basic
+         Block_time.Controller.create Block_time.Controller.basic
        in
        let consensus_local_state =
          Consensus.Data.Local_state.create
@@ -388,6 +387,14 @@ let daemon logger =
        in
        trace_database_initialization "transaction_database" __LOC__
          transaction_database_dir ;
+       let external_transition_database_dir =
+         conf_dir ^/ "external_transition_database"
+       in
+       let%bind () = Async.Unix.mkdir ~p:() external_transition_database_dir in
+       let external_transition_database =
+         Auxiliary_database.External_transition_database.create logger
+           external_transition_database_dir
+       in
        let monitor = Async.Monitor.create ~name:"coda" () in
        let%bind coda =
          Run.create
@@ -400,7 +407,8 @@ let daemon logger =
               ~snark_work_fee:snark_work_fee_flag ~receipt_chain_database
               ~transition_frontier_location ~time_controller
               ?propose_keypair:Config0.propose_keypair ~monitor
-              ~consensus_local_state ~transaction_database ())
+              ~consensus_local_state ~transaction_database
+              ~external_transition_database ())
        in
        Run.handle_shutdown ~monitor ~conf_dir coda ;
        Async.Scheduler.within' ~monitor
