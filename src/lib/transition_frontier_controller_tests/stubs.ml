@@ -372,7 +372,9 @@ struct
           Ledger_transfer.transfer_accounts ~src:Genesis_ledger.t
             ~dest:ledger_db
         in
-        let consensus_local_state = Consensus.Data.Local_state.create None in
+        let consensus_local_state =
+          Consensus.Data.Local_state.create Public_key.Compressed.Set.empty
+        in
         let%bind frontier =
           create_frontier_from_genesis_protocol_state ~logger
             ~consensus_local_state
@@ -388,7 +390,8 @@ struct
     in
     let consensus_local_state =
       Consensus.Data.Local_state.create
-        (Some (Account.public_key proposer_account))
+        (Public_key.Compressed.Set.singleton
+           (Account.public_key proposer_account))
     in
     let genesis_protocol_state_with_hash =
       Genesis_protocol_state.create_with_custom_ledger

@@ -10,6 +10,7 @@ open Strict_pipe
 open Signature_lib
 open O1trace
 open Auxiliary_database
+open Otp_lib
 
 module type Transaction_pool_read_intf = sig
   type t
@@ -91,7 +92,9 @@ module type Proposer_intf = sig
                            -> completed_work_checked option)
     -> transaction_pool:transaction_pool
     -> time_controller:Block_time.Controller.t
-    -> keypair:Keypair.t
+    -> keypairs:( Agent.read_only Agent.flag
+                , Keypair.And_compressed_pk.Set.t )
+                Agent.t
     -> consensus_local_state:Consensus.Data.Local_state.t
     -> frontier_reader:transition_frontier option Broadcast_pipe.Reader.t
     -> transition_writer:( breadcrumb
@@ -248,7 +251,8 @@ module Make (Inputs : Inputs_intf) = struct
   module Ledger_transfer = Ledger_transfer.Make (Ledger) (Ledger.Db)
 
   type t =
-    { propose_keypair: Keypair.t option
+    { propose_keypairs:
+        (Agent.read_write Agent.flag, Keypair.And_compressed_pk.Set.t) Agent.t
     ; snark_worker_key: Public_key.Compressed.Stable.V1.t option
     ; net: Net.t
     ; verifier: Verifier.t
@@ -268,6 +272,7 @@ module Make (Inputs : Inputs_intf) = struct
     ; trust_system: Trust_system.t
     ; mutable seen_jobs: Work_selector.State.t
     ; transaction_database: Transaction_database.t
+    ; external_transition_database: External_transition_database.t
     ; receipt_chain_database: Coda_base.Receipt_chain_database.t
     ; staged_ledger_transition_backup_capacity: int
     ; external_transitions_writer:
@@ -289,7 +294,10 @@ module Make (Inputs : Inputs_intf) = struct
 
   let snark_worker_key t = t.snark_worker_key
 
-  let propose_keypair t = t.propose_keypair
+  let propose_public_keys t =
+    Consensus.Data.Local_state.current_proposers t.consensus_local_state
+
+  let replace_propose_keypairs t kps = Agent.update t.propose_keypairs kps
 
   let best_tip_opt t =
     let open Option.Let_syntax in
@@ -428,6 +436,8 @@ module Make (Inputs : Inputs_intf) = struct
 
   let transaction_database t = t.transaction_database
 
+  let external_transition_database t = t.external_transition_database
+
   let snark_pool t = t.snark_pool
 
   let peers t = Net.peers t.net
@@ -483,7 +493,7 @@ module Make (Inputs : Inputs_intf) = struct
       { logger: Logger.t
       ; trust_system: Trust_system.t
       ; verifier: Verifier.t
-      ; propose_keypair: Keypair.t option
+      ; initial_propose_keypairs: Keypair.Set.t
       ; snark_worker_key: Public_key.Compressed.Stable.V1.t option
       ; net_config: Net.Config.t
       ; transaction_pool_disk_location: string
@@ -495,6 +505,7 @@ module Make (Inputs : Inputs_intf) = struct
       ; time_controller: Block_time.Controller.t
       ; receipt_chain_database: Coda_base.Receipt_chain_database.t
       ; transaction_database: Transaction_database.t
+      ; external_transition_database: External_transition_database.t
       ; snark_work_fee: Currency.Fee.t
       ; monitor: Monitor.t option
       ; consensus_local_state: Consensus.Data.Local_state.t
@@ -504,14 +515,14 @@ module Make (Inputs : Inputs_intf) = struct
   end
 
   let start t =
-    Option.iter t.propose_keypair ~f:(fun keypair ->
-        Proposer.run ~logger:t.logger ~verifier:t.verifier
-          ~trust_system:t.trust_system ~transaction_pool:t.transaction_pool
-          ~get_completed_work:(Snark_pool.get_completed_work t.snark_pool)
-          ~time_controller:t.time_controller ~keypair
-          ~consensus_local_state:t.consensus_local_state
-          ~frontier_reader:t.transition_frontier
-          ~transition_writer:t.proposer_transition_writer )
+    Proposer.run ~logger:t.logger ~verifier:t.verifier
+      ~trust_system:t.trust_system ~transaction_pool:t.transaction_pool
+      ~get_completed_work:(Snark_pool.get_completed_work t.snark_pool)
+      ~time_controller:t.time_controller
+      ~keypairs:(Agent.read_only t.propose_keypairs)
+      ~consensus_local_state:t.consensus_local_state
+      ~frontier_reader:t.transition_frontier
+      ~transition_writer:t.proposer_transition_writer
 
   let create_genesis_frontier (config : Config.t) =
     let consensus_local_state = config.consensus_local_state in
@@ -785,7 +796,14 @@ module Make (Inputs : Inputs_intf) = struct
                    Net.broadcast_snark_pool_diff net x ;
                    Deferred.unit )) ;
             return
-              { propose_keypair= config.propose_keypair
+              { propose_keypairs=
+                  Agent.create
+                    ~f:(fun kps ->
+                      Keypair.Set.to_list kps
+                      |> List.map ~f:(fun kp ->
+                             (kp, Public_key.compress kp.Keypair.public_key) )
+                      |> Keypair.And_compressed_pk.Set.of_list )
+                    config.initial_propose_keypairs
               ; snark_worker_key= config.snark_worker_key
               ; net
               ; verifier= config.verifier
@@ -806,5 +824,7 @@ module Make (Inputs : Inputs_intf) = struct
               ; snark_work_fee= config.snark_work_fee
               ; proposer_transition_writer
               ; consensus_local_state= config.consensus_local_state
-              ; transaction_database= config.transaction_database } ) )
+              ; transaction_database= config.transaction_database
+              ; external_transition_database=
+                  config.external_transition_database } ) )
 end

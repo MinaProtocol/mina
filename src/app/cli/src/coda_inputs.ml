@@ -46,7 +46,7 @@ module type Init_intf = sig
 
   module Make_work_selector : Work_selector_F
 
-  val proposer_prover : [`Proposer of Prover.t | `Non_proposer]
+  val proposer_prover : Prover.t
 
   val verifier : Verifier.t
 
@@ -115,7 +115,7 @@ module type Main_intf = sig
       { logger: Logger.t
       ; trust_system: Trust_system.t
       ; verifier: Verifier.t
-      ; propose_keypair: Keypair.t option
+      ; initial_propose_keypairs: Keypair.Set.t
       ; snark_worker_key: Public_key.Compressed.Stable.V1.t option
       ; net_config: Inputs.Net.Config.t
       ; transaction_pool_disk_location: string
@@ -127,6 +127,8 @@ module type Main_intf = sig
       ; time_controller: Block_time.Controller.t
       ; receipt_chain_database: Receipt_chain_database.t
       ; transaction_database: Auxiliary_database.Transaction_database.t
+      ; external_transition_database:
+          Auxiliary_database.External_transition_database.t
       ; snark_work_fee: Currency.Fee.t
       ; monitor: Async.Monitor.t option
       ; consensus_local_state: Consensus.Data.Local_state.t }
@@ -135,7 +137,10 @@ module type Main_intf = sig
 
   type t
 
-  val propose_keypair : t -> Keypair.t option
+  (** Derived from local state (aka they may not reflect the latest public keys to which you've attempted to change *)
+  val propose_public_keys : t -> Public_key.Compressed.Set.t
+
+  val replace_propose_keypairs : t -> Keypair.And_compressed_pk.Set.t -> unit
 
   val snark_worker_key : t -> Public_key.Compressed.Stable.V1.t option
 
@@ -174,6 +179,9 @@ module type Main_intf = sig
   val transaction_pool : t -> Inputs.Transaction_pool.t
 
   val transaction_database : t -> Auxiliary_database.Transaction_database.t
+
+  val external_transition_database :
+    t -> Auxiliary_database.External_transition_database.t
 
   val snark_pool : t -> Inputs.Snark_pool.t
 
@@ -214,15 +222,9 @@ module Pending_coinbase = struct
   end
 end
 
-let make_init ~should_propose (module Config : Config_intf) :
-    (module Init_intf) Deferred.t =
+let make_init (module Config : Config_intf) : (module Init_intf) Deferred.t =
   let open Config in
-  let%bind proposer_prover =
-    if should_propose then
-      let%map prover = Prover.create () in
-      `Proposer prover
-    else return `Non_proposer
-  in
+  let%bind proposer_prover = Prover.create () in
   let%map verifier = Verifier.create () in
   let (module Make_work_selector : Work_selector_F) =
     match work_selection with
@@ -325,7 +327,6 @@ module Make_inputs0 (Init : Init_intf) = struct
 
     type pool_diff = Pool.Diff.t
 
-    (* TODO *)
     let load ~logger ~trust_system ~disk_location:_ ~incoming_diffs
         ~frontier_broadcast_pipe =
       return
@@ -463,18 +464,15 @@ struct
     module Prover = struct
       let prove ~prev_state ~prev_state_proof ~next_state
           (transition : Internal_transition.t) pending_coinbase =
-        match Init.proposer_prover with
-        | `Non_proposer ->
-            failwith "prove: Coda not run as proposer"
-        | `Proposer prover ->
-            let open Deferred.Or_error.Let_syntax in
-            Prover.extend_blockchain prover
-              (Blockchain.create ~proof:prev_state_proof ~state:prev_state)
-              next_state
-              (Internal_transition.snark_transition transition)
-              (Internal_transition.prover_state transition)
-              pending_coinbase
-            >>| fun {Blockchain.proof; _} -> proof
+        let prover = Init.proposer_prover in
+        let open Deferred.Or_error.Let_syntax in
+        Prover.extend_blockchain prover
+          (Blockchain.create ~proof:prev_state_proof ~state:prev_state)
+          next_state
+          (Internal_transition.snark_transition transition)
+          (Internal_transition.prover_state transition)
+          pending_coinbase
+        >>| fun {Blockchain.proof; _} -> proof
     end
   end)
 
