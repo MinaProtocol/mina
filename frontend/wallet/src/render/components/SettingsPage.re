@@ -3,11 +3,34 @@ open Tc;
 module Styles = {
   open Css;
 
+  let headerContainer =
+    style([display(`flex), justifyContent(`spaceBetween)]);
+
+  let networkContainer = style([width(`rem(21.))]);
+
+  let customNetwork = style([display(`flex), alignItems(`center)]);
+
+  let versionText =
+    merge([
+      Theme.Text.Header.h6,
+      style([display(`flex), textTransform(`uppercase)]),
+    ]);
+
   let container =
     style([
       height(`percent(100.)),
       padding(`rem(2.)),
       backgroundColor(Theme.Colors.greyish(0.1)),
+    ]);
+
+  let label =
+    merge([
+      Theme.Text.Header.h3,
+      style([
+        margin2(~v=`rem(0.5), ~h=`zero),
+        color(Theme.Colors.midnight),
+        userSelect(`none),
+      ]),
     ]);
 
   let walletItemContainer =
@@ -25,10 +48,12 @@ module Styles = {
     merge([
       Theme.Text.Body.regular,
       style([
+        userSelect(`none),
         padding(`rem(0.5)),
         color(Theme.Colors.midnight),
         display(`flex),
         alignItems(`center),
+        hover([opacity(0.6)]),
       ]),
     ]);
 
@@ -68,7 +93,9 @@ module WalletItem = {
       <div className=Styles.walletName>
         {React.string(AddressBook.getWalletName(addressBook, publicKey))}
       </div>
-      <Pill> {React.string(PublicKey.prettyPrint(publicKey))} </Pill>
+      <span className=Theme.Text.Body.mono>
+        <Pill> {React.string(PublicKey.prettyPrint(publicKey))} </Pill>
+      </span>
       <Spacer width=5.0 />
       <span className=Styles.walletChevron>
         <Icon kind=Icon.EmptyChevronRight />
@@ -77,37 +104,118 @@ module WalletItem = {
   };
 };
 
+let doubleList = l => List.map(~f=x => (x, x), l);
+
+type networkOption =
+  | NetworkOption(string)
+  | Custom(string);
+
 [@react.component]
 let make = () => {
-  <div className=Styles.container>
-    <span className=Theme.Text.title> {React.string("Settings")} </span>
-    <Spacer height=1. />
-    <SettingsQuery>
-      {response =>
-         switch (response.result) {
-         | Loading => React.string("...")
-         | Error(err) => React.string(err##message)
-         | Data(data) =>
-           <>
-             <span className=Theme.Text.Body.regular>
-               {React.string("Wallet version: " ++ data##version)}
-             </span>
-             <div className=Styles.walletItemContainer>
-               {data##ownedWallets
-                |> Array.mapi(~f=(i, w) =>
-                     <>
-                       <WalletItem
-                         key={PublicKey.toString(w##publicKey)}
-                         publicKey=w##publicKey
-                       />
-                       {i < Array.length(data##ownedWallets) - 1
-                          ? <hr className=Styles.line /> : React.null}
-                     </>
-                   )
-                |> React.array}
+  // TODO: Get and save value from the settings
+  let (networkValue, setNetworkValue) =
+    React.useState(() => NetworkOption("testnet.codaprotocol.com"));
+
+  <SettingsQuery>
+    {response =>
+       switch (response.result) {
+       | Loading => React.string("...")
+       | Error(err) => React.string(err##message)
+       | Data(data) =>
+         let versionText =
+           String.slice(
+             data##version,
+             ~from=0,
+             ~to_=min(8, String.length(data##version)),
+           );
+         <div className=Styles.container>
+           <div className=Styles.headerContainer>
+             <div className=Styles.label> {React.string("Network")} </div>
+             <div className=Styles.versionText>
+               <span
+                 className=Css.(
+                   style([color(Theme.Colors.slateAlpha(0.3))])
+                 )>
+                 {React.string("Version:")}
+               </span>
+               <Spacer width=0.5 />
+               <span
+                 className=Css.(
+                   style([color(Theme.Colors.slateAlpha(0.7))])
+                 )>
+                 {React.string(versionText)}
+               </span>
              </div>
-           </>
-         }}
-    </SettingsQuery>
-  </div>;
+           </div>
+           <div className=Styles.networkContainer>
+             <Dropdown
+               value={
+                 switch (networkValue) {
+                 | NetworkOption(s) => Some(s)
+                 | Custom(_) => Some("CUSTOM")
+                 }
+               }
+               label="URL"
+               options={doubleList([
+                 "testnet.codaprotocol.com",
+                 "testnet2.codaprotocol.com",
+                 "testnet3.codaprotocol.com",
+                 "CUSTOM",
+               ])}
+               onChange={s =>
+                 switch (s) {
+                 | "CUSTOM" =>
+                   setNetworkValue(
+                     fun
+                     | NetworkOption(_) => Custom("")
+                     | x => x,
+                   )
+                 | s => setNetworkValue(_ => NetworkOption(s))
+                 }
+               }
+             />
+             {switch (networkValue) {
+              | Custom(v) =>
+                <>
+                  <Spacer height=0.5 />
+                  <div className=Styles.customNetwork>
+                    <Icon kind=Icon.BentArrow />
+                    <Spacer width=0.5 />
+                    <TextField
+                      value=v
+                      label="URL"
+                      placeholder="my.network.com"
+                      onChange={s => setNetworkValue(_ => Custom(s))}
+                      button={
+                        <TextField.Button
+                          text="Save"
+                          color=`Green
+                          onClick=ignore
+                        />
+                      }
+                    />
+                  </div>
+                </>
+              | _ => React.null
+              }}
+           </div>
+           <Spacer height=1. />
+           <div className=Styles.label> {React.string("Wallets")} </div>
+           <div className=Styles.walletItemContainer>
+             {data##ownedWallets
+              |> Array.mapi(~f=(i, w) =>
+                   <>
+                     <WalletItem
+                       key={PublicKey.toString(w##publicKey)}
+                       publicKey=w##publicKey
+                     />
+                     {i < Array.length(data##ownedWallets) - 1
+                        ? <hr className=Styles.line /> : React.null}
+                   </>
+                 )
+              |> React.array}
+           </div>
+         </div>;
+       }}
+  </SettingsQuery>;
 };
