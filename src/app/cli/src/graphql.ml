@@ -840,7 +840,9 @@ module Make (Commands : Coda_commands.Intf) = struct
         ~resolve:(fun {ctx= coda; _} () (pk_string : string) ->
           let open Result.Let_syntax in
           let propose_public_keys = Program.propose_public_keys coda in
-          let%map pk = Arguments.public_key ~name:"publicKey" pk_string in
+          let%map pk =
+            Types.Arguments.public_key ~name:"publicKey" pk_string
+          in
           Option.map
             Partial_account.(
               of_pk coda pk |> to_full_account |> Option.map ~f:of_full_account)
@@ -1043,7 +1045,9 @@ module Make (Commands : Coda_commands.Intf) = struct
             List.fold pk_strings ~init:(Result.return [])
               ~f:(fun acc pk_string ->
                 let%bind acc = acc in
-                let%map pk = Arguments.public_key ~name:"wallets" pk_string in
+                let%map pk =
+                  Types.Arguments.public_key ~name:"wallets" pk_string
+                in
                 pk :: acc )
           in
           let kps =
