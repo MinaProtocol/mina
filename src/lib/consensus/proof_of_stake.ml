@@ -2336,6 +2336,32 @@ module Hooks = struct
       | ls ->
           Non_empty_list.of_list_opt ls )
 
+  (* TODO: Remove this once required_local_state_sync function is fixed *)
+  let bootstrap_local_state_sync ~(consensus_state : Consensus_state.Value.t)
+      ~local_state =
+    let open Coda_base in
+    let required_snapshot_sync snapshot_id expected_root =
+      Option.some_if
+        (not
+           (Ledger_hash.equal
+              (Frozen_ledger_hash.to_ledger_hash expected_root)
+              (Sparse_ledger.merkle_root
+                 (Local_state.get_snapshot local_state snapshot_id).ledger)))
+        {snapshot_id; expected_root}
+    in
+    match
+      Core.List.filter_map
+        [ required_snapshot_sync Curr_epoch_snapshot
+            consensus_state.curr_epoch_data.ledger.hash
+        ; required_snapshot_sync Last_epoch_snapshot
+            consensus_state.last_epoch_data.ledger.hash ]
+        ~f:Fn.id
+    with
+    | [] ->
+        None
+    | ls ->
+        Non_empty_list.of_list_opt ls
+
   let sync_local_state ~logger ~trust_system ~local_state ~random_peers
       ~(query_peer : Network_peer.query_peer) requested_syncs =
     let open Local_state in

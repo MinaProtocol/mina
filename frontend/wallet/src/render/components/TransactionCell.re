@@ -127,28 +127,9 @@ module ViewModel = {
 module ActorName = {
   [@react.component]
   let make = (~value: ViewModel.Actor.t) => {
-    let activeWallet = Hooks.useActiveWallet();
-    let (settings, _) = React.useContext(AddressBookProvider.context);
     switch (value) {
     | Key(key) =>
-      <Pill mode={activeWallet === Some(key) ? Pill.Blue : Pill.Grey}>
-        <span
-          className=Css.(
-            merge([
-              Option.isSome(AddressBook.lookup(settings, key))
-                ? Theme.Text.Body.regular : Theme.Text.mono,
-              style([
-                color(
-                  activeWallet === Some(key)
-                    ? Theme.Colors.marineAlpha(1.) : Theme.Colors.midnight,
-                ),
-                opacity(0.7),
-              ]),
-            ])
-          )>
-          {ReasonReact.string(AddressBook.getWalletName(settings, key))}
-        </span>
-      </Pill>
+      <AddressPill pubkey=key />
     | Unknown =>
       <Pill>
         <span

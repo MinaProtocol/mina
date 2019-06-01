@@ -461,6 +461,11 @@ module type S = sig
       -> local_state:Local_state.t
       -> local_state_sync Non_empty_list.t option
 
+    val bootstrap_local_state_sync :
+         consensus_state:Consensus_state.Value.t
+      -> local_state:Local_state.t
+      -> local_state_sync Non_empty_list.t option
+
     (**
       * Synchronize local state over the network.
     *)
