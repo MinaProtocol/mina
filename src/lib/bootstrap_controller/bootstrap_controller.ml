@@ -336,10 +336,18 @@ end = struct
         let local_state = Transition_frontier.consensus_local_state frontier in
         let%bind () =
           match
-            Consensus.Hooks.required_local_state_sync ~consensus_state
+            Consensus.Hooks.bootstrap_local_state_sync ~consensus_state
               ~local_state
           with
           | None ->
+              Logger.info logger ~module_:__MODULE__ ~location:__LOC__
+                ~metadata:
+                  [ ( "local_state"
+                    , Consensus.Data.Local_state.to_yojson local_state )
+                  ; ( "consensus_state"
+                    , Consensus.Data.Consensus_state.Value.to_yojson
+                        consensus_state ) ]
+                "Not synchronizing consensus local state" ;
               Deferred.unit
           | Some sync_jobs -> (
               Logger.info logger ~module_:__MODULE__ ~location:__LOC__
