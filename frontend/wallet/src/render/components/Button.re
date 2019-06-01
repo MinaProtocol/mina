@@ -15,7 +15,7 @@ module Styles = {
         alignItems(`center),
         justifyContent(`center),
         height(`rem(3.)),
-        minWidth(`rem(10.4375)),
+        minWidth(`rem(10.)),
         padding2(~v=`zero, ~h=`rem(1.)),
         background(white),
         border(`px(0), `solid, white),

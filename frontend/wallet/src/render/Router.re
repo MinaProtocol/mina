@@ -11,11 +11,7 @@ let make = () => {
     {switch (url.path) {
      | ["settings"] => <SettingsPage />
      | ["settings", publicKey] =>
-       <WalletSettings
-         publicKey={PublicKey.ofStringExn(
-           Js.Global.decodeURIComponent(publicKey),
-         )}
-       />
+       <WalletSettings publicKey={PublicKey.uriDecode(publicKey)} />
      | _ => <TransactionsView />
      }}
   </div>;
