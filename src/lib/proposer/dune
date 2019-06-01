@@ -5,7 +5,7 @@
  (library_flags -linkall)
  (inline_tests)
  (libraries core async coda_lib coda_base envelope coda_intf async_extra
-   unix_timestamp o1trace interruptible pipe_lib transaction_snark_scan_state)
+   unix_timestamp o1trace interruptible pipe_lib transaction_snark_scan_state otp_lib)
  (preprocess
   (pps ppx_jane bisect_ppx -- -conditional))
  (synopsis "Coda block proposer"))
