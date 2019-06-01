@@ -26,3 +26,5 @@ let update (t : (read_write flag, 'a) t) a =
 
 let on_update (t : (_ flag, 'a) t) ~f =
   t.on_update <- (fun a -> t.on_update a ; f a)
+
+let read_only t = {a= t.a; on_update= t.on_update; dirty= t.dirty}

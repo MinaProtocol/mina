@@ -17,3 +17,5 @@ val get : (_ flag, 'a) t -> 'a * [> `Different | `Same]
 val update : (read_write flag, 'a) t -> 'a -> unit
 
 val on_update : (_ flag, 'a) t -> f:('a -> unit) -> unit
+
+val read_only : (read_write flag, 'a) t -> (read_only flag, 'a) t
