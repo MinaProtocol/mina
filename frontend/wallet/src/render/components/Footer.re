@@ -93,7 +93,7 @@ let make = () => {
          onClick={_ => setDownloadState(_ => true)}
        />;
      }}
-    <WalletQuery>
+    <WalletQuery partialRefetch=true>
       {response =>
          switch (response.result) {
          | Loading

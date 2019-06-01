@@ -64,7 +64,7 @@ let make = (~wallet: Wallet.t) => {
       }
     }
     onClick={_ =>
-      ReasonReact.Router.push("/wallet/" ++ PublicKey.toString(wallet.key))
+      ReasonReact.Router.push("/wallet/" ++ PublicKey.uriEncode(wallet.key))
     }>
     <div className=Styles.walletName> {ReasonReact.string(walletName)} </div>
     <div className=Styles.balance>

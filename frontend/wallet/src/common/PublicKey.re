@@ -13,3 +13,7 @@ let prettyPrint = s =>
   };
 
 let equal = (a, b) => a === b;
+
+let uriEncode = Js.Global.encodeURIComponent;
+
+let uriDecode = Js.Global.decodeURIComponent;
