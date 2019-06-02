@@ -16,12 +16,7 @@ module Styles = {
       style([display(`flex), textTransform(`uppercase)]),
     ]);
 
-  let container =
-    style([
-      height(`percent(100.)),
-      padding(`rem(2.)),
-      backgroundColor(Theme.Colors.greyish(0.1)),
-    ]);
+  let container = style([height(`percent(100.)), padding(`rem(2.))]);
 
   let label =
     merge([
