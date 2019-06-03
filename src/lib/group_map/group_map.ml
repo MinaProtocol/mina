@@ -75,6 +75,8 @@ end
 
 module Conic = struct
   type 'f t = {z: 'f; y: 'f}
+
+  let map {z; y} ~f = {z= f z; y= f y}
 end
 
 module S = struct
@@ -100,6 +102,14 @@ module Params = struct
     ; a: 'f
     ; b: 'f }
   [@@deriving fields]
+
+  let map {u; u_over_2; projection_point; conic_c; a; b} ~f =
+    { u= f u
+    ; u_over_2= f u_over_2
+    ; projection_point= Conic.map ~f projection_point
+    ; conic_c= f conic_c
+    ; a= f a
+    ; b= f b }
 
   (* A deterministic function for constructing a valid choice of parameters for a
      given field.

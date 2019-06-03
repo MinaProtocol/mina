@@ -15,6 +15,8 @@ end
 module Params : sig
   type 'f t
 
+  val map : 'a t -> f:('a -> 'b) -> 'b t
+
   val a : 'f t -> 'f
 
   val b : 'f t -> 'f
