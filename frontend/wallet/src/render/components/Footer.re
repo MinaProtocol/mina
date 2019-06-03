@@ -19,7 +19,7 @@ module Styles = {
 
   let footerButtons =
     style([
-      
+      display(`flex),
     ]);
 
   let stakingSwitch =
@@ -56,7 +56,7 @@ module StakingSwitch = {
 };
 
 module Wallets = [%graphql
-  {| query getWallets { ownedWallets {publicKey, balance{total}} } |}
+  {| query getWallets { ownedWallets {publicKey, balance {total}} } |}
 ];
 
 module WalletQuery = ReasonApollo.CreateQuery(Wallets);
@@ -87,86 +87,92 @@ let make = () => {
   let (modalState, setModalState) = React.useState(() => None);
   <div className=Styles.footer>
     <StakingSwitch />
-    {if (downloading) {
-       let downloadName = "keys-temporary_hack-testnet_postake.tar.bz2";
-       <Downloader
-         keyName=downloadName
-         onFinish={_ => setDownloadState(_ => false)}
-       />;
-     } else {
-       <Button
-         label="Download keys"
-         onClick={_ => setDownloadState(_ => true)}
-       />;
-     }}
-    <WalletQuery partialRefetch=true>
-      {response =>
-         switch (response.result) {
-         | Loading
-         | Error(_) => <Button label="Send" style=Button.Gray />
-         | Data(data) =>
-         <>
-          <Button
-            label="Request"
-            style=Button.Gray
-            onClick={_ => setModalState(_ => Some("active wallet"))}
-          />
-          {switch (modalState) {
-            | None => React.null
-            | _ =>
-              <RequestCodaModal
-                wallets={Array.map(
-                  ~f=Wallet.ofGraphqlExn,
-                  data##ownedWallets,
-                )}
-                setModalState
-              />
-          }}
-           <SendPaymentMutation>
-             (
-               (mutation, _) =>
-                 <SendButton
-                   wallets={Array.map(
-                     ~f=Wallet.ofGraphqlExn,
-                     data##ownedWallets,
-                   )}
-                   onSubmit={(
-                     {from, to_, amount, fee, memoOpt}: SendButton.ModalState.Validated.t,
-                     afterSubmit,
-                   ) => {
-                     let variables =
-                       SendPayment.make(
-                         ~from=PublicKey.toString(from),
-                         ~to_=PublicKey.toString(to_),
-                         ~amount,
-                         ~fee,
-                         ~memo=?memoOpt,
-                         (),
-                       )##variables;
-                     let performMutation =
-                       Task.liftPromise(() => mutation(~variables, ()));
-                     Task.perform(
-                       performMutation,
-                       ~f=
-                         fun
-                         | Data(_)
-                         | EmptyResponse => afterSubmit(Belt.Result.Ok())
-                         | Errors(err) => {
-                             /* TODO: Display more than first error? */
-                             let message =
-                               err
-                               |> Array.get(~index=0)
-                               |> Option.map(~f=e => e##message)
-                               |> Option.withDefault(~default="Server error");
-                             afterSubmit(Error(message));
-                           },
-                     );
-                   }}
-                 />
-             )
-           </SendPaymentMutation>
-           </>
-         }}
-    </WalletQuery>
+    <div className=Styles.footerButtons>
+      {if (downloading) {
+        let downloadName = "keys-temporary_hack-testnet_postake.tar.bz2";
+        <Downloader
+          keyName=downloadName
+          onFinish={_ => setDownloadState(_ => false)}
+        />;
+      } else {
+        <Button
+          label="Download keys"
+          onClick={_ => setDownloadState(_ => true)}
+        />;
+      }}
+      <Spacer width=1. />
+      <WalletQuery partialRefetch=true>
+        {response =>
+          switch (response.result) {
+          | Loading
+          | Error(_) => <Button label="Send" style=Button.Gray />
+          | Data(data) =>
+          <>
+            <Button
+              /* className=Styles.footerButton */
+              label="Request"
+              style=Button.Gray
+              onClick={_ => setModalState(_ => Some("active wallet"))}
+            />
+            {switch (modalState) {
+              | None => React.null
+              | _ =>
+                <RequestCodaModal
+                  wallets={Array.map(
+                    ~f=Wallet.ofGraphqlExn,
+                    data##ownedWallets,
+                  )}
+                  setModalState
+                />
+            }}
+            <Spacer width=1. />
+            <SendPaymentMutation>
+              (
+                (mutation, _) =>
+                  <SendButton
+                    /* className=Styles.footerButton */
+                    wallets={Array.map(
+                      ~f=Wallet.ofGraphqlExn,
+                      data##ownedWallets,
+                    )}
+                    onSubmit={(
+                      {from, to_, amount, fee, memoOpt}: SendButton.ModalState.Validated.t,
+                      afterSubmit,
+                    ) => {
+                      let variables =
+                        SendPayment.make(
+                          ~from=PublicKey.toString(from),
+                          ~to_=PublicKey.toString(to_),
+                          ~amount,
+                          ~fee,
+                          ~memo=?memoOpt,
+                          (),
+                        )##variables;
+                      let performMutation =
+                        Task.liftPromise(() => mutation(~variables, ()));
+                      Task.perform(
+                        performMutation,
+                        ~f=
+                          fun
+                          | Data(_)
+                          | EmptyResponse => afterSubmit(Belt.Result.Ok())
+                          | Errors(err) => {
+                              /* TODO: Display more than first error? */
+                              let message =
+                                err
+                                |> Array.get(~index=0)
+                                |> Option.map(~f=e => e##message)
+                                |> Option.withDefault(~default="Server error");
+                              afterSubmit(Error(message));
+                            },
+                      );
+                    }}
+                  />
+              )
+            </SendPaymentMutation>
+          </>
+        }}
+      </WalletQuery>
+    </div>
   </div>;
 };
