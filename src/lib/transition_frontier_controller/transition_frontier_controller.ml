@@ -93,9 +93,6 @@ module Make (Inputs : Inputs_intf) :
     let unprocessed_transition_cache =
       Transition_handler.Unprocessed_transition_cache.create ~logger
     in
-    Transition_handler.Validator.run ~logger ~trust_system ~frontier
-      ~transition_reader:network_transition_reader ~valid_transition_writer
-      ~unprocessed_transition_cache ;
     List.iter collected_transitions ~f:(fun t ->
         (* since the cache was just built, it's safe to assume
          * registering these will not fail, so long as there
@@ -103,6 +100,9 @@ module Make (Inputs : Inputs_intf) :
         Transition_handler.Unprocessed_transition_cache.register_exn
           unprocessed_transition_cache t
         |> Strict_pipe.Writer.write primary_transition_writer ) ;
+    Transition_handler.Validator.run ~logger ~trust_system ~frontier
+      ~transition_reader:network_transition_reader ~valid_transition_writer
+      ~unprocessed_transition_cache ;
     Strict_pipe.Reader.iter_without_pushback valid_transition_reader
       ~f:(Strict_pipe.Writer.write primary_transition_writer)
     |> don't_wait_for ;

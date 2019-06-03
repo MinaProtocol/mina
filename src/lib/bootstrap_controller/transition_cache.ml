@@ -41,13 +41,17 @@ module Make (Inputs : Inputs_intf) :
           [new_child]
       | Some children ->
           if
-            List.mem children new_child
-              ~equal:
-                (Envelope.Incoming.equal (fun (a, _) (b, _) ->
-                     Inputs.External_transition.equal (With_hash.data a)
-                       (With_hash.data b) ))
+            List.mem children new_child ~equal:(fun e1 e2 ->
+                State_hash.equal
+                  (Envelope.Incoming.data e1 |> fst |> With_hash.hash)
+                  (Envelope.Incoming.data e2 |> fst |> With_hash.hash) )
           then children
           else new_child :: children )
 
-  let data t = State_hash.Table.data t |> List.concat
+  let data t =
+    let collected_transitions = State_hash.Table.data t |> List.concat in
+    assert (
+      List.length collected_transitions
+      = List.length (List.stable_dedup collected_transitions) ) ;
+    collected_transitions
 end

@@ -319,11 +319,7 @@ let daemon logger =
 
          let max_concurrent_connections = max_concurrent_connections
        end in
-       let%bind (module Init) =
-         make_init
-           ~should_propose:(Option.is_some propose_keypair)
-           (module Config0)
-       in
+       let%bind (module Init) = make_init (module Config0) in
        let module M = Coda_inputs.Make_coda (Init) in
        let module Run = Coda_run.Make (Config0) (M) in
        Stream.iter
@@ -350,11 +346,15 @@ let daemon logger =
        let time_controller =
          Block_time.Controller.create Block_time.Controller.basic
        in
+       let initial_propose_keypairs =
+         Config0.propose_keypair |> Option.to_list |> Keypair.Set.of_list
+       in
        let consensus_local_state =
          Consensus.Data.Local_state.create
-           (Option.map Config0.propose_keypair ~f:(fun keypair ->
-                let open Keypair in
-                Public_key.compress keypair.public_key ))
+           ( Option.map Config0.propose_keypair ~f:(fun keypair ->
+                 let open Keypair in
+                 Public_key.compress keypair.public_key )
+           |> Option.to_list |> Public_key.Compressed.Set.of_list )
        in
        let net_config =
          { M.Inputs.Net.Config.logger
@@ -387,6 +387,14 @@ let daemon logger =
        in
        trace_database_initialization "transaction_database" __LOC__
          transaction_database_dir ;
+       let external_transition_database_dir =
+         conf_dir ^/ "external_transition_database"
+       in
+       let%bind () = Async.Unix.mkdir ~p:() external_transition_database_dir in
+       let external_transition_database =
+         Auxiliary_database.External_transition_database.create logger
+           external_transition_database_dir
+       in
        let monitor = Async.Monitor.create ~name:"coda" () in
        let%bind coda =
          Run.create
@@ -398,8 +406,8 @@ let daemon logger =
               ~ledger_db_location:(conf_dir ^/ "ledger_db")
               ~snark_work_fee:snark_work_fee_flag ~receipt_chain_database
               ~transition_frontier_location ~time_controller
-              ?propose_keypair:Config0.propose_keypair ~monitor
-              ~consensus_local_state ~transaction_database ())
+              ~initial_propose_keypairs ~monitor ~consensus_local_state
+              ~transaction_database ~external_transition_database ())
        in
        Run.handle_shutdown ~monitor ~conf_dir coda ;
        Async.Scheduler.within' ~monitor
