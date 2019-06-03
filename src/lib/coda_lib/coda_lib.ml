@@ -241,6 +241,24 @@ module type Inputs_intf = sig
                 , Transaction_witness.t
                 , Ledger_proof.t )
                 Snark_work_lib.Work.Single.Spec.t
+
+  (* TODO: Remove once the external_transition is not a functor parameter anymore *)
+  module Filtered_external_transition : sig
+    type t
+
+    val of_transition :
+         tracked_participants:Public_key.Compressed.Set.t
+      -> (External_transition.Validated.t, 'a) With_hash.t
+      -> (t, Staged_ledger.Pre_diff_info.Error.t) result
+
+    val participants : t -> Public_key.Compressed.Set.t
+  end
+
+  module External_transition_database :
+    Auxiliary_database.Intf.External_transition
+    with type filtered_external_transition := Filtered_external_transition.t
+     and type time := Block_time.Stable.V1.t
+     and type hash := State_hash.t
 end
 
 (* used in error below to allow pattern-match against error *)
@@ -280,7 +298,16 @@ module Make (Inputs : Inputs_intf) = struct
         Pipe.Writer.t
     ; time_controller: Block_time.Controller.t
     ; snark_work_fee: Currency.Fee.t
-    ; consensus_local_state: Consensus.Data.Local_state.t }
+    ; consensus_local_state: Consensus.Data.Local_state.t
+    ; filtered_new_block:
+        (Filtered_external_transition.t, State_hash.t) With_hash.t
+        Broadcast_pipe.Reader.t
+    ; subscribed_block_users:
+        ( (Filtered_external_transition.t, State_hash.t) With_hash.t
+          Pipe.Reader.t
+        * (Filtered_external_transition.t, State_hash.t) With_hash.t
+          Pipe.Writer.t )
+        Public_key.Compressed.Table.t }
 
   let peek_frontier frontier_broadcast_pipe =
     Broadcast_pipe.Reader.peek frontier_broadcast_pipe
@@ -430,6 +457,13 @@ module Make (Inputs : Inputs_intf) = struct
 
   let seen_jobs t = t.seen_jobs
 
+  let filtered_new_block t = t.filtered_new_block
+
+  let add_block_subscriber t public_key =
+    let reader, writer = Pipe.create () in
+    Hashtbl.set t.subscribed_block_users ~key:public_key ~data:(reader, writer) ;
+    reader
+
   let set_seen_jobs t seen_jobs = t.seen_jobs <- seen_jobs
 
   let transaction_pool t = t.transaction_pool
@@ -508,6 +542,7 @@ module Make (Inputs : Inputs_intf) = struct
       ; external_transition_database: External_transition_database.t
       ; snark_work_fee: Currency.Fee.t
       ; monitor: Monitor.t option
+            (* Please implement an asychronous version of this *)
       ; consensus_local_state: Consensus.Data.Local_state.t
             (* TODO: Pass banlist to modules discussed in Ban Reasons issue: https://github.com/CodaProtocol/coda/issues/852 *)
       }
@@ -720,8 +755,10 @@ module Make (Inputs : Inputs_intf) = struct
                      ~f:(fun (tn, tm) -> (`Transition tn, `Time_received tm)))
                 ~proposer_transition_reader
             in
-            let valid_transitions_for_network, valid_transitions_for_api =
-              Strict_pipe.Reader.Fork.two valid_transitions
+            let ( valid_transitions_for_network
+                , valid_transitions_for_api
+                , new_blocks ) =
+              Strict_pipe.Reader.Fork.three valid_transitions
             in
             let%bind transaction_pool =
               Transaction_pool.load ~logger:config.logger
@@ -795,6 +832,80 @@ module Make (Inputs : Inputs_intf) = struct
               (Linear_pipe.iter (Snark_pool.broadcasts snark_pool) ~f:(fun x ->
                    Net.broadcast_snark_pool_diff net x ;
                    Deferred.unit )) ;
+            let subscribed_block_users =
+              Public_key.Compressed.Table.of_alist_exn
+              @@ List.map (Secrets.Wallets.pks wallets) ~f:(fun wallet ->
+                     let reader, writer = Pipe.create () in
+                     (wallet, (reader, writer)) )
+            in
+            let filtered_new_block =
+              Strict_pipe.Reader.filter_map new_blocks
+                ~f:(fun ({With_hash.data= _; hash} as new_block_with_hash) ->
+                  match
+                    Filtered_external_transition.of_transition
+                      ~tracked_participants:
+                        ( Public_key.Compressed.Set.of_list
+                        @@ Hashtbl.keys subscribed_block_users )
+                      new_block_with_hash
+                  with
+                  | Ok filtered_external_transition ->
+                      let block_time = Block_time.now config.time_controller in
+                      let filtered_external_transition_with_hash =
+                        {With_hash.data= filtered_external_transition; hash}
+                      in
+                      let participants =
+                        Filtered_external_transition.participants
+                          filtered_external_transition
+                      in
+                      (* Send block to subscribed partipants *)
+                      Set.iter participants ~f:(fun participant ->
+                          Hashtbl.find_and_call subscribed_block_users
+                            participant
+                            ~if_found:(fun (_, writer) ->
+                              Pipe.write_without_pushback writer
+                                filtered_external_transition_with_hash )
+                            ~if_not_found:ignore ) ;
+                      External_transition_database.add
+                        config.external_transition_database
+                        filtered_external_transition_with_hash block_time ;
+                      Some filtered_external_transition_with_hash
+                  | Error e ->
+                      Logger.error config.logger
+                        "Could not process transactions in valid \
+                         external_transition "
+                        ~module_:__MODULE__ ~location:__LOC__
+                        ~metadata:
+                          [ ( "error"
+                            , `String
+                                (Staged_ledger.Pre_diff_info.Error.to_string e)
+                            ) ] ;
+                      None )
+            in
+            let root_transition =
+              Transition_frontier.Breadcrumb.transition_with_hash
+              @@ Transition_frontier.root transition_frontier
+            in
+            let filtered_root_external_transition =
+              (* The root transition should always have valid transitions *)
+              Option.value_exn
+                ( Result.ok
+                @@ Filtered_external_transition.of_transition
+                     ~tracked_participants:
+                       ( Public_key.Compressed.Set.of_list
+                       @@ Hashtbl.keys subscribed_block_users )
+                     root_transition )
+            in
+            let filtered_new_block_reader, filtered_new_block_broadcast_writer
+                =
+              Broadcast_pipe.create
+                { With_hash.data= filtered_root_external_transition
+                ; hash= root_transition.hash }
+            in
+            Strict_pipe.Reader.iter filtered_new_block
+              ~f:(fun filtered_new_block ->
+                Broadcast_pipe.Writer.write filtered_new_block_broadcast_writer
+                  filtered_new_block )
+            |> don't_wait_for ;
             return
               { propose_keypairs=
                   Agent.create
@@ -826,5 +937,7 @@ module Make (Inputs : Inputs_intf) = struct
               ; consensus_local_state= config.consensus_local_state
               ; transaction_database= config.transaction_database
               ; external_transition_database=
-                  config.external_transition_database } ) )
+                  config.external_transition_database
+              ; filtered_new_block= filtered_new_block_reader
+              ; subscribed_block_users } ) )
 end

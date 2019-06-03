@@ -897,19 +897,23 @@ module Make (Commands : Coda_commands.Intf) = struct
           Program.sync_status coda |> Coda_incremental.Status.to_pipe
           |> Deferred.Result.return )
 
-    let new_user_command_update =
-      subscription_field "newUserCommandUpdate"
+    let new_block =
+      subscription_field "newBlock"
         ~doc:
-          "Subscribes for payments with the sender's public key KEY whenever \
-           we receive a block"
-        ~typ:(non_null Types.user_command)
+          "Subscribes on a new block created by a proposer with a public key \
+           KEY"
+        ~typ:(non_null Types.block)
         ~args:Arg.[arg "publicKey" ~typ:(non_null string)]
         ~resolve:(fun {ctx= coda; _} public_key ->
-          let public_key = Public_key.Compressed.of_base64_exn public_key in
+          let open Deferred.Result.Let_syntax in
+          let%bind public_key =
+            Deferred.return
+            @@ Types.Arguments.public_key ~name:"publicKey" public_key
+          in
           Deferred.Result.return
-          @@ Commands.Subscriptions.new_user_command coda public_key )
+          @@ Commands.Subscriptions.new_block coda public_key )
 
-    let commands = [new_sync_update; new_user_command_update]
+    let commands = [new_sync_update; new_block]
   end
 
   module Mutations = struct
