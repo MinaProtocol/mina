@@ -50,9 +50,6 @@ module Styles = {
     ]);
 };
 
-[@bs.val] [@bs.scope "window.history"]
-external historyBack: unit => unit = "back";
-
 module SyncStatus = [%graphql
   {|
 subscription syncStatus {
@@ -69,9 +66,13 @@ module SyncStatusSubscription = ReasonApollo.CreateSubscription(SyncStatus);
 [@react.component]
 let make = () => {
   let url = ReasonReact.Router.useUrl();
-  let onSettingsPage = url.path == ["settings"];
+  let onSettingsPage =
+    switch (url.path) {
+    | ["settings", ..._] => true
+    | _ => false
+    };
   <header className=Styles.header>
-    <div className=Styles.logo>
+    <div className=Styles.logo onClick={_ => ReasonReact.Router.push("/")}>
       <img src="CodaLogo.svg" alt="Coda logo" />
     </div>
     <div className=Styles.rightButtons>
@@ -98,7 +99,8 @@ let make = () => {
         }
         onClick={_e =>
           onSettingsPage
-            ? historyBack() : ReasonReact.Router.push("/settings")
+            ? ReasonReact.Router.push("/")
+            : ReasonReact.Router.push("/settings")
         }>
         <Icon kind=Icon.Settings />
         <Spacer width=0.25 />

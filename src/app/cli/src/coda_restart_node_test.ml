@@ -8,7 +8,6 @@ open Signature_lib
 let name = "coda-restart-node-test"
 
 let main () =
-  let open Keypair in
   let logger = Logger.create () in
   let largest_account_keypair =
     Genesis_ledger.largest_account_keypair_exn ()

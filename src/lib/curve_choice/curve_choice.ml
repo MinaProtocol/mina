@@ -1,5 +1,5 @@
 [%%import
-"../../../config.mlh"]
+"../../config.mlh"]
 
 [%%if
 curve_size = 298]

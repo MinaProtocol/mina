@@ -46,7 +46,9 @@ module Colors = {
   let marineAlpha = a => `rgba((51, 104, 151, a));
   let marine = marineAlpha(1.0);
 
-  let midnight = `hex("1F2D3D");
+  let midnightAlpha = a => `rgba((31, 45, 61, a));
+  let midnight = midnightAlpha(1.0);
+
   let jungle = `hex("2BAC46");
   let sage = `hex("65906e");
   let blanco = `hex("e3e0d5");
@@ -129,13 +131,24 @@ module Text = {
         lineHeight(`rem(1.25)),
       ]);
 
-    let smallSemiBold =
+    let semiBold =
       style([
         Typeface.plex,
         fontWeight(`semiBold),
         fontSize(`rem(1.)),
         lineHeight(`rem(1.5)),
         letterSpacing(`rem(-0.0125)),
+      ]);
+  };
+
+  module Header = {
+    let h3 =
+      style([
+        Typeface.plex,
+        fontWeight(`medium),
+        fontSize(`rem(1.25)),
+        lineHeight(`rem(1.5)),
+        letterSpacing(`rem(-0.03125)),
       ]);
   };
 
