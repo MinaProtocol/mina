@@ -109,7 +109,6 @@ let make = () => {
           | Data(data) =>
           <>
             <Button
-              /* className=Styles.footerButton */
               label="Request"
               style=Button.Gray
               onClick={_ => setModalState(_ => Some("active wallet"))}
@@ -130,7 +129,6 @@ let make = () => {
               (
                 (mutation, _) =>
                   <SendButton
-                    /* className=Styles.footerButton */
                     wallets={Array.map(
                       ~f=Wallet.ofGraphqlExn,
                       data##ownedWallets,
