@@ -54,6 +54,7 @@ struct
           * Transaction_snark_statement.t
           * Compressed_public_key.t
       | Pre_diff of Pre_diff_info.Error.t
+      | Insufficient_work of string
       | Unexpected of Error.t
     [@@deriving sexp]
 
@@ -79,6 +80,8 @@ struct
               Statement: %{sexp: Transaction_snark_statement.t} Prover: \
               %{sexp:Compressed_public_key.t}\n"
             p s prover
+      | Insufficient_work str ->
+          str
       | Unexpected e ->
           Error.to_string_hum e
 
@@ -194,50 +197,9 @@ struct
     Scan_state.latest_ledger_proof t.scan_state
     |> Option.bind ~f:(Fn.compose Non_empty_list.of_list_opt snd)
 
-  let chunks_of xs ~n = List.groupi xs ~break:(fun i _ _ -> i mod n = 0)
-
-  let all_work_pairs_exn t =
-    let all_jobs = Scan_state.all_jobs t.scan_state in
-    let module A = Scan_state.Available_job in
-    let module L = Transaction_snark_statement in
-    let single_spec (job : job) =
-      match Scan_state.extract_from_job job with
-      | First (transaction_with_info, statement, witness) ->
-          let transaction =
-            Or_error.ok_exn @@ Ledger.Undo.transaction transaction_with_info
-          in
-          Snark_work_lib.Work.Single.Spec.Transition
-            (statement, transaction, witness)
-      | Second (p1, p2) ->
-          let merged =
-            Transaction_snark_statement.merge
-              (Ledger_proof.statement p1)
-              (Ledger_proof.statement p2)
-            |> Or_error.ok_exn
-          in
-          Snark_work_lib.Work.Single.Spec.Merge (merged, p1, p2)
-    in
-    let all_jobs_paired jobs =
-      let pairs = chunks_of jobs ~n:2 in
-      List.map pairs ~f:(fun js ->
-          match js with
-          | [j] ->
-              (j, None)
-          | [j1; j2] ->
-              (j1, Some j2)
-          | _ ->
-              failwith "error pairing jobs" )
-    in
-    let job_pair_to_work_spec_pair = function
-      | j, Some j' ->
-          (single_spec j, Some (single_spec j'))
-      | j, None ->
-          (single_spec j, None)
-    in
-    List.concat_map all_jobs ~f:(fun jobs ->
-        List.map (all_jobs_paired jobs) ~f:job_pair_to_work_spec_pair )
-
   let scan_state {scan_state; _} = scan_state
+
+  let all_work_pairs_exn t = Scan_state.all_work_pairs_exn t.scan_state
 
   let pending_coinbase_collection {pending_coinbase_collection; _} =
     pending_coinbase_collection
@@ -503,12 +465,22 @@ struct
     go current_stack [] ts
 
   let check_completed_works ~logger ~verifier scan_state
-      (completed_works : Transaction_snark_work.t list) =
+      (completed_works : Transaction_snark_work.t list) ~data =
     let open Deferred.Result.Let_syntax in
-    let%bind jobses =
-      Deferred.return
-        (to_staged_ledger_or_error
-           (Scan_state.next_k_jobs scan_state ~k:(List.length completed_works)))
+    let slots = List.length data in
+    let job_pairs = Scan_state.required_work_pairs scan_state ~slots in
+    let%bind () =
+      let required = List.length job_pairs in
+      let got = List.length completed_works in
+      if required <> got then
+        Deferred.return
+          (Error
+             (Staged_ledger_error.Insufficient_work
+                (sprintf
+                   !"Required number of transaction snark work (slots %d)  \
+                     %d, got %d"
+                   slots required got)))
+      else Deferred.return (Ok ())
     in
     let check job_proofs prover message =
       let open Deferred.Let_syntax in
@@ -521,7 +493,7 @@ struct
     in
     let open Deferred.Let_syntax in
     let%map result =
-      Deferred.List.find_map (List.zip_exn jobses completed_works)
+      Deferred.List.find_map (List.zip_exn job_pairs completed_works)
         ~f:(fun (jobs, work) ->
           let message = Sok_message.create ~fee:work.fee ~prover:work.prover in
           check (List.zip_exn jobs work.proofs) work.prover message )
@@ -746,7 +718,9 @@ struct
       update_coinbase_stack_and_get_data t.scan_state new_ledger
         t.pending_coinbase_collection transactions
     in
-    let%bind () = check_completed_works ~logger ~verifier t.scan_state works in
+    let%bind () =
+      check_completed_works ~logger ~verifier t.scan_state works ~data
+    in
     let%bind () = Deferred.return (check_zero_fee_excess t.scan_state data) in
     let%bind res_opt, scan_state' =
       (* TODO: Add rollback *)
@@ -893,10 +867,7 @@ struct
         | true, Some (cw, rem_cw) ->
             (Staged_ledger_diff.At_most_two.One (coinbase_ft cw), rem_cw)
         | true, None ->
-            (*new count after a coinbase is added should be less than the capacity*)
-            (*let new_count = cur_work_count + 2 in*)
-            if job_count = 0 (*|| new_count <= work_capacity*) then
-              (One None, cw_unchecked)
+            if job_count = 0 then (One None, cw_unchecked)
             else (Zero, cw_unchecked)
         | _ ->
             (Zero, cw_unchecked)
@@ -1179,7 +1150,14 @@ struct
         let init_resources =
           Resources.init ts_seq cw_seq partition self ~add_coinbase logger
         in
-        check_constraints_and_update init_resources )
+        let res = check_constraints_and_update init_resources in
+        let rec remove res =
+          if worked_more_than_required res then
+            remove
+              (check_constraints_and_update (Resources.discard_last_work res))
+          else res
+        in
+        remove res )
 
   let generate logger cw_seq ts_seq self
       (partitions : Scan_state.Space_partition.t) =
@@ -1299,7 +1277,6 @@ struct
     O1trace.trace_event "done mask" ;
     let partitions = Scan_state.partition_if_overflowing t.scan_state in
     O1trace.trace_event "partitioned" ;
-    (*TODO: return an or_error here *)
     let work_to_do = Scan_state.work_for_new_diff t.scan_state in
     O1trace.trace_event "computed_work" ;
     let completed_works_seq, proof_count =
