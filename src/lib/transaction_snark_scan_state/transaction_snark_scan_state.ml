@@ -123,7 +123,7 @@ module Make
     type t = Transaction_snark_statement.t Parallel_scan.Job_view.t
     [@@deriving sexp]
 
-    let to_yojson ({value; position; _} : t) : Yojson.Safe.json =
+    let to_yojson ({value; position} : t) : Yojson.Safe.json =
       let hash_string h = Sexp.to_string (Frozen_ledger_hash.sexp_of_t h) in
       let statement_to_yojson (s : Transaction_snark_statement.t) =
         `Assoc
@@ -132,15 +132,31 @@ module Make
           ; ("Fee Excess", Currency.Fee.Signed.to_yojson s.fee_excess)
           ; ("Supply Increase", Currency.Amount.to_yojson s.supply_increase) ]
       in
-      let opt_json x =
-        Option.value_map x ~default:(`List []) ~f:statement_to_yojson
-      in
       let job_to_yojson =
         match value with
-        | Merge (x, y) ->
-            `Assoc [("M", `List [opt_json x; opt_json y])]
-        | Base x ->
-            `Assoc [("B", `List [opt_json x])]
+        | BEmpty ->
+            `Assoc [("B", `List [])]
+        | MEmpty ->
+            `Assoc [("M", `List [])]
+        | MPart x ->
+            `Assoc [("M", `List [statement_to_yojson x])]
+        | MFull (x, y, {seq_no; status}) ->
+            `Assoc
+              [ ( "M"
+                , `List
+                    [ statement_to_yojson x
+                    ; statement_to_yojson y
+                    ; `Int seq_no
+                    ; `String (Parallel_scan.Job_status.to_string status) ] )
+              ]
+        | BFull (x, {seq_no; status}) ->
+            `Assoc
+              [ ( "B"
+                , `List
+                    [ statement_to_yojson x
+                    ; `Int seq_no
+                    ; `String (Parallel_scan.Job_status.to_string status) ] )
+              ]
       in
       `List [`Int position; job_to_yojson]
   end
@@ -169,8 +185,6 @@ module Make
         Staged_ledger_aux_hash.of_bytes
           (state_hash |> Digestif.SHA256.to_raw_string)
 
-      let is_valid _t = failwith "TODO"
-
       include Binable.Of_binable
                 (T)
                 (struct
@@ -178,9 +192,7 @@ module Make
 
                   let to_binable = Fn.id
 
-                  let of_binable t =
-                    (* assert (is_valid t) ; *)
-                    t
+                  let of_binable = Fn.id
                 end)
     end
 
@@ -199,7 +211,7 @@ module Make
   type t = Stable.Latest.t [@@deriving sexp]
 
   [%%define_locally
-  Stable.Latest.(hash, is_valid)]
+  Stable.Latest.(hash)]
 
   (**********Helpers*************)
 
@@ -530,21 +542,6 @@ module Make
   (*This needs to be grouped like in work_to_do function. Group of two jobs per list and not group of two jobs after concatenating the lists*)
   let all_jobs = Parallel_scan.all_jobs
 
-  let next_jobs = Parallel_scan.jobs_for_next_update
-
-  let next_k_jobs t ~k =
-    let jobses =
-      List.concat_map (Parallel_scan.jobs_for_next_update t)
-        ~f:(fun work_list ->
-          List.chunks_of work_list ~length:Transaction_snark_work.proofs_length
-      )
-    in
-    if List.length jobses >= k then Ok (List.take jobses k)
-    else
-      Or_error.errorf
-        !"Requested %d jobs but only %d are available for the next update"
-        k (List.length jobses)
-
   let all_jobs_sequence t =
     Parallel_scan.all_jobs t |> Sequence.of_list
     |> Sequence.map ~f:Sequence.of_list
@@ -566,8 +563,6 @@ module Make
       (Parallel_scan.pending_data t |> List.rev)
       ~f:(fun (t : Transaction_with_witness.t) -> t.transaction_with_info)
 
-  (*let copy {tree; job_count} = {tree= Parallel_scan.State.copy tree; job_count}*)
-
   let partition_if_overflowing t =
     let bundle_count work_count = (work_count + 1) / 2 in
     let {Space_partition.first= slots, job_count; second} =
@@ -578,9 +573,6 @@ module Make
         Option.map second ~f:(fun (slots, job_count) ->
             (slots, bundle_count job_count) ) }
 
-  let current_job_sequence_number tree =
-    Parallel_scan.current_job_sequence_number tree
-
   let extract_from_job (job : job) =
     match job with
     | Parallel_scan.Available_job.Base d ->
@@ -589,14 +581,17 @@ module Make
         Second (p1, p2)
 
   let snark_job_list_json t =
-    let all_jobs : Job_view.t list =
+    let all_jobs : Job_view.t list list =
       let fa (a : Ledger_proof_with_sok_message.t) =
         Ledger_proof.statement (fst a)
       in
       let fd (d : Transaction_with_witness.t) = d.statement in
       Parallel_scan.view_jobs_with_position t fa fd
     in
-    Yojson.Safe.to_string (`List (List.map all_jobs ~f:Job_view.to_yojson))
+    Yojson.Safe.to_string
+      (`List
+        (List.map all_jobs ~f:(fun tree ->
+             `List (List.map tree ~f:Job_view.to_yojson) )))
 
   (*Always the same pairing of jobs*)
   let all_work_to_do t : Transaction_snark_work.Statement.t Sequence.t =
@@ -610,6 +605,11 @@ module Make
                | Some stmt ->
                    stmt ))
           Transaction_snark_work.proofs_length )
+
+  let required_work_pairs t ~slots =
+    let work_list = Parallel_scan.jobs_for_slots t ~slots in
+    List.concat_map work_list ~f:(fun works ->
+        List.chunks_of works ~length:Transaction_snark_work.proofs_length )
 
   (*Always the same pairing of jobs*)
   let work_for_new_diff t : Transaction_snark_work.Statement.t Sequence.t =
@@ -627,6 +627,48 @@ module Make
                | Some stmt ->
                    stmt ))
           Transaction_snark_work.proofs_length )
+
+  let all_work_pairs_exn t =
+    let chunks_of xs ~n = List.groupi xs ~break:(fun i _ _ -> i mod n = 0) in
+    let all_jobs = all_jobs t in
+    let module A = Available_job in
+    let module L = Transaction_snark_statement in
+    let single_spec (job : job) =
+      match extract_from_job job with
+      | First (transaction_with_info, statement, witness) ->
+          let transaction =
+            Or_error.ok_exn @@ Ledger.Undo.transaction transaction_with_info
+          in
+          Snark_work_lib.Work.Single.Spec.Transition
+            (statement, transaction, witness)
+      | Second (p1, p2) ->
+          let merged =
+            Transaction_snark_statement.merge
+              (Ledger_proof.statement p1)
+              (Ledger_proof.statement p2)
+            |> Or_error.ok_exn
+          in
+          Snark_work_lib.Work.Single.Spec.Merge (merged, p1, p2)
+    in
+    let all_jobs_paired jobs =
+      let pairs = chunks_of jobs ~n:2 in
+      List.map pairs ~f:(fun js ->
+          match js with
+          | [j] ->
+              (j, None)
+          | [j1; j2] ->
+              (j1, Some j2)
+          | _ ->
+              failwith "error pairing jobs" )
+    in
+    let job_pair_to_work_spec_pair = function
+      | j, Some j' ->
+          (single_spec j, Some (single_spec j'))
+      | j, None ->
+          (single_spec j, None)
+    in
+    List.concat_map all_jobs ~f:(fun jobs ->
+        List.map (all_jobs_paired jobs) ~f:job_pair_to_work_spec_pair )
 end
 
 module Constants = Constants
