@@ -18,5 +18,12 @@ module Styles = {
 [@react.component]
 let make = (~wallets) =>
   <div className=Styles.container>
-    {React.array(Array.map(~f=wallet => <WalletItem wallet />, wallets))}
+    {React.array(
+       Array.map(
+         ~f=
+           wallet =>
+             <WalletItem key={PublicKey.toString(wallet.key)} wallet />,
+         wallets,
+       ),
+     )}
   </div>;
