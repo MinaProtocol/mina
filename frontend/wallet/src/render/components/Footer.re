@@ -16,20 +16,25 @@ module Styles = {
       padding2(~v=`zero, ~h=`rem(2.)),
       borderTop(`px(1), `solid, Theme.Colors.borderColor),
     ]);
+
+  let footerButtons =
+    style([
+      
+    ]);
+
+  let stakingSwitch =
+    style([
+      color(Theme.Colors.serpentine),
+      display(`flex),
+      alignItems(`center),
+    ]);
 };
 
 module StakingSwitch = {
   [@react.component]
   let make = () => {
     let (staking, setStaking) = React.useState(() => true);
-    <div
-      className=Css.(
-        style([
-          color(Theme.Colors.serpentine),
-          display(`flex),
-          alignItems(`center),
-        ])
-      )>
+    <div className=Styles.stakingSwitch>
       <Toggle value=staking onChange={_e => setStaking(staking => !staking)} />
       <span
         className=Css.(
@@ -44,14 +49,14 @@ module StakingSwitch = {
             ]),
           ])
         )>
-        {ReasonReact.string("Earn Coda > Vault")}
+        {ReasonReact.string("Compress the blockchain")}
       </span>
     </div>;
   };
 };
 
 module Wallets = [%graphql
-  {| query getWallets { ownedWallets {publicKey, balance {total}} } |}
+  {| query getWallets { ownedWallets {publicKey, balance{total}} } |}
 ];
 
 module WalletQuery = ReasonApollo.CreateQuery(Wallets);
@@ -79,6 +84,7 @@ module SendPaymentMutation = ReasonApollo.CreateMutation(SendPayment);
 [@react.component]
 let make = () => {
   let (downloading, setDownloadState) = React.useState(() => false);
+  let (modalState, setModalState) = React.useState(() => None);
   <div className=Styles.footer>
     <StakingSwitch />
     {if (downloading) {
@@ -99,6 +105,23 @@ let make = () => {
          | Loading
          | Error(_) => <Button label="Send" style=Button.Gray />
          | Data(data) =>
+         <>
+          <Button
+            label="Request"
+            style=Button.Gray
+            onClick={_ => setModalState(_ => Some("active wallet"))}
+          />
+          {switch (modalState) {
+            | None => React.null
+            | _ =>
+              <RequestCodaModal
+                wallets={Array.map(
+                  ~f=Wallet.ofGraphqlExn,
+                  data##ownedWallets,
+                )}
+                setModalState
+              />
+          }}
            <SendPaymentMutation>
              (
                (mutation, _) =>
@@ -142,6 +165,7 @@ let make = () => {
                  />
              )
            </SendPaymentMutation>
+           </>
          }}
     </WalletQuery>
   </div>;

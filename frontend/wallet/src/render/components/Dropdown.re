@@ -103,18 +103,20 @@ let make = (~onChange, ~value, ~label, ~options) => {
     <span className=Styles.icon> <Icon kind=Icon.ChevronDown /> </span>
     <div className={isOpen ? Styles.options : Styles.hidden}>
       {List.map(
-         ~f=
-           ((value, label)) =>
-             <div
-               key=label
-               className=Styles.item
-               onClick={_e => onChange(Some(value))}>
-               {React.string(label)}
-             </div>,
-         options,
+        ~f=
+          ((value, label)) =>
+            <div
+              key=label
+              className=Styles.item
+              onClick={_e => onChange(Some(value))}
+            >
+              {React.string(label)}
+            </div>,
+        options,
        )
        |> Array.fromList
-       |> React.array}
+       |> React.array
+      }
     </div>
   </div>;
 };

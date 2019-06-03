@@ -42,7 +42,11 @@ let make = () => {
   <div className=Styles.sidebar>
     // TODO: Remove fetchPolicy="no-cache" after merge of
     // https://github.com/apollographql/reason-apollo/pull/196
-
+      /* TODO(PM): push the active wallet onto router
+        - not sure if best way to do this is a side effect when we get data
+        from query. eg. check if a wallet is already selected, if not
+        ReasonReact.Router.push("/wallet/" ++ PublicKey.uriEncode(firstWallet.key))
+      */
       <WalletQuery fetchPolicy="no-cache" partialRefetch=true>
         {response =>
            switch (response.result) {
