@@ -64,6 +64,7 @@ module Make_real (Keys : Keys_lib.Keys.S) = struct
       { Keys.Step.Prover_state.prev_proof= Tock.Proof.dummy
       ; wrap_vk= Tock.Keypair.vk Keys.Wrap.keys
       ; prev_state= Protocol_state.negative_one
+      ; expected_next_state= None
       ; update= Snark_transition.genesis }
     in
     let main x =

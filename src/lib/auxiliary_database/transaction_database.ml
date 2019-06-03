@@ -18,15 +18,14 @@ end) (Time : sig
 end) =
 struct
   module Database = Rocksdb.Serializable.Make (Transaction) (Time)
-  module Pagination = Pagination.Make (Transaction) (Time)
+  module Pagination = Pagination.Make (Transaction) (Transaction) (Time)
 
   type t = {database: Database.t; pagination: Pagination.t; logger: Logger.t}
 
   let add_user_transaction (pagination : Pagination.t) (transaction, date) =
-    Pagination.add_involved_participants pagination
+    Pagination.add pagination
       (Transaction.accounts_accessed transaction)
-      (transaction, date) ;
-    Hashtbl.add_exn pagination.all_values ~key:transaction ~data:date
+      transaction transaction date
 
   let create ~logger directory =
     let database = Database.create ~directory in

@@ -22,7 +22,7 @@ module Make (Inputs : Inputs.S) = struct
 
   type t =
     { logger: Logger.t
-    ; time_controller: Time.Controller.t
+    ; time_controller: Block_time.Controller.t
     ; catchup_job_writer:
         ( State_hash.t
           * ( External_transition.with_initial_validation Envelope.Incoming.t
@@ -48,7 +48,7 @@ module Make (Inputs : Inputs.S) = struct
           (** `parent_root_timeouts` stores the timeouts for catchup job. The
               keys are the missing transitions, and the values are the
               timeouts. *)
-    ; parent_root_timeouts: unit Time.Timeout.t State_hash.Table.t
+    ; parent_root_timeouts: unit Block_time.Timeout.t State_hash.Table.t
     ; breadcrumb_builder_supervisor:
         ( State_hash.t
         * ( External_transition.with_initial_validation Envelope.Incoming.t
@@ -82,7 +82,7 @@ module Make (Inputs : Inputs.S) = struct
             List.iter cached_transitions
               ~f:(Fn.compose ignore Cached.invalidate_with_failure) ) ;
         Hashtbl.iter parent_root_timeouts ~f:(fun timeout ->
-            Time.Timeout.cancel time_controller timeout () ) ) ;
+            Block_time.Timeout.cancel time_controller timeout () ) ) ;
     let breadcrumb_builder_supervisor =
       Capped_supervisor.create ~job_capacity:30
         (fun (initial_hash, transition_branches) ->
@@ -124,9 +124,11 @@ module Make (Inputs : Inputs.S) = struct
     let remaining_time =
       Option.map
         (Hashtbl.find t.parent_root_timeouts hash)
-        ~f:Time.Timeout.remaining_time
+        ~f:Block_time.Timeout.remaining_time
     in
-    let cancel timeout = Time.Timeout.cancel t.time_controller timeout () in
+    let cancel timeout =
+      Block_time.Timeout.cancel t.time_controller timeout ()
+    in
     Hashtbl.change t.parent_root_timeouts hash
       ~f:Fn.(compose (const None) (Option.iter ~f:cancel)) ;
     remaining_time
@@ -167,7 +169,7 @@ module Make (Inputs : Inputs.S) = struct
       With_hash.data transition_with_hash |> External_transition.parent_hash
     in
     let make_timeout duration =
-      Time.Timeout.create t.time_controller duration ~f:(fun _ ->
+      Block_time.Timeout.create t.time_controller duration ~f:(fun _ ->
           let forest = extract_forest t parent_hash in
           Hashtbl.remove t.parent_root_timeouts parent_hash ;
           remove_tree t parent_hash ;
@@ -175,7 +177,7 @@ module Make (Inputs : Inputs.S) = struct
             ~metadata:
               [ ("parent_hash", Coda_base.State_hash.to_yojson parent_hash)
               ; ( "duration"
-                , `Int (Inputs.Time.Span.to_ms duration |> Int64.to_int_trunc)
+                , `Int (Block_time.Span.to_ms duration |> Int64.to_int_trunc)
                 )
               ; ( "cached_transition"
                 , With_hash.data transition_with_hash
@@ -214,7 +216,7 @@ module Make (Inputs : Inputs.S) = struct
             "Received request to watch transition for catchup that already \
              was being watched: $state_hash"
         else
-          let (_ : Time.Span.t option) = cancel_timeout t hash in
+          let (_ : Block_time.Span.t option) = cancel_timeout t hash in
           Hashtbl.set t.collected_transitions ~key:parent_hash
             ~data:(cached_transition :: cached_sibling_transitions) ;
           Hashtbl.update t.collected_transitions hash
@@ -230,7 +232,7 @@ module Make (Inputs : Inputs.S) = struct
           non-parent_root_transition: %{sexp: State_hash.t}"
         hash
     else
-      let (_ : Time.Span.t option) = cancel_timeout t hash in
+      let (_ : Block_time.Span.t option) = cancel_timeout t hash in
       Option.iter (Hashtbl.find t.collected_transitions hash)
         ~f:(fun collected_transitions ->
           let transition_subtrees =

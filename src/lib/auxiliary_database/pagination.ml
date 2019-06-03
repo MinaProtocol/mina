@@ -6,24 +6,26 @@ let assert_same_set expected_transactions transactions =
   User_command.Set.(
     [%test_eq: t] (of_list expected_transactions) (of_list transactions))
 
-module Make (Value : sig
-  type t [@@deriving bin_io, compare, sexp, hash]
+module Make (Cursor : sig
+  type t [@@deriving compare, sexp, hash]
 
   include Comparable.S with type t := t
 
   include Hashable.S with type t := t
+end) (Value : sig
+  type t
 end) (Time : sig
   type t [@@deriving bin_io, compare, sexp]
 end) =
 struct
-  module Value_with_date = struct
+  module Cursor_with_date = struct
     module T = struct
-      type t = Value.t * Time.t [@@deriving sexp]
+      type t = Cursor.t * Time.t [@@deriving sexp]
 
       let compare =
         Comparable.lift
           ~f:(fun (value, date) -> (date, value))
-          [%compare: Time.t * Value.t]
+          [%compare: Time.t * Cursor.t]
     end
 
     include T
@@ -31,59 +33,62 @@ struct
   end
 
   type t =
-    { user_values: Value_with_date.Set.t Public_key.Compressed.Table.t
-    ; all_values: Time.t Value.Table.t }
+    { user_cursors: Cursor_with_date.Set.t Public_key.Compressed.Table.t
+    ; all_values: (Time.t * Value.t) Cursor.Table.t }
 
   let create () =
-    { user_values= Public_key.Compressed.Table.create ()
-    ; all_values= Value.Table.create () }
+    { user_cursors= Public_key.Compressed.Table.create ()
+    ; all_values= Cursor.Table.create () }
 
-  let add_involved_participants (pagination : t) participants value_with_date =
+  let get_value t cursor =
+    let _, value = Hashtbl.find_exn t.all_values cursor in
+    value
+
+  let add (pagination : t) participants cursor value date =
     List.iter participants ~f:(fun pk ->
-        let user_values =
+        let user_cursors =
           Option.value
-            (Hashtbl.find pagination.user_values pk)
-            ~default:Value_with_date.Set.empty
+            (Hashtbl.find pagination.user_cursors pk)
+            ~default:Cursor_with_date.Set.empty
         in
-        Hashtbl.set pagination.user_values ~key:pk
-          ~data:(Set.add user_values value_with_date) )
+        Hashtbl.set pagination.user_cursors ~key:pk
+          ~data:(Set.add user_cursors (cursor, date)) ) ;
+    Hashtbl.set pagination.all_values ~key:cursor ~data:(date, value)
 
-  let get_total_values {user_values; _} public_key =
+  let get_total_values {user_cursors; _} public_key =
     let open Option.Let_syntax in
-    let%map value_with_dates_set = Hashtbl.find user_values public_key in
-    Set.length value_with_dates_set
+    let%map cursor_with_dates = Hashtbl.find user_cursors public_key in
+    Set.length cursor_with_dates
 
-  let get_values {user_values; _} public_key =
+  let get_values ({user_cursors; _} as t) public_key =
     let queried_values =
       let open Option.Let_syntax in
-      let%map values_with_dates_set = Hashtbl.find user_values public_key in
-      List.map (Value_with_date.Set.to_list values_with_dates_set)
-        ~f:(fun (txn, _) -> txn)
+      let%map cursors_with_dates = Hashtbl.find user_cursors public_key in
+      List.map (Cursor_with_date.Set.to_list cursors_with_dates)
+        ~f:(fun (cursor, _) -> get_value t cursor)
     in
     Option.value queried_values ~default:[]
 
-  (* let add_involved_participants  *)
-
   module With_non_null_value = struct
-    let get_pagination_query ~f t public_key value =
+    let get_pagination_query ~f t public_key cursor =
       let open Option.Let_syntax in
       let queried_values_opt =
-        let%bind values_with_dates = Hashtbl.find t.user_values public_key in
-        let%map value_with_date =
-          let%map date = Hashtbl.find t.all_values value in
-          (value, date)
+        let%bind cursors_with_dates = Hashtbl.find t.user_cursors public_key in
+        let%map cursor_with_date =
+          let%map date, _value = Hashtbl.find t.all_values cursor in
+          (cursor, date)
         in
         let earlier, value_opt, later =
-          Set.split values_with_dates value_with_date
+          Set.split cursors_with_dates cursor_with_date
         in
-        [%test_pred: Value_with_date.t option]
+        [%test_pred: Cursor_with_date.t option]
           ~message:
             "Transaction should be in-memory cache database for public key"
           Option.is_some value_opt ;
         f earlier later
       in
-      let%map values_with_dates, has_previous, has_next = queried_values_opt in
-      (List.map values_with_dates ~f:fst, has_previous, has_next)
+      let%map cursor_with_dates, has_previous, has_next = queried_values_opt in
+      (List.map cursor_with_dates ~f:fst, has_previous, has_next)
 
     let has_neighboring_page = Fn.compose not Set.is_empty
 
@@ -134,8 +139,8 @@ struct
       match value_opt with
       | None -> (
           let open Option.Let_syntax in
-          let%bind user_values = Hashtbl.find t.user_values public_key in
-          let%bind default_value, _ = get_default user_values in
+          let%bind user_cursors = Hashtbl.find t.user_cursors public_key in
+          let%bind default_value, _ = get_default user_cursors in
           match amount_to_query_opt with
           | None ->
               let%map queries, has_earlier_page, has_later_page =
@@ -156,8 +161,15 @@ struct
       | Some value ->
           get_queries t public_key value amount_to_query_opt
     in
-    Option.value query_opt
-      ~default:([], `Has_earlier_page false, `Has_later_page false)
+    let cursors, has_earlier, has_later =
+      Option.value query_opt
+        ~default:([], `Has_earlier_page false, `Has_later_page false)
+    in
+    ( List.map cursors ~f:(fun cursor ->
+          let _, value = Hashtbl.find_exn t.all_values cursor in
+          value )
+    , has_earlier
+    , has_later )
 
   let get_earlier_values =
     get_pagination_query ~get_default:Set.max_elt
@@ -170,7 +182,8 @@ end
 
 let%test_module "Pagination" =
   ( module struct
-    module Pagination = Make (User_command.Stable.V1) (Int)
+    module Pagination =
+      Make (User_command.Stable.V1) (User_command.Stable.V1) (Int)
 
     let ({Keypair.public_key= pk1; _} as keypair1) = Keypair.create ()
 
@@ -184,15 +197,8 @@ let%test_module "Pagination" =
     let add_all_transactions (t : Pagination.t) transactions_with_dates =
       List.iter transactions_with_dates ~f:(fun (txn, time) ->
           if Option.is_none @@ Hashtbl.find t.all_values txn then
-            Hashtbl.add_exn t.all_values ~key:txn ~data:time ;
-          List.iter (User_command.accounts_accessed txn) ~f:(fun pk ->
-              let user_txns =
-                Option.value
-                  (Hashtbl.find t.user_values pk)
-                  ~default:Pagination.Value_with_date.Set.empty
-              in
-              Hashtbl.set t.user_values ~key:pk
-                ~data:(Set.add user_txns (txn, time)) ) )
+            Pagination.add t (User_command.accounts_accessed txn) txn txn time
+      )
 
     let%test_unit "We can get all values associated with a public key" =
       let trials = 10 in
@@ -421,7 +427,7 @@ let%test_module "Pagination" =
             ~message:"We should have at least one later transaction"
             ~equal:Bool.equal ~expect:true has_later )
 
-    let%test_unit "Get the n most latest transactions if transactions are not \
+    let%test_unit "Get the n latest transactions if transactions are not \
                    provided" =
       test_no_transaction_input ~trials:5 Gen.test_no_transaction_input
         ~query_next_page:Pagination.get_earlier_values

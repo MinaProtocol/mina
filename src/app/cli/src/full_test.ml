@@ -43,11 +43,9 @@ let run_test () : unit Deferred.t =
 
         let commit_id = None
 
-        let work_selection = Protocols.Coda_pow.Work_selection.Seq
+        let work_selection = Cli_lib.Arg_type.Seq
       end in
-      let%bind (module Init) =
-        make_init ~should_propose:true (module Config)
-      in
+      let%bind (module Init) = make_init (module Config) in
       let%bind () =
         match Unix.getenv "CODA_TRACING" with
         | Some trace_dir ->
@@ -80,13 +78,23 @@ let run_test () : unit Deferred.t =
       trace_database_initialization "transaction_database" __LOC__
         receipt_chain_dir_name ;
       let transaction_database =
-        Auxiliary_database.Transaction_database.create logger
+        Auxiliary_database.Transaction_database.create ~logger
           transaction_database_dir
       in
-      let time_controller = Main.Inputs.Time.Controller.(create basic) in
+      let%bind external_transition_database_dir =
+        Async.Unix.mkdtemp (temp_conf_dir ^/ "external_transition_database")
+      in
+      trace_database_initialization "external_transition_database" __LOC__
+        external_transition_database_dir ;
+      let external_transition_database =
+        Auxiliary_database.External_transition_database.create ~logger
+          external_transition_database_dir
+      in
+      let time_controller = Block_time.Controller.(create basic) in
       let consensus_local_state =
         Consensus.Data.Local_state.create
-          (Some (Public_key.compress keypair.public_key))
+          (Public_key.Compressed.Set.singleton
+             (Public_key.compress keypair.public_key))
       in
       let net_config =
         Main.Inputs.Net.Config.
@@ -120,7 +128,8 @@ let run_test () : unit Deferred.t =
       let%bind coda =
         Main.create
           (Main.Config.make ~logger ~trust_system ~verifier:Init.verifier
-             ~net_config ~propose_keypair:keypair
+             ~net_config
+             ~initial_propose_keypairs:(Keypair.Set.singleton keypair)
              ~snark_worker_key:
                (Public_key.compress largest_account_keypair.public_key)
              ~transaction_pool_disk_location:
@@ -129,7 +138,7 @@ let run_test () : unit Deferred.t =
              ~wallets_disk_location:(temp_conf_dir ^/ "wallets")
              ~time_controller ~receipt_chain_database
              ~snark_work_fee:(Currency.Fee.of_int 0) ~consensus_local_state
-             ~transaction_database ())
+             ~transaction_database ~external_transition_database ())
       in
       Main.start coda ;
       don't_wait_for

@@ -1,6 +1,7 @@
 type mode =
   | Grey
   | Blue
+  | DarkBlue
   | Green;
 
 module Styles = {
@@ -18,13 +19,19 @@ module Styles = {
     ]);
 
   let grey =
-    merge([base, style([backgroundColor(Theme.Colors.slateAlpha(0.06))])]);
+    merge([
+      base,
+      style([backgroundColor(Theme.Colors.midnightAlpha(0.06))]),
+    ]);
 
   let green =
     merge([base, style([backgroundColor(Theme.Colors.serpentineLight)])]);
 
   let blue =
     merge([base, style([backgroundColor(Theme.Colors.marineAlpha(0.1))])]);
+
+  let darkBlue =
+    merge([base, style([backgroundColor(Theme.Colors.marine)])]);
 };
 
 [@react.component]
@@ -35,6 +42,7 @@ let make = (~mode=Grey, ~children) => {
       | Grey => Styles.grey
       | Green => Styles.green
       | Blue => Styles.blue
+      | DarkBlue => Styles.darkBlue
       }
     }>
     children
