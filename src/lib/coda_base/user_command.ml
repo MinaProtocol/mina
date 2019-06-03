@@ -44,6 +44,9 @@ module Stable = struct
     include Registration.Make_latest_version (T)
     include Comparable.Make (T)
     include Hashable.Make (T)
+
+    let accounts_accessed ({payload; sender; _} : t) =
+      Public_key.compress sender :: Payload.accounts_accessed payload
   end
 
   module Latest = V1
@@ -60,6 +63,8 @@ end
 
 type t = Stable.Latest.t [@@deriving sexp, yojson, hash]
 
+let accounts_accessed = Stable.Latest.accounts_accessed
+
 include Comparable.Make (Stable.Latest)
 
 type value = t
@@ -71,9 +76,6 @@ let fee = Fn.compose Payload.fee payload
 let nonce = Fn.compose Payload.nonce payload
 
 let sender t = Public_key.compress Poly.(t.sender)
-
-let accounts_accessed ({payload; sender; _} : value) =
-  Public_key.compress sender :: Payload.accounts_accessed payload
 
 let sign (kp : Signature_keypair.t) (payload : Payload.t) : t =
   { payload

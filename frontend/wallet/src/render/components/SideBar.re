@@ -17,13 +17,13 @@ module Styles = {
 };
 
 module Wallets = [%graphql
-  {| query getWallets { ownedWallets {publicKey, balance {total}} } |}
+  {| query getWallets { ownedWallets {publicKey, balance{total}}} |}
 ];
 module WalletQuery = ReasonApollo.CreateQuery(Wallets);
 
 module AddWallet = [%graphql
   {|
-  mutation {
+  mutation addWallet {
       addWallet(input: {}) {
           publicKey
       }
@@ -40,53 +40,56 @@ let make = () => {
     React.useContext(AddressBookProvider.context);
 
   <div className=Styles.sidebar>
-    <WalletQuery>
-      {response =>
-         switch (response.result) {
-         | Loading => React.string("...")
-         | Error(err) => React.string(err##message)
-         | Data(data) =>
-           <WalletList
-             wallets={Array.map(~f=Wallet.ofGraphqlExn, data##ownedWallets)}
-           />
-         }}
-    </WalletQuery>
-    <div className=Styles.footer>
-      <Link onClick={_ => setModalState(_ => Some("My Wallet"))}>
-        {React.string("+ Add wallet")}
-      </Link>
-    </div>
-    <AddWalletMutation>
-      {(mutation, _) =>
-         switch (modalState) {
-         | None => React.null
-         | Some(newWalletName) =>
-           <AddWalletModal
-             walletName=newWalletName
-             setModalState
-             onSubmit={name => {
-               let performMutation =
-                 Task.liftPromise(() =>
-                   mutation(~refetchQueries=[|"getWallets"|], ())
+    // TODO: Remove fetchPolicy="no-cache" after merge of
+    // https://github.com/apollographql/reason-apollo/pull/196
+
+      <WalletQuery fetchPolicy="no-cache" partialRefetch=true>
+        {response =>
+           switch (response.result) {
+           | Loading => React.string("...")
+           | Error(err) => React.string(err##message)
+           | Data(data) =>
+             <WalletList
+               wallets={Array.map(~f=Wallet.ofGraphqlExn, data##ownedWallets)}
+             />
+           }}
+      </WalletQuery>
+      <div className=Styles.footer>
+        <Link onClick={_ => setModalState(_ => Some("My Wallet"))}>
+          {React.string("+ Add wallet")}
+        </Link>
+      </div>
+      <AddWalletMutation>
+        {(mutation, _) =>
+           switch (modalState) {
+           | None => React.null
+           | Some(newWalletName) =>
+             <AddWalletModal
+               walletName=newWalletName
+               setModalState
+               onSubmit={name => {
+                 let performMutation =
+                   Task.liftPromise(() =>
+                     mutation(~refetchQueries=[|"getWallets"|], ())
+                   );
+                 Task.perform(
+                   performMutation,
+                   ~f=
+                     fun
+                     | EmptyResponse => ()
+                     | Errors(_) => print_endline("Error adding wallet")
+                     | Data(data) =>
+                       data##addWallet
+                       |> Option.andThen(~f=addWallet => addWallet##publicKey)
+                       |> Option.map(~f=pk => {
+                            let key = PublicKey.ofStringExn(pk);
+                            updateAddressBook(AddressBook.set(~key, ~name));
+                          })
+                       |> ignore,
                  );
-               Task.perform(
-                 performMutation,
-                 ~f=
-                   fun
-                   | EmptyResponse => ()
-                   | Errors(_) => print_endline("Error adding wallet")
-                   | Data(data) =>
-                     data##addWallet
-                     |> Option.andThen(~f=addWallet => addWallet##publicKey)
-                     |> Option.map(~f=pk => {
-                          let key = PublicKey.ofStringExn(pk);
-                          updateAddressBook(AddressBook.set(~key, ~name));
-                        })
-                     |> ignore,
-               );
-             }}
-           />
-         }}
-    </AddWalletMutation>
-  </div>;
+               }}
+             />
+           }}
+      </AddWalletMutation>
+    </div>;
 };

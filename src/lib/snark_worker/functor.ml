@@ -4,7 +4,7 @@ open Coda_base
 open Signature_lib
 
 module Make (Inputs : Intf.Inputs_intf) :
-  Intf.S with module Ledger_proof := Inputs.Ledger_proof = struct
+  Intf.S with type ledger_proof := Inputs.Ledger_proof.t = struct
   open Inputs
   module Rpcs = Rpcs.Make (Inputs)
 

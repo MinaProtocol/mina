@@ -34,12 +34,7 @@ type UserCommand {
 
 type FeeTransfer {
   recipient: String! @examples(values: ["PUB_KEY_E9873DF4453213303DA61F2", "PUB_KEY_F1173DF4453213303DA61F2"])
-  fee: String! @fake(type: number)
-}
-
-type CoinbaseTransaction {
-	amount: String! @fake(type: number)
-	feeTransfer: FeeTransfer!
+  amount: String! @fake(type: number)
 }
 
 type BlockchainState {
@@ -56,12 +51,11 @@ type ProtocolState {
 type Transactions {
   userCommands: [UserCommand!]!
   feeTransfer: [FeeTransfer!]!
-  coinbase: CoinbaseTransaction!
+  coinbase: String! @fake(type: number)
 }
 
 type Block {
   creator: String! @examples(values: ["PUB_KEY_E9873DF4453213303DA61F2", "PUB_KEY_F1173DF4453213303DA61F2"])
-  numConfirmations: Int!
   stateHash: String!
   protocolState: ProtocolState!
   transactions: Transactions!
@@ -84,6 +78,7 @@ type Wallet {
   delegate: String!
   votingFor: String!
   balance: AnnotatedBalance!
+  stakingActive: Boolean! # Actively staking. There is a lag between switching staking keys and them appearing here as you may be in the middle of a staking procedure with other keys.
 }
 
 type NodeStatus {
@@ -134,11 +129,13 @@ input UserCommandFilterInput {
 }
 
 input BlockFilterInput {
-  relatedTo: String,
+  relatedTo: String!,
 }
 
 input SetStakingInput {
-  on: Boolean
+  # Set to empty to stop staking
+  # Set to a non-empty list of public keys to start staking on these keys
+  wallets: [String!]!
 }
 
 ## Payload types
@@ -172,7 +169,9 @@ type DeleteWalletPayload {
 }
 
 type SetStakingPayload {
-  on: Boolean
+  # Returns the last wallet public keys that were staking before
+  # or empty if there were none
+  lastStaking: [String!]!
 }
 
 # Pagination types
@@ -225,7 +224,7 @@ type Query {
     before: String): UserCommandConnection!
   
   blocks(
-    filter: BlockFilterInput,
+    filter: BlockFilterInput!,
     first: Int,
     after: String,
     last: Int,
@@ -264,7 +263,7 @@ type Mutation {
   # Deletes private key associated with `key` and all related information
   deleteWallet(input: DeleteWalletInput!): DeleteWalletPayload
 
-  setStaking(input: SetStakingInput!): SetStakingPayload
+  setStaking(input: SetStakingInput!): SetStakingPayload!
 }
 
 type Subscription {

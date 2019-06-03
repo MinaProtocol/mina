@@ -30,7 +30,8 @@ let command =
     let open Deferred.Let_syntax in
     let%bind () = Unix.mkdir ~p:() directory in
     let%map _, wallets, foreign_keys =
-      Transaction_database.For_tests.populate_database ~directory
+      Auxiliary_database.Transaction_database.For_tests.populate_database
+        ~directory
         ~num_wallets:(Option.value ~default:3 num_wallets)
         ~num_foreign:(Option.value ~default:5 num_foreign_users)
         (Option.value ~default:1000 num_transactions)
