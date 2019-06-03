@@ -19,7 +19,7 @@ module Styles = {
       borderRadius(`rem(0.25)),
       borderBottomLeftRadius(isOpen ? `zero : `rem(0.25)),
       borderBottomRightRadius(isOpen ? `zero : `rem(0.25)),
-      focus([outlineStyle(`none), borderColor(black)]),
+      focus([outlineStyle(`none)]),
     ]);
 
   let label =
