@@ -1,18 +1,61 @@
+(*
+   
+   This follows the approach of SvdW06 to construct a "near injection" from
+   a field into an elliptic curve defined over that field. WB19 is also a useful
+   reference that details several constructions which are more appropriate in other
+   contexts.
+
+   Fix an elliptic curve E given by y^2 = x^3 + ax + b over a field "F"
+   Let f(x) = x^3 + ax + b.
+
+   Define the variety V to be 
+   (x1, x2, x3, x4) : f(x1) f(x2) f(x3) = x4^2.
+
+   By a not-too-hard we have a map `V -> E`. Thus, a map of type `F -> V` yields a
+   map of type `F -> E` by composing. 
+   
+   Our goal is to construct such a map of type `F -> V`. The paper SvdW06 constructs
+   a family of such maps, defined by a collection of values which we'll term `params`.
+
+   Define `params` to be the type of records of the form
+    { u: F
+    ; u_over_2: F
+    ; projection_point: { z : F; y : F }
+    ; conic_c: F
+    ; a: F
+    ; b: F }
+   such that
+   - a and b are the coefficients of our curve's defining equation.
+   - u satisfies
+      i. 0 <> 3/4 u^2 + a
+      ii. 0 <> f(u)
+      iii. -f(u) is not a square.
+   - conic_c = 3/4 u^2 + a
+   - {z; y} satisfy
+      i. z^2 + conic_c * y^2 = -f(u) 
+
+   We will define a map of type `params -> (F -> V)`. Thus, fixing a choice of
+   a value of type params, we obtain a map `F -> V` as desired.
+
+SvdW06: Shallue and van de Woestijne, "Construction of rational points on elliptic curves over finite fields." Proc. ANTS 2006. https://works.bepress.com/andrew_shallue/1/download/
+WB19: Riad S. Wahby and Dan Boneh, Fast and simple constant-time hashing to the BLS12-381 elliptic curve. https://eprint.iacr.org/2019/403
+*)
+
 (* we have φ(t) : F -> S
- * and φ1(λ) : S -> V with
- * V(F) : f(x1)f(x2)f(x3) = x4^2,
- * (f is y^2 = x^3 + Bx + C)) (note choice of constant names
- * -- A is coeff of x^2 so A = 0 for us)
- *
- * To construct a rational point on V(F), the authors define
- * the surface S(F) and the rational map φ1:S(F)→ V(F), which
- * is invertible on its image [SvdW06, Lemma 6]:
- * S(F) : y^2(u^2 + uv + v^2 + a) = −f(u)
- *
- * φ(t) : t → ( u, α(t)/β(t) - u/2, β(t) )
- * φ1: (u, v, y) →  ( v, −u − v, u + y^2,
- *                  f(u + y^2)·(y^2 + uv + v^2 + ay)/y )
- *)
+   and φ1(λ) : S -> V with
+   V(F) : f(x1)f(x2)f(x3) = x4^2,
+   (f is y^2 = x^3 + Bx + C)) (note choice of constant names
+   -- A is coeff of x^2 so A = 0 for us)
+  
+   To construct a rational point on V(F), the authors define
+   the surface S(F) and the rational map φ1:S(F)→ V(F), which
+   is invertible on its image [SvdW06, Lemma 6]:
+   S(F) : y^2(u^2 + uv + v^2 + a) = −f(u)
+  
+   φ(t) : t → ( u, α(t)/β(t) - u/2, β(t) )
+   φ1: (u, v, y) →  ( v, −u − v, u + y^2,
+                   f(u + y^2)·(y^2 + uv + v^2 + ay)/y )
+*)
 
 open Core_kernel
 module Field_intf = Field_intf
@@ -57,6 +100,17 @@ module Params = struct
     ; a: 'f
     ; b: 'f }
   [@@deriving fields]
+
+  (* A deterministic function for constructing a valid choice of parameters for a
+     given field.
+
+     We start by finding the first `u` satisfying the constraints described above,
+     then find the first `y` satisyfing the condition described above. The other
+     values are derived from these two choices*.
+
+     *Actually we have one bit of freedom in choosing `z` as z = sqrt(conic_c y^2 - conic_d),
+     since there are two square roots.
+  *)
 
   let create (type t) (module F : Field_intf.S_unchecked with type t = t) ~a ~b
       =
