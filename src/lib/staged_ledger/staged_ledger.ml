@@ -1417,7 +1417,11 @@ let%test_module "test" =
     module Test_input1 = struct
       (* mirrors module structure of Public_key.Compressed *)
       module Compressed_public_key = struct
-        type t = string [@@deriving sexp, compare, yojson, hash]
+        module T = struct
+          type t = string [@@deriving sexp, compare, yojson, hash]
+        end
+
+        include T
 
         module Stable = struct
           module V1 = struct
@@ -1432,6 +1436,7 @@ let%test_module "test" =
         end
 
         include Comparable.Make_binable (String)
+        include Hashable.Make (T)
 
         let gen = String.quickcheck_generator
       end
