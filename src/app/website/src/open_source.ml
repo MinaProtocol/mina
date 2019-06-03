@@ -43,8 +43,10 @@ module Cta_description = struct
     p
       [Style.(render (of_class "mw57 ibmplex fw4 lh-copy" + extra_style))]
       (List.map copy ~f:(function
-        | `Normal s -> span [] [text s]
-        | `Bold s -> span [Style.just "fw6"] [text s] ))
+        | `Normal s ->
+            span [] [text s]
+        | `Bold s ->
+            span [Style.just "fw6"] [text s] ))
 
   let create ~button_text ~copy ~link =
     Mobile_switch.create

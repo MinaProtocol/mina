@@ -1,0 +1,10 @@
+(library
+ (name file_stack_database)
+ (public_name file_stack_database)
+ (flags :standard -short-paths -warn-error -27-32-34-6-58)
+ (library_flags -linkall)
+ (inline_tests)
+ (libraries core async bitstring file_system integers)
+ (preprocess
+  (pps ppx_jane bisect_ppx -- -conditional))
+ (synopsis "File representing a stack"))

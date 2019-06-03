@@ -75,7 +75,8 @@ module Make (F : Intf.Basic) = struct
 
   let div_unsafe x y =
     match (to_constant x, to_constant y) with
-    | Some x, Some y -> return (constant Unchecked.(x / y))
+    | Some x, Some y ->
+        return (constant Unchecked.(x / y))
     | _, _ ->
         let%bind x_over_y =
           exists typ
@@ -87,16 +88,20 @@ module Make (F : Intf.Basic) = struct
 
   let assert_square =
     match assert_square with
-    | `Custom f -> f
-    | `Define -> fun a a2 -> assert_r1cs a a a2
+    | `Custom f ->
+        f
+    | `Define ->
+        fun a a2 -> assert_r1cs a a a2
 
   let ( * ) =
     match ( * ) with
-    | `Custom f -> f
+    | `Custom f ->
+        f
     | `Define -> (
         fun x y ->
           match (to_constant x, to_constant y) with
-          | Some x, Some y -> return (constant Unchecked.(x * y))
+          | Some x, Some y ->
+              return (constant Unchecked.(x * y))
           | _, _ ->
               let%bind res =
                 exists typ
@@ -113,11 +118,13 @@ module Make (F : Intf.Basic) = struct
 
   let square =
     match square with
-    | `Custom f -> f
+    | `Custom f ->
+        f
     | `Define -> (
         fun x ->
           match to_constant x with
-          | Some x -> return (constant (Unchecked.square x))
+          | Some x ->
+              return (constant (Unchecked.square x))
           | None ->
               let%bind res =
                 exists typ
@@ -132,11 +139,13 @@ module Make (F : Intf.Basic) = struct
 
   let inv_exn =
     match inv_exn with
-    | `Custom f -> f
+    | `Custom f ->
+        f
     | `Define -> (
         fun t ->
           match to_constant t with
-          | Some x -> return (constant (Unchecked.inv x))
+          | Some x ->
+              return (constant (Unchecked.inv x))
           | None ->
               let%bind res =
                 exists typ
@@ -163,8 +172,10 @@ struct
         Some
           (A.map t ~f:(fun x ->
                match F.to_constant x with
-               | Some x -> x
-               | None -> raise None_exn ))
+               | Some x ->
+                   x
+               | None ->
+                   raise None_exn ))
       with None_exn -> None
 
   let if_ b ~then_ ~else_ =
@@ -222,10 +233,7 @@ struct
 
     let to_list x = [x]
 
-    module Unchecked = struct
-      include Field
-      include Field.Infix
-    end
+    module Unchecked = Field
 
     type t = Field.Var.t
 
@@ -243,9 +251,9 @@ struct
 
     let assert_r1cs a b c = assert_r1cs a b c
 
-    let ( + ) = Field.Checked.Infix.( + )
+    let ( + ) = Field.Checked.( + )
 
-    let ( - ) = Field.Checked.Infix.( - )
+    let ( - ) = Field.Checked.( - )
 
     let negate t = Field.Var.scale t Unchecked.(negate one)
 
@@ -285,7 +293,6 @@ end = struct
     module Base = F
     module Impl = F.Impl
     open Impl
-    open Let_syntax
     module Unchecked = Snarkette.Fields.Make_fp2 (F.Unchecked) (Params)
 
     module A = struct
@@ -334,7 +341,7 @@ end = struct
 
     let assert_square (a, b) (a2, b2) =
       let open F in
-      let ab = scale b2 Field.(Infix.(one / of_int 2)) in
+      let ab = scale b2 Field.(one / of_int 2) in
       let%map () = assert_r1cs a b ab
       and () =
         assert_r1cs (a + b)
@@ -421,7 +428,6 @@ module E3
     module Unchecked = Snarkette.Fields.Make_fp3 (F.Unchecked) (Params)
     module Impl = F.Impl
     open Impl
-    open Let_syntax
 
     module A = struct
       include T3
@@ -576,7 +582,6 @@ module F3
     module Unchecked = Snarkette.Fields.Make_fp3 (F.Unchecked) (Params)
     module Impl = F.Impl
     open Impl
-    open Let_syntax
 
     let mul_by_primitive_element (a, b, c) =
       (F.scale c Params.non_residue, a, b)
@@ -653,7 +658,6 @@ module Cyclotomic_square = struct
     let cyclotomic_square (c0, c1) =
       let open F2 in
       let open Impl in
-      let open Let_syntax in
       let%map b_squared = square (c0 + c1) and a = square c1 in
       let c = b_squared - a in
       let d = mul_by_primitive_element a in
@@ -672,7 +676,6 @@ module Cyclotomic_square = struct
   struct
     let cyclotomic_square ((x00, x01, x02), (x10, x11, x12)) =
       let open F2.Impl in
-      let open Let_syntax in
       let ((a0, a1) as a) = (x00, x11) in
       let ((b0, b1) as b) = (x10, x02) in
       let ((c0, c1) as c) = (x01, x12) in
@@ -727,7 +730,7 @@ struct
   let fq_mul_by_non_residue x = Fq.scale x Fq3.Params.non_residue
 
   let special_mul (a0, a1) (b0, b1) =
-    let open Impl.Let_syntax in
+    let open Impl in
     let%bind v1 = Fq3.(a1 * b1) in
     let%bind v0 =
       let a00, a01, a02 = a0 in
@@ -744,7 +747,6 @@ struct
   let assert_special_mul ((((a00, a01, a02) as a0), a1) : t)
       ((((_, _, b02) as b0), b1) : t) ((c00, c01, c02), c1) =
     let open Impl in
-    let open Let_syntax in
     let%bind ((v10, v11, v12) as v1) = Fq3.(a1 * b1) in
     let%bind v0 =
       exists Fq3.typ
@@ -770,7 +772,6 @@ struct
 
   let special_div_unsafe a b =
     let open Impl in
-    let open Let_syntax in
     let%bind result =
       exists typ
         ~compute:As_prover.(map2 ~f:Unchecked.( / ) (read typ a) (read typ b))
@@ -834,5 +835,5 @@ struct
     let p2 = Params.frobenius_coeffs_c1.(Int.( * ) (power mod 2) 2) in
     let p4 = Params.frobenius_coeffs_c1.(power mod 4) in
     let ( * ) s x = Field.Var.scale x s in
-    ((c00, p2 * c01), (p4 * c10, Field.Infix.(p4 * p2) * c11))
+    ((c00, p2 * c01), (p4 * c10, Field.(p4 * p2) * c11))
 end

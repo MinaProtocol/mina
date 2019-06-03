@@ -5,10 +5,8 @@ open Tuple_lib
 open Fold_lib
 
 module type Basic = sig
-  (* TODO: Use stable for bin_io *)
-
   type t = private Pedersen.Digest.t
-  [@@deriving bin_io, sexp, eq, compare, hash]
+  [@@deriving sexp, eq, compare, hash, yojson]
 
   val gen : t Quickcheck.Generator.t
 
@@ -20,10 +18,15 @@ module type Basic = sig
 
   module Stable : sig
     module V1 : sig
-      type nonrec t = t [@@deriving bin_io, sexp, compare, eq, hash]
+      type nonrec t = t
+      [@@deriving bin_io, sexp, compare, eq, hash, yojson, version]
 
       include Hashable_binable with type t := t
+
+      include Comparable.S with type t := t
     end
+
+    module Latest : module type of V1
   end
 
   type var
@@ -44,7 +47,7 @@ module type Basic = sig
 
   include Bits_intf.S with type t := t
 
-  include Hashable_binable with type t := t
+  include Hashable with type t := t
 
   val fold : t -> bool Triple.t Fold.t
 end

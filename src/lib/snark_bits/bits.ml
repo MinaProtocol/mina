@@ -191,7 +191,6 @@ module Snarkable = struct
           init ~f:(fun i -> Bigint.test_bit n i)
         in
         let store t =
-          let open Store.Let_syntax in
           let rec go two_to_the_i i acc =
             if i = V.length then acc
             else
@@ -241,6 +240,8 @@ module Snarkable = struct
 
     let var_of_field = unpack_var
 
+    let var_of_field_unsafe = Fn.id
+
     let unpack_value (x : Packed.value) : Unpacked.value = x
 
     let compare_var x y =
@@ -270,7 +271,8 @@ module Snarkable = struct
         List.map2 then_ else_ ~f:(fun then_ else_ ->
             Boolean.if_ cond ~then_ ~else_ )
       with
-      | Ok result -> Checked.List.all result
+      | Ok result ->
+          Checked.List.all result
       | Unequal_lengths ->
           failwith "Bits.if_: unpacked bit lengths were unequal"
   end

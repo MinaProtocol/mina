@@ -1,14 +1,32 @@
 open Core_kernel
 open Snark_params
 open Snark_bits
+open Module_version
 
 module Stable = struct
   module V1 = struct
-    type t = Tick.Field.t [@@deriving bin_io, sexp, eq, compare]
+    module T = struct
+      type t = Tick.Field.t
+      [@@deriving bin_io, sexp, eq, compare, version {asserted}]
+    end
+
+    include T
+    include Registration.Make_latest_version (T)
   end
+
+  module Latest = V1
+
+  module Module_decl = struct
+    let name = "target"
+
+    type latest = Latest.t
+  end
+
+  module Registrar = Registration.Make (Module_decl)
+  module Registered_V1 = Registrar.Register (V1)
 end
 
-include Stable.V1
+include Stable.Latest
 module Field = Tick.Field
 module Bigint = Tick_backend.Bigint.R
 
@@ -33,17 +51,6 @@ let of_bigint n =
   assert (Bigint.compare x max_bigint <= 0) ;
   Bigint.to_field x
 
-let assert_mem x xs =
-  let open Tick in
-  let open Let_syntax in
-  let rec go acc = function
-    | [] -> Boolean.Assert.any acc
-    | y :: ys ->
-        let%bind e = Field.Checked.equal x y in
-        go (e :: acc) ys
-  in
-  go [] xs
-
 (* TODO: Use a "dual" variable to ensure the bit_length constraint is actually always
    enforced. *)
 include Bits.Snarkable.Small
@@ -59,7 +66,6 @@ module Bits =
     end)
 
 open Tick
-open Let_syntax
 
 let var_to_unpacked (x : Field.Var.t) =
   Field.Checked.unpack ~length:bit_length x

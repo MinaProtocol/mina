@@ -19,9 +19,8 @@ let%test_module "test functor on in memory databases" =
 
       module Location : Merkle_ledger.Location_intf.S
 
-      module Addr : Merkle_address.S
-
-      module MT : DB
+      module MT :
+        DB with module Location = Location and module Addr = Location.Addr
 
       val with_instance : (MT.t -> 'a) -> 'a
     end
@@ -32,15 +31,18 @@ let%test_module "test functor on in memory databases" =
       let%test_unit "getting a non existing account returns None" =
         Test.with_instance (fun mdb ->
             Quickcheck.test MT.For_tests.gen_account_location
-              ~f:(fun location -> assert (MT.get mdb location = None) ) )
+              ~f:(fun location -> assert (MT.get mdb location = None)) )
 
-      let create_new_account_exn mdb ({Account.public_key; _} as account) =
+      let create_new_account_exn mdb account =
+        let public_key = Account.public_key account in
         let action, location =
           MT.get_or_create_account_exn mdb public_key account
         in
         match action with
-        | `Existed -> failwith "Expected to allocate a new account"
-        | `Added -> location
+        | `Existed ->
+            failwith "Expected to allocate a new account"
+        | `Added ->
+            location
 
       let%test "add and retrieve an account" =
         Test.with_instance (fun mdb ->
@@ -60,8 +62,10 @@ let%test_module "test functor on in memory databases" =
             MT.Location.equal location location'
             &&
             match (MT.get mdb location, MT.get mdb location') with
-            | Some acct, Some acct' -> Account.equal acct acct'
-            | _, _ -> false )
+            | Some acct, Some acct' ->
+                Account.equal acct acct'
+            | _, _ ->
+                false )
 
       let dedup_accounts accounts =
         List.dedup_and_sort accounts ~compare:(fun account1 account2 ->
@@ -124,7 +128,8 @@ let%test_module "test functor on in memory databases" =
             in
             let accounts = Quickcheck.random_value accounts_gen in
             Sequence.of_list accounts
-            |> Sequence.iter ~f:(fun ({Account.public_key; _} as account) ->
+            |> Sequence.iter ~f:(fun account ->
+                   let public_key = Account.public_key account in
                    let _, location =
                      MT.get_or_create_account_exn mdb public_key account
                    in
@@ -160,8 +165,129 @@ let%test_module "test functor on in memory databases" =
                    account
                in
                match action with
-               | `Added -> ()
-               | `Existed -> MT.set mdb location account )
+               | `Added ->
+                   ()
+               | `Existed ->
+                   MT.set mdb location account )
+
+      let%test_unit "If the entire database is full, let \
+                     addresses_and_accounts = \
+                     get_all_accounts_rooted_at_exn(address) in \
+                     set_batch_accounts(addresses_and_accounts) won't cause \
+                     any changes" =
+        Test.with_instance (fun mdb ->
+            let max_height = Int.min MT.depth 5 in
+            Quickcheck.test (Direction.gen_var_length_list max_height)
+              ~sexp_of:[%sexp_of: Direction.t List.t] ~f:(fun directions ->
+                let address =
+                  let offset = MT.depth - max_height in
+                  let padding =
+                    List.init offset ~f:(fun _ -> Direction.Left)
+                  in
+                  let padded_directions = List.concat [padding; directions] in
+                  MT.Addr.of_directions padded_directions
+                in
+                let old_merkle_root = MT.merkle_root mdb in
+                let addresses_and_accounts =
+                  MT.get_all_accounts_rooted_at_exn mdb address
+                in
+                MT.set_batch_accounts mdb addresses_and_accounts ;
+                let new_merkle_root = MT.merkle_root mdb in
+                assert (Hash.equal old_merkle_root new_merkle_root) ) )
+
+      let%test_unit "set_batch_accounts would change the merkle root" =
+        Test.with_instance (fun mdb ->
+            let max_height = Int.min 5 MT.depth in
+            populate_db mdb max_height ;
+            Quickcheck.test (Direction.gen_var_length_list max_height)
+              ~sexp_of:[%sexp_of: Direction.t List.t] ~f:(fun directions ->
+                let address =
+                  let offset = MT.depth - max_height in
+                  let padding =
+                    List.init offset ~f:(fun _ -> Direction.Left)
+                  in
+                  let padded_directions = List.concat [padding; directions] in
+                  MT.Addr.of_directions padded_directions
+                in
+                let num_accounts = 1 lsl (MT.depth - MT.Addr.depth address) in
+                let accounts =
+                  Quickcheck.random_value
+                    (Quickcheck.Generator.list_with_length num_accounts
+                       Account.gen)
+                in
+                if not @@ List.is_empty accounts then
+                  let addresses =
+                    List.rev
+                    @@ MT.Addr.Range.fold (MT.Addr.Range.subtree_range address)
+                         ~init:[] ~f:(fun address addresses ->
+                           address :: addresses )
+                  in
+                  let new_addresses_and_accounts =
+                    List.zip_exn addresses accounts
+                  in
+                  let old_addresses_and_accounts =
+                    MT.get_all_accounts_rooted_at_exn mdb address
+                  in
+                  (* TODO: After we do not generate duplicate accounts anymore,
+                     this should get removed *)
+                  if
+                    not
+                    @@ List.equal
+                         (fun (addr1, account1) (addr2, account2) ->
+                           MT.Addr.equal addr1 addr2
+                           && Account.equal account1 account2 )
+                         old_addresses_and_accounts new_addresses_and_accounts
+                  then (
+                    let old_merkle_root = MT.merkle_root mdb in
+                    MT.set_batch_accounts mdb new_addresses_and_accounts ;
+                    let new_merkle_root = MT.merkle_root mdb in
+                    assert (not @@ Hash.equal old_merkle_root new_merkle_root) )
+            ) )
+
+      let%test_unit "We can retrieve accounts by their by key after using \
+                     set_batch_accounts" =
+        Test.with_instance (fun mdb ->
+            (* We want to add accounts to a nonempty database *)
+            let max_height = Int.min (MT.depth - 1) 3 in
+            populate_db mdb max_height ;
+            let accounts = random_accounts max_height |> dedup_accounts in
+            let (last_location : MT.Location.t) =
+              MT.last_filled mdb |> Option.value_exn
+            in
+            let accounts_with_addresses =
+              List.folding_map accounts ~init:last_location
+                ~f:(fun prev_location account ->
+                  let location =
+                    Test.Location.next prev_location |> Option.value_exn
+                  in
+                  (location, (location |> Test.Location.to_path_exn, account))
+              )
+            in
+            MT.set_batch_accounts mdb accounts_with_addresses ;
+            List.iter accounts ~f:(fun account ->
+                let key = Account.public_key account in
+                let location =
+                  MT.location_of_key mdb key |> Option.value_exn
+                in
+                let queried_account =
+                  MT.get mdb location |> Option.value_exn
+                in
+                assert (Account.equal queried_account account) ) ;
+            let to_int =
+              Fn.compose MT.Location.Addr.to_int MT.Location.to_path_exn
+            in
+            let expected_last_location =
+              (MT.Location.Addr.to_int @@ MT.Location.to_path_exn last_location)
+              + List.length accounts
+            in
+            let actual_last_location =
+              to_int (MT.last_filled mdb |> Option.value_exn)
+            in
+            [%test_result: int] ~expect:expected_last_location
+              actual_last_location
+              ~message:
+                (sprintf "(expected_location: %i) (actual_location: %i)"
+                   expected_last_location actual_last_location) )
 
       let%test_unit "If the entire database is full, \
                      set_all_accounts_rooted_at_exn(address,accounts);get_all_accounts_rooted_at_exn(address) \
@@ -186,8 +312,11 @@ let%test_module "test functor on in memory databases" =
                        Account.gen)
                 in
                 MT.set_all_accounts_rooted_at_exn mdb address accounts ;
-                let result = MT.get_all_accounts_rooted_at_exn mdb address in
-                assert (List.equal ~equal:Account.equal accounts result) ) )
+                let result =
+                  List.map ~f:snd
+                  @@ MT.get_all_accounts_rooted_at_exn mdb address
+                in
+                assert (List.equal Account.equal accounts result) ) )
 
       let%test_unit "create_empty doesn't modify the hash" =
         Test.with_instance (fun ledger ->
@@ -198,7 +327,7 @@ let%test_module "test functor on in memory databases" =
             | `Existed, _ ->
                 failwith
                   "create_empty with empty ledger somehow already has that key?"
-            | `Added, new_loc ->
+            | `Added, _ ->
                 [%test_eq: Hash.t] start_hash (merkle_root ledger) )
 
       let%test "get_at_index_exn t (index_of_key_exn t public_key) = account" =
@@ -278,12 +407,11 @@ let%test_module "test functor on in memory databases" =
               List.iter accounts ~f:(fun account ->
                   ignore @@ create_new_account_exn mdb account ) ;
               let retrieved_accounts =
-                MT.get_all_accounts_rooted_at_exn mdb (MT.Addr.root ())
+                List.map ~f:snd
+                @@ MT.get_all_accounts_rooted_at_exn mdb (MT.Addr.root ())
               in
               assert (List.length accounts = List.length retrieved_accounts) ;
-              assert (
-                List.equal ~equal:Account.equal accounts retrieved_accounts )
-          )
+              assert (List.equal Account.equal accounts retrieved_accounts) )
 
       let%test_unit "removing accounts restores Merkle root" =
         Test.with_instance (fun mdb ->
@@ -366,12 +494,16 @@ let%test_module "test functor on in memory databases" =
       let depth = Depth.depth
 
       module Location = Merkle_ledger.Location.Make (Depth)
-      module Addr = Location.Addr
 
-      module MT : DB =
-        Database.Make (Key) (Account) (Hash) (Depth) (Location)
-          (In_memory_kvdb)
-          (Storage_locations)
+      module Inputs = struct
+        include Test_stubs.Base_inputs
+        module Location = Location
+        module Kvdb = In_memory_kvdb
+        module Storage_locations = Storage_locations
+        module Depth = Depth
+      end
+
+      module MT = Database.Make (Inputs)
 
       (* TODO: maybe this function should work with dynamic modules *)
       let with_instance (f : MT.t -> 'a) =

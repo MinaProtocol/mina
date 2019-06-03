@@ -86,8 +86,10 @@ module Controller = struct
       | Some {Action.at; _}, `No when at < t.last_time ->
           let%bind () = exec t in
           go `No
-      | Some _, `No -> return ()
-      | None, _ -> return ()
+      | Some _, `No ->
+          return ()
+      | None, _ ->
+          return ()
     in
     go `First
 end

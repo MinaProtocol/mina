@@ -2,7 +2,7 @@
 
 ## Introduction
 
-Hello! We'll walk you through a short demo to get a local testnet running using Coda. 
+Hello! We'll walk you through a short demo to get a local testnet running using Coda.
 
 Specifically, you'll download a docker image, run it, then play around with the command line interface to create a wallet and send/receive payments.
 
@@ -29,7 +29,7 @@ We'll walk through them one by one.
 
 **Software**: You need to be running **a Debian 9 or Ubuntu 18 distribution**, either natively or in a VM. These are the only operating systems we have tested against. If you don't have this running locally, there are instructions in the [appendix](#appendix) to set up a Google Compute instance.
 
-**Hardware**: We'll be running three nodes on your machine, including a node that is performing intensive zk-SNARK proving work. Therefore, we recommend the following system requirements: 12GB ram (you may be able to get away with less), 4 cores. 
+**Hardware**: We'll be running three nodes on your machine, including a node that is performing intensive zk-SNARK proving work. Therefore, we recommend the following system requirements: 12GB ram (you may be able to get away with less), 4 cores.
 
 ### Download the docker image
 
@@ -87,7 +87,7 @@ $ watch coda client status -daemon-port 8301
 
 #### Create a wallet
 
-A wallet in Coda is just a [public/private key pair](https://en.wikipedia.org/wiki/Public-key_cryptography). The public key corresponds to your publicly available address, and the private key is like a password, required to authorize sending funds from that address. 
+A wallet in Coda is just a [public/private key pair](https://en.wikipedia.org/wiki/Public-key_cryptography). The public key corresponds to your publicly available address, and the private key is like a password, required to authorize sending funds from that address.
 
 First, create a directory for your wallet:
 

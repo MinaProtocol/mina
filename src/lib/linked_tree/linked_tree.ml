@@ -54,7 +54,8 @@ module Make (Key : Key) : S with module Key = Key = struct
     let rec go acc (node : _ Node.t) =
       let acc = node.value :: acc in
       match node.parent with
-      | `Key k -> if Key.compare k ancestor = 0 then Some acc else None
+      | `Key k ->
+          if Key.compare k ancestor = 0 then Some acc else None
       | `Node parent ->
           if Key.compare parent.key ancestor = 0 then Some acc
           else go acc parent
@@ -66,8 +67,10 @@ module Make (Key : Key) : S with module Key = Key = struct
       if d = 0 then Some (node.key, acc)
       else
         match node.parent with
-        | `Node parent -> go (node.value :: acc) (d - 1) parent
-        | `Key k -> if d = 1 then Some (k, node.value :: acc) else None
+        | `Node parent ->
+            go (node.value :: acc) (d - 1) parent
+        | `Key k ->
+            if d = 1 then Some (k, node.value :: acc) else None
     in
     fun t ~source ~depth -> Option.bind (lookup_node t source) ~f:(go [] depth)
 
@@ -86,8 +89,10 @@ module Make (Key : Key) : S with module Key = Key = struct
 
   let is_old t length =
     match t.newest with
-    | None -> false
-    | Some newest -> is_old ~max_size:t.max_size ~newest length
+    | None ->
+        false
+    | Some newest ->
+        is_old ~max_size:t.max_size ~newest length
 
   let add t ~prev_key ~key ~length ~data =
     if is_old t length then `Too_old
@@ -118,7 +123,8 @@ module Make (Key : Key) : S with module Key = Key = struct
       in
       Hashtbl.set t.table ~key ~data:node ;
       ( match t.newest with
-      | None -> t.newest <- Some length
+      | None ->
+          t.newest <- Some length
       | Some newest ->
           if Length.(newest < length) then (
             t.newest <- Some length ;

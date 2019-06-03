@@ -65,18 +65,28 @@ kademlia:
 # Alias
 dht: kademlia
 
-build: git_hooks
+build: git_hooks reformat-diff
 	$(info Starting Build)
-	ulimit -s 65532 && (ulimit -n 10240 || true) && (ulimit -u 2128 || true) && cd src && $(WRAPSRC) env CODA_COMMIT_SHA1=$(GITLONGHASH) dune build --profile=$(DUNE_PROFILE)
+	ulimit -s 65532 && (ulimit -n 10240 || true) && cd src && $(WRAPSRC) env CODA_COMMIT_SHA1=$(GITLONGHASH) dune build app/logproc/logproc.exe app/cli/src/coda.exe  --profile=$(DUNE_PROFILE)
 	$(info Build complete)
 
 dev: codabuilder containerstart build
+
+macos-portable:
+	@rm -rf _build/coda-daemon-macos/
+	@rm -rf _build/coda-daemon-macos.zip
+	@./scripts/macos-portable.sh src/_build/default/app/cli/src/coda.exe src/app/kademlia-haskell/result/bin/kademlia _build/coda-daemon-macos
+	@zip -r _build/coda-daemon-macos.zip _build/coda-daemon-macos/
+	@echo Find coda-daemon-macos.zip inside _build/
 
 ########################################
 ## Lint
 
 reformat: git_hooks
 	cd src; $(WRAPSRC) dune exec --profile=$(DUNE_PROFILE) app/reformat/reformat.exe -- -path .
+
+reformat-diff:
+	ocamlformat --doc-comments=before --inplace $(shell git status -s | cut -c 4- | grep '\.mli\?$$' | while IFS= read -r f; do stat "$$f" >/dev/null 2>&1 && echo "$$f"; done) || true
 
 check-format:
 	cd src; $(WRAPSRC) dune exec --profile=$(DUNE_PROFILE) app/reformat/reformat.exe -- -path . -check
@@ -114,7 +124,7 @@ macos-setup:
 # push steps require auth on docker hub
 docker-toolchain:
 	@if git diff-index --quiet HEAD ; then \
-		docker build --file dockerfiles/Dockerfile-toolchain --tag codaprotocol/coda:toolchain-$(GITLONGHASH) . && \
+		docker build --no-cache --file dockerfiles/Dockerfile-toolchain --tag codaprotocol/coda:toolchain-$(GITLONGHASH) . && \
 		docker tag  codaprotocol/coda:toolchain-$(GITLONGHASH) codaprotocol/coda:toolchain-latest && \
 		docker push codaprotocol/coda:toolchain-$(GITLONGHASH) && \
 		docker push codaprotocol/coda:toolchain-latest ;\
@@ -144,7 +154,7 @@ toolchains: docker-toolchain docker-toolchain-rust docker-toolchain-haskell
 
 update-deps:
 	./scripts/update-toolchain-references.sh $(GITLONGHASH)
-	cd .circleci; python2 render.py > config.yml
+	make render-circleci
 
 # Local 'codabuilder' docker image (based off docker-toolchain)
 codabuilder: git_hooks
@@ -162,42 +172,20 @@ deb:
 	@mkdir -p /tmp/artifacts
 	@cp src/_build/coda.deb /tmp/artifacts/.
 
-# deb-s3 https://github.com/krobertson/deb-s3
-DEBS3 = deb-s3 upload --s3-region=us-west-2 --bucket packages.o1test.net --preserve-versions --cache-control=120
-
-publish_kademlia_deb:
-	@if [ $(AWS_ACCESS_KEY_ID) ] ; then \
-		if [ "$(CIRCLE_BRANCH)" = "master" ] ; then \
-			$(DEBS3) --codename stable   --component main src/_build/coda-kademlia.deb ; \
-		else \
-			$(DEBS3) --codename unstable --component main src/_build/coda-kademlia.deb ; \
-		fi ; \
-	else \
-		echo "WARNING: AWS_ACCESS_KEY_ID not set, deb-s3 not run" ; \
-	fi
-
 publish_deb:
-	@if [ $(AWS_ACCESS_KEY_ID) ] ; then \
-		if [ "$(CIRCLE_BRANCH)" = "master" ] ; then \
-			$(DEBS3) --codename stable   --component main src/_build/coda.deb ; \
-		else \
-			$(DEBS3) --codename unstable --component main src/_build/coda.deb ; \
-		fi ; \
-	else  \
-		echo "WARNING: AWS_ACCESS_KEY_ID not set, deb-s3 commands not run" ; \
-	fi
+	@./scripts/publish-deb.sh
 
-publish_debs: publish_deb publish_kademlia_deb
+publish_debs: publish_deb
 
 provingkeys:
 	$(WRAP) tar -cvjf src/_build/coda_cache_dir_$(GITHASH)_$(CODA_CONSENSUS).tar.bz2  /tmp/coda_cache_dir ; \
 	mkdir -p /tmp/artifacts ; \
 	cp src/_build/coda_cache_dir*.tar.bz2 /tmp/artifacts/. ; \
 
-
 genesiskeys:
 	@mkdir -p /tmp/artifacts
 	@cp src/_build/default/lib/coda_base/sample_keypairs.ml /tmp/artifacts/.
+	@cp src/_build/default/lib/coda_base/sample_keypairs.json /tmp/artifacts/.
 
 codaslim:
 	@# FIXME: Could not reference .deb file in the sub-dir in the docker build
@@ -209,33 +197,10 @@ codaslim:
 ## Tests
 
 render-circleci:
-	cd .circleci; python2 render.py > config.yml
+	./scripts/test.py render .circleci/config.yml.jinja .mergify.yml.jinja
 
-check-render-circleci:
-	cd .circleci; ./check_render.sh
-
-test:
-	$(WRAP) make test-all
-
-test-all: | test-runtest \
-			test-sigs \
-			test-stakes
-
-test-runtest: SHELL := /bin/bash
-test-runtest:
-	source scripts/test_all.sh ; cd src ; run_unit_tests
-
-test-sigs: SHELL := /bin/bash
-test-sigs:
-	source scripts/test_all.sh ; cd src ; run_all_sig_integration_tests
-
-test-stakes: SHELL := /bin/bash
-test-stakes:
-	source scripts/test_all.sh ; cd src ; run_all_stake_integration_tests
-
-test-withsnark: SHELL := /bin/bash
-test-withsnark:
-	source scripts/test_all.sh ; cd src; WITH_SNARKS=true DUNE_PROFILE=test_posig run_integration_test full-test
+test-ppx:
+	$(MAKE) -C src/lib/ppx_coda/tests
 
 web:
 	./scripts/web.sh

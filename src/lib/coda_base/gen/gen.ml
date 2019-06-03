@@ -10,7 +10,7 @@ let seed = "Coda_sample_keypairs"
 
 let random_bool = Crs.create ~seed
 
-module Group = Crypto_params_init.Tick_backend.Inner_curve
+module Group = Curve_choice.Tick_backend.Inner_curve
 open Tuple_lib
 
 let bigint_of_bits bits =
@@ -27,7 +27,7 @@ let rec random_scalar () =
   else random_scalar ()
 
 let keypairs =
-  let n = 40 in
+  let n = 120 in
   List.init n ~f:(fun _ ->
       let pk = random_scalar () in
       Keypair.of_private_key_exn pk )

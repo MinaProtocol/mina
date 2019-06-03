@@ -11,7 +11,7 @@ A consensus mechanism controls many aspects in a protocol which is built on top 
 
 ### Local\_state
 
-`Local_state` is consensus related state which is only stored locally on the machine. It provides a place for consensus to track some information on the local node across points of finality in the protocol state. See the `lock_transition` hook for more details on how
+`Local_state` is consensus related state which is only stored locally on the machine. It provides a place for consensus to track some information on the local node across points of finality in the protocol state. See the `frontier_root_transition` hook for more details on how
 
 ### Consensus\_transition\_data
 
@@ -62,9 +62,9 @@ The `select` hook informs the protocol that, given two states, which state is "b
 
 The `received_at_valid_time` hook is a predicate on whether or not a given consensus state is valid at a given time. This lets the consensus mechanism optionally control temporal properties of when a consensus state was valid to generate, rejecting the received protocol state if it was recieved out of band. The implementation of the protocol should call this hook whenever a transition is received from the network, before processing the transition and adding it to the frontier.
 
-### lock\_transition
+### frontier\_root\_transition
 
-The `lock_transition` hook needs to be called whenever a transition occurs at the point of finality (in coda, this is the root of the transition frontier). This provides a chance for the consensus mechanism to update its local state in accordance with the network's finalized state.
+The `frontier_root_transition` hook needs to be called whenever a transition occurs at the point of finality (in coda, this is the root of the transition frontier). This provides a chance for the consensus mechanism to update its local state in accordance with the network's finalized state.
 
 ### should\_bootstrap
 

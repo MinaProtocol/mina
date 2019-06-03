@@ -27,16 +27,20 @@ module Make (Iso : Iso_intf) = struct
   module For_tests = struct
     let check_encoding t ~equal =
       match of_yojson (to_yojson t) with
-      | Ok result -> equal t result
-      | Error e -> failwithf !"%s" e ()
+      | Ok result ->
+          equal t result
+      | Error e ->
+          failwithf !"%s" e ()
   end
 end
 
 module For_tests = struct
   let check_encoding (type t) (module M : S with type t = t) t ~equal =
     match M.of_yojson (M.to_yojson t) with
-    | Ok result -> equal t result
-    | Error e -> failwithf !"%s" e ()
+    | Ok result ->
+        equal t result
+    | Error e ->
+        failwithf !"%s" e ()
 end
 
 module Make_of_int (Iso : sig
@@ -72,3 +76,22 @@ Make (struct
 
   let decode = Iso.of_string
 end)
+
+module Make_base64 (T : sig
+  type t [@@deriving bin_io]
+end) =
+struct
+  let to_base64 t = Binable.to_string (module T) t |> Base64.encode_string
+
+  let of_base64_exn s = Base64.decode_exn s |> Binable.of_string (module T)
+
+  module String_ops = struct
+    type t = T.t
+
+    let to_string = to_base64
+
+    let of_string = of_base64_exn
+  end
+
+  include Make_of_string (String_ops)
+end
