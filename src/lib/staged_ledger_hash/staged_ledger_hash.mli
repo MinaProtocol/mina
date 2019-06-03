@@ -40,7 +40,8 @@ module Aux_hash : sig
 
   module Stable : sig
     module V1 : sig
-      type nonrec t = t [@@deriving bin_io, sexp, eq, compare, hash, yojson]
+      type nonrec t = t
+      [@@deriving bin_io, sexp, eq, compare, hash, yojson, version]
     end
 
     module Latest : module type of V1

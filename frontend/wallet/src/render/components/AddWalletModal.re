@@ -1,7 +1,17 @@
 module Styles = {
   open Css;
 
-  let bodyMargin = style([margin(`rem(1.0))]);
+  let container =
+    style([
+      margin(`auto),
+      width(`rem(22.)),
+      display(`flex),
+      flexDirection(`column),
+      alignItems(`center),
+      justifyContent(`center),
+    ]);
+
+  let alert = style([margin2(~v=`rem(1.), ~h=`zero)]);
 };
 
 // TODO: Add validation that the wallet name isn't already in use
@@ -9,20 +19,17 @@ module Styles = {
 [@react.component]
 let make = (~walletName, ~setModalState, ~onSubmit) => {
   <Modal title="Add Wallet" onRequestClose={() => setModalState(_ => None)}>
-    <div
-      className=Css.(
-        style([
-          display(`flex),
-          flexDirection(`column),
-          alignItems(`center),
-          justifyContent(`center),
-        ])
-      )>
-      <div className=Styles.bodyMargin>
-        <TextField
-          label="Name"
-          onChange={value => setModalState(_ => Some(value))}
-          value=walletName
+    <div className=Styles.container>
+      <Spacer height=1. />
+      <TextField
+        label="Name"
+        onChange={value => setModalState(_ => Some(value))}
+        value=walletName
+      />
+      <div className=Styles.alert>
+        <Alert
+          kind=`Info
+          message="You can change or delete your wallet later."
         />
       </div>
       <div className=Css.(style([display(`flex)]))>
@@ -31,7 +38,7 @@ let make = (~walletName, ~setModalState, ~onSubmit) => {
           style=Button.Gray
           onClick={_ => setModalState(_ => None)}
         />
-        <Spacer width=1. />
+        <Spacer width=2. />
         <Button
           label="Create"
           style=Button.Green

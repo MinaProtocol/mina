@@ -1,6 +1,5 @@
 open Core
 open Async
-open Protocols.Coda_pow
 open Coda_base
 open Coda_state
 open Pipe_lib.Strict_pipe
@@ -9,25 +8,18 @@ module type Inputs_intf = sig
   include Transition_frontier.Inputs_intf
 
   module Transition_frontier :
-    Transition_frontier_intf
-    with type state_hash := State_hash.t
-     and type external_transition_validated := External_transition.Validated.t
+    Coda_intf.Transition_frontier_intf
+    with type external_transition_validated := External_transition.Validated.t
      and type mostly_validated_external_transition :=
                 ( [`Time_received] * Truth.true_t
                 , [`Proof] * Truth.true_t
                 , [`Frontier_dependencies] * Truth.true_t
                 , [`Staged_ledger_diff] * Truth.false_t )
                 External_transition.Validation.with_transition
-     and type ledger_database := Ledger.Db.t
-     and type masked_ledger := Ledger.Mask.Attached.t
      and type transaction_snark_scan_state := Staged_ledger.Scan_state.t
      and type staged_ledger_diff := Staged_ledger_diff.t
      and type staged_ledger := Staged_ledger.t
-     and type consensus_local_state := Consensus.Data.Local_state.t
-     and type user_command := User_command.t
      and type verifier := Verifier.t
-     and type pending_coinbase := Pending_coinbase.t
-     and type consensus_state := Consensus.Data.Consensus_state.Value.t
 
   module Root_sync_ledger :
     Syncable_ledger.S
@@ -41,41 +33,23 @@ module type Inputs_intf = sig
      and type answer := Sync_ledger.Answer.t
 
   module Network :
-    Network_intf
-    with type peer := Network_peer.Peer.t
-     and type state_hash := State_hash.t
-     and type external_transition := External_transition.t
-     and type consensus_state := Consensus.Data.Consensus_state.Value.t
-     and type state_body_hash := State_body_hash.t
-     and type ledger_hash := Ledger_hash.t
-     and type sync_ledger_query := Sync_ledger.Query.t
-     and type sync_ledger_answer := Sync_ledger.Answer.t
-     and type parallel_scan_state := Staged_ledger.Scan_state.t
-     and type pending_coinbases := Pending_coinbase.t
-
-  module Time : Time_intf
+    Coda_intf.Network_intf
+    with type external_transition := External_transition.t
+     and type transaction_snark_scan_state := Staged_ledger.Scan_state.t
 
   module Sync_handler :
-    Sync_handler_intf
-    with type ledger_hash := Ledger_hash.t
-     and type state_hash := State_hash.t
-     and type external_transition := External_transition.t
+    Coda_intf.Sync_handler_intf
+    with type external_transition := External_transition.t
      and type external_transition_validated := External_transition.Validated.t
      and type transition_frontier := Transition_frontier.t
-     and type syncable_ledger_query := Sync_ledger.Query.t
-     and type syncable_ledger_answer := Sync_ledger.Answer.t
-     and type pending_coinbases := Pending_coinbase.t
      and type parallel_scan_state := Staged_ledger.Scan_state.t
 
   module Root_prover :
-    Root_prover_intf
-    with type state_body_hash := State_body_hash.t
-     and type transition_frontier := Transition_frontier.t
+    Coda_intf.Root_prover_intf
+    with type transition_frontier := Transition_frontier.t
      and type external_transition := External_transition.t
      and type external_transition_with_initial_validation :=
                 External_transition.with_initial_validation
-     and type consensus_state := Consensus.Data.Consensus_state.Value.t
-     and type state_hash := State_hash.t
      and type verifier := Verifier.t
 end
 
@@ -83,14 +57,12 @@ module Make (Inputs : Inputs_intf) : sig
   open Inputs
 
   include
-    Bootstrap_controller_intf
+    Coda_intf.Bootstrap_controller_intf
     with type network := Network.t
      and type verifier := Verifier.t
      and type transition_frontier := Transition_frontier.t
      and type external_transition_with_initial_validation :=
                 External_transition.with_initial_validation
-     and type ledger_db := Ledger.Db.t
-     and type time := Time.t
 
   module For_tests : sig
     type t
@@ -313,9 +285,7 @@ end = struct
       in
       let received_staged_ledger_hash =
         Staged_ledger_hash.of_aux_ledger_and_coinbase_hash
-          (Staged_ledger_hash.Aux_hash.of_bytes
-             (Staged_ledger_aux_hash.to_bytes
-                (Staged_ledger.Scan_state.hash scan_state)))
+          (Staged_ledger.Scan_state.hash scan_state)
           expected_merkle_root pending_coinbases
       in
       let%bind () =
@@ -366,10 +336,18 @@ end = struct
         let local_state = Transition_frontier.consensus_local_state frontier in
         let%bind () =
           match
-            Consensus.Hooks.required_local_state_sync ~consensus_state
+            Consensus.Hooks.bootstrap_local_state_sync ~consensus_state
               ~local_state
           with
           | None ->
+              Logger.info logger ~module_:__MODULE__ ~location:__LOC__
+                ~metadata:
+                  [ ( "local_state"
+                    , Consensus.Data.Local_state.to_yojson local_state )
+                  ; ( "consensus_state"
+                    , Consensus.Data.Consensus_state.Value.to_yojson
+                        consensus_state ) ]
+                "Not synchronizing consensus local state" ;
               Deferred.unit
           | Some sync_jobs -> (
               Logger.info logger ~module_:__MODULE__ ~location:__LOC__

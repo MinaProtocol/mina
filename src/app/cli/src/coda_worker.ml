@@ -1,6 +1,7 @@
 open Core
 open Async
 open Coda_base
+open Coda_state
 open Signature_lib
 open Coda_inputs
 open Signature_lib
@@ -18,7 +19,7 @@ module Input = struct
     ; env: (string * string) list
     ; proposer: int option
     ; snark_worker_config: Snark_worker_config.t option
-    ; work_selection: Protocols.Coda_pow.Work_selection.t
+    ; work_selection: Cli_lib.Arg_type.work_selection
     ; conf_dir: string
     ; trace_dir: string option
     ; program_dir: string
@@ -85,8 +86,7 @@ module T = struct
     ; root_diff:
         ( 'worker
         , unit
-        , User_command.t Protocols.Coda_transition_frontier.Root_diff_view.t
-          Pipe.Reader.t )
+        , Transition_frontier.Diff.Root_diff.view Pipe.Reader.t )
         Rpc_parallel.Function.t
     ; prove_receipt:
         ( 'worker
@@ -130,9 +130,7 @@ module T = struct
         -> User_command.Stable.V1.t list Deferred.t
     ; coda_root_diff:
            unit
-        -> User_command.t Protocols.Coda_transition_frontier.Root_diff_view.t
-           Pipe.Reader.t
-           Deferred.t
+        -> Transition_frontier.Diff.Root_diff.view Pipe.Reader.t Deferred.t
     ; coda_prove_receipt:
            Receipt.Chain_hash.t * Receipt.Chain_hash.t
         -> Payment_proof.t Deferred.t
@@ -258,10 +256,8 @@ module T = struct
 
     let root_diff =
       C.create_pipe ~f:root_diff_impl ~bin_input:Unit.bin_t
-        ~bin_output:
-          [%bin_type_class:
-            User_command.Stable.Latest.t
-            Protocols.Coda_transition_frontier.Root_diff_view.t] ()
+        ~bin_output:[%bin_type_class: Transition_frontier.Diff.Root_diff.view]
+        ()
 
     let sync_status =
       C.create_pipe ~f:sync_status_impl ~bin_input:Unit.bin_t
@@ -355,9 +351,7 @@ module T = struct
         let max_concurrent_connections = max_concurrent_connections
       end in
       O1trace.trace_task "worker_main" (fun () ->
-          let%bind (module Init) =
-            make_init ~should_propose:(Option.is_some proposer) (module Config)
-          in
+          let%bind (module Init) = make_init (module Config) in
           let module Main = Coda_inputs.Make_coda (Init) in
           let module Run = Coda_run.Make (Config) (Main) in
           let%bind receipt_chain_dir_name =
@@ -366,6 +360,9 @@ module T = struct
           let%bind trust_dir = Unix.mkdtemp (conf_dir ^/ "trust") in
           let%bind transaction_database_dir =
             Unix.mkdtemp @@ conf_dir ^/ "transaction"
+          in
+          let%bind external_transition_database_dir =
+            Unix.mkdtemp @@ conf_dir ^/ "external_transition"
           in
           let trace_database_initialization typ location =
             Logger.trace logger "Creating %s at %s" ~module_:__MODULE__
@@ -380,18 +377,32 @@ module T = struct
           let trust_system = Trust_system.create ~db_dir:trust_dir in
           trace_database_initialization "trust_system" __LOC__ trust_dir ;
           let transaction_database =
-            Transaction_database.create logger transaction_database_dir
+            Auxiliary_database.Transaction_database.create ~logger
+              transaction_database_dir
           in
           trace_database_initialization "transaction_database" __LOC__
             transaction_database_dir ;
+          let external_transition_database =
+            Auxiliary_database.External_transition_database.create ~logger
+              external_transition_database_dir
+          in
+          trace_database_initialization "external_transition_database" __LOC__
+            external_transition_database_dir ;
           let time_controller =
-            Run.Inputs.Time.Controller.create Run.Inputs.Time.Controller.basic
+            Block_time.Controller.create Block_time.Controller.basic
+          in
+          let initial_propose_keypairs =
+            Keypair.Set.of_list (Config.propose_keypair |> Option.to_list)
+          in
+          let initial_propose_keys =
+            Public_key.Compressed.Set.of_list
+              ( Option.map Config.propose_keypair ~f:(fun keypair ->
+                    let open Keypair in
+                    Public_key.compress keypair.public_key )
+              |> Option.to_list )
           in
           let consensus_local_state =
-            Consensus.Data.Local_state.create
-              (Option.map Config.propose_keypair ~f:(fun keypair ->
-                   let open Keypair in
-                   Public_key.compress keypair.public_key ))
+            Consensus.Data.Local_state.create initial_propose_keys
           in
           let net_config =
             { Main.Inputs.Net.Config.logger
@@ -424,8 +435,8 @@ module T = struct
                  ~wallets_disk_location:(conf_dir ^/ "wallets")
                  ~time_controller ~receipt_chain_database
                  ~snark_work_fee:(Currency.Fee.of_int 0)
-                 ?propose_keypair:Config.propose_keypair ~monitor
-                 ~consensus_local_state ~transaction_database ())
+                 ~initial_propose_keypairs ~monitor ~consensus_local_state
+                 ~transaction_database ~external_transition_database ())
           in
           Run.handle_shutdown ~monitor ~conf_dir coda ;
           let%map () =
