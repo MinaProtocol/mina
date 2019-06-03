@@ -8,6 +8,7 @@
     snarky_taylor
     core_kernel
     coda_base
+    with_hash
     genesis_ledger
     snark_params
     gossip_net

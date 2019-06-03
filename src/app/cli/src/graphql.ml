@@ -46,6 +46,12 @@ module Make (Commands : Coda_commands.Intf) = struct
 
       (** Balance of Coda (a uint64 under the hood) *)
       let balance b = Balance.to_uint64 b |> uint64
+
+      let fee fee = uint64 @@ Currency.Fee.to_uint64 fee
+
+      let amount amount = uint64 @@ Currency.Amount.to_uint64 amount
+
+      module State_hash = Codable.Make_base64 (State_hash.Stable.V1)
     end
 
     let uint64_arg name ~doc ~typ =
@@ -123,6 +129,16 @@ module Make (Commands : Coda_commands.Intf) = struct
                 User_command_payload.memo @@ User_command.payload payment
                 |> User_command_memo.to_string ) ] )
 
+    let fee_transfer =
+      obj "FeeTransfer" ~fields:(fun _ ->
+          [ field "recipient"
+              ~args:Arg.[]
+              ~doc:"Receipt of fee transfer" ~typ:(non_null string)
+              ~resolve:(fun _ (pk, _) -> Stringable.public_key pk)
+          ; uint64_field "fee" ~doc:"Fee that the receipt receives"
+              ~args:Arg.[]
+              ~resolve:(fun _ (_, fee) -> Stringable.fee fee) ] )
+
     let delegation_update =
       obj "DelegationUpdate" ~fields:(fun _ ->
           [ field "status"
@@ -132,6 +148,27 @@ module Make (Commands : Coda_commands.Intf) = struct
             (* TODO: include active field *)
             (* TODO: include consensus field *)
            ] )
+
+    let transactions :
+        ( Program.t
+        , Auxiliary_database.Filtered_external_transition.Transactions.t option
+        )
+        typ =
+      let open Auxiliary_database.Filtered_external_transition.Transactions in
+      obj "Transactions" ~doc:"Different types of transactions in a block"
+        ~fields:(fun _ ->
+          [ field "userCommands"
+              ~typ:(non_null @@ list @@ non_null user_command)
+              ~args:Arg.[]
+              ~resolve:(fun _ {user_commands; _} -> user_commands)
+          ; field "feeTransfer"
+              ~typ:(non_null @@ list @@ non_null fee_transfer)
+              ~args:Arg.[]
+              ~resolve:(fun _ {fee_transfers; _} -> fee_transfers)
+          ; uint64_field "coinbase"
+              ~doc:"Coinbase amount that proposer receives"
+              ~args:Arg.[]
+              ~resolve:(fun _ {coinbase; _} -> Stringable.amount coinbase) ] )
 
     let snark_fee : (Program.t, Transaction_snark_work.t option) typ =
       obj "SnarkFee" ~fields:(fun _ ->
@@ -146,36 +183,61 @@ module Make (Commands : Coda_commands.Intf) = struct
               ~resolve:(fun _ {Transaction_snark_work.fee; _} ->
                 Currency.Fee.to_uint64 fee |> Unsigned.UInt64.to_string ) ] )
 
-    let block : ('context, External_transition.t option) typ =
+    let blockchain_state =
+      obj "BlockchainState" ~fields:(fun _ ->
+          [ field "date" ~typ:(non_null string)
+              ~args:Arg.[]
+              ~resolve:
+                (fun _ {Coda_state.Blockchain_state.Poly.timestamp; _} ->
+                Block_time.to_string timestamp )
+          ; field "snarkedLedgerHash" ~typ:(non_null string)
+              ~args:Arg.[]
+              ~resolve:
+                (fun _
+                     {Coda_state.Blockchain_state.Poly.snarked_ledger_hash; _} ->
+                Frozen_ledger_hash.to_bytes snarked_ledger_hash )
+          ; field "stagedLedgerHash" ~typ:(non_null string)
+              ~args:Arg.[]
+              ~resolve:
+                (fun _ {Coda_state.Blockchain_state.Poly.staged_ledger_hash; _} ->
+                Ledger_hash.to_bytes
+                @@ Staged_ledger_hash.ledger_hash staged_ledger_hash ) ] )
+
+    let protocol_state =
+      let open Auxiliary_database.Filtered_external_transition.Protocol_state in
+      obj "ProtocolState" ~fields:(fun _ ->
+          [ field "previousStateHash" ~typ:(non_null string)
+              ~args:Arg.[]
+              ~resolve:(fun _ t ->
+                Stringable.State_hash.to_base64 t.previous_state_hash )
+          ; field "blockchainState"
+              ~typ:(non_null blockchain_state)
+              ~args:Arg.[]
+              ~resolve:(fun _ t -> t.blockchain_state) ] )
+
+    let block :
+        ( 'context
+        , ( Auxiliary_database.Filtered_external_transition.t
+          , State_hash.t )
+          With_hash.t
+          option )
+        typ =
+      let open Auxiliary_database.Filtered_external_transition in
       obj "Block" ~fields:(fun _ ->
-          [ uint64_field "coinbase" ~doc:"Total coinbase awarded to proposer"
+          [ field "creator" ~typ:(non_null string)
               ~args:Arg.[]
-              ~resolve:(fun _ external_transition ->
-                let staged_ledger_diff =
-                  External_transition.staged_ledger_diff external_transition
-                in
-                staged_ledger_diff |> Staged_ledger_diff.coinbase
-                |> Currency.Amount.to_uint64 |> Stringable.uint64 )
-          ; field "creator" ~typ:(non_null string)
-              ~doc:"Public key of the proposer creating the block"
+              ~resolve:(fun _ {With_hash.data; _} ->
+                Stringable.public_key data.creator )
+          ; field "stateHash" ~typ:(non_null string)
               ~args:Arg.[]
-              ~resolve:(fun _ external_transition ->
-                Stringable.public_key
-                @@ External_transition.proposer external_transition )
-          ; field "userCommands" ~doc:"List of user commands in the block"
-              ~typ:(non_null (list @@ non_null user_command))
+              ~resolve:(fun _ {With_hash.hash; _} ->
+                Stringable.State_hash.to_base64 hash )
+          ; field "protocolState" ~typ:(non_null protocol_state)
               ~args:Arg.[]
-              ~resolve:(fun _ external_transition ->
-                External_transition.user_commands external_transition )
-          ; field "snarkFees"
-              ~doc:"Fees that a proposer for constructing proofs"
-              ~typ:(non_null (list @@ non_null snark_fee))
+              ~resolve:(fun _ {With_hash.data; _} -> data.protocol_state)
+          ; field "transactions" ~typ:(non_null transactions)
               ~args:Arg.[]
-              ~resolve:(fun _ external_transition ->
-                let staged_ledger_diff =
-                  External_transition.staged_ledger_diff external_transition
-                in
-                Staged_ledger_diff.completed_works staged_ledger_diff ) ] )
+              ~resolve:(fun _ {With_hash.data; _} -> data.transactions) ] )
 
     let sync_status : ('context, [`Offline | `Synced | `Bootstrap]) typ =
       non_null
@@ -213,32 +275,32 @@ module Make (Commands : Coda_commands.Intf) = struct
       let wallet =
         obj "Wallet" ~doc:"An account record according to the daemon"
           ~fields:(fun _ ->
-            [ pubkey_field ~resolve:(fun _ account ->
+            [ pubkey_field ~resolve:(fun _ (account, _) ->
                   (* Hack: Account.Poly.t is only parameterized over 'pk once
-                   * and so, in order for delegate to be optional, we must also
-                   * make account public_key optional even though it's always
-                   * Some. In an attempt to avoid a large refactoring, and also
-                   * avoid making a new record, we'll deal with a value_exn here
-                   * and be sad. *)
+                           * and so, in order for delegate to be optional, we must also
+                           * make account public_key optional even though it's always
+                           * Some. In an attempt to avoid a large refactoring, and also
+                           * avoid making a new record, we'll deal with a value_exn here
+                           * and be sad. *)
                   Stringable.public_key
                   @@ Option.value_exn account.Account.Poly.public_key )
             ; field "balance"
                 ~typ:(non_null AnnotatedBalance.obj)
                 ~doc:"A balance of Coda as a stringified uint64"
                 ~args:Arg.[]
-                ~resolve:(fun _ account -> account.Account.Poly.balance)
+                ~resolve:(fun _ (account, _) -> account.Account.Poly.balance)
             ; field "nonce" ~typ:string
                 ~doc:
                   "Nonces are natural numbers that increase each transaction. \
                    Stringified uint32"
                 ~args:Arg.[]
-                ~resolve:(fun _ account ->
+                ~resolve:(fun _ (account, _) ->
                   Option.map ~f:Account.Nonce.to_string
                     account.Account.Poly.nonce )
             ; field "receiptChainHash" ~typ:string
                 ~doc:"Top hash of the receipt chain merkle-list"
                 ~args:Arg.[]
-                ~resolve:(fun _ account ->
+                ~resolve:(fun _ (account, _) ->
                   Option.map ~f:Receipt.Chain_hash.to_string
                     account.Account.Poly.receipt_chain_hash )
             ; field "delegate" ~typ:string
@@ -247,7 +309,7 @@ module Make (Commands : Coda_commands.Intf) = struct
                    delegating to anybody, than this would return your public \
                    key."
                 ~args:Arg.[]
-                ~resolve:(fun _ account ->
+                ~resolve:(fun _ (account, _) ->
                   Option.map ~f:Stringable.public_key
                     account.Account.Poly.delegate )
             ; field "votingFor" ~typ:string
@@ -255,9 +317,16 @@ module Make (Commands : Coda_commands.Intf) = struct
                   "The previous epoch lock hash of the chain which you are \
                    voting for"
                 ~args:Arg.[]
-                ~resolve:(fun _ account ->
+                ~resolve:(fun _ (account, _) ->
                   Option.map ~f:Coda_base.State_hash.to_bytes
-                    account.Account.Poly.voting_for ) ] )
+                    account.Account.Poly.voting_for )
+            ; field "stakingActive" ~typ:(non_null bool)
+                ~doc:
+                  "Actively staking. There is a lag between switching staking \
+                   keys and them appearing here as you may be in the middle \
+                   of a staking procedure with other keys."
+                ~args:Arg.[]
+                ~resolve:(fun _ (_, staking_active) -> staking_active) ] )
     end
 
     let snark_worker =
@@ -297,71 +366,23 @@ module Make (Commands : Coda_commands.Intf) = struct
             [ field "payment" ~typ:(non_null user_command)
                 ~args:Arg.[]
                 ~resolve:(fun _ -> Fn.id) ] )
-    end
 
-    module Pagination = struct
-      module Page_info = struct
-        type t = {has_previous_page: bool; has_next_page: bool}
-
-        let typ =
-          obj "PageInfo" ~fields:(fun _ ->
-              [ field "hasPreviousPage" ~typ:(non_null bool)
-                  ~args:Arg.[]
-                  ~resolve:(fun _ {has_previous_page; _} -> has_previous_page)
-              ; field "hasNextPage" ~typ:(non_null bool)
-                  ~args:Arg.[]
-                  ~resolve:(fun _ {has_next_page; _} -> has_next_page) ] )
-      end
-
-      module Connection = struct
-        type 'a t = {edges: 'a list; total_count: int; page_info: Page_info.t}
-      end
-    end
-
-    module User_command = struct
-      module Cursor = struct
-        let serialize payment =
-          let bigstring =
-            Bin_prot.Utils.bin_dump
-              Coda_base.User_command.Stable.V1.bin_t.writer payment
-          in
-          Base64.encode_exn @@ Bigstring.to_string bigstring
-
-        let deserialize serialized_payment =
-          let serialized_transaction = Base64.decode_exn serialized_payment in
-          Coda_base.User_command.Stable.V1.bin_t.reader.read
-            (Bigstring.of_string serialized_transaction)
-            ~pos_ref:(ref 0)
-      end
-
-      let edge =
-        obj "PaymentEdge" ~fields:(fun _ ->
-            [ field "cursor" ~typ:(non_null string)
+      let set_staking =
+        obj "SetStakingPayload" ~fields:(fun _ ->
+            [ field "lastStaking"
                 ~doc:
-                  "Cursor is the base64 version of a serialized user command \
-                   (via Jane Street bin_prot)"
+                  "Returns the last wallet public keys that were staking \
+                   before or empty if there were none"
+                ~typ:(non_null (list (non_null string)))
                 ~args:Arg.[]
-                ~resolve:(fun _ user_command -> Cursor.serialize user_command)
-            ; field "node" ~typ:(non_null user_command)
-                ~args:Arg.[]
-                ~resolve:(fun _ -> Fn.id) ] )
+                ~resolve:(fun _ keys -> List.map ~f:Stringable.public_key keys)
+            ] )
+    end
 
-      let connection =
-        obj "PaymentConnection" ~fields:(fun _ ->
-            [ field "edges"
-                ~typ:(non_null @@ list @@ non_null user_command)
-                ~args:Arg.[]
-                ~resolve:(fun _ {Pagination.Connection.edges; _} -> edges)
-            ; field "totalCount" ~typ:(non_null int)
-                ~doc:"Total number of payments that daemon holds"
-                ~args:Arg.[]
-                ~resolve:(fun _ {Pagination.Connection.total_count; _} ->
-                  total_count )
-            ; field "pageInfo"
-                ~typ:(non_null Pagination.Page_info.typ)
-                ~args:Arg.[]
-                ~resolve:(fun _ {Pagination.Connection.page_info; _} ->
-                  page_info ) ] )
+    module Arguments = struct
+      let public_key ~name public_key =
+        result_of_exn Public_key.Compressed.of_base64_exn public_key
+          ~error:(sprintf !"%s address is not valid." name)
     end
 
     module Input = struct
@@ -400,6 +421,16 @@ module Make (Commands : Coda_commands.Intf) = struct
             ; fee ~doc:"Fee amount in order to send a stake delegation"
             ; memo ~doc:"Public description of a stake delegation" ]
 
+      (* TODO: Treat cases where filter_input has a null argument *)
+      let filter_input ~title ~arg_name ~arg_doc =
+        obj title ~coerce:Fn.id
+          ~fields:[arg arg_name ~doc:arg_doc ~typ:(non_null string)]
+
+      let block_filter_input =
+        filter_input ~title:"BlockFilterInput" ~arg_name:"relatedTo"
+          ~arg_doc:
+            "A public key of an user who has their transaction in a block"
+
       let user_command_filter_input =
         obj "UserCommandFilterType"
           ~coerce:(fun public_key -> public_key)
@@ -407,6 +438,15 @@ module Make (Commands : Coda_commands.Intf) = struct
             [ arg "toOrFrom"
                 ~doc:"Public key of transactions you are looking for"
                 ~typ:(non_null string) ]
+
+      let set_staking =
+        let open Fields in
+        obj "SetStakingInput"
+          ~coerce:(fun wallets -> wallets)
+          ~fields:
+            [ arg "wallets"
+                ~typ:(non_null (list (non_null string)))
+                ~doc:"Public keys of own wallets you wish to stake" ]
 
       module AddPaymentReceipt = struct
         type t = {payment: string; added_time: string}
@@ -426,6 +466,265 @@ module Make (Commands : Coda_commands.Intf) = struct
                     (Doc.date "added_time"
                        "Time that a payment gets added to another clients \
                         transaction database") ]
+      end
+    end
+
+    module Pagination = struct
+      module Page_info = struct
+        type t =
+          { has_previous_page: bool
+          ; has_next_page: bool
+          ; first_cursor: string option
+          ; last_cursor: string option }
+
+        let obj =
+          obj "PageInfo" ~fields:(fun _ ->
+              [ field "hasPreviousPage" ~typ:(non_null bool)
+                  ~args:Arg.[]
+                  ~resolve:(fun _ {has_previous_page; _} -> has_previous_page)
+              ; field "hasNextPage" ~typ:(non_null bool)
+                  ~args:Arg.[]
+                  ~resolve:(fun _ {has_next_page; _} -> has_next_page)
+              ; field "firstCursor" ~typ:string
+                  ~args:Arg.[]
+                  ~resolve:(fun _ {first_cursor; _} -> first_cursor)
+              ; field "lastCursor" ~typ:string
+                  ~args:Arg.[]
+                  ~resolve:(fun _ {last_cursor; _} -> last_cursor) ] )
+      end
+
+      module Edge = struct
+        type 'a t = {node: 'a; cursor: string}
+      end
+
+      module Connection = struct
+        type 'a t =
+          {edges: 'a Edge.t list; total_count: int; page_info: Page_info.t}
+      end
+
+      module type Inputs_intf = sig
+        module Type : sig
+          type t
+
+          val typ : (Program.t, t option) typ
+
+          val name : string
+        end
+
+        module Cursor : sig
+          type t
+
+          val serialize : t -> string
+
+          val deserialize : string -> t
+
+          val doc : string
+        end
+
+        module Pagination_database :
+          Auxiliary_database.Intf.Pagination
+          with type value := Type.t
+           and type cursor := Cursor.t
+           and type time := Block_time.Time.Stable.V1.t
+
+        val get_database : Program.t -> Pagination_database.t
+
+        val filter_argument : string sexp_option Schema.Arg.arg_typ
+
+        val query_name : string
+
+        val to_cursor : Type.t -> Cursor.t
+      end
+
+      module Make (Inputs : Inputs_intf) = struct
+        open Inputs
+
+        let edge =
+          obj (Type.name ^ "Edge") ~fields:(fun _ ->
+              [ field "cursor" ~typ:(non_null string) ~doc:Cursor.doc
+                  ~args:Arg.[]
+                  ~resolve:(fun _ {Edge.cursor; _} -> cursor)
+              ; field "node" ~typ:(non_null Type.typ)
+                  ~args:Arg.[]
+                  ~resolve:(fun _ {Edge.node; _} -> node) ] )
+
+        let connection =
+          obj (Type.name ^ "Connection") ~fields:(fun _ ->
+              [ field "edges"
+                  ~typ:(non_null @@ list @@ non_null edge)
+                  ~args:Arg.[]
+                  ~resolve:(fun _ {Connection.edges; _} -> edges)
+              ; field "nodes"
+                  ~typ:(non_null @@ list @@ non_null Type.typ)
+                  ~args:Arg.[]
+                  ~resolve:(fun _ {Connection.edges; _} ->
+                    List.map edges ~f:(fun {Edge.node; _} -> node) )
+              ; field "totalCount" ~typ:(non_null int)
+                  ~args:Arg.[]
+                  ~resolve:(fun _ {Connection.total_count; _} -> total_count)
+              ; field "pageInfo" ~typ:(non_null Page_info.obj)
+                  ~args:Arg.[]
+                  ~resolve:(fun _ {Connection.page_info; _} -> page_info) ] )
+
+        let build_connection
+            ( queried_transactions
+            , `Has_earlier_page has_previous_page
+            , `Has_later_page has_next_page ) total_count =
+          let first_cursor =
+            Option.map ~f:(fun {Edge.cursor} -> cursor)
+            @@ List.hd queried_transactions
+          in
+          let last_cursor =
+            Option.map ~f:(fun {Edge.cursor} -> cursor)
+            @@ List.last queried_transactions
+          in
+          let page_info =
+            { Page_info.has_previous_page
+            ; has_next_page
+            ; first_cursor
+            ; last_cursor }
+          in
+          {Connection.edges= queried_transactions; page_info; total_count}
+
+        let query =
+          io_field query_name
+            ~args:
+              Arg.
+                [ arg "filter" ~typ:(non_null filter_argument)
+                ; arg "first" ~typ:int
+                ; arg "after" ~typ:string
+                ; arg "last" ~typ:int
+                ; arg "before" ~typ:string ]
+            ~typ:(non_null connection)
+            ~resolve:
+              (fun {ctx= coda; _} () public_key first after last before ->
+              let open Deferred.Result.Let_syntax in
+              let%map result, total_counts =
+                let%bind public_key =
+                  Deferred.return
+                  @@ Arguments.public_key ~name:"publicKey" public_key
+                in
+                let database = get_database coda in
+                let%map queried_nodes, has_earlier_page, has_later_page =
+                  Deferred.return
+                  @@
+                  match (first, after, last, before) with
+                  | Some _n_queries_before, _, Some _n_queries_after, _ ->
+                      Error
+                        "Illegal query: first and last must not be non-null \
+                         value at the same time"
+                  | num_to_query, cursor, None, _ ->
+                      Ok
+                        (Pagination_database.get_earlier_values database
+                           public_key
+                           (Option.map ~f:Cursor.deserialize cursor)
+                           num_to_query)
+                  | None, _, num_to_query, cursor ->
+                      Ok
+                        (Pagination_database.get_later_values database
+                           public_key
+                           (Option.map ~f:Cursor.deserialize cursor)
+                           num_to_query)
+                in
+                ( ( List.map queried_nodes ~f:(fun node ->
+                        {Edge.node; cursor= Cursor.serialize @@ to_cursor node}
+                    )
+                  , has_earlier_page
+                  , has_later_page )
+                , Pagination_database.get_values database public_key )
+              in
+              build_connection result (List.length total_counts) )
+      end
+
+      module User_command = struct
+        open Schema
+
+        module Inputs = struct
+          module Type = struct
+            type t = User_command.t
+
+            let typ = user_command
+
+            let name = "UserCommand"
+          end
+
+          module Cursor = struct
+            type t = User_command.t
+
+            let serialize payment =
+              let bigstring =
+                Bin_prot.Utils.bin_dump
+                  Coda_base.User_command.Stable.V1.bin_t.writer payment
+              in
+              Base64.encode_exn @@ Bigstring.to_string bigstring
+
+            let deserialize serialized_payment =
+              let serialized_transaction =
+                Base64.decode_exn serialized_payment
+              in
+              Coda_base.User_command.Stable.V1.bin_t.reader.read
+                (Bigstring.of_string serialized_transaction)
+                ~pos_ref:(ref 0)
+
+            let doc =
+              "Cursor is the base64 version of a serialized user command (via \
+               Jane Street bin_prot)"
+          end
+
+          module Pagination_database = Auxiliary_database.Transaction_database
+
+          let get_database = Program.transaction_database
+
+          let filter_argument = Input.user_command_filter_input
+
+          let query_name = "userCommands"
+
+          let to_cursor = Fn.id
+        end
+
+        include Make (Inputs)
+      end
+
+      module Blocks = struct
+        open Schema
+
+        module Inputs = struct
+          module Type = struct
+            type t =
+              ( Auxiliary_database.Filtered_external_transition.t
+              , State_hash.t )
+              With_hash.t
+
+            let typ = block
+
+            let name = "Block"
+          end
+
+          module Cursor = struct
+            type t = State_hash.t
+
+            let serialize = Stringable.State_hash.to_base64
+
+            let deserialize = Stringable.State_hash.of_base64_exn
+
+            let doc =
+              "Cursor is the base64 version of a serialized user command (via \
+               Jane Street bin_prot)"
+          end
+
+          module Pagination_database =
+            Auxiliary_database.External_transition_database
+
+          let get_database = Program.external_transition_database
+
+          let filter_argument = Input.block_filter_input
+
+          let query_name = "blocks"
+
+          let to_cursor {With_hash.hash; _} = hash
+        end
+
+        include Make (Inputs)
       end
     end
   end
@@ -498,12 +797,6 @@ module Make (Commands : Coda_commands.Intf) = struct
           ; voting_for= None }
   end
 
-  module Arguments = struct
-    let public_key ~name public_key =
-      result_of_exn Public_key.Compressed.of_base64_exn public_key
-        ~error:(sprintf !"%s address is not valid." name)
-  end
-
   module Queries = struct
     open Schema
 
@@ -528,8 +821,11 @@ module Make (Commands : Coda_commands.Intf) = struct
         ~typ:(non_null (list (non_null Types.Wallet.wallet)))
         ~args:Arg.[]
         ~resolve:(fun {ctx= coda; _} () ->
+          let propose_public_keys = Program.propose_public_keys coda in
           Program.wallets coda |> Secrets.Wallets.pks
-          |> List.map ~f:(fun pk -> Partial_account.of_pk coda pk) )
+          |> List.map ~f:(fun pk ->
+                 ( Partial_account.of_pk coda pk
+                 , Public_key.Compressed.Set.mem propose_public_keys pk ) ) )
 
     let wallet =
       result_field "wallet"
@@ -541,12 +837,18 @@ module Make (Commands : Coda_commands.Intf) = struct
           Types.Wallet.wallet
           (* TODO: Is there anyway to describe `public_key` arg in a more typesafe way on our ocaml-side *)
         ~args:Arg.[arg "publicKey" ~typ:(non_null string)]
-        ~resolve:(fun {ctx= coda; _} () pk_string ->
+        ~resolve:(fun {ctx= coda; _} () (pk_string : string) ->
           let open Result.Let_syntax in
-          let%map pk = Arguments.public_key ~name:"publicKey" pk_string in
-          Partial_account.(
-            of_pk coda pk |> to_full_account |> Option.map ~f:of_full_account)
-          )
+          let propose_public_keys = Program.propose_public_keys coda in
+          let%map pk =
+            Types.Arguments.public_key ~name:"publicKey" pk_string
+          in
+          Option.map
+            Partial_account.(
+              of_pk coda pk |> to_full_account |> Option.map ~f:of_full_account)
+            ~f:(fun account ->
+              (account, Public_key.Compressed.Set.mem propose_public_keys pk)
+              ) )
 
     let current_snark_worker =
       field "currentSnarkWorker" ~typ:Types.snark_worker
@@ -556,64 +858,9 @@ module Make (Commands : Coda_commands.Intf) = struct
           Option.map (Program.snark_worker_key coda) ~f:(fun k ->
               (k, Program.snark_work_fee coda) ) )
 
-    let build_connection ~query transaction_database public_key cursor
-        num_to_query =
-      let ( queried_transactions
-          , `Has_earlier_page has_previous_page
-          , `Has_later_page has_next_page ) =
-        query transaction_database public_key
-          (Option.map ~f:Types.User_command.Cursor.deserialize cursor)
-          num_to_query
-      in
-      let page_info =
-        {Types.Pagination.Page_info.has_previous_page; has_next_page}
-      in
-      let total_count =
-        Option.value
-          (Auxiliary_database.Transaction_database.get_total_values
-             transaction_database public_key)
-          ~default:0
-      in
-      { Types.Pagination.Connection.edges= queried_transactions
-      ; page_info
-      ; total_count }
+    let user_command = Types.Pagination.User_command.query
 
-    let user_command =
-      io_field "userCommand"
-        ~args:
-          Arg.
-            [ arg "filter" ~typ:(non_null Types.Input.user_command_filter_input)
-            ; arg "first" ~typ:int
-            ; arg "after" ~typ:string
-            ; arg "last" ~typ:int
-            ; arg "before" ~typ:string ]
-        ~typ:(non_null Types.User_command.connection)
-        ~resolve:(fun {ctx= coda; _} () public_key first after last before ->
-          let open Deferred.Result.Let_syntax in
-          let%bind public_key =
-            Deferred.return
-            @@ Arguments.public_key ~name:"publicKey" public_key
-          in
-          let transaction_database = Program.transaction_database coda in
-          Deferred.return
-          @@
-          match (first, after, last, before) with
-          | Some _n_queries_before, _, Some _n_queries_after, _ ->
-              Error
-                "Illegal query: first and last must not be non-null value at \
-                 the same time"
-          | num_to_query, cursor, None, _ ->
-              Ok
-                (build_connection
-                   ~query:
-                     Auxiliary_database.Transaction_database.get_earlier_values
-                   transaction_database public_key cursor num_to_query)
-          | None, _, num_to_query, cursor ->
-              Ok
-                (build_connection
-                   ~query:
-                     Auxiliary_database.Transaction_database.get_later_values
-                   transaction_database public_key cursor num_to_query) )
+    let blocks = Types.Pagination.Blocks.query
 
     let initial_peers =
       field "initialPeers"
@@ -634,6 +881,7 @@ module Make (Commands : Coda_commands.Intf) = struct
       ; wallet
       ; current_snark_worker
       ; user_command
+      ; blocks
       ; initial_peers ]
   end
 
@@ -649,23 +897,6 @@ module Make (Commands : Coda_commands.Intf) = struct
           Program.sync_status coda |> Coda_incremental.Status.to_pipe
           |> Deferred.Result.return )
 
-    let new_block =
-      subscription_field "newBlock"
-        ~doc:
-          "Subscribes on a new block created by a proposer with a public key \
-           KEY"
-        ~typ:(non_null Types.block)
-        ~args:Arg.[arg "publicKey" ~typ:(non_null string)]
-        ~resolve:(fun {ctx= coda; _} public_key ->
-          let open Deferred.Result.Let_syntax in
-          let%bind public_key =
-            Deferred.return
-            @@ Arguments.public_key ~name:"publicKey" public_key
-          in
-          (* Pipes that will alert a subscriber of any new blocks throughout the entire time the daemon is on *)
-          Deferred.Result.return
-          @@ Commands.Subscriptions.new_block coda public_key )
-
     let new_user_command_update =
       subscription_field "newUserCommandUpdate"
         ~doc:
@@ -678,7 +909,7 @@ module Make (Commands : Coda_commands.Intf) = struct
           Deferred.Result.return
           @@ Commands.Subscriptions.new_user_command coda public_key )
 
-    let commands = [new_sync_update; new_block; new_user_command_update]
+    let commands = [new_sync_update; new_user_command_update]
   end
 
   module Mutations = struct
@@ -712,8 +943,8 @@ module Make (Commands : Coda_commands.Intf) = struct
 
     let parse_user_command_input ~kind coda from to_ fee maybe_memo =
       let open Result.Let_syntax in
-      let%bind receiver = Arguments.public_key ~name:"to" to_ in
-      let%bind sender = Arguments.public_key ~name:"from" from in
+      let%bind receiver = Types.Arguments.public_key ~name:"to" to_ in
+      let%bind sender = Types.Arguments.public_key ~name:"from" from in
       let%bind sender_account =
         Result.of_option
           Partial_account.(of_pk coda sender |> to_full_account)
@@ -791,7 +1022,8 @@ module Make (Commands : Coda_commands.Intf) = struct
               ~error:"Invalid `time` provided"
           in
           let%map payment =
-            result_of_exn Types.User_command.Cursor.deserialize payment
+            result_of_exn
+              Types.Pagination.User_command.Inputs.Cursor.deserialize payment
               ~error:"Invaid `payment` provided"
           in
           let transaction_database = Program.transaction_database coda in
@@ -799,8 +1031,44 @@ module Make (Commands : Coda_commands.Intf) = struct
             payment added_time ;
           Some payment )
 
+    let set_staking =
+      result_field "setStaking"
+        ~doc:
+          "Set keys you wish to stake with. Silently fails if you pass keys \
+           we aren't tracking in ownedWallets"
+        ~args:Arg.[arg "input" ~typ:(non_null Types.Input.set_staking)]
+        ~typ:(non_null Types.Payload.set_staking)
+        ~resolve:(fun {ctx= coda; _} () pk_strings ->
+          let open Result.Let_syntax in
+          (* TODO: Handle errors like: duplicates, etc *)
+          let%map pks =
+            List.fold pk_strings ~init:(Result.return [])
+              ~f:(fun acc pk_string ->
+                let%bind acc = acc in
+                let%map pk =
+                  Types.Arguments.public_key ~name:"wallets" pk_string
+                in
+                pk :: acc )
+          in
+          let kps =
+            List.filter_map pks ~f:(fun pk ->
+                let open Option.Let_syntax in
+                let%map kps =
+                  Program.wallets coda |> Secrets.Wallets.find ~needle:pk
+                in
+                (kps, pk) )
+          in
+          let old_propose_keys = Program.propose_public_keys coda in
+          Program.replace_propose_keypairs coda
+            (Keypair.And_compressed_pk.Set.of_list kps) ;
+          Public_key.Compressed.Set.to_list old_propose_keys )
+
     let commands =
-      [add_wallet; send_payment; set_delegation; add_payment_receipt]
+      [ add_wallet
+      ; send_payment
+      ; set_delegation
+      ; add_payment_receipt
+      ; set_staking ]
   end
 
   let schema =
