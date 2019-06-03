@@ -374,7 +374,7 @@ let run_test () : unit Deferred.t =
         let%bind _ =
           test_multiple_payments other_accounts
             ~txn_count:(List.length other_accounts)
-            7.
+            8.
         in
         test_duplicate_payments sender_keypair receiver_keypair )
 
