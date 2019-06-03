@@ -49,19 +49,14 @@ module Styles = {
         display(`flex),
         alignItems(`center),
         hover([opacity(0.6)]),
+        borderBottom(`px(1), `solid, Theme.Colors.slateAlpha(0.5)),
+        lastChild([borderBottomWidth(`zero)]),
       ]),
     ]);
 
   let walletName = style([width(`rem(12.5))]);
 
-  let walletChevron = style([color(Theme.Colors.teal)]);
-
-  let line =
-    style([
-      border(`zero, `none, transparent),
-      borderTop(`px(1), `solid, Theme.Colors.slateAlpha(0.5)),
-      width(`percent(100.)),
-    ]);
+  let walletChevron = style([color(Theme.Colors.tealAlpha(0.5))]);
 };
 
 module SettingsQueryString = [%graphql
@@ -111,6 +106,31 @@ let make = () => {
   let (networkValue, setNetworkValue) =
     React.useState(() => NetworkOption("testnet.codaprotocol.com"));
 
+  let dropDownValue =
+    switch (networkValue) {
+    | NetworkOption(s) => Some(s)
+    | Custom(_) => Some("CUSTOM")
+    };
+
+  let dropDownOptions =
+    doubleList([
+      "testnet.codaprotocol.com",
+      "testnet2.codaprotocol.com",
+      "testnet3.codaprotocol.com",
+      "CUSTOM",
+    ]);
+
+  let dropdownHandler = s =>
+    switch (s) {
+    | "CUSTOM" =>
+      setNetworkValue(
+        fun
+        | NetworkOption(_) => Custom("")
+        | x => x,
+      )
+    | s => setNetworkValue(_ => NetworkOption(s))
+    };
+
   <SettingsQuery>
     {response =>
        switch (response.result) {
@@ -144,30 +164,10 @@ let make = () => {
            </div>
            <div className=Styles.networkContainer>
              <Dropdown
-               value={
-                 switch (networkValue) {
-                 | NetworkOption(s) => Some(s)
-                 | Custom(_) => Some("CUSTOM")
-                 }
-               }
+               value=dropDownValue
                label="URL"
-               options={doubleList([
-                 "testnet.codaprotocol.com",
-                 "testnet2.codaprotocol.com",
-                 "testnet3.codaprotocol.com",
-                 "CUSTOM",
-               ])}
-               onChange={s =>
-                 switch (s) {
-                 | "CUSTOM" =>
-                   setNetworkValue(
-                     fun
-                     | NetworkOption(_) => Custom("")
-                     | x => x,
-                   )
-                 | s => setNetworkValue(_ => NetworkOption(s))
-                 }
-               }
+               options=dropDownOptions
+               onChange=dropdownHandler
              />
              {switch (networkValue) {
               | Custom(v) =>
@@ -198,15 +198,11 @@ let make = () => {
            <div className=Styles.label> {React.string("Wallets")} </div>
            <div className=Styles.walletItemContainer>
              {data##ownedWallets
-              |> Array.mapi(~f=(i, w) =>
-                   <>
-                     <WalletItem
-                       key={PublicKey.toString(w##publicKey)}
-                       publicKey=w##publicKey
-                     />
-                     {i < Array.length(data##ownedWallets) - 1
-                        ? <hr className=Styles.line /> : React.null}
-                   </>
+              |> Array.map(~f=w =>
+                   <WalletItem
+                     key={PublicKey.toString(w##publicKey)}
+                     publicKey=w##publicKey
+                   />
                  )
               |> React.array}
            </div>
