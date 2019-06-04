@@ -37,7 +37,17 @@ module Styles = {
     ]);
 
   let deactivatedSettings =
-    merge([Link.Styles.link, style([padding(`rem(0.5))])]);
+    merge([
+      Link.Styles.link,
+      style([
+        padding4(
+          ~top=`rem(0.5),
+          ~right=`rem(0.75),
+          ~bottom=`rem(0.5),
+          ~left=`rem(0.5),
+        ),
+      ]),
+    ]);
 
   let activatedSettings =
     merge([
@@ -52,13 +62,13 @@ module Styles = {
 
 module SyncStatus = [%graphql
   {|
-subscription syncStatus {
-  newSyncUpdate {
-    status
-    description
-  }
-}
-|}
+    subscription syncStatus {
+      newSyncUpdate {
+        status
+        description
+      }
+    }
+  |}
 ];
 
 module SyncStatusSubscription = ReasonApollo.CreateSubscription(SyncStatus);
@@ -91,7 +101,7 @@ let make = () => {
              };
            }}
       </SyncStatusSubscription>
-      <Spacer width=1.5 />
+      <Spacer width=0.75 />
       <a
         className={
           onSettingsPage
