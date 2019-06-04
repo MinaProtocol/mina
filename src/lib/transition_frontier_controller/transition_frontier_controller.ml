@@ -113,12 +113,13 @@ module Make (Inputs : Inputs_intf) :
       ~catchup_job_reader ~catchup_breadcrumbs_writer
       ~unprocessed_transition_cache ;
     Strict_pipe.Reader.iter_without_pushback clear_reader ~f:(fun _ ->
-        Strict_pipe.Writer.kill valid_transition_writer ;
-        Strict_pipe.Writer.kill primary_transition_writer ;
-        Strict_pipe.Writer.kill processed_transition_writer ;
-        Strict_pipe.Writer.kill catchup_job_writer ;
-        Strict_pipe.Writer.kill catchup_breadcrumbs_writer ;
-        Strict_pipe.Writer.kill proposer_transition_writer_copy ;
+        let open Strict_pipe.Writer in
+        kill valid_transition_writer ;
+        kill primary_transition_writer ;
+        kill processed_transition_writer ;
+        kill catchup_job_writer ;
+        kill catchup_breadcrumbs_writer ;
+        kill proposer_transition_writer_copy ;
         Ivar.fill clean_up_catchup_scheduler () )
     |> don't_wait_for ;
     processed_transition_reader
