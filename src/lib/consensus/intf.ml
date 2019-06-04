@@ -221,7 +221,7 @@ module type State_hooks_intf = sig
    * for a new transition. Called from the proposer in order to generate
    * a new transition to propose to the network. Returns `None` if a new
    * transition cannot be generated.
-   *)
+  *)
   val generate_transition :
        previous_protocol_state:protocol_state
     -> blockchain_state:blockchain_state
@@ -265,7 +265,7 @@ module type S = sig
     *
     * This is mostly useful for PoStake and other consensus mechanisms that have their own
     * notions of time.
-    *)
+  *)
   val time_hum : Time.t -> string
 
   module Constants : Constants_intf
@@ -280,7 +280,17 @@ module type S = sig
     module Local_state : sig
       type t [@@deriving sexp, to_yojson]
 
-      val create : Signature_lib.Public_key.Compressed.t option -> t
+      val create : Signature_lib.Public_key.Compressed.Set.t -> t
+
+      val current_proposers : t -> Signature_lib.Public_key.Compressed.Set.t
+
+      (** Swap in a new set of proposers and invalidate and/or recompute cached
+       * data *)
+      val proposer_swap :
+           t
+        -> Signature_lib.Public_key.Compressed.Set.t
+        -> Coda_base.Block_time.t
+        -> unit
     end
 
     module Prover_state : sig
@@ -407,18 +417,20 @@ module type S = sig
     (**
      * Determine if and when to perform the next transition proposal. Either
      * informs the callee to check again at some time in the future, or to
-     * schedule a proposal at some time in the future, or to propose now
-     * and check again some time in the future.
+     * schedule a proposal with some particular keypair at some time in the
+     * future, or to propose now with some keypair and check again some time in
+     * the future.
     *)
     val next_proposal :
          Unix_timestamp.t
       -> Consensus_state.Value.t
       -> local_state:Local_state.t
-      -> keypair:Signature_lib.Keypair.t
+      -> keypairs:Signature_lib.Keypair.And_compressed_pk.Set.t
       -> logger:Logger.t
       -> [ `Check_again of Unix_timestamp.t
-         | `Propose_now of Proposal_data.t
-         | `Propose of Unix_timestamp.t * Proposal_data.t ]
+         | `Propose_now of Signature_lib.Keypair.t * Proposal_data.t
+         | `Propose of
+           Unix_timestamp.t * Signature_lib.Keypair.t * Proposal_data.t ]
 
     (**
      * A hook for managing local state when the locked tip is updated.
@@ -432,7 +444,7 @@ module type S = sig
 
     (**
        * Indicator of when we should bootstrap
-      *)
+    *)
     val should_bootstrap :
          existing:Consensus_state.Value.t
       -> candidate:Consensus_state.Value.t
@@ -443,7 +455,7 @@ module type S = sig
 
     (**
       * Predicate indicating whether or not the local state requires synchronization.
-      *)
+    *)
     val required_local_state_sync :
          consensus_state:Consensus_state.Value.t
       -> local_state:Local_state.t
@@ -456,7 +468,7 @@ module type S = sig
 
     (**
       * Synchronize local state over the network.
-      *)
+    *)
     val sync_local_state :
          logger:Logger.t
       -> trust_system:Trust_system.t

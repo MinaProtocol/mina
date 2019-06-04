@@ -245,9 +245,7 @@ struct
     in
     let user_commands_sent = !txn_count in
     let run_snark_worker = Option.is_some (snark_worker_key t) in
-    let propose_pubkey =
-      Option.map ~f:(fun kp -> kp.public_key) (propose_keypair t)
-    in
+    let propose_pubkeys = propose_public_keys t in
     let consensus_mechanism = Consensus.name in
     let consensus_time_now = Consensus.time_hum (Core_kernel.Time.now ()) in
     let consensus_configuration = Consensus.Configuration.t in
@@ -360,7 +358,7 @@ struct
     ; peers
     ; user_commands_sent
     ; run_snark_worker
-    ; propose_pubkey
+    ; propose_pubkeys= Public_key.Compressed.Set.to_list propose_pubkeys
     ; histograms
     ; consensus_time_now
     ; consensus_mechanism
