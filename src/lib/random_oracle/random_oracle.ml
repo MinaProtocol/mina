@@ -10,6 +10,8 @@ module Digest = struct
 
     type t = Boolean.var array
 
+    let to_bits = Fn.id
+
     let to_triples t =
       Fold_lib.Fold.(to_list (group3 ~default:Boolean.false_ (of_array t)))
 
@@ -18,7 +20,7 @@ module Digest = struct
       Array.map (Blake2.string_to_bits (s :> string)) ~f:Boolean.var_of_value
   end
 
-  let to_bits (t : t) = Array.to_list (Blake2.string_to_bits (t :> string))
+  let to_bits (t : t) = Blake2.string_to_bits (t :> string)
 
   let typ : (Checked.t, t) Typ.t =
     Typ.transport

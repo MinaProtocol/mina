@@ -5,7 +5,8 @@ module Styles = {
 
   let container = style([padding(`rem(1.0))]);
 
-  let backHeader = style([display(`flex), alignItems(`center)]);
+  let backHeader =
+    style([display(`flex), alignItems(`center), userSelect(`none)]);
 
   let backIcon =
     style([
@@ -23,6 +24,7 @@ module Styles = {
         color(Theme.Colors.midnight),
         margin(`rem(0.25)),
         marginTop(`rem(1.0)),
+        userSelect(`none),
       ]),
     ]);
 
@@ -30,7 +32,7 @@ module Styles = {
 
   let deleteAlert = style([margin2(~v=`rem(0.5), ~h=`zero)]);
 
-  let textBox = style([maxWidth(`rem(21.))]);
+  let textBox = style([width(`rem(21.))]);
 
   let modalContainer =
     style([
@@ -73,6 +75,7 @@ module DeleteButton = {
       This can't be undone, and you may lose the funds in this wallet.";
     <>
       <Link
+        isRed=true
         onClick={_ =>
           updateModal(x => Option.or_(Some({text: "", error: None}), x))
         }>
@@ -171,10 +174,18 @@ module DeleteButton = {
   };
 };
 
+[@bs.scope "window"] [@bs.val] external showItemInFolder: string => unit = "";
+
 [@react.component]
 let make = (~publicKey) => {
   let (addressBook, updateAddressBook) =
     React.useContext(AddressBookProvider.context);
+
+  let handleClipboard = () =>
+    ignore(
+      Bindings.Navigator.Clipboard.writeText(PublicKey.toString(publicKey)),
+    );
+
   <div className=Styles.container>
     <div className=Styles.backHeader>
       <span
@@ -197,6 +208,7 @@ let make = (~publicKey) => {
           ~default="",
           AddressBook.lookup(addressBook, publicKey),
         )}
+        placeholder="My Coda Wallet"
         onChange={value =>
           updateAddressBook(ab =>
             AddressBook.set(ab, ~key=publicKey, ~name=value)
@@ -208,14 +220,30 @@ let make = (~publicKey) => {
     <div className=Styles.textBox>
       <TextField
         label="Key"
-        value={PublicKey.toString(publicKey)}
+        value={PublicKey.prettyPrint(publicKey)}
+        mono=true
         onChange={_ => ()}
+        button={
+          <TextField.Button text="Copy" color=`Blue onClick=handleClipboard />
+        }
       />
     </div>
     <div className=Styles.label> {React.string("Private key")} </div>
     <div className=Styles.textBox>
-      <TextField label="Path" value="" onChange={_ => ()} />
+      <TextField
+        label="Path"
+        value={Caml.Array.get(Sys.argv, 0)}
+        onChange=ignore
+        button={
+          <TextField.Button
+            text="Open"
+            color=`Teal
+            onClick={_ => showItemInFolder(Caml.Array.get(Sys.argv, 0))}
+          />
+        }
+      />
     </div>
+    <Spacer height=1.5 />
     <DeleteButton publicKey />
   </div>;
 };
