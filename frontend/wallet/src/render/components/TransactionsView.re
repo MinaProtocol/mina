@@ -107,7 +107,7 @@ let make = () => {
       </span>
       <span> {ReasonReact.string("Memo")} </span>
       <span className=Css.(style([textAlign(`right)]))>
-        {ReasonReact.string("Transaction")}
+        {ReasonReact.string("Date / Amount")}
       </span>
     </div>
     <TransactionsQuery variables=transactionQuery##variables>
