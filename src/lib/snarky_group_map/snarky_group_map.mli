@@ -1,5 +1,5 @@
 module Params : sig
-  type 'f t
+  type 'f t = 'f Group_map.Params.t
 
   val create :
        (module Group_map.Field_intf.S_unchecked with type t = 'f)
