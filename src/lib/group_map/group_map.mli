@@ -13,7 +13,7 @@ end) : sig
 end
 
 module Params : sig
-  type 'f t
+  type 'f t [@@deriving bin_io]
 
   val map : 'a t -> f:('a -> 'b) -> 'b t
 

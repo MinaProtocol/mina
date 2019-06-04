@@ -74,7 +74,7 @@ struct
 end
 
 module Conic = struct
-  type 'f t = {z: 'f; y: 'f}
+  type 'f t = {z: 'f; y: 'f} [@@deriving bin_io]
 
   let map {z; y} ~f = {z= f z; y= f y}
 end
@@ -101,7 +101,7 @@ module Params = struct
     ; conic_c: 'f
     ; a: 'f
     ; b: 'f }
-  [@@deriving fields]
+  [@@deriving fields, bin_io]
 
   let map {u; u_over_2; projection_point; conic_c; a; b} ~f =
     { u= f u
