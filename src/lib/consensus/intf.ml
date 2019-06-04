@@ -274,8 +274,6 @@ module type S = sig
     type t [@@deriving yojson, bin_io]
 
     val t : t
-
-    val network_delay_opt : t -> int option (* for postake, at least *)
   end
 
   module Data : sig

@@ -115,8 +115,6 @@ module Configuration = struct
     ; epoch_duration= Int64.to_int (Time.Span.to_ms Epoch.duration)
     ; acceptable_network_delay= Int64.to_int (Time.Span.to_ms delta_duration)
     }
-
-  let network_delay_opt t = Some t.acceptable_network_delay
 end
 
 module Data = struct
