@@ -9,6 +9,14 @@ type t = {cache: Keypair.t Public_key.Compressed.Table.t; path: string}
 (* TODO: Don't just generate bad passwords *)
 let password = lazy (Deferred.Or_error.return (Bytes.of_string ""))
 
+let get_path {path; _} public_key =
+  let pubkey_str =
+    (* TODO: Do we need to version this? *)
+    Public_key.Compressed.to_base64 public_key
+    |> String.tr ~target:'/' ~replacement:'x'
+  in
+  path ^/ pubkey_str
+
 let load ~logger ~disk_location : t Deferred.t =
   let logger =
     Logger.extend logger [("wallets_context", `String "Wallets.get")]
@@ -43,12 +51,7 @@ let load ~logger ~disk_location : t Deferred.t =
 (** Effectfully generates a new private key file and a keypair *)
 let generate_new t : Public_key.Compressed.t Deferred.t =
   let keypair = Keypair.create () in
-  let pubkey_str =
-    (* TODO: Do we need to version this? *)
-    Public_key.Compressed.to_base64 (keypair.public_key |> Public_key.compress)
-    |> String.tr ~target:'/' ~replacement:'x'
-  in
-  let privkey_path = t.path ^/ pubkey_str in
+  let privkey_path = get_path t (Public_key.compress keypair.public_key) in
   let%bind () = Secret_keypair.write_exn keypair ~privkey_path ~password in
   let%map () = Unix.chmod privkey_path ~perm:0o600 in
   let pk = Public_key.compress keypair.public_key in
