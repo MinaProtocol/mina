@@ -1203,10 +1203,14 @@ let all_work : type merge base.
       ~f:(fun (t, work_list) _ ->
         let trees' = Non_empty_list.cons (create_tree ~depth) t.trees in
         let t' = {t with trees= trees'} in
-        let work = work_for_current_tree t' in
-        (t', work :: work_list) )
+        match work_for_current_tree t' with
+        | [] ->
+            (t', work_list)
+        | work ->
+            (t', work :: work_list) )
   in
-  set1 :: List.rev other_sets
+  if List.is_empty set1 then List.rev other_sets
+  else set1 :: List.rev other_sets
 
 let work_for_next_update : type merge base.
        (merge, base) t
@@ -1229,8 +1233,12 @@ let work_for_next_update : type merge base.
            ~max_base_jobs:t.max_base_jobs ~delay)
         ((count - current_tree_space) * 2)
     in
-    [set1; set2]
-  else [List.take set1 (2 * count)]
+    if List.is_empty set1 && List.is_empty set2 then []
+    else if List.is_empty set1 then [set2]
+    else [set1; set2]
+  else
+    let set = List.take set1 (2 * count) in
+    if List.is_empty set then [] else [set]
 
 let free_space_on_current_tree t =
   let tree = Non_empty_list.head t.trees in
@@ -1261,7 +1269,7 @@ let add_merge_jobs : completed_jobs:'merge list -> (_, 'merge, _) State_monad.t
         (List.length merge_jobs > List.length jobs_required)
         ~message:
           (sprintf
-             !"Incorrect number of jobs: Required- %d got- %d"
+             !"More work than required: Required- %d got- %d"
              (List.length jobs_required)
              (List.length merge_jobs))
     in
@@ -1412,9 +1420,10 @@ let update_helper :
   in
   let required_jobs = List.concat @@ work_for_next_update t ~data_count in
   let%bind () =
-    let required = List.length required_jobs in
-    let got = List.length completed_jobs in
-    error_if (got < required)
+    let required = (List.length required_jobs + 1) / 2 in
+    let got = (List.length completed_jobs + 1) / 2 in
+    error_if
+      (got < required && List.length data > t.max_base_jobs - required + got)
       ~message:
         (sprintf
            !"Insufficient jobs (Data count %d): Required- %d got- %d"

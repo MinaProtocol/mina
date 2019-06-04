@@ -58,7 +58,7 @@ struct
           ~metadata:
             [ ("user_command", User_command.to_yojson txn)
             ; ("receipt_chain_hash", Receipt.Chain_hash.to_yojson hash) ]
-          "Added  payment $user_command into receipt_chain database. You \
+          "Added payment $user_command into receipt_chain database. You \
            should wait for a bit to see your account's receipt chain hash \
            update as $receipt_chain_hash" ;
         hash

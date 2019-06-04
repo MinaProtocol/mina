@@ -328,13 +328,17 @@ module type Transaction_snark_scan_state_generalized_intf = sig
   val snark_job_list_json : t -> string
 
   (** All the proof bundles *)
-  val all_work_to_do : t -> transaction_snark_statement list Sequence.t
+  val all_work_statements : t -> transaction_snark_statement list Sequence.t
 
   (** Required proof bundles for a certain number of slots *)
   val required_work_pairs : t -> slots:int -> Available_job.t list list
 
+  (**K proof bundles*)
+  val k_work_pairs_for_new_diff : t -> k:int -> Available_job.t list list
+
   (** All the proof bundles for 2^transaction_capacity_log2 slots that can be used up in one diff *)
-  val work_for_new_diff : t -> transaction_snark_statement list Sequence.t
+  val work_statements_for_new_diff :
+    t -> transaction_snark_statement list Sequence.t
 
   (** True if the latest tree is full and transactions would be added on to a new tree *)
   val next_on_new_tree : t -> bool
@@ -448,9 +452,10 @@ module type Staged_ledger_generalized_intf = sig
 
     val partition_if_overflowing : t -> Space_partition.t
 
-    val all_work_to_do : t -> transaction_snark_work_statement Sequence.t
+    val all_work_statements : t -> transaction_snark_work_statement Sequence.t
 
-    val work_for_new_diff : t -> transaction_snark_work_statement Sequence.t
+    val work_statements_for_new_diff :
+      t -> transaction_snark_work_statement Sequence.t
 
     val staged_transactions : t -> transaction list Or_error.t
   end
