@@ -2261,15 +2261,9 @@ module Hooks = struct
    * as the ledger hash specified by the epoch data).
   *)
   let select_epoch_snapshot ~(consensus_state : Consensus_state.Value.t)
-      ~local_state ~epoch ~epoch_data =
+      ~local_state ~epoch =
     let open Local_state in
     let open Epoch_data.Poly in
-    let open Epoch_ledger.Poly in
-    (* is the snapshot we need the genesis snapshot? *)
-    let is_genesis_snapshot =
-      Coda_base.Frozen_ledger_hash.equal epoch_data.ledger.hash
-        genesis_ledger_hash
-    in
     (* are we in the next epoch after the consensus state? *)
     let in_next_epoch =
       Epoch.equal epoch (Epoch.succ consensus_state.curr_epoch)
@@ -2278,10 +2272,8 @@ module Hooks = struct
     let epoch_is_finalized =
       consensus_state.curr_epoch_data.length > Length.of_int Constants.k
     in
-    if is_genesis_snapshot then
-      (`Genesis, !local_state.Data.genesis_epoch_snapshot)
-    else if in_next_epoch || not epoch_is_finalized then
-      (`Curr, !local_state.curr_epoch_snapshot)
+    if in_next_epoch || not epoch_is_finalized then
+      (`Curr, !local_state.Data.curr_epoch_snapshot)
     else (`Last, !local_state.last_epoch_snapshot)
 
   type local_state_sync =
@@ -2293,19 +2285,8 @@ module Hooks = struct
       ~local_state =
     let open Coda_base in
     let epoch = consensus_state.curr_epoch in
-    let epoch_data =
-      (* This should not fail since we are getting epoch data for the
-       * same epoch that the consensus state is in. *)
-      select_epoch_data ~consensus_state ~epoch
-      |> Result.map_error
-           ~f:
-             (Fn.const
-                "unexpected failure while selecting epoch data from consensus \
-                 state")
-      |> Result.ok_or_failwith
-    in
     let source, _snapshot =
-      select_epoch_snapshot ~consensus_state ~local_state ~epoch ~epoch_data
+      select_epoch_snapshot ~consensus_state ~local_state ~epoch
     in
     let required_snapshot_sync snapshot_id expected_root =
       Option.some_if
@@ -2317,9 +2298,6 @@ module Hooks = struct
         {snapshot_id; expected_root}
     in
     match source with
-    | `Genesis ->
-        None
-    (* We never need to do work to have the genesis snapshot*)
     | `Curr ->
         Option.map
           (required_snapshot_sync Curr_epoch_snapshot
@@ -2338,32 +2316,6 @@ module Hooks = struct
           None
       | ls ->
           Non_empty_list.of_list_opt ls )
-
-  (* TODO: Remove this once required_local_state_sync function is fixed *)
-  let bootstrap_local_state_sync ~(consensus_state : Consensus_state.Value.t)
-      ~local_state =
-    let open Coda_base in
-    let required_snapshot_sync snapshot_id expected_root =
-      Option.some_if
-        (not
-           (Ledger_hash.equal
-              (Frozen_ledger_hash.to_ledger_hash expected_root)
-              (Sparse_ledger.merkle_root
-                 (Local_state.get_snapshot local_state snapshot_id).ledger)))
-        {snapshot_id; expected_root}
-    in
-    match
-      Core.List.filter_map
-        [ required_snapshot_sync Curr_epoch_snapshot
-            consensus_state.curr_epoch_data.ledger.hash
-        ; required_snapshot_sync Last_epoch_snapshot
-            consensus_state.last_epoch_data.ledger.hash ]
-        ~f:Fn.id
-    with
-    | [] ->
-        None
-    | ls ->
-        Non_empty_list.of_list_opt ls
 
   let sync_local_state ~logger ~trust_system ~local_state ~random_peers
       ~(query_peer : Network_peer.query_peer) requested_syncs =
@@ -2620,7 +2572,6 @@ module Hooks = struct
       let epoch_snapshot =
         let source, snapshot =
           select_epoch_snapshot ~consensus_state:state ~local_state ~epoch
-            ~epoch_data
         in
         Logger.info logger ~module_:__MODULE__ ~location:__LOC__
           !"using %s_epoch_snapshot root hash %{sexp:Coda_base.Ledger_hash.t}"
