@@ -92,6 +92,8 @@ module Constants = struct
     Time.Span.of_ms (Int64.of_int (Int64.to_int Slot.duration_ms * delta))
 end
 
+let epoch_size = UInt32.to_int Constants.Epoch.size
+
 module Configuration = struct
   type t =
     { delta: int
@@ -2082,8 +2084,12 @@ module Data = struct
       ; curr_slot= Segment_id.to_int t.curr_slot
       ; total_currency= Amount.to_int t.total_currency }
 
-    let curr_epoch_and_slot_opt (t : Value.t) =
-      Some (Epoch.to_int t.curr_epoch, Epoch.Slot.to_int t.curr_slot)
+    let network_delay (config : Configuration.t) =
+      config.acceptable_network_delay
+
+    let curr_epoch (t : Value.t) = Epoch.to_int t.curr_epoch
+
+    let curr_slot (t : Value.t) = Epoch.Slot.to_int t.curr_slot
   end
 
   module Prover_state = struct

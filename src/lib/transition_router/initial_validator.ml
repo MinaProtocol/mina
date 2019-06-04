@@ -48,17 +48,53 @@ module Make (Inputs : Transition_frontier.Inputs_intf) = struct
              , [("slot_diff", `String (Int64.to_string slot_diff))] ))
 
   module Duplicate_proposal_detector = struct
-    module T = struct
-      (* int is a slot *)
-      type t = Public_key.Compressed.Stable.V1.t * int
-      [@@deriving bin_io, sexp, hash, compare]
+    (* maintain a map from proposer, epoch, slot to state hashes *)
+
+    module Proposals = struct
+      module T = struct
+        (* order of fields significant, compare by epoch, then slot, then proposer *)
+        type t =
+          {epoch: int; slot: int; proposer: Public_key.Compressed.Stable.V1.t}
+        [@@deriving sexp, compare]
+      end
+
+      include T
+      include Comparable.Make (T)
     end
 
-    module Key = Hashable.Make_binable (T)
+    type t =
+      {mutable table: State_hash.t Proposals.Map.t; mutable latest_epoch: int}
 
-    type t = {table: State_hash.t Key.Table.t; mutable latest_epoch: int}
+    (* every gc_interval proposals seen, discard proposals more than gc_width ago *)
+    let table_gc =
+      let open Consensus in
+      let delay = Data.Consensus_state.network_delay Configuration.t in
+      let gc_width = delay * 2 in
+      let gc_interval = gc_width * 2 in
+      let count = ref 0 in
+      (* create dummy proposal to split map on *)
+      let make_splitting_proposal (proposal : Proposals.t) : Proposals.t =
+        let proposer = Public_key.Compressed.empty in
+        if proposal.slot >= gc_width then
+          (* within current epoch *)
+          {epoch= proposal.epoch; slot= proposal.slot - gc_width; proposer}
+        else if Int.equal proposal.epoch 0 then
+          (* back to the beginning *)
+          {epoch= 0; slot= 0; proposer}
+        else
+          (* in previous epoch *)
+          { epoch= proposal.epoch - 1
+          ; slot= epoch_size - gc_width + proposal.slot
+          ; proposer }
+      in
+      fun t proposal ->
+        count := (!count + 1) mod gc_interval ;
+        if Int.equal !count 0 then
+          let splitting_proposal = make_splitting_proposal proposal in
+          let _, _, gt_map = Map.split t.table splitting_proposal in
+          t.table <- gt_map
 
-    let create () = {table= Key.Table.create (); latest_epoch= 0}
+    let create () = {table= Map.empty (module Proposals); latest_epoch= 0}
 
     let check t logger external_transition_with_hash =
       let external_transition = external_transition_with_hash.With_hash.data in
@@ -67,28 +103,24 @@ module Make (Inputs : Transition_frontier.Inputs_intf) = struct
       let consensus_state =
         External_transition.consensus_state external_transition
       in
-      match curr_epoch_and_slot_opt consensus_state with
+      let epoch = curr_epoch consensus_state in
+      let slot = curr_slot consensus_state in
+      let proposer = External_transition.proposer external_transition in
+      let proposal = Proposals.{epoch; slot; proposer} in
+      (* try table GC *)
+      table_gc t proposal ;
+      match Map.find t.table proposal with
       | None ->
-          ()
-      | Some (epoch, slot) -> (
-          (* new epoch, flush table *)
-          (* TODO: can we see transitions from previous epochs *)
-          if epoch > t.latest_epoch then (
-            Key.Table.clear t.table ;
-            t.latest_epoch <- epoch ) ;
-          let proposer = External_transition.proposer external_transition in
-          let key = (proposer, slot) in
-          match Key.Table.find t.table key with
-          | None ->
-              Key.Table.add_exn t.table ~key ~data:protocol_state_hash
-          | Some hash ->
-              if not (State_hash.equal hash protocol_state_hash) then
-                Logger.error logger ~module_:__MODULE__ ~location:__LOC__
-                  !"Duplicate proposer and slot: proposer = %{sexp: \
-                    Public_key.Compressed.t}, slot = %i, previous protocol \
-                    state hash = %s, current protocol state hash = %s"
-                  proposer slot (State_hash.to_bytes hash)
-                  (State_hash.to_bytes protocol_state_hash) )
+          t.table
+          <- Map.add_exn t.table ~key:proposal ~data:protocol_state_hash
+      | Some hash ->
+          if not (State_hash.equal hash protocol_state_hash) then
+            Logger.error logger ~module_:__MODULE__ ~location:__LOC__
+              !"Duplicate proposer and slot: proposer = %{sexp: \
+                Public_key.Compressed.t}, slot = %i, previous protocol state \
+                hash = %s, current protocol state hash = %s"
+              proposer slot (State_hash.to_bytes hash)
+              (State_hash.to_bytes protocol_state_hash)
   end
 
   let run ~logger ~trust_system ~verifier ~transition_reader
