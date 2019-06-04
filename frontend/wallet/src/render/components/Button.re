@@ -11,6 +11,7 @@ module Styles = {
     merge([
       Theme.Text.Body.regular,
       style([
+        userSelect(`none),
         display(`inlineFlex),
         alignItems(`center),
         justifyContent(`center),
@@ -68,6 +69,15 @@ module Styles = {
         hover([backgroundColor(Theme.Colors.slateAlpha(0.2))]),
       ]),
     ]);
+
+  let disabled =
+    merge([
+      base,
+      style([
+        backgroundColor(Theme.Colors.slateAlpha(0.05)),
+        color(Theme.Colors.midnightAlpha(0.5)),
+      ]),
+    ]);
 };
 
 [@react.component]
@@ -77,7 +87,7 @@ let make = (~label, ~onClick=?, ~style=Blue, ~disabled=false) =>
     ?onClick
     className={
       switch (style) {
-      | _ when disabled => Styles.gray
+      | _ when disabled => Styles.disabled
       | Blue => Styles.blue
       | Green => Styles.green
       | Red => Styles.red
