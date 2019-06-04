@@ -79,8 +79,8 @@ let make = (~pubkey) => {
 
   let pillMode =
     switch (hovered, editing, isActive) {
-    | (false, false, false) => Pill.Blue
-    | (false, false, true) => Pill.Grey
+    | (false, false, true) => Pill.Blue
+    | (false, false, false) => Pill.Grey
     | (true, _, _)
     | (_, true, _) => Pill.DarkBlue
     };

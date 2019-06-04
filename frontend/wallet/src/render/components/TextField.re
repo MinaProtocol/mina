@@ -51,7 +51,7 @@ module Styles = {
         border(`zero, `none, transparent),
         flexGrow(1.),
         padding(`zero),
-        margin(`zero),
+        marginTop(`px(3)),
         color(Theme.Colors.teal),
         active([outline(`zero, `solid, white)]),
         focus([outline(`zero, `solid, white)]),

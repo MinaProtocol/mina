@@ -32,10 +32,10 @@ module Styles = {
     style([
       display(`flex),
       flexDirection(`column),
-      backgroundColor(white),
-      padding(`rem(0.5)),
+      backgroundColor(`rgba(255, 255, 255, 0.8)),
+      padding2(~v=`zero, ~h=`rem(0.75)),
       borderRadius(`px(6)),
-      border(`px(1), `solid, Theme.Colors.slateAlpha(0.5)),
+      border(`px(1), `solid, Theme.Colors.slateAlpha(0.4)),
       width(`rem(28.)),
     ]);
 
@@ -44,19 +44,19 @@ module Styles = {
       Theme.Text.Body.regular,
       style([
         userSelect(`none),
-        padding(`rem(0.5)),
+        padding2(~v=`rem(1.), ~h=`rem(0.25)),
         color(Theme.Colors.midnight),
         display(`flex),
         alignItems(`center),
         hover([opacity(0.6)]),
-        borderBottom(`px(1), `solid, Theme.Colors.slateAlpha(0.5)),
+        borderBottom(`px(1), `solid, Theme.Colors.slateAlpha(0.25)),
         lastChild([borderBottomWidth(`zero)]),
       ]),
     ]);
 
   let walletName = style([width(`rem(12.5))]);
 
-  let walletChevron = style([color(Theme.Colors.tealAlpha(0.5))]);
+  let walletChevron = style([display(`inlineFlex), color(Theme.Colors.tealAlpha(0.5))]);
 };
 
 module SettingsQueryString = [%graphql
@@ -198,6 +198,7 @@ let make = () => {
            </div>
            <Spacer height=1. />
            <div className=Styles.label> {React.string("Wallet Settings")} </div>
+           <Spacer height=0.5 />
            <div className=Styles.walletItemContainer>
              {data##ownedWallets
               |> Array.map(~f=w =>
