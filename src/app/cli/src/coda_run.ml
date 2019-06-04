@@ -104,6 +104,7 @@ struct
       Rpc.Rpc.implement rpc (fun () input ->
           trace_recurring_task (Rpc.Rpc.name rpc) (fun () -> f () input) )
     in
+    let implement_notrace = Rpc.Rpc.implement in
     let logger =
       Logger.extend
         (Program.top_level_logger coda)
@@ -153,7 +154,7 @@ struct
       ; implement Daemon_rpcs.Get_nonce.rpc (fun () pk ->
             return
               (Commands.get_nonce coda pk |> Participating_state.active_exn) )
-      ; implement Daemon_rpcs.Get_status.rpc (fun () flag ->
+      ; implement_notrace Daemon_rpcs.Get_status.rpc (fun () flag ->
             return (Commands.get_status ~flag coda) )
       ; implement Daemon_rpcs.Clear_hist_status.rpc (fun () flag ->
             return (Commands.clear_hist_status ~flag coda) )
