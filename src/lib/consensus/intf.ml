@@ -274,6 +274,8 @@ module type S = sig
     type t [@@deriving yojson, bin_io]
 
     val t : t
+
+    val network_delay_opt : t -> int option (* for postake, at least *)
   end
 
   module Data : sig
@@ -376,6 +378,9 @@ module type S = sig
       val to_lite : (Value.t -> Lite_base.Consensus_state.t) option
 
       val display : Value.t -> display
+
+      (* for postake, returns Some *)
+      val curr_epoch_and_slot_opt : Value.t -> (int * int) option
     end
 
     module Proposal_data : sig

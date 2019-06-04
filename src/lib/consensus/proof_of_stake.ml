@@ -115,6 +115,8 @@ module Configuration = struct
     ; epoch_duration= Int64.to_int (Time.Span.to_ms Epoch.duration)
     ; acceptable_network_delay= Int64.to_int (Time.Span.to_ms delta_duration)
     }
+
+  let network_delay_opt t = Some t.acceptable_network_delay
 end
 
 module Data = struct
@@ -2081,6 +2083,9 @@ module Data = struct
       ; curr_epoch= Segment_id.to_int t.curr_epoch
       ; curr_slot= Segment_id.to_int t.curr_slot
       ; total_currency= Amount.to_int t.total_currency }
+
+    let curr_epoch_and_slot_opt (t : Value.t) =
+      Some (Epoch.to_int t.curr_epoch, Epoch.Slot.to_int t.curr_slot)
   end
 
   module Prover_state = struct
