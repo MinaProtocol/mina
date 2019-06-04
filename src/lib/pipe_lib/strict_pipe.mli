@@ -100,6 +100,9 @@ module Writer : sig
 
   val close : (_, _, _) t -> unit
 
+  (** This function would first clear the pipe and then close it. *)
+  val kill : (_, _, _) t -> unit
+
   val is_closed : (_, _, _) t -> bool
 end
 

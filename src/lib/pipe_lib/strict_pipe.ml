@@ -43,7 +43,7 @@ module Reader0 = struct
         r :: downstreams_from_list rs
 
   (* TODO: See #1281 *)
-  let to_linear_pipe {reader= pipe; has_reader; downstreams= _} =
+  let to_linear_pipe {reader= pipe; has_reader; _} =
     {Linear_pipe.Reader.pipe; has_reader}
 
   let of_linear_pipe ?name {Linear_pipe.Reader.pipe= reader; has_reader} =
@@ -194,7 +194,7 @@ module Writer = struct
     ; name: string option }
 
   (* TODO: See #1281 *)
-  let to_linear_pipe {writer= pipe; strict_reader= _; type_= _} = pipe
+  let to_linear_pipe {writer= pipe; _} = pipe
 
   let handle_overflow : type b.
       ('t, b buffered, unit) t -> 't -> b overflow_behavior -> unit =
@@ -222,7 +222,12 @@ module Writer = struct
           handle_overflow writer data overflow
         else Pipe.write_without_pushback writer.writer data
 
-  let close {type_= _; strict_reader; writer} =
+  let close {strict_reader; writer; _} =
+    Pipe.close writer ;
+    Reader0.close_downstreams strict_reader.downstreams
+
+  let kill {strict_reader; writer; _} =
+    Pipe.clear strict_reader.reader ;
     Pipe.close writer ;
     Reader0.close_downstreams strict_reader.downstreams
 
@@ -237,7 +242,7 @@ let create ?name type_ =
   let strict_writer = Writer.{type_; strict_reader; writer; name} in
   (strict_reader, strict_writer)
 
-let transfer reader {Writer.type_= _; strict_reader; writer} ~f =
+let transfer reader Writer.{strict_reader; writer; _} ~f =
   Reader0.(reader.downstreams <- [strict_reader]) ;
   Reader0.enforce_single_reader reader (Pipe.transfer reader.reader writer ~f)
 
