@@ -11,8 +11,7 @@ module Styles = {
       gridTemplateColumns([`rem(16.), `fr(1.), `px(200)]),
       gridGap(Theme.Spacing.defaultSpacing),
       alignItems(`flexStart),
-      marginLeft(`rem(0.25)),
-      padding2(~h=`rem(0.75), ~v=`zero),
+      padding2(~h=`rem(1.), ~v=`zero),
       borderBottom(`px(1), `solid, Theme.Colors.savilleAlpha(0.1)),
       lastChild([borderBottom(`px(0), `solid, white)]),
     ]);
