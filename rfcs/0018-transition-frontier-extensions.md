@@ -41,7 +41,7 @@ Transition Frontier Diffs will now be represented as smaller, composable micro-d
 ```ocaml
 type 'mutant diff =
   | Breadcrumb_added : Breadcrumb.t -> {added: Breadcrumb.t; parent: Breadcrumb.t} diff
-  | Root_transitioned : State_hash.t -> {previous: Root.t; new: Root.t} diff
+  | Root_transitioned : {new: State_hash.t; garbage: Breadcrumb.t list} -> {previous: Root.t; new: Root.t; garbage: Breadcrumb.t list} diff
   | Best_tip_changed : State_hash.t -> {previous: Breadcrumb.t; new: Breadcrumb.t} diff
 ```
 
