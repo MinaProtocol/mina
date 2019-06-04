@@ -17,7 +17,7 @@ module Styles = {
 
   let label =
     merge([
-      Theme.Text.smallHeader,
+      Theme.Text.Header.h6,
       style([
         userSelect(`none),
         textTransform(`uppercase),

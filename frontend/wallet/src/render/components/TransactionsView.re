@@ -24,6 +24,7 @@ module Styles = {
       height(`rem(2.)),
       alignItems(`center),
       color(Theme.Colors.slate),
+      userSelect(`none),
     ]);
 
   let body =
@@ -97,7 +98,7 @@ let make = () => {
     <div
       className={Css.merge([
         Styles.row,
-        Theme.Text.smallHeader,
+        Theme.Text.Header.h6,
         Styles.headerRow,
       ])}>
       <span className=Css.(style([display(`flex), alignItems(`center)]))>

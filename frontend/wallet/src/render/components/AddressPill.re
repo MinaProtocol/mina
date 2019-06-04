@@ -116,7 +116,7 @@ let make = (~pubkey) => {
              {React.string(name)}
            </span>
          | None =>
-           <span className=Theme.Text.mono>
+           <span className=Theme.Text.Body.mono>
              {React.string(PublicKey.prettyPrint(pubkey))}
            </span>
          }}

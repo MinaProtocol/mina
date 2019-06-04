@@ -13,7 +13,7 @@ module Styles = {
   let versionText =
     merge([
       Theme.Text.Header.h6,
-      style([display(`flex), textTransform(`uppercase)]),
+      style([display(`flex), textTransform(`uppercase), paddingTop(`rem(0.5))]),
     ]);
 
   let container = style([height(`percent(100.)), padding(`rem(2.))]);
@@ -60,13 +60,14 @@ module Styles = {
 };
 
 module SettingsQueryString = [%graphql
-  {| query getSettings {
+  {|
+    query getSettings {
       version
       ownedWallets {
         publicKey @bsDecoder(fn: "Apollo.Decoders.publicKey")
       }
-     }
-|}
+    }
+  |}
 ];
 
 module SettingsQuery = ReasonApollo.CreateQuery(SettingsQueryString);
@@ -109,7 +110,7 @@ let make = () => {
   let dropDownValue =
     switch (networkValue) {
     | NetworkOption(s) => Some(s)
-    | Custom(_) => Some("CUSTOM")
+    | Custom(_) => Some("Custom network")
     };
 
   let dropDownOptions =
@@ -117,12 +118,12 @@ let make = () => {
       "testnet.codaprotocol.com",
       "testnet2.codaprotocol.com",
       "testnet3.codaprotocol.com",
-      "CUSTOM",
+      "Custom network",
     ]);
 
   let dropdownHandler = s =>
     switch (s) {
-    | "CUSTOM" =>
+    | "Custom network" =>
       setNetworkValue(
         fun
         | NetworkOption(_) => Custom("")
@@ -145,7 +146,7 @@ let make = () => {
            );
          <div className=Styles.container>
            <div className=Styles.headerContainer>
-             <div className=Styles.label> {React.string("Network")} </div>
+             <div className=Theme.Text.Header.h3>{React.string("Node Settings")}</div>
              <div className=Styles.versionText>
                <span
                  className=Css.(
@@ -162,10 +163,11 @@ let make = () => {
                </span>
              </div>
            </div>
+           <Spacer height=1. />
            <div className=Styles.networkContainer>
              <Dropdown
                value=dropDownValue
-               label="URL"
+               label="Network"
                options=dropDownOptions
                onChange=dropdownHandler
              />
@@ -195,7 +197,7 @@ let make = () => {
               }}
            </div>
            <Spacer height=1. />
-           <div className=Styles.label> {React.string("Wallets")} </div>
+           <div className=Styles.label> {React.string("Wallet Settings")} </div>
            <div className=Styles.walletItemContainer>
              {data##ownedWallets
               |> Array.map(~f=w =>
