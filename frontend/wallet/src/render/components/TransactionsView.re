@@ -32,6 +32,8 @@ module Styles = {
       overflow(`auto),
       maxHeight(`calc((`sub, `percent(100.), `rem(2.)))),
     ]);
+
+  let icon = style([opacity(0.5), height(`rem(1.5))]);
 };
 
 module Transactions = [%graphql
@@ -68,23 +70,25 @@ module Transactions = [%graphql
 ];
 module TransactionsQuery = ReasonApollo.CreateQuery(Transactions);
 
-let extractTransactions: Js.t('a) => array(TransactionCell.Transaction.t) = data => {
-  data##blocks##nodes
-  |> Array.map(~f=block => {
-       open TransactionCell.Transaction;
-       let userCommands =
-         block##transactions##userCommands
-         |> Array.map(~f=userCommand => UserCommand(userCommand));
-       let blockReward =
-         BlockReward({
-           date: block##protocolState##blockchainState##date,
-           creator: block##creator,
-           coinbase: block##transactions##coinbase,
-           feeTransfers: block##transactions##feeTransfer,
-         });
-       Array.append(userCommands, [|blockReward|]);
-     }) |> Array.concatenate;
-};
+let extractTransactions: Js.t('a) => array(TransactionCell.Transaction.t) =
+  data => {
+    data##blocks##nodes
+    |> Array.map(~f=block => {
+         open TransactionCell.Transaction;
+         let userCommands =
+           block##transactions##userCommands
+           |> Array.map(~f=userCommand => UserCommand(userCommand));
+         let blockReward =
+           BlockReward({
+             date: block##protocolState##blockchainState##date,
+             creator: block##creator,
+             coinbase: block##transactions##coinbase,
+             feeTransfers: block##transactions##feeTransfer,
+           });
+         Array.append(userCommands, [|blockReward|]);
+       })
+    |> Array.concatenate;
+  };
 
 [@react.component]
 let make = () => {
@@ -96,7 +100,11 @@ let make = () => {
         Theme.Text.smallHeader,
         Styles.headerRow,
       ])}>
-      <span> {ReasonReact.string("Sender")} </span>
+      <span className=Css.(style([display(`flex), alignItems(`center)]))>
+        {React.string("Sender")}
+        <span className=Styles.icon> <Icon kind=Icon.BentArrow /> </span>
+        {React.string("recipient")}
+      </span>
       <span> {ReasonReact.string("Memo")} </span>
       <span className=Css.(style([textAlign(`right)]))>
         {ReasonReact.string("Transaction")}
