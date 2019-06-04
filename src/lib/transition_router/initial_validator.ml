@@ -65,34 +65,40 @@ module Make (Inputs : Transition_frontier.Inputs_intf) = struct
     type t =
       {mutable table: State_hash.t Proposals.Map.t; mutable latest_epoch: int}
 
-    (* every gc_interval proposals seen, discard proposals more than gc_width ago *)
-    let table_gc =
+    let delay =
       let open Consensus in
-      let delay = Data.Consensus_state.network_delay Configuration.t in
-      let gc_width = delay * 2 in
-      let gc_interval = gc_width * 2 in
-      let count = ref 0 in
-      (* create dummy proposal to split map on *)
-      let make_splitting_proposal (proposal : Proposals.t) : Proposals.t =
-        let proposer = Public_key.Compressed.empty in
-        if proposal.slot >= gc_width then
-          (* within current epoch *)
-          {epoch= proposal.epoch; slot= proposal.slot - gc_width; proposer}
-        else if Int.equal proposal.epoch 0 then
-          (* back to the beginning *)
-          {epoch= 0; slot= 0; proposer}
-        else
-          (* in previous epoch *)
-          { epoch= proposal.epoch - 1
-          ; slot= epoch_size - gc_width + proposal.slot
-          ; proposer }
-      in
-      fun t proposal ->
-        count := (!count + 1) mod gc_interval ;
-        if Int.equal !count 0 then
-          let splitting_proposal = make_splitting_proposal proposal in
-          let _, _, gt_map = Map.split t.table splitting_proposal in
-          t.table <- gt_map
+      Data.Consensus_state.network_delay Configuration.t
+
+    let gc_width = delay * 2
+
+    let gc_interval = gc_width
+
+    let gc_count = ref 0
+
+    (* create dummy proposal to split map on *)
+    let make_splitting_proposal (proposal : Proposals.t) : Proposals.t =
+      let roundup_div x y = (x / y) + if x mod y > 0 then 1 else 0 in
+      let proposer = Public_key.Compressed.empty in
+      if proposal.slot >= gc_width then
+        (* within current epoch *)
+        {epoch= proposal.epoch; slot= proposal.slot - gc_width; proposer}
+      else
+        (* earlier epoch *)
+        { epoch=
+            max 0 (proposal.epoch - roundup_div gc_width Consensus.epoch_size)
+        ; slot=
+            Consensus.epoch_size - 1
+            - (gc_width mod Consensus.epoch_size)
+            + proposal.slot
+        ; proposer }
+
+    (* every gc_interval proposals seen, discard proposals more than gc_width ago *)
+    let table_gc t proposal =
+      gc_count := (!gc_count + 1) mod gc_interval ;
+      if Int.equal !gc_count 0 then
+        let splitting_proposal = make_splitting_proposal proposal in
+        let _, _, gt_map = Map.split t.table splitting_proposal in
+        t.table <- gt_map
 
     let create () = {table= Map.empty (module Proposals); latest_epoch= 0}
 
