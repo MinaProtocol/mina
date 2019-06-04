@@ -1,12 +1,12 @@
 ## Summary
 [summary]: #summary
 
-The RFC proposes a new design for Transition Frontier Extensions (previously known as the Transition Frontier Listener). The design in code has changed drastically as newe development needs arose. This RFC intends to improve upon the current design by consolidating concerns and providing a stricter guideline to what should and should not be an extension.
+The RFC proposes a new design for Transition Frontier Extensions (previously known as the Transition Frontier Listener). The design in code has changed drastically as newer development needs arose. This RFC intends to improve upon the current design by consolidating concerns and providing a stricter guideline to what should and should not be an extension.
 
 ## Motivation
 [motivation]: #motivation
 
-Transition Frontier Extensions, as they are right now in the code, are fairly messy. There are multiple representations of what a Transition Frontier Diff is, some extensions exist only to resurface diff information, and extensions are no provided some necessary information at initialization. New rules/guidelines are necessary for determining what should and should not be an extension, as well as what the scope of extensions should be.
+Transition Frontier Extensions, as they are right now in the code, are fairly messy. There are multiple representations of what a Transition Frontier Diff is, some extensions exist only to resurface diff information, and extensions are not provided some necessary information at initialization. New rules/guidelines are necessary for determining what should and should not be an extension, as well as what the scope of extensions should be.
 
 ## Prior art
 [prior-art]: #prior-art
