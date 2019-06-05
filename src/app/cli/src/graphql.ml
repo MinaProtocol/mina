@@ -54,6 +54,16 @@ module Make (Commands : Coda_commands.Intf) = struct
       module State_hash = Codable.Make_base64 (State_hash.Stable.V1)
     end
 
+    module Id = struct
+      (* The id of a user_command is base64 the seralized version of the user_command *)
+      let user_command user_command =
+        let bigstring =
+          Bin_prot.Utils.bin_dump Coda_base.User_command.Stable.V1.bin_t.writer
+            user_command
+        in
+        Base64.encode_exn @@ Bigstring.to_string bigstring
+    end
+
     let uint64_arg name ~doc ~typ =
       let open Schema.Arg in
       arg name ~typ ~doc:(Doc.uint64 name doc)
@@ -68,7 +78,10 @@ module Make (Commands : Coda_commands.Intf) = struct
     (* TODO: include submitted_at (date) and included_at (date). These two fields are not exposed in the user_command *)
     let user_command : (Program.t, User_command.t option) typ =
       obj "UserCommand" ~fields:(fun _ ->
-          [ field "isDelegation" ~typ:(non_null bool)
+          [ field "id" ~typ:(non_null string)
+              ~args:Arg.[]
+              ~resolve:(fun _ user_command -> Id.user_command user_command)
+          ; field "isDelegation" ~typ:(non_null bool)
               ~doc:
                 "If true, then User command is a Stake Delegation kind, \
                  otherwise it is a payment kind"
@@ -661,12 +674,7 @@ module Make (Commands : Coda_commands.Intf) = struct
           module Cursor = struct
             type t = User_command.t
 
-            let serialize payment =
-              let bigstring =
-                Bin_prot.Utils.bin_dump
-                  Coda_base.User_command.Stable.V1.bin_t.writer payment
-              in
-              Base64.encode_exn @@ Bigstring.to_string bigstring
+            let serialize = Id.user_command
 
             let deserialize serialized_payment =
               let serialized_transaction =
