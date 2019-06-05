@@ -8,12 +8,6 @@ let createTray = dispatch => {
   let trayItems =
     Menu.Item.[
       make(
-        Label("Synced"),
-        ~icon=Filename.concat(ProjectRoot.resource, "public/circle-16.png"),
-        (),
-      ),
-      make(Separator, ()),
-      make(
         Label("Debug"),
         ~click=
           () =>
