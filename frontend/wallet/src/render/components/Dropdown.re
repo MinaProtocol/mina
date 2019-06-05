@@ -19,15 +19,18 @@ module Styles = {
       borderRadius(`rem(0.25)),
       borderBottomLeftRadius(isOpen ? `zero : `rem(0.25)),
       borderBottomRightRadius(isOpen ? `zero : `rem(0.25)),
+      focus([outlineStyle(`none)]),
     ]);
 
   let label =
     merge([
       Theme.Text.smallHeader,
       style([
+        userSelect(`none),
         textTransform(`uppercase),
         color(Theme.Colors.slateAlpha(0.7)),
         cursor(`default),
+        minWidth(`rem(2.5)),
       ]),
     ]);
 
@@ -56,6 +59,7 @@ module Styles = {
       borderBottomLeftRadius(`rem(0.25)),
       borderBottomRightRadius(`rem(0.25)),
       cursor(`default),
+      zIndex(1),
     ]);
 
   let item =
@@ -108,7 +112,7 @@ let make = (~onChange, ~value, ~label, ~options) => {
              <div
                key=label
                className=Styles.item
-               onClick={_e => onChange(Some(value))}>
+               onClick={_e => onChange(value)}>
                {React.string(label)}
              </div>,
          options,

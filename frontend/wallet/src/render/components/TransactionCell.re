@@ -128,8 +128,7 @@ module ActorName = {
   [@react.component]
   let make = (~value: ViewModel.Actor.t) => {
     switch (value) {
-    | Key(key) =>
-      <AddressPill pubkey=key />
+    | Key(key) => <AddressPill pubkey=key />
     | Unknown =>
       <Pill>
         <span
@@ -341,6 +340,8 @@ module TopLevelStyles = {
       alignItems(`center),
     ]);
 
+  let icon = style([opacity(0.5)]);
+
   module RightSide = {
     let outerWrapper =
       style([
@@ -385,7 +386,10 @@ let make = (~transaction: Transaction.t) => {
       <ActorName value={viewModel.sender} />
       <div className=TopLevelStyles.Actors.mode>
         {switch (viewModel.action) {
-         | Transfer => <Icon kind=Icon.BentArrow />
+         | Transfer =>
+           <span className=TopLevelStyles.icon>
+             <Icon kind=Icon.BentArrow />
+           </span>
          | Pending => React.string("... ")
          | Failed => React.string("x ")
          }}
