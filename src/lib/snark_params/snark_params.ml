@@ -686,10 +686,14 @@ let set_chunked_hashing b = Tick.Pedersen.State.set_chunked_fold b
 "scan_state_transaction_capacity_log_2", scan_state_transaction_capacity_log_2]
 
 [%%inject
-"scan_state_work_delay_factor", scan_state_work_delay_factor]
+"scan_state_work_delay", scan_state_work_delay]
 
+(*Log of maximum number of trees in the parallel scan state*)
 let pending_coinbase_depth =
-  scan_state_transaction_capacity_log_2 + scan_state_work_delay_factor
+  Int.ceil_log2
+    ( (scan_state_transaction_capacity_log_2 + 1)
+      * (scan_state_work_delay + 1)
+    + 1 )
 
 (* Let n = Tick.Field.size_in_bits.
    Let k = n - 3.

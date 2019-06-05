@@ -342,7 +342,7 @@ module T = struct
 
         let transaction_capacity_log_2 = 3
 
-        let work_delay_factor = 2
+        let work_delay = 2
 
         let commit_id = None
 
