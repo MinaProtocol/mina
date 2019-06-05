@@ -210,7 +210,7 @@ module Job_view : sig
       module V1 : sig
         type t =
           {seq_no: Sequence_number.Stable.V1.t; status: Job_status.Stable.V1.t}
-        [@@deriving sexp, bin_io, version]
+        [@@deriving sexp, bin_io]
       end
 
       module Latest = V1
@@ -294,6 +294,13 @@ module State : sig
       -> finish:('accum -> 'final M.t)
       -> 'final M.t
   end
+
+  val fold_chronological :
+       ('merge, 'base) t
+    -> init:'accum
+    -> f_merge:('accum -> 'merge Merge.t -> 'accum)
+    -> f_base:('accum -> 'base Base.t -> 'accum)
+    -> 'accum
 end
 
 (** The initial state of the parallel scan at some parallelism *)

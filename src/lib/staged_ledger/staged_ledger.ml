@@ -973,6 +973,10 @@ struct
       + ((total_fee_transfer_pks + 1) / 2)
       + coinbase_added t
 
+    let space_available res =
+      let slots = slots_occupied res in
+      res.max_space > slots
+
     let work_done t =
       let no_of_proof_bundles = Sequence.length t.completed_work_rev in
       let slots = slots_occupied t in
@@ -1224,6 +1228,24 @@ struct
           one_prediff cw_seq_1 ts_seq self partitions.first ~add_coinbase:false
             logger
         in
+        let incr_coinbase_and_compute res count =
+          let new_res = Resources.incr_coinbase_part_by res count in
+          if Resources.space_available new_res then
+            (*Don't create the second prediff instead recompute first diff with just once coinbase*)
+            ( one_prediff cw_seq_1 ts_seq self partitions.first
+                ~add_coinbase:true logger
+            , None )
+          else
+            let res2 =
+              second_pre_diff new_res y ~add_coinbase:false cw_seq_2
+            in
+            if isEmpty res2 then
+              (*Don't create the second prediff instead recompute first diff with just once coinbase*)
+              ( one_prediff cw_seq_1 ts_seq self partitions.first
+                  ~add_coinbase:true logger
+              , None )
+            else (new_res, Some res2)
+        in
         let res1, res2 =
           match Resources.available_space res with
           | 0 ->
@@ -1232,22 +1254,10 @@ struct
               (res, Some res2)
           | 1 ->
               (*There's a slot available in the first partition, fill it with coinbase and create another pre_diff for the slots in the second partiton with the remaining user commands and work *)
-              let new_res = Resources.incr_coinbase_part_by res `One in
-              let res2 =
-                second_pre_diff new_res y ~add_coinbase:false cw_seq_2
-              in
-              if isEmpty res2 then (new_res, None) else (new_res, Some res2)
+              incr_coinbase_and_compute res `One
           | 2 ->
               (*There are two slots which cannot be filled using user commands, so we split the coinbase into two parts and fill those two spots*)
-              let new_res = Resources.incr_coinbase_part_by res `Two in
-              let res2 =
-                second_pre_diff new_res y ~add_coinbase:false cw_seq_2
-              in
-              if isEmpty res2 then
-                (*No transactions included in the next slot? don't split the coinbase*)
-                let new_res = Resources.incr_coinbase_part_by res `One in
-                (new_res, None)
-              else (new_res, Some res2)
+              incr_coinbase_and_compute res `Two
           | _ ->
               (* Too many slots left in the first partition. Either there wasn't enough work to add transactions or there weren't enough transactions. Create a new pre_diff for just the first partition*)
               let new_res =

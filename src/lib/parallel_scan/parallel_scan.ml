@@ -11,6 +11,8 @@ open Pipe_lib
   6. 'merge_job: Merge.Job.t
   *)
 
+(*Note:  Prefixing some of the general purpose functions that could be used in the future with an "_" to not cause "unused function" error*)
+
 (**Sequence number for jobs in the scan state that corresponds to the order in 
 which they were added*)
 module Sequence_number = struct
@@ -260,7 +262,7 @@ module Job_view = struct
           type t =
             { seq_no: Sequence_number.Stable.V1.t
             ; status: Job_status.Stable.V1.t }
-          [@@deriving sexp, bin_io, version]
+          [@@deriving sexp, bin_io]
         end
 
         include T
@@ -469,7 +471,7 @@ module Tree = struct
    fun ~f_merge ~f_base ~init t ->
     fold_depth t ~init ~f_merge:(fun _ -> f_merge) ~f_base
 
-  let fold_until : type merge_t base_t accum final.
+  let _fold_until : type merge_t base_t accum final.
          f_merge:(accum -> merge_t -> (accum, final) Continue_or_stop.t)
       -> f_base:(accum -> base_t -> (accum, final) Continue_or_stop.t)
       -> init:accum
@@ -486,8 +488,6 @@ module Tree = struct
     module T = struct
       type 'a t = Single of 'a | Double of ('a * 'a) t [@@deriving sexp]
     end
-
-    type ('a, 'b) tree = ('a, 'b) t
 
     include T
 
@@ -510,44 +510,13 @@ module Tree = struct
       | _ ->
           failwith "Cannot merge the two data lists"
 
-    let rec fold : type a b. a t -> f:(b -> a -> b) -> init:b -> b =
+    let rec _fold : type a b. a t -> f:(b -> a -> b) -> init:b -> b =
      fun t ~f ~init ->
       match t with
       | Single a ->
           f init a
       | Double a ->
-          fold a ~f:(fun acc (a, b) -> f (f acc a) b) ~init
-
-    let rec of_tree : type merge_t weight data base_t.
-           data t
-        -> (merge_t, base_t) tree
-        -> weight_a:(merge_t -> weight * weight)
-        -> weight_d:(base_t -> weight * weight)
-        -> f_split:(weight * weight -> data -> data * data)
-        -> on_level:int
-        -> data t =
-     fun job_list tree ~weight_a ~weight_d ~f_split ~on_level ->
-      match tree with
-      | Node {depth; value; sub_tree} ->
-          if depth = on_level then job_list
-          else
-            let l, r = weight_a value in
-            let new_job_list = split job_list (f_split (l, r)) in
-            Double
-              (of_tree new_job_list sub_tree
-                 ~weight_a:(fun (a, b) -> (weight_a a, weight_a b))
-                 ~weight_d:(fun (a, b) -> (weight_d a, weight_d b))
-                 ~f_split:(fun ((x1, y1), (x2, y2)) (a, b) ->
-                   (f_split (x1, y1) a, f_split (x2, y2) b) )
-                 ~on_level)
-      | Leaf b ->
-          Double (split job_list (f_split (weight_d b)))
-
-    let of_list_and_tree lst tree on_level =
-      of_tree (Single lst) tree ~weight_a:fst
-        ~weight_d:(fun d -> (fst d, 0))
-        ~f_split:(fun (l, r) a -> (List.take a l, List.take (List.drop a l) r))
-        ~on_level
+          _fold a ~f:(fun acc (a, b) -> f (f acc a) b) ~init
 
     (*Just the nested data*)
     let to_data : type a. a t -> a =
@@ -781,25 +750,6 @@ module Tree = struct
       tree
     |> List.rev
 
-  let to_available_jobs :
-      ('merge_t, 'base_t) t -> ('merge_job, 'base_job) Available_job.t list =
-   fun tree ->
-    fold ~init:[]
-      ~f_merge:(fun acc a ->
-        match a with
-        | _weight, Merge.Job.Full {left; right; status= Todo; _} ->
-            Available_job.Merge (left, right) :: acc
-        | _ ->
-            acc )
-      ~f_base:(fun acc d ->
-        match d with
-        | _weight, Base.Job.Full {job; status= Todo; _} ->
-            Available_job.Base job :: acc
-        | _ ->
-            acc )
-      tree
-    |> List.rev
-
   let jobs_records :
       ('merge_t, 'base_t) t -> ('merge_job, 'base_job) New_job.t list =
    fun tree ->
@@ -837,7 +787,7 @@ module Tree = struct
       tree
     |> List.rev
 
-  let rec view_tree : type merge_t base_t.
+  let rec _view_tree : type merge_t base_t.
          (merge_t, base_t) t
       -> show_merge:(merge_t -> string)
       -> show_base:(base_t -> string)
@@ -849,7 +799,7 @@ module Tree = struct
     | Node {value; sub_tree; _} ->
         let curr = sprintf !"Node %s\n" (show_merge value) in
         let subtree =
-          view_tree sub_tree
+          _view_tree sub_tree
             ~show_merge:(fun (x, y) ->
               sprintf !"%s  %s" (show_merge x) (show_merge y) )
             ~show_base:(fun (x, y) ->
@@ -991,14 +941,6 @@ module type State_monad_intf = functor (State : State_intf) -> sig
     -> state:('merge, 'base) State.t
     -> ('a * ('merge, 'base) State.t) Or_error.t
 
-  val eval_state :
-    ('a, 'merge, 'base) t -> state:('merge, 'base) State.t -> 'a Or_error.t
-
-  val exec_state :
-       ('a, 'merge, 'base) t
-    -> state:('merge, 'base) State.t
-    -> ('merge, 'base) State.t Or_error.t
-
   val get : (('merge, 'base) State.t, 'merge, 'base) t
 
   val put : ('merge, 'base) State.t -> (unit, 'merge, 'base) t
@@ -1043,16 +985,6 @@ functor
 
     let error_if b ~message =
       if b then fun _ -> Or_error.error_string message else return ()
-
-    let eval_state t ~state =
-      let open Or_error.Let_syntax in
-      let%map b, _ = run_state t ~state in
-      b
-
-    let exec_state t ~state =
-      let open Or_error.Let_syntax in
-      let%map _, s = run_state t ~state in
-      s
   end
 
 module State = struct
@@ -1617,8 +1549,6 @@ let gen :
       Option.value_map ~default:s res_opt ~f:(fun x ->
           let tuple = if Option.is_some old_tuple then old_tuple else s.acc in
           {s with acc= f_acc tuple x} ) )
-
-let default_seq_no = 0
 
 let%test_module "scans" =
   ( module struct
