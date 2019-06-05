@@ -257,7 +257,7 @@ struct
     in
     let user_commands_sent = !txn_count in
     let run_snark_worker = Option.is_some (snark_worker_key t) in
-    let propose_pubkeys = propose_public_keys t in
+    let propose_pubkeys = Program.propose_public_keys t in
     let consensus_mechanism = Consensus.name in
     let consensus_time_now = Consensus.time_hum (Core_kernel.Time.now ()) in
     let consensus_configuration = Consensus.Configuration.t in
@@ -404,18 +404,7 @@ struct
 
     module Subscriptions = struct
       let new_user_commands coda public_key =
-        let reader, writer = Pipe.create () in
-        let filtered_new_block = Program.filtered_new_block coda in
-        Broadcast_pipe.Reader.iter filtered_new_block ~f:(Pipe.write writer)
-        |> don't_wait_for ;
-        Pipe.map' reader ~f:(fun block_queue ->
-            Deferred.return
-            @@ Queue.concat_map block_queue
-                 ~f:(fun {With_hash.data= filtered_new_block; _} ->
-                   let open Auxiliary_database.Filtered_external_transition in
-                   User_command.filter_by_participant
-                     (user_commands filtered_new_block)
-                     public_key ) )
+        Program.add_payment_subscriber coda public_key
     end
   end
 end

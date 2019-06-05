@@ -142,13 +142,6 @@ module type Main_intf = sig
 
   val replace_propose_keypairs : t -> Keypair.And_compressed_pk.Set.t -> unit
 
-  val filtered_new_block :
-       t
-    -> ( Auxiliary_database.Filtered_external_transition.t
-       , State_hash.t )
-       With_hash.t
-       Broadcast_pipe.Reader.t
-
   val add_block_subscriber :
        t
     -> Public_key.Compressed.t
@@ -156,6 +149,8 @@ module type Main_intf = sig
        , State_hash.t )
        With_hash.t
        Pipe.Reader.t
+
+  val add_payment_subscriber : t -> Account.key -> User_command.t Pipe.Reader.t
 
   val snark_worker_key : t -> Public_key.Compressed.Stable.V1.t option
 
