@@ -113,7 +113,7 @@ let make = () => {
     <TransactionsQuery variables=transactionQuery##variables>
       {response =>
          switch (response.result) {
-         | Loading => React.string("...") /* TODO replace with a spinner */
+         | Loading => <Loader.Page><Loader /></Loader.Page>
          | Error(err) => React.string(err##message) /* TODO format this error message */
          | Data(data) =>
            <div className=Styles.body>
