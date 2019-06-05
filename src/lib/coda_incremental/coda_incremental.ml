@@ -7,12 +7,19 @@
 open Pipe_lib
 open Async
 
-module Make (Incremental : Incremental.S) = struct
+module Make
+    (Incremental : Incremental.S) (Name : sig
+        val t : string
+    end) =
+struct
   include Incremental
 
   let to_pipe observer =
     let reader, writer =
-      Strict_pipe.(create (Buffered (`Capacity 1, `Overflow Drop_head)))
+      Strict_pipe.(
+        create
+          ~name:("Coda_incremental__" ^ Name.t)
+          (Buffered (`Capacity 1, `Overflow Drop_head)))
     in
     Observer.on_update_exn observer ~f:(function
       | Initialized value ->
@@ -32,6 +39,18 @@ module Make (Incremental : Incremental.S) = struct
     var
 end
 
-module New_transition = Make (Incremental.Make ())
+module New_transition =
+  Make
+    (Incremental.Make
+       ())
+       (struct
+         let t = "New_transition"
+       end)
 
-module Status = Make (Incremental.Make ())
+module Status =
+  Make
+    (Incremental.Make
+       ())
+       (struct
+         let t = "Status"
+       end)
