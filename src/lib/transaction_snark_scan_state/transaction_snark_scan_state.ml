@@ -496,42 +496,6 @@ module Make
         Ledger.Undo.transaction txn_with_witness.transaction_with_info
         |> Or_error.ok_exn )
 
-  let fill_work_and_enqueue_transactions t transactions work =
-    let open Or_error.Let_syntax in
-    let fill_in_transaction_snark_work t
-        (works : Transaction_snark_work.t list) :
-        (Ledger_proof.t * Sok_message.t) list Or_error.t =
-      let next_jobs =
-        List.take
-          (List.concat @@ Parallel_scan.jobs_for_next_update t)
-          (total_proofs works)
-      in
-      map2_or_error next_jobs
-        (List.concat_map works
-           ~f:(fun {Transaction_snark_work.fee; proofs; prover} ->
-             List.map proofs ~f:(fun proof -> (fee, proof, prover)) ))
-        ~f:completed_work_to_scanable_work
-    in
-    let old_proof = Parallel_scan.last_emitted_value t in
-    let%bind work_list = fill_in_transaction_snark_work t work in
-    let%bind proof_opt, updated_tree =
-      Parallel_scan.update t ~completed_jobs:work_list ~data:transactions
-    in
-    let%map result_opt =
-      Option.value_map ~default:(Ok None) proof_opt
-        ~f:(fun ((proof, _), txns_with_witnesses) ->
-          let curr_source = (Ledger_proof.statement proof).source in
-          (*TODO: get genesis ledger hash if the old_proof is none*)
-          let prev_target =
-            Option.value_map ~default:curr_source old_proof
-              ~f:(fun ((p', _), _) -> (Ledger_proof.statement p').target)
-          in
-          if Frozen_ledger_hash.equal curr_source prev_target then
-            Ok (Some (proof, extract_txns txns_with_witnesses))
-          else Or_error.error_string "Unexpected ledger proof emitted" )
-    in
-    (result_opt, updated_tree)
-
   let latest_ledger_proof t =
     let open Option.Let_syntax in
     let%map proof, txns_with_witnesses = Parallel_scan.last_emitted_value t in
@@ -594,7 +558,7 @@ module Make
              `List (List.map tree ~f:Job_view.to_yojson) )))
 
   (*Always the same pairing of jobs*)
-  let all_work_to_do t : Transaction_snark_work.Statement.t Sequence.t =
+  let all_work_statements t : Transaction_snark_work.Statement.t Sequence.t =
     let work_seqs = all_jobs_sequence t in
     Sequence.concat_map work_seqs ~f:(fun work_seq ->
         Sequence.chunks_exn
@@ -611,8 +575,17 @@ module Make
     List.concat_map work_list ~f:(fun works ->
         List.chunks_of works ~length:Transaction_snark_work.proofs_length )
 
+  let k_work_pairs_for_new_diff t ~k =
+    let work_list = Parallel_scan.jobs_for_next_update t in
+    List.(
+      take
+        (concat_map work_list ~f:(fun works ->
+             chunks_of works ~length:Transaction_snark_work.proofs_length ))
+        k)
+
   (*Always the same pairing of jobs*)
-  let work_for_new_diff t : Transaction_snark_work.Statement.t Sequence.t =
+  let work_statements_for_new_diff t :
+      Transaction_snark_work.Statement.t Sequence.t =
     let work_seqs =
       Sequence.map
         (Parallel_scan.jobs_for_next_update t |> Sequence.of_list)
@@ -669,6 +642,43 @@ module Make
     in
     List.concat_map all_jobs ~f:(fun jobs ->
         List.map (all_jobs_paired jobs) ~f:job_pair_to_work_spec_pair )
+
+  let fill_work_and_enqueue_transactions t transactions work =
+    let open Or_error.Let_syntax in
+    let fill_in_transaction_snark_work t
+        (works : Transaction_snark_work.t list) :
+        (Ledger_proof.t * Sok_message.t) list Or_error.t =
+      let next_jobs =
+        List.(
+          take
+            (concat @@ Parallel_scan.jobs_for_next_update t)
+            (total_proofs works))
+      in
+      map2_or_error next_jobs
+        (List.concat_map works
+           ~f:(fun {Transaction_snark_work.fee; proofs; prover} ->
+             List.map proofs ~f:(fun proof -> (fee, proof, prover)) ))
+        ~f:completed_work_to_scanable_work
+    in
+    let old_proof = Parallel_scan.last_emitted_value t in
+    let%bind work_list = fill_in_transaction_snark_work t work in
+    let%bind proof_opt, updated_scan_state =
+      Parallel_scan.update t ~completed_jobs:work_list ~data:transactions
+    in
+    let%map result_opt =
+      Option.value_map ~default:(Ok None) proof_opt
+        ~f:(fun ((proof, _), txns_with_witnesses) ->
+          let curr_source = (Ledger_proof.statement proof).source in
+          (*TODO: get genesis ledger hash if the old_proof is none*)
+          let prev_target =
+            Option.value_map ~default:curr_source old_proof
+              ~f:(fun ((p', _), _) -> (Ledger_proof.statement p').target)
+          in
+          if Frozen_ledger_hash.equal curr_source prev_target then
+            Ok (Some (proof, extract_txns txns_with_witnesses))
+          else Or_error.error_string "Unexpected ledger proof emitted" )
+    in
+    (result_opt, updated_scan_state)
 end
 
 module Constants = Constants

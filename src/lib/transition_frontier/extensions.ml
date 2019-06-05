@@ -51,7 +51,7 @@ end) :
     let get_work (breadcrumb : Breadcrumb.t) : Work.t Sequence.t =
       let ledger = Inputs.Breadcrumb.staged_ledger breadcrumb in
       let scan_state = Inputs.Staged_ledger.scan_state ledger in
-      Inputs.Staged_ledger.Scan_state.all_work_to_do scan_state
+      Inputs.Staged_ledger.Scan_state.all_work_statements scan_state
 
     (** Returns true if this update changed which elements are in the table
     (but not if the same elements exist with a different reference count) *)
