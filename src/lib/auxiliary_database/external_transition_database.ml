@@ -8,8 +8,7 @@ module Database = struct
       module V1 = struct
         module T = struct
           type t =
-            Filtered_external_transition.Stable.V1.t
-            * Block_time.Time.Stable.V1.t
+            Filtered_external_transition.Stable.V1.t * Block_time.Stable.V1.t
           [@@deriving bin_io, version {unnumbered}]
         end
 
@@ -27,7 +26,7 @@ module Pagination =
     (struct
       type t = (Filtered_external_transition.t, State_hash.t) With_hash.t
     end)
-    (Block_time.Time.Stable.V1)
+    (Block_time.Stable.V1)
 
 let fee_transfer_participants (pk, _) = [pk]
 
@@ -56,8 +55,9 @@ let create ~logger directory =
       add_user_blocks pagination ({With_hash.hash; data= block_data}, time) ) ;
   {database; pagination= Pagination.create (); logger}
 
-let add ~tracked_participants {database; pagination; logger}
-    ({With_hash.hash= state_hash; _} as external_transition) date =
+let add {database; pagination; logger}
+    ( {With_hash.hash= state_hash; data= filtered_external_transition} as
+    transition_with_hash ) date =
   match Hashtbl.find pagination.all_values state_hash with
   | Some _ ->
       Logger.trace logger
@@ -65,23 +65,10 @@ let add ~tracked_participants {database; pagination; logger}
           already exists: $transaction"
         ~module_:__MODULE__ ~location:__LOC__
         ~metadata:[("transaction", State_hash.to_yojson state_hash)]
-  | None -> (
-    match
-      Filtered_external_transition.of_transition ~tracked_participants
-        external_transition
-    with
-    | Ok block ->
-        Database.set database ~key:state_hash ~data:(block, date) ;
-        add_user_blocks pagination
-          ({With_hash.hash= state_hash; data= block}, date)
-    | Error error ->
-        Logger.error logger
-          !"Could not extract transactions from external_transition \
-            $state_hash: %s"
-          ~module_:__MODULE__ ~location:__LOC__
-          ( Error.to_string_hum
-          @@ Staged_ledger.Pre_diff_info.Error.to_error error )
-          ~metadata:[("state_hash", State_hash.to_yojson state_hash)] )
+  | None ->
+      Database.set database ~key:state_hash
+        ~data:(filtered_external_transition, date) ;
+      add_user_blocks pagination (transition_with_hash, date)
 
 let get_total_values {pagination; _} = Pagination.get_total_values pagination
 

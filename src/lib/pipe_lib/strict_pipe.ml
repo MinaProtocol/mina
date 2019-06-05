@@ -172,6 +172,13 @@ module Reader0 = struct
 
     let two reader =
       match n reader 2 with [a; b] -> (a, b) | _ -> failwith "unexpected"
+
+    let three reader =
+      match n reader 3 with
+      | [a; b; c] ->
+          (a, b, c)
+      | _ ->
+          failwith "unexpected"
   end
 
   let rec close_downstreams = function

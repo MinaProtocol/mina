@@ -79,6 +79,7 @@ type Wallet {
   votingFor: String!
   balance: AnnotatedBalance!
   stakingActive: Boolean! # Actively staking. There is a lag between switching staking keys and them appearing here as you may be in the middle of a staking procedure with other keys.
+  privateKeyPath: String! @examples(values: ["/Users/o1labs/.coda_config/wallets/store/ASgu5t5hlbjC3DZYZ87tASbUX+mGXJUpp+uekWKwtxlJbHxGuedIAQAAAQ=="])
 }
 
 type NodeStatus {
