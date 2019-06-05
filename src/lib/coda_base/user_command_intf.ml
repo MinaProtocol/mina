@@ -100,4 +100,6 @@ module type S = sig
   val forget_check : With_valid_signature.t -> t
 
   val accounts_accessed : t -> Public_key.Compressed.t list
+
+  val filter_by_participant : t list -> Public_key.Compressed.t -> t list
 end

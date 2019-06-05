@@ -224,3 +224,9 @@ let%test_unit "json" =
 let check t = Option.some_if (check_signature t) t
 
 let forget_check t = t
+
+let filter_by_participant user_commands public_key =
+  List.filter user_commands ~f:(fun user_command ->
+      List.mem
+        (accounts_accessed user_command)
+        public_key ~equal:Public_key.Compressed.equal )
