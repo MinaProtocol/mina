@@ -7,19 +7,19 @@ open Signature_lib
 module Make (Inputs : Intf.Inputs) = struct
   open Inputs
 
+  type 'a reader_and_writer = 'a Pipe.Reader.t * 'a Pipe.Writer.t
+
   type t =
     { subscribed_payment_users:
-        (User_command.t Pipe.Reader.t * User_command.t Pipe.Writer.t)
-        Public_key.Compressed.Table.t
+        User_command.t reader_and_writer Public_key.Compressed.Table.t
     ; subscribed_block_users:
-        ( (Filtered_external_transition.t, State_hash.t) With_hash.t
-          Pipe.Reader.t
-        * (Filtered_external_transition.t, State_hash.t) With_hash.t
-          Pipe.Writer.t )
-        Public_key.Compressed.Table.t }
+        (Filtered_external_transition.t, State_hash.t) With_hash.t
+        reader_and_writer
+        Public_key.Compressed.Table.t
+    ; mutable reorganization_subscription: [`Changed] reader_and_writer list }
 
   let create ~logger ~wallets ~time_controller ~external_transition_database
-      ~new_blocks =
+      ~new_blocks ~transition_frontier =
     let subscribed_block_users =
       Public_key.Compressed.Table.of_alist_exn
       @@ List.map (Secrets.Wallets.pks wallets) ~f:(fun wallet ->
@@ -82,7 +82,35 @@ module Make (Inputs : Intf.Inputs) = struct
                 ] ;
             Deferred.unit )
     |> don't_wait_for ;
-    {subscribed_payment_users; subscribed_block_users}
+    let reorganization_subscription = [] in
+    let reader, writer =
+      Strict_pipe.create ~name:"Reorganization subscription"
+        Strict_pipe.(Buffered (`Capacity 10, `Overflow Drop_head))
+    in
+    let t =
+      { subscribed_payment_users
+      ; subscribed_block_users
+      ; reorganization_subscription }
+    in
+    don't_wait_for
+    @@ Broadcast_pipe.Reader.iter transition_frontier
+         ~f:
+           (Option.value_map ~default:Deferred.unit
+              ~f:(fun transition_frontier ->
+                let best_tip_diff_pipe =
+                  Transition_frontier.best_tip_diff_pipe transition_frontier
+                in
+                Broadcast_pipe.Reader.iter best_tip_diff_pipe
+                  ~f:(fun {removed_user_commands; _} ->
+                    if List.is_empty removed_user_commands then
+                      Strict_pipe.Writer.write writer () ;
+                    Deferred.unit ) )) ;
+    Strict_pipe.Reader.iter reader ~f:(fun () ->
+        List.iter t.reorganization_subscription ~f:(fun (_, writer) ->
+            Pipe.write_without_pushback writer `Changed ) ;
+        Deferred.unit )
+    |> don't_wait_for ;
+    t
 
   (* When you subscribe to a block, you will also subscribe to it's payments *)
   let add_block_subscriber t public_key =
@@ -96,4 +124,10 @@ module Make (Inputs : Intf.Inputs) = struct
     Hashtbl.set t.subscribed_payment_users ~key:public_key
       ~data:(payment_reader, payment_writer) ;
     payment_reader
+
+  let add_reorganization_subscriber t =
+    let reader, writer = Pipe.create () in
+    t.reorganization_subscription
+    <- (reader, writer) :: t.reorganization_subscription ;
+    reader
 end

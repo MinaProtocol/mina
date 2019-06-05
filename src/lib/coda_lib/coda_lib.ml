@@ -201,11 +201,7 @@ module Make (Inputs : Intf.Inputs) = struct
 
   let seen_jobs t = t.seen_jobs
 
-  let add_block_subscriber t public_key =
-    Subscriptions.add_block_subscriber t.subscriptions public_key
-
-  let add_payment_subscriber t public_key =
-    Subscriptions.add_payment_subscriber t.subscriptions public_key
+  let subscription t = t.subscriptions
 
   let set_seen_jobs t seen_jobs = t.seen_jobs <- seen_jobs
 
@@ -579,6 +575,7 @@ module Make (Inputs : Intf.Inputs) = struct
                 ~time_controller:config.time_controller ~new_blocks ~wallets
                 ~external_transition_database:
                   config.external_transition_database
+                ~transition_frontier:frontier_broadcast_pipe_r
             in
             return
               { propose_keypairs=

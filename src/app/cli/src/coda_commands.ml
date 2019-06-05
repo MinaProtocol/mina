@@ -23,6 +23,8 @@ module type Intf = sig
          , State_hash.t )
          With_hash.t
          Pipe.Reader.t
+
+    val reorganization : Program.t -> [`Changed] Pipe.Reader.t
   end
 
   module For_tests : sig
@@ -376,7 +378,13 @@ struct
   let clear_hist_status ~flag t = Perf_histograms.wipe () ; get_status ~flag t
 
   module Subscriptions = struct
-    let new_block = Program.add_block_subscriber
+    let new_block t public_key =
+      let subscription = Program.subscription t in
+      Program.Subscriptions.add_block_subscriber subscription public_key
+
+    let reorganization t =
+      let subscription = Program.subscription t in
+      Program.Subscriptions.add_reorganization_subscriber subscription
   end
 
   module For_tests = struct
@@ -401,7 +409,8 @@ struct
 
     module Subscriptions = struct
       let new_user_commands coda public_key =
-        Program.add_payment_subscriber coda public_key
+        let subscription = Program.subscription coda in
+        Program.Subscriptions.add_payment_subscriber subscription public_key
     end
   end
 end

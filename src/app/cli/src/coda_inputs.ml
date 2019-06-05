@@ -51,6 +51,23 @@ module type Init_intf = sig
   val genesis_proof : Proof.t
 end
 
+module type Subscriptions = sig
+  type t
+
+  val add_block_subscriber :
+       t
+    -> Public_key.Compressed.t
+    -> ( Auxiliary_database.Filtered_external_transition.t
+       , State_hash.t )
+       With_hash.t
+       Pipe.Reader.t
+
+  val add_payment_subscriber :
+    t -> Public_key.Compressed.t -> User_command.t Pipe.Reader.t
+
+  val add_reorganization_subscriber : t -> [`Changed] Pipe.Reader.t
+end
+
 module type Main_intf = sig
   module Inputs : sig
     module Net : sig
@@ -138,6 +155,8 @@ module type Main_intf = sig
     [@@deriving make]
   end
 
+  module Subscriptions : Subscriptions
+
   type t
 
   (** Derived from local state (aka they may not reflect the latest public keys to which you've attempted to change *)
@@ -145,15 +164,7 @@ module type Main_intf = sig
 
   val replace_propose_keypairs : t -> Keypair.And_compressed_pk.Set.t -> unit
 
-  val add_block_subscriber :
-       t
-    -> Public_key.Compressed.t
-    -> ( Auxiliary_database.Filtered_external_transition.t
-       , State_hash.t )
-       With_hash.t
-       Pipe.Reader.t
-
-  val add_payment_subscriber : t -> Account.key -> User_command.t Pipe.Reader.t
+  val subscription : t -> Subscriptions.t
 
   val snark_worker_key : t -> Public_key.Compressed.Stable.V1.t option
 

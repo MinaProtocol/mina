@@ -243,13 +243,18 @@ module Make (Commands : Coda_commands.Intf) = struct
               ~args:Arg.[]
               ~resolve:(fun _ {With_hash.data; _} -> data.transactions) ] )
 
-    let sync_status : ('context, [`Offline | `Synced | `Bootstrap]) typ =
-      non_null
-        (enum "SyncStatus" ~doc:"Sync status as daemon node"
-           ~values:
-             [ enum_value "BOOTSTRAP" ~value:`Bootstrap
-             ; enum_value "SYNCED" ~value:`Synced
-             ; enum_value "OFFLINE" ~value:`Offline ])
+    let sync_status : ('context, [`Offline | `Synced | `Bootstrap] option) typ
+        =
+      enum "SyncStatus" ~doc:"Sync status as daemon node"
+        ~values:
+          [ enum_value "BOOTSTRAP" ~value:`Bootstrap
+          ; enum_value "SYNCED" ~value:`Synced
+          ; enum_value "OFFLINE" ~value:`Offline ]
+
+    let chain_reorganization_status : ('context, [`Changed] option) typ =
+      enum "ChainReorganizationStatus"
+        ~doc:"Status for whenever the best tip changes"
+        ~values:[enum_value "CHANGED" ~value:`Changed]
 
     let pubkey_field ~resolve =
       field "publicKey" ~typ:(non_null string)
@@ -828,8 +833,8 @@ module Make (Commands : Coda_commands.Intf) = struct
             ~f:User_command.forget_check )
 
     let sync_state =
-      result_field_no_inputs "syncStatus" ~args:[] ~typ:Types.sync_status
-        ~resolve:(fun {ctx= coda; _} () ->
+      result_field_no_inputs "syncStatus" ~args:[]
+        ~typ:(non_null Types.sync_status) ~resolve:(fun {ctx= coda; _} () ->
           Result.map_error
             (Coda_incremental.Status.Observer.value @@ Program.sync_status coda)
             ~f:Error.to_string_hum )
@@ -924,7 +929,7 @@ module Make (Commands : Coda_commands.Intf) = struct
     let new_sync_update =
       subscription_field "newSyncUpdate"
         ~doc:"Subscribes on sync update from Coda" ~deprecated:NotDeprecated
-        ~typ:Types.sync_status
+        ~typ:(non_null Types.sync_status)
         ~args:Arg.[]
         ~resolve:(fun {ctx= coda; _} ->
           Program.sync_status coda |> Coda_incremental.Status.to_pipe
@@ -944,6 +949,17 @@ module Make (Commands : Coda_commands.Intf) = struct
             @@ Types.Arguments.public_key ~name:"publicKey" public_key
           in
           Commands.Subscriptions.new_block coda public_key )
+
+    let chain_reorganization =
+      subscription_field "chainReorganization"
+        ~doc:
+          "Subscribes whenever a fork in the Transition Frontier suddenly \
+           becomes the longest chain"
+        ~typ:(non_null Types.chain_reorganization_status)
+        ~args:Arg.[]
+        ~resolve:(fun {ctx= coda; _} ->
+          Deferred.Result.return @@ Commands.Subscriptions.reorganization coda
+          )
 
     let commands = [new_sync_update; new_block]
   end
