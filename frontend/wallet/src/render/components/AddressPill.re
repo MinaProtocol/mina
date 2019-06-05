@@ -23,13 +23,22 @@ module Styles = {
       bottom(`zero),
       left(`zero),
       display(`flex),
-      justifyContent(`spaceBetween), padding2(~v=`zero, ~h=`rem(0.5)),
+      justifyContent(`spaceBetween),
+      padding2(~v=`zero, ~h=`rem(0.5)),
       color(white),
     ]);
 
   let copyButton =
-    merge([Theme.Text.Body.regular, style([overflow(`hidden)])]);
-  let editButton = merge([Theme.Text.Body.regular, style([opacity(0.5)])]);
+    merge([
+      Theme.Text.Body.regular,
+      style([overflow(`hidden), opacity(0.9), hover([opacity(1.0)])]),
+    ]);
+
+  let editButton =
+    merge([
+      Theme.Text.Body.regular,
+      style([opacity(0.5), hover([opacity(0.8)])]),
+    ]);
 
   let editing =
     style([
@@ -90,6 +99,10 @@ let make = (~pubkey) => {
       AddressBook.set(~key=pubkey, ~name=ReactEvent.Form.target(e)##value),
     );
 
+  let handleClipboard = _ =>
+    ignore @@
+    Bindings.Navigator.Clipboard.writeText(PublicKey.toString(pubkey));
+
   <div
     className=Styles.container
     onClick={e => ReactEvent.Mouse.stopPropagation(e)}
@@ -112,7 +125,9 @@ let make = (~pubkey) => {
     {switch (hovered, editing) {
      | (true, false) =>
        <div className=Styles.hoverContainer>
-         <span className=Styles.copyButton> {React.string("Copy")} </span>
+         <span className=Styles.copyButton onClick=handleClipboard>
+           {React.string("Copy")}
+         </span>
          <span
            onClick={_ => setEditing(_ => true)} className=Styles.editButton>
            {React.string("Edit")}
