@@ -4,7 +4,7 @@ module Styles = {
   let container =
     style([
       margin(`auto),
-      width(`rem(22.)),
+      width(`rem(21.)),
       display(`flex),
       flexDirection(`column),
       alignItems(`center),

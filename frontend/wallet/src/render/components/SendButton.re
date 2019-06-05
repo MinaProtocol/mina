@@ -134,7 +134,9 @@ let make = (~wallets, ~onSubmit) => {
                label="From"
                value=fromStr
                onChange={value =>
-                 setModalState(Option.map(~f=s => {...s, fromStr: value}))
+                 setModalState(
+                   Option.map(~f=s => {...s, fromStr: Some(value)}),
+                 )
                }
                options={
                  wallets
@@ -150,6 +152,7 @@ let make = (~wallets, ~onSubmit) => {
              spacer
              <TextField
                label="To"
+               mono=true
                onChange={value =>
                  setModalState(Option.map(~f=s => {...s, toStr: value}))
                }

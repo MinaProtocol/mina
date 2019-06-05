@@ -336,7 +336,7 @@ end = struct
         let local_state = Transition_frontier.consensus_local_state frontier in
         let%bind () =
           match
-            Consensus.Hooks.bootstrap_local_state_sync ~consensus_state
+            Consensus.Hooks.required_local_state_sync ~consensus_state
               ~local_state
           with
           | None ->
