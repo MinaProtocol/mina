@@ -36,10 +36,10 @@ include Single.Make({
             ~minWidth=800,
             ~minHeight=500,
             ~frame=false,
-            ~fullscreenable=false,
+            ~transparent=true,
             ~resizeable=false,
             ~title="Coda Wallet",
-            ~titleBarStyle=`Hidden,
+            ~titleBarStyle=`CustomButtonsOnHover,
             ~backgroundColor=Theme.Colors.bgColorElectronWindow,
             ~webPreferences=
               makeWebPreferences(
