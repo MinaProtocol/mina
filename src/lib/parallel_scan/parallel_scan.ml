@@ -1233,9 +1233,7 @@ let work_for_next_update : type merge base.
            ~max_base_jobs:t.max_base_jobs ~delay)
         ((count - current_tree_space) * 2)
     in
-    if List.is_empty set1 && List.is_empty set2 then []
-    else if List.is_empty set1 then [set2]
-    else [set1; set2]
+    List.filter ~f:(Fn.compose not List.is_empty) [set1; set2]
   else
     let set = List.take set1 (2 * count) in
     if List.is_empty set then [] else [set]

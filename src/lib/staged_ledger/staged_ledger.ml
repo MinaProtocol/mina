@@ -1157,12 +1157,6 @@ struct
       (* There isn't enough work for the transactions. Discard a trasnaction and check again *)
       check_constraints_and_update (Resources.discard_user_command resources)
 
-  let rec _remove_work res =
-    if worked_more res then
-      _remove_work
-        (check_constraints_and_update (Resources.discard_last_work res))
-    else res
-
   let one_prediff cw_seq ts_seq self ~add_coinbase partition logger =
     O1trace.measure "one_prediff" (fun () ->
         let init_resources =
