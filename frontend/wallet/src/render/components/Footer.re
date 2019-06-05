@@ -85,22 +85,10 @@ module SendPaymentMutation = ReasonApollo.CreateMutation(SendPayment);
 let make = () => {
   let (downloading, setDownloadState) = React.useState(() => false);
   let (modalState, setModalState) = React.useState(() => None);
+  let activePublicKey = Hooks.useActiveWallet();
   <div className=Styles.footer>
     <StakingSwitch />
     <div className=Styles.footerButtons>
-      {if (downloading) {
-        let downloadName = "keys-temporary_hack-testnet_postake.tar.bz2";
-        <Downloader
-          keyName=downloadName
-          onFinish={_ => setDownloadState(_ => false)}
-        />;
-      } else {
-        <Button
-          label="Download keys"
-          onClick={_ => setDownloadState(_ => true)}
-        />;
-      }}
-      <Spacer width=1. />
       <WalletQuery partialRefetch=true>
         {response =>
           switch (response.result) {
@@ -111,17 +99,18 @@ let make = () => {
             <Button
               label="Request"
               style=Button.Gray
-              onClick={_ => setModalState(_ => Some("active wallet"))}
+              onClick={_ => setModalState(_ => activePublicKey)}
             />
             {switch (modalState) {
               | None => React.null
-              | _ =>
+              | Some(activePublicKey) =>
                 <RequestCodaModal
                   wallets={Array.map(
                     ~f=Wallet.ofGraphqlExn,
                     data##ownedWallets,
                   )}
                   setModalState
+                  activePublicKey
                 />
             }}
             <Spacer width=1. />

@@ -21,14 +21,14 @@ module Styles = {
   };
     
   [@react.component]
-  let make = (~wallets, ~setModalState) => {
+  let make = (~wallets, ~setModalState, ~activePublicKey) => {
     let (settings, _updateAddressBook) = React.useContext(AddressBookProvider.context);
-    let activePublicKey = Hooks.useActiveWallet();
     let (selectedWallet, setSelectedWallet) = React.useState(() => activePublicKey);
-    let keyString = switch (selectedWallet) {
+    let keyString = PublicKey.toString(selectedWallet);
+    /* let keyString = switch (selectedWallet) {
       | None => ""
       | Some(wallet) => PublicKey.toString(wallet)
-    };
+    }; */
     <Modal 
       title="Request Coda"
       onRequestClose={() => setModalState(_ => None)}
