@@ -14,7 +14,10 @@ let pk_of_sk sk = Public_key.of_private_key_exn sk |> Public_key.compress
 
 let name = "full-test"
 
-[%%if
+[%%inject
+"proof_level", proof_level]
+
+(*[%%if
 proof_level = "full"]
 
 let with_snark = true
@@ -24,6 +27,16 @@ let with_snark = true
 let with_snark = false
 
 [%%endif]
+
+[%%if proof_level = "none"]
+
+let dummy_proofs = true
+
+[%%else]
+
+let dummy_proofs = false
+
+[%%endif]*)
 
 let run_test () : unit Deferred.t =
   Parallel.init_master () ;
@@ -125,8 +138,9 @@ let run_test () : unit Deferred.t =
         `With_public_key
           (Public_key.compress largest_account_keypair.public_key)
       in
-      let snark_work_fee =
-        if with_snark then Currency.Fee.of_int 0 else Currency.Fee.of_int 1
+      let fee = Currency.Fee.of_int in
+      let snark_work_fee, transaction_fee =
+        if proof_level = "full" then (fee 0, fee 0) else (fee 1, fee 2)
       in
       let%bind coda =
         Main.create
@@ -214,8 +228,9 @@ let run_test () : unit Deferred.t =
       in
       let assert_ok x = assert (Or_error.is_ok x) in
       let test_sending_payment sender_sk receiver_pk =
-        let fee = Currency.Fee.of_int 2 in
-        let payment = build_payment send_amount sender_sk receiver_pk fee in
+        let payment =
+          build_payment send_amount sender_sk receiver_pk transaction_fee
+        in
         let prev_sender_balance =
           Run.Commands.get_balance coda (pk_of_sk sender_sk)
           |> Participating_state.active_exn
@@ -232,7 +247,9 @@ let run_test () : unit Deferred.t =
         assert_ok (p1_res |> Participating_state.active_exn) ;
         (* Send a similar payment twice on purpose; this second one will be rejected
            because the nonce is wrong *)
-        let payment' = build_payment send_amount sender_sk receiver_pk fee in
+        let payment' =
+          build_payment send_amount sender_sk receiver_pk transaction_fee
+        in
         let%bind p2_res =
           Run.Commands.send_user_command coda (payment' :> User_command.t)
         in
@@ -249,7 +266,7 @@ let run_test () : unit Deferred.t =
           |> Option.value_exn ?here:None ?error:None ?message:None ) ;
         assert_balance (pk_of_sk sender_sk)
           ( Currency.Balance.( - ) prev_sender_balance
-              ( Currency.Amount.add_fee send_amount fee
+              ( Currency.Amount.add_fee send_amount transaction_fee
               |> Option.value_exn ?here:None ?error:None ?message:None )
           |> Option.value_exn ?here:None ?error:None ?message:None )
       in
@@ -358,10 +375,10 @@ let run_test () : unit Deferred.t =
                ( Genesis_ledger.keypair_of_account_record_exn (sk, account)
                , account ) )
       in
-      if with_snark then
+      if proof_level = "full" then
         let accounts = List.take other_accounts 2 in
         let%bind block_count' =
-          test_multiple_payments accounts ~txn_count:1 15.
+          test_multiple_payments accounts ~txn_count:2 15.
         in
         (*wait for a block after the ledger_proof is emitted*)
         let%map () =
@@ -370,11 +387,18 @@ let run_test () : unit Deferred.t =
             ~timeout:5.
         in
         assert (block_count coda > block_count')
+      else if proof_level = "check" then
+        let%map _ =
+          test_multiple_payments other_accounts
+            ~txn_count:(List.length other_accounts / 2)
+            7.
+        in
+        ()
       else
         let%bind _ =
           test_multiple_payments other_accounts
             ~txn_count:(List.length other_accounts)
-            8.
+            7.
         in
         test_duplicate_payments sender_keypair receiver_keypair )
 
