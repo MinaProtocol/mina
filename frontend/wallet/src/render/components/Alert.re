@@ -12,7 +12,7 @@ module Styles = {
 
   let text = Theme.Text.Body.semiBold;
 
-  let icon = style([flexShrink(0)]);
+  let icon = style([flexShrink(0), display(`inlineFlex)]);
 };
 
 [@react.component]
