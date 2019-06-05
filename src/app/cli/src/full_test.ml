@@ -17,27 +17,6 @@ let name = "full-test"
 [%%inject
 "proof_level", proof_level]
 
-(*[%%if
-proof_level = "full"]
-
-let with_snark = true
-
-[%%else]
-
-let with_snark = false
-
-[%%endif]
-
-[%%if proof_level = "none"]
-
-let dummy_proofs = true
-
-[%%else]
-
-let dummy_proofs = false
-
-[%%endif]*)
-
 let run_test () : unit Deferred.t =
   Parallel.init_master () ;
   let logger = Logger.create () in
