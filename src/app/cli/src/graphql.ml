@@ -266,35 +266,45 @@ module Make (Commands : Coda_commands.Intf) = struct
                   ~resolve:(fun _ (b : t) -> Stringable.balance b.unknown) ] )
       end
 
+      (** Hack: Account.Poly.t is only parameterized over 'pk once and so, in
+          order for delegate to be optional, we must also make account
+          public_key optional even though it's always Some. In an attempt to
+          avoid a large refactoring, and also avoid making a new record, we'll
+          deal with a value_exn here and be sad. *)
+      type t =
+        { account:
+            ( Public_key.Compressed.t option
+            , AnnotatedBalance.t
+            , Account.Nonce.t option
+            , Receipt.Chain_hash.t option
+            , State_hash.t option )
+            Account.Poly.t
+        ; is_actively_staking: bool
+        ; path: string }
+
       let wallet =
         obj "Wallet" ~doc:"An account record according to the daemon"
           ~fields:(fun _ ->
-            [ pubkey_field ~resolve:(fun _ (account, _) ->
-                  (* Hack: Account.Poly.t is only parameterized over 'pk once
-                         and so, in order for delegate to be optional, we must also
-                         make account public_key optional even though it's always
-                         Some. In an attempt to avoid a large refactoring, and also
-                         avoid making a new record, we'll deal with a value_exn
-                         here and be sad. *)
+            [ pubkey_field ~resolve:(fun _ {account; _} ->
                   Stringable.public_key
                   @@ Option.value_exn account.Account.Poly.public_key )
             ; field "balance"
                 ~typ:(non_null AnnotatedBalance.obj)
                 ~doc:"A balance of Coda as a stringified uint64"
                 ~args:Arg.[]
-                ~resolve:(fun _ (account, _) -> account.Account.Poly.balance)
+                ~resolve:(fun _ {account; _} -> account.Account.Poly.balance)
             ; field "nonce" ~typ:string
                 ~doc:
                   "Nonces are natural numbers that increase each transaction. \
                    Stringified uint32"
                 ~args:Arg.[]
-                ~resolve:(fun _ (account, _) ->
+                ~resolve:(fun _ {account; _} ->
                   Option.map ~f:Account.Nonce.to_string
                     account.Account.Poly.nonce )
             ; field "receiptChainHash" ~typ:string
                 ~doc:"Top hash of the receipt chain merkle-list"
                 ~args:Arg.[]
-                ~resolve:(fun _ (account, _) ->
+                ~resolve:(fun _ {account; _} ->
                   Option.map ~f:Receipt.Chain_hash.to_string
                     account.Account.Poly.receipt_chain_hash )
             ; field "delegate" ~typ:string
@@ -303,7 +313,7 @@ module Make (Commands : Coda_commands.Intf) = struct
                    delegating to anybody, than this would return your public \
                    key."
                 ~args:Arg.[]
-                ~resolve:(fun _ (account, _) ->
+                ~resolve:(fun _ {account; _} ->
                   Option.map ~f:Stringable.public_key
                     account.Account.Poly.delegate )
             ; field "votingFor" ~typ:string
@@ -311,7 +321,7 @@ module Make (Commands : Coda_commands.Intf) = struct
                   "The previous epoch lock hash of the chain which you are \
                    voting for"
                 ~args:Arg.[]
-                ~resolve:(fun _ (account, _) ->
+                ~resolve:(fun _ {account; _} ->
                   Option.map ~f:Coda_base.State_hash.to_bytes
                     account.Account.Poly.voting_for )
             ; field "stakingActive" ~typ:(non_null bool)
@@ -320,7 +330,11 @@ module Make (Commands : Coda_commands.Intf) = struct
                    keys and them appearing here as you may be in the middle \
                    of a staking procedure with other keys."
                 ~args:Arg.[]
-                ~resolve:(fun _ (_, staking_active) -> staking_active) ] )
+                ~resolve:(fun _ {is_actively_staking; _} -> is_actively_staking)
+            ; field "privateKeyPath" ~typ:(non_null string)
+                ~doc:"The path of the private key for wallet"
+                ~args:Arg.[]
+                ~resolve:(fun _ {path; _} -> path) ] )
     end
 
     let snark_worker =
@@ -523,7 +537,7 @@ module Make (Commands : Coda_commands.Intf) = struct
 
         val get_database : Program.t -> Pagination_database.t
 
-        val filter_argument : string sexp_option Schema.Arg.arg_typ
+        val filter_argument : string option Schema.Arg.arg_typ
 
         val query_name : string
 
@@ -811,11 +825,14 @@ module Make (Commands : Coda_commands.Intf) = struct
         ~typ:(non_null (list (non_null Types.Wallet.wallet)))
         ~args:Arg.[]
         ~resolve:(fun {ctx= coda; _} () ->
+          let wallets = Program.wallets coda in
           let propose_public_keys = Program.propose_public_keys coda in
-          Program.wallets coda |> Secrets.Wallets.pks
+          wallets |> Secrets.Wallets.pks
           |> List.map ~f:(fun pk ->
-                 ( Partial_account.of_pk coda pk
-                 , Public_key.Compressed.Set.mem propose_public_keys pk ) ) )
+                 { Types.Wallet.account= Partial_account.of_pk coda pk
+                 ; is_actively_staking=
+                     Public_key.Compressed.Set.mem propose_public_keys pk
+                 ; path= Secrets.Wallets.get_path wallets pk } ) )
 
     let wallet =
       result_field "wallet"
@@ -837,8 +854,10 @@ module Make (Commands : Coda_commands.Intf) = struct
             Partial_account.(
               of_pk coda pk |> to_full_account |> Option.map ~f:of_full_account)
             ~f:(fun account ->
-              (account, Public_key.Compressed.Set.mem propose_public_keys pk)
-              ) )
+              { Types.Wallet.account
+              ; is_actively_staking=
+                  Public_key.Compressed.Set.mem propose_public_keys pk
+              ; path= Secrets.Wallets.get_path (Program.wallets coda) pk } ) )
 
     let current_snark_worker =
       field "currentSnarkWorker" ~typ:Types.snark_worker
