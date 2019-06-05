@@ -19,15 +19,18 @@ module Styles = {
       borderRadius(`rem(0.25)),
       borderBottomLeftRadius(isOpen ? `zero : `rem(0.25)),
       borderBottomRightRadius(isOpen ? `zero : `rem(0.25)),
+      focus([outlineStyle(`none)]),
     ]);
 
   let label =
     merge([
       Theme.Text.smallHeader,
       style([
+        userSelect(`none),
         textTransform(`uppercase),
         color(Theme.Colors.slateAlpha(0.7)),
         cursor(`default),
+        minWidth(`rem(2.5)),
       ]),
     ]);
 
@@ -56,6 +59,7 @@ module Styles = {
       borderBottomLeftRadius(`rem(0.25)),
       borderBottomRightRadius(`rem(0.25)),
       cursor(`default),
+      zIndex(1),
     ]);
 
   let item =
@@ -103,6 +107,7 @@ let make = (~onChange, ~value, ~label, ~options) => {
     <span className=Styles.icon> <Icon kind=Icon.ChevronDown /> </span>
     <div className={isOpen ? Styles.options : Styles.hidden}>
       {List.map(
+<<<<<<< HEAD
         ~f=
           ((value, label)) =>
             <div
@@ -113,6 +118,17 @@ let make = (~onChange, ~value, ~label, ~options) => {
               {React.string(label)}
             </div>,
         options,
+=======
+         ~f=
+           ((value, label)) =>
+             <div
+               key=label
+               className=Styles.item
+               onClick={_e => onChange(value)}>
+               {React.string(label)}
+             </div>,
+         options,
+>>>>>>> master
        )
        |> Array.fromList
        |> React.array

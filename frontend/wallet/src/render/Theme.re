@@ -25,7 +25,9 @@ module Colors = {
   let slateAlpha = a => `rgba((81, 102, 121, a));
   let slate = slateAlpha(1.);
 
-  let roseBud = `hex("a3536f");
+  let roseBudAlpha = a => `rgba((163, 83, 112, a));
+  let roseBud = roseBudAlpha(1.);
+
   let pendingOrange = `hex("967103");
   let greenblack = `hex("2a3c2e");
 
@@ -61,7 +63,9 @@ module Colors = {
 
   // TODO: Rename
   let greyish = a => `rgba((51, 66, 79, a));
-  let teal = `hex("4782A0");
+
+  let tealAlpha = a => `rgba((71, 130, 160, a));
+  let teal = tealAlpha(1.0);
 };
 
 module Typeface = {
@@ -123,6 +127,14 @@ module Text = {
         lineHeight(`rem(1.5)),
       ]);
 
+    let mono =
+      style([
+        Typeface.mono,
+        fontWeight(`normal),
+        fontSize(`rem(0.9)),
+        lineHeight(`rem(1.4)),
+      ]);
+
     let small =
       style([
         Typeface.plex,
@@ -149,6 +161,15 @@ module Text = {
         fontSize(`rem(1.25)),
         lineHeight(`rem(1.5)),
         letterSpacing(`rem(-0.03125)),
+      ]);
+
+    let h6 =
+      style([
+        Typeface.plex,
+        fontWeight(`medium),
+        fontSize(`rem(0.75)),
+        lineHeight(`rem(1.0)),
+        letterSpacing(`rem(0.0875)),
       ]);
   };
 

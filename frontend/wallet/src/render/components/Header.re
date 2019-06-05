@@ -50,10 +50,10 @@ module Styles = {
     ]);
 };
 
-module SyncStatus = [%graphql
+module SyncStatusQ = [%graphql
   {|
-subscription syncStatus {
-  newSyncUpdate {
+query querySyncStatus {
+  syncState {
     status
     description
   }
@@ -61,7 +61,55 @@ subscription syncStatus {
 |}
 ];
 
-module SyncStatusSubscription = ReasonApollo.CreateSubscription(SyncStatus);
+module SyncStatusQuery = ReasonApollo.CreateQuery(SyncStatusQ);
+
+module SyncStatus = {
+  module SubscriptionGQL = [%graphql
+    {|
+    subscription syncStatus {
+      newSyncUpdate {
+        status
+        description
+      }
+    }
+    |}
+  ];
+
+  module Subscription = ReasonApollo.CreateSubscription(SubscriptionGQL);
+
+  [@react.component]
+  let make =
+      (
+        ~result,
+        ~subscribeToMore:
+           (
+             ~document: ReasonApolloTypes.queryString,
+             ~variables: Js.Json.t=?,
+             ~updateQuery: ReasonApolloQuery.updateQuerySubscriptionT=?,
+             ~onError: ReasonApolloQuery.onErrorT=?,
+             unit
+           ) =>
+           unit,
+      ) => {
+    let _ =
+      React.useEffect0(() => {
+        subscribeToMore(~document=Subscription.graphQLSubscriptionAST, ());
+        None;
+      });
+    switch ((result: SyncStatusQuery.response)) {
+    | Loading => <Alert kind=`Warning message="Connecting" />
+    | Error(_) => <Alert kind=`Danger message="Error" />
+    | Data(response) =>
+      let update = response##syncState;
+      switch (update##status) {
+      | `STALE => <Alert kind=`Warning message="Stale" />
+      | `ERROR => <Alert kind=`Danger message="Unsynced" />
+      | `SYNCED => <Alert kind=`Success message="Synced" />
+      | `BOOTSTRAP => <Alert kind=`Warning message="Syncing" />
+      };
+    };
+  };
+};
 
 [@react.component]
 let make = () => {
@@ -76,21 +124,13 @@ let make = () => {
       <img src="CodaLogo.svg" alt="Coda logo" />
     </div>
     <div className=Styles.rightButtons>
-      <SyncStatusSubscription>
+      <SyncStatusQuery fetchPolicy="no-cache" partialRefetch=true>
         {response =>
-           switch (response.result) {
-           | Loading => <Alert kind=`Warning message="Syncing" />
-           | Error(_) => <Alert kind=`Danger message="Error" />
-           | Data(response) =>
-             let update = response##newSyncUpdate;
-             switch (update##status) {
-             | `STALE => <Alert kind=`Warning message="Stale" />
-             | `ERROR => <Alert kind=`Danger message="Unsynced" />
-             | `SYNCED => <Alert kind=`Success message="Synced" />
-             | `BOOTSTRAP => <Alert kind=`Warning message="Syncing" />
-             };
-           }}
-      </SyncStatusSubscription>
+           <SyncStatus
+             result={response.result}
+             subscribeToMore={response.subscribeToMore}
+           />}
+      </SyncStatusQuery>
       <Spacer width=1.5 />
       <a
         className={
