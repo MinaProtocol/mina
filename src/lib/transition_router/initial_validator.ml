@@ -71,6 +71,11 @@ module Make (Inputs : Transition_frontier.Inputs_intf) = struct
 
     let gc_width = delay * 2
 
+    (* epoch, slot components of gc_width *)
+    let gc_width_epoch = gc_width / Consensus.epoch_size
+
+    let gc_width_slot = gc_width mod Consensus.epoch_size
+
     let gc_interval = gc_width
 
     let gc_count = ref 0
@@ -78,19 +83,20 @@ module Make (Inputs : Transition_frontier.Inputs_intf) = struct
     (* create dummy proposal to split map on *)
     let make_splitting_proposal (proposal : Proposals.t) : Proposals.t =
       let proposer = Public_key.Compressed.empty in
-      if proposal.slot >= gc_width then
-        (* within current epoch *)
-        {epoch= proposal.epoch; slot= proposal.slot - gc_width; proposer}
+      if
+        [%compare: int * int]
+          (proposal.epoch, proposal.slot)
+          (gc_width_epoch, gc_width_slot)
+        < 0
+      then (* proposal not beyond gc_width *)
+        {epoch= 0; slot= 0; proposer}
       else
-        (* earlier epoch *)
+        let open Int in
+        (* subtract epoch, slot components of gc_width *)
         { epoch=
-            max 0
-              ( proposal.epoch - 1
-              - ((gc_width - proposal.slot) / Consensus.epoch_size) )
-        ; slot=
-            Consensus.epoch_size - 1
-            - (gc_width mod Consensus.epoch_size)
-            + proposal.slot
+            ( proposal.epoch - gc_width_epoch
+            - if gc_width_slot > proposal.slot then 1 else 0 )
+        ; slot= (proposal.slot - gc_width_slot) % Consensus.epoch_size
         ; proposer }
 
     (* every gc_interval proposals seen, discard proposals more than gc_width ago *)
