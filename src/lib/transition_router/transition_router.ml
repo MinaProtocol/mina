@@ -50,10 +50,6 @@ module Make (Inputs : Inputs_intf) = struct
   let create_bufferred_pipe ?name () =
     Strict_pipe.create ?name (Buffered (`Capacity 50, `Overflow Crash))
 
-  let kill reader writer =
-    Strict_pipe.Reader.clear reader ;
-    Strict_pipe.Writer.close writer
-
   let is_transition_for_bootstrap root_state new_transition =
     let open External_transition in
     let new_state = protocol_state new_transition in
@@ -123,12 +119,10 @@ module Make (Inputs : Inputs_intf) = struct
     in
     let clean_transition_frontier_controller_and_start_bootstrap
         ~controller_type ~clear_reader ~clear_writer
-        ~transition_frontier_controller_reader
         ~transition_frontier_controller_writer ~old_frontier
         ~verified_transition_writer
         (`Transition _incoming_transition, `Time_received tm) =
-      kill transition_frontier_controller_reader
-        transition_frontier_controller_writer ;
+      Strict_pipe.Writer.kill transition_frontier_controller_writer ;
       Strict_pipe.Writer.write clear_writer `Clear |> don't_wait_for ;
       let bootstrap_controller_reader, bootstrap_controller_writer =
         Strict_pipe.create ~name:"bootstrap controller"
@@ -146,7 +140,7 @@ module Make (Inputs : Inputs_intf) = struct
            ~ledger_db ~frontier:old_frontier
            ~transition_reader:bootstrap_controller_reader)
         (fun (new_frontier, collected_transitions) ->
-          kill bootstrap_controller_reader bootstrap_controller_writer ;
+          Strict_pipe.Writer.kill bootstrap_controller_writer ;
           let reader, writer =
             start_transition_frontier_controller ~verified_transition_writer
               ~clear_reader ~collected_transitions new_frontier
@@ -198,14 +192,11 @@ module Make (Inputs : Inputs_intf) = struct
         in
         match Broadcaster.get controller_type with
         | `Transition_frontier_controller
-            ( frontier
-            , transition_frontier_controller_reader
-            , transition_frontier_controller_writer ) ->
+            (frontier, _, transition_frontier_controller_writer) ->
             let root_state = get_root_state frontier in
             if is_transition_for_bootstrap root_state new_transition then
               clean_transition_frontier_controller_and_start_bootstrap
                 ~controller_type ~clear_reader ~clear_writer
-                ~transition_frontier_controller_reader
                 ~transition_frontier_controller_writer ~old_frontier:frontier
                 ~verified_transition_writer valid_transition
             else
