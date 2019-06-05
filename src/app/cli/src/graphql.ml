@@ -6,6 +6,7 @@ open Coda_base
 open Coda_transition
 open Signature_lib
 open Currency
+open Auxiliary_database
 
 module Make (Commands : Coda_commands.Intf) = struct
   module Program = Commands.Program
@@ -149,12 +150,8 @@ module Make (Commands : Coda_commands.Intf) = struct
             (* TODO: include consensus field *)
            ] )
 
-    let transactions :
-        ( Program.t
-        , Auxiliary_database.Filtered_external_transition.Transactions.t option
-        )
-        typ =
-      let open Auxiliary_database.Filtered_external_transition.Transactions in
+    let transactions =
+      let open Filtered_external_transition.Transactions in
       obj "Transactions" ~doc:"Different types of transactions in a block"
         ~fields:(fun _ ->
           [ field "userCommands"
@@ -204,7 +201,7 @@ module Make (Commands : Coda_commands.Intf) = struct
                 @@ Staged_ledger_hash.ledger_hash staged_ledger_hash ) ] )
 
     let protocol_state =
-      let open Auxiliary_database.Filtered_external_transition.Protocol_state in
+      let open Filtered_external_transition.Protocol_state in
       obj "ProtocolState" ~fields:(fun _ ->
           [ field "previousStateHash" ~typ:(non_null string)
               ~args:Arg.[]
@@ -216,13 +213,10 @@ module Make (Commands : Coda_commands.Intf) = struct
               ~resolve:(fun _ t -> t.blockchain_state) ] )
 
     let block :
-        ( 'context
-        , ( Auxiliary_database.Filtered_external_transition.t
-          , State_hash.t )
-          With_hash.t
-          option )
+        ( Program.t
+        , (Filtered_external_transition.t, State_hash.t) With_hash.t option )
         typ =
-      let open Auxiliary_database.Filtered_external_transition in
+      let open Filtered_external_transition in
       obj "Block" ~fields:(fun _ ->
           [ field "creator" ~typ:(non_null string)
               ~args:Arg.[]
@@ -272,7 +266,11 @@ module Make (Commands : Coda_commands.Intf) = struct
                   ~resolve:(fun _ (b : t) -> Stringable.balance b.unknown) ] )
       end
 
-      (** Hack: Account.Poly.t is only parameterized over 'pk once and so, in order for delegate to be optional, we must also make account public_key optional even though it's always Some. In an attempt to avoid a large refactoring, and also avoid making a new record, we'll deal with a value_exn here and be sad. *)
+      (** Hack: Account.Poly.t is only parameterized over 'pk once and so, in
+          order for delegate to be optional, we must also make account
+          public_key optional even though it's always Some. In an attempt to
+          avoid a large refactoring, and also avoid making a new record, we'll
+          deal with a value_exn here and be sad. *)
       type t =
         { account:
             ( Public_key.Compressed.t option
@@ -355,7 +353,7 @@ module Make (Commands : Coda_commands.Intf) = struct
                 Stringable.uint64 (Currency.Fee.to_uint64 fee) ) ] )
 
     module Payload = struct
-      let add_wallet =
+      let add_wallet : (Program.t, Account.key sexp_option) typ =
         obj "AddWalletPayload" ~fields:(fun _ ->
             [pubkey_field ~resolve:(fun _ key -> Stringable.public_key key)] )
 
@@ -540,7 +538,7 @@ module Make (Commands : Coda_commands.Intf) = struct
         end
 
         module Pagination_database :
-          Auxiliary_database.Intf.Pagination
+          Intf.Pagination
           with type value := Type.t
            and type cursor := Cursor.t
            and type time := Block_time.Time.Stable.V1.t
@@ -557,7 +555,7 @@ module Make (Commands : Coda_commands.Intf) = struct
       module Make (Inputs : Inputs_intf) = struct
         open Inputs
 
-        let edge =
+        let edge : (Program.t, Type.t Edge.t sexp_option) typ =
           obj (Type.name ^ "Edge") ~fields:(fun _ ->
               [ field "cursor" ~typ:(non_null string) ~doc:Cursor.doc
                   ~args:Arg.[]
@@ -566,7 +564,7 @@ module Make (Commands : Coda_commands.Intf) = struct
                   ~args:Arg.[]
                   ~resolve:(fun _ {Edge.node; _} -> node) ] )
 
-        let connection =
+        let connection : (Program.t, Type.t Connection.t option) typ =
           obj (Type.name ^ "Connection") ~fields:(fun _ ->
               [ field "edges"
                   ~typ:(non_null @@ list @@ non_null edge)
@@ -689,7 +687,7 @@ module Make (Commands : Coda_commands.Intf) = struct
                Jane Street bin_prot)"
           end
 
-          module Pagination_database = Auxiliary_database.Transaction_database
+          module Pagination_database = Transaction_database
 
           let get_database = Program.transaction_database
 
@@ -708,10 +706,7 @@ module Make (Commands : Coda_commands.Intf) = struct
 
         module Inputs = struct
           module Type = struct
-            type t =
-              ( Auxiliary_database.Filtered_external_transition.t
-              , State_hash.t )
-              With_hash.t
+            type t = (Filtered_external_transition.t, State_hash.t) With_hash.t
 
             let typ = block
 
@@ -730,8 +725,7 @@ module Make (Commands : Coda_commands.Intf) = struct
                Jane Street bin_prot)"
           end
 
-          module Pagination_database =
-            Auxiliary_database.External_transition_database
+          module Pagination_database = External_transition_database
 
           let get_database = Program.external_transition_database
 
@@ -920,19 +914,22 @@ module Make (Commands : Coda_commands.Intf) = struct
           Program.sync_status coda |> Coda_incremental.Status.to_pipe
           |> Deferred.Result.return )
 
-    let new_user_command_update =
-      subscription_field "newUserCommandUpdate"
+    let new_block =
+      subscription_field "newBlock"
         ~doc:
-          "Subscribes for payments with the sender's public key KEY whenever \
-           we receive a block"
-        ~typ:(non_null Types.user_command)
+          "Subscribes on a new block created by a proposer with a public key \
+           KEY"
+        ~typ:(non_null Types.block)
         ~args:Arg.[arg "publicKey" ~typ:(non_null string)]
         ~resolve:(fun {ctx= coda; _} public_key ->
-          let public_key = Public_key.Compressed.of_base64_exn public_key in
-          Deferred.Result.return
-          @@ Commands.Subscriptions.new_user_command coda public_key )
+          let open Deferred.Result.Let_syntax in
+          let%map public_key =
+            Deferred.return
+            @@ Types.Arguments.public_key ~name:"publicKey" public_key
+          in
+          Commands.Subscriptions.new_block coda public_key )
 
-    let commands = [new_sync_update; new_user_command_update]
+    let commands = [new_sync_update; new_block]
   end
 
   module Mutations = struct
@@ -944,9 +941,9 @@ module Make (Commands : Coda_commands.Intf) = struct
           (non_null Types.Payload.add_wallet)
           (* TODO: For now, not including add wallet input *)
         ~args:Arg.[]
-        ~resolve:(fun {ctx= coda; _} () ->
+        ~resolve:(fun {ctx= t; _} () ->
           let open Deferred.Let_syntax in
-          let%map pk = Program.wallets coda |> Secrets.Wallets.generate_new in
+          let%map pk = Program.wallets t |> Secrets.Wallets.generate_new in
           Result.return pk )
 
     let delete_wallet =
@@ -1072,8 +1069,7 @@ module Make (Commands : Coda_commands.Intf) = struct
               ~error:"Invaid `payment` provided"
           in
           let transaction_database = Program.transaction_database coda in
-          Auxiliary_database.Transaction_database.add transaction_database
-            payment added_time ;
+          Transaction_database.add transaction_database payment added_time ;
           Some payment )
 
     let set_staking =
