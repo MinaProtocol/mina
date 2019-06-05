@@ -171,6 +171,10 @@ module Api = struct
       ~f:(fun worker -> Coda_process.new_block_exn worker key)
       t i
 
+  let new_user_command_and_subscribe t i key =
+    ignore @@ new_block t i key ;
+    new_user_command t i key
+
   let teardown t =
     Deferred.Array.iteri ~how:`Parallel t.workers ~f:(fun i _ -> stop t i)
 
@@ -544,13 +548,11 @@ end = struct
     let fee = Currency.Fee.of_int 1 in
     let%bind new_payment_readers =
       Deferred.List.init (Array.length testnet.workers) ~f:(fun i ->
-          let%map pipe =
-            Api.new_user_command testnet i
-              Public_key.(compress @@ of_private_key_exn sender)
-          in
+          let pk = Public_key.(compress @@ of_private_key_exn sender) in
+          let%map pipe = Api.new_user_command_and_subscribe testnet i pk in
           Option.value_exn pipe )
     in
-    Deferred.List.init ~how:`Sequential n ~f:(fun _ ->
+    Deferred.List.init ~how:`Sequential n ~f:(fun i ->
         let receiver_keypair = List.random_element_exn keypairs in
         let receiver_pk = receiver_keypair.public_key |> Public_key.compress in
         (* Everybody will be watching for a payment *)

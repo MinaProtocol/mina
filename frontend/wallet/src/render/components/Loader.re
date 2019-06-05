@@ -38,8 +38,8 @@ module Styles = {
     style([
       position(`relative),
       display(`inlineBlock),
-      width(`px(40)),
-      height(`px(40)),
+      width(`px(32)),
+      height(`px(32)),
       overflow(`hidden),
       transformOrigin(`percent(0.), `percent(100.)),
       animationName(bigSqureShrink),
@@ -51,12 +51,12 @@ module Styles = {
   let square =
     style([
       position(`absolute),
-      width(`px(20)),
-      height(`px(20)),
+      width(`px(16)),
+      height(`px(16)),
       backgroundColor(`currentColor),
     ]);
 
-  let first = style([left(`px(0)), top(`px(20))]);
+  let first = style([left(`px(0)), top(`px(16))]);
 
   let drop2 =
     keyframes([
@@ -81,8 +81,8 @@ module Styles = {
 
   let second =
     style([
-      left(`px(20)),
-      top(`px(20)),
+      left(`px(16)),
+      top(`px(16)),
       animation(
         drop2,
         ~duration=1000,
@@ -105,7 +105,7 @@ module Styles = {
 
   let fourth =
     style([
-      left(`px(20)),
+      left(`px(16)),
       top(`px(0)),
       animation(
         drop4,
