@@ -217,12 +217,7 @@ type Query {
   # state to be the "real" balance
   balance(publicKey: String!): String!
   
-  pooledUserCommands(
-    filter: UserCommandFilterInput,
-    first: Int,
-    after: String,
-    last: Int,
-    before: String): UserCommandConnection!
+  pooledUserCommands(publicKey: String!): [UserCommand!]!
   
   blocks(
     filter: BlockFilterInput!,
