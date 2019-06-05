@@ -77,7 +77,6 @@ module Make (Inputs : Transition_frontier.Inputs_intf) = struct
 
     (* create dummy proposal to split map on *)
     let make_splitting_proposal (proposal : Proposals.t) : Proposals.t =
-      let roundup_div x y = (x / y) + if x mod y > 0 then 1 else 0 in
       let proposer = Public_key.Compressed.empty in
       if proposal.slot >= gc_width then
         (* within current epoch *)
@@ -85,7 +84,9 @@ module Make (Inputs : Transition_frontier.Inputs_intf) = struct
       else
         (* earlier epoch *)
         { epoch=
-            max 0 (proposal.epoch - roundup_div gc_width Consensus.epoch_size)
+            max 0
+              ( proposal.epoch - 1
+              - ((gc_width - proposal.slot) / Consensus.epoch_size) )
         ; slot=
             Consensus.epoch_size - 1
             - (gc_width mod Consensus.epoch_size)
