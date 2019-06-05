@@ -55,6 +55,16 @@ module Make (Commands : Coda_commands.Intf) = struct
       module State_hash = Codable.Make_base64 (State_hash.Stable.V1)
     end
 
+    module Id = struct
+      (* The id of a user_command is base64 the seralized version of the user_command *)
+      let user_command user_command =
+        let bigstring =
+          Bin_prot.Utils.bin_dump Coda_base.User_command.Stable.V1.bin_t.writer
+            user_command
+        in
+        Base64.encode_exn @@ Bigstring.to_string bigstring
+    end
+
     let uint64_arg name ~doc ~typ =
       let open Schema.Arg in
       arg name ~typ ~doc:(Doc.uint64 name doc)
@@ -69,7 +79,10 @@ module Make (Commands : Coda_commands.Intf) = struct
     (* TODO: include submitted_at (date) and included_at (date). These two fields are not exposed in the user_command *)
     let user_command : (Program.t, User_command.t option) typ =
       obj "UserCommand" ~fields:(fun _ ->
-          [ field "isDelegation" ~typ:(non_null bool)
+          [ field "id" ~typ:(non_null string)
+              ~args:Arg.[]
+              ~resolve:(fun _ user_command -> Id.user_command user_command)
+          ; field "isDelegation" ~typ:(non_null bool)
               ~doc:
                 "If true, then User command is a Stake Delegation kind, \
                  otherwise it is a payment kind"
@@ -357,6 +370,10 @@ module Make (Commands : Coda_commands.Intf) = struct
         obj "AddWalletPayload" ~fields:(fun _ ->
             [pubkey_field ~resolve:(fun _ key -> Stringable.public_key key)] )
 
+      let delete_wallet =
+        obj "DeleteWalletPayload" ~fields:(fun _ ->
+            [pubkey_field ~resolve:(fun _ key -> Stringable.public_key key)] )
+
       let create_payment =
         obj "CreatePaymentPayload" ~fields:(fun _ ->
             [ field "payment" ~typ:(non_null user_command)
@@ -428,6 +445,10 @@ module Make (Commands : Coda_commands.Intf) = struct
             ; to_ ~doc:"Public key of sender of a stake delegation"
             ; fee ~doc:"Fee amount in order to send a stake delegation"
             ; memo ~doc:"Public description of a stake delegation" ]
+
+      let delete_wallet =
+        obj "DeleteWalletInput" ~coerce:Fn.id
+          ~fields:[arg "publicKey" ~typ:(non_null string)]
 
       (* TODO: Treat cases where filter_input has a null argument *)
       let filter_input ~title ~arg_name ~arg_doc =
@@ -659,12 +680,7 @@ module Make (Commands : Coda_commands.Intf) = struct
           module Cursor = struct
             type t = User_command.t
 
-            let serialize payment =
-              let bigstring =
-                Bin_prot.Utils.bin_dump
-                  Coda_base.User_command.Stable.V1.bin_t.writer payment
-              in
-              Base64.encode_exn @@ Bigstring.to_string bigstring
+            let serialize = Id.user_command
 
             let deserialize serialized_payment =
               let serialized_transaction =
@@ -938,6 +954,28 @@ module Make (Commands : Coda_commands.Intf) = struct
           let%map pk = Program.wallets t |> Secrets.Wallets.generate_new in
           Result.return pk )
 
+    let delete_wallet =
+      io_field "deleteWallet"
+        ~doc:"Delete a wallet that you own based on its public key"
+        ~typ:(non_null Types.Payload.delete_wallet)
+        ~args:Arg.[arg "input" ~typ:(non_null Types.Input.delete_wallet)]
+        ~resolve:(fun {ctx= coda; _} () public_key_input ->
+          let open Deferred.Result.Let_syntax in
+          let%bind public_key =
+            Deferred.return
+            @@ Types.Arguments.public_key ~name:"public_key" public_key_input
+          in
+          let wallets = Program.wallets coda in
+          let%map () =
+            Deferred.Result.map_error
+              ~f:(fun `Not_found ->
+                sprintf
+                  !"Could not find wallet with public key: %s"
+                  public_key_input )
+              (Secrets.Wallets.delete wallets public_key)
+          in
+          public_key )
+
     let build_user_command coda {Account.Poly.nonce; _} sender_kp memo
         payment_body fee =
       let payload =
@@ -1076,6 +1114,7 @@ module Make (Commands : Coda_commands.Intf) = struct
 
     let commands =
       [ add_wallet
+      ; delete_wallet
       ; send_payment
       ; set_delegation
       ; add_payment_receipt
