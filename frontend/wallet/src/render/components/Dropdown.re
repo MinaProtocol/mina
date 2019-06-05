@@ -107,18 +107,6 @@ let make = (~onChange, ~value, ~label, ~options) => {
     <span className=Styles.icon> <Icon kind=Icon.ChevronDown /> </span>
     <div className={isOpen ? Styles.options : Styles.hidden}>
       {List.map(
-<<<<<<< HEAD
-        ~f=
-          ((value, label)) =>
-            <div
-              key=label
-              className=Styles.item
-              onClick={_e => onChange(Some(value))}
-            >
-              {React.string(label)}
-            </div>,
-        options,
-=======
          ~f=
            ((value, label)) =>
              <div
@@ -128,7 +116,6 @@ let make = (~onChange, ~value, ~label, ~options) => {
                {React.string(label)}
              </div>,
          options,
->>>>>>> master
        )
        |> Array.fromList
        |> React.array
