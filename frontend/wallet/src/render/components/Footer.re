@@ -44,7 +44,7 @@ module StakingSwitch = {
             ]),
           ])
         )>
-        {ReasonReact.string("Earn Coda > Vault")}
+        {ReasonReact.string("Compress the blockchain")}
       </span>
     </div>;
   };
@@ -58,41 +58,28 @@ module WalletQuery = ReasonApollo.CreateQuery(Wallets);
 
 module SendPayment = [%graphql
   {|
-  mutation sendPayment(
-    $from: String!,
-    $to_: String!,
-    $amount: String!,
-    $fee: String!,
-    $memo: String) {
-  createPayment(input:
-                {from: $from, to: $to_, amount: $amount, fee: $fee, memo: $memo}) {
-    payment {
-      nonce
+    mutation sendPayment(
+      $from: String!,
+      $to_: String!,
+      $amount: String!,
+      $fee: String!,
+      $memo: String) {
+      createPayment(input:
+                    {from: $from, to: $to_, amount: $amount, fee: $fee, memo: $memo}) {
+        payment {
+          nonce
+        }
+      }
     }
-  }
-}
-|}
+  |}
 ];
 
 module SendPaymentMutation = ReasonApollo.CreateMutation(SendPayment);
 
 [@react.component]
-let make = () => {
-  let (downloading, setDownloadState) = React.useState(() => false);
+let make = () =>
   <div className=Styles.footer>
     <StakingSwitch />
-    {if (downloading) {
-       let downloadName = "keys-temporary_hack-testnet_postake.tar.bz2";
-       <Downloader
-         keyName=downloadName
-         onFinish={_ => setDownloadState(_ => false)}
-       />;
-     } else {
-       <Button
-         label="Download keys"
-         onClick={_ => setDownloadState(_ => true)}
-       />;
-     }}
     <WalletQuery partialRefetch=true>
       {response =>
          switch (response.result) {
@@ -145,4 +132,3 @@ let make = () => {
          }}
     </WalletQuery>
   </div>;
-};

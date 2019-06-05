@@ -15,7 +15,7 @@ module Colors = {
 
   let bgColor = white;
 
-  let bgColorElectronWindow = "E9E9E9";
+  let bgColorElectronWindow = "#00E9E9E9";
 
   let savilleAlpha = a => `rgba((61, 88, 120, a));
   let saville = savilleAlpha(1.);
@@ -130,9 +130,10 @@ module Text = {
     let mono =
       style([
         Typeface.mono,
-        fontWeight(`normal),
+        fontWeight(`medium),
         fontSize(`rem(0.9)),
-        lineHeight(`rem(1.4)),
+        // Due to the font weirdness, we need to offset by 4px
+        paddingTop(`px(4)),
       ]);
 
     let small =
@@ -179,24 +180,6 @@ module Text = {
       fontWeight(`normal),
       fontSize(`rem(2.25)),
       lineHeight(`rem(3.)),
-    ]);
-
-  let smallHeader =
-    style([
-      Typeface.plex,
-      fontWeight(`medium),
-      fontSize(`rem(0.75)),
-      lineHeight(`rem(1.)),
-    ]);
-
-  let mono =
-    style([
-      Typeface.mono,
-      fontWeight(`medium),
-      fontSize(`rem(1.)),
-      lineHeight(`rem(1.5)),
-      // Due to the font weirdness, we need to offset by 4px
-      paddingTop(`px(4)),
     ]);
 };
 
