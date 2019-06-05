@@ -70,13 +70,10 @@ let main () =
   let delegator_proposal_goal = 30 in
   Deferred.don't_wait_for
     (Pipe_lib.Linear_pipe.iter delegator_transition_reader
-       ~f:(fun transition ->
-         let proposer =
-           Coda_transition.External_transition.proposer transition
-         in
+       ~f:(fun {With_hash.data= transition; _} ->
          assert (
-           Signature_lib.Public_key.Compressed.equal proposer delegator_pubkey
-         ) ;
+           Signature_lib.Public_key.Compressed.equal transition.creator
+             delegator_pubkey ) ;
          Logger.info logger ~module_:__MODULE__ ~location:__LOC__
            "Observed delegator proposal" ;
          assert (not !delegatee_has_proposed) ;
@@ -96,13 +93,10 @@ let main () =
   let delegatee_proposal_goal = 10 in
   Deferred.don't_wait_for
     (Pipe_lib.Linear_pipe.iter delegatee_transition_reader
-       ~f:(fun transition ->
-         let proposer =
-           Coda_transition.External_transition.proposer transition
-         in
+       ~f:(fun {With_hash.data= transition; _} ->
          assert (
-           Signature_lib.Public_key.Compressed.equal proposer delegatee_pubkey
-         ) ;
+           Signature_lib.Public_key.Compressed.equal transition.creator
+             delegatee_pubkey ) ;
          Logger.info logger ~module_:__MODULE__ ~location:__LOC__
            "Observed delegatee proposal" ;
          delegatee_has_proposed := true ;

@@ -53,6 +53,28 @@ module Tick0 = struct
   module Snarkable = Make_snarkable (Crypto_params.Tick0)
 end
 
+let%test_unit "group-map test" =
+  let params =
+    Group_map.Params.create
+      (module Tick0.Field)
+      ~a:Tick_backend.Inner_curve.Coefficients.a
+      ~b:Tick_backend.Inner_curve.Coefficients.b
+  in
+  let module M = Snarky.Snark.Run.Make (Tick_backend) in
+  Quickcheck.test ~trials:3 Tick0.Field.gen ~f:(fun t ->
+      let checked_output =
+        M.run_and_check (fun () ->
+            let x, y =
+              Snarky_group_map.Checked.to_group
+                (module M)
+                ~params (M.Field.constant t)
+            in
+            fun () -> M.As_prover.(read_var x, read_var y) )
+        |> Or_error.ok_exn
+      in
+      [%test_eq: Tick0.Field.t * Tick0.Field.t] checked_output
+        (Group_map.to_group (module Tick0.Field) ~params t) )
+
 module Wrap_input = Crypto_params.Wrap_input
 
 module Make_inner_curve_scalar
