@@ -6,6 +6,7 @@
   "dependencies": {
     "@glennsl/bs-jest": "^0.4.8",
     "@glennsl/bs-json": "^3.0.0",
+    "apollo-link-retry": "^2.2.13",
     "bs-css": "^8.0.2",
     "bs-electron": "github:Schmavery/bs-electron#ae44a7a509cbed92c032be2302a4e9cf12c11797",
     "bs-platform": "5.0.3",
@@ -48,12 +49,13 @@
       "!node_modules/electron",
       "!node_modules/graphql_ppx",
       "!node_modules/bs-platform/lib",
+      "!node_modules/graphql-faker",
       "node_modules/bs-platform/lib/js",
       "package.json"
     ],
     "extraResources": [
       "_build/",
-      "node_modules/graphql-faker/dist/index.js",
+      "node_modules/graphql-faker",
       "bundle/**/*",
       "public/**/*"
     ],

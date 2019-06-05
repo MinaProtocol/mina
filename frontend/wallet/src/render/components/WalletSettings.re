@@ -3,13 +3,14 @@ open Tc;
 module Styles = {
   open Css;
 
-  let container = style([padding(`rem(1.0))]);
+  let container = style([padding(`rem(2.0))]);
 
   let backHeader =
     style([display(`flex), alignItems(`center), userSelect(`none)]);
 
   let backIcon =
     style([
+      display(`inlineFlex),
       color(Theme.Colors.hyperlinkAlpha(1.0)),
       hover([color(Theme.Colors.hyperlinkAlpha(0.5))]),
     ]);

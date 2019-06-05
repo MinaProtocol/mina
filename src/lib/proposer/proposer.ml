@@ -26,7 +26,7 @@ module type Inputs_intf = sig
      and type verifier := Verifier.t
 
   module Transaction_pool :
-    Coda_lib.Transaction_pool_read_intf
+    Coda_lib.Intf.Transaction_pool_read
     with type transaction_with_valid_signature :=
                 User_command.With_valid_signature.t
 
@@ -80,7 +80,7 @@ end = struct
 end
 
 module Make (Inputs : Inputs_intf) :
-  Coda_lib.Proposer_intf
+  Coda_lib.Intf.Proposer
   with type breadcrumb := Inputs.Transition_frontier.Breadcrumb.t
    and type staged_ledger := Inputs.Staged_ledger.t
    and type completed_work_statement :=
