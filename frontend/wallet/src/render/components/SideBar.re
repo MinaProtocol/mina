@@ -46,7 +46,7 @@ let make = () => {
       <WalletQuery fetchPolicy="no-cache" partialRefetch=true>
         {response =>
            switch (response.result) {
-           | Loading => React.string("...")
+           | Loading => <Loader.Page><Loader /></Loader.Page>
            | Error(err) => React.string(err##message)
            | Data(data) =>
              <WalletList

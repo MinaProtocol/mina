@@ -79,8 +79,8 @@ let make = (~pubkey) => {
 
   let pillMode =
     switch (hovered, editing, isActive) {
-    | (false, false, false) => Pill.Blue
-    | (false, false, true) => Pill.Grey
+    | (false, false, true) => Pill.Blue
+    | (false, false, false) => Pill.Grey
     | (true, _, _)
     | (_, true, _) => Pill.DarkBlue
     };
@@ -116,7 +116,7 @@ let make = (~pubkey) => {
              {React.string(name)}
            </span>
          | None =>
-           <span className=Theme.Text.mono>
+           <span className=Theme.Text.Body.mono>
              {React.string(PublicKey.prettyPrint(pubkey))}
            </span>
          }}
