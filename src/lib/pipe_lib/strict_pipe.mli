@@ -80,6 +80,8 @@ module Reader : sig
     val n : 'a t -> int -> 'a t list
 
     val two : 'a t -> 'a t * 'a t
+
+    val three : 'a t -> 'a t * 'a t * 'a t
   end
 
   (** This function would take a pipe and split the reader side into 3 ends. The
