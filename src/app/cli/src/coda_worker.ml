@@ -96,7 +96,10 @@ module T = struct
     ; new_block:
         ( 'worker
         , Account.key
-        , Coda_transition.External_transition.t Pipe.Reader.t )
+        , ( Auxiliary_database.Filtered_external_transition.t
+          , State_hash.t )
+          With_hash.t
+          Pipe.Reader.t )
         Rpc_parallel.Function.t
     ; dump_tf: ('worker, unit, string) Rpc_parallel.Function.t
     ; best_path:
@@ -136,7 +139,11 @@ module T = struct
         -> Payment_proof.t Deferred.t
     ; coda_new_block:
            Account.key
-        -> Coda_transition.External_transition.t Pipe.Reader.t Deferred.t
+        -> ( Auxiliary_database.Filtered_external_transition.t
+           , State_hash.t )
+           With_hash.t
+           Pipe.Reader.t
+           Deferred.t
     ; coda_dump_tf: unit -> string Deferred.t
     ; coda_best_path: unit -> State_hash.Stable.Latest.t list Deferred.t }
 
@@ -237,7 +244,10 @@ module T = struct
       C.create_pipe ~f:new_block_impl
         ~bin_input:[%bin_type_class: Account.Stable.V1.key]
         ~bin_output:
-          [%bin_type_class: Coda_transition.External_transition.Stable.V1.t] ()
+          [%bin_type_class:
+            ( Auxiliary_database.Filtered_external_transition.Stable.V1.t
+            , State_hash.Stable.V1.t )
+            With_hash.Stable.V1.t] ()
 
     let send_user_command =
       C.create_rpc ~f:send_payment_impl ~bin_input:Send_payment_input.bin_t
@@ -582,11 +592,11 @@ module T = struct
           in
           let coda_new_user_command =
             Fn.compose Deferred.return
-            @@ Run.Commands.Subscriptions.new_user_command coda
+            @@ Run.Commands.For_tests.Subscriptions.new_user_commands coda
           in
           let coda_get_all_user_commands =
             Fn.compose Deferred.return
-            @@ Run.Commands.get_all_user_commands coda
+            @@ Run.Commands.For_tests.get_all_user_commands coda
           in
           { coda_peers= with_monitor coda_peers
           ; coda_verified_transitions= with_monitor coda_verified_transitions

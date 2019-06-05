@@ -4,251 +4,21 @@
 open Core_kernel
 open Async_kernel
 open Coda_base
-open Coda_state
 open Pipe_lib
 open Strict_pipe
 open Signature_lib
+open Coda_state
 open O1trace
-open Auxiliary_database
 open Otp_lib
-
-module type Transaction_pool_read_intf = sig
-  type t
-
-  type transaction_with_valid_signature
-
-  val transactions : t -> transaction_with_valid_signature Sequence.t
-end
-
-module type Transaction_pool_intf = sig
-  include Transaction_pool_read_intf
-
-  type pool_diff
-
-  type transaction
-
-  type transition_frontier
-
-  val broadcasts : t -> pool_diff Linear_pipe.Reader.t
-
-  val load :
-       logger:Logger.t
-    -> trust_system:Trust_system.t
-    -> disk_location:string
-    -> incoming_diffs:pool_diff Envelope.Incoming.t Linear_pipe.Reader.t
-    -> frontier_broadcast_pipe:transition_frontier Option.t
-                               Broadcast_pipe.Reader.t
-    -> t Deferred.t
-
-  val add : t -> transaction -> unit Deferred.t
-end
-
-module type Snark_pool_intf = sig
-  type t
-
-  type completed_work_statement
-
-  type completed_work_checked
-
-  type pool_diff
-
-  type transition_frontier
-
-  val broadcasts : t -> pool_diff Linear_pipe.Reader.t
-
-  val load :
-       logger:Logger.t
-    -> trust_system:Trust_system.t
-    -> disk_location:string
-    -> incoming_diffs:pool_diff Envelope.Incoming.t Linear_pipe.Reader.t
-    -> frontier_broadcast_pipe:transition_frontier Option.t
-                               Broadcast_pipe.Reader.t
-    -> t Deferred.t
-
-  val get_completed_work :
-    t -> completed_work_statement -> completed_work_checked option
-end
-
-module type Proposer_intf = sig
-  type staged_ledger
-
-  type breadcrumb
-
-  type completed_work_statement
-
-  type completed_work_checked
-
-  type transition_frontier
-
-  type transaction_pool
-
-  type verifier
-
-  val run :
-       logger:Logger.t
-    -> verifier:verifier
-    -> trust_system:Trust_system.t
-    -> get_completed_work:(   completed_work_statement
-                           -> completed_work_checked option)
-    -> transaction_pool:transaction_pool
-    -> time_controller:Block_time.Controller.t
-    -> keypairs:( Agent.read_only Agent.flag
-                , Keypair.And_compressed_pk.Set.t )
-                Agent.t
-    -> consensus_local_state:Consensus.Data.Local_state.t
-    -> frontier_reader:transition_frontier option Broadcast_pipe.Reader.t
-    -> transition_writer:( breadcrumb
-                         , synchronous
-                         , unit Deferred.t )
-                         Strict_pipe.Writer.t
-    -> unit
-end
-
-module type Witness_change_intf = sig
-  type t_with_witness
-
-  type witness
-
-  type t
-
-  val forget_witness : t_with_witness -> t
-
-  val add_witness_exn : t -> witness -> t_with_witness
-
-  val add_witness : t -> witness -> t_with_witness Or_error.t
-end
-
-module type State_with_witness_intf = sig
-  type state
-
-  type ledger_hash
-
-  type staged_ledger_transition
-
-  type staged_ledger_transition_with_valid_signatures_and_proofs
-
-  type t =
-    { staged_ledger_transition:
-        staged_ledger_transition_with_valid_signatures_and_proofs
-    ; state: state }
-  [@@deriving sexp]
-
-  module Stripped : sig
-    type t = {staged_ledger_transition: staged_ledger_transition; state: state}
-  end
-
-  val strip : t -> Stripped.t
-
-  val forget_witness : t -> state
-end
-
-module type Inputs_intf = sig
-  include Coda_intf.Inputs_intf
-
-  module Transition_frontier :
-    Coda_intf.Transition_frontier_intf
-    with type external_transition_validated := External_transition.Validated.t
-     and type mostly_validated_external_transition :=
-                ( [`Time_received] * Truth.true_t
-                , [`Proof] * Truth.true_t
-                , [`Frontier_dependencies] * Truth.true_t
-                , [`Staged_ledger_diff] * Truth.false_t )
-                External_transition.Validation.with_transition
-     and type transaction_snark_scan_state := Staged_ledger.Scan_state.t
-     and type staged_ledger_diff := Staged_ledger_diff.t
-     and type staged_ledger := Staged_ledger.t
-     and type verifier := Verifier.t
-
-  module Transition_frontier_persistence :
-    Transition_frontier_persistence.Intf.S
-    with type frontier := Transition_frontier.t
-     and type verifier := Verifier.t
-
-  module Transaction_pool :
-    Transaction_pool_intf
-    with type transaction_with_valid_signature :=
-                User_command.With_valid_signature.t
-     and type transaction := User_command.t
-     and type transition_frontier := Transition_frontier.t
-
-  module Snark_pool :
-    Snark_pool_intf
-    with type completed_work_statement := Transaction_snark_work.Statement.t
-     and type completed_work_checked := Transaction_snark_work.Checked.t
-     and type transition_frontier := Transition_frontier.t
-
-  module State_body_hash : sig
-    type t
-  end
-
-  module Net :
-    Coda_intf.Network_intf
-    with type external_transition := External_transition.t
-     and type transaction_snark_scan_state := Staged_ledger.Scan_state.t
-     and type snark_pool_diff = Snark_pool.pool_diff
-     and type transaction_pool_diff = Transaction_pool.pool_diff
-
-  module Transition_router :
-    Coda_intf.Transition_router_intf
-    with type external_transition := External_transition.t
-     and type external_transition_verified := External_transition.Validated.t
-     and type transition_frontier := Transition_frontier.t
-     and type network := Net.t
-     and type breadcrumb := Transition_frontier.Breadcrumb.t
-     and type verifier := Verifier.t
-
-  module Root_prover :
-    Coda_intf.Root_prover_intf
-    with type transition_frontier := Transition_frontier.t
-     and type external_transition := External_transition.t
-     and type external_transition_with_initial_validation :=
-                External_transition.with_initial_validation
-     and type verifier := Verifier.t
-
-  module Proposer :
-    Proposer_intf
-    with type staged_ledger := Staged_ledger.t
-     and type completed_work_statement := Transaction_snark_work.Statement.t
-     and type completed_work_checked := Transaction_snark_work.Checked.t
-     and type transition_frontier := Transition_frontier.t
-     and type breadcrumb := Transition_frontier.Breadcrumb.t
-     and type transaction_pool := Transaction_pool.t
-     and type verifier := Verifier.t
-
-  module Genesis : sig
-    val state : (Protocol_state.Value.t, State_hash.t) With_hash.t
-
-    val ledger : Ledger.maskable_ledger
-
-    val proof : Proof.t
-  end
-
-  module Sync_handler :
-    Coda_intf.Sync_handler_intf
-    with type external_transition := External_transition.t
-     and type external_transition_validated := External_transition.Validated.t
-     and type transition_frontier := Transition_frontier.t
-     and type parallel_scan_state := Staged_ledger.Scan_state.t
-
-  module Work_selector :
-    Work_selector.Intf.S
-    with type snark_pool := Snark_pool.t
-     and type fee := Currency.Fee.t
-     and type staged_ledger := Staged_ledger.t
-     and type work :=
-                ( Transaction_snark.Statement.t
-                , Transaction.t
-                , Transaction_witness.t
-                , Ledger_proof.t )
-                Snark_work_lib.Work.Single.Spec.t
-end
 
 (* used in error below to allow pattern-match against error *)
 let refused_answer_query_string = "Refused to answer_query"
 
-module Make (Inputs : Inputs_intf) = struct
+module Make (Inputs : Intf.Inputs) = struct
+  open Auxiliary_database
   open Inputs
   module Ledger_transfer = Ledger_transfer.Make (Ledger) (Ledger.Db)
+  module Subscriptions = Coda_subscriptions.Make (Inputs)
 
   type t =
     { propose_keypairs:
@@ -280,7 +50,8 @@ module Make (Inputs : Inputs_intf) = struct
         Pipe.Writer.t
     ; time_controller: Block_time.Controller.t
     ; snark_work_fee: Currency.Fee.t
-    ; consensus_local_state: Consensus.Data.Local_state.t }
+    ; consensus_local_state: Consensus.Data.Local_state.t
+    ; subscriptions: Subscriptions.t }
 
   let peek_frontier frontier_broadcast_pipe =
     Broadcast_pipe.Reader.peek frontier_broadcast_pipe
@@ -429,6 +200,12 @@ module Make (Inputs : Inputs_intf) = struct
           "staged ledger hash not found in transition frontier"
 
   let seen_jobs t = t.seen_jobs
+
+  let add_block_subscriber t public_key =
+    Subscriptions.add_block_subscriber t.subscriptions public_key
+
+  let add_payment_subscriber t public_key =
+    Subscriptions.add_payment_subscriber t.subscriptions public_key
 
   let set_seen_jobs t seen_jobs = t.seen_jobs <- seen_jobs
 
@@ -720,8 +497,10 @@ module Make (Inputs : Inputs_intf) = struct
                      ~f:(fun (tn, tm) -> (`Transition tn, `Time_received tm)))
                 ~proposer_transition_reader
             in
-            let valid_transitions_for_network, valid_transitions_for_api =
-              Strict_pipe.Reader.Fork.two valid_transitions
+            let ( valid_transitions_for_network
+                , valid_transitions_for_api
+                , new_blocks ) =
+              Strict_pipe.Reader.Fork.three valid_transitions
             in
             let%bind transaction_pool =
               Transaction_pool.load ~logger:config.logger
@@ -795,6 +574,12 @@ module Make (Inputs : Inputs_intf) = struct
               (Linear_pipe.iter (Snark_pool.broadcasts snark_pool) ~f:(fun x ->
                    Net.broadcast_snark_pool_diff net x ;
                    Deferred.unit )) ;
+            let subscriptions =
+              Subscriptions.create ~logger:config.logger
+                ~time_controller:config.time_controller ~new_blocks ~wallets
+                ~external_transition_database:
+                  config.external_transition_database
+            in
             return
               { propose_keypairs=
                   Agent.create
@@ -826,5 +611,8 @@ module Make (Inputs : Inputs_intf) = struct
               ; consensus_local_state= config.consensus_local_state
               ; transaction_database= config.transaction_database
               ; external_transition_database=
-                  config.external_transition_database } ) )
+                  config.external_transition_database
+              ; subscriptions } ) )
 end
+
+module Intf = Intf

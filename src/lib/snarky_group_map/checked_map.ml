@@ -66,13 +66,13 @@ struct
         + constant (Group_map.Params.b params))
     in
     let x1, x2, x3 = B.potential_xs x in
-    let y1, b1 = sqrt_flagged (f x1) in
-    let y2, b2 = sqrt_flagged (f x2) in
-    let y3, b3 = sqrt_flagged (f x3) in
+    let y1, b1 = sqrt_flagged (f x1)
+    and y2, b2 = sqrt_flagged (f x2)
+    and y3, b3 = sqrt_flagged (f x3) in
     Boolean.Assert.any [b1; b2; b3] ;
-    let x1_is_first = (b1 :> Field.t) in
-    let x2_is_first = (Boolean.((not b1) && b2) :> Field.t) in
-    let x3_is_first = (b3 :> Field.t) in
+    let x1_is_first = (b1 :> Field.t)
+    and x2_is_first = (Boolean.((not b1) && b2) :> Field.t)
+    and x3_is_first = (Boolean.((not b1) && (not b2) && b3) :> Field.t) in
     ( Field.((x1_is_first * x1) + (x2_is_first * x2) + (x3_is_first * x3))
     , Field.((x1_is_first * y1) + (x2_is_first * y2) + (x3_is_first * y3)) )
 end
