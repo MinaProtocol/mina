@@ -436,7 +436,7 @@ module Make (Commands : Coda_commands.Intf) = struct
             ; memo ~doc:"Public description of a stake delegation" ]
 
       let delete_wallet =
-        obj "deleteWalletInput" ~coerce:Fn.id
+        obj "DeleteWalletInput" ~coerce:Fn.id
           ~fields:[arg "publicKey" ~typ:(non_null string)]
 
       (* TODO: Treat cases where filter_input has a null argument *)
