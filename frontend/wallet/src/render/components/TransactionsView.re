@@ -93,41 +93,51 @@ let extractTransactions: Js.t('a) => array(TransactionCell.Transaction.t) =
 [@react.component]
 let make = () => {
   let transactionQuery = Transactions.make(~publicKey="123", ());
+  /* let emptyTransactionsView =  */
   <div className=Styles.container>
-    <div
-      className={Css.merge([
-        Styles.row,
-        Theme.Text.Header.h6,
-        Styles.headerRow,
-      ])}>
-      <span className=Css.(style([display(`flex), alignItems(`center)]))>
-        {React.string("Sender")}
-        <span className=Styles.icon> <Icon kind=Icon.BentArrow /> </span>
-        {React.string("recipient")}
-      </span>
-      <span> {ReasonReact.string("Memo")} </span>
-      <span className=Css.(style([textAlign(`right)]))>
-        {ReasonReact.string("Date / Amount")}
-      </span>
-    </div>
     <TransactionsQuery variables=transactionQuery##variables>
       {response =>
-         switch (response.result) {
-         | Loading => <Loader.Page><Loader /></Loader.Page>
-         | Error(err) => React.string(err##message) /* TODO format this error message */
-         | Data(data) =>
-           <div className=Styles.body>
-             {Array.map(
-                ~f=
-                  transaction =>
-                    <div className=Styles.row>
-                      <TransactionCell transaction />
-                    </div>,
-                extractTransactions(data),
-              )
-              |> React.array}
-           </div>
-         }}
+        switch (response.result) {
+        | Loading => <Loader.Page><Loader /></Loader.Page>
+        | Error(err) => React.string(err##message) /* TODO format this error message */
+        | Data(data) =>
+          let transactions = extractTransactions(data);
+          Js.log(transactions);
+          switch (Array.length(transactions)) {
+          | 0 => <>{React.string("No Transactions :(")}</>
+          | _ =>
+            <>  
+              <div
+                className={Css.merge([
+                  Styles.row,
+                  Theme.Text.Header.h6,
+                  Styles.headerRow,
+                ])}>
+                <span className=Css.(style([display(`flex), alignItems(`center)]))>
+                  {React.string("Sender")}
+                  <span className=Styles.icon> <Icon kind=Icon.BentArrow /> </span>
+                  {React.string("recipient")}
+                </span>
+                <span> {ReasonReact.string("Memo")} </span>
+                <span className=Css.(style([textAlign(`right)]))>
+                  {ReasonReact.string("Date / Amount")}
+                </span>
+              </div>
+              <div className=Styles.body>
+                {Array.map(
+                  ~f=
+                    transaction =>
+                      <div className=Styles.row>
+                        <TransactionCell transaction />
+                      </div>,
+                  transactions,
+                )
+                |> React.array}
+              </div>
+            </>
+          }
+        }
+      }
     </TransactionsQuery>
   </div>;
 };
