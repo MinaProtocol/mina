@@ -1,0 +1,8 @@
+(library
+  (name sonic_prototype)
+  (modules srs commitment_scheme laurent test_laurent)
+  (inline_tests)
+  (preprocess (pps ppx_inline_test))
+  (libraries core snarkette)
+)
+  

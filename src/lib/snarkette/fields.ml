@@ -54,6 +54,8 @@ module type Fp_intf = sig
   val is_square : t -> bool
 
   val sqrt : t -> t
+
+  val ( ** ) : t -> nat -> t
 end
 
 module type Extension_intf = sig
