@@ -24,7 +24,7 @@ module type Basic = sig
   module Stable : sig
     module V1 : sig
       type nonrec t = t
-      [@@deriving bin_io, sexp, compare, eq, hash, yojson, version]
+      [@@deriving bin_io, sexp, compare, hash, yojson, version]
 
       include Hashable_binable with type t := t
 
@@ -83,7 +83,7 @@ struct
     module V1 = struct
       module T = struct
         type t = Pedersen.Digest.Stable.V1.t
-        [@@deriving bin_io, sexp, eq, compare, hash, yojson, version]
+        [@@deriving bin_io, sexp, compare, hash, yojson, version]
       end
 
       include T
