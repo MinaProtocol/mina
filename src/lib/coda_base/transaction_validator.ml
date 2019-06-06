@@ -64,7 +64,7 @@ module Hashless_ledger = struct
     failwith "hashless_ledger: bug in transaction_logic, who is calling undo?"
 
   (* Without undo validating that the hashes match, Transaction_logic doesn't really care what this is. *)
-  let merkle_root t = Ledger_hash.empty_hash
+  let merkle_root _t = Ledger_hash.empty_hash
 
   let create l =
     {base= l; overlay= Hashtbl.create (module Public_key.Compressed)}
@@ -76,8 +76,6 @@ module Hashless_ledger = struct
 end
 
 include Transaction_logic.Make (Hashless_ledger)
-
-type ledger = Hashless_ledger.t
 
 let create = Hashless_ledger.create
 
