@@ -11,8 +11,7 @@ module Styles = {
       gridTemplateColumns([`rem(16.), `fr(1.), `px(200)]),
       gridGap(Theme.Spacing.defaultSpacing),
       alignItems(`flexStart),
-      marginLeft(`rem(0.25)),
-      padding2(~h=`rem(0.75), ~v=`zero),
+      padding2(~h=`rem(1.), ~v=`zero),
       borderBottom(`px(1), `solid, Theme.Colors.savilleAlpha(0.1)),
       lastChild([borderBottom(`px(0), `solid, white)]),
     ]);
@@ -24,6 +23,7 @@ module Styles = {
       height(`rem(2.)),
       alignItems(`center),
       color(Theme.Colors.slate),
+      userSelect(`none),
     ]);
 
   let body =
@@ -97,7 +97,7 @@ let make = () => {
     <div
       className={Css.merge([
         Styles.row,
-        Theme.Text.smallHeader,
+        Theme.Text.Header.h6,
         Styles.headerRow,
       ])}>
       <span className=Css.(style([display(`flex), alignItems(`center)]))>
@@ -107,13 +107,13 @@ let make = () => {
       </span>
       <span> {ReasonReact.string("Memo")} </span>
       <span className=Css.(style([textAlign(`right)]))>
-        {ReasonReact.string("Transaction")}
+        {ReasonReact.string("Date / Amount")}
       </span>
     </div>
     <TransactionsQuery variables=transactionQuery##variables>
       {response =>
          switch (response.result) {
-         | Loading => React.string("...") /* TODO replace with a spinner */
+         | Loading => <Loader.Page><Loader /></Loader.Page>
          | Error(err) => React.string(err##message) /* TODO format this error message */
          | Data(data) =>
            <div className=Styles.body>

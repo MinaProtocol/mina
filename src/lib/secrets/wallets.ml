@@ -58,6 +58,12 @@ let generate_new t : Public_key.Compressed.t Deferred.t =
   Public_key.Compressed.Table.add_exn t.cache ~key:pk ~data:keypair ;
   pk
 
+let delete ({cache; _} as t : t) (pk : Public_key.Compressed.t) :
+    (unit, [`Not_found]) Deferred.Result.t =
+  Hashtbl.remove cache pk ;
+  Deferred.Or_error.try_with (fun () -> Unix.remove (get_path t pk))
+  |> Deferred.Result.map_error ~f:(fun _ -> `Not_found)
+
 let pks ({cache; _} : t) = Public_key.Compressed.Table.keys cache
 
 let find ({cache; _} : t) ~needle =
@@ -83,12 +89,35 @@ let%test_module "wallets" =
       Async.Thread_safe.block_on_async_exn (fun () ->
           File_system.with_temp_dir "/tmp/coda-wallets-test" ~f:(fun path ->
               let%bind wallets = load ~logger ~disk_location:path in
-              let%bind kp1 = generate_new wallets in
-              let%bind kp2 = generate_new wallets in
+              let%bind pk1 = generate_new wallets in
+              let%bind pk2 = generate_new wallets in
               let keys = Set.of_list (pks wallets) in
-              assert (Set.mem keys kp1 && Set.mem keys kp2) ;
+              assert (Set.mem keys pk1 && Set.mem keys pk2) ;
               (* Get wallets again from scratch *)
               let%map wallets = load ~logger ~disk_location:path in
               let keys = Set.of_list (pks wallets) in
-              assert (Set.mem keys kp1 && Set.mem keys kp2) ) )
+              assert (Set.mem keys pk1 && Set.mem keys pk2) ) )
+
+    let%test_unit "create wallet then delete it" =
+      Async.Thread_safe.block_on_async_exn (fun () ->
+          File_system.with_temp_dir "/tmp/coda-wallets-test" ~f:(fun path ->
+              let%bind wallets = load ~logger ~disk_location:path in
+              let%bind pk = generate_new wallets in
+              let keys = Set.of_list (pks wallets) in
+              assert (Set.mem keys pk) ;
+              match%map delete wallets pk with
+              | Ok () ->
+                  assert (Option.is_none @@ find wallets ~needle:pk)
+              | Error _ ->
+                  failwith "unexpected" ) )
+
+    let%test_unit "Unable to find wallet" =
+      Async.Thread_safe.block_on_async_exn (fun () ->
+          File_system.with_temp_dir "/tmp/coda-wallets-test" ~f:(fun path ->
+              let%bind wallets = load ~logger ~disk_location:path in
+              let keypair = Keypair.create () in
+              let%map result =
+                delete wallets (Public_key.compress @@ keypair.public_key)
+              in
+              assert (Result.is_error result) ) )
   end )
