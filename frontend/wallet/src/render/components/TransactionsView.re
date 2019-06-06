@@ -34,6 +34,20 @@ module Styles = {
     ]);
 
   let icon = style([opacity(0.5), height(`rem(1.5))]);
+
+  let alertContainer =
+    style([
+      display(`flex),
+      height(`percent(100.)),
+      alignItems(`center),
+      justifyContent(`center),
+    ]);
+
+  let noTransactionsAlert =
+    style([
+      width(`px(348)),
+      height(`px(80)),
+    ]);
 };
 
 module Transactions = [%graphql
@@ -93,7 +107,18 @@ let extractTransactions: Js.t('a) => array(TransactionCell.Transaction.t) =
 [@react.component]
 let make = () => {
   let transactionQuery = Transactions.make(~publicKey="123", ());
-  /* let emptyTransactionsView =  */
+  let emptyTransactionsView = 
+    <div className=Styles.alertContainer>
+      <div className=Styles.noTransactionsAlert>
+        <Alert
+          kind=`Info
+          message={|Your Coda wallet is empty!
+            Once you've sent or received Coda, 
+            your transactions will appear here.
+          |}
+        />
+      </div>
+    </div>;
   <div className=Styles.container>
     <TransactionsQuery variables=transactionQuery##variables>
       {response =>
@@ -102,9 +127,8 @@ let make = () => {
         | Error(err) => React.string(err##message) /* TODO format this error message */
         | Data(data) =>
           let transactions = extractTransactions(data);
-          Js.log(transactions);
           switch (Array.length(transactions)) {
-          | 0 => <>{React.string("No Transactions :(")}</>
+          | 0 => emptyTransactionsView 
           | _ =>
             <>  
               <div
@@ -112,13 +136,16 @@ let make = () => {
                   Styles.row,
                   Theme.Text.Header.h6,
                   Styles.headerRow,
-                ])}>
+                ])}
+              >
                 <span className=Css.(style([display(`flex), alignItems(`center)]))>
                   {React.string("Sender")}
                   <span className=Styles.icon> <Icon kind=Icon.BentArrow /> </span>
-                  {React.string("recipient")}
+                  {React.string("Recipient")}
                 </span>
-                <span> {ReasonReact.string("Memo")} </span>
+                <span>
+                  {ReasonReact.string("Memo")}
+                </span>
                 <span className=Css.(style([textAlign(`right)]))>
                   {ReasonReact.string("Date / Amount")}
                 </span>
@@ -127,6 +154,7 @@ let make = () => {
                 {Array.map(
                   ~f=
                     transaction =>
+                      /* TODO(PM): Add unique key here for transaction */
                       <div className=Styles.row>
                         <TransactionCell transaction />
                       </div>,
