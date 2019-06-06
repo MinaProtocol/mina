@@ -17,13 +17,27 @@ module Styles = {
     ]);
 
   let headerRow =
+    merge([
+      row,
+      Theme.Text.Header.h6,
+      style([
+        padding2(~v=`px(0), ~h=`rem(1.)),
+        textTransform(`uppercase),
+        height(`rem(2.)),
+        alignItems(`center),
+        color(Theme.Colors.slate),
+        userSelect(`none),
+      ]),
+    ]);
+
+  let sectionHeader =
     style([
-      padding2(~v=`px(0), ~h=`rem(1.)),
+      padding2(~v=`rem(0.25), ~h=`rem(1.)),
       textTransform(`uppercase),
-      height(`rem(2.)),
       alignItems(`center),
-      color(Theme.Colors.slate),
-      userSelect(`none),
+      color(Theme.Colors.slateAlpha(0.7)),
+      backgroundColor(Theme.Colors.midnightAlpha(0.06)),
+      marginTop(`rem(1.5)),
     ]);
 
   let body =
@@ -38,8 +52,8 @@ module Styles = {
 
 module Transactions = [%graphql
   {|
-    query transactions($publicKey: String!) {
-      blocks(filter: { relatedTo: $publicKey }) {
+    query transactions($after: String, $publicKey: String!) {
+      blocks(first: 5, after: $after, filter: { relatedTo: $publicKey }) {
         nodes {
           creator @bsDecoder(fn: "Apollo.Decoders.publicKey")
           protocolState {
@@ -63,6 +77,10 @@ module Transactions = [%graphql
             }
             coinbase @bsDecoder(fn: "Apollo.Decoders.int64")
           }
+        }
+        pageInfo {
+          hasNextPage
+          lastCursor
         }
       }
     }
@@ -92,14 +110,35 @@ let extractTransactions: Js.t('a) => array(TransactionCell.Transaction.t) =
 
 [@react.component]
 let make = () => {
-  let transactionQuery = Transactions.make(~publicKey="123", ());
+  let activeWallet = Hooks.useActiveWallet();
+  let activeWalletKey =
+    Option.map(~f=PublicKey.toString, activeWallet)
+    |> Option.withDefault(~default="");
+  let transactionQuery = Transactions.make(~publicKey="123", ~after="", ());
+  let (isFetchingMore, setFetchingMore) = React.useState(() => false);
+
+  let keyForTransaction = (data, index) =>
+    Option.withDefault(~default="", data##blocks##pageInfo##lastCursor)
+    ++ string_of_int(index);
+
+  let updateQuery: ReasonApolloQuery.updateQueryT = [%bs.raw
+    {| function (prevResult, { fetchMoreResult }) {
+      const newBlocks = fetchMoreResult.blocks.nodes;
+      const pageInfo = fetchMoreResult.blocks.pageInfo;
+      return newBlocks.length > 0 ?
+        {
+          blocks: {
+            __typename: "BlockConnection",
+            nodes: [...prevResult.blocks.nodes, ...newBlocks],
+            pageInfo,
+          },
+        } : prevResult
+    }
+    |}
+  ];
+
   <div className=Styles.container>
-    <div
-      className={Css.merge([
-        Styles.row,
-        Theme.Text.Header.h6,
-        Styles.headerRow,
-      ])}>
+    <div className=Styles.headerRow>
       <span className=Css.(style([display(`flex), alignItems(`center)]))>
         {React.string("Sender")}
         <span className=Styles.icon> <Icon kind=Icon.BentArrow /> </span>
@@ -113,19 +152,44 @@ let make = () => {
     <TransactionsQuery variables=transactionQuery##variables>
       {response =>
          switch (response.result) {
-         | Loading => <Loader.Page><Loader /></Loader.Page>
+         | Loading => <Loader.Page> <Loader /> </Loader.Page>
          | Error(err) => React.string(err##message) /* TODO format this error message */
          | Data(data) =>
            <div className=Styles.body>
-             {Array.map(
+             {Array.mapi(
                 ~f=
-                  transaction =>
-                    <div className=Styles.row>
+                  (i, transaction) =>
+                    <div
+                      className=Styles.row key={keyForTransaction(data, i)}>
                       <TransactionCell transaction />
                     </div>,
                 extractTransactions(data),
               )
               |> React.array}
+             {!isFetchingMore
+                ? <Waypoint
+                    onEnter={_ => {
+                      setFetchingMore(_ => true);
+                      let moreTransactions =
+                        Transactions.make(~publicKey=activeWalletKey, ());
+                      let _ =
+                        response.fetchMore(
+                          ~variables=moreTransactions##variables,
+                          ~updateQuery,
+                          (),
+                        )
+                        |> Js.Promise.then_(_ => {
+                             setFetchingMore(_ => false);
+                             Js.Promise.resolve();
+                           });
+                      ();
+                    }}
+                    topOffset="100px"
+                  />
+                : <div
+                    className=Css.(style([margin2(~v=`rem(1.5), ~h=`auto)]))>
+                    <Loader />
+                  </div>}
            </div>
          }}
     </TransactionsQuery>
