@@ -129,8 +129,6 @@ let%test_module "network pool test" =
     module Mock_work = struct
       module T = struct
         type t = Int.t [@@deriving sexp, hash, compare, yojson]
-
-        let gen = Int.quickcheck_generator
       end
 
       include T

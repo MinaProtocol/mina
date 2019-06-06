@@ -6,6 +6,5 @@
  (libraries core async pipe_lib snark_pool transition_frontier)
  (preprocess
   (pps ppx_jane ppx_coda ppx_deriving.eq bisect_ppx ppx_deriving_yojson -- -conditional))
- (flags :standard -short-paths -warn-error -6-27-34-32-9-58)
  (synopsis
    "Network pool is an interface that processes incoming diffs and then broadcasts them"))
