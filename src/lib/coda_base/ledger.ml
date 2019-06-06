@@ -16,8 +16,6 @@ module Ledger_inner = struct
   module Kvdb : Intf.Key_value_database = Rocksdb.Database
 
   module Storage_locations : Intf.Storage_locations = struct
-    let stack_db_file = "coda_stack_db"
-
     let key_value_db_dir = "coda_key_value_db"
   end
 
