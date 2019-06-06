@@ -112,9 +112,9 @@ let make = () => {
       <div className=Styles.noTransactionsAlert>
         <Alert
           kind=`Info
-          message={|Your Coda wallet is empty!
-            Once you've sent or received Coda, 
-            your transactions will appear here.
+          message={|
+            Your Coda wallet is empty. Once you receive 
+            Coda, your transactions will appear here.
           |}
         />
       </div>
