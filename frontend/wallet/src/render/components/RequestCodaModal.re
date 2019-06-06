@@ -21,17 +21,21 @@ module Styles = {
   };
     
   [@react.component]
-  let make = (~wallets, ~setModalState, ~activePublicKey) => {
+  let make = (~wallets, ~setModalState) => {
+    let activePublicKey = Hooks.useActiveWallet();
     let (settings, _updateAddressBook) = React.useContext(AddressBookProvider.context);
     let (selectedWallet, setSelectedWallet) = React.useState(() => activePublicKey);
-    let keyString = PublicKey.toString(selectedWallet);
-    /* let keyString = switch (selectedWallet) {
+    /* let keyString = PublicKey.toString(selectedWallet); */
+    let keyString = switch (selectedWallet) {
       | None => ""
-      | Some(wallet) => PublicKey.toString(wallet)
-    }; */
+      | Some(selectedWallet) => PublicKey.toString(selectedWallet)
+    };
+    let handleClipboard = _ =>
+      Bindings.Navigator.Clipboard.writeTextTask(keyString)
+      |> Task.perform(~f=() => setModalState(_ => false));
     <Modal 
       title="Request Coda"
-      onRequestClose={() => setModalState(_ => None)}
+      onRequestClose={() => setModalState(_ => false)}
     >
       <div
         className=Css.(
@@ -50,8 +54,8 @@ module Styles = {
           */
           <Dropdown
             label="To"
-            value=selectedWallet
-            onChange={value => setSelectedWallet(_ => value)}
+            value={selectedWallet}
+            onChange={value => setSelectedWallet(_ => Some(value))}
             options={
               wallets
               |> Array.map(~f=wallet =>
@@ -64,33 +68,29 @@ module Styles = {
             }
           />
           <Spacer height=1. />
-          <div className=Styles.publicKey>
-            {React.string(keyString)}
-          </div>
+          {switch (selectedWallet) {
+          | None => React.null
+          | Some(_selectedWallet) => 
+            <div className=Styles.publicKey>
+              {React.string(keyString)}
+            </div>
+          }}
         </div>
         <div className=Css.(style([display(`flex)]))>
           <Button
             label="Cancel"
             style=Button.Gray
-            onClick={_ => setModalState(_ => None)}
+            onClick={_ => setModalState(_ => false)}
           />
           <Spacer width=1. />
           <Button
             label="Copy public key"
             style=Button.Blue
-            onClick={_ => {
-              Bindings.Navigator.Clipboard.writeText(keyString)
-              |> Js.Promise.then_(_value => {
-                  Js.log("Public key copied to clipboard");
-                  Js.Promise.resolve(1);
-                })
-              |> Js.Promise.catch(err => {
-                  Js.log2("Error copying to clipboard", err);
-                  Js.Promise.resolve(2);
-                })
-              |> ignore;
-              setModalState(_ => None);
+            disabled={switch (selectedWallet) {
+            | None => true
+            | Some(_selectedWallet) => false
             }}
+            onClick=handleClipboard
           />
         </div>
       </div>

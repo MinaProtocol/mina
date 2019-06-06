@@ -83,9 +83,7 @@ module SendPaymentMutation = ReasonApollo.CreateMutation(SendPayment);
 
 [@react.component]
 let make = () => {
-  let (downloading, setDownloadState) = React.useState(() => false);
-  let (modalState, setModalState) = React.useState(() => None);
-  let activePublicKey = Hooks.useActiveWallet();
+  let (modalState, setModalState) = React.useState(() => false);
   <div className=Styles.footer>
     <StakingSwitch />
     <div className=Styles.footerButtons>
@@ -99,18 +97,17 @@ let make = () => {
             <Button
               label="Request"
               style=Button.Gray
-              onClick={_ => setModalState(_ => activePublicKey)}
+              onClick={_ => setModalState(_ => true)}
             />
             {switch (modalState) {
-              | None => React.null
-              | Some(activePublicKey) =>
+              | false => React.null
+              | true =>
                 <RequestCodaModal
                   wallets={Array.map(
                     ~f=Wallet.ofGraphqlExn,
                     data##ownedWallets,
                   )}
                   setModalState
-                  activePublicKey
                 />
             }}
             <Spacer width=1. />
