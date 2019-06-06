@@ -25,7 +25,6 @@ module Styles = {
     let activePublicKey = Hooks.useActiveWallet();
     let (settings, _updateAddressBook) = React.useContext(AddressBookProvider.context);
     let (selectedWallet, setSelectedWallet) = React.useState(() => activePublicKey);
-    /* let keyString = PublicKey.toString(selectedWallet); */
     let keyString = switch (selectedWallet) {
       | None => ""
       | Some(selectedWallet) => PublicKey.toString(selectedWallet)
