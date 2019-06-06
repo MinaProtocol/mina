@@ -340,7 +340,8 @@ let start_payment_check logger root_pipe workers (testnet : Api.t) =
                         [ ("worker_id", `Int worker_id)
                         ; ("user_cmd", User_command.to_yojson user_cmd) ]
                       "transaction $user_cmd took too long to get into the \
-                       root of node $worker_id" ;
+                       root of node $worker_id. Length expected: %d got: %d"
+                      expected_deadline length ;
                     exit 9 |> ignore ) ) ;
               List.iter user_commands ~f:(fun user_cmd ->
                   Hashtbl.change user_cmds_under_inspection user_cmd

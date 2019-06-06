@@ -253,7 +253,7 @@ module type Transaction_snark_scan_state_generalized_intf = sig
   end
 
   module Space_partition : sig
-    type t = {first: int; second: int option} [@@deriving sexp]
+    type t = {first: int * int; second: (int * int) option} [@@deriving sexp]
   end
 
   module Job_view : sig
@@ -299,59 +299,65 @@ module type Transaction_snark_scan_state_generalized_intf = sig
 
   val empty : unit -> t
 
-  val capacity : t -> int
-
   val fill_work_and_enqueue_transactions :
        t
     -> Transaction_with_witness.t list
     -> transaction_snark_work list
-    -> (ledger_proof * transaction list) option Or_error.t
+    -> ((ledger_proof * transaction list) option * t) Or_error.t
 
   val latest_ledger_proof :
     t -> (Ledger_proof_with_sok_message.t * transaction list) option
 
   val free_space : t -> int
 
-  val next_k_jobs : t -> k:int -> Available_job.t list Or_error.t
-
-  val next_jobs : t -> Available_job.t list Or_error.t
-
-  val next_jobs_sequence : t -> Available_job.t Sequence.t Or_error.t
-
   val base_jobs_on_latest_tree : t -> Transaction_with_witness.t list
-
-  val is_valid : t -> bool
 
   val hash : t -> staged_ledger_aux_hash
 
-  val staged_transactions : t -> ledger_undo list
+  (** All the staged transactions in the reverse order of their application (Latest first)*)
+  val staged_transactions_with_info_rev : t -> ledger_undo list
 
-  val all_transactions : t -> transaction list Or_error.t
+  (** All the transactions in the order in which they were applied*)
+  val staged_transactions : t -> transaction list Or_error.t
 
-  val extract_from_job :
-       Available_job.t
-    -> ( ledger_undo * transaction_snark_statement * transaction_witness
-       , ledger_proof * ledger_proof )
-       Either.t
-
-  val copy : t -> t
-
+  (** Available space and the corresponding required work-count in one and/or two trees (if the slots to be occupied are in two different trees)*)
   val partition_if_overflowing : t -> Space_partition.t
 
   val statement_of_job : Available_job.t -> transaction_snark_statement option
 
-  val current_job_sequence_number : t -> int
-
   val snark_job_list_json : t -> string
 
-  val all_work_to_do :
-    t -> transaction_snark_statement list Sequence.t Or_error.t
+  (** All the proof bundles *)
+  val all_work_statements : t -> transaction_snark_statement list Sequence.t
 
-  val current_job_count : t -> int
+  (** Required proof bundles for a certain number of slots *)
+  val required_work_pairs : t -> slots:int -> Available_job.t list list
 
-  val work_capacity : int
+  (**K proof bundles*)
+  val k_work_pairs_for_new_diff : t -> k:int -> Available_job.t list list
 
-  val next_on_new_tree : t -> bool Or_error.t
+  (** All the proof bundles for 2^transaction_capacity_log2 slots that can be used up in one diff *)
+  val work_statements_for_new_diff :
+    t -> transaction_snark_statement list Sequence.t
+
+  (** True if the latest tree is full and transactions would be added on to a new tree *)
+  val next_on_new_tree : t -> bool
+
+  (** All the proof bundles for snark workers*)
+  val all_work_pairs_exn :
+       t
+    -> ( ( transaction_snark_statement
+         , transaction
+         , transaction_witness
+         , ledger_proof )
+         Snark_work_lib.Work.Single.Spec.t
+       * ( transaction_snark_statement
+         , transaction
+         , transaction_witness
+         , ledger_proof )
+         Snark_work_lib.Work.Single.Spec.t
+         option )
+       list
 end
 
 module type Transaction_snark_scan_state_intf =
@@ -435,12 +441,10 @@ module type Staged_ledger_generalized_intf = sig
     end
 
     module Space_partition : sig
-      type t = {first: int; second: int option} [@@deriving sexp]
+      type t = {first: int * int; second: (int * int) option} [@@deriving sexp]
     end
 
     val hash : t -> staged_ledger_aux_hash
-
-    val is_valid : t -> bool
 
     val empty : unit -> t
 
@@ -448,14 +452,12 @@ module type Staged_ledger_generalized_intf = sig
 
     val partition_if_overflowing : t -> Space_partition.t
 
-    val all_work_to_do :
-      t -> transaction_snark_statement list Sequence.t Or_error.t
+    val all_work_statements : t -> transaction_snark_work_statement Sequence.t
 
-    val all_transactions : t -> transaction list Or_error.t
+    val work_statements_for_new_diff :
+      t -> transaction_snark_work_statement Sequence.t
 
-    val work_capacity : int
-
-    val current_job_count : t -> int
+    val staged_transactions : t -> transaction list Or_error.t
   end
 
   module Staged_ledger_error : sig
@@ -465,6 +467,7 @@ module type Staged_ledger_generalized_intf = sig
       | Invalid_proof of
           ledger_proof * transaction_snark_statement * compressed_public_key
       | Pre_diff of Pre_diff_info.Error.t
+      | Insufficient_work of string
       | Unexpected of Error.t
     [@@deriving sexp]
 
@@ -542,6 +545,17 @@ module type Staged_ledger_generalized_intf = sig
                            -> transaction_snark_work_checked option)
     -> valid_diff
 
+  val statement_exn : t -> [`Non_empty of transaction_snark_statement | `Empty]
+
+  val of_scan_state_pending_coinbases_and_snarked_ledger :
+       logger:Logger.t
+    -> verifier:verifier
+    -> scan_state:Scan_state.t
+    -> snarked_ledger:ledger
+    -> expected_merkle_root:ledger_hash
+    -> pending_coinbases:pending_coinbase
+    -> t Or_error.t Deferred.t
+
   val all_work_pairs_exn :
        t
     -> ( ( transaction_snark_statement
@@ -556,17 +570,6 @@ module type Staged_ledger_generalized_intf = sig
          Snark_work_lib.Work.Single.Spec.t
          option )
        list
-
-  val statement_exn : t -> [`Non_empty of transaction_snark_statement | `Empty]
-
-  val of_scan_state_pending_coinbases_and_snarked_ledger :
-       logger:Logger.t
-    -> verifier:verifier
-    -> scan_state:Scan_state.t
-    -> snarked_ledger:ledger
-    -> expected_merkle_root:ledger_hash
-    -> pending_coinbases:pending_coinbase
-    -> t Or_error.t Deferred.t
 end
 
 module type Staged_ledger_intf =
