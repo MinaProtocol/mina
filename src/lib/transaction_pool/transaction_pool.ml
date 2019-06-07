@@ -61,6 +61,8 @@ struct
     ; mutable diff_reader: unit Deferred.t Option.t
     ; mutable best_tip_ledger: Base_ledger.t option }
 
+  let all_from_user {pool; _} = Indexed_pool.all_from_user pool
+
   let transactions' p =
     Sequence.unfold ~init:p ~f:(fun pool ->
         match Indexed_pool.get_highest_fee pool with

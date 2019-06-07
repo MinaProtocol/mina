@@ -78,6 +78,11 @@ module type Main_intf = sig
       type t
 
       val add : t -> User_command.t -> unit Deferred.t
+
+      val all_from_user :
+           t
+        -> Public_key.Compressed.t
+        -> User_command.With_valid_signature.t list
     end
 
     module Staged_ledger :
@@ -347,6 +352,8 @@ module Make_inputs0 (Init : Init_intf) = struct
     (* TODO: This causes the signature to get checked twice as it is checked
        below before feeding it to add *)
     let add t txn = apply_and_broadcast t (Envelope.Incoming.local [txn])
+
+    let all_from_user t = Pool.all_from_user (pool t)
   end
 
   module Transaction_pool_diff = Transaction_pool.Pool.Diff

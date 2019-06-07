@@ -820,6 +820,21 @@ module Make (Commands : Coda_commands.Intf) = struct
   module Queries = struct
     open Schema
 
+    let pooled_user_commands =
+      result_field "pooledUserCommands"
+        ~doc:"Retrieve all the user commands sent by public key publicKey"
+        ~typ:(non_null @@ list @@ non_null Types.user_command)
+        ~args:Arg.[arg "publicKey" ~typ:(non_null string)]
+        ~resolve:(fun {ctx= coda; _} () pk_string ->
+          let open Result.Let_syntax in
+          let%map pk =
+            Types.Arguments.public_key ~name:"publicKey" pk_string
+          in
+          let transaction_pool = Program.transaction_pool coda in
+          List.map
+            (Transaction_pool.all_from_user transaction_pool pk)
+            ~f:User_command.forget_check )
+
     let sync_state =
       result_field_no_inputs "syncStatus" ~args:[] ~typ:Types.sync_status
         ~resolve:(fun {ctx= coda; _} () ->
@@ -907,7 +922,8 @@ module Make (Commands : Coda_commands.Intf) = struct
       ; current_snark_worker
       ; user_command
       ; blocks
-      ; initial_peers ]
+      ; initial_peers
+      ; pooled_user_commands ]
   end
 
   module Subscriptions = struct
