@@ -13,7 +13,7 @@ module Styles = {
       height(Theme.Spacing.footerHeight),
       justifyContent(`spaceBetween),
       alignItems(`center),
-      padding2(~v=`zero, ~h=`rem(2.)),
+      padding2(~v=`zero, ~h=`rem(1.25)),
       borderTop(`px(1), `solid, Theme.Colors.borderColor),
     ]);
 };
@@ -30,7 +30,7 @@ module StakingSwitch = {
           alignItems(`center),
         ])
       )>
-      <Toggle value=staking onChange={_e => setStaking(staking => !staking)} />
+      <Toggle value=staking onChange=setStaking />
       <span
         className=Css.(
           merge([
