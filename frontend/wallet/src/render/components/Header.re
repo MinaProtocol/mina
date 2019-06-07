@@ -34,7 +34,7 @@ module Styles = {
       display(`flex),
       alignItems(`center),
       justifyContent(`spaceBetween),
-    ]);    
+    ]);
 
   let deactivatedSettings =
     merge([
