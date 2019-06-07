@@ -1,7 +1,6 @@
 (library
  (name receipt_chain_database_lib)
   (public_name receipt_chain_database_lib)
-  (flags (:standard -short-paths -warn-error -39))
   (library_flags (-linkall))
   (libraries core key_value_database ppx_deriving_yojson.runtime yojson)
   (inline_tests)

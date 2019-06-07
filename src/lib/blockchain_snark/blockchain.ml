@@ -3,13 +3,6 @@ open Coda_base
 open Coda_state
 open Module_version
 
-module type S = sig
-  type t = {state: Protocol_state.Value.t; proof: Proof.Stable.V1.t}
-  [@@deriving bin_io, fields, sexp]
-
-  val create : state:Protocol_state.Value.t -> proof:Proof.Stable.V1.t -> t
-end
-
 module Stable = struct
   module V1 = struct
     module T = struct
