@@ -290,16 +290,15 @@ module Schnorr
   module Checked = struct
     open Impl.Let_syntax
 
-    let compress ((x, _) : Curve.var) =
-      Field.Checked.choose_preimage_var x ~length:Field.size_in_bits
     let to_bits x =
       Field.Checked.choose_preimage_var x ~length:Field.size_in_bits
-    let to_triples x = Fold.to_list Fold.(group3 ~default:Boolean.false_ x)
+    let compress ((x, _) : Curve.var) = to_bits x
+    let to_triples x = Fold.to_list Fold.(group3 ~default:Boolean.false_ (of_list x))
 
     let y_even ((_, y) : Curve.var) =
       let%map bs = Field.Checked.unpack_full y in
       List.hd_exn (Bitstring_lib.Bitstring.Lsb_first.to_list bs)
-      >>= Boolean.Assert.(( = ) Boolean.true_ )
+      |>  Boolean.Assert.(( = ) Boolean.true_ )
 
 
     (* returning r_point as a representable point ensures it is nonzero so the nonzero
@@ -311,19 +310,22 @@ module Schnorr
         ((r, s) : Signature.var)
         (public_key : Public_key.var)
         (m : Message.var) =
-    let%bind nonce = to_triples ((to_bits r) @ (compress pk)) in
+    let%bind pk_bits = compress public_key in
+    let%bind r_bits = to_bits r in
+    let nonce = to_triples (r_bits @ pk_bits) in
     let%bind e = Message.hash_checked m ~nonce in
         (* s * g - e * public_key *)
         let%bind e_pk =
-          Curve.Checked.scale shifted public_key
+          Curve.Checked.scale shifted (Curve.Checked.negate public_key)
             (Curve.Scalar.Checked.to_bits e)
-            ~init:Shifted.zero in
+            ~init:Shifted.zero
+        in
         let%bind s_g_e_pk =
           Curve.Checked.scale_known shifted Curve.one
             (Curve.Scalar.Checked.to_bits s)
-            ~init:(Curve.Checked.negate e_pk)
+            ~init:e_pk
         in
-        compress (Shifted.unshift_nonzero s_g_e_pk)
+        Shifted.unshift_nonzero s_g_e_pk >>| fst
 
     let%snarkydef verifies shifted ((r, s) as signature) pk m =
       verification shifted signature pk m
