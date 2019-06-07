@@ -3,8 +3,6 @@ open Async_kernel
 open Pipe_lib
 
 module Ident = struct
-  type t = int ref
-
   let state = ref 0
 
   let next () =
@@ -24,8 +22,6 @@ module Time_queue = struct
     { mutable curr_time: Time.Span.t
     ; pending_actions: ('action * Time.Span.t) Heap.t
     ; mutable on_new_action: unit Ivar.t option }
-
-  let size t = Heap.length t.pending_actions
 
   let handle_in_future t ~after action =
     Option.iter t.on_new_action ~f:(fun ivar ->
@@ -208,7 +204,7 @@ struct
           (Or_error.error_string
              (Printf.sprintf "Unknown recipient %s"
                 (Peer.sexp_of_t recipient |> Sexp.to_string_hum)))
-    | Some (r, w) ->
+    | Some (_r, _w) ->
         Time_queue.handle_in_future t.q
           ~after:(Message_delay.delay message)
           (Msg (message, recipient)) ;
@@ -333,7 +329,7 @@ struct
       (Timer_transport)
 
   module Identifier = struct
-    type t = Trivial_peer.t [@@deriving eq]
+    type t = Trivial_peer.t
 
     include MyNode.Identifier
   end
@@ -363,7 +359,7 @@ struct
               Some b
           | Some a, None ->
               Some a
-          | Some a, Some b ->
+          | Some a, Some _ ->
               Some a
         in
         let choose3 (a : 'a Deferred.t) (a_imm : 'a option) (b : 'b Deferred.t)
@@ -402,7 +398,7 @@ struct
                     acc
                 | None, x when MyNode.is_ready x ->
                     Some x
-                | None, x ->
+                | None, _ ->
                     acc )
           in
           Option.value maybe_real ~default:n
@@ -473,13 +469,11 @@ let%test_module "Distributed_dsl" =
     end
 
     module Message_delay = struct
-      type message = Message.t
-
       let delay _ = Time.Span.of_ms 500.
     end
 
     module Message_label = struct
-      type label = Send_msg [@@deriving eq, enum, sexp, compare, hash]
+      type label = Send_msg [@@deriving enum, sexp, compare, hash]
 
       module T = struct
         type t = label [@@deriving compare, hash, sexp]
@@ -530,9 +524,9 @@ let%test_module "Distributed_dsl" =
             , (* no message handlers *)
               [ on Init
                   (function Start -> true | _ -> false)
-                  ~f:(fun t state ->
+                  ~f:(fun t _state ->
                     timeout' t Spawn_msg (Time.Span.of_sec 10.)
-                      ~f:(fun t state ->
+                      ~f:(fun t _state ->
                         let%map () =
                           send_multi_exn t
                             ~recipients:
@@ -546,7 +540,7 @@ let%test_module "Distributed_dsl" =
             let open Machine.MyNode in
             ( [ msg Send_msg
                   (Fn.const (Fn.const true))
-                  ~f:(fun t (Msg i) -> function Wait_msg -> return (Got_msg i)
+                  ~f:(fun _t (Msg i) -> function Wait_msg -> return (Got_msg i)
                     | m -> return m ) ]
             , [ on Init
                   (function Start -> true | _ -> false)
@@ -555,7 +549,7 @@ let%test_module "Distributed_dsl" =
                   (function Wait_msg -> true | _ -> false)
                   ~f:(fun t state ->
                     timeout' t Timeout_message (Time.Span.of_sec 20.)
-                      ~f:(fun t -> function
+                      ~f:(fun _t -> function
                       | Got_msg _ as m -> return m | _ -> return Timeout ) ;
                     return state )
               ; on Failure_case

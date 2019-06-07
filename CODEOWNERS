@@ -53,7 +53,6 @@
 /src/lib/dyn_array/ @johnwu93
 /src/lib/empty_hashes/ @johnwu93
 /src/lib/envelope/ @psteckler @cmr
-/src/lib/file_stack_database/ @johnwu93 @bkase
 /src/lib/file_system/ @johnwu93 @bkase
 /src/lib/genesis_ledger/ @nholland94 @bkase @cmr
 /src/lib/global_signer_private_key/ @nholland94

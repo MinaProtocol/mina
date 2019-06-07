@@ -48,6 +48,20 @@ module Styles = {
     ]);
 
   let icon = style([opacity(0.5), height(`rem(1.5))]);
+
+  let alertContainer =
+    style([
+      display(`flex),
+      height(`percent(100.)),
+      alignItems(`center),
+      justifyContent(`center),
+    ]);
+
+  let noTransactionsAlert =
+    style([
+      width(`px(348)),
+      height(`px(80)),
+    ]);
 };
 
 module Transactions = [%graphql
@@ -110,6 +124,7 @@ let extractTransactions: Js.t('a) => array(TransactionCell.Transaction.t) =
 
 [@react.component]
 let make = () => {
+<<<<<<< HEAD
   let activeWallet = Hooks.useActiveWallet();
   let activeWalletKey =
     Option.map(~f=PublicKey.toString, activeWallet)
