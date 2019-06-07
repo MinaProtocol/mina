@@ -21,7 +21,6 @@ module Styles = {
       alignItems(`center),
       color(Theme.Colors.slateAlpha(0.7)),
       backgroundColor(Theme.Colors.midnightAlpha(0.06)),
-      marginTop(`rem(1.5)),
     ]);
 
   let body =
@@ -33,10 +32,15 @@ module Styles = {
 };
 
 [@react.component]
-let make = (~transactions, ~pending, ~onLoadMore: unit => Js.Promise.t('a)) => {
+let make = (~blocks, ~pending, ~onLoadMore: unit => Js.Promise.t('a)) => {
   let (isFetchingMore, setFetchingMore) = React.useState(() => false);
 
   <div className=Styles.body>
+    <div className=Styles.sectionHeader>
+      <span className=Theme.Text.Header.h6>
+        {React.string("Pending Transactions")}
+      </span>
+    </div>
     {Array.mapi(
        ~f=
          (i, transaction) =>
@@ -46,13 +50,27 @@ let make = (~transactions, ~pending, ~onLoadMore: unit => Js.Promise.t('a)) => {
        pending,
      )
      |> React.array}
-    {Array.mapi(
+    {Array.map(
        ~f=
-         (i, transaction) =>
-           <div className=Styles.row key={string_of_int(i)}>
-             <TransactionCell transaction />
-           </div>,
-       transactions,
+         ((transactions, stateHash)) =>
+           <>
+             <Spacer height=1.5 />
+             <div className=Styles.sectionHeader>
+               <span className=Theme.Text.Header.h6>
+                 {React.string("Block " ++ stateHash)}
+               </span>
+             </div>
+             {Array.mapi(
+                ~f=
+                  (i, transaction) =>
+                    <div className=Styles.row key={string_of_int(i)}>
+                      <TransactionCell transaction />
+                    </div>,
+                transactions,
+              )
+              |> React.array}
+           </>,
+       blocks,
      )
      |> React.array}
     {!isFetchingMore

@@ -56,7 +56,7 @@ type Transactions {
 
 type Block {
   creator: String! @examples(values: ["PUB_KEY_E9873DF4453213303DA61F2", "PUB_KEY_F1173DF4453213303DA61F2"])
-  stateHash: String!
+  stateHash: String! @examples(values: ["bd6c106462010ba158c428272bb30bd8", "36d14efca6de2774692605f910b852ddf9468418"])
   protocolState: ProtocolState!
   transactions: Transactions!
 }

@@ -41,6 +41,7 @@ module TransactionsQueryString = [%graphql
       blocks(first: 5, after: $after, filter: { relatedTo: $publicKey }) {
         nodes {
           creator @bsDecoder(fn: "Apollo.Decoders.publicKey")
+          stateHash
           protocolState {
             blockchainState {
               date @bsDecoder(fn: "Apollo.Decoders.date")
@@ -93,7 +94,7 @@ module TransactionsQuery = ReasonApollo.CreateQuery(TransactionsQueryString);
  */
 
 type extractedResponse = {
-  blocks: array(array(TransactionCell.Transaction.t)),
+  blocks: array((array(TransactionCell.Transaction.t), string)), // tuple of (transctions, stateHash)
   pending: array(TransactionCell.Transaction.t),
 };
 
@@ -113,7 +114,7 @@ let extractTransactions: Js.t('a) => extractedResponse =
                coinbase: block##transactions##coinbase,
                feeTransfers: block##transactions##feeTransfer,
              });
-           Array.append(userCommands, [|blockReward|]);
+           (Array.append(userCommands, [|blockReward|]), block##stateHash);
          });
 
     let pending =
@@ -173,8 +174,7 @@ let make = () => {
              | Error(err) => React.string(err##message) /* TODO format this error message */
              | Data(data) =>
                let { blocks, pending } = extractTransactions(data);
-               let transactions = Array.concatenate(blocks);
-               switch ((Array.length(transactions), Array.length(pending))) {
+               switch ((Array.length(blocks), Array.length(pending))) {
                | (0, 0) =>
                  <div className=Styles.alertContainer>
                    <Alert
@@ -185,7 +185,7 @@ let make = () => {
                | (_, _) =>
                  <TransactionsList
                    pending
-                   transactions
+                   blocks
                    onLoadMore={() => {
                      let moreTransactions =
                        TransactionsQueryString.make(
