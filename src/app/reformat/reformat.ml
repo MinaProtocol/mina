@@ -28,7 +28,7 @@ let rec fold_over_files ~path ~process_path ~init ~f =
           return acc )
 
 let main dry_run check path =
-  let%bind all =
+  let%bind _all =
     fold_over_files ~path ~init:()
       ~process_path:(fun kind path ->
         match kind with

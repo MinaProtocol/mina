@@ -4,7 +4,6 @@
 open Core
 open Async
 open Coda_base
-open Blockchain_snark
 open Cli_lib
 open Coda_inputs
 open Signature_lib
@@ -106,9 +105,6 @@ let daemon logger =
                snark proof (default: %d)"
               (Currency.Fee.to_int Cli_lib.Fee.default_snark_worker))
          (optional txn_fee)
-     and sexp_logging =
-       flag "sexp-logging" no_arg
-         ~doc:"Use S-expressions in log output, instead of JSON"
      and enable_tracing =
        flag "tracing" no_arg ~doc:"Trace into $config-directory/$pid.trace"
      and limit_connections =
@@ -316,8 +312,6 @@ let daemon logger =
          let commit_id = commit_id
 
          let work_selection = work_selection
-
-         let max_concurrent_connections = max_concurrent_connections
        end in
        let%bind (module Init) = make_init (module Config0) in
        let module M = Coda_inputs.Make_coda (Init) in
@@ -382,7 +376,7 @@ let daemon logger =
        let transaction_database_dir = conf_dir ^/ "transaction" in
        let%bind () = Async.Unix.mkdir ~p:() transaction_database_dir in
        let transaction_database =
-         Auxiliary_database.Transaction_database.create logger
+         Auxiliary_database.Transaction_database.create ~logger
            transaction_database_dir
        in
        trace_database_initialization "transaction_database" __LOC__
@@ -392,7 +386,7 @@ let daemon logger =
        in
        let%bind () = Async.Unix.mkdir ~p:() external_transition_database_dir in
        let external_transition_database =
-         Auxiliary_database.External_transition_database.create logger
+         Auxiliary_database.External_transition_database.create ~logger
            external_transition_database_dir
        in
        let monitor = Async.Monitor.create ~name:"coda" () in

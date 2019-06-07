@@ -1,7 +1,5 @@
 open Core
 open Async
-open Coda_worker
-open Coda_inputs
 open Signature_lib
 
 let name = "coda-shared-prefix-multiproposer-test"
