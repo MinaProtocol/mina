@@ -32,42 +32,6 @@ module Styles = {
     ]);
 };
 
-module TransactionsQueryString = [%graphql
-  {|
-    query transactions($after: String, $publicKey: String!) {
-      blocks(first: 5, after: $after, filter: { relatedTo: $publicKey }) {
-        nodes {
-          creator @bsDecoder(fn: "Apollo.Decoders.publicKey")
-          protocolState {
-            blockchainState {
-              date @bsDecoder(fn: "Apollo.Decoders.date")
-            }
-          }
-          transactions {
-            userCommands {
-              to_: to @bsDecoder(fn: "Apollo.Decoders.publicKey")
-              from @bsDecoder(fn: "Apollo.Decoders.publicKey")
-              amount @bsDecoder(fn: "Apollo.Decoders.int64")
-              fee @bsDecoder(fn: "Apollo.Decoders.int64")
-              memo
-              isDelegation
-              date @bsDecoder(fn: "Apollo.Decoders.date")
-            }
-            feeTransfer {
-              recipient @bsDecoder(fn: "Apollo.Decoders.publicKey")
-              amount @bsDecoder(fn: "Apollo.Decoders.int64")
-            }
-            coinbase @bsDecoder(fn: "Apollo.Decoders.int64")
-          }
-        }
-        pageInfo {
-          hasNextPage
-          lastCursor
-        }
-      }
-    }
-  |}
-];
 [@react.component]
 let make = (~transactions, ~onLoadMore: unit => Js.Promise.t('a)) => {
   let (isFetchingMore, setFetchingMore) = React.useState(() => false);
@@ -86,11 +50,12 @@ let make = (~transactions, ~onLoadMore: unit => Js.Promise.t('a)) => {
        ? <Waypoint
            onEnter={_ => {
              setFetchingMore(_ => true);
-             let _ = onLoadMore()
-                |> Js.Promise.then_(() => {
-                 setFetchingMore(_ => false);
-                 Js.Promise.resolve();
-               });
+             let _ =
+               onLoadMore()
+               |> Js.Promise.then_(() => {
+                    setFetchingMore(_ => false);
+                    Js.Promise.resolve();
+                  });
              ();
            }}
            topOffset="100px"
