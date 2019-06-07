@@ -37,7 +37,7 @@ module Styles = {
 
   let modalContainer =
     style([
-      width(`rem(21.)),
+      width(`rem(22.)),
       display(`flex),
       flexDirection(`column),
       alignItems(`center),
