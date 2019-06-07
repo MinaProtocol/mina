@@ -574,8 +574,10 @@ module T = struct
                     Async.Pipe.map pipe ~f:(function
                       | Ok json ->
                           parse_sync_status_exn json
-                      | Error _ ->
-                          failwith "Receiving sync status error: " )
+                      | Error json ->
+                          failwith
+                            (sprintf "Receiving sync status error: %s"
+                               (Yojson.Basic.to_string json)) )
                 | _ ->
                     failwith "Expected to get a stream of sync updates" )
             | Error e ->

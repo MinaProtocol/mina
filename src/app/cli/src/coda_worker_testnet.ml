@@ -128,7 +128,7 @@ module Api = struct
     let%bind () = wait_for_no_rpcs () in
     Coda_process.disconnect t.workers.(i)
 
-  let run_user_command t i (sk : Private_key.t) (_ : Account.key) fee ~body =
+  let run_user_command t i (sk : Private_key.t) fee ~body =
     let open Deferred.Option.Let_syntax in
     let worker = t.workers.(i) in
     let pk_of_sk = Public_key.of_private_key_exn sk |> Public_key.compress in
@@ -148,11 +148,11 @@ module Api = struct
     user_cmd
 
   let delegate_stake t i delegator_sk delegate_pk fee =
-    run_user_command t i delegator_sk delegate_pk fee
+    run_user_command t i delegator_sk fee
       ~body:(Stake_delegation (Set_delegate {new_delegate= delegate_pk}))
 
   let send_payment t i sender_sk receiver_pk amount fee =
-    run_user_command t i sender_sk receiver_pk fee
+    run_user_command t i sender_sk fee
       ~body:(Payment {receiver= receiver_pk; amount})
 
   (* TODO: resulting_receipt should be replaced with the sender's pk so that we prove the
@@ -296,7 +296,7 @@ let start_prefix_check logger workers events testnet ~acceptable_delay =
 type user_cmd_status =
   {snapshots: int option array; passed_root: bool array; result: unit Ivar.t}
 
-let start_payment_check logger root_pipe _workers (testnet : Api.t) =
+let start_payment_check logger root_pipe (testnet : Api.t) =
   Linear_pipe.iter root_pipe ~f:(function
       | `Root
           ( worker_id
@@ -399,7 +399,7 @@ let start_checks logger (workers : Coda_process.t array) start_reader testnet
   let event_reader, root_reader = events workers start_reader in
   start_prefix_check logger workers event_reader testnet ~acceptable_delay
   |> don't_wait_for ;
-  start_payment_check logger root_reader workers testnet
+  start_payment_check logger root_reader testnet
 
 (* note: this is very declarative, maybe this should be more imperative? *)
 (* next steps:

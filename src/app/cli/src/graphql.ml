@@ -352,13 +352,14 @@ module Make (Commands : Coda_commands.Intf) = struct
           [ field "key" ~typ:(non_null string)
               ~doc:"Public key of current snark worker."
               ~args:Arg.[]
-              ~resolve:(fun {ctx= _; _} (key, _) -> Stringable.public_key key)
+              ~resolve:(fun (_ : Program.t resolve_info) (key, _) ->
+                Stringable.public_key key )
           ; field "fee" ~typ:(non_null string)
               ~doc:
                 "Fee that snark worker is charging to generate a snark proof \
                  (fee is uint64 and is coerced as a string)"
               ~args:Arg.[]
-              ~resolve:(fun {ctx= _; _} (_, fee) ->
+              ~resolve:(fun (_ : Program.t resolve_info) (_, fee) ->
                 Stringable.uint64 (Currency.Fee.to_uint64 fee) ) ] )
 
     module Payload = struct
