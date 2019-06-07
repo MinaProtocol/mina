@@ -37,7 +37,17 @@ module Styles = {
     ]);
 
   let deactivatedSettings =
-    merge([Link.Styles.link, style([padding(`rem(0.5))])]);
+    merge([
+      Link.Styles.link,
+      style([
+        padding4(
+          ~top=`rem(0.5),
+          ~right=`rem(0.75),
+          ~bottom=`rem(0.5),
+          ~left=`rem(0.5),
+        ),
+      ]),
+    ]);
 
   let activatedSettings =
     merge([
@@ -52,13 +62,13 @@ module Styles = {
 
 module SyncStatusQ = [%graphql
   {|
-query querySyncStatus {
-  syncState {
-    status
-    description
-  }
-}
-|}
+    query querySyncStatus {
+      syncState {
+        status
+        description
+      }
+    }
+  |}
 ];
 
 module SyncStatusQuery = ReasonApollo.CreateQuery(SyncStatusQ);
@@ -120,6 +130,20 @@ let make = () => {
     | _ => false
     };
   <header className=Styles.header>
+    <svg
+      className=Css.(
+        style([position(`absolute), top(`px(4)), left(`px(7))])
+      )
+      width="54"
+      fill="transparent"
+      stroke="#C4C4C4"
+      height="14"
+      viewBox="-1 -1 54 14"
+      xmlns="http://www.w3.org/2000/svg">
+      <circle cx="6" cy="6" r="6" />
+      <circle cx="26" cy="6" r="6" />
+      <circle cx="46" cy="6" r="6" />
+    </svg>
     <div className=Styles.logo onClick={_ => ReasonReact.Router.push("/")}>
       <img src="CodaLogo.svg" alt="Coda logo" />
     </div>

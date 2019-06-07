@@ -24,7 +24,7 @@ module Styles = {
 
   let label =
     merge([
-      Theme.Text.smallHeader,
+      Theme.Text.Header.h6,
       style([
         userSelect(`none),
         textTransform(`uppercase),
@@ -40,7 +40,7 @@ module Styles = {
       style([
         paddingBottom(`px(2)),
         color(Theme.Colors.teal),
-        cursor(`default),
+        userSelect(`none),
         flexGrow(1.),
       ]),
     ]);
@@ -52,7 +52,7 @@ module Styles = {
       top(`percent(100.)),
       left(`px(-1)),
       right(`px(-1)),
-      maxHeight(`rem(10.)),
+      maxHeight(`calc(`add, `rem(10.), `px(2))),
       overflow(`scroll),
       background(white),
       border(`px(1), `solid, Theme.Colors.marineAlpha(0.3)),
@@ -71,6 +71,7 @@ module Styles = {
         alignItems(`center),
         padding2(~v=`zero, ~h=`rem(1.)),
         color(Theme.Colors.teal),
+        userSelect(`none),
         hover([backgroundColor(Theme.Colors.slateAlpha(0.1))]),
       ]),
     ]);
