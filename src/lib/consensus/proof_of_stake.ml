@@ -417,7 +417,7 @@ module Data = struct
         }
 
     type snapshot_identifier = Last_epoch_snapshot | Curr_epoch_snapshot
-    [@@deriving to_yojson, eq]
+    [@@deriving to_yojson]
 
     let get_snapshot (t : t) id =
       match id with
