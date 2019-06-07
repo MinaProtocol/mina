@@ -15,7 +15,7 @@ module Styles = {
 
   let footer = 
     style([
-      padding2(~v=`rem(0.5), ~h=`rem(1.25)),
+      padding2(~v=`rem(0.5), ~h=`rem(0.75)),
     ]);
 
   let addWalletLink =
@@ -25,10 +25,10 @@ module Styles = {
         display(`inlineFlex),
         alignItems(`center),
         cursor(`default),
-        color(Theme.Colors.teal),
+        color(Theme.Colors.tealAlpha(0.5)),
         padding2(~v=`zero, ~h=`rem(0.5)),
         hover([
-          /* color(white), */
+          color(Theme.Colors.teal),
           backgroundColor(Theme.Colors.hyperlinkAlpha(0.15)),
           borderRadius(`px(2)),
         ]),
@@ -81,13 +81,6 @@ let make = () => {
         >
           {React.string("+ Add wallet")}
         </a>
-        /* <Link
-          color=Link.Teal
-          hoverStyle=Styles.addWalletLinkHover
-          onClick={_ => setModalState(_ => Some("My Wallet"))}
-        >
-          {React.string("+ Add wallet")}
-        </Link> */
       </div>
       <AddWalletMutation>
         {(mutation, _) =>

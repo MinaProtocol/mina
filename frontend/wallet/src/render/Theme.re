@@ -195,7 +195,7 @@ module Spacing = {
   let defaultPadding = padding(defaultSpacing);
   let headerHeight = `rem(5.);
   let footerHeight = `rem(5.);
-  let modalWidth = `rem(30.);
+  let modalWidth = `rem(26.);
 };
 
 let notText = style([cursor(`default), userSelect(`none)]);

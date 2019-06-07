@@ -182,6 +182,7 @@ let make = (~wallets, ~onSubmit) => {
               | None =>
                 <div className=Css.(style([alignSelf(`flexEnd)]))>
                   <Link
+                    color=Link.Teal
                     onClick={_ =>
                       setModalState(
                         Option.map(~f=s => {...s, memoOpt: Some("")}),
