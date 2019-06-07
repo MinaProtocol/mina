@@ -34,28 +34,25 @@ module Styles = {
       display(`flex),
       alignItems(`center),
       justifyContent(`spaceBetween),
-    ]);
-
-  let settingsButton =
-    style([
-      padding4(
-        ~top=`rem(0.5),
-        ~right=`rem(0.75),
-        ~bottom=`rem(0.5),
-        ~left=`rem(0.5),
-      ),
-      color(Theme.Colors.slateAlpha(0.5)),
-      hover([
-        backgroundColor(Theme.Colors.slateAlpha(0.15)),
-        borderRadius(`px(6)),
-        color(Theme.Colors.slate),
-      ]),
-    ]);
+    ]);    
 
   let deactivatedSettings =
     merge([
       Link.Styles.greyLink,
-      settingsButton,
+      style([
+        padding4(
+          ~top=`rem(0.5),
+          ~right=`rem(0.75),
+          ~bottom=`rem(0.5),
+          ~left=`rem(0.5),
+        ),
+        color(Theme.Colors.slateAlpha(0.5)),
+        hover([
+          backgroundColor(Theme.Colors.slateAlpha(0.15)),
+          borderRadius(`px(6)),
+          color(Theme.Colors.slate),
+        ]),
+      ]),
     ]);
 
   let activatedSettings =
