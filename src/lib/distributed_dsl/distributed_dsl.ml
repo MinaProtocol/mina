@@ -204,7 +204,7 @@ struct
           (Or_error.error_string
              (Printf.sprintf "Unknown recipient %s"
                 (Peer.sexp_of_t recipient |> Sexp.to_string_hum)))
-    | Some _ ->
+    | Some (_r, _w) ->
         Time_queue.handle_in_future t.q
           ~after:(Message_delay.delay message)
           (Msg (message, recipient)) ;
