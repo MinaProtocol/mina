@@ -1,7 +1,6 @@
 open Core
 open Signature_lib
 open Coda_base
-open Snark_params
 
 let name = "transaction-snark-profiler"
 
@@ -13,7 +12,6 @@ module Sparse_ledger = struct
 end
 
 let create_ledger_and_transactions num_transitions =
-  let open Tick in
   let num_accounts = 4 in
   let ledger = Ledger.create () in
   let keys =
@@ -51,7 +49,8 @@ let create_ledger_and_transactions num_transitions =
   | `Count n ->
       let num_transactions = n - 2 in
       let transactions =
-        List.rev (List.init num_transactions (fun _ -> random_transaction ()))
+        List.rev
+          (List.init num_transactions ~f:(fun _ -> random_transaction ()))
       in
       let fee_transfer =
         let open Currency.Fee in
@@ -134,7 +133,7 @@ let profile (module T : Transaction_snark.S) sparse_ledger0
   in
   let rec merge_all serial_time proofs =
     match proofs with
-    | [x] ->
+    | [_] ->
         serial_time
     | _ ->
         let layer_time, new_proofs =
@@ -229,7 +228,7 @@ let run profiler num_transactions repeats preeval =
            | User_command t ->
                let t = (t :> User_command.t) in
                User_command.accounts_accessed t
-           | Coinbase {proposer; fee_transfer} ->
+           | Coinbase {proposer; fee_transfer; _} ->
                proposer :: Option.to_list (Option.map fee_transfer ~f:fst) ))
   in
   for i = 1 to repeats do

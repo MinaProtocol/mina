@@ -1,7 +1,5 @@
 open Core
 open Async
-open Coda_worker
-open Coda_inputs
 open Coda_base
 
 let name = "coda-five-nodes-test"
@@ -24,6 +22,5 @@ let main () =
   Coda_worker_testnet.Api.teardown testnet
 
 let command =
-  let open Command.Let_syntax in
   Command.async ~summary:"Test that five nodes work"
     (Command.Param.return main)

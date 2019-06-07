@@ -26,7 +26,8 @@ let () =
     |> List.map chop_file_extension
   in
   let foreach ls ~f = List.map f ls |> String.concat "" in
-  let env_entry profile = "  ("^profile^" (flags (:standard -w @a-4-29-40-41-42-44-45-48-58-59-60)))\n" in
+  (* the -w list here should be the same as in src/app/cli/src/dune and src/app/reformat/dune *)
+  let env_entry profile = "  ("^profile^" (flags (:standard -short-paths -w @a-4-29-40-41-42-44-45-48-58-59-60)))\n" in
 
 
   let dune_file = "\

@@ -63,7 +63,7 @@ let of_any_ledger (ledger : Ledger.Any_ledger.witness) =
 
 let of_ledger_subset_exn (oledger : Ledger.t) keys =
   let ledger = Ledger.copy oledger in
-  let new_keys, sparse =
+  let _, sparse =
     List.fold keys
       ~f:(fun (new_keys, sl) key ->
         match Ledger.location_of_key ledger key with

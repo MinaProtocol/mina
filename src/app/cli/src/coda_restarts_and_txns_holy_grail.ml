@@ -1,7 +1,5 @@
 open Core
 open Async
-open Coda_worker
-open Coda_inputs
 open Coda_base
 
 let name = "coda-restarts-and-txns-holy-grail"
