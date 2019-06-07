@@ -94,7 +94,7 @@ input AddWalletInput {
 }
 
 input DeleteWalletInput {
-  publicKey: String
+  publicKey: String!
 }
 
 input AddPaymentReceiptInput {

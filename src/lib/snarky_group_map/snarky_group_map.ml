@@ -1,8 +1,8 @@
 open Core_kernel
 module Params = Group_map.Params
 
-let to_group (type t) (module F : Field_intf.S_unchecked with type t = t)
-    ~params t =
+let to_group (type t)
+    (module F : Group_map.Field_intf.S_unchecked with type t = t) ~params t =
   let module M =
     Group_map.Make
       (F)

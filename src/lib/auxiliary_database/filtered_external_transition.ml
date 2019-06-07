@@ -68,8 +68,23 @@ type t = Stable.Latest.t =
   ; protocol_state: Protocol_state.t
   ; transactions: Transactions.t }
 
-let of_transition {With_hash.data= external_transition; _}
-    ~tracked_participants =
+let participants {transactions= {user_commands; fee_transfers; _}; creator; _}
+    =
+  let open Public_key.Compressed.Set in
+  let user_command_set =
+    List.fold user_commands ~init:empty ~f:(fun set user_command ->
+        union set (of_list @@ User_command.accounts_accessed user_command) )
+  in
+  let fee_transfer_participants =
+    List.fold fee_transfers ~init:empty ~f:(fun set (pk, _) -> add set pk)
+  in
+  add (union user_command_set fee_transfer_participants) creator
+
+let user_commands {transactions= {Transactions.user_commands; _}; _} =
+  user_commands
+
+let of_transition ~tracked_participants {With_hash.data= external_transition; _}
+    =
   let open External_transition.Validated in
   let creator = proposer external_transition in
   let protocol_state =
@@ -97,9 +112,7 @@ let of_transition {With_hash.data= external_transition; _}
               ~f:(Public_key.Compressed.Set.mem tracked_participants)
           then
             { acc_transactions with
-              user_commands=
-                User_command.forget_check checked_user_command
-                :: acc_transactions.user_commands }
+              user_commands= user_command :: acc_transactions.user_commands }
           else acc_transactions
       | Fee_transfer fee_transfer ->
           let fee_transfers =

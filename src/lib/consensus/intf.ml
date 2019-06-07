@@ -270,6 +270,9 @@ module type S = sig
 
   module Constants : Constants_intf
 
+  (** from postake *)
+  val epoch_size : int
+
   module Configuration : sig
     type t [@@deriving yojson, bin_io]
 
@@ -376,6 +379,12 @@ module type S = sig
       val to_lite : (Value.t -> Lite_base.Consensus_state.t) option
 
       val display : Value.t -> display
+
+      val network_delay : Configuration.t -> int
+
+      val curr_epoch : Value.t -> int
+
+      val curr_slot : Value.t -> int
     end
 
     module Proposal_data : sig

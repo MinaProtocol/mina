@@ -1,19 +1,68 @@
-(* Points on elliptic curves over finite fields by M. SKALBA
- * https://www.impan.pl/pl/wydawnictwa/czasopisma-i-serie-wydawnicze/acta-arithmetica/all/117/3/82159/points-on-elliptic-curves-over-finite-fields
- *
- * Thm 1.
- * have f(X1)f(X2)f(X3) = U^2 => at least one of f(X1), f(X2) or f(X3) 
- * is square. Take that Xi as the x coordinate and solve for y to 
- * find a point on the curve.
- *
- * Thm 2.
- * if we take map(t) = (Xj(t^2), sqrt(f(Xj(t^2)),
- * with j = min{1 <= i <= 3 | f(Xi(t^2)) in F_q^2}, then map(t)
- * is well defined for at least |T| - 25 values of t and |Im(map| > (|T|-25)/26
- *)
+(*
+   
+   This follows the approach of SvdW06 to construct a "near injection" from
+   a field into an elliptic curve defined over that field. WB19 is also a useful
+   reference that details several constructions which are more appropriate in other
+   contexts.
+
+   Fix an elliptic curve E given by y^2 = x^3 + ax + b over a field "F"
+   Let f(x) = x^3 + ax + b.
+
+   Define the variety V to be 
+   (x1, x2, x3, x4) : f(x1) f(x2) f(x3) = x4^2.
+
+   By a not-too-hard we have a map `V -> E`. Thus, a map of type `F -> V` yields a
+   map of type `F -> E` by composing. 
+   
+   Our goal is to construct such a map of type `F -> V`. The paper SvdW06 constructs
+   a family of such maps, defined by a collection of values which we'll term `params`.
+
+   Define `params` to be the type of records of the form
+    { u: F
+    ; u_over_2: F
+    ; projection_point: { z : F; y : F }
+    ; conic_c: F
+    ; a: F
+    ; b: F }
+   such that
+   - a and b are the coefficients of our curve's defining equation.
+   - u satisfies
+      i. 0 <> 3/4 u^2 + a
+      ii. 0 <> f(u)
+      iii. -f(u) is not a square.
+   - conic_c = 3/4 u^2 + a
+   - {z; y} satisfy
+      i. z^2 + conic_c * y^2 = -f(u) 
+
+   We will define a map of type `params -> (F -> V)`. Thus, fixing a choice of
+   a value of type params, we obtain a map `F -> V` as desired.
+
+SvdW06: Shallue and van de Woestijne, "Construction of rational points on elliptic curves over finite fields." Proc. ANTS 2006. https://works.bepress.com/andrew_shallue/1/download/
+WB19: Riad S. Wahby and Dan Boneh, Fast and simple constant-time hashing to the BLS12-381 elliptic curve. https://eprint.iacr.org/2019/403
+*)
+
+(* we have φ(t) : F -> S
+   and φ1(λ) : S -> V with
+   V(F) : f(x1)f(x2)f(x3) = x4^2,
+   (f is y^2 = x^3 + Bx + C)) (note choice of constant names
+   -- A is coeff of x^2 so A = 0 for us)
+  
+   To construct a rational point on V(F), the authors define
+   the surface S(F) and the rational map φ1:S(F)→ V(F), which
+   is invertible on its image [SvdW06, Lemma 6]:
+   S(F) : y^2(u^2 + uv + v^2 + a) = −f(u)
+  
+   φ(t) : t → ( u, α(t)/β(t) - u/2, β(t) )
+   φ1: (u, v, y) →  ( v, −u − v, u + y^2,
+                   f(u + y^2)·(y^2 + uv + v^2 + ay)/y )
+*)
 
 open Core_kernel
 module Field_intf = Field_intf
+
+let ( = ) = `Don't_use_polymorphic_compare
+
+let _ = ( = )
 
 module Intf (F : sig
   type t
@@ -24,323 +73,90 @@ struct
   end
 end
 
-module AB_pair = struct
-  module T = struct
-    type t = int * int [@@deriving compare, hash, sexp]
-  end
+module Conic = struct
+  type 'f t = {z: 'f; y: 'f} [@@deriving bin_io]
 
-  include T
-  include Hashable.Make (T)
+  let map {z; y} ~f = {z= f z; y= f y}
 end
 
-let interval x y = Sequence.range ~start:`inclusive ~stop:`inclusive x y
+module S = struct
+  (* S = S(u, v, y) : y^2(u^2 + uv + v^2 + a) = −f(u)
+     from (12)
+  *)
+  type 'f t = {u: 'f; v: 'f; y: 'f}
+end
 
-(* for v, k, powers produces v^0, v^1, ... v^k *)
-let powers ~mul ~one v k =
-  let len = k + 1 in
-  let arr = Array.create ~len one in
-  let rec go acc i =
-    arr.(i) <- acc ;
-    let i = i + 1 in
-    if i < len then go (mul acc v) i
-  in
-  go v 1 ; arr
+module V = struct
+  (* V = V(x1, x2, x3, x4) : f(x1)f(x2)f(x3) = x4^2
+     from (8)
+  *)
+  type 'f t = 'f * 'f * 'f * 'f
+end
 
 module Params = struct
-  type 'f coefficients =
-    {n1: 'f; d1: 'f; n2: 'f; d2: 'f; n3: 'f; d31: 'f; d32: 'f}
+  type 'f t =
+    { u: 'f
+    ; u_over_2: 'f
+    ; projection_point: 'f Conic.t
+    ; conic_c: 'f
+    ; a: 'f
+    ; b: 'f }
+  [@@deriving fields, bin_io]
 
-  let map {n1; d1; n2; d2; n3; d31; d32} ~f =
-    {n1= f n1; d1= f d1; n2= f n2; d2= f d2; n3= f n3; d31= f d31; d32= f d32}
+  let map {u; u_over_2; projection_point; conic_c; a; b} ~f =
+    { u= f u
+    ; u_over_2= f u_over_2
+    ; projection_point= Conic.map ~f projection_point
+    ; conic_c= f conic_c
+    ; a= f a
+    ; b= f b }
 
-  let t =
-    { n1=
-        AB_pair.Table.of_alist_exn
-          [ ((0, 0), "212")
-          ; ((0, 1), "-208")
-          ; ((3, 0), "-161568")
-          ; ((0, 2), "-264")
-          ; ((3, 1), "441408")
-          ; ((0, 3), "304")
-          ; ((6, 0), "-92765376")
-          ; ((3, 2), "-127776")
-          ; ((0, 4), "-44") ]
-    ; d1=
-        AB_pair.Table.of_alist_exn
-          [ ((0, 0), "-1")
-          ; ((0, 1), "5")
-          ; ((3, 0), "10536")
-          ; ((0, 2), "-10")
-          ; ((3, 1), "9480")
-          ; ((0, 3), "10")
-          ; ((6, 0), "4024944")
-          ; ((3, 2), "-4488")
-          ; ((0, 4), "-5")
-          ; ((6, 1), "2108304")
-          ; ((3, 3), "2904")
-          ; ((0, 5), "1") ]
-    ; n2=
-        AB_pair.Table.of_alist_exn
-          [ ((0, 0), "-1")
-          ; ((0, 1), "6")
-          ; ((3, 0), "-4356")
-          ; ((0, 2), "-15")
-          ; ((3, 1), "-424944")
-          ; ((0, 3), "20")
-          ; ((6, 0), "-6324912")
-          ; ((3, 2), "-26136")
-          ; ((0, 4), "-15")
-          ; ((6, 1), "12649824")
-          ; ((3, 3), "17424")
-          ; ((0, 5), "6")
-          ; ((9, 0), "-3061257408")
-          ; ((6, 2), "-6324912")
-          ; ((3, 4), "-4356")
-          ; ((0, 6), "-6") ]
-    ; d2=
-        AB_pair.Table.of_alist_exn
-          [ ((0, 0), "1")
-          ; ((0, 1), "-4")
-          ; ((3, 0), "5976")
-          ; ((0, 2), "6")
-          ; ((3, 1), "-5808")
-          ; ((0, 3), "-4")
-          ; ((6, 0), "2108304")
-          ; ((3, 2), "2904")
-          ; ((0, 4), "1") ]
-    ; n3=
-        AB_pair.Table.of_alist_exn
-          [ ((0, 1), "1")
-          ; ((3, 0), "0")
-          ; ((0, 2), "-15")
-          ; ((3, 1), "-31608")
-          ; ((0, 3), "105")
-          ; ((6, 0), "-2382032")
-          ; ((3, 2), "287640")
-          ; ((0, 4), "-455")
-          ; ((6, 1), "327958320")
-          ; ((3, 3), "-1124496")
-          ; ((0, 5), "1365")
-          ; ((9, 0), "5446134144")
-          ; ((6, 2), "-949378416")
-          ; ((3, 4), "2369808")
-          ; ((0, 6), "-3003")
-          ; ((9, 1), "-940697745408")
-          ; ((6, 3), "-185899568")
-          ; ((3, 5), "-2531880")
-          ; ((0, 7), "5005")
-          ; ((12, 0), "-1023635467008")
-          ; ((9, 2), "-4041852271488")
-          ; ((6, 4), "3844905120")
-          ; ((3, 6), "-14904")
-          ; ((0, 8), "6435")
-          ; ((12, 1), "-1271178606627072")
-          ; ((9, 3), "-557953136640")
-          ; ((6, 5), "-5637798432")
-          ; ((3, 7), "4402080")
-          ; ((0, 9), "6435")
-          ; ((15, 0), "-3711755775062016")
-          ; ((12, 2), "-3365703371771136")
-          ; ((9, 4), "1809225932544")
-          ; ((6, 6), "2558454048")
-          ; ((3, 8), "-7401888")
-          ; ((0, 10), "-5005")
-          ; ((15, 1), "-502999567986972672")
-          ; ((12, 3), "-924766944152832")
-          ; ((9, 5), "-3401013749760")
-          ; ((6, 7), "1784103840")
-          ; ((3, 9), "7013304")
-          ; ((0, 11), "3003")
-          ; ((18, 0), "447914759358173184")
-          ; ((15, 2), "-981669643253544960")
-          ; ((12, 4), "329477012308224")
-          ; ((9, 6), "913161021696")
-          ; ((6, 8), "-3372070032")
-          ; ((3, 10), "-4408920")
-          ; ((0, 12), "-1365")
-          ; ((18, 1), "-73786028437373497344")
-          ; ((15, 3), "-459570852044992512")
-          ; ((12, 5), "-977913669655296")
-          ; ((9, 7), "439245379584")
-          ; ((6, 9), "2438317040")
-          ; ((3, 11), "1904112")
-          ; ((0, 13), "455")
-          ; ((21, 0), "1042769766152244658176")
-          ; ((18, 2), "-84332284536876355584")
-          ; ((15, 4), "5961076345331712")
-          ; ((12, 6), "-43484326592256")
-          ; ((9, 8), "-707241693312")
-          ; ((6, 10), "-1030036656")
-          ; ((3, 12), "-555120")
-          ; ((0, 14), "-105")
-          ; ((21, 1), "-2848874263082603053056")
-          ; ((18, 3), "-63482146340076490752")
-          ; ((15, 5), "-101522561076541440")
-          ; ((12, 7), "69490543161600")
-          ; ((9, 9), "280657428480")
-          ; ((6, 11), "255430032")
-          ; ((3, 13), "100584")
-          ; ((0, 15), "15")
-          ; ((24, 0), "199571139166470771769344")
-          ; ((21, 2), "824674128787069304832")
-          ; ((18, 4), "-7951403445605351424")
-          ; ((15, 6), "-37420516674680832")
-          ; ((12, 8), "-66000709716480")
-          ; ((9, 10), "-61039617408")
-          ; ((6, 12), "-31603264")
-          ; ((3, 14), "-8712")
-          ; ((0, 16), "-1") ]
-    ; d31=
-        AB_pair.Table.of_alist_exn
-          [ ((0, 0), "-1")
-          ; ((0, 1), "5")
-          ; ((3, 0), "10536")
-          ; ((0, 2), "-10")
-          ; ((3, 1), "9480")
-          ; ((0, 3), "10")
-          ; ((6, 0), "4024944")
-          ; ((3, 2), "-4488")
-          ; ((0, 4), "-5")
-          ; ((6, 1), "2108304")
-          ; ((3, 3), "2904")
-          ; ((0, 5), "1") ]
-    ; d32=
-        AB_pair.Table.of_alist_exn
-          [ ((0, 0), "1")
-          ; ((0, 1), "-10")
-          ; ((3, 0), "12636")
-          ; ((0, 2), "45")
-          ; ((3, 1), "20256")
-          ; ((0, 3), "-120")
-          ; ((6, 0), "51578784")
-          ; ((3, 2), "-158448")
-          ; ((0, 4), "210")
-          ; ((6, 1), "426572352")
-          ; ((3, 3), "149472")
-          ; ((0, 5), "-252")
-          ; ((9, 0), "74892394368")
-          ; ((6, 2), "-178487712")
-          ; ((3, 4), "146472")
-          ; ((0, 6), "210")
-          ; ((9, 1), "42705805824")
-          ; ((6, 3), "-194173056")
-          ; ((3, 5), "-328224")
-          ; ((0, 7), "-120")
-          ; ((12, 0), "38682048607488")
-          ; ((9, 2), "217678171392")
-          ; ((6, 4), "339663456")
-          ; ((3, 6), "208656")
-          ; ((0, 8), "45")
-          ; ((12, 1), "-44449457564160")
-          ; ((9, 3), "-122450296320")
-          ; ((6, 5), "-126498240")
-          ; ((3, 7), "-58080")
-          ; ((0, 9), "10")
-          ; ((15, 0), "6454061238316032")
-          ; ((12, 2), "22224728782080")
-          ; ((9, 4), "30612574080")
-          ; ((6, 6), "21083040")
-          ; ((3, 8), "7260")
-          ; ((0, 10), "1") ] }
+  (* A deterministic function for constructing a valid choice of parameters for a
+     given field.
 
-  let%test_unit "sanity check" =
-    let {n1; d1; n2; d2; n3; d31; d32} = t in
-    List.iter [n1; d1; n2; d2; n3; d31; d32] ~f:(fun t ->
-        Hashtbl.iter_keys t ~f:(fun (a, b) ->
-            let three_j = (2 * a) + (3 * b) in
-            if three_j mod 3 <> 0 then
-              failwithf "2 * %d + 3 * %d = %d = %d mod 3" a b three_j
-                (three_j mod 3) ()
-            else () ) )
+     We start by finding the first `u` satisfying the constraints described above,
+     then find the first `y` satisyfing the condition described above. The other
+     values are derived from these two choices*.
 
-  module Magic_numbers = struct
-    type nonrec 'f t = 'f AB_pair.Table.t coefficients
+     *Actually we have one bit of freedom in choosing `z` as z = sqrt(conic_c y^2 - conic_d),
+     since there are two square roots.
+  *)
 
-    let create ~negate ~of_string : _ t =
-      map t
-        ~f:
-          (Hashtbl.map ~f:(fun s ->
-               if s.[0] = '-' then
-                 let s' = String.sub s ~pos:1 ~len:(String.length s - 1) in
-                 negate (of_string s')
-               else of_string s ))
-  end
-
-  let ( @! ) tbl (a, b) =
-    match Hashtbl.find tbl (a, b) with
-    | None ->
-        failwithf "group_map: coefficient for (%d, %d) not found" a b ()
-    | Some c ->
-        c
-
-  let abs j =
-    (* Find all integers a, b >= 0 such that 2 a + 3 b = 3 j.
-        Note that this implies 
-        3 b <= 3 j so 0 <= b <= j.
-    *)
-    let open Sequence in
-    let open Let_syntax in
-    let%bind b = interval 0 j in
-    let two_a = (3 * j) - (3 * b) in
-    if two_a mod 2 = 0 then return (two_a / 2, b) else empty
-
-  module Intermediate = struct
-    type 'f t = {ab_products: 'f AB_pair.Table.t}
-
-    let max_j = 16
-
-    let max_a = 3 * max_j / 2
-
-    let max_b = max_j
-
-    let create (type t) (module F : Field_intf.S with type t = t) ~a:coeff_a
-        ~b:coeff_b =
-      let mul = F.( * ) in
-      let one = F.one in
-      let a_powers = powers ~mul ~one coeff_a max_a in
-      let b_powers = powers ~mul ~one coeff_b max_b in
-      let ab_products =
-        let res = AB_pair.Table.create () in
-        let open Sequence in
-        iter
-          (concat_map (interval 0 max_j) ~f:abs)
-          ~f:(fun (a, b) ->
-            Hashtbl.find_or_add res (a, b) ~default:(fun () ->
-                F.(a_powers.(a) * b_powers.(b)) )
-            |> ignore ) ;
-        res
-      in
-      {ab_products}
-  end
-
-  let init_range x y ~f = Array.init (y - x + 1) ~f:(fun i -> f (x + i))
-
-  type 'f t = {coefficients: 'f array coefficients; a: 'f; b: 'f; a2: 'f}
-  [@@deriving fields]
-
-  (* Compute the coefficients for all the magic polynomials *)
-  let create (type t) ((module F : Field_intf.S with type t = t) as m) ~a ~b =
+  let create (type t) (module F : Field_intf.S_unchecked with type t = t) ~a ~b
+      =
     let open F in
-    let {Intermediate.ab_products} = Intermediate.create m ~a ~b in
-    let {n1; d1; n2; d2; n3; d31; d32} =
-      Magic_numbers.create ~negate
-        ~of_string:(Fn.flip Sexp.of_string_conv_exn t_of_sexp)
+    let first_map f =
+      let rec go i = match f i with Some x -> x | None -> go (i + one) in
+      go zero
     in
-    let sum seq f = Sequence.fold seq ~init:zero ~f:(fun acc x -> f x + acc) in
-    let absum tbl j =
-      sum (abs j) (fun ab -> (tbl @! ab) * (ab_products @! ab))
+    let first f = first_map (fun x -> Option.some_if (f x) x) in
+    let three_fourths = of_int 3 / of_int 4 in
+    let curve_eqn u = (u * u * u) + (a * u) + b in
+    let u =
+      first (fun u ->
+          (* from (15), A = 0, B = Params.a *)
+          let check = (three_fourths * u * u) + a in
+          let fu = curve_eqn u in
+          (not (equal check zero))
+          && (not (equal fu zero))
+          && not (is_square (negate fu))
+          (* imeckler: I added this condition. It prevents the possibility of having
+   a point (z, 0) on the conic, which is useful because in the map from the
+   conic to S we divide by the "y" coordinate of the conic. It's not strictly
+   necessary when we have a random input in a large field, but it is still nice to avoid the 
+   bad case in theory (and for the tests below with a small field). *)
+      )
     in
-    { coefficients=
-        { n1= init_range 0 4 ~f:(absum n1)
-        ; d1= init_range 0 5 ~f:(absum d1)
-        ; n2= init_range 0 6 ~f:(absum n2)
-        ; d2= init_range 0 4 ~f:(absum d2)
-        ; n3= init_range 0 15 ~f:(fun j -> absum n3 Int.(j + 1))
-        ; d31= init_range 0 5 ~f:(absum d31)
-        ; d32= init_range 0 10 ~f:(absum d32) }
-    ; a
-    ; a2= a * a
-    ; b }
+    (* The coefficients defining the conic z^2 + c y^2 = d
+       in (15). *)
+    let conic_c = (three_fourths * u * u) + a in
+    let conic_d = negate (curve_eqn u) in
+    let projection_point =
+      first_map (fun y ->
+          let z2 = conic_d - (conic_c * y * y) in
+          if F.is_square z2 then Some {Conic.z= F.sqrt z2; y} else None )
+    in
+    {u; u_over_2= u / of_int 2; conic_c; projection_point; a; b}
 end
 
 module Make
@@ -352,64 +168,42 @@ module Make
       val params : Constant.t Params.t
     end) =
 struct
-  open P
+  open F
 
-  let eval_polynomial coefficients t_powers =
-    Array.foldi coefficients ~init:F.zero ~f:(fun i acc c ->
-        F.((constant c * t_powers.(i)) + acc) )
-
-  (* Xi(t) = Ni(t)/Di(t)  for i = 1, 2, 3 *)
-  (*
-   * N1(t) = A^2 . t . sum from j = 0 to j = 4 of [
-   *    sum for 2a+3b=3j of ( n1_(a,b) A^a . B^b ) . t^j ]
-   * D1(t) = sum from j = 0 to j = 5 of [
-   *    sum for 2a+3b=3j of ( d1_(a,b) A^a . B^b ) . t^j ]
-   *)
-  let make_x1 t_powers =
-    let open F in
-    let n1 =
-      constant params.a2 * t_powers.(1)
-      * eval_polynomial params.coefficients.n1 t_powers
+  (* For a curve z^2 + c y^2 = d and a point (z0, y0) on the curve, there
+     is one other point on the curve which is also on the line through (z0, y0)
+     with slope t. This function returns that point. *)
+  let field_to_conic t =
+    let z0, y0 =
+      ( constant P.params.projection_point.z
+      , constant P.params.projection_point.y )
     in
-    let d1 = eval_polynomial params.coefficients.d1 t_powers in
-    n1 / d1
+    let ct = constant P.params.conic_c * t in
+    let s = of_int 2 * ((ct * y0) + z0) / ((ct * t) + one) in
+    {Conic.z= z0 - s; y= y0 - (s * t)}
 
-  (* N2(t) = sum from j = 0 to j = 6 of [
-   *    sum for 2a+3b=3j of ( n2_(a,b) A^a . B^b ) . t^j ]
-   * D2(t) = 144At . sum from j = 0 to j = 4 of [
-   *    sum for 2a+3b=3j of ( d2_(a,b) A^a . B^b ) . t^j ]
-   *)
-  let make_x2 t_powers =
-    let open F in
-    let n2 = eval_polynomial params.coefficients.n2 t_powers in
-    let d2 =
-      constant Constant.(of_int 144 * params.a)
-      * t_powers.(1)
-      * eval_polynomial params.coefficients.d2 t_powers
+  (* From (16) : φ(λ) : F → S : λ → ( u, α(λ)/β(λ) - u/2, β(λ) ) *)
+  let conic_to_s {Conic.z; y} =
+    { S.u= constant P.params.u
+    ; v= (z / y) - constant P.params.u_over_2 (* From (16) *)
+    ; y }
+
+  (* This is here for explanatory purposes. See s_to_v_truncated. *)
+  let _s_to_v {S.u; v; y} : _ V.t =
+    let curve_eqn x =
+      (x * x * x) + (constant P.params.a * x) + constant P.params.b
     in
-    n2 / d2
+    let h = (u * u) + (u * v) + (v * v) + constant P.params.a in
+    (v, negate (u + v), u + (y * y), curve_eqn (u + (y * y)) * h / y)
 
-  (* N3(t) = sum from j = 0 to j = 15 of [
-   *    sum for 2a+3b=3(j+1) of ( n3_(a,b) A^a . B^b ) . t^j ]
-   * D3(t) = A . sum from j = 0 to j = 5 of [
-   *    sum for 2a+3b=3j of ( d31_(a,b) a^a . b^b ) . t^j ]
-   *    .
-   *    sum from j = 0 to j = 10 of [
-   *    sum for 2a+3b=3j of ( d32_(a,b) a^a . b^b ) . t^j ]
-   *)
-  let make_x3 t_powers =
-    let open F in
-    let n3 = eval_polynomial params.coefficients.n3 t_powers in
-    let d3 =
-      let d31 = eval_polynomial params.coefficients.d31 t_powers in
-      let d32 = eval_polynomial params.coefficients.d32 t_powers in
-      constant params.a * d31 * d32
-    in
-    n3 / d3
+  (* from (13) *)
 
-  let potential_xs t =
-    let ts = powers ~mul:F.( * ) ~one:F.one t 15 in
-    (make_x1 ts, make_x2 ts, make_x3 ts)
+  (* We don't actually need to compute the final coordinate in V *)
+  let s_to_v_truncated {S.u; v; y} = (v, negate (u + v), u + (y * y))
+
+  let potential_xs =
+    let ( @ ) = Fn.compose in
+    s_to_v_truncated @ conic_to_s @ field_to_conic
 end
 
 let to_group (type t) (module F : Field_intf.S_unchecked with type t = t)
@@ -426,8 +220,8 @@ let to_group (type t) (module F : Field_intf.S_unchecked with type t = t)
         let params = params
       end)
   in
-  let a = Params.a params in
-  let b = Params.b params in
+  let a = params.a in
+  let b = params.b in
   let try_decode x =
     let f x = F.((x * x * x) + (a * x) + b) in
     let y = f x in
@@ -435,3 +229,150 @@ let to_group (type t) (module F : Field_intf.S_unchecked with type t = t)
   in
   let x1, x2, x3 = M.potential_xs t in
   List.find_map [x1; x2; x3] ~f:try_decode |> Option.value_exn
+
+let%test_module "test" =
+  ( module struct
+    module Fp = struct
+      include Snarkette.Fields.Make_fp
+                (Snarkette.Nat)
+                (struct
+                  let order = Snarkette.Nat.of_int 100003
+                end)
+
+      let a = of_int 1
+
+      let b = of_int 3
+    end
+
+    module F13 = struct
+      type t = int [@@deriving sexp]
+
+      let p = 13
+
+      let ( + ) x y = (x + y) mod p
+
+      let ( * ) x y = x * y mod p
+
+      let negate x = (p - x) mod p
+
+      let ( - ) x y = (x - y + p) mod p
+
+      let equal = Int.equal
+
+      let ( / ) x y =
+        let rec go i = if equal x (i * y) then i else go (i + 1) in
+        if equal y 0 then failwith "Divide by 0" else go 1
+
+      let sqrt' x =
+        let rec go i =
+          if Int.equal i p then None
+          else if equal (i * i) x then Some i
+          else go Int.(i + 1)
+        in
+        go 0
+
+      let sqrt x = Option.value_exn (sqrt' x)
+
+      let is_square x = Option.is_some (sqrt' x)
+
+      let zero = 0
+
+      let one = 1
+
+      let of_int = Fn.id
+
+      let gen = Int.gen_incl 0 Int.(p - 1)
+
+      let a = 1
+
+      let b = 3
+    end
+
+    module Make_tests (F : sig
+      include Field_intf.S_unchecked
+
+      val gen : t Quickcheck.Generator.t
+
+      val a : t
+
+      val b : t
+    end) =
+    struct
+      module F = struct
+        include F
+
+        let constant = Fn.id
+      end
+
+      open F
+
+      let params = Params.create (module F) ~a ~b
+
+      let curve_eqn u = (u * u * u) + (params.a * u) + params.b
+
+      let conic_d =
+        let open F in
+        negate (curve_eqn params.u)
+
+      let on_conic {Conic.z; y} =
+        F.(equal ((z * z) + (params.conic_c * y * y)) conic_d)
+
+      let on_s {S.u; v; y} =
+        F.(equal conic_d (y * y * ((u * u) + (u * v) + (v * v) + a)))
+
+      let on_v (x1, x2, x3, x4) =
+        F.(equal (curve_eqn x1 * curve_eqn x2 * curve_eqn x3) (x4 * x4))
+
+      (* Filter the two points which cause the group-map to blow up. This
+   is not an issue in practice because the points we feed into this function
+   will be the output of blake2s, and thus (modeling blake2s as a random oracle)
+   will not be either of those two points. *)
+      let gen =
+        Quickcheck.Generator.filter F.gen ~f:(fun t ->
+            not F.(equal ((params.conic_c * t * t) + one) zero) )
+
+      module M =
+        Make (F) (F)
+          (struct
+            let params = params
+          end)
+
+      let%test "projection point well-formed" =
+        on_conic params.projection_point
+
+      let%test_unit "field-to-conic" =
+        Quickcheck.test ~sexp_of:F.sexp_of_t gen ~f:(fun t ->
+            assert (on_conic (M.field_to_conic t)) )
+
+      let%test_unit "conic-to-S" =
+        let conic_gen =
+          Quickcheck.Generator.filter_map F.gen ~f:(fun y ->
+              let z2 = conic_d - (params.conic_c * y * y) in
+              if is_square z2 then Some {Conic.z= sqrt z2; y} else None )
+        in
+        Quickcheck.test conic_gen ~f:(fun p -> assert (on_s (M.conic_to_s p)))
+
+      let%test_unit "field-to-S" =
+        Quickcheck.test ~sexp_of:F.sexp_of_t gen ~f:(fun t ->
+            assert (on_s (Fn.compose M.conic_to_s M.field_to_conic t)) )
+
+      (* Schwarz-zippel says if this tests succeeds once, then the probability that 
+   the implementation is correct is at least 1 - (D / field-size), where D is
+   the total degree of the polynomial defining_equation_of_V(s_to_v(t)) which should
+   be less than, say, 10. So, this test succeeding gives good evidence of the
+   correctness of the implementation (assuming that the implementation is just a
+   polynomial, which it is by parametricity!) *)
+      let%test_unit "field-to-V" =
+        Quickcheck.test ~sexp_of:F.sexp_of_t gen ~f:(fun t ->
+            let s = M.conic_to_s (M.field_to_conic t) in
+            assert (on_v (M._s_to_v s)) )
+
+      let%test_unit "full map works" =
+        Quickcheck.test ~sexp_of:F.sexp_of_t gen ~f:(fun t ->
+            let x, y = to_group (module F) ~params t in
+            assert (equal (curve_eqn x) (y * y)) )
+    end
+
+    module T0 = Make_tests (F13)
+    module T1 = Make_tests (Fp)
+  end )

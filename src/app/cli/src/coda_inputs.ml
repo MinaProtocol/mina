@@ -147,6 +147,16 @@ module type Main_intf = sig
 
   val replace_propose_keypairs : t -> Keypair.And_compressed_pk.Set.t -> unit
 
+  val add_block_subscriber :
+       t
+    -> Public_key.Compressed.t
+    -> ( Auxiliary_database.Filtered_external_transition.t
+       , State_hash.t )
+       With_hash.t
+       Pipe.Reader.t
+
+  val add_payment_subscriber : t -> Account.key -> User_command.t Pipe.Reader.t
+
   val snark_worker_key : t -> Public_key.Compressed.Stable.V1.t option
 
   val snark_work_fee : t -> Currency.Fee.t
@@ -543,6 +553,10 @@ module Make_coda (Init : Init_intf) = struct
     module Consensus_state = Consensus.Data.Consensus_state
     module Blockchain_state = Blockchain_state
     module Prover_state = Consensus.Data.Prover_state
+    module Filtered_external_transition =
+      Auxiliary_database.Filtered_external_transition
+    module External_transition_database =
+      Auxiliary_database.External_transition_database
   end
 
   include Coda_lib.Make (Inputs)

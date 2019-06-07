@@ -29,7 +29,8 @@ module Styles = {
         height(`rem(1.)),
         width(`rem(1.)),
         transition(~duration=400, "all"),
-        backgroundColor(white),
+        background(`url("light-bg-texture.svg")),
+        backgroundSize(`cover),
         contentRule("\"\""),
         borderRadius(`percent(50.)),
       ]),
@@ -54,7 +55,7 @@ let make = (~value, ~onChange) =>
       type_="checkbox"
       id="checkbox"
       checked=value
-      onClick={_e => onChange(toggle => !toggle)}
+      onChange
     />
     <div className=Styles.slider />
   </label>;
