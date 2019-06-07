@@ -1,9 +1,7 @@
 open Core
 open Async
 open Graphql_async
-open Pipe_lib
 open Coda_base
-open Coda_transition
 open Signature_lib
 open Currency
 open Auxiliary_database
@@ -11,7 +9,6 @@ open Auxiliary_database
 module Make (Commands : Coda_commands.Intf) = struct
   module Program = Commands.Program
   module Config_in = Commands.Config_in
-  open Program.Inputs
 
   let result_of_exn f v ~error = try Ok (f v) with _ -> Error error
 
@@ -355,14 +352,13 @@ module Make (Commands : Coda_commands.Intf) = struct
           [ field "key" ~typ:(non_null string)
               ~doc:"Public key of current snark worker."
               ~args:Arg.[]
-              ~resolve:(fun {ctx= coda; _} (key, _) ->
-                Stringable.public_key key )
+              ~resolve:(fun {ctx= _; _} (key, _) -> Stringable.public_key key)
           ; field "fee" ~typ:(non_null string)
               ~doc:
                 "Fee that snark worker is charging to generate a snark proof \
                  (fee is uint64 and is coerced as a string)"
               ~args:Arg.[]
-              ~resolve:(fun {ctx= coda; _} (_, fee) ->
+              ~resolve:(fun {ctx= _; _} (_, fee) ->
                 Stringable.uint64 (Currency.Fee.to_uint64 fee) ) ] )
 
     module Payload = struct
@@ -469,7 +465,6 @@ module Make (Commands : Coda_commands.Intf) = struct
                 ~typ:(non_null string) ]
 
       let set_staking =
-        let open Fields in
         obj "SetStakingInput"
           ~coerce:(fun wallets -> wallets)
           ~fields:
@@ -600,11 +595,11 @@ module Make (Commands : Coda_commands.Intf) = struct
             , `Has_earlier_page has_previous_page
             , `Has_later_page has_next_page ) total_count =
           let first_cursor =
-            Option.map ~f:(fun {Edge.cursor} -> cursor)
+            Option.map ~f:(fun {Edge.cursor; _} -> cursor)
             @@ List.hd queried_transactions
           in
           let last_cursor =
-            Option.map ~f:(fun {Edge.cursor} -> cursor)
+            Option.map ~f:(fun {Edge.cursor; _} -> cursor)
             @@ List.last queried_transactions
           in
           let page_info =
@@ -666,8 +661,6 @@ module Make (Commands : Coda_commands.Intf) = struct
       end
 
       module User_command = struct
-        open Schema
-
         module Inputs = struct
           module Type = struct
             type t = User_command.t
@@ -710,8 +703,6 @@ module Make (Commands : Coda_commands.Intf) = struct
       end
 
       module Blocks = struct
-        open Schema
-
         module Inputs = struct
           module Type = struct
             type t = (Filtered_external_transition.t, State_hash.t) With_hash.t
@@ -1025,7 +1016,8 @@ module Make (Commands : Coda_commands.Intf) = struct
       io_field "sendPayment" ~doc:"Send a payment"
         ~typ:(non_null Types.Payload.create_payment)
         ~args:Arg.[arg "input" ~typ:(non_null Types.Input.create_payment)]
-        ~resolve:(fun {ctx= coda; _} () (from, to_, amount, fee, maybe_memo) ->
+        ~resolve:
+          (fun {ctx= coda; _} () (from, to_, _amount, fee, maybe_memo) ->
           let open Deferred.Result.Let_syntax in
           let%bind sender_account, sender_kp, memo, new_delegate, fee =
             Deferred.return
