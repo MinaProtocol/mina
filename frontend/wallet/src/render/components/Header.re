@@ -46,6 +46,12 @@ module Styles = {
           ~bottom=`rem(0.5),
           ~left=`rem(0.5),
         ),
+        color(Theme.Colors.slateAlpha(0.5)),
+        hover([
+          backgroundColor(Theme.Colors.slateAlpha(0.15)),
+          borderRadius(`px(6)),
+          color(Theme.Colors.slate),
+        ]),
       ]),
     ]);
 
@@ -147,10 +153,8 @@ let make = () => {
           onSettingsPage
             ? Styles.activatedSettings : Styles.deactivatedSettings
         }
-        onClick={_e =>
-          onSettingsPage
-            ? ReasonReact.Router.push("/")
-            : ReasonReact.Router.push("/settings")
+        onClick={_e => 
+          ReasonReact.Router.push(onSettingsPage ? "/" : "/settings")
         }>
         <Icon kind=Icon.Settings />
         <Spacer width=0.25 />
