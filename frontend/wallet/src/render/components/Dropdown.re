@@ -78,7 +78,7 @@ module Styles = {
 
   let icon =
     style([
-      color(Theme.Colors.teal),
+      color(Theme.Colors.tealAlpha(0.5)),
       height(`rem(1.5)),
       marginRight(`px(-5)),
     ]);
