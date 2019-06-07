@@ -55,7 +55,7 @@ let make = (~value, ~onChange) =>
       type_="checkbox"
       id="checkbox"
       checked=value
-      onClick={_e => onChange(toggle => !toggle)}
+      onChange
     />
     <div className=Styles.slider />
   </label>;
