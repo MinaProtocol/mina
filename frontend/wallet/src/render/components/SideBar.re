@@ -59,7 +59,7 @@ let make = () => {
            }}
       </WalletQuery>
       <div className=Styles.footer>
-        <Link onClick={_ => setModalState(_ => Some("My Wallet"))}>
+        <Link kind=Link.Grey onClick={_ => setModalState(_ => Some("My Wallet"))}>
           {React.string("+ Add wallet")}
         </Link>
       </div>

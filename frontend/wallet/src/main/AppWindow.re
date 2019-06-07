@@ -35,11 +35,8 @@ include Single.Make({
             ~height=610,
             ~minWidth=800,
             ~minHeight=500,
-            ~frame=false,
-            ~transparent=true,
             ~resizeable=false,
-            ~title="Coda Wallet",
-            ~titleBarStyle=`CustomButtonsOnHover,
+            ~title="Coda",
             ~backgroundColor=Theme.Colors.bgColorElectronWindow,
             ~webPreferences=
               makeWebPreferences(

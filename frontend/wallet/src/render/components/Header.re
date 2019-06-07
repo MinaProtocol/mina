@@ -38,7 +38,7 @@ module Styles = {
 
   let deactivatedSettings =
     merge([
-      Link.Styles.link,
+      Link.Styles.greyLink,
       style([
         padding4(
           ~top=`rem(0.5),
@@ -130,20 +130,6 @@ let make = () => {
     | _ => false
     };
   <header className=Styles.header>
-    <svg
-      className=Css.(
-        style([position(`absolute), top(`px(4)), left(`px(7))])
-      )
-      width="54"
-      fill="transparent"
-      stroke="#C4C4C4"
-      height="14"
-      viewBox="-1 -1 54 14"
-      xmlns="http://www.w3.org/2000/svg">
-      <circle cx="6" cy="6" r="6" />
-      <circle cx="26" cy="6" r="6" />
-      <circle cx="46" cy="6" r="6" />
-    </svg>
     <div className=Styles.logo onClick={_ => ReasonReact.Router.push("/")}>
       <img src="CodaLogo.svg" alt="Coda logo" />
     </div>
@@ -155,7 +141,7 @@ let make = () => {
              subscribeToMore={response.subscribeToMore}
            />}
       </SyncStatusQuery>
-      <Spacer width=1.5 />
+      <Spacer width=0.75 />
       <a
         className={
           onSettingsPage

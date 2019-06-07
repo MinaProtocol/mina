@@ -1,12 +1,9 @@
 open Core
 open Async
-open Pipe_lib
 open Signature_lib
 open Coda_numbers
 open Coda_base
 open Coda_state
-open Coda_transition
-open O1trace
 
 module type Intf = sig
   module Program : Coda_inputs.Main_intf
@@ -92,7 +89,7 @@ struct
            collision should not happen." ;
         Core.exit 1
 
-  let is_valid_user_command t (txn : User_command.t) account_opt =
+  let is_valid_user_command _t (txn : User_command.t) account_opt =
     let remainder =
       let open Option.Let_syntax in
       let%bind account = account_opt

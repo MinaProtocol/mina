@@ -13,7 +13,7 @@ module Styles = {
       height(Theme.Spacing.footerHeight),
       justifyContent(`spaceBetween),
       alignItems(`center),
-      padding2(~v=`zero, ~h=`rem(2.)),
+      padding2(~v=`zero, ~h=`rem(1.25)),
       borderTop(`px(1), `solid, Theme.Colors.borderColor),
     ]);
 
@@ -34,8 +34,15 @@ module StakingSwitch = {
   [@react.component]
   let make = () => {
     let (staking, setStaking) = React.useState(() => true);
-    <div className=Styles.stakingSwitch>
-      <Toggle value=staking onChange={_e => setStaking(staking => !staking)} />
+    <div
+      className=Css.(
+        style([
+          color(Theme.Colors.serpentine),
+          display(`flex),
+          alignItems(`center),
+        ])
+      )>
+      <Toggle value=staking onChange=setStaking />
       <span
         className=Css.(
           merge([
