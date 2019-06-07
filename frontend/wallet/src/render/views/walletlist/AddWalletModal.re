@@ -10,8 +10,6 @@ module Styles = {
       alignItems(`center),
       justifyContent(`center),
     ]);
-
-  let alert = style([margin2(~v=`rem(1.), ~h=`zero)]);
 };
 
 // TODO: Add validation that the wallet name isn't already in use
@@ -20,18 +18,17 @@ module Styles = {
 let make = (~walletName, ~setModalState, ~onSubmit) => {
   <Modal title="Add Wallet" onRequestClose={() => setModalState(_ => None)}>
     <div className=Styles.container>
+      <Alert
+        kind=`Info
+        message="You can change the name or delete the wallet later."
+      />
       <Spacer height=1. />
       <TextField
         label="Name"
         onChange={value => setModalState(_ => Some(value))}
         value=walletName
       />
-      <div className=Styles.alert>
-        <Alert
-          kind=`Info
-          message="You can change or delete your wallet later."
-        />
-      </div>
+      <Spacer height=1.5 />
       <div className=Css.(style([display(`flex)]))>
         <Button
           label="Cancel"

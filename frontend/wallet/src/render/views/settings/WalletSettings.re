@@ -76,7 +76,11 @@ module DeleteButton = {
       This can't be undone, and you may lose the funds in this wallet.";
     <>
       <Link
+<<<<<<< HEAD:frontend/wallet/src/render/components/WalletSettings.re
         color=Link.Red
+=======
+        kind=Link.Red
+>>>>>>> master:frontend/wallet/src/render/views/settings/WalletSettings.re
         onClick={_ =>
           updateModal(x => Option.or_(Some({text: "", error: None}), x))
         }>
@@ -87,7 +91,6 @@ module DeleteButton = {
        | Some({text, error}) =>
          <Modal
            title="Delete Wallet"
-           isRed=true
            onRequestClose={_ => updateModal(_ => None)}>
            <div className=Styles.modalContainer>
              <div className=Styles.deleteAlert>

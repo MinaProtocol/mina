@@ -1,11 +1,7 @@
 open Core
 open Async
-open Coda_worker
-open Coda_inputs
 
 let name = "coda-transitive-peers-test"
-
-open Coda_processes
 
 let main () =
   let%bind program_dir = Unix.getcwd () in

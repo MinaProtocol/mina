@@ -1,7 +1,7 @@
-type color =
-  | Slate
-  | Red
-  | Teal;
+type kind =
+  | Blue
+  | Grey
+  | Red;
 
 module Styles = {
   open Css;
@@ -13,44 +13,40 @@ module Styles = {
         display(`inlineFlex),
         alignItems(`center),
         cursor(`default),
+        color(Theme.Colors.hyperlinkAlpha(0.7)),
+        hover([color(Theme.Colors.hyperlinkAlpha(1.))]),
       ]),
     ]);
 
-  let slate =
-    style([
-      color(Theme.Colors.slateAlpha(0.5)),
-      hover([color(Theme.Colors.hyperlinkAlpha(0.7))]),
+  let greyLink =
+    merge([
+      link,
+      style([
+        color(Theme.Colors.slateAlpha(0.5)),
+        hover([color(Theme.Colors.hyperlinkAlpha(0.7))]),
+      ]),
     ]);
 
-  let red =
-    style([
-      color(Theme.Colors.roseBudAlpha(0.5)),
-      hover([color(Theme.Colors.roseBud)]),
-    ]);
-  
-  let teal =
-    style([
-      color(Theme.Colors.teal),
-      hover([color(Theme.Colors.hyperlinkAlpha(1.))]),
+  let redLink =
+    merge([
+      link,
+      style([
+        color(Theme.Colors.roseBudAlpha(0.7)),
+        hover([color(Theme.Colors.roseBud)]),
+      ]),
     ]);
 };
 
 [@react.component]
-let make = (
-    ~children,
-    ~onClick=?,
-    ~color=Slate,
-  ) =>
+let make = (~children, ~onClick=?, ~kind=Blue) =>
   <a
-    className={Css.merge([
-      Styles.link,
-      switch (color) {
-      | Slate => Styles.slate
-      | Red => Styles.red
-      | Teal => Styles.teal
-      },
-    ])}
-    ?onClick
-  >
+    className={
+      switch (kind) {
+      | Blue => Styles.link
+      | Red => Styles.redLink
+      | Grey => Styles.greyLink
+      }
+    }
+    ?onClick>
     children
   </a>;
