@@ -33,10 +33,19 @@ module Styles = {
 };
 
 [@react.component]
-let make = (~transactions, ~onLoadMore: unit => Js.Promise.t('a)) => {
+let make = (~transactions, ~pending, ~onLoadMore: unit => Js.Promise.t('a)) => {
   let (isFetchingMore, setFetchingMore) = React.useState(() => false);
 
   <div className=Styles.body>
+    {Array.mapi(
+       ~f=
+         (i, transaction) =>
+           <div className=Styles.row key={string_of_int(i)}>
+             <TransactionCell transaction pending=true />
+           </div>,
+       pending,
+     )
+     |> React.array}
     {Array.mapi(
        ~f=
          (i, transaction) =>

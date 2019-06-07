@@ -6,6 +6,7 @@ type kind =
   | Question
   | Warning
   | Info
+  | Dots
   | Success
   | Danger
   | BackArrow;
@@ -78,5 +79,11 @@ let make = (~kind) =>
          d="M10.9956 20L3 12L10.9956 4L13.3263 6.332L9.29034 10.3509H21V13.6491L9.29034 13.6491L13.3263 17.668L10.9956 20Z"
          strokeWidth="0"
        />
+     | Dots =>
+       <>
+         <rect x="16" y="10" width="4" height="4" rx="2" />
+         <rect x="10" y="10" width="4" height="4" rx="2" />
+         <rect x="4" y="10" width="4" height="4" rx="2" />
+       </>
      }}
   </svg>;
