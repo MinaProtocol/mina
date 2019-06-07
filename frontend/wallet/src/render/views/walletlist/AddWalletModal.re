@@ -4,7 +4,7 @@ module Styles = {
   let container =
     style([
       margin(`auto),
-      width(`rem(21.)),
+      width(`rem(22.)),
       display(`flex),
       flexDirection(`column),
       alignItems(`center),
@@ -35,7 +35,7 @@ let make = (~walletName, ~setModalState, ~onSubmit) => {
           style=Button.Gray
           onClick={_ => setModalState(_ => None)}
         />
-        <Spacer width=2. />
+        <Spacer width=1. />
         <Button
           label="Create"
           style=Button.Green

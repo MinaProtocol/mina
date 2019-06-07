@@ -3,7 +3,11 @@ open Tc;
 module Styles = {
   open Css;
 
-  let container = style([height(`percent(100.))]);
+  let container = 
+    style([
+      height(`percent(100.)),
+      borderLeft(`px(1), `solid, white),
+    ]);
 
   let headerRow =
     merge([

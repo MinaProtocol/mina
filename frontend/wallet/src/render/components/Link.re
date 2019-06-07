@@ -42,8 +42,8 @@ let make = (~children, ~onClick=?, ~kind=Blue) =>
   <a
     className={
       switch (kind) {
-      | Red => Styles.redLink
       | Blue => Styles.link
+      | Red => Styles.redLink
       | Grey => Styles.greyLink
       }
     }
