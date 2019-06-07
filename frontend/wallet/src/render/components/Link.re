@@ -39,15 +39,15 @@ module Styles = {
 let make = (
     ~children,
     ~onClick=?,
-    ~color=Slate
+    ~color=Slate,
   ) =>
   <a
     className={Css.merge([
       Styles.link,
       switch (color) {
-        | Slate => Styles.slate
-        | Red => Styles.red
-        | Teal => Styles.teal
+      | Slate => Styles.slate
+      | Red => Styles.red
+      | Teal => Styles.teal
       },
     ])}
     ?onClick

@@ -48,7 +48,7 @@ module Styles = {
       hover([
         backgroundColor(Theme.Colors.slateAlpha(0.15)),
         borderRadius(`px(6)),
-        color(white),
+        color(Theme.Colors.slate),
       ]),
     ]);
 

@@ -13,11 +13,26 @@ module Styles = {
       borderRight(`px(1), `solid, Theme.Colors.borderColor),
     ]);
 
-  let addWalletLink = 
+  let footer = 
     style([
-      padding2(~v=`rem(0.5),
-      ~h=`rem(1.)),
-      color(Theme.Colors.teal),
+      padding2(~v=`rem(0.5), ~h=`rem(1.25)),
+    ]);
+
+  let addWalletLink =
+    merge([
+      Theme.Text.Body.regular,
+      style([
+        display(`inlineFlex),
+        alignItems(`center),
+        cursor(`default),
+        color(Theme.Colors.teal),
+        padding2(~v=`zero, ~h=`rem(0.5)),
+        hover([
+          /* color(white), */
+          backgroundColor(Theme.Colors.hyperlinkAlpha(0.15)),
+          borderRadius(`px(2)),
+        ]),
+      ]),
     ]);
 };
 
@@ -59,10 +74,20 @@ let make = () => {
              />
            }}
       </WalletQuery>
-      <div className=Styles.addWalletLink>
-        <Link color=Link.Teal onClick={_ => setModalState(_ => Some("My Wallet"))}>
+      <div className=Styles.footer>
+        <a
+          className=Styles.addWalletLink
+          onClick={_ => setModalState(_ => Some("My Wallet"))}
+        >
           {React.string("+ Add wallet")}
-        </Link>
+        </a>
+        /* <Link
+          color=Link.Teal
+          hoverStyle=Styles.addWalletLinkHover
+          onClick={_ => setModalState(_ => Some("My Wallet"))}
+        >
+          {React.string("+ Add wallet")}
+        </Link> */
       </div>
       <AddWalletMutation>
         {(mutation, _) =>

@@ -3,7 +3,11 @@ open Tc;
 module Styles = {
   open Css;
 
-  let container = style([height(`percent(100.))]);
+  let container = 
+    style([
+      height(`percent(100.)),
+      borderLeft(`px(1), `solid, white),
+    ]);
 
   let row =
     style([
@@ -13,6 +17,7 @@ module Styles = {
       alignItems(`flexStart),
       padding2(~h=`rem(1.), ~v=`zero),
       borderBottom(`px(1), `solid, Theme.Colors.savilleAlpha(0.1)),
+      borderTop(`px(1), `solid, white),
       lastChild([borderBottom(`px(0), `solid, white)]),
     ]);
 
