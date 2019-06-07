@@ -1,7 +1,6 @@
 (library
  (name perf_histograms)
  (public_name perf_histograms)
- (flags :standard -short-paths -warn-error -39)
  (library_flags -linkall)
  (modules perf_histograms0 perf_histograms histogram rpc intf)
  (inline_tests)
