@@ -124,7 +124,6 @@ let extractTransactions: Js.t('a) => array(TransactionCell.Transaction.t) =
 
 [@react.component]
 let make = () => {
-<<<<<<< HEAD
   let activeWallet = Hooks.useActiveWallet();
   let activeWalletKey =
     Option.map(~f=PublicKey.toString, activeWallet)
