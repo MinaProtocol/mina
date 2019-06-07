@@ -31,6 +31,10 @@ module type S = sig
 
   type boolean_var
 
+  type field
+
+  type field_var
+
   type curve
 
   type curve_var
@@ -59,9 +63,9 @@ module type S = sig
      and type ('a, 'b) checked := ('a, 'b) checked
 
   module Signature : sig
-    type t = bool list * curve_scalar [@@deriving sexp]
+    type t = field * curve_scalar [@@deriving sexp]
 
-    type var = boolean_var list * curve_scalar_var
+    type var = field_var * curve_scalar_var
 
     val typ : (var, t) typ
   end
@@ -78,14 +82,13 @@ module type S = sig
 
   module Checked : sig
     val compress : curve_var -> (boolean_var list, _) checked
-    val is_even : (boolean_var list, _) checked -> (boolean_var, _) checked
 
     val verification :
          (module Shifted.S with type t = 't)
       -> Signature.var
       -> Public_key.var
       -> Message.var
-      -> (curve_scalar_var, _) checked
+      -> (field_var, _) checked
 
     val verifies :
          (module Shifted.S with type t = 't)
@@ -120,31 +123,19 @@ module Schnorr
 
           val typ : (var, t) Typ.t
 
-          val random : unit -> t
           val zero : t
           val order : t
-          val field_order : t
 
           val ( * ) : t -> t -> t
           val ( + ) : t -> t -> t
           val ( - ) : t -> t -> t
 
           val to_bits : t -> bool list
-          val of_bits : bool list -> t
-
-          val test_bit : t -> int -> bool
-
-          val length_in_bits : int
 
           module Checked : sig
-            val equal : var -> var -> (Boolean.var, _) Checked.t
-
             val to_bits :
               var -> Boolean.var Bitstring_lib.Bitstring.Lsb_first.t
 
-            module Assert : sig
-              val equal : var -> var -> (unit, _) Checked.t
-            end
           end
         end
 
@@ -162,16 +153,11 @@ module Schnorr
 
         val zero : t
 
-        val add : t -> t -> t
         val subtract : t -> t -> t
-
-        val double : t -> t
 
         val scale : t -> Scalar.t -> t
 
         val to_affine_coordinates : t -> Field.t * Field.t
-        val is_on_curve : t -> bool
-        val is_inf : t -> bool
     end)
     (Message : Message_intf
                with type boolean_var := Impl.Boolean.var
@@ -180,6 +166,8 @@ module Schnorr
                 and type ('a, 'b) checked := ('a, 'b) Impl.Checked.t) :
   S
   with type boolean_var := Impl.Boolean.var
+   and type field := Impl.Field.t
+   and type field_var := Impl.Field.Var.t
    and type curve := Curve.t
    and type curve_var := Curve.var
    and type curve_scalar := Curve.Scalar.t
@@ -223,29 +211,6 @@ module Schnorr
     type var = Curve.var
   end =
     Curve
-
-  (* TODO: Have expect test for this *)
-  let shamir_sum ((sp, p) : Curve.Scalar.t * Curve.t)
-      ((sq, q) : Curve.Scalar.t * Curve.t) =
-    let pq = Curve.add p q in
-    let rec go i acc =
-      if i < 0 then acc
-      else
-        let acc = Curve.double acc in
-        let acc =
-          match (Curve.Scalar.test_bit sp i, Curve.Scalar.test_bit sq i) with
-          | true, false ->
-              Curve.add p acc
-          | false, true ->
-              Curve.add q acc
-          | true, true ->
-              Curve.add pq acc
-          | false, false ->
-              acc
-        in
-        go (i - 1) acc
-    in
-    go (Curve.Scalar.length_in_bits - 1) Curve.zero
 
     open Fold_lib
 
@@ -295,10 +260,10 @@ module Schnorr
     let compress ((x, _) : Curve.var) = to_bits x
     let to_triples x = Fold.to_list Fold.(group3 ~default:Boolean.false_ (of_list x))
 
-    let y_even ((_, y) : Curve.var) =
-      let%map bs = Field.Checked.unpack_full y in
+    let assert_y_even ((_, y) : Curve.var) =
+      let%bind bs = Field.Checked.unpack_full y in
       List.hd_exn (Bitstring_lib.Bitstring.Lsb_first.to_list bs)
-      |>  Boolean.Assert.(( = ) Boolean.true_ )
+      |>  Boolean.Assert.(( = ) Boolean.false_ )
 
 
     (* returning r_point as a representable point ensures it is nonzero so the nonzero
@@ -314,18 +279,21 @@ module Schnorr
     let%bind r_bits = to_bits r in
     let nonce = to_triples (r_bits @ pk_bits) in
     let%bind e = Message.hash_checked m ~nonce in
-        (* s * g - e * public_key *)
-        let%bind e_pk =
-          Curve.Checked.scale shifted (Curve.Checked.negate public_key)
-            (Curve.Scalar.Checked.to_bits e)
-            ~init:Shifted.zero
-        in
-        let%bind s_g_e_pk =
-          Curve.Checked.scale_known shifted Curve.one
-            (Curve.Scalar.Checked.to_bits s)
-            ~init:e_pk
-        in
-        Shifted.unshift_nonzero s_g_e_pk >>| fst
+    (* s * g - e * public_key *)
+    let%bind e_pk =
+      Curve.Checked.scale shifted (Curve.Checked.negate public_key)
+        (Curve.Scalar.Checked.to_bits e)
+        ~init:Shifted.zero
+    in
+    let%bind s_g_e_pk =
+      Curve.Checked.scale_known shifted Curve.one
+        (Curve.Scalar.Checked.to_bits s)
+        ~init:e_pk
+    in
+    let%bind r_pt = Shifted.unshift_nonzero s_g_e_pk in
+    let%map () = assert_y_even
+    r_pt in
+    fst r_pt
 
     let%snarkydef verifies shifted ((r, s) as signature) pk m =
       verification shifted signature pk m
