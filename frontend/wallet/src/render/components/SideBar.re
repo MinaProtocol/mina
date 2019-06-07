@@ -13,7 +13,12 @@ module Styles = {
       borderRight(`px(1), `solid, Theme.Colors.borderColor),
     ]);
 
-  let footer = style([padding2(~v=`rem(0.5), ~h=`rem(1.))]);
+  let addWalletLink = 
+    style([
+      padding2(~v=`rem(0.5),
+      ~h=`rem(1.)),
+      color(Theme.Colors.teal),
+    ]);
 };
 
 module Wallets = [%graphql
@@ -54,8 +59,8 @@ let make = () => {
              />
            }}
       </WalletQuery>
-      <div className=Styles.footer>
-        <Link onClick={_ => setModalState(_ => Some("My Wallet"))}>
+      <div className=Styles.addWalletLink>
+        <Link color=Link.Teal onClick={_ => setModalState(_ => Some("My Wallet"))}>
           {React.string("+ Add wallet")}
         </Link>
       </div>

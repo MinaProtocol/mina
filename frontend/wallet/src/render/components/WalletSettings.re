@@ -76,7 +76,7 @@ module DeleteButton = {
       This can't be undone, and you may lose the funds in this wallet.";
     <>
       <Link
-        isRed=true
+        color=Link.Red
         onClick={_ =>
           updateModal(x => Option.or_(Some({text: "", error: None}), x))
         }>
