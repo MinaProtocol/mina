@@ -11,8 +11,8 @@ module Styles = {
   let bg =
     style([
       transition(~duration=200, "background"),
-      background(`url("light-bg-texture.svg")),
-      backgroundSize(`cover),
+      background(`url("bg-texture.png")),
+      backgroundColor(`hex("f4f4f4")),
     ]);
 
   let window =

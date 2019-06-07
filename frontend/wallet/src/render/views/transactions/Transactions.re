@@ -5,23 +5,15 @@ module Styles = {
 
   let container = style([height(`percent(100.))]);
 
-  let row =
-    style([
-      display(`grid),
-      gridTemplateColumns([`rem(16.), `fr(1.), `px(200)]),
-      gridGap(Theme.Spacing.defaultSpacing),
-      alignItems(`flexStart),
-      padding2(~h=`rem(1.), ~v=`zero),
-      borderBottom(`px(1), `solid, Theme.Colors.savilleAlpha(0.1)),
-      lastChild([borderBottom(`px(0), `solid, white)]),
-    ]);
-
   let headerRow =
     merge([
-      row,
       Theme.Text.Header.h6,
       style([
+        display(`grid),
+        gridTemplateColumns([`rem(16.), `fr(1.), `px(200)]),
+        gridGap(Theme.Spacing.defaultSpacing),
         padding2(~v=`px(0), ~h=`rem(1.)),
+        borderBottom(`px(1), `solid, Theme.Colors.savilleAlpha(0.1)),
         textTransform(`uppercase),
         height(`rem(2.)),
         alignItems(`center),
@@ -29,25 +21,6 @@ module Styles = {
         userSelect(`none),
       ]),
     ]);
-
-  let sectionHeader =
-    style([
-      padding2(~v=`rem(0.25), ~h=`rem(1.)),
-      textTransform(`uppercase),
-      alignItems(`center),
-      color(Theme.Colors.slateAlpha(0.7)),
-      backgroundColor(Theme.Colors.midnightAlpha(0.06)),
-      marginTop(`rem(1.5)),
-    ]);
-
-  let body =
-    style([
-      width(`percent(100.)),
-      overflow(`auto),
-      maxHeight(`calc((`sub, `percent(100.), `rem(2.)))),
-    ]);
-
-  let icon = style([opacity(0.5), height(`rem(1.5))]);
 
   let alertContainer =
     style([
@@ -57,14 +30,12 @@ module Styles = {
       justifyContent(`center),
     ]);
 
-  let noTransactionsAlert =
-    style([
-      width(`px(348)),
-      height(`px(80)),
-    ]);
+  let noTransactionsAlert = style([width(`px(348)), height(`px(80))]);
+
+  let icon = style([opacity(0.5), height(`rem(1.5))]);
 };
 
-module Transactions = [%graphql
+module TransactionsQueryString = [%graphql
   {|
     query transactions($after: String, $publicKey: String!) {
       blocks(first: 5, after: $after, filter: { relatedTo: $publicKey }) {
@@ -100,7 +71,7 @@ module Transactions = [%graphql
     }
   |}
 ];
-module TransactionsQuery = ReasonApollo.CreateQuery(Transactions);
+module TransactionsQuery = ReasonApollo.CreateQuery(TransactionsQueryString);
 
 let extractTransactions: Js.t('a) => array(TransactionCell.Transaction.t) =
   data => {
@@ -125,15 +96,6 @@ let extractTransactions: Js.t('a) => array(TransactionCell.Transaction.t) =
 [@react.component]
 let make = () => {
   let activeWallet = Hooks.useActiveWallet();
-  let activeWalletKey =
-    Option.map(~f=PublicKey.toString, activeWallet)
-    |> Option.withDefault(~default="");
-  let transactionQuery = Transactions.make(~publicKey="123", ~after="", ());
-  let (isFetchingMore, setFetchingMore) = React.useState(() => false);
-
-  let keyForTransaction = (data, index) =>
-    Option.withDefault(~default="", data##blocks##pageInfo##lastCursor)
-    ++ string_of_int(index);
 
   let updateQuery: ReasonApolloQuery.updateQueryT = [%bs.raw
     {| function (prevResult, { fetchMoreResult }) {
@@ -163,49 +125,58 @@ let make = () => {
         {ReasonReact.string("Date / Amount")}
       </span>
     </div>
-    <TransactionsQuery variables=transactionQuery##variables>
-      {response =>
-         switch (response.result) {
-         | Loading => <Loader.Page> <Loader /> </Loader.Page>
-         | Error(err) => React.string(err##message) /* TODO format this error message */
-         | Data(data) =>
-           <div className=Styles.body>
-             {Array.mapi(
-                ~f=
-                  (i, transaction) =>
-                    <div
-                      className=Styles.row key={keyForTransaction(data, i)}>
-                      <TransactionCell transaction />
-                    </div>,
-                extractTransactions(data),
-              )
-              |> React.array}
-             {!isFetchingMore
-                ? <Waypoint
-                    onEnter={_ => {
-                      setFetchingMore(_ => true);
-                      let moreTransactions =
-                        Transactions.make(~publicKey=activeWalletKey, ());
-                      let _ =
-                        response.fetchMore(
-                          ~variables=moreTransactions##variables,
-                          ~updateQuery,
-                          (),
-                        )
-                        |> Js.Promise.then_(_ => {
-                             setFetchingMore(_ => false);
-                             Js.Promise.resolve();
-                           });
-                      ();
-                    }}
-                    topOffset="100px"
-                  />
-                : <div
-                    className=Css.(style([margin2(~v=`rem(1.5), ~h=`auto)]))>
-                    <Loader />
-                  </div>}
-           </div>
-         }}
-    </TransactionsQuery>
+    {switch (activeWallet) {
+     | Some(pubkey) =>
+       let transactionQuery =
+         TransactionsQueryString.make(
+           ~publicKey=PublicKey.toString(pubkey),
+           ~after="",
+           (),
+         );
+       <TransactionsQuery variables=transactionQuery##variables>
+         (
+           response =>
+             switch (response.result) {
+             | Loading => <Loader.Page> <Loader /> </Loader.Page>
+             | Error(err) => React.string(err##message) /* TODO format this error message */
+             | Data(data) =>
+               let transactions = extractTransactions(data);
+               switch (Array.length(transactions)) {
+               | 0 =>
+                 <div className=Styles.alertContainer>
+                   <Alert
+                     kind=`Info
+                     message="You don't have any coda in this wallet."
+                   />
+                 </div>
+               | _ =>
+                 <TransactionsList
+                   transactions
+                   onLoadMore={() => {
+                     let moreTransactions =
+                       TransactionsQueryString.make(
+                         ~publicKey=PublicKey.toString(pubkey),
+                         (),
+                       );
+
+                     response.fetchMore(
+                       ~variables=moreTransactions##variables,
+                       ~updateQuery,
+                       (),
+                     );
+                   }}
+                 />
+               };
+             }
+         )
+       </TransactionsQuery>;
+     | None =>
+       <div className=Styles.alertContainer>
+         <Alert
+           message="Select a wallet from the side bar to view related transactions."
+           kind=`Info
+         />
+       </div>
+     }}
   </div>;
 };
