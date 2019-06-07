@@ -38,7 +38,7 @@ module Styles = {
 
   let deactivatedSettings =
     merge([
-      Link.Styles.link,
+      Link.Styles.greyLink,
       style([
         padding4(
           ~top=`rem(0.5),
@@ -128,8 +128,7 @@ let make = () => {
     switch (url.path) {
     | ["settings", ..._] => true
     | _ => false
-    };
-  <header className=Styles.header>
+    }; <header className=Styles.header>
     <svg
       className=Css.(
         style([position(`absolute), top(`px(4)), left(`px(7))])
@@ -155,7 +154,7 @@ let make = () => {
              subscribeToMore={response.subscribeToMore}
            />}
       </SyncStatusQuery>
-      <Spacer width=1.5 />
+      <Spacer width=0.75 />
       <a
         className={
           onSettingsPage
