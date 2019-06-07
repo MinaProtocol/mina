@@ -1,8 +1,6 @@
 open Core
 open Async
-open Pipe_lib
 open Signature_lib
-open Coda_numbers
 open Coda_base
 open Coda_transition
 open Coda_state
@@ -209,7 +207,7 @@ struct
               Server.create_expert
                 ~on_handler_error:
                   (`Call
-                    (fun net exn ->
+                    (fun _net exn ->
                       Logger.error logger ~module_:__MODULE__ ~location:__LOC__
                         "%s" (Exn.to_string_mach exn) ))
                 (Tcp.Where_to_listen.bind_to Localhost
@@ -242,7 +240,7 @@ struct
         Tcp.Server.create
           ~on_handler_error:
             (`Call
-              (fun net exn ->
+              (fun _net exn ->
                 Logger.error logger ~module_:__MODULE__ ~location:__LOC__ "%s"
                   (Exn.to_string_mach exn) ))
           where_to_listen
@@ -270,7 +268,6 @@ struct
     |> ignore
 
   let create_snark_worker ~public_key ~client_port ~shutdown_on_disconnect =
-    let open Snark_worker in
     let%map p =
       let our_binary = Sys.executable_name in
       Process.create_exn () ~prog:our_binary

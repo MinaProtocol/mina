@@ -2,7 +2,6 @@ open Core
 open Async
 open Coda_base
 open Coda_state
-open Signature_lib
 open Coda_inputs
 open Signature_lib
 open Pipe_lib
@@ -316,9 +315,9 @@ module T = struct
         ; work_selection
         ; conf_dir
         ; trace_dir
-        ; program_dir
         ; peers
-        ; max_concurrent_connections } =
+        ; max_concurrent_connections
+        ; _ } =
       let logger =
         Logger.create
           ~metadata:
@@ -350,15 +349,9 @@ module T = struct
 
         let genesis_proof = Precomputed_values.base_proof
 
-        let transaction_capacity_log_2 = 3
-
-        let work_delay_factor = 2
-
         let commit_id = None
 
         let work_selection = work_selection
-
-        let max_concurrent_connections = max_concurrent_connections
       end in
       O1trace.trace_task "worker_main" (fun () ->
           let%bind (module Init) = make_init (module Config) in
@@ -581,8 +574,10 @@ module T = struct
                     Async.Pipe.map pipe ~f:(function
                       | Ok json ->
                           parse_sync_status_exn json
-                      | Error e ->
-                          failwith "Receiving sync status error: " )
+                      | Error json ->
+                          failwith
+                            (sprintf "Receiving sync status error: %s"
+                               (Yojson.Basic.to_string json)) )
                 | _ ->
                     failwith "Expected to get a stream of sync updates" )
             | Error e ->

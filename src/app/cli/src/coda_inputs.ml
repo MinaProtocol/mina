@@ -8,9 +8,7 @@ open Coda_state
 open Coda_transition
 open Signature_lib
 open Blockchain_snark
-open Coda_numbers
 open Pipe_lib
-open O1trace
 
 module type Work_selector_F = functor
   (Inputs : Work_selector.Inputs.Inputs_intf)
@@ -259,8 +257,6 @@ let make_init (module Config : Config_intf) : (module Init_intf) Deferred.t =
   (module Init : Init_intf)
 
 module Make_inputs0 (Init : Init_intf) = struct
-  open Init
-
   let max_length = Consensus.Constants.k
 
   module Time_close_validator = struct
