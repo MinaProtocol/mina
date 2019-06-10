@@ -5,5 +5,4 @@
  (libraries core async rpc_parallel)
  (preprocess
   (pps ppx_jane ppx_deriving.eq))
- (flags :standard -short-paths -warn-error -58)
  (synopsis "Template code to run programs that rely Rpc_parallel.Expert"))

@@ -79,7 +79,7 @@ module type S = sig
       module V1 = Latest
     end
 
-    type t = Stable.Latest.t [@@deriving sexp, eq, yojson, compare, hash]
+    type t = Stable.Latest.t [@@deriving sexp, yojson, compare, hash]
 
     include Gen_intf with type t := t
 
@@ -100,4 +100,6 @@ module type S = sig
   val forget_check : With_valid_signature.t -> t
 
   val accounts_accessed : t -> Public_key.Compressed.t list
+
+  val filter_by_participant : t list -> Public_key.Compressed.t -> t list
 end

@@ -53,7 +53,6 @@
 /src/lib/dyn_array/ @johnwu93
 /src/lib/empty_hashes/ @johnwu93
 /src/lib/envelope/ @psteckler @cmr
-/src/lib/file_stack_database/ @johnwu93 @bkase
 /src/lib/file_system/ @johnwu93 @bkase
 /src/lib/genesis_ledger/ @nholland94 @bkase @cmr
 /src/lib/global_signer_private_key/ @nholland94
@@ -130,10 +129,9 @@
 /src/lib/sync_handler/ @cmr
 /src/lib/sync_status/ @johnwu93
 /src/lib/syncable_ledger/ @cmr @enolan
-/src/lib/test_mocks/ @nholland94
 /src/lib/test_util/ @nholland94
 /src/lib/time_simulator/ @bkase
-/src/lib/transaction_database/ @johnwu93 @bkase
+/src/lib/auxiliary_database/ @johnwu93 @bkase
 /src/lib/transaction_pool/ @enolan
 /src/lib/transaction_snark/ @deepthiskumar @bkase
 /src/lib/transaction_snark_scan_state/ @deepthiskumar

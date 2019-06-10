@@ -83,7 +83,6 @@ let get_balance =
              printf "Failed to get balance %s\n" (Error.to_string_hum e) ))
 
 let get_public_keys =
-  let open Deferred.Let_syntax in
   let open Daemon_rpcs in
   let open Command.Param in
   let with_balances_flag =
@@ -104,7 +103,6 @@ let get_public_keys =
              Get_public_keys.rpc () port ))
 
 let prove_payment =
-  let open Deferred.Let_syntax in
   let open Daemon_rpcs in
   let open Command.Param in
   let open Cli_lib.Arg_type in
@@ -201,9 +199,7 @@ let get_nonce_cmd =
              exit 0 ))
 
 let status =
-  let open Deferred.Let_syntax in
   let open Daemon_rpcs in
-  let open Command.Param in
   let flag = Args.zip2 Cli_lib.Flag.json Cli_lib.Flag.performance in
   Command.async ~summary:"Get running daemon status"
     (Cli_lib.Background_daemon.init flag ~f:(fun port (json, performance) ->
@@ -214,7 +210,6 @@ let status =
            port ))
 
 let status_clear_hist =
-  let open Deferred.Let_syntax in
   let open Daemon_rpcs in
   let flag = Args.zip2 Cli_lib.Flag.json Cli_lib.Flag.performance in
   Command.async ~summary:"Clear histograms reported in status"
@@ -256,7 +251,7 @@ let batch_send_payments =
     with
     | Ok x ->
         return x
-    | Error e ->
+    | Error _ ->
         let sample_info () : Payment_info.t =
           let keypair = Keypair.create () in
           { Payment_info.receiver=
@@ -451,7 +446,6 @@ let constraint_system_digests =
 
 let snark_job_list =
   let open Deferred.Let_syntax in
-  let open Daemon_rpcs in
   let open Command.Param in
   Command.async ~summary:"List of snark jobs in JSON format"
     (Cli_lib.Background_daemon.init (return ()) ~f:(fun port () ->
@@ -463,7 +457,6 @@ let snark_job_list =
 
 let start_tracing =
   let open Deferred.Let_syntax in
-  let open Daemon_rpcs in
   let open Command.Param in
   Command.async ~summary:"Start async tracing to $config-directory/$pid.trace"
     (Cli_lib.Background_daemon.init (return ()) ~f:(fun port () ->
@@ -475,7 +468,6 @@ let start_tracing =
 
 let stop_tracing =
   let open Deferred.Let_syntax in
-  let open Daemon_rpcs in
   let open Command.Param in
   Command.async ~summary:"Stop async tracing"
     (Cli_lib.Background_daemon.init (return ()) ~f:(fun port () ->
@@ -489,7 +481,6 @@ module Visualization = struct
   let create_command (type rpc_response) ~name ~f
       (rpc : (string, rpc_response) Rpc.Rpc.t) =
     let open Deferred.Let_syntax in
-    let open Command.Param in
     Command.async
       ~summary:(sprintf !"Produce a visualization of the %s" name)
       (Cli_lib.Background_daemon.init

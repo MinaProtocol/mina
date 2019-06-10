@@ -7,7 +7,6 @@ open Async
 open Coda_base
 open Module_version
 open Pipe_lib
-open Protocols.Coda_transition_frontier
 open Signature_lib
 
 module type Transition_frontier_intf = sig
@@ -21,16 +20,17 @@ module type Transition_frontier_intf = sig
     val staged_ledger : t -> staged_ledger
   end
 
-  module Extensions : sig
+  module Diff : sig
     module Best_tip_diff : sig
-      type view = User_command.t Best_tip_diff_view.t
+      type view =
+        { new_user_commands: User_command.t list
+        ; removed_user_commands: User_command.t list }
     end
   end
 
   val best_tip : t -> Breadcrumb.t
 
-  val best_tip_diff_pipe :
-    t -> Extensions.Best_tip_diff.view Broadcast_pipe.Reader.t
+  val best_tip_diff_pipe : t -> Diff.Best_tip_diff.view Broadcast_pipe.Reader.t
 end
 
 (* Functor over user command, base ledger and transaction validator for mocking. *)
@@ -60,6 +60,8 @@ struct
     ; trust_system: Trust_system.t
     ; mutable diff_reader: unit Deferred.t Option.t
     ; mutable best_tip_ledger: Base_ledger.t option }
+
+  let all_from_user {pool; _} = Indexed_pool.all_from_user pool
 
   let transactions' p =
     Sequence.unfold ~init:p ~f:(fun pool ->
@@ -115,7 +117,7 @@ struct
 
   let handle_diff t frontier
       ({new_user_commands; removed_user_commands} :
-        Transition_frontier.Extensions.Best_tip_diff.view) =
+        Transition_frontier.Diff.Best_tip_diff.view) =
     (* This runs whenever the best tip changes. The simple case is when the new
        best tip is an extension of the old one. There, we remove any user
        commands that were included in it from the transaction pool. Dealing with
@@ -481,17 +483,23 @@ let%test_module _ =
         let staged_ledger = Fn.id
       end
 
-      type t =
-        User_command.t Best_tip_diff_view.t Broadcast_pipe.Reader.t
-        * Breadcrumb.t ref
+      module Diff = struct
+        module Best_tip_diff = struct
+          type view =
+            { new_user_commands: User_command.t list
+            ; removed_user_commands: User_command.t list }
+        end
+      end
 
-      let create :
-             unit
-          -> t * User_command.t Best_tip_diff_view.t Broadcast_pipe.Writer.t =
+      type t =
+        Diff.Best_tip_diff.view Broadcast_pipe.Reader.t * Breadcrumb.t ref
+
+      let create : unit -> t * Diff.Best_tip_diff.view Broadcast_pipe.Writer.t
+          =
        fun () ->
         let pipe_r, pipe_w =
           Broadcast_pipe.create
-            Best_tip_diff_view.
+            Diff.Best_tip_diff.
               {new_user_commands= []; removed_user_commands= []}
         in
         let accounts =
@@ -502,12 +510,6 @@ let%test_module _ =
         in
         let ledger = Public_key.Compressed.Map.of_alist_exn accounts in
         ((pipe_r, ref ledger), pipe_w)
-
-      module Extensions = struct
-        module Best_tip_diff = struct
-          type view = User_command.t Best_tip_diff_view.t
-        end
-      end
 
       let best_tip (_, best_tip_ref) = !best_tip_ref
 

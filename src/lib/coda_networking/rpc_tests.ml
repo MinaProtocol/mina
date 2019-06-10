@@ -8,7 +8,7 @@
 
 let%test_module "RPC deserialization tests" =
   ( module struct
-    let serialization_in_buffer serialization =
+    let _serialization_in_buffer serialization =
       let len = String.length serialization in
       let buff = Bin_prot.Common.create_buf len in
       Bin_prot.Common.blit_string_buf serialization buff ~len ;

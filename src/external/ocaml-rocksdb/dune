@@ -4,7 +4,6 @@
     (no_dynlink)
     (modes native)
     (libraries ctypes ctypes.foreign)
-    (flags (:standard -warn-error -A))
     (modules (:standard \ rocks_linker_flags_gen rocks_test))
     (c_library_flags (:standard (:include flags.sexp)))
     (self_build_stubs_archive (rocksdb))
