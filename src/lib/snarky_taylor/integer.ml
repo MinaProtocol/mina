@@ -9,12 +9,12 @@ let create ~value ~upper_bound = {value; upper_bound}
 
 let to_field t = t.value
 
-let constant (type f) ~m:((module M) as m : f m) x =
+let constant (type f s) ~m:((module M) as m : (s, f) m) x =
   let open M in
   assert (x < Field.size) ;
   {value= Field.(constant (bigint_to_field ~m x)); upper_bound= B.(one + x)}
 
-let shift_left (type f) ~m:((module M) as m : f m) t k =
+let shift_left (type f s) ~m:((module M) as m : (s, f) m) t k =
   let open M in
   let two_to_k = B.(one lsl k) in
   let upper_bound = B.(two_to_k * t.upper_bound) in
@@ -24,7 +24,7 @@ let shift_left (type f) ~m:((module M) as m : f m) t k =
 (* The number of bits needed to represent a number < x *)
 let bits_needed x = Z.log2up (B.to_zarith_bigint x)
 
-let of_bits (type f) ~m:((module M) : f m) bs =
+let of_bits (type f s) ~m:((module M) : (s, f) m) bs =
   {value= M.Field.project bs; upper_bound= B.(of_int 2 lsl List.length bs)}
 
 (* Given a and b returns (q, r) such that
@@ -32,7 +32,7 @@ let of_bits (type f) ~m:((module M) : f m) bs =
     a = q * b + r
     r < b
 *)
-let div_mod (type f) ~m:((module M) as m : f m) a b =
+let div_mod (type f s) ~m:((module M) as m : (s, f) m) a b =
   let open M in
   (* Guess (q, r) *)
   let q, r =

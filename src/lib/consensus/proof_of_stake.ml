@@ -1856,9 +1856,14 @@ module Data = struct
             (Global_slot.create ~epoch:next_epoch ~slot:next_slot)
       ; checkpoints }
 
-    module M = Snarky.Snark.Run.Make (Curve_choice.Tick_backend)
+    module M =
+      Snarky.Snark.Run.Make
+        (Curve_choice.Tick_backend)
+        (struct
+          type t = unit
+        end)
 
-    let m : M.field Snarky.Snark.m = (module M)
+    let m : (unit, M.field) Snarky.Snark.m = (module M)
 
     let same_checkpoint_window ~prev:(slot1 : Global_slot.Packed.var)
         ~next:(slot2 : Global_slot.Packed.var) =
@@ -1882,7 +1887,8 @@ module Data = struct
         .less
 
     let same_checkpoint_window ~prev ~next =
-      M.make_checked (fun () -> same_checkpoint_window ~prev ~next)
+      with_state (As_prover.return ())
+        (M.make_checked (fun () -> same_checkpoint_window ~prev ~next))
 
     let negative_one : Value.t =
       { Poly.length= Length.zero

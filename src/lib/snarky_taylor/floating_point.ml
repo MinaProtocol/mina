@@ -16,7 +16,7 @@ type 'f t = {value: 'f Cvar.t; precision: int}
 
 let precision t = t.precision
 
-let to_bignum (type f) ~m:((module M) as m : f m) t =
+let to_bignum (type f s) ~m:((module M) as m : (s, f) m) t =
   let open M in
   let d = t.precision in
   fun () ->
@@ -28,13 +28,13 @@ let to_bignum (type f) ~m:((module M) as m : f m) t =
     ---- * ---- = ---------
     2^px   2^py   2^(px+py)
 *)
-let mul (type f) ~m:((module I) : f m) x y =
+let mul (type f s) ~m:((module I) : (s, f) m) x y =
   let open I in
   let new_precision = x.precision + y.precision in
   assert (new_precision < Field.Constant.size_in_bits) ;
   {value= Field.(x.value * y.value); precision= new_precision}
 
-let constant (type f) ~m:((module M) as m : f m) ~value ~precision =
+let constant (type f s) ~m:((module M) as m : (s, f) m) ~value ~precision =
   assert (B.(value < one lsl precision)) ;
   let open M in
   {value= Field.constant (bigint_to_field ~m value); precision}
@@ -62,7 +62,7 @@ let pow2 add ~one k =
     ---- + ---- = ---------------
     2^px   2^py        2^py
 *)
-let add_signed (type f) ~m:((module M) : f m) t1 (sgn, t2) =
+let add_signed (type f s) ~m:((module M) : (s, f) m) t1 (sgn, t2) =
   let open M in
   let precision = max t1.precision t2.precision in
   assert (precision < Field.Constant.size_in_bits) ;
@@ -78,7 +78,7 @@ let add ~m x y = add_signed ~m x (`Pos, y)
 
 let sub ~m x y = add_signed ~m x (`Neg, y)
 
-let le (type f) ~m:((module M) : f m) t1 t2 =
+let le (type f s) ~m:((module M) : (s, f) m) t1 t2 =
   let open M in
   let precision = max t1.precision t2.precision in
   assert (precision < Field.Constant.size_in_bits) ;
@@ -118,13 +118,19 @@ let of_quotient ~m ~precision ~top ~bottom ~top_is_less_than_bottom:() =
   let q, _r = Integer.(div_mod ~m (shift_left ~m top precision) bottom) in
   {value= Integer.to_field q; precision}
 
-let of_bits (type f) ~m:((module M) : f m) bits ~precision =
+let of_bits (type f s) ~m:((module M) : (s, f) m) bits ~precision =
   assert (List.length bits <= precision) ;
   {value= M.Field.pack bits; precision}
 
 let%test_unit "of-quotient" =
-  let module M = Snarky.Snark.Run.Make (Snarky.Backends.Mnt4.Default) in
-  let m : M.field m = (module M) in
+  let module M =
+    Snarky.Snark.Run.Make
+      (Snarky.Backends.Mnt4.Default)
+      (struct
+        type t = unit
+      end)
+  in
+  let m : (unit, M.field) m = (module M) in
   let gen =
     let open Quickcheck in
     let open Generator.Let_syntax in
@@ -135,14 +141,16 @@ let%test_unit "of-quotient" =
   in
   Quickcheck.test ~trials:5 gen ~f:(fun (a, b) ->
       let precision = 32 in
-      let res =
+      let (), res =
         assert (B.(a < b)) ;
-        M.run_and_check (fun () ->
+        M.run_and_check
+          (fun () ->
             let t =
               of_quotient ~m ~precision ~top:(Integer.constant ~m a)
                 ~bottom:(Integer.constant ~m b) ~top_is_less_than_bottom:()
             in
             to_bignum ~m t )
+          ()
         |> Or_error.ok_exn
       in
       let actual = Bignum.(of_bigint a / of_bigint b) in

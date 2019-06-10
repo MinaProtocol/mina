@@ -60,16 +60,24 @@ let%test_unit "group-map test" =
       ~a:Tick_backend.Inner_curve.Coefficients.a
       ~b:Tick_backend.Inner_curve.Coefficients.b
   in
-  let module M = Snarky.Snark.Run.Make (Tick_backend) in
+  let module M =
+    Snarky.Snark.Run.Make
+      (Tick_backend)
+      (struct
+        type t = unit
+      end)
+  in
   Quickcheck.test ~trials:3 Tick0.Field.gen ~f:(fun t ->
-      let checked_output =
-        M.run_and_check (fun () ->
+      let (), checked_output =
+        M.run_and_check
+          (fun () ->
             let x, y =
               Snarky_group_map.Checked.to_group
                 (module M)
                 ~params (M.Field.constant t)
             in
             fun () -> M.As_prover.(read_var x, read_var y) )
+          ()
         |> Or_error.ok_exn
       in
       [%test_eq: Tick0.Field.t * Tick0.Field.t] checked_output
