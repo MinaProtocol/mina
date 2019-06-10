@@ -70,9 +70,6 @@ module Styles = {
   let walletChevron = style([
     display(`inlineFlex), 
     color(Theme.Colors.tealAlpha(0.5)),
-    /* hover([
-      color(Theme.Colors.hyperlink),
-    ]), */
   ]);
 };
 
