@@ -20,7 +20,13 @@ module Styles = {
     ]);
 
   let inactiveWalletItem =
-    merge([walletItem, style([hover([color(Colors.saville)])]), notText]);
+    merge([
+      walletItem,
+      style([
+        hover([color(Colors.saville)])
+      ]),
+      notText,
+    ]);
 
   let activeWalletItem =
     merge([
