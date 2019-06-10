@@ -1,7 +1,6 @@
 (library
  (name daemon_rpcs)
  (public_name daemon_rpcs)
- (flags :standard -short-paths -warn-error -58-39)
  (library_flags -linkall)
  (inline_tests)
  (libraries core async coda_base ppx_deriving_yojson.runtime yojson

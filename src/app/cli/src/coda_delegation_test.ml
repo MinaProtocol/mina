@@ -1,7 +1,5 @@
 open Core
 open Async
-open Coda_worker
-open Coda_inputs
 open Coda_base
 
 let name = "coda-delegation-test"
@@ -36,7 +34,7 @@ let main () =
   (* keep CI alive *)
   Deferred.don't_wait_for (print_heartbeat ()) ;
   (* dump account info to log *)
-  List.iteri Genesis_ledger.accounts (fun ndx ((_, acct) as record) ->
+  List.iteri Genesis_ledger.accounts ~f:(fun ndx ((_, acct) as record) ->
       let keypair = Genesis_ledger.keypair_of_account_record_exn record in
       Logger.info logger ~module_:__MODULE__ ~location:__LOC__
         !"Account: %i private key: %{sexp: Import.Private_key.t} public key: \
@@ -51,9 +49,7 @@ let main () =
     Genesis_ledger.keypair_of_account_record_exn delegator
   in
   (* zeroth account is delegatee *)
-  let ((_, delegatee_account) as delegatee) =
-    List.nth_exn Genesis_ledger.accounts 0
-  in
+  let _, delegatee_account = List.nth_exn Genesis_ledger.accounts 0 in
   let delegatee_pubkey = Account.public_key delegatee_account in
   let worker = testnet.workers.(0) in
   (* setup readers for proposals by delegator, delegatee *)
@@ -127,7 +123,6 @@ let main () =
   Coda_worker_testnet.Api.teardown testnet
 
 let command =
-  let open Command.Let_syntax in
   Command.async
     ~summary:
       "Test whether stake delegation from a high-balance account to a \

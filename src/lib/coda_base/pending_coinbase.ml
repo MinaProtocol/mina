@@ -103,7 +103,7 @@ end = struct
     module Registered_V1 = Registrar.Register (V1)
   end
 
-  type t = Stable.Latest.t [@@deriving sexp, compare, eq]
+  type t = Stable.Latest.t [@@deriving sexp, compare]
 
   let ( > ), to_string, zero, to_int, of_int, equal =
     Int.(( > ), to_string, zero, to_int, of_int, equal)
@@ -367,8 +367,7 @@ module T = struct
       , set_exn
       , find_index_exn
       , add_path
-      , merkle_root
-      , iteri )]
+      , merkle_root )]
   end
 
   module Checked = struct

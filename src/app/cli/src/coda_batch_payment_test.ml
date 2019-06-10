@@ -1,7 +1,5 @@
 open Core
 open Async
-open Coda_worker
-open Coda_inputs
 open Signature_lib
 
 let name = "coda-batch-payment-test"
@@ -37,5 +35,4 @@ let main () =
   Coda_worker_testnet.Api.teardown testnet
 
 let command =
-  let open Command.Let_syntax in
   Command.async ~summary:"Test batch payments" (Async.Command.Spec.return main)

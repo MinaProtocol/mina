@@ -12,7 +12,7 @@ let make = () => {
      | ["settings"] => <SettingsPage />
      | ["settings", publicKey] =>
        <WalletSettings publicKey={PublicKey.uriDecode(publicKey)} />
-     | _ => <TransactionsView />
+     | _ => <Transactions />
      }}
   </div>;
 };

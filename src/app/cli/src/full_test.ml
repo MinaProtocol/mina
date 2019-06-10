@@ -253,13 +253,13 @@ let run_test () : unit Deferred.t =
           amount balance_sheet fee =
         let payment = build_payment amount sender_sk receiver_pk fee in
         let new_balance_sheet =
-          Map.update balance_sheet sender_pk (fun v ->
+          Map.update balance_sheet sender_pk ~f:(fun v ->
               Option.value_exn
                 (Currency.Balance.sub_amount (Option.value_exn v)
                    (Option.value_exn (Currency.Amount.add_fee amount fee))) )
         in
         let new_balance_sheet' =
-          Map.update new_balance_sheet receiver_pk (fun v ->
+          Map.update new_balance_sheet receiver_pk ~f:(fun v ->
               Option.value_exn
                 (Currency.Balance.add_amount (Option.value_exn v) amount) )
         in
@@ -382,7 +382,6 @@ let run_test () : unit Deferred.t =
         test_duplicate_payments sender_keypair receiver_keypair )
 
 let command =
-  let open Core in
   let open Async in
   Command.async ~summary:"Full coda end-to-end test"
     (Command.Param.return run_test)

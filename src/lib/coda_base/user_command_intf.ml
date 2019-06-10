@@ -79,7 +79,7 @@ module type S = sig
       module V1 = Latest
     end
 
-    type t = Stable.Latest.t [@@deriving sexp, eq, yojson, compare, hash]
+    type t = Stable.Latest.t [@@deriving sexp, yojson, compare, hash]
 
     include Gen_intf with type t := t
 
