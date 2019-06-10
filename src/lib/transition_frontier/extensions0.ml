@@ -56,7 +56,7 @@ module Make (Inputs : sig
           { new_: State_hash.t Mutant.Root.t
           ; garbage: State_hash.t list }
           -> Mutant.Root_transitioned.t t
-      | Best_tip_changed : State_hash.t -> Mutant.Best_tip_changed.t t
+      | Best_tip_changed : Breadcrumb.t -> Mutant.Best_tip_changed.t t
 
     type 'a diff_mutant = 'a t
 
@@ -331,12 +331,8 @@ struct
               (fun ( ({new_user_commands; removed_user_commands} as acc)
                    , old_best_tip
                    , should_broadcast ) -> function
-              | Diff.E.E (Best_tip_changed state_hash) ->
+              | Diff.E.E (Best_tip_changed new_best_tip_breadcrumb) ->
                   (* TODO: probably do not use state_hash and use breadcrumb *)
-                  let new_best_tip_breadcrumb =
-                    Inputs.Transition_frontier.find_exn transition_frontier
-                      state_hash
-                  in
                   let added_to_best_tip_path, removed_from_best_tip_path =
                     get_path_diff transition_frontier new_best_tip_breadcrumb
                       old_best_tip
