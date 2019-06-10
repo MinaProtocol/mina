@@ -7,6 +7,8 @@ open Coda_incremental
 
 module type Inputs_intf = Inputs.Inputs_intf
 
+module Lol = Extensions0
+
 module Make (Inputs : Inputs_intf) :
   Coda_intf.Transition_frontier_intf
   with type mostly_validated_external_transition :=
@@ -376,6 +378,7 @@ module Make (Inputs : Inputs_intf) :
     in
     Option.map ~f:Non_empty_list.rev (go state_hash)
 
+  (* Deprecated *)
   let previous_root t =
     Extensions.Root_history.most_recent t.extensions.root_history
 
@@ -589,6 +592,7 @@ module Make (Inputs : Inputs_intf) :
       (Breadcrumb.state_hash bc1)
       (Breadcrumb.state_hash bc2)
 
+  (* TODO: Might be an error *)
   (* Get the breadcrumbs that are on bc1's path but not bc2's, and vice versa.
      Ordered oldest to newest.
   *)
