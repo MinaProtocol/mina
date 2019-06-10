@@ -3,8 +3,7 @@ open Snarkette.Mnt6_80
 open Srs
 open Laurent
 module Fq_target = Fq6
-
-module FqLaurent = Make_field_laurent(N)(Fq)
+module FqLaurent = Make_field_laurent (N) (Fq)
 
 let commitPoly (srs : Srs.t) maxm x poly =
   let diff = srs.d - maxm in
