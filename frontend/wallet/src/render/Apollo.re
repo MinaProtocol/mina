@@ -26,12 +26,12 @@ let createClient = (~faker, ~coda) => {
   let codaLink =
     ApolloLinks.createHttpLink(~uri=coda, ~fetch=Bindings.Fetch.fetch, ());
 
-  let link =
+  let _link =
     ApolloLinks.split(
       operation => {
         let operation: {. "operationName": option(string)} =
           Obj.magic(operation);
-        operation##operationName == Some("addWallet")
+        operation##operationName == Some("addWalletss")
         ||
         operation##operationName == Some("getWallets");
       },
@@ -41,7 +41,7 @@ let createClient = (~faker, ~coda) => {
 
   let retry = createRetryLink(retryOptions);
 
-  let retryLink = ApolloLinks.from([|retry, link|]);
+  let retryLink = ApolloLinks.from([|retry, fakerLink|]);
 
   ReasonApollo.createApolloClient(~link=retryLink, ~cache=inMemoryCache, ());
 };
