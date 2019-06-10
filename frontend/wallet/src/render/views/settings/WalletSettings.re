@@ -11,7 +11,7 @@ module Styles = {
   let backIcon =
     style([
       display(`inlineFlex),
-      color(Theme.Colors.hyperlinkAlpha(1.0)),
+      color(Theme.Colors.hyperlink),
       hover([color(Theme.Colors.hyperlinkAlpha(0.5))]),
     ]);
 

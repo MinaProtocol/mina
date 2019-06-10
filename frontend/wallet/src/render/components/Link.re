@@ -14,7 +14,7 @@ module Styles = {
         alignItems(`center),
         cursor(`default),
         color(Theme.Colors.hyperlinkAlpha(0.7)),
-        hover([color(Theme.Colors.hyperlinkAlpha(1.))]),
+        hover([color(Theme.Colors.hyperlink)]),
       ]),
     ]);
 

@@ -43,12 +43,12 @@ module WalletQuery = ReasonApollo.CreateQuery(Wallets);
 
 module AddWallet = [%graphql
   {|
-  mutation addWallet {
-      addWallet(input: {}) {
-          publicKey
-      }
-  }
-|}
+    mutation addWallet {
+        addWallet(input: {}) {
+            publicKey
+        }
+    }
+  |}
 ];
 
 module AddWalletMutation = ReasonApollo.CreateMutation(AddWallet);
@@ -60,19 +60,17 @@ let make = () => {
     React.useContext(AddressBookProvider.context);
 
   <div className=Styles.sidebar>
-    // TODO: Remove fetchPolicy="no-cache" after merge of
-    // https://github.com/apollographql/reason-apollo/pull/196
-
-      <WalletQuery fetchPolicy="no-cache" partialRefetch=true>
+      <WalletQuery partialRefetch=true>
         {response =>
-           switch (response.result) {
-           | Loading => <Loader.Page><Loader /></Loader.Page>
-           | Error(err) => React.string(err##message)
-           | Data(data) =>
-             <WalletList
-               wallets={Array.map(~f=Wallet.ofGraphqlExn, data##ownedWallets)}
-             />
-           }}
+          switch (response.result) {
+          | Loading => <Loader.Page><Loader /></Loader.Page>
+          | Error(err) => React.string(err##message)
+          | Data(data) =>
+            <WalletList
+              wallets={Array.map(~f=Wallet.ofGraphqlExn, data##ownedWallets)}
+            />
+          }
+        }
       </WalletQuery>
       <div className=Styles.footer>
         <a
