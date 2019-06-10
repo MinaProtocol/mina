@@ -1,8 +1,5 @@
 open Core
 open Async
-open Coda_worker
-open Coda_inputs
-open Coda_processes
 
 let name = "coda-peers-test"
 

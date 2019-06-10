@@ -111,8 +111,6 @@ module rec Iterator : (Rocks_intf.ITERATOR with type db := RocksDb.t) = struct
 
   let t = t
 
-  type db
-
   let db = t
 
   let get_pointer = get_pointer
@@ -245,8 +243,6 @@ and Transaction :
 
   let destructor = "rocksdb_" ^ name ^ "_destroy"
 
-  type db = t
-
   let db = t
 
   type nonrec t = t
@@ -301,8 +297,8 @@ and Transaction :
       ( t @-> ocaml_string @-> Views.int_to_size_t @-> ocaml_string
       @-> Views.int_to_size_t @-> returning_error void )
 
-  let put ?(key_pos = 0) ?key_len ?(value_pos = 0) ?value_len ?opts t key value
-      =
+  let put ?(key_pos = 0) ?key_len ?(value_pos = 0) ?value_len ?opts:_ t key
+      value =
     let open Bigarray.Array1 in
     let key_len =
       match key_len with None -> dim key - key_pos | Some len -> len
@@ -317,7 +313,7 @@ and Transaction :
          (bigarray_start array1 value +@ value_pos)
          value_len)
 
-  let put_string ?(key_pos = 0) ?key_len ?(value_pos = 0) ?value_len ?opts t
+  let put_string ?(key_pos = 0) ?key_len ?(value_pos = 0) ?value_len ?opts:_ t
       key value =
     let key_len =
       match key_len with
@@ -348,12 +344,12 @@ and Transaction :
     foreign "rocksdb_transaction_delete"
       (t @-> ocaml_string @-> Views.int_to_size_t @-> returning_error void)
 
-  let delete ?(pos = 0) ?len ?opts t key =
+  let delete ?(pos = 0) ?len ?opts:_ t key =
     let open Bigarray.Array1 in
     let len = match len with None -> dim key - pos | Some len -> len in
     with_err_pointer (delete_raw t (bigarray_start array1 key +@ pos) len)
 
-  let delete_string ?(pos = 0) ?len ?opts t key =
+  let delete_string ?(pos = 0) ?len ?opts:_ t key =
     let len =
       match len with None -> String.length key - pos | Some len -> len
     in
@@ -464,8 +460,6 @@ and RocksDb : (Rocks_intf.ROCKS with type batch := WriteBatch.t) = struct
   module TransactionDbOptions = Rocks_options.TransactionDbOptions
 
   type nonrec t = t
-
-  type batch
 
   let t = t
 
@@ -720,21 +714,13 @@ and RocksDb : (Rocks_intf.ROCKS with type batch := WriteBatch.t) = struct
 
     let destructor = "rocksdb_" ^ name ^ "_destroy"
 
-    type db = t
-
     let db = t
-
-    type nonrec t = t
 
     let t = t
 
     let create_no_gc = foreign constructor (db @-> returning t)
 
     let destroy = make_destroy t destructor
-
-    let create db =
-      let t = create_no_gc db in
-      Gc.finalise destroy t ; t
 
     let with_t db f =
       let t = create_no_gc db in

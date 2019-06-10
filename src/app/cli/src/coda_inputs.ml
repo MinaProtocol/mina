@@ -8,9 +8,7 @@ open Coda_state
 open Coda_transition
 open Signature_lib
 open Blockchain_snark
-open Coda_numbers
 open Pipe_lib
-open O1trace
 
 module type Work_selector_F = functor
   (Inputs : Work_selector.Inputs.Inputs_intf)
@@ -78,6 +76,11 @@ module type Main_intf = sig
       type t
 
       val add : t -> User_command.t -> unit Deferred.t
+
+      val all_from_user :
+           t
+        -> Public_key.Compressed.t
+        -> User_command.With_valid_signature.t list
     end
 
     module Staged_ledger :
@@ -254,8 +257,6 @@ let make_init (module Config : Config_intf) : (module Init_intf) Deferred.t =
   (module Init : Init_intf)
 
 module Make_inputs0 (Init : Init_intf) = struct
-  open Init
-
   let max_length = Consensus.Constants.k
 
   module Time_close_validator = struct
@@ -347,6 +348,8 @@ module Make_inputs0 (Init : Init_intf) = struct
     (* TODO: This causes the signature to get checked twice as it is checked
        below before feeding it to add *)
     let add t txn = apply_and_broadcast t (Envelope.Incoming.local [txn])
+
+    let all_from_user t = Pool.all_from_user (pool t)
   end
 
   module Transaction_pool_diff = Transaction_pool.Pool.Diff
