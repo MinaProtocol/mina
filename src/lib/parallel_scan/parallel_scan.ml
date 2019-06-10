@@ -488,54 +488,14 @@ module Tree = struct
       ~f_merge:(fun _ -> f_merge)
       ~f_base ~init ~finish t
 
-  (*Data that map to a specific level on the tree (A complete binary tree)*)
-  module Tree_data = struct
-    module T = struct
-      type 'a t = Data of 'a | Level of ('a * 'a) t [@@deriving sexp]
-    end
-
-    include T
-
-    let rec map : type a b. a t -> f:(a -> b) -> b t =
-     fun lst ~f ->
-      match lst with
-      | Data a ->
-          Data (f a)
-      | Level t ->
-          let sub = map t ~f:(fun (x, y) -> (f x, f y)) in
-          Level sub
-
-    let rec zip_exn : type a. a t -> a t -> (a * a) t =
-     fun lst1 lst2 ->
-      match (lst1, lst2) with
-      | Data a, Data b ->
-          Data (a, b)
-      | Level a, Level b ->
-          Level (zip_exn a b)
-      | _ ->
-          failwith "Cannot zip the two data lists"
-
-    let rec _fold : type a b. a t -> f:(b -> a -> b) -> init:b -> b =
-     fun t ~f ~init ->
-      match t with
-      | Data a ->
-          f init a
-      | Level a ->
-          _fold a ~f:(fun acc (a, b) -> f (f acc a) b) ~init
-
-    (*Just the nested data*)
-    let rec to_data : type a. a t -> a =
-     fun t -> match t with Data a -> a | Level js -> fst (to_data js)
-  end
-
   (*
     result -> final proof
-    f_merge, f_base are to update the nodes with new jobs and mark old jobs to "Done"*)
+    f_merge, f_base are to update the nodes with new jobs and mark old jobs as "Done"*)
   let rec update_split : type merge_t base_t data weight result.
          f_merge:(data -> int -> merge_t -> merge_t * result option)
       -> f_base:(data -> base_t -> base_t)
       -> weight_merge:(merge_t -> weight * weight)
-      -> jobs:data Tree_data.t
+      -> jobs:data
       -> update_level:int
       -> jobs_split:(weight * weight -> data -> data * data)
       -> (merge_t, base_t) t
@@ -543,22 +503,18 @@ module Tree = struct
    fun ~f_merge ~f_base ~weight_merge ~jobs ~update_level ~jobs_split t ->
     match t with
     | Leaf d ->
-        let x = (Leaf (f_base (Tree_data.to_data jobs) d), None) in
-        x
+        (Leaf (f_base jobs d), None)
     | Node {depth; value; sub_tree} ->
         let weight_left_subtree, weight_right_subtree = weight_merge value in
         (*update the jobs at the current level*)
-        let value', scan_result =
-          f_merge (Tree_data.to_data jobs) depth value
-        in
+        let value', scan_result = f_merge jobs depth value in
         (*get the updated subtree*)
         let sub, _ =
           if update_level = depth then (sub_tree, None)
           else
             (*split the jobs for the next level*)
             let new_jobs_list =
-              Tree_data.map jobs
-                ~f:(jobs_split (weight_left_subtree, weight_right_subtree))
+              jobs_split (weight_left_subtree, weight_right_subtree) jobs
             in
             update_split
               ~f_merge:(fun (b, b') i (x, y) ->
@@ -575,12 +531,10 @@ module Tree = struct
         (Node {depth; value= value'; sub_tree= sub}, scan_result)
 
   let rec update_accumulate : type merge_t base_t data.
-         f_merge:(   (data * data) Tree_data.t
-                  -> merge_t
-                  -> merge_t * data Tree_data.t)
-      -> f_base:(base_t -> base_t * data Tree_data.t)
+         f_merge:(data * data -> merge_t -> merge_t * data)
+      -> f_base:(base_t -> base_t * data)
       -> (merge_t, base_t) t
-      -> (merge_t, base_t) t * data Tree_data.t =
+      -> (merge_t, base_t) t * data =
    fun ~f_merge ~f_base t ->
     match t with
     | Leaf d ->
@@ -591,15 +545,15 @@ module Tree = struct
         let sub, counts =
           update_accumulate
             ~f_merge:(fun b (x, y) ->
-              let b1, b2 = Tree_data.to_data b in
-              let left, count1 = f_merge (Data b1) x in
-              let right, count2 = f_merge (Data b2) y in
-              let count = Tree_data.zip_exn count1 count2 in
+              let b1, b2 = b in
+              let left, count1 = f_merge b1 x in
+              let right, count2 = f_merge b2 y in
+              let count = (count1, count2) in
               ((left, right), count) )
             ~f_base:(fun (x, y) ->
               let left, count1 = f_base x in
               let right, count2 = f_base y in
-              let count = Tree_data.zip_exn count1 count2 in
+              let count = (count1, count2) in
               ((left, right), count) )
             sub_tree
         in
@@ -685,7 +639,7 @@ module Tree = struct
       | _ ->
           failwith "Invalid base job"
     in
-    let jobs = Tree_data.Data completed_jobs in
+    let jobs = completed_jobs in
     update_split ~f_merge:add_merges ~f_base:add_bases tree ~weight_merge:fst
       ~jobs ~update_level ~jobs_split:(fun (l, r) a ->
         (List.take a l, List.take (List.drop a l) r) )
@@ -695,17 +649,17 @@ module Tree = struct
     let f_base base =
       match base with
       | _weight, Base.Job.Full {status= Job_status.Todo; _} ->
-          ((1, snd base), Tree_data.Data (1, 0))
+          ((1, snd base), (1, 0))
       | _ ->
-          ((0, snd base), Data (0, 0))
+          ((0, snd base), (0, 0))
     in
     let f_merge lst m =
-      let (l1, r1), (l2, r2) = Tree_data.to_data lst in
+      let (l1, r1), (l2, r2) = lst in
       match m with
       | (_, _), Merge.Job.Full {status= Job_status.Todo; _} ->
-          (((1, 0), snd m), Tree_data.Data (1, 0))
+          (((1, 0), snd m), (1, 0))
       | _ ->
-          (((l1 + r1, l2 + r2), snd m), Data (l1 + r1, l2 + r2))
+          (((l1 + r1, l2 + r2), snd m), (l1 + r1, l2 + r2))
     in
     fst (update_accumulate ~f_merge ~f_base tree)
 
@@ -1230,8 +1184,8 @@ let add_merge_jobs : completed_jobs:'merge list -> (_, 'merge, _) State_monad.t
             | [] ->
                 ([], None)
             | t :: ts ->
-                let tree_Data = Tree.base_jobs t in
-                (List.rev ts, Some (res, tree_Data)) )
+                let tree_data = Tree.base_jobs t in
+                (List.rev ts, Some (res, tree_data)) )
       in
       if
         Option.is_some result_opt
