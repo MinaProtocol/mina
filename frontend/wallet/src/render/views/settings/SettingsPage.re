@@ -49,7 +49,7 @@ module Styles = {
       Theme.Text.Body.regular,
       style([
         userSelect(`none),
-        padding2(~v=`rem(1.), ~h=`rem(1.)),
+        padding(`rem(1.)),
         color(Theme.Colors.midnight),
         display(`flex),
         alignItems(`center),
