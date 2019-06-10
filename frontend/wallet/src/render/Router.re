@@ -1,7 +1,11 @@
 module Styles = {
   open Css;
 
-  let container = style([width(`percent(100.)), overflow(`scroll)]);
+  let container =
+    style([
+      width(`percent(100.)),
+      overflow(`hidden),
+    ]);
 };
 
 [@react.component]
