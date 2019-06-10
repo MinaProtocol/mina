@@ -89,14 +89,14 @@ module ViewModel = {
   };
 
   let ofTransaction =
-      (transaction: Transaction.t, ~myWallets: list(PublicKey.t)) => {
+      (transaction: Transaction.t, ~myWallets: list(PublicKey.t), ~pending) => {
     switch (transaction) {
     | UserCommand(userCmd) =>
       let date = userCmd##date;
       {
         sender: Actor.Key(userCmd##from),
         recipient: Actor.Key(userCmd##to_),
-        action: Action.Transfer,
+        action: pending ? Action.Pending : Action.Transfer,
         info:
           Option.map(userCmd##memo, ~f=x => Info.Memo(x, date))
           |> Option.withDefault(~default=Info.Empty(date)),
@@ -342,6 +342,8 @@ module TopLevelStyles = {
 
   let icon = style([opacity(0.5)]);
 
+  let pendingIcon = style([display(`inlineFlex), color(Theme.Colors.clay), opacity(0.5)]);
+
   module RightSide = {
     let outerWrapper =
       style([
@@ -374,12 +376,12 @@ module TopLevelStyles = {
 // These cells are returned as a fragment so that the parent container can
 // use a consistent grid layout to keep everything lined up.
 [@react.component]
-let make = (~transaction: Transaction.t) => {
+let make = (~transaction: Transaction.t, ~pending=false) => {
   let activeWallet = Hooks.useActiveWallet();
   let myWallets =
     Option.map(~f=wallet => [wallet], activeWallet)
     |> Option.withDefault(~default=[]);
-  let viewModel = ViewModel.ofTransaction(transaction, ~myWallets);
+  let viewModel = ViewModel.ofTransaction(transaction, ~myWallets, ~pending);
 
   <>
     <span className=TopLevelStyles.Actors.wrapper>
@@ -390,7 +392,7 @@ let make = (~transaction: Transaction.t) => {
            <span className=TopLevelStyles.icon>
              <Icon kind=Icon.BentArrow />
            </span>
-         | Pending => React.string("... ")
+         | Pending => <span className=TopLevelStyles.pendingIcon> <Icon kind=Icon.Dots /> </span>
          | Failed => React.string("x ")
          }}
         <ActorName value={viewModel.recipient} />

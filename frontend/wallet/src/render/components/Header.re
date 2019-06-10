@@ -37,7 +37,23 @@ module Styles = {
     ]);
 
   let deactivatedSettings =
-    merge([Link.Styles.link, style([padding(`rem(0.5))])]);
+    merge([
+      Link.Styles.greyLink,
+      style([
+        padding4(
+          ~top=`rem(0.5),
+          ~right=`rem(0.75),
+          ~bottom=`rem(0.5),
+          ~left=`rem(0.5),
+        ),
+        color(Theme.Colors.slateAlpha(0.5)),
+        hover([
+          backgroundColor(Theme.Colors.slateAlpha(0.15)),
+          borderRadius(`px(6)),
+          color(Theme.Colors.slate),
+        ]),
+      ]),
+    ]);
 
   let activatedSettings =
     merge([
@@ -52,13 +68,13 @@ module Styles = {
 
 module SyncStatusQ = [%graphql
   {|
-query querySyncStatus {
-  syncState {
-    status
-    description
-  }
-}
-|}
+    query querySyncStatus {
+      syncState {
+        status
+        description
+      }
+    }
+  |}
 ];
 
 module SyncStatusQuery = ReasonApollo.CreateQuery(SyncStatusQ);
@@ -131,16 +147,14 @@ let make = () => {
              subscribeToMore={response.subscribeToMore}
            />}
       </SyncStatusQuery>
-      <Spacer width=1.5 />
+      <Spacer width=0.75 />
       <a
         className={
           onSettingsPage
             ? Styles.activatedSettings : Styles.deactivatedSettings
         }
-        onClick={_e =>
-          onSettingsPage
-            ? ReasonReact.Router.push("/")
-            : ReasonReact.Router.push("/settings")
+        onClick={_e => 
+          ReasonReact.Router.push(onSettingsPage ? "/" : "/settings")
         }>
         <Icon kind=Icon.Settings />
         <Spacer width=0.25 />

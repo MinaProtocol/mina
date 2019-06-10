@@ -317,7 +317,7 @@ let%test_module "sparse-ledger-test" =
       [@@deriving sexp, eq]
 
       [%%define_locally
-      Stable.Latest.(key, gen, data_hash)]
+      Stable.Latest.(key, gen)]
     end
 
     module Key = struct
@@ -333,7 +333,7 @@ let%test_module "sparse-ledger-test" =
         module Latest = V1
       end
 
-      type t = Stable.Latest.t [@@deriving eq, sexp]
+      type t = Stable.Latest.t [@@deriving sexp]
     end
 
     include Make (Hash.Stable.Latest) (Key.Stable.Latest)

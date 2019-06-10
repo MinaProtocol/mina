@@ -3,14 +3,15 @@ open Tc;
 module Styles = {
   open Css;
 
-  let container = style([padding(`rem(1.0))]);
+  let container = style([padding(`rem(2.0))]);
 
   let backHeader =
     style([display(`flex), alignItems(`center), userSelect(`none)]);
 
   let backIcon =
     style([
-      color(Theme.Colors.hyperlinkAlpha(1.0)),
+      display(`inlineFlex),
+      color(Theme.Colors.hyperlink),
       hover([color(Theme.Colors.hyperlinkAlpha(0.5))]),
     ]);
 
@@ -36,7 +37,7 @@ module Styles = {
 
   let modalContainer =
     style([
-      width(`rem(21.)),
+      width(`rem(22.)),
       display(`flex),
       flexDirection(`column),
       alignItems(`center),
@@ -75,10 +76,11 @@ module DeleteButton = {
       This can't be undone, and you may lose the funds in this wallet.";
     <>
       <Link
-        isRed=true
+        kind=Link.Red
         onClick={_ =>
           updateModal(x => Option.or_(Some({text: "", error: None}), x))
-        }>
+        }
+      >
         {React.string("Delete wallet")}
       </Link>
       {switch (modalState) {
@@ -86,7 +88,6 @@ module DeleteButton = {
        | Some({text, error}) =>
          <Modal
            title="Delete Wallet"
-           isRed=true
            onRequestClose={_ => updateModal(_ => None)}>
            <div className=Styles.modalContainer>
              <div className=Styles.deleteAlert>

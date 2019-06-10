@@ -1,7 +1,5 @@
 open Core
 open Async
-open Coda_worker
-open Coda_inputs
 open Coda_base
 open Signature_lib
 
@@ -66,6 +64,5 @@ let main () =
   Deferred.List.iter workers ~f:Coda_process.disconnect
 
 let command =
-  let open Command.Let_syntax in
   Command.async ~summary:"Test that peers can prove sent payments"
     (Command.Param.return main)

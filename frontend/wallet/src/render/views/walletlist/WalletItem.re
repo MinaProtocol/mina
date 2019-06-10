@@ -13,13 +13,20 @@ module Styles = {
       justifyContent(`center),
       height(`rem(4.5)),
       fontFamily("IBM Plex Sans, Sans-Serif"),
-      color(grey),
-      padding2(~v=`px(0), ~h=Theme.Spacing.defaultSpacing),
+      color(Theme.Colors.slateAlpha(0.5)),
+      padding2(~v=`px(0), ~h=`rem(1.25)),
       borderBottom(`px(1), `solid, Theme.Colors.borderColor),
+      borderTop(`px(1), `solid, white),
     ]);
 
   let inactiveWalletItem =
-    merge([walletItem, style([hover([color(Colors.saville)])]), notText]);
+    merge([
+      walletItem,
+      style([
+        hover([color(Colors.saville)])
+      ]),
+      notText,
+    ]);
 
   let activeWalletItem =
     merge([

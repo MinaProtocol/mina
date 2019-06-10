@@ -6,7 +6,6 @@ open Asttypes
 open Parsetree
 open Longident
 open Core
-open Fold_lib
 open Chunked_triples
 
 let seed = "CodaPedersenParams"
@@ -15,7 +14,6 @@ let random_bool = Crs.create ~seed
 
 module Impl = Curve_choice.Tick0
 module Group = Curve_choice.Tick_backend.Inner_curve
-open Tuple_lib
 
 let bigint_of_bits bits =
   List.foldi bits ~init:Bigint.zero ~f:(fun i acc b ->
@@ -57,7 +55,7 @@ let max_input_size_in_bits = 20000
 let base_params =
   List.init
     (max_input_size_in_bits / (3 * scalar_size_in_triples))
-    ~f:(fun i -> Group.of_affine_coordinates (random_point ()))
+    ~f:(fun _i -> Group.of_affine_coordinates (random_point ()))
 
 let sixteen_times x =
   x |> Group.double |> Group.double |> Group.double |> Group.double

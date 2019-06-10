@@ -16,7 +16,7 @@ module Styles = {
         alignItems(`center),
         justifyContent(`center),
         height(`rem(3.)),
-        minWidth(`rem(10.)),
+        minWidth(`rem(10.5)),
         padding2(~v=`zero, ~h=`rem(1.)),
         background(white),
         border(`px(0), `solid, white),
@@ -70,14 +70,7 @@ module Styles = {
       ]),
     ]);
 
-  let disabled =
-    merge([
-      base,
-      style([
-        backgroundColor(Theme.Colors.slateAlpha(0.05)),
-        color(Theme.Colors.midnightAlpha(0.5)),
-      ]),
-    ]);
+  let disabled = style([opacity(0.5)]);
 };
 
 [@react.component]
@@ -85,14 +78,14 @@ let make = (~label, ~onClick=?, ~style=Blue, ~disabled=false) =>
   <button
     disabled
     ?onClick
-    className={
+    className={Css.merge([
+      disabled ? Styles.disabled : "",
       switch (style) {
-      | _ when disabled => Styles.disabled
       | Blue => Styles.blue
       | Green => Styles.green
       | Red => Styles.red
       | Gray => Styles.gray
-      }
-    }>
+      },
+    ])}>
     {React.string(label)}
   </button>;

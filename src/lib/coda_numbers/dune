@@ -1,7 +1,6 @@
 (library
  (name coda_numbers)
  (public_name coda_numbers)
- (flags :standard -short-paths -warn-error -58)
  (inline_tests)
  (library_flags -linkall)
  (libraries fold_lib tuple_lib snark_bits snark_params unsigned_extended
