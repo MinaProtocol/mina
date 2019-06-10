@@ -109,7 +109,7 @@ let make = (~pubkey) => {
     onMouseLeave={_ => setHovered(_ => false)}>
     <Pill mode=pillMode>
       <span className={Styles.pillContents(hovered, isActive)}>
-        <AddressName pubkey />
+        <WalletName pubkey />
       </span>
     </Pill>
     {switch (hovered, editing) {

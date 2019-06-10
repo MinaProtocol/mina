@@ -87,7 +87,7 @@ module WalletItem = {
       className=Styles.walletItem
       onClick={_ => ReasonReact.Router.push(route)}>
       <div className=Styles.walletName>
-        <AddressName pubkey={publicKey} />
+        <WalletName pubkey={publicKey} />
       </div>
       <span className=Theme.Text.Body.mono>
         <Pill> {React.string(PublicKey.prettyPrint(publicKey))} </Pill>

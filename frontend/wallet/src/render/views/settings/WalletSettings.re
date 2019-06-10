@@ -199,7 +199,7 @@ let make = (~publicKey) => {
       </span>
       <Spacer width=0.5 />
       <span className=Styles.backHeaderText>
-        <AddressName pubkey=publicKey />
+        <WalletName pubkey=publicKey />
         {React.string(" settings")}
       </span>
     </div>

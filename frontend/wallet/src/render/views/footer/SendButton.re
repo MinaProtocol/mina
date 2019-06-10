@@ -141,7 +141,7 @@ let make = (~wallets, ~onSubmit) => {
                  |> Array.map(~f=wallet =>
                       (
                         PublicKey.toString(wallet.Wallet.key),
-                        <AddressName pubkey={wallet.key} />
+                        <WalletName pubkey={wallet.key} />
                       )
                     )
                  |> Array.toList
