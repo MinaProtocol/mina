@@ -37,7 +37,7 @@ module Styles = {
 
   let modalContainer =
     style([
-      width(`rem(21.)),
+      width(`rem(22.)),
       display(`flex),
       flexDirection(`column),
       alignItems(`center),
@@ -79,7 +79,8 @@ module DeleteButton = {
         kind=Link.Red
         onClick={_ =>
           updateModal(x => Option.or_(Some({text: "", error: None}), x))
-        }>
+        }
+      >
         {React.string("Delete wallet")}
       </Link>
       {switch (modalState) {
