@@ -2,26 +2,26 @@ open Core
 open Snarkette.Mnt6_80
 open Laurent
 
-let makeLaurentForTest idx ints =
-  let rec convert ints =
-    match ints with
-    | [] ->
-        []
-    | hd :: tl ->
-        (if hd < 0 then Fq.negate (Fq.of_int (abs hd)) else Fq.of_int hd)
-        :: convert tl
-  in
-  makeLaurent idx (convert ints)
+module FqLaurent = Make_field_laurent(N)(Fq)
+
+let makeLaurentForTest deg ints =
+  FqLaurent.create deg (List.map ints ~f:Fq.of_int)
 
 let test polyA polyB polySum polyDifference polyProduct =
-  assert (eqLaurent (addLaurent polyA polyB) polySum) ;
-  assert (eqLaurent (mulLaurent polyA polyB) polyProduct) ;
-  assert (eqLaurent (subtractLaurent polyA polyB) polyDifference) ;
+  assert (FqLaurent.equal polyA polyA) ;
+  assert (FqLaurent.equal polyB polyB) ;
+  assert (not (FqLaurent.equal polyA polyB)) ;
+
+  assert (FqLaurent.equal (FqLaurent.( + ) polyA polyB) polySum) ;
+  assert (FqLaurent.equal (FqLaurent.( - ) polyA polyB) polyDifference) ;
+  assert (FqLaurent.equal (FqLaurent.( * ) polyA polyB) polyProduct) ;
+
   assert (
-    eqLaurent (subtractLaurent polyB polyA) (negateLaurent polyDifference) ) ;
-  assert (eqLaurent (addLaurent (subtractLaurent polyA polyB) polyB) polyA) ;
-  assert (eqLaurent (quotLaurent (mulLaurent polyA polyB) polyB) polyA) ;
-  assert (eqLaurent (quotLaurent (mulLaurent polyA polyB) polyA) polyB)
+    FqLaurent.equal (FqLaurent.( - ) polyB polyA) (FqLaurent.negate polyDifference) ) ;
+  assert (FqLaurent.equal (FqLaurent.( + ) (FqLaurent.( - ) polyA polyB) polyB) polyA) ;
+
+  assert (FqLaurent.equal (FqLaurent.( / ) (FqLaurent.( * ) polyA polyB) polyB) polyA) ;
+  assert (FqLaurent.equal (FqLaurent.( / ) (FqLaurent.( * ) polyA polyB) polyA) polyB)
 
 let%test_unit "test1" =
   let polyA = makeLaurentForTest 0 [2; 0; 1] in
@@ -48,3 +48,9 @@ let%test_unit "test2" =
   let polyProduct = makeLaurentForTest (-4) [-2; 0; -1; 4; 0; 0; 16; -2; -8] in
   (* -2x^{-4} - x^{-2} + 4x^{-1} + 16x^2 - 2x^3 - 8x^4 *)
   test polyA polyB polySum polyDifference polyProduct
+
+let%test_unit "evaluationTest" =
+  let polyA = makeLaurentForTest 0 [2; 0; 1] in
+  assert (Fq.equal (FqLaurent.eval polyA Fq.one) (Fq.of_string "3"));
+  assert (Fq.equal (FqLaurent.eval polyA (Fq.of_string "3")) (Fq.of_string "11"));
+  assert (Fq.equal (FqLaurent.eval polyA (Fq.of_string "-3")) (Fq.of_string "11"))

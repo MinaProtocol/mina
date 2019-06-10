@@ -2,7 +2,7 @@
   (name sonic_prototype)
   (modules srs commitment_scheme laurent test_laurent)
   (inline_tests)
-  (preprocess (pps ppx_inline_test))
+  (preprocess (pps ppx_inline_test ppx_jane ppx_deriving.eq))
   (libraries core snarkette)
 )
   

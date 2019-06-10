@@ -1,156 +1,201 @@
-open Snarkette
-open Snarkette.Mnt6_80
+open Core
 
 exception PolyDivisionError of string
 
-type 'f laurent = {starting_index: int; coefficients: 'f list}
+module type Ring = sig
+  type nat
 
-let makeLaurent idx coeffs = {starting_index= idx; coefficients= coeffs}
+  type t
+  [@@deriving eq, sexp]
 
-let laurentZero = makeLaurent 0 []
+  val ( + ) : t -> t -> t
+  val ( * ) : t -> t -> t
+  val ( ** ) : t -> nat -> t
+  val negate : t -> t
+  val zero : t
+  val one : t
+  val to_string : t -> string
+end
 
-let rec eqList a b =
-  match (a, b) with
-  | [], [] ->
-      true
-  | [], _ | _, [] ->
-      false
-  | aHd :: aTl, bHd :: bTl ->
-      Fq.equal aHd bHd && eqList aTl bTl
+module type Field = sig
+  include Ring
 
-let rec mulList x lst =
-  match lst with [] -> [] | hd :: tl -> Fq.( * ) x hd :: mulList x tl
+  val ( - ) : t -> t -> t
+  val ( / ) : t -> t -> t
+end
 
-(* assumes that length of a > length of b *)
-let rec subtractList a b =
-  match a with
-  | [] ->
-      []
-  | aHd :: aTl -> (
-    match b with
-    | [] ->
-        a
-    | bHd :: bTl ->
-        Fq.( - ) aHd bHd :: subtractList aTl bTl )
+module type Ring_laurent = sig
+  type ring
 
-let rec trimLaurent poly =
-  match poly.coefficients with
-  | [] ->
-      poly
-  | hd :: tl ->
-      if Fq.equal hd Fq.zero then
-        trimLaurent (makeLaurent (poly.starting_index + 1) tl)
-      else poly
+  type t = int * (ring list)
 
-let evalLaurent poly pt =
-  let rec loop remainingCoeffs pt currentPower =
-    match remainingCoeffs with
-    | [] ->
-        Fq.zero
-    | _ :: _ ->
-        Fq.( + ) currentPower
-          (loop (List.tl remainingCoeffs) pt (Fq.( * ) pt currentPower))
-  in
-  loop poly.coefficients pt (Fq.( ** ) pt (Nat.of_int poly.starting_index))
+  val create : int -> ring list -> t
 
-let printLaurent poly =
-  let rec printLoop idx coeffs =
-    match coeffs with
-    | [] ->
-        Printf.printf "\n" ; ()
-    | hd :: tl ->
-        if not (Fq.equal hd Fq.zero) then
-          Printf.printf "%s%s%s"
-            (if Fq.equal hd Fq.one && idx != 0 then "" else Fq.to_string hd)
-            ( if idx = 0 then ""
-            else "x" ^ if idx != 1 then "^" ^ string_of_int idx else "" )
-            (if List.length tl > 0 then " + " else "")
-        else () ;
-        printLoop (idx + 1) tl
-  in
-  printLoop poly.starting_index poly.coefficients
+  val eval : t -> ring -> ring
+  val equal : t -> t -> bool
+  val negate : t -> t
+  val zero : t
 
-let laurentIsZero poly = List.length poly.coefficients = 0
+  val ( + ) : t -> t -> t
+  val ( - ) : t -> t -> t
+  val ( * ) : t -> t -> t
 
-let negateLaurent poly =
-  let rec negateList lst =
-    match lst with
-    | [] ->
-        []
-    | hd :: tl ->
-        Fq.( - ) Fq.zero hd :: negateList tl
-  in
-  makeLaurent poly.starting_index (negateList poly.coefficients)
+  val to_string : t -> string
+end
 
-let eqLaurent a b =
-  let aT = trimLaurent a in
-  let bT = trimLaurent b in
-  aT.starting_index = bT.starting_index
-  && eqList aT.coefficients bT.coefficients
+module Make_ring_laurent (N: sig
+    type t
 
-let addLaurent a b =
-  let rec pad lst howMuch =
-    if howMuch = 0 then lst else Fq.zero :: pad lst (howMuch - 1)
-  in
-  let rec addLoop aCoeffs bCoeffs =
-    match aCoeffs with
-    | [] ->
-        bCoeffs
-    | aHd :: aTl -> (
-      match bCoeffs with
+    val of_int : int -> t
+  end) (R : Ring with type nat := N.t) : Ring_laurent with type ring := R.t = struct
+  type t = int * (R.t list)
+
+  let create starting_degree coefficients =
+    (starting_degree, coefficients)
+
+  let eval poly pt =
+    let (starting_degree, coefficients) = poly in
+    let rec loop remainingCoeffs pt currentPower =
+      match remainingCoeffs with
       | [] ->
-          aCoeffs
-      | bHd :: bTl ->
-          Fq.( + ) aHd bHd :: addLoop aTl bTl )
-  in
-  let newStartingIndex = min a.starting_index b.starting_index in
-  let paddedACoeffs =
-    if newStartingIndex < a.starting_index then
-      pad a.coefficients (a.starting_index - newStartingIndex)
-    else a.coefficients
-  in
-  let paddedBCoeffs =
-    if newStartingIndex < b.starting_index then
-      pad b.coefficients (b.starting_index - newStartingIndex)
-    else b.coefficients
-  in
-  makeLaurent newStartingIndex (addLoop paddedACoeffs paddedBCoeffs)
+          R.zero
+      | hd :: tl ->
+          R.( + ) (R.( * ) hd currentPower)
+            (loop tl pt (R.( * ) pt currentPower))
+    in
+    loop coefficients pt (R.( ** ) pt (N.of_int starting_degree))
+  
+  let trim poly =
+    let (starting_degree, coefficients) = poly in
+    let rec allZeroes lst =
+      match lst with
+      | [] -> true
+      | hd::tl -> R.equal R.zero hd && allZeroes tl in
+    let rec removeZerosFromEnd lst =
+      match lst with
+      | [] -> []
+      | hd::tl -> if allZeroes lst then [] else hd :: removeZerosFromEnd tl in
+    let rec trimBeginning starting_degree coeffs =
+      match coeffs with
+      | [] -> create starting_degree coeffs
+      | hd :: tl ->
+      if 
+      R.equal R.zero hd then
+          trimBeginning (starting_degree + 1) tl
+        else create starting_degree coeffs in
+    trimBeginning starting_degree (removeZerosFromEnd coefficients)
+  
+  let equal polyA polyB =
+    let rec eqList lstA lstB =
+      match lstA, lstB with
+      | [], [] -> true
+      | [], _ | _, [] -> false
+      | aHd::aTl, bHd::bTl -> R.equal aHd bHd && eqList aTl bTl in
+    let trimmedA = trim polyA in
+    let trimmedB = trim polyB in
+    let (degA, coeffsA) = trimmedA in
+    let (degB, coeffsB) = trimmedB in
+    degA = degB && eqList coeffsA coeffsB
 
-let subtractLaurent a b = addLaurent a (negateLaurent b)
+  let negate poly =
+    let (starting_degree, coefficients) = poly in
+    let rec negateList lst =
+      match lst with
+      | [] -> []
+      | hd::tl -> (R.negate hd) :: negateList tl in
+    create starting_degree (negateList coefficients)
+  
+  let zero =
+    create 0 []
+  
+  let ( + ) polyA polyB =
+    let rec pad lst howMuch =
+      if howMuch <= 0 then lst else R.zero :: pad lst (howMuch - 1) in
+    let rec addLoop aCoeffs bCoeffs =
+      match aCoeffs, bCoeffs with
+      | [], _ -> bCoeffs
+      | _, [] -> aCoeffs
+      | aHd::aTl, bHd::bTl -> R.( + ) aHd bHd :: addLoop aTl bTl in
+    let (degA, coeffsA) = polyA in
+    let (degB, coeffsB) = polyB in
+    let padded_coeffsA = pad coeffsA (degA - degB) in
+    let padded_coeffsB = pad coeffsB (degB - degA) in
+    create (min degA degB) (addLoop padded_coeffsA padded_coeffsB)
+  
+  let ( - ) polyA polyB =
+    ( + ) polyA (negate polyB)
+  
+  let ( * ) polyA polyB =
+    let rec mul polyA polyB =
+      if equal polyA zero || equal polyB zero then zero else
+      let (degA, coeffsA) = polyA in
+      let (degB, coeffsB) = polyB in
+      match coeffsA with
+      | [] -> zero
+      | aHd::aTl ->
+        let firstProduct = create Int.(degA + degB) (List.map coeffsB ~f:(fun c -> R.( * ) c aHd)) in
+        let remainingProduct = mul (create Int.(degA + 1) aTl) polyB in
+        firstProduct + remainingProduct
+    in
+    mul polyA polyB
+  
+  let to_string poly =
+    let (starting_degree, coefficients) = poly in
+    let rec printLoop deg coeffs =
+      match coeffs with
+      | [] ->
+          Printf.sprintf "\n"
+      | hd :: tl ->
+          let first =
+            if not (R.equal hd R.zero) then
+              Printf.sprintf "%s%s%s"
+                (if R.equal hd R.one && deg <> 0 then "" else R.to_string hd)
+                ( if deg = 0 then ""
+                else "x" ^ if deg <> 1 then "^" ^ string_of_int deg else "" )
+                (if List.length tl > 0 then " + " else "")
+            else "" in
+          Printf.sprintf "%s%s" first (printLoop Int.(deg + 1) tl)
+    in
+    printLoop starting_degree coefficients
+end
 
-let rec mulLaurent a b =
-  if laurentIsZero a || laurentIsZero b then laurentZero
-  else
-    let firstProduct =
-      makeLaurent
-        (a.starting_index + b.starting_index)
-        (mulList (List.hd a.coefficients) b.coefficients)
-    in
-    let remainingProduct =
-      mulLaurent
-        (makeLaurent (a.starting_index + 1) (List.tl a.coefficients))
-        b
-    in
-    addLaurent firstProduct remainingProduct
+module type Field_laurent = sig
+  type field
 
-let rec quotLaurent dividend divisor =
-  if List.length dividend.coefficients < List.length divisor.coefficients then
-    raise (PolyDivisionError "not divisible!")
-  else
-    let fac =
-      Fq.( / ) (List.hd dividend.coefficients) (List.hd divisor.coefficients)
-    in
-    let partialStartingIndex =
-      dividend.starting_index - divisor.starting_index
-    in
-    let partialQuotient = makeLaurent partialStartingIndex [fac] in
-    let reducedCoefficients =
-      List.tl
-        (subtractList dividend.coefficients (mulList fac divisor.coefficients))
-    in
-    let reduced =
-      makeLaurent (dividend.starting_index + 1) reducedCoefficients
-    in
-    if List.length reducedCoefficients < List.length divisor.coefficients then
-      partialQuotient
-    else addLaurent partialQuotient (quotLaurent reduced divisor)
+  include Ring_laurent with type ring := field
+  
+  val ( / ) : t -> t -> t
+end
+
+module Make_field_laurent (N: sig
+  type t
+
+  val of_int : int -> t
+end) (F : Field with type nat := N.t) : Field_laurent with type field := F.t = struct
+  include Make_ring_laurent(N)(F)
+
+  let ( / ) polyA polyB =
+    let rec div polyA polyB =
+      let (degA, coeffsA) = polyA in
+      let (degB, coeffsB) = polyB in
+      if List.length coeffsA < List.length coeffsB then
+        raise (PolyDivisionError "not divisible!")
+      else
+        match coeffsA with
+        | [] -> zero
+        | aHd::aTl ->
+        match coeffsB with
+        | [] -> raise (PolyDivisionError "dividing by zero!")
+        | bHd::bTl ->
+        let fac = F.( / ) aHd bHd in
+        let partial_quotient = create Int.(degA - degB) [fac] in
+        if List.length coeffsA = List.length coeffsB then partial_quotient else
+        let rec subtractMultiple x y =
+          match x, y with
+          | [], _ -> []
+          | _, [] -> x
+          | xHd::xTl, yHd::yTl -> F.( - ) xHd (F.( * ) fac yHd) :: subtractMultiple xTl yTl in
+        let reduced = create Int.(degA + 1) (subtractMultiple aTl bTl) in
+        partial_quotient + (div reduced polyB) in
+    div polyA polyB
+end

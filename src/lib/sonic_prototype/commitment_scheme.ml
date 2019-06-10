@@ -4,22 +4,24 @@ open Srs
 open Laurent
 module Fq_target = Fq6
 
+module FqLaurent = Make_field_laurent(N)(Fq)
+
 let commitPoly (srs : Srs.t) maxm x poly =
   let diff = srs.d - maxm in
   let gxi =
     if diff >= 0 then List.nth_exn srs.gPositiveAlphaX diff
     else List.nth_exn srs.gNegativeAlphaX (abs diff - 1)
   in
-  G1.scale gxi (Fq.to_bigint (evalLaurent poly x))
+  G1.scale gxi (Fq.to_bigint (FqLaurent.eval poly x))
 
 let openPoly _srs _commitment x z fPoly =
-  let fz = evalLaurent fPoly z in
+  let fz = FqLaurent.eval fPoly z in
   let wPoly =
-    quotLaurent
-      (subtractLaurent fPoly (makeLaurent 0 [fz]))
-      (makeLaurent 0 [Fq.negate z; Fq.one])
+    FqLaurent.( / )
+      (FqLaurent.( - ) fPoly (FqLaurent.create 0 [fz]))
+      (FqLaurent.create 0 [Fq.negate z; Fq.one])
   in
-  let w = G1.scale G1.one (Fq.to_bigint (evalLaurent wPoly x)) in
+  let w = G1.scale G1.one (Fq.to_bigint (FqLaurent.eval wPoly x)) in
   (fz, w)
 
 let pcV (srs : Srs.t) maxm commitment z (v, w) =

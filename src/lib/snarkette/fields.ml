@@ -53,6 +53,8 @@ module type Fp_intf = sig
 
   val is_square : t -> bool
 
+  val equal : t -> t -> bool
+
   val sqrt : t -> t
 
   val ( ** ) : t -> nat -> t
@@ -79,7 +81,7 @@ module Make_fp
   include Info
 
   (* TODO version *)
-  type t = N.t [@@deriving eq, bin_io, sexp, compare]
+  type t = N.t [@@deriving bin_io, sexp, compare]
 
   let to_bigint = Fn.id
 
@@ -203,6 +205,9 @@ module Make_fp
 
   let rec loop ~while_ ~init f =
     if while_ init then loop ~while_ ~init:(f init) f else init
+
+  let equal x y =
+    N.equal (x % Info.order) (y % Info.order)
 
   let ( = ) = equal
 
