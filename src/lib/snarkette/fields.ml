@@ -206,8 +206,7 @@ module Make_fp
   let rec loop ~while_ ~init f =
     if while_ init then loop ~while_ ~init:(f init) f else init
 
-  let equal x y =
-    N.equal (x % Info.order) (y % Info.order)
+  let equal x y = N.equal (x % Info.order) (y % Info.order)
 
   let ( = ) = equal
 
