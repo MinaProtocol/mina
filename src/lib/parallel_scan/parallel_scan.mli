@@ -190,6 +190,12 @@ module Available_job : sig
   [@@deriving sexp]
 end
 
+(**Space available and number of jobs required to enqueue data. 
+ first = space on the current tree and number of jobs required 
+ to be completed
+ second = If the current-tree space is less than <max_base_jobs> 
+ then remaining number of slots on a new tree and the corresponding
+ job count.*)
 module Space_partition : sig
   module Stable : sig
     module V1 : sig

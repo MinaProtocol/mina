@@ -234,7 +234,12 @@ module New_job = struct
   [@@deriving sexp]
 end
 
-(**Space available and number of jobs required to enqueue data. When there isn't enough space on the current tree for all the base jobs per update, the remainder of it would be added on to a new tree. The partition specifies how much space is available and the number on the each of the trees *)
+(**Space available and number of jobs required to enqueue data. 
+ first = space on the current tree and number of jobs required 
+ to be completed
+ second = If the current-tree space is less than <max_base_jobs> 
+ then remaining number of slots on a new tree and the corresponding
+ job count.*)
 module Space_partition = struct
   module Stable = struct
     module V1 = struct
@@ -483,49 +488,44 @@ module Tree = struct
       ~f_merge:(fun _ -> f_merge)
       ~f_base ~init ~finish t
 
-  (*List of things that map to a specific level on the tree*)
-  module Data_list = struct
+  (*Data that map to a specific level on the tree (A complete binary tree)*)
+  module Tree_data = struct
     module T = struct
-      type 'a t = Single of 'a | Double of ('a * 'a) t [@@deriving sexp]
+      type 'a t = Data of 'a | Level of ('a * 'a) t [@@deriving sexp]
     end
 
     include T
 
-    let rec split : type a. a t -> (a -> a * a) -> (a * a) t =
-     fun lst f ->
+    let rec map : type a b. a t -> f:(a -> b) -> b t =
+     fun lst ~f ->
       match lst with
-      | Single a ->
-          Single (f a)
-      | Double t ->
-          let sub = split t (fun (x, y) -> (f x, f y)) in
-          Double sub
+      | Data a ->
+          Data (f a)
+      | Level t ->
+          let sub = map t ~f:(fun (x, y) -> (f x, f y)) in
+          Level sub
 
-    let rec merge : type a. a t -> a t -> (a * a) t =
+    let rec zip_exn : type a. a t -> a t -> (a * a) t =
      fun lst1 lst2 ->
       match (lst1, lst2) with
-      | Single a, Single b ->
-          Single (a, b)
-      | Double a, Double b ->
-          Double (merge a b)
+      | Data a, Data b ->
+          Data (a, b)
+      | Level a, Level b ->
+          Level (zip_exn a b)
       | _ ->
-          failwith "Cannot merge the two data lists"
+          failwith "Cannot zip the two data lists"
 
     let rec _fold : type a b. a t -> f:(b -> a -> b) -> init:b -> b =
      fun t ~f ~init ->
       match t with
-      | Single a ->
+      | Data a ->
           f init a
-      | Double a ->
+      | Level a ->
           _fold a ~f:(fun acc (a, b) -> f (f acc a) b) ~init
 
     (*Just the nested data*)
-    let to_data : type a. a t -> a =
-     fun t ->
-      let rec go : type a. a t -> a * a =
-       fun data_list ->
-        match data_list with Single a -> (a, a) | Double js -> fst (go js)
-      in
-      fst @@ go t
+    let rec to_data : type a. a t -> a =
+     fun t -> match t with Data a -> a | Level js -> fst (to_data js)
   end
 
   (*
@@ -535,7 +535,7 @@ module Tree = struct
          f_merge:(data -> int -> merge_t -> merge_t * result option)
       -> f_base:(data -> base_t -> base_t)
       -> weight_merge:(merge_t -> weight * weight)
-      -> jobs:data Data_list.t
+      -> jobs:data Tree_data.t
       -> update_level:int
       -> jobs_split:(weight * weight -> data -> data * data)
       -> (merge_t, base_t) t
@@ -543,13 +543,13 @@ module Tree = struct
    fun ~f_merge ~f_base ~weight_merge ~jobs ~update_level ~jobs_split t ->
     match t with
     | Leaf d ->
-        let x = (Leaf (f_base (Data_list.to_data jobs) d), None) in
+        let x = (Leaf (f_base (Tree_data.to_data jobs) d), None) in
         x
     | Node {depth; value; sub_tree} ->
         let weight_left_subtree, weight_right_subtree = weight_merge value in
         (*update the jobs at the current level*)
         let value', scan_result =
-          f_merge (Data_list.to_data jobs) depth value
+          f_merge (Tree_data.to_data jobs) depth value
         in
         (*get the updated subtree*)
         let sub, _ =
@@ -557,8 +557,8 @@ module Tree = struct
           else
             (*split the jobs for the next level*)
             let new_jobs_list =
-              Data_list.split jobs
-                (jobs_split (weight_left_subtree, weight_right_subtree))
+              Tree_data.map jobs
+                ~f:(jobs_split (weight_left_subtree, weight_right_subtree))
             in
             update_split
               ~f_merge:(fun (b, b') i (x, y) ->
@@ -575,12 +575,12 @@ module Tree = struct
         (Node {depth; value= value'; sub_tree= sub}, scan_result)
 
   let rec update_accumulate : type merge_t base_t data.
-         f_merge:(   (data * data) Data_list.t
+         f_merge:(   (data * data) Tree_data.t
                   -> merge_t
-                  -> merge_t * data Data_list.t)
-      -> f_base:(base_t -> base_t * data Data_list.t)
+                  -> merge_t * data Tree_data.t)
+      -> f_base:(base_t -> base_t * data Tree_data.t)
       -> (merge_t, base_t) t
-      -> (merge_t, base_t) t * data Data_list.t =
+      -> (merge_t, base_t) t * data Tree_data.t =
    fun ~f_merge ~f_base t ->
     match t with
     | Leaf d ->
@@ -591,15 +591,15 @@ module Tree = struct
         let sub, counts =
           update_accumulate
             ~f_merge:(fun b (x, y) ->
-              let b1, b2 = Data_list.to_data b in
-              let left, count1 = f_merge (Single b1) x in
-              let right, count2 = f_merge (Single b2) y in
-              let count = Data_list.merge count1 count2 in
+              let b1, b2 = Tree_data.to_data b in
+              let left, count1 = f_merge (Data b1) x in
+              let right, count2 = f_merge (Data b2) y in
+              let count = Tree_data.zip_exn count1 count2 in
               ((left, right), count) )
             ~f_base:(fun (x, y) ->
               let left, count1 = f_base x in
               let right, count2 = f_base y in
-              let count = Data_list.merge count1 count2 in
+              let count = Tree_data.zip_exn count1 count2 in
               ((left, right), count) )
             sub_tree
         in
@@ -685,7 +685,7 @@ module Tree = struct
       | _ ->
           failwith "Invalid base job"
     in
-    let jobs = Data_list.Single completed_jobs in
+    let jobs = Tree_data.Data completed_jobs in
     update_split ~f_merge:add_merges ~f_base:add_bases tree ~weight_merge:fst
       ~jobs ~update_level ~jobs_split:(fun (l, r) a ->
         (List.take a l, List.take (List.drop a l) r) )
@@ -695,17 +695,17 @@ module Tree = struct
     let f_base base =
       match base with
       | _weight, Base.Job.Full {status= Job_status.Todo; _} ->
-          ((1, snd base), Data_list.Single (1, 0))
+          ((1, snd base), Tree_data.Data (1, 0))
       | _ ->
-          ((0, snd base), Single (0, 0))
+          ((0, snd base), Data (0, 0))
     in
     let f_merge lst m =
-      let (l1, r1), (l2, r2) = Data_list.to_data lst in
+      let (l1, r1), (l2, r2) = Tree_data.to_data lst in
       match m with
       | (_, _), Merge.Job.Full {status= Job_status.Todo; _} ->
-          (((1, 0), snd m), Data_list.Single (1, 0))
+          (((1, 0), snd m), Tree_data.Data (1, 0))
       | _ ->
-          (((l1 + r1, l2 + r2), snd m), Single (l1 + r1, l2 + r2))
+          (((l1 + r1, l2 + r2), snd m), Data (l1 + r1, l2 + r2))
     in
     fst (update_accumulate ~f_merge ~f_base tree)
 
@@ -1230,8 +1230,8 @@ let add_merge_jobs : completed_jobs:'merge list -> (_, 'merge, _) State_monad.t
             | [] ->
                 ([], None)
             | t :: ts ->
-                let data_list = Tree.base_jobs t in
-                (List.rev ts, Some (res, data_list)) )
+                let tree_Data = Tree.base_jobs t in
+                (List.rev ts, Some (res, tree_Data)) )
       in
       if
         Option.is_some result_opt
