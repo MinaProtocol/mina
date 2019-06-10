@@ -73,29 +73,61 @@ module TransactionsQueryString = [%graphql
           lastCursor
         }
       }
+
+      pooledUserCommands(publicKey: $publicKey) {
+        to_: to @bsDecoder(fn: "Apollo.Decoders.publicKey")
+        from @bsDecoder(fn: "Apollo.Decoders.publicKey")
+        amount @bsDecoder(fn: "Apollo.Decoders.int64")
+        fee @bsDecoder(fn: "Apollo.Decoders.int64")
+        memo
+        isDelegation
+        date @bsDecoder(fn: "Apollo.Decoders.date")
+      }
     }
   |}
 ];
 module TransactionsQuery = ReasonApollo.CreateQuery(TransactionsQueryString);
 
-let extractTransactions: Js.t('a) => array(TransactionCell.Transaction.t) =
+/**
+  This function is getting pretty gnarly so here's an explaination.
+  We take in the GraphQL response object called `data`.
+  Next we extract the data from the response object, and put it into a
+  record of type `{ pending: [], blocks: [] }`.
+  Pending contains the pending userCommands, while transactions contains
+  an array of transactions per block.
+ */
+
+type extractedResponse = {
+  blocks: array(array(TransactionCell.Transaction.t)),
+  pending: array(TransactionCell.Transaction.t),
+};
+
+let extractTransactions: Js.t('a) => extractedResponse =
   data => {
-    data##blocks##nodes
-    |> Array.map(~f=block => {
-         open TransactionCell.Transaction;
-         let userCommands =
-           block##transactions##userCommands
-           |> Array.map(~f=userCommand => UserCommand(userCommand));
-         let blockReward =
-           BlockReward({
-             date: block##protocolState##blockchainState##date,
-             creator: block##creator,
-             coinbase: block##transactions##coinbase,
-             feeTransfers: block##transactions##feeTransfer,
-           });
-         Array.append(userCommands, [|blockReward|]);
-       })
-    |> Array.concatenate;
+    let blocks =
+      data##blocks##nodes
+      |> Array.map(~f=block => {
+           open TransactionCell.Transaction;
+           let userCommands =
+             block##transactions##userCommands
+             |> Array.map(~f=userCommand => UserCommand(userCommand));
+           let blockReward =
+             BlockReward({
+               date: block##protocolState##blockchainState##date,
+               creator: block##creator,
+               coinbase: block##transactions##coinbase,
+               feeTransfers: block##transactions##feeTransfer,
+             });
+           Array.append(userCommands, [|blockReward|]);
+         });
+
+    let pending =
+      data##pooledUserCommands
+      |> Array.map(~f=userCommand =>
+           TransactionCell.Transaction.UserCommand(userCommand)
+         );
+
+    { pending, blocks }
   };
 
 [@react.component]
@@ -145,17 +177,19 @@ let make = () => {
              | Loading => <Loader.Page> <Loader /> </Loader.Page>
              | Error(err) => React.string(err##message) /* TODO format this error message */
              | Data(data) =>
-               let transactions = extractTransactions(data);
-               switch (Array.length(transactions)) {
-               | 0 =>
+               let { blocks, pending } = extractTransactions(data);
+               let transactions = Array.concatenate(blocks);
+               switch ((Array.length(transactions), Array.length(pending))) {
+               | (0, 0) =>
                  <div className=Styles.alertContainer>
                    <Alert
                      kind=`Info
                      message="You don't have any coda in this wallet."
                    />
                  </div>
-               | _ =>
+               | (_, _) =>
                  <TransactionsList
+                   pending
                    transactions
                    onLoadMore={() => {
                      let moreTransactions =
