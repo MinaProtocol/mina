@@ -18,6 +18,7 @@ module Styles = {
         gridGap(Theme.Spacing.defaultSpacing),
         padding2(~v=`px(0), ~h=`rem(1.)),
         borderBottom(`px(1), `solid, Theme.Colors.savilleAlpha(0.1)),
+        borderTop(`px(1), `solid, white),
         textTransform(`uppercase),
         height(`rem(2.)),
         alignItems(`center),
