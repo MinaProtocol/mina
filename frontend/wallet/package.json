@@ -13,6 +13,7 @@
     "graphql_ppx": "^0.2.8",
     "node-fetch": "^2.5.0",
     "react-modal": "^3.8.1",
+    "react-waypoint": "^9.0.2",
     "reason-apollo": "^0.16.0",
     "reason-react": "^0.7.0",
     "tablecloth-bucklescript": "file:./tablecloth/bs"

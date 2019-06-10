@@ -1,8 +1,5 @@
 open Core
 open Async
-open Coda_worker
-open Coda_inputs
-open Coda_base
 open Signature_lib
 
 let name = "coda-shared-state-test"
@@ -28,6 +25,5 @@ let main () =
   Coda_worker_testnet.Api.teardown testnet
 
 let command =
-  let open Command.Let_syntax in
   Command.async ~summary:"Test that workers share states"
     (Command.Param.return main)
