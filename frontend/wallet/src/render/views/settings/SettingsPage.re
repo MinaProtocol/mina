@@ -81,14 +81,13 @@ module SettingsQuery = ReasonApollo.CreateQuery(SettingsQueryString);
 module WalletItem = {
   [@react.component]
   let make = (~publicKey) => {
-    let (addressBook, _) = React.useContext(AddressBookProvider.context);
     let keyStr = PublicKey.toString(publicKey);
     let route = "/settings/" ++ Js.Global.encodeURIComponent(keyStr);
     <div
       className=Styles.walletItem
       onClick={_ => ReasonReact.Router.push(route)}>
       <div className=Styles.walletName>
-        {React.string(AddressBook.getWalletName(addressBook, publicKey))}
+        <AddressName pubkey={publicKey} />
       </div>
       <span className=Theme.Text.Body.mono>
         <Pill> {React.string(PublicKey.prettyPrint(publicKey))} </Pill>
@@ -101,7 +100,7 @@ module WalletItem = {
   };
 };
 
-let doubleList = l => List.map(~f=x => (x, x), l);
+let doubleList = l => List.map(~f=x => (x, React.string(x)), l);
 
 type networkOption =
   | NetworkOption(string)

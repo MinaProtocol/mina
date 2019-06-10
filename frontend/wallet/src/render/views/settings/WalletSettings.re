@@ -68,7 +68,12 @@ module DeleteButton = {
   let make = (~publicKey) => {
     let (modalState, updateModal) = React.useState(() => None);
     let (addressBook, _) = React.useContext(AddressBookProvider.context);
-    let walletName = AddressBook.getWalletName(addressBook, publicKey);
+    let walletName =
+      switch (AddressBook.lookup(addressBook, publicKey)) {
+      | Some(name) => name
+      | None =>
+        PublicKey.toString(publicKey) |> String.slice(~from=0, ~to_=5)
+      };
     let warningMessage =
       "Are you sure you want to delete "
       ++ walletName
@@ -79,16 +84,14 @@ module DeleteButton = {
         kind=Link.Red
         onClick={_ =>
           updateModal(x => Option.or_(Some({text: "", error: None}), x))
-        }
-      >
+        }>
         {React.string("Delete wallet")}
       </Link>
       {switch (modalState) {
        | None => React.null
        | Some({text, error}) =>
          <Modal
-           title="Delete Wallet"
-           onRequestClose={_ => updateModal(_ => None)}>
+           title="Delete Wallet" onRequestClose={_ => updateModal(_ => None)}>
            <div className=Styles.modalContainer>
              <div className=Styles.deleteAlert>
                <Alert kind=`Warning message=warningMessage />
@@ -196,9 +199,8 @@ let make = (~publicKey) => {
       </span>
       <Spacer width=0.5 />
       <span className=Styles.backHeaderText>
-        {React.string(
-           AddressBook.getWalletName(addressBook, publicKey) ++ " settings",
-         )}
+        <AddressName pubkey=publicKey />
+        {React.string(" settings")}
       </span>
     </div>
     <div className=Styles.label> {React.string("Wallet name")} </div>

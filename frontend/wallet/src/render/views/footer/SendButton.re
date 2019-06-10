@@ -25,7 +25,7 @@ module ModalState = {
   };
   module Unvalidated = {
     type t = {
-      fromStr: option(PublicKey.t),
+      fromStr: option(string),
       toStr: string,
       amountStr: string,
       feeStr: string,
@@ -37,7 +37,7 @@ module ModalState = {
 
 let emptyModal: option(PublicKey.t) => ModalState.Unvalidated.t =
   activeWallet => {
-    fromStr: activeWallet,
+    fromStr: Option.map(~f=PublicKey.toString, activeWallet),
     toStr: "",
     amountStr: "",
     feeStr: "",
@@ -69,7 +69,7 @@ let validate:
     | ({feeStr}, _) when !validateInt64(feeStr) =>
       Error("Please specify a non-zero fee.")
     | ({fromStr: Some(fromPk), amountStr, feeStr, memoOpt}, Some(toPk)) =>
-      Ok({from: fromPk, to_: toPk, amount: amountStr, fee: feeStr, memoOpt})
+      Ok({from: PublicKey.ofStringExn(fromPk), to_: toPk, amount: amountStr, fee: feeStr, memoOpt})
     };
 
 let modalButtons = (unvalidated, setModalState, onSubmit) => {
@@ -107,8 +107,6 @@ let modalButtons = (unvalidated, setModalState, onSubmit) => {
 [@react.component]
 let make = (~wallets, ~onSubmit) => {
   let (sendState, setModalState) = React.useState(_ => None);
-  let (settings, _updateAddressBook) =
-    React.useContext(AddressBookProvider.context);
   let activeWallet = Hooks.useActiveWallet();
   let spacer = <Spacer height=0.5 />;
   ModalState.Unvalidated.(
@@ -142,8 +140,8 @@ let make = (~wallets, ~onSubmit) => {
                  wallets
                  |> Array.map(~f=wallet =>
                       (
-                        wallet.Wallet.key,
-                        AddressBook.getWalletName(settings, wallet.key),
+                        PublicKey.toString(wallet.Wallet.key),
+                        <AddressName pubkey={wallet.key} />
                       )
                     )
                  |> Array.toList
@@ -151,7 +149,7 @@ let make = (~wallets, ~onSubmit) => {
              />
              spacer
              <TextField
-               label="To"
+             label="To"
                mono=true
                onChange={value =>
                  setModalState(Option.map(~f=s => {...s, toStr: value}))
