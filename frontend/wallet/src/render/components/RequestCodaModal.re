@@ -37,13 +37,22 @@ let make = (~wallets, ~setModalState) => {
   <Modal title="Request Coda" onRequestClose={() => setModalState(_ => false)}>
     <div className=Styles.modalBody>
       <div className=Styles.bodyMargin>
-        <WalletDropdown
+        <Dropdown
           label="To"
           value={Option.map(~f=PublicKey.toString, selectedWallet)}
           onChange={value =>
             setSelectedWallet(_ => Some(PublicKey.ofStringExn(value)))
           }
-          wallets
+          options={
+            wallets
+            |> Array.map(~f=wallet =>
+                (
+                  PublicKey.toString(wallet.Wallet.key),
+                  <WalletDropdownItem wallet />
+                )
+              )
+            |> Array.toList
+          }
         />
         <Spacer height=1. />
         {switch (selectedWallet) {

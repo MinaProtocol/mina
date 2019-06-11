@@ -134,7 +134,7 @@ let make = (~wallets, ~onSubmit) => {
               | Some(err) => <Alert kind=`Danger message=err />
               }}
              spacer
-             <WalletDropdown
+             <Dropdown
                label="From"
                value=fromStr
                onChange={value =>
@@ -142,7 +142,16 @@ let make = (~wallets, ~onSubmit) => {
                    Option.map(~f=s => {...s, fromStr: Some(value)}),
                  )
                }
-               wallets
+                options={
+                  wallets
+                  |> Array.map(~f=wallet =>
+                        (
+                          PublicKey.toString(wallet.Wallet.key),
+                          <WalletDropdownItem wallet />,
+                        )
+                      )
+                  |> Array.toList
+                }
              />
              spacer
              <TextField
