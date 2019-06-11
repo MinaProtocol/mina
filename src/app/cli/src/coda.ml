@@ -36,6 +36,10 @@ let daemon logger =
     (let%map_open conf_dir =
        flag "config-directory" ~doc:"DIR Configuration directory"
          (optional string)
+     and is_genesis =
+       flag "is_genesis"
+         ~doc:"Indicating that we are start from genesis or not"
+         (optional bool)
      and propose_key =
        flag "propose-key"
          ~doc:
@@ -407,6 +411,14 @@ let daemon logger =
        Async.Scheduler.within' ~monitor
        @@ fun () ->
        let%bind () = maybe_sleep 3. in
+       let%bind () =
+         Option.fold is_genesis ~init:Deferred.unit ~f:(fun _ is_genesis ->
+             if is_genesis then Deferred.unit
+             else
+               after
+                 ( Consensus.Constants.block_window_duration_ms * 2
+                 |> Float.of_int |> Time.Span.of_ms ) )
+       in
        M.start coda ;
        let web_service = Web_pipe.get_service () in
        Web_pipe.run_service (module Run) coda web_service ~conf_dir ~logger ;

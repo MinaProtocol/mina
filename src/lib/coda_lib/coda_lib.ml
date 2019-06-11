@@ -292,22 +292,14 @@ module Make (Inputs : Intf.Inputs) = struct
   end
 
   let start t =
-    (* TODO: remove this hack once #2642 is fixed *)
-    Logger.debug t.logger ~module_:__MODULE__ ~location:__LOC__
-      "Proposer blocked waiting for potential bootstrap" ;
-    upon
-      (after
-         ( Consensus.Constants.(block_window_duration_ms * 2)
-         |> Float.of_int |> Time_ns.Span.of_ms ))
-      (fun () ->
-        Proposer.run ~logger:t.logger ~verifier:t.verifier
-          ~trust_system:t.trust_system ~transaction_pool:t.transaction_pool
-          ~get_completed_work:(Snark_pool.get_completed_work t.snark_pool)
-          ~time_controller:t.time_controller
-          ~keypairs:(Agent.read_only t.propose_keypairs)
-          ~consensus_local_state:t.consensus_local_state
-          ~frontier_reader:t.transition_frontier
-          ~transition_writer:t.proposer_transition_writer )
+    Proposer.run ~logger:t.logger ~verifier:t.verifier
+      ~trust_system:t.trust_system ~transaction_pool:t.transaction_pool
+      ~get_completed_work:(Snark_pool.get_completed_work t.snark_pool)
+      ~time_controller:t.time_controller
+      ~keypairs:(Agent.read_only t.propose_keypairs)
+      ~consensus_local_state:t.consensus_local_state
+      ~frontier_reader:t.transition_frontier
+      ~transition_writer:t.proposer_transition_writer
 
   let create_genesis_frontier (config : Config.t) =
     let consensus_local_state = config.consensus_local_state in
