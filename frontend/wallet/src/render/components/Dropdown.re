@@ -54,7 +54,6 @@ module Styles = {
       right(`px(-1)),
       maxHeight(`calc(`add, `rem(10.), `px(2))),
       overflow(`scroll),
-      /* overflowX(`hidden), */
       background(white),
       border(`px(1), `solid, Theme.Colors.marineAlpha(0.3)),
       borderBottomLeftRadius(`rem(0.25)),

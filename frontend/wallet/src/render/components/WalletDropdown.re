@@ -3,6 +3,13 @@ open Tc;
 module Styles = {
   open Css;
     
+  let container =
+    style([
+      display(`flex),
+      justifyContent(`spaceBetween),
+      width(`percent(100.)),
+    ]);
+
   let currencySymbol = 
     style([Theme.Typeface.lucidaGrande]);
 };
@@ -23,15 +30,17 @@ let make = (
       |> Array.map(~f=wallet =>
           (
             PublicKey.toString(wallet.Wallet.key),
-            /* TODO(PM): Fix styling here once we get design */
-            <span>
+            /* TODO(PM): Update styling here once we get mockup */
+            <div className=Styles.container>
               <WalletName pubkey={wallet.key} />
-              {React.string(" ( ")}
-              <span className=Styles.currencySymbol>
-                {React.string({j|■|j})}
+              <span>
+                {React.string(" ( ")}
+                <span className=Styles.currencySymbol>
+                  {React.string({j|■|j})}
+                </span>
+                {React.string(" " ++ wallet.Wallet.balance ++ " )")}
               </span>
-              {React.string(" " ++ wallet.Wallet.balance ++ " )")}
-            </span>,
+            </div>,
           )
         )
       |> Array.toList
