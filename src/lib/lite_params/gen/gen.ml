@@ -24,12 +24,10 @@ struct
   module E = Ppxlib.Ast_builder.Make (L)
   open E
 
+  let string_expr m x = estring (Base64.encode_string (Binable.to_string m x))
+
   let g_string_expr g =
-    estring
-      (Base64.encode_string
-         (Binable.to_string
-            (module Lite_curve_choice.Tock.G1)
-            (Lite_compat_algebra.g1 g)))
+    string_expr (module Lite_curve_choice.Tock.G1) (Lite_compat_algebra.g1 g)
 
   let un_g_expr s_expr =
     [%expr
@@ -49,15 +47,13 @@ struct
 
   let group_map_params =
     let e =
-      estring
-        (Base64.encode_string
-           (Binable.to_string
-              ( module struct
-                type t = Lite_curve_choice.Tock.Fq.t Group_map.Params.t
-                [@@deriving bin_io]
-              end )
-              (Group_map.Params.map Crypto_params.Tock_backend.bg_params
-                 ~f:Lite_compat_algebra.field)))
+      string_expr
+        ( module struct
+          type t = Lite_curve_choice.Tock.Fq.t Group_map.Params.t
+          [@@deriving bin_io]
+        end )
+        (Group_map.Params.map Crypto_params.Group_map_params.params
+           ~f:Lite_compat_algebra.field)
     in
     [%expr
       Core_kernel.Binable.of_string
