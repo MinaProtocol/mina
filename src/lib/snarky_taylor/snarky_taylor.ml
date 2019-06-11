@@ -195,7 +195,7 @@ module Exp = struct
 end
 
 let%test_unit "instantiate" =
-  let module M = Snarky.Snark.Run.Make (Snarky.Backends.Mnt4.Default) in
+  let module M = Snarky.Snark.Run.Make (Snarky.Backends.Mnt4.Default) (Unit) in
   let m : M.field m = (module M) in
   let open M in
   let params =
@@ -211,6 +211,6 @@ let%test_unit "instantiate" =
     in
     Floating_point.to_bignum ~m (Exp.one_minus_exp ~m params arg)
   in
-  let res = M.run_and_check c |> Or_error.ok_exn in
+  let (), res = M.run_and_check c () |> Or_error.ok_exn in
   assert (
     Bignum.(equal res (Exp.Unchecked.one_minus_exp params (one / of_int 2))) )

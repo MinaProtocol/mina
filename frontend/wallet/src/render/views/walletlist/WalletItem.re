@@ -38,8 +38,6 @@ module Styles = {
       notText,
     ]);
 
-  let walletName = Text.Body.regular;
-
   let balance =
     style([
       fontWeight(`num(500)),
@@ -52,16 +50,11 @@ module Styles = {
 
 [@react.component]
 let make = (~wallet: Wallet.t) => {
-  let (settings, _setAddressBook) =
-    React.useContext(AddressBookProvider.context);
-
   let isActive =
     Option.map(Hooks.useActiveWallet(), ~f=activeWallet =>
       PublicKey.equal(activeWallet, wallet.key)
     )
     |> Option.withDefault(~default=false);
-
-  let walletName = AddressBook.getWalletName(settings, wallet.key);
 
   <div
     className={
@@ -73,7 +66,7 @@ let make = (~wallet: Wallet.t) => {
     onClick={_ =>
       ReasonReact.Router.push("/wallet/" ++ PublicKey.uriEncode(wallet.key))
     }>
-    <div className=Styles.walletName> {ReasonReact.string(walletName)} </div>
+    <WalletName pubkey={wallet.key} />
     <div className=Styles.balance>
       {ReasonReact.string({js|■ |js} ++ wallet.balance)}
     </div>
