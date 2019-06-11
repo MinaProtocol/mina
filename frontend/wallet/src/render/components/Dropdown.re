@@ -119,7 +119,8 @@ let make = (~onChange, ~value, ~label, ~options: list((string, React.element))) 
          options,
        )
        |> Array.fromList
-       |> React.array}
+       |> React.array
+      }
     </div>
   </div>;
 };

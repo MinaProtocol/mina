@@ -39,7 +39,6 @@ module Styles = {
       display(`flex),
       flexDirection(`column),
       backgroundColor(`rgba(255, 255, 255, 0.8)),
-      padding2(~v=`zero, ~h=`rem(0.75)),
       borderRadius(`px(6)),
       border(`px(1), `solid, Theme.Colors.slateAlpha(0.4)),
       width(`rem(28.)),
@@ -50,19 +49,28 @@ module Styles = {
       Theme.Text.Body.regular,
       style([
         userSelect(`none),
-        padding2(~v=`rem(1.), ~h=`rem(0.25)),
+        padding(`rem(1.)),
         color(Theme.Colors.midnight),
         display(`flex),
         alignItems(`center),
-        hover([opacity(0.6)]),
         borderBottom(`px(1), `solid, Theme.Colors.slateAlpha(0.25)),
         lastChild([borderBottomWidth(`zero)]),
+        hover([
+          backgroundColor(Theme.Colors.midnightAlpha(0.05)),
+          selector(
+            "> :last-child",
+            [color(Theme.Colors.hyperlink)],
+          ),
+        ]),
       ]),
     ]);
 
   let walletName = style([width(`rem(12.5))]);
 
-  let walletChevron = style([display(`inlineFlex), color(Theme.Colors.tealAlpha(0.5))]);
+  let walletChevron = style([
+    display(`inlineFlex), 
+    color(Theme.Colors.tealAlpha(0.5)),
+  ]);
 };
 
 module SettingsQueryString = [%graphql
@@ -78,14 +86,15 @@ module SettingsQueryString = [%graphql
 
 module SettingsQuery = ReasonApollo.CreateQuery(SettingsQueryString);
 
-module WalletItem = {
+module WalletSettingsItem = {
   [@react.component]
   let make = (~publicKey) => {
     let keyStr = PublicKey.toString(publicKey);
     let route = "/settings/" ++ Js.Global.encodeURIComponent(keyStr);
     <div
       className=Styles.walletItem
-      onClick={_ => ReasonReact.Router.push(route)}>
+      onClick={_ => ReasonReact.Router.push(route)}
+    >
       <div className=Styles.walletName>
         <WalletName pubkey={publicKey} />
       </div>
@@ -207,7 +216,7 @@ let make = () => {
            <div className=Styles.walletItemContainer>
              {data##ownedWallets
               |> Array.map(~f=w =>
-                   <WalletItem
+                   <WalletSettingsItem
                      key={PublicKey.toString(w##publicKey)}
                      publicKey=w##publicKey
                    />
