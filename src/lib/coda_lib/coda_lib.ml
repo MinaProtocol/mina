@@ -292,14 +292,19 @@ module Make (Inputs : Intf.Inputs) = struct
   end
 
   let start t =
-    Proposer.run ~logger:t.logger ~verifier:t.verifier
-      ~trust_system:t.trust_system ~transaction_pool:t.transaction_pool
-      ~get_completed_work:(Snark_pool.get_completed_work t.snark_pool)
-      ~time_controller:t.time_controller
-      ~keypairs:(Agent.read_only t.propose_keypairs)
-      ~consensus_local_state:t.consensus_local_state
-      ~frontier_reader:t.transition_frontier
-      ~transition_writer:t.proposer_transition_writer
+    upon
+      (after
+         ( Consensus.Constants.(block_window_duration_ms * k)
+         |> Float.of_int |> Time_ns.Span.of_ms ))
+      (fun () ->
+        Proposer.run ~logger:t.logger ~verifier:t.verifier
+          ~trust_system:t.trust_system ~transaction_pool:t.transaction_pool
+          ~get_completed_work:(Snark_pool.get_completed_work t.snark_pool)
+          ~time_controller:t.time_controller
+          ~keypairs:(Agent.read_only t.propose_keypairs)
+          ~consensus_local_state:t.consensus_local_state
+          ~frontier_reader:t.transition_frontier
+          ~transition_writer:t.proposer_transition_writer )
 
   let create_genesis_frontier (config : Config.t) =
     let consensus_local_state = config.consensus_local_state in
