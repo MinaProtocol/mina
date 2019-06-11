@@ -69,7 +69,13 @@ let validate:
     | ({feeStr}, _) when !validateInt64(feeStr) =>
       Error("Please specify a non-zero fee.")
     | ({fromStr: Some(fromPk), amountStr, feeStr, memoOpt}, Some(toPk)) =>
-      Ok({from: PublicKey.ofStringExn(fromPk), to_: toPk, amount: amountStr, fee: feeStr, memoOpt})
+      Ok({
+        from: PublicKey.ofStringExn(fromPk),
+        to_: toPk,
+        amount: amountStr,
+        fee: feeStr,
+        memoOpt,
+      })
     };
 
 let modalButtons = (unvalidated, setModalState, onSubmit) => {
@@ -141,7 +147,7 @@ let make = (~wallets, ~onSubmit) => {
                  |> Array.map(~f=wallet =>
                       (
                         PublicKey.toString(wallet.Wallet.key),
-                        <WalletName pubkey={wallet.key} />
+                        <WalletName pubkey={wallet.key} />,
                       )
                     )
                  |> Array.toList
@@ -149,7 +155,7 @@ let make = (~wallets, ~onSubmit) => {
              />
              spacer
              <TextField
-             label="To"
+               label="To"
                mono=true
                onChange={value =>
                  setModalState(Option.map(~f=s => {...s, toStr: value}))
