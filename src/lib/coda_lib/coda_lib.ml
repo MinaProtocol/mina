@@ -292,9 +292,12 @@ module Make (Inputs : Intf.Inputs) = struct
   end
 
   let start t =
+    (* TODO: remove this hack once #2642 is fixed *)
+    Logger.debug t.logger ~module_:__MODULE__ ~location:__LOC__
+      "Proposer blocked waiting for potential bootstrap" ;
     upon
       (after
-         ( Consensus.Constants.(block_window_duration_ms * k)
+         ( Consensus.Constants.(block_window_duration_ms * 2)
          |> Float.of_int |> Time_ns.Span.of_ms ))
       (fun () ->
         Proposer.run ~logger:t.logger ~verifier:t.verifier
