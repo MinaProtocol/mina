@@ -1856,14 +1856,9 @@ module Data = struct
             (Global_slot.create ~epoch:next_epoch ~slot:next_slot)
       ; checkpoints }
 
-    module M =
-      Snarky.Snark.Run.Make
-        (Curve_choice.Tick_backend)
-        (struct
-          type t = unit
-        end)
+    module M = Snarky.Snark.Run.Make (Curve_choice.Tick_backend) (Unit)
 
-    let m : (unit, M.field) Snarky.Snark.m = (module M)
+    let m : M.field Snarky.Snark.m = (module M)
 
     let same_checkpoint_window ~prev:(slot1 : Global_slot.Packed.var)
         ~next:(slot2 : Global_slot.Packed.var) =

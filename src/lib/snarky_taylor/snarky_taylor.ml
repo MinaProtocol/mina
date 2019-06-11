@@ -195,14 +195,8 @@ module Exp = struct
 end
 
 let%test_unit "instantiate" =
-  let module M =
-    Snarky.Snark.Run.Make
-      (Snarky.Backends.Mnt4.Default)
-      (struct
-        type t = unit
-      end)
-  in
-  let m : (unit, M.field) m = (module M) in
+  let module M = Snarky.Snark.Run.Make (Snarky.Backends.Mnt4.Default) (Unit) in
+  let m : M.field m = (module M) in
   let open M in
   let params =
     Exp.params ~field_size_in_bits:Field.Constant.size_in_bits

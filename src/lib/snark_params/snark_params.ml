@@ -60,13 +60,7 @@ let%test_unit "group-map test" =
       ~a:Tick_backend.Inner_curve.Coefficients.a
       ~b:Tick_backend.Inner_curve.Coefficients.b
   in
-  let module M =
-    Snarky.Snark.Run.Make
-      (Tick_backend)
-      (struct
-        type t = unit
-      end)
-  in
+  let module M = Snarky.Snark.Run.Make (Tick_backend) (Unit) in
   Quickcheck.test ~trials:3 Tick0.Field.gen ~f:(fun t ->
       let (), checked_output =
         M.run_and_check
