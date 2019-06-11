@@ -214,24 +214,38 @@ end) :
 
     let merge = Fn.flip Hash.merge
 
-    let hash_root_data (hash, scan_state, pending_coinbase) acc =
-      merge
-        ( Bin_prot.Utils.bin_dump
-            [%bin_type_class:
-              State_hash.Stable.V1.t
-              * Staged_ledger.Scan_state.Stable.V1.t
-              * Pending_coinbase.Stable.V1.t]
-              .writer
-            (hash, scan_state, pending_coinbase)
-        |> Bigstring.to_string )
-        acc
+    let hash_root_data ~logger ~should_print
+        (hash, scan_state, pending_coinbase) acc =
+      let state_hash_bytes = State_hash.to_bytes hash in
+      let scan_state_bytes =
+        Staged_ledger_hash.Aux_hash.to_bytes
+        @@ Staged_ledger.Scan_state.hash scan_state
+      in
+      let pending_coinbase_bytes =
+        Bigstring.to_string
+        @@ Bin_prot.Utils.bin_dump Pending_coinbase.Stable.V1.bin_t.writer
+             pending_coinbase
+      in
+      let hash1 = merge state_hash_bytes acc in
+      let hash2 = merge scan_state_bytes hash1 in
+      let hash3 = merge pending_coinbase_bytes hash2 in
+      if should_print then
+        Logger.trace logger !"Hashing Root data" ~module_:__MODULE__
+          ~location:__LOC__
+          ~metadata:
+            [ ("state_hash", `String (Hash.to_string hash1))
+            ; ("scan_state", `String (Hash.to_string hash2))
+            ; ("pending_coinbase", `String (Hash.to_string hash3)) ] ;
+      hash3
 
-    let hash_diff_contents (type mutant) (t : mutant t) acc =
+    let hash_diff_contents (type mutant) ~logger (t : mutant t) acc =
       match t with
       | New_frontier
           {Root.Poly.root= {With_hash.hash; _}; scan_state; pending_coinbase}
         ->
-          hash_root_data (hash, scan_state, pending_coinbase) acc
+          hash_root_data ~should_print:false ~logger
+            (hash, scan_state, pending_coinbase)
+            acc
       | Add_transition {With_hash.hash; _} ->
           Hash.merge acc (State_hash.to_bytes hash)
       | Remove_transitions removed_transitions ->
@@ -242,9 +256,14 @@ end) :
           { Root.Poly.root= new_hash
           ; scan_state= new_scan_state
           ; pending_coinbase= new_pending_coinbase } ->
-          hash_root_data (new_hash, new_scan_state, new_pending_coinbase) acc
+          Logger.info logger "Hashing diff contents" ~module_:__MODULE__
+            ~location:__LOC__ ;
+          hash_root_data ~should_print:true ~logger
+            (new_hash, new_scan_state, new_pending_coinbase)
+            acc
 
-    let hash_mutant (type mutant) (t : mutant t) (mutant : mutant) acc =
+    let hash_mutant (type mutant) ~logger (t : mutant t) (mutant : mutant) acc
+        =
       match (t, mutant) with
       | New_frontier _, () ->
           acc
@@ -258,11 +277,15 @@ end) :
         , { Root.Poly.root= old_root
           ; scan_state= old_scan_state
           ; pending_coinbase= old_pending_coinbase } ) ->
-          hash_root_data (old_root, old_scan_state, old_pending_coinbase) acc
+          Logger.info logger "Hashing Update Root Value" ~module_:__MODULE__
+            ~location:__LOC__ ;
+          hash_root_data ~should_print:true ~logger
+            (old_root, old_scan_state, old_pending_coinbase)
+            acc
 
-    let hash (type mutant) acc_hash (t : mutant t) (mutant : mutant) =
-      let diff_contents_hash = hash_diff_contents t acc_hash in
-      hash_mutant t mutant diff_contents_hash
+    let hash (type mutant) ~logger acc_hash (t : mutant t) (mutant : mutant) =
+      let diff_contents_hash = hash_diff_contents ~logger t acc_hash in
+      hash_mutant ~logger t mutant diff_contents_hash
 
     module E = struct
       type t = E : 'output diff_mutant -> t

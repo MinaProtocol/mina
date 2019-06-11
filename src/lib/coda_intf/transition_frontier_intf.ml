@@ -127,7 +127,7 @@ module type Transition_frontier_diff_intf = sig
 
     val value_to_yojson : 'output t -> 'output -> Yojson.Safe.json
 
-    val hash : Hash.t -> 'output t -> 'output -> Hash.t
+    val hash : logger:Logger.t -> Hash.t -> 'output t -> 'output -> Hash.t
 
     module E : sig
       type t = E : 'output diff_mutant -> t

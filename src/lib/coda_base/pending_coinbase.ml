@@ -146,9 +146,7 @@ module type Data_hash_binable_intf = sig
   val gen : t Quickcheck.Generator.t
 end
 
-module Data_hash_binable = struct
-  include Data_hash.Make_full_size ()
-end
+module Data_hash_binable = Data_hash.Make_full_size ()
 
 module Coinbase_stack = struct
   module Stack = struct

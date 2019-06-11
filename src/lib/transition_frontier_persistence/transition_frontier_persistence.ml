@@ -23,15 +23,25 @@ module Make (Inputs : Intf.Main_inputs) = struct
         Strict_pipe.Writer.t
     ; buffer: Transition_frontier.Diff.Mutant.E.with_value Queue.t }
 
-  let write_diff_and_verify ~logger ~acc_hash worker (diff, ground_truth_mutant)
-      =
-    Logger.trace logger "Handling mutant diff" ~module_:__MODULE__
-      ~location:__LOC__
-      ~metadata:
-        [("diff_mutant", Transition_frontier.Diff.Mutant.key_to_yojson diff)] ;
+  let write_diff_and_verify (type a) ~logger ~acc_hash worker
+      ((diff, ground_truth_mutant) : a Transition_frontier.Diff.Mutant.t * a) =
     let ground_truth_hash =
-      Transition_frontier.Diff.Mutant.hash acc_hash diff ground_truth_mutant
+      Transition_frontier.Diff.Mutant.hash ~logger acc_hash diff
+        ground_truth_mutant
     in
+    ( match diff with
+    | Update_root _ ->
+        Logger.trace logger "Ground truth Handled mutant diff ****"
+          ~module_:__MODULE__ ~location:__LOC__
+          ~metadata:
+            [ ( "diff_mutant"
+              , Transition_frontier.Diff.Mutant.key_to_yojson diff )
+            ; ( "ground_truth_hash"
+              , `String
+                  (Transition_frontier.Diff.Hash.to_string ground_truth_hash)
+              ) ]
+    | _ ->
+        () ) ;
     match%map
       Worker.handle_diff worker acc_hash
         (Transition_frontier.Diff.Mutant.E.E diff)
@@ -67,15 +77,24 @@ module Make (Inputs : Intf.Main_inputs) = struct
         Strict_pipe.Synchronous
     in
     let worker_thread =
-      Strict_pipe.Reader.fold reader ~init:Transition_frontier.Diff.Hash.empty
-        ~f:(fun init_hash diff_pairs ->
-          Deferred.List.fold diff_pairs ~init:init_hash
-            ~f:(fun acc_hash
+      Strict_pipe.Reader.fold reader
+        ~init:(0, Transition_frontier.Diff.Hash.empty)
+        ~f:(fun (i, init_hash) diff_pairs ->
+          O1trace.measure "worker_mutant_diff_work"
+          @@ fun () ->
+          Deferred.List.fold diff_pairs ~init:(i, init_hash)
+            ~f:(fun (i, acc_hash)
                (Transition_frontier.Diff.Mutant.E.With_value
                  (diff, ground_truth_mutant))
                ->
-              write_diff_and_verify ~logger ~acc_hash worker
-                (diff, ground_truth_mutant) ) )
+              Logger.trace logger
+                !"Worker thread processing diff %i"
+                i ~module_:__MODULE__ ~location:__LOC__ ;
+              let%map new_hash =
+                write_diff_and_verify ~logger ~acc_hash worker
+                  (diff, ground_truth_mutant)
+              in
+              (i + 1, new_hash) ) )
       |> Deferred.ignore
     in
     { worker

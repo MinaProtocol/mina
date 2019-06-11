@@ -54,6 +54,7 @@ end = struct
 
   let handle_diff (t : t) acc_hash
       (E diff : Transition_frontier.Diff.Mutant.E.t) =
+    let logger = t.logger in
     match diff with
     | New_frontier
         Transition_frontier.Diff.Mutant.Root.Poly.
@@ -66,14 +67,15 @@ end = struct
               ~data:(first_root_hash, scan_state, pending_coinbase) ;
             Transition_storage.Batch.set batch
               ~key:(Transition first_root_hash) ~data:(first_root, []) ;
-            Transition_frontier.Diff.Mutant.hash acc_hash diff () )
+            Transition_frontier.Diff.Mutant.hash ~logger acc_hash diff () )
     | Add_transition transition_with_hash ->
         Transition_storage.Batch.with_batch t.transition_storage
           ~f:(fun batch ->
             let mutant =
               apply_add_transition (t, batch) transition_with_hash
             in
-            Transition_frontier.Diff.Mutant.hash acc_hash diff mutant )
+            Transition_frontier.Diff.Mutant.hash ~logger acc_hash diff mutant
+        )
     | Remove_transitions removed_transitions ->
         let mutant =
           Transition_storage.Batch.with_batch t.transition_storage
@@ -89,7 +91,7 @@ end = struct
                     removed_transition
                   |> Protocol_state.consensus_state ) )
         in
-        Transition_frontier.Diff.Mutant.hash acc_hash diff mutant
+        Transition_frontier.Diff.Mutant.hash ~logger acc_hash diff mutant
     | Update_root {root; scan_state; pending_coinbase} ->
         let new_root_data = (root, scan_state, pending_coinbase) in
         let old_root_data =
@@ -116,7 +118,18 @@ end = struct
               , Transition_frontier.Diff.Mutant.value_to_yojson diff
                   old_root_data ) ]
           "Worker root update mutant" ;
-        Transition_frontier.Diff.Mutant.hash acc_hash diff old_root_data
+        let hash =
+          Transition_frontier.Diff.Mutant.hash ~logger acc_hash diff
+            old_root_data
+        in
+        Logger.trace t.logger ~module_:__MODULE__ ~location:__LOC__
+          ~metadata:
+            [ ( "diff_mutant"
+              , Transition_frontier.Diff.Mutant.key_to_yojson diff )
+            ; ( "worker_hash"
+              , `String (Transition_frontier.Diff.Hash.to_string hash) ) ]
+          "Worker Handled mutant diff ****" ;
+        hash
 
   module For_tests = struct
     let transition_storage {transition_storage; _} = transition_storage

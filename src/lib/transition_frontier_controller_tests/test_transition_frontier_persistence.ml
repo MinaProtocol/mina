@@ -76,14 +76,14 @@ let%test_module "Transition Frontier Persistence" =
       let directory_name = Uuid.to_string (Uuid_unix.create ()) in
       let%map breadcrumbs =
         with_persistence ~logger ~directory_name ~f:(fun (frontier, t) ->
-            let%bind breadcrumbs =
-              generate_breadcrumbs ~gen_root_breadcrumb_builder frontier
-                num_breadcrumbs
-            in
             let reader_frontier, _ = Broadcast_pipe.create (Some frontier) in
             don't_wait_for
             @@ Transition_frontier_persistence
                .listen_to_frontier_broadcast_pipe reader_frontier t ;
+            let%bind breadcrumbs =
+              generate_breadcrumbs ~gen_root_breadcrumb_builder frontier
+                num_breadcrumbs
+            in
             let%map () = store_transitions frontier breadcrumbs in
             breadcrumbs )
       in
@@ -149,10 +149,32 @@ let%test_module "Transition Frontier Persistence" =
       Thread_safe.block_on_async_exn (fun () ->
           test_linear_breadcrumbs (max_length - 1) )
 
+    let test_breadcrumbs_forever num_breadcrumbs_per_round =
+      Thread_safe.block_on_async_exn
+      @@ fun () ->
+      let directory_name = Uuid.to_string (Uuid_unix.create ()) in
+      with_persistence ~logger ~directory_name ~f:(fun (frontier, t) ->
+          let reader_frontier, _ = Broadcast_pipe.create (Some frontier) in
+          don't_wait_for
+          @@ Transition_frontier_persistence.listen_to_frontier_broadcast_pipe
+               reader_frontier t ;
+          let rec go initial_breadcrumb =
+            let%bind breadcrumbs =
+              gen_linear_breadcrumbs ~logger ~trust_system
+                ~size:num_breadcrumbs_per_round
+                ~accounts_with_secret_keys:Genesis_ledger.accounts
+                initial_breadcrumb
+              |> Quickcheck.random_value |> Deferred.all
+            in
+            let%bind () = store_transitions frontier breadcrumbs in
+            go (List.last_exn breadcrumbs)
+          in
+          let%map () = go (Transition_frontier.root frontier) in
+          Transition_frontier.visualize ~filename:"frontier.dot" frontier )
+
     let%test_unit "Root changes multiple times" =
       Printexc.record_backtrace true ;
-      Thread_safe.block_on_async_exn (fun () ->
-          test_linear_breadcrumbs (2 * max_length) )
+      test_breadcrumbs_forever 10
 
     let%test_unit "Randomly generate a tree" =
       Thread_safe.block_on_async_exn (fun () ->
