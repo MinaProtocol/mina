@@ -1,5 +1,6 @@
 open Async
 open Core
+open Coda_base
 open Cache_lib
 open Pipe_lib
 
@@ -16,7 +17,8 @@ module Inputs = struct
   module Transition_frontier = Transition_frontier
 end
 
-module Catchup_scheduler = Transition_handler.Catchup_scheduler.Make (Inputs)
+module Catchup_scheduler =
+  Transition_handler.Components.Catchup_scheduler.Make (Inputs)
 module Transition_handler = Transition_handler.Make (Inputs)
 open Transition_handler
 
@@ -26,9 +28,9 @@ let%test_module "Transition_handler.Catchup_scheduler tests" =
 
     let trust_system = Trust_system.null ()
 
-    let time_controller = Time.Controller.basic
+    let time_controller = Block_time.Controller.basic
 
-    let timeout_duration = Time.Span.of_ms 200L
+    let timeout_duration = Block_time.Span.of_ms 200L
 
     let accounts_with_secret_keys = Genesis_ledger.accounts
 

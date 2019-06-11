@@ -1,8 +1,6 @@
 open Core
 open Async
-open Pipe_lib
 open Signature_lib
-open Coda_numbers
 open Coda_base
 open Coda_transition
 open Coda_state
@@ -104,6 +102,7 @@ struct
       Rpc.Rpc.implement rpc (fun () input ->
           trace_recurring_task (Rpc.Rpc.name rpc) (fun () -> f () input) )
     in
+    let implement_notrace = Rpc.Rpc.implement in
     let logger =
       Logger.extend
         (Program.top_level_logger coda)
@@ -111,10 +110,10 @@ struct
     in
     let client_impls =
       [ implement Daemon_rpcs.Send_user_command.rpc (fun () tx ->
-            let%map result = Commands.send_payment coda tx in
+            let%map result = Commands.send_user_command coda tx in
             result |> Participating_state.active_exn )
       ; implement Daemon_rpcs.Send_user_commands.rpc (fun () ts ->
-            Commands.schedule_payments coda ts
+            Commands.schedule_user_commands coda ts
             |> Participating_state.active_exn ;
             Deferred.unit )
       ; implement Daemon_rpcs.Get_balance.rpc (fun () pk ->
@@ -153,7 +152,7 @@ struct
       ; implement Daemon_rpcs.Get_nonce.rpc (fun () pk ->
             return
               (Commands.get_nonce coda pk |> Participating_state.active_exn) )
-      ; implement Daemon_rpcs.Get_status.rpc (fun () flag ->
+      ; implement_notrace Daemon_rpcs.Get_status.rpc (fun () flag ->
             return (Commands.get_status ~flag coda) )
       ; implement Daemon_rpcs.Clear_hist_status.rpc (fun () flag ->
             return (Commands.clear_hist_status ~flag coda) )
@@ -208,7 +207,7 @@ struct
               Server.create_expert
                 ~on_handler_error:
                   (`Call
-                    (fun net exn ->
+                    (fun _net exn ->
                       Logger.error logger ~module_:__MODULE__ ~location:__LOC__
                         "%s" (Exn.to_string_mach exn) ))
                 (Tcp.Where_to_listen.bind_to Localhost
@@ -241,7 +240,7 @@ struct
         Tcp.Server.create
           ~on_handler_error:
             (`Call
-              (fun net exn ->
+              (fun _net exn ->
                 Logger.error logger ~module_:__MODULE__ ~location:__LOC__ "%s"
                   (Exn.to_string_mach exn) ))
           where_to_listen
@@ -269,7 +268,6 @@ struct
     |> ignore
 
   let create_snark_worker ~public_key ~client_port ~shutdown_on_disconnect =
-    let open Snark_worker in
     let%map p =
       let our_binary = Sys.executable_name in
       Process.create_exn () ~prog:our_binary

@@ -49,7 +49,7 @@ module Make (Inputs : Intf.Inputs_intf) = struct
           ( Transaction_snark.Statement.Stable.V1.t
           , Transaction.Stable.V1.t
           , Transaction_witness.Stable.V1.t
-          , Ledger_proof.t )
+          , Ledger_proof.Stable.V1.t )
           Work.Single.Spec.Stable.V1.t
           Work.Spec.Stable.V1.t
           option
@@ -103,10 +103,10 @@ module Make (Inputs : Intf.Inputs_intf) = struct
           ( ( Transaction_snark.Statement.Stable.V1.t
             , Transaction.Stable.V1.t
             , Transaction_witness.Stable.V1.t
-            , Ledger_proof.t )
+            , Ledger_proof.Stable.V1.t )
             Work.Single.Spec.Stable.V1.t
             Work.Spec.Stable.V1.t
-          , Ledger_proof.t )
+          , Ledger_proof.Stable.V1.t )
           Work.Result.Stable.V1.t
         [@@deriving bin_io, version {rpc}]
 

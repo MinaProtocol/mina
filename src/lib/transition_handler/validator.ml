@@ -4,17 +4,13 @@ open Pipe_lib.Strict_pipe
 open Coda_base
 open Coda_state
 open Cache_lib
-open Protocols.Coda_transition_frontier
 
 module Make (Inputs : Inputs.With_unprocessed_transition_cache.S) :
-  Transition_handler_validator_intf
-  with type time := Inputs.Time.t
-   and type state_hash := State_hash.t
-   and type external_transition_with_initial_validation :=
+  Coda_intf.Transition_handler_validator_intf
+  with type external_transition_with_initial_validation :=
               Inputs.External_transition.with_initial_validation
    and type unprocessed_transition_cache :=
               Inputs.Unprocessed_transition_cache.t
-   and type trust_system := Trust_system.t
    and type transition_frontier := Inputs.Transition_frontier.t
    and type staged_ledger := Inputs.Staged_ledger.t = struct
   open Inputs

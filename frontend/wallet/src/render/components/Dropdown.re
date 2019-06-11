@@ -19,15 +19,18 @@ module Styles = {
       borderRadius(`rem(0.25)),
       borderBottomLeftRadius(isOpen ? `zero : `rem(0.25)),
       borderBottomRightRadius(isOpen ? `zero : `rem(0.25)),
+      focus([outlineStyle(`none)]),
     ]);
 
   let label =
     merge([
-      Theme.Text.smallHeader,
+      Theme.Text.Header.h6,
       style([
+        userSelect(`none),
         textTransform(`uppercase),
         color(Theme.Colors.slateAlpha(0.7)),
         cursor(`default),
+        minWidth(`rem(2.5)),
       ]),
     ]);
 
@@ -37,7 +40,7 @@ module Styles = {
       style([
         paddingBottom(`px(2)),
         color(Theme.Colors.teal),
-        cursor(`default),
+        userSelect(`none),
         flexGrow(1.),
       ]),
     ]);
@@ -49,13 +52,14 @@ module Styles = {
       top(`percent(100.)),
       left(`px(-1)),
       right(`px(-1)),
-      maxHeight(`rem(10.)),
+      maxHeight(`calc(`add, `rem(10.), `px(2))),
       overflow(`scroll),
       background(white),
       border(`px(1), `solid, Theme.Colors.marineAlpha(0.3)),
       borderBottomLeftRadius(`rem(0.25)),
       borderBottomRightRadius(`rem(0.25)),
       cursor(`default),
+      zIndex(1),
     ]);
 
   let item =
@@ -67,13 +71,14 @@ module Styles = {
         alignItems(`center),
         padding2(~v=`zero, ~h=`rem(1.)),
         color(Theme.Colors.teal),
+        userSelect(`none),
         hover([backgroundColor(Theme.Colors.slateAlpha(0.1))]),
       ]),
     ]);
 
   let icon =
     style([
-      color(Theme.Colors.teal),
+      color(Theme.Colors.tealAlpha(0.5)),
       height(`rem(1.5)),
       marginRight(`px(-5)),
     ]);
@@ -108,13 +113,14 @@ let make = (~onChange, ~value, ~label, ~options) => {
              <div
                key=label
                className=Styles.item
-               onClick={_e => onChange(Some(value))}>
+               onClick={_e => onChange(value)}>
                {React.string(label)}
              </div>,
          options,
        )
        |> Array.fromList
-       |> React.array}
+       |> React.array
+      }
     </div>
   </div>;
 };

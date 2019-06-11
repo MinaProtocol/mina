@@ -34,7 +34,7 @@ end) : S with type key := Key.t = struct
 
   let add t key =
     if not (Key.Table.mem t.key_to_loc key) then (
-      Key.Table.set t.key_to_loc key (Dyn_array.length t.keys) ;
+      Key.Table.set t.key_to_loc ~key ~data:(Dyn_array.length t.keys) ;
       Dyn_array.add t.keys key )
     else ()
 

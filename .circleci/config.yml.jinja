@@ -50,7 +50,7 @@ jobs:
 
     lint:
         docker:
-            - image: codaprotocol/coda:toolchain-a667ae88520eaa5acc6eac754dccc724092ff2f2
+            - image: codaprotocol/coda:toolchain-4c1060cf4d7094ecddd40e4f1db677633f080c40
         steps:
             - checkout
             - run: git submodule sync && git submodule update --init --recursive
@@ -63,6 +63,9 @@ jobs:
             - run:
                   name: Snarky tracks master (make check-snarky-submodule)
                   command: make check-snarky-submodule
+            - run:
+                  name: Check CODEOWNERS file format
+                  command: ./scripts/lint_codeowners.sh
 
     update-branch-protection:
         docker:
@@ -128,7 +131,7 @@ jobs:
     build-artifacts--{{profile}}:
         resource_class: large
         docker:
-            - image: codaprotocol/coda:toolchain-a667ae88520eaa5acc6eac754dccc724092ff2f2
+            - image: codaprotocol/coda:toolchain-4c1060cf4d7094ecddd40e4f1db677633f080c40
         environment:
             DUNE_PROFILE: {{profile}}
         steps:
@@ -167,20 +170,23 @@ jobs:
     test-unit--{{profile}}:
         resource_class: large
         docker:
-            - image: codaprotocol/coda:toolchain-a667ae88520eaa5acc6eac754dccc724092ff2f2
+            - image: codaprotocol/coda:toolchain-4c1060cf4d7094ecddd40e4f1db677633f080c40
         steps:
             - checkout
+            - run: ulimit -c unlimited
             - run: git submodule sync && git submodule update --init --recursive
             - run:
                   name: Run unit tests
                   command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && dune build --profile={{profile}} -j8 && dune runtest --profile={{profile}} -j8'
+            - store_artifacts:
+                path: core*
     {%- endfor %}
 
     {%- for profile in test_permutations.keys() | sort %}
     test--{{profile}}:
         resource_class: large
         docker:
-            - image: codaprotocol/coda:toolchain-a667ae88520eaa5acc6eac754dccc724092ff2f2
+            - image: codaprotocol/coda:toolchain-4c1060cf4d7094ecddd40e4f1db677633f080c40
         steps:
             - checkout
             - run: git submodule sync && git submodule update --init --recursive

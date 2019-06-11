@@ -6,9 +6,9 @@ module Make (Inputs : Intf.Worker_inputs) = struct
 
   module type S = sig
     val handle_diff :
-         Transition_frontier.Diff_hash.t
-      -> Transition_frontier.Diff_mutant.E.t
-      -> Transition_frontier.Diff_hash.t
+         Transition_frontier.Diff.Hash.t
+      -> Transition_frontier.Diff.Mutant.E.t
+      -> Transition_frontier.Diff.Hash.t
   end
 
   module Worker = Worker.Make (Inputs)
@@ -38,8 +38,8 @@ module Make (Inputs : Intf.Worker_inputs) = struct
     let handle_diff =
       create
         [%bin_type_class:
-          Transition_frontier.Diff_hash.t * Transition_frontier.Diff_mutant.E.t]
-        Transition_frontier.Diff_hash.bin_t
+          Transition_frontier.Diff.Hash.t * Transition_frontier.Diff.Mutant.E.t]
+        Transition_frontier.Diff.Hash.bin_t
         (fun (module W) (diff_hash, diff_mutant) ->
           Deferred.return (W.handle_diff diff_hash diff_mutant) )
   end
@@ -51,9 +51,9 @@ module Make (Inputs : Intf.Worker_inputs) = struct
       type 'w functions =
         { handle_diff:
             ( 'w
-            , Transition_frontier.Diff_hash.t
-              * Transition_frontier.Diff_mutant.E.t
-            , Transition_frontier.Diff_hash.t )
+            , Transition_frontier.Diff.Hash.t
+              * Transition_frontier.Diff.Mutant.E.t
+            , Transition_frontier.Diff.Hash.t )
             F.t }
 
       module Worker_state = Worker_state

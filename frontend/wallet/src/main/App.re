@@ -1,18 +1,12 @@
 open BsElectron;
 open Tc;
 
-let killDaemons = DaemonProcess.startAll(~fakerPort=8080, ~codaPort=0xc0da);
+let killFaker = DaemonProcess.startFaker(8080);
 
 let createTray = dispatch => {
   let t = AppTray.get();
   let trayItems =
     Menu.Item.[
-      make(
-        Label("Synced"),
-        ~icon=Filename.concat(ProjectRoot.resource, "public/circle-16.png"),
-        (),
-      ),
-      make(Separator, ()),
       make(
         Label("Debug"),
         ~click=
@@ -48,7 +42,8 @@ let createTray = dispatch => {
 // We need this handler here to prevent the application from exiting on all
 // windows closed. Keep in mind, we have the tray.
 App.on(`WindowAllClosed, () => ());
-App.on(`WillQuit, () => killDaemons());
+// TODO: Also kill coda.exe
+App.on(`WillQuit, () => killFaker());
 
 let initialTask = Task.uncallbackifyValue(App.on(`Ready));
 

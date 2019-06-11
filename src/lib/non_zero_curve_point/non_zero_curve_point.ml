@@ -3,25 +3,6 @@ open Snark_params
 open Fold_lib
 open Module_version
 
-module Codable_via_base64 (T : sig
-  type t [@@deriving bin_io]
-end) =
-struct
-  let to_base64 t = Binable.to_string (module T) t |> Base64.encode_string
-
-  let of_base64_exn s = Base64.decode_exn s |> Binable.of_string (module T)
-
-  module String_ops = struct
-    type t = T.t
-
-    let to_string = to_base64
-
-    let of_string = of_base64_exn
-  end
-
-  include Codable.Make_of_string (String_ops)
-end
-
 module Stable = struct
   module V1 = struct
     module T = struct
@@ -44,7 +25,7 @@ module Stable = struct
       let _ = Bigstring.write_bin_prot bs bin_writer_t elem in
       bs
 
-    include Codable_via_base64 (T)
+    include Codable.Make_base64 (T)
   end
 
   module Latest = V1
@@ -125,7 +106,7 @@ module Compressed = struct
 
       include T
       include Registration.Make_latest_version (T)
-      include Codable_via_base64 (T)
+      include Codable.Make_base64 (T)
     end
 
     module Latest = V1
@@ -145,7 +126,7 @@ module Compressed = struct
 
   include Comparable.Make_binable (Stable.Latest)
   include Hashable.Make_binable (Stable.Latest)
-  include Codable_via_base64 (Stable.Latest)
+  include Codable.Make_base64 (Stable.Latest)
 
   let compress (x, y) : t = {x; is_odd= parity y}
 

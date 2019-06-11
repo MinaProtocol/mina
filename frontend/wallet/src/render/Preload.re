@@ -10,4 +10,10 @@ let downloadKey = (keyName, chunkCb, doneCb) =>
     doneCb,
   );
 
+[@bs.module "electron"] [@bs.scope "shell"] [@bs.val]
+external showItemInFolder: string => unit = "";
+
+let showItemInFolder = showItemInFolder;
+
 [%bs.raw "window.downloadKey = downloadKey"];
+[%bs.raw "window.showItemInFolder = showItemInFolder"];

@@ -458,7 +458,7 @@ module T = struct
         (Merkle_tree.modify_req ~depth (Hash.var_to_hash_packed t) addr
            ~f:(fun stack ->
              let total_coinbase_amount =
-               Currency.Amount.var_of_t Protocols.Coda_praos.coinbase_amount
+               Currency.Amount.var_of_t Coda_compile_config.coinbase
              in
              let%bind rem_amount =
                Currency.Amount.Checked.sub total_coinbase_amount amount
@@ -781,8 +781,8 @@ let%test_unit "Checked_stack = Unchecked_stack" =
 let%test_unit "Checked_tree = Unchecked_tree" =
   let open Quickcheck in
   let pending_coinbases = create () |> Or_error.ok_exn in
-  test ~trials:10 Coinbase.gen ~f:(fun coinbase ->
-      let max_coinbase_amount = Protocols.Coda_praos.coinbase_amount in
+  test ~trials:20 Coinbase.gen ~f:(fun coinbase ->
+      let max_coinbase_amount = Coda_compile_config.coinbase in
       let coinbase_data = Coinbase_data.of_coinbase coinbase in
       let coinbase2 =
         Coinbase.create
@@ -826,7 +826,7 @@ let%test_unit "Checked_tree = Unchecked_tree" =
 let%test_unit "push and pop multiple stacks" =
   let open Quickcheck in
   let pending_coinbases = ref (create () |> Or_error.ok_exn) in
-  let max_coinbase_amount = Protocols.Coda_praos.coinbase_amount in
+  let max_coinbase_amount = Coda_compile_config.coinbase_amount in
   let coinbases_gen = Quickcheck.Generator.list Coinbase.gen in
   let add_new_stack t = function
     | [] ->

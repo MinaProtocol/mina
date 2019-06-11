@@ -5,125 +5,28 @@ open Coda_base
 open Coda_state
 open Signature_lib
 open O1trace
+open Otp_lib
 module Time = Coda_base.Block_time
 
 module type Inputs_intf = sig
-  open Protocols.Coda_pow
-
-  module Pending_coinbase_witness :
-    Pending_coinbase_witness_intf
-    with type pending_coinbases := Pending_coinbase.t
-
-  module Pending_coinbase_stack_state :
-    Pending_coinbase_stack_state_intf
-    with type pending_coinbase_stack := Pending_coinbase.Stack.t
-
-  module Ledger_proof_statement :
-    Ledger_proof_statement_intf
-    with type ledger_hash := Frozen_ledger_hash.t
-     and type pending_coinbase_stack_state := Pending_coinbase_stack_state.t
-
-  module Ledger_proof :
-    Ledger_proof_intf
-    with type ledger_hash := Frozen_ledger_hash.t
-     and type statement := Ledger_proof_statement.t
-     and type proof := Proof.t
-     and type sok_digest := Sok_message.Digest.t
-
-  module Transaction_snark_work :
-    Transaction_snark_work_intf
-    with type proof := Ledger_proof.t
-     and type statement := Ledger_proof_statement.t
-     and type public_key := Public_key.Compressed.t
-
-  module Staged_ledger_diff :
-    Staged_ledger_diff_intf
-    with type user_command := User_command.t
-     and type user_command_with_valid_signature :=
-                User_command.With_valid_signature.t
-     and type staged_ledger_hash := Staged_ledger_hash.t
-     and type public_key := Public_key.Compressed.t
-     and type completed_work := Transaction_snark_work.t
-     and type completed_work_checked := Transaction_snark_work.Checked.t
-     and type fee_transfer_single := Fee_transfer.Single.t
-
-  module Staged_ledger :
-    Staged_ledger_intf
-    with type diff := Staged_ledger_diff.t
-     and type valid_diff :=
-                Staged_ledger_diff.With_valid_signatures_and_proofs.t
-     and type staged_ledger_hash := Staged_ledger_hash.t
-     and type staged_ledger_aux_hash := Staged_ledger_hash.Aux_hash.t
-     and type ledger_hash := Ledger_hash.t
-     and type frozen_ledger_hash := Frozen_ledger_hash.t
-     and type public_key := Public_key.Compressed.t
-     and type ledger := Ledger.t
-     and type ledger_proof := Ledger_proof.t
-     and type user_command_with_valid_signature :=
-                User_command.With_valid_signature.t
-     and type statement := Transaction_snark_work.Statement.t
-     and type completed_work_checked := Transaction_snark_work.Checked.t
-     and type sparse_ledger := Sparse_ledger.t
-     and type ledger_proof_statement := Ledger_proof_statement.t
-     and type ledger_proof_statement_set := Ledger_proof_statement.Set.t
-     and type transaction := Transaction.t
-     and type user_command := User_command.t
-     and type transaction_witness := Transaction_witness.t
-     and type pending_coinbase_collection := Pending_coinbase.t
-     and type verifier := Verifier.t
-
-  module External_transition :
-    External_transition_intf
-    with type state_hash := State_hash.t
-     and type time := Time.t
-     and type protocol_state := Protocol_state.Value.t
-     and type staged_ledger_diff := Staged_ledger_diff.t
-     and type proof := Proof.t
-     and type consensus_state := Consensus.Data.Consensus_state.Value.t
-     and type user_command := User_command.t
-     and type compressed_public_key := Public_key.Compressed.t
-     and type verifier := Verifier.t
-     and type staged_ledger_hash := Staged_ledger_hash.t
-     and type ledger_proof := Ledger_proof.t
-     and type transaction := Transaction.t
-
-  module Internal_transition :
-    Internal_transition_intf
-    with type snark_transition := Snark_transition.Value.t
-     and type prover_state := Consensus.Data.Prover_state.t
-     and type staged_ledger_diff := Staged_ledger_diff.t
-
-  module Ledger_db : sig
-    type t
-  end
-
-  module Masked_ledger : sig
-    type t
-  end
+  include Coda_intf.Inputs_intf
 
   module Transition_frontier :
-    Transition_frontier_intf
-    with type state_hash := State_hash.t
-     and type consensus_state := Consensus.Data.Consensus_state.Value.t
-     and type mostly_validated_external_transition :=
+    Coda_intf.Transition_frontier_intf
+    with type mostly_validated_external_transition :=
                 ( [`Time_received] * Truth.true_t
                 , [`Proof] * Truth.true_t
                 , [`Frontier_dependencies] * Truth.true_t
                 , [`Staged_ledger_diff] * Truth.false_t )
                 External_transition.Validation.with_transition
      and type external_transition_validated := External_transition.Validated.t
-     and type pending_coinbase := Pending_coinbase.t
-     and type ledger_database := Ledger_db.t
      and type staged_ledger := Staged_ledger.t
      and type staged_ledger_diff := Staged_ledger_diff.t
      and type transaction_snark_scan_state := Staged_ledger.Scan_state.t
-     and type masked_ledger := Masked_ledger.t
-     and type consensus_local_state := Consensus.Data.Local_state.t
-     and type user_command := User_command.t
      and type verifier := Verifier.t
 
   module Transaction_pool :
-    Coda_lib.Transaction_pool_read_intf
+    Coda_lib.Intf.Transaction_pool_read
     with type transaction_with_valid_signature :=
                 User_command.With_valid_signature.t
 
@@ -136,37 +39,6 @@ module type Inputs_intf = sig
       -> Pending_coinbase_witness.t
       -> Proof.t Deferred.Or_error.t
   end
-end
-
-module Agent : sig
-  type 'a t
-
-  val create : f:('a -> 'b) -> 'a Linear_pipe.Reader.t -> 'b t
-
-  val get : 'a t -> 'a option
-
-  val with_value : f:('a -> unit) -> 'a t -> unit
-end = struct
-  type 'a t = {signal: unit Ivar.t; mutable value: 'a option}
-
-  let create ~(f : 'a -> 'b) (reader : 'a Linear_pipe.Reader.t) : 'b t =
-    let t = {signal= Ivar.create (); value= None} in
-    don't_wait_for
-      (Linear_pipe.iter reader ~f:(fun x ->
-           let old_value = t.value in
-           t.value <- Some (f x) ;
-           if old_value = None then Ivar.fill t.signal () ;
-           return () )) ;
-    t
-
-  let get t = t.value
-
-  let rec with_value ~f t =
-    match t.value with
-    | Some x ->
-        f x
-    | None ->
-        don't_wait_for (Ivar.read t.signal >>| fun () -> with_value ~f t)
 end
 
 module Singleton_supervisor : sig
@@ -208,24 +80,15 @@ end = struct
 end
 
 module Make (Inputs : Inputs_intf) :
-  Coda_lib.Proposer_intf
+  Coda_lib.Intf.Proposer
   with type breadcrumb := Inputs.Transition_frontier.Breadcrumb.t
-   and type state_hash := State_hash.t
-   and type ledger_hash := Ledger_hash.t
    and type staged_ledger := Inputs.Staged_ledger.t
-   and type transaction := User_command.With_valid_signature.t
-   and type protocol_state := Protocol_state.Value.t
-   and type protocol_state_proof := Proof.t
-   and type consensus_local_state := Consensus.Data.Local_state.t
    and type completed_work_statement :=
               Inputs.Transaction_snark_work.Statement.t
    and type completed_work_checked := Inputs.Transaction_snark_work.Checked.t
-   and type time_controller := Time.Controller.t
-   and type keypair := Keypair.t
    and type transition_frontier := Inputs.Transition_frontier.t
    and type transaction_pool := Inputs.Transaction_pool.t
-   and type time := Time.t
-   and type verifier := Verifier.t = struct
+   and type verifier := Inputs.Verifier.t = struct
   open Inputs
   module Transition_frontier_validation =
     External_transition.Transition_frontier_validation (Transition_frontier)
@@ -243,6 +106,7 @@ module Make (Inputs : Inputs_intf) :
 
     val create : Time.Controller.t -> t
 
+    (** If you reschedule when already scheduled, take the min of the two schedulings *)
     val schedule : t -> Time.t -> f:(unit -> unit) -> unit
   end = struct
     type t =
@@ -260,10 +124,22 @@ module Make (Inputs : Inputs_intf) :
           ()
 
     let schedule t time ~f =
+      let remaining_time =
+        Option.map t.timeout ~f:Time.Timeout.remaining_time
+      in
       cancel t ;
       let span_till_time = Time.diff time (Time.now t.time_controller) in
+      let wait_span =
+        match remaining_time with
+        | Some remaining
+          when Time.Span.(remaining > Time.Span.of_ms Int64.zero) ->
+            let min a b = if Time.Span.(a < b) then a else b in
+            min remaining span_till_time
+        | None | Some _ ->
+            span_till_time
+      in
       let timeout =
-        Time.Timeout.create t.time_controller span_till_time ~f:(fun _ ->
+        Time.Timeout.create t.time_controller wait_span ~f:(fun _ ->
             t.timeout <- None ;
             f () )
       in
@@ -375,8 +251,8 @@ module Make (Inputs : Inputs_intf) :
             Some (protocol_state, internal_transition, witness) ) )
 
   let run ~logger ~verifier ~trust_system ~get_completed_work ~transaction_pool
-      ~time_controller ~keypair ~consensus_local_state ~frontier_reader
-      ~transition_writer ~random_peers ~query_peer =
+      ~time_controller ~keypairs ~consensus_local_state ~frontier_reader
+      ~transition_writer =
     trace_task "proposer" (fun () ->
         let log_bootstrap_mode () =
           Logger.info logger ~module_:__MODULE__ ~location:__LOC__
@@ -384,7 +260,7 @@ module Make (Inputs : Inputs_intf) :
              schedule event"
         in
         let module Breadcrumb = Transition_frontier.Breadcrumb in
-        let propose ivar proposal_data =
+        let propose ivar (keypair, proposal_data) =
           let open Interruptible.Let_syntax in
           match Broadcast_pipe.Reader.peek frontier_reader with
           | None ->
@@ -567,8 +443,8 @@ module Make (Inputs : Inputs_intf) :
                           ; Deferred.choice
                               ( Time.Timeout.create time_controller
                                   (* We allow up to 15 seconds for the transition to make its way from the transition_writer to the frontier.
-                                     This value is chosen to be reasonably generous. In theory, this should not take terribly long. But long
-                                     cycles do happen in our system, and with medium curves those long cycles can be substantial. *)
+                                    This value is chosen to be reasonably generous. In theory, this should not take terribly long. But long
+                                    cycles do happen in our system, and with medium curves those long cycles can be substantial. *)
                                   (Time.Span.of_ms 15000L)
                                   ~f:(Fn.const ())
                               |> Time.Timeout.to_deferred )
@@ -592,6 +468,22 @@ module Make (Inputs : Inputs_intf) :
         let scheduler = Singleton_scheduler.create time_controller in
         let rec check_for_proposal () =
           trace_recurring_task "check for proposal" (fun () ->
+              (* See if we want to change keypairs *)
+              let keypairs =
+                match Agent.get keypairs with
+                | keypairs, `Different ->
+                    (* Perform proposer swap since we have new keypairs *)
+                    Consensus.Data.Local_state.proposer_swap
+                      consensus_local_state
+                      ( Keypair.And_compressed_pk.Set.to_list keypairs
+                      |> List.map ~f:snd |> Public_key.Compressed.Set.of_list
+                      )
+                      (Time.now time_controller) ;
+                    keypairs
+                | keypairs, `Same ->
+                    keypairs
+              in
+              (* Begin proposal checking *)
               match Broadcast_pipe.Reader.peek frontier_reader with
               | None ->
                   log_bootstrap_mode () ;
@@ -614,53 +506,45 @@ module Make (Inputs : Inputs_intf) :
                   let consensus_state =
                     Protocol_state.consensus_state protocol_state
                   in
-                  match
+                  assert (
                     Consensus.Hooks.required_local_state_sync ~consensus_state
                       ~local_state:consensus_local_state
+                    = None ) ;
+                  match
+                    measure "asking conensus what to do" (fun () ->
+                        Consensus.Hooks.next_proposal
+                          (time_to_ms (Time.now time_controller))
+                          consensus_state ~local_state:consensus_local_state
+                          ~keypairs ~logger )
                   with
-                  | Some sync_jobs ->
-                      Logger.info logger ~module_:__MODULE__ ~location:__LOC__
-                        "Synchronizing consensus local state" ;
-                      don't_wait_for
-                        (let%map res =
-                           Consensus.Hooks.sync_local_state
-                             ~local_state:consensus_local_state ~logger
-                             ~trust_system ~random_peers ~query_peer sync_jobs
-                         in
-                         ( match res with
-                         | Ok () ->
-                             ()
-                         | Error e ->
-                             Logger.error logger ~module_:__MODULE__
-                               ~location:__LOC__
-                               "error syncing local state: %s"
-                               (Error.to_string_hum e) ) ;
-                         check_for_proposal ())
-                  | None -> (
-                    match
-                      measure "asking conensus what to do" (fun () ->
-                          Consensus.Hooks.next_proposal
-                            (time_to_ms (Time.now time_controller))
-                            consensus_state ~local_state:consensus_local_state
-                            ~keypair ~logger )
-                    with
-                    | `Check_again time ->
-                        Singleton_scheduler.schedule scheduler
-                          (time_of_ms time) ~f:check_for_proposal
-                    | `Propose_now data ->
-                        Interruptible.finally
-                          (Singleton_supervisor.dispatch proposal_supervisor
-                             data)
-                          ~f:check_for_proposal
-                        |> ignore
-                    | `Propose (time, data) ->
-                        Singleton_scheduler.schedule scheduler
-                          (time_of_ms time) ~f:(fun () ->
-                            ignore
-                              (Interruptible.finally
-                                 (Singleton_supervisor.dispatch
-                                    proposal_supervisor data)
-                                 ~f:check_for_proposal) ) ) ) )
+                  | `Check_again time ->
+                      Singleton_scheduler.schedule scheduler (time_of_ms time)
+                        ~f:check_for_proposal
+                  | `Propose_now (keypair, data) ->
+                      Interruptible.finally
+                        (Singleton_supervisor.dispatch proposal_supervisor
+                           (keypair, data))
+                        ~f:check_for_proposal
+                      |> ignore
+                  | `Propose (time, keypair, data) ->
+                      Singleton_scheduler.schedule scheduler (time_of_ms time)
+                        ~f:(fun () ->
+                          ignore
+                            (Interruptible.finally
+                               (Singleton_supervisor.dispatch
+                                  proposal_supervisor (keypair, data))
+                               ~f:check_for_proposal) ) ) )
         in
+        (* Schedule to wake up immediately on the next tick of the proposer
+         * instead of immediately mutating local_state here as there could be a
+         * race.
+         *
+         * Given that rescheduling takes the min of the two timeouts, we won't
+         * erase this timeout even if the last run of the proposer wants to wait
+         * for a long while.
+         * *)
+        Agent.on_update keypairs ~f:(fun _new_keypairs ->
+            Singleton_scheduler.schedule scheduler (Time.now time_controller)
+              ~f:check_for_proposal ) ;
         check_for_proposal () )
 end
