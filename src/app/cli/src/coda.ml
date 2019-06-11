@@ -37,7 +37,7 @@ let daemon logger =
        flag "config-directory" ~doc:"DIR Configuration directory"
          (optional string)
      and is_genesis =
-       flag "is_genesis"
+       flag "is-genesis"
          ~doc:"Indicating that we are start from genesis or not"
          (optional bool)
      and propose_key =
