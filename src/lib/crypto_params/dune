@@ -3,7 +3,7 @@
  (public_name crypto_params)
  (library_flags -linkall)
  (inline_tests)
- (libraries chunked_pedersen_lib snarky bignum_bigint curve_choice chunk_table tuple_lib)
+ (libraries chunked_pedersen_lib snarky bignum_bigint curve_choice chunk_table tuple_lib group_map)
  (preprocess
   (pps ppx_jane bisect_ppx -- -conditional))
  (synopsis "Cryptographic parameters"))

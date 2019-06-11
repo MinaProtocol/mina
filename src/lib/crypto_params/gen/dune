@@ -1,6 +1,6 @@
 (executable
  (name gen)
- (libraries async core crs coda_digestif fold_lib snarky tuple_lib ppxlib
+ (libraries async core crs coda_digestif fold_lib snarky tuple_lib ppxlib group_map
    curve_choice chunk_table chunked_triples)
  (preprocess
   (pps ppx_jane ppxlib.metaquot ppxlib.runner))
