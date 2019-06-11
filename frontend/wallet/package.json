@@ -54,8 +54,9 @@
       "package.json"
     ],
     "extraResources": [
-      "_build/",
-      "node_modules/graphql-faker",
+      "_build/**/*",
+      "node_modules/graphql-faker/**/*",
+      "node_modules/core-js/**/*",
       "bundle/**/*",
       "public/**/*"
     ],
