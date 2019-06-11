@@ -105,18 +105,19 @@ let rec pair_up = function
    unbounded parallelism. *)
 let profile (module T : Transaction_snark.S) sparse_ledger0
     (transitions : Transaction.t list) preeval =
-  let (base_proof_time, _), base_proofs =
-    List.fold_map transitions ~init:(Time.Span.zero, sparse_ledger0)
-      ~f:(fun (max_span, sparse_ledger) t ->
+  let (base_proof_time, _, _), base_proofs =
+    List.fold_map transitions
+      ~init:(Time.Span.zero, sparse_ledger0, Pending_coinbase.Stack.empty)
+      ~f:(fun (max_span, sparse_ledger, coinbase_stack_source) t ->
         let sparse_ledger' =
           Sparse_ledger.apply_transaction_exn sparse_ledger t
         in
         let coinbase_stack_target =
           match t with
           | Coinbase c ->
-              Pending_coinbase.(Stack.push Stack.empty c)
+              Pending_coinbase.Stack.push coinbase_stack_source c
           | _ ->
-              Pending_coinbase.Stack.empty
+              coinbase_stack_source
         in
         let span, proof =
           time (fun () ->
@@ -124,12 +125,12 @@ let profile (module T : Transaction_snark.S) sparse_ledger0
                 ~source:(Sparse_ledger.merkle_root sparse_ledger)
                 ~target:(Sparse_ledger.merkle_root sparse_ledger')
                 ~pending_coinbase_stack_state:
-                  { source= Pending_coinbase.Stack.empty
-                  ; target= coinbase_stack_target }
+                  {source= coinbase_stack_source; target= coinbase_stack_target}
                 t
                 (unstage (Sparse_ledger.handler sparse_ledger)) )
         in
-        ((Time.Span.max span max_span, sparse_ledger'), proof) )
+        ( (Time.Span.max span max_span, sparse_ledger', coinbase_stack_target)
+        , proof ) )
   in
   let rec merge_all serial_time proofs =
     match proofs with

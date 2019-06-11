@@ -178,7 +178,7 @@ module Make (Inputs : Intf.Main_inputs) = struct
     let transition_storage =
       Transition_storage.create ~directory:directory_name
     in
-    let result = f transition_storage in
+    let%map result = f transition_storage in
     Transition_storage.close transition_storage ;
     result
 

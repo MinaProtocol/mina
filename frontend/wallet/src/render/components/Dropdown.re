@@ -85,14 +85,14 @@ module Styles = {
 };
 
 [@react.component]
-let make = (~onChange, ~value, ~label, ~options) => {
+let make = (~onChange, ~value, ~label, ~options: list((string, React.element))) => {
   let (isOpen, setOpen) = React.useState(() => false);
   let toggleOpen = () => setOpen(isOpen => !isOpen);
 
   let currentLabel =
     value
     |> Option.map(~f=v => Caml.List.assoc(v, options))
-    |> Option.withDefault(~default="");
+    |> Option.withDefault(~default=React.string(""));
 
   Window.onClick(Window.current, () => setOpen(_ => false));
   <div
@@ -103,7 +103,7 @@ let make = (~onChange, ~value, ~label, ~options) => {
     }}>
     <span className=Styles.label> {React.string(label ++ ":")} </span>
     <Spacer width=0.5 />
-    <span className=Styles.value> {React.string(currentLabel)} </span>
+    <span className=Styles.value> {currentLabel} </span>
     <Spacer width=0.5 />
     <span className=Styles.icon> <Icon kind=Icon.ChevronDown /> </span>
     <div className={isOpen ? Styles.options : Styles.hidden}>
@@ -111,15 +111,16 @@ let make = (~onChange, ~value, ~label, ~options) => {
          ~f=
            ((value, label)) =>
              <div
-               key=label
+               key=value
                className=Styles.item
                onClick={_e => onChange(value)}>
-               {React.string(label)}
+               {label}
              </div>,
          options,
        )
        |> Array.fromList
-       |> React.array}
+       |> React.array
+      }
     </div>
   </div>;
 };
