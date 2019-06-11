@@ -100,7 +100,7 @@ module Styles = {
     merge([
       baseButton,
       style([
-        backgroundColor(Theme.Colors.hyperlinkAlpha(1.)),
+        backgroundColor(Theme.Colors.hyperlink),
         color(white),
         hover([backgroundColor(Theme.Colors.hyperlinkAlpha(0.7))]),
       ]),

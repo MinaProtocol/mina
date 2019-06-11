@@ -21,6 +21,7 @@ module Colors = {
   let saville = savilleAlpha(1.);
 
   let hyperlinkAlpha = a => `rgba((45, 158, 219, a));
+  let hyperlink = hyperlinkAlpha(1.);
 
   let slateAlpha = a => `rgba((81, 102, 121, a));
   let slate = slateAlpha(1.);
