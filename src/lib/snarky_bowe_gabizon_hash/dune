@@ -1,0 +1,12 @@
+(library
+  (name snarky_bowe_gabizon_hash)
+  (public_name snarky_bowe_gabizon_hash)
+  (preprocess (pps ppx_jane ppx_deriving.eq))
+  (inline_tests)
+  (libraries
+    snarky_group_map
+    core_kernel
+    tuple_lib
+    fold_lib
+    group_map
+    snarky_blake2 ))
