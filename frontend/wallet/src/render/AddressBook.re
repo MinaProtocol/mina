@@ -38,6 +38,3 @@ let set = (t: StrDict.t(string), ~key, ~name) =>
   } else {
     StrDict.insert(t, ~key=PublicKey.toString(key), ~value=name);
   };
-
-let getWalletName = (t: StrDict.t(string), key: PublicKey.t) =>
-  lookup(t, key) |> Option.withDefault(~default=PublicKey.prettyPrint(key));
