@@ -36,6 +36,9 @@ module Make (Inputs : Intf.Main_inputs) = struct
           ~metadata:
             [ ( "diff_mutant"
               , Transition_frontier.Diff.Mutant.key_to_yojson diff )
+            ; ( "ground_truth_value"
+              , Transition_frontier.Diff.Mutant.value_to_yojson diff
+                  ground_truth_mutant )
             ; ( "ground_truth_hash"
               , `String
                   (Transition_frontier.Diff.Hash.to_string ground_truth_hash)
