@@ -33,13 +33,7 @@ let component = ReasonReact.statelessComponent("Investors");
 let make = _children => {
   ...component,
   render: _self =>
-    <div
-      className=Css.(
-        style([
-          display(`flex),
-          flexDirection(`column),
-        ])
-      )>
+    <div className=Css.(style([display(`flex), flexDirection(`column)]))>
       <h3 className=Style.H3.Technical.boxed>
         {ReasonReact.string("O(1) Investors")}
       </h3>

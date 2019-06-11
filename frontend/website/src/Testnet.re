@@ -70,7 +70,7 @@ let extraHeaders = () => <> {Head.legacyStylesheets()} </>;
   // Disable red state since the demo is broken
   global(
     ".bg-brightred div",
-    [ 
+    [
       backgroundColor(Style.Colors.teal),
       Style.Typeface.ibmplexsans,
       color(Style.Colors.saville),
