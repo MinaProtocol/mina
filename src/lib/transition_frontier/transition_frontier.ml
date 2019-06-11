@@ -414,6 +414,7 @@ module Make (Inputs : Inputs_intf) :
     in
     List.rev (find_path breadcrumb)
 
+  (* TODO: create a unit test for hash_path *)
   let hash_path t breadcrumb = path_map t breadcrumb ~f:Breadcrumb.state_hash
 
   let iter t ~f = Hashtbl.iter t.table ~f:(fun n -> f n.breadcrumb)
@@ -503,6 +504,11 @@ module Make (Inputs : Inputs_intf) :
                 successor_hashes= hash :: parent_node.successor_hashes } ;
           Some node )
 
+  let consensus_state_of_breadcrumb b =
+    Breadcrumb.transition_with_hash b
+    |> With_hash.data |> External_transition.Validated.protocol_state
+    |> Protocol_state.consensus_state
+
   let attach_breadcrumb_exn t breadcrumb =
     let hash = Breadcrumb.state_hash breadcrumb in
     let parent_hash = Breadcrumb.parent_hash breadcrumb in
@@ -515,7 +521,20 @@ module Make (Inputs : Inputs_intf) :
     let node =
       {Node.breadcrumb; successor_hashes= []; length= parent_node.length + 1}
     in
-    attach_node_to t ~parent_node ~node
+    attach_node_to t ~parent_node ~node ;
+    (* TODO: This should probably be in consensus_state  *)
+    Debug_assert.debug_assert (fun () ->
+        (* if the proof verified, then this should always hold*)
+        assert (
+          Consensus.Hooks.select
+            ~existing:(consensus_state_of_breadcrumb parent_node.breadcrumb)
+            ~candidate:(consensus_state_of_breadcrumb breadcrumb)
+            ~logger:
+              (Logger.extend t.logger
+                 [ ( "selection_context"
+                   , `String "debug_assert that child is preferred over parent"
+                   ) ])
+          = `Take ) )
 
   (** Given:
    *
@@ -531,6 +550,7 @@ module Make (Inputs : Inputs_intf) :
    *  Modifications are in-place
   *)
   let move_root t (soon_to_be_root_node : Node.t) : Node.t =
+    (* TODO: decompose this to new root and old root *)
     let root_node = Hashtbl.find_exn t.table t.root in
     let root_breadcrumb = root_node.breadcrumb in
     let root = root_breadcrumb |> Breadcrumb.staged_ledger in
@@ -637,24 +657,23 @@ module Make (Inputs : Inputs_intf) :
   *)
   let add_breadcrumb_exn t breadcrumb =
     O1trace.measure "add_breadcrumb" (fun () ->
-        let consensus_state_of_breadcrumb b =
-          Breadcrumb.transition_with_hash b
-          |> With_hash.data |> External_transition.Validated.protocol_state
-          |> Protocol_state.consensus_state
-        in
         let hash =
           With_hash.hash (Breadcrumb.transition_with_hash breadcrumb)
         in
         let root_node = Hashtbl.find_exn t.table t.root in
         let old_best_tip = best_tip t in
+        (* TODO: add the old one *)
         let local_state_was_synced_at_start =
+          (* This function is immutable *)
           Consensus.Hooks.required_local_state_sync
             ~consensus_state:(consensus_state_of_breadcrumb old_best_tip)
             ~local_state:t.consensus_local_state
           |> Option.is_none
         in
         (* 1 *)
+        (* Diff: Add_breadcrumb *)
         attach_breadcrumb_exn t breadcrumb ;
+        (* TODO: New_breadcrumb diff *)
         let parent_hash = Breadcrumb.parent_hash breadcrumb in
         let parent_node =
           Option.value_exn
@@ -663,25 +682,12 @@ module Make (Inputs : Inputs_intf) :
               (Error.of_exn
                  (Parent_not_found (`Parent parent_hash, `Target hash)))
         in
-        Debug_assert.debug_assert (fun () ->
-            (* if the proof verified, then this should always hold*)
-            assert (
-              Consensus.Hooks.select
-                ~existing:
-                  (consensus_state_of_breadcrumb parent_node.breadcrumb)
-                ~candidate:(consensus_state_of_breadcrumb breadcrumb)
-                ~logger:
-                  (Logger.extend t.logger
-                     [ ( "selection_context"
-                       , `String
-                           "debug_assert that child is preferred over parent"
-                       ) ])
-              = `Take ) ) ;
         let node = Hashtbl.find_exn t.table hash in
         (* 2 *)
         let distance_to_parent = node.length - root_node.length in
         let best_tip_node = Hashtbl.find_exn t.table t.best_tip in
         (* 3 *)
+        (* Calculate_Diff: Best tip change *)
         let best_tip_change =
           Consensus.Hooks.select
             ~existing:(consensus_state_of_breadcrumb best_tip_node.breadcrumb)
@@ -691,6 +697,7 @@ module Make (Inputs : Inputs_intf) :
                  [ ( "selection_context"
                    , `String "comparing new breadcrumb to best tip" ) ])
         in
+        (* TODO: remove this code since it used in best_tip_diff *)
         let added_to_best_tip_path, removed_from_best_tip_path =
           match best_tip_change with
           | `Keep ->
@@ -699,18 +706,6 @@ module Make (Inputs : Inputs_intf) :
               t.best_tip <- hash ;
               get_path_diff t breadcrumb best_tip_node.breadcrumb
         in
-        Logger.debug t.logger ~module_:__MODULE__ ~location:__LOC__
-          "added %d breadcrumbs and removed %d making path to new best tip"
-          (List.length added_to_best_tip_path)
-          (List.length removed_from_best_tip_path)
-          ~metadata:
-            [ ( "new_breadcrumbs"
-              , `List (List.map ~f:Breadcrumb.to_yojson added_to_best_tip_path)
-              )
-            ; ( "old_breadcrumbs"
-              , `List
-                  (List.map ~f:Breadcrumb.to_yojson removed_from_best_tip_path)
-              ) ] ;
         (* 4 *)
         (* note: new_root_node is the same as root_node if the root didn't change *)
         let garbage_breadcrumbs, new_root_node =
@@ -720,8 +715,10 @@ module Make (Inputs : Inputs_intf) :
               distance_to_parent max_length ;
             (* 4.I *)
             let heir_hash = List.hd_exn (hash_path t node.breadcrumb) in
+            (* TODO: this will be used to compute Best_tip_changed  *)
             let heir_node = Hashtbl.find_exn t.table heir_hash in
             (* 4.II *)
+            (* TODO: compute garbage hashes *)
             let bad_hashes =
               List.filter root_node.successor_hashes
                 ~f:(Fn.compose not (State_hash.equal heir_hash))
@@ -738,9 +735,10 @@ module Make (Inputs : Inputs_intf) :
             |> List.iter ~f:(fun bad ->
                    ignore
                      (Ledger.unregister_mask_exn root_ledger
-                        (Breadcrumb.staged_ledger bad |> Staged_ledger.ledger))
+                        (Staged_ledger.ledger @@ Breadcrumb.staged_ledger bad))
                ) ;
             (* 4.IV *)
+            (* TODO: compute new_root *)
             let new_root_node = move_root t heir_node in
             (* 4.V *)
             let garbage =
@@ -766,6 +764,7 @@ module Make (Inputs : Inputs_intf) :
               Breadcrumb.staged_ledger new_root_node.breadcrumb
             in
             (* 4.VII *)
+            (* TODO: put this in the process add new_root diff *)
             Consensus.Hooks.frontier_root_transition
               (Breadcrumb.consensus_state root_node.breadcrumb)
               (Breadcrumb.consensus_state new_root_node.breadcrumb)
@@ -808,6 +807,7 @@ module Make (Inputs : Inputs_intf) :
                 | None ->
                     () ) ;
             (* 4.VIII *)
+            (* TODO: Put in new root  *)
             ( match
                 ( Staged_ledger.proof_txns new_root_staged_ledger
                 , heir_node.breadcrumb.just_emitted_a_proof )
@@ -850,6 +850,7 @@ module Make (Inputs : Inputs_intf) :
               ( Ledger.Db.merkle_root t.root_snarked_ledger
               |> Frozen_ledger_hash.of_ledger_hash ) ;
             (* 4.IX *)
+            (* TODO: This is a new extension do not include *)
             let root_breadcrumb = Node.breadcrumb root_node in
             let root_state_hash = Breadcrumb.state_hash root_breadcrumb in
             Extensions.Root_history.enqueue t.extensions.root_history

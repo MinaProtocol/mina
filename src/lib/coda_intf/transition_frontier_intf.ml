@@ -364,6 +364,60 @@ module type Transition_frontier_base_intf = sig
   val logger : t -> Logger.t
 end
 
+module type Transition_frontier_base0_intf = sig
+  include Transition_frontier_base_intf
+
+  exception
+    Parent_not_found of ([`Parent of State_hash.t] * [`Target of State_hash.t])
+
+  exception Already_exists of State_hash.t
+
+  val max_length : int
+
+  val consensus_local_state : t -> Consensus.Data.Local_state.t
+
+  val all_breadcrumbs : t -> Breadcrumb.t list
+
+  val root : t -> Breadcrumb.t
+
+  val previous_root : t -> Breadcrumb.t option
+
+  val root_length : t -> int
+
+  val best_tip : t -> Breadcrumb.t
+
+  val path_map : t -> Breadcrumb.t -> f:(Breadcrumb.t -> 'a) -> 'a list
+
+  val hash_path : t -> Breadcrumb.t -> State_hash.t list
+
+  val find : t -> State_hash.t -> Breadcrumb.t option
+
+  val find_in_root_history : t -> State_hash.t -> Breadcrumb.t option
+
+  val root_history_path_map :
+    t -> State_hash.t -> f:(Breadcrumb.t -> 'a) -> 'a Non_empty_list.t option
+
+  val successor_hashes : t -> State_hash.t -> State_hash.t list
+
+  val successor_hashes_rec : t -> State_hash.t -> State_hash.t list
+
+  val successors : t -> Breadcrumb.t -> Breadcrumb.t list
+
+  val successors_rec : t -> Breadcrumb.t -> Breadcrumb.t list
+
+  val common_ancestor : t -> Breadcrumb.t -> Breadcrumb.t -> State_hash.t
+
+  val iter : t -> f:(Breadcrumb.t -> unit) -> unit
+
+  val best_tip_path_length_exn : t -> int
+
+  val shallow_copy_root_snarked_ledger : t -> Ledger.Mask.Attached.t
+
+  val wait_for_transition : t -> State_hash.t -> unit Deferred.t
+
+  val length_at_transition : t -> State_hash.t -> int option
+end
+
 module type Transition_frontier_intf = sig
   include Transition_frontier_base_intf
 
