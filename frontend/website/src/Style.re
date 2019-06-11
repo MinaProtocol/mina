@@ -295,12 +295,14 @@ module H3 = {
         style([
           color(Colors.white),
           lineHeight(`rem(1.5)),
-          display(`flex),
+          display(`inlineFlex),
           justifyContent(`center),
           alignItems(`center),
-          width(`rem(9.0625)),
+          minWidth(`rem(9.0625)),
           height(`rem(3.)),
           margin(`auto),
+          whiteSpace(`nowrap),
+          padding2(~v=`zero, ~h=`rem(1.)),
         ]),
       ]);
   };

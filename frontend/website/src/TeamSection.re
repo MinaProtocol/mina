@@ -143,7 +143,13 @@ module Section = {
     render: _self => {
       let checkboxName = name ++ "-checkbox";
       let labelName = name ++ "-label";
-      <>
+    <div
+      className=Css.(
+        style([
+          display(`flex),
+          flexDirection(`column),
+        ])
+      )>
         <h3 className=Style.H3.Technical.boxed>
           {ReasonReact.string(name)}
         </h3>
@@ -223,7 +229,7 @@ module Section = {
              checkboxName,
            )}
         </RunScript>
-      </>;
+      </div>;
     },
   };
 };
