@@ -9,11 +9,6 @@ open Currency
 open Fold_lib
 open Module_version
 
-let coinbase_tree_depth = Snark_params.pending_coinbase_depth
-
-(* Total number of stacks *)
-let coinbase_stacks = Int.pow 2 coinbase_tree_depth
-
 module Coinbase_data = struct
   type t = Public_key.Compressed.Stable.V1.t * Amount.Stable.V1.t
   [@@deriving bin_io, sexp]
@@ -230,7 +225,15 @@ module Stack_builder = Coinbase_stack.Stack
    modules for Hash and Stack.
  *)
 
-module T = struct
+module Make (Depth : sig
+  val depth : int
+end) =
+struct
+  include Depth
+
+  (* Total number of stacks *)
+  let max_coinbase_stack_count = Int.pow 2 depth
+
   module Stack = struct
     module Stable = struct
       module V1 = struct
@@ -409,8 +412,6 @@ module T = struct
           let hash (t : var) = return (var_to_hash_packed t)
         end)
 
-    let depth = coinbase_tree_depth
-
     module Path = Merkle_tree.Path
 
     type path = Path.value
@@ -554,7 +555,7 @@ module T = struct
     let init_hash = Stack.data_hash Stack.empty in
     let hash_on_level, root_hash =
       List.fold
-        (List.init coinbase_tree_depth ~f:(fun i -> i + 1))
+        (List.init depth ~f:(fun i -> i + 1))
         ~init:([(0, init_hash)], init_hash)
         ~f:(fun (hashes, (cur_hash : Stack.t)) height ->
           let (merged : Stack.t) =
@@ -574,22 +575,14 @@ module T = struct
           (key / 2)
     in
     let rec go t key =
-      if
-        Stack_id.( > ) key
-          (Stack_id.of_int @@ (Int.pow 2 coinbase_tree_depth - 1))
-      then t
+      if Stack_id.( > ) key (Stack_id.of_int @@ (Int.pow 2 depth - 1)) then t
       else
-        let path =
-          create_path (coinbase_tree_depth - 1) [] (Stack_id.to_int key)
-        in
+        let path = create_path (depth - 1) [] (Stack_id.to_int key) in
         go
           (Merkle_tree.add_path t path key Stack.empty)
           (Or_error.ok_exn (Stack_id.incr_by_one key))
     in
-    { Poly.tree=
-        go
-          (Merkle_tree.of_hash ~depth:coinbase_tree_depth root_hash)
-          Stack_id.zero
+    { Poly.tree= go (Merkle_tree.of_hash ~depth root_hash) Stack_id.zero
     ; pos_list= []
     ; new_pos= Stack_id.zero }
 
@@ -615,7 +608,9 @@ module T = struct
     let open Or_error.Let_syntax in
     if is_new_stack then
       let%map new_pos =
-        if Stack_id.equal t.new_pos (Stack_id.of_int (coinbase_stacks - 1))
+        if
+          Stack_id.equal t.new_pos
+            (Stack_id.of_int (max_coinbase_stack_count - 1))
         then Ok Stack_id.zero
         else Stack_id.incr_by_one t.new_pos
       in
@@ -735,7 +730,9 @@ module T = struct
             unhandled )
 end
 
-include T
+include Make (struct
+  let depth = Snark_params.pending_coinbase_depth
+end)
 
 let%test_unit "add stack + remove stack = initial tree " =
   let pending_coinbases = ref (create () |> Or_error.ok_exn) in
@@ -825,16 +822,20 @@ let%test_unit "Checked_tree = Unchecked_tree" =
 
 let%test_unit "push and pop multiple stacks" =
   let open Quickcheck in
-  let pending_coinbases = ref (create () |> Or_error.ok_exn) in
-  let max_coinbase_amount = Coda_compile_config.coinbase_amount in
-  let coinbases_gen = Quickcheck.Generator.list Coinbase.gen in
-  let add_new_stack t = function
+  let max_coinbase_amount = Coda_compile_config.coinbase in
+  let module Pending_coinbase = Make (struct
+    let depth = 3
+  end) in
+  let t_of_coinbases t = function
     | [] ->
-        let t' = incr_index t ~is_new_stack:true |> Or_error.ok_exn in
-        (Stack.empty, t')
+        let t' =
+          Pending_coinbase.incr_index t ~is_new_stack:true |> Or_error.ok_exn
+        in
+        (Pending_coinbase.Stack.empty, t')
     | initial_coinbase :: coinbases ->
         let t' =
-          add_coinbase t ~coinbase:initial_coinbase ~is_new_stack:true
+          Pending_coinbase.add_coinbase t ~coinbase:initial_coinbase
+            ~is_new_stack:true
           |> Or_error.ok_exn
         in
         let updated =
@@ -852,44 +853,56 @@ let%test_unit "push and pop multiple stacks" =
                 pending_coinbases
               else
                 let interim_tree =
-                  add_coinbase pending_coinbases ~coinbase ~is_new_stack:false
+                  Pending_coinbase.add_coinbase pending_coinbases ~coinbase
+                    ~is_new_stack:false
                   |> Or_error.ok_exn
                 in
                 if Amount.equal coinbase2.amount Amount.zero then interim_tree
                 else
-                  add_coinbase interim_tree ~coinbase:coinbase2
-                    ~is_new_stack:false
+                  Pending_coinbase.add_coinbase interim_tree
+                    ~coinbase:coinbase2 ~is_new_stack:false
                   |> Or_error.ok_exn )
         in
         let new_stack =
-          Or_error.ok_exn @@ latest_stack updated ~is_new_stack:false
+          Or_error.ok_exn
+          @@ Pending_coinbase.latest_stack updated ~is_new_stack:false
         in
         (new_stack, updated)
   in
-  (*push the coinbases*)
-  let add coinbases_list pending_coinbases =
-    List.fold ~init:([], pending_coinbases) coinbases_list
+  (*Create pending coinbase stacks from coinbase lists and add it to the pending coinbase merkle tree*)
+  let add coinbase_lists pending_coinbases =
+    List.fold ~init:([], pending_coinbases) coinbase_lists
       ~f:(fun (stacks, pc) coinbases ->
-        let new_stack, pc = add_new_stack pc coinbases in
+        let new_stack, pc = t_of_coinbases pc coinbases in
         (new_stack :: stacks, pc) )
   in
   (*remove the oldest stack and check if that's the expected one *)
   let remove_check t expected_stack =
     let popped_stack, updated_pending_coinbases =
-      remove_coinbase_stack t |> Or_error.ok_exn
+      Pending_coinbase.remove_coinbase_stack t |> Or_error.ok_exn
     in
-    assert (Stack.equal popped_stack expected_stack) ;
+    assert (Pending_coinbase.Stack.equal popped_stack expected_stack) ;
     updated_pending_coinbases
   in
-  let add_remove_check coinbases_list =
-    let stacks, pending_coinbases_updated =
-      add coinbases_list !pending_coinbases
+  let add_remove_check coinbase_lists =
+    let pending_coinbases = Pending_coinbase.create_exn' () in
+    let rec go coinbase_lists pc =
+      if List.is_empty coinbase_lists then ()
+      else
+        let coinbase_lists' =
+          List.take coinbase_lists Pending_coinbase.max_coinbase_stack_count
+        in
+        let added_stacks, pending_coinbases_updated = add coinbase_lists' pc in
+        let pending_coinbases' =
+          List.fold ~init:pending_coinbases_updated (List.rev added_stacks)
+            ~f:(fun pc expected_stack -> remove_check pc expected_stack)
+        in
+        let remaining_lists =
+          List.drop coinbase_lists Pending_coinbase.max_coinbase_stack_count
+        in
+        go remaining_lists pending_coinbases'
     in
-    pending_coinbases :=
-      List.fold ~init:pending_coinbases_updated (List.rev stacks)
-        ~f:(fun pc expected_stack -> remove_check pc expected_stack)
+    go coinbase_lists pending_coinbases
   in
-  let list_of_list_gen =
-    Quickcheck.Generator.list_with_length coinbase_stacks coinbases_gen
-  in
-  test ~trials:20 list_of_list_gen ~f:add_remove_check
+  let coinbase_lists_gen = Quickcheck.Generator.(list (list Coinbase.gen)) in
+  test ~trials:100 coinbase_lists_gen ~f:add_remove_check
