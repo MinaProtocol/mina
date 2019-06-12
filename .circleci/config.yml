@@ -4,7 +4,7 @@ version: 3
 jobs:
     tracetool:
         docker:
-            - image: codaprotocol/coda:toolchain-rust-51191cf583a5129255d2c53ad946f6821ad9989c
+            - image: codaprotocol/coda:toolchain-rust-8959b8dfda29263d2f88f13a284ef34c9da0a081
         steps:
             - checkout
             - run: git submodule sync && git submodule update --init --recursive
