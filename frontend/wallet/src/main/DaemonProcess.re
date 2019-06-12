@@ -5,16 +5,17 @@ module Command = {
   type t = {
     executable: string,
     args: array(string),
-    env: option(Js.Dict.t(string)),
+    env: Js.Dict.t(string),
+    logfileName: string,
   };
 };
 
 let (^/) = Filename.concat;
+
 let codaCommand = (~port, ~extraArgs) => {
   let codaPath = "_build/coda-daemon-macos";
   {
     Command.executable: ProjectRoot.resource ^/ codaPath ^/ "coda.exe",
-    // yes Js.Array.concat is backwards :(
     args:
       Js.Array.concat(
         extraArgs,
@@ -27,57 +28,63 @@ let codaCommand = (~port, ~extraArgs) => {
         |],
       ),
     env:
-      Some(
-        Js.Dict.fromList([
-          (
-            "CODA_KADEMLIA_PATH",
-            ProjectRoot.resource ^/ codaPath ^/ "kademlia",
-          ),
-        ]),
+      Js.Dict.fromArray(
+        Js.Array.concat(
+          [|
+            (
+              "CODA_KADEMLIA_PATH",
+              ProjectRoot.resource ^/ codaPath ^/ "kademlia",
+            ),
+          |],
+          Js.Dict.entries(ChildProcess.Process.env),
+        ),
       ),
+    logfileName: "daemon",
   };
 };
 
 module Process = {
   let start = (command: Command.t) => {
-    let {Command.executable, args} = command;
-    print_endline({j|Starting $executable with $args|j});
+    let {Command.executable, args, logfileName} = command;
+    print_endline(
+      {j|Starting $executable with $args. Logging to `$logfileName.log`|j},
+    );
 
+    /*
+     child_process.spawn communicates with processes using sockets.
+     When the proposer process starts up in the daemon, stdout and stderr
+     are accessed using a helper function from async_unix:
+     https://github.com/janestreet/async_unix/blob/ff13d69c96f4b857737263910b3f6b08311b5dfc/src/writer0.ml#L1465
+     This causes async_unix to attempt to infer the type of stdout/err
+     using and check if it has SO_ACCEPTCONN set using getsockopt.
+     This flag is not supported on Mac, so it crashes with "Protocol not available"
+
+     As a workaround, we have to redirect all output to a file.
+
+     If this issue is ever resolved or we stop using async_unix, this code can be simplified:
+     https://github.com/janestreet/async_unix/issues/15
+     */
+
+    let log = Fs.openSync(command.logfileName ++ ".log", "w");
     let p =
-      switch (command.env) {
-      | None => ChildProcess.spawn(command.executable, command.args)
-      | Some(env) =>
-        ChildProcess.spawnWithEnv(
-          command.executable,
-          command.args,
-          {"env": env},
-        )
-      };
+      ChildProcess.spawn(
+        command.executable,
+        command.args,
+        {
+          "env": command.env,
+          "stdio":
+            ChildProcess.makeIOTriple(`Ignore, `Stream(log), `Stream(log)),
+        },
+      );
 
     ChildProcess.Process.onError(p, e =>
       prerr_endline(
         "Daemon process "
         ++ command.executable
-        ++ " crashed: "
+        ++ " crashed. Logs are in `"
+        ++ command.logfileName
+        ++ ".log`. Error:"
         ++ ChildProcess.Error.messageGet(e),
-      )
-    );
-
-    ChildProcess.ReadablePipe.on(ChildProcess.Process.stderrGet(p), "data", s =>
-      prerr_endline(
-        "Daemon "
-        ++ command.executable
-        ++ " error: "
-        ++ Node.Buffer.toString(s),
-      )
-    );
-
-    ChildProcess.ReadablePipe.on(ChildProcess.Process.stdoutGet(p), "data", s =>
-      prerr_endline(
-        "Daemon "
-        ++ command.executable
-        ++ " stdout: "
-        ++ Node.Buffer.toString(s),
       )
     );
 
@@ -88,9 +95,10 @@ module Process = {
         if (code != 0) {
           Printf.fprintf(
             stderr,
-            "Daemon process %s died with non-zero exit code: %d\n",
+            "Daemon process %s died with non-zero exit code: %d. Logs are in `%s.log`\n",
             command.executable,
             code,
+            command.logfileName,
           );
         } else {
           print_endline(
@@ -140,7 +148,8 @@ let startFaker = port => {
       "--",
       "schema.graphql",
     |],
-    env: None,
+    env: ChildProcess.Process.env,
+    logfileName: "faker",
   };
   let p = Process.start(graphqlFaker);
   () => {
