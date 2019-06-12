@@ -9,20 +9,22 @@ module type Inputs_intf = Inputs.Inputs_intf
 
 module Lol = Extensions0
 
-module Make (Inputs : Inputs_intf) :
-  Coda_intf.Transition_frontier_intf
-  with type mostly_validated_external_transition :=
-              ( [`Time_received] * Truth.true_t
-              , [`Proof] * Truth.true_t
-              , [`Frontier_dependencies] * Truth.true_t
-              , [`Staged_ledger_diff] * Truth.false_t )
-              Inputs.External_transition.Validation.with_transition
-   and type external_transition_validated :=
-              Inputs.External_transition.Validated.t
-   and type staged_ledger_diff := Inputs.Staged_ledger_diff.t
-   and type staged_ledger := Inputs.Staged_ledger.t
-   and type transaction_snark_scan_state := Inputs.Staged_ledger.Scan_state.t
-   and type verifier := Inputs.Verifier.t = struct
+module Make (Inputs : Inputs_intf) =
+(* :
+     Coda_intf.Transition_frontier_intf
+     with type mostly_validated_external_transition :=
+                ( [`Time_received] * Truth.true_t
+                , [`Proof] * Truth.true_t
+                , [`Frontier_dependencies] * Truth.true_t
+                , [`Staged_ledger_diff] * Truth.false_t )
+                Inputs.External_transition.Validation.with_transition
+     and type external_transition_validated :=
+                Inputs.External_transition.Validated.t
+     and type staged_ledger_diff := Inputs.Staged_ledger_diff.t
+     and type staged_ledger := Inputs.Staged_ledger.t
+     and type transaction_snark_scan_state := Inputs.Staged_ledger.Scan_state.t
+     and type verifier := Inputs.Verifier.t  *)
+struct
   open Inputs
 
   (* NOTE: is Consensus_mechanism.select preferable over distance? *)
@@ -200,6 +202,7 @@ module Make (Inputs : Inputs_intf) :
       user_commands @@ staged_ledger_diff external_transition
   end
 
+  (* TODO: put this in base *)
   module Fake_db = struct
     include Coda_base.Ledger.Db
 
@@ -226,6 +229,26 @@ module Make (Inputs : Inputs_intf) :
     include Inputs
     module Breadcrumb = Breadcrumb
   end)
+
+  module Diff0 = struct
+    type _ t =
+      (* External transition of the node that is going on top of it *)
+      | New_breadcrumb : Breadcrumb.t -> External_transition.Validated.t t
+      (* External transition of the node that is going on top of it *)
+      | Root_transitioned :
+          { new_: Breadcrumb.t (* The nodes to remove excluding the old root *)
+          ; garbage: Breadcrumb.t list }
+          -> (* Remove the old Root *)
+          External_transition.Validated.t t
+      (* TODO: Mutant is just the old best tip *)
+      | Best_tip_changed : Breadcrumb.t -> External_transition.Validated.t t
+
+    type 'a diff_mutant = 'a t
+
+    module E = struct
+      type t = E : 'output diff_mutant -> t
+    end
+  end
 
   module Extensions = Extensions.Make (struct
     include Inputs
@@ -362,6 +385,7 @@ module Make (Inputs : Inputs_intf) :
     let node = Hashtbl.find_exn t.table hash in
     node.breadcrumb
 
+  (* Put this in  *)
   let find_in_root_history t hash =
     Extensions.Root_history.lookup t.extensions.root_history hash
 
@@ -634,6 +658,87 @@ module Make (Inputs : Inputs_intf) :
     ( path_from_to (find_exn t ancestor) bc1
     , path_from_to (find_exn t ancestor) bc2 )
 
+  let length_at_transition transition_frontier hash =
+    Option.map (Hashtbl.find transition_frontier.table hash) ~f:(fun node ->
+        node.length )
+
+  let calculate_diffs transition_frontier breadcrumb =
+    O1trace.measure "calculate_diffs" (fun () ->
+        let logger = logger transition_frontier in
+        let hash =
+          With_hash.hash (Breadcrumb.transition_with_hash breadcrumb)
+        in
+        let root = root transition_frontier in
+        let new_breadcrumb_diff = Diff0.New_breadcrumb breadcrumb in
+        let best_tip_breadcrumb = best_tip transition_frontier in
+        let new_best_tip_diff =
+          match
+            Consensus.Hooks.select
+              ~existing:(consensus_state_of_breadcrumb best_tip_breadcrumb)
+              ~candidate:(consensus_state_of_breadcrumb breadcrumb)
+              ~logger:
+                (Logger.extend logger
+                   [ ( "selection_context"
+                     , `String "comparing new breadcrumb to best tip" ) ])
+          with
+          | `Keep ->
+              None
+          | `Take ->
+              Some (Diff0.Best_tip_changed breadcrumb)
+        in
+        let new_breadcrumb_length =
+          Option.value_exn (length_at_transition transition_frontier hash) + 1
+        in
+        let root_length =
+          Option.value_exn
+            (length_at_transition transition_frontier
+               (Breadcrumb.state_hash root))
+        in
+        let distance_to_root = new_breadcrumb_length - root_length in
+        let root_transitioned_diff =
+          if distance_to_root > max_length then (
+            Logger.info logger ~module_:__MODULE__ ~location:__LOC__
+              !"Distance to parent: %d exceeded max_lenth %d"
+              distance_to_root max_length ;
+            let heir_hash =
+              List.hd_exn (hash_path transition_frontier breadcrumb)
+            in
+            let bad_children =
+              List.filter (successors transition_frontier root)
+                ~f:(fun breadcrumb ->
+                  not
+                  @@ State_hash.equal heir_hash
+                       (Breadcrumb.state_hash breadcrumb) )
+            in
+            let bad_children_descendants =
+              List.bind bad_children ~f:(successors_rec transition_frontier)
+            in
+            let total_garbage = bad_children @ bad_children_descendants in
+            let yojson_breadcrumb =
+              Fn.compose State_hash.to_yojson Breadcrumb.state_hash
+            in
+            Logger.trace logger ~module_:__MODULE__ ~location:__LOC__
+              ~metadata:
+                [ ( "bad_children"
+                  , `List (List.map bad_children ~f:yojson_breadcrumb) )
+                ; ("length_of_garbage", `Int (List.length total_garbage))
+                ; ( "bad_children_descendants"
+                  , `List
+                      (List.map bad_children_descendants ~f:yojson_breadcrumb)
+                  )
+                ; ( "local_state"
+                  , Consensus.Data.Local_state.to_yojson
+                      (consensus_local_state transition_frontier) ) ]
+              "collecting $length_of_garbage nodes rooted from $bad_hashes" ;
+            Some (Diff0.Root_transitioned {new_= root; garbage= bad_children}) )
+          else None
+        in
+        Diff0.E.E new_breadcrumb_diff
+        :: List.filter_opt
+             [ Option.map new_best_tip_diff ~f:(fun diff -> Diff0.E.E diff)
+             ; Option.map root_transitioned_diff ~f:(fun diff -> Diff0.E.E diff)
+             ] )
+
   (* Adding a breadcrumb to the transition frontier is broken into the following steps:
    *   1) attach the breadcrumb to the transition frontier
    *   2) calculate the distance from the new node to the parent and the
@@ -877,7 +982,7 @@ module Make (Inputs : Inputs_intf) :
                 ; removed_from_best_tip_path
                 ; garbage= garbage_breadcrumbs } ) )
 
-  let add_breadcrumb_if_present_exn t breadcrumb =
+  let add_breadcrumb_if_ present_exn t breadcrumb =
     let parent_hash = Breadcrumb.parent_hash breadcrumb in
     match Hashtbl.find t.table parent_hash with
     | Some _ ->
@@ -901,7 +1006,7 @@ module Make (Inputs : Inputs_intf) :
   let shallow_copy_root_snarked_ledger {root_snarked_ledger; _} =
     Ledger.of_database root_snarked_ledger
 
-  let wait_for_transition t target_hash =
+  let wait_for_tranition t target_hash =
     if Hashtbl.mem t.table target_hash then Deferred.unit
     else
       let transition_registry = Extensions.transition_registry t.extensions in
@@ -916,7 +1021,7 @@ module Make (Inputs : Inputs_intf) :
         let%map node = Hashtbl.find frontier.table @@ state_hash breadcrumb in
         Node.successor_hashes node
       in
-      equal breadcrumb1 breadcrumb2
+      equal beadcrumb1 breadcrumb2
       && State_hash.equal (parent_hash breadcrumb1) (parent_hash breadcrumb2)
       && (let%bind successors1 = get_successor_nodes t1 breadcrumb1 in
           let%map successors2 = get_successor_nodes t2 breadcrumb2 in
@@ -926,7 +1031,7 @@ module Make (Inputs : Inputs_intf) :
          |> Option.value_map ~default:false ~f:Fn.id
     in
     List.equal equal_breadcrumb
-      (all_breadcrumbs t1 |> sort_breadcrumbs)
+      (all_breacrumbs t1 |> sort_breadcrumbs)
       (all_breadcrumbs t2 |> sort_breadcrumbs)
 
   module For_tests = struct

@@ -20,53 +20,16 @@ module Make (Inputs : sig
      and type transaction_snark_scan_state := Staged_ledger.Scan_state.t
      and type verifier := Verifier.t
 
-  module Breadcrumb = Transition_frontier.Breadcrumb
-
-  module Mutant : sig
-    module Root : sig
-      (** Data representing the root of a transition frontier. 'root can either be an external_transition with hash or a state_hash  *)
-      module Poly : sig
-        type ('root, 'scan_state, 'pending_coinbase) t =
-          { root: 'root
-          ; scan_state: 'scan_state
-          ; pending_coinbase: 'pending_coinbase }
-      end
-
-      type 'root t =
-        ('root, Staged_ledger.Scan_state.t, Pending_coinbase.t) Poly.t
-    end
-
-    module Best_tip_changed : sig
-      type t =
-        { previous: External_transition.Validated.t
-        ; new_: External_transition.Validated.t }
-    end
-  end
-
-  module Diff : sig
-    type _ t =
-      (* External transition of the node that is going on top of it *)
-      | New_breadcrumb : Breadcrumb.t -> External_transition.Validated.t t
-      (* External transition of the node that is going on top of it *)
-      | Root_transitioned :
-          { new_: Breadcrumb.t (* The nodes to remove excluding the old root *)
-          ; garbage: Breadcrumb.t list }
-          -> (* Remove the old Root *)
-          External_transition.Validated.t t
-      (* TODO: Mutant is just the old best tip *)
-      | Best_tip_changed : Breadcrumb.t -> External_transition.Validated.t t
-
-    type 'a diff_mutant = 'a t
-
-    module E : sig
-      type t = E : 'output diff_mutant -> t
-    end
-  end
+  module Diff :
+    Coda_intf.Transition_frontier_diff0_intf
+    with type breadcrumb := Transition_frontier.Breadcrumb.t
+     and type external_transition_validated := External_transition.Validated.t
 end) =
 struct
   (* Have to treat functor Transition_frontier as Inputs.Transition_frontier *)
   (* Invariant: No mutations are allowed to the transition_frontier on the transactions *)
   open Inputs
+  module Breadcrumb = Inputs.Transition_frontier.Breadcrumb
 
   module Root_history = struct
     module Queue = Hash_queue.Make (State_hash)
@@ -90,50 +53,58 @@ struct
     let is_empty {history; _} = Queue.is_empty history
   end
 
+  module type Base_ext_intf = sig
+    type t
+
+    type view
+
+    val create : Breadcrumb.t -> t * view
+
+    val handle_diffs :
+         t
+      -> Inputs.Transition_frontier.t
+      -> Diff.E.t list
+      -> view Deferred.Option.t
+  end
+
+  module type Broadcast_extension_intf = sig
+    type t
+
+    type view
+
+    val create : Breadcrumb.t -> t
+
+    val peek : t -> view
+
+    val update :
+      t -> Inputs.Transition_frontier.t -> Diff.E.t list -> unit Deferred.t
+  end
+
+  module Make_broadcastable (Ext : Base_ext_intf) :
+    Broadcast_extension_intf with type view = Ext.view = struct
+    type t =
+      { t: Ext.t
+      ; writer: Ext.view Broadcast_pipe.Writer.t
+      ; reader: Ext.view Broadcast_pipe.Reader.t }
+
+    type view = Ext.view
+
+    let peek {reader; _} = Broadcast_pipe.Reader.peek reader
+
+    let create breadcrumb =
+      let t, initial_view = Ext.create breadcrumb in
+      let reader, writer = Broadcast_pipe.create initial_view in
+      {t; reader; writer}
+
+    let update {t; writer; _} transition_frontier diffs =
+      match%bind Ext.handle_diffs t transition_frontier diffs with
+      | Some view ->
+          Broadcast_pipe.Writer.write writer view
+      | None ->
+          Deferred.unit
+  end
+
   module Extensions = struct
-    module type Base_ext_intf = sig
-      type t
-
-      type view
-
-      val create : Breadcrumb.t -> t * view
-
-      val handle_diffs :
-           t
-        -> Inputs.Transition_frontier.t
-        -> Diff.E.t list
-        -> view Deferred.Option.t
-    end
-
-    module type Broadcast_extension_intf = sig
-      type t
-
-      val create : Breadcrumb.t -> t
-
-      val update :
-        t -> Inputs.Transition_frontier.t -> Diff.E.t list -> unit Deferred.t
-    end
-
-    module Broadcast_extension (Ext : Base_ext_intf) :
-      Broadcast_extension_intf = struct
-      type t =
-        { t: Ext.t
-        ; writer: Ext.view Broadcast_pipe.Writer.t
-        ; reader: Ext.view Broadcast_pipe.Reader.t }
-
-      let create breadcrumb =
-        let t, initial_view = Ext.create breadcrumb in
-        let reader, writer = Broadcast_pipe.create initial_view in
-        {t; reader; writer}
-
-      let update {t; writer; _} transition_frontier diffs =
-        match%bind Ext.handle_diffs t transition_frontier diffs with
-        | Some view ->
-            Broadcast_pipe.Writer.write writer view
-        | None ->
-            Deferred.unit
-    end
-
     module Root_history = struct
       type t = Root_history.t
 
@@ -225,7 +196,7 @@ struct
 
       type diff_update = {num_removed: int; is_added: bool}
 
-      let handle_diffs t transition_frontier diffs =
+      let handle_diffs t (_ : Inputs.Transition_frontier.t) diffs =
         let {num_removed; is_added} =
           List.fold diffs ~init:{num_removed= 0; is_added= false}
             ~f:(fun ({num_removed; is_added} as init) -> function
@@ -365,131 +336,63 @@ struct
         in
         Deferred.return @@ Option.some_if should_broadcast view
     end
-
-    module Broadcast = struct
-      module Root_history = Broadcast_extension (Root_history)
-      module Snark_pool_refcount = Broadcast_extension (Snark_pool_refcount)
-      module Best_tip_diff = Broadcast_extension (Best_tip_diff)
-    end
-
-    type t =
-      { snark_pool_refcount: Broadcast.Snark_pool_refcount.t
-      ; root_history: Broadcast.Root_history.t
-      ; best_tip_diff: Broadcast.Best_tip_diff.t }
-    [@@deriving fields]
-
-    let update_all (t : t) transition_frontier diffs =
-      let run_update (type t)
-          (module Broadcast : Broadcast_extension_intf with type t = t)
-          (deferred_unit : unit Deferred.t) field =
-        let%bind () = deferred_unit in
-        let extension = Field.get field t in
-        Broadcast.update extension transition_frontier diffs
-      in
-      let open Broadcast in
-      Fields.fold ~init:Deferred.unit
-        ~snark_pool_refcount:(run_update (module Snark_pool_refcount))
-        ~root_history:(run_update (module Root_history))
-        ~best_tip_diff:(run_update (module Best_tip_diff))
   end
 
-  let consensus_state_of_breadcrumb b =
-    Breadcrumb.transition_with_hash b
-    |> With_hash.data |> External_transition.Validated.protocol_state
-    |> Coda_state.Protocol_state.consensus_state
+  module Broadcast = struct
+    open Extensions
+    module Root_history = Make_broadcastable (Root_history)
+    module Snark_pool_refcount = Make_broadcastable (Snark_pool_refcount)
+    module Best_tip_diff = Make_broadcastable (Best_tip_diff)
+  end
 
-  let calculate_diffs transition_frontier breadcrumb =
-    let open Inputs.Transition_frontier in
-    O1trace.measure "calculate_diffs" (fun () ->
-        let logger = logger transition_frontier in
-        let hash =
-          With_hash.hash (Breadcrumb.transition_with_hash breadcrumb)
-        in
-        let root = root transition_frontier in
-        let new_breadcrumb_diff = Diff.New_breadcrumb breadcrumb in
-        let best_tip_breadcrumb = best_tip transition_frontier in
-        let new_best_tip_diff =
-          match
-            Consensus.Hooks.select
-              ~existing:(consensus_state_of_breadcrumb best_tip_breadcrumb)
-              ~candidate:(consensus_state_of_breadcrumb breadcrumb)
-              ~logger:
-                (Logger.extend logger
-                   [ ( "selection_context"
-                     , `String "comparing new breadcrumb to best tip" ) ])
-          with
-          | `Keep ->
-              None
-          | `Take ->
-              Some (Diff.Best_tip_changed breadcrumb)
-        in
-        let new_breadcrumb_length =
-          Option.value_exn (length_at_transition transition_frontier hash) + 1
-        in
-        let root_length =
-          Option.value_exn
-            (length_at_transition transition_frontier
-               (Breadcrumb.state_hash root))
-        in
-        let distance_to_root = new_breadcrumb_length - root_length in
-        let root_transitioned_diff =
-          if distance_to_root > Transition_frontier.max_length then (
-            Logger.info logger ~module_:__MODULE__ ~location:__LOC__
-              !"Distance to parent: %d exceeded max_lenth %d"
-              distance_to_root max_length ;
-            let heir_hash =
-              List.hd_exn (hash_path transition_frontier breadcrumb)
-            in
-            let bad_children =
-              List.filter
-                (Transition_frontier.successors transition_frontier root)
-                ~f:(fun breadcrumb ->
-                  not
-                  @@ State_hash.equal heir_hash
-                       (Breadcrumb.state_hash breadcrumb) )
-            in
-            let bad_children_descendants =
-              List.bind bad_children ~f:(successors_rec transition_frontier)
-            in
-            let total_garbage = bad_children @ bad_children_descendants in
-            let yojson_breadcrumb =
-              Fn.compose State_hash.to_yojson Breadcrumb.state_hash
-            in
-            Logger.trace logger ~module_:__MODULE__ ~location:__LOC__
-              ~metadata:
-                [ ( "bad_children"
-                  , `List (List.map bad_children ~f:yojson_breadcrumb) )
-                ; ("length_of_garbage", `Int (List.length total_garbage))
-                ; ( "bad_children_descendants"
-                  , `List
-                      (List.map bad_children_descendants ~f:yojson_breadcrumb)
-                  )
-                ; ( "local_state"
-                  , Consensus.Data.Local_state.to_yojson
-                      (Transition_frontier.consensus_local_state
-                         transition_frontier) ) ]
-              "collecting $length_of_garbage nodes rooted from $bad_hashes" ;
-            Some (Diff.Root_transitioned {new_= root; garbage= bad_children}) )
-          else None
-        in
-        Diff.E.E new_breadcrumb_diff
-        :: List.filter_opt
-             [ Option.map new_best_tip_diff ~f:(fun diff -> Diff.E.E diff)
-             ; Option.map root_transitioned_diff ~f:(fun diff -> Diff.E.E diff)
-             ] )
+  type t =
+    { root_history: Broadcast.Root_history.t
+    ; snark_pool_refcount: Broadcast.Snark_pool_refcount.t
+    ; best_tip_diff: Broadcast.Best_tip_diff.t }
+  [@@deriving fields]
 
-  let add_breadcrumb_exn t breadcrumb =
-    let open Inputs.Transition_frontier in
-    let old_consensus_state = Transition_frontier.consensus_local_state t in
-    let old_best_tip = best_tip t in
-    let old_root = Transition_frontier.root t in
-    let diffs = calculate_diffs t breadcrumb in
-    List.iter diffs ~f:(function
-      | Diff.E.E (New_breadcrumb breadcrumb) ->
+  let create (breadcrumb : Breadcrumb.t) =
+    { root_history= Broadcast.Root_history.create breadcrumb
+    ; snark_pool_refcount= Broadcast.Snark_pool_refcount.create breadcrumb
+    ; best_tip_diff= Broadcast.Best_tip_diff.create breadcrumb }
+
+  let update_all (t : t) transition_frontier diffs =
+    let run_update (type t)
+        (module Broadcast : Broadcast_extension_intf with type t = t)
+        (deferred_unit : unit Deferred.t) field =
+      let%bind () = deferred_unit in
+      let extension = Field.get field t in
+      Broadcast.update extension transition_frontier diffs
+    in
+    let open Broadcast in
+    Fields.fold ~init:Deferred.unit
+      ~root_history:(run_update (module Root_history))
+      ~snark_pool_refcount:(run_update (module Snark_pool_refcount))
+      ~best_tip_diff:(run_update (module Best_tip_diff))
+
+  (* let consensus_state_of_breadcrumb b =
+     Breadcrumb.transition_with_hash b
+     |> With_hash.data |> External_transition.Validated.protocol_state
+     |> Coda_state.Protocol_state.consensus_state *)
+
+  (* let add_breadcrumb_exn t breadcrumb =
+     let open Inputs.Transition_frontier in
+     let old_consensus_state = Transition_frontier.consensus_local_state t in
+     let old_best_tip = best_tip t in
+     let old_root = Transition_frontier.root t in
+     let local_state_before_adding_breadcrumb =
+      Consensus.Hooks.required_local_state_sync
+        ~consensus_state:(consensus_state_of_breadcrumb old_best_tip)
+        ~local_state:(Transition_frontier.consensus_local_state t)
+      |> Option.is_none
+     in
+     let diffs = calculate_diffs t breadcrumb in
+     List.iter diffs ~f:(function
+        | Diff.E.E (New_breadcrumb breadcrumb) ->
           attach_breadcrumb_exn t breadcrumb
-      | Diff.E.E (Best_tip_changed new_breadcrumb) ->
+        | Diff.E.E (Best_tip_changed new_breadcrumb) ->
           t.best_tip <- Breadcrumb.state_hash new_breadcrumb
-      | Diff.E.E (Root_transitioned {new_; garbage}) ->
+        | Diff.E.E (Root_transitioned {new_; garbage}) ->
           (* 4.III Unregister staged ledger *)
           let root_staged_ledger = Breadcrumb.staged_ledger old_root in
           let root_ledger = Staged_ledger.ledger root_staged_ledger in
@@ -521,34 +424,34 @@ struct
                   ~local_state:t.consensus_local_state
               with
               | Some jobs ->
-                  (* But if there wasn't sync work to do when we started, then there shouldn't be now. *)
-                  (* TODO: get old local_state_was_synced *)
-                  if local_state_was_synced_at_start then (
-                    Logger.fatal t.logger
-                      "after lock transition, the best tip consensus state is \
-                       out of sync with the local state -- bug in either \
-                       required_local_state_sync or frontier_root_transition."
-                      ~module_:__MODULE__ ~location:__LOC__
-                      ~metadata:
-                        [ ( "sync_jobs"
-                          , `List
-                              ( Non_empty_list.to_list jobs
+                (* But if there wasn't sync work to do when we started, then there shouldn't be now. *)
+                (* TODO: get old local_state_was_synced *)
+                if local_state_was_synced_at_start then (
+                  Logger.fatal t.logger
+                    "after lock transition, the best tip consensus state is \
+                     out of sync with the local state -- bug in either \
+                     required_local_state_sync or frontier_root_transition."
+                    ~module_:__MODULE__ ~location:__LOC__
+                    ~metadata:
+                      [ ( "sync_jobs"
+                        , `List
+                            ( Non_empty_list.to_list jobs
                               |> List.map
-                                   ~f:
-                                     Consensus.Hooks.local_state_sync_to_yojson
-                              ) )
-                        ; ( "local_state"
-                          , Consensus.Data.Local_state.to_yojson
-                              t.consensus_local_state )
-                        ; ("tf_viz", `String (visualize_to_string t)) ] ;
-                    assert false )
+                                ~f:
+                                  Consensus.Hooks.local_state_sync_to_yojson
+                            ) )
+                      ; ( "local_state"
+                        , Consensus.Data.Local_state.to_yojson
+                            t.consensus_local_state )
+                      ; ("tf_viz", `String (visualize_to_string t)) ] ;
+                  assert false )
               | None ->
-                  () ) ;
+                () ) ;
           ( match
               ( Staged_ledger.proof_txns new_root_staged_ledger
               , heir_node.breadcrumb.just_emitted_a_proof )
             with
-          | Some txns, true ->
+            | Some txns, true ->
               let proof_data =
                 Staged_ledger.current_ledger_proof new_root_staged_ledger
                 |> Option.value_exn
@@ -559,7 +462,7 @@ struct
                    hash in the proof that was just emitted"
                 ~expect:(Ledger_proof.statement proof_data).source
                 ( Ledger.Db.merkle_root t.root_snarked_ledger
-                |> Frozen_ledger_hash.of_ledger_hash ) ;
+                  |> Frozen_ledger_hash.of_ledger_hash ) ;
               let db_mask = Ledger.of_database t.root_snarked_ledger in
               Non_empty_list.iter txns ~f:(fun txn ->
                   (* TODO: @cmr use the ignore-hash ledger here as well *)
@@ -574,7 +477,7 @@ struct
                       (module Ledger.Db)
                       t.root_snarked_ledger)
                    db_mask)
-          | _, false | None, _ ->
+            | _, false | None, _ ->
               () ) ;
-          (garbage_breadcrumbs, new_root_node) )
+          (garbage_breadcrumbs, new_root_node) ) *)
 end

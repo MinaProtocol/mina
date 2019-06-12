@@ -29,6 +29,30 @@ module type Transition_frontier_extension_intf = sig
   val handle_diff : t -> transition_frontier_diff -> view Option.t
 end
 
+module type Transition_frontier_diff0_intf = sig
+  type breadcrumb
+
+  type external_transition_validated
+
+  type _ t =
+    (* External transition of the node that is going on top of it *)
+    | New_breadcrumb : breadcrumb -> external_transition_validated t
+    (* External transition of the node that is going on top of it *)
+    | Root_transitioned :
+        { new_: breadcrumb (* The nodes to remove excluding the old root *)
+        ; garbage: breadcrumb list }
+        -> (* Remove the old Root *)
+        external_transition_validated t
+    (* TODO: Mutant is just the old best tip *)
+    | Best_tip_changed : breadcrumb -> external_transition_validated t
+
+  type 'a diff_mutant = 'a t
+
+  module E : sig
+    type t = E : 'output diff_mutant -> t
+  end
+end
+
 module type Transition_frontier_diff_intf = sig
   type breadcrumb
 
@@ -37,7 +61,7 @@ module type Transition_frontier_diff_intf = sig
   type transaction_snark_scan_state
 
   (* TODO: Remove New_frontier. 
-    Each transition frontier extension should be initialized by the input, the root breadcrumb *)
+     Each transition frontier extension should be initialized by the input, the root breadcrumb *)
   type t =
     | New_breadcrumb of {previous: breadcrumb; added: breadcrumb}
         (** Triggered when a new breadcrumb is added without changing the root or best_tip *)
