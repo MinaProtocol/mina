@@ -121,8 +121,8 @@ let jobOpenings = [|
 
 Rimraf.sync("site");
 
-let blogPage =
-  <Page page=`Blog name="blog" extraHeaders={Blog.extraHeaders()}>
+let blogPage = name =>
+  <Page page=`Blog name extraHeaders={Blog.extraHeaders()}>
     <Wrapped> <Blog posts /> </Wrapped>
   </Page>;
 
@@ -159,7 +159,7 @@ Router.(
                  </Page>,
                )
              )
-          |> Array.append([|File("index", blogPage)|]),
+          |> Array.append([|File("index", blogPage("index"))|]),
         ),
         Dir(
           "jobs",
@@ -196,7 +196,7 @@ Router.(
             <Wrapped> <Testnet /> </Wrapped>
           </Page>,
         ),
-        File("blog", blogPage),
+        File("blog", blogPage("blog")),
         File(
           "privacy",
           <Page page=`Privacy name="privacy">
