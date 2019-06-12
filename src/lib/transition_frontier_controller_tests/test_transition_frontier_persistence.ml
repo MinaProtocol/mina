@@ -177,6 +177,8 @@ let%test_module "Transition Frontier Persistence" =
 
     let%test_unit "Root changes multiple times" =
       Printexc.record_backtrace true ;
+      Core.Backtrace.elide := false ;
+      Async.Scheduler.set_record_backtraces true ;
       test_breadcrumbs_forever 10
 
     let%test_unit "Randomly generate a tree" =

@@ -85,22 +85,29 @@ module Make (Inputs : Intf.Main_inputs) = struct
         ~f:(fun (i, init_hash) diff_pairs ->
           O1trace.measure "worker_mutant_diff_work"
           @@ fun () ->
+          let num_diff_pairs = List.length diff_pairs in
           Logger.trace logger
             !"Worker processing batch of diffs of length %i"
-            (List.length diff_pairs) ~module_:__MODULE__ ~location:__LOC__ ;
-          Deferred.List.fold diff_pairs ~init:(i, init_hash)
-            ~f:(fun (i, acc_hash)
-               (Transition_frontier.Diff.Mutant.E.With_value
-                 (diff, ground_truth_mutant))
-               ->
-              Logger.trace logger
-                !"Worker thread processing diff %i"
-                i ~module_:__MODULE__ ~location:__LOC__ ;
-              let%map new_hash =
-                write_diff_and_verify ~logger ~acc_hash worker
-                  (diff, ground_truth_mutant)
-              in
-              (i + 1, new_hash) ) )
+            num_diff_pairs ~module_:__MODULE__ ~location:__LOC__ ;
+          let%map result =
+            Deferred.List.fold diff_pairs ~init:(i, init_hash)
+              ~f:(fun (i, acc_hash)
+                 (Transition_frontier.Diff.Mutant.E.With_value
+                   (diff, ground_truth_mutant))
+                 ->
+                Logger.trace logger
+                  !"Worker thread processing diff %i"
+                  i ~module_:__MODULE__ ~location:__LOC__ ;
+                let%map new_hash =
+                  write_diff_and_verify ~logger ~acc_hash worker
+                    (diff, ground_truth_mutant)
+                in
+                (i + 1, new_hash) )
+          in
+          Logger.trace logger
+            !"Worker finished processing batch of diffs of length %i"
+            num_diff_pairs ~module_:__MODULE__ ~location:__LOC__ ;
+          result )
       |> Deferred.ignore
     in
     { worker
