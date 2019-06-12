@@ -85,6 +85,9 @@ module Make (Inputs : Intf.Main_inputs) = struct
         ~f:(fun (i, init_hash) diff_pairs ->
           O1trace.measure "worker_mutant_diff_work"
           @@ fun () ->
+          Logger.trace logger
+            !"Worker processing batch of diffs of length %i"
+            (List.length diff_pairs) ~module_:__MODULE__ ~location:__LOC__ ;
           Deferred.List.fold diff_pairs ~init:(i, init_hash)
             ~f:(fun (i, acc_hash)
                (Transition_frontier.Diff.Mutant.E.With_value
