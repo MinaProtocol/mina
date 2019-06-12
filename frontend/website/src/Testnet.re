@@ -184,8 +184,9 @@ let make = _ => {
           style([
             display(`flex),
             flexWrap(`wrap),
+            flexDirection(`column),
             justifyContent(`spaceBetween),
-            maxWidth(`rem(52.)),
+            maxWidth(`rem(32.)),
             marginLeft(`auto),
             marginRight(`auto),
             media(
@@ -199,7 +200,6 @@ let make = _ => {
             merge([
               Style.Body.basic,
               style([
-                maxWidth(`rem(20.)),
                 marginLeft(`rem(1.)),
                 marginRight(`rem(1.)),
                 marginTop(`rem(1.)),
@@ -226,18 +226,7 @@ let make = _ => {
             target="_blank"
             href={Links.Forms.participateInConsensus.link}
             className=rightSideLink>
-            {ReasonReact.string(
-               {js|Notify me about participating in consensus\u00A0→|js},
-             )}
-          </A>
-          <A
-            name={"testnet-" ++ Links.Forms.compressTheBlockchain.name}
-            target="_blank"
-            href={Links.Forms.compressTheBlockchain.link}
-            className=rightSideLink>
-            {ReasonReact.string(
-               {js|Help to compress the Coda blockchain\u00A0→|js},
-             )}
+            {ReasonReact.string({js|Participate in the testnet\u00A0→|js})}
           </A>
         </div>
       </div>
