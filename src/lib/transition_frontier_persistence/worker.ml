@@ -105,18 +105,23 @@ end = struct
           ; scan_state
           ; pending_coinbase }
         in
-        Logger.trace t.logger !"Setting old root data" ~module_:__MODULE__
-          ~location:__LOC__ ;
+        Logger.trace t.logger
+          !"Worker setting new root data"
+          ~module_:__MODULE__ ~location:__LOC__
+          ~metadata:
+            [ ( "setting new root_data"
+              , Transition_frontier.Diff.Mutant.value_to_yojson diff
+                  { Transition_frontier.Diff.Mutant.Root.Poly.root
+                  ; scan_state
+                  ; pending_coinbase } ) ] ;
         Transition_storage.set t.transition_storage ~key:Root
           ~data:new_root_data ;
         Logger.trace t.logger
           !"Finished setting old root data"
           ~module_:__MODULE__ ~location:__LOC__ ;
-        let value_data =
+        let old_root_data_json =
           Transition_frontier.Diff.Mutant.value_to_yojson diff old_root_data
         in
-        Logger.trace t.logger ~module_:__MODULE__ ~location:__LOC__
-          ~metadata:[("mutant", value_data)] "Worker root update mutant" ;
         let hash =
           Transition_frontier.Diff.Mutant.hash ~logger acc_hash diff
             old_root_data
@@ -125,7 +130,7 @@ end = struct
           ~metadata:
             [ ( "diff_mutant"
               , Transition_frontier.Diff.Mutant.key_to_yojson diff )
-            ; ("worker_value", value_data)
+            ; ("worker_value", old_root_data_json)
             ; ( "worker_hash"
               , `String (Transition_frontier.Diff.Hash.to_string hash) ) ]
           "Worker Handled mutant diff ****" ;
