@@ -171,27 +171,6 @@ struct
     ; pending_coinbase_collection: Pending_coinbase.t }
   [@@deriving sexp]
 
-  type serializable =
-    Scan_state.Stable.V1.t * Ledger.serializable * pending_coinbase_collection
-  [@@deriving bin_io]
-
-  let serializable_of_t t =
-    ( t.scan_state
-    , Ledger.serializable_of_t t.ledger
-    , t.pending_coinbase_collection )
-
-  let of_serialized_and_unserialized ~(serialized : serializable)
-      ~(unserialized : Ledger.maskable_ledger) =
-    (* reattach the serialized mask to the unserialized ledger *)
-    let scan_state, serialized_mask, pending_coinbase_collection =
-      serialized
-    in
-    let attached_mask =
-      Ledger.register_mask unserialized
-        (Ledger.unattached_mask_of_serializable serialized_mask)
-    in
-    {scan_state; ledger= attached_mask; pending_coinbase_collection}
-
   let proof_txns t =
     Scan_state.latest_ledger_proof t.scan_state
     |> Option.bind ~f:(Fn.compose Non_empty_list.of_list_opt snd)
@@ -1965,10 +1944,6 @@ let%test_module "test" =
         end
 
         let register_mask l _m = copy l
-
-        let unattached_mask_of_serializable _ = failwith "unimplemented"
-
-        let serializable_of_t _ = failwith "unimplemented"
 
         (* END BOILERPLATE UNUSED *)
 

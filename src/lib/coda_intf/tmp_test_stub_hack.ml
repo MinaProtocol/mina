@@ -118,12 +118,6 @@ module type For_transaction_snark_scan_state_intf = sig
 
     type maskable_ledger = t
 
-    type serializable [@@deriving bin_io]
-
-    val serializable_of_t : t -> serializable
-
-    val unattached_mask_of_serializable : serializable -> Mask.t
-
     val register_mask : t -> Mask.t -> t
 
     val merkle_root : t -> Ledger_hash.t

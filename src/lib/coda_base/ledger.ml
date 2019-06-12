@@ -169,13 +169,6 @@ module Ledger_inner = struct
   let remove_and_reparent_exn t t_as_mask ~children =
     Maskable.remove_and_reparent_exn (packed t) t_as_mask ~children
 
-  (* TODO: Implement the serialization/deserialization *)
-  let unattached_mask_of_serializable _ = failwith "unimplmented"
-
-  let serializable_of_t _ = failwith "unimplented"
-
-  type serializable = int [@@deriving bin_io]
-
   type unattached_mask = Mask.t
 
   type attached_mask = Mask.Attached.t

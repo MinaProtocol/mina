@@ -62,13 +62,6 @@ include
  * work off of this type *)
 type maskable_ledger = t
 
-type serializable = int [@@deriving bin_io]
-
-(* TODO: Actually implement serializable properly #1206 *)
-val unattached_mask_of_serializable : serializable -> unattached_mask
-
-val serializable_of_t : t -> serializable
-
 val with_ledger : f:(t -> 'a) -> 'a
 
 val with_ephemeral_ledger : f:(t -> 'a) -> 'a

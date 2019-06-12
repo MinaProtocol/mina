@@ -405,8 +405,6 @@ module type Staged_ledger_generalized_intf = sig
 
   type transaction_snark_statement
 
-  type serializable [@@deriving bin_io]
-
   module Pre_diff_info :
     Staged_ledger_pre_diff_info_generalized_intf
     with type user_command := user_command
@@ -490,9 +488,6 @@ module type Staged_ledger_generalized_intf = sig
     -> pending_coinbase_collection:pending_coinbase
     -> t Or_error.t Deferred.t
 
-  val of_serialized_and_unserialized :
-    serialized:serializable -> unserialized:ledger -> t
-
   val replace_ledger_exn : t -> ledger -> t
 
   val proof_txns : t -> transaction Non_empty_list.t option
@@ -500,8 +495,6 @@ module type Staged_ledger_generalized_intf = sig
   val copy : t -> t
 
   val hash : t -> staged_ledger_hash
-
-  val serializable_of_t : t -> serializable
 
   val apply :
        t
