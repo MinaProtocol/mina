@@ -66,7 +66,7 @@ module Process = {
      */
 
     let log = Fs.openSync(command.logfileName ++ ".log", "w");
-    let p =
+    let process =
       ChildProcess.spawn(
         command.executable,
         command.args,
@@ -77,7 +77,7 @@ module Process = {
         },
       );
 
-    ChildProcess.Process.onError(p, e =>
+    ChildProcess.Process.onError(process, e =>
       prerr_endline(
         "Daemon process "
         ++ command.executable
@@ -89,7 +89,7 @@ module Process = {
     );
 
     ChildProcess.Process.onExit(
-      p,
+      process,
       fun
       | `Code(code) =>
         if (code != 0) {
@@ -115,7 +115,7 @@ module Process = {
         },
     );
 
-    p;
+    process;
   };
 };
 
