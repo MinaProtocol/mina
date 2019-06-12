@@ -145,6 +145,8 @@ let make = () => {
             nodes: [...prevResult.blocks.nodes, ...newBlocks],
             pageInfo,
           },
+          // Since these aren't paginated, we can just reuse the previous result
+          pooledUserCommands: prevResult.pooledUserCommands,
         } : prevResult
     }
     |}

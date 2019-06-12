@@ -3,7 +3,14 @@ open Tc;
 module Styles = {
   open Css;
 
-  let container = style([padding(`rem(2.0))]);
+  let container =
+    style([
+      height(`percent(100.)),
+      padding(`rem(2.)),
+      borderTop(`px(1), `solid, white),
+      borderLeft(`px(1), `solid, white),
+      overflow(`scroll),
+    ]);
 
   let backHeader =
     style([display(`flex), alignItems(`center), userSelect(`none)]);
@@ -16,15 +23,21 @@ module Styles = {
     ]);
 
   let backHeaderText =
-    merge([Theme.Text.Header.h3, style([color(Theme.Colors.midnight)])]);
+    merge([
+      Theme.Text.Header.h3,
+      style([
+        // HACK(figitaki): workaround to fix WalletName font-size
+        selector("span", [important(fontSize(`rem(1.25)))]),
+        color(Theme.Colors.midnight),
+      ]),
+    ]);
 
   let label =
     merge([
       Theme.Text.Body.semiBold,
       style([
         color(Theme.Colors.midnight),
-        margin(`rem(0.25)),
-        marginTop(`rem(1.0)),
+        marginBottom(`rem(0.25)),
         userSelect(`none),
       ]),
     ]);
@@ -203,6 +216,7 @@ let make = (~publicKey) => {
         {React.string(" settings")}
       </span>
     </div>
+    <Spacer height=1. />
     <div className=Styles.label> {React.string("Wallet name")} </div>
     <div className=Styles.textBox>
       <TextField
@@ -219,6 +233,7 @@ let make = (~publicKey) => {
         }
       />
     </div>
+    <Spacer height=1. />
     <div className=Styles.label> {React.string("Public key")} </div>
     <div className=Styles.textBox>
       <TextField
@@ -231,6 +246,7 @@ let make = (~publicKey) => {
         }
       />
     </div>
+    <Spacer height=1. />
     <div className=Styles.label> {React.string("Private key")} </div>
     <div className=Styles.textBox>
       <TextField
@@ -245,6 +261,30 @@ let make = (~publicKey) => {
           />
         }
       />
+    </div>
+    <Spacer height=1.5 />
+    <div>
+      <h3 className=Theme.Text.Header.h3>
+        {React.string("Compression Settings")}
+      </h3>
+      <Spacer height=0.5 />
+      <Well>
+        <div className=Css.(style([display(`flex), alignItems(`flexEnd)]))>
+          <div className=Styles.textBox>
+            <div className=Styles.label>
+              {React.string("Delegating to")}
+            </div>
+            <TextField
+              label="Key"
+              value={PublicKey.prettyPrint(publicKey)}
+              mono=true
+              onChange={_ => ()}
+            />
+          </div>
+          <Spacer width=1. />
+          <Button width=8. height=2.5 style=Button.Green label="Change" />
+        </div>
+      </Well>
     </div>
     <Spacer height=1.5 />
     <DeleteButton publicKey />

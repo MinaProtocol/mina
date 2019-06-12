@@ -22,6 +22,7 @@ module Styles = {
       padding(`rem(2.)),
       borderTop(`px(1), `solid, white),
       borderLeft(`px(1), `solid, white),
+      overflow(`scroll),
     ]);
 
   let label =
