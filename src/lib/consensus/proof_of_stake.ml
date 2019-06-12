@@ -2517,7 +2517,8 @@ module Hooks = struct
              ( "default case"
              , "candidate length is longer than existing length"
              , lazy
-                 (* TODO: Undo this hack once the min_length_of_epoch bug is fixed *)
+                 (* TODO: THIS IS INSECURE! See #2643.
+                    Undo this hack once the min_length_of_epoch bug is fixed *)
                  Length.(existing.length < candidate.length) )
     in
     let choice = if Lazy.force should_take then `Take else `Keep in
