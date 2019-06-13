@@ -175,6 +175,50 @@ module Make_rpcs (Inputs : Base_inputs_intf) = struct
     end
   end
 
+  module Get_best_tip = struct
+    module Master = struct
+      let name = "get_best_tip"
+
+      module T = struct
+        type query = Unit.t
+
+        type response = External_transition.Stable.V1.t option
+      end
+
+      module Caller = T
+      module Callee = T
+    end
+
+    include Master.T
+    module M = Versioned_rpc.Both_convert.Plain.Make (Master)
+    include M
+
+    include Perf_histograms.Rpc.Plain.Extend (struct
+      include M
+      include Master
+    end)
+
+    module V1 = struct
+      module T = struct
+        type query = Unit.t [@@deriving bin_io]
+
+        type response = External_transition.Stable.V1.t option
+        [@@deriving bin_io, version {rpc}]
+
+        let query_of_caller_model = Fn.id
+
+        let callee_model_of_query = Fn.id
+
+        let response_of_callee_model = Fn.id
+
+        let caller_model_of_response = Fn.id
+      end
+
+      include T
+      include Register (T)
+    end
+  end
+
   module Get_ancestry = struct
     module Master = struct
       let name = "get_ancestry"
@@ -429,7 +473,9 @@ module Make (Inputs : Inputs_intf) = struct
          -> ( External_transition.t
             , State_body_hash.t list * External_transition.t )
             Proof_carrying_data.t
-            Deferred.Option.t) =
+            Deferred.Option.t)
+      ~(get_best_tip :
+         Unit.t Envelope.Incoming.t -> External_transition.t Option.t) =
     let run_for_rpc_result conn data ~f action_msg msg_args =
       let data_in_envelope = wrap_rpc_data_in_envelope conn data in
       let sender = Envelope.Incoming.sender data_in_envelope in
@@ -518,6 +564,18 @@ module Make (Inputs : Inputs_intf) = struct
       in
       record_unknown_item result sender action_msg msg_args
     in
+    let get_best_tip_rpc conn ~version:_ query =
+      Logger.info config.logger ~module_:__MODULE__ ~location:__LOC__
+        "Sending best tip to peer with IP %s" conn.Host_and_port.host ;
+      let action_msg = "Get_best_tip query" in
+      let msg_args = [] in
+      let%bind result, sender =
+        run_for_rpc_result conn query
+          ~f:(Fn.compose Deferred.return get_best_tip)
+          action_msg msg_args
+      in
+      record_unknown_item result sender action_msg msg_args
+    in
     let implementations =
       List.concat
         [ Rpcs.Get_staged_ledger_aux_and_pending_coinbases_at_hash
@@ -527,6 +585,7 @@ module Make (Inputs : Inputs_intf) = struct
             answer_sync_ledger_query_rpc
         ; Rpcs.Transition_catchup.implement_multi transition_catchup_rpc
         ; Rpcs.Get_ancestry.implement_multi get_ancestry_rpc
+        ; Rpcs.Get_best_tip.implement_multi get_best_tip_rpc
         ; Consensus.Hooks.Rpcs.implementations ~logger:config.logger
             ~local_state:config.consensus_local_state ]
     in
@@ -727,6 +786,20 @@ module Make (Inputs : Inputs_intf) = struct
 
   let get_ancestry t inet_addr input =
     try_preferred_peer t inet_addr input ~rpc:Rpcs.Get_ancestry.dispatch_multi
+
+  let get_best_tip t peer =
+    let%bind response =
+      Gossip_net.query_peer t.gossip_net peer Rpcs.Get_best_tip.dispatch_multi
+        ()
+    in
+    match response with
+    | Ok (Some data) ->
+        return
+          (Some
+             (Envelope.Incoming.wrap ~data
+                ~sender:(Envelope.Sender.Remote peer.host)))
+    | Ok None | Error _ ->
+        return None
 
   let glue_sync_ledger t query_reader response_writer =
     (* We attempt to query 3 random peers, retry_max times. We keep track of the

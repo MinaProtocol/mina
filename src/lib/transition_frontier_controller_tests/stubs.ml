@@ -583,6 +583,18 @@ struct
            let%bind frontier = Hashtbl.find ip_table inet_addr in
            Root_prover.prove ~logger ~frontier consensus_state)
 
+    let get_best_tip {ip_table; _} peer =
+      Deferred.return
+      @@
+      let open Option.Let_syntax in
+      let%map frontier = Hashtbl.find ip_table peer.Network_peer.Peer.host in
+      let data =
+        Transition_frontier.best_tip frontier
+        |> Transition_frontier.Breadcrumb.external_transition
+        |> External_transition.Validated.forget_validation
+      in
+      Envelope.Incoming.wrap ~data ~sender:(Envelope.Sender.Remote peer.host)
+
     let glue_sync_ledger {ip_table; logger; _} query_reader response_writer :
         unit =
       Pipe_lib.Linear_pipe.iter_unordered ~max_concurrency:8 query_reader

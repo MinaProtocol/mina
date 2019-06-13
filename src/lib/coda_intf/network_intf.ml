@@ -41,6 +41,11 @@ module type Network_intf = sig
        Proof_carrying_data.t
        Deferred.Or_error.t
 
+  val get_best_tip :
+       t
+    -> Network_peer.Peer.t
+    -> external_transition Envelope.Incoming.t Deferred.Option.t
+
   val get_staged_ledger_aux_and_pending_coinbases_at_hash :
        t
     -> Unix.Inet_addr.t
@@ -115,5 +120,6 @@ module type Network_intf = sig
                         , State_body_hash.t list * external_transition )
                         Proof_carrying_data.t
                         Deferred.Option.t)
+    -> get_best_tip:(Unit.t Envelope.Incoming.t -> external_transition Option.t)
     -> t Deferred.t
 end

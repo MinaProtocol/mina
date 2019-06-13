@@ -484,7 +484,24 @@ module Make (Inputs : Intf.Inputs) = struct
                   in
                   Root_prover.prove ~logger:config.logger ~frontier
                     consensus_state )
+                ~get_best_tip:(fun _ ->
+                  let open Option.Let_syntax in
+                  let%map frontier =
+                    Broadcast_pipe.Reader.peek frontier_broadcast_pipe_r
+                  in
+                  Transition_frontier.best_tip frontier
+                  |> Transition_frontier.Breadcrumb.external_transition
+                  |> External_transition.Validated.forget_validation )
             in
+            let peers = Net.random_peers net 5 in
+            let%bind best_tips =
+              List.map peers ~f:(fun peer -> Net.get_best_tip net peer)
+              |> Deferred.all >>| List.filter_opt
+            in
+            List.iter best_tips ~f:(fun best_tip ->
+                Strict_pipe.Writer.write external_transitions_writer
+                  (best_tip, Block_time.now config.time_controller)
+                |> don't_wait_for ) ;
             let valid_transitions =
               Transition_router.run ~logger:config.logger
                 ~trust_system:config.trust_system ~verifier:config.verifier
