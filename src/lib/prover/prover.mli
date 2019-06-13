@@ -1,6 +1,7 @@
 open Async
 open Coda_base
 open Coda_state
+open Coda_transition
 open Blockchain_snark
 
 module type S = sig
@@ -24,6 +25,15 @@ module type S = sig
     -> Consensus.Data.Prover_state.t
     -> Pending_coinbase_witness.t
     -> Blockchain.t Deferred.Or_error.t
+
+  val prove :
+       t
+    -> prev_state:Protocol_state.Value.t
+    -> prev_state_proof:Proof.t
+    -> next_state:Protocol_state.Value.t
+    -> Internal_transition.t
+    -> Pending_coinbase_witness.t
+    -> Proof.t Deferred.Or_error.t
 end
 
 include S

@@ -2,6 +2,7 @@ open Core
 open Async
 open Coda_base
 open Coda_state
+open Coda_transition
 open Blockchain_snark
 
 module Extend_blockchain_input = struct
@@ -35,6 +36,15 @@ module type S = sig
     -> Consensus.Data.Prover_state.t
     -> Pending_coinbase_witness.t
     -> Blockchain.t Deferred.Or_error.t
+
+  val prove :
+       t
+    -> prev_state:Protocol_state.Value.t
+    -> prev_state_proof:Proof.t
+    -> next_state:Protocol_state.Value.t
+    -> Internal_transition.t
+    -> Pending_coinbase_witness.t
+    -> Proof.t Deferred.Or_error.t
 end
 
 module Consensus_mechanism = Consensus
@@ -294,3 +304,14 @@ let extend_blockchain {connection; _} chain next_state block prover_state
                 (Binable.to_string (module Extend_blockchain_input) input) ) ]
         "Prover failed: %s" (Error.to_string_hum e) ;
       Error.raise e
+
+let prove t ~prev_state ~prev_state_proof ~next_state
+    (transition : Internal_transition.t) pending_coinbase =
+  let open Deferred.Or_error.Let_syntax in
+  extend_blockchain t
+    (Blockchain.create ~proof:prev_state_proof ~state:prev_state)
+    next_state
+    (Internal_transition.snark_transition transition)
+    (Internal_transition.prover_state transition)
+    pending_coinbase
+  >>| fun {Blockchain.proof; _} -> proof

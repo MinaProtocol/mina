@@ -48,7 +48,6 @@ struct
   module Program = Program
   module Config_in = Config_in
   open Program
-  open Inputs
 
   (** For status *)
   let txn_count = ref 0
@@ -110,7 +109,7 @@ struct
       Or_error.error_string "Invalid user command: account balance is too low"
     else
       let txn_pool = transaction_pool t in
-      don't_wait_for (Transaction_pool.add txn_pool txn) ;
+      don't_wait_for (Network_pool.Transaction_pool.add txn_pool txn) ;
       let logger =
         Logger.extend
           (Program.top_level_logger t)

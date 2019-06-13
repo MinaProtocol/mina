@@ -2,8 +2,9 @@ open Core
 open Async
 open Coda_base
 open Coda_state
-open Coda_inputs
+open Coda_transition
 open Signature_lib
+open Coda_inputs
 open Pipe_lib
 
 module Snark_worker_config = struct
@@ -408,12 +409,12 @@ module T = struct
             Consensus.Data.Local_state.create initial_propose_keys
           in
           let net_config =
-            { Main.Inputs.Net.Config.logger
+            { Coda_networking.Config.logger
             ; trust_system
             ; time_controller
             ; consensus_local_state
             ; gossip_net_params=
-                { Main.Inputs.Net.Gossip_net.Config.timeout= Time.Span.of_sec 3.
+                { Coda_networking.Gossip_net.Config.timeout= Time.Span.of_sec 3.
                 ; target_peer_count= 8
                 ; conf_dir
                 ; initial_peers= peers
@@ -428,12 +429,10 @@ module T = struct
           in
           let%bind coda =
             Main.create
-              (Main.Config.make ~logger ~trust_system ~verifier:Init.verifier
-                 ~net_config
+              (Coda_lib.Config.make ~logger ~trust_system
+                 ~verifier:Init.verifier ~prover:Init.prover ~net_config
                  ?snark_worker_key:
                    (Option.map snark_worker_config ~f:(fun c -> c.public_key))
-                 ~transaction_pool_disk_location:
-                   (conf_dir ^/ "transaction_pool")
                  ~snark_pool_disk_location:(conf_dir ^/ "snark_pool")
                  ~wallets_disk_location:(conf_dir ^/ "wallets")
                  ~time_controller ~receipt_chain_database
@@ -520,7 +519,6 @@ module T = struct
             don't_wait_for
               (Strict_pipe.Reader.iter (Main.validated_transitions coda)
                  ~f:(fun t ->
-                   let open Main.Inputs in
                    let p =
                      External_transition.Validated.protocol_state
                        (With_hash.data t)

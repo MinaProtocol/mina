@@ -8,12 +8,13 @@ end)
 
 open Stubs
 module Transition_storage =
-  Transition_frontier_persistence.Transition_storage.Make (Stubs)
+  Transition_frontier_persistence.Components.Transition_storage.Make (Stubs)
 
 module Transition_frontier_persistence =
 Transition_frontier_persistence.Make (struct
   include Stubs
-  module Make_worker = Transition_frontier_persistence.Worker.Make_async
+  module Make_worker =
+    Transition_frontier_persistence.Components.Worker.Make_async
   module Transition_storage = Transition_storage
 end)
 

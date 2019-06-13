@@ -16,7 +16,6 @@ struct
   module Commands = Coda_commands.Make (Config_in) (Program)
   module Graphql = Graphql.Make (Commands)
   include Program
-  open Inputs
 
   module For_tests = struct
     let ledger_proof t = staged_ledger_ledger_proof t
@@ -194,7 +193,8 @@ struct
                 | `Transition ->
                     Perf_histograms.add_span
                       ~name:"snark_worker_transition_time" total ) ;
-            Snark_pool.add_completed_work (snark_pool coda) work ) ]
+            Network_pool.Snark_pool.add_completed_work (snark_pool coda) work
+        ) ]
     in
     Option.iter rest_server_port ~f:(fun rest_server_port ->
         trace_task "REST server" (fun () ->
