@@ -141,6 +141,9 @@ val random_peers : net -> int -> PeerID.t list Deferred.t
   Close the write pipe when you are done. This won't close the reading end.
   The reading end will be closed when the remote peer closes their writing
   end. Once both write ends are closed, the stream ends.
+
+  IMPORTANT NOTE: A single write to the stream will not necessarily result
+  in a single read on the other side. libp2p may fragment messages arbitrarily.
  *)
 module Stream : sig
   type t
@@ -199,7 +202,7 @@ val open_stream :
   via [`Raise], or in the function passed via [`Call]), [Protocol_handler.close] will
   be called.
 
-  `Call takes the stream that faulted.
+  The function in `Call will be passed the stream that faulted.
 *)
 val handle_protocol :
      net

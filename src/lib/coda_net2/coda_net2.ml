@@ -115,20 +115,28 @@ module Helper = struct
   let make_stream net idx protocol =
     let incoming_r, incoming_w = Pipe.create () in
     let outgoing_r, outgoing_w = Pipe.create () in
-    Pipe.iter outgoing_r ~f:(fun msg ->
-        match%map
-          do_rpc net "sendStreamMsg"
-            [("stream_idx", `Int idx); ("data", `String (to_b58_data msg))]
-        with
-        | Ok (`String "sendStreamMsg success") ->
-            ()
-        | Ok v ->
-            (* XXX nowhere for these to go. raise it? *)
-            (*Or_error.errorf "helper broke RPC protocol: sendStreamMsg got %s"
-          (Yojson.Safe.to_string v)*)
-            ()
-        | Error e ->
-            () )
+    (let%bind () =
+       Pipe.iter outgoing_r ~f:(fun msg ->
+           match%map
+             do_rpc net "sendStreamMsg"
+               [("stream_idx", `Int idx); ("data", `String (to_b58_data msg))]
+           with
+           | Ok (`String "sendStreamMsg success") ->
+               ()
+           | Ok v ->
+               failwithf "helper broke RPC protocol: sendStreamMsg got %s"
+                 (Yojson.Safe.to_string v) ()
+           | Error e ->
+               Error.raise e )
+     in
+     match%map do_rpc net "closeStream" [("stream_idx", `Int idx)] with
+     | Ok (`String "closeStream success") ->
+         ()
+     | Ok v ->
+         failwithf "helper broke RPC protocol: closeStream got %s"
+           (Yojson.Safe.to_string v) ()
+     | Error e ->
+         Error.raise e)
     |> don't_wait_for ;
     {net; idx; protocol; incoming_r; incoming_w; outgoing_r; outgoing_w}
 
@@ -303,6 +311,9 @@ module Helper = struct
     Pipe.iter lines ~f:(fun line ->
         let open Yojson.Safe.Util in
         let v = Yojson.Safe.from_string line in
+        Logger.trace logger "handling line from helper: $line"
+          ~module_:__MODULE__ ~location:__LOC__
+          ~metadata:[("line", `String line)] ;
         ( match
             if member "upcall" v = `Null then handle_response t v
             else handle_upcall t v
@@ -711,20 +722,14 @@ let create ~logger ~conf_dir =
         write_lock_file lock_path (Process.pid t.subprocess)
         |> Deferred.map ~f:Or_error.return
       in
-      don't_wait_for
-        (Pipe.iter_without_pushback
-           (Reader.pipe (Process.stderr t.subprocess))
-           ~f:(fun str ->
-             Logger.error logger ~module_:__MODULE__ ~location:__LOC__ "%s" str
-             )) ;
       t
   | _ ->
       Deferred.Or_error.errorf "Config directory (%s) must exist" conf_dir
 
 let%test_module "coda network tests" =
   ( module struct
-
     let () = Backtrace.elide := false
+
     let () = Async.Scheduler.set_record_backtraces true
 
     let logger = Logger.create ()
@@ -736,8 +741,18 @@ let%test_module "coda network tests" =
     let%test_unit "stream" =
       let test_def =
         let open Deferred.Let_syntax in
-        let%bind a = create ~logger ~conf_dir:"/tmp/a" >>| Or_error.ok_exn in
-        let%bind b = create ~logger ~conf_dir:"/tmp/b" >>| Or_error.ok_exn in
+        let%bind a =
+          create
+            ~logger:(Logger.extend logger [("name", `String "a")])
+            ~conf_dir:"/tmp/a"
+          >>| Or_error.ok_exn
+        in
+        let%bind b =
+          create
+            ~logger:(Logger.extend logger [("name", `String "b")])
+            ~conf_dir:"/tmp/b"
+          >>| Or_error.ok_exn
+        in
         let%bind kp_a = Keypair.random a >>| Or_error.ok_exn in
         let%bind kp_b = Keypair.random a >>| Or_error.ok_exn in
         let a_peerid = Keypair.to_peerid kp_a in
@@ -749,12 +764,15 @@ let%test_module "coda network tests" =
         let%bind () =
           configure b ~me:kp_b ~maddrs ~network_id >>| Or_error.ok_exn
         in
+        (* Give the libp2p helpers time to see each other. *)
+        let%bind () = after (sec 1.) in
         let handler_finished = ref false in
         let%bind echo_handler =
           handle_protocol a ~on_handler_error:`Raise ~protocol:"echo"
             (fun stream ->
               let r, w = Stream.pipes stream in
               let%map () = Pipe.transfer r w ~f:Fn.id in
+              Pipe.close w ;
               handler_finished := true )
         in
         let%bind stream =
@@ -763,8 +781,9 @@ let%test_module "coda network tests" =
         let r, w = Stream.pipes stream in
         Pipe.write_without_pushback w testmsg ;
         Pipe.close w ;
-        let%bind msg = Pipe.read r in
-        assert (msg = `Ok testmsg) ;
+        let%bind msg = Pipe.read_all r in
+        let msg = Queue.to_list msg |> String.concat in
+        assert (msg = testmsg) ;
         assert !handler_finished ;
         return ()
       in

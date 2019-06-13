@@ -7,6 +7,7 @@ import (
 	"crypto/rand"
 	"encoding/json"
 	"fmt"
+	"io"
 	"log"
 	"os"
 	"sync"
@@ -15,10 +16,10 @@ import (
 	"github.com/go-errors/errors"
 	logging "github.com/ipfs/go-log"
 	logwriter "github.com/ipfs/go-log/writer"
-	crypto "github.com/libp2p/go-libp2p-crypto"
-	net "github.com/libp2p/go-libp2p-net"
-	peer "github.com/libp2p/go-libp2p-peer"
-	protocol "github.com/libp2p/go-libp2p-protocol"
+	crypto "github.com/libp2p/go-libp2p-core/crypto"
+	net "github.com/libp2p/go-libp2p-core/network"
+	peer "github.com/libp2p/go-libp2p-core/peer"
+	protocol "github.com/libp2p/go-libp2p-core/protocol"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	b58 "github.com/mr-tron/base58/base58"
 	"github.com/multiformats/go-multiaddr"
@@ -44,10 +45,10 @@ type app struct {
 
 var seqs = make(chan int)
 
-//generate jsonenums -type=methodIdx
 type methodIdx int
 
 const (
+	// when editing this block, see the README for how to update methodidx_jsonenum
 	configure methodIdx = iota
 	listen
 	publish
@@ -359,12 +360,7 @@ func handleStreamReads(app *app, stream net.Stream, idx int) {
 		buf := make([]byte, 512)
 		for {
 			len, err := stream.Read(buf)
-
-			if len == 0 {
-				break
-			}
-
-			if err != nil {
+			if err != nil && err != io.EOF {
 				app.writeMsg(streamLostUpcall{
 					Upcall:    "streamLost",
 					StreamIdx: idx,
@@ -373,11 +369,17 @@ func handleStreamReads(app *app, stream net.Stream, idx int) {
 				stream.Reset()
 			}
 
-			app.writeMsg(incomingMsgUpcall{
-				Upcall:    "incomingStreamMsg",
-				Data:      b58.Encode(buf[:len]),
-				StreamIdx: idx,
-			})
+			if len != 0 {
+				app.writeMsg(incomingMsgUpcall{
+					Upcall:    "incomingStreamMsg",
+					Data:      b58.Encode(buf[:len]),
+					StreamIdx: idx,
+				})
+			}
+
+			if err == io.EOF {
+				break
+			}
 		}
 		app.writeMsg(streamReadCompleteUpcall{
 			Upcall:    "streamReadComplete",
@@ -390,16 +392,20 @@ func (o *openStreamMsg) run(app *app) (interface{}, error) {
 	streamIdx := <-seqs
 	peer, err := peer.IDB58Decode(o.Peer)
 	if err != nil {
-		return nil, badRPC(err) // TODO: this isn't an RPC error
+		// TODO: this isn't necessarily an RPC error. Perhaps the encoded Peer ID
+		// isn't supported by this version of libp2p.
+		return nil, badRPC(err)
 	}
 
-	if stream, err := app.P2p.Host.NewStream(app.Ctx, peer, protocol.ID(o.ProtocolID)); err != nil {
-		app.Streams[streamIdx] = stream
-		handleStreamReads(app, stream, streamIdx)
-		return streamIdx, nil
+	stream, err := app.P2p.Host.NewStream(app.Ctx, peer, protocol.ID(o.ProtocolID))
+
+	if err != nil {
+		return nil, badp2p(err)
 	}
 
-	return nil, err
+	app.Streams[streamIdx] = stream
+	handleStreamReads(app, stream, streamIdx)
+	return streamIdx, nil
 }
 
 type closeStreamMsg struct {
@@ -534,10 +540,13 @@ func main() {
 	out := bufio.NewWriter(os.Stdout)
 
 	app := &app{
-		P2p:  nil,
-		Ctx:  context.Background(),
-		Subs: make(map[int]subscription),
-		Out:  out,
+		P2p:        nil,
+		Ctx:        context.Background(),
+		Subs:       make(map[int]subscription),
+		Validators: make(map[int]chan bool),
+		Streams:    make(map[int]net.Stream),
+		// OutLock doesn't need to be initialized
+		Out: out,
 	}
 
 	for lines.Scan() {
@@ -567,7 +576,6 @@ func main() {
 			}
 		}()
 	}
-	log.Print("stdin eof, I guess we are done: ", lines.Err())
 	os.Exit(0)
 }
 
