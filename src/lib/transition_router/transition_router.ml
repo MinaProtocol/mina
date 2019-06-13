@@ -100,6 +100,7 @@ module Make (Inputs : Inputs_intf) = struct
     in
     transition_reader_ref := bootstrap_controller_reader ;
     transition_writer_ref := bootstrap_controller_writer ;
+    Transition_frontier.close frontier ;
     Broadcast_pipe.Writer.write frontier_w None |> don't_wait_for ;
     upon
       (Bootstrap_controller.run ~logger ~trust_system ~verifier ~network
@@ -123,9 +124,10 @@ module Make (Inputs : Inputs_intf) = struct
     in
     let sync'd =
       List.for_all best_tips ~f:(fun best_tip ->
-          is_transition_for_bootstrap
-            (get_root_state (peek_exn frontier_r))
-            best_tip )
+          not
+          @@ is_transition_for_bootstrap
+               (get_root_state (peek_exn frontier_r))
+               best_tip )
     in
     let transition_reader, transition_writer =
       create_bufferred_pipe ~name:"transition pipe" ()
