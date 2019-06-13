@@ -7,7 +7,7 @@ open Coda_incremental
 
 module type Inputs_intf = Inputs.Inputs_intf
 
-module Lol = Extensions0
+module Lol = Transition_frontier_main
 
 module Make (Inputs : Inputs_intf) =
 (* :
@@ -401,10 +401,6 @@ struct
           Non_empty_list.singleton elem
     in
     Option.map ~f:Non_empty_list.rev (go state_hash)
-
-  (* Deprecated *)
-  let previous_root t =
-    Extensions.Root_history.most_recent t.extensions.root_history
 
   let get_path_inclusively_in_root_history t state_hash ~f =
     path_search t state_hash
@@ -1021,7 +1017,7 @@ struct
         let%map node = Hashtbl.find frontier.table @@ state_hash breadcrumb in
         Node.successor_hashes node
       in
-      equal beadcrumb1 breadcrumb2
+      equal breadcrumb1 breadcrumb2
       && State_hash.equal (parent_hash breadcrumb1) (parent_hash breadcrumb2)
       && (let%bind successors1 = get_successor_nodes t1 breadcrumb1 in
           let%map successors2 = get_successor_nodes t2 breadcrumb2 in
@@ -1031,7 +1027,7 @@ struct
          |> Option.value_map ~default:false ~f:Fn.id
     in
     List.equal equal_breadcrumb
-      (all_breacrumbs t1 |> sort_breadcrumbs)
+      (all_breadcrumbs t1 |> sort_breadcrumbs)
       (all_breadcrumbs t2 |> sort_breadcrumbs)
 
   module For_tests = struct

@@ -340,6 +340,8 @@ module type Transition_frontier_breadcrumb_intf = sig
 
   val parent_hash : t -> State_hash.t
 
+  val consensus_state : t -> Consensus.Data.Consensus_state.Value.t
+
   val display : t -> display
 
   val name : t -> string
@@ -378,16 +380,14 @@ module type Transition_frontier_base_intf = sig
     -> root_snarked_ledger:Ledger.Db.t
     -> root_staged_ledger:staged_ledger
     -> consensus_local_state:Consensus.Data.Local_state.t
-    -> t Deferred.t
-
-  (** Clean up internal state. *)
-  val close : t -> unit
+    -> t
 
   val find_exn : t -> State_hash.t -> Breadcrumb.t
 
   val logger : t -> Logger.t
 end
 
+(* TODO: merge this with base *)
 module type Transition_frontier_base0_intf = sig
   include Transition_frontier_base_intf
 
@@ -404,8 +404,6 @@ module type Transition_frontier_base0_intf = sig
 
   val root : t -> Breadcrumb.t
 
-  val previous_root : t -> Breadcrumb.t option
-
   val root_length : t -> int
 
   val best_tip : t -> Breadcrumb.t
@@ -415,11 +413,6 @@ module type Transition_frontier_base0_intf = sig
   val hash_path : t -> Breadcrumb.t -> State_hash.t list
 
   val find : t -> State_hash.t -> Breadcrumb.t option
-
-  val find_in_root_history : t -> State_hash.t -> Breadcrumb.t option
-
-  val root_history_path_map :
-    t -> State_hash.t -> f:(Breadcrumb.t -> 'a) -> 'a Non_empty_list.t option
 
   val successor_hashes : t -> State_hash.t -> State_hash.t list
 
@@ -437,55 +430,13 @@ module type Transition_frontier_base0_intf = sig
 
   val shallow_copy_root_snarked_ledger : t -> Ledger.Mask.Attached.t
 
-  val wait_for_transition : t -> State_hash.t -> unit Deferred.t
+  val visualize_to_string : t -> string
 
-  val length_at_transition : t -> State_hash.t -> int option
+  val visualize : filename:string -> t -> unit
 end
 
 module type Transition_frontier_intf = sig
-  include Transition_frontier_base_intf
-
-  exception
-    Parent_not_found of ([`Parent of State_hash.t] * [`Target of State_hash.t])
-
-  exception Already_exists of State_hash.t
-
-  val max_length : int
-
-  val consensus_local_state : t -> Consensus.Data.Local_state.t
-
-  val all_breadcrumbs : t -> Breadcrumb.t list
-
-  val root : t -> Breadcrumb.t
-
-  val previous_root : t -> Breadcrumb.t option
-
-  val root_length : t -> int
-
-  val best_tip : t -> Breadcrumb.t
-
-  val path_map : t -> Breadcrumb.t -> f:(Breadcrumb.t -> 'a) -> 'a list
-
-  val hash_path : t -> Breadcrumb.t -> State_hash.t list
-
-  val find : t -> State_hash.t -> Breadcrumb.t option
-
-  val find_in_root_history : t -> State_hash.t -> Breadcrumb.t option
-
-  val root_history_path_map :
-    t -> State_hash.t -> f:(Breadcrumb.t -> 'a) -> 'a Non_empty_list.t option
-
-  val successor_hashes : t -> State_hash.t -> State_hash.t list
-
-  val successor_hashes_rec : t -> State_hash.t -> State_hash.t list
-
-  val successors : t -> Breadcrumb.t -> Breadcrumb.t list
-
-  val successors_rec : t -> Breadcrumb.t -> Breadcrumb.t list
-
-  val common_ancestor : t -> Breadcrumb.t -> Breadcrumb.t -> State_hash.t
-
-  val iter : t -> f:(Breadcrumb.t -> unit) -> unit
+  include Transition_frontier_base0_intf
 
   (** Adds a breadcrumb to the transition frontier or throws. It possibly
    * triggers a root move and it triggers any extensions that are listening to
@@ -496,9 +447,10 @@ module type Transition_frontier_intf = sig
    * missing from the transition frontier *)
   val add_breadcrumb_if_present_exn : t -> Breadcrumb.t -> unit Deferred.t
 
-  val best_tip_path_length_exn : t -> int
+  val find_in_root_history : t -> State_hash.t -> Breadcrumb.t option
 
-  val shallow_copy_root_snarked_ledger : t -> Ledger.Mask.Attached.t
+  val root_history_path_map :
+    t -> State_hash.t -> f:(Breadcrumb.t -> 'a) -> 'a Non_empty_list.t option
 
   val wait_for_transition : t -> State_hash.t -> unit Deferred.t
 
@@ -525,12 +477,7 @@ module type Transition_frontier_intf = sig
   val persistence_diff_pipe :
     t -> Diff.Persistence_diff.view Broadcast_pipe.Reader.t
 
-  val new_transition :
-    t -> external_transition_validated Coda_incremental.New_transition.t
-
-  val visualize_to_string : t -> string
-
-  val visualize : filename:string -> t -> unit
+  val close : t -> unit
 
   module For_tests : sig
     val root_snarked_ledger : t -> Ledger.Db.t
