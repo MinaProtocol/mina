@@ -25,7 +25,7 @@ module Forms = {
   };
 
   let participateInConsensus = {
-    link: "https://docs.google.com/forms/d/e/1FAIpQLSdChigoRhyZqg1RbaA6ODiqJ4q42cPpNbSH-koxXHjLwDeqDw/viewform?usp=pp_url&entry.2026041782=I+want+to+help+run+the+Coda+network+by+participating+in+consensus",
+    link: "https://docs.google.com/forms/d/e/1FAIpQLScQRGW0-xGattPmr5oT-yRb9aCkPE6yIKXSfw1LRmNx1oh6AA/viewform?usp=sf_link",
     name: "mailinglist-participateinconsensus",
   };
 
