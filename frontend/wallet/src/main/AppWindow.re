@@ -91,5 +91,5 @@ let deepLink = input => {
   // route handling is idempotent so doesn't matter if we also send the message
   // if window already exists
   send(w, `Deep_link(Route.print(input.path)));
-  ();
+  show(w);
 };
