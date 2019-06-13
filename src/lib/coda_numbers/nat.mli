@@ -4,7 +4,7 @@ open Fold_lib
 open Tuple_lib
 
 module type S = sig
-  type t [@@deriving bin_io, sexp, compare, hash, yojson]
+  type t [@@deriving sexp, compare, hash, yojson]
 
   include Comparable.S with type t := t
 
@@ -12,11 +12,14 @@ module type S = sig
 
   module Stable : sig
     module V1 : sig
-      type nonrec t = t [@@deriving bin_io, sexp, eq, compare, hash, yojson]
+      type nonrec t = t
+      [@@deriving bin_io, sexp, eq, compare, hash, yojson, version]
     end
 
     module Latest = V1
   end
+
+  val length_in_bits : int
 
   val length_in_triples : int
 
@@ -41,10 +44,15 @@ module type S = sig
 
   module Bits : Bits_intf.S with type t := t
 
+  open Snark_params.Tick
+
   include
-    Snark_params.Tick.Snarkable.Bits.Small
-    with type Unpacked.value = t
-     and type Packed.value = t
+    Snarkable.Bits.Small with type Unpacked.value = t and type Packed.value = t
+
+  val is_succ_var :
+    pred:Unpacked.var -> succ:Unpacked.var -> (Boolean.var, _) Checked.t
+
+  val min_var : Unpacked.var -> Unpacked.var -> (Unpacked.var, _) Checked.t
 
   val fold : t -> bool Triple.t Fold.t
 end

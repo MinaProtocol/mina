@@ -146,8 +146,10 @@ module Parser = struct
         in
         maybe base
         >>= function
-        | Some base -> access base <|> return base
-        | None -> access Ast.value_this )
+        | Some base ->
+            access base <|> return base
+        | None ->
+            access Ast.value_this )
     <?> "value_exp"
 
   let cmp_exp =
@@ -167,9 +169,9 @@ module Parser = struct
       (fun value f -> f value)
       (value_exp <* commit)
       (choice
-         [ pad ws (stringc "==") *> value_exp >>| Ast.cmp_eq
-         ; pad ws (stringc "!=") *> value_exp >>| Ast.cmp_neq
-         ; pad ws (stringc "in") *> value_exp >>| Ast.cmp_in
+         [ pad ws (stringc "==") *> value_exp >>| Fn.flip Ast.cmp_eq
+         ; pad ws (stringc "!=") *> value_exp >>| Fn.flip Ast.cmp_neq
+         ; pad ws (stringc "in") *> value_exp >>| Fn.flip Ast.cmp_in
          ; pad ws (stringc "match") *> regex >>| Fn.flip Ast.cmp_match ])
     <* commit <?> "cmp_exp"
 
@@ -179,7 +181,7 @@ module Parser = struct
           choice
             [ wrap parens (pad ws bool_exp)
             ; bool >>| Ast.bool_lit
-            ; char '!' *> bool_exp >>| Ast.bool_not
+            ; char '!' *> ws *> bool_exp >>| Ast.bool_not
             ; cmp_exp >>| Ast.bool_cmp ]
         in
         let infix_op =
@@ -196,8 +198,10 @@ module Parser = struct
     Result.map_error (parse_string parser str) ~f:(fun err ->
         let msg =
           match err with
-          | ": end_of_input" -> "expected end of input, found more characters"
-          | _ -> err
+          | ": end_of_input" ->
+              "expected end of input, found more characters"
+          | _ ->
+              err
         in
         sprintf "invalid syntax (%s)" msg )
 end
@@ -208,7 +212,8 @@ module Interpreter = struct
 
   let option_list_map ls ~f =
     let rec loop acc = function
-      | [] -> Some acc
+      | [] ->
+          Some acc
       | h :: t ->
           let%bind el = f h in
           loop (el :: acc) t
@@ -216,24 +221,31 @@ module Interpreter = struct
     loop [] ls >>| List.rev
 
   let json_value = function
-    | Bool b -> `Bool b
-    | String s -> `String s
-    | Int i -> `Int i
+    | Bool b ->
+        `Bool b
+    | String s ->
+        `String s
+    | Int i ->
+        `Int i
 
   let access_string json str =
     match json with
-    | `Assoc ls -> List.Assoc.find ~equal:String.equal ls str
-    | _ -> None
+    | `Assoc ls ->
+        List.Assoc.find ~equal:String.equal ls str
+    | _ ->
+        None
 
   let access_int json i =
     match json with `List ls -> List.nth ls i | _ -> None
 
   let rec interpret_value_exp (json : Yojson.Safe.json) = function
-    | Value_lit v -> Some (json_value v)
+    | Value_lit v ->
+        Some (json_value v)
     | Value_list ls ->
         let%map ls' = option_list_map ls ~f:(interpret_value_exp json) in
         `List ls'
-    | Value_this -> Some json
+    | Value_this ->
+        Some json
     | Value_access_string (parent, s) ->
         interpret_value_exp json parent >>= (Fn.flip access_string) s
     | Value_access_int (parent, i) ->
@@ -256,22 +268,44 @@ module Interpreter = struct
         Option.map2 (interpret_value_exp json x) (interpret_value_exp json y)
           ~f:(fun scalar list ->
             match list with
-            | `List items -> List.exists items ~f:(( = ) scalar)
-            | _ -> (* TODO: filter warnings *) false )
+            | `List items ->
+                List.exists items ~f:(( = ) scalar)
+            | _ ->
+                (* TODO: filter warnings *) false )
         |> Option.value ~default:false
     | Cmp_match (x, regex) ->
         Option.map (interpret_value_exp json x) ~f:(fun value ->
             match value with
-            | `String str -> Re2.matches regex str
-            | _ -> false )
+            | `String str ->
+                Re2.matches regex str
+            | _ ->
+                false )
         |> Option.value ~default:false
 
   let rec interpret_bool_exp json = function
-    | Bool_lit b -> b
-    | Bool_cmp cmp -> interpret_cmp_exp json cmp
-    | Bool_not x -> not (interpret_bool_exp json x)
-    | Bool_and (x, y) -> interpret_bool_exp json x && interpret_bool_exp json y
-    | Bool_or (x, y) -> interpret_bool_exp json x || interpret_bool_exp json y
+    | Bool_lit b ->
+        b
+    | Bool_cmp cmp ->
+        interpret_cmp_exp json cmp
+    | Bool_not x ->
+        not (interpret_bool_exp json x)
+    | Bool_and (x, y) ->
+        interpret_bool_exp json x && interpret_bool_exp json y
+    | Bool_or (x, y) ->
+        interpret_bool_exp json x || interpret_bool_exp json y
 
   let matches filter json = interpret_bool_exp json filter
 end
+
+let%test_module "filter tests" =
+  ( module struct
+    let test ~filter ~data ~expect =
+      let filter' = Result.ok_or_failwith (Parser.parse filter) in
+      let data' = Yojson.Safe.from_string data in
+      [%test_result: bool] ~expect (Interpreter.matches filter' data')
+
+    let%test_unit "negation + in" =
+      let filter = {|! .source.module in ["a", "c"]|} in
+      test ~filter ~data:{|{ "source": { "module": "b" }}|} ~expect:true ;
+      test ~filter ~data:{|{ "source": { "module": "a" }}|} ~expect:false
+  end )

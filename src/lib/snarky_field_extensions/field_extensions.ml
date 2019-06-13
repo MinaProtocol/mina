@@ -75,7 +75,8 @@ module Make (F : Intf.Basic) = struct
 
   let div_unsafe x y =
     match (to_constant x, to_constant y) with
-    | Some x, Some y -> return (constant Unchecked.(x / y))
+    | Some x, Some y ->
+        return (constant Unchecked.(x / y))
     | _, _ ->
         let%bind x_over_y =
           exists typ
@@ -87,16 +88,20 @@ module Make (F : Intf.Basic) = struct
 
   let assert_square =
     match assert_square with
-    | `Custom f -> f
-    | `Define -> fun a a2 -> assert_r1cs a a a2
+    | `Custom f ->
+        f
+    | `Define ->
+        fun a a2 -> assert_r1cs a a a2
 
   let ( * ) =
     match ( * ) with
-    | `Custom f -> f
+    | `Custom f ->
+        f
     | `Define -> (
         fun x y ->
           match (to_constant x, to_constant y) with
-          | Some x, Some y -> return (constant Unchecked.(x * y))
+          | Some x, Some y ->
+              return (constant Unchecked.(x * y))
           | _, _ ->
               let%bind res =
                 exists typ
@@ -113,11 +118,13 @@ module Make (F : Intf.Basic) = struct
 
   let square =
     match square with
-    | `Custom f -> f
+    | `Custom f ->
+        f
     | `Define -> (
         fun x ->
           match to_constant x with
-          | Some x -> return (constant (Unchecked.square x))
+          | Some x ->
+              return (constant (Unchecked.square x))
           | None ->
               let%bind res =
                 exists typ
@@ -132,11 +139,13 @@ module Make (F : Intf.Basic) = struct
 
   let inv_exn =
     match inv_exn with
-    | `Custom f -> f
+    | `Custom f ->
+        f
     | `Define -> (
         fun t ->
           match to_constant t with
-          | Some x -> return (constant (Unchecked.inv x))
+          | Some x ->
+              return (constant (Unchecked.inv x))
           | None ->
               let%bind res =
                 exists typ
@@ -163,8 +172,10 @@ struct
         Some
           (A.map t ~f:(fun x ->
                match F.to_constant x with
-               | Some x -> x
-               | None -> raise None_exn ))
+               | Some x ->
+                   x
+               | None ->
+                   raise None_exn ))
       with None_exn -> None
 
   let if_ b ~then_ ~else_ =
@@ -222,10 +233,7 @@ struct
 
     let to_list x = [x]
 
-    module Unchecked = struct
-      include Field
-      include Field.Infix
-    end
+    module Unchecked = Field
 
     type t = Field.Var.t
 
@@ -243,9 +251,9 @@ struct
 
     let assert_r1cs a b c = assert_r1cs a b c
 
-    let ( + ) = Field.Checked.Infix.( + )
+    let ( + ) = Field.Checked.( + )
 
-    let ( - ) = Field.Checked.Infix.( - )
+    let ( - ) = Field.Checked.( - )
 
     let negate t = Field.Var.scale t Unchecked.(negate one)
 
@@ -333,7 +341,7 @@ end = struct
 
     let assert_square (a, b) (a2, b2) =
       let open F in
-      let ab = scale b2 Field.(Infix.(one / of_int 2)) in
+      let ab = scale b2 Field.(one / of_int 2) in
       let%map () = assert_r1cs a b ab
       and () =
         assert_r1cs (a + b)
@@ -827,5 +835,5 @@ struct
     let p2 = Params.frobenius_coeffs_c1.(Int.( * ) (power mod 2) 2) in
     let p4 = Params.frobenius_coeffs_c1.(power mod 4) in
     let ( * ) s x = Field.Var.scale x s in
-    ((c00, p2 * c01), (p4 * c10, Field.Infix.(p4 * p2) * c11))
+    ((c00, p2 * c01), (p4 * c10, Field.(p4 * p2) * c11))
 end

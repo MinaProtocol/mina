@@ -4,26 +4,9 @@ open Core
 (* TODO: generate new keypairs before public testnet *)
 include Make (struct
   let accounts =
-    let balances =
-      [ 5_000_000
-      ; 5_000_000
-      ; 5_000_000
-      ; 5_000_000
-      ; 5_000_000
-      ; 1_000
-      ; 1_000
-      ; 1_000
-      ; 1_000
-      ; 1_000
-      ; 1_000
-      ; 1_000
-      ; 1_000
-      ; 1_000
-      ; 1_000
-      ; 1_000
-      ; 1_000
-      ; 1_000 ]
-    in
+    let high_balances = List.init 5 ~f:(Fn.const 5_000_000) in
+    let low_balances = List.init 13 ~f:(Fn.const 1_000) in
+    let balances = high_balances @ low_balances in
     List.mapi balances ~f:(fun i b ->
         { balance= b
         ; pk= fst Coda_base.Sample_keypairs.keypairs.(i)

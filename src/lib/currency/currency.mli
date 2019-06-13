@@ -7,7 +7,7 @@ open Tuple_lib
 type uint64 = Unsigned.uint64
 
 module type Basic = sig
-  type t [@@deriving bin_io, sexp, compare, hash, yojson]
+  type t [@@deriving sexp, compare, hash, yojson]
 
   val max_int : t
 
@@ -19,7 +19,8 @@ module type Basic = sig
 
   module Stable : sig
     module V1 : sig
-      type nonrec t = t [@@deriving bin_io, sexp, compare, eq, hash, yojson]
+      type nonrec t = t
+      [@@deriving bin_io, sexp, compare, eq, hash, yojson, version]
     end
 
     module Latest = V1
@@ -56,6 +57,8 @@ module type Basic = sig
   val var_to_number : var -> Number.t
 
   val var_to_triples : var -> Boolean.var Triple.t list
+
+  val equal_var : var -> var -> (Boolean.var, _) Checked.t
 end
 
 module type Arithmetic_intf = sig
@@ -103,32 +106,42 @@ module type Signed_intf = sig
 
   type magnitude_var
 
-  type ('magnitude, 'sgn) t_
+  module Poly : sig
+    type ('magnitude, 'sgn) t
 
-  type t = (magnitude, Sgn.t) t_
-  [@@deriving sexp, hash, bin_io, compare, eq, yojson]
+    module Stable :
+      sig
+        module V1 : sig
+          type ('magnitude, 'sgn) t [@@deriving version]
+        end
 
-  val gen : t Quickcheck.Generator.t
+        module Latest = V1
+      end
+      with type ('magnitude, 'sgn) V1.t = ('magnitude, 'sgn) t
+  end
 
   module Stable : sig
     module V1 : sig
-      type nonrec ('magnitude, 'sgn) t_ = ('magnitude, 'sgn) t_
-
-      type nonrec t = t [@@deriving bin_io, sexp, hash, compare, eq, yojson]
+      type t = (magnitude, Sgn.Stable.V1.t) Poly.Stable.V1.t
+      [@@deriving bin_io, sexp, hash, compare, eq, yojson, version]
     end
 
     module Latest = V1
   end
 
+  type t = Stable.Latest.t [@@deriving sexp, hash, compare, eq, yojson]
+
+  val gen : t Quickcheck.Generator.t
+
   val length_in_triples : int
 
-  val create : magnitude:'magnitude -> sgn:'sgn -> ('magnitude, 'sgn) t_
+  val create : magnitude:'magnitude -> sgn:'sgn -> ('magnitude, 'sgn) Poly.t
 
   val sgn : t -> Sgn.t
 
   val magnitude : t -> magnitude
 
-  type nonrec var = (magnitude_var, Sgn.var) t_
+  type var = (magnitude_var, Sgn.var) Poly.t
 
   val typ : (var, t) Typ.t
 
@@ -163,7 +176,7 @@ module type Signed_intf = sig
 
     val cswap :
          Boolean.var
-      -> (magnitude_var, Sgn.t) t_ * (magnitude_var, Sgn.t) t_
+      -> (magnitude_var, Sgn.t) Poly.t * (magnitude_var, Sgn.t) Poly.t
       -> (var * var, _) Checked.t
   end
 end

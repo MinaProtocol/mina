@@ -5,7 +5,7 @@ open Util
 module Floating_point = Floating_point
 module Integer = Integer
 
-(* 
+(*
     Given
     p / q = 0.b1 b2 b3 ...
 
@@ -22,8 +22,10 @@ let least ~such_that =
 let greatest ~such_that =
   let rec go best i =
     match such_that i with
-    | Some acc -> go (Some acc) (i + 1)
-    | None -> Option.value_exn best
+    | Some acc ->
+        go (Some acc) (i + 1)
+    | None ->
+        Option.value_exn best
   in
   go None 0
 
@@ -50,7 +52,7 @@ let log ~terms x =
 
 (* This computes the number of terms of a taylor series one needs to compute
    if the output is to be within 1/2^k of the actual value.
-   It requires one give an upper bound on the absolute value of the 
+   It requires one give an upper bound on the absolute value of the
    derivatives of the function *)
 let terms_needed ~derivative_magnitude_upper_bound ~bits_of_precision:k =
   (*
@@ -64,7 +66,8 @@ let terms_needed ~derivative_magnitude_upper_bound ~bits_of_precision:k =
       let d = derivative_magnitude_upper_bound Int.(n + 1) in
       Bignum.(of_bigint (factorial nn) / d > lower_bound) )
 
-let ceil_log2 n = least ~such_that:(fun i -> B.(pow (of_int 2) (of_int i) >= n))
+let ceil_log2 n =
+  least ~such_that:(fun i -> B.(pow (of_int 2) (of_int i) >= n))
 
 let binary_expansion x =
   assert (Bignum.(x < one)) ;
@@ -107,7 +110,7 @@ module Exp = struct
 
   (* This figures out how many bits we can hope to calculate given our field
    size. This is because computing the terms
-   
+
    x^k
 
    in the taylor series will start to overflow when k is too large. E.g.,
@@ -133,7 +136,7 @@ module Exp = struct
     let {total_precision; terms_needed; per_term_precision} =
       bit_params ~field_size_in_bits ~log_base:abs_log_base
     in
-    (* Precompute the coefficeints 
+    (* Precompute the coefficeints
 
        log(base)^i / i !
 
@@ -172,7 +175,8 @@ module Exp = struct
         | None ->
             assert (sgn = `Pos) ;
             Some term
-        | Some s -> Some (Floating_point.add_signed ~m s (sgn, term)) )
+        | Some s ->
+            Some (Floating_point.add_signed ~m s (sgn, term)) )
     |> Option.value_exn
 
   let one_minus_exp ~m
@@ -191,7 +195,7 @@ module Exp = struct
 end
 
 let%test_unit "instantiate" =
-  let module M = Snarky.Snark.Run.Make (Snarky.Backends.Mnt4.Default) in
+  let module M = Snarky.Snark.Run.Make (Snarky.Backends.Mnt4.Default) (Unit) in
   let m : M.field m = (module M) in
   let open M in
   let params =
@@ -207,6 +211,6 @@ let%test_unit "instantiate" =
     in
     Floating_point.to_bignum ~m (Exp.one_minus_exp ~m params arg)
   in
-  let res = M.run_and_check c |> Or_error.ok_exn in
+  let (), res = M.run_and_check c () |> Or_error.ok_exn in
   assert (
     Bignum.(equal res (Exp.Unchecked.one_minus_exp params (one / of_int 2))) )

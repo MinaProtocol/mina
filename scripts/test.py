@@ -7,20 +7,24 @@ import os
 import subprocess
 import sys
 import time
+from itertools import chain
 
 build_artifact_profiles = [
     'testnet_postake',
-    'testnet_postake_snarkless_fake_hash'
+    'testnet_postake_many_proposers',
+    'testnet_postake_snarkless_fake_hash',
+    # ihm: Commenting this out to get the big curves fixes in. The CI machines were too weak to build
+    # 'testnet_postake_medium_curves',
 ]
 
 unit_test_profiles = [
-    'test_posig_snarkless',
-    'test_postake_snarkless'
+    'test_postake_snarkless',
+    'dev'
 ]
 
 simple_tests = [
     'full-test',
-    'transaction-snark-profiler -check-only',
+    'transaction-snark-profiler -k 2',
 ]
 
 integration_tests = [
@@ -29,28 +33,48 @@ integration_tests = [
     'coda-block-production-test',
     'coda-shared-prefix-test -who-proposes 0',
     'coda-shared-prefix-test -who-proposes 1',
-    'coda-shared-state-test',
-    'coda-restart-node-test'
+    'coda-restart-node-test',
 ]
 
 all_tests = simple_tests + integration_tests
 
+# dictionary mapping configs to lists of tests
 test_permutations = {
     'fake_hash': ['full-test'],
-    'test_posig_snarkless': all_tests,
     'test_postake_snarkless': simple_tests,
     'test_postake_split_snarkless': integration_tests,
-    'test_postake_split': ['coda-shared-prefix-multiproposer-test'],
-    'test_posig': simple_tests,
+    'test_postake_split': ['coda-shared-prefix-multiproposer-test -num-proposers 2'],
     'test_postake': simple_tests,
     'test_postake_catchup': ['coda-restart-node-test'],
-    'test_postake_bootstrap' : ['coda-bootstrap-test']
+    'test_postake_bootstrap': ['coda-bootstrap-test', 'coda-long-fork -num-proposers 2'],
+    'test_postake_holy_grail': ['coda-restarts-and-txns-holy-grail -num-proposers 5', 'coda-long-fork -num-proposers 5'],
+    'test_postake_delegation': ['coda-delegation-test'],
+    'test_postake_txns': ['coda-shared-state-test', 'coda-batch-payment-test'],
+    'test_postake_five_even_snarkless': ['coda-shared-prefix-multiproposer-test -num-proposers 5'],
+    'test_postake_five_even_txns': ['coda-shared-prefix-multiproposer-test -num-proposers 5 -payments'],
 }
 
-ci_blacklist = [
-    'test_posig:*',
-    'test_posig_snarkless:*',
+ci_blacklist = []
+
+# of all the generated CI jobs, allow these specific ones to fail (extra blacklist on top of ci_blacklist)
+required_blacklist = [
+    'test_postake_five_even_snarkless:*',
+    'test_postake_holy_grail:*',
+    'test_postake_catchup:*',
 ]
+
+# these extra jobs are not filters, they are full status check names
+extra_required_status_checks = [
+    "ci/circleci: lint",
+    "ci/circleci: tracetool",
+    "ci/circleci: build-wallet",
+]
+
+# these are full status check names. they will not be required to succeed.
+not_required_status_checks = [
+    "ci/circleci: build-macos",
+]
+
 
 def fail(msg):
     print('ERROR: %s' % msg)
@@ -76,7 +100,10 @@ def parse_filter(pattern_src):
         [profile, test] = parts
         return (profile, test)
 
-def filter_test_permutations(whitelist_filters, blacklist_filters):
+def filter_test_permutations(whitelist_filters, blacklist_filters, permutations=None):
+    if permutations is None:
+        permutations = test_permutations
+
     whitelist_patterns = list(map(parse_filter, whitelist_filters))
     blacklist_patterns = list(map(parse_filter, blacklist_filters))
 
@@ -92,7 +119,7 @@ def filter_test_permutations(whitelist_filters, blacklist_filters):
         return whitelisted and not(blacklisted)
 
     result = collections.defaultdict(list)
-    for (profile,tests) in test_permutations.items():
+    for (profile,tests) in permutations.items():
         for test in tests:
             if keep(profile, test):
                 result[profile].append(test)
@@ -120,18 +147,19 @@ def run(args):
     coda_exe_path = os.path.join(coda_app_path, 'cli/src/coda.exe')
     coda_exe = os.path.join(coda_build_path, coda_exe_path)
 
-    if os.system('which logproc') == 0:
-        logproc_exe = 'logproc'
-        build_targets = coda_exe
-    else:
-        logproc_exe_path = os.path.join(coda_app_path, 'logproc/logproc.exe')
-        logproc_exe = os.path.join(coda_build_path, logproc_exe_path)
-        build_targets = '%s %s' % (coda_exe_path, logproc_exe_path)
+    with open(os.devnull, 'w') as null:
+        if subprocess.call(['which', 'logproc'], stdout=null, stderr=null) == 0:
+            logproc_exe = 'logproc'
+            build_targets = coda_exe
+        else:
+            logproc_exe_path = os.path.join(coda_app_path, 'logproc/logproc.exe')
+            logproc_exe = os.path.join(coda_build_path, logproc_exe_path)
+            build_targets = '%s %s' % (coda_exe, logproc_exe)
 
     test_permutations = filter_test_permutations(args.whitelist_patterns, args.blacklist_patterns)
     if len(test_permutations) == 0:
         # TODO: support direct test dispatching
-        if args.test_pattern:
+        if args.whitelist_patterns != ['*']:
             fail('no tests were selected -- whitelist pattern did not match any known tests')
         else:
             fail('no tests were selected -- blacklist is too restrictive')
@@ -170,22 +198,37 @@ def run(args):
             print('  - %s' % test)
             log = os.path.join(profile_dir, '%s.log' % test)
             cmd = 'set -o pipefail && %s integration-test %s 2>&1 ' % (coda_exe, test)
-            cmd += '| grep -v "* Elements of w " | grep -v "elements in proof:" '
             cmd += '| tee \'%s\' | %s -f \'%s\' ' % (log, logproc_exe, logproc_filter)
             print('Running: %s' % (cmd))
             run_cmd(cmd, lambda: fail('Test "%s:%s" failed' % (profile, test)))
 
-    print('Testing successfull')
+    print('Testing successful')
+
+
+def get_required_status():
+    test_permutations = filter_test_permutations(['*'], required_blacklist, permutations=filter_test_permutations(['*'], ci_blacklist))
+    return list(filter(lambda el: el not in not_required_status_checks,
+            chain(
+            ("ci/circleci: %s" % job for job in
+                chain(("test--%s" % profile for profile in test_permutations.keys()),
+                      ("test-unit--%s" % profile for profile in unit_test_profiles),
+                      ("build-artifacts--%s" % profile for profile in build_artifact_profiles))),
+            extra_required_status_checks
+             )))
+
+
+def required_status(args):
+    print('\n'.join(get_required_status()))
 
 def render(args):
-    circle_ci_conf_dir = os.path.dirname(args.jinja_file)
-    jinja_file_basename = os.path.basename(args.jinja_file)
-    (output_file, ext) = os.path.splitext(args.jinja_file)
+    circle_ci_conf_dir = os.path.dirname(args.circle_jinja_file)
+    jinja_file_basename = os.path.basename(args.circle_jinja_file)
+    (output_file, ext) = os.path.splitext(args.circle_jinja_file)
     assert ext == '.jinja'
 
     test_permutations = filter_test_permutations(['*'], ci_blacklist)
 
-    env = jinja2.Environment(loader=jinja2.FileSystemLoader(circle_ci_conf_dir))
+    env = jinja2.Environment(loader=jinja2.FileSystemLoader(circle_ci_conf_dir), autoescape=False)
     template = env.get_template(jinja_file_basename)
     rendered = template.render(
         build_artifact_profiles=build_artifact_profiles,
@@ -201,6 +244,27 @@ def render(args):
         with open(output_file, 'w') as file:
             file.write(rendered)
 
+    # now for mergify!
+    mergify_conf_dir = os.path.dirname(args.mergify_jinja_file)
+    jinja_file_basename = os.path.basename(args.mergify_jinja_file)
+    (output_file, ext) = os.path.splitext(args.mergify_jinja_file)
+    assert ext == '.jinja'
+
+    env = jinja2.Environment(loader=jinja2.FileSystemLoader(mergify_conf_dir), autoescape=False)
+    template = env.get_template(jinja_file_basename)
+
+    rendered = template.render(
+        required_status=get_required_status()
+    )
+
+    if args.check:
+        with open(output_file, 'r') as file:
+            if file.read() != rendered:
+                fail('mergify configuration is out of date, re-render it')
+    else:
+        with open(output_file, 'w') as file:
+            file.write(rendered)
+
 def list_tests(_args):
     for profile in test_permutations.keys():
         print('- ' + profile)
@@ -211,7 +275,8 @@ def main():
     actions = {
         'run': run,
         'render': render,
-        'list': list_tests
+        'list': list_tests,
+        'required-status': required_status
     }
 
     root_parser = argparse.ArgumentParser(description='Coda integration test runner/configurator.')
@@ -253,10 +318,14 @@ def main():
         action='store_true',
         help='Check that CI configuration was rendered properly.'
     )
-    render_parser.add_argument('jinja_file')
+    render_parser.add_argument('circle_jinja_file')
+    render_parser.add_argument('mergify_jinja_file')
 
     list_parser = subparsers.add_parser('list', description='List available tests.')
     list_parser.set_defaults(action='list')
+
+    required_status_parser = subparsers.add_parser('required-status', description='Print required status checks')
+    required_status_parser.set_defaults(action='required-status')
 
     args = root_parser.parse_args()
     if not(hasattr(args, 'action')):

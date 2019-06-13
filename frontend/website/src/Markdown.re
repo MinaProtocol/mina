@@ -8,7 +8,7 @@ module Metadata = {
         {|^---(?:.|\n)*^|} ++ key ++ {|:(.*)\n(?:.|\n)*^---|},
         ~flags="m",
       );
-    switch (Js.Re.exec(content, re)) {
+    switch (Js.Re.exec_(re, content)) {
     | None => None
     | Some(result) =>
       let captures = Js.Re.captures(result);
@@ -24,11 +24,33 @@ module Metadata = {
     };
 };
 
+module Child_process = {
+  type env = {
+    .
+    "CODA_CDN_URL": string,
+    "PATH": string,
+  };
+  type option;
+
+  [@bs.obj] external option: (~env: env=?, unit) => option = "";
+
+  [@bs.module "child_process"]
+  external execSync: (string, option) => string = "";
+};
+
 let load = path => {
+  let filter = Links.Cdn.prefix^ == "" ? "" : "--filter src/filter.js ";
+
   let html =
-    Node.Child_process.execSync(
-      "pandoc " ++ path ++ " --mathjax",
-      Node.Child_process.option(),
+    Child_process.execSync(
+      "pandoc " ++ filter ++ path ++ " --mathjax",
+      Child_process.option(
+        ~env={
+          "CODA_CDN_URL": Links.Cdn.prefix^,
+          "PATH": Js_dict.unsafeGet(Node.Process.process##env, "PATH"),
+        },
+        (),
+      ),
     );
   let content = Node.Fs.readFileAsUtf8Sync(path);
   (html, content);

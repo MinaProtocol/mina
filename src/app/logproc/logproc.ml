@@ -1,4 +1,5 @@
 open Core
+open Logproc_lib
 
 let find_timezone () =
   let ch = Unix.open_process_in {|date +"%z"|} in
@@ -17,13 +18,20 @@ let level_color =
   let open Bash_colors in
   let open Logger.Level in
   function
-  | Trace -> cyan
-  | Debug -> green
-  | Info -> magenta
-  | Warn -> yellow
-  | Error -> red
-  | Faulty_peer -> orange
-  | Fatal -> bright_red
+  | Trace ->
+      cyan
+  | Debug ->
+      green
+  | Info ->
+      magenta
+  | Warn ->
+      yellow
+  | Error ->
+      red
+  | Faulty_peer ->
+      orange
+  | Fatal ->
+      bright_red
 
 let format_msg ~interpolation_config ~timezone msg =
   let open Logger.Message in
@@ -32,7 +40,8 @@ let format_msg ~interpolation_config ~timezone msg =
     match
       Interpolator.interpolate interpolation_config msg.message msg.metadata
     with
-    | Ok x -> x
+    | Ok x ->
+        x
     | Error err ->
         let open Bash_colors in
         printf
@@ -47,7 +56,8 @@ let format_msg ~interpolation_config ~timezone msg =
   Out_channel.(flush stdout)
 
 let yojson_from_string_result str =
-  try Ok (Yojson.Safe.from_string str) with exn ->
+  try Ok (Yojson.Safe.from_string str)
+  with exn ->
     print_string "exn!" ;
     Error (Exn.to_string exn)
 
@@ -58,7 +68,8 @@ let process_line ~timezone ~interpolation_config ~filter line =
     let%map msg = Logger.Message.of_yojson json in
     (json, msg)
   with
-  | Error err -> printf !"ERROR PROCESSING LINE: %s:%s\n%!" err line
+  | Error err ->
+      printf !"ERROR PROCESSING LINE: %s:%s\n%!" err line
   | Ok (json, msg) ->
       if Filter.Interpreter.matches filter json then
         format_msg ~timezone ~interpolation_config msg
@@ -73,11 +84,13 @@ let main timezone_str interpolation_config filter_str =
         exit 1
       in
       match
-        try Filter.Parser.parse filter_str with exn ->
-          error (Exn.to_string exn)
+        try Filter.Parser.parse filter_str
+        with exn -> error (Exn.to_string exn)
       with
-      | Ok x -> x
-      | Error err -> error err
+      | Ok x ->
+          x
+      | Error err ->
+          error err
   in
   (* let filter = Result.ok_or_failwith (Filter.Parser.parse "true") in *)
   (* let filter = Result.ok_or_failwith (Filter.Parser.parse ".level === \"Info\"") in *)

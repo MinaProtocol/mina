@@ -4,7 +4,7 @@ version: 3
 jobs:
     tracetool:
         docker:
-            - image: codaprotocol/coda:toolchain-rust-b2e9fa0d25f2f9b7c7f01d6f8727e2c6c7690712
+            - image: codaprotocol/coda:toolchain-rust-8959b8dfda29263d2f88f13a284ef34c9da0a081
         steps:
             - checkout
             - run: git submodule sync && git submodule update --init --recursive
@@ -14,96 +14,124 @@ jobs:
 
     build-wallet:
         macos:
-            xcode: "10.1.0"
+            xcode: "10.2.0"
         steps:
             - checkout
-            - run: cd frontend/wallet && npm install
+            - run: git submodule sync && git submodule update --init --recursive
+            - run: cd frontend/wallet && yarn
             - run:
                   name: Lint wallet
-                  command: cd frontend/wallet && npm run reformat && git diff --exit-code src
+                  command: cd frontend/wallet && yarn run reformat && git diff --exit-code src
             - run:
                   name: Build wallet
-                  command: cd frontend/wallet && npm run build
-            - run: cd frontend/website && npm install
+                  command: cd frontend/wallet && yarn run build-ci
+            - run:
+                  name: Test wallet
+                  command: cd frontend/wallet && yarn test
+#            - run:
+#                  name: Build dist wallet
+#                  command: cd frontend/wallet && yarn run dist
+#            - run:
+#                  name: Publish dist wallet
+#                  command: (env HOMEBREW_NO_AUTO_UPDATE=1 brew install awscli) && ./scripts/publish-wallet.sh
+            - run: cd frontend/website && yarn install
+            - run:
+                  name: Decrypt PragmataPro font
+                  command: cd frontend/website && yarn run decrypt-ci
             - run:
                   name: Lint website
-                  command: cd frontend/website && npm run reformat && git diff --exit-code src
+                  command: cd frontend/website && yarn run reformat && git diff --exit-code src
             - run:
                   name: Build website
-                  command: cd frontend/website && npm run build && (env HOMEBREW_NO_AUTO_UPDATE=1 brew install pandoc) && node ./lib/js/src/Render.js
+                  command: cd frontend/website && (env HOMEBREW_NO_AUTO_UPDATE=1 brew install pandoc) && yarn run build
             - run:
                   name: Deploy staging
-                  command: cd frontend/website && (if [ "$CIRCLE_BRANCH" == "master" ]; then npm run deploy-ci; fi)
+                  command: cd frontend/website && (if [ "$CIRCLE_BRANCH" == "master" ]; then yarn run deploy-ci; fi)
 
     lint:
         docker:
-            - image: codaprotocol/coda:toolchain-af1380e0f6c8726391d82b2adb6a2a3b20dd46a0
+            - image: codaprotocol/coda:toolchain-51191cf583a5129255d2c53ad946f6821ad9989c
         steps:
             - checkout
             - run: git submodule sync && git submodule update --init --recursive
             - run:
                   name: Check circle CI configuration rendering
-                  command: ./scripts/test.py render --check .circleci/config.yml.jinja
+                  command: ./scripts/test.py render --check .circleci/config.yml.jinja .mergify.yml.jinja
             - run:
                   name: OCamlformat (make check-format)
                   command: eval `opam config env` && make check-format
             - run:
                   name: Snarky tracks master (make check-snarky-submodule)
                   command: make check-snarky-submodule
+            - run:
+                  name: Check CODEOWNERS file format
+                  command: ./scripts/lint_codeowners.sh
 
-    build-macos:
-        macos:
-            xcode: "10.1.0"
-        working_directory: /Users/distiller/coda
-        environment:
-            HOMEBREW_LOGS: /Users/distiller/homebrew.log
-            OPAMYES: 1
+    update-branch-protection:
+        docker:
+            - image: python:3
         steps:
             - run:
-                name: Make /nix paths
-                command: |
-                    sudo mkdir /nix
-                    sudo chown distiller /nix
+                name: Install dependencies
+                command: pip install --user requests jinja2
             - checkout
-            - restore_cache:
-                  keys:
-                      - homebrew-v1-{{'{{'}} checksum "scripts/macos-setup.sh" {{'}}'}}
-                      - homebrew-v1-
-            - restore_cache:
-                  keys:
-                      - opam-v3-{{'{{'}} checksum "src/opam.export" {{'}}'}}
-                      - opam-v3-
-            - run: git submodule sync && git submodule update --init --recursive
             - run:
-                  name: Download Deps -- make macos-setup-download
-                  command: ./scripts/skip_if_only_frontend.sh make macos-setup-download
-            - run:
-                  name: Compile Deps -- make macos-setup-compile
-                  command: ./scripts/skip_if_only_frontend.sh make macos-setup-compile
-            - save_cache:
-                  key: homebrew-v1-{{'{{'}} checksum "scripts/macos-setup.sh" {{'}}'}}
-                  paths:
-                      - "/usr/local/Homebrew"
-                      - "/Users/distiller/Library/Caches/Homebrew"
-            - save_cache:
-                  key: opam-v3-{{'{{'}} checksum "src/opam.export" {{'}}'}}
-                  paths:
-                      - "/Users/distiller/.opam"
-            - run:
-                  name: Build OCaml
-                  command: ./scripts/skip_if_only_frontend.sh bash -c 'eval `opam config env` && make build 2>&1 | tee /tmp/buildocaml.log'
-            - run:
-                  name: Record Constraint System Digests
-                  command: ./scripts/skip_if_only_frontend.sh bash -c 'src/_build/default/app/cli/src/coda.exe client constraint-system-digests | tee /tmp/constraint-system-digests.log'
-            - run:
-                  name: Run all tests (on master)
-                  command: echo "FIXME Tests not yet working on mac"
+                  name: Update branch protection rule from test configuration
+                  command: ./scripts/test.py required-status >required_status && cat required_status && ./scripts/update_branch_rule.py required_status
+
+    #build-macos:
+    #    macos:
+    #        xcode: "10.1.0"
+    #    working_directory: /Users/distiller/coda
+    #    environment:
+    #        HOMEBREW_LOGS: /Users/distiller/homebrew.log
+    #        OPAMYES: 1
+    #    steps:
+    #        - run:
+    #            name: Make /nix paths
+    #            command: |
+    #                sudo mkdir /nix
+    #                sudo chown distiller /nix
+    #        - checkout
+    #        - restore_cache:
+    #              keys:
+    #                  - homebrew-v1-{{'{{'}} checksum "scripts/macos-setup.sh" {{'}}'}}
+    #                  - homebrew-v1-
+    #        - restore_cache:
+    #              keys:
+    #                  - opam-v3-{{'{{'}} checksum "src/opam.export" {{'}}'}}
+    #                  - opam-v3-
+    #        - run: git submodule sync && git submodule update --init --recursive
+    #        - run:
+    #              name: Download Deps -- make macos-setup-download
+    #              command: ./scripts/skip_if_only_frontend.sh make macos-setup-download
+    #        - run:
+    #              name: Compile Deps -- make macos-setup-compile
+    #              command: ./scripts/skip_if_only_frontend.sh make macos-setup-compile
+    #        - save_cache:
+    #              key: homebrew-v1-{{'{{'}} checksum "scripts/macos-setup.sh" {{'}}'}}
+    #              paths:
+    #                  - "/usr/local/Homebrew"
+    #                  - "/Users/distiller/Library/Caches/Homebrew"
+    #        - save_cache:
+    #              key: opam-v3-{{'{{'}} checksum "src/opam.export" {{'}}'}}
+    #              paths:
+    #                  - "/Users/distiller/.opam"
+    #        - run:
+    #              name: Build OCaml
+    #              command: ./scripts/skip_if_only_frontend.sh bash -c 'eval `opam config env` && make build 2>&1 | tee /tmp/buildocaml.log'
+    #        - run:
+    #              name: Record Constraint System Digests
+    #              command: ./scripts/skip_if_only_frontend.sh bash -c 'src/_build/default/app/cli/src/coda.exe client constraint-system-digests | tee /tmp/constraint-system-digests.log'
+    #        - run:
+    #              name: Run all tests (on master)
+    #              command: echo "FIXME Tests not yet working on mac"
 
     {%- for profile in build_artifact_profiles %}
     build-artifacts--{{profile}}:
         resource_class: large
         docker:
-            - image: codaprotocol/coda:toolchain-af1380e0f6c8726391d82b2adb6a2a3b20dd46a0
+            - image: codaprotocol/coda:toolchain-51191cf583a5129255d2c53ad946f6821ad9989c
         environment:
             DUNE_PROFILE: {{profile}}
         steps:
@@ -142,20 +170,23 @@ jobs:
     test-unit--{{profile}}:
         resource_class: large
         docker:
-            - image: codaprotocol/coda:toolchain-af1380e0f6c8726391d82b2adb6a2a3b20dd46a0
+            - image: codaprotocol/coda:toolchain-51191cf583a5129255d2c53ad946f6821ad9989c
         steps:
             - checkout
+            - run: ulimit -c unlimited
             - run: git submodule sync && git submodule update --init --recursive
             - run:
                   name: Run unit tests
                   command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && dune build --profile={{profile}} -j8 && dune runtest --profile={{profile}} -j8'
+            - store_artifacts:
+                path: core*
     {%- endfor %}
 
     {%- for profile in test_permutations.keys() | sort %}
     test--{{profile}}:
         resource_class: large
         docker:
-            - image: codaprotocol/coda:toolchain-af1380e0f6c8726391d82b2adb6a2a3b20dd46a0
+            - image: codaprotocol/coda:toolchain-51191cf583a5129255d2c53ad946f6821ad9989c
         steps:
             - checkout
             - run: git submodule sync && git submodule update --init --recursive
@@ -173,8 +204,11 @@ workflows:
     coda_parallel:
         jobs:
             - lint
+            - update-branch-protection:
+                filters:
+                  branches:
+                    only: master
             - tracetool
-            - build-macos
             - build-wallet
             {%- for profile in build_artifact_profiles %}
             - build-artifacts--{{profile}}

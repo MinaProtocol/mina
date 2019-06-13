@@ -25,14 +25,19 @@ genesis_ledger = "test_five_even_stakes"]
 include Test_five_even_stakes
 
 [%%elif
-genesis_ledger = "testnet_posig"]
+genesis_ledger = "test_postake_delegation"]
 
-include Testnet_posig_ledger
+include Test_delegation_ledger
 
 [%%elif
 genesis_ledger = "testnet_postake"]
 
 include Testnet_postake_ledger
+
+[%%elif
+genesis_ledger = "testnet_postake_many_proposers"]
+
+include Testnet_postake_ledger_many_proposers
 
 [%%else]
 

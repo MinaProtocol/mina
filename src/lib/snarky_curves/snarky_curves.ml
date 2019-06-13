@@ -315,7 +315,7 @@ module Make_weierstrass_checked
     let choose a1 a2 =
       let open Field.Checked in
       F.map2_ a1 a2 ~f:(fun a1 a2 ->
-          Infix.((a1 * cond) + (a2 * (Field.Var.constant Field.one - cond))) )
+          (a1 * cond) + (a2 * (Field.Var.constant Field.one - cond)) )
     in
     (choose x1 x2, choose y1 y2)
 
@@ -327,7 +327,8 @@ module Make_weierstrass_checked
     let open Let_syntax in
     let rec go i bs0 acc pt =
       match bs0 with
-      | [] -> return acc
+      | [] ->
+          return acc
       | b :: bs ->
           let%bind acc' =
             with_label (sprintf "acc_%d" i)
@@ -430,7 +431,8 @@ module Make_weierstrass_checked
         Can get away with using an unsafe add if we modify this a bit. *)
     let rec go acc two_to_the_i bits =
       match bits with
-      | [] -> return acc
+      | [] ->
+          return acc
       | [b_i] ->
           let term =
             lookup_single_bit b_i (sigma, Curve.(sigma + two_to_the_i))
@@ -457,14 +459,17 @@ module Make_weierstrass_checked
 
   let scale m t c ~init =
     match to_constant t with
-    | Some t -> scale_known m t c ~init
-    | None -> scale m t c ~init
+    | Some t ->
+        scale_known m t c ~init
+    | None ->
+        scale m t c ~init
 
   let sum (type shifted) (module Shifted : Shifted.S with type t = shifted) xs
       ~init =
     let open Let_syntax in
     let rec go acc = function
-      | [] -> return acc
+      | [] ->
+          return acc
       | t :: ts ->
           let%bind acc' = Shifted.add acc t in
           go acc' ts

@@ -6,17 +6,19 @@ open Module_version
 module Stable = struct
   module V1 = struct
     module T = struct
-      let version = 1
-
-      (* we using Blocking_sexp to be able to derive hash, sexp
-         the base Inet_addr and Stable.V1 modules don't give that to you
-       *)
       type t =
-        { host: Unix.Inet_addr.Blocking_sexp.t (* IPv4 or IPv6 address *)
+        { host: Core.Unix.Inet_addr.Stable.V1.t (* IPv4 or IPv6 address *)
         ; discovery_port: int (* UDP *)
-        ; communication_port: int
-        (* TCP *) }
-      [@@deriving bin_io, compare, hash, sexp]
+        ; communication_port: int (* TCP *) }
+      [@@deriving bin_io, compare, sexp, version]
+
+      let equal t t' = compare t t' = 0
+
+      (* these hash functions come from the implementation of Inet_addr, 
+         though they're not exposed *)
+      let hash_fold_t hash t = hash_fold_int hash (Hashtbl.hash t)
+
+      let hash : t -> int = Ppx_hash_lib.Std.Hash.of_fold hash_fold_t
 
       let to_yojson {host; discovery_port; communication_port} =
         `Assoc
@@ -44,7 +46,8 @@ module Stable = struct
                in
                let host = Unix.Inet_addr.of_string host_str in
                {host; discovery_port; communication_port})
-        | _ -> Error "expected object"
+        | _ ->
+            Error "expected object"
     end
 
     include T
@@ -63,7 +66,16 @@ module Stable = struct
   module Registered_V1 = Registrar.Register (V1)
 end
 
-include Stable.Latest
+(* bin_io omitted *)
+type t = Stable.Latest.t =
+  { host: Core.Unix.Inet_addr.Stable.V1.t
+  ; discovery_port: int
+  ; communication_port: int }
+[@@deriving compare, sexp]
+
+[%%define_locally
+Stable.Latest.(of_yojson, to_yojson)]
+
 include Hashable.Make (Stable.Latest)
 include Comparable.Make_binable (Stable.Latest)
 

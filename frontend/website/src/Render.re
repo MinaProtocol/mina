@@ -32,28 +32,58 @@ module Rimraf = {
   [@bs.val] [@bs.module "rimraf"] external sync: string => unit = "";
 };
 
+Array.length(Sys.argv) > 2
+&& (Sys.argv[2] == "prod" || Sys.argv[2] == "staging")
+  ? {
+    Links.Cdn.prefix := "https://cdn.codaprotocol.com/v4";
+  }
+  : ();
+
+Style.Typeface.load();
+
 let writeStatic = (path, rootComponent) => {
   let rendered =
     extractCritical(ReactDOMServerRe.renderToStaticMarkup(rootComponent));
   Node.Fs.writeFileAsUtf8Sync(
     path ++ ".html",
-    "<!doctype html><meta charset=\"utf-8\" />\n" ++ rendered##html,
+    "<!doctype html>\n" ++ rendered##html,
   );
   Node.Fs.writeFileAsUtf8Sync(path ++ ".css", rendered##css);
 };
 
-let posts =
-  Node.Fs.readdirSync("posts")
-  |> Array.to_list
-  |> List.filter(s => Js.String.endsWith(Markdown.suffix, s))
-  |> List.map(fileName => {
-       let length = String.length(fileName) - String.length(Markdown.suffix);
-       let name = String.sub(fileName, 0, length);
-       let path = "posts/" ++ fileName;
-       let (html, content) = Markdown.load(path);
-       let metadata = BlogPost.parseMetadata(content, path);
-       (name, html, metadata);
-     });
+let asset_regex = [%re {|/\/static\/blog\/.*{png,jpg,svg}/|}];
+
+let posts = {
+  let unsorted =
+    Node.Fs.readdirSync("posts")
+    |> Array.to_list
+    |> List.filter(s => Js.String.endsWith(Markdown.suffix, s))
+    |> List.map(fileName => {
+         let length =
+           String.length(fileName) - String.length(Markdown.suffix);
+         let name = String.sub(fileName, 0, length);
+         let path = "posts/" ++ fileName;
+         let (html, content) = Markdown.load(path);
+         let metadata = BlogPost.parseMetadata(content, path);
+         (name, html, metadata);
+       });
+
+  List.sort(
+    ((_, _, metadata1), (_, _, metadata2)) => {
+      let date1 = Js.Date.fromString(metadata1.BlogPost.date);
+      let date2 = Js.Date.fromString(metadata2.date);
+      let diff = Js.Date.getTime(date2) -. Js.Date.getTime(date1);
+      if (diff > 0.) {
+        1;
+      } else if (diff < 0.) {
+        (-1);
+      } else {
+        0;
+      };
+    },
+    unsorted,
+  );
+};
 
 module Router = {
   type t =
@@ -76,27 +106,43 @@ module Router = {
   };
 };
 
-// TODO: Render job pages
 let jobOpenings = [|
   ("engineering-manager", "Engineering Manager (San Francisco)."),
   ("product-manager", "Product Manager (San Francisco)."),
   ("senior-frontend-engineer", "Senior Frontend Engineer (San Francisco)."),
-  (
-    "protocol-reliability-engineer",
-    "Protocol Reliability Engineer (San Francisco).",
-  ),
   ("protocol-engineer", "Senior Protocol Engineer (San Francisco)."),
+  (
+    "director-of-business-development",
+    "Director of Business Development (San Francisco).",
+  ),
 |];
 
 // GENERATE
 
 Rimraf.sync("site");
+
+let blogPage = name =>
+  <Page page=`Blog name extraHeaders={Blog.extraHeaders()}>
+    <Wrapped> <Blog posts /> </Wrapped>
+  </Page>;
+
 Router.(
   generateStatic(
     Dir(
       "site",
       [|
-        File("index", <Page name="index"> <Home /> </Page>),
+        File(
+          "index",
+          <Page page=`Home name="index" footerColor=Style.Colors.navyBlue>
+            <Home
+              posts={List.map(
+                ((name, html, metadata)) =>
+                  (name, html, (metadata.BlogPost.title, "blog-" ++ name)),
+                posts,
+              )}
+            />
+          </Page>,
+        ),
         Dir(
           "blog",
           posts
@@ -105,13 +151,15 @@ Router.(
                File(
                  name,
                  <Page
+                   page=`Blog
                    name
-                   extraHeaders=Blog.extraHeaders
-                   footerColor=Style.Colors.offWhite>
-                   <BlogPost name html metadata />
+                   extraHeaders={Blog.extraHeaders()}
+                   footerColor=Style.Colors.gandalf>
+                   <Wrapped> <BlogPost name html metadata /> </Wrapped>
                  </Page>,
                )
-             ),
+             )
+          |> Array.append([|File("index", blogPage("index"))|]),
         ),
         Dir(
           "jobs",
@@ -120,37 +168,44 @@ Router.(
                File(
                  name,
                  <Page
+                   page=`Jobs
                    name
-                   footerColor=Style.Colors.offWhite
-                   extraHeaders=Careers.extraHeaders>
-                   <CareerPost path={"jobs/" ++ name ++ ".markdown"} />
+                   footerColor=Style.Colors.gandalf
+                   extraHeaders={Careers.extraHeaders()}>
+                   <Wrapped>
+                     <CareerPost path={"jobs/" ++ name ++ ".markdown"} />
+                   </Wrapped>
                  </Page>,
                )
              ),
         ),
         File(
           "jobs",
-          <Page name="jobs" extraHeaders=Careers.extraHeaders>
-            <Careers jobOpenings />
+          <Page page=`Jobs name="jobs" extraHeaders={Careers.extraHeaders()}>
+            <Wrapped> <Careers jobOpenings /> </Wrapped>
           </Page>,
         ),
         File(
           "code",
-          <Page name="code" extraHeaders=Code.extraHeaders> <Code /> </Page>,
+          <Page page=`Code name="code"> <Wrapped> <Code /> </Wrapped> </Page>,
         ),
         File(
-          "blog",
-          <Page name="blog" extraHeaders=Blog.extraHeaders>
-            <Blog posts />
+          "testnet",
+          <Page
+            page=`Testnet name="testnet" extraHeaders={Testnet.extraHeaders()}>
+            <Wrapped> <Testnet /> </Wrapped>
+          </Page>,
+        ),
+        File("blog", blogPage("blog")),
+        File(
+          "privacy",
+          <Page page=`Privacy name="privacy">
+            <RawHtml path="html/Privacy.html" />
           </Page>,
         ),
         File(
-          "privacy",
-          <Page name="privacy"> <RawHtml path="html/Privacy.html" /> </Page>,
-        ),
-        File(
           "tos",
-          <Page name="tos"> <RawHtml path="html/TOS.html" /> </Page>,
+          <Page page=`Tos name="tos"> <RawHtml path="html/TOS.html" /> </Page>,
         ),
       |],
     ),

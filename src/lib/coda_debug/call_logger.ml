@@ -33,7 +33,8 @@ let rings = String.Table.create ()
 let record_call name =
   let ring =
     match Hashtbl.find rings name with
-    | Some ring -> ring
+    | Some ring ->
+        ring
     | None ->
         let ring = Call_ring.create name in
         Hashtbl.set rings ~key:name ~data:ring ;

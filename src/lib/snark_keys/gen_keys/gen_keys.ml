@@ -5,7 +5,6 @@ open Ppxlib
 open Asttypes
 open Parsetree
 open Longident
-open Signature_lib
 open Core
 
 module Blockchain_snark_keys = struct
@@ -142,13 +141,12 @@ let gen_keys () =
     Transaction_snark.Keys.cached ()
   in
   let module M =
-    (* TODO make toplevel library to encapsulate consensus params *)
-      Blockchain_snark.Blockchain_transition.Make
-        (Consensus)
-        (Transaction_snark.Verification.Make (struct
-          let keys = tx_keys
-        end))
-  in
+  (* TODO make toplevel library to encapsulate consensus params *)
+  Blockchain_snark.Blockchain_transition.Make (Transaction_snark.Verification
+                                               .Make
+                                                 (struct
+    let keys = tx_keys
+  end)) in
   let%map bc_keys_location, _bc_keys, bc_keys_checksum = M.Keys.cached () in
   ( Blockchain_snark_keys.Proving.load_expr ~loc bc_keys_location.proving
       bc_keys_checksum.proving

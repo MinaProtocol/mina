@@ -39,7 +39,7 @@ module type S = sig
 end
 
 module type Tick_keypair_intf = sig
-  val keys : Tick.Groth16.Keypair.t
+  val keys : Tick.Keypair.t
 end
 
 module type Tock_keypair_intf = sig
@@ -57,9 +57,9 @@ module Make (Digest : sig
 end)
 (System : S) =
 struct
-  let step_input () = Tick.Groth16.Data_spec.[Tick.Groth16.Field.typ]
+  let step_input () = Tick.Data_spec.[Tick.Field.typ]
 
-  let step_input_size = Tick.Groth16.Data_spec.size (step_input ())
+  let step_input_size = Tick.Data_spec.size (step_input ())
 
   module Step_base = struct
     open System
@@ -69,6 +69,7 @@ struct
         { wrap_vk: Tock.Verification_key.t
         ; prev_proof: Tock.Proof.t
         ; prev_state: State.value
+        ; expected_next_state: State.value option
         ; update: Update.value }
       [@@deriving fields]
     end
@@ -135,12 +136,15 @@ struct
           in
           (* true if not with_snark *)
           Verifier.verify wrap_vk precomp prev_top_hash proof
-      | "check" | "none" -> return Boolean.true_
-      | _ -> failwith "unknown proof_level"
+      | "check" | "none" ->
+          return Boolean.true_
+      | _ ->
+          failwith "unknown proof_level"
 
     let exists' typ ~f = exists typ ~compute:As_prover.(map get_state ~f)
 
-    let%snarkydef main (top_hash : Digest.Tick.Packed.var) =
+    let%snarkydef main (logger : Logger.t) (top_hash : Digest.Tick.Packed.var)
+        =
       let%bind prev_state = exists' State.typ ~f:Prover_state.prev_state
       and update = exists' Update.typ ~f:Prover_state.update in
       let%bind prev_state_hash = State.Checked.hash prev_state in
@@ -154,13 +158,50 @@ struct
             Verifier.vk_of_backend_vk wrap_vk )
       in
       let%bind wrap_vk_section = hash_vk wrap_vk in
-      let%bind () =
+      let%bind next_top_hash =
         with_label __LOC__
           (let%bind sh = State.Hash.var_to_triples next_state_hash in
            (* We could be reusing the intermediate state of the hash on sh here instead of
                hashing anew *)
-           compute_top_hash wrap_vk_section sh
-           >>= Field.Checked.Assert.equal top_hash)
+           compute_top_hash wrap_vk_section sh)
+      in
+      let%bind () =
+        as_prover
+          As_prover.(
+            Let_syntax.(
+              let%map prover_state = get_state in
+              Option.map (Prover_state.expected_next_state prover_state)
+                ~f:(fun expected_next_state ->
+                  let%bind in_snark_next_state = read State.typ _next_state in
+                  let%bind next_top_hash = read Field.typ next_top_hash in
+                  let%bind top_hash = read Field.typ top_hash in
+                  let updated = State.sexp_of_value in_snark_next_state in
+                  let original = State.sexp_of_value expected_next_state in
+                  ( if not (Field.equal next_top_hash top_hash) then
+                    let diff =
+                      Sexp_diff_kernel.Algo.diff ~original ~updated ()
+                    in
+                    Logger.fatal logger
+                      "Out-of-snark (left) and in-snark (right) disagree on \
+                       what the next top_hash should be."
+                      ~metadata:
+                        [ ( "state_sexp_diff"
+                          , `String
+                              (Sexp_diff_kernel.Display.display_as_plain_string
+                                 diff) ) ]
+                      ~location:__LOC__ ~module_:__MODULE__ ) ;
+                  return () )
+              |> ignore ;
+              if Option.is_none (Prover_state.expected_next_state prover_state)
+              then
+                Logger.error logger
+                  "expected_next_state is empty; this should only be true \
+                   during precomputed_values"
+                  ~location:__LOC__ ~module_:__MODULE__ ;
+              ()))
+      in
+      let%bind () =
+        with_label __LOC__ Field.Checked.Assert.(equal next_top_hash top_hash)
       in
       let%bind prev_state_valid =
         prev_state_valid wrap_vk_section wrap_vk prev_state_hash
@@ -179,7 +220,7 @@ struct
   end
 
   module type Step_vk_intf = sig
-    val verification_key : Tick.Groth16.Verification_key.t
+    val verification_key : Tick.Verification_key.t
   end
 
   module Wrap_base (Step_vk : Step_vk_intf) = struct
@@ -190,7 +231,7 @@ struct
     module Verifier = Tock.Groth_verifier
 
     module Prover_state = struct
-      type t = {proof: Tick.Groth16.Proof.t} [@@deriving fields]
+      type t = {proof: Tick.Proof.t} [@@deriving fields]
     end
 
     let step_vk = Verifier.vk_of_backend_vk Step_vk.verification_key

@@ -8,7 +8,7 @@
 open Core_kernel
 open Async_kernel
 
-type 'a t = T of 'a * 'a t list
+type 'a t = T of 'a * 'a t list [@@deriving yojson]
 
 val of_list_exn : 'a list -> 'a t
 
@@ -21,6 +21,8 @@ val iter : 'a t -> f:('a -> unit) -> unit
 val map : 'a t -> f:('a -> 'b) -> 'b t
 
 val fold_map : 'a t -> init:'b -> f:('b -> 'a -> 'b) -> 'b t
+
+val fold_map_over_subtrees : 'a t -> init:'b -> f:('b -> 'a t -> 'b) -> 'b t
 
 val flatten : 'a t -> 'a list
 
@@ -46,6 +48,12 @@ module Deferred : sig
       -> init:'b
       -> f:('b -> 'a -> 'b Deferred.Or_error.t)
       -> 'b t Deferred.Or_error.t
+
+    val fold_map_over_subtrees :
+         'a t
+      -> init:'b
+      -> f:('b -> 'a t -> 'b Deferred.Or_error.t)
+      -> 'b t Deferred.Or_error.t
   end
 end
 
@@ -56,4 +64,7 @@ module Or_error : sig
 
   val fold_map :
     'a t -> init:'b -> f:('b -> 'a -> 'b Or_error.t) -> 'b t Or_error.t
+
+  val fold_map_over_subtrees :
+    'a t -> init:'b -> f:('b -> 'a t -> 'b Or_error.t) -> 'b t Or_error.t
 end

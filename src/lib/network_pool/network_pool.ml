@@ -9,6 +9,7 @@ module type Pool_intf = sig
 
   val create :
        logger:Logger.t
+    -> trust_system:Trust_system.t
     -> frontier_broadcast_pipe:transition_frontier Option.t
                                Broadcast_pipe.Reader.t
     -> t
@@ -35,6 +36,7 @@ module type Network_pool_intf = sig
 
   val create :
        logger:Logger.t
+    -> trust_system:Trust_system.t
     -> incoming_diffs:pool_diff Envelope.Incoming.t Linear_pipe.Reader.t
     -> frontier_broadcast_pipe:transition_frontier Option.t
                                Broadcast_pipe.Reader.t
@@ -93,37 +95,60 @@ module Make
     |> ignore ;
     network_pool
 
-  let create ~logger ~incoming_diffs ~frontier_broadcast_pipe =
+  let create ~logger ~trust_system ~incoming_diffs ~frontier_broadcast_pipe =
     of_pool_and_diffs
-      (Pool.create ~logger ~frontier_broadcast_pipe)
+      (Pool.create ~logger ~trust_system ~frontier_broadcast_pipe)
       ~logger ~incoming_diffs
 end
 
 let%test_module "network pool test" =
   ( module struct
+    module Int = struct
+      include Int
+
+      let to_yojson x = `Int x
+
+      let of_yojson = function `Int x -> Ok x | _ -> Error "expected `Int"
+    end
+
     module Mock_proof = struct
-      type input = Int.t
+      module Stable = struct
+        module V1 = struct
+          module T = struct
+            type t = int
+            [@@deriving bin_io, sexp, yojson, version {unnumbered}]
+          end
 
-      type t = Int.t [@@deriving sexp, bin_io]
+          include T
+        end
+      end
 
-      let verify _ _ = return true
-
-      let gen = Int.gen
+      include Stable.V1.T
     end
 
     module Mock_work = struct
-      (* no bin_io except in Stable versions *)
       module T = struct
-        type t = Int.t [@@deriving sexp, hash, compare]
-
-        let gen = Int.gen
+        type t = Int.t [@@deriving sexp, hash, compare, yojson]
       end
 
       include T
       include Hashable.Make (T)
 
       module Stable = struct
-        module V1 = Int
+        module V1 = struct
+          module T = struct
+            type t = int
+            [@@deriving
+              bin_io, sexp, yojson, hash, compare, version {unnumbered}]
+          end
+
+          include T
+          module Table = Int.Table
+          module Hash_queue = Int.Hash_queue
+          module Hash_set = Int.Hash_set
+
+          let hashable = Int.hashable
+        end
       end
     end
 
@@ -143,13 +168,12 @@ let%test_module "network pool test" =
         reader
     end
 
-    module Mock_fee = Int
+    let trust_system = Trust_system.null ()
+
     module Mock_snark_pool =
-      Snark_pool.Make (Mock_proof) (Mock_fee) (Mock_work)
-        (Mock_transition_frontier)
+      Snark_pool.Make (Mock_proof) (Mock_work) (Mock_transition_frontier)
     module Mock_snark_pool_diff =
-      Snark_pool_diff.Make (Mock_proof) (Mock_fee) (Mock_work) (Int)
-        (Mock_snark_pool)
+      Snark_pool_diff.Make (Mock_proof) (Mock_work) (Int) (Mock_snark_pool)
     module Mock_network_pool =
       Make (Mock_transition_frontier) (Mock_snark_pool) (Mock_snark_pool_diff)
 
@@ -160,23 +184,30 @@ let%test_module "network pool test" =
         Broadcast_pipe.create (Some (Mock_transition_frontier.create ()))
       in
       let network_pool =
-        Mock_network_pool.create ~logger:(Logger.null ())
+        Mock_network_pool.create ~logger:(Logger.null ()) ~trust_system
           ~incoming_diffs:pool_reader
           ~frontier_broadcast_pipe:frontier_broadcast_pipe_r
       in
       let work = 1 in
       let priced_proof =
-        {Mock_snark_pool_diff.Priced_proof.proof= 0; fee= 0}
+        { Snark_pool.Priced_proof.proof= []
+        ; fee=
+            { fee= Currency.Fee.of_int 0
+            ; prover= Signature_lib.Public_key.Compressed.empty } }
       in
-      let command = Snark_pool_diff.Add_solved_work (work, priced_proof) in
+      let command =
+        Snark_pool_diff.Diff.Add_solved_work (work, priced_proof)
+      in
       (fun () ->
         don't_wait_for
         @@ Linear_pipe.iter (Mock_network_pool.broadcasts network_pool)
              ~f:(fun _ ->
                let pool = Mock_network_pool.pool network_pool in
                ( match Mock_snark_pool.request_proof pool 1 with
-               | Some {proof; fee= _} -> assert (proof = priced_proof.proof)
-               | None -> failwith "There should have been a proof here" ) ;
+               | Some {proof; fee= _} ->
+                   assert (proof = priced_proof.proof)
+               | None ->
+                   failwith "There should have been a proof here" ) ;
                Deferred.unit ) ;
         Mock_network_pool.apply_and_broadcast network_pool
           (Envelope.Incoming.local command) )
@@ -189,16 +220,21 @@ let%test_module "network pool test" =
         let work_diffs =
           List.map works ~f:(fun work ->
               Envelope.Incoming.local
-                (Snark_pool_diff.Add_solved_work
-                   (work, Mock_snark_pool_diff.Priced_proof.{proof= 0; fee= 0}))
-          )
+                (Snark_pool_diff.Diff.Add_solved_work
+                   ( work
+                   , Snark_pool.Priced_proof.
+                       { proof= []
+                       ; fee=
+                           { fee= Currency.Fee.of_int 0
+                           ; prover= Signature_lib.Public_key.Compressed.empty
+                           } } )) )
           |> Linear_pipe.of_list
         in
         let frontier_broadcast_pipe_r, _ =
           Broadcast_pipe.create (Some (Mock_transition_frontier.create ()))
         in
         let network_pool =
-          Mock_network_pool.create ~logger:(Logger.null ())
+          Mock_network_pool.create ~logger:(Logger.null ()) ~trust_system
             ~incoming_diffs:work_diffs
             ~frontier_broadcast_pipe:frontier_broadcast_pipe_r
         in
@@ -206,8 +242,9 @@ let%test_module "network pool test" =
         @@ Linear_pipe.iter (Mock_network_pool.broadcasts network_pool)
              ~f:(fun work_command ->
                let work =
-                 match work_command
-                 with Snark_pool_diff.Add_solved_work (work, _) -> work
+                 match work_command with
+                 | Snark_pool_diff.Diff.Add_solved_work (work, _) ->
+                     work
                in
                assert (List.mem works work ~equal:( = )) ;
                Deferred.unit ) ;

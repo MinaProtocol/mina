@@ -4,7 +4,7 @@ open Snark_params
 type uint64 = Unsigned.uint64
 
 module type S = sig
-  type t [@@deriving bin_io, sexp, hash, compare, eq, yojson]
+  type t [@@deriving bin_io, sexp, hash, compare, eq, yojson, version]
 
   val length_in_bits : int
 
@@ -46,29 +46,6 @@ module type F = functor
       val length : int
     end)
   -> S with type t = Unsigned.t
-
-module Make_bin_io (M : sig
-  type v
-
-  type t
-
-  val bin_t : t Bin_prot.Type_class.t
-
-  val there : v -> t
-
-  val back : t -> v
-end) =
-struct
-  let ( { Bin_prot.Type_class.reader= bin_reader_t
-        ; writer= bin_writer_t
-        ; shape= bin_shape_t } as bin_t ) =
-    Bin_prot.Type_class.cnv Fn.id M.there M.back M.bin_t
-
-  let {Bin_prot.Type_class.read= bin_read_t; vtag_read= __bin_read_t__} =
-    bin_reader_t
-
-  let {Bin_prot.Type_class.write= bin_write_t; size= bin_size_t} = bin_writer_t
-end
 
 module type Unsigned_intf = Unsigned.S
 
@@ -118,14 +95,22 @@ module Extend
     let of_binable = M.of_signed
   end)
 
+  (* Unsigned comes from an external library, so not actually versioned
+    we assert versioning here, and use tests to assure the serialization
+    doesn't change
+  *)
+  let __versioned__ = true
+
   include (Unsigned : Unsigned_intf with type t := t)
 
   (* serializes to and from json as strings since bit lengths > 32 cannot be represented in json *)
   let to_yojson n = `String (to_string n)
 
   let of_yojson = function
-    | `String s -> Ok (of_string s)
-    | _ -> Error "expected string"
+    | `String s ->
+        Ok (of_string s)
+    | _ ->
+        Error "expected string"
 
   let to_uint64 = M.to_uint64
 
@@ -171,3 +156,27 @@ module UInt32 =
       let of_uint64 =
         Fn.compose Unsigned.UInt32.of_int64 Unsigned.UInt64.to_int64
     end)
+
+(* since we don't have real versioning, check that serialization don't change *)
+let%test_module "Unsigned serializations" =
+  ( module struct
+    let run_test (type t) (module M : Bin_prot.Binable.S with type t = t)
+        known_good_serialization (value : t) =
+      let buff = Bin_prot.Common.create_buf 256 in
+      let len = M.bin_write_t buff ~pos:0 value in
+      let bytes = Bytes.create len in
+      Bin_prot.Common.blit_buf_bytes buff bytes ~len ;
+      Bytes.equal bytes known_good_serialization
+
+    let%test "uint32 serialization" =
+      let uint32 = UInt32.of_int 9775 in
+      let known_good_serialization = Bytes.of_string "\xFE\x2F\x26" in
+      run_test (module UInt32) known_good_serialization uint32
+
+    let%test "uint64 serialization" =
+      let uint64 = UInt64.of_int64 191797697848L in
+      let known_good_serialization =
+        Bytes.of_string "\xFC\x38\x9D\x08\xA8\x2C\x00\x00\x00"
+      in
+      run_test (module UInt64) known_good_serialization uint64
+  end )

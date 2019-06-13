@@ -2,23 +2,68 @@ open Core
 open Import
 open Snark_params.Tick
 
-include Sparse_ledger_lib.Sparse_ledger.Make
-          (Ledger_hash)
-          (Public_key.Compressed.Stable.V1)
-          (struct
-            include Account.Stable.Latest
+module V1_make =
+  Sparse_ledger_lib.Sparse_ledger.Make (struct
+      include Ledger_hash.Stable.V1
 
-            let hash = Fn.compose Ledger_hash.of_digest Account.digest
-          end)
+      let merge = Ledger_hash.merge
+    end)
+    (Public_key.Compressed.Stable.V1)
+    (struct
+      include Account.Stable.V1
+
+      let data_hash = Fn.compose Ledger_hash.of_digest Account.digest
+    end)
+
+module Stable = struct
+  module V1 = struct
+    module T = struct
+      type t = V1_make.Stable.V1.t
+      [@@deriving bin_io, sexp, version {unnumbered}]
+    end
+
+    include T
+  end
+
+  module Latest = V1
+end
+
+type t = Stable.Latest.t [@@deriving sexp]
+
+module Latest_make = V1_make
+
+[%%define_locally
+Latest_make.
+  ( of_hash
+  , get_exn
+  , path_exn
+  , set_exn
+  , find_index_exn
+  , add_path
+  , merkle_root
+  , iteri )]
 
 let of_root (h : Ledger_hash.t) =
   of_hash ~depth:Ledger.depth (Ledger_hash.of_digest (h :> Pedersen.Digest.t))
 
 let of_ledger_root ledger = of_root (Ledger.merkle_root ledger)
 
+let of_any_ledger (ledger : Ledger.Any_ledger.witness) =
+  Ledger.Any_ledger.M.foldi ledger
+    ~init:(of_root (Ledger.Any_ledger.M.merkle_root ledger))
+    ~f:(fun _addr sparse_ledger account ->
+      let loc =
+        Option.value_exn
+          (Ledger.Any_ledger.M.location_of_key ledger account.public_key)
+      in
+      add_path sparse_ledger
+        (Ledger.Any_ledger.M.merkle_path ledger loc)
+        account.public_key
+        (Option.value_exn (Ledger.Any_ledger.M.get ledger loc)) )
+
 let of_ledger_subset_exn (oledger : Ledger.t) keys =
   let ledger = Ledger.copy oledger in
-  let new_keys, sparse =
+  let _, sparse =
     List.fold keys
       ~f:(fun (new_keys, sl) key ->
         match Ledger.location_of_key ledger key with
@@ -107,7 +152,7 @@ let apply_user_command_exn t ({sender; payload; signature= _} : User_command.t)
               (Balance.add_amount receiver_account.balance amount) }
 
 let apply_fee_transfer_exn =
-  let apply_single t ((pk, fee) : Fee_transfer.single) =
+  let apply_single t ((pk, fee) : Fee_transfer.Single.t) =
     let index = find_index_exn t pk in
     let account = get_or_initialize_exn pk t index in
     let open Currency in
@@ -131,7 +176,8 @@ let apply_coinbase_exn t
   in
   let proposer_reward, t =
     match fee_transfer with
-    | None -> (coinbase_amount, t)
+    | None ->
+        (coinbase_amount, t)
     | Some (receiver, fee) ->
         let fee = Amount.of_fee fee in
         let reward =
@@ -142,11 +188,14 @@ let apply_coinbase_exn t
   in
   add_to_balance t proposer proposer_reward
 
-let apply_transaction_exn t transition =
+let apply_transaction_exn t (transition : Transaction.t) =
   match transition with
-  | Transaction.Fee_transfer tr -> apply_fee_transfer_exn t tr
-  | User_command cmd -> apply_user_command_exn t (cmd :> User_command.t)
-  | Coinbase c -> apply_coinbase_exn t c
+  | Fee_transfer tr ->
+      apply_fee_transfer_exn t tr
+  | User_command cmd ->
+      apply_user_command_exn t (cmd :> User_command.t)
+  | Coinbase c ->
+      apply_coinbase_exn t c
 
 let merkle_root t = Ledger_hash.of_hash (merkle_root t :> Pedersen.Digest.t)
 
@@ -170,4 +219,5 @@ let handler t =
       | Ledger_hash.Find_index pk ->
           let index = find_index_exn !ledger pk in
           respond (Provide index)
-      | _ -> unhandled )
+      | _ ->
+          unhandled )

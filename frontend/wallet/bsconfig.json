@@ -1,21 +1,37 @@
 {
-  "name": "electron-test",
-  "reason" : {"react-jsx" : 2},
-  "sources": {
+  "name": "coda-wallet",
+  "reason": {
+    "react-jsx": 3
+  },
+  "sources": [
+    {
       "dir": "src",
       "subdirs": true
-  },
+    },
+    {
+      "dir": "__tests__",
+      "type": "dev"
+    }
+  ],
   "bs-dependencies": [
     "bs-electron",
     "reason-react",
     "reason-apollo",
-    "bs-css"
+    "bs-css",
+    "tablecloth-bucklescript",
+    "@glennsl/bs-json"
+  ],
+  "bs-dev-dependencies": [
+    "@glennsl/bs-jest"
   ],
   "ppx-flags": [
     "graphql_ppx/ppx"
   ],
+  "bsc-flags": [
+    "-bs-g"
+  ],
   "warnings": {
-    "error": "+101"
+    "error": "+a+101-4-9-30-40-41-42-102"
   },
   "refmt": 3
 }

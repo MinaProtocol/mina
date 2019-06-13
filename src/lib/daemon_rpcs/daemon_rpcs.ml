@@ -44,8 +44,8 @@ module Types = struct
       let total = List.sum (module Int) values ~f:Fn.id in
       List.fold msgs
         ~init:
-          (Printf.sprintf "Total: %d (overflow:%d) (underflow:%d)\n\t" total
-             overflow underflow) ~f:(fun acc x -> acc ^ "\n\t" ^ x )
+          (Printf.sprintf "\n\tTotal: %d (overflow:%d) (underflow:%d)\n\t"
+             total overflow underflow) ~f:(fun acc x -> acc ^ "\n\t" ^ x)
       ^ "\n\t..."
 
     module Rpc_timings = struct
@@ -110,33 +110,38 @@ module Types = struct
               ("RPC Timings", Rpc_timings.to_text (f x)) :: acc )
             ~external_transition_latency:(fun acc x ->
               match f x with
-              | None -> acc
+              | None ->
+                  acc
               | Some report ->
                   ("Block Latencies (hist.)", summarize_report report) :: acc
               )
             ~accepted_transition_local_latency:(fun acc x ->
               match f x with
-              | None -> acc
+              | None ->
+                  acc
               | Some report ->
                   ( "Accepted local block Latencies (hist.)"
                   , summarize_report report )
                   :: acc )
             ~accepted_transition_remote_latency:(fun acc x ->
               match f x with
-              | None -> acc
+              | None ->
+                  acc
               | Some report ->
                   ( "Accepted remote block Latencies (hist.)"
                   , summarize_report report )
                   :: acc )
             ~snark_worker_transition_time:(fun acc x ->
               match f x with
-              | None -> acc
+              | None ->
+                  acc
               | Some report ->
                   ("Snark Worker a->b (hist.)", summarize_report report) :: acc
               )
             ~snark_worker_merge_time:(fun acc x ->
               match f x with
-              | None -> acc
+              | None ->
+                  acc
               | Some report ->
                   ("Snark Worker Merge (hist.)", summarize_report report)
                   :: acc )
@@ -195,13 +200,12 @@ module Types = struct
 
       let run_snark_worker = bool_entry "Snark Worker Running"
 
-      let is_bootstrapping = bool_entry "Is Bootstrapping"
+      let sync_status = map_entry "Sync Status" ~f:Sync_status.to_string
 
-      let propose_pubkey =
-        map_entry "Proposer Running"
-          ~f:
-            (Option.value_map ~default:"false"
-               ~f:(Printf.sprintf !"%{sexp: Public_key.t}"))
+      let propose_pubkeys =
+        map_entry "Proposers Running" ~f:(fun keys ->
+            Printf.sprintf "Total: %d " (List.length keys)
+            ^ List.to_string ~f:Public_key.Compressed.to_string keys )
 
       let histograms = option_entry "Histograms" ~f:Histograms.to_text
 
@@ -219,7 +223,8 @@ module Types = struct
               List.fold_left ls ~init:"" ~f:(fun acc (k, v) ->
                   acc ^ sprintf "\n    %s = %s" k (Yojson.Safe.to_string v) )
               ^ "\n"
-          | _ -> failwith "unexpected consensus configuration json format"
+          | _ ->
+              failwith "unexpected consensus configuration json format"
         in
         map_entry "Consensus Configuration" ~f:render
     end
@@ -236,8 +241,8 @@ module Types = struct
       ; peers: string list
       ; user_commands_sent: int
       ; run_snark_worker: bool
-      ; is_bootstrapping: bool
-      ; propose_pubkey: Public_key.t option
+      ; sync_status: Sync_status.Stable.V1.t
+      ; propose_pubkeys: Public_key.Compressed.Stable.V1.t list
       ; histograms: Histograms.t option
       ; consensus_time_best_tip: string option
       ; consensus_time_now: string
@@ -252,9 +257,9 @@ module Types = struct
         let get field = Field.get field s
       end) in
       let open M in
-      Fields.to_list ~is_bootstrapping ~num_accounts ~block_count ~uptime_secs
+      Fields.to_list ~sync_status ~num_accounts ~block_count ~uptime_secs
         ~ledger_merkle_root ~staged_ledger_hash ~state_hash ~commit_id
-        ~conf_dir ~peers ~user_commands_sent ~run_snark_worker ~propose_pubkey
+        ~conf_dir ~peers ~user_commands_sent ~run_snark_worker ~propose_pubkeys
         ~histograms ~consensus_time_best_tip ~consensus_time_now
         ~consensus_mechanism ~consensus_configuration
       |> List.filter_map ~f:Fn.id
@@ -270,7 +275,8 @@ end
 module Send_user_command = struct
   type query = User_command.Stable.Latest.t [@@deriving bin_io]
 
-  type response = Receipt.Chain_hash.t Or_error.t [@@deriving bin_io]
+  type response = Receipt.Chain_hash.Stable.Latest.t Or_error.t
+  [@@deriving bin_io]
 
   type error = unit [@@deriving bin_io]
 
@@ -294,7 +300,7 @@ end
 module Get_ledger = struct
   type query = Staged_ledger_hash.Stable.Latest.t [@@deriving bin_io]
 
-  type response = Account.Stable.V1.t list Or_error.t [@@deriving bin_io]
+  type response = Account.Stable.Latest.t list Or_error.t [@@deriving bin_io]
 
   type error = unit [@@deriving bin_io]
 
@@ -315,7 +321,9 @@ end
 
 module Verify_proof = struct
   type query =
-    Public_key.Compressed.Stable.Latest.t * User_command.t * Payment_proof.t
+    Public_key.Compressed.Stable.Latest.t
+    * User_command.Stable.V1.t
+    * Payment_proof.t
   [@@deriving bin_io]
 
   type response = unit Or_error.t [@@deriving bin_io]
@@ -327,7 +335,8 @@ module Verify_proof = struct
 end
 
 module Prove_receipt = struct
-  type query = Receipt.Chain_hash.t * Public_key.Compressed.Stable.Latest.t
+  type query =
+    Receipt.Chain_hash.Stable.Latest.t * Public_key.Compressed.Stable.Latest.t
   [@@deriving bin_io]
 
   type response = Payment_proof.t Or_error.t [@@deriving bin_io]

@@ -16,14 +16,13 @@ module Ledger_inner = struct
   module Kvdb : Intf.Key_value_database = Rocksdb.Database
 
   module Storage_locations : Intf.Storage_locations = struct
-    let stack_db_file = "coda_stack_db"
-
     let key_value_db_dir = "coda_key_value_db"
   end
 
   module Hash = struct
+    (* TODO : version *)
     module T = struct
-      type t = Ledger_hash.t
+      type t = Ledger_hash.Stable.V1.t
       [@@deriving bin_io, sexp, compare, hash, eq, yojson]
     end
 
@@ -44,11 +43,9 @@ module Ledger_inner = struct
 
     let public_key = Account.public_key
 
-    let balance = Account.balance
+    let balance Account.Poly.{balance; _} = balance
 
     let initialize = Account.initialize
-
-    let balance = Account.balance
   end
 
   module Inputs = struct
@@ -153,12 +150,12 @@ module Ledger_inner = struct
     let base_ledger, masked_ledger = create_ephemeral_with_base () in
     try
       let result = f masked_ledger in
-      let _ : Mask.t =
+      let (_ : Mask.t) =
         Maskable.unregister_mask_exn base_ledger masked_ledger
       in
       result
     with exn ->
-      let _ : Mask.t =
+      let (_ : Mask.t) =
         Maskable.unregister_mask_exn base_ledger masked_ledger
       in
       raise exn
@@ -203,19 +200,49 @@ module Ledger_inner = struct
   let get_or_create ledger key =
     let key, loc =
       match get_or_create_account_exn ledger key (Account.initialize key) with
-      | `Existed, loc -> ([], loc)
-      | `Added, loc -> ([key], loc)
+      | `Existed, loc ->
+          ([], loc)
+      | `Added, loc ->
+          ([key], loc)
     in
     (key, Option.value_exn (get ledger loc), loc)
 
   let create_empty ledger key =
     let start_hash = merkle_root ledger in
     match get_or_create_account_exn ledger key Account.empty with
-    | `Existed, _ -> failwith "create_empty for a key already present"
+    | `Existed, _ ->
+        failwith "create_empty for a key already present"
     | `Added, new_loc ->
         Debug_assert.debug_assert (fun () ->
             [%test_eq: Ledger_hash.t] start_hash (merkle_root ledger) ) ;
         (merkle_path ledger new_loc, Account.empty)
+
+  let _handler t =
+    let open Snark_params.Tick in
+    let path_exn idx =
+      List.map (merkle_path_at_index_exn t idx) ~f:(function
+        | `Left h ->
+            h
+        | `Right h ->
+            h )
+    in
+    stage (fun (With {request; respond}) ->
+        match request with
+        | Ledger_hash.Get_element idx ->
+            let elt = get_at_index_exn t idx in
+            let path = (path_exn idx :> Pedersen.Digest.t list) in
+            respond (Provide (elt, path))
+        | Ledger_hash.Get_path idx ->
+            let path = (path_exn idx :> Pedersen.Digest.t list) in
+            respond (Provide path)
+        | Ledger_hash.Set (idx, account) ->
+            set_at_index_exn t idx account ;
+            respond (Provide ())
+        | Ledger_hash.Find_index pk ->
+            let index = index_of_key_exn t pk in
+            respond (Provide index)
+        | _ ->
+            unhandled )
 end
 
 include Ledger_inner

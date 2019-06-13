@@ -10,11 +10,16 @@ if [[ ! "$CIRCLE_BUILD_NUM" ]]; then
     exit 0
 fi
 
+# No creds
+if [[ -z "$JSON_GCLOUD_CREDENTIALS" || "$JSON_GCLOUD_CREDENTIALS" == "" ]]; then
+    echo "Skipping artifact upload as creds are missing"
+    exit 0
+fi
+
 do_copy () {
     # GC credentials
     echo $JSON_GCLOUD_CREDENTIALS > google_creds.json
     /usr/bin/gcloud auth activate-service-account --key-file=google_creds.json
-    /usr/bin/gcloud config set project $(cat google_creds.json | jq -r .project_id)
 
     SOURCES="/tmp/artifacts/*"
     DESTINATION="gs://network-debug/${CIRCLE_BUILD_NUM}/build/"

@@ -5,12 +5,10 @@ open Module_version
 module Stable = struct
   module V1 = struct
     module T = struct
-      let version = 1
-
       type t =
         { fee: Currency.Fee.Stable.V1.t
         ; prover: Public_key.Compressed.Stable.V1.t }
-      [@@deriving bin_io, sexp]
+      [@@deriving bin_io, sexp, yojson, version]
     end
 
     include T
@@ -32,7 +30,7 @@ end
 (* bin_io omitted intentionally *)
 type t = Stable.Latest.t =
   {fee: Currency.Fee.Stable.V1.t; prover: Public_key.Compressed.Stable.V1.t}
-[@@deriving sexp]
+[@@deriving sexp, yojson]
 
 let create ~fee ~prover = Stable.Latest.{fee; prover}
 
@@ -40,9 +38,10 @@ module Digest = struct
   module Stable = struct
     module V1 = struct
       module T = struct
-        let version = 1
+        include Random_oracle.Digest.Stable.V1
 
-        include Random_oracle.Digest
+        let fold, typ, length_in_triples =
+          Random_oracle.Digest.(fold, typ, length_in_triples)
       end
 
       include T
@@ -62,12 +61,12 @@ module Digest = struct
   end
 
   (* bin_io omitted intentionally *)
-  type t = Stable.Latest.t [@@deriving sexp, eq]
+  type t = Stable.Latest.t [@@deriving sexp, eq, yojson]
 
-  module Checked = Stable.Latest.Checked
+  module Checked = Random_oracle.Digest.Checked
 
-  let fold, typ, length_in_triples =
-    Stable.Latest.(fold, typ, length_in_triples)
+  [%%define_locally
+  Stable.Latest.(fold, typ, length_in_triples)]
 
   let default =
     let open Random_oracle.Digest in

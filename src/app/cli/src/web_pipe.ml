@@ -1,42 +1,22 @@
 open Core
 open Async
 open Coda_base
+open Coda_transition
 open Signature_lib
 open Pipe_lib
 
 let request_service_name = "CODA_WEB_CLIENT_SERVICE"
 
-module type Coda_intf = sig
+module type Intf = sig
   type t
-
-  module Inputs : sig
-    module Ledger : sig
-      type t
-
-      val fold_until :
-           t
-        -> init:'accum
-        -> f:('accum -> Account.t -> ('accum, 'stop) Base.Continue_or_stop.t)
-        -> finish:('accum -> 'stop)
-        -> 'stop
-    end
-
-    module External_transition : sig
-      type t
-
-      module Verified : sig
-        type t
-      end
-    end
-  end
 
   val get_lite_chain :
     (t -> Signature_lib.Public_key.Compressed.t list -> Lite_base.Lite_chain.t)
     option
 
-  val strongest_ledgers :
+  val validated_transitions :
        t
-    -> (Inputs.External_transition.Verified.t, State_hash.t) With_hash.t
+    -> (External_transition.Validated.t, State_hash.t) With_hash.t
        Strict_pipe.Reader.t
 end
 
@@ -47,9 +27,7 @@ module Storage (Bin : Binable.S) = struct
     Writer.save location ~contents:(to_base64 (module Bin) data)
 end
 
-module Make_broadcaster
-    (Program : Coda_intf)
-    (Put_request : Web_request.Intf.S) =
+module Make_broadcaster (Program : Intf) (Put_request : Web_request.Intf.S) =
 struct
   let get_proposer_chain coda =
     let open Base in
@@ -68,7 +46,7 @@ struct
 
   let run ~filename ~logger coda =
     let%bind web_client_pipe = Web_pipe.create ~filename ~logger in
-    Strict_pipe.Reader.iter (Program.strongest_ledgers coda) ~f:(fun _ ->
+    Strict_pipe.Reader.iter (Program.validated_transitions coda) ~f:(fun _ ->
         let chain = get_proposer_chain coda in
         Web_pipe.store web_client_pipe chain )
 end
@@ -76,8 +54,10 @@ end
 let get_service () =
   Unix.getenv request_service_name
   |> Option.value_map ~default:`None ~f:(function
-       | "S3" -> `S3
-       | path -> `Local path )
+       | "S3" ->
+           `S3
+       | path ->
+           `Local path )
 
 let verification_key_basename = "client_verification_key"
 
@@ -85,10 +65,12 @@ let verification_key_location () =
   let autogen = Cache_dir.autogen_path ^/ verification_key_basename in
   let manual = Cache_dir.manual_install_path ^/ verification_key_basename in
   match%bind Sys.file_exists manual with
-  | `Yes -> return (Ok manual)
+  | `Yes ->
+      return (Ok manual)
   | `No | `Unknown -> (
       match%map Sys.file_exists autogen with
-      | `Yes -> Ok autogen
+      | `Yes ->
+          Ok autogen
       | `No | `Unknown ->
           Or_error.errorf
             !"IO ERROR: Verification key does not exist\n\
@@ -126,15 +108,15 @@ let copy ~src ~dst =
 
 let project_directory = "CODA_PROJECT_DIR"
 
-let run_service (type t) (module Program : Coda_intf with type t = t) coda
-    ~conf_dir ~logger =
+let run_service (type t) (module Program : Intf with type t = t) coda ~conf_dir
+    ~logger =
   O1trace.trace_task "web pipe" (fun () -> function
     | `None ->
         Logger.info logger ~module_:__MODULE__ ~location:__LOC__
           "Not running a web client pipe" ;
         don't_wait_for
           (Strict_pipe.Reader.iter_without_pushback
-             (Program.strongest_ledgers coda)
+             (Program.validated_transitions coda)
              ~f:ignore)
     | `Local path ->
         let open Keypair in
@@ -146,7 +128,8 @@ let run_service (type t) (module Program : Coda_intf with type t = t) coda
         |> don't_wait_for ;
         let get_lite_chain = Option.value_exn Program.get_lite_chain in
         let keypair = Genesis_ledger.largest_account_keypair_exn () in
-        Strict_pipe.Reader.iter (Program.strongest_ledgers coda) ~f:(fun _ ->
+        Strict_pipe.Reader.iter (Program.validated_transitions coda)
+          ~f:(fun _ ->
             Writer.save (path ^/ "chain")
               ~contents:
                 (Base64.encode_string

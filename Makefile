@@ -72,6 +72,13 @@ build: git_hooks reformat-diff
 
 dev: codabuilder containerstart build
 
+macos-portable:
+	@rm -rf _build/coda-daemon-macos/
+	@rm -rf _build/coda-daemon-macos.zip
+	@./scripts/macos-portable.sh src/_build/default/app/cli/src/coda.exe src/app/kademlia-haskell/result/bin/kademlia _build/coda-daemon-macos
+	@zip -r _build/coda-daemon-macos.zip _build/coda-daemon-macos/
+	@echo Find coda-daemon-macos.zip inside _build/
+
 ########################################
 ## Lint
 
@@ -79,7 +86,7 @@ reformat: git_hooks
 	cd src; $(WRAPSRC) dune exec --profile=$(DUNE_PROFILE) app/reformat/reformat.exe -- -path .
 
 reformat-diff:
-	ocamlformat --inplace $(shell git diff --name-only HEAD | grep '.mli\?$$' | while IFS= read -r f; do stat "$$f" >/dev/null 2>&1 && echo "$$f"; done) || true
+	ocamlformat --doc-comments=before --inplace $(shell git status -s | cut -c 4- | grep '\.mli\?$$' | while IFS= read -r f; do stat "$$f" >/dev/null 2>&1 && echo "$$f"; done) || true
 
 check-format:
 	cd src; $(WRAPSRC) dune exec --profile=$(DUNE_PROFILE) app/reformat/reformat.exe -- -path . -check
@@ -117,7 +124,7 @@ macos-setup:
 # push steps require auth on docker hub
 docker-toolchain:
 	@if git diff-index --quiet HEAD ; then \
-		docker build --file dockerfiles/Dockerfile-toolchain --tag codaprotocol/coda:toolchain-$(GITLONGHASH) . && \
+		docker build --no-cache --file dockerfiles/Dockerfile-toolchain --tag codaprotocol/coda:toolchain-$(GITLONGHASH) . && \
 		docker tag  codaprotocol/coda:toolchain-$(GITLONGHASH) codaprotocol/coda:toolchain-latest && \
 		docker push codaprotocol/coda:toolchain-$(GITLONGHASH) && \
 		docker push codaprotocol/coda:toolchain-latest ;\
@@ -165,34 +172,10 @@ deb:
 	@mkdir -p /tmp/artifacts
 	@cp src/_build/coda.deb /tmp/artifacts/.
 
-# deb-s3 https://github.com/krobertson/deb-s3
-DEBS3 = deb-s3 upload --s3-region=us-west-2 --bucket packages.o1test.net --preserve-versions --cache-control=max-age=120
-
-publish_kademlia_deb:
-	@if [ $(AWS_ACCESS_KEY_ID) ] ; then \
-		if [ "$(CIRCLE_BRANCH)" = "master" ] ; then \
-			$(DEBS3) --codename stable   --component main src/_build/coda-kademlia.deb ; \
-		else \
-			$(DEBS3) --codename unstable --component main src/_build/coda-kademlia.deb ; \
-		fi ; \
-	else \
-		echo "WARNING: AWS_ACCESS_KEY_ID not set, deb-s3 not run" ; \
-	fi
-
 publish_deb:
-	@if [ $(AWS_ACCESS_KEY_ID) ] ; then \
-		if [ "$(CIRCLE_BRANCH)" = "master" ] && [ "$(CIRCLE_JOB)" = "build-artifacts--testnet_postake" ] ; then \
-            echo "Publishing to stable" ; \
-			$(DEBS3) --codename stable   --component main src/_build/coda-*.deb ; \
-		else \
-            echo "Publishing to unstable" ; \
-			$(DEBS3) --codename unstable --component main src/_build/coda-*.deb ; \
-		fi ; \
-	else  \
-		echo "WARNING: AWS_ACCESS_KEY_ID not set, deb-s3 commands not run" ; \
-	fi
+	@./scripts/publish-deb.sh
 
-publish_debs: publish_deb publish_kademlia_deb
+publish_debs: publish_deb
 
 provingkeys:
 	$(WRAP) tar -cvjf src/_build/coda_cache_dir_$(GITHASH)_$(CODA_CONSENSUS).tar.bz2  /tmp/coda_cache_dir ; \
@@ -214,7 +197,7 @@ codaslim:
 ## Tests
 
 render-circleci:
-	./scripts/test.py render .circleci/config.yml.jinja
+	./scripts/test.py render .circleci/config.yml.jinja .mergify.yml.jinja
 
 test-ppx:
 	$(MAKE) -C src/lib/ppx_coda/tests

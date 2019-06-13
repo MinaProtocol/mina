@@ -53,9 +53,7 @@ let merge ~height (h1 : t) (h2 : t) =
 (* TODO: @ihm cryptography review *)
 let empty_hash =
   let open Tick.Pedersen in
-  digest_fold
-    (State.create params ~get_chunk_table)
-    (Fold.string_triples "nothing up my sleeve")
+  digest_fold (State.create ()) (Fold.string_triples "nothing up my sleeve")
   |> of_hash
 
 let of_digest = Fn.compose Fn.id of_hash
@@ -70,10 +68,14 @@ type _ Request.t +=
 
 let reraise_merkle_requests (With {request; respond}) =
   match request with
-  | Merkle_tree.Get_path addr -> respond (Delegate (Get_path addr))
-  | Merkle_tree.Set (addr, account) -> respond (Delegate (Set (addr, account)))
-  | Merkle_tree.Get_element addr -> respond (Delegate (Get_element addr))
-  | _ -> unhandled
+  | Merkle_tree.Get_path addr ->
+      respond (Delegate (Get_path addr))
+  | Merkle_tree.Set (addr, account) ->
+      respond (Delegate (Set (addr, account)))
+  | Merkle_tree.Get_element addr ->
+      respond (Delegate (Get_element addr))
+  | _ ->
+      unhandled
 
 let get t addr =
   handle
@@ -111,7 +113,7 @@ let%snarkydef modify_account t pk ~(filter : Account.var -> ('a, _) Checked.t)
    - returns a root [t'] of a tree of depth [depth]
    which is [t] but with the account [f account] at path [addr].
 *)
-let modify_account_send t pk ~is_fee_transfer ~f =
+let%snarkydef modify_account_send t pk ~is_writeable ~f =
   modify_account t pk
     ~filter:(fun account ->
       let%bind account_already_there =
@@ -121,9 +123,13 @@ let modify_account_send t pk ~is_fee_transfer ~f =
         Public_key.Compressed.Checked.equal account.public_key
           Public_key.Compressed.(var_of_t empty)
       in
-      let%bind fee_transfer = Boolean.(account_not_there && is_fee_transfer) in
-      let%bind () = Boolean.Assert.any [account_already_there; fee_transfer] in
-      return fee_transfer )
+      let%bind not_there_but_writeable =
+        Boolean.(account_not_there && is_writeable)
+      in
+      let%bind () =
+        Boolean.Assert.any [account_already_there; not_there_but_writeable]
+      in
+      return not_there_but_writeable )
     ~f:(fun is_empty_and_writeable x -> f ~is_empty_and_writeable x)
 
 (*
@@ -133,7 +139,7 @@ let modify_account_send t pk ~is_fee_transfer ~f =
    - returns a root [t'] of a tree of depth [depth]
    which is [t] but with the account [f account] at path [addr].
 *)
-let modify_account_recv t pk ~f =
+let%snarkydef modify_account_recv t pk ~f =
   modify_account t pk
     ~filter:(fun account ->
       let%bind account_already_there =

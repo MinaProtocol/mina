@@ -1,7 +1,15 @@
 open Core
 
 module type Key = sig
-  type t [@@deriving sexp, bin_io]
+  type t [@@deriving sexp]
+
+  module Stable :
+    sig
+      module V1 : sig
+        type t [@@deriving sexp, bin_io]
+      end
+    end
+    with type V1.t = t
 
   val empty : t
 
@@ -63,9 +71,14 @@ module type Key_value_database = sig
 
   val get_uuid : t -> Uuid.t
 
-  val set_batch : t -> key_data_pairs:(Bigstring.t * Bigstring.t) list -> unit
+  val set_batch :
+       t
+    -> ?remove_keys:Bigstring.t list
+    -> key_data_pairs:(Bigstring.t * Bigstring.t) list
+    -> unit
 
   val to_alist : t -> (Bigstring.t * Bigstring.t) list
+
   (* an association list, sorted by key *)
 end
 
