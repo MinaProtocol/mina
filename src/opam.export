@@ -50,6 +50,7 @@ installed: [
   "base-bytes.base"
   "base-threads.base"
   "base-unix.base"
+  "base58.0.1.0"
   "base64.3.2.0"
   "base_bigstring.v0.12.0"
   "base_quickcheck.v0.12.0"
