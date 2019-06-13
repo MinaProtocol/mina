@@ -17,6 +17,7 @@ THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND 
 
  -}
 
+import           Control.Exception         (finally)
 import           Control.Monad             (when, foldM)
 import           Control.Monad.Random      (Rand, RandomGen, evalRand, getRandom)
 import           Data.Binary               (Binary (..), decodeOrFail, encode, getWord8,
@@ -103,10 +104,10 @@ hasPeers inst = do
 formatAddress :: (Show a, Show b) => a -> b -> B.ByteString -> String
 formatAddress ip port key = show ip ++ ":" ++ show port ++ ", " ++ show (B64.encode key)
 
-{- Usage: ./$0 test '("127.0.0.1", 3000)' '("127.0.0.1", 3001)' -}
+{- Usage: ./$0 test 0.0.0.0 '("127.0.0.1", 3000)' '("127.0.0.1", 3001)' -}
 main :: IO ()
 main = do
-    (state : rest) <- getArgs
+    (state : bindIp : rest) <- getArgs
     {- TODO: When we implement (state == "prod"):
      -  1. Don't just cycle through all the peers in order
      -  2. Make sure that nonces are securely randomly generated
@@ -127,7 +128,7 @@ main = do
       let logTrace = putStrLn . ("TRAC: " ++)
 
       logInfo $ "Creating instance"
-      kInstance <- K.createL ("127.0.0.1", myPort) (externalIp, myPort) myKey config logTrace logError
+      kInstance <- K.createL (bindIp, myPort) (externalIp, myPort) myKey config logTrace logError
 
       {- If this is an initial peer, then don't try to connect to others -}
       _ <- if length peers == 0 then return () else do
@@ -164,7 +165,8 @@ main = do
       hFlush stdout
 
       {- Forever, once a second, check to see if anything changed, and dump it -}
-      foreverM (\oldPeers -> do
+      finally
+        (foreverM (\oldPeers -> do
         _ <- threadDelay 1000000
         currDump <- K.dumpPeers kInstance
         let currPeers = peersFromDump currDump
@@ -174,7 +176,5 @@ main = do
         when (length newDeads /= 0) $ do
           mapM_ logData $ (dumpFormat Dead) <$> newDeads
         hFlush stdout
-        return currPeers) initialPeers
-
-      {- Finally, close -}
-      K.close kInstance
+        return currPeers) initialPeers)
+        (K.close kInstance)

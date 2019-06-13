@@ -222,10 +222,14 @@ module Schnorr
         let acc = Curve.double acc in
         let acc =
           match (Curve.Scalar.test_bit sp i, Curve.Scalar.test_bit sq i) with
-          | true, false -> Curve.add p acc
-          | false, true -> Curve.add q acc
-          | true, true -> Curve.add pq acc
-          | false, false -> acc
+          | true, false ->
+              Curve.add p acc
+          | false, true ->
+              Curve.add q acc
+          | true, true ->
+              Curve.add pq acc
+          | false, false ->
+              acc
         in
         go (i - 1) acc
     in

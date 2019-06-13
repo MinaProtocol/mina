@@ -38,7 +38,7 @@ module Variable_base = struct
     end
 
     let verify' k ({h; s} : t) ({base; element} : Instance.t) =
-      let open Impl.Let_syntax in
+      let open Impl.Checked in
       let%bind c = Hash.(create h >>| to_scalar) in
       let open Group in
       let%bind rhs = s * base and lhs = c * element >>= ( + ) h in

@@ -1,0 +1,10 @@
+(library
+ (name dyn_array)
+ (public_name dyn_array)
+ (library_flags -linkall)
+ (inline_tests)
+ (libraries core extlib)
+ (preprocess
+  (pps ppx_jane bisect_ppx -- -conditional))
+ (synopsis
+   "dyn_array has the same capabilities as Core's DynArray and it is also serializable"))

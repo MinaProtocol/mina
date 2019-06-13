@@ -22,5 +22,6 @@ module Make
                !"Unable to derive resulting receipt %{sexp: \
                  Receipt_chain_hash.t}"
                resulting_receipt)
-    | [] -> Or_error.error_string "A merkle list should be non-empty"
+    | [] ->
+        Or_error.error_string "A merkle list should be non-empty"
 end

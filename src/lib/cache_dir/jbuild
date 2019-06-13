@@ -1,8 +1,0 @@
-(library (
-  (name        cache_dir)
-  (public_name cache_dir)
-  (libraries (core))
-  (preprocess no_preprocessing)))
-
-(jbuild_version 1)
-

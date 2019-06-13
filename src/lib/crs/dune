@@ -1,0 +1,6 @@
+(library
+ (name crs)
+ (public_name crs)
+ (library_flags -linkall)
+ (libraries coda_digestif)
+ (synopsis "Common random string generation library"))

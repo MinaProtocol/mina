@@ -4,8 +4,10 @@ module Make (Inputs : Inputs.Inputs_intf) = struct
   module Work_spec = Snark_work_lib.Work.Single.Spec
 
   let statement_pair = function
-    | j, None -> (Work_spec.statement j, None)
-    | j1, Some j2 -> (Work_spec.statement j1, Some (Work_spec.statement j2))
+    | j, None ->
+        (Work_spec.statement j, None)
+    | j1, Some j2 ->
+        (Work_spec.statement j1, Some (Work_spec.statement j2))
 
   module Job_status = struct
     type t = Assigned of Time.t
@@ -13,9 +15,10 @@ module Make (Inputs : Inputs.Inputs_intf) = struct
     let max_age = Time.Span.of_min 2.
 
     let is_old t ~now =
-      match t with Assigned at_time ->
-        let delta = Time.diff now at_time in
-        Time.Span.( > ) delta max_age
+      match t with
+      | Assigned at_time ->
+          let delta = Time.diff now at_time in
+          Time.Span.( > ) delta max_age
   end
 
   module State = struct
@@ -57,9 +60,12 @@ module Make (Inputs : Inputs.Inputs_intf) = struct
 
   module For_tests = struct
     let to_pair = function
-      | [x] -> (x, None)
-      | [x1; x2] -> (x1, Some x2)
-      | _ -> failwith "Should contain one or two elements"
+      | [x] ->
+          (x, None)
+      | [x1; x2] ->
+          (x1, Some x2)
+      | _ ->
+          failwith "Should contain one or two elements"
 
     type statement = Inputs.Ledger_proof_statement.t
 

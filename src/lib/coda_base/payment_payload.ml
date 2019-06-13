@@ -1,50 +1,84 @@
 open Core
 open Fold_lib
-open Coda_numbers
 open Snark_params.Tick
-open Let_syntax
 open Import
-open Sha256_lib
+open Module_version
 module Amount = Currency.Amount
 module Fee = Currency.Fee
 
-module Stable = struct
-  module V1 = struct
-    type ('pk, 'amount) t_ = {receiver: 'pk; amount: 'amount}
-    [@@deriving bin_io, eq, sexp, hash, compare, yojson]
+module Poly = struct
+  module Stable = struct
+    module V1 = struct
+      module T = struct
+        type ('pk, 'amount) t = {receiver: 'pk; amount: 'amount}
+        [@@deriving bin_io, eq, sexp, hash, yojson, compare, version]
+      end
 
-    type t = (Public_key.Compressed.Stable.V1.t, Amount.Stable.V1.t) t_
-    [@@deriving bin_io, eq, sexp, hash, compare, yojson]
+      include T
+    end
+
+    module Latest = V1
   end
+
+  type ('pk, 'amount) t = ('pk, 'amount) Stable.Latest.t =
+    {receiver: 'pk; amount: 'amount}
+  [@@deriving eq, sexp, hash, yojson, compare]
 end
 
-include Stable.V1
+module Stable = struct
+  module V1 = struct
+    module T = struct
+      type t =
+        ( Public_key.Compressed.Stable.V1.t
+        , Amount.Stable.V1.t )
+        Poly.Stable.V1.t
+      [@@deriving bin_io, compare, eq, sexp, hash, compare, yojson, version]
+    end
 
-let dummy = {receiver= Public_key.Compressed.empty; amount= Amount.zero}
+    include T
+    include Registration.Make_latest_version (T)
+  end
 
-type var = (Public_key.Compressed.var, Amount.var) t_
+  module Latest = V1
+
+  module Module_decl = struct
+    let name = "payment_payload"
+
+    type latest = Latest.t
+  end
+
+  module Registrar = Registration.Make (Module_decl)
+  module Registered_V1 = Registrar.Register (V1)
+end
+
+(* bin_io, version omitted *)
+type t = Stable.Latest.t [@@deriving eq, sexp, hash, yojson]
+
+let dummy = Poly.{receiver= Public_key.Compressed.empty; amount= Amount.zero}
+
+type var = (Public_key.Compressed.var, Amount.var) Poly.t
 
 let typ : (var, t) Typ.t =
   let spec =
     let open Data_spec in
     [Public_key.Compressed.typ; Amount.typ]
   in
-  let of_hlist : 'a 'b. (unit, 'a -> 'b -> unit) H_list.t -> ('a, 'b) t_ =
+  let of_hlist : 'a 'b. (unit, 'a -> 'b -> unit) H_list.t -> ('a, 'b) Poly.t =
     let open H_list in
     fun [receiver; amount] -> {receiver; amount}
   in
-  let to_hlist {receiver; amount} = H_list.[receiver; amount] in
+  let to_hlist Poly.{receiver; amount} = H_list.[receiver; amount] in
   Typ.of_hlistable spec ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist
     ~value_to_hlist:to_hlist ~value_of_hlist:of_hlist
 
-let fold {receiver; amount} =
+let fold Poly.{receiver; amount} =
   let open Fold in
   Public_key.Compressed.fold receiver +> Amount.fold amount
 
 (* TODO: This could be a bit more efficient by packing across triples,
    but I think the added confusion-possibility
    is not worth it. *)
-let%snarkydef var_to_triples {receiver; amount} =
+let%snarkydef var_to_triples Poly.{receiver; amount} =
   let%map receiver = Public_key.Compressed.var_to_triples receiver in
   let amount = Amount.var_to_triples amount in
   receiver @ amount
@@ -58,15 +92,17 @@ let gen ~max_amount =
   let open Quickcheck.Generator.Let_syntax in
   let%map receiver = Public_key.Compressed.gen
   and amount = Amount.gen_incl Amount.zero max_amount in
-  {receiver; amount}
+  Poly.{receiver; amount}
 
 let%test_unit "to_bits" =
   let open Test_util in
   with_randomness 123456789 (fun () ->
       let input =
-        { receiver=
-            {Public_key.Compressed.x= Field.random (); is_odd= Random.bool ()}
-        ; amount= Amount.of_int (Random.int Int.max_value) }
+        Poly.
+          { receiver=
+              { Public_key.Compressed.Poly.x= Field.random ()
+              ; is_odd= Random.bool () }
+          ; amount= Amount.of_int (Random.int Int.max_value) }
       in
       Test_util.test_to_triples typ fold var_to_triples input )
 

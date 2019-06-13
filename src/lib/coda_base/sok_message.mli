@@ -5,18 +5,32 @@ open Fold_lib
 open Tuple_lib
 open Import
 
-type t = {fee: Currency.Fee.t; prover: Public_key.Compressed.t}
-[@@deriving bin_io, sexp]
+module Stable : sig
+  module V1 : sig
+    type t =
+      {fee: Currency.Fee.Stable.V1.t; prover: Public_key.Compressed.Stable.V1.t}
+    [@@deriving bin_io, sexp, yojson, version]
+  end
+
+  module Latest = V1
+end
+
+type t = Stable.Latest.t =
+  {fee: Currency.Fee.Stable.V1.t; prover: Public_key.Compressed.Stable.V1.t}
+[@@deriving sexp, yojson]
 
 val create : fee:Currency.Fee.t -> prover:Public_key.Compressed.t -> t
 
 module Digest : sig
-  type t [@@deriving sexp, eq]
+  type t [@@deriving sexp, eq, yojson]
 
   module Stable : sig
     module V1 : sig
-      type nonrec t = t [@@deriving sexp, bin_io, hash, compare, eq]
+      type nonrec t = t
+      [@@deriving sexp, bin_io, hash, compare, eq, yojson, version]
     end
+
+    module Latest = V1
   end
 
   module Checked : sig

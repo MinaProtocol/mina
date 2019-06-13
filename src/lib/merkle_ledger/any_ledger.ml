@@ -45,19 +45,20 @@ module type S = sig
   module M : Base_intf with type t = witness
 end
 
-module Make_base
-    (Key : Intf.Key)
-    (Account : Intf.Account with type key := Key.t)
-    (Hash : Intf.Hash with type account := Account.t)
-    (Location : Location_intf.S) (Depth : sig
-        val depth : int
-    end) :
+module type Inputs_intf = sig
+  include Base_inputs_intf.S
+
+  module Location : Location_intf.S
+end
+
+module Make_base (Inputs : Inputs_intf) :
   S
-  with module Location = Location
-  with type key := Key.t
-   and type hash := Hash.t
-   and type key_set := Key.Set.t
-   and type account := Account.t = struct
+  with module Location = Inputs.Location
+  with type key := Inputs.Key.t
+   and type hash := Inputs.Hash.t
+   and type key_set := Inputs.Key.Set.t
+   and type account := Inputs.Account.t = struct
+  open Inputs
   module Location = Location
 
   module type Base_intf =
@@ -155,6 +156,8 @@ module Make_base
 
     let set_all_accounts_rooted_at_exn (T ((module Base), t)) =
       Base.set_all_accounts_rooted_at_exn t
+
+    let set_batch_accounts (T ((module Base), t)) = Base.set_batch_accounts t
 
     let set_inner_hash_at_addr_exn (T ((module Base), t)) =
       Base.set_inner_hash_at_addr_exn t

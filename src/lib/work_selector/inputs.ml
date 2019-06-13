@@ -17,6 +17,10 @@ module type Inputs_intf = sig
     type t
   end
 
+  module Transaction_witness : sig
+    type t
+  end
+
   module Ledger_proof : sig
     type t
   end
@@ -45,12 +49,12 @@ module type Inputs_intf = sig
          t
       -> ( ( Ledger_proof_statement.t
            , Transaction.t
-           , Sparse_ledger.t
+           , Transaction_witness.t
            , Ledger_proof.t )
            Snark_work_lib.Work.Single.Spec.t
          * ( Ledger_proof_statement.t
            , Transaction.t
-           , Sparse_ledger.t
+           , Transaction_witness.t
            , Ledger_proof.t )
            Snark_work_lib.Work.Single.Spec.t
            option )
@@ -59,6 +63,7 @@ module type Inputs_intf = sig
 end
 
 module Test_input = struct
+  module Transaction_witness = Int
   module Ledger_hash = Int
   module Ledger_proof_statement = Int
   module Sparse_ledger = Int
@@ -99,9 +104,12 @@ module Test_input = struct
       let pairs = chunks_of ls ~n:2 in
       List.map pairs ~f:(fun js ->
           match js with
-          | [j] -> (work j, None)
-          | [j1; j2] -> (work j1, Some (work j2))
-          | _ -> failwith "error pairing jobs" )
+          | [j] ->
+              (work j, None)
+          | [j1; j2] ->
+              (work j1, Some (work j2))
+          | _ ->
+              failwith "error pairing jobs" )
 
     let all_work_pairs_exn (t : t) = paired t
   end

@@ -1,6 +1,6 @@
 opam-version: "1.2"
 version: "0.1"
 build: [
-  ["jbuilder" "build" "--only" "src" "--root" "." "-j" jobs "@install"]
+  ["dune" "build" "-p" name "-j" jobs]
 ]
 

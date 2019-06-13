@@ -1,0 +1,5 @@
+(library
+ (name immutable_array)
+ (public_name immutable_array)
+ (library_flags -linkall)
+ (synopsis "Access only array utility"))

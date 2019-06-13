@@ -5,12 +5,14 @@ type 'a value = {path: string; value: 'a; checksum: Md5.t}
 
 let try_load bin path =
   let logger = Logger.create () in
-  let controller = Storage.Disk.Controller.create ~parent_log:logger bin in
+  let controller = Storage.Disk.Controller.create ~logger bin in
   match%map Storage.Disk.load_with_checksum controller path with
   | Ok {Storage.Checked_data.data; checksum} ->
-      Logger.info logger "Loaded value successfully from %s" path ;
+      Logger.info logger ~module_:__MODULE__ ~location:__LOC__
+        "Loaded value successfully from %s" path ;
       Ok {path; value= data; checksum}
-  | Error `Checksum_no_match -> Or_error.error_string "Checksum failure"
+  | Error `Checksum_no_match ->
+      Or_error.error_string "Checksum failure"
   | Error ((`IO_error _ | `No_exist) as err) -> (
     match err with
     | `IO_error e ->
@@ -34,7 +36,7 @@ module Component = struct
   let store (Load {label; f; bin}) ~base_path ~env =
     let path = base_path ^ "_" ^ label in
     let logger = Logger.create () in
-    let controller = Storage.Disk.Controller.create ~parent_log:logger bin in
+    let controller = Storage.Disk.Controller.create ~logger bin in
     let value = f env in
     let%map checksum =
       Storage.Disk.store_with_checksum controller path value
@@ -53,14 +55,18 @@ module With_components = struct
     let rec map : type a b e. (a, e) t -> f:(a -> b) -> (b, e) t =
      fun t ~f ->
       match t with
-      | Pure x -> Pure (f x)
-      | Ap (c, t1) -> Ap (c, map t1 ~f:(fun g x -> f (g x)))
+      | Pure x ->
+          Pure (f x)
+      | Ap (c, t1) ->
+          Ap (c, map t1 ~f:(fun g x -> f (g x)))
 
     let rec apply : type a b e. (a -> b, e) t -> (a, e) t -> (b, e) t =
      fun t1 t2 ->
       match (t1, t2) with
-      | Pure f, y -> map ~f y
-      | Ap (x, y), z -> Ap (x, apply (map y ~f:Fn.flip) z)
+      | Pure f, y ->
+          map ~f y
+      | Ap (x, y), z ->
+          Ap (x, apply (map y ~f:Fn.flip) z)
 
     let map = `Define_using_apply
   end
@@ -73,7 +79,8 @@ module With_components = struct
     let open Deferred.Or_error.Let_syntax in
     fun t ~base_path ->
       match t with
-      | Pure x -> return x
+      | Pure x ->
+          return x
       | Ap ((Load _ as c), tf) ->
           let%map x = Component.load c ~base_path and f = load tf ~base_path in
           f x
@@ -83,7 +90,8 @@ module With_components = struct
     let open Deferred.Let_syntax in
     fun t ~base_path ~env ->
       match t with
-      | Pure x -> return x
+      | Pure x ->
+          return x
       | Ap ((Load _ as c), tf) ->
           let%bind x = Component.store c ~base_path ~env in
           let%map f = store tf ~base_path ~env in
