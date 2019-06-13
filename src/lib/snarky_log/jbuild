@@ -1,6 +1,0 @@
-(jbuild_version 1)
-
-(library
-  ((name snarky_log)
-   (public_name snarky_log)
-   (libraries (yojson snarky webkit_trace_event))))

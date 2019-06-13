@@ -12,10 +12,9 @@ module Make (Impl : Snarky.Snark_intf.S) = struct
     let open Impl in
     let (), checked_result =
       run_and_check
-        (let open Let_syntax in
-        let%bind input = exists typ1 ~compute:(As_prover.return input) in
-        let%map result = checked input in
-        As_prover.read typ2 result)
+        (let%bind input = exists typ1 ~compute:(As_prover.return input) in
+         let%map result = checked input in
+         As_prover.read typ2 result)
         ()
       |> Or_error.ok_exn
     in
@@ -25,13 +24,13 @@ module Make (Impl : Snarky.Snark_intf.S) = struct
     let open Impl in
     let (), checked =
       run_and_check
-        (let open Let_syntax in
-        let%bind input = exists typ ~compute:(As_prover.return input) in
-        let%map result = var_to_triples input in
-        As_prover.all
-          (List.map result
-             ~f:
-               (As_prover.read (Typ.tuple3 Boolean.typ Boolean.typ Boolean.typ))))
+        (let%bind input = exists typ ~compute:(As_prover.return input) in
+         let%map result = var_to_triples input in
+         As_prover.all
+           (List.map result
+              ~f:
+                (As_prover.read
+                   (Typ.tuple3 Boolean.typ Boolean.typ Boolean.typ))))
         ()
       |> Or_error.ok_exn
     in

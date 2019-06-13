@@ -1,0 +1,9 @@
+(library
+ (name rocksdb)
+ (public_name rocksdb)
+ (library_flags -linkall)
+ (inline_tests)
+ (libraries core rocks key_value_database file_system)
+ (preprocess
+  (pps ppx_jane))
+ (synopsis "RocksDB Database module"))

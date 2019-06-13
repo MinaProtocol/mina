@@ -24,13 +24,10 @@ let coinbase = Currency.Amount.of_int coinbase_int
 let block_window_duration =
   Coda_base.Block_time.Span.of_ms (Int64.of_int block_window_duration_ms)
 
-[%%if
-consensus_mechanism = "proof_of_stake"]
-
 [%%inject
 "c", c]
 
 [%%inject
 "delta", delta]
 
-[%%endif]
+let inactivity_secs = block_window_duration_ms * delta

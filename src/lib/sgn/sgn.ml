@@ -2,7 +2,9 @@ open Core_kernel
 open Snark_params.Tick
 include Sgn_type.Sgn
 
-let gen = Quickcheck.Generator.map Bool.gen ~f:(fun b -> if b then Pos else Neg)
+let gen =
+  Quickcheck.Generator.map Bool.quickcheck_generator ~f:(fun b ->
+      if b then Pos else Neg )
 
 let negate = function Pos -> Neg | Neg -> Pos
 
@@ -36,20 +38,20 @@ module Checked = struct
   let is_pos (v : var) =
     Boolean.Unsafe.of_cvar
       (let open Field.Checked in
-      Infix.(one_half * (v + Field.Var.constant Field.one)))
+      one_half * (v + Field.Var.constant Field.one))
 
   let is_neg (v : var) =
     Boolean.Unsafe.of_cvar
       (let open Field.Checked in
-      Infix.(neg_one_half * (v - Field.Var.constant Field.one)))
+      neg_one_half * (v - Field.Var.constant Field.one))
 
   let pos_if_true (b : Boolean.var) =
     let open Field.Checked in
-    Infix.((two * (b :> Field.Var.t)) - Field.Var.constant Field.one)
+    (two * (b :> Field.Var.t)) - Field.Var.constant Field.one
 
   let neg_if_true (b : Boolean.var) =
     let open Field.Checked in
-    Infix.((neg_two * (b :> Field.Var.t)) + Field.Var.constant Field.one)
+    (neg_two * (b :> Field.Var.t)) + Field.Var.constant Field.one
 
   let negate t = Field.Var.scale t neg_one
 

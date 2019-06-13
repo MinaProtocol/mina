@@ -135,8 +135,10 @@ let color_of_hash (h : Pedersen.Digest.t) : string =
 
 let map_adjacent_pairs xs ~f =
   let rec go acc = function
-    | [_] | [] -> List.rev acc
-    | x1 :: (x2 :: _ as xs) -> go (f x1 x2 :: acc) xs
+    | [_] | [] ->
+        List.rev acc
+    | x1 :: (x2 :: _ as xs) ->
+        go (f x1 x2 :: acc) xs
   in
   go [] xs
 
@@ -154,8 +156,10 @@ let drop_top_of_tree ~desired_layers =
   let rec layers = function
     | Sparse_ledger_lib.Sparse_ledger.Node (_, l, r) ->
         1 + max (layers l) (layers r)
-    | Account _ -> 1
-    | Hash _ -> 1
+    | Account _ ->
+        1
+    | Hash _ ->
+        1
   in
   let rec drop n t =
     if n = 0 then t
@@ -163,7 +167,8 @@ let drop_top_of_tree ~desired_layers =
       match t with
       | Sparse_ledger_lib.Sparse_ledger.Account _ | Hash _ ->
           failwith "Cannot drop from Account or Hash"
-      | Node (_, Hash _, t') | Node (_, t', Hash _) -> drop (n - 1) t'
+      | Node (_, Hash _, t') | Node (_, t', Hash _) ->
+          drop (n - 1) t'
       | Node (_, Account _, Node _) | Node (_, Node _, Account _) ->
           failwith "Accounts should only be at leaves"
       | Node (_, Account _, Account _) ->
@@ -253,8 +258,10 @@ module Html = struct
         (List.join
            (List.map text ~f:(fun text ->
                 match text with
-                | `Text text -> [Node.text text]
-                | `New_line -> [Node.create "br" [] []; Node.create "br" [] []]
+                | `Text text ->
+                    [Node.text text]
+                | `New_line ->
+                    [Node.create "br" [] []; Node.create "br" [] []]
                 | `Link (text, link) ->
                     [ Node.a
                         [ Attr.href link
@@ -289,8 +296,10 @@ module Html = struct
                   ( of_class "flex items-center animate-opacity"
                   + if active then Style.empty else of_class "o-30" )) ]
             ( match arity with
-            | `Left -> [body; chevron_dom]
-            | `Right -> [chevron_dom; body] ) ]
+            | `Left ->
+                [body; chevron_dom]
+            | `Right ->
+                [chevron_dom; body] ) ]
   end
 
   module Record = struct
@@ -313,7 +322,8 @@ module Html = struct
                 + extra_style
                 +
                 match (important, verification) with
-                | true, `Complete (Ok _) -> of_class "grass-gradient b-grass"
+                | true, `Complete (Ok _) ->
+                    of_class "grass-gradient b-grass"
                 | true, `Pending _ | false, _ ->
                     of_class "silver-gradient br3 b-silver"
                 | true, `Complete (Error _) ->
@@ -362,18 +372,24 @@ module Html = struct
     let render ?tooltip ?(grouping = `Separate) {style; rows; heading} width =
       let width =
         match width with
-        | `Wide -> Style.of_class "mw5"
-        | `Thin -> Style.of_class "mw5"
+        | `Wide ->
+            Style.of_class "mw5"
+        | `Thin ->
+            Style.of_class "mw5"
       in
       let grouping =
         match grouping with
-        | `Thin_together -> Style.of_class "b-silver ph2 pv2 br3"
-        | `Together -> grouping_style
-        | `Separate -> Style.empty
+        | `Thin_together ->
+            Style.of_class "b-silver ph2 pv2 br3"
+        | `Together ->
+            grouping_style
+        | `Separate ->
+            Style.empty
       in
       let maybe_tooltip_overlay =
         match tooltip with
-        | None -> []
+        | None ->
+            []
         | Some (`Left tooltip) | Some (`Right tooltip) ->
             [Tooltip.render_overlay tooltip]
       in
@@ -381,7 +397,8 @@ module Html = struct
         div
           [Style.(render (style + width + grouping))]
           ( ( match heading with
-            | None -> []
+            | None ->
+                []
             | Some heading ->
                 [ Node.div
                     [Style.just "record-title-padding fw5 silver roboto tc"]
@@ -390,12 +407,15 @@ module Html = struct
           @ maybe_tooltip_overlay )
       in
       match tooltip with
-      | None -> record
+      | None ->
+          record
       | Some tooltip ->
           let content =
             match tooltip with
-            | `Left tooltip -> [Tooltip.render_wide tooltip; record]
-            | `Right tooltip -> [record; Tooltip.render_wide tooltip]
+            | `Left tooltip ->
+                [Tooltip.render_wide tooltip; record]
+            | `Right tooltip ->
+                [record; Tooltip.render_wide tooltip]
           in
           div
             [ Style.just
@@ -430,9 +450,12 @@ let hoverable ?(extra_style = Style.empty) state node target =
     ( if js_is_mobile_small () then
       let target' =
         match (state.State.tooltip_stage, target) with
-        | Tooltip_stage.None, _ -> target
-        | x, y when Tooltip_stage.equal x y -> Tooltip_stage.None
-        | _ -> target
+        | Tooltip_stage.None, _ ->
+            target
+        | x, y when Tooltip_stage.equal x y ->
+            Tooltip_stage.None
+        | _ ->
+            target
       in
       !g_update_state_and_vdom {state with State.tooltip_stage= target'} ) ;
     Event.Stop_propagation
@@ -506,8 +529,10 @@ let merkle_tree num_layers_to_show =
         let hash_spec = Spec.Node {pos; color= color_at_layer layer} in
         let finish x = List.rev (x :: acc) in
         match t with
-        | Account account -> finish (Spec.Account {account; pos})
-        | Hash _h -> finish hash_spec
+        | Account account ->
+            finish (Spec.Account {account; pos})
+        | Hash _h ->
+            finish hash_spec
         | Node (_h, Hash _, r) ->
             go (hash_spec :: acc) (layer + 1) ((2 * index) + 1) r
         | Node (_h, l, Hash _) ->
@@ -543,7 +568,8 @@ let merkle_tree num_layers_to_show =
     let rendered =
       let account =
         match List.last_exn specs with
-        | Spec.Node _ -> None
+        | Spec.Node _ ->
+            None
         | Spec.Account
             { pos= _
             ; account= {public_key; balance; nonce; receipt_chain_hash; _} } ->
@@ -611,8 +637,10 @@ let merkle_tree num_layers_to_show =
       let colors =
         List.filter_map specs ~f:(fun spec ->
             match spec with
-            | Spec.Node {pos= _; color} -> Some color
-            | Spec.Account _ -> None )
+            | Spec.Node {pos= _; color} ->
+                Some color
+            | Spec.Account _ ->
+                None )
       in
       let colors =
         if List.length colors <> List.length sibling_edge_positions then
@@ -636,7 +664,8 @@ let merkle_tree num_layers_to_show =
             match spec with
             | Spec.Node {pos; color} ->
                 Some (Svg.circle ~radius ~color ~center:pos)
-            | Spec.Account _ -> None )
+            | Spec.Account _ ->
+                None )
       in
       let tooltip =
         Html.Tooltip.create
@@ -731,16 +760,22 @@ let state_html state =
     Style.of_class
     @@
     match verification with
-    | `Complete (Ok _) -> "grass-gradient b-grass"
-    | `Complete (Error _) -> "proof"
-    | `Pending _ -> "proof verifying shake shake-constant"
+    | `Complete (Ok _) ->
+        "grass-gradient b-grass"
+    | `Complete (Error _) ->
+        "proof"
+    | `Pending _ ->
+        "proof verifying shake shake-constant"
   in
   let proof_style = Style.(proof_style + of_class "wb") in
   let state_hash =
     match verification with
-    | `Complete (Ok {state_hash}) -> field_to_base64 state_hash
-    | `Complete (Error _e) -> "Could not verify SNARK"
-    | `Pending _ -> "Verification pending..."
+    | `Complete (Ok {state_hash}) ->
+        field_to_base64 state_hash
+    | `Complete (Error _e) ->
+        "Could not verify SNARK"
+    | `Pending _ ->
+        "Verification pending..."
   in
   let state_record =
     let open Html.Record in
@@ -852,7 +887,7 @@ let state_html state =
   else div [Style.(render (of_class "animate-opacity o-100"))] contents
 
 (* HACK: To get a web worker running for the verifier from s3 and avoid remote origin issues,
-  we have to download the code via a get request, encapsulate it in a Blob object to get 
+  we have to download the code via a get request, encapsulate it in a Blob object to get
   an url link and then feed the url link into verifier*)
 let run_verifier ~f =
   let verifier_url = sprintf !"%s/verifier_main.bc.js" Web_response.s3_link in
@@ -884,7 +919,8 @@ let main ~render ~get_data =
               update_state_and_vdom
                 { !state with
                   verification= `Complete (Verifier.Response.result resp) }
-          | _ -> () ) ;
+          | _ ->
+              () ) ;
       let latest_completed = ref (-1) in
       let count = ref 0 in
       let loop () =

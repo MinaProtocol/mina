@@ -2,7 +2,9 @@ open Core_kernel
 open Receipt_chain_database_lib
 
 module T = struct
-  type t = (Receipt.Chain_hash.t, User_command.t) Payment_proof.t
+  (* TODO : version *)
+  type t =
+    (Receipt.Chain_hash.Stable.V1.t, User_command.Stable.V1.t) Payment_proof.t
   [@@deriving eq, sexp, bin_io, yojson]
 end
 
@@ -18,7 +20,8 @@ let gen ~keys ~max_amount ~max_fee =
   let%bind initial_receipt = Receipt.Chain_hash.gen in
   let%map payments =
     Quickcheck.Generator.list_with_length list_size
-      (User_command.gen ~keys ~max_amount ~max_fee)
+      (User_command.Gen.payment_with_random_participants ~keys ~max_amount
+         ~max_fee ())
   in
   {Payment_proof.initial_receipt; payments}
 

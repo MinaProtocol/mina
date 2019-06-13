@@ -1,32 +1,54 @@
+[%%import
+"../../../config.mlh"]
+
 open Core
 open Async
-open Coda_worker
-open Coda_main
 
 let init () = Parallel.init_master ()
 
 let net_configs n =
   let external_ports = List.init n ~f:(fun i -> 23000 + (i * 2)) in
   let discovery_ports = List.init n ~f:(fun i -> 23000 + 1 + (i * 2)) in
+  let ips =
+    List.init n ~f:(fun i ->
+        Unix.Inet_addr.of_string @@ sprintf "127.0.0.%i" (i + 10) )
+  in
+  let addrs_and_ports_list =
+    List.map3_exn external_ports discovery_ports ips
+      ~f:(fun communication_port discovery_port ip ->
+        Kademlia.Node_addrs_and_ports.
+          {external_ip= ip; bind_ip= ip; discovery_port; communication_port} )
+  in
   let all_peers =
-    List.map discovery_ports ~f:(fun p -> Host_and_port.create "127.0.0.1" p)
+    List.map addrs_and_ports_list
+      ~f:Kademlia.Node_addrs_and_ports.to_discovery_host_and_port
   in
   let peers =
     List.init n ~f:(fun i -> List.take all_peers i @ List.drop all_peers (i + 1)
     )
   in
-  (discovery_ports, external_ports, peers)
+  (addrs_and_ports_list, peers)
 
-let local_configs ?proposal_interval ?(should_propose = Fn.const true) n
-    ~program_dir ~snark_worker_public_keys ~work_selection =
-  let discovery_ports, external_ports, peers = net_configs n in
+[%%inject
+"genesis_state_timestamp_string", genesis_state_timestamp]
+
+let offset =
+  lazy
+    (let genesis_state_timestamp =
+       let default_timezone = Core.Time.Zone.of_utc_offset ~hours:(-8) in
+       Core.Time.of_string_gen ~if_no_timezone:(`Use_this_one default_timezone)
+         genesis_state_timestamp_string
+     in
+     Core_kernel.Time.diff (Core_kernel.Time.now ()) genesis_state_timestamp)
+
+let local_configs ?proposal_interval ?(proposers = Fn.const None) n
+    ~acceptable_delay ~program_dir ~snark_worker_public_keys ~work_selection
+    ~trace_dir ~max_concurrent_connections =
+  let addrs_and_ports_list, peers = net_configs n in
   let peers = [] :: List.drop peers 1 in
-  let args =
-    List.map3_exn discovery_ports external_ports peers ~f:(fun x y z ->
-        (x, y, z) )
-  in
+  let args = List.zip_exn addrs_and_ports_list peers in
   let configs =
-    List.mapi args ~f:(fun i (discovery_port, external_port, peers) ->
+    List.mapi args ~f:(fun i (addrs_and_ports, peers) ->
         let public_key =
           Option.map snark_worker_public_keys ~f:(fun keys ->
               List.nth_exn keys i )
@@ -38,9 +60,10 @@ let local_configs ?proposal_interval ?(should_propose = Fn.const true) n
                     { Coda_worker.Snark_worker_config.public_key
                     ; port= 20000 + i } ) )
         in
-        Coda_process.local_config ?proposal_interval ~peers ~discovery_port
-          ~external_port ~snark_worker_config ~program_dir
-          ~should_propose:(should_propose i) ~work_selection () )
+        Coda_process.local_config ?proposal_interval ~addrs_and_ports ~peers
+          ~snark_worker_config ~program_dir ~acceptable_delay
+          ~proposer:(proposers i) ~work_selection ~trace_dir
+          ~offset:(Lazy.force offset) ~max_concurrent_connections () )
   in
   configs
 
@@ -68,7 +91,8 @@ let stabalize_and_start_or_timeout ?(timeout_ms = 2000.) nodes =
 
 let spawn_local_processes_exn ?(first_delay = 0.0) configs =
   match configs with
-  | [] -> failwith "Configs should be non-empty"
+  | [] ->
+      failwith "Configs should be non-empty"
   | first :: rest ->
       let%bind first_created = Coda_process.spawn_exn first in
       let%bind () = after (Time.Span.of_sec first_delay) in

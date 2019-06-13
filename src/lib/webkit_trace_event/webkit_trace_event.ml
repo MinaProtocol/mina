@@ -13,8 +13,9 @@ type event_kind =
   | Cycle_end
   | Pid_is
   | Event
-  | Start
-  | End
+  | Measure_start
+  | Measure_end
+  | Trace_end
 
 type event =
   { name: string
@@ -43,14 +44,24 @@ module Output = struct
     let emitk ~buf (k : event_kind) pos =
       let num =
         match k with
-        | New_thread -> 0
-        | Thread_switch -> 1
-        | Cycle_start -> 2
-        | Cycle_end -> 3
-        | Pid_is -> 4
-        | Event -> 5
-        | Start -> 6
-        | End -> 7
+        | New_thread ->
+            0
+        | Thread_switch ->
+            1
+        | Cycle_start ->
+            2
+        | Cycle_end ->
+            3
+        | Pid_is ->
+            4
+        | Event ->
+            5
+        | Measure_start ->
+            6
+        | Measure_end ->
+            7
+        | Trace_end ->
+            8
       in
       Bigstring.set_uint8 buf ~pos num ;
       pos + 1
@@ -77,18 +88,25 @@ module Output = struct
       | Thread_switch ->
           emitk ~buf Thread_switch 0 |> emiti ~buf event.timestamp
           |> emiti ~buf event.tid |> finish ~buf wr
-      | Cycle_start -> ()
+      | Cycle_start ->
+          ()
       | Cycle_end ->
           emitk ~buf Cycle_end 0 |> emiti ~buf event.timestamp
           |> finish ~buf wr
-      | Pid_is -> emitk ~buf Pid_is 0 |> emiti ~buf event.pid |> finish ~buf wr
+      | Pid_is ->
+          emitk ~buf Pid_is 0 |> emiti ~buf event.pid |> finish ~buf wr
       | Event ->
           emitk ~buf Event 0 |> emiti ~buf event.timestamp
           |> emits ~buf event.name |> finish ~buf wr
-      | Start ->
-          emitk ~buf Start 0 |> emiti ~buf event.timestamp
+      | Measure_start ->
+          emitk ~buf Measure_start 0 |> emiti ~buf event.timestamp
           |> emits ~buf event.name |> finish ~buf wr
-      | End -> emitk ~buf End 0 |> emiti ~buf event.timestamp |> finish ~buf wr
+      | Measure_end ->
+          emitk ~buf Measure_end 0 |> emiti ~buf event.timestamp
+          |> finish ~buf wr
+      | Trace_end ->
+          emitk ~buf Trace_end 0 |> emiti ~buf event.timestamp
+          |> finish ~buf wr
   end
 
   module JSON = struct
@@ -98,13 +116,22 @@ module Output = struct
         This library deliberately avoid including Yojson here to avoid bloating
         the dependency tree of its downstream users.*)
     let phase_of_kind = function
-      | New_thread | Pid_is -> `String "M" (* Meta-events *)
-      | Cycle_start -> `String "b" (* Async event start *)
-      | Cycle_end -> `String "e" (* Async event end *)
-      | Thread_switch -> `String "X"
-      | Event -> `String "i"
-      | Start -> `String "B"
-      | End -> `String "E"
+      | New_thread | Pid_is ->
+          `String "M" (* Meta-events *)
+      | Cycle_start ->
+          `String "b" (* Async event start *)
+      | Cycle_end ->
+          `String "e" (* Async event end *)
+      | Thread_switch ->
+          `String "X"
+      | Event ->
+          `String "i"
+      | Measure_start ->
+          `String "B"
+      | Measure_end ->
+          `String "E"
+      | Trace_end ->
+          `String "e"
 
     let json_of_event {name; categories; phase; timestamp; pid; tid} =
       let categories = String.concat ~sep:"," categories in
@@ -126,7 +153,7 @@ module Output = struct
             ; ("ts", `Int timestamp)
             ; ("pid", `Int pid)
             ; ("tid", `Int tid) ]
-      | Cycle_start | Cycle_end ->
+      | Cycle_start | Cycle_end | Trace_end ->
           `Assoc
             [ ("name", `String name)
             ; ("cat", `String categories)
@@ -135,7 +162,7 @@ module Output = struct
             ; ("ts", `Int timestamp)
             ; ("pid", `Int pid)
             ; ("tid", `Int tid) ]
-      | Event | Start | End ->
+      | Event | Measure_start | Measure_end ->
           `Assoc
             [ ("name", `String name)
             ; ("cat", `String categories)

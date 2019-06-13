@@ -8,10 +8,12 @@ include Codable.S with type t := t
 module Stable : sig
   module V1 : sig
     type t = Snark_params.Tock.Field.t * Snark_params.Tock.Field.t
-    [@@deriving sexp, eq, bin_io, compare, hash]
+    [@@deriving sexp, eq, bin_io, compare, hash, version]
 
     include Codable.S with type t := t
   end
+
+  module Latest = V1
 end
 
 open Snark_params.Tick

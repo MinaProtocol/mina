@@ -2,8 +2,10 @@ open Core_kernel
 open Fold_lib
 open Tuple_lib
 
+let ( = ) = `Don't_use_polymorphic_equality
+
 module type Intf = sig
-  type t [@@deriving eq, bin_io, sexp]
+  type t [@@deriving eq, bin_io, sexp, compare]
 
   val gen : t Quickcheck.Generator.t
 
@@ -29,11 +31,13 @@ end
 module type Fp_intf = sig
   include Intf
 
+  include Stringable.S with type t := t
+
   type nat
 
-  val of_int : int -> t
+  include Stringable.S with type t := t
 
-  val of_string : string -> t
+  val of_int : int -> t
 
   val of_bits : bool list -> t option
 
@@ -46,6 +50,10 @@ module type Fp_intf = sig
   val fold : t -> bool Triple.t Fold.t
 
   val length_in_bits : int
+
+  val is_square : t -> bool
+
+  val sqrt : t -> t
 end
 
 module type Extension_intf = sig
@@ -59,7 +67,7 @@ module type Extension_intf = sig
 
   val project_to_base : t -> base
 
-  val to_base_elements : t -> base list
+  val to_list : t -> base list
 end
 
 module Make_fp
@@ -68,7 +76,8 @@ module Make_fp
     end) : Fp_intf with type nat := N.t = struct
   include Info
 
-  type t = N.t [@@deriving eq, bin_io, sexp]
+  (* TODO version *)
+  type t = N.t [@@deriving eq, bin_io, sexp, compare]
 
   let to_bigint = Fn.id
 
@@ -81,16 +90,20 @@ module Make_fp
   let gen =
     let length_in_int32s = (length_in_bits + 31) / 32 in
     Quickcheck.Generator.(
-      map (list_with_length length_in_int32s Int32.gen) ~f:(fun xs ->
+      map
+        (list_with_length length_in_int32s
+           (Int32.gen_incl Int32.zero Int32.max_value))
+        ~f:(fun xs ->
           List.foldi xs ~init:zero ~f:(fun i acc x ->
               N.log_or acc
-                (N.shift_left (N.of_int (Int32.to_int_exn x)) (32 * i)) ) ))
+                (N.shift_left (N.of_int (Int32.to_int_exn x)) (32 * i)) )
+          |> fun x -> N.(x % order) ))
 
   let fold_bits n : bool Fold_lib.Fold.t =
     { fold=
         (fun ~init ~f ->
           let rec go acc i =
-            if i = length_in_bits then acc
+            if Int.(i = length_in_bits) then acc
             else go (f acc (N.test_bit n i)) (i + 1)
           in
           go init 0 ) }
@@ -99,7 +112,8 @@ module Make_fp
 
   let of_bits bits =
     let rec go acc i = function
-      | [] -> acc
+      | [] ->
+          acc
       | b :: bs ->
           let acc = if b then N.log_or acc (N.shift_left one i) else acc in
           go acc (i + 1) bs
@@ -113,11 +127,14 @@ module Make_fp
 
   let of_string = N.of_string
 
+  let to_string = N.to_string
+
   let rec extended_euclidean a b =
     if equal b zero then (a, one, zero)
     else
-      match extended_euclidean b (a % b) with d, x, y ->
-        (d, y, x - (a // b * y))
+      match extended_euclidean b (a % b) with
+      | d, x, y ->
+          (d, y, x - (a // b * y))
 
   let ( + ) x y = (x + y) % Info.order
 
@@ -129,6 +146,23 @@ module Make_fp
 
   let square x = x * x
 
+  let ( ** ) x n =
+    let k = N.num_bits n in
+    let rec go acc i =
+      if Int.(i < 0) then acc
+      else
+        let acc = acc * acc in
+        let acc = if N.test_bit n i then acc * x else acc in
+        go acc Int.(i - 1)
+    in
+    go one Int.(k - 1)
+
+  let%test_unit "exp test" = [%test_eq: t] (of_int 8) (of_int 2 ** of_int 3)
+
+  let is_square =
+    let euler = N.((Info.order - one) // of_int 2) in
+    fun x -> N.equal (x ** euler) one
+
   let inv_no_mod x =
     let _, a, _b = extended_euclidean x Info.order in
     a
@@ -136,6 +170,93 @@ module Make_fp
   let inv x = inv_no_mod x % Info.order
 
   let ( / ) x y = x * inv_no_mod y
+
+  module Sqrt_params = struct
+    let two_adicity n =
+      let rec go i = if N.test_bit n i then i else go Int.(i + 1) in
+      go 0
+
+    type nonrec t =
+      {two_adicity: int; quadratic_non_residue_to_t: t; t_minus_1_over_2: t}
+
+    let first f =
+      let rec go i = match f i with Some x -> x | None -> go Int.(i + 1) in
+      go 1
+
+    let create () =
+      let p_minus_one = N.(Info.order - one) in
+      let s = two_adicity p_minus_one in
+      let t = N.shift_right p_minus_one s in
+      let quadratic_non_residue =
+        first (fun i ->
+            let i = of_int i in
+            Option.some_if (not (is_square i)) i )
+      in
+      { two_adicity= s
+      ; quadratic_non_residue_to_t= quadratic_non_residue ** t
+      ; t_minus_1_over_2= (t - one) / of_int 2 }
+
+    let t = lazy (create ())
+  end
+
+  let rec loop ~while_ ~init f =
+    if while_ init then loop ~while_ ~init:(f init) f else init
+
+  let ( = ) = equal
+
+  let rec pow2 b n = if n > 0 then pow2 (square b) Int.(n - 1) else b
+
+  let%test_unit "pow2" =
+    let b = 7 in
+    if N.(of_int Int.(7 ** 8) < order) then
+      [%test_eq: t] (pow2 (of_int b) 3) (of_int Int.(7 ** 8))
+    else ()
+
+  let sqrt =
+    let pow2_order b =
+      loop
+        ~while_:(fun (b2m, _) -> not (b2m = one))
+        ~init:(b, 0)
+        (fun (b2m, m) -> (square b2m, Int.succ m))
+      |> snd
+    in
+    let module Loop_params = struct
+      type nonrec t = {z: t; b: t; x: t; v: int}
+    end in
+    let open Loop_params in
+    fun a ->
+      let { Sqrt_params.two_adicity= v
+          ; quadratic_non_residue_to_t= z
+          ; t_minus_1_over_2 } =
+        Lazy.force Sqrt_params.t
+      in
+      let w = a ** t_minus_1_over_2 in
+      let x = a * w in
+      let b = x * w in
+      let {x; _} =
+        loop
+          ~while_:(fun p -> not (p.b = one))
+          ~init:{z; b; x; v}
+          (fun {z; b; x; v} ->
+            let m = pow2_order b in
+            let w = pow2 z Int.(v - m - 1) in
+            let z = square w in
+            {z; b= b * z; x= x * w; v= m} )
+      in
+      x
+
+  let%test_unit "sqrt agrees with integer square root on small values" =
+    let rec mem a = function
+      | [] ->
+          ()
+      | x :: xs -> (
+        try [%test_eq: t] a x with _ -> mem a xs )
+    in
+    let gen = Int.gen_incl 1 Int.max_value_30_bits in
+    Quickcheck.test ~trials:10 gen ~f:(fun n ->
+        let n = abs n in
+        let n2 = Int.(n * n) in
+        mem (sqrt (of_int n2)) [of_int n; Info.order - of_int n] )
 end
 
 module type Degree_2_extension_intf = sig
@@ -200,11 +321,11 @@ end = struct
 
   type base = Fp.t
 
-  type t = Fp.t * Fp.t * Fp.t [@@deriving eq, bin_io, sexp]
+  type t = Fp.t * Fp.t * Fp.t [@@deriving eq, bin_io, sexp, compare]
 
   let gen = Quickcheck.Generator.tuple3 Fp.gen Fp.gen Fp.gen
 
-  let to_base_elements (x, y, z) = [x; y; z]
+  let to_list (x, y, z) = [x; y; z]
 
   let componentwise f (x1, x2, x3) (y1, y2, y3) = (f x1 y1, f x2 y2, f x3 y3)
 
@@ -275,13 +396,13 @@ module Make_fp2
 end = struct
   type base = Fp.t
 
-  type t = Fp.t * Fp.t [@@deriving eq, bin_io, sexp]
+  type t = Fp.t * Fp.t [@@deriving eq, bin_io, sexp, compare]
 
   let gen = Quickcheck.Generator.tuple2 Fp.gen Fp.gen
 
   let of_base x = (x, Fp.zero)
 
-  let to_base_elements (x, y) = [x; y]
+  let to_list (x, y) = [x; y]
 
   let project_to_base (x, _) = x
 
@@ -347,13 +468,13 @@ module Make_fp6
 
   val unitary_inverse : t -> t
 end = struct
-  type t = Fp3.t * Fp3.t [@@deriving eq, bin_io, sexp]
+  type t = Fp3.t * Fp3.t [@@deriving eq, bin_io, sexp, compare]
 
   type base = Fp3.t
 
   let gen = Quickcheck.Generator.tuple2 Fp3.gen Fp3.gen
 
-  let to_base_elements (x, y) = [x; y]
+  let to_list (x, y) = [x; y]
 
   let int_sub = ( - )
 

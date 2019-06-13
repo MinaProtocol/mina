@@ -1,0 +1,6 @@
+(executable
+ (name clear_keys)
+ (libraries core async cache_dir snarky)
+ (preprocess
+  (pps ppx_jane))
+ (modes native))

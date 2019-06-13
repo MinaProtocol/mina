@@ -3,8 +3,6 @@ open Async_kernel
 open Pipe_lib
 
 module Ident = struct
-  type t = int ref
-
   let state = ref 0
 
   let next () =
@@ -25,8 +23,6 @@ module Time_queue = struct
     ; pending_actions: ('action * Time.Span.t) Heap.t
     ; mutable on_new_action: unit Ivar.t option }
 
-  let size t = Heap.length t.pending_actions
-
   let handle_in_future t ~after action =
     Option.iter t.on_new_action ~f:(fun ivar ->
         Ivar.fill_if_empty ivar () ;
@@ -41,8 +37,10 @@ module Time_queue = struct
 
   let actions_ready t =
     match (Heap.top t.pending_actions, t.on_new_action) with
-    | Some _, _ -> return ()
-    | None, Some ivar -> Ivar.read ivar
+    | Some _, _ ->
+        return ()
+    | None, Some ivar ->
+        Ivar.read ivar
     | None, None ->
         let ivar = Ivar.create () in
         t.on_new_action <- Some ivar ;
@@ -55,7 +53,8 @@ module Time_queue = struct
         f action
       in
       match Heap.top t.pending_actions with
-      | None -> return ()
+      | None ->
+          return ()
       | Some (_, at) ->
           let%bind () = do_next_action () in
           if Time.Span.(t.curr_time >= at) then go ()
@@ -63,11 +62,13 @@ module Time_queue = struct
             t.curr_time <- at ;
             let rec loop () =
               match Heap.top t.pending_actions with
-              | None -> return ()
+              | None ->
+                  return ()
               | Some (_, at) when t.curr_time >= at ->
                   let%bind () = do_next_action () in
                   loop ()
-              | Some _ -> return ()
+              | Some _ ->
+                  return ()
             in
             loop () )
     in
@@ -191,8 +192,10 @@ struct
 
   let cancel t tok =
     match Token.Table.find t.timer_stoppers tok with
-    | Some ivar -> Ivar.fill ivar `Cancelled
-    | None -> ()
+    | Some ivar ->
+        Ivar.fill ivar `Cancelled
+    | None ->
+        ()
 
   let send t ~recipient message : unit Deferred.Or_error.t =
     match Peer.Table.find t.network recipient with
@@ -201,7 +204,7 @@ struct
           (Or_error.error_string
              (Printf.sprintf "Unknown recipient %s"
                 (Peer.sexp_of_t recipient |> Sexp.to_string_hum)))
-    | Some (r, w) ->
+    | Some (_r, _w) ->
         Time_queue.handle_in_future t.q
           ~after:(Message_delay.delay message)
           (Msg (message, recipient)) ;
@@ -216,14 +219,14 @@ struct
 end
 
 module type Trivial_peer_intf = sig
-  type t = int [@@deriving eq, hash, compare, sexp]
+  type t = int [@@deriving eq, hash, compare, sexp, yojson]
 
   include Hashable.S with type t := t
 end
 
 module Trivial_peer : Trivial_peer_intf = struct
   module T = struct
-    type t = int [@@deriving eq, hash, compare, sexp]
+    type t = int [@@deriving eq, hash, compare, sexp, yojson]
   end
 
   include Hashable.Make (T)
@@ -233,7 +236,7 @@ end
 module type S = functor
   (State :sig
           
-          type t [@@deriving eq, sexp]
+          type t [@@deriving eq, sexp, yojson]
         end)
   (Message :sig
             
@@ -254,7 +257,7 @@ module type S = functor
               end)
   (Condition_label :sig
                     
-                    type label [@@deriving enum, sexp]
+                    type label [@@deriving enum, sexp, yojson]
 
                     include Hashable.S with type t = label
                   end)
@@ -297,7 +300,7 @@ module type S = functor
 end
 
 module Make (State : sig
-  type t [@@deriving eq, sexp]
+  type t [@@deriving eq, sexp, yojson]
 end) (Message : sig
   type t
 end)
@@ -311,7 +314,7 @@ end) (Timer_label : sig
 
   include Hashable.S with type t = label
 end) (Condition_label : sig
-  type label [@@deriving enum, sexp]
+  type label [@@deriving enum, sexp, yojson]
 
   include Hashable.S with type t = label
 end) =
@@ -326,7 +329,7 @@ struct
       (Timer_transport)
 
   module Identifier = struct
-    type t = Trivial_peer.t [@@deriving eq]
+    type t = Trivial_peer.t
 
     include MyNode.Identifier
   end
@@ -337,20 +340,27 @@ struct
 
   let change t changes =
     List.iter changes ~f:(function
-      | Delete ident -> Identifier.Table.remove t.nodes ident
-      | Add n -> Identifier.Table.add_exn t.nodes ~key:(MyNode.ident n) ~data:n )
+      | Delete ident ->
+          Identifier.Table.remove t.nodes ident
+      | Add n ->
+          Identifier.Table.add_exn t.nodes ~key:(MyNode.ident n) ~data:n )
 
   let rec loop t ~stop ~max_iters =
     match max_iters with
-    | Some iters when iters <= 0 -> return ()
+    | Some iters when iters <= 0 ->
+        return ()
     | _ -> (
         let merge : 'a. 'a option -> 'a option -> 'a option =
          fun a b ->
           match (a, b) with
-          | None, None -> None
-          | None, Some b -> Some b
-          | Some a, None -> Some a
-          | Some a, Some b -> Some a
+          | None, None ->
+              None
+          | None, Some b ->
+              Some b
+          | Some a, None ->
+              Some a
+          | Some a, Some _ ->
+              Some a
         in
         let choose3 (a : 'a Deferred.t) (a_imm : 'a option) (b : 'b Deferred.t)
             (b_imm : 'b option) (c : 'c Deferred.t) (c_imm : 'c option) :
@@ -384,9 +394,12 @@ struct
             List.fold (Identifier.Table.data t.nodes) ~init:None
               ~f:(fun acc x ->
                 match (acc, x) with
-                | Some _, _ -> acc
-                | None, x when MyNode.is_ready x -> Some x
-                | None, x -> acc )
+                | Some _, _ ->
+                    acc
+                | None, x when MyNode.is_ready x ->
+                    Some x
+                | None, _ ->
+                    acc )
           in
           Option.value maybe_real ~default:n
         in
@@ -398,7 +411,8 @@ struct
           choose3 stop None node_ready node_ready_imm ticks_available None
         in
         match%bind chosen with
-        | Some (), _, _ -> return ()
+        | Some (), _, _ ->
+            return ()
         | None, Some n, _ ->
             (*printf "There's a transition at peer %d\n%!" (MyNode.ident n);*)
             let%bind n' = MyNode.step n in
@@ -410,7 +424,8 @@ struct
             (*printf "There's an event since no stuff for peers\n%!";*)
             let%bind () = Timer_transport.tick_forwards t.timer in
             loop t ~stop ~max_iters:(Option.map max_iters ~f:(fun i -> i - 1))
-        | None, None, None -> failwith "Something is ready" )
+        | None, None, None ->
+            failwith "Something is ready" )
 
   let create ~count ~initial_state cmds_per_node ~stop =
     let table = Identifier.Table.create () in
@@ -420,9 +435,8 @@ struct
       List.init count ~f:(fun i ->
           let messages = Timer_transport.listen timer ~me:i in
           let msg_commands, handle_commands = cmds_per_node i in
-          MyNode.make_node ~parent_log:(Logger.create ()) ~transport:timer
-            ~me:i ~messages ~initial_state ~timer msg_commands handle_commands
-      )
+          MyNode.make_node ~logger:(Logger.create ()) ~transport:timer ~me:i
+            ~messages ~initial_state ~timer msg_commands handle_commands )
     in
     (* Schedule cleanup *)
     don't_wait_for
@@ -440,12 +454,14 @@ let%test_module "Distributed_dsl" =
     let expect f =
       Async.Thread_safe.block_on_async_exn (fun () ->
           match%map Deferred.create f with
-          | `Success -> ()
-          | `Failure s -> failwith s )
+          | `Success ->
+              ()
+          | `Failure s ->
+              failwith s )
 
     module State = struct
       type t = Start | Wait_msg | Sent_msg | Got_msg of int | Timeout
-      [@@deriving eq, sexp]
+      [@@deriving eq, sexp, yojson]
     end
 
     module Message = struct
@@ -453,13 +469,11 @@ let%test_module "Distributed_dsl" =
     end
 
     module Message_delay = struct
-      type message = Message.t
-
       let delay _ = Time.Span.of_ms 500.
     end
 
     module Message_label = struct
-      type label = Send_msg [@@deriving eq, enum, sexp, compare, hash]
+      type label = Send_msg [@@deriving enum, sexp, compare, hash]
 
       module T = struct
         type t = label [@@deriving compare, hash, sexp]
@@ -483,7 +497,7 @@ let%test_module "Distributed_dsl" =
 
     module Condition_label = struct
       type label = Init | Wait_timeout | Bigger_than_five | Failure_case
-      [@@deriving enum, sexp, compare, hash]
+      [@@deriving enum, sexp, compare, hash, yojson]
 
       module T = struct
         type t = label [@@deriving compare, hash, sexp]
@@ -510,9 +524,9 @@ let%test_module "Distributed_dsl" =
             , (* no message handlers *)
               [ on Init
                   (function Start -> true | _ -> false)
-                  ~f:(fun t state ->
+                  ~f:(fun t _state ->
                     timeout' t Spawn_msg (Time.Span.of_sec 10.)
-                      ~f:(fun t state ->
+                      ~f:(fun t _state ->
                         let%map () =
                           send_multi_exn t
                             ~recipients:
@@ -526,8 +540,8 @@ let%test_module "Distributed_dsl" =
             let open Machine.MyNode in
             ( [ msg Send_msg
                   (Fn.const (Fn.const true))
-                  ~f:(fun t (Msg i) -> function
-                    | Wait_msg -> return (Got_msg i) | m -> return m ) ]
+                  ~f:(fun _t (Msg i) -> function Wait_msg -> return (Got_msg i)
+                    | m -> return m ) ]
             , [ on Init
                   (function Start -> true | _ -> false)
                   ~f:(fun _ _ -> return Wait_msg)
@@ -535,14 +549,17 @@ let%test_module "Distributed_dsl" =
                   (function Wait_msg -> true | _ -> false)
                   ~f:(fun t state ->
                     timeout' t Timeout_message (Time.Span.of_sec 20.)
-                      ~f:(fun t -> function
+                      ~f:(fun _t -> function
                       | Got_msg _ as m -> return m | _ -> return Timeout ) ;
                     return state )
               ; on Failure_case
                   (function
-                    | Timeout -> true
-                    | Got_msg i when i <= 5 -> true
-                    | _ -> false)
+                    | Timeout ->
+                        true
+                    | Got_msg i when i <= 5 ->
+                        true
+                    | _ ->
+                        false )
                   ~f:(fun _ _ ->
                     failwith
                       "All nodes should have received a message containing a \

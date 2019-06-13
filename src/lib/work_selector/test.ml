@@ -1,27 +1,13 @@
 open Core_kernel
 open Async
 
-module type For_tests_intf = sig
-  type work
-
-  type snark_pool
-
-  type fee
+module type Work_selector_with_tests_intf = sig
+  include Intf.S
 
   module For_tests : sig
     val does_not_have_better_fee :
       snark_pool:snark_pool -> fee:fee -> work list -> bool
   end
-end
-
-module type Work_selector_with_tests_intf = sig
-  include Protocols.Coda_pow.Work_selector_intf
-
-  include
-    For_tests_intf
-    with type work := work
-     and type snark_pool := snark_pool
-     and type fee := fee
 end
 
 module type Work_selector_F = functor (Inputs : Inputs.Inputs_intf) -> Work_selector_with_tests_intf
@@ -39,7 +25,7 @@ module type Work_selector_F = functor (Inputs : Inputs.Inputs_intf) -> Work_sele
                                                                            .Transaction
                                                                            .t
                                                                          , Inputs
-                                                                           .Sparse_ledger
+                                                                           .Transaction_witness
                                                                            .t
                                                                          , Inputs
                                                                            .Ledger_proof
@@ -90,7 +76,7 @@ module Make_test (Make_selector : Work_selector_F) = struct
     let snark_pool = T.Snark_pool.create () in
     let gen_add_work work =
       let open Quickcheck.Generator.Let_syntax in
-      let%bind should_add_work = Bool.gen in
+      let%bind should_add_work = Bool.quickcheck_generator in
       if should_add_work then
         let%map fee =
           Quickcheck.Generator.of_list [cheap_work_fee; expensive_work_fee]
@@ -119,7 +105,8 @@ module Make_test (Make_selector : Work_selector_F) = struct
                 (i <= p) ;
               let work, seen = Selector.work ~snark_pool ~fee:my_fee sl seen in
               match work with
-              | [] -> return ()
+              | [] ->
+                  return ()
               | job ->
                   [%test_result: Bool.t]
                     ~message:"Should not get any cheap jobs" ~expect:true

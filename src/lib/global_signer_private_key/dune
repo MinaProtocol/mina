@@ -1,0 +1,10 @@
+(library
+ (name global_signer_private_key)
+ (public_name global_signer_private_key)
+ (flags :standard -short-paths)
+ (library_flags -linkall)
+ (inline_tests)
+ (libraries core_kernel signature_lib)
+ (preprocess
+  (pps ppx_jane ppx_deriving.eq bisect_ppx -- -conditional))
+ (synopsis "fold types"))

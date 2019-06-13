@@ -25,11 +25,15 @@ s.setAttribute('data-timestamp', +new Date());
                         <noscript>Please enable JavaScript to view the <a href="https://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>|html}
     name name
 
-let title s =
+let title ~standalone ~name s =
   let open Html_concise in
-  h1
-    [Style.just "f2 f1-ns ddinexp tracked-tightish pt2 pt3-m pt4-l mb1"]
-    [text s]
+  let t =
+    h1
+      [Style.just "f2 f1-ns ddinexp tracked-tightish pt2 pt3-m pt4-l mb1"]
+      [text s]
+  in
+  if standalone then t
+  else a [Style.just "blueblack"; href (sprintf "/blog/%s.html" name)] [t]
 
 let subtitle s =
   let open Html_concise in
@@ -49,7 +53,8 @@ let author s website =
             ; literal
                 {literal|<i class="ml-1 ml-2-ns fab f7 fa-twitter mr3 mr2-m mr3-l"></i>|literal}
             ] ]
-    | None -> [text ("by " ^ s)] )
+    | None ->
+        [text ("by " ^ s)] )
 
 let date d =
   let month_day = Date.format d "%B %d" in
@@ -84,11 +89,12 @@ module Share = struct
       (share :: channels)
 end
 
-let post name =
+let markdown_path name = "posts/" ^ name ^ ".markdown"
+
+let post ~standalone name (post : Post.t) =
   let open Html_concise in
-  let%map post = Post.load ("posts/" ^ name ^ ".markdown") in
   let content_chunk =
-    title post.title
+    title ~standalone ~name post.title
     :: (match post.subtitle with None -> [] | Some s -> [subtitle s])
     @ [ author post.author post.author_website
       ; date post.date
@@ -96,7 +102,7 @@ let post name =
           [Stationary.Attribute.class_ "blog-content lh-copy"]
           [ post.content
           ; hr []
-          (* HACK: to reuse styles from blog hr, we can just stick it in blog-content *)
+            (* HACK: to reuse styles from blog hr, we can just stick it in blog-content *)
            ]
       ; Share.content ]
   in
@@ -109,16 +115,17 @@ let post name =
       [div [Style.just "mw65-ns f5 left blueblack"] content_chunk]
   in
   let disqus =
-    div
-      [Style.just "mw65-ns ibmplex f5 center blueblack"]
-      [Html.literal (disqus_html name)]
+    if standalone then
+      [ div
+          [Style.just "mw65-ns ibmplex f5 center blueblack"]
+          [Html.literal (disqus_html name)] ]
+    else []
   in
   div
     [Style.just "ph3 ph4-m ph5-l"]
-    [Huge_switch.create ~regular ~huge:big; disqus]
+    ([Huge_switch.create ~regular ~huge:big] @ disqus)
 
-let content name =
-  let%map p = post name in
+let wrap p =
   wrap
     ~headers:
       [ Html.literal
@@ -136,7 +143,7 @@ let content name =
               var blocks = document.querySelectorAll(".katex-block code");
               for (var i = 0; i < blocks.length; i++) {
                 var b = blocks[i];
-                katex.render(b.innerText, b);
+                katex.render(b.innerText, b, {displayMode:true});
               }
             });
           </script>|html}
@@ -155,4 +162,27 @@ let content name =
       ]
     ~tight:true ~fixed_footer:false
     ~page_label:Links.(label blog)
-    [(fun _ -> p)]
+    p
+
+let content (name, p) =
+  let p = post ~standalone:true name p in
+  wrap [(fun _ -> p)]
+
+let index nps =
+  let ps = List.map nps ~f:(fun (n, p) -> post ~standalone:false n p) in
+  wrap (List.map ps ~f:(fun p _ -> p))
+
+let files names =
+  let%map posts =
+    Deferred.List.map names ~f:(fun name ->
+        let%map p = Post.load (markdown_path name) in
+        (name, p) )
+    >>| List.sort ~compare:(fun (_, p1) (_, p2) ->
+            -Date.compare p1.Post.date p2.Post.date )
+  in
+  let open File_system in
+  file (File.of_html_path ~name:"blog/index.html" (index posts))
+  :: List.map posts ~f:(fun (n, p) ->
+         file
+           (File.of_html_path ~name:(sprintf "blog/%s.html" n) (content (n, p)))
+     )

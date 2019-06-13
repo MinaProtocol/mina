@@ -17,8 +17,9 @@ let ip_service_result {uri; body_handler} =
 
 let find () =
   let handler acc elem =
-    match acc with None -> ip_service_result elem | Some x -> return acc
+    match acc with None -> ip_service_result elem | Some _ -> return acc
   in
   Deferred.List.fold services ~init:None ~f:handler
   >>| fun x ->
-  Option.value_exn ~message:"couldn't figure out own IP from the internet" x
+  Unix.Inet_addr.of_string
+  @@ Option.value_exn ~message:"couldn't determine our IP from the internet" x
