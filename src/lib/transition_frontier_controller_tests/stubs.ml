@@ -588,12 +588,9 @@ struct
       @@
       let open Option.Let_syntax in
       let%map frontier = Hashtbl.find ip_table peer.Network_peer.Peer.host in
-      let data =
-        Transition_frontier.best_tip frontier
-        |> Transition_frontier.Breadcrumb.external_transition
-        |> External_transition.Validated.forget_validation
-      in
-      Envelope.Incoming.wrap ~data ~sender:(Envelope.Sender.Remote peer.host)
+      Transition_frontier.best_tip frontier
+      |> Transition_frontier.Breadcrumb.external_transition
+      |> External_transition.Validated.forget_validation
 
     let glue_sync_ledger {ip_table; logger; _} query_reader response_writer :
         unit =

@@ -498,10 +498,6 @@ module Make (Inputs : Intf.Inputs) = struct
               List.map peers ~f:(fun peer -> Net.get_best_tip net peer)
               |> Deferred.all >>| List.filter_opt
             in
-            List.iter best_tips ~f:(fun best_tip ->
-                Strict_pipe.Writer.write external_transitions_writer
-                  (best_tip, Block_time.now config.time_controller)
-                |> don't_wait_for ) ;
             let valid_transitions =
               Transition_router.run ~logger:config.logger
                 ~trust_system:config.trust_system ~verifier:config.verifier
@@ -512,7 +508,7 @@ module Make (Inputs : Intf.Inputs) = struct
                 ~network_transition_reader:
                   (Strict_pipe.Reader.map external_transitions_reader
                      ~f:(fun (tn, tm) -> (`Transition tn, `Time_received tm)))
-                ~proposer_transition_reader
+                ~proposer_transition_reader ~best_tips
             in
             let ( valid_transitions_for_network
                 , valid_transitions_for_api

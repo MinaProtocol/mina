@@ -794,10 +794,7 @@ module Make (Inputs : Inputs_intf) = struct
     in
     match response with
     | Ok (Some data) ->
-        return
-          (Some
-             (Envelope.Incoming.wrap ~data
-                ~sender:(Envelope.Sender.Remote peer.host)))
+        return (Some data)
     | Ok None | Error _ ->
         return None
 

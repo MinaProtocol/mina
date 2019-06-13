@@ -62,6 +62,7 @@ module Make (Inputs : Inputs_intf) : sig
                                  Strict_pipe.Reader.t
     -> proposer_transition_reader:Transition_frontier.Breadcrumb.t
                                   Strict_pipe.Reader.t
+    -> best_tips:External_transition.t list
     -> (External_transition.Validated.t, State_hash.t) With_hash.t
        Strict_pipe.Reader.t
 end

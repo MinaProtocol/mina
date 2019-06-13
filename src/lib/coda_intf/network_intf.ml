@@ -42,9 +42,7 @@ module type Network_intf = sig
        Deferred.Or_error.t
 
   val get_best_tip :
-       t
-    -> Network_peer.Peer.t
-    -> external_transition Envelope.Incoming.t Deferred.Option.t
+    t -> Network_peer.Peer.t -> external_transition Deferred.Option.t
 
   val get_staged_ledger_aux_and_pending_coinbases_at_hash :
        t
