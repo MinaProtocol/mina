@@ -506,9 +506,6 @@ let configure net ~me ~maddrs ~network_id =
 (** TODO: do we need this? *)
 let peers net = Deferred.return []
 
-(** TODO: do we need this? *)
-let random_peers net count = Deferred.return []
-
 let listen_on net ma =
   match%map
     Helper.do_rpc net "listen" [("iface", `String (Multiaddr.to_string ma))]
@@ -817,7 +814,11 @@ let%test_module "coda network tests" =
       in
       Async.Thread_safe.block_on_async_exn (fun () -> test_def)
 
-    let unwrap_eof = function `Eof -> failwith "unexpected EOF" | `Ok a -> Envelope.Incoming.data a
+    let unwrap_eof = function
+      | `Eof ->
+          failwith "unexpected EOF"
+      | `Ok a ->
+          Envelope.Incoming.data a
 
     let three_str_eq a b c = assert (String.equal a b && String.equal b c)
 

@@ -10,6 +10,9 @@ otherwise mentioned, the deferred is resolved immediately once the RPC action
 to the libp2p helper is finished. Unless otherwise mentioned, everything can
 throw an exception due to an internal helper error. These indicate a bug in
 this module/the helper, and not misuse.
+
+Some errors can arise from calling certain functions before [configure] has been
+called. In general, anything that returns an [Or_error] can fail in this manner.
 *)
 
 open Async
@@ -154,9 +157,6 @@ val me : net -> Keypair.t option
 
 (** List of all peers we know about. *)
 val peers : net -> PeerID.t list Deferred.t
-
-(** Randomly pick a few peers from all the ones we know about. *)
-val random_peers : net -> int -> PeerID.t list Deferred.t
 
 (** An open stream.
 
