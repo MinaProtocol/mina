@@ -110,8 +110,11 @@ module Pubsub : sig
     * the deferred it returns is resolved. The helper process waits 5 seconds for
     * the result of [f] to be reported, otherwise it considers the message invalid.
     *
-    * This can fail if a validator is already registered for [topic].
-  *)
+    * If multiple validators are registered for a topic, they will all be called. If
+    * any of them return [false] the message is considered invalid.
+    *
+    * If no validators are registered for a topic, all messages will be forwarded.
+    *)
   val register_validator :
        net
     -> string
