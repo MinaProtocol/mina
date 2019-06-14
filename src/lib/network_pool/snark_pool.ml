@@ -1,6 +1,5 @@
 open Core_kernel
 open Async
-open Coda_base
 open Signature_lib
 open Pipe_lib
 
@@ -281,6 +280,8 @@ include Make (Ledger_proof.Stable.V1) (Transaction_snark)
 
 let%test_module "random set test" =
   ( module struct
+    open Coda_base
+
     let trust_system = Mocks.trust_system
 
     module Mock_snark_pool =
