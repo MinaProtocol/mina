@@ -212,8 +212,7 @@ module Make_fp
 
   let ( = ) = equal
 
-let random () =
-    N.random Info.order
+  let random () = N.random Info.order
 
   let rec pow2 b n = if n > 0 then pow2 (square b) Int.(n - 1) else b
 

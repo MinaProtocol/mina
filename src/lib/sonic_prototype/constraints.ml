@@ -1,7 +1,5 @@
-(* open Core *)
 open Snarkette
 open Snarkette.Mnt6_80
-(* open Commitment_scheme *)
 open Arithmetic_circuit
 open Laurent
 open Utils
