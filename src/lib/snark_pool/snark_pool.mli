@@ -22,23 +22,27 @@ module type Transition_frontier_intf = sig
   type t
 
   module Extensions : sig
-    module Work : sig
-      type t = work [@@deriving sexp]
+    module Snark_pool_refcount : sig
+      module Work : sig
+        type t = work [@@deriving sexp]
 
-      module Stable : sig
-        module V1 : sig
-          type nonrec t = t [@@deriving sexp, bin_io]
+        module Stable : sig
+          module V1 : sig
+            type nonrec t = t [@@deriving sexp, bin_io]
 
-          include Hashable.S_binable with type t := t
+            include Hashable.S_binable with type t := t
+          end
         end
-      end
 
-      include Hashable.S with type t := t
+        include Hashable.S with type t := t
+      end
     end
   end
 
   val snark_pool_refcount_pipe :
-    t -> (int * int Extensions.Work.Table.t) Pipe_lib.Broadcast_pipe.Reader.t
+       t
+    -> (int * int Extensions.Snark_pool_refcount.Work.Table.t)
+       Pipe_lib.Broadcast_pipe.Reader.t
 end
 
 module type S = sig

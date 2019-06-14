@@ -160,12 +160,15 @@ let%test_module "network pool test" =
       let create () : t = 0
 
       module Extensions = struct
-        module Work = Mock_work
+        module Snark_pool_refcount = struct
+          module Work = Mock_work
+        end
       end
 
       let snark_pool_refcount_pipe _ =
         let reader, _writer =
-          Pipe_lib.Broadcast_pipe.create (0, Extensions.Work.Table.create ())
+          Pipe_lib.Broadcast_pipe.create
+            (0, Extensions.Snark_pool_refcount.Work.Table.create ())
         in
         reader
     end

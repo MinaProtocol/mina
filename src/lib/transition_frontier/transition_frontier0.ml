@@ -7,10 +7,6 @@ module Make (Inputs : Inputs.Inputs_intf) = struct
   open Inputs
 
   (* NOTE: is Consensus_mechanism.select preferable over distance? *)
-  exception
-    Parent_not_found of ([`Parent of State_hash.t] * [`Target of State_hash.t])
-
-  exception Already_exists of State_hash.t
 
   let max_length = max_length
 

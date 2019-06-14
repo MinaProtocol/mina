@@ -20,7 +20,7 @@ module type Transition_frontier_intf = sig
     val staged_ledger : t -> staged_ledger
   end
 
-  module Diff : sig
+  module Extensions : sig
     module Best_tip_diff : sig
       type view =
         { new_user_commands: User_command.t list
@@ -30,7 +30,8 @@ module type Transition_frontier_intf = sig
 
   val best_tip : t -> Breadcrumb.t
 
-  val best_tip_diff_pipe : t -> Diff.Best_tip_diff.view Broadcast_pipe.Reader.t
+  val best_tip_diff_pipe :
+    t -> Extensions.Best_tip_diff.view Broadcast_pipe.Reader.t
 end
 
 (* Functor over user command, base ledger and transaction validator for mocking. *)
@@ -115,7 +116,7 @@ struct
 
   let handle_diff t frontier
       ({new_user_commands; removed_user_commands} :
-        Transition_frontier.Diff.Best_tip_diff.view) =
+        Transition_frontier.Extensions.Best_tip_diff.view) =
     (* This runs whenever the best tip changes. The simple case is when the new
        best tip is an extension of the old one. There, we remove any user
        commands that were included in it from the transaction pool. Dealing with
@@ -481,7 +482,7 @@ let%test_module _ =
         let staged_ledger = Fn.id
       end
 
-      module Diff = struct
+      module Extensions = struct
         module Best_tip_diff = struct
           type view =
             { new_user_commands: User_command.t list
@@ -490,14 +491,15 @@ let%test_module _ =
       end
 
       type t =
-        Diff.Best_tip_diff.view Broadcast_pipe.Reader.t * Breadcrumb.t ref
+        Extensions.Best_tip_diff.view Broadcast_pipe.Reader.t
+        * Breadcrumb.t ref
 
-      let create : unit -> t * Diff.Best_tip_diff.view Broadcast_pipe.Writer.t
-          =
+      let create :
+          unit -> t * Extensions.Best_tip_diff.view Broadcast_pipe.Writer.t =
        fun () ->
         let pipe_r, pipe_w =
           Broadcast_pipe.create
-            Diff.Best_tip_diff.
+            Extensions.Best_tip_diff.
               {new_user_commands= []; removed_user_commands= []}
         in
         let accounts =

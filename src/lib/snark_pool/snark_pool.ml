@@ -27,23 +27,27 @@ module type Transition_frontier_intf = sig
   type t
 
   module Extensions : sig
-    module Work : sig
-      type t = work [@@deriving sexp]
+    module Snark_pool_refcount : sig
+      module Work : sig
+        type t = work [@@deriving sexp]
 
-      module Stable : sig
-        module V1 : sig
-          type nonrec t = t [@@deriving sexp, bin_io]
+        module Stable : sig
+          module V1 : sig
+            type nonrec t = t [@@deriving sexp, bin_io]
 
-          include Hashable.S_binable with type t := t
+            include Hashable.S_binable with type t := t
+          end
         end
-      end
 
-      include Hashable.S with type t := t
+        include Hashable.S with type t := t
+      end
     end
   end
 
   val snark_pool_refcount_pipe :
-    t -> (int * int Extensions.Work.Table.t) Pipe_lib.Broadcast_pipe.Reader.t
+       t
+    -> (int * int Extensions.Snark_pool_refcount.Work.Table.t)
+       Pipe_lib.Broadcast_pipe.Reader.t
 end
 
 module type S = sig
@@ -156,7 +160,7 @@ end = struct
     t
 
   (** True when there is no active transition_frontier or
-    when the refcount for the given work is 0 *)
+      when the refcount for the given work is 0 *)
   let work_is_referenced t work =
     match t.ref_table with
     | None ->
@@ -229,12 +233,15 @@ let%test_module "random set test" =
       let create () : t = ""
 
       module Extensions = struct
-        module Work = Mock_work
+        module Snark_pool_refcount = struct
+          module Work = Mock_work
+        end
       end
 
       let snark_pool_refcount_pipe _ =
         let reader, _writer =
-          Pipe_lib.Broadcast_pipe.create (0, Extensions.Work.Table.create ())
+          Pipe_lib.Broadcast_pipe.create
+            (0, Extensions.Snark_pool_refcount.Work.Table.create ())
         in
         reader
     end

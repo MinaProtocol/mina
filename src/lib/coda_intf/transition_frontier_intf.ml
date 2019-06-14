@@ -53,6 +53,110 @@ module type Transition_frontier_diff0_intf = sig
   end
 end
 
+(* TODO: Probably can remove *)
+(* module type Root_history_read_only = sig
+   type t
+
+   type breadcrumb
+
+   val lookup : t -> State_hash.t -> breadcrumb option
+
+   val mem : t -> State_hash.t -> bool
+
+   val is_empty : t -> bool
+   end
+
+   module type Root_history = sig
+   include Root_history_read_only
+
+   val create : int -> t
+
+   val enqueue : t -> breadcrumb -> unit
+   end *)
+
+module type Broadcast_extension_intf = sig
+  type t
+
+  type view
+
+  type breadcrumb
+
+  type base_transition_frontier
+
+  type diff
+
+  val create : breadcrumb -> t Deferred.t
+
+  val peek : t -> view
+
+  val update : t -> base_transition_frontier -> diff list -> unit Deferred.t
+end
+
+module type Extension0 = sig
+  type t
+
+  type breadcrumb
+
+  type base_transition_frontier
+
+  type diff
+
+  type view
+
+  val create : breadcrumb -> t * view
+
+  val handle_diffs :
+    t -> base_transition_frontier -> diff list -> view Deferred.Option.t
+end
+
+module type Extensions0 = sig
+  type breadcrumb
+
+  type base_transition_frontier
+
+  type diff
+
+  module Snark_pool_refcount : sig
+    module Work : sig
+      type t = Transaction_snark.Statement.t list [@@deriving sexp, yojson]
+
+      module Stable :
+        sig
+          module V1 : sig
+            type t [@@deriving sexp, bin_io]
+
+            include Hashable.S_binable with type t := t
+          end
+        end
+        with type V1.t = t
+
+      include Hashable.S with type t := t
+
+      val gen : t Quickcheck.Generator.t
+    end
+
+    include
+      Extension0
+      with type view = int * int Work.Table.t
+       and type breadcrumb := breadcrumb
+       and type base_transition_frontier := base_transition_frontier
+       and type diff := diff
+  end
+
+  module Best_tip_diff : sig
+    type view =
+      { new_user_commands: User_command.t list
+      ; removed_user_commands: User_command.t list }
+
+    include
+      Extension0
+      with type view := view
+       and type breadcrumb := breadcrumb
+       and type base_transition_frontier := base_transition_frontier
+       and type diff := diff
+  end
+end
+
 module type Transition_frontier_diff_intf = sig
   type breadcrumb
 
@@ -391,11 +495,6 @@ end
 module type Transition_frontier_base0_intf = sig
   include Transition_frontier_base_intf
 
-  exception
-    Parent_not_found of ([`Parent of State_hash.t] * [`Target of State_hash.t])
-
-  exception Already_exists of State_hash.t
-
   val max_length : int
 
   val consensus_local_state : t -> Consensus.Data.Local_state.t
@@ -438,6 +537,26 @@ end
 module type Transition_frontier_intf = sig
   include Transition_frontier_base0_intf
 
+  val create :
+       logger:Logger.t
+    -> root_transition:( external_transition_validated
+                       , State_hash.t )
+                       With_hash.t
+    -> root_snarked_ledger:Ledger.Db.t
+    -> root_staged_ledger:staged_ledger
+    -> consensus_local_state:Consensus.Data.Local_state.t
+    -> t Deferred.t
+
+  module Transition_frontier_base :
+    Transition_frontier_base0_intf
+    with type mostly_validated_external_transition :=
+                mostly_validated_external_transition
+     and type external_transition_validated := external_transition_validated
+     and type staged_ledger_diff := staged_ledger_diff
+     and type staged_ledger := staged_ledger
+     and type transaction_snark_scan_state := transaction_snark_scan_state
+     and type verifier := verifier
+
   (** Adds a breadcrumb to the transition frontier or throws. It possibly
    * triggers a root move and it triggers any extensions that are listening to
    * events on the frontier. *)
@@ -455,27 +574,25 @@ module type Transition_frontier_intf = sig
   val wait_for_transition : t -> State_hash.t -> unit Deferred.t
 
   module Diff :
-    Transition_frontier_diff_intf
+    Transition_frontier_diff0_intf
     with type breadcrumb := Breadcrumb.t
      and type external_transition_validated := external_transition_validated
-     and type transaction_snark_scan_state := transaction_snark_scan_state
 
   module Extensions :
-    Transition_frontier_extensions_intf
+    Extensions0
     with type breadcrumb := Breadcrumb.t
-     and type external_transition_validated := external_transition_validated
-     and type transaction_snark_scan_state := transaction_snark_scan_state
-     and module Diff := Diff
+     and type base_transition_frontier := Transition_frontier_base.t
+     and type diff := Diff.E.t
 
   val snark_pool_refcount_pipe :
     t -> Extensions.Snark_pool_refcount.view Broadcast_pipe.Reader.t
 
-  val best_tip_diff_pipe : t -> Diff.Best_tip_diff.view Broadcast_pipe.Reader.t
+  val best_tip_diff_pipe :
+    t -> Extensions.Best_tip_diff.view Broadcast_pipe.Reader.t
 
-  val root_diff_pipe : t -> Diff.Root_diff.view Broadcast_pipe.Reader.t
-
-  val persistence_diff_pipe :
-    t -> Diff.Persistence_diff.view Broadcast_pipe.Reader.t
+  (* TODO: recover *)
+  (* val persistence_diff_pipe :
+    t -> Diff.Persistence_diff.view Broadcast_pipe.Reader.t *)
 
   val close : t -> unit
 
