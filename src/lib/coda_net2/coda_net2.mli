@@ -130,6 +130,13 @@ val configure :
   -> network_id:string
   -> unit Deferred.Or_error.t
 
+(** The keypair the network was configured with.
+  *
+  * If configuration hasn't taken place or didn't succeed,
+  * this will be [None].
+  *)
+val me : net -> Keypair.t option
+
 (** List of all peers we know about. *)
 val peers : net -> PeerID.t list Deferred.t
 

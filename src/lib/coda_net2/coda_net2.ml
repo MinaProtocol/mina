@@ -38,6 +38,8 @@ let to_string_res x =
   | None ->
       Or_error.error_string "needed a string"
 
+type keypair = {secret: string; public: string; peer_id: string}
+
 module Helper = struct
   (* duplicate record field names in same module *)
   type t =
@@ -48,6 +50,7 @@ module Helper = struct
     ; outstanding_requests: (int, Yojson.Safe.json Or_error.t Ivar.t) Hashtbl.t
     ; seqno: int ref
     ; logger: Logger.t
+    ; mutable me_keypair: keypair option
     ; subscriptions:
         ( int
         , ( string Envelope.Incoming.t
@@ -290,6 +293,7 @@ module Helper = struct
       ; lock_path
       ; conf_dir
       ; logger
+      ; me_keypair= None
       ; outstanding_requests= Hashtbl.create (module Int)
       ; subscriptions= Hashtbl.create (module Int)
       ; validators= Hashtbl.create (module String)
@@ -337,7 +341,7 @@ type peer_id = string
 
 (* We hardcode support for only Ed25519 keys so we can keygen without calling go *)
 module Keypair = struct
-  type t = {secret: string; public: string; peer_id: string}
+  type t = keypair
 
   let random net =
     match%map Helper.do_rpc net "generateKeypair" [] with
@@ -478,6 +482,8 @@ module Pubsub = struct
               (Yojson.Safe.to_string v) () )
 end
 
+let me (net : Helper.t) = net.me_keypair
+
 let configure net ~me ~maddrs ~network_id =
   match%map
     Helper.do_rpc net "configure"
@@ -489,6 +495,7 @@ let configure net ~me ~maddrs ~network_id =
       ; ("network_id", `String network_id) ]
   with
   | Ok (`String "configure success") ->
+      net.me_keypair <- Some me ;
       Ok ()
   | Ok j ->
       failwithf "helper broke RPC protocol: configure got %s"
