@@ -338,8 +338,8 @@ type generateKeypairMsg struct {
 }
 
 type generatedKeypair struct {
-	Private string `json:"privk"`
-	Public  string `json:"pubk"`
+	Private string `json:"sk"`
+	Public  string `json:"pk"`
 	PeerID  string `json:"peer_id"`
 }
 

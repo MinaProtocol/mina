@@ -347,8 +347,8 @@ module Keypair = struct
     match%map Helper.do_rpc net "generateKeypair" [] with
     | Ok
         (`Assoc
-          [ ("privk", `String secret)
-          ; ("pubk", `String public)
+          [ ("sk", `String secret)
+          ; ("pk", `String public)
           ; ("peer_id", `String peer_id) ]) ->
         let open Or_error.Let_syntax in
         let%bind secret = of_b58_data (`String secret) in
