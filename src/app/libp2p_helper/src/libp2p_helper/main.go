@@ -121,6 +121,10 @@ func badHelper(e error) error {
 	return wrapError(e, "initializing helper")
 }
 
+func needsConfigure() error {
+	return badRPC(errors.New("helper not yet configured"))
+}
+
 type configureMsg struct {
 	Statedir  string   `json:"statedir"`
 	Privk     string   `json:"privk"`
@@ -159,6 +163,9 @@ type listenMsg struct {
 }
 
 func (m *listenMsg) run(app *app) (interface{}, error) {
+	if app.P2p == nil {
+		return nil, needsConfigure()
+	}
 	ma, err := multiaddr.NewMultiaddr(m.Iface)
 	if err != nil {
 		return nil, badp2p(err)
@@ -169,12 +176,25 @@ func (m *listenMsg) run(app *app) (interface{}, error) {
 	return app.P2p.Host.Addrs(), nil
 }
 
+type listeningAddrsMsg struct {
+}
+
+func (m *listeningAddrsMsg) run(app *app) (interface{}, error) {
+	if app.P2p == nil {
+		return nil, needsConfigure()
+	}
+	return app.P2p.Host.Addrs(), nil
+}
+
 type publishMsg struct {
 	Topic string `json:"topic"`
 	Data  string `json:"data"`
 }
 
 func (t *publishMsg) run(app *app) (interface{}, error) {
+	if app.P2p == nil {
+		return nil, needsConfigure()
+	}
 	data, err := b58.Decode(t.Data)
 	if err != nil {
 		return nil, badRPC(err)
@@ -197,6 +217,9 @@ type publishUpcall struct {
 }
 
 func (s *subscribeMsg) run(app *app) (interface{}, error) {
+	if app.P2p == nil {
+		return nil, needsConfigure()
+	}
 	sub, err := app.P2p.Pubsub.Subscribe(s.Topic)
 	if err != nil {
 		return nil, badp2p(err)
@@ -235,6 +258,9 @@ type unsubscribeMsg struct {
 }
 
 func (u *unsubscribeMsg) run(app *app) (interface{}, error) {
+	if app.P2p == nil {
+		return nil, needsConfigure()
+	}
 	if sub, ok := app.Subs[u.Subscription]; ok {
 		sub.Sub.Cancel()
 		sub.Cancel()
@@ -263,6 +289,9 @@ type validationCompleteMsg struct {
 }
 
 func (r *registerValidatorMsg) run(app *app) (interface{}, error) {
+	if app.P2p == nil {
+		return nil, needsConfigure()
+	}
 	ch := make(chan bool)
 
 	seq := <-seqs
@@ -293,6 +322,9 @@ func (r *registerValidatorMsg) run(app *app) (interface{}, error) {
 }
 
 func (r *validationCompleteMsg) run(app *app) (interface{}, error) {
+	if app.P2p == nil {
+		return nil, needsConfigure()
+	}
 	if ch, ok := app.Validators[r.Seqno]; ok {
 		ch <- r.Valid
 		delete(app.Validators, r.Seqno)
@@ -389,6 +421,9 @@ func handleStreamReads(app *app, stream net.Stream, idx int) {
 }
 
 func (o *openStreamMsg) run(app *app) (interface{}, error) {
+	if app.P2p == nil {
+		return nil, needsConfigure()
+	}
 	streamIdx := <-seqs
 	peer, err := peer.IDB58Decode(o.Peer)
 	if err != nil {
@@ -413,6 +448,9 @@ type closeStreamMsg struct {
 }
 
 func (cs *closeStreamMsg) run(app *app) (interface{}, error) {
+	if app.P2p == nil {
+		return nil, needsConfigure()
+	}
 	if stream, ok := app.Streams[cs.StreamIdx]; ok {
 		err := stream.Close()
 		if err != nil {
@@ -428,6 +466,9 @@ type resetStreamMsg struct {
 }
 
 func (cs *resetStreamMsg) run(app *app) (interface{}, error) {
+	if app.P2p == nil {
+		return nil, needsConfigure()
+	}
 	if stream, ok := app.Streams[cs.StreamIdx]; ok {
 		err := stream.Close()
 		if err != nil {
@@ -444,6 +485,9 @@ type sendStreamMsgMsg struct {
 }
 
 func (cs *sendStreamMsgMsg) run(app *app) (interface{}, error) {
+	if app.P2p == nil {
+		return nil, needsConfigure()
+	}
 	data, err := b58.Decode(cs.Data)
 	if err != nil {
 		return nil, badRPC(err)
@@ -471,6 +515,9 @@ type incomingStreamUpcall struct {
 }
 
 func (as *addStreamHandlerMsg) run(app *app) (interface{}, error) {
+	if app.P2p == nil {
+		return nil, needsConfigure()
+	}
 	app.P2p.Host.SetStreamHandler(protocol.ID(as.Protocol), func(stream net.Stream) {
 		streamIdx := <-seqs
 		app.Streams[streamIdx] = stream
@@ -491,6 +538,9 @@ type removeStreamHandlerMsg struct {
 }
 
 func (rs *removeStreamHandlerMsg) run(app *app) (interface{}, error) {
+	if app.P2p == nil {
+		return nil, needsConfigure()
+	}
 	app.P2p.Host.RemoveStreamHandler(protocol.ID(rs.Protocol))
 
 	return "removeStreamHandler success", nil
