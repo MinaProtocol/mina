@@ -32,8 +32,8 @@ type t =
       (User_command.With_valid_signature.t F_sequence.t * Currency.Amount.t)
       Public_key.Compressed.Map.t
         (** All pending transactions along with the total currency required to
-            execute them, indexed by sender account. Ordered by nonce inside the
-            accounts. *)
+      execute them, indexed by sender account. Ordered by nonce inside the
+      accounts. *)
   ; all_by_fee: User_command.With_valid_signature.Set.t Currency.Fee.Map.t
         (** All transactions in the pool indexed by fee. *)
   ; size: int }
@@ -179,6 +179,13 @@ let member : t -> User_command.With_valid_signature.t -> bool =
       false
   | Some cmds_at_fee ->
       Set.mem cmds_at_fee cmd
+
+let all_from_user :
+    t -> Public_key.Compressed.t -> User_command.With_valid_signature.t list =
+ fun {all_by_sender; _} public_key ->
+  Option.value_map ~default:[] (Map.find all_by_sender public_key)
+    ~f:(fun (user_commands, _) ->
+      Sequence.to_list @@ F_sequence.to_seq user_commands )
 
 (* Remove a command from the applicable_by_fee field. This may break an
    invariant. *)
@@ -356,7 +363,7 @@ let handle_committed_txn :
         in
         let currency_reserved' =
           (* safe since the sum reserved must be >= reserved by any individual
-             command *)
+           command *)
           Option.value_exn
             Currency.Amount.(currency_reserved - first_cmd_consumed)
         in
@@ -579,8 +586,8 @@ let add_from_backtrack : t -> User_command.With_valid_signature.t -> t =
             ~key:
               sender
               (* If the command comes from backtracking, then we know it doesn't
-               cause overflow, so it's OK to throw here.
-              *)
+             cause overflow, so it's OK to throw here.
+          *)
             ~data:(F_sequence.singleton cmd, consumed)
       ; all_by_fee=
           Map_set.insert

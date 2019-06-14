@@ -10,8 +10,7 @@ let seed = "Coda_sample_keypairs"
 
 let random_bool = Crs.create ~seed
 
-module Group = Crypto_params_init.Tick_backend.Inner_curve
-open Tuple_lib
+module Group = Curve_choice.Tick_backend.Inner_curve
 
 let bigint_of_bits bits =
   List.foldi bits ~init:Bigint.zero ~f:(fun i acc b ->

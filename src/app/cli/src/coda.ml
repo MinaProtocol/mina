@@ -4,7 +4,6 @@
 open Core
 open Async
 open Coda_base
-open Blockchain_snark
 open Cli_lib
 open Coda_inputs
 open Signature_lib
@@ -37,6 +36,9 @@ let daemon logger =
     (let%map_open conf_dir =
        flag "config-directory" ~doc:"DIR Configuration directory"
          (optional string)
+     and from_genesis =
+       flag "from-genesis"
+         ~doc:"Indicating that we are starting from genesis or not" no_arg
      and propose_key =
        flag "propose-key"
          ~doc:
@@ -106,9 +108,6 @@ let daemon logger =
                snark proof (default: %d)"
               (Currency.Fee.to_int Cli_lib.Fee.default_snark_worker))
          (optional txn_fee)
-     and sexp_logging =
-       flag "sexp-logging" no_arg
-         ~doc:"Use S-expressions in log output, instead of JSON"
      and enable_tracing =
        flag "tracing" no_arg ~doc:"Trace into $config-directory/$pid.trace"
      and limit_connections =
@@ -206,8 +205,7 @@ let daemon logger =
          or_from_config
            (Fn.compose Option.return
               (Fn.compose work_selection_val YJ.Util.to_string))
-           "work-selection" ~default:Protocols.Coda_pow.Work_selection.Seq
-           work_selection_flag
+           "work-selection" ~default:Cli_lib.Arg_type.Seq work_selection_flag
        in
        let initial_peers_raw =
          List.concat
@@ -317,14 +315,8 @@ let daemon logger =
          let commit_id = commit_id
 
          let work_selection = work_selection
-
-         let max_concurrent_connections = max_concurrent_connections
        end in
-       let%bind (module Init) =
-         make_init
-           ~should_propose:(Option.is_some propose_keypair)
-           (module Config0)
-       in
+       let%bind (module Init) = make_init (module Config0) in
        let module M = Coda_inputs.Make_coda (Init) in
        let module Run = Coda_run.Make (Config0) (M) in
        Stream.iter
@@ -349,13 +341,17 @@ let daemon logger =
        let trust_system = Trust_system.create ~db_dir:trust_dir in
        trace_database_initialization "trust_system" __LOC__ trust_dir ;
        let time_controller =
-         M.Inputs.Time.Controller.create M.Inputs.Time.Controller.basic
+         Block_time.Controller.create Block_time.Controller.basic
+       in
+       let initial_propose_keypairs =
+         Config0.propose_keypair |> Option.to_list |> Keypair.Set.of_list
        in
        let consensus_local_state =
          Consensus.Data.Local_state.create
-           (Option.map Config0.propose_keypair ~f:(fun keypair ->
-                let open Keypair in
-                Public_key.compress keypair.public_key ))
+           ( Option.map Config0.propose_keypair ~f:(fun keypair ->
+                 let open Keypair in
+                 Public_key.compress keypair.public_key )
+           |> Option.to_list |> Public_key.Compressed.Set.of_list )
        in
        let net_config =
          { M.Inputs.Net.Config.logger
@@ -383,10 +379,19 @@ let daemon logger =
        let transaction_database_dir = conf_dir ^/ "transaction" in
        let%bind () = Async.Unix.mkdir ~p:() transaction_database_dir in
        let transaction_database =
-         Transaction_database.create logger transaction_database_dir
+         Auxiliary_database.Transaction_database.create ~logger
+           transaction_database_dir
        in
        trace_database_initialization "transaction_database" __LOC__
          transaction_database_dir ;
+       let external_transition_database_dir =
+         conf_dir ^/ "external_transition_database"
+       in
+       let%bind () = Async.Unix.mkdir ~p:() external_transition_database_dir in
+       let external_transition_database =
+         Auxiliary_database.External_transition_database.create ~logger
+           external_transition_database_dir
+       in
        let monitor = Async.Monitor.create ~name:"coda" () in
        let%bind coda =
          Run.create
@@ -398,13 +403,20 @@ let daemon logger =
               ~ledger_db_location:(conf_dir ^/ "ledger_db")
               ~snark_work_fee:snark_work_fee_flag ~receipt_chain_database
               ~transition_frontier_location ~time_controller
-              ?propose_keypair:Config0.propose_keypair ~monitor
-              ~consensus_local_state ~transaction_database ())
+              ~initial_propose_keypairs ~monitor ~consensus_local_state
+              ~transaction_database ~external_transition_database ())
        in
        Run.handle_shutdown ~monitor ~conf_dir coda ;
        Async.Scheduler.within' ~monitor
        @@ fun () ->
        let%bind () = maybe_sleep 3. in
+       let%bind () =
+         if from_genesis then Deferred.unit
+         else
+           after
+             ( Consensus.Constants.block_window_duration_ms * 2
+             |> Float.of_int |> Time.Span.of_ms )
+       in
        M.start coda ;
        let web_service = Web_pipe.get_service () in
        Web_pipe.run_service (module Run) coda web_service ~conf_dir ~logger ;
@@ -492,25 +504,33 @@ let coda_commands logger =
 [%%if
 integration_tests]
 
+module type Integration_test = sig
+  val name : string
+
+  val command : Async.Command.t
+end
+
 let coda_commands logger =
   let group =
-    [ (Coda_peers_test.name, Coda_peers_test.command)
-    ; (Coda_block_production_test.name, Coda_block_production_test.command)
-    ; (Coda_shared_state_test.name, Coda_shared_state_test.command)
-    ; (Coda_transitive_peers_test.name, Coda_transitive_peers_test.command)
-    ; (Coda_shared_prefix_test.name, Coda_shared_prefix_test.command)
-    ; ( Coda_shared_prefix_multiproposer_test.name
-      , Coda_shared_prefix_multiproposer_test.command )
-    ; (Coda_five_nodes_test.name, Coda_five_nodes_test.command)
-    ; (Coda_restart_node_test.name, Coda_restart_node_test.command)
-    ; (Coda_receipt_chain_test.name, Coda_receipt_chain_test.command)
-    ; ( Coda_restarts_and_txns_holy_grail.name
-      , Coda_restarts_and_txns_holy_grail.command )
-    ; (Coda_bootstrap_test.name, Coda_bootstrap_test.command)
-    ; (Coda_batch_payment_test.name, Coda_batch_payment_test.command)
-    ; (Coda_long_fork.name, Coda_long_fork.command)
-    ; ("full-test", Full_test.command)
-    ; ("transaction-snark-profiler", Transaction_snark_profiler.command) ]
+    List.map
+      ~f:(fun (module T) -> (T.name, T.command))
+      ( [ (module Coda_peers_test)
+        ; (module Coda_block_production_test)
+        ; (module Coda_shared_state_test)
+        ; (module Coda_transitive_peers_test)
+        ; (module Coda_shared_prefix_test)
+        ; (module Coda_shared_prefix_multiproposer_test)
+        ; (module Coda_five_nodes_test)
+        ; (module Coda_restart_node_test)
+        ; (module Coda_receipt_chain_test)
+        ; (module Coda_restarts_and_txns_holy_grail)
+        ; (module Coda_bootstrap_test)
+        ; (module Coda_batch_payment_test)
+        ; (module Coda_long_fork)
+        ; (module Coda_delegation_test)
+        ; (module Full_test)
+        ; (module Transaction_snark_profiler) ]
+        : (module Integration_test) list )
   in
   coda_commands logger
   @ [("integration-tests", Command.group ~summary:"Integration tests" group)]

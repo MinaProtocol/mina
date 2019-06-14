@@ -43,14 +43,14 @@ jobs:
                   command: cd frontend/website && yarn run reformat && git diff --exit-code src
             - run:
                   name: Build website
-                  command: cd frontend/website && yarn run build && (env HOMEBREW_NO_AUTO_UPDATE=1 brew install pandoc) && node ./lib/js/src/Render.js
+                  command: cd frontend/website && (env HOMEBREW_NO_AUTO_UPDATE=1 brew install pandoc) && yarn run build
             - run:
                   name: Deploy staging
                   command: cd frontend/website && (if [ "$CIRCLE_BRANCH" == "master" ]; then yarn run deploy-ci; fi)
 
     lint:
         docker:
-            - image: codaprotocol/coda:toolchain-a667ae88520eaa5acc6eac754dccc724092ff2f2
+            - image: codaprotocol/coda:toolchain-51191cf583a5129255d2c53ad946f6821ad9989c
         steps:
             - checkout
             - run: git submodule sync && git submodule update --init --recursive
@@ -63,6 +63,9 @@ jobs:
             - run:
                   name: Snarky tracks master (make check-snarky-submodule)
                   command: make check-snarky-submodule
+            - run:
+                  name: Check CODEOWNERS file format
+                  command: ./scripts/lint_codeowners.sh
 
     update-branch-protection:
         docker:
@@ -128,7 +131,7 @@ jobs:
     build-artifacts--{{profile}}:
         resource_class: large
         docker:
-            - image: codaprotocol/coda:toolchain-a667ae88520eaa5acc6eac754dccc724092ff2f2
+            - image: codaprotocol/coda:toolchain-51191cf583a5129255d2c53ad946f6821ad9989c
         environment:
             DUNE_PROFILE: {{profile}}
         steps:
@@ -167,20 +170,23 @@ jobs:
     test-unit--{{profile}}:
         resource_class: large
         docker:
-            - image: codaprotocol/coda:toolchain-a667ae88520eaa5acc6eac754dccc724092ff2f2
+            - image: codaprotocol/coda:toolchain-51191cf583a5129255d2c53ad946f6821ad9989c
         steps:
             - checkout
+            - run: ulimit -c unlimited
             - run: git submodule sync && git submodule update --init --recursive
             - run:
                   name: Run unit tests
                   command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && dune build --profile={{profile}} -j8 && dune runtest --profile={{profile}} -j8'
+            - store_artifacts:
+                path: core*
     {%- endfor %}
 
     {%- for profile in test_permutations.keys() | sort %}
     test--{{profile}}:
         resource_class: large
         docker:
-            - image: codaprotocol/coda:toolchain-a667ae88520eaa5acc6eac754dccc724092ff2f2
+            - image: codaprotocol/coda:toolchain-51191cf583a5129255d2c53ad946f6821ad9989c
         steps:
             - checkout
             - run: git submodule sync && git submodule update --init --recursive

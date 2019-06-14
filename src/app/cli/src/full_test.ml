@@ -12,6 +12,8 @@ open O1trace
 
 let pk_of_sk sk = Public_key.of_private_key_exn sk |> Public_key.compress
 
+let name = "full-test"
+
 [%%if
 proof_level = "full"]
 
@@ -41,11 +43,9 @@ let run_test () : unit Deferred.t =
 
         let commit_id = None
 
-        let work_selection = Protocols.Coda_pow.Work_selection.Seq
+        let work_selection = Cli_lib.Arg_type.Seq
       end in
-      let%bind (module Init) =
-        make_init ~should_propose:true (module Config)
-      in
+      let%bind (module Init) = make_init (module Config) in
       let%bind () =
         match Unix.getenv "CODA_TRACING" with
         | Some trace_dir ->
@@ -78,12 +78,23 @@ let run_test () : unit Deferred.t =
       trace_database_initialization "transaction_database" __LOC__
         receipt_chain_dir_name ;
       let transaction_database =
-        Transaction_database.create logger transaction_database_dir
+        Auxiliary_database.Transaction_database.create ~logger
+          transaction_database_dir
       in
-      let time_controller = Main.Inputs.Time.Controller.(create basic) in
+      let%bind external_transition_database_dir =
+        Async.Unix.mkdtemp (temp_conf_dir ^/ "external_transition_database")
+      in
+      trace_database_initialization "external_transition_database" __LOC__
+        external_transition_database_dir ;
+      let external_transition_database =
+        Auxiliary_database.External_transition_database.create ~logger
+          external_transition_database_dir
+      in
+      let time_controller = Block_time.Controller.(create basic) in
       let consensus_local_state =
         Consensus.Data.Local_state.create
-          (Some (Public_key.compress keypair.public_key))
+          (Public_key.Compressed.Set.singleton
+             (Public_key.compress keypair.public_key))
       in
       let net_config =
         Main.Inputs.Net.Config.
@@ -117,7 +128,8 @@ let run_test () : unit Deferred.t =
       let%bind coda =
         Main.create
           (Main.Config.make ~logger ~trust_system ~verifier:Init.verifier
-             ~net_config ~propose_keypair:keypair
+             ~net_config
+             ~initial_propose_keypairs:(Keypair.Set.singleton keypair)
              ~snark_worker_key:
                (Public_key.compress largest_account_keypair.public_key)
              ~transaction_pool_disk_location:
@@ -126,7 +138,7 @@ let run_test () : unit Deferred.t =
              ~wallets_disk_location:(temp_conf_dir ^/ "wallets")
              ~time_controller ~receipt_chain_database
              ~snark_work_fee:(Currency.Fee.of_int 0) ~consensus_local_state
-             ~transaction_database ())
+             ~transaction_database ~external_transition_database ())
       in
       Main.start coda ;
       don't_wait_for
@@ -214,7 +226,7 @@ let run_test () : unit Deferred.t =
           |> Option.value ~default:Currency.Balance.zero
         in
         let%bind p1_res =
-          Run.Commands.send_payment coda (payment :> User_command.t)
+          Run.Commands.send_user_command coda (payment :> User_command.t)
         in
         assert_ok (p1_res |> Participating_state.active_exn) ;
         (* Send a similar payment twice on purpose; this second one will be rejected
@@ -224,7 +236,7 @@ let run_test () : unit Deferred.t =
             (Currency.Fee.of_int 0)
         in
         let%bind p2_res =
-          Run.Commands.send_payment coda (payment' :> User_command.t)
+          Run.Commands.send_user_command coda (payment' :> User_command.t)
         in
         assert_ok (p2_res |> Participating_state.active_exn) ;
         (* The payment fails, but the rpc command doesn't indicate that because that
@@ -245,24 +257,29 @@ let run_test () : unit Deferred.t =
           amount balance_sheet fee =
         let payment = build_payment amount sender_sk receiver_pk fee in
         let new_balance_sheet =
-          Map.update balance_sheet sender_pk (fun v ->
+          Map.update balance_sheet sender_pk ~f:(fun v ->
               Option.value_exn
                 (Currency.Balance.sub_amount (Option.value_exn v)
                    (Option.value_exn (Currency.Amount.add_fee amount fee))) )
         in
         let new_balance_sheet' =
-          Map.update new_balance_sheet receiver_pk (fun v ->
+          Map.update new_balance_sheet receiver_pk ~f:(fun v ->
               Option.value_exn
                 (Currency.Balance.add_amount (Option.value_exn v) amount) )
         in
         let%map p_res =
-          Run.Commands.send_payment coda (payment :> User_command.t)
+          Run.Commands.send_user_command coda (payment :> User_command.t)
         in
         p_res |> Participating_state.active_exn |> assert_ok ;
         new_balance_sheet'
       in
-      let send_payments accounts pks balance_sheet f_amount =
-        Deferred.List.foldi accounts ~init:balance_sheet
+      let pks accounts =
+        List.map accounts ~f:(fun ((keypair : Signature_lib.Keypair.t), _) ->
+            Public_key.compress keypair.public_key )
+      in
+      let send_payments accounts ~txn_count balance_sheet f_amount =
+        let pks = pks accounts in
+        Deferred.List.foldi (List.take accounts txn_count) ~init:balance_sheet
           ~f:(fun i acc ((keypair : Signature_lib.Keypair.t), _) ->
             let sender_pk = Public_key.compress keypair.public_key in
             let receiver =
@@ -281,7 +298,7 @@ let run_test () : unit Deferred.t =
         let cond t = Option.is_some @@ Run.For_tests.ledger_proof t in
         wait_until_cond ~f:cond ~timeout
       in
-      let test_multiple_payments accounts pks timeout =
+      let test_multiple_payments accounts ~txn_count timeout =
         let balance_sheet =
           Public_key.Compressed.Map.of_alist_exn
             (List.map accounts
@@ -290,7 +307,7 @@ let run_test () : unit Deferred.t =
                  , account.Account.Poly.balance ) ))
         in
         let%bind updated_balance_sheet =
-          send_payments accounts pks balance_sheet (fun i ->
+          send_payments accounts ~txn_count balance_sheet (fun i ->
               Currency.Amount.of_int ((i + 1) * 10) )
         in
         (*After mining a few blocks and emitting a ledger_proof (by the parallel scan), check if the balances match *)
@@ -308,10 +325,6 @@ let run_test () : unit Deferred.t =
         in
         test_sending_payment sender_keypair.private_key
           (Public_key.compress receiver_keypair.public_key)
-      in
-      let pks accounts =
-        List.map accounts ~f:(fun ((keypair : Signature_lib.Keypair.t), _) ->
-            Public_key.compress keypair.public_key )
       in
       (*Need some accounts from the genesis ledger to test payment replays and
         sending multiple payments*)
@@ -348,7 +361,7 @@ let run_test () : unit Deferred.t =
       if with_snark then
         let accounts = List.take other_accounts 2 in
         let%bind block_count' =
-          test_multiple_payments accounts (pks accounts) 15.
+          test_multiple_payments accounts ~txn_count:1 15.
         in
         (*wait for a block after the ledger_proof is emitted*)
         let%map () =
@@ -359,12 +372,13 @@ let run_test () : unit Deferred.t =
         assert (block_count coda > block_count')
       else
         let%bind _ =
-          test_multiple_payments other_accounts (pks other_accounts) 7.
+          test_multiple_payments other_accounts
+            ~txn_count:(List.length other_accounts)
+            7.
         in
         test_duplicate_payments sender_keypair receiver_keypair )
 
 let command =
-  let open Core in
   let open Async in
   Command.async ~summary:"Full coda end-to-end test"
     (Command.Param.return run_test)

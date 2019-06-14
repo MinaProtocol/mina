@@ -2,7 +2,7 @@ open Core
 open Async
 
 module Inputs = struct
-  module Ledger_proof = Ledger_proof.Debug.Stable.V1
+  module Ledger_proof = Ledger_proof.Debug
 
   module Worker_state = struct
     include Unit

@@ -198,7 +198,7 @@ end = struct
           go acc (i - 1) l ~f ;
           go (acc + (1 lsl i)) (i - 1) r ~f
     in
-    go 0 t.depth t.tree ~f
+    go 0 (t.depth - 1) t.tree ~f
 
   let ith_bit idx i = (idx lsr i) land 1 = 1
 
@@ -317,7 +317,7 @@ let%test_module "sparse-ledger-test" =
       [@@deriving sexp, eq]
 
       [%%define_locally
-      Stable.Latest.(key, gen, data_hash)]
+      Stable.Latest.(key, gen)]
     end
 
     module Key = struct
@@ -333,7 +333,7 @@ let%test_module "sparse-ledger-test" =
         module Latest = V1
       end
 
-      type t = Stable.Latest.t [@@deriving eq, sexp]
+      type t = Stable.Latest.t [@@deriving sexp]
     end
 
     include Make (Hash.Stable.Latest) (Key.Stable.Latest)
@@ -380,6 +380,16 @@ let%test_module "sparse-ledger-test" =
       let%bind depth = Int.gen_incl 0 16 in
       let%map tree = gen depth >>| prune_hash_branches in
       {Poly.tree; depth; indexes= indexes depth tree}
+
+    let%test_unit "iteri consistent indices with t.indexes" =
+      Quickcheck.test gen ~f:(fun t ->
+          let indexes = Int.Set.of_list (t.indexes |> List.map ~f:snd) in
+          iteri t ~f:(fun i _ ->
+              [%test_result: bool]
+                ~message:
+                  "Iteri index should be contained in the indexes auxillary \
+                   structure"
+                ~expect:true (Int.Set.mem indexes i) ) )
 
     let%test_unit "path_test" =
       Quickcheck.test gen ~f:(fun t ->

@@ -1,18 +1,20 @@
 /src/ @imeckler
 /CODEOWNERS @imeckler @bkase
-/frontend/ @schmavery @bkase
+/frontend/ @schmavery @bkase @figitaki
 /dockerfiles/ @jkrauska
 /rfcs/ @imeckler @es92 @bkase
-/docs/ @rbkhmrcr @imeckler @bkase @nholland94 @cmr
-/scripts/ @nholland94 @jkrauska
+/docs/ @rbkhmrcr @imeckler @bkase @nholland94 @cmr @o1pranay
+/scripts/ @nholland94 @jkrauska @cmr
 /Makefile @jkrauska
-/config/ @imeckler @nholland94
+/src/config/ @imeckler @nholland94
 /CODE_OF_CONDUCT.md @imeckler @cmr
 /CONTRIBUTING.md @imeckler @cmr
 /DIRECTORY_STRUCTURE.md @imeckler @jkrauska
 /LICENSE @imeckler
-/README* @cmr
+/README.md @cmr @imeckler @o1pranay
+/README-dev.md @cmr @imeckler @o1pranay
 /azure-pipelines.yml @jkrauska
+/.circleci @jkrauska @bkase
 
 /src/app/cli/ @cmr @nholland94 @bkase
 /src/app/kademlia-haskell/ @bkase @enolan
@@ -21,19 +23,18 @@
 /src/app/reformat/ @bkase
 /src/app/testone/ @johnwu93
 /src/app/trace-tool/ @cmr
-/src/app/website/ @bkase @schmavery
+/src/app/website/ @bkase @schmavery @figitaki
 
+/src/lib/base58_check/ @psteckler @cmr
 /src/lib/bignum_bigint/ @nholland94 @bkase
 /src/lib/blake2/ @rbkhmrcr @vanishreerao
 /src/lib/blockchain_snark/ @nholland94 @bkase
 /src/lib/bootstrap_controller/ @nholland94 @johnwu93
 /src/lib/cache_dir/ @cmr
-/src/lib/cached/ @nholland94
+/src/lib/cache_lib/ @nholland94
 /src/lib/chunked_triples/ @psteckler @rbkhmrcr @vanishreerao
 /src/lib/cli_lib/ @johnwu93
 /src/lib/coda_base/ @cmr @nholland94 @bkase
-/src/lib/coda_base/pending_coinbase* @deepthiskumar
-/src/lib/coda_base/coinbase* @deepthiskumar
 /src/lib/coda_compile_config/ @nholland94
 /src/lib/coda_debug/ @nholland94
 /src/lib/coda_networking/ @cmr
@@ -53,11 +54,9 @@
 /src/lib/dyn_array/ @johnwu93
 /src/lib/empty_hashes/ @johnwu93
 /src/lib/envelope/ @psteckler @cmr
-/src/lib/external_transition_validation/ @nholland94
-/src/lib/file_stack_database/ @johnwu93 @bkase
 /src/lib/file_system/ @johnwu93 @bkase
 /src/lib/genesis_ledger/ @nholland94 @bkase @cmr
-/src/lib/global_signer_private_key/ @nholland94 # dead code?
+/src/lib/global_signer_private_key/ @nholland94
 /src/lib/gossip_net/ @cmr
 /src/lib/group_map/ @rbkhmrcr @vanishreerao
 /src/lib/hash_prefixes/ @rbkhmrcr @vanishreerao
@@ -92,19 +91,16 @@
 /src/lib/pipe_lib/ @nholland94
 /src/lib/pokolog/ @bkase @vanishreerao @rbkhmrcr
 /src/lib/ppx_coda/ @psteckler @mrmr1993
-/src/lib/ppx_snarky/ @mrmr1993
 /src/lib/ppx_util/ @mrmr1993
 /src/lib/precomputed_values/ @cmr @bkase
 /src/lib/proof_carrying_data/ @psteckler @bkase
 /src/lib/proposer/ @nholland94 @cmr
-/src/lib/protocol_state_validator/ @nholland94
 /src/lib/prover/ @nholland94 @bkase
 /src/lib/quickcheck_lib/ @nholland94 @ghost-not-in-the-shell
 /src/lib/random_oracle/ @cmr
 /src/lib/rc_pool/ @nholland94 @cmr
 /src/lib/receipt_chain_database_lib/ @johnwu93
 /src/lib/rocksdb/ @psteckler @nholland94
-/src/lib/rocksdb_database/ @psteckler @nholland94
 /src/lib/root_history/ @cmr
 /src/lib/root_prover/ @johnwu93 @bkase
 /src/lib/rose_tree/ @bkase @nholland94
@@ -134,10 +130,9 @@
 /src/lib/sync_handler/ @cmr
 /src/lib/sync_status/ @johnwu93
 /src/lib/syncable_ledger/ @cmr @enolan
-/src/lib/test_mocks/ @nholland94
 /src/lib/test_util/ @nholland94
 /src/lib/time_simulator/ @bkase
-/src/lib/transaction_database/ @johnwu93 @bkase
+/src/lib/auxiliary_database/ @johnwu93 @bkase
 /src/lib/transaction_pool/ @enolan
 /src/lib/transaction_snark/ @deepthiskumar @bkase
 /src/lib/transaction_snark_scan_state/ @deepthiskumar

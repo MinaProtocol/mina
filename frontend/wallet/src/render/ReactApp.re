@@ -1,14 +1,17 @@
 [@react.component]
 let make = () => {
-  let settingsValue = SettingsProvider.createContext();
+  let settingsValue = AddressBookProvider.createContext();
+  let dispatch = CodaProcess.useHook();
 
-  <SettingsProvider value=settingsValue>
-    <ReasonApollo.Provider client=Apollo.faker>
-      <Window>
-        <Header />
-        <Main> <SideBar /> <Router /> </Main>
-        <Footer />
-      </Window>
-    </ReasonApollo.Provider>
-  </SettingsProvider>;
+  <AddressBookProvider value=settingsValue>
+    <ProcessDispatchProvider value=dispatch>
+      <ReasonApollo.Provider client=Apollo.client>
+        <Window>
+          <Header />
+          <Main> <SideBar /> <Router /> </Main>
+          <Footer />
+        </Window>
+      </ReasonApollo.Provider>
+    </ProcessDispatchProvider>
+  </AddressBookProvider>;
 };

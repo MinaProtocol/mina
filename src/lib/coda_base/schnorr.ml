@@ -22,7 +22,8 @@ module Message = struct
         Fold.(User_command_payload.fold t +> of_list nonce)
     in
     Scalar.of_bits
-      (Random_oracle.digest_field d |> Random_oracle.Digest.to_bits)
+      ( Random_oracle.digest_field d
+      |> Random_oracle.Digest.to_bits |> Array.to_list )
 
   let () = assert Insecure.signature_hash_function
 

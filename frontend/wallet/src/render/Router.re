@@ -1,10 +1,12 @@
 module Styles = {
   open Css;
 
-  let container = style([width(`percent(100.)), overflow(`scroll)]);
+  let container =
+    style([
+      width(`percent(100.)),
+      overflow(`hidden),
+    ]);
 };
-
-let navigate = route => ReasonReact.Router.push("#" ++ Route.print(route));
 
 [@react.component]
 let make = () => {
@@ -12,7 +14,9 @@ let make = () => {
   <div className=Styles.container>
     {switch (url.path) {
      | ["settings"] => <SettingsPage />
-     | _ => <TransactionsView />
+     | ["settings", publicKey] =>
+       <WalletSettings publicKey={PublicKey.uriDecode(publicKey)} />
+     | _ => <Transactions />
      }}
   </div>;
 };

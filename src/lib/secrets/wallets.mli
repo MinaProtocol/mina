@@ -10,3 +10,8 @@ val generate_new : t -> Public_key.Compressed.t Deferred.t
 val pks : t -> Public_key.Compressed.t list
 
 val find : t -> needle:Public_key.Compressed.t -> Keypair.t option
+
+val get_path : t -> Public_key.Compressed.t -> string
+
+val delete :
+  t -> Public_key.Compressed.t -> (unit, [`Not_found]) Deferred.Result.t

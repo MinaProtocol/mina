@@ -32,11 +32,14 @@ module Rimraf = {
   [@bs.val] [@bs.module "rimraf"] external sync: string => unit = "";
 };
 
-Array.length(Sys.argv) > 2 && Sys.argv[2] == "prod"
+Array.length(Sys.argv) > 2
+&& (Sys.argv[2] == "prod" || Sys.argv[2] == "staging")
   ? {
-    Links.Cdn.prefix := "https://cdn.codaprotocol.com/v2";
+    Links.Cdn.prefix := "https://cdn.codaprotocol.com/v4";
   }
   : ();
+
+Style.Typeface.load();
 
 let writeStatic = (path, rootComponent) => {
   let rendered =
@@ -118,8 +121,8 @@ let jobOpenings = [|
 
 Rimraf.sync("site");
 
-let blogPage =
-  <Page page=`Blog name="blog" extraHeaders={Blog.extraHeaders()}>
+let blogPage = name =>
+  <Page page=`Blog name extraHeaders={Blog.extraHeaders()}>
     <Wrapped> <Blog posts /> </Wrapped>
   </Page>;
 
@@ -156,7 +159,7 @@ Router.(
                  </Page>,
                )
              )
-          |> Array.append([|File("index", blogPage)|]),
+          |> Array.append([|File("index", blogPage("index"))|]),
         ),
         Dir(
           "jobs",
@@ -193,7 +196,7 @@ Router.(
             <Wrapped> <Testnet /> </Wrapped>
           </Page>,
         ),
-        File("blog", blogPage),
+        File("blog", blogPage("blog")),
         File(
           "privacy",
           <Page page=`Privacy name="privacy">

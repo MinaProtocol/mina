@@ -116,25 +116,19 @@ let%test_module "network pool test" =
         module V1 = struct
           module T = struct
             type t = int
-            [@@deriving sexp, bin_io, yojson, version {unnumbered}]
+            [@@deriving bin_io, sexp, yojson, version {unnumbered}]
           end
 
           include T
-
-          type input = Int.t
-
-          let verify _ _ = return true
-
-          let gen = Int.quickcheck_generator
         end
       end
+
+      include Stable.V1.T
     end
 
     module Mock_work = struct
       module T = struct
         type t = Int.t [@@deriving sexp, hash, compare, yojson]
-
-        let gen = Int.quickcheck_generator
       end
 
       include T
@@ -174,30 +168,12 @@ let%test_module "network pool test" =
         reader
     end
 
-    module Mock_fee = struct
-      module Stable = struct
-        module V1 = struct
-          module T = struct
-            type t = int
-            [@@deriving bin_io, yojson, sexp, version {unnumbered}]
-          end
-
-          include T
-          include Comparable.Make (Int)
-        end
-      end
-    end
-
     let trust_system = Trust_system.null ()
 
     module Mock_snark_pool =
-      Snark_pool.Make (Mock_proof.Stable.V1) (Mock_fee.Stable.V1) (Mock_work)
-        (Mock_transition_frontier)
+      Snark_pool.Make (Mock_proof) (Mock_work) (Mock_transition_frontier)
     module Mock_snark_pool_diff =
-      Snark_pool_diff.Make (Mock_proof.Stable.V1) (Mock_fee.Stable.V1)
-        (Mock_work)
-        (Int)
-        (Mock_snark_pool)
+      Snark_pool_diff.Make (Mock_proof) (Mock_work) (Int) (Mock_snark_pool)
     module Mock_network_pool =
       Make (Mock_transition_frontier) (Mock_snark_pool) (Mock_snark_pool_diff)
 
@@ -214,7 +190,10 @@ let%test_module "network pool test" =
       in
       let work = 1 in
       let priced_proof =
-        {Mock_snark_pool_diff.Priced_proof.proof= 0; fee= 0}
+        { Snark_pool.Priced_proof.proof= []
+        ; fee=
+            { fee= Currency.Fee.of_int 0
+            ; prover= Signature_lib.Public_key.Compressed.empty } }
       in
       let command =
         Snark_pool_diff.Diff.Add_solved_work (work, priced_proof)
@@ -242,8 +221,13 @@ let%test_module "network pool test" =
           List.map works ~f:(fun work ->
               Envelope.Incoming.local
                 (Snark_pool_diff.Diff.Add_solved_work
-                   (work, Mock_snark_pool_diff.Priced_proof.{proof= 0; fee= 0}))
-          )
+                   ( work
+                   , Snark_pool.Priced_proof.
+                       { proof= []
+                       ; fee=
+                           { fee= Currency.Fee.of_int 0
+                           ; prover= Signature_lib.Public_key.Compressed.empty
+                           } } )) )
           |> Linear_pipe.of_list
         in
         let frontier_broadcast_pipe_r, _ =
