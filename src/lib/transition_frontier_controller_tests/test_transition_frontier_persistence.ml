@@ -1,4 +1,4 @@
-open Async
+(* open Async
 open Core
 open Pipe_lib
 
@@ -210,4 +210,4 @@ let%test_module "Transition Frontier Persistence" =
     (* TODO: create a test where a batch of diffs are being applied, but the
        worker dies in the middle. The transition_frontier_database can be left
        in a bad state and it needs a way to recover from it. *)
-  end )
+  end ) *)

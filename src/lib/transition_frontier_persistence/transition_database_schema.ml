@@ -1,4 +1,4 @@
-open Core_kernel
+(* open Core_kernel
 open Coda_base
 
 module Make (Inputs : Transition_frontier.Inputs_intf) :
@@ -73,4 +73,4 @@ module Make (Inputs : Transition_frontier.Inputs_intf) :
           (module Unit)
           ~to_gadt:(fun _ -> Root)
           ~of_gadt:(fun Root -> ())
-end
+end *)

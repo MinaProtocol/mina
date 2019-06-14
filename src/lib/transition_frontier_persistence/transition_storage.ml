@@ -1,4 +1,4 @@
-open Core
+(* open Core
 open Coda_base
 
 module Make (Inputs : Transition_frontier.Inputs_intf) = struct
@@ -21,4 +21,4 @@ module Make (Inputs : Transition_frontier.Inputs_intf) = struct
         | Root ->
             log_error "Could not retrieve root" ;
             failwith "Could not retrieve root" )
-end
+end *)

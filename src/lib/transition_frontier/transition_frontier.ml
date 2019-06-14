@@ -40,10 +40,40 @@ module Make (Inputs : Inputs.Inputs_intf) :
       (* TODO: Mutant is just the old best tip *)
       | Best_tip_changed : Breadcrumb.t -> External_transition.Validated.t t
 
+    let name : type a. a t -> string = function
+      | Root_transitioned _ ->
+          "Root_transitioned"
+      | New_breadcrumb _ ->
+          "New_breadcrumb"
+      | Best_tip_changed _ ->
+          "Best_tip_changed"
+
+    let key_to_yojson (type a) (key : a t) =
+      let json_key =
+        match key with
+        | New_breadcrumb breadcrumb ->
+            State_hash.to_yojson (Breadcrumb.state_hash breadcrumb)
+        | Root_transitioned {new_; garbage} ->
+            `Assoc
+              [ ("new_root", State_hash.to_yojson (Breadcrumb.state_hash new_))
+              ; ( "garbage"
+                , `List
+                    (List.map
+                       ~f:
+                         (Fn.compose State_hash.to_yojson Breadcrumb.state_hash)
+                       garbage) ) ]
+        | Best_tip_changed breadcrumb ->
+            State_hash.to_yojson (Breadcrumb.state_hash breadcrumb)
+      in
+      `List [`String (name key); json_key]
+
     type 'a diff_mutant = 'a t
 
     module E = struct
       type t = E : 'output diff_mutant -> t
+
+      (* let to_yojson = function
+        | E (New_breadcrumb breadcrumb) ->  *)
     end
   end
 
@@ -140,9 +170,6 @@ module Make (Inputs : Inputs.Inputs_intf) :
       breadcrumb =
     O1trace.measure "calculate_diffs" (fun () ->
         let logger = transition_frontier.logger in
-        let hash =
-          With_hash.hash (Breadcrumb.transition_with_hash breadcrumb)
-        in
         let root = Transition_frontier_base.root transition_frontier in
         let new_breadcrumb_diff = Diff.New_breadcrumb breadcrumb in
         let best_tip_breadcrumb =
@@ -164,7 +191,10 @@ module Make (Inputs : Inputs.Inputs_intf) :
               Some (Diff.Best_tip_changed breadcrumb)
         in
         let new_breadcrumb_length =
-          Option.value_exn (length_at_transition transition_frontier hash) + 1
+          Option.value_exn
+            (length_at_transition transition_frontier
+               (Breadcrumb.parent_hash breadcrumb))
+          + 1
         in
         let root_length =
           Option.value_exn
@@ -174,6 +204,7 @@ module Make (Inputs : Inputs.Inputs_intf) :
         let distance_to_root = new_breadcrumb_length - root_length in
         let root_transitioned_diff =
           if distance_to_root > max_length then (
+            printf "\nCreating a new root\n" ;
             Logger.info logger ~module_:__MODULE__ ~location:__LOC__
               !"Distance to parent: %d exceeded max_lenth %d"
               distance_to_root max_length ;
@@ -216,6 +247,8 @@ module Make (Inputs : Inputs.Inputs_intf) :
             Some (Diff.Root_transitioned {new_= root; garbage= bad_children}) )
           else None
         in
+        Logger.trace transition_frontier.logger ~module_:__MODULE__
+          ~location:__LOC__ ;
         Diff.E.E new_breadcrumb_diff
         :: List.filter_opt
              [ Option.map new_best_tip_diff ~f:(fun diff -> Diff.E.E diff)
@@ -341,6 +374,11 @@ module Make (Inputs : Inputs.Inputs_intf) :
         <- Breadcrumb.state_hash new_best_tip_breadcrumb
     | Diff.E.E (Root_transitioned {new_; garbage}) -> (
         (* TODO: probably divide this up *)
+        assert (
+          not
+          @@ List.mem garbage new_
+               ~equal:
+                 (Comparable.lift State_hash.equal ~f:Breadcrumb.state_hash) ) ;
         let old_consensus_state =
           Transition_frontier_base.consensus_local_state transition_frontier
         in

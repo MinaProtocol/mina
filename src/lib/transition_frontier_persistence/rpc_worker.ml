@@ -1,4 +1,4 @@
-open Core
+(* open Core
 open Async
 
 module Make (Inputs : Intf.Worker_inputs) = struct
@@ -102,4 +102,4 @@ module Make (Inputs : Intf.Worker_inputs) = struct
   let handle_diff {connection; _} hash diff =
     Rpc_worker.Connection.run connection ~f:Rpc_worker.functions.handle_diff
       ~arg:(hash, diff)
-end
+end *)

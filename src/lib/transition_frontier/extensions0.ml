@@ -106,6 +106,7 @@ struct
       let mem {history; _} = Queue.mem history
 
       let enqueue {history; capacity} breadcrumb =
+        (* printf !"Enqueuing breadcrumb with backtrace: %s" (Printexc.get_backtrace ()); *)
         if Queue.length history >= capacity then
           Queue.dequeue_front_exn history |> ignore ;
         Queue.enqueue_back history
@@ -136,9 +137,8 @@ struct
 
     type view = View.t
 
-    let create breadcrumb =
+    let create (_ : Breadcrumb.t) =
       let root_history = T.create (2 * Inputs.max_length) in
-      T.enqueue root_history breadcrumb ;
       (root_history, View.to_view root_history)
 
     let handle_diffs root_history transition_frontier diffs =
@@ -387,14 +387,6 @@ struct
     ; transition_registry: Broadcast.Transition_registry.t }
   [@@deriving fields]
 
-  (* type readers = 
-    {
-      root_history: Root_history.view Broadcast_pipe.Reader.t
-    ; snark_pool_refcount: Snark_pool_refcount.view Broadcast_pipe.Reader.t
-    ; best_tip_diff: Best_tip_diff.view Broadcast_pipe.Reader.t
-    ; transition_registry: Transition_registry.view Broadcast_pipe.Reader.t
-    } *)
-
   let create (breadcrumb : Breadcrumb.t) : t Deferred.t =
     let open Broadcast in
     let%bind root_history = Root_history.create breadcrumb in
@@ -429,6 +421,8 @@ struct
     Fields.fold ~init:Deferred.unit
       ~root_history:(run_update (module Root_history))
       ~snark_pool_refcount:(run_update (module Snark_pool_refcount))
-      ~best_tip_diff:(run_update (module Best_tip_diff))
+      ~best_tip_diff:
+        (run_update (module Best_tip_diff))
+        (* ~best_tip_diff:(fun _ _ -> Deferred.unit) *)
       ~transition_registry:(run_update (module Transition_registry))
 end

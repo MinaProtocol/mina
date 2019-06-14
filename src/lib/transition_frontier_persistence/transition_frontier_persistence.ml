@@ -1,4 +1,4 @@
-open Core_kernel
+(* open Core_kernel
 open Coda_base
 open Coda_state
 open Async_kernel
@@ -248,4 +248,4 @@ module Make (Inputs : Intf.Main_inputs) = struct
   module For_tests = struct
     let write_diff_and_verify = write_diff_and_verify
   end
-end
+end *)

@@ -347,24 +347,26 @@ module Make (Inputs : Inputs.Inputs_intf) = struct
 
   let common_ancestor t (bc1 : Breadcrumb.t) (bc2 : Breadcrumb.t) :
       State_hash.t =
-    let rec go ancestors1 ancestors2 sh1 sh2 =
+    let rec go ancestors1 ancestors2 b1 b2 =
+      let sh1 = Breadcrumb.state_hash b1 in
+      let sh2 = Breadcrumb.state_hash b2 in
       Hash_set.add ancestors1 sh1 ;
       Hash_set.add ancestors2 sh2 ;
       if Hash_set.mem ancestors1 sh2 then sh2
       else if Hash_set.mem ancestors2 sh1 then sh1
       else
-        let parent_unless_root sh =
-          if State_hash.equal sh t.root then sh
-          else find_exn t sh |> Breadcrumb.parent_hash
+        let parent_unless_root breadcrumb =
+          if State_hash.equal (Breadcrumb.state_hash breadcrumb) t.root then
+            breadcrumb
+          else find_exn t (Breadcrumb.parent_hash breadcrumb)
         in
-        go ancestors1 ancestors2 (parent_unless_root sh1)
-          (parent_unless_root sh2)
+        go ancestors1 ancestors2 (parent_unless_root b1)
+          (parent_unless_root b2)
     in
     go
       (Hash_set.create (module State_hash) ())
       (Hash_set.create (module State_hash) ())
-      (Breadcrumb.state_hash bc1)
-      (Breadcrumb.state_hash bc2)
+      bc1 bc2
 
   (* Visualize the structure of the transition frontier or a particular node
    * within the frontier (for debugging purposes). *)

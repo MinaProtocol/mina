@@ -1,4 +1,4 @@
-open Coda_base
+(* open Coda_base
 open Async_kernel
 open Pipe_lib
 
@@ -134,4 +134,4 @@ module type S = sig
     -> root_snarked_ledger:Ledger.Db.t
     -> consensus_local_state:Consensus.Data.Local_state.t
     -> frontier Deferred.t
-end
+end *)

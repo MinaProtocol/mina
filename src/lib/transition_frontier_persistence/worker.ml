@@ -1,4 +1,4 @@
-open Core
+(* open Core
 open Coda_base
 open Coda_state
 open Async
@@ -128,4 +128,4 @@ module Make_async (Inputs : Intf.Worker_inputs) = struct
 
   let handle_diff t acc_hash diff_mutant =
     Deferred.Or_error.return (handle_diff t acc_hash diff_mutant)
-end
+end *)
