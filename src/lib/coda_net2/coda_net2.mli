@@ -115,7 +115,7 @@ module Pubsub : sig
   val register_validator :
        net
     -> string
-    -> f:(peerid:string -> data:string -> bool Deferred.t)
+    -> f:(peerid:PeerID.t -> data:string -> bool Deferred.t)
     -> unit Deferred.Or_error.t
 end
 
