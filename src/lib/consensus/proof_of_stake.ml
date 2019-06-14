@@ -1856,7 +1856,7 @@ module Data = struct
             (Global_slot.create ~epoch:next_epoch ~slot:next_slot)
       ; checkpoints }
 
-    module M = Snarky.Snark.Run.Make (Curve_choice.Tick_backend)
+    module M = Snarky.Snark.Run.Make (Curve_choice.Tick_backend) (Unit)
 
     let m : M.field Snarky.Snark.m = (module M)
 
@@ -1882,7 +1882,8 @@ module Data = struct
         .less
 
     let same_checkpoint_window ~prev ~next =
-      M.make_checked (fun () -> same_checkpoint_window ~prev ~next)
+      with_state (As_prover.return ())
+        (M.make_checked (fun () -> same_checkpoint_window ~prev ~next))
 
     let negative_one : Value.t =
       { Poly.length= Length.zero
@@ -2514,24 +2515,11 @@ module Hooks = struct
       |> Option.value
            ~default:
              ( "default case"
-             , "candidate virtual min-length is longer than existing virtual \
-                min-length"
+             , "candidate length is longer than existing length"
              , lazy
-                 (let newest_epoch =
-                    Epoch.max existing.curr_epoch candidate.curr_epoch
-                  in
-                  let virtual_min_length (s : Consensus_state.Value.t) =
-                    if Epoch.(succ s.curr_epoch < newest_epoch) then
-                      Length.zero (* There is a gap of an entire epoch *)
-                    else if Epoch.(succ s.curr_epoch = newest_epoch) then
-                      Length.(
-                        min s.min_length_of_epoch s.curr_epoch_data.length)
-                      (* Imagine the latest epoch was padded out with zeroes to reach the newest_epoch *)
-                    else s.min_length_of_epoch
-                  in
-                  Length.(
-                    virtual_min_length existing < virtual_min_length candidate))
-             )
+                 (* TODO: THIS IS INSECURE! See #2643.
+                    Undo this hack once the min_length_of_epoch bug is fixed *)
+                 Length.(existing.length < candidate.length) )
     in
     let choice = if Lazy.force should_take then `Take else `Keep in
     log_choice ~precondition_msg ~choice_msg choice ;

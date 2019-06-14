@@ -60,16 +60,18 @@ let%test_unit "group-map test" =
       ~a:Tick_backend.Inner_curve.Coefficients.a
       ~b:Tick_backend.Inner_curve.Coefficients.b
   in
-  let module M = Snarky.Snark.Run.Make (Tick_backend) in
+  let module M = Snarky.Snark.Run.Make (Tick_backend) (Unit) in
   Quickcheck.test ~trials:3 Tick0.Field.gen ~f:(fun t ->
-      let checked_output =
-        M.run_and_check (fun () ->
+      let (), checked_output =
+        M.run_and_check
+          (fun () ->
             let x, y =
               Snarky_group_map.Checked.to_group
                 (module M)
                 ~params (M.Field.constant t)
             in
             fun () -> M.As_prover.(read_var x, read_var y) )
+          ()
         |> Or_error.ok_exn
       in
       [%test_eq: Tick0.Field.t * Tick0.Field.t] checked_output
@@ -710,8 +712,17 @@ let set_chunked_hashing b = Tick.Pedersen.State.set_chunked_fold b
 [%%inject
 "scan_state_work_delay_factor", scan_state_work_delay_factor]
 
+[%%inject
+"scan_state_latency_factor", scan_state_latency_factor]
+
 let pending_coinbase_depth =
-  scan_state_transaction_capacity_log_2 + scan_state_work_delay_factor
+  let working_levels =
+    scan_state_transaction_capacity_log_2 + scan_state_work_delay_factor
+    - scan_state_latency_factor + 1
+  in
+  let root_nodes = Int.pow 2 scan_state_latency_factor in
+  let total_stacks = working_levels * root_nodes in
+  Int.ceil_log2 total_stacks
 
 (* Let n = Tick.Field.size_in_bits.
    Let k = n - 3.
