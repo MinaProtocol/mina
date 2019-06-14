@@ -527,9 +527,7 @@ let listen_on net ma =
       Error e
 
 let listening_addrs net =
-  match%map
-    Helper.do_rpc net "listeningAddrs" []
-  with
+  match%map Helper.do_rpc net "listeningAddrs" [] with
   | Ok (`List maddrs) ->
       let lots =
         List.map
@@ -762,34 +760,38 @@ let%test_module "coda network tests" =
       "This is a test. This is a test of the Outdoor Warning System. This is \
        only a test."
 
+    let setup_two_nodes network_id =
+      let%bind a =
+        create
+          ~logger:(Logger.extend logger [("name", `String "a")])
+          ~conf_dir:"/tmp/a"
+        >>| Or_error.ok_exn
+      in
+      let%bind b =
+        create
+          ~logger:(Logger.extend logger [("name", `String "b")])
+          ~conf_dir:"/tmp/b"
+        >>| Or_error.ok_exn
+      in
+      let%bind kp_a = Keypair.random a >>| Or_error.ok_exn in
+      let%bind kp_b = Keypair.random a >>| Or_error.ok_exn in
+      let maddrs = ["/ip4/127.0.0.1/tcp/0"] in
+      let network_id = "test_stream" in
+      let%bind () =
+        configure a ~me:kp_a ~maddrs ~network_id >>| Or_error.ok_exn
+      in
+      let%map () =
+        configure b ~me:kp_b ~maddrs ~network_id >>| Or_error.ok_exn
+      in
+      (a, b)
+
     let%test_unit "stream" =
       let test_def =
         let open Deferred.Let_syntax in
-        let%bind a =
-          create
-            ~logger:(Logger.extend logger [("name", `String "a")])
-            ~conf_dir:"/tmp/a"
-          >>| Or_error.ok_exn
-        in
-        let%bind b =
-          create
-            ~logger:(Logger.extend logger [("name", `String "b")])
-            ~conf_dir:"/tmp/b"
-          >>| Or_error.ok_exn
-        in
-        let%bind kp_a = Keypair.random a >>| Or_error.ok_exn in
-        let%bind kp_b = Keypair.random a >>| Or_error.ok_exn in
-        let a_peerid = Keypair.to_peerid kp_a in
-        let maddrs = ["/ip4/127.0.0.1/tcp/0"] in
-        let network_id = "test_stream" in
-        let%bind () =
-          configure a ~me:kp_a ~maddrs ~network_id >>| Or_error.ok_exn
-        in
-        let%bind () =
-          configure b ~me:kp_b ~maddrs ~network_id >>| Or_error.ok_exn
-        in
+        let%bind a, b = setup_two_nodes "test_stream" in
+        let a_peerid = Keypair.to_peerid (me a |> Option.value_exn) in
         (* Give the libp2p helpers time to see each other. *)
-        let%bind () = after (sec 1.) in
+        let%bind () = after (sec 0.5) in
         let handler_finished = ref false in
         let%bind echo_handler =
           handle_protocol a ~on_handler_error:`Raise ~protocol:"echo"
@@ -809,7 +811,51 @@ let%test_module "coda network tests" =
         let msg = Queue.to_list msg |> String.concat in
         assert (msg = testmsg) ;
         assert !handler_finished ;
-        return ()
+        let%bind () = shutdown a in
+        let%map () = shutdown b in
+        ()
+      in
+      Async.Thread_safe.block_on_async_exn (fun () -> test_def)
+
+    let unwrap_eof = function `Eof -> failwith "unexpected EOF" | `Ok a -> Envelope.Incoming.data a
+
+    let three_str_eq a b c = assert (String.equal a b && String.equal b c)
+
+    let%test_unit "pubsub" =
+      let test_def =
+        let open Deferred.Let_syntax in
+        let%bind a, b = setup_two_nodes "test_pubsub" in
+        (* Give the libp2p helpers time to see each other. *)
+        let%bind () = after (sec 0.5) in
+        let a_r, a_w =
+          Strict_pipe.(create (Buffered (`Capacity 10, `Overflow Crash)))
+        in
+        let b_r, b_w =
+          Strict_pipe.(create (Buffered (`Capacity 10, `Overflow Crash)))
+        in
+        let%bind a_sub =
+          Pubsub.subscribe a "test" a_w |> Deferred.Or_error.ok_exn
+        in
+        let%bind b_sub =
+          Pubsub.subscribe b "test" b_w |> Deferred.Or_error.ok_exn
+        in
+        (* Give the subscriptions time to propagate *)
+        let%bind () = after (sec 0.5) in
+        let%bind () = Pubsub.Subscription.publish a_sub "msg from a" in
+        (* Give the publish time to propagate *)
+        let%bind () = after (sec 0.5) in
+        let%bind a_msg = Strict_pipe.Reader.read a_r in
+        let%bind b_msg = Strict_pipe.Reader.read b_r in
+        three_str_eq "msg from a" (unwrap_eof a_msg) (unwrap_eof b_msg) ;
+        let%bind () = Pubsub.Subscription.publish b_sub "msg from b" in
+        (* Give the publish time to propagate *)
+        let%bind () = after (sec 0.5) in
+        let%bind a_msg = Strict_pipe.Reader.read a_r in
+        let%bind b_msg = Strict_pipe.Reader.read b_r in
+        three_str_eq "msg from b" (unwrap_eof a_msg) (unwrap_eof b_msg) ;
+        let%bind () = shutdown a in
+        let%map () = shutdown b in
+        ()
       in
       Async.Thread_safe.block_on_async_exn (fun () -> test_def)
   end )
