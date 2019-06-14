@@ -50,6 +50,18 @@ let to_int_exn = Big_int.int_of_big_int
 
 let compare = Big_int.compare_big_int
 
+let random_bytes num_bytes =
+  of_bytes (String.init num_bytes ~f:(fun _ -> Char.of_int_exn (Random.int 250)))
+
+let random bound =
+  let n = num_bits bound in
+  let num_bytes = Int.((n + 7) / 8) in
+  let rand = ref (random_bytes num_bytes) in
+  while bound < !rand do
+    rand := random_bytes num_bytes
+  done;
+  !rand
+
 module String_hum = struct
   type nonrec t = t
 

@@ -57,6 +57,8 @@ module type Fp_intf = sig
 
   val sqrt : t -> t
 
+  val random : unit -> t
+
   val ( ** ) : t -> nat -> t
 end
 
@@ -209,6 +211,9 @@ module Make_fp
   let equal x y = N.equal (x % Info.order) (y % Info.order)
 
   let ( = ) = equal
+
+let random () =
+    N.random Info.order
 
   let rec pow2 b n = if n > 0 then pow2 (square b) Int.(n - 1) else b
 
