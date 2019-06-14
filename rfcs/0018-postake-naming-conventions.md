@@ -11,7 +11,7 @@ There has been a great deal of misunderstandings and miscommunications around pr
 ## Detailed design
 [detailed-design]: #detailed-design
 
-The biggest source of confusion is the ambigious and non-unique use of "prev" and "next". The goal with these names is to remove those names and keep all names unambigious. These name changes would be reflected in the code after we agree upon them.
+The biggest source of confusion is the ambiguous and non-unique use of "prev" and "next". The goal with these names is to remove those names and keep all names unambiguous. These name changes would be reflected in the code after we agree upon them.
 
 ```
 Epoch Ledger: the ledger for VRF evaluations (associated with a specific epoch)
@@ -25,6 +25,6 @@ Epoch Length: the number of blocks in an epoch
 Epoch Seed Update Range: the middle third of an epoch (where the epoch seed is calculated)
 Epoch Seed: the input for the VRF message which is calculated in the seed update range
 Checkpoint: a pointer to a state hash that is in the blockchain
-Epoch Start Checkpoint: a pointer to the state hash immediately preceeding the first block of an epoch
-Epoch Lock Checkpoint: a pointer to the state hash immediately preceeding the first block in the last third of an epoch (the last block in the seed update range)
+Epoch Start Checkpoint: a pointer to the state hash immediately preceding the first block of an epoch
+Epoch Lock Checkpoint: a pointer to the state hash immediately preceding the first block in the last third of an epoch (the last block in the seed update range)
 ```
