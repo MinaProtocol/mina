@@ -63,6 +63,7 @@ const (
 	sendStreamMsg
 	removeStreamHandler
 	addStreamHandler
+	listeningAddrs
 )
 
 type envelope struct {
@@ -561,6 +562,7 @@ var msgHandlers = map[methodIdx]func() action{
 	sendStreamMsg:       func() action { return &sendStreamMsgMsg{} },
 	removeStreamHandler: func() action { return &removeStreamHandlerMsg{} },
 	addStreamHandler:    func() action { return &addStreamHandlerMsg{} },
+	listeningAddrs:      func() action { return &listeningAddrsMsg{} },
 }
 
 type errorResult struct {

@@ -519,6 +519,23 @@ let listen_on net ma =
   | Error e ->
       Error e
 
+let listening_addrs net =
+  match%map
+    Helper.do_rpc net "listeningAddrs" []
+  with
+  | Ok (`List maddrs) ->
+      let lots =
+        List.map
+          ~f:(fun s -> Or_error.map ~f:Multiaddr.of_string (to_string_res s))
+          maddrs
+      in
+      Or_error.combine_errors lots
+  | Ok v ->
+      Or_error.errorf "helper broke RPC protocol: listeningAddrs got %s"
+        (Yojson.Safe.to_string v)
+  | Error e ->
+      Error e
+
 (** TODO: graceful shutdown *)
 let shutdown (net : net) =
   net.failure_response <- `Ignore ;

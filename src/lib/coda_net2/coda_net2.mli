@@ -220,5 +220,12 @@ val handle_protocol :
 *)
 val listen_on : net -> Multiaddr.t -> Multiaddr.t list Deferred.Or_error.t
 
+(** The list of addresses this net is listening on.
+
+  This returns the same thing that [listen_on] does, without listening
+  on an address.
+*)
+val listening_addrs : net -> Multiaddr.t list Deferred.Or_error.t
+
 (** Stop listening, close all connections and subscription pipes, and kill the subprocess. *)
 val shutdown : net -> unit Deferred.t

@@ -23,6 +23,7 @@ var (
 		"sendStreamMsg":       sendStreamMsg,
 		"removeStreamHandler": removeStreamHandler,
 		"addStreamHandler":    addStreamHandler,
+		"listeningAddrs":      listeningAddrs,
 	}
 
 	_methodIdxValueToName = map[methodIdx]string{
@@ -40,6 +41,7 @@ var (
 		sendStreamMsg:       "sendStreamMsg",
 		removeStreamHandler: "removeStreamHandler",
 		addStreamHandler:    "addStreamHandler",
+		listeningAddrs:      "listeningAddrs",
 	}
 )
 
@@ -61,6 +63,7 @@ func init() {
 			interface{}(sendStreamMsg).(fmt.Stringer).String():       sendStreamMsg,
 			interface{}(removeStreamHandler).(fmt.Stringer).String(): removeStreamHandler,
 			interface{}(addStreamHandler).(fmt.Stringer).String():    addStreamHandler,
+			interface{}(listeningAddrs).(fmt.Stringer).String():      listeningAddrs,
 		}
 	}
 }

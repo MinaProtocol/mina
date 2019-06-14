@@ -99,7 +99,7 @@ func main() {
 		Command:     "generate_methodidx",
 		PackageName: "main",
 		TypesAndValues: map[string][]string{
-			"methodIdx": []string{"configure", "listen", "publish", "subscribe", "unsubscribe", "registerValidator", "validationComplete", "generateKeypair", "openStream", "closeStream", "resetStream", "sendStreamMsg", "removeStreamHandler", "addStreamHandler"},
+			"methodIdx": []string{"configure", "listen", "publish", "subscribe", "unsubscribe", "registerValidator", "validationComplete", "generateKeypair", "openStream", "closeStream", "resetStream", "sendStreamMsg", "removeStreamHandler", "addStreamHandler", "listeningAddrs"},
 		},
 	}
 
