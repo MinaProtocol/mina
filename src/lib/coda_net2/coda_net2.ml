@@ -732,7 +732,7 @@ let%test_module "coda network tests" =
 
     let () = Async.Scheduler.set_record_backtraces true
 
-    let logger = Logger.create ()
+    let logger = Logger.null ()
 
     let testmsg =
       "This is a test. This is a test of the Outdoor Warning System. This is \
