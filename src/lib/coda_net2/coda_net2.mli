@@ -13,6 +13,8 @@ this module/the helper, and not misuse.
 
 Some errors can arise from calling certain functions before [configure] has been
 called. In general, anything that returns an [Or_error] can fail in this manner.
+
+A note about connection limits: TODO
 *)
 
 open Async
