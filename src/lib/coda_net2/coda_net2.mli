@@ -34,6 +34,18 @@ module Keypair : sig
   val to_peerid : t -> peer_id
 end
 
+(** A "multiaddr" is libp2p's extensible encoding for network addresses.
+
+  They generally look like paths, and are read left-to-right. Each protocol
+  type defines how to decode its address format, and everything leftover is
+  encapsulated inside that protocol.
+
+  Some example multiaddrs:
+
+  - [/ipfs/QmcgpsyWgH8Y8ajJz1Cu72KnS5uo2Aa2LpzU7kinSupNKC]
+  - [/ip4/127.0.0.1/ipfs/QmcgpsyWgH8Y8ajJz1Cu72KnS5uo2Aa2LpzU7kinSupNKC/tcp/1234]
+  - [/ip6/2601:9:4f81:9700:803e:ca65:66e8:c21]
+ *)
 module Multiaddr : sig
   type t
 
