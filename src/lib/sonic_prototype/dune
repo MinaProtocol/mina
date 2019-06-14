@@ -1,8 +1,8 @@
 (library
   (name sonic_prototype)
-  (modules srs commitment_scheme laurent test_laurent)
+  (modules laurent srs commitment_scheme arithmetic_circuit constraints utils test_laurent test_constraints test_commitment_scheme)
   (inline_tests)
   (preprocess (pps ppx_inline_test ppx_jane ppx_deriving.eq))
-  (libraries core snarkette)
+  (libraries core snarkette snarky snarky_taylor)
 )
   

@@ -2,6 +2,7 @@ open Core
 open Snarkette
 open Snarkette.Mnt6_80
 module Fq_target = Fq6
+module Fr = Snarkette.Mnt4_80.Fq
 
 module Srs = struct
   type t =
@@ -17,40 +18,40 @@ module Srs = struct
     ; srsPairing: Fq_target.t }
 
   let create d x alpha =
-    let xInv = Fq.inv x in
+    let xInv = Fr.inv x in
     let g1 = G1.one in
     let g2 = G2.one in
     { d
     ; gNegativeX=
         List.map (List.range 1 d) ~f:(fun i ->
-            G1.scale g1 (Fq.to_bigint (Fq.( ** ) xInv (Nat.of_int i))) )
+            G1.scale g1 (Fr.to_bigint (Fr.( ** ) xInv (Nat.of_int i))) )
     ; gPositiveX=
         List.map (List.range 0 d) ~f:(fun i ->
-            G1.scale g1 (Fq.to_bigint (Fq.( ** ) x (Nat.of_int i))) )
+            G1.scale g1 (Fr.to_bigint (Fr.( ** ) x (Nat.of_int i))) )
     ; hNegativeX=
         List.map (List.range 1 d) ~f:(fun i ->
-            G2.scale g2 (Fq.to_bigint (Fq.( ** ) xInv (Nat.of_int i))) )
+            G2.scale g2 (Fr.to_bigint (Fr.( ** ) xInv (Nat.of_int i))) )
     ; hPositiveX=
         List.map (List.range 0 d) ~f:(fun i ->
-            G2.scale g2 (Fq.to_bigint (Fq.( ** ) x (Nat.of_int i))) )
+            G2.scale g2 (Fr.to_bigint (Fr.( ** ) x (Nat.of_int i))) )
     ; gNegativeAlphaX=
         List.map (List.range 1 d) ~f:(fun i ->
             G1.scale g1
-              (Fq.to_bigint (Fq.( * ) alpha (Fq.( ** ) xInv (Nat.of_int i))))
+              (Fr.to_bigint (Fr.( * ) alpha (Fr.( ** ) xInv (Nat.of_int i))))
         )
     ; gPositiveAlphaX=
         List.map (List.range 0 d) ~f:(fun i ->
             G1.scale g1
-              (Fq.to_bigint (Fq.( * ) alpha (Fq.( ** ) x (Nat.of_int i)))) )
+              (Fr.to_bigint (Fr.( * ) alpha (Fr.( ** ) x (Nat.of_int i)))) )
     ; hNegativeAlphaX=
         List.map (List.range 1 d) ~f:(fun i ->
             G2.scale g2
-              (Fq.to_bigint (Fq.( * ) alpha (Fq.( ** ) xInv (Nat.of_int i))))
+              (Fr.to_bigint (Fr.( * ) alpha (Fr.( ** ) xInv (Nat.of_int i))))
         )
     ; hPositiveAlphaX=
         List.map (List.range 0 d) ~f:(fun i ->
             G2.scale g2
-              (Fq.to_bigint (Fq.( * ) alpha (Fq.( ** ) x (Nat.of_int i)))) )
-    ; srsPairing= Pairing.reduced_pairing g1 (G2.scale g2 (Fq.to_bigint alpha))
+              (Fr.to_bigint (Fr.( * ) alpha (Fr.( ** ) x (Nat.of_int i)))) )
+    ; srsPairing= Pairing.reduced_pairing g1 (G2.scale g2 (Fr.to_bigint alpha))
     }
 end
