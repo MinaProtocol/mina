@@ -32,6 +32,7 @@ module Make (Inputs : Inputs.Inputs_intf) :
       (* External transition of the node that is going on top of it *)
       | New_breadcrumb : Breadcrumb.t -> External_transition.Validated.t t
       (* External transition of the node that is going on top of it *)
+      (* TODO: might include new best *)
       | Root_transitioned :
           { new_: Breadcrumb.t (* The nodes to remove excluding the old root *)
           ; garbage: Breadcrumb.t list }
@@ -71,9 +72,6 @@ module Make (Inputs : Inputs.Inputs_intf) :
 
     module E = struct
       type t = E : 'output diff_mutant -> t
-
-      (* let to_yojson = function
-        | E (New_breadcrumb breadcrumb) ->  *)
     end
   end
 
@@ -204,14 +202,17 @@ module Make (Inputs : Inputs.Inputs_intf) :
         let distance_to_root = new_breadcrumb_length - root_length in
         let root_transitioned_diff =
           if distance_to_root > max_length then (
-            printf "\nCreating a new root\n" ;
             Logger.info logger ~module_:__MODULE__ ~location:__LOC__
-              !"Distance to parent: %d exceeded max_lenth %d"
+              !"Computing a new root diff. Distance to parent: %d exceeded \
+                max_lenth %d"
               distance_to_root max_length ;
             let heir_hash =
               List.hd_exn
                 (Transition_frontier_base.hash_path transition_frontier
                    breadcrumb)
+            in
+            let heir_breadcrumb =
+              Transition_frontier_base.find_exn transition_frontier heir_hash
             in
             let bad_children =
               List.filter
@@ -244,16 +245,27 @@ module Make (Inputs : Inputs.Inputs_intf) :
                       (Transition_frontier_base.consensus_local_state
                          transition_frontier) ) ]
               "collecting $length_of_garbage nodes rooted from $bad_hashes" ;
-            Some (Diff.Root_transitioned {new_= root; garbage= bad_children}) )
+            Some
+              (Diff.Root_transitioned
+                 {new_= heir_breadcrumb; garbage= bad_children}) )
           else None
         in
-        Logger.trace transition_frontier.logger ~module_:__MODULE__
-          ~location:__LOC__ ;
-        Diff.E.E new_breadcrumb_diff
-        :: List.filter_opt
-             [ Option.map new_best_tip_diff ~f:(fun diff -> Diff.E.E diff)
-             ; Option.map root_transitioned_diff ~f:(fun diff -> Diff.E.E diff)
-             ] )
+        let result =
+          Diff.E.E new_breadcrumb_diff
+          :: List.filter_opt
+               [ Option.map new_best_tip_diff ~f:(fun diff -> Diff.E.E diff)
+               ; Option.map root_transitioned_diff ~f:(fun diff ->
+                     Diff.E.E diff ) ]
+        in
+        Logger.trace logger !"Diff produced "
+          ~metadata:
+            [ ( "data"
+              , `List
+                  (List.map
+                     ~f:(fun (Diff.E.E x) -> Diff.key_to_yojson x)
+                     result) ) ]
+          ~module_:__MODULE__ ~location:__LOC__ ;
+        result )
 
   let attach_node_to (t : Transition_frontier_base.t) ~(parent_node : Node.t)
       ~(node : Node.t) =
@@ -293,7 +305,6 @@ module Make (Inputs : Inputs.Inputs_intf) :
       {Node.breadcrumb; successor_hashes= []; length= parent_node.length + 1}
     in
     attach_node_to t ~parent_node ~node ;
-    (* TODO: This should probably be in consensus_state  *)
     Debug_assert.debug_assert (fun () ->
         (* if the proof verified, then this should always hold*)
         assert (
@@ -323,21 +334,43 @@ module Make (Inputs : Inputs.Inputs_intf) :
   let move_root (transition_frontier : Transition_frontier_base.t)
       (soon_to_be_root_node : Node.t) : Node.t =
     (* TODO: decompose this to new root and old root *)
+    Ledger.Maskable.Debug.visualize ~filename:"after_moving_root.dot" ;
     let root_node =
       Hashtbl.find_exn transition_frontier.table transition_frontier.root
     in
     let root_breadcrumb = root_node.breadcrumb in
-    let root = root_breadcrumb |> Breadcrumb.staged_ledger in
-    let soon_to_be_root =
-      soon_to_be_root_node.breadcrumb |> Breadcrumb.staged_ledger
-    in
+    let root = root_breadcrumb.staged_ledger in
+    let soon_to_be_root = soon_to_be_root_node.breadcrumb.staged_ledger in
     let children =
       List.map soon_to_be_root_node.successor_hashes ~f:(fun h ->
           (Hashtbl.find_exn transition_frontier.table h).breadcrumb
-          |> Breadcrumb.staged_ledger |> Staged_ledger.ledger )
+            .staged_ledger |> Staged_ledger.ledger )
     in
     let root_ledger = Staged_ledger.ledger root in
+    let logger = Transition_frontier_base.logger transition_frontier in
+    Logger.trace logger
+      !"Root hash before move_root update."
+      ~metadata:
+        [ ( "hash"
+          , State_hash.to_yojson @@ Breadcrumb.state_hash root_breadcrumb )
+        ; ("uuid", `String (Uuid.to_string_hum @@ Ledger.get_uuid root_ledger))
+        ; ( "merkle_root"
+          , Ledger_hash.to_yojson @@ Ledger.merkle_root root_ledger ) ]
+      ~module_:__MODULE__ ~location:__LOC__ ;
     let soon_to_be_root_ledger = Staged_ledger.ledger soon_to_be_root in
+    Logger.trace logger
+      !"Soon_to_be_root before move_root update "
+      ~metadata:
+        [ ( "hash"
+          , State_hash.to_yojson
+            @@ Breadcrumb.state_hash soon_to_be_root_node.breadcrumb )
+        ; ( "uuid"
+          , `String
+              (Uuid.to_string_hum @@ Ledger.get_uuid soon_to_be_root_ledger) )
+        ; ( "merkle_root"
+          , Ledger_hash.to_yojson @@ Ledger.merkle_root soon_to_be_root_ledger
+          ) ]
+      ~module_:__MODULE__ ~location:__LOC__ ;
     let soon_to_be_root_merkle_root =
       Ledger.merkle_root soon_to_be_root_ledger
     in
@@ -395,11 +428,14 @@ module Make (Inputs : Inputs.Inputs_intf) :
         (* 4.III Unregister staged ledger *)
         let old_root_staged_ledger = Breadcrumb.staged_ledger old_root in
         let old_root_ledger = Staged_ledger.ledger old_root_staged_ledger in
-        (* TODO: Seperate bad root child nodes with descendants of the garbage on diff *)
+        (* TODO: Seperate bad root child nodes with descendants of the garbage on diff if there is a bug with unregsitered masks *)
         List.iter garbage ~f:(fun bad ->
             ignore
               (Ledger.unregister_mask_exn old_root_ledger
                  (Staged_ledger.ledger @@ Breadcrumb.staged_ledger bad)) ) ;
+        List.iter garbage ~f:(fun bad_breadcrumb ->
+            Hashtbl.remove transition_frontier.table
+              (Breadcrumb.state_hash bad_breadcrumb) ) ;
         let heir_node =
           Hashtbl.find_exn transition_frontier.table
             (Breadcrumb.state_hash new_)
@@ -420,11 +456,7 @@ module Make (Inputs : Inputs.Inputs_intf) :
             (* After the lock transition, if the local_state was previously synced, it should continue to be synced *)
             match
               Consensus.Hooks.required_local_state_sync
-                ~consensus_state:
-                  (Breadcrumb.consensus_state
-                     (Hashtbl.find_exn transition_frontier.table
-                        transition_frontier.best_tip)
-                       .breadcrumb)
+                ~consensus_state:(Breadcrumb.consensus_state new_)
                 ~local_state:transition_frontier.consensus_local_state
             with
             | Some jobs ->
@@ -606,6 +638,8 @@ module Make (Inputs : Inputs.Inputs_intf) :
         Extensions.Broadcast.Root_history.peek extensions.root_history
       in
       Extensions.Root_history.View.is_empty root_history
+
+    let apply_diff {transition_frontier; _} = apply_diff transition_frontier
   end
 end
 

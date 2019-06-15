@@ -92,60 +92,67 @@ let%test_module "Root_history and Transition_frontier" =
       @@ fun () ->
       let%bind frontier = create_root_frontier ~logger in
       let root = Transition_frontier.root frontier in
-      Core.printf
-        !"Root State_hash: %{sexp: State_hash.t}\n"
-        (Transition_frontier.Breadcrumb.state_hash root) ;
       let%bind breadcrumbs =
         create_breadcrumbs ~logger ~trust_system ~size:(max_length + 1) root
       in
       let%map () =
-        Deferred.List.iter breadcrumbs ~f:(fun breadcrumb ->
-            let%map () =
-              Transition_frontier.add_breadcrumb_exn frontier breadcrumb
-            in
-            Core.printf
-              !"Added breadcrumb with state_hash: %{sexp: State_hash.t} \n"
-              (Transition_frontier.Breadcrumb.state_hash breadcrumb) )
+        Deferred.List.iter breadcrumbs
+          ~f:(Transition_frontier.add_breadcrumb_exn frontier)
       in
       (* TODO: Make test more complicated by testing the appropriate children got deleted *)
       let new_root = Transition_frontier.root frontier in
-      Core.printf
-        !"New Root State_hash %{sexp: State_hash.t}"
-        (Transition_frontier.Breadcrumb.state_hash new_root) ;
       Transition_frontier.Breadcrumb.equal (List.hd_exn breadcrumbs) new_root
 
-    let%test "The length of the longest branch in the transition_frontier \
-              should be max_length + 1" =
+    (* TODO: replace this with a polymorphic variant *)
+    let%test_unit "We apply diff on adding a breadcrumb and then setting that \
+                   as our root" =
+      Backtrace.elide := false ;
+      Async.Scheduler.set_record_backtraces true ;
       Async.Thread_safe.block_on_async_exn
       @@ fun () ->
       let%bind frontier = create_root_frontier ~logger in
       let root = Transition_frontier.root frontier in
-      Core.printf
-        !"Root State_hash: %{sexp: State_hash.t}\n"
-        (Transition_frontier.Breadcrumb.state_hash root) ;
+      let generate_breadcrumb =
+        Quickcheck.random_value
+          (gen_breadcrumb ~logger ~trust_system ~accounts_with_secret_keys)
+      in
+      let%bind next_breadcrumb = generate_breadcrumb (Deferred.return root) in
+      let open Transition_frontier.Diff in
+      let diffs =
+        [ E.E (New_breadcrumb next_breadcrumb)
+        ; E.E (Best_tip_changed next_breadcrumb)
+        ; E (Root_transitioned {new_= next_breadcrumb; garbage= []}) ]
+      in
+      List.iter diffs ~f:(Transition_frontier.For_tests.apply_diff frontier) ;
+      Deferred.unit
+
+    let%test "The length of the longest branch in the transition_frontier \
+              should be max_length" =
+      Backtrace.elide := false ;
+      Async.Scheduler.set_record_backtraces true ;
+      Async.Thread_safe.block_on_async_exn
+      @@ fun () ->
+      let%bind frontier = create_root_frontier ~logger in
+      let root = Transition_frontier.root frontier in
+      let offset = 2 in
       let%bind breadcrumbs =
-        create_breadcrumbs ~logger ~trust_system ~size:(max_length + 2) root
+        create_breadcrumbs ~logger ~trust_system ~size:(max_length + offset)
+          root
       in
+      Ledger.Maskable.Debug.visualize ~filename:"before_move_root.dot" ;
       let%map () =
-        Deferred.List.iter breadcrumbs ~f:(fun breadcrumb ->
-            let%map () =
-              Transition_frontier.add_breadcrumb_exn frontier breadcrumb
-            in
-            Core.printf
-              !"Added breadcrumb with state_hash: %{sexp: State_hash.t} \n"
-              (Transition_frontier.Breadcrumb.state_hash breadcrumb) )
+        Deferred.List.iter breadcrumbs
+          ~f:(Transition_frontier.add_breadcrumb_exn frontier)
       in
-      let best_tip_length =
-        Transition_frontier.best_tip_path_length_exn frontier
+      let breadcrumbs_path_to_root =
+        Transition_frontier.path_map ~f:Fn.id frontier
+          Transition_frontier.(best_tip frontier)
       in
-      assert (best_tip_length = max_length + 1) ;
-      breadcrumb_trail_equals
-        ( Non_empty_list.to_list
-        @@ Option.value_exn
-             (breadcrumbs_path frontier
-                Transition_frontier.(
-                  Breadcrumb.state_hash @@ best_tip frontier)) )
-        (List.drop breadcrumbs 0)
+      let expected_results = List.drop breadcrumbs offset in
+      [%test_eq: int] ~message:"Expected best tip length to be max_length"
+        ~equal:Int.equal max_length
+        (List.length breadcrumbs_path_to_root) ;
+      breadcrumb_trail_equals expected_results breadcrumbs_path_to_root
 
     let common_ancestor_test ancestor_length branch1_length branch2_length =
       Async.Thread_safe.block_on_async_exn (fun () ->
@@ -284,12 +291,13 @@ let%test_module "Root_history and Transition_frontier" =
               ~accounts_with_secret_keys ~frontier
               ~parent:(Transition_frontier.root frontier)
           in
-          let root = Transition_frontier.root frontier in
           let add_child =
             add_child ~logger ~trust_system ~accounts_with_secret_keys
               ~frontier
           in
-          let%bind soon_garbage = add_child ~parent:root in
+          let%bind soon_garbage =
+            add_child ~parent:(Transition_frontier.root frontier)
+          in
           let%map _ =
             add_child ~parent:(Transition_frontier.best_tip frontier)
           in

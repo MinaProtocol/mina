@@ -602,5 +602,7 @@ module type Transition_frontier_intf = sig
     val root_history_mem : t -> State_hash.t -> bool
 
     val root_history_is_empty : t -> bool
+
+    val apply_diff : t -> Diff.E.t -> unit
   end
 end
