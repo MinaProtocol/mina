@@ -536,6 +536,7 @@ module Tree = struct
       -> (merge_t, base_t) t
       -> (merge_t, base_t) t * data =
    fun ~f_merge ~f_base t ->
+    let transpose ((x1, y1), (x2, y2)) = ((x1, x2), (y1, y2)) in
     match t with
     | Leaf d ->
         let new_base, count_list = f_base d in
@@ -546,15 +547,8 @@ module Tree = struct
           update_accumulate
             ~f_merge:(fun b (x, y) ->
               let b1, b2 = b in
-              let left, count1 = f_merge b1 x in
-              let right, count2 = f_merge b2 y in
-              let count = (count1, count2) in
-              ((left, right), count) )
-            ~f_base:(fun (x, y) ->
-              let left, count1 = f_base x in
-              let right, count2 = f_base y in
-              let count = (count1, count2) in
-              ((left, right), count) )
+              transpose (f_merge b1 x, f_merge b2 y) )
+            ~f_base:(fun (x, y) -> transpose (f_base x, f_base y))
             sub_tree
         in
         let value', count_list = f_merge counts value in
@@ -837,7 +831,7 @@ module T = struct
     let rec go : type merge_t base_t.
         int -> (int -> merge_t) -> base_t -> (merge_t, base_t) Tree.t =
      fun d fmerge base ->
-      if d >= depth then Leaf base
+      if d >= depth then Tree.Leaf base
       else
         let sub_tree =
           go (d + 1) (fun i -> (fmerge i, fmerge i)) (base, base)
@@ -864,82 +858,16 @@ module T = struct
       max_base_jobs:int -> delay:int -> (merge, base) t =
    fun ~max_base_jobs ~delay ->
     let depth = Int.ceil_log2 max_base_jobs in
-    let first_tree = create_tree ~depth in
+    let first_tree :
+        ((int * int) * merge Merge.Job.t, int * base Base.Job.t) Tree.t =
+      create_tree ~depth
+    in
     { trees= Non_empty_list.singleton first_tree
     ; acc= None
     ; curr_job_seq_no= 0
     ; max_base_jobs
     ; delay }
-
-  let delay : type merge base. (merge, base) t -> int = fun t -> t.delay
-
-  let max_base_jobs : type merge base. (merge, base) t -> int =
-   fun t -> t.max_base_jobs
 end
-
-module type State_intf = sig
-  type ('merge, 'base) t
-
-  val empty : max_base_jobs:int -> delay:int -> ('merge, 'base) t
-
-  val max_base_jobs : ('merge, 'base) t -> int
-
-  val delay : ('merge, 'base) t -> int
-end
-
-module type State_monad_intf = functor (State : State_intf) -> sig
-  include Monad.S3
-
-  val run_state :
-       ('a, 'merge, 'base) t
-    -> state:('merge, 'base) State.t
-    -> ('a * ('merge, 'base) State.t) Or_error.t
-
-  val get : (('merge, 'base) State.t, 'merge, 'base) t
-
-  val put : ('merge, 'base) State.t -> (unit, 'merge, 'base) t
-
-  val error_if : bool -> message:string -> (unit, _, _) t
-end
-
-module Make_state_monad : State_monad_intf =
-functor
-  (State : State_intf)
-  ->
-  struct
-    module T = struct
-      type ('merge, 'base) state = ('merge, 'base) State.t
-
-      type ('a, 'merge, 'base) t =
-        ('merge, 'base) state -> ('a * ('merge, 'base) state) Or_error.t
-
-      let return : type a merge base. a -> (a, merge, base) t =
-       fun a s -> Ok (a, s)
-
-      let bind m ~f = function
-        | s ->
-            let open Or_error.Let_syntax in
-            let%bind a, s' = m s in
-            f a s'
-
-      let map = `Define_using_bind
-    end
-
-    include T
-    include Monad.Make3 (T)
-
-    let get (*: type merge base. ((merge, base) state, merge, base) t*) =
-      function
-      | s ->
-          Ok (s, s)
-
-    let put s = function _ -> Ok ((), s)
-
-    let run_state t ~state = t state
-
-    let error_if b ~message =
-      if b then fun _ -> Or_error.error_string message else return ()
-  end
 
 module State = struct
   include T
@@ -950,40 +878,33 @@ module State = struct
     let h = ref (Digestif.SHA256.init ()) in
     let add_string s = h := Digestif.SHA256.feed_string !h s in
     let () =
-      let tree_acc = Buffer.create 0 in
-      let buff a = Buffer.add_string tree_acc a in
       let tree_hash tree f_merge f_base =
         List.iter (Tree.to_hashable_jobs tree) ~f:(fun job ->
             match job with New_job.Merge a -> f_merge a | Base d -> f_base d )
       in
-      let () =
-        Non_empty_list.iter trees ~f:(fun tree ->
-            let w_to_string (l, r) = Int.to_string l ^ Int.to_string r in
-            let f_merge = function
-              | w, Merge.Job.Empty ->
-                  buff (w_to_string w ^ "Empty")
-              | w, Merge.Job.Full {left; right; status; seq_no} ->
-                  buff
-                    ( w_to_string w ^ "Full" ^ Int.to_string seq_no
-                    ^ Job_status.to_string status ) ;
-                  buff (f_merge left) ;
-                  buff (f_merge right)
-              | w, Merge.Job.Part j ->
-                  buff (w_to_string w ^ "Part") ;
-                  buff (f_merge j)
-            in
-            let f_base = function
-              | w, Base.Job.Empty ->
-                  buff (Int.to_string w ^ "Empty")
-              | w, Base.Job.Full {job; status; seq_no} ->
-                  buff
-                    ( Int.to_string w ^ "Full" ^ Int.to_string seq_no
-                    ^ Job_status.to_string status ) ;
-                  buff (f_base job)
-            in
-            tree_hash tree f_merge f_base )
-      in
-      add_string (Buffer.contents tree_acc)
+      Non_empty_list.iter trees ~f:(fun tree ->
+          let w_to_string (l, r) = Int.to_string l ^ Int.to_string r in
+          let f_merge = function
+            | w, Merge.Job.Empty ->
+                add_string (w_to_string w ^ "Empty")
+            | w, Merge.Job.Full {left; right; status; seq_no} ->
+                add_string
+                  ( w_to_string w ^ "Full" ^ Int.to_string seq_no
+                  ^ Job_status.to_string status
+                  ^ f_merge left ^ f_merge right )
+            | w, Merge.Job.Part j ->
+                add_string (w_to_string w ^ "Part" ^ f_merge j)
+          in
+          let f_base = function
+            | w, Base.Job.Empty ->
+                add_string (Int.to_string w ^ "Empty")
+            | w, Base.Job.Full {job; status; seq_no} ->
+                add_string
+                  ( Int.to_string w ^ "Full" ^ Int.to_string seq_no
+                  ^ Job_status.to_string status
+                  ^ f_base job )
+          in
+          tree_hash tree f_merge f_base )
     in
     let acc_string =
       Option.value_map acc ~default:"None" ~f:(fun (a, d_lst) ->
@@ -1046,7 +967,7 @@ module State = struct
 end
 
 include T
-module State_monad = Make_state_monad (T)
+module State_monad = State_or_error.Make3 (T)
 
 let max_trees : ('merge, 'base) t -> int =
  fun t -> ((Int.ceil_log2 t.max_base_jobs + 1) * (t.delay + 1)) + 1

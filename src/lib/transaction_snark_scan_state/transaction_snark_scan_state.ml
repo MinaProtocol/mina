@@ -29,6 +29,7 @@ module Make
    and type sok_message := Inputs.Sok_message.t
    and type frozen_ledger_hash := Inputs.Frozen_ledger_hash.t
    and type ledger_undo := Inputs.Ledger.Undo.t
+   and type ledger := Inputs.Ledger.t
    and type transaction := Inputs.Transaction.t
    and type transaction_witness := Inputs.Transaction_witness.t
    and type staged_ledger_aux_hash := Inputs.Staged_ledger_aux_hash.t
@@ -455,6 +456,22 @@ module Make
           ()
   end
 
+  module Staged_undos = struct
+    type undo = Ledger.Undo.t
+
+    type t = undo list
+
+    let apply t ledger =
+      List.fold_left t ~init:(Ok ()) ~f:(fun acc t ->
+          Or_error.bind
+            (Or_error.map acc ~f:(fun _ -> t))
+            ~f:(fun u -> Ledger.undo ledger u) )
+  end
+
+  module Bundle = struct
+    type 'a t = 'a list
+  end
+
   let statement_of_job : job -> Transaction_snark_statement.t option = function
     | Base {statement; _} ->
         Some statement
@@ -506,10 +523,6 @@ module Make
   (*This needs to be grouped like in work_to_do function. Group of two jobs per list and not group of two jobs after concatenating the lists*)
   let all_jobs = Parallel_scan.all_jobs
 
-  let all_jobs_sequence t =
-    Parallel_scan.all_jobs t |> Sequence.of_list
-    |> Sequence.map ~f:Sequence.of_list
-
   let next_on_new_tree = Parallel_scan.next_on_new_tree
 
   let base_jobs_on_latest_tree = Parallel_scan.base_jobs_on_latest_tree
@@ -522,7 +535,7 @@ module Make
     |> Or_error.all
 
   (*All the staged transactions in the reverse order of their application (Latest first)*)
-  let staged_transactions_with_info_rev t =
+  let staged_undos t : Staged_undos.t =
     List.map
       (Parallel_scan.pending_data t |> List.rev)
       ~f:(fun (t : Transaction_with_witness.t) -> t.transaction_with_info)
@@ -558,17 +571,17 @@ module Make
              `List (List.map tree ~f:Job_view.to_yojson) )))
 
   (*Always the same pairing of jobs*)
-  let all_work_statements t : Transaction_snark_work.Statement.t Sequence.t =
-    let work_seqs = all_jobs_sequence t in
-    Sequence.concat_map work_seqs ~f:(fun work_seq ->
-        Sequence.chunks_exn
-          (Sequence.map work_seq ~f:(fun job ->
+  let all_work_statements t : Transaction_snark_work.Statement.t list =
+    let work_seqs = all_jobs t in
+    List.concat_map work_seqs ~f:(fun work_seq ->
+        List.chunks_of
+          (List.map work_seq ~f:(fun job ->
                match statement_of_job job with
                | None ->
                    assert false
                | Some stmt ->
                    stmt ))
-          Transaction_snark_work.proofs_length )
+          ~length:Transaction_snark_work.proofs_length )
 
   let required_work_pairs t ~slots =
     let work_list = Parallel_scan.jobs_for_slots t ~slots in
@@ -584,22 +597,18 @@ module Make
         k)
 
   (*Always the same pairing of jobs*)
-  let work_statements_for_new_diff t :
-      Transaction_snark_work.Statement.t Sequence.t =
-    let work_seqs =
-      Sequence.map
-        (Parallel_scan.jobs_for_next_update t |> Sequence.of_list)
-        ~f:Sequence.of_list
-    in
-    Sequence.concat_map work_seqs ~f:(fun work_seq ->
-        Sequence.chunks_exn
-          (Sequence.map work_seq ~f:(fun job ->
+  let work_statements_for_new_diff t : Transaction_snark_work.Statement.t list
+      =
+    let work_list = Parallel_scan.jobs_for_next_update t in
+    List.concat_map work_list ~f:(fun work_seq ->
+        List.chunks_of
+          (List.map work_seq ~f:(fun job ->
                match statement_of_job job with
                | None ->
                    assert false
                | Some stmt ->
                    stmt ))
-          Transaction_snark_work.proofs_length )
+          ~length:Transaction_snark_work.proofs_length )
 
   let all_work_pairs_exn t =
     let chunks_of xs ~n = List.groupi xs ~break:(fun i _ _ -> i mod n = 0) in

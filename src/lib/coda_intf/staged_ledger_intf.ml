@@ -213,6 +213,8 @@ module type Transaction_snark_scan_state_generalized_intf = sig
 
   type ledger_undo
 
+  type ledger
+
   type transaction
 
   type transaction_witness
@@ -297,6 +299,19 @@ module type Transaction_snark_scan_state_generalized_intf = sig
       -> (unit, Error.t) result M.t
   end
 
+  (*All the transactions with undos*)
+  module Staged_undos : sig
+    type t
+
+    val apply : t -> ledger -> unit Or_error.t
+  end
+
+  module Bundle : sig
+    type 'a t = 'a list
+  end
+
+  val staged_undos : t -> Staged_undos.t
+
   val empty : unit -> t
 
   val fill_work_and_enqueue_transactions :
@@ -314,9 +329,6 @@ module type Transaction_snark_scan_state_generalized_intf = sig
 
   val hash : t -> staged_ledger_aux_hash
 
-  (** All the staged transactions in the reverse order of their application (Latest first)*)
-  val staged_transactions_with_info_rev : t -> ledger_undo list
-
   (** All the transactions in the order in which they were applied*)
   val staged_transactions : t -> transaction list Or_error.t
 
@@ -328,17 +340,17 @@ module type Transaction_snark_scan_state_generalized_intf = sig
   val snark_job_list_json : t -> string
 
   (** All the proof bundles *)
-  val all_work_statements : t -> transaction_snark_statement list Sequence.t
+  val all_work_statements : t -> transaction_snark_statement Bundle.t list
 
   (** Required proof bundles for a certain number of slots *)
-  val required_work_pairs : t -> slots:int -> Available_job.t list list
+  val required_work_pairs : t -> slots:int -> Available_job.t Bundle.t list
 
   (**K proof bundles*)
-  val k_work_pairs_for_new_diff : t -> k:int -> Available_job.t list list
+  val k_work_pairs_for_new_diff : t -> k:int -> Available_job.t Bundle.t list
 
   (** All the proof bundles for 2^transaction_capacity_log2 slots that can be used up in one diff *)
   val work_statements_for_new_diff :
-    t -> transaction_snark_statement list Sequence.t
+    t -> transaction_snark_statement Bundle.t list
 
   (** True if the latest tree is full and transactions would be added on to a new tree *)
   val next_on_new_tree : t -> bool
@@ -452,12 +464,10 @@ module type Staged_ledger_generalized_intf = sig
 
     val partition_if_overflowing : t -> Space_partition.t
 
-    val all_work_statements : t -> transaction_snark_work_statement Sequence.t
+    val all_work_statements : t -> transaction_snark_work_statement list
 
     val work_statements_for_new_diff :
-      t -> transaction_snark_work_statement Sequence.t
-
-    val staged_transactions : t -> transaction list Or_error.t
+      t -> transaction_snark_work_statement list
   end
 
   module Staged_ledger_error : sig

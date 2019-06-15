@@ -14,8 +14,27 @@ let pk_of_sk sk = Public_key.of_private_key_exn sk |> Public_key.compress
 
 let name = "full-test"
 
-[%%inject
-"proof_level", proof_level]
+[%%if
+proof_level = "full"]
+
+let with_snark = true
+
+let with_check = false
+
+[%%elif
+proof_level = "check"]
+
+let with_snark = false
+
+let with_check = true
+
+[%%else]
+
+let with_snark = false
+
+let with_check = false
+
+[%%endif]
 
 let run_test () : unit Deferred.t =
   Parallel.init_master () ;
@@ -119,7 +138,7 @@ let run_test () : unit Deferred.t =
       in
       let fee = Currency.Fee.of_int in
       let snark_work_fee, transaction_fee =
-        if proof_level = "full" then (fee 0, fee 0) else (fee 1, fee 2)
+        if with_snark then (fee 0, fee 0) else (fee 1, fee 2)
       in
       let%bind coda =
         Main.create
@@ -354,7 +373,7 @@ let run_test () : unit Deferred.t =
                ( Genesis_ledger.keypair_of_account_record_exn (sk, account)
                , account ) )
       in
-      if proof_level = "full" then
+      if with_snark then
         let accounts = List.take other_accounts 2 in
         let%bind block_count' =
           test_multiple_payments accounts ~txn_count:2 15.
@@ -366,7 +385,7 @@ let run_test () : unit Deferred.t =
             ~timeout:5.
         in
         assert (block_count coda > block_count')
-      else if proof_level = "check" then
+      else if with_check then
         let%map _ =
           test_multiple_payments other_accounts
             ~txn_count:(List.length other_accounts / 2)

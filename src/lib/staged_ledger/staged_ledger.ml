@@ -228,15 +228,10 @@ struct
       t -> snarked_ledger_hash:Frozen_ledger_hash.t -> Ledger.t Or_error.t =
    fun {ledger; scan_state; _} ~snarked_ledger_hash:expected_target ->
     let open Or_error.Let_syntax in
-    let txns_still_being_worked_on =
-      Scan_state.staged_transactions_with_info_rev scan_state
-    in
+    let txns_still_being_worked_on = Scan_state.staged_undos scan_state in
     let snarked_ledger = Ledger.register_mask ledger (Ledger.Mask.create ()) in
     let%bind () =
-      List.fold_left txns_still_being_worked_on ~init:(Ok ()) ~f:(fun acc t ->
-          Or_error.bind
-            (Or_error.map acc ~f:(fun _ -> t))
-            ~f:(fun u -> Ledger.undo snarked_ledger u) )
+      Scan_state.Staged_undos.apply txns_still_being_worked_on snarked_ledger
     in
     let snarked_ledger_hash =
       Ledger.merkle_root snarked_ledger |> Frozen_ledger_hash.of_ledger_hash
@@ -683,7 +678,7 @@ struct
     let spots_available, proofs_waiting =
       let jobs = Scan_state.all_work_statements t.scan_state in
       ( Int.min (Scan_state.free_space t.scan_state) max_throughput
-      , Sequence.length jobs )
+      , List.length jobs )
     in
     let%bind () =
       let curr_hash = hash t in
@@ -712,7 +707,7 @@ struct
       Scan_state.work_statements_for_new_diff t.scan_state
     in
     let%bind () =
-      let required = Sequence.length required_pairs in
+      let required = List.length required_pairs in
       if
         work_count < required
         && List.length data
@@ -797,7 +792,7 @@ struct
       Scan_state.work_statements_for_new_diff t.scan_state
     in
     let%bind () =
-      let required = Sequence.length required_pairs in
+      let required = List.length required_pairs in
       if
         work_count < required
         && List.length data
@@ -1293,7 +1288,7 @@ struct
     let work_to_do = Scan_state.work_statements_for_new_diff t.scan_state in
     O1trace.trace_event "computed_work" ;
     let completed_works_seq, proof_count =
-      Sequence.fold_until work_to_do ~init:(Sequence.empty, 0)
+      List.fold_until work_to_do ~init:(Sequence.empty, 0)
         ~f:(fun (seq, count) w ->
           match get_completed_work w with
           | Some cw_checked ->
@@ -2605,7 +2600,7 @@ let%test_module "test" =
                 Sl.Scan_state.partition_if_overflowing scan_state
               in
               let work_done =
-                Sequence.filter_map
+                List.filter_map
                   ~f:(fun stmts ->
                     Some
                       { Transaction_snark_work.Checked.fee= Fee.zero
@@ -2615,8 +2610,7 @@ let%test_module "test" =
               in
               let hash = Sl.hash !sl in
               let diff =
-                create_diff_with_non_zero_fee_excess hash txns
-                  (Sequence.to_list work_done)
+                create_diff_with_non_zero_fee_excess hash txns work_done
                   partitions
               in
               match%map Sl.apply !sl diff ~logger ~verifier:() with
@@ -2683,7 +2677,6 @@ let%test_module "test" =
               let all_ts = txns p (fun x -> (x + 1) * 100) (fun _ -> 4) in
               let work_list : Transaction_snark_work.Statement.t list =
                 Sl.Scan_state.all_work_statements (Sl.scan_state !sl)
-                |> Sequence.to_list
               in
               let%map proof, diff =
                 create_and_apply sl logger (Sequence.of_list all_ts)
@@ -2725,7 +2718,6 @@ let%test_module "test" =
               let ts = List.take all_ts i in
               let work_list : Transaction_snark_work.Statement.t list =
                 Sl.Scan_state.all_work_statements (Sl.scan_state !sl)
-                |> Sequence.to_list
               in
               let%map proof, diff =
                 create_and_apply sl logger (Sequence.of_list ts)
@@ -2779,7 +2771,6 @@ let%test_module "test" =
               let ts = List.take all_ts i in
               let work_list : Transaction_snark_work.Statement.t list =
                 Sl.Scan_state.all_work_statements (Sl.scan_state !sl)
-                |> Sequence.to_list
               in
               let%map proof, diff =
                 create_and_apply sl logger (Sequence.of_list ts)
