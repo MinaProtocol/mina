@@ -105,8 +105,7 @@ module type Extension0 = sig
 
   val create : breadcrumb -> t * view
 
-  val handle_diffs :
-    t -> base_transition_frontier -> diff list -> view Deferred.Option.t
+  val handle_diffs : t -> base_transition_frontier -> diff list -> view option
 end
 
 module type Extensions0 = sig
@@ -557,13 +556,21 @@ module type Transition_frontier_intf = sig
      and type transaction_snark_scan_state := transaction_snark_scan_state
      and type verifier := verifier
 
-  (** Adds a breadcrumb to the transition frontier or throws. It possibly
-   * triggers a root move and it triggers any extensions that are listening to
-   * events on the frontier. *)
+  (** Adds a breadcrumb to the transition_frontier. It will first compute diffs
+      corresponding to the add breadcrumb mutation. Then, these diffs will be
+      fed into different extensions in the transition_frontier and the
+      extensions will be updated accordingly. The updates that occur is based
+      on the diff and the past version of the transition_frontier before the
+      mutation occurs. Afterwards, the diffs are applied to the
+      transition_frontier that will conduct the actual mutation on the
+      transition_frontier. Finally, the updates on the extensions will be
+      written into their respective broadcast pipes. It is important that all
+      the updates on the transition_frontier are synchronous to prevent data
+      races in the protocol. Thus, the writes must occur last on this function. *)
   val add_breadcrumb_exn : t -> Breadcrumb.t -> unit Deferred.t
 
   (** Like add_breadcrumb_exn except it doesn't throw if the parent hash is
-   * missing from the transition frontier *)
+      missing from the transition frontier *)
   val add_breadcrumb_if_present_exn : t -> Breadcrumb.t -> unit Deferred.t
 
   val find_in_root_history : t -> State_hash.t -> Breadcrumb.t option
@@ -590,7 +597,6 @@ module type Transition_frontier_intf = sig
   val best_tip_diff_pipe :
     t -> Extensions.Best_tip_diff.view Broadcast_pipe.Reader.t
 
-  (* TODO: recover *)
   (* val persistence_diff_pipe :
     t -> Diff.Persistence_diff.view Broadcast_pipe.Reader.t *)
 

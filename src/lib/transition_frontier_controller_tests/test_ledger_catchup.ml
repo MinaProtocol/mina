@@ -289,6 +289,16 @@ let%test_module "Ledger catchup" =
             |> Option.value_exn
           in
           let missing_breadcrumbs = Non_empty_list.tail history in
+          Logger.trace logger !"Breadcrumbs to process"
+            ~metadata:
+              [ ( "Breadcrumbs"
+                , `List
+                    (List.map
+                       ~f:
+                         (Fn.compose State_hash.to_yojson
+                            Transition_frontier.Breadcrumb.state_hash)
+                       missing_breadcrumbs) ) ]
+            ~location:__LOC__ ~module_:__MODULE__ ;
           let missing_transitions =
             List.map missing_breadcrumbs
               ~f:Transition_frontier.Breadcrumb.transition_with_hash
@@ -340,6 +350,14 @@ let%test_module "Ledger catchup" =
                 Rose_tree.map (List.hd_exn rose_trees)
                   ~f:Cache_lib.Cached.invalidate_with_success
               in
+              Logger.info logger
+                !"Breadcrumbs that got processed"
+                ~module_:__MODULE__ ~location:__LOC__
+                ~metadata:
+                  [ ( "rose_tree"
+                    , Rose_tree.to_yojson State_hash.to_yojson
+                        (Rose_tree.map catchup_breadcrumb_tree
+                           ~f:Transition_frontier.Breadcrumb.state_hash) ) ] ;
               assert (
                 List.length (Rose_tree.flatten catchup_breadcrumb_tree) = 1 ) ;
               let catchup_breadcrumb =

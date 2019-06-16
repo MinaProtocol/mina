@@ -38,11 +38,9 @@ struct
 
     val create : Breadcrumb.t -> t * view
 
+    (* It is of upmost importance to make this synchronous *)
     val handle_diffs :
-         t
-      -> Inputs.Transition_frontier.t
-      -> Diff.E.t list
-      -> view Deferred.Option.t
+      t -> Inputs.Transition_frontier.t -> Diff.E.t list -> view option
   end
 
   module type Broadcast_extension_intf = sig
@@ -58,8 +56,12 @@ struct
 
     val reader : t -> view Broadcast_pipe.Reader.t
 
-    val update :
-      t -> Inputs.Transition_frontier.t -> Diff.E.t list -> unit Deferred.t
+    val update_and_create_broadcast_job :
+         t
+      -> Inputs.Transition_frontier.t
+      -> Diff.E.t list
+      -> unit
+      -> unit Deferred.t
   end
 
   module Make_broadcastable (Ext : Base_ext_intf) :
@@ -83,12 +85,15 @@ struct
       let%map () = Broadcast_pipe.Writer.write writer initial_view in
       {t; reader; writer}
 
-    let update {t; writer; _} transition_frontier diffs =
-      match%bind Ext.handle_diffs t transition_frontier diffs with
-      | Some view ->
-          Broadcast_pipe.Writer.write writer view
-      | None ->
-          Deferred.unit
+    let update_and_create_broadcast_job {t; writer; _} transition_frontier
+        diffs =
+      let update = Ext.handle_diffs t transition_frontier diffs in
+      fun () ->
+        match update with
+        | Some view ->
+            Broadcast_pipe.Writer.write writer view
+        | None ->
+            Deferred.unit
   end
 
   module Root_history = struct
@@ -151,9 +156,7 @@ struct
           | Diff.E.E _ ->
               false )
       in
-      Deferred.return
-      @@ Option.some_if should_produce_view
-      @@ View.to_view root_history
+      Option.some_if should_produce_view @@ View.to_view root_history
 
     [%%define_locally
     T.(lookup, mem, enqueue, is_empty)]
@@ -200,9 +203,7 @@ struct
           | Diff.E.E _ ->
               false )
       in
-      Deferred.return
-      @@ Option.some_if should_produce_view
-      @@ transition_registry
+      Option.some_if should_produce_view @@ transition_registry
 
     [%%define_locally
     T.(notify, register)]
@@ -278,8 +279,7 @@ struct
           | Diff.E.E (Best_tip_changed _) ->
               init )
       in
-      Deferred.return
-        (if num_removed > 0 || is_added then Some (num_removed, t) else None)
+      if num_removed > 0 || is_added then Some (num_removed, t) else None
   end
 
   module Best_tip_diff = struct
@@ -317,7 +317,7 @@ struct
       ( path_from_to (find_exn t ancestor) bc1
       , path_from_to (find_exn t ancestor) bc2 )
 
-    let handle_diffs () transition_frontier diffs : view Deferred.Option.t =
+    let handle_diffs () transition_frontier diffs : view option =
       let old_best_tip =
         Inputs.Transition_frontier.best_tip transition_frontier
       in
@@ -370,7 +370,7 @@ struct
             | Diff.E.E (Root_transitioned _) ->
                 (acc, old_best_tip, should_broadcast) )
       in
-      Deferred.return @@ Option.some_if should_broadcast view
+      Option.some_if should_broadcast view
   end
 
   module Broadcast = struct
@@ -409,20 +409,25 @@ struct
       ~best_tip_diff:(close_extension (module Best_tip_diff))
       ~transition_registry:(close_extension (module Transition_registry))
 
-  let update_all (t : t) transition_frontier diffs : unit Deferred.t =
-    let run_update (type t)
-        (module Broadcast : Broadcast_extension_intf with type t = t)
-        (deferred_unit : unit Deferred.t) field =
-      let%bind () = deferred_unit in
+  let update_all (t : t) transition_frontier diffs =
+    let run_updates_and_setup_broadcast_jobs (type t)
+        (module Broadcast : Broadcast_extension_intf with type t = t) field =
       let extension = Field.get field t in
-      Broadcast.update extension transition_frontier diffs
+      Broadcast.update_and_create_broadcast_job extension transition_frontier
+        diffs
     in
     let open Broadcast in
-    Fields.fold ~init:Deferred.unit
-      ~root_history:(run_update (module Root_history))
-      ~snark_pool_refcount:(run_update (module Snark_pool_refcount))
-      ~best_tip_diff:
-        (run_update (module Best_tip_diff))
-        (* ~best_tip_diff:(fun _ _ -> Deferred.unit) *)
-      ~transition_registry:(run_update (module Transition_registry))
+    let jobs =
+      Fields.to_list
+        ~root_history:
+          (run_updates_and_setup_broadcast_jobs (module Root_history))
+        ~snark_pool_refcount:
+          (run_updates_and_setup_broadcast_jobs (module Snark_pool_refcount))
+        ~best_tip_diff:
+          (run_updates_and_setup_broadcast_jobs (module Best_tip_diff))
+          (* ~best_tip_diff:(fun _ _ -> Deferred.unit) *)
+        ~transition_registry:
+          (run_updates_and_setup_broadcast_jobs (module Transition_registry))
+    in
+    fun () -> Deferred.List.iter ~how:`Parallel jobs ~f:(fun job -> job ())
 end

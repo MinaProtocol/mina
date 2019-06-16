@@ -666,14 +666,25 @@ struct
     end
 
     let setup ~source_accounts ~logger ~trust_system configs =
-      let%bind me = create_root_frontier ~logger source_accounts in
+      let%bind me =
+        create_root_frontier
+          ~logger:
+            (Logger.extend logger [("me_frontier", `String "me_frontier")])
+          source_accounts
+      in
       let%map _, _, peers_with_frontiers =
         Deferred.List.fold
           ~init:(Constants.init_ip, Constants.init_discovery_port, []) configs
           ~f:(fun (ip, discovery_port, acc_peers)
              {num_breadcrumbs; accounts}
              ->
-            let%bind frontier = create_root_frontier ~logger accounts in
+            let%bind frontier =
+              create_root_frontier
+                ~logger:
+                  (Logger.extend logger
+                     [("peer_frontier", `String "peer_frontier")])
+                accounts
+            in
             let%map () =
               build_frontier_randomly frontier
                 ~gen_root_breadcrumb_builder:

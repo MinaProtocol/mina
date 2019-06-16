@@ -20,7 +20,7 @@ module Make (Inputs : Inputs.S) :
      * frontier while we're catching up, it means this path is not on the
      * critical path that has been chosen in the frontier. As such, we should
      * drop it on the floor. *)
-    let breadcrumb_if_present () =
+    let breadcrumb_if_present logger =
       match Transition_frontier.find frontier initial_hash with
       | None ->
           let msg =
@@ -38,7 +38,10 @@ module Make (Inputs : Inputs.S) :
       ~f:(fun subtree_of_enveloped_transitions ->
         let open Deferred.Or_error.Let_syntax in
         let%bind init_breadcrumb =
-          breadcrumb_if_present () |> Deferred.return
+          breadcrumb_if_present
+            (Logger.extend logger
+               [("Check", `String "Before creating breadcrumb")])
+          |> Deferred.return
         in
         Rose_tree.Deferred.Or_error.fold_map_over_subtrees
           subtree_of_enveloped_transitions ~init:(Cached.pure init_breadcrumb)
@@ -97,7 +100,9 @@ module Make (Inputs : Inputs.S) :
                       let open Result.Let_syntax in
                       Deferred.return
                         (let%map (_ : Transition_frontier.Breadcrumb.t) =
-                           breadcrumb_if_present ()
+                           breadcrumb_if_present
+                             (Logger.extend logger
+                                [("Check", `String "After creating breadcrumb")])
                          in
                          new_breadcrumb)
                   | Error err -> (

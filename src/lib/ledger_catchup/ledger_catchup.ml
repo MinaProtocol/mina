@@ -147,6 +147,14 @@ module Make (Inputs : Inputs.S) :
     in
     (result, Option.value_exn initial_state_hash)
 
+  let to_yojson subtrees_of_transitions =
+    let rose_tree_hash =
+      List.map subtrees_of_transitions ~f:(fun sub_tree ->
+          Rose_tree.to_yojson State_hash.to_yojson
+            (Rose_tree.map sub_tree ~f:Cached.original) )
+    in
+    `List rose_tree_hash
+
   let get_transitions_and_compute_breadcrumbs ~logger ~trust_system ~verifier
       ~network ~frontier ~num_peers ~unprocessed_transition_cache
       ~target_forest =
@@ -199,6 +207,11 @@ module Make (Inputs : Inputs.S) :
                                External_transition.protocol_state)
                           transition
                       in
+                      Logger.info logger
+                        !"External_transition received from the network: \
+                          %{sexp:State_hash.t}"
+                        transition_with_hash.hash ~module_:__MODULE__
+                        ~location:__LOC__ ;
                       verify_transition ~logger ~trust_system ~verifier
                         ~frontier ~unprocessed_transition_cache
                         (Envelope.Incoming.wrap ~data:transition_with_hash
@@ -221,8 +234,18 @@ module Make (Inputs : Inputs.S) :
                   else subtrees
                 in
                 let open Deferred.Let_syntax in
+                Logger.trace logger
+                  !"Attempting to build subtree"
+                  ~metadata:
+                    [ ("initial_hash", State_hash.to_yojson initial_state_hash)
+                    ; ("subtree", to_yojson subtrees_of_transitions) ]
+                  ~location:__LOC__ ~module_:__MODULE__ ;
                 match%bind
-                  Breadcrumb_builder.build_subtrees_of_breadcrumbs ~logger
+                  Breadcrumb_builder.build_subtrees_of_breadcrumbs
+                    ~logger:
+                      (Logger.extend logger
+                         [ ( "ledger_catchup"
+                           , `String "Called from ledger catchup" ) ])
                     ~verifier ~trust_system ~frontier
                     ~initial_hash:initial_state_hash subtrees_of_transitions
                 with
@@ -258,7 +281,10 @@ module Make (Inputs : Inputs.S) :
                  closed pipe" ;
               Deferred.unit )
             else
-              Strict_pipe.Writer.write catchup_breadcrumbs_writer trees
+              ( Logger.trace logger !"Writing subtree to pipe"
+                  ~metadata:[("subtree", to_yojson trees)]
+                  ~location:__LOC__ ~module_:__MODULE__ ;
+                Strict_pipe.Writer.write catchup_breadcrumbs_writer trees )
               |> Deferred.return
         | Error e ->
             Logger.info logger ~module_:__MODULE__ ~location:__LOC__

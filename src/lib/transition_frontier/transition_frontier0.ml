@@ -211,8 +211,7 @@ module Make (Inputs : Inputs.Inputs_intf) = struct
 
   let breadcrumb_of_node {Node.breadcrumb; _} = breadcrumb
 
-  (* Invariant: The path from the root to the tip inclusively, will be max_length + 1 *)
-  (* TODO: Make a test of this invariant *)
+  (* Invariant: The path from the root to the tip inclusively, will be max_length *)
   type t =
     { root_snarked_ledger: Ledger.Db.t
     ; mutable root: State_hash.t

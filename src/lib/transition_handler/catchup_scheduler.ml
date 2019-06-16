@@ -87,8 +87,13 @@ module Make (Inputs : Inputs.S) = struct
       Capped_supervisor.create ~job_capacity:30
         (fun (initial_hash, transition_branches) ->
           match%map
-            Breadcrumb_builder.build_subtrees_of_breadcrumbs ~logger ~verifier
-              ~trust_system ~frontier ~initial_hash transition_branches
+            Breadcrumb_builder.build_subtrees_of_breadcrumbs
+              ~logger:
+                (Logger.extend logger
+                   [ ( "catchup_scheduler"
+                     , `String "Called from catchup scheduler" ) ])
+              ~verifier ~trust_system ~frontier ~initial_hash
+              transition_branches
           with
           | Ok trees_of_breadcrumbs ->
               Writer.write catchup_breadcrumbs_writer trees_of_breadcrumbs

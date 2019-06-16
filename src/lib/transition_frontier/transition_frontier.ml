@@ -267,8 +267,8 @@ module Make (Inputs : Inputs.Inputs_intf) :
           ~module_:__MODULE__ ~location:__LOC__ ;
         result )
 
-  let attach_node_to (t : Transition_frontier_base.t) ~(parent_node : Node.t)
-      ~(node : Node.t) =
+  let attach_node_to (transition_frontier : Transition_frontier_base.t)
+      ~(parent_node : Node.t) ~(node : Node.t) =
     let hash = Breadcrumb.state_hash (Node.breadcrumb node) in
     let parent_hash = Breadcrumb.state_hash parent_node.breadcrumb in
     if
@@ -278,33 +278,35 @@ module Make (Inputs : Inputs.Inputs_intf) :
       failwith
         "invalid call to attach_to: hash parent_node <> parent_hash node" ;
     (* We only want to update the parent node if we don't have a dupe *)
-    Hashtbl.change t.table hash ~f:(function
+    Hashtbl.change transition_frontier.table hash ~f:(function
       | Some x ->
-          Logger.warn t.logger ~module_:__MODULE__ ~location:__LOC__
+          Logger.warn transition_frontier.logger ~module_:__MODULE__
+            ~location:__LOC__
             ~metadata:[("state_hash", State_hash.to_yojson hash)]
             "attach_node_to with breadcrumb for state $state_hash already \
              present; catchup scheduler bug?" ;
           Some x
       | None ->
-          Hashtbl.set t.table ~key:parent_hash
+          Hashtbl.set transition_frontier.table ~key:parent_hash
             ~data:
               { parent_node with
                 successor_hashes= hash :: parent_node.successor_hashes } ;
           Some node )
 
-  let attach_breadcrumb_exn (t : Transition_frontier_base.t) breadcrumb =
+  let attach_breadcrumb_exn (transition_frontier : Transition_frontier_base.t)
+      breadcrumb =
     let hash = Breadcrumb.state_hash breadcrumb in
     let parent_hash = Breadcrumb.parent_hash breadcrumb in
     let parent_node =
       Option.value_exn
-        (Hashtbl.find t.table parent_hash)
+        (Hashtbl.find transition_frontier.table parent_hash)
         ~error:
           (Error.of_exn (Parent_not_found (`Parent parent_hash, `Target hash)))
     in
     let node =
       {Node.breadcrumb; successor_hashes= []; length= parent_node.length + 1}
     in
-    attach_node_to t ~parent_node ~node ;
+    attach_node_to transition_frontier ~parent_node ~node ;
     Debug_assert.debug_assert (fun () ->
         (* if the proof verified, then this should always hold*)
         assert (
@@ -312,7 +314,7 @@ module Make (Inputs : Inputs.Inputs_intf) :
             ~existing:(Breadcrumb.consensus_state parent_node.breadcrumb)
             ~candidate:(Breadcrumb.consensus_state breadcrumb)
             ~logger:
-              (Logger.extend t.logger
+              (Logger.extend transition_frontier.logger
                  [ ( "selection_context"
                    , `String "debug_assert that child is preferred over parent"
                    ) ])
@@ -334,7 +336,6 @@ module Make (Inputs : Inputs.Inputs_intf) :
   let move_root (transition_frontier : Transition_frontier_base.t)
       (soon_to_be_root_node : Node.t) : Node.t =
     (* TODO: decompose this to new root and old root *)
-    Ledger.Maskable.Debug.visualize ~filename:"after_moving_root.dot" ;
     let root_node =
       Hashtbl.find_exn transition_frontier.table transition_frontier.root
     in
@@ -522,9 +523,11 @@ module Make (Inputs : Inputs.Inputs_intf) :
 
   let add_breadcrumb_exn {transition_frontier; extensions} breadcrumb =
     let diffs = calculate_diffs transition_frontier breadcrumb in
-    let%bind () = Extensions.update_all extensions transition_frontier diffs in
+    let broadcast_job =
+      Extensions.update_all extensions transition_frontier diffs
+    in
     List.iter diffs ~f:(apply_diff transition_frontier) ;
-    Deferred.unit
+    broadcast_job ()
 
   let add_breadcrumb_if_present_exn t breadcrumb =
     let parent_hash = Breadcrumb.parent_hash breadcrumb in
