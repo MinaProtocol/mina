@@ -213,9 +213,9 @@ let run_test () : unit Deferred.t =
       let build_payment amount sender_sk receiver_pk fee =
         trace_recurring_task "build_payment" (fun () ->
             let nonce =
-              Run.Commands.get_nonce coda (pk_of_sk sender_sk)
-              |> Participating_state.active_exn
-              |> Option.value_exn ?here:None ?error:None ?message:None
+              Option.value_exn
+                ( Run.Commands.get_nonce coda (pk_of_sk sender_sk)
+                |> Participating_state.active_exn )
             in
             let payload : User_command.Payload.t =
               User_command.Payload.create ~fee ~nonce
@@ -230,9 +230,9 @@ let run_test () : unit Deferred.t =
           build_payment send_amount sender_sk receiver_pk transaction_fee
         in
         let prev_sender_balance =
-          Run.Commands.get_balance coda (pk_of_sk sender_sk)
-          |> Participating_state.active_exn
-          |> Option.value_exn ?here:None ?error:None ?message:None
+          Option.value_exn
+            ( Run.Commands.get_balance coda (pk_of_sk sender_sk)
+            |> Participating_state.active_exn )
         in
         let prev_receiver_balance =
           Run.Commands.get_balance coda receiver_pk
@@ -260,13 +260,13 @@ let run_test () : unit Deferred.t =
             ~initial_receiver_balance:prev_receiver_balance receiver_pk
         in
         assert_balance receiver_pk
-          ( Currency.Balance.( + ) prev_receiver_balance send_amount
-          |> Option.value_exn ?here:None ?error:None ?message:None ) ;
+          (Option.value_exn
+             (Currency.Balance.( + ) prev_receiver_balance send_amount)) ;
         assert_balance (pk_of_sk sender_sk)
-          ( Currency.Balance.( - ) prev_sender_balance
-              ( Currency.Amount.add_fee send_amount transaction_fee
-              |> Option.value_exn ?here:None ?error:None ?message:None )
-          |> Option.value_exn ?here:None ?error:None ?message:None )
+          (Option.value_exn
+             (Currency.Balance.( - ) prev_sender_balance
+                (Option.value_exn
+                   (Currency.Amount.add_fee send_amount transaction_fee))))
       in
       let send_payment_update_balance_sheet sender_sk sender_pk receiver_pk
           amount balance_sheet fee =
