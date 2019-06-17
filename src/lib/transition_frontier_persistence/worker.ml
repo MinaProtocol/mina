@@ -3,15 +3,11 @@ open Coda_base
 open Coda_state
 open Async
 
-module Make (Inputs : Intf.Worker_inputs) : sig
-  open Inputs
-
-  include
-    Intf.Worker
-    with type hash := Inputs.Transition_frontier.Diff.Hash.t
-     and type diff := Inputs.Transition_frontier.Diff.Mutant.E.t
-     and type transition_storage := Transition_storage.t
-end = struct
+module Make (Inputs : Intf.Worker_inputs) :
+  Intf.Worker
+  with type hash := Inputs.Transition_frontier.Diff.Hash.t
+   and type diff := Inputs.Transition_frontier.Diff.Mutant.E.t
+   and type transition_storage := Inputs.Transition_storage.t = struct
   open Inputs
 
   type t = {transition_storage: Transition_storage.t; logger: Logger.t}

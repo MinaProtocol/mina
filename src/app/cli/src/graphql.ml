@@ -824,7 +824,9 @@ module Make (Commands : Coda_commands.Intf) = struct
           in
           let transaction_pool = Program.transaction_pool coda in
           List.map
-            (Program.Inputs.Transaction_pool.all_from_user transaction_pool pk)
+            (Network_pool.Transaction_pool.Resource_pool.all_from_user
+               (Network_pool.Transaction_pool.resource_pool transaction_pool)
+               pk)
             ~f:User_command.forget_check )
 
     let sync_state =

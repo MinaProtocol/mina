@@ -181,3 +181,8 @@ module Make (Inputs : Inputs_intf) :
     in
     (validated_root, validated_best_tip)
 end
+
+include Make (struct
+  include Transition_frontier.Inputs
+  module Transition_frontier = Transition_frontier
+end)

@@ -97,7 +97,7 @@ let run_test () : unit Deferred.t =
              (Public_key.compress keypair.public_key))
       in
       let net_config =
-        Main.Inputs.Net.Config.
+        Coda_networking.Config.
           { logger
           ; trust_system
           ; time_controller
@@ -127,13 +127,11 @@ let run_test () : unit Deferred.t =
       in
       let%bind coda =
         Main.create
-          (Main.Config.make ~logger ~trust_system ~verifier:Init.verifier
-             ~net_config
+          (Coda_lib.Config.make ~logger ~trust_system ~verifier:Init.verifier
+             ~prover:Init.prover ~net_config
              ~initial_propose_keypairs:(Keypair.Set.singleton keypair)
              ~snark_worker_key:
                (Public_key.compress largest_account_keypair.public_key)
-             ~transaction_pool_disk_location:
-               (temp_conf_dir ^/ "transaction_pool")
              ~snark_pool_disk_location:(temp_conf_dir ^/ "snark_pool")
              ~wallets_disk_location:(temp_conf_dir ^/ "wallets")
              ~time_controller ~receipt_chain_database
