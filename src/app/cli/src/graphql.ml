@@ -69,7 +69,6 @@ module Types = struct
     result_field_no_inputs name ~typ:(non_null string)
       ~doc:(Doc.uint64 doc name)
 
-  (* TODO: include submitted_at (date) and included_at (date). These two fields are not exposed in the user_command *)
   let user_command : (Coda_lib.t, User_command.t option) typ =
     obj "UserCommand" ~fields:(fun _ ->
         [ field "id" ~typ:(non_null string)
@@ -93,12 +92,11 @@ module Types = struct
             ~resolve:(fun _ payment ->
               User_command_payload.nonce @@ User_command.payload payment
               |> Account.Nonce.to_int )
-        ; field "sender" ~typ:(non_null string) ~doc:"Public key of the sender"
+        ; field "from" ~typ:(non_null string) ~doc:"Public key of the sender"
             ~args:Arg.[]
             ~resolve:(fun _ payment ->
               User_command.sender payment |> Stringable.public_key )
-        ; field "receiver" ~typ:(non_null string)
-            ~doc:"Public key of the receiver"
+        ; field "to" ~typ:(non_null string) ~doc:"Public key of the receiver"
             ~args:Arg.[]
             ~resolve:(fun _ payment ->
               match
@@ -109,7 +107,7 @@ module Types = struct
               | Stake_delegation (Set_delegate {new_delegate}) ->
                   Stringable.public_key new_delegate )
         ; uint64_result_field "amount"
-            ~doc:"Amount that sender send to receiver"
+            ~doc:"Amount that sender is sending to receiver"
             ~args:Arg.[]
             ~resolve:(fun _ payment ->
               match
@@ -360,14 +358,14 @@ module Types = struct
       obj "DeleteWalletPayload" ~fields:(fun _ ->
           [pubkey_field ~resolve:(fun _ key -> Stringable.public_key key)] )
 
-    let create_payment =
-      obj "CreatePaymentPayload" ~fields:(fun _ ->
+    let send_payment =
+      obj "SendPaymentPayload" ~fields:(fun _ ->
           [ field "payment" ~typ:(non_null user_command)
               ~args:Arg.[]
               ~resolve:(fun _ -> Fn.id) ] )
 
-    let set_delegation =
-      obj "SetDelegationPayload" ~fields:(fun _ ->
+    let send_delegation =
+      obj "SendDelegationPayload" ~fields:(fun _ ->
           [ field "delegation" ~typ:(non_null user_command)
               ~args:Arg.[]
               ~resolve:(fun _ -> Fn.id) ] )
@@ -409,9 +407,9 @@ module Types = struct
       let memo ~doc = uint64_arg "memo" ~typ:string ~doc
     end
 
-    let create_payment =
+    let send_payment =
       let open Fields in
-      obj "CreatePaymentInput"
+      obj "SendPaymentInput"
         ~coerce:(fun from to_ amount fee memo -> (from, to_, amount, fee, memo))
         ~fields:
           [ from ~doc:"Public key of recipient of payment"
@@ -421,9 +419,9 @@ module Types = struct
           ; fee ~doc:"Fee amount in order to send payment"
           ; memo ~doc:"Public description of payment" ]
 
-    let set_delegation =
+    let send_delegation =
       let open Fields in
-      obj "SetDelegationInput"
+      obj "SendDelegationInput"
         ~coerce:(fun from to_ fee memo -> (from, to_, fee, memo))
         ~fields:
           [ from ~doc:"Public key of recipient of a stake delegation"
@@ -1009,11 +1007,11 @@ module Mutations = struct
     in
     (sender_account, sender_kp, memo, receiver, fee)
 
-  let set_delegation =
-    io_field "sendPayment" ~doc:"Send a payment"
-      ~typ:(non_null Types.Payload.create_payment)
-      ~args:Arg.[arg "input" ~typ:(non_null Types.Input.create_payment)]
-      ~resolve:(fun {ctx= coda; _} () (from, to_, _amount, fee, maybe_memo) ->
+  let send_delegation =
+    io_field "sendDelegation" ~doc:"Send a delegation"
+      ~typ:(non_null Types.Payload.send_delegation)
+      ~args:Arg.[arg "input" ~typ:(non_null Types.Input.send_delegation)]
+      ~resolve:(fun {ctx= coda; _} () (from, to_, fee, maybe_memo) ->
         let open Deferred.Result.Let_syntax in
         let%bind sender_account, sender_kp, memo, new_delegate, fee =
           Deferred.return
@@ -1028,8 +1026,8 @@ module Mutations = struct
 
   let send_payment =
     io_field "sendPayment" ~doc:"Send a payment"
-      ~typ:(non_null Types.Payload.create_payment)
-      ~args:Arg.[arg "input" ~typ:(non_null Types.Input.create_payment)]
+      ~typ:(non_null Types.Payload.send_payment)
+      ~args:Arg.[arg "input" ~typ:(non_null Types.Input.send_payment)]
       ~resolve:(fun {ctx= coda; _} () (from, to_, amount, fee, maybe_memo) ->
         let open Deferred.Result.Let_syntax in
         let%bind amount =
@@ -1102,7 +1100,7 @@ module Mutations = struct
     [ add_wallet
     ; delete_wallet
     ; send_payment
-    ; set_delegation
+    ; send_delegation
     ; add_payment_receipt
     ; set_staking ]
 end
