@@ -253,6 +253,17 @@ let transfer reader Writer.{strict_reader; writer; _} ~f =
   Reader0.(reader.downstreams <- [strict_reader]) ;
   Reader0.enforce_single_reader reader (Pipe.transfer reader.reader writer ~f)
 
+let rec transfer_while_writer_alive reader writer ~f =
+  if Pipe.is_closed writer.Writer.writer then Deferred.unit
+  else
+    match%bind Pipe.read reader.Reader0.reader with
+    | `Ok x ->
+        let%bind () = Pipe.write writer.Writer.writer (f x) in
+        transfer_while_writer_alive reader writer ~f
+    | `Eof ->
+        Pipe.close writer.Writer.writer ;
+        Deferred.unit
+
 module Reader = struct
   include Reader0
 
