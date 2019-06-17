@@ -67,15 +67,23 @@ let txn_nonce =
   let open Coda_base in
   Command.Arg_type.map Command.Param.string ~f:Account.Nonce.of_string
 
-type work_selection = Seq | Random [@@deriving bin_io]
+type work_selection_method = Sequence | Random [@@deriving bin_io]
 
-let work_selection_val = function
+let work_selection_method_val = function
   | "seq" ->
-      Seq
+      Sequence
   | "rand" ->
       Random
   | _ ->
       failwith "Invalid work selection"
 
-let work_selection =
-  Command.Arg_type.map Command.Param.string ~f:work_selection_val
+let work_selection_method =
+  Command.Arg_type.map Command.Param.string ~f:work_selection_method_val
+
+let work_selection_method_to_module :
+    work_selection_method -> (module Work_selector.Selection_method_intf) =
+  function
+  | Sequence ->
+      (module Work_selector.Selection_methods.Sequence)
+  | Random ->
+      (module Work_selector.Selection_methods.Random)

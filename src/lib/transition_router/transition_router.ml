@@ -158,3 +158,11 @@ module Make (Inputs : Inputs_intf) = struct
     |> don't_wait_for ;
     verified_transition_reader
 end
+
+include Make (struct
+  include Transition_frontier.Inputs
+  module Transition_frontier = Transition_frontier
+  module Network = Coda_networking
+  module Transition_frontier_controller = Transition_frontier_controller
+  module Bootstrap_controller = Bootstrap_controller
+end)

@@ -124,3 +124,12 @@ module Make (Inputs : Inputs_intf) :
     |> don't_wait_for ;
     processed_transition_reader
 end
+
+include Make (struct
+  include Transition_frontier.Inputs
+  module Transition_frontier = Transition_frontier
+  module Catchup = Ledger_catchup
+  module Network = Coda_networking
+  module Transition_handler = Transition_handler
+  module Sync_handler = Sync_handler
+end)

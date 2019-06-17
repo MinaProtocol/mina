@@ -275,3 +275,13 @@ module Make (Inputs : Inputs.S) :
         |> don't_wait_for )
     |> don't_wait_for
 end
+
+include Make (struct
+  include Transition_frontier.Inputs
+  module Transition_frontier = Transition_frontier
+  module Unprocessed_transition_cache =
+    Transition_handler.Unprocessed_transition_cache
+  module Transition_handler_validator = Transition_handler.Validator
+  module Breadcrumb_builder = Transition_handler.Breadcrumb_builder
+  module Network = Coda_networking
+end)
