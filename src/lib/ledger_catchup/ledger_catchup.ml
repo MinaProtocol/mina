@@ -147,7 +147,7 @@ module Make (Inputs : Inputs.S) :
     in
     (result, Option.value_exn initial_state_hash)
 
-  let to_yojson subtrees_of_transitions =
+  let verified_transitions_to_yojson subtrees_of_transitions =
     let rose_tree_hash =
       List.map subtrees_of_transitions ~f:(fun sub_tree ->
           Rose_tree.to_yojson State_hash.to_yojson
@@ -238,7 +238,9 @@ module Make (Inputs : Inputs.S) :
                   !"Attempting to build subtree"
                   ~metadata:
                     [ ("initial_hash", State_hash.to_yojson initial_state_hash)
-                    ; ("subtree", to_yojson subtrees_of_transitions) ]
+                    ; ( "subtree"
+                      , verified_transitions_to_yojson subtrees_of_transitions
+                      ) ]
                   ~location:__LOC__ ~module_:__MODULE__ ;
                 match%bind
                   Breadcrumb_builder.build_subtrees_of_breadcrumbs
@@ -282,7 +284,7 @@ module Make (Inputs : Inputs.S) :
               Deferred.unit )
             else
               ( Logger.trace logger !"Writing subtree to pipe"
-                  ~metadata:[("subtree", to_yojson trees)]
+                  ~metadata:[("subtree", verified_transitions_to_yojson trees)]
                   ~location:__LOC__ ~module_:__MODULE__ ;
                 Strict_pipe.Writer.write catchup_breadcrumbs_writer trees )
               |> Deferred.return

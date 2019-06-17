@@ -83,7 +83,6 @@ let%test_module "Root_history and Transition_frontier" =
       in
       State_hash.equal expected_new_best_tip new_best_tip
 
-    (* TODO: Add test for the longest path length *)
     let%test "Adding many transitions to the frontier should update the root \
               of the transition_frontier" =
       Backtrace.elide := false ;
@@ -95,15 +94,32 @@ let%test_module "Root_history and Transition_frontier" =
       let%bind breadcrumbs =
         create_breadcrumbs ~logger ~trust_system ~size:(max_length + 1) root
       in
+      let%bind small_fork_breadcrumbs1 =
+        create_breadcrumbs ~logger ~trust_system ~size:(max_length / 2) root
+      in
+      let%bind small_fork_breadcrumbs2 =
+        create_breadcrumbs ~logger ~trust_system ~size:(max_length / 2) root
+      in
+      let forking_breadcrumbs =
+        small_fork_breadcrumbs1 @ small_fork_breadcrumbs2
+      in
+      let%bind () =
+        Deferred.List.iter forking_breadcrumbs
+          ~f:(Transition_frontier.add_breadcrumb_exn frontier)
+      in
       let%map () =
         Deferred.List.iter breadcrumbs
           ~f:(Transition_frontier.add_breadcrumb_exn frontier)
       in
-      (* TODO: Make test more complicated by testing the appropriate children got deleted *)
+      assert (
+        List.for_all forking_breadcrumbs ~f:(fun breadcrumb ->
+            let state_hash =
+              Transition_frontier.Breadcrumb.state_hash breadcrumb
+            in
+            Option.is_none @@ Transition_frontier.find frontier state_hash ) ) ;
       let new_root = Transition_frontier.root frontier in
       Transition_frontier.Breadcrumb.equal (List.hd_exn breadcrumbs) new_root
 
-    (* TODO: replace this with a polymorphic variant *)
     let%test_unit "We apply diff on adding a breadcrumb and then setting that \
                    as our root" =
       Backtrace.elide := false ;
@@ -139,7 +155,6 @@ let%test_module "Root_history and Transition_frontier" =
         create_breadcrumbs ~logger ~trust_system ~size:(max_length + offset)
           root
       in
-      Ledger.Maskable.Debug.visualize ~filename:"before_move_root.dot" ;
       let%map () =
         Deferred.List.iter breadcrumbs
           ~f:(Transition_frontier.add_breadcrumb_exn frontier)

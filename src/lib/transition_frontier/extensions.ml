@@ -1,14 +1,13 @@
 open Async_kernel
 open Core_kernel
 open Coda_base
-open Coda_incremental
 open Pipe_lib
 
 module Make (Inputs : sig
   include Inputs.Inputs_intf
 
-  module Breadcrumb :
-    Coda_intf.Transition_frontier_breadcrumb_intf
+  module Transition_frontier :
+    Coda_intf.Transition_frontier_base_intf
     with type mostly_validated_external_transition :=
                 ( [`Time_received] * Truth.true_t
                 , [`Proof] * Truth.true_t
@@ -16,28 +15,198 @@ module Make (Inputs : sig
                 , [`Staged_ledger_diff] * Truth.false_t )
                 External_transition.Validation.with_transition
      and type external_transition_validated := External_transition.Validated.t
+     and type staged_ledger_diff := Staged_ledger_diff.t
      and type staged_ledger := Staged_ledger.t
+     and type transaction_snark_scan_state := Staged_ledger.Scan_state.t
      and type verifier := Verifier.t
 
   module Diff :
     Coda_intf.Transition_frontier_diff_intf
-    with type breadcrumb := Breadcrumb.t
-     and type transaction_snark_scan_state := Staged_ledger.Scan_state.t
+    with type breadcrumb := Transition_frontier.Breadcrumb.t
      and type external_transition_validated := External_transition.Validated.t
-end) :
-  Coda_intf.Transition_frontier_extensions_intf
-  with type breadcrumb := Inputs.Breadcrumb.t
-   and type external_transition_validated :=
-              Inputs.External_transition.Validated.t
-   and type transaction_snark_scan_state := Inputs.Staged_ledger.Scan_state.t
-   and module Diff := Inputs.Diff = struct
+end) =
+struct
+  (* Have to treat functor Transition_frontier as Inputs.Transition_frontier *)
+  (* Invariant: No mutations are allowed to the transition_frontier on the transactions *)
   open Inputs
+  module Breadcrumb = Inputs.Transition_frontier.Breadcrumb
 
-  module type Extension_intf =
-    Coda_intf.Transition_frontier_extension_intf
-    with type transition_frontier_diff := Diff.t
+  module type Base_ext_intf = sig
+    type t
 
-  module Work = Transaction_snark_work.Statement
+    type view
+
+    val create : Breadcrumb.t -> t * view
+
+    (* It is of upmost importance to make this synchronous. To prevent data races via context switching *)
+    val handle_diffs :
+      t -> Inputs.Transition_frontier.t -> Diff.E.t list -> view option
+  end
+
+  module type Broadcast_extension_intf = sig
+    type t
+
+    type view
+
+    val create : Breadcrumb.t -> t Deferred.t
+
+    val close : t -> unit
+
+    val peek : t -> view
+
+    val reader : t -> view Broadcast_pipe.Reader.t
+
+    val update_and_create_broadcast_job :
+         t
+      -> Inputs.Transition_frontier.t
+      -> Diff.E.t list
+      -> unit
+      -> unit Deferred.t
+  end
+
+  module Make_broadcastable (Ext : Base_ext_intf) :
+    Broadcast_extension_intf with type view = Ext.view = struct
+    type t =
+      { t: Ext.t
+      ; writer: Ext.view Broadcast_pipe.Writer.t
+      ; reader: Ext.view Broadcast_pipe.Reader.t }
+
+    type view = Ext.view
+
+    let peek {reader; _} = Broadcast_pipe.Reader.peek reader
+
+    let close {writer; _} = Broadcast_pipe.Writer.close writer
+
+    let reader {reader; _} = reader
+
+    let create breadcrumb =
+      let t, initial_view = Ext.create breadcrumb in
+      let reader, writer = Broadcast_pipe.create initial_view in
+      let%map () = Broadcast_pipe.Writer.write writer initial_view in
+      {t; reader; writer}
+
+    let update_and_create_broadcast_job {t; writer; _} transition_frontier
+        diffs =
+      let update = Ext.handle_diffs t transition_frontier diffs in
+      fun () ->
+        match update with
+        | Some view ->
+            Broadcast_pipe.Writer.write writer view
+        | None ->
+            Deferred.unit
+  end
+
+  module Root_history = struct
+    module T = struct
+      module Queue = Hash_queue.Make (State_hash)
+
+      type t = {history: Breadcrumb.t Queue.t; capacity: int}
+
+      let create capacity =
+        let history = Queue.create () in
+        {history; capacity}
+
+      let lookup {history; _} = Queue.lookup history
+
+      let mem {history; _} = Queue.mem history
+
+      let enqueue {history; capacity} breadcrumb =
+        if Queue.length history >= capacity then
+          Queue.dequeue_front_exn history |> ignore ;
+        Queue.enqueue_back history
+          (Breadcrumb.state_hash breadcrumb)
+          breadcrumb
+        |> ignore
+
+      let is_empty {history; _} = Queue.is_empty history
+    end
+
+    type t = T.t
+
+    module View : sig
+      type t = private T.t
+
+      val lookup : t -> State_hash.t -> Breadcrumb.t option
+
+      val to_view : T.t -> t
+
+      val mem : t -> State_hash.t -> bool
+
+      val is_empty : t -> bool
+    end = struct
+      include T
+
+      let to_view = Fn.id
+    end
+
+    type view = View.t
+
+    let create (_ : Breadcrumb.t) =
+      let root_history = T.create (2 * Inputs.max_length) in
+      (root_history, View.to_view root_history)
+
+    let handle_diffs root_history transition_frontier diffs =
+      let should_produce_view =
+        List.exists diffs ~f:(function
+          | Diff.E.E (Diff.Root_transitioned _) ->
+              T.enqueue root_history
+                (Inputs.Transition_frontier.root transition_frontier) ;
+              true
+          | Diff.E.E _ ->
+              false )
+      in
+      Option.some_if should_produce_view @@ View.to_view root_history
+
+    [%%define_locally
+    T.(lookup, mem, enqueue, is_empty)]
+  end
+
+  module Transition_registry = struct
+    module T = struct
+      type t = unit Ivar.t list State_hash.Table.t
+
+      let create () = State_hash.Table.create ()
+
+      let notify t state_hash =
+        State_hash.Table.change t state_hash ~f:(function
+          | Some ls ->
+              List.iter ls ~f:(Fn.flip Ivar.fill ()) ;
+              None
+          | None ->
+              None )
+
+      let register t state_hash =
+        Deferred.create (fun ivar ->
+            State_hash.Table.update t state_hash ~f:(function
+              | Some ls ->
+                  ivar :: ls
+              | None ->
+                  [ivar] ) )
+    end
+
+    type t = T.t
+
+    type view = T.t
+
+    let create (_ : Breadcrumb.t) =
+      let registry = T.create () in
+      (registry, registry)
+
+    let handle_diffs transition_registry _ diffs =
+      let should_produce_view =
+        List.exists diffs ~f:(function
+          | Diff.E.E (Diff.New_breadcrumb breadcrumb) ->
+              let state_hash = Breadcrumb.state_hash breadcrumb in
+              T.notify transition_registry state_hash ;
+              true
+          | Diff.E.E _ ->
+              false )
+      in
+      Option.some_if should_produce_view @@ transition_registry
+
+    [%%define_locally
+    T.(notify, register)]
+  end
 
   module Snark_pool_refcount = struct
     module Work = Inputs.Transaction_snark_work.Statement
@@ -46,18 +215,18 @@ end) :
 
     type view = int * int Work.Table.t
 
-    type input = unit
-
     let get_work (breadcrumb : Breadcrumb.t) : Work.t Sequence.t =
-      let ledger = Inputs.Breadcrumb.staged_ledger breadcrumb in
-      let scan_state = Inputs.Staged_ledger.scan_state ledger in
+      let staged_ledger =
+        Inputs.Transition_frontier.Breadcrumb.staged_ledger breadcrumb
+      in
+      let scan_state = Inputs.Staged_ledger.scan_state staged_ledger in
       let work_to_do =
         Inputs.Staged_ledger.Scan_state.all_work_to_do scan_state
       in
       Or_error.ok_exn work_to_do
 
     (** Returns true if this update changed which elements are in the table
-    (but not if the same elements exist with a different reference count) *)
+        (but not if the same elements exist with a different reference count) *)
     let add_breadcrumb_to_ref_table table breadcrumb : bool =
       Sequence.fold ~init:false (get_work breadcrumb) ~f:(fun acc work ->
           match Work.Table.find table work with
@@ -69,7 +238,7 @@ end) :
               true )
 
     (** Returns true if this update changed which elements are in the table
-    (but not if the same elements exist with a different reference count) *)
+        (but not if the same elements exist with a different reference count) *)
     let remove_breadcrumb_from_ref_table table breadcrumb : bool =
       Sequence.fold (get_work breadcrumb) ~init:false ~f:(fun acc work ->
           match Work.Table.find table work with
@@ -82,193 +251,199 @@ end) :
           | None ->
               failwith "Removed a breadcrumb we didn't know about" )
 
-    let create () = Work.Table.create ()
+    let create breadcrumb =
+      let t = Work.Table.create () in
+      let (_ : bool) = add_breadcrumb_to_ref_table t breadcrumb in
+      (t, (0, t))
 
-    let initial_view () = (0, Work.Table.create ())
+    type diff_update = {num_removed: int; is_added: bool}
 
-    let handle_diff t diff =
-      let removed, added =
-        match (diff : Diff.t) with
-        | New_breadcrumb {added= breadcrumb; _} | New_frontier breadcrumb ->
-            (0, add_breadcrumb_to_ref_table t breadcrumb)
-        | New_best_tip {old_root; new_root; added_to_best_tip_path; garbage; _}
-          ->
-            let added =
-              add_breadcrumb_to_ref_table t
-              @@ Non_empty_list.last added_to_best_tip_path
-            in
-            let all_garbage =
-              if phys_equal old_root new_root then garbage
-              else old_root :: garbage
-            in
-            ( List.fold ~init:0
-                ~f:(fun acc bc ->
-                  acc + if remove_breadcrumb_from_ref_table t bc then 1 else 0
-                  )
-                all_garbage
-            , added )
+    let handle_diffs t (_ : Inputs.Transition_frontier.t) diffs =
+      let {num_removed; is_added} =
+        List.fold diffs ~init:{num_removed= 0; is_added= false}
+          ~f:(fun ({num_removed; is_added} as init) -> function
+          | Diff.E.E (New_breadcrumb breadcrumb) ->
+              { num_removed
+              ; is_added= is_added || add_breadcrumb_to_ref_table t breadcrumb
+              }
+          | Diff.E.E (Root_transitioned {new_= _; garbage}) ->
+              let extra_num_removed =
+                List.fold ~init:0
+                  ~f:(fun acc bc ->
+                    acc
+                    + if remove_breadcrumb_from_ref_table t bc then 1 else 0 )
+                  garbage
+              in
+              {num_removed= num_removed + extra_num_removed; is_added}
+          | Diff.E.E (Best_tip_changed _) ->
+              init )
       in
-      if removed > 0 || added then Some (removed, t) else None
+      if num_removed > 0 || is_added then Some (num_removed, t) else None
   end
 
-  module Root_history = struct
-    module Queue = Hash_queue.Make (State_hash)
+  module Best_tip_diff = struct
+    type t = unit
 
-    type t =
-      { history: Breadcrumb.t Queue.t
-      ; capacity: int
-      ; mutable most_recent: Breadcrumb.t option }
+    type view =
+      { new_user_commands: User_command.t list
+      ; removed_user_commands: User_command.t list }
 
-    let create capacity =
-      let history = Queue.create () in
-      {history; capacity; most_recent= None}
+    let create breadcrumb =
+      ( ()
+      , { new_user_commands= Breadcrumb.to_user_commands breadcrumb
+        ; removed_user_commands= [] } )
 
-    let lookup {history; _} = Queue.lookup history
+    (* Get the breadcrumbs that are on bc1's path but not bc2's, and vice versa.
+       Ordered oldest to newest. *)
+    let get_path_diff t (bc1 : Breadcrumb.t) (bc2 : Breadcrumb.t) :
+        Breadcrumb.t list * Breadcrumb.t list =
+      let ancestor = Inputs.Transition_frontier.common_ancestor t bc1 bc2 in
+      (* Find the breadcrumbs connecting bc1 and bc2, excluding bc1. Precondition:
+         bc1 is an ancestor of bc2. *)
+      let open Inputs.Transition_frontier in
+      let path_from_to bc1 bc2 =
+        let rec go cursor acc =
+          if Breadcrumb.equal cursor bc1 then acc
+          else go (find_exn t @@ Breadcrumb.parent_hash cursor) (cursor :: acc)
+        in
+        go bc2 []
+      in
+      Logger.debug (logger t) ~module_:__MODULE__ ~location:__LOC__
+        !"Common ancestor: %{sexp: State_hash.t}"
+        ancestor ;
+      ( path_from_to (find_exn t ancestor) bc1
+      , path_from_to (find_exn t ancestor) bc2 )
 
-    let most_recent {most_recent; _} = most_recent
-
-    let mem {history; _} = Queue.mem history
-
-    let enqueue ({history; capacity; _} as t) state_hash breadcrumb =
-      if Queue.length history >= capacity then
-        Queue.dequeue_front_exn history |> ignore ;
-      Queue.enqueue_back history state_hash breadcrumb |> ignore ;
-      t.most_recent <- Some breadcrumb
-
-    let is_empty {history; _} = Queue.is_empty history
+    let handle_diffs () transition_frontier diffs : view option =
+      let old_best_tip =
+        Inputs.Transition_frontier.best_tip transition_frontier
+      in
+      let view, _, should_broadcast =
+        List.fold diffs
+          ~init:
+            ( {new_user_commands= []; removed_user_commands= []}
+            , old_best_tip
+            , false )
+          ~f:
+            (fun ( ({new_user_commands; removed_user_commands} as acc)
+                 , old_best_tip
+                 , should_broadcast ) -> function
+            | Diff.E.E (Best_tip_changed new_best_tip_breadcrumb) ->
+                let added_to_best_tip_path, removed_from_best_tip_path =
+                  get_path_diff transition_frontier new_best_tip_breadcrumb
+                    old_best_tip
+                in
+                Logger.debug
+                  (Inputs.Transition_frontier.logger transition_frontier)
+                  ~module_:__MODULE__ ~location:__LOC__
+                  "added %d breadcrumbs and removed %d making path to new \
+                   best tip"
+                  (List.length added_to_best_tip_path)
+                  (List.length removed_from_best_tip_path)
+                  ~metadata:
+                    [ ( "new_breadcrumbs"
+                      , `List
+                          (List.map ~f:Breadcrumb.to_yojson
+                             added_to_best_tip_path) )
+                    ; ( "old_breadcrumbs"
+                      , `List
+                          (List.map ~f:Breadcrumb.to_yojson
+                             removed_from_best_tip_path) ) ] ;
+                let new_user_commands =
+                  List.bind added_to_best_tip_path
+                    ~f:Breadcrumb.to_user_commands
+                  @ new_user_commands
+                in
+                let removed_user_commands =
+                  List.bind removed_from_best_tip_path
+                    ~f:Breadcrumb.to_user_commands
+                  @ removed_user_commands
+                in
+                ( {new_user_commands; removed_user_commands}
+                , new_best_tip_breadcrumb
+                , true ) | Diff.E.E (New_breadcrumb _) ->
+                (acc, old_best_tip, should_broadcast)
+            | Diff.E.E (Root_transitioned _) ->
+                (acc, old_best_tip, should_broadcast) )
+      in
+      Option.some_if should_broadcast view
   end
 
-  (* TODO: guard against waiting for transitions that already exist in the frontier *)
-  module Transition_registry = struct
-    type t = unit Ivar.t list State_hash.Table.t
+  (** Used for testing. Allows a client to process the actual diffs that are
+      passed down to a broadcast pipe *)
+  module Identity = struct
+    type t = unit
 
-    let create () = State_hash.Table.create ()
+    type view = Diff.E.t list
 
-    let notify t state_hash =
-      State_hash.Table.change t state_hash ~f:(function
-        | Some ls ->
-            List.iter ls ~f:(Fn.flip Ivar.fill ()) ;
-            None
-        | None ->
-            None )
+    let create _ = ((), [])
 
-    let register t state_hash =
-      Deferred.create (fun ivar ->
-          State_hash.Table.update t state_hash ~f:(function
-            | Some ls ->
-                ivar :: ls
-            | None ->
-                [ivar] ) )
+    let handle_diffs () _ diffs : view option = Some diffs
+  end
+
+  module Broadcast = struct
+    module Root_history = Make_broadcastable (Root_history)
+    module Snark_pool_refcount = Make_broadcastable (Snark_pool_refcount)
+    module Best_tip_diff = Make_broadcastable (Best_tip_diff)
+    module Transition_registry = Make_broadcastable (Transition_registry)
+    module Identity = Make_broadcastable (Identity)
   end
 
   type t =
-    { root_history: Root_history.t
-    ; snark_pool_refcount: Snark_pool_refcount.t
-    ; transition_registry: Transition_registry.t
-    ; best_tip_diff: Diff.Best_tip_diff.t
-    ; root_diff: Diff.Root_diff.t
-    ; persistence_diff: Diff.Persistence_diff.t
-    ; new_transition: External_transition.Validated.t New_transition.Var.t }
+    { root_history: Broadcast.Root_history.t
+    ; snark_pool_refcount: Broadcast.Snark_pool_refcount.t
+    ; best_tip_diff: Broadcast.Best_tip_diff.t
+    ; transition_registry: Broadcast.Transition_registry.t
+    ; identity: Broadcast.Identity.t }
   [@@deriving fields]
 
-  (* TODO: Each of these extensions should be created with the input of the breadcrumb *)
-  let create root_breadcrumb =
-    let new_transition =
-      New_transition.Var.create
-        (Breadcrumb.external_transition root_breadcrumb)
+  let create (breadcrumb : Breadcrumb.t) : t Deferred.t =
+    let open Broadcast in
+    let%bind root_history = Root_history.create breadcrumb in
+    let%bind snark_pool_refcount = Snark_pool_refcount.create breadcrumb in
+    let%bind best_tip_diff = Best_tip_diff.create breadcrumb in
+    let%bind transition_registry = Transition_registry.create breadcrumb in
+    let%map identity = Identity.create breadcrumb in
+    { root_history
+    ; snark_pool_refcount
+    ; best_tip_diff
+    ; transition_registry
+    ; identity }
+
+  (* HACK: A way to ensure that all the pipes are closed in a type-safe manner *)
+  let close t : unit =
+    let close_extension (type t)
+        (module Broadcast : Broadcast_extension_intf with type t = t) field =
+      let extension = Field.get field t in
+      Broadcast.close extension
     in
-    { root_history= Root_history.create (2 * max_length)
-    ; snark_pool_refcount= Snark_pool_refcount.create ()
-    ; transition_registry= Transition_registry.create ()
-    ; best_tip_diff= Diff.Best_tip_diff.create ()
-    ; root_diff= Diff.Root_diff.create ()
-    ; persistence_diff= Diff.Persistence_diff.create ()
-    ; new_transition }
+    let open Broadcast in
+    Fields.iter
+      ~root_history:(close_extension (module Root_history))
+      ~snark_pool_refcount:(close_extension (module Snark_pool_refcount))
+      ~best_tip_diff:(close_extension (module Best_tip_diff))
+      ~transition_registry:(close_extension (module Transition_registry))
+      ~identity:(close_extension (module Identity))
 
-  type writers =
-    { snark_pool: Snark_pool_refcount.view Broadcast_pipe.Writer.t
-    ; best_tip_diff: Diff.Best_tip_diff.view Broadcast_pipe.Writer.t
-    ; root_diff: Diff.Root_diff.view Broadcast_pipe.Writer.t
-    ; persistence_diff: Diff.Persistence_diff.view Broadcast_pipe.Writer.t }
-
-  type readers =
-    { snark_pool: Snark_pool_refcount.view Broadcast_pipe.Reader.t
-    ; best_tip_diff: Diff.Best_tip_diff.view Broadcast_pipe.Reader.t
-    ; root_diff: Diff.Root_diff.view Broadcast_pipe.Reader.t
-    ; persistence_diff: Diff.Persistence_diff.view Broadcast_pipe.Reader.t }
-  [@@deriving fields]
-
-  let make_pipes () : readers * writers =
-    let snark_reader, snark_writer =
-      Broadcast_pipe.create (Snark_pool_refcount.initial_view ())
-    and best_tip_reader, best_tip_writer =
-      Broadcast_pipe.create (Diff.Best_tip_diff.initial_view ())
-    and root_diff_reader, root_diff_writer =
-      Broadcast_pipe.create (Diff.Root_diff.initial_view ())
-    and persistence_diff_reader, persistence_diff_writer =
-      Broadcast_pipe.create (Diff.Persistence_diff.initial_view ())
+  let update_all (t : t) transition_frontier diffs =
+    let run_updates_and_setup_broadcast_jobs (type t)
+        (module Broadcast : Broadcast_extension_intf with type t = t) field =
+      let extension = Field.get field t in
+      Broadcast.update_and_create_broadcast_job extension transition_frontier
+        diffs
     in
-    ( { snark_pool= snark_reader
-      ; best_tip_diff= best_tip_reader
-      ; root_diff= root_diff_reader
-      ; persistence_diff= persistence_diff_reader }
-    , { snark_pool= snark_writer
-      ; best_tip_diff= best_tip_writer
-      ; root_diff= root_diff_writer
-      ; persistence_diff= persistence_diff_writer } )
-
-  let close_pipes
-      ({snark_pool; best_tip_diff; root_diff; persistence_diff} : writers) =
-    Broadcast_pipe.Writer.close snark_pool ;
-    Broadcast_pipe.Writer.close best_tip_diff ;
-    Broadcast_pipe.Writer.close root_diff ;
-    Broadcast_pipe.Writer.close persistence_diff
-
-  let mb_write_to_pipe diff ext_t handle pipe =
-    Option.value ~default:Deferred.unit
-    @@ Option.map ~f:(Broadcast_pipe.Writer.write pipe) (handle ext_t diff)
-
-  let handle_diff t (pipes : writers) (diff : Diff.t) : unit Deferred.t =
-    let use handler pipe acc field =
-      let%bind () = acc in
-      mb_write_to_pipe diff (Field.get field t) handler pipe
-    in
-    ( match diff with
-    | New_best_tip {old_root; new_root; _} ->
-        if not (Breadcrumb.equal old_root new_root) then
-          Root_history.enqueue t.root_history
-            (Breadcrumb.state_hash old_root)
-            old_root
-    | _ ->
-        () ) ;
-    let%map () =
-      Fields.fold ~init:diff
-        ~root_history:(fun _ _ -> Deferred.unit)
+    let open Broadcast in
+    let jobs =
+      Fields.to_list
+        ~root_history:
+          (run_updates_and_setup_broadcast_jobs (module Root_history))
         ~snark_pool_refcount:
-          (use Snark_pool_refcount.handle_diff pipes.snark_pool)
-        ~transition_registry:(fun acc _ -> acc)
-        ~best_tip_diff:(use Diff.Best_tip_diff.handle_diff pipes.best_tip_diff)
-        ~root_diff:(use Diff.Root_diff.handle_diff pipes.root_diff)
-        ~persistence_diff:
-          (use Diff.Persistence_diff.handle_diff pipes.persistence_diff)
-        ~new_transition:(fun acc _ -> acc)
+          (run_updates_and_setup_broadcast_jobs (module Snark_pool_refcount))
+        ~best_tip_diff:
+          (run_updates_and_setup_broadcast_jobs (module Best_tip_diff))
+        ~transition_registry:
+          (run_updates_and_setup_broadcast_jobs (module Transition_registry))
+        ~identity:(run_updates_and_setup_broadcast_jobs (module Identity))
     in
-    let bc_opt =
-      match diff with
-      | New_breadcrumb {added; _} ->
-          Some added
-      | New_best_tip {added_to_best_tip_path; _} ->
-          Some (Non_empty_list.last added_to_best_tip_path)
-      | _ ->
-          None
-    in
-    Option.iter bc_opt ~f:(fun bc ->
-        (* Other components may be waiting on these, so it's important they're
-           updated after the views above so that those other components see
-           the views updated with the new breadcrumb. *)
-        Transition_registry.notify t.transition_registry
-          (Breadcrumb.state_hash bc) ;
-        New_transition.Var.set t.new_transition
-        @@ Breadcrumb.external_transition bc ;
-        New_transition.stabilize () )
+    fun () -> Deferred.List.iter ~how:`Parallel jobs ~f:(fun job -> job ())
 end
