@@ -3,8 +3,12 @@ open Core_kernel
 open Coda_base
 open Pipe_lib
 
+(** A [Resource_pool_base_intf] is a mutable pool of resources that supports
+ *  mutation via some [Resource_pool_diff_intf]. A [Resource_pool_base_intf]
+ *  can only be initialized, and any interaction with it must go through
+ *  its [Resource_pool_diff_intf] *)
 module type Resource_pool_base_intf = sig
-  type t [@@deriving sexp]
+  type t [@@deriving sexp_of]
 
   type transition_frontier
 
@@ -16,6 +20,10 @@ module type Resource_pool_base_intf = sig
     -> t
 end
 
+(** A [Resource_pool_diff_intf] is a representation of a mutation to
+ *  perform on a [Resource_pool_base_intf]. It includes the logic for
+ *  processing this mutation and applying it to an underlying
+ *  [Resource_pool_base_intf]. *)
 module type Resource_pool_diff_intf = sig
   type pool
 
@@ -26,12 +34,22 @@ module type Resource_pool_diff_intf = sig
   val apply : pool -> t Envelope.Incoming.t -> t Deferred.Or_error.t
 end
 
+(** A [Resource_pool_intf] ties together an associated pair of
+ *  [Resource_pool_base_intf] and [Resource_pool_diff_intf]. *)
 module type Resource_pool_intf = sig
   include Resource_pool_base_intf
 
   module Diff : Resource_pool_diff_intf with type pool := t
 end
 
+(** A [Network_pool_base_intf] is the core implementation of a
+ *  network pool on top of a [Resource_pool_intf]. It wraps
+ *  some [Resource_pool_intf] and provides a generic interface
+ *  for interacting with the [Resource_pool_intf] using the
+ *  network. A [Network_pool_base_intf] wires the [Resource_pool_intf]
+ *  into the network using pipes of diffs and transition frontiers.
+ *  It also provides a way to apply new diffs and rebroadcast them
+ *  to the network if necessary. *)
 module type Network_pool_base_intf = sig
   type t
 
@@ -65,6 +83,8 @@ module type Network_pool_base_intf = sig
     t -> resource_pool_diff Envelope.Incoming.t -> unit Deferred.t
 end
 
+(** A [Snark_resource_pool_intf] is a superset of a
+ *  [Resource_pool_intf] specifically for handling snarks. *)
 module type Snark_resource_pool_intf = sig
   type ledger_proof
 
@@ -88,6 +108,8 @@ module type Snark_resource_pool_intf = sig
   val request_proof : t -> work -> ledger_proof list Priced_proof.t option
 end
 
+(** A [Snark_pool_diff_intf] is the resource pool diff for
+ *  a [Snark_resource_pool_intf]. *)
 module type Snark_pool_diff_intf = sig
   type ledger_proof
 

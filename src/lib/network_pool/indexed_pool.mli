@@ -10,7 +10,7 @@ open Coda_numbers
 open Signature_lib
 
 (** Transaction pool. This is a purely functional data structure. *)
-type t [@@deriving sexp]
+type t [@@deriving sexp_of]
 
 (* TODO sexp is debug only, remove *)
 

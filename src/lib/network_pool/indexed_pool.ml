@@ -29,8 +29,7 @@ type t =
       User_command.With_valid_signature.Set.t Currency.Fee.Map.t
         (** Transactions valid against the current ledger, indexed by fee. *)
   ; all_by_sender:
-      ( User_command.With_valid_signature.t F_sequence.t sexp_opaque
-      * Currency.Amount.t )
+      (User_command.With_valid_signature.t F_sequence.t * Currency.Amount.t)
       Public_key.Compressed.Map.t
         (** All pending transactions along with the total currency required to
       execute them, indexed by sender account. Ordered by nonce inside the
@@ -38,7 +37,7 @@ type t =
   ; all_by_fee: User_command.With_valid_signature.Set.t Currency.Fee.Map.t
         (** All transactions in the pool indexed by fee. *)
   ; size: int }
-[@@deriving sexp]
+[@@deriving sexp_of]
 
 (* Compute the total currency required from the sender to execute a command.
    Returns None in case of overflow.

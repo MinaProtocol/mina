@@ -61,7 +61,7 @@ struct
       ; trust_system: Trust_system.t sexp_opaque
       ; mutable diff_reader: unit Deferred.t sexp_opaque Option.t
       ; mutable best_tip_ledger: Base_ledger.t sexp_opaque option }
-    [@@deriving sexp]
+    [@@deriving sexp_of]
 
     let transactions' p =
       Sequence.unfold ~init:p ~f:(fun pool ->
@@ -548,7 +548,7 @@ let%test_module _ =
           let open Test.Resource_pool in
           Indexed_pool.For_tests.assert_invariants pool.pool ;
           [%test_eq: User_command.t List.t]
-            ( Test.Resource_pool.transactions pool
+            ( transactions pool
             |> Sequence.map ~f:User_command.forget_check
             |> Sequence.to_list
             |> List.sort ~compare:User_command.compare )
