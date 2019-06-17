@@ -79,10 +79,10 @@ module SyncStatusQuery = ReasonApollo.CreateQuery(SyncStatusQ);
 module SyncStatus = {
   module SubscriptionGQL = [%graphql
     {|
-         subscription syncStatus {
-           newSyncUpdate
-         }
-         |}
+      subscription syncStatus {
+        newSyncUpdate
+      }
+    |}
   ];
 
   module Subscription = ReasonApollo.CreateSubscription(SubscriptionGQL);
@@ -102,6 +102,7 @@ module SyncStatus = {
             ) =>
             unit,
       ) => {
+    // TODO: Replace/remove when we fix/replace the current subscriptions
     /* let _ = */
     /*   React.useEffect0(() => { */
     /*     subscribeToMore(~document=Subscription.graphQLSubscriptionAST, ()); */

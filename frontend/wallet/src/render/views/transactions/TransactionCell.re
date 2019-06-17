@@ -427,8 +427,10 @@ let make = (~transaction: Transaction.t, ~pending=false) => {
                   {ReasonReact.string("Failed")}
                 </span>
               }}
-             {Option.map(~f=date => <TimeDisplay date />, date)
-              |> Option.withDefault(~default=React.null)}
+             {switch (date) {
+              | Some(date) => <TimeDisplay date />
+              | None => React.null
+              }}
            </>
          | MissingReceipts => <span />
          }}

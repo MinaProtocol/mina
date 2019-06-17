@@ -15,15 +15,15 @@ let client = {
 
   let retryOptions: retryOptions = [%bs.raw
     {|
-    {delay: {
-      initial: 300,
-      max: 500,
-      jitter: false
-    },
-    attempts: {
-      max: 60,
-    }}
-  |}
+      {delay: {
+        initial: 300,
+        max: 500,
+        jitter: false
+      },
+      attempts: {
+        max: 60,
+      }}
+    |}
   ];
   let retry = createRetryLink(retryOptions);
 

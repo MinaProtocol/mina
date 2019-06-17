@@ -98,16 +98,17 @@ type extractedResponse = {
 };
 
 let gqlUserCommandToRecord = (userCommand, maybeDate) =>
-  TransactionCell.Transaction.UserCommand({
-    TransactionCell.Transaction.PaymentDetails.isDelegation:
-      userCommand##isDelegation,
-    from: userCommand##from,
-    to_: userCommand##to_,
-    amount: userCommand##amount,
-    fee: userCommand##fee,
-    memo: userCommand##memo,
-    date: maybeDate,
-  });
+  TransactionCell.Transaction.(
+    UserCommand({
+      PaymentDetails.isDelegation: userCommand##isDelegation,
+      from: userCommand##from,
+      to_: userCommand##to_,
+      amount: userCommand##amount,
+      fee: userCommand##fee,
+      memo: userCommand##memo,
+      date: maybeDate,
+    })
+  );
 
 let extractTransactions: Js.t('a) => extractedResponse =
   data => {
