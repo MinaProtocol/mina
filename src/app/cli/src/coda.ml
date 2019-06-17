@@ -4,7 +4,6 @@
 open Core
 open Async
 open Coda_base
-open Blockchain_snark
 open Cli_lib
 open Coda_inputs
 open Signature_lib
@@ -37,6 +36,9 @@ let daemon logger =
     (let%map_open conf_dir =
        flag "config-directory" ~doc:"DIR Configuration directory"
          (optional string)
+     and from_genesis =
+       flag "from-genesis"
+         ~doc:"Indicating that we are starting from genesis or not" no_arg
      and propose_key =
        flag "propose-key"
          ~doc:
@@ -106,9 +108,6 @@ let daemon logger =
                snark proof (default: %d)"
               (Currency.Fee.to_int Cli_lib.Fee.default_snark_worker))
          (optional txn_fee)
-     and sexp_logging =
-       flag "sexp-logging" no_arg
-         ~doc:"Use S-expressions in log output, instead of JSON"
      and enable_tracing =
        flag "tracing" no_arg ~doc:"Trace into $config-directory/$pid.trace"
      and limit_connections =
@@ -206,8 +205,7 @@ let daemon logger =
          or_from_config
            (Fn.compose Option.return
               (Fn.compose work_selection_val YJ.Util.to_string))
-           "work-selection" ~default:Protocols.Coda_pow.Work_selection.Seq
-           work_selection_flag
+           "work-selection" ~default:Cli_lib.Arg_type.Seq work_selection_flag
        in
        let initial_peers_raw =
          List.concat
@@ -317,14 +315,8 @@ let daemon logger =
          let commit_id = commit_id
 
          let work_selection = work_selection
-
-         let max_concurrent_connections = max_concurrent_connections
        end in
-       let%bind (module Init) =
-         make_init
-           ~should_propose:(Option.is_some propose_keypair)
-           (module Config0)
-       in
+       let%bind (module Init) = make_init (module Config0) in
        let module M = Coda_inputs.Make_coda (Init) in
        let module Run = Coda_run.Make (Config0) (M) in
        Stream.iter
@@ -349,16 +341,20 @@ let daemon logger =
        let trust_system = Trust_system.create ~db_dir:trust_dir in
        trace_database_initialization "trust_system" __LOC__ trust_dir ;
        let time_controller =
-         M.Inputs.Time.Controller.create M.Inputs.Time.Controller.basic
+         Block_time.Controller.create Block_time.Controller.basic
+       in
+       let initial_propose_keypairs =
+         Config0.propose_keypair |> Option.to_list |> Keypair.Set.of_list
        in
        let consensus_local_state =
          Consensus.Data.Local_state.create
-           (Option.map Config0.propose_keypair ~f:(fun keypair ->
-                let open Keypair in
-                Public_key.compress keypair.public_key ))
+           ( Option.map Config0.propose_keypair ~f:(fun keypair ->
+                 let open Keypair in
+                 Public_key.compress keypair.public_key )
+           |> Option.to_list |> Public_key.Compressed.Set.of_list )
        in
        let net_config =
-         { M.Inputs.Net.Config.logger
+         { Coda_networking.Config.logger
          ; trust_system
          ; time_controller
          ; consensus_local_state
@@ -383,28 +379,44 @@ let daemon logger =
        let transaction_database_dir = conf_dir ^/ "transaction" in
        let%bind () = Async.Unix.mkdir ~p:() transaction_database_dir in
        let transaction_database =
-         Transaction_database.create logger transaction_database_dir
+         Auxiliary_database.Transaction_database.create ~logger
+           transaction_database_dir
        in
        trace_database_initialization "transaction_database" __LOC__
          transaction_database_dir ;
+       let external_transition_database_dir =
+         conf_dir ^/ "external_transition_database"
+       in
+       let%bind () = Async.Unix.mkdir ~p:() external_transition_database_dir in
+       let external_transition_database =
+         Auxiliary_database.External_transition_database.create ~logger
+           external_transition_database_dir
+       in
        let monitor = Async.Monitor.create ~name:"coda" () in
        let%bind coda =
          Run.create
-           (Run.Config.make ~logger ~trust_system ~verifier:Init.verifier
-              ~net_config ?snark_worker_key:run_snark_worker_flag
-              ~transaction_pool_disk_location:(conf_dir ^/ "transaction_pool")
+           (Coda_lib.Config.make ~logger ~trust_system ~verifier:Init.verifier
+              ~prover:Init.prover ~net_config
+              ?snark_worker_key:run_snark_worker_flag
               ~snark_pool_disk_location:(conf_dir ^/ "snark_pool")
               ~wallets_disk_location:(conf_dir ^/ "wallets")
               ~ledger_db_location:(conf_dir ^/ "ledger_db")
               ~snark_work_fee:snark_work_fee_flag ~receipt_chain_database
               ~transition_frontier_location ~time_controller
-              ?propose_keypair:Config0.propose_keypair ~monitor
-              ~consensus_local_state ~transaction_database ())
+              ~initial_propose_keypairs ~monitor ~consensus_local_state
+              ~transaction_database ~external_transition_database ())
        in
        Run.handle_shutdown ~monitor ~conf_dir coda ;
        Async.Scheduler.within' ~monitor
        @@ fun () ->
        let%bind () = maybe_sleep 3. in
+       let%bind () =
+         if from_genesis then Deferred.unit
+         else
+           after
+             ( Consensus.Constants.block_window_duration_ms * 2
+             |> Float.of_int |> Time.Span.of_ms )
+       in
        M.start coda ;
        let web_service = Web_pipe.get_service () in
        Web_pipe.run_service (module Run) coda web_service ~conf_dir ~logger ;

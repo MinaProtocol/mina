@@ -67,7 +67,7 @@ module type Extension_intf = sig
 
   val project_to_base : t -> base
 
-  val to_base_elements : t -> base list
+  val to_list : t -> base list
 end
 
 module Make_fp
@@ -90,11 +90,14 @@ module Make_fp
   let gen =
     let length_in_int32s = (length_in_bits + 31) / 32 in
     Quickcheck.Generator.(
-      map (list_with_length length_in_int32s Int32.quickcheck_generator)
+      map
+        (list_with_length length_in_int32s
+           (Int32.gen_incl Int32.zero Int32.max_value))
         ~f:(fun xs ->
           List.foldi xs ~init:zero ~f:(fun i acc x ->
               N.log_or acc
-                (N.shift_left (N.of_int (Int32.to_int_exn x)) (32 * i)) ) ))
+                (N.shift_left (N.of_int (Int32.to_int_exn x)) (32 * i)) )
+          |> fun x -> N.(x % order) ))
 
   let fold_bits n : bool Fold_lib.Fold.t =
     { fold=
@@ -205,7 +208,9 @@ module Make_fp
 
   let%test_unit "pow2" =
     let b = 7 in
-    [%test_eq: t] (pow2 (of_int b) 3) (of_int Int.(7 ** 8))
+    if N.(of_int Int.(7 ** 8) < order) then
+      [%test_eq: t] (pow2 (of_int b) 3) (of_int Int.(7 ** 8))
+    else ()
 
   let sqrt =
     let pow2_order b =
@@ -320,7 +325,7 @@ end = struct
 
   let gen = Quickcheck.Generator.tuple3 Fp.gen Fp.gen Fp.gen
 
-  let to_base_elements (x, y, z) = [x; y; z]
+  let to_list (x, y, z) = [x; y; z]
 
   let componentwise f (x1, x2, x3) (y1, y2, y3) = (f x1 y1, f x2 y2, f x3 y3)
 
@@ -397,7 +402,7 @@ end = struct
 
   let of_base x = (x, Fp.zero)
 
-  let to_base_elements (x, y) = [x; y]
+  let to_list (x, y) = [x; y]
 
   let project_to_base (x, _) = x
 
@@ -469,7 +474,7 @@ end = struct
 
   let gen = Quickcheck.Generator.tuple2 Fp3.gen Fp3.gen
 
-  let to_base_elements (x, y) = [x; y]
+  let to_list (x, y) = [x; y]
 
   let int_sub = ( - )
 

@@ -217,7 +217,8 @@ module Make (T : Transaction_snark.Verification.S) = struct
           (Fn.compose Md5.to_hex Tick.R1CS_constraint_system.digest)
         ~create_env:Tick.Keypair.generate
         ~input:
-          (Tick.constraint_system ~exposing:(Step_base.input ()) Step_base.main)
+          (Tick.constraint_system ~exposing:(Step_base.input ())
+             (Step_base.main (Logger.null ())))
 
     let cached () =
       let paths = Fn.compose Cache_dir.possible_paths Filename.basename in
@@ -272,6 +273,9 @@ let constraint_system_digests () =
   let digest = Tick.R1CS_constraint_system.digest in
   let digest' = Tock.R1CS_constraint_system.digest in
   [ ( "blockchain-step"
-    , digest M.Step_base.(Tick.constraint_system ~exposing:(input ()) main) )
+    , digest
+        M.Step_base.(
+          Tick.constraint_system ~exposing:(input ()) (main (Logger.null ())))
+    )
   ; ("blockchain-wrap", digest' W.(Tock.constraint_system ~exposing:input main))
   ]

@@ -1,7 +1,5 @@
 open Core
 open Async
-open Coda_worker
-open Coda_inputs
 open Coda_base
 open Signature_lib
 
@@ -35,7 +33,7 @@ let main () =
   let send_amount = Currency.Amount.of_int 10 in
   let fee = Currency.Fee.of_int 0 in
   let%bind program_dir = Unix.getcwd () in
-  let work_selection = Protocols.Coda_pow.Work_selection.Seq in
+  let work_selection = Cli_lib.Arg_type.Seq in
   Parallel.init_master () ;
   let configs =
     Coda_processes.local_configs n ~program_dir ~proposal_interval
@@ -66,6 +64,5 @@ let main () =
   Deferred.List.iter workers ~f:Coda_process.disconnect
 
 let command =
-  let open Command.Let_syntax in
   Command.async ~summary:"Test that peers can prove sent payments"
     (Command.Param.return main)

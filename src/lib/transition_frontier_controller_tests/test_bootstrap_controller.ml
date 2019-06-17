@@ -40,7 +40,7 @@ let%test_module "Bootstrap Controller" =
       let logger = Logger.null () in
       let trust_system = Trust_system.null () in
       let network =
-        Network.create ~logger
+        Network.create_stub ~logger
           ~ip_table:(Hashtbl.create (module Unix.Inet_addr))
           ~peers:(Hash_set.create (module Network_peer.Peer) ())
       in

@@ -2,6 +2,50 @@ open Jest;
 open Expect;
 open Tc;
 
+describe("setTimeout", () => {
+  testAsync(
+    "setTimeout finishes successfully",
+    ~timeout=50,
+    cb => {
+      let (_, task) = Bindings.setTimeout(10);
+      Task.perform(task, ~f=v => cb(expect(v) |> toEqual(`Finished)));
+    },
+  );
+
+  testAsync(
+    "setTimeout cancelled synchronously",
+    ~timeout=50,
+    cb => {
+      let (`Canceller(cancel), task) = Bindings.setTimeout(10);
+      cancel();
+      Task.perform(task, ~f=v => cb(expect(v) |> toEqual(`Cancelled)));
+    },
+  );
+
+  testAsync(
+    "setTimeout cancelled asynchronously",
+    ~timeout=50,
+    cb => {
+      let (`Canceller(cancel), t1) = Bindings.setTimeout(10);
+      let (_, t2) = Bindings.setTimeout(1);
+      let t2 = t2 |> Task.map(~f=_ => cancel());
+      let task = Task.map2(t1, t2, ~f=(v, _) => v);
+      Task.perform(task, ~f=v => cb(expect(v) |> toEqual(`Cancelled)));
+    },
+  );
+
+  testAsync(
+    "setTimeout cancelled too late",
+    ~timeout=50,
+    cb => {
+      let (`Canceller(cancel), t1) = Bindings.setTimeout(10);
+      let (_, t2) = Bindings.setTimeout(30);
+      let t2 = t2 |> Task.map(~f=_ => cancel());
+      let task = Task.map2(t1, t2, ~f=(v, _) => v);
+      Task.perform(task, ~f=v => cb(expect(v) |> toEqual(`Finished)));
+    },
+  );
+});
 module Typ = {
   type t('a) =
     | Int: t(int)
@@ -86,9 +130,14 @@ describe("Bindings", () =>
       "echo and get stdout",
       ~timeout=10,
       cb => {
-        let echoProcess = ChildProcess.spawn("echo", [|"hello"|]);
+        let echoProcess =
+          ChildProcess.spawn(
+            "echo",
+            [|"hello"|],
+            {"stdio": ChildProcess.pipe, "env": ChildProcess.Process.env},
+          );
         let stdout = ChildProcess.Process.stdoutGet(echoProcess);
-        ChildProcess.ReadablePipe.on(stdout, "data", data =>
+        Stream.Readable.on(stdout, "data", data =>
           cb(expect(Node.Buffer.toString(data)) |> toEqual("hello\n"))
         );
       },
@@ -97,15 +146,20 @@ describe("Bindings", () =>
       "kill sleep and get exit code",
       ~timeout=10,
       cb => {
-        let pauseProcess = ChildProcess.spawn("sleep", [|"10"|]);
+        let pauseProcess =
+          ChildProcess.spawn(
+            "sleep",
+            [|"10"|],
+            {"stdio": ChildProcess.ignore, "env": ChildProcess.Process.env},
+          );
         ChildProcess.Process.onExit(
           pauseProcess,
           fun
           | `Code(n) =>
             failwith(Printf.sprintf("Unexpected exit via code: %d", n))
-          | `Signal(s) => cb(expect(s) |> toEqual("SIGTERM")),
+          | `Signal(s) => cb(expect(s) |> toEqual("SIGINT")),
         );
-        ChildProcess.Process.kill(pauseProcess);
+        ChildProcess.Process.kill(pauseProcess, "SIGINT");
       },
     );
     testAsync(
@@ -113,7 +167,11 @@ describe("Bindings", () =>
       ~timeout=10,
       cb => {
         let pauseProcess =
-          ChildProcess.spawn("this-program-doesn't-exist", [||]);
+          ChildProcess.spawn(
+            "this-program-doesn't-exist",
+            [||],
+            {"stdio": ChildProcess.ignore, "env": ChildProcess.Process.env},
+          );
         ChildProcess.Process.onError(pauseProcess, _ => cb(pass));
       },
     );
@@ -292,14 +350,14 @@ module TestProcess = {
 
   let crash = (t: t) => exit(t, Some("CRASH"));
 
-  let kill = (t: t) => exit(t, Some("SIGTERM"));
+  let kill = (t: t) => exit(t, Some("SIGINT"));
 
   let start = args => {
     let pending =
       CallTable.nextPending(callTable, Messages.Typ.String, ~loc=__LOC__);
     let t = {state: ref(State.Started), args, pending};
     Counts.start(args);
-    Belt.Result.Ok(t);
+    t;
   };
 };
 
@@ -327,6 +385,8 @@ describe("ApplicationReducer", () => {
   };
 
   describe("CodaProcess", () => {
+    let getTask = t => snd(t);
+
     module Counts = TestProcess.Counts;
 
     module Machine = {
@@ -349,21 +409,23 @@ describe("ApplicationReducer", () => {
         {store, dispatch};
       };
 
-      let foldCoda = (t, ~initial, ~started, ~stopped) => {
+      let foldCoda = (t, ~initial, ~started, ~stopped, ~willStart) => {
         let state = TestApplication.Store.currentState(t.store);
         switch (state.coda) {
         | Application.State.CodaProcessState.Started(args', p) =>
           started(initial, args', p)
         | Stopped(res) => stopped(initial, res)
+        | WillStart(args, canceller) => willStart(initial, args, canceller)
         };
       };
 
-      let checkCodaState = (t, ~started, ~stopped) =>
+      let checkCodaState = (t, ~started, ~stopped, ~willStart) =>
         foldCoda(
           t,
           ~initial=(),
           ~started=() => started,
           ~stopped=() => stopped,
+          ~willStart=() => willStart,
         );
     };
 
@@ -381,6 +443,7 @@ describe("ApplicationReducer", () => {
             expect((args', p.state^))
             |> toEqual((args', TestProcess.State.Started)),
         ~stopped=_ => failwith("Bad state, should have started"),
+        ~willStart=(_, _) => failwith("Bad state, should have started"),
       );
     });
 
@@ -401,9 +464,9 @@ describe("ApplicationReducer", () => {
             // start it immediately
             Task.succeed(run()),
             // start it after some time
-            Bindings.setTimeout(5) |> Task.map(~f=run),
+            getTask(Bindings.setTimeout(5)) |> Task.map(~f=_ => run()),
             // start and again
-            Bindings.setTimeout(50) |> Task.map(~f=run),
+            getTask(Bindings.setTimeout(50)) |> Task.map(~f=_ => run()),
             ~f=((), (), ()) =>
             ()
           );
@@ -418,6 +481,7 @@ describe("ApplicationReducer", () => {
                   |> toEqual((args', TestProcess.State.Started, 1)),
                 ),
             ~stopped=_ => failwith("Bad state, should have started"),
+            ~willStart=(_, _) => failwith("Bad state, should have started"),
           )
         );
       },
@@ -436,21 +500,23 @@ describe("ApplicationReducer", () => {
 
         // after we're ready, stop it
         let task =
-          Bindings.setTimeout(1)
-          |> Task.map(~f=() => {
+          getTask(Bindings.setTimeout(1))
+          |> Task.map(~f=_ => {
                Machine.checkCodaState(
                  m,
                  ~started=(_args', _p) => (),
                  ~stopped=_ => failwith("Bad state, should have started"),
+                 ~willStart=
+                   (_, _) => failwith("Bad state, should have started"),
                );
 
                m.dispatch(TestWindow.controlCodaDaemon(None));
              })
-          |> Task.andThen(~f=() => Bindings.setTimeout(10));
+          |> Task.andThen(~f=() => getTask(Bindings.setTimeout(10)));
 
         Task.perform(
           task,
-          ~f=() => {
+          ~f=_ => {
             let counts = Counts.get(args);
 
             Machine.checkCodaState(
@@ -460,8 +526,10 @@ describe("ApplicationReducer", () => {
                 res =>
                   cb(
                     expect((res, counts.stopped))
-                    |> toEqual((Belt.Result.Error(`Signal("SIGTERM")), 1)),
+                    |> toEqual((Belt.Result.Error(`Signal("SIGINT")), 1)),
                   ),
+              ~willStart=
+                (_, _) => failwith("Bad state, should have started"),
             );
           },
         );
@@ -470,7 +538,7 @@ describe("ApplicationReducer", () => {
 
     testAsync(
       "Start coda with different args",
-      ~timeout=200,
+      ~timeout=500,
       cb => {
         let args1 = ["test3", "a", "b"];
         let args2 = ["test3", "a", "b", "c"];
@@ -485,22 +553,37 @@ describe("ApplicationReducer", () => {
           Machine.checkCodaState(
             m,
             ~started=(_args', p) => TestProcess.waitExit(p),
-            ~stopped=_ => failwith("Bad state, should have started"),
+            ~willStart=
+              (_, _) =>
+                failwith("Bad state, should have started (willstart1)"),
+            ~stopped=
+              _ => failwith("Bad state, should have started (stopped)"),
           );
 
         // after we're ready, start it again with different args
         let task =
-          Bindings.setTimeout(1)
-          |> Task.map(~f=() => {
+          getTask(Bindings.setTimeout(1))
+          |> Task.map(~f=_ =>
+               m.dispatch(TestWindow.controlCodaDaemon(Some(args2)))
+             );
+
+        // after a longer while, will-start will have actually started
+        let waitLonger =
+          getTask(Bindings.setTimeout(300))
+          |> Task.map(~f=_ =>
                Machine.checkCodaState(
                  m,
                  ~started=(_args', _p) => (),
-                 ~stopped=_ => failwith("Bad state, should have started"),
-               );
-               m.dispatch(TestWindow.controlCodaDaemon(Some(args2)));
-             });
+                 ~stopped=
+                   _ => failwith("Bad state, should have started (stopped)"),
+                 ~willStart=
+                   (_, _) =>
+                     failwith("Bad state, should have started (willstart2)"),
+               )
+             );
 
-        let results = Task.map2(exitFirst, task, ~f=(s, ()) => s);
+        let results =
+          Task.map3(exitFirst, task, waitLonger, ~f=(s, (), ()) => s);
 
         Task.perform(results, ~f=s =>
           Machine.checkCodaState(
@@ -513,10 +596,11 @@ describe("ApplicationReducer", () => {
                        args',
                        TestProcess.State.Started,
                        2,
-                       `Signal("SIGTERM"),
+                       `Signal("SIGINT"),
                      )),
                 ),
             ~stopped=_ => failwith("Bad state, should have started"),
+            ~willStart=(_, _) => failwith("Bad state, should have started"),
           )
         );
       },
@@ -538,16 +622,19 @@ describe("ApplicationReducer", () => {
             m,
             ~started=(_args', p) => TestProcess.waitExit(p),
             ~stopped=_ => failwith("Bad state, should have started"),
+            ~willStart=(_, _) => failwith("Bad state, should have started"),
           );
 
         // after a bit, stop the process
         let task =
-          Bindings.setTimeout(30)
-          |> Task.map(~f=() =>
+          getTask(Bindings.setTimeout(30))
+          |> Task.map(~f=_ =>
                Machine.checkCodaState(
                  m,
                  ~started=(_args', p) => TestProcess.stop(p),
                  ~stopped=_ => failwith("Bad state, should have started"),
+                 ~willStart=
+                   (_, _) => failwith("Bad state, should have started"),
                )
              );
 
@@ -577,16 +664,19 @@ describe("ApplicationReducer", () => {
           m,
           ~started=(_args', p) => TestProcess.waitExit(p),
           ~stopped=_ => failwith("Bad state, should have started"),
+          ~willStart=(_, _) => failwith("Bad state, should have started"),
         );
 
       // after a bit, stop the process
       let task =
-        Bindings.setTimeout(30)
-        |> Task.map(~f=() =>
+        getTask(Bindings.setTimeout(30))
+        |> Task.map(~f=_ =>
              Machine.checkCodaState(
                m,
                ~started=(_args', p) => haltProcess(p),
                ~stopped=_ => failwith("Bad state, should have started"),
+               ~willStart=
+                 (_, _) => failwith("Bad state, should have started"),
              )
            );
 

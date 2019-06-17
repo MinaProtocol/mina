@@ -87,7 +87,7 @@ module Pending_coinbase_stack_state = struct
   type t = Stable.Latest.t =
     { source: Pending_coinbase.Stack.Stable.V1.t
     ; target: Pending_coinbase.Stack.Stable.V1.t }
-  [@@deriving sexp, hash, compare, eq, yojson]
+  [@@deriving sexp, hash, compare, yojson]
 
   include Hashable.Make_binable (Stable.Latest)
   include Comparable.Make (Stable.Latest)

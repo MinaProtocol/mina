@@ -1,12 +1,9 @@
 open Core
 open Async
-open Pipe_lib
 open Signature_lib
 open Coda_numbers
 open Coda_base
 open Coda_state
-open Coda_transition
-open O1trace
 
 module type Intf = sig
   module Program : Coda_inputs.Main_intf
@@ -22,14 +19,26 @@ module type Intf = sig
     val new_block :
          Program.t
       -> Public_key.Compressed.t
-      -> External_transition.t Pipe.Reader.t
-
-    val new_user_command :
-      Program.t -> Public_key.Compressed.t -> User_command.t Pipe.Reader.t
+      -> ( Auxiliary_database.Filtered_external_transition.t
+         , State_hash.t )
+         With_hash.t
+         Pipe.Reader.t
   end
 
-  val get_all_user_commands :
-    Program.t -> Public_key.Compressed.t -> User_command.t list
+  module For_tests : sig
+    (** [get_all_user_commands t pk] queries all the user_commands involving [pk]
+        as a participant. *)
+
+    val get_all_user_commands :
+      Program.t -> Public_key.Compressed.t -> User_command.t list
+
+    module Subscriptions : sig
+      (* Subscribe to new user_commands via a pipe. We get the user_commands
+         from the filtered transitions. *)
+      val new_user_commands :
+        Program.t -> Public_key.Compressed.t -> User_command.t Pipe.Reader.t
+    end
+  end
 end
 
 module Make
@@ -39,7 +48,6 @@ struct
   module Program = Program
   module Config_in = Config_in
   open Program
-  open Inputs
 
   (** For status *)
   let txn_count = ref 0
@@ -80,7 +88,7 @@ struct
            collision should not happen." ;
         Core.exit 1
 
-  let is_valid_user_command t (txn : User_command.t) account_opt =
+  let is_valid_user_command _t (txn : User_command.t) account_opt =
     let remainder =
       let open Option.Let_syntax in
       let%bind account = account_opt
@@ -101,7 +109,7 @@ struct
       Or_error.error_string "Invalid user command: account balance is too low"
     else
       let txn_pool = transaction_pool t in
-      don't_wait_for (Transaction_pool.add txn_pool txn) ;
+      don't_wait_for (Network_pool.Transaction_pool.add txn_pool txn) ;
       let logger =
         Logger.extend
           (Program.top_level_logger t)
@@ -245,9 +253,7 @@ struct
     in
     let user_commands_sent = !txn_count in
     let run_snark_worker = Option.is_some (snark_worker_key t) in
-    let propose_pubkey =
-      Option.map ~f:(fun kp -> kp.public_key) (propose_keypair t)
-    in
+    let propose_pubkeys = Program.propose_public_keys t in
     let consensus_mechanism = Consensus.name in
     let consensus_time_now = Consensus.time_hum (Core_kernel.Time.now ()) in
     let consensus_configuration = Consensus.Configuration.t in
@@ -360,7 +366,7 @@ struct
     ; peers
     ; user_commands_sent
     ; run_snark_worker
-    ; propose_pubkey
+    ; propose_pubkeys= Public_key.Compressed.Set.to_list propose_pubkeys
     ; histograms
     ; consensus_time_now
     ; consensus_mechanism
@@ -368,87 +374,33 @@ struct
 
   let clear_hist_status ~flag t = Perf_histograms.wipe () ; get_status ~flag t
 
-  let get_all_user_commands coda public_key =
-    let transaction_database = Program.transaction_database coda in
-    Transaction_database.get_transactions transaction_database public_key
-
   module Subscriptions = struct
-    (* Creates a global pipe to feed a subscription that will be available throughout the entire duration that a daemon is runnning  *)
-    let global_pipe coda ~to_pipe =
-      let global_reader, global_writer = Pipe.create () in
-      let init, _ = Pipe.create () in
-      Broadcast_pipe.Reader.fold (Program.transition_frontier coda) ~init
-        ~f:(fun acc_pipe -> function
-        | None ->
-            Deferred.return acc_pipe
-        | Some transition_frontier ->
-            Pipe.close_read acc_pipe ;
-            let new_block_incr =
-              Transition_frontier.new_transition transition_frontier
-            in
-            let frontier_pipe = to_pipe new_block_incr in
-            Pipe.transfer frontier_pipe global_writer ~f:Fn.id
-            |> don't_wait_for ;
-            Deferred.return frontier_pipe )
-      |> Deferred.ignore |> don't_wait_for ;
-      global_reader
+    let new_block = Program.add_block_subscriber
+  end
 
-    let new_block coda public_key =
-      global_pipe coda ~to_pipe:(fun new_block_incr ->
-          let new_block_observer =
-            Coda_incremental.New_transition.observe new_block_incr
-          in
-          Coda_incremental.New_transition.stabilize () ;
-          let frontier_new_block_reader =
-            Coda_incremental.New_transition.to_pipe new_block_observer
-          in
-          Pipe.filter_map frontier_new_block_reader ~f:(fun new_block ->
-              let unverified_new_block =
-                External_transition.Validated.forget_validation new_block
-              in
-              Option.some_if
-                (Public_key.Compressed.equal
-                   (External_transition.proposer unverified_new_block)
-                   public_key)
-                unverified_new_block ) )
+  module For_tests = struct
+    let get_all_user_commands coda public_key =
+      let external_transition_database =
+        Program.external_transition_database coda
+      in
+      let user_commands =
+        List.concat_map
+          ~f:
+            (Fn.compose
+               Auxiliary_database.Filtered_external_transition.user_commands
+               With_hash.data)
+        @@ Auxiliary_database.External_transition_database.get_values
+             external_transition_database public_key
+      in
+      let participants_user_commands =
+        User_command.filter_by_participant user_commands public_key
+      in
+      List.dedup_and_sort participants_user_commands
+        ~compare:User_command.compare
 
-    let new_user_command coda public_key =
-      let transaction_database = Program.transaction_database coda in
-      global_pipe coda ~to_pipe:(fun new_block_incr ->
-          let user_command_incr =
-            Coda_incremental.New_transition.map new_block_incr
-              ~f:External_transition.Validated.user_commands
-          in
-          let payments_observer =
-            Coda_incremental.New_transition.observe user_command_incr
-          in
-          Coda_incremental.New_transition.stabilize () ;
-          let frontier_payment_reader, frontier_payment_writer =
-            (* TODO: capacity should be the max amount of transactions in a block *)
-            Strict_pipe.(create (Buffered (`Capacity 20, `Overflow Drop_head)))
-          in
-          let write_user_commands user_commands =
-            List.filter user_commands ~f:(fun user_command ->
-                Public_key.Compressed.equal
-                  (User_command.sender user_command)
-                  public_key )
-            |> List.iter ~f:(fun user_command ->
-                   (* TODO: Time should be computed when a payment gets into the transition frontier  *)
-                   Transaction_database.add transaction_database user_command
-                     ( Coda_base.Block_time.Time.now
-                     @@ Coda_base.Block_time.Time.Controller.basic ) ;
-                   Strict_pipe.Writer.write frontier_payment_writer
-                     user_command )
-          in
-          Coda_incremental.New_transition.Observer.on_update_exn
-            payments_observer ~f:(function
-            | Initialized user_commands ->
-                write_user_commands user_commands
-            | Changed (_, user_commands) ->
-                write_user_commands user_commands
-            | Invalidated ->
-                () ) ;
-          (Strict_pipe.Reader.to_linear_pipe frontier_payment_reader)
-            .Linear_pipe.Reader.pipe )
+    module Subscriptions = struct
+      let new_user_commands coda public_key =
+        Program.add_payment_subscriber coda public_key
+    end
   end
 end

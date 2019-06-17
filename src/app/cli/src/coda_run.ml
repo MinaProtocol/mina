@@ -1,8 +1,6 @@
 open Core
 open Async
-open Pipe_lib
 open Signature_lib
-open Coda_numbers
 open Coda_base
 open Coda_transition
 open Coda_state
@@ -18,7 +16,6 @@ struct
   module Commands = Coda_commands.Make (Config_in) (Program)
   module Graphql = Graphql.Make (Commands)
   include Program
-  open Inputs
 
   module For_tests = struct
     let ledger_proof t = staged_ledger_ledger_proof t
@@ -104,6 +101,7 @@ struct
       Rpc.Rpc.implement rpc (fun () input ->
           trace_recurring_task (Rpc.Rpc.name rpc) (fun () -> f () input) )
     in
+    let implement_notrace = Rpc.Rpc.implement in
     let logger =
       Logger.extend
         (Program.top_level_logger coda)
@@ -153,7 +151,7 @@ struct
       ; implement Daemon_rpcs.Get_nonce.rpc (fun () pk ->
             return
               (Commands.get_nonce coda pk |> Participating_state.active_exn) )
-      ; implement Daemon_rpcs.Get_status.rpc (fun () flag ->
+      ; implement_notrace Daemon_rpcs.Get_status.rpc (fun () flag ->
             return (Commands.get_status ~flag coda) )
       ; implement Daemon_rpcs.Clear_hist_status.rpc (fun () flag ->
             return (Commands.clear_hist_status ~flag coda) )
@@ -195,7 +193,8 @@ struct
                 | `Transition ->
                     Perf_histograms.add_span
                       ~name:"snark_worker_transition_time" total ) ;
-            Snark_pool.add_completed_work (snark_pool coda) work ) ]
+            Network_pool.Snark_pool.add_completed_work (snark_pool coda) work
+        ) ]
     in
     Option.iter rest_server_port ~f:(fun rest_server_port ->
         trace_task "REST server" (fun () ->
@@ -208,7 +207,7 @@ struct
               Server.create_expert
                 ~on_handler_error:
                   (`Call
-                    (fun net exn ->
+                    (fun _net exn ->
                       Logger.error logger ~module_:__MODULE__ ~location:__LOC__
                         "%s" (Exn.to_string_mach exn) ))
                 (Tcp.Where_to_listen.bind_to Localhost
@@ -241,7 +240,7 @@ struct
         Tcp.Server.create
           ~on_handler_error:
             (`Call
-              (fun net exn ->
+              (fun _net exn ->
                 Logger.error logger ~module_:__MODULE__ ~location:__LOC__ "%s"
                   (Exn.to_string_mach exn) ))
           where_to_listen
@@ -269,7 +268,6 @@ struct
     |> ignore
 
   let create_snark_worker ~public_key ~client_port ~shutdown_on_disconnect =
-    let open Snark_worker in
     let%map p =
       let our_binary = Sys.executable_name in
       Process.create_exn () ~prog:our_binary

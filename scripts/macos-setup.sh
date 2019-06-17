@@ -64,6 +64,7 @@ if [[ $COMPILE_THINGS == "YES" ]]; then
   env TERM=xterm opam pin -y add src/external/ocaml-extlib
   env TERM=xterm opam pin -y add src/external/digestif
   env TERM=xterm opam pin -y add src/external/async_kernel
+  env TERM=xterm opam pin -y add src/external/coda_base58
   eval $(opam config env)
 
   # Kademlia
