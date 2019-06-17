@@ -32,11 +32,11 @@ let () =
     in
     let bc_pk =
       Snark_params.Tick.Keypair.pk bc_keys
-      (*|> bin_io_id (module Snark_params.Tick.Proving_key)*)
+      |> bin_io_id (module Snark_params.Tick.Proving_key)
     in
     let bc_vk =
       Snark_params.Tick.Keypair.vk bc_keys
-      (*|> bin_io_id (module Snark_params.Tick.Verification_key)*)
+      |> bin_io_id (module Snark_params.Tick.Verification_key)
     in
     (bc_pk, bc_vk, bc_keys)
   in
