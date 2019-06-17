@@ -245,10 +245,22 @@ module Make (Inputs : Intf.Inputs) = struct
             Deferred.unit
         | Some frontier ->
             Broadcast_pipe.Reader.iter
-              (Transition_frontier.root_diff_pipe frontier)
-              ~f:(fun root_diff ->
-                Strict_pipe.Writer.write root_diff_writer root_diff
-                |> Deferred.return ) )) ;
+              (Transition_frontier.For_tests.identity_pipe frontier)
+              ~f:
+                (Deferred.List.iter ~f:(function
+                  | Transition_frontier.Diff.E.E (New_breadcrumb _) ->
+                      Deferred.unit
+                  | Transition_frontier.Diff.E.E (Best_tip_changed _) ->
+                      Deferred.unit
+                  | Transition_frontier.Diff.E.E
+                      (Root_transitioned {new_= new_root; _}) ->
+                      Strict_pipe.Writer.write root_diff_writer
+                        ( `User_commands
+                            (Transition_frontier.Breadcrumb.to_user_commands
+                               new_root)
+                        , `New_length
+                            (Transition_frontier.root_length frontier + 1) ) ;
+                      Deferred.unit )) )) ;
     root_diff_reader
 
   let dump_tf t =
@@ -368,72 +380,12 @@ module Make (Inputs : Intf.Inputs) = struct
               Strict_pipe.create Synchronous
             in
             let net_ivar = Ivar.create () in
-            let flush_capacity = 30 in
-            let%bind persistence, ledger_db, transition_frontier =
-              match config.transition_frontier_location with
-              | None ->
-                  let%map ledger_db, frontier =
-                    create_genesis_frontier config
-                  in
-                  ( None
-                  , Ledger_transfer.transfer_accounts ~src:Genesis.ledger
-                      ~dest:ledger_db
-                  , frontier )
-              | Some transition_frontier_location -> (
-                  match%bind
-                    Async.Sys.file_exists transition_frontier_location
-                  with
-                  | `No | `Unknown ->
-                      Logger.info config.logger ~module_:__MODULE__
-                        ~location:__LOC__
-                        !"Persistence database does not exist yet. Creating \
-                          it at %s"
-                        transition_frontier_location ;
-                      let%bind () =
-                        Async.Unix.mkdir transition_frontier_location
-                      in
-                      let persistence =
-                        Transition_frontier_persistence.create
-                          ~directory_name:transition_frontier_location
-                          ~logger:config.logger ~flush_capacity
-                          ~max_buffer_capacity:(4 * flush_capacity) ()
-                      in
-                      let%map root_snarked_ledger, frontier =
-                        create_genesis_frontier config
-                      in
-                      (Some persistence, root_snarked_ledger, frontier)
-                  | `Yes ->
-                      let directory_name = transition_frontier_location in
-                      let root_snarked_ledger =
-                        Ledger.Db.create
-                          ?directory_name:config.ledger_db_location ()
-                      in
-                      Logger.debug config.logger ~module_:__MODULE__
-                        ~location:__LOC__
-                        !"Reading persistence data from %s"
-                        transition_frontier_location ;
-                      let%map frontier =
-                        Transition_frontier_persistence.deserialize
-                          ~directory_name ~logger:config.logger
-                          ~trust_system:config.trust_system
-                          ~verifier:config.verifier ~root_snarked_ledger
-                          ~consensus_local_state:config.consensus_local_state
-                      in
-                      let persistence =
-                        Transition_frontier_persistence.create ~directory_name
-                          ~logger:config.logger ~flush_capacity
-                          ~max_buffer_capacity:(4 * flush_capacity) ()
-                      in
-                      (Some persistence, root_snarked_ledger, frontier) )
+            let%bind ledger_db, transition_frontier =
+              create_genesis_frontier config
             in
             let frontier_broadcast_pipe_r, frontier_broadcast_pipe_w =
               Broadcast_pipe.create (Some transition_frontier)
             in
-            Option.iter persistence ~f:(fun persistence ->
-                Transition_frontier_persistence
-                .listen_to_frontier_broadcast_pipe frontier_broadcast_pipe_r
-                  persistence
-                |> don't_wait_for ) ;
             let%bind net =
               Net.create config.net_config
                 ~get_staged_ledger_aux_and_pending_coinbases_at_hash:

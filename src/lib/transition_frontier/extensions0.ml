@@ -373,18 +373,31 @@ struct
       Option.some_if should_broadcast view
   end
 
+  (** Used for testing. Allows a client to process the actual diffs that are passed down to a broadcast pipe *)
+  module Identity = struct
+    type t = unit
+
+    type view = Diff.E.t list
+
+    let create _ = ((), [])
+
+    let handle_diffs () _ diffs : view option = Some diffs
+  end
+
   module Broadcast = struct
     module Root_history = Make_broadcastable (Root_history)
     module Snark_pool_refcount = Make_broadcastable (Snark_pool_refcount)
     module Best_tip_diff = Make_broadcastable (Best_tip_diff)
     module Transition_registry = Make_broadcastable (Transition_registry)
+    module Identity = Make_broadcastable (Identity)
   end
 
   type t =
     { root_history: Broadcast.Root_history.t
     ; snark_pool_refcount: Broadcast.Snark_pool_refcount.t
     ; best_tip_diff: Broadcast.Best_tip_diff.t
-    ; transition_registry: Broadcast.Transition_registry.t }
+    ; transition_registry: Broadcast.Transition_registry.t
+    ; identity: Broadcast.Identity.t }
   [@@deriving fields]
 
   let create (breadcrumb : Breadcrumb.t) : t Deferred.t =
@@ -392,8 +405,13 @@ struct
     let%bind root_history = Root_history.create breadcrumb in
     let%bind snark_pool_refcount = Snark_pool_refcount.create breadcrumb in
     let%bind best_tip_diff = Best_tip_diff.create breadcrumb in
-    let%map transition_registry = Transition_registry.create breadcrumb in
-    {root_history; snark_pool_refcount; best_tip_diff; transition_registry}
+    let%bind transition_registry = Transition_registry.create breadcrumb in
+    let%map identity = Identity.create breadcrumb in
+    { root_history
+    ; snark_pool_refcount
+    ; best_tip_diff
+    ; transition_registry
+    ; identity }
 
   (* HACK: A way to ensure that all the pipes are closed in a type-safe manner *)
   let close t : unit =
@@ -408,6 +426,7 @@ struct
       ~snark_pool_refcount:(close_extension (module Snark_pool_refcount))
       ~best_tip_diff:(close_extension (module Best_tip_diff))
       ~transition_registry:(close_extension (module Transition_registry))
+      ~identity:(close_extension (module Identity))
 
   let update_all (t : t) transition_frontier diffs =
     let run_updates_and_setup_broadcast_jobs (type t)
@@ -425,9 +444,9 @@ struct
           (run_updates_and_setup_broadcast_jobs (module Snark_pool_refcount))
         ~best_tip_diff:
           (run_updates_and_setup_broadcast_jobs (module Best_tip_diff))
-          (* ~best_tip_diff:(fun _ _ -> Deferred.unit) *)
         ~transition_registry:
           (run_updates_and_setup_broadcast_jobs (module Transition_registry))
+        ~identity:(run_updates_and_setup_broadcast_jobs (module Identity))
     in
     fun () -> Deferred.List.iter ~how:`Parallel jobs ~f:(fun job -> job ())
 end

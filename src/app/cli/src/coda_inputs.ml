@@ -184,7 +184,9 @@ module type Main_intf = sig
        Strict_pipe.Reader.t
 
   val root_diff :
-    t -> Transition_frontier.Diff.Root_diff.view Strict_pipe.Reader.t
+       t
+    -> ([`User_commands of User_command.t list] * [`New_length of int])
+       Strict_pipe.Reader.t
 
   val transaction_pool : t -> Inputs.Transaction_pool.t
 
@@ -318,18 +320,6 @@ module Make_inputs0 (Init : Init_intf) = struct
 
     let max_length = Consensus.Constants.k
   end
-
-  module Transition_storage =
-    Transition_frontier_persistence.Transition_storage.Make
-      (Transition_frontier_inputs)
-
-  module Transition_frontier_persistence =
-  Transition_frontier_persistence.Make (struct
-    include Transition_frontier_inputs
-    module Transition_frontier = Transition_frontier
-    module Make_worker = Transition_frontier_persistence.Worker.Make_async
-    module Transition_storage = Transition_storage
-  end)
 
   module Transaction_pool = struct
     module Pool = Transaction_pool.Make (Staged_ledger) (Transition_frontier)

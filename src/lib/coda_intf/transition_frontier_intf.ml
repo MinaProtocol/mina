@@ -154,6 +154,17 @@ module type Extensions0 = sig
        and type base_transition_frontier := base_transition_frontier
        and type diff := diff
   end
+
+  module Identity : sig
+    type view = diff list
+
+    include
+      Extension0
+      with type view := view
+       and type breadcrumb := breadcrumb
+       and type base_transition_frontier := base_transition_frontier
+       and type diff := diff
+  end
 end
 
 module type Transition_frontier_diff_intf = sig
@@ -597,9 +608,6 @@ module type Transition_frontier_intf = sig
   val best_tip_diff_pipe :
     t -> Extensions.Best_tip_diff.view Broadcast_pipe.Reader.t
 
-  (* val persistence_diff_pipe :
-    t -> Diff.Persistence_diff.view Broadcast_pipe.Reader.t *)
-
   val close : t -> unit
 
   module For_tests : sig
@@ -610,5 +618,7 @@ module type Transition_frontier_intf = sig
     val root_history_is_empty : t -> bool
 
     val apply_diff : t -> Diff.E.t -> unit
+
+    val identity_pipe : t -> Extensions.Identity.view Broadcast_pipe.Reader.t
   end
 end

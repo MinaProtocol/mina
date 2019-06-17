@@ -86,7 +86,8 @@ module T = struct
     ; root_diff:
         ( 'worker
         , unit
-        , Transition_frontier.Diff.Root_diff.view Pipe.Reader.t )
+        , ([`User_commands of User_command.t list] * [`New_length of int])
+          Pipe.Reader.t )
         Rpc_parallel.Function.t
     ; prove_receipt:
         ( 'worker
@@ -133,7 +134,9 @@ module T = struct
         -> User_command.Stable.V1.t list Deferred.t
     ; coda_root_diff:
            unit
-        -> Transition_frontier.Diff.Root_diff.view Pipe.Reader.t Deferred.t
+        -> ([`User_commands of User_command.t list] * [`New_length of int])
+           Pipe.Reader.t
+           Deferred.t
     ; coda_prove_receipt:
            Receipt.Chain_hash.t * Receipt.Chain_hash.t
         -> Payment_proof.t Deferred.t
@@ -266,8 +269,10 @@ module T = struct
 
     let root_diff =
       C.create_pipe ~f:root_diff_impl ~bin_input:Unit.bin_t
-        ~bin_output:[%bin_type_class: Transition_frontier.Diff.Root_diff.view]
-        ()
+        ~bin_output:
+          [%bin_type_class:
+            [`User_commands of User_command.Stable.V1.t list]
+            * [`New_length of int]] ()
 
     let sync_status =
       C.create_pipe ~f:sync_status_impl ~bin_input:Unit.bin_t

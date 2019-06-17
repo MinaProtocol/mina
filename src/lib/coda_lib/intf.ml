@@ -116,11 +116,6 @@ module type Inputs = sig
      and type staged_ledger := Staged_ledger.t
      and type verifier := Verifier.t
 
-  module Transition_frontier_persistence :
-    Transition_frontier_persistence.Intf.S
-    with type frontier := Transition_frontier.t
-     and type verifier := Verifier.t
-
   module Transaction_pool :
     Transaction_pool
     with type transaction_with_valid_signature :=

@@ -643,6 +643,9 @@ module Make (Inputs : Inputs.Inputs_intf) :
       Extensions.Root_history.View.is_empty root_history
 
     let apply_diff {transition_frontier; _} = apply_diff transition_frontier
+
+    let identity_pipe {extensions; _} =
+      Extensions.Broadcast.Identity.reader extensions.identity
   end
 end
 
