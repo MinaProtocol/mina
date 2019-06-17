@@ -13,7 +13,27 @@ module Styles = {
       borderRight(`px(1), `solid, Theme.Colors.borderColor),
     ]);
 
-  let footer = style([padding2(~v=`rem(0.5), ~h=`rem(1.))]);
+  let footer = 
+    style([
+      padding2(~v=`rem(0.5), ~h=`rem(0.75)),
+    ]);
+
+  let addWalletLink =
+    merge([
+      Theme.Text.Body.regular,
+      style([
+        display(`inlineFlex),
+        alignItems(`center),
+        cursor(`default),
+        color(Theme.Colors.tealAlpha(0.5)),
+        padding2(~v=`zero, ~h=`rem(0.5)),
+        hover([
+          color(Theme.Colors.teal),
+          backgroundColor(Theme.Colors.hyperlinkAlpha(0.15)),
+          borderRadius(`px(2)),
+        ]),
+      ]),
+    ]);
 };
 
 module Wallets = [%graphql
@@ -23,12 +43,12 @@ module WalletQuery = ReasonApollo.CreateQuery(Wallets);
 
 module AddWallet = [%graphql
   {|
-  mutation addWallet {
-      addWallet(input: {}) {
-          publicKey
-      }
-  }
-|}
+    mutation addWallet {
+        addWallet(input: {}) {
+            publicKey
+        }
+    }
+  |}
 ];
 
 module AddWalletMutation = ReasonApollo.CreateMutation(AddWallet);
@@ -40,24 +60,25 @@ let make = () => {
     React.useContext(AddressBookProvider.context);
 
   <div className=Styles.sidebar>
-    // TODO: Remove fetchPolicy="no-cache" after merge of
-    // https://github.com/apollographql/reason-apollo/pull/196
-
-      <WalletQuery fetchPolicy="no-cache" partialRefetch=true>
+      <WalletQuery partialRefetch=true>
         {response =>
-           switch (response.result) {
-           | Loading => React.string("...")
-           | Error(err) => React.string(err##message)
-           | Data(data) =>
-             <WalletList
-               wallets={Array.map(~f=Wallet.ofGraphqlExn, data##ownedWallets)}
-             />
-           }}
+          switch (response.result) {
+          | Loading => <Loader.Page><Loader /></Loader.Page>
+          | Error(err) => React.string(err##message)
+          | Data(data) =>
+            <WalletList
+              wallets={Array.map(~f=Wallet.ofGraphqlExn, data##ownedWallets)}
+            />
+          }
+        }
       </WalletQuery>
       <div className=Styles.footer>
-        <Link onClick={_ => setModalState(_ => Some("My Wallet"))}>
+        <a
+          className=Styles.addWalletLink
+          onClick={_ => setModalState(_ => Some("My Wallet"))}
+        >
           {React.string("+ Add wallet")}
-        </Link>
+        </a>
       </div>
       <AddWalletMutation>
         {(mutation, _) =>

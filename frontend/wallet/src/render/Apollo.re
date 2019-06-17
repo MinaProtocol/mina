@@ -1,5 +1,24 @@
 open Tc;
 
+type retryOptions;
+let retryOptions: retryOptions = [%bs.raw
+  {|
+  {delay: {
+    initial: 300,
+    max: 500,
+    jitter: false
+  },
+  attempts: {
+    max: 60,
+  }
+}
+|}
+];
+
+[@bs.module "apollo-link-retry"] [@bs.new]
+external createRetryLink: retryOptions => ReasonApolloTypes.apolloLink =
+  "RetryLink";
+
 let createClient = (~faker, ~coda) => {
   let inMemoryCache = ApolloInMemoryCache.createInMemoryCache();
   let fakerLink =
@@ -7,12 +26,12 @@ let createClient = (~faker, ~coda) => {
   let codaLink =
     ApolloLinks.createHttpLink(~uri=coda, ~fetch=Bindings.Fetch.fetch, ());
 
-  let link =
+  let _link =
     ApolloLinks.split(
       operation => {
         let operation: {. "operationName": option(string)} =
           Obj.magic(operation);
-        operation##operationName == Some("addWallet")
+        operation##operationName == Some("addWalletss")
         ||
         operation##operationName == Some("getWallets");
       },
@@ -20,7 +39,11 @@ let createClient = (~faker, ~coda) => {
       fakerLink,
     );
 
-  ReasonApollo.createApolloClient(~link, ~cache=inMemoryCache, ());
+  let retry = createRetryLink(retryOptions);
+
+  let retryLink = ApolloLinks.from([|retry, fakerLink|]);
+
+  ReasonApollo.createApolloClient(~link=retryLink, ~cache=inMemoryCache, ());
 };
 
 let client =

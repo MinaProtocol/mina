@@ -11,11 +11,12 @@ module Styles = {
     merge([
       Theme.Text.Body.regular,
       style([
+        userSelect(`none),
         display(`inlineFlex),
         alignItems(`center),
         justifyContent(`center),
         height(`rem(3.)),
-        minWidth(`rem(10.)),
+        minWidth(`rem(10.5)),
         padding2(~v=`zero, ~h=`rem(1.)),
         background(white),
         border(`px(0), `solid, white),
@@ -68,6 +69,8 @@ module Styles = {
         hover([backgroundColor(Theme.Colors.slateAlpha(0.2))]),
       ]),
     ]);
+
+  let disabled = style([opacity(0.5)]);
 };
 
 [@react.component]
@@ -75,14 +78,14 @@ let make = (~label, ~onClick=?, ~style=Blue, ~disabled=false) =>
   <button
     disabled
     ?onClick
-    className={
+    className={Css.merge([
+      disabled ? Styles.disabled : "",
       switch (style) {
-      | _ when disabled => Styles.gray
       | Blue => Styles.blue
       | Green => Styles.green
       | Red => Styles.red
       | Gray => Styles.gray
-      }
-    }>
+      },
+    ])}>
     {React.string(label)}
   </button>;

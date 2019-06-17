@@ -23,13 +23,22 @@ module Styles = {
       bottom(`zero),
       left(`zero),
       display(`flex),
-      justifyContent(`spaceBetween), padding2(~v=`zero, ~h=`rem(0.5)),
+      justifyContent(`spaceBetween),
+      padding2(~v=`zero, ~h=`rem(0.5)),
       color(white),
     ]);
 
   let copyButton =
-    merge([Theme.Text.Body.regular, style([overflow(`hidden)])]);
-  let editButton = merge([Theme.Text.Body.regular, style([opacity(0.5)])]);
+    merge([
+      Theme.Text.Body.regular,
+      style([overflow(`hidden), opacity(0.9), hover([opacity(1.0)])]),
+    ]);
+
+  let editButton =
+    merge([
+      Theme.Text.Body.regular,
+      style([opacity(0.5), hover([opacity(0.8)])]),
+    ]);
 
   let editing =
     style([
@@ -62,7 +71,6 @@ let make = (~pubkey) => {
   let activeWallet = Hooks.useActiveWallet();
   let (addressBook, updateAddressBook) =
     React.useContext(AddressBookProvider.context);
-  let walletName = AddressBook.lookup(addressBook, pubkey);
   let isActive = activeWallet === Some(pubkey);
 
   let (hovered, setHovered) = React.useState(() => false);
@@ -70,8 +78,8 @@ let make = (~pubkey) => {
 
   let pillMode =
     switch (hovered, editing, isActive) {
-    | (false, false, false) => Pill.Blue
-    | (false, false, true) => Pill.Grey
+    | (false, false, true) => Pill.Blue
+    | (false, false, false) => Pill.Grey
     | (true, _, _)
     | (_, true, _) => Pill.DarkBlue
     };
@@ -90,6 +98,10 @@ let make = (~pubkey) => {
       AddressBook.set(~key=pubkey, ~name=ReactEvent.Form.target(e)##value),
     );
 
+  let handleClipboard = _ =>
+    ignore @@
+    Bindings.Navigator.Clipboard.writeText(PublicKey.toString(pubkey));
+
   <div
     className=Styles.container
     onClick={e => ReactEvent.Mouse.stopPropagation(e)}
@@ -97,22 +109,15 @@ let make = (~pubkey) => {
     onMouseLeave={_ => setHovered(_ => false)}>
     <Pill mode=pillMode>
       <span className={Styles.pillContents(hovered, isActive)}>
-        {switch (walletName) {
-         | Some(name) =>
-           <span className=Theme.Text.Body.regular>
-             {React.string(name)}
-           </span>
-         | None =>
-           <span className=Theme.Text.mono>
-             {React.string(PublicKey.prettyPrint(pubkey))}
-           </span>
-         }}
+        <WalletName pubkey />
       </span>
     </Pill>
     {switch (hovered, editing) {
      | (true, false) =>
        <div className=Styles.hoverContainer>
-         <span className=Styles.copyButton> {React.string("Copy")} </span>
+         <span className=Styles.copyButton onClick=handleClipboard>
+           {React.string("Copy")}
+         </span>
          <span
            onClick={_ => setEditing(_ => true)} className=Styles.editButton>
            {React.string("Edit")}
@@ -126,7 +131,10 @@ let make = (~pubkey) => {
            onKeyPress=handleEnter
            onBlur={_ => setEditing(_ => false)}
            onChange=handleNameChange
-           value={Option.withDefault(~default="", walletName)}
+           value={
+             AddressBook.lookup(addressBook, pubkey)
+             |> Option.withDefault(~default="")
+           }
          />
        </div>
      | (false, false) => React.string("")

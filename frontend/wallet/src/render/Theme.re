@@ -15,17 +15,20 @@ module Colors = {
 
   let bgColor = white;
 
-  let bgColorElectronWindow = "E9E9E9";
+  let bgColorElectronWindow = "#00E9E9E9";
 
   let savilleAlpha = a => `rgba((61, 88, 120, a));
   let saville = savilleAlpha(1.);
 
   let hyperlinkAlpha = a => `rgba((45, 158, 219, a));
+  let hyperlink = hyperlinkAlpha(1.);
 
   let slateAlpha = a => `rgba((81, 102, 121, a));
   let slate = slateAlpha(1.);
 
-  let roseBud = `hex("a3536f");
+  let roseBudAlpha = a => `rgba((163, 83, 112, a));
+  let roseBud = roseBudAlpha(1.);
+
   let pendingOrange = `hex("967103");
   let greenblack = `hex("2a3c2e");
 
@@ -61,7 +64,9 @@ module Colors = {
 
   // TODO: Rename
   let greyish = a => `rgba((51, 66, 79, a));
-  let teal = `hex("4782A0");
+
+  let tealAlpha = a => `rgba((71, 130, 160, a));
+  let teal = tealAlpha(1.0);
 };
 
 module Typeface = {
@@ -123,6 +128,15 @@ module Text = {
         lineHeight(`rem(1.5)),
       ]);
 
+    let mono =
+      style([
+        Typeface.mono,
+        fontWeight(`medium),
+        fontSize(`rem(0.9)),
+        // Due to the font weirdness, we need to offset by 4px
+        paddingTop(`px(4)),
+      ]);
+
     let small =
       style([
         Typeface.plex,
@@ -150,6 +164,15 @@ module Text = {
         lineHeight(`rem(1.5)),
         letterSpacing(`rem(-0.03125)),
       ]);
+
+    let h6 =
+      style([
+        Typeface.plex,
+        fontWeight(`medium),
+        fontSize(`rem(0.75)),
+        lineHeight(`rem(1.0)),
+        letterSpacing(`rem(0.0875)),
+      ]);
   };
 
   let title =
@@ -158,24 +181,6 @@ module Text = {
       fontWeight(`normal),
       fontSize(`rem(2.25)),
       lineHeight(`rem(3.)),
-    ]);
-
-  let smallHeader =
-    style([
-      Typeface.plex,
-      fontWeight(`medium),
-      fontSize(`rem(0.75)),
-      lineHeight(`rem(1.)),
-    ]);
-
-  let mono =
-    style([
-      Typeface.mono,
-      fontWeight(`medium),
-      fontSize(`rem(1.)),
-      lineHeight(`rem(1.5)),
-      // Due to the font weirdness, we need to offset by 4px
-      paddingTop(`px(4)),
     ]);
 };
 
@@ -189,9 +194,9 @@ module CssElectron = {
 module Spacing = {
   let defaultSpacing = `rem(1.);
   let defaultPadding = padding(defaultSpacing);
-  let headerHeight = `rem(5.);
+  let headerHeight = `rem(4.);
   let footerHeight = `rem(5.);
-  let modalWidth = `rem(30.);
+  let modalWidth = `rem(26.);
 };
 
 let notText = style([cursor(`default), userSelect(`none)]);

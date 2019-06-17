@@ -73,8 +73,6 @@ end
 module type External_transition = sig
   type t
 
-  type external_transition
-
   type filtered_external_transition
 
   type hash
@@ -86,11 +84,7 @@ module type External_transition = sig
   val close : t -> unit
 
   val add :
-       tracked_participants:Public_key.Compressed.Set.t
-    -> t
-    -> (external_transition, hash) With_hash.t
-    -> time
-    -> unit
+    t -> (filtered_external_transition, hash) With_hash.t -> time -> unit
 
   include
     Pagination

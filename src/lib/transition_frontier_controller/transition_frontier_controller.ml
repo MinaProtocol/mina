@@ -53,10 +53,6 @@ module Make (Inputs : Inputs_intf) :
    and type verifier := Inputs.Verifier.t = struct
   open Inputs
 
-  let kill reader writer =
-    Strict_pipe.Reader.clear reader ;
-    Strict_pipe.Writer.close writer
-
   let run ~logger ~trust_system ~verifier ~network ~time_controller
       ~collected_transitions ~frontier ~network_transition_reader
       ~proposer_transition_reader ~clear_reader =
@@ -117,13 +113,23 @@ module Make (Inputs : Inputs_intf) :
       ~catchup_job_reader ~catchup_breadcrumbs_writer
       ~unprocessed_transition_cache ;
     Strict_pipe.Reader.iter_without_pushback clear_reader ~f:(fun _ ->
-        kill valid_transition_reader valid_transition_writer ;
-        kill primary_transition_reader primary_transition_writer ;
-        kill processed_transition_reader processed_transition_writer ;
-        kill catchup_job_reader catchup_job_writer ;
-        kill catchup_breadcrumbs_reader catchup_breadcrumbs_writer ;
-        kill proposer_transition_reader_copy proposer_transition_writer_copy ;
+        let open Strict_pipe.Writer in
+        kill valid_transition_writer ;
+        kill primary_transition_writer ;
+        kill processed_transition_writer ;
+        kill catchup_job_writer ;
+        kill catchup_breadcrumbs_writer ;
+        kill proposer_transition_writer_copy ;
         Ivar.fill clean_up_catchup_scheduler () )
     |> don't_wait_for ;
     processed_transition_reader
 end
+
+include Make (struct
+  include Transition_frontier.Inputs
+  module Transition_frontier = Transition_frontier
+  module Catchup = Ledger_catchup
+  module Network = Coda_networking
+  module Transition_handler = Transition_handler
+  module Sync_handler = Sync_handler
+end)

@@ -5,7 +5,6 @@ open Ppxlib
 open Asttypes
 open Parsetree
 open Longident
-open Signature_lib
 open Core
 
 module Blockchain_snark_keys = struct

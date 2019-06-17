@@ -79,6 +79,7 @@ type Wallet {
   votingFor: String!
   balance: AnnotatedBalance!
   stakingActive: Boolean! # Actively staking. There is a lag between switching staking keys and them appearing here as you may be in the middle of a staking procedure with other keys.
+  privateKeyPath: String! @examples(values: ["/Users/o1labs/.coda_config/wallets/store/ASgu5t5hlbjC3DZYZ87tASbUX+mGXJUpp+uekWKwtxlJbHxGuedIAQAAAQ=="])
 }
 
 type NodeStatus {
@@ -93,7 +94,7 @@ input AddWalletInput {
 }
 
 input DeleteWalletInput {
-  publicKey: String
+  publicKey: String!
 }
 
 input AddPaymentReceiptInput {
@@ -216,12 +217,7 @@ type Query {
   # state to be the "real" balance
   balance(publicKey: String!): String!
   
-  pooledUserCommands(
-    filter: UserCommandFilterInput,
-    first: Int,
-    after: String,
-    last: Int,
-    before: String): UserCommandConnection!
+  pooledUserCommands(publicKey: String!): [UserCommand!]!
   
   blocks(
     filter: BlockFilterInput!,

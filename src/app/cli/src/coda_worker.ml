@@ -2,9 +2,9 @@ open Core
 open Async
 open Coda_base
 open Coda_state
+open Coda_transition
 open Signature_lib
 open Coda_inputs
-open Signature_lib
 open Pipe_lib
 
 module Snark_worker_config = struct
@@ -96,7 +96,10 @@ module T = struct
     ; new_block:
         ( 'worker
         , Account.key
-        , Coda_transition.External_transition.t Pipe.Reader.t )
+        , ( Auxiliary_database.Filtered_external_transition.t
+          , State_hash.t )
+          With_hash.t
+          Pipe.Reader.t )
         Rpc_parallel.Function.t
     ; dump_tf: ('worker, unit, string) Rpc_parallel.Function.t
     ; best_path:
@@ -136,7 +139,11 @@ module T = struct
         -> Payment_proof.t Deferred.t
     ; coda_new_block:
            Account.key
-        -> Coda_transition.External_transition.t Pipe.Reader.t Deferred.t
+        -> ( Auxiliary_database.Filtered_external_transition.t
+           , State_hash.t )
+           With_hash.t
+           Pipe.Reader.t
+           Deferred.t
     ; coda_dump_tf: unit -> string Deferred.t
     ; coda_best_path: unit -> State_hash.Stable.Latest.t list Deferred.t }
 
@@ -237,7 +244,10 @@ module T = struct
       C.create_pipe ~f:new_block_impl
         ~bin_input:[%bin_type_class: Account.Stable.V1.key]
         ~bin_output:
-          [%bin_type_class: Coda_transition.External_transition.Stable.V1.t] ()
+          [%bin_type_class:
+            ( Auxiliary_database.Filtered_external_transition.Stable.V1.t
+            , State_hash.Stable.V1.t )
+            With_hash.Stable.V1.t] ()
 
     let send_user_command =
       C.create_rpc ~f:send_payment_impl ~bin_input:Send_payment_input.bin_t
@@ -306,9 +316,9 @@ module T = struct
         ; work_selection
         ; conf_dir
         ; trace_dir
-        ; program_dir
         ; peers
-        ; max_concurrent_connections } =
+        ; max_concurrent_connections
+        ; _ } =
       let logger =
         Logger.create
           ~metadata:
@@ -340,15 +350,9 @@ module T = struct
 
         let genesis_proof = Precomputed_values.base_proof
 
-        let transaction_capacity_log_2 = 3
-
-        let work_delay_factor = 2
-
         let commit_id = None
 
         let work_selection = work_selection
-
-        let max_concurrent_connections = max_concurrent_connections
       end in
       O1trace.trace_task "worker_main" (fun () ->
           let%bind (module Init) = make_init (module Config) in
@@ -405,12 +409,12 @@ module T = struct
             Consensus.Data.Local_state.create initial_propose_keys
           in
           let net_config =
-            { Main.Inputs.Net.Config.logger
+            { Coda_networking.Config.logger
             ; trust_system
             ; time_controller
             ; consensus_local_state
             ; gossip_net_params=
-                { Main.Inputs.Net.Gossip_net.Config.timeout= Time.Span.of_sec 3.
+                { Coda_networking.Gossip_net.Config.timeout= Time.Span.of_sec 3.
                 ; target_peer_count= 8
                 ; conf_dir
                 ; initial_peers= peers
@@ -425,12 +429,10 @@ module T = struct
           in
           let%bind coda =
             Main.create
-              (Main.Config.make ~logger ~trust_system ~verifier:Init.verifier
-                 ~net_config
+              (Coda_lib.Config.make ~logger ~trust_system
+                 ~verifier:Init.verifier ~prover:Init.prover ~net_config
                  ?snark_worker_key:
                    (Option.map snark_worker_config ~f:(fun c -> c.public_key))
-                 ~transaction_pool_disk_location:
-                   (conf_dir ^/ "transaction_pool")
                  ~snark_pool_disk_location:(conf_dir ^/ "snark_pool")
                  ~wallets_disk_location:(conf_dir ^/ "wallets")
                  ~time_controller ~receipt_chain_database
@@ -517,7 +519,6 @@ module T = struct
             don't_wait_for
               (Strict_pipe.Reader.iter (Main.validated_transitions coda)
                  ~f:(fun t ->
-                   let open Main.Inputs in
                    let p =
                      External_transition.Validated.protocol_state
                        (With_hash.data t)
@@ -571,8 +572,10 @@ module T = struct
                     Async.Pipe.map pipe ~f:(function
                       | Ok json ->
                           parse_sync_status_exn json
-                      | Error e ->
-                          failwith "Receiving sync status error: " )
+                      | Error json ->
+                          failwith
+                            (sprintf "Receiving sync status error: %s"
+                               (Yojson.Basic.to_string json)) )
                 | _ ->
                     failwith "Expected to get a stream of sync updates" )
             | Error e ->
@@ -582,11 +585,11 @@ module T = struct
           in
           let coda_new_user_command =
             Fn.compose Deferred.return
-            @@ Run.Commands.Subscriptions.new_user_command coda
+            @@ Run.Commands.For_tests.Subscriptions.new_user_commands coda
           in
           let coda_get_all_user_commands =
             Fn.compose Deferred.return
-            @@ Run.Commands.get_all_user_commands coda
+            @@ Run.Commands.For_tests.get_all_user_commands coda
           in
           { coda_peers= with_monitor coda_peers
           ; coda_verified_transitions= with_monitor coda_verified_transitions

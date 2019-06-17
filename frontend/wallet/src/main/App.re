@@ -8,12 +8,6 @@ let createTray = dispatch => {
   let trayItems =
     Menu.Item.[
       make(
-        Label("Synced"),
-        ~icon=Filename.concat(ProjectRoot.resource, "public/circle-16.png"),
-        (),
-      ),
-      make(Separator, ()),
-      make(
         Label("Debug"),
         ~click=
           () =>
@@ -25,14 +19,13 @@ let createTray = dispatch => {
       make(
         Label("Open"),
         ~accelerator="CmdOrCtrl+O",
-        ~click=
-          () => AppWindow.get({path: Route.Home, dispatch}) |> AppWindow.show,
+        ~click=() => AppWindow.deepLink({path: Route.Home, dispatch}),
         (),
       ),
       make(
         Label("Settings"),
         ~accelerator="CmdOrCtrl+,",
-        ~click=() => AppWindow.deepLink({path: Route.Home, dispatch}),
+        ~click=() => AppWindow.deepLink({path: Route.Settings, dispatch}),
         (),
       ),
       make(Separator, ()),

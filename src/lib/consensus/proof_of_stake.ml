@@ -92,6 +92,8 @@ module Constants = struct
     Time.Span.of_ms (Int64.of_int (Int64.to_int Slot.duration_ms * delta))
 end
 
+let epoch_size = UInt32.to_int Constants.Epoch.size
+
 module Configuration = struct
   type t =
     { delta: int
@@ -415,7 +417,7 @@ module Data = struct
         }
 
     type snapshot_identifier = Last_epoch_snapshot | Curr_epoch_snapshot
-    [@@deriving to_yojson, eq]
+    [@@deriving to_yojson]
 
     let get_snapshot (t : t) id =
       match id with
@@ -1854,7 +1856,7 @@ module Data = struct
             (Global_slot.create ~epoch:next_epoch ~slot:next_slot)
       ; checkpoints }
 
-    module M = Snarky.Snark.Run.Make (Curve_choice.Tick_backend)
+    module M = Snarky.Snark.Run.Make (Curve_choice.Tick_backend) (Unit)
 
     let m : M.field Snarky.Snark.m = (module M)
 
@@ -1880,7 +1882,8 @@ module Data = struct
         .less
 
     let same_checkpoint_window ~prev ~next =
-      M.make_checked (fun () -> same_checkpoint_window ~prev ~next)
+      with_state (As_prover.return ())
+        (M.make_checked (fun () -> same_checkpoint_window ~prev ~next))
 
     let negative_one : Value.t =
       { Poly.length= Length.zero
@@ -2081,6 +2084,13 @@ module Data = struct
       ; curr_epoch= Segment_id.to_int t.curr_epoch
       ; curr_slot= Segment_id.to_int t.curr_slot
       ; total_currency= Amount.to_int t.total_currency }
+
+    let network_delay (config : Configuration.t) =
+      config.acceptable_network_delay
+
+    let curr_epoch (t : Value.t) = Epoch.to_int t.curr_epoch
+
+    let curr_slot (t : Value.t) = Epoch.Slot.to_int t.curr_slot
   end
 
   module Prover_state = struct
@@ -2258,15 +2268,9 @@ module Hooks = struct
    * as the ledger hash specified by the epoch data).
   *)
   let select_epoch_snapshot ~(consensus_state : Consensus_state.Value.t)
-      ~local_state ~epoch ~epoch_data =
+      ~local_state ~epoch =
     let open Local_state in
     let open Epoch_data.Poly in
-    let open Epoch_ledger.Poly in
-    (* is the snapshot we need the genesis snapshot? *)
-    let is_genesis_snapshot =
-      Coda_base.Frozen_ledger_hash.equal epoch_data.ledger.hash
-        genesis_ledger_hash
-    in
     (* are we in the next epoch after the consensus state? *)
     let in_next_epoch =
       Epoch.equal epoch (Epoch.succ consensus_state.curr_epoch)
@@ -2275,10 +2279,8 @@ module Hooks = struct
     let epoch_is_finalized =
       consensus_state.curr_epoch_data.length > Length.of_int Constants.k
     in
-    if is_genesis_snapshot then
-      (`Genesis, !local_state.Data.genesis_epoch_snapshot)
-    else if in_next_epoch || not epoch_is_finalized then
-      (`Curr, !local_state.curr_epoch_snapshot)
+    if in_next_epoch || not epoch_is_finalized then
+      (`Curr, !local_state.Data.curr_epoch_snapshot)
     else (`Last, !local_state.last_epoch_snapshot)
 
   type local_state_sync =
@@ -2290,19 +2292,8 @@ module Hooks = struct
       ~local_state =
     let open Coda_base in
     let epoch = consensus_state.curr_epoch in
-    let epoch_data =
-      (* This should not fail since we are getting epoch data for the
-       * same epoch that the consensus state is in. *)
-      select_epoch_data ~consensus_state ~epoch
-      |> Result.map_error
-           ~f:
-             (Fn.const
-                "unexpected failure while selecting epoch data from consensus \
-                 state")
-      |> Result.ok_or_failwith
-    in
     let source, _snapshot =
-      select_epoch_snapshot ~consensus_state ~local_state ~epoch ~epoch_data
+      select_epoch_snapshot ~consensus_state ~local_state ~epoch
     in
     let required_snapshot_sync snapshot_id expected_root =
       Option.some_if
@@ -2314,9 +2305,6 @@ module Hooks = struct
         {snapshot_id; expected_root}
     in
     match source with
-    | `Genesis ->
-        None
-    (* We never need to do work to have the genesis snapshot*)
     | `Curr ->
         Option.map
           (required_snapshot_sync Curr_epoch_snapshot
@@ -2335,32 +2323,6 @@ module Hooks = struct
           None
       | ls ->
           Non_empty_list.of_list_opt ls )
-
-  (* TODO: Remove this once required_local_state_sync function is fixed *)
-  let bootstrap_local_state_sync ~(consensus_state : Consensus_state.Value.t)
-      ~local_state =
-    let open Coda_base in
-    let required_snapshot_sync snapshot_id expected_root =
-      Option.some_if
-        (not
-           (Ledger_hash.equal
-              (Frozen_ledger_hash.to_ledger_hash expected_root)
-              (Sparse_ledger.merkle_root
-                 (Local_state.get_snapshot local_state snapshot_id).ledger)))
-        {snapshot_id; expected_root}
-    in
-    match
-      Core.List.filter_map
-        [ required_snapshot_sync Curr_epoch_snapshot
-            consensus_state.curr_epoch_data.ledger.hash
-        ; required_snapshot_sync Last_epoch_snapshot
-            consensus_state.last_epoch_data.ledger.hash ]
-        ~f:Fn.id
-    with
-    | [] ->
-        None
-    | ls ->
-        Non_empty_list.of_list_opt ls
 
   let sync_local_state ~logger ~trust_system ~local_state ~random_peers
       ~(query_peer : Network_peer.query_peer) requested_syncs =
@@ -2553,24 +2515,11 @@ module Hooks = struct
       |> Option.value
            ~default:
              ( "default case"
-             , "candidate virtual min-length is longer than existing virtual \
-                min-length"
+             , "candidate length is longer than existing length"
              , lazy
-                 (let newest_epoch =
-                    Epoch.max existing.curr_epoch candidate.curr_epoch
-                  in
-                  let virtual_min_length (s : Consensus_state.Value.t) =
-                    if Epoch.(succ s.curr_epoch < newest_epoch) then
-                      Length.zero (* There is a gap of an entire epoch *)
-                    else if Epoch.(succ s.curr_epoch = newest_epoch) then
-                      Length.(
-                        min s.min_length_of_epoch s.curr_epoch_data.length)
-                      (* Imagine the latest epoch was padded out with zeroes to reach the newest_epoch *)
-                    else s.min_length_of_epoch
-                  in
-                  Length.(
-                    virtual_min_length existing < virtual_min_length candidate))
-             )
+                 (* TODO: THIS IS INSECURE! See #2643.
+                    Undo this hack once the min_length_of_epoch bug is fixed *)
+                 Length.(existing.length < candidate.length) )
     in
     let choice = if Lazy.force should_take then `Take else `Keep in
     log_choice ~precondition_msg ~choice_msg choice ;
@@ -2617,7 +2566,6 @@ module Hooks = struct
       let epoch_snapshot =
         let source, snapshot =
           select_epoch_snapshot ~consensus_state:state ~local_state ~epoch
-            ~epoch_data
         in
         Logger.info logger ~module_:__MODULE__ ~location:__LOC__
           !"using %s_epoch_snapshot root hash %{sexp:Coda_base.Ledger_hash.t}"

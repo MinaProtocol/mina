@@ -14,4 +14,5 @@ app.js
 *.cmi
 *.cmx
 *.o
+*.log
 coda-daemon-macos.zip

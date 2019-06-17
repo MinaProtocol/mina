@@ -4,5 +4,5 @@
   (preprocess (pps ppx_jane ppx_deriving.eq))
   (inline_tests)
   (libraries
-    snarkette
+    snarkette ; This is actually just needed in tests
     core_kernel ))
