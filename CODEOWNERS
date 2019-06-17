@@ -25,6 +25,7 @@
 /src/app/trace-tool/ @cmr
 /src/app/website/ @bkase @schmavery @figitaki
 
+/src/lib/base58_check/ @psteckler @cmr
 /src/lib/bignum_bigint/ @nholland94 @bkase
 /src/lib/blake2/ @rbkhmrcr @vanishreerao
 /src/lib/blockchain_snark/ @nholland94 @bkase

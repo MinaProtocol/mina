@@ -103,20 +103,16 @@ let reduce = (acc, action) => {
   };
 };
 
-// TODO: Use the version query as health check
-module Version = [%graphql {| query version { version } |}];
-module VersionQuery = ReasonApollo.CreateQuery(Version);
-
-[@react.component]
-let make = (~children) => {
+let useHook = () => {
   let (_state, dispatch) =
     Hooks.Reducer.useReducer(reduce, {State.args: [], mode: Stable});
 
   let () =
     React.useEffect0(() => {
+      let token = MainCommunication.listen();
       dispatch(Action.ForceStartCoda);
-      None;
+      Some(() => MainCommunication.stopListening(token));
     });
 
-  children(dispatch);
+  dispatch;
 };
