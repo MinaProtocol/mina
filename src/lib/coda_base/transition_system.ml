@@ -249,7 +249,8 @@ struct
       ; alpha_beta= Pairing.Fqk.constant alpha_beta }
 
     (* TODO: Use an online verifier here *)
-    let%snarkydef main (input : Wrap_input.var) =
+    let%snarkydef main (_input : Wrap_input.var) =
+      (*
       let%bind result =
         (* The use of choose_preimage here is justified since we feed it to the verifier, which doesn't
              depend on which unpacking is provided. *)
@@ -264,8 +265,11 @@ struct
                        Prover_state.proof))
         in
         Verifier.verify step_vk_constant step_vk_precomp [input] proof
-      in
-      with_label __LOC__ (Boolean.Assert.is_true result)
+              with_label __LOC__ (Boolean.Assert.is_true result)
+
+        *)
+      let%bind x = exists Field.typ ~compute:(As_prover.return Field.one) in
+      Field.Checked.Assert.equal x x
   end
 
   module Wrap (Step_vk : Step_vk_intf) (Tock_keypair : Tock_keypair_intf) =

@@ -47,6 +47,8 @@ module Wrap_input = struct
 
     val of_tick_field : Tick0.Field.t -> t
 
+    val to_tick_field : t -> Tick0.Field.t
+
     val typ : (var, t) Typ.t
 
     module Checked : sig
@@ -69,6 +71,9 @@ module Wrap_input = struct
 
     let of_tick_field (x : Tick0.Field.t) : t =
       Tock0.Field.project (Tick0.Field.unpack x)
+
+    let to_tick_field (t : t) : Tick0.Field.t =
+      Tick0.Field.project (Tock0.Field.unpack t)
 
     module Checked = struct
       let tick_field_to_scalars x =
@@ -106,6 +111,8 @@ module Wrap_input = struct
       | [] -> failwith "split_last: Empty list" | x :: xs -> go [] x xs
 
     let of_tick_field (x : Tick0.Field.t) : t = x
+
+    let to_tick_field (t : t) : Tick0.Field.t = t
 
     let typ : (var, t) Typ.t =
       Typ.of_hlistable spec

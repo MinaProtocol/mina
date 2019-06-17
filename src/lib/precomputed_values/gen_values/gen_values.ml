@@ -50,6 +50,9 @@ module Make_real (Keys : Keys_lib.Keys.S) = struct
     let open Snark_params in
     let module Wrap = Keys.Wrap in
     let input = Wrap_input.of_tick_field hash in
+    let hash' = Wrap_input.to_tick_field input in
+    Core.printf !"input typ\n%!" ;
+    assert (Tick0.Field.equal hash hash') ;
     let proof =
       Tock.prove
         (Tock.Keypair.pk Wrap.keys)
