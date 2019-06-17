@@ -258,7 +258,7 @@ let rec transfer_while_writer_alive reader writer ~f =
   else
     match%bind Pipe.read reader.Reader0.reader with
     | `Ok x ->
-        let%bind () = Pipe.write writer.Writer.writer (f x) in
+        let%bind () = Pipe.write_if_open writer.Writer.writer (f x) in
         transfer_while_writer_alive reader writer ~f
     | `Eof ->
         Pipe.close writer.Writer.writer ;
