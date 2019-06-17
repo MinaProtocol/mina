@@ -410,6 +410,11 @@ let daemon logger =
        Async.Scheduler.within' ~monitor
        @@ fun () ->
        let%bind () = maybe_sleep 3. in
+       let web_service = Web_pipe.get_service () in
+       Web_pipe.run_service (module Run) coda web_service ~conf_dir ~logger ;
+       Run.setup_local_server ?client_whitelist ?rest_server_port ~coda
+         ~client_port () ;
+       Run.run_snark_worker ~client_port run_snark_worker_action ;
        let%bind () =
          if from_genesis then Deferred.unit
          else
@@ -418,11 +423,6 @@ let daemon logger =
              |> Float.of_int |> Time.Span.of_ms )
        in
        M.start coda ;
-       let web_service = Web_pipe.get_service () in
-       Web_pipe.run_service (module Run) coda web_service ~conf_dir ~logger ;
-       Run.setup_local_server ?client_whitelist ?rest_server_port ~coda
-         ~client_port () ;
-       Run.run_snark_worker ~client_port run_snark_worker_action ;
        Logger.info logger ~module_:__MODULE__ ~location:__LOC__
          "Running coda services" ;
        Async.never ())
