@@ -10,7 +10,7 @@ let main who_proposes () =
   let snark_work_public_keys _ = None in
   let%bind testnet =
     Coda_worker_testnet.test logger n proposers snark_work_public_keys
-      Cli_lib.Arg_type.Seq ~max_concurrent_connections:None
+      Cli_lib.Arg_type.Sequence ~max_concurrent_connections:None
   in
   let%bind () = after (Time.Span.of_sec 30.) in
   Coda_worker_testnet.Api.teardown testnet

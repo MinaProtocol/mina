@@ -19,7 +19,7 @@ let spawn_exn (config : Coda_worker.Input.t) =
   return (conn, process, config)
 
 let local_config ?proposal_interval:_ ~peers ~addrs_and_ports ~acceptable_delay
-    ~program_dir ~proposer ~snark_worker_config ~work_selection ~offset
+    ~program_dir ~proposer ~snark_worker_config ~work_selection_method ~offset
     ~trace_dir ~max_concurrent_connections () =
   let conf_dir =
     Filename.temp_dir_name
@@ -41,7 +41,7 @@ let local_config ?proposal_interval:_ ~peers ~addrs_and_ports ~acceptable_delay
                      (String.split ~on:'=')) )
     ; proposer
     ; snark_worker_config
-    ; work_selection
+    ; work_selection_method
     ; peers
     ; conf_dir
     ; trace_dir
