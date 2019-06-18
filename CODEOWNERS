@@ -41,6 +41,7 @@
 /src/lib/coda_numbers/ @bkase @nholland94
 /src/lib/coda_state/ @nholland94
 /src/lib/coda_transition/ @nholland94
+/src/lib/coda_version/ @nholland94 @cmr
 /src/lib/codable/ @johnwu93 @bkase
 /src/lib/consensus/ @nholland94
 /src/lib/crs/ @rbkhmrcr @vanishreerao

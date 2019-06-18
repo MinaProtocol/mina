@@ -2093,6 +2093,8 @@ let%test_module "test" =
           {fee: fee; proofs: proof list; prover: public_key}
         [@@deriving sexp, compare]
 
+        let fee {fee; _} = fee
+
         module Statement = struct
           module Stable = struct
             module V1 = struct
