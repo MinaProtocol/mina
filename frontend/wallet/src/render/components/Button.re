@@ -11,7 +11,6 @@ module Styles = {
     merge([
       Theme.Text.Body.regular,
       style([
-        userSelect(`none),
         display(`inlineFlex),
         alignItems(`center),
         justifyContent(`center),

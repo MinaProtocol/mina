@@ -13,7 +13,7 @@ module Styles = {
     ]);
 
   let backHeader =
-    style([display(`flex), alignItems(`center), userSelect(`none)]);
+    style([display(`flex), alignItems(`center)]);
 
   let backIcon =
     style([
@@ -38,7 +38,6 @@ module Styles = {
       style([
         color(Theme.Colors.midnight),
         marginBottom(`rem(0.25)),
-        userSelect(`none),
       ]),
     ]);
 
@@ -62,12 +61,12 @@ module Styles = {
 
 module DeleteWallet = [%graphql
   {|
-  mutation deleteWallet($key: String!) {
+    mutation deleteWallet($key: String!) {
       deleteWallet(input: {publicKey: $key}) {
         publicKey
       }
-  }
-|}
+    }
+  |}
 ];
 
 module DeleteWalletMutation = ReasonApollo.CreateMutation(DeleteWallet);
@@ -263,29 +262,7 @@ let make = (~publicKey) => {
       />
     </div>
     <Spacer height=1.5 />
-    <div>
-      <h3 className=Theme.Text.Header.h3>
-        {React.string("Compression Settings")}
-      </h3>
-      <Spacer height=0.5 />
-      <Well>
-        <div className=Css.(style([display(`flex), alignItems(`flexEnd)]))>
-          <div className=Styles.textBox>
-            <div className=Styles.label>
-              {React.string("Delegating to")}
-            </div>
-            <TextField
-              label="Key"
-              value={PublicKey.prettyPrint(publicKey)}
-              mono=true
-              onChange={_ => ()}
-            />
-          </div>
-          <Spacer width=1. />
-          <Button width=8. height=2.5 style=Button.Green label="Change" />
-        </div>
-      </Well>
-    </div>
+    <CompressorSettings />
     <Spacer height=1.5 />
     <DeleteButton publicKey />
   </div>;

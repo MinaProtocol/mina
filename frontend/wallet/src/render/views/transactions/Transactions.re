@@ -23,7 +23,6 @@ module Styles = {
         height(`rem(2.)),
         alignItems(`center),
         color(Theme.Colors.slate),
-        userSelect(`none),
       ]),
     ]);
 

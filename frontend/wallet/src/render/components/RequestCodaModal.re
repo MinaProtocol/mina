@@ -14,6 +14,7 @@ module Styles = {
         padding(`px(12)),
         backgroundColor(white),
         wordWrap(`breakWord),
+        userSelect(`text),
       ]),
     ]);
 };

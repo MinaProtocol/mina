@@ -1,7 +1,7 @@
 /** Shared styles and colors */
 open Css;
 
-global("*", [boxSizing(`borderBox)]);
+global("*", [boxSizing(`borderBox), userSelect(`none)]);
 global("h1, h2, h3, h4, h5", [margin(`zero)]);
 
 module Colors = {
@@ -38,6 +38,9 @@ module Colors = {
 
   let yeezyAlpha = a => `rgba((197, 49, 49, a));
   let yeezy = yeezyAlpha(1.0);
+
+  let gandalfAlpha = a => `rgba((213, 212, 210, a));
+  let gandalf = gandalfAlpha(1.);
 
   let clover = `rgb((71, 144, 86));
 
@@ -106,7 +109,7 @@ module Typeface = {
       ),
       fontFace(
         ~fontFamily="OCR A Std",
-        ~src=[`url("fonts/OCR A Std Regular.ttf")],
+        ~src=[`url("fonts/OCR A Std Regular.otf")],
         ~fontStyle=`normal,
         ~fontWeight=`normal,
         (),
@@ -134,8 +137,6 @@ module Text = {
         Typeface.mono,
         fontWeight(`medium),
         fontSize(`rem(0.9)),
-        // Due to the font weirdness, we need to offset by 4px
-        paddingTop(`px(4)),
       ]);
 
     let small =

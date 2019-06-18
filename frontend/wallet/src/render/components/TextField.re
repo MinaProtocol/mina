@@ -19,7 +19,6 @@ module Styles = {
     merge([
       Theme.Text.Header.h6,
       style([
-        userSelect(`none),
         textTransform(`uppercase),
         color(Theme.Colors.slateAlpha(0.7)),
         minWidth(`rem(2.5)),
@@ -51,7 +50,6 @@ module Styles = {
         border(`zero, `none, transparent),
         flexGrow(1.),
         padding(`zero),
-        marginTop(`px(3)),
         color(Theme.Colors.teal),
         active([outline(`zero, `solid, white)]),
         focus([outline(`zero, `solid, white)]),
@@ -165,6 +163,7 @@ let make =
       ~mono=false,
       ~button=React.null,
       ~placeholder=?,
+      ~disabled=false,
     ) =>
   <label className=Styles.container>
     <span className=Styles.label> {React.string(label ++ ":")} </span>
@@ -175,6 +174,7 @@ let make =
       onChange={e => onChange(ReactEvent.Form.target(e)##value)}
       value
       ?placeholder
+      disabled
     />
     button
   </label>;
