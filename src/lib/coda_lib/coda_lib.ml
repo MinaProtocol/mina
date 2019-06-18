@@ -13,6 +13,7 @@ open O1trace
 open Otp_lib
 module Ledger_transfer = Ledger_transfer.Make (Ledger) (Ledger.Db)
 module Config = Config
+module Subscriptions = Coda_subscriptions
 
 type processes = {prover: Prover.t; verifier: Verifier.t}
 
@@ -44,6 +45,8 @@ type t =
   ; mutable seen_jobs: Work_selector.State.t
   ; subscriptions: Coda_subscriptions.t }
 [@@deriving fields]
+
+let subscription t = t.subscriptions
 
 let peek_frontier frontier_broadcast_pipe =
   Broadcast_pipe.Reader.peek frontier_broadcast_pipe
@@ -585,6 +588,7 @@ let create (config : Config.t) =
             Coda_subscriptions.create ~logger:config.logger
               ~time_controller:config.time_controller ~new_blocks ~wallets
               ~external_transition_database:config.external_transition_database
+              ~transition_frontier:frontier_broadcast_pipe_r
           in
           return
             { config
@@ -604,4 +608,3 @@ let create (config : Config.t) =
             ; propose_keypairs
             ; seen_jobs= Work_selector.State.init
             ; subscriptions } ) )
-  >>>>>>> origin / master

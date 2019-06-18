@@ -6,8 +6,11 @@ open Coda_transition
 open Pipe_lib
 open Signature_lib
 module Config = Config
+module Subscriptions = Coda_subscriptions
 
 type t
+
+val subscription : t -> Coda_subscriptions.t
 
 (** Derived from local state (aka they may not reflect the latest public keys to which you've attempted to change *)
 val propose_public_keys : t -> Public_key.Compressed.Set.t
