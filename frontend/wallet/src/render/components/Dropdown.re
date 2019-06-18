@@ -50,7 +50,7 @@ module Styles = {
       top(`percent(100.)),
       left(`px(-1)),
       right(`px(-1)),
-      maxHeight(`calc(`add, `rem(10.), `px(2))),
+      maxHeight(`calc((`add, `rem(10.), `px(2)))),
       overflow(`scroll),
       background(white),
       border(`px(1), `solid, Theme.Colors.marineAlpha(0.3)),
@@ -82,7 +82,14 @@ module Styles = {
 };
 
 [@react.component]
-let make = (~onChange, ~value, ~label, ~options: list((string, React.element))) => {
+let make =
+    (
+      ~onChange,
+      ~value,
+      ~label,
+      ~disabled=false,
+      ~options: list((string, React.element)),
+    ) => {
   let (isOpen, setOpen) = React.useState(() => false);
   let toggleOpen = () => setOpen(isOpen => !isOpen);
 
@@ -96,11 +103,13 @@ let make = (~onChange, ~value, ~label, ~options: list((string, React.element))) 
     className={Styles.container(isOpen)}
     onClick={e => {
       ReactEvent.Mouse.stopPropagation(e);
-      toggleOpen();
+      if (!disabled) {
+        toggleOpen();
+      };
     }}>
     <span className=Styles.label> {React.string(label ++ ":")} </span>
     <Spacer width=0.5 />
-    <span className=Styles.value> {currentLabel} </span>
+    <span className=Styles.value> currentLabel </span>
     <Spacer width=0.5 />
     <span className=Styles.icon> <Icon kind=Icon.ChevronDown /> </span>
     <div className={isOpen ? Styles.options : Styles.hidden}>
@@ -111,13 +120,12 @@ let make = (~onChange, ~value, ~label, ~options: list((string, React.element))) 
                key=value
                className=Styles.item
                onClick={_e => onChange(value)}>
-               {label}
+               label
              </div>,
          options,
        )
        |> Array.fromList
-       |> React.array
-      }
+       |> React.array}
     </div>
   </div>;
 };

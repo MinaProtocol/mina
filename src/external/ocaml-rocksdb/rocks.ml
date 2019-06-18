@@ -379,7 +379,7 @@ and Transaction :
       if to_voidp res = null then None
       else
         let res' = bigarray_of_ptr array1 !@res_size Bigarray.char res in
-        Gc.finalise (fun res -> free (to_voidp res)) res ;
+        Gc.finalise_last (fun () -> free (to_voidp res)) res' ;
         Some res'
     in
     match opts with
@@ -401,7 +401,7 @@ and Transaction :
       if to_voidp res = null then None
       else
         let res' = string_from_ptr res ~length:!@res_size in
-        Gc.finalise (fun res -> free (to_voidp res)) res ;
+        Gc.finalise_last (fun () -> free (to_voidp res)) res' ;
         Some res'
     in
     match opts with
@@ -659,7 +659,7 @@ and RocksDb : (Rocks_intf.ROCKS with type batch := WriteBatch.t) = struct
       if to_voidp res = null then None
       else
         let res' = bigarray_of_ptr array1 !@res_size Bigarray.char res in
-        Gc.finalise (fun res -> free (to_voidp res)) res ;
+        Gc.finalise_last (fun () -> free (to_voidp res)) res' ;
         Some res'
     in
     match opts with
@@ -681,7 +681,7 @@ and RocksDb : (Rocks_intf.ROCKS with type batch := WriteBatch.t) = struct
       if to_voidp res = null then None
       else
         let res' = string_from_ptr res ~length:!@res_size in
-        Gc.finalise (fun res -> free (to_voidp res)) res ;
+        Gc.finalise_last (fun () -> free (to_voidp res)) res' ;
         Some res'
     in
     match opts with

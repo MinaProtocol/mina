@@ -1,62 +1,19 @@
 open Core_kernel
 open Async
+open Currency
 
-module type Work_selector_with_tests_intf = sig
-  include Intf.S
-
-  module For_tests : sig
-    val does_not_have_better_fee :
-      snark_pool:snark_pool -> fee:fee -> work list -> bool
-  end
-end
-
-module type Work_selector_F = functor (Inputs : Inputs.Inputs_intf) -> Work_selector_with_tests_intf
-                                                                       with type 
-                                                                       staged_ledger :=
-                                                                         Inputs
-                                                                         .Staged_ledger
-                                                                         .t
-                                                                        and type 
-                                                                       work :=
-                                                                         ( Inputs
-                                                                           .Ledger_proof_statement
-                                                                           .t
-                                                                         , Inputs
-                                                                           .Transaction
-                                                                           .t
-                                                                         , Inputs
-                                                                           .Transaction_witness
-                                                                           .t
-                                                                         , Inputs
-                                                                           .Ledger_proof
-                                                                           .t
-                                                                         )
-                                                                         Snark_work_lib
-                                                                         .Work
-                                                                         .Single
-                                                                         .Spec
-                                                                         .t
-                                                                        and type 
-                                                                       snark_pool :=
-                                                                         Inputs
-                                                                         .Snark_pool
-                                                                         .t
-                                                                        and type 
-                                                                       fee :=
-                                                                         Inputs
-                                                                         .Fee
-                                                                         .t
-
-module Make_test (Make_selector : Work_selector_F) = struct
-  module T = Inputs.Test_input
-  module Selector = Make_selector (T)
+module Make_test (Make_selection_method : Intf.Make_selection_method_intf) =
+struct
+  module T = Inputs.Test_inputs
+  module Lib = Work_lib.Make (T)
+  module Selection_method = Make_selection_method (T) (Lib)
 
   let%test_unit "Workspec chunk doesn't send same things again" =
     Backtrace.elide := false ;
     let p = 50 in
     let g = Int.gen_incl 1 p in
     let snark_pool = T.Snark_pool.create () in
-    let fee = 0 in
+    let fee = Fee.of_int 0 in
     Quickcheck.test g ~trials:100 ~f:(fun i ->
         Async.Thread_safe.block_on_async_exn (fun () ->
             let open Deferred.Let_syntax in
@@ -65,14 +22,16 @@ module Make_test (Make_selector : Work_selector_F) = struct
               [%test_result: Bool.t]
                 ~message:"Exceeded time expected to exhaust work" ~expect:true
                 (i <= p) ;
-              let stuff, seen = Selector.work ~snark_pool ~fee sl seen in
+              let stuff, seen =
+                Selection_method.work ~snark_pool ~fee sl seen
+              in
               match stuff with [] -> return () | _ -> go (i + 1) seen
             in
-            go 0 Selector.State.init ) )
+            go 0 Lib.State.init ) )
 
   let gen_snark_pool works fee =
-    let cheap_work_fee = fee - 1 in
-    let expensive_work_fee = fee + 1 in
+    let cheap_work_fee = Option.value_exn Fee.(sub fee one) in
+    let expensive_work_fee = Option.value_exn Fee.(add fee one) in
     let snark_pool = T.Snark_pool.create () in
     let gen_add_work work =
       let open Quickcheck.Generator.Let_syntax in
@@ -96,23 +55,28 @@ module Make_test (Make_selector : Work_selector_F) = struct
         Async.Thread_safe.block_on_async_exn (fun () ->
             let open Deferred.Let_syntax in
             let sl : T.Staged_ledger.t = List.init i ~f:Fn.id in
-            let works = T.Staged_ledger.chunks_of sl ~n:2 in
-            let my_fee = 2 in
+            let works =
+              T.Staged_ledger.chunks_of sl ~n:2
+              |> List.map ~f:(List.map ~f:Fee.of_int)
+            in
+            let my_fee = Fee.of_int 2 in
             let snark_pool = gen_snark_pool works my_fee in
             let rec go i seen =
               [%test_result: Bool.t]
                 ~message:"Exceeded time expected to exhaust work" ~expect:true
                 (i <= p) ;
-              let work, seen = Selector.work ~snark_pool ~fee:my_fee sl seen in
+              let work, seen =
+                Selection_method.work ~snark_pool ~fee:my_fee sl seen
+              in
               match work with
               | [] ->
                   return ()
               | job ->
                   [%test_result: Bool.t]
                     ~message:"Should not get any cheap jobs" ~expect:true
-                    (Selector.For_tests.does_not_have_better_fee ~snark_pool
+                    (Lib.For_tests.does_not_have_better_fee ~snark_pool
                        ~fee:my_fee job) ;
                   go (i + 1) seen
             in
-            go 0 Selector.State.init ) )
+            go 0 Lib.State.init ) )
 end

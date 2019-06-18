@@ -6,10 +6,6 @@ module Styles = {
   let headerContainer =
     style([display(`flex), justifyContent(`spaceBetween)]);
 
-  let networkContainer = style([width(`rem(21.))]);
-
-  let customNetwork = style([display(`flex), alignItems(`center)]);
-
   let versionText =
     merge([
       Theme.Text.Header.h6,
@@ -107,43 +103,8 @@ module WalletSettingsItem = {
   };
 };
 
-let doubleList = l => List.map(~f=x => (x, React.string(x)), l);
-
-type networkOption =
-  | NetworkOption(string)
-  | Custom(string);
-
 [@react.component]
 let make = () => {
-  // TODO: Get and save value from the settings
-  let (networkValue, setNetworkValue) =
-    React.useState(() => NetworkOption("testnet.codaprotocol.com"));
-
-  let dropDownValue =
-    switch (networkValue) {
-    | NetworkOption(s) => Some(s)
-    | Custom(_) => Some("Custom network")
-    };
-
-  let dropDownOptions =
-    doubleList([
-      "testnet.codaprotocol.com",
-      "testnet2.codaprotocol.com",
-      "testnet3.codaprotocol.com",
-      "Custom network",
-    ]);
-
-  let dropdownHandler = s =>
-    switch (s) {
-    | "Custom network" =>
-      setNetworkValue(
-        fun
-        | NetworkOption(_) => Custom("")
-        | x => x,
-      )
-    | s => setNetworkValue(_ => NetworkOption(s))
-    };
-
   <SettingsQuery>
     {response =>
        switch (response.result) {
@@ -151,11 +112,15 @@ let make = () => {
        | Error(err) => React.string(err##message)
        | Data(data) =>
          let versionText =
-           String.slice(
-             data##version,
-             ~from=0,
-             ~to_=min(8, String.length(data##version)),
-           );
+           data##version
+           |> Option.map(~f=version =>
+                String.slice(
+                  version,
+                  ~from=0,
+                  ~to_=min(8, String.length(version)),
+                )
+              )
+           |> Option.withDefault(~default="Unknown");
          <div className=Styles.container>
            <div className=Styles.headerContainer>
              <div className=Theme.Text.Header.h3>
@@ -178,38 +143,7 @@ let make = () => {
              </div>
            </div>
            <Spacer height=1. />
-           <div className=Styles.networkContainer>
-             <Dropdown
-               value=dropDownValue
-               label="Network"
-               options=dropDownOptions
-               onChange=dropdownHandler
-             />
-             {switch (networkValue) {
-              | Custom(v) =>
-                <>
-                  <Spacer height=0.5 />
-                  <div className=Styles.customNetwork>
-                    <Icon kind=Icon.BentArrow />
-                    <Spacer width=0.5 />
-                    <TextField
-                      value=v
-                      label="URL"
-                      placeholder="my.network.com"
-                      onChange={s => setNetworkValue(_ => Custom(s))}
-                      button={
-                        <TextField.Button
-                          text="Save"
-                          color=`Green
-                          onClick=ignore
-                        />
-                      }
-                    />
-                  </div>
-                </>
-              | _ => React.null
-              }}
-           </div>
+           <NetworkDropdown />
            <Spacer height=1. />
            <div className=Styles.label>
              {React.string("Wallet Settings")}

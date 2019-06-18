@@ -54,12 +54,18 @@ module Navigator = {
   };
 };
 
-module ChildProcess = {
-  module ReadablePipe = {
+module Stream = {
+  module Readable = {
     type t;
     [@bs.send] external on: (t, string, Node.Buffer.t => unit) => unit = "";
   };
 
+  module Writable = {
+    type t;
+  };
+};
+
+module ChildProcess = {
   module Error = {
     [@bs.deriving abstract]
     type t = {
@@ -69,10 +75,12 @@ module ChildProcess = {
   };
 
   module Process = {
+    [@bs.val] [@bs.module "process"] external env: Js.Dict.t(string) = "";
+
     [@bs.deriving abstract]
     type t = {
-      stdout: ReadablePipe.t,
-      stderr: ReadablePipe.t,
+      stdout: Stream.Readable.t,
+      stderr: Stream.Readable.t,
     };
 
     [@bs.send] external kill: (t, string) => unit = "";
@@ -103,13 +111,48 @@ module ChildProcess = {
       );
     let onExitTask = t => Task.uncallbackifyValue(onExit(t));
   };
-  [@bs.val] [@bs.module "child_process"]
-  external spawn: (string, array(string)) => Process.t = "spawn";
+
+  type io;
+
+  /**
+    https://nodejs.org/api/child_process.html#child_process_options_stdio
+    The stdio parameter to spawn is a 3-element heterogenous list of some string
+    keywords and Streams (as well as some other cases not supported here).
+    This function lets us safely construct this parameter (with makeIOTriple).
+    */
+  let makeIO = (v): io =>
+    switch (v) {
+    | `Pipe => Obj.magic("pipe")
+    | `Inherit => Obj.magic("inherit")
+    | `Ignore => Obj.magic("ignore")
+    | `Stream((s: Stream.Writable.t)) => Obj.magic(s)
+    };
+
+  let makeIOTriple = (io1, io2, io3) => (
+    makeIO(io1),
+    makeIO(io2),
+    makeIO(io3),
+  );
+
+  let pipe = makeIOTriple(`Pipe, `Pipe, `Pipe);
+  let ignore = makeIOTriple(`Ignore, `Ignore, `Ignore);
 
   [@bs.val] [@bs.module "child_process"]
-  external spawnWithEnv:
-    (string, array(string), {. "env": Js.Dict.t(string)}) => Process.t =
+  external spawn:
+    (
+      string,
+      array(string),
+      {
+        .
+        "env": Js.Dict.t(string),
+        "stdio": (io, io, io),
+      }
+    ) =>
+    Process.t =
     "spawn";
+
+  [@bs.val] [@bs.module "child_process"]
+  external execSync: (string, array(string)) => unit = "exec";
 };
 
 module Fs = {
@@ -122,6 +165,9 @@ module Fs = {
     ) =>
     unit =
     "";
+
+  [@bs.val] [@bs.module "fs"]
+  external openSync: (string, string) => Stream.Writable.t = "";
 
   [@bs.val] [@bs.module "fs"]
   external writeFile:

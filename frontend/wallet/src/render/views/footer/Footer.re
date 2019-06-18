@@ -17,10 +17,7 @@ module Styles = {
       borderTop(`px(1), `solid, Theme.Colors.borderColor),
     ]);
 
-  let footerButtons =
-    style([
-      display(`flex),
-    ]);
+  let footerButtons = style([display(`flex)]);
 
   let stakingSwitch =
     style([
@@ -70,13 +67,13 @@ module WalletQuery = ReasonApollo.CreateQuery(Wallets);
 
 module SendPayment = [%graphql
   {|
-    mutation sendPayment(
+    mutation (
       $from: String!,
       $to_: String!,
       $amount: String!,
       $fee: String!,
       $memo: String) {
-      createPayment(input:
+      sendPayment(input:
                     {from: $from, to: $to_, amount: $amount, fee: $fee, memo: $memo}) {
         payment {
           nonce
@@ -96,17 +93,17 @@ let make = () => {
     <div className=Styles.footerButtons>
       <WalletQuery partialRefetch=true>
         {response =>
-          switch (response.result) {
-          | Loading
-          | Error(_) => <Button label="Send" style=Button.Gray />
-          | Data(data) =>
-            <>
-              <Button
-                label="Request"
-                style=Button.Gray
-                onClick={_ => setModalState(_ => true)}
-              />
-              {switch (modalState) {
+           switch (response.result) {
+           | Loading
+           | Error(_) => <Button label="Send" style=Button.Gray />
+           | Data(data) =>
+             <>
+               <Button
+                 label="Request"
+                 style=Button.Gray
+                 onClick={_ => setModalState(_ => true)}
+               />
+               {switch (modalState) {
                 | false => React.null
                 | true =>
                   <RequestCodaModal
@@ -116,55 +113,56 @@ let make = () => {
                     )}
                     setModalState
                   />
-              }}
-              <Spacer width=1. />
-              <SendPaymentMutation>
-                (
-                  (mutation, _) =>
-                    <SendButton
-                      wallets={Array.map(
-                        ~f=Wallet.ofGraphqlExn,
-                        data##ownedWallets,
-                      )}
-                      onSubmit={(
-                        {from, to_, amount, fee, memoOpt}: SendButton.ModalState.Validated.t,
-                        afterSubmit,
-                      ) => {
-                        let variables =
-                          SendPayment.make(
-                            ~from=PublicKey.toString(from),
-                            ~to_=PublicKey.toString(to_),
-                            ~amount,
-                            ~fee,
-                            ~memo=?memoOpt,
-                            (),
-                          )##variables;
-                        let performMutation =
-                          Task.liftPromise(() => mutation(~variables, ()));
-                        Task.perform(
-                          performMutation,
-                          ~f=
-                            fun
-                            | Data(_)
-                            | EmptyResponse => afterSubmit(Belt.Result.Ok())
-                            | Errors(err) => {
-                                /* TODO: Display more than first error? */
-                                let message =
-                                  err
-                                  |> Array.get(~index=0)
-                                  |> Option.map(~f=e => e##message)
-                                  |> Option.withDefault(~default="Server error");
-                                afterSubmit(Error(message));
-                              },
-                        );
-                      }}
-                    />
-                )
-              </SendPaymentMutation>
-            </>
-          }
-        }
+                }}
+               <Spacer width=1. />
+               <SendPaymentMutation>
+                 (
+                   (mutation, _) =>
+                     <SendButton
+                       wallets={Array.map(
+                         ~f=Wallet.ofGraphqlExn,
+                         data##ownedWallets,
+                       )}
+                       onSubmit={(
+                         {from, to_, amount, fee, memoOpt}: SendButton.ModalState.Validated.t,
+                         afterSubmit,
+                       ) => {
+                         let variables =
+                           SendPayment.make(
+                             ~from=PublicKey.toString(from),
+                             ~to_=PublicKey.toString(to_),
+                             ~amount,
+                             ~fee,
+                             ~memo=?memoOpt,
+                             (),
+                           )##variables;
+                         let performMutation =
+                           Task.liftPromise(() => mutation(~variables, ()));
+                         Task.perform(
+                           performMutation,
+                           ~f=
+                             fun
+                             | Data(_)
+                             | EmptyResponse => afterSubmit(Belt.Result.Ok())
+                             | Errors(err) => {
+                                 /* TODO: Display more than first error? */
+                                 let message =
+                                   err
+                                   |> Array.get(~index=0)
+                                   |> Option.map(~f=e => e##message)
+                                   |> Option.withDefault(
+                                        ~default="Server error",
+                                      );
+                                 afterSubmit(Error(message));
+                               },
+                         );
+                       }}
+                     />
+                 )
+               </SendPaymentMutation>
+             </>
+           }}
       </WalletQuery>
     </div>
-  </div>
+  </div>;
 };
