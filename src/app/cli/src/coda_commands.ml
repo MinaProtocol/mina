@@ -329,7 +329,13 @@ let get_status ~flag t =
 let clear_hist_status ~flag t = Perf_histograms.wipe () ; get_status ~flag t
 
 module Subscriptions = struct
-  let new_block = Coda_lib.add_block_subscriber
+  let new_block t public_key =
+    let subscription = Coda_lib.subscription t in
+    Coda_lib.Subscriptions.add_block_subscriber subscription public_key
+
+  let reorganization t =
+    let subscription = Coda_lib.subscription t in
+    Coda_lib.Subscriptions.add_reorganization_subscriber subscription
 end
 
 module For_tests = struct
