@@ -1,6 +1,7 @@
 open Core_kernel
+open Currency
 
-module Make (Inputs : Inputs.Inputs_intf) = struct
+module Make (Inputs : Intf.Inputs_intf) = struct
   module Work_spec = Snark_work_lib.Work.Single.Spec
 
   let statement_pair = function
@@ -56,7 +57,7 @@ module Make (Inputs : Inputs.Inputs_intf) = struct
       (Inputs.Snark_pool.get_completed_work snark_pool statements)
       ~f:(fun priced_proof ->
         let competing_fee = Inputs.Transaction_snark_work.fee priced_proof in
-        Inputs.Fee.compare fee competing_fee < 0 )
+        Fee.compare fee competing_fee < 0 )
 
   module For_tests = struct
     let to_pair = function

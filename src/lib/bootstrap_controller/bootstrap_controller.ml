@@ -407,3 +407,12 @@ end = struct
     let sync_ledger = sync_ledger
   end
 end
+
+include Make (struct
+  include Transition_frontier.Inputs
+  module Transition_frontier = Transition_frontier
+  module Root_sync_ledger = Sync_ledger.Db
+  module Network = Coda_networking
+  module Sync_handler = Sync_handler
+  module Root_prover = Root_prover
+end)
