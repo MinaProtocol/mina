@@ -17,7 +17,7 @@ let listToOptions = l => List.map(~f=x => (x, React.string(x)), l);
 
 module NetworkQueryString = [%graphql {|
     {
-      network
+      initialPeers
     }
   |}];
 
@@ -34,11 +34,12 @@ module InnerDropdown = {
         | Loading => Loading
         | Error(_) => None
         | Data(d) =>
-          switch (d##network) {
-          | Some("testnet.codaprotocol.com") =>
+          // TODO: Refactor this to actually check network, translate from IP etc
+          switch (d##initialPeers) {
+          | [|"testnet.codaprotocol.com"|] =>
             NetworkOption("testnet.codaprotocol.com")
-          | Some(s) => Custom(s)
-          | None => None
+          | [||] => None
+          | a => Custom(Caml.Array.get(a, 0))
           }
         }
       );

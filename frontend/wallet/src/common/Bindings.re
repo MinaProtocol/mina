@@ -150,6 +150,9 @@ module ChildProcess = {
     ) =>
     Process.t =
     "spawn";
+
+  [@bs.val] [@bs.module "child_process"]
+  external execSync: (string, array(string)) => unit = "exec";
 };
 
 module Fs = {

@@ -1,56 +1,36 @@
 open Tc;
 
 type retryOptions;
-let retryOptions: retryOptions = [%bs.raw
-  {|
-  {delay: {
-    initial: 300,
-    max: 500,
-    jitter: false
-  },
-  attempts: {
-    max: 60,
-  }
-}
-|}
-];
 
 [@bs.module "apollo-link-retry"] [@bs.new]
 external createRetryLink: retryOptions => ReasonApolloTypes.apolloLink =
   "RetryLink";
 
-let createClient = (~faker, ~coda) => {
+let client = {
   let inMemoryCache = ApolloInMemoryCache.createInMemoryCache();
-  let fakerLink =
-    ApolloLinks.createHttpLink(~uri=faker, ~fetch=Bindings.Fetch.fetch, ());
+
+  let uri = "http://localhost:49370/graphql";
   let codaLink =
-    ApolloLinks.createHttpLink(~uri=coda, ~fetch=Bindings.Fetch.fetch, ());
+    ApolloLinks.createHttpLink(~uri, ~fetch=Bindings.Fetch.fetch, ());
 
-  let _link =
-    ApolloLinks.split(
-      operation => {
-        let operation: {. "operationName": option(string)} =
-          Obj.magic(operation);
-        operation##operationName == Some("addWalletss")
-        ||
-        operation##operationName == Some("getWallets");
+  let retryOptions: retryOptions = [%bs.raw
+    {|
+      {delay: {
+        initial: 300,
+        max: 500,
+        jitter: false
       },
-      codaLink,
-      fakerLink,
-    );
-
+      attempts: {
+        max: 60,
+      }}
+    |}
+  ];
   let retry = createRetryLink(retryOptions);
 
-  let retryLink = ApolloLinks.from([|retry, fakerLink|]);
+  let retryLink = ApolloLinks.from([|retry, codaLink|]);
 
   ReasonApollo.createApolloClient(~link=retryLink, ~cache=inMemoryCache, ());
 };
-
-let client =
-  createClient(
-    ~faker="http://localhost:8080/graphql",
-    ~coda="http://localhost:49370/graphql",
-  );
 
 module Decoders = {
   let int64 = Int64.of_string;
