@@ -824,8 +824,8 @@ module Subscriptions = struct
   let chain_reorganization =
     subscription_field "chainReorganization"
       ~doc:
-        "Fires whenever a fork in the Transition Frontier suddenly becomes \
-         the longest chain"
+        "Fires whenever the best tip changes in a way that is not a trivial \
+         extension of the existing one"
       ~typ:(non_null Types.chain_reorganization_status)
       ~args:Arg.[]
       ~resolve:(fun {ctx= coda; _} ->
