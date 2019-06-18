@@ -261,7 +261,7 @@ let rec transfer_while_writer_alive reader writer ~f =
         let%bind () = Pipe.write_if_open writer.Writer.writer (f x) in
         transfer_while_writer_alive reader writer ~f
     | `Eof ->
-        Pipe.close writer.Writer.writer ;
+        Pipe.close_read writer.Writer.strict_reader.reader ;
         Deferred.unit
 
 module Reader = struct
