@@ -124,6 +124,8 @@ module type Transaction_snark_work_generalized_intf = sig
     ; prover: compressed_public_key }
   [@@deriving sexp]
 
+  val fee : t -> Fee.Stable.V1.t
+
   module Stable :
     sig
       module V1 : sig

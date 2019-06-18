@@ -16,7 +16,7 @@ let main () =
   in
   let%bind testnet =
     Coda_worker_testnet.test logger n Option.some snark_work_public_keys
-      Cli_lib.Arg_type.Seq ~max_concurrent_connections:None
+      Cli_lib.Arg_type.Sequence ~max_concurrent_connections:None
   in
   let%bind () = after (Time.Span.of_min 10.) in
   Coda_worker_testnet.Api.teardown testnet

@@ -105,3 +105,8 @@ module Make (Inputs : Inputs_intf) :
     in
     (scan_state, merkle_root, pending_coinbases)
 end
+
+include Make (struct
+  include Transition_frontier.Inputs
+  module Transition_frontier = Transition_frontier
+end)
