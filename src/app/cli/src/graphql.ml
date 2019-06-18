@@ -230,13 +230,17 @@ module Types = struct
             ~args:Arg.[]
             ~resolve:(fun _ {With_hash.data; _} -> data.transactions) ] )
 
-  let sync_status : ('context, [`Offline | `Synced | `Bootstrap]) typ =
-    non_null
-      (enum "SyncStatus" ~doc:"Sync status as daemon node"
-         ~values:
-           [ enum_value "BOOTSTRAP" ~value:`Bootstrap
-           ; enum_value "SYNCED" ~value:`Synced
-           ; enum_value "OFFLINE" ~value:`Offline ])
+  let sync_status : ('context, [`Offline | `Synced | `Bootstrap] option) typ =
+    enum "SyncStatus" ~doc:"Sync status as daemon node"
+      ~values:
+        [ enum_value "BOOTSTRAP" ~value:`Bootstrap
+        ; enum_value "SYNCED" ~value:`Synced
+        ; enum_value "OFFLINE" ~value:`Offline ]
+
+  let chain_reorganization_status : ('context, [`Changed] option) typ =
+    enum "ChainReorganizationStatus"
+      ~doc:"Status for whenever the best tip changes"
+      ~values:[enum_value "CHANGED" ~value:`Changed]
 
   let pubkey_field ~resolve =
     field "publicKey" ~typ:(non_null string)
@@ -792,118 +796,13 @@ module Partial_account = struct
         ; voting_for= None }
 end
 
-module Queries = struct
-  open Schema
-
-  let pooled_user_commands =
-    result_field "pooledUserCommands"
-      ~doc:"Retrieve all the user commands sent by public key publicKey"
-      ~typ:(non_null @@ list @@ non_null Types.user_command)
-      ~args:Arg.[arg "publicKey" ~typ:(non_null string)]
-      ~resolve:(fun {ctx= coda; _} () pk_string ->
-        let open Result.Let_syntax in
-        let%map pk = Types.Arguments.public_key ~name:"publicKey" pk_string in
-        let transaction_pool = Coda_lib.transaction_pool coda in
-        List.map
-          (Network_pool.Transaction_pool.Resource_pool.all_from_user
-             (Network_pool.Transaction_pool.resource_pool transaction_pool)
-             pk)
-          ~f:User_command.forget_check )
-
-  let sync_state =
-    result_field_no_inputs "syncStatus" ~args:[] ~typ:Types.sync_status
-      ~resolve:(fun {ctx= coda; _} () ->
-        Result.map_error
-          (Coda_incremental.Status.Observer.value @@ Coda_lib.sync_status coda)
-          ~f:Error.to_string_hum )
-
-  let version =
-    field "version" ~typ:string
-      ~args:Arg.[]
-      ~doc:"The version of the node (git commit hash)"
-      ~resolve:(fun _ _ -> Some Coda_version.commit_id)
-
-  let owned_wallets =
-    field "ownedWallets"
-      ~doc:
-        "Wallets for which the daemon knows the private key. If they are \
-         found in our ledger, all the fields will be non-null"
-      ~typ:(non_null (list (non_null Types.Wallet.wallet)))
-      ~args:Arg.[]
-      ~resolve:(fun {ctx= coda; _} () ->
-        let wallets = Coda_lib.wallets coda in
-        let propose_public_keys = Coda_lib.propose_public_keys coda in
-        wallets |> Secrets.Wallets.pks
-        |> List.map ~f:(fun pk ->
-               { Types.Wallet.account= Partial_account.of_pk coda pk
-               ; is_actively_staking=
-                   Public_key.Compressed.Set.mem propose_public_keys pk
-               ; path= Secrets.Wallets.get_path wallets pk } ) )
-
-  let wallet =
-    result_field "wallet"
-      ~doc:
-        "Find any wallet via a public key. Null if the key was not found for \
-         some reason (i.e. we're bootstrapping, or the account doesn't exist)"
-      ~typ:
-        Types.Wallet.wallet
-        (* TODO: Is there anyway to describe `public_key` arg in a more typesafe way on our ocaml-side *)
-      ~args:Arg.[arg "publicKey" ~typ:(non_null string)]
-      ~resolve:(fun {ctx= coda; _} () (pk_string : string) ->
-        let open Result.Let_syntax in
-        let propose_public_keys = Coda_lib.propose_public_keys coda in
-        let%map pk = Types.Arguments.public_key ~name:"publicKey" pk_string in
-        Option.map
-          Partial_account.(
-            of_pk coda pk |> to_full_account |> Option.map ~f:of_full_account)
-          ~f:(fun account ->
-            { Types.Wallet.account
-            ; is_actively_staking=
-                Public_key.Compressed.Set.mem propose_public_keys pk
-            ; path= Secrets.Wallets.get_path (Coda_lib.wallets coda) pk } ) )
-
-  let current_snark_worker =
-    field "currentSnarkWorker" ~typ:Types.snark_worker
-      ~args:Arg.[]
-      ~doc:"Get information about the current snark worker."
-      ~resolve:(fun {ctx= coda; _} _ ->
-        Option.map (Coda_lib.snark_worker_key coda) ~f:(fun k ->
-            (k, Coda_lib.snark_work_fee coda) ) )
-
-  let user_command = Types.Pagination.User_command.query
-
-  let blocks = Types.Pagination.Blocks.query
-
-  let initial_peers =
-    field "initialPeers"
-      ~doc:
-        "The initial peers that a client syncs with is an inidication of \
-         specifically the network they are in"
-      ~args:Arg.[]
-      ~typ:(non_null @@ list @@ non_null string)
-      ~resolve:(fun {ctx= coda; _} () ->
-        List.map (Coda_lib.initial_peers coda)
-          ~f:(fun {Host_and_port.host; port} -> sprintf !"%s:%i" host port) )
-
-  let commands =
-    [ sync_state
-    ; version
-    ; owned_wallets
-    ; wallet
-    ; current_snark_worker
-    ; user_command
-    ; blocks
-    ; initial_peers
-    ; pooled_user_commands ]
-end
-
 module Subscriptions = struct
   open Schema
 
   let new_sync_update =
-    subscription_field "newSyncUpdate"
-      ~doc:"Subscribes on sync update from Coda" ~deprecated:NotDeprecated
-      ~typ:Types.sync_status
+    subscription_field "newSyncUpdate" ~doc:"Fires on sync update from Coda"
+      ~deprecated:NotDeprecated
+      ~typ:(non_null Types.sync_status)
       ~args:Arg.[]
       ~resolve:(fun {ctx= coda; _} ->
         Coda_lib.sync_status coda |> Coda_incremental.Status.to_pipe
@@ -911,8 +810,7 @@ module Subscriptions = struct
 
   let new_block =
     subscription_field "newBlock"
-      ~doc:
-        "Subscribes on a new block created by a proposer with a public key KEY"
+      ~doc:"Fires on a new block created by a proposer with a public key KEY"
       ~typ:(non_null Types.block)
       ~args:Arg.[arg "publicKey" ~typ:(non_null string)]
       ~resolve:(fun {ctx= coda; _} public_key ->
@@ -922,6 +820,17 @@ module Subscriptions = struct
           @@ Types.Arguments.public_key ~name:"publicKey" public_key
         in
         Coda_commands.Subscriptions.new_block coda public_key )
+
+  let chain_reorganization =
+    subscription_field "chainReorganization"
+      ~doc:
+        "Fires whenever the best tip changes in a way that is not a trivial \
+         extension of the existing one"
+      ~typ:(non_null Types.chain_reorganization_status)
+      ~args:Arg.[]
+      ~resolve:(fun {ctx= coda; _} ->
+        Deferred.Result.return
+        @@ Coda_commands.Subscriptions.reorganization coda )
 
   let commands = [new_sync_update; new_block]
 end
@@ -1103,6 +1012,111 @@ module Mutations = struct
     ; send_delegation
     ; add_payment_receipt
     ; set_staking ]
+end
+
+module Queries = struct
+  open Schema
+
+  let pooled_user_commands =
+    result_field "pooledUserCommands"
+      ~doc:"Retrieve all the user commands sent by public key publicKey"
+      ~typ:(non_null @@ list @@ non_null Types.user_command)
+      ~args:Arg.[arg "publicKey" ~typ:(non_null string)]
+      ~resolve:(fun {ctx= coda; _} () pk_string ->
+        let open Result.Let_syntax in
+        let%map pk = Types.Arguments.public_key ~name:"publicKey" pk_string in
+        let transaction_pool = Coda_lib.transaction_pool coda in
+        List.map
+          (Network_pool.Transaction_pool.Resource_pool.all_from_user
+             (Network_pool.Transaction_pool.resource_pool transaction_pool)
+             pk)
+          ~f:User_command.forget_check )
+
+  let sync_state =
+    result_field_no_inputs "syncStatus" ~args:[]
+      ~typ:(non_null Types.sync_status) ~resolve:(fun {ctx= coda; _} () ->
+        Result.map_error
+          (Coda_incremental.Status.Observer.value @@ Coda_lib.sync_status coda)
+          ~f:Error.to_string_hum )
+
+  let version =
+    field "version" ~typ:string
+      ~args:Arg.[]
+      ~doc:"The version of the node (git commit hash)"
+      ~resolve:(fun _ _ -> Some Coda_version.commit_id)
+
+  let owned_wallets =
+    field "ownedWallets"
+      ~doc:
+        "Wallets for which the daemon knows the private key. If they are \
+         found in our ledger, all the fields will be non-null"
+      ~typ:(non_null (list (non_null Types.Wallet.wallet)))
+      ~args:Arg.[]
+      ~resolve:(fun {ctx= coda; _} () ->
+        let wallets = Coda_lib.wallets coda in
+        let propose_public_keys = Coda_lib.propose_public_keys coda in
+        wallets |> Secrets.Wallets.pks
+        |> List.map ~f:(fun pk ->
+               { Types.Wallet.account= Partial_account.of_pk coda pk
+               ; is_actively_staking=
+                   Public_key.Compressed.Set.mem propose_public_keys pk
+               ; path= Secrets.Wallets.get_path wallets pk } ) )
+
+  let wallet =
+    result_field "wallet"
+      ~doc:
+        "Find any wallet via a public key. Null if the key was not found for \
+         some reason (i.e. we're bootstrapping, or the account doesn't exist)"
+      ~typ:
+        Types.Wallet.wallet
+        (* TODO: Is there anyway to describe `public_key` arg in a more typesafe way on our ocaml-side *)
+      ~args:Arg.[arg "publicKey" ~typ:(non_null string)]
+      ~resolve:(fun {ctx= coda; _} () (pk_string : string) ->
+        let open Result.Let_syntax in
+        let propose_public_keys = Coda_lib.propose_public_keys coda in
+        let%map pk = Types.Arguments.public_key ~name:"publicKey" pk_string in
+        Option.map
+          Partial_account.(
+            of_pk coda pk |> to_full_account |> Option.map ~f:of_full_account)
+          ~f:(fun account ->
+            { Types.Wallet.account
+            ; is_actively_staking=
+                Public_key.Compressed.Set.mem propose_public_keys pk
+            ; path= Secrets.Wallets.get_path (Coda_lib.wallets coda) pk } ) )
+
+  let current_snark_worker =
+    field "currentSnarkWorker" ~typ:Types.snark_worker
+      ~args:Arg.[]
+      ~doc:"Get information about the current snark worker."
+      ~resolve:(fun {ctx= coda; _} _ ->
+        Option.map (Coda_lib.snark_worker_key coda) ~f:(fun k ->
+            (k, Coda_lib.snark_work_fee coda) ) )
+
+  let user_command = Types.Pagination.User_command.query
+
+  let blocks = Types.Pagination.Blocks.query
+
+  let initial_peers =
+    field "initialPeers"
+      ~doc:
+        "The initial peers that a client syncs with is an inidication of \
+         specifically the network they are in"
+      ~args:Arg.[]
+      ~typ:(non_null @@ list @@ non_null string)
+      ~resolve:(fun {ctx= coda; _} () ->
+        List.map (Coda_lib.initial_peers coda)
+          ~f:(fun {Host_and_port.host; port} -> sprintf !"%s:%i" host port) )
+
+  let commands =
+    [ sync_state
+    ; version
+    ; owned_wallets
+    ; wallet
+    ; current_snark_worker
+    ; user_command
+    ; blocks
+    ; initial_peers
+    ; pooled_user_commands ]
 end
 
 let schema =

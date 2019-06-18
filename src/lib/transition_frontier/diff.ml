@@ -310,14 +310,16 @@ end) :
 
     type input = unit
 
+    (* these are populated by the best-tip-path changes *)
     type view =
       { new_user_commands: User_command.t list
-      ; removed_user_commands: User_command.t list }
+      ; removed_user_commands: User_command.t list
+      ; reorg_best_tip: bool }
 
     let create () = ()
 
     let initial_view () : view =
-      {new_user_commands= []; removed_user_commands= []}
+      {new_user_commands= []; removed_user_commands= []; reorg_best_tip= false}
 
     let handle_diff () diff : view Option.t =
       match diff with
@@ -326,7 +328,8 @@ end) :
       | New_frontier breadcrumb ->
           Some
             { new_user_commands= Breadcrumb.to_user_commands breadcrumb
-            ; removed_user_commands= [] }
+            ; removed_user_commands= []
+            ; reorg_best_tip= false }
       | New_best_tip {added_to_best_tip_path; removed_from_best_tip_path; _} ->
           Some
             { new_user_commands=
@@ -335,7 +338,8 @@ end) :
                   ~f:Breadcrumb.to_user_commands
             ; removed_user_commands=
                 List.bind removed_from_best_tip_path
-                  ~f:Breadcrumb.to_user_commands }
+                  ~f:Breadcrumb.to_user_commands
+            ; reorg_best_tip= true }
   end
 
   module Root_diff = struct
