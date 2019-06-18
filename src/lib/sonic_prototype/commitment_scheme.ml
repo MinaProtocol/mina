@@ -1,10 +1,7 @@
 open Core
 open Snarkette.Mnt6_80
 open Srs
-open Laurent
-module Fq_target = Fq6
-module Fr = Snarkette.Mnt4_80.Fq
-module Fr_laurent = Make_laurent (N) (Fr)
+open Default_backend.Backend
 
 let commit_poly (srs : Srs.t) maxm x poly =
   let diff = srs.d - maxm in

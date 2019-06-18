@@ -1,12 +1,7 @@
 open Snarkette
-open Snarkette.Mnt6_80
 open Arithmetic_circuit
-open Laurent
 open Utils
-module Fq_target = Fq6
-module Fr = Snarkette.Mnt4_80.Fq
-module Fr_laurent = Make_laurent (N) (Fr)
-module Bivariate_Fr_laurent = Make_laurent (N) (Fr_laurent)
+open Default_backend.Backend
 
 (* helper functions *)
 let reverse = List.fold_left (fun list x -> x :: list) []
@@ -52,7 +47,7 @@ let r_poly (assignment : Assignment.t) =
   let reorder =
     List.sort (fun l1 l2 -> Fr_laurent.deg l1 - Fr_laurent.deg l2)
   in
-  Bivariate_Fr_laurent.create (-2 * n)
+  Bivariate_fr_laurent.create (-2 * n)
     (reorder (Fr_laurent.create 0 [] :: processed))
 
 (* bivariate polynomial; X deg = Y deg, so we just sort Y polys as coeffs of X polys *)
@@ -74,17 +69,17 @@ let s_poly (gate_weights : Gate_weights.t) =
   let rec gg wis i =
     match wis with [] -> [] | wi :: wiss -> g wi i :: gg wiss (i + 1)
   in
-  Bivariate_Fr_laurent.( + )
-    (Bivariate_Fr_laurent.( + )
-       (Bivariate_Fr_laurent.create (-n) (ff (reverse wL) 1))
-       (Bivariate_Fr_laurent.create 1 (ff wR 1)))
-    (Bivariate_Fr_laurent.create (n + 1) (gg wO 1))
+  Bivariate_fr_laurent.( + )
+    (Bivariate_fr_laurent.( + )
+       (Bivariate_fr_laurent.create (-n) (ff (reverse wL) 1))
+       (Bivariate_fr_laurent.create 1 (ff wR 1)))
+    (Bivariate_fr_laurent.create (n + 1) (gg wO 1))
 
 let t_poly rP sP kP =
-  Bivariate_Fr_laurent.( + )
-    (Bivariate_Fr_laurent.( * )
+  Bivariate_fr_laurent.( + )
+    (Bivariate_fr_laurent.( * )
        (convert_to_two_variate_X (eval_on_Y Fr.one rP))
-       (Bivariate_Fr_laurent.( + ) rP sP))
+       (Bivariate_fr_laurent.( + ) rP sP))
     (convert_to_two_variate_Y (Fr_laurent.negate kP))
 
 let k_poly k n = Fr_laurent.create (n + 1) k
