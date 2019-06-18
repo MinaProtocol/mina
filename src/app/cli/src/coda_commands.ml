@@ -88,7 +88,7 @@ let get_accounts t =
   Ledger.to_list ledger
 
 let string_of_public_key =
-  Fn.compose Public_key.Compressed.to_base64 Account.public_key
+  Fn.compose Public_key.Compressed.to_base58_check Account.public_key
 
 let get_public_keys t =
   let open Participating_state.Let_syntax in

@@ -255,7 +255,8 @@ let batch_send_payments =
         let sample_info () : Payment_info.t =
           let keypair = Keypair.create () in
           { Payment_info.receiver=
-              Public_key.(Compressed.to_base64 (compress keypair.public_key))
+              Public_key.(
+                Compressed.to_base58_check (compress keypair.public_key))
           ; amount= Currency.Amount.of_int (Random.int 100)
           ; fee= Currency.Fee.of_int (Random.int 100) }
         in
@@ -281,7 +282,8 @@ let batch_send_payments =
                  ~memo:User_command_memo.dummy
                  ~body:
                    (Payment
-                      { receiver= Public_key.Compressed.of_base64_exn receiver
+                      { receiver=
+                          Public_key.Compressed.of_base58_check_exn receiver
                       ; amount })) ) )
     in
     dispatch_with_message Daemon_rpcs.Send_user_commands.rpc
@@ -376,7 +378,8 @@ let wrap_key =
       Secrets.Password.hidden_line_or_env "Private key: " ~env:"CODA_PRIVKEY"
     in
     let pk =
-      Private_key.of_base64_exn (privkey |> Or_error.ok_exn |> Bytes.to_string)
+      Private_key.of_base58_check_exn
+        (privkey |> Or_error.ok_exn |> Bytes.to_string)
     in
     let kp = Keypair.of_private_key_exn pk in
     Secrets.Keypair.Terminal_stdin.write_exn kp ~privkey_path)
@@ -394,8 +397,9 @@ let dump_keypair =
           (lazy (Secrets.Password.read "Password for private key file: "))
     in
     printf "Public key: %s\nPrivate key: %s\n"
-      (kp.public_key |> Public_key.compress |> Public_key.Compressed.to_base64)
-      (kp.private_key |> Private_key.to_base64))
+      ( kp.public_key |> Public_key.compress
+      |> Public_key.Compressed.to_base58_check )
+      (kp.private_key |> Private_key.to_base58_check))
 
 let generate_keypair =
   Command.async ~summary:"Generate a new public-key/private-key pair"
@@ -407,7 +411,8 @@ let generate_keypair =
     let kp = Keypair.create () in
     let%bind () = Secrets.Keypair.Terminal_stdin.write_exn kp ~privkey_path in
     printf "Public key: %s\n"
-      (kp.public_key |> Public_key.compress |> Public_key.Compressed.to_base64) ;
+      ( kp.public_key |> Public_key.compress
+      |> Public_key.Compressed.to_base58_check ) ;
     exit 0)
 
 let dump_ledger =

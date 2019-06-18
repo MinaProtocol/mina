@@ -28,13 +28,13 @@ let compute_checksum ~version_string ~payload =
   let second_hash = get ctx3 |> to_raw_string in
   second_hash |> String.sub ~pos:0 ~len:checksum_len
 
-let base58_check ~(version_byte : char) ~(payload : string) =
+let encode ~(version_byte : char) ~(payload : string) =
   let version_string = String.make 1 version_byte in
   let checksum = compute_checksum ~version_string ~payload in
   let bytes = version_string ^ payload ^ checksum |> Bytes.of_string in
   B58.encode coda_alphabet bytes |> Bytes.to_string
 
-let base58_check_decode_exn s =
+let decode_exn s =
   let bytes = Bytes.of_string s in
   let decoded = B58.decode coda_alphabet bytes |> Bytes.to_string in
   let len = String.length decoded in
@@ -57,8 +57,8 @@ let base58_check_decode_exn s =
 let%test_module "empty string" =
   ( module struct
     let test_roundtrip version_byte payload =
-      let encoded = base58_check ~version_byte ~payload in
-      let version_byte', payload' = base58_check_decode_exn encoded in
+      let encoded = encode ~version_byte ~payload in
+      let version_byte', payload' = decode_exn encoded in
       String.equal payload payload' && Char.equal version_byte version_byte'
 
     let%test "empty_string" = test_roundtrip '\x57' ""
@@ -75,7 +75,7 @@ let%test_module "empty string" =
     let%test "invalid checksum" =
       try
         let encoded =
-          base58_check ~version_byte:'\xAC'
+          encode ~version_byte:'\xAC'
             ~payload:"Bluer than velvet were her eyes"
         in
         let bytes = Bytes.of_string encoded in
@@ -88,15 +88,13 @@ let%test_module "empty string" =
         in
         Bytes.set bytes (len - 1) new_last_ch ;
         let encoded_bad_checksum = Bytes.to_string bytes in
-        let _version_byte, _payload =
-          base58_check_decode_exn encoded_bad_checksum
-        in
+        let _version_byte, _payload = decode_exn encoded_bad_checksum in
         false
       with Invalid_base58_checksum -> true
 
     let%test "invalid length" =
       try
-        let _version_byte, _payload = base58_check_decode_exn "abcd" in
+        let _version_byte, _payload = decode_exn "abcd" in
         false
       with Invalid_base58_check_length -> true
   end )

@@ -12,7 +12,7 @@ let password = lazy (Deferred.Or_error.return (Bytes.of_string ""))
 let get_path {path; _} public_key =
   let pubkey_str =
     (* TODO: Do we need to version this? *)
-    Public_key.Compressed.to_base64 public_key
+    Public_key.Compressed.to_base58_check public_key
     |> String.tr ~target:'/' ~replacement:'x'
   in
   path ^/ pubkey_str

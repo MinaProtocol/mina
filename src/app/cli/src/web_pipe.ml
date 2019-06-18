@@ -20,11 +20,14 @@ module type Intf = sig
        Strict_pipe.Reader.t
 end
 
-let to_base64 m x = Base64.encode_string (Binable.to_string m x)
+let version_byte = '\x41'
+
+let to_base58 m x =
+  Base58_check.encode ~version_byte ~payload:(Binable.to_string m x)
 
 module Storage (Bin : Binable.S) = struct
   let store location data =
-    Writer.save location ~contents:(to_base64 (module Bin) data)
+    Writer.save location ~contents:(to_base58 (module Bin) data)
 end
 
 module Make_broadcaster (Put_request : Web_request.Intf.S) = struct
@@ -130,11 +133,12 @@ let run_service coda ~conf_dir ~logger =
           ~f:(fun _ ->
             Writer.save (path ^/ "chain")
               ~contents:
-                (Base64.encode_string
-                   (Binable.to_string
-                      (module Lite_base.Lite_chain)
-                      (get_lite_chain coda
-                         [Public_key.compress keypair.public_key]))) )
+                (Base58_check.encode ~version_byte
+                   ~payload:
+                     (Binable.to_string
+                        (module Lite_base.Lite_chain)
+                        (get_lite_chain coda
+                           [Public_key.compress keypair.public_key]))) )
         |> don't_wait_for
     | `S3 ->
         Logger.info logger ~module_:__MODULE__ ~location:__LOC__
