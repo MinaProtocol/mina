@@ -99,8 +99,11 @@ let create ~logger ~wallets ~time_controller ~external_transition_database
               in
               Broadcast_pipe.Reader.iter best_tip_diff_pipe
                 ~f:(fun {removed_user_commands; _} ->
-                  if not (List.is_empty removed_user_commands) then
-                    Strict_pipe.Writer.write writer () ;
+                  ( match removed_user_commands with
+                  | [] ->
+                      ()
+                  | _ ->
+                      Strict_pipe.Writer.write writer () ) ;
                   Deferred.unit ) )) ;
   Strict_pipe.Reader.iter reader ~f:(fun () ->
       List.iter t.reorganization_subscription ~f:(fun (_, writer) ->
