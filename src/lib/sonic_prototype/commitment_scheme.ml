@@ -1,5 +1,4 @@
 open Core
-open Snarkette.Mnt6_80
 open Srs
 open Default_backend.Backend
 

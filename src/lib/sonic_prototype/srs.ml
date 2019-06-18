@@ -1,8 +1,5 @@
 open Core
-open Snarkette
-open Snarkette.Mnt6_80
-module Fq_target = Fq6
-module Fr = Snarkette.Mnt4_80.Fq
+open Default_backend.Backend
 
 module Srs = struct
   type t =
@@ -24,34 +21,34 @@ module Srs = struct
     { d
     ; gNegativeX=
         List.map (List.range 1 d) ~f:(fun i ->
-            G1.scale g1 (Fr.to_bigint (Fr.( ** ) xInv (Nat.of_int i))) )
+            G1.scale g1 (Fr.to_bigint (Fr.( ** ) xInv (N.of_int i))) )
     ; gPositiveX=
         List.map (List.range 0 d) ~f:(fun i ->
-            G1.scale g1 (Fr.to_bigint (Fr.( ** ) x (Nat.of_int i))) )
+            G1.scale g1 (Fr.to_bigint (Fr.( ** ) x (N.of_int i))) )
     ; hNegativeX=
         List.map (List.range 1 d) ~f:(fun i ->
-            G2.scale g2 (Fr.to_bigint (Fr.( ** ) xInv (Nat.of_int i))) )
+            G2.scale g2 (Fr.to_bigint (Fr.( ** ) xInv (N.of_int i))) )
     ; hPositiveX=
         List.map (List.range 0 d) ~f:(fun i ->
-            G2.scale g2 (Fr.to_bigint (Fr.( ** ) x (Nat.of_int i))) )
+            G2.scale g2 (Fr.to_bigint (Fr.( ** ) x (N.of_int i))) )
     ; gNegativeAlphaX=
         List.map (List.range 1 d) ~f:(fun i ->
             G1.scale g1
-              (Fr.to_bigint (Fr.( * ) alpha (Fr.( ** ) xInv (Nat.of_int i))))
+              (Fr.to_bigint (Fr.( * ) alpha (Fr.( ** ) xInv (N.of_int i))))
         )
     ; gPositiveAlphaX=
         List.map (List.range 0 d) ~f:(fun i ->
             G1.scale g1
-              (Fr.to_bigint (Fr.( * ) alpha (Fr.( ** ) x (Nat.of_int i)))) )
+              (Fr.to_bigint (Fr.( * ) alpha (Fr.( ** ) x (N.of_int i)))) )
     ; hNegativeAlphaX=
         List.map (List.range 1 d) ~f:(fun i ->
             G2.scale g2
-              (Fr.to_bigint (Fr.( * ) alpha (Fr.( ** ) xInv (Nat.of_int i))))
+              (Fr.to_bigint (Fr.( * ) alpha (Fr.( ** ) xInv (N.of_int i))))
         )
     ; hPositiveAlphaX=
         List.map (List.range 0 d) ~f:(fun i ->
             G2.scale g2
-              (Fr.to_bigint (Fr.( * ) alpha (Fr.( ** ) x (Nat.of_int i)))) )
+              (Fr.to_bigint (Fr.( * ) alpha (Fr.( ** ) x (N.of_int i)))) )
     ; srsPairing= Pairing.reduced_pairing g1 (G2.scale g2 (Fr.to_bigint alpha))
     }
 end

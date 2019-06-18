@@ -24,9 +24,6 @@ let%test_unit "polynomial commitment scheme" =
   let aO = hadamardp aL aR in
   let (gate_weights : Gate_weights.t) = {wL; wR; wO} in
   let (gate_inputs : Assignment.t) = {aL; aR; aO} in
-  let (_arith_circuit : Arith_circuit.t) =
-    {weights= gate_weights; commitment_weights= []; cs}
-  in
   let srs = Srs.create d x alpha in
   let n = List.length aL in
   let fX =

@@ -1,6 +1,4 @@
-open Snarkette.Mnt6_80
-module Fq_target = Fq6
-module Fr = Snarkette.Mnt4_80.Fq
+open Default_backend.Backend
 
 module Arith_circuit_proof = struct
   type t =

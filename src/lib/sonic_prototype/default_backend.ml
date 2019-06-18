@@ -8,6 +8,7 @@ module Backend = struct
   module Fqe = Fq3
   module Fq_target = Fq6
   module Fr = Snarkette.Mnt4_80.Fq
+  module Pairing = Pairing
   module Fr_laurent = Make_laurent (N) (Fr)
   module Bivariate_fr_laurent = Make_laurent (N) (Fr_laurent)
 end
