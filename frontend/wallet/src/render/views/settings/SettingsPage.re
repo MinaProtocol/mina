@@ -110,11 +110,15 @@ let make = () => {
        | Error(err) => React.string(err##message)
        | Data(data) =>
          let versionText =
-           String.slice(
-             data##version,
-             ~from=0,
-             ~to_=min(8, String.length(data##version)),
-           );
+           data##version
+           |> Option.map(~f=version =>
+                String.slice(
+                  version,
+                  ~from=0,
+                  ~to_=min(8, String.length(version)),
+                )
+              )
+           |> Option.withDefault(~default="Unknown");
          <div className=Styles.container>
            <div className=Styles.headerContainer>
              <div className=Theme.Text.Header.h3>
