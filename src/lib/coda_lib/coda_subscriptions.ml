@@ -89,6 +89,11 @@ let create ~logger ~wallets ~time_controller ~external_transition_database
     ; subscribed_block_users
     ; reorganization_subscription }
   in
+  (* Decorates `f` to skip it's first call *)
+  let skipFirstCall f =
+    let b = ref false in
+    fun a -> if !b then f a else b := true
+  in
   don't_wait_for
   @@ Broadcast_pipe.Reader.iter transition_frontier
        ~f:
@@ -97,13 +102,8 @@ let create ~logger ~wallets ~time_controller ~external_transition_database
               let best_tip_diff_pipe =
                 Transition_frontier.best_tip_diff_pipe transition_frontier
               in
-              Broadcast_pipe.Reader.iter best_tip_diff_pipe
-                ~f:(fun {removed_user_commands; _} ->
-                  ( match removed_user_commands with
-                  | [] ->
-                      ()
-                  | _ ->
-                      Strict_pipe.Writer.write writer () ) ;
+              Broadcast_pipe.Reader.iter best_tip_diff_pipe ~f:(fun _ ->
+                  skipFirstCall (Strict_pipe.Writer.write writer) () ;
                   Deferred.unit ) )) ;
   Strict_pipe.Reader.iter reader ~f:(fun () ->
       List.iter t.reorganization_subscription ~f:(fun (_, writer) ->
