@@ -99,8 +99,6 @@ module type Proposer = sig
     -> unit
 end
 
-module type Subscriptions = sig end
-
 module type Inputs = sig
   include Coda_intf.Inputs_intf
 

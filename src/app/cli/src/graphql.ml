@@ -927,8 +927,8 @@ module Make (Commands : Coda_commands.Intf) = struct
     open Schema
 
     let new_sync_update =
-      subscription_field "newSyncUpdate"
-        ~doc:"Subscribes on sync update from Coda" ~deprecated:NotDeprecated
+      subscription_field "newSyncUpdate" ~doc:"Fires on sync update from Coda"
+        ~deprecated:NotDeprecated
         ~typ:(non_null Types.sync_status)
         ~args:Arg.[]
         ~resolve:(fun {ctx= coda; _} ->
@@ -937,9 +937,7 @@ module Make (Commands : Coda_commands.Intf) = struct
 
     let new_block =
       subscription_field "newBlock"
-        ~doc:
-          "Subscribes on a new block created by a proposer with a public key \
-           KEY"
+        ~doc:"Fires on a new block created by a proposer with a public key KEY"
         ~typ:(non_null Types.block)
         ~args:Arg.[arg "publicKey" ~typ:(non_null string)]
         ~resolve:(fun {ctx= coda; _} public_key ->
@@ -953,8 +951,8 @@ module Make (Commands : Coda_commands.Intf) = struct
     let chain_reorganization =
       subscription_field "chainReorganization"
         ~doc:
-          "Subscribes whenever a fork in the Transition Frontier suddenly \
-           becomes the longest chain"
+          "Fires whenever a fork in the Transition Frontier suddenly becomes \
+           the longest chain"
         ~typ:(non_null Types.chain_reorganization_status)
         ~args:Arg.[]
         ~resolve:(fun {ctx= coda; _} ->

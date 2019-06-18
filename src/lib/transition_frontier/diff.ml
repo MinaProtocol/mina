@@ -310,6 +310,7 @@ end) :
 
     type input = unit
 
+    (* these are populated by the best-tip-path changes *)
     type view =
       { new_user_commands: User_command.t list
       ; removed_user_commands: User_command.t list }

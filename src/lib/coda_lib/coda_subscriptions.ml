@@ -85,7 +85,7 @@ module Make (Inputs : Intf.Inputs) = struct
     let reorganization_subscription = [] in
     let reader, writer =
       Strict_pipe.create ~name:"Reorganization subscription"
-        Strict_pipe.(Buffered (`Capacity 10, `Overflow Drop_head))
+        Strict_pipe.(Buffered (`Capacity 1, `Overflow Drop_head))
     in
     let t =
       { subscribed_payment_users
