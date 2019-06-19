@@ -122,6 +122,11 @@ let get_balance t (addr : Public_key.Compressed.t) =
   let%map account = get_account t addr in
   account.Account.Poly.balance
 
+let get_trust_status t (ip_address : Unix.Inet_addr.Blocking_sexp.t) =
+  let config = Coda_lib.config t in
+  let trust_system = config.trust_system in
+  Trust_system.lookup trust_system ip_address
+
 module Receipt_chain_hash = struct
   (* Receipt.Chain_hash does not have bin_io *)
   include Receipt.Chain_hash.Stable.V1

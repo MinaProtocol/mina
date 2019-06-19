@@ -64,11 +64,10 @@ let get_balance =
   let open Deferred.Let_syntax in
   let address_flag =
     flag "address"
-      ~doc:
-        "PUBLICKEY Public-key address of which you want to check the balance"
+      ~doc:"PUBLICKEY Public-key for which you want to check the balance"
       (required Cli_lib.Arg_type.public_key)
   in
-  Command.async ~summary:"Get balance associated with an address"
+  Command.async ~summary:"Get balance associated with a public key"
     (Cli_lib.Background_daemon.init address_flag ~f:(fun port address ->
          match%map
            dispatch Daemon_rpcs.Get_balance.rpc
@@ -81,6 +80,42 @@ let get_balance =
              printf "No account found at that public_key (zero balance)\n"
          | Error e ->
              printf "Failed to get balance %s\n" (Error.to_string_hum e) ))
+
+let get_trust_status =
+  let open Command.Param in
+  let open Deferred.Let_syntax in
+  let address_flag =
+    flag "ip-address"
+      ~doc:
+        "IP An IPv4 or IPv6 address for which you want to query the trust \
+         status"
+      (required Cli_lib.Arg_type.ip_address)
+  in
+  let json_flag = Cli_lib.Flag.json in
+  let flags = Args.zip2 address_flag json_flag in
+  Command.async ~summary:"Get the trust status associated with an IP address"
+    (Cli_lib.Background_daemon.init flags ~f:(fun port (ip_address, json) ->
+         match%map
+           dispatch Daemon_rpcs.Get_trust_status.rpc ip_address port
+         with
+         | Ok status ->
+             if json then
+               printf "%s\n"
+                 (Yojson.Safe.to_string
+                    (Trust_system.Peer_status.to_yojson status))
+             else
+               let ban_status =
+                 match status.banned with
+                 | Unbanned ->
+                     "Unbanned"
+                 | Banned_until tm ->
+                     sprintf "Banned_until %s"
+                       (Time.to_string_abs tm ~zone:Time.Zone.utc)
+               in
+               printf "%0.04f, %s\n" status.trust ban_status
+         | Error e ->
+             printf "Failed to get trust status %s\n" (Error.to_string_hum e)
+     ))
 
 let get_public_keys =
   let open Daemon_rpcs in
@@ -530,6 +565,7 @@ let command =
   Command.group ~summary:"Lightweight client commands"
     [ ("get-balance", get_balance)
     ; ("get-public-keys", get_public_keys)
+    ; ("get-trust-status", get_trust_status)
     ; ("prove-payment", prove_payment)
     ; ("verify-payment", verify_payment)
     ; ("get-nonce", get_nonce_cmd)
