@@ -16,7 +16,8 @@ module Aux_hash = struct
       module T = struct
         type t = string [@@deriving bin_io, sexp, eq, compare, hash, version]
 
-        let version_byte = '\x57'
+        let version_byte =
+          Base58_check.Version_bytes.staged_ledger_hash_aux_hash
 
         let to_yojson s =
           `String (Base58_check.encode ~version_byte ~payload:s)
@@ -71,7 +72,8 @@ module Pending_coinbase_aux = struct
       module T = struct
         type t = string [@@deriving bin_io, sexp, eq, compare, hash, version]
 
-        let version_byte = '\x81'
+        let version_byte =
+          Base58_check.Version_bytes.staged_ledger_hash_pending_coinbase_aux
 
         let to_yojson s =
           `String (Base58_check.encode ~version_byte ~payload:s)

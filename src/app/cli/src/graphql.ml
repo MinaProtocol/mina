@@ -49,9 +49,9 @@ module Types = struct
   end
 
   module Id = struct
-    let version_byte = '\x17'
+    let version_byte = Base58_check.Version_bytes.graphql
 
-    (* The id of a user_command is.encode of the seralized version of the user_command *)
+    (* The id of a user_command is the Base58Check encoding of the serialized version of the user_command *)
     let user_command user_command =
       let bigstring =
         Bin_prot.Utils.bin_dump Coda_base.User_command.Stable.V1.bin_t.writer

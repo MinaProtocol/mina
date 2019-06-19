@@ -54,6 +54,8 @@ let decode_exn s =
   let version_byte = decoded.[0] in
   (version_byte, payload)
 
+module Version_bytes = Version_bytes
+
 let%test_module "empty string" =
   ( module struct
     let test_roundtrip version_byte payload =

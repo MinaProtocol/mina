@@ -9,3 +9,5 @@ val encode : version_byte:char -> payload:string -> string
 
 (** decode Base58Check result into version byte and payload; can raise the above exceptions *)
 val decode_exn : string -> char * string
+
+module Version_bytes : module type of Version_bytes

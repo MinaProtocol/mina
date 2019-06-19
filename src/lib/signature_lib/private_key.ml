@@ -31,7 +31,7 @@ let of_bigstring_exn = Binable.of_bigstring (module Stable.Latest)
 
 let to_bigstring = Binable.to_bigstring (module Stable.Latest)
 
-let version_byte = '\x5A'
+let version_byte = Base58_check.Version_bytes.private_key
 
 let to_base58_check t =
   let payload = to_bigstring t |> Bigstring.to_string in

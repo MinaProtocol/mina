@@ -24,7 +24,7 @@ module Digest = struct
 
       include T
 
-      let version_byte = '\x03'
+      let version_byte = Base58_check.Version_bytes.random_oracle_base
 
       let to_yojson s = `String (Base58_check.encode ~version_byte ~payload:s)
 

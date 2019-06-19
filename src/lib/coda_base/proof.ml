@@ -16,7 +16,7 @@ module Stable = struct
     include T
     include Sexpable.Of_stringable (T)
 
-    let version_byte = '\x70'
+    let version_byte = Base58_check.Version_bytes.proof
 
     let to_yojson s =
       `String (Base58_check.encode ~version_byte ~payload:(to_string s))

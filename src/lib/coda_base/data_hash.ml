@@ -90,7 +90,7 @@ struct
 
       include T
 
-      let version_byte = '\x37'
+      let version_byte = Base58_check.Version_bytes.data_hash
 
       include Registration.Make_latest_version (T)
       include Hashable.Make_binable (T)

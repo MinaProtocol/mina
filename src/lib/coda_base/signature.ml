@@ -7,7 +7,7 @@ module Stable = struct
       type t = Snark_params.Tock.Field.t * Snark_params.Tock.Field.t
       [@@deriving sexp, eq, compare, hash, bin_io, version {asserted}]
 
-      let version_byte = '\x9A'
+      let version_byte = Base58_check.Version_bytes.signature
 
       (* TODO : version Field in snarky *)
     end

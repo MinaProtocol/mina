@@ -20,9 +20,8 @@ module type Intf = sig
        Strict_pipe.Reader.t
 end
 
-let version_byte = '\x41'
-
 let to_base58 m x =
+  let version_byte = Base58_check.Version_bytes.web_pipe in
   Base58_check.encode ~version_byte ~payload:(Binable.to_string m x)
 
 module Storage (Bin : Binable.S) = struct
@@ -133,12 +132,10 @@ let run_service coda ~conf_dir ~logger =
           ~f:(fun _ ->
             Writer.save (path ^/ "chain")
               ~contents:
-                (Base58_check.encode ~version_byte
-                   ~payload:
-                     (Binable.to_string
-                        (module Lite_base.Lite_chain)
-                        (get_lite_chain coda
-                           [Public_key.compress keypair.public_key]))) )
+                (to_base58
+                   (module Lite_base.Lite_chain)
+                   (get_lite_chain coda [Public_key.compress keypair.public_key]))
+        )
         |> don't_wait_for
     | `S3 ->
         Logger.info logger ~module_:__MODULE__ ~location:__LOC__
