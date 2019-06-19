@@ -404,6 +404,9 @@ module type S = sig
         -> Host_and_port.t Rpc.Implementation.t list
     end
 
+    (* Check whether we are in the genesis epoch *)
+    val is_genesis : Coda_base.Block_time.t -> bool
+
     (**
      * Check that a consensus state was received at a valid time.
     *)
