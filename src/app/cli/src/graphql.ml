@@ -242,7 +242,7 @@ module Types = struct
 
   let chain_reorganization_status : ('context, [`Changed] option) typ =
     enum "ChainReorganizationStatus"
-      ~doc:"Status for whenever the best tip changes"
+      ~doc:"Status for whenever the blockchain is reorganized"
       ~values:[enum_value "CHANGED" ~value:`Changed]
 
   let pubkey_field ~resolve =
