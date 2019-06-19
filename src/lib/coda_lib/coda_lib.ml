@@ -484,6 +484,12 @@ let create (config : Config.t) =
                 Root_prover.prove ~logger:config.logger ~frontier
                   consensus_state )
           in
+          let transaction_pool =
+            Network_pool.Transaction_pool.create ~logger:config.logger
+              ~trust_system:config.trust_system
+              ~incoming_diffs:(Coda_networking.transaction_pool_diffs net)
+              ~frontier_broadcast_pipe:frontier_broadcast_pipe_r
+          in
           let valid_transitions =
             Transition_router.run ~logger:config.logger
               ~trust_system:config.trust_system ~verifier ~network:net
@@ -500,12 +506,6 @@ let create (config : Config.t) =
               , valid_transitions_for_api
               , new_blocks ) =
             Strict_pipe.Reader.Fork.three valid_transitions
-          in
-          let transaction_pool =
-            Network_pool.Transaction_pool.create ~logger:config.logger
-              ~trust_system:config.trust_system
-              ~incoming_diffs:(Coda_networking.transaction_pool_diffs net)
-              ~frontier_broadcast_pipe:frontier_broadcast_pipe_r
           in
           don't_wait_for
             (Linear_pipe.iter
