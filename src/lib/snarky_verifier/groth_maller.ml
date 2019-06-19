@@ -16,6 +16,7 @@ module Make (Inputs : Inputs.S) = struct
       ; g_gamma: 'g1
       ; h_gamma: 'g2
       ; g_alpha_h_beta: 'fqk }
+    [@@deriving bin_io, sexp]
 
     let to_hlist
         { query_base
@@ -85,7 +86,7 @@ module Make (Inputs : Inputs.S) = struct
       ; g2s= [h; h_beta; h_gamma]
       ; gts= [g_alpha_h_beta] }
 
-    type ('a, 'b, 'c) vk = ('a, 'b, 'c) t_
+    type ('a, 'b, 'c) vk = ('a, 'b, 'c) t_ [@@deriving bin_io, sexp]
 
     module Precomputation = struct
       type t = {h_gamma: G2_precomputation.t; h: G2_precomputation.t}

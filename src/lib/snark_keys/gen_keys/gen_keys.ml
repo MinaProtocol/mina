@@ -77,7 +77,6 @@ let () =
         let keys = wrap_keys
       end)
   in
-  (* Make base proof *)
   let wrap hash proof =
     let open Snark_params in
     let module Wrap = Wrap in
@@ -98,9 +97,12 @@ let () =
       ( Yojson.Safe.pretty_to_string
       @@ Snark_params.Tock.R1CS_constraint_system.to_json
            (Snark_params.Tock.Proving_key.r1cs_constraint_system wrap_pk) ) ;
-    let proof =
+    let proof1 =
       Tock.prove wrap_pk_bin_io Wrap.input {Wrap.Prover_state.proof} Wrap.main
         input
+    in
+    let proof2 =
+      Tock.prove wrap_pk Wrap.input {Wrap.Prover_state.proof} Wrap.main input
     in
     Core.printf
       !"Constraint system of bin_io-ed version: %s\n %!"
@@ -118,7 +120,8 @@ let () =
     Core.printf !"assert proving key equality after prove\n%!" ;
     assert (Snark_params.Tock.Proving_key.equal wrap_pk_bin_io wrap_pk) ;
     Core.printf !"verify wrap proof\n%!" ;
-    assert (Tock.verify proof wrap_vk_bin_io Wrap.input input) ;
+    assert (Tock.verify proof2 wrap_vk Wrap.input input) ;
+    assert (Tock.verify proof1 wrap_vk_bin_io Wrap.input input) ;
     assert (1 = 0) ;
     proof
   in

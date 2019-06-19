@@ -9,7 +9,7 @@ module Make (Inputs : Inputs.S) = struct
   module Verification_key = struct
     type ('g1, 'g2, 'fqk) t_ =
       {query_base: 'g1; query: 'g1 list; delta: 'g2; alpha_beta: 'fqk}
-    [@@deriving fields]
+    [@@deriving fields, sexp]
 
     include Summary.Make (Inputs)
 

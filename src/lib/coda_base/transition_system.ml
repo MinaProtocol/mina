@@ -250,8 +250,7 @@ struct
 
     (* TODO: Use an online verifier here *)
     let%snarkydef main (_input : Wrap_input.var) =
-      (*
-      let%bind result =
+      (*let%bind result =
         (* The use of choose_preimage here is justified since we feed it to the verifier, which doesn't
              depend on which unpacking is provided. *)
         let%bind input = Wrap_input.Checked.to_scalar input in
@@ -265,9 +264,8 @@ struct
                        Prover_state.proof))
         in
         Verifier.verify step_vk_constant step_vk_precomp [input] proof
-              with_label __LOC__ (Boolean.Assert.is_true result)
-
-        *)
+      in
+      with_label __LOC__ (Boolean.Assert.is_true result)*)
       let%bind x = exists Field.typ ~compute:(As_prover.return Field.one) in
       Field.Checked.Assert.equal x x
   end
