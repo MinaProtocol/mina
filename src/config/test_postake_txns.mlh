@@ -7,7 +7,7 @@
 [%%import "config/proof_level/check.mlh"]
 [%%import "config/txpool_size.mlh"]
 
-[%%define time_offsets false]
+[%%define time_offsets true]
 [%%define fake_hash false]
 
 [%%define genesis_ledger "test_split_two_stakers"]

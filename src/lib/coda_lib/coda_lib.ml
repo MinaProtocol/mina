@@ -490,6 +490,7 @@ let create (config : Config.t) =
               ~incoming_diffs:(Coda_networking.transaction_pool_diffs net)
               ~frontier_broadcast_pipe:frontier_broadcast_pipe_r
           in
+          let%bind () = after (Time_ns.Span.of_sec 5.) in
           let valid_transitions =
             Transition_router.run ~logger:config.logger
               ~trust_system:config.trust_system ~verifier ~network:net
