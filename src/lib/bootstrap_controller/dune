@@ -1,7 +1,6 @@
 (library
   (name bootstrap_controller)
   (public_name bootstrap_controller)
-  (flags :standard -warn-error -3)
   (preprocess (pps ppx_coda ppx_jane ppx_deriving.eq))
   (libraries
     core
@@ -12,4 +11,6 @@
     consensus
     kademlia
     transition_frontier
-    ))
+    coda_networking
+    sync_handler
+    root_prover))

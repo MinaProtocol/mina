@@ -21,6 +21,7 @@ module Colors = {
   let saville = savilleAlpha(1.);
 
   let hyperlinkAlpha = a => `rgba((45, 158, 219, a));
+  let hyperlink = hyperlinkAlpha(1.);
 
   let slateAlpha = a => `rgba((81, 102, 121, a));
   let slate = slateAlpha(1.);
@@ -193,9 +194,9 @@ module CssElectron = {
 module Spacing = {
   let defaultSpacing = `rem(1.);
   let defaultPadding = padding(defaultSpacing);
-  let headerHeight = `rem(5.);
+  let headerHeight = `rem(4.);
   let footerHeight = `rem(5.);
-  let modalWidth = `rem(30.);
+  let modalWidth = `rem(26.);
 };
 
 let notText = style([cursor(`default), userSelect(`none)]);

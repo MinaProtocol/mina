@@ -1,7 +1,11 @@
 module Styles = {
   open Css;
 
-  let container = style([width(`percent(100.)), overflow(`scroll)]);
+  let container =
+    style([
+      width(`percent(100.)),
+      overflow(`hidden),
+    ]);
 };
 
 [@react.component]
@@ -12,7 +16,7 @@ let make = () => {
      | ["settings"] => <SettingsPage />
      | ["settings", publicKey] =>
        <WalletSettings publicKey={PublicKey.uriDecode(publicKey)} />
-     | _ => <TransactionsView />
+     | _ => <Transactions />
      }}
   </div>;
 };

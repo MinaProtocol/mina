@@ -2,8 +2,7 @@ open Core
 open Async
 open Coda_base
 open Coda_state
-open Signature_lib
-open Coda_inputs
+open Coda_transition
 open Signature_lib
 open Pipe_lib
 
@@ -19,7 +18,7 @@ module Input = struct
     ; env: (string * string) list
     ; proposer: int option
     ; snark_worker_config: Snark_worker_config.t option
-    ; work_selection: Cli_lib.Arg_type.work_selection
+    ; work_selection_method: Cli_lib.Arg_type.work_selection_method
     ; conf_dir: string
     ; trace_dir: string option
     ; program_dir: string
@@ -313,12 +312,12 @@ module T = struct
         { addrs_and_ports
         ; proposer
         ; snark_worker_config
-        ; work_selection
+        ; work_selection_method
         ; conf_dir
         ; trace_dir
-        ; program_dir
         ; peers
-        ; max_concurrent_connections } =
+        ; max_concurrent_connections
+        ; _ } =
       let logger =
         Logger.create
           ~metadata:
@@ -336,34 +335,7 @@ module T = struct
           ~default:Deferred.unit
       in
       let%bind () = File_system.create_dir conf_dir in
-      let module Config = struct
-        let logger = logger
-
-        let conf_dir = conf_dir
-
-        let lbc_tree_max_depth = `Finite 50
-
-        let propose_keypair =
-          Option.map proposer ~f:(fun i ->
-              List.nth_exn Genesis_ledger.accounts i
-              |> Genesis_ledger.keypair_of_account_record_exn )
-
-        let genesis_proof = Precomputed_values.base_proof
-
-        let transaction_capacity_log_2 = 3
-
-        let work_delay_factor = 2
-
-        let commit_id = None
-
-        let work_selection = work_selection
-
-        let max_concurrent_connections = max_concurrent_connections
-      end in
       O1trace.trace_task "worker_main" (fun () ->
-          let%bind (module Init) = make_init (module Config) in
-          let module Main = Coda_inputs.Make_coda (Init) in
-          let module Run = Coda_run.Make (Config) (Main) in
           let%bind receipt_chain_dir_name =
             Unix.mkdtemp @@ conf_dir ^/ "receipt_chain"
           in
@@ -401,12 +373,17 @@ module T = struct
           let time_controller =
             Block_time.Controller.create Block_time.Controller.basic
           in
+          let propose_keypair =
+            Option.map proposer ~f:(fun i ->
+                List.nth_exn Genesis_ledger.accounts i
+                |> Genesis_ledger.keypair_of_account_record_exn )
+          in
           let initial_propose_keypairs =
-            Keypair.Set.of_list (Config.propose_keypair |> Option.to_list)
+            Keypair.Set.of_list (propose_keypair |> Option.to_list)
           in
           let initial_propose_keys =
             Public_key.Compressed.Set.of_list
-              ( Option.map Config.propose_keypair ~f:(fun keypair ->
+              ( Option.map propose_keypair ~f:(fun keypair ->
                     let open Keypair in
                     Public_key.compress keypair.public_key )
               |> Option.to_list )
@@ -415,12 +392,12 @@ module T = struct
             Consensus.Data.Local_state.create initial_propose_keys
           in
           let net_config =
-            { Main.Inputs.Net.Config.logger
+            { Coda_networking.Config.logger
             ; trust_system
             ; time_controller
             ; consensus_local_state
             ; gossip_net_params=
-                { Main.Inputs.Net.Gossip_net.Config.timeout= Time.Span.of_sec 3.
+                { Coda_networking.Gossip_net.Config.timeout= Time.Span.of_sec 3.
                 ; target_peer_count= 8
                 ; conf_dir
                 ; initial_peers= peers
@@ -434,13 +411,13 @@ module T = struct
             Async.Scheduler.within' ~monitor (fun () -> f input)
           in
           let%bind coda =
-            Main.create
-              (Main.Config.make ~logger ~trust_system ~verifier:Init.verifier
-                 ~net_config
+            Coda_lib.create
+              (Coda_lib.Config.make ~logger ~trust_system ~conf_dir ~net_config
+                 ~work_selection_method:
+                   (Cli_lib.Arg_type.work_selection_method_to_module
+                      work_selection_method)
                  ?snark_worker_key:
                    (Option.map snark_worker_config ~f:(fun c -> c.public_key))
-                 ~transaction_pool_disk_location:
-                   (conf_dir ^/ "transaction_pool")
                  ~snark_pool_disk_location:(conf_dir ^/ "snark_pool")
                  ~wallets_disk_location:(conf_dir ^/ "wallets")
                  ~time_controller ~receipt_chain_database
@@ -448,7 +425,7 @@ module T = struct
                  ~initial_propose_keypairs ~monitor ~consensus_local_state
                  ~transaction_database ~external_transition_database ())
           in
-          Run.handle_shutdown ~monitor ~conf_dir coda ;
+          Coda_run.handle_shutdown ~monitor ~conf_dir coda ;
           let%map () =
             with_monitor
               (fun () ->
@@ -457,24 +434,26 @@ module T = struct
                        let run_snark_worker =
                          `With_public_key config.public_key
                        in
-                       Run.setup_local_server ~client_port:config.port ~coda () ;
-                       Run.run_snark_worker ~client_port:config.port
+                       Coda_run.setup_local_server ~client_port:config.port
+                         ~coda () ;
+                       Coda_run.run_snark_worker ~client_port:config.port
                          run_snark_worker ) )
               ()
           in
-          let coda_peers () = return (Main.peers coda) in
-          let coda_start () = return (Main.start coda) in
+          let coda_peers () = return (Coda_lib.peers coda) in
+          let coda_start () = return (Coda_lib.start coda) in
           let coda_get_balance pk =
             return
-              ( Run.Commands.get_balance coda pk
+              ( Coda_commands.get_balance coda pk
               |> Participating_state.active_exn )
           in
           let coda_get_nonce pk =
             return
-              (Run.Commands.get_nonce coda pk |> Participating_state.active_exn)
+              ( Coda_commands.get_nonce coda pk
+              |> Participating_state.active_exn )
           in
           let coda_root_length () =
-            return (Main.root_length coda |> Participating_state.active_exn)
+            return (Coda_lib.root_length coda |> Participating_state.active_exn)
           in
           let coda_send_payment (sk, pk, amount, fee, memo) =
             let pk_of_sk sk =
@@ -482,7 +461,7 @@ module T = struct
             in
             let build_txn amount sender_sk receiver_pk fee =
               let nonce =
-                Run.Commands.get_nonce coda (pk_of_sk sender_sk)
+                Coda_commands.get_nonce coda (pk_of_sk sender_sk)
                 |> Participating_state.active_exn
                 |> Option.value_exn ?here:None ?message:None ?error:None
               in
@@ -494,19 +473,19 @@ module T = struct
             in
             let payment = build_txn amount sk pk fee in
             let%map receipt =
-              Run.Commands.send_user_command coda (payment :> User_command.t)
+              Coda_commands.send_user_command coda (payment :> User_command.t)
             in
             receipt |> Participating_state.active_exn
           in
           let coda_process_user_command cmd =
             let%map receipt =
-              Run.Commands.send_user_command coda (cmd :> User_command.t)
+              Coda_commands.send_user_command coda (cmd :> User_command.t)
             in
             receipt |> Participating_state.active_exn
           in
           let coda_prove_receipt (proving_receipt, resulting_receipt) =
             match%map
-              Run.Commands.prove_receipt coda ~proving_receipt
+              Coda_commands.prove_receipt coda ~proving_receipt
                 ~resulting_receipt
             with
             | Ok proof ->
@@ -520,14 +499,13 @@ module T = struct
                   e ()
           in
           let coda_new_block key =
-            Deferred.return @@ Run.Commands.Subscriptions.new_block coda key
+            Deferred.return @@ Coda_commands.Subscriptions.new_block coda key
           in
           let coda_verified_transitions () =
             let r, w = Linear_pipe.create () in
             don't_wait_for
-              (Strict_pipe.Reader.iter (Main.validated_transitions coda)
+              (Strict_pipe.Reader.iter (Coda_lib.validated_transitions coda)
                  ~f:(fun t ->
-                   let open Main.Inputs in
                    let p =
                      External_transition.Validated.protocol_state
                        (With_hash.data t)
@@ -550,17 +528,22 @@ module T = struct
           let coda_root_diff () =
             let r, w = Linear_pipe.create () in
             don't_wait_for
-              (Strict_pipe.Reader.iter (Main.root_diff coda) ~f:(fun diff ->
-                   Linear_pipe.write w diff )) ;
+              (Strict_pipe.Reader.iter (Coda_lib.root_diff coda)
+                 ~f:(fun diff ->
+                   if Pipe.is_closed w then
+                     Logger.error logger ~module_:__MODULE__ ~location:__LOC__
+                       "[coda_root_diff] why is this w pipe closed? did \
+                        someone close the reader end? dropping this write..." ;
+                   Linear_pipe.write_if_open w diff )) ;
             return r.pipe
           in
           let coda_dump_tf () =
             Deferred.return
-              ( Main.dump_tf coda |> Or_error.ok
+              ( Coda_lib.dump_tf coda |> Or_error.ok
               |> Option.value ~default:"<failed to visualize>" )
           in
           let coda_best_path () =
-            let path = Main.best_path coda in
+            let path = Coda_lib.best_path coda in
             Deferred.return (Option.value ~default:[] path)
           in
           let parse_sync_status_exn = function
@@ -573,7 +556,7 @@ module T = struct
                   ()
           in
           let coda_sync_status () =
-            let schema = Run.Graphql.schema in
+            let schema = Graphql.schema in
             match Graphql_parser.parse "subscription { newSyncUpdate }" with
             | Ok query -> (
                 match%map Graphql_async.Schema.execute schema coda query with
@@ -581,8 +564,10 @@ module T = struct
                     Async.Pipe.map pipe ~f:(function
                       | Ok json ->
                           parse_sync_status_exn json
-                      | Error e ->
-                          failwith "Receiving sync status error: " )
+                      | Error json ->
+                          failwith
+                            (sprintf "Receiving sync status error: %s"
+                               (Yojson.Basic.to_string json)) )
                 | _ ->
                     failwith "Expected to get a stream of sync updates" )
             | Error e ->
@@ -592,11 +577,11 @@ module T = struct
           in
           let coda_new_user_command =
             Fn.compose Deferred.return
-            @@ Run.Commands.For_tests.Subscriptions.new_user_commands coda
+            @@ Coda_commands.For_tests.Subscriptions.new_user_commands coda
           in
           let coda_get_all_user_commands =
             Fn.compose Deferred.return
-            @@ Run.Commands.For_tests.get_all_user_commands coda
+            @@ Coda_commands.For_tests.get_all_user_commands coda
           in
           { coda_peers= with_monitor coda_peers
           ; coda_verified_transitions= with_monitor coda_verified_transitions

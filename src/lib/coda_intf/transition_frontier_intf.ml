@@ -142,7 +142,8 @@ module type Transition_frontier_diff_intf = sig
   module Best_tip_diff : sig
     type view =
       { new_user_commands: User_command.t list
-      ; removed_user_commands: User_command.t list }
+      ; removed_user_commands: User_command.t list
+      ; reorg_best_tip: bool }
 
     include
       Transition_frontier_extension_intf

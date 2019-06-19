@@ -1,7 +1,5 @@
 open Core
 open Async
-open Coda_worker
-open Coda_inputs
 open Signature_lib
 
 let name = "coda-batch-payment-test"
@@ -25,7 +23,7 @@ let main () =
   let num_nodes = 3 in
   let%bind testnet =
     Coda_worker_testnet.test logger num_nodes proposers snark_work_public_keys
-      Cli_lib.Arg_type.Seq ~max_concurrent_connections:None
+      Cli_lib.Arg_type.Sequence ~max_concurrent_connections:None
   in
   let%bind payments =
     Coda_worker_testnet.Payments.send_batch_consecutive_payments testnet
@@ -37,5 +35,4 @@ let main () =
   Coda_worker_testnet.Api.teardown testnet
 
 let command =
-  let open Command.Let_syntax in
   Command.async ~summary:"Test batch payments" (Async.Command.Spec.return main)
