@@ -29,8 +29,8 @@ module Types = struct
   open Schema
 
   module Stringable = struct
-    (** base64 representation of public key that is compressed to make snark computation efficent *)
-    let public_key = Public_key.Compressed.to_base64
+    (** base58 representation of public key that is compressed to make snark computation efficent *)
+    let public_key = Public_key.Compressed.to_base58_check
 
     (** Unix form of time, which is the number of milliseconds that elapsed from January 1, 1970 *)
     let date = Time.to_string
@@ -45,17 +45,20 @@ module Types = struct
 
     let amount amount = uint64 @@ Currency.Amount.to_uint64 amount
 
-    module State_hash = Codable.Make_base64 (State_hash.Stable.V1)
+    module State_hash = Codable.Make_base58_check (State_hash.Stable.V1)
   end
 
   module Id = struct
-    (* The id of a user_command is base64 the seralized version of the user_command *)
+    let version_byte = Base58_check.Version_bytes.graphql
+
+    (* The id of a user_command is the Base58Check encoding of the serialized version of the user_command *)
     let user_command user_command =
       let bigstring =
         Bin_prot.Utils.bin_dump Coda_base.User_command.Stable.V1.bin_t.writer
           user_command
       in
-      Base64.encode_exn @@ Bigstring.to_string bigstring
+      let payload = Bigstring.to_string bigstring in
+      Base58_check.encode ~version_byte ~payload
   end
 
   let uint64_arg name ~doc ~typ =
@@ -203,7 +206,7 @@ module Types = struct
         [ field "previousStateHash" ~typ:(non_null string)
             ~args:Arg.[]
             ~resolve:(fun _ t ->
-              Stringable.State_hash.to_base64 t.previous_state_hash )
+              Stringable.State_hash.to_base58_check t.previous_state_hash )
         ; field "blockchainState"
             ~typ:(non_null blockchain_state)
             ~args:Arg.[]
@@ -222,7 +225,7 @@ module Types = struct
         ; field "stateHash" ~typ:(non_null string)
             ~args:Arg.[]
             ~resolve:(fun _ {With_hash.hash; _} ->
-              Stringable.State_hash.to_base64 hash )
+              Stringable.State_hash.to_base58_check hash )
         ; field "protocolState" ~typ:(non_null protocol_state)
             ~args:Arg.[]
             ~resolve:(fun _ {With_hash.data; _} -> data.protocol_state)
@@ -394,7 +397,7 @@ module Types = struct
 
   module Arguments = struct
     let public_key ~name public_key =
-      result_of_exn Public_key.Compressed.of_base64_exn public_key
+      result_of_exn Public_key.Compressed.of_base58_check_exn public_key
         ~error:(sprintf !"%s address is not valid." name)
   end
 
@@ -471,7 +474,7 @@ module Types = struct
           ~fields:
             [ arg "payment"
                 ~doc:
-                  "Payment is the base64 version of a serialized payment (via \
+                  "Payment is the base58 version of a serialized payment (via \
                    Jane Street bin_prot)"
                 ~typ:(non_null string)
             ; (* TODO: create a formal method for verifying that the provided added_time is correct  *)
@@ -664,15 +667,17 @@ module Types = struct
           let serialize = Id.user_command
 
           let deserialize serialized_payment =
-            let serialized_transaction =
-              Base64.decode_exn serialized_payment
+            let vb, serialized_transaction =
+              Base58_check.decode_exn serialized_payment
             in
+            if not (Char.equal vb Id.version_byte) then
+              failwith "Cursor.deserialize: unexpected version byte" ;
             Coda_base.User_command.Stable.V1.bin_t.reader.read
               (Bigstring.of_string serialized_transaction)
               ~pos_ref:(ref 0)
 
           let doc =
-            "Cursor is the base64 version of a serialized user command (via \
+            "Cursor is the base58 version of a serialized user command (via \
              Jane Street bin_prot)"
         end
 
@@ -703,12 +708,12 @@ module Types = struct
         module Cursor = struct
           type t = State_hash.t
 
-          let serialize = Stringable.State_hash.to_base64
+          let serialize = Stringable.State_hash.to_base58_check
 
-          let deserialize = Stringable.State_hash.of_base64_exn
+          let deserialize = Stringable.State_hash.of_base58_check_exn
 
           let doc =
-            "Cursor is the base64 version of a serialized user command (via \
+            "Cursor is the base58 version of a serialized user command (via \
              Jane Street bin_prot)"
         end
 

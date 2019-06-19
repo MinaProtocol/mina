@@ -10,9 +10,9 @@ let int16 =
 module Key_arg_type (Key : sig
   type t
 
-  val of_base64_exn : string -> t
+  val of_base58_check_exn : string -> t
 
-  val to_base64 : t -> string
+  val to_base58_check : t -> string
 
   val name : string
 
@@ -21,14 +21,14 @@ end) =
 struct
   let arg_type =
     Command.Arg_type.create (fun s ->
-        try Key.of_base64_exn s
+        try Key.of_base58_check_exn s
         with e ->
           failwithf
             "Couldn't read %s (Invalid key format) %s -- here's a sample one: \
              %s"
             Key.name
             (Error.to_string_hum (Error.of_exn e))
-            (Key.to_base64 (Key.random ()))
+            (Key.to_base58_check (Key.random ()))
             () )
 end
 

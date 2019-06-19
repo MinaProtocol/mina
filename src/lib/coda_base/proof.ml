@@ -16,15 +16,20 @@ module Stable = struct
     include T
     include Sexpable.Of_stringable (T)
 
-    let to_yojson s = `String (Base64.encode_string (to_string s))
+    let version_byte = Base58_check.Version_bytes.proof
+
+    let to_yojson s =
+      `String (Base58_check.encode ~version_byte ~payload:(to_string s))
 
     let of_yojson = function
       | `String s -> (
-        match Base64.decode s with
-        | Ok s ->
-            Ok (of_string s)
-        | Error (`Msg e) ->
-            Error (sprintf "bad base64: %s" e) )
+        try
+          let vb, decoded = Base58_check.decode_exn s in
+          if Char.equal vb version_byte then Ok (of_string decoded)
+          else Error "of_yojson: unexpected version byte"
+        with exn ->
+          Error (sprintf "of_yojson, bad Base58Check: %s" (Exn.to_string exn))
+        )
       | _ ->
           Error "expected `String"
 
