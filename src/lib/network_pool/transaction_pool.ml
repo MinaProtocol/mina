@@ -647,7 +647,7 @@ let%test_module _ =
             Broadcast_pipe.Writer.write best_tip_diff_w
               { new_user_commands= List.take independent_cmds 1
               ; removed_user_commands= [List.nth_exn independent_cmds 1]
-              ; reorg_best_tip= false }
+              ; reorg_best_tip= true }
           in
           assert_pool_txs (List.tl_exn independent_cmds) ;
           Deferred.unit )
@@ -724,7 +724,7 @@ let%test_module _ =
             Broadcast_pipe.Writer.write best_tip_diff_w
               { new_user_commands= cmd2 :: List.drop independent_cmds 2
               ; removed_user_commands= List.take independent_cmds 2
-              ; reorg_best_tip= false }
+              ; reorg_best_tip= true }
           in
           assert_pool_txs [List.nth_exn independent_cmds 1] ;
           Deferred.unit )

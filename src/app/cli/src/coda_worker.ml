@@ -529,7 +529,12 @@ module T = struct
             let r, w = Linear_pipe.create () in
             don't_wait_for
               (Strict_pipe.Reader.iter (Coda_lib.root_diff coda)
-                 ~f:(fun diff -> Linear_pipe.write w diff)) ;
+                 ~f:(fun diff ->
+                   if Pipe.is_closed w then
+                     Logger.error logger ~module_:__MODULE__ ~location:__LOC__
+                       "[coda_root_diff] why is this w pipe closed? did \
+                        someone close the reader end? dropping this write..." ;
+                   Linear_pipe.write_if_open w diff )) ;
             return r.pipe
           in
           let coda_dump_tf () =
