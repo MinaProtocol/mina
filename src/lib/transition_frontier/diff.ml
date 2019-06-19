@@ -24,7 +24,7 @@ end) :
   open Inputs
 
   (* TODO: Remove New_frontier. 
-    Each transition frontier extension should be initialized by the input, the root breadcrumb *)
+     Each transition frontier extension should be initialized by the input, the root breadcrumb *)
   type t =
     | New_breadcrumb of {previous: Breadcrumb.t; added: Breadcrumb.t}
         (** Triggered when a new breadcrumb is added without changing the root or best_tip *)
@@ -339,7 +339,9 @@ end) :
             ; removed_user_commands=
                 List.bind removed_from_best_tip_path
                   ~f:Breadcrumb.to_user_commands
-            ; reorg_best_tip= true }
+                (* Using `removed_user_commands` as a proxy for reorg_best_tip is not a good enough because we could be reorg-ing orphaning only coinbase blocks. However, `removed_from_best_tip_path` are all breadcrumbs including those with no user_commands *)
+            ; reorg_best_tip= not @@ List.is_empty removed_from_best_tip_path
+            }
   end
 
   module Root_diff = struct
