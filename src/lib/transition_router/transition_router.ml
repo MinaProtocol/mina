@@ -67,7 +67,7 @@ module Make (Inputs : Inputs_intf) = struct
   let start_transition_frontier_controller ~logger ~trust_system ~verifier
       ~network ~time_controller ~proposer_transition_reader
       ~verified_transition_writer ~clear_reader ~collected_transitions
-      ~transition_reader_ref ~transition_writer_ref ~frontier_w frontier =
+      ~transition_reader_ref ~transition_writer_ref frontier =
     Logger.info logger ~module_:__MODULE__ ~location:__LOC__
       "Starting Transition Frontier Controller phase" ;
     let ( transition_frontier_controller_reader
@@ -76,7 +76,6 @@ module Make (Inputs : Inputs_intf) = struct
     in
     transition_reader_ref := transition_frontier_controller_reader ;
     transition_writer_ref := transition_frontier_controller_writer ;
-    Broadcast_pipe.Writer.write frontier_w (Some frontier) |> don't_wait_for ;
     let new_verified_transition_reader =
       Transition_frontier_controller.run ~logger ~trust_system ~verifier
         ~network ~time_controller ~collected_transitions ~frontier
@@ -107,11 +106,12 @@ module Make (Inputs : Inputs_intf) = struct
          ~ledger_db ~frontier ~transition_reader:!transition_reader_ref)
       (fun (new_frontier, collected_transitions) ->
         Strict_pipe.Writer.kill !transition_writer_ref ;
+        Broadcast_pipe.Writer.write frontier_w (Some new_frontier)
+        |> don't_wait_for ;
         start_transition_frontier_controller ~logger ~trust_system ~verifier
           ~network ~time_controller ~proposer_transition_reader
           ~verified_transition_writer ~clear_reader ~collected_transitions
-          ~frontier_w ~transition_reader_ref ~transition_writer_ref
-          new_frontier )
+          ~transition_reader_ref ~transition_writer_ref new_frontier )
 
   let run ~logger ~trust_system ~verifier ~network ~time_controller
       ~frontier_broadcast_pipe:(frontier_r, frontier_w) ~ledger_db
@@ -137,8 +137,7 @@ module Make (Inputs : Inputs_intf) = struct
       start_transition_frontier_controller ~logger ~trust_system ~verifier
         ~network ~time_controller ~proposer_transition_reader
         ~verified_transition_writer ~clear_reader ~collected_transitions:[]
-        ~frontier_w ~transition_reader_ref ~transition_writer_ref
-        (peek_exn frontier_r)
+        ~transition_reader_ref ~transition_writer_ref (peek_exn frontier_r)
     else
       start_bootstrap_controller ~logger ~trust_system ~verifier ~network
         ~time_controller ~proposer_transition_reader
