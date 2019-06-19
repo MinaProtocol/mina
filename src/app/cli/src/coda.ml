@@ -29,6 +29,13 @@ let daemon logger =
      and from_genesis =
        flag "from-genesis"
          ~doc:"Indicating that we are starting from genesis or not" no_arg
+     and unsafe_track_propose_key =
+       flag "unsafe-track-propose-key"
+         ~doc:
+           "Your private key will be copied to the inernal wallets folder \
+            stripped of its password if it is given using the `propose-key` \
+            flag. (default:don't copy a passwordless copy of the privatekey)"
+         no_arg
      and propose_key =
        flag "propose-key"
          ~doc:
@@ -269,7 +276,27 @@ let daemon logger =
                 `propose-public-key`" ;
              exit 11
          | Some sk_file, None ->
-             Secrets.Keypair.Terminal_stdin.read_exn sk_file >>| Option.some
+             let%bind keypair =
+               Secrets.Keypair.Terminal_stdin.read_exn sk_file
+             in
+             let%map () =
+               (* If we wish to track the propose key *)
+               if unsafe_track_propose_key then
+                 let pk = Public_key.compress keypair.public_key in
+                 let%bind wallets =
+                   Secrets.Wallets.load ~logger
+                     ~disk_location:wallets_disk_location
+                 in
+                 (* Either we already are tracking it *)
+                 match Secrets.Wallets.find wallets ~needle:pk with
+                 | Some _ ->
+                     Deferred.unit
+                 | None ->
+                     (* Or we import it *)
+                     Secrets.Wallets.import_keypair wallets keypair >>| ignore
+               else Deferred.unit
+             in
+             Some keypair
          | None, Some wallet_pk -> (
              match%bind
                Secrets.Wallets.load ~logger

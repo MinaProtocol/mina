@@ -48,15 +48,21 @@ let load ~logger ~disk_location : t Deferred.t =
   in
   {cache; path}
 
-(** Effectfully generates a new private key file and a keypair *)
-let generate_new t : Public_key.Compressed.t Deferred.t =
-  let keypair = Keypair.create () in
-  let privkey_path = get_path t (Public_key.compress keypair.public_key) in
+(** Effectfully generates a new private key file for the given keypair *)
+let import_keypair t keypair : Public_key.Compressed.t Deferred.t =
+  let privkey_path =
+    get_path t (Public_key.compress keypair.Keypair.public_key)
+  in
   let%bind () = Secret_keypair.write_exn keypair ~privkey_path ~password in
   let%map () = Unix.chmod privkey_path ~perm:0o600 in
   let pk = Public_key.compress keypair.public_key in
   Public_key.Compressed.Table.add_exn t.cache ~key:pk ~data:keypair ;
   pk
+
+(** Effectfully generates a new private key file and a keypair *)
+let generate_new t : Public_key.Compressed.t Deferred.t =
+  let keypair = Keypair.create () in
+  import_keypair t keypair
 
 let delete ({cache; _} as t : t) (pk : Public_key.Compressed.t) :
     (unit, [`Not_found]) Deferred.Result.t =
