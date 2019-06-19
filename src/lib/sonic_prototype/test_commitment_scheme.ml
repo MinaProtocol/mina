@@ -15,21 +15,21 @@ let%test_unit "polynomial commitment scheme" =
   let bL0 = Fr.of_string "7" in
   let bR0 = Fr.of_string "3" in
   let bL1 = Fr.of_string "2" in
-  let wL = [[Fr.of_string "1"]; [Fr.of_string "0"]] in
-  let wR = [[Fr.of_string "0"]; [Fr.of_string "1"]] in
-  let wO = [[Fr.of_string "0"]; [Fr.of_string "0"]] in
+  let w_l = [[Fr.of_string "1"]; [Fr.of_string "0"]] in
+  let w_r = [[Fr.of_string "0"]; [Fr.of_string "1"]] in
+  let w_o = [[Fr.of_string "0"]; [Fr.of_string "0"]] in
   let cs = [Fr.(bL0 + bR0); Fr.(bL1 + of_string "10")] in
-  let aL = [Fr.of_string "10"] in
-  let aR = [Fr.of_string "12"] in
-  let aO = hadamardp aL aR in
-  let (gate_weights : Gate_weights.t) = {wL; wR; wO} in
-  let (gate_inputs : Assignment.t) = {aL; aR; aO} in
+  let a_l = [Fr.of_string "10"] in
+  let a_r = [Fr.of_string "12"] in
+  let a_o = hadamardp a_l a_r in
+  let (gate_weights : Gate_weights.t) = {w_l; w_r; w_o} in
+  let (gate_inputs : Assignment.t) = {a_l; a_r; a_o} in
   let srs = Srs.create d x alpha in
-  let n = List.length aL in
+  let n = List.length a_l in
   let fX =
-    eval_on_Y y
+    eval_on_y y
       (t_poly (r_poly gate_inputs) (s_poly gate_weights) (k_poly cs n))
   in
   let commitment = commit_poly srs max x fX in
   let opening = open_poly srs commitment x z fX in
-  assert (pcV srs max commitment z opening)
+  assert (pc_v srs max commitment z opening)

@@ -35,14 +35,15 @@ module type Backend_intf = sig
 
     val unitary_inverse : t -> t
   end
-  
-  module Pairing : 
+
+  module Pairing :
     Pairing.S
     with module G1 := G1
-    and module G2 := G2
-    and module Fq_target := Fq_target
+     and module G2 := G2
+     and module Fq_target := Fq_target
 
   module Fr_laurent : Laurent with type field := Fr.t and type nat := N.t
 
-  module Bivariate_fr_laurent : Laurent with type field := Fr_laurent.t and type nat := N.t
+  module Bivariate_fr_laurent :
+    Laurent with type field := Fr_laurent.t and type nat := N.t
 end

@@ -3,18 +3,18 @@ open Constraints
 open Default_backend.Backend
 
 let (example_assignment : Assignment.t) =
-  { aL= [Fr.of_string "1"; Fr.of_string "2"]
-  ; aR= [Fr.of_string "3"; Fr.of_string "4"]
-  ; aO= [Fr.of_string "5"; Fr.of_string "6"] }
+  { a_l= [Fr.of_string "1"; Fr.of_string "2"]
+  ; a_r= [Fr.of_string "3"; Fr.of_string "4"]
+  ; a_o= [Fr.of_string "5"; Fr.of_string "6"] }
 
 let (example_weights : Gate_weights.t) =
-  { wL=
+  { w_l=
       [ [Fr.of_string "1"; Fr.of_string "2"]
       ; [Fr.of_string "3"; Fr.of_string "4"] ]
-  ; wR=
+  ; w_r=
       [ [Fr.of_string "5"; Fr.of_string "6"]
       ; [Fr.of_string "7"; Fr.of_string "8"] ]
-  ; wO=
+  ; w_o=
       [ [Fr.of_string "9"; Fr.of_string "10"]
       ; [Fr.of_string "11"; Fr.of_string "12"] ] }
 

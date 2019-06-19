@@ -12,7 +12,7 @@ module Arith_circuit_proof = struct
 end
 
 module Gate_weights = struct
-  type t = {wL: Fr.t list list; wR: Fr.t list list; wO: Fr.t list list}
+  type t = {w_l: Fr.t list list; w_r: Fr.t list list; w_o: Fr.t list list}
   [@@deriving eq]
 end
 
@@ -23,7 +23,7 @@ module Arith_circuit = struct
 end
 
 module Assignment = struct
-  type t = {aL: Fr.t list; aR: Fr.t list; aO: Fr.t list} [@@deriving eq]
+  type t = {a_l: Fr.t list; a_r: Fr.t list; a_o: Fr.t list} [@@deriving eq]
 end
 
 module Arith_witness = struct

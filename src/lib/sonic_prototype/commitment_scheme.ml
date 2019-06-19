@@ -10,17 +10,17 @@ let commit_poly (srs : Srs.t) maxm x poly =
   in
   G1.scale gxi (Fr.to_bigint (Fr_laurent.eval poly x))
 
-let open_poly _srs _commitment x z fPoly =
-  let fz = Fr_laurent.eval fPoly z in
+let open_poly _srs _commitment x z f_poly =
+  let fz = Fr_laurent.eval f_poly z in
   let wPoly =
     Fr_laurent.( / )
-      (Fr_laurent.( - ) fPoly (Fr_laurent.create 0 [fz]))
+      (Fr_laurent.( - ) f_poly (Fr_laurent.create 0 [fz]))
       (Fr_laurent.create 0 [Fr.negate z; Fr.one])
   in
   let w = G1.scale G1.one (Fr.to_bigint (Fr_laurent.eval wPoly x)) in
   (fz, w)
 
-let pcV (srs : Srs.t) maxm commitment z (v, w) =
+let pc_v (srs : Srs.t) maxm commitment z (v, w) =
   let diff = maxm - srs.d in
   let hxi =
     if diff >= 0 then List.nth_exn srs.hPositiveX diff

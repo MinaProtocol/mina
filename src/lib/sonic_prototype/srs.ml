@@ -34,8 +34,7 @@ module Srs = struct
     ; gNegativeAlphaX=
         List.map (List.range 1 d) ~f:(fun i ->
             G1.scale g1
-              (Fr.to_bigint (Fr.( * ) alpha (Fr.( ** ) xInv (N.of_int i))))
-        )
+              (Fr.to_bigint (Fr.( * ) alpha (Fr.( ** ) xInv (N.of_int i)))) )
     ; gPositiveAlphaX=
         List.map (List.range 0 d) ~f:(fun i ->
             G1.scale g1
@@ -43,8 +42,7 @@ module Srs = struct
     ; hNegativeAlphaX=
         List.map (List.range 1 d) ~f:(fun i ->
             G2.scale g2
-              (Fr.to_bigint (Fr.( * ) alpha (Fr.( ** ) xInv (N.of_int i))))
-        )
+              (Fr.to_bigint (Fr.( * ) alpha (Fr.( ** ) xInv (N.of_int i)))) )
     ; hPositiveAlphaX=
         List.map (List.range 0 d) ~f:(fun i ->
             G2.scale g2
