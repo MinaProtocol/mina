@@ -87,7 +87,8 @@ let get_trust_status =
   let address_flag =
     flag "ip-address"
       ~doc:
-        "An IPv4 or IPv6 address for which you want to query the trust status"
+        "IP An IPv4 or IPv6 address for which you want to query the trust \
+         status"
       (required Cli_lib.Arg_type.ip_address)
   in
   let json_flag = Cli_lib.Flag.json in
