@@ -2227,7 +2227,7 @@ module Hooks = struct
       Get_epoch_ledger.(implement_multi (implementation ~logger ~local_state))
   end
 
-  let is_genesis time = Epoch.(equal (of_time_exn time) (succ zero))
+  let is_genesis time = Epoch.(equal (of_time_exn time) zero)
 
   (* Select the correct epoch data to use from a consensus state for a given epoch.
    * The rule for selecting the correct epoch data changes based on whether or not
