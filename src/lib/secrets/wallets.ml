@@ -48,7 +48,7 @@ let load ~logger ~disk_location : t Deferred.t =
   in
   {cache; path}
 
-(** Effectfully generates a new private key file for the given keypair *)
+(** Generates a new private key file for the given keypair *)
 let import_keypair t keypair : Public_key.Compressed.t Deferred.t =
   let privkey_path =
     get_path t (Public_key.compress keypair.Keypair.public_key)
@@ -59,7 +59,7 @@ let import_keypair t keypair : Public_key.Compressed.t Deferred.t =
   Public_key.Compressed.Table.add_exn t.cache ~key:pk ~data:keypair ;
   pk
 
-(** Effectfully generates a new private key file and a keypair *)
+(** Generates a new private key file and a keypair *)
 let generate_new t : Public_key.Compressed.t Deferred.t =
   let keypair = Keypair.create () in
   import_keypair t keypair

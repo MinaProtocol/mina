@@ -32,9 +32,9 @@ let daemon logger =
      and unsafe_track_propose_key =
        flag "unsafe-track-propose-key"
          ~doc:
-           "Your private key will be copied to the inernal wallets folder \
+           "Your private key will be copied to the internal wallets folder \
             stripped of its password if it is given using the `propose-key` \
-            flag. (default:don't copy a passwordless copy of the privatekey)"
+            flag. (default:don't copy the private key)"
          no_arg
      and propose_key =
        flag "propose-key"
