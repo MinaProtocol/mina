@@ -80,6 +80,7 @@ module Process = {
      */
 
     let log = Fs.openSync(logfileName, "w");
+    Fs.writeSync(log, {j|Started with $args\n|j});
     let process =
       ChildProcess.spawn(
         command.executable,

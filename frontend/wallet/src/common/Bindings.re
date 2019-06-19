@@ -175,6 +175,9 @@ module Fs = {
     "";
 
   [@bs.val] [@bs.module "fs"]
+  external writeSync: (Stream.Writable.t, string) => unit = "";
+
+  [@bs.val] [@bs.module "fs"]
   external watchFile: (string, unit => unit) => unit = "";
 };
 
@@ -184,8 +187,23 @@ module Fetch = {
 
 module LocalStorage = {
   [@bs.val] [@bs.scope "localStorage"]
-  external setItem: (string, string) => unit = "";
+  external setItem:
+    (
+      ~key: [@bs.string] [
+              | [@bs.as "network"] `Network
+              | [@bs.as "addressbook"] `AddressBook
+            ],
+      ~value: string
+    ) =>
+    unit =
+    "";
 
   [@bs.val] [@bs.scope "localStorage"]
-  external getItem: string => Js.nullable(string) = "";
+  external getItem:
+    (
+    [@bs.string]
+    [ | [@bs.as "network"] `Network | [@bs.as "addressbook"] `AddressBook]
+    ) =>
+    Js.nullable(string) =
+    "";
 };
