@@ -67,6 +67,9 @@ let txn_nonce =
   let open Coda_base in
   Command.Arg_type.map Command.Param.string ~f:Account.Nonce.of_string
 
+let ip_address =
+  Command.Arg_type.map Command.Param.string ~f:Unix.Inet_addr.of_string
+
 type work_selection_method = Sequence | Random [@@deriving bin_io]
 
 let work_selection_method_val = function
