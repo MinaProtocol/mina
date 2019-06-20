@@ -70,6 +70,12 @@ struct
     | None ->
         Record_inst.to_peer_status @@ Record_inst.init ()
 
+  let peer_statuses {db; _} =
+    Option.value_map db ~default:[] ~f:(fun db' ->
+        Db.to_alist db'
+        |> List.map ~f:(fun (peer, record) ->
+               (peer, Record_inst.to_peer_status record) ) )
+
   let reset ({db; _} as t) peer =
     Option.value_map db ~default:() ~f:(fun db' -> Db.remove db' ~key:peer) ;
     lookup t peer

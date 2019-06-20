@@ -118,6 +118,53 @@ let get_trust_status =
              printf "Failed to get trust status %s\n" (Error.to_string_hum e)
      ))
 
+let ip_trust_statuses_to_yojson ip_trust_statuses =
+  let items =
+    List.map ip_trust_statuses ~f:(fun (ip_addr, status) ->
+        `Assoc
+          [ ("ip", `String (Unix.Inet_addr.to_string ip_addr))
+          ; ("status", Trust_system.Peer_status.to_yojson status) ] )
+  in
+  `List items
+
+let print_ip_trust_statuses ip_statuses json =
+  if json then
+    printf "%s\n"
+      (Yojson.Safe.to_string @@ ip_trust_statuses_to_yojson ip_statuses)
+  else
+    List.iter ip_statuses ~f:(fun (ip_addr, status) ->
+        printf "%s : " (Unix.Inet_addr.to_string ip_addr) ;
+        print_trust_status status false )
+
+let get_trust_status_all =
+  let open Command.Param in
+  let open Deferred.Let_syntax in
+  let nonzero_flag =
+    flag "nonzero-only" no_arg
+      ~doc:"Only show trust statuses whose trust score is nonzero"
+  in
+  let json_flag = Cli_lib.Flag.json in
+  let flags = Args.zip2 nonzero_flag json_flag in
+  Command.async
+    ~summary:"Get trust statuses for all peers known to the trust system"
+    (Cli_lib.Background_daemon.init flags ~f:(fun port (nonzero, json) ->
+         match%map dispatch Daemon_rpcs.Get_trust_status_all.rpc () port with
+         | Ok ip_trust_statuses ->
+             let filtered_ip_trust_statuses =
+               if nonzero then
+                 List.filter ip_trust_statuses ~f:(fun (_ip_addr, status) ->
+                     not
+                       Float.(
+                         equal zero
+                           (round_significant status.trust
+                              ~significant_digits:4)) )
+               else ip_trust_statuses
+             in
+             print_ip_trust_statuses filtered_ip_trust_statuses json
+         | Error e ->
+             printf "Failed to get trust statuses %s\n" (Error.to_string_hum e)
+     ))
+
 let reset_trust_status =
   let open Command.Param in
   let open Deferred.Let_syntax in
@@ -590,6 +637,7 @@ let command =
     [ ("get-balance", get_balance)
     ; ("get-public-keys", get_public_keys)
     ; ("get-trust-status", get_trust_status)
+    ; ("get-trust-status-all", get_trust_status_all)
     ; ("reset-trust-status", reset_trust_status)
     ; ("prove-payment", prove_payment)
     ; ("verify-payment", verify_payment)
