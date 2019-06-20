@@ -189,12 +189,11 @@ module Types = struct
                ~acceptable_network_delay:int' )
 
     let t : (_, Daemon_rpcs.Types.Status.t option) typ =
-      let module S = Daemon_rpcs.Types.Status in
       obj "DaemonStatus" ~fields:(fun _ ->
           let open Reflection.Shorthand in
           List.rev
-          @@ S.Fields.fold ~init:[] ~num_accounts:int ~block_count:int
-               ~uptime_secs:int' ~ledger_merkle_root:string
+          @@ Daemon_rpcs.Types.Status.Fields.fold ~init:[] ~num_accounts:int
+               ~block_count:int ~uptime_secs:int' ~ledger_merkle_root:string
                ~staged_ledger_hash:string ~state_hash:string ~commit_id:string'
                ~conf_dir:string'
                ~peers:(id ~typ:Schema.(non_null @@ list (non_null string)))
