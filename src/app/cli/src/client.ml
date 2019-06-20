@@ -150,15 +150,27 @@ let get_trust_status_all =
     (Cli_lib.Background_daemon.init flags ~f:(fun port (nonzero, json) ->
          match%map dispatch Daemon_rpcs.Get_trust_status_all.rpc () port with
          | Ok ip_trust_statuses ->
+             (* always round the trust scores for display *)
+             let ip_rounded_trust_statuses =
+               List.map ip_trust_statuses ~f:(fun (ip_addr, status) ->
+                   let rounded_trust =
+                     Float.round_significant status.trust ~significant_digits:4
+                   in
+                   (* =. is a "robust compare" that is an approximate equality *)
+                   let trust =
+                     if Float.(rounded_trust =. zero) then Float.zero
+                     else rounded_trust
+                   in
+                   let rounded_status = {status with trust} in
+                   (ip_addr, rounded_status) )
+             in
              let filtered_ip_trust_statuses =
                if nonzero then
-                 List.filter ip_trust_statuses ~f:(fun (_ip_addr, status) ->
-                     not
-                       Float.(
-                         equal zero
-                           (round_significant status.trust
-                              ~significant_digits:4)) )
-               else ip_trust_statuses
+                 List.filter ip_rounded_trust_statuses
+                   ~f:(fun (_ip_addr, status) ->
+                     (* can use equal here; we have exactly zero when we had approximately zero *)
+                     not Float.(equal status.trust zero) )
+               else ip_rounded_trust_statuses
              in
              print_ip_trust_statuses filtered_ip_trust_statuses json
          | Error e ->
