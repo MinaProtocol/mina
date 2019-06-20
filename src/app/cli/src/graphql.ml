@@ -78,6 +78,9 @@ module Types = struct
     (** base58 representation of public key that is compressed to make snark computation efficent *)
     let public_key = Public_key.Compressed.to_base58_check
 
+    (** string representation of IPv4 or IPv6 address *)
+    let ip_address = Unix.Inet_addr.to_string
+
     (** Unix form of time, which is the number of milliseconds that elapsed from January 1, 1970 *)
     let date = Time.to_string
 
@@ -495,6 +498,13 @@ module Types = struct
       obj "DeleteWalletPayload" ~fields:(fun _ ->
           [pubkey_field ~resolve:(fun _ key -> Stringable.public_key key)] )
 
+    let reset_trust_status =
+      obj "ResetTrustStatusPayload" ~fields:(fun _ ->
+          [ field "ipAddress" ~typ:(non_null string)
+              ~doc:"An IPv4 or IPv6 address"
+              ~args:Arg.[]
+              ~resolve:(fun _ ip_addr -> Stringable.ip_address ip_addr) ] )
+
     let send_payment =
       obj "SendPaymentPayload" ~fields:(fun _ ->
           [ field "payment" ~typ:(non_null user_command)
@@ -529,6 +539,10 @@ module Types = struct
     let public_key ~name public_key =
       result_of_exn Public_key.Compressed.of_base58_check_exn public_key
         ~error:(sprintf !"%s address is not valid." name)
+
+    let ip_address ~name ip_addr =
+      result_of_exn Unix.Inet_addr.of_string ip_addr
+        ~error:(sprintf !"%s is not valid." name)
   end
 
   module Input = struct
@@ -569,6 +583,10 @@ module Types = struct
     let delete_wallet =
       obj "DeleteWalletInput" ~coerce:Fn.id
         ~fields:[arg "publicKey" ~typ:(non_null string)]
+
+    let reset_trust_status =
+      obj "ResetTrustStatusInput" ~coerce:Fn.id
+        ~fields:[arg "ipAddress" ~typ:(non_null string)]
 
     (* TODO: Treat cases where filter_input has a null argument *)
     let filter_input ~title ~arg_name ~arg_doc =
@@ -1005,6 +1023,20 @@ module Mutations = struct
             (Secrets.Wallets.delete wallets public_key)
         in
         public_key )
+
+  let reset_trust_status =
+    io_field "resetTrustStatus"
+      ~doc:"Reset trust status for a given IP address"
+      ~typ:(non_null Types.Payload.reset_trust_status)
+      ~args:Arg.[arg "input" ~typ:(non_null Types.Input.reset_trust_status)]
+      ~resolve:(fun {ctx= coda; _} () ip_address_input ->
+        let open Deferred.Result.Let_syntax in
+        let%bind ip_address =
+          Deferred.return
+          @@ Types.Arguments.ip_address ~name:"ip_address" ip_address_input
+        in
+        ignore (Coda_commands.reset_trust_status coda ip_address) ;
+        return ip_address )
 
   let build_user_command coda {Account.Poly.nonce; _} sender_kp memo
       payment_body fee =
