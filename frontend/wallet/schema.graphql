@@ -1,3 +1,68 @@
+type Interval {
+  start: String! # timespan
+  end: String! # timespan
+}
+
+type Histogram {
+  values: [Int!]!
+  intervals: [Interval!]!
+  underflow: Int!
+  overflow: Int!
+}
+
+type RpcPair {
+  dispatch: Histogram
+  impl: Histogram
+}
+
+type RpcTimings {
+  getStagedLedgerAux: RpcPair!
+  answerSyncLedgerQuery: RpcPair!
+  getAncestry: RpcPair!
+  transitionCatchup: RpcPair!
+}
+
+type Histograms {
+  rpcTimings: RpcTimings!
+  externalTransitionLatency: Histogram
+  acceptedTransitionLocalLatency: Histogram
+  acceptedTransitionRemoteLatency: Histogram
+  snarkWorkerTransitionTime: Histogram
+  snarkWorkerMergeTime: Histogram
+}
+
+type ConsensusConfiguration {
+  delta: Int!
+  k: Int!
+  c: Int!
+  cTimesK: Int!
+  slotsPerEpoch: Int!
+  slotDuration: Int!
+  epochDuration: Int!
+  acceptableNetworkDelay: Int!
+}
+
+type DaemonStatus {
+  numAccounts: Int
+  blockCount: Int
+  uptimeSecs: Int!
+  ledgerMerkleRoot: String
+  stagedLedgerHash: String
+  stateHash: String
+  commitId: String! # git sha
+  confDir: String!
+  peers: [String!]!
+  userCommandsSent: Int!
+  runSnarkWorker: Boolean!
+  syncStatus: SyncStatus!
+  proposePubkeys: [String!]! @examples(values: [["PUB_KEY_E9873DF4453213303DA61F2", "PUB_KEY_F1173DF4453213303DA61F2"]])
+  histograms: Histograms
+  consensusTimeBestTip: String
+  consensusTimeNow: String!
+  consensusMechanism: String!
+  consensusConfiguration: ConsensusConfiguration!
+}
+
 enum SyncStatus {
   OFFLINE
   BOOTSTRAP # Resyncing
@@ -223,6 +288,9 @@ type Query {
 
   # Current sync status of the node
   syncStatus: SyncStatus!
+
+  # Current daemon status of the node
+  daemonStatus: DaemonStatus!
   
   # version of the node (commit hash or version #)
   version: String @examples(values: ["aa8c3f93ec2bad4718c308914df9e47b586f8ecd"])
