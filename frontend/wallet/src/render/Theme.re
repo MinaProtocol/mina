@@ -3,6 +3,10 @@ open Css;
 
 global("*", [boxSizing(`borderBox), userSelect(`none)]);
 global("h1, h2, h3, h4, h5", [margin(`zero)]);
+global(
+  "input[type=number]::-webkit-inner-spin-button, input[type=number]::-webkit-outer-spin-button",
+  [margin(`zero), unsafe("-webkit-appearance", "none")],
+);
 
 module Colors = {
   let string =
@@ -133,11 +137,7 @@ module Text = {
       ]);
 
     let mono =
-      style([
-        Typeface.mono,
-        fontWeight(`medium),
-        fontSize(`rem(0.9)),
-      ]);
+      style([Typeface.mono, fontWeight(`medium), fontSize(`rem(0.9))]);
 
     let small =
       style([

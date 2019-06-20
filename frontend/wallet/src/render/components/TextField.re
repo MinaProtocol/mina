@@ -141,7 +141,7 @@ module Currency = {
       </span>
       <input
         className=Styles.input
-        type_="text"
+        type_="number"
         onChange={e => {
           let value =
             ReactEvent.Form.target(e)##value
