@@ -47,26 +47,26 @@ module Reflection = struct
 
     let id ~typ a x = reflect Fn.id ~typ a x
 
-    let int' a x = id ~typ:(non_null int) a x
+    let nn_int a x = id ~typ:(non_null int) a x
 
     let int a x = id ~typ:int a x
 
-    let bool' a x = id ~typ:(non_null bool) a x
+    let nn_bool a x = id ~typ:(non_null bool) a x
 
     let bool a x = id ~typ:bool a x
 
-    let string' a x = id ~typ:(non_null string) a x
+    let nn_string a x = id ~typ:(non_null string) a x
 
     let string a x = id ~typ:string a x
 
     module F = struct
       let int f a x = reflect f ~typ:Schema.int a x
 
-      let int' f a x = reflect f ~typ:Schema.(non_null int) a x
+      let nn_int f a x = reflect f ~typ:Schema.(non_null int) a x
 
       let string f a x = reflect f ~typ:Schema.string a x
 
-      let string' f a x = reflect f ~typ:Schema.(non_null string) a x
+      let nn_string f a x = reflect f ~typ:Schema.(non_null string) a x
     end
   end
 end
@@ -147,7 +147,7 @@ module Types = struct
           @@ Perf_histograms.Report.Fields.fold ~init:[]
                ~values:(id ~typ:Schema.(non_null (list (non_null int))))
                ~intervals:(id ~typ:(non_null (list (non_null interval))))
-               ~underflow:int' ~overflow:int' )
+               ~underflow:nn_int ~overflow:nn_int )
 
     module Rpc_timings = Daemon_rpcs.Types.Status.Rpc_timings
     module Rpc_pair = Rpc_timings.Rpc_pair
@@ -183,28 +183,28 @@ module Types = struct
       obj "ConsensusConfiguration" ~fields:(fun _ ->
           let open Reflection.Shorthand in
           List.rev
-          @@ Consensus.Configuration.Fields.fold ~init:[] ~delta:int' ~k:int'
-               ~c:int' ~c_times_k:int' ~slots_per_epoch:int'
-               ~slot_duration:int' ~epoch_duration:int'
-               ~acceptable_network_delay:int' )
+          @@ Consensus.Configuration.Fields.fold ~init:[] ~delta:nn_int
+               ~k:nn_int ~c:nn_int ~c_times_k:nn_int ~slots_per_epoch:nn_int
+               ~slot_duration:nn_int ~epoch_duration:nn_int
+               ~acceptable_network_delay:nn_int )
 
     let t : (_, Daemon_rpcs.Types.Status.t option) typ =
       obj "DaemonStatus" ~fields:(fun _ ->
           let open Reflection.Shorthand in
           List.rev
           @@ Daemon_rpcs.Types.Status.Fields.fold ~init:[] ~num_accounts:int
-               ~block_count:int ~uptime_secs:int' ~ledger_merkle_root:string
-               ~staged_ledger_hash:string ~state_hash:string ~commit_id:string'
-               ~conf_dir:string'
+               ~block_count:int ~uptime_secs:nn_int ~ledger_merkle_root:string
+               ~staged_ledger_hash:string ~state_hash:string
+               ~commit_id:nn_string ~conf_dir:nn_string
                ~peers:(id ~typ:Schema.(non_null @@ list (non_null string)))
-               ~user_commands_sent:int' ~run_snark_worker:bool'
+               ~user_commands_sent:nn_int ~run_snark_worker:nn_bool
                ~sync_status:(id ~typ:(non_null sync_status))
                ~propose_pubkeys:
                  (Reflection.reflect
                     ~typ:Schema.(non_null @@ list (non_null string))
                     (List.map ~f:Stringable.public_key))
                ~histograms:(id ~typ:histograms) ~consensus_time_best_tip:string
-               ~consensus_time_now:string' ~consensus_mechanism:string'
+               ~consensus_time_now:nn_string ~consensus_mechanism:nn_string
                ~consensus_configuration:
                  (id ~typ:(non_null consensus_configuration)) )
   end
