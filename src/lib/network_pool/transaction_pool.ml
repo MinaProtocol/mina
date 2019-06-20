@@ -24,7 +24,8 @@ module type Transition_frontier_intf = sig
     module Best_tip_diff : sig
       type view =
         { new_user_commands: User_command.t list
-        ; removed_user_commands: User_command.t list }
+        ; removed_user_commands: User_command.t list
+        ; reorg_best_tip: bool }
     end
   end
 
@@ -118,7 +119,7 @@ struct
       go pool @@ Sequence.empty
 
     let handle_diff t frontier
-        ({new_user_commands; removed_user_commands} :
+        ({new_user_commands; removed_user_commands; reorg_best_tip= _} :
           Transition_frontier.Diff.Best_tip_diff.view) =
       (* This runs whenever the best tip changes. The simple case is when the new
          best tip is an extension of the old one. There, we remove any user
@@ -196,7 +197,7 @@ struct
                  Logger.debug t.logger ~module_:__MODULE__ ~location:__LOC__
                    "no frontier" ;
                  (* Sanity check: the view pipe should have been closed before the
-                        frontier was destroyed. *)
+                          frontier was destroyed. *)
                  match t.diff_reader with
                  | None ->
                      Deferred.unit
@@ -451,7 +452,7 @@ struct
   include Network_pool_base.Make (Transition_frontier) (Resource_pool)
 
   (* TODO: This causes the signature to get checked twice as it is checked
-   below before feeding it to add *)
+     below before feeding it to add *)
   let add t txn = apply_and_broadcast t (Envelope.Incoming.local [txn])
 end
 
@@ -499,7 +500,8 @@ let%test_module _ =
         module Best_tip_diff = struct
           type view =
             { new_user_commands: User_command.t list
-            ; removed_user_commands: User_command.t list }
+            ; removed_user_commands: User_command.t list
+            ; reorg_best_tip: bool }
         end
       end
 
@@ -512,7 +514,9 @@ let%test_module _ =
         let pipe_r, pipe_w =
           Broadcast_pipe.create
             Diff.Best_tip_diff.
-              {new_user_commands= []; removed_user_commands= []}
+              { new_user_commands= []
+              ; removed_user_commands= []
+              ; reorg_best_tip= false }
         in
         let accounts =
           List.map (Array.to_list test_keys) ~f:(fun kp ->
@@ -590,13 +594,15 @@ let%test_module _ =
           let%bind () =
             Broadcast_pipe.Writer.write best_tip_diff_w
               { new_user_commands= [List.hd_exn independent_cmds]
-              ; removed_user_commands= [] }
+              ; removed_user_commands= []
+              ; reorg_best_tip= false }
           in
           assert_pool_txs (List.tl_exn independent_cmds) ;
           let%bind () =
             Broadcast_pipe.Writer.write best_tip_diff_w
               { new_user_commands= List.take (List.tl_exn independent_cmds) 2
-              ; removed_user_commands= [] }
+              ; removed_user_commands= []
+              ; reorg_best_tip= false }
           in
           assert_pool_txs (List.drop independent_cmds 3) ;
           Deferred.unit )
@@ -640,7 +646,8 @@ let%test_module _ =
           let%bind () =
             Broadcast_pipe.Writer.write best_tip_diff_w
               { new_user_commands= List.take independent_cmds 1
-              ; removed_user_commands= [List.nth_exn independent_cmds 1] }
+              ; removed_user_commands= [List.nth_exn independent_cmds 1]
+              ; reorg_best_tip= true }
           in
           assert_pool_txs (List.tl_exn independent_cmds) ;
           Deferred.unit )
@@ -656,7 +663,9 @@ let%test_module _ =
           (* need a best tip diff so the ref is actually read *)
           let%bind _ =
             Broadcast_pipe.Writer.write best_tip_diff_w
-              {new_user_commands= []; removed_user_commands= []}
+              { new_user_commands= []
+              ; removed_user_commands= []
+              ; reorg_best_tip= false }
           in
           let%bind apply_res =
             Test.Resource_pool.Diff.apply pool
@@ -691,7 +700,8 @@ let%test_module _ =
           let%bind _ =
             Broadcast_pipe.Writer.write best_tip_diff_w
               { new_user_commands= List.take independent_cmds 1
-              ; removed_user_commands= [] }
+              ; removed_user_commands= []
+              ; reorg_best_tip= false }
           in
           assert_pool_txs [] ;
           let cmd1 =
@@ -713,7 +723,8 @@ let%test_module _ =
           let%bind _ =
             Broadcast_pipe.Writer.write best_tip_diff_w
               { new_user_commands= cmd2 :: List.drop independent_cmds 2
-              ; removed_user_commands= List.take independent_cmds 2 }
+              ; removed_user_commands= List.take independent_cmds 2
+              ; reorg_best_tip= true }
           in
           assert_pool_txs [List.nth_exn independent_cmds 1] ;
           Deferred.unit )
@@ -825,7 +836,9 @@ let%test_module _ =
       best_tip_ref := map_set_multi !best_tip_ref [mk_account 0 970 1] ;
       let%bind () =
         Broadcast_pipe.Writer.write best_tip_diff_w
-          {new_user_commands= [committed_tx]; removed_user_commands= []}
+          { new_user_commands= [committed_tx]
+          ; removed_user_commands= []
+          ; reorg_best_tip= false }
       in
       assert_pool_txs [List.nth_exn txs 1] ;
       Deferred.unit

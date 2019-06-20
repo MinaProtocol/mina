@@ -83,7 +83,7 @@ module Make (Inputs : Inputs_intf) :
     let proposer_transition_reader_copy, proposer_transition_writer_copy =
       Strict_pipe.create ~name:"proposer transition copy" Synchronous
     in
-    Strict_pipe.transfer proposer_transition_reader
+    Strict_pipe.transfer_while_writer_alive proposer_transition_reader
       proposer_transition_writer_copy ~f:Fn.id
     |> don't_wait_for ;
     let unprocessed_transition_cache =

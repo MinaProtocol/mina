@@ -17,7 +17,7 @@ module Report : sig
     ; intervals: (Time.Span.t * Time.Span.t) list
     ; underflow: int
     ; overflow: int }
-  [@@deriving yojson, bin_io]
+  [@@deriving yojson, bin_io, fields]
 end
 
 val add_span : name:string -> Time.Span.t -> unit

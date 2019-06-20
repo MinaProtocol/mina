@@ -108,6 +108,12 @@ let setup_local_server ?(client_whitelist = []) ?rest_server_port ~coda
           return
             ( Coda_commands.get_balance coda pk
             |> Participating_state.active_exn ) )
+    ; implement Daemon_rpcs.Get_trust_status.rpc (fun () ip_address ->
+          return (Coda_commands.get_trust_status coda ip_address) )
+    ; implement Daemon_rpcs.Get_trust_status_all.rpc (fun () () ->
+          return (Coda_commands.get_trust_status_all coda) )
+    ; implement Daemon_rpcs.Reset_trust_status.rpc (fun () ip_address ->
+          return (Coda_commands.reset_trust_status coda ip_address) )
     ; implement Daemon_rpcs.Verify_proof.rpc (fun () (pk, tx, proof) ->
           return
             ( Coda_commands.verify_payment coda pk tx proof

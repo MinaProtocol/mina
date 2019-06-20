@@ -95,3 +95,20 @@ struct
 
   include Make_of_string (String_ops)
 end
+
+module Make_base58_check (T : sig
+  type t [@@deriving bin_io]
+
+  val version_byte : char
+end) =
+struct
+  let to_base58_check t =
+    let payload = Binable.to_string (module T) t in
+    Base58_check.encode ~version_byte:T.version_byte ~payload
+
+  let of_base58_check_exn s =
+    let version_byte, decoded = Base58_check.decode_exn s in
+    if not (Char.equal version_byte T.version_byte) then
+      failwith "of.encode_exn: unexpected version byte" ;
+    Binable.of_string (module T) decoded
+end

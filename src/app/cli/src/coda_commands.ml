@@ -88,7 +88,7 @@ let get_accounts t =
   Ledger.to_list ledger
 
 let string_of_public_key =
-  Fn.compose Public_key.Compressed.to_base64 Account.public_key
+  Fn.compose Public_key.Compressed.to_base58_check Account.public_key
 
 let get_public_keys t =
   let open Participating_state.Let_syntax in
@@ -121,6 +121,21 @@ let get_balance t (addr : Public_key.Compressed.t) =
   let open Participating_state.Option.Let_syntax in
   let%map account = get_account t addr in
   account.Account.Poly.balance
+
+let get_trust_status t (ip_address : Unix.Inet_addr.Blocking_sexp.t) =
+  let config = Coda_lib.config t in
+  let trust_system = config.trust_system in
+  Trust_system.lookup trust_system ip_address
+
+let get_trust_status_all t =
+  let config = Coda_lib.config t in
+  let trust_system = config.trust_system in
+  Trust_system.peer_statuses trust_system
+
+let reset_trust_status t (ip_address : Unix.Inet_addr.Blocking_sexp.t) =
+  let config = Coda_lib.config t in
+  let trust_system = config.trust_system in
+  Trust_system.reset trust_system ip_address
 
 module Receipt_chain_hash = struct
   (* Receipt.Chain_hash does not have bin_io *)
@@ -329,7 +344,13 @@ let get_status ~flag t =
 let clear_hist_status ~flag t = Perf_histograms.wipe () ; get_status ~flag t
 
 module Subscriptions = struct
-  let new_block = Coda_lib.add_block_subscriber
+  let new_block t public_key =
+    let subscription = Coda_lib.subscription t in
+    Coda_lib.Subscriptions.add_block_subscriber subscription public_key
+
+  let reorganization t =
+    let subscription = Coda_lib.subscription t in
+    Coda_lib.Subscriptions.add_reorganization_subscriber subscription
 end
 
 module For_tests = struct
