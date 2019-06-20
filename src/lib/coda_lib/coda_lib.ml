@@ -426,7 +426,7 @@ let create (config : Config.t) =
                     (Some persistence, root_snarked_ledger, frontier) )
           in
           let frontier_broadcast_pipe_r, frontier_broadcast_pipe_w =
-            Broadcast_pipe.create (Some transition_frontier)
+            Broadcast_pipe.create None
           in
           Option.iter persistence ~f:(fun persistence ->
               Transition_frontier_persistence.listen_to_frontier_broadcast_pipe
@@ -490,7 +490,6 @@ let create (config : Config.t) =
               ~incoming_diffs:(Coda_networking.transaction_pool_diffs net)
               ~frontier_broadcast_pipe:frontier_broadcast_pipe_r
           in
-          let%bind () = after (Time_ns.Span.of_sec 5.) in
           let valid_transitions =
             Transition_router.run ~logger:config.logger
               ~trust_system:config.trust_system ~verifier ~network:net
@@ -501,7 +500,7 @@ let create (config : Config.t) =
               ~network_transition_reader:
                 (Strict_pipe.Reader.map external_transitions_reader
                    ~f:(fun (tn, tm) -> (`Transition tn, `Time_received tm)))
-              ~proposer_transition_reader
+              ~proposer_transition_reader transition_frontier
           in
           let ( valid_transitions_for_network
               , valid_transitions_for_api

@@ -25,6 +25,12 @@ let with_snark = false
 [%%endif]
 
 let run_test () : unit Deferred.t =
+  Unix.putenv ~key:"CODA_TIME_OFFSET"
+    ~data:
+      ( Time.Span.to_int63_seconds_round_down_exn (force Coda_processes.offset)
+      |> Int63.to_int
+      |> Option.value_exn ?here:None ?message:None ?error:None
+      |> Int.to_string ) ;
   Parallel.init_master () ;
   let logger = Logger.create () in
   File_system.with_temp_dir "full_test_config" ~f:(fun temp_conf_dir ->
