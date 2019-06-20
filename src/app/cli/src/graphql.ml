@@ -25,6 +25,52 @@ module Doc = struct
         that elapsed from January 1, 1970)"
 end
 
+module Reflection = struct
+  let regex = lazy (Re2.create_exn {regex|\_(\w)|regex})
+
+  let underToCamel s =
+    Re2.replace_exn (Lazy.force regex) s ~f:(fun m ->
+        let s = Re2.Match.get_exn ~sub:(`Index 1) m in
+        String.capitalize s )
+
+  (** When Fields.folding, create graphql fields via reflection *)
+  let reflect f ~typ acc x =
+    let new_name = underToCamel (Field.name x) in
+    Schema.(
+      field new_name ~typ ~args:Arg.[] ~resolve:(fun _ v -> f (Field.get x v))
+      :: acc)
+
+  module Shorthand = struct
+    open Schema
+
+    (* Note: Eta expansion is needed here to combat OCaml's weak polymorphism nonsense *)
+
+    let id ~typ a x = reflect Fn.id ~typ a x
+
+    let int' a x = id ~typ:(non_null int) a x
+
+    let int a x = id ~typ:int a x
+
+    let bool' a x = id ~typ:(non_null bool) a x
+
+    let bool a x = id ~typ:bool a x
+
+    let string' a x = id ~typ:(non_null string) a x
+
+    let string a x = id ~typ:string a x
+
+    module F = struct
+      let int f a x = reflect f ~typ:Schema.int a x
+
+      let int' f a x = reflect f ~typ:Schema.(non_null int) a x
+
+      let string f a x = reflect f ~typ:Schema.string a x
+
+      let string' f a x = reflect f ~typ:Schema.(non_null string) a x
+    end
+  end
+end
+
 module Types = struct
   open Schema
 
@@ -71,6 +117,98 @@ module Types = struct
   let uint64_result_field name ~doc =
     result_field_no_inputs name ~typ:(non_null string)
       ~doc:(Doc.uint64 doc name)
+
+  let sync_status : ('context, [`Offline | `Synced | `Bootstrap] option) typ =
+    enum "SyncStatus" ~doc:"Sync status as daemon node"
+      ~values:
+        [ enum_value "BOOTSTRAP" ~value:`Bootstrap
+        ; enum_value "SYNCED" ~value:`Synced
+        ; enum_value "OFFLINE" ~value:`Offline ]
+
+  module DaemonStatus = struct
+    type t = Daemon_rpcs.Types.Status.t
+
+    let interval : (_, (Time.Span.t * Time.Span.t) option) typ =
+      obj "Interval" ~fields:(fun _ ->
+          [ field "start" ~typ:(non_null string)
+              ~args:Arg.[]
+              ~resolve:(fun _ (start, _) ->
+                Time.Span.to_ms start |> Int64.of_float |> Int64.to_string )
+          ; field "stop" ~typ:(non_null string)
+              ~args:Arg.[]
+              ~resolve:(fun _ (_, end_) ->
+                Time.Span.to_ms end_ |> Int64.of_float |> Int64.to_string ) ]
+      )
+
+    let histogram : (_, Perf_histograms.Report.t option) typ =
+      obj "Histogram" ~fields:(fun _ ->
+          let open Reflection.Shorthand in
+          List.rev
+          @@ Perf_histograms.Report.Fields.fold ~init:[]
+               ~values:(id ~typ:Schema.(non_null (list (non_null int))))
+               ~intervals:(id ~typ:(non_null (list (non_null interval))))
+               ~underflow:int' ~overflow:int' )
+
+    module Rpc_timings = Daemon_rpcs.Types.Status.Rpc_timings
+    module Rpc_pair = Rpc_timings.Rpc_pair
+
+    let rpc_pair : (_, Perf_histograms.Report.t option Rpc_pair.t option) typ =
+      let h = Reflection.Shorthand.id ~typ:histogram in
+      obj "RpcPair" ~fields:(fun _ ->
+          List.rev @@ Rpc_pair.Fields.fold ~init:[] ~dispatch:h ~impl:h )
+
+    let rpc_timings : (_, Rpc_timings.t option) typ =
+      let fd = Reflection.Shorthand.id ~typ:(non_null rpc_pair) in
+      obj "RpcTimings" ~fields:(fun _ ->
+          List.rev
+          @@ Rpc_timings.Fields.fold ~init:[] ~get_staged_ledger_aux:fd
+               ~answer_sync_ledger_query:fd ~get_ancestry:fd
+               ~transition_catchup:fd )
+
+    module Histograms = Daemon_rpcs.Types.Status.Histograms
+
+    let histograms : (_, Histograms.t option) typ =
+      let h = Reflection.Shorthand.id ~typ:histogram in
+      obj "Histograms" ~fields:(fun _ ->
+          let open Reflection.Shorthand in
+          List.rev
+          @@ Histograms.Fields.fold ~init:[]
+               ~rpc_timings:(id ~typ:(non_null rpc_timings))
+               ~external_transition_latency:h
+               ~accepted_transition_local_latency:h
+               ~accepted_transition_remote_latency:h
+               ~snark_worker_transition_time:h ~snark_worker_merge_time:h )
+
+    let consensus_configuration : (_, Consensus.Configuration.t option) typ =
+      obj "ConsensusConfiguration" ~fields:(fun _ ->
+          let open Reflection.Shorthand in
+          List.rev
+          @@ Consensus.Configuration.Fields.fold ~init:[] ~delta:int' ~k:int'
+               ~c:int' ~c_times_k:int' ~slots_per_epoch:int'
+               ~slot_duration:int' ~epoch_duration:int'
+               ~acceptable_network_delay:int' )
+
+    let t : (_, Daemon_rpcs.Types.Status.t option) typ =
+      let module S = Daemon_rpcs.Types.Status in
+      obj "DaemonStatus" ~fields:(fun _ ->
+          let open Reflection.Shorthand in
+          List.rev
+          @@ S.Fields.fold ~init:[] ~num_accounts:int ~block_count:int
+               ~uptime_secs:int' ~ledger_merkle_root:string
+               ~staged_ledger_hash:string ~state_hash:string ~commit_id:string'
+               ~conf_dir:string'
+               ~peers:(id ~typ:Schema.(non_null @@ list (non_null string)))
+               ~user_commands_sent:int' ~run_snark_worker:bool'
+               ~sync_status:(id ~typ:(non_null sync_status))
+               ~propose_pubkeys:
+                 (Reflection.reflect
+                    ~typ:Schema.(non_null @@ list (non_null string))
+                    (List.map ~f:Stringable.public_key))
+               ~histograms:(id ~typ:histograms) ~consensus_time_best_tip:string
+               ~consensus_time_now:string' ~consensus_mechanism:string'
+               ~consensus_configuration:
+                 (id ~typ:(non_null consensus_configuration)) )
+  end
 
   let user_command : (Coda_lib.t, User_command.t option) typ =
     obj "UserCommand" ~fields:(fun _ ->
@@ -232,13 +370,6 @@ module Types = struct
         ; field "transactions" ~typ:(non_null transactions)
             ~args:Arg.[]
             ~resolve:(fun _ {With_hash.data; _} -> data.transactions) ] )
-
-  let sync_status : ('context, [`Offline | `Synced | `Bootstrap] option) typ =
-    enum "SyncStatus" ~doc:"Sync status as daemon node"
-      ~values:
-        [ enum_value "BOOTSTRAP" ~value:`Bootstrap
-        ; enum_value "SYNCED" ~value:`Synced
-        ; enum_value "OFFLINE" ~value:`Offline ]
 
   let chain_reorganization_status : ('context, [`Changed] option) typ =
     enum "ChainReorganizationStatus"
@@ -1044,6 +1175,11 @@ module Queries = struct
           (Coda_incremental.Status.Observer.value @@ Coda_lib.sync_status coda)
           ~f:Error.to_string_hum )
 
+  let daemon_status =
+    field "daemonStatus" ~doc:"Get running daemon status" ~args:[]
+      ~typ:(non_null Types.DaemonStatus.t) ~resolve:(fun {ctx= coda; _} () ->
+        Coda_commands.get_status ~flag:`Performance coda )
+
   let version =
     field "version" ~typ:string
       ~args:Arg.[]
@@ -1114,6 +1250,7 @@ module Queries = struct
 
   let commands =
     [ sync_state
+    ; daemon_status
     ; version
     ; owned_wallets
     ; wallet
