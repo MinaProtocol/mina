@@ -103,6 +103,18 @@ let reduce = (acc, action) => {
   };
 };
 
+let defaultNetwork = "testnet.codaprotocol.com";
+let getLocalStorageNetwork = () => {
+  Bindings.(
+    switch (Js.Nullable.toOption(LocalStorage.getItem(`Network))) {
+    | Some(x) => x
+    | None =>
+      LocalStorage.setItem(~key=`Network, ~value=defaultNetwork);
+      defaultNetwork;
+    }
+  );
+};
+
 let useHook = () => {
   let (_state, dispatch) =
     Hooks.Reducer.useReducer(reduce, {State.args: [], mode: Stable});
@@ -110,7 +122,7 @@ let useHook = () => {
   let () =
     React.useEffect0(() => {
       let token = MainCommunication.listen();
-      dispatch(Action.ForceStartCoda);
+      dispatch(Action.ChangeArgs(["-peer", getLocalStorageNetwork()]));
       Some(() => MainCommunication.stopListening(token));
     });
 

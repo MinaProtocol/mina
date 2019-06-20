@@ -6,14 +6,13 @@ module Command = {
     executable: string,
     args: array(string),
     env: Js.Dict.t(string),
-    logfileName: string,
   };
 };
 
 let (^/) = Filename.concat;
 
+let codaPath = "_build/coda-daemon-macos";
 let codaCommand = (~port, ~extraArgs) => {
-  let codaPath = "_build/coda-daemon-macos";
   {
     Command.executable: ProjectRoot.resource ^/ codaPath ^/ "coda.exe",
     args:
@@ -39,15 +38,30 @@ let codaCommand = (~port, ~extraArgs) => {
           Js.Dict.entries(ChildProcess.Process.env),
         ),
       ),
-    logfileName: "daemon",
   };
+};
+
+let fakerCommand = (~port) => {
+  Command.executable: "node",
+  args: [|
+    Filename.concat(
+      ProjectRoot.resource,
+      "node_modules/graphql-faker/dist/index.js",
+    ),
+    "--port",
+    string_of_int(port),
+    "--",
+    "schema.graphql",
+  |],
+  env: ChildProcess.Process.env,
 };
 
 module Process = {
   let start = (command: Command.t) => {
-    let {Command.executable, args, logfileName} = command;
+    let {Command.executable, args} = command;
+    let logfileName = "daemon.log";
     print_endline(
-      {j|Starting $executable with $args. Logging to `$logfileName.log`|j},
+      {j|Starting $executable with $args. Logging to `$logfileName`|j},
     );
 
     /*
@@ -65,7 +79,8 @@ module Process = {
      https://github.com/janestreet/async_unix/issues/15
      */
 
-    let log = Fs.openSync(command.logfileName ++ ".log", "w");
+    let log = Fs.openSync(logfileName, "w");
+    Fs.writeSync(log, {j|Started with $args\n|j});
     let process =
       ChildProcess.spawn(
         command.executable,
@@ -82,8 +97,8 @@ module Process = {
         "Daemon process "
         ++ command.executable
         ++ " crashed. Logs are in `"
-        ++ command.logfileName
-        ++ ".log`. Error:"
+        ++ logfileName
+        ++ "`. Error:"
         ++ ChildProcess.Error.messageGet(e),
       )
     );
@@ -95,10 +110,10 @@ module Process = {
         if (code != 0) {
           Printf.fprintf(
             stderr,
-            "Daemon process %s died with non-zero exit code: %d. Logs are in `%s.log`\n",
+            "Daemon process %s died with non-zero exit code: %d. Logs are in `%s`\n",
             command.executable,
             code,
-            command.logfileName,
+            logfileName,
           );
         } else {
           print_endline(
@@ -127,32 +142,24 @@ module CodaProcess = {
 
   let kill: t => unit = t => ChildProcess.Process.kill(t, "SIGINT");
 
+  let port = 0xc0da;
+
   let start: list(string) => t =
     args => {
-      Process.start(
-        codaCommand(~port=0xc0da, ~extraArgs=args |> Array.fromList),
-      );
-    };
-};
+      switch (Js.Dict.get(ChildProcess.Process.env, "GRAPHQL_BACKEND")) {
+      | Some("faker") => Process.start(fakerCommand(~port))
+      | _ =>
+        /* Workaround for https://github.com/CodaProtocol/coda/issues/2667
+           Remove the config deletion when it is resolved.  */
+        let transitionFrontierPath =
+          ProjectRoot.resource ^/ codaPath ^/ "config/transition_frontier";
 
-let startFaker = port => {
-  let graphqlFaker = {
-    Command.executable: "node",
-    args: [|
-      Filename.concat(
-        ProjectRoot.resource,
-        "node_modules/graphql-faker/dist/index.js",
-      ),
-      "--port",
-      string_of_int(port),
-      "--",
-      "schema.graphql",
-    |],
-    env: ChildProcess.Process.env,
-    logfileName: "faker",
-  };
-  let p = Process.start(graphqlFaker);
-  () => {
-    ChildProcess.Process.kill(p, "SIGINT");
-  };
+        Printf.fprintf(stderr, "Deleting %s\n%!", transitionFrontierPath);
+        Bindings.ChildProcess.execSync(
+          "rm",
+          [|"-rf", transitionFrontierPath|],
+        );
+        Process.start(codaCommand(~port, ~extraArgs=args |> Array.fromList));
+      };
+    };
 };
