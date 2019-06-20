@@ -7,15 +7,17 @@ let%test_module "network pool test" =
     let trust_system = Mocks.trust_system
 
     module Mock_snark_pool =
-      Snark_pool.Make (Mocks.Ledger_proof) (Mocks.Transaction_snark)
-        (Mocks.Transaction_snark_work)
+      Snark_pool.Make (Mocks.Ledger_proof) (Mocks.Transaction_snark_work)
         (Mocks.Transition_frontier)
 
     let%test_unit "Work that gets fed into apply_and_broadcast will be \
                    received in the pool's reader" =
       let pool_reader, _pool_writer = Linear_pipe.create () in
       let frontier_broadcast_pipe_r, _ = Broadcast_pipe.create None in
-      let work = [1] in
+      let work =
+        [ Quickcheck.random_value ~seed:(`Deterministic "network_pool_test")
+            Transaction_snark.Statement.gen ]
+      in
       let priced_proof =
         { Priced_proof.proof= []
         ; fee=
@@ -47,7 +49,13 @@ let%test_module "network pool test" =
 
     let%test_unit "when creating a network, the incoming diffs in reader pipe \
                    will automatically get process" =
-      let works = List.range 0 10 |> List.map ~f:(fun x -> [x]) in
+      let works =
+        Quickcheck.random_sequence ~seed:(`Deterministic "works")
+          Transaction_snark.Statement.gen
+        |> Fn.flip Sequence.take 10
+        |> Sequence.map ~f:List.return
+        |> Sequence.to_list
+      in
       let verify_unsolved_work () =
         let work_diffs =
           List.map works ~f:(fun work ->
