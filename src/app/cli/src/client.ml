@@ -81,6 +81,20 @@ let get_balance =
          | Error e ->
              printf "Failed to get balance %s\n" (Error.to_string_hum e) ))
 
+let print_trust_status status json =
+  if json then
+    printf "%s\n"
+      (Yojson.Safe.to_string (Trust_system.Peer_status.to_yojson status))
+  else
+    let ban_status =
+      match status.banned with
+      | Unbanned ->
+          "Unbanned"
+      | Banned_until tm ->
+          sprintf "Banned_until %s" (Time.to_string_abs tm ~zone:Time.Zone.utc)
+    in
+    printf "%0.04f, %s\n" status.trust ban_status
+
 let get_trust_status =
   let open Command.Param in
   let open Deferred.Let_syntax in
@@ -99,22 +113,32 @@ let get_trust_status =
            dispatch Daemon_rpcs.Get_trust_status.rpc ip_address port
          with
          | Ok status ->
-             if json then
-               printf "%s\n"
-                 (Yojson.Safe.to_string
-                    (Trust_system.Peer_status.to_yojson status))
-             else
-               let ban_status =
-                 match status.banned with
-                 | Unbanned ->
-                     "Unbanned"
-                 | Banned_until tm ->
-                     sprintf "Banned_until %s"
-                       (Time.to_string_abs tm ~zone:Time.Zone.utc)
-               in
-               printf "%0.04f, %s\n" status.trust ban_status
+             print_trust_status status json
          | Error e ->
              printf "Failed to get trust status %s\n" (Error.to_string_hum e)
+     ))
+
+let reset_trust_status =
+  let open Command.Param in
+  let open Deferred.Let_syntax in
+  let address_flag =
+    flag "ip-address"
+      ~doc:
+        "IP An IPv4 or IPv6 address for which you want to reset the trust \
+         status"
+      (required Cli_lib.Arg_type.ip_address)
+  in
+  let json_flag = Cli_lib.Flag.json in
+  let flags = Args.zip2 address_flag json_flag in
+  Command.async ~summary:"Reset the trust status associated with an IP address"
+    (Cli_lib.Background_daemon.init flags ~f:(fun port (ip_address, json) ->
+         match%map
+           dispatch Daemon_rpcs.Reset_trust_status.rpc ip_address port
+         with
+         | Ok status ->
+             print_trust_status status json
+         | Error e ->
+             printf "Failed to reset trust status %s\n" (Error.to_string_hum e)
      ))
 
 let get_public_keys =
@@ -566,6 +590,7 @@ let command =
     [ ("get-balance", get_balance)
     ; ("get-public-keys", get_public_keys)
     ; ("get-trust-status", get_trust_status)
+    ; ("reset-trust-status", reset_trust_status)
     ; ("prove-payment", prove_payment)
     ; ("verify-payment", verify_payment)
     ; ("get-nonce", get_nonce_cmd)

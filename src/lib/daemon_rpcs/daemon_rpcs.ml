@@ -325,7 +325,19 @@ module Get_trust_status = struct
   type error = unit [@@deriving bin_io]
 
   let rpc : (query, response) Rpc.Rpc.t =
-    Rpc.Rpc.create ~name:"Get_trust_score" ~version:0 ~bin_query ~bin_response
+    Rpc.Rpc.create ~name:"Get_trust_status" ~version:0 ~bin_query ~bin_response
+end
+
+module Reset_trust_status = struct
+  type query = Unix.Inet_addr.Blocking_sexp.t [@@deriving bin_io]
+
+  type response = Trust_system.Peer_status.Stable.Latest.t [@@deriving bin_io]
+
+  type error = unit [@@deriving bin_io]
+
+  let rpc : (query, response) Rpc.Rpc.t =
+    Rpc.Rpc.create ~name:"Reset_trust_status" ~version:0 ~bin_query
+      ~bin_response
 end
 
 module Verify_proof = struct
