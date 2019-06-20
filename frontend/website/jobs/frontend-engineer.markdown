@@ -3,26 +3,26 @@ title: Product Engineer (Frontend)
 date: 2019-06-20
 ---
 
-Help us build accessible, usable, delightful products on top of the Coda Cryptocurrency Protocol!
+Help us build accessible, usable, delightful products on top of the Coda Protocol!
 
-We’re seeking a frontend product engineer who is also excited by building beautiful products. While it's hard to say exactly what we'll work on given that we are such an early-stage startup, we expect projects to include:
+We’re seeking a product engineer who is also excited by building beautiful products. While it's hard to say exactly what we'll work on given that we are such an early-stage startup, we expect projects to include:
 
 - Wallet software that is a joy to use, with innovative onboarding and account recovery mechanisms.
 - The product side of developer tools and SDKs
 - Imaginative cryptocurrency applications that showcase what’s possible with a lightweight blockchain
 
 
-# Requirements
+## Requirements
 
 
 - An internship or 1+ years engineering experience
     - Bonus: Worked on a product team doing frontend work
 - Willingness to work on-site in a San Francisco based office
 - Exposure to a declarative frontend framework, such as React, Angular, Vue, Elm etc.
-    - Bonus for experience with React Hooks or GraphQL
+    - Bonus: Experience with React Hooks or GraphQL
 
 
-# Grab Bag (at least one of the following)
+## Nice to have (at least one of the following)
 
 
 - Familiarity with functional programming, know your way around map and reduce.
@@ -31,10 +31,10 @@ We’re seeking a frontend product engineer who is also excited by building beau
 - Exposure to working with cryptocurrencies
 - Experience with ReasonML, OCaml, Elm, or Purescript
 - Early stage startup experience
-- Experience with contributing to Open Source
+- Experience with contributing to open source
 
 
-# About
+## About us
 
 
 O(1) Labs is aiming to develop the first cryptocurrency protocol that can deliver on the promise of supporting real-world applications and widespread use. Our team is based in San Francisco, and we are funded by top investors (including Polychain, Metastable, Max Levchin, and Naval Ravikant).

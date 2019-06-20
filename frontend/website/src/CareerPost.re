@@ -13,7 +13,7 @@ let make = (~path, _) => {
         <style>
           {ReasonReact.string(
              {css|
-main h1 {
+main h2 {
   margin-top: 1.5rem;
   margin-bottom: 1.5rem;
 }
