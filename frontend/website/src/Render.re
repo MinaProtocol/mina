@@ -107,14 +107,13 @@ module Router = {
 };
 
 let jobOpenings = [|
-  ("engineering-manager", "Engineering Manager (San Francisco)."),
   ("product-manager", "Product Manager (San Francisco)."),
-  ("senior-frontend-engineer", "Senior Frontend Engineer (San Francisco)."),
-  ("protocol-engineer", "Senior Protocol Engineer (San Francisco)."),
   (
-    "director-of-business-development",
-    "Director of Business Development (San Francisco).",
+    "senior-frontend-engineer",
+    "Senior Product Engineer (Frontend) (San Francisco).",
   ),
+  ("frontend-engineer", "Product Engineer (Frontend) (San Francisco)."),
+  ("protocol-engineer", "Senior Protocol Engineer (San Francisco)."),
 |];
 
 // GENERATE
@@ -171,7 +170,7 @@ Router.(
                    page=`Jobs
                    name
                    footerColor=Style.Colors.gandalf
-                   extraHeaders={Careers.extraHeaders()}>
+                   extraHeaders={CareerPost.extraHeaders()}>
                    <Wrapped>
                      <CareerPost path={"jobs/" ++ name ++ ".markdown"} />
                    </Wrapped>
