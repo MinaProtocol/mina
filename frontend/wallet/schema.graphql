@@ -10,12 +10,12 @@ type Histogram {
   overflow: Int!
 }
 
-type RpcPair = {
+type RpcPair {
   dispatch: Histogram
   impl: Histogram
 }
 
-type RpcTimings = {
+type RpcTimings {
   getStagedLedgerAux: RpcPair!
   answerSyncLedgerQuery: RpcPair!
   getAncestry: RpcPair!
