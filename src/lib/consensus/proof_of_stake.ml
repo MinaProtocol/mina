@@ -104,7 +104,7 @@ module Configuration = struct
     ; slot_duration: int
     ; epoch_duration: int
     ; acceptable_network_delay: int }
-  [@@deriving yojson, bin_io]
+  [@@deriving yojson, bin_io, fields]
 
   let t =
     let open Constants in

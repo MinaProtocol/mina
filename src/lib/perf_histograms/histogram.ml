@@ -50,7 +50,7 @@ struct
       ; intervals: (Elem.t * Elem.t) list
       ; underflow: int
       ; overflow: int }
-    [@@deriving yojson, bin_io]
+    [@@deriving yojson, bin_io, fields]
   end
 
   let report {intervals; buckets; underflow; overflow; params= _} =

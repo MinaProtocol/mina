@@ -274,7 +274,16 @@ module type S = sig
   val epoch_size : int
 
   module Configuration : sig
-    type t [@@deriving yojson, bin_io]
+    type t =
+      { delta: int
+      ; k: int
+      ; c: int
+      ; c_times_k: int
+      ; slots_per_epoch: int
+      ; slot_duration: int
+      ; epoch_duration: int
+      ; acceptable_network_delay: int }
+    [@@deriving yojson, bin_io, fields]
 
     val t : t
   end

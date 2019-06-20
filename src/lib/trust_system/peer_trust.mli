@@ -68,6 +68,13 @@ module Make (Action : Action_intf) : sig
   (** Look up the score of a peer and whether it's banned .*)
   val lookup : t -> Unix.Inet_addr.Blocking_sexp.t -> Peer_status.t
 
+  (** reset peer status; return the reset status *)
+  val reset : t -> Unix.Inet_addr.Blocking_sexp.t -> Peer_status.t
+
+  (** get all peer, status pairs in the trust system *)
+  val peer_statuses :
+    t -> (Unix.Inet_addr.Blocking_sexp.t * Peer_status.t) list
+
   (** Shut down. *)
   val close : t -> unit
 
