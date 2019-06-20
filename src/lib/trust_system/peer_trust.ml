@@ -70,6 +70,10 @@ struct
     | None ->
         Record_inst.to_peer_status @@ Record_inst.init ()
 
+  let reset ({db; _} as t) peer =
+    Option.value_map db ~default:() ~f:(fun db' -> Db.remove db' ~key:peer) ;
+    lookup t peer
+
   let close {db; bans_writer; _} =
     Option.iter db ~f:Db.close ;
     Strict_pipe.Writer.close bans_writer
