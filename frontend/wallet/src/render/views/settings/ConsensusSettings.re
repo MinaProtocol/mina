@@ -20,7 +20,7 @@ let intForState = state =>
   | Stake(_) => 1
   };
 
-module CompressorModal = {
+module ConsensusModal = {
   [@react.component]
   let make = (~state, ~updateModal) =>
     <Modal
@@ -125,7 +125,7 @@ let make = () => {
   let (modalState, updateModal) = React.useState(() => None);
   <div>
     <h3 className=Theme.Text.Header.h3>
-      {React.string("Compression Settings")}
+      {React.string("Consensus Settings")}
     </h3>
     <Spacer height=0.5 />
     <Well>
@@ -152,7 +152,7 @@ let make = () => {
     </Well>
     {switch (modalState) {
      | None => React.null
-     | Some(state) => <CompressorModal state updateModal />
+     | Some(state) => <ConsensusModal state updateModal />
      }}
   </div>;
 };

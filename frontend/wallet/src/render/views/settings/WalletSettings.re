@@ -262,7 +262,7 @@ let make = (~publicKey) => {
       />
     </div>
     <Spacer height=1.5 />
-    <CompressorSettings />
+    <ConsensusSettings />
     <Spacer height=1.5 />
     <DeleteButton publicKey />
   </div>;
