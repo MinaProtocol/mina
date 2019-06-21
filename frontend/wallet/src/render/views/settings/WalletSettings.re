@@ -3,10 +3,16 @@ open Tc;
 module Styles = {
   open Css;
 
-  let container = style([padding(`rem(2.0))]);
+  let container =
+    style([
+      height(`percent(100.)),
+      padding(`rem(2.)),
+      borderTop(`px(1), `solid, white),
+      borderLeft(`px(1), `solid, white),
+      overflow(`scroll),
+    ]);
 
-  let backHeader =
-    style([display(`flex), alignItems(`center), userSelect(`none)]);
+  let backHeader = style([display(`flex), alignItems(`center)]);
 
   let backIcon =
     style([
@@ -18,15 +24,12 @@ module Styles = {
   let backHeaderText =
     merge([Theme.Text.Header.h3, style([color(Theme.Colors.midnight)])]);
 
+  let headerWalletName = style([fontSize(`rem(1.25))]);
+
   let label =
     merge([
       Theme.Text.Body.semiBold,
-      style([
-        color(Theme.Colors.midnight),
-        margin(`rem(0.25)),
-        marginTop(`rem(1.0)),
-        userSelect(`none),
-      ]),
+      style([color(Theme.Colors.midnight), marginBottom(`rem(0.25))]),
     ]);
 
   let deleteModalLabel = merge([label, style([alignSelf(`flexStart)])]);
@@ -49,12 +52,12 @@ module Styles = {
 
 module DeleteWallet = [%graphql
   {|
-  mutation deleteWallet($key: String!) {
+    mutation deleteWallet($key: String!) {
       deleteWallet(input: {publicKey: $key}) {
         publicKey
       }
-  }
-|}
+    }
+  |}
 ];
 
 module DeleteWalletMutation = ReasonApollo.CreateMutation(DeleteWallet);
@@ -199,10 +202,11 @@ let make = (~publicKey) => {
       </span>
       <Spacer width=0.5 />
       <span className=Styles.backHeaderText>
-        <WalletName pubkey=publicKey />
+        <WalletName pubkey=publicKey className=Styles.headerWalletName />
         {React.string(" settings")}
       </span>
     </div>
+    <Spacer height=1. />
     <div className=Styles.label> {React.string("Wallet name")} </div>
     <div className=Styles.textBox>
       <TextField
@@ -219,6 +223,7 @@ let make = (~publicKey) => {
         }
       />
     </div>
+    <Spacer height=1. />
     <div className=Styles.label> {React.string("Public key")} </div>
     <div className=Styles.textBox>
       <TextField
@@ -231,6 +236,7 @@ let make = (~publicKey) => {
         }
       />
     </div>
+    <Spacer height=1. />
     <div className=Styles.label> {React.string("Private key")} </div>
     <div className=Styles.textBox>
       <TextField
@@ -246,6 +252,8 @@ let make = (~publicKey) => {
         }
       />
     </div>
+    <Spacer height=1.5 />
+    <ConsensusSettings />
     <Spacer height=1.5 />
     <DeleteButton publicKey />
   </div>;
