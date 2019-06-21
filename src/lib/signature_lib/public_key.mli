@@ -88,6 +88,8 @@ module Compressed : sig
 
   val of_base58_check_exn : string -> t
 
+  val of_base58_check : string -> t Or_error.t
+
   module Checked : sig
     val equal : var -> var -> (Boolean.var, _) Checked.t
 
