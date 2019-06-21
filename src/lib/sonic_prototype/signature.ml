@@ -22,6 +22,7 @@ let hsc_p (srs : Srs.t) (gate_weights : Gate_weights.t) x ys : Hsc_proof.t =
     List.map ys ~f:(fun yi ->
         commit_poly srs srs.d x (eval_on_y yi (s_poly gate_weights)) )
   in
+  (* verifier samples u (from random oracle) and sends to prover *)
   let u = Fr.random () in
   let suX = eval_on_x u (s_poly gate_weights) in
   let commit = commit_poly srs srs.d x suX in
@@ -30,6 +31,7 @@ let hsc_p (srs : Srs.t) (gate_weights : Gate_weights.t) x ys : Hsc_proof.t =
         open_poly srs si x u (eval_on_y yi (s_poly gate_weights)) )
   in
   let sQ = List.map ys ~f:(fun yi -> open_poly srs commit x yi suX) in
+  (* verifier samples z (from random oracle) and sends to prover *)
   let z = Fr.random () in
   let _, qz = open_poly srs commit x z suX in
   { hsc_s= ss

@@ -58,8 +58,8 @@ let%test_unit "test2" =
 
 let%test_unit "evaluationTest" =
   let polyA = makeLaurentForTest 0 [2; 0; 1] in
-  assert (Fq.equal (Fq_laurent.eval polyA Fq.one) (Fq.of_string "3")) ;
+  assert (Fq.equal (Fq_laurent.eval polyA Fq.one) (Fq.of_int 3)) ;
   assert (
-    Fq.equal (Fq_laurent.eval polyA (Fq.of_string "3")) (Fq.of_string "11") ) ;
+    Fq.equal (Fq_laurent.eval polyA (Fq.of_int 3)) (Fq.of_int 11) ) ;
   assert (
-    Fq.equal (Fq_laurent.eval polyA (Fq.of_string "-3")) (Fq.of_string "11") )
+    Fq.equal (Fq_laurent.eval polyA (Fq.of_int (-3))) (Fq.of_int 11) )

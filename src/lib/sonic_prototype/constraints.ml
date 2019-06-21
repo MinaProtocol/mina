@@ -59,8 +59,8 @@ let s_poly (gate_weights : Gate_weights.t) =
   let g wi i =
     Fr_laurent.( + )
       (Fr_laurent.( + )
-         (Fr_laurent.create i [Fr.of_string "-1"])
-         (Fr_laurent.create (-i) [Fr.of_string "-1"]))
+         (Fr_laurent.create i [Fr.of_int (-1)])
+         (Fr_laurent.create (-i) [Fr.of_int (-1)]))
       (Fr_laurent.create (n + 1) wi)
   in
   let rec gg wis i =
