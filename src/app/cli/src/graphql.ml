@@ -84,6 +84,13 @@ module Types = struct
     (** Unix form of time, which is the number of milliseconds that elapsed from January 1, 1970 *)
     let date = Time.to_string
 
+    (** string representation of Trust_system.Banned_status *)
+    let banned_status = function
+      | Trust_system.Banned_status.Unbanned ->
+          None
+      | Banned_until tm ->
+          Some (date tm)
+
     (** Javascript only has 53-bit integers so we need to make them into strings  *)
     let uint64 uint64 = Unsigned.UInt64.to_string uint64
 
@@ -498,12 +505,20 @@ module Types = struct
       obj "DeleteWalletPayload" ~fields:(fun _ ->
           [pubkey_field ~resolve:(fun _ key -> Stringable.public_key key)] )
 
-    let reset_trust_status =
-      obj "ResetTrustStatusPayload" ~fields:(fun _ ->
-          [ field "ipAddress" ~typ:(non_null string)
-              ~doc:"An IPv4 or IPv6 address"
+    let trust_status =
+      obj "TrustStatusPayload" ~fields:(fun _ ->
+          let open Trust_system.Peer_status in
+          [ field "ip_addr" ~typ:(non_null string) ~doc:"IP address"
               ~args:Arg.[]
-              ~resolve:(fun _ ip_addr -> Stringable.ip_address ip_addr) ] )
+              ~resolve:(fun (_ : Coda_lib.t resolve_info) (ip_addr, _) ->
+                Unix.Inet_addr.to_string ip_addr )
+          ; field "trust" ~typ:(non_null float) ~doc:"Trust score"
+              ~args:Arg.[]
+              ~resolve:(fun _ (_, {trust; _}) -> trust)
+          ; field "banned_status" ~typ:string ~doc:"Banned status"
+              ~args:Arg.[]
+              ~resolve:(fun _ (_, {banned; _}) ->
+                Stringable.banned_status banned ) ] )
 
     let send_payment =
       obj "SendPaymentPayload" ~fields:(fun _ ->
@@ -1027,16 +1042,15 @@ module Mutations = struct
   let reset_trust_status =
     io_field "resetTrustStatus"
       ~doc:"Reset trust status for a given IP address"
-      ~typ:(non_null Types.Payload.reset_trust_status)
+      ~typ:(non_null Types.Payload.trust_status)
       ~args:Arg.[arg "input" ~typ:(non_null Types.Input.reset_trust_status)]
       ~resolve:(fun {ctx= coda; _} () ip_address_input ->
         let open Deferred.Result.Let_syntax in
-        let%bind ip_address =
+        let%map ip_address =
           Deferred.return
           @@ Types.Arguments.ip_address ~name:"ip_address" ip_address_input
         in
-        ignore (Coda_commands.reset_trust_status coda ip_address) ;
-        return ip_address )
+        (ip_address, Coda_commands.reset_trust_status coda ip_address) )
 
   let build_user_command coda {Account.Poly.nonce; _} sender_kp memo
       payment_body fee =
@@ -1210,6 +1224,25 @@ module Queries = struct
     field "daemonStatus" ~doc:"Get running daemon status" ~args:[]
       ~typ:(non_null Types.DaemonStatus.t) ~resolve:(fun {ctx= coda; _} () ->
         Coda_commands.get_status ~flag:`Performance coda )
+
+  let trust_status =
+    field "trustStatus" ~typ:Types.Payload.trust_status
+      ~args:Arg.[arg "ipAddress" ~typ:(non_null string)]
+      ~doc:"Trust status for an IPv4 or IPv6 address"
+      ~resolve:(fun {ctx= coda; _} () (ip_addr_string : string) ->
+        match Types.Arguments.ip_address ~name:"ipAddress" ip_addr_string with
+        | Ok ip_addr ->
+            Some (ip_addr, Coda_commands.get_trust_status coda ip_addr)
+        | Error _ ->
+            None )
+
+  let trust_status_all =
+    field "trustStatusAll"
+      ~typ:(non_null @@ list @@ non_null Types.Payload.trust_status)
+      ~args:Arg.[]
+      ~doc:"IP address and trust status for all peers"
+      ~resolve:(fun {ctx= coda; _} () ->
+        Coda_commands.get_trust_status_all coda )
 
   let version =
     field "version" ~typ:string
