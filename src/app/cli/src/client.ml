@@ -97,13 +97,7 @@ let print_trust_status status json =
 
 let round_trust_score trust_status =
   let open Trust_system.Peer_status in
-  let rounded_trust =
-    Float.round_significant trust_status.trust ~significant_digits:4
-  in
-  (* =. is a "robust compare" that is an approximate equality *)
-  let trust =
-    if Float.(rounded_trust =. zero) then Float.zero else rounded_trust
-  in
+  let trust = Float.round_decimal trust_status.trust ~decimal_digits:4 in
   {trust_status with trust}
 
 let get_trust_status =
@@ -170,7 +164,6 @@ let get_trust_status_all =
                if nonzero then
                  List.filter ip_rounded_trust_statuses
                    ~f:(fun (_ip_addr, status) ->
-                     (* can use equal here; we have exactly zero when we had approximately zero *)
                      not Float.(equal status.trust zero) )
                else ip_rounded_trust_statuses
              in
