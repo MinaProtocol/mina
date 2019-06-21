@@ -47,7 +47,7 @@ let useHook = () => {
     Hooks.Reducer.useReducer(reduce, {State.args: [], mode: Stable});
 
   let () =
-    React.useLayoutEffect0(() => {
+    React.useEffect0(() => {
       let token = MainCommunication.listen();
       let args =
         switch (getLocalStorageNetwork()) {
