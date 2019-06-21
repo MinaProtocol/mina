@@ -12,8 +12,7 @@ module Styles = {
       overflow(`scroll),
     ]);
 
-  let backHeader =
-    style([display(`flex), alignItems(`center)]);
+  let backHeader = style([display(`flex), alignItems(`center)]);
 
   let backIcon =
     style([
@@ -23,22 +22,14 @@ module Styles = {
     ]);
 
   let backHeaderText =
-    merge([
-      Theme.Text.Header.h3,
-      style([
-        // HACK(figitaki): workaround to fix WalletName font-size
-        selector("span", [important(fontSize(`rem(1.25)))]),
-        color(Theme.Colors.midnight),
-      ]),
-    ]);
+    merge([Theme.Text.Header.h3, style([color(Theme.Colors.midnight)])]);
+
+  let headerWalletName = style([fontSize(`rem(1.25))]);
 
   let label =
     merge([
       Theme.Text.Body.semiBold,
-      style([
-        color(Theme.Colors.midnight),
-        marginBottom(`rem(0.25)),
-      ]),
+      style([color(Theme.Colors.midnight), marginBottom(`rem(0.25))]),
     ]);
 
   let deleteModalLabel = merge([label, style([alignSelf(`flexStart)])]);
@@ -211,7 +202,7 @@ let make = (~publicKey) => {
       </span>
       <Spacer width=0.5 />
       <span className=Styles.backHeaderText>
-        <WalletName pubkey=publicKey />
+        <WalletName pubkey=publicKey className=Styles.headerWalletName />
         {React.string(" settings")}
       </span>
     </div>
