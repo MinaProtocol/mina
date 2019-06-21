@@ -10,11 +10,12 @@ let result_of_exn f v ~error = try Ok (f v) with _ -> Error error
 
 let result_of_or_error ?error v =
   Result.map_error v ~f:(fun internal_error ->
+      let str_error = Error.to_string_hum internal_error in
       match error with
       | None ->
-          Error.to_string_hum internal_error
+          str_error
       | Some error ->
-          sprintf "%s (%s)" error (Error.to_string_hum internal_error) )
+          sprintf "%s (%s)" error str_error )
 
 let result_field ~resolve =
   Schema.io_field ~resolve:(fun resolve_info src inputs ->
@@ -888,7 +889,7 @@ module Types = struct
           let deserialize ?error data =
             result_of_or_error
               (Stringable.State_hash.of_base58_check data)
-              ~error:(Option.value error ~default:"Invalid cursor data")
+              ~error:(Option.value error ~default:"Invalid state hash data")
 
           let doc =
             "Cursor is the base58 version of a serialized user command (via \

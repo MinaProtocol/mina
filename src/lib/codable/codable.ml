@@ -110,7 +110,7 @@ struct
     let open Or_error.Let_syntax in
     let%bind version_byte, decoded = Base58_check.decode s in
     if not (Char.equal version_byte T.version_byte) then
-      Or_error.error_string "of.encode_exn: unexpected version byte"
+      Or_error.error_string "of_base58_check: unexpected version byte"
     else Ok (Binable.of_string (module T) decoded)
 
   let of_base58_check_exn s = of_base58_check s |> Or_error.ok_exn
