@@ -119,14 +119,14 @@ module Styles = {
 
 module Button = {
   [@react.component]
-  let make = (~text, ~color, ~onClick) => {
+  let make = (~text, ~color, ~disabled=false, ~onClick) => {
     let buttonStyle =
       switch (color) {
       | `Blue => Styles.blueButton
       | `Teal => Styles.tealButton
       | `Green => Styles.greenButton
       };
-    <button className=buttonStyle onClick={_ => onClick()}>
+    <button className=buttonStyle disabled onClick={_ => onClick()}>
       {React.string(text)}
     </button>;
   };

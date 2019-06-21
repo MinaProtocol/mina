@@ -33,11 +33,6 @@ module Styles = {
     ]);
 };
 
-module Wallets = [%graphql
-  {| query getWallets { ownedWallets {publicKey, balance{total}}} |}
-];
-module WalletQuery = ReasonApollo.CreateQuery(Wallets);
-
 module AddWallet = [%graphql
   {|
     mutation addWallet {
@@ -57,17 +52,7 @@ let make = () => {
     React.useContext(AddressBookProvider.context);
 
   <div className=Styles.sidebar>
-    <WalletQuery partialRefetch=true>
-      {response =>
-         switch (response.result) {
-         | Loading => <Loader.Page> <Loader /> </Loader.Page>
-         | Error(err) => React.string(err##message)
-         | Data(data) =>
-           <WalletList
-             wallets={Array.map(~f=Wallet.ofGraphqlExn, data##ownedWallets)}
-           />
-         }}
-    </WalletQuery>
+    <WalletList />
     <div className=Styles.footer>
       <a
         className=Styles.addWalletLink

@@ -9,8 +9,7 @@ module Styles = {
 
 type networkOption =
   | NetworkOption(string)
-  | Custom(string)
-  | None;
+  | Custom(string);
 
 let listToOptions = l => List.map(~f=x => (x, React.string(x)), l);
 
@@ -47,7 +46,7 @@ module InnerDropdown = {
         | Data(d) =>
           // TODO: Refactor this to actually check network, translate from IP etc
           switch (d##initialPeers) {
-          | [||] => None
+          | [||] => Custom("")
           | a => stringToNetworkOption(Caml.Array.get(a, 0))
           }
         }
@@ -57,14 +56,18 @@ module InnerDropdown = {
       switch (networkValue) {
       | NetworkOption(s) => Some(s)
       | Custom(_) => Some(customNetwork)
-      | None => None
       };
 
     let dispatchNetwork = {
       let dispatchToMain = React.useContext(ProcessDispatchProvider.context);
       s => {
         Bindings.LocalStorage.setItem(~key=`Network, ~value=s);
-        dispatchToMain(CodaProcess.Action.ChangeArgs(["-peer", s]));
+        let args =
+          switch (s) {
+          | "" => []
+          | s => ["-peer", s]
+          };
+        dispatchToMain(CodaProcess.Action.StartCoda(args));
       };
     };
 
