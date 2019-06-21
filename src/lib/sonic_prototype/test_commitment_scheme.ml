@@ -5,7 +5,10 @@ open Constraints
 open Arithmetic_circuit
 open Default_backend.Backend
 
-let%test_unit "polynomial commitment scheme" =
+let poly_commitment_scheme_test =
+  QCheck.Test.make ~count:10 ~name:"polynomial commitment scheme"
+  QCheck.(int)
+  (fun l -> Random.init l ;
   let x = Fr.random () in
   let y = Fr.random () in
   let z = Fr.random () in
@@ -32,4 +35,8 @@ let%test_unit "polynomial commitment scheme" =
   in
   let commitment = commit_poly srs max x fX in
   let opening = open_poly srs commitment x z fX in
-  assert (pc_v srs max commitment z opening)
+  pc_v srs max commitment z opening
+  )
+
+let () =
+  QCheck.Test.check_exn poly_commitment_scheme_test

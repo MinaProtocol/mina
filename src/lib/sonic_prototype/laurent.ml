@@ -89,13 +89,13 @@ end)
 
   let eval poly pt =
     let starting_degree, coefficients = poly in
-    let rec loop remainingCoeffs pt currentPower =
-      match remainingCoeffs with
+    let rec loop remaining_coeffs pt current_power =
+      match remaining_coeffs with
       | [] ->
           F.zero
       | hd :: tl ->
-          F.( + ) (F.( * ) hd currentPower)
-            (loop tl pt (F.( * ) pt currentPower))
+          F.( + ) (F.( * ) hd current_power)
+            (loop tl pt (F.( * ) pt current_power))
     in
     let starting_pt =
       if starting_degree < 0 then
@@ -106,45 +106,47 @@ end)
 
   let trim poly =
     let starting_degree, coefficients = poly in
-    let rec allZeroes lst =
+    let rec all_zeros lst =
       match lst with
       | [] ->
           true
       | hd :: tl ->
-          F.equal F.zero hd && allZeroes tl
+          F.equal F.zero hd && all_zeros tl
     in
-    let rec removeZerosFromEnd lst =
+    let rec remove_zeros_from_end lst =
       match lst with
       | [] ->
           []
       | hd :: tl ->
-          if allZeroes lst then [] else hd :: removeZerosFromEnd tl
+          if all_zeros lst then [] else hd :: remove_zeros_from_end tl
     in
-    let rec trimBeginning starting_degree coeffs =
+    let rec trim_beginning starting_degree coeffs =
       match coeffs with
       | [] ->
           create starting_degree coeffs
       | hd :: tl ->
-          if F.equal F.zero hd then trimBeginning (starting_degree + 1) tl
+          if F.equal F.zero hd then trim_beginning (starting_degree + 1) tl
           else create starting_degree coeffs
     in
-    trimBeginning starting_degree (removeZerosFromEnd coefficients)
+    let trimmed_coeffs = remove_zeros_from_end coefficients in
+    if trimmed_coeffs = [] then create 0 [] else
+    trim_beginning starting_degree trimmed_coeffs
 
-  let equal polyA polyB =
-    let rec eqList lstA lstB =
-      match (lstA, lstB) with
+  let equal poly_a poly_b =
+    let rec eqList lst_a lst_b =
+      match (lst_a, lst_b) with
       | [], [] ->
           true
       | [], _ | _, [] ->
           false
-      | aHd :: aTl, bHd :: bTl ->
-          F.equal aHd bHd && eqList aTl bTl
+      | a_hd :: a_tl, b_hd :: b_tl ->
+          F.equal a_hd b_hd && eqList a_tl b_tl
     in
-    let trimmedA = trim polyA in
-    let trimmedB = trim polyB in
-    let degA, coeffsA = trimmedA in
-    let degB, coeffsB = trimmedB in
-    degA = degB && eqList coeffsA coeffsB
+    let trimmed_a = trim poly_a in
+    let trimmed_b = trim poly_b in
+    let deg_a, coeffs_a = trimmed_a in
+    let deg_b, coeffs_b = trimmed_b in
+    deg_a = deg_b && eqList coeffs_a coeffs_b
 
   let negate poly =
     let starting_degree, coefficients = poly in
@@ -157,9 +159,9 @@ end)
 
   let one = create 0 [F.one]
 
-  let ( + ) polyA polyB =
-    let rec pad lst howMuch =
-      if howMuch <= 0 then lst else F.zero :: pad lst (howMuch - 1)
+  let ( + ) poly_a poly_b =
+    let rec pad lst how_much =
+      if how_much <= 0 then lst else F.zero :: pad lst (how_much - 1)
     in
     let rec addLoop aCoeffs bCoeffs =
       match (aCoeffs, bCoeffs) with
@@ -167,46 +169,46 @@ end)
           bCoeffs
       | _, [] ->
           aCoeffs
-      | aHd :: aTl, bHd :: bTl ->
-          F.( + ) aHd bHd :: addLoop aTl bTl
+      | a_hd :: a_tl, b_hd :: b_tl ->
+          F.( + ) a_hd b_hd :: addLoop a_tl b_tl
     in
-    let degA, coeffsA = polyA in
-    let degB, coeffsB = polyB in
-    let padded_coeffsA = pad coeffsA (degA - degB) in
-    let padded_coeffsB = pad coeffsB (degB - degA) in
-    create (min degA degB) (addLoop padded_coeffsA padded_coeffsB)
+    let deg_a, coeffs_a = poly_a in
+    let deg_b, coeffs_b = poly_b in
+    let padded_coeffs_a = pad coeffs_a (deg_a - deg_b) in
+    let padded_coeffs_b = pad coeffs_b (deg_b - deg_a) in
+    create (min deg_a deg_b) (addLoop padded_coeffs_a padded_coeffs_b)
 
-  let ( - ) polyA polyB = polyA + negate polyB
+  let ( - ) poly_a poly_b = poly_a + negate poly_b
 
-  let ( * ) polyA polyB =
-    let rec mul polyA polyB =
-      if equal polyA zero || equal polyB zero then zero
+  let ( * ) poly_a poly_b =
+    let rec mul poly_a poly_b =
+      if equal poly_a zero || equal poly_b zero then zero
       else
-        let degA, coeffsA = polyA in
-        let degB, coeffsB = polyB in
-        match coeffsA with
+        let deg_a, coeffs_a = poly_a in
+        let deg_b, coeffs_b = poly_b in
+        match coeffs_a with
         | [] ->
             zero
-        | aHd :: aTl ->
+        | a_hd :: a_tl ->
             let firstProduct =
               create
-                Int.(degA + degB)
-                (List.map coeffsB ~f:(fun c -> F.( * ) c aHd))
+                Int.(deg_a + deg_b)
+                (List.map coeffs_b ~f:(fun c -> F.( * ) c a_hd))
             in
-            let remainingProduct = mul (create Int.(degA + 1) aTl) polyB in
+            let remainingProduct = mul (create Int.(deg_a + 1) a_tl) poly_b in
             firstProduct + remainingProduct
     in
-    mul polyA polyB
+    mul poly_a poly_b
 
-  let ( ** ) polyA n =
-    let rec pow polyA n =
-      if n = 1 then polyA else polyA * pow polyA Int.(n - 1)
+  let ( ** ) poly_a n =
+    let rec pow poly_a n =
+      if n = 1 then poly_a else poly_a * pow poly_a Int.(n - 1)
     in
-    pow polyA (N.to_int_exn n)
+    pow poly_a (N.to_int_exn n)
 
   let to_string poly =
     let starting_degree, coefficients = poly in
-    let rec printLoop deg coeffs =
+    let rec print_loop deg coeffs =
       match coeffs with
       | [] ->
           ""
@@ -220,43 +222,43 @@ end)
                 (if List.length tl > 0 then " + " else "")
             else ""
           in
-          Printf.sprintf "%s%s" first (printLoop Int.(deg + 1) tl)
+          Printf.sprintf "%s%s" first (print_loop Int.(deg + 1) tl)
     in
-    printLoop starting_degree coefficients
+    print_loop starting_degree coefficients
 
-  let ( / ) polyA polyB =
-    let rec div polyA polyB =
-      let degA, coeffsA = polyA in
-      let degB, coeffsB = polyB in
-      if List.length coeffsA < List.length coeffsB then
+  let ( / ) poly_a poly_b =
+    let rec div poly_a poly_b =
+      let deg_a, coeffs_a = poly_a in
+      let deg_b, coeffs_b = poly_b in
+      if List.length coeffs_a < List.length coeffs_b then
         raise (Poly_division_error "not divisible!")
       else
-        match coeffsA with
+        match coeffs_a with
         | [] ->
             zero
-        | aHd :: aTl -> (
-          match coeffsB with
+        | a_hd :: a_tl -> (
+          match coeffs_b with
           | [] ->
               raise (Poly_division_error "dividing by zero!")
-          | bHd :: bTl ->
-              let fac = F.( / ) aHd bHd in
-              let partial_quotient = create Int.(degA - degB) [fac] in
-              if List.length coeffsA = List.length coeffsB then
+          | b_hd :: b_tl ->
+              let fac = F.( / ) a_hd b_hd in
+              let partial_quotient = create Int.(deg_a - deg_b) [fac] in
+              if List.length coeffs_a = List.length coeffs_b then
                 partial_quotient
               else
-                let rec subtractMultiple x y =
+                let rec subtract_multiple x y =
                   match (x, y) with
                   | [], _ ->
                       []
                   | _, [] ->
                       x
-                  | xHd :: xTl, yHd :: yTl ->
-                      F.( - ) xHd (F.( * ) fac yHd) :: subtractMultiple xTl yTl
+                  | x_hd :: x_tl, y_hd :: y_tl ->
+                      F.( - ) x_hd (F.( * ) fac y_hd) :: subtract_multiple x_tl y_tl
                 in
                 let reduced =
-                  create Int.(degA + 1) (subtractMultiple aTl bTl)
+                  create Int.(deg_a + 1) (subtract_multiple a_tl b_tl)
                 in
-                partial_quotient + div reduced polyB )
+                partial_quotient + div reduced poly_b )
     in
-    div polyA polyB
+    div poly_a poly_b
 end

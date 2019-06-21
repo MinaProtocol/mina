@@ -51,7 +51,7 @@ let r_poly (assignment : Assignment.t) =
 
 let s_poly (gate_weights : Gate_weights.t) =
   let w_l, w_r, w_o = (gate_weights.w_l, gate_weights.w_r, gate_weights.w_o) in
-  let n = List.length (List.hd w_l) in
+  let n = List.length w_l in
   let f wi _i = Fr_laurent.create (n + 1) wi in
   let rec ff wis i =
     match wis with [] -> [] | wi :: wiss -> f wi i :: ff wiss (i + 1)
@@ -72,11 +72,11 @@ let s_poly (gate_weights : Gate_weights.t) =
        (Bivariate_fr_laurent.create 1 (ff w_r 1)))
     (Bivariate_fr_laurent.create (n + 1) (gg w_o 1))
 
-let t_poly rP sP kP =
+let t_poly r_p s_p k_p =
   Bivariate_fr_laurent.( + )
     (Bivariate_fr_laurent.( * )
-       (convert_to_two_variate_X (eval_on_y Fr.one rP))
-       (Bivariate_fr_laurent.( + ) rP sP))
-    (convert_to_two_variate_Y (Fr_laurent.negate kP))
+       (convert_to_two_variate_X (eval_on_y Fr.one r_p))
+       (Bivariate_fr_laurent.( + ) r_p s_p))
+    (convert_to_two_variate_Y (Fr_laurent.negate k_p))
 
 let k_poly k n = Fr_laurent.create (n + 1) k
