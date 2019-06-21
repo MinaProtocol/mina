@@ -1204,9 +1204,7 @@ module Queries = struct
 
   let wallet =
     result_field "wallet"
-      ~doc:
-        "Find any wallet via a public key. Null if the key was not found for \
-         some reason (i.e. we're bootstrapping, or the account doesn't exist)"
+      ~doc:"Find any wallet via a public key. Null if the key was not found."
       ~typ:
         Types.Wallet.wallet
         (* TODO: Is there anyway to describe `public_key` arg in a more typesafe way on our ocaml-side *)
