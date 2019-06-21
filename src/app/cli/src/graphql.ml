@@ -84,14 +84,16 @@ module Types = struct
     (** Unix form of time, which is the number of milliseconds that elapsed from January 1, 1970 *)
     let date = Time.to_string
 
-    (** string representation of JSON version of trust status *)
-    let trust_status st =
-      Trust_system.Peer_status.to_yojson st |> Yojson.Safe.to_string
+    (** string representation of Trust_system.Banned_status *)
+    let banned_status = function
+      | Trust_system.Banned_status.Unbanned ->
+          "Unbanned"
+      | Banned_until tm ->
+          sprintf "Banned_until %s" (Time.to_string_abs ~zone:Time.Zone.utc tm)
 
-    (** string representation of JSON version of list of ip,trust status pairs *)
-    let ip_trust_statuses ip_trust_statuses =
-      Client.ip_trust_statuses_to_yojson ip_trust_statuses
-      |> Yojson.Safe.to_string
+    (** string representation of Trust_system.Peer_trust.t *)
+    let trust_status {Trust_system.Peer_status.trust; banned} =
+      Printf.sprintf "%0.04f : %s" trust (banned_status banned)
 
     (** Javascript only has 53-bit integers so we need to make them into strings  *)
     let uint64 uint64 = Unsigned.UInt64.to_string uint64
@@ -498,22 +500,6 @@ module Types = struct
             ~resolve:(fun (_ : Coda_lib.t resolve_info) (_, fee) ->
               Stringable.uint64 (Currency.Fee.to_uint64 fee) ) ] )
 
-  let trust_status =
-    obj "TrustStatus" ~fields:(fun _ ->
-        [ field "trust_status" ~typ:(non_null string)
-            ~doc:"Trust status for an IPv4 or IPv6 address."
-            ~args:Arg.[]
-            ~resolve:(fun (_ : Coda_lib.t resolve_info) trust_status ->
-              Stringable.trust_status trust_status ) ] )
-
-  let ip_trust_statuses =
-    obj "IPTrustStatuses" ~fields:(fun _ ->
-        [ field "ip_trust_statuses" ~typ:(non_null string)
-            ~doc:"IP address and trust status list."
-            ~args:Arg.[]
-            ~resolve:(fun (_ : Coda_lib.t resolve_info) ip_trust_statuses ->
-              Stringable.ip_trust_statuses ip_trust_statuses ) ] )
-
   module Payload = struct
     let add_wallet : (Coda_lib.t, Account.key sexp_option) typ =
       obj "AddWalletPayload" ~fields:(fun _ ->
@@ -525,10 +511,24 @@ module Types = struct
 
     let trust_status =
       obj "TrustStatusPayload" ~fields:(fun _ ->
-          [ field "trustStatus" ~typ:(non_null string)
-              ~doc:"A trust status associated with an IPv4 or IPv6 address"
+          let open Trust_system.Peer_status in
+          [ field "trust" ~typ:(non_null string) ~doc:"Trust score"
               ~args:Arg.[]
-              ~resolve:(fun _ trust_status ->
+              ~resolve:(fun _ {trust; _} -> Printf.sprintf "%0.04f" trust)
+          ; field "banned_status" ~typ:(non_null string) ~doc:"Banned status"
+              ~args:Arg.[]
+              ~resolve:(fun _ {banned; _} -> Stringable.banned_status banned)
+          ] )
+
+    let ip_trust_status =
+      obj "IPTrustStatusPayload" ~fields:(fun _ ->
+          [ field "ip_addr" ~typ:(non_null string) ~doc:"IP address"
+              ~args:Arg.[]
+              ~resolve:(fun (_ : Coda_lib.t resolve_info) (ip_addr, _) ->
+                Unix.Inet_addr.to_string ip_addr )
+          ; field "trust_status" ~typ:(non_null string) ~doc:"trust status"
+              ~args:Arg.[]
+              ~resolve:(fun (_ : Coda_lib.t resolve_info) (_, trust_status) ->
                 Stringable.trust_status trust_status ) ] )
 
     let send_payment =
@@ -1237,7 +1237,7 @@ module Queries = struct
         Coda_commands.get_status ~flag:`Performance coda )
 
   let trust_status =
-    field "trustStatus" ~typ:Types.trust_status
+    field "trustStatus" ~typ:Types.Payload.trust_status
       ~args:Arg.[arg "ipAddress" ~typ:(non_null string)]
       ~doc:"Trust status for an IPv4 or IPv6 address"
       ~resolve:(fun {ctx= coda; _} () (ip_addr_string : string) ->
@@ -1249,7 +1249,7 @@ module Queries = struct
 
   let trust_status_all =
     field "trustStatusAll"
-      ~typ:(non_null Types.ip_trust_statuses)
+      ~typ:(non_null @@ list @@ non_null Types.Payload.ip_trust_status)
       ~args:Arg.[]
       ~doc:"IP address and trust status for all peers"
       ~resolve:(fun {ctx= coda; _} () ->
