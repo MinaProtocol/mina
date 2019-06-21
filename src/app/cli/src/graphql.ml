@@ -87,13 +87,9 @@ module Types = struct
     (** string representation of Trust_system.Banned_status *)
     let banned_status = function
       | Trust_system.Banned_status.Unbanned ->
-          "Unbanned"
+          None
       | Banned_until tm ->
-          sprintf "Banned_until %s" (Time.to_string_abs ~zone:Time.Zone.utc tm)
-
-    (** string representation of Trust_system.Peer_trust.t *)
-    let trust_status {Trust_system.Peer_status.trust; banned} =
-      Printf.sprintf "%0.04f : %s" trust (banned_status banned)
+          Some (Time.to_string_abs ~zone:Time.Zone.utc tm)
 
     (** Javascript only has 53-bit integers so we need to make them into strings  *)
     let uint64 uint64 = Unsigned.UInt64.to_string uint64
@@ -512,24 +508,28 @@ module Types = struct
     let trust_status =
       obj "TrustStatusPayload" ~fields:(fun _ ->
           let open Trust_system.Peer_status in
-          [ field "trust" ~typ:(non_null string) ~doc:"Trust score"
+          [ field "trust" ~typ:(non_null float) ~doc:"Trust score"
               ~args:Arg.[]
-              ~resolve:(fun _ {trust; _} -> Printf.sprintf "%0.04f" trust)
-          ; field "banned_status" ~typ:(non_null string) ~doc:"Banned status"
+              ~resolve:(fun _ {trust; _} -> trust)
+          ; field "banned_status" ~typ:string ~doc:"Banned status"
               ~args:Arg.[]
               ~resolve:(fun _ {banned; _} -> Stringable.banned_status banned)
           ] )
 
     let ip_trust_status =
-      obj "IPTrustStatusPayload" ~fields:(fun _ ->
+      obj "TrustStatusPayload" ~fields:(fun _ ->
+          let open Trust_system.Peer_status in
           [ field "ip_addr" ~typ:(non_null string) ~doc:"IP address"
               ~args:Arg.[]
               ~resolve:(fun (_ : Coda_lib.t resolve_info) (ip_addr, _) ->
                 Unix.Inet_addr.to_string ip_addr )
-          ; field "trust_status" ~typ:(non_null string) ~doc:"trust status"
+          ; field "trust" ~typ:(non_null float) ~doc:"Trust score"
               ~args:Arg.[]
-              ~resolve:(fun (_ : Coda_lib.t resolve_info) (_, trust_status) ->
-                Stringable.trust_status trust_status ) ] )
+              ~resolve:(fun _ (_, {trust; _}) -> trust)
+          ; field "banned_status" ~typ:string ~doc:"Banned status"
+              ~args:Arg.[]
+              ~resolve:(fun _ (_, {banned; _}) ->
+                Stringable.banned_status banned ) ] )
 
     let send_payment =
       obj "SendPaymentPayload" ~fields:(fun _ ->
