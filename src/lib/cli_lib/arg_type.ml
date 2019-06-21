@@ -10,9 +10,9 @@ let int16 =
 module Key_arg_type (Key : sig
   type t
 
-  val of_base64_exn : string -> t
+  val of_base58_check_exn : string -> t
 
-  val to_base64 : t -> string
+  val to_base58_check : t -> string
 
   val name : string
 
@@ -21,14 +21,14 @@ end) =
 struct
   let arg_type =
     Command.Arg_type.create (fun s ->
-        try Key.of_base64_exn s
+        try Key.of_base58_check_exn s
         with e ->
           failwithf
             "Couldn't read %s (Invalid key format) %s -- here's a sample one: \
              %s"
             Key.name
             (Error.to_string_hum (Error.of_exn e))
-            (Key.to_base64 (Key.random ()))
+            (Key.to_base58_check (Key.random ()))
             () )
 end
 
@@ -67,15 +67,26 @@ let txn_nonce =
   let open Coda_base in
   Command.Arg_type.map Command.Param.string ~f:Account.Nonce.of_string
 
-type work_selection = Seq | Random [@@deriving bin_io]
+let ip_address =
+  Command.Arg_type.map Command.Param.string ~f:Unix.Inet_addr.of_string
 
-let work_selection_val = function
+type work_selection_method = Sequence | Random [@@deriving bin_io]
+
+let work_selection_method_val = function
   | "seq" ->
-      Seq
+      Sequence
   | "rand" ->
       Random
   | _ ->
       failwith "Invalid work selection"
 
-let work_selection =
-  Command.Arg_type.map Command.Param.string ~f:work_selection_val
+let work_selection_method =
+  Command.Arg_type.map Command.Param.string ~f:work_selection_method_val
+
+let work_selection_method_to_module :
+    work_selection_method -> (module Work_selector.Selection_method_intf) =
+  function
+  | Sequence ->
+      (module Work_selector.Selection_methods.Sequence)
+  | Random ->
+      (module Work_selector.Selection_methods.Random)

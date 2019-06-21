@@ -3,9 +3,12 @@ open Coda_base
 open Coda_state
 open Async_kernel
 open Pipe_lib
-module Worker = Worker
 module Intf = Intf
-module Transition_storage = Transition_storage
+
+module Components = struct
+  module Transition_storage = Transition_storage
+  module Worker = Worker
+end
 
 module Make (Inputs : Intf.Main_inputs) = struct
   open Inputs
@@ -249,3 +252,26 @@ module Make (Inputs : Intf.Main_inputs) = struct
     let write_diff_and_verify = write_diff_and_verify
   end
 end
+
+module Base_inputs = struct
+  open Coda_transition
+
+  let max_length = Consensus.Constants.k
+
+  module Verifier = Verifier
+  module Ledger_proof = Ledger_proof
+  module External_transition = External_transition
+  module Internal_transition = Internal_transition
+  module Staged_ledger = Staged_ledger
+  module Transition_frontier = Transition_frontier
+  module Staged_ledger_diff = Staged_ledger_diff
+  module Transaction_snark_work = Transaction_snark_work
+end
+
+module Inputs = struct
+  include Base_inputs
+  module Transition_storage = Transition_storage.Make (Base_inputs)
+  module Make_worker = Worker.Make_async
+end
+
+include Make (Inputs)

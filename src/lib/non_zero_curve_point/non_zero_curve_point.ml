@@ -8,6 +8,8 @@ module Stable = struct
     module T = struct
       type t = Tick.Field.t * Tick.Field.t
       [@@deriving bin_io, sexp, eq, compare, hash, version {asserted}]
+
+      let version_byte = Base58_check.Version_bytes.non_zero_curve_point
     end
 
     include T
@@ -26,6 +28,7 @@ module Stable = struct
       bs
 
     include Codable.Make_base64 (T)
+    include Codable.Make_base58_check (T)
   end
 
   module Latest = V1
@@ -102,6 +105,9 @@ module Compressed = struct
       module T = struct
         type t = (Field.t, bool) Poly.Stable.V1.t
         [@@deriving bin_io, sexp, eq, compare, hash, version {asserted}]
+
+        let version_byte =
+          Base58_check.Version_bytes.non_zero_curve_point_compressed
       end
 
       include T
@@ -127,6 +133,7 @@ module Compressed = struct
   include Comparable.Make_binable (Stable.Latest)
   include Hashable.Make_binable (Stable.Latest)
   include Codable.Make_base64 (Stable.Latest)
+  include Codable.Make_base58_check (Stable.Latest)
 
   let compress (x, y) : t = {x; is_odd= parity y}
 

@@ -938,7 +938,7 @@ module Make (Inputs : Inputs_intf) :
   end
 end
 
-include Make (struct
+module Inputs = struct
   module Verifier = Verifier
   module Ledger_proof = Ledger_proof
   module Transaction_snark_work = Transaction_snark_work
@@ -948,4 +948,6 @@ include Make (struct
   module Staged_ledger = Staged_ledger
 
   let max_length = Consensus.Constants.k
-end)
+end
+
+include Make (Inputs)

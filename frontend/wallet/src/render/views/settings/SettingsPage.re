@@ -68,18 +68,46 @@ module Styles = {
     style([display(`inlineFlex), color(Theme.Colors.tealAlpha(0.5))]);
 };
 
-module SettingsQueryString = [%graphql
-  {|
-    query getSettings {
-      version
-      ownedWallets {
-        publicKey @bsDecoder(fn: "Apollo.Decoders.publicKey")
+module Version = {
+  module QueryString = [%graphql
+    {|
+      query getVersion {
+        version
       }
-    }
-  |}
-];
+    |}
+  ];
 
-module SettingsQuery = ReasonApollo.CreateQuery(SettingsQueryString);
+  module Query = ReasonApollo.CreateQuery(QueryString);
+
+  [@react.component]
+  let make = () => {
+    let prettyVersion = v =>
+      String.slice(v, ~from=0, ~to_=min(8, String.length(v)));
+
+    <div className=Styles.versionText>
+      <span className=Css.(style([color(Theme.Colors.slateAlpha(0.3))]))>
+        {React.string("Version:")}
+      </span>
+      <Spacer width=0.5 />
+      <span className=Css.(style([color(Theme.Colors.slateAlpha(0.7))]))>
+        <Query>
+          {response =>
+             (
+               switch (response.result) {
+               | Loading => "..."
+               | Error(err) => err##message
+               | Data(data) =>
+                 data##version
+                 |> Option.map(~f=prettyVersion)
+                 |> Option.withDefault(~default="Unknown")
+               }
+             )
+             |> React.string}
+        </Query>
+      </span>
+    </div>;
+  };
+};
 
 module WalletSettingsItem = {
   [@react.component]
@@ -101,59 +129,49 @@ module WalletSettingsItem = {
   };
 };
 
+module WalletsQueryString = [%graphql
+  {|
+    query getWallets {
+      ownedWallets {
+        publicKey @bsDecoder(fn: "Apollo.Decoders.publicKey")
+      }
+    }
+  |}
+];
+
+module WalletsQuery = ReasonApollo.CreateQuery(WalletsQueryString);
+
 [@react.component]
 let make = () => {
-  <SettingsQuery>
-    {response =>
-       switch (response.result) {
-       | Loading => React.string("...")
-       | Error(err) => React.string(err##message)
-       | Data(data) =>
-         let versionText =
-           String.slice(
-             data##version,
-             ~from=0,
-             ~to_=min(8, String.length(data##version)),
-           );
-         <div className=Styles.container>
-           <div className=Styles.headerContainer>
-             <div className=Theme.Text.Header.h3>
-               {React.string("Node Settings")}
-             </div>
-             <div className=Styles.versionText>
-               <span
-                 className=Css.(
-                   style([color(Theme.Colors.slateAlpha(0.3))])
-                 )>
-                 {React.string("Version:")}
-               </span>
-               <Spacer width=0.5 />
-               <span
-                 className=Css.(
-                   style([color(Theme.Colors.slateAlpha(0.7))])
-                 )>
-                 {React.string(versionText)}
-               </span>
-             </div>
-           </div>
-           <Spacer height=1. />
-           <NetworkDropdown />
-           <Spacer height=1. />
-           <div className=Styles.label>
-             {React.string("Wallet Settings")}
-           </div>
-           <Spacer height=0.5 />
-           <div className=Styles.walletItemContainer>
-             {data##ownedWallets
-              |> Array.map(~f=w =>
-                   <WalletSettingsItem
-                     key={PublicKey.toString(w##publicKey)}
-                     publicKey=w##publicKey
-                   />
-                 )
-              |> React.array}
-           </div>
-         </div>;
-       }}
-  </SettingsQuery>;
+  <div className=Styles.container>
+    <div className=Styles.headerContainer>
+      <div className=Theme.Text.Header.h3>
+        {React.string("Node Settings")}
+      </div>
+      <Version />
+    </div>
+    <Spacer height=1. />
+    <NetworkDropdown />
+    <Spacer height=1. />
+    <div className=Styles.label> {React.string("Wallet Settings")} </div>
+    <Spacer height=0.5 />
+    <div className=Styles.walletItemContainer>
+      <WalletsQuery>
+        {({result}) =>
+           switch (result) {
+           | Loading
+           | Error(_) => React.null
+           | Data(data) =>
+             data##ownedWallets
+             |> Array.map(~f=w =>
+                  <WalletSettingsItem
+                    key={PublicKey.toString(w##publicKey)}
+                    publicKey=w##publicKey
+                  />
+                )
+             |> React.array
+           }}
+      </WalletsQuery>
+    </div>
+  </div>;
 };

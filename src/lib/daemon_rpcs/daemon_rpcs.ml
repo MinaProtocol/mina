@@ -185,9 +185,7 @@ module Types = struct
 
       let state_hash = string_option_entry "Staged Hash"
 
-      let commit_id =
-        option_entry "GIT SHA1"
-          ~f:(Fn.compose Sexp.to_string Git_sha.sexp_of_t)
+      let commit_id = string_entry "GIT SHA1"
 
       let conf_dir = string_entry "Configuration Directory"
 
@@ -236,7 +234,7 @@ module Types = struct
       ; ledger_merkle_root: string option
       ; staged_ledger_hash: string option
       ; state_hash: string option
-      ; commit_id: Git_sha.t option
+      ; commit_id: Git_sha.t
       ; conf_dir: string
       ; peers: string list
       ; user_commands_sent: int
@@ -317,6 +315,44 @@ module Get_balance = struct
 
   let rpc : (query, response) Rpc.Rpc.t =
     Rpc.Rpc.create ~name:"Get_balance" ~version:0 ~bin_query ~bin_response
+end
+
+module Get_trust_status = struct
+  type query = Unix.Inet_addr.Blocking_sexp.t [@@deriving bin_io]
+
+  type response = Trust_system.Peer_status.Stable.Latest.t [@@deriving bin_io]
+
+  type error = unit [@@deriving bin_io]
+
+  let rpc : (query, response) Rpc.Rpc.t =
+    Rpc.Rpc.create ~name:"Get_trust_status" ~version:0 ~bin_query ~bin_response
+end
+
+module Get_trust_status_all = struct
+  type query = unit [@@deriving bin_io]
+
+  type response =
+    (Unix.Inet_addr.Blocking_sexp.t * Trust_system.Peer_status.Stable.Latest.t)
+    list
+  [@@deriving bin_io]
+
+  type error = unit [@@deriving bin_io]
+
+  let rpc : (query, response) Rpc.Rpc.t =
+    Rpc.Rpc.create ~name:"Get_trust_status_all" ~version:0 ~bin_query
+      ~bin_response
+end
+
+module Reset_trust_status = struct
+  type query = Unix.Inet_addr.Blocking_sexp.t [@@deriving bin_io]
+
+  type response = Trust_system.Peer_status.Stable.Latest.t [@@deriving bin_io]
+
+  type error = unit [@@deriving bin_io]
+
+  let rpc : (query, response) Rpc.Rpc.t =
+    Rpc.Rpc.create ~name:"Reset_trust_status" ~version:0 ~bin_query
+      ~bin_response
 end
 
 module Verify_proof = struct
