@@ -848,24 +848,16 @@ module Types = struct
 
           let deserialize ?error serialized_payment =
             let open Result.Let_syntax in
-            let%bind vb, serialized_transaction =
+            let%bind serialized_transaction =
               result_of_or_error
-                (Base58_check.decode serialized_payment)
+                (Base58_check.decode ~version_byte:Id.version_byte
+                   serialized_payment)
                 ~error:(Option.value error ~default:"Invalid cursor")
             in
-            if not (Char.equal vb Id.version_byte) then
-              let details = "Cursor.deserialize: unexpected version byte" in
-              Error
-                ( match error with
-                | None ->
-                    details
-                | Some e ->
-                    sprintf "%s (%s)" e details )
-            else
-              Ok
-                (Coda_base.User_command.Stable.V1.bin_t.reader.read
-                   (Bigstring.of_string serialized_transaction)
-                   ~pos_ref:(ref 0))
+            Ok
+              (Coda_base.User_command.Stable.V1.bin_t.reader.read
+                 (Bigstring.of_string serialized_transaction)
+                 ~pos_ref:(ref 0))
 
           let doc =
             "Cursor is the base58 version of a serialized user command (via \
