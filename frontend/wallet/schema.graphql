@@ -269,10 +269,7 @@ type Query {
   # List of wallets currently tracked by the node
   ownedWallets: [Wallet!]!
   
-  # Gets balance of key at a certain consensus state
-  # Note: `consensus` is optional as we will likely decide one
-  # state to be the "real" balance
-  balance(publicKey: String!): String!
+  wallet(publicKey: String!): Wallet
   
   pooledUserCommands(publicKey: String!): [UserCommand!]!
   

@@ -1292,9 +1292,7 @@ module Queries = struct
 
   let wallet =
     result_field "wallet"
-      ~doc:
-        "Find any wallet via a public key. Null if the key was not found for \
-         some reason (i.e. we're bootstrapping, or the account doesn't exist)"
+      ~doc:"Find any wallet via a public key. Null if the key was not found."
       ~typ:
         Types.Wallet.wallet
         (* TODO: Is there anyway to describe `public_key` arg in a more typesafe way on our ocaml-side *)
@@ -1303,14 +1301,12 @@ module Queries = struct
         let open Result.Let_syntax in
         let propose_public_keys = Coda_lib.propose_public_keys coda in
         let%map pk = Types.Arguments.public_key ~name:"publicKey" pk_string in
-        Option.map
-          Partial_account.(
-            of_pk coda pk |> to_full_account |> Option.map ~f:of_full_account)
-          ~f:(fun account ->
-            { Types.Wallet.account
-            ; is_actively_staking=
-                Public_key.Compressed.Set.mem propose_public_keys pk
-            ; path= Secrets.Wallets.get_path (Coda_lib.wallets coda) pk } ) )
+        (* TODO: return null if the pubkey is not a valid base58check key *)
+        Some
+          { Types.Wallet.account= Partial_account.of_pk coda pk
+          ; is_actively_staking=
+              Public_key.Compressed.Set.mem propose_public_keys pk
+          ; path= Secrets.Wallets.get_path (Coda_lib.wallets coda) pk } )
 
   let current_snark_worker =
     field "currentSnarkWorker" ~typ:Types.snark_worker
