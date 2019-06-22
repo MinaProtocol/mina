@@ -270,10 +270,10 @@ let run_test () : unit Deferred.t =
             send_payment_update_balance_sheet keypair.private_key sender_pk
               receiver (f_amount i) acc (Currency.Fee.of_int 0) )
       in
-      let block_count t =
+      let blockchain_length t =
         Coda_lib.best_protocol_state t
         |> Participating_state.active_exn |> Protocol_state.consensus_state
-        |> Consensus.Data.Consensus_state.length
+        |> Consensus.Data.Consensus_state.blockchain_length
       in
       let wait_for_proof_or_timeout timeout () =
         let cond t = Option.is_some @@ Coda_lib.staged_ledger_ledger_proof t in
@@ -296,7 +296,7 @@ let run_test () : unit Deferred.t =
         assert (Option.is_some @@ Coda_lib.staged_ledger_ledger_proof coda) ;
         Map.fold updated_balance_sheet ~init:() ~f:(fun ~key ~data () ->
             assert_balance key data ) ;
-        block_count coda
+        blockchain_length coda
       in
       let test_duplicate_payments (sender_keypair : Signature_lib.Keypair.t)
           (receiver_keypair : Signature_lib.Keypair.t) =
@@ -341,16 +341,16 @@ let run_test () : unit Deferred.t =
       in
       if with_snark then
         let accounts = List.take other_accounts 2 in
-        let%bind block_count' =
+        let%bind blockchain_length' =
           test_multiple_payments accounts ~txn_count:1 15.
         in
         (*wait for a block after the ledger_proof is emitted*)
         let%map () =
           wait_until_cond
-            ~f:(fun t -> block_count t > block_count')
+            ~f:(fun t -> blockchain_length t > blockchain_length')
             ~timeout:5.
         in
-        assert (block_count coda > block_count')
+        assert (blockchain_length coda > blockchain_length')
       else
         let%bind _ =
           test_multiple_payments other_accounts

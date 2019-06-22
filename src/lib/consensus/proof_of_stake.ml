@@ -996,7 +996,7 @@ module Data = struct
               ; seed: 'epoch_seed
               ; start_checkpoint: 'start_checkpoint
               ; lock_checkpoint: 'lock_checkpoint
-              ; length: 'length }
+              ; epoch_length: 'length }
             [@@deriving sexp, bin_io, eq, compare, hash, to_yojson, version]
           end
 
@@ -1022,7 +1022,7 @@ module Data = struct
         ; seed: 'epoch_seed
         ; start_checkpoint: 'start_checkpoint
         ; lock_checkpoint: 'lock_checkpoint
-        ; length: 'length }
+        ; epoch_length: 'length }
       [@@deriving sexp, compare, hash, to_yojson]
     end
 
@@ -1035,7 +1035,7 @@ module Data = struct
       Poly.t
 
     let var_to_triples
-        {Poly.ledger; seed; start_checkpoint; lock_checkpoint; length} =
+        {Poly.ledger; seed; start_checkpoint; lock_checkpoint; epoch_length} =
       let open Snark_params.Tick.Checked.Let_syntax in
       let%map ledger_triples = Epoch_ledger.var_to_triples ledger
       and seed_triples = Epoch_seed.var_to_triples seed
@@ -1046,7 +1046,7 @@ module Data = struct
       in
       ledger_triples @ seed_triples @ start_checkpoint_triples
       @ lock_checkpoint_triples
-      @ Length.Unpacked.var_to_triples length
+      @ Length.Unpacked.var_to_triples epoch_length
 
     let length_in_triples =
       Epoch_ledger.length_in_triples + Epoch_seed.length_in_triples
@@ -1078,13 +1078,15 @@ module Data = struct
       and lock_checkpoint =
         Coda_base.State_hash.if_ cond ~then_:then_.lock_checkpoint
           ~else_:else_.lock_checkpoint
-      and length = Length.if_ cond ~then_:then_.length ~else_:else_.length in
-      {Poly.ledger; seed; start_checkpoint; lock_checkpoint; length}
+      and epoch_length =
+        Length.if_ cond ~then_:then_.epoch_length ~else_:else_.epoch_length
+      in
+      {Poly.ledger; seed; start_checkpoint; lock_checkpoint; epoch_length}
 
-    let to_hlist {Poly.ledger; seed; start_checkpoint; lock_checkpoint; length}
-        =
+    let to_hlist
+        {Poly.ledger; seed; start_checkpoint; lock_checkpoint; epoch_length} =
       Coda_base.H_list.
-        [ledger; seed; start_checkpoint; lock_checkpoint; length]
+        [ledger; seed; start_checkpoint; lock_checkpoint; epoch_length]
 
     let of_hlist :
            ( unit
@@ -1102,8 +1104,8 @@ module Data = struct
            , 'length )
            Poly.t =
      fun Coda_base.H_list.
-           [ledger; seed; start_checkpoint; lock_checkpoint; length] ->
-      {ledger; seed; start_checkpoint; lock_checkpoint; length}
+           [ledger; seed; start_checkpoint; lock_checkpoint; epoch_length] ->
+      {ledger; seed; start_checkpoint; lock_checkpoint; epoch_length}
 
     module Make (Lock_checkpoint : sig
       module Stable : sig
@@ -1179,12 +1181,14 @@ module Data = struct
           ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist
           ~value_of_hlist:of_hlist
 
-      let fold {Poly.ledger; seed; start_checkpoint; lock_checkpoint; length} =
+      let fold
+          {Poly.ledger; seed; start_checkpoint; lock_checkpoint; epoch_length}
+          =
         let open Fold in
         Epoch_ledger.fold ledger +> Epoch_seed.fold seed
         +> Coda_base.State_hash.fold start_checkpoint
         +> Lock_checkpoint.fold lock_checkpoint
-        +> Length.fold length
+        +> Length.fold epoch_length
 
       let genesis =
         { Poly.ledger=
@@ -1193,7 +1197,7 @@ module Data = struct
         ; seed= Epoch_seed.initial
         ; start_checkpoint= Coda_base.State_hash.(of_hash zero)
         ; lock_checkpoint= Lock_checkpoint.null
-        ; length= Length.of_int 1 }
+        ; epoch_length= Length.of_int 1 }
     end
 
     module Last = Make (struct
@@ -1219,10 +1223,10 @@ module Data = struct
               ~default:Coda_base.State_hash.(of_hash zero) }
 
     let update_pair ((last_data, curr_data) : Last.Value.t * Curr.Value.t)
-        epoch_length ~prev_epoch ~next_epoch ~prev_slot
+        epoch_count ~prev_epoch ~next_epoch ~prev_slot
         ~prev_protocol_state_hash ~proposer_vrf_result ~snarked_ledger_hash
         ~total_currency =
-      let last_data, curr_data, epoch_length =
+      let last_data, curr_data, epoch_count =
         if next_epoch > prev_epoch then
           ( curr_to_last curr_data
           , { Poly.seed= Epoch_seed.initial
@@ -1230,13 +1234,14 @@ module Data = struct
                 {Epoch_ledger.Poly.hash= snarked_ledger_hash; total_currency}
             ; start_checkpoint= prev_protocol_state_hash
             ; lock_checkpoint= None
-            ; length= Length.of_int 1 }
-          , Length.succ epoch_length )
+            ; epoch_length= Length.of_int 1 }
+          , Length.succ epoch_count )
         else (
           assert (Epoch.equal next_epoch prev_epoch) ;
           ( last_data
-          , Poly.{curr_data with length= Length.succ curr_data.length}
-          , epoch_length ) )
+          , Poly.
+              {curr_data with epoch_length= Length.succ curr_data.epoch_length}
+          , epoch_count ) )
       in
       let curr_seed, curr_lock_checkpoint =
         if Epoch.Slot.in_seed_update_range prev_slot then
@@ -1250,7 +1255,7 @@ module Data = struct
             seed= curr_seed
           ; lock_checkpoint= curr_lock_checkpoint }
       in
-      (last_data, curr_data, epoch_length)
+      (last_data, curr_data, epoch_count)
   end
 
   module Consensus_transition = struct
@@ -1530,9 +1535,9 @@ module Data = struct
                  , 'bool
                  , 'checkpoints )
                  t =
-              { length: 'length
-              ; epoch_length: 'length
-              ; min_length_of_epoch: 'length
+              { blockchain_length: 'length
+              ; epoch_count: 'length
+              ; min_epoch_length: 'length
               ; last_vrf_output: 'vrf_output
               ; total_currency: 'amount
               ; curr_epoch: 'epoch
@@ -1570,9 +1575,9 @@ module Data = struct
             , 'bool
             , 'checkpoints )
             Stable.Latest.t =
-        { length: 'length
-        ; epoch_length: 'length
-        ; min_length_of_epoch: 'length
+        { blockchain_length: 'length
+        ; epoch_count: 'length
+        ; min_epoch_length: 'length
         ; last_vrf_output: 'vrf_output
         ; total_currency: 'amount
         ; curr_epoch: 'epoch
@@ -1637,9 +1642,9 @@ module Data = struct
       Poly.t
 
     let to_hlist
-        { Poly.length
-        ; epoch_length
-        ; min_length_of_epoch
+        { Poly.blockchain_length
+        ; epoch_count
+        ; min_epoch_length
         ; last_vrf_output
         ; total_currency
         ; curr_epoch
@@ -1649,9 +1654,9 @@ module Data = struct
         ; has_ancestor_in_same_checkpoint_window
         ; checkpoints } =
       let open Coda_base.H_list in
-      [ length
-      ; epoch_length
-      ; min_length_of_epoch
+      [ blockchain_length
+      ; epoch_count
+      ; min_epoch_length
       ; last_vrf_output
       ; total_currency
       ; curr_epoch
@@ -1687,9 +1692,9 @@ module Data = struct
            , 'checkpoints )
            Poly.t =
      fun Coda_base.H_list.
-           [ length
-           ; epoch_length
-           ; min_length_of_epoch
+           [ blockchain_length
+           ; epoch_count
+           ; min_epoch_length
            ; last_vrf_output
            ; total_currency
            ; curr_epoch
@@ -1698,9 +1703,9 @@ module Data = struct
            ; curr_epoch_data
            ; has_ancestor_in_same_checkpoint_window
            ; checkpoints ] ->
-      { length
-      ; epoch_length
-      ; min_length_of_epoch
+      { blockchain_length
+      ; epoch_count
+      ; min_epoch_length
       ; last_vrf_output
       ; total_currency
       ; curr_epoch
@@ -1730,8 +1735,8 @@ module Data = struct
         ~value_of_hlist:of_hlist
 
     let var_to_triples
-        { Poly.length
-        ; epoch_length
+        { Poly.blockchain_length
+        ; epoch_count
         ; last_vrf_output
         ; total_currency
         ; curr_epoch
@@ -1745,8 +1750,8 @@ module Data = struct
       and curr_epoch_data_triples =
         Epoch_data.var_to_triples curr_epoch_data
       in
-      Length.Unpacked.var_to_triples length
-      @ Length.Unpacked.var_to_triples epoch_length
+      Length.Unpacked.var_to_triples blockchain_length
+      @ Length.Unpacked.var_to_triples epoch_count
       @ Vrf.Output.Checked.to_triples last_vrf_output
       @ Epoch.Unpacked.var_to_triples curr_epoch
       @ Epoch.Slot.Unpacked.var_to_triples curr_slot
@@ -1754,8 +1759,8 @@ module Data = struct
       @ last_epoch_data_triples @ curr_epoch_data_triples
 
     let fold
-        { Poly.length
-        ; epoch_length
+        { Poly.blockchain_length
+        ; epoch_count
         ; last_vrf_output
         ; curr_epoch
         ; curr_slot
@@ -1764,7 +1769,8 @@ module Data = struct
         ; curr_epoch_data
         ; _ } =
       let open Fold in
-      Length.fold length +> Length.fold epoch_length
+      Length.fold blockchain_length
+      +> Length.fold epoch_count
       +> Vrf.Output.fold last_vrf_output
       +> Epoch.fold curr_epoch +> Epoch.Slot.fold curr_slot
       +> Amount.fold total_currency
@@ -1820,11 +1826,11 @@ module Data = struct
               Epoch.Slot.t}, next=%{sexp:Epoch.t * Epoch.Slot.t}"
             (prev_epoch, prev_slot) (next_epoch, next_slot)
       in
-      let last_epoch_data, curr_epoch_data, epoch_length =
+      let last_epoch_data, curr_epoch_data, epoch_count =
         Epoch_data.update_pair
           ( previous_consensus_state.last_epoch_data
           , previous_consensus_state.curr_epoch_data )
-          previous_consensus_state.epoch_length ~prev_epoch ~next_epoch
+          previous_consensus_state.epoch_count ~prev_epoch ~next_epoch
           ~prev_slot ~prev_protocol_state_hash:previous_protocol_state_hash
           ~proposer_vrf_result ~snarked_ledger_hash ~total_currency
       in
@@ -1835,14 +1841,15 @@ module Data = struct
           Checkpoints.cons previous_protocol_state_hash
             previous_consensus_state.checkpoints
       in
-      { Poly.length= Length.succ previous_consensus_state.length
-      ; epoch_length
-      ; min_length_of_epoch=
+      { Poly.blockchain_length=
+          Length.succ previous_consensus_state.blockchain_length
+      ; epoch_count
+      ; min_epoch_length=
           ( if Epoch.equal prev_epoch next_epoch then
-            previous_consensus_state.min_length_of_epoch
+            previous_consensus_state.min_epoch_length
           else if Epoch.(equal next_epoch (succ prev_epoch)) then
-            Length.min previous_consensus_state.min_length_of_epoch
-              previous_consensus_state.curr_epoch_data.length
+            Length.min previous_consensus_state.min_epoch_length
+              previous_consensus_state.curr_epoch_data.epoch_length
           else Length.zero )
       ; last_vrf_output= proposer_vrf_result
       ; total_currency
@@ -1886,9 +1893,9 @@ module Data = struct
         (M.make_checked (fun () -> same_checkpoint_window ~prev ~next))
 
     let negative_one : Value.t =
-      { Poly.length= Length.zero
-      ; epoch_length= Length.zero
-      ; min_length_of_epoch= Length.of_int (UInt32.to_int Constants.Epoch.size)
+      { Poly.blockchain_length= Length.zero
+      ; epoch_count= Length.zero
+      ; min_epoch_length= Length.of_int (UInt32.to_int Constants.Epoch.size)
       ; last_vrf_output= Vrf.Output.dummy
       ; total_currency= genesis_ledger_total_currency
       ; curr_epoch= Epoch.zero
@@ -1988,12 +1995,12 @@ module Data = struct
           in
           let%bind updated = Epoch_seed.update_var base vrf_result in
           Epoch_seed.if_ in_seed_update_range ~then_:updated ~else_:base
-        and length =
+        and epoch_length =
           let%bind base =
             Field.Checked.if_ epoch_increased
               ~then_:Field.(Var.constant zero)
               ~else_:
-                ( Length.pack_var previous_state.curr_epoch_data.length
+                ( Length.pack_var previous_state.curr_epoch_data.epoch_length
                   :> Field.Var.t )
           in
           Length.var_of_field Field.(Var.(add (constant one) base))
@@ -2023,19 +2030,20 @@ module Data = struct
             ~then_:previous_protocol_state_hash ~else_:base
         in
         { Epoch_data.Poly.seed
-        ; length
+        ; epoch_length
         ; ledger
         ; start_checkpoint
         ; lock_checkpoint }
-      and length = Length.increment_var previous_state.length
+      and blockchain_length =
+        Length.increment_var previous_state.blockchain_length
       (* TODO: keep track of total_currency in transaction snark. The current_slot
        * implementation would allow an adversary to make then total_currency incorrect by
        * not adding the coinbase to their account. *)
       and new_total_currency =
         Amount.Checked.add previous_state.total_currency supply_increase
-      and epoch_length =
-        Length.increment_if_var previous_state.epoch_length epoch_increased
-      and min_length_of_epoch =
+      and epoch_count =
+        Length.increment_if_var previous_state.epoch_count epoch_increased
+      and min_epoch_length =
         let if_ b ~then_ ~else_ =
           let%bind b = b and then_ = then_ and else_ = else_ in
           Length.if_ b ~then_ ~else_
@@ -2043,20 +2051,20 @@ module Data = struct
         let return = Checked.return in
         if_
           (return Boolean.(not epoch_increased))
-          ~then_:(return previous_state.min_length_of_epoch)
+          ~then_:(return previous_state.min_epoch_length)
           ~else_:
             (if_
                (Epoch.is_succ_var ~pred:prev_epoch ~succ:next_epoch)
                ~then_:
-                 (Length.min_var previous_state.min_length_of_epoch
-                    previous_state.curr_epoch_data.length)
+                 (Length.min_var previous_state.min_epoch_length
+                    previous_state.curr_epoch_data.epoch_length)
                ~else_:(return (Length.Unpacked.var_of_value Length.zero)))
       in
       Checked.return
         ( `Success threshold_satisfied
-        , { Poly.length
-          ; epoch_length
-          ; min_length_of_epoch
+        , { Poly.blockchain_length
+          ; epoch_count
+          ; min_epoch_length
           ; last_vrf_output= vrf_result
           ; curr_epoch= transition_data.epoch
           ; curr_slot= transition_data.slot
@@ -2066,21 +2074,21 @@ module Data = struct
           ; has_ancestor_in_same_checkpoint_window
           ; checkpoints } )
 
-    let length (t : Value.t) = t.length
+    let blockchain_length (t : Value.t) = t.blockchain_length
 
     let to_lite = None
 
     type display =
-      { length: int
-      ; epoch_length: int
+      { blockchain_length: int
+      ; epoch_count: int
       ; curr_epoch: int
       ; curr_slot: int
       ; total_currency: int }
     [@@deriving yojson]
 
     let display (t : Value.t) =
-      { length= Length.to_int t.length
-      ; epoch_length= Length.to_int t.epoch_length
+      { blockchain_length= Length.to_int t.blockchain_length
+      ; epoch_count= Length.to_int t.epoch_count
       ; curr_epoch= Segment_id.to_int t.curr_epoch
       ; curr_slot= Segment_id.to_int t.curr_slot
       ; total_currency= Amount.to_int t.total_currency }
@@ -2242,7 +2250,7 @@ module Hooks = struct
     in
     (* is the consensus state from the genesis epoch? *)
     let from_genesis_epoch =
-      Length.equal consensus_state.epoch_length Length.zero
+      Length.equal consensus_state.epoch_count Length.zero
     in
     if in_same_epoch || from_genesis_epoch then
       Ok consensus_state.last_epoch_data
@@ -2277,7 +2285,7 @@ module Hooks = struct
     in
     (* has the first transition in the epoch reached finalization? *)
     let epoch_is_finalized =
-      consensus_state.curr_epoch_data.length > Length.of_int Constants.k
+      consensus_state.curr_epoch_data.epoch_length > Length.of_int Constants.k
     in
     if in_next_epoch || not epoch_is_finalized then
       (`Curr, !local_state.Data.curr_epoch_snapshot)
@@ -2459,15 +2467,15 @@ module Hooks = struct
               ( existing.last_epoch_data.lock_checkpoint
               = candidate.last_epoch_data.lock_checkpoint )
           , "last epoch lock checkpoints are equal" )
-        , ( lazy (existing.length << candidate.length)
+        , ( lazy (existing.blockchain_length << candidate.blockchain_length)
           , "candidate is longer than existing" ) )
       ; ( ( lazy
               ( existing.last_epoch_data.start_checkpoint
               = candidate.last_epoch_data.start_checkpoint )
           , "last epoch start checkpoints are equal" )
         , ( lazy
-              ( existing.last_epoch_data.length
-              << candidate.last_epoch_data.length )
+              ( existing.last_epoch_data.epoch_length
+              << candidate.last_epoch_data.epoch_length )
           , "candidate last epoch is longer than existing last epoch" ) )
         (* these two could be condensed into one entry *)
       ; ( ( lazy
@@ -2477,7 +2485,7 @@ module Hooks = struct
                    = candidate.last_epoch_data.lock_checkpoint ))
           , "candidate last epoch lock checkpoint is equal to existing \
              current epoch lock checkpoint" )
-        , ( lazy (existing.length << candidate.length)
+        , ( lazy (existing.blockchain_length << candidate.blockchain_length)
           , "candidate is longer than existing" ) )
       ; ( ( lazy
               (Option.fold candidate.curr_epoch_data.lock_checkpoint
@@ -2486,7 +2494,7 @@ module Hooks = struct
                    = candidate_curr_lock_checkpoint ))
           , "candidate current epoch lock checkpoint is equal to existing \
              last epoch lock checkpoint" )
-        , ( lazy (existing.length << candidate.length)
+        , ( lazy (existing.blockchain_length << candidate.blockchain_length)
           , "candidate is longer than existing" ) )
       ; ( ( lazy
               ( existing.curr_epoch_data.start_checkpoint
@@ -2494,8 +2502,8 @@ module Hooks = struct
           , "candidate last epoch start checkpoint is equal to existing \
              current epoch start checkpoint" )
         , ( lazy
-              ( existing.curr_epoch_data.length
-              << candidate.last_epoch_data.length )
+              ( existing.curr_epoch_data.epoch_length
+              << candidate.last_epoch_data.epoch_length )
           , "candidate last epoch is longer than existing current epoch" ) )
       ; ( ( lazy
               ( existing.last_epoch_data.start_checkpoint
@@ -2503,8 +2511,8 @@ module Hooks = struct
           , "candidate current epoch start checkpoint is equal to existing \
              last epoch start checkpoint" )
         , ( lazy
-              ( existing.last_epoch_data.length
-              << candidate.curr_epoch_data.length )
+              ( existing.last_epoch_data.epoch_length
+              << candidate.curr_epoch_data.epoch_length )
           , "candidate current epoch is longer than existing last epoch" ) ) ]
     in
     let precondition_msg, choice_msg, should_take =
@@ -2518,8 +2526,9 @@ module Hooks = struct
              , "candidate length is longer than existing length"
              , lazy
                  (* TODO: THIS IS INSECURE! See #2643.
-                    Undo this hack once the min_length_of_epoch bug is fixed *)
-                 Length.(existing.length < candidate.length) )
+                    Undo this hack once the min_epoch_length bug is fixed *)
+                 Length.(
+                   existing.blockchain_length < candidate.blockchain_length) )
     in
     let choice = if Lazy.force should_take then `Take else `Keep in
     log_choice ~precondition_msg ~choice_msg choice ;
@@ -2548,10 +2557,10 @@ module Hooks = struct
     let next_slot =
       Logger.info logger ~module_:__MODULE__ ~location:__LOC__
         !"Selecting correct epoch data from state -- epoch by time: %d, state \
-          epoch: %d, state epoch length: %d"
+          epoch: %d, state epoch count: %d"
         (Epoch.to_int epoch)
         (Epoch.to_int state.curr_epoch)
-        (Length.to_int state.epoch_length) ;
+        (Length.to_int state.epoch_count) ;
       let epoch_data =
         match select_epoch_data ~consensus_state:state ~epoch with
         | Ok epoch_data ->
@@ -2652,8 +2661,8 @@ module Hooks = struct
 
   let should_bootstrap ~existing ~candidate =
     should_bootstrap_len
-      ~existing:(Consensus_state.length existing)
-      ~candidate:(Consensus_state.length candidate)
+      ~existing:(Consensus_state.blockchain_length existing)
+      ~candidate:(Consensus_state.blockchain_length candidate)
 
   let%test "should_bootstrap is sane" =
     (* Even when consensus constants are of prod sizes, candidate should still trigger a bootstrap *)
@@ -2781,7 +2790,7 @@ module Hooks = struct
             Protocol_state.consensus_state
               (With_hash.data previous_protocol_state)
           in
-          let length = Length.succ prev.length in
+          let blockchain_length = Length.succ prev.blockchain_length in
           let curr_epoch, curr_slot =
             let slot = prev.curr_slot + UInt32.of_int slot_advancement in
             let epoch_advancement = slot / Constants.Epoch.size in
@@ -2791,10 +2800,10 @@ module Hooks = struct
             Option.value_exn
               (Amount.add prev.total_currency Constants.coinbase)
           in
-          let last_epoch_data, curr_epoch_data, epoch_length =
+          let last_epoch_data, curr_epoch_data, epoch_count =
             Epoch_data.update_pair
               (prev.last_epoch_data, prev.curr_epoch_data)
-              prev.epoch_length ~prev_epoch:prev.curr_epoch
+              prev.epoch_count ~prev_epoch:prev.curr_epoch
               ~next_epoch:curr_epoch ~prev_slot:prev.curr_slot
               ~prev_protocol_state_hash:
                 (With_hash.hash previous_protocol_state)
@@ -2805,13 +2814,14 @@ module Hooks = struct
               prev.checkpoints
             else Checkpoints.cons previous_protocol_state.hash prev.checkpoints
           in
-          { Poly.length
-          ; epoch_length
-          ; min_length_of_epoch=
+          { Poly.blockchain_length
+          ; epoch_count
+          ; min_epoch_length=
               ( if Epoch.equal prev.curr_epoch curr_epoch then
-                prev.min_length_of_epoch
+                prev.min_epoch_length
               else if Epoch.(equal curr_epoch (succ prev.curr_epoch)) then
-                Length.min prev.min_length_of_epoch prev.curr_epoch_data.length
+                Length.min prev.min_epoch_length
+                  prev.curr_epoch_data.epoch_length
               else Length.zero )
           ; last_vrf_output= proposer_vrf_result
           ; total_currency
