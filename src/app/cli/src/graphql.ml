@@ -8,6 +8,15 @@ open Auxiliary_database
 
 let result_of_exn f v ~error = try Ok (f v) with _ -> Error error
 
+let result_of_or_error ?error v =
+  Result.map_error v ~f:(fun internal_error ->
+      let str_error = Error.to_string_hum internal_error in
+      match error with
+      | None ->
+          str_error
+      | Some error ->
+          sprintf "%s (%s)" error str_error )
+
 let result_field ~resolve =
   Schema.io_field ~resolve:(fun resolve_info src inputs ->
       Deferred.return @@ resolve resolve_info src inputs )
@@ -552,7 +561,8 @@ module Types = struct
 
   module Arguments = struct
     let public_key ~name public_key =
-      result_of_exn Public_key.Compressed.of_base58_check_exn public_key
+      result_of_or_error
+        (Public_key.Compressed.of_base58_check public_key)
         ~error:(sprintf !"%s address is not valid." name)
 
     let ip_address ~name ip_addr =
@@ -696,7 +706,7 @@ module Types = struct
 
         val serialize : t -> string
 
-        val deserialize : string -> t
+        val deserialize : ?error:string -> string -> (t, string) result
 
         val doc : string
       end
@@ -784,6 +794,14 @@ module Types = struct
                 @@ Arguments.public_key ~name:"publicKey" public_key
               in
               let database = get_database coda in
+              let resolve_cursor = function
+                | None ->
+                    Ok None
+                | Some data ->
+                    let open Result.Let_syntax in
+                    let%map decoded = Cursor.deserialize data in
+                    Some decoded
+              in
               let%map queried_nodes, has_earlier_page, has_later_page =
                 Deferred.return
                 @@
@@ -793,16 +811,15 @@ module Types = struct
                       "Illegal query: first and last must not be non-null \
                        value at the same time"
                 | num_to_query, cursor, None, _ ->
-                    Ok
-                      (Pagination_database.get_earlier_values database
-                         public_key
-                         (Option.map ~f:Cursor.deserialize cursor)
-                         num_to_query)
+                    let open Result.Let_syntax in
+                    let%map cursor = resolve_cursor cursor in
+                    Pagination_database.get_earlier_values database public_key
+                      cursor num_to_query
                 | None, _, num_to_query, cursor ->
-                    Ok
-                      (Pagination_database.get_later_values database public_key
-                         (Option.map ~f:Cursor.deserialize cursor)
-                         num_to_query)
+                    let open Result.Let_syntax in
+                    let%map cursor = resolve_cursor cursor in
+                    Pagination_database.get_later_values database public_key
+                      cursor num_to_query
               in
               ( ( List.map queried_nodes ~f:(fun node ->
                       {Edge.node; cursor= Cursor.serialize @@ to_cursor node}
@@ -829,15 +846,26 @@ module Types = struct
 
           let serialize = Id.user_command
 
-          let deserialize serialized_payment =
-            let vb, serialized_transaction =
-              Base58_check.decode_exn serialized_payment
+          let deserialize ?error serialized_payment =
+            let open Result.Let_syntax in
+            let%bind vb, serialized_transaction =
+              result_of_or_error
+                (Base58_check.decode serialized_payment)
+                ~error:(Option.value error ~default:"Invalid cursor")
             in
             if not (Char.equal vb Id.version_byte) then
-              failwith "Cursor.deserialize: unexpected version byte" ;
-            Coda_base.User_command.Stable.V1.bin_t.reader.read
-              (Bigstring.of_string serialized_transaction)
-              ~pos_ref:(ref 0)
+              let details = "Cursor.deserialize: unexpected version byte" in
+              Error
+                ( match error with
+                | None ->
+                    details
+                | Some e ->
+                    sprintf "%s (%s)" e details )
+            else
+              Ok
+                (Coda_base.User_command.Stable.V1.bin_t.reader.read
+                   (Bigstring.of_string serialized_transaction)
+                   ~pos_ref:(ref 0))
 
           let doc =
             "Cursor is the base58 version of a serialized user command (via \
@@ -873,7 +901,10 @@ module Types = struct
 
           let serialize = Stringable.State_hash.to_base58_check
 
-          let deserialize = Stringable.State_hash.of_base58_check_exn
+          let deserialize ?error data =
+            result_of_or_error
+              (Stringable.State_hash.of_base58_check data)
+              ~error:(Option.value error ~default:"Invalid state hash data")
 
           let doc =
             "Cursor is the base58 version of a serialized user command (via \
@@ -1147,8 +1178,8 @@ module Mutations = struct
             ~error:"Invalid `time` provided"
         in
         let%map payment =
-          result_of_exn Types.Pagination.User_command.Inputs.Cursor.deserialize
-            payment ~error:"Invaid `payment` provided"
+          Types.Pagination.User_command.Inputs.Cursor.deserialize
+            ~error:"Invaid `payment` provided" payment
         in
         let transaction_database = Coda_lib.transaction_database coda in
         Transaction_database.add transaction_database payment added_time ;

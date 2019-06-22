@@ -1,6 +1,6 @@
 (* base58_check.ml : implement Base58Check algorithm
    see: https://www.oreilly.com/library/view/mastering-bitcoin-2nd/9781491954379/ch04.html#base58
- *)
+*)
 
 open Core_kernel
 
@@ -53,6 +53,15 @@ let decode_exn s =
   then raise Invalid_base58_checksum ;
   let version_byte = decoded.[0] in
   (version_byte, payload)
+
+let decode s =
+  try Ok (decode_exn s) with
+  | B58.Invalid_base58_character ->
+      Or_error.error_string "Invalid base58 character"
+  | Invalid_base58_check_length ->
+      Or_error.error_string "Invalid base58 check length"
+  | Invalid_base58_checksum ->
+      Or_error.error_string "Invalid base58 checksum"
 
 module Version_bytes = Version_bytes
 
