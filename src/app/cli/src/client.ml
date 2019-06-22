@@ -95,6 +95,11 @@ let print_trust_status status json =
     in
     printf "%0.04f, %s\n" status.trust ban_status
 
+let round_trust_score trust_status =
+  let open Trust_system.Peer_status in
+  let trust = Float.round_decimal trust_status.trust ~decimal_digits:4 in
+  {trust_status with trust}
+
 let get_trust_status =
   let open Command.Param in
   let open Deferred.Let_syntax in
@@ -113,7 +118,7 @@ let get_trust_status =
            dispatch Daemon_rpcs.Get_trust_status.rpc ip_address port
          with
          | Ok status ->
-             print_trust_status status json
+             print_trust_status (round_trust_score status) json
          | Error e ->
              printf "Failed to get trust status %s\n" (Error.to_string_hum e)
      ))
@@ -150,15 +155,17 @@ let get_trust_status_all =
     (Cli_lib.Background_daemon.init flags ~f:(fun port (nonzero, json) ->
          match%map dispatch Daemon_rpcs.Get_trust_status_all.rpc () port with
          | Ok ip_trust_statuses ->
+             (* always round the trust scores for display *)
+             let ip_rounded_trust_statuses =
+               List.map ip_trust_statuses ~f:(fun (ip_addr, status) ->
+                   (ip_addr, round_trust_score status) )
+             in
              let filtered_ip_trust_statuses =
                if nonzero then
-                 List.filter ip_trust_statuses ~f:(fun (_ip_addr, status) ->
-                     not
-                       Float.(
-                         equal zero
-                           (round_significant status.trust
-                              ~significant_digits:4)) )
-               else ip_trust_statuses
+                 List.filter ip_rounded_trust_statuses
+                   ~f:(fun (_ip_addr, status) ->
+                     not Float.(equal status.trust zero) )
+               else ip_rounded_trust_statuses
              in
              print_ip_trust_statuses filtered_ip_trust_statuses json
          | Error e ->

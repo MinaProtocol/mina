@@ -8,6 +8,15 @@ open Auxiliary_database
 
 let result_of_exn f v ~error = try Ok (f v) with _ -> Error error
 
+let result_of_or_error ?error v =
+  Result.map_error v ~f:(fun internal_error ->
+      let str_error = Error.to_string_hum internal_error in
+      match error with
+      | None ->
+          str_error
+      | Some error ->
+          sprintf "%s (%s)" error str_error )
+
 let result_field ~resolve =
   Schema.io_field ~resolve:(fun resolve_info src inputs ->
       Deferred.return @@ resolve resolve_info src inputs )
@@ -78,8 +87,18 @@ module Types = struct
     (** base58 representation of public key that is compressed to make snark computation efficent *)
     let public_key = Public_key.Compressed.to_base58_check
 
+    (** string representation of IPv4 or IPv6 address *)
+    let ip_address = Unix.Inet_addr.to_string
+
     (** Unix form of time, which is the number of milliseconds that elapsed from January 1, 1970 *)
     let date = Time.to_string
+
+    (** string representation of Trust_system.Banned_status *)
+    let banned_status = function
+      | Trust_system.Banned_status.Unbanned ->
+          None
+      | Banned_until tm ->
+          Some (date tm)
 
     (** Javascript only has 53-bit integers so we need to make them into strings  *)
     let uint64 uint64 = Unsigned.UInt64.to_string uint64
@@ -495,6 +514,21 @@ module Types = struct
       obj "DeleteWalletPayload" ~fields:(fun _ ->
           [pubkey_field ~resolve:(fun _ key -> Stringable.public_key key)] )
 
+    let trust_status =
+      obj "TrustStatusPayload" ~fields:(fun _ ->
+          let open Trust_system.Peer_status in
+          [ field "ip_addr" ~typ:(non_null string) ~doc:"IP address"
+              ~args:Arg.[]
+              ~resolve:(fun (_ : Coda_lib.t resolve_info) (ip_addr, _) ->
+                Unix.Inet_addr.to_string ip_addr )
+          ; field "trust" ~typ:(non_null float) ~doc:"Trust score"
+              ~args:Arg.[]
+              ~resolve:(fun _ (_, {trust; _}) -> trust)
+          ; field "banned_status" ~typ:string ~doc:"Banned status"
+              ~args:Arg.[]
+              ~resolve:(fun _ (_, {banned; _}) ->
+                Stringable.banned_status banned ) ] )
+
     let send_payment =
       obj "SendPaymentPayload" ~fields:(fun _ ->
           [ field "payment" ~typ:(non_null user_command)
@@ -527,8 +561,13 @@ module Types = struct
 
   module Arguments = struct
     let public_key ~name public_key =
-      result_of_exn Public_key.Compressed.of_base58_check_exn public_key
+      result_of_or_error
+        (Public_key.Compressed.of_base58_check public_key)
         ~error:(sprintf !"%s address is not valid." name)
+
+    let ip_address ~name ip_addr =
+      result_of_exn Unix.Inet_addr.of_string ip_addr
+        ~error:(sprintf !"%s is not valid." name)
   end
 
   module Input = struct
@@ -569,6 +608,10 @@ module Types = struct
     let delete_wallet =
       obj "DeleteWalletInput" ~coerce:Fn.id
         ~fields:[arg "publicKey" ~typ:(non_null string)]
+
+    let reset_trust_status =
+      obj "ResetTrustStatusInput" ~coerce:Fn.id
+        ~fields:[arg "ipAddress" ~typ:(non_null string)]
 
     (* TODO: Treat cases where filter_input has a null argument *)
     let filter_input ~title ~arg_name ~arg_doc =
@@ -663,7 +706,7 @@ module Types = struct
 
         val serialize : t -> string
 
-        val deserialize : string -> t
+        val deserialize : ?error:string -> string -> (t, string) result
 
         val doc : string
       end
@@ -751,6 +794,14 @@ module Types = struct
                 @@ Arguments.public_key ~name:"publicKey" public_key
               in
               let database = get_database coda in
+              let resolve_cursor = function
+                | None ->
+                    Ok None
+                | Some data ->
+                    let open Result.Let_syntax in
+                    let%map decoded = Cursor.deserialize data in
+                    Some decoded
+              in
               let%map queried_nodes, has_earlier_page, has_later_page =
                 Deferred.return
                 @@
@@ -760,16 +811,15 @@ module Types = struct
                       "Illegal query: first and last must not be non-null \
                        value at the same time"
                 | num_to_query, cursor, None, _ ->
-                    Ok
-                      (Pagination_database.get_earlier_values database
-                         public_key
-                         (Option.map ~f:Cursor.deserialize cursor)
-                         num_to_query)
+                    let open Result.Let_syntax in
+                    let%map cursor = resolve_cursor cursor in
+                    Pagination_database.get_earlier_values database public_key
+                      cursor num_to_query
                 | None, _, num_to_query, cursor ->
-                    Ok
-                      (Pagination_database.get_later_values database public_key
-                         (Option.map ~f:Cursor.deserialize cursor)
-                         num_to_query)
+                    let open Result.Let_syntax in
+                    let%map cursor = resolve_cursor cursor in
+                    Pagination_database.get_later_values database public_key
+                      cursor num_to_query
               in
               ( ( List.map queried_nodes ~f:(fun node ->
                       {Edge.node; cursor= Cursor.serialize @@ to_cursor node}
@@ -796,15 +846,18 @@ module Types = struct
 
           let serialize = Id.user_command
 
-          let deserialize serialized_payment =
-            let vb, serialized_transaction =
-              Base58_check.decode_exn serialized_payment
+          let deserialize ?error serialized_payment =
+            let open Result.Let_syntax in
+            let%bind serialized_transaction =
+              result_of_or_error
+                (Base58_check.decode ~version_byte:Id.version_byte
+                   serialized_payment)
+                ~error:(Option.value error ~default:"Invalid cursor")
             in
-            if not (Char.equal vb Id.version_byte) then
-              failwith "Cursor.deserialize: unexpected version byte" ;
-            Coda_base.User_command.Stable.V1.bin_t.reader.read
-              (Bigstring.of_string serialized_transaction)
-              ~pos_ref:(ref 0)
+            Ok
+              (Coda_base.User_command.Stable.V1.bin_t.reader.read
+                 (Bigstring.of_string serialized_transaction)
+                 ~pos_ref:(ref 0))
 
           let doc =
             "Cursor is the base58 version of a serialized user command (via \
@@ -840,7 +893,10 @@ module Types = struct
 
           let serialize = Stringable.State_hash.to_base58_check
 
-          let deserialize = Stringable.State_hash.of_base58_check_exn
+          let deserialize ?error data =
+            result_of_or_error
+              (Stringable.State_hash.of_base58_check data)
+              ~error:(Option.value error ~default:"Invalid state hash data")
 
           let doc =
             "Cursor is the base58 version of a serialized user command (via \
@@ -1006,6 +1062,19 @@ module Mutations = struct
         in
         public_key )
 
+  let reset_trust_status =
+    io_field "resetTrustStatus"
+      ~doc:"Reset trust status for a given IP address"
+      ~typ:(non_null Types.Payload.trust_status)
+      ~args:Arg.[arg "input" ~typ:(non_null Types.Input.reset_trust_status)]
+      ~resolve:(fun {ctx= coda; _} () ip_address_input ->
+        let open Deferred.Result.Let_syntax in
+        let%map ip_address =
+          Deferred.return
+          @@ Types.Arguments.ip_address ~name:"ip_address" ip_address_input
+        in
+        (ip_address, Coda_commands.reset_trust_status coda ip_address) )
+
   let build_user_command coda {Account.Poly.nonce; _} sender_kp memo
       payment_body fee =
     let payload =
@@ -1101,8 +1170,8 @@ module Mutations = struct
             ~error:"Invalid `time` provided"
         in
         let%map payment =
-          result_of_exn Types.Pagination.User_command.Inputs.Cursor.deserialize
-            payment ~error:"Invaid `payment` provided"
+          Types.Pagination.User_command.Inputs.Cursor.deserialize
+            ~error:"Invaid `payment` provided" payment
         in
         let transaction_database = Coda_lib.transaction_database coda in
         Transaction_database.add transaction_database payment added_time ;
@@ -1178,6 +1247,25 @@ module Queries = struct
     field "daemonStatus" ~doc:"Get running daemon status" ~args:[]
       ~typ:(non_null Types.DaemonStatus.t) ~resolve:(fun {ctx= coda; _} () ->
         Coda_commands.get_status ~flag:`Performance coda )
+
+  let trust_status =
+    field "trustStatus" ~typ:Types.Payload.trust_status
+      ~args:Arg.[arg "ipAddress" ~typ:(non_null string)]
+      ~doc:"Trust status for an IPv4 or IPv6 address"
+      ~resolve:(fun {ctx= coda; _} () (ip_addr_string : string) ->
+        match Types.Arguments.ip_address ~name:"ipAddress" ip_addr_string with
+        | Ok ip_addr ->
+            Some (ip_addr, Coda_commands.get_trust_status coda ip_addr)
+        | Error _ ->
+            None )
+
+  let trust_status_all =
+    field "trustStatusAll"
+      ~typ:(non_null @@ list @@ non_null Types.Payload.trust_status)
+      ~args:Arg.[]
+      ~doc:"IP address and trust status for all peers"
+      ~resolve:(fun {ctx= coda; _} () ->
+        Coda_commands.get_trust_status_all coda )
 
   let version =
     field "version" ~typ:string
