@@ -177,7 +177,7 @@ struct
                   let%bind top_hash = read Field.typ top_hash in
                   let updated = State.sexp_of_value in_snark_next_state in
                   let original = State.sexp_of_value expected_next_state in
-                  (if not (Field.equal next_top_hash top_hash) then
+                  ( if not (Field.equal next_top_hash top_hash) then
                     let diff =
                       Sexp_diff_kernel.Algo.diff ~original ~updated ()
                     in
@@ -189,7 +189,7 @@ struct
                           , `String
                               (Sexp_diff_kernel.Display.display_as_plain_string
                                  diff) ) ]
-                      ~location:__LOC__ ~module_:__MODULE__) ;
+                      ~location:__LOC__ ~module_:__MODULE__ ) ;
                   return ()
               | None ->
                   Logger.error logger
