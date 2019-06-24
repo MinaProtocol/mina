@@ -46,15 +46,21 @@ module Make (Inputs : Intf.Main_inputs) = struct
     | Ok new_hash ->
         if Transition_frontier.Diff.Hash.equal new_hash ground_truth_hash then
           ground_truth_hash
-        else
-          failwithf
-            !"Unable to write mutant diff correctly as hashes are different:\n\
-             \ %s. Hash of groundtruth %s Hash of actual %s"
-            (Yojson.Safe.to_string
-               (Transition_frontier.Diff.Mutant.key_to_yojson diff))
-            (Transition_frontier.Diff.Hash.to_string ground_truth_hash)
-            (Transition_frontier.Diff.Hash.to_string new_hash)
-            ()
+        else (
+          (* TODO: this should be a failure that never occurs *)
+          Logger.error logger "Mutant diff hashes differ" ~module_:__MODULE__
+            ~location:__LOC__
+            ~metadata:
+              [ ( "diff_mutant"
+                , Transition_frontier.Diff.Mutant.key_to_yojson diff )
+              ; ( "hash of ground_truth"
+                , `String
+                    (Transition_frontier.Diff.Hash.to_string ground_truth_hash)
+                )
+              ; ( "hash of actual"
+                , `String (Transition_frontier.Diff.Hash.to_string new_hash) )
+              ] ;
+          ground_truth_hash )
 
   let rec flush ({buffer; worker_writer; flush_capacity; _} as t) =
     let list = Queue.to_list buffer in
