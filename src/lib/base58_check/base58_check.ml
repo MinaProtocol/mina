@@ -1,10 +1,12 @@
 (* base58_check.ml : implement Base58Check algorithm
    see: https://www.oreilly.com/library/view/mastering-bitcoin-2nd/9781491954379/ch04.html#base58
- *)
+*)
 
 open Core_kernel
 
 exception Invalid_base58_checksum
+
+exception Invalid_base58_version_byte
 
 exception Invalid_base58_check_length
 
@@ -34,7 +36,7 @@ let encode ~(version_byte : char) ~(payload : string) =
   let bytes = version_string ^ payload ^ checksum |> Bytes.of_string in
   B58.encode coda_alphabet bytes |> Bytes.to_string
 
-let decode_exn s =
+let decode_exn ~(version_byte : char) s =
   let bytes = Bytes.of_string s in
   let decoded = B58.decode coda_alphabet bytes |> Bytes.to_string in
   let len = String.length decoded in
@@ -51,8 +53,20 @@ let decode_exn s =
   in
   if not (String.equal checksum (compute_checksum ~version_string ~payload))
   then raise Invalid_base58_checksum ;
-  let version_byte = decoded.[0] in
-  (version_byte, payload)
+  if not (Char.equal decoded.[0] version_byte) then
+    raise Invalid_base58_version_byte ;
+  payload
+
+let decode ~(version_byte : char) s =
+  try Ok (decode_exn ~version_byte s) with
+  | B58.Invalid_base58_character ->
+      Or_error.error_string "Invalid base58 character"
+  | Invalid_base58_check_length ->
+      Or_error.error_string "Invalid base58 check length"
+  | Invalid_base58_checksum ->
+      Or_error.error_string "Invalid base58 checksum"
+  | Invalid_base58_version_byte ->
+      Or_error.error_string "Invalid base58 version byte"
 
 module Version_bytes = Version_bytes
 
@@ -60,8 +74,8 @@ let%test_module "empty string" =
   ( module struct
     let test_roundtrip version_byte payload =
       let encoded = encode ~version_byte ~payload in
-      let version_byte', payload' = decode_exn encoded in
-      String.equal payload payload' && Char.equal version_byte version_byte'
+      let payload' = decode_exn ~version_byte encoded in
+      String.equal payload payload'
 
     let%test "empty_string" = test_roundtrip '\x57' ""
 
@@ -76,9 +90,9 @@ let%test_module "empty string" =
 
     let%test "invalid checksum" =
       try
+        let version_byte = '\xAC' in
         let encoded =
-          encode ~version_byte:'\xAC'
-            ~payload:"Bluer than velvet were her eyes"
+          encode ~version_byte ~payload:"Bluer than velvet were her eyes"
         in
         let bytes = Bytes.of_string encoded in
         let len = Bytes.length bytes in
@@ -90,13 +104,13 @@ let%test_module "empty string" =
         in
         Bytes.set bytes (len - 1) new_last_ch ;
         let encoded_bad_checksum = Bytes.to_string bytes in
-        let _version_byte, _payload = decode_exn encoded_bad_checksum in
+        let _payload = decode_exn ~version_byte encoded_bad_checksum in
         false
       with Invalid_base58_checksum -> true
 
     let%test "invalid length" =
       try
-        let _version_byte, _payload = decode_exn "abcd" in
+        let _payload = decode_exn ~version_byte:'\x53' "abcd" in
         false
       with Invalid_base58_check_length -> true
   end )
