@@ -28,8 +28,8 @@ module Make (Inputs : Intf.Main_inputs) = struct
 
   let write_diff_and_verify ~logger ~acc_hash worker (diff, ground_truth_mutant)
       =
-    Logger.trace logger "Handling mutant diff" ~module_:__MODULE__
-      ~location:__LOC__
+    Logger.trace logger "Handling mutant diff: $diff_mutant"
+      ~module_:__MODULE__ ~location:__LOC__
       ~metadata:
         [("diff_mutant", Transition_frontier.Diff.Mutant.key_to_yojson diff)] ;
     let ground_truth_hash =
@@ -46,15 +46,24 @@ module Make (Inputs : Intf.Main_inputs) = struct
     | Ok new_hash ->
         if Transition_frontier.Diff.Hash.equal new_hash ground_truth_hash then
           ground_truth_hash
-        else
-          failwithf
-            !"Unable to write mutant diff correctly as hashes are different:\n\
-             \ %s. Hash of groundtruth %s Hash of actual %s"
-            (Yojson.Safe.to_string
-               (Transition_frontier.Diff.Mutant.key_to_yojson diff))
-            (Transition_frontier.Diff.Hash.to_string ground_truth_hash)
-            (Transition_frontier.Diff.Hash.to_string new_hash)
-            ()
+        else (
+          (* TODO: this should be a failure that never occurs *)
+          Logger.error logger
+            "Mutant diff hashes differ: diff_mutant: $diff_mutant; hash of \
+             ground truth: $hash_of_ground_truth; hash of actual: \
+             $hash_of_actual"
+            ~module_:__MODULE__ ~location:__LOC__
+            ~metadata:
+              [ ( "diff_mutant"
+                , Transition_frontier.Diff.Mutant.key_to_yojson diff )
+              ; ( "hash_of_ground_truth"
+                , `String
+                    (Transition_frontier.Diff.Hash.to_string ground_truth_hash)
+                )
+              ; ( "hash_of_actual"
+                , `String (Transition_frontier.Diff.Hash.to_string new_hash) )
+              ] ;
+          ground_truth_hash )
 
   let rec flush ({buffer; worker_writer; flush_capacity; _} as t) =
     let list = Queue.to_list buffer in

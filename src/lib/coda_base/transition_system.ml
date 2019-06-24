@@ -169,9 +169,9 @@ struct
         as_prover
           As_prover.(
             Let_syntax.(
-              let%map prover_state = get_state in
-              Option.map (Prover_state.expected_next_state prover_state)
-                ~f:(fun expected_next_state ->
+              let%bind prover_state = get_state in
+              match Prover_state.expected_next_state prover_state with
+              | Some expected_next_state ->
                   let%bind in_snark_next_state = read State.typ _next_state in
                   let%bind next_top_hash = read Field.typ next_top_hash in
                   let%bind top_hash = read Field.typ top_hash in
@@ -190,15 +190,13 @@ struct
                               (Sexp_diff_kernel.Display.display_as_plain_string
                                  diff) ) ]
                       ~location:__LOC__ ~module_:__MODULE__ ) ;
-                  return () )
-              |> ignore ;
-              if Option.is_none (Prover_state.expected_next_state prover_state)
-              then
-                Logger.error logger
-                  "expected_next_state is empty; this should only be true \
-                   during precomputed_values"
-                  ~location:__LOC__ ~module_:__MODULE__ ;
-              ()))
+                  return ()
+              | None ->
+                  Logger.error logger
+                    "expected_next_state is empty; this should only be true \
+                     during precomputed_values"
+                    ~location:__LOC__ ~module_:__MODULE__ ;
+                  return ()))
       in
       let%bind () =
         with_label __LOC__ Field.Checked.Assert.(equal next_top_hash top_hash)
