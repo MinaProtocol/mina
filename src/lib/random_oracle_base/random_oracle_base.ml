@@ -30,10 +30,7 @@ module Digest = struct
 
       let of_yojson = function
         | `String s -> (
-          try
-            let vb, decoded = Base58_check.decode_exn s in
-            if Char.equal vb version_byte then Ok decoded
-            else Error "of_yojson: unexpected version byte"
+          try Ok (Base58_check.decode_exn ~version_byte s)
           with exn ->
             Error
               (sprintf "of_yojson, bad Base58Check: %s" (Exn.to_string exn)) )

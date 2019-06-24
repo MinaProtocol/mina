@@ -183,6 +183,18 @@ module DeleteButton = {
 
 [@bs.scope "window"] [@bs.val] external showItemInFolder: string => unit = "";
 
+module KeypathQueryString = [%graphql
+  {|
+    query ($publicKey: String!)  {
+      wallet(publicKey: $publicKey) {
+        privateKeyPath
+      }
+    }
+  |}
+];
+
+module KeypathQuery = ReasonApollo.CreateQuery(KeypathQueryString);
+
 [@react.component]
 let make = (~publicKey) => {
   let (addressBook, updateAddressBook) =
@@ -239,18 +251,51 @@ let make = (~publicKey) => {
     <Spacer height=1. />
     <div className=Styles.label> {React.string("Private key")} </div>
     <div className=Styles.textBox>
-      <TextField
-        label="Path"
-        value={Caml.Array.get(Sys.argv, 0)}
-        onChange=ignore
-        button={
-          <TextField.Button
-            text="Open"
-            color=`Teal
-            onClick={_ => showItemInFolder(Caml.Array.get(Sys.argv, 0))}
-          />
-        }
-      />
+      <KeypathQuery
+        variables=
+          {KeypathQueryString.make(
+             ~publicKey=PublicKey.toString(publicKey),
+             (),
+           )##variables}>
+        {({result}) => {
+           let path =
+             switch (result) {
+             | Loading
+             | Error(_) => None
+             | Data(data) =>
+               Option.map(~f=w => w##privateKeyPath, data##wallet)
+             };
+           switch (path) {
+           | Some(secretKeyPath) =>
+             <TextField
+               label="Path"
+               value=secretKeyPath
+               onChange=ignore
+               button={
+                 <TextField.Button
+                   text="Open"
+                   color=`Teal
+                   onClick={_ => showItemInFolder(secretKeyPath)}
+                 />
+               }
+             />
+           | None =>
+             <TextField
+               label="Path"
+               value=""
+               onChange=ignore
+               button={
+                 <TextField.Button
+                   text="Open"
+                   disabled=true
+                   color=`Teal
+                   onClick=ignore
+                 />
+               }
+             />
+           };
+         }}
+      </KeypathQuery>
     </div>
     <Spacer height=1.5 />
     <ConsensusSettings />
