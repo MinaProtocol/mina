@@ -28,8 +28,8 @@ module Make (Inputs : Intf.Main_inputs) = struct
 
   let write_diff_and_verify ~logger ~acc_hash worker (diff, ground_truth_mutant)
       =
-    Logger.trace logger "Handling mutant diff" ~module_:__MODULE__
-      ~location:__LOC__
+    Logger.trace logger "Handling mutant diff: $diff_mutant"
+      ~module_:__MODULE__ ~location:__LOC__
       ~metadata:
         [("diff_mutant", Transition_frontier.Diff.Mutant.key_to_yojson diff)] ;
     let ground_truth_hash =
@@ -48,16 +48,19 @@ module Make (Inputs : Intf.Main_inputs) = struct
           ground_truth_hash
         else (
           (* TODO: this should be a failure that never occurs *)
-          Logger.error logger "Mutant diff hashes differ" ~module_:__MODULE__
-            ~location:__LOC__
+          Logger.error logger
+            "Mutant diff hashes differ: diff_mutant: $diff_mutant; hash of \
+             ground truth: $hash_of_ground_truth; hash of actual: \
+             $hash_of_actual"
+            ~module_:__MODULE__ ~location:__LOC__
             ~metadata:
               [ ( "diff_mutant"
                 , Transition_frontier.Diff.Mutant.key_to_yojson diff )
-              ; ( "hash of ground_truth"
+              ; ( "hash_of_ground_truth"
                 , `String
                     (Transition_frontier.Diff.Hash.to_string ground_truth_hash)
                 )
-              ; ( "hash of actual"
+              ; ( "hash_of_actual"
                 , `String (Transition_frontier.Diff.Hash.to_string new_hash) )
               ] ;
           ground_truth_hash )
