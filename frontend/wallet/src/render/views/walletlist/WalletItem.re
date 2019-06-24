@@ -32,7 +32,7 @@ module Styles = {
     merge([
       walletItem,
       style([
-        color(Colors.marineAlpha(1.)),
+        color(Colors.marine),
         backgroundColor(Colors.hyperlinkAlpha(0.15)),
       ]),
       notText,

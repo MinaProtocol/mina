@@ -38,7 +38,5 @@ let to_base58_check t =
   Base58_check.encode ~version_byte ~payload
 
 let of_base58_check_exn s =
-  let vb, decoded = Base58_check.decode_exn s in
-  if not (Char.equal vb version_byte) then
-    failwith "of.encode_exn: unexpected version byte" ;
+  let decoded = Base58_check.decode_exn ~version_byte s in
   decoded |> Bigstring.of_string |> of_bigstring_exn

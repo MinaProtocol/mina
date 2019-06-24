@@ -20,7 +20,6 @@ module Styles = {
         height(`rem(2.)),
         alignItems(`center),
         color(Theme.Colors.slate),
-        userSelect(`none),
       ]),
     ]);
 
@@ -158,6 +157,8 @@ let make = () => {
             nodes: [...prevResult.blocks.nodes, ...newBlocks],
             pageInfo,
           },
+          // Since these aren't paginated, we can just reuse the previous result
+          pooledUserCommands: prevResult.pooledUserCommands,
         } : prevResult
     }
     |}
