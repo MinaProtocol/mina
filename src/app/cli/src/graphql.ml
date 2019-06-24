@@ -848,24 +848,16 @@ module Types = struct
 
           let deserialize ?error serialized_payment =
             let open Result.Let_syntax in
-            let%bind vb, serialized_transaction =
+            let%bind serialized_transaction =
               result_of_or_error
-                (Base58_check.decode serialized_payment)
+                (Base58_check.decode ~version_byte:Id.version_byte
+                   serialized_payment)
                 ~error:(Option.value error ~default:"Invalid cursor")
             in
-            if not (Char.equal vb Id.version_byte) then
-              let details = "Cursor.deserialize: unexpected version byte" in
-              Error
-                ( match error with
-                | None ->
-                    details
-                | Some e ->
-                    sprintf "%s (%s)" e details )
-            else
-              Ok
-                (Coda_base.User_command.Stable.V1.bin_t.reader.read
-                   (Bigstring.of_string serialized_transaction)
-                   ~pos_ref:(ref 0))
+            Ok
+              (Coda_base.User_command.Stable.V1.bin_t.reader.read
+                 (Bigstring.of_string serialized_transaction)
+                 ~pos_ref:(ref 0))
 
           let doc =
             "Cursor is the base58 version of a serialized user command (via \
@@ -1300,9 +1292,7 @@ module Queries = struct
 
   let wallet =
     result_field "wallet"
-      ~doc:
-        "Find any wallet via a public key. Null if the key was not found for \
-         some reason (i.e. we're bootstrapping, or the account doesn't exist)"
+      ~doc:"Find any wallet via a public key. Null if the key was not found."
       ~typ:
         Types.Wallet.wallet
         (* TODO: Is there anyway to describe `public_key` arg in a more typesafe way on our ocaml-side *)
@@ -1311,14 +1301,12 @@ module Queries = struct
         let open Result.Let_syntax in
         let propose_public_keys = Coda_lib.propose_public_keys coda in
         let%map pk = Types.Arguments.public_key ~name:"publicKey" pk_string in
-        Option.map
-          Partial_account.(
-            of_pk coda pk |> to_full_account |> Option.map ~f:of_full_account)
-          ~f:(fun account ->
-            { Types.Wallet.account
-            ; is_actively_staking=
-                Public_key.Compressed.Set.mem propose_public_keys pk
-            ; path= Secrets.Wallets.get_path (Coda_lib.wallets coda) pk } ) )
+        (* TODO: return null if the pubkey is not a valid base58check key *)
+        Some
+          { Types.Wallet.account= Partial_account.of_pk coda pk
+          ; is_actively_staking=
+              Public_key.Compressed.Set.mem propose_public_keys pk
+          ; path= Secrets.Wallets.get_path (Coda_lib.wallets coda) pk } )
 
   let current_snark_worker =
     field "currentSnarkWorker" ~typ:Types.snark_worker
