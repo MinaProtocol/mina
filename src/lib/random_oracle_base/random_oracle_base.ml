@@ -4,18 +4,6 @@ open Module_version
 module Digest = struct
   open Fold_lib
 
-  let fold_bits s =
-    { Fold.fold=
-        (fun ~init ~f ->
-          let n = 8 * String.length s in
-          let rec go acc i =
-            if i = n then acc
-            else
-              let b = (Char.to_int s.[i / 8] lsr (i mod 8)) land 1 = 1 in
-              go (f acc b) (i + 1)
-          in
-          go init 0 ) }
-
   module Stable = struct
     module V1 = struct
       module T = struct
@@ -52,6 +40,18 @@ module Digest = struct
     module Registrar = Registration.Make (Module_decl)
     module Registered_V1 = Registrar.Register (V1)
   end
+
+  let fold_bits s =
+    { Fold.fold=
+        (fun ~init ~f ->
+          let n = 8 * String.length s in
+          let rec go acc i =
+            if i = n then acc
+            else
+              let b = (Char.to_int s.[i / 8] lsr (i mod 8)) land 1 = 1 in
+              go (f acc b) (i + 1)
+          in
+          go init 0 ) }
 
   let to_bits = Blake2.string_to_bits
 
