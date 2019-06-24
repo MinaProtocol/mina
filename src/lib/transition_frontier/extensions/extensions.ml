@@ -1,8 +1,7 @@
 open Async_kernel
 open Core_kernel
-open Coda_base
-open Pipe_lib
 
+(* TODO: revisit existing extensions and split off into new files *)
 module Make (Inputs : sig
   include Inputs.Inputs_intf
 

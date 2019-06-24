@@ -2,6 +2,7 @@ open Core_kernel
 open Async_kernel
 open Pipe_lib
 open Coda_base
+open Coda_state
 
 (** An extension to the transition frontier that provides a view onto the data
     other components can use. These are exposed through the broadcast pipes
@@ -33,39 +34,116 @@ module type Transition_frontier_diff_intf = sig
 
   type external_transition_validated
 
-  module Root_data : sig
-    module Stable : sig
-      module V1 : sig
-        type t [@@deriving bin_io, version]
-      end
+  type scan_state
 
-      module Latest = V1
+  type full
+  type lite
+
+  (** A node can be represented in two different formats.
+   *  A full node representation is a breadcrumb, which
+   *  contains both an external transition and a computed
+   *  staged ledger (masked off of the node parent's
+   *  staged ledger). A lite node representation is merely
+   *  the external transition itself. The staged ledger
+   *  can be recomputed if needed, though not cheaply.
+   *  The purpose of the separation of these two formats
+   *  is required due to the fact that a breadcrumb cannot
+   *  be serialized with bin_io. Only the external transition
+   *  can be serialized and persisted to disk. This node
+   *  representation type is used to parameterize the diff
+   *  type over which representation is being used so that
+   *  the diff format can be shared between both the in memory
+   *  transition frontier and the persistent transition frontier.
+   *)
+  type 'repr node_representation =
+    | Full : breadcrumb -> full node_representation
+    | Lite : (external_transition_validated, State_hash.t) With_hash.t -> lite node_representation
+
+  type root_data = 
+    { hash: State_hash.Stable.V1.t
+    ; scan_state: scan_state
+    ; pending_coinbase: Pending_coinbase.Stable.V1.t }
+  [@@deriving bin_io]
+
+  (** A root transition is a representation of the
+   *  change that occurs in a transition frontier when the
+   *  root is transitioned. It contains a pointer to the new
+   *  root, as well as pointers to all the nodes which are removed
+   *  by transitioning the root.
+   *)
+  type root_transition =
+    { new_root: root_data
+    ; garbage: State_hash.t list }
+  [@@deriving bin_io]
+
+  (** A transition frontier diff represents a single item
+   *  of mutation that can be or has been performed on
+   *  a transition frontier. Each diff is associated with
+   *  a type parameter that reprsents a "diff mutant".
+   *  A "diff mutant" is any information related to the
+   *  correct application of a diff which is not encapsulated
+   *  directly within the itself. This is used for computing
+   *  the transition frontier incremental hash. For example,
+   *  if some diff adds some new information, the diff itself
+   *  would contain the information it's adding, but if the
+   *  act of adding that information correctly to the transition
+   *  frontier depends on some other state at the time the
+   *  diff is applied, that state should be represented in mutant
+   *  parameter for that diff.
+   *)
+  type ('repr, 'mutant) t =
+    (** A diff representing new nodes which are added to
+     *  the transition frontier. This has no mutant as adding
+     *  a node merely depends on its parent being in the
+     *  transition frontier already. If the parent wasn't
+     *  already in the transition frontier, attempting to
+     *  process this diff would generate an error instead. *)
+    | New_node : 'repr node_representation -> ('repr, unit) t
+    (** A diff representing that the transition frontier root
+     *  has been moved forward. The diff contains the state hash
+     *  of the new root, as well as state hashes of all nodes that
+     *  were garbage collected by this root change. Garbage is
+     *  topologically sorted from oldest to youngest. The old root
+     *  should not be included in the garbage since it is implicitly
+     *  removed. The mutant for this diff is the state hash of the
+     *  old root. This ensures that all transition frontiers agreed
+     *  on the old roots value at the time of processing this diff.
+     *)
+    | Root_transitioned : root_transition -> (_, State_hash.t) t
+    (** A diff representing that there is a new best tip in
+     *  the transition frontier. The mutant for this diff is
+     *  the state hash of the old best tip. This ensures that
+     *  all transition frontiers agreed on the old best tip
+     *  pointer at the time of processing this diff.
+     *)
+    | Best_tip_changed : State_hash.t -> (_, State_hash.t) t
+
+  type ('repr, 'mutant) diff = ('repr, 'mutant) t
+
+  val key_to_yojson : ('repr, 'mutant) t -> Yojson.Safe.json
+
+  module Lite : sig
+    type 'mutant t = (lite, 'mutant) diff
+
+    module E : sig
+      type t = E : (lite, 'output) diff -> t
+      [@@deriving bin_io]
     end
-
-    type t = Stable.Latest.t
   end
+end
 
-  type _ t =
-    (* Mutant is the parent of the breadcrumb that got added*)
-    | New_breadcrumb : breadcrumb -> external_transition_validated t
-    | Root_transitioned :
-        { new_: breadcrumb
-        ; garbage: breadcrumb list
-              (* The nodes to remove excluding the old root. The breadcrumbs
-                 should be topologically sorted from oldest to youngest *)
-        }
-        -> (* Mutant is the old root data *)
-        Root_data.t t
-    (* Mutant is the old best tip *)
-    | Best_tip_changed : breadcrumb -> external_transition_validated t
+module type Transition_frontier_incremental_hash_intf = sig
+  type 'mutant lite_diff
 
-  type 'a diff_mutant = 'a t
+  type t [@@deriving eq, bin_io]
 
-  val key_to_yojson : 'a t -> Yojson.Safe.json
+  type transition = { source: t; target: t }
 
-  module E : sig
-    type t = E : 'output diff_mutant -> t
-  end
+  val empty : t
+
+  val to_string : t -> string
+
+  val merge_diff : t -> 'mutant lite_diff -> 'mutant -> t
 end
 
 module type Extension = sig
@@ -166,7 +244,12 @@ end
 module type Transition_frontier_breadcrumb_intf = sig
   type t [@@deriving sexp, eq, compare, to_yojson]
 
-  type display [@@deriving yojson]
+  type display =
+    { state_hash: string
+    ; blockchain_state: Blockchain_state.display
+    ; consensus_state: Consensus.Data.Consensus_state.display
+    ; parent: string }
+  [@@deriving yojson]
 
   type staged_ledger
 
@@ -202,6 +285,8 @@ module type Transition_frontier_breadcrumb_intf = sig
     t -> (external_transition_validated, State_hash.t) With_hash.t
 
   val staged_ledger : t -> staged_ledger
+
+  val just_emitted_a_proof : t -> bool
 
   val hash : t -> int
 
@@ -352,7 +437,7 @@ module type Transition_frontier_intf = sig
     Exntesions
     with type breadcrumb := Breadcrumb.t
      and type base_transition_frontier := Transition_frontier_base.t
-     and type diff := Diff.E.t
+     and type diff := Diff.Lite.E.t
 
   val snark_pool_refcount_pipe :
     t -> Extensions.Snark_pool_refcount.view Broadcast_pipe.Reader.t
@@ -369,7 +454,7 @@ module type Transition_frontier_intf = sig
 
     val root_history_is_empty : t -> bool
 
-    val apply_diff : t -> Diff.E.t -> unit
+    val apply_diff : t -> Diff.Lite.E.t -> unit
 
     val identity_pipe : t -> Extensions.Identity.view Broadcast_pipe.Reader.t
   end

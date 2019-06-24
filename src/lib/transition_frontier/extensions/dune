@@ -1,0 +1,4 @@
+(library
+  (name extensions)
+  (public_name extensions)
+  (libraries async_kernel core_kernel))

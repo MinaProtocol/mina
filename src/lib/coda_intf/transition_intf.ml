@@ -77,6 +77,7 @@ module type External_transition_intf = sig
 
   module Validated : sig
     type t
+    [@@deriving bin_io]
 
     val create_unsafe :
       external_transition -> [`I_swear_this_is_safe_see_my_comment of t]

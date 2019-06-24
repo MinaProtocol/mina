@@ -1,0 +1,4 @@
+(library
+  (name inputs)
+  (public_name inputs)
+  (libraries coda_intf))

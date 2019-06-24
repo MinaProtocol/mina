@@ -1,36 +1,86 @@
-(* open Core_kernel
+open Async_kernel
+open Core_kernel
 open Coda_base
 open Coda_state
-open Async_kernel
 open Pipe_lib
-module Worker = Worker
-module Intf = Intf
-module Transition_storage = Transition_storage
 
-module Make (Inputs : Intf.Main_inputs) = struct
+module Make (Inputs : Intf.Inputs_with_transition_storage_intf) = struct
   open Inputs
-  module Worker = Inputs.Make_worker (Inputs)
+
+  module Diff_buffer = Diff_buffer.Make (Inputs)
+  module Worker = Worker.Make (Inputs)
+
+  (* TODO: might be able to undo splitting out of db now? *)
+  let create ~logger ~db_directory ~root_snarked_ledger ~frontier_hash =
+    let db = Db.create ~directory:db_directory in
+    (match Db.check db with
+    | Ok () ->
+        if (Db.get_root_hash db).hash = (Ledger.Db.merkle_root root_snarked_ledger) then (
+          Result.ok_if_true
+            (Frontier.Hash.equal (Db.get_frontier_hash db) frontier_hash)
+            ~error:`Invalid_frontier_hash)
+        else if Db.mem_transition root.hash then (
+          Logger.info logger ~module_:__MODULE__ ~location:__LOC__
+            ~metadata:[("new_root_hash", State_hash.to_yojson root.hash) ]
+            "fast forwarding persistent transition frontier root to $new_root_hash";
+          let%map () = Db.fast_forward_root db ~new_root:root in
+          Db.set_frontier_hash frontier_hash)
+        else (
+          Db.clear db;
+          Db.initialize db ~root_data:root.root_data ~base_hash:frontier_hash;
+          Ok ())
+    | Error `Not_initialized ->
+        Db.initialize db ~root:genesis;
+        Ok ()
+    | Error `Corrupt ->
+        failwith "corrupt transition frontier database: please fix or delete");
+    let worker = Worker.create {db; logger} in
+    let buffer = Buffer.create () in
+    {db; worker; buffer}
+
+  let load_full_frontier t ~consensus_local_state =
+    let root_data, root_transition = Db.get_root t.db in
+    let staged_ledger_mask = failwith "TODO" in
+    let staged_ledger =
+      Staged_ledger.of_scan_state_and_ledger
+        ~logger ~verifier
+        ~snarked_ledger_hash
+        ~ledger:staged_ledger_mask
+        ~scan_state:root_data.scan_state
+        ~pending_coinbases:root_data.pending_coinbase
+    in
+    let frontier =
+      Full_frontier.create
+        ~logger:t.logger
+        ~root_transition
+        ~root_staged_ledger
+        ~consensus_local_state
+    in
+    (* TODO reconstruct and add breadcrumbs dfs, set best tip, perform basic validation *)
+    frontier
+
+(***********************)
 
   type t =
     { worker: Worker.t
     ; worker_thread: unit Deferred.t
     ; max_buffer_capacity: int
     ; flush_capacity: int
-    ; worker_writer:
-        ( Transition_frontier.Diff.Mutant.E.with_value list
+    ; work_writer:
+        ( work
         , Strict_pipe.synchronous
         , unit Deferred.t )
         Strict_pipe.Writer.t
-    ; buffer: Transition_frontier.Diff.Mutant.E.with_value Queue.t }
+    ; buffer: Buffer.t }
 
   let write_diff_and_verify ~logger ~acc_hash worker (diff, ground_truth_mutant)
       =
     Logger.trace logger "Handling mutant diff" ~module_:__MODULE__
       ~location:__LOC__
       ~metadata:
-        [("diff_mutant", Transition_frontier.Diff.Mutant.key_to_yojson diff)] ;
+        [("diff_mutant", Diff.key_to_yojson diff)] ;
     let ground_truth_hash =
-      Transition_frontier.Diff.Mutant.hash acc_hash diff ground_truth_mutant
+      Incremental_hash.merge_diff acc_hash diff ground_truth_mutant
     in
     match%map
       Worker.handle_diff worker acc_hash
@@ -52,38 +102,6 @@ module Make (Inputs : Intf.Main_inputs) = struct
             (Transition_frontier.Diff.Hash.to_string ground_truth_hash)
             (Transition_frontier.Diff.Hash.to_string new_hash)
             ()
-
-  let rec flush ({buffer; worker_writer; flush_capacity; _} as t) =
-    let list = Queue.to_list buffer in
-    Queue.clear buffer ;
-    let%bind () = Strict_pipe.Writer.write worker_writer list in
-    if Queue.length buffer >= flush_capacity then flush t else Deferred.unit
-
-  let create ?directory_name ~logger ~flush_capacity ~max_buffer_capacity () =
-    let worker = Worker.create ?directory_name ~logger () in
-    let buffer = Queue.create () in
-    let reader, writer =
-      Strict_pipe.create ~name:"Transition_frontier_persistence worker"
-        Strict_pipe.Synchronous
-    in
-    let worker_thread =
-      Strict_pipe.Reader.fold reader ~init:Transition_frontier.Diff.Hash.empty
-        ~f:(fun init_hash diff_pairs ->
-          Deferred.List.fold diff_pairs ~init:init_hash
-            ~f:(fun acc_hash
-               (Transition_frontier.Diff.Mutant.E.With_value
-                 (diff, ground_truth_mutant))
-               ->
-              write_diff_and_verify ~logger ~acc_hash worker
-                (diff, ground_truth_mutant) ) )
-      |> Deferred.ignore
-    in
-    { worker
-    ; worker_writer= writer
-    ; flush_capacity
-    ; max_buffer_capacity
-    ; buffer
-    ; worker_thread }
 
   (* TODO: Remove once #2115 is solved *)
   let close_and_finish_copy_without_closing_worker t =
@@ -114,58 +132,6 @@ module Make (Inputs : Intf.Main_inputs) = struct
           %i, buffer_capacity: %i}"
         flush_capacity max_buffer_capacity ()
     else current_work
-
-  let listen_to_frontier_broadcast_pipe
-      (frontier_broadcast_pipe :
-        Transition_frontier.t option Broadcast_pipe.Reader.t) t =
-    Broadcast_pipe.Reader.iter frontier_broadcast_pipe
-      ~f:
-        (Option.value_map ~default:Deferred.unit ~f:(fun frontier ->
-             Deferred.join
-             @@ Broadcast_pipe.Reader.fold ~init:Deferred.unit
-                  (Transition_frontier.persistence_diff_pipe frontier)
-                  ~f:(fun worker_thread new_diffs ->
-                    Deferred.return
-                    @@
-                    if not @@ Strict_pipe.Writer.is_closed t.worker_writer then (
-                      Queue.enqueue_all t.buffer new_diffs ;
-                      select_work t worker_thread )
-                    else worker_thread ) ))
-
-  let directly_add_breadcrumb ~logger ~verifier ~trust_system
-      transition_frontier transition parent =
-    let log_error () =
-      Logger.fatal logger ~module_:__MODULE__ ~location:__LOC__
-        ~metadata:[("hash", State_hash.to_yojson (With_hash.hash transition))]
-        "Failed to add breadcrumb into $hash"
-    in
-    (* TMP HACK: our transition is already validated, so we "downgrade" it's validation #2486 *)
-    let mostly_validated_external_transition =
-      ( With_hash.map ~f:External_transition.Validated.forget_validation
-          transition
-      , ( (`Time_received, Truth.True)
-        , (`Proof, Truth.True)
-        , (`Frontier_dependencies, Truth.True)
-        , (`Staged_ledger_diff, Truth.False) ) )
-    in
-    let%bind child_breadcrumb =
-      match%map
-        Transition_frontier.Breadcrumb.build ~logger ~verifier ~trust_system
-          ~parent ~transition:mostly_validated_external_transition ~sender:None
-      with
-      | Ok child_breadcrumb ->
-          child_breadcrumb
-      | Error (`Fatal_error exn) ->
-          log_error () ; raise exn
-      | Error (`Invalid_staged_ledger_diff error)
-      | Error (`Invalid_staged_ledger_hash error) ->
-          log_error () ; Error.raise error
-    in
-    let%map () =
-      Transition_frontier.add_breadcrumb_exn transition_frontier
-        child_breadcrumb
-    in
-    child_breadcrumb
 
   let staged_ledger_hash transition =
     let open External_transition.Validated in
@@ -248,4 +214,4 @@ module Make (Inputs : Intf.Main_inputs) = struct
   module For_tests = struct
     let write_diff_and_verify = write_diff_and_verify
   end
-end *)
+end

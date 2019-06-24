@@ -1,30 +1,22 @@
-(* open Core
+open Core
 open Async
 
-module Make (Inputs : Intf.Worker_inputs) = struct
+module Make (Inputs : Intf.Inputs_with_transition_storage_intf) = struct
   open Inputs
-
-  module type S = sig
-    val handle_diff :
-         Transition_frontier.Diff.Hash.t
-      -> Transition_frontier.Diff.Mutant.E.t
-      -> Transition_frontier.Diff.Hash.t
-  end
 
   module Worker = Worker.Make (Inputs)
 
+  module type S = (module type of Worker)
+
   module Worker_state = struct
-    type t = (module S)
+    type t = Worker.t
 
     type init_arg = string [@@deriving bin_io]
 
     let create directory_name : t Deferred.t =
       let logger = Logger.create () in
       let worker = Worker.create ~logger ~directory_name () in
-      let module M = struct
-        let handle_diff = Worker.handle_diff worker
-      end in
-      Deferred.return (module M : S)
+      Deferred.return worker
   end
 
   module Functions = struct
@@ -37,11 +29,10 @@ module Make (Inputs : Intf.Worker_inputs) = struct
 
     let handle_diff =
       create
-        [%bin_type_class:
-          Transition_frontier.Diff.Hash.t * Transition_frontier.Diff.Mutant.E.t]
-        Transition_frontier.Diff.Hash.bin_t
-        (fun (module W) (diff_hash, diff_mutant) ->
-          Deferred.return (W.handle_diff diff_hash diff_mutant) )
+        [%bin_type_class: Incremental_hash.t * Diff.Lite.E.t]
+        Incremental_hash.bin_t
+        (fun worker (incremental_hash, diff) ->
+          Deferred.return (Worker.handle_diff worker incremental_hash diff) )
   end
 
   module Rpc_worker = struct
@@ -51,9 +42,9 @@ module Make (Inputs : Intf.Worker_inputs) = struct
       type 'w functions =
         { handle_diff:
             ( 'w
-            , Transition_frontier.Diff.Hash.t
-              * Transition_frontier.Diff.Mutant.E.t
-            , Transition_frontier.Diff.Hash.t )
+            , Incremental_hash.t
+              * Diff.Lite.E.t
+            , Incremental_hash.t )
             F.t }
 
       module Worker_state = Worker_state
@@ -102,4 +93,4 @@ module Make (Inputs : Intf.Worker_inputs) = struct
   let handle_diff {connection; _} hash diff =
     Rpc_worker.Connection.run connection ~f:Rpc_worker.functions.handle_diff
       ~arg:(hash, diff)
-end *)
+end
