@@ -106,9 +106,10 @@ struct
     let payload = Binable.to_string (module T) t in
     Base58_check.encode ~version_byte:T.version_byte ~payload
 
-  let of_base58_check_exn s =
-    let version_byte, decoded = Base58_check.decode_exn s in
-    if not (Char.equal version_byte T.version_byte) then
-      failwith "of.encode_exn: unexpected version byte" ;
-    Binable.of_string (module T) decoded
+  let of_base58_check s =
+    let open Or_error.Let_syntax in
+    let%bind decoded = Base58_check.decode ~version_byte:T.version_byte s in
+    Ok (Binable.of_string (module T) decoded)
+
+  let of_base58_check_exn s = of_base58_check s |> Or_error.ok_exn
 end
