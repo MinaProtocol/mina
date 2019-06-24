@@ -1227,7 +1227,7 @@ module Data = struct
         epoch_count ~prev_epoch ~next_epoch ~prev_slot
         ~prev_protocol_state_hash ~proposer_vrf_result ~snarked_ledger_hash
         ~total_currency =
-      let staking_data, next_data, epoch_count =
+      let staking_data', next_data', epoch_count' =
         if next_epoch > prev_epoch then
           ( next_to_staking next_data
           , { Poly.seed= Epoch_seed.initial
@@ -1246,17 +1246,17 @@ module Data = struct
       in
       let curr_seed, curr_lock_checkpoint =
         if Epoch.Slot.in_seed_update_range prev_slot then
-          ( Epoch_seed.update next_data.seed proposer_vrf_result
+          ( Epoch_seed.update next_data'.seed proposer_vrf_result
           , Some prev_protocol_state_hash )
-        else (next_data.seed, next_data.lock_checkpoint)
+        else (next_data'.seed, next_data'.lock_checkpoint)
       in
-      let next_data =
+      let next_data'' =
         Poly.
-          { next_data with
+          { next_data' with
             seed= curr_seed
           ; lock_checkpoint= curr_lock_checkpoint }
       in
-      (staking_data, next_data, epoch_count)
+      (staking_data', next_data'', epoch_count')
   end
 
   module Consensus_transition = struct
