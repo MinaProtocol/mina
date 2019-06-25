@@ -466,6 +466,23 @@ let send_payment =
   user_command body ~label:"payment" ~summary:"Send payment to an address"
     ~error:"Failed to send payment"
 
+let change_delegate =
+  let body =
+    let open Command.Let_syntax in
+    let open Cli_lib.Arg_type in
+    let%map_open new_delegate =
+      flag "delegate"
+        ~doc:
+          "PUBLICKEY Public key address to which you want to which you want \
+           to delegate"
+        (required public_key_compressed)
+    in
+    User_command_payload.Body.Stake_delegation (Set_delegate {new_delegate})
+  in
+  user_command body ~label:"delegate"
+    ~summary:"Change the address to which you're delegating your coda"
+    ~error:"Failed to change delegate"
+
 let delegate_stake =
   let body =
     let open Command.Let_syntax in
@@ -650,6 +667,7 @@ let command =
     ; ("verify-payment", verify_payment)
     ; ("get-nonce", get_nonce_cmd)
     ; ("send-payment", send_payment)
+    ; ("change-delegate", change_delegate)
     ; ("stop-daemon", stop_daemon)
     ; ("batch-send-payments", batch_send_payments)
     ; ("status", status)
