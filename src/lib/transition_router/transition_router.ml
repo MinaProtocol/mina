@@ -50,12 +50,13 @@ module Make (Inputs : Inputs_intf) = struct
   let create_bufferred_pipe ?name () =
     Strict_pipe.create ?name (Buffered (`Capacity 50, `Overflow Crash))
 
-  let is_transition_for_bootstrap root_state new_transition =
+  let is_transition_for_bootstrap ~logger root_state new_transition =
     let open External_transition in
     let new_state = protocol_state new_transition in
     Consensus.Hooks.should_bootstrap
       ~existing:(Protocol_state.consensus_state root_state)
       ~candidate:(Protocol_state.consensus_state new_state)
+      ~logger
 
   let get_root_state frontier =
     Transition_frontier.root frontier
@@ -117,7 +118,9 @@ module Make (Inputs : Inputs_intf) = struct
         in
         ( match Broadcast_pipe.Reader.peek frontier_r with
         | Some frontier ->
-            if is_transition_for_bootstrap (get_root_state frontier) transition
+            if
+              is_transition_for_bootstrap ~logger (get_root_state frontier)
+                transition
             then (
               Strict_pipe.Writer.kill !transition_writer_ref ;
               let bootstrap_controller_reader, bootstrap_controller_writer =
