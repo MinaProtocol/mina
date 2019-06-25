@@ -306,4 +306,5 @@ let handle_shutdown ~monitor ~conf_dir t =
         in
         Logger.info logger ~module_:__MODULE__ ~location:__LOC__
           !"Coda process got interrupted by signal %{sexp:t}"
-          signal ))
+          signal ;
+        Stdlib.exit 0 ))
