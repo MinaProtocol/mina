@@ -56,7 +56,10 @@ module Make (Inputs : Inputs_intf) = struct
     Consensus.Hooks.should_bootstrap
       ~existing:(Protocol_state.consensus_state root_state)
       ~candidate:(Protocol_state.consensus_state new_state)
-      ~logger
+      ~logger:
+        (Logger.extend logger
+           [ ( "selection_context"
+             , `String "Transition_router.is_transition_for_bootstrap" ) ])
 
   let get_root_state frontier =
     Transition_frontier.root frontier
