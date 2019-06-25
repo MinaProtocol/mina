@@ -494,7 +494,22 @@ let ensure_testnet_id_still_good _ = Deferred.unit
 
 [%%endif]
 
-let internal_commands = [(Snark_worker.Intf.command_name, Snark_worker.command)]
+let snark_hashes =
+  let open Command.Let_syntax in
+  Command.basic ~summary:"List hashes of proving and verification keys"
+    [%map_open
+      let json = Cli_lib.Flag.json in
+      let print = Core.printf "%s\n%!" in
+      fun () ->
+        if json then
+          print
+            (Yojson.Safe.to_string
+               (Snark_keys.key_hashes_to_yojson Snark_keys.key_hashes))
+        else List.iter Snark_keys.key_hashes ~f:print]
+
+let internal_commands =
+  [ (Snark_worker.Intf.command_name, Snark_worker.command)
+  ; ("snark-hashes", snark_hashes) ]
 
 let coda_commands logger =
   [ (Parallel.worker_command_name, Parallel.worker_command)
