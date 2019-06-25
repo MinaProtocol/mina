@@ -15,15 +15,31 @@ module Styles = {
     ]);
 };
 
+module Wallets = [%graphql
+  {| query getWallets { ownedWallets {publicKey, balance{total}}} |}
+];
+module WalletQuery = ReasonApollo.CreateQuery(Wallets);
+
 [@react.component]
-let make = (~wallets) =>
-  <div className=Styles.container>
-    {React.array(
-       Array.map(
-         ~f=
-           wallet =>
-             <WalletItem key={PublicKey.toString(wallet.key)} wallet />,
-         wallets,
-       ),
-     )}
-  </div>;
+let make = () =>
+  <WalletQuery partialRefetch=true>
+    {response =>
+       switch (response.result) {
+       | Loading => <Loader.Page> <Loader /> </Loader.Page>
+       | Error(err) => React.string(err##message)
+       | Data(wallets) =>
+         <div className=Styles.container>
+           {React.array(
+              Array.map(
+                ~f=
+                  wallet =>
+                    <WalletItem
+                      key={PublicKey.toString(wallet.key)}
+                      wallet
+                    />,
+                Array.map(wallets##ownedWallets, ~f=Wallet.ofGraphqlExn),
+              ),
+            )}
+         </div>
+       }}
+  </WalletQuery>;
