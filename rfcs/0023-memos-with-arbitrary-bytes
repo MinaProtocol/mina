@@ -42,15 +42,26 @@ sequences, by requiring the input to be UTF-8 in the latter case. A
 third tag could be used for that purpose. That would add a small
 amount of complexity to the API.
 
+The current memo data size of 32, which is derived from the Blake2
+digest size, could be increased, at the expense of more work for the
+SNARK.
+
 Of course, we could leave the memo contain as-is, containing only
 Blake2 digests, which would avoid the drawbacks mentioned.
 
 ## Prior art
 
-RFC #2708 implements the strategy described here.
+RFC #2708 implements the strategy described here. The current wallet
+design allows reading and viewing of memos in transactions.
 
 ## Unresolved questions
 
 The performance impact of this change has not been evaluated.
 
-It's unknown how eventual Coda users will make use of this facility.
+Should we enforce full memo validity, as implemented in the "is_valid"
+function in the implementation, in the SNARK? If not, what aspects of
+the memo should be enforced? Arguably, the structure of the memo bytes
+don't affect the protocol.
+
+It's unknown how eventual Coda users will make use of this facility
+beyond what the wallet implementation provides.
