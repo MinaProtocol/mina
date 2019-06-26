@@ -258,7 +258,7 @@ jobs:
                   name: Run unit tests
                   command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && dune build --profile=test_postake_snarkless -j8 && (dune runtest --profile=test_postake_snarkless -j8 || (./scripts/gather-coredumps.sh && false))'
             - store_artifacts:
-                path: project/core*
+                path: core*
     test-unit--dev:
         resource_class: large
         docker:
@@ -271,7 +271,7 @@ jobs:
                   name: Run unit tests
                   command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && dune build --profile=dev -j8 && (dune runtest --profile=dev -j8 || (./scripts/gather-coredumps.sh && false))'
             - store_artifacts:
-                path: project/core*
+                path: core*
     test--fake_hash:
         resource_class: large
         docker:
