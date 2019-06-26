@@ -3,7 +3,7 @@ open Snark_params
 open Tick
 open Tuple_lib
 
-exception Too_long_user_memo_length
+exception Too_long_user_memo_input
 
 exception Too_long_digestible_string
 
@@ -40,9 +40,13 @@ val is_digest : t -> bool
 (** is the memo well-formed *)
 val is_valid : t -> bool
 
+(** bound on length of strings to digest *)
 val max_digestible_string_length : int
 
-(** create a memo by digesting a string; raises [Too_long_digestible_string] if 
+(** bound on length of strings or bytes in memo *)
+val max_input_length : int
+
+(** create a memo by digesting a string; raises [Too_long_digestible_string] if
     length exceeds [max_digestible_string_length]
  *)
 val create_by_digesting_string_exn : string -> t
@@ -52,27 +56,27 @@ val create_by_digesting_string_exn : string -> t
  *)
 val create_by_digesting_string : string -> t Or_error.t
 
-(** create a memo from bytes of length up to 32;
-    raise [Too_long_user_memo_length] if length is greater
+(** create a memo from bytes of length up to max_input_length;
+    raise [Too_long_user_memo_input] if length is greater
  *)
 val create_from_bytes_exn : bytes -> t
 
-(** create a memo from bytes of length up to 32; returns
+(** create a memo from bytes of length up to max_input_length; returns
     error is length is greater
  *)
 val create_from_bytes : bytes -> t Or_error.t
 
-(** create a memo from a string of length up to 32;
-    raise [Too_long_user_memo_length] if length is greater
+(** create a memo from a string of length up to max_input_length;
+    raise [Too_long_user_memo_input] if length is greater
  *)
 val create_from_string_exn : string -> t
 
-(** create a memo from a string of length up to 32;
+(** create a memo from a string of length up to max_input_length;
     returns error if length is greater
  *)
 val create_from_string : string -> t Or_error.t
 
-(** convert a memo to a fold of boolean triples 
+(** convert a memo to a fold of boolean triples
  *)
 val fold : t -> bool Tuple_lib.Triple.t Fold_lib.Fold.t
 
