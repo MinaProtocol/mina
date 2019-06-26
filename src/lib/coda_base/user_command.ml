@@ -204,7 +204,11 @@ let gen_test =
   Gen.payment_with_random_participants ~sign_type:`Real ~keys ~max_amount:10000
     ~max_fee:1000 ()
 
+type record = {x: int; y: string}
+
 let%test_unit "completeness" =
+  let r : record = Obj.magic '\x00' in
+  let _ = Core.eprintf "DOES THIS SEGFAULT: %s\n%!" r.y in
   Quickcheck.test ~trials:20 gen_test ~f:(fun t -> assert (check_signature t))
 
 let%test_unit "json" =
