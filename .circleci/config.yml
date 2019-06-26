@@ -126,16 +126,16 @@ jobs:
            - run:
                  name: Run all tests (on master)
                  command: echo "FIXME Tests not yet working on mac"
-           - run: 
+           - run:
                  name: Create Portable Binary
                  command: ./scripts/skip_if_only_frontend.sh make macos-portable
-           - run: 
+           - run:
                  name: Install JFrog CLI
                  command: ./scripts/skip_if_only_frontend.sh bash -c 'curl -fL https://getcli.jfrog.io | sh'
-           - run: 
+           - run:
                  name: Configure JFrog CLI
                  command: ./scripts/skip_if_only_frontend.sh bash -c './jfrog rt config --url $ARTIFACTORY_URL --user $ARTIFACTORY_USER --apikey $ARTIFACTORY_API_KEY --interactive=false'
-           - run: 
+           - run:
                  name: Release Build to Artifactory
                  command: ./scripts/skip_if_only_frontend.sh bash -c './jfrog rt u _build/coda-daemon-macos.zip macos-coda/coda-daemon-$CIRCLE_BUILD_NUM.zip --build-name=build-macos --build-number=$CIRCLE_BUILD_NUM'
     build-artifacts--testnet_postake:
@@ -256,7 +256,7 @@ jobs:
             - run: git submodule sync && git submodule update --init --recursive
             - run:
                   name: Run unit tests
-                  command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && dune build --profile=test_postake_snarkless -j8 && dune runtest --profile=test_postake_snarkless -j8'
+                  command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && dune build --profile=test_postake_snarkless -j8 && (dune runtest --profile=test_postake_snarkless -j8 || (./scripts/gather-coredumps.sh && false))'
             - store_artifacts:
                 path: core*
     test-unit--dev:
@@ -269,7 +269,7 @@ jobs:
             - run: git submodule sync && git submodule update --init --recursive
             - run:
                   name: Run unit tests
-                  command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && dune build --profile=dev -j8 && dune runtest --profile=dev -j8'
+                  command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && dune build --profile=dev -j8 && (dune runtest --profile=dev -j8 || (./scripts/gather-coredumps.sh && false))'
             - store_artifacts:
                 path: core*
     test--fake_hash:
