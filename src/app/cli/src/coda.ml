@@ -142,7 +142,7 @@ let daemon logger =
            ; client_port: 'd
            ; run_snark_worker_action: 'e }
        end in
-       let coda_initialization_deferred =
+       let coda_initialization_deferred () =
          let%bind config =
            match%map
              Monitor.try_with_or_error ~extract_exn:true (fun () ->
@@ -427,9 +427,9 @@ let daemon logger =
          ; client_port
          ; run_snark_worker_action }
        in
+       let coda_initialization_deferred = coda_initialization_deferred () in
        Coda_run.handle_shutdown ~monitor ~conf_dir ~top_logger:logger
          (coda_initialization_deferred >>| fun c -> c.Coda_initialization.coda) ;
-       let crash () = raise TestException in
        Async.Scheduler.within' ~monitor
        @@ fun () ->
        let%bind { Coda_initialization.coda
