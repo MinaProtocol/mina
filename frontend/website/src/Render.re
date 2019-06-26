@@ -108,6 +108,7 @@ module Router = {
 
 let jobOpenings = [|
   ("product-manager", "Product Manager (San Francisco)."),
+  ("senior-designer", "Senior Designer (San Francisco)."),
   (
     "senior-frontend-engineer",
     "Senior Product Engineer (Frontend) (San Francisco).",
