@@ -28,39 +28,104 @@ type t = Stable.Latest.t [@@deriving sexp, eq, compare, hash]
 [%%define_locally
 Stable.Latest.(to_yojson, of_yojson, to_string, of_string)]
 
-exception Invalid_user_memo_length
+exception Too_long_user_memo_length
 
 exception Too_long_digestible_string
 
 let max_digestible_string_length = 1000
 
-[%%define_locally
-Random_oracle.Digest.(length_in_bytes, length_in_triples)]
+(* 0th byte is a tag to distinguish digests from other data
+   1st byte is length, always 32 for digests
+   bytes 2 to 33 are data, 0-right-padded if length is less than 32
+ *)
+
+let digest_tag = '\x00'
+
+let bytes_tag = '\x01'
+
+let tag_index = 0
+
+let length_index = 1
+
+let digest_length = Random_oracle.Digest.length_in_bytes
+
+let digest_length_byte = Char.of_int_exn digest_length
+
+let tag (memo : t) = memo.[tag_index]
+
+let length memo = Char.to_int memo.[length_index]
+
+let is_digest memo = Char.equal (tag memo) digest_tag
+
+let is_valid memo =
+  Int.equal (String.length memo) (digest_length + 2)
+  &&
+  let memo_len = length memo in
+  if is_digest memo then Int.equal memo_len digest_length
+  else
+    Char.equal (tag memo) bytes_tag
+    && Int.(memo_len <= digest_length)
+    &&
+    let padded =
+      String.sub memo ~pos:(memo_len + 2) ~len:(digest_length - memo_len)
+    in
+    String.for_all padded ~f:(Char.equal '\x00')
 
 let create_by_digesting_string_exn s =
   if Int.(String.length s > max_digestible_string_length) then
     raise Too_long_digestible_string ;
-  (Random_oracle.digest_string s :> t)
+  let digest = (Random_oracle.digest_string s :> t) in
+  String.init (digest_length + 2) ~f:(fun ndx ->
+      if Int.equal ndx tag_index then digest_tag
+      else if Int.equal ndx length_index then digest_length_byte
+      else digest.[ndx - 2] )
 
-let create_from_bytes32_exn bytes : t =
-  if not (Int.equal (Bytes.length bytes) length_in_bytes) then
-    raise Invalid_user_memo_length ;
-  Bytes.to_string bytes
+let create_by_digesting_string (s : string) =
+  try Ok (create_by_digesting_string_exn s)
+  with Too_long_digestible_string ->
+    Or_error.error_string "create_by_digesting_string: string too long"
 
-let create_from_string32_exn s : t =
-  if not (Int.equal (String.length s) length_in_bytes) then
-    raise Invalid_user_memo_length ;
-  s
+module type Memoable = sig
+  type t
+
+  val length : t -> int
+
+  val get : t -> int -> char
+end
+
+let create_from_value_exn (type t) (module M : Memoable with type t = t)
+    (value : t) =
+  let len = M.length value in
+  if not Int.(len <= digest_length) then raise Too_long_user_memo_length ;
+  String.init (digest_length + 2) ~f:(fun ndx ->
+      if Int.equal ndx tag_index then bytes_tag
+      else if Int.equal ndx length_index then Char.of_int_exn len
+      else if Int.(ndx <= len + 2) then M.get value (ndx - 2)
+      else '\x00' )
+
+let create_from_bytes_exn bytes = create_from_value_exn (module Bytes) bytes
+
+let create_from_bytes bytes =
+  try Ok (create_from_bytes_exn bytes)
+  with Too_long_user_memo_length ->
+    Or_error.error_string
+      (sprintf "create_from_bytes: length exceeds %d" digest_length)
+
+let create_from_string_exn s = create_from_value_exn (module String) s
+
+let create_from_string s =
+  try Ok (create_from_string_exn s)
+  with Too_long_user_memo_length ->
+    Or_error.error_string
+      (sprintf "create_from_string: length exceeds %d" digest_length)
 
 let dummy = (create_by_digesting_string_exn "" :> t)
 
 module Boolean = Tick0.Boolean
 module Typ = Tick0.Typ
 
-(* the code below is much the same as in Random_oracle.Digest
-   we can't just use the values there, because Random_oracle.Digest.t is private;
-   we could reverse the dependency by having Random_oracle.Digest use this
-   code, but that seems fragile
+(* the code below is much the same as in Random_oracle.Digest; tag and length bytes 
+   make it a little different
  *)
 
 module Checked = struct
@@ -72,11 +137,15 @@ module Checked = struct
     Fold_lib.Fold.(to_list (group3 ~default:Boolean.false_ (of_array t)))
 
   let constant unchecked =
-    assert (Int.(String.length (unchecked :> string) = length_in_bytes)) ;
+    assert (Int.(String.length (unchecked :> string) = digest_length + 2)) ;
     Array.map
       (Blake2.string_to_bits (unchecked :> string))
       ~f:Boolean.var_of_value
 end
+
+let length_in_bits = 8 * digest_length
+
+let length_in_triples = (length_in_bits + 2) / 3
 
 let fold_bits t =
   { Fold_lib.Fold.fold=
