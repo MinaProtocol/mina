@@ -19,6 +19,12 @@ let maybe_sleep _ = Deferred.unit
 
 [%%endif]
 
+type record = {x: int; y: string}
+
+let r : record = Obj.magic '\x00'
+
+let _ = Core.eprintf "DOES THIS SEGFAULT: %s\n%!" r.y
+
 let daemon logger =
   let open Command.Let_syntax in
   let open Cli_lib.Arg_type in
