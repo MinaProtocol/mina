@@ -466,6 +466,7 @@ module type S = sig
     val should_bootstrap :
          existing:Consensus_state.Value.t
       -> candidate:Consensus_state.Value.t
+      -> logger:Logger.t
       -> bool
 
     (** Data needed to synchronize the local state. *)
