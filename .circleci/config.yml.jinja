@@ -191,7 +191,7 @@ jobs:
                   name: Run unit tests
                   command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && dune build --profile={{profile}} -j8 && (dune runtest --profile={{profile}} -j8 || (./scripts/gather-coredumps.sh && false))'
             - store_artifacts:
-                path: core*
+                path: core_dumps
     {%- endfor %}
 
     {%- for profile in test_permutations.keys() | sort %}
