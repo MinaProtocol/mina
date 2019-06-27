@@ -202,7 +202,7 @@ let start_time = Time_ns.now ()
 
 type active_state_fields =
   { num_accounts: int option
-  ; block_count: int option
+  ; blockchain_length: int option
   ; ledger_merkle_root: string option
   ; staged_ledger_hash: string option
   ; state_hash: string option
@@ -272,8 +272,9 @@ let get_status ~flag t =
       Protocol_state.hash state |> [%sexp_of: State_hash.t] |> Sexp.to_string
     in
     let consensus_state = state |> Protocol_state.consensus_state in
-    let block_count =
-      Length.to_int @@ Consensus.Data.Consensus_state.length consensus_state
+    let blockchain_length =
+      Length.to_int
+      @@ Consensus.Data.Consensus_state.blockchain_length consensus_state
     in
     let%bind sync_status =
       Coda_incremental.Status.stabilize () ;
@@ -297,7 +298,7 @@ let get_status ~flag t =
     in
     ( sync_status
     , { num_accounts= Some num_accounts
-      ; block_count= Some block_count
+      ; blockchain_length= Some blockchain_length
       ; ledger_merkle_root= Some ledger_merkle_root
       ; staged_ledger_hash= Some staged_ledger_hash
       ; state_hash= Some state_hash
@@ -305,7 +306,7 @@ let get_status ~flag t =
   in
   let ( sync_status
       , { num_accounts
-        ; block_count
+        ; blockchain_length
         ; ledger_merkle_root
         ; staged_ledger_hash
         ; state_hash
@@ -316,7 +317,7 @@ let get_status ~flag t =
     | `Bootstrapping ->
         ( `Bootstrap
         , { num_accounts= None
-          ; block_count= None
+          ; blockchain_length= None
           ; ledger_merkle_root= None
           ; staged_ledger_hash= None
           ; state_hash= None
@@ -324,7 +325,7 @@ let get_status ~flag t =
   in
   { Daemon_rpcs.Types.Status.num_accounts
   ; sync_status
-  ; block_count
+  ; blockchain_length
   ; uptime_secs
   ; ledger_merkle_root
   ; staged_ledger_hash
