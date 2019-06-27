@@ -766,7 +766,7 @@ let%test_module _ =
             in
             let cmd_payload =
               User_command.Payload.create ~fee ~nonce
-                ~memo:(User_command_memo.create_exn memo)
+                ~memo:(User_command_memo.create_by_digesting_string_exn memo)
                 ~body:
                   (User_command.Payload.Body.Payment
                      {receiver= receiver_pk; amount})
