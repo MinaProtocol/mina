@@ -7,5 +7,5 @@ CORE_DIR=core_dumps
 mkdir $CORE_DIR
 
 for file in `find . -name "core.[0-9]*.*"` ;
-  do ln -s "`pwd`/$file" "$CORE_DIR/`basename $file`" ;
+  do ln -s "`pwd`/$file" $CORE_DIR/ ;
 done
