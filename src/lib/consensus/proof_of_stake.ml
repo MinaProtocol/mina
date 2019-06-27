@@ -2246,10 +2246,10 @@ module Hooks = struct
     let from_genesis_epoch =
       Length.equal consensus_state.epoch_length Length.zero
     in
-    if in_same_epoch || from_genesis_epoch then
-      Ok consensus_state.last_epoch_data
-    else if in_next_epoch then
+    if in_next_epoch then
       Ok (Epoch_data.curr_to_last consensus_state.curr_epoch_data)
+    else if in_same_epoch || from_genesis_epoch then
+      Ok consensus_state.last_epoch_data
     else Error ()
 
   let epoch_snapshot_name = function
