@@ -1,32 +1,26 @@
 open Core_kernel
 open Async_kernel
-open Protocols.Coda_transition_frontier
 open Coda_base
 open Coda_state
-open Pipe_lib
+open Coda_transition
 open Coda_incremental
 
 module type Inputs_intf = Inputs.Inputs_intf
 
 module Make (Inputs : Inputs_intf) :
-  Transition_frontier_intf
-  with type state_hash := State_hash.t
-   and type external_transition_verified :=
-              Inputs.External_transition.Verified.t
-   and type ledger_database := Ledger.Db.t
+  Coda_intf.Transition_frontier_intf
+  with type mostly_validated_external_transition :=
+              ( [`Time_received] * Truth.true_t
+              , [`Proof] * Truth.true_t
+              , [`Frontier_dependencies] * Truth.true_t
+              , [`Staged_ledger_diff] * Truth.false_t )
+              Inputs.External_transition.Validation.with_transition
+   and type external_transition_validated :=
+              Inputs.External_transition.Validated.t
    and type staged_ledger_diff := Inputs.Staged_ledger_diff.t
    and type staged_ledger := Inputs.Staged_ledger.t
-   and type masked_ledger := Ledger.Mask.Attached.t
    and type transaction_snark_scan_state := Inputs.Staged_ledger.Scan_state.t
-   and type consensus_local_state := Consensus.Data.Local_state.t
-   and type user_command := User_command.t
-   and type diff_mutant :=
-              ( Inputs.External_transition.Stable.Latest.t
-              , State_hash.Stable.Latest.t )
-              With_hash.t
-              Inputs.Diff_mutant.E.t
-   and module Extensions.Work = Inputs.Transaction_snark_work.Statement =
-struct
+   and type verifier := Inputs.Verifier.t = struct
   open Inputs
 
   (* NOTE: is Consensus_mechanism.select preferable over distance? *)
@@ -35,31 +29,10 @@ struct
 
   exception Already_exists of State_hash.t
 
-  module Fake_db = struct
-    include Coda_base.Ledger.Db
-
-    type location = Location.t
-
-    let get_or_create ledger key =
-      let key, loc =
-        match
-          get_or_create_account_exn ledger key (Account.initialize key)
-        with
-        | `Existed, loc ->
-            ([], loc)
-        | `Added, loc ->
-            ([key], loc)
-      in
-      (key, get ledger loc |> Option.value_exn, loc)
-  end
-
-  module TL = Coda_base.Transaction_logic.Make (Fake_db)
-
   module Breadcrumb = struct
-    (* TODO: external_transition should be type : External_transition.With_valid_protocol_state.t #1344 *)
     type t =
       { transition_with_hash:
-          (External_transition.Verified.t, State_hash.t) With_hash.t
+          (External_transition.Validated.t, State_hash.t) With_hash.t
       ; mutable staged_ledger: Staged_ledger.t sexp_opaque
       ; just_emitted_a_proof: bool }
     [@@deriving sexp, fields]
@@ -68,7 +41,7 @@ struct
         =
       `Assoc
         [ ( "transition_with_hash"
-          , With_hash.to_yojson External_transition.Verified.to_yojson
+          , With_hash.to_yojson External_transition.Validated.to_yojson
               State_hash.to_yojson transition_with_hash )
         ; ("staged_ledger", `String "<opaque>")
         ; ("just_emitted_a_proof", `Bool just_emitted_a_proof) ]
@@ -78,84 +51,43 @@ struct
 
     let copy t = {t with staged_ledger= Staged_ledger.copy t.staged_ledger}
 
-    let build ~logger ~trust_system ~parent ~transition_with_hash ~sender =
+    module Staged_ledger_validation =
+      External_transition.Staged_ledger_validation (Staged_ledger)
+
+    let build ~logger ~verifier ~trust_system ~parent
+        ~transition:transition_with_validation ~sender =
       O1trace.measure "Breadcrumb.build" (fun () ->
-          let open Deferred.Result.Let_syntax in
-          let staged_ledger = parent.staged_ledger in
-          let transition = With_hash.data transition_with_hash in
-          let transition_protocol_state =
-            External_transition.Verified.protocol_state transition
-          in
-          let blockchain_state =
-            Protocol_state.blockchain_state transition_protocol_state
-          in
-          let blockchain_staged_ledger_hash =
-            Blockchain_state.staged_ledger_hash blockchain_state
-          in
-          let%bind ( `Hash_after_applying staged_ledger_hash
-                   , `Ledger_proof proof_opt
-                   , `Staged_ledger transitioned_staged_ledger
-                   , `Pending_coinbase_data _ ) =
-            let open Deferred.Let_syntax in
-            match%bind
-              Staged_ledger.apply ~logger staged_ledger
-                (External_transition.Verified.staged_ledger_diff transition)
-            with
-            | Ok x ->
-                return (Ok x)
-            | Error (Staged_ledger.Staged_ledger_error.Unexpected e) ->
-                return (Error (`Fatal_error (Error.to_exn e)))
-            | Error staged_ledger_error ->
-                let%bind () =
-                  match sender with
-                  | None | Some Envelope.Sender.Local ->
-                      return ()
-                  | Some (Envelope.Sender.Remote inet_addr) ->
-                      let error_string =
-                        Staged_ledger.Staged_ledger_error.to_string
-                          staged_ledger_error
-                      in
-                      let make_actions action =
-                        ( action
-                        , Some
-                            ( "Staged_ledger error: $error"
-                            , [("error", `String error_string)] ) )
-                      in
-                      let open Trust_system.Actions in
-                      (* TODO : refine these actions, issue 2375 *)
-                      let action =
-                        match staged_ledger_error with
-                        | Invalid_proof _ ->
-                            make_actions Sent_invalid_proof
-                        | Bad_signature _ ->
-                            make_actions Sent_invalid_signature
-                        | Coinbase_error _
-                        | Bad_prev_hash _
-                        | Insufficient_fee _
-                        | Non_zero_fee_excess _ ->
-                            make_actions Gossiped_invalid_transition
-                        | Unexpected _ ->
-                            failwith
-                              "build: Unexpected staged ledger error should \
-                               have been caught in another pattern"
-                      in
-                      Trust_system.record trust_system logger inet_addr action
-                in
-                return
-                  (Error
-                     (`Invalid_staged_ledger_diff
-                       (Staged_ledger.Staged_ledger_error.to_error
-                          staged_ledger_error)))
-          in
-          let just_emitted_a_proof = Option.is_some proof_opt in
-          let%map transitioned_staged_ledger =
-            if
-              Staged_ledger_hash.equal staged_ledger_hash
-                blockchain_staged_ledger_hash
-            then Deferred.return (Ok transitioned_staged_ledger)
-            else
-              let open Deferred.Let_syntax in
-              let%bind () =
+          let open Deferred.Let_syntax in
+          match%bind
+            Staged_ledger_validation.validate_staged_ledger_diff ~logger
+              ~verifier ~parent_staged_ledger:parent.staged_ledger
+              transition_with_validation
+          with
+          | Ok
+              ( `Just_emitted_a_proof just_emitted_a_proof
+              , `External_transition_with_validation
+                  fully_valid_external_transition
+              , `Staged_ledger transitioned_staged_ledger ) ->
+              return
+                (Ok
+                   { transition_with_hash=
+                       External_transition.Validation.lift
+                         fully_valid_external_transition
+                   ; staged_ledger= transitioned_staged_ledger
+                   ; just_emitted_a_proof })
+          | Error (`Invalid_staged_ledger_diff errors) ->
+              let reasons =
+                String.concat ~sep:" && "
+                  (List.map errors ~f:(function
+                    | `Incorrect_target_staged_ledger_hash ->
+                        "staged ledger hash"
+                    | `Incorrect_target_snarked_ledger_hash ->
+                        "snarked ledger hash" ))
+              in
+              let message =
+                "invalid staged ledger diff: incorrect " ^ reasons
+              in
+              let%map () =
                 match sender with
                 | None | Some Envelope.Sender.Local ->
                     return ()
@@ -163,20 +95,51 @@ struct
                     Trust_system.(
                       record trust_system logger inet_addr
                         Actions.
-                          ( Gossiped_invalid_transition
-                          , Some ("Invalid staged ledger hash", []) ))
+                          (Gossiped_invalid_transition, Some (message, [])))
               in
-              return
-                (Error
-                   (`Invalid_staged_ledger_hash
-                     (Error.of_string
-                        "Snarked ledger hash and Staged ledger hash after \
-                         applying the diff does not match blockchain state's \
-                         ledger hash and staged ledger hash resp.")))
-          in
-          { transition_with_hash
-          ; staged_ledger= transitioned_staged_ledger
-          ; just_emitted_a_proof } )
+              Error (`Invalid_staged_ledger_hash (Error.of_string message))
+          | Error
+              (`Staged_ledger_application_failed
+                (Staged_ledger.Staged_ledger_error.Unexpected e)) ->
+              return (Error (`Fatal_error (Error.to_exn e)))
+          | Error (`Staged_ledger_application_failed staged_ledger_error) ->
+              let%map () =
+                match sender with
+                | None | Some Envelope.Sender.Local ->
+                    return ()
+                | Some (Envelope.Sender.Remote inet_addr) ->
+                    let error_string =
+                      Staged_ledger.Staged_ledger_error.to_string
+                        staged_ledger_error
+                    in
+                    let make_actions action =
+                      ( action
+                      , Some
+                          ( "Staged_ledger error: $error"
+                          , [("error", `String error_string)] ) )
+                    in
+                    let open Trust_system.Actions in
+                    (* TODO : refine these actions, issue 2375 *)
+                    let open Staged_ledger.Pre_diff_info.Error in
+                    let action =
+                      match staged_ledger_error with
+                      | Invalid_proof _ ->
+                          make_actions Sent_invalid_proof
+                      | Pre_diff (Bad_signature _) ->
+                          make_actions Sent_invalid_signature
+                      | Pre_diff _ | Bad_prev_hash _ | Non_zero_fee_excess _ ->
+                          make_actions Gossiped_invalid_transition
+                      | Unexpected _ ->
+                          failwith
+                            "build: Unexpected staged ledger error should \
+                             have been caught in another pattern"
+                    in
+                    Trust_system.record trust_system logger inet_addr action
+              in
+              Error
+                (`Invalid_staged_ledger_diff
+                  (Staged_ledger.Staged_ledger_error.to_error
+                     staged_ledger_error)) )
 
     let external_transition {transition_with_hash; _} =
       With_hash.data transition_with_hash
@@ -186,7 +149,7 @@ struct
 
     let parent_hash {transition_with_hash; _} =
       With_hash.data transition_with_hash
-      |> External_transition.Verified.protocol_state
+      |> External_transition.Validated.protocol_state
       |> Protocol_state.previous_state_hash
 
     let equal breadcrumb1 breadcrumb2 =
@@ -199,12 +162,12 @@ struct
 
     let consensus_state {transition_with_hash; _} =
       With_hash.data transition_with_hash
-      |> External_transition.Verified.protocol_state
+      |> External_transition.Validated.protocol_state
       |> Protocol_state.consensus_state
 
     let blockchain_state {transition_with_hash; _} =
       With_hash.data transition_with_hash
-      |> External_transition.Verified.protocol_state
+      |> External_transition.Validated.protocol_state
       |> Protocol_state.blockchain_state
 
     let name t =
@@ -230,195 +193,43 @@ struct
 
     let to_user_commands
         {transition_with_hash= {data= external_transition; _}; _} =
-      let open External_transition.Verified in
+      let open External_transition.Validated in
       let open Staged_ledger_diff in
       user_commands @@ staged_ledger_diff external_transition
   end
 
-  module type Transition_frontier_extension_intf =
-    Transition_frontier_extension_intf0
-    with type transition_frontier_breadcrumb := Breadcrumb.t
+  module Fake_db = struct
+    include Coda_base.Ledger.Db
+
+    type location = Location.t
+
+    let get_or_create ledger key =
+      let key, loc =
+        match
+          get_or_create_account_exn ledger key (Account.initialize key)
+        with
+        | `Existed, loc ->
+            ([], loc)
+        | `Added, loc ->
+            ([key], loc)
+      in
+      (key, get ledger loc |> Option.value_exn, loc)
+  end
+
+  module TL = Coda_base.Transaction_logic.Make (Fake_db)
 
   let max_length = max_length
 
-  module Extensions = struct
-    module Work = Transaction_snark_work.Statement
+  module Diff = Diff.Make (struct
+    include Inputs
+    module Breadcrumb = Breadcrumb
+  end)
 
-    module Snark_pool_refcount = Snark_pool_refcount.Make (struct
-      include Inputs
-      module Breadcrumb = Breadcrumb
-    end)
-
-    module Root_history = struct
-      module Queue = Hash_queue.Make (State_hash)
-
-      type t =
-        { history: Breadcrumb.t Queue.t
-        ; capacity: int
-        ; mutable most_recent: Breadcrumb.t option }
-
-      let create capacity =
-        let history = Queue.create () in
-        {history; capacity; most_recent= None}
-
-      let lookup {history; _} = Queue.lookup history
-
-      let most_recent {most_recent; _} = most_recent
-
-      let mem {history; _} = Queue.mem history
-
-      let enqueue ({history; capacity; _} as t) state_hash breadcrumb =
-        if Queue.length history >= capacity then
-          Queue.dequeue_front_exn history |> ignore ;
-        Queue.enqueue_back history state_hash breadcrumb |> ignore ;
-        t.most_recent <- Some breadcrumb
-
-      let is_empty {history; _} = Queue.is_empty history
-    end
-
-    (* TODO: guard against waiting for transitions that already exist in the frontier *)
-    module Transition_registry = struct
-      type t = unit Ivar.t list State_hash.Table.t
-
-      let create () = State_hash.Table.create ()
-
-      let notify t state_hash =
-        State_hash.Table.change t state_hash ~f:(function
-          | Some ls ->
-              List.iter ls ~f:(Fn.flip Ivar.fill ()) ;
-              None
-          | None ->
-              None )
-
-      let register t state_hash =
-        Deferred.create (fun ivar ->
-            State_hash.Table.update t state_hash ~f:(function
-              | Some ls ->
-                  ivar :: ls
-              | None ->
-                  [ivar] ) )
-    end
-
-    module Best_tip_diff = Best_tip_diff.Make (Breadcrumb)
-    module Root_diff = Root_diff.Make (Breadcrumb)
-
-    module Persistence_diff = Persistence_diff.Make (struct
-      include Inputs
-      module Breadcrumb = Breadcrumb
-    end)
-
-    type t =
-      { root_history: Root_history.t
-      ; snark_pool_refcount: Snark_pool_refcount.t
-      ; transition_registry: Transition_registry.t
-      ; best_tip_diff: Best_tip_diff.t
-      ; root_diff: Root_diff.t
-      ; persistence_diff: Persistence_diff.t
-      ; new_transition: External_transition.Verified.t New_transition.Var.t }
-    [@@deriving fields]
-
-    (* TODO: Each of these extensions should be created with the input of the breadcrumb *)
-    let create root_breadcrumb =
-      let new_transition =
-        New_transition.Var.create
-          (Breadcrumb.external_transition root_breadcrumb)
-      in
-      { root_history= Root_history.create (2 * max_length)
-      ; snark_pool_refcount= Snark_pool_refcount.create ()
-      ; transition_registry= Transition_registry.create ()
-      ; best_tip_diff= Best_tip_diff.create ()
-      ; root_diff= Root_diff.create ()
-      ; persistence_diff= Persistence_diff.create ()
-      ; new_transition }
-
-    type writers =
-      { snark_pool: Snark_pool_refcount.view Broadcast_pipe.Writer.t
-      ; best_tip_diff: Best_tip_diff.view Broadcast_pipe.Writer.t
-      ; root_diff: Root_diff.view Broadcast_pipe.Writer.t
-      ; persistence_diff: Persistence_diff.view Broadcast_pipe.Writer.t }
-
-    type readers =
-      { snark_pool: Snark_pool_refcount.view Broadcast_pipe.Reader.t
-      ; best_tip_diff: Best_tip_diff.view Broadcast_pipe.Reader.t
-      ; root_diff: Root_diff.view Broadcast_pipe.Reader.t
-      ; persistence_diff: Persistence_diff.view Broadcast_pipe.Reader.t }
-    [@@deriving fields]
-
-    let make_pipes () : readers * writers =
-      let snark_reader, snark_writer =
-        Broadcast_pipe.create (Snark_pool_refcount.initial_view ())
-      and best_tip_reader, best_tip_writer =
-        Broadcast_pipe.create (Best_tip_diff.initial_view ())
-      and root_diff_reader, root_diff_writer =
-        Broadcast_pipe.create (Root_diff.initial_view ())
-      and persistence_diff_reader, persistence_diff_writer =
-        Broadcast_pipe.create (Persistence_diff.initial_view ())
-      in
-      ( { snark_pool= snark_reader
-        ; best_tip_diff= best_tip_reader
-        ; root_diff= root_diff_reader
-        ; persistence_diff= persistence_diff_reader }
-      , { snark_pool= snark_writer
-        ; best_tip_diff= best_tip_writer
-        ; root_diff= root_diff_writer
-        ; persistence_diff= persistence_diff_writer } )
-
-    let close_pipes
-        ({snark_pool; best_tip_diff; root_diff; persistence_diff} : writers) =
-      Broadcast_pipe.Writer.close snark_pool ;
-      Broadcast_pipe.Writer.close best_tip_diff ;
-      Broadcast_pipe.Writer.close root_diff ;
-      Broadcast_pipe.Writer.close persistence_diff
-
-    let mb_write_to_pipe diff ext_t handle pipe =
-      Option.value ~default:Deferred.unit
-      @@ Option.map ~f:(Broadcast_pipe.Writer.write pipe) (handle ext_t diff)
-
-    let handle_diff t (pipes : writers)
-        (diff : Breadcrumb.t Transition_frontier_diff.t) : unit Deferred.t =
-      let use handler pipe acc field =
-        let%bind () = acc in
-        mb_write_to_pipe diff (Field.get field t) handler pipe
-      in
-      ( match diff with
-      | Transition_frontier_diff.New_best_tip {old_root; new_root; _} ->
-          if not (Breadcrumb.equal old_root new_root) then
-            Root_history.enqueue t.root_history
-              (Breadcrumb.state_hash old_root)
-              old_root
-      | _ ->
-          () ) ;
-      let%map () =
-        Fields.fold ~init:diff
-          ~root_history:(fun _ _ -> Deferred.unit)
-          ~snark_pool_refcount:
-            (use Snark_pool_refcount.handle_diff pipes.snark_pool)
-          ~transition_registry:(fun acc _ -> acc)
-          ~best_tip_diff:(use Best_tip_diff.handle_diff pipes.best_tip_diff)
-          ~root_diff:(use Root_diff.handle_diff pipes.root_diff)
-          ~persistence_diff:
-            (use Persistence_diff.handle_diff pipes.persistence_diff)
-          ~new_transition:(fun acc _ -> acc)
-      in
-      let bc_opt =
-        match diff with
-        | New_breadcrumb bc ->
-            Some bc
-        | New_best_tip {added_to_best_tip_path; _} ->
-            Some (Non_empty_list.last added_to_best_tip_path)
-        | _ ->
-            None
-      in
-      Option.iter bc_opt ~f:(fun bc ->
-          (* Other components may be waiting on these, so it's important they're
-             updated after the views above so that those other components see
-             the views updated with the new breadcrumb. *)
-          Transition_registry.notify t.transition_registry
-            (Breadcrumb.state_hash bc) ;
-          New_transition.Var.set t.new_transition
-          @@ Breadcrumb.external_transition bc ;
-          New_transition.stabilize () )
-  end
+  module Extensions = Extensions.Make (struct
+    include Inputs
+    module Breadcrumb = Breadcrumb
+    module Diff = Diff
+  end)
 
   module Node = struct
     type t =
@@ -488,11 +299,11 @@ struct
   (* TODO: load from and write to disk *)
   let create ~logger
       ~(root_transition :
-         (External_transition.Verified.t, State_hash.t) With_hash.t)
+         (External_transition.Validated.t, State_hash.t) With_hash.t)
       ~root_snarked_ledger ~root_staged_ledger ~consensus_local_state =
     let root_hash = With_hash.hash root_transition in
     let root_protocol_state =
-      External_transition.Verified.protocol_state
+      External_transition.Validated.protocol_state
         (With_hash.data root_transition)
     in
     let root_blockchain_state =
@@ -529,7 +340,7 @@ struct
     in
     let%map () =
       Extensions.handle_diff t.extensions t.extension_writers
-        (Transition_frontier_diff.New_frontier root_breadcrumb)
+        (Diff.New_frontier root_breadcrumb)
     in
     t
 
@@ -824,7 +635,7 @@ struct
     O1trace.measure "add_breadcrumb" (fun () ->
         let consensus_state_of_breadcrumb b =
           Breadcrumb.transition_with_hash b
-          |> With_hash.data |> External_transition.Verified.protocol_state
+          |> With_hash.data |> External_transition.Validated.protocol_state
           |> Protocol_state.consensus_state
         in
         let hash =
@@ -936,7 +747,10 @@ struct
                 [ ("garbage", `List (List.map garbage ~f:State_hash.to_yojson))
                 ; ("length_of_garbage", `Int (List.length garbage))
                 ; ( "bad_hashes"
-                  , `List (List.map bad_hashes ~f:State_hash.to_yojson) ) ]
+                  , `List (List.map bad_hashes ~f:State_hash.to_yojson) )
+                ; ( "local_state"
+                  , Consensus.Data.Local_state.to_yojson
+                      t.consensus_local_state ) ]
               "collecting $length_of_garbage nodes rooted from $bad_hashes" ;
             let garbage_breadcrumbs =
               List.map garbage ~f:(fun g ->
@@ -948,7 +762,7 @@ struct
               Breadcrumb.staged_ledger new_root_node.breadcrumb
             in
             (* 4.VII *)
-            Consensus.Hooks.lock_transition
+            Consensus.Hooks.frontier_root_transition
               (Breadcrumb.consensus_state root_node.breadcrumb)
               (Breadcrumb.consensus_state new_root_node.breadcrumb)
               ~local_state:t.consensus_local_state
@@ -971,7 +785,8 @@ struct
                       Logger.fatal t.logger
                         "after lock transition, the best tip consensus state \
                          is out of sync with the local state -- bug in either \
-                         required_local_state_sync or lock_transition."
+                         required_local_state_sync or \
+                         frontier_root_transition."
                         ~module_:__MODULE__ ~location:__LOC__
                         ~metadata:
                           [ ( "sync_jobs"
@@ -1042,12 +857,14 @@ struct
         Extensions.handle_diff t.extensions t.extension_writers
           ( match best_tip_change with
           | `Keep ->
-              Transition_frontier_diff.New_breadcrumb node.breadcrumb
+              Diff.New_breadcrumb
+                {previous= parent_node.breadcrumb; added= node.breadcrumb}
           | `Take ->
-              Transition_frontier_diff.New_best_tip
+              Diff.New_best_tip
                 { old_root= root_node.breadcrumb
                 ; old_root_length= root_node.length
                 ; new_root= new_root_node.breadcrumb
+                ; parent= parent_node.breadcrumb
                 ; added_to_best_tip_path=
                     Non_empty_list.of_list_opt added_to_best_tip_path
                     |> Option.value_exn
@@ -1117,3 +934,17 @@ struct
       Extensions.Root_history.is_empty extensions.root_history
   end
 end
+
+module Inputs = struct
+  module Verifier = Verifier
+  module Ledger_proof = Ledger_proof
+  module Transaction_snark_work = Transaction_snark_work
+  module External_transition = External_transition
+  module Internal_transition = Internal_transition
+  module Staged_ledger_diff = Staged_ledger_diff
+  module Staged_ledger = Staged_ledger
+
+  let max_length = Consensus.Constants.k
+end
+
+include Make (Inputs)

@@ -19,15 +19,17 @@ module Styles = {
       borderRadius(`rem(0.25)),
       borderBottomLeftRadius(isOpen ? `zero : `rem(0.25)),
       borderBottomRightRadius(isOpen ? `zero : `rem(0.25)),
+      focus([outlineStyle(`none)]),
     ]);
 
   let label =
     merge([
-      Theme.Text.smallHeader,
+      Theme.Text.Header.h6,
       style([
         textTransform(`uppercase),
         color(Theme.Colors.slateAlpha(0.7)),
         cursor(`default),
+        minWidth(`rem(2.5)),
       ]),
     ]);
 
@@ -37,7 +39,6 @@ module Styles = {
       style([
         paddingBottom(`px(2)),
         color(Theme.Colors.teal),
-        cursor(`default),
         flexGrow(1.),
       ]),
     ]);
@@ -49,13 +50,14 @@ module Styles = {
       top(`percent(100.)),
       left(`px(-1)),
       right(`px(-1)),
-      maxHeight(`rem(10.)),
+      maxHeight(`calc((`add, `rem(10.), `px(2)))),
       overflow(`scroll),
       background(white),
       border(`px(1), `solid, Theme.Colors.marineAlpha(0.3)),
       borderBottomLeftRadius(`rem(0.25)),
       borderBottomRightRadius(`rem(0.25)),
       cursor(`default),
+      zIndex(1),
     ]);
 
   let item =
@@ -73,31 +75,52 @@ module Styles = {
 
   let icon =
     style([
-      color(Theme.Colors.teal), height(`rem(1.5)), marginRight(`px(-5))]);
+      color(Theme.Colors.tealAlpha(0.5)),
+      height(`rem(1.5)),
+      marginRight(`px(-5)),
+    ]);
 };
 
 [@react.component]
-let make = (~onChange, ~value, ~label, ~options) => {
+let make =
+    (
+      ~onChange,
+      ~value,
+      ~label,
+      ~disabled=false,
+      ~options: list((string, React.element)),
+    ) => {
   let (isOpen, setOpen) = React.useState(() => false);
   let toggleOpen = () => setOpen(isOpen => !isOpen);
+
+  let currentLabel =
+    value
+    |> Option.map(~f=v => Caml.List.assoc(v, options))
+    |> Option.withDefault(~default=React.string(""));
+
   Window.onClick(Window.current, () => setOpen(_ => false));
   <div
     className={Styles.container(isOpen)}
     onClick={e => {
       ReactEvent.Mouse.stopPropagation(e);
-      toggleOpen();
+      if (!disabled) {
+        toggleOpen();
+      };
     }}>
     <span className=Styles.label> {React.string(label ++ ":")} </span>
     <Spacer width=0.5 />
-    <span className=Styles.value> {React.string(value)} </span>
+    <span className=Styles.value> currentLabel </span>
     <Spacer width=0.5 />
     <span className=Styles.icon> <Icon kind=Icon.ChevronDown /> </span>
     <div className={isOpen ? Styles.options : Styles.hidden}>
       {List.map(
          ~f=
-           item =>
-             <div className=Styles.item onClick={_e => onChange(item)}>
-               {React.string(item)}
+           ((value, label)) =>
+             <div
+               key=value
+               className=Styles.item
+               onClick={_e => onChange(value)}>
+               label
              </div>,
          options,
        )

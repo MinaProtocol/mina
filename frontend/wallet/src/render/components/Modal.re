@@ -68,14 +68,15 @@ module Binding = {
 
 // Wrap react-modal with a default style
 [@react.component]
-let make = (~isOpen, ~isRed=false, ~onRequestClose, ~title, ~children) =>
+let make = (~isRed=false, ~onRequestClose, ~title, ~children) =>
   <Binding
-    isOpen
+    isOpen=true
     onRequestClose
     contentLabel=title
     appElement={Binding.getElementById(Binding.document, "index")}
     className=Styles.content
     overlayClassName=Styles.overlay>
     <h1 className={Styles.title(isRed)}> {React.string(title)} </h1>
+    <Spacer height=1. />
     children
   </Binding>;

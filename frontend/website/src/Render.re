@@ -32,11 +32,14 @@ module Rimraf = {
   [@bs.val] [@bs.module "rimraf"] external sync: string => unit = "";
 };
 
-Array.length(Sys.argv) > 2 && Sys.argv[2] == "prod"
+Array.length(Sys.argv) > 2
+&& (Sys.argv[2] == "prod" || Sys.argv[2] == "staging")
   ? {
-    Links.Cdn.prefix := "https://cdn.codaprotocol.com/v2";
+    Links.Cdn.prefix := "https://cdn.codaprotocol.com/v4";
   }
   : ();
+
+Style.Typeface.load();
 
 let writeStatic = (path, rootComponent) => {
   let rendered =
@@ -85,7 +88,6 @@ let posts = {
 module Router = {
   type t =
     | File(string, ReasonReact.reactElement)
-    | Css_file(string, string)
     | Dir(string, array(t));
 
   let generateStatic = {
@@ -93,9 +95,6 @@ module Router = {
       fun
       | File(name, elem) => {
           writeStatic(path ++ "/" ++ name, elem);
-        }
-      | Css_file(name, content) => {
-          Node.Fs.writeFileAsUtf8Sync(path ++ "/" ++ name ++ ".css", content);
         }
       | Dir(name, routes) => {
           let path_ = path ++ "/" ++ name;
@@ -108,22 +107,22 @@ module Router = {
 };
 
 let jobOpenings = [|
-  ("engineering-manager", "Engineering Manager (San Francisco)."),
   ("product-manager", "Product Manager (San Francisco)."),
-  ("senior-frontend-engineer", "Senior Frontend Engineer (San Francisco)."),
-  ("protocol-engineer", "Senior Protocol Engineer (San Francisco)."),
+  ("senior-designer", "Senior Designer (San Francisco)."),
   (
-    "director-of-business-development",
-    "Director of Business Development (San Francisco).",
+    "senior-frontend-engineer",
+    "Senior Product Engineer (Frontend) (San Francisco).",
   ),
+  ("frontend-engineer", "Product Engineer (Frontend) (San Francisco)."),
+  ("protocol-engineer", "Senior Protocol Engineer (San Francisco)."),
 |];
 
 // GENERATE
 
 Rimraf.sync("site");
 
-let blogPage =
-  <Page page=`Blog name="blog" extraHeaders={Blog.extraHeaders()}>
+let blogPage = name =>
+  <Page page=`Blog name extraHeaders={Blog.extraHeaders()}>
     <Wrapped> <Blog posts /> </Wrapped>
   </Page>;
 
@@ -132,7 +131,6 @@ Router.(
     Dir(
       "site",
       [|
-        Css_file("fonts", Style.Typeface.Loader.load()),
         File(
           "index",
           <Page page=`Home name="index" footerColor=Style.Colors.navyBlue>
@@ -161,7 +159,7 @@ Router.(
                  </Page>,
                )
              )
-          |> Array.append([|File("index", blogPage)|]),
+          |> Array.append([|File("index", blogPage("index"))|]),
         ),
         Dir(
           "jobs",
@@ -173,7 +171,7 @@ Router.(
                    page=`Jobs
                    name
                    footerColor=Style.Colors.gandalf
-                   extraHeaders={Careers.extraHeaders()}>
+                   extraHeaders={CareerPost.extraHeaders()}>
                    <Wrapped>
                      <CareerPost path={"jobs/" ++ name ++ ".markdown"} />
                    </Wrapped>
@@ -198,7 +196,7 @@ Router.(
             <Wrapped> <Testnet /> </Wrapped>
           </Page>,
         ),
-        File("blog", blogPage),
+        File("blog", blogPage("blog")),
         File(
           "privacy",
           <Page page=`Privacy name="privacy">

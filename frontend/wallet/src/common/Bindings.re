@@ -1,5 +1,29 @@
 open Tc;
 
+let setTimeout:
+  int =>
+  ([ | `Canceller(unit => unit)], Task.t('x, [ | `Cancelled | `Finished])) =
+  millis => {
+    let synchronousCancel = ref(false);
+    let cancel: ref(unit => unit) = ref(() => synchronousCancel := true);
+    let task =
+      Task.uncallbackifyValue(cb =>
+        if (synchronousCancel^) {
+          cb(`Cancelled);
+        } else {
+          let token = Js.Global.setTimeout(() => cb(`Finished), millis);
+          cancel :=
+            (
+              () => {
+                Js.Global.clearTimeout(token);
+                cb(`Cancelled);
+              }
+            );
+        }
+      );
+    (`Canceller(() => cancel^()), task);
+  };
+
 module Window = {
   type t;
 
@@ -30,12 +54,18 @@ module Navigator = {
   };
 };
 
-module ChildProcess = {
-  module ReadablePipe = {
+module Stream = {
+  module Readable = {
     type t;
     [@bs.send] external on: (t, string, Node.Buffer.t => unit) => unit = "";
   };
 
+  module Writable = {
+    type t;
+  };
+};
+
+module ChildProcess = {
   module Error = {
     [@bs.deriving abstract]
     type t = {
@@ -45,26 +75,84 @@ module ChildProcess = {
   };
 
   module Process = {
+    [@bs.val] [@bs.module "process"] external env: Js.Dict.t(string) = "";
+
     [@bs.deriving abstract]
     type t = {
-      stdout: ReadablePipe.t,
-      stderr: ReadablePipe.t,
+      stdout: Stream.Readable.t,
+      stderr: Stream.Readable.t,
     };
 
-    [@bs.send] external kill: t => unit = "";
-    [@bs.send] external onError: (t, string, Error.t => unit) => unit = "on";
-    let onError = (t, cb) => onError(t, "error", cb);
+    [@bs.send] external kill: (t, string) => unit = "";
 
     [@bs.send]
-    external onExit: (t, string, (float, Js.nullable(string)) => unit) => unit =
+    external onError: (t, [@bs.as "error"] _, Error.t => unit) => unit = "on";
+
+    [@bs.send]
+    external onExit:
+      (
+        t,
+        [@bs.as "exit"] _,
+        (Js.nullable(float), Js.nullable(string)) => unit
+      ) =>
+      unit =
       "on";
+
     let onExit = (t, cb) =>
-      onExit(t, "exit", (f, s) =>
-        cb(int_of_float(f), Js.Nullable.toOption(s))
+      onExit(t, (f, s) =>
+        switch (Js.Nullable.toOption(f), Js.Nullable.toOption(s)) {
+        | (None, None) =>
+          failwith("Expected one of code,signal to be non-null")
+        | (Some(code), None) => cb(`Code(int_of_float(code)))
+        | (None, Some(signal)) => cb(`Signal(signal))
+        | (Some(_), Some(_)) =>
+          failwith("Expected one of code,signal to be null")
+        }
       );
+    let onExitTask = t => Task.uncallbackifyValue(onExit(t));
   };
+
+  type io;
+
+  /**
+    https://nodejs.org/api/child_process.html#child_process_options_stdio
+    The stdio parameter to spawn is a 3-element heterogenous list of some string
+    keywords and Streams (as well as some other cases not supported here).
+    This function lets us safely construct this parameter (with makeIOTriple).
+    */
+  let makeIO = (v): io =>
+    switch (v) {
+    | `Pipe => Obj.magic("pipe")
+    | `Inherit => Obj.magic("inherit")
+    | `Ignore => Obj.magic("ignore")
+    | `Stream((s: Stream.Writable.t)) => Obj.magic(s)
+    };
+
+  let makeIOTriple = (io1, io2, io3) => (
+    makeIO(io1),
+    makeIO(io2),
+    makeIO(io3),
+  );
+
+  let pipe = makeIOTriple(`Pipe, `Pipe, `Pipe);
+  let ignore = makeIOTriple(`Ignore, `Ignore, `Ignore);
+
   [@bs.val] [@bs.module "child_process"]
-  external spawn: (string, array(string)) => Process.t = "";
+  external spawn:
+    (
+      string,
+      array(string),
+      {
+        .
+        "env": Js.Dict.t(string),
+        "stdio": (io, io, io),
+      }
+    ) =>
+    Process.t =
+    "spawn";
+
+  [@bs.val] [@bs.module "child_process"]
+  external execSync: (string, array(string)) => unit = "exec";
 };
 
 module Fs = {
@@ -79,9 +167,15 @@ module Fs = {
     "";
 
   [@bs.val] [@bs.module "fs"]
+  external openSync: (string, string) => Stream.Writable.t = "";
+
+  [@bs.val] [@bs.module "fs"]
   external writeFile:
     (string, string, string, Js.Nullable.t(Js.Exn.t) => unit) => unit =
     "";
+
+  [@bs.val] [@bs.module "fs"]
+  external writeSync: (Stream.Writable.t, string) => unit = "";
 
   [@bs.val] [@bs.module "fs"]
   external watchFile: (string, unit => unit) => unit = "";
@@ -89,4 +183,27 @@ module Fs = {
 
 module Fetch = {
   [@bs.module] external fetch: ApolloClient.fetch = "node-fetch";
+};
+
+module LocalStorage = {
+  [@bs.val] [@bs.scope "localStorage"]
+  external setItem:
+    (
+      ~key: [@bs.string] [
+              | [@bs.as "network"] `Network
+              | [@bs.as "addressbook"] `AddressBook
+            ],
+      ~value: string
+    ) =>
+    unit =
+    "";
+
+  [@bs.val] [@bs.scope "localStorage"]
+  external getItem:
+    (
+    [@bs.string]
+    [ | [@bs.as "network"] `Network | [@bs.as "addressbook"] `AddressBook]
+    ) =>
+    Js.nullable(string) =
+    "";
 };

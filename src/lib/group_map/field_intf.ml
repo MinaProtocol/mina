@@ -5,6 +5,8 @@ module type S = sig
 
   val ( + ) : t -> t -> t
 
+  val ( - ) : t -> t -> t
+
   val ( * ) : t -> t -> t
 
   val ( / ) : t -> t -> t

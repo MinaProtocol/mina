@@ -72,6 +72,13 @@ build: git_hooks reformat-diff
 
 dev: codabuilder containerstart build
 
+macos-portable:
+	@rm -rf _build/coda-daemon-macos/
+	@rm -rf _build/coda-daemon-macos.zip
+	@./scripts/macos-portable.sh src/_build/default/app/cli/src/coda.exe src/app/kademlia-haskell/result/bin/kademlia _build/coda-daemon-macos
+	@zip -r _build/coda-daemon-macos.zip _build/coda-daemon-macos/
+	@echo Find coda-daemon-macos.zip inside _build/
+
 ########################################
 ## Lint
 
@@ -79,7 +86,7 @@ reformat: git_hooks
 	cd src; $(WRAPSRC) dune exec --profile=$(DUNE_PROFILE) app/reformat/reformat.exe -- -path .
 
 reformat-diff:
-	ocamlformat --doc-comments=before --inplace $(shell git status -s | cut -c 4- | grep '.mli\?$$' | while IFS= read -r f; do stat "$$f" >/dev/null 2>&1 && echo "$$f"; done) || true
+	ocamlformat --doc-comments=before --inplace $(shell git status -s | cut -c 4- | grep '\.mli\?$$' | while IFS= read -r f; do stat "$$f" >/dev/null 2>&1 && echo "$$f"; done) || true
 
 check-format:
 	cd src; $(WRAPSRC) dune exec --profile=$(DUNE_PROFILE) app/reformat/reformat.exe -- -path . -check

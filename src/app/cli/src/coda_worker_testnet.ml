@@ -1,7 +1,5 @@
 open Core
 open Async
-open Coda_worker
-open Coda_inputs
 open Signature_lib
 open Coda_base
 open Pipe_lib
@@ -39,10 +37,13 @@ module Api = struct
           `On (`Synced user_cmds_under_inspection) )
     in
     let locks =
-      Array.init (Array.length workers) (fun _ -> (ref 0, Condition.create ()))
+      Array.init (Array.length workers) ~f:(fun _ ->
+          (ref 0, Condition.create ()) )
     in
-    let root_lengths = Array.init (Array.length workers) (fun _ -> 0) in
-    let restart_signals = Array.init (Array.length workers) (fun _ -> None) in
+    let root_lengths = Array.init (Array.length workers) ~f:(fun _ -> 0) in
+    let restart_signals =
+      Array.init (Array.length workers) ~f:(fun _ -> None)
+    in
     { workers
     ; configs
     ; start_writer
@@ -89,14 +90,15 @@ module Api = struct
   let sync_status =
     run_online_worker ~f:(fun worker -> Coda_process.sync_status_exn worker)
 
-  let new_payment t i public_key =
+  let new_user_command t i public_key =
     run_online_worker
-      ~f:(fun worker -> Coda_process.new_payment_exn worker public_key)
+      ~f:(fun worker -> Coda_process.new_user_command_exn worker public_key)
       t i
 
-  let get_all_payments t i public_key =
+  let get_all_user_commands t i public_key =
     run_online_worker
-      ~f:(fun worker -> Coda_process.get_all_payments_exn worker public_key)
+      ~f:(fun worker ->
+        Coda_process.get_all_user_commands_exn worker public_key )
       t i
 
   let start t i =
@@ -126,37 +128,53 @@ module Api = struct
     let%bind () = wait_for_no_rpcs () in
     Coda_process.disconnect t.workers.(i)
 
-  let send_payment t i sender_sk receiver_pk amount fee =
+  let run_user_command t i (sk : Private_key.t) fee ~body =
     let open Deferred.Option.Let_syntax in
     let worker = t.workers.(i) in
-    let sender_pk =
-      Public_key.of_private_key_exn sender_sk |> Public_key.compress
-    in
-    let%bind nonce = Coda_process.get_nonce_exn worker sender_pk in
+    let pk_of_sk = Public_key.of_private_key_exn sk |> Public_key.compress in
+    let%bind nonce = Coda_process.get_nonce_exn worker pk_of_sk in
     let payload =
       User_command.Payload.create ~fee ~nonce ~memo:User_command_memo.dummy
-        ~body:(Payment {receiver= receiver_pk; amount})
+        ~body
     in
     let user_cmd =
-      ( User_command.sign (Keypair.of_private_key_exn sender_sk) payload
+      ( User_command.sign (Keypair.of_private_key_exn sk) payload
         :> User_command.t )
     in
     let%map _receipt =
-      Coda_process.process_payment_exn worker user_cmd
+      Coda_process.process_user_command_exn worker user_cmd
       |> Deferred.map ~f:Or_error.ok
     in
     user_cmd
 
+  let delegate_stake t i delegator_sk delegate_pk fee =
+    run_user_command t i delegator_sk fee
+      ~body:(Stake_delegation (Set_delegate {new_delegate= delegate_pk}))
+
+  let send_payment t i sender_sk receiver_pk amount fee =
+    run_user_command t i sender_sk fee
+      ~body:(Payment {receiver= receiver_pk; amount})
+
   (* TODO: resulting_receipt should be replaced with the sender's pk so that we prove the
-      merkle_list of receipts up to the current state of a sender's receipt_chain hash for some blockchain.
-      However, whenever we get a new transition, the blockchain does not update and `prove_receipt` would not query
-      the merkle list that we are looking for *)
+     merkle_list of receipts up to the current state of a sender's receipt_chain hash for some blockchain.
+     However, whenever we get a new transition, the blockchain does not update and `prove_receipt` would not query
+     the merkle list that we are looking for *)
+
   let prove_receipt t i proving_receipt resulting_receipt =
     run_online_worker
       ~f:(fun worker ->
         Coda_process.prove_receipt_exn worker proving_receipt resulting_receipt
         )
       t i
+
+  let new_block t i key =
+    run_online_worker
+      ~f:(fun worker -> Coda_process.new_block_exn worker key)
+      t i
+
+  let new_user_command_and_subscribe t i key =
+    ignore @@ new_block t i key ;
+    new_user_command t i key
 
   let teardown t =
     Deferred.Array.iteri ~how:`Parallel t.workers ~f:(fun i _ -> stop t i)
@@ -181,7 +199,7 @@ end
 let start_prefix_check logger workers events testnet ~acceptable_delay =
   let all_transitions_r, all_transitions_w = Linear_pipe.create () in
   let%map chains =
-    Deferred.Array.init (Array.length workers) (fun i ->
+    Deferred.Array.init (Array.length workers) ~f:(fun i ->
         Coda_process.best_path workers.(i) )
   in
   let check_chains (chains : State_hash.Stable.Latest.t list array) =
@@ -278,12 +296,11 @@ let start_prefix_check logger workers events testnet ~acceptable_delay =
 type user_cmd_status =
   {snapshots: int option array; passed_root: bool array; result: unit Ivar.t}
 
-let start_payment_check logger root_pipe workers (testnet : Api.t) =
+let start_payment_check logger root_pipe (testnet : Api.t) =
   Linear_pipe.iter root_pipe ~f:(function
       | `Root
           ( worker_id
-          , Protocols.Coda_transition_frontier.Root_diff_view.
-              {user_commands; root_length} )
+          , Transition_frontier.Diff.Root_diff.{user_commands; root_length} )
       ->
       Option.fold root_length ~init:Deferred.unit ~f:(fun _ length ->
           match testnet.status.(worker_id) with
@@ -312,7 +329,7 @@ let start_payment_check logger root_pipe workers (testnet : Api.t) =
                     else () ) ;
               let earliest_user_cmd =
                 List.min_elt (Hashtbl.to_alist user_cmds_under_inspection)
-                  ~compare:(fun (user_cmd1, status1) (user_cmd2, status2) ->
+                  ~compare:(fun (_user_cmd1, status1) (_user_cmd2, status2) ->
                     Int.compare status1.expected_deadline
                       status2.expected_deadline )
               in
@@ -382,7 +399,7 @@ let start_checks logger (workers : Coda_process.t array) start_reader testnet
   let event_reader, root_reader = events workers start_reader in
   start_prefix_check logger workers event_reader testnet ~acceptable_delay
   |> don't_wait_for ;
-  start_payment_check logger root_reader workers testnet
+  start_payment_check logger root_reader testnet
 
 (* note: this is very declarative, maybe this should be more imperative? *)
 (* next steps:
@@ -390,7 +407,7 @@ let start_checks logger (workers : Coda_process.t array) start_reader testnet
    *   implement stop/start
    *   change live whether nodes are producing, snark producing
    *   change network connectivity *)
-let test logger n proposers snark_work_public_keys work_selection
+let test logger n proposers snark_work_public_keys work_selection_method
     ~max_concurrent_connections =
   let logger = Logger.extend logger [("worker_testnet", `Bool true)] in
   let proposal_interval = Consensus.Constants.block_window_duration_ms in
@@ -403,8 +420,8 @@ let test logger n proposers snark_work_public_keys work_selection
   let configs =
     Coda_processes.local_configs n ~proposal_interval ~program_dir ~proposers
       ~acceptable_delay
-      ~snark_worker_public_keys:(Some (List.init n snark_work_public_keys))
-      ~work_selection
+      ~snark_worker_public_keys:(Some (List.init n ~f:snark_work_public_keys))
+      ~work_selection_method
       ~trace_dir:(Unix.getenv "CODA_TRACING")
       ~max_concurrent_connections
   in
@@ -414,6 +431,45 @@ let test logger n proposers snark_work_public_keys work_selection
   let testnet = Api.create configs workers start_writer in
   start_checks logger workers start_reader testnet ~acceptable_delay ;
   testnet
+
+module Delegation : sig
+  val delegate_stake :
+       ?acceptable_delay:int
+    -> Api.t
+    -> node:int
+    -> delegator:Private_key.t
+    -> delegatee:Account.key
+    -> unit Deferred.t
+end = struct
+  let delegate_stake ?acceptable_delay:(delay = 7) (testnet : Api.t) ~node
+      ~delegator ~delegatee =
+    let fee = Currency.Fee.of_int 1 in
+    let worker = testnet.workers.(node) in
+    let%bind _ =
+      let open Deferred.Option.Let_syntax in
+      let%bind user_cmd =
+        Api.delegate_stake testnet node delegator delegatee fee
+      in
+      let%map (all_passed_root : unit Ivar.t list) =
+        let open Deferred.Let_syntax in
+        Deferred.List.filter_map (testnet.status |> Array.to_list) ~f:(function
+          | `On (`Synced user_cmds_under_inspection) ->
+              let%map root_length = Coda_process.root_length_exn worker in
+              let passed_root = Ivar.create () in
+              Hashtbl.add_exn user_cmds_under_inspection ~key:user_cmd
+                ~data:
+                  { expected_deadline=
+                      root_length + Consensus.Constants.k + delay
+                  ; passed_root } ;
+              Option.return passed_root
+          | _ ->
+              return None )
+        >>| Option.return
+      in
+      Deferred.List.iter all_passed_root ~f:Ivar.read
+    in
+    Deferred.unit
+end
 
 module Payments : sig
   val send_several_payments :
@@ -485,7 +541,7 @@ end = struct
     in
     Deferred.unit
 
-  (* TODO: code should be flexible enough even when bootstrapping. 
+  (* TODO: code should be flexible enough even when bootstrapping.
      This is most appropriate todo when #2336 is completed *)
   let send_batch_consecutive_payments (testnet : Api.t) ~node ~sender
       ~(keypairs : Keypair.t list) ~n =
@@ -493,13 +549,11 @@ end = struct
     let fee = Currency.Fee.of_int 1 in
     let%bind new_payment_readers =
       Deferred.List.init (Array.length testnet.workers) ~f:(fun i ->
-          let%map pipe =
-            Api.new_payment testnet i
-              Public_key.(compress @@ of_private_key_exn sender)
-          in
+          let pk = Public_key.(compress @@ of_private_key_exn sender) in
+          let%map pipe = Api.new_user_command_and_subscribe testnet i pk in
           Option.value_exn pipe )
     in
-    Deferred.List.init ~how:`Sequential n ~f:(fun _ ->
+    Deferred.List.init ~how:`Sequential n ~f:(fun _i ->
         let receiver_keypair = List.random_element_exn keypairs in
         let receiver_pk = receiver_keypair.public_key |> Public_key.compress in
         (* Everybody will be watching for a payment *)
@@ -528,7 +582,7 @@ end = struct
   let query_relevant_payments (testnet : Api.t) worker_index public_keys =
     Deferred.List.concat_map public_keys ~f:(fun public_key ->
         let%map payments =
-          Api.get_all_payments testnet worker_index public_key
+          Api.get_all_user_commands testnet worker_index public_key
         in
         Option.value_exn payments )
     >>| User_command.Set.of_list

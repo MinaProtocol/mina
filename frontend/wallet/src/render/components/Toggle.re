@@ -21,7 +21,7 @@ module Styles = {
       transition(~duration=400, "background"),
       transition(~duration=100, "transform"),
       borderRadius(`px(12)),
-      hover([transform(`scale(1.07, 1.05))]),
+      hover([transform(`scale((1.07, 1.05)))]),
       before([
         position(`absolute),
         bottom(`px(4)),
@@ -29,7 +29,8 @@ module Styles = {
         height(`rem(1.)),
         width(`rem(1.)),
         transition(~duration=400, "all"),
-        backgroundColor(white),
+        background(`url("bg-texture.png")),
+        backgroundSize(`cover),
         contentRule("\"\""),
         borderRadius(`percent(50.)),
       ]),
@@ -44,7 +45,6 @@ module Styles = {
     ]);
 
   let label = style([]);
-
 };
 
 [@react.component]
@@ -55,7 +55,7 @@ let make = (~value, ~onChange) =>
       type_="checkbox"
       id="checkbox"
       checked=value
-      onClick={_e => onChange(toggle => !toggle)}
+      onChange={_e => onChange(toggle => !toggle)}
     />
     <div className=Styles.slider />
   </label>;

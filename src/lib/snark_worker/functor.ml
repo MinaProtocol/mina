@@ -4,7 +4,7 @@ open Coda_base
 open Signature_lib
 
 module Make (Inputs : Intf.Inputs_intf) :
-  Intf.S with module Ledger_proof := Inputs.Ledger_proof = struct
+  Intf.S with type ledger_proof := Inputs.Ledger_proof.t = struct
   open Inputs
   module Rpcs = Rpcs.Make (Inputs)
 
@@ -159,7 +159,7 @@ module Make (Inputs : Intf.Inputs_intf) :
 
   let arguments ~public_key ~daemon_address ~shutdown_on_disconnect =
     [ "-public-key"
-    ; Public_key.Compressed.to_base64 public_key
+    ; Public_key.Compressed.to_base58_check public_key
     ; "-daemon-address"
     ; Host_and_port.to_string daemon_address
     ; "-shutdown-on-disconnect"
