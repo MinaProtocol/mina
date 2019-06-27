@@ -9,7 +9,8 @@
     linked_tree
     hash_prefixes
     syncable_ledger
-    base64
+    base58_check
+    fold_lib
     signature_lib
     test_util
     random_oracle

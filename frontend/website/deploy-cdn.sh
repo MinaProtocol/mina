@@ -19,7 +19,7 @@ cp -r site/static lib/cdn/
 
 cd lib/cdn
 
-read -p "Are you sure? This cost \$\$ and can break the live site: [y/N]" -n 1 -r
+read -p "Are you sure? This costs \$\$ and can break the live site: [y/N]" -n 1 -r
 echo
 if [[ ! $REPLY =~ ^[Yy]$ ]]; then
   exit 1
