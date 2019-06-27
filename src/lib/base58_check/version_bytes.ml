@@ -25,3 +25,5 @@ let private_key : t = '\x5A'
 let staged_ledger_hash_aux_hash : t = '\x0B'
 
 let staged_ledger_hash_pending_coinbase_aux : t = '\x81'
+
+let user_command_memo : t = '\xA2'
