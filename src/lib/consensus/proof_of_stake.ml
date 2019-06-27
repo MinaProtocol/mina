@@ -2660,10 +2660,14 @@ module Hooks = struct
     let length = Length.to_int in
     length candidate - length existing > (2 * Constants.k) + Constants.delta
 
-  let should_bootstrap ~existing ~candidate =
-    should_bootstrap_len
-      ~existing:(Consensus_state.blockchain_length existing)
-      ~candidate:(Consensus_state.blockchain_length candidate)
+  let should_bootstrap ~existing ~candidate ~logger =
+    match select ~existing ~candidate ~logger with
+    | `Keep ->
+        false
+    | `Take ->
+        should_bootstrap_len
+          ~existing:(Consensus_state.blockchain_length existing)
+          ~candidate:(Consensus_state.blockchain_length candidate)
 
   let%test "should_bootstrap is sane" =
     (* Even when consensus constants are of prod sizes, candidate should still trigger a bootstrap *)

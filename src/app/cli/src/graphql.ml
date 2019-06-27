@@ -1115,7 +1115,7 @@ module Mutations = struct
     let%map memo =
       Option.value_map maybe_memo ~default:(Ok User_command_memo.dummy)
         ~f:(fun memo ->
-          result_of_exn User_command_memo.create_exn memo
+          result_of_exn User_command_memo.create_by_digesting_string_exn memo
             ~error:"Invalid `memo` provided." )
     in
     (sender_account, sender_kp, memo, receiver, fee)

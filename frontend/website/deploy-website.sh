@@ -33,7 +33,7 @@ elif [[ "$1" == "ci" ]]; then
 elif [[ "$1" == "prod" ]]; then
   TARGET=coda-203520
 else
-  echo "Target must be one of: staging, prod"
+  echo "Target must be one of: staging, prod, ci"
   exit 1
 fi
 

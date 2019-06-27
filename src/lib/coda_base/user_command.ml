@@ -98,7 +98,7 @@ module Gen = struct
     let%map body = create_body receiver in
     let payload : Payload.t =
       Payload.create ~fee ~nonce
-        ~memo:(User_command_memo.create_exn memo)
+        ~memo:(User_command_memo.create_by_digesting_string_exn memo)
         ~body
     in
     sign' sender payload
