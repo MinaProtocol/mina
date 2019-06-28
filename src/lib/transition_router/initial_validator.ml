@@ -26,8 +26,17 @@ module Make (Inputs : Transition_frontier.Inputs_intf) = struct
       (error : validation_error) =
     let open Trust_system.Actions in
     let punish action message =
+      let message' =
+        "external transition with state hash $hash"
+        ^ Option.value_map message ~default:"" ~f:(fun (txt, _) ->
+              sprintf ", %s" txt )
+      in
+      let metadata =
+        ("hash", State_hash.to_yojson state_hash)
+        :: Option.value_map message ~default:[] ~f:Tuple2.get2
+      in
       Trust_system.record_envelope_sender trust_system logger sender
-        (action, message)
+        (action, Some (message', metadata))
     in
     match error with
     | `Verifier_error err ->
