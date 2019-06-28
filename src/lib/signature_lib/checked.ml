@@ -41,17 +41,17 @@ module type S = sig
   module Shifted : sig
     module type S =
       Curves.Shifted_intf
-        with type curve_var := curve_var
-         and type boolean_var := Boolean.var
-         and type ('a, 'b) checked := ('a, 'b) Checked.t
+      with type curve_var := curve_var
+       and type boolean_var := Boolean.var
+       and type ('a, 'b) checked := ('a, 'b) Checked.t
   end
 
   module Message :
     Message_intf
-      with type boolean_var := Boolean.var
-       and type curve_scalar := curve_scalar
-       and type curve_scalar_var := curve_scalar_var
-       and type ('a, 'b) checked := ('a, 'b) Checked.t
+    with type boolean_var := Boolean.var
+     and type curve_scalar := curve_scalar
+     and type curve_scalar_var := curve_scalar_var
+     and type ('a, 'b) checked := ('a, 'b) Checked.t
 
   module Signature : sig
     type t = field * curve_scalar [@@deriving sexp]
@@ -105,65 +105,66 @@ end
 
 module Schnorr
     (Impl : Snark_intf.S) (Curve : sig
-      open Impl
+        open Impl
 
-      module Scalar : sig
-        type t [@@deriving sexp, eq]
+        module Scalar : sig
+          type t [@@deriving sexp, eq]
 
-        type var
+          type var
 
-        val typ : (var, t) Typ.t
+          val typ : (var, t) Typ.t
+
+          val zero : t
+
+          val ( * ) : t -> t -> t
+
+          val ( + ) : t -> t -> t
+
+          val negate : t -> t
+
+          val unpack : t -> bool list
+
+          module Checked : sig
+            val to_bits :
+              var -> Boolean.var Bitstring_lib.Bitstring.Lsb_first.t
+          end
+        end
+
+        type t [@@deriving eq]
+
+        type var = Field.Var.t * Field.Var.t
+
+        module Checked :
+          Curves.Weierstrass_checked_intf
+          with module Impl := Impl
+           and type t := t
+           and type var := var
+
+        val one : t
 
         val zero : t
-
-        val ( * ) : t -> t -> t
 
         val ( + ) : t -> t -> t
 
         val negate : t -> t
 
-        val unpack : t -> bool list
+        val scale : t -> Scalar.t -> t
 
-        module Checked : sig
-          val to_bits : var -> Boolean.var Bitstring_lib.Bitstring.Lsb_first.t
-        end
-      end
-
-      type t [@@deriving eq]
-
-      type var = Field.Var.t * Field.Var.t
-
-      module Checked :
-        Curves.Weierstrass_checked_intf
-          with module Impl := Impl
-           and type t := t
-           and type var := var
-
-      val one : t
-
-      val zero : t
-
-      val ( + ) : t -> t -> t
-
-      val negate : t -> t
-
-      val scale : t -> Scalar.t -> t
-
-      val to_affine_coordinates : t -> Field.t * Field.t
+        val to_affine_coordinates : t -> Field.t * Field.t
     end)
     (Message : Message_intf
-                 with type boolean_var := Impl.Boolean.var
-                  and type curve_scalar_var := Curve.Scalar.var
-                  and type curve_scalar := Curve.Scalar.t
-                  and type ('a, 'b) checked := ('a, 'b) Impl.Checked.t) :
+               with type boolean_var := Impl.Boolean.var
+                and type curve_scalar_var := Curve.Scalar.var
+                and type curve_scalar := Curve.Scalar.t
+                and type ('a, 'b) checked := ('a, 'b) Impl.Checked.t) :
   S
-    with module Impl := Impl
-     and type curve := Curve.t
-     and type curve_var := Curve.var
-     and type curve_scalar := Curve.Scalar.t
-     and type curve_scalar_var := Curve.Scalar.var
-     and module Shifted := Curve.Checked.Shifted
-     and module Message := Message = struct
+  with module Impl := Impl
+   and type curve := Curve.t
+   and type curve_var := Curve.var
+   and type curve_scalar := Curve.Scalar.t
+   and type curve_scalar_var := Curve.Scalar.var
+   and module Shifted := Curve.Checked.Shifted
+   and module Message := Message = struct
   open Impl
 
   module Signature = struct
@@ -283,23 +284,31 @@ end
 open Snark_params
 
 module Message = struct
-  let gen =
-    let open Quickcheck.Let_syntax in
-    let%map msg = "testing schnorr" in
-    msg
+  include Tick.Field
 
-  (*
-  module Checked = struct
-    let var_to_triples {state_hash} =
-      Coda_base.State_hash.var_to_triples state_hash
+  type var = Tick.Field.Var.t
 
-    let hash_to_group msg =
-      let open Snark_params.Tick in
-      let%bind msg_triples = var_to_triples msg in
-      Pedersen.Checked.hash_triples ~init:Coda_base.Hash_prefix.vrf_message
-        msg_triples
-  end
-*)
+  let hash t ~nonce =
+    Random_oracle.digest_field
+      (Tick.Pedersen.digest_fold
+         (Tick.Pedersen.State.create ())
+         (Fold_lib.Fold.of_list
+            ( nonce
+            @ Bitstring_lib.Bitstring.pad_to_triple_list ~default:false
+                (Tick.Field.unpack t) )))
+    |> Random_oracle.Digest.to_bits |> Array.to_list |> Tock.Field.project
+
+  let hash_checked t ~nonce =
+    let open Tick.Checked.Let_syntax in
+    let%bind bits = Checked.choose_preimage_var ~length:size_in_bits t in
+    Tick.Pedersen.Checked.digest_triples
+      ~init:(Tick.Pedersen.State.create ())
+      ( nonce
+      @ Bitstring_lib.Bitstring.pad_to_triple_list ~default:Tick.Boolean.false_
+          bits )
+    >>= Random_oracle.Checked.digest_field
+    >>| Random_oracle.Digest.Checked.to_bits >>| Array.to_list
+    >>| Bitstring_lib.Bitstring.Lsb_first.of_list
 end
 
 module S = Schnorr (Tick) (Tick.Inner_curve) (Message)
@@ -309,23 +318,19 @@ let gen =
   let%map pk = Private_key.gen and msg = Message.gen in
   (pk, msg)
 
-let%test_unit "schnorr unchecked vs. checked equality" =
-  Quickcheck.test ~trials:10 gen
-    ~f:
-      (Tick.Test.test_equal ~sexp_of_t:[%sexp_of: Output_hash.value]
-         ~equal:Output_hash.equal_value
-         Tick.Typ.(Scalar.typ * Message.typ)
-         Output_hash.typ
-         (fun (private_key, msg) ->
+let%test_unit "schnorr checked + unchecked" =
+  Quickcheck.test ~trials:5 gen ~f:(fun (pk, msg) ->
+      let s = S.sign pk msg in
+      let pubkey = Tick.Inner_curve.(scale one pk) in
+      assert (S.verify s pubkey msg) ;
+      (Tick.Test.test_equal ~sexp_of_t:[%sexp_of: bool] ~equal:Bool.equal
+         Tick.Typ.(tuple3 Tick.Inner_curve.typ Message.typ S.Signature.typ)
+         Tick.Boolean.typ
+         (fun (public_key, msg, s) ->
            let open Tick.Checked in
-           let%bind (module Shifted) = Group.Checked.Shifted.create () in
-           S.Checked.sign (module Shifted) ~private_key msg)
-         (fun (private_key, msg) -> S.sign ~private_key msg))
-
-let%test_unit "schnorr unchecked" =
-  Quickcheck.test ~trials:5 gen ~f:(fun s ->
-      [%test_eq: bool] true (S.verify (S.sign s)))
-
-let%test_unit "checked schnorr" =
-  Quickcheck.test ~trials:5 gen ~f:(fun s ->
-      [%test_eq: bool] true (S.Checked.verifies (S.Checked.sign s)))
+           let%bind (module Shifted) =
+             Tick.Inner_curve.Checked.Shifted.create ()
+           in
+           S.Checked.verifies (module Shifted) s public_key msg )
+         (fun _ -> true))
+        (pubkey, msg, s) )

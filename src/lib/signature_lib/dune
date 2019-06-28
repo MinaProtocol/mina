@@ -2,6 +2,7 @@
  (name signature_lib)
  (public_name signature_lib)
  (library_flags -linkall)
+ (inline_tests)
  (libraries snarky base64 snark_params core non_zero_curve_point yojson blake2 random_oracle)
  (preprocessor_deps ../../config.mlh)
  (preprocess
