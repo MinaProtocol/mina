@@ -113,6 +113,7 @@
 /src/lib/snark_bits/ @bkase
 /src/lib/snark_work_lib/ @deepthiskumar
 /src/lib/snark_worker/ @cmr @nholland94
+/src/lib/snark_keys/ @imeckler @mrmr1993
 /src/lib/snarkette/ @bkase
 /src/lib/snarky @imeckler @mrmr1993
 /src/lib/snarky_blake2/ @rbkhmrcr @vanishreerao
