@@ -93,7 +93,7 @@
 /src/lib/pokolog/ @bkase @vanishreerao @rbkhmrcr
 /src/lib/ppx_coda/ @psteckler @mrmr1993
 /src/lib/ppx_util/ @mrmr1993
-/src/lib/precomputed_values/ @cmr @bkase
+/src/lib/precomputed_values/ @cmr @bkase @mrmr1993
 /src/lib/proof_carrying_data/ @psteckler @bkase
 /src/lib/proposer/ @nholland94 @cmr
 /src/lib/prover/ @nholland94 @bkase
