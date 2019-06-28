@@ -19,8 +19,8 @@ end
 
 type var = Field.Var.t * Inner_curve.Scalar.var
 
-val to_base64 : t -> string
+val to_base58_check : t -> string
 
-val of_base64_exn : string -> t
+val of_base58_check_exn : string -> t
 
 val dummy : t

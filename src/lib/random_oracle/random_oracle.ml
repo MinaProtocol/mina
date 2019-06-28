@@ -15,9 +15,11 @@ module Digest = struct
     let to_triples t =
       Fold_lib.Fold.(to_list (group3 ~default:Boolean.false_ (of_array t)))
 
-    let constant (s : unchecked) =
-      assert (Int.(String.length (s :> string) = length_in_bytes)) ;
-      Array.map (Blake2.string_to_bits (s :> string)) ~f:Boolean.var_of_value
+    let constant (unchecked : unchecked) =
+      assert (Int.(String.length (unchecked :> string) = length_in_bytes)) ;
+      Array.map
+        (Blake2.string_to_bits (unchecked :> string))
+        ~f:Boolean.var_of_value
   end
 
   let to_bits (t : t) = Blake2.string_to_bits (t :> string)

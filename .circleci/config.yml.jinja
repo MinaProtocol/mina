@@ -28,12 +28,12 @@ jobs:
             - run:
                   name: Test wallet
                   command: cd frontend/wallet && yarn test
-#            - run:
-#                  name: Build dist wallet
-#                  command: cd frontend/wallet && yarn run dist
-#            - run:
-#                  name: Publish dist wallet
-#                  command: (env HOMEBREW_NO_AUTO_UPDATE=1 brew install awscli) && ./scripts/publish-wallet.sh
+            - run:
+                  name: Build dist wallet
+                  command: cd frontend/wallet && yarn run dist
+            - run:
+                  name: Publish dist wallet
+                  command: (env HOMEBREW_NO_AUTO_UPDATE=1 brew install awscli) && ./scripts/publish-wallet.sh
             - run: cd frontend/website && yarn install
             - run:
                   name: Decrypt PragmataPro font
@@ -79,53 +79,65 @@ jobs:
                   name: Update branch protection rule from test configuration
                   command: ./scripts/test.py required-status >required_status && cat required_status && ./scripts/update_branch_rule.py required_status
 
-    #build-macos:
-    #    macos:
-    #        xcode: "10.1.0"
-    #    working_directory: /Users/distiller/coda
-    #    environment:
-    #        HOMEBREW_LOGS: /Users/distiller/homebrew.log
-    #        OPAMYES: 1
-    #    steps:
-    #        - run:
-    #            name: Make /nix paths
-    #            command: |
-    #                sudo mkdir /nix
-    #                sudo chown distiller /nix
-    #        - checkout
-    #        - restore_cache:
-    #              keys:
-    #                  - homebrew-v1-{{'{{'}} checksum "scripts/macos-setup.sh" {{'}}'}}
-    #                  - homebrew-v1-
-    #        - restore_cache:
-    #              keys:
-    #                  - opam-v3-{{'{{'}} checksum "src/opam.export" {{'}}'}}
-    #                  - opam-v3-
-    #        - run: git submodule sync && git submodule update --init --recursive
-    #        - run:
-    #              name: Download Deps -- make macos-setup-download
-    #              command: ./scripts/skip_if_only_frontend.sh make macos-setup-download
-    #        - run:
-    #              name: Compile Deps -- make macos-setup-compile
-    #              command: ./scripts/skip_if_only_frontend.sh make macos-setup-compile
-    #        - save_cache:
-    #              key: homebrew-v1-{{'{{'}} checksum "scripts/macos-setup.sh" {{'}}'}}
-    #              paths:
-    #                  - "/usr/local/Homebrew"
-    #                  - "/Users/distiller/Library/Caches/Homebrew"
-    #        - save_cache:
-    #              key: opam-v3-{{'{{'}} checksum "src/opam.export" {{'}}'}}
-    #              paths:
-    #                  - "/Users/distiller/.opam"
-    #        - run:
-    #              name: Build OCaml
-    #              command: ./scripts/skip_if_only_frontend.sh bash -c 'eval `opam config env` && make build 2>&1 | tee /tmp/buildocaml.log'
-    #        - run:
-    #              name: Record Constraint System Digests
-    #              command: ./scripts/skip_if_only_frontend.sh bash -c 'src/_build/default/app/cli/src/coda.exe client constraint-system-digests | tee /tmp/constraint-system-digests.log'
-    #        - run:
-    #              name: Run all tests (on master)
-    #              command: echo "FIXME Tests not yet working on mac"
+    build-macos:
+       macos:
+           xcode: "10.1.0"
+       working_directory: /Users/distiller/coda
+       environment:
+           HOMEBREW_LOGS: /Users/distiller/homebrew.log
+           OPAMYES: 1
+       steps:
+           - run:
+               name: Make /nix paths
+               command: |
+                   sudo mkdir /nix
+                   sudo chown distiller /nix
+           - checkout
+           - restore_cache:
+                 keys:
+                     - homebrew-v1-{{'{{'}} checksum "scripts/macos-setup.sh" {{'}}'}}
+                     - homebrew-v1-
+           - restore_cache:
+                 keys:
+                     - opam-v3-{{'{{'}} checksum "src/opam.export" {{'}}'}}
+                     - opam-v3-
+           - run: git submodule sync && git submodule update --init --recursive
+           - run:
+                 name: Download Deps -- make macos-setup-download
+                 command: ./scripts/skip_if_only_frontend.sh make macos-setup-download
+           - run:
+                 name: Compile Deps -- make macos-setup-compile
+                 command: ./scripts/skip_if_only_frontend.sh make macos-setup-compile
+           - save_cache:
+                 key: homebrew-v1-{{'{{'}} checksum "scripts/macos-setup.sh" {{'}}'}}
+                 paths:
+                     - "/usr/local/Homebrew"
+                     - "/Users/distiller/Library/Caches/Homebrew"
+           - save_cache:
+                 key: opam-v3-{{'{{'}} checksum "src/opam.export" {{'}}'}}
+                 paths:
+                     - "/Users/distiller/.opam"
+           - run:
+                 name: Build OCaml
+                 command: ./scripts/skip_if_only_frontend.sh bash -c 'eval `opam config env` && make build 2>&1 | tee /tmp/buildocaml.log'
+           - run:
+                 name: Record Constraint System Digests
+                 command: ./scripts/skip_if_only_frontend.sh bash -c 'src/_build/default/app/cli/src/coda.exe client constraint-system-digests | tee /tmp/constraint-system-digests.log'
+           - run:
+                 name: Run all tests (on master)
+                 command: echo "FIXME Tests not yet working on mac"
+           - run: 
+                 name: Create Portable Binary
+                 command: ./scripts/skip_if_only_frontend.sh make macos-portable
+           - run: 
+                 name: Install JFrog CLI
+                 command: ./scripts/skip_if_only_frontend.sh bash -c 'curl -fL https://getcli.jfrog.io | sh'
+           - run: 
+                 name: Configure JFrog CLI
+                 command: ./scripts/skip_if_only_frontend.sh bash -c './jfrog rt config --url $ARTIFACTORY_URL --user $ARTIFACTORY_USER --apikey $ARTIFACTORY_API_KEY --interactive=false'
+           - run: 
+                 name: Release Build to Artifactory
+                 command: ./scripts/skip_if_only_frontend.sh bash -c './jfrog rt u _build/coda-daemon-macos.zip macos-coda/coda-daemon-$CIRCLE_BUILD_NUM.zip --build-name=build-macos --build-number=$CIRCLE_BUILD_NUM'
 
     {%- for profile in build_artifact_profiles %}
     build-artifacts--{{profile}}:
@@ -177,9 +189,9 @@ jobs:
             - run: git submodule sync && git submodule update --init --recursive
             - run:
                   name: Run unit tests
-                  command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && dune build --profile={{profile}} -j8 && dune runtest --profile={{profile}} -j8'
+                  command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && dune build --profile={{profile}} -j8 && (dune runtest --profile={{profile}} -j8 || (./scripts/link-coredumps.sh && false))'
             - store_artifacts:
-                path: core*
+                path: core_dumps
     {%- endfor %}
 
     {%- for profile in test_permutations.keys() | sort %}
@@ -210,6 +222,7 @@ workflows:
                     only: master
             - tracetool
             - build-wallet
+            - build-macos
             {%- for profile in build_artifact_profiles %}
             - build-artifacts--{{profile}}
             {%- endfor %}

@@ -1,18 +1,76 @@
+type Interval {
+  start: String! # timespan
+  end: String! # timespan
+}
+
+type Histogram {
+  values: [Int!]!
+  intervals: [Interval!]!
+  underflow: Int!
+  overflow: Int!
+}
+
+type RpcPair {
+  dispatch: Histogram
+  impl: Histogram
+}
+
+type RpcTimings {
+  getStagedLedgerAux: RpcPair!
+  answerSyncLedgerQuery: RpcPair!
+  getAncestry: RpcPair!
+  transitionCatchup: RpcPair!
+}
+
+type Histograms {
+  rpcTimings: RpcTimings!
+  externalTransitionLatency: Histogram
+  acceptedTransitionLocalLatency: Histogram
+  acceptedTransitionRemoteLatency: Histogram
+  snarkWorkerTransitionTime: Histogram
+  snarkWorkerMergeTime: Histogram
+}
+
+type ConsensusConfiguration {
+  delta: Int!
+  k: Int!
+  c: Int!
+  cTimesK: Int!
+  slotsPerEpoch: Int!
+  slotDuration: Int!
+  epochDuration: Int!
+  acceptableNetworkDelay: Int!
+}
+
+type DaemonStatus {
+  numAccounts: Int
+  blockCount: Int
+  uptimeSecs: Int!
+  ledgerMerkleRoot: String
+  stagedLedgerHash: String
+  stateHash: String
+  commitId: String! # git sha
+  confDir: String!
+  peers: [String!]!
+  userCommandsSent: Int!
+  runSnarkWorker: Boolean!
+  syncStatus: SyncStatus!
+  proposePubkeys: [String!]! @examples(values: [["PUB_KEY_E9873DF4453213303DA61F2", "PUB_KEY_F1173DF4453213303DA61F2"]])
+  histograms: Histograms
+  consensusTimeBestTip: String
+  consensusTimeNow: String!
+  consensusMechanism: String!
+  consensusConfiguration: ConsensusConfiguration!
+}
+
 enum SyncStatus {
-  ERROR
+  OFFLINE
   BOOTSTRAP # Resyncing
-  STALE # You haven't seen any activity recently
   SYNCED
 }
 
 enum ChainReorganizationStatus {
   CHANGED
-}
-
-type SyncUpdate {
-  status: SyncStatus!
-  estimatedPercentSynced: Float!
-  description: String @examples(values: ["Sync description"])
 }
 
 type SnarkWorker {
@@ -24,17 +82,16 @@ type UserCommand {
   id: String!
   isDelegation: Boolean!
   nonce: Int!
-  date: String! @fake(type: pastDate)
   from: String! @examples(values: ["PUB_KEY_E9873DF4453213303DA61F2", "PUB_KEY_F1173DF4453213303DA61F2"]) 
   to: String! @examples(values: ["PUB_KEY_E9873DF4453213303DA61F2", "PUB_KEY_F1173DF4453213303DA61F2"])
   amount: String! @fake(type: number)
   fee: String! @fake(type: number)
-  memo: String @fake(type:hackerPhrase)
+  memo: String! @fake(type:hackerPhrase)
 }
 
 type FeeTransfer {
   recipient: String! @examples(values: ["PUB_KEY_E9873DF4453213303DA61F2", "PUB_KEY_F1173DF4453213303DA61F2"])
-  amount: String! @fake(type: number)
+  fee: String! @fake(type: number)
 }
 
 type BlockchainState {
@@ -162,7 +219,7 @@ type AddPaymentReceiptPayload {
 }
 
 type AddWalletPayload {
-  publicKey: String @examples(values: ["PUB_KEY_E9873DF4453213303DA61F2", "PUB_KEY_F1173DF4453213303DA61F2"])
+  publicKey: String! @examples(values: ["PUB_KEY_E9873DF4453213303DA61F2", "PUB_KEY_F1173DF4453213303DA61F2"])
 }
 
 type DeleteWalletPayload {
@@ -212,10 +269,7 @@ type Query {
   # List of wallets currently tracked by the node
   ownedWallets: [Wallet!]!
   
-  # Gets balance of key at a certain consensus state
-  # Note: `consensus` is optional as we will likely decide one
-  # state to be the "real" balance
-  balance(publicKey: String!): String!
+  wallet(publicKey: String!): Wallet
   
   pooledUserCommands(publicKey: String!): [UserCommand!]!
   
@@ -230,18 +284,23 @@ type Query {
   currentSnarkWorker: SnarkWorker
 
   # Current sync status of the node
-  syncState: SyncUpdate!
+  syncStatus: SyncStatus!
+
+  # Current daemon status of the node
+  daemonStatus: DaemonStatus!
   
   # version of the node (commit hash or version #)
-  version: String! @examples(values: ["aa8c3f93ec2bad4718c308914df9e47b586f8ecd"])
+  version: String @examples(values: ["aa8c3f93ec2bad4718c308914df9e47b586f8ecd"])
   
   # Network that the node is connected to
   network: String @examples(values: ["testnet"])
   status: NodeStatus
+
+  initialPeers: [String!]! @examples(values: ["testnet"])
 }
 
 type Mutation {
-  createPayment(input: CreatePaymentInput!): CreatePaymentPayload
+  sendPayment(input: CreatePaymentInput!): CreatePaymentPayload
 
   createDelegation(input: CreateDelegationInput!): CreateDelegationPayload
   
@@ -254,7 +313,7 @@ type Mutation {
   addPaymentReceipt(input: AddPaymentReceiptInput!): AddPaymentReceiptPayload
   
   # Tell server to track a private key and all associated transactions
-  addWallet(input: AddWalletInput!): AddWalletPayload
+  addWallet(input: AddWalletInput!): AddWalletPayload!
   
   # Deletes private key associated with `key` and all related information
   deleteWallet(input: DeleteWalletInput!): DeleteWalletPayload
@@ -264,7 +323,7 @@ type Mutation {
 
 type Subscription {
   # Subscribe to sync status of the node
-  newSyncUpdate: SyncUpdate!
+  newSyncUpdate: SyncStatus!
   
   blockConfirmation: BlockConfirmation!
   

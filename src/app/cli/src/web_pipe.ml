@@ -20,19 +20,20 @@ module type Intf = sig
        Strict_pipe.Reader.t
 end
 
-let to_base64 m x = Base64.encode_string (Binable.to_string m x)
+let to_base58 m x =
+  let version_byte = Base58_check.Version_bytes.web_pipe in
+  Base58_check.encode ~version_byte ~payload:(Binable.to_string m x)
 
 module Storage (Bin : Binable.S) = struct
   let store location data =
-    Writer.save location ~contents:(to_base64 (module Bin) data)
+    Writer.save location ~contents:(to_base58 (module Bin) data)
 end
 
-module Make_broadcaster (Program : Intf) (Put_request : Web_request.Intf.S) =
-struct
+module Make_broadcaster (Put_request : Web_request.Intf.S) = struct
   let get_proposer_chain coda =
     let open Base in
     let open Keypair in
-    let get_lite_chain_exn = Option.value_exn Program.get_lite_chain in
+    let get_lite_chain_exn = Option.value_exn Coda_run.get_lite_chain in
     (* HACK: we are just passing in the proposer path for this demo *)
     let keypair = Genesis_ledger.largest_account_keypair_exn () in
     let keys = [Public_key.compress keypair.public_key] in
@@ -46,7 +47,7 @@ struct
 
   let run ~filename ~logger coda =
     let%bind web_client_pipe = Web_pipe.create ~filename ~logger in
-    Strict_pipe.Reader.iter (Program.validated_transitions coda) ~f:(fun _ ->
+    Strict_pipe.Reader.iter (Coda_lib.validated_transitions coda) ~f:(fun _ ->
         let chain = get_proposer_chain coda in
         Web_pipe.store web_client_pipe chain )
 end
@@ -108,15 +109,14 @@ let copy ~src ~dst =
 
 let project_directory = "CODA_PROJECT_DIR"
 
-let run_service (type t) (module Program : Intf with type t = t) coda ~conf_dir
-    ~logger =
+let run_service coda ~conf_dir ~logger =
   O1trace.trace_task "web pipe" (fun () -> function
     | `None ->
         Logger.info logger ~module_:__MODULE__ ~location:__LOC__
           "Not running a web client pipe" ;
         don't_wait_for
           (Strict_pipe.Reader.iter_without_pushback
-             (Program.validated_transitions coda)
+             (Coda_lib.validated_transitions coda)
              ~f:ignore)
     | `Local path ->
         let open Keypair in
@@ -126,30 +126,25 @@ let run_service (type t) (module Program : Intf with type t = t) coda ~conf_dir
             copy ~src:vk_location ~dst:(path ^/ verification_key_basename)
             >>| Or_error.return )
         |> don't_wait_for ;
-        let get_lite_chain = Option.value_exn Program.get_lite_chain in
+        let get_lite_chain = Option.value_exn Coda_run.get_lite_chain in
         let keypair = Genesis_ledger.largest_account_keypair_exn () in
-        Strict_pipe.Reader.iter (Program.validated_transitions coda)
+        Strict_pipe.Reader.iter (Coda_lib.validated_transitions coda)
           ~f:(fun _ ->
             Writer.save (path ^/ "chain")
               ~contents:
-                (Base64.encode_string
-                   (Binable.to_string
-                      (module Lite_base.Lite_chain)
-                      (get_lite_chain coda
-                         [Public_key.compress keypair.public_key]))) )
+                (to_base58
+                   (module Lite_base.Lite_chain)
+                   (get_lite_chain coda [Public_key.compress keypair.public_key]))
+        )
         |> don't_wait_for
     | `S3 ->
         Logger.info logger ~module_:__MODULE__ ~location:__LOC__
           "Running S3 web client pipe" ;
-        let module Broadcaster =
-          Make_broadcaster
-            (Program)
-            (struct
-              include Web_request.S3_put_request
+        let module Broadcaster = Make_broadcaster (struct
+          include Web_request.S3_put_request
 
-              let put = put ~options:["--cache-control"; "max-age=0,no-store"]
-            end)
-        in
+          let put = put ~options:["--cache-control"; "max-age=0,no-store"]
+        end) in
         don't_wait_for
           (let location = conf_dir ^/ "snarkette-data" in
            let%bind () = Unix.mkdir location ~p:() in

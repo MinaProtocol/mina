@@ -41,6 +41,7 @@
 /src/lib/coda_numbers/ @bkase @nholland94
 /src/lib/coda_state/ @nholland94
 /src/lib/coda_transition/ @nholland94
+/src/lib/coda_version/ @nholland94 @cmr
 /src/lib/codable/ @johnwu93 @bkase
 /src/lib/consensus/ @nholland94
 /src/lib/crs/ @rbkhmrcr @vanishreerao
@@ -110,7 +111,6 @@
 /src/lib/sha256_lib/ @rbkhmrcr @vanishreerao
 /src/lib/signature_lib/ @rbkhmrcr @vanishreerao
 /src/lib/snark_bits/ @bkase
-/src/lib/snark_pool/ @enolan
 /src/lib/snark_work_lib/ @deepthiskumar
 /src/lib/snark_worker/ @cmr @nholland94
 /src/lib/snarkette/ @bkase
@@ -133,7 +133,6 @@
 /src/lib/test_util/ @nholland94
 /src/lib/time_simulator/ @bkase
 /src/lib/auxiliary_database/ @johnwu93 @bkase
-/src/lib/transaction_pool/ @enolan
 /src/lib/transaction_snark/ @deepthiskumar @bkase
 /src/lib/transaction_snark_scan_state/ @deepthiskumar
 /src/lib/transaction_snark_work/ @deepthiskumar

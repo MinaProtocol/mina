@@ -50,12 +50,16 @@ module Make (Inputs : Inputs_intf) = struct
   let create_bufferred_pipe ?name () =
     Strict_pipe.create ?name (Buffered (`Capacity 50, `Overflow Crash))
 
-  let is_transition_for_bootstrap root_state new_transition =
+  let is_transition_for_bootstrap ~logger root_state new_transition =
     let open External_transition in
     let new_state = protocol_state new_transition in
     Consensus.Hooks.should_bootstrap
       ~existing:(Protocol_state.consensus_state root_state)
       ~candidate:(Protocol_state.consensus_state new_state)
+      ~logger:
+        (Logger.extend logger
+           [ ( "selection_context"
+             , `String "Transition_router.is_transition_for_bootstrap" ) ])
 
   let get_root_state frontier =
     Transition_frontier.root frontier
@@ -117,7 +121,9 @@ module Make (Inputs : Inputs_intf) = struct
         in
         ( match Broadcast_pipe.Reader.peek frontier_r with
         | Some frontier ->
-            if is_transition_for_bootstrap (get_root_state frontier) transition
+            if
+              is_transition_for_bootstrap ~logger (get_root_state frontier)
+                transition
             then (
               Strict_pipe.Writer.kill !transition_writer_ref ;
               let bootstrap_controller_reader, bootstrap_controller_writer =
@@ -158,3 +164,11 @@ module Make (Inputs : Inputs_intf) = struct
     |> don't_wait_for ;
     verified_transition_reader
 end
+
+include Make (struct
+  include Transition_frontier.Inputs
+  module Transition_frontier = Transition_frontier
+  module Network = Coda_networking
+  module Transition_frontier_controller = Transition_frontier_controller
+  module Bootstrap_controller = Bootstrap_controller
+end)

@@ -9,21 +9,30 @@ module Styles = {
 
 type networkOption =
   | NetworkOption(string)
-  | Custom(string)
-  | Loading
-  | None;
+  | Custom(string);
 
 let listToOptions = l => List.map(~f=x => (x, React.string(x)), l);
 
 module NetworkQueryString = [%graphql {|
     {
-      network
+      initialPeers
     }
   |}];
 
 module NetworkQuery = ReasonApollo.CreateQuery(NetworkQueryString);
 
 module InnerDropdown = {
+  let customNetwork = "Custom network";
+  let networkOptions = [CodaProcess.defaultNetwork];
+  let dropDownOptions = List.append(networkOptions, [customNetwork]);
+
+  let stringToNetworkOption = s =>
+    if (List.member(~value=s, networkOptions)) {
+      NetworkOption(s);
+    } else {
+      Custom(s);
+    };
+
   [@react.component]
   let make = (~network) => {
     let (networkValue, setNetworkValue) =
@@ -31,36 +40,36 @@ module InnerDropdown = {
         switch (
           (network: ReasonApolloTypes.queryResponse(NetworkQueryString.t))
         ) {
-        | Loading => Loading
-        | Error(_) => None
+        | Loading
+        | Error(_) =>
+          stringToNetworkOption(CodaProcess.getLocalStorageNetwork())
         | Data(d) =>
-          switch (d##network) {
-          | Some("testnet.codaprotocol.com") =>
-            NetworkOption("testnet.codaprotocol.com")
-          | Some(s) => Custom(s)
-          | None => None
+          // TODO: Refactor this to actually check network, translate from IP etc
+          switch (d##initialPeers) {
+          | [||] => Custom("")
+          | a => stringToNetworkOption(Caml.Array.get(a, 0))
           }
         }
       );
-
-    let customNetwork = "Custom network";
-    let loading = "Loading...";
 
     let dropDownValue =
       switch (networkValue) {
       | NetworkOption(s) => Some(s)
       | Custom(_) => Some(customNetwork)
-      | Loading => Some(loading)
-      | None => None
       };
 
-    let isLoading = networkValue == Loading;
-
-    let dropDownOptions = ["testnet.codaprotocol.com", customNetwork];
-    let dropDownOptions =
-      isLoading ? [loading, ...dropDownOptions] : dropDownOptions;
-
-    let dispatchToMain = React.useContext(ProcessDispatchProvider.context);
+    let dispatchNetwork = {
+      let dispatchToMain = React.useContext(ProcessDispatchProvider.context);
+      s => {
+        Bindings.LocalStorage.setItem(~key=`Network, ~value=s);
+        let args =
+          switch (s) {
+          | "" => []
+          | s => ["-peer", s]
+          };
+        dispatchToMain(CodaProcess.Action.StartCoda(args));
+      };
+    };
 
     let dropdownHandler = s =>
       switch (s) {
@@ -71,7 +80,7 @@ module InnerDropdown = {
           | x => x,
         )
       | s =>
-        dispatchToMain(CodaProcess.Action.ChangeArgs(["-peer", s]));
+        dispatchNetwork(s);
         setNetworkValue(_ => NetworkOption(s));
       };
 
@@ -81,17 +90,16 @@ module InnerDropdown = {
         label="Network"
         options={listToOptions(dropDownOptions)}
         onChange=dropdownHandler
-        disabled=isLoading
       />
       {switch (networkValue) {
-       | Custom(v) =>
+       | Custom(customValue) =>
          <>
            <Spacer height=0.5 />
            <div className=Styles.customNetwork>
              <Icon kind=Icon.BentArrow />
              <Spacer width=0.5 />
              <TextField
-               value=v
+               value=customValue
                label="URL"
                placeholder="my.network.com"
                onChange={s => setNetworkValue(_ => Custom(s))}
@@ -99,11 +107,7 @@ module InnerDropdown = {
                  <TextField.Button
                    text="Save"
                    color=`Green
-                   onClick={_ =>
-                     dispatchToMain(
-                       CodaProcess.Action.ChangeArgs(["-peer", v]),
-                     )
-                   }
+                   onClick={_ => dispatchNetwork(customValue)}
                  />
                }
              />
