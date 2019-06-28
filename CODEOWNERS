@@ -65,7 +65,7 @@
 /src/lib/interruptible/ @bkase
 /src/lib/kademlia @bkase @cmr @enolan
 /src/lib/key_value_database/ @johnwu93 @bkase
-/src/lib/keys_lib/ @cmr
+/src/lib/keys_lib/ @cmr @mrmr1993
 /src/lib/ledger_catchup/ @nholland94 @johnwu93
 /src/lib/ledger_proof/ @nholland94
 /src/lib/linked_tree/ @cmr
@@ -114,7 +114,7 @@
 /src/lib/snark_work_lib/ @deepthiskumar
 /src/lib/snark_worker/ @cmr @nholland94
 /src/lib/snarkette/ @bkase
-# /src/lib/snarky (submodule!)
+/src/lib/snarky @imeckler @mrmr1993
 /src/lib/snarky_blake2/ @rbkhmrcr @vanishreerao
 /src/lib/snarky_curves/ @rbkhmrcr @vanishreerao
 /src/lib/snarky_field_extensions/ @bkase @rbkhmrcr @vanishreerao
