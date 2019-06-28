@@ -3,13 +3,13 @@ title: Senior Designer
 date: 2019-06-20
 ---
 
-Help us build accessible, usable, delightful products on top of the Coda Cryptocurrency Protocol!
+Help us build accessible, usable, delightful products on top of Coda Protocol!
 
-We're seeking a Senior Designer who can navigate between a variety of mediums to deliver world-class user experiences. In the nascent sector of crypto ux, human-centric usability is generally an afterthought. We aim to create accessible experiences that are easily understood by an international audience.
+We're seeking a Senior Designer who can navigate a variety of mediums to deliver world-class user experiences. In the nascent sector of crypto product design, human-centric usability is generally an afterthought. We aim to create accessible experiences that are easily understood by an international audience.
 
 Designers have the opportunity to work in close concert with engineering, to form a unified product team. Brainstorming is promoted as an inclusive process, involving the entire organization.
 
-The Vignelli Canon, and Ten Principles of Good design inspire our design approach, we emphasize using a grid based approach. Figma is our primary design tool, wherein creating and maintaining design libraries plays an integral part of the role.
+The Vignelli Canon and Ten Principles of Good Design inspire our design approach, we emphasize using a grid-based approach. Figma is our primary design tool, wherein creating and maintaining design libraries plays an integral part of the role.
 
 ## Requirements
 
@@ -38,7 +38,7 @@ This is a chance to join a small, collaborative team and have a ton of independe
 
 If you’d be interested in talking further, please get in touch by
 sending an email with your resume, link to your portfolio, and the subject “Senior Designer
-Applicant” to [jobs@o1labs.org](mailto:jobs@o1labs.org?subject="Product Engineer Applicant"). A portfolio is required to be considered for this role.
+Applicant” to [jobs@o1labs.org](mailto:jobs@o1labs.org?subject="Senior Designer Applicant"). A portfolio is required to be considered for this role.
 
 We are committed to building a diverse, inclusive company. People of
 color, LGBTQ individuals, women, and people with disabilities are
