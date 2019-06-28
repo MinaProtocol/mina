@@ -294,6 +294,7 @@ module NavWrapper = {
             style([
               position(`relative),
               width(`auto),
+              maxWidth(px(500)),
               order(2),
               NavStyle.bottomNudgeOffset(0.5),
               media(
@@ -443,7 +444,7 @@ let make = (~page, _children) => {
         link="/jobs.html"
         activePage={page == `Jobs}
       />
-      <SignupButton name="Sign up" link=Links.Forms.mailingList />
+      //<SignupButton name="Sign up" link=Links.Forms.mailingList />
     </NavWrapper>;
   },
 };

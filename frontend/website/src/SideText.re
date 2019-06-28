@@ -50,20 +50,21 @@ let make = (~className="", ~paragraphs, ~cta, _children) => {
           ]),
         ])
       )>
-      ...{Array.append(
-        ps,
-        [|
-          <A
-            name={link.name}
-            target="_blank"
-            href={link.link}
-            className=Css.(
-              merge([Style.Link.basic, style([marginTop(`rem(1.5))])])
-            )>
-            {ReasonReact.string(copy ++ {j|\u00A0→|j})}
-          </A>,
-        |],
-      )}
+      ...ps
+      //...{Array.append(
+      //  ps,
+      //  [|
+      //    <A
+      //      name={link.name}
+      //      target="_blank"
+      //      href={link.link}
+      //      className=Css.(
+      //        merge([Style.Link.basic, style([marginTop(`rem(1.5))])])
+      //      )>
+      //      {ReasonReact.string(copy ++ {j|\u00A0→|j})}
+      //    </A>,
+      //  |],
+      //)}
     </div>;
   },
 };
