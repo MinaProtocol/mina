@@ -31,10 +31,10 @@ let net_configs n =
 
 let offset =
   lazy
-    Coda_base.Block_time.(
-      diff
-        (of_time @@ Core.Time.now ())
-        Consensus.Constants.genesis_state_timestamp)
+    Core.Time.(
+      diff (now ())
+        ( Consensus.Constants.genesis_state_timestamp
+        |> Coda_base.Block_time.to_time ))
 
 let local_configs ?proposal_interval ?(proposers = Fn.const None) n
     ~acceptable_delay ~program_dir ~snark_worker_public_keys
