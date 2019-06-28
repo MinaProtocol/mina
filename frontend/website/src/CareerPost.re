@@ -18,7 +18,7 @@ main h2 {
   margin-bottom: 1.5rem;
 }
 
-ul ul {
+ul li {
   margin-left: 1.25rem;
 }     |css},
            )}
