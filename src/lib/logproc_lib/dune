@@ -2,6 +2,6 @@
   (name logproc_lib)
   (public_name logproc_lib)
   (modules filter interpolator)
-  (libraries core yojson angstrom cmdliner logger)
+  (libraries core yojson angstrom re2)
   (preprocess (pps ppx_jane ppx_deriving.std))
   (inline_tests))
