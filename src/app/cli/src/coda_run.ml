@@ -60,7 +60,7 @@ let get_lite_chain :
       let proof = Lite_compat.proof proof in
       {Lite_base.Lite_chain.proof; ledger; protocol_state} )
 
-let log_shutdown ~conf_dir ~top_logger t_deferred =
+let log_shutdown ~conf_dir ~top_logger coda_ref =
   let logger =
     Logger.extend top_logger
       [("coda_run", `String "Logging state before program ends")]
@@ -70,7 +70,7 @@ let log_shutdown ~conf_dir ~top_logger t_deferred =
   Logger.info logger ~module_:__MODULE__ ~location:__LOC__ "%s"
     (Visualization_message.success "registered masks" mask_file) ;
   Coda_base.Ledger.Debug.visualize ~filename:mask_file ;
-  match Deferred.peek t_deferred with
+  match !coda_ref with
   | None ->
       Logger.info logger ~module_:__MODULE__ ~location:__LOC__
         "Shutdown before Coda instance was created, not saving a visualization"
@@ -297,13 +297,30 @@ let run_snark_worker ?shutdown_on_disconnect:(s = true) ~client_port
       create_snark_worker ~shutdown_on_disconnect:s ~public_key ~client_port
       |> ignore
 
-let handle_shutdown ~monitor ~conf_dir ~top_logger t_deferred =
+let handle_crash e =
+  Core.eprintf
+    !{err|
+
+  💀 Coda's Daemon Crashed. The Coda Protocol developers would like to know why!
+
+  Please:
+    Open an issue:
+      https://github.com/CodaProtocol/coda/issues/new
+
+    Tell us what you were doing, and paste the last 20 lines of log messages.
+    And then paste the following:
+
+    %s%!|err}
+    (Exn.to_string e)
+
+let handle_shutdown ~monitor ~conf_dir ~top_logger coda_ref =
   Monitor.detach_and_iter_errors monitor ~f:(fun exn ->
-      log_shutdown ~conf_dir ~top_logger t_deferred ;
-      raise exn ) ;
+      log_shutdown ~conf_dir ~top_logger coda_ref ;
+      handle_crash exn ;
+      Stdlib.exit 1 ) ;
   Async_unix.Signal.(
     handle terminating ~f:(fun signal ->
-        log_shutdown ~conf_dir ~top_logger t_deferred ;
+        log_shutdown ~conf_dir ~top_logger coda_ref ;
         let logger =
           Logger.extend top_logger
             [("coda_run", `String "Program got killed by signal")]
