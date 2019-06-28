@@ -795,7 +795,6 @@ module Data = struct
         (* It was somewhat involved to implement that check with the small field, so
            we've stubbed it out for now. *)
         let is_satisfied ~my_stake:_ ~total_stake:_ _vrf_output =
-          let () = assert Coda_base.Insecure.vrf_threshold_check in
           Snark_params.Tick.(Checked.return Boolean.true_)
       end
     end
