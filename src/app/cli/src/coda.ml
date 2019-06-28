@@ -427,9 +427,9 @@ let daemon logger =
          ; client_port
          ; run_snark_worker_action }
        in
-       let coda_initialization_deferred = coda_initialization_deferred () in
-       Coda_run.handle_shutdown ~monitor ~conf_dir ~top_logger:logger
-         (coda_initialization_deferred >>| fun c -> c.Coda_initialization.coda) ;
+       (* Breaks a dependency cycle with monitor initilization and coda *)
+       let coda_ref : Coda_lib.t option ref = ref None in
+       Coda_run.handle_shutdown ~monitor ~conf_dir ~top_logger:logger coda_ref ;
        Async.Scheduler.within' ~monitor
        @@ fun () ->
        let%bind { Coda_initialization.coda
@@ -437,8 +437,9 @@ let daemon logger =
                 ; rest_server_port
                 ; client_port
                 ; run_snark_worker_action } =
-         coda_initialization_deferred
+         coda_initialization_deferred ()
        in
+       coda_ref := Some coda ;
        let%bind () = maybe_sleep 3. in
        let%bind () =
          if from_genesis then Deferred.unit
