@@ -47,7 +47,7 @@ let%test_module "Command line tests" =
     let test_background_daemon () =
       let config_dir = "/tmp/coda-spun-test" in
       let port = 1337 in
-      let client_delay = 12. in
+      let client_delay = 15. in
       let%bind _ = create_config_directory config_dir in
       let%bind _ = start_daemon config_dir port in
       (* it takes awhile for the daemon to become available *)
