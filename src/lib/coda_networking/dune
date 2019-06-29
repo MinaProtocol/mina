@@ -2,9 +2,9 @@
  (name coda_networking)
  (public_name coda_networking)
  (library_flags -linkall)
- (libraries core o1trace envelope async gossip_net coda_lib coda_intf
+ (libraries core o1trace envelope async gossip_net coda_intf
   async_extra coda_base unix_timestamp perf_histograms proof_carrying_data
-  consensus transaction_pool snark_pool network_pool coda_transition
+  consensus network_pool coda_transition
   staged_ledger)
  (inline_tests)
  (preprocess

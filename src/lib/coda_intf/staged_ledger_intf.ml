@@ -136,19 +136,13 @@ module type Staged_ledger_diff_generalized_intf = sig
       with type V1.t = t
   end
 
-  type t =
-    { diff: Diff.t
-    ; prev_hash: staged_ledger_hash
-    ; creator: compressed_public_key }
+  type t = {diff: Diff.t; creator: compressed_public_key}
   [@@deriving sexp, fields]
 
   module Stable :
     sig
       module V1 : sig
-        type t =
-          { diff: Diff.t
-          ; prev_hash: staged_ledger_hash
-          ; creator: compressed_public_key }
+        type t = {diff: Diff.t; creator: compressed_public_key}
         [@@deriving sexp, bin_io, version]
       end
 
@@ -174,11 +168,7 @@ module type Staged_ledger_diff_generalized_intf = sig
       * pre_diff_with_at_most_one_coinbase option
     [@@deriving sexp]
 
-    type t =
-      { diff: diff
-      ; prev_hash: staged_ledger_hash
-      ; creator: compressed_public_key }
-    [@@deriving sexp]
+    type t = {diff: diff; creator: compressed_public_key} [@@deriving sexp]
 
     val user_commands : t -> user_command_with_valid_signature list
   end
@@ -460,7 +450,6 @@ module type Staged_ledger_generalized_intf = sig
 
   module Staged_ledger_error : sig
     type t =
-      | Bad_prev_hash of staged_ledger_hash * staged_ledger_hash
       | Non_zero_fee_excess of Scan_state.Space_partition.t * transaction list
       | Invalid_proof of
           ledger_proof * transaction_snark_statement * compressed_public_key

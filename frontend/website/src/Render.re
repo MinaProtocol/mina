@@ -107,22 +107,22 @@ module Router = {
 };
 
 let jobOpenings = [|
-  ("engineering-manager", "Engineering Manager (San Francisco)."),
   ("product-manager", "Product Manager (San Francisco)."),
-  ("senior-frontend-engineer", "Senior Frontend Engineer (San Francisco)."),
-  ("protocol-engineer", "Senior Protocol Engineer (San Francisco)."),
+  ("senior-designer", "Senior Designer (San Francisco)."),
   (
-    "director-of-business-development",
-    "Director of Business Development (San Francisco).",
+    "senior-frontend-engineer",
+    "Senior Product Engineer (Frontend) (San Francisco).",
   ),
+  ("frontend-engineer", "Product Engineer (Frontend) (San Francisco)."),
+  ("protocol-engineer", "Senior Protocol Engineer (San Francisco)."),
 |];
 
 // GENERATE
 
 Rimraf.sync("site");
 
-let blogPage =
-  <Page page=`Blog name="blog" extraHeaders={Blog.extraHeaders()}>
+let blogPage = name =>
+  <Page page=`Blog name extraHeaders={Blog.extraHeaders()}>
     <Wrapped> <Blog posts /> </Wrapped>
   </Page>;
 
@@ -159,7 +159,7 @@ Router.(
                  </Page>,
                )
              )
-          |> Array.append([|File("index", blogPage)|]),
+          |> Array.append([|File("index", blogPage("index"))|]),
         ),
         Dir(
           "jobs",
@@ -171,7 +171,7 @@ Router.(
                    page=`Jobs
                    name
                    footerColor=Style.Colors.gandalf
-                   extraHeaders={Careers.extraHeaders()}>
+                   extraHeaders={CareerPost.extraHeaders()}>
                    <Wrapped>
                      <CareerPost path={"jobs/" ++ name ++ ".markdown"} />
                    </Wrapped>
@@ -196,7 +196,7 @@ Router.(
             <Wrapped> <Testnet /> </Wrapped>
           </Page>,
         ),
-        File("blog", blogPage),
+        File("blog", blogPage("blog")),
         File(
           "privacy",
           <Page page=`Privacy name="privacy">

@@ -24,7 +24,7 @@ end) :
   open Inputs
 
   (* TODO: Remove New_frontier. 
-    Each transition frontier extension should be initialized by the input, the root breadcrumb *)
+     Each transition frontier extension should be initialized by the input, the root breadcrumb *)
   type t =
     | New_breadcrumb of {previous: Breadcrumb.t; added: Breadcrumb.t}
         (** Triggered when a new breadcrumb is added without changing the root or best_tip *)
@@ -310,14 +310,16 @@ end) :
 
     type input = unit
 
+    (* these are populated by the best-tip-path changes *)
     type view =
       { new_user_commands: User_command.t list
-      ; removed_user_commands: User_command.t list }
+      ; removed_user_commands: User_command.t list
+      ; reorg_best_tip: bool }
 
     let create () = ()
 
     let initial_view () : view =
-      {new_user_commands= []; removed_user_commands= []}
+      {new_user_commands= []; removed_user_commands= []; reorg_best_tip= false}
 
     let handle_diff () diff : view Option.t =
       match diff with
@@ -326,7 +328,8 @@ end) :
       | New_frontier breadcrumb ->
           Some
             { new_user_commands= Breadcrumb.to_user_commands breadcrumb
-            ; removed_user_commands= [] }
+            ; removed_user_commands= []
+            ; reorg_best_tip= false }
       | New_best_tip {added_to_best_tip_path; removed_from_best_tip_path; _} ->
           Some
             { new_user_commands=
@@ -335,7 +338,10 @@ end) :
                   ~f:Breadcrumb.to_user_commands
             ; removed_user_commands=
                 List.bind removed_from_best_tip_path
-                  ~f:Breadcrumb.to_user_commands }
+                  ~f:Breadcrumb.to_user_commands
+                (* Using `removed_user_commands` as a proxy for reorg_best_tip is not a good enough because we could be reorg-ing orphaning only coinbase blocks. However, `removed_from_best_tip_path` are all breadcrumbs including those with no user_commands *)
+            ; reorg_best_tip= not @@ List.is_empty removed_from_best_tip_path
+            }
   end
 
   module Root_diff = struct

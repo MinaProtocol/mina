@@ -274,7 +274,16 @@ module type S = sig
   val epoch_size : int
 
   module Configuration : sig
-    type t [@@deriving yojson, bin_io]
+    type t =
+      { delta: int
+      ; k: int
+      ; c: int
+      ; c_times_k: int
+      ; slots_per_epoch: int
+      ; slot_duration: int
+      ; epoch_duration: int
+      ; acceptable_network_delay: int }
+    [@@deriving yojson, bin_io, fields]
 
     val t : t
   end
@@ -372,7 +381,7 @@ module type S = sig
 
       val fold : Value.t -> bool Triple.t Fold.t
 
-      val length : Value.t -> Length.t
+      val blockchain_length : Value.t -> Length.t
 
       val time_hum : Value.t -> string
 
@@ -457,6 +466,7 @@ module type S = sig
     val should_bootstrap :
          existing:Consensus_state.Value.t
       -> candidate:Consensus_state.Value.t
+      -> logger:Logger.t
       -> bool
 
     (** Data needed to synchronize the local state. *)

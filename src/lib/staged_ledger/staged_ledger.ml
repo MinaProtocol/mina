@@ -48,7 +48,6 @@ struct
 
   module Staged_ledger_error = struct
     type t =
-      | Bad_prev_hash of Staged_ledger_hash.t * Staged_ledger_hash.t
       | Non_zero_fee_excess of
           Scan_state.Space_partition.t * Transaction.t list
       | Invalid_proof of
@@ -60,11 +59,6 @@ struct
     [@@deriving sexp]
 
     let to_string = function
-      | Bad_prev_hash (h1, h2) ->
-          Format.asprintf
-            !"bad prev_hash: Expected %{sexp: Staged_ledger_hash.t}, got \
-              %{sexp: Staged_ledger_hash.t} \n"
-            h1 h2
       | Non_zero_fee_excess (partition, txns) ->
           Format.asprintf
             !"Fee excess is non-zero for the transactions: %{sexp: \
@@ -744,14 +738,6 @@ struct
       ( Int.min (Scan_state.free_space t.scan_state) max_throughput
       , List.length jobs )
     in
-    let%bind () =
-      let curr_hash = hash t in
-      if Staged_ledger_hash.equal sl_diff.prev_hash (hash t) then return ()
-      else
-        Deferred.return
-          (Error
-             (Staged_ledger_error.Bad_prev_hash (curr_hash, sl_diff.prev_hash)))
-    in
     let new_mask = Inputs.Ledger.Mask.create () in
     let new_ledger = Inputs.Ledger.register_mask t.ledger new_mask in
     let scan_state' = Scan_state.copy t.scan_state in
@@ -1337,7 +1323,6 @@ struct
       ~(get_completed_work :
             Transaction_snark_work.Statement.t
          -> Transaction_snark_work.Checked.t option) =
-    let curr_hash = hash t in
     O1trace.trace_event "curr_hash" ;
     let validating_ledger = Transaction_validator.create t.ledger in
     O1trace.trace_event "done mask" ;
@@ -1395,9 +1380,7 @@ struct
     Logger.info logger ~module_:__MODULE__ ~location:__LOC__
       "Block stats: Proofs ready for purchase: %d" proof_count ;
     trace_event "prediffs done" ;
-    { Staged_ledger_diff.With_valid_signatures_and_proofs.diff
-    ; creator= self
-    ; prev_hash= curr_hash }
+    {Staged_ledger_diff.With_valid_signatures_and_proofs.diff; creator= self}
 
   module For_tests = struct
     let snarked_ledger = snarked_ledger
@@ -2093,6 +2076,8 @@ let%test_module "test" =
           {fee: fee; proofs: proof list; prover: public_key}
         [@@deriving sexp, compare]
 
+        let fee {fee; _} = fee
+
         module Statement = struct
           module Stable = struct
             module V1 = struct
@@ -2297,10 +2282,7 @@ let%test_module "test" =
         module Stable = struct
           module V1 = struct
             module T = struct
-              type t =
-                { diff: Diff.Stable.V1.t
-                ; prev_hash: staged_ledger_hash
-                ; creator: public_key }
+              type t = {diff: Diff.Stable.V1.t; creator: public_key}
               [@@deriving sexp, bin_io, version {for_test}]
             end
 
@@ -2310,10 +2292,7 @@ let%test_module "test" =
           module Latest = V1
         end
 
-        type t = Stable.Latest.t =
-          { diff: Diff.Stable.V1.t
-          ; prev_hash: staged_ledger_hash
-          ; creator: public_key }
+        type t = Stable.Latest.t = {diff: Diff.Stable.V1.t; creator: public_key}
         [@@deriving sexp, yojson, fields]
 
         module With_valid_signatures_and_proofs = struct
@@ -2334,9 +2313,7 @@ let%test_module "test" =
             * pre_diff_with_at_most_one_coinbase option
           [@@deriving sexp, yojson]
 
-          type t =
-            {diff: diff; prev_hash: staged_ledger_hash; creator: public_key}
-          [@@deriving sexp, yojson]
+          type t = {diff: diff; creator: public_key} [@@deriving sexp, yojson]
 
           let user_commands t =
             (fst t.diff).user_commands
@@ -2369,7 +2346,6 @@ let%test_module "test" =
           { diff=
               ( forget_pre_diff_with_at_most_two (fst t.diff)
               , Option.map (snd t.diff) ~f:forget_pre_diff_with_at_most_one )
-          ; prev_hash= t.prev_hash
           ; creator= t.creator }
 
         let user_commands (t : t) =
@@ -2629,14 +2605,13 @@ let%test_module "test" =
       let g = Int.gen_incl 1 p in
       let initial_ledger = ref 0 in
       let sl = ref (Sl.create_exn ~ledger:initial_ledger) in
-      let create_diff_with_non_zero_fee_excess prev_hash txns completed_works
+      let create_diff_with_non_zero_fee_excess txns completed_works
           (partition : Sl.Scan_state.Space_partition.t) : Staged_ledger_diff.t
           =
         match partition.second with
         | None ->
             { diff=
                 ({completed_works; user_commands= txns; coinbase= Zero}, None)
-            ; prev_hash
             ; creator= "C" }
         | Some _ ->
             let diff : Staged_ledger_diff.Diff.t =
@@ -2648,7 +2623,7 @@ let%test_module "test" =
                   ; user_commands= List.drop txns partition.first
                   ; coinbase= Zero } )
             in
-            {diff; prev_hash; creator= "C"}
+            {diff; creator= "C"}
       in
       Quickcheck.test g ~trials:50 ~f:(fun i ->
           Async.Thread_safe.block_on_async_exn (fun () ->
@@ -2671,9 +2646,8 @@ let%test_module "test" =
                       ; prover= "P" } )
                   work
               in
-              let hash = Sl.hash !sl in
               let diff =
-                create_diff_with_non_zero_fee_excess hash txns
+                create_diff_with_non_zero_fee_excess txns
                   (Sequence.to_list work_done)
                   partitions
               in

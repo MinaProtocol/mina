@@ -17,7 +17,7 @@ let load_with_checksum (type a) (c : a Controller.t) location =
   | `Yes -> (
       match%map
         Reader.load_bin_prot
-          ~max_len:(1000 * 1024 * 1024)
+          ~max_len:(5 * 512 * 1024 * 1024 (* 2.5 GB *))
           location
           (bin_reader_t String.bin_reader_t)
       with

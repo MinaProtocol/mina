@@ -90,6 +90,8 @@ end) :
   end
 
   let forget = Fn.id
+
+  let fee {fee; _} = fee
 end
 
 include Make (Ledger_proof.Stable.V1)

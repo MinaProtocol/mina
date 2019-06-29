@@ -6,22 +6,23 @@ module Styles = {
   let headerContainer =
     style([display(`flex), justifyContent(`spaceBetween)]);
 
-  let networkContainer = style([width(`rem(21.))]);
-
-  let customNetwork = style([display(`flex), alignItems(`center)]);
-
   let versionText =
     merge([
       Theme.Text.Header.h6,
-      style([display(`flex), textTransform(`uppercase), paddingTop(`rem(0.5))]),
+      style([
+        display(`flex),
+        textTransform(`uppercase),
+        paddingTop(`rem(0.5)),
+      ]),
     ]);
 
-  let container = 
+  let container =
     style([
       height(`percent(100.)),
       padding(`rem(2.)),
       borderTop(`px(1), `solid, white),
       borderLeft(`px(1), `solid, white),
+      overflow(`scroll),
     ]);
 
   let label =
@@ -30,7 +31,6 @@ module Styles = {
       style([
         margin2(~v=`rem(0.5), ~h=`zero),
         color(Theme.Colors.midnight),
-        userSelect(`none),
       ]),
     ]);
 
@@ -38,7 +38,7 @@ module Styles = {
     style([
       display(`flex),
       flexDirection(`column),
-      backgroundColor(`rgba(255, 255, 255, 0.8)),
+      backgroundColor(`rgba((255, 255, 255, 0.8))),
       borderRadius(`px(6)),
       border(`px(1), `solid, Theme.Colors.slateAlpha(0.4)),
       width(`rem(28.)),
@@ -48,7 +48,6 @@ module Styles = {
     merge([
       Theme.Text.Body.regular,
       style([
-        userSelect(`none),
         padding(`rem(1.)),
         color(Theme.Colors.midnight),
         display(`flex),
@@ -57,49 +56,71 @@ module Styles = {
         lastChild([borderBottomWidth(`zero)]),
         hover([
           backgroundColor(Theme.Colors.midnightAlpha(0.05)),
-          selector(
-            "> :last-child",
-            [color(Theme.Colors.hyperlink)],
-          ),
+          selector("> :last-child", [color(Theme.Colors.hyperlink)]),
         ]),
       ]),
     ]);
 
-  let walletName = style([width(`rem(12.5))]);
+  let walletName = style([width(`rem(12.5)), color(Theme.Colors.marine)]);
 
-  let walletChevron = style([
-    display(`inlineFlex), 
-    color(Theme.Colors.tealAlpha(0.5)),
-  ]);
+  let walletKey =
+    merge([Theme.Text.Body.mono, style([color(Theme.Colors.midnightAlpha(0.7))])]);
+
+  let walletChevron =
+    style([display(`inlineFlex), color(Theme.Colors.tealAlpha(0.5))]);
 };
 
-module SettingsQueryString = [%graphql
-  {|
-    query getSettings {
-      version
-      ownedWallets {
-        publicKey @bsDecoder(fn: "Apollo.Decoders.publicKey")
+module Version = {
+  module QueryString = [%graphql
+    {|
+      query getVersion {
+        version
       }
-    }
-  |}
-];
+    |}
+  ];
 
-module SettingsQuery = ReasonApollo.CreateQuery(SettingsQueryString);
+  module Query = ReasonApollo.CreateQuery(QueryString);
+
+  [@react.component]
+  let make = () => {
+    let prettyVersion = v =>
+      String.slice(v, ~from=0, ~to_=min(8, String.length(v)));
+
+    <div className=Styles.versionText>
+      <span className=Css.(style([color(Theme.Colors.slateAlpha(0.3))]))>
+        {React.string("Version:")}
+      </span>
+      <Spacer width=0.5 />
+      <span className=Css.(style([color(Theme.Colors.slateAlpha(0.7))]))>
+        <Query>
+          {response =>
+             (
+               switch (response.result) {
+               | Loading => "..."
+               | Error(err) => err##message
+               | Data(data) =>
+                 data##version
+                 |> Option.map(~f=prettyVersion)
+                 |> Option.withDefault(~default="Unknown")
+               }
+             )
+             |> React.string}
+        </Query>
+      </span>
+    </div>;
+  };
+};
 
 module WalletSettingsItem = {
   [@react.component]
   let make = (~publicKey) => {
-    let (addressBook, _) = React.useContext(AddressBookProvider.context);
     let keyStr = PublicKey.toString(publicKey);
     let route = "/settings/" ++ Js.Global.encodeURIComponent(keyStr);
     <div
       className=Styles.walletItem
-      onClick={_ => ReasonReact.Router.push(route)}
-    >
-      <div className=Styles.walletName>
-        {React.string(AddressBook.getWalletName(addressBook, publicKey))}
-      </div>
-      <span className=Theme.Text.Body.mono>
+      onClick={_ => ReasonReact.Router.push(route)}>
+      <div className=Styles.walletName> <WalletName pubkey=publicKey /> </div>
+      <span className=Styles.walletKey>
         <Pill> {React.string(PublicKey.prettyPrint(publicKey))} </Pill>
       </span>
       <Spacer width=5.0 />
@@ -110,121 +131,49 @@ module WalletSettingsItem = {
   };
 };
 
-let doubleList = l => List.map(~f=x => (x, x), l);
+module WalletsQueryString = [%graphql
+  {|
+    query getWallets {
+      ownedWallets {
+        publicKey @bsDecoder(fn: "Apollo.Decoders.publicKey")
+      }
+    }
+  |}
+];
 
-type networkOption =
-  | NetworkOption(string)
-  | Custom(string);
+module WalletsQuery = ReasonApollo.CreateQuery(WalletsQueryString);
 
 [@react.component]
 let make = () => {
-  // TODO: Get and save value from the settings
-  let (networkValue, setNetworkValue) =
-    React.useState(() => NetworkOption("testnet.codaprotocol.com"));
-
-  let dropDownValue =
-    switch (networkValue) {
-    | NetworkOption(s) => Some(s)
-    | Custom(_) => Some("Custom network")
-    };
-
-  let dropDownOptions =
-    doubleList([
-      "testnet.codaprotocol.com",
-      "testnet2.codaprotocol.com",
-      "testnet3.codaprotocol.com",
-      "Custom network",
-    ]);
-
-  let dropdownHandler = s =>
-    switch (s) {
-    | "Custom network" =>
-      setNetworkValue(
-        fun
-        | NetworkOption(_) => Custom("")
-        | x => x,
-      )
-    | s => setNetworkValue(_ => NetworkOption(s))
-    };
-
-  <SettingsQuery>
-    {response =>
-       switch (response.result) {
-       | Loading => React.string("...")
-       | Error(err) => React.string(err##message)
-       | Data(data) =>
-         let versionText =
-           String.slice(
-             data##version,
-             ~from=0,
-             ~to_=min(8, String.length(data##version)),
-           );
-         <div className=Styles.container>
-           <div className=Styles.headerContainer>
-             <div className=Theme.Text.Header.h3>{React.string("Node Settings")}</div>
-             <div className=Styles.versionText>
-               <span
-                 className=Css.(
-                   style([color(Theme.Colors.slateAlpha(0.3))])
-                 )>
-                 {React.string("Version:")}
-               </span>
-               <Spacer width=0.5 />
-               <span
-                 className=Css.(
-                   style([color(Theme.Colors.slateAlpha(0.7))])
-                 )>
-                 {React.string(versionText)}
-               </span>
-             </div>
-           </div>
-           <Spacer height=1. />
-           <div className=Styles.networkContainer>
-             <Dropdown
-               value=dropDownValue
-               label="Network"
-               options=dropDownOptions
-               onChange=dropdownHandler
-             />
-             {switch (networkValue) {
-              | Custom(v) =>
-                <>
-                  <Spacer height=0.5 />
-                  <div className=Styles.customNetwork>
-                    <Icon kind=Icon.BentArrow />
-                    <Spacer width=0.5 />
-                    <TextField
-                      value=v
-                      label="URL"
-                      placeholder="my.network.com"
-                      onChange={s => setNetworkValue(_ => Custom(s))}
-                      button={
-                        <TextField.Button
-                          text="Save"
-                          color=`Green
-                          onClick=ignore
-                        />
-                      }
-                    />
-                  </div>
-                </>
-              | _ => React.null
-              }}
-           </div>
-           <Spacer height=1. />
-           <div className=Styles.label> {React.string("Wallet Settings")} </div>
-           <Spacer height=0.5 />
-           <div className=Styles.walletItemContainer>
-             {data##ownedWallets
-              |> Array.map(~f=w =>
-                   <WalletSettingsItem
-                     key={PublicKey.toString(w##publicKey)}
-                     publicKey=w##publicKey
-                   />
-                 )
-              |> React.array}
-           </div>
-         </div>;
-       }}
-  </SettingsQuery>;
+  <div className=Styles.container>
+    <div className=Styles.headerContainer>
+      <div className=Theme.Text.Header.h3>
+        {React.string("Node Settings")}
+      </div>
+      <Version />
+    </div>
+    <Spacer height=1. />
+    <NetworkDropdown />
+    <Spacer height=1. />
+    <div className=Styles.label> {React.string("Wallet Settings")} </div>
+    <Spacer height=0.5 />
+    <div className=Styles.walletItemContainer>
+      <WalletsQuery>
+        {({result}) =>
+           switch (result) {
+           | Loading
+           | Error(_) => React.null
+           | Data(data) =>
+             data##ownedWallets
+             |> Array.map(~f=w =>
+                  <WalletSettingsItem
+                    key={PublicKey.toString(w##publicKey)}
+                    publicKey=w##publicKey
+                  />
+                )
+             |> React.array
+           }}
+      </WalletsQuery>
+    </div>
+  </div>;
 };

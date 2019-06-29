@@ -25,6 +25,7 @@
 /src/app/trace-tool/ @cmr
 /src/app/website/ @bkase @schmavery @figitaki
 
+/src/lib/base58_check/ @psteckler @cmr
 /src/lib/bignum_bigint/ @nholland94 @bkase
 /src/lib/blake2/ @rbkhmrcr @vanishreerao
 /src/lib/blockchain_snark/ @nholland94 @bkase
@@ -40,6 +41,7 @@
 /src/lib/coda_numbers/ @bkase @nholland94
 /src/lib/coda_state/ @nholland94
 /src/lib/coda_transition/ @nholland94
+/src/lib/coda_version/ @nholland94 @cmr
 /src/lib/codable/ @johnwu93 @bkase
 /src/lib/consensus/ @nholland94
 /src/lib/crs/ @rbkhmrcr @vanishreerao
@@ -63,7 +65,7 @@
 /src/lib/interruptible/ @bkase
 /src/lib/kademlia @bkase @cmr @enolan
 /src/lib/key_value_database/ @johnwu93 @bkase
-/src/lib/keys_lib/ @cmr
+/src/lib/keys_lib/ @cmr @mrmr1993
 /src/lib/ledger_catchup/ @nholland94 @johnwu93
 /src/lib/ledger_proof/ @nholland94
 /src/lib/linked_tree/ @cmr
@@ -91,7 +93,7 @@
 /src/lib/pokolog/ @bkase @vanishreerao @rbkhmrcr
 /src/lib/ppx_coda/ @psteckler @mrmr1993
 /src/lib/ppx_util/ @mrmr1993
-/src/lib/precomputed_values/ @cmr @bkase
+/src/lib/precomputed_values/ @cmr @bkase @mrmr1993
 /src/lib/proof_carrying_data/ @psteckler @bkase
 /src/lib/proposer/ @nholland94 @cmr
 /src/lib/prover/ @nholland94 @bkase
@@ -109,11 +111,11 @@
 /src/lib/sha256_lib/ @rbkhmrcr @vanishreerao
 /src/lib/signature_lib/ @rbkhmrcr @vanishreerao
 /src/lib/snark_bits/ @bkase
-/src/lib/snark_pool/ @enolan
 /src/lib/snark_work_lib/ @deepthiskumar
 /src/lib/snark_worker/ @cmr @nholland94
+/src/lib/snark_keys/ @mrmr1993
 /src/lib/snarkette/ @bkase
-# /src/lib/snarky (submodule!)
+/src/lib/snarky/ @mrmr1993
 /src/lib/snarky_blake2/ @rbkhmrcr @vanishreerao
 /src/lib/snarky_curves/ @rbkhmrcr @vanishreerao
 /src/lib/snarky_field_extensions/ @bkase @rbkhmrcr @vanishreerao
@@ -132,7 +134,6 @@
 /src/lib/test_util/ @nholland94
 /src/lib/time_simulator/ @bkase
 /src/lib/auxiliary_database/ @johnwu93 @bkase
-/src/lib/transaction_pool/ @enolan
 /src/lib/transaction_snark/ @deepthiskumar @bkase
 /src/lib/transaction_snark_scan_state/ @deepthiskumar
 /src/lib/transaction_snark_work/ @deepthiskumar

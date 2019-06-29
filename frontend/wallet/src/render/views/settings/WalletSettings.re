@@ -3,10 +3,16 @@ open Tc;
 module Styles = {
   open Css;
 
-  let container = style([padding(`rem(2.0))]);
+  let container =
+    style([
+      height(`percent(100.)),
+      padding(`rem(2.)),
+      borderTop(`px(1), `solid, white),
+      borderLeft(`px(1), `solid, white),
+      overflow(`scroll),
+    ]);
 
-  let backHeader =
-    style([display(`flex), alignItems(`center), userSelect(`none)]);
+  let backHeader = style([display(`flex), alignItems(`center)]);
 
   let backIcon =
     style([
@@ -18,15 +24,12 @@ module Styles = {
   let backHeaderText =
     merge([Theme.Text.Header.h3, style([color(Theme.Colors.midnight)])]);
 
+  let headerWalletName = style([fontSize(`rem(1.25))]);
+
   let label =
     merge([
       Theme.Text.Body.semiBold,
-      style([
-        color(Theme.Colors.midnight),
-        margin(`rem(0.25)),
-        marginTop(`rem(1.0)),
-        userSelect(`none),
-      ]),
+      style([color(Theme.Colors.midnight), marginBottom(`rem(0.25))]),
     ]);
 
   let deleteModalLabel = merge([label, style([alignSelf(`flexStart)])]);
@@ -49,12 +52,12 @@ module Styles = {
 
 module DeleteWallet = [%graphql
   {|
-  mutation deleteWallet($key: String!) {
+    mutation deleteWallet($key: String!) {
       deleteWallet(input: {publicKey: $key}) {
         publicKey
       }
-  }
-|}
+    }
+  |}
 ];
 
 module DeleteWalletMutation = ReasonApollo.CreateMutation(DeleteWallet);
@@ -68,7 +71,12 @@ module DeleteButton = {
   let make = (~publicKey) => {
     let (modalState, updateModal) = React.useState(() => None);
     let (addressBook, _) = React.useContext(AddressBookProvider.context);
-    let walletName = AddressBook.getWalletName(addressBook, publicKey);
+    let walletName =
+      switch (AddressBook.lookup(addressBook, publicKey)) {
+      | Some(name) => name
+      | None =>
+        PublicKey.toString(publicKey) |> String.slice(~from=0, ~to_=5)
+      };
     let warningMessage =
       "Are you sure you want to delete "
       ++ walletName
@@ -79,16 +87,14 @@ module DeleteButton = {
         kind=Link.Red
         onClick={_ =>
           updateModal(x => Option.or_(Some({text: "", error: None}), x))
-        }
-      >
+        }>
         {React.string("Delete wallet")}
       </Link>
       {switch (modalState) {
        | None => React.null
        | Some({text, error}) =>
          <Modal
-           title="Delete Wallet"
-           onRequestClose={_ => updateModal(_ => None)}>
+           title="Delete Wallet" onRequestClose={_ => updateModal(_ => None)}>
            <div className=Styles.modalContainer>
              <div className=Styles.deleteAlert>
                <Alert kind=`Warning message=warningMessage />
@@ -177,6 +183,18 @@ module DeleteButton = {
 
 [@bs.scope "window"] [@bs.val] external showItemInFolder: string => unit = "";
 
+module KeypathQueryString = [%graphql
+  {|
+    query ($publicKey: String!)  {
+      wallet(publicKey: $publicKey) {
+        privateKeyPath
+      }
+    }
+  |}
+];
+
+module KeypathQuery = ReasonApollo.CreateQuery(KeypathQueryString);
+
 [@react.component]
 let make = (~publicKey) => {
   let (addressBook, updateAddressBook) =
@@ -196,11 +214,11 @@ let make = (~publicKey) => {
       </span>
       <Spacer width=0.5 />
       <span className=Styles.backHeaderText>
-        {React.string(
-           AddressBook.getWalletName(addressBook, publicKey) ++ " settings",
-         )}
+        <WalletName pubkey=publicKey className=Styles.headerWalletName />
+        {React.string(" settings")}
       </span>
     </div>
+    <Spacer height=1. />
     <div className=Styles.label> {React.string("Wallet name")} </div>
     <div className=Styles.textBox>
       <TextField
@@ -217,6 +235,7 @@ let make = (~publicKey) => {
         }
       />
     </div>
+    <Spacer height=1. />
     <div className=Styles.label> {React.string("Public key")} </div>
     <div className=Styles.textBox>
       <TextField
@@ -229,21 +248,57 @@ let make = (~publicKey) => {
         }
       />
     </div>
+    <Spacer height=1. />
     <div className=Styles.label> {React.string("Private key")} </div>
     <div className=Styles.textBox>
-      <TextField
-        label="Path"
-        value={Caml.Array.get(Sys.argv, 0)}
-        onChange=ignore
-        button={
-          <TextField.Button
-            text="Open"
-            color=`Teal
-            onClick={_ => showItemInFolder(Caml.Array.get(Sys.argv, 0))}
-          />
-        }
-      />
+      <KeypathQuery
+        variables=
+          {KeypathQueryString.make(
+             ~publicKey=PublicKey.toString(publicKey),
+             (),
+           )##variables}>
+        {({result}) => {
+           let path =
+             switch (result) {
+             | Loading
+             | Error(_) => None
+             | Data(data) =>
+               Option.map(~f=w => w##privateKeyPath, data##wallet)
+             };
+           switch (path) {
+           | Some(secretKeyPath) =>
+             <TextField
+               label="Path"
+               value=secretKeyPath
+               onChange=ignore
+               button={
+                 <TextField.Button
+                   text="Open"
+                   color=`Teal
+                   onClick={_ => showItemInFolder(secretKeyPath)}
+                 />
+               }
+             />
+           | None =>
+             <TextField
+               label="Path"
+               value=""
+               onChange=ignore
+               button={
+                 <TextField.Button
+                   text="Open"
+                   disabled=true
+                   color=`Teal
+                   onClick=ignore
+                 />
+               }
+             />
+           };
+         }}
+      </KeypathQuery>
     </div>
+    <Spacer height=1.5 />
+    <ConsensusSettings />
     <Spacer height=1.5 />
     <DeleteButton publicKey />
   </div>;

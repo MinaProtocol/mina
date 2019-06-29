@@ -95,3 +95,21 @@ struct
 
   include Make_of_string (String_ops)
 end
+
+module Make_base58_check (T : sig
+  type t [@@deriving bin_io]
+
+  val version_byte : char
+end) =
+struct
+  let to_base58_check t =
+    let payload = Binable.to_string (module T) t in
+    Base58_check.encode ~version_byte:T.version_byte ~payload
+
+  let of_base58_check s =
+    let open Or_error.Let_syntax in
+    let%bind decoded = Base58_check.decode ~version_byte:T.version_byte s in
+    Ok (Binable.of_string (module T) decoded)
+
+  let of_base58_check_exn s = of_base58_check s |> Or_error.ok_exn
+end
