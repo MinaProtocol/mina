@@ -38,25 +38,31 @@ let%test_module "Command line tests" =
         ~args:["client"; "status"; "-daemon-port"; sprintf "%d" port]
         ()
 
-    let create_config_directory config_dir =
+    let create_config_directory () =
       (* create empty config dir to avoid any issues with the default config dir *)
-      let%bind _ = Process.run_exn ~prog:"rm" ~args:["-rf"; config_dir] () in
-      let%map _ = Process.run_exn ~prog:"mkdir" ~args:["-p"; config_dir] () in
-      ()
+      Filename.temp_dir ~in_dir:"/tmp" "coda_spun_test" ""
+
+    let remove_config_directory config_dir =
+      Process.run_exn ~prog:"rm" ~args:["-rf"; config_dir] ()
 
     let test_background_daemon () =
-      let config_dir = "/tmp/coda-spun-test" in
       let port = 1337 in
       let client_delay = 40. in
-      let%bind _ = create_config_directory config_dir in
+      let config_dir = create_config_directory () in
       let%bind _ = start_daemon config_dir port in
       (* it takes awhile for the daemon to become available *)
       let%bind () = after (Time.Span.of_sec client_delay) in
       let%bind result = start_client port in
-      let%map _ = stop_daemon port in
+      let%bind _ = stop_daemon port in
+      let%map _ = remove_config_directory config_dir in
       result
 
     let%test "The coda daemon works in background mode" =
-      Async.Thread_safe.block_on_async_exn (fun () ->
-          test_background_daemon () |> Deferred.map ~f:Result.is_ok )
+      match Core.Sys.is_file coda_exe with
+      | `Yes ->
+          Async.Thread_safe.block_on_async_exn (fun () ->
+              test_background_daemon () |> Deferred.map ~f:Result.is_ok )
+      | `No | `Unknown ->
+          printf "Please build coda.exe in order to run this test\n%!" ;
+          false
   end )
