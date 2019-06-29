@@ -176,9 +176,7 @@ struct
     module V1 = struct
       module T = struct
         type t =
-          { diff: Diff.Stable.V1.t
-          ; prev_hash: Staged_ledger_hash.Stable.V1.t
-          ; creator: Public_key.Compressed.Stable.V1.t }
+          {diff: Diff.Stable.V1.t; creator: Public_key.Compressed.Stable.V1.t}
         [@@deriving sexp, bin_io, version]
       end
 
@@ -199,9 +197,7 @@ struct
   end
 
   type t = Stable.Latest.t =
-    { diff: Diff.Stable.V1.t
-    ; prev_hash: Staged_ledger_hash.Stable.V1.t
-    ; creator: Public_key.Compressed.Stable.V1.t }
+    {diff: Diff.Stable.V1.t; creator: Public_key.Compressed.Stable.V1.t}
   [@@deriving sexp, fields]
 
   module With_valid_signatures_and_proofs = struct
@@ -222,11 +218,7 @@ struct
       * pre_diff_with_at_most_one_coinbase option
     [@@deriving sexp]
 
-    type t =
-      { diff: diff
-      ; prev_hash: Staged_ledger_hash.t
-      ; creator: Public_key.Compressed.t }
-    [@@deriving sexp]
+    type t = {diff: diff; creator: Public_key.Compressed.t} [@@deriving sexp]
 
     let user_commands t =
       (fst t.diff).user_commands
@@ -255,7 +247,6 @@ struct
     { diff=
         ( forget_pre_diff_with_at_most_two (fst t.diff)
         , Option.map (snd t.diff) ~f:forget_pre_diff_with_at_most_one )
-    ; prev_hash= t.prev_hash
     ; creator= t.creator }
 
   let user_commands (t : t) =
