@@ -73,6 +73,7 @@
 /src/lib/lite_lib/ @bkase @cmr
 /src/lib/lite_params/ @rbkhmrcr @vanishreerao
 /src/lib/logger/ @nholland94
+/src/lib/logproc_lib/ @nholland94
 /src/lib/merkle_address/ @cmr @bkase @nholland94 @johnwu93
 /src/lib/merkle_ledger/ @cmr @nholland94
 /src/lib/merkle_list/ @johnwu93 @cmr
