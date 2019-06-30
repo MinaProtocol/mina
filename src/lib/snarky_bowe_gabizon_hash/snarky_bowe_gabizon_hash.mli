@@ -1,7 +1,7 @@
 open Snarky
 
 module Make
-    (M : Snark_intf.Run)
+    (M : Snark_intf.Run with type prover_state = unit)
     (Impl : Snark_intf.S with type field = M.field)
     (Inputs : Inputs_intf.S
               with type field := M.field
