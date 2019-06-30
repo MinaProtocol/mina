@@ -18,7 +18,7 @@ module Tock_backend = struct
   module Full = Cycle.Mnt6
   include Full.GM
 
-  module Bg = struct
+  module Bowe_gabizon = struct
     let bg_salt =
       lazy (Tick_pedersen.State.salt Hash_prefixes.bowe_gabizon_hash)
 

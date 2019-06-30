@@ -688,7 +688,7 @@ module Tick = struct
             let pedersen x =
               Pedersen.Checked.digest_triples ~init (Fold_lib.Fold.to_list x)
 
-            let params = Tock_backend.Bg.bg_params
+            let params = Tock_backend.Bowe_gabizon.bg_params
           end)
 
       let hash = H.hash
@@ -709,11 +709,11 @@ module Tick = struct
       (f 0, f 1)
 
     let proof_of_backend_proof
-        ({a; b; c; delta_prime; z} : Tock_backend.Bg.Proof.t) =
+        ({a; b; c; delta_prime; z} : Tock_backend.Bowe_gabizon.Proof.t) =
       {Proof.a; b= conv_g2 b; c; delta_prime= conv_g2 delta_prime; z}
 
-    let vk_of_backend_vk (vk : Tock_backend.Bg.Verification_key.t) =
-      let open Tock_backend.Bg.Verification_key in
+    let vk_of_backend_vk (vk : Tock_backend.Bowe_gabizon.Verification_key.t) =
+      let open Tock_backend.Bowe_gabizon.Verification_key in
       let open Inner_curve.Vector in
       let q = query vk in
       { Verification_key.query_base= get q 0
