@@ -26,7 +26,7 @@ let wrap_vk ~loc =
   let vk_base64 =
     Base64.encode_string
       (Binable.to_string
-         (module Lite_params.Tock.Groth_maller.Verification_key)
+         (module Lite_base.Crypto_params.Tock.Bowe_gabizon.Verification_key)
          vk)
   in
   let%map () =
@@ -43,7 +43,7 @@ let wrap_vk ~loc =
   let open E in
   [%expr
     Core_kernel.Binable.of_string
-      (module Lite_params.Tock.Groth_maller.Verification_key)
+      (module Lite_base.Crypto_params.Tock.Bowe_gabizon.Verification_key)
       (Base64.decode_exn [%e estring vk_base64])]
 
 let protocol_state (s : Protocol_state.Value.t) : Lite_base.Protocol_state.t =
