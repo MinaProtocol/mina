@@ -623,6 +623,28 @@ module Tick = struct
     let final_exponentiation = FE.final_exponentiation6
   end
 
+  module Run = Snarky.Snark.Run.Make (Tick_backend) (Unit)
+
+  module Bowe_gabizon_verifier = Snarky_verifier.Bowe_gabizon.Make (struct
+    include Pairing
+
+    module H =
+      Snarky_bowe_gabizon_hash.Make (Run) (Tick0)
+        (struct
+          module Fqe = Pairing.Fqe
+
+          let init =
+            Pedersen.State.salt (Hash_prefixes.bowe_gabizon_hash :> string)
+
+          let pedersen x =
+            Pedersen.Checked.digest_triples ~init (Fold_lib.Fold.to_list x)
+
+          let params = Tock_backend.Bg.bg_params
+        end)
+
+    let hash = H.hash
+  end)
+
   module Groth_maller_verifier = struct
     include Snarky_verifier.Groth_maller.Make (Pairing)
 
