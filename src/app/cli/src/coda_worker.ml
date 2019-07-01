@@ -410,7 +410,7 @@ module T = struct
           let with_monitor f input =
             Async.Scheduler.within' ~monitor (fun () -> f input)
           in
-          let%bind coda =
+          let coda_deferred () =
             Coda_lib.create
               (Coda_lib.Config.make ~logger ~trust_system ~conf_dir ~net_config
                  ~work_selection_method:
@@ -425,19 +425,23 @@ module T = struct
                  ~initial_propose_keypairs ~monitor ~consensus_local_state
                  ~transaction_database ~external_transition_database ())
           in
-          Coda_run.handle_shutdown ~monitor ~conf_dir coda ;
-          let%map () =
+          let coda_ref : Coda_lib.t option ref = ref None in
+          Coda_run.handle_shutdown ~monitor ~conf_dir ~top_logger:logger
+            coda_ref ;
+          let%map coda =
             with_monitor
               (fun () ->
-                return
-                @@ Option.iter snark_worker_config ~f:(fun config ->
-                       let run_snark_worker =
-                         `With_public_key config.public_key
-                       in
-                       Coda_run.setup_local_server ~client_port:config.port
-                         ~coda () ;
-                       Coda_run.run_snark_worker ~client_port:config.port
-                         run_snark_worker ) )
+                let%map coda = coda_deferred () in
+                coda_ref := Some coda ;
+                Option.iter snark_worker_config ~f:(fun config ->
+                    let run_snark_worker =
+                      `With_public_key config.public_key
+                    in
+                    Coda_run.setup_local_server ~client_port:config.port ~coda
+                      () ;
+                    Coda_run.run_snark_worker ~client_port:config.port
+                      run_snark_worker ) ;
+                coda )
               ()
           in
           let coda_peers () = return (Coda_lib.peers coda) in

@@ -128,7 +128,6 @@ module Make (Inputs : Inputs_intf) :
                       | Pre_diff (Bad_signature _) ->
                           make_actions Sent_invalid_signature
                       | Pre_diff _
-                      | Bad_prev_hash _
                       | Non_zero_fee_excess _
                       | Insufficient_work _ ->
                           make_actions Gossiped_invalid_transition
