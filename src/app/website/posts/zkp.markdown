@@ -36,9 +36,20 @@ A ZKP protocol between you and someone else -- call her  Verifier, must satisfy 
 
 Now, let's try to construct a ZKP protocol, where, your proving and Verifier's verifying procedures are as follows.
 
-**Proving:** Imagine the graph drawn on the floor in a closed space. Per the 3-coloring you know, you would place the corresponding colored balls on the nodes. Then you would completely cover the balls with inverted opaque bowls.
+**Proving:** Imagine the graph drawn on the floor in a closed space. Per the 3-coloring you know, you would place the corresponding colored balls on the nodes. Then you would completely cover the balls with inverted opaque bowls. 
+
+
+![](/static/blog/zkp/covored-graph.png)
+
 
 **Verifying:** Then, Verifier comes and points at an edge of her choice. You would lift up the two bowls on either side of the edge. Verifier verifies that the balls revealed are of different colors. If they are not, you are caught cheating. 
+
+![Verifier chooses an edge.](/static/blog/zkp/verifier-chooses.png)
+
+![Prover reveals the ball colors corresponding to the edge.](/static/blog/zkp/prover-reveals.png)
+
+
+
 
 Now that we've defined our protocol, we want to check that it satisfies *zero-knowledgeness* and *soundness* (the property that you can't cheat).
 
@@ -74,7 +85,6 @@ Let $N$ be the total number of rounds.
 \Pr[\text{You will not be caught in any of the N rounds}] \leq \left(1 - \frac{1}{E} \right)^N
 ```
 </div>
-
 
 
 
