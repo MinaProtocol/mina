@@ -97,6 +97,12 @@ let daemon logger =
          (optional string)
      and is_background =
        flag "background" no_arg ~doc:"Run process on the background"
+     and log_json =
+       flag "log-json" no_arg
+         ~doc:"Print daemon log output as JSON (default: plain text)"
+     and log_level =
+       flag "log-level" (optional string)
+         ~doc:"Set daemon log level (default: Warn)"
      and snark_work_fee =
        flag "snark-worker-fee"
          ~doc:
@@ -119,6 +125,33 @@ let daemon logger =
        let compute_conf_dir home =
          Option.value ~default:(home ^/ ".coda-config") conf_dir
        in
+       let%bind log_level =
+         match log_level with
+         | None ->
+             Deferred.return Logger.Level.Warn
+         | Some log_level_str_with_case -> (
+             let open Logger in
+             let log_level_str = String.lowercase log_level_str_with_case in
+             match Level.of_string log_level_str with
+             | Error _ ->
+                 eprintf "Received unknown log-level %s. Expected one of: %s\n"
+                   log_level_str
+                   ( Level.all |> List.map ~f:Level.show
+                   |> List.map ~f:String.lowercase
+                   |> String.concat ~sep:", " ) ;
+                 exit 14
+             | Ok ll ->
+                 Deferred.return ll )
+       in
+       let logger_config =
+         if log_json then None
+         else
+           Some
+             { Logproc_lib.Interpolator.mode= Inline
+             ; max_interpolation_length= 30
+             ; pretty_print= true }
+       in
+       Logger.settings := (log_level, logger_config) ;
        let%bind conf_dir =
          if is_background then (
            let home = Core.Sys.home_directory () in
@@ -280,7 +313,7 @@ let daemon logger =
            | Some _, Some _ ->
                eprintf
                  "Error: You cannot provide both `propose-key` and \
-                  `propose-public-key`" ;
+                  `propose-public-key`\n" ;
                exit 11
            | Some sk_file, None ->
                let%bind keypair =
@@ -316,7 +349,7 @@ let daemon logger =
                | None ->
                    eprintf
                      "Error: This public key was not found in the local \
-                      daemon's wallet database" ;
+                      daemon's wallet database\n" ;
                    exit 12 )
            | None, None ->
                return None
@@ -501,7 +534,7 @@ let rec ensure_testnet_id_still_good logger =
              (version %s) is no longer compatible. Please download the latest \
              Coda software!\n\
              Valid versions:\n\
-             %s"
+             %s\n"
             ( local_id |> Option.map ~f:str
             |> Option.value ~default:"[COMMIT_SHA1 not set]" )
             remote_ids ;
