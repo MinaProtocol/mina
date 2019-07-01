@@ -20,7 +20,8 @@ module Tock_backend = struct
 
   module Bowe_gabizon = struct
     let bg_salt =
-      lazy (Tick_pedersen.State.salt Hash_prefixes.bowe_gabizon_hash)
+      lazy
+        (Tick_pedersen.State.salt (Hash_prefixes.bowe_gabizon_hash :> string))
 
     let bg_params =
       Group_map.Params.create
