@@ -78,10 +78,6 @@ module Compressed : sig
 
   val var_to_triples : var -> (Boolean.var Triple.t list, _) Checked.t
 
-  val of_base64_exn : string -> t
-
-  val to_base64 : t -> string
-
   val to_string : t -> string
 
   val to_base58_check : t -> string
