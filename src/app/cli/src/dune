@@ -1,7 +1,7 @@
 (executable
  (name coda)
  (public_name coda)
- (libraries base64 base58_check core debug_assert daemon_rpcs pipe_lib coda_networking
+ (libraries base58_check core debug_assert daemon_rpcs pipe_lib coda_networking
    proposer gossip_net kademlia coda_lib coda_numbers coda_intf lite_lib
    lite_compat coda_base coda_state coda_transition test_util staged_ledger sparse_ledger_lib
    syncable_ledger blockchain_snark transaction_snark snarky

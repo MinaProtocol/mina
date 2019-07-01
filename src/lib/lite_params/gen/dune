@@ -2,6 +2,7 @@
   (name gen)
   (libraries
      async
+     base58_check
      core
      crypto_params
      snarky

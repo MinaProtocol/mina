@@ -77,25 +77,6 @@ Make (struct
   let decode = Iso.of_string
 end)
 
-module Make_base64 (T : sig
-  type t [@@deriving bin_io]
-end) =
-struct
-  let to_base64 t = Binable.to_string (module T) t |> Base64.encode_string
-
-  let of_base64_exn s = Base64.decode_exn s |> Binable.of_string (module T)
-
-  module String_ops = struct
-    type t = T.t
-
-    let to_string = to_base64
-
-    let of_string = of_base64_exn
-  end
-
-  include Make_of_string (String_ops)
-end
-
 module Make_base58_check (T : sig
   type t [@@deriving bin_io]
 
@@ -112,4 +93,14 @@ struct
     Ok (Binable.of_string (module T) decoded)
 
   let of_base58_check_exn s = of_base58_check s |> Or_error.ok_exn
+
+  module String_ops = struct
+    type t = T.t
+
+    let to_string = to_base58_check
+
+    let of_string = of_base58_check_exn
+  end
+
+  include Make_of_string (String_ops)
 end
