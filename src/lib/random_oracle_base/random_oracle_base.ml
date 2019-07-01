@@ -12,13 +12,15 @@ module Digest = struct
 
       include T
 
-      let version_byte = Base58_check.Version_bytes.random_oracle_base
+      module Base58_check = Base58_check.Make (struct
+        let version_byte = Base58_check.Version_bytes.random_oracle_base
+      end)
 
-      let to_yojson s = `String (Base58_check.encode ~version_byte ~payload:s)
+      let to_yojson s = `String (Base58_check.encode s)
 
       let of_yojson = function
         | `String s -> (
-          try Ok (Base58_check.decode_exn ~version_byte s)
+          try Ok (Base58_check.decode_exn s)
           with exn ->
             Error
               (sprintf "of_yojson, bad Base58Check: %s" (Exn.to_string exn)) )
