@@ -141,7 +141,11 @@ jobs:
 
     {%- for profile in build_artifact_profiles %}
     build-artifacts--{{profile}}:
+        {%- if profile == "testnet_postake_medium_curves" %}
+        resource_class: xlarge
+        {%- else %}
         resource_class: large
+        {%- endif %}
         docker:
             - image: codaprotocol/coda:toolchain-51191cf583a5129255d2c53ad946f6821ad9989c
         environment:
