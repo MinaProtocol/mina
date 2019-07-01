@@ -18,13 +18,17 @@ let key_generation = false
 
 [%%endif]
 
+module Base58_check = Base58_check.Make (struct
+  let version_byte = Base58_check.Version_bytes.lite_precomputed
+end)
+
 let wrap_vk ~loc =
   let open Async in
   let%bind keys = Snark_keys.blockchain_verification () in
   let vk = keys.wrap in
   let vk = Lite_compat.verification_key vk in
-  let vk_base64 =
-    Base64.encode_string
+  let vk_base58 =
+    Base58_check.encode
       (Binable.to_string
          (module Lite_params.Tock.Groth_maller.Verification_key)
          vk)
@@ -35,7 +39,7 @@ let wrap_vk ~loc =
       let%bind () = Unix.mkdir ~p:() Cache_dir.autogen_path in
       Writer.save
         (Cache_dir.autogen_path ^/ "client_verification_key")
-        ~contents:vk_base64
+        ~contents:vk_base58
   in
   let module E = Ppxlib.Ast_builder.Make (struct
     let loc = loc
@@ -83,7 +87,7 @@ let genesis ~loc =
   [%expr
     Core_kernel.Binable.of_string
       (module Lite_base.Lite_chain)
-      (Base64.decode_exn
+      (Base58_check.decode_exn
          [%e
            estring
              (Base64.encode_string
