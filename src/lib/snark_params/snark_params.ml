@@ -472,7 +472,19 @@ module Tick = struct
         let fold = gen_fold n in
         let result, unchunked_result = run_updates fold in
         assert (equal_states result unchunked_result)
+
+      let hash_unchunked n =
+        ignore (Lazy.force chunk_table) ;
+        let fold = gen_fold n in
+        State.update_fold_unchunked initial_state fold
+
+      let hash_chunked n =
+        ignore (Lazy.force chunk_table) ;
+        let fold = gen_fold n in
+        State.update_fold_chunked initial_state fold
     end
+
+    (* compare unchunked, chunked hashes *)
 
     let%test_unit "hash one triple" = For_tests.run_hash_test 1
 
@@ -487,6 +499,30 @@ module Tick = struct
 
     let%test_unit "hash large number of chunks plus 2" =
       For_tests.run_hash_test ((Chunked_triples.Chunk.size * 250) + 2)
+
+    (* benchmark unchunked, chunked hashes *)
+
+    let%bench "hash one triple unchunked" = For_tests.hash_unchunked 1
+
+    let%bench "hash one triple chunked" = For_tests.hash_chunked 1
+
+    let%bench "hash small number of triples unchunked" =
+      For_tests.hash_unchunked 25
+
+    let%bench "hash small number of triples chunked" =
+      For_tests.hash_chunked 25
+
+    let%bench "hash large number of triples unchunked" =
+      For_tests.hash_unchunked 250
+
+    let%bench "hash large number of triples chunked" =
+      For_tests.hash_chunked 250
+
+    let%bench "hash huge number of triples unchunked" =
+      For_tests.hash_unchunked 1000
+
+    let%bench "hash huge number of triples chunked" =
+      For_tests.hash_chunked 1000
   end
 
   module Util = Snark_util.Make (Tick0)
