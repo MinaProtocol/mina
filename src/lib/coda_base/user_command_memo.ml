@@ -4,16 +4,16 @@ open Crypto_params
 module Stable = struct
   module V1 = struct
     module T = struct
-      open Base58_check
+      module Base58_check = Base58_check.Make (struct
+        let version_byte = Base58_check.Version_bytes.user_command_memo
+      end)
 
       type t = string
       [@@deriving bin_io, sexp, eq, compare, hash, version {unnumbered}]
 
-      let version_byte = Version_bytes.user_command_memo
+      let to_string (memo : t) : string = Base58_check.encode memo
 
-      let to_string (memo : t) : string = encode ~version_byte ~payload:memo
-
-      let of_string (s : string) : t = decode_exn ~version_byte s
+      let of_string (s : string) : t = Base58_check.decode_exn s
     end
 
     include T

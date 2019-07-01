@@ -20,9 +20,11 @@ module type Intf = sig
        Strict_pipe.Reader.t
 end
 
-let to_base58 m x =
-  let version_byte = Base58_check.Version_bytes.web_pipe in
-  Base58_check.encode ~version_byte ~payload:(Binable.to_string m x)
+module Base58_check = Base58_check.Make (struct
+  let version_byte = Base58_check.Version_bytes.web_pipe
+end)
+
+let to_base58 m x = Base58_check.encode (Binable.to_string m x)
 
 module Storage (Bin : Binable.S) = struct
   let store location data =
