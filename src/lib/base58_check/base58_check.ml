@@ -79,7 +79,7 @@ end
 
 module Version_bytes = Version_bytes
 
-let%test_module "empty string" =
+let%test_module "base58check tests" =
   ( module struct
     module Base58_check = Make (struct
       let version_byte = '\x53'
