@@ -4,7 +4,7 @@ date: 2019-05-13
 author: Vanishree Rao
 ---
 
-Zero-knowledge proofs (ZKPs) are a powerful cryptographic primitive that enables you to prove that you have a secret, without revealing it to anyone.
+aZero-knowledge proofs (ZKPs) are a powerful cryptographic primitive that enables you to prove that you have a secret, without revealing it to anyone.
  If you are hearing about ZKPs for the first time, you are likely to say "Hah! That sounds impossible." Read on to get an intuitive understanding of what they are. But first, some background. ZKPs were [invented](http://people.csail.mit.edu/silvio/Selected%20Scientific%20Papers/Proof%20Systems/The_Knowledge_Complexity_Of_Interactive_Proof_Systems.pdf) by Shafi Goldwasser, Silvio Micali, and Charles Rackoff in 1985. Ever since, ZKPs have been one of the most active areas of research in Cryptography. Moreover, recently, they are enjoying significant impact on real-world applications, specifically on blockchain technologies. [Zcash](https://z.cash/technology/), a pioneering blockchain project, employed ZKPs to achieve anonymity in financial transactions. At O(1)Labs, we are building CODA, the first succinct blockchain, using ZKPs. No matter how many transactions are recorded on the blockchain, the blockchain remains at most the size of a few tweets. 
 
 
@@ -20,9 +20,9 @@ Let's look at a particular puzzle to see how you can accomplish exactly this.
 
 The 3-coloring puzzle can be described as follows. You are given a graph of nodes and edges (like in the figure below). The task is to find a "3-coloring" to the graph, which is a coloring of the nodes with three different colors in such a way that no two adjacent nodes have the same color. 
 
-![An uncolored graph.](/static/blog/zkp/uncolored-graph.png)
+![Figure: An uncolored graph.](/static/blog/zkp/svg/uncolored-graph.svg)
 
-![A colored graph.](/static/blog/zkp/colored-graph.png)
+![Figure: A colored graph.](/static/blog/zkp/svg/colored-graph.svg)
 
 ### A Zero-knowledge Proof for the 3-coloring Puzzle. 
 
@@ -39,14 +39,16 @@ Now, let's try to construct a ZKP protocol, where, your proving and Verifier's v
 **Proving:** Imagine the graph drawn on the floor in a closed space. Per the 3-coloring you know, you would place the corresponding colored balls on the nodes. Then you would completely cover the balls with inverted opaque bowls. 
 
 
-![](/static/blog/zkp/covored-graph.png)
+![Figure: The graph with bowls hiding the colors.](/static/blog/zkp/svg/covered-graph.svg)
 
 
 **Verifying:** Then, Verifier comes and points at an edge of her choice. You would lift up the two bowls on either side of the edge. Verifier verifies that the balls revealed are of different colors. If they are not, you are caught cheating. 
 
-![Verifier chooses an edge.](/static/blog/zkp/verifier-chooses.png)
 
-![Prover reveals the ball colors corresponding to the edge.](/static/blog/zkp/prover-reveals.png)
+![Figure: Verifier chooses an edge.](/static/blog/zkp/svg/verifier-chooses.svg)
+
+
+![Figure: Prover reveals the colors corresponding to the edge.](/static/blog/zkp/svg/prover-reveals.svg)
 
 
 
