@@ -50,7 +50,7 @@ module G1 = struct
   include Elliptic_curve.Make (N) (Fq) (Params)
 
   let one =
-    of_affine_coordinates
+    of_affine
       ( Fq.of_string
           "336685752883082228109289846353937104185698209371404178342968838739115829740084426881123453"
       , Fq.of_string
@@ -68,7 +68,7 @@ module G2 = struct
   include Elliptic_curve.Make (N) (Fq2) (Params)
 
   let one =
-    of_affine_coordinates
+    of_affine
       Fq.
         ( ( of_string
               "438374926219350099854919100077809681842783509163790991847867546339851681564223481322252708"
