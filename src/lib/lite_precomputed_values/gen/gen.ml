@@ -48,7 +48,7 @@ let wrap_vk ~loc =
   [%expr
     Core_kernel.Binable.of_string
       (module Lite_params.Tock.Groth_maller.Verification_key)
-      (Base64.decode_exn [%e estring vk_base64])]
+      (Base58_check.decode_exn [%e estring vk_base58])]
 
 let protocol_state (s : Protocol_state.Value.t) : Lite_base.Protocol_state.t =
   let consensus_state =
@@ -90,7 +90,7 @@ let genesis ~loc =
       (Base58_check.decode_exn
          [%e
            estring
-             (Base64.encode_string
+             (Base58_check.encode
                 (Binable.to_string (module Lite_base.Lite_chain) chain))])]
 
 open Async
