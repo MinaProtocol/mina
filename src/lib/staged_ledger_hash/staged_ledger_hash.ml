@@ -16,15 +16,16 @@ module Aux_hash = struct
       module T = struct
         type t = string [@@deriving bin_io, sexp, eq, compare, hash, version]
 
-        let version_byte =
-          Base58_check.Version_bytes.staged_ledger_hash_aux_hash
+        module Base58_check = Base58_check.Make (struct
+          let version_byte =
+            Base58_check.Version_bytes.staged_ledger_hash_aux_hash
+        end)
 
-        let to_yojson s =
-          `String (Base58_check.encode ~version_byte ~payload:s)
+        let to_yojson s = `String (Base58_check.encode s)
 
         let of_yojson = function
           | `String s -> (
-            try Ok (Base58_check.decode_exn ~version_byte s)
+            try Ok (Base58_check.decode_exn s)
             with exn ->
               Error
                 (sprintf "of_yojson, bad Base58Check: %s" (Exn.to_string exn))
@@ -69,15 +70,16 @@ module Pending_coinbase_aux = struct
       module T = struct
         type t = string [@@deriving bin_io, sexp, eq, compare, hash, version]
 
-        let version_byte =
-          Base58_check.Version_bytes.staged_ledger_hash_pending_coinbase_aux
+        module Base58_check = Base58_check.Make (struct
+          let version_byte =
+            Base58_check.Version_bytes.staged_ledger_hash_pending_coinbase_aux
+        end)
 
-        let to_yojson s =
-          `String (Base58_check.encode ~version_byte ~payload:s)
+        let to_yojson s = `String (Base58_check.encode s)
 
         let of_yojson = function
           | `String s -> (
-            try Ok (Base58_check.decode_exn ~version_byte s)
+            try Ok (Base58_check.decode_exn s)
             with exn ->
               Error
                 (sprintf "of_yojson, bad Base58Check: %s" (Exn.to_string exn))
