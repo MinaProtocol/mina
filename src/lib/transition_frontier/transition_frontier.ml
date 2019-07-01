@@ -127,7 +127,7 @@ module Make (Inputs : Inputs_intf) :
                           make_actions Sent_invalid_proof
                       | Pre_diff (Bad_signature _) ->
                           make_actions Sent_invalid_signature
-                      | Pre_diff _ | Bad_prev_hash _ | Non_zero_fee_excess _ ->
+                      | Pre_diff _ | Non_zero_fee_excess _ ->
                           make_actions Gossiped_invalid_transition
                       | Unexpected _ ->
                           failwith

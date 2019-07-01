@@ -306,11 +306,6 @@ let create_genesis_frontier (config : Config.t) ~verifier =
           ; user_commands= []
           ; coinbase= Staged_ledger_diff.At_most_two.Zero }
         , None )
-    ; prev_hash=
-        Staged_ledger_hash.of_aux_ledger_and_coinbase_hash
-          (Staged_ledger_hash.Aux_hash.of_bytes "")
-          (Ledger.merkle_root Genesis_ledger.t)
-          pending_coinbases
     ; creator= Account.public_key (snd (List.hd_exn Genesis_ledger.accounts))
     }
   in
