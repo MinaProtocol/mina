@@ -104,6 +104,10 @@ let main () =
   let%bind wrap_vk_expr = wrap_vk ~loc in
   let structure =
     [%str
+      module Base58_check = Base58_check.Make (struct
+        let version_byte = Base58_check.Version_bytes.lite_precomputed
+      end)
+
       let wrap_vk = [%e wrap_vk_expr]
 
       let genesis_chain = [%e genesis ~loc]]
