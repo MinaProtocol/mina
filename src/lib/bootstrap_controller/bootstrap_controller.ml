@@ -338,24 +338,24 @@ end = struct
           |> Protocol_state.consensus_state
         in
         let local_state = Transition_frontier.consensus_local_state frontier in
-        match
-          Consensus.Hooks.required_local_state_sync ~consensus_state
-            ~local_state
-        with
-        | None ->
-            Logger.fatal logger ~module_:__MODULE__ ~location:__LOC__
-              ~metadata:
-                [ ( "local_state"
-                  , Consensus.Data.Local_state.to_yojson local_state )
-                ; ( "consensus_state"
-                  , Consensus.Data.Consensus_state.Value.to_yojson
-                      consensus_state ) ]
-              "Not synchronizing consensus local state" ;
-            failwith "Bootstrap must also sync local state"
-        | Some sync_jobs -> (
-            Logger.info logger ~module_:__MODULE__ ~location:__LOC__
-              "Synchronizing consensus local state" ;
-            match%bind
+        match%bind
+          match
+            Consensus.Hooks.required_local_state_sync ~consensus_state
+              ~local_state
+          with
+          | None ->
+              Logger.info logger ~module_:__MODULE__ ~location:__LOC__
+                ~metadata:
+                  [ ( "local_state"
+                    , Consensus.Data.Local_state.to_yojson local_state )
+                  ; ( "consensus_state"
+                    , Consensus.Data.Consensus_state.Value.to_yojson
+                        consensus_state ) ]
+                "Not synchronizing consensus local state" ;
+              Deferred.return @@ Ok ()
+          | Some sync_jobs ->
+              Logger.info logger ~module_:__MODULE__ ~location:__LOC__
+                "Synchronizing consensus local state" ;
               Consensus.Hooks.sync_local_state ~local_state ~logger
                 ~trust_system
                 ~random_peers:(fun n ->
@@ -367,21 +367,21 @@ end = struct
                       (fun peer f query ->
                         Network.query_peer t.network peer f query ) }
                 sync_jobs
-            with
-            | Error _ ->
-                Logger.info logger ~module_:__MODULE__ ~location:__LOC__
-                  "Local state sync failed. Retry bootstrap" ;
-                run ~logger ~trust_system ~verifier ~network ~frontier
-                  ~ledger_db ~transition_reader
-            | Ok () ->
-                let%map new_frontier =
-                  Transition_frontier.create ~logger ~root_transition:new_root
-                    ~root_snarked_ledger:synced_db ~root_staged_ledger
-                    ~consensus_local_state:local_state
-                in
-                Logger.info logger ~module_:__MODULE__ ~location:__LOC__
-                  "Bootstrap state: complete." ;
-                (new_frontier, Transition_cache.data transition_graph) ) )
+        with
+        | Error _ ->
+            Logger.info logger ~module_:__MODULE__ ~location:__LOC__
+              "Local state sync failed. Retry bootstrap" ;
+            run ~logger ~trust_system ~verifier ~network ~frontier ~ledger_db
+              ~transition_reader
+        | Ok () ->
+            let%map new_frontier =
+              Transition_frontier.create ~logger ~root_transition:new_root
+                ~root_snarked_ledger:synced_db ~root_staged_ledger
+                ~consensus_local_state:local_state
+            in
+            Logger.info logger ~module_:__MODULE__ ~location:__LOC__
+              "Bootstrap state: complete." ;
+            (new_frontier, Transition_cache.data transition_graph) )
 
   module For_tests = struct
     type nonrec t = t
