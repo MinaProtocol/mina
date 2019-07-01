@@ -102,13 +102,13 @@ module Make_base58_check (T : sig
   val version_byte : char
 end) =
 struct
-  let to_base58_check t =
-    let payload = Binable.to_string (module T) t in
-    Base58_check.encode ~version_byte:T.version_byte ~payload
+  module Base58_check = Base58_check.Make (T)
+
+  let to_base58_check t = Base58_check.encode (Binable.to_string (module T) t)
 
   let of_base58_check s =
     let open Or_error.Let_syntax in
-    let%bind decoded = Base58_check.decode ~version_byte:T.version_byte s in
+    let%bind decoded = Base58_check.decode s in
     Ok (Binable.of_string (module T) decoded)
 
   let of_base58_check_exn s = of_base58_check s |> Or_error.ok_exn

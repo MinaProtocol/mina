@@ -113,6 +113,7 @@ module Compressed = struct
       include T
       include Registration.Make_latest_version (T)
       include Codable.Make_base64 (T)
+      include Codable.Make_base58_check (T)
     end
 
     module Latest = V1
