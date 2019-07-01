@@ -3,7 +3,7 @@ open Async
 
 module Level = struct
   type t = Trace | Debug | Info | Warn | Error | Faulty_peer | Fatal
-  [@@deriving sexp, compare, show {with_path= false}]
+  [@@deriving sexp, compare, show {with_path= false}, enumerate]
 
   let of_string str =
     try Ok (t_of_sexp (Sexp.Atom str))
@@ -83,6 +83,8 @@ end
 
 type t = {null: bool; metadata: Metadata.t}
 
+let settings = ref (Level.Trace, None)
+
 let create ?(metadata = []) () =
   let pid = lazy (Unix.getpid () |> Pid.to_int) in
   let metadata' = ("pid", `Int (Lazy.force pid)) :: metadata in
@@ -100,8 +102,10 @@ let make_message (t : t) ~level ~module_ ~location ~metadata ~message =
   ; metadata= Metadata.extend t.metadata metadata }
 
 let format_message t ~level ~module_ ~location ?(metadata = []) fmt =
+  let level_setting, _ = !settings in
   let f message =
     if t.null then ""
+    else if level < level_setting then ""
     else
       let message =
         make_message t ~level ~module_ ~location ~metadata ~message
@@ -114,14 +118,23 @@ let format_message t ~level ~module_ ~location ?(metadata = []) fmt =
   ksprintf f fmt
 
 let log t ~level ~module_ ~location ?(metadata = []) fmt =
+  let level_setting, config = !settings in
   let f message =
     if t.null then ()
+    else if level < level_setting then ()
     else
       let message =
         make_message t ~level ~module_ ~location ~metadata ~message
       in
       if Message.check_invariants message then
-        Message.to_yojson message |> Yojson.Safe.to_string
+        config
+        |> Option.bind ~f:(fun config ->
+               Result.ok
+                 (Logproc_lib.Interpolator.interpolate config message.message
+                    message.metadata) )
+        |> Option.value_map
+             ~f:(fun (msg, _) -> Level.show level ^ ": " ^ msg)
+             ~default:(Message.to_yojson message |> Yojson.Safe.to_string)
         |> Core.print_endline
         (* Core.print_endline flushes (which may block) and Async.print_endline
            doesn't. We use the Core version here to ensure complete log messages
