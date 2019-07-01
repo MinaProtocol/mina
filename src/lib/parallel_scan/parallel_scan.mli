@@ -46,7 +46,7 @@ module Sequence_number : sig
   type t = Stable.Latest.t [@@deriving sexp]
 end
 
-(*Each node on the tree is viewed as a job that needs to be completed. When a job is completed, it creates a new "Todo" job and marks the old job as "Done"*)
+(**Each node on the tree is viewed as a job that needs to be completed. When a job is completed, it creates a new "Todo" job and marks the old job as "Done"*)
 module Job_status : sig
   module Stable : sig
     module V1 : sig
@@ -61,7 +61,7 @@ module Job_status : sig
   val to_string : t -> string
 end
 
-(*number of jobs that can be added to this tree. This number corresponding to a specific level of the tree. New jobs received is distributed across the tree based on this number. *)
+(**number of jobs that can be added to this tree. This number corresponding to a specific level of the tree. New jobs received is distributed across the tree based on this number. *)
 module Weight : sig
   module Stable : sig
     module V1 : sig
@@ -74,7 +74,7 @@ module Weight : sig
   type t = Stable.Latest.t [@@deriving sexp]
 end
 
-(*Base Job: Proving new transactions*)
+(**Base Job: Proving new transactions*)
 module Base : sig
   module Record : sig
     module Stable : sig
@@ -120,7 +120,7 @@ module Base : sig
   type 'base t = 'base Stable.Latest.t [@@deriving sexp]
 end
 
-(* Merge Job: Merging two proofs*)
+(** Merge Job: Merging two proofs*)
 module Merge : sig
   module Record : sig
     module Stable : sig

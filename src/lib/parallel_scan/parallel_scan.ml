@@ -192,7 +192,7 @@ module Merge = struct
   type 'merge t = 'merge Stable.Latest.t [@@deriving sexp]
 end
 
-(**All the jobs on a tree that can be done. Base.Full and Merge.Bcomp*)
+(**All the jobs on a tree that can be done. Base.Full and Merge.Full*)
 module Available_job = struct
   module Stable = struct
     module V1 = struct
@@ -330,7 +330,7 @@ module Hash = struct
   type t = Digestif.SHA256.t
 end
 
-(**A single tree with number of leaves = max_base_jobs = 2^transaction_capacity_log_2 *)
+(**A single tree with number of leaves = max_base_jobs = 2**transaction_capacity_log_2 *)
 module Tree = struct
   module Stable = struct
     module V1 = struct

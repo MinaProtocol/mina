@@ -338,7 +338,7 @@ module type Transaction_snark_scan_state_generalized_intf = sig
   (**K proof bundles*)
   val k_work_pairs_for_new_diff : t -> k:int -> Available_job.t Bundle.t list
 
-  (** All the proof bundles for 2^transaction_capacity_log2 slots that can be used up in one diff *)
+  (** All the proof bundles for 2**transaction_capacity_log2 slots that can be used up in one diff *)
   val work_statements_for_new_diff :
     t -> transaction_snark_statement Bundle.t list
 

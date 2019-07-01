@@ -108,7 +108,7 @@ type 'd base = ('d * sequence_number) option
 type 'a merge =
     | Empty
     | Part of 'a
-    | Bcomp of ('a * 'a * sequence_number)
+    | Full of ('a * 'a * sequence_number)
 
 
 type ('a, 'd) tree = Base of 'd | Merge of 'a * ('a * 'a, 'd * 'd) tree
@@ -117,11 +117,11 @@ type ('a, 'd) tree = Base of 'd | Merge of 'a * ('a * 'a, 'd * 'd) tree
 type ('a, 'd) t =
     {trees: ('a merge, 'd base) tree list
     ; acc: int * ('a * 'd list) option
-    (*last emitted proof and the corresponding transactions*)
+    (* last emitted proof and the corresponding transactions*)
     ; curr_job_seq_no: int
-    (*Sequence number for the jobs added every block*)
+    (* Sequence number for the jobs added every block*)
     ; max_base_jobs: int
-    (*2^transaction_capacity_log_2*)
+    (* 2**transaction_capacity_log_2*)
     ; delay: int }
 
 val update :: ('a, 'd) t -> data:'d list -> work:'a list -> ('a, 'd) t
