@@ -18,15 +18,10 @@ module Make (Transaction_snark_work : sig
 
   val forget : Checked.t -> t
 end) :
-  Protocols.Coda_pow.Staged_ledger_diff_intf
-  with type user_command := User_command.t
-   and type user_command_with_valid_signature :=
-              User_command.With_valid_signature.t
-   and type staged_ledger_hash := Staged_ledger_hash.t
-   and type public_key := Public_key.Compressed.t
-   and type completed_work := Transaction_snark_work.t
-   and type completed_work_checked := Transaction_snark_work.Checked.t
-   and type fee_transfer_single := Fee_transfer.Single.t = struct
+  Coda_intf.Staged_ledger_diff_intf
+  with type transaction_snark_work := Transaction_snark_work.t
+   and type transaction_snark_work_checked := Transaction_snark_work.Checked.t =
+struct
   module At_most_two = struct
     module Stable = struct
       module V1 = struct
@@ -181,9 +176,7 @@ end) :
     module V1 = struct
       module T = struct
         type t =
-          { diff: Diff.Stable.V1.t
-          ; prev_hash: Staged_ledger_hash.Stable.V1.t
-          ; creator: Public_key.Compressed.Stable.V1.t }
+          {diff: Diff.Stable.V1.t; creator: Public_key.Compressed.Stable.V1.t}
         [@@deriving sexp, bin_io, version]
       end
 
@@ -204,9 +197,7 @@ end) :
   end
 
   type t = Stable.Latest.t =
-    { diff: Diff.Stable.V1.t
-    ; prev_hash: Staged_ledger_hash.Stable.V1.t
-    ; creator: Public_key.Compressed.Stable.V1.t }
+    {diff: Diff.Stable.V1.t; creator: Public_key.Compressed.Stable.V1.t}
   [@@deriving sexp, fields]
 
   module With_valid_signatures_and_proofs = struct
@@ -227,11 +218,7 @@ end) :
       * pre_diff_with_at_most_one_coinbase option
     [@@deriving sexp]
 
-    type t =
-      { diff: diff
-      ; prev_hash: Staged_ledger_hash.t
-      ; creator: Public_key.Compressed.t }
-    [@@deriving sexp]
+    type t = {diff: diff; creator: Public_key.Compressed.t} [@@deriving sexp]
 
     let user_commands t =
       (fst t.diff).user_commands
@@ -260,7 +247,6 @@ end) :
     { diff=
         ( forget_pre_diff_with_at_most_two (fst t.diff)
         , Option.map (snd t.diff) ~f:forget_pre_diff_with_at_most_one )
-    ; prev_hash= t.prev_hash
     ; creator= t.creator }
 
   let user_commands (t : t) =
@@ -281,7 +267,7 @@ end) :
     | At_most_two.Zero, At_most_one.Zero ->
         Currency.Amount.zero
     | _ ->
-        Protocols.Coda_praos.coinbase_amount
+        Coda_compile_config.coinbase
 end
 
 include Make (Transaction_snark_work)

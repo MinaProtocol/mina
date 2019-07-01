@@ -175,7 +175,8 @@ module Types = struct
 
       let num_accounts = int_option_entry "Global Number of Accounts"
 
-      let block_count = int_option_entry "Block Count"
+      let blockchain_length =
+        int_option_entry "The Total Number of Blocks in the Blockchain"
 
       let uptime_secs = map_entry "Local Uptime" ~f:(sprintf "%ds")
 
@@ -185,9 +186,7 @@ module Types = struct
 
       let state_hash = string_option_entry "Staged Hash"
 
-      let commit_id =
-        option_entry "GIT SHA1"
-          ~f:(Fn.compose Sexp.to_string Git_sha.sexp_of_t)
+      let commit_id = string_entry "GIT SHA1"
 
       let conf_dir = string_entry "Configuration Directory"
 
@@ -202,11 +201,10 @@ module Types = struct
 
       let sync_status = map_entry "Sync Status" ~f:Sync_status.to_string
 
-      let propose_pubkey =
-        map_entry "Proposer Running"
-          ~f:
-            (Option.value_map ~default:"false"
-               ~f:(Printf.sprintf !"%{sexp: Public_key.t}"))
+      let propose_pubkeys =
+        map_entry "Proposers Running" ~f:(fun keys ->
+            Printf.sprintf "Total: %d " (List.length keys)
+            ^ List.to_string ~f:Public_key.Compressed.to_string keys )
 
       let histograms = option_entry "Histograms" ~f:Histograms.to_text
 
@@ -232,18 +230,18 @@ module Types = struct
 
     type t =
       { num_accounts: int option
-      ; block_count: int option
+      ; blockchain_length: int option
       ; uptime_secs: int
       ; ledger_merkle_root: string option
       ; staged_ledger_hash: string option
       ; state_hash: string option
-      ; commit_id: Git_sha.t option
+      ; commit_id: Git_sha.t
       ; conf_dir: string
       ; peers: string list
       ; user_commands_sent: int
       ; run_snark_worker: bool
       ; sync_status: Sync_status.Stable.V1.t
-      ; propose_pubkey: Public_key.Stable.Latest.t option
+      ; propose_pubkeys: Public_key.Compressed.Stable.V1.t list
       ; histograms: Histograms.t option
       ; consensus_time_best_tip: string option
       ; consensus_time_now: string
@@ -258,9 +256,9 @@ module Types = struct
         let get field = Field.get field s
       end) in
       let open M in
-      Fields.to_list ~sync_status ~num_accounts ~block_count ~uptime_secs
+      Fields.to_list ~sync_status ~num_accounts ~blockchain_length ~uptime_secs
         ~ledger_merkle_root ~staged_ledger_hash ~state_hash ~commit_id
-        ~conf_dir ~peers ~user_commands_sent ~run_snark_worker ~propose_pubkey
+        ~conf_dir ~peers ~user_commands_sent ~run_snark_worker ~propose_pubkeys
         ~histograms ~consensus_time_best_tip ~consensus_time_now
         ~consensus_mechanism ~consensus_configuration
       |> List.filter_map ~f:Fn.id
@@ -318,6 +316,44 @@ module Get_balance = struct
 
   let rpc : (query, response) Rpc.Rpc.t =
     Rpc.Rpc.create ~name:"Get_balance" ~version:0 ~bin_query ~bin_response
+end
+
+module Get_trust_status = struct
+  type query = Unix.Inet_addr.Blocking_sexp.t [@@deriving bin_io]
+
+  type response = Trust_system.Peer_status.Stable.Latest.t [@@deriving bin_io]
+
+  type error = unit [@@deriving bin_io]
+
+  let rpc : (query, response) Rpc.Rpc.t =
+    Rpc.Rpc.create ~name:"Get_trust_status" ~version:0 ~bin_query ~bin_response
+end
+
+module Get_trust_status_all = struct
+  type query = unit [@@deriving bin_io]
+
+  type response =
+    (Unix.Inet_addr.Blocking_sexp.t * Trust_system.Peer_status.Stable.Latest.t)
+    list
+  [@@deriving bin_io]
+
+  type error = unit [@@deriving bin_io]
+
+  let rpc : (query, response) Rpc.Rpc.t =
+    Rpc.Rpc.create ~name:"Get_trust_status_all" ~version:0 ~bin_query
+      ~bin_response
+end
+
+module Reset_trust_status = struct
+  type query = Unix.Inet_addr.Blocking_sexp.t [@@deriving bin_io]
+
+  type response = Trust_system.Peer_status.Stable.Latest.t [@@deriving bin_io]
+
+  type error = unit [@@deriving bin_io]
+
+  let rpc : (query, response) Rpc.Rpc.t =
+    Rpc.Rpc.create ~name:"Reset_trust_status" ~version:0 ~bin_query
+      ~bin_response
 end
 
 module Verify_proof = struct

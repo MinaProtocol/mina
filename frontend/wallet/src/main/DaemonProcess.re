@@ -5,92 +5,132 @@ module Command = {
   type t = {
     executable: string,
     args: array(string),
-    env: option(Js.Dict.t(string)),
+    env: Js.Dict.t(string),
   };
-
-  let addArgs = (t, args) => {...t, args: Js.Array.concat(t.args, args)};
 };
 
 let (^/) = Filename.concat;
-let baseCodaCommand = port => {
-  let codaPath = "_build/coda-daemon-macos";
+
+let codaPath = "_build/coda-daemon-macos";
+let codaCommand = (~port, ~extraArgs) => {
   {
     Command.executable: ProjectRoot.resource ^/ codaPath ^/ "coda.exe",
-    args: [|
-      "daemon",
-      "-rest-port",
-      Js.Int.toString(port),
-      "-config-directory",
-      ProjectRoot.resource ^/ codaPath ^/ "config",
-    |],
+    args:
+      Js.Array.concat(
+        extraArgs,
+        [|
+          "daemon",
+          "-rest-port",
+          Js.Int.toString(port),
+          "-config-directory",
+          ProjectRoot.resource ^/ codaPath ^/ "config",
+        |],
+      ),
     env:
-      Some(
-        Js.Dict.fromList([
-          (
-            "CODA_KADEMLIA_PATH",
-            ProjectRoot.resource ^/ codaPath ^/ "kademlia",
-          ),
-        ]),
+      Js.Dict.fromArray(
+        Js.Array.concat(
+          [|
+            (
+              "CODA_KADEMLIA_PATH",
+              ProjectRoot.resource ^/ codaPath ^/ "kademlia",
+            ),
+          |],
+          Js.Dict.entries(ChildProcess.Process.env),
+        ),
       ),
   };
 };
 
+let fakerCommand = (~port) => {
+  Command.executable: "node",
+  args: [|
+    Filename.concat(
+      ProjectRoot.resource,
+      "node_modules/graphql-faker/dist/index.js",
+    ),
+    "--port",
+    string_of_int(port),
+    "--",
+    "schema.graphql",
+  |],
+  env: ChildProcess.Process.env,
+};
+
 module Process = {
   let start = (command: Command.t) => {
-    print_endline("Starting graphql-faker");
+    let {Command.executable, args} = command;
+    let logfileName = "daemon.log";
+    print_endline(
+      {j|Starting $executable with $args. Logging to `$logfileName`|j},
+    );
 
-    let p =
-      switch (command.env) {
-      | None => ChildProcess.spawn(command.executable, command.args)
-      | Some(env) =>
-        ChildProcess.spawnWithEnv(
-          command.executable,
-          command.args,
-          {"env": env},
-        )
-      };
+    /*
+     child_process.spawn communicates with processes using sockets.
+     When the proposer process starts up in the daemon, stdout and stderr
+     are accessed using a helper function from async_unix:
+     https://github.com/janestreet/async_unix/blob/ff13d69c96f4b857737263910b3f6b08311b5dfc/src/writer0.ml#L1465
+     This causes async_unix to attempt to infer the type of stdout/err
+     using and check if it has SO_ACCEPTCONN set using getsockopt.
+     This flag is not supported on Mac, so it crashes with "Protocol not available"
 
-    ChildProcess.Process.onError(p, e =>
+     As a workaround, we have to redirect all output to a file.
+
+     If this issue is ever resolved or we stop using async_unix, this code can be simplified:
+     https://github.com/janestreet/async_unix/issues/15
+     */
+
+    let log = Fs.openSync(logfileName, "w");
+    Fs.writeSync(log, {j|Started with $args\n|j});
+    let process =
+      ChildProcess.spawn(
+        command.executable,
+        command.args,
+        {
+          "env": command.env,
+          "stdio":
+            ChildProcess.makeIOTriple(`Ignore, `Stream(log), `Stream(log)),
+        },
+      );
+
+    ChildProcess.Process.onError(process, e =>
       prerr_endline(
         "Daemon process "
         ++ command.executable
-        ++ " crashed: "
+        ++ " crashed. Logs are in `"
+        ++ logfileName
+        ++ "`. Error:"
         ++ ChildProcess.Error.messageGet(e),
       )
     );
 
-    ChildProcess.ReadablePipe.on(ChildProcess.Process.stderrGet(p), "data", s =>
-      prerr_endline(
-        "Daemon "
-        ++ command.executable
-        ++ " error: "
-        ++ Node.Buffer.toString(s),
-      )
-    );
-
     ChildProcess.Process.onExit(
-      p,
+      process,
       fun
       | `Code(code) =>
         if (code != 0) {
           Printf.fprintf(
             stderr,
-            "Daemon process died with non-zero exit code: %d\n",
+            "Daemon process %s died with non-zero exit code: %d. Logs are in `%s`\n",
+            command.executable,
             code,
+            logfileName,
           );
         } else {
-          print_endline("Shutting down daemon process.");
+          print_endline(
+            "Shutting down daemon process: " ++ command.executable,
+          );
         }
       | `Signal(signal) => {
           Printf.fprintf(
             stderr,
-            "Daemon process died via signal: %s\n",
+            "Daemon process %s died via signal: %s\n",
+            command.executable,
             signal,
           );
         },
     );
 
-    p;
+    process;
   };
 };
 
@@ -100,57 +140,26 @@ module CodaProcess = {
   let waitExit: t => Task.t('x, [> | `Code(int) | `Signal(string)]) =
     t => ChildProcess.Process.onExitTask(t);
 
-  let kill: t => unit = t => ChildProcess.Process.kill(t);
+  let kill: t => unit = t => ChildProcess.Process.kill(t, "SIGINT");
 
-  let start: list(string) => Result.t(string, t) =
+  let port = 0xc0da;
+
+  let start: list(string) => t =
     args => {
-      let p =
-        Process.start(
-          Command.addArgs(baseCodaCommand(0xc0da), args |> Array.fromList),
-        );
-      Belt.Result.Ok(p);
-    };
-};
+      switch (Js.Dict.get(ChildProcess.Process.env, "GRAPHQL_BACKEND")) {
+      | Some("faker") => Process.start(fakerCommand(~port))
+      | _ =>
+        /* Workaround for https://github.com/CodaProtocol/coda/issues/2667
+           Remove the config deletion when it is resolved.  */
+        let transitionFrontierPath =
+          ProjectRoot.resource ^/ codaPath ^/ "config/transition_frontier";
 
-let startAll = (~fakerPort, ~codaPort) => {
-  let graphqlFaker = {
-    Command.executable: "node",
-    args: [|
-      Filename.concat(
-        ProjectRoot.resource,
-        "node_modules/graphql-faker/dist/index.js",
-      ),
-      "--port",
-      string_of_int(fakerPort),
-      "--",
-      "schema.graphql",
-    |],
-    env: None,
-  };
-  let codaPath = "_build/coda-daemon-macos";
-  let coda = {
-    Command.executable: ProjectRoot.resource ^/ codaPath ^/ "coda.exe",
-    args: [|
-      "daemon",
-      "-rest-port",
-      Js.Int.toString(codaPort),
-      "-config-directory",
-      ProjectRoot.resource ^/ codaPath ^/ "config",
-    |],
-    env:
-      Some(
-        Js.Dict.fromList([
-          (
-            "CODA_KADEMLIA_PATH",
-            ProjectRoot.resource ^/ codaPath ^/ "kademlia",
-          ),
-        ]),
-      ),
-  };
-  let p1 = Process.start(graphqlFaker);
-  let p2 = Process.start(coda);
-  () => {
-    ChildProcess.Process.kill(p1);
-    ChildProcess.Process.kill(p2);
-  };
+        Printf.fprintf(stderr, "Deleting %s\n%!", transitionFrontierPath);
+        Bindings.ChildProcess.execSync(
+          "rm",
+          [|"-rf", transitionFrontierPath|],
+        );
+        Process.start(codaCommand(~port, ~extraArgs=args |> Array.fromList));
+      };
+    };
 };

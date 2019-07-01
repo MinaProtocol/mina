@@ -2,12 +2,7 @@
 
 open Coda_base
 
-module type S =
-  Protocols.Coda_pow.Ledger_proof_intf
-  with type statement := Transaction_snark.Statement.t
-   and type sok_digest := Sok_message.Digest.t
-   and type ledger_hash := Frozen_ledger_hash.t
-   and type proof := Proof.t
+module type S = Coda_intf.Ledger_proof_intf
 
 module Prod : S with type t = Transaction_snark.t
 

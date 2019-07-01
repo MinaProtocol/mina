@@ -23,7 +23,7 @@ unit_test_profiles = [
 
 simple_tests = [
     'full-test',
-    'transaction-snark-profiler',
+    'transaction-snark-profiler -k 2',
 ]
 
 integration_tests = [

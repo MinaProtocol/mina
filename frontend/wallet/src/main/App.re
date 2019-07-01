@@ -1,18 +1,10 @@
 open BsElectron;
 open Tc;
 
-let killDaemons = DaemonProcess.startAll(~fakerPort=8080, ~codaPort=0xc0da);
-
 let createTray = dispatch => {
   let t = AppTray.get();
   let trayItems =
     Menu.Item.[
-      make(
-        Label("Synced"),
-        ~icon=Filename.concat(ProjectRoot.resource, "public/circle-16.png"),
-        (),
-      ),
-      make(Separator, ()),
       make(
         Label("Debug"),
         ~click=
@@ -25,14 +17,13 @@ let createTray = dispatch => {
       make(
         Label("Open"),
         ~accelerator="CmdOrCtrl+O",
-        ~click=
-          () => AppWindow.get({path: Route.Home, dispatch}) |> AppWindow.show,
+        ~click=() => AppWindow.deepLink({path: Route.Home, dispatch}),
         (),
       ),
       make(
         Label("Settings"),
         ~accelerator="CmdOrCtrl+,",
-        ~click=() => AppWindow.deepLink({path: Route.Home, dispatch}),
+        ~click=() => AppWindow.deepLink({path: Route.Settings, dispatch}),
         (),
       ),
       make(Separator, ()),
@@ -48,7 +39,6 @@ let createTray = dispatch => {
 // We need this handler here to prevent the application from exiting on all
 // windows closed. Keep in mind, we have the tray.
 App.on(`WindowAllClosed, () => ());
-App.on(`WillQuit, () => killDaemons());
 
 let initialTask = Task.uncallbackifyValue(App.on(`Ready));
 
@@ -71,6 +61,7 @@ let run = () =>
       dispatch := Application.Store.apply((), store);
       let dispatch = dispatch^;
 
+      App.on(`WillQuit, () => dispatch(Action.ControlCoda(None)));
       createTray(dispatch);
 
       AppWindow.deepLink({AppWindow.Input.path: Route.Home, dispatch});

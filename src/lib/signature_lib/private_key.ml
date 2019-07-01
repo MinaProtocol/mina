@@ -31,7 +31,12 @@ let of_bigstring_exn = Binable.of_bigstring (module Stable.Latest)
 
 let to_bigstring = Binable.to_bigstring (module Stable.Latest)
 
-let to_base64 t = to_bigstring t |> Bigstring.to_string |> Base64.encode_string
+let version_byte = Base58_check.Version_bytes.private_key
 
-let of_base64_exn s =
-  Base64.decode_exn s |> Bigstring.of_string |> of_bigstring_exn
+let to_base58_check t =
+  let payload = to_bigstring t |> Bigstring.to_string in
+  Base58_check.encode ~version_byte ~payload
+
+let of_base58_check_exn s =
+  let decoded = Base58_check.decode_exn ~version_byte s in
+  decoded |> Bigstring.of_string |> of_bigstring_exn

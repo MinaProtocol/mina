@@ -4,5 +4,6 @@ let make = (~width=0., ~height=0.) =>
     className={Css.style([
       Css.width(`rem(width)),
       Css.height(`rem(height)),
+      Css.flexShrink(0),
     ])}
   />;

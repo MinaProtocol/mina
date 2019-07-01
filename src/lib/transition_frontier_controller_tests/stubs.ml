@@ -1,6 +1,6 @@
 open Async
 open Core_kernel
-open Protocols.Coda_pow
+open Currency
 open Coda_base
 open Coda_state
 open Coda_transition
@@ -12,8 +12,6 @@ end) =
 struct
   (** [Stubs] is a set of modules used for testing different components of tfc  *)
   let max_length = Inputs.max_length
-
-  module Time = Block_time
 
   module State_proof = struct
     include Proof
@@ -41,14 +39,15 @@ struct
   module Staged_ledger_diff = Staged_ledger_diff.Make (Transaction_snark_work)
 
   module External_transition =
-    External_transition.Make
-      (Verifier)
+    External_transition.Make (Ledger_proof) (Verifier)
       (struct
         include Staged_ledger_diff.Stable.V1
 
         [%%define_locally
         Staged_ledger_diff.(creator, user_commands)]
       end)
+
+  module Internal_transition = Internal_transition.Make (Staged_ledger_diff)
 
   module Staged_ledger_hash_binable = struct
     include Staged_ledger_hash
@@ -85,12 +84,15 @@ struct
     module Ledger_proof_verifier = Verifier
     module Staged_ledger_aux_hash = Staged_ledger_aux_hash
     module Staged_ledger_hash = Staged_ledger_hash_binable
+    module Transaction_snark_statement = Transaction_snark.Statement
     module Transaction_snark_work = Transaction_snark_work
     module Transaction_validator = Transaction_validator
     module Staged_ledger_diff = Staged_ledger_diff
     module Account = Coda_base.Account
     module Ledger = Coda_base.Ledger
     module Sparse_ledger = Coda_base.Sparse_ledger
+    module Verifier = Verifier
+    module Proof_type = Transaction_snark.Proof_type
 
     module Pending_coinbase = struct
       include Pending_coinbase.Stable.V1
@@ -100,6 +102,7 @@ struct
     end
 
     module Pending_coinbase_hash = Pending_coinbase.Hash
+    module Pending_coinbase_stack = Pending_coinbase.Stack
     module Pending_coinbase_stack_state =
       Transaction_snark.Pending_coinbase_stack_state
     module Transaction_witness = Transaction_witness
@@ -126,7 +129,7 @@ struct
         in
         let%map _ = Currency.Amount.sub sender_account_amount send_amount in
         let payload : User_command.Payload.t =
-          User_command.Payload.create ~fee:Fee.Unsigned.zero
+          User_command.Payload.create ~fee:Fee.zero
             ~nonce:sender_account.Account.Poly.nonce
             ~memo:User_command_memo.dummy
             ~body:(Payment {receiver= receiver_pk; amount= send_amount})
@@ -140,6 +143,7 @@ struct
     module Transaction_snark_work = Transaction_snark_work
     module Staged_ledger_diff = Staged_ledger_diff
     module External_transition = External_transition
+    module Internal_transition = Internal_transition
     module Transaction_witness = Transaction_witness
     module Staged_ledger = Staged_ledger
     module Scan_state = Staged_ledger.Scan_state
@@ -182,7 +186,7 @@ struct
         let prover = Public_key.compress public_key in
         Some
           Transaction_snark_work.Checked.
-            { fee= Fee.Unsigned.of_int 1
+            { fee= Fee.of_int 1
             ; proofs=
                 List.map stmts ~f:(fun stmt ->
                     (stmt, Sok_message.Digest.default) )
@@ -220,7 +224,7 @@ struct
       in
       let next_blockchain_state =
         Blockchain_state.create_value
-          ~timestamp:(Block_time.now Time.Controller.basic)
+          ~timestamp:(Block_time.now Block_time.Controller.basic)
           ~snarked_ledger_hash:next_ledger_hash
           ~staged_ledger_hash:next_staged_ledger_hash
       in
@@ -324,7 +328,6 @@ struct
             ; user_commands= []
             ; coinbase= Staged_ledger_diff.At_most_two.Zero }
           , None )
-      ; prev_hash= Staged_ledger_hash.genesis
       ; creator }
     in
     (* the genesis transition is assumed to be valid *)
@@ -368,7 +371,9 @@ struct
           Ledger_transfer.transfer_accounts ~src:Genesis_ledger.t
             ~dest:ledger_db
         in
-        let consensus_local_state = Consensus.Data.Local_state.create None in
+        let consensus_local_state =
+          Consensus.Data.Local_state.create Public_key.Compressed.Set.empty
+        in
         let%bind frontier =
           create_frontier_from_genesis_protocol_state ~logger
             ~consensus_local_state
@@ -384,7 +389,8 @@ struct
     in
     let consensus_local_state =
       Consensus.Data.Local_state.create
-        (Some (Account.public_key proposer_account))
+        (Public_key.Compressed.Set.singleton
+           (Account.public_key proposer_account))
     in
     let genesis_protocol_state_with_hash =
       Genesis_protocol_state.create_with_custom_ledger
@@ -452,13 +458,11 @@ struct
 
   module Sync_handler = Sync_handler.Make (struct
     include Transition_frontier_inputs
-    module Time = Time
     module Transition_frontier = Transition_frontier
   end)
 
   module Root_prover = Root_prover.Make (struct
     include Transition_frontier_inputs
-    module Time = Time
     module Transition_frontier = Transition_frontier
   end)
 
@@ -505,12 +509,42 @@ struct
   end
 
   module Network = struct
+    type snark_pool_diff = unit
+
+    type transaction_pool_diff = unit
+
     type t =
       { logger: Logger.t
       ; ip_table: (Unix.Inet_addr.t, Transition_frontier.t) Hashtbl.t
       ; peers: Network_peer.Peer.t Hash_set.t }
 
-    let create ~logger ~ip_table ~peers = {logger; ip_table; peers}
+    module Gossip_net = struct
+      module Config = struct
+        type t =
+          { timeout: Time.Span.t
+          ; target_peer_count: int
+          ; initial_peers: Host_and_port.t list
+          ; addrs_and_ports: Kademlia.Node_addrs_and_ports.t
+          ; conf_dir: string
+          ; logger: Logger.t
+          ; trust_system: Trust_system.t
+          ; max_concurrent_connections: int option }
+        [@@deriving make]
+      end
+    end
+
+    module Config = struct
+      type t =
+        { logger: Logger.t
+        ; trust_system: Trust_system.t
+        ; gossip_net_params: Gossip_net.Config.t
+        ; time_controller: Block_time.Controller.t
+        ; consensus_local_state: Consensus.Data.Local_state.t }
+    end
+
+    let create _ = failwith "stub"
+
+    let create_stub ~logger ~ip_table ~peers = {logger; ip_table; peers}
 
     let random_peers {peers; _} num_peers =
       let peer_list = Hash_set.to_list peers in
@@ -524,6 +558,8 @@ struct
       Sync_handler.transition_catchup ~frontier state_hash
 
     let mplus ma mb = if Option.is_some ma then ma else mb
+
+    let query_peer {ip_table= _; _} _peer _f _r = failwith "..."
 
     let get_staged_ledger_aux_and_pending_coinbases_at_hash {ip_table; _}
         inet_addr hash =
@@ -588,6 +624,24 @@ struct
               Pipe_lib.Linear_pipe.write response_writer
                 (ledger_hash, sync_ledger_query, answer) )
       |> don't_wait_for
+
+    let initial_peers _ = failwith "stub"
+
+    let broadcast_state _ _ = failwith "stub"
+
+    let broadcast_snark_pool_diff _ _ = failwith "stub"
+
+    let broadcast_transaction_pool_diff _ _ = failwith "stub"
+
+    let online_status _ = failwith "stub"
+
+    let peers _ = failwith "stub"
+
+    let states _ = failwith "stub"
+
+    let transaction_pool_diffs _ = failwith "stub"
+
+    let snark_pool_diffs _ = failwith "stub"
   end
 
   module Network_builder = struct
@@ -645,7 +699,7 @@ struct
           List.map peers_with_frontiers ~f:(fun {peer; _} -> peer)
           |> Hash_set.of_list (module Network_peer.Peer)
         in
-        Network.create ~logger
+        Network.create_stub ~logger
           ~ip_table:
             (Hashtbl.of_alist_exn
                (module Unix.Inet_addr)
