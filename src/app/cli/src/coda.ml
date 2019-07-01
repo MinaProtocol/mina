@@ -129,13 +129,16 @@ let daemon logger =
          match log_level with
          | None ->
              Deferred.return Logger.Level.Warn
-         | Some log_level_str -> (
+         | Some log_level_str_with_case -> (
              let open Logger in
+             let log_level_str = String.lowercase log_level_str_with_case in
              match Level.of_string log_level_str with
              | Error _ ->
                  eprintf "Received unknown log-level %s. Expected one of: %s\n"
                    log_level_str
-                   (String.concat ~sep:", " (List.map ~f:Level.show Level.all)) ;
+                   ( Level.all |> List.map ~f:Level.show
+                   |> List.map ~f:String.lowercase
+                   |> String.concat ~sep:", " ) ;
                  exit 14
              | Ok ll ->
                  Deferred.return ll )
