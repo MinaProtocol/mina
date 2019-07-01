@@ -113,17 +113,18 @@ module Types = struct
     module State_hash = Codable.Make_base58_check (State_hash.Stable.V1)
   end
 
-  module Id = struct
+  module Base58_check = Base58_check.Make (struct
     let version_byte = Base58_check.Version_bytes.graphql
+  end)
 
+  module Id = struct
     (* The id of a user_command is the Base58Check encoding of the serialized version of the user_command *)
     let user_command user_command =
       let bigstring =
         Bin_prot.Utils.bin_dump Coda_base.User_command.Stable.V1.bin_t.writer
           user_command
       in
-      let payload = Bigstring.to_string bigstring in
-      Base58_check.encode ~version_byte ~payload
+      Base58_check.encode (Bigstring.to_string bigstring)
   end
 
   let uint64_arg name ~doc ~typ =
@@ -850,8 +851,7 @@ module Types = struct
             let open Result.Let_syntax in
             let%bind serialized_transaction =
               result_of_or_error
-                (Base58_check.decode ~version_byte:Id.version_byte
-                   serialized_payment)
+                (Base58_check.decode serialized_payment)
                 ~error:(Option.value error ~default:"Invalid cursor")
             in
             Ok
