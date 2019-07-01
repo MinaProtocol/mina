@@ -10,10 +10,10 @@ module Make (Inputs : Inputs_intf.S) = struct
 
   let g2_to_bits t =
     let x, y = G2.to_affine_coordinates t in
-    let y0 = List.hd_exn (Fqe.parts y) in
+    let y0 = List.hd_exn (Fqe.to_list y) in
     assert (not Field.(equal y0 zero)) ;
     Bigint.(test_bit (of_field y0) 0)
-    :: List.concat_map (Fqe.parts x) ~f:Field.to_bits
+    :: List.concat_map (Fqe.to_list x) ~f:Field.to_bits
 
   let random_oracle =
     let field_to_bits = Fn.compose Array.of_list Field.to_bits in
