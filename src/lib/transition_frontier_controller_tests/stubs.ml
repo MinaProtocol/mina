@@ -546,6 +546,8 @@ struct
 
     let create_stub ~logger ~ip_table ~peers = {logger; ip_table; peers}
 
+    let peers_by_ip = failwith "unimplemented"
+
     let random_peers {peers; _} num_peers =
       let peer_list = Hash_set.to_list peers in
       List.take (List.permute peer_list) num_peers
