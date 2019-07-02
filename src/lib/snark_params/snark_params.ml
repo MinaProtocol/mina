@@ -474,12 +474,10 @@ module Tick = struct
         assert (equal_states result unchunked_result)
 
       let hash_unchunked n =
-        ignore (Lazy.force chunk_table) ;
         let fold = gen_fold n in
         State.update_fold_unchunked initial_state fold
 
       let hash_chunked n =
-        ignore (Lazy.force chunk_table) ;
         let fold = gen_fold n in
         State.update_fold_chunked initial_state fold
     end
@@ -502,12 +500,12 @@ module Tick = struct
 
     (* benchmark unchunked, chunked hashes *)
 
-    let%bench "dummy test to force deserialization" =
-      For_tests.hash_unchunked 1
-
     let%bench "hash one triple unchunked" = For_tests.hash_unchunked 1
 
-    let%bench "hash one triple chunked" = For_tests.hash_chunked 1
+    let%bench_fun "hash one triple chunked" =
+      (* make sure chunk table deserialized *)
+      ignore (Lazy.force chunk_table) ;
+      fun () -> For_tests.hash_chunked 1
 
     let%bench "hash small number of triples unchunked" =
       For_tests.hash_unchunked 25
