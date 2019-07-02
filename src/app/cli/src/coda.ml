@@ -578,6 +578,7 @@ let coda_commands logger =
   ; ("internal", Command.group ~summary:"Internal commands" internal_commands)
   ; ("daemon", daemon logger)
   ; ("client", Client.command)
+  ; ("advanced", Client.advanced)
   ; ("transaction-snark-profiler", Transaction_snark_profiler.command) ]
 
 [%%if

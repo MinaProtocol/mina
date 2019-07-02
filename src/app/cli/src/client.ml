@@ -646,23 +646,26 @@ let command =
   Command.group ~summary:"Lightweight client commands"
     [ ("get-balance", get_balance)
     ; ("get-public-keys", get_public_keys)
-    ; ("get-trust-status", get_trust_status)
-    ; ("get-trust-status-all", get_trust_status_all)
-    ; ("reset-trust-status", reset_trust_status)
     ; ("prove-payment", prove_payment)
     ; ("verify-payment", verify_payment)
     ; ("get-nonce", get_nonce_cmd)
     ; ("send-payment", send_payment)
     ; ("delegate-stake", delegate_stake)
     ; ("stop-daemon", stop_daemon)
-    ; ("batch-send-payments", batch_send_payments)
     ; ("status", status)
+    ; ("generate-keypair", generate_keypair) ]
+
+let advanced =
+  Command.group ~summary:"Advanced client commands"
+    [ ("get-trust-status", get_trust_status)
+    ; ("get-trust-status-all", get_trust_status_all)
+    ; ("reset-trust-status", reset_trust_status)
+    ; ("batch-send-payments", batch_send_payments)
     ; ("status-clear-hist", status_clear_hist)
     ; ("wrap-key", wrap_key)
     ; ("dump-keypair", dump_keypair)
     ; ("dump-ledger", dump_ledger)
     ; ("constraint-system-digests", constraint_system_digests)
-    ; ("generate-keypair", generate_keypair)
     ; ("start-tracing", start_tracing)
     ; ("stop-tracing", stop_tracing)
     ; ("snark-job-list", snark_job_list)
