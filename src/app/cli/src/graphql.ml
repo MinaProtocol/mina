@@ -113,17 +113,18 @@ module Types = struct
     module State_hash = Codable.Make_base58_check (State_hash.Stable.V1)
   end
 
-  module Id = struct
+  module Base58_check = Base58_check.Make (struct
     let version_byte = Base58_check.Version_bytes.graphql
+  end)
 
+  module Id = struct
     (* The id of a user_command is the Base58Check encoding of the serialized version of the user_command *)
     let user_command user_command =
       let bigstring =
         Bin_prot.Utils.bin_dump Coda_base.User_command.Stable.V1.bin_t.writer
           user_command
       in
-      let payload = Bigstring.to_string bigstring in
-      Base58_check.encode ~version_byte ~payload
+      Base58_check.encode (Bigstring.to_string bigstring)
   end
 
   let uint64_arg name ~doc ~typ =
@@ -212,9 +213,9 @@ module Types = struct
           let open Reflection.Shorthand in
           List.rev
           @@ Daemon_rpcs.Types.Status.Fields.fold ~init:[] ~num_accounts:int
-               ~block_count:int ~uptime_secs:nn_int ~ledger_merkle_root:string
-               ~staged_ledger_hash:string ~state_hash:string
-               ~commit_id:nn_string ~conf_dir:nn_string
+               ~blockchain_length:int ~uptime_secs:nn_int
+               ~ledger_merkle_root:string ~staged_ledger_hash:string
+               ~state_hash:string ~commit_id:nn_string ~conf_dir:nn_string
                ~peers:(id ~typ:Schema.(non_null @@ list (non_null string)))
                ~user_commands_sent:nn_int ~run_snark_worker:nn_bool
                ~sync_status:(id ~typ:(non_null sync_status))
@@ -850,8 +851,7 @@ module Types = struct
             let open Result.Let_syntax in
             let%bind serialized_transaction =
               result_of_or_error
-                (Base58_check.decode ~version_byte:Id.version_byte
-                   serialized_payment)
+                (Base58_check.decode serialized_payment)
                 ~error:(Option.value error ~default:"Invalid cursor")
             in
             Ok
@@ -1115,7 +1115,7 @@ module Mutations = struct
     let%map memo =
       Option.value_map maybe_memo ~default:(Ok User_command_memo.dummy)
         ~f:(fun memo ->
-          result_of_exn User_command_memo.create_exn memo
+          result_of_exn User_command_memo.create_by_digesting_string_exn memo
             ~error:"Invalid `memo` provided." )
     in
     (sender_account, sender_kp, memo, receiver, fee)

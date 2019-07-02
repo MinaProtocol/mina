@@ -98,7 +98,7 @@ module Gen = struct
     let%map body = create_body receiver in
     let payload : Payload.t =
       Payload.create ~fee ~nonce
-        ~memo:(User_command_memo.create_exn memo)
+        ~memo:(User_command_memo.create_by_digesting_string_exn memo)
         ~body
     in
     sign' sender payload
@@ -194,7 +194,7 @@ let check_signature _ = true
 
 let check_signature ({payload; sender; signature} : t) =
   Schnorr.verify signature
-    (Snark_params.Tick.Inner_curve.of_affine_coordinates sender)
+    (Snark_params.Tick.Inner_curve.of_affine sender)
     payload
 
 [%%endif]

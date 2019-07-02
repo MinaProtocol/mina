@@ -18,7 +18,6 @@
 
 /src/app/cli/ @cmr @nholland94 @bkase
 /src/app/kademlia-haskell/ @bkase @enolan
-/src/app/lite/ @cmr @bkase
 /src/app/logproc/ @nholland94
 /src/app/reformat/ @bkase
 /src/app/testone/ @johnwu93
@@ -65,7 +64,7 @@
 /src/lib/interruptible/ @bkase
 /src/lib/kademlia @bkase @cmr @enolan
 /src/lib/key_value_database/ @johnwu93 @bkase
-/src/lib/keys_lib/ @cmr
+/src/lib/keys_lib/ @cmr @mrmr1993
 /src/lib/ledger_catchup/ @nholland94 @johnwu93
 /src/lib/ledger_proof/ @nholland94
 /src/lib/linked_tree/ @cmr
@@ -73,6 +72,7 @@
 /src/lib/lite_lib/ @bkase @cmr
 /src/lib/lite_params/ @rbkhmrcr @vanishreerao
 /src/lib/logger/ @nholland94
+/src/lib/logproc_lib/ @nholland94
 /src/lib/merkle_address/ @cmr @bkase @nholland94 @johnwu93
 /src/lib/merkle_ledger/ @cmr @nholland94
 /src/lib/merkle_list/ @johnwu93 @cmr
@@ -93,7 +93,7 @@
 /src/lib/pokolog/ @bkase @vanishreerao @rbkhmrcr
 /src/lib/ppx_coda/ @psteckler @mrmr1993
 /src/lib/ppx_util/ @mrmr1993
-/src/lib/precomputed_values/ @cmr @bkase
+/src/lib/precomputed_values/ @cmr @bkase @mrmr1993
 /src/lib/proof_carrying_data/ @psteckler @bkase
 /src/lib/proposer/ @nholland94 @cmr
 /src/lib/prover/ @nholland94 @bkase
@@ -113,8 +113,9 @@
 /src/lib/snark_bits/ @bkase
 /src/lib/snark_work_lib/ @deepthiskumar
 /src/lib/snark_worker/ @cmr @nholland94
+/src/lib/snark_keys/ @mrmr1993
 /src/lib/snarkette/ @bkase
-# /src/lib/snarky (submodule!)
+/src/lib/snarky/ @mrmr1993
 /src/lib/snarky_blake2/ @rbkhmrcr @vanishreerao
 /src/lib/snarky_curves/ @rbkhmrcr @vanishreerao
 /src/lib/snarky_field_extensions/ @bkase @rbkhmrcr @vanishreerao
