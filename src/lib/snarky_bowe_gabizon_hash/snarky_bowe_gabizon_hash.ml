@@ -171,7 +171,7 @@ let%test_module "test" =
 
         let to_affine_coordinates t =
           let f v = C.Field.Vector.(get v 0, get v 1, get v 2) in
-          let x, y = D.G2.to_affine_coordinates t in
+          let x, y = D.G2.to_affine_exn t in
           (f x, f y)
 
         let of_affine_coordinates (x, y) =
@@ -181,7 +181,7 @@ let%test_module "test" =
             List.iter (Fqe.to_list a) ~f:(emplace_back t) ;
             t
           in
-          of_affine_coordinates (f x, f y)
+          of_affine (f x, f y)
 
         let typ =
           let fqe = Typ.tuple3 Field.typ Field.typ Field.typ in
