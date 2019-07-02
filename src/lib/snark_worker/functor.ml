@@ -103,7 +103,7 @@ module Make (Inputs : Intf.Inputs_intf) :
       with
       | Error e ->
           log_and_retry "getting work" e
-      | Ok (None, _) ->
+      | Ok None ->
           let random_delay =
             Worker_state.worker_wait_time
             +. (0.5 *. Random.float Worker_state.worker_wait_time)
@@ -111,11 +111,7 @@ module Make (Inputs : Intf.Inputs_intf) :
           (* No work to be done -- quietly take a brief nap *)
           let%bind () = wait ~sec:random_delay () in
           go ()
-      | Ok (Some _work, None) ->
-          log_and_retry
-            "Will not perform work work since no public_key is provided !"
-            (Error.of_string "No snark worker set")
-      | Ok (Some work, Some public_key) -> (
+      | Ok (Some (work, public_key)) -> (
           Logger.info logger ~module_:__MODULE__ ~location:__LOC__
             !"Received work from %s%!"
             (Host_and_port.to_string daemon_address) ;

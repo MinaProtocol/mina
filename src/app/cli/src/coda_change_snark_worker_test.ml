@@ -26,7 +26,7 @@ let main () =
   in
   let%bind new_block_pipe1, new_block_pipe2 =
     let%map pipe =
-      Coda_worker_testnet.Api.forked_transitions testnet
+      Coda_worker_testnet.Api.validated_transitions_keyswaptest testnet
         snark_worker_and_proposer_id
     in
     Pipe.fork ~pushback_uses:`Fast_consumer_only (Option.value_exn pipe).pipe

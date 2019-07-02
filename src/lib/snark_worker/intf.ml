@@ -61,7 +61,7 @@ module type S = sig
       module V1 : sig
         type query = unit
 
-        type response = Work.Spec.t option * Public_key.Compressed.t option
+        type response = (Work.Spec.t * Public_key.Compressed.t) option
 
         val rpc : (query, response) Rpc.Rpc.t
       end

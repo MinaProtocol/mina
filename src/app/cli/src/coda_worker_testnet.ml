@@ -177,9 +177,10 @@ module Api = struct
       ~f:(fun worker -> Coda_process.replace_snark_worker_key worker key)
       t i
 
-  let forked_transitions t i =
+  let validated_transitions_keyswaptest t i =
     run_online_worker
-      ~f:(fun worker -> Coda_process.forked_transitions_exn worker)
+      ~f:(fun worker ->
+        Coda_process.validated_transitions_keyswaptest_exn worker )
       t i
 
   let new_user_command_and_subscribe t i key =
