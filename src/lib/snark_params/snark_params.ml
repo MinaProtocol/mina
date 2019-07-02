@@ -510,20 +510,23 @@ module Tick = struct
     let%bench "hash small number of triples unchunked" =
       For_tests.hash_unchunked 25
 
-    let%bench "hash small number of triples chunked" =
-      For_tests.hash_chunked 25
+    let%bench_fun "hash small number of triples chunked" =
+      ignore (Lazy.force chunk_table) ;
+      fun () -> For_tests.hash_chunked 25
 
     let%bench "hash large number of triples unchunked" =
       For_tests.hash_unchunked 250
 
-    let%bench "hash large number of triples chunked" =
-      For_tests.hash_chunked 250
+    let%bench_fun "hash large number of triples chunked" =
+      ignore (Lazy.force chunk_table) ;
+      fun () -> For_tests.hash_chunked 250
 
     let%bench "hash huge number of triples unchunked" =
       For_tests.hash_unchunked 1000
 
-    let%bench "hash huge number of triples chunked" =
-      For_tests.hash_chunked 1000
+    let%bench_fun "hash huge number of triples chunked" =
+      ignore (Lazy.force chunk_table) ;
+      fun () -> For_tests.hash_chunked 1000
   end
 
   module Util = Snark_util.Make (Tick0)
