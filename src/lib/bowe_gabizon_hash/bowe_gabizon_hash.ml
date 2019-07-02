@@ -5,7 +5,7 @@ module Make (Inputs : Inputs_intf.S) = struct
   open Inputs
 
   let g1_to_bits t =
-    let x, y = G1.to_affine_coordinates t in
+    let x, y = G1.to_affine_exn t in
     Bigint.(test_bit (of_field y) 0) :: Field.to_bits x
 
   let g2_to_bits t =
@@ -32,5 +32,5 @@ module Make (Inputs : Inputs_intf.S) = struct
           +> of_array (Option.value ~default:[||] message) ))
     |> random_oracle |> Field.of_bits
     |> Group_map.to_group (module Field) ~params
-    |> G1.of_affine_coordinates
+    |> G1.of_affine
 end
