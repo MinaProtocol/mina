@@ -180,7 +180,7 @@ let setup_local_server ?(client_whitelist = []) ?rest_server_port ~coda
               Logger.trace logger ~module_:__MODULE__ ~location:__LOC__
                 !"Get_work: %{sexp:Snark_worker.Work.Spec.t}"
                 r ) ;
-          return r )
+          return (r, Coda_lib.snark_worker_key coda) )
     ; implement Snark_worker.Rpcs.Submit_work.Latest.rpc
         (fun () (work : Snark_worker.Work.Result.t) ->
           Logger.trace logger ~module_:__MODULE__ ~location:__LOC__
@@ -266,13 +266,13 @@ let setup_local_server ?(client_whitelist = []) ?rest_server_port ~coda
                     Deferred.unit )) ) )
   |> ignore
 
-let create_snark_worker ~public_key ~client_port ~shutdown_on_disconnect =
-  let%map p =
+let create_snark_worker ~client_port ~shutdown_on_disconnect =
+  let%bind p =
     let our_binary = Sys.executable_name in
     Process.create_exn () ~prog:our_binary
       ~args:
         ( "internal" :: Snark_worker.Intf.command_name
-        :: Snark_worker.arguments ~public_key
+        :: Snark_worker.arguments
              ~daemon_address:
                (Host_and_port.create ~host:"127.0.0.1" ~port:client_port)
              ~shutdown_on_disconnect )
@@ -288,14 +288,8 @@ let create_snark_worker ~public_key ~client_port ~shutdown_on_disconnect =
   |> don't_wait_for ;
   Deferred.unit
 
-let run_snark_worker ?shutdown_on_disconnect:(s = true) ~client_port
-    run_snark_worker =
-  match run_snark_worker with
-  | `Don't_run ->
-      ()
-  | `With_public_key public_key ->
-      create_snark_worker ~shutdown_on_disconnect:s ~public_key ~client_port
-      |> ignore
+let run_snark_worker ?shutdown_on_disconnect:(s = true) client_port =
+  create_snark_worker ~shutdown_on_disconnect:s ~client_port |> don't_wait_for
 
 let handle_crash e =
   Core.eprintf

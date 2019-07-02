@@ -17,6 +17,8 @@ val propose_public_keys : t -> Public_key.Compressed.Set.t
 
 val replace_propose_keypairs : t -> Keypair.And_compressed_pk.Set.t -> unit
 
+val replace_snark_worker_key : t -> Public_key.Compressed.t option -> unit
+
 val add_block_subscriber :
      t
   -> Public_key.Compressed.t

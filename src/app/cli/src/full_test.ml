@@ -102,10 +102,6 @@ let run_test () : unit Deferred.t =
       let largest_account_keypair =
         Genesis_ledger.largest_account_keypair_exn ()
       in
-      let run_snark_worker =
-        `With_public_key
-          (Public_key.compress largest_account_keypair.public_key)
-      in
       let%bind coda =
         Coda_lib.create
           (Coda_lib.Config.make ~logger ~trust_system ~net_config
@@ -166,7 +162,7 @@ let run_test () : unit Deferred.t =
       in
       let client_port = 8123 in
       Coda_run.setup_local_server ~client_port ~coda () ;
-      Coda_run.run_snark_worker ~client_port run_snark_worker ;
+      Coda_run.run_snark_worker client_port ;
       (* Let the system settle *)
       let%bind () = Async.after (Time.Span.of_ms 100.) in
       (* No proof emitted by the parallel scan at the begining *)

@@ -172,8 +172,7 @@ let daemon logger =
            { coda: 'a
            ; client_whitelist: 'b
            ; rest_server_port: 'c
-           ; client_port: 'd
-           ; run_snark_worker_action: 'e }
+           ; client_port: 'd }
        end in
        let coda_initialization_deferred () =
          let%bind config =
@@ -367,10 +366,6 @@ let daemon logger =
              Logger.warn logger ~module_:__MODULE__ ~location:__LOC__
                "long async cycle %s"
                (Time_ns.Span.to_string span) ) ;
-         let run_snark_worker_action =
-           Option.value_map run_snark_worker_flag ~default:`Don't_run
-             ~f:(fun k -> `With_public_key k)
-         in
          let trace_database_initialization typ location =
            Logger.trace logger "Creating %s at %s" ~module_:__MODULE__
              ~location typ
@@ -457,8 +452,7 @@ let daemon logger =
          { Coda_initialization.coda
          ; client_whitelist
          ; rest_server_port
-         ; client_port
-         ; run_snark_worker_action }
+         ; client_port }
        in
        (* Breaks a dependency cycle with monitor initilization and coda *)
        let coda_ref : Coda_lib.t option ref = ref None in
@@ -468,8 +462,7 @@ let daemon logger =
        let%bind { Coda_initialization.coda
                 ; client_whitelist
                 ; rest_server_port
-                ; client_port
-                ; run_snark_worker_action } =
+                ; client_port } =
          coda_initialization_deferred ()
        in
        coda_ref := Some coda ;
@@ -486,7 +479,7 @@ let daemon logger =
        Web_pipe.run_service coda web_service ~conf_dir ~logger ;
        Coda_run.setup_local_server ?client_whitelist ?rest_server_port ~coda
          ~client_port () ;
-       Coda_run.run_snark_worker ~client_port run_snark_worker_action ;
+       Coda_run.run_snark_worker client_port ;
        Logger.info logger ~module_:__MODULE__ ~location:__LOC__
          "Running coda services" ;
        Async.never ())
@@ -607,6 +600,7 @@ let coda_commands logger =
         ; (module Coda_batch_payment_test)
         ; (module Coda_long_fork)
         ; (module Coda_delegation_test)
+        ; (module Coda_change_snark_worker_test)
         ; (module Full_test)
         ; (module Transaction_snark_profiler) ]
         : (module Integration_test) list )

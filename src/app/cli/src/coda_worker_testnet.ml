@@ -172,6 +172,16 @@ module Api = struct
       ~f:(fun worker -> Coda_process.new_block_exn worker key)
       t i
 
+  let replace_snark_worker_key t i key =
+    run_online_worker
+      ~f:(fun worker -> Coda_process.replace_snark_worker_key worker key)
+      t i
+
+  let forked_transitions t i =
+    run_online_worker
+      ~f:(fun worker -> Coda_process.forked_transitions_exn worker)
+      t i
+
   let new_user_command_and_subscribe t i key =
     ignore @@ new_block t i key ;
     new_user_command t i key

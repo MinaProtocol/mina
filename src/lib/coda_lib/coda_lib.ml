@@ -43,7 +43,8 @@ type t =
   ; propose_keypairs:
       (Agent.read_write Agent.flag, Keypair.And_compressed_pk.Set.t) Agent.t
   ; mutable seen_jobs: Work_selector.State.t
-  ; subscriptions: Coda_subscriptions.t }
+  ; subscriptions: Coda_subscriptions.t
+  ; mutable snark_worker_key: Public_key.Compressed.t option }
 [@@deriving fields]
 
 let subscription t = t.subscriptions
@@ -55,12 +56,14 @@ let peek_frontier frontier_broadcast_pipe =
          (Error.of_string
             "Cannot retrieve transition frontier now. Bootstrapping right now.")
 
-let snark_worker_key t = t.config.snark_worker_key
-
 let propose_public_keys t =
   Consensus.Data.Local_state.current_proposers t.config.consensus_local_state
 
 let replace_propose_keypairs t kps = Agent.update t.propose_keypairs kps
+
+let snark_worker_key t = t.snark_worker_key
+
+let replace_snark_worker_key t key = t.snark_worker_key <- key
 
 let best_tip_opt t =
   let open Option.Let_syntax in
@@ -602,4 +605,5 @@ let create (config : Config.t) =
             ; wallets
             ; propose_keypairs
             ; seen_jobs= Work_selector.State.init
-            ; subscriptions } ) )
+            ; subscriptions
+            ; snark_worker_key= config.snark_worker_key } ) )

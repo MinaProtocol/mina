@@ -98,6 +98,14 @@ let verified_transitions_exn (conn, _proc, _) =
   in
   Linear_pipe.wrap_reader r
 
+(* TODO: delete once transition_frontier extensions refactoring gets in *)
+let forked_transitions_exn (conn, _, _) =
+  let%map r =
+    Coda_worker.Connection.run_exn conn
+      ~f:Coda_worker.functions.forked_transitions ~arg:()
+  in
+  Linear_pipe.wrap_reader r
+
 let new_block_exn (conn, _proc, __) key =
   let%map r =
     Coda_worker.Connection.run_exn conn ~f:Coda_worker.functions.new_block
@@ -129,3 +137,7 @@ let dump_tf (conn, _proc, _) =
 let best_path (conn, _proc, _) =
   Coda_worker.Connection.run_exn conn ~f:Coda_worker.functions.best_path
     ~arg:()
+
+let replace_snark_worker_key (conn, _proc, _) key =
+  Coda_worker.Connection.run_exn conn
+    ~f:Coda_worker.functions.replace_snark_worker_key ~arg:key

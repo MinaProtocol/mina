@@ -105,6 +105,13 @@ module T = struct
         ( 'worker
         , unit
         , State_hash.Stable.Latest.t list )
+        Rpc_parallel.Function.t
+    ; replace_snark_worker_key:
+        ('worker, Public_key.Compressed.t option, unit) Rpc_parallel.Function.t
+    ; forked_transitions:
+        ( 'worker
+        , unit
+        , (External_transition.t, State_hash.t) With_hash.t Pipe.Reader.t )
         Rpc_parallel.Function.t }
 
   type coda_functions =
@@ -130,6 +137,15 @@ module T = struct
     ; coda_get_all_user_commands:
            Public_key.Compressed.Stable.V1.t
         -> User_command.Stable.V1.t list Deferred.t
+    ; coda_replace_snark_worker_key:
+        Public_key.Compressed.Stable.V1.t option -> unit Deferred.t
+    ; coda_forked_validated_transitions:
+           unit
+        -> ( External_transition.Stable.V1.t
+           , State_hash.Stable.V1.t )
+           With_hash.t
+           Pipe.Reader.t
+           Deferred.t
     ; coda_root_diff:
            unit
         -> Transition_frontier.Diff.Root_diff.view Pipe.Reader.t Deferred.t
@@ -208,6 +224,12 @@ module T = struct
 
     let best_path_impl ~worker_state ~conn_state:() () =
       worker_state.coda_best_path ()
+
+    let replace_snark_worker_key_impl ~worker_state ~conn_state:() key =
+      worker_state.coda_replace_snark_worker_key key
+
+    let forked_transitions_impl ~worker_state ~conn_state:() =
+      worker_state.coda_forked_validated_transitions
 
     let peers =
       C.create_rpc ~f:peers_impl ~bin_input:Unit.bin_t
@@ -290,6 +312,20 @@ module T = struct
       C.create_rpc ~f:best_path_impl ~bin_input:Unit.bin_t
         ~bin_output:[%bin_type_class: State_hash.Stable.Latest.t list] ()
 
+    let forked_transitions =
+      C.create_pipe ~f:forked_transitions_impl ~bin_input:Unit.bin_t
+        ~bin_output:
+          [%bin_type_class:
+            ( External_transition.Stable.Latest.t
+            , State_hash.Stable.Latest.t )
+            With_hash.Stable.Latest.t] ()
+
+    let replace_snark_worker_key =
+      C.create_rpc ~f:replace_snark_worker_key_impl
+        ~bin_input:
+          [%bin_type_class: Public_key.Compressed.Stable.Latest.t option]
+        ~bin_output:Unit.bin_t ()
+
     let functions =
       { peers
       ; start
@@ -306,7 +342,9 @@ module T = struct
       ; best_path
       ; sync_status
       ; new_user_command
-      ; get_all_user_commands }
+      ; get_all_user_commands
+      ; replace_snark_worker_key
+      ; forked_transitions }
 
     let init_worker_state
         { addrs_and_ports
@@ -434,13 +472,9 @@ module T = struct
                 let%map coda = coda_deferred () in
                 coda_ref := Some coda ;
                 Option.iter snark_worker_config ~f:(fun config ->
-                    let run_snark_worker =
-                      `With_public_key config.public_key
-                    in
                     Coda_run.setup_local_server ~client_port:config.port ~coda
                       () ;
-                    Coda_run.run_snark_worker ~client_port:config.port
-                      run_snark_worker ) ;
+                    Coda_run.run_snark_worker config.port ) ;
                 coda )
               ()
           in
@@ -502,14 +536,20 @@ module T = struct
                   !"Failed to construct payment proof: %{sexp:Error.t}"
                   e ()
           in
+          let coda_replace_snark_worker_key =
+            Fn.compose Deferred.return (Coda_lib.replace_snark_worker_key coda)
+          in
           let coda_new_block key =
             Deferred.return @@ Coda_commands.Subscriptions.new_block coda key
+          in
+          (* TODO: Remove forked_validated_transitions once the refactoring of broadcast pipe enters the code base *)
+          let validated_transitions, forked_validated_transitions =
+            Strict_pipe.Reader.Fork.two (Coda_lib.validated_transitions coda)
           in
           let coda_verified_transitions () =
             let r, w = Linear_pipe.create () in
             don't_wait_for
-              (Strict_pipe.Reader.iter (Coda_lib.validated_transitions coda)
-                 ~f:(fun t ->
+              (Strict_pipe.Reader.iter validated_transitions ~f:(fun t ->
                    let p =
                      External_transition.Validated.protocol_state
                        (With_hash.data t)
@@ -528,6 +568,16 @@ module T = struct
                      (prev_state_hash, state_hash) ;
                    Deferred.unit )) ;
             return r.pipe
+          in
+          let coda_forked_validated_transitions () =
+            Deferred.return
+              ( Strict_pipe.Reader.to_linear_pipe
+              @@ Strict_pipe.Reader.map
+                   ~f:
+                     (With_hash.map
+                        ~f:External_transition.Validated.forget_validation)
+                   forked_validated_transitions )
+                .pipe
           in
           let coda_root_diff () =
             let r, w = Linear_pipe.create () in
@@ -603,7 +653,10 @@ module T = struct
           ; coda_sync_status= with_monitor coda_sync_status
           ; coda_new_user_command= with_monitor coda_new_user_command
           ; coda_get_all_user_commands= with_monitor coda_get_all_user_commands
-          } )
+          ; coda_forked_validated_transitions=
+              with_monitor coda_forked_validated_transitions
+          ; coda_replace_snark_worker_key=
+              with_monitor coda_replace_snark_worker_key } )
 
     let init_connection_state ~connection:_ ~worker_state:_ = return
   end
