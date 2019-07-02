@@ -502,6 +502,9 @@ module Tick = struct
 
     (* benchmark unchunked, chunked hashes *)
 
+    let%bench "dummy test to force deserialization" =
+      For_tests.hash_unchunked 1
+
     let%bench "hash one triple unchunked" = For_tests.hash_unchunked 1
 
     let%bench "hash one triple chunked" = For_tests.hash_chunked 1
