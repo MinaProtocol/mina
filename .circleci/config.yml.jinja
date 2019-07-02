@@ -50,7 +50,7 @@ jobs:
 
     lint:
         docker:
-            - image: codaprotocol/coda:toolchain-51191cf583a5129255d2c53ad946f6821ad9989c
+            - image: codaprotocol/coda:toolchain-ee5f10295e63166d313219808c98149e32df0fcf
         steps:
             - checkout
             - run: git submodule sync && git submodule update --init --recursive
@@ -147,7 +147,7 @@ jobs:
         resource_class: large
         {%- endif %}
         docker:
-            - image: codaprotocol/coda:toolchain-51191cf583a5129255d2c53ad946f6821ad9989c
+            - image: codaprotocol/coda:toolchain-ee5f10295e63166d313219808c98149e32df0fcf
         environment:
             DUNE_PROFILE: {{profile}}
         steps:
@@ -186,7 +186,7 @@ jobs:
     test-unit--{{profile}}:
         resource_class: large
         docker:
-            - image: codaprotocol/coda:toolchain-51191cf583a5129255d2c53ad946f6821ad9989c
+            - image: codaprotocol/coda:toolchain-ee5f10295e63166d313219808c98149e32df0fcf
         steps:
             - checkout
             - run: ulimit -c unlimited
@@ -202,7 +202,7 @@ jobs:
     test--{{profile}}:
         resource_class: large
         docker:
-            - image: codaprotocol/coda:toolchain-51191cf583a5129255d2c53ad946f6821ad9989c
+            - image: codaprotocol/coda:toolchain-ee5f10295e63166d313219808c98149e32df0fcf
         steps:
             - checkout
             - run: git submodule sync && git submodule update --init --recursive
