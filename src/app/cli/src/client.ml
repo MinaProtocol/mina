@@ -215,21 +215,22 @@ let get_public_keys =
              (module Cli_lib.Render.String_list_formatter)
              Get_public_keys.rpc () port ))
 
-let prove_payment =
+let generate_receipt =
   let open Daemon_rpcs in
   let open Command.Param in
   let open Cli_lib.Arg_type in
   let receipt_hash_flag =
     flag "receipt-chain-hash"
       ~doc:
-        "RECEIPTHASH Receipt-chain-hash of the payment that you want to prove"
+        "RECEIPTHASH Receipt-chain-hash of the payment that you want to\n\
+        \        generate a receipt for"
       (required receipt_chain_hash)
   in
   let address_flag =
     flag "address" ~doc:"PUBLICKEY Public-key address of sender"
       (required public_key_compressed)
   in
-  Command.async ~summary:"Generate a proof of a sent payment"
+  Command.async ~summary:"Generate a receipt for a sent payment"
     (Cli_lib.Background_daemon.init (Args.zip2 receipt_hash_flag address_flag)
        ~f:(fun port (receipt_chain_hash, pk) ->
          dispatch_with_message Prove_receipt.rpc (receipt_chain_hash, pk) port
@@ -240,14 +241,14 @@ let read_json filepath =
   let%map json_contents = Reader.file_contents filepath in
   Yojson.Safe.from_string json_contents
 
-let verify_payment =
+let verify_receipt =
   let open Deferred.Let_syntax in
   let open Daemon_rpcs in
   let open Command.Param in
   let open Cli_lib.Arg_type in
   let proof_path_flag =
     flag "proof-path"
-      ~doc:"PROOFFILE File to read json version of payment proof"
+      ~doc:"PROOFFILE File to read json version of payment receipt"
       (required string)
   in
   let payment_path_flag =
@@ -259,7 +260,7 @@ let verify_payment =
     flag "address" ~doc:"PUBLICKEY Public-key address of sender"
       (required public_key_compressed)
   in
-  Command.async ~summary:"Verify a proof of a sent payment"
+  Command.async ~summary:"Verify a receipt of a sent payment"
     (Cli_lib.Background_daemon.init
        (Args.zip3 payment_path_flag proof_path_flag address_flag)
        ~f:(fun port (payment_path, proof_path, pk) ->
@@ -644,21 +645,22 @@ end
 
 let command =
   Command.group ~summary:"Lightweight client commands"
+    ~preserve_subcommand_order:()
     [ ("get-balance", get_balance)
-    ; ("get-public-keys", get_public_keys)
-    ; ("prove-payment", prove_payment)
-    ; ("verify-payment", verify_payment)
-    ; ("get-nonce", get_nonce_cmd)
     ; ("send-payment", send_payment)
+    ; ("generate-keypair", generate_keypair)
     ; ("delegate-stake", delegate_stake)
+    ; ("generate-receipt", generate_receipt)
+    ; ("verify-receipt", verify_receipt)
     ; ("stop-daemon", stop_daemon)
-    ; ("status", status)
-    ; ("generate-keypair", generate_keypair) ]
+    ; ("status", status) ]
 
 let advanced =
   Command.group ~summary:"Advanced client commands"
-    [ ("get-trust-status", get_trust_status)
+    [ ("get-nonce", get_nonce_cmd)
+    ; ("get-trust-status", get_trust_status)
     ; ("get-trust-status-all", get_trust_status_all)
+    ; ("get-public-keys", get_public_keys)
     ; ("reset-trust-status", reset_trust_status)
     ; ("batch-send-payments", batch_send_payments)
     ; ("status-clear-hist", status_clear_hist)
