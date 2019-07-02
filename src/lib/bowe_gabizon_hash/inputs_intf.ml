@@ -23,7 +23,7 @@ module type S = sig
   module Fqe : sig
     type t
 
-    val parts : t -> Field.t list
+    val to_list : t -> Field.t list
   end
 
   module G1 : sig
