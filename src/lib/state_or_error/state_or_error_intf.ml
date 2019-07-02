@@ -22,7 +22,7 @@ module type S = functor (State : State_intf) -> sig
 
   val put : State.t -> unit t
 
-  val error_if : bool -> message:string -> unit t
+  val error_if : bool -> message:string -> value:'a -> 'a t
 end
 
 module type S2 = functor (State : State_intf1) -> sig
@@ -35,7 +35,7 @@ module type S2 = functor (State : State_intf1) -> sig
 
   val put : 'a State.t -> (unit, 'a) t
 
-  val error_if : bool -> message:string -> (unit, _) t
+  val error_if : bool -> message:string -> value:'a -> ('a, _) t
 end
 
 module type S3 = functor (State : State_intf2) -> sig
@@ -50,5 +50,5 @@ module type S3 = functor (State : State_intf2) -> sig
 
   val put : ('a, 'b) State.t -> (unit, 'a, 'b) t
 
-  val error_if : bool -> message:string -> (unit, _, _) t
+  val error_if : bool -> message:string -> value:'a -> ('a, _, _) t
 end

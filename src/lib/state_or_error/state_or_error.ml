@@ -30,8 +30,8 @@ functor
 
     let run_state t ~state = t state
 
-    let error_if b ~message =
-      if b then fun _ -> Or_error.error_string message else return ()
+    let error_if b ~message ~value =
+      if b then fun _ -> Or_error.error_string message else return value
   end
 
 module Make2 : State_or_error_intf.S2 =
@@ -64,8 +64,8 @@ functor
 
     let run_state t ~state = t state
 
-    let error_if b ~message =
-      if b then fun _ -> Or_error.error_string message else return ()
+    let error_if b ~message ~value =
+      if b then fun _ -> Or_error.error_string message else return value
   end
 
 module Make3 : State_or_error_intf.S3 =
@@ -98,6 +98,6 @@ functor
 
     let run_state t ~state = t state
 
-    let error_if b ~message =
-      if b then fun _ -> Or_error.error_string message else return ()
+    let error_if b ~message ~value =
+      if b then fun _ -> Or_error.error_string message else return value
   end
