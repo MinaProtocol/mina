@@ -1,13 +1,14 @@
 open Core
 open Async
-open Coda_base
 
 module Make (Inputs : Intf.Worker_inputs) = struct
   open Inputs
 
   module type S = sig
     val handle_diff :
-      Diff_hash.t -> State_hash.t Diff_mutant.E.t -> Diff_hash.t
+         Transition_frontier.Diff.Hash.t
+      -> Transition_frontier.Diff.Mutant.E.t
+      -> Transition_frontier.Diff.Hash.t
   end
 
   module Worker = Worker.Make (Inputs)
@@ -37,8 +38,9 @@ module Make (Inputs : Intf.Worker_inputs) = struct
     let handle_diff =
       create
         [%bin_type_class:
-          Diff_hash.t * State_hash.Stable.Latest.t Diff_mutant.E.t]
-        Diff_hash.bin_t (fun (module W) (diff_hash, diff_mutant) ->
+          Transition_frontier.Diff.Hash.t * Transition_frontier.Diff.Mutant.E.t]
+        Transition_frontier.Diff.Hash.bin_t
+        (fun (module W) (diff_hash, diff_mutant) ->
           Deferred.return (W.handle_diff diff_hash diff_mutant) )
   end
 
@@ -49,8 +51,9 @@ module Make (Inputs : Intf.Worker_inputs) = struct
       type 'w functions =
         { handle_diff:
             ( 'w
-            , Diff_hash.t * State_hash.Stable.Latest.t Diff_mutant.E.t
-            , Diff_hash.t )
+            , Transition_frontier.Diff.Hash.t
+              * Transition_frontier.Diff.Mutant.E.t
+            , Transition_frontier.Diff.Hash.t )
             F.t }
 
       module Worker_state = Worker_state

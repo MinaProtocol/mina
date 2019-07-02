@@ -3,6 +3,7 @@ let component = ReasonReact.statelessComponent("Header");
 module Styles = {
   open Css;
   open Theme;
+
   let header =
     merge([
       style([
@@ -16,47 +17,143 @@ module Styles = {
         display(`flex),
         alignItems(`center),
         justifyContent(`spaceBetween),
-        backgroundColor(Colors.headerBgColor),
         color(black),
         fontFamily("IBM Plex Sans, Sans-Serif"),
-        padding2(~v=`px(0), ~h=Theme.Spacing.defaultSpacing),
+        padding2(~v=`zero, ~h=Theme.Spacing.defaultSpacing),
         borderBottom(`px(1), `solid, Colors.borderColor),
         CssElectron.appRegion(`drag),
       ]),
       notText,
     ]);
+
+  let logo =
+    style([display(`flex), alignItems(`center), marginLeft(`px(4))]);
+
+  let rightButtons =
+    style([
+      display(`flex),
+      alignItems(`center),
+      justifyContent(`spaceBetween),
+    ]);
+
+  let deactivatedSettings =
+    merge([
+      Link.Styles.greyLink,
+      style([
+        padding4(
+          ~top=`rem(0.5),
+          ~right=`rem(0.75),
+          ~bottom=`rem(0.5),
+          ~left=`rem(0.5),
+        ),
+        color(Theme.Colors.slateAlpha(0.5)),
+        hover([
+          backgroundColor(Theme.Colors.slateAlpha(0.15)),
+          borderRadius(`px(6)),
+          color(Theme.Colors.slate),
+        ]),
+      ]),
+    ]);
+
+  let activatedSettings =
+    merge([
+      deactivatedSettings,
+      style([
+        color(Theme.Colors.hyperlinkAlpha(0.8)),
+        backgroundColor(Theme.Colors.hyperlinkAlpha(0.15)),
+        borderRadius(`px(6)),
+      ]),
+    ]);
+};
+
+module SyncStatusQ = [%graphql
+  {|
+    query querySyncStatus {
+      syncStatus
+    }
+  |}
+];
+
+module SyncStatusQuery = ReasonApollo.CreateQuery(SyncStatusQ);
+
+module SyncStatus = {
+  module SubscriptionGQL = [%graphql
+    {|
+      subscription syncStatus {
+        newSyncUpdate
+      }
+    |}
+  ];
+
+  module Subscription = ReasonApollo.CreateSubscription(SubscriptionGQL);
+
+  [@react.component]
+  let make =
+      (
+        ~result,
+        ~subscribeToMore as
+          _:
+            (
+              ~document: ReasonApolloTypes.queryString,
+              ~variables: Js.Json.t=?,
+              ~updateQuery: ReasonApolloQuery.updateQuerySubscriptionT=?,
+              ~onError: ReasonApolloQuery.onErrorT=?,
+              unit
+            ) =>
+            unit,
+      ) => {
+    // TODO: Replace/remove when we fix/replace the current subscriptions
+    /* let _ = */
+    /*   React.useEffect0(() => { */
+    /*     subscribeToMore(~document=Subscription.graphQLSubscriptionAST, ()); */
+    /*     None; */
+    /*   }); */
+    switch ((result: SyncStatusQuery.response)) {
+    | Loading => <Alert kind=`Warning message="Connecting" />
+    | Error(_) => <Alert kind=`Danger message="Error" />
+    | Data(response) =>
+      switch (response##syncStatus) {
+      | `OFFLINE => <Alert kind=`Danger message="Offline" />
+      | `SYNCED => <Alert kind=`Success message="Synced" />
+      | `BOOTSTRAP => <Alert kind=`Warning message="Syncing" />
+      }
+    };
+  };
 };
 
 [@react.component]
-let make = () =>
+let make = () => {
+  let url = ReasonReact.Router.useUrl();
+  let onSettingsPage =
+    switch (url.path) {
+    | ["settings", ..._] => true
+    | _ => false
+    };
   <header className=Styles.header>
-    <div
-      style={ReactDOMRe.Style.make(~display="flex", ~alignItems="center", ())}>
-      <div className=Theme.codaLogoCurrent />
-      <p
-        style={ReactDOMRe.Style.make(~fontWeight="100", ~fontSize="160%", ())}>
-        {ReasonReact.string({j|CODA|j})}
-      </p>
+    <div className=Styles.logo onClick={_ => ReasonReact.Router.push("/")}>
+      <img src="CodaLogo.svg" alt="Coda logo" />
     </div>
-    <div
-      style={ReactDOMRe.Style.make(
-        ~fontWeight="500",
-        ~color="#479056",
-        ~marginRight="10px",
-        ~padding="0.25em",
-        ~paddingLeft="2em",
-        ~paddingRight="2em",
-        ~overflow="hidden",
-        ~borderRadius="4px",
-        ~background=
-          {|repeating-linear-gradient(
-                to right,
-                transparent,
-                transparent 2px,
-                rgba(71, 144, 86, 0.3) 2px,
-                rgba(71, 144, 86, 0.3) 4px)|},
-        (),
-      )}>
-      {ReasonReact.string({j|SYNCED 1.4s|j})}
+    <div className=Styles.rightButtons>
+      <SyncStatusQuery fetchPolicy="no-cache" partialRefetch=true>
+        {response =>
+           <SyncStatus
+             result={response.result}
+             subscribeToMore={response.subscribeToMore}
+           />}
+      </SyncStatusQuery>
+      <Spacer width=0.75 />
+      <a
+        className={
+          onSettingsPage
+            ? Styles.activatedSettings : Styles.deactivatedSettings
+        }
+        onClick={_e =>
+          ReasonReact.Router.push(onSettingsPage ? "/" : "/settings")
+        }>
+        <Icon kind=Icon.Settings />
+        <Spacer width=0.25 />
+        {React.string("Settings")}
+      </a>
     </div>
   </header>;
+};

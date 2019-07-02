@@ -53,6 +53,30 @@ module Tick0 = struct
   module Snarkable = Make_snarkable (Crypto_params.Tick0)
 end
 
+let%test_unit "group-map test" =
+  let params =
+    Group_map.Params.create
+      (module Tick0.Field)
+      ~a:Tick_backend.Inner_curve.Coefficients.a
+      ~b:Tick_backend.Inner_curve.Coefficients.b
+  in
+  let module M = Snarky.Snark.Run.Make (Tick_backend) (Unit) in
+  Quickcheck.test ~trials:3 Tick0.Field.gen ~f:(fun t ->
+      let (), checked_output =
+        M.run_and_check
+          (fun () ->
+            let x, y =
+              Snarky_group_map.Checked.to_group
+                (module M)
+                ~params (M.Field.constant t)
+            in
+            fun () -> M.As_prover.(read_var x, read_var y) )
+          ()
+        |> Or_error.ok_exn
+      in
+      [%test_eq: Tick0.Field.t * Tick0.Field.t] checked_output
+        (Group_map.to_group (module Tick0.Field) ~params t) )
+
 module Wrap_input = Crypto_params.Wrap_input
 
 module Make_inner_curve_scalar
@@ -106,23 +130,13 @@ struct
   end
 end
 
-module Make_inner_curve_aux
-    (Impl : Snark_intf.S)
-    (Other_impl : Snark_intf.S) (Coefficients : sig
-        val a : Impl.Field.t
-
-        val b : Impl.Field.t
-    end) =
+module Make_inner_curve_aux (Impl : Snark_intf.S) (Other_impl : Snark_intf.S) =
 struct
   open Impl
 
   type var = Field.Var.t * Field.Var.t
 
   module Scalar = Make_inner_curve_scalar (Impl) (Other_impl)
-
-  let find_y x =
-    let y2 = Field.((x * square x) + (Coefficients.a * x) + Coefficients.b) in
-    if Field.is_square y2 then Some (Field.sqrt y2) else None
 end
 
 module Tock = struct
@@ -139,13 +153,12 @@ module Tock = struct
               (struct
                 type nonrec t = t
 
-                let to_sexpable = to_affine_coordinates
+                let to_sexpable = to_affine_exn
 
-                let of_sexpable = of_affine_coordinates
+                let of_sexpable = of_affine
               end)
 
     include Make_inner_curve_aux (Tock0) (Tick0)
-              (Tock_backend.Inner_curve.Coefficients)
 
     let ctypes_typ = typ
 
@@ -216,7 +229,7 @@ module Tock = struct
                     (Coefficients)
 
           let one =
-            let x, y = Snarkette_tock.G2.(to_affine_coordinates one) in
+            let x, y = Snarkette_tock.G2.(to_affine_exn one) in
             {x= Fqe.conv x; y= Fqe.conv y; z= Fqe.Unchecked.one}
         end
 
@@ -270,7 +283,7 @@ module Tock = struct
                   end)
 
         let create_constant =
-          Fn.compose create_constant G2.Unchecked.to_affine_coordinates
+          Fn.compose create_constant G2.Unchecked.to_affine_exn
       end
     end
 
@@ -293,8 +306,8 @@ module Tock = struct
     let conv_fqe v = Field.Vector.(get v 0, get v 1)
 
     let conv_g2 p =
-      let x, y = Tock_backend.Inner_twisted_curve.to_affine_coordinates p in
-      Pairing.G2.Unchecked.of_affine_coordinates (conv_fqe x, conv_fqe y)
+      let x, y = Tock_backend.Inner_twisted_curve.to_affine_exn p in
+      Pairing.G2.Unchecked.of_affine (conv_fqe x, conv_fqe y)
 
     let conv_fqk p =
       let v = Tick_backend.Full.Fqk.to_elts p in
@@ -348,27 +361,16 @@ module Tick = struct
               (struct
                 type nonrec t = t
 
-                let to_sexpable = to_affine_coordinates
+                let to_sexpable = to_affine_exn
 
-                let of_sexpable = of_affine_coordinates
+                let of_sexpable = of_affine
               end)
 
     include Make_inner_curve_aux (Tick0) (Tock0)
-              (Tick_backend.Inner_curve.Coefficients)
 
     let ctypes_typ = typ
 
     let scale = scale_field
-
-    let point_near_x x =
-      let rec go x = function
-        | Some y ->
-            of_affine_coordinates (x, y)
-        | None ->
-            let x' = Field.(add one x) in
-            go x' (find_y x')
-      in
-      go x (find_y x)
 
     module Checked = struct
       include Snarky_curves.Make_weierstrass_checked (Fq) (Scalar)
@@ -388,16 +390,7 @@ module Tick = struct
   module Pedersen = struct
     include Crypto_params.Pedersen_params
     include Crypto_params.Pedersen_chunk_table
-
-    include Pedersen.Make (struct
-      module Field = Field
-      module Bigint = Bigint
-      module Curve = Inner_curve
-
-      let params = params
-
-      let chunk_table = chunk_table
-    end)
+    include Crypto_params.Tick_pedersen
 
     let zero_hash =
       digest_fold (State.create ())
@@ -424,8 +417,8 @@ module Tick = struct
         if phys_equal c1 Inner_curve.zero || phys_equal c2 Inner_curve.zero
         then phys_equal c1 c2
         else
-          let c1_x, c1_y = Inner_curve.to_affine_coordinates c1 in
-          let c2_x, c2_y = Inner_curve.to_affine_coordinates c2 in
+          let c1_x, c1_y = Inner_curve.to_affine_exn c1 in
+          let c2_x, c2_y = Inner_curve.to_affine_exn c2 in
           Field.equal c1_x c2_x && Field.equal c1_y c2_y
 
       let equal_states s1 s2 =
@@ -559,7 +552,7 @@ module Tick = struct
                     end)
 
           let one =
-            let x, y = Snarkette_tick.G2.(to_affine_coordinates one) in
+            let x, y = Snarkette_tick.G2.(to_affine_exn one) in
             {z= Fqe.Unchecked.one; x= Fqe.conv x; y= Fqe.conv y}
         end
 
@@ -619,7 +612,7 @@ module Tick = struct
                   end)
 
         let create_constant =
-          Fn.compose create_constant G2.Unchecked.to_affine_coordinates
+          Fn.compose create_constant G2.Unchecked.to_affine_exn
       end
     end
 
@@ -636,8 +629,8 @@ module Tick = struct
     let conv_fqe v = Field.Vector.(get v 0, get v 1, get v 2)
 
     let conv_g2 p =
-      let x, y = Tick_backend.Inner_twisted_curve.to_affine_coordinates p in
-      Pairing.G2.Unchecked.of_affine_coordinates (conv_fqe x, conv_fqe y)
+      let x, y = Tick_backend.Inner_twisted_curve.to_affine_exn p in
+      Pairing.G2.Unchecked.of_affine (conv_fqe x, conv_fqe y)
 
     let conv_fqk (p : Tock_backend.Full.Fqk.t) =
       let v = Tock_backend.Full.Fqk.to_elts p in
@@ -681,8 +674,8 @@ end
 
 let tock_vk_to_bool_list vk =
   let vk = Tick.Groth_maller_verifier.vk_of_backend_vk vk in
-  let g1 = Tick.Inner_curve.to_affine_coordinates in
-  let g2 = Tick.Pairing.G2.Unchecked.to_affine_coordinates in
+  let g1 = Tick.Inner_curve.to_affine_exn in
+  let g2 = Tick.Pairing.G2.Unchecked.to_affine_exn in
   let vk =
     { vk with
       query_base= g1 vk.query_base
@@ -719,8 +712,17 @@ let set_chunked_hashing b = Tick.Pedersen.State.set_chunked_fold b
 [%%inject
 "scan_state_work_delay_factor", scan_state_work_delay_factor]
 
+[%%inject
+"scan_state_latency_factor", scan_state_latency_factor]
+
 let pending_coinbase_depth =
-  scan_state_transaction_capacity_log_2 + scan_state_work_delay_factor
+  let working_levels =
+    scan_state_transaction_capacity_log_2 + scan_state_work_delay_factor
+    - scan_state_latency_factor + 1
+  in
+  let root_nodes = Int.pow 2 scan_state_latency_factor in
+  let total_stacks = working_levels * root_nodes in
+  Int.ceil_log2 total_stacks
 
 (* Let n = Tick.Field.size_in_bits.
    Let k = n - 3.

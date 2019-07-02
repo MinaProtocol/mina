@@ -3,9 +3,9 @@ open Coda_base
 open Signature_lib
 open Currency
 
-let pk = Public_key.Compressed.of_base64_exn
+let pk = Public_key.Compressed.of_base58_check_exn
 
-let sk = Private_key.of_base64_exn
+let sk = Private_key.of_base58_check_exn
 
 module type Base_intf = sig
   val accounts : (Private_key.t option * Account.t) list

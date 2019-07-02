@@ -67,8 +67,14 @@ module Common = struct
     let%map fee = Currency.Fee.gen
     and nonce = Account_nonce.gen
     and memo =
-      String.gen_with_length Memo.max_size_in_bytes Char.quickcheck_generator
-      >>| Memo.create_exn
+      let%bind is_digest = Bool.quickcheck_generator in
+      if is_digest then
+        String.gen_with_length Memo.max_digestible_string_length
+          Char.quickcheck_generator
+        >>| Memo.create_by_digesting_string_exn
+      else
+        String.gen_with_length Memo.max_input_length Char.quickcheck_generator
+        >>| Memo.create_from_string_exn
     in
     Poly.{fee; nonce; memo}
 
@@ -147,12 +153,6 @@ module Body = struct
           Tag.fold Stake_delegation +> Stake_delegation.fold d
           +> Fold.init (max_variant_size - Stake_delegation.length_in_triples)
                ~f:(fun _ -> (false, false, false)))
-
-  let sender_cost = function
-    | Payment {amount; _} ->
-        amount
-    | Stake_delegation _ ->
-        Currency.Amount.zero
 
   let length_in_triples = Tag.length_in_triples + max_variant_size
 

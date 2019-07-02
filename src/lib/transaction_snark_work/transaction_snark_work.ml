@@ -1,17 +1,14 @@
 open Core_kernel
 open Async_kernel
-open Protocols
-open Coda_pow
-open Signature_lib
 open Module_version
+open Currency
+open Signature_lib
 
 module Make (Ledger_proof : sig
   type t [@@deriving sexp, bin_io]
 end) :
-  Protocols.Coda_pow.Transaction_snark_work_intf
-  with type proof := Ledger_proof.t
-   and type statement := Transaction_snark.Statement.t
-   and type public_key := Public_key.Compressed.t = struct
+  Coda_intf.Transaction_snark_work_intf
+  with type ledger_proof := Ledger_proof.t = struct
   let proofs_length = 2
 
   module Statement = struct
@@ -54,7 +51,7 @@ end) :
       module V1 = struct
         module T = struct
           type t =
-            { fee: Fee.Unsigned.t
+            { fee: Fee.Stable.V1.t
             ; proofs: Ledger_proof.t list
             ; prover: Public_key.Compressed.Stable.V1.t }
           [@@deriving sexp, bin_io, version {asserted}]
@@ -78,9 +75,7 @@ end) :
 
     (* bin_io omitted *)
     type t = Stable.Latest.t =
-      { fee: Fee.Unsigned.t
-      ; proofs: Ledger_proof.t list
-      ; prover: Public_key.Compressed.t }
+      {fee: Fee.t; proofs: Ledger_proof.t list; prover: Public_key.Compressed.t}
     [@@deriving sexp]
   end
 
@@ -95,6 +90,8 @@ end) :
   end
 
   let forget = Fn.id
+
+  let fee {fee; _} = fee
 end
 
 include Make (Ledger_proof.Stable.V1)

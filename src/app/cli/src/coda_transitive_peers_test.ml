@@ -1,11 +1,7 @@
 open Core
 open Async
-open Coda_worker
-open Coda_inputs
 
 let name = "coda-transitive-peers-test"
-
-open Coda_processes
 
 let main () =
   let%bind program_dir = Unix.getcwd () in
@@ -16,31 +12,28 @@ let main () =
     Time.Span.of_ms
       (proposal_interval * Consensus.Constants.delta |> Float.of_int)
   in
-  let work_selection = Protocols.Coda_pow.Work_selection.Seq in
+  let work_selection_method = Cli_lib.Arg_type.Sequence in
   Coda_processes.init () ;
   let trace_dir = Unix.getenv "CODA_TRACING" in
   let max_concurrent_connections = None in
   let configs =
     Coda_processes.local_configs n ~program_dir ~proposal_interval
       ~acceptable_delay ~snark_worker_public_keys:None
-      ~proposers:(Fn.const None) ~work_selection ~trace_dir
+      ~proposers:(Fn.const None) ~work_selection_method ~trace_dir
       ~max_concurrent_connections
   in
   let%bind workers = Coda_processes.spawn_local_processes_exn configs in
-  let discovery_ports, external_ports, peers =
-    Coda_processes.net_configs (n + 1)
-  in
+  let addrs_and_ports_list, peers = Coda_processes.net_configs (n + 1) in
   let expected_peers = List.nth_exn peers n in
   let peers = [List.hd_exn expected_peers] in
-  let external_port = List.nth_exn external_ports n in
-  let discovery_port = List.nth_exn discovery_ports n in
+  let addrs_and_ports = List.nth_exn addrs_and_ports_list n in
   Logger.debug logger ~module_:__MODULE__ ~location:__LOC__
     !"connecting to peers %{sexp: Host_and_port.t list}\n"
     peers ;
   let config =
-    Coda_process.local_config ~peers ~external_port ~discovery_port
-      ~acceptable_delay ~snark_worker_config:None ~proposer:None ~program_dir
-      ~work_selection ~trace_dir ~offset:Time.Span.zero ()
+    Coda_process.local_config ~peers ~addrs_and_ports ~acceptable_delay
+      ~snark_worker_config:None ~proposer:None ~program_dir
+      ~work_selection_method ~trace_dir ~offset:Time.Span.zero ()
       ~max_concurrent_connections
   in
   let%bind worker = Coda_process.spawn_exn config in

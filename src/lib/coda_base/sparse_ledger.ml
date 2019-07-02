@@ -32,23 +32,16 @@ type t = Stable.Latest.t [@@deriving sexp]
 
 module Latest_make = V1_make
 
-let ( of_hash
-    , get_exn
-    , path_exn
-    , set_exn
-    , find_index_exn
-    , add_path
-    , merkle_root
-    , iteri ) =
-  Latest_make.
-    ( of_hash
-    , get_exn
-    , path_exn
-    , set_exn
-    , find_index_exn
-    , add_path
-    , merkle_root
-    , iteri )
+[%%define_locally
+Latest_make.
+  ( of_hash
+  , get_exn
+  , path_exn
+  , set_exn
+  , find_index_exn
+  , add_path
+  , merkle_root
+  , iteri )]
 
 let of_root (h : Ledger_hash.t) =
   of_hash ~depth:Ledger.depth (Ledger_hash.of_digest (h :> Pedersen.Digest.t))
@@ -70,7 +63,7 @@ let of_any_ledger (ledger : Ledger.Any_ledger.witness) =
 
 let of_ledger_subset_exn (oledger : Ledger.t) keys =
   let ledger = Ledger.copy oledger in
-  let new_keys, sparse =
+  let _, sparse =
     List.fold keys
       ~f:(fun (new_keys, sl) key ->
         match Ledger.location_of_key ledger key with

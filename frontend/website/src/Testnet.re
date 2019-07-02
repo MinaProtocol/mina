@@ -67,6 +67,26 @@ let extraHeaders = () => <> {Head.legacyStylesheets()} </>;
     [Style.Typeface.ibmplexsans, color(Style.Colors.saville)],
   );
 
+  // Disable red state since the demo is broken
+  global(
+    ".bg-brightred div",
+    [
+      backgroundColor(Style.Colors.teal),
+      Style.Typeface.ibmplexsans,
+      color(Style.Colors.saville),
+    ],
+  );
+
+  global(
+    ".shadow-small1.bg-brightred",
+    [backgroundColor(`hex("bcbcbc")), boxShadow(transparent)],
+  );
+
+  global(
+    ".state-with-proof div:nth-child(2) div .mw5 > div:nth-child(2)",
+    [display(`none)],
+  );
+
   // Header on other containers
   global(
     "div.silver-gradient div",
@@ -164,8 +184,9 @@ let make = _ => {
           style([
             display(`flex),
             flexWrap(`wrap),
+            flexDirection(`column),
             justifyContent(`spaceBetween),
-            maxWidth(`rem(52.)),
+            maxWidth(`rem(32.)),
             marginLeft(`auto),
             marginRight(`auto),
             media(
@@ -179,7 +200,6 @@ let make = _ => {
             merge([
               Style.Body.basic,
               style([
-                maxWidth(`rem(20.)),
                 marginLeft(`rem(1.)),
                 marginRight(`rem(1.)),
                 marginTop(`rem(1.)),
@@ -188,10 +208,9 @@ let make = _ => {
             ])
           )>
           {ReasonReact.string(
-             "Coda's testnet is live as of September 2018, \
-        performing transactions and updating its protocol state proof. See below \
-        for a live demo of your browser (whether on mobile or desktop) fully \
-        verifying the protocol state and an account balance as they are updated.",
+             "Public Testnet Beta is launching soon. See below \
+              for an explanation of how the protocol state and \
+              account balance are verified.",
            )}
         </div>
         <div
@@ -202,32 +221,12 @@ let make = _ => {
               marginRight(`rem(1.)),
             ])
           )>
-          <p className=rightSideText>
-            {ReasonReact.string("We'll soon be releasing the public testnet")}
-          </p>
           <A
             name={"testnet-" ++ Links.Forms.participateInConsensus.name}
             target="_blank"
             href={Links.Forms.participateInConsensus.link}
             className=rightSideLink>
-            {ReasonReact.string(
-               {js|Notify me about participating in consensus\u00A0→|js},
-             )}
-          </A>
-          <A
-            name={"testnet-" ++ Links.Forms.compressTheBlockchain.name}
-            target="_blank"
-            href={Links.Forms.compressTheBlockchain.link}
-            className=rightSideLink>
-            {ReasonReact.string(
-               {js|Help to compress the Coda blockchain\u00A0→|js},
-             )}
-          </A>
-          <A
-            name="testnet-status"
-            href=Links.ThirdParty.testnetStatus
-            className=rightSideLink>
-            {ReasonReact.string({js|Check testnet uptime status\u00A0→|js})}
+            {ReasonReact.string({js|Participate in the testnet\u00A0→|js})}
           </A>
         </div>
       </div>

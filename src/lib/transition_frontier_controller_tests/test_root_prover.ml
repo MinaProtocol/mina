@@ -12,7 +12,7 @@ let%test_module "Root_prover" =
   ( module struct
     let to_external_transition breadcrumb =
       Transition_frontier.Breadcrumb.transition_with_hash breadcrumb
-      |> With_hash.data |> External_transition.of_verified
+      |> With_hash.data |> External_transition.Validated.forget_validation
 
     let%test "a node should be able to give a valid proof of their root" =
       let logger = Logger.null () in
@@ -37,7 +37,7 @@ let%test_module "Root_prover" =
               |> Breadcrumb.transition_with_hash |> With_hash.data)
           in
           let observed_state =
-            External_transition.Verified.protocol_state seen_transition
+            External_transition.Validated.protocol_state seen_transition
             |> Protocol_state.consensus_state
           in
           let root_with_proof =
@@ -45,16 +45,16 @@ let%test_module "Root_prover" =
               (Root_prover.prove ~logger ~frontier observed_state)
           in
           let%map proof_verified_root, proof_verified_best_tip =
-            Root_prover.verify ~logger ~observed_state
+            Root_prover.verify ~logger ~verifier:() ~observed_state
               ~peer_root:root_with_proof
             |> Deferred.Or_error.ok_exn
           in
           let open Transition_frontier in
           External_transition.(
             equal
-              (of_proof_verified @@ With_hash.data proof_verified_root)
-              (to_external_transition @@ root frontier)
+              (With_hash.data (fst proof_verified_root))
+              (to_external_transition (root frontier))
             && equal
-                 (of_proof_verified @@ With_hash.data proof_verified_best_tip)
-                 (to_external_transition @@ best_tip frontier)) )
+                 (With_hash.data (fst proof_verified_best_tip))
+                 (to_external_transition (best_tip frontier))) )
   end )

@@ -5,12 +5,7 @@ open Core_kernel
 open Coda_base
 open Module_version
 
-module type S =
-  Protocols.Coda_pow.Ledger_proof_intf
-  with type statement := Transaction_snark.Statement.t
-   and type sok_digest := Sok_message.Digest.t
-   and type ledger_hash := Frozen_ledger_hash.t
-   and type proof := Proof.t
+module type S = Coda_intf.Ledger_proof_intf
 
 let to_signed_amount signed_fee =
   let magnitude =

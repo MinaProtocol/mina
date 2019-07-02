@@ -13,8 +13,7 @@ build_artifact_profiles = [
     'testnet_postake',
     'testnet_postake_many_proposers',
     'testnet_postake_snarkless_fake_hash',
-    # ihm: Commenting this out to get the big curves fixes in. The CI machines were too weak to build
-    # 'testnet_postake_medium_curves',
+    'testnet_postake_medium_curves',
 ]
 
 unit_test_profiles = [
@@ -24,7 +23,7 @@ unit_test_profiles = [
 
 simple_tests = [
     'full-test',
-    'transaction-snark-profiler -check-only',
+    'transaction-snark-profiler -k 2',
 ]
 
 integration_tests = [
@@ -38,17 +37,17 @@ integration_tests = [
 
 all_tests = simple_tests + integration_tests
 
+# dictionary mapping configs to lists of tests
 test_permutations = {
     'fake_hash': ['full-test'],
     'test_postake_snarkless': simple_tests,
     'test_postake_split_snarkless': integration_tests,
     'test_postake_split': ['coda-shared-prefix-multiproposer-test -num-proposers 2'],
-    # Temporarily not doing all `simple_tests` because it's failing
-    # TODO: Deepthi will re-enable
-    'test_postake': [ 'transaction-snark-profiler -check-only' ],
+    'test_postake': simple_tests,
     'test_postake_catchup': ['coda-restart-node-test'],
     'test_postake_bootstrap': ['coda-bootstrap-test', 'coda-long-fork -num-proposers 2'],
     'test_postake_holy_grail': ['coda-restarts-and-txns-holy-grail -num-proposers 5', 'coda-long-fork -num-proposers 5'],
+    'test_postake_delegation': ['coda-delegation-test'],
     'test_postake_txns': ['coda-shared-state-test', 'coda-batch-payment-test'],
     'test_postake_five_even_snarkless': ['coda-shared-prefix-multiproposer-test -num-proposers 5'],
     'test_postake_five_even_txns': ['coda-shared-prefix-multiproposer-test -num-proposers 5 -payments'],

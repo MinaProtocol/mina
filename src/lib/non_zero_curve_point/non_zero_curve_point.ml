@@ -3,30 +3,13 @@ open Snark_params
 open Fold_lib
 open Module_version
 
-module Codable_via_base64 (T : sig
-  type t [@@deriving bin_io]
-end) =
-struct
-  let to_base64 t = Binable.to_string (module T) t |> Base64.encode_string
-
-  let of_base64_exn s = Base64.decode_exn s |> Binable.of_string (module T)
-
-  module String_ops = struct
-    type t = T.t
-
-    let to_string = to_base64
-
-    let of_string = of_base64_exn
-  end
-
-  include Codable.Make_of_string (String_ops)
-end
-
 module Stable = struct
   module V1 = struct
     module T = struct
       type t = Tick.Field.t * Tick.Field.t
       [@@deriving bin_io, sexp, eq, compare, hash, version {asserted}]
+
+      let version_byte = Base58_check.Version_bytes.non_zero_curve_point
     end
 
     include T
@@ -44,7 +27,7 @@ module Stable = struct
       let _ = Bigstring.write_bin_prot bs bin_writer_t elem in
       bs
 
-    include Codable_via_base64 (T)
+    include Codable.Make_base58_check (T)
   end
 
   module Latest = V1
@@ -67,15 +50,24 @@ include Comparable.Make_binable (Stable.Latest)
 
 type var = Tick.Field.Var.t * Tick.Field.Var.t
 
+let assert_equal var1 var2 =
+  let open Tick0.Checked.Let_syntax in
+  let open Tick.Field.Checked.Assert in
+  let v1_f1, v1_f2 = var1 in
+  let v2_f1, v2_f2 = var2 in
+  let%bind () = equal v1_f1 v2_f1 in
+  let%bind () = equal v1_f2 v2_f2 in
+  return ()
+
 let var_of_t (x, y) = (Tick.Field.Var.constant x, Tick.Field.Var.constant y)
 
 let typ : (var, t) Tick.Typ.t = Tick.Typ.(field * field)
 
 let ( = ) = equal
 
-let of_inner_curve_exn = Tick.Inner_curve.to_affine_coordinates
+let of_inner_curve_exn = Tick.Inner_curve.to_affine_exn
 
-let to_inner_curve = Tick.Inner_curve.of_affine_coordinates
+let to_inner_curve = Tick.Inner_curve.of_affine
 
 let gen : t Quickcheck.Generator.t =
   Quickcheck.Generator.filter_map Tick.Field.gen ~f:(fun x ->
@@ -112,11 +104,14 @@ module Compressed = struct
       module T = struct
         type t = (Field.t, bool) Poly.Stable.V1.t
         [@@deriving bin_io, sexp, eq, compare, hash, version {asserted}]
+
+        let version_byte =
+          Base58_check.Version_bytes.non_zero_curve_point_compressed
       end
 
       include T
       include Registration.Make_latest_version (T)
-      include Codable_via_base64 (T)
+      include Codable.Make_base58_check (T)
     end
 
     module Latest = V1
@@ -136,11 +131,11 @@ module Compressed = struct
 
   include Comparable.Make_binable (Stable.Latest)
   include Hashable.Make_binable (Stable.Latest)
-  include Codable_via_base64 (Stable.Latest)
+  include Codable.Make_base58_check (Stable.Latest)
 
   let compress (x, y) : t = {x; is_odd= parity y}
 
-  let to_string = to_base64
+  let to_string = to_base58_check
 
   let empty = Poly.{x= Field.zero; is_odd= false}
 

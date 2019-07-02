@@ -36,8 +36,7 @@ struct
     let proof =
       let exposing = Data_spec.[Typ.field] in
       let main x =
-        let open Let_syntax in
-        let%bind z = Field.Checked.mul x x in
+        let%bind _z = Field.Checked.mul x x in
         Field.Checked.Assert.equal x x
       in
       let keypair = generate_keypair main ~exposing in
@@ -51,7 +50,7 @@ struct
       match M.curve with
       | Tick ->
           generate_keypair
-            Data_spec.[Boolean.typ]
+            ~exposing:Data_spec.[Boolean.typ]
             (fun b -> Boolean.Assert.is_true b)
       | Tock -> (
           (* Hack *)
@@ -61,12 +60,12 @@ struct
           match n with
           | 1 ->
               generate_keypair
-                Data_spec.[Boolean.typ]
+                ~exposing:Data_spec.[Boolean.typ]
                 (fun b1 -> Boolean.Assert.is_true b1)
           | 2 ->
               generate_keypair
-                Data_spec.[Boolean.typ; Boolean.typ]
-                (fun b1 b2 -> Boolean.Assert.is_true b1)
+                ~exposing:Data_spec.[Boolean.typ; Boolean.typ]
+                (fun b1 _b2 -> Boolean.Assert.is_true b1)
           | _ ->
               assert false )
     in
@@ -74,7 +73,7 @@ struct
     , Proving_key.to_string (Keypair.pk kp) )
 
   let structure ~loc =
-    let ident str = Loc.make loc (Longident.parse str) in
+    let ident str = Loc.make ~loc (Longident.parse str) in
     let ( ^. ) x y = x ^ "." ^ y in
     let module E = Ppxlib.Ast_builder.Make (struct
       let loc = loc

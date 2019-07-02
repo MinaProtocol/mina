@@ -1,6 +1,5 @@
 open Core
 open Async
-open Protocols.Coda_transition_frontier
 open Cache_lib
 open Pipe_lib
 open Coda_base
@@ -36,65 +35,56 @@ open Coda_state
     the [Processor] via writing them to catchup_breadcrumbs_writer. *)
 
 module Make (Inputs : Inputs.S) :
-  Catchup_intf
-  with type external_transition_verified :=
-              Inputs.External_transition.Verified.t
+  Coda_intf.Catchup_intf
+  with type external_transition_with_initial_validation :=
+              Inputs.External_transition.with_initial_validation
    and type unprocessed_transition_cache :=
               Inputs.Unprocessed_transition_cache.t
    and type transition_frontier := Inputs.Transition_frontier.t
    and type transition_frontier_breadcrumb :=
               Inputs.Transition_frontier.Breadcrumb.t
-   and type state_hash := State_hash.t
    and type network := Inputs.Network.t
-   and type trust_system := Trust_system.t = struct
+   and type verifier := Inputs.Verifier.t = struct
   open Inputs
 
   type verification_error =
     [ `In_frontier of State_hash.t
     | `In_process of State_hash.t Cache_lib.Intf.final_state
-    | `Invalid_proof
-    | `Disconnected ]
+    | `Disconnected
+    | `Verifier_error of Error.t
+    | `Invalid_proof ]
 
   type 'a verification_result = ('a, verification_error) Result.t
 
-  let verify_transition ~logger ~trust_system ~frontier
-      ~unprocessed_transition_cache transition_enveloped =
-    let cached_verified_transition =
+  let verify_transition ~logger ~trust_system ~verifier ~frontier
+      ~unprocessed_transition_cache enveloped_transition =
+    let sender = Envelope.Incoming.sender enveloped_transition in
+    let cached_initially_validated_transition_result =
       let open Deferred.Result.Let_syntax in
-      let transition = Envelope.Incoming.data transition_enveloped in
-      let%bind (_ : External_transition.Proof_verified.t) =
-        ( Protocol_state_validator.validate_proof transition
-          :> External_transition.Proof_verified.t verification_result
+      let transition = Envelope.Incoming.data enveloped_transition in
+      let%bind initially_validated_transition =
+        ( External_transition.Validation.wrap transition
+          |> External_transition.skip_time_received_validation
+               `This_transition_was_not_received_via_gossip
+          |> External_transition.validate_proof ~verifier
+          :> External_transition.with_initial_validation verification_result
              Deferred.t )
       in
-      let verified_transition_with_hash_enveloped =
-        Envelope.Incoming.map transition_enveloped ~f:(fun transition ->
-            (* We need to coerce the transition from a proof_verified
-         transition to a fully verified in
-         order to add the transition to be added to the
-         transition frontier and to be fed through the
-         transition_handler_validator. *)
-            let (`I_swear_this_is_safe_see_my_comment verified_transition) =
-              External_transition.to_verified transition
-            in
-            With_hash.of_data verified_transition
-              ~hash_data:
-                (Fn.compose Protocol_state.hash
-                   External_transition.Verified.protocol_state) )
+      let enveloped_initially_validated_transition =
+        Envelope.Incoming.map enveloped_transition
+          ~f:(Fn.const initially_validated_transition)
       in
       Deferred.return
-      @@ ( Transition_handler_validator.validate_transition ~logger ~frontier
-             ~unprocessed_transition_cache
-             verified_transition_with_hash_enveloped
-           :> ( (External_transition.Verified.t, State_hash.t) With_hash.t
-                Envelope.Incoming.t
-              , State_hash.t )
-              Cached.t
-              verification_result )
+        ( Transition_handler_validator.validate_transition ~logger ~frontier
+            ~unprocessed_transition_cache
+            enveloped_initially_validated_transition
+          :> ( External_transition.with_initial_validation Envelope.Incoming.t
+             , State_hash.t )
+             Cached.t
+             verification_result )
     in
     let open Deferred.Let_syntax in
-    let sender = Envelope.Incoming.sender transition_enveloped in
-    match%bind cached_verified_transition with
+    match%bind cached_initially_validated_transition_result with
     | Ok x ->
         Deferred.return @@ Ok (Either.Second x)
     | Error (`In_frontier hash) ->
@@ -112,6 +102,16 @@ module Make (Inputs : Inputs.S) :
             Error (Error.of_string "Previous transition failed")
         | `Success hash ->
             Ok (Either.First hash) )
+    | Error (`Verifier_error error) ->
+        Logger.warn logger ~module_:__MODULE__ ~location:__LOC__
+          ~metadata:[("error", `String (Error.to_string_hum error))]
+          "verifier threw an error while verifying transiton queried during \
+           ledger catchup: $error" ;
+        return
+          (Error
+             (Error.of_string
+                (sprintf "verifier threw an error: %s"
+                   (Error.to_string_hum error))))
     | Error `Invalid_proof ->
         let%map () =
           Trust_system.record_envelope_sender trust_system logger sender
@@ -147,8 +147,9 @@ module Make (Inputs : Inputs.S) :
     in
     (result, Option.value_exn initial_state_hash)
 
-  let get_transitions_and_compute_breadcrumbs ~logger ~trust_system ~network
-      ~frontier ~num_peers ~unprocessed_transition_cache ~target_forest =
+  let get_transitions_and_compute_breadcrumbs ~logger ~trust_system ~verifier
+      ~network ~frontier ~num_peers ~unprocessed_transition_cache
+      ~target_forest =
     let peers = Network.random_peers network num_peers in
     let target_hash, subtrees = target_forest in
     let open Deferred.Or_error.Let_syntax in
@@ -191,9 +192,16 @@ module Make (Inputs : Inputs.S) :
                   take_while_map_result_rev
                     Non_empty_list.(to_list rev_queried_transitions)
                     ~f:(fun transition ->
-                      verify_transition ~logger ~trust_system ~frontier
-                        ~unprocessed_transition_cache
-                        (Envelope.Incoming.wrap ~data:transition
+                      let transition_with_hash =
+                        With_hash.of_data
+                          ~hash_data:
+                            (Fn.compose Protocol_state.hash
+                               External_transition.protocol_state)
+                          transition
+                      in
+                      verify_transition ~logger ~trust_system ~verifier
+                        ~frontier ~unprocessed_transition_cache
+                        (Envelope.Incoming.wrap ~data:transition_with_hash
                            ~sender:(Envelope.Sender.Remote peer.host)) )
                 in
                 let split_last xs =
@@ -215,8 +223,8 @@ module Make (Inputs : Inputs.S) :
                 let open Deferred.Let_syntax in
                 match%bind
                   Breadcrumb_builder.build_subtrees_of_breadcrumbs ~logger
-                    ~trust_system ~frontier ~initial_hash:initial_state_hash
-                    subtrees_of_transitions
+                    ~verifier ~trust_system ~frontier
+                    ~initial_hash:initial_state_hash subtrees_of_transitions
                 with
                 | Ok result ->
                     Deferred.Or_error.return result
@@ -225,13 +233,21 @@ module Make (Inputs : Inputs.S) :
                       ~f:(Fn.compose ignore Cached.invalidate_with_failure) ;
                     Deferred.return error ) ) )
 
-  let run ~logger ~trust_system ~network ~frontier ~catchup_job_reader
-      ~catchup_breadcrumbs_writer ~unprocessed_transition_cache =
-    Strict_pipe.Reader.iter catchup_job_reader ~f:(fun (hash, subtrees) ->
+  let run ~logger ~trust_system ~verifier ~network ~frontier
+      ~catchup_job_reader
+      ~(catchup_breadcrumbs_writer :
+         ( (Inputs.Transition_frontier.Breadcrumb.t, State_hash.t) Cached.t
+           Rose_tree.t
+           list
+         , Strict_pipe.crash Strict_pipe.buffered
+         , unit )
+         Strict_pipe.Writer.t) ~unprocessed_transition_cache : unit =
+    Strict_pipe.Reader.iter_without_pushback catchup_job_reader
+      ~f:(fun (hash, subtrees) ->
         ( match%bind
             get_transitions_and_compute_breadcrumbs ~logger ~trust_system
-              ~network ~frontier ~num_peers:8 ~unprocessed_transition_cache
-              ~target_forest:(hash, subtrees)
+              ~verifier ~network ~frontier ~num_peers:8
+              ~unprocessed_transition_cache ~target_forest:(hash, subtrees)
           with
         | Ok trees ->
             Logger.trace logger ~module_:__MODULE__ ~location:__LOC__
@@ -241,7 +257,9 @@ module Make (Inputs : Inputs.S) :
                 "catchup breadcrumbs pipe was closed; attempt to write to \
                  closed pipe" ;
               Deferred.unit )
-            else Strict_pipe.Writer.write catchup_breadcrumbs_writer trees
+            else
+              Strict_pipe.Writer.write catchup_breadcrumbs_writer trees
+              |> Deferred.return
         | Error e ->
             Logger.info logger ~module_:__MODULE__ ~location:__LOC__
               !"All peers either sent us bad data, didn't have the info, or \
@@ -254,7 +272,16 @@ module Make (Inputs : Inputs.S) :
             Logger.trace logger ~module_:__MODULE__ ~location:__LOC__
               "garbage collected failed cached transitions" ;
             Deferred.unit )
-        |> don't_wait_for ;
-        Deferred.unit )
+        |> don't_wait_for )
     |> don't_wait_for
 end
+
+include Make (struct
+  include Transition_frontier.Inputs
+  module Transition_frontier = Transition_frontier
+  module Unprocessed_transition_cache =
+    Transition_handler.Unprocessed_transition_cache
+  module Transition_handler_validator = Transition_handler.Validator
+  module Breadcrumb_builder = Transition_handler.Breadcrumb_builder
+  module Network = Coda_networking
+end)

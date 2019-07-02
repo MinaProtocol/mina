@@ -1,41 +1,19 @@
-open Tc;
+let downloadRoot = "https://s3-us-west-1.amazonaws.com/proving-key-2018-10-01/";
 
-let writeFileAsync = (path, data) =>
-  Task.uncallbackify0(Bindings.Fs.writeFile(path, data, "utf-8"));
+let downloadKey = (keyName, chunkCb, doneCb) =>
+  DownloadLogic.download(
+    keyName,
+    downloadRoot ++ keyName,
+    "binary",
+    1,
+    chunkCb,
+    doneCb,
+  );
 
-include Settings.Loader.Make(
-          Result,
-          {
-            let readSettings = settingsLocation =>
-              try (
-                Node.Fs.readFileSync(settingsLocation, `utf8) |> Result.return
-              ) {
-              | e => Result.fail(Js.Exn.asJsExn(e) |> Option.getExn)
-              };
-          },
-        );
+[@bs.module "electron"] [@bs.scope "shell"] [@bs.val]
+external showItemInFolder: string => unit = "";
 
-let settingsPath = {
-  let url = [%bs.raw "window.location.href"];
-  let searchParams = Bindings.Url.create(url) |> Bindings.Url.searchParams;
+let showItemInFolder = showItemInFolder;
 
-  Bindings.Url.SearchParams.get(searchParams, "settingsPath")
-  |> Js.Global.decodeURI;
-};
-
-// TODO: Is exposing a writeFile to this particular path, still too large of an
-// attack vector? An adversary could send a super large settings payload for
-// example.
-let saveSettings: SettingsRenderer.saveSettings('a) =
-  settings =>
-    writeFileAsync(
-      settingsPath,
-      Js.Json.stringify(Settings.Encode.t(settings)),
-    )
-    |> Task.onError(~f=e => Task.fail(`Error_saving_file(e)));
-
-let loadSettings: Settings.Intf(Result).loadSettings(unit, 'a) =
-  () => load(settingsPath);
-
-[%bs.raw "window.loadSettings = loadSettings"];
-[%bs.raw "window.saveSettings = saveSettings"];
+[%bs.raw "window.downloadKey = downloadKey"];
+[%bs.raw "window.showItemInFolder = showItemInFolder"];

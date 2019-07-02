@@ -47,7 +47,7 @@ module Make (Field : sig
 end) (Curve : sig
   type t [@@deriving sexp]
 
-  val to_affine_coordinates : t -> Field.t * Field.t
+  val to_affine_exn : t -> Field.t * Field.t
 
   val zero : t
 

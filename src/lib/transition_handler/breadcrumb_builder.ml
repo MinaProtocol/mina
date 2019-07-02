@@ -1,4 +1,3 @@
-open Protocols.Coda_pow
 open Coda_base
 open Coda_state
 open Core
@@ -6,17 +5,16 @@ open Async
 open Cache_lib
 
 module Make (Inputs : Inputs.S) :
-  Breadcrumb_builder_intf
-  with type state_hash := State_hash.t
-  with type trust_system := Trust_system.t
-  with type external_transition_verified :=
-              Inputs.External_transition.Verified.t
-  with type transition_frontier := Inputs.Transition_frontier.t
-  with type transition_frontier_breadcrumb :=
-              Inputs.Transition_frontier.Breadcrumb.t = struct
+  Coda_intf.Breadcrumb_builder_intf
+  with type external_transition_with_initial_validation :=
+              Inputs.External_transition.with_initial_validation
+   and type transition_frontier := Inputs.Transition_frontier.t
+   and type transition_frontier_breadcrumb :=
+              Inputs.Transition_frontier.Breadcrumb.t
+   and type verifier := Inputs.Verifier.t = struct
   open Inputs
 
-  let build_subtrees_of_breadcrumbs ~logger ~trust_system ~frontier
+  let build_subtrees_of_breadcrumbs ~logger ~verifier ~trust_system ~frontier
       ~initial_hash subtrees_of_enveloped_transitions =
     (* If the breadcrumb we are targetting is removed from the transition
      * frontier while we're catching up, it means this path is not on the
@@ -52,8 +50,19 @@ module Make (Inputs : Inputs.S) :
               Cached.transform cached_enveloped_transition
                 ~f:(fun enveloped_transition ->
                   let open Deferred.Or_error.Let_syntax in
-                  let transition =
+                  let transition_with_initial_validation =
                     Envelope.Incoming.data enveloped_transition
+                  in
+                  let transition_with_hash, _ =
+                    transition_with_initial_validation
+                  in
+                  let mostly_validated_transition =
+                    (* TODO: handle this edge case more gracefully *)
+                    (* since we are building a disconnected subtree of breadcrumbs,
+                     * we skip this step in validation *)
+                    External_transition.skip_frontier_dependencies_validation
+                      `This_transition_belongs_to_a_detached_subtree
+                      transition_with_initial_validation
                   in
                   let sender = Envelope.Incoming.sender enveloped_transition in
                   let parent = Cached.peek cached_parent in
@@ -62,8 +71,8 @@ module Make (Inputs : Inputs.S) :
                     |> With_hash.hash
                   in
                   let actual_parent_hash =
-                    transition |> With_hash.data
-                    |> External_transition.Verified.protocol_state
+                    transition_with_hash |> With_hash.data
+                    |> External_transition.protocol_state
                     |> Protocol_state.previous_state_hash
                   in
                   let%bind () =
@@ -79,8 +88,9 @@ module Make (Inputs : Inputs.S) :
                   in
                   let open Deferred.Let_syntax in
                   match%bind
-                    Transition_frontier.Breadcrumb.build ~logger ~trust_system
-                      ~parent ~transition_with_hash:transition
+                    Transition_frontier.Breadcrumb.build ~logger ~verifier
+                      ~trust_system ~parent
+                      ~transition:mostly_validated_transition
                       ~sender:(Some sender)
                   with
                   | Ok new_breadcrumb ->

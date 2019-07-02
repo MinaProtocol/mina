@@ -87,7 +87,7 @@ module Pending_coinbase_stack_state = struct
   type t = Stable.Latest.t =
     { source: Pending_coinbase.Stack.Stable.V1.t
     ; target: Pending_coinbase.Stack.Stable.V1.t }
-  [@@deriving sexp, hash, compare, eq, yojson]
+  [@@deriving sexp, hash, compare, yojson]
 
   include Hashable.Make_binable (Stable.Latest)
   include Comparable.Make (Stable.Latest)
@@ -1631,9 +1631,9 @@ let%test_module "transaction_snark" =
                 user_command wallets 1 0 8
                   (Fee.of_int (Random.int 20))
                   Account.Nonce.zero
-                  (User_command_memo.create_exn
+                  (User_command_memo.create_by_digesting_string_exn
                      (Test_util.arbitrary_string
-                        ~len:User_command_memo.max_size_in_bytes))
+                        ~len:User_command_memo.max_digestible_string_length))
               in
               let target =
                 Ledger.merkle_root_after_user_command_exn ledger t1
@@ -1665,17 +1665,17 @@ let%test_module "transaction_snark" =
                 user_command wallets 0 1 8
                   (Fee.of_int (Random.int 20))
                   Account.Nonce.zero
-                  (User_command_memo.create_exn
+                  (User_command_memo.create_by_digesting_string_exn
                      (Test_util.arbitrary_string
-                        ~len:User_command_memo.max_size_in_bytes))
+                        ~len:User_command_memo.max_digestible_string_length))
               in
               let t2 =
                 user_command wallets 1 2 3
                   (Fee.of_int (Random.int 20))
                   Account.Nonce.zero
-                  (User_command_memo.create_exn
+                  (User_command_memo.create_by_digesting_string_exn
                      (Test_util.arbitrary_string
-                        ~len:User_command_memo.max_size_in_bytes))
+                        ~len:User_command_memo.max_digestible_string_length))
               in
               let pending_coinbase_stack_state =
                 Pending_coinbase_stack_state.Stable.Latest.

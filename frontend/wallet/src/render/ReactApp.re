@@ -1,26 +1,15 @@
 [@react.component]
 let make = () => {
-  let (settings, setSettings) = Hooks.useSettings();
-  let settingsContext = (
-    Tc.Result.toOption(settings),
-    newSettings => setSettings(Ok(newSettings)),
-  );
+  let settingsValue = AddressBookProvider.createContext();
+  let dispatch = CodaProcess.useHook();
 
-  let (activeWallet, setActiveWallet) = React.useState(() => None);
-  let activeWalletContext = (
-    activeWallet,
-    newWallet => setActiveWallet(_ => Some(newWallet)),
-  );
-
-  <ActiveWalletProvider value=activeWalletContext>
-    <SettingsProvider value=settingsContext>
-      <ReasonApollo.Provider client=Apollo.faker>
-        <Window>
-          <Header />
-          <Main> <SideBar /> <Router /> </Main>
-          <Footer />
-        </Window>
+  <AddressBookProvider value=settingsValue>
+    <ProcessDispatchProvider value=dispatch>
+      <ReasonApollo.Provider client=Apollo.client>
+        <Header />
+        <Main> <SideBar /> <Router /> </Main>
+        <Footer />
       </ReasonApollo.Provider>
-    </SettingsProvider>
-  </ActiveWalletProvider>;
+    </ProcessDispatchProvider>
+  </AddressBookProvider>;
 };

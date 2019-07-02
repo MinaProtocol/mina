@@ -1,17 +1,9 @@
 open BsElectron;
-open Tc;
 
 include IpcRenderer.MakeIpcRenderer(Messages);
 
-module CallTable = Messages.CallTable;
-
-let callTable = CallTable.make();
-
-let setName = (key, name) => {
-  let pending =
-    CallTable.nextPending(callTable, Messages.Typ.Unit, ~loc=__LOC__);
-  send(`Set_name((key, name, CallTable.Ident.Encode.t(pending.ident))));
-  pending.task;
+let controlCodaDaemon = maybeArgs => {
+  send(`Control_coda_daemon(maybeArgs));
 };
 
 module ListenToken = {
@@ -22,14 +14,9 @@ let listen = () => {
   let cb =
     (. _event, message: Messages.mainToRendererMessages) =>
       switch (message) {
-      | `Respond_new_settings(ident, ()) =>
-        CallTable.resolve(
-          callTable,
-          CallTable.Ident.Decode.t(ident, Messages.Typ.Unit),
-          (),
-        )
-      | `Deep_link(routeString) =>
-        Router.navigate(Route.parse(routeString) |> Option.getExn)
+      | `Coda_crashed(_error) => ()
+      // TODO: Push the error into some sort of context/model that triggers a re-render as necessary
+      | `Deep_link(routeString) => ReasonReact.Router.push(routeString)
       };
   on(cb);
   cb;

@@ -1,18 +1,10 @@
 open BsElectron;
 open Tc;
 
-let killDaemon = DaemonProcess.start(8080);
-
 let createTray = dispatch => {
   let t = AppTray.get();
   let trayItems =
     Menu.Item.[
-      make(
-        Label("Synced"),
-        ~icon=Filename.concat(ProjectRoot.resource, "public/circle-16.png"),
-        (),
-      ),
-      make(Separator, ()),
       make(
         Label("Debug"),
         ~click=
@@ -25,14 +17,13 @@ let createTray = dispatch => {
       make(
         Label("Open"),
         ~accelerator="CmdOrCtrl+O",
-        ~click=
-          () => AppWindow.get({path: Route.Home, dispatch}) |> AppWindow.show,
+        ~click=() => AppWindow.deepLink({path: Route.Home, dispatch}),
         (),
       ),
       make(
         Label("Settings"),
         ~accelerator="CmdOrCtrl+,",
-        ~click=() => AppWindow.deepLink({path: Route.Home, dispatch}),
+        ~click=() => AppWindow.deepLink({path: Route.Settings, dispatch}),
         (),
       ),
       make(Separator, ()),
@@ -48,34 +39,29 @@ let createTray = dispatch => {
 // We need this handler here to prevent the application from exiting on all
 // windows closed. Keep in mind, we have the tray.
 App.on(`WindowAllClosed, () => ());
-App.on(`WillQuit, () => killDaemon());
 
-module Test = [%graphql {| query { wallets {publicKey} } |}];
-module TestQuery = GraphqlMain.CreateQuery(Test);
-
-let initialTask =
-  Task.map2(
-    Task.uncallbackifyValue(App.on(`Ready)),
-    SettingsMain.load(ProjectRoot.settings),
-    ~f=((), settings) =>
-    settings
-  );
+let initialTask = Task.uncallbackifyValue(App.on(`Ready));
 
 let run = () =>
   Task.attempt(
     initialTask,
-    ~f=settingsOrError => {
-      let initialState = {Application.State.settingsOrError, wallets: [||]};
+    ~f=_ => {
+      let initialState = {
+        Application.State.coda:
+          Application.State.CodaProcessState.Stopped(Belt.Result.Ok()),
+        window: None,
+      };
 
       let dispatch = ref(_ => ());
       let store =
         Application.Store.create(
-          initialState, ~onNewState=(_last, _curr: Application.State.t('a)) =>
+          initialState, ~onNewState=(_last, _curr: Application.Store.state) =>
           createTray(dispatch^)
         );
-      dispatch := Application.Store.apply(store);
+      dispatch := Application.Store.apply((), store);
       let dispatch = dispatch^;
 
+      App.on(`WillQuit, () => dispatch(Action.ControlCoda(None)));
       createTray(dispatch);
 
       AppWindow.deepLink({AppWindow.Input.path: Route.Home, dispatch});
