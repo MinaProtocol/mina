@@ -545,8 +545,7 @@ module Tree = struct
         (*get the updated subtree*)
         let sub, counts =
           update_accumulate
-            ~f_merge:(fun b (x, y) ->
-              let b1, b2 = b in
+            ~f_merge:(fun (b1, b2) (x, y) ->
               transpose (f_merge b1 x, f_merge b2 y) )
             ~f_base:(fun (x, y) -> transpose (f_base x, f_base y))
             sub_tree
@@ -890,10 +889,12 @@ module State = struct
             | w, Merge.Job.Full {left; right; status; seq_no} ->
                 add_string
                   ( w_to_string w ^ "Full" ^ Int.to_string seq_no
-                  ^ Job_status.to_string status
-                  ^ f_merge left ^ f_merge right )
+                  ^ Job_status.to_string status ) ;
+                add_string (f_merge left) ;
+                add_string (f_merge right)
             | w, Merge.Job.Part j ->
-                add_string (w_to_string w ^ "Part" ^ f_merge j)
+                add_string (w_to_string w ^ "Part") ;
+                add_string (f_merge j)
           in
           let f_base = function
             | w, Base.Job.Empty ->
@@ -901,8 +902,8 @@ module State = struct
             | w, Base.Job.Full {job; status; seq_no} ->
                 add_string
                   ( Int.to_string w ^ "Full" ^ Int.to_string seq_no
-                  ^ Job_status.to_string status
-                  ^ f_base job )
+                  ^ Job_status.to_string status ) ;
+                add_string (f_base job)
           in
           tree_hash tree f_merge f_base )
     in
@@ -1082,9 +1083,8 @@ let add_merge_jobs : completed_jobs:'merge list -> (_, 'merge, _) State_monad.t
     let updated_trees, result_opt, _ =
       List.foldi (Non_empty_list.tail state.trees) ~init:([], None, merge_jobs)
         ~f:(fun i (trees, scan_result, jobs) tree ->
-          if i % delay = delay - 1 then
-            (*All the trees with delay number of trees between them*)
-            (*TODO: dont update if required job count is zero*)
+          if i % delay = delay - 1 || not (List.is_empty jobs) then
+            (*Every nth (n=delay) tree*)
             let tree', scan_result' =
               Tree.update
                 (List.take jobs (Tree.required_job_count tree))

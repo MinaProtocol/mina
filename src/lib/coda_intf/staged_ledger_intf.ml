@@ -54,20 +54,18 @@ module type Staged_ledger_diff_generalized_intf = sig
 
   type compressed_public_key
 
-  type staged_ledger_hash
-
   type transaction_snark_work
 
   type transaction_snark_work_checked
 
   module At_most_two : sig
     type 'a t = Zero | One of 'a option | Two of ('a * 'a option) option
-    [@@deriving sexp]
+    [@@deriving sexp, yojson]
 
     module Stable :
       sig
         module V1 : sig
-          type 'a t [@@deriving sexp, bin_io, version]
+          type 'a t [@@deriving sexp, bin_io, version, yojson]
         end
       end
       with type 'a V1.t = 'a t
@@ -76,12 +74,12 @@ module type Staged_ledger_diff_generalized_intf = sig
   end
 
   module At_most_one : sig
-    type 'a t = Zero | One of 'a option [@@deriving sexp]
+    type 'a t = Zero | One of 'a option [@@deriving sexp, yojson]
 
     module Stable :
       sig
         module V1 : sig
-          type 'a t [@@deriving sexp, bin_io, version]
+          type 'a t [@@deriving sexp, bin_io, version, yojson]
         end
       end
       with type 'a V1.t = 'a t
@@ -94,12 +92,12 @@ module type Staged_ledger_diff_generalized_intf = sig
       { completed_works: transaction_snark_work list
       ; user_commands: user_command list
       ; coinbase: fee_transfer_single At_most_two.Stable.V1.t }
-    [@@deriving sexp]
+    [@@deriving sexp, yojson]
 
     module Stable :
       sig
         module V1 : sig
-          type t [@@deriving sexp, bin_io, version]
+          type t [@@deriving sexp, bin_io, version, yojson]
         end
       end
       with type V1.t = t
@@ -110,12 +108,12 @@ module type Staged_ledger_diff_generalized_intf = sig
       { completed_works: transaction_snark_work list
       ; user_commands: user_command list
       ; coinbase: fee_transfer_single At_most_one.t }
-    [@@deriving sexp]
+    [@@deriving sexp, yojson]
 
     module Stable :
       sig
         module V1 : sig
-          type t [@@deriving sexp, bin_io, version]
+          type t [@@deriving sexp, bin_io, version, yojson]
         end
       end
       with type V1.t = t
@@ -125,25 +123,25 @@ module type Staged_ledger_diff_generalized_intf = sig
     type t =
       Pre_diff_with_at_most_two_coinbase.Stable.V1.t
       * Pre_diff_with_at_most_one_coinbase.Stable.V1.t option
-    [@@deriving sexp]
+    [@@deriving sexp, yojson]
 
     module Stable :
       sig
         module V1 : sig
-          type t [@@deriving sexp, bin_io, version]
+          type t [@@deriving sexp, bin_io, version, yojson]
         end
       end
       with type V1.t = t
   end
 
   type t = {diff: Diff.t; creator: compressed_public_key}
-  [@@deriving sexp, fields]
+  [@@deriving sexp, fields, yojson]
 
   module Stable :
     sig
       module V1 : sig
-        type t = {diff: Diff.t; creator: compressed_public_key}
-        [@@deriving sexp, bin_io, version]
+        type t = {diff: Diff.Stable.V1.t; creator: compressed_public_key}
+        [@@deriving sexp, bin_io, version, yojson]
       end
 
       module Latest = V1
@@ -168,7 +166,8 @@ module type Staged_ledger_diff_generalized_intf = sig
       * pre_diff_with_at_most_one_coinbase option
     [@@deriving sexp]
 
-    type t = {diff: diff; creator: compressed_public_key} [@@deriving sexp]
+    type t = {diff: diff; creator: compressed_public_key}
+    [@@deriving sexp, yojson]
 
     val user_commands : t -> user_command_with_valid_signature list
   end
@@ -189,7 +188,6 @@ module type Staged_ledger_diff_intf =
    and type user_command_with_valid_signature :=
               User_command.With_valid_signature.t
    and type compressed_public_key := Public_key.Compressed.t
-   and type staged_ledger_hash := Staged_ledger_hash.t
 
 (* TODO: this is temporarily required due to staged ledger test stubs *)
 module type Transaction_snark_scan_state_generalized_intf = sig

@@ -1,14 +1,14 @@
 module Make (Transaction_snark_work : sig
   module Stable : sig
     module V1 : sig
-      type t [@@deriving bin_io, sexp, version]
+      type t [@@deriving bin_io, sexp, version, yojson]
     end
   end
 
   type t = Stable.V1.t
 
   module Checked : sig
-    type t [@@deriving sexp]
+    type t [@@deriving sexp, yojson]
   end
 
   val forget : Checked.t -> t

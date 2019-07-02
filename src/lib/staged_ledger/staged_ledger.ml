@@ -715,8 +715,21 @@ struct
         Scan_state.fill_work_and_enqueue_transactions t.scan_state data works
       in
       Or_error.iter_error r ~f:(fun e ->
+          let data_json =
+            `List
+              (List.map data
+                 ~f:(fun {Scan_state.Transaction_with_witness.statement; _} ->
+                   Transaction_snark_statement.to_yojson statement ))
+          in
           Logger.error logger ~module_:__MODULE__ ~location:__LOC__
-            !"Unexpected error: %s\n%!"
+            ~metadata:
+              [ ("staged_ledger_diff", Staged_ledger_diff.to_yojson sl_diff)
+              ; ( "scan_state"
+                , `String (Scan_state.snark_job_list_json t.scan_state) )
+              ; ("data", data_json) ]
+            !"Unexpected error when applying the diff $staged_ledger_diff, \
+              data $data to the scan_state $scan_state: %s\n\
+              %!"
             (Error.to_string_hum e) ) ;
       Deferred.return (to_staged_ledger_or_error r)
     in
@@ -2010,7 +2023,7 @@ let%test_module "test" =
 
         type t = Stable.Latest.t =
           {fee: fee; proofs: proof list; prover: public_key}
-        [@@deriving sexp, compare]
+        [@@deriving sexp, compare, yojson]
 
         let fee {fee; _} = fee
 
@@ -2046,7 +2059,7 @@ let%test_module "test" =
 
           type t = Stable.Latest.t =
             {fee: fee; proofs: proof list; prover: public_key}
-          [@@deriving sexp, compare]
+          [@@deriving sexp, compare, yojson]
 
           let create_unsafe = Fn.id
         end
@@ -2219,7 +2232,7 @@ let%test_module "test" =
           module V1 = struct
             module T = struct
               type t = {diff: Diff.Stable.V1.t; creator: public_key}
-              [@@deriving sexp, bin_io, version {for_test}]
+              [@@deriving sexp, bin_io, version {for_test}, yojson]
             end
 
             include T

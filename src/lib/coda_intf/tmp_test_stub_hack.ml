@@ -161,11 +161,11 @@ module type For_transaction_snark_scan_state_intf = sig
       ; pending_coinbase_stack_state: Pending_coinbase_stack_state.t
       ; fee_excess: Currency.Fee.Signed.Stable.V1.t
       ; proof_type: Proof_type.t }
-    [@@deriving compare, eq, sexp]
+    [@@deriving compare, eq, sexp, yojson]
 
     module Stable : sig
       module V1 : sig
-        type nonrec t = t [@@deriving bin_io, sexp, version]
+        type nonrec t = t [@@deriving bin_io, sexp, version, yojson]
       end
     end
 
@@ -255,7 +255,6 @@ module type For_staged_ledger_intf = sig
      and type user_command_with_valid_signature :=
                 User_command.With_valid_signature.t
      and type compressed_public_key := Compressed_public_key.t
-     and type staged_ledger_hash := Staged_ledger_hash.t
      and type transaction_snark_work := Transaction_snark_work.t
      and type transaction_snark_work_checked :=
                 Transaction_snark_work.Checked.t

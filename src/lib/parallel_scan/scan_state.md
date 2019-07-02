@@ -2,9 +2,9 @@
 
 The parallel scan state currently is a full-binary tree with leaves (or called `Base` nodes) having values of type `Transaction_with_witness.t` and intermediate nodes (or called `Merge` nodes) having values of type `Ledger_proof_with_sok_message.t`
 
-Everytime a diff is applied, the transactions are transformed to new base jobs and added to the scan state. The diff also includes completed works that correspond to a sequence of jobs that already exist on the scan state. These, when added to scan state, create new merge jobs except when it is for the root node in which case the proof is simply returned as the result.
+Everytime a diff is applied, the transactions are transformed to new base jobs and added to the scan state. The diff also includes completed works that correspond to a sequence of jobs that already exist in the scan state. These, when added to scan state, create new merge jobs except when it is for the root node in which case the proof is simply returned as the result.
 
-Currently, parallel scan is implemented using arrays and involve a lot of index manipulation. This makes the code difficult to read and maintain. This refactoring aims to make the structure declarative and more "functional" given that we can lax a bit on the efficiency since there are other expensive operations(sparse ledgers for witness) in `apply_diff`.
+Currently, parallel scan is one big tree implemented using arrays. It involves a lot of index manipulation to maintain certain invariants. This makes the code difficult to read and maintain. Also, the scan state can be configured to emit proofs from levels other than the root to improve the latency. This is equivalent to having a forest but has been made to fit the existing implementation in a not-so-elagant way. This refactoring aims to make the structure declarative and more "functional" given that we can lax a bit on the efficiency since there are other expensive operations(sparse ledgers for witness) in `apply_diff`.
 
 The following constants dictate the structure and behaviour of the scan state.
 
@@ -95,7 +95,7 @@ Block 11: three transactions, complete seven proofs (B8, B8, B9, B9, M8, M8, M9)
 
 2. The merge node that is to be updated after adding proofs corresponding to its children is always empty. This allows us keep the number of trees to a minimum of $work\_delay+2$.
 
-The latency in this impl is as good as it can get because it emits a ledger proof for every $2^{transaction\_capacity\_log\_2}$ transactions.
+For a given throughput, the latency (number of blocks before a new ledger proof is emitted) in the proposed implementation is better (at least twice as much) because it emits a ledger proof for every $2^{transaction\_capacity\_log\_2}$ transactions compared to the current implementation which emits a ledger proof for transactions >= $2^{transaction\_capacity\_log\_2+1}$.
 
 ## Types
 

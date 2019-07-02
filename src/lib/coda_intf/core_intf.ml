@@ -122,14 +122,14 @@ module type Transaction_snark_work_generalized_intf = sig
     { fee: Fee.Stable.V1.t
     ; proofs: ledger_proof list
     ; prover: compressed_public_key }
-  [@@deriving sexp]
+  [@@deriving sexp, yojson]
 
   val fee : t -> Fee.Stable.V1.t
 
   module Stable :
     sig
       module V1 : sig
-        type t [@@deriving sexp, bin_io, version]
+        type t [@@deriving sexp, bin_io, version, yojson]
       end
     end
     with type V1.t = t
@@ -139,7 +139,7 @@ module type Transaction_snark_work_generalized_intf = sig
   module Checked : sig
     type nonrec t = t =
       {fee: Fee.t; proofs: ledger_proof list; prover: compressed_public_key}
-    [@@deriving sexp]
+    [@@deriving sexp, yojson]
 
     module Stable : module type of Stable
 

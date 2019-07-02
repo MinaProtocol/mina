@@ -5,7 +5,7 @@ open Currency
 open Signature_lib
 
 module Make (Ledger_proof : sig
-  type t [@@deriving sexp, bin_io]
+  type t [@@deriving sexp, bin_io, yojson]
 end) :
   Coda_intf.Transaction_snark_work_intf
   with type ledger_proof := Ledger_proof.t = struct
@@ -54,7 +54,7 @@ end) :
             { fee: Fee.Stable.V1.t
             ; proofs: Ledger_proof.t list
             ; prover: Public_key.Compressed.Stable.V1.t }
-          [@@deriving sexp, bin_io, version {asserted}]
+          [@@deriving sexp, bin_io, version {asserted}, yojson]
         end
 
         include T
@@ -76,7 +76,7 @@ end) :
     (* bin_io omitted *)
     type t = Stable.Latest.t =
       {fee: Fee.t; proofs: Ledger_proof.t list; prover: Public_key.Compressed.t}
-    [@@deriving sexp]
+    [@@deriving sexp, yojson]
   end
 
   include T
