@@ -106,10 +106,13 @@ module Actions = struct
         Insta_ban
     | Sent_invalid_proof ->
         Insta_ban
+    (* incoming and outgoing connection errors can happen due to network
+       failures, killing the client, or ungraceful shutdown, so we need to be
+       pretty lenient. *)
     | Incoming_connection_error ->
-        Trust_decrease 0.2
+        Trust_decrease 0.05
     | Outgoing_connection_error ->
-        Trust_decrease 0.4
+        Trust_decrease 0.05
     | Violated_protocol ->
         Insta_ban
     | Made_request ->
