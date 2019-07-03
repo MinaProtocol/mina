@@ -312,7 +312,7 @@ end = struct
                     , [] ) ))
         in
         Logger.info logger ~module_:__MODULE__ ~location:__LOC__
-          ~metadata:[("error", Error.to_string_hum e)]
+          ~metadata:[("error", `String (Error.to_string_hum e))]
           "Failed to find scan state from the peer or received faulty scan \
            state. Retry bootstrap!" ;
         run ~logger ~trust_system ~verifier ~network ~frontier ~ledger_db
@@ -371,7 +371,7 @@ end = struct
         with
         | Error e ->
             Logger.info logger ~module_:__MODULE__ ~location:__LOC__
-              ~metadata:[("error", Error.to_string_hum e)]
+              ~metadata:[("error", `String (Error.to_string_hum e))]
               "Local state sync failed. Retry bootstrap" ;
             run ~logger ~trust_system ~verifier ~network ~frontier ~ledger_db
               ~transition_reader
