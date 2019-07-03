@@ -205,6 +205,14 @@ test-ppx:
 web:
 	./scripts/web.sh
 
+
+########################################
+## Benchmarks
+
+benchmarks:
+	cd src && dune build app/benchmarks/main.exe
+
+
 ########################################
 # Coverage testing and output
 
