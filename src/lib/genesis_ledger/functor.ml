@@ -14,6 +14,7 @@ end
 module Make_from_base (Base : Base_intf) : Intf.S = struct
   include Base
 
+  (* TODO: #1488 compute this at compile time instead of lazily *)
   let t =
     lazy (let ledger = Ledger.create_ephemeral () in
     List.iter accounts ~f:(fun (_, account) ->
