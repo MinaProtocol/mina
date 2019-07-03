@@ -21,13 +21,19 @@ struct
 
   module Coefficients = Coefficients
 
-  let to_affine_coordinates {x; y; z} =
+  module Affine = struct
+    type t = Fq.t * Fq.t
+  end
+
+  let of_affine (x, y) = {x; y; z= Fq.one}
+
+  let is_zero t = Fq.(equal zero t.x) && Fq.(equal zero t.z)
+
+  let to_affine_exn {x; y; z} =
     let z_inv = Fq.inv z in
     Fq.(x * z_inv, y * z_inv)
 
-  let of_affine_coordinates (x, y) = {x; y; z= Fq.one}
-
-  let is_zero t = Fq.(equal zero t.x) && Fq.(equal zero t.z)
+  let to_affine t = if is_zero t then None else Some (to_affine_exn t)
 
   let is_well_formed ({x; y; z} as t) =
     if is_zero t then true
