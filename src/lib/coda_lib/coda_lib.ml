@@ -309,7 +309,9 @@ let create_genesis_frontier (config : Config.t) ~verifier =
     ; creator= Account.public_key (snd (List.hd_exn Genesis_ledger.accounts))
     }
   in
-  let genesis_protocol_state = With_hash.data (Lazy.force Genesis_protocol_state.t) in
+  let genesis_protocol_state =
+    With_hash.data (Lazy.force Genesis_protocol_state.t)
+  in
   (* the genesis transition is assumed to be valid *)
   let (`I_swear_this_is_safe_see_my_comment first_transition) =
     External_transition.Validated.create_unsafe
@@ -371,7 +373,8 @@ let create (config : Config.t) =
                   create_genesis_frontier config ~verifier
                 in
                 ( None
-                , Ledger_transfer.transfer_accounts ~src:(Lazy.force Genesis_ledger.t)
+                , Ledger_transfer.transfer_accounts
+                    ~src:(Lazy.force Genesis_ledger.t)
                     ~dest:ledger_db
                 , frontier )
             | Some transition_frontier_location -> (

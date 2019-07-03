@@ -38,12 +38,13 @@ let pedersen_params ~loc =
     |> E.pexp_array
   in
   [%expr
-    Array.map
-      (fun s ->
-        Core_kernel.Binable.of_string
-          (module Lite_curve_choice.Tock.G1)
-          (Base58_check.decode_exn s) )
-      [%e arr_expr]]
+    lazy
+      (Array.map
+         (fun s ->
+           Core_kernel.Binable.of_string
+             (module Lite_curve_choice.Tock.G1)
+             (Base58_check.decode_exn s) )
+         [%e arr_expr])]
 
 open Async
 

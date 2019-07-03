@@ -77,7 +77,9 @@ let genesis ~loc =
     let loc = loc
   end) in
   let open E in
-  let protocol_state = protocol_state (Lazy.force Genesis_protocol_state.t).data in
+  let protocol_state =
+    protocol_state (Lazy.force Genesis_protocol_state.t).data
+  in
   let ledger =
     Sparse_ledger_lib.Sparse_ledger.of_hash ~depth:0
       protocol_state.body.blockchain_state.staged_ledger_hash.ledger_hash

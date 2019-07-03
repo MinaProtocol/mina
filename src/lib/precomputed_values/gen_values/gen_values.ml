@@ -37,7 +37,8 @@ end
 module Make_real (Keys : Keys_lib.Keys.S) = struct
   let loc = Ppxlib.Location.none
 
-  let base_hash = Keys.Step.instance_hash (Lazy.force Genesis_protocol_state.t).data
+  let base_hash =
+    Keys.Step.instance_hash (Lazy.force Genesis_protocol_state.t).data
 
   let base_hash_expr =
     [%expr

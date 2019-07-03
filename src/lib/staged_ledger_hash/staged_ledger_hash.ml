@@ -144,9 +144,9 @@ module Non_snark = struct
 
   let dummy : t Lazy.t =
     lazy
-    ({ ledger_hash= Ledger.merkle_root (Lazy.force Genesis_ledger.t)
-    ; aux_hash= Aux_hash.dummy
-    ; pending_coinbase_aux= Pending_coinbase_aux.dummy })
+      { ledger_hash= Ledger.merkle_root (Lazy.force Genesis_ledger.t)
+      ; aux_hash= Aux_hash.dummy
+      ; pending_coinbase_aux= Pending_coinbase_aux.dummy }
 
   type var = Boolean.var Triple.t list
 
@@ -276,9 +276,10 @@ let of_aux_ledger_and_coinbase_hash aux_hash ledger_hash pending_coinbase : t =
   ; pending_coinbase_hash= Pending_coinbase.merkle_root pending_coinbase }
 
 let genesis : t Lazy.t =
-  lazy (let pending_coinbase = Pending_coinbase.create () |> Or_error.ok_exn in
-  { non_snark= Lazy.force Non_snark.dummy
-  ; pending_coinbase_hash= Pending_coinbase.merkle_root pending_coinbase })
+  lazy
+    (let pending_coinbase = Pending_coinbase.create () |> Or_error.ok_exn in
+     { non_snark= Lazy.force Non_snark.dummy
+     ; pending_coinbase_hash= Pending_coinbase.merkle_root pending_coinbase })
 
 let var_of_t ({pending_coinbase_hash; non_snark} : t) : var =
   let non_snark = Non_snark.var_of_t non_snark in
