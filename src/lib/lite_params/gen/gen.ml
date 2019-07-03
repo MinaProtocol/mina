@@ -31,18 +31,14 @@ let pedersen_params ~loc =
     List.init (Array.length arr) ~f:(fun i ->
         let g, _, _, _ = arr.(i) in
         estring
-          (Base58_check.encode
-             (Binable.to_string
-                (module Lite_curve_choice.Tock.G1)
-                (Lite_compat_algebra.g1 g))) )
+          (Binable.to_string
+             (module Lite_curve_choice.Tock.G1)
+             (Lite_compat_algebra.g1 g)) )
     |> E.pexp_array
   in
   [%expr
     Array.map
-      (fun s ->
-        Core_kernel.Binable.of_string
-          (module Lite_curve_choice.Tock.G1)
-          (Base58_check.decode_exn s) )
+      (Core_kernel.Binable.of_string (module Lite_curve_choice.Tock.G1))
       [%e arr_expr]]
 
 open Async
