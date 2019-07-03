@@ -16,7 +16,6 @@ end)
 
 module Tock_backend = struct
   module Full = Cycle.Mnt6
-  include Full.GM
 
   module Bowe_gabizon = struct
     let bg_salt =
@@ -75,6 +74,7 @@ module Tock_backend = struct
     let field_size = Full.field_size
   end
 
+  include Bowe_gabizon
   module Inner_curve = Cycle.Mnt4.G1
   module Inner_twisted_curve = Cycle.Mnt4.G2
 end

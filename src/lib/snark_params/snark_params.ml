@@ -297,7 +297,7 @@ module Tock = struct
   module Proof = struct
     include Tock0.Proof
 
-    let dummy = Dummy_values.Tock.GrothMaller17.proof
+    let dummy = Dummy_values.Tock.Bowe_gabizon18.proof
   end
 
   module Groth_verifier = struct
@@ -399,6 +399,11 @@ module Tick = struct
     module Checked = struct
       include Snarky.Pedersen.Make (Tick0) (Inner_curve)
                 (Crypto_params.Pedersen_params)
+
+      let hash_prefix (p : State.t) =
+        Section.create ~acc:(`Value p.acc)
+          ~support:
+            (Interval_union.of_interval (0, Hash_prefixes.length_in_triples))
 
       let hash_triples ts ~(init : State.t) =
         hash ts ~init:(init.triples_consumed, `Value init.acc)
@@ -665,8 +670,26 @@ module Tick = struct
 
   module Run = Snarky.Snark.Run.Make (Tick_backend) (Unit)
 
-  module Groth_maller_verifier = struct
-    include Snarky_verifier.Groth_maller.Make (Pairing)
+  module Verifier = struct
+    include Snarky_verifier.Bowe_gabizon.Make (struct
+      include Pairing
+
+      module H =
+        Snarky_bowe_gabizon_hash.Make (Run) (Tick0)
+          (struct
+            module Fqe = Pairing.Fqe
+
+            let init =
+              Pedersen.State.salt (Hash_prefixes.bowe_gabizon_hash :> string)
+
+            let pedersen x =
+              Pedersen.Checked.digest_triples ~init (Fold_lib.Fold.to_list x)
+
+            let params = Tock_backend.bg_params
+          end)
+
+      let hash = H.hash
+    end)
 
     let conv_fqe v = Field.Vector.(get v 0, get v 1, get v 2)
 
@@ -682,35 +705,25 @@ module Tick = struct
       in
       (f 0, f 1)
 
-    let proof_of_backend_proof p =
-      let open Tock_backend.Full.GM_proof_accessors in
-      {Proof.a= a p; b= conv_g2 (b p); c= c p}
+    let proof_of_backend_proof
+        ({a; b; c; delta_prime; z} : Tock_backend.Proof.t) =
+      {Proof.a; b= conv_g2 b; c; delta_prime= conv_g2 delta_prime; z}
 
-    let vk_of_backend_vk (vk : Tock_backend.Full.GM.Verification_key.t) =
-      let open Tock_backend.Full.GM_verification_key_accessors in
+    let vk_of_backend_vk (vk : Tock_backend.Verification_key.t) =
+      let open Tock_backend.Verification_key in
       let open Inner_curve.Vector in
       let q = query vk in
-      let g_alpha = g_alpha vk in
-      let h_beta = conv_g2 (h_beta vk) in
       { Verification_key.query_base= get q 0
       ; query= List.init (length q - 1) ~f:(fun i -> get q (i + 1))
-      ; h= conv_g2 (h vk)
-      ; g_alpha
-      ; h_beta
-      ; g_gamma= g_gamma vk
-      ; h_gamma= conv_g2 (h_gamma vk)
-      ; g_alpha_h_beta= conv_fqk (g_alpha_h_beta vk) }
+      ; delta= conv_g2 (delta vk)
+      ; alpha_beta= conv_fqk (alpha_beta vk) }
 
     let constant_vk vk =
       let open Verification_key in
       { query_base= Inner_curve.Checked.constant vk.query_base
       ; query= List.map ~f:Inner_curve.Checked.constant vk.query
-      ; h= Pairing.G2.constant vk.h
-      ; g_alpha= Pairing.G1.constant vk.g_alpha
-      ; h_beta= Pairing.G2.constant vk.h_beta
-      ; g_gamma= Pairing.G1.constant vk.g_gamma
-      ; h_gamma= Pairing.G2.constant vk.h_gamma
-      ; g_alpha_h_beta= Pairing.Fqk.constant vk.g_alpha_h_beta }
+      ; delta= Pairing.G2.constant vk.delta
+      ; alpha_beta= Pairing.Fqk.constant vk.alpha_beta }
   end
 
   module Bowe_gabizon_verifier = struct
@@ -771,21 +784,16 @@ module Tick = struct
 end
 
 let tock_vk_to_bool_list vk =
-  let vk = Tick.Groth_maller_verifier.vk_of_backend_vk vk in
+  let vk = Tick.Verifier.vk_of_backend_vk vk in
   let g1 = Tick.Inner_curve.to_affine_exn in
   let g2 = Tick.Pairing.G2.Unchecked.to_affine_exn in
   let vk =
     { vk with
       query_base= g1 vk.query_base
     ; query= List.map vk.query ~f:g1
-    ; g_alpha= g1 vk.g_alpha
-    ; g_gamma= g1 vk.g_gamma
-    ; h= g2 vk.h
-    ; h_beta= g2 vk.h_beta
-    ; h_gamma= g2 vk.h_gamma }
+    ; delta= g2 vk.delta }
   in
-  Tick.Groth_maller_verifier.Verification_key.(
-    summary_unchecked (summary_input vk))
+  Tick.Verifier.Verification_key.(summary_unchecked (summary_input vk))
 
 let embed (x : Tick.Field.t) : Tock.Field.t =
   let n = Tick.Bigint.of_field x in
