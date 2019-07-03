@@ -17,10 +17,6 @@ let key_generation = false
 
 [%%endif]
 
-module Base58_check = Base58_check.Make (struct
-  let version_byte = Base58_check.Version_bytes.lite_params
-end)
-
 let pedersen_params ~loc =
   let module E = Ppxlib.Ast_builder.Make (struct
     let loc = loc
@@ -49,12 +45,7 @@ let main () =
   in
   let loc = Ppxlib.Location.none in
   let structure =
-    [%str
-      module Base58_check = Base58_check.Make (struct
-        let version_byte = Base58_check.Version_bytes.lite_params
-      end)
-
-      let pedersen_params = [%e pedersen_params ~loc]]
+    [%str let pedersen_params = lazy [%e pedersen_params ~loc]]
   in
   Pprintast.top_phrase fmt (Ptop_def structure) ;
   exit 0
