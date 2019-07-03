@@ -169,25 +169,24 @@ let%test_module "test" =
       module G2 = struct
         include D.G2
 
-        let to_affine_coordinates t =
+        let to_affine_exn t =
           let f v = C.Field.Vector.(get v 0, get v 1, get v 2) in
-          let x, y = D.G2.to_affine_coordinates t in
+          let x, y = D.G2.to_affine_exn t in
           (f x, f y)
 
-        let of_affine_coordinates (x, y) =
+        let of_affine (x, y) =
           let f a =
             let open C.Field.Vector in
             let t = C.Field.Vector.create () in
             List.iter (Fqe.to_list a) ~f:(emplace_back t) ;
             t
           in
-          of_affine_coordinates (f x, f y)
+          of_affine (f x, f y)
 
         let typ =
           let fqe = Typ.tuple3 Field.typ Field.typ Field.typ in
           Typ.tuple2 fqe fqe
-          |> Typ.transport ~there:to_affine_coordinates
-               ~back:of_affine_coordinates
+          |> Typ.transport ~there:to_affine_exn ~back:of_affine
 
         let gen = curve_gen (scale_field one)
       end
