@@ -35,3 +35,5 @@ let lite_precomputed : t = '\xBC'
 let receipt_chain_hash : t = '\x9D'
 
 let secret_box_byteswr : t = '\x02'
+
+let ledger_hash : t = '\x63'
