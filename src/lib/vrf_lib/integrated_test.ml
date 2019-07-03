@@ -124,3 +124,27 @@ let%test_unit "eval unchecked vs. checked equality" =
            let%bind (module Shifted) = Group.Checked.Shifted.create () in
            Vrf.Checked.eval (module Shifted) ~private_key msg )
          (fun (private_key, msg) -> Vrf.eval ~private_key msg))
+
+let%bench_module "vrf bench module" =
+  ( module struct
+    let gen =
+      let open Quickcheck.Let_syntax in
+      let%map pk = Private_key.gen and msg = Message.gen in
+      (pk, msg)
+
+    let%bench_fun "vrf eval unchecked" =
+      let private_key, msg = Quickcheck.random_value gen in
+      fun () -> Vrf.eval ~private_key msg
+
+    let%bench_fun "vrf eval checked" =
+      let private_key, msg = Quickcheck.random_value gen in
+      fun () ->
+        Tick.Test.checked_to_unchecked
+          Tick.Typ.(Scalar.typ * Message.typ)
+          Output_hash.typ
+          (fun (private_key, msg) ->
+            let open Tick.Checked in
+            let%bind (module Shifted) = Group.Checked.Shifted.create () in
+            Vrf.Checked.eval (module Shifted) ~private_key msg )
+          (private_key, msg)
+  end )
