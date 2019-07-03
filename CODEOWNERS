@@ -18,7 +18,6 @@
 
 /src/app/cli/ @cmr @nholland94 @bkase
 /src/app/kademlia-haskell/ @bkase @enolan
-/src/app/lite/ @cmr @bkase
 /src/app/logproc/ @nholland94
 /src/app/reformat/ @bkase
 /src/app/testone/ @johnwu93

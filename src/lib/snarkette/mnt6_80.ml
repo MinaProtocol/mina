@@ -142,3 +142,24 @@ module Groth_maller = Groth_maller.Make (struct
   module Fq_target = Fq6
   module Pairing = Pairing
 end)
+
+module Make_bowe_gabizon (M : sig
+  val hash :
+       ?message:bool array
+    -> a:G1.t
+    -> b:G2.t
+    -> c:G1.t
+    -> delta_prime:G2.t
+    -> G1.t
+end) =
+Bowe_gabizon.Make (struct
+  module N = N
+  module G1 = G1
+  module G2 = G2
+  module Fq = Fq
+  module Fqe = Fq3
+  module Fq_target = Fq6
+  module Pairing = Pairing
+
+  let hash = M.hash
+end)

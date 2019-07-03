@@ -17,6 +17,10 @@ let key_generation = false
 
 [%%endif]
 
+module Base58_check = Base58_check.Make (struct
+  let version_byte = Base58_check.Version_bytes.lite_params
+end)
+
 let pedersen_params ~loc =
   let module E = Ppxlib.Ast_builder.Make (struct
     let loc = loc
@@ -27,7 +31,7 @@ let pedersen_params ~loc =
     List.init (Array.length arr) ~f:(fun i ->
         let g, _, _, _ = arr.(i) in
         estring
-          (Base64.encode_string
+          (Base58_check.encode
              (Binable.to_string
                 (module Lite_curve_choice.Tock.G1)
                 (Lite_compat_algebra.g1 g))) )
@@ -38,7 +42,7 @@ let pedersen_params ~loc =
       (fun s ->
         Core_kernel.Binable.of_string
           (module Lite_curve_choice.Tock.G1)
-          (Base64.decode_exn s) )
+          (Base58_check.decode_exn s) )
       [%e arr_expr]]
 
 open Async
@@ -48,7 +52,14 @@ let main () =
     Format.formatter_of_out_channel (Out_channel.create "pedersen_params.ml")
   in
   let loc = Ppxlib.Location.none in
-  let structure = [%str let pedersen_params = [%e pedersen_params ~loc]] in
+  let structure =
+    [%str
+      module Base58_check = Base58_check.Make (struct
+        let version_byte = Base58_check.Version_bytes.lite_params
+      end)
+
+      let pedersen_params = [%e pedersen_params ~loc]]
+  in
   Pprintast.top_phrase fmt (Ptop_def structure) ;
   exit 0
 
