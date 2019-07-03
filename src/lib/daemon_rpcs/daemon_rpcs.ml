@@ -485,6 +485,18 @@ module Stop_tracing = struct
     Rpc.Rpc.create ~name:"Stop_tracing" ~version:0 ~bin_query ~bin_response
 end
 
+module Set_staking = struct
+  type query = Public_key.Compressed.Stable.Latest.t list [@@deriving bin_io]
+
+  type response = Public_key.Compressed.Stable.Latest.t list
+  [@@deriving bin_io]
+
+  type error = unit
+
+  let rpc : (query, response) Rpc.Rpc.t =
+    Rpc.Rpc.create ~name:"Set_staking" ~version:0 ~bin_query ~bin_response
+end
+
 module Visualization = struct
   module Frontier = struct
     type query = string [@@deriving bin_io]

@@ -57,8 +57,10 @@ let peek_frontier frontier_broadcast_pipe =
 
 let snark_worker_key t = t.config.snark_worker_key
 
-let propose_public_keys t =
-  Consensus.Data.Local_state.current_proposers t.config.consensus_local_state
+(* Get the most recently set public keys  *)
+let propose_public_keys t : Public_key.Compressed.Set.t =
+  let public_keys, _ = Agent.get t.propose_keypairs in
+  Public_key.Compressed.Set.map public_keys ~f:snd
 
 let replace_propose_keypairs t kps = Agent.update t.propose_keypairs kps
 

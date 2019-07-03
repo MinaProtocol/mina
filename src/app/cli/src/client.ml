@@ -16,9 +16,9 @@ let dispatch rpc query port =
           Rpc.Rpc.dispatch rpc conn query )
 
 (** Call an RPC, passing handlers for a successful call and a failing one. Note
-   that a successful *call* may have failed on the server side and returned a
-   failing result. To deal with that, the success handler returns an
-   Or_error. *)
+    that a successful *call* may have failed on the server side and returned a
+    failing result. To deal with that, the success handler returns an
+    Or_error. *)
 let dispatch_with_message rpc query port ~success ~error =
   let fail err = eprintf "%s\n%!" err ; exit 14 in
   match%bind dispatch rpc query port with
@@ -599,6 +599,27 @@ let stop_tracing =
          | Error e ->
              eprintf !"Error: %{sexp:Error.t}\n" e ))
 
+let set_staking =
+  let open Deferred.Let_syntax in
+  let open Command.Anons in
+  let public_keys =
+    Command.Param.anon
+      (sequence ("addresses" %: Cli_lib.Arg_type.public_key_compressed))
+  in
+  Command.async ~summary:"Set keys you wish to stake with"
+    (Cli_lib.Background_daemon.init public_keys ~f:(fun port public_keys ->
+         match%map dispatch Daemon_rpcs.Set_staking.rpc public_keys port with
+         | Error e ->
+             eprintf !"Error: %{sexp:Error.t}\n" e
+         | Ok new_staking_public_keys ->
+             let pretty_new_staking_keys =
+               List.map new_staking_public_keys
+                 ~f:Public_key.Compressed.to_base58_check
+             in
+             printf
+               !"New staking public keys : [%s]\n"
+               (String.concat ~sep:"," pretty_new_staking_keys) ))
+
 module Visualization = struct
   let create_command (type rpc_response) ~name ~f
       (rpc : (string, rpc_response) Rpc.Rpc.t) =
@@ -650,6 +671,7 @@ let command =
     ; ("send-payment", send_payment)
     ; ("generate-keypair", generate_keypair)
     ; ("delegate-stake", delegate_stake)
+    ; ("set-staking", set_staking)
     ; ("generate-receipt", generate_receipt)
     ; ("verify-receipt", verify_receipt)
     ; ("stop-daemon", stop_daemon)

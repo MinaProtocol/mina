@@ -171,7 +171,9 @@ let setup_local_server ?(client_whitelist = []) ?rest_server_port ~coda
           return (Coda_lib.visualize_frontier ~filename coda) )
     ; implement Daemon_rpcs.Visualization.Registered_masks.rpc
         (fun () filename -> return (Coda_base.Ledger.Debug.visualize ~filename)
-      ) ]
+      )
+    ; implement Daemon_rpcs.Set_staking.rpc (fun () public_keys ->
+          return (Coda_commands.replace_proposers coda public_keys) ) ]
   in
   let snark_worker_impls =
     [ implement Snark_worker.Rpcs.Get_work.Latest.rpc (fun () () ->
