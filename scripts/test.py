@@ -14,11 +14,17 @@ build_artifact_profiles = [
     'testnet_postake_many_proposers',
     'testnet_postake_snarkless_fake_hash',
     'testnet_postake_medium_curves',
+    'testnet_postake_many_proposers_medium_curves'
 ]
 
 unit_test_profiles = [
     'test_postake_snarkless',
     'dev'
+]
+
+unit_test_profiles_medium_curves = [
+    'test_postake_snarkless_medium_curves',
+    'dev_medium_curves'
 ]
 
 simple_tests = [
@@ -51,6 +57,13 @@ test_permutations = {
     'test_postake_txns': ['coda-shared-state-test', 'coda-batch-payment-test'],
     'test_postake_five_even_snarkless': ['coda-shared-prefix-multiproposer-test -num-proposers 5'],
     'test_postake_five_even_txns': ['coda-shared-prefix-multiproposer-test -num-proposers 5 -payments'],
+    'test_postake_medium_curves': simple_tests,
+    'test_postake_snarkless_medium_curves': simple_tests,
+}
+
+test_medium_curves = {
+    'test_postake_medium_curves': simple_tests,
+    'test_postake_snarkless_medium_curves': simple_tests,
 }
 
 ci_blacklist = []
@@ -232,7 +245,9 @@ def render(args):
     rendered = template.render(
         build_artifact_profiles=build_artifact_profiles,
         unit_test_profiles=unit_test_profiles,
-        test_permutations=test_permutations
+        unit_test_profiles_medium_curves=unit_test_profiles_medium_curves,
+        test_permutations=test_permutations,
+        test_medium_curves=test_medium_curves
     )
 
     if args.check:

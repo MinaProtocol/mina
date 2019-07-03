@@ -236,3 +236,20 @@ workflows:
             {%- for profile in test_permutations.keys() | sort %}
             - test--{{profile}}
             {%- endfor %}
+
+    medium_curves:
+        triggers:
+          - schedule:
+            cron: "0 12 * * *"{# 12pm UTC = 5am PT#}
+            filters:
+              branches:
+                only:
+                  - master
+                  - release/beta
+        jobs:
+          {%- for profile in unit_test_profiles_medium_curves %}
+          - test-unit--{{profile}}
+          {%- endfor %}
+          {%- for profile in test_medium_curves.keys() | sort %}
+          - test--{{profile}}
+          {%- endfor %}
