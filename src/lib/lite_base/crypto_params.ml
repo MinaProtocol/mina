@@ -68,7 +68,7 @@ module Tock = struct
     let init =
       lazy
         (Pedersen.State.salt Lite_params.pedersen_params
-           Hash_prefixes.bowe_gabizon_hash)
+           (Hash_prefixes.bowe_gabizon_hash :> string))
 
     let pedersen t = Pedersen.digest_fold (Lazy.force init) t
   end))

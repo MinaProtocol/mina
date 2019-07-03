@@ -15,7 +15,7 @@ module type Backend_intf = sig
 
     val zero : t
 
-    val to_affine_coordinates : t -> Fq.t * Fq.t
+    val to_affine_exn : t -> Fq.t * Fq.t
 
     val is_well_formed : t -> bool
 
@@ -27,7 +27,7 @@ module type Backend_intf = sig
   module G2 : sig
     type t [@@deriving sexp, bin_io]
 
-    val to_affine_coordinates : t -> Fqe.t * Fqe.t
+    val to_affine_exn : t -> Fqe.t * Fqe.t
 
     val ( + ) : t -> t -> t
 
@@ -74,7 +74,7 @@ module Make (Backend : Backend_intf) = struct
       let g1s = Array.to_list query in
       let g2s = [delta] in
       let gts = [Fq_target.unitary_inverse alpha_beta] in
-      let g1_elts, g1_signs = map_to_two g1s ~f:G1.to_affine_coordinates in
+      let g1_elts, g1_signs = map_to_two g1s ~f:G1.to_affine_exn in
       let non_zero_base_coordinate a =
         let x = Fqe.project_to_base a in
         assert (not (Fq.equal x Fq.zero)) ;
@@ -82,7 +82,7 @@ module Make (Backend : Backend_intf) = struct
       in
       let g2_elts, g2_signs =
         map_to_two g2s ~f:(fun g ->
-            let x, y = G2.to_affine_coordinates g in
+            let x, y = G2.to_affine_exn g in
             (Fqe.to_list x, non_zero_base_coordinate y) )
       in
       let gt_elts, gt_signs =

@@ -153,9 +153,9 @@ module Tock = struct
               (struct
                 type nonrec t = t
 
-                let to_sexpable = to_affine_coordinates
+                let to_sexpable = to_affine_exn
 
-                let of_sexpable = of_affine_coordinates
+                let of_sexpable = of_affine
               end)
 
     include Make_inner_curve_aux (Tock0) (Tick0)
@@ -229,7 +229,7 @@ module Tock = struct
                     (Coefficients)
 
           let one =
-            let x, y = Snarkette_tock.G2.(to_affine_coordinates one) in
+            let x, y = Snarkette_tock.G2.(to_affine_exn one) in
             {x= Fqe.conv x; y= Fqe.conv y; z= Fqe.Unchecked.one}
         end
 
@@ -283,7 +283,7 @@ module Tock = struct
                   end)
 
         let create_constant =
-          Fn.compose create_constant G2.Unchecked.to_affine_coordinates
+          Fn.compose create_constant G2.Unchecked.to_affine_exn
       end
     end
 
@@ -306,8 +306,8 @@ module Tock = struct
     let conv_fqe v = Field.Vector.(get v 0, get v 1)
 
     let conv_g2 p =
-      let x, y = Tock_backend.Inner_twisted_curve.to_affine_coordinates p in
-      Pairing.G2.Unchecked.of_affine_coordinates (conv_fqe x, conv_fqe y)
+      let x, y = Tock_backend.Inner_twisted_curve.to_affine_exn p in
+      Pairing.G2.Unchecked.of_affine (conv_fqe x, conv_fqe y)
 
     let conv_fqk p =
       let v = Tick_backend.Full.Fqk.to_elts p in
@@ -361,9 +361,9 @@ module Tick = struct
               (struct
                 type nonrec t = t
 
-                let to_sexpable = to_affine_coordinates
+                let to_sexpable = to_affine_exn
 
-                let of_sexpable = of_affine_coordinates
+                let of_sexpable = of_affine
               end)
 
     include Make_inner_curve_aux (Tick0) (Tock0)
@@ -417,8 +417,8 @@ module Tick = struct
         if phys_equal c1 Inner_curve.zero || phys_equal c2 Inner_curve.zero
         then phys_equal c1 c2
         else
-          let c1_x, c1_y = Inner_curve.to_affine_coordinates c1 in
-          let c2_x, c2_y = Inner_curve.to_affine_coordinates c2 in
+          let c1_x, c1_y = Inner_curve.to_affine_exn c1 in
+          let c2_x, c2_y = Inner_curve.to_affine_exn c2 in
           Field.equal c1_x c2_x && Field.equal c1_y c2_y
 
       let equal_states s1 s2 =
@@ -472,7 +472,17 @@ module Tick = struct
         let fold = gen_fold n in
         let result, unchunked_result = run_updates fold in
         assert (equal_states result unchunked_result)
+
+      let hash_unchunked n =
+        let fold = gen_fold n in
+        State.update_fold_unchunked initial_state fold
+
+      let hash_chunked n =
+        let fold = gen_fold n in
+        State.update_fold_chunked initial_state fold
     end
+
+    (* compare unchunked, chunked hashes *)
 
     let%test_unit "hash one triple" = For_tests.run_hash_test 1
 
@@ -487,6 +497,36 @@ module Tick = struct
 
     let%test_unit "hash large number of chunks plus 2" =
       For_tests.run_hash_test ((Chunked_triples.Chunk.size * 250) + 2)
+
+    (* benchmark unchunked, chunked hashes *)
+
+    let%bench "hash one triple unchunked" = For_tests.hash_unchunked 1
+
+    let%bench_fun "hash one triple chunked" =
+      (* make sure chunk table deserialized *)
+      ignore (Lazy.force chunk_table) ;
+      fun () -> For_tests.hash_chunked 1
+
+    let%bench "hash small number of triples unchunked" =
+      For_tests.hash_unchunked 25
+
+    let%bench_fun "hash small number of triples chunked" =
+      ignore (Lazy.force chunk_table) ;
+      fun () -> For_tests.hash_chunked 25
+
+    let%bench "hash large number of triples unchunked" =
+      For_tests.hash_unchunked 250
+
+    let%bench_fun "hash large number of triples chunked" =
+      ignore (Lazy.force chunk_table) ;
+      fun () -> For_tests.hash_chunked 250
+
+    let%bench "hash huge number of triples unchunked" =
+      For_tests.hash_unchunked 1000
+
+    let%bench_fun "hash huge number of triples chunked" =
+      ignore (Lazy.force chunk_table) ;
+      fun () -> For_tests.hash_chunked 1000
   end
 
   module Util = Snark_util.Make (Tick0)
@@ -552,7 +592,7 @@ module Tick = struct
                     end)
 
           let one =
-            let x, y = Snarkette_tick.G2.(to_affine_coordinates one) in
+            let x, y = Snarkette_tick.G2.(to_affine_exn one) in
             {z= Fqe.Unchecked.one; x= Fqe.conv x; y= Fqe.conv y}
         end
 
@@ -612,7 +652,7 @@ module Tick = struct
                   end)
 
         let create_constant =
-          Fn.compose create_constant G2.Unchecked.to_affine_coordinates
+          Fn.compose create_constant G2.Unchecked.to_affine_exn
       end
     end
 
@@ -631,8 +671,8 @@ module Tick = struct
     let conv_fqe v = Field.Vector.(get v 0, get v 1, get v 2)
 
     let conv_g2 p =
-      let x, y = Tick_backend.Inner_twisted_curve.to_affine_coordinates p in
-      Pairing.G2.Unchecked.of_affine_coordinates (conv_fqe x, conv_fqe y)
+      let x, y = Tick_backend.Inner_twisted_curve.to_affine_exn p in
+      Pairing.G2.Unchecked.of_affine (conv_fqe x, conv_fqe y)
 
     let conv_fqk (p : Tock_backend.Full.Fqk.t) =
       let v = Tock_backend.Full.Fqk.to_elts p in
@@ -697,8 +737,8 @@ module Tick = struct
     let conv_fqe v = Field.Vector.(get v 0, get v 1, get v 2)
 
     let conv_g2 p =
-      let x, y = Tick_backend.Inner_twisted_curve.to_affine_coordinates p in
-      Pairing.G2.Unchecked.of_affine_coordinates (conv_fqe x, conv_fqe y)
+      let x, y = Tick_backend.Inner_twisted_curve.to_affine_exn p in
+      Pairing.G2.Unchecked.of_affine (conv_fqe x, conv_fqe y)
 
     let conv_fqk (p : Tock_backend.Full.Fqk.t) =
       let v = Tock_backend.Full.Fqk.to_elts p in
@@ -732,8 +772,8 @@ end
 
 let tock_vk_to_bool_list vk =
   let vk = Tick.Groth_maller_verifier.vk_of_backend_vk vk in
-  let g1 = Tick.Inner_curve.to_affine_coordinates in
-  let g2 = Tick.Pairing.G2.Unchecked.to_affine_coordinates in
+  let g1 = Tick.Inner_curve.to_affine_exn in
+  let g2 = Tick.Pairing.G2.Unchecked.to_affine_exn in
   let vk =
     { vk with
       query_base= g1 vk.query_base
