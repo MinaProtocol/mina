@@ -226,8 +226,8 @@ let hash s =
 [%%endif]
 
 let negative_one =
-  { Poly.Stable.Latest.previous_state_hash=
+  lazy { Poly.Stable.Latest.previous_state_hash=
       State_hash.of_hash Snark_params.Tick.Pedersen.zero_hash
   ; body=
-      { Body.Poly.blockchain_state= Blockchain_state.negative_one
-      ; consensus_state= Consensus.Data.Consensus_state.negative_one } }
+      { Body.Poly.blockchain_state= Lazy.force Blockchain_state.negative_one
+      ; consensus_state= Lazy.force Consensus.Data.Consensus_state.negative_one } }

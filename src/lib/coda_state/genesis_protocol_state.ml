@@ -2,7 +2,7 @@ open Core_kernel
 open Coda_base
 
 let create_with_custom_ledger ~genesis_consensus_state ~genesis_ledger =
-  let negative_one_protocol_state_hash = Protocol_state.(hash negative_one) in
+  let negative_one_protocol_state_hash = Protocol_state.(hash (Lazy.force negative_one)) in
   let root_ledger_hash = Ledger.merkle_root genesis_ledger in
   let staged_ledger_hash =
     Staged_ledger_hash.of_aux_ledger_and_coinbase_hash
@@ -14,7 +14,7 @@ let create_with_custom_ledger ~genesis_consensus_state ~genesis_ledger =
   in
   let blockchain_state =
     Blockchain_state.create_value
-      ~timestamp:Blockchain_state.(timestamp genesis)
+      ~timestamp:Blockchain_state.(timestamp (Lazy.force genesis))
       ~staged_ledger_hash ~snarked_ledger_hash
   in
   let state =
@@ -25,7 +25,8 @@ let create_with_custom_ledger ~genesis_consensus_state ~genesis_ledger =
   With_hash.of_data ~hash_data:Protocol_state.hash state
 
 let t =
-  let negative_one_protocol_state_hash = Protocol_state.(hash negative_one) in
+  lazy (
+  let negative_one_protocol_state_hash = Protocol_state.(hash @@ Lazy.force negative_one) in
   let genesis_consensus_state =
     Consensus.Data.Consensus_state.create_genesis
       ~negative_one_protocol_state_hash
@@ -33,7 +34,8 @@ let t =
   let state =
     Protocol_state.create_value
       ~previous_state_hash:negative_one_protocol_state_hash
-      ~blockchain_state:Blockchain_state.genesis
+      ~blockchain_state:(Lazy.force Blockchain_state.genesis)
       ~consensus_state:genesis_consensus_state
   in
   With_hash.of_data ~hash_data:Protocol_state.hash state
+  )

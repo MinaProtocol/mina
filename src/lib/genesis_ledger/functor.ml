@@ -15,10 +15,10 @@ module Make_from_base (Base : Base_intf) : Intf.S = struct
   include Base
 
   let t =
-    let ledger = Ledger.create_ephemeral () in
+    lazy (let ledger = Ledger.create_ephemeral () in
     List.iter accounts ~f:(fun (_, account) ->
         Ledger.create_new_account_exn ledger account.public_key account ) ;
-    ledger
+    ledger)
 
   let find_account_record_exn ~f =
     List.find_exn accounts ~f:(fun (_, account) -> f account)
