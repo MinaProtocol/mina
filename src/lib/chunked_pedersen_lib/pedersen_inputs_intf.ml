@@ -27,7 +27,7 @@ module type S = sig
     val negate : t -> t
   end
 
-  val params : Curve.t Tuple_lib.Quadruple.t array
+  val params : Curve.t Tuple_lib.Quadruple.t array Lazy.t
 
   val chunk_table : Curve.t array array Lazy.t
 end

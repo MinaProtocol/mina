@@ -22,7 +22,7 @@ let pedersen_params ~loc =
     let loc = loc
   end) in
   let open E in
-  let arr = Crypto_params.Pedersen_params.params in
+  let arr = Lazy.force Crypto_params.Pedersen_params.params in
   let arr_expr =
     List.init (Array.length arr) ~f:(fun i ->
         let g, _, _, _ = arr.(i) in

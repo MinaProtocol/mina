@@ -98,25 +98,28 @@ let%test_module "test" =
     end
 
     let pedersen_params =
-      let len = 10 * Impl.Field.size_in_bits in
-      let chunk = Impl.Field.size_in_bits / 4 in
-      let arr = Array.create ~len Curve.(zero, zero, zero, zero) in
-      let rec go acc i =
-        let times4 x =
-          let open Curve in
-          x |> double |> double
-        in
-        if i < len then (
-          let x2 = Curve.double acc in
-          let x3 = Curve.add x2 acc in
-          let x4 = Curve.double x2 in
-          arr.(i) <- (acc, x2, x3, x4) ;
-          let i = i + 1 in
-          let acc = if i mod chunk = 0 then Curve.random () else times4 x4 in
-          go acc i )
-      in
-      go (Curve.random ()) 0 ;
-      arr
+      lazy
+        (let len = 10 * Impl.Field.size_in_bits in
+         let chunk = Impl.Field.size_in_bits / 4 in
+         let arr = Array.create ~len Curve.(zero, zero, zero, zero) in
+         let rec go acc i =
+           let times4 x =
+             let open Curve in
+             x |> double |> double
+           in
+           if i < len then (
+             let x2 = Curve.double acc in
+             let x3 = Curve.add x2 acc in
+             let x4 = Curve.double x2 in
+             arr.(i) <- (acc, x2, x3, x4) ;
+             let i = i + 1 in
+             let acc =
+               if i mod chunk = 0 then Curve.random () else times4 x4
+             in
+             go acc i )
+         in
+         go (Curve.random ()) 0 ;
+         arr)
 
     module Pedersen =
       Snarky.Pedersen.Make (Impl) (Curve)
@@ -197,10 +200,13 @@ let%test_module "test" =
       module Pedersen = Pedersen_lib.Pedersen.Make (Field) (G1)
 
       let pedersen_params =
-        Array.map pedersen_params ~f:(fun (x, _, _, _) -> x)
+        lazy
+          (Array.map (Lazy.force pedersen_params) ~f:(fun (x, _, _, _) -> x))
 
       let pedersen t =
-        Pedersen.digest_fold (Pedersen.State.create pedersen_params) t
+        Pedersen.digest_fold
+          (Pedersen.State.create (Lazy.force pedersen_params))
+          t
     end
 
     module H = Bowe_gabizon_hash.Make (Inputs)

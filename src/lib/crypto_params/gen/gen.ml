@@ -93,9 +93,8 @@ let params_ast ~loc =
     Tick_backend.Inner_curve.of_affine
       (Tick0.Field.of_string x, Tick0.Field.of_string y)
   in
-  Array.map
-    (fun (g1, g2, g3, g4) -> (conv g1, conv g2, conv g3, conv g4))
-    [%e earray]
+  Core_kernel.Array.map [%e earray] ~f:(fun (g1, g2, g3, g4) ->
+      (conv g1, conv g2, conv g3, conv g4) )
 
 let group_map_params =
   Group_map.Params.create
@@ -129,7 +128,7 @@ let params_structure ~loc =
   let open E in
   [%str open Curve_choice
 
-        let params = [%e params_ast ~loc]]
+        let params = lazy [%e params_ast ~loc]]
 
 (* for the reversed chunk with value n, compute its curve value
    start is the starting parameter position of the chunk, based

@@ -136,8 +136,9 @@ struct
 
     let update_fold (t : t) (fold : bool Triple.t Fold.t) =
       O1trace.measure "pedersen fold" (fun () ->
-          let max_num_params = Array.length params in
-          (* As much space as we could need: we can only have up to [length params] triples before we overflow that, and each triple is packed into a single byte *)
+          let params_forced = Lazy.force params in
+          let max_num_params = Array.length params_forced in
+          (* As much space as we could need: we can only have up to [length params_forced] triples before we overflow that, and each triple is packed into a single byte *)
           let bs = Bigstring.init max_num_params ~f:(fun _ -> '0') in
           let triples_consumed_here =
             fold.fold ~init:0 ~f:(fun i (b0, b1, b2) ->
@@ -182,6 +183,7 @@ struct
 
     let update_fold_chunked (t : t) (fold : bool Triple.t Fold.t) =
       O1trace.measure "pedersen fold" (fun () ->
+          let params_forced = Lazy.force params in
           let chunk_ndx =
             let boundary = t.triples_consumed / Chunk.size in
             if Int.equal (t.triples_consumed mod Chunk.size) 0 then
@@ -191,8 +193,8 @@ struct
               boundary + 1
           in
           let process_triple i triple =
-            Snarky.Pedersen.local_function ~negate:Curve.negate params.(i)
-              triple
+            Snarky.Pedersen.local_function ~negate:Curve.negate
+              params_forced.(i) triple
           in
           let table = Lazy.force chunk_table in
           (* consume a triple at a time until we're at a chunk boundary, then
@@ -251,11 +253,12 @@ struct
             {acc; triples_consumed} )
 
     let update_fold_unchunked (t : t) (fold : bool Triple.t Fold.t) =
+      let params_forced = Lazy.force params in
       let acc, triples_consumed =
         fold.fold ~init:(t.acc, t.triples_consumed) ~f:(fun (acc, i) triple ->
             let term =
-              Snarky.Pedersen.local_function ~negate:Curve.negate params.(i)
-                triple
+              Snarky.Pedersen.local_function ~negate:Curve.negate
+                params_forced.(i) triple
             in
             (Curve.add acc term, i + 1) )
       in
