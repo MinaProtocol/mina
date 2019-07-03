@@ -64,7 +64,7 @@ Note that no  information about the 3-coloring is revealed to Verifier, since wh
 If you didn't really know a 3-coloring, then for some two nodes connected by an edge, you put balls of the same color during the proving stage. That means that during the verifying stage, since Verifier picks an edge at random, the probability that they catch you is at least $1 / |E|$, where $|E|$ is the number of edges in the graph.
 
 
-Note that there is still some significant probability that you could cheat and still get away with it (specifically, $(1 - 1/E)$). This probability is called the _soundness error_.  We would like to reduce this error to negligible. Here is an idea:  Repeat the above protocol multiple times. Now, you can get away only if you get away in each one of those executions. This significantly reduces the soundness error, as quantified in the following.   
+Note that there is still some significant probability that you could cheat and still get away with it (specifically, $(1 - 1/E)$). This probability is called the _soundness error_.  We would like to reduce this error to negligible. Here is an idea:  Repeat the above protocol multiple times. Now, you can get away with cheating only if you get away in each one of those executions. This significantly reduces the soundness error, as quantified in the following.   
 
 
 
@@ -97,7 +97,7 @@ Let $N$ be the total number of rounds.
 
 ## Revisiting Zero-knowledgeness
 
-Unfortunately, there is an issue in the above protocol. Since Verifier gets to see the coloring two nodes at a time, she can learn the entire 3-coloring by running enough rounds. Luckily, we can get around this issue: After every round, you would ask Verifier to step out of sight, you would randomly permute the colors and again cover all the nodes. That way, anything that Verifier might have learned in one round is not relevant in the subsequent rounds, since whatever Verifier viewed can be simulated by just picking two random, but differently-colored balls in each round. 
+Unfortunately, there is an issue in the above protocol. Since Verifier gets to see the coloring of two nodes at a time, she can learn the entire 3-coloring by running enough rounds. Luckily, we can get around this issue: After every round, you would ask Verifier to step out of sight, you would randomly permute the colors and again cover all the nodes. That way, anything that Verifier might have learned in one round is not relevant in the subsequent rounds, since whatever Verifier viewed can be simulated by just picking two random, but differently-colored balls in each round. 
 
 
 
