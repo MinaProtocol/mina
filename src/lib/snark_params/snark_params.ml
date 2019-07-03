@@ -725,6 +725,62 @@ module Tick = struct
       ; delta= Pairing.G2.constant vk.delta
       ; alpha_beta= Pairing.Fqk.constant vk.alpha_beta }
   end
+
+  module Bowe_gabizon_verifier = struct
+    include Snarky_verifier.Bowe_gabizon.Make (struct
+      include Pairing
+
+      module H =
+        Snarky_bowe_gabizon_hash.Make (Run) (Tick0)
+          (struct
+            module Fqe = Pairing.Fqe
+
+            let init =
+              Pedersen.State.salt (Hash_prefixes.bowe_gabizon_hash :> string)
+
+            let pedersen x =
+              Pedersen.Checked.digest_triples ~init (Fold_lib.Fold.to_list x)
+
+            let params = Tock_backend.Bowe_gabizon.bg_params
+          end)
+
+      let hash = H.hash
+    end)
+
+    let conv_fqe v = Field.Vector.(get v 0, get v 1, get v 2)
+
+    let conv_g2 p =
+      let x, y = Tick_backend.Inner_twisted_curve.to_affine_exn p in
+      Pairing.G2.Unchecked.of_affine (conv_fqe x, conv_fqe y)
+
+    let conv_fqk (p : Tock_backend.Full.Fqk.t) =
+      let v = Tock_backend.Full.Fqk.to_elts p in
+      let f i =
+        let x j = Tick0.Field.Vector.get v ((3 * i) + j) in
+        (x 0, x 1, x 2)
+      in
+      (f 0, f 1)
+
+    let proof_of_backend_proof
+        ({a; b; c; delta_prime; z} : Tock_backend.Bowe_gabizon.Proof.t) =
+      {Proof.a; b= conv_g2 b; c; delta_prime= conv_g2 delta_prime; z}
+
+    let vk_of_backend_vk (vk : Tock_backend.Bowe_gabizon.Verification_key.t) =
+      let open Tock_backend.Bowe_gabizon.Verification_key in
+      let open Inner_curve.Vector in
+      let q = query vk in
+      { Verification_key.query_base= get q 0
+      ; query= List.init (length q - 1) ~f:(fun i -> get q (i + 1))
+      ; delta= conv_g2 (delta vk)
+      ; alpha_beta= conv_fqk (alpha_beta vk) }
+
+    let constant_vk vk =
+      let open Verification_key in
+      { query_base= Inner_curve.Checked.constant vk.query_base
+      ; query= List.map ~f:Inner_curve.Checked.constant vk.query
+      ; delta= Pairing.G2.constant vk.delta
+      ; alpha_beta= Pairing.Fqk.constant vk.alpha_beta }
+  end
 end
 
 let tock_vk_to_bool_list vk =
