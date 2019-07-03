@@ -101,6 +101,8 @@ module Base = struct
         end
 
         include T
+
+        let job_str = function Empty -> "Base.Empty" | Full _ -> "Base.Full"
       end
 
       module Latest = V1
@@ -110,6 +112,8 @@ module Base = struct
       | Empty
       | Full of 'base Record.Stable.V1.t
     [@@deriving sexp]
+
+    let job_str = Stable.Latest.job_str
   end
 
   module Stable = struct
@@ -163,6 +167,14 @@ module Merge = struct
         end
 
         include T
+
+        let job_str = function
+          | Empty ->
+              "Merge.Empty"
+          | Full _ ->
+              "Merge.Full"
+          | Part _ ->
+              "Merge.Part"
       end
 
       module Latest = V1
@@ -173,6 +185,8 @@ module Merge = struct
       | Part of 'merge
       | Full of 'merge Record.Stable.V1.t
     [@@deriving sexp]
+
+    let job_str = Stable.Latest.job_str
   end
 
   module Stable = struct
@@ -573,8 +587,8 @@ module Tree = struct
         (*Create new jobs from the completed ones*)
         let%map new_weight, m' =
           match (jobs, m) with
-          | [], e ->
-              Ok (weight, e)
+          | [], _ ->
+              Ok (weight, m)
           | [New_job.Merge a; Merge b], Merge.Job.Empty ->
               Ok
                 ( (left - 1, right - 1)
@@ -591,15 +605,13 @@ module Tree = struct
                 if left = 0 then (left, right - 1) else (left - 1, right)
               in
               Ok (weight, m)
-          | [Base _], Part _ ->
-              (*This should not happen because of 2:1 jobs-data invariant of the tree*)
-              Or_error.errorf
-                "Got base jobs when merge nodes at level %d are partly filled"
-                cur_level
           | [Base _; Base _], Empty ->
               Ok ((left - 1, right - 1), m)
-          | _ ->
-              failwith "Invalid merge job (level-1)"
+          | xs, m ->
+              Or_error.errorf
+                "Got %d jobs when updating level %d and when one of the merge \
+                 nodes at level %d is %s"
+                (List.length xs) update_level cur_level (Merge.Job.job_str m)
         in
         ((new_weight, m'), None)
       else if cur_level = update_level then
@@ -613,8 +625,11 @@ module Tree = struct
             Ok ((weight', new_job), scan_result)
         | [], m ->
             Ok ((weight, m), None)
-        | _ ->
-            failwith "Invalid merge job"
+        | xs, m ->
+            Or_error.errorf
+              "Got %d jobs when updating level %d and when one of the merge \
+               nodes at level %d is %s"
+              (List.length xs) update_level cur_level (Merge.Job.job_str m)
       else if cur_level < update_level - 1 then
         (*Update the job count for all the level above*)
         match jobs with
@@ -633,16 +648,19 @@ module Tree = struct
     in
     let add_bases jobs (weight, d) =
       match (jobs, d) with
-      | [], e ->
-          Ok (weight, e)
+      | [], _ ->
+          Ok (weight, d)
       | [New_job.Base d], Base.Job.Empty ->
           Ok
             ( weight - 1
             , Base.Job.Full {job= d; seq_no; status= Job_status.Todo} )
       | [New_job.Merge _], Full b ->
           Ok (weight, Full {b with status= Job_status.Done})
-      | _ ->
-          failwith "Invalid base job"
+      | xs, _ ->
+          Or_error.errorf
+            "Got %d jobs when updating level %d and when one of the base \
+             nodes is %s"
+            (List.length xs) update_level (Base.Job.job_str d)
     in
     let jobs = completed_jobs in
     update_split ~f_merge:add_merges ~f_base:add_bases tree ~weight_merge:fst
@@ -1013,22 +1031,29 @@ let work : type merge base.
   in
   work_to_do work_trees ~max_base_jobs
 
-let work_for_current_tree t =
+let work_for_tree t ~data_tree =
   let delay = t.delay + 1 in
-  work (Non_empty_list.tail t.trees) ~max_base_jobs:t.max_base_jobs ~delay
+  let trees =
+    match data_tree with
+    | `Current ->
+        Non_empty_list.tail t.trees
+    | `Next ->
+        Non_empty_list.to_list t.trees
+  in
+  work trees ~max_base_jobs:t.max_base_jobs ~delay
 
 (*work on all the level and all the trees*)
 let all_work : type merge base.
     (merge, base) t -> (merge, base) Available_job.t list list =
  fun t ->
   let depth = Int.ceil_log2 t.max_base_jobs in
-  let set1 = work_for_current_tree t in
+  let set1 = work_for_tree t ~data_tree:`Current in
   let _, other_sets =
     List.fold ~init:(t, []) (List.init ~f:Fn.id t.delay)
       ~f:(fun (t, work_list) _ ->
         let trees' = Non_empty_list.cons (create_tree ~depth) t.trees in
         let t' = {t with trees= trees'} in
-        match work_for_current_tree t' with
+        match work_for_tree t' ~data_tree:`Current with
         | [] ->
             (t', work_list)
         | work ->
@@ -1086,7 +1111,7 @@ let add_merge_jobs :
     let delay = state.delay + 1 in
     let depth = Int.ceil_log2 state.max_base_jobs in
     let merge_jobs = List.map completed_jobs ~f:(fun j -> New_job.Merge j) in
-    let jobs_required = work_for_current_tree state in
+    let jobs_required = work_for_tree state ~data_tree:`Current in
     let%bind () =
       check
         (List.length merge_jobs > List.length jobs_required)
@@ -1096,16 +1121,17 @@ let add_merge_jobs :
              (List.length jobs_required)
              (List.length merge_jobs))
     in
-    let curr_tree = Non_empty_list.head state.trees in
+    let curr_tree, to_be_updated_trees =
+      (Non_empty_list.head state.trees, Non_empty_list.tail state.trees)
+    in
     let%bind updated_trees, result_opt, _ =
       let res =
-        List.foldi
-          (Non_empty_list.tail state.trees)
+        List.foldi to_be_updated_trees
           ~init:(Ok ([], None, merge_jobs))
           ~f:(fun i acc tree ->
             let open Or_error.Let_syntax in
             let%bind trees, scan_result, jobs = acc in
-            if i % delay = delay - 1 || not (List.is_empty jobs) then
+            if i % delay = delay - 1 && not (List.is_empty jobs) then
               (*Every nth (n=delay) tree*)
               match
                 Tree.update
@@ -1119,7 +1145,8 @@ let add_merge_jobs :
                     , scan_result'
                     , List.drop jobs (Tree.required_job_count tree) )
               | Error e ->
-                  Or_error.errorf "Error while updating tree# %d: %s" i
+                  Or_error.errorf
+                    "Error while adding merge jobs to tree# %d: %s" i
                     (Error.to_string_hum e)
             else Ok (tree :: trees, scan_result, jobs) )
       in
@@ -1179,7 +1206,11 @@ let add_data : data:'base list -> (_, _, 'base) State_or_error.t =
       | Ok res ->
           State_or_error.return res
       | Error e ->
-          return_error e (tree, None)
+          return_error
+            (Error.of_string
+               (sprintf "Error while adding base jobs to the tree: %s"
+                  (Error.to_string_hum e)))
+            (tree, None)
     in
     let updated_trees =
       if List.length base_jobs = available_space then
@@ -1339,13 +1370,8 @@ let partition_if_overflowing : ('merge, 'base) t -> Space_partition.t =
  fun t ->
   let cur_tree_space = free_space_on_current_tree t in
   (*Check actual work count because it would be zero initially*)
-  let work_count = work_for_current_tree t |> List.length in
-  let depth = Int.ceil_log2 t.max_base_jobs in
-  let work_count_new_tree =
-    work_for_current_tree
-      {t with trees= Non_empty_list.cons (create_tree ~depth) t.trees}
-    |> List.length
-  in
+  let work_count = work_for_tree t ~data_tree:`Current |> List.length in
+  let work_count_new_tree = work_for_tree t ~data_tree:`Next |> List.length in
   { first= (cur_tree_space, work_count)
   ; second=
       ( if cur_tree_space < t.max_base_jobs then
@@ -1402,7 +1428,7 @@ let%test_module "test" =
       in
       ()
 
-    let%test_unit "Ramdom base jobs" =
+    let%test_unit "Random base jobs" =
       let max_base_jobs = 512 in
       let t = empty ~max_base_jobs ~delay:3 in
       let state = ref t in
