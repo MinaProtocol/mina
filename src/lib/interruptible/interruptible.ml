@@ -57,6 +57,12 @@ module T = struct
   let return a =
     {interruption_signal= Deferred.never (); d= Deferred.Result.return a}
 
+  module Can_err = struct
+    type (_, 'a, 's) t =
+      | () : (('a, 's) Result.t, 'a, 's) t
+      | Cannot_err : ('a, 'a, 's) t
+  end
+
   let don't_wait_for {d; _} =
     don't_wait_for @@ Deferred.map d ~f:(function Ok () -> () | Error _ -> ())
 

@@ -103,7 +103,7 @@ end
 
 let generate_next_state ~previous_protocol_state ~time_controller
     ~staged_ledger ~transactions ~get_completed_work ~logger
-    ~(keypair : Keypair.t) ~proposal_data =
+    ~(keypair : Keypair.t) ~proposal_data ~scheduled_time =
   let open Interruptible.Let_syntax in
   let self = Public_key.compress keypair.public_key in
   let%bind ( diff
@@ -153,17 +153,25 @@ let generate_next_state ~previous_protocol_state ~time_controller
             ~default:Currency.Amount.zero
         in
         let blockchain_state =
-          Blockchain_state.create_value ~timestamp:(Time.now time_controller)
+          (* We use the time this proposal was supposed to happen at because
+             if things are slower than expected, we may have entered the next
+             slot and putting the **current** timestamp rather than the expected
+             one will screw things up.
+
+             [generate_transition] will log an error if the [current_time] has a
+             different slot from the [scheduled_time]
+          *)
+          Blockchain_state.create_value ~timestamp:scheduled_time
             ~snarked_ledger_hash:next_ledger_hash
             ~staged_ledger_hash:next_staged_ledger_hash
         in
-        let time =
+        let current_time =
           Time.now time_controller |> Time.to_span_since_epoch
           |> Time.Span.to_ms
         in
         measure "consensus generate_transition" (fun () ->
             Consensus_state_hooks.generate_transition ~previous_protocol_state
-              ~blockchain_state ~time ~proposal_data
+              ~blockchain_state ~current_time ~proposal_data
               ~transactions:
                 ( Staged_ledger_diff.With_valid_signatures_and_proofs
                   .user_commands diff
@@ -214,7 +222,7 @@ let run ~logger ~prover ~verifier ~trust_system ~get_completed_work
            schedule event"
       in
       let module Breadcrumb = Transition_frontier.Breadcrumb in
-      let propose ivar (keypair, proposal_data) =
+      let propose ivar (keypair, scheduled_time, proposal_data) =
         let open Interruptible.Let_syntax in
         match Broadcast_pipe.Reader.peek frontier_reader with
         | None ->
@@ -241,8 +249,8 @@ let run ~logger ~prover ~verifier ~trust_system ~get_completed_work
               Interruptible.lift (Deferred.return ()) (Ivar.read ivar)
             in
             let%bind next_state_opt =
-              generate_next_state ~proposal_data ~previous_protocol_state
-                ~time_controller
+              generate_next_state ~scheduled_time ~proposal_data
+                ~previous_protocol_state ~time_controller
                 ~staged_ledger:(Breadcrumb.staged_ledger crumb)
                 ~transactions ~get_completed_work ~logger ~keypair
             in
@@ -459,10 +467,10 @@ let run ~logger ~prover ~verifier ~trust_system ~get_completed_work
                   Consensus.Hooks.required_local_state_sync ~consensus_state
                     ~local_state:consensus_local_state
                   = None ) ;
+                let now = Time.now time_controller in
                 match
                   measure "asking conensus what to do" (fun () ->
-                      Consensus.Hooks.next_proposal
-                        (time_to_ms (Time.now time_controller))
+                      Consensus.Hooks.next_proposal (time_to_ms now)
                         consensus_state ~local_state:consensus_local_state
                         ~keypairs ~logger )
                 with
@@ -472,16 +480,17 @@ let run ~logger ~prover ~verifier ~trust_system ~get_completed_work
                 | `Propose_now (keypair, data) ->
                     Interruptible.finally
                       (Singleton_supervisor.dispatch proposal_supervisor
-                         (keypair, data))
+                         (keypair, now, data))
                       ~f:check_for_proposal
                     |> ignore
                 | `Propose (time, keypair, data) ->
-                    Singleton_scheduler.schedule scheduler (time_of_ms time)
+                    let schedled_time = time_of_ms time in
+                    Singleton_scheduler.schedule scheduler schedled_time
                       ~f:(fun () ->
                         ignore
                           (Interruptible.finally
                              (Singleton_supervisor.dispatch proposal_supervisor
-                                (keypair, data))
+                                (keypair, schedled_time, data))
                              ~f:check_for_proposal) ) ) )
       in
       (* Schedule to wake up immediately on the next tick of the proposer
