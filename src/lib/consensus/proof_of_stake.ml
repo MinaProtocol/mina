@@ -762,7 +762,7 @@ module Data = struct
       open Bignum_bigint
 
       (* TEMPORARY HACK FOR TESTNETS: c should be 1 (or possibly 2) otherwise *)
-      let c = `Two_to_the 2
+      let c = `Two_to_the 0
 
       let base = Bignum.(one / of_int 2)
 
@@ -810,18 +810,8 @@ module Data = struct
         in
         Bignum.(lhs <= rhs)
 
-      (*
-        of_bit_fold_lsb (Random_oracle.Digest.fold_bits vrf_output)
-        * of_uint64_exn (Amount.to_uint64 total_stake)
-        <= shift_left
-             (c * of_uint64_exn (Balance.to_uint64 my_stake))
-             Random_oracle.Digest.length_in_bits
-
-*)
       module Checked = struct
         let is_satisfied ~my_stake ~total_stake (vrf_output : Output.var) =
-          (* TODO: Ask matthew about this. was thinking there would be a 
-           val direct : (field m, _) Checked.t *)
           let open Snarky_taylor in
           make_checked (fun () ->
               let open Run in
