@@ -300,7 +300,7 @@ end = struct
         ~snarked_ledger:(Ledger.of_database synced_db)
         ~expected_merkle_root ~pending_coinbases
     with
-    | Error _ ->
+    | Error e ->
         let%bind () =
           Trust_system.(
             record t.trust_system t.logger sender
@@ -312,6 +312,7 @@ end = struct
                     , [] ) ))
         in
         Logger.info logger ~module_:__MODULE__ ~location:__LOC__
+          ~metadata:[("error", Error.to_string_hum e)]
           "Failed to find scan state from the peer or received faulty scan \
            state. Retry bootstrap!" ;
         run ~logger ~trust_system ~verifier ~network ~frontier ~ledger_db
@@ -368,8 +369,9 @@ end = struct
                         Network.query_peer t.network peer f query ) }
                 sync_jobs
         with
-        | Error _ ->
+        | Error e ->
             Logger.info logger ~module_:__MODULE__ ~location:__LOC__
+              ~metadata:[("error", Error.to_string_hum e)]
               "Local state sync failed. Retry bootstrap" ;
             run ~logger ~trust_system ~verifier ~network ~frontier ~ledger_db
               ~transition_reader
