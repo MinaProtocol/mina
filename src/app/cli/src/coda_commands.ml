@@ -264,7 +264,7 @@ let get_status ~flag t =
     let open Participating_state.Let_syntax in
     let%bind ledger = Coda_lib.best_ledger t in
     let ledger_merkle_root =
-      Ledger.merkle_root ledger |> Ledger_hash.to_string
+      Ledger.merkle_root ledger |> [%sexp_of: Ledger_hash.t] |> Sexp.to_string
     in
     let num_accounts = Ledger.num_accounts ledger in
     let%bind state = Coda_lib.best_protocol_state t in

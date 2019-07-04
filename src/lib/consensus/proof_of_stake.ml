@@ -857,10 +857,8 @@ module Data = struct
     let eval = T.eval
 
     module Precomputed = struct
-      let keypairs = Lazy.force Coda_base.Sample_keypairs.keypairs
-
       let handler : Snark_params.Tick.Handler.t =
-        let pk, sk = keypairs.(0) in
+        let pk, sk = Coda_base.Sample_keypairs.keypairs.(0) in
         let dummy_sparse_ledger =
           Coda_base.Sparse_ledger.of_ledger_subset_exn Genesis_ledger.t [pk]
         in
@@ -897,7 +895,7 @@ module Data = struct
                       request))
 
       let vrf_output =
-        let _, sk = keypairs.(0) in
+        let _, sk = Coda_base.Sample_keypairs.keypairs.(0) in
         eval ~private_key:sk
           { Message.epoch= Epoch.zero
           ; slot= Epoch.Slot.zero

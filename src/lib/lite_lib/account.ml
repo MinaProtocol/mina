@@ -3,8 +3,7 @@ include Lite_base.Account
 
 let digest t =
   Lite_base.Pedersen.digest_fold
-    (Lite_base.Pedersen.State.salt
-       (Lazy.force Lite_params.pedersen_params)
+    (Lite_base.Pedersen.State.salt Lite_params.pedersen_params
        (Hash_prefixes.account :> string))
     (fold t)
 
@@ -16,7 +15,7 @@ module Membership_proof = struct
       (Merkle_path.implied_root proof
          Pedersen.(
            digest_fold
-             (State.create (Lazy.force Lite_params.pedersen_params))
+             (State.create Lite_params.pedersen_params)
              (fold account)))
       root
 end
