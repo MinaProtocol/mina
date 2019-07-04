@@ -473,11 +473,10 @@ let%test_module "vrf-test" =
     end
 
     let params =
-      lazy
-        (Array.init (5 * Impl.Field.size_in_bits) ~f:(fun _ ->
-             let t = Curve.random () in
-             let tt = Curve.double t in
-             (t, tt, Curve.add t tt, Curve.double tt) ))
+      Array.init (5 * Impl.Field.size_in_bits) ~f:(fun _ ->
+          let t = Curve.random () in
+          let tt = Curve.double t in
+          (t, tt, Curve.add t tt, Curve.double tt) )
 
     module Pedersen =
       Snarky.Pedersen.Make (Impl) (Curve)
@@ -523,12 +522,11 @@ let%test_module "vrf-test" =
           [(b1, b2, default)]
 
     let hash_bits bits =
-      let params_forced = Lazy.force params in
       List.foldi ~init:Curve.zero (bits_to_triples ~default:false bits)
         ~f:(fun i acc triple ->
           Curve.add acc
-            (Snarky.Pedersen.local_function ~negate:Curve.negate
-               params_forced.(i) triple) )
+            (Snarky.Pedersen.local_function ~negate:Curve.negate params.(i)
+               triple) )
       |> Curve.to_affine_exn |> fst
 
     let hash_bits_checked bits =
