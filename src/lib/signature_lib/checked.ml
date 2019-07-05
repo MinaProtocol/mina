@@ -143,7 +143,7 @@ module Schnorr
 
         val scale : t -> Scalar.t -> t
 
-        val to_affine_coordinates : t -> Field.t * Field.t
+        val to_affine_exn : t -> Field.t * Field.t
     end)
     (Message : Message_intf
                with type boolean_var := Impl.Boolean.var
@@ -173,7 +173,7 @@ module Schnorr
   end
 
   let compress (t : Curve.t) =
-    let x, _ = Curve.to_affine_coordinates t in
+    let x, _ = Curve.to_affine_exn t in
     Field.unpack x
 
   let is_even (t : Field.t) = not (Bigint.test_bit (Bigint.of_field t) 0)

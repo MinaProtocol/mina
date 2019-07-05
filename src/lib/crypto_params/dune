@@ -1,9 +1,19 @@
 (library
  (name crypto_params)
  (public_name crypto_params)
+ (flags :standard -short-paths -warn-error -58)
  (library_flags -linkall)
  (inline_tests)
- (libraries chunked_pedersen_lib snarky bignum_bigint curve_choice chunk_table tuple_lib group_map)
+ (libraries
+  hash_prefixes
+  group_map
+  chunked_pedersen_lib
+  snarky
+  bignum_bigint
+  curve_choice
+  chunk_table
+  bowe_gabizon_hash
+  tuple_lib)
  (preprocess
   (pps ppx_jane bisect_ppx -- -conditional))
  (synopsis "Cryptographic parameters"))

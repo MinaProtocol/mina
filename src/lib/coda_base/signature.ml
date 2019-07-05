@@ -16,14 +16,6 @@ module Stable = struct
     include T
     include Codable.Make_base58_check (T)
     include Registration.Make_latest_version (T)
-
-    include Codable.Make_of_string (struct
-      type nonrec t = t
-
-      let to_string = to_base58_check
-
-      let of_string = of_base58_check_exn
-    end)
   end
 
   module Latest = V1

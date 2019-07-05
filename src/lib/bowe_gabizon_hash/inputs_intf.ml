@@ -23,21 +23,21 @@ module type S = sig
   module Fqe : sig
     type t
 
-    val parts : t -> Field.t list
+    val to_list : t -> Field.t list
   end
 
   module G1 : sig
     type t
 
-    val to_affine_coordinates : t -> Field.t * Field.t
+    val to_affine_exn : t -> Field.t * Field.t
 
-    val of_affine_coordinates : Field.t * Field.t -> t
+    val of_affine : Field.t * Field.t -> t
   end
 
   module G2 : sig
     type t
 
-    val to_affine_coordinates : t -> Fqe.t * Fqe.t
+    val to_affine_exn : t -> Fqe.t * Fqe.t
   end
 
   val pedersen : bool Triple.t Fold.t -> Field.t

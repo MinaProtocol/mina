@@ -119,7 +119,7 @@ let negative_one =
     ; snarked_ledger_hash=
         Frozen_ledger_hash.of_ledger_hash
         @@ Ledger.merkle_root Genesis_ledger.t
-    ; timestamp= Genesis_state_timestamp.value |> Block_time.of_time }
+    ; timestamp= Consensus.Constants.genesis_state_timestamp }
 
 (* negative_one and genesis blockchain states are equivalent *)
 let genesis = negative_one
