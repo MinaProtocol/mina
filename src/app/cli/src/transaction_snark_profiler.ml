@@ -161,6 +161,8 @@ let check_base_snarks sparse_ledger0 (transitions : Transaction.t list) preeval
           Public_key.(compress (of_private_key_exn (Private_key.create ())))
     in
     List.fold transitions ~init:sparse_ledger0 ~f:(fun sparse_ledger t ->
+        print_endline "HI" ;
+        printf !"Transaction is %{sexp:Transaction.t}\n%!" t ;
         let sparse_ledger' =
           Sparse_ledger.apply_transaction_exn sparse_ledger t
         in

@@ -74,13 +74,6 @@ module type S = sig
   module Checked : sig
     val compress : curve_var -> (Boolean.var list, _) Checked.t
 
-    val verification :
-         (module Shifted.S with type t = 't)
-      -> Signature.var
-      -> Public_key.var
-      -> Message.var
-      -> (Field.Var.t, _) Checked.t
-
     val verifies :
          (module Shifted.S with type t = 't)
       -> Signature.var
@@ -230,8 +223,6 @@ module Schnorr
   [%%endif]
 
   module Checked = struct
-    open Impl.Let_syntax
-
     let to_bits x =
       Field.Checked.choose_preimage_var x ~length:Field.size_in_bits
 
@@ -240,15 +231,15 @@ module Schnorr
     let to_triples x =
       Fold.to_list Fold.(group3 ~default:Boolean.false_ (of_list x))
 
-    let assert_even y =
-      let%bind bs = Field.Checked.unpack_full y in
-      List.hd_exn (Bitstring_lib.Bitstring.Lsb_first.to_list bs)
-      |> Boolean.Assert.(( = ) Boolean.false_)
+    let is_even y =
+      let%map bs = Field.Checked.unpack_full y in
+      Bitstring_lib.Bitstring.Lsb_first.to_list bs
+      |> List.hd_exn |> Boolean.not
 
     (* returning r_point as a representable point ensures it is nonzero so the nonzero
      * check does not have to explicitly be performed *)
 
-    let%snarkydef verification (type s)
+    let%snarkydef verifier (type s) ~equal ~final_check
         ((module Shifted) as shifted :
           (module Curve.Checked.Shifted.S with type t = s))
         ((r, s) : Signature.var) (public_key : Public_key.var)
@@ -270,14 +261,17 @@ module Schnorr
           ~init:e_pk
       in
       let%bind rx, ry = Shifted.unshift_nonzero s_g_e_pk in
-      let%map () = assert_even ry in
-      rx
+      let%bind y_even = is_even ry in
+      let%bind r_correct = equal r rx in
+      final_check r_correct y_even
 
-    let%snarkydef verifies shifted ((r, _) as signature) pk m =
-      verification shifted signature pk m >>= Field.Checked.equal r
+    let verifies s =
+      verifier ~equal:Field.Checked.equal ~final_check:Boolean.( && ) s
 
-    let%snarkydef assert_verifies shifted ((r, _) as signature) pk m =
-      verification shifted signature pk m >>= Field.Checked.Assert.equal r
+    let assert_verifies s =
+      verifier ~equal:Field.Checked.Assert.equal
+        ~final_check:(fun () ry_even -> Boolean.Assert.is_true ry_even)
+        s
   end
 end
 
