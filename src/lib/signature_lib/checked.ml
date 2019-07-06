@@ -194,7 +194,7 @@ module Schnorr
     let k_prime = Message.hash m ~nonce in
     assert (not Curve.Scalar.(equal k_prime zero)) ;
     let r_pt = Curve.scale Curve.one k_prime in
-    let rx, ry = Curve.to_affine_coordinates r_pt in
+    let rx, ry = Curve.to_affine_exn r_pt in
     let k = if is_even ry then k_prime else Curve.Scalar.negate k_prime in
     let nonce =
       to_triples (compress r_pt @ compress (Curve.scale Curve.one d))
@@ -207,7 +207,7 @@ module Schnorr
     let nonce = to_triples (Field.unpack r @ compress pk) in
     let e = Message.hash m ~nonce in
     let r_pt = Curve.(scale one s + negate (scale pk e)) in
-    let rx, ry = Curve.to_affine_coordinates r_pt in
+    let rx, ry = Curve.to_affine_exn r_pt in
     (not Curve.(equal zero r_pt)) && is_even ry && Field.(equal rx r)
 
   [%%if
