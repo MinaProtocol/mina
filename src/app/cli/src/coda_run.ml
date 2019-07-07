@@ -268,8 +268,8 @@ let setup_local_server ?(client_whitelist = []) ?rest_server_port ~coda
                     Deferred.unit )) ) )
   |> ignore
 
-let create_snark_worker ~client_port ~shutdown_on_disconnect =
-  let%bind p =
+let create_snark_worker ~logger ?(shutdown_on_disconnect = true) client_port =
+  let%map p =
     let our_binary = Sys.executable_name in
     Process.create_exn () ~prog:our_binary
       ~args:
@@ -279,6 +279,10 @@ let create_snark_worker ~client_port ~shutdown_on_disconnect =
                (Host_and_port.create ~host:"127.0.0.1" ~port:client_port)
              ~shutdown_on_disconnect )
   in
+  Logger.trace logger
+    !"Node created snark worker %i"
+    ~module_:__MODULE__ ~location:__LOC__
+    (Pid.to_int @@ Process.pid p) ;
   (* We want these to be printfs so we don't double encode our logs here *)
   Pipe.iter_without_pushback
     (Reader.pipe (Process.stdout p))
@@ -288,10 +292,7 @@ let create_snark_worker ~client_port ~shutdown_on_disconnect =
     (Reader.pipe (Process.stderr p))
     ~f:(fun s -> printf "%s" s)
   |> don't_wait_for ;
-  Deferred.unit
-
-let run_snark_worker ?shutdown_on_disconnect:(s = true) client_port =
-  create_snark_worker ~shutdown_on_disconnect:s ~client_port |> don't_wait_for
+  p
 
 let handle_crash e =
   Core.eprintf

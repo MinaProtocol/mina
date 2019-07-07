@@ -335,6 +335,8 @@ let start_payment_check logger root_pipe (testnet : Api.t) =
                       testnet.root_lengths.(i) + (Consensus.Constants.k / 2)
                       < length - 1
                     then (
+                      Logger.info logger !"Filled catchup ivar"
+                        ~module_:__MODULE__ ~location:__LOC__ ;
                       Ivar.fill signal () ;
                       testnet.restart_signals.(i) <- None )
                     else () ) ;
@@ -395,7 +397,6 @@ let events workers start_reader =
               (let ms_to_catchup =
                  (Consensus.Constants.c + Consensus.Constants.delta)
                  * Consensus.Constants.block_window_duration_ms
-                 + 16_000
                  |> Float.of_int
                in
                let%map () = after (Time.Span.of_ms ms_to_catchup) in

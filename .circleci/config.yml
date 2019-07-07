@@ -465,6 +465,9 @@ jobs:
             - run:
                   name: Running test -- test_postake_split_snarkless:coda-restart-node-test
                   command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run "test_postake_split_snarkless:coda-restart-node-test"'
+            - run:
+                  name: Running test -- test_postake_split_snarkless:coda-change-snark-worker-test
+                  command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run "test_postake_split_snarkless:coda-change-snark-worker-test"'
             - store_artifacts:
                   path: test_logs
     test--test_postake_txns:

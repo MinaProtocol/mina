@@ -9,10 +9,7 @@ let init () = Parallel.init_master ()
 let net_configs n =
   let external_ports = List.init n ~f:(fun i -> 23000 + (i * 2)) in
   let discovery_ports = List.init n ~f:(fun i -> 23000 + 1 + (i * 2)) in
-  let ips =
-    List.init n ~f:(fun i ->
-        Unix.Inet_addr.of_string @@ sprintf "127.0.0.%i" (i + 10) )
-  in
+  let ips = List.init n ~f:(fun _i -> Unix.Inet_addr.of_string "127.0.0.1") in
   let addrs_and_ports_list =
     List.map3_exn external_ports discovery_ports ips
       ~f:(fun communication_port discovery_port ip ->
@@ -45,20 +42,15 @@ let local_configs ?proposal_interval ?(proposers = Fn.const None) n
   let configs =
     List.mapi args ~f:(fun i (addrs_and_ports, peers) ->
         let public_key =
-          Option.map snark_worker_public_keys ~f:(fun keys ->
+          Option.bind snark_worker_public_keys ~f:(fun keys ->
               List.nth_exn keys i )
         in
-        let snark_worker_config =
-          Option.bind public_key ~f:(fun public_key ->
-              Option.bind public_key ~f:(fun public_key ->
-                  Some
-                    { Coda_worker.Snark_worker_config.public_key
-                    ; port= 20000 + i } ) )
-        in
+        let client_port = 20000 + i in
         Coda_process.local_config ?proposal_interval ~addrs_and_ports ~peers
-          ~snark_worker_config ~program_dir ~acceptable_delay
-          ~proposer:(proposers i) ~work_selection_method ~trace_dir
-          ~offset:(Lazy.force offset) ~max_concurrent_connections () )
+          ~client_port ~snark_worker_key:public_key ~program_dir
+          ~acceptable_delay ~proposer:(proposers i) ~work_selection_method
+          ~trace_dir ~offset:(Lazy.force offset) ~max_concurrent_connections ()
+    )
   in
   configs
 

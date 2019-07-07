@@ -32,7 +32,7 @@ let main () =
     peers ;
   let config =
     Coda_process.local_config ~peers ~addrs_and_ports ~acceptable_delay
-      ~snark_worker_config:None ~proposer:None ~program_dir
+      ~client_port:2000 ~snark_worker_key:None ~proposer:None ~program_dir
       ~work_selection_method ~trace_dir ~offset:Time.Span.zero ()
       ~max_concurrent_connections
   in

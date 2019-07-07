@@ -162,7 +162,9 @@ let run_test () : unit Deferred.t =
       in
       let client_port = 8123 in
       Coda_run.setup_local_server ~client_port ~coda () ;
-      Coda_run.run_snark_worker client_port ;
+      let%bind (_ : Process.t) =
+        Coda_run.create_snark_worker ~logger client_port
+      in
       (* Let the system settle *)
       let%bind () = Async.after (Time.Span.of_ms 100.) in
       (* No proof emitted by the parallel scan at the begining *)

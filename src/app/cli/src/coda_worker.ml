@@ -6,18 +6,13 @@ open Coda_transition
 open Signature_lib
 open Pipe_lib
 
-module Snark_worker_config = struct
-  (* TODO : version *)
-  type t = {port: int; public_key: Public_key.Compressed.Stable.V1.t}
-  [@@deriving bin_io]
-end
-
 module Input = struct
   type t =
     { addrs_and_ports: Kademlia.Node_addrs_and_ports.t
+    ; client_port: int
+    ; snark_worker_key: Public_key.Compressed.Stable.V1.t option
     ; env: (string * string) list
     ; proposer: int option
-    ; snark_worker_config: Snark_worker_config.t option
     ; work_selection_method: Cli_lib.Arg_type.work_selection_method
     ; conf_dir: string
     ; trace_dir: string option
@@ -350,7 +345,8 @@ module T = struct
     let init_worker_state
         { addrs_and_ports
         ; proposer
-        ; snark_worker_config
+        ; client_port
+        ; snark_worker_key
         ; work_selection_method
         ; conf_dir
         ; trace_dir
@@ -455,8 +451,7 @@ module T = struct
                  ~work_selection_method:
                    (Cli_lib.Arg_type.work_selection_method_to_module
                       work_selection_method)
-                 ?snark_worker_key:
-                   (Option.map snark_worker_config ~f:(fun c -> c.public_key))
+                 ?snark_worker_key
                  ~snark_pool_disk_location:(conf_dir ^/ "snark_pool")
                  ~wallets_disk_location:(conf_dir ^/ "wallets")
                  ~time_controller ~receipt_chain_database
@@ -470,15 +465,19 @@ module T = struct
           let%map coda =
             with_monitor
               (fun () ->
-                let%map coda = coda_deferred () in
+                let%bind coda = coda_deferred () in
                 coda_ref := Some coda ;
-                Option.iter snark_worker_config ~f:(fun config ->
-                    Coda_run.setup_local_server ~client_port:config.port ~coda
-                      () ;
-                    Coda_run.run_snark_worker config.port ) ;
+                Logger.info logger "Setting up snark worker "
+                  ~module_:__MODULE__ ~location:__LOC__ ;
+                Coda_run.setup_local_server ~client_port ~coda () ;
+                let%map (_ : Process.t) =
+                  Coda_run.create_snark_worker ~logger client_port
+                in
                 coda )
               ()
           in
+          Logger.info logger "Worker finish setting up coda"
+            ~module_:__MODULE__ ~location:__LOC__ ;
           let coda_peers () = return (Coda_lib.peers coda) in
           let coda_start () = return (Coda_lib.start coda) in
           let coda_get_balance pk =
@@ -544,13 +543,19 @@ module T = struct
             Deferred.return @@ Coda_commands.Subscriptions.new_block coda key
           in
           (* TODO: Remove validated_transitions_keyswaptest once the refactoring of broadcast pipe enters the code base *)
-          let validated_transitions, validated_transitions_keyswaptest =
-            Strict_pipe.Reader.Fork.two (Coda_lib.validated_transitions coda)
+          let ( validated_transitions_keyswaptest_reader
+              , validated_transitions_keyswaptest_writer ) =
+            Pipe.create ()
           in
           let coda_verified_transitions () =
             let r, w = Linear_pipe.create () in
             don't_wait_for
-              (Strict_pipe.Reader.iter validated_transitions ~f:(fun t ->
+              (Strict_pipe.Reader.iter (Coda_lib.validated_transitions coda)
+                 ~f:(fun t ->
+                   Pipe.write_without_pushback_if_open
+                     validated_transitions_keyswaptest_writer
+                     (With_hash.map t
+                        ~f:External_transition.Validated.forget_validation) ;
                    let p =
                      External_transition.Validated.protocol_state
                        (With_hash.data t)
@@ -571,14 +576,7 @@ module T = struct
             return r.pipe
           in
           let coda_validated_transitions_keyswaptest () =
-            Deferred.return
-              ( Strict_pipe.Reader.to_linear_pipe
-              @@ Strict_pipe.Reader.map
-                   ~f:
-                     (With_hash.map
-                        ~f:External_transition.Validated.forget_validation)
-                   validated_transitions_keyswaptest )
-                .pipe
+            Deferred.return validated_transitions_keyswaptest_reader
           in
           let coda_root_diff () =
             let r, w = Linear_pipe.create () in
