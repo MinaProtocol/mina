@@ -459,11 +459,11 @@ jobs:
             - run:
                   name: Running test -- test_postake_medium_curves:full-test
                   command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run "test_postake_medium_curves:full-test"'
-            - no_output_timeout: 30m
+                  no_output_timeout: 30m
             - run:
                   name: Running test -- test_postake_medium_curves:transaction-snark-profiler -k 2
                   command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run "test_postake_medium_curves:transaction-snark-profiler -k 2"'
-            - no_output_timeout: 30m
+                  no_output_timeout: 30m
             - store_artifacts:
                   path: test_logs
     test--test_postake_snarkless:

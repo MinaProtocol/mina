@@ -210,9 +210,9 @@ jobs:
             - run:
                   name: Running test -- {{profile}}:{{test}}
                   command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run "{{profile}}:{{test}}"'
-            {%- if profile in medium_curve_profiles %}
-            - no_output_timeout: 30m
-            {%- endif %}
+                  {%- if profile in medium_curve_profiles %}
+                  no_output_timeout: 30m
+                  {%- endif %}
             {%- endfor %}
             - store_artifacts:
                   path: test_logs
