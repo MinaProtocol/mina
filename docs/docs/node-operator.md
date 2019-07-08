@@ -1,10 +1,10 @@
 # Become a Node Operator
 
-Now that we've run through the basic steps to set up our Coda node and sent our first transaction, let's turn our attention to the other ways we can interact with the Coda network - participating in consensus, and helping compress data by generating zk-SNARKs. By operating a node that helps secure the network, you can receive coda as compensation for your efforts.
+Now that we've run through the basic steps to set up our Coda node and sent our first transaction, let's turn our attention to the other ways we can interact with the Coda network - participating in consensus, and helping compress data by generating zk-SNARKs. By operating a node that helps secure the network, you can receive coda for your efforts.
 
 ## Participating in Consensus
 
-The Coda network is secured by Proof-of-Stake consensus. With this model of consensus, you don't need to have complex equipment like in Bitcoin mining. By simply having coda in our wallet, we can choose to either stake it ourselves, or delegate it to another node to have a voice in the network. Let's first see how to stake coda ourselves:
+The Coda network is secured by [Proof-of-Stake consensus](/glossary/#proof-of-stake). With this model of consensus, you don't need to have complex equipment like in Bitcoin mining. By simply having coda in our wallet, we can choose to either stake it ourselves, or delegate it to another node to have a voice in the network. Let's first see how to stake coda ourselves:
 
 ### Staking coda
 
