@@ -118,4 +118,3 @@ let make = _ => {
       </RunScript>
     </form>,
 };
-();
