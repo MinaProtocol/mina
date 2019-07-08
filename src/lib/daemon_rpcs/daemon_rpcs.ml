@@ -486,10 +486,9 @@ module Stop_tracing = struct
 end
 
 module Set_staking = struct
-  type query = Public_key.Compressed.Stable.Latest.t list [@@deriving bin_io]
+  type query = Keypair.Stable.Latest.t list [@@deriving bin_io]
 
-  type response = Public_key.Compressed.Stable.Latest.t list
-  [@@deriving bin_io]
+  type response = unit [@@deriving bin_io]
 
   type error = unit
 

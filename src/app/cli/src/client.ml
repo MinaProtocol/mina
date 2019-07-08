@@ -602,23 +602,20 @@ let stop_tracing =
 let set_staking =
   let open Deferred.Let_syntax in
   let open Command.Anons in
-  let public_keys =
-    Command.Param.anon
-      (sequence ("addresses" %: Cli_lib.Arg_type.public_key_compressed))
-  in
-  Command.async ~summary:"Set keys you wish to stake with"
-    (Cli_lib.Background_daemon.init public_keys ~f:(fun port public_keys ->
-         match%map dispatch Daemon_rpcs.Set_staking.rpc public_keys port with
+  let privkey_path = Cli_lib.Flag.privkey_write_path in
+  Command.async ~summary:"Set keypair to stake and propose a new block"
+    (Cli_lib.Background_daemon.init privkey_path ~f:(fun port privkey_path ->
+         let%bind ({Keypair.public_key; _} as keypair) =
+           Secrets.Keypair.Terminal_stdin.read_exn privkey_path
+         in
+         match%map dispatch Daemon_rpcs.Set_staking.rpc [keypair] port with
          | Error e ->
              eprintf !"Error: %{sexp:Error.t}\n" e
-         | Ok new_staking_public_keys ->
-             let pretty_new_staking_keys =
-               List.map new_staking_public_keys
-                 ~f:Public_key.Compressed.to_base58_check
-             in
+         | Ok () ->
              printf
-               !"New staking public keys : [%s]\n"
-               (String.concat ~sep:"," pretty_new_staking_keys) ))
+               !"New staking public key : %s\n"
+               (Public_key.Compressed.to_base58_check
+                  (Public_key.compress public_key)) ))
 
 module Visualization = struct
   let create_command (type rpc_response) ~name ~f
