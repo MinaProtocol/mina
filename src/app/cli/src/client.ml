@@ -600,8 +600,6 @@ let stop_tracing =
              eprintf !"Error: %{sexp:Error.t}\n" e ))
 
 let set_staking =
-  let open Deferred.Let_syntax in
-  let open Command.Anons in
   let privkey_path = Cli_lib.Flag.privkey_write_path in
   Command.async ~summary:"Set keypair to stake and propose a new block"
     (Cli_lib.Background_daemon.init privkey_path ~f:(fun port privkey_path ->
