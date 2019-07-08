@@ -1,0 +1,5 @@
+(executable
+  (name bilinearity)
+  (public_name bilinearity)
+  (libraries core snarky snark_params)
+  (preprocess (pps ppx_jane ppx_deriving.std)))
