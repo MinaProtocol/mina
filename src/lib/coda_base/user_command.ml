@@ -194,7 +194,7 @@ let check_signature _ = true
 
 let check_signature ({payload; sender; signature} : t) =
   Schnorr.verify signature
-    (Snark_params.Tick.Inner_curve.of_affine_coordinates sender)
+    (Snark_params.Tick.Inner_curve.of_affine sender)
     payload
 
 [%%endif]
