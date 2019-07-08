@@ -282,6 +282,7 @@ jobs:
             - run:
                   name: Copy artifacts to Google Cloud
                   command: ./scripts/skip_if_only_frontend.sh scripts/artifacts.sh
+<<<<<<< HEAD
     build-artifacts--testnet_postake_many_proposers_medium_curves:
         resource_class: large
         docker:
@@ -319,6 +320,9 @@ jobs:
                   name: Copy artifacts to Google Cloud
                   command: ./scripts/skip_if_only_frontend.sh scripts/artifacts.sh
     test-unit--test_postake_snarkless:
+=======
+    test-unit--test_postake_snarkless_unittest:
+>>>>>>> origin/release/beta
         resource_class: large
         docker:
             - image: codaprotocol/coda:toolchain-bc9f6e8cb1f2132cb964b4a3caa3aecee67b1826
@@ -328,7 +332,7 @@ jobs:
             - run: git submodule sync && git submodule update --init --recursive
             - run:
                   name: Run unit tests
-                  command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && dune build --profile=test_postake_snarkless -j8 && (dune runtest --profile=test_postake_snarkless -j8 || (./scripts/link-coredumps.sh && false))'
+                  command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && dune build --profile=test_postake_snarkless_unittest -j8 && (dune runtest --profile=test_postake_snarkless_unittest -j8 || (./scripts/link-coredumps.sh && false))'
             - store_artifacts:
                 path: core_dumps
     test-unit--dev:
@@ -568,7 +572,7 @@ workflows:
             - build-artifacts--testnet_postake_snarkless_fake_hash
             - build-artifacts--testnet_postake_medium_curves
             - build-artifacts--testnet_postake_many_proposers_medium_curves
-            - test-unit--test_postake_snarkless
+            - test-unit--test_postake_snarkless_unittest
             - test-unit--dev
             - test--fake_hash
             - test--test_postake
