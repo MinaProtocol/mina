@@ -248,7 +248,6 @@ workflows:
                   only:
                     - master
                     - release/beta
-                    - medium-curve-ci-tests
         jobs:
           {%- for profile in unit_test_profiles_medium_curves %}
           - test-unit--{{profile}}
