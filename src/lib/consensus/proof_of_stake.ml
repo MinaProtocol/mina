@@ -2736,14 +2736,11 @@ module Hooks = struct
      and type snark_transition_var := Snark_transition.var = struct
     (* TODO: only track total currency from accounts > 1% of the currency using transactions *)
 
-    let error ~module_ ~location ~logger fmt =
-      Logger.error ~module_ ~location logger fmt
-
     let check_proposal_data ~logger (proposal_data : Proposal_data.t)
         epoch_and_slot =
       if not (Epoch_and_slot.equal epoch_and_slot proposal_data.epoch_and_slot)
       then
-        error ~module_:__MODULE__ ~location:__LOC__ ~logger
+        Logger.error ~module_:__MODULE__ ~location:__LOC__ logger
           !"VRF was evaluated at (epoch, slot) %{sexp:Epoch_and_slot.t} but \
             the corresponding proposal happened at a time corresponding to \
             %{sexp:Epoch_and_slot.t}. This means that generating the proposal \
