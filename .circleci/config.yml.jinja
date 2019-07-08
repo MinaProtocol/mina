@@ -210,6 +210,9 @@ jobs:
             - run:
                   name: Running test -- {{profile}}:{{test}}
                   command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run "{{profile}}:{{test}}"'
+            {%- if profile in medium_curve_profiles %}
+            - no_output_timeout: 30m
+            {%- endif %}
             {%- endfor %}
             - store_artifacts:
                   path: test_logs
@@ -239,12 +242,13 @@ workflows:
     daily:
         triggers:
           - schedule:
-              cron: "0 12 * * *"
+              cron: "0 20 * * *"
               filters:
                 branches:
                   only:
                     - master
                     - release/beta
+                    - medium-curve-ci-tests
         jobs:
           {%- for profile in unit_test_profiles_medium_curves %}
           - test-unit--{{profile}}
