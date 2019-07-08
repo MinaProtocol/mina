@@ -27,3 +27,11 @@ let staged_ledger_hash_aux_hash : t = '\x0B'
 let staged_ledger_hash_pending_coinbase_aux : t = '\x81'
 
 let user_command_memo : t = '\xA2'
+
+let lite_precomputed : t = '\xBC'
+
+let receipt_chain_hash : t = '\x9D'
+
+let secret_box_byteswr : t = '\x02'
+
+let ledger_hash : t = '\x63'

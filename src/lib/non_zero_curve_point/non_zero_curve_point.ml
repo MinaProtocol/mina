@@ -27,7 +27,6 @@ module Stable = struct
       let _ = Bigstring.write_bin_prot bs bin_writer_t elem in
       bs
 
-    include Codable.Make_base64 (T)
     include Codable.Make_base58_check (T)
   end
 
@@ -66,9 +65,9 @@ let typ : (var, t) Tick.Typ.t = Tick.Typ.(field * field)
 
 let ( = ) = equal
 
-let of_inner_curve_exn = Tick.Inner_curve.to_affine_coordinates
+let of_inner_curve_exn = Tick.Inner_curve.to_affine_exn
 
-let to_inner_curve = Tick.Inner_curve.of_affine_coordinates
+let to_inner_curve = Tick.Inner_curve.of_affine
 
 let gen : t Quickcheck.Generator.t =
   Quickcheck.Generator.filter_map Tick.Field.gen ~f:(fun x ->
@@ -112,7 +111,7 @@ module Compressed = struct
 
       include T
       include Registration.Make_latest_version (T)
-      include Codable.Make_base64 (T)
+      include Codable.Make_base58_check (T)
     end
 
     module Latest = V1
@@ -132,12 +131,11 @@ module Compressed = struct
 
   include Comparable.Make_binable (Stable.Latest)
   include Hashable.Make_binable (Stable.Latest)
-  include Codable.Make_base64 (Stable.Latest)
   include Codable.Make_base58_check (Stable.Latest)
 
   let compress (x, y) : t = {x; is_odd= parity y}
 
-  let to_string = to_base64
+  let to_string = to_base58_check
 
   let empty = Poly.{x= Field.zero; is_odd= false}
 

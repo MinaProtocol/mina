@@ -55,7 +55,7 @@ let max_input_size_in_bits = 20000
 let base_params =
   List.init
     (max_input_size_in_bits / (3 * scalar_size_in_triples))
-    ~f:(fun _i -> Group.of_affine_coordinates (random_point ()))
+    ~f:(fun _i -> Group.of_affine (random_point ()))
 
 let sixteen_times x =
   x |> Group.double |> Group.double |> Group.double |> Group.double
@@ -83,13 +83,14 @@ let params_ast ~loc =
       (List.map params ~f:(fun (g1, g2, g3, g4) ->
            E.pexp_tuple
              (List.map [g1; g2; g3; g4] ~f:(fun g ->
-                  let x, y = Group.to_affine_coordinates g in
+                  (* g is a random point so this is safe. *)
+                  let x, y = Group.to_affine_exn g in
                   E.pexp_tuple
                     [ estring (Impl.Field.to_string x)
                     ; estring (Impl.Field.to_string y) ] )) ))
   in
   let%expr conv (x, y) =
-    Tick_backend.Inner_curve.of_affine_coordinates
+    Tick_backend.Inner_curve.of_affine
       (Tick0.Field.of_string x, Tick0.Field.of_string y)
   in
   Array.map
