@@ -282,7 +282,6 @@ jobs:
             - run:
                   name: Copy artifacts to Google Cloud
                   command: ./scripts/skip_if_only_frontend.sh scripts/artifacts.sh
-<<<<<<< HEAD
     build-artifacts--testnet_postake_many_proposers_medium_curves:
         resource_class: large
         docker:
@@ -319,10 +318,7 @@ jobs:
             - run:
                   name: Copy artifacts to Google Cloud
                   command: ./scripts/skip_if_only_frontend.sh scripts/artifacts.sh
-    test-unit--test_postake_snarkless:
-=======
     test-unit--test_postake_snarkless_unittest:
->>>>>>> origin/release/beta
         resource_class: large
         docker:
             - image: codaprotocol/coda:toolchain-bc9f6e8cb1f2132cb964b4a3caa3aecee67b1826
@@ -597,7 +593,6 @@ workflows:
                   only:
                     - master
                     - release/beta
-                    - medium-curve-ci-tests
         jobs:
           - test-unit--test_postake_snarkless_medium_curves
           - test-unit--dev_medium_curves
