@@ -81,11 +81,160 @@ module Message = struct
     List.for_all refs ~f:(Metadata.mem t.metadata)
 end
 
+module Processor = struct
+  module type S = sig
+    type t
+
+    val process : t -> Message.t -> string option
+  end
+
+  type t = T : (module S with type t = 't) * 't -> t
+
+  module Raw = struct
+    type t = unit
+
+    let create () = ()
+
+    let process () msg = Some (Yojson.Safe.to_string (Message.to_yojson msg))
+  end
+
+  module Pretty = struct
+    type t = {log_level: Level.t; config: Logproc_lib.Interpolator.config}
+
+    let create ~log_level ~config = {log_level; config}
+
+    let process {log_level; config} msg =
+      let open Message in
+      if msg.level < log_level then None
+      else
+        match
+          Logproc_lib.Interpolator.interpolate config msg.message msg.metadata
+        with
+        | Error err ->
+            Core.printf "logproc interpolation error: %s\n" err ;
+            None
+        | Ok (str, _) ->
+            Some (Level.show msg.level ^ ": " ^ str)
+  end
+
+  let raw () = T ((module Raw), Raw.create ())
+
+  let pretty ~log_level ~config =
+    T ((module Pretty), Pretty.create ~log_level ~config)
+end
+
+module Transport = struct
+  module type S = sig
+    type t
+
+    val transport : t -> string -> unit
+  end
+
+  type t = T : (module S with type t = 't) * 't -> t
+
+  module Stdout = struct
+    type t = unit
+
+    let create () = ()
+
+    let transport () = Core.print_endline
+  end
+
+  let stdout () = T ((module Stdout), Stdout.create ())
+
+  module File_system = struct
+    module Dumb_logrotate = struct
+      open Core.Unix
+
+      (* 512MB *)
+      let max_size = 1024 * 1024 * 512
+
+      let log_perm = 0o644
+
+      let primary_log_name = "coda.log.0"
+
+      let secondary_log_name = "coda.log.1"
+
+      type t =
+        { directory: string
+        ; mutable primary_log: File_descr.t
+        ; mutable primary_log_size: int }
+
+      let create ~directory =
+        let primary_log_loc = Filename.concat directory primary_log_name in
+        let primary_log_size =
+          if Result.is_ok (access primary_log_loc [`Read; `Write]) then
+            let log_stats = stat primary_log_loc in
+            Int64.to_int_exn log_stats.st_size
+          else 0
+        in
+        let primary_log =
+          openfile ~perm:log_perm ~mode:[O_RDWR; O_APPEND] primary_log_loc
+        in
+        {directory; primary_log; primary_log_size}
+
+      let rotate t =
+        let primary_log_loc = Filename.concat t.directory primary_log_name in
+        let secondary_log_loc =
+          Filename.concat t.directory secondary_log_name
+        in
+        close t.primary_log ;
+        rename ~src:primary_log_loc ~dst:secondary_log_loc ;
+        t.primary_log
+        <- openfile ~perm:log_perm ~mode:[O_RDWR; O_TRUNC] primary_log_loc ;
+        t.primary_log_size <- 0
+
+      let transport t str =
+        if t.primary_log_size > max_size then rotate t ;
+        let len = String.length str in
+        if write t.primary_log ~buf:(Bytes.of_string str) ~len <> len then
+          printf "unexpected error writing to persistent log" ;
+        t.primary_log_size <- t.primary_log_size + len
+    end
+
+    let dumb_logrotate ~directory =
+      T ((module Dumb_logrotate), Dumb_logrotate.create ~directory)
+  end
+end
+
+module Consumer_registry = struct
+  type id = string
+
+  type consumer = {processor: Processor.t; transport: Transport.t}
+
+  type nonrec t = (id, consumer) List.Assoc.t ref
+
+  let t : t = ref []
+
+  let is_registered id = Option.is_some (List.Assoc.find !t id ~equal:( = ))
+
+  let register ~id ~processor ~transport =
+    if is_registered id then
+      failwith "cannot register logger consumer with the same id twice"
+    else t := List.Assoc.add !t id {processor; transport} ~equal:( = )
+
+  let broadcast_log_message msg =
+    List.iter !t ~f:(fun (_, consumer) ->
+        let (Processor.T ((module Processor_mod), processor)) =
+          consumer.processor
+        in
+        let (Transport.T ((module Transport_mod), transport)) =
+          consumer.transport
+        in
+        match Processor_mod.process processor msg with
+        | Some str ->
+            Transport_mod.transport transport str
+        | None ->
+            () )
+end
+
 type t = {null: bool; metadata: Metadata.t}
 
-let settings = ref (Level.Trace, None)
-
-let create ?(metadata = []) () =
+let create ?(metadata = []) ?(initialize_default_consumer = true) () =
+  if initialize_default_consumer then
+    if not (Consumer_registry.is_registered "default") then
+      Consumer_registry.register ~id:"default" ~processor:(Processor.raw ())
+        ~transport:(Transport.stdout ()) ;
   let pid = lazy (Unix.getpid () |> Pid.to_int) in
   let metadata' = ("pid", `Int (Lazy.force pid)) :: metadata in
   {null= false; metadata= Metadata.extend Metadata.empty metadata'}
@@ -101,46 +250,16 @@ let make_message (t : t) ~level ~module_ ~location ~metadata ~message =
   ; message
   ; metadata= Metadata.extend t.metadata metadata }
 
-let format_message t ~level ~module_ ~location ?(metadata = []) fmt =
-  let level_setting, _ = !settings in
-  let f message =
-    if t.null then ""
-    else if level < level_setting then ""
-    else
-      let message =
-        make_message t ~level ~module_ ~location ~metadata ~message
-      in
-      if Message.check_invariants message then
-        Message.to_yojson message |> Yojson.Safe.to_string
-      else (* TODO: handle gracefully *)
-        ""
-  in
-  ksprintf f fmt
-
 let log t ~level ~module_ ~location ?(metadata = []) fmt =
-  let level_setting, config = !settings in
   let f message =
     if t.null then ()
-    else if level < level_setting then ()
     else
       let message =
         make_message t ~level ~module_ ~location ~metadata ~message
       in
       if Message.check_invariants message then
-        config
-        |> Option.bind ~f:(fun config ->
-               Result.ok
-                 (Logproc_lib.Interpolator.interpolate config message.message
-                    message.metadata) )
-        |> Option.value_map
-             ~f:(fun (msg, _) -> Level.show level ^ ": " ^ msg)
-             ~default:(Message.to_yojson message |> Yojson.Safe.to_string)
-        |> Core.print_endline
-        (* Core.print_endline flushes (which may block) and Async.print_endline
-           doesn't. We use the Core version here to ensure complete log messages
-           are delivered in a timely fashion. *)
-      else (* TODO: handle gracefully *)
-        failwith "invalid log call"
+        Consumer_registry.broadcast_log_message message
+      else failwith "invalid log call"
   in
   ksprintf f fmt
 

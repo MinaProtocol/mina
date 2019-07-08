@@ -9,8 +9,6 @@ module Level : sig
   val of_string : string -> (t, string) result
 end
 
-val settings : (Level.t * Logproc_lib.Interpolator.config option) ref
-
 module Time : sig
   include module type of Time
 
@@ -40,14 +38,30 @@ module Message : sig
   [@@deriving yojson]
 end
 
-val format_message :
-     t
-  -> level:Level.t
-  -> module_:string
-  -> location:string
-  -> ?metadata:(string, Yojson.Safe.json) List.Assoc.t
-  -> ('a, unit, string, string) format4
-  -> 'a
+module Processor : sig
+  type t
+
+  val raw : unit -> t
+
+  val pretty : log_level:Level.t -> config:Logproc_lib.Interpolator.config -> t
+end
+
+module Transport : sig
+  type t
+
+  val stdout : unit -> t
+
+  module File_system : sig
+    val dumb_logrotate : directory:string -> t
+  end
+end
+
+module Consumer_registry : sig
+  type id = string
+
+  val register :
+    id:id -> processor:Processor.t -> transport:Transport.t -> unit
+end
 
 type 'a log_function =
      t
@@ -57,7 +71,11 @@ type 'a log_function =
   -> ('a, unit, string, unit) format4
   -> 'a
 
-val create : ?metadata:(string, Yojson.Safe.json) List.Assoc.t -> unit -> t
+val create :
+     ?metadata:(string, Yojson.Safe.json) List.Assoc.t
+  -> ?initialize_default_consumer:bool
+  -> unit
+  -> t
 
 val null : unit -> t
 

@@ -140,15 +140,6 @@ let daemon logger =
              | Ok ll ->
                  Deferred.return ll )
        in
-       let logger_config =
-         if log_json then None
-         else
-           Some
-             { Logproc_lib.Interpolator.mode= Inline
-             ; max_interpolation_length= 30
-             ; pretty_print= true }
-       in
-       Logger.settings := (log_level, logger_config) ;
        let%bind conf_dir =
          if is_background then (
            let home = Core.Sys.home_directory () in
@@ -162,6 +153,22 @@ let daemon logger =
            Deferred.return conf_dir )
          else Sys.home_directory () >>| compute_conf_dir
        in
+       Logger.Consumer_registry.register ~id:"raw_persistent"
+         ~processor:(Logger.Processor.raw ())
+         ~transport:
+           (Logger.Transport.File_system.dumb_logrotate ~directory:conf_dir) ;
+       let stdout_log_processor =
+         if log_json then Logger.Processor.raw ()
+         else
+           Logger.Processor.pretty ~log_level
+             ~config:
+               { Logproc_lib.Interpolator.mode= Inline
+               ; max_interpolation_length= 30
+               ; pretty_print= true }
+       in
+       Logger.Consumer_registry.register ~id:"primary_output"
+         ~processor:stdout_log_processor
+         ~transport:(Logger.Transport.stdout ()) ;
        Parallel.init_master () ;
        let monitor = Async.Monitor.create ~name:"coda" () in
        let module Coda_initialization = struct
@@ -609,7 +616,7 @@ let coda_commands logger =
 
 let () =
   Random.self_init () ;
-  let logger = Logger.create () in
+  let logger = Logger.create ~initialize_default_consumer:false () in
   don't_wait_for (ensure_testnet_id_still_good logger) ;
   (* Turn on snark debugging in prod for now *)
   Snarky.Snark.set_eval_constraints true ;
