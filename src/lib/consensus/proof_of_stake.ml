@@ -857,8 +857,10 @@ module Data = struct
     let eval = T.eval
 
     module Precomputed = struct
+      let keypairs = Lazy.force Coda_base.Sample_keypairs.keypairs
+
       let handler : Snark_params.Tick.Handler.t =
-        let pk, sk = Coda_base.Sample_keypairs.keypairs.(0) in
+        let pk, sk = keypairs.(0) in
         let dummy_sparse_ledger =
           Coda_base.Sparse_ledger.of_ledger_subset_exn Genesis_ledger.t [pk]
         in
@@ -895,7 +897,7 @@ module Data = struct
                       request))
 
       let vrf_output =
-        let _, sk = Coda_base.Sample_keypairs.keypairs.(0) in
+        let _, sk = keypairs.(0) in
         eval ~private_key:sk
           { Message.epoch= Epoch.zero
           ; slot= Epoch.Slot.zero
@@ -2236,6 +2238,8 @@ module Hooks = struct
       Get_epoch_ledger.(implement_multi (implementation ~logger ~local_state))
   end
 
+  let is_genesis time = Epoch.(equal (of_time_exn time) zero)
+
   (* Select the correct epoch data to use from a consensus state for a given epoch.
    * The rule for selecting the correct epoch data changes based on whether or not
    * the consensus state we are selecting from is in the epoch we want to select.
@@ -2253,10 +2257,10 @@ module Hooks = struct
     let from_genesis_epoch =
       Length.equal consensus_state.epoch_count Length.zero
     in
-    if in_same_epoch || from_genesis_epoch then
-      Ok consensus_state.staking_epoch_data
-    else if in_next_epoch then
+    if in_next_epoch then
       Ok (Epoch_data.next_to_staking consensus_state.next_epoch_data)
+    else if in_same_epoch || from_genesis_epoch then
+      Ok consensus_state.staking_epoch_data
     else Error ()
 
   let epoch_snapshot_name = function
@@ -2524,12 +2528,24 @@ module Hooks = struct
       |> Option.value
            ~default:
              ( "default case"
-             , "candidate length is longer than existing length"
+             , "candidate virtual min-length is longer than existing virtual \
+                min-length"
              , lazy
-                 (* TODO: THIS IS INSECURE! See #2643.
-                    Undo this hack once the min_epoch_length bug is fixed *)
-                 Length.(
-                   existing.blockchain_length < candidate.blockchain_length) )
+                 (let newest_epoch =
+                    Epoch.max existing.curr_epoch candidate.curr_epoch
+                  in
+                  let virtual_min_length (s : Consensus_state.Value.t) =
+                    if Epoch.(succ s.curr_epoch < newest_epoch) then
+                      Length.zero (* There is a gap of an entire epoch *)
+                    else if Epoch.(succ s.curr_epoch = newest_epoch) then
+                      Length.(
+                        min s.min_epoch_length s.next_epoch_data.epoch_length)
+                      (* Imagine the latest epoch was padded out with zeros to reach the newest_epoch *)
+                    else s.min_epoch_length
+                  in
+                  Length.(
+                    virtual_min_length existing < virtual_min_length candidate))
+             )
     in
     let choice = if Lazy.force should_take then `Take else `Keep in
     log_choice ~precondition_msg ~choice_msg choice ;

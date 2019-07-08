@@ -26,9 +26,6 @@ let daemon logger =
     (let%map_open conf_dir =
        flag "config-directory" ~doc:"DIR Configuration directory"
          (optional string)
-     and from_genesis =
-       flag "from-genesis"
-         ~doc:"Indicating that we are starting from genesis or not" no_arg
      and unsafe_track_propose_key =
        flag "unsafe-track-propose-key"
          ~doc:
@@ -474,13 +471,6 @@ let daemon logger =
        in
        coda_ref := Some coda ;
        let%bind () = maybe_sleep 3. in
-       let%bind () =
-         if from_genesis then Deferred.unit
-         else
-           after
-             ( Consensus.Constants.block_window_duration_ms * 2
-             |> Float.of_int |> Time.Span.of_ms )
-       in
        Coda_lib.start coda ;
        let web_service = Web_pipe.get_service () in
        Web_pipe.run_service coda web_service ~conf_dir ~logger ;
