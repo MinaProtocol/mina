@@ -110,7 +110,7 @@ module Types = struct
 
     let amount amount = uint64 @@ Currency.Amount.to_uint64 amount
 
-    module State_hash = Codable.Make_base58_check (State_hash.Stable.V1)
+    module State_hash = State_hash
   end
 
   module Base58_check = Base58_check.Make (struct
