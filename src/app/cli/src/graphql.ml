@@ -481,10 +481,9 @@ module Types = struct
                   account.Account.Poly.voting_for )
           ; field "stakingActive" ~typ:(non_null bool)
               ~doc:
-                "True if you are actively staking with this account - there \
-                 is a lag between switching staking keys and them appearing \
-                 here as you may be in the middle of a staking procedure with \
-                 other keys"
+                "True if you are actively staking with this account - this \
+                 may not yet have been updated if the staking key was changed \
+                 recently"
               ~args:Arg.[]
               ~resolve:(fun _ {is_actively_staking; _} -> is_actively_staking)
           ; field "privateKeyPath" ~typ:(non_null string)
@@ -803,10 +802,20 @@ module Types = struct
           ~args:
             Arg.
               [ arg "filter" ~typ:(non_null filter_argument)
-              ; arg "first" ~typ:int
-              ; arg "after" ~typ:string
-              ; arg "last" ~typ:int
-              ; arg "before" ~typ:string ]
+              ; arg "first" ~doc:"Returns the first _n_ elements from the list"
+                  ~typ:int
+              ; arg "after"
+                  ~doc:
+                    "Returns the elements in the list that come after the \
+                     specified cursor"
+                  ~typ:string
+              ; arg "last" ~doc:"Returns the last _n_ elements from the list"
+                  ~typ:int
+              ; arg "before"
+                  ~doc:
+                    "Returns the elements in the list that come before the \
+                     specified cursor"
+                  ~typ:string ]
           ~typ:(non_null connection)
           ~resolve:(fun {ctx= coda; _} () public_key first after last before ->
             let open Deferred.Result.Let_syntax in
@@ -1009,7 +1018,8 @@ module Subscriptions = struct
 
   let new_sync_update =
     subscription_field "newSyncUpdate"
-      ~doc:"Fires on network sync status change" ~deprecated:NotDeprecated
+      ~doc:"Event that triggers when the network sync status changes"
+      ~deprecated:NotDeprecated
       ~typ:(non_null Types.sync_status)
       ~args:Arg.[]
       ~resolve:(fun {ctx= coda; _} ->
@@ -1019,10 +1029,13 @@ module Subscriptions = struct
   let new_block =
     subscription_field "newBlock"
       ~doc:
-        "Fires on a new block involving the specified public key - either by \
-         producing this block or by having a transaction included in it"
+        "Event that triggers when a new block is created that either contains \
+         a transaction with the specified public key, or was produced by it"
       ~typ:(non_null Types.block)
-      ~args:Arg.[arg "publicKey" ~typ:(non_null string)]
+      ~args:
+        Arg.
+          [ arg "publicKey" ~doc:"Public key that is included in the block"
+              ~typ:(non_null string) ]
       ~resolve:(fun {ctx= coda; _} public_key ->
         let open Deferred.Result.Let_syntax in
         let%map public_key =
@@ -1034,8 +1047,8 @@ module Subscriptions = struct
   let chain_reorganization =
     subscription_field "chainReorganization"
       ~doc:
-        "Fires whenever the best tip changes in a way that is not a trivial \
-         extension of the existing one"
+        "Event that triggers when the best tip changes in a way that is not a \
+         trivial extension of the existing one"
       ~typ:(non_null Types.chain_reorganization_status)
       ~args:Arg.[]
       ~resolve:(fun {ctx= coda; _} ->
@@ -1263,7 +1276,7 @@ module Queries = struct
           ~f:User_command.forget_check )
 
   let sync_state =
-    result_field_no_inputs "syncStatus" ~args:[]
+    result_field_no_inputs "syncStatus" ~doc:"Network sync status" ~args:[]
       ~typ:(non_null Types.sync_status) ~resolve:(fun {ctx= coda; _} () ->
         Result.map_error
           (Coda_incremental.Status.Observer.value @@ Coda_lib.sync_status coda)
@@ -1319,7 +1332,10 @@ module Queries = struct
       ~typ:
         Types.Wallet.wallet
         (* TODO: Is there anyway to describe `public_key` arg in a more typesafe way on our ocaml-side *)
-      ~args:Arg.[arg "publicKey" ~typ:(non_null string)]
+      ~args:
+        Arg.
+          [ arg "publicKey" ~doc:"Public key of wallet being retrieved"
+              ~typ:(non_null string) ]
       ~resolve:(fun {ctx= coda; _} () (pk_string : string) ->
         let open Result.Let_syntax in
         let propose_public_keys = Coda_lib.propose_public_keys coda in
@@ -1359,7 +1375,6 @@ module Queries = struct
     ; owned_wallets
     ; wallet
     ; current_snark_worker
-    ; user_command
     ; blocks
     ; initial_peers
     ; pooled_user_commands ]
