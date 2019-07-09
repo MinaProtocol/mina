@@ -215,8 +215,9 @@ end)
       | hd :: tl ->
           let first =
             if not (F.equal hd F.zero) then
-              Printf.sprintf "%s%s%s"
-                (if F.equal hd F.one && deg <> 0 then "" else F.to_string hd)
+              Printf.sprintf "(%s)%s%s"
+                (* (if F.equal hd F.one && deg <> 0 then "" else F.to_string hd) *)
+                (F.to_string hd)
                 ( if deg = 0 then ""
                 else "x" ^ if deg <> 1 then "^" ^ string_of_int deg else "" )
                 (if List.length tl > 0 then " + " else "")

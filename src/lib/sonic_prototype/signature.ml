@@ -17,6 +17,8 @@ module Hsc_proof = struct
     ; hsc_z: Fr.t }
 end
 
+(* helped signature of correct computation from Sonic, Sec. 8 *)
+(* proving the value of s(z_j, y_j) is computed correctly, for y_j in ys *)
 let hsc_p (srs : Srs.t) (gate_weights : Gate_weights.t) x ys : Hsc_proof.t =
   let ss =
     List.map ys ~f:(fun yi ->
@@ -51,5 +53,5 @@ let hsc_v (srs : Srs.t) ys (gate_weights : Gate_weights.t)
     ( pc_v srs srs.d proof.hsc_c proof.hsc_z (sz, proof.hsc_qz)
       :: List.map2_exn proof.hsc_s proof.hsc_w ~f:(fun sj (wsj, wj) ->
              pc_v srs srs.d sj proof.hsc_u (wsj, wj) )
-    @ List.map2_exn ys proof.hsc_q ~f:(fun yj (wsj, wj) ->
-          pc_v srs srs.d proof.hsc_c yj (wsj, wj) ) )
+    @ List.map2_exn ys proof.hsc_q ~f:(fun yj (qsj, qj) ->
+          pc_v srs srs.d proof.hsc_c yj (qsj, qj) ) )

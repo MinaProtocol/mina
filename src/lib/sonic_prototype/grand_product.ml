@@ -9,14 +9,15 @@ let pair = Pairing.reduced_pairing
 
 let wform_p (srs : Srs.t) x n _commitment coeffs =
   let poly = Fr_laurent.create 1 coeffs in
-  let g_neg_d = List.nth_exn srs.gNegativeX (1 - srs.d) in
-  let l = G1.scale g_neg_d (Fr.to_bigint (Fr_laurent.eval poly x)) in
+  let f_x = Fr.to_bigint (Fr_laurent.eval poly x) in
+  let g_neg_d = List.nth_exn srs.gNegativeX (srs.d - 1) in
+  let l = G1.scale g_neg_d f_x in
   let g_d_n = List.nth_exn srs.gPositiveX (srs.d - n) in
-  let r = G1.scale g_d_n (Fr.to_bigint (Fr_laurent.eval poly x)) in
+  let r = G1.scale g_d_n f_x in
   (l, r)
 
 let wform_v (srs : Srs.t) n commitment (l, r) =
-  let h = List.nth_exn srs.hPositiveX 1 in
+  let h = List.hd_exn srs.hPositiveX in
   let lhs = pair commitment h in
   let h_alpha_x_d = List.nth_exn srs.hPositiveAlphaX srs.d in
   let rhs1 = pair l h_alpha_x_d in
