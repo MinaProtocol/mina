@@ -278,7 +278,7 @@ module Verification_keys = struct
   let dummy : t =
     { merge= Dummy_values.Tick.Groth16.verification_key
     ; base= Dummy_values.Tick.Groth16.verification_key
-    ; wrap= Dummy_values.Tock.GrothMaller17.verification_key }
+    ; wrap= Dummy_values.Tock.Bowe_gabizon18.verification_key }
 end
 
 module Keys0 = struct
@@ -293,7 +293,7 @@ module Keys0 = struct
     let dummy =
       { merge= Dummy_values.Tick.Groth16.proving_key
       ; base= Dummy_values.Tick.Groth16.proving_key
-      ; wrap= Dummy_values.Tock.GrothMaller17.proving_key }
+      ; wrap= Dummy_values.Tock.Bowe_gabizon18.proving_key }
   end
 
   module T = struct
@@ -597,7 +597,7 @@ module Merge = struct
           ~f:(fun acc x -> Pedersen.Checked.Section.disjoint_union_exn acc x)
           ~init:s ss
 
-  module Verifier = Tick.Groth_maller_verifier
+  module Verifier = Tick.Verifier
 
   let vk_input_offset =
     Hash_prefix.length_in_triples + Sok_message.Digest.length_in_triples

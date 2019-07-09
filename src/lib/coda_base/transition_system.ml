@@ -83,7 +83,7 @@ struct
 
     let wrap_vk_typ = Typ.list ~length:wrap_vk_length Boolean.typ
 
-    module Verifier = Tick.Groth_maller_verifier
+    module Verifier = Tick.Verifier
 
     let wrap_input_size = Tock.Data_spec.size [Wrap_input.typ]
 
@@ -98,10 +98,7 @@ struct
         >>| Bitstring_lib.Bitstring.pad_to_triple_list ~default:Boolean.false_
       in
       Pedersen.Checked.Section.extend
-        (Pedersen.Checked.Section.create
-           ~acc:(`Value Hash_prefix.transition_system_snark.acc)
-           ~support:
-             (Interval_union.of_interval (0, Hash_prefix.length_in_triples)))
+        (Pedersen.Checked.hash_prefix Hash_prefix.transition_system_snark)
         ~start:Hash_prefix.length_in_triples bs
 
     let compute_top_hash wrap_vk_section state_hash_trips =

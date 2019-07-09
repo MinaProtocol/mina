@@ -37,7 +37,7 @@ module type S = sig
   module G2 : sig
     type t
 
-    val to_affine_coordinates : t -> Fqe.t * Fqe.t
+    val to_affine_exn : t -> Fqe.t * Fqe.t
   end
 
   val pedersen : bool Triple.t Fold.t -> Field.t
