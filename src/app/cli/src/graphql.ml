@@ -360,7 +360,7 @@ module Types = struct
             ~resolve:(fun _ t ->
               Stringable.State_hash.to_base58_check t.previous_state_hash )
         ; field "blockchainState"
-            ~doc:"Base58Check-encoded hash of the blockchain state"
+            ~doc:"State related to the succinct blockchain"
             ~typ:(non_null blockchain_state)
             ~args:Arg.[]
             ~resolve:(fun _ t -> t.blockchain_state) ] )
