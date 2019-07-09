@@ -38,6 +38,9 @@ module Message : sig
   [@@deriving yojson]
 end
 
+(** A Processor is a module which processes structured log
+ *  messages into strings. This is used as part of defining
+ *  a Consumer. *)
 module Processor : sig
   type t
 
@@ -46,16 +49,34 @@ module Processor : sig
   val pretty : log_level:Level.t -> config:Logproc_lib.Interpolator.config -> t
 end
 
+(** A Transport is a module which represent a destination
+ *  for a log strings. This is used as part of defining a
+ *  Consumer. *)
 module Transport : sig
   type t
 
   val stdout : unit -> t
 
   module File_system : sig
-    val dumb_logrotate : directory:string -> t
+    (** Dumb_logrotate is a Transport which persists logs
+     *  to the file system by using 2 log files. This
+     *  Transport will rotate the 2 logs, ensuring that
+     *  each log file is less than some maximum size 
+     *  before writing to it. When the logs reach max
+     *  size, the old log is deleted and a new log is
+     *  started. *)
+    val dumb_logrotate : directory:string -> max_size:int -> t
   end
 end
 
+(** The Consumer_registry is a global registry where consumers
+ *  of the Logger can be registered. Each Consumer consists of
+ *  a Processor and a Transport. The processor filters and
+ *  serializes structured log messages to strings, and the
+ *  transport encapsulates the side effects of the consumer.
+ *  Every Consumer is registered under some unique id to
+ *  ensure the code does not accidentally attach the same
+ *  consumer multiple times. *)
 module Consumer_registry : sig
   type id = string
 

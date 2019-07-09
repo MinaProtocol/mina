@@ -153,10 +153,13 @@ let daemon logger =
            Deferred.return conf_dir )
          else Sys.home_directory () >>| compute_conf_dir
        in
+       (* 512MB logrotate max size = 1GB max filesystem usage *)
+       let logrotate_max_size = 1024 * 1024 * 512 in
        Logger.Consumer_registry.register ~id:"raw_persistent"
          ~processor:(Logger.Processor.raw ())
          ~transport:
-           (Logger.Transport.File_system.dumb_logrotate ~directory:conf_dir) ;
+           (Logger.Transport.File_system.dumb_logrotate ~directory:conf_dir
+              ~max_size:logrotate_max_size) ;
        let stdout_log_processor =
          if log_json then Logger.Processor.raw ()
          else
