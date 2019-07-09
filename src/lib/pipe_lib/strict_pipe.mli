@@ -80,6 +80,8 @@ module Reader : sig
     val n : 'a t -> int -> 'a t list
 
     val two : 'a t -> 'a t * 'a t
+
+    val three : 'a t -> 'a t * 'a t * 'a t
   end
 
   (** This function would take a pipe and split the reader side into 3 ends. The
@@ -100,6 +102,9 @@ module Writer : sig
 
   val close : (_, _, _) t -> unit
 
+  (** This function would first clear the pipe and then close it. *)
+  val kill : (_, _, _) t -> unit
+
   val is_closed : (_, _, _) t -> bool
 end
 
@@ -109,6 +114,12 @@ val create :
   -> 't Reader.t * ('t, 'type_, 'write_return) Writer.t
 
 val transfer :
+     'a Reader.t
+  -> ('b, synchronous, unit Deferred.t) Writer.t
+  -> f:('a -> 'b)
+  -> unit Deferred.t
+
+val transfer_while_writer_alive :
      'a Reader.t
   -> ('b, synchronous, unit Deferred.t) Writer.t
   -> f:('a -> 'b)

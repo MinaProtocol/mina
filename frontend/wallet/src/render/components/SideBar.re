@@ -13,22 +13,34 @@ module Styles = {
       borderRight(`px(1), `solid, Theme.Colors.borderColor),
     ]);
 
-  let footer = style([padding2(~v=`rem(0.5), ~h=`rem(1.))]);
-};
+  let footer = style([padding2(~v=`rem(0.5), ~h=`rem(0.75))]);
 
-module Wallets = [%graphql
-  {| query getWallets { ownedWallets {publicKey, balance{total}}} |}
-];
-module WalletQuery = ReasonApollo.CreateQuery(Wallets);
+  let addWalletLink =
+    merge([
+      Theme.Text.Body.regular,
+      style([
+        display(`inlineFlex),
+        alignItems(`center),
+        cursor(`default),
+        color(Theme.Colors.tealAlpha(0.5)),
+        padding2(~v=`zero, ~h=`rem(0.5)),
+        hover([
+          color(Theme.Colors.teal),
+          backgroundColor(Theme.Colors.hyperlinkAlpha(0.15)),
+          borderRadius(`px(2)),
+        ]),
+      ]),
+    ]);
+};
 
 module AddWallet = [%graphql
   {|
-  mutation addWallet {
-      addWallet(input: {}) {
-          publicKey
-      }
-  }
-|}
+    mutation addWallet {
+        addWallet {
+            publicKey
+        }
+    }
+  |}
 ];
 
 module AddWalletMutation = ReasonApollo.CreateMutation(AddWallet);
@@ -40,21 +52,13 @@ let make = () => {
     React.useContext(AddressBookProvider.context);
 
   <div className=Styles.sidebar>
-    <WalletQuery>
-      {response =>
-         switch (response.result) {
-         | Loading => React.string("...")
-         | Error(err) => React.string(err##message)
-         | Data(data) =>
-           <WalletList
-             wallets={Array.map(~f=Wallet.ofGraphqlExn, data##ownedWallets)}
-           />
-         }}
-    </WalletQuery>
+    <WalletList />
     <div className=Styles.footer>
-      <Link onClick={_ => setModalState(_ => Some("My Wallet"))}>
+      <a
+        className=Styles.addWalletLink
+        onClick={_ => setModalState(_ => Some("My Wallet"))}>
         {React.string("+ Add wallet")}
-      </Link>
+      </a>
     </div>
     <AddWalletMutation>
       {(mutation, _) =>
@@ -75,14 +79,11 @@ let make = () => {
                    fun
                    | EmptyResponse => ()
                    | Errors(_) => print_endline("Error adding wallet")
-                   | Data(data) =>
-                     data##addWallet
-                     |> Option.andThen(~f=addWallet => addWallet##publicKey)
-                     |> Option.map(~f=pk => {
-                          let key = PublicKey.ofStringExn(pk);
-                          updateAddressBook(AddressBook.set(~key, ~name));
-                        })
-                     |> ignore,
+                   | Data(data) => {
+                       let pk = data##addWallet##publicKey;
+                       let key = PublicKey.ofStringExn(pk);
+                       updateAddressBook(AddressBook.set(~key, ~name));
+                     },
                );
              }}
            />

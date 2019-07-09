@@ -14,7 +14,7 @@ module Poly = struct
       module T = struct
         type ('payload, 'pk, 'signature) t =
           {payload: 'payload; sender: 'pk; signature: 'signature}
-        [@@deriving bin_io, compare, eq, sexp, hash, yojson, version]
+        [@@deriving bin_io, compare, sexp, hash, yojson, version]
       end
 
       include T
@@ -26,7 +26,7 @@ module Poly = struct
   type ('payload, 'pk, 'signature) t =
         ('payload, 'pk, 'signature) Stable.Latest.t =
     {payload: 'payload; sender: 'pk; signature: 'signature}
-  [@@deriving eq, sexp, hash, yojson]
+  [@@deriving sexp, hash, yojson]
 end
 
 module Stable = struct
@@ -37,7 +37,7 @@ module Stable = struct
         , Public_key.Stable.V1.t
         , Signature.Stable.V1.t )
         Poly.Stable.V1.t
-      [@@deriving bin_io, compare, eq, sexp, hash, yojson, version]
+      [@@deriving bin_io, compare, sexp, hash, yojson, version]
     end
 
     include T
@@ -66,8 +66,6 @@ type t = Stable.Latest.t [@@deriving sexp, yojson, hash]
 let accounts_accessed = Stable.Latest.accounts_accessed
 
 include Comparable.Make (Stable.Latest)
-
-type value = t
 
 let payload Poly.{payload; _} = payload
 
@@ -100,17 +98,10 @@ module Gen = struct
     let%map body = create_body receiver in
     let payload : Payload.t =
       Payload.create ~fee ~nonce
-        ~memo:(User_command_memo.create_exn memo)
+        ~memo:(User_command_memo.create_by_digesting_string_exn memo)
         ~body
     in
     sign' sender payload
-
-  let gen ?(sign_type = `Fake) =
-    match sign_type with
-    | `Fake ->
-        gen_inner For_tests.fake_sign
-    | `Real ->
-        gen_inner sign
 
   let with_random_participants ~keys ~gen =
     let key_gen = Quickcheck_lib.gen_pair @@ Quickcheck_lib.of_array keys in
@@ -203,7 +194,7 @@ let check_signature _ = true
 
 let check_signature ({payload; sender; signature} : t) =
   Schnorr.verify signature
-    (Snark_params.Tick.Inner_curve.of_affine_coordinates sender)
+    (Snark_params.Tick.Inner_curve.of_affine sender)
     payload
 
 [%%endif]
@@ -224,3 +215,9 @@ let%test_unit "json" =
 let check t = Option.some_if (check_signature t) t
 
 let forget_check t = t
+
+let filter_by_participant user_commands public_key =
+  List.filter user_commands ~f:(fun user_command ->
+      List.mem
+        (accounts_accessed user_command)
+        public_key ~equal:Public_key.Compressed.equal )

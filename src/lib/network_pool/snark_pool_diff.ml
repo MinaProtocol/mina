@@ -1,33 +1,11 @@
 open Core_kernel
-open Async
+open Async_kernel
 open Module_version
 
-module Diff = struct
-  module Stable = struct
-    module V1 = struct
-      module T = struct
-        type ('work, 'priced_proof) t =
-          | Add_solved_work of 'work * 'priced_proof
-        [@@deriving bin_io, sexp, yojson, version]
-      end
-
-      include T
-    end
-
-    module Latest = V1
-  end
-
-  type ('work, 'priced_proof) t = ('work, 'priced_proof) Stable.Latest.t =
-    | Add_solved_work of 'work * 'priced_proof
-  [@@deriving sexp, yojson]
-end
-
-module Make (Proof : sig
-  type t [@@deriving bin_io, yojson, version]
-end) (Fee : sig
+module Make (Ledger_proof : sig
   type t [@@deriving bin_io, sexp, yojson, version]
 end) (Work : sig
-  type t [@@deriving sexp, yojson]
+  type t [@@deriving sexp]
 
   module Stable :
     sig
@@ -38,74 +16,20 @@ end) (Work : sig
     with type V1.t = t
 end)
 (Transition_frontier : T)
-(Pool : Snark_pool.S
+(Pool : Intf.Snark_resource_pool_intf
         with type work := Work.t
-         and type proof := Proof.t
-         and type fee := Fee.t
-         and type transition_frontier := Transition_frontier.t) =
-struct
-  module Priced_proof = struct
-    module Stable = struct
-      module V1 = struct
-        module T = struct
-          type t = {proof: Proof.t sexp_opaque; fee: Fee.t}
-          [@@deriving bin_io, sexp, version]
-
-          let to_yojson {proof; fee} =
-            `Assoc
-              [("proof", Proof.to_yojson proof); ("fee", Fee.to_yojson fee)]
-
-          let of_yojson (json : Yojson.Safe.json) =
-            match json with
-            | `Assoc attrs ->
-                let open Result.Let_syntax in
-                let%bind proof_json, fee_json =
-                  Result.of_option ~error:"missing keys"
-                    (let open Option.Let_syntax in
-                    let%bind proof_json =
-                      List.Assoc.find attrs ~equal:String.equal "proof"
-                    in
-                    let%map fee_json =
-                      List.Assoc.find attrs ~equal:String.equal "fee"
-                    in
-                    (proof_json, fee_json))
-                in
-                let%bind proof_val = Proof.of_yojson proof_json in
-                let%map fee_val = Fee.of_yojson fee_json in
-                {proof= proof_val; fee= fee_val}
-            | _ ->
-                Error "expected `Assoc"
-        end
-
-        include T
-        include Registration.Make_latest_version (T)
-      end
-
-      module Latest = V1
-
-      module Module_decl = struct
-        let name = "snark_pool_diff_priced_proof"
-
-        type latest = Latest.t
-      end
-
-      module Registrar = Registration.Make (Module_decl)
-      module Registered_V1 = Registrar.Register (V1)
-    end
-
-    (* bin_io omitted *)
-    type t = Stable.Latest.t = {proof: Proof.t sexp_opaque; fee: Fee.t}
-    [@@deriving sexp]
-
-    let to_yojson = Stable.Latest.to_yojson
-
-    let of_yojson = Stable.Latest.of_yojson
-  end
-
+         and type transition_frontier := Transition_frontier.t
+         and type ledger_proof := Ledger_proof.t) :
+  Intf.Snark_pool_diff_intf
+  with type ledger_proof := Ledger_proof.t
+   and type work := Work.t
+   and type resource_pool := Pool.t = struct
   module Stable = struct
     module V1 = struct
       module T = struct
-        type t = (Work.Stable.V1.t, Priced_proof.Stable.V1.t) Diff.Stable.V1.t
+        type t =
+          | Add_solved_work of
+              Work.Stable.V1.t * Ledger_proof.t list Priced_proof.Stable.V1.t
         [@@deriving bin_io, sexp, yojson, version]
       end
 
@@ -129,8 +53,10 @@ struct
   type t = Stable.Latest.t [@@deriving sexp, yojson]
 
   let summary = function
-    | Diff.Add_solved_work (_, Priced_proof.{proof= _; fee}) ->
-        Printf.sprintf !"Snark_pool_diff add with fee %{sexp: Fee.t}" fee
+    | Stable.V1.Add_solved_work (_, {proof= _; fee}) ->
+        Printf.sprintf
+          !"Snark_pool_diff add with fee %{sexp: Coda_base.Fee_with_prover.t}"
+          fee
 
   let apply (pool : Pool.t) (t : t Envelope.Incoming.t) :
       t Or_error.t Deferred.t =
@@ -142,7 +68,7 @@ struct
           Ok t
     in
     ( match t with
-    | Add_solved_work (work, {proof; fee}) ->
+    | Stable.V1.Add_solved_work (work, {proof; fee}) ->
         Pool.add_snark pool ~work ~proof ~fee )
     |> to_or_error |> Deferred.return
 end

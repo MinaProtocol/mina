@@ -31,7 +31,7 @@ module Dummy = struct
 
   let base_hash_expr = [%expr Snark_params.Tick.Field.zero]
 
-  let base_proof_expr = [%expr Dummy_values.Tock.GrothMaller17.proof]
+  let base_proof_expr = [%expr Dummy_values.Tock.Bowe_gabizon18.proof]
 end
 
 module Make_real (Keys : Keys_lib.Keys.S) = struct
@@ -64,6 +64,7 @@ module Make_real (Keys : Keys_lib.Keys.S) = struct
       { Keys.Step.Prover_state.prev_proof= Tock.Proof.dummy
       ; wrap_vk= Tock.Keypair.vk Keys.Wrap.keys
       ; prev_state= Protocol_state.negative_one
+      ; expected_next_state= None
       ; update= Snark_transition.genesis }
     in
     let main x =

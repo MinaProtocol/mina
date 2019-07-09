@@ -1,7 +1,5 @@
-open Protocols
 open Core
 open Async
-open Protocols.Coda_transition_frontier
 open Coda_base
 open Coda_state
 
@@ -9,33 +7,23 @@ module type Inputs_intf = sig
   include Transition_frontier.Inputs_intf
 
   module Transition_frontier :
-    Transition_frontier_intf
-    with type state_hash := State_hash.t
-     and type external_transition_validated := External_transition.Validated.t
+    Coda_intf.Transition_frontier_intf
+    with type external_transition_validated := External_transition.Validated.t
      and type mostly_validated_external_transition :=
                 ( [`Time_received] * Truth.true_t
                 , [`Proof] * Truth.true_t
                 , [`Frontier_dependencies] * Truth.true_t
                 , [`Staged_ledger_diff] * Truth.false_t )
                 External_transition.Validation.with_transition
-     and type ledger_database := Ledger.Db.t
-     and type staged_ledger := Staged_ledger.t
-     and type masked_ledger := Ledger.Mask.Attached.t
      and type transaction_snark_scan_state := Staged_ledger.Scan_state.t
      and type staged_ledger_diff := Staged_ledger_diff.t
-     and type consensus_local_state := Consensus.Data.Local_state.t
-     and type user_command := User_command.t
+     and type staged_ledger := Staged_ledger.t
      and type verifier := Verifier.t
-     and type pending_coinbase := Pending_coinbase.t
-     and type consensus_state := Consensus.Data.Consensus_state.Value.t
-
-  module Time : Protocols.Coda_pow.Time_intf
 end
 
 module Make (Inputs : Inputs_intf) :
-  Coda_transition_frontier.Root_prover_intf
-  with type state_body_hash := State_body_hash.t
-   and type transition_frontier := Inputs.Transition_frontier.t
+  Coda_intf.Root_prover_intf
+  with type transition_frontier := Inputs.Transition_frontier.t
    and type external_transition := Inputs.External_transition.t
    and type external_transition_with_initial_validation :=
               ( [`Time_received] * Truth.true_t
@@ -43,8 +31,6 @@ module Make (Inputs : Inputs_intf) :
               , [`Frontier_dependencies] * Truth.false_t
               , [`Staged_ledger_diff] * Truth.false_t )
               Inputs.External_transition.Validation.with_transition
-   and type consensus_state := Consensus.Data.Consensus_state.Value.t
-   and type state_hash := State_hash.t
    and type verifier := Inputs.Verifier.t = struct
   open Inputs
 
@@ -195,3 +181,8 @@ module Make (Inputs : Inputs_intf) :
     in
     (validated_root, validated_best_tip)
 end
+
+include Make (struct
+  include Transition_frontier.Inputs
+  module Transition_frontier = Transition_frontier
+end)

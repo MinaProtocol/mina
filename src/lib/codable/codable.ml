@@ -76,3 +76,31 @@ Make (struct
 
   let decode = Iso.of_string
 end)
+
+module Make_base58_check (T : sig
+  type t [@@deriving bin_io]
+
+  val version_byte : char
+end) =
+struct
+  module Base58_check = Base58_check.Make (T)
+
+  let to_base58_check t = Base58_check.encode (Binable.to_string (module T) t)
+
+  let of_base58_check s =
+    let open Or_error.Let_syntax in
+    let%bind decoded = Base58_check.decode s in
+    Ok (Binable.of_string (module T) decoded)
+
+  let of_base58_check_exn s = of_base58_check s |> Or_error.ok_exn
+
+  module String_ops = struct
+    type t = T.t
+
+    let to_string = to_base58_check
+
+    let of_string = of_base58_check_exn
+  end
+
+  include Make_of_string (String_ops)
+end

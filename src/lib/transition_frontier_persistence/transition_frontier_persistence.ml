@@ -3,9 +3,12 @@ open Coda_base
 open Coda_state
 open Async_kernel
 open Pipe_lib
-module Worker = Worker
 module Intf = Intf
-module Transition_storage = Transition_storage
+
+module Components = struct
+  module Transition_storage = Transition_storage
+  module Worker = Worker
+end
 
 module Make (Inputs : Intf.Main_inputs) = struct
   open Inputs
@@ -17,41 +20,50 @@ module Make (Inputs : Intf.Main_inputs) = struct
     ; max_buffer_capacity: int
     ; flush_capacity: int
     ; worker_writer:
-        ( Transition_frontier.Diff_mutant.E.with_value list
+        ( Transition_frontier.Diff.Mutant.E.with_value list
         , Strict_pipe.synchronous
         , unit Deferred.t )
         Strict_pipe.Writer.t
-    ; buffer: Transition_frontier.Diff_mutant.E.with_value Queue.t }
+    ; buffer: Transition_frontier.Diff.Mutant.E.with_value Queue.t }
 
   let write_diff_and_verify ~logger ~acc_hash worker (diff, ground_truth_mutant)
       =
-    Logger.trace logger "Handling mutant diff" ~module_:__MODULE__
-      ~location:__LOC__
+    Logger.trace logger "Handling mutant diff: $diff_mutant"
+      ~module_:__MODULE__ ~location:__LOC__
       ~metadata:
-        [("diff_mutant", Transition_frontier.Diff_mutant.key_to_yojson diff)] ;
+        [("diff_mutant", Transition_frontier.Diff.Mutant.key_to_yojson diff)] ;
     let ground_truth_hash =
-      Transition_frontier.Diff_mutant.hash acc_hash diff ground_truth_mutant
+      Transition_frontier.Diff.Mutant.hash acc_hash diff ground_truth_mutant
     in
     match%map
       Worker.handle_diff worker acc_hash
-        (Transition_frontier.Diff_mutant.E.E diff)
+        (Transition_frontier.Diff.Mutant.E.E diff)
     with
     | Error e ->
         Logger.error ~module_:__MODULE__ ~location:__LOC__ logger
           "Could not connect to worker" ;
         Error.raise e
     | Ok new_hash ->
-        if Transition_frontier.Diff_hash.equal new_hash ground_truth_hash then
+        if Transition_frontier.Diff.Hash.equal new_hash ground_truth_hash then
           ground_truth_hash
-        else
-          failwithf
-            !"Unable to write mutant diff correctly as hashes are different:\n\
-             \ %s. Hash of groundtruth %s Hash of actual %s"
-            (Yojson.Safe.to_string
-               (Transition_frontier.Diff_mutant.key_to_yojson diff))
-            (Transition_frontier.Diff_hash.to_string ground_truth_hash)
-            (Transition_frontier.Diff_hash.to_string new_hash)
-            ()
+        else (
+          (* TODO: this should be a failure that never occurs *)
+          Logger.error logger
+            "Mutant diff hashes differ: diff_mutant: $diff_mutant; hash of \
+             ground truth: $hash_of_ground_truth; hash of actual: \
+             $hash_of_actual"
+            ~module_:__MODULE__ ~location:__LOC__
+            ~metadata:
+              [ ( "diff_mutant"
+                , Transition_frontier.Diff.Mutant.key_to_yojson diff )
+              ; ( "hash_of_ground_truth"
+                , `String
+                    (Transition_frontier.Diff.Hash.to_string ground_truth_hash)
+                )
+              ; ( "hash_of_actual"
+                , `String (Transition_frontier.Diff.Hash.to_string new_hash) )
+              ] ;
+          ground_truth_hash )
 
   let rec flush ({buffer; worker_writer; flush_capacity; _} as t) =
     let list = Queue.to_list buffer in
@@ -67,11 +79,11 @@ module Make (Inputs : Intf.Main_inputs) = struct
         Strict_pipe.Synchronous
     in
     let worker_thread =
-      Strict_pipe.Reader.fold reader ~init:Transition_frontier.Diff_hash.empty
+      Strict_pipe.Reader.fold reader ~init:Transition_frontier.Diff.Hash.empty
         ~f:(fun init_hash diff_pairs ->
           Deferred.List.fold diff_pairs ~init:init_hash
             ~f:(fun acc_hash
-               (Transition_frontier.Diff_mutant.E.With_value
+               (Transition_frontier.Diff.Mutant.E.With_value
                  (diff, ground_truth_mutant))
                ->
               write_diff_and_verify ~logger ~acc_hash worker
@@ -178,7 +190,7 @@ module Make (Inputs : Intf.Main_inputs) = struct
     let transition_storage =
       Transition_storage.create ~directory:directory_name
     in
-    let result = f transition_storage in
+    let%map result = f transition_storage in
     Transition_storage.close transition_storage ;
     result
 
@@ -249,3 +261,26 @@ module Make (Inputs : Intf.Main_inputs) = struct
     let write_diff_and_verify = write_diff_and_verify
   end
 end
+
+module Base_inputs = struct
+  open Coda_transition
+
+  let max_length = Consensus.Constants.k
+
+  module Verifier = Verifier
+  module Ledger_proof = Ledger_proof
+  module External_transition = External_transition
+  module Internal_transition = Internal_transition
+  module Staged_ledger = Staged_ledger
+  module Transition_frontier = Transition_frontier
+  module Staged_ledger_diff = Staged_ledger_diff
+  module Transaction_snark_work = Transaction_snark_work
+end
+
+module Inputs = struct
+  include Base_inputs
+  module Transition_storage = Transition_storage.Make (Base_inputs)
+  module Make_worker = Worker.Make_async
+end
+
+include Make (Inputs)

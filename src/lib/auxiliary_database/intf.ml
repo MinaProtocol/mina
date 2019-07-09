@@ -3,6 +3,8 @@ open Signature_lib
 module type Pagination = sig
   type time
 
+  type cursor
+
   type value
 
   type t
@@ -13,31 +15,32 @@ module type Pagination = sig
       participant. *)
   val get_values : t -> Public_key.Compressed.t -> value list
 
-  (** [get_earlier_values t pk value n] queries [n] values (or all if
-      n is None) involving peer, [pk], added before [value] (exclusively) if
-      [value] is non-null. Otherwise, it queries the [n] latest values. It
-      indicates if there are any earlier values added before the earliest
-      value in the query. It also indicates any values that
-      occurred after [value]. It outputs an empty list of values if there
-      are no values related to [pk] in the database *)
+  (** [get_earlier_values t pk cursor n] queries [n] values (or all if n is
+      None) involving peer, [pk], added before the value corresponding to
+      [cursor] (exclusively) if [cursor] is non-null. Otherwise, it queries the
+      [n] latest values. It indicates if there are any earlier values added
+      before the earliest value in the query. It also indicates any values that
+      occurred after [cursor]. It outputs an empty list of values if there are
+      no values related to [pk] in the database *)
+
   val get_earlier_values :
        t
     -> Public_key.Compressed.t
-    -> value option
+    -> cursor option
     -> int option
     -> value list * [`Has_earlier_page of bool] * [`Has_later_page of bool]
 
-  (** [get_later_values t pk value n] queries [n] values (or all if n
-      is None) involving peer, [pk], added after [value], (exclusively) if [value]
-      is non-null. Otherwise, it queries the [n] earliest values. It
-      would indicate if there are any later values added after the latest
-      value in the query. It also indicates any values that
-      occurred before [value]. It would output an empty list of values if
+  (** [get_later_values t pk cursor n] queries [n] values (or all if n is None)
+      involving peer, [pk], added after the value corresponding to [cursor],
+      (exclusively) if [cursor] is non-null. Otherwise, it queries the [n]
+      earliest values. It would indicate if there are any later values added
+      after the latest value in the query. It also indicates any values that
+      occurred before [cursor]. It would output an empty list of values if
       there are no values related to [pk] in the database *)
   val get_later_values :
        t
     -> Public_key.Compressed.t
-    -> value option
+    -> cursor option
     -> int option
     -> value list * [`Has_earlier_page of bool] * [`Has_later_page of bool]
 end
@@ -64,12 +67,13 @@ module type Transaction = sig
     with type t := t
      and type time := time
      and type value := transaction
+     and type cursor := transaction
 end
 
 module type External_transition = sig
   type t
 
-  type external_transition
+  type filtered_external_transition
 
   type hash
 
@@ -80,12 +84,12 @@ module type External_transition = sig
   val close : t -> unit
 
   val add :
-       tracked_participants:Public_key.Compressed.Set.t
-    -> t
-    -> (external_transition, hash) With_hash.t
-    -> time
-    -> unit
+    t -> (filtered_external_transition, hash) With_hash.t -> time -> unit
 
   include
-    Pagination with type t := t and type time := time and type value := hash
+    Pagination
+    with type t := t
+     and type time := time
+     and type cursor := hash
+     and type value := (filtered_external_transition, hash) With_hash.t
 end

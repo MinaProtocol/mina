@@ -11,7 +11,6 @@ let seed = "Coda_sample_keypairs"
 let random_bool = Crs.create ~seed
 
 module Group = Curve_choice.Tick_backend.Inner_curve
-open Tuple_lib
 
 let bigint_of_bits bits =
   List.foldi bits ~init:Bigint.zero ~f:(fun i acc b ->
@@ -42,13 +41,21 @@ let expr ~loc =
       (List.map keypairs ~f:(fun {public_key; private_key} ->
            E.pexp_tuple
              [ estring
-                 (Public_key.Compressed.to_base64
+                 (Binable.to_string
+                    (module Public_key.Compressed.Stable.Latest)
                     (Public_key.compress public_key))
-             ; estring (Private_key.to_base64 private_key) ] ))
+             ; estring
+                 (Binable.to_string
+                    (module Private_key.Stable.Latest)
+                    private_key) ] ))
   in
   let%expr conv (pk, sk) =
-    ( Signature_lib.Public_key.Compressed.of_base64_exn pk
-    , Signature_lib.Private_key.of_base64_exn sk )
+    ( Core_kernel.Binable.of_string
+        (module Signature_lib.Public_key.Compressed.Stable.Latest)
+        pk
+    , Core_kernel.Binable.of_string
+        (module Signature_lib.Private_key.Stable.Latest)
+        sk )
   in
   Array.map conv [%e earray]
 
@@ -57,7 +64,7 @@ let structure ~loc =
     let loc = loc
   end) in
   let open E in
-  [%str let keypairs = [%e expr ~loc]]
+  [%str let keypairs = lazy [%e expr ~loc]]
 
 let json =
   `List
@@ -65,9 +72,10 @@ let json =
          `Assoc
            [ ( "public_key"
              , `String
-                 Public_key.(Compressed.to_base64 (compress kp.public_key)) )
-           ; ("private_key", `String (Private_key.to_base64 kp.private_key)) ]
-     ))
+                 Public_key.(
+                   Compressed.to_base58_check (compress kp.public_key)) )
+           ; ( "private_key"
+             , `String (Private_key.to_base58_check kp.private_key) ) ] ))
 
 let main () =
   Out_channel.with_file "sample_keypairs.ml" ~f:(fun ml_file ->

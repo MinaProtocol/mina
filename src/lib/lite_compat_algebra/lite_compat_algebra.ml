@@ -13,14 +13,18 @@ let twist_field x : LTock.Fq3.t =
   let c i = field (V.get x i) in
   (c 0, c 1, c 2)
 
+let target_field (x : Snark_params.Tock_backend.Full.Fqk.t) : LTock.Fq6.t =
+  let x = Snark_params.Tock_backend.Full.Fqk.to_elts x in
+  let module V = Snark_params.Tick_backend.Field.Vector in
+  let c i = field (V.get x i) in
+  ((c 0, c 1, c 2), (c 3, c 4, c 5))
+
 let g1 (t : Tick.Inner_curve.t) : LTock.G1.t =
-  let x, y = Tick.Inner_curve.to_affine_coordinates t in
+  let x, y = Tick.Inner_curve.to_affine_exn t in
   {x= field x; y= field y; z= LTock.Fq.one}
 
 let g2 (t : Crypto_params.Cycle.Mnt6.G2.t) : LTock.G2.t =
-  let x, y =
-    Crypto_params.Tick_backend.Inner_twisted_curve.to_affine_coordinates t
-  in
+  let x, y = Crypto_params.Tick_backend.Inner_twisted_curve.to_affine_exn t in
   {x= twist_field x; y= twist_field y; z= LTock.Fq3.one}
 
 let g1_vector v =

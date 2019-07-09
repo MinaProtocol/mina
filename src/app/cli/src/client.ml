@@ -64,11 +64,10 @@ let get_balance =
   let open Deferred.Let_syntax in
   let address_flag =
     flag "address"
-      ~doc:
-        "PUBLICKEY Public-key address of which you want to check the balance"
+      ~doc:"PUBLICKEY Public-key for which you want to check the balance"
       (required Cli_lib.Arg_type.public_key)
   in
-  Command.async ~summary:"Get balance associated with an address"
+  Command.async ~summary:"Get balance associated with a public key"
     (Cli_lib.Background_daemon.init address_flag ~f:(fun port address ->
          match%map
            dispatch Daemon_rpcs.Get_balance.rpc
@@ -82,8 +81,121 @@ let get_balance =
          | Error e ->
              printf "Failed to get balance %s\n" (Error.to_string_hum e) ))
 
-let get_public_keys =
+let print_trust_status status json =
+  if json then
+    printf "%s\n"
+      (Yojson.Safe.to_string (Trust_system.Peer_status.to_yojson status))
+  else
+    let ban_status =
+      match status.banned with
+      | Unbanned ->
+          "Unbanned"
+      | Banned_until tm ->
+          sprintf "Banned_until %s" (Time.to_string_abs tm ~zone:Time.Zone.utc)
+    in
+    printf "%0.04f, %s\n" status.trust ban_status
+
+let round_trust_score trust_status =
+  let open Trust_system.Peer_status in
+  let trust = Float.round_decimal trust_status.trust ~decimal_digits:4 in
+  {trust_status with trust}
+
+let get_trust_status =
+  let open Command.Param in
   let open Deferred.Let_syntax in
+  let address_flag =
+    flag "ip-address"
+      ~doc:
+        "IP An IPv4 or IPv6 address for which you want to query the trust \
+         status"
+      (required Cli_lib.Arg_type.ip_address)
+  in
+  let json_flag = Cli_lib.Flag.json in
+  let flags = Args.zip2 address_flag json_flag in
+  Command.async ~summary:"Get the trust status associated with an IP address"
+    (Cli_lib.Background_daemon.init flags ~f:(fun port (ip_address, json) ->
+         match%map
+           dispatch Daemon_rpcs.Get_trust_status.rpc ip_address port
+         with
+         | Ok status ->
+             print_trust_status (round_trust_score status) json
+         | Error e ->
+             printf "Failed to get trust status %s\n" (Error.to_string_hum e)
+     ))
+
+let ip_trust_statuses_to_yojson ip_trust_statuses =
+  let items =
+    List.map ip_trust_statuses ~f:(fun (ip_addr, status) ->
+        `Assoc
+          [ ("ip", `String (Unix.Inet_addr.to_string ip_addr))
+          ; ("status", Trust_system.Peer_status.to_yojson status) ] )
+  in
+  `List items
+
+let print_ip_trust_statuses ip_statuses json =
+  if json then
+    printf "%s\n"
+      (Yojson.Safe.to_string @@ ip_trust_statuses_to_yojson ip_statuses)
+  else
+    List.iter ip_statuses ~f:(fun (ip_addr, status) ->
+        printf "%s : " (Unix.Inet_addr.to_string ip_addr) ;
+        print_trust_status status false )
+
+let get_trust_status_all =
+  let open Command.Param in
+  let open Deferred.Let_syntax in
+  let nonzero_flag =
+    flag "nonzero-only" no_arg
+      ~doc:"Only show trust statuses whose trust score is nonzero"
+  in
+  let json_flag = Cli_lib.Flag.json in
+  let flags = Args.zip2 nonzero_flag json_flag in
+  Command.async
+    ~summary:"Get trust statuses for all peers known to the trust system"
+    (Cli_lib.Background_daemon.init flags ~f:(fun port (nonzero, json) ->
+         match%map dispatch Daemon_rpcs.Get_trust_status_all.rpc () port with
+         | Ok ip_trust_statuses ->
+             (* always round the trust scores for display *)
+             let ip_rounded_trust_statuses =
+               List.map ip_trust_statuses ~f:(fun (ip_addr, status) ->
+                   (ip_addr, round_trust_score status) )
+             in
+             let filtered_ip_trust_statuses =
+               if nonzero then
+                 List.filter ip_rounded_trust_statuses
+                   ~f:(fun (_ip_addr, status) ->
+                     not Float.(equal status.trust zero) )
+               else ip_rounded_trust_statuses
+             in
+             print_ip_trust_statuses filtered_ip_trust_statuses json
+         | Error e ->
+             printf "Failed to get trust statuses %s\n" (Error.to_string_hum e)
+     ))
+
+let reset_trust_status =
+  let open Command.Param in
+  let open Deferred.Let_syntax in
+  let address_flag =
+    flag "ip-address"
+      ~doc:
+        "IP An IPv4 or IPv6 address for which you want to reset the trust \
+         status"
+      (required Cli_lib.Arg_type.ip_address)
+  in
+  let json_flag = Cli_lib.Flag.json in
+  let flags = Args.zip2 address_flag json_flag in
+  Command.async ~summary:"Reset the trust status associated with an IP address"
+    (Cli_lib.Background_daemon.init flags ~f:(fun port (ip_address, json) ->
+         match%map
+           dispatch Daemon_rpcs.Reset_trust_status.rpc ip_address port
+         with
+         | Ok status ->
+             print_trust_status status json
+         | Error e ->
+             printf "Failed to reset trust status %s\n" (Error.to_string_hum e)
+     ))
+
+let get_public_keys =
   let open Daemon_rpcs in
   let open Command.Param in
   let with_balances_flag =
@@ -103,22 +215,22 @@ let get_public_keys =
              (module Cli_lib.Render.String_list_formatter)
              Get_public_keys.rpc () port ))
 
-let prove_payment =
-  let open Deferred.Let_syntax in
+let generate_receipt =
   let open Daemon_rpcs in
   let open Command.Param in
   let open Cli_lib.Arg_type in
   let receipt_hash_flag =
     flag "receipt-chain-hash"
       ~doc:
-        "RECEIPTHASH Receipt-chain-hash of the payment that you want to prove"
+        "RECEIPTHASH Receipt-chain-hash of the payment that you want to\n\
+        \        generate a receipt for"
       (required receipt_chain_hash)
   in
   let address_flag =
     flag "address" ~doc:"PUBLICKEY Public-key address of sender"
       (required public_key_compressed)
   in
-  Command.async ~summary:"Generate a proof of a sent payment"
+  Command.async ~summary:"Generate a receipt for a sent payment"
     (Cli_lib.Background_daemon.init (Args.zip2 receipt_hash_flag address_flag)
        ~f:(fun port (receipt_chain_hash, pk) ->
          dispatch_with_message Prove_receipt.rpc (receipt_chain_hash, pk) port
@@ -129,14 +241,14 @@ let read_json filepath =
   let%map json_contents = Reader.file_contents filepath in
   Yojson.Safe.from_string json_contents
 
-let verify_payment =
+let verify_receipt =
   let open Deferred.Let_syntax in
   let open Daemon_rpcs in
   let open Command.Param in
   let open Cli_lib.Arg_type in
   let proof_path_flag =
     flag "proof-path"
-      ~doc:"PROOFFILE File to read json version of payment proof"
+      ~doc:"PROOFFILE File to read json version of payment receipt"
       (required string)
   in
   let payment_path_flag =
@@ -148,7 +260,7 @@ let verify_payment =
     flag "address" ~doc:"PUBLICKEY Public-key address of sender"
       (required public_key_compressed)
   in
-  Command.async ~summary:"Verify a proof of a sent payment"
+  Command.async ~summary:"Verify a receipt of a sent payment"
     (Cli_lib.Background_daemon.init
        (Args.zip3 payment_path_flag proof_path_flag address_flag)
        ~f:(fun port (payment_path, proof_path, pk) ->
@@ -201,9 +313,7 @@ let get_nonce_cmd =
              exit 0 ))
 
 let status =
-  let open Deferred.Let_syntax in
   let open Daemon_rpcs in
-  let open Command.Param in
   let flag = Args.zip2 Cli_lib.Flag.json Cli_lib.Flag.performance in
   Command.async ~summary:"Get running daemon status"
     (Cli_lib.Background_daemon.init flag ~f:(fun port (json, performance) ->
@@ -214,7 +324,6 @@ let status =
            port ))
 
 let status_clear_hist =
-  let open Deferred.Let_syntax in
   let open Daemon_rpcs in
   let flag = Args.zip2 Cli_lib.Flag.json Cli_lib.Flag.performance in
   Command.async ~summary:"Clear histograms reported in status"
@@ -256,11 +365,12 @@ let batch_send_payments =
     with
     | Ok x ->
         return x
-    | Error e ->
+    | Error _ ->
         let sample_info () : Payment_info.t =
           let keypair = Keypair.create () in
           { Payment_info.receiver=
-              Public_key.(Compressed.to_base64 (compress keypair.public_key))
+              Public_key.(
+                Compressed.to_base58_check (compress keypair.public_key))
           ; amount= Currency.Amount.of_int (Random.int 100)
           ; fee= Currency.Fee.of_int (Random.int 100) }
         in
@@ -286,7 +396,8 @@ let batch_send_payments =
                  ~memo:User_command_memo.dummy
                  ~body:
                    (Payment
-                      { receiver= Public_key.Compressed.of_base64_exn receiver
+                      { receiver=
+                          Public_key.Compressed.of_base58_check_exn receiver
                       ; amount })) ) )
     in
     dispatch_with_message Daemon_rpcs.Send_user_commands.rpc
@@ -362,13 +473,16 @@ let delegate_stake =
     let open Cli_lib.Arg_type in
     let%map_open new_delegate =
       flag "delegate"
-        ~doc:"PUBLICKEY Public-key address you want to set as your delegate"
+        ~doc:
+          "PUBLICKEY Public key address to which you want to which you want \
+           to delegate your stake"
         (required public_key_compressed)
     in
     User_command_payload.Body.Stake_delegation (Set_delegate {new_delegate})
   in
-  user_command body ~label:"stake delegation"
-    ~summary:"Set your proof-of-stake delegate" ~error:"Failed to set delegate"
+  user_command body ~label:"delegate"
+    ~summary:"Change the address to which you're delegating your coda"
+    ~error:"Failed to change delegate"
 
 let wrap_key =
   Command.async ~summary:"Wrap a private key into a private key file"
@@ -381,7 +495,8 @@ let wrap_key =
       Secrets.Password.hidden_line_or_env "Private key: " ~env:"CODA_PRIVKEY"
     in
     let pk =
-      Private_key.of_base64_exn (privkey |> Or_error.ok_exn |> Bytes.to_string)
+      Private_key.of_base58_check_exn
+        (privkey |> Or_error.ok_exn |> Bytes.to_string)
     in
     let kp = Keypair.of_private_key_exn pk in
     Secrets.Keypair.Terminal_stdin.write_exn kp ~privkey_path)
@@ -399,8 +514,9 @@ let dump_keypair =
           (lazy (Secrets.Password.read "Password for private key file: "))
     in
     printf "Public key: %s\nPrivate key: %s\n"
-      (kp.public_key |> Public_key.compress |> Public_key.Compressed.to_base64)
-      (kp.private_key |> Private_key.to_base64))
+      ( kp.public_key |> Public_key.compress
+      |> Public_key.Compressed.to_base58_check )
+      (kp.private_key |> Private_key.to_base58_check))
 
 let generate_keypair =
   Command.async ~summary:"Generate a new public-key/private-key pair"
@@ -412,7 +528,8 @@ let generate_keypair =
     let kp = Keypair.create () in
     let%bind () = Secrets.Keypair.Terminal_stdin.write_exn kp ~privkey_path in
     printf "Public key: %s\n"
-      (kp.public_key |> Public_key.compress |> Public_key.Compressed.to_base64) ;
+      ( kp.public_key |> Public_key.compress
+      |> Public_key.Compressed.to_base58_check ) ;
     exit 0)
 
 let dump_ledger =
@@ -451,7 +568,6 @@ let constraint_system_digests =
 
 let snark_job_list =
   let open Deferred.Let_syntax in
-  let open Daemon_rpcs in
   let open Command.Param in
   Command.async ~summary:"List of snark jobs in JSON format"
     (Cli_lib.Background_daemon.init (return ()) ~f:(fun port () ->
@@ -463,7 +579,6 @@ let snark_job_list =
 
 let start_tracing =
   let open Deferred.Let_syntax in
-  let open Daemon_rpcs in
   let open Command.Param in
   Command.async ~summary:"Start async tracing to $config-directory/$pid.trace"
     (Cli_lib.Background_daemon.init (return ()) ~f:(fun port () ->
@@ -475,7 +590,6 @@ let start_tracing =
 
 let stop_tracing =
   let open Deferred.Let_syntax in
-  let open Daemon_rpcs in
   let open Command.Param in
   Command.async ~summary:"Stop async tracing"
     (Cli_lib.Background_daemon.init (return ()) ~f:(fun port () ->
@@ -489,7 +603,6 @@ module Visualization = struct
   let create_command (type rpc_response) ~name ~f
       (rpc : (string, rpc_response) Rpc.Rpc.t) =
     let open Deferred.Let_syntax in
-    let open Command.Param in
     Command.async
       ~summary:(sprintf !"Produce a visualization of the %s" name)
       (Cli_lib.Background_daemon.init
@@ -532,21 +645,29 @@ end
 
 let command =
   Command.group ~summary:"Lightweight client commands"
+    ~preserve_subcommand_order:()
     [ ("get-balance", get_balance)
-    ; ("get-public-keys", get_public_keys)
-    ; ("prove-payment", prove_payment)
-    ; ("verify-payment", verify_payment)
-    ; ("get-nonce", get_nonce_cmd)
     ; ("send-payment", send_payment)
+    ; ("generate-keypair", generate_keypair)
+    ; ("delegate-stake", delegate_stake)
+    ; ("generate-receipt", generate_receipt)
+    ; ("verify-receipt", verify_receipt)
     ; ("stop-daemon", stop_daemon)
+    ; ("status", status) ]
+
+let advanced =
+  Command.group ~summary:"Advanced client commands"
+    [ ("get-nonce", get_nonce_cmd)
+    ; ("get-trust-status", get_trust_status)
+    ; ("get-trust-status-all", get_trust_status_all)
+    ; ("get-public-keys", get_public_keys)
+    ; ("reset-trust-status", reset_trust_status)
     ; ("batch-send-payments", batch_send_payments)
-    ; ("status", status)
     ; ("status-clear-hist", status_clear_hist)
     ; ("wrap-key", wrap_key)
     ; ("dump-keypair", dump_keypair)
     ; ("dump-ledger", dump_ledger)
     ; ("constraint-system-digests", constraint_system_digests)
-    ; ("generate-keypair", generate_keypair)
     ; ("start-tracing", start_tracing)
     ; ("stop-tracing", stop_tracing)
     ; ("snark-job-list", snark_job_list)

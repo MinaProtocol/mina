@@ -3,8 +3,6 @@
 
 open Core
 open Async
-open Coda_worker
-open Coda_inputs
 
 let init () = Parallel.init_master ()
 
@@ -31,21 +29,16 @@ let net_configs n =
   in
   (addrs_and_ports_list, peers)
 
-[%%inject
-"genesis_state_timestamp_string", genesis_state_timestamp]
-
 let offset =
   lazy
-    (let genesis_state_timestamp =
-       let default_timezone = Core.Time.Zone.of_utc_offset ~hours:(-8) in
-       Core.Time.of_string_gen ~if_no_timezone:(`Use_this_one default_timezone)
-         genesis_state_timestamp_string
-     in
-     Core_kernel.Time.diff (Core_kernel.Time.now ()) genesis_state_timestamp)
+    Core.Time.(
+      diff (now ())
+        ( Consensus.Constants.genesis_state_timestamp
+        |> Coda_base.Block_time.to_time ))
 
 let local_configs ?proposal_interval ?(proposers = Fn.const None) n
-    ~acceptable_delay ~program_dir ~snark_worker_public_keys ~work_selection
-    ~trace_dir ~max_concurrent_connections =
+    ~acceptable_delay ~program_dir ~snark_worker_public_keys
+    ~work_selection_method ~trace_dir ~max_concurrent_connections =
   let addrs_and_ports_list, peers = net_configs n in
   let peers = [] :: List.drop peers 1 in
   let args = List.zip_exn addrs_and_ports_list peers in
@@ -64,7 +57,7 @@ let local_configs ?proposal_interval ?(proposers = Fn.const None) n
         in
         Coda_process.local_config ?proposal_interval ~addrs_and_ports ~peers
           ~snark_worker_config ~program_dir ~acceptable_delay
-          ~proposer:(proposers i) ~work_selection ~trace_dir
+          ~proposer:(proposers i) ~work_selection_method ~trace_dir
           ~offset:(Lazy.force offset) ~max_concurrent_connections () )
   in
   configs

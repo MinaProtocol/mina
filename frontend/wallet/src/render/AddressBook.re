@@ -1,6 +1,8 @@
 open Tc;
 
 /// state is an immutable dictionary from public-key to name
+/// Empty string values are not allowed, setting to "" is
+/// equivalent to removing the name for a given key
 
 type t = StrDict.t(string);
 
@@ -21,11 +23,18 @@ let toJsonString = t => {
   |> Js.Json.stringify;
 };
 
-let lookup = (t, key: PublicKey.t) =>
-  StrDict.get(t, ~key=PublicKey.toString(key));
+let lookup = (t: StrDict.t(string), key: PublicKey.t) =>
+  StrDict.get(t, ~key=PublicKey.toString(key))
+  |> Option.andThen(
+       ~f=
+         fun
+         | "" => None
+         | x => Some(x),
+     );
 
-let set = (t, ~key, ~name) =>
-  StrDict.insert(t, ~key=PublicKey.toString(key), ~value=name);
-
-let getWalletName = (t, key: PublicKey.t) =>
-  lookup(t, key) |> Option.withDefault(~default=PublicKey.prettyPrint(key));
+let set = (t: StrDict.t(string), ~key, ~name) =>
+  if (name == "") {
+    StrDict.update(t, ~key=PublicKey.toString(key), ~f=_ => None);
+  } else {
+    StrDict.insert(t, ~key=PublicKey.toString(key), ~value=name);
+  };

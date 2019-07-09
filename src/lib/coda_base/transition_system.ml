@@ -69,6 +69,7 @@ struct
         { wrap_vk: Tock.Verification_key.t
         ; prev_proof: Tock.Proof.t
         ; prev_state: State.value
+        ; expected_next_state: State.value option
         ; update: Update.value }
       [@@deriving fields]
     end
@@ -82,7 +83,7 @@ struct
 
     let wrap_vk_typ = Typ.list ~length:wrap_vk_length Boolean.typ
 
-    module Verifier = Tick.Groth_maller_verifier
+    module Verifier = Tick.Verifier
 
     let wrap_input_size = Tock.Data_spec.size [Wrap_input.typ]
 
@@ -97,10 +98,7 @@ struct
         >>| Bitstring_lib.Bitstring.pad_to_triple_list ~default:Boolean.false_
       in
       Pedersen.Checked.Section.extend
-        (Pedersen.Checked.Section.create
-           ~acc:(`Value Hash_prefix.transition_system_snark.acc)
-           ~support:
-             (Interval_union.of_interval (0, Hash_prefix.length_in_triples)))
+        (Pedersen.Checked.hash_prefix Hash_prefix.transition_system_snark)
         ~start:Hash_prefix.length_in_triples bs
 
     let compute_top_hash wrap_vk_section state_hash_trips =
@@ -142,7 +140,8 @@ struct
 
     let exists' typ ~f = exists typ ~compute:As_prover.(map get_state ~f)
 
-    let%snarkydef main (top_hash : Digest.Tick.Packed.var) =
+    let%snarkydef main (logger : Logger.t) (top_hash : Digest.Tick.Packed.var)
+        =
       let%bind prev_state = exists' State.typ ~f:Prover_state.prev_state
       and update = exists' Update.typ ~f:Prover_state.update in
       let%bind prev_state_hash = State.Checked.hash prev_state in
@@ -156,13 +155,48 @@ struct
             Verifier.vk_of_backend_vk wrap_vk )
       in
       let%bind wrap_vk_section = hash_vk wrap_vk in
-      let%bind () =
+      let%bind next_top_hash =
         with_label __LOC__
           (let%bind sh = State.Hash.var_to_triples next_state_hash in
            (* We could be reusing the intermediate state of the hash on sh here instead of
                hashing anew *)
-           compute_top_hash wrap_vk_section sh
-           >>= Field.Checked.Assert.equal top_hash)
+           compute_top_hash wrap_vk_section sh)
+      in
+      let%bind () =
+        as_prover
+          As_prover.(
+            Let_syntax.(
+              let%bind prover_state = get_state in
+              match Prover_state.expected_next_state prover_state with
+              | Some expected_next_state ->
+                  let%bind in_snark_next_state = read State.typ _next_state in
+                  let%bind next_top_hash = read Field.typ next_top_hash in
+                  let%bind top_hash = read Field.typ top_hash in
+                  let updated = State.sexp_of_value in_snark_next_state in
+                  let original = State.sexp_of_value expected_next_state in
+                  ( if not (Field.equal next_top_hash top_hash) then
+                    let diff =
+                      Sexp_diff_kernel.Algo.diff ~original ~updated ()
+                    in
+                    Logger.fatal logger
+                      "Out-of-snark (left) and in-snark (right) disagree on \
+                       what the next top_hash should be."
+                      ~metadata:
+                        [ ( "state_sexp_diff"
+                          , `String
+                              (Sexp_diff_kernel.Display.display_as_plain_string
+                                 diff) ) ]
+                      ~location:__LOC__ ~module_:__MODULE__ ) ;
+                  return ()
+              | None ->
+                  Logger.error logger
+                    "expected_next_state is empty; this should only be true \
+                     during precomputed_values"
+                    ~location:__LOC__ ~module_:__MODULE__ ;
+                  return ()))
+      in
+      let%bind () =
+        with_label __LOC__ Field.Checked.Assert.(equal next_top_hash top_hash)
       in
       let%bind prev_state_valid =
         prev_state_valid wrap_vk_section wrap_vk prev_state_hash

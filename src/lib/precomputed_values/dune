@@ -1,7 +1,6 @@
 (library
  (name precomputed_values)
  (public_name precomputed_values)
- (flags :standard -short-paths -warn-error -58)
  (libraries crypto_params dummy_values snarky snark_keys coda_base)
  (ppx_runtime_libraries base)
  (preprocess
