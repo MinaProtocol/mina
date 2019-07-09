@@ -162,15 +162,14 @@ module Transport = struct
 
       let create ~directory =
         let primary_log_loc = Filename.concat directory primary_log_name in
-        let primary_log_size =
-          if Result.is_ok (access primary_log_loc [`Read; `Write]) then
+        let primary_log_size, mode =
+          if Result.is_ok (access primary_log_loc [`Exists; `Read; `Write])
+          then
             let log_stats = stat primary_log_loc in
-            Int64.to_int_exn log_stats.st_size
-          else 0
+            (Int64.to_int_exn log_stats.st_size, [O_RDWR; O_APPEND])
+          else (0, [O_RDWR; O_CREAT])
         in
-        let primary_log =
-          openfile ~perm:log_perm ~mode:[O_RDWR; O_APPEND] primary_log_loc
-        in
+        let primary_log = openfile ~perm:log_perm ~mode primary_log_loc in
         {directory; primary_log; primary_log_size}
 
       let rotate t =
