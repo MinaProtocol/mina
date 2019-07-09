@@ -12,6 +12,10 @@ A set of transactions to be added to the blockchain. It can also be thought of a
 
 The data structure that is used in a cryptocurrency to maintain a shared state of all accounts in the network. 
 
+####Block Confirmations
+
+The number of blocks added after the reference block. As the number of confirmations increases, the likelihood of a reorganization decreases, thereby increasing the likelihood of all transactions in the reference block being confirmed.
+
 ####Block Producer
 
 The node selected to add the next block to the Coda blockchain. The block producer is selected through the consensus mechanism.
@@ -69,6 +73,10 @@ One component of public-key cryptography - public keys can be widely shared with
 ####Pub-sub
 
 Short for publish-subscribe, pub-sub is a a messaging pattern where message senders broadcast messages, and any listeners that have previously subscribed to that sender's messages will be notified. Coda utilizes this pattern, for example, as a way to notify clients when a new block has been added to the chain. This event can be "heard" by all listeners, and each listener need not independently poll for new data.
+
+####Reorganization
+
+When a competing fork of the blockchain increases in length relative to the main branch, the blockchain undergoes a reorganization to reflect the stronger fork as the main branch. After a reorganization, the transactions on the dropped branch are no longer guaranteed inclusion into the blockchain, and will need to be added to new blocks on the longest branch.
 
 ####Signatures
 

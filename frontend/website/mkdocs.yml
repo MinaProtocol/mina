@@ -2,13 +2,13 @@ site_name: Coda Documentation
 theme:
   name: 'material'
 nav:
-  - Home: index.md
+  - Overview: index.md
   - Getting Started: getting-started.md
   - My First Transaction: my-first-transaction.md
   - Become a Node Operator: node-operator.md
   - Contributing to Coda: contributing.md
   - Developers:
-    - Home: developers/index.md
+    - Overview: developers/index.md
     - Repository Structure: developers/directory-structure.md
     - Style Guide: developers/style-guide.md
     - Code Reviews: developers/code-reviews.md
