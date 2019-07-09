@@ -863,42 +863,44 @@ module Data = struct
       let keypairs = Lazy.force Coda_base.Sample_keypairs.keypairs
 
       let handler : Snark_params.Tick.Handler.t Lazy.t =
-        lazy (
-        let pk, sk = keypairs.(0) in
-        let dummy_sparse_ledger =
-          Coda_base.Sparse_ledger.of_ledger_subset_exn (Lazy.force Genesis_ledger.t) [pk]
-        in
-        let empty_pending_coinbase =
-          Coda_base.Pending_coinbase.create () |> Or_error.ok_exn
-        in
-        let ledger_handler =
-          unstage (Coda_base.Sparse_ledger.handler dummy_sparse_ledger)
-        in
-        let pending_coinbase_handler =
-          unstage
-            (Coda_base.Pending_coinbase.handler empty_pending_coinbase
-               ~is_new_stack:false)
-        in
-        let handlers =
-          Snarky.Request.Handler.(
-            push
-              (push fail (create_single pending_coinbase_handler))
-              (create_single ledger_handler))
-        in
-        fun (With {request; respond}) ->
-          match request with
-          | Winner_address ->
-              respond (Provide 0)
-          | Private_key ->
-              respond (Provide sk)
-          | Public_key ->
-              respond (Provide (Public_key.decompress_exn pk))
-          | _ ->
-              respond
-                (Provide
-                   (Snarky.Request.Handler.run handlers
-                      ["Ledger Handler"; "Pending Coinbase Handler"]
-                      request)))
+        lazy
+          (let pk, sk = keypairs.(0) in
+           let dummy_sparse_ledger =
+             Coda_base.Sparse_ledger.of_ledger_subset_exn
+               (Lazy.force Genesis_ledger.t)
+               [pk]
+           in
+           let empty_pending_coinbase =
+             Coda_base.Pending_coinbase.create () |> Or_error.ok_exn
+           in
+           let ledger_handler =
+             unstage (Coda_base.Sparse_ledger.handler dummy_sparse_ledger)
+           in
+           let pending_coinbase_handler =
+             unstage
+               (Coda_base.Pending_coinbase.handler empty_pending_coinbase
+                  ~is_new_stack:false)
+           in
+           let handlers =
+             Snarky.Request.Handler.(
+               push
+                 (push fail (create_single pending_coinbase_handler))
+                 (create_single ledger_handler))
+           in
+           fun (With {request; respond}) ->
+             match request with
+             | Winner_address ->
+                 respond (Provide 0)
+             | Private_key ->
+                 respond (Provide sk)
+             | Public_key ->
+                 respond (Provide (Public_key.decompress_exn pk))
+             | _ ->
+                 respond
+                   (Provide
+                      (Snarky.Request.Handler.run handlers
+                         ["Ledger Handler"; "Pending Coinbase Handler"]
+                         request)))
 
       let vrf_output =
         let _, sk = keypairs.(0) in
