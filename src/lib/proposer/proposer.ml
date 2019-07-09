@@ -484,15 +484,26 @@ let run ~logger ~prover ~verifier ~trust_system ~get_completed_work
                                 (keypair, data))
                              ~f:check_for_proposal) ) ) )
       in
-      (* Schedule to wake up immediately on the next tick of the proposer
-       * instead of immediately mutating local_state here as there could be a
-       * race.
-       *
-       * Given that rescheduling takes the min of the two timeouts, we won't
-       * erase this timeout even if the last run of the proposer wants to wait
-       * for a long while.
-       * *)
-      Agent.on_update keypairs ~f:(fun _new_keypairs ->
-          Singleton_scheduler.schedule scheduler (Time.now time_controller)
-            ~f:check_for_proposal ) ;
-      check_for_proposal () )
+      let start _ =
+        (* Schedule to wake up immediately on the next tick of the proposer
+         * instead of immediately mutating local_state here as there could be a
+         * race.
+         *
+         * Given that rescheduling takes the min of the two timeouts, we won't
+         * erase this timeout even if the last run of the proposer wants to wait
+         * for a long while.
+         * *)
+        Agent.on_update keypairs ~f:(fun _new_keypairs ->
+            Singleton_scheduler.schedule scheduler (Time.now time_controller)
+              ~f:check_for_proposal ) ;
+        check_for_proposal ()
+      in
+      let now = Time.now time_controller in
+      if Time.( < ) now Consensus.Constants.genesis_state_timestamp then
+        start now
+      else
+        let time_till_genesis =
+          Time.diff Consensus.Constants.genesis_state_timestamp now
+        in
+        ignore (Time.Timeout.create time_controller time_till_genesis ~f:start)
+  )
