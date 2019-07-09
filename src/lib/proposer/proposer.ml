@@ -505,5 +505,12 @@ let run ~logger ~prover ~verifier ~trust_system ~get_completed_work
         let time_till_genesis =
           Time.diff Consensus.Constants.genesis_state_timestamp now
         in
+        Logger.warn logger ~module_:__MODULE__ ~location:__LOC__
+          ~metadata:
+            [ ( "time_till_genesis"
+              , `Int (Int64.to_int_exn (Time.Span.to_ms time_till_genesis)) )
+            ]
+          "node started before genesis: waiting $time_till_genesis ms before \
+           proposing any blocks" ;
         ignore (Time.Timeout.create time_controller time_till_genesis ~f:start)
   )
