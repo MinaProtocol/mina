@@ -326,7 +326,7 @@ module Types = struct
             ~args:Arg.[]
             ~resolve:(fun _ {fee_transfers; _} -> fee_transfers)
         ; uint64_field "coinbase"
-            ~doc:"Number of tokens granted to the producer of this block"
+            ~doc:"Amount of coda granted to the producer of this block"
             ~args:Arg.[]
             ~resolve:(fun _ {coinbase; _} -> Stringable.amount coinbase) ] )
 
@@ -410,14 +410,13 @@ module Types = struct
              unknown with the invariant: unknown <= total" ~fields:(fun _ ->
             [ field "total" ~typ:(non_null string)
                 ~doc:
-                  "The number of coda tokens owned by the account \
-                   (stringified uint64)"
+                  "The amount of coda owned by the account (stringified uint64)"
                 ~args:Arg.[]
                 ~resolve:(fun _ (b : t) -> Stringable.balance b.total)
             ; field "unknown" ~typ:(non_null string)
                 ~doc:
-                  "The number of coda tokens owned by the account that whose \
-                   origin is currently unknown (stringified uint64)"
+                  "The amount of coda owned by the account whose origin is \
+                   currently unknown (stringified uint64)"
                 ~args:Arg.[]
                 ~resolve:(fun _ (b : t) -> Stringable.balance b.unknown) ] )
     end
@@ -446,7 +445,7 @@ module Types = struct
                 @@ Option.value_exn account.Account.Poly.public_key )
           ; field "balance"
               ~typ:(non_null AnnotatedBalance.obj)
-              ~doc:"The number of coda tokens owned by the account"
+              ~doc:"The amount of coda owned by the account"
               ~args:Arg.[]
               ~resolve:(fun _ {account; _} -> account.Account.Poly.balance)
           ; field "nonce" ~typ:string
@@ -600,8 +599,7 @@ module Types = struct
         ~fields:
           [ from ~doc:"Public key of recipient of payment"
           ; to_ ~doc:"Public key of sender of payment"
-          ; uint64_arg "amount"
-              ~doc:"Number of coda tokens to send to to receiver"
+          ; uint64_arg "amount" ~doc:"Amount of coda to send to to receiver"
               ~typ:(non_null string)
           ; fee ~doc:"Fee amount in order to send payment"
           ; memo ~doc:"Short arbitrary message provided by the sender" ]
