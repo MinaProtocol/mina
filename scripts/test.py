@@ -66,7 +66,10 @@ test_medium_curves = {
     'test_postake_snarkless_medium_curves': simple_tests,
 }
 
-medium_curve_profiles = ['test_postake_medium_curves']
+medium_curve_profiles = [
+    'test_postake_medium_curves',
+    'testnet_postake_medium_curves',
+    'testnet_postake_many_proposers_medium_curves']
 
 ci_blacklist = []
 

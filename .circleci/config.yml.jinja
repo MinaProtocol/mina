@@ -163,6 +163,9 @@ jobs:
             - run:
                   name: Build deb Package with keys
                   command: ./scripts/skip_if_only_frontend.sh make deb
+                  {%- if profile in medium_curve_profiles %}
+                  no_output_timeout: 20m
+                  {%- endif %}
             - run:
                   name: Store Generated Proving and Verifying Keys
                   command: ./scripts/skip_if_only_frontend.sh make provingkeys
@@ -211,7 +214,7 @@ jobs:
                   name: Running test -- {{profile}}:{{test}}
                   command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run "{{profile}}:{{test}}"'
                   {%- if profile in medium_curve_profiles %}
-                  no_output_timeout: 30m
+                  no_output_timeout: 20m
                   {%- endif %}
             {%- endfor %}
             - store_artifacts:
