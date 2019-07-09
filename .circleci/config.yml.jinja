@@ -86,6 +86,7 @@ jobs:
        environment:
            HOMEBREW_LOGS: /Users/distiller/homebrew.log
            OPAMYES: 1
+           DUNE_PROFILE: testnet_postake_medium_curves
        steps:
            - run:
                name: Make /nix paths
@@ -137,7 +138,7 @@ jobs:
                  command: ./scripts/skip_if_only_frontend.sh bash -c './jfrog rt config --url $ARTIFACTORY_URL --user $ARTIFACTORY_USER --apikey $ARTIFACTORY_API_KEY --interactive=false'
            - run: 
                  name: Release Build to Artifactory
-                 command: ./scripts/skip_if_only_frontend.sh bash -c './jfrog rt u _build/coda-daemon-macos.zip macos-coda/coda-daemon-$CIRCLE_BUILD_NUM.zip --build-name=build-macos --build-number=$CIRCLE_BUILD_NUM'
+                 command: ./scripts/skip_if_only_frontend.sh bash -c './jfrog rt u _build/coda-daemon-macos.zip macos-coda/coda-daemon-$CIRCLE_BRANCH-$CIRCLE_SHA1.zip --build-name=build-macos --build-number=$CIRCLE_BUILD_NUM'
 
     {%- for profile in build_artifact_profiles %}
     build-artifacts--{{profile}}:
