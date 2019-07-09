@@ -232,6 +232,6 @@ Router.(
 
 // Run mkdocs to generate static docs site
 Markdown.Child_process.execSync(
-  "cd ../../docs && mkdocs build -d ../frontend/website/site/docs",
+  "mkdocs build -d site/docs",
   Markdown.Child_process.option(),
 );

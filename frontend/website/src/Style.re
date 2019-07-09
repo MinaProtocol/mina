@@ -312,8 +312,8 @@ module H3 = {
 module H4 = {
   open Css;
 
-  let basic =
-    style([
+  let (basic, basicStyles) =
+    generateStyles([
       Typeface.ibmplexsans,
       textAlign(`center),
       fontSize(`rem(1.0625)),

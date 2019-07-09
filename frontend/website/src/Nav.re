@@ -430,7 +430,7 @@ let make = (~page, _children) => {
       <SimpleButton name="Blog" link="/blog.html" activePage={page == `Blog} />
       <SimpleButton
         name="Docs"
-        link="/docs/index.html"
+        link="/docs/"
         activePage={page == `Docs}
       />
       <SimpleButton
