@@ -26,9 +26,6 @@ let daemon logger =
     (let%map_open conf_dir =
        flag "config-directory" ~doc:"DIR Configuration directory"
          (optional string)
-     and from_genesis =
-       flag "from-genesis"
-         ~doc:"Indicating that we are starting from genesis or not" no_arg
      and unsafe_track_propose_key =
        flag "unsafe-track-propose-key"
          ~doc:
@@ -474,13 +471,6 @@ let daemon logger =
        in
        coda_ref := Some coda ;
        let%bind () = maybe_sleep 3. in
-       let%bind () =
-         if from_genesis then Deferred.unit
-         else
-           after
-             ( Consensus.Constants.block_window_duration_ms * 2
-             |> Float.of_int |> Time.Span.of_ms )
-       in
        Coda_lib.start coda ;
        let web_service = Web_pipe.get_service () in
        Web_pipe.run_service coda web_service ~conf_dir ~logger ;
@@ -574,10 +564,11 @@ let internal_commands =
   ; ("snark-hashes", snark_hashes) ]
 
 let coda_commands logger =
-  [ (Parallel.worker_command_name, Parallel.worker_command)
-  ; ("internal", Command.group ~summary:"Internal commands" internal_commands)
+  [ ("client", Client.command)
   ; ("daemon", daemon logger)
-  ; ("client", Client.command)
+  ; ("advanced", Client.advanced)
+  ; ("internal", Command.group ~summary:"Internal commands" internal_commands)
+  ; (Parallel.worker_command_name, Parallel.worker_command)
   ; ("transaction-snark-profiler", Transaction_snark_profiler.command) ]
 
 [%%if
@@ -622,5 +613,7 @@ let () =
   don't_wait_for (ensure_testnet_id_still_good logger) ;
   (* Turn on snark debugging in prod for now *)
   Snarky.Snark.set_eval_constraints true ;
-  Command.run (Command.group ~summary:"Coda" (coda_commands logger)) ;
+  Command.run
+    (Command.group ~summary:"Coda" ~preserve_subcommand_order:()
+       (coda_commands logger)) ;
   Core.exit 0
