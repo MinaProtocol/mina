@@ -66,6 +66,11 @@ test_medium_curves = {
     'test_postake_snarkless_medium_curves': simple_tests,
 }
 
+medium_curve_profiles = [
+    'test_postake_medium_curves',
+    'testnet_postake_medium_curves',
+    'testnet_postake_many_proposers_medium_curves']
+
 ci_blacklist = []
 
 # of all the generated CI jobs, allow these specific ones to fail (extra blacklist on top of ci_blacklist)
@@ -247,7 +252,8 @@ def render(args):
         unit_test_profiles=unit_test_profiles,
         unit_test_profiles_medium_curves=unit_test_profiles_medium_curves,
         test_permutations=test_permutations,
-        test_medium_curves=test_medium_curves
+        test_medium_curves=test_medium_curves,
+        medium_curve_profiles=medium_curve_profiles
     )
 
     if args.check:
