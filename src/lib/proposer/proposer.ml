@@ -484,7 +484,7 @@ let run ~logger ~prover ~verifier ~trust_system ~get_completed_work
                                 (keypair, data))
                              ~f:check_for_proposal) ) ) )
       in
-      let start _ =
+      let start () =
         (* Schedule to wake up immediately on the next tick of the proposer
          * instead of immediately mutating local_state here as there could be a
          * race.
@@ -498,9 +498,10 @@ let run ~logger ~prover ~verifier ~trust_system ~get_completed_work
               ~f:check_for_proposal ) ;
         check_for_proposal ()
       in
+      (* if the proposer starts before genesis, sleep until genesis *)
       let now = Time.now time_controller in
-      if Time.( < ) now Consensus.Constants.genesis_state_timestamp then
-        start now
+      if Time.( >= ) now Consensus.Constants.genesis_state_timestamp then
+        start ()
       else
         let time_till_genesis =
           Time.diff Consensus.Constants.genesis_state_timestamp now
@@ -512,5 +513,6 @@ let run ~logger ~prover ~verifier ~trust_system ~get_completed_work
             ]
           "node started before genesis: waiting $time_till_genesis ms before \
            proposing any blocks" ;
-        ignore (Time.Timeout.create time_controller time_till_genesis ~f:start)
-  )
+        ignore
+          (Time.Timeout.create time_controller time_till_genesis ~f:(fun _ ->
+               start () )) )
