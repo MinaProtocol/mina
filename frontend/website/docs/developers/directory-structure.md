@@ -1,1 +1,1 @@
-docs/directory-structure.md
+../../../../docs/directory-structure.md

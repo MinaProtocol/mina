@@ -1,1 +1,1 @@
-docs/reporting-guidelines.md
+../../../docs/reporting-guidelines.md
