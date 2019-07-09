@@ -212,3 +212,26 @@ Router.(
   )
 );
 Fs.symlinkSync(Node.Process.cwd() ++ "/static", "./site/static");
+
+Router.(
+  generateStatic(
+    Dir(
+      "docs-theme",
+      [|
+        File(
+          "main",
+          <Page
+            page=`Docs name="/docs/main" extraHeaders={Docs.extraHeaders()}>
+            <Wrapped> <Docs /> </Wrapped>
+          </Page>,
+        ),
+      |],
+    ),
+  )
+);
+
+// Run mkdocs to generate static docs site
+Markdown.Child_process.execSync(
+  "cd ../../docs && mkdocs build -d ../frontend/website/site/docs",
+  Markdown.Child_process.option(),
+);

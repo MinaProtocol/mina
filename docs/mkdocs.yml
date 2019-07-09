@@ -1,6 +1,7 @@
 site_name: Coda Documentation
 theme:
-  name: 'material'
+  name: null
+  custom_dir: '../frontend/website/docs-theme/'
 nav:
   - Home: index.md
   - Getting Started: getting-started.md
@@ -8,7 +9,8 @@ nav:
   - Become a Node Operator: node-operator.md
   - Contributing to Coda: contributing.md
   - Advanced:
-    - Developers:
+    - Home: developers/index.md
+    - Developers: 
       - Home: developers/index.md
       - Repository Structure: developers/directory-structure.md
       - Style Guide: developers/style-guide.md
