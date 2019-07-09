@@ -16,17 +16,6 @@ let wrap_input = Tock.Data_spec.[Wrap_input.typ]
 
 let exists' typ ~f = Tick.(exists typ ~compute:As_prover.(map get_state ~f))
 
-module Input = struct
-  (* TODO : version *)
-  type t =
-    { source: Frozen_ledger_hash.Stable.V1.t
-    ; target: Frozen_ledger_hash.Stable.V1.t
-    ; fee_excess: Currency.Amount.Signed.Stable.V1.t
-    ; pending_coinbase_before: Pending_coinbase.Stack.Stable.V1.t
-    ; pending_coinbase_after: Pending_coinbase.Stack.Stable.V1.t }
-  [@@deriving bin_io, sexp, compare]
-end
-
 module Proof_type = struct
   module Stable = struct
     module V1 = struct
