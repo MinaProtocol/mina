@@ -10,7 +10,7 @@ nav:
   - Advanced:
     - Developers:
       - Home: developers/index.md
-      - Repository Structure: developers/repo-structure.md
+      - Repository Structure: developers/directory-structure.md
       - Style Guide: developers/style-guide.md
       - Code Reviews: developers/code-reviews.md
       - GraphQL API: developers/graphql-api.md

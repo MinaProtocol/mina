@@ -1,6 +1,6 @@
-# The structure of the repository
+# Coda Repository Structure
 
-This document describes the file-structure of the repository, and what roles various
+This document describes the file-structure of [the Coda repository](https://github.com/codaprotocol/coda), and what roles various
 files play.
 
 - `rfcs/`
