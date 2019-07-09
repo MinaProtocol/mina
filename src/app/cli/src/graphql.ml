@@ -407,7 +407,7 @@ module Types = struct
         obj "AnnotatedBalance"
           ~doc:
             "A total balance annotated with the amount that is currently \
-             unknown. Invariant: unknown <= total" ~fields:(fun _ ->
+             unknown with the invariant: unknown <= total" ~fields:(fun _ ->
             [ field "total" ~typ:(non_null string)
                 ~doc:
                   "The number of coda tokens owned by the account \
@@ -417,7 +417,7 @@ module Types = struct
             ; field "unknown" ~typ:(non_null string)
                 ~doc:
                   "The number of coda tokens owned by the account that whose \
-                   origin is currently unknown. (stringified uint64)"
+                   origin is currently unknown (stringified uint64)"
                 ~args:Arg.[]
                 ~resolve:(fun _ (b : t) -> Stringable.balance b.unknown) ] )
     end
