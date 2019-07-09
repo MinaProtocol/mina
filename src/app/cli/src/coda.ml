@@ -574,8 +574,8 @@ let internal_commands =
   ; ("snark-hashes", snark_hashes) ]
 
 let coda_commands logger =
-  [ ("client", Client.command)
-  ; ("daemon", daemon logger)
+  [ ("daemon", daemon logger)
+  ; ("client", Client.command)
   ; ("advanced", Client.advanced)
   ; ("internal", Command.group ~summary:"Internal commands" internal_commands)
   ; (Parallel.worker_command_name, Parallel.worker_command)
