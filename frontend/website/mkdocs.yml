@@ -1,6 +1,7 @@
 site_name: Coda Documentation
 theme:
-  name: 'material'
+  name: null
+  custom_dir: 'docs-theme/'
 nav:
   - Overview: index.md
   - Getting Started: getting-started.md
@@ -21,4 +22,6 @@ nav:
   - CLI Reference: cli-reference.md
   - Glossary: glossary.md
 markdown_extensions:
+  - toc:
+      permalink: a
   - admonition

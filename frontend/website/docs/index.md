@@ -14,4 +14,4 @@ Check out this short video explaining how the Coda protocol works in detail:
 
 Sign up for the public testnet [here](https://bit.ly/TestnetForm).
 
-Head over to the [getting started page](/getting-started) to learn how to install the Coda client.
+Head over to the [getting started page](getting-started) to learn how to install the Coda client.

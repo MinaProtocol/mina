@@ -161,11 +161,13 @@ let paddingX = m => Css.[paddingLeft(m), paddingRight(m)];
 /** sets both paddingTop and paddingBottom, as one should */
 let paddingY = m => Css.[paddingTop(m), paddingBottom(m)];
 
+let generateStyles = rules => (Css.style(rules), rules);
+
 module Link = {
   open Css;
 
-  let init =
-    style([
+  let (init, basicStyles) =
+    generateStyles([
       Typeface.ibmplexsans,
       color(Colors.hyperlink),
       textDecoration(`none),
@@ -186,29 +188,28 @@ module Link = {
 module H1 = {
   open Css;
 
-  let hero =
-    style([
-      Typeface.ibmplexsans,
-      fontWeight(`light),
-      fontSize(`rem(2.25)),
-      letterSpacing(`rem(-0.02375)),
-      lineHeight(`rem(3.0)),
-      media(
-        MediaQuery.full,
-        [
-          fontSize(`rem(3.0)),
-          letterSpacing(`rem(-0.03125)),
-          lineHeight(`rem(4.0)),
-        ],
-      ),
-    ]);
+  let (hero, heroStyles) = generateStyles([
+    Typeface.ibmplexsans,
+    fontWeight(`light),
+    fontSize(`rem(2.25)),
+    letterSpacing(`rem(-0.02375)),
+    lineHeight(`rem(3.0)),
+    media(
+      MediaQuery.full,
+      [
+        fontSize(`rem(3.0)),
+        letterSpacing(`rem(-0.03125)),
+        lineHeight(`rem(4.0)),
+      ],
+    ),
+  ]);
 };
 
 module H2 = {
   open Css;
 
-  let basic =
-    style([
+  let (basic, basicStyles) =
+    generateStyles([
       Typeface.ibmplexsans,
       fontWeight(`normal),
       fontSize(`rem(2.25)),
@@ -234,8 +235,8 @@ module Technical = {
 module H3 = {
   open Css;
 
-  let basic =
-    style([
+  let (basic, basicStyles) =
+    generateStyles([
       Typeface.ibmplexsans,
       fontSize(`rem(1.25)),
       textAlign(`center),
@@ -311,8 +312,8 @@ module H3 = {
 module H4 = {
   open Css;
 
-  let basic =
-    style([
+  let (basic, basicStyles) =
+    generateStyles([
       Typeface.ibmplexsans,
       textAlign(`center),
       fontSize(`rem(1.0625)),
@@ -359,8 +360,8 @@ module Body = {
   open Css;
 
   module Technical = {
-    let basic =
-      style([
+    let (basic, basicStyles) =
+      generateStyles([
         Typeface.pragmataPro,
         color(Css.white),
         fontSize(`rem(1.)),
@@ -369,8 +370,8 @@ module Body = {
       ]);
   };
 
-  let basic =
-    style([
+  let (basic, basicStyles) =
+    generateStyles([
       Typeface.ibmplexsans,
       color(Colors.metallicBlue),
       fontSize(`rem(1.0)),

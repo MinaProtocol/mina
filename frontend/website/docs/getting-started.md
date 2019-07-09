@@ -5,17 +5,17 @@ This section will walk you through the requirements needed to run a Coda protoco
 !!! note
     Last updated for release v0.0.1
 
-### Requirements
+## Requirements
 
 **Software**: macOS (10.x.x and above) or Linux (currently supports Debian 9 and Ubuntu)
 
 **Hardware**: Sending and receiving coda does not require any special hardware, but [some requirements]() exist for generating zk-SNARKs
 
-### Installation
+## Installation
 
 The newest binary releases can be found [here](). With the exception of the .exe and .dmg files, they are archives of the latest executable binaries for each release. Instructions are provided for macOS and Linux below:
 
-**macOS**
+### macOS
 
 1. Download [coda.zip]()
 2. Unzip anywhere, `cd` to navigate to the Coda directory
@@ -23,7 +23,7 @@ The newest binary releases can be found [here](). With the exception of the .exe
 4. Set up port forwarding (see below)
 5. `./coda -help` to see if it works
 
-**Linux (Ubuntu / Debian)**
+### Linux (Ubuntu / Debian)
 
 1. Download [coda.deb]()
 2. Run `apt-get install miniupnpc` to install [MiniUPnP client](https://github.com/miniupnp/miniupnp)
@@ -32,7 +32,7 @@ The newest binary releases can be found [here](). With the exception of the .exe
 5. `coda -help` to see if it works
 
 
-**Windows**
+### Windows
 
 Windows is not yet supported - there is [grant funding available]() for adding Windows support.
 
