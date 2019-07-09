@@ -1,0 +1,24 @@
+site_name: Coda Documentation
+theme:
+  name: 'material'
+nav:
+  - Home: index.md
+  - Getting Started: getting-started.md
+  - My First Transaction: my-first-transaction.md
+  - Become a Node Operator: node-operator.md
+  - Contributing to Coda: contributing.md
+  - Developers:
+    - Home: developers/index.md
+    - Repository Structure: developers/directory-structure.md
+    - Style Guide: developers/style-guide.md
+    - Code Reviews: developers/code-reviews.md
+    - GraphQL API: developers/graphql-api.md
+  - Coda Protocol Architecture:
+    - Overview: architecture/index.md
+    - Lifecycle of a Payment: architecture/lifecycle-payment.md
+    - Consensus: architecture/consensus.md
+    - Proof of Stake: architecture/proof-of-stake.md
+  - CLI Reference: cli-reference.md
+  - Glossary: glossary.md
+markdown_extensions:
+  - admonition

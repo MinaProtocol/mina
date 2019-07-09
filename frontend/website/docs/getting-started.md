@@ -13,7 +13,7 @@ This section will walk you through the requirements needed to run a Coda protoco
 
 ### Installation
 
-The newest binary releases can be found [here](). With the exception of the .exe and .dmg files, they are archives of the latest executable binaries for each release. Although most of this will be extract and go, instructions are provided for macOS and Linux below:
+The newest binary releases can be found [here](). With the exception of the .exe and .dmg files, they are archives of the latest executable binaries for each release. Instructions are provided for macOS and Linux below:
 
 **macOS**
 
@@ -40,11 +40,11 @@ To build from source code, please follow [the instructions in the Coda protocol 
 
 ## Port forwarding
 
-If you're running a Coda node on a home or office machine, you'll have to manually set up [port forwarding](https://en.wikipedia.org/wiki/Port_forwarding) to make the node visible on the internet to the other Coda nodes.
+If you're running a Coda node on a home or office machine, you'll have to manually set up [port forwarding](https://en.wikipedia.org/wiki/Port_forwarding) to make your node visible on the internet to other Coda nodes.
 
 Run the following commands to use MiniUPnP to reconfigure ports on your IP address:
 
-1. First run `ifconfig` to get your external IP address - see the response corresponding with `en0`:
+1. First run `ifconfig` to get your external IP address - you can find this in the output corresponding to the field `en0`:
 
 
         $ ifconfig
@@ -58,7 +58,7 @@ Run the following commands to use MiniUPnP to reconfigure ports on your IP addre
                 status: active
         ...
 
-2. Then run `upnpc -a <IP address> <internal port> <external port> TCP`, where the IP address is the one from the previous command. Note that you'll have to run it four times, one for each port we are forwarding:
+2. Then run `upnpc -a <IP address> <internal port> <external port> TCP`, with the IP address from from the previous step. Note that you'll have to run it four times, one for each port that needs to be forwarded:
 
         $ upnpc -a 192.168.101.7 8301 8301 TCP
         $ upnpc -a 192.168.101.7 8302 8302 TCP
@@ -71,6 +71,6 @@ If these commands succeed, you will have successfully forwarded ports `8301-8304
 
     No IGD UPnP Device found on the network !
 
-If so, [find your router model](https://portforward.com/router.htm) and follow the instructions to forward `8301-8304` TCP ports from your router to your device running the Coda node.
+If so, [find your router model](https://portforward.com/router.htm) and follow the instructions to forward TCP ports `8301-8304` from your router to your device running the Coda node.
 
-Now that we've installed the Coda daemon and client, and configured our settings, we can move on to the fun part - [sending a transaction](/my-first-transaction)!
+Now that you've installed the Coda binary and configured settings, let's move on to the fun part - [sending a transaction](/my-first-transaction)!
