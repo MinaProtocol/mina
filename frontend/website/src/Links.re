@@ -47,6 +47,14 @@ module Static = {
     link: "https://cdn.codaprotocol.com/v2/static/coda-whitepaper-05-10-2018-0.pdf",
   };
 
+  let modifiedsnark = () => {
+    name: (
+      "Read about the zkSNARK construction we're using",
+      "modified-BG-snark",
+    ),
+    link: Cdn.url("/static/modified-BG-snark-05-03-2019-0.pdf"),
+  };
+
   let snarkette = {
     name: ("Snarkette: JavaScript Groth-Maller SNARK verifier", "snarkette"),
     link: "https://github.com/o1-labs/snarkette",
@@ -208,6 +216,7 @@ module Lists = {
       ThirdParty.coindeskStartupBlockchain,
       ThirdParty.codaMediumPost,
       ThirdParty.tokenDailyQA,
+      Static.modifiedsnark(),
     ]
     // top 5 above, rest below the fold
     @ List.map(
