@@ -266,7 +266,7 @@ module type S = sig
     * This is mostly useful for PoStake and other consensus mechanisms that have their own
     * notions of time.
   *)
-  val time_hum : Time.t -> string
+  val time_hum : Coda_base.Block_time.t -> string
 
   module Constants : Constants_intf
 
