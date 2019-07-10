@@ -60,7 +60,7 @@ let keys = Set_once.create ()
 let create () : (module S) Async.Deferred.t =
   match Set_once.get keys with
   | Some x ->
-      x
+      Async.Deferred.return x
   | None ->
       let open Async in
       let%map tx_vk = Lazy.force tx_vk
@@ -171,4 +171,5 @@ let create () : (module S) Async.Deferred.t =
               (main x)
         end
       end in
+      Set_once.set_exn keys Lexing.dummy_pos (module M : S) ;
       (module M : S)
