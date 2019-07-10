@@ -21,6 +21,7 @@ Split ledger catchup into 2 phases:
 1) Instead of
    * requesting a path/list of transitions from peer's root history to the requested hash,
    * requesting a merkle path/list from peer's root history to the requested hash together with their root history transition.
+   
    The merkle path/list contains a list of *state_body_hash*es. Upon received
    the merkle_path/list, we could verify that the merkle path by first trying
    to find the root in our frontier or root_history and then call
