@@ -117,10 +117,7 @@ module Styles = {
           color(Style.Colors.rosebud),
           selector(
             ".admonition-title",
-            [
-              color(white),
-              backgroundColor(Style.Colors.rosebud),
-            ],
+            [color(white), backgroundColor(Style.Colors.rosebud)],
           ),
         ],
       ),
@@ -131,6 +128,10 @@ module Styles = {
       minWidth(rem(15.)),
       selector("ul", [listStyleType(`none)]),
       selector("li > ul", [marginLeft(rem(1.))]),
+      selector("li", [marginBottom(rem(0.5))]),
+      selector("ul > li > ul", [marginTop(rem(0.5))]),
+      selector("input + ul", [display(`none)]),
+      selector("input:checked + ul", [display(`block)]),
       media(
         Style.MediaQuery.somewhatLarge,
         [marginRight(rem(2.)), marginTop(rem(3.))],
@@ -164,25 +165,33 @@ let make = _children => {
         dangerouslySetInnerHTML={
           "__html": {|
             {% if nav|length>1 %}
-                <ul>
-                {% for nav_item in nav %}
-                    {% if nav_item.children %}
-                        <li>{{ nav_item.title }}
-                            <ul>
-                            {% for nav_item in nav_item.children %}
-                                <li class="{% if nav_item.active%}current{% endif %}">
-                                    <a href="{{ nav_item.url|url }}">{{ nav_item.title }}</a>
-                                </li>
-                            {% endfor %}
-                            </ul>
-                        </li>
-                    {% else %}
-                        <li class="{% if nav_item.active%}current{% endif %}">
-                            <a href="{{ nav_item.url|url }}">{{ nav_item.title }}</a>
-                        </li>
-                    {% endif %}
-                {% endfor %}
-                </ul>
+              <ul>
+              {% for nav_item in nav %}
+                {% if nav_item.children %}
+                  <li>
+                    <label for="{{ nav_item.title }}-toggle">
+                      {{ nav_item.title }}
+                    </label>
+                    <input
+                      type="checkbox"
+                      style="display:none"
+                      id="{{ nav_item.title }}-toggle"
+                    />
+                    <ul>
+                    {% for nav_item in nav_item.children %}
+                      <li class="{% if nav_item.active%}current{% endif %}">
+                        <a href="{{ nav_item.url|url }}">{{ nav_item.title }}</a>
+                      </li>
+                    {% endfor %}
+                    </ul>
+                  </li>
+                {% else %}
+                  <li class="{% if nav_item.active%}current{% endif %}">
+                    <a href="{{ nav_item.url|url }}">{{ nav_item.title }}</a>
+                  </li>
+                {% endif %}
+              {% endfor %}
+              </ul>
             {% endif %}
           |},
         }
