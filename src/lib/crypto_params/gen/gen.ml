@@ -81,29 +81,24 @@ let affine_params_ast ~loc =
   let arr =
     E.pexp_array
       (List.map params ~f:(fun (g1, g2, g3, g4) ->
-            E.pexp_tuple
-              (List.map [g1; g2; g3; g4] ~f:(fun g ->
+           E.pexp_tuple
+             (List.map [g1; g2; g3; g4] ~f:(fun g ->
                   (* g is a random point so this is safe. *)
                   let x, y = Group.to_affine_exn g in
                   E.pexp_tuple
                     [ estring (Impl.Field.to_string x)
                     ; estring (Impl.Field.to_string y) ] )) ))
   in
-  let%expr conv (x, y) =
-    (Tick0.Field.of_string x, Tick0.Field.of_string y)
-  in
-  Array.map (fun (g1, g2, g3, g4) -> (conv g1, conv g2, conv g3, conv g4))
+  let%expr conv (x, y) = (Tick0.Field.of_string x, Tick0.Field.of_string y) in
+  Array.map
+    (fun (g1, g2, g3, g4) -> (conv g1, conv g2, conv g3, conv g4))
     [%e arr]
-;;
 
 let params_ast affine_params ~loc =
-  let%expr conv =
-    Tick_backend.Inner_curve.of_affine
-  in
+  let%expr conv = Tick_backend.Inner_curve.of_affine in
   Array.map
     (fun (g1, g2, g3, g4) -> (conv g1, conv g2, conv g3, conv g4))
     [%e affine_params]
-;;
 
 let group_map_params =
   Group_map.Params.create
@@ -135,11 +130,12 @@ let params_structure ~loc =
     let loc = loc
   end) in
   let open E in
-  [%str open Curve_choice
+  [%str
+    open Curve_choice
 
     let affine = [%e affine_params_ast ~loc]
-    let params = [%e params_ast [%expr affine] ~loc]
-  ]
+
+    let params = [%e params_ast [%expr affine] ~loc]]
 
 (* for the reversed chunk with value n, compute its curve value
    start is the starting parameter position of the chunk, based
