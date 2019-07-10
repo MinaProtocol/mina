@@ -26,13 +26,13 @@ Split ledger catchup into 2 phases:
    * requesting a path/list of transitions from peer's history root to the requested hash,
    * requesting a merkle path/list from peer's history root to the requested hash together with their root history transition.
    
-   * The merkle path/list contains a list of *state_body_hash*es. Upon received
-the merkle_path/list, we could verify that the merkle path by first trying
+   * The merkle path/list contains a list of *state_body_hash*es as its
+*proof_elem*s. Upon received the merkle_path/list, we could verify that the merkle path by first trying
 to find the history root in our frontier or root_history and then call
 *Merkle_list.verify* on that merkle path. This would guarantee that the
 peer didn't send us a list of garbage and it also guarantees that the
 order is correct. And we could then reconstruct a list of *state_hash*es
-from the list of *state_body_hash*es. Using this list of *state_hash*es we
+from the list of *state_body_hash*es.[1] Using this list of *state_hash*es we
 can find the missing transitions by repeated searching *state_hash*es until
 we find one (the one we find is the closest ancestor in our transition
 frontier).
@@ -76,3 +76,6 @@ hinder us from scaling up to a more realistic setting.
 ## Prior art
 
 The current implementation is summaried in the `Summary` part.
+
+[1] state_hash = H(previous_state_hash, state_body_hash), thus giving a root
+transition and a list of state_body_hash we can compute a list of state_hash.
