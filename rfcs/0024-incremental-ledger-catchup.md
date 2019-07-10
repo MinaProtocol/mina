@@ -22,7 +22,7 @@ Split ledger catchup into 2 phases:
    * requesting a path/list of transitions from peer's root history to the requested hash,
    * requesting a merkle path/list from peer's root history to the requested hash together with their root history transition.
    
-The merkle path/list contains a list of *state_body_hash*es. Upon received
+   * The merkle path/list contains a list of *state_body_hash*es. Upon received
 the merkle_path/list, we could verify that the merkle path by first trying
 to find the root in our frontier or root_history and then call
 *Merkle_list.verify* on that merkle path. This would guarantee that the
@@ -34,8 +34,24 @@ we find one (the one we find is the closest ancestor in our transition
 frontier).
    
 2) Depending on the size of the list of the missing transitions, spawn one or
-more parallel requests to get the missing transitions from peers.
+more parallel requests to get the missing transitions from peers. We could
+verify the list of transitions that send by peer against the list of
+state_hashes.
+
+For trust system, I would describe different actions for the 2 phases described
+above:
+1) * If a peer isn't able to handle the request, we shouldn't decrease their
+     trust score.
+   * If the peer send us the a merkle path that doesn't pass verification we
+     should flag the peer as **Violated_protocol**.
    
+2) * If a peer isn't able to handle the request, we shouldn't decrease their
+     trust score.
+   * If a peer returns a list of transitions whose state_hashes are different
+     from what we have, we should flag the peer as **Violate_protocol**.
+   * If transitions returned by the peer don't pass verification or their
+     proofs are invalid, we should decrease the peer's trust score accordingly.
+
 ## Drawbacks
 
 The new design has the overhead of first downloading a merkle path. But this
