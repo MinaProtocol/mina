@@ -1,8 +1,12 @@
+## Terminology
+
+history root: the oldest node in root history
+
 ## Summary
 
 The origin transition catchup design has performance issues. In
-current implementation, we would always downloading the a list of transitions
-from requested hash to peer's root (plus the entire root history).
+current implementation, we would always downloading a list of transitions
+from the requested hash to peer's history root.
 The minimum number of transitions that transition catchup would request is
 k + 1 under current implementation. This is not very efficient in a realistic
 setting where k is ~3000. The new design features
@@ -19,12 +23,12 @@ The new design would improve the efficiency of doing ledger catchup.
 Split ledger catchup into 2 phases:
 
 1) Instead of
-   * requesting a path/list of transitions from peer's root history to the requested hash,
-   * requesting a merkle path/list from peer's root history to the requested hash together with their root history transition.
+   * requesting a path/list of transitions from peer's history root to the requested hash,
+   * requesting a merkle path/list from peer's history root to the requested hash together with their root history transition.
    
    * The merkle path/list contains a list of *state_body_hash*es. Upon received
 the merkle_path/list, we could verify that the merkle path by first trying
-to find the root in our frontier or root_history and then call
+to find the history root in our frontier or root_history and then call
 *Merkle_list.verify* on that merkle path. This would guarantee that the
 peer didn't send us a list of garbage and it also guarantees that the
 order is correct. And we could then reconstruct a list of *state_hash*es
