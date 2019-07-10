@@ -160,6 +160,9 @@ jobs:
             - run:
                   name: Build OCaml
                   command: ./scripts/skip_if_only_frontend.sh bash -c 'eval `opam config env` && make build 2>&1 | tee /tmp/artifacts/buildocaml.log'
+                  {%- if profile in medium_curve_profiles %}
+                  no_output_timeout: 20m
+                  {%- endif %}
             - run:
                   name: Build deb Package with keys
                   command: ./scripts/skip_if_only_frontend.sh make deb
@@ -241,6 +244,12 @@ workflows:
             {%- endfor %}
             {%- for profile in test_permutations.keys() | sort %}
             - test--{{profile}}
+            {%- endfor %}
+            {%- for profile in test_medium_curves.keys() | sort %}
+            - test--{{profile}}
+            {%- endfor %}
+            {%- for profile in unit_test_profiles_medium_curves %}
+            - test-unit--{{profile}}
             {%- endfor %}
     daily:
         triggers:
