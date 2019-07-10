@@ -81,7 +81,7 @@ jobs:
 
     build-macos:
        macos:
-           xcode: "10.1.0"
+           xcode: "10.2.1"
        working_directory: /Users/distiller/coda
        environment:
            HOMEBREW_LOGS: /Users/distiller/homebrew.log
@@ -120,6 +120,9 @@ jobs:
            - run:
                  name: Build OCaml
                  command: ./scripts/skip_if_only_frontend.sh bash -c 'eval `opam config env` && make build 2>&1 | tee /tmp/buildocaml.log'
+                 no_output_timeout: 1h
+                 environment: 
+                  DUNE_PROFILE: testnet_postake_medium_curves
            - run:
                  name: Record Constraint System Digests
                  command: ./scripts/skip_if_only_frontend.sh bash -c 'src/_build/default/app/cli/src/coda.exe client constraint-system-digests | tee /tmp/constraint-system-digests.log'
@@ -137,7 +140,7 @@ jobs:
                  command: ./scripts/skip_if_only_frontend.sh bash -c './jfrog rt config --url $ARTIFACTORY_URL --user $ARTIFACTORY_USER --apikey $ARTIFACTORY_API_KEY --interactive=false'
            - run: 
                  name: Release Build to Artifactory
-                 command: ./scripts/skip_if_only_frontend.sh bash -c './jfrog rt u _build/coda-daemon-macos.zip macos-coda/coda-daemon-$CIRCLE_BUILD_NUM.zip --build-name=build-macos --build-number=$CIRCLE_BUILD_NUM'
+                 command: ./scripts/skip_if_only_frontend.sh bash -c './jfrog rt u _build/coda-daemon-macos.zip macos-coda/coda-daemon-$CIRCLE_BRANCH-$CIRCLE_SHA1.zip --build-name=build-macos --build-number=$CIRCLE_BUILD_NUM'
 
     {%- for profile in build_artifact_profiles %}
     build-artifacts--{{profile}}:

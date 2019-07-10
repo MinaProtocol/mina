@@ -238,7 +238,9 @@ let get_status ~flag t =
   let run_snark_worker = Option.is_some (Coda_lib.snark_worker_key t) in
   let propose_pubkeys = Coda_lib.propose_public_keys t in
   let consensus_mechanism = Consensus.name in
-  let consensus_time_now = Consensus.time_hum (Core_kernel.Time.now ()) in
+  let consensus_time_now =
+    Consensus.time_hum (Block_time.now (Coda_lib.config t).time_controller)
+  in
   let consensus_configuration = Consensus.Configuration.t in
   let r = Perf_histograms.report in
   let histograms =
@@ -281,9 +283,7 @@ let get_status ~flag t =
     in
     let num_accounts = Ledger.num_accounts ledger in
     let%bind state = Coda_lib.best_protocol_state t in
-    let state_hash =
-      Protocol_state.hash state |> [%sexp_of: State_hash.t] |> Sexp.to_string
-    in
+    let state_hash = Protocol_state.hash state |> State_hash.to_string in
     let consensus_state = state |> Protocol_state.consensus_state in
     let blockchain_length =
       Length.to_int
