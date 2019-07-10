@@ -225,7 +225,9 @@ let get_status ~flag t =
   let run_snark_worker = Option.is_some (Coda_lib.snark_worker_key t) in
   let propose_pubkeys = Coda_lib.propose_public_keys t in
   let consensus_mechanism = Consensus.name in
-  let consensus_time_now = Consensus.time_hum (Core_kernel.Time.now ()) in
+  let consensus_time_now =
+    Consensus.time_hum (Block_time.now (Coda_lib.config t).time_controller)
+  in
   let consensus_configuration = Consensus.Configuration.t in
   let r = Perf_histograms.report in
   let histograms =
