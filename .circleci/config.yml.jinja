@@ -276,12 +276,12 @@ workflows:
             {%- for profile in build_artifact_profiles %}
             - build-artifacts--{{profile}}
             {%- endfor %}
-            {%- for profile in unit_test_profiles %}
+            {#{%- for profile in unit_test_profiles %}
             - test-unit--{{profile}}
             {%- endfor %}
             {%- for profile in small_curves_tests.keys() | sort %}
             - test--{{profile}}
-            {%- endfor %}
+            {%- endfor %}#}
             {%- for profile in medium_curves_tests.keys() | sort %}
             - test--{{profile}}
             {%- endfor %}
