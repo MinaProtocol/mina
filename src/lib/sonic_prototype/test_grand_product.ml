@@ -7,7 +7,7 @@ open Default_backend.Backend
 let run_well_formed_test a_nums b_nums =
   let x = Fr.random () in
   let alpha = Fr.random () in
-  let d = 110 in (* max degree (largest small_nat + small_list) *)
+  let d = 15 in
   let srs = Srs.create d x alpha in
   let a_coeffs = List.map a_nums ~f:Fr.of_int in
   let b_coeffs = List.map b_nums ~f:Fr.of_int in
@@ -26,25 +26,26 @@ let%test_unit "well_formed_test" =
   let b_nums = [-1; 2; -3; 4; -5] in
   assert (run_well_formed_test a_nums b_nums)
 
-let run_grand_product_test a_deg b_deg a_nums b_nums =
+let run_grand_product_test a_nums b_nums =
   let x = Fr.random () in
   let alpha = Fr.random () in
-  let d = 110 in (* max degree (largest small_nat + small_list) *)
-  let _srs = Srs.create d x alpha in
+  let d = 15 in
+  let srs = Srs.create d x alpha in
   let a_coeffs = List.map a_nums ~f:Fr.of_int in
-  let _poly_a = Fr_laurent.create a_deg a_coeffs in
+  let poly_a = Fr_laurent.create 1 a_coeffs in
   let a_product = List.fold_left ~f:Fr.( * ) ~init:Fr.one a_coeffs in
   let b_coeffs_initial = List.map b_nums ~f:Fr.of_int in
   let b_product = List.fold_left ~f:Fr.( * ) ~init:Fr.one b_coeffs_initial in
   let b_coeffs = b_coeffs_initial @ [Fr.inv b_product; a_product] in
-  let _poly_b = Fr_laurent.create b_deg b_coeffs in
-  true
+  let poly_b = Fr_laurent.create 1 b_coeffs in
+  let commit_a = commit_poly srs srs.d x poly_a in
+  let commit_b = commit_poly srs srs.d x poly_b in
+  let gprod_proof = gprod_p srs commit_a commit_b a_coeffs b_coeffs x in
+  gprod_v srs commit_a commit_b gprod_proof
   
   (* polys with same grand product work, random polys don't *)
 
 let%test_unit "grand_product_test" =
-  let a_deg = 5 in
-  let b_deg = -5 in
   let a_nums = [1; 2; 3; 4; 5] in
-  let b_nums = [-1; 2; -3; 4; -5] in
-  assert (run_grand_product_test a_deg b_deg a_nums b_nums)
+  let b_nums = [-1; 2; -3] in
+  assert (run_grand_product_test a_nums b_nums)

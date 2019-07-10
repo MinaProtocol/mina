@@ -58,9 +58,9 @@ let partial_products lst mul one =
 
 let gprod_p (srs : Srs.t) u v u_coeffs v_coeffs x : Gprod_proof.t =
   let n = List.length u_coeffs in
+  assert ((List.length v_coeffs) = n);
   let u_partial_prods = partial_products u_coeffs Fr.( * ) Fr.one in
   let v_partial_prods = partial_products v_coeffs Fr.( * ) Fr.one in
-  let b = [Fr.one] @ u_partial_prods @ [Fr.one] @ (list_first v_partial_prods ((List.length v_partial_prods) - 1)) in
   let c = u_partial_prods @ [Fr.one] @ v_partial_prods in
   let cn_inv = Fr.inv (List.nth_exn v_partial_prods ((List.length v_partial_prods) - 1)) in
   let a = u_coeffs @ [cn_inv] @ v_coeffs in
@@ -90,8 +90,8 @@ let gprod_p (srs : Srs.t) u v u_coeffs v_coeffs x : Gprod_proof.t =
     match rest with
     | [] -> []
     | hd::tl -> (Fr_laurent.create 0 [hd]) :: gen_r_prime_poly_coeffs tl in
-  let r_prime_poly = Bivariate_fr_laurent.create (-2 * n - 1) (gen_r_prime_poly_coeffs (reverse b)) in
-  let k_poly = Bivariate_fr_laurent.create 0 [Fr_laurent.create 1 (Fr.one :: c)] in
+  let r_prime_poly = Bivariate_fr_laurent.create (-2 * n - 2) (gen_r_prime_poly_coeffs ((reverse c) @ [Fr.one])) in
+  let k_poly = Bivariate_fr_laurent.create 0 [Fr_laurent.create 0 (Fr.one :: Fr.zero :: c)] in
   let t_poly = Bivariate_fr_laurent.((r_poly + s_poly) * r_prime_poly - k_poly) in
 
   let t = commit_poly srs srs.d x (eval_on_y y t_poly) in
@@ -137,19 +137,21 @@ let gprod_v (srs : Srs.t) u v (proof : Gprod_proof.t) =
   let wt = proof.gprod_wt in
   let y = proof.gprod_y in
   let z = proof.gprod_z in
-  let h = List.nth_exn srs.hPositiveX 1 in
+  let h = List.nth_exn srs.hPositiveX 0 in
   let r = Fr.( * ) y va in
   let s = Fr.((z ** (Nat.of_int Int.(n + 2))) + (z ** (Nat.of_int Int.(n + 1))) * y - (z ** (Nat.of_int Int.(2 * n + 2))) * y) in
-  let r_prime = Fr.(vc * (inv z)) in
+  let r_prime = Fr.(vc * (inv z) + (inv z)) in
   let k = Fr.(vk * y + one) in
   let t = Fr.((r + s) * r_prime - k) in
-  (pair a h) = Fq_target.( * )
-    (pair G1.((scale (List.nth_exn srs.gPositiveAlphaX Int.(n + 1)) (Fr.to_bigint cn_inv)) + u) h)
-    (pair v (List.nth_exn srs.hPositiveX (n + 1)))
+  Fq_target.equal
+    (pair a h)
+    (Fq_target.( * )
+      (pair G1.((scale (List.nth_exn srs.gPositiveAlphaX Int.(n + 1)) (Fr.to_bigint cn_inv)) + u) h)
+      (pair v (List.nth_exn srs.hPositiveX (n + 1))))
   && pc_v srs srs.d a (Fr.( * ) y z) (va, wa)
   && pc_v srs srs.d c (Fr.inv z) (vc, wc)
   && pc_v srs srs.d c y (vk, wk)
   && pc_v srs srs.d t_commit z (t, wt)
   && wform_v srs (2 * n + 1) c cw
   && wform_v srs n u uw
-  && wform_v srs n v vw
+  && wform_v srs n v vw 
