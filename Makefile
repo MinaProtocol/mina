@@ -167,6 +167,9 @@ containerstart: git_hooks
 ########################################
 ## Artifacts
 
+publish-macos:
+	@./scripts/publish-macos.sh
+
 deb:
 	$(WRAP) ./scripts/rebuild-deb.sh
 	@mkdir -p /tmp/artifacts
