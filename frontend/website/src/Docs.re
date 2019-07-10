@@ -7,10 +7,10 @@ module Styles = {
     style([
       position(`relative),
       selector(
-        "h1, h2, h3",
+        "h1, h2, h3, h4",
         [
           display(`flex),
-          marginTop(rem(1.)),
+          marginTop(rem(2.)),
           marginBottom(`rem(0.5)),
           hover([selector(".headerlink", [display(`inlineBlock)])]),
         ],
@@ -28,11 +28,19 @@ module Styles = {
           backgroundImage(url("/static/img/link.svg")),
         ],
       ),
-      selector("h1", Style.H1.heroStyles @ [alignItems(`baseline)]),
+      selector(
+        "h1",
+        Style.H1.heroStyles @ [alignItems(`baseline), fontWeight(`normal)],
+      ),
       selector("h2", Style.H2.basicStyles @ [alignItems(`baseline)]),
       selector(
         "h3",
-        Style.H3.basicStyles @ [textAlign(`left), alignItems(`center)],
+        Style.H3.basicStyles
+        @ [textAlign(`left), alignItems(`center), fontWeight(`medium)],
+      ),
+      selector(
+        "h4",
+        Style.H4.basicStyles @ [textAlign(`left), alignItems(`center)],
       ),
       selector("p", Style.Body.basicStyles),
       selector(
@@ -73,6 +81,49 @@ module Styles = {
           ...Style.Link.basicStyles,
         ],
       ),
+      selector(
+        "strong",
+        [fontWeight(`num(600)), color(Style.Colors.metallicBlue)],
+      ),
+      selector(
+        ".admonition",
+        [
+          border(px(1), `solid, `currentColor),
+          borderRadius(px(9)),
+          overflow(`hidden),
+          selector(
+            "p",
+            [margin(`zero), padding2(~v=`rem(0.5), ~h=`rem(1.))],
+          ),
+          selector(".admonition-title", [fontWeight(`num(600))]),
+        ],
+      ),
+      selector(
+        ".admonition.note",
+        [
+          color(Style.Colors.hyperlinkAlpha(0.5)),
+          selector(
+            ".admonition-title",
+            [
+              color(white),
+              backgroundColor(Style.Colors.hyperlinkAlpha(0.5)),
+            ],
+          ),
+        ],
+      ),
+      selector(
+        ".admonition.warning",
+        [
+          color(Style.Colors.rosebud),
+          selector(
+            ".admonition-title",
+            [
+              color(white),
+              backgroundColor(Style.Colors.rosebud),
+            ],
+          ),
+        ],
+      ),
     ]);
 
   let sideNav =
@@ -80,7 +131,10 @@ module Styles = {
       minWidth(rem(15.)),
       selector("ul", [listStyleType(`none)]),
       selector("li > ul", [marginLeft(rem(1.))]),
-      media(Style.MediaQuery.somewhatLarge, [marginTop(rem(2.))]),
+      media(
+        Style.MediaQuery.somewhatLarge,
+        [marginRight(rem(2.)), marginTop(rem(3.))],
+      ),
     ]);
 };
 
@@ -133,7 +187,10 @@ let make = _children => {
           |},
         }
       />
-      <article className=Css.(style([maxWidth(`rem(43.))]))>
+      <article
+        className=Css.(
+          style([maxWidth(`rem(43.)), width(`percent(100.))])
+        )>
         {ReasonReact.string("{{ page.content }}")}
       </article>
     </div>,
