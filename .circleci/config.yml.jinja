@@ -204,7 +204,24 @@ jobs:
                 path: core_dumps
     {%- endfor %}
 
-    {%- for profile in test_permutations.keys() | sort %}
+    {%- for profile in unit_test_profiles_medium_curves %}
+    test-unit--{{profile}}:
+        resource_class: large
+        docker:
+            - image: codaprotocol/coda:toolchain-bc9f6e8cb1f2132cb964b4a3caa3aecee67b1826
+        steps:
+            - checkout
+            - run: ulimit -c unlimited
+            - run: git submodule sync && git submodule update --init --recursive
+            - run:
+                  name: Run unit tests
+                  command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && dune build --profile={{profile}} -j8 && (dune runtest --profile={{profile}} -j8 || (./scripts/link-coredumps.sh && false))'
+                  no_output_timeout: 20m
+            - store_artifacts:
+                path: core_dumps
+    {%- endfor %}
+
+    {%- for profile in small_curves_tests.keys() | sort %}
     test--{{profile}}:
         resource_class: large
         docker:
@@ -212,7 +229,24 @@ jobs:
         steps:
             - checkout
             - run: git submodule sync && git submodule update --init --recursive
-            {%- for test in test_permutations[profile] %}
+            {%- for test in small_curves_tests[profile] %}
+            - run:
+                  name: Running test -- {{profile}}:{{test}}
+                  command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run "{{profile}}:{{test}}"'
+            {%- endfor %}
+            - store_artifacts:
+                  path: test_logs
+    {%- endfor %}
+
+    {%- for profile in medium_curves_tests.keys() | sort %}
+    test--{{profile}}:
+        resource_class: large
+        docker:
+            - image: codaprotocol/coda:toolchain-bc9f6e8cb1f2132cb964b4a3caa3aecee67b1826
+        steps:
+            - checkout
+            - run: git submodule sync && git submodule update --init --recursive
+            {%- for test in medium_curves_tests[profile] %}
             - run:
                   name: Running test -- {{profile}}:{{test}}
                   command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run "{{profile}}:{{test}}"'
@@ -242,10 +276,10 @@ workflows:
             {%- for profile in unit_test_profiles %}
             - test-unit--{{profile}}
             {%- endfor %}
-            {%- for profile in test_permutations.keys() | sort %}
+            {%- for profile in small_curves_tests.keys() | sort %}
             - test--{{profile}}
             {%- endfor %}
-            {%- for profile in test_medium_curves.keys() | sort %}
+            {%- for profile in medium_curves_tests.keys() | sort %}
             - test--{{profile}}
             {%- endfor %}
             {%- for profile in unit_test_profiles_medium_curves %}
@@ -264,6 +298,6 @@ workflows:
           {%- for profile in unit_test_profiles_medium_curves %}
           - test-unit--{{profile}}
           {%- endfor %}
-          {%- for profile in test_medium_curves.keys() | sort %}
+          {%- for profile in medium_curves_tests.keys() | sort %}
           - test--{{profile}}
           {%- endfor %}

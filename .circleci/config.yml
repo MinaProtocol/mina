@@ -348,6 +348,34 @@ jobs:
                   command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && dune build --profile=dev -j8 && (dune runtest --profile=dev -j8 || (./scripts/link-coredumps.sh && false))'
             - store_artifacts:
                 path: core_dumps
+    test-unit--test_postake_snarkless_medium_curves_unit_test:
+        resource_class: large
+        docker:
+            - image: codaprotocol/coda:toolchain-bc9f6e8cb1f2132cb964b4a3caa3aecee67b1826
+        steps:
+            - checkout
+            - run: ulimit -c unlimited
+            - run: git submodule sync && git submodule update --init --recursive
+            - run:
+                  name: Run unit tests
+                  command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && dune build --profile=test_postake_snarkless_medium_curves_unit_test -j8 && (dune runtest --profile=test_postake_snarkless_medium_curves_unit_test -j8 || (./scripts/link-coredumps.sh && false))'
+                  no_output_timeout: 20m
+            - store_artifacts:
+                path: core_dumps
+    test-unit--dev_medium_curves:
+        resource_class: large
+        docker:
+            - image: codaprotocol/coda:toolchain-bc9f6e8cb1f2132cb964b4a3caa3aecee67b1826
+        steps:
+            - checkout
+            - run: ulimit -c unlimited
+            - run: git submodule sync && git submodule update --init --recursive
+            - run:
+                  name: Run unit tests
+                  command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && dune build --profile=dev_medium_curves -j8 && (dune runtest --profile=dev_medium_curves -j8 || (./scripts/link-coredumps.sh && false))'
+                  no_output_timeout: 20m
+            - store_artifacts:
+                path: core_dumps
     test--fake_hash:
         resource_class: large
         docker:
@@ -453,23 +481,6 @@ jobs:
                   command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run "test_postake_holy_grail:coda-long-fork -num-proposers 5"'
             - store_artifacts:
                   path: test_logs
-    test--test_postake_medium_curves:
-        resource_class: large
-        docker:
-            - image: codaprotocol/coda:toolchain-bc9f6e8cb1f2132cb964b4a3caa3aecee67b1826
-        steps:
-            - checkout
-            - run: git submodule sync && git submodule update --init --recursive
-            - run:
-                  name: Running test -- test_postake_medium_curves:full-test
-                  command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run "test_postake_medium_curves:full-test"'
-                  no_output_timeout: 20m
-            - run:
-                  name: Running test -- test_postake_medium_curves:transaction-snark-profiler -k 2
-                  command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run "test_postake_medium_curves:transaction-snark-profiler -k 2"'
-                  no_output_timeout: 20m
-            - store_artifacts:
-                  path: test_logs
     test--test_postake_snarkless:
         resource_class: large
         docker:
@@ -483,21 +494,6 @@ jobs:
             - run:
                   name: Running test -- test_postake_snarkless:transaction-snark-profiler -k 2
                   command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run "test_postake_snarkless:transaction-snark-profiler -k 2"'
-            - store_artifacts:
-                  path: test_logs
-    test--test_postake_snarkless_medium_curves:
-        resource_class: large
-        docker:
-            - image: codaprotocol/coda:toolchain-bc9f6e8cb1f2132cb964b4a3caa3aecee67b1826
-        steps:
-            - checkout
-            - run: git submodule sync && git submodule update --init --recursive
-            - run:
-                  name: Running test -- test_postake_snarkless_medium_curves:full-test
-                  command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run "test_postake_snarkless_medium_curves:full-test"'
-            - run:
-                  name: Running test -- test_postake_snarkless_medium_curves:transaction-snark-profiler -k 2
-                  command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run "test_postake_snarkless_medium_curves:transaction-snark-profiler -k 2"'
             - store_artifacts:
                   path: test_logs
     test--test_postake_split:
@@ -554,6 +550,104 @@ jobs:
                   command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run "test_postake_txns:coda-batch-payment-test"'
             - store_artifacts:
                   path: test_logs
+    test--test_postake_delegation_medium_curves:
+        resource_class: large
+        docker:
+            - image: codaprotocol/coda:toolchain-bc9f6e8cb1f2132cb964b4a3caa3aecee67b1826
+        steps:
+            - checkout
+            - run: git submodule sync && git submodule update --init --recursive
+            - run:
+                  name: Running test -- test_postake_delegation_medium_curves:coda-delegation-test
+                  command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run "test_postake_delegation_medium_curves:coda-delegation-test"'
+            - store_artifacts:
+                  path: test_logs
+    test--test_postake_medium_curves:
+        resource_class: large
+        docker:
+            - image: codaprotocol/coda:toolchain-bc9f6e8cb1f2132cb964b4a3caa3aecee67b1826
+        steps:
+            - checkout
+            - run: git submodule sync && git submodule update --init --recursive
+            - run:
+                  name: Running test -- test_postake_medium_curves:full-test
+                  command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run "test_postake_medium_curves:full-test"'
+                  no_output_timeout: 20m
+            - run:
+                  name: Running test -- test_postake_medium_curves:transaction-snark-profiler -k 2
+                  command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run "test_postake_medium_curves:transaction-snark-profiler -k 2"'
+                  no_output_timeout: 20m
+            - store_artifacts:
+                  path: test_logs
+    test--test_postake_snarkless_medium_curves:
+        resource_class: large
+        docker:
+            - image: codaprotocol/coda:toolchain-bc9f6e8cb1f2132cb964b4a3caa3aecee67b1826
+        steps:
+            - checkout
+            - run: git submodule sync && git submodule update --init --recursive
+            - run:
+                  name: Running test -- test_postake_snarkless_medium_curves:full-test
+                  command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run "test_postake_snarkless_medium_curves:full-test"'
+            - run:
+                  name: Running test -- test_postake_snarkless_medium_curves:transaction-snark-profiler -k 2
+                  command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run "test_postake_snarkless_medium_curves:transaction-snark-profiler -k 2"'
+            - store_artifacts:
+                  path: test_logs
+    test--test_postake_split_medium_curves:
+        resource_class: large
+        docker:
+            - image: codaprotocol/coda:toolchain-bc9f6e8cb1f2132cb964b4a3caa3aecee67b1826
+        steps:
+            - checkout
+            - run: git submodule sync && git submodule update --init --recursive
+            - run:
+                  name: Running test -- test_postake_split_medium_curves:coda-shared-prefix-multiproposer-test -num-proposers 2
+                  command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run "test_postake_split_medium_curves:coda-shared-prefix-multiproposer-test -num-proposers 2"'
+            - store_artifacts:
+                  path: test_logs
+    test--test_postake_split_snarkless_medium_curves:
+        resource_class: large
+        docker:
+            - image: codaprotocol/coda:toolchain-bc9f6e8cb1f2132cb964b4a3caa3aecee67b1826
+        steps:
+            - checkout
+            - run: git submodule sync && git submodule update --init --recursive
+            - run:
+                  name: Running test -- test_postake_split_snarkless_medium_curves:coda-peers-test
+                  command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run "test_postake_split_snarkless_medium_curves:coda-peers-test"'
+            - run:
+                  name: Running test -- test_postake_split_snarkless_medium_curves:coda-transitive-peers-test
+                  command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run "test_postake_split_snarkless_medium_curves:coda-transitive-peers-test"'
+            - run:
+                  name: Running test -- test_postake_split_snarkless_medium_curves:coda-block-production-test
+                  command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run "test_postake_split_snarkless_medium_curves:coda-block-production-test"'
+            - run:
+                  name: Running test -- test_postake_split_snarkless_medium_curves:coda-shared-prefix-test -who-proposes 0
+                  command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run "test_postake_split_snarkless_medium_curves:coda-shared-prefix-test -who-proposes 0"'
+            - run:
+                  name: Running test -- test_postake_split_snarkless_medium_curves:coda-shared-prefix-test -who-proposes 1
+                  command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run "test_postake_split_snarkless_medium_curves:coda-shared-prefix-test -who-proposes 1"'
+            - run:
+                  name: Running test -- test_postake_split_snarkless_medium_curves:coda-restart-node-test
+                  command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run "test_postake_split_snarkless_medium_curves:coda-restart-node-test"'
+            - store_artifacts:
+                  path: test_logs
+    test--test_postake_txns_medium_curves:
+        resource_class: large
+        docker:
+            - image: codaprotocol/coda:toolchain-bc9f6e8cb1f2132cb964b4a3caa3aecee67b1826
+        steps:
+            - checkout
+            - run: git submodule sync && git submodule update --init --recursive
+            - run:
+                  name: Running test -- test_postake_txns_medium_curves:coda-shared-state-test
+                  command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run "test_postake_txns_medium_curves:coda-shared-state-test"'
+            - run:
+                  name: Running test -- test_postake_txns_medium_curves:coda-batch-payment-test
+                  command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run "test_postake_txns_medium_curves:coda-batch-payment-test"'
+            - store_artifacts:
+                  path: test_logs
 
 workflows:
     version: 2
@@ -582,9 +676,7 @@ workflows:
             - test--test_postake_five_even_snarkless
             - test--test_postake_five_even_txns
             - test--test_postake_holy_grail
-            - test--test_postake_medium_curves
             - test--test_postake_snarkless
-            - test--test_postake_snarkless_medium_curves
             - test--test_postake_split
             - test--test_postake_split_snarkless
             - test--test_postake_txns
@@ -594,7 +686,7 @@ workflows:
             - test--test_postake_split_medium_curves
             - test--test_postake_split_snarkless_medium_curves
             - test--test_postake_txns_medium_curves
-            - test-unit--test_postake_snarkless_medium_curves
+            - test-unit--test_postake_snarkless_medium_curves_unit_test
             - test-unit--dev_medium_curves
     daily:
         triggers:
@@ -606,7 +698,7 @@ workflows:
                     - master
                     - release/beta
         jobs:
-          - test-unit--test_postake_snarkless_medium_curves
+          - test-unit--test_postake_snarkless_medium_curves_unit_test
           - test-unit--dev_medium_curves
           - test--test_postake_delegation_medium_curves
           - test--test_postake_medium_curves
