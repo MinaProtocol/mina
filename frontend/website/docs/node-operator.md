@@ -1,21 +1,21 @@
 # Become a Node Operator
 
-Now that we've run through the basic steps to set up our Coda node and sent our first transaction, let's turn our attention to the other ways we can interact with the Coda network - namely, participating in consensus, and helping compress data by generating zk-SNARKs. By operating a node that helps secure the network, you can receive coda for your efforts.
+Now that we've set up our Coda node and sent our first transaction, let's turn our attention to the other ways we can interact with the Coda network - namely, participating in consensus, and helping compress data by generating zk-SNARKs. By operating a node that helps secure the network, you can receive coda for your efforts.
 
 ## Participating in Consensus
 
-The Coda network is secured by [Proof-of-Stake consensus](/glossary/#proof-of-stake). With this model of consensus, you don't need to have complex equipment like in Bitcoin mining. By simply having coda in our wallet, we can choose to either stake it ourselves, or delegate it to another node to have a voice in the network. Let's first see how to stake coda ourselves:
+The Coda network is secured by [Proof-of-Stake consensus](/glossary/#proof-of-stake). With this model of consensus, you don't need to have complex equipment like in Bitcoin mining. By simply having coda in our wallet, we can choose to either stake it ourselves, or delegate it to another node. Let's first see how to stake coda ourselves:
 
 ### Staking coda
 
-Since we have some funds in our wallet from [the previous step](https://www.notion.so/codaprotocol/My-First-Transaction-0304f6d71707419fadf9678318c6107b), we can configure that wallet to stake its coda by issuing the following command, passing in the file path for the associated private key:
+Since we have some funds in our wallet from [the previous step](/my-first-transaction), we can configure that wallet to stake its coda by issuing the following command, passing in the file path for the associated private key:
 
-    $ coda.exe client set-staking -- <private-key-file>
+    $ coda.exe client set-staking -- <private-key-path>
 
 !!! note
     You can provide a list of key files to turn on staking for multiple wallets at the same time
 
-You can check which keys you're currently staking for using the `coda.exe client status` command, checking the `Proposers Running` field:
+We can always check which wallets we're currently staking with, by using the `coda.exe client status` command:
 
     $ coda.exe client status
     
@@ -40,16 +40,32 @@ You can check which keys you're currently staking for using the `coda.exe client
     Consensus Mechanism:                           proof_of_stake
     ...
 
+The `Proposers Running` field in the response above returns the number of accounts currently staking, with the associated key.
+
+!!! warning
+    Keep in mind that if you are staking independently with funds in a wallet, you need to remain connected to the network at all times to be elected as a block producer. If you need to go offline frequently, it may be better to delegate your stake.
+
 ### Delegating coda
 
-To delegate your stake, instead of running your own staking node, you can send a transaction that will delegate your stake to another node:
+Delegating coda is an alternative option to staking it directly, with the benefit of not having to remain connected to the network at all times. However, keep in mind that:
+
+- you will need to pay a small transaction fee to make a delegate change, as this change is issued as a transaction recorded on the blockchain
+- the delegate staking for you may choose to charge you a commission for providing the staking service
+
+To delegate your stake, instead of running your own staking node, run this command:
 
     $ coda.exe client delegate-stake \
         -delegate <public-key> \
         -privkey-path <file> \
         -fee <fee>
 
-Uses for this:
+The fields in this command:
+
+- The `delegate` flag requires the public key of the delegate you've chosen
+- `privkey-path` is the file path to your private key with the funds that you wish to delegate
+- `fee` is the transaction fee to record your transaction on the blockchain
+
+Delegating your stake might be useful if you're interested in:
 
 - Running your own staking node that uses funds from a "cold wallet"
 - Delegating to a "staking pool" which will provide token payouts periodically
@@ -57,7 +73,7 @@ Uses for this:
 !!! note
     There is a waiting period of a day before this change will come into effect to prevent abuse of the network
 
-## Compressing data in the Coda network
+## Compressing data in the Coda network 
 
 In addition to participating in consensus, Coda nodes can also help compress data in the network by generating cryptographic proofs (zk-SNARKs).
 

@@ -8,7 +8,7 @@ Coda is a cryptocurrency protocol that leverages zk-SNARKs to compress the block
 
 Check out this short video explaining how the Coda protocol works in detail:
 
-<iframe width="560" height="315" src="https://www.youtube.com/embed/eWVGATxEB6M" frameborder="0" allow="accelerometer; autoplay; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
+<iframe width="560" height="315" src="https://www.youtube-nocookie.com/embed/eWVGATxEB6M?start=100" frameborder="0" allow="accelerometer; autoplay; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
 
 ### Try Coda
 
