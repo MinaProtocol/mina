@@ -81,12 +81,11 @@ jobs:
 
     build-macos:
        macos:
-           xcode: "10.1.0"
+           xcode: "10.2.1"
        working_directory: /Users/distiller/coda
        environment:
            HOMEBREW_LOGS: /Users/distiller/homebrew.log
            OPAMYES: 1
-           CODA_DUNE_PROFILE: testnet_postake_medium_curves
        steps:
            - run:
                name: Make /nix paths
@@ -121,6 +120,9 @@ jobs:
            - run:
                  name: Build OCaml
                  command: ./scripts/skip_if_only_frontend.sh bash -c 'eval `opam config env` && make build 2>&1 | tee /tmp/buildocaml.log'
+                 no_output_timeout: 1h
+                 environment: 
+                  DUNE_PROFILE: testnet_postake_medium_curves
            - run:
                  name: Record Constraint System Digests
                  command: ./scripts/skip_if_only_frontend.sh bash -c 'src/_build/default/app/cli/src/coda.exe client constraint-system-digests | tee /tmp/constraint-system-digests.log'
@@ -144,7 +146,7 @@ jobs:
         docker:
             - image: codaprotocol/coda:toolchain-bc9f6e8cb1f2132cb964b4a3caa3aecee67b1826
         environment:
-            CODA_DUNE_PROFILE: testnet_postake
+            DUNE_PROFILE: testnet_postake
         steps:
             - checkout
             - run: mkdir -p /tmp/artifacts
@@ -180,7 +182,7 @@ jobs:
         docker:
             - image: codaprotocol/coda:toolchain-bc9f6e8cb1f2132cb964b4a3caa3aecee67b1826
         environment:
-            CODA_DUNE_PROFILE: testnet_postake_many_proposers
+            DUNE_PROFILE: testnet_postake_many_proposers
         steps:
             - checkout
             - run: mkdir -p /tmp/artifacts
@@ -216,7 +218,7 @@ jobs:
         docker:
             - image: codaprotocol/coda:toolchain-bc9f6e8cb1f2132cb964b4a3caa3aecee67b1826
         environment:
-            CODA_DUNE_PROFILE: testnet_postake_snarkless_fake_hash
+            DUNE_PROFILE: testnet_postake_snarkless_fake_hash
         steps:
             - checkout
             - run: mkdir -p /tmp/artifacts
@@ -252,7 +254,7 @@ jobs:
         docker:
             - image: codaprotocol/coda:toolchain-bc9f6e8cb1f2132cb964b4a3caa3aecee67b1826
         environment:
-            CODA_DUNE_PROFILE: testnet_postake_medium_curves
+            DUNE_PROFILE: testnet_postake_medium_curves
         steps:
             - checkout
             - run: mkdir -p /tmp/artifacts
