@@ -1230,17 +1230,8 @@ module Mutations = struct
               in
               pk :: acc )
         in
-        let kps =
-          List.filter_map pks ~f:(fun pk ->
-              let open Option.Let_syntax in
-              let%map kps =
-                Coda_lib.wallets coda |> Secrets.Wallets.find ~needle:pk
-              in
-              (kps, pk) )
-        in
         let old_propose_keys = Coda_lib.propose_public_keys coda in
-        Coda_lib.replace_propose_keypairs coda
-          (Keypair.And_compressed_pk.Set.of_list kps) ;
+        ignore @@ Coda_commands.replace_proposers coda pks ;
         Public_key.Compressed.Set.to_list old_propose_keys )
 
   let commands =
