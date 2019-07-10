@@ -484,13 +484,13 @@ let run ~logger ~prover ~verifier ~trust_system ~get_completed_work
                       ~f:check_for_proposal
                     |> ignore
                 | `Propose (time, keypair, data) ->
-                    let schedled_time = time_of_ms time in
-                    Singleton_scheduler.schedule scheduler schedled_time
+                    let scheduled_time = time_of_ms time in
+                    Singleton_scheduler.schedule scheduler scheduled_time
                       ~f:(fun () ->
                         ignore
                           (Interruptible.finally
                              (Singleton_supervisor.dispatch proposal_supervisor
-                                (keypair, schedled_time, data))
+                                (keypair, scheduled_time, data))
                              ~f:check_for_proposal) ) ) )
       in
       (* Schedule to wake up immediately on the next tick of the proposer
