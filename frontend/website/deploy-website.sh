@@ -29,8 +29,11 @@ if [[ "$1" == "prod" ]]; then
   fi
   BUCKET="s3://website-codaprotocol/website"
   echo "*** Deploying to $BUCKET"
-  cp -r site/static deploy/cdn/
+  mkdir -p deploy/cdn
+  cp -r site/static deploy/cdn/static
+  pushd deploy/cdn > /dev/null
   aws s3 sync . "$BUCKET"
+  popd > /dev/null
 fi
 
 # Deploy firebase
@@ -61,7 +64,7 @@ else
 fi
 
 if [[ "$CI" = "no" ]]; then
-  read -p "You are deploying to $1. ARE YOU SURE? [y/N]" -n 1 -r
+  read -p "You are deploying to $1 ($TARGET). ARE YOU SURE? [y/N]" -n 1 -r
   echo
   if [[ ! $REPLY =~ ^[Yy]$ ]]; then
     echo "Canceled deployment"
@@ -75,9 +78,9 @@ if [[ "$CI" == "yes" ]]; then
   if [[ -z "$FIREBASE_TOKEN" || "$FIREBASE_TOKEN" == "" ]]; then
     echo "Skipping deployment as you don't have the creds to see our token!"
   else
-    npx firebase --token "$FIREBASE_TOKEN" --project $TARGET deploy
+    npx firebase-tools --token "$FIREBASE_TOKEN" --project $TARGET deploy
   fi
 else
-  npx firebase --project $TARGET deploy
+  npx firebase-tools --project $TARGET deploy
 fi
 
