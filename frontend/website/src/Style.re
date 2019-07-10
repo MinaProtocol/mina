@@ -46,9 +46,19 @@ module Colors = {
   let tealAlpha = a => `rgba((71, 130, 160, a));
 
   let rosebud = `rgb((163, 83, 111));
-
+  let rosebudAlpha = a => `rgba((163, 83, 111, a));
+  
   let blueBlue = `rgb((42, 81, 224));
   let midnight = `rgb((31, 45, 61));
+
+  let india = `rgb((242, 183, 5));
+  let indiaAlpha = a => `rgba((242, 183, 5, a));
+
+  let amber = `rgb((242, 149, 68));
+  let amberAlpha = a => `rgba((242, 149, 68, a));
+
+  let marine = `rgb((51, 104, 151));
+  let marineAlpha = a => `rgba((51, 104, 151, a));
 };
 
 module Typeface = {

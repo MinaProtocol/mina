@@ -101,12 +101,12 @@ module Styles = {
       selector(
         ".admonition.note",
         [
-          color(Style.Colors.hyperlinkAlpha(0.5)),
+          color(Style.Colors.marineAlpha(0.8)),
           selector(
             ".admonition-title",
             [
               color(white),
-              backgroundColor(Style.Colors.hyperlinkAlpha(0.5)),
+              backgroundColor(Style.Colors.marineAlpha(0.8)),
             ],
           ),
         ],
@@ -114,12 +114,12 @@ module Styles = {
       selector(
         ".admonition.warning",
         [
-          color(Style.Colors.rosebud),
+          color(Style.Colors.rosebudAlpha(0.8)),
           selector(
             ".admonition-title",
             [
               color(white),
-              backgroundColor(Style.Colors.rosebud),
+              backgroundColor(Style.Colors.rosebudAlpha(0.8)),
             ],
           ),
         ],

@@ -1,7 +1,7 @@
 # CLI Reference
 
 !!! warning
-    🏗️ Coda APIs are still under construction, so these commands may change
+    Coda APIs are still under construction, so these commands may change
 
 $ coda.exe -help
     Coda

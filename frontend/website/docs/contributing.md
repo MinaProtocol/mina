@@ -14,7 +14,7 @@ Specifically, we will need help in the form of reporting bugs, validating econom
 
 ## Developers
 
-See the [Developers](/developers/) section for details on how to contribute code to the Coda protocol.
+See the [Developers](../developers/) section for details on how to contribute code to the Coda protocol.
 
 Coda is entirely open source, and the code is distributed under the terms of the [Apache License 2.0](https://github.com/CodaProtocol/coda/blob/master/LICENSE).
 
@@ -24,6 +24,6 @@ There are also a [limited set of grants]() for projects related to Coda's develo
 
 ## Reporting Issues
 
-If you notice any [Code of Conduct](/code-of-conduct) violations, please follow the [Reporting Guidelines](/reporting-guidelines) to file a report and alert the community to any bad behavior.
+If you notice any [Code of Conduct](../code-of-conduct) violations, please follow the [Reporting Guidelines](../reporting-guidelines) to file a report and alert the community to any bad behavior.
 
 If you encounter any critical bugs or vulnerabilities in the protocol, please report them to security@codaprotocol.com. For minor bugs and issues, please create a issue on Github.

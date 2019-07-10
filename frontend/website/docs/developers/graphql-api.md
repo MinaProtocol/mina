@@ -1,7 +1,7 @@
 # GraphQL API
 
 !!! warning
-    🏗️ Coda APIs are still under construction, so these endpoints may change
+    Coda APIs are still under construction, so these endpoints may change
 
 ### Basic setup:
 
