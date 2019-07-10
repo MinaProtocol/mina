@@ -22,19 +22,19 @@ Split ledger catchup into 2 phases:
    * requesting a path/list of transitions from peer's root history to the requested hash,
    * requesting a merkle path/list from peer's root history to the requested hash together with their root history transition.
    
-   The merkle path/list contains a list of *state_body_hash*es. Upon received
-   the merkle_path/list, we could verify that the merkle path by first trying
-   to find the root in our frontier or root_history and then call
-   *Merkle_list.verify* on that merkle path. This would guarantee that the
-   peer didn't send us a list of garbage and it also guarantees that the
-   order is correct. And we could then reconstruct a list of *state_hash*es
-   from the list of *state_body_hash*es. Using this list of *state_hash*es we
-   can find the missing transitions by repeated searching *state_hash*es until
-   we find one (the one we find is the closest ancestor in our transition
-   frontier).
+The merkle path/list contains a list of *state_body_hash*es. Upon received
+the merkle_path/list, we could verify that the merkle path by first trying
+to find the root in our frontier or root_history and then call
+*Merkle_list.verify* on that merkle path. This would guarantee that the
+peer didn't send us a list of garbage and it also guarantees that the
+order is correct. And we could then reconstruct a list of *state_hash*es
+from the list of *state_body_hash*es. Using this list of *state_hash*es we
+can find the missing transitions by repeated searching *state_hash*es until
+we find one (the one we find is the closest ancestor in our transition
+frontier).
    
 2) Depending on the size of the list of the missing transitions, spawn one or
-   more parallel requests to get the missing transitions from peers.
+more parallel requests to get the missing transitions from peers.
    
 ## Drawbacks
 
