@@ -140,7 +140,7 @@ jobs:
                  command: ./scripts/skip_if_only_frontend.sh bash -c './jfrog rt config --url $ARTIFACTORY_URL --user $ARTIFACTORY_USER --apikey $ARTIFACTORY_API_KEY --interactive=false'
            - run: 
                  name: Release Build to Artifactory
-                 command: ./scripts/skip_if_only_frontend.sh bash -c './jfrog rt u _build/coda-daemon-macos.zip macos-coda/coda-daemon-$CIRCLE_BRANCH-$CIRCLE_SHA1.zip --build-name=build-macos --build-number=$CIRCLE_BUILD_NUM'
+                 command: ./scripts/skip_if_only_frontend.sh bash -c './jfrog rt u _build/coda-daemon-macos.zip macos-coda/coda-daemon-$($CIRCLE_BRANCH | sed 's!/!-!')-$CIRCLE_SHA1.zip --build-name=build-macos --build-number=$CIRCLE_BUILD_NUM'
     build-artifacts--testnet_postake:
         resource_class: large
         docker:
