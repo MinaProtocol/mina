@@ -42,8 +42,8 @@ let run_grand_product_test a_nums b_nums =
   let commit_b = commit_poly srs srs.d x poly_b in
   let gprod_proof = gprod_p srs commit_a commit_b a_coeffs b_coeffs x in
   gprod_v srs commit_a commit_b gprod_proof
-  
-  (* polys with same grand product work, random polys don't *)
+
+(* polys with same grand product work, random polys don't *)
 
 let%test_unit "grand_product_test" =
   let a_nums = [1; 2; 3; 4; 5] in

@@ -3,16 +3,12 @@ open Snarkette
 open Default_backend.Backend
 
 let rec list_first l n =
-  if n = 0 then [] else
-  match l with
-  | [] -> []
-  | hd::tl -> hd :: list_first tl (n - 1)
+  if n = 0 then []
+  else match l with [] -> [] | hd :: tl -> hd :: list_first tl (n - 1)
 
 let rec list_except_first l n =
-  if n = 0 then l else
-  match l with
-  | [] -> []
-  | _::tl -> list_except_first tl (n - 1)
+  if n = 0 then l
+  else match l with [] -> [] | _ :: tl -> list_except_first tl (n - 1)
 
 let reverse = List.fold_left ~init:[] ~f:(fun lst x -> x :: lst)
 

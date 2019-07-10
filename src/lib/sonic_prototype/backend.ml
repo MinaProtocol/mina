@@ -38,9 +38,9 @@ module type Backend_intf = sig
 
   module Pairing :
     Pairing.S
-    with module G1 := G1
-     and module G2 := G2
-     and module Fq_target := Fq_target
+      with module G1 := G1
+       and module G2 := G2
+       and module Fq_target := Fq_target
 
   module Fr_laurent : Laurent with type field := Fr.t and type nat := N.t
 

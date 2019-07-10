@@ -20,33 +20,47 @@ module Srs = struct
     let g2 = G2.one in
     { d
     ; gNegativeX=
-        List.map (List.range 1 (d + 1)) ~f:(fun i ->
-            G1.scale g1 (Fr.to_bigint (Fr.( ** ) xInv (N.of_int i))) )
+        List.map
+          (List.range 1 (d + 1))
+          ~f:(fun i ->
+            G1.scale g1 (Fr.to_bigint (Fr.( ** ) xInv (N.of_int i))))
     ; gPositiveX=
-        List.map (List.range 0 (d + 1)) ~f:(fun i ->
-            G1.scale g1 (Fr.to_bigint (Fr.( ** ) x (N.of_int i))) )
+        List.map
+          (List.range 0 (d + 1))
+          ~f:(fun i -> G1.scale g1 (Fr.to_bigint (Fr.( ** ) x (N.of_int i))))
     ; hNegativeX=
-        List.map (List.range 1 (d + 1)) ~f:(fun i ->
-            G2.scale g2 (Fr.to_bigint (Fr.( ** ) xInv (N.of_int i))) )
+        List.map
+          (List.range 1 (d + 1))
+          ~f:(fun i ->
+            G2.scale g2 (Fr.to_bigint (Fr.( ** ) xInv (N.of_int i))))
     ; hPositiveX=
-        List.map (List.range 0 (d + 1)) ~f:(fun i ->
-            G2.scale g2 (Fr.to_bigint (Fr.( ** ) x (N.of_int i))) )
+        List.map
+          (List.range 0 (d + 1))
+          ~f:(fun i -> G2.scale g2 (Fr.to_bigint (Fr.( ** ) x (N.of_int i))))
     ; gNegativeAlphaX=
-        List.map (List.range 1 (d + 1)) ~f:(fun i ->
+        List.map
+          (List.range 1 (d + 1))
+          ~f:(fun i ->
             G1.scale g1
-              (Fr.to_bigint (Fr.( * ) alpha (Fr.( ** ) xInv (N.of_int i)))) )
+              (Fr.to_bigint (Fr.( * ) alpha (Fr.( ** ) xInv (N.of_int i)))))
     ; gPositiveAlphaX=
-        List.map (List.range 0 (d + 1)) ~f:(fun i ->
+        List.map
+          (List.range 0 (d + 1))
+          ~f:(fun i ->
             G1.scale g1
-              (Fr.to_bigint (Fr.( * ) alpha (Fr.( ** ) x (N.of_int i)))) )
+              (Fr.to_bigint (Fr.( * ) alpha (Fr.( ** ) x (N.of_int i)))))
     ; hNegativeAlphaX=
-        List.map (List.range 1 (d + 1)) ~f:(fun i ->
+        List.map
+          (List.range 1 (d + 1))
+          ~f:(fun i ->
             G2.scale g2
-              (Fr.to_bigint (Fr.( * ) alpha (Fr.( ** ) xInv (N.of_int i)))) )
+              (Fr.to_bigint (Fr.( * ) alpha (Fr.( ** ) xInv (N.of_int i)))))
     ; hPositiveAlphaX=
-        List.map (List.range 0 (d + 1)) ~f:(fun i ->
+        List.map
+          (List.range 0 (d + 1))
+          ~f:(fun i ->
             G2.scale g2
-              (Fr.to_bigint (Fr.( * ) alpha (Fr.( ** ) x (N.of_int i)))) )
+              (Fr.to_bigint (Fr.( * ) alpha (Fr.( ** ) x (N.of_int i)))))
     ; srsPairing= Pairing.reduced_pairing g1 (G2.scale g2 (Fr.to_bigint alpha))
     }
 end

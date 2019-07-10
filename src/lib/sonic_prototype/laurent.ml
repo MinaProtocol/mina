@@ -129,8 +129,8 @@ end)
           else create starting_degree coeffs
     in
     let trimmed_coeffs = remove_zeros_from_end coefficients in
-    if trimmed_coeffs = [] then create 0 [] else
-    trim_beginning starting_degree trimmed_coeffs
+    if trimmed_coeffs = [] then create 0 []
+    else trim_beginning starting_degree trimmed_coeffs
 
   let equal poly_a poly_b =
     let rec eqList lst_a lst_b =
@@ -254,7 +254,8 @@ end)
                   | _, [] ->
                       x
                   | x_hd :: x_tl, y_hd :: y_tl ->
-                      F.( - ) x_hd (F.( * ) fac y_hd) :: subtract_multiple x_tl y_tl
+                      F.( - ) x_hd (F.( * ) fac y_hd)
+                      :: subtract_multiple x_tl y_tl
                 in
                 let reduced =
                   create Int.(deg_a + 1) (subtract_multiple a_tl b_tl)
