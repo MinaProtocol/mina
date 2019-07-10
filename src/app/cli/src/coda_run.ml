@@ -84,8 +84,7 @@ let log_shutdown ~conf_dir ~top_logger coda_ref =
           (Visualization_message.bootstrap "transition frontier") )
 
 (* TODO: handle participation_status more appropriately than doing participate_exn *)
-let setup_local_server ?(client_whitelist = []) ?rest_server_port ~coda
-    ~client_port () =
+let setup_local_server ?(client_whitelist = []) ?rest_server_port coda =
   let client_whitelist =
     Unix.Inet_addr.Set.of_list (Unix.Inet_addr.localhost :: client_whitelist)
   in
@@ -235,7 +234,8 @@ let setup_local_server ?(client_whitelist = []) ?rest_server_port ~coda
                     >>| lift )) )
       |> ignore ) ;
   let where_to_listen =
-    Tcp.Where_to_listen.bind_to All_addresses (On_port client_port)
+    Tcp.Where_to_listen.bind_to All_addresses
+      (On_port (Coda_lib.client_port coda))
   in
   trace_task "client RPC handling" (fun () ->
       Tcp.Server.create
@@ -267,32 +267,6 @@ let setup_local_server ?(client_whitelist = []) ?rest_server_port ~coda
                       "%s" (Exn.to_string_mach exn) ;
                     Deferred.unit )) ) )
   |> ignore
-
-let create_snark_worker ~logger ?(shutdown_on_disconnect = true) client_port =
-  let%map p =
-    let our_binary = Sys.executable_name in
-    Process.create_exn () ~prog:our_binary
-      ~args:
-        ( "internal" :: Snark_worker.Intf.command_name
-        :: Snark_worker.arguments
-             ~daemon_address:
-               (Host_and_port.create ~host:"127.0.0.1" ~port:client_port)
-             ~shutdown_on_disconnect )
-  in
-  Logger.trace logger
-    !"Node created snark worker %i"
-    ~module_:__MODULE__ ~location:__LOC__
-    (Pid.to_int @@ Process.pid p) ;
-  (* We want these to be printfs so we don't double encode our logs here *)
-  Pipe.iter_without_pushback
-    (Reader.pipe (Process.stdout p))
-    ~f:(fun s -> printf "%s" s)
-  |> don't_wait_for ;
-  Pipe.iter_without_pushback
-    (Reader.pipe (Process.stderr p))
-    ~f:(fun s -> printf "%s" s)
-  |> don't_wait_for ;
-  p
 
 let handle_crash e =
   Core.eprintf

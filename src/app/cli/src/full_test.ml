@@ -77,6 +77,9 @@ let run_test () : unit Deferred.t =
           (Public_key.Compressed.Set.singleton
              (Public_key.compress keypair.public_key))
       in
+      let discovery_port = 8001 in
+      let communication_port = 8000 in
+      let client_port = 8123 in
       let net_config =
         Coda_networking.Config.
           { logger
@@ -92,8 +95,9 @@ let run_test () : unit Deferred.t =
               ; addrs_and_ports=
                   { external_ip= Unix.Inet_addr.localhost
                   ; bind_ip= Unix.Inet_addr.localhost
-                  ; discovery_port= 8001
-                  ; communication_port= 8000 }
+                  ; discovery_port
+                  ; communication_port
+                  ; client_port }
               ; trust_system
               ; max_concurrent_connections= Some 10 } }
       in
@@ -109,8 +113,12 @@ let run_test () : unit Deferred.t =
              ~work_selection_method:
                (module Work_selector.Selection_methods.Sequence)
              ~initial_propose_keypairs:(Keypair.Set.singleton keypair)
-             ~snark_worker_key:
-               (Public_key.compress largest_account_keypair.public_key)
+             ~snark_worker_config:
+               Coda_lib.Config.Snark_worker_config.
+                 { initial_snark_worker_key=
+                     Some
+                       (Public_key.compress largest_account_keypair.public_key)
+                 ; shutdown_on_disconnect= true }
              ~snark_pool_disk_location:(temp_conf_dir ^/ "snark_pool")
              ~wallets_disk_location:(temp_conf_dir ^/ "wallets")
              ~time_controller ~receipt_chain_database
@@ -160,11 +168,7 @@ let run_test () : unit Deferred.t =
             failwith
               (sprintf !"Invalid Account: %{sexp: Public_key.Compressed.t}" pk)
       in
-      let client_port = 8123 in
-      Coda_run.setup_local_server ~client_port ~coda () ;
-      let%bind (_ : Process.t) =
-        Coda_run.create_snark_worker ~logger client_port
-      in
+      Coda_run.setup_local_server coda ;
       (* Let the system settle *)
       let%bind () = Async.after (Time.Span.of_ms 100.) in
       (* No proof emitted by the parallel scan at the begining *)

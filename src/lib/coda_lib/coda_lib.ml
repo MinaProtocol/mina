@@ -2,7 +2,7 @@
 "../../config.mlh"]
 
 open Core_kernel
-open Async_kernel
+open Async
 open Coda_base
 open Coda_transition
 open Pipe_lib
@@ -34,6 +34,12 @@ type pipes =
       (External_transition.t Envelope.Incoming.t * Block_time.t) Pipe.Writer.t
   }
 
+(* A way to run a single snark worker for a daemon in a lazy manner. Evaluating
+   this lazy value will run the snark worker process. A snark work is
+   assigned to a public key. This public key can change throughout the entire time
+   the daemon is running *)
+type snark_worker_process = Public_key.Compressed.t option ref Lazy.t
+
 type t =
   { config: Config.t
   ; processes: processes
@@ -44,7 +50,7 @@ type t =
       (Agent.read_write Agent.flag, Keypair.And_compressed_pk.Set.t) Agent.t
   ; mutable seen_jobs: Work_selector.State.t
   ; subscriptions: Coda_subscriptions.t
-  ; mutable snark_worker_key: Public_key.Compressed.t option }
+  ; snark_worker_process: snark_worker_process }
 [@@deriving fields]
 
 let subscription t = t.subscriptions
@@ -56,14 +62,69 @@ let peek_frontier frontier_broadcast_pipe =
          (Error.of_string
             "Cannot retrieve transition frontier now. Bootstrapping right now.")
 
+let client_port t =
+  let {Kademlia.Node_addrs_and_ports.client_port; _} =
+    t.config.net_config.gossip_net_params.addrs_and_ports
+  in
+  client_port
+
 let propose_public_keys t =
   Consensus.Data.Local_state.current_proposers t.config.consensus_local_state
 
 let replace_propose_keypairs t kps = Agent.update t.propose_keypairs kps
 
-let snark_worker_key t = t.snark_worker_key
+let create_snark_worker ~logger ?(shutdown_on_disconnect = true) client_port =
+  let%bind p =
+    let our_binary = Sys.executable_name in
+    Process.create_exn () ~prog:our_binary
+      ~args:
+        ( "internal" :: Snark_worker.Intf.command_name
+        :: Snark_worker.arguments
+             ~daemon_address:
+               (Host_and_port.create ~host:"127.0.0.1" ~port:client_port)
+             ~shutdown_on_disconnect )
+  in
+  don't_wait_for
+    ( match%bind Process.wait p with
+    | Ok () ->
+        Core.printf
+          "Snark worker process died normally, so the daemon will die as well" ;
+        exit 0
+    | Error (`Exit_non_zero non_zero_error) ->
+        Core.printf
+          !"Snark worker process died with a nonzero error %i"
+          non_zero_error ;
+        exit non_zero_error
+    | Error (`Signal signal) ->
+        Core.printf
+          !"Snark worker died with signal %{sexp:Signal.t}. Aborting daemon"
+          signal ;
+        exit 0 ) ;
+  let logger = Logger.extend logger [("process", `String "Snark Worker")] in
+  Logger.trace logger
+    !"Node created snark worker %i"
+    ~module_:__MODULE__ ~location:__LOC__
+    (Pid.to_int @@ Process.pid p) ;
+  (* We want these to be printfs so we don't double encode our logs here *)
+  Pipe.iter_without_pushback
+    (Async.Reader.pipe (Process.stdout p))
+    ~f:(fun s -> printf "%s" s)
+  |> don't_wait_for ;
+  Pipe.iter_without_pushback
+    (Async.Reader.pipe (Process.stderr p))
+    ~f:(fun s -> printf "%s" s)
+  |> don't_wait_for ;
+  Deferred.unit
 
-let replace_snark_worker_key t key = t.snark_worker_key <- key
+let snark_worker_key t =
+  if Lazy.is_val t.snark_worker_process then
+    !(Lazy.force t.snark_worker_process)
+  else None
+
+let replace_snark_worker_key t new_key =
+  if Option.is_some new_key || Lazy.is_val t.snark_worker_process then
+    Lazy.force t.snark_worker_process := new_key
+  else ()
 
 let best_tip_opt t =
   let open Option.Let_syntax in
@@ -588,6 +649,16 @@ let create (config : Config.t) =
               ~external_transition_database:config.external_transition_database
               ~transition_frontier:frontier_broadcast_pipe_r
           in
+          let snark_worker_process =
+            Lazy.from_fun
+            @@ fun () ->
+            create_snark_worker ~logger:config.logger
+              config.net_config.gossip_net_params.addrs_and_ports.client_port
+            |> don't_wait_for ;
+            ref config.snark_worker_config.initial_snark_worker_key
+          in
+          Option.iter config.snark_worker_config.initial_snark_worker_key
+            ~f:(fun _key -> ignore @@ Lazy.force snark_worker_process) ;
           return
             { config
             ; processes= {prover; verifier}
@@ -606,4 +677,4 @@ let create (config : Config.t) =
             ; propose_keypairs
             ; seen_jobs= Work_selector.State.init
             ; subscriptions
-            ; snark_worker_key= config.snark_worker_key } ) )
+            ; snark_worker_process } ) )

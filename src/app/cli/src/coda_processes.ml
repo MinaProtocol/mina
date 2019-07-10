@@ -7,14 +7,18 @@ open Async
 let init () = Parallel.init_master ()
 
 let net_configs n =
-  let external_ports = List.init n ~f:(fun i -> 23000 + (i * 2)) in
-  let discovery_ports = List.init n ~f:(fun i -> 23000 + 1 + (i * 2)) in
   let ips = List.init n ~f:(fun _i -> Unix.Inet_addr.of_string "127.0.0.1") in
   let addrs_and_ports_list =
-    List.map3_exn external_ports discovery_ports ips
-      ~f:(fun communication_port discovery_port ip ->
+    List.mapi ips ~f:(fun i ip ->
+        let communication_port = 23000 + (i * 2) in
+        let discovery_port = 23000 + 1 + (i * 2) in
+        let client_port = 20000 + i in
         Kademlia.Node_addrs_and_ports.
-          {external_ip= ip; bind_ip= ip; discovery_port; communication_port} )
+          { external_ip= ip
+          ; bind_ip= ip
+          ; discovery_port
+          ; communication_port
+          ; client_port } )
   in
   let all_peers =
     List.map addrs_and_ports_list
@@ -45,12 +49,10 @@ let local_configs ?proposal_interval ?(proposers = Fn.const None) n
           Option.bind snark_worker_public_keys ~f:(fun keys ->
               List.nth_exn keys i )
         in
-        let client_port = 20000 + i in
         Coda_process.local_config ?proposal_interval ~addrs_and_ports ~peers
-          ~client_port ~snark_worker_key:public_key ~program_dir
-          ~acceptable_delay ~proposer:(proposers i) ~work_selection_method
-          ~trace_dir ~offset:(Lazy.force offset) ~max_concurrent_connections ()
-    )
+          ~snark_worker_key:public_key ~program_dir ~acceptable_delay
+          ~proposer:(proposers i) ~work_selection_method ~trace_dir
+          ~offset:(Lazy.force offset) ~max_concurrent_connections () )
   in
   configs
 

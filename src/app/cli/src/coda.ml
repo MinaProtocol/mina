@@ -168,11 +168,8 @@ let daemon logger =
        Parallel.init_master () ;
        let monitor = Async.Monitor.create ~name:"coda" () in
        let module Coda_initialization = struct
-         type ('a, 'b, 'c, 'd, 'e) t =
-           { coda: 'a
-           ; client_whitelist: 'b
-           ; rest_server_port: 'c
-           ; client_port: 'd }
+         type ('a, 'b, 'c) t =
+           {coda: 'a; client_whitelist: 'b; rest_server_port: 'c}
        end in
        let coda_initialization_deferred () =
          let%bind config =
@@ -301,7 +298,8 @@ let daemon logger =
            { external_ip
            ; bind_ip
            ; discovery_port
-           ; communication_port= external_port }
+           ; communication_port= external_port
+           ; client_port }
          in
          let wallets_disk_location = conf_dir ^/ "wallets" in
          (* HACK: Until we can properly change propose keys at runtime we'll
@@ -440,7 +438,10 @@ let daemon logger =
                 ~work_selection_method:
                   (Cli_lib.Arg_type.work_selection_method_to_module
                      work_selection_method)
-                ?snark_worker_key:run_snark_worker_flag
+                ~snark_worker_config:
+                  { Coda_lib.Config.Snark_worker_config.initial_snark_worker_key=
+                      run_snark_worker_flag
+                  ; shutdown_on_disconnect= true }
                 ~snark_pool_disk_location:(conf_dir ^/ "snark_pool")
                 ~wallets_disk_location:(conf_dir ^/ "wallets")
                 ~ledger_db_location:(conf_dir ^/ "ledger_db")
@@ -449,20 +450,15 @@ let daemon logger =
                 ~initial_propose_keypairs ~monitor ~consensus_local_state
                 ~transaction_database ~external_transition_database ())
          in
-         { Coda_initialization.coda
-         ; client_whitelist
-         ; rest_server_port
-         ; client_port }
+         {Coda_initialization.coda; client_whitelist; rest_server_port}
        in
        (* Breaks a dependency cycle with monitor initilization and coda *)
        let coda_ref : Coda_lib.t option ref = ref None in
        Coda_run.handle_shutdown ~monitor ~conf_dir ~top_logger:logger coda_ref ;
        Async.Scheduler.within' ~monitor
        @@ fun () ->
-       let%bind { Coda_initialization.coda
-                ; client_whitelist
-                ; rest_server_port
-                ; client_port } =
+       let%bind {Coda_initialization.coda; client_whitelist; rest_server_port}
+           =
          coda_initialization_deferred ()
        in
        coda_ref := Some coda ;
@@ -477,11 +473,7 @@ let daemon logger =
        Coda_lib.start coda ;
        let web_service = Web_pipe.get_service () in
        Web_pipe.run_service coda web_service ~conf_dir ~logger ;
-       Coda_run.setup_local_server ?client_whitelist ?rest_server_port ~coda
-         ~client_port () ;
-       let%bind (_ : Process.t) =
-         Coda_run.create_snark_worker ~logger client_port
-       in
+       Coda_run.setup_local_server ?client_whitelist ?rest_server_port coda ;
        Logger.info logger ~module_:__MODULE__ ~location:__LOC__
          "Running coda services" ;
        Async.never ())

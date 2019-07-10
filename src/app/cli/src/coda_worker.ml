@@ -9,7 +9,6 @@ open Pipe_lib
 module Input = struct
   type t =
     { addrs_and_ports: Kademlia.Node_addrs_and_ports.t
-    ; client_port: int
     ; snark_worker_key: Public_key.Compressed.Stable.V1.t option
     ; env: (string * string) list
     ; proposer: int option
@@ -345,7 +344,6 @@ module T = struct
     let init_worker_state
         { addrs_and_ports
         ; proposer
-        ; client_port
         ; snark_worker_key
         ; work_selection_method
         ; conf_dir
@@ -451,7 +449,10 @@ module T = struct
                  ~work_selection_method:
                    (Cli_lib.Arg_type.work_selection_method_to_module
                       work_selection_method)
-                 ?snark_worker_key
+                 ~snark_worker_config:
+                   Coda_lib.Config.Snark_worker_config.
+                     { initial_snark_worker_key= snark_worker_key
+                     ; shutdown_on_disconnect= true }
                  ~snark_pool_disk_location:(conf_dir ^/ "snark_pool")
                  ~wallets_disk_location:(conf_dir ^/ "wallets")
                  ~time_controller ~receipt_chain_database
@@ -465,14 +466,11 @@ module T = struct
           let%map coda =
             with_monitor
               (fun () ->
-                let%bind coda = coda_deferred () in
+                let%map coda = coda_deferred () in
                 coda_ref := Some coda ;
                 Logger.info logger "Setting up snark worker "
                   ~module_:__MODULE__ ~location:__LOC__ ;
-                Coda_run.setup_local_server ~client_port ~coda () ;
-                let%map (_ : Process.t) =
-                  Coda_run.create_snark_worker ~logger client_port
-                in
+                Coda_run.setup_local_server coda ;
                 coda )
               ()
           in
