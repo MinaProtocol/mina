@@ -598,5 +598,9 @@ workflows:
         jobs:
           - test-unit--test_postake_snarkless_medium_curves
           - test-unit--dev_medium_curves
+          - test--test_postake_delegation_medium_curves
           - test--test_postake_medium_curves
           - test--test_postake_snarkless_medium_curves
+          - test--test_postake_split_medium_curves
+          - test--test_postake_split_snarkless_medium_curves
+          - test--test_postake_txns_medium_curves

@@ -64,9 +64,13 @@ test_permutations = {
 test_medium_curves = {
     'test_postake_medium_curves': simple_tests,
     'test_postake_snarkless_medium_curves': simple_tests,
+    'test_postake_split_snarkless_medium_curves': integration_tests,
+    'test_postake_split_medium_curves': ['coda-shared-prefix-multiproposer-test -num-proposers 2'],
+    'test_postake_delegation_medium_curves': ['coda-delegation-test'],
+    'test_postake_txns_medium_curves': ['coda-shared-state-test', 'coda-batch-payment-test'],
 }
 
-medium_curve_profiles = [
+medium_curve_profiles_full = [
     'test_postake_medium_curves',
     'testnet_postake_medium_curves',
     'testnet_postake_many_proposers_medium_curves']
@@ -253,7 +257,7 @@ def render(args):
         unit_test_profiles_medium_curves=unit_test_profiles_medium_curves,
         test_permutations=test_permutations,
         test_medium_curves=test_medium_curves,
-        medium_curve_profiles=medium_curve_profiles
+        medium_curve_profiles=medium_curve_profiles_full
     )
 
     if args.check:
