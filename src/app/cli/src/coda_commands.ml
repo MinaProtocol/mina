@@ -137,6 +137,19 @@ let reset_trust_status t (ip_address : Unix.Inet_addr.Blocking_sexp.t) =
   let trust_system = config.trust_system in
   Trust_system.reset trust_system ip_address
 
+let replace_proposers keys pks =
+  let kps =
+    List.filter_map pks ~f:(fun pk ->
+        let open Option.Let_syntax in
+        let%map kps =
+          Coda_lib.wallets keys |> Secrets.Wallets.find ~needle:pk
+        in
+        (kps, pk) )
+  in
+  Coda_lib.replace_propose_keypairs keys
+    (Keypair.And_compressed_pk.Set.of_list kps) ;
+  kps |> List.map ~f:snd
+
 module Receipt_chain_hash = struct
   (* Receipt.Chain_hash does not have bin_io *)
   include Receipt.Chain_hash.Stable.V1
