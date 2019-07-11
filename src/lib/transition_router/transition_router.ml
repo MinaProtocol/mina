@@ -66,18 +66,23 @@ module Make (Inputs : Inputs_intf) = struct
     |> Transition_frontier.Breadcrumb.transition_with_hash |> With_hash.data
     |> External_transition.Validated.protocol_state
 
-  let peek_exn p = Broadcast_pipe.Reader.peek p |> Option.value_exn
-
   let start_transition_frontier_controller ~logger ~trust_system ~verifier
       ~network ~time_controller ~proposer_transition_reader
       ~verified_transition_writer ~clear_reader ~collected_transitions
-      ~transition_reader frontier =
+      ~transition_reader_ref ~transition_writer_ref ~frontier_w frontier =
     Logger.info logger ~module_:__MODULE__ ~location:__LOC__
       "Starting Transition Frontier Controller phase" ;
+    let ( transition_frontier_controller_reader
+        , transition_frontier_controller_writer ) =
+      create_bufferred_pipe ~name:"transition frontier controller pipe" ()
+    in
+    transition_reader_ref := transition_frontier_controller_reader ;
+    transition_writer_ref := transition_frontier_controller_writer ;
+    Broadcast_pipe.Writer.write frontier_w (Some frontier) |> don't_wait_for ;
     let new_verified_transition_reader =
       Transition_frontier_controller.run ~logger ~trust_system ~verifier
         ~network ~time_controller ~collected_transitions ~frontier
-        ~network_transition_reader:transition_reader
+        ~network_transition_reader:!transition_reader_ref
         ~proposer_transition_reader ~clear_reader
     in
     Strict_pipe.Reader.iter new_verified_transition_reader
@@ -86,24 +91,60 @@ module Make (Inputs : Inputs_intf) = struct
            (Strict_pipe.Writer.write verified_transition_writer))
     |> don't_wait_for
 
+  let start_bootstrap_controller ~logger ~trust_system ~verifier ~network
+      ~time_controller ~proposer_transition_reader ~verified_transition_writer
+      ~clear_reader ~transition_reader_ref ~transition_writer_ref ~ledger_db
+      ~frontier_w frontier =
+    Logger.info logger ~module_:__MODULE__ ~location:__LOC__
+      "Starting Bootstrap Controller phase" ;
+    let bootstrap_controller_reader, bootstrap_controller_writer =
+      create_bufferred_pipe ~name:"bootstrap controller pipe" ()
+    in
+    transition_reader_ref := bootstrap_controller_reader ;
+    transition_writer_ref := bootstrap_controller_writer ;
+    Transition_frontier.close frontier ;
+    Broadcast_pipe.Writer.write frontier_w None |> don't_wait_for ;
+    upon
+      (Bootstrap_controller.run ~logger ~trust_system ~verifier ~network
+         ~ledger_db ~frontier ~transition_reader:!transition_reader_ref)
+      (fun (new_frontier, collected_transitions) ->
+        Strict_pipe.Writer.kill !transition_writer_ref ;
+        start_transition_frontier_controller ~logger ~trust_system ~verifier
+          ~network ~time_controller ~proposer_transition_reader
+          ~verified_transition_writer ~clear_reader ~collected_transitions
+          ~transition_reader_ref ~transition_writer_ref ~frontier_w
+          new_frontier )
+
   let run ~logger ~trust_system ~verifier ~network ~time_controller
       ~frontier_broadcast_pipe:(frontier_r, frontier_w) ~ledger_db
-      ~network_transition_reader ~proposer_transition_reader =
-    let ( transition_frontier_controller_reader
-        , transition_frontier_controller_writer ) =
-      create_bufferred_pipe ~name:"network transitions" ()
-    in
+      ~network_transition_reader ~proposer_transition_reader frontier =
     let clear_reader, clear_writer =
       Strict_pipe.create ~name:"clear" Synchronous
     in
     let verified_transition_reader, verified_transition_writer =
       create_bufferred_pipe ~name:"verified transitions" ()
     in
-    start_transition_frontier_controller ~logger ~trust_system ~verifier
-      ~network ~time_controller
-      ~transition_reader:transition_frontier_controller_reader
-      ~proposer_transition_reader ~verified_transition_writer ~clear_reader
-      ~collected_transitions:[] (peek_exn frontier_r) ;
+    let transition_reader, transition_writer =
+      create_bufferred_pipe ~name:"transition pipe" ()
+    in
+    let transition_reader_ref = ref transition_reader in
+    let transition_writer_ref = ref transition_writer in
+    (* This might be unsafe. Image the following scenario:
+       If a node joined at the very end of the first epoch, and
+       it didn't receive any transition from network for a while.
+       Then it went to the second epoch and it could propose at
+       the second epoch. *)
+    if Consensus.Hooks.is_genesis @@ Coda_base.Block_time.now time_controller
+    then
+      start_transition_frontier_controller ~logger ~trust_system ~verifier
+        ~network ~time_controller ~proposer_transition_reader
+        ~verified_transition_writer ~clear_reader ~collected_transitions:[]
+        ~transition_reader_ref ~transition_writer_ref ~frontier_w frontier
+    else
+      start_bootstrap_controller ~logger ~trust_system ~verifier ~network
+        ~time_controller ~proposer_transition_reader
+        ~verified_transition_writer ~clear_reader ~transition_reader_ref
+        ~transition_writer_ref ~ledger_db ~frontier_w frontier ;
     let ( valid_protocol_state_transition_reader
         , valid_protocol_state_transition_writer ) =
       create_bufferred_pipe ~name:"valid transitions" ()
@@ -111,8 +152,6 @@ module Make (Inputs : Inputs_intf) = struct
     Initial_validator.run ~logger ~trust_system ~verifier
       ~transition_reader:network_transition_reader
       ~valid_transition_writer:valid_protocol_state_transition_writer ;
-    let transition_reader_ref = ref transition_frontier_controller_reader in
-    let transition_writer_ref = ref transition_frontier_controller_writer in
     Strict_pipe.Reader.iter_without_pushback
       valid_protocol_state_transition_reader ~f:(fun transition_with_time ->
         let `Transition enveloped_transition, _ = transition_with_time in
@@ -126,38 +165,12 @@ module Make (Inputs : Inputs_intf) = struct
                 transition
             then (
               Strict_pipe.Writer.kill !transition_writer_ref ;
-              let bootstrap_controller_reader, bootstrap_controller_writer =
-                create_bufferred_pipe ~name:"bootstrap controller reader" ()
-              in
-              transition_reader_ref := bootstrap_controller_reader ;
-              transition_writer_ref := bootstrap_controller_writer ;
               Strict_pipe.Writer.write clear_writer `Clear |> don't_wait_for ;
-              Transition_frontier.close (peek_exn frontier_r) ;
-              Logger.info logger ~module_:__MODULE__ ~location:__LOC__
-                "Starting Bootstrap Controller phase" ;
-              Broadcast_pipe.Writer.write frontier_w None |> don't_wait_for ;
-              upon
-                (Bootstrap_controller.run ~logger ~trust_system ~verifier
-                   ~network ~ledger_db ~frontier
-                   ~transition_reader:!transition_reader_ref)
-                (fun (new_frontier, collected_transitions) ->
-                  Strict_pipe.Writer.kill !transition_writer_ref ;
-                  let ( transition_frontier_controller_reader
-                      , transition_frontier_controller_writer ) =
-                    create_bufferred_pipe
-                      ~name:"transition frontier controller pipe" ()
-                  in
-                  transition_reader_ref :=
-                    transition_frontier_controller_reader ;
-                  transition_writer_ref :=
-                    transition_frontier_controller_writer ;
-                  start_transition_frontier_controller ~logger ~trust_system
-                    ~verifier ~network ~time_controller
-                    ~proposer_transition_reader ~verified_transition_writer
-                    ~clear_reader ~collected_transitions
-                    ~transition_reader:!transition_reader_ref new_frontier ;
-                  Broadcast_pipe.Writer.write frontier_w (Some new_frontier)
-                  |> don't_wait_for ) )
+              start_bootstrap_controller ~logger ~trust_system ~verifier
+                ~network ~time_controller ~proposer_transition_reader
+                ~verified_transition_writer ~clear_reader
+                ~transition_reader_ref ~transition_writer_ref ~ledger_db
+                ~frontier_w frontier )
         | None ->
             () ) ;
         Strict_pipe.Writer.write !transition_writer_ref transition_with_time )

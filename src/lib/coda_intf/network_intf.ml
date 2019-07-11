@@ -78,6 +78,8 @@ module type Network_intf = sig
 
   val initial_peers : t -> Host_and_port.t list
 
+  val peers_by_ip : t -> Unix.Inet_addr.t -> Network_peer.Peer.t list
+
   module Gossip_net : sig
     module Config : Gossip_net.Config_intf
   end
