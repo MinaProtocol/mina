@@ -225,9 +225,24 @@ module Data = struct
     end
 
     let slot_start_time (epoch : t) (slot : Slot.t) =
-      Time.add (start_time epoch)
-        (Time.Span.of_ms
+      Coda_base.Block_time.add (start_time epoch)
+        (Coda_base.Block_time.Span.of_ms
            Int64.Infix.(int64_of_uint32 slot * Constants.Slot.duration_ms))
+
+    (*
+    let slot_end_time (epoch : t) (slot : Slot.t) =
+      Time.add (slot_start_time epoch slot) Constants.Slot.duration
+    *)
+
+    let epoch_and_slot_of_time_exn tm : t * Slot.t =
+      let epoch = of_time_exn tm in
+      let time_since_epoch = Coda_base.Block_time.diff tm (start_time epoch) in
+      let slot =
+        uint32_of_int64
+        @@ Int64.Infix.(
+             Time.Span.to_ms time_since_epoch / Constants.Slot.duration_ms)
+      in
+      (epoch, slot)
 
     let diff_in_slots ((epoch, slot) : t * Slot.t)
         ((epoch', slot') : t * Slot.t) : int64 =
@@ -2239,6 +2254,8 @@ module Hooks = struct
       Get_epoch_ledger.(implement_multi (implementation ~logger ~local_state))
   end
 
+  let is_genesis time = Epoch.(equal (of_time_exn time) zero)
+
   (* Select the correct epoch data to use from a consensus state for a given epoch.
    * The rule for selecting the correct epoch data changes based on whether or not
    * the consensus state we are selecting from is in the epoch we want to select.
@@ -2256,10 +2273,10 @@ module Hooks = struct
     let from_genesis_epoch =
       Length.equal consensus_state.epoch_count Length.zero
     in
-    if in_same_epoch || from_genesis_epoch then
-      Ok consensus_state.staking_epoch_data
-    else if in_next_epoch then
+    if in_next_epoch then
       Ok (Epoch_data.next_to_staking consensus_state.next_epoch_data)
+    else if in_same_epoch || from_genesis_epoch then
+      Ok consensus_state.staking_epoch_data
     else Error ()
 
   let epoch_snapshot_name = function
@@ -2527,12 +2544,24 @@ module Hooks = struct
       |> Option.value
            ~default:
              ( "default case"
-             , "candidate length is longer than existing length"
+             , "candidate virtual min-length is longer than existing virtual \
+                min-length"
              , lazy
-                 (* TODO: THIS IS INSECURE! See #2643.
-                    Undo this hack once the min_epoch_length bug is fixed *)
-                 Length.(
-                   existing.blockchain_length < candidate.blockchain_length) )
+                 (let newest_epoch =
+                    Epoch.max existing.curr_epoch candidate.curr_epoch
+                  in
+                  let virtual_min_length (s : Consensus_state.Value.t) =
+                    if Epoch.(succ s.curr_epoch < newest_epoch) then
+                      Length.zero (* There is a gap of an entire epoch *)
+                    else if Epoch.(succ s.curr_epoch = newest_epoch) then
+                      Length.(
+                        min s.min_epoch_length s.next_epoch_data.epoch_length)
+                      (* Imagine the latest epoch was padded out with zeros to reach the newest_epoch *)
+                    else s.min_epoch_length
+                  in
+                  Length.(
+                    virtual_min_length existing < virtual_min_length candidate))
+             )
     in
     let choice = if Lazy.force should_take then `Take else `Keep in
     log_choice ~precondition_msg ~choice_msg choice ;
@@ -2543,8 +2572,9 @@ module Hooks = struct
     Logger.info logger ~module_:__MODULE__ ~location:__LOC__
       "Checking for next proposal..." ;
     let curr_epoch, curr_slot =
-      Epoch_and_slot.of_time_exn
-        (Time.of_span_since_epoch (Time.Span.of_ms now))
+      Epoch.epoch_and_slot_of_time_exn
+        (Coda_base.Block_time.of_span_since_epoch
+           (Coda_base.Block_time.Span.of_ms now))
     in
     let epoch, slot =
       if
@@ -2862,8 +2892,8 @@ module Hooks = struct
   end
 end
 
-let time_hum (now : Core_kernel.Time.t) =
-  let epoch, slot = Data.Epoch_and_slot.of_time_exn (Time.of_time now) in
+let time_hum (now : Coda_base.Block_time.t) =
+  let epoch, slot = Data.Epoch.epoch_and_slot_of_time_exn now in
   Printf.sprintf "%d:%d" (Data.Epoch.to_int epoch)
     (Data.Epoch.Slot.to_int slot)
 
