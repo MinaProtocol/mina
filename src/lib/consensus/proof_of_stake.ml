@@ -145,16 +145,8 @@ module Data = struct
       var_of_hash_packed hash
   end
 
-  module Proposal_data = struct
-    type t =
-      { stake_proof: Coda_base.Stake_proof.Stable.V1.t
-      ; vrf_result: Random_oracle.Digest.Stable.V1.t }
-
-    let prover_state {stake_proof; _} = stake_proof
-  end
-
   module Epoch = struct
-    include Segment_id
+    include Epoch
 
     let of_time_exn t : t =
       if Time.(t < Constants.genesis_state_timestamp) then
@@ -180,7 +172,7 @@ module Data = struct
       Time.add (start_time epoch) Constants.Epoch.duration
 
     module Slot = struct
-      include Segment_id
+      include Slot
 
       (*
       let after_lock_checkpoint (slot : t) =
@@ -237,21 +229,6 @@ module Data = struct
         (Time.Span.of_ms
            Int64.Infix.(int64_of_uint32 slot * Constants.Slot.duration_ms))
 
-    (*
-    let slot_end_time (epoch : t) (slot : Slot.t) =
-      Time.add (slot_start_time epoch slot) Constants.Slot.duration
-    *)
-
-    let epoch_and_slot_of_time_exn tm : t * Slot.t =
-      let epoch = of_time_exn tm in
-      let time_since_epoch = Time.diff tm (start_time epoch) in
-      let slot =
-        uint32_of_int64
-        @@ Int64.Infix.(
-             Time.Span.to_ms time_since_epoch / Constants.Slot.duration_ms)
-      in
-      (epoch, slot)
-
     let diff_in_slots ((epoch, slot) : t * Slot.t)
         ((epoch', slot') : t * Slot.t) : int64 =
       let ( < ) x y = Pervasives.(Int64.compare x y < 0) in
@@ -294,6 +271,29 @@ module Data = struct
       if Slot.equal slot (sub Constants.Epoch.size one) then
         (add epoch one, zero)
       else (epoch, add slot one)
+  end
+
+  module Epoch_and_slot = struct
+    type t = Epoch.t * Epoch.Slot.t [@@deriving eq, sexp]
+
+    let of_time_exn tm : t =
+      let epoch = Epoch.of_time_exn tm in
+      let time_since_epoch = Time.diff tm (Epoch.start_time epoch) in
+      let slot =
+        uint32_of_int64
+        @@ Int64.Infix.(
+             Time.Span.to_ms time_since_epoch / Constants.Slot.duration_ms)
+      in
+      (epoch, slot)
+  end
+
+  module Proposal_data = struct
+    type t =
+      { stake_proof: Stake_proof.t
+      ; epoch_and_slot: Epoch_and_slot.t
+      ; vrf_result: Random_oracle.Digest.t }
+
+    let prover_state {stake_proof; _} = stake_proof
   end
 
   module Local_state = struct
@@ -412,7 +412,7 @@ module Data = struct
               !t.Data.last_checked_slot_and_epoch proposer_public_keys
               ~default:
                 ((* TODO: Be smarter so that we don't have to look at the slot before again *)
-                 let epoch, slot = Epoch.epoch_and_slot_of_time_exn now in
+                 let epoch, slot = Epoch_and_slot.of_time_exn now in
                  (epoch, UInt32.(if slot > zero then sub slot one else slot)))
         }
 
@@ -939,6 +939,7 @@ module Data = struct
                          ; public_key
                          ; delegator
                          ; ledger= epoch_snapshot.ledger }
+                     ; epoch_and_slot= (epoch, slot)
                      ; vrf_result }) ) ;
           None )
   end
@@ -2105,7 +2106,7 @@ module Data = struct
   end
 
   module Prover_state = struct
-    include Coda_base.Stake_proof
+    include Stake_proof
 
     let precomputed_handler = Vrf.Precomputed.handler
 
@@ -2414,7 +2415,7 @@ module Hooks = struct
     in
     let slot_diff =
       Epoch.diff_in_slots
-        (Epoch.epoch_and_slot_of_time_exn time_received)
+        (Epoch_and_slot.of_time_exn time_received)
         (epoch, slot)
     in
     if slot_diff < 0L then Error `Too_early
@@ -2542,7 +2543,7 @@ module Hooks = struct
     Logger.info logger ~module_:__MODULE__ ~location:__LOC__
       "Checking for next proposal..." ;
     let curr_epoch, curr_slot =
-      Epoch.epoch_and_slot_of_time_exn
+      Epoch_and_slot.of_time_exn
         (Time.of_span_since_epoch (Time.Span.of_ms now))
     in
     let epoch, slot =
@@ -2694,7 +2695,7 @@ module Hooks = struct
   let%test "Receive an invalid consensus_state" =
     let epoch = Epoch.of_int 5 in
     let start_time = Epoch.start_time epoch in
-    let curr_epoch, curr_slot = Epoch.epoch_and_slot_of_time_exn start_time in
+    let curr_epoch, curr_slot = Epoch_and_slot.of_time_exn start_time in
     let consensus_state =
       {Consensus_state.negative_one with curr_epoch; curr_slot}
     in
@@ -2736,17 +2737,33 @@ module Hooks = struct
      and type protocol_state_var := Protocol_state.var
      and type snark_transition_var := Snark_transition.var = struct
     (* TODO: only track total currency from accounts > 1% of the currency using transactions *)
+
+    let check_proposal_data ~logger (proposal_data : Proposal_data.t)
+        epoch_and_slot =
+      if not (Epoch_and_slot.equal epoch_and_slot proposal_data.epoch_and_slot)
+      then
+        Logger.error ~module_:__MODULE__ ~location:__LOC__ logger
+          !"VRF was evaluated at (epoch, slot) %{sexp:Epoch_and_slot.t} but \
+            the corresponding proposal happened at a time corresponding to \
+            %{sexp:Epoch_and_slot.t}. This means that generating the proposal \
+            took more time than expected."
+          proposal_data.epoch_and_slot epoch_and_slot
+
     let generate_transition ~(previous_protocol_state : Protocol_state.Value.t)
-        ~blockchain_state ~time ~proposal_data ~transactions:_
-        ~snarked_ledger_hash ~supply_increase ~logger:_ =
+        ~blockchain_state ~current_time ~(proposal_data : Proposal_data.t)
+        ~transactions:_ ~snarked_ledger_hash ~supply_increase ~logger =
       let previous_consensus_state =
         Protocol_state.consensus_state previous_protocol_state
       in
-      let epoch, slot =
-        let time = Time.of_span_since_epoch (Time.Span.of_ms time) in
-        Epoch.epoch_and_slot_of_time_exn time
+      (let actual_epoch_and_slot =
+         let time = Time.of_span_since_epoch (Time.Span.of_ms current_time) in
+         Epoch_and_slot.of_time_exn time
+       in
+       check_proposal_data ~logger proposal_data actual_epoch_and_slot) ;
+      let consensus_transition =
+        let epoch, slot = proposal_data.epoch_and_slot in
+        Consensus_transition.Poly.{epoch; slot}
       in
-      let consensus_transition = Consensus_transition.Poly.{epoch; slot} in
       let consensus_state =
         Or_error.ok_exn
           (Consensus_state.update ~previous_consensus_state
@@ -2846,7 +2863,7 @@ module Hooks = struct
 end
 
 let time_hum (now : Core_kernel.Time.t) =
-  let epoch, slot = Data.Epoch.epoch_and_slot_of_time_exn (Time.of_time now) in
+  let epoch, slot = Data.Epoch_and_slot.of_time_exn (Time.of_time now) in
   Printf.sprintf "%d:%d" (Data.Epoch.to_int epoch)
     (Data.Epoch.Slot.to_int slot)
 
@@ -2867,8 +2884,7 @@ let%test_module "Proof of stake tests" =
           ~negative_one_protocol_state_hash:previous_protocol_state_hash
       in
       let epoch, slot =
-        Epoch.epoch_and_slot_of_time_exn
-          (Time.of_time (Core_kernel.Time.now ()))
+        Epoch_and_slot.of_time_exn (Time.of_time (Core_kernel.Time.now ()))
       in
       let consensus_transition : Consensus_transition.Value.t =
         {Consensus_transition.Poly.epoch; slot}

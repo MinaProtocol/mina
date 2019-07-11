@@ -1,4 +1,5 @@
 open Core
+open Coda_base
 
 module Stable = struct
   module V1 = struct
@@ -17,6 +18,11 @@ module Stable = struct
   module Latest = V1
 end
 
+(* This is only the data that is neccessary for creating the
+   blockchain SNARK which is not otherwise available. So in
+   particular it excludes the epoch and slot this stake proof
+   is for.
+*)
 type t = Stable.Latest.t =
   { delegator: Account.Index.t
   ; ledger: Sparse_ledger.Stable.V1.t
