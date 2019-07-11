@@ -266,7 +266,7 @@ module type S = sig
     * This is mostly useful for PoStake and other consensus mechanisms that have their own
     * notions of time.
   *)
-  val time_hum : Time.t -> string
+  val time_hum : Coda_base.Block_time.t -> string
 
   module Constants : Constants_intf
 
@@ -412,6 +412,9 @@ module type S = sig
         -> local_state:Local_state.t
         -> Host_and_port.t Rpc.Implementation.t list
     end
+
+    (* Check whether we are in the genesis epoch *)
+    val is_genesis : Coda_base.Block_time.t -> bool
 
     (**
      * Check that a consensus state was received at a valid time.
