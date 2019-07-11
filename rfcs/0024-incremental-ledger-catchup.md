@@ -74,16 +74,14 @@ The proposed design would do much better than the current in average case. Let's
 
 ### Example 1
 
-suppose **k** = 3000, **size of transition** = 1 kB, **size of state_body_hash** = 5 bytes
-let block_window_duration = 5 min
+suppose **k** = 3000, **size of transition** = 1 kB, **size of state_body_hash** = 5 bytes, 
 
-let's assume a node is offline for 5 hours, and therefore it missed about 40
-transitions.
+With block_window_duration to be 5 min and let's assume a node is offline for 5 hours. In this scenario, we assume that it missed about 40 transitions.
 
 After realizing it's disconnected with the network, it sends a ledger-catchup
 request to some random peers.
 
-* In current implementation, the peer would respond with ~2k=6000 transitions (could off by 1~2 if new blocks are created during the same time), while we only need 40 transitions to do the catchup, the other 5960 transitions sent by peer are unnecessary. We would download 2k * size of transition = 6MB data in total.
+* In current implementation, the peer would respond with ~2k=6000 transitions (could be off by 1 to 2 if new blocks are created during the same time), while we only need 40 transitions to do the catchup, the other 5960 transitions sent by peer are unnecessary. We would download 2k * size of transition = 6MB data in total.
 
 * In proposed design, the peer would respond with 2k state_body_hash. By
 looking at the hashes, we would realize that we only need 40 transitions, so
