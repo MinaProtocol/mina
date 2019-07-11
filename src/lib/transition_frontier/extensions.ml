@@ -128,6 +128,12 @@ end) :
       Queue.enqueue_back history state_hash breadcrumb |> ignore ;
       breadcrumb
 
+    let oldest {history; _} =
+      let open Option.Let_syntax in
+      let%map state_hash, breadcrumb = Queue.dequeue_front_with_key history in
+      Queue.enqueue_front history state_hash breadcrumb |> ignore ;
+      breadcrumb
+
     let mem {history; _} = Queue.mem history
 
     let enqueue {history; capacity} state_hash breadcrumb =
