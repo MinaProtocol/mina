@@ -244,7 +244,7 @@ jobs:
             - run:
                   name: Running test -- {{profile}}:{{test}}
                   command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run "{{profile}}:{{test}}"'
-                  {%- if test in medium_curve_profiles %}
+                  {%- if profile in medium_curve_profiles %}
                   no_output_timeout: 20m
                   {%- endif %}
             {%- endfor %}
