@@ -23,47 +23,50 @@ module Srs = struct
         List.map
           (List.range 1 (d + 1))
           ~f:(fun i ->
-            G1.scale g1 (Fr.to_bigint (Fr.( ** ) xInv (N.of_int i))))
+            G1.scale_plus_minus g1 (Fr.to_bigint (Fr.( ** ) xInv (N.of_int i))))
     ; gPositiveX=
         List.map
           (List.range 0 (d + 1))
-          ~f:(fun i -> G1.scale g1 (Fr.to_bigint (Fr.( ** ) x (N.of_int i))))
+          ~f:(fun i ->
+            G1.scale_plus_minus g1 (Fr.to_bigint (Fr.( ** ) x (N.of_int i))))
     ; hNegativeX=
         List.map
           (List.range 1 (d + 1))
           ~f:(fun i ->
-            G2.scale g2 (Fr.to_bigint (Fr.( ** ) xInv (N.of_int i))))
+            G2.scale_plus_minus g2 (Fr.to_bigint (Fr.( ** ) xInv (N.of_int i))))
     ; hPositiveX=
         List.map
           (List.range 0 (d + 1))
-          ~f:(fun i -> G2.scale g2 (Fr.to_bigint (Fr.( ** ) x (N.of_int i))))
+          ~f:(fun i ->
+            G2.scale_plus_minus g2 (Fr.to_bigint (Fr.( ** ) x (N.of_int i))))
     ; gNegativeAlphaX=
         List.map
           (List.range 1 (d + 1))
           ~f:(fun i ->
-            G1.scale g1
+            G1.scale_plus_minus g1
               (Fr.to_bigint (Fr.( * ) alpha (Fr.( ** ) xInv (N.of_int i)))))
     ; gPositiveAlphaX=
         G1.zero
         :: List.map
              (List.range 1 (d + 1))
              ~f:(fun i ->
-               G1.scale g1
+               G1.scale_plus_minus g1
                  (Fr.to_bigint (Fr.( * ) alpha (Fr.( ** ) x (N.of_int i)))))
     ; hNegativeAlphaX=
         List.map
           (List.range 1 (d + 1))
           ~f:(fun i ->
-            G2.scale g2
+            G2.scale_plus_minus g2
               (Fr.to_bigint (Fr.( * ) alpha (Fr.( ** ) xInv (N.of_int i)))))
     ; hPositiveAlphaX=
         List.map
           (List.range 0 (d + 1))
           ~f:(fun i ->
-            G2.scale g2
+            G2.scale_plus_minus g2
               (Fr.to_bigint (Fr.( * ) alpha (Fr.( ** ) x (N.of_int i)))))
-    ; srsPairing= Pairing.reduced_pairing g1 (G2.scale g2 (Fr.to_bigint alpha))
-    }
+    ; srsPairing=
+        Pairing.reduced_pairing g1
+          (G2.scale_plus_minus g2 (Fr.to_bigint alpha)) }
 end
 
 let select_helper positives negatives poly init plus scale =
@@ -83,15 +86,17 @@ let select_helper positives negatives poly init plus scale =
   accum deg coeffs init
 
 let select_g (srs : Srs.t) poly =
-  select_helper srs.gPositiveX srs.gNegativeX poly G1.zero G1.( + ) G1.scale
+  select_helper srs.gPositiveX srs.gNegativeX poly G1.zero G1.( + )
+    G1.scale_plus_minus
 
 let select_g_alpha (srs : Srs.t) poly =
   select_helper srs.gPositiveAlphaX srs.gNegativeAlphaX poly G1.zero G1.( + )
-    G1.scale
+    G1.scale_plus_minus
 
 let select_h (srs : Srs.t) poly =
-  select_helper srs.hPositiveX srs.hNegativeX poly G2.zero G2.( + ) G2.scale
+  select_helper srs.hPositiveX srs.hNegativeX poly G2.zero G2.( + )
+    G2.scale_plus_minus
 
 let select_h_alpha (srs : Srs.t) poly =
   select_helper srs.hPositiveAlphaX srs.hNegativeAlphaX poly G2.zero G2.( + )
-    G2.scale
+    G2.scale_plus_minus
