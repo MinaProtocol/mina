@@ -289,5 +289,5 @@ Labs are using it in the development of our new cryptocurrency protocol that aim
 to power the examples described above and more.
 
 If you find what we're doing interesting, we're hiring. You can find more
-info [here](https://o1labs.org/jobs.html). You can also sign up for
+info [here](https://codaprotocol.com/jobs.html). You can also sign up for
 our mailing list [here](/#contact).

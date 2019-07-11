@@ -8,29 +8,27 @@ Help us build accessible, usable, delightful products on top of the Coda Protoco
 We’re seeking a product engineer who is also excited by building beautiful products. While it's hard to say exactly what we'll work on given that we are such an early-stage startup, we expect projects to include:
 
 - Wallet software that is a joy to use, with innovative onboarding and account recovery mechanisms.
-- The product side of developer tools and SDKs
+- Developer tools and SDKs
 - Imaginative cryptocurrency applications that showcase what’s possible with a lightweight blockchain
 
-
 ## Requirements
-
 
 - An internship or 1+ years engineering experience
     - Bonus: Worked on a product team doing frontend work
 - Willingness to work on-site in a San Francisco based office
-- Exposure to a declarative frontend framework, such as React, Angular, Vue, Elm etc.
+- Exposure to a declarative frontend framework, such as React, Angular, Vue, Elm
     - Bonus: Experience with React Hooks or GraphQL
 
 
 ## Nice to have (at least one of the following)
 
-
-- Familiarity with functional programming, know your way around map and reduce.
-- CSS chops, should be comfortable with Flexbox.
-- Experience working on multiple collaborative projects with a product team containing at least one additional developer or designer (or larger team-based projects at university or a bootcamp program).
+- Familiarity with functional programming, know your way around map and reduce
+- Comfortable with modern CSS (including Flexbox)
+- Experience working on collaborative projects with a product team (or larger team-based projects at a university/bootcamp)
 - Exposure to working with cryptocurrencies
-- Experience with ReasonML, OCaml, Elm, or Purescript
-- Early stage startup experience
+- Experience with ReasonML, OCaml, Elm, or Purescript (we like to use ReasonReact!)
+- Experience developing accessible products
+- Early-stage startup experience
 - Experience with contributing to open source
 
 

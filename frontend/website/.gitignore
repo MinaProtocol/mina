@@ -6,6 +6,7 @@ node_modules
 /lib
 /bundle
 /site
+/deploy
 PragmataPro-Bold.woff*
 Essential-PragmataPro-Bold.woff*
 Essential-PragmataPro-Regular.woff*

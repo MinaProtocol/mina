@@ -32,12 +32,11 @@ module Rimraf = {
   [@bs.val] [@bs.module "rimraf"] external sync: string => unit = "";
 };
 
-Array.length(Sys.argv) > 2
-&& (Sys.argv[2] == "prod" || Sys.argv[2] == "staging")
-  ? {
-    Links.Cdn.prefix := "https://cdn.codaprotocol.com/v4";
-  }
-  : ();
+let isProd = Array.length(Sys.argv) > 2 && Sys.argv[2] == "prod";
+
+if (isProd) {
+  Links.Cdn.prefix := "https://cdn.codaprotocol.com/website";
+};
 
 Style.Typeface.load();
 
@@ -107,6 +106,7 @@ module Router = {
 };
 
 let jobOpenings = [|
+  ("engineering-manager", "Engineering Manager (San Francisco)."),
   ("product-manager", "Product Manager (San Francisco)."),
   ("senior-designer", "Senior Designer (San Francisco)."),
   (
@@ -211,4 +211,46 @@ Router.(
     ),
   )
 );
-Fs.symlinkSync(Node.Process.cwd() ++ "/static", "./site/static");
+
+module MoreFs = {
+  type stat;
+  [@bs.val] [@bs.module "fs"] external lstatSync: string => stat = "";
+  [@bs.send] external isDirectory: stat => bool = "";
+
+  [@bs.val] [@bs.module "fs"]
+  external copyFileSync: (string, string) => unit = "";
+
+  [@bs.val] [@bs.module "fs"] external mkdirSync: string => unit = "";
+};
+
+let ignoreFiles = ["main.bc.js", "verifier_main.bc.js", ".DS_Store"];
+let rec copyFolder = path => {
+  MoreFs.mkdirSync("site/" ++ path);
+  Array.iter(
+    s => {
+      let path = Filename.concat(path, s);
+      let isDir = MoreFs.lstatSync(path) |> MoreFs.isDirectory;
+      if (isDir) {
+        copyFolder(path);
+      } else if (!List.mem(s, ignoreFiles)) {
+        MoreFs.copyFileSync(
+          path,
+          "./site" ++ Links.Cdn.getHashedPath("/" ++ path),
+        );
+      };
+    },
+    Node.Fs.readdirSync(path),
+  );
+};
+
+let moveToSite = path =>
+  MoreFs.copyFileSync(path, Filename.concat("./site", path));
+
+copyFolder("static");
+
+// Special-case the jsoo-compiled files for now
+// They can't be loaded from cdn so they get copied to the site separately
+if (!isProd) {
+  moveToSite("static/main.bc.js");
+  moveToSite("static/verifier_main.bc.js");
+};
