@@ -44,8 +44,9 @@ module Srs = struct
             G1.scale g1
               (Fr.to_bigint (Fr.( * ) alpha (Fr.( ** ) xInv (N.of_int i)))))
     ; gPositiveAlphaX=
+        G1.zero ::
         List.map
-          (List.range 0 (d + 1))
+          (List.range 1 (d + 1))
           ~f:(fun i ->
             G1.scale g1
               (Fr.to_bigint (Fr.( * ) alpha (Fr.( ** ) x (N.of_int i)))))

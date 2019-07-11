@@ -2,6 +2,10 @@ open Core_kernel
 
 type t = Big_int.big_int
 
+let zero = Big_int.zero_big_int
+
+let negate = Big_int.minus_big_int
+
 let equal = Big_int.eq_big_int
 
 let num_bits = Big_int.num_bits_big_int

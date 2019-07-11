@@ -8,7 +8,7 @@ let%test_unit "test protocol" =
   let x = Fr.random () in
   let z = Fr.random () in
   let alpha = Fr.random () in
-  let d = Random.int 99 + 2 in
+  let d = 18 in
   let w_l =
     [ [Fr.of_int 0; Fr.of_int 0]
     ; [Fr.of_int 1; Fr.of_int 0]

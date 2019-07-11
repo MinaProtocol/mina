@@ -6,7 +6,7 @@ open Srs
 let%test_unit "test signatures of computation" =
   let x = Fr.random () in
   let alpha = Fr.random () in
-  let d = Random.int 99 + 2 in
+  let d = 15 in
   let w_l = [[Fr.of_int 1]; [Fr.of_int 0]] in
   let w_r = [[Fr.of_int 0]; [Fr.of_int 1]] in
   let w_o = [[Fr.of_int 0]; [Fr.of_int 0]] in

@@ -5,6 +5,10 @@ module type S = sig
 
   include Stringable.S with type t := t
 
+  val zero : t
+
+  val negate : t -> t
+
   val of_int : int -> t
 
   val to_int_exn : t -> int
