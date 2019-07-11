@@ -85,7 +85,9 @@ module Make (Inputs : Intf.Inputs_intf) :
               (Time.Span.to_string total) )
 
   let main daemon_address shutdown_on_disconnect =
-    let logger = Logger.create () in
+    let logger =
+      Logger.create () ~metadata:[("process", `String "Snark Worker")]
+    in
     let%bind state = Worker_state.create () in
     let wait ?(sec = 0.5) () = after (Time.Span.of_sec sec) in
     let rec go () =

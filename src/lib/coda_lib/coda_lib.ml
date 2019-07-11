@@ -15,7 +15,18 @@ module Ledger_transfer = Ledger_transfer.Make (Ledger) (Ledger.Db)
 module Config = Config
 module Subscriptions = Coda_subscriptions
 
-type processes = {prover: Prover.t; verifier: Verifier.t}
+exception Snark_worker_error of int
+
+exception Snark_worker_signal_interrupt of Signal.t
+
+(* A way to run a single snark worker for a daemon in a lazy manner. Evaluating
+   this lazy value will run the snark worker process. A snark work is
+   assigned to a public key. This public key can change throughout the entire time
+   the daemon is running *)
+type snark_worker = Public_key.Compressed.t option ref Lazy.t
+
+type processes =
+  {prover: Prover.t; verifier: Verifier.t; snark_worker: snark_worker}
 
 type components =
   { net: Coda_networking.t
@@ -34,12 +45,6 @@ type pipes =
       (External_transition.t Envelope.Incoming.t * Block_time.t) Pipe.Writer.t
   }
 
-(* A way to run a single snark worker for a daemon in a lazy manner. Evaluating
-   this lazy value will run the snark worker process. A snark work is
-   assigned to a public key. This public key can change throughout the entire time
-   the daemon is running *)
-type snark_worker_process = Public_key.Compressed.t option ref Lazy.t
-
 type t =
   { config: Config.t
   ; processes: processes
@@ -49,8 +54,7 @@ type t =
   ; propose_keypairs:
       (Agent.read_write Agent.flag, Keypair.And_compressed_pk.Set.t) Agent.t
   ; mutable seen_jobs: Work_selector.State.t
-  ; subscriptions: Coda_subscriptions.t
-  ; snark_worker_process: snark_worker_process }
+  ; subscriptions: Coda_subscriptions.t }
 [@@deriving fields]
 
 let subscription t = t.subscriptions
@@ -87,22 +91,22 @@ let create_snark_worker ~logger ?(shutdown_on_disconnect = true) client_port =
   don't_wait_for
     ( match%bind Process.wait p with
     | Ok () ->
-        Core.printf
-          "Snark worker process died normally, so the daemon will die as well" ;
+        Logger.info logger
+          "Snark worker process died normally, so the daemon will die as well"
+          ~module_:__MODULE__ ~location:__LOC__ ;
         exit 0
     | Error (`Exit_non_zero non_zero_error) ->
-        Core.printf
+        Logger.fatal logger
           !"Snark worker process died with a nonzero error %i"
-          non_zero_error ;
-        exit non_zero_error
+          non_zero_error ~module_:__MODULE__ ~location:__LOC__ ;
+        raise (Snark_worker_error non_zero_error)
     | Error (`Signal signal) ->
-        Core.printf
+        Logger.info logger
           !"Snark worker died with signal %{sexp:Signal.t}. Aborting daemon"
-          signal ;
-        exit 0 ) ;
-  let logger = Logger.extend logger [("process", `String "Snark Worker")] in
+          signal ~module_:__MODULE__ ~location:__LOC__ ;
+        raise (Snark_worker_signal_interrupt signal) ) ;
   Logger.trace logger
-    !"Node created snark worker %i"
+    !"Created snark worker with pid: %i"
     ~module_:__MODULE__ ~location:__LOC__
     (Pid.to_int @@ Process.pid p) ;
   (* We want these to be printfs so we don't double encode our logs here *)
@@ -116,14 +120,14 @@ let create_snark_worker ~logger ?(shutdown_on_disconnect = true) client_port =
   |> don't_wait_for ;
   Deferred.unit
 
-let snark_worker_key t =
-  if Lazy.is_val t.snark_worker_process then
-    !(Lazy.force t.snark_worker_process)
+let snark_worker_key {processes; _} =
+  if Lazy.is_val processes.snark_worker then
+    !(Lazy.force processes.snark_worker)
   else None
 
-let replace_snark_worker_key t new_key =
-  if Option.is_some new_key || Lazy.is_val t.snark_worker_process then
-    Lazy.force t.snark_worker_process := new_key
+let replace_snark_worker_key {processes; _} new_key =
+  if Option.is_some new_key || Lazy.is_val processes.snark_worker then
+    Lazy.force processes.snark_worker := new_key
   else ()
 
 let best_tip_opt t =
@@ -419,6 +423,18 @@ let create (config : Config.t) =
       trace_task "coda" (fun () ->
           let%bind prover = Prover.create () in
           let%bind verifier = Verifier.create () in
+          let snark_worker =
+            Lazy.from_fun
+            @@ fun () ->
+            let {Kademlia.Node_addrs_and_ports.client_port; _} =
+              config.net_config.gossip_net_params.addrs_and_ports
+            in
+            create_snark_worker ~logger:config.logger client_port
+            |> don't_wait_for ;
+            ref config.snark_worker_config.initial_snark_worker_key
+          in
+          Option.iter config.snark_worker_config.initial_snark_worker_key
+            ~f:(fun _key -> ignore @@ Lazy.force snark_worker) ;
           let external_transitions_reader, external_transitions_writer =
             Strict_pipe.create Synchronous
           in
@@ -649,19 +665,9 @@ let create (config : Config.t) =
               ~external_transition_database:config.external_transition_database
               ~transition_frontier:frontier_broadcast_pipe_r
           in
-          let snark_worker_process =
-            Lazy.from_fun
-            @@ fun () ->
-            create_snark_worker ~logger:config.logger
-              config.net_config.gossip_net_params.addrs_and_ports.client_port
-            |> don't_wait_for ;
-            ref config.snark_worker_config.initial_snark_worker_key
-          in
-          Option.iter config.snark_worker_config.initial_snark_worker_key
-            ~f:(fun _key -> ignore @@ Lazy.force snark_worker_process) ;
           return
             { config
-            ; processes= {prover; verifier}
+            ; processes= {prover; verifier; snark_worker}
             ; components=
                 { net
                 ; transaction_pool
@@ -676,5 +682,4 @@ let create (config : Config.t) =
             ; wallets
             ; propose_keypairs
             ; seen_jobs= Work_selector.State.init
-            ; subscriptions
-            ; snark_worker_process } ) )
+            ; subscriptions } ) )

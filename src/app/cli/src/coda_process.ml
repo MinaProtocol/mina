@@ -98,7 +98,7 @@ let verified_transitions_exn (conn, _proc, _) =
   in
   Linear_pipe.wrap_reader r
 
-(* TODO: delete once transition_frontier extensions refactoring gets in *)
+(* TODO: 2836 delete once transition_frontier extensions refactoring gets in *)
 let validated_transitions_keyswaptest_exn (conn, _, _) =
   let%map r =
     Coda_worker.Connection.run_exn conn

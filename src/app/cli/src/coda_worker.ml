@@ -540,7 +540,7 @@ module T = struct
           let coda_new_block key =
             Deferred.return @@ Coda_commands.Subscriptions.new_block coda key
           in
-          (* TODO: Remove validated_transitions_keyswaptest once the refactoring of broadcast pipe enters the code base *)
+          (* TODO: #2836 Remove validated_transitions_keyswaptest once the refactoring of broadcast pipe enters the code base *)
           let ( validated_transitions_keyswaptest_reader
               , validated_transitions_keyswaptest_writer ) =
             Pipe.create ()
