@@ -62,6 +62,11 @@ let daemon logger =
            "seq|rand Choose work sequentially (seq) or randomly (rand) \
             (default: seq)"
          (optional work_selection_method)
+     and no_check_open_ports =
+       flag "no-check-open-ports" no_arg
+         ~doc:
+           "Don't check for open ports based on chosen ezternal ports \
+            (defaul: Do this check)"
      and external_port =
        flag "external-port"
          ~doc:
@@ -301,9 +306,89 @@ let daemon logger =
            | Some ip ->
                return @@ Unix.Inet_addr.of_string ip
          in
+         (* Check if ports are open *)
+         let%bind () =
+           if no_check_open_ports then return ()
+           else
+             let%bind external_open =
+               Port_open.check_tcp external_ip ~port:external_port ~logger
+             and discovery_open =
+               Port_open.check_udp external_ip ~port_to_use:9988
+                 ~port_to_check:discovery_port ~logger
+             in
+             let fail ~tcp_fail ~udp_fail =
+               let tcp_message, udp_message =
+                 ( ( match tcp_fail with
+                   | Ok () ->
+                       ""
+                   | Error _ ->
+                       sprintf "$ upnpc -a <your local ip> %d %d tcp"
+                         external_port external_port )
+                 , match udp_fail with
+                   | Ok () ->
+                       ""
+                   | Error _ ->
+                       sprintf "$ upnpc -a <your local ip> %d %d udp"
+                         discovery_port discovery_port )
+               in
+               let pretty_errors =
+                 let describe = function
+                   | `Io_error e ->
+                       sprintf "IO error: %s" (Error.to_string_hum e)
+                   | `Bad_code | `Eof ->
+                       "Found a different server on this port!"
+                   | `Timeout ->
+                       "Could not reach the server (timed out)"
+                 in
+                 ( match tcp_fail with
+                 | Ok () ->
+                     ""
+                 | Error e ->
+                     "External port check failed: " ^ describe e )
+                 ^
+                 match udp_fail with
+                 | Ok () ->
+                     ""
+                 | Error e ->
+                     "\nDiscover port check failed: " ^ describe e
+               in
+               eprintf
+                 {|
+Failed to verify that your ports were open. If your ports aren't accessible externally, you could be banned from the Coda network without realizing it!
+
+This could be a false positive. If you know what you are doing, please add `-no-check-open-ports` and we will skip this check.
+
+More details:
+
+Error: could not access ports externally
+%s
+
+To resolve:
+
+Are your ports open?
+Find your local ip address with `ifconfig`.
+Get miniupnpc (you can download via your favorite package manager).
+
+Then run:
+%s
+%s
+
+If this doesn't work, check out portforwarding.com for more tips or go to Coda discord chat for help.|}
+                 pretty_errors tcp_message udp_message ;
+               exit 21
+             in
+             match (external_open, discovery_open) with
+             | Error _, Error _ | Error _, _ | _, Error _ ->
+                 fail ~tcp_fail:external_open ~udp_fail:discovery_open
+             | Ok (), Ok () ->
+                 return ()
+         in
          let bind_ip =
-           Option.value bind_ip_opt ~default:"0.0.0.0"
-           |> Unix.Inet_addr.of_string
+           match bind_ip_opt with
+           | Some ip ->
+               Unix.Inet_addr.of_string ip
+           | None ->
+               Unix.Inet_addr.bind_any
          in
          let addrs_and_ports : Kademlia.Node_addrs_and_ports.t =
            { external_ip
@@ -313,8 +398,8 @@ let daemon logger =
          in
          let wallets_disk_location = conf_dir ^/ "wallets" in
          (* HACK: Until we can properly change propose keys at runtime we'll
-          * suffer by accepting a propose_public_key flag and reloading the wallet
-          * db here to find the keypair for the pubkey *)
+                * suffer by accepting a propose_public_key flag and reloading the wallet
+                * db here to find the keypair for the pubkey *)
          let%bind propose_keypair =
            match (propose_key, propose_public_key) with
            | Some _, Some _ ->

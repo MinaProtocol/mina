@@ -15,7 +15,7 @@
  (preprocessor_deps ../../../config.mlh)
  (preprocess
   (pps ppx_deriving.eq ppx_deriving.make ppx_inline_test ppx_coda
-    ppx_base ppx_let ppx_optcomp ppx_sexp_conv ppx_bin_prot ppx_fields_conv ppx_custom_printf ppx_assert ppx_deriving_yojson
+    ppx_base ppx_let ppx_optcomp ppx_sexp_conv ppx_bin_prot ppx_fields_conv ppx_custom_printf ppx_assert ppx_deriving_yojson ppx_sexp_message
   ))
  ; the -w list here should be the same as in src/dune
  (flags -short-paths -g -w @a-4-29-40-41-42-44-45-48-58-59-60)
