@@ -185,5 +185,4 @@ let gprod_v (srs : Srs.t) u v (proof : Gprod_proof.t) =
   && pc_v srs c y (vk, wk)
   && pc_v srs t_commit z (t, wt)
   && wform_v srs ((2 * n) + 1) c cw
-  && wform_v srs n u uw
-  && wform_v srs n v vw
+  && wform_v srs n u uw && wform_v srs n v vw

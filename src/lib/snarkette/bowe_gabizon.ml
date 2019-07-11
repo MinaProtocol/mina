@@ -50,9 +50,9 @@ module type Backend_intf = sig
 
   module Pairing :
     Pairing.S
-    with module G1 := G1
-     and module G2 := G2
-     and module Fq_target := Fq_target
+      with module G1 := G1
+       and module G2 := G2
+       and module Fq_target := Fq_target
 end
 
 module Make (Backend : Backend_intf) = struct
@@ -66,7 +66,7 @@ module Make (Backend : Backend_intf) = struct
       let xs, ys =
         List.fold_left t ~init:([], []) ~f:(fun (xs, ys) a ->
             let x, y = f a in
-            (x :: xs, y :: ys) )
+            (x :: xs, y :: ys))
       in
       (List.rev xs, List.rev ys)
 
@@ -83,14 +83,14 @@ module Make (Backend : Backend_intf) = struct
       let g2_elts, g2_signs =
         map_to_two g2s ~f:(fun g ->
             let x, y = G2.to_affine_coordinates g in
-            (Fqe.to_list x, non_zero_base_coordinate y) )
+            (Fqe.to_list x, non_zero_base_coordinate y))
       in
       let gt_elts, gt_signs =
         map_to_two gts ~f:(fun g ->
             (* g is unitary, so (a, b) satisfy a quadratic over Fqe and thus
              b is determined by a up to sign *)
             let a, b = g in
-            (Fqe.to_list a, non_zero_base_coordinate b) )
+            (Fqe.to_list a, non_zero_base_coordinate b))
       in
       let open Fold in
       let of_fq_list_list ls =
@@ -152,7 +152,7 @@ module Make (Backend : Backend_intf) = struct
     let input_acc =
       List.foldi input ~init:vk.query.(0) ~f:(fun i acc x ->
           let q = vk.query.(1 + i) in
-          G1.(acc + (x * q)) )
+          G1.(acc + (x * q)))
     in
     let delta_prime_pc = Pairing.G2_precomputation.create delta_prime in
     let test1 =

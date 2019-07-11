@@ -47,15 +47,14 @@ let r_poly (assignment : Assignment.t) =
   in
   Bivariate_fr_laurent.create (-2 * n)
     (reorder (Fr_laurent.create 0 [] :: processed))
+
 (* bivariate polynomial; X deg = Y deg, so we just sort Y polys as coeffs of X polys *)
 
 let s_poly (gate_weights : Gate_weights.t) =
   let w_l, w_r, w_o = (gate_weights.w_l, gate_weights.w_r, gate_weights.w_o) in
   let n = List.length (List.hd_exn w_l) in
   let f wi = Fr_laurent.create (n + 1) wi in
-  let rec ff lst =
-    match lst with [] -> [] | hd::tl -> f hd :: ff tl
-  in
+  let rec ff lst = match lst with [] -> [] | hd :: tl -> f hd :: ff tl in
   let g wi i =
     Fr_laurent.( + )
       (Fr_laurent.( + )
@@ -64,11 +63,11 @@ let s_poly (gate_weights : Gate_weights.t) =
       (Fr_laurent.create (n + 1) wi)
   in
   let rec gg lst i =
-    match lst with [] -> [] | hd::tl -> g hd i :: gg tl (i + 1)
+    match lst with [] -> [] | hd :: tl -> g hd i :: gg tl (i + 1)
   in
   Bivariate_fr_laurent.( + )
     (Bivariate_fr_laurent.( + )
-    (Bivariate_fr_laurent.create (-n) (ff (reverse (flip w_l))))
+       (Bivariate_fr_laurent.create (-n) (ff (reverse (flip w_l))))
        (Bivariate_fr_laurent.create 1 (ff (flip w_r))))
     (Bivariate_fr_laurent.create (n + 1) (gg (flip w_o) 1))
 

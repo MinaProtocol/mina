@@ -2,8 +2,7 @@ open Core
 open Srs
 open Default_backend.Backend
 
-let commit_poly (srs : Srs.t) poly =
-  select_g_alpha srs poly
+let commit_poly (srs : Srs.t) poly = select_g_alpha srs poly
 
 let open_poly srs _commitment z f_poly =
   let fz = Fr_laurent.eval f_poly z in

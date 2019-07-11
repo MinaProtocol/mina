@@ -32,11 +32,11 @@ let to_bytes x =
         if test_bit x bit then 1 lsl i else 0
       in
       Char.of_int_exn
-        (c 0 lor c 1 lor c 2 lor c 3 lor c 4 lor c 5 lor c 6 lor c 7) )
+        (c 0 lor c 1 lor c 2 lor c 3 lor c 4 lor c 5 lor c 6 lor c 7))
 
 let of_bytes x =
   String.foldi x ~init:Big_int.zero_big_int ~f:(fun i acc c ->
-      log_or acc (shift_left (of_int (Char.to_int c)) (8 * i)) )
+      log_or acc (shift_left (of_int (Char.to_int c)) (8 * i)))
 
 let ( + ) = Big_int.add_big_int
 

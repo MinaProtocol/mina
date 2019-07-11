@@ -62,5 +62,5 @@ let false_grand_product_test a_nums b_nums =
 let%test_unit "grand_product_test" =
   let a_nums = [1; 2; 3; 4; 5] in
   let b_nums = [-1; 2; -3] in
-  assert (true_grand_product_test a_nums b_nums);
+  assert (true_grand_product_test a_nums b_nums) ;
   assert (not (false_grand_product_test a_nums b_nums))

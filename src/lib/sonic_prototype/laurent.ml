@@ -221,7 +221,8 @@ end)
                 ( if deg = 0 then ""
                 else "x" ^ if deg <> 1 then "^" ^ string_of_int deg else "" )
                 (if List.length tl > 0 then " + " else "")
-            else if List.length tl = 0 then "0" else ""
+            else if List.length tl = 0 then "0"
+            else ""
           in
           Printf.sprintf "%s%s" first (print_loop Int.(deg + 1) tl)
     in

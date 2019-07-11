@@ -78,7 +78,7 @@ end
 
 module Make_fp
     (N : Nat_intf.S) (Info : sig
-        val order : N.t
+      val order : N.t
     end) : Fp_intf with type nat := N.t = struct
   include Info
 
@@ -102,8 +102,8 @@ module Make_fp
         ~f:(fun xs ->
           List.foldi xs ~init:zero ~f:(fun i acc x ->
               N.log_or acc
-                (N.shift_left (N.of_int (Int32.to_int_exn x)) (32 * i)) )
-          |> fun x -> N.(x % order) ))
+                (N.shift_left (N.of_int (Int32.to_int_exn x)) (32 * i)))
+          |> fun x -> N.(x % order)))
 
   let fold_bits n : bool Fold_lib.Fold.t =
     { fold=
@@ -112,7 +112,7 @@ module Make_fp
             if Int.(i = length_in_bits) then acc
             else go (f acc (N.test_bit n i)) (i + 1)
           in
-          go init 0 ) }
+          go init 0) }
 
   let fold n = Fold_lib.Fold.group3 ~default:false (fold_bits n)
 
@@ -196,7 +196,7 @@ module Make_fp
       let quadratic_non_residue =
         first (fun i ->
             let i = of_int i in
-            Option.some_if (not (is_square i)) i )
+            Option.some_if (not (is_square i)) i)
       in
       { two_adicity= s
       ; quadratic_non_residue_to_t= quadratic_non_residue ** t
@@ -251,7 +251,7 @@ module Make_fp
             let m = pow2_order b in
             let w = pow2 z Int.(v - m - 1) in
             let z = square w in
-            {z; b= b * z; x= x * w; v= m} )
+            {z; b= b * z; x= x * w; v= m})
       in
       x
 
@@ -266,7 +266,7 @@ module Make_fp
     Quickcheck.test ~trials:10 gen ~f:(fun n ->
         let n = abs n in
         let n2 = Int.(n * n) in
-        mem (sqrt (of_int n2)) [of_int n; Info.order - of_int n] )
+        mem (sqrt (of_int n2)) [of_int n; Info.order - of_int n])
 end
 
 module type Degree_2_extension_intf = sig
@@ -315,11 +315,11 @@ let find_wnaf (type t) (module N : Nat_intf.S with type t = t) window_size
 
 module Make_fp3
     (Fp : Intf) (Info : sig
-        val non_residue : Fp.t
+      val non_residue : Fp.t
 
-        val frobenius_coeffs_c1 : Fp.t array
+      val frobenius_coeffs_c1 : Fp.t array
 
-        val frobenius_coeffs_c2 : Fp.t array
+      val frobenius_coeffs_c2 : Fp.t array
     end) : sig
   include Degree_3_extension_intf with type base = Fp.t
 
@@ -400,7 +400,7 @@ end
 
 module Make_fp2
     (Fp : Intf) (Info : sig
-        val non_residue : Fp.t
+      val non_residue : Fp.t
     end) : sig
   include Degree_2_extension_intf with type base = Fp.t
 end = struct
@@ -458,11 +458,11 @@ module Make_fp6
     (N : Nat_intf.S)
     (Fp : Intf)
     (Fp2 : Degree_2_extension_intf with type base = Fp.t) (Fp3 : sig
-        include Degree_3_extension_intf with type base = Fp.t
+      include Degree_3_extension_intf with type base = Fp.t
 
-        val frobenius : t -> int -> t
+      val frobenius : t -> int -> t
 
-        val non_residue : Fp.t
+      val non_residue : Fp.t
     end) (Info : sig
       val non_residue : Fp.t
 

@@ -48,10 +48,13 @@ let satisfied (circuit : Arith_circuit.t) (assignment : Assignment.t) =
   let cs = circuit.cs in
   let q = List.length cs in
   List.fold_left ~init:true ~f:( && )
-    (List.map ~f:(fun i ->
-      Fr.equal
-        (Fr.( + )
-          (Fr.( + ) (dot_product (List.nth_exn w_l i) a_l) (dot_product (List.nth_exn w_r i) a_r))
-          ((dot_product (List.nth_exn w_o i) a_o)))
-        (List.nth_exn cs i)
-      ) (List.range 0 q))
+    (List.map
+       ~f:(fun i ->
+         Fr.equal
+           (Fr.( + )
+              (Fr.( + )
+                 (dot_product (List.nth_exn w_l i) a_l)
+                 (dot_product (List.nth_exn w_r i) a_r))
+              (dot_product (List.nth_exn w_o i) a_o))
+           (List.nth_exn cs i))
+       (List.range 0 q))

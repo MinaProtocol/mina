@@ -16,9 +16,9 @@ module Make (N : sig
   val num_bits : t -> int
 end)
 (Fq : Fields.Intf) (Coefficients : sig
-    val a : Fq.t
+  val a : Fq.t
 
-    val b : Fq.t
+  val b : Fq.t
 end) =
 struct
   type t = {x: Fq.t; y: Fq.t; z: Fq.t} [@@deriving bin_io, sexp]
@@ -90,15 +90,16 @@ struct
   let negate {x; y; z} = {x; y= Fq.negate y; z}
 
   let rec scale base s =
-    if N.( < ) s N.zero then (negate (scale base (N.negate s))) else
-    let rec go found_one acc i =
-      if i < 0 then acc
-      else
-        let acc = if found_one then acc + acc else acc in
-        if N.test_bit s i then go true (acc + base) (i - 1)
-        else go found_one acc (i - 1)
-    in
-    go false zero (N.num_bits s - 1)
+    if N.( < ) s N.zero then negate (scale base (N.negate s))
+    else
+      let rec go found_one acc i =
+        if i < 0 then acc
+        else
+          let acc = if found_one then acc + acc else acc in
+          if N.test_bit s i then go true (acc + base) (i - 1)
+          else go found_one acc (i - 1)
+      in
+      go false zero (N.num_bits s - 1)
 
   let ( * ) s g = scale g s
 

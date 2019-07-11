@@ -50,18 +50,18 @@ module Make
     (N : Nat_intf.S)
     (Fq : Fields.Fp_intf with type nat := N.t)
     (Fq_twist : Fields.Extension_intf with type base = Fq.t) (Fq_target : sig
-        include Fields.Degree_2_extension_intf with type base = Fq_twist.t
+      include Fields.Degree_2_extension_intf with type base = Fq_twist.t
 
-        val frobenius : t -> int -> t
+      val frobenius : t -> int -> t
 
-        val cyclotomic_exp : t -> N.t -> t
+      val cyclotomic_exp : t -> N.t -> t
     end)
     (G1 : Simple_elliptic_curve_intf with type base := Fq.t) (G2 : sig
-        include Simple_elliptic_curve_intf with type base := Fq_twist.t
+      include Simple_elliptic_curve_intf with type base := Fq_twist.t
 
-        module Coefficients : sig
-          val a : Fq_twist.t
-        end
+      module Coefficients : sig
+        val a : Fq_twist.t
+      end
     end) (Info : sig
       val twist : Fq_twist.t
 

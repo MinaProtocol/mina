@@ -80,17 +80,11 @@ let satisfied () =
     Fr.( + )
       (Fr.( + )
          (List.fold_left ~init:Fr.zero ~f:Fr.( + )
-            (List.map2_exn a_l
-               (List.nth_exn w_l q)
-               ~f:Fr.( * )))
+            (List.map2_exn a_l (List.nth_exn w_l q) ~f:Fr.( * )))
          (List.fold_left ~init:Fr.zero ~f:Fr.( + )
-            (List.map2_exn a_r
-              (List.nth_exn w_r q)
-               ~f:Fr.( * ))))
+            (List.map2_exn a_r (List.nth_exn w_r q) ~f:Fr.( * ))))
       (List.fold_left ~init:Fr.zero ~f:Fr.( + )
-         (List.map2_exn a_o
-            (List.nth_exn w_o q)
-            ~f:Fr.( * )))
+         (List.map2_exn a_o (List.nth_exn w_o q) ~f:Fr.( * )))
   in
   let rec k_loop q = if q = q_max then [] else k_q q :: k_loop (q + 1) in
   let k = k_loop 0 in
@@ -123,17 +117,11 @@ let mult_not_satisfied () =
     Fr.( + )
       (Fr.( + )
          (List.fold_left ~init:Fr.zero ~f:Fr.( + )
-            (List.map2_exn a_l
-               (List.nth_exn w_l q)
-               ~f:Fr.( * )))
+            (List.map2_exn a_l (List.nth_exn w_l q) ~f:Fr.( * )))
          (List.fold_left ~init:Fr.zero ~f:Fr.( + )
-            (List.map2_exn a_r
-              (List.nth_exn w_r q)
-               ~f:Fr.( * ))))
+            (List.map2_exn a_r (List.nth_exn w_r q) ~f:Fr.( * ))))
       (List.fold_left ~init:Fr.zero ~f:Fr.( + )
-         (List.map2_exn a_o
-            (List.nth_exn w_o q)
-            ~f:Fr.( * )))
+         (List.map2_exn a_o (List.nth_exn w_o q) ~f:Fr.( * )))
   in
   let rec k_loop q = if q = q_max then [] else k_q q :: k_loop (q + 1) in
   let k = k_loop 0 in
