@@ -123,6 +123,12 @@ type FeeTransfer {
   fee: UInt64!
 }
 
+enum TransactionStatus {
+  PENDING
+  INCLUDED
+  UNKNOWN
+}
+
 type Histogram {
   values: [Int!]!
   intervals: [Interval!]!
@@ -227,6 +233,9 @@ type query {
     # Public key of sender of pooled user commands
     publicKey: PublicKey!
   ): [UserCommand!]!
+
+  # Retrieve status of a transaction
+  transactionStatus(payment: string): TransactionStatus
 }
 
 type RpcPair {
@@ -386,4 +395,3 @@ type Wallet {
   # Path of the private key file for this account
   privateKeyPath: String!
 }
-

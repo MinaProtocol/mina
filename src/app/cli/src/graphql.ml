@@ -133,6 +133,24 @@ module Types = struct
         ; enum_value "SYNCED" ~value:`Synced
         ; enum_value "OFFLINE" ~value:`Offline ]
 
+  let transaction_status : ('context, Transaction_status.State.t option) typ =
+    enum "TransactionStatus" ~doc:"Status of a transaction"
+      ~values:
+        Transaction_status.State.
+          [ enum_value "INCLUDED" ~value:Included
+              ~doc:
+                "A transaction that is in the best tip path of the transition \
+                 frontier"
+          ; enum_value "PENDING" ~value:Pending
+              ~doc:
+                "A transaction either in the transition frontier or in \
+                 transaction pool"
+          ; enum_value "UNKOWN" ~value:Unknown
+              ~doc:
+                "The status includes either been snarked, reached finality \
+                 through consensus or has been dropped. Computing these type \
+                 of statuses still need to be implemented" ]
+
   module DaemonStatus = struct
     type t = Daemon_rpcs.Types.Status.t
 
@@ -1293,6 +1311,24 @@ module Queries = struct
               Public_key.Compressed.Set.mem propose_public_keys pk
           ; path= Secrets.Wallets.get_path (Coda_lib.wallets coda) pk } )
 
+  let transaction_status =
+    result_field "transactionStatus" ~doc:"Get the status of a transaction"
+      ~typ:(non_null Types.transaction_status)
+      ~args:
+        Arg.
+          [ arg "payment" ~typ:(non_null string)
+              ~doc:(Doc.bin_prot "Serialized payment") ]
+      ~resolve:(fun {ctx= coda; _} () serialized_payment ->
+        let open Result.Let_syntax in
+        let%map payment =
+          Types.Pagination.User_command.Inputs.Cursor.deserialize
+            ~error:"Invalid payment provided" serialized_payment
+        in
+        let transition_frontier_pipe = Coda_lib.transition_frontier coda in
+        let transaction_pool = Coda_lib.transaction_pool coda in
+        Transaction_status.get_status ~transition_frontier_pipe
+          ~transaction_pool payment )
+
   let current_snark_worker =
     field "currentSnarkWorker" ~typ:Types.snark_worker
       ~args:Arg.[]
@@ -1323,7 +1359,8 @@ module Queries = struct
     ; current_snark_worker
     ; blocks
     ; initial_peers
-    ; pooled_user_commands ]
+    ; pooled_user_commands
+    ; transaction_status ]
 end
 
 let schema =
