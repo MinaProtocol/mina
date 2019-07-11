@@ -175,8 +175,9 @@ def run(args):
             logproc_exe = os.path.join(coda_build_path, logproc_exe_path)
             build_targets = '%s %s' % (coda_exe, logproc_exe)
 
-    all_tests = filter_tests(small_curves_tests, args.whitelist_patterns, args.blacklist_patterns)
+    all_tests = small_curves_tests
     all_tests.update(medium_curves_tests)
+    all_tests = filter_tests(all_tests, args.whitelist_patterns, args.blacklist_patterns)
     if len(all_tests) == 0:
         # TODO: support direct test dispatching
         if args.whitelist_patterns != ['*']:
