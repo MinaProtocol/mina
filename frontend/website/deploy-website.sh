@@ -47,7 +47,7 @@ CI=no
 if [[ "$1" == "staging" ]]; then
   TARGET=coda-staging-84430
 elif [[ "$1" == "ci" ]]; then
-  TARGET=coda-staging-84430
+  TARGET=proof-of-steak-7ab54
   CI=yes
 elif [[ "$1" == "prod" ]]; then
   TARGET=coda-203520
