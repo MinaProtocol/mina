@@ -235,8 +235,8 @@ module Data = struct
     end
 
     let slot_start_time (epoch : t) (slot : Slot.t) =
-      Time.add (start_time epoch)
-        (Time.Span.of_ms
+      Coda_base.Block_time.add (start_time epoch)
+        (Coda_base.Block_time.Span.of_ms
            Int64.Infix.(int64_of_uint32 slot * Constants.Slot.duration_ms))
 
     (*
@@ -246,7 +246,7 @@ module Data = struct
 
     let epoch_and_slot_of_time_exn tm : t * Slot.t =
       let epoch = of_time_exn tm in
-      let time_since_epoch = Time.diff tm (start_time epoch) in
+      let time_since_epoch = Coda_base.Block_time.diff tm (start_time epoch) in
       let slot =
         uint32_of_int64
         @@ Int64.Infix.(
@@ -2566,7 +2566,8 @@ module Hooks = struct
       "Checking for next proposal..." ;
     let curr_epoch, curr_slot =
       Epoch.epoch_and_slot_of_time_exn
-        (Time.of_span_since_epoch (Time.Span.of_ms now))
+        (Coda_base.Block_time.of_span_since_epoch
+           (Coda_base.Block_time.Span.of_ms now))
     in
     let epoch, slot =
       if
@@ -2871,8 +2872,8 @@ module Hooks = struct
   end
 end
 
-let time_hum (now : Core_kernel.Time.t) =
-  let epoch, slot = Data.Epoch.epoch_and_slot_of_time_exn (Time.of_time now) in
+let time_hum (now : Coda_base.Block_time.t) =
+  let epoch, slot = Data.Epoch.epoch_and_slot_of_time_exn now in
   Printf.sprintf "%d:%d" (Data.Epoch.to_int epoch)
     (Data.Epoch.Slot.to_int slot)
 
