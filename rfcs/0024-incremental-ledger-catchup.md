@@ -72,32 +72,37 @@ hinder us from scaling up to a more realistic setting.
 
 The proposed design would do much better than the current in average case. Let's see some examples first:
 
+In all of the following examples, let's assume **k** = 3000, **size of transition** = 1 kB, **size of state_body_hash** = 5 bytes, 
+
 ### Example 1
 
-suppose **k** = 3000, **size of transition** = 1 kB, **size of state_body_hash** = 5 bytes, 
-
-With block_window_duration to be 5 min and let's assume a node is offline for 5 hours. In this scenario, we assume that it missed about 40 transitions.
+With block_window_duration to be 5 min and if a node is offline for 5 hours, assuming at least half of the slots are filled, we could safely say that it missed about 40 transitions.
 
 After realizing it's disconnected with the network, it sends a ledger-catchup
 request to some random peers.
 
-* In current implementation, the peer would respond with ~2k=6000 transitions (could be off by 1 to 2 if new blocks are created during the same time), while we only need 40 transitions to do the catchup, the other 5960 transitions sent by peer are unnecessary. We would download 2k * size of transition = 6MB data in total.
+* In current implementation, the peer would respond with ~2k=6000 transitions (could be off by 1 to 2 if new blocks are created during the same time), while we only need 40 transitions to do the catchup, the other 5960 transitions sent by peer are unnecessary. We would download 2k * **size of transition** = 6MB data in total.
 
 * In proposed design, the peer would respond with 2k state_body_hash. By
 looking at the hashes, we would realize that we only need 40 transitions, so
 we send another request to download those 40 transitions. In this scenario we
-would download 2k * size of state_body_hash + 40 * size of transition = 70kB
+would download 2k * **size of state_body_hash** + 40 * **size of transition** = 70kB
 data in total.
 
 ### Example 2
 
-suppose **k** = 3000, **size of transition** = 1 kB, **size of state_body_hash** = 5 bytes
+let's assume this time the node is missing k transitions.
 
-let assume a node is offline for a long time, and it's missing 2k-1 transitions (which
+* In current implementation, we would download 6MB of data.
+* In proposed design, we would download 3.04MB of data
+
+### Example 3
+
+let's assume a node is offline for a long time, and it's missing 2k-1 transitions (which
 is the edger case between ledger-catchup and bootstrap).
 
-* In current implementation, we would still download 2k * size of transition = 6MB data.
-* In proposed design, we would download 2k * size of state_body_hash + (2k-1) * size of transitions = 6.04 MB.
+* In current implementation, we would download 6MB of data.
+* In proposed design, we would download 6.04 MB of data.
 
 We can see that in this case, the proposed design would behave slightly worse than the current implementation.
 
@@ -106,6 +111,9 @@ We can see that in this case, the proposed design would behave slightly worse th
 In general, small number of missing transitions would cause huge performance improvement in the proposed design;
 As the number of missing transitions grows larger, the performance of the proposed design would converge to the
 performance of the current implementation.
+
+In the above examples, I always set the transition size to 1kB, but in reality its size depends on how much
+transactions are included in it. Larger transition size would make performance of current impelementation worse.
 
 [1] Since transition frontier also store a list of past roots which is known
 as root history, oldest transition could be the oldest transition in
