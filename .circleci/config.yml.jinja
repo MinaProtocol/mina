@@ -210,7 +210,7 @@ jobs:
             - run:
                   name: Run unit tests
                   command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && dune build --profile={{profile}} -j8 && (dune runtest --profile={{profile}} -j8 || (./scripts/link-coredumps.sh && false))'
-                  no_output_timeout: 20m
+                  no_output_timeout: 1h
             - store_artifacts:
                 path: core_dumps
     {%- endfor %}
@@ -244,7 +244,9 @@ jobs:
             - run:
                   name: Running test -- {{profile}}:{{test}}
                   command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run "{{profile}}:{{test}}"'
+                  {%- if test in medium_curve_profiles %}
                   no_output_timeout: 20m
+                  {%- endif %}
             {%- endfor %}
             - store_artifacts:
                   path: test_logs
