@@ -229,12 +229,6 @@ Router.(
   )
 );
 
-// Run mkdocs to generate static docs site
-Markdown.Child_process.execSync(
-  "mkdocs build -d site/docs",
-  Markdown.Child_process.option(),
-);
-
 module MoreFs = {
   type stat;
   [@bs.val] [@bs.module "fs"] external lstatSync: string => stat = "";
@@ -277,3 +271,9 @@ if (!isProd) {
   moveToSite("static/main.bc.js");
   moveToSite("static/verifier_main.bc.js");
 };
+
+// Run mkdocs to generate static docs site
+Markdown.Child_process.execSync(
+  "mkdocs build -d site/docs",
+  Markdown.Child_process.option(),
+);
