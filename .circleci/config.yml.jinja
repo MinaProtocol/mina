@@ -267,22 +267,16 @@ workflows:
             {%- for profile in build_artifact_profiles %}
             - build-artifacts--{{profile}}
             {%- endfor %}
-            {%- for profile in medium_curves_tests.keys() | sort %}
-            - test--{{profile}}
-            {%- endfor %}
-            {%- for profile in unit_test_profiles_medium_curves %}
-            - test-unit--{{profile}}
-            {%- endfor %}
-{#{%- for profile in unit_test_profiles %}
+            {%- for profile in unit_test_profiles %}
             - test-unit--{{profile}}
             {%- endfor %}
             {%- for profile in small_curves_tests.keys() | sort %}
             - test--{{profile}}
-            {%- endfor %}#}
+            {%- endfor %}
     daily:
         triggers:
           - schedule:
-              cron: "0 20 * * *"
+              cron: "0 12 * * *"
               filters:
                 branches:
                   only:

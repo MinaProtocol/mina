@@ -660,19 +660,24 @@ workflows:
             - build-artifacts--testnet_postake_snarkless_fake_hash
             - build-artifacts--testnet_postake_medium_curves
             - build-artifacts--testnet_postake_many_proposers_medium_curves
-            - test--test_postake_delegation_medium_curves
-            - test--test_postake_medium_curves
-            - test--test_postake_snarkless_medium_curves
-            - test--test_postake_split_medium_curves
-            - test--test_postake_split_snarkless_medium_curves
-            - test--test_postake_txns_medium_curves
-            - test-unit--test_postake_snarkless_medium_curves_unit_test
-            - test-unit--dev_medium_curves
-
+            - test-unit--test_postake_snarkless_unittest
+            - test-unit--dev
+            - test--fake_hash
+            - test--test_postake
+            - test--test_postake_bootstrap
+            - test--test_postake_catchup
+            - test--test_postake_delegation
+            - test--test_postake_five_even_snarkless
+            - test--test_postake_five_even_txns
+            - test--test_postake_holy_grail
+            - test--test_postake_snarkless
+            - test--test_postake_split
+            - test--test_postake_split_snarkless
+            - test--test_postake_txns
     daily:
         triggers:
           - schedule:
-              cron: "0 20 * * *"
+              cron: "0 12 * * *"
               filters:
                 branches:
                   only:
