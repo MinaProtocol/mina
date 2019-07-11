@@ -2,6 +2,10 @@ open Core_kernel
 open Snarkette
 open Default_backend.Backend
 
+let flip lst =
+  let n = List.length (List.hd_exn lst) in
+  List.map ~f:(fun i -> (List.map ~f:(fun x -> (List.nth_exn x i)) lst)) (List.range 0 n)
+
 let rec list_first l n =
   if n = 0 then []
   else match l with [] -> [] | hd :: tl -> hd :: list_first tl (n - 1)
@@ -9,6 +13,9 @@ let rec list_first l n =
 let rec list_except_first l n =
   if n = 0 then l
   else match l with [] -> [] | _ :: tl -> list_except_first tl (n - 1)
+
+let list_replace lst idx new_val =
+  (list_first lst idx) @ [new_val] @ (list_except_first lst (idx + 1))
 
 let reverse = List.fold_left ~init:[] ~f:(fun lst x -> x :: lst)
 

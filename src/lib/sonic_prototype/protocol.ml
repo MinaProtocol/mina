@@ -37,12 +37,12 @@ let prover (srs : Srs.t) (assignment : Assignment.t)
     Bivariate_fr_laurent.create (-((2 * n) + 4)) (reverse (cn_poly_fn cns 1))
   in
   let poly_r' = Bivariate_fr_laurent.( + ) r_xy sumc_xy in
-  let commit_r = commit_poly srs n x (eval_on_y Fr.one poly_r') in
+  let commit_r = commit_poly srs x (eval_on_y Fr.one poly_r') in
   let y = Fr.random () in
   let ky = k_poly arith_circuit.cs n in
   let s_p = s_poly arith_circuit.weights in
   let t_p = t_poly poly_r' s_p ky in
-  let commit_t = commit_poly srs srs.d x (eval_on_y y t_p) in
+  let commit_t = commit_poly srs x (eval_on_y y t_p) in
   let z = Fr.random () in
   let a, wa = open_poly srs commit_r x z (eval_on_y Fr.one poly_r') in
   let b, wb =
@@ -75,8 +75,8 @@ let verifier (srs : Srs.t) (arith_circuit : Arith_circuit.t) (proof : Proof.t)
   in
   let checks =
     [ hsc_v srs ys arith_circuit.weights proof.pr_hsc_proof
-    ; pc_v srs n proof.pr_r z (proof.pr_a, proof.pr_wa)
-    ; pc_v srs n proof.pr_r (Fr.( * ) y z) (proof.pr_b, proof.pr_wb)
-    ; pc_v srs srs.d proof.pr_t z (t, proof.pr_wt) ]
+    ; pc_v srs proof.pr_r z (proof.pr_a, proof.pr_wa)
+    ; pc_v srs proof.pr_r (Fr.( * ) y z) (proof.pr_b, proof.pr_wb)
+    ; pc_v srs proof.pr_t z (t, proof.pr_wt) ]
   in
   List.fold_left ~f:( && ) ~init:true checks

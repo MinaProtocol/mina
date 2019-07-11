@@ -22,12 +22,12 @@ end
 let hsc_p (srs : Srs.t) (gate_weights : Gate_weights.t) x ys : Hsc_proof.t =
   let ss =
     List.map ys ~f:(fun yi ->
-        commit_poly srs srs.d x (eval_on_y yi (s_poly gate_weights)))
+        commit_poly srs x (eval_on_y yi (s_poly gate_weights)))
   in
   (* verifier samples u (from random oracle) and sends to prover *)
   let u = Fr.random () in
   let suX = eval_on_x u (s_poly gate_weights) in
-  let commit = commit_poly srs srs.d x suX in
+  let commit = commit_poly srs x suX in
   let sW =
     List.map2_exn ys ss ~f:(fun yi si ->
         open_poly srs si x u (eval_on_y yi (s_poly gate_weights)))
@@ -50,8 +50,8 @@ let hsc_v (srs : Srs.t) ys (gate_weights : Gate_weights.t)
     Fr_laurent.eval (eval_on_y proof.hsc_z (s_poly gate_weights)) proof.hsc_u
   in
   List.fold_left ~f:( && ) ~init:true
-    ( pc_v srs srs.d proof.hsc_c proof.hsc_z (sz, proof.hsc_qz)
+    ( pc_v srs proof.hsc_c proof.hsc_z (sz, proof.hsc_qz)
       :: List.map2_exn proof.hsc_s proof.hsc_w ~f:(fun sj (wsj, wj) ->
-             pc_v srs srs.d sj proof.hsc_u (wsj, wj))
+             pc_v srs sj proof.hsc_u (wsj, wj))
     @ List.map2_exn ys proof.hsc_q ~f:(fun yj (qsj, qj) ->
-          pc_v srs srs.d proof.hsc_c yj (qsj, qj)) )
+          pc_v srs proof.hsc_c yj (qsj, qj)) )

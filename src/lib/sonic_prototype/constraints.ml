@@ -1,3 +1,4 @@
+open Core
 open Snarkette
 open Arithmetic_circuit
 open Utils
@@ -41,20 +42,19 @@ let r_poly (assignment : Assignment.t) =
         List.concat [f a_lHd a_rHd a_oHd i; process a_lTl a_rTl a_oTl (i + 1)]
   in
   let processed = process assignment.a_l assignment.a_r assignment.a_o 1 in
-  let reorder =
-    List.sort (fun l1 l2 -> Fr_laurent.deg l1 - Fr_laurent.deg l2)
+  let reorder lst =
+    List.sort lst ~compare:(fun l1 l2 -> Fr_laurent.deg l1 - Fr_laurent.deg l2)
   in
   Bivariate_fr_laurent.create (-2 * n)
     (reorder (Fr_laurent.create 0 [] :: processed))
-
 (* bivariate polynomial; X deg = Y deg, so we just sort Y polys as coeffs of X polys *)
 
 let s_poly (gate_weights : Gate_weights.t) =
   let w_l, w_r, w_o = (gate_weights.w_l, gate_weights.w_r, gate_weights.w_o) in
-  let n = List.length w_l in
-  let f wi _i = Fr_laurent.create (n + 1) wi in
-  let rec ff wis i =
-    match wis with [] -> [] | wi :: wiss -> f wi i :: ff wiss (i + 1)
+  let n = List.length (List.hd_exn w_l) in
+  let f wi = Fr_laurent.create (n + 1) wi in
+  let rec ff lst =
+    match lst with [] -> [] | hd::tl -> f hd :: ff tl
   in
   let g wi i =
     Fr_laurent.( + )
@@ -63,14 +63,14 @@ let s_poly (gate_weights : Gate_weights.t) =
          (Fr_laurent.create (-i) [Fr.of_int (-1)]))
       (Fr_laurent.create (n + 1) wi)
   in
-  let rec gg wis i =
-    match wis with [] -> [] | wi :: wiss -> g wi i :: gg wiss (i + 1)
+  let rec gg lst i =
+    match lst with [] -> [] | hd::tl -> g hd i :: gg tl (i + 1)
   in
   Bivariate_fr_laurent.( + )
     (Bivariate_fr_laurent.( + )
-       (Bivariate_fr_laurent.create (-n) (ff (reverse w_l) 1))
-       (Bivariate_fr_laurent.create 1 (ff w_r 1)))
-    (Bivariate_fr_laurent.create (n + 1) (gg w_o 1))
+    (Bivariate_fr_laurent.create (-n) (ff (reverse (flip w_l))))
+       (Bivariate_fr_laurent.create 1 (ff (flip w_r))))
+    (Bivariate_fr_laurent.create (n + 1) (gg (flip w_o) 1))
 
 let t_poly r_p s_p k_p =
   Bivariate_fr_laurent.( + )

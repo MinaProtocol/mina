@@ -37,7 +37,7 @@ let%test_unit "test protocol" =
     ; [Fr.of_int 0; Fr.of_int 1; Fr.of_int 0; Fr.of_int 0]
     ; [Fr.of_int 0; Fr.of_int 0; Fr.of_int 0; Fr.of_int 1] ]
   in
-  let cs = [Fr.zero; Fr.negate z; Fr.negate z; Fr.negate z; Fr.negate z] in
+  let cs = [Fr.zero; Fr.(of_int 4 - z); Fr.(of_int 9 - z); Fr.(of_int 9 - z); Fr.(of_int 4 - z)] in
   let a_l = [Fr.(of_int 4 - z); Fr.(of_int 9 - z)] in
   let a_r = [Fr.(of_int 9 - z); Fr.(of_int 4 - z)] in
   let a_o = hadamardp a_l a_r in

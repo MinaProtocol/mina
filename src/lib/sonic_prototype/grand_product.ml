@@ -77,7 +77,7 @@ let gprod_p (srs : Srs.t) u v u_coeffs v_coeffs x : Gprod_proof.t =
       + (u + scale v (Fr.to_bigint (Fr.( ** ) x (Nat.of_int Int.(n + 1))))))
   in
   let c_poly = Fr_laurent.create 1 c in
-  let c_commit = commit_poly srs srs.d x c_poly in
+  let c_commit = commit_poly srs x c_poly in
   let cw = wform_p srs x ((2 * n) + 1) c_commit c in
   let uw = wform_p srs x n u u_coeffs in
   let vw = wform_p srs x n v v_coeffs in
@@ -118,7 +118,7 @@ let gprod_p (srs : Srs.t) u v u_coeffs v_coeffs x : Gprod_proof.t =
   let t_poly =
     Bivariate_fr_laurent.(((r_poly + s_poly) * r_prime_poly) - k_poly)
   in
-  let t = commit_poly srs srs.d x (eval_on_y y t_poly) in
+  let t = commit_poly srs x (eval_on_y y t_poly) in
   (* verifier samples z (from random oracle) and sends to prover *)
   let z = Fr.random () in
   let va, wa = open_poly srs a x (Fr.( * ) y z) a_poly in
@@ -182,9 +182,10 @@ let gprod_v (srs : Srs.t) u v (proof : Gprod_proof.t) =
             + u)
           h)
        (pair v (List.nth_exn srs.hPositiveX (n + 1))))
-  && pc_v srs srs.d a (Fr.( * ) y z) (va, wa)
-  && pc_v srs srs.d c (Fr.inv z) (vc, wc)
-  && pc_v srs srs.d c y (vk, wk)
-  && pc_v srs srs.d t_commit z (t, wt)
+  && pc_v srs a (Fr.( * ) y z) (va, wa)
+  && pc_v srs c (Fr.inv z) (vc, wc)
+  && pc_v srs c y (vk, wk)
+  && pc_v srs t_commit z (t, wt)
   && wform_v srs ((2 * n) + 1) c cw
-  && wform_v srs n u uw && wform_v srs n v vw
+  && wform_v srs n u uw
+  && wform_v srs n v vw

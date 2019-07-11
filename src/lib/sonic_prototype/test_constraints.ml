@@ -26,28 +26,28 @@ let r_poly_output =
 let s_poly_output =
   Bivariate_fr_laurent.create (-2)
     [ Fr_laurent.create 0
-        [Fr.of_int 0; Fr.of_int 0; Fr.of_int 0; Fr.of_int 3; Fr.of_int 4]
+        [Fr.of_int 0; Fr.of_int 0; Fr.of_int 0; Fr.of_int 2; Fr.of_int 4]
     ; Fr_laurent.create 0
-        [Fr.of_int 0; Fr.of_int 0; Fr.of_int 0; Fr.of_int 1; Fr.of_int 2]
+        [Fr.of_int 0; Fr.of_int 0; Fr.of_int 0; Fr.of_int 1; Fr.of_int 3]
     ; Fr_laurent.create 0 []
     ; Fr_laurent.create 0
-        [Fr.of_int 0; Fr.of_int 0; Fr.of_int 0; Fr.of_int 5; Fr.of_int 6]
+        [Fr.of_int 0; Fr.of_int 0; Fr.of_int 0; Fr.of_int 5; Fr.of_int 7]
     ; Fr_laurent.create 0
-        [Fr.of_int 0; Fr.of_int 0; Fr.of_int 0; Fr.of_int 7; Fr.of_int 8]
+        [Fr.of_int 0; Fr.of_int 0; Fr.of_int 0; Fr.of_int 6; Fr.of_int 8]
     ; Fr_laurent.create (-1)
         [ Fr.of_int (-1)
         ; Fr.of_int 0
         ; Fr.of_int (-1)
         ; Fr.of_int 0
         ; Fr.of_int 9
-        ; Fr.of_int 10 ]
+        ; Fr.of_int 11 ]
     ; Fr_laurent.create (-2)
         [ Fr.of_int (-1)
         ; Fr.of_int 0
         ; Fr.of_int 0
         ; Fr.of_int 0
         ; Fr.of_int (-1)
-        ; Fr.of_int 11
+        ; Fr.of_int 10
         ; Fr.of_int 12 ] ]
 
 let%test_unit "s_poly_test" =
@@ -61,16 +61,19 @@ let satisfied () =
   let a_r = [Fr.random (); Fr.random ()] in
   let a_o = List.map2_exn a_l a_r ~f:(fun l r -> Fr.( * ) l r) in
   let w_l =
-    [ [Fr.random (); Fr.random (); Fr.random ()]
-    ; [Fr.random (); Fr.random (); Fr.random ()] ]
+    [ [Fr.random (); Fr.random ()]
+    ; [Fr.random (); Fr.random ()]
+    ; [Fr.random (); Fr.random ()] ]
   in
   let w_r =
-    [ [Fr.random (); Fr.random (); Fr.random ()]
-    ; [Fr.random (); Fr.random (); Fr.random ()] ]
+    [ [Fr.random (); Fr.random ()]
+    ; [Fr.random (); Fr.random ()]
+    ; [Fr.random (); Fr.random ()] ]
   in
   let w_o =
-    [ [Fr.random (); Fr.random (); Fr.random ()]
-    ; [Fr.random (); Fr.random (); Fr.random ()] ]
+    [ [Fr.random (); Fr.random ()]
+    ; [Fr.random (); Fr.random ()]
+    ; [Fr.random (); Fr.random ()] ]
   in
   let q_max = 3 in
   let k_q q =
@@ -78,15 +81,15 @@ let satisfied () =
       (Fr.( + )
          (List.fold_left ~init:Fr.zero ~f:Fr.( + )
             (List.map2_exn a_l
-               (List.map w_l ~f:(fun l -> List.nth_exn l q))
+               (List.nth_exn w_l q)
                ~f:Fr.( * )))
          (List.fold_left ~init:Fr.zero ~f:Fr.( + )
             (List.map2_exn a_r
-               (List.map w_r ~f:(fun l -> List.nth_exn l q))
+              (List.nth_exn w_r q)
                ~f:Fr.( * ))))
       (List.fold_left ~init:Fr.zero ~f:Fr.( + )
          (List.map2_exn a_o
-            (List.map w_o ~f:(fun l -> List.nth_exn l q))
+            (List.nth_exn w_o q)
             ~f:Fr.( * )))
   in
   let rec k_loop q = if q = q_max then [] else k_q q :: k_loop (q + 1) in
@@ -101,16 +104,19 @@ let mult_not_satisfied () =
   let a_r = [Fr.random (); Fr.random ()] in
   let a_o = [Fr.random (); Fr.random ()] in
   let w_l =
-    [ [Fr.random (); Fr.random (); Fr.random ()]
-    ; [Fr.random (); Fr.random (); Fr.random ()] ]
+    [ [Fr.random (); Fr.random ()]
+    ; [Fr.random (); Fr.random ()]
+    ; [Fr.random (); Fr.random ()] ]
   in
   let w_r =
-    [ [Fr.random (); Fr.random (); Fr.random ()]
-    ; [Fr.random (); Fr.random (); Fr.random ()] ]
+    [ [Fr.random (); Fr.random ()]
+    ; [Fr.random (); Fr.random ()]
+    ; [Fr.random (); Fr.random ()] ]
   in
   let w_o =
-    [ [Fr.random (); Fr.random (); Fr.random ()]
-    ; [Fr.random (); Fr.random (); Fr.random ()] ]
+    [ [Fr.random (); Fr.random ()]
+    ; [Fr.random (); Fr.random ()]
+    ; [Fr.random (); Fr.random ()] ]
   in
   let q_max = 3 in
   let k_q q =
@@ -118,15 +124,15 @@ let mult_not_satisfied () =
       (Fr.( + )
          (List.fold_left ~init:Fr.zero ~f:Fr.( + )
             (List.map2_exn a_l
-               (List.map w_l ~f:(fun l -> List.nth_exn l q))
+               (List.nth_exn w_l q)
                ~f:Fr.( * )))
          (List.fold_left ~init:Fr.zero ~f:Fr.( + )
             (List.map2_exn a_r
-               (List.map w_r ~f:(fun l -> List.nth_exn l q))
+              (List.nth_exn w_r q)
                ~f:Fr.( * ))))
       (List.fold_left ~init:Fr.zero ~f:Fr.( + )
          (List.map2_exn a_o
-            (List.map w_o ~f:(fun l -> List.nth_exn l q))
+            (List.nth_exn w_o q)
             ~f:Fr.( * )))
   in
   let rec k_loop q = if q = q_max then [] else k_q q :: k_loop (q + 1) in
@@ -141,16 +147,19 @@ let add_not_satisfied () =
   let a_r = [Fr.random (); Fr.random ()] in
   let a_o = List.map2_exn a_l a_r ~f:(fun l r -> Fr.( * ) l r) in
   let w_l =
-    [ [Fr.random (); Fr.random (); Fr.random ()]
-    ; [Fr.random (); Fr.random (); Fr.random ()] ]
+    [ [Fr.random (); Fr.random ()]
+    ; [Fr.random (); Fr.random ()]
+    ; [Fr.random (); Fr.random ()] ]
   in
   let w_r =
-    [ [Fr.random (); Fr.random (); Fr.random ()]
-    ; [Fr.random (); Fr.random (); Fr.random ()] ]
+    [ [Fr.random (); Fr.random ()]
+    ; [Fr.random (); Fr.random ()]
+    ; [Fr.random (); Fr.random ()] ]
   in
   let w_o =
-    [ [Fr.random (); Fr.random (); Fr.random ()]
-    ; [Fr.random (); Fr.random (); Fr.random ()] ]
+    [ [Fr.random (); Fr.random ()]
+    ; [Fr.random (); Fr.random ()]
+    ; [Fr.random (); Fr.random ()] ]
   in
   let k = [Fr.random (); Fr.random (); Fr.random ()] in
   let (assignment : Assignment.t) = {a_l; a_r; a_o} in

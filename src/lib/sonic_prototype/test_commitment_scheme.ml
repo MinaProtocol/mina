@@ -15,7 +15,6 @@ let poly_commitment_scheme_test =
       let z = Fr.random () in
       let alpha = Fr.random () in
       let d = Random.int 99 + 2 in
-      let max = Random.int ((2 * d) - 1 - (d / 2)) + (d / 2) in
       let bL0 = Fr.of_int 7 in
       let bR0 = Fr.of_int 3 in
       let bL1 = Fr.of_int 2 in
@@ -34,8 +33,8 @@ let poly_commitment_scheme_test =
         eval_on_y y
           (t_poly (r_poly gate_inputs) (s_poly gate_weights) (k_poly cs n))
       in
-      let commitment = commit_poly srs max x fX in
+      let commitment = commit_poly srs x fX in
       let opening = open_poly srs commitment x z fX in
-      pc_v srs max commitment z opening)
+      pc_v srs commitment z opening)
 
 let () = QCheck.Test.check_exn poly_commitment_scheme_test
