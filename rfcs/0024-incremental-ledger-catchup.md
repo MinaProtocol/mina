@@ -1,15 +1,12 @@
-## Terminology
-
-history root: the oldest node in root history
-
 ## Summary
 
 The origin transition catchup design has performance issues. In
-current implementation, we would always downloading a list of transitions
-from the requested hash to peer's history root.
-The minimum number of transitions that transition catchup would request is
-k + 1 under current implementation. This is not very efficient in a realistic
-setting where k is ~3000. The new design features
+current implementation, we would always downloading a path/list of transitions
+from peer's oldest transition[1] to the request transition.
+If the request transition is in peer's frontier, then the minimum number of
+transitions that transition catchup would request is k + 1 under current
+implementation. This is not very efficient in a realistic setting where k is
+~3000. The new design features
 1) avoids requesting unnecessary transitions;
 2) instead of having a monolithic request to download everything; try to
    download small pieces from different peers at the same time.
@@ -22,17 +19,17 @@ The new design would improve the efficiency of doing ledger catchup.
 
 Split ledger catchup into 2 phases:
 
-1) Instead of
-   * requesting a path/list of transitions from peer's history root to the requested hash,
-   * requesting a merkle path/list from peer's history root to the requested hash together with their root history transition.
+1) * Instead of
+       - requesting a path/list of transitions from peer's oldest transition to the requested transition,
+       - requesting a merkle path/list from peer's oldest transition to the requested transition together with that oldest transition.
    
    * The merkle path/list contains a list of *state_body_hash*es as its
 *proof_elem*s. Upon received the merkle_path/list, we could verify that the merkle path by first trying
-to find the history root in our frontier or root_history and then call
+to find the oldest transition in our frontier or root_history and then call
 *Merkle_list.verify* on that merkle path. This would guarantee that the
 peer didn't send us a list of garbage and it also guarantees that the
 order is correct. And we could then reconstruct a list of *state_hash*es
-from the list of *state_body_hash*es.[1] Using this list of *state_hash*es we
+from the list of *state_body_hash*es.[2] Using this list of *state_hash*es we
 can find the missing transitions by repeated searching *state_hash*es until
 we find one (the one we find is the closest ancestor in our transition
 frontier).
@@ -67,15 +64,55 @@ transitions.
 It's not very clear to me what's a reasonable size of the list of transition
 that we should download in 1 request.
 
-## Rationale and alternatives
+## Rationale
 
 We currently have an almost stable testnet which is quite small. We are
 moving toward the direction of solving the known performance issues that would
 hinder us from scaling up to a more realistic setting.
 
-## Prior art
+The proposed design would do much better than the current in average case. Let's see some examples first:
 
-The current implementation is summaried in the `Summary` part.
+### Example 1
 
-[1] state_hash = H(previous_state_hash, state_body_hash), thus giving a root
+suppose **k** = 3000, **size of transition** = 1 kB, **size of state_body_hash** = 5 bytes
+let block_window_duration = 5 min
+
+let's assume a node is offline for 5 hours, and therefore it missed about 40
+transitions.
+
+After realizing it's disconnected with the network, it sends a ledger-catchup
+request to some random peers.
+
+* In current implementation, the peer would respond with ~2k=6000 transitions (could off by 1~2 if new blocks are created during the same time), while we only need 40 transitions to do the catchup, the other 5960 transitions sent by peer are unnecessary. We would download 2k * size of transition = 6MB data in total.
+
+* In proposed design, the peer would respond with 2k state_body_hash. By
+looking at the hashes, we would realize that we only need 40 transitions, so
+we send another request to download those 40 transitions. In this scenario we
+would download 2k * size of state_body_hash + 40 * size of transition = 70kB
+data in total.
+
+### Example 2
+
+suppose **k** = 3000, **size of transition** = 1 kB, **size of state_body_hash** = 5 bytes
+
+let assume a node is offline for a long time, and it's missing 2k-1 transitions (which
+is the edger case between ledger-catchup and bootstrap).
+
+* In current implementation, we would still download 2k * size of transition = 6MB data.
+* In proposed design, we would download 2k * size of state_body_hash + (2k-1) * size of transitions = 6.04 MB.
+
+We can see that in this case, the proposed design would behave slightly worse than the current implementation.
+
+### Analysis
+
+In general, small number of missing transitions would cause huge performance improvement in the proposed design;
+As the number of missing transitions grows larger, the performance of the proposed design would converge to the
+performance of the current implementation.
+
+[1] Since transition frontier also store a list of past roots which is known
+as root history, oldest transition could be the oldest transition in
+root_history if root_history is not empty or oldest transition just refers to
+the root if root history is empty.
+
+[2] state_hash = H(previous_state_hash, state_body_hash), thus giving a root
 transition and a list of state_body_hash we can compute a list of state_hash.
