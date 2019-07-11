@@ -21,8 +21,9 @@ let print_heartbeat () =
 
 let main () =
   let num_proposers = 3 in
+  let accounts = Lazy.force Genesis_ledger.accounts in
   let snark_work_public_keys ndx =
-    List.nth_exn Genesis_ledger.accounts ndx
+    List.nth_exn accounts ndx
     |> fun (_, acct) -> Some (Account.public_key acct)
   in
   let%bind testnet =
@@ -34,22 +35,20 @@ let main () =
   (* keep CI alive *)
   Deferred.don't_wait_for (print_heartbeat ()) ;
   (* dump account info to log *)
-  List.iteri Genesis_ledger.accounts ~f:(fun ndx ((_, acct) as record) ->
+  List.iteri accounts ~f:(fun ndx ((_, acct) as record) ->
       let keypair = Genesis_ledger.keypair_of_account_record_exn record in
       Logger.info logger ~module_:__MODULE__ ~location:__LOC__
         !"Account: %i private key: %{sexp: Import.Private_key.t} public key: \
           %{sexp: Account.key} balance: %{sexp: Currency.Balance.t}"
         ndx keypair.private_key (Account.public_key acct) acct.balance ) ;
   (* second account is delegator; see genesis_ledger/test_delegation_ledger.ml *)
-  let ((_, delegator_account) as delegator) =
-    List.nth_exn Genesis_ledger.accounts 2
-  in
+  let ((_, delegator_account) as delegator) = List.nth_exn accounts 2 in
   let delegator_pubkey = Account.public_key delegator_account in
   let delegator_keypair =
     Genesis_ledger.keypair_of_account_record_exn delegator
   in
   (* zeroth account is delegatee *)
-  let _, delegatee_account = List.nth_exn Genesis_ledger.accounts 0 in
+  let _, delegatee_account = List.nth_exn accounts 0 in
   let delegatee_pubkey = Account.public_key delegatee_account in
   let worker = testnet.workers.(0) in
   (* setup readers for proposals by delegator, delegatee *)

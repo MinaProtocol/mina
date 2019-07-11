@@ -2720,12 +2720,9 @@ module Hooks = struct
     let epoch = Epoch.of_int 5 in
     let start_time = Epoch.start_time epoch in
     let curr_epoch, curr_slot = Epoch.epoch_and_slot_of_time_exn start_time in
-    let consensus_state =
-      {(Lazy.force Consensus_state.negative_one) with curr_epoch; curr_slot}
-    in
-    let too_early =
-      Epoch.start_time (Lazy.force Consensus_state.negative_one).curr_slot
-    in
+    let negative_one = Lazy.force Consensus_state.negative_one in
+    let consensus_state = {negative_one with curr_epoch; curr_slot} in
+    let too_early = Epoch.start_time negative_one.curr_slot in
     let too_late =
       let delay = Constants.delta * 2 |> UInt32.of_int in
       let delayed_slot = UInt32.Infix.(curr_slot + delay) in

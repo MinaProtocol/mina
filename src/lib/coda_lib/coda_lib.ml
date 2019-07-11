@@ -308,8 +308,9 @@ let create_genesis_frontier (config : Config.t) ~verifier =
           ; user_commands= []
           ; coinbase= Staged_ledger_diff.At_most_two.Zero }
         , None )
-    ; creator= Account.public_key (snd (List.hd_exn Genesis_ledger.accounts))
-    }
+    ; creator=
+        Account.public_key
+          (snd (List.hd_exn (Lazy.force Genesis_ledger.accounts))) }
   in
   let genesis_protocol_state =
     With_hash.data (Lazy.force Genesis_protocol_state.t)
@@ -321,10 +322,10 @@ let create_genesis_frontier (config : Config.t) ~verifier =
          ~protocol_state_proof:Precomputed_values.base_proof
          ~staged_ledger_diff:empty_diff)
   in
-  let genesis_ledger = Lazy.force Genesis_ledger.t in
   let ledger_db =
     Ledger.Db.create ?directory_name:config.ledger_db_location ()
   in
+  let genesis_ledger = Lazy.force Genesis_ledger.t in
   let root_snarked_ledger =
     Ledger_transfer.transfer_accounts ~src:genesis_ledger ~dest:ledger_db
   in

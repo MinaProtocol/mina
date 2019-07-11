@@ -342,7 +342,8 @@ let run_test () : unit Deferred.t =
         Genesis_ledger.keypair_of_account_record_exn sender
       in
       let other_accounts =
-        List.filter Genesis_ledger.accounts ~f:(fun (_, account) ->
+        List.filter (Lazy.force Genesis_ledger.accounts)
+          ~f:(fun (_, account) ->
             let reserved_public_keys =
               [ largest_account_keypair.public_key
               ; receiver_keypair.public_key

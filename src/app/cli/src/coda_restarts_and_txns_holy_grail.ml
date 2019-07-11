@@ -7,10 +7,9 @@ let name = "coda-restarts-and-txns-holy-grail"
 let main n () =
   assert (n > 1) ;
   let logger = Logger.create () in
+  let accounts = Lazy.force Genesis_ledger.accounts in
   let snark_work_public_keys =
-    Fn.const
-    @@ Some
-         (List.nth_exn Genesis_ledger.accounts 5 |> snd |> Account.public_key)
+    Fn.const @@ Some (List.nth_exn accounts 5 |> snd |> Account.public_key)
   in
   let%bind testnet =
     Coda_worker_testnet.test logger n Option.some snark_work_public_keys
@@ -18,8 +17,7 @@ let main n () =
   in
   (* SEND TXNS *)
   let keypairs =
-    List.map Genesis_ledger.accounts
-      ~f:Genesis_ledger.keypair_of_account_record_exn
+    List.map accounts ~f:Genesis_ledger.keypair_of_account_record_exn
   in
   let random_node () = Random.int (n - 1) + 1 in
   Coda_worker_testnet.Payments.send_several_payments testnet ~node:0 ~keypairs
