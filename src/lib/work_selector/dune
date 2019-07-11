@@ -1,11 +1,10 @@
 (library
  (name work_selector)
  (public_name work_selector)
- (flags :standard -short-paths -warn-error -58)
  (library_flags -linkall)
  (inline_tests)
  (libraries core debug_assert logger coda_intf async async_extra
-   unix_timestamp staged_ledger snark_pool)
+   unix_timestamp staged_ledger network_pool)
  (preprocess
   (pps ppx_jane ppx_deriving.std bisect_ppx -- -conditional))
  (synopsis "Selects work from the work pool"))

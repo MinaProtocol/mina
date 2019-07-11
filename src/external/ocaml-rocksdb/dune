@@ -4,7 +4,6 @@
     (no_dynlink)
     (modes native)
     (libraries ctypes ctypes.foreign)
-    (flags (:standard -warn-error -A))
     (modules (:standard \ rocks_linker_flags_gen rocks_test))
     (c_library_flags (:standard (:include flags.sexp)))
     (self_build_stubs_archive (rocksdb))
@@ -49,6 +48,7 @@
         ROCKSDB_DISABLE_BACKTRACE=1 \\
         PORTABLE=1 \\
         FORCE_SSE42=1 \\
+        DISABLE_WARNING_AS_ERROR=1 \\
         make static_lib -j${jobs}
 
       strip -S librocksdb.a

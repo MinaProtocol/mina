@@ -127,7 +127,7 @@ module Make (Inputs : Inputs_intf) :
                           make_actions Sent_invalid_proof
                       | Pre_diff (Bad_signature _) ->
                           make_actions Sent_invalid_signature
-                      | Pre_diff _ | Bad_prev_hash _ | Non_zero_fee_excess _ ->
+                      | Pre_diff _ | Non_zero_fee_excess _ ->
                           make_actions Gossiped_invalid_transition
                       | Unexpected _ ->
                           failwith
@@ -935,7 +935,7 @@ module Make (Inputs : Inputs_intf) :
   end
 end
 
-include Make (struct
+module Inputs = struct
   module Verifier = Verifier
   module Ledger_proof = Ledger_proof
   module Transaction_snark_work = Transaction_snark_work
@@ -945,4 +945,6 @@ include Make (struct
   module Staged_ledger = Staged_ledger
 
   let max_length = Consensus.Constants.k
-end)
+end
+
+include Make (Inputs)

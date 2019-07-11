@@ -16,15 +16,20 @@ module Aux_hash = struct
       module T = struct
         type t = string [@@deriving bin_io, sexp, eq, compare, hash, version]
 
-        let to_yojson s = `String (Base64.encode_string s)
+        module Base58_check = Base58_check.Make (struct
+          let version_byte =
+            Base58_check.Version_bytes.staged_ledger_hash_aux_hash
+        end)
+
+        let to_yojson s = `String (Base58_check.encode s)
 
         let of_yojson = function
           | `String s -> (
-            match Base64.decode s with
-            | Ok s ->
-                Ok s
-            | Error (`Msg e) ->
-                Error (sprintf "bad base64: %s" e) )
+            try Ok (Base58_check.decode_exn s)
+            with exn ->
+              Error
+                (sprintf "of_yojson, bad Base58Check: %s" (Exn.to_string exn))
+            )
           | _ ->
               Error "expected `String"
       end
@@ -65,15 +70,20 @@ module Pending_coinbase_aux = struct
       module T = struct
         type t = string [@@deriving bin_io, sexp, eq, compare, hash, version]
 
-        let to_yojson s = `String (Base64.encode_string s)
+        module Base58_check = Base58_check.Make (struct
+          let version_byte =
+            Base58_check.Version_bytes.staged_ledger_hash_pending_coinbase_aux
+        end)
+
+        let to_yojson s = `String (Base58_check.encode s)
 
         let of_yojson = function
           | `String s -> (
-            match Base64.decode s with
-            | Ok s ->
-                Ok s
-            | Error (`Msg e) ->
-                Error (sprintf "bad base64: %s" e) )
+            try Ok (Base58_check.decode_exn s)
+            with exn ->
+              Error
+                (sprintf "of_yojson, bad Base58Check: %s" (Exn.to_string exn))
+            )
           | _ ->
               Error "expected `String"
       end

@@ -6,6 +6,8 @@ open Coda_state
 open Pipe_lib
 open Network_peer
 
+let refused_answer_query_string = "Refused to answer_query"
+
 module type Base_inputs_intf = Coda_intf.Inputs_intf
 
 (* assumption: the Rpcs functor is applied only once in the codebase, so that
@@ -478,9 +480,7 @@ module Make (Inputs : Inputs_intf) = struct
         | Error err ->
             (* N.B.: to_string_mach double-quotes the string, don't want that *)
             let err_msg = Error.to_string_hum err in
-            if
-              String.is_prefix err_msg
-                ~prefix:Coda_lib.refused_answer_query_string
+            if String.is_prefix err_msg ~prefix:refused_answer_query_string
             then
               Trust_system.(
                 record_envelope_sender config.trust_system config.logger sender
@@ -803,6 +803,7 @@ include Make (struct
   module External_transition = External_transition
   module Internal_transition = Internal_transition
   module Staged_ledger = Staged_ledger
-  module Transaction_pool_diff = Transaction_pool.Diff
-  module Snark_pool_diff = Network_pool.Snark_pool_diff
+  module Transaction_pool_diff =
+    Network_pool.Transaction_pool.Resource_pool.Diff
+  module Snark_pool_diff = Network_pool.Snark_pool.Resource_pool.Diff
 end)

@@ -57,7 +57,7 @@ of the repo.
 
 * Pull down developer container image  (~2GB download, go stretch your legs)
 
-`docker pull codaprotocol/coda:toolchain-4c1060cf4d7094ecddd40e4f1db677633f080c40`
+`docker pull codaprotocol/coda:toolchain-bc9f6e8cb1f2132cb964b4a3caa3aecee67b1826`
 
 * Create local builder image
 
@@ -151,6 +151,7 @@ with `dune`, so you need to add them manually:
 * `opam pin add src/external/ocaml-sodium`
 * `opam pin add src/external/rpc_parallel`
 * `opam pin add src/external/ocaml-extlib`
+* `opam pin add src/external/coda_base58`
 
 There are a variety of C libraries we expect to be available in the system.
 These are also listed in the dockerfiles. Unlike most of the C libraries,

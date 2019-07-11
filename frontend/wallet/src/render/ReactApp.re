@@ -1,23 +1,15 @@
 [@react.component]
 let make = () => {
   let settingsValue = AddressBookProvider.createContext();
-
-  let () =
-    React.useEffect0(() => {
-      let token = MainCommunication.listen();
-      Some(() => MainCommunication.stopListening(token));
-    });
+  let dispatch = CodaProcess.useHook();
 
   <AddressBookProvider value=settingsValue>
-    <ReasonApollo.Provider client=Apollo.client>
-      <CodaProcess>
-        {_dispatch =>
-           {<Window>
-              <Header />
-              <Main> <SideBar /> <Router /> </Main>
-              <Footer />
-            </Window>}}
-      </CodaProcess>
-    </ReasonApollo.Provider>
+    <ProcessDispatchProvider value=dispatch>
+      <ReasonApollo.Provider client=Apollo.client>
+        <Header />
+        <Main> <SideBar /> <Router /> </Main>
+        <Footer />
+      </ReasonApollo.Provider>
+    </ProcessDispatchProvider>
   </AddressBookProvider>;
 };

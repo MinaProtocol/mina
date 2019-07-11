@@ -1,8 +1,22 @@
+open Tc;
+
 module Styles = {
   open Css;
 
-  let container = style([width(`percent(100.)), overflow(`scroll)]);
+  let container = style([width(`percent(100.)), overflow(`hidden)]);
 };
+
+module Wallets = [%graphql
+  {|
+    query getWallets {
+      ownedWallets {
+        publicKey @bsDecoder(fn: "Apollo.Decoders.publicKey")
+      }
+    }
+  |}
+];
+
+module WalletQuery = ReasonApollo.CreateQuery(Wallets);
 
 [@react.component]
 let make = () => {
@@ -12,7 +26,27 @@ let make = () => {
      | ["settings"] => <SettingsPage />
      | ["settings", publicKey] =>
        <WalletSettings publicKey={PublicKey.uriDecode(publicKey)} />
-     | _ => <TransactionsView />
+     | ["wallet", _pk, ..._] => <Transactions />
+     | _ =>
+       <WalletQuery>
+         (
+           ({result}) =>
+             switch (result) {
+             | Loading
+             | Error(_) => <Transactions />
+             | Data(data) =>
+               data##ownedWallets
+               |> Array.get(~index=0)
+               |> Option.map(~f=w => w##publicKey)
+               |> Option.iter(~f=pk =>
+                    ReasonReact.Router.push(
+                      "/wallet/" ++ PublicKey.uriEncode(pk),
+                    )
+                  );
+               <Transactions />;
+             }
+         )
+       </WalletQuery>
      }}
   </div>;
 };

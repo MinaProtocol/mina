@@ -21,7 +21,7 @@ let max_rate secs =
   1. -. (Record.decay_rate ** interval)
 
 module Make0 (Peer_id : sig
-  type t [@@deriving sexp, yojson]
+  type t [@@deriving sexp, to_yojson]
 end) (Now : sig
   val now : unit -> Time.t
 end)
@@ -59,9 +59,9 @@ struct
     in
     {db= None; bans_reader; bans_writer; actions_writers= []}
 
-  let ban_pipe {bans_reader} = bans_reader
+  let ban_pipe {bans_reader; _} = bans_reader
 
-  let get_db {db} peer = Option.bind db (fun db' -> Db.get db' peer)
+  let get_db {db; _} peer = Option.bind db ~f:(fun db' -> Db.get db' ~key:peer)
 
   let lookup t peer =
     match get_db t peer with
@@ -70,11 +70,21 @@ struct
     | None ->
         Record_inst.to_peer_status @@ Record_inst.init ()
 
-  let close {db; bans_writer} =
+  let peer_statuses {db; _} =
+    Option.value_map db ~default:[] ~f:(fun db' ->
+        Db.to_alist db'
+        |> List.map ~f:(fun (peer, record) ->
+               (peer, Record_inst.to_peer_status record) ) )
+
+  let reset ({db; _} as t) peer =
+    Option.value_map db ~default:() ~f:(fun db' -> Db.remove db' ~key:peer) ;
+    lookup t peer
+
+  let close {db; bans_writer; _} =
     Option.iter db ~f:Db.close ;
     Strict_pipe.Writer.close bans_writer
 
-  let record ({db; bans_writer} as t) logger peer action =
+  let record ({db; bans_writer; _} as t) logger peer action =
     t.actions_writers
     <- List.filter t.actions_writers ~f:(Fn.compose not Pipe.is_closed) ;
     List.iter t.actions_writers
@@ -253,9 +263,9 @@ let%test_module "peer_trust" =
           let db = setup_mock_db () in
           let%map () = act_constant_rate db 1. Action.Slow_punish in
           match Peer_trust_test.lookup db 0 with
-          | {banned= Banned_until _} ->
+          | {banned= Banned_until _; _} ->
               false
-          | {banned= Unbanned} ->
+          | {banned= Unbanned; _} ->
               assert_ban_pipe [] ; true )
 
     let%test "peers do get banned for acting faster than the maximum rate" =
@@ -263,10 +273,10 @@ let%test_module "peer_trust" =
           let db = setup_mock_db () in
           let%map () = act_constant_rate db 1.1 Action.Slow_punish in
           match Peer_trust_test.lookup db 0 with
-          | {trust; banned= Banned_until _} ->
+          | {banned= Banned_until _; _} ->
               assert_ban_pipe [0] ;
               true
-          | {trust; banned= Unbanned} ->
+          | {banned= Unbanned; _} ->
               false )
 
     let%test "good cancels bad" =
@@ -280,9 +290,9 @@ let%test_module "peer_trust" =
                 Peer_trust_test.record db nolog 0 Action.Slow_credit )
           in
           match Peer_trust_test.lookup db 0 with
-          | {trust; banned= Banned_until _} ->
+          | {banned= Banned_until _; _} ->
               false
-          | {trust; banned= Unbanned} ->
+          | {banned= Unbanned; _} ->
               assert_ban_pipe [] ; true )
 
     let%test "insta-bans ignore positive trust" =
@@ -293,16 +303,16 @@ let%test_module "peer_trust" =
           | {trust; banned= Unbanned} ->
               assert (trust >. 0.99) ;
               assert_ban_pipe []
-          | {trust; banned= Banned_until _} ->
+          | {banned= Banned_until _; _} ->
               failwith "Peer is banned after credits" ) ;
           let%map () = Peer_trust_test.record db nolog 0 Action.Insta_ban in
           match Peer_trust_test.lookup db 0 with
           | {trust= -1.0; banned= Banned_until _} ->
               assert_ban_pipe [0] ;
               true
-          | {trust; banned= Banned_until _} ->
+          | {banned= Banned_until _; _} ->
               failwith "Trust not set to -1"
-          | {trust; banned= Unbanned} ->
+          | {banned= Unbanned; _} ->
               failwith "Peer not banned" )
 
     let%test "multiple peers getting banned causes multiple ban events" =
@@ -340,12 +350,6 @@ module Make =
       include Unix.Inet_addr.Blocking_sexp
 
       let to_yojson x = `String (Unix.Inet_addr.to_string x)
-
-      let of_yojson = function
-        | `String str ->
-            Ok (Unix.Inet_addr.of_string str)
-        | _ ->
-            Error "expected string"
     end)
     (struct
       let now = Time.now

@@ -19,7 +19,6 @@ module Styles = {
     merge([
       Theme.Text.Header.h6,
       style([
-        userSelect(`none),
         textTransform(`uppercase),
         color(Theme.Colors.slateAlpha(0.7)),
         minWidth(`rem(2.5)),
@@ -51,7 +50,6 @@ module Styles = {
         border(`zero, `none, transparent),
         flexGrow(1.),
         padding(`zero),
-        marginTop(`px(3)),
         color(Theme.Colors.teal),
         active([outline(`zero, `solid, white)]),
         focus([outline(`zero, `solid, white)]),
@@ -100,7 +98,7 @@ module Styles = {
     merge([
       baseButton,
       style([
-        backgroundColor(Theme.Colors.hyperlinkAlpha(1.)),
+        backgroundColor(Theme.Colors.hyperlink),
         color(white),
         hover([backgroundColor(Theme.Colors.hyperlinkAlpha(0.7))]),
       ]),
@@ -119,14 +117,14 @@ module Styles = {
 
 module Button = {
   [@react.component]
-  let make = (~text, ~color, ~onClick) => {
+  let make = (~text, ~color, ~disabled=false, ~onClick) => {
     let buttonStyle =
       switch (color) {
       | `Blue => Styles.blueButton
       | `Teal => Styles.tealButton
       | `Green => Styles.greenButton
       };
-    <button className=buttonStyle onClick={_ => onClick()}>
+    <button className=buttonStyle disabled onClick={_ => onClick()}>
       {React.string(text)}
     </button>;
   };
@@ -143,7 +141,7 @@ module Currency = {
       </span>
       <input
         className=Styles.input
-        type_="text"
+        type_="number"
         onChange={e => {
           let value =
             ReactEvent.Form.target(e)##value
@@ -165,6 +163,7 @@ let make =
       ~mono=false,
       ~button=React.null,
       ~placeholder=?,
+      ~disabled=false,
     ) =>
   <label className=Styles.container>
     <span className=Styles.label> {React.string(label ++ ":")} </span>
@@ -175,6 +174,7 @@ let make =
       onChange={e => onChange(ReactEvent.Form.target(e)##value)}
       value
       ?placeholder
+      disabled
     />
     button
   </label>;

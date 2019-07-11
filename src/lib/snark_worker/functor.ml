@@ -159,7 +159,7 @@ module Make (Inputs : Intf.Inputs_intf) :
 
   let arguments ~public_key ~daemon_address ~shutdown_on_disconnect =
     [ "-public-key"
-    ; Public_key.Compressed.to_base64 public_key
+    ; Public_key.Compressed.to_base58_check public_key
     ; "-daemon-address"
     ; Host_and_port.to_string daemon_address
     ; "-shutdown-on-disconnect"
