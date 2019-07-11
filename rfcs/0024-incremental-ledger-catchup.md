@@ -70,6 +70,11 @@ We currently have an almost stable testnet which is quite small. We are
 moving toward the direction of solving the known performance issues that would
 hinder us from scaling up to a more realistic setting.
 
+The rationale behind this proposed design is that downloading a list of
+*state_body_hash*es is much more cheaper than downloading a list of **transition*s.
+And we could use the list of *state_body_hash*es to figure out the missing *transition*s,
+therefore avoiding downloading unnecessary things.
+
 The proposed design would do much better than the current in average case. Let's see some examples first:
 
 In all of the following examples, let's assume **k** = 3000, **size of transition** = 1 kB, **size of state_body_hash** = 5 bytes, 
