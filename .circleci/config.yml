@@ -563,6 +563,7 @@ jobs:
             - run:
                   name: Running test -- test_postake_delegation_medium_curves:coda-delegation-test
                   command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run "test_postake_delegation_medium_curves:coda-delegation-test"'
+                  no_output_timeout: 20m
             - store_artifacts:
                   path: test_logs
     test--test_postake_medium_curves:
@@ -592,9 +593,11 @@ jobs:
             - run:
                   name: Running test -- test_postake_snarkless_medium_curves:full-test
                   command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run "test_postake_snarkless_medium_curves:full-test"'
+                  no_output_timeout: 20m
             - run:
                   name: Running test -- test_postake_snarkless_medium_curves:transaction-snark-profiler -k 2
                   command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run "test_postake_snarkless_medium_curves:transaction-snark-profiler -k 2"'
+                  no_output_timeout: 20m
             - store_artifacts:
                   path: test_logs
     test--test_postake_split_medium_curves:
@@ -607,6 +610,7 @@ jobs:
             - run:
                   name: Running test -- test_postake_split_medium_curves:coda-shared-prefix-multiproposer-test -num-proposers 2
                   command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run "test_postake_split_medium_curves:coda-shared-prefix-multiproposer-test -num-proposers 2"'
+                  no_output_timeout: 20m
             - store_artifacts:
                   path: test_logs
     test--test_postake_split_snarkless_medium_curves:
@@ -619,21 +623,27 @@ jobs:
             - run:
                   name: Running test -- test_postake_split_snarkless_medium_curves:coda-peers-test
                   command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run "test_postake_split_snarkless_medium_curves:coda-peers-test"'
+                  no_output_timeout: 20m
             - run:
                   name: Running test -- test_postake_split_snarkless_medium_curves:coda-transitive-peers-test
                   command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run "test_postake_split_snarkless_medium_curves:coda-transitive-peers-test"'
+                  no_output_timeout: 20m
             - run:
                   name: Running test -- test_postake_split_snarkless_medium_curves:coda-block-production-test
                   command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run "test_postake_split_snarkless_medium_curves:coda-block-production-test"'
+                  no_output_timeout: 20m
             - run:
                   name: Running test -- test_postake_split_snarkless_medium_curves:coda-shared-prefix-test -who-proposes 0
                   command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run "test_postake_split_snarkless_medium_curves:coda-shared-prefix-test -who-proposes 0"'
+                  no_output_timeout: 20m
             - run:
                   name: Running test -- test_postake_split_snarkless_medium_curves:coda-shared-prefix-test -who-proposes 1
                   command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run "test_postake_split_snarkless_medium_curves:coda-shared-prefix-test -who-proposes 1"'
+                  no_output_timeout: 20m
             - run:
                   name: Running test -- test_postake_split_snarkless_medium_curves:coda-restart-node-test
                   command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run "test_postake_split_snarkless_medium_curves:coda-restart-node-test"'
+                  no_output_timeout: 20m
             - store_artifacts:
                   path: test_logs
     test--test_postake_txns_medium_curves:
@@ -646,9 +656,11 @@ jobs:
             - run:
                   name: Running test -- test_postake_txns_medium_curves:coda-shared-state-test
                   command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run "test_postake_txns_medium_curves:coda-shared-state-test"'
+                  no_output_timeout: 20m
             - run:
                   name: Running test -- test_postake_txns_medium_curves:coda-batch-payment-test
                   command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run "test_postake_txns_medium_curves:coda-batch-payment-test"'
+                  no_output_timeout: 20m
             - store_artifacts:
                   path: test_logs
 
@@ -669,7 +681,6 @@ workflows:
             - build-artifacts--testnet_postake_snarkless_fake_hash
             - build-artifacts--testnet_postake_medium_curves
             - build-artifacts--testnet_postake_many_proposers_medium_curves
-            
             - test--test_postake_delegation_medium_curves
             - test--test_postake_medium_curves
             - test--test_postake_snarkless_medium_curves
@@ -678,6 +689,7 @@ workflows:
             - test--test_postake_txns_medium_curves
             - test-unit--test_postake_snarkless_medium_curves_unit_test
             - test-unit--dev_medium_curves
+
     daily:
         triggers:
           - schedule:

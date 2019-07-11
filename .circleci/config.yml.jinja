@@ -253,9 +253,7 @@ jobs:
             - run:
                   name: Running test -- {{profile}}:{{test}}
                   command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run "{{profile}}:{{test}}"'
-                  {%- if profile in medium_curve_profiles %}
                   no_output_timeout: 20m
-                  {%- endif %}
             {%- endfor %}
             - store_artifacts:
                   path: test_logs
@@ -276,18 +274,18 @@ workflows:
             {%- for profile in build_artifact_profiles %}
             - build-artifacts--{{profile}}
             {%- endfor %}
-            {#{%- for profile in unit_test_profiles %}
-            - test-unit--{{profile}}
-            {%- endfor %}
-            {%- for profile in small_curves_tests.keys() | sort %}
-            - test--{{profile}}
-            {%- endfor %}#}
             {%- for profile in medium_curves_tests.keys() | sort %}
             - test--{{profile}}
             {%- endfor %}
             {%- for profile in unit_test_profiles_medium_curves %}
             - test-unit--{{profile}}
             {%- endfor %}
+{#{%- for profile in unit_test_profiles %}
+            - test-unit--{{profile}}
+            {%- endfor %}
+            {%- for profile in small_curves_tests.keys() | sort %}
+            - test--{{profile}}
+            {%- endfor %}#}
     daily:
         triggers:
           - schedule:
