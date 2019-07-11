@@ -65,3 +65,27 @@ module Srs = struct
     ; srsPairing= Pairing.reduced_pairing g1 (G2.scale g2 (Fr.to_bigint alpha))
     }
 end
+
+let select_helper positives negatives poly init plus scale =
+  let rec accum current_deg remaining_coeffs so_far =
+    match remaining_coeffs with
+    | [] -> so_far
+    | hd::tl ->
+    let next = if current_deg < 0 then (List.nth_exn negatives (-1 - current_deg))
+               else List.nth_exn positives current_deg in
+    accum (current_deg + 1) tl (plus (scale next (Fr.to_bigint hd)) so_far) in
+  let deg = Fr_laurent.deg poly in
+  let coeffs = Fr_laurent.coeffs poly in
+  accum deg coeffs init
+
+let select_g (srs : Srs.t) poly =
+  select_helper srs.gPositiveX srs.gNegativeX poly G1.zero G1.( + ) G1.scale
+
+let select_g_alpha (srs : Srs.t) poly =
+  select_helper srs.gPositiveAlphaX srs.gNegativeAlphaX poly G1.zero G1.( + ) G1.scale
+  
+let select_h (srs : Srs.t) poly =
+  select_helper srs.hPositiveX srs.hNegativeX poly G2.zero G2.( + ) G2.scale
+
+let select_h_alpha (srs : Srs.t) poly =
+  select_helper srs.hPositiveAlphaX srs.hNegativeAlphaX poly G2.zero G2.( + ) G2.scale

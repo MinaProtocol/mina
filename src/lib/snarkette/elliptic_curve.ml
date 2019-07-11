@@ -5,11 +5,11 @@ let ( = ) = `Don't_use_polymorphic_compare
 module Make (N : sig
   type t
 
-  (* val zero : t
+  val zero : t
 
   val negate : t -> t
 
-  val ( < ) : t -> t -> bool *)
+  val ( < ) : t -> t -> bool
 
   val test_bit : t -> int -> bool
 
@@ -89,8 +89,8 @@ struct
 
   let negate {x; y; z} = {x; y= Fq.negate y; z}
 
-  let (* rec *) scale base s =
-    (* if N.( < ) s N.zero then (negate (scale base (N.negate s))) else *)
+  let rec scale base s =
+    if N.( < ) s N.zero then (negate (scale base (N.negate s))) else
     let rec go found_one acc i =
       if i < 0 then acc
       else

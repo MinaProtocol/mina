@@ -19,23 +19,23 @@ end
 
 (* helped signature of correct computation from Sonic, Sec. 8 *)
 (* proving the value of s(z_j, y_j) is computed correctly, for y_j in ys *)
-let hsc_p (srs : Srs.t) (gate_weights : Gate_weights.t) x ys : Hsc_proof.t =
+let hsc_p (srs : Srs.t) (gate_weights : Gate_weights.t) ys : Hsc_proof.t =
   let ss =
     List.map ys ~f:(fun yi ->
-        commit_poly srs x (eval_on_y yi (s_poly gate_weights)))
+        commit_poly srs (eval_on_y yi (s_poly gate_weights)))
   in
   (* verifier samples u (from random oracle) and sends to prover *)
   let u = Fr.random () in
   let suX = eval_on_x u (s_poly gate_weights) in
-  let commit = commit_poly srs x suX in
+  let commit = commit_poly srs suX in
   let sW =
     List.map2_exn ys ss ~f:(fun yi si ->
-        open_poly srs si x u (eval_on_y yi (s_poly gate_weights)))
+        open_poly srs si u (eval_on_y yi (s_poly gate_weights)))
   in
-  let sQ = List.map ys ~f:(fun yi -> open_poly srs commit x yi suX) in
+  let sQ = List.map ys ~f:(fun yi -> open_poly srs commit yi suX) in
   (* verifier samples z (from random oracle) and sends to prover *)
   let z = Fr.random () in
-  let _, qz = open_poly srs commit x z suX in
+  let _, qz = open_poly srs commit z suX in
   { hsc_s= ss
   ; hsc_w= sW
   ; hsc_q= sQ

@@ -21,7 +21,7 @@ module Proof = struct
 end
 
 let prover (srs : Srs.t) (assignment : Assignment.t)
-    (arith_circuit : Arith_circuit.t) x : Proof.t * Fr.t * Fr.t * Fr.t list =
+    (arith_circuit : Arith_circuit.t) : Proof.t * Fr.t * Fr.t * Fr.t list =
   let n = List.length assignment.a_l in
   let m = List.length arith_circuit.weights.w_l in
   let cns = replicate 4 Fr.random in
@@ -37,21 +37,21 @@ let prover (srs : Srs.t) (assignment : Assignment.t)
     Bivariate_fr_laurent.create (-((2 * n) + 4)) (reverse (cn_poly_fn cns 1))
   in
   let poly_r' = Bivariate_fr_laurent.( + ) r_xy sumc_xy in
-  let commit_r = commit_poly srs x (eval_on_y Fr.one poly_r') in
+  let commit_r = commit_poly srs (eval_on_y Fr.one poly_r') in
   let y = Fr.random () in
   let ky = k_poly arith_circuit.cs n in
   let s_p = s_poly arith_circuit.weights in
   let t_p = t_poly poly_r' s_p ky in
-  let commit_t = commit_poly srs x (eval_on_y y t_p) in
+  let commit_t = commit_poly srs (eval_on_y y t_p) in
   let z = Fr.random () in
-  let a, wa = open_poly srs commit_r x z (eval_on_y Fr.one poly_r') in
+  let a, wa = open_poly srs commit_r z (eval_on_y Fr.one poly_r') in
   let b, wb =
-    open_poly srs commit_r x (Fr.( * ) y z) (eval_on_y Fr.one poly_r')
+    open_poly srs commit_r (Fr.( * ) y z) (eval_on_y Fr.one poly_r')
   in
-  let _t', wt = open_poly srs commit_t x z (eval_on_y y t_p) in
+  let _t', wt = open_poly srs commit_t z (eval_on_y y t_p) in
   let s = Fr_laurent.eval (eval_on_y y s_p) z in
   let ys = replicate m Fr.random in
-  let hsc_proof = hsc_p srs arith_circuit.weights x ys in
+  let hsc_proof = hsc_p srs arith_circuit.weights ys in
   ( { pr_r= commit_r
     ; pr_t= commit_t
     ; pr_a= a

@@ -15,5 +15,5 @@ let%test_unit "test signatures of computation" =
   let m = List.length w_l in
   let rec make_ys n = if n = 0 then [] else Fr.random () :: make_ys (n - 1) in
   let ys = make_ys m in
-  let proof = hsc_p srs gate_weights x ys in
+  let proof = hsc_p srs gate_weights ys in
   assert (hsc_v srs ys gate_weights proof)

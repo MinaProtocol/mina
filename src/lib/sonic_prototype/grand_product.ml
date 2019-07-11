@@ -7,13 +7,11 @@ open Default_backend.Backend
 
 let pair = Pairing.reduced_pairing
 
-let wform_p (srs : Srs.t) x n _commitment coeffs =
-  let poly = Fr_laurent.create 1 coeffs in
-  let f_x = Fr.to_bigint (Fr_laurent.eval poly x) in
-  let g_neg_d = List.nth_exn srs.gNegativeX (srs.d - 1) in
-  let l = G1.scale g_neg_d f_x in
-  let g_d_n = List.nth_exn srs.gPositiveX (srs.d - n) in
-  let r = G1.scale g_d_n f_x in
+let wform_p (srs : Srs.t) n _commitment coeffs =
+  let poly_shifted_neg_d = Fr_laurent.create (1 - srs.d) coeffs in
+  let l = select_g srs poly_shifted_neg_d in
+  let poly_shifted_d_n = Fr_laurent.create (1 + srs.d - n) coeffs in
+  let r = select_g srs poly_shifted_d_n in
   (l, r)
 
 let wform_v (srs : Srs.t) n commitment (l, r) =
@@ -77,10 +75,10 @@ let gprod_p (srs : Srs.t) u v u_coeffs v_coeffs x : Gprod_proof.t =
       + (u + scale v (Fr.to_bigint (Fr.( ** ) x (Nat.of_int Int.(n + 1))))))
   in
   let c_poly = Fr_laurent.create 1 c in
-  let c_commit = commit_poly srs x c_poly in
-  let cw = wform_p srs x ((2 * n) + 1) c_commit c in
-  let uw = wform_p srs x n u u_coeffs in
-  let vw = wform_p srs x n v v_coeffs in
+  let c_commit = commit_poly srs c_poly in
+  let cw = wform_p srs ((2 * n) + 1) c_commit c in
+  let uw = wform_p srs n u u_coeffs in
+  let vw = wform_p srs n v v_coeffs in
   (* verifier samples y (from random oracle) and sends to prover *)
   let y = Fr.random () in
   let rec gen_r_poly_coeffs idx a_rest =
@@ -118,13 +116,13 @@ let gprod_p (srs : Srs.t) u v u_coeffs v_coeffs x : Gprod_proof.t =
   let t_poly =
     Bivariate_fr_laurent.(((r_poly + s_poly) * r_prime_poly) - k_poly)
   in
-  let t = commit_poly srs x (eval_on_y y t_poly) in
+  let t = commit_poly srs (eval_on_y y t_poly) in
   (* verifier samples z (from random oracle) and sends to prover *)
   let z = Fr.random () in
-  let va, wa = open_poly srs a x (Fr.( * ) y z) a_poly in
-  let vc, wc = open_poly srs c x (Fr.inv z) c_poly in
-  let vk, wk = open_poly srs c x y c_poly in
-  let _, wt = open_poly srs t x z (eval_on_y y t_poly) in
+  let va, wa = open_poly srs a (Fr.( * ) y z) a_poly in
+  let vc, wc = open_poly srs c (Fr.inv z) c_poly in
+  let vk, wk = open_poly srs c y c_poly in
+  let _, wt = open_poly srs t z (eval_on_y y t_poly) in
   { gprod_n= n
   ; gprod_a= a_commit
   ; gprod_c= c_commit

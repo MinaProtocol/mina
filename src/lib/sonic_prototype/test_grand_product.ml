@@ -15,10 +15,10 @@ let run_well_formed_test a_nums b_nums =
   let poly_b = Fr_laurent.create 1 b_coeffs in
   let a_n = List.length a_coeffs in
   let b_n = List.length b_coeffs in
-  let commit_a = commit_poly srs x poly_a in
-  let commit_b = commit_poly srs x poly_b in
-  let wfp_a = wform_p srs x a_n commit_a a_coeffs in
-  let wfp_b = wform_p srs x b_n commit_b b_coeffs in
+  let commit_a = commit_poly srs poly_a in
+  let commit_b = commit_poly srs poly_b in
+  let wfp_a = wform_p srs a_n commit_a a_coeffs in
+  let wfp_b = wform_p srs b_n commit_b b_coeffs in
   wform_v srs a_n commit_a wfp_a && wform_v srs b_n commit_b wfp_b
 
 let%test_unit "well_formed_test" =
@@ -29,8 +29,8 @@ let%test_unit "well_formed_test" =
 let run_grand_product_test a_coeffs b_coeffs srs x =
   let poly_a = Fr_laurent.create 1 a_coeffs in
   let poly_b = Fr_laurent.create 1 b_coeffs in
-  let commit_a = commit_poly srs x poly_a in
-  let commit_b = commit_poly srs x poly_b in
+  let commit_a = commit_poly srs poly_a in
+  let commit_b = commit_poly srs poly_b in
   let gprod_proof = gprod_p srs commit_a commit_b a_coeffs b_coeffs x in
   gprod_v srs commit_a commit_b gprod_proof
 

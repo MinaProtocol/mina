@@ -12,8 +12,8 @@ let%test_unit "basic commitment scheme test" =
   let d = 15 in
   let srs = Srs.create d x alpha in
   let f = Fr_laurent.create 1 [Fr.of_int 10] in
-  let commitment = commit_poly_orig srs x f in
-  let opening = open_poly srs commitment x z f in
+  let commitment = commit_poly srs f in
+  let opening = open_poly srs commitment z f in
   assert (pc_v srs commitment z opening)
 
 let poly_commitment_scheme_test =
@@ -44,8 +44,8 @@ let poly_commitment_scheme_test =
         eval_on_y y
           (t_poly (r_poly gate_inputs) (s_poly gate_weights) (k_poly cs n))
       in
-      let commitment = commit_poly srs x fX in
-      let opening = open_poly srs commitment x z fX in
-      true || pc_v srs commitment z opening)
+      let commitment = commit_poly srs fX in
+      let opening = open_poly srs commitment z fX in
+      pc_v srs commitment z opening)
 
-(* let () = QCheck.Test.check_exn poly_commitment_scheme_test *)
+let () = QCheck.Test.check_exn poly_commitment_scheme_test

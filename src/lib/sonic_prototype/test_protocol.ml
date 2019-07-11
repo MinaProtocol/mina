@@ -47,5 +47,5 @@ let%test_unit "test protocol" =
     {weights= gate_weights; commitment_weights= w_v; cs}
   in
   let srs = Srs.create d x alpha in
-  let proof, y, z, ys = prover srs gate_inputs arith_circuit x in
+  let proof, y, z, ys = prover srs gate_inputs arith_circuit in
   assert (verifier srs arith_circuit proof y z ys)
