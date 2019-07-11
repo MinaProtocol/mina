@@ -22,6 +22,7 @@ let%test_module "Command line tests" =
       Process.run_exn ~prog:coda_exe
         ~args:
           [ "daemon"
+          ; "-no-check-open-ports"
           ; "-background"
           ; "-client-port"
           ; sprintf "%d" port
@@ -48,7 +49,7 @@ let%test_module "Command line tests" =
 
     let test_background_daemon () =
       let port = 1337 in
-      let client_delay = 40. in
+      let client_delay = 10. in
       let config_dir = create_config_directory () in
       Monitor.protect
         ~finally:(fun () -> remove_config_directory config_dir)
