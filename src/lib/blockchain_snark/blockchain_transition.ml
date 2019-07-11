@@ -29,7 +29,7 @@ module Keys = struct
 
     let dummy =
       { step= Dummy_values.Tick.Groth16.proving_key
-      ; wrap= Dummy_values.Tock.GrothMaller17.proving_key }
+      ; wrap= Dummy_values.Tock.Bowe_gabizon18.proving_key }
 
     let load ({step; wrap} : Location.t) =
       let open Storage in
@@ -69,7 +69,7 @@ module Keys = struct
 
     let dummy =
       { step= Dummy_values.Tick.Groth16.verification_key
-      ; wrap= Dummy_values.Tock.GrothMaller17.verification_key }
+      ; wrap= Dummy_values.Tock.Bowe_gabizon18.verification_key }
 
     let load ({step; wrap} : Location.t) =
       let open Storage in

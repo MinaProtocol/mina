@@ -21,7 +21,7 @@ export CODA_PRIVKEY_PASS=""
 # Iterate over the keys in the JSON and wrap them in the proper format
 i=1
 for k in $(jq -r '.[] | .private_key' < "$jsonpath"); do
-    dune exec -- coda client wrap-key -privkey-path "wallet-keys/$i" <<<"$k"
+    dune exec -- coda advanced wrap-key -privkey-path "wallet-keys/$i" <<<"$k"
     # echo "$k" > "wallet-keys/$i"
     i=$((i + 1))
 done

@@ -1,1 +1,1 @@
-include Lite_params.Pedersen
+include Crypto_params.Pedersen

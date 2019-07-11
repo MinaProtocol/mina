@@ -671,10 +671,11 @@ module Make (Inputs : Inputs_intf) = struct
     in
     loop peers 1
 
+  let peers_by_ip t inet_addr =
+    Hashtbl.find_multi t.gossip_net.peers_by_ip inet_addr
+
   let try_preferred_peer t inet_addr input ~rpc =
-    let peers_at_addr =
-      Hashtbl.find_multi t.gossip_net.peers_by_ip inet_addr
-    in
+    let peers_at_addr = peers_by_ip t inet_addr in
     (* if there's a single peer at inet_addr, call it the preferred peer *)
     match peers_at_addr with
     | [peer] -> (

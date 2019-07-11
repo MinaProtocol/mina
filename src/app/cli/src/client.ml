@@ -16,9 +16,9 @@ let dispatch rpc query port =
           Rpc.Rpc.dispatch rpc conn query )
 
 (** Call an RPC, passing handlers for a successful call and a failing one. Note
-   that a successful *call* may have failed on the server side and returned a
-   failing result. To deal with that, the success handler returns an
-   Or_error. *)
+    that a successful *call* may have failed on the server side and returned a
+    failing result. To deal with that, the success handler returns an
+    Or_error. *)
 let dispatch_with_message rpc query port ~success ~error =
   let fail err = eprintf "%s\n%!" err ; exit 14 in
   match%bind dispatch rpc query port with
@@ -215,21 +215,22 @@ let get_public_keys =
              (module Cli_lib.Render.String_list_formatter)
              Get_public_keys.rpc () port ))
 
-let prove_payment =
+let generate_receipt =
   let open Daemon_rpcs in
   let open Command.Param in
   let open Cli_lib.Arg_type in
   let receipt_hash_flag =
     flag "receipt-chain-hash"
       ~doc:
-        "RECEIPTHASH Receipt-chain-hash of the payment that you want to prove"
+        "RECEIPTHASH Receipt-chain-hash of the payment that you want to\n\
+        \        generate a receipt for"
       (required receipt_chain_hash)
   in
   let address_flag =
     flag "address" ~doc:"PUBLICKEY Public-key address of sender"
       (required public_key_compressed)
   in
-  Command.async ~summary:"Generate a proof of a sent payment"
+  Command.async ~summary:"Generate a receipt for a sent payment"
     (Cli_lib.Background_daemon.init (Args.zip2 receipt_hash_flag address_flag)
        ~f:(fun port (receipt_chain_hash, pk) ->
          dispatch_with_message Prove_receipt.rpc (receipt_chain_hash, pk) port
@@ -240,14 +241,14 @@ let read_json filepath =
   let%map json_contents = Reader.file_contents filepath in
   Yojson.Safe.from_string json_contents
 
-let verify_payment =
+let verify_receipt =
   let open Deferred.Let_syntax in
   let open Daemon_rpcs in
   let open Command.Param in
   let open Cli_lib.Arg_type in
   let proof_path_flag =
     flag "proof-path"
-      ~doc:"PROOFFILE File to read json version of payment proof"
+      ~doc:"PROOFFILE File to read json version of payment receipt"
       (required string)
   in
   let payment_path_flag =
@@ -259,7 +260,7 @@ let verify_payment =
     flag "address" ~doc:"PUBLICKEY Public-key address of sender"
       (required public_key_compressed)
   in
-  Command.async ~summary:"Verify a proof of a sent payment"
+  Command.async ~summary:"Verify a receipt of a sent payment"
     (Cli_lib.Background_daemon.init
        (Args.zip3 payment_path_flag proof_path_flag address_flag)
        ~f:(fun port (payment_path, proof_path, pk) ->
@@ -598,6 +599,22 @@ let stop_tracing =
          | Error e ->
              eprintf !"Error: %{sexp:Error.t}\n" e ))
 
+let set_staking =
+  let privkey_path = Cli_lib.Flag.privkey_write_path in
+  Command.async ~summary:"Set keypair to stake and propose a new block"
+    (Cli_lib.Background_daemon.init privkey_path ~f:(fun port privkey_path ->
+         let%bind ({Keypair.public_key; _} as keypair) =
+           Secrets.Keypair.Terminal_stdin.read_exn privkey_path
+         in
+         match%map dispatch Daemon_rpcs.Set_staking.rpc [keypair] port with
+         | Error e ->
+             eprintf !"Error: %{sexp:Error.t}\n" e
+         | Ok () ->
+             printf
+               !"New staking public key : %s\n"
+               (Public_key.Compressed.to_base58_check
+                  (Public_key.compress public_key)) ))
+
 module Visualization = struct
   let create_command (type rpc_response) ~name ~f
       (rpc : (string, rpc_response) Rpc.Rpc.t) =
@@ -644,25 +661,30 @@ end
 
 let command =
   Command.group ~summary:"Lightweight client commands"
+    ~preserve_subcommand_order:()
     [ ("get-balance", get_balance)
-    ; ("get-public-keys", get_public_keys)
+    ; ("send-payment", send_payment)
+    ; ("generate-keypair", generate_keypair)
+    ; ("delegate-stake", delegate_stake)
+    ; ("set-staking", set_staking)
+    ; ("generate-receipt", generate_receipt)
+    ; ("verify-receipt", verify_receipt)
+    ; ("stop-daemon", stop_daemon)
+    ; ("status", status) ]
+
+let advanced =
+  Command.group ~summary:"Advanced client commands"
+    [ ("get-nonce", get_nonce_cmd)
     ; ("get-trust-status", get_trust_status)
     ; ("get-trust-status-all", get_trust_status_all)
+    ; ("get-public-keys", get_public_keys)
     ; ("reset-trust-status", reset_trust_status)
-    ; ("prove-payment", prove_payment)
-    ; ("verify-payment", verify_payment)
-    ; ("get-nonce", get_nonce_cmd)
-    ; ("send-payment", send_payment)
-    ; ("delegate-stake", delegate_stake)
-    ; ("stop-daemon", stop_daemon)
     ; ("batch-send-payments", batch_send_payments)
-    ; ("status", status)
     ; ("status-clear-hist", status_clear_hist)
     ; ("wrap-key", wrap_key)
     ; ("dump-keypair", dump_keypair)
     ; ("dump-ledger", dump_ledger)
     ; ("constraint-system-digests", constraint_system_digests)
-    ; ("generate-keypair", generate_keypair)
     ; ("start-tracing", start_tracing)
     ; ("stop-tracing", stop_tracing)
     ; ("snark-job-list", snark_job_list)
