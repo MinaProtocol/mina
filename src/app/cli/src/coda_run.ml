@@ -178,11 +178,11 @@ let setup_local_server ?(client_whitelist = []) ?rest_server_port ~coda
           let r = Coda_lib.request_work coda in
           Option.iter r ~f:(fun r ->
               Logger.trace logger ~module_:__MODULE__ ~location:__LOC__
-                "responding to a Get_work request with some new work"
                 ~metadata:
                   [ ( "work_spec"
                     , `String (sprintf "%{sexp:Snark_worker.Work.Spec.t}" r) )
-                  ] ) ;
+                  ] ) 
+                  "responding to a Get_work request with some new work" ;
           return r )
     ; implement Snark_worker.Rpcs.Submit_work.Latest.rpc
         (fun () (work : Snark_worker.Work.Result.t) ->
