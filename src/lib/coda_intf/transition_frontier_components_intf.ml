@@ -255,6 +255,26 @@ module type Sync_handler_intf = sig
     -> (parallel_scan_state * Ledger_hash.t * Pending_coinbase.t) Option.t
 end
 
+module type Transition_chain_witness_intf = sig
+  type transition_frontier
+
+  type external_transition
+
+  val prove :
+       frontier:transition_frontier
+    -> State_hash.t
+    -> (State_hash.t * State_body_hash.t List.t) Option.t
+
+  (* Expanding the list of state_body_hash to the corresponding list of
+     state hash in reverse order, state_hash of new transitions comes first *)
+  val expand : State_hash.t * State_body_hash.t List.t -> State_hash.t List.t
+
+  val verify :
+       state_hash:State_hash.t
+    -> transition_chain_witness:State_hash.t * State_body_hash.t List.t
+    -> Bool.t
+end
+
 module type Root_prover_intf = sig
   type transition_frontier
 
