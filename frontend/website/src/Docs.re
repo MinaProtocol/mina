@@ -174,6 +174,9 @@ module Styles = {
     ]);
 };
 
+// We need to calculate the CDN url and inject it into the template
+let chevronUrl = Links.Cdn.url("/static/img/chevron-down.svg")
+
 let component = ReasonReact.statelessComponent("Blog");
 
 let make = _children => {
@@ -198,7 +201,7 @@ let make = _children => {
       <aside
         className=Styles.sideNav
         dangerouslySetInnerHTML={
-          "__html": {|
+          "__html": {j|
             {% if nav|length>1 %}
               <ul>
               {% for nav_item in nav %}
@@ -214,7 +217,7 @@ let make = _children => {
                     />
                     <label for="{{nav_item.title|replace(" ", "_") }}-toggle">
                       {{ nav_item.title }}
-                      <img src="/static/img/chevron-down.svg" width="16" height="16" />
+                      <img src="$chevronUrl" width="16" height="16" />
                     </label>
                     <ul>
                     {% for nav_item in nav_item.children %}
@@ -232,7 +235,7 @@ let make = _children => {
               {% endfor %}
               </ul>
             {% endif %}
-          |},
+          |j},
         }
       />
       <article
