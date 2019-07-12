@@ -75,8 +75,17 @@ Delegating your stake might be useful if you're interested in:
 
 ## Compressing data in the Coda network 
 
-In addition to participating in consensus, Coda nodes can also help compress data in the network by generating cryptographic proofs (zk-SNARKs).
+The Coda protocol is unique in that it doesn't require nodes to maintain the full history of the blockchain like other cryptocurrency protocols. By recursively using cryptographic proofs, the Coda protocol effectively compresses the blockchain to constant size. We call this compression, because it reduces terabytes of data to a few kilobytes.
 
-Run the following command to set your node as a "snark worker":
+However, this isn't data encoding or compression in the traditional sense - rather nodes "compress" data in the network by generating cryptographic proofs. Node operators play a crucial role in this process by designating themselves as "snark-workers" that generate zk-SNARKs for transactions that have been added to blocks.
+
+!!! note
+    This requires a GPU as generating SNARK proofs is computationally intensive. For more information on hardware requirements, [see here]().
+
+Run the following command to set your node as a snark-worker:
 
     $ coda.exe client set-snark-worker -pubkey <public-key> -snark-worker-fee <fee>
+
+As a snark-worker, you get to share some of the block reward for each block your compressed transactions make it in to. The block producer is responsible for gathering compressed transactions before including them into a block, and will be incentivized by the protocol to reward snark-workers.
+
+That about covers the roles and responsibilities as a Code node operator. Since Coda is a permissionless peer-to-peer network, everything is managed and run in a decentralized manner by nodes all over the world. Similarly, the Coda project is also distributed and permissionless to join. The code is all open source, and there is much work to be done, both technical and non-technical. To learn more about how you can get involved with Coda, please check out the [Contributing to Coda section](../contributing).

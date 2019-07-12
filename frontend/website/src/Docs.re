@@ -107,20 +107,26 @@ module Styles = {
       selector(
         ".admonition.note",
         [
-          color(Style.Colors.marine),
+          color(Style.Colors.marineAlpha(0.8)),
           selector(
             ".admonition-title",
-            [color(white), backgroundColor(Style.Colors.marine)],
+            [
+              color(white),
+              backgroundColor(Style.Colors.marineAlpha(0.8)),
+            ],
           ),
         ],
       ),
       selector(
         ".admonition.warning",
         [
-          color(Style.Colors.rosebud),
+          color(Style.Colors.rosebudAlpha(0.8)),
           selector(
             ".admonition-title",
-            [color(white), backgroundColor(Style.Colors.rosebud)],
+            [
+              color(white),
+              backgroundColor(Style.Colors.rosebudAlpha(0.8)),
+            ],
           ),
         ],
       ),

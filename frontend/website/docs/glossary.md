@@ -20,7 +20,7 @@ The number of blocks added after the reference block. As the number of confirmat
 
 The node selected to add the next block to the Coda blockchain. The block producer is selected through the consensus mechanism.
 
-####Coda vs. coda vs. CODA
+####Coda
 
 - "Coda" with a capital C references the underlying cryptocurrency protocol and the network infrastructure that the system depends upon
 - "coda" is the unit of the cryptocurrency that is exchanged by participating nodes on the network

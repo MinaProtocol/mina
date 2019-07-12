@@ -11,6 +11,8 @@ This section will walk you through the requirements needed to run a Coda protoco
 
 **Hardware**: Sending and receiving coda does not require any special hardware, but [some requirements]() exist for generating zk-SNARKs
 
+**Network**: At least 1 Mbps connection
+
 ## Installation
 
 The newest binary releases can be found [here](). With the exception of the .exe and .dmg files, they are archives of the latest executable binaries for each release. Instructions are provided for macOS and Linux below:
@@ -64,8 +66,6 @@ Run the following commands to use MiniUPnP to reconfigure ports on your IP addre
         $ upnpc -a 192.168.101.7 8302 8302 TCP
         $ upnpc -a 192.168.101.7 8303 8303 TCP
         $ upnpc -a 192.168.101.7 8304 8304 TCP
-
-
 
 If these commands succeed, you will have successfully forwarded ports `8301-8304`. Otherwise, you may see the following error message:
 
