@@ -138,13 +138,11 @@ module Types = struct
       ~values:
         Transaction_status.State.
           [ enum_value "INCLUDED" ~value:Included
-              ~doc:
-                "A transaction that is in the best tip path of the transition \
-                 frontier"
+              ~doc:"A transaction that is on the longest chain"
           ; enum_value "PENDING" ~value:Pending
               ~doc:
                 "A transaction either in the transition frontier or in \
-                 transaction pool"
+                 transaction pool but is not on the longest chain"
           ; enum_value "UNKOWN" ~value:Unknown
               ~doc:
                 "The status includes either been snarked, reached finality \
@@ -1324,9 +1322,9 @@ module Queries = struct
           Types.Pagination.User_command.Inputs.Cursor.deserialize
             ~error:"Invalid payment provided" serialized_payment
         in
-        let transition_frontier_pipe = Coda_lib.transition_frontier coda in
+        let frontier_broadcast_pipe = Coda_lib.transition_frontier coda in
         let transaction_pool = Coda_lib.transaction_pool coda in
-        Transaction_status.get_status ~transition_frontier_pipe
+        Transaction_status.get_status ~frontier_broadcast_pipe
           ~transaction_pool payment )
 
   let current_snark_worker =

@@ -3,23 +3,20 @@ open Coda_base
 open Pipe_lib
 
 module State = struct
-  type t = Pending | Included | Unknown
+  type t = Pending | Included | Unknown [@@deriving equal, sexp, compare]
 end
 
 module type S = sig
-  type t
-
   type transition_frontier
 
   type transaction_pool
 
-  val create :
+  val get_status :
        frontier_broadcast_pipe:transition_frontier Option.t
                                Broadcast_pipe.Reader.t
     -> transaction_pool:transaction_pool
-    -> t
-
-  val get_status : t -> User_command.t -> State.t
+    -> User_command.t
+    -> State.t
 end
 
 module type Inputs_intf = sig
@@ -45,16 +42,19 @@ module type Inputs_intf = sig
      and type best_tip_diff := Transition_frontier.Diff.Best_tip_diff.view
 end
 
-module Make (Inputs : Inputs_intf) = struct
+module Make (Inputs : Inputs_intf) :
+  S
+  with type transition_frontier := Inputs.Transition_frontier.t
+   and type transaction_pool := Inputs.Transaction_pool.t = struct
   open Inputs
 
   let error_if_true bool ~error = if bool then Error error else Ok ()
 
-  let get_status ~transition_frontier_pipe ~transaction_pool cmd =
+  let get_status ~frontier_broadcast_pipe ~transaction_pool cmd =
     let check_cmd = User_command.check cmd |> Option.value_exn in
     let resource_pool = Transaction_pool.resource_pool transaction_pool in
     let indexed_pool = Transaction_pool.Resource_pool.pool resource_pool in
-    match Broadcast_pipe.Reader.peek transition_frontier_pipe with
+    match Broadcast_pipe.Reader.peek frontier_broadcast_pipe with
     | None ->
         if Network_pool.Indexed_pool.member indexed_pool check_cmd then
           State.Unknown
