@@ -12,13 +12,13 @@ module Curve_name = struct
 end
 
 module Proof_system_name = struct
-  type t = Groth16 | GrothMaller17
+  type t = Groth16 | Bowe_gabizon18
 
   let to_string = function
     | Groth16 ->
         "Groth16"
-    | GrothMaller17 ->
-        "GrothMaller17"
+    | Bowe_gabizon18 ->
+        "Bowe_gabizon18"
 end
 
 module Make
@@ -33,15 +33,14 @@ struct
 
   let proof_string =
     let open Impl in
-    let proof =
-      let exposing = Data_spec.[Typ.field] in
-      let main x =
-        let%bind _z = Field.Checked.mul x x in
-        Field.Checked.Assert.equal x x
-      in
-      let keypair = generate_keypair main ~exposing in
-      prove (Keypair.pk keypair) exposing () main Field.one
+    let exposing = Data_spec.[Typ.field] in
+    let main x =
+      let%bind _z = Field.Checked.mul x x in
+      Field.Checked.Assert.equal x x
     in
+    let keypair = generate_keypair main ~exposing in
+    let proof = prove (Keypair.pk keypair) exposing () main Field.one in
+    assert (verify proof (Keypair.vk keypair) exposing Field.one) ;
     Binable.to_string (module Proof) proof
 
   let vk_string, pk_string =
@@ -82,7 +81,7 @@ struct
     let curve_name = Curve_name.to_string curve in
     let curve_module_name =
       match proof_system with
-      | GrothMaller17 ->
+      | Bowe_gabizon18 ->
           sprintf "Crypto_params.%s_backend" curve_name
       | Groth16 ->
           sprintf "Crypto_params.%s_backend.Full.Default" curve_name
@@ -116,24 +115,28 @@ end
 
 type spec = Curve_name.t * Proof_system_name.t
 
-let backend_of_spec (s : spec) =
-  match s with
-  | Tick, GrothMaller17 ->
-      (module Crypto_params.Tick_backend : Snarky.Backend_intf.S)
-  | Tock, GrothMaller17 ->
-      (module Crypto_params.Tock_backend : Snarky.Backend_intf.S)
-  | Tick, Groth16 ->
-      (module Crypto_params.Tick_backend.Full.Default : Snarky.Backend_intf.S)
-  | Tock, Groth16 ->
-      (module Crypto_params.Tock_backend.Full.Default : Snarky.Backend_intf.S)
+let proof_system_of_curve : Curve_name.t -> Proof_system_name.t = function
+  | Tick ->
+      Groth16
+  | Tock ->
+      Bowe_gabizon18
 
-let structure_item_of_spec ((curve, proof_system) as spec : spec) =
+let backend_of_curve (s : Curve_name.t) =
+  match s with
+  | Tick ->
+      assert (proof_system_of_curve Tick = Groth16) ;
+      (module Crypto_params.Tick_backend : Snarky.Backend_intf.S)
+  | Tock ->
+      assert (proof_system_of_curve Tock = Bowe_gabizon18) ;
+      (module Crypto_params.Tock_backend : Snarky.Backend_intf.S)
+
+let structure_item_of_spec ((curve, proof_system) : spec) =
   let module N = struct
     let curve = curve
 
     let proof_system = proof_system
   end in
-  let module B = (val backend_of_spec spec) in
+  let module B = (val backend_of_curve curve) in
   let module M = Make (B) (N) in
   M.structure ~loc:Ppxlib.Location.none
 
@@ -155,8 +158,8 @@ let main () =
              ~name:(Loc.make ~loc (Curve_name.to_string curve))
              ~expr:
                (pmod_structure
-                  (List.map [Proof_system_name.Groth16; GrothMaller17]
-                     ~f:(fun sys -> structure_item_of_spec (curve, sys))))) )
+                  [structure_item_of_spec (curve, proof_system_of_curve curve)]))
+    )
   in
   Pprintast.top_phrase fmt (Ptop_def structure) ;
   exit 0
