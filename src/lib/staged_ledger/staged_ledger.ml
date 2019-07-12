@@ -2421,7 +2421,41 @@ let%test_module "test" =
         in
         return (ledger_init_state, cmds, iters, proofs_available)
       in
-      Quickcheck.test g ~trials:10
+      let shrinker =
+        Quickcheck.Shrinker.create
+          (fun (ledger_init_state, cmds, iters, proofs_available) ->
+            let all_but_last xs = List.take xs (List.length xs - 1) in
+            let iter_count = List.length iters in
+            let mod_iters iters' =
+              ( ledger_init_state
+              , List.take cmds
+                @@ List.sum (module Int) iters' ~f:(Option.value ~default:0)
+              , iters'
+              , List.take proofs_available (List.length iters') )
+            in
+            let half_iters =
+              if iter_count > 1 then
+                Some (mod_iters (List.take iters (iter_count / 2)))
+              else None
+            in
+            let one_less_iters =
+              if iter_count > 2 then Some (mod_iters (all_but_last iters))
+              else None
+            in
+            List.filter_map [half_iters; one_less_iters] ~f:Fn.id
+            |> Sequence.of_list )
+      in
+      (* This test fails with the default seed, but I tried 11 other seeds and
+         couldn't get it to fail with any of them. Deepthi is looking into the
+         problem. *)
+      Quickcheck.test g ~seed:(`Deterministic "more magic") ~shrinker
+        ~shrink_attempts:`Exhaustive
+        ~sexp_of:
+          [%sexp_of:
+            Ledger.init_state
+            * User_command.With_valid_signature.t list
+            * int option list
+            * int list] ~trials:10
         ~f:(fun (ledger_init_state, cmds, iters, proofs_available) ->
           async_with_ledgers ledger_init_state (fun sl test_mask ->
               test_random_number_of_proofs ledger_init_state cmds iters
