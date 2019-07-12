@@ -1248,7 +1248,7 @@ module Data = struct
       let staking_data', next_data', epoch_count' =
         if next_epoch > prev_epoch then
           ( next_to_staking next_data
-          , { Poly.seed= Epoch_seed.initial
+          , { Poly.seed= next_data.seed
             ; ledger=
                 {Epoch_ledger.Poly.hash= snarked_ledger_hash; total_currency}
             ; start_checkpoint= prev_protocol_state_hash
@@ -2007,11 +2007,7 @@ module Data = struct
           let%bind in_seed_update_range =
             Epoch.Slot.in_seed_update_range_var prev_slot
           in
-          let%bind base =
-            Epoch_seed.if_ epoch_increased
-              ~then_:Epoch_seed.(var_of_t initial)
-              ~else_:previous_state.next_epoch_data.seed
-          in
+          let base = previous_state.next_epoch_data.seed in
           let%bind updated = Epoch_seed.update_var base vrf_result in
           Epoch_seed.if_ in_seed_update_range ~then_:updated ~else_:base
         and epoch_length =
