@@ -56,7 +56,7 @@ let partial_products lst mul one =
   in
   helper lst one
 
-let gprod_p (srs : Srs.t) u v u_coeffs v_coeffs x : Gprod_proof.t =
+let gprod_p (srs : Srs.t) u v u_coeffs v_coeffs : Gprod_proof.t =
   let n = List.length u_coeffs in
   assert (List.length v_coeffs = n) ;
   let u_partial_prods = partial_products u_coeffs Fr.( * ) Fr.one in
@@ -67,12 +67,14 @@ let gprod_p (srs : Srs.t) u v u_coeffs v_coeffs x : Gprod_proof.t =
   in
   let a = u_coeffs @ [cn_inv] @ v_coeffs in
   let a_poly = Fr_laurent.create 1 a in
+  let scaled_v_poly = Fr_laurent.create (n + 2) v_coeffs in
+  let scaled_v = select_g_alpha srs scaled_v_poly in
   let a_commit =
     G1.(
       scale
         (List.nth_exn srs.gPositiveAlphaX Int.(n + 1))
         (Fr.to_bigint cn_inv)
-      + (u + scale v (Fr.to_bigint (Fr.( ** ) x (Nat.of_int Int.(n + 1))))))
+      + (u + scaled_v))
   in
   let c_poly = Fr_laurent.create 1 c in
   let c_commit = commit_poly srs c_poly in
