@@ -84,6 +84,13 @@ let gen_division_generic (type t) (module M : Int_s with type t = t) (n : t)
   if k = 0 then Quickcheck.Generator.return []
   else
     let open Quickcheck.Generator.Let_syntax in
+    (* Using a symmetric Dirichlet distribution with concentration parameter 1
+       defined above gives a distribution with uniform probability density over
+       all possible splits of the quantity. See the Wikipedia article for some
+       more detail: https://en.wikipedia.org/wiki/Dirichlet_distribution,
+       particularly the sections about the flat Dirichlet distribution and
+       string cutting.
+    *)
     let%bind dirichlet = gen_symm_dirichlet k in
     let n_float = Float.of_int @@ M.to_int n in
     let float_to_mt : float -> t =
