@@ -153,8 +153,6 @@ module Message = struct
     List.take (Field.unpack d) Inner_curve.Scalar.length_in_bits
     |> Inner_curve.Scalar.of_bits
 
-  let () = assert Insecure.signature_hash_function
-
   let%snarkydef hash_checked t ~nonce =
     let%bind trips = var_to_triples t in
     let%bind hash =

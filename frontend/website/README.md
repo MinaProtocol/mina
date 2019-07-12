@@ -15,7 +15,7 @@
 
 1. Make sure you have the latest `master` branch and that code is stable.
 2. If you've changed any static assets, first run `./deploy-cdn.sh` - this will update the S3 bucket with latest assets.
-3. Run `./deploy-website.sh staging` and make sure that the staging build is stable (visit https://coda-staging-84430.firebaseapp.com/).
+3. Run `./deploy-website.sh staging` and make sure that the staging build is stable (visit https://proof-of-steak-7ab54.firebaseapp.com/).
 4. Run `./deploy-website.sh prod`.
 
 - NOTE: this will require Firebase and AWS credentials
