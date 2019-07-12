@@ -15,8 +15,19 @@ module Styles = {
     ]);
 };
 
+type ownedWallets =
+  Wallet.t = {
+    publicKey: PublicKey.t,
+    balance: {. "total": int64},
+  };
+
 module Wallets = [%graphql
-  {| query getWallets { ownedWallets {publicKey, balance{total}}} |}
+  {| query getWallets { ownedWallets @bsRecord {
+      publicKey @bsDecoder(fn: "Apollo.Decoders.publicKey")
+      balance {
+          total @bsDecoder(fn: "Apollo.Decoders.int64")
+      }
+    }} |}
 ];
 module WalletQuery = ReasonApollo.CreateQuery(Wallets);
 
@@ -34,10 +45,10 @@ let make = () =>
                 ~f=
                   wallet =>
                     <WalletItem
-                      key={PublicKey.toString(wallet.key)}
+                      key={PublicKey.toString(wallet.publicKey)}
                       wallet
                     />,
-                Array.map(wallets##ownedWallets, ~f=Wallet.ofGraphqlExn),
+                wallets##ownedWallets,
               ),
             )}
          </div>

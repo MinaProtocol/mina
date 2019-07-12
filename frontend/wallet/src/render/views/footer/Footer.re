@@ -59,8 +59,19 @@ module StakingSwitch = {
   };
 };
 
+type ownedWallets =
+  Wallet.t = {
+    publicKey: PublicKey.t,
+    balance: {. "total": int64},
+  };
+
 module Wallets = [%graphql
-  {| query getWallets { ownedWallets {publicKey, balance {total}} } |}
+  {| query getWallets { ownedWallets @bsRecord {
+      publicKey @bsDecoder(fn: "Apollo.Decoders.publicKey")
+      balance {
+          total @bsDecoder(fn: "Apollo.Decoders.int64")
+      }
+    }} |}
 ];
 
 module WalletQuery = ReasonApollo.CreateQuery(Wallets);
@@ -106,23 +117,14 @@ let make = () => {
                {switch (modalState) {
                 | false => React.null
                 | true =>
-                  <RequestCodaModal
-                    wallets={Array.map(
-                      ~f=Wallet.ofGraphqlExn,
-                      data##ownedWallets,
-                    )}
-                    setModalState
-                  />
+                  <RequestCodaModal wallets=data##ownedWallets setModalState />
                 }}
                <Spacer width=1. />
                <SendPaymentMutation>
                  (
                    (mutation, _) =>
                      <SendButton
-                       wallets={Array.map(
-                         ~f=Wallet.ofGraphqlExn,
-                         data##ownedWallets,
-                       )}
+                       wallets=data##ownedWallets
                        onSubmit={(
                          {from, to_, amount, fee, memoOpt}: SendButton.ModalState.Validated.t,
                          afterSubmit,
